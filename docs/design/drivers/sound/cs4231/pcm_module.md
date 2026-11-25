@@ -1,6 +1,6 @@
-# drivers/sound/cs4231/pcm_module.c — 設計
+# sys/dev/sound/cs4231/pcm_module.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_A_DESIGN (D1 で移した)
-ソース: `drivers/sound/cs4231/pcm_module.c`
+ソース: `sys/dev/sound/cs4231/pcm_module.c`
 
 - 常駐側は登録成功したIRQ番号を保存する。固定番号検査を外すが、引数・二重登録・module状態・irq_register自身の既存検査は残す。
 
@@ -19,6 +19,6 @@ int rc = !irq_target || !pcm_module_irq_unregister(irq_line, irq_target, 0);
 
 | ファイル | 登録 |
 |---|---|
-| `drivers/sound/cs4231/pcm_module.c` | `pcm_module_load()` の先頭、同様に pcm façade を登録 |
+| `sys/dev/sound/cs4231/pcm_module.c` | `pcm_module_load()` の先頭、同様に pcm façade を登録 |
 
 - tick_register が失敗したときの load の戻り値は各部品の既存の初期化失敗の値 (FM/PCM/LAN の MODULE_INIT_FAILED 相当、今の load の失敗の経路と同じ)。

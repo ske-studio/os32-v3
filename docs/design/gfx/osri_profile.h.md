@@ -1,7 +1,7 @@
-# gfx/osri_profile.h — 1 行の境界で出す OUT の本数の上限 (B) の正典
+# sys/kern/gfx/osri/osri_profile.h — 1 行の境界で出す OUT の本数の上限 (B) の正典
 
 > 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
-ソース: `gfx/osri_profile.h`・`tools/osri_profile.py`
+ソース: `sys/kern/gfx/osri/osri_profile.h`・`tools/osri_profile.py`
 
 ## 何をするか
 
@@ -26,7 +26,7 @@
 ## 不変条件と、変えるときに止まる所
 
 - `tools/osri_profile.py` は `#define` を 1 つだけ厳密に読む。欠落・重複・1〜47 の外は例外で、31 への fallback は無い。比較の上限 `OSRI_COMPARE_OUT_LIMIT = 47` はこの Python のモジュールだけに置く。
-- ゲストは `STATIC_ASSERT` で B==31 を固定している (`gfx/gfx_osri.h` の `osri_default_budget_b31`、`drivers/video/pc98/splash_raster_play.h` の行 64B・plan 25,608B、`splash_raster_play.c` の emit 表の長さ B+1)。値を変えるとビルドが止まるので、行の配列と手書きの emit 表を一緒に直す。emit 表の生成器は作らない。
+- ゲストは `STATIC_ASSERT` で B==31 を固定している (`sys/kern/gfx/osri/gfx_osri.h` の `osri_default_budget_b31`、`sys/platform/pc98/video/splash_raster_play.h` の行 64B・plan 25,608B、`splash_raster_play.c` の emit 表の長さ B+1)。値を変えるとビルドが止まるので、行の配列と手書きの emit 表を一緒に直す。emit 表の生成器は作らない。
 - 形式の上限 (行 16 番号・全体 6,384 件) は B から導かない (同値イベントは 0 本なので)。B を下げるときは容量と同値の互換を設計し直す。
 
 ## 検査

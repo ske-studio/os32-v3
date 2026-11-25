@@ -1,10 +1,10 @@
-"""ブート情報域 (0x7E00) の検証関数 (platform/pc98/bootinfo_check.c) のホスト試験。
+"""ブート情報域 (0x7E00) の検証関数 (sys/platform/pc98/bootinfo_check.c) のホスト試験。
 
 記録: tools/tests/bootinfo_tdd.md
 票  : docs/archive/realhw_v21/TASK_HDD_INSTALL.md 段 0 (§1-v3 N1 / N2)
 
-実物の platform/pc98/bootinfo_check.c を 1 行も写さずに #include して回す。
-加えて **NASM 側の写し boot/bootinfo.inc** の値が include/bootinfo.h と名前ごとに
+実物の sys/platform/pc98/bootinfo_check.c を 1 行も写さずに #include して回す。
+加えて **NASM 側の写し boot/bootinfo.inc** の値が sys/include/bootinfo.h と名前ごとに
 一致するかを見る (ローダとカーネルが別のオフセットを読むと静かにずれる)。
 
   python3 -B tools/tests/test_bootinfo.py            # ホストで全ケース
@@ -12,7 +12,7 @@
   python3 -B tools/tests/test_bootinfo.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='bootinfo-host', tier=1,
-    covers=['platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'platform/pc98/bootinfo_capture.c', 'platform/pc98/bootinfo_geom.c', 'platform/pc98/bootinfo_report.c', 'drivers/ata/ide.c', 'init/bootinfo.c', 'platform/pc98/boot_disk.c', 'platform/pc98/boot_disk.h', 'platform/pc98/bootinfo_check.c', 'tools/tests/bootinfo_host.c', 'tools/tests/test_boot_named_constants.py', 'boot/boot_fat.asm', 'boot/boot_hdd.asm', 'boot/loader_hdd.asm', 'boot/loader.ld', 'boot/bootinfo_rm.inc', 'boot/memmap_defs.inc', 'boot/pc98_defs.inc', 'boot/realmode_defs.inc', 'boot/gdt_defs.inc', 'boot/hex_defs.inc', 'boot/boot_probe.inc', 'boot/fat12_defs.inc', 'include/memmap.h', 'include/pc98.h', 'include/types.h', 'arch/x86/kernel/gdt.h', 'lib/kstring.h', 'lib/le_internal.h', 'boot/vk32_defs.inc', 'boot/lz4_defs.inc', 'boot/crc32_defs.inc', 'boot/loader_fat_new.asm', 'boot/boot_defs.h', 'include/bootinfo.h', 'init/boot_disk.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/platform/pc98/bootinfo_wire.h', 'sys/platform/pc98/bootinfo_native.h', 'sys/platform/pc98/bootinfo_capture.c', 'sys/platform/pc98/bootinfo_geom.c', 'sys/platform/pc98/bootinfo_report.c', 'sys/dev/ata/ide.c', 'sys/kern/init/bootinfo.c', 'sys/platform/pc98/boot_disk.c', 'sys/platform/pc98/boot_disk.h', 'sys/platform/pc98/bootinfo_check.c', 'tools/tests/bootinfo_host.c', 'tools/tests/test_boot_named_constants.py', 'boot/boot_fat.asm', 'boot/boot_hdd.asm', 'boot/loader_hdd.asm', 'boot/loader.ld', 'boot/bootinfo_rm.inc', 'boot/memmap_defs.inc', 'boot/pc98_defs.inc', 'boot/realmode_defs.inc', 'boot/gdt_defs.inc', 'boot/hex_defs.inc', 'boot/boot_probe.inc', 'boot/fat12_defs.inc', 'sys/include/memmap.h', 'sys/platform/pc98/pc98.h', 'sys/include/types.h', 'sys/arch/x86/kernel/gdt.h', 'sys/kern/kstring.h', 'lib/le_internal.h', 'boot/vk32_defs.inc', 'boot/lz4_defs.inc', 'boot/crc32_defs.inc', 'boot/loader_fat_new.asm', 'boot/boot_defs.h', 'sys/include/bootinfo.h', 'sys/kern/init/boot_disk.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.5,
     kind='characterization',
 )
@@ -26,11 +26,11 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/bootinfo_host.c"
-SRC = ROOT / "platform/pc98/bootinfo_check.c"
+SRC = ROOT / "sys/platform/pc98/bootinfo_check.c"
 INC = ROOT / "boot/bootinfo.inc"
 # i386-elf で通す実ソース。bootinfo.c は構造体の並びを STATIC_ASSERT で見る
 # (ホストでは u32 が 64bit なので見られない)。
-TARGET_SRCS = ["platform/pc98/bootinfo_check.c", "init/bootinfo.c", "drivers/ata/ide.c"]
+TARGET_SRCS = ["sys/platform/pc98/bootinfo_check.c", "sys/kern/init/bootinfo.c", "sys/dev/ata/ide.c"]
 
 CASES = ["good", "magic", "check_word", "version", "sum", "rules", "format",
          "image", "inc_mirror"]
@@ -98,7 +98,7 @@ def host_build(tmp, source_text=None):
         harness = src_dir / "harness.c"
         harness.write_text(
             HARNESS.read_text(encoding="utf-8").replace(
-                '"../../platform/pc98/bootinfo_check.c"', '"platform/pc98/bootinfo_check.c"'),
+                '"../../sys/platform/pc98/bootinfo_check.c"', '"sys/platform/pc98/bootinfo_check.c"'),
             encoding="utf-8")
     cmd = ["gcc", *FLAGS, "-I" + str(src_dir), *INCLUDES, str(harness),
            "-o", str(exe)]
@@ -117,7 +117,7 @@ def parse_inc(text):
 
 
 def inc_mirror(exe, inc_text=None):
-    """boot/bootinfo.inc の値が include/bootinfo.h と一致するか。"""
+    """boot/bootinfo.inc の値が sys/include/bootinfo.h と一致するか。"""
     dump = subprocess.run([str(exe), "dump"], cwd=ROOT, check=True,
                           capture_output=True, text=True).stdout
     want = {}
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     check_named_constants()
     with tempfile.TemporaryDirectory(prefix="os32-bootinfo-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real platform/pc98/bootinfo_check.c)",
+        print("HOST GNU11 -Werror compile PASS (real sys/platform/pc98/bootinfo_check.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

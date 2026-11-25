@@ -2,8 +2,8 @@
 #define GF_S5_ENTRY s5_entry
 #include "gfinit_bus_host.c"
 #undef GF_S5_ENTRY
-#include "../../kdebug/gfinit_plan.c"
-#include "../../kdebug/recover_profile.c"
+#include "../../sys/dev/video/geforce/diag/gfinit_plan.c"
+#include "../../sys/platform/pc98/kdebug/recover_profile.c"
 static struct gfinit_plan composed;
 static char last_row[512];
 static u32 row_used;

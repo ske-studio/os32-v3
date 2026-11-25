@@ -12,33 +12,33 @@
 
 | 置き場 | 責務 |
 | --- | --- |
-| `kdebug/recover.c`・profile 群 (新設) | KPEEK と並ぶ ops。固定長 snapshot、許可表、状態機械、期限、restore/verify。KDEBUG=0 は入口で拒否し書込み 0 件 |
+| `sys/platform/pc98/kdebug/recover.c`・profile 群 (新設) | KPEEK と並ぶ ops。固定長 snapshot、許可表、状態機械、期限、restore/verify。KDEBUG=0 は入口で拒否し書込み 0 件 |
 | kernel/HAL の共通部 | 98 表示復帰・短い窓操作・tick・serial の必要最小限の import。汎用の任意番地 write API は作らない |
 
 ## 索引
 
-- [kdebug/gf_stage_state.c](gf_stage_state.md)
-- [kdebug/gfinit.c](gfinit.md)
-- [kdebug/gfinit_bus.c](gfinit_bus.md)
-- [kdebug/gfinit_decode.c](gfinit_decode.md)
-- [kdebug/gfinit_exec.c](gfinit_exec.md)
-- [kdebug/gfinit_mode.c](gfinit_mode.md)
-- [kdebug/gfinit_plan.c](gfinit_plan.md)
-- [kdebug/gfinit_plan_c.c](gfinit_plan_c.md)
-- [kdebug/gfinit_pll.c](gfinit_pll.md)
-- [kdebug/gfinit_resources.c](gfinit_resources.md)
-- [kdebug/gfinit_wire.h](gfinit_wire.md)
-- [kdebug/kdebug_main.c](kdebug_main.md)
-- [kdebug/recover.c](recover.md)
-- [kdebug/recover_cleanup.h](recover_cleanup.md)
-- [kdebug/recover_gf.c](recover_gf.md)
-- [kdebug/recover_gf_locate.c](recover_gf_locate.md)
-- [kdebug/recover_profile.c](recover_profile.md)
-- [kdebug/recover_virtual.c](recover_virtual.md)
-- [kdebug/recover_wire.h](recover_wire.md)
-- [kdebug/selftest_exec.c](selftest_exec.md)
-- [kdebug/selftest_kbd_inject.c](selftest_kbd_inject.md)
-- [kdebug/selftest_lease.c](selftest_lease.md)
+- [sys/dev/video/geforce/diag/gf_stage_state.c](gf_stage_state.md)
+- [sys/dev/video/geforce/diag/gfinit.c](gfinit.md)
+- [sys/dev/video/geforce/diag/gfinit_bus.c](gfinit_bus.md)
+- [sys/dev/video/geforce/diag/gfinit_decode.c](gfinit_decode.md)
+- [sys/dev/video/geforce/diag/gfinit_exec.c](gfinit_exec.md)
+- [sys/dev/video/geforce/diag/gfinit_mode.c](gfinit_mode.md)
+- [sys/dev/video/geforce/diag/gfinit_plan.c](gfinit_plan.md)
+- [sys/dev/video/geforce/diag/gfinit_plan_c.c](gfinit_plan_c.md)
+- [sys/dev/video/geforce/diag/gfinit_pll.c](gfinit_pll.md)
+- [sys/dev/video/geforce/diag/gfinit_resources.c](gfinit_resources.md)
+- [sys/dev/video/geforce/diag/gfinit_wire.h](gfinit_wire.md)
+- [sys/platform/pc98/kdebug/kdebug_main.c](kdebug_main.md)
+- [sys/platform/pc98/kdebug/recover.c](recover.md)
+- [sys/platform/pc98/kdebug/recover_cleanup.h](recover_cleanup.md)
+- [sys/dev/video/geforce/diag/recover_gf.c](recover_gf.md)
+- [sys/dev/video/geforce/diag/recover_gf_locate.c](recover_gf_locate.md)
+- [sys/platform/pc98/kdebug/recover_profile.c](recover_profile.md)
+- [sys/kern/kdebug/recover_virtual.c](recover_virtual.md)
+- [sys/kern/kdebug/recover_wire.h](recover_wire.md)
+- [sys/arch/x86/kdebug/selftest_exec.c](selftest_exec.md)
+- [sys/kern/kdebug/selftest_kbd_inject.c](selftest_kbd_inject.md)
+- [sys/arch/x86/kdebug/selftest_lease.c](selftest_lease.md)
 - [kdebug/generated/](generated/README.md)
 - [kdebug/gfinit_decode/](gfinit_decode/README.md)
 - [kdebug/gfinit_op/](gfinit_op/README.md)
@@ -46,19 +46,19 @@
 - [kdebug/gfinit_pll/](gfinit_pll/README.md)
 - [kdebug/gfinit_resources/](gfinit_resources/README.md)
 - [kdebug/recover_plan/](recover_plan/README.md)
-- [kdebug/gfinit/rom.inc](gfinit/rom.md)
-- [kdebug/recover_common/clock.inc](recover_common/clock.md)
-- [kdebug/recover_common/log.inc](recover_common/log.md)
-- [kdebug/recover_common/s0.inc](recover_common/s0.md)
-- [kdebug/recover_common/session.inc](recover_common/session.md)
-- [kdebug/recover_gf_stage/c.inc](recover_gf_stage/c.md)
+- [sys/dev/video/geforce/gfinit/rom.inc](gfinit/rom.md)
+- [sys/kern/kdebug/recover_common/clock.inc](recover_common/clock.md)
+- [sys/dev/video/geforce/diag/recover_common/log.inc](recover_common/log.md)
+- [sys/dev/video/geforce/diag/recover_common/s0.inc](recover_common/s0.md)
+- [sys/dev/video/geforce/diag/recover_common/session.inc](recover_common/session.md)
+- [sys/dev/video/geforce/recover_gf_stage/c.inc](recover_gf_stage/c.md)
 
 ### selftest_internal.h
 
-ソース: `kdebug/selftest_internal.h`
+ソース: `sys/kern/kdebug/selftest_internal.h`
 
 ```c
-/* kdebug/selftest_internal.h: 移植先の通常C関数、importマクロ対象外 */
+/* sys/kern/kdebug/selftest_internal.h: 移植先の通常C関数、importマクロ対象外 */
 u32 kst_kbd_inject(void);
 int kst_lease(void);
 u32 kst_exec_tramp_user(void); u32 kst_exec_kapi_layout(void);
@@ -68,7 +68,7 @@ u32 kst_exec_tramp_user(void); u32 kst_exec_kapi_layout(void);
 
 ### kdebug_window.c
 
-ソース: `kdebug/kdebug_window.c`
+ソース: `sys/arch/x86/kdebug/kdebug_window.c`
 
 必要ページだけ保存・付け替え・復元
 
@@ -88,21 +88,21 @@ u32 kst_exec_tramp_user(void); u32 kst_exec_kapi_layout(void);
 
 ### kpeek.c
 
-ソース: `kdebug/kpeek.c`
+ソース: `sys/platform/pc98/kdebug/kpeek.c`
 
 同じ静的 PT を使い、RW 無し
 
 ### gfinit_budget.inc
 
-ソース: `kdebug/gfinit_budget.inc`
+ソース: `sys/dev/video/geforce/diag/gfinit_budget.inc`
 
 実際のRECはBEGIN/END・内部MMIO・cleanupも含め、manifestの全分岐・反復展開と各フィールド最大桁数から最大送信バイト数Bを計算する。UARTの実設定bits/frameで`T_wire=ceil(B×bits/frame/9600)`を求め、有限の送信待ち余裕を加えたT_logをtrial_beginの予算に渡す。kdebug_call内だけを数える総時間上限=60秒+T_log（PAUSEDの承認待ちは除外）、実測送信時間だけを60秒の実行予算から除外し、T_log超過はLOG_FAIL。待ち5秒は実行予算内。事前に算定不能・桁溢れ・recoverが総予算を受理しない場合は書く前に拒否する。
 
-REC予算は転送/比較の計2組4行（480行ずつの処理は内部反復）・DAC768アクセス・全レジスタ操作/待ち/失敗分岐の最悪行数から開始前に算定し、既存gf_budgetのnode/arg式へ反復分を加える（`kdebug/gfinit.c`）。trial全体の送信除外60秒・PAUSED積算外は維持。
+REC予算は転送/比較の計2組4行（480行ずつの処理は内部反復）・DAC768アクセス・全レジスタ操作/待ち/失敗分岐の最悪行数から開始前に算定し、既存gf_budgetのnode/arg式へ反復分を加える（`sys/dev/video/geforce/diag/gfinit.c`）。trial全体の送信除外60秒・PAUSED積算外は維持。
 
 > [要確認] GF_STAGES の C 実行は定数期限へ移行している。この旧 C 送信予算式は現行の C-only には適用されない。
 
-5 回の読取りに新しい時間の上限は作らない。既存の verify の読取り (kdebug/recover.c) と同じく、送信の時間は tx_ticks、読取りの時間は試行の spent に数え (同・808-818)、期限の検査 (同) で超えたら REC_TIMEOUT。trial_limit (60 秒、recover_profile.c) は変えない。
+5 回の読取りに新しい時間の上限は作らない。既存の verify の読取り (sys/platform/pc98/kdebug/recover.c) と同じく、送信の時間は tx_ticks、読取りの時間は試行の spent に数え (同・808-818)、期限の検査 (同) で超えたら REC_TIMEOUT。trial_limit (60 秒、recover_profile.c) は変えない。
 
 - 予算: 増える 10 行・最大 3850B は RUNNING だけ。B'=B+3850 で log_limit と transport.max_polls を算出し直す (gfinit.c)。cleanup の restore_limit・P/S の予約・diag/final は変えない。
 
@@ -110,7 +110,7 @@ REC予算は転送/比較の計2組4行（480行ずつの処理は内部反復�
 
 ### recover_diag.h
 
-ソース: `kdebug/recover_diag.h`
+ソース: `sys/kern/kdebug/recover_diag.h`
 
 recover.c の static 1 枠（リング・動的確保なし）。
 
@@ -127,7 +127,7 @@ struct rec_tx_diag {                  /* 全て32bit、48 B。共有 recover に
 
 ### recover_gf_expand.h
 
-ソース: `kdebug/recover_gf_expand.h`
+ソース: `sys/dev/video/geforce/diag/recover_gf_expand.h`
 
 - 展開関数はrecover_gf.cで定義し、新規recover_gf_expand.hに宣言する。このヘッダはgfinit*.hからincludeしない。
 
@@ -142,7 +142,7 @@ int recover_gf_profile_expand(struct recover_profile *p, struct gfinit_plan *buf
 
 ### recover_gf_c.h
 
-ソース: `kdebug/recover_gf_c.h`
+ソース: `sys/dev/video/geforce/diag/recover_gf_c.h`
 
 許可表は `recover_gf` のC専用phaseに§3各先の幅・値式・順・verify maskを登録。PLL・indexed対象は既存targetを共有、mode dataはCOLD。
 
@@ -154,7 +154,7 @@ C出口は50C/510/508/578/580/524、CONFIG/START、CR00..18・19/1A/25/28/33/44/
 
 ### gfinit_verify.inc
 
-ソース: `kdebug/gfinit_verify.inc`
+ソース: `sys/dev/video/geforce/diag/gfinit_verify.inc`
 
 記録属性と比較 mask
 

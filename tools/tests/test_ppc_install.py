@@ -6,22 +6,22 @@ import tempfile
 CHECK = dict(name='ppc-install-host', tier=1, needs=[], budget=35,
              covers=['tools/tests/test_ppc_install.py', 'tools/tests/ppc_install_host.c',
                      'tools/tests/host32.py', 'tools/tests/cc_cache.py', 'platform/powermac/install*',
-                     'platform/powermac/partition_view.c', 'platform/powermac/apm.h',
-                     'platform/powermac/platform_install_layout.h', 'userland/system/inst_*.h',
+                     'sys/platform/powermac/partition_view.c', 'sys/platform/powermac/apm.h',
+                     'sys/platform/powermac/platform_install_layout.h', 'userland/system/inst_*.h',
                      'userland/shell/hdprep_plan.h',
-                     'platform/powermac/platform_ext2.h', 'platform/powermac/platform_install_management.h',
+                     'sys/platform/powermac/platform_ext2.h', 'sys/platform/powermac/platform_install_management.h',
                      'kernel/dev/**', 'fs/ext2/**', 'include/**', 'lib/kstring*', 'lib/crc32*',
-                     'drivers/ata/ide.h', 'drivers/block/disk.h', 'drivers/block/fdc.h', 'drivers/base/dev.c', 'mm/kmalloc.h', 'sdk/include/**', 'fs/*.h'],
+                     'sys/dev/ata/ide.h', 'sys/dev/block/disk.h', 'sys/dev/block/fdc.h', 'sys/dev/base/dev.c', 'sys/kern/mm/kmalloc.h', 'sdk/include/**', 'fs/*.h'],
              basis=['docs/decisions/ppc/PPC_ROOT_MOUNT_ALIGN_X86_DESIGN.md §5–6'])
 
 
 def run(ctx):
     import host32
-    sources = ['platform/powermac/install_backend.c', 'platform/powermac/partition_view.c',
-               'kernel/dev/install_management.c', 'fs/ext2/ext2_fmt.c', 'fs/ext2/ext2_layout.c',
-               'tools/tests/ppc_install_host.c', 'lib/kstring_c.c', 'lib/crc32.c', 'drivers/base/dev.c',
-               'fs/ext2/ext2_super.c', 'fs/ext2/ext2_file.c', 'fs/ext2/ext2_inode.c',
-               'fs/ext2/ext2_dir.c', 'platform/powermac/install_target.c']
+    sources = ['sys/platform/powermac/install_backend.c', 'sys/platform/powermac/partition_view.c',
+               'sys/kern/dev/install_management.c', 'sys/fs/ext2/ext2_fmt.c', 'sys/fs/ext2/ext2_layout.c',
+               'tools/tests/ppc_install_host.c', 'sys/kern/kstring_c.c', 'lib/crc32.c', 'sys/dev/base/dev.c',
+               'sys/fs/ext2/ext2_super.c', 'sys/fs/ext2/ext2_file.c', 'sys/fs/ext2/ext2_inode.c',
+               'sys/fs/ext2/ext2_dir.c', 'sys/platform/powermac/install_target.c']
     cases = [('normal', None, None, 0)]
     if ctx.mutate:
         cases += [('raw', '!raw_write || !m || !m->requires_raw_reservation', '1', 28),

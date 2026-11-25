@@ -28,7 +28,7 @@ static void svc_mark(u32 step) { if (!stop_order[step]) stop_order[step]=++stop_
 #define gf2_stop(ch) (svc_mark(6),gf2_stop(ch))
 static i32 __attribute__((unused)) svc_detect_budget(struct gf4_ctx *,u32);
 #ifndef GF4_SERVICE_SOURCE
-#define GF4_SERVICE_SOURCE "../../hwdev/gf/display/service.c"
+#define GF4_SERVICE_SOURCE "../../sys/dev/video/geforce/display/service.c"
 #define gf4_detect svc_detect_budget
 #endif
 #include GF4_SERVICE_SOURCE
@@ -40,7 +40,7 @@ static i32 __attribute__((unused)) svc_detect_budget(struct gf4_ctx *,u32);
  * publication binding before invoking the production initializer again. */
 #define service_check guard_f5_check
 #define service_publish guard_f5_publish
-#include "../../hwdev/gf/feature5_service.c"
+#include "../../sys/dev/video/geforce/feature5_service.c"
 #undef service_publish
 #undef service_check
 static const struct gf5_test_ops *guard_f5_slot;

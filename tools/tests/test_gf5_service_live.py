@@ -1,14 +1,14 @@
 """A10 service admission and independent thermal lifetime, production assembly."""
 CHECK = dict(name='gf5-service-live-host', tier=1, budget=17.1,
              needs=['make:build/out/geforce/geforce_imports.h'],
-             covers=['drivers/pci/pci_barsize.c', 'drivers/pci/pci_barsize.h', 'tools/tests/**', 'hwdev/**', 'drivers/video/geforce/**',
-                     'include/**', 'kdebug/**', 'mm/pgalloc.h', 'mm/physmem.h',
-                     'mm/paging.h', 'lib/kstring.h', 'drivers/pci/pci.h',
-                     'drivers/pci/pci_decode.h', 'drivers/char/serial.h',
-                     'drivers/base/dev.c', 'kernel/module/**',
-                     'kernel/console/console_backend.h', 'arch/x86/kernel/idt.h',
-                     'sdk/include/os32/os32_kapi_shared.h', 'fs/fd_redirect.h',
-                     'fs/vfs.c', 'platform/pc98/boot_names.c'],
+             covers=['sys/dev/pci/pci_barsize.c', 'sys/dev/pci/pci_barsize.h', 'tools/tests/**', 'hwdev/**', 'drivers/video/geforce/**',
+                     'include/**', 'kdebug/**', 'sys/kern/mm/pgalloc.h', 'sys/kern/mm/physmem.h',
+                     'sys/kern/mm/paging.h', 'sys/kern/kstring.h', 'sys/dev/pci/pci.h',
+                     'sys/dev/pci/pci_decode.h', 'sys/dev/char/serial.h',
+                     'sys/dev/base/dev.c', 'kernel/module/**',
+                     'sys/kern/console/console_backend.h', 'sys/arch/x86/kernel/idt.h',
+                     'sdk/include/os32/os32_kapi_shared.h', 'sys/fs/fd_redirect.h',
+                     'sys/fs/vfs.c', 'sys/platform/pc98/boot_names.c'],
     basis=['GF_GUARD_THERM_DESIGN §4', 'GF_GUARD_THERM_DESIGN §5', 'GF_GUARD_THERM_DESIGN §6'],
 )
 from pathlib import Path
@@ -20,7 +20,7 @@ from kernel_includes import include_flags
 import test_gf_display as display
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'hwdev/gf/feature5_service.c'
+PRODUCT = 'sys/dev/video/geforce/feature5_service.c'
 MUTATIONS = [
     ('boot-publication', '.state_boot_target=service_state_boot_target',
      '.state_boot_target=(true ? 0 : service_state_boot_target)'),

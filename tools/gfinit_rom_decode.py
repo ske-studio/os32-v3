@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Notebook diagnostic: python3 tools/gfinit_rom_decode.py /path/to/private.rom
-Runs kdebug/gfinit_decode.c (host build, same flags as test_gfinit.py) on a private
+Runs sys/dev/video/geforce/diag/gfinit_decode.c (host build, same flags as test_gfinit.py) on a private
 ROM copy and prints the decode counters and failing pc. The ROM is turned into a C
 array only inside a temporary directory; no ROM bytes are printed or written into
 the repository. Does not disassemble anything.

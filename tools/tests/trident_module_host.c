@@ -2,11 +2,11 @@
 #include "bootinfo_native.h"
 /* Actual loader/body/HAL assembly; case 65 initializes the real device over
  * fake hardware and calls the core drawing entrypoints and public cursor hooks. */
-#include "drivers/video/trident/trident_module.c"
-#include "drivers/video/trident/trident_body.c"
-#include "lib/kstring.h"
+#include "sys/dev/video/trident/trident_module.c"
+#include "sys/dev/video/trident/trident_body.c"
+#include "sys/kern/kstring.h"
 #include "trident_device_fake.h"
-#include "mm/kmalloc.h"
+#include "sys/kern/mm/kmalloc.h"
 #define CHECK(x) do { if (!(x)) finish(__LINE__); } while (0)
 static void finish(int line)
 {
@@ -64,7 +64,7 @@ static int fake_read8(void *opaque, enum trident_space space, u32 off, u8 *v)
 GfxBackend *g_backend;
 static int gfx_started;
 #include "display_provider.h"
-#include "gfx/gfx_core_api.inc"
+#include "sys/hal/gfx/gfx_core_api.inc"
 int __wrap_trident_regs_bind(struct trident_device *d)
 {
     trident_fake_bind(&fake, d);
@@ -319,7 +319,7 @@ void _start(void)
 }
 
 u32 cpu_loops_per_tick(void) { return 1000000; }
-#include "../../platform/pc98/module_pair.c"
+#include "../../sys/platform/pc98/module_pair.c"
 
 const struct boot_common *boot_common_get(void) {
     static struct boot_common info;

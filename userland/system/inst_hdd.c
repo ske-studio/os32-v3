@@ -6,7 +6,7 @@
 /* ======================================================================== */
 
 #include "inst_hdd.h"
-#include "include/platform_install_boot.h"
+#include "sys/include/platform_install_boot.h"
 
 static int ih_streq(const char *a, const char *b)
 {

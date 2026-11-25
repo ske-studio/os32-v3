@@ -13,9 +13,9 @@
 
 |役目|PC-98|PowerMac|
 |---|---|---|
-|書式|lib/kprintf.c の console_printf と console_vprintf に kprintf と kvprintf を alias|同ファイルと PM/log_printf.c が lib/kprintf_format.inc を使う。exec 像は PM/console_log.c の pm_diag_write から pm_log_write、core/link は別名から PM/kboot_console.c の console_write|
-|保存・配送|kernel/console/console.c の console_write、init/bootlog.c の bootlog_push、platform/pc98/kernel.c の platform_boot_services で bootlog_save|PM/log.c の pm_log_write が登録順に ESCC と PM/lan_log.c のリングへ配る。PM/lan_service.c の pm_lan_poll が非 link の PLN1、link の前景サービスが PM/link_log.c の pm_link_log_poll を駆動。送出済みスロットは再利用する|
-|起動と端末|platform/pc98/kernel.c の platform_boot_machine/services/run と pc98_shell_failure|PM/ppc_kernel.c の同じ三局面。root_ready 後 pm_exec_boot、shell_loop_run。PM/shell_loop_ops.c の loading/result は kprintf、failure は shell_print と idle_wait_step|
+|書式|sys/kern/kprintf.c の console_printf と console_vprintf に kprintf と kvprintf を alias|同ファイルと PM/log_printf.c が sys/kern/kprintf_format.inc を使う。exec 像は PM/console_log.c の pm_diag_write から pm_log_write、core/link は別名から PM/kboot_console.c の console_write|
+|保存・配送|sys/kern/console/console.c の console_write、sys/kern/init/bootlog.c の bootlog_push、sys/platform/pc98/kernel.c の platform_boot_services で bootlog_save|PM/log.c の pm_log_write が登録順に ESCC と PM/lan_log.c のリングへ配る。PM/lan_service.c の pm_lan_poll が非 link の PLN1、link の前景サービスが PM/link_log.c の pm_link_log_poll を駆動。送出済みスロットは再利用する|
+|起動と端末|sys/platform/pc98/kernel.c の platform_boot_machine/services/run と pc98_shell_failure|PM/ppc_kernel.c の同じ三局面。root_ready 後 pm_exec_boot、shell_loop_run。PM/shell_loop_ops.c の loading/result は kprintf、failure は shell_print と idle_wait_step|
 
 装置差は契約 §9 の範囲。診断では FB に描画しない。共通入力・端末の方針、x86 boot.log の寿命、kdebug は今回の変更対象外。
 
@@ -23,15 +23,15 @@
 
 ## 2　選択と起動順
 
-段1では全 PPC 像に同じ診断書式を提供する。lib/kprintf.c の末尾に固定名 platform_kprintf.h を include し、PC-98 版に現在の alias 宣言二つをそのまま置く。PPC 版は既存の公開宣言に従い別名を定義しない。両 platform_console.h の PLATFORM_KPRINTF_IS_CONSOLE と include/kprintf.h の対応説明を整理する。端末の書式実体は共通のまま。
+段1では全 PPC 像に同じ診断書式を提供する。sys/kern/kprintf.c の末尾に固定名 platform_kprintf.h を include し、PC-98 版に現在の alias 宣言二つをそのまま置く。PPC 版は既存の公開宣言に従い別名を定義しない。両 platform_console.h の PLATFORM_KPRINTF_IS_CONSOLE と sys/include/kprintf.h の対応説明を整理する。端末の書式実体は共通のまま。
 
 build/platform/powermac.mk では EXEC リストから console_log.c と log_printf.c を除き、CORE 定義の直後で次の一行を加える。
 
-    C_PLATFORM_CORE += platform/powermac/log_printf.c
+    C_PLATFORM_CORE += sys/platform/powermac/log_printf.c
 
-PM/log_printf.c は kprintf.h、stdarg.h、kboot_log.h、kstring.h を include。static void pm_diag_write(const char *bytes,u32 n,u8 color) は色を捨て pm_log_write(bytes,n)。static void pm_diag_print(const char *s,u8 color) は kstrlen(s) を渡す。KPRINTF_PRINT と KPRINTF_PRINT_UTF8 は共に後者、KPRINTF_WRITE は前者。既存 VNAME/NAME で "lib/kprintf_format.inc" を一回展開し console_log.[ch] を除く。試験の include path にリポジトリルートも加える。
+PM/log_printf.c は kprintf.h、stdarg.h、kboot_log.h、kstring.h を include。static void pm_diag_write(const char *bytes,u32 n,u8 color) は色を捨て pm_log_write(bytes,n)。static void pm_diag_print(const char *s,u8 color) は kstrlen(s) を渡す。KPRINTF_PRINT と KPRINTF_PRINT_UTF8 は共に後者、KPRINTF_WRITE は前者。既存 VNAME/NAME で "sys/kern/kprintf_format.inc" を一回展開し console_log.[ch] を除く。試験の include path にリポジトリルートも加える。
 
-段2のビルド表。各行の命令は `make ARCH=ppc PLATFORM=powermac` に右欄を付ける。build/images/ppc-flags.mk が決めた最終 IMAGE と既存の KBOOT_SHELL_LAYOUT_DIAG から powermac.mk で reporter を一つだけ選ぶ。
+段2のビルド表。各行の命令は `make ARCH=ppc PLATFORM=powermac` に右欄を付ける。sys/conf/images/ppc-flags.mk が決めた最終 IMAGE と既存の KBOOT_SHELL_LAYOUT_DIAG から powermac.mk で reporter を一つだけ選ぶ。
 
 |呼び方|実体・観測|追加引数|
 |---|---|---|

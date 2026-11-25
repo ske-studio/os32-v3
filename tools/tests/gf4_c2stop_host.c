@@ -5,8 +5,8 @@
  * PM must first integrate C2-service-f3. No libc; entry _start.
  * Ordering oracle: MIT nouveau c03c1a1 nouveau_drm.c:944-988 (display,
  * idle/fence, objects). Local quiesce values are the PC-98 coexistence
- * contract, hwdev/gf/quiesce_rows.h, not a nouveau register sequence. */
-#include "../../include/io.h"
+ * contract, sys/dev/video/geforce/quiesce_rows.h, not a nouveau register sequence. */
+#include "../../sys/include/io.h"
 #define irq_save() 0U
 #define irq_restore(flags) ((void)(flags))
 #ifndef GF_PRODUCTION_MODULE
@@ -17,13 +17,13 @@
 #define GF3_CINT_C2
 #include "gf_accel_c1_host.c"
 #ifndef GF4_COMMAND_TEST_SOURCE
-#define GF4_COMMAND_TEST_SOURCE "../../hwdev/gf/command_test.c"
+#define GF4_COMMAND_TEST_SOURCE "../../sys/dev/video/geforce/command_test.c"
 #endif
 #include GF4_COMMAND_TEST_SOURCE
 /* UNIT14 links real service dependencies; no gf4_service_stop stub.
  * This TU becomes available when PM integrates C2-service. */
 #ifndef GF4_SERVICE_SOURCE
-#define GF4_SERVICE_SOURCE "../../hwdev/gf/display/service.c"
+#define GF4_SERVICE_SOURCE "../../sys/dev/video/geforce/display/service.c"
 #endif
 #include GF4_SERVICE_SOURCE
 
@@ -31,7 +31,7 @@
  * tiles (GF_GUARD_LIFETIME_DESIGN section 4). No thermal policy is faked. */
 #define service_check guard_f5_check
 #define service_publish guard_f5_publish
-#include "../../hwdev/gf/feature5_service.c"
+#include "../../sys/dev/video/geforce/feature5_service.c"
 #undef service_publish
 #undef service_check
 static const struct gf5_test_ops *guard_f5_slot;

@@ -11,10 +11,10 @@ CHECK = dict(name='installer-boot-order-host', tier=1, needs=[], budget=10,
                      'include/**', 'sdk/include/**', 'fs/pc98pt.*', 'fs/ext2/**'],
              basis=['docs/decisions/ppc/PPC_ROOT_MOUNT_ALIGN_X86_DESIGN.md §5'])
 
-DIRECTORY_SOURCES = ['userland/system/inst_hdd.c', 'platform/pc98/install_target.c',
-                     'userland/system/inst_disk.c', 'platform/pc98/install_disk.c',
-                     'userland/shell/hdprep_plan.c', 'platform/pc98/install_plan.c',
-                     'fs/pc98pt.c', 'fs/ext2/ext2_layout.c']
+DIRECTORY_SOURCES = ['userland/system/inst_hdd.c', 'sys/platform/pc98/install_target.c',
+                     'userland/system/inst_disk.c', 'sys/platform/pc98/install_disk.c',
+                     'userland/shell/hdprep_plan.c', 'sys/platform/pc98/install_plan.c',
+                     'sys/fs/pc98pt.c', 'sys/fs/ext2/ext2_layout.c']
 
 
 def run(ctx):

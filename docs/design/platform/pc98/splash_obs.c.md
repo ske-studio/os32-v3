@@ -1,7 +1,7 @@
-# platform/pc98/splash_obs.c — 観測の像: 16 枚の画像を順に再生して記録する
+# sys/platform/pc98/splash_obs.c — 観測の像: 16 枚の画像を順に再生して記録する
 
 > 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
-ソース: `platform/pc98/splash_obs.c` (画像は `tools/raster_obs_assets.py`・`tools/img2osri.py` で作る)
+ソース: `sys/platform/pc98/splash_obs.c` (画像は `tools/raster_obs_assets.py`・`tools/img2osri.py` で作る)
 
 ## 何をするか
 

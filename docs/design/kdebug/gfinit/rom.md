@@ -1,6 +1,6 @@
-# kdebug/gfinit/rom.inc — 設計
+# sys/dev/video/geforce/gfinit/rom.inc — 設計
 > 状態: **現行 (2026-10-31)** — 出所: GF6200_4A_DESIGN.md・GF6200_S7_SHELL.md (D1 で移した)
-ソース: `kdebug/gfinit/rom.inc`
+ソース: `sys/dev/video/geforce/gfinit/rom.inc`
 
 ## GF6200_4A_DESIGN
 
@@ -14,7 +14,7 @@ trial の外の INSPECT は例外として通常の 1 行と終わりの行を�
 
 ## GF6200_S7_SHELL
 
-- `kdebug/gfinit.c` のINSPECTはROM二重読取・PCIR・checksum・decode。表示を足すだけでsnapshot経路は作らない。
+- `sys/dev/video/geforce/diag/gfinit.c` のINSPECTはROM二重読取・PCIR・checksum・decode。表示を足すだけでsnapshot経路は作らない。
 
 - D2：INSPECTは通常行 `GF inspect sid= rc= rom_len= crc= chip= expect= match=` と `GF inspect-end sid= rc=` だけ。RECのsid/seqを進めない。
 

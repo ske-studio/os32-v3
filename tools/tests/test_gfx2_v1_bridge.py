@@ -22,7 +22,7 @@ def observe(work, source):
     target = work / 'bridge.c'
     target.write_text(source)
     # Compile the actual v1 fill/blit entries, including both SHADOW aliases.
-    api = (ROOT / 'gfx/gfx_core_api.inc').read_text()
+    api = (ROOT / 'sys/hal/gfx/gfx_core_api.inc').read_text()
     entries = ['#include "gfx2_int.h"']
     for name in ['gfx_hw_fill_rect', 'gfx_hw_blit']:
         match = re.search(r'int __cdecl ' + name + r'\([^\n]*\)\n\{', api)
@@ -39,7 +39,7 @@ def observe(work, source):
         '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib', '-static',
         '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
         '-I' + str(ROOT / 'gfx/v2'), *include_flags(ROOT), str(target),
-        str(calls), str(ROOT / 'gfx/v2/lock.c'), str(ROOT / 'gfx/v2/surface.c'),
+        str(calls), str(ROOT / 'sys/hal/gfx/v2/lock.c'), str(ROOT / 'sys/hal/gfx/v2/surface.c'),
         str(ROOT / 'tools/tests/gfx2_v1_bridge_host.c'), '-o', str(exe)], check=True)
     return host32.run([str(exe)]).returncode
 
@@ -47,7 +47,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/v2/v1_bridge.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/v2/v1_bridge.c').read_text()
     with tempfile.TemporaryDirectory(prefix='gfx2-bridge-') as td:
         work = Path(td)
         rc = observe(work, source)

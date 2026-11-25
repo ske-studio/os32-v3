@@ -79,10 +79,10 @@ static void sequence_cases(void)
     if(failures==before)output("A2 -> main0..4 -> baseline required/record/A4 stable/changing GPIO PASS\n");
 }
 #ifdef HWDEV_SEQUENCE_IMAGE
-#include "../../drivers/char/serial.h"
-#include "../../hwdev/owner.h"
-#include "../../hwdev/gf/command.h"
-#include "../../hwdev/gf/gf2_test.h"
+#include "../../sys/dev/char/serial.h"
+#include "../../sys/dev/hwdev/owner.h"
+#include "../../sys/dev/video/geforce/command.h"
+#include "../../sys/dev/video/geforce/gf2_test.h"
 #include "hwdev_trace_symbols.h"
 static int sequence_foundation_prepare(struct gf_foundation *f,
     const struct recover_bar_extent *bars, u32 n)

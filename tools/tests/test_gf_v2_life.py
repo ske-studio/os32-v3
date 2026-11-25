@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Test GeForce v2 lifecycle with a freestanding fake channel."""
 CHECK = dict(name='gf-v2-life-host', tier=1, needs=[], budget=5,
-    covers=['drivers/video/geforce/gf_v2_life.c', 'drivers/video/geforce/gf_v2_fence.c',
-            'drivers/video/geforce/gf_v2.h', 'drivers/video/geforce/backend_geforce.c', 'tools/tests/gf_v2_life_host.c',
+    covers=['sys/dev/video/geforce/gf_v2_life.c', 'sys/dev/video/geforce/gf_v2_fence.c',
+            'sys/dev/video/geforce/gf_v2.h', 'sys/dev/video/geforce/backend_geforce.c', 'tools/tests/gf_v2_life_host.c',
             'tools/tests/test_gf_v2_life.py', 'tools/tests/host32.py'],
     basis=['HAL_V2_DESIGN §6-3'],
 )
@@ -32,9 +32,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'drivers/video/geforce/gf_v2_life.c').read_text()
-    fence_source = (ROOT / 'drivers/video/geforce/gf_v2_fence.c').read_text()
-    backend = (ROOT / 'drivers/video/geforce/backend_geforce.c').read_text()
+    source = (ROOT / 'sys/dev/video/geforce/gf_v2_life.c').read_text()
+    fence_source = (ROOT / 'sys/dev/video/geforce/gf_v2_fence.c').read_text()
+    backend = (ROOT / 'sys/dev/video/geforce/backend_geforce.c').read_text()
     backend_anchor = '    (void)gf_v2_idle();'
     assert backend.count(backend_anchor) == 1
     with tempfile.TemporaryDirectory() as td:

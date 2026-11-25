@@ -3,9 +3,9 @@
 import subprocess
 
 CHECK = dict(name='ppc-hostfs-wire', tier=1, budget=30, needs=[],
-             covers=['tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/host_agent_config.py','platform/powermac/lan_wire.c', 'platform/powermac/lan_boot.h',
+             covers=['tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/host_agent_config.py','sys/platform/powermac/lan_wire.c', 'sys/platform/powermac/lan_boot.h',
                      'tools/ppc_lan_host.py', 'tools/tests/ppc_hostfs_wire.py',
-                     'lib/kstring_c.c', 'tools/host_image.py',
+                     'sys/kern/kstring_c.c', 'tools/host_image.py',
                      'tools/lan_bridge.py', 'tools/lanfs_host.py',
                      'tools/ppc_hostfs.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py'],
     basis=['PPC_SHELL_W8_DESIGN §3', 'PPC_SHELL_W8_DESIGN §6'],

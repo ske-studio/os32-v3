@@ -1,6 +1,6 @@
 """Real disk KAPI authorization policy; every mutant must fail at runtime."""
 CHECK = dict(name='disk-auth-host', tier=1,
-    covers=['platform/pc98/legacy/guest.c', 'include/kapi_call.h', 'sound/hal/a0_weak.c', 'tools/tests/av_sound_stubs.c', 'include/kapi_call_generated.h', 'net/host_mailbox.c', 'kapi/kapi_host_notice.c', 'lib/sqlite3/generated/*', 'exec/exec.c', 'exec/exec.h', 'exec/appslot.h', 'exec/redir_access.c', 'include/config.h', 'sdk/kapi.json', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/disk_auth_host.c', 'tools/tests/test_kapi_ranges.py', 'tools/tests/access_walk_host.c', 'tools/tests/test_access_walk.py', 'tools/tests/kernel_layout.py', 'exec/access_walk.c', 'exec/ring3_str.c', 'kapi/kapi_generated.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'tools/tests/host32.py', 'tools/tests/kapi_ranges_host.c', 'tools/tests/mutpar.py', 'tools/tests/test_kapi_out.py', 'fs/vfs.c', 'fs/vfs.h', 'userland/deploy.yaml', 'tools/check_manifests.py', 'tools/deploy_manifests.py', 'CLAUDE.md', 'build/app.conf', 'build/core.yaml', 'build/packages.yaml', 'build/programs.mk', 'docs/07_shell.md', 'tools/check_artifacts.py', 'kapi/kapi_sysinfo.c', 'platform/pc98/platform_mem_stat.h', 'platform/powermac/platform_mem_stat.h', 'tools/tests/mem_stat_source.py', 'sdk/include/os32/*.h', 'build/sdk/crt/**', 'build/out/lib/**', 'build/sdk/lib/**', 'sdk/crt/**', 'include/ide_contract.h', 'include/platform_device.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['sys/platform/pc98/legacy/guest.c', 'sys/include/kapi_call.h', 'sys/kern/v86/a0_weak.c', 'tools/tests/av_sound_stubs.c', 'sys/include/kapi_call_generated.h', 'sys/net/host_mailbox.c', 'sys/kapi/kapi_host_notice.c', 'lib/sqlite3/generated/*', 'sys/kern/exec/exec.c', 'sys/kern/exec/exec.h', 'sys/kern/exec/appslot.h', 'sys/kern/exec/redir_access.c', 'sys/include/config.h', 'sdk/kapi.json', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/disk_auth_host.c', 'tools/tests/test_kapi_ranges.py', 'tools/tests/access_walk_host.c', 'tools/tests/test_access_walk.py', 'tools/tests/kernel_layout.py', 'sys/kern/exec/access_walk.c', 'sys/kern/exec/ring3_str.c', 'sys/kapi/kapi_generated.c', 'sys/platform/pc98/kdebug/kselftest.c', 'kdebug/kselftest/**', 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c', 'sys/kern/mm/physmem.c', 'sys/kern/mm/shlib.c', 'tools/tests/host32.py', 'tools/tests/kapi_ranges_host.c', 'tools/tests/mutpar.py', 'tools/tests/test_kapi_out.py', 'sys/fs/vfs.c', 'sys/fs/vfs.h', 'userland/deploy.yaml', 'tools/check_manifests.py', 'tools/deploy_manifests.py', 'CLAUDE.md', 'build/app.conf', 'build/core.yaml', 'build/packages.yaml', 'build/programs.mk', 'docs/07_shell.md', 'tools/check_artifacts.py', 'sys/kapi/kapi_sysinfo.c', 'sys/platform/pc98/platform_mem_stat.h', 'sys/platform/powermac/platform_mem_stat.h', 'tools/tests/mem_stat_source.py', 'sdk/include/os32/*.h', 'build/sdk/crt/**', 'build/out/lib/**', 'build/sdk/lib/**', 'sdk/crt/**', 'sys/include/ide_contract.h', 'sys/include/platform_device.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'tools/tests/paging_source.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=4.2,
     basis=['KAPI_SPEC'],
 )
@@ -40,14 +40,14 @@ if __name__ == '__main__':
     p.add_argument('--mutate', action='store_true')
     args = p.parse_args()
     # Fail closed if the loader no longer records the actual resolved image.
-    source = paging_source(ROOT / 'exec/exec.c')
+    source = paging_source(ROOT / 'sys/kern/exec/exec.c')
     assert 'ctx->disk_write_authorized = exec_disk_write_path_allowed(resolved);' in source
     # Exercise the manifest check with real inputs and a moved installer.
     import copy
     import sys
     sys.path.insert(0, str(ROOT / 'tools'))
     from check_manifests import check_disk_write_paths, yaml
-    config = (ROOT / 'include/config.h').read_text()
+    config = (ROOT / 'sys/include/config.h').read_text()
     manifest = yaml.safe_load((ROOT / 'userland/deploy.yaml').read_text())
     assert not check_disk_write_paths(config, manifest)
     for name in ('install', 'cdinst'):

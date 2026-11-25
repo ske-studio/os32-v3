@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Focused lexical/format controls for the CPL3 argument-window check."""
 CHECK = dict(name='kprintf-window', tier=1,
-    covers=['hwdev/hwdev_module.c', 'platform/pc98/sysclk.c', 'platform/pc98/boot_display.c', 'platform/pc98/boot_platform.c', 'platform/pc98/boot_splash.c', 'platform/pc98/kernel.c', 'platform/powermac/ppc_kernel.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c', 'platform/pc98/boot_capture.c', 'platform/pc98/bios_snapshot.c', 'platform/pc98/bootinfo_report.c', 'platform/pc98/bootinfo_geom.c', 'platform/pc98/bootinfo_check.c', 'platform/pc98/bootinfo_capture.c', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/source_roots.py', 'userland/**/*.[ch]', 'userland/**/*.inc', 'sdk/**/*.[ch]', 'sdk/**/*.inc', 'sdk/rust/**/*.rs', 'userland/**/*.rs', 'exec/exec_syscall.inc', 'tools/check_kprintf_window.py', 'tools/check_kprintf_window_allow.txt', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'exec/exec.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h', 'platform/pc98/ime_display.c', 'platform/pc98/ime_render_tvram.c'],
+    covers=['sys/dev/hwdev/hwdev_module.c', 'sys/platform/pc98/sysclk.c', 'sys/platform/pc98/boot_display.c', 'sys/platform/pc98/boot_platform.c', 'sys/platform/pc98/boot_splash.c', 'sys/platform/pc98/kernel.c', 'sys/platform/powermac/ppc_kernel.c', 'sys/platform/pc98/gfx_scroll.c', 'sys/platform/pc98/gfx_init.c', 'sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_surfaces.c', 'sys/platform/pc98/boot_capture.c', 'sys/platform/pc98/bios_snapshot.c', 'sys/platform/pc98/bootinfo_report.c', 'sys/platform/pc98/bootinfo_geom.c', 'sys/platform/pc98/bootinfo_check.c', 'sys/platform/pc98/bootinfo_capture.c', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/source_roots.py', 'userland/**/*.[ch]', 'userland/**/*.inc', 'sdk/**/*.[ch]', 'sdk/**/*.inc', 'sdk/rust/**/*.rs', 'userland/**/*.rs', 'sys/kern/exec/exec_syscall.inc', 'tools/check_kprintf_window.py', 'tools/check_kprintf_window_allow.txt', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sys/kern/exec/exec.c', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h', 'sys/platform/pc98/ime_display.c', 'sys/platform/pc98/ime_render_tvram.c'],
     needs=[], budget=5.6,
     basis=['KAPI_SPEC'],
 )
@@ -23,7 +23,7 @@ class WindowTests(unittest.TestCase):
         for subdir in ('exec', 'tools', 'userland', 'sdk'):
             (root / subdir).mkdir(parents=True, exist_ok=True)
         # Use the real ABI definition for boundary and allowlist tests.
-        (root / 'exec/exec_syscall.inc').write_text((checker.ROOT / 'exec/exec_syscall.inc').read_text())
+        (root / 'sys/kern/exec/exec_syscall.inc').write_text((checker.ROOT / 'sys/kern/exec/exec_syscall.inc').read_text())
         (root / checker.ALLOW).write_text(allow)
         for file, source in sources.items():
             path = root / file
@@ -108,7 +108,7 @@ void second(void) {
         with tempfile.TemporaryDirectory(prefix='kprintf-limit-') as directory:
             root = Path(directory)
             (root / 'exec').mkdir()
-            (root / 'exec/exec_syscall.inc').write_text('#define RING3_ARG_WINDOW  80u\n')
+            (root / 'sys/kern/exec/exec_syscall.inc').write_text('#define RING3_ARG_WINDOW  80u\n')
             self.assertEqual(checker.window_limit(root), (80, 18))
 
     def test_all_user_sources_and_sdk_but_not_submodules(self):

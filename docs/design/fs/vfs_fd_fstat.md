@@ -1,9 +1,9 @@
-# fs/vfs_fd.c の fd 0/1/2 の `fstat` / `isatty` — 設計
+# sys/fs/vfs_fd.c の fd 0/1/2 の `fstat` / `isatty` — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_FSTAT_REDIR の契約を今のソースと照らして要約
-ソース: `fs/vfs_fd.c` (`vfs_fstat`・`vfs_isatty`)・`fs/fd_redirect.c` (`fd_redirect_ifmt`・`fd_is_redirected`)
+ソース: `sys/fs/vfs_fd.c` (`vfs_fstat`・`vfs_isatty`)・`sys/fs/fd_redirect.c` (`fd_redirect_ifmt`・`fd_is_redirected`)
 
-試験は `tools/tests/fstat_redir_host.c` (実物の `fs/vfs.c`・`fs/vfs_fd.c`・`fs/fd_redirect.c` を取り込む) と、
-ゲスト側の `userland/tests/stat_t.c`。
+試験は `tools/tests/fstat_redir_host.c` (実物の `sys/fs/vfs.c`・`sys/fs/vfs_fd.c`・`sys/fs/fd_redirect.c` を取り込む) と、
+ゲスト側の `userland/diag/stat_t.c`。
 
 ## 1. 判定の管理元は 1 本 ([C4])
 

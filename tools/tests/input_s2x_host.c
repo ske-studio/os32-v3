@@ -1,7 +1,7 @@
 /* Compare complete traces with the real 08e024265 HAL/merge, in separate processes. */
 #include "in2_int.h"
 #include "keymap.h"
-#include "drivers/input/kbd.h"
+#include "sys/platform/pc98/input/kbd.h"
 #include "io.h"
 #define T(c) do { if (!(c)) return __LINE__ % 120 + 1; } while (0)
 static u8 config[2];

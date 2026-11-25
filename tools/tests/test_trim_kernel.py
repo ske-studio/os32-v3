@@ -4,7 +4,7 @@ Normal control always precedes mutations; only named runtime failures are RED.
 The shared f9/f13 fixture simulates MMU/IRQ and external resource side effects.
 """
 CHECK = dict(name='trim-kernel-host', tier=1,
-    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/font_guard_inactive.h', 'arch/x86/arch_cpu.h', 'arch/x86/x86_flags.h', 'arch/x86/arch_io.h', 'drivers/input/kbd.h', 'exec/access_walk.c', 'exec/appmem.c', 'exec/appmem.h', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'exec/appslot.c', 'exec/appslot.h', 'exec/exec.c', 'exec/ring3_str.c', 'exec/exec.h', 'exec/exec_heap.c', 'exec/exec_heap.h', 'exec/lease.c', 'exec/redir_access.c', 'fs/fd_redirect.h', 'include/appmem_types.h', 'include/cpu.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/redir_access.h', 'include/sys.h', 'include/text_screen.h', 'include/types.h', 'kapi/kapi_generated.c', 'kapi/kapi_sysinfo.c', 'platform/pc98/platform_mem_stat.h', 'platform/powermac/platform_mem_stat.h', 'tools/tests/mem_stat_source.py', 'kernel/sqlite_engine.c', 'arch/x86/kernel/gdt.h', 'kernel/gui.c', 'kernel/gui.h', 'kernel/ime/ime.h', 'include/ime_control.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'kdebug/kselftest.c', 'mm/paging.c', 'mm/paging.h', 'mm/paging_app.c', 'mm/paging_app.h', 'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h', 'arch/x86/kernel/tss.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'sdk/include/os32/os32_gui_shared.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/kapi.json', 'tools/tests/appmem_map_host.c', 'tools/tests/exec_heap_host.h', 'tools/tests/host32.py', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/mem_stat_host.c', 'tools/tests/mutpar.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/test_appmem_map.py', 'tools/tests/test_mem_stat.py', 'tools/tests/trim_kernel_host.c', 'userland/shell/cmd_sys.c', 'userland/gshell/src/trim.rs', 'userland/rust/trim_back_rs/src/cache.rs', 'exec/owner_diag.h', 'platform/pc98/kernel.c', 'kernel/kstack_hw.c', 'tools/tests/kdebug_cli_host.c', 'userland/shell/cmd_base.c', 'init/sysconfig.c', 'tools/tests/kernel_layout.py', 'init/kaudit_boot.c', 'mm/memory_boot.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/font_guard_inactive.h', 'sys/arch/x86/arch_cpu.h', 'sys/arch/x86/x86_flags.h', 'sys/arch/x86/arch_io.h', 'sys/platform/pc98/input/kbd.h', 'sys/kern/exec/access_walk.c', 'sys/kern/exec/appmem.c', 'sys/kern/exec/appmem.h', 'sys/kern/exec/appmem_map.c', 'sys/kern/exec/appmem_unmap.c', 'sys/kern/exec/appslot.c', 'sys/kern/exec/appslot.h', 'sys/kern/exec/exec.c', 'sys/kern/exec/ring3_str.c', 'sys/kern/exec/exec.h', 'sys/kern/exec/exec_heap.c', 'sys/kern/exec/exec_heap.h', 'sys/kern/exec/lease.c', 'sys/kern/exec/redir_access.c', 'sys/fs/fd_redirect.h', 'sys/include/appmem_types.h', 'sys/include/cpu.h', 'sys/include/io.h', 'sys/include/memmap.h', 'sys/platform/pc98/pc98.h', 'sys/include/redir_access.h', 'sys/include/sys.h', 'sys/include/text_screen.h', 'sys/include/types.h', 'sys/kapi/kapi_generated.c', 'sys/kapi/kapi_sysinfo.c', 'sys/platform/pc98/platform_mem_stat.h', 'sys/platform/powermac/platform_mem_stat.h', 'tools/tests/mem_stat_source.py', 'sys/kern/sqlite_engine.c', 'sys/arch/x86/kernel/gdt.h', 'sys/kern/gui.c', 'sys/kern/gui.h', 'sys/kern/ime/ime.h', 'sys/include/ime_control.h', 'sys/kern/mm/kmalloc.c', 'sys/kern/mm/kmalloc.h', 'sys/platform/pc98/kdebug/kselftest.c', 'sys/kern/mm/paging.c', 'sys/kern/mm/paging.h', 'sys/kern/mm/paging_app.c', 'sys/kern/mm/paging_app.h', 'sys/kern/mm/pgalloc.c', 'sys/kern/mm/pgalloc.h', 'sys/kern/mm/physmem.c', 'sys/kern/mm/physmem.h', 'sys/arch/x86/kernel/tss.h', 'sys/kern/kstring.h', 'sys/platform/pc98/platform_io.h', 'sdk/include/os32/os32_gui_shared.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/kapi.json', 'tools/tests/appmem_map_host.c', 'tools/tests/exec_heap_host.h', 'tools/tests/host32.py', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/mem_stat_host.c', 'tools/tests/mutpar.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/test_appmem_map.py', 'tools/tests/test_mem_stat.py', 'tools/tests/trim_kernel_host.c', 'userland/shell/cmd_sys.c', 'userland/gshell/src/trim.rs', 'userland/rust/trim_back_rs/src/cache.rs', 'sys/kern/exec/owner_diag.h', 'sys/platform/pc98/kernel.c', 'sys/kern/kstack_hw.c', 'tools/tests/kdebug_cli_host.c', 'userland/shell/cmd_base.c', 'sys/kern/init/sysconfig.c', 'tools/tests/kernel_layout.py', 'sys/kern/init/kaudit_boot.c', 'sys/kern/mm/memory_boot.c', 'tools/tests/input_fixture_host.h', 'sys/hal/input/input_service.c', 'sys/hal/input/pointer_service.h', 'sys/hal/input/input_service.h', 'sys/include/kbd.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=4.7,
     kind='characterization',
 )
@@ -21,53 +21,53 @@ import test_mem_stat as base
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = base.TARGET_SRCS + [
-    'kernel/gui.c', 'kernel/gui.h', 'kdebug/kselftest/appmem.inc', 'fs/fd_redirect.h',
+    'sys/kern/gui.c', 'sys/kern/gui.h', 'sys/kern/kdebug/kselftest/appmem.inc', 'sys/fs/fd_redirect.h',
     'sdk/include/os32/os32_gui_shared.h', 'tools/tests/trim_kernel_host.c',
     'tools/tests/test_trim_kernel.py', 'tools/tests/test_mem_stat.py',
 ]
 
 # Each substitution applies to exactly one product input, never the assertions.
 MUTANTS = [
-    ('fallback-removed', 'exec/exec_heap.c',
+    ('fallback-removed', 'sys/kern/exec/exec_heap.c',
      'if (rc) {\n            if (appmem_map(as, &as->appmem, &as->appmem_layout, bytes, 0,',
      'if (rc) {\n            return 0;\n            if (appmem_map(as, &as->appmem, &as->appmem_layout, bytes, 0,',
      'TOPDOWN 16 pages'),
-    ('saturation-stops-mark', 'exec/appslot.c',
+    ('saturation-stops-mark', 'sys/kern/exec/appslot.c',
      'if (appslot_trim_epoch != ~(u32)0) appslot_trim_epoch++;',
      'if (appslot_trim_epoch == ~(u32)0) return;\n    appslot_trim_epoch++;',
      'epoch saturation'),
-    ('mark-excludes-wait-poll', 'exec/appslot.c',
+    ('mark-excludes-wait-poll', 'sys/kern/exec/appslot.c',
      'a->state != APP_STATE_WAIT_KEY &&\n            a->state != APP_STATE_WAIT_POLL',
      'a->state != APP_STATE_WAIT_KEY', 'back states marked'),
-    ('enova-marks', 'exec/appmem_map.c',
+    ('enova-marks', 'sys/kern/exec/appmem_map.c',
      'int rc = appmem_prepare(table, layout, bytes, hint, map_flags, kind, extent_flags, &plan);\n    if (rc) return rc;',
      'int rc = appmem_prepare(table, layout, bytes, hint, map_flags, kind, extent_flags, &plan);\n    if (rc) { if (rc == APPMEM_ENOVA) appslot_trim_request_as(as); return rc; }',
      'prepare errors do not mark'),
-    ('mark-requester', 'exec/appslot.c', 'id == requester || ', '', 'requester excluded'),
-    ('mark-cui', 'exec/appslot.c', '!a->gui || ', '', 'ineligible excluded'),
-    ('mark-running', 'exec/appslot.c',
+    ('mark-requester', 'sys/kern/exec/appslot.c', 'id == requester || ', '', 'requester excluded'),
+    ('mark-cui', 'sys/kern/exec/appslot.c', '!a->gui || ', '', 'ineligible excluded'),
+    ('mark-running', 'sys/kern/exec/appslot.c',
      'a->state != APP_STATE_PARKED && a->state != APP_STATE_WAIT_KEY &&\n            a->state != APP_STATE_WAIT_POLL) continue;',
      'a->state != APP_STATE_RUNNING && a->state != APP_STATE_PARKED && a->state != APP_STATE_WAIT_KEY &&\n            a->state != APP_STATE_WAIT_POLL) continue;',
      'ineligible excluded'),
-    ('remark-changes-epoch', 'exec/appslot.c', ' || a->trim_pending', '', 'pending coalesces'),
-    ('epoch-wrap', 'exec/appslot.c', 'if (appslot_trim_epoch != ~(u32)0) appslot_trim_epoch++;',
+    ('remark-changes-epoch', 'sys/kern/exec/appslot.c', ' || a->trim_pending', '', 'pending coalesces'),
+    ('epoch-wrap', 'sys/kern/exec/appslot.c', 'if (appslot_trim_epoch != ~(u32)0) appslot_trim_epoch++;',
      'appslot_trim_epoch++;', 'epoch saturation'),
-    ('start-keeps-bit', 'exec/appslot.c', 'a->trim_pending = 0;\n    a->trim_epoch = 0;',
+    ('start-keeps-bit', 'sys/kern/exec/appslot.c', 'a->trim_pending = 0;\n    a->trim_epoch = 0;',
      '/* retain both fields */', 'start clears trim'),
-    ('done-any-epoch', 'exec/appslot.c', ' && a->trim_epoch == epoch',
+    ('done-any-epoch', 'sys/kern/exec/appslot.c', ' && a->trim_epoch == epoch',
      ' && (epoch || !epoch)', 'stale immutable'),
-    ('done-trims-on-stale', 'exec/exec.c',
+    ('done-trims-on-stale', 'sys/kern/exec/exec.c',
      'if (!appslot_trim_done(c.app_id, epoch)) return OS32_ERR_STALE;',
      'if (!appslot_trim_done(c.app_id, epoch)) { exec_heap_user_trim(slot->as); return OS32_ERR_STALE; }',
      'stale immutable'),
-    ('done-other-as', 'exec/exec.c', 'slot->as != c.as || ', '', 'other AS refused'),
-    ('done-from-wm', 'exec/exec.c', ' || ring3_wm_depth)', ')', 'context refused'),
-    ('done-forwards-to-wm', 'kernel/gui.c',
+    ('done-other-as', 'sys/kern/exec/exec.c', 'slot->as != c.as || ', '', 'other AS refused'),
+    ('done-from-wm', 'sys/kern/exec/exec.c', ' || ring3_wm_depth)', ')', 'context refused'),
+    ('done-forwards-to-wm', 'sys/kern/gui.c',
      'if (op == GUI_OP_TRIM_DONE) return exec_trim_done(arg);', '', 'stale immutable'),
-    ('done-keeps-bit', 'exec/appslot.c', '        a->trim_pending = 0;',
+    ('done-keeps-bit', 'sys/kern/exec/appslot.c', '        a->trim_pending = 0;',
      '        /* keep pending */', 'DONE accepted'),
-    ('mark-cpl0', 'exec/appslot.c', '!a->cpl3 || ', '', 'ineligible excluded'),
-    ('mark-poisoned', 'exec/appslot.c', 'a->as->appmem_poisoned || ', '', 'ineligible excluded'),
+    ('mark-cpl0', 'sys/kern/exec/appslot.c', '!a->cpl3 || ', '', 'ineligible excluded'),
+    ('mark-poisoned', 'sys/kern/exec/appslot.c', 'a->as->appmem_poisoned || ', '', 'ineligible excluded'),
 ]
 
 
@@ -105,10 +105,10 @@ void fd_redirect_restore(const FdRedirectState *s) { (void)s; }
     heap = (tmp / 'exec_heap_host.h').read_text()
     heap = heap.replace(fn(heap, 'AppSlot *appslot_at('), '')
     (tmp / 'exec_heap_host.h').write_text(heap)
-    (tmp / 'trim_slot_source.c').write_text(sources['exec/appslot.c'])
-    (tmp / 'trim_exec_source.c').write_text('#include "exec_legacy.h"\n' + fn(sources['exec/exec.c'], 'i32 exec_trim_done('))
-    (tmp / 'trim_gui_source.c').write_text(sources['kernel/gui.c'])
-    stat = sources['kapi/kapi_sysinfo.c']
+    (tmp / 'trim_slot_source.c').write_text(sources['sys/kern/exec/appslot.c'])
+    (tmp / 'trim_exec_source.c').write_text('#include "exec_legacy.h"\n' + fn(sources['sys/kern/exec/exec.c'], 'i32 exec_trim_done('))
+    (tmp / 'trim_gui_source.c').write_text(sources['sys/kern/gui.c'])
+    stat = sources['sys/kapi/kapi_sysinfo.c']
     (tmp / 'mem_stat_source.c').write_text(base.mem_stat_source(stat))
     setters = ('appslot_trim_epoch', 'appslot_trim_request_count', 'appslot_trim_mark_count',
                'appslot_trim_done_count', 'appslot_trim_done_reject_count',
@@ -116,19 +116,19 @@ void fd_redirect_restore(const FdRedirectState *s) { (void)s; }
     (tmp / 'trim_selftest_source.c').write_text(
         ''.join('static void kdi_set_' + name + '(' + ('int' if name.endswith('_id') else 'u32') +
                 ' value) { ' + name + ' = value; }\n' for name in setters) +
-        fn(sources['kdebug/kselftest/appmem.inc'], 'static void test_appmem('))
-    (tmp / 'heap_source.c').write_text(sources['exec/exec_heap.c'])
+        fn(sources['sys/kern/kdebug/kselftest/appmem.inc'], 'static void test_appmem('))
+    (tmp / 'heap_source.c').write_text(sources['sys/kern/exec/exec_heap.c'])
     return cc
 
 
 def execute(tmp, sources, runner):
     cc = build_fixture(tmp, sources)
     objects = []
-    for i, name in enumerate(('exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
-                              'mm/paging_app.c', 'mm/physmem.c')):
+    for i, name in enumerate(('sys/kern/exec/appmem.c', 'sys/kern/exec/appmem_map.c', 'sys/kern/exec/appmem_unmap.c',
+                              'sys/kern/mm/paging_app.c', 'sys/kern/mm/physmem.c')):
         src, obj = tmp / f'part{i}.c', tmp / f'part{i}.o'
         src.write_text(sources[name])
-        extra = ['-Dpgalloc_alloc_phys=map_alloc', '-Dpgalloc_free_n_owner=map_free'] if name == 'mm/paging_app.c' else []
+        extra = ['-Dpgalloc_alloc_phys=map_alloc', '-Dpgalloc_free_n_owner=map_free'] if name == 'sys/kern/mm/paging_app.c' else []
         host32.build(cc + extra + ['-c', str(src), '-o', str(obj)],
                      check=True, capture_output=True, text=True)
         objects.append(str(obj))
@@ -180,9 +180,9 @@ def main():
     p.add_argument('--mutate', action='store_true')
     p.add_argument('--runner', choices=('native', 'qemu'), default='native')
     args = p.parse_args()
-    paths = ['exec/appslot.c', 'exec/exec.c', 'kernel/gui.c', 'kdebug/kselftest/appmem.inc',
-             'kapi/kapi_sysinfo.c', 'exec/exec_heap.c', 'exec/appmem.c', 'exec/appmem_map.c',
-             'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/physmem.c']
+    paths = ['sys/kern/exec/appslot.c', 'sys/kern/exec/exec.c', 'sys/kern/gui.c', 'sys/kern/kdebug/kselftest/appmem.inc',
+             'sys/kapi/kapi_sysinfo.c', 'sys/kern/exec/exec_heap.c', 'sys/kern/exec/appmem.c', 'sys/kern/exec/appmem_map.c',
+             'sys/kern/exec/appmem_unmap.c', 'sys/kern/mm/paging_app.c', 'sys/kern/mm/physmem.c']
     sources = {name: (ROOT / name).read_text() for name in paths}
     with tempfile.TemporaryDirectory(prefix='trim-kernel-') as directory:
         tmp = pathlib.Path(directory)

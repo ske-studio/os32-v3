@@ -2,7 +2,7 @@
  * deferred shell fault landing. F4 module composition is covered by C3.
  * Acquisition/CPU/MSR and device operations are models; exec/GUI functions are extracted
  * verbatim by test_geforce.py. Each scenario runs in a fresh process. */
-#include "arch/x86/kernel/mtrr_wc.h"
+#include "sys/arch/x86/kernel/mtrr_wc.h"
 #include "ksetjmp.h"
 static int identity_ok=1, bios_wc, wc_acquires, wc_releases, wc_effective;
 static unsigned long long msr_base=0x12345000ULL, msr_mask=0x43210000ULL;

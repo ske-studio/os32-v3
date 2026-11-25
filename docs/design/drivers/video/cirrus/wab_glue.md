@@ -1,6 +1,6 @@
-# drivers/video/cirrus/wab_glue.h — 設計
+# sys/dev/video/cirrus/wab_glue.h — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DESIGN (D1 で移した)
-ソース: `drivers/video/cirrus/wab_glue.h`
+ソース: `sys/dev/video/cirrus/wab_glue.h`
 
 HAL の下は 2 層に分ける:
 

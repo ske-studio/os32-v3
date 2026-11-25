@@ -4,13 +4,13 @@
 
 ### limits.inc
 
-ソース: `kdebug/gfinit_pll/limits.inc`
+ソース: `sys/dev/video/geforce/gfinit_pll/limits.inc`
 
 `/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/nvkm/subdev/bios/pll.c:301–333` のVCO1/2上下限・入力周波数・/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/nvkm/M範囲・max_p/bias_pをchecked読取。ref_clk=0は27,000kHz（同:386–398）。
 
 ### parse.inc
 
-ソース: `kdebug/gfinit_pll/parse.inc`
+ソース: `sys/dev/video/geforce/gfinit_pll/parse.inc`
 
 - PLL limits: 表0x5BC8、版0x21、4件。対象レジスタのキー (NV40 の対応 CORE 0x004000・MEMORY 0x004020・VPLL0 0x680508) が一致するエントリ、無ければ表の最初のエントリ (`/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/nvkm/subdev/bios/pll.c:162–175`)。キーの重複は断る。Ra266 の ROM はヘッダ 5・エントリ 35 バイト、キーは 0・0x4020・0x4008・0x402C で、CORE と VIDEO は最初のエントリを使う。
 
@@ -20,7 +20,7 @@
 
 ### solve.inc
 
-ソース: `kdebug/gfinit_pll/solve.inc`
+ソース: `sys/dev/video/geforce/gfinit_pll/solve.inc`
 
 - 周波数はkHz整数、`f≈27000×N1×N2/(M1×M2×2^P)`。単段はN2=M2=1。中間積はu32、nouveauの段別演算順を維持し、一括積の式へ置換しない。/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/nvkm/M<=255、ref=27000を検査し、`_Static_assert(27000U <= UINT32_MAX / 255U / 255U, "PLL product")`で二段積上限1,755,675,000を確認する。clkP×M+丸め項も乗算前に `(UINT32_MAX-add)/M` と比較し、shift・加算・分母を検査して超過は拒否。pllnv04.c:99/107/171/184/195の演算をhostで比較し、32bitリンクで__udivdi3等の64bit除算支援が不要なことを確認する。
 
@@ -28,7 +28,7 @@
 
 ### sequence.inc
 
-ソース: `kdebug/gfinit_pll/sequence.inc`
+ソース: `sys/dev/video/geforce/gfinit_pll/sequence.inc`
 
 - 4004h/4024hは低位PLLのNMNM。limits検索はreg−4（`/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/nvkm/subdev/devinit/nv04.c:366`）、4000h/4020hの制御と対で扱う。680508hは高位PLL。
 
@@ -44,4 +44,4 @@
 
 - capture上限は3から32（valid bitmapの幅内）にし、PLLの一時値は既存3件に続く23件の単一consumer slotで扱う；4038hの設定元は4020hなのでconsumer宛先とsource targetの同一条件だけ外し、同pc/ctx/head・先行read・全経路の到達・一回消費・許可ruleを維持する。
 
-> [要確認] 現行は診断も hwdev/gf/runner.c を使い、main 境界の 5 node を生成する。原文の静的展開・ordinal・verify 規則を現行実装と同一とは扱えない。
+> [要確認] 現行は診断も sys/dev/video/geforce/runner.c を使い、main 境界の 5 node を生成する。原文の静的展開・ordinal・verify 規則を現行実装と同一とは扱えない。

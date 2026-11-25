@@ -1,12 +1,12 @@
 /* Real PowerMac provider, formatter and reservation manager over a RAM disk. */
 #include "install_management.h"
-#include "include/platform_install_boot.h"
+#include "sys/include/platform_install_boot.h"
 #include "install_access.h"
 #include "install_backend.h"
 #include "install_apm.h"
 #include "platform_ext2.h"
-#include "fs/ext2/ext2_priv.h"
-#include "drivers/ata/ide.h"
+#include "sys/fs/ext2/ext2_priv.h"
+#include "sys/dev/ata/ide.h"
 #include "lib/crc32.h"
 #include "kstring.h"
 

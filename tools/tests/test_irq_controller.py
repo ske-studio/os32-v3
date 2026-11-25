@@ -1,11 +1,11 @@
 """IRQ controller contract: actual core with PC98 ports and a 64-line mock provider."""
 CHECK = dict(name='irq-controller-host', tier=1,
     covers=['tools/tests/test_irq_controller.py', 'tools/tests/irq_controller_host.c',
-            'kernel/irq/irq.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.c',
-            'kernel/irq/irq_math.h', 'include/platform_irq.h', 'include/kernel_tick.h',
-            'platform/pc98/platform_irq_limits.h', 'platform/powermac/platform_irq_limits.h',
-            'platform/pc98/irq_policy.c', 'platform/pc98/irq_complete.c',
-            'platform/pc98/pic.c', 'include/pc98.h', 'arch/x86/kernel/idt.h',
+            'sys/kern/irq/irq.c', 'sys/kern/irq/irq.h', 'sys/kern/irq/irq_math.c',
+            'sys/kern/irq/irq_math.h', 'sys/include/platform_irq.h', 'sys/include/kernel_tick.h',
+            'sys/platform/pc98/platform_irq_limits.h', 'sys/platform/powermac/platform_irq_limits.h',
+            'sys/platform/pc98/irq_policy.c', 'sys/platform/pc98/irq_complete.c',
+            'sys/platform/pc98/pic.c', 'sys/platform/pc98/pc98.h', 'sys/arch/x86/kernel/idt.h',
             'tools/tests/dep_dir_b_io_shim.h', 'tools/tests/ver_test_utils.py',
             'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
     needs=[], budget=3.6,
@@ -19,22 +19,22 @@ import host32
 from kernel_includes import include_flags
 from ver_test_utils import ROOT, SUPPORT
 
-SOURCES = ['kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'platform/pc98/irq_policy.c',
-           'platform/pc98/irq_complete.c', 'platform/pc98/pic.c']
+SOURCES = ['sys/kern/irq/irq.c', 'sys/kern/irq/irq_math.c', 'sys/platform/pc98/irq_policy.c',
+           'sys/platform/pc98/irq_complete.c', 'sys/platform/pc98/pic.c']
 MUTATIONS = [
-    ('kernel/irq/irq.c', '    if (claim.needs_finish) platform_irq_complete(&claim);\n    if (!handled &&',
+    ('sys/kern/irq/irq.c', '    if (claim.needs_finish) platform_irq_complete(&claim);\n    if (!handled &&',
      '    if (claim.needs_finish) { platform_irq_complete(&claim); platform_irq_complete(&claim); }\n    if (!handled &&', 16),
-    ('platform/pc98/pic.c', 'outp(PIC2_CMD, OCW2_EOI);\n        outp(PIC1_CMD, OCW2_EOI);',
+    ('sys/platform/pc98/pic.c', 'outp(PIC2_CMD, OCW2_EOI);\n        outp(PIC1_CMD, OCW2_EOI);',
      'outp(PIC1_CMD, OCW2_EOI);\n        outp(PIC2_CMD, OCW2_EOI);', 16),
-    ('platform/pc98/irq_policy.c', 'return slave_isr_bit7 ? IRQ_EOI_SLAVE_MASTER : IRQ_EOI_MASTER;',
+    ('sys/platform/pc98/irq_policy.c', 'return slave_isr_bit7 ? IRQ_EOI_SLAVE_MASTER : IRQ_EOI_MASTER;',
      'return slave_isr_bit7 >= 0 ? IRQ_EOI_SLAVE_MASTER : IRQ_EOI_MASTER;', 16),
-    ('platform/pc98/irq_complete.c', 'platform_irq_reserved(native_token))',
+    ('sys/platform/pc98/irq_complete.c', 'platform_irq_reserved(native_token))',
      '(platform_irq_reserved(native_token) && native_token != 7))', 16),
-    ('kernel/irq/irq.c', 'return irq < 32 ? (u32)(1u << irq) : 0;',
+    ('sys/kern/irq/irq.c', 'return irq < 32 ? (u32)(1u << irq) : 0;',
      'return irq <= 32 ? (u32)(1u << (irq & 31)) : 0;', 64),
-    ('kernel/irq/irq.c', 'return irq < 32 ? (u32)(1u << irq) : 0;',
+    ('sys/kern/irq/irq.c', 'return irq < 32 ? (u32)(1u << irq) : 0;',
      'return irq < 31 ? (u32)(1u << irq) : 0;', 64),
-    ('platform/pc98/irq_policy.c', '3, 5, 6, 8, 9, 10, 11, 14, 15',
+    ('sys/platform/pc98/irq_policy.c', '3, 5, 6, 8, 9, 10, 11, 14, 15',
      '0, 5, 6, 8, 9, 10, 11, 14, 15', 16),
 ]
 
@@ -49,7 +49,7 @@ def execute(lines, mutation=None):
         sources = SOURCES if lines == 16 else SOURCES[:2]
         copies = []
         for rel in sources:
-            text = (ROOT / rel).read_text().replace('"../../include/platform_irq.h"', '"platform_irq.h"')
+            text = (ROOT / rel).read_text().replace('"../../sys/include/platform_irq.h"', '"platform_irq.h"')
             if mutation and mutation[0] == rel:
                 assert text.count(mutation[1]) == 1, mutation[1]
                 text = text.replace(mutation[1], mutation[2])

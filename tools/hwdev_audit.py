@@ -62,10 +62,10 @@ def audit(out, cross):
     kernel_table = doc.split('## 3.', 1)[1].split('## 4.', 1)[0]
     rows = re.findall(r'^\| (\d+) \| `(\w+)` \| `([^`]+)` \|$',
                       core_table, re.M)
-    private = json.loads((ROOT/'hwdev/hwdev_imports.def').read_text())['imports']
+    private = json.loads((ROOT/'sys/dev/hwdev/hwdev_imports.def').read_text())['imports']
     require([int(r[0]) for r in rows] == [e['index'] for e in private if e['group'] == 'core'],
             'core slot order/count')
-    imports = {r['symbol']: r for r in json.loads((ROOT/'kernel/module/kdebug_imports.def').read_text())['imports']}
+    imports = {r['symbol']: r for r in json.loads((ROOT/'sys/kern/module/kdebug_imports.def').read_text())['imports']}
     core_names = {r[1] for r in rows}
     kernel_names = refs & imports.keys()
     require(refs == core_names | kernel_names, f'missing={refs-core_names-kernel_names}, unused={core_names-refs}')

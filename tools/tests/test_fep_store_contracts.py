@@ -6,11 +6,11 @@ existing ILP32 VfsSqliteCookie/OS32_MAX_PATH. Regenerate expectations only when
 that contract changes. Mutants must compile and return a runtime failure.
 """
 CHECK = dict(name='fep-store-contracts', tier=1, needs=[], budget=4.4,
-    covers=['kernel/ime/ime_store.h', 'kernel/ime/ime.h', 'include/ime_boot.h',
+    covers=['sys/kern/ime/ime_store.h', 'sys/kern/ime/ime.h', 'sys/include/ime_boot.h',
             'tools/tests/fep_store_fixture.h', 'tools/tests/fep_store_fixture.c',
-            'kernel/ime/fep_module.h', 'kernel/module/module_runtime.h',
+            'sys/kern/ime/fep_module.h', 'sys/kern/module/module_runtime.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'build/config.mk', 'kernel/ime/ime_dict_info.c',
+            'build/config.mk', 'sys/kern/ime/ime_dict_info.c',
             'lib/sqlite3/os32_sqlite_vfs.h'],
     basis=['docs/design/kernel/ime/ime_store.md 型と不変条件', 'docs/design/kernel/ime/ime_store.md 口の持ち主'],
 )
@@ -27,7 +27,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = 'kernel/ime/ime_store.h'
+HEADER = 'sys/kern/ime/ime_store.h'
 FIXTURE_H = 'tools/tests/fep_store_fixture.h'
 FIXTURE_C = 'tools/tests/fep_store_fixture.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
@@ -86,7 +86,7 @@ SIGNATURES = {
     'fep_test_resident_finish': 'void (*)(FepTestFixture *, int)',
 }
 MUTATIONS = (
-    ('old-ops', 'kernel/ime/fep_module.h', 'FEP_MODULE_OPS_VERSION 6u', 'FEP_MODULE_OPS_VERSION 5u'),
+    ('old-ops', 'sys/kern/ime/fep_module.h', 'FEP_MODULE_OPS_VERSION 6u', 'FEP_MODULE_OPS_VERSION 5u'),
     ('reader', HEADER, 'FEP_DICT_READER_VERSION 1u', 'FEP_DICT_READER_VERSION 2u'),
     ('format', HEADER, 'FEP_DICT_FORMAT_VERSION 1u', 'FEP_DICT_FORMAT_VERSION 2u'),
     ('page', HEADER, 'FEP_DICT_PAGE_SIZE 1024u', 'FEP_DICT_PAGE_SIZE 2048u'),
@@ -118,7 +118,7 @@ def source():
         'FepStore': (676, [('system', 0), ('user', 288), ('meta', 576),
                           ('boot_reserve_kb', 668), ('user_enabled', 672)]),
     }
-    body = '#include "tools/tests/fep_store_fixture.h"\n#include "kernel/ime/fep_module.h"\n'
+    body = '#include "tools/tests/fep_store_fixture.h"\n#include "sys/kern/ime/fep_module.h"\n'
     checks += [('FEP_MODULE_API_SLOTS', '24'), ('sizeof(FepModuleApi)', '96'),
                ('__builtin_offsetof(FepModuleApi, dict_suspend)', '84'),
                ('__builtin_offsetof(FepModuleApi, boot_connections)', '88'),
@@ -227,11 +227,11 @@ def build(work, tree, compiler, execute):
         return host32.run([str(exe)], cwd=ROOT).returncode
     subprocess.run([*cmd, '-c', str(src), '-o', str(work / 'types.o')], check=True)
     subprocess.run([*cmd, '-c', str(tree / FIXTURE_C), '-o', str(work / 'fixture.o')], check=True)
-    for header in (HEADER, FIXTURE_H, 'kernel/ime/ime.h'):
+    for header in (HEADER, FIXTURE_H, 'sys/kern/ime/ime.h'):
         src.write_text(f'#include "{header}"\n#include "{header}"\n')
         subprocess.run([*cmd, '-c', str(src), '-o', str(work / 'header.o')], check=True)
-    src.write_text('#include "kernel/ime/ime_store.h"\n'
-                   '#include "kernel/ime/ime_dict_info.c"\n')
+    src.write_text('#include "sys/kern/ime/ime_store.h"\n'
+                   '#include "sys/kern/ime/ime_dict_info.c"\n')
     subprocess.run([*cmd, '-c', str(src), '-o', str(work / 'coinclude.o')], check=True)
     return 0
 
@@ -256,7 +256,7 @@ def main():
             tree = work / 'overlay'
             # The implementer's read-only index still lists working-tree deletions.
             present_headers = {rel for rel in headers if (ROOT / rel).is_file()}
-            for rel in present_headers | {HEADER, FIXTURE_H, FIXTURE_C, 'include/ime_boot.h'}:
+            for rel in present_headers | {HEADER, FIXTURE_H, FIXTURE_C, 'sys/include/ime_boot.h'}:
                 target = tree / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(ROOT / rel, target)

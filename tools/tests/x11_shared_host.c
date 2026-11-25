@@ -1,6 +1,6 @@
 #define LEGACY_KEYMAP_SOURCE "legacy_keymap_source.inc"
 #define KBD_MERGE_SOURCE "kbd_merge_source.inc"
-#include "input/hal/input_context.h"
+#include "sys/input/input_context.h"
 static KbdPolicySnapshot foreground;
 int input_context_snapshot(KbdPolicySnapshot *out)
 {
@@ -9,10 +9,10 @@ int input_context_snapshot(KbdPolicySnapshot *out)
     return 0;
 }
 #include "kbd_capture_fixture_host.h"
-#include "../../input/hal/legacy_ring.c"
+#include "../../sys/hal/input/legacy_ring.c"
 #include "ime_gate_source.inc"
-#include "../../input/hal/legacy_mode.c"
-#include "../../kernel/input_legacy.c"
+#include "../../sys/hal/input/legacy_mode.c"
+#include "../../sys/kern/input_legacy.c"
 #include "wait_source.inc"
 /* X-11: real shared services and keyboard queues, ILP32. Device rendering,
  * dictionary storage and CPU transitions are fixture boundaries. No per-owner
@@ -168,8 +168,8 @@ int fep_store_user_export(FepStore *d, const char *p)
 int fep_store_user_clear(FepStore *d)
 { management++; return d == shared_dict ? storage_rc : -99; }
 
-#include "../../drivers/input/kbd.h"
-#include "../../drivers/input/kbd_dlog.c"
+#include "../../sys/platform/pc98/input/kbd.h"
+#include "../../sys/dev/input/kbd_dlog.c"
 #include "kbd_source.inc"
 /* Back the CUI candidate save/restore addresses with host memory. */
 #include "text_screen.h"
@@ -180,7 +180,7 @@ static u8 fixture_tvram_attr[25 * 160];
 #undef TVRAM_ATTR
 #define TVRAM_BASE ((uptr)fixture_tvram_text)
 #define TVRAM_ATTR ((uptr)fixture_tvram_attr)
-#include "../../platform/pc98/ime_display.c"
+#include "../../sys/platform/pc98/ime_display.c"
 #ifdef TEST_IME_FG1
 static unsigned publications;
 static void counted_state(u32 active, u32 owner, u32 command_gen)
@@ -241,15 +241,15 @@ static int scripted_fep_try(int *key)
 #undef kbd_getkey_wait
 #undef tvram_set_scroll_reserve
 #endif
-#include "../../kernel/input_service.c"
+#include "../../sys/hal/input/input_service.c"
 #include "pointer_fixture_host.h"
 #include "port_fixture_host.h"
 /* This fixture exercises input/serial; supply a fake calendar provider. */
-#include "../../kernel/time/clock_service.c"
+#include "../../sys/hal/time/clock_service.c"
 const ClockOps pc98_clock = {
     .read_date = clock_empty_date, .read_legacy = clock_empty_legacy,
 };
-#include "../../platform/pc98/d2_bind.c"
+#include "../../sys/platform/pc98/d2_bind.c"
 #include "gui_source.inc"
 #include "sink_source.inc"
 #include "inject_source.inc"
@@ -816,7 +816,7 @@ static int candidate_boundaries(void)
 #include "x11_shared_host_l45.inc"
 
 #ifdef TEST_IME_FG1
-#include "../../input/keymaps/hid_jp.c"
+#include "../../sys/input/keymaps/hid_jp.c"
 static int usage(u8 src, u16 gen, u8 code, int down)
 {
     KmKey event = {.src=src, .generation=gen, .keycode=code, .down=down};

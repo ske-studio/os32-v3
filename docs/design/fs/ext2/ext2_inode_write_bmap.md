@@ -1,4 +1,4 @@
-# fs/ext2/ext2_inode_write_bmap.inc — 書込み用の間接表
+# sys/fs/ext2/ext2_inode_write_bmap.inc — 書込み用の間接表
 
 > 状態: **現行 (2026-10-31)**
 

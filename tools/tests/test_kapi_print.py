@@ -8,9 +8,9 @@ import subprocess
 import test_access_walk as walk
 
 ROOT = walk.ROOT
-TARGET_SRC = [*walk.FILES.values(), 'kapi/kapi_print.c', 'lib/kprintf.c',
-              'lib/kprintf_attr.c', 'platform/pc98/console_attr.c',
-              'include/console_attr.h', 'include/kapi_call.h', 'arch/x86/kernel/kapi_call.c', 'exec/exec.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
+TARGET_SRC = [*walk.FILES.values(), 'sys/kapi/kapi_print.c', 'sys/kern/kprintf.c',
+              'sys/kern/kprintf_attr.c', 'sys/platform/pc98/console_attr.c',
+              'sys/include/console_attr.h', 'sys/include/kapi_call.h', 'sys/arch/x86/kernel/kapi_call.c', 'sys/kern/exec/exec.c', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h']
 MUTANTS = [
     ('format raw pointer', 'print',
      'format, sizeof(format))) return 0;',
@@ -53,14 +53,14 @@ def exercise(runner, mutant=None):
                           '#include "' + str(ROOT / 'tools/tests/pgalloc_host_fixture.h') + '"')
     setup = setup.replace('    caller_copy_tests();', '    caller_copy_tests();\n    die(0);')
     sources['setup'] = setup
-    for key, path in [('print', 'kapi/kapi_print.c'), ('format', 'lib/kprintf.c'),
-                      ('attr', 'lib/kprintf_attr.c'),
-                      ('attr_backend', 'platform/pc98/console_attr.c')]:
+    for key, path in [('print', 'sys/kapi/kapi_print.c'), ('format', 'sys/kern/kprintf.c'),
+                      ('attr', 'sys/kern/kprintf_attr.c'),
+                      ('attr_backend', 'sys/platform/pc98/console_attr.c')]:
         sources[key] = (ROOT / path).read_text()
-    dispatch = (ROOT / 'exec/exec_syscall.inc').read_text()
+    dispatch = (ROOT / 'sys/kern/exec/exec_syscall.inc').read_text()
     start = dispatch.index('    if (!handled && slot == KAPI_SLOT_KPRINTF) {')
     sources['dispatch'] = dispatch[start:dispatch.index('    if (!handled) handled = kapi_strings', start)]
-    sources['call'] = (ROOT / 'arch/x86/kernel/kapi_call.c').read_text()
+    sources['call'] = (ROOT / 'sys/arch/x86/kernel/kapi_call.c').read_text()
     if mutant:
         name, key, old, new = mutant
         assert sources[key].count(old) == 1, name

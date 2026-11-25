@@ -1,6 +1,6 @@
-# exec/lease.c — 設計
+# sys/kern/exec/lease.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: MEMMAP_V3・SLIM_KERNEL_DESIGN・SLIM_KERNEL_IMPORTS・GFX_MODES_DESIGN (D1 で移した)
-ソース: `exec/lease.c`
+ソース: `sys/kern/exec/lease.c`
 
 - **lease = 台帳の SURFACE (owner、物理範囲または VRAM 範囲、幅・高さ・ピッチ・形式) を 1 つの AS の lease 窓に USER (RW/RO、PCD は物理の属性を継承) で張ること。** `addrspace_map_user_page` の「共有 PT を書き換えて PDE に USER を立てる」経路 (`paging.c`) は**廃止**し、lease 窓の私有 PT にだけ書く。
 - 解放は「その AS の lease を外す」だけで他 AS に波及しない。物理の解放は全 lease が返り、かつ owner が返したとき。
@@ -21,12 +21,12 @@ AS 生成時に **lease 窓の先頭 4MB の PT を 1 枚事前確保**
 **lease 台帳は AS ごとの固定配列**
 で実行時確保はしない。
 
-exec/lease.c
+sys/kern/exec/lease.c
 leaseは既存観測変数への1代入。
 
 lease_selftest_result
 
-- `kdi_selftest_lease_result` は `exec/lease.c` に既存観測変数への 1 代入として置く。
+- `kdi_selftest_lease_result` は `sys/kern/exec/lease.c` に既存観測変数への 1 代入として置く。
 
 | 記号 | 元の種類・操作 | r2での扱い |
 |---|---|---|
@@ -64,4 +64,4 @@ lease_selftest_result
 
 ### native の VRAM の属性
 
-PC-98 の native VRAM (TVRAM・B/R/G/I の各面) の master alias は、`paging_init` の最初の表の構築で UC にする (`mm/paging.c` の `native_cache_bits`)。後から WB を UC に書き換えない。CG・ROM・RAM は WB のまま。V86 の setup/teardown もこの属性を保ち、exec・V86・再 exec の各時点で低位 1MB の PCD/PWT が変わらないこと、lease の alias と台帳が一致することを `tools/tests/test_surface_bundle.py` が確かめる。
+PC-98 の native VRAM (TVRAM・B/R/G/I の各面) の master alias は、`paging_init` の最初の表の構築で UC にする (`sys/kern/mm/paging.c` の `native_cache_bits`)。後から WB を UC に書き換えない。CG・ROM・RAM は WB のまま。V86 の setup/teardown もこの属性を保ち、exec・V86・再 exec の各時点で低位 1MB の PCD/PWT が変わらないこと、lease の alias と台帳が一致することを `tools/tests/test_surface_bundle.py` が確かめる。

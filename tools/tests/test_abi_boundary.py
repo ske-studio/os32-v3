@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Execute the public calling convention and ABI alignment on an ILP32 host."""
 CHECK = dict(name='abi-boundary', tier=1, needs=[], budget=15,
-    covers=['include/abi.h', 'include/cpu.h', 'include/types.h',
-            'arch/x86/arch_abi.h', 'arch/ppc/arch_abi.h',
+    covers=['sys/include/abi.h', 'sys/include/cpu.h', 'sys/include/types.h',
+            'sys/arch/x86/arch_abi.h', 'sys/arch/ppc/arch_abi.h',
             'tools/tests/host_arch/arch_abi.h',
-            'include/callconv.h', 'sdk/include/os32/**',
-            'arch/x86/kernel/cpu_flags.inc',
+            'sys/include/callconv.h', 'sdk/include/os32/**',
+            'sys/arch/x86/kernel/cpu_flags.inc',
             'tools/tests/test_abi_boundary.py', 'tools/tests/host32.py'],
     basis=['[C1]', '[ABI]', 'KAPI_SPEC §3-1'],
 )
@@ -59,13 +59,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    callconv = (ROOT / 'include/callconv.h').read_text()
-    abi = (ROOT / 'arch/x86/arch_abi.h').read_text()
-    assert '%define ABI_STACK_ALIGN 16' in (ROOT / 'arch/x86/kernel/cpu_flags.inc').read_text()
+    callconv = (ROOT / 'sys/include/callconv.h').read_text()
+    abi = (ROOT / 'sys/arch/x86/arch_abi.h').read_text()
+    assert '%define ABI_STACK_ALIGN 16' in (ROOT / 'sys/arch/x86/kernel/cpu_flags.inc').read_text()
     with tempfile.TemporaryDirectory() as temp:
         directory = Path(temp)
         assert observe(directory, callconv, abi) == 0
-        assert observe(directory, callconv, (ROOT / "arch/ppc/arch_abi.h").read_text()) == 0
+        assert observe(directory, callconv, (ROOT / "sys/arch/ppc/arch_abi.h").read_text()) == 0
         # The public SDK remains independently usable in GNU89.
         subprocess.run(['gcc', '-m32', '-std=gnu89', '-Werror', '-fsyntax-only',
                         '-Isdk/include/os32', '-x', 'c', '-'], cwd=ROOT, check=True,

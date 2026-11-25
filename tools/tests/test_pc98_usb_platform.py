@@ -4,12 +4,12 @@ import subprocess
 import tempfile
 
 CHECK = dict(name='pc98-usb-platform-host', tier=1, needs=[], budget=3,
-             covers=['platform/pc98/usb_platform.c', 'platform/pc98/usb_probe.h',
+             covers=['sys/platform/pc98/usb_platform.c', 'sys/platform/pc98/usb_probe.h',
                      'tools/tests/pc98_usb_platform_host.c', 'tools/tests/test_pc98_usb_platform.py',
-                     'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'drivers/pci/pci_barsize.h',
-                     'include/pci_contract.h', 'include/pci_dev_contract.h', 'include/usb_platform.h',
-                     'drivers/usb/ehci_quiesce.c', 'drivers/usb/ehci_handoff.c', 'drivers/usb/*.h', 'include/endian_dma.h',
-                     'arch/x86/arch_endian_dma.h', 'include/kprintf.h', 'include/types.h', 'include/callconv.h', 'sdk/include/os32/os32_*.h'],
+                     'sys/dev/pci/pci.h', 'sys/dev/pci/pci_decode.h', 'sys/dev/pci/pci_barsize.h',
+                     'sys/include/pci_contract.h', 'sys/include/pci_dev_contract.h', 'sys/include/usb_platform.h',
+                     'sys/dev/usb/ehci_quiesce.c', 'sys/dev/usb/ehci_handoff.c', 'drivers/usb/*.h', 'sys/include/endian_dma.h',
+                     'sys/arch/x86/arch_endian_dma.h', 'sys/include/kprintf.h', 'sys/include/types.h', 'sys/include/callconv.h', 'sdk/include/os32/os32_*.h'],
              basis=['docs/decisions/usb/USB_DESIGN.md §4-1'])
 MUTATIONS = [
     ('dev->progif == 0x10', '1', 2),
@@ -30,8 +30,8 @@ MUTATIONS = [
 
 def run(ctx):
     root = Path(ctx.root)
-    paths = ['platform/pc98/usb_platform.c', 'drivers/usb/ehci_handoff.c',
-             'platform/pc98/usb_probe.h']
+    paths = ['sys/platform/pc98/usb_platform.c', 'sys/dev/usb/ehci_handoff.c',
+             'sys/platform/pc98/usb_probe.h']
     originals = [(root / path).read_text() for path in paths]
     with tempfile.TemporaryDirectory() as directory:
         sources = [Path(directory) / Path(path).name for path in paths]
@@ -46,7 +46,7 @@ def run(ctx):
                 src.write_text(content)
             subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                             '-Iarch/x86', '-I.', '-Iinclude', '-Iplatform/pc98', '-Isdk/include/os32',
-                            *[src for src in sources if src.suffix == '.c'], 'drivers/usb/ehci_quiesce.c', 'tools/tests/pc98_usb_platform_host.c', '-o', exe],
+                            *[src for src in sources if src.suffix == '.c'], 'sys/dev/usb/ehci_quiesce.c', 'tools/tests/pc98_usb_platform_host.c', '-o', exe],
                            cwd=root, check=True)
             result = subprocess.run([exe]).returncode
             assert result == expected, (result, expected)

@@ -11,7 +11,7 @@
 
 全文は [PPC_BOOT_DESIGN](../../decisions/ppc/PPC_BOOT_DESIGN.md)。要点:
 
-- 像は独立の `build/ppc.mk` で組み、共有のコードは変えない (`lib/kstring_c.c` は無変更で組む)。契約ヘッダ `io.h`・`cpu.h` はこの段では取り込まない。
+- 像は独立の `build/ppc.mk` で組み、共有のコードは変えない (`sys/kern/kstring_c.c` は無変更で組む)。契約ヘッダ `io.h`・`cpu.h` はこの段では取り込まない。
 - カーネル側は `-nostdlib`・`-msoft-float -mno-altivec`。newlib nano はユーザーランドと SDK の段。
 - 手本は NetBSD の ofwboot と zs、OpenBSD の ofwboot。手本に無い物は `map` の mode (ビット定義から求めた) と drain (送信直後に止まるため) で、設計に明記した。
 - 試験は QEMU のシリアル照合、readelf/objdump、libc なしの host の fake の 3 つで、`make check` の外 (`tools/ppc/run.py`)。

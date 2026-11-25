@@ -161,7 +161,7 @@ struct gf_instmem_map_ops {
 | 入れ先 | 増分text/rodata | 常駐RAM / VRAM | 制限への影響 |
 |---|---:|---|---|
 | geforce.mod | master 0.6、instmem 1.8、IRQ 2.5、engine stop 0.3、統合/map 1.0、計約6.2（予算8） | 状態約0.3KiB＋callerの割当記述、追加PTは§4。VRAM Rは末尾を予約 | 大きい本体をkernel/起動FDへ複製しない。modをFDへ同梱する構成なら格納量+約8KiBを要確認。 |
-| kernel | IRQ import/停止adapter・常駐tick 約0.5（予算0.8） | 追加PT以外の固定BSSは小ポインタ群のみ | `include/memmap.h`のMEM_KERNEL_IMAGE_MAXと既存link ASSERTで確認。 |
+| kernel | IRQ import/停止adapter・常駐tick 約0.5（予算0.8） | 追加PT以外の固定BSSは小ポインタ群のみ | `sys/include/memmap.h`のMEM_KERNEL_IMAGE_MAXと既存link ASSERTで確認。 |
 | kdebug.bin / 診断部品 | recover列・診断入口約0.8（予算1.5） | stats snapshot約0.05KiB、ログ予算増 | 層1本体を複製せずmodule側試験入口を使う。KDEBUG=0で本番がリンクすること。 |
 
 許可された資料には現在のFD空き量/kdebug.bin上限の数値がないので「収まる」とは断定しない。実装段で既存の像サイズ検査と実ビルド前後差を必須にし、上限は緩めない。今回ビルド/配備はしない。
@@ -173,23 +173,23 @@ import現状は`build/out/geforce/geforce_imports.h:34`の20。irq_register/unre
 
 | 段 | ファイル（O/相対、新/変） | 単一の役目 | 行数 / 依存 |
 |---|---|---|---|
-| A0 | hwdev/gf/foundation.h 新、hwdev/gf/production.h・hwdev/gf/internal.h・kdebug/recover.h・kernel/irq/tick.h・platform/pc98/tick_order.h 変、drivers/video/geforce/geforce_tick.h 新、tools/tests/tick_host.c・tools/tests/test_tick.py 変 | 内部ABI・所有state・hook・RUN/STOP・tick枠6→7の宣言。tick の試験も 7 枠に (tick_host.c の callbacks[] を 7 個に、test_tick.py の OWNERS と 同ファイル内 の covers に geforce_tick.c) | 計170 / 最初 |
-| B0 | hwdev/gf/master.c 新 | PCI BM/latency | 80 / A0 |
-| B1 | hwdev/gf/instmem.c 新 | instance確保/free/access | 180 / A0 |
-| B2 | hwdev/gf/irq.c 新 | 登録/dispatch/ACK/counter | 240 / A0 |
-| B3 | hwdev/gf/engine_stop.c 新 | engine停止 | 40 / A0 |
-| B4 | hwdev/gf/mc.c 新 | nv44 MC初期化 | 35 / A0 |
-| B5 | hwdev/gf/instmem_map.c 新 | BAR2資源/mapの生存期間 | 80 / A0 |
-| B6 | drivers/video/geforce/geforce_tick.c 新 | 常駐tick登録・callback参照管理 | 55 / A0（kernelへ配置） |
-| C0 | hwdev/gf/foundation.c 新 | 開始/終了の順序。Command の書き込みと expected_command の更新のあいだに MMIO を挟まない | 100 / B群 |
-| C1 | hwdev/gf/devinit.c 変 | N1/owner adapter | 35 / B0,C0 |
-| C2 | hwdev/gf/bus.c 変 | 状態別Command照合 | 12 / B0 |
-| C3 | hwdev/gf/service.c 変 | 初回/initialized再開始の両経路からCHECK後start（先頭BM enable）へ接続 | 15 / C0 |
-| C4 | hwdev/gf/display/quiesce.c 変 | 全停止入口の共通stop接続 | 12 / C0 |
-| C5 | drivers/video/geforce/geforce_module.c 変 | tick unbind/IRQ登録解除済みをdetach条件にする | 20 / B2,B6 |
-| C7 | kdebug/recover_profile.c 変 | engine停止列とS0/REC予算 | 55 / B3,A0 |
-| C8 | kdebug/gf_stage_state.c 変 | `gf_stage_entry()` Command・`gf_stage_entry()` PMCをexpected_command/expected_pmcと照合 | 10 / A0,C0 |
-| C9 | kdebug/gf_foundation_test.c 新 | serial試験adapter | 100 / C0 |
+| A0 | sys/dev/video/geforce/foundation.h 新、sys/dev/video/geforce/production.h・sys/dev/video/geforce/internal.h・sys/dev/video/geforce/diag/recover.h・sys/kern/irq/tick.h・sys/platform/pc98/tick_order.h 変、sys/platform/pc98/video/geforce/geforce_tick.h 新、tools/tests/tick_host.c・tools/tests/test_tick.py 変 | 内部ABI・所有state・hook・RUN/STOP・tick枠6→7の宣言。tick の試験も 7 枠に (tick_host.c の callbacks[] を 7 個に、test_tick.py の OWNERS と 同ファイル内 の covers に geforce_tick.c) | 計170 / 最初 |
+| B0 | sys/dev/video/geforce/master.c 新 | PCI BM/latency | 80 / A0 |
+| B1 | sys/dev/video/geforce/instmem.c 新 | instance確保/free/access | 180 / A0 |
+| B2 | sys/dev/video/geforce/irq.c 新 | 登録/dispatch/ACK/counter | 240 / A0 |
+| B3 | sys/dev/video/geforce/engine_stop.c 新 | engine停止 | 40 / A0 |
+| B4 | sys/dev/video/geforce/mc.c 新 | nv44 MC初期化 | 35 / A0 |
+| B5 | sys/dev/video/geforce/instmem_map.c 新 | BAR2資源/mapの生存期間 | 80 / A0 |
+| B6 | sys/platform/pc98/video/geforce/geforce_tick.c 新 | 常駐tick登録・callback参照管理 | 55 / A0（kernelへ配置） |
+| C0 | sys/dev/video/geforce/foundation.c 新 | 開始/終了の順序。Command の書き込みと expected_command の更新のあいだに MMIO を挟まない | 100 / B群 |
+| C1 | sys/dev/video/geforce/devinit.c 変 | N1/owner adapter | 35 / B0,C0 |
+| C2 | sys/dev/video/geforce/bus.c 変 | 状態別Command照合 | 12 / B0 |
+| C3 | sys/dev/video/geforce/service.c 変 | 初回/initialized再開始の両経路からCHECK後start（先頭BM enable）へ接続 | 15 / C0 |
+| C4 | sys/dev/video/geforce/display/quiesce.c 変 | 全停止入口の共通stop接続 | 12 / C0 |
+| C5 | sys/dev/video/geforce/geforce_module.c 変 | tick unbind/IRQ登録解除済みをdetach条件にする | 20 / B2,B6 |
+| C7 | sys/platform/pc98/kdebug/recover_profile.c 変 | engine停止列とS0/REC予算 | 55 / B3,A0 |
+| C8 | sys/dev/video/geforce/diag/gf_stage_state.c 変 | `gf_stage_entry()` Command・`gf_stage_entry()` PMCをexpected_command/expected_pmcと照合 | 10 / A0,C0 |
+| C9 | sys/dev/video/geforce/diag/gf_foundation_test.c 新 | serial試験adapter | 100 / C0 |
 | C10 | tools/prototypes/geforce_imports.def 変 | import契約追加（kexports生成元） | 50〜70 / A0,B5,B6 |
 | C11 | build/geforce-module.mk 変 | 新部品/常駐tick配置とimport生成依存 | 20 / B群,C10 |
 | D0 | docs/design/hwdev/gf/devinit.md 変 | N1/試験値の訂正 | 15 / C群 |
@@ -245,8 +245,8 @@ BAR の予約は起動時の永久予約（O/drivers/video/geforce/geforce_platf
 ### 欠け1 — build 対象を決める
 B の前に build/geforce-module.mk の追補を出し、GEFORCE_SOURCES の wildcard 結果から次のファイルを filter-out する。
 ```make
-GEFORCE_LAYER1_PENDING := hwdev/gf/master.c hwdev/gf/instmem.c hwdev/gf/irq.c \
- hwdev/gf/instmem_map.c hwdev/gf/foundation.c
+GEFORCE_LAYER1_PENDING := sys/dev/video/geforce/master.c sys/dev/video/geforce/instmem.c sys/dev/video/geforce/irq.c \
+ sys/dev/video/geforce/instmem_map.c sys/dev/video/geforce/foundation.c
 GEFORCE_SOURCES := $(filter-out $(GEFORCE_LAYER1_PENDING),$(GEFORCE_SOURCES))
 ```
 配置は既存 GEFORCE_SOURCES 定義の直後、GEFORCE_SERVICE_OBJS 算出より前。B6 の常駐 tick も C11 まで kernel に追加しない。
@@ -294,19 +294,19 @@ gf_instmem_init(f) と gf_instmem_map(f,bar,bytes) の関数宣言、production.
 
 ### 欠け3 — map/unmap API と失敗
 O/ で rg -n 'paging_map_phys|paging_unmap' mm include を実行し、paging_unmap は存在しないと確認した。
-map は paging_map_phys(base, base, R/PAGE_SIZE, PAGE_RW | PTE_PCD)（mm/paging.h、mm/paging_map.inc）。PTE_USER は付けない。
+map は paging_map_phys(base, base, R/PAGE_SIZE, PAGE_RW | PTE_PCD)（sys/kern/mm/paging.h、sys/kern/mm/paging_map.inc）。PTE_USER は付けない。
 B5 production adapter は geforce_range_reserved(base,R) の成功と、対象全頁の paging_pte_raw の Present=0 を先に確認し、既存の他者の map は上書きしない。
 成功後だけ *out=P2V_IO(base) を公開する。引数/予約/PTE 検査の失敗は無変更、paging_map_phys の失敗も全範囲無変更・追加 PT 全解放（同 .inc:14–48,107–119）。
 成功後に失敗し得る処理を置かず、map 失敗時の個別ページ巻戻しや ledger_reserve_set は呼ばない。B5 は失敗を GF1_EMAP に変換する。
-unmap は paging_set_not_present(base, base+R-1)（mm/paging.h、mm/paging_map.inc）。end は inclusive；全対象の P を落とし TLB を flush する。
+unmap は paging_set_not_present(base, base+R-1)（sys/kern/mm/paging.h、sys/kern/mm/paging_map.inc）。end は inclusive；全対象の P を落とし TLB を flush する。
 これはアクセス解除であり PTE の frame/属性や PT 自体は残る。PT は master の寿命まで保持し、再開始で再利用する。永久 BAR 予約も残す。
 unmap 成功時だけ mapped=false・bar2=NULL・aperture_bytes=0。失敗は GF1_EMAP とし、それらと ops/owner を保持して stop 再試行へ渡す。
-新 PT は live AS≠0 では作れない (mm/paging.h、paging_map.inc) ので、**BAR2 の PT は起動時に作る** (下の「確定」の B7)。B5 の map は既存の PT に P を立てるだけになる。
+新 PT は live AS≠0 では作れない (sys/kern/mm/paging.h、paging_map.inc) ので、**BAR2 の PT は起動時に作る** (下の「確定」の B7)。B5 の map は既存の PT に P を立てるだけになる。
 BAR2 の追加 PT 予算は §4 の ceil((base の4MiB内offset+R)/4MiB) を D2 に明記する。unmap による PT の回収を予算に織り込まない。
 B1/B5 host 試験は V/R と map-before-zero、map拒否時の無変更、末尾頁だけまでの unmap、unmap失敗時の所有保持、再開始を検査する。
 
 ### 確定 (2026-11-02、Opus 第 3 回、PM が反映)
-- P1 (欠け 3): GeForce の開始は GUI を起こしたとき (live AS≥1) なので、初回 map で新 PT を作る形では毎回 GF1_EMAP になる。BAR2 (0x25000000、PDE 0x94) の PT は今 geforce_platform.c:38-41 で作られていない (BAR0 の 0x90〜0x93 と表示の窓 0xC0 だけ、:7-9 の STATIC_ASSERT で 5 頁)。**段 B7 (drivers/video/geforce/geforce_platform.c) を足す**: reserve() で BAR2 の先頭 R_max を起動時に paging_map_phys(PAGE_RW|PTE_PCD) で張り、すぐ paging_set_not_present で閉じる。R_max = vs=8 の R = align4096((4980h*8+4000h)*32+100000h) = 618000h (PT 2 頁)、BAR2 の長さで切る。STATIC_ASSERT・GF_PRODUCTION_PT_PAGES・docs/02_memory.md の予算を +2。AS は PDE ごと写すので、どの AS からも同じ PT が見え、B5 の「全頁 Present=0 を確かめて map → set_not_present で unmap」はそのまま成り立つ。手本 (ioremap だけ) との差は「OS32 では新しい PT を後から作れないため」。
+- P1 (欠け 3): GeForce の開始は GUI を起こしたとき (live AS≥1) なので、初回 map で新 PT を作る形では毎回 GF1_EMAP になる。BAR2 (0x25000000、PDE 0x94) の PT は今 geforce_platform.c:38-41 で作られていない (BAR0 の 0x90〜0x93 と表示の窓 0xC0 だけ、:7-9 の STATIC_ASSERT で 5 頁)。**段 B7 (sys/dev/video/geforce/geforce_platform.c) を足す**: reserve() で BAR2 の先頭 R_max を起動時に paging_map_phys(PAGE_RW|PTE_PCD) で張り、すぐ paging_set_not_present で閉じる。R_max = vs=8 の R = align4096((4980h*8+4000h)*32+100000h) = 618000h (PT 2 頁)、BAR2 の長さで切る。STATIC_ASSERT・GF_PRODUCTION_PT_PAGES・docs/02_memory.md の予算を +2。AS は PDE ごと写すので、どの AS からも同じ PT が見え、B5 の「全頁 Present=0 を確かめて map → set_not_present で unmap」はそのまま成り立つ。手本 (ioremap だけ) との差は「OS32 では新しい PT を後から作れないため」。
 - P3 (欠け 1): filter-out は未解決の import を持つものだけ (master・instmem・irq・instmem_map・foundation)。mc.c・engine_stop.c (B4・B3、main) は今も geforce.mod に組まれリンクできているので外さない。
 - P3 (欠け 2): 途中失敗の後始末は foundation_stop の順に従う (列を書き直さない)。
 - 段の順: **A0 追補** (foundation.h の追加 2 行・コメント 5 行、build/geforce-module.mk の filter-out) と **B7** (geforce_platform.c の BAR2 の PT) を先に出し、取り込んでから B0・B1・B2・B5 を続ける。
@@ -396,7 +396,7 @@ MASTER/START/STOP/REVOKE は既存関数へ、SNAPSHOT はソフト状態と sta
 HEADS は running 時だけ既存 FIFO/GR 要求を保ち gf_irq_enable。INST_PAGE は1頁を確保し32bit pattern/readback/free。
 flags は bit0=bm、1=mapped、2=registered、3=running、4=revoked。command/pmc は期待値、実測と区別して出力。
 INST_PAGE は bytes=比較済みbyte数、bad_off=先頭不一致（なしは ~0U）。他操作は bytes=0、bad_off=~0U。
-module の新 hwdev/gf/foundation_test.c が表と dispatch/prepare を所有し、C11 は geforce.mod だけに組む。
+module の新 sys/dev/video/geforce/foundation_test.c が表と dispatch/prepare を所有し、C11 は geforce.mod だけに組む。
 C5 は kernel static slot の番地を Context へ渡す。module 初期化成功後に公開、所有中の abort/detach は公開を保って拒否、解除成功後に NULL、旧版は拒否。
 loader/manifest/host 期待値を3へ揃える。層3は確保済み accel_out を使い、同じ版上げを重複実施しない。
 getter を kernel export 生成元へ追加し kdebug/hwdev の import に接続。geforce.mod は既存31本のまま、生成物は手編集しない。
@@ -414,10 +414,10 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 - P2-b: 失効でも 98 の表示への切り替え (backend_geforce.c の pc98_route_to_98、GeForce の MMIO を使わない) は従来どおり行う。display/quiesce.c の gf_display_stop で変えるのは「失効のときは reusable=false を保持する」ことだけ (書き込みの拒否を全行試し、最後に engaged=false にする今の動きは変えない)。
 - P2-c: 層 3 の確定設計の末尾にも同じ日付で 1 行足した (accel_out の欄と OPS_VERSION 3 はこの追記の §3 で確保済み、層 3 の C5 は 0 行)。
 - P3: identity が一致して BAR だけが変わった場合に config 経由で Command=0102h を書くか (手本 nouveau_drm.c:940 の pci_disable_device 相当) は、DMA を出す層 2 で決める。層 1 は書かない。
-- P3: drivers/video/geforce/geforce_module.h に `struct gf3_test_ops;` の前方宣言を足す。getter は kdebug の import にだけ足す (C9 と gfinit.c はどちらも kdebug)。prepare(f, bars, n) で貸す常設 adapter の opaque は診断の lease の bus (診断の f の revoked はその bus の REVOKE が立てる)。
-- P3 の訂正 (2026-11-02、PM、CK の sol の指摘): 「getter は kdebug の import にだけ」は誤り。kdebug/gfinit.c と gf_stage_state.c は build/hwdev.mk で -DHWDEV_MODULE として hwdev.mod に組まれる (kdebug.mk の KDEBUG_OBJS には無い)。getter は**それを使うファイルが入る像の import に足す** — gfinit.c・gf_stage_state.c は hwdev、C9 (gf_foundation_test.c) は置く像に合わせる。追記の当初の記述 (同ファイル内、kdebug と hwdev の両方) に戻す。
-- 段の順 (PM): gf_foundation_revoke (hwdev/gf/foundation.c) は CK が書く。CK を先に取り込み、CW をその上に進めて仕上げる。
-- 段の分け直し (2026-11-02、PM): CK の 3 回目の停止 (C9 の cycle で診断表示の stop/start をどの入口・状態遷移で行うかが未規定、kdebug/gfinit.c、hwdev/hwdev_private.h) を受け、CK を **C7・C8・gf_foundation_revoke・宣言の追補** に絞る。**C9 (実機のシリアルの試験の入口) は CW の取り込みの後**に、設計者が入口の契約を追記してから出す。
+- P3: sys/dev/video/geforce/geforce_module.h に `struct gf3_test_ops;` の前方宣言を足す。getter は kdebug の import にだけ足す (C9 と gfinit.c はどちらも kdebug)。prepare(f, bars, n) で貸す常設 adapter の opaque は診断の lease の bus (診断の f の revoked はその bus の REVOKE が立てる)。
+- P3 の訂正 (2026-11-02、PM、CK の sol の指摘): 「getter は kdebug の import にだけ」は誤り。sys/dev/video/geforce/diag/gfinit.c と gf_stage_state.c は build/hwdev.mk で -DHWDEV_MODULE として hwdev.mod に組まれる (kdebug.mk の KDEBUG_OBJS には無い)。getter は**それを使うファイルが入る像の import に足す** — gfinit.c・gf_stage_state.c は hwdev、C9 (gf_foundation_test.c) は置く像に合わせる。追記の当初の記述 (同ファイル内、kdebug と hwdev の両方) に戻す。
+- 段の順 (PM): gf_foundation_revoke (sys/dev/video/geforce/foundation.c) は CK が書く。CK を先に取り込み、CW をその上に進めて仕上げる。
+- 段の分け直し (2026-11-02、PM): CK の 3 回目の停止 (C9 の cycle で診断表示の stop/start をどの入口・状態遷移で行うかが未規定、sys/dev/video/geforce/diag/gfinit.c、sys/dev/hwdev/hwdev_private.h) を受け、CK を **C7・C8・gf_foundation_revoke・宣言の追補** に絞る。**C9 (実機のシリアルの試験の入口) は CW の取り込みの後**に、設計者が入口の契約を追記してから出す。
 
 ## CK の実装で設計者が決めたこと
 - C7 の固定表は変動する PMC 値を表せないため、Command の QUIESCE rule に REC_GF_ENGINE_STOP を登録し write_verify から固定停止関数を呼ぶ；汎用 plan/式の実行契約は変更せず、FIFO→GR→MPEG の現値 clear/read/set/read を既存の guarded bus・REC・safe point で実施し、どの失敗も後続 Command/保存復元を止める。
@@ -425,10 +425,10 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 - C8 は stage に const foundation 借用欄を追加して参照なし/失効を拒否する；所有者の設定と寿命の結線は CW、CK は共有レイアウトの入力台帳も追従させ生成器で契約 CRC を更新する（公開 KAPI 変更なし）。
 
 ### CK の取り込みで CW へ送る項目 (2026-11-02、Opus レビュー、PM)
-- P2-1: C7 は recover_gf_profile に載ったが本番の呼び手は無い (本番の gfinit の回復表 recover_gf_template、kdebug/recover_gf.c の quiesce は PBUS1850/1854/PMC_IRQ の 3 行)。§3:113 のとおりで、本番で engine を止めるのは §2:369 の「cleanup/S0 の前の stop フック」= CW の結線だけ。CW はこのフックを必ず結ぶ。
-- P2-2: gf_foundation_stop (hwdev/gf/foundation.c) に、失効のときに先に戻る分岐 (追記 同ファイル内) と P2-a の B5 unmap がまだ無い → **CW で足す** (失効なら MMIO を書かずに unmap して GF1_EPCI)。
+- P2-1: C7 は recover_gf_profile に載ったが本番の呼び手は無い (本番の gfinit の回復表 recover_gf_template、sys/dev/video/geforce/diag/recover_gf.c の quiesce は PBUS1850/1854/PMC_IRQ の 3 行)。§3:113 のとおりで、本番で engine を止めるのは §2:369 の「cleanup/S0 の前の stop フック」= CW の結線だけ。CW はこのフックを必ず結ぶ。
+- P2-2: gf_foundation_stop (sys/dev/video/geforce/foundation.c) に、失効のときに先に戻る分岐 (追記 同ファイル内) と P2-a の B5 unmap がまだ無い → **CW で足す** (失効なら MMIO を書かずに unmap して GF1_EPCI)。
 - P3-1: revoke の試験 (tools/tests/gf1_foundation_host.c) は saves==restores しか見ない → 呼ぶ前の saves を控えて +1 を CHECK し、「CLI を外す」変異を足す (CW)。
-- P3-2: engine の bit (0x100/0x1000/0x2) が kdebug/recover_common/s0.inc と hwdev/gf/engine_stop.c に別々にある → recover.h の RECOVER_PMC_ENABLE の隣に共通の定義を置く (CW)。
+- P3-2: engine の bit (0x100/0x1000/0x2) が sys/dev/video/geforce/diag/recover_common/s0.inc と sys/dev/video/geforce/engine_stop.c に別々にある → recover.h の RECOVER_PMC_ENABLE の隣に共通の定義を置く (CW)。
 - P3-3: CK から CW の取り込みまでのあいだ stage.foundation の設定が無く gf_stage_entry は -1 → そのあいだ C 段の診断を実機で回さない。
 
 ## CW の実装で設計者が決めたこと
@@ -447,16 +447,16 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 
 > 出所: ~/os32-tmp/run/gf-c9/ADDENDUM.md (astra 起草 r1・r2、Opus レビュー r1 Request changes → r2 写してよい、P3 2 件を PM が反映)。
 対象: main 502be34e (GF 側の現物は 40fec057 から変化なし)。GF_FEAT1_DESIGN.md の本文・CW 末尾・ユーザー決定を維持する。
-C9 は試験 adapter のみ。既存経路（platform/pc98/kernel.c）の module 登録・既存予約を使い、試験から load/reserve/GUI 起動をしない。
+C9 は試験 adapter のみ。既存経路（sys/platform/pc98/kernel.c）の module 登録・既存予約を使い、試験から load/reserve/GUI 起動をしない。
 未公開なら `unavailable`。診断 owner を使える起動経路を新設せず、利用不能を合格に数えない。
 ### 像と入口
-`kdebug/gf_foundation_test.c` は **hwdev.mod** に組む。gfinit.c と同じ像なので control/lease を外へ渡さない。
+`sys/dev/video/geforce/diag/gf_foundation_test.c` は **hwdev.mod** に組む。gfinit.c と同じ像なので control/lease を外へ渡さない。
 ```c
-/* 新 kdebug/gf_foundation_wire.h: 以下3行のみ userland と共有（u32 の定義を include） */
+/* 新 sys/dev/video/geforce/diag/gf_foundation_wire.h: 以下3行のみ userland と共有（u32 の定義を include） */
 #define GF_OP_FOUNDATION 16U
 enum gf1_case { GF1_STATUS, GF1_INSTMEM, GF1_VBLANK, GF1_CYCLE };
 struct gf1_request { u32 size, test, session; int rc; };
-/* 新 kdebug/gf_foundation_test.h: wire・foundation.h・recover.h を include、userland は読まない */
+/* 新 sys/dev/video/geforce/diag/gf_foundation_test.h: wire・foundation.h・recover.h を include、userland は読まない */
 int gf_foundation_test(struct gf1_request *, struct gf_foundation *, const struct recover_ops *, int (*display)(bool));
 int geforce_foundation_display(bool start); /* module 内入口、geforce_module.h に宣言 */
     GF1T_DISPLAY_STOP, GF1T_DISPLAY_START /* gf1_test.h の enum 末尾追加、既存値・構造体は不変 */
@@ -499,8 +499,8 @@ cycle は RUN→表示stop→STOP→表示start→RUN の各区間1000ms。元�
 cycle 全体を trial_step で包まない。区間ごとの trial_step を終えて PAUSED に戻してから display(false/true) を呼ぶ。
 診断 STOP 区間は REC_VERIFIED のまま時計・ソフト snapshot・上記 PCI 読取りで測定する。初回 start の代わりに承認済み gfinit 手順を自動実行しない。
 CUI/rshell の要求は `gf1 status|instmem|vblank|cycle`（改行終端）、owner は自動選択。新しい汎用コマンドや承認方式は設けない。
-GUI RUN では shell.bin と gshell.bin は同時常駐せず（platform/pc98/kernel.c）、GSERIAL open が rshell を切る（gshell/src/gserial.rs:84）；直接の gf1 行は実行されない。
-本番は既存 GFX=geforce・GUI=0 起動→os32gui で RUN とし、利用者が GUI 端末 sh.bin を開いてフォーカスする。共通 gf1 を結線し、既存 GSERIAL の `SOH + 8桁hex ID + " type gf1 cycle" + LF`、次に同形式の `key 1c`（Enter）で実行する。同様に他caseも入力可、GF1応答は C9 が `serial_puts_polled` で直接 serial 出力 (GUI 中の kprintf は con_sink で GUI 端末へ流れ、GSERIAL は端末の文字をシリアルへ返さない — kernel/console/console.c、userland/gshell/src/gserial.rs。devinit.c は geforce.mod の部品で、hwdev.mod には serial_puts_polled の import を追加する。C9b で hwdev/hwdev_imports.def と docs/design/hwdev/hwdev_imports.md の表の末尾に serial_puts_polled (取得元は kdebug と同じ lib/serial_diag.h) を 1 本足し、契約と stub は PM がまとめビルドで再生成する。geforce.mod の import 31 本は変わらない)。
+GUI RUN では shell.bin と gshell.bin は同時常駐せず（sys/platform/pc98/kernel.c）、GSERIAL open が rshell を切る（gshell/src/gserial.rs:84）；直接の gf1 行は実行されない。
+本番は既存 GFX=geforce・GUI=0 起動→os32gui で RUN とし、利用者が GUI 端末 sh.bin を開いてフォーカスする。共通 gf1 を結線し、既存 GSERIAL の `SOH + 8桁hex ID + " type gf1 cycle" + LF`、次に同形式の `key 1c`（Enter）で実行する。同様に他caseも入力可、GF1応答は C9 が `serial_puts_polled` で直接 serial 出力 (GUI 中の kprintf は con_sink で GUI 端末へ流れ、GSERIAL は端末の文字をシリアルへ返さない — sys/kern/console/console.c、userland/gshell/src/gserial.rs。devinit.c は geforce.mod の部品で、hwdev.mod には serial_puts_polled の import を追加する。C9b で sys/dev/hwdev/hwdev_imports.def と docs/design/hwdev/hwdev_imports.md の表の末尾に serial_puts_polled (取得元は kdebug と同じ lib/serial_diag.h) を 1 本足し、契約と stub は PM がまとめビルドで再生成する。geforce.mod の import 31 本は変わらない)。
 根拠: gserial.rs の parse/enqueue/deliver、shell/main.c:112–118（共通表・rshellのみ除外）、userland/sh.inputs.json。GUI/GSERIAL は変更しない。CUI 復帰は gfx_shutdown 済み（gshell/src/lib.rs:678）なので STOP status のみ、cycle は上記 precheck で ng。
 応答は完了時 `GF1 case=<...> owner=production|diagnostic session=<n> phase=<...> ms=<実測> rc=<n> result=ok|ng|unavailable`。
 各 phase 行に `command_expected/actual pmc_expected/actual flags delta_entries/fifo/graph/vblankA/vblankB unknown bytes bad_off crc_before/after` を付ける。
@@ -521,9 +521,9 @@ P3-4: 診断 STOP の PCI 経路・PMC=na を明記。推測: rshell は不可�
 > 出所: ~/os32-tmp/run/gf-c9/ADDENDUM_C9a.md (C9a の sol の設計の欠け → astra 起草、Opus レビュー写してよい、P3 2 件を PM が反映)。
 確定本文の表示 CRC 前後一致・範囲・guarded bus を維持する。既存診断入口だけでは実測列を取得できないため、固定行 read を補う。
 ```c
-/* C9b: kdebug/gfinit_bus.h に追加、同 .c に定義（hwdev.mod 内）。 */
+/* C9b: sys/dev/video/geforce/diag/gfinit_bus.h に追加、同 .c に定義（hwdev.mod 内）。 */
 int gfinit_bus_mode_read_row(struct gfinit_bus *, u32 y, u8 *row);
-/* C9a: kdebug/gf_foundation_test.h の既存宣言を置換、同 .c が利用。 */
+/* C9a: sys/dev/video/geforce/diag/gf_foundation_test.h の既存宣言を置換、同 .c が利用。 */
 int gf_foundation_test(struct gf1_request *, struct gf_foundation *, const struct recover_ops *, int (*display)(bool), int (*read_row)(void *, u32, u8 *), void *row_owner);
 /* C9a: 両 owner 共通。row は呼出側の640 byte buffer、y=0..479。 */
 rc = read_row(row_owner, y, row); /* 成功時だけ crc32_core_update(state, row, 640) */
@@ -533,7 +533,7 @@ C9b の gfinit.c が選択済み owner の同期専用 callback/context を渡�
 新 bus 入口は gfinit_bus.c の ready/y/範囲検査・memory_config と recover_window_access を共有し、write=false、4 byteずつ取得して低位byteから row に格納する。戻り値は既存同様0/-1、callback は失敗を GF1_EIO に変換。
 既存 mode_row の比較契約は変更しない。memory_config (:80-91) の identity/BAR/失効検査と既存 window の復元を通し、登録 target を偽装せず、直接 window を試験から呼ばない。
 本番 callback（C9b、gfinit.c）は slot->production と一致する f から offsetof(struct gf_production,foundation) で p を得て、p->display.io.read(p->display.io.opaque,1,y*640+x,4,&v) を x=0..636 に呼び、低位byteから格納する（y<480）。失敗は GF1_EIO。
-本番の結線は hwdev/gf/devinit.c、入口は bus.c の gf_production_read、実読取りは native.c の既存 CPU map。f->io.read は BAR0 専用なので両 owner とも表示には使わない。
+本番の結線は sys/dev/video/geforce/devinit.c、入口は bus.c の gf_production_read、実読取りは native.c の既存 CPU map。f->io.read は BAR0 専用なので両 owner とも表示には使わない。
 読む範囲は両方とも BAR1 の [0,307200)、640×480×8bit 全体。追加の常設 map・予約・import は不要。診断の一時 window 操作は既存のものだけ。
 C9a は lib/crc32_core.inc を使い各走査で INIT→480行 update→final を1回、CRC前→INST_PAGE→CRC後の順に比較する。診断はこの列を trial_step 内で実施し、途中失敗は未測定CRC=na/result=ng、不一致も GF1_EIO。測定中は既定どおり serial 出力しない。
 宣言変更は追加1行＋置換1行＝2行（r2 の宣言追補総数は8→9行、static/include/生成物は除く）。C9a は callback 消費まで、bus実装・両callback・呼出元・共有入力台帳 (tools/hwdev_layout.json に struct gf_production の foundation・display.io の 2 欄を足す)/契約生成の追従は C9b。確定本文の撤回なし、新しい守り・回復機構なし。

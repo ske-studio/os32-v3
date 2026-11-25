@@ -4,12 +4,12 @@ CHECK = dict(name='geforce-fgpoll-host', tier=1, needs=['make:build/out/geforce/
                      'tools/tests/geforce_fgpoll_host.c', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'build/config.mk',
                      'drivers/video/geforce/**', 'hwdev/gf/**', 'include/**',
-                     'gfx/gfx_internal.h', 'kernel/gui.h', 'gfx/palette.h', 'mm/pgalloc.h',
-                     'fs/vfs.h', 'exec/appslot.h', 'lib/serial_diag.h',
-                     'arch/x86/kernel/idt.h',
-                     'kernel/module/*.h', 'lib/kstring.h',
-                     'drivers/video/pc98/pc98_route.h',
-                     'build/out/geforce/geforce_imports.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+                     'sys/hal/gfx/gfx_internal.h', 'sys/kern/gui.h', 'sys/hal/gfx/palette.h', 'sys/kern/mm/pgalloc.h',
+                     'sys/fs/vfs.h', 'sys/kern/exec/appslot.h', 'lib/serial_diag.h',
+                     'sys/arch/x86/kernel/idt.h',
+                     'kernel/module/*.h', 'sys/kern/kstring.h',
+                     'sys/platform/pc98/video/pc98_route.h',
+                     'build/out/geforce/geforce_imports.h', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     basis=['GF_GUARD_THERM_DESIGN §4', 'GF_GUARD_THERM_DESIGN §5', 'GF_GUARD_THERM_DESIGN §6'],
 )
 
@@ -25,7 +25,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'drivers/video/geforce/geforce_module.c'
+SOURCE = ROOT / 'sys/dev/video/geforce/geforce_module.c'
 MUTATIONS = [
     ('deadline-minimum', 'if (deadlines[i] && deadlines[i]<next)', 'if (0 && deadlines[i] && deadlines[i]<next)'),
     ('deadline-pending', 'return heat_bridge.stop_state.state==GF5_STOP_REQUESTED || !foreground_deadline_valid ||', 'return false || !foreground_deadline_valid ||'),
@@ -54,7 +54,7 @@ def run_case(folder, label, replacement=None):
     product.write_text(source)
     fixture = folder / 'host.c'
     fixture.write_text((ROOT / 'tools/tests/geforce_fgpoll_host.c').read_text().replace(
-        '../../drivers/video/geforce/geforce_module.c', str(product)))
+        '../../sys/dev/video/geforce/geforce_module.c', str(product)))
     exe = folder / 'host'
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                     '-Wall', '-Wextra', '-Werror', '-Werror=vla', '-ffreestanding',

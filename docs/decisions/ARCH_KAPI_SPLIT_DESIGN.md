@@ -91,7 +91,7 @@ data_off = 8 + 4 * layout["func_capacity"]
 
 **刻印と更新手順（KAPI_SPEC §3-1 の改訂）**
 
-1. 意味追加時は JSON の末尾へ追記し提供機種の台帳の version を上げ、共有ヘッダの手書き KAPI_VERSION を各台帳からの生成定義に移す。x86 は従来の木に生成し exec/os32x_hdr.c の min_api_ver 比較に供給する。check_kapi_version.py の TARGETS（README・INDEX・KAPI_SPEC）は x86 版と照合する。今回の配置分離のみでは意味版 91 を保つ。
+1. 意味追加時は JSON の末尾へ追記し提供機種の台帳の version を上げ、共有ヘッダの手書き KAPI_VERSION を各台帳からの生成定義に移す。x86 は従来の木に生成し sys/kern/exec/os32x_hdr.c の min_api_ver 比較に供給する。check_kapi_version.py の TARGETS（README・INDEX・KAPI_SPEC）は x86 版と照合する。今回の配置分離のみでは意味版 91 を保つ。
 2. 提供するターゲットの台帳だけに追記する。互換破壊には対象 ABI 世代と crt symbol の更新、同じ遷移の機種付き破壊宣言を要求する。
 3. 移行初回は PPC ABI 2→3。x86 は ABI 2、memory 4、OS32X 5、shlib 2 のまま。PPC のメモリ移動時だけ memory 4→5。
 4. crt・Rust 起動コード・独自入口が非ロード刻印を発行し、リンクでは発行元の参照が対象 crt symbol に解決することを確認する。.os32_kapi_layout は起動側で発行する。別に両機種で os32_unit_stamp.h が各翻訳単位に .os32_generations と __os32_abi_* 参照を強制する。リンク時に参照を解決し link_guard.check_note が全 note の一致を検査する。
@@ -131,8 +131,8 @@ data_off = 8 + 4 * layout["func_capacity"]
 - まず機種別入力から C・ld・梱包用の数値を生成し、旧値で経路だけ置換する。次段で PPC の値を移す。
 - 共通 mm には boot paging geometry を渡す。PPC は関数で渡し、PC-98 はヘッダの既存コンパイル時定数を用い、従来の静的検査は PC-98 設定の検査として残す。
 - paging.c の paging frame 末尾＝stack guard、kstack 末尾＝shell、shell 末尾＝pool の隣接検査は PC-98 に限定。PPC の memory_boot.c は旧固定境界から pool を一括予約せず、実 RAM の常駐像・chain・stack・ソフト表・shell の backing・HPT と保護用 guard を個別に allocator から除外する。空き RAM は他予約との照合後に返す。
-- 段8で mm/physmem.c の RAM 供給を切り替える。実 RAM と予約を同じ物理台帳に登録し、供給可能な全区間から頁外向きに丸めた予約の和集合を引き、残った完全頁を allocator に渡す。旧 guard と pool 先頭の両側で空き頁が割当可能、予約頁が割当不能であることを独立した期待頁集合と比較する。
-- mm/paging_boot.inc の構築・恒等写像・検証、mm/paging.c の保護属性判定も同じ geometry を参照する。
+- 段8で sys/kern/mm/physmem.c の RAM 供給を切り替える。実 RAM と予約を同じ物理台帳に登録し、供給可能な全区間から頁外向きに丸めた予約の和集合を引き、残った完全頁を allocator に渡す。旧 guard と pool 先頭の両側で空き頁が割当可能、予約頁が割当不能であることを独立した期待頁集合と比較する。
+- sys/kern/mm/paging_boot.inc の構築・恒等写像・検証、sys/kern/mm/paging.c の保護属性判定も同じ geometry を参照する。
 - 案 D の 4 KiB PD が 1 枚、現行の事前登録する低位 PT が 8 枚、aperture と最高位 MMIO の PT が各 1 枚。初期ソフト表は 44 KiB。
 - 低位 PT は未使用ページにも PDE を事前登録する。現在 present な PTE 数から算出すると後の map が壊れる。
 - 26 枚との差の 15 枚（60 KiB）は自動継承しない。予約台帳・割当・root 切替までの利用者を列挙し、使う分だけ名前付きで予約する。
@@ -194,10 +194,10 @@ data_off = 8 + 4 * layout["func_capacity"]
 |3 本線|変更 tools/tests/test_arch_compat.py 65、docs/KAPI_SPEC.md 30、ARCH_COMPAT_CONTRACT.md §4.2・§9 約10|両ターゲットを名前で検査。文書は docs-1124g を基準に統合|
 |4 PPC|変更 sdk/kapi_layout_ppc.json 約325、変更 sdk/kapi_target_ppc.py 40、gen_kapi.py 120、kapi_rust_gen.py 45|compact 表・SDK ビュー・init/invoke を専用出力へ生成|
 |5 PPC|変更 arch/ppc/{exec_kapi.c,kapi_table.h,syscall_code.c} 各10〜30、PPC crt 40、exec の trampoline/launch/finish 各15〜30|SDK と製品を一緒に切替、独自 crt と親子復帰も確認|
-|6 PPC|変更 sdk/{os32x_hdr.py,mkos32x.py} 各25、exec/os32x_hdr.c 15、tools/ppc/test_kapi_{table,binding}.py 各60|機種別世代・刻印・実結線。4〜6 は製品切替まで同じ統合系列で検査|
-|7 本線|変更 tools/gen_memmap.py 50、include/memmap.h 20、mm/{paging.c,paging_boot.inc} 各45、新 共通 geometry 宣言約35|既存 PC-98 定数で同じコード・配置を生成。PPC も旧値で起動|
-|8 PPC|変更 platform/powermac/{platform_kboot_layout.h,kernel_boot.c,kboot_reserve.c,memory.c} 各20〜55、arch/ppc/kernel.ld 25|guard・PD/PT・HPT の予約と walk を新配置に切替|
-|9 PPC|変更 sdk/link/ppc/app_sys.ld 15、exec/exec_launch.inc 20、tools/ppc/{kboot_accept.py,kboot_layout.py} 各60|機種の shell VA と新 memory 世代を梱包・受入へ反映。8 と同時に旧像を隔離|
+|6 PPC|変更 sdk/{os32x_hdr.py,mkos32x.py} 各25、sys/kern/exec/os32x_hdr.c 15、tools/ppc/test_kapi_{table,binding}.py 各60|機種別世代・刻印・実結線。4〜6 は製品切替まで同じ統合系列で検査|
+|7 本線|変更 tools/gen_memmap.py 50、sys/include/memmap.h 20、mm/{paging.c,paging_boot.inc} 各45、新 共通 geometry 宣言約35|既存 PC-98 定数で同じコード・配置を生成。PPC も旧値で起動|
+|8 PPC|変更 platform/powermac/{platform_kboot_layout.h,kernel_boot.c,kboot_reserve.c,memory.c} 各20〜55、sys/arch/ppc/kernel.ld 25|guard・PD/PT・HPT の予約と walk を新配置に切替|
+|9 PPC|変更 sdk/link/ppc/app_sys.ld 15、sys/kern/exec/exec_launch.inc 20、tools/ppc/{kboot_accept.py,kboot_layout.py} 各60|機種の shell VA と新 memory 世代を梱包・受入へ反映。8 と同時に旧像を隔離|
 |10 PPC|変更 tools/{mkmod.py,ppc/root_pair.py} 各50〜90、build/targets/ppc-powermac.mk 40、module_pair.c 45、kernel/module/{module_schema.h,module_image.c} 各25|§5 の製品 ID・新形式・媒体別最終リンクを導入、KDEBUG 8 位置を維持|
 |11 PPC|変更 tools/accept/ppc_module.py 50、対応 tools/checks/ 登録各5〜15、PPC の KAPI_FILL・SHELL_ALIGN・MODULE_ALIGN 設計に各10〜20|各変異が意図した箇所で落ち、製品シェルと部品が起動|
 
@@ -253,7 +253,7 @@ data_off = 8 + 4 * layout["func_capacity"]
 
 本節は §2・§8 の該当の記述より優先する。
 
-- **S3-1 (sol P1・§2/§8 段 6 — 72 B のヘッダの読み込み側):** 今の `exec/exec_launch.inc` と `exec/os32x_hdr.c` は共有の `OS32X_HDR_SIZE=64` を使う。機種ごとの生成値を、読み込みのバッファ・読み込み長・デコード・形式の検査まで通す。受入に PowerPC の 72 B の正例と、64〜71 B で切れた負例を足す。x86 は 64 のまま (生成物は不変)。
+- **S3-1 (sol P1・§2/§8 段 6 — 72 B のヘッダの読み込み側):** 今の `sys/kern/exec/exec_launch.inc` と `sys/kern/exec/os32x_hdr.c` は共有の `OS32X_HDR_SIZE=64` を使う。機種ごとの生成値を、読み込みのバッファ・読み込み長・デコード・形式の検査まで通す。受入に PowerPC の 72 B の正例と、64〜71 B で切れた負例を足す。x86 は 64 のまま (生成物は不変)。
 - **S3-2 (sol P2・N1/N3・§8 段 2):** 読み手の一覧に `tools/tests/test_vfs_excl.py` と `tools/tests/test_hsync_h3.py` を足す (旧 JSON の版と手書きの共有ヘッダの定義を直に照合している)。x86 の解決値と生成した定義の照合に移し、検査の `covers` に新しい入力を登録する。
 - **S3-3 (sol P2・§8、PowerPC の HDD のパッケージの版):** `build/ppc-install-boot.mk` の `$(HD_PACKAGES)` の前提に PowerPC の版の生成物を登録し、同じ値を `tools/ppc/install_packages.py` に明示の引数で渡す。受入: 版だけ変えた増分の `make` で BOOT・MINIMAL の両方が作り直される。
 - **M1 (本線 P1・§2 手順 1 — 手書きの KAPI_VERSION):** x86 では、生成した `#define KAPI_VERSION <n>` の行を、今の `sdk/include/os32/os32_kapi_shared.h` の中の生成区間に **今と同じ書式で** 置く (別のヘッダへ移さない)。これを正規表現で読む物を段 2 の読み手に載せる: `tools/nhd_deploy.py` の `tree_kapi_version`、`tools/tests/test_public_surface.py`・`test_vfs_excl.py`・`test_hsync_h3.py`・`test_ver_api.py`、`tools/gen_sdk_manifest.py`、`build/sdk.mk`、mkpkg。`tree_kapi_version` が版を読めない時は **失敗で止める** (今の `legacy_pt_guard` は None で素通りする — 旧い区画表の NHD に新しいカーネルを配る守りが黙って消えるため)。受入に「版の行が読めない木で nhd_deploy が止まる」負例を足す。

@@ -4,14 +4,14 @@ B components are contract fakes here; their own host tests verify hardware
 operations. The production C0 translation unit is also cross-compiled unchanged.
 """
 CHECK = dict(name='gf1-foundation-host', tier=1,
-    covers=['hwdev/gf/foundation.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.h',
-            'hwdev/gf/master.c', 'hwdev/gf/mc.c', 'hwdev/gf/instmem.c',
-            'hwdev/gf/instmem_map.c', 'hwdev/gf/irq.c', 'hwdev/gf/engine_stop.c',
-            'hwdev/gf_load_state.h', 'kdebug/recover.h', 'kdebug/gfinit_decode.h',
-            'include/types.h', 'include/io.h', 'include/video_service.h',
-            'include/pci_dev_contract.h', 'arch/x86/arch_io.h',
-            'drivers/video/geforce/geforce_tick.h',
-            'drivers/video/geforce/geforce_tick.c',
+    covers=['sys/dev/video/geforce/foundation.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.h',
+            'sys/dev/video/geforce/master.c', 'sys/dev/video/geforce/mc.c', 'sys/dev/video/geforce/instmem.c',
+            'sys/dev/video/geforce/instmem_map.c', 'sys/dev/video/geforce/irq.c', 'sys/dev/video/geforce/engine_stop.c',
+            'sys/dev/video/geforce/gf_load_state.h', 'sys/dev/video/geforce/diag/recover.h', 'sys/dev/video/geforce/diag/gfinit_decode.h',
+            'sys/include/types.h', 'sys/include/io.h', 'sys/include/video_service.h',
+            'sys/include/pci_dev_contract.h', 'sys/arch/x86/arch_io.h',
+            'sys/platform/pc98/video/geforce/geforce_tick.h',
+            'sys/platform/pc98/video/geforce/geforce_tick.c',
             'tools/tests/gf1_foundation_host.c', 'tools/tests/test_gf1_foundation.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.3,
@@ -27,7 +27,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'hwdev/gf/foundation.c'
+SOURCE = ROOT / 'sys/dev/video/geforce/foundation.c'
 
 
 def main():
@@ -103,7 +103,7 @@ def main():
                 text = original.replace(old, new, 1)
                 text = text.replace('#include "foundation.h"',
                                     '#include "' + str(SOURCE.parent / 'foundation.h') + '"')
-                for header in ('include/io.h', 'drivers/video/geforce/geforce_tick.h'):
+                for header in ('sys/include/io.h', 'sys/platform/pc98/video/geforce/geforce_tick.h'):
                     text = text.replace('#include "../../' + header + '"',
                                         '#include "' + str(ROOT / header) + '"')
                 mutant.write_text(text)

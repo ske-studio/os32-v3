@@ -1,6 +1,6 @@
-# gfx/gfx_core_bridge.inc — 設計
+# sys/hal/gfx/gfx_core_bridge.inc — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_T2D_T2H (§2-3・§2-5 e6) の契約を今のソースと照らして要約
-ソース: `gfx/gfx_core_bridge.inc` (`gfx/gfx_core.c` が取り込む)
+ソース: `sys/hal/gfx/gfx_core_bridge.inc` (`sys/hal/gfx/gfx_core.c` が取り込む)
 
 旧公開の void `gfx_get_framebuffer` を USER から呼んだときの互換の橋 (`gfx_framebuffer_bridge`)。USER には kernel alias を返さず、取り消せる CLIENT の lease の VA を返す。
 

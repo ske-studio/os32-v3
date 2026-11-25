@@ -2,7 +2,7 @@
 記録: tools/tests/module_image_tdd.md
 """
 CHECK = dict(name='module-image-host', tier=1,
-    covers=['kernel/module/module_fixup_ppc.inc', 'include/endian_le.h', 'kernel/module/module_schema.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'include/types.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'lib/le_internal.h', 'tools/tests/host32.py', 'tools/tests/module_image_host.c', 'tools/tests/module_image_tdd.md', 'tools/tests/kernel_includes.py'],
+    covers=['sys/kern/module/module_fixup_ppc.inc', 'sys/include/endian_le.h', 'sys/kern/module/module_schema.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'sys/include/types.h', 'sys/kern/module/module_image.c', 'sys/kern/module/module_image.h', 'lib/le_internal.h', 'tools/tests/host32.py', 'tools/tests/module_image_host.c', 'tools/tests/module_image_tdd.md', 'tools/tests/kernel_includes.py'],
     needs=[], budget=6.7,
     kind='characterization',
 )
@@ -19,7 +19,7 @@ import zlib
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET_SRC = ROOT / "kernel/module/module_image.c"
+TARGET_SRC = ROOT / "sys/kern/module/module_image.c"
 HARNESS = ROOT / "tools/tests/module_image_host.c"
 FLAGS = ["-m32", "-march=i386", "-std=gnu11", "-O2", "-Wall", "-Wextra", "-Werror",
          "-Werror=vla", "-ffreestanding", "-fno-pie", "-fno-stack-protector"]

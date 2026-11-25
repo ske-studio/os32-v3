@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """W[1] wire framing, compiled directly without libc."""
 CHECK = dict(name='input-w1', tier=1, budget=20, needs=[], covers=[
-    'input/hal/input_policy.c', 'input/hal/input_policy.h', 'input/hal/keymap.h', 'include/io.h', 'include/app_ids.h',
+    'sys/input/input_policy.c', 'sys/input/input_policy.h', 'sys/hal/input/keymap.h', 'sys/include/io.h', 'sys/include/app_ids.h',
     'tools/tests/input_w1_host.c', 'tools/tests/test_input_w1.py',
-    'tools/tests/host32.py', 'include/types.h', 'include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h'],
+    'tools/tests/host32.py', 'sys/include/types.h', 'sys/include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h'],
     basis=['docs/decisions/INPUT_KEYMAP_DESIGN.md §5・§8・W の小段の割り方・IKM1 v2 の列挙の数値'], kind='contract')
 from pathlib import Path
 from types import SimpleNamespace
@@ -20,7 +20,7 @@ MUTATIONS = [('read16(wire + 4) != 2', 'read16(wire + 4) != 1'),
                              ('n > IKM_MAX_ROWS || ', '')]
 
 def run(ctx):
-    source = (ctx.root/'input/hal/input_policy.c').read_text()
+    source = (ctx.root/'sys/input/input_policy.c').read_text()
     cc = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))/'bin/powerpc-elf-gcc'
     qemu = shutil.which('qemu-ppc')
     arches = ['x86']

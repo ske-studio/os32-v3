@@ -1,7 +1,7 @@
 # USB body and typed imports, paired separately with each PC-98 kernel.
 USB_OUT := $(BUILD_OUT)/usb
 USB_GEN := $(addprefix $(USB_OUT)/,usb_imports.h usb_imports.json usb_import_slots.c usb_import_stubs.S usb_provider_types.c usb_kexports.c)
-USB_DEF_SOURCES := input/hal/usb_input.h mm/dma_pool.h input/hal/in2_int.h mm/kmalloc.h lib/kstring.h include/kprintf.h kernel/module/module_runtime.h platform/pc98/usb_resident.h include/usb_platform.h drivers/usb/usb_core.h
+USB_DEF_SOURCES := sys/hal/input/usb_input.h sys/kern/mm/dma_pool.h sys/hal/input/in2_int.h sys/kern/mm/kmalloc.h sys/kern/kstring.h sys/include/kprintf.h sys/kern/module/module_runtime.h sys/platform/pc98/usb_resident.h sys/include/usb_platform.h sys/dev/usb/usb_core.h
 $(USB_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/module_schema.py tools/prototypes/usb_imports.def $(USB_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module usb --out-dir $(USB_OUT)
 
@@ -18,8 +18,8 @@ $(USB_OUT)/usb.elf: $(USB_OBJS) build/usb-module.ld sdk/link/generations.ld
 C_KERNEL_OBJ += $(USB_OUT)/usb_kexports.o
 R1_OBJECTS += $(USB_OUT)/usb_kexports.o
 $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf: $(USB_OUT)/usb_kexports.o
-$(KERNEL_OBJ_PREFIX)platform/pc98/usb_load.o $(R1_OBJ)/platform/pc98/usb_load.o: $(USB_GEN)
-$(KERNEL_OBJ_PREFIX)platform/pc98/usb_load.o $(R1_OBJ)/platform/pc98/usb_load.o: private CFLAGS_BASE += -I$(USB_OUT)
+$(KERNEL_OBJ_PREFIX)sys/platform/pc98/usb_load.o $(R1_OBJ)/sys/platform/pc98/usb_load.o: $(USB_GEN)
+$(KERNEL_OBJ_PREFIX)sys/platform/pc98/usb_load.o $(R1_OBJ)/sys/platform/pc98/usb_load.o: private CFLAGS_BASE += -I$(USB_OUT)
 
 define pack_usb
 	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --module-id 14 --elf $(USB_OUT)/usb.elf --metadata $(USB_OUT)/usb_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@

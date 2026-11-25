@@ -1,4 +1,4 @@
-#include "hwdev/gf/foundation.h"
+#include "sys/dev/video/geforce/foundation.h"
 
 struct fake { u32 reg, values[6]; int calls, writes, fail, mismatch; };
 static int read_reg(void *opaque, u32 bar, u32 off, u32 width, u32 *out)

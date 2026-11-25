@@ -4,9 +4,9 @@ CHECK = dict(name='kcg-ebdt', tier=1, needs=['make:assets/fonts/shino16.kcgfont'
              covers=['tools/gen_font16.py', 'tools/gen_g16.py', 'tools/mkroot_image.py',
                      'build/ram-root.mk', 'build/targets/ppc-powermac.mk', 'build/assets.mk', 'build/font-fetch.mk',
                      'assets/fonts/**', 'tools/fetch_fonts.py',
-                     'tools/gen_unicode.c', 'lib/unicode_jis_table.h', 'kernel/console/unicode_file.h',
-                     'include/endian_le.h', 'include/types.h', 'include/callconv.h',
-                     'build/ppc-ram-root.json', 'include/config.h',
+                     'tools/gen_unicode.c', 'lib/unicode_jis_table.h', 'sys/kern/console/unicode_file.h',
+                     'sys/include/endian_le.h', 'sys/include/types.h', 'sys/include/callconv.h',
+                     'build/ppc-ram-root.json', 'sys/include/config.h',
                      'tools/tests/test_kcg_ebdt.py', 'tools/tests/test_mkroot_image.py',
                      'build/core.yaml', 'build/packages.yaml', 'userland/deploy.yaml',
                      'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'requirements.txt'],
@@ -89,7 +89,7 @@ def check():
     manifest = json.loads((ROOT / 'build/ppc-ram-root.json').read_text())
     font_paths = ('/fonts/shino16.kcg', '/fonts/shino16.txt', '/sys/unicode.bin')
     manifest = {path: manifest[path] for path in font_paths}
-    config = (ROOT / 'include/config.h').read_text()
+    config = (ROOT / 'sys/include/config.h').read_text()
     assert all(path in config for path in manifest)
     product = (ROOT / manifest['/fonts/shino16.kcg']).read_bytes()
     assert struct.unpack_from('<4sIII', product) == (b'KCG1', 295940, 1, 0)

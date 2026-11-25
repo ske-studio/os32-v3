@@ -1,4 +1,4 @@
-# arch/x86/kernel/mtrr_wc.c / mtrr_wc.h — CPU の WC lease
+# sys/arch/x86/kernel/mtrr_wc.c / mtrr_wc.h — CPU の WC lease
 
 > 状態: **現行 (2026-11-01)** — CPU 部品。GeForce は kernel の video_wc を通して利用する。
 

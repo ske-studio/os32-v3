@@ -1,6 +1,6 @@
 /* Built only by kernel-tick-probe; uses the existing private kdebug call. */
 #include "os32api.h"
-#include "../../kernel/time/tick_probe.h"
+#include "../../sys/kern/time/tick_probe.h"
 #include <stdio.h>
 #include <string.h>
 int main(int argc, char **argv, KernelAPI *api)

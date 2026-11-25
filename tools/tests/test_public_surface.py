@@ -5,10 +5,10 @@ import subprocess
 import tempfile
 import json
 from test_surface_lease import main, ROOT
-TARGET_SRC = ['sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/surface_query.c',
-              'exec/lease.c', 'sdk/include/os32/os32_surface.h', 'exec/ring3_ls.c',
-              'sdk/include/os32/os32_ls.h', 'mm/shm.c',
-              'tools/check_kapi_version.py', 'docs/KAPI_SPEC.md', 'exec/exec.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
+TARGET_SRC = ['sdk/kapi.json', 'sys/kapi/kapi_generated.c', 'sys/kern/exec/surface_query.c',
+              'sys/kern/exec/lease.c', 'sdk/include/os32/os32_surface.h', 'sys/kern/exec/ring3_ls.c',
+              'sdk/include/os32/os32_ls.h', 'sys/kern/mm/shm.c',
+              'tools/check_kapi_version.py', 'docs/KAPI_SPEC.md', 'sys/kern/exec/exec.c', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h']
 NAMES = ['surface_query', 'surface_lease', 'gfx_surface_lease', 'surface_unlease',
          'sys_ls_window', 'caller_identity']
 
@@ -35,8 +35,8 @@ if __name__ == '__main__':
     import sys
     values = [json.loads((ROOT/'sdk/kapi.json').read_text()),
               (ROOT/'sdk/include/os32/os32_kapi_shared.h').read_text(),
-              (ROOT/'exec/surface_query.c').read_text(),
-              (ROOT/'exec/ring3_ls.c').read_text(), (ROOT/'mm/shm.c').read_text()]
+              (ROOT/'sys/kern/exec/surface_query.c').read_text(),
+              (ROOT/'sys/kern/exec/ring3_ls.c').read_text(), (ROOT/'sys/kern/mm/shm.c').read_text()]
     contract(*values)
     version = values[0]['version']
     if '--mutate' in sys.argv:
@@ -70,11 +70,11 @@ if __name__ == '__main__':
         with patch('builtins.open', stale_open):
             assert checker.main() == 1
         print('RED (checker rc=1): overview version rollback')
-    gen = (ROOT/'kapi/kapi_generated.c').read_text()
+    gen = (ROOT/'sys/kapi/kapi_generated.c').read_text()
     wraps = '\n'.join(re.search(r'int __cdecl wrap_'+n+r'\([^\n]+\n\{.*?\n\}', gen, re.S)[0]
                       for n in NAMES if n != 'sys_ls_window')
     from test_kcallback import function
-    wm = (ROOT/'exec/exec.c').read_text()
+    wm = (ROOT/'sys/kern/exec/exec.c').read_text()
     wraps = 'volatile u32 ring3_wm_depth_underflow;\n' + '\n'.join(function(wm, 'void ' + n + '(void)') for n in ('ring3_wm_enter', 'ring3_wm_leave')) + '\n' + wraps
     mutants = [
         ('public_wrap', '!caller_access_get(&caller) || caller.origin != CALLER_USER',

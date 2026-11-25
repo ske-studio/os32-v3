@@ -2,7 +2,7 @@
 #include "types.h"
 #include "console_dual.h"
 #include "pc98_route.h"
-#include "gfx/v2/gfx2_int.h"
+#include "sys/hal/gfx/v2/gfx2_int.h"
 #include "console_backend.h"
 #include "utf8.h"
 #include "kprintf.h"

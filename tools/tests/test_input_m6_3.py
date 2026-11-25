@@ -2,19 +2,19 @@
 """M6[3]: execute resource generation/reservation and exec boundary adapters."""
 CHECK = dict(name='input-m6-3-host', tier=1, budget=8, needs=['make:all'],
     basis=['docs/decisions/INPUT_BIND_DESIGN.md'],
-    covers=['input/hal/input_context.c', 'input/hal/input_interrupt.c',
-            'input/hal/input_context.h', 'exec/appslot.c', 'exec/appslot.h',
-            'exec/appslot_selftest.inc', 'exec/exec_abort.inc', 'exec/shell_service.h',
+    covers=['sys/input/input_context.c', 'sys/input/input_interrupt.c',
+            'sys/input/input_context.h', 'sys/kern/exec/appslot.c', 'sys/kern/exec/appslot.h',
+            'sys/kern/exec/appslot_selftest.inc', 'sys/kern/exec/exec_abort.inc', 'sys/kern/exec/shell_service.h',
             'tools/tests/input_m6_3_host.c', 'tools/tests/test_input_m6_3.py',
             'tools/tests/hwb_fake.h', 'tools/tests/host_arch/**', 'userland/shell/hwb.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'include/**',
-            'mm/pgalloc.h', 'exec/exec_surface.h', 'fs/fd_redirect.h',
-            'gfx/gfx_core_init.inc', 'gfx/gfx_core.c', 'gfx/gfx.h', 'gfx/gfx_osri_view.h', 'kdebug/gf_display_test.c',
+            'sys/kern/mm/pgalloc.h', 'sys/kern/exec/exec_surface.h', 'sys/fs/fd_redirect.h',
+            'sys/hal/gfx/gfx_core_init.inc', 'sys/hal/gfx/gfx_core.c', 'sys/hal/gfx/gfx.h', 'sys/kern/gfx/osri/gfx_osri_view.h', 'sys/dev/video/geforce/diag/gf_display_test.c',
             'tools/tests/gf4_a3_host.c', 'tools/tests/gf4_display_fake.h',
             'tools/tests/gf_accel_unbound_stubs.c',
             'tools/tests/gf_command_runtime_host.h', 'hwdev/gf/**',
-            'drivers/video/geforce/**', 'kdebug/gf_display_test.h',
-            'kdebug/gf_command_wire.h', 'sdk/include/os32/**'])
+            'drivers/video/geforce/**', 'sys/dev/video/geforce/diag/gf_display_test.h',
+            'sys/dev/video/geforce/diag/gf_command_wire.h', 'sdk/include/os32/**'])
 from pathlib import Path
 from types import SimpleNamespace
 import subprocess, sys, tempfile
@@ -32,19 +32,19 @@ MUTATIONS = [
     ('no-boundary', 'adapter', '        input_interrupt_exec_exit((u32)id, gen);', '        (void)gen;'),
 ]
 def run(ctx):
-    sources = dict(appslot=(ctx.root/'exec/appslot.c').read_text(),
-                   context=(ctx.root/'input/hal/input_context.c').read_text(),
-                   interrupt=(ctx.root/'input/hal/input_interrupt.c').read_text())
-    abort = (ctx.root/'exec/exec_abort.inc').read_text()
+    sources = dict(appslot=(ctx.root/'sys/kern/exec/appslot.c').read_text(),
+                   context=(ctx.root/'sys/input/input_context.c').read_text(),
+                   interrupt=(ctx.root/'sys/input/input_interrupt.c').read_text())
+    abort = (ctx.root/'sys/kern/exec/exec_abort.inc').read_text()
     start = abort.index('static void exec_input_owner_exit(int id)')
     take_start = abort.index('u32 exec_hwb_abort_take(void)')
     take_end = abort.index('\n}', take_start) + 2
     sources['adapter'] = abort[start:abort.index('\nu32 exec_hwb_abort_take', start)] + abort[take_start:take_end]
     with tempfile.TemporaryDirectory(prefix='input-m6-3-') as td:
         tmp = Path(td)
-        prefix = (ctx.root/'gfx/gfx_core_init.inc').read_text().split('    palette_shadow_reset();', 1)[0]
+        prefix = (ctx.root/'sys/hal/gfx/gfx_core_init.inc').read_text().split('    palette_shadow_reset();', 1)[0]
         (tmp/'m6_gfx_acquire.inc').write_text(prefix.split('{\n', 1)[1])
-        core = (ctx.root/'gfx/gfx_core.c').read_text()
+        core = (ctx.root/'sys/hal/gfx/gfx_core.c').read_text()
         start = core.index('static int gfx_kapi_claim(void)')
         (tmp/'m6_gfx_claim.inc').write_text(core[start:core.index('void gfx_kapi_init(void)', start)])
         def execute(edits):
@@ -69,7 +69,7 @@ def run(ctx):
     # Diagnostic enter/leave with real M6 state and the shipped gfx acquisition prologue.
     with tempfile.TemporaryDirectory(prefix='input-m6-display-') as td:
         tmp = Path(td)
-        prefix = (ctx.root/'gfx/gfx_core_init.inc').read_text().split('    palette_shadow_reset();', 1)[0]
+        prefix = (ctx.root/'sys/hal/gfx/gfx_core_init.inc').read_text().split('    palette_shadow_reset();', 1)[0]
         (tmp/'m6_gfx_acquire.inc').write_text(prefix.split('{\n', 1)[1])
         exe = tmp/'display'
         command = ['gcc', '-DINPUT_M6_3_REAL', '-I'+str(ctx.root/'tools/tests/host_arch'),
@@ -79,7 +79,7 @@ def run(ctx):
             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-D__KERNEL_BUILD__',
             *include_flags(ctx.root), '-I'+str(ctx.root), '-I'+str(ctx.root/'build/out/geforce'),
             str(ctx.root/'tools/tests/gf4_a3_host.c'),
-            *[str(ctx.root/x) for x in ['drivers/video/geforce/edid.c', 'tools/tests/gf_accel_unbound_stubs.c']], '-o', str(exe)]
+            *[str(ctx.root/x) for x in ['sys/dev/video/geforce/edid.c', 'tools/tests/gf_accel_unbound_stubs.c']], '-o', str(exe)]
         subprocess.run(command, check=True)
         assert host32.run([str(exe)], runner='qemu', timeout=30).returncode == 0
         print('PASS M6[3] (6) diagnostic leave/enter, IRQ and ESTATE with no pending', flush=True)

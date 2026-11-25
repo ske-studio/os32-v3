@@ -4,7 +4,7 @@
 --i686-elf PATH also extracts and checks the target descriptor (no live reads).
 """
 CHECK = dict(name='gui-desc-host', tier=1,
-    covers=['include/remote_control.h', 'net/link.h', 'sdk/include/os32/os32_gui_shared.h', 'userland/gshell/**', 'sdk/rust/os32api/**', 'tools/tests/os32api_host.py', 'exec/shell_service.h', 'sdk/include/os32/os32_kapi_shared.h', 'userland/lib/font/**', 'tools/np21w_mcp/gui_desc.py'],
+    covers=['sys/include/remote_control.h', 'sys/net/link.h', 'sdk/include/os32/os32_gui_shared.h', 'userland/gshell/**', 'sdk/rust/os32api/**', 'tools/tests/os32api_host.py', 'sys/kern/exec/shell_service.h', 'sdk/include/os32/os32_kapi_shared.h', 'userland/lib/font/**', 'tools/np21w_mcp/gui_desc.py'],
     needs=[], budget=7.8,
     kind='characterization',
 )
@@ -53,8 +53,8 @@ def build_fixture(gshell, out, rlib):
         for m in re.finditer(r"^#define\s+(OS32_GUI_DIAG_P[12]_[XY])\s+(\d+)", header, re.M))
     assert points.count("const ") == 4, "OS32_GUI_DIAG_P* missing"
     (out / "diag_points.rs").write_text(points)
-    # ffi.rs includes OUT_DIR/shell_service.rs, made from exec/shell_service.h (T7b-b2).
-    svc = (ROOT / "exec/shell_service.h").read_text()
+    # ffi.rs includes OUT_DIR/shell_service.rs, made from sys/kern/exec/shell_service.h (T7b-b2).
+    svc = (ROOT / "sys/kern/exec/shell_service.h").read_text()
     consts = ""
     for name in ("SHELL_SERVICE_MAGIC", "SHELL_SERVICE_VERSION", "SHELL_SERVICE_SIZE"):
         m = re.search(r"^#define\s+%s\s+(\S+)" % name, svc, re.M)

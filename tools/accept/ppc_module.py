@@ -139,7 +139,7 @@ def main():
     work = Path(tempfile.mkdtemp(prefix='ppc-module-')).resolve()
     manifest = fixtures(work, Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')))
     probe = work / 'ppc_kernel.c'
-    kernel = (ROOT / 'platform/powermac/ppc_kernel.c').read_text()
+    kernel = (ROOT / 'sys/platform/powermac/ppc_kernel.c').read_text()
     anchor = '    if (root_ready) {'
     assert kernel.count(anchor) == 1
     probe.write_text('static int probe_modules(void);\n' + kernel.replace(
@@ -150,10 +150,10 @@ def main():
         settings = []
         if case == 'bypass':
             settings = [x.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for x in mutant_settings(
-                work, case, 'kernel/module/module_image.c', 'if (h[MI_PAIR_CRC] != policy->pair_image_crc)',
+                work, case, 'sys/kern/module/module_image.c', 'if (h[MI_PAIR_CRC] != policy->pair_image_crc)',
                 'if (0)')]
         if case == 'slot7-hash':
-            meta = json.loads((ROOT / 'platform/powermac/kdebug_imports.json').read_text())
+            meta = json.loads((ROOT / 'sys/platform/powermac/kdebug_imports.json').read_text())
             meta['imports'][7]['name'] += '_bad'
             path = work / 'slot7.json'
             path.write_text(json.dumps(meta))
@@ -165,7 +165,7 @@ def main():
             generated = generate_bindings(work / case, case, ide=True, fep=True)
             (generated / 'mutant.stamp').touch()
         media = build_media(work / case, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(work / 'user'),
-                    'KB_MUT_SRC=platform/powermac/ppc_kernel.c', 'KB_MUT_FILE=' + str(probe),
+                    'KB_MUT_SRC=sys/platform/powermac/ppc_kernel.c', 'KB_MUT_FILE=' + str(probe),
                     'ROOT_MANIFEST=' + str(manifest), 'PPC_SYSTEM_CFG=' + str(work / 'system.cfg'), *settings, 'kb-user', 'kernel')
         cfg = subprocess.check_output(['isoinfo', '-i', media.elf.parent / 'root.iso',
                                        '-x', '/ETC/SYSTEM.CFG;1'])

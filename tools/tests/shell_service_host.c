@@ -1,13 +1,13 @@
 #include "host_exec_context.h"
 /* ========================================================================
  *  shell_service_host.c — 常駐 shell の内部入口の段 A / B と登録 (T7b-b2 S3a)
- *                         + exec/exec.c への結線 (S3b)
+ *                         + sys/kern/exec/exec.c への結線 (S3b)
  *
  *  設計: ~/os32-tmp/run/t7bb12/DESIGN.final.md §3・§5 (b2①③⑤⑥)
  *  実行: python3 -B tools/tests/test_shell_service.py [--target] [--mutate]
  *
- *  実物 exec/shell_service.c と exec/ring3_str.c (ring3_guard_active) を
- *  #include する。exec/exec.c はカーネル一式を引くので丸ごとは組めない —
+ *  実物 sys/kern/exec/shell_service.c と sys/kern/exec/ring3_str.c (ring3_guard_active) を
+ *  #include する。sys/kern/exec/exec.c はカーネル一式を引くので丸ごとは組めない —
  *  試験 py が exec.c から結線の部分を切り出して tmp に書き、ここで #include
  *  する (S3b、手本 test_caller_access.py の wm.inc):
  *    wire_wm.inc     ring3_wm_enter / ring3_wm_leave (深さと WM の印)
@@ -17,13 +17,13 @@
  *  dispatch 入口の印の 0 と frame[5] は字面で見る (試験 py の static_checks)。
  *
  *  version 2 (T7b-b3 S2): 表の末尾の font_guard_run の wrapper (段 A/B) を
- *  6 で見る (x87 無しの open の NOSYS は TASK_FONTPERF F6 で撤去)。kernel/console/font_guard.c の実物は
+ *  6 で見る (x87 無しの open の NOSYS は TASK_FONTPERF F6 で撤去)。sys/kern/console/font_guard.c の実物は
  *  test_font_guard.py が見るので、ここでは贋物 (呼ばれた数・戻りを差し替え
  *  可能、既定は call(ctx) をそのまま呼ぶ) を置く。
  *
- *  段 C / D の実体 (kernel/console/font_source.c の font_lease_shell_*、S2) は
+ *  段 C / D の実体 (sys/kern/console/font_source.c の font_lease_shell_*、S2) は
  *  別の試験 (font_source_host.c) が見るので、ここでは registry の贋物を置く
- *  (署名は kernel/console/font_source.h): lease は「使用中 + owner_gen」
+ *  (署名は sys/kern/console/font_source.h): lease は「使用中 + owner_gen」
  *  だけで、渡された shell_gen と違えば STALE、close_shell で全部 FREE。
  *
  *  戻り番地の範囲 (段 A) は、正当な呼び手を section "svc_in" / "svc_in2"
@@ -41,7 +41,7 @@
 #include "fd_redirect.h"
 #include "redir_access.h"   /* CallerAccessFrame (wire_ctx.inc の Ring3CallContext) */
 
-/* ---- exec/exec.c・exec/appslot.c・fs/fd_redirect.c の代わり ------------- */
+/* ---- sys/kern/exec/exec.c・sys/kern/exec/appslot.c・sys/fs/fd_redirect.c の代わり ------------- */
 volatile int ring3_in_syscall = 0;
 volatile int ring3_wm_depth = 0;
 volatile u32 ring3_wm_depth_underflow = 0;
@@ -69,7 +69,7 @@ char *kstrncpy(char *dst, const char *src, u32 n)
     return dst;
 }
 
-/* ---- 段 C / D の贋物 (kernel/console/font_source.c の shell 側実体の代わり) ------ */
+/* ---- 段 C / D の贋物 (sys/kern/console/font_source.c の shell 側実体の代わり) ------ */
 #define FAKE_LEASES 4
 static struct { int used; u32 owner_gen; } fake[FAKE_LEASES];
 static u32 fake_last_gen;
@@ -134,7 +134,7 @@ void font_lease_close_shell(void)
     for (i = 0; i < FAKE_LEASES; i++) fake[i].used = 0;
 }
 
-/* ---- kernel/console/font_guard.c の贋物 (version 2 の wrapper の先) ------------ */
+/* ---- sys/kern/console/font_guard.c の贋物 (version 2 の wrapper の先) ------------ */
 static int fake_guard_calls;
 static i32 fake_guard_rc;          /* 0 なら call(ctx) を呼ぶ、他はそれを返す */
 int font_guard_run(int (*call)(void *), void *context)
@@ -219,7 +219,7 @@ static void plain_context(void)
     host_slot.state = APP_STATE_RUNNING;
 }
 
-/* ---- exec/exec.c から切り出した結線 (S3b) ------------------------------ */
+/* ---- sys/kern/exec/exec.c から切り出した結線 (S3b) ------------------------------ */
 /* ring3_context_* が引く外部 (caller の控え・TSS・IRQ) の贋物。 */
 static struct arch_syscall *g_cur_frame = 0;
 static u32 host_esp0;
@@ -258,7 +258,7 @@ static void host_shell_finish(int id, int kind)
 #include "wire_finish.inc"
 }
 
-/* 実物の ring3_wm_enter / leave (exec/exec.c) を通す。 */
+/* 実物の ring3_wm_enter / leave (sys/kern/exec/exec.c) を通す。 */
 static void wm_enter(void) { ring3_wm_enter(); }
 static void wm_leave(void) { ring3_wm_leave(); }
 
@@ -464,7 +464,7 @@ static void case_reload(void)
 }
 
 /* ========================================================================
- *  5. S3b: exec/exec.c の結線 (切り出した実物)
+ *  5. S3b: sys/kern/exec/exec.c の結線 (切り出した実物)
  * ======================================================================== */
 static void case_wire(void)
 {

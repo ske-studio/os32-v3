@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the C5 VRAM allocator and its failure atomicity."""
 CHECK = dict(name='gfx2-heap-host', tier=1, needs=[], budget=5,
-    covers=['gfx/v2/vram_heap.c', 'gfx/v2/gfx2_int.h',
+    covers=['sys/hal/gfx/v2/vram_heap.c', 'sys/hal/gfx/v2/gfx2_int.h',
             'tools/tests/gfx2_heap_host.c', 'tools/tests/test_gfx2_heap.py',
             'tools/tests/host32.py'],
     basis=['HAL_V2_DESIGN §7-6'],
@@ -29,7 +29,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/v2/vram_heap.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/v2/vram_heap.c').read_text()
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         assert observe(work, source) == 0

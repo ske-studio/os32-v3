@@ -1,8 +1,8 @@
 #include "lan_boot.h"
 #include "kboot_log.h"
 #include "ofw.h"
-#include "net/link.h"
-#include "net/host_mailbox.h"
+#include "sys/net/link.h"
+#include "sys/net/host_mailbox.h"
 #include "os32/os32_kapi_shared.h"
 
 static char input[64 * 256 + 256];

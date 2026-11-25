@@ -3,9 +3,9 @@ CHECK = dict(name='remote-x9', tier=1, needs=[], budget=5,
     covers=['tools/tests/fixtures/build_profile_ppc.json', 'sdk/kapi.json', 'sdk/gen_kapi.py', 'sdk/kapi_target_ppc.py',
             'sdk/kapi_rust_gen.py', 'sdk/include/os32/os32_kapi_shared.h',
             'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_slots.h',
-            'sdk/rust/os32api/src/kapi_generated.rs', 'include/kapi_call_generated.h',
-            'kapi/kapi_generated.c', 'exec/exec_kapi_init.inc',
-            'build/targets/ppc-powermac.mk', 'kernel/console/con_sink.c', 'tools/tests/test_remote_x9.py'],
+            'sdk/rust/os32api/src/kapi_generated.rs', 'sys/include/kapi_call_generated.h',
+            'sys/kapi/kapi_generated.c', 'sys/kern/exec/exec_kapi_init.inc',
+            'build/targets/ppc-powermac.mk', 'sys/kern/console/con_sink.c', 'tools/tests/test_remote_x9.py'],
     basis=['LAN_OPERATOR_DESIGN §3', '[ABI]'],
 )
 import argparse
@@ -17,7 +17,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUTS = ('sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_slots.h',
-           'include/kapi_call_generated.h', 'kapi/kapi_generated.c', 'exec/exec_kapi_init.inc')
+           'sys/include/kapi_call_generated.h', 'sys/kapi/kapi_generated.c', 'sys/kern/exec/exec_kapi_init.inc')
 
 def main():
     parser = argparse.ArgumentParser()
@@ -32,7 +32,7 @@ def main():
             dest = out / target
             subprocess.run([sys.executable, '-B', str(ROOT / 'sdk/gen_kapi.py'),
                             '--target', target, '--out-dir', str(dest)], cwd=ROOT, check=True)
-            generated = (dest / 'kapi/kapi_generated.c').read_text()
+            generated = (dest / 'sys/kapi/kapi_generated.c').read_text()
             assert 'return con_sink_capture(op);' in generated
             for name in ('open', 'status', 'read', 'write', 'close', 'notice_read', 'notice_serial'):
                 assert 'return kapi_host_' + name + '(' in generated
@@ -43,18 +43,18 @@ def main():
                 assert 'rshell_active = active;' in generated
                 assert 'int __cdecl wrap_serial_is_initialized(void)\n{\n    KAPI_HIT(38);\n    return port_is_initialized();\n}\n' in generated
             # The pinned link-SH source list (checked against make by build-selection-host).
-            assert 'kernel/console/con_sink.c' in json.loads(
+            assert 'sys/kern/console/con_sink.c' in json.loads(
                 (ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())['link-sh']['KB_C']
         x86 = out / 'x86-pc98'
         for name in OUTPUTS:
             assert (x86 / name).read_bytes() == (ROOT / name).read_bytes(), name
         if args.mutate:
-            path = x86 / 'kapi/kapi_generated.c'
+            path = x86 / 'sys/kapi/kapi_generated.c'
             text = path.read_text()
             anchor = 'return con_sink_capture(op);'
             assert text.count(anchor) == 1
             path.write_text(text.replace(anchor, 'return 0;'))
-            assert path.read_bytes() != (ROOT / 'kapi/kapi_generated.c').read_bytes()
+            assert path.read_bytes() != (ROOT / 'sys/kapi/kapi_generated.c').read_bytes()
             print('RED generated wrapper tampering')
     print('PASS X9 slot, x86 and PPC provider, generated outputs')
 

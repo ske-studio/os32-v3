@@ -20,13 +20,13 @@ import host32
 from r1_recovery import recovery, lease_recovery, RECOVERY_MUTANTS, LEASE_MUTANTS
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET_SRCS = ['kernel/r1_fixture.c', 'kernel/r1_fixture.h', 'arch/x86/kernel/isr_handlers.c',
-               'platform/pc98/legacy/v86_mem.c', 'exec/exec.c', 'mm/pgalloc.c',
+TARGET_SRCS = ['sys/kern/r1_fixture.c', 'sys/kern/r1_fixture.h', 'sys/arch/x86/kernel/isr_handlers.c',
+               'sys/platform/pc98/legacy/v86_mem.c', 'sys/kern/exec/exec.c', 'sys/kern/mm/pgalloc.c',
                'tools/tests/r1_fixture_host.c', 'tools/r1_manifest.py',
                'tools/tests/r1_recovery.py', 'tools/tests/r1_recovery_host.c',
-               'tools/tests/r1_lease_host.c', 'exec/appslot.c', 'exec/appslot.h',
-               'exec/owner_diag.h', 'mm/paging.c', 'exec/lease.c',
-               'kdebug/selftest_lease.c', 'tools/tests/lease_selftest_host.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
+               'tools/tests/r1_lease_host.c', 'sys/kern/exec/appslot.c', 'sys/kern/exec/appslot.h',
+               'sys/kern/exec/owner_diag.h', 'sys/kern/mm/paging.c', 'sys/kern/exec/lease.c',
+               'sys/arch/x86/kdebug/selftest_lease.c', 'tools/tests/lease_selftest_host.h', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h']
 
 
 def function(source, signature):
@@ -43,7 +43,7 @@ def function(source, signature):
 
 def fixture(tmp, mutation=None, runner="qemu"):
     read = lambda p: paging_source(ROOT / p)
-    fixture = read('kernel/r1_fixture.c')
+    fixture = read('sys/kern/r1_fixture.c')
     if mutation:
         old, new = mutation
         assert old in fixture
@@ -51,17 +51,17 @@ def fixture(tmp, mutation=None, runner="qemu"):
     fixture = fixture.replace('arch_fixture_ud()', 'host_raise_ud()')
     fixture = fixture.replace('"../exec/appslot.h"', '"appslot.h"')
     (tmp / 'fixture_source.c').write_text(fixture)
-    (tmp / 'pgalloc_source.c').write_text(read('mm/pgalloc.c').replace('#include "io.h"', ''))
-    exe = read('exec/exec.c')
+    (tmp / 'pgalloc_source.c').write_text(read('sys/kern/mm/pgalloc.c').replace('#include "io.h"', ''))
+    exe = read('sys/kern/exec/exec.c')
     (tmp / 'exec_stop_source.c').write_text('\n'.join(function(exe, sig) for sig in (
         'static void exec_stop_mark(', 'static void exec_pending_transfer(')))
-    isr = read('arch/x86/kernel/isr_handlers.c')
+    isr = read('sys/arch/x86/kernel/isr_handlers.c')
     # Whole dispatch prefix through the real ring3 fault branch, omit screen dumps.
     entry = function(isr, 'void exception_handler(')
     entry = entry[:entry.index('    /* 画面上部クリア */')] + '}\n'
     entry = entry.replace('    const char *name;\n    int row = 0;\n', '')
     entry = entry.replace('    _disable();', '    (void)error_code;\n    _disable();')
-    end = function(read('platform/pc98/legacy/v86_mem.c'), 'void v86_session_end(')
+    end = function(read('sys/platform/pc98/legacy/v86_mem.c'), 'void v86_session_end(')
     end = end[:end.index('    if (!v86_session.open)')] + '    irq_restore(flags);\n}\n'
     (tmp / 'entry_source.c').write_text('#include "idt.h"\n' + entry + end)
     (tmp / 'timer_source.c').write_text(function(isr, 'void timer_handler('))
@@ -70,7 +70,7 @@ def fixture(tmp, mutation=None, runner="qemu"):
            '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-DOS32_R1_FIXTURE',
            '-I' + str(tmp)]
     cmd += (['-I' + str(ROOT / p) for p in ('tools/tests',)] + include_flags(ROOT))
-    cmd += [str(ROOT / 'tools/tests/r1_fixture_host.c'), str(ROOT / 'mm/physmem.c'),
+    cmd += [str(ROOT / 'tools/tests/r1_fixture_host.c'), str(ROOT / 'sys/kern/mm/physmem.c'),
             '-o', str(tmp / 'probe')]
     result = subprocess.run(cmd, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
@@ -134,7 +134,7 @@ def builds(tmp):
                             env=bad_env, capture_output=True, text=True)
     assert result.returncode != 0 and 'requires PROFILE=t2h' in result.stdout
     # Same kselftest source and KAPI generation; no fixture bypass of tests.
-    for source in [root / 'kdebug/kselftest.c', *sorted((root / 'kdebug/kselftest').glob('*.inc'))]:
+    for source in [root / 'sys/platform/pc98/kdebug/kselftest.c', *sorted((root / 'kdebug/kselftest').glob('*.inc'))]:
         assert 'OS32_R1_FIXTURE' not in source.read_text()
     print('r1 build isolation: both orders PASS, product bytes=' + str(product.stat().st_size))
 

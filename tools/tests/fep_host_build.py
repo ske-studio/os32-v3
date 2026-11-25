@@ -17,7 +17,7 @@ def prepare(work, probe=None, observe=False):
         str(ROOT / 'lib/sqlite3/sqlite3.c'), '-o', str(work / 'sqlite.o')], check=True)
     shim = work / 'ime_shim'
     shim.mkdir()
-    (shim / 'memmap.h').write_text('#include "' + str(ROOT / 'include/memmap.h') + '"\n'
+    (shim / 'memmap.h').write_text('#include "' + str(ROOT / 'sys/include/memmap.h') + '"\n'
         'extern unsigned char test_shm[];\n#undef MEM_SHM_BASE\n#define MEM_SHM_BASE test_shm\n')
     for header in ('stdio.h', 'stdlib.h', 'string.h'):
         (work / header).write_text('#include "fep_boundary_runtime.h"\n')
@@ -30,7 +30,7 @@ def prepare(work, probe=None, observe=False):
         'void kfree(void *p) { free(p); }\n') + harness[end:]
     if probe is not None:
         harness = harness.replace('#include "fep_store_host.h"',
-            '#include "kernel/ime/ime_conn.c"\n#include "kernel/ime/ime_user_store.c"\n#include "probe.c"')
+            '#include "sys/kern/ime/ime_conn.c"\n#include "sys/kern/ime/ime_user_store.c"\n#include "probe.c"')
         (work / 'probe.c').write_text(probe)
     if observe:
         vfs = (ROOT / 'lib/sqlite3/os32_sqlite_vfs.c').read_text()
@@ -43,7 +43,7 @@ def prepare(work, probe=None, observe=False):
 
 
 def probe_source():
-    source = (ROOT / 'kernel/fep_boot.c').read_text()
+    source = (ROOT / 'sys/kern/fep_boot.c').read_text()
     source = source[source.index('static int probe_close('):source.index('/* Missing/unreadable reserve settings')]
     # Bind only the outer import seam to the real bundled implementation.
     return (source.replace('os32_sqlite_outer_group_', 'os32_sqlite_group_')
@@ -68,6 +68,6 @@ def build(work, body, name='test', flags=()):
         '-I' + str(work), '-I' + str(work / 'ime_shim'), '-I' + str(ROOT),
         '-I' + str(ROOT / 'tools/tests/host_arch'), '-I' + str(ROOT / 'tools/tests'),
         '-I' + str(ROOT / 'lib/sqlite3'), *include_flags(ROOT), *flags, str(source),
-        *[str(ROOT / p) for p in ('lib/kstring_c.c', 'lib/kstring.c', 'lib/kmath.c', 'lib/divdi3.c')],
+        *[str(ROOT / p) for p in ('sys/kern/kstring_c.c', 'sys/kern/kstring.c', 'lib/kmath.c', 'lib/divdi3.c')],
         str(work / 'sqlite.o'), '-o', str(exe)], check=True)
     return exe

@@ -9,11 +9,11 @@ static unsigned int bh_now, bh_pio_cost, bh_demux_cost, bh_requests;
 void io_request(u32 id);
 void bh_request(u32 id) { if (id == IO_SVC_NE2K_BH) bh_requests++; io_request(id); }
 static void _idle(void) {}
-#include "../../kernel/idle_work.c"
+#include "../../sys/kern/idle_work.c"
 #define pending nic_pending
-#include "../../net/nic.c"
+#include "../../sys/net/nic.c"
 #undef pending
-#include "../../net/rx_work.c"
+#include "../../sys/net/rx_work.c"
 #include "rx_io_clock.h"
 int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = bh_now; *hi = 0; return 0; }
 

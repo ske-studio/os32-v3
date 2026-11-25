@@ -14,7 +14,7 @@
 #ifdef HOST_EXEC_CONTEXT_SOURCE
 #include HOST_EXEC_CONTEXT_SOURCE
 #else
-#include "../../arch/x86/kernel/exec_context.c"
+#include "../../sys/arch/x86/kernel/exec_context.c"
 #endif
 #else
 /* Test substitutes for the product; never x86 provider coverage. */

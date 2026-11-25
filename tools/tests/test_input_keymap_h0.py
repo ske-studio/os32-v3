@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compile the internal keymap declaration contract without libc."""
 CHECK = dict(name='input-keymap-h0', tier=1, budget=5, needs=[], covers=[
-    'input/hal/keymap.h', 'include/types.h', 'include/callconv.h',
+    'sys/hal/input/keymap.h', 'sys/include/types.h', 'sys/include/callconv.h',
     'tools/tests/test_input_keymap_h0.py', 'tools/tests/host32.py'],
     basis=['INPUT_KEYMAP_DESIGN §2, §3, K10'], kind='contract')
 import os
@@ -47,7 +47,7 @@ void _start(void) {
 '''
 
 def run(ctx):
-    header = (ctx.root / 'input/hal/keymap.h').read_text()
+    header = (ctx.root / 'sys/hal/input/keymap.h').read_text()
     with tempfile.TemporaryDirectory(prefix='input-keymap-decl-') as td:
         tmp = Path(td)
         (tmp / 'test.c').write_text(SOURCE)

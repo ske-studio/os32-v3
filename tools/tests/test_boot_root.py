@@ -7,17 +7,17 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CHECK = dict(name='boot-root-host', tier=1, budget=30, needs=['make:all'],
-             covers=['build/core.yaml', 'userland/deploy.yaml', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml', 'init/boot_root.c', 'platform/powermac/root_boot.[ch]',
-                     'platform/powermac/root_image.c', 'mm/pgalloc.h', 'tools/tests/boot_root_host.c', 'tools/tests/test_boot_root.py',
-                     'include/boot_root.h', 'kernel/dev/ram_ro.[ch]',
-                     'drivers/base/dev.c', 'kernel/dev/dev.[ch]', 'kernel/dev/dev_name.h', 'fs/vfs*', 'fs/isofs/**',
+             covers=['build/core.yaml', 'userland/deploy.yaml', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml', 'sys/kern/init/boot_root.c', 'platform/powermac/root_boot.[ch]',
+                     'sys/platform/powermac/root_image.c', 'sys/kern/mm/pgalloc.h', 'tools/tests/boot_root_host.c', 'tools/tests/test_boot_root.py',
+                     'sys/include/boot_root.h', 'kernel/dev/ram_ro.[ch]',
+                     'sys/dev/base/dev.c', 'kernel/dev/dev.[ch]', 'sys/kern/dev/dev_name.h', 'fs/vfs*', 'fs/isofs/**',
                      'fs/ramfs/**', 'lib/kstring*', 'lib/path.[ch]', 'tools/mkroot_image.py'],
     basis=['PPC_SHELL_DESIGN §3', 'PPC_SHELL_DESIGN §4', 'PPC_SHELL_DESIGN §5', 'PPC_SHELL_DESIGN §6', 'PPC_SHELL_DESIGN §7', 'PPC_SHELL_DESIGN §8', 'PPC_SHELL_DESIGN §11'],
 )
 
 
 def main():
-    source = (ROOT / 'init/boot_root.c').read_text()
+    source = (ROOT / 'sys/kern/init/boot_root.c').read_text()
     anchor = 'return vfs_mount("/tmp", "rd1", "ramfs");'
     if source.count(anchor) != 1:
         raise RuntimeError('mutation anchor is not unique')
@@ -39,7 +39,7 @@ def main():
                             stage, '--fixed-dates', '--out', iso], cwd=ROOT, check=True)
             fixed_images.append(iso.read_bytes())
         assert fixed_images[0] == fixed_images[1], 'fixed-date ISO depends on staging'
-        release = (ROOT / 'platform/powermac/root_image.c').read_text()
+        release = (ROOT / 'sys/platform/powermac/root_image.c').read_text()
         call = 'pgalloc_free_n_owner(LEDGER_OWNER_BOOT, frame_pfn, pages)'
         if release.count(call) != 1:
             raise RuntimeError('frame release mutation anchor is not unique')
@@ -57,11 +57,11 @@ def main():
                    '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                    '-D__cdecl=', '-I.', '-Iinclude', '-Isdk/include/os32', '-Ifs',
                    '-Ifs/isofs', '-Ikernel/dev', '-Idrivers/ata', '-Imm', '-Ilib',
-                   '-Iplatform/powermac', 'platform/powermac/root_boot.c', str(d / 'boot_root.c'), str(d / 'root_image.c'),
+                   '-Iplatform/powermac', 'sys/platform/powermac/root_boot.c', str(d / 'boot_root.c'), str(d / 'root_image.c'),
                    '-Wl,--wrap=ram_ro_register', '-Wl,--wrap=vfs_register_fs', '-Wl,--wrap=vfs_mount',
-                   'kernel/dev/ram_ro.c', 'kernel/dev/dev.c', 'drivers/base/dev.c', 'fs/vfs.c',
-                   'fs/isofs/iso9660.c', 'fs/isofs/iso9660_media.c', 'fs/ramfs/ramfs.c',
-                   'lib/kstring_c.c', 'lib/path.c', 'tools/tests/boot_root_host.c', '-o', str(d / 'test')]
+                   'sys/kern/dev/ram_ro.c', 'sys/kern/dev/dev.c', 'sys/dev/base/dev.c', 'sys/fs/vfs.c',
+                   'sys/fs/isofs/iso9660.c', 'sys/fs/isofs/iso9660_media.c', 'sys/fs/ramfs/ramfs.c',
+                   'sys/kern/kstring_c.c', 'lib/path.c', 'tools/tests/boot_root_host.c', '-o', str(d / 'test')]
             subprocess.run(cmd, cwd=ROOT, check=True)
             result = subprocess.run([str(d / 'test'), str(d / 'root.iso')], cwd=ROOT)
             if not expected:

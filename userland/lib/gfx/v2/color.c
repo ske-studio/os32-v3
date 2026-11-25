@@ -1,6 +1,6 @@
 /* HAL_V2_DESIGN U1: ARGB to the destination's raw pixel value. */
 #include "os32gfx2u.h"
-#include "gfx/v2/gfx2_fmt.h"
+#include "sys/hal/gfx/v2/gfx2_fmt.h"
 
 int gfx2_color_pack(u32 fmt, u32 argb, const u32 *pal256, u32 *out)
 {

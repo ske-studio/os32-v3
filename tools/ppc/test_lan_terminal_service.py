@@ -7,10 +7,10 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'platform/powermac/lan_service.c'
+SOURCE = ROOT / 'sys/platform/powermac/lan_service.c'
 PRODUCTS = ['drivers/net/gem/gem_' + name + '.c'
             for name in ('reset', 'ring', 'mac', 'phy', 'tx', 'rx')]
-PRODUCTS += ['platform/powermac/gmac_dma.c']
+PRODUCTS += ['sys/platform/powermac/gmac_dma.c']
 PRODUCTS += ['platform/powermac/lan_' + name + '.c'
              for name in ('log', 'wire', 'monitor', 'diag', 'terminal')]
 MUTATIONS = [

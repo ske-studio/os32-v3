@@ -1,4 +1,4 @@
-# drivers/ata/ide_multiple.inc — ドライブ別 MULTIPLE 設定
+# sys/dev/ata/ide_multiple.inc — ドライブ別 MULTIPLE 設定
 
 > 状態: **現行 (2026-10-31)**
 

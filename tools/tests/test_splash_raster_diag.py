@@ -1,17 +1,17 @@
 """Diagnostic records execute; the ordinary player retains identical text."""
 CHECK = dict(name='splash-raster-diag-host', tier=1,
-    covers=['platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster_image.c', 'drivers/video/pc98/splash_raster.h',
+    covers=['sys/platform/pc98/bootinfo_wire.h', 'sys/platform/pc98/bootinfo_native.h', 'sys/platform/pc98/video/splash_raster.c', 'sys/platform/pc98/video/splash_raster_image.c', 'sys/platform/pc98/video/splash_raster.h',
             'tools/tests/splash_raster_diag_host.c', 'tools/tests/splash_raster_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'gfx/gfx_osri.h', 'gfx/gfx.h', 'include/types.h', 'include/pc98.h',
-            'include/pegc.h', 'include/sys.h', 'gfx/palette.h',
-            'sdk/include/os32/os32_kapi_shared.h', 'platform/pc98/splash_probe.c',
+            'sys/kern/gfx/osri/gfx_osri.h', 'sys/hal/gfx/gfx.h', 'sys/include/types.h', 'sys/platform/pc98/pc98.h',
+            'sys/platform/pc98/pegc.h', 'sys/include/sys.h', 'sys/hal/gfx/palette.h',
+            'sdk/include/os32/os32_kapi_shared.h', 'sys/platform/pc98/splash_probe.c',
             'tools/tests/splash_probe_host.c', 'tools/tests/splash_raster_model_host.c',
-            'drivers/video/pc98/splash_raster_image.h', 'include/platform_splash.h',
-            'gfx/gfx_internal.h', 'include/gfx_hal.h', 'mm/paging.h',
-            'platform/pc98/legacy/v86_bios.h', 'drivers/char/serial.h', 'lib/serial_diag.h',
-            'include/bootinfo.h', 'include/build_id.h', 'include/config.h',
-            'arch/x86/kernel/idt.h', 'kernel/time/ktime.h'], needs=[], budget=33.2,
+            'sys/platform/pc98/video/splash_raster_image.h', 'sys/include/platform_splash.h',
+            'sys/hal/gfx/gfx_internal.h', 'sys/include/gfx_hal.h', 'sys/kern/mm/paging.h',
+            'sys/platform/pc98/legacy/v86_bios.h', 'sys/dev/char/serial.h', 'lib/serial_diag.h',
+            'sys/include/bootinfo.h', 'sys/include/build_id.h', 'sys/include/config.h',
+            'sys/arch/x86/kernel/idt.h', 'sys/kern/time/ktime.h'], needs=[], budget=33.2,
     basis=['docs/design/drivers/video/pc98/splash_raster.c.md 診断の像', 'docs/design/platform/pc98/splash_probe.c.md 1 行の OUT の列の計測 (PL の列・M1)', 'docs/design/drivers/video/pc98/splash_raster_image.c.md 診断だけに残る型'],
     env_limit='模型の診断時刻とobject配置を確認するが、物理IF=0時間と実走査時序は保証しない。',
 )
@@ -24,7 +24,7 @@ import tempfile
 import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'drivers/video/pc98/splash_raster.c'
+SOURCE = 'sys/platform/pc98/video/splash_raster.c'
 MUTATIONS = (
     ('omit interval total', 'diag.if0_total_us += span;', '(void)span;'),
     ('omit maximum', 'diag.if0_max_us = span;', 'diag.if0_max_us = 0;'),
@@ -51,7 +51,7 @@ def execute(source):
         return result.returncode
 
 
-PROBE = 'platform/pc98/splash_probe.c'
+PROBE = 'sys/platform/pc98/splash_probe.c'
 CAPTURE = 'u32 count = ((PROBE_HPERIODS + 1) * s->line_num_us + q + probe_q_lower - 1) / probe_q_lower + 1;'
 def model(truncate=False):
     with tempfile.TemporaryDirectory(prefix='splash-model-') as td:

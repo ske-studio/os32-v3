@@ -1,9 +1,9 @@
 """Compile real generated wrappers with the real B1 managed walk (ILP32).
 Only private generated/source copies are mutated; compiler failure is not RED.
 """
-TARGET_SRC = ['platform/pc98/legacy/guest.c', 'sdk/gen_kapi.py', 'sdk/kapi.json', 'exec/exec.c', 'exec/ring3_str.c',
-              'net/host_mailbox.c', 'kapi/kapi_host_notice.c',
-              'exec/access_walk.c', 'exec/redir_access.c', 'kapi/kapi_sysinfo.c', 'platform/pc98/platform_mem_stat.h', 'tools/tests/kapi_ranges_host.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
+TARGET_SRC = ['sys/platform/pc98/legacy/guest.c', 'sdk/gen_kapi.py', 'sdk/kapi.json', 'sys/kern/exec/exec.c', 'sys/kern/exec/ring3_str.c',
+              'sys/net/host_mailbox.c', 'sys/kapi/kapi_host_notice.c',
+              'sys/kern/exec/access_walk.c', 'sys/kern/exec/redir_access.c', 'sys/kapi/kapi_sysinfo.c', 'sys/platform/pc98/platform_mem_stat.h', 'tools/tests/kapi_ranges_host.c', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h']
 from exec_source import exec_source
 import argparse
 import json
@@ -62,12 +62,12 @@ def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
         rc, output, generated = generator.gen(directory, data)
         assert rc == 0, output
         sources = {k: (ROOT / p).read_text() for k, p in walk.FILES.items()}
-        sources['notice'] = (ROOT / 'kapi/kapi_host_notice.c').read_text().replace(
-            '#include "../net/host_mailbox.h"', '#include "' + str(ROOT / 'net/host_mailbox.h') + '"')
-        sources['mailbox'] = (ROOT / 'net/host_mailbox.c').read_text().replace(
-            '#include "host_mailbox.h"', '#include "' + str(ROOT / 'net/host_mailbox.h') + '"')
-        sources['generated'] = (generated / 'kapi/kapi_generated.c').read_text()
-        guest = (ROOT / 'platform/pc98/legacy/guest.c').read_text()
+        sources['notice'] = (ROOT / 'sys/kapi/kapi_host_notice.c').read_text().replace(
+            '#include "../net/host_mailbox.h"', '#include "' + str(ROOT / 'sys/net/host_mailbox.h') + '"')
+        sources['mailbox'] = (ROOT / 'sys/net/host_mailbox.c').read_text().replace(
+            '#include "host_mailbox.h"', '#include "' + str(ROOT / 'sys/net/host_mailbox.h') + '"')
+        sources['generated'] = (generated / 'sys/kapi/kapi_generated.c').read_text()
+        guest = (ROOT / 'sys/platform/pc98/legacy/guest.c').read_text()
         start = guest.index('int legacy_call_dispatch(')
         sources['legacy'] = guest[start:guest.index('\n}', start) + 2]
         source = exec_source(ROOT)
@@ -83,17 +83,17 @@ def run(runner, mutant=None, fixture_name="kapi_ranges_host.c"):
         sources['early'] = source[start:end]
         start = source.index('static int exec_disk_write_path_allowed(')
         end = source.index('/* ======================================================================== */', start)
-        sources['disk'] = '#include "' + str(ROOT / 'fs/vfs.h') + '"\n' + source[start:end]
-        vfs = (ROOT / 'fs/vfs.c').read_text()
+        sources['disk'] = '#include "' + str(ROOT / 'sys/fs/vfs.h') + '"\n' + source[start:end]
+        vfs = (ROOT / 'sys/fs/vfs.c').read_text()
         start = vfs.index('#define VFS_NAME_MAX')
         end = vfs.index('/* 末尾の', start)
-        sources['resolve'] = ('#include "' + str(ROOT / 'fs/vfs.h') + '"\n' +
+        sources['resolve'] = ('#include "' + str(ROOT / 'sys/fs/vfs.h') + '"\n' +
                               # These caller/range fixtures have no mounted FS.
                               # Resource lifetime is outside their boundary.
                               'int vfs_resource_prepare(VfsOps *ops, void *ctx)\n'
                               '{ (void)ops; (void)ctx; return VFS_OK; }\n' +
                               'static char cwd[VFS_MAX_PATH] = "/";\n' + vfs[start:end])
-        memstat = (ROOT / 'kapi/kapi_sysinfo.c').read_text()
+        memstat = (ROOT / 'sys/kapi/kapi_sysinfo.c').read_text()
         sources['memstat'] = mem_stat_source(memstat).replace('i32 kapi_mem_stat(', 'static i32 mem_stat_body(')
         if mutant and not no_out:
             name, key, old, new, expected = mutant

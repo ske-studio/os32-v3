@@ -31,7 +31,7 @@ description: OS32 の KernelAPI (KAPI) を追加・変更するときに使う�
 - **外部 apps/game は H-7 で持越し中**。[再開条件](../../../docs/tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) を満たし、
   再開を決定した後だけ `make external` で再構築する。
 - 関数ポインタでない値は `api` ではなく `data_fields`。ジェネレータは `= 0;` を出すだけなので、
-  実際の代入を `exec/exec.c` の `exec_init()` に書く。書き忘れると呼び出し側で NULL を踏む。
+  実際の代入を `sys/kern/exec/exec.c` の `exec_init()` に書く。書き忘れると呼び出し側で NULL を踏む。
 - 新 API に依存するプログラムは `build/app.conf` の要求バージョンを上げる。上げ忘れると
   古いカーネルで動かして原因不明の失敗になる。
 

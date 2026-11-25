@@ -149,17 +149,17 @@ def main():
         kernel = folder / 'kernel'
         mutation = []
         if case == 'invert-x':
-            mutation = mutant_settings(folder, case, 'platform/powermac/usb_platform.c',
+            mutation = mutant_settings(folder, case, 'sys/platform/powermac/usb_platform.c',
                                        'if (present) mouse_legacy_snapshot(dx, dy, buttons, x, y);',
                                        'if (present) { mouse_legacy_snapshot(dx, dy, buttons, x, y); *dx = -*dx; }')
         elif case == 'ignore-bounds':
-            mutation = mutant_settings(folder, case, 'platform/powermac/usb_platform.c',
+            mutation = mutant_settings(folder, case, 'sys/platform/powermac/usb_platform.c',
                                        '    usb_pointer.bounds = mouse_set_bounds;', '')
         elif case == 'default-bounds':
-            mutation = mutant_settings(folder, case, 'platform/powermac/ppc_kernel.c',
+            mutation = mutant_settings(folder, case, 'sys/platform/powermac/ppc_kernel.c',
                                        'if (fb_w && fb_h)', 'if (0)')
         elif case == 'drop-release':
-            mutation = mutant_settings(folder, case, 'input/hal/in2_state.c',
+            mutation = mutant_settings(folder, case, 'sys/hal/input/in2_state.c',
                                        'if (pointer_source_buttons(src)) input_capture(&e);', '')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')

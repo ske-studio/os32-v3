@@ -40,16 +40,16 @@ def function(source, signature):
 def run(args, mutant=None):
     source = exec_source(ROOT)
     sources = {
-        'wrapper': function((ROOT / 'kapi/kapi_generated.c').read_text(),
+        'wrapper': function((ROOT / 'sys/kapi/kapi_generated.c').read_text(),
                             'int __cdecl wrap_sys_ls(const char *path, void *cb, void *ctx)'),
-        'public_wrapper': function((ROOT / 'kapi/kapi_generated.c').read_text(),
+        'public_wrapper': function((ROOT / 'sys/kapi/kapi_generated.c').read_text(),
                             'int __cdecl wrap_sys_ls_window(const char *path, u32 skip, OS32_LsPacket *out)'),
-        'window': (ROOT / 'fs/vfs.c').read_text().split('struct vfs_ls_window_ctx {', 1)[1].split('int vfs_ls(const char *path', 1)[0],
-        'ext2_cb': function((ROOT / 'fs/ext2/ext2_vfs.c').read_text(),
+        'window': (ROOT / 'sys/fs/vfs.c').read_text().split('struct vfs_ls_window_ctx {', 1)[1].split('int vfs_ls(const char *path', 1)[0],
+        'ext2_cb': function((ROOT / 'sys/fs/ext2/ext2_vfs.c').read_text(),
                             'static void ext2_to_vfs_cb(const Ext2DirEntry *e, void *ctx)'),
-        'ls': (ROOT / 'exec/ring3_ls.c').read_text(),
-        'call': (ROOT / 'arch/x86/kernel/kapi_call.c').read_text(),
-        'shim': (ROOT / 'arch/x86/kernel/ring3_ls.S').read_text(),
+        'ls': (ROOT / 'sys/kern/exec/ring3_ls.c').read_text(),
+        'call': (ROOT / 'sys/arch/x86/kernel/kapi_call.c').read_text(),
+        'shim': (ROOT / 'sys/arch/x86/kernel/ring3_ls.S').read_text(),
     }
     if mutant:
         name, key, old, new, expected = mutant
@@ -67,7 +67,7 @@ def run(args, mutant=None):
         (tmp / 'call_source.inc').write_text(sources['call'])
         (tmp / 'shim.S').write_text(sources['shim'])
         (tmp / 'client_source.inc').write_bytes((ROOT / 'userland/lib/rt/ls.c').read_bytes())
-        offset = next(line for line in (ROOT / 'exec/ring3_str.h').read_text().splitlines()
+        offset = next(line for line in (ROOT / 'sys/kern/exec/ring3_str.h').read_text().splitlines()
                       if line.startswith('#define RING3_LS_SHIM_OFF'))
         (tmp / 'trampoline.inc').write_text('#include "syscall_code.h"\n' + offset + '\n' + function(source, 'int ring3_trampoline_init(void)'))
         exe = tmp / 'test'
@@ -76,7 +76,7 @@ def run(args, mutant=None):
                         '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-fno-stack-protector', '-ffreestanding',
                         *include_flags(ROOT),
                         '-I' + str(tmp), str(ROOT / 'tools/tests/kcallback_host.c'),
-                        str(tmp / 'shim.S'), str(ROOT / 'arch/x86/kernel/syscall_code.c'), '-o', str(exe)], check=True, capture_output=True)
+                        str(tmp / 'shim.S'), str(ROOT / 'sys/arch/x86/kernel/syscall_code.c'), '-o', str(exe)], check=True, capture_output=True)
         result = host32.run([str(exe)], runner=args.runner, timeout=30, capture_output=True, text=True)
         if mutant:
             assert result.returncode == 1 and expected in result.stdout, (name, result)
@@ -90,7 +90,7 @@ def run_guest_result(args, mutant=None):
     """Guest PASS=0, sys_ls error/empty/bad callback=1 (PRIO-2)."""
     with tempfile.TemporaryDirectory(prefix='kcallback-result-') as folder:
         tmp = pathlib.Path(folder)
-        source = (ROOT / 'userland/tests/kcallback_test.c').read_text()
+        source = (ROOT / 'userland/diag/kcallback_test.c').read_text()
         if mutant is not None:
             old = 'return failed ? 1 : 0;'
             assert source.count(old) == 1

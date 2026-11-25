@@ -3,7 +3,7 @@
 #define GF4_HOST_UNIT 8
 #include "gf4_display_fake.h"
 #define GF_PRODUCTION_MODULE
-#include "../../hwdev/gf/display/palette.c"
+#include "../../sys/dev/video/geforce/display/palette.c"
 #define REQUIRE(x) do { if (!(x)) return __LINE__; } while (0)
 #define T_ENTRIES 256U
 #define T_RGB 3U

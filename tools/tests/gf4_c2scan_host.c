@@ -8,10 +8,10 @@
  * scan.c's placement implementation; no reference checkout needed at runtime. */
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
-#include "../../hwdev/gf/internal.h"
-#include "../../hwdev/gf/production.h"
-#include "../../hwdev/gf/accel_service.h"
-#include "../../drivers/video/geforce/geforce_module.h"
+#include "../../sys/dev/video/geforce/internal.h"
+#include "../../sys/dev/video/geforce/production.h"
+#include "../../sys/dev/video/geforce/accel_service.h"
+#include "../../sys/dev/video/geforce/geforce_module.h"
 
 #define TEST_VRAM (16U*1024U*1024U)
 #define TEST_DL 123456U

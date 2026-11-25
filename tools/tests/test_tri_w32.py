@@ -1,11 +1,11 @@
 """Execute tri_w32 with byte-addressed LFB and injected store-width faults."""
 CHECK = dict(name='tri-w32', tier=1, needs=[], budget=8.7, covers=[
-    'userland/tests/hw/tri_w32.hwb', 'tools/tests/test_tri_w32.py',
+    'userland/diag/hw/tri_w32.hwb', 'tools/tests/test_tri_w32.py',
     'tools/tests/hwb_fake.h', 'tools/tests/hwb_host.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
     'userland/shell/hwb.h', 'userland/shell/hwb_probe.c', 'userland/shell/hwb_parse.c',
     'userland/shell/hwb_exec.c', 'userland/shell/hwb_log.c',
-    'kdebug/probe_wire.h', 'kdebug/hwb_wire.h', 'include/types.h',
+    'sys/kern/kdebug/probe_wire.h', 'sys/kern/kdebug/hwb_wire.h', 'sys/include/types.h',
     'sdk/include/os32/os32_kapi_shared.h'],
     kind='characterization',
 )
@@ -15,7 +15,7 @@ import tempfile
 import sys
 import hwb_host
 
-SCRIPT = 'userland/tests/hw/tri_w32.hwb'
+SCRIPT = 'userland/diag/hw/tri_w32.hwb'
 
 
 def trial(mutation=None):

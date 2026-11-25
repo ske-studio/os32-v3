@@ -2,7 +2,7 @@
  * adapters below implement the same eight entry points without hardware.
  * This checks expressibility/signatures, not production driver behavior. */
 #include "video_service.h"
-#include "hwdev/gf/internal.h"
+#include "sys/dev/video/geforce/internal.h"
 void gf_init_contract_test(void);
 
 static void finish(int rc) __attribute__((noreturn));

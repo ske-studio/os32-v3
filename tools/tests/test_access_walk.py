@@ -4,7 +4,7 @@ Only a fixed source closure is copied; compile failures never count as RED.
 from paging_source import paging_source
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
-TARGET_SRC = ['exec/access_walk.c', 'exec/redir_access.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/shlib.c', 'kdebug/kselftest/caller_boot.inc']
+TARGET_SRC = ['sys/kern/exec/access_walk.c', 'sys/kern/exec/redir_access.c', 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c', 'sys/kern/mm/shlib.c', 'sys/arch/x86/kdebug/kselftest/caller_boot.inc']
 
 import argparse
 import hashlib
@@ -17,10 +17,10 @@ from mutpar import run_ordered
 import host32
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FILES = {
-    'paging': 'mm/paging.c', 'pgalloc': 'mm/pgalloc.c',
-    'shlib': 'mm/shlib.c', 'access_walk': 'exec/access_walk.c',
-    'redir_access': 'exec/redir_access.c',
-    'boot': 'kdebug/kselftest/caller_boot.inc',
+    'paging': 'sys/kern/mm/paging.c', 'pgalloc': 'sys/kern/mm/pgalloc.c',
+    'shlib': 'sys/kern/mm/shlib.c', 'access_walk': 'sys/kern/exec/access_walk.c',
+    'redir_access': 'sys/kern/exec/redir_access.c',
+    'boot': 'sys/arch/x86/kdebug/kselftest/caller_boot.inc',
 }
 MUTANTS = [
     ('paging', 'i < pages; ++i', 'i + 1 < pages; ++i', 'second trampoline page missing'),
@@ -93,7 +93,7 @@ def run(sources, mutant=None, fixture="access_walk_host.c", high_stack=False, ru
                '-static', '-no-pie', '-Wl,--gc-sections',
                *['-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)],
                '-I' + str(tmp), str(ROOT / 'tools/tests' / fixture),
-               str(ROOT / 'mm/physmem.c'), '-o', str(exe)]
+               str(ROOT / 'sys/kern/mm/physmem.c'), '-o', str(exe)]
         host32.build(cmd, check=True, capture_output=True, text=True)
         return run_host32(exe, runner)
 

@@ -1,6 +1,6 @@
 """T4b-1: real op 11 dispatcher, 40-byte wire rejection, no HAL calls."""
 CHECK = dict(name='recover-wire-host', tier=1,
-    covers=['kdebug/kdebug_main.c', 'kdebug/tri_command_wire.h', 'kdebug/trident_command_test.h', 'kdebug/recover_wire.h', 'tools/tests/recover_wire_host.c', 'tools/tests/kdebug_init_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'kdebug/recover_virtual.h', 'tools/tests/recover_hostshim/io.h', 'kdebug/recover.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/platform/pc98/kdebug/kdebug_main.c', 'sys/dev/video/trident/diag/tri_command_wire.h', 'sys/dev/video/trident/diag/trident_command_test.h', 'sys/kern/kdebug/recover_wire.h', 'tools/tests/recover_wire_host.c', 'tools/tests/kdebug_init_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sys/kern/kdebug/recover_virtual.h', 'tools/tests/recover_hostshim/io.h', 'sys/dev/video/geforce/diag/recover.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.1,
     basis=['REALHW_RECOVER_DESIGN §5'],
 )
@@ -14,7 +14,7 @@ import host32
 import mutpar
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'kdebug/kdebug_main.c'
+SOURCE = 'sys/platform/pc98/kdebug/kdebug_main.c'
 
 MUTATIONS = [
     ('route_dispatch_now', 'recover_route_test_session(r, out->session) :', 'recover_now_session(r, out->session) :'),

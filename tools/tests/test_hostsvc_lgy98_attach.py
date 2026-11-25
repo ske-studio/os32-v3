@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """LGY attach transfers shared link ownership and preserves reflection."""
 CHECK = dict(name='hostsvc-lgy98-attach', tier=1, needs=[], budget=3.4, covers=[
-    'drivers/net/ne2000/lgy98.c', 'drivers/net/ne2000/lgy98.h',
-    'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h',
-    'drivers/char/np2sysp.h', 'net/nic.h', 'net/link.h',
-    'kernel/irq/tick.h', 'kernel/irq/irq.h', 'platform/pc98/tick_order.h',
-    'include/config.h', 'include/kprintf.h', 'lib/kstring.h',
+    'sys/dev/net/ne2000/lgy98.c', 'sys/dev/net/ne2000/lgy98.h',
+    'sys/dev/net/ne2000/ne2000.h', 'sys/dev/net/ne2000/ne2000_regs.h',
+    'sys/dev/char/np2sysp.h', 'sys/net/nic.h', 'sys/net/link.h',
+    'sys/kern/irq/tick.h', 'sys/kern/irq/irq.h', 'sys/platform/pc98/tick_order.h',
+    'sys/include/config.h', 'sys/include/kprintf.h', 'sys/kern/kstring.h',
     'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/hostsvc_fixture.h',
     'tools/tests/hostsvc_fixture.c', 'tools/tests/hostsvc_lgy98_attach_host.c',
     'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk'],
@@ -42,7 +42,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'drivers/net/ne2000/lgy98.c').read_text()
+    original = (ROOT / 'sys/dev/net/ne2000/lgy98.c').read_text()
     with tempfile.TemporaryDirectory(prefix='hostsvc-lgy98-attach-') as tmp:
         work = Path(tmp)
         rc = build_run(work, original)

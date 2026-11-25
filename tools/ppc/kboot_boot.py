@@ -17,19 +17,19 @@ CHECK = dict(name='ppc-kboot-boot', tier=2, budget=600, covers=[
     'arch/ppc/**', 'platform/powermac/**', 'mm/**', 'include/**', 'lib/kstring*',
     'tools/ppc/kboot_boot*', 'tools/ppc/kboot_vectors.py', 'tools/ppc/run.py',
     'tools/tests/kernel_includes.py', 'build/arch/ppc.mk'])
-PRODUCT = ['arch/ppc/entry.S', 'arch/ppc/kernel_entry.S', 'arch/ppc/kernel_takeover.S',
-    'platform/powermac/kernel_boot.c', 'arch/ppc/kernel_cpu.c', 'arch/ppc/kernel_vectors.S',
-    'arch/ppc/kernel_mmu.S', 'arch/ppc/kernel_hpt.c', 'arch/ppc/kernel_trap.c',
-    'arch/ppc/kboot_unavailable.c', 'platform/powermac/machcfg.c', 'kernel/machcfg.c',
-    'arch/ppc/pd_walk.c', 'arch/ppc/mmu.S', 'arch/ppc/cache_copy.S',
-    'platform/powermac/rh_observe.c',
-    'platform/powermac/ofw.c', 'platform/powermac/escc.c',
-    'platform/powermac/escc_tree.c', 'platform/powermac/kboot_capture.c',
-    'platform/powermac/gmac_tree.c', 'platform/powermac/via_tree.c',
-    'platform/powermac/kboot_reserve.c', 'platform/powermac/memory.c',
-    'platform/powermac/mpic_tree.c',
-    'mm/memory_boot.c', 'mm/paging.c', 'mm/physmem.c', 'mm/pgalloc.c',
-    'lib/kstring_c.c', 'tools/ppc/kboot_boot_guest.c']
+PRODUCT = ['sys/arch/ppc/entry.S', 'sys/arch/ppc/kernel_entry.S', 'sys/arch/ppc/kernel_takeover.S',
+    'sys/platform/powermac/kernel_boot.c', 'sys/arch/ppc/kernel_cpu.c', 'sys/arch/ppc/kernel_vectors.S',
+    'sys/arch/ppc/kernel_mmu.S', 'sys/arch/ppc/kernel_hpt.c', 'sys/arch/ppc/kernel_trap.c',
+    'sys/arch/ppc/kboot_unavailable.c', 'sys/platform/powermac/machcfg.c', 'sys/kern/machcfg.c',
+    'sys/arch/ppc/pd_walk.c', 'sys/arch/ppc/mmu.S', 'sys/arch/ppc/cache_copy.S',
+    'sys/platform/powermac/rh_observe.c',
+    'sys/platform/powermac/ofw.c', 'sys/platform/powermac/escc.c',
+    'sys/platform/powermac/escc_tree.c', 'sys/platform/powermac/kboot_capture.c',
+    'sys/platform/powermac/gmac_tree.c', 'sys/platform/powermac/via_tree.c',
+    'sys/platform/powermac/kboot_reserve.c', 'sys/platform/powermac/memory.c',
+    'sys/platform/powermac/mpic_tree.c',
+    'sys/kern/mm/memory_boot.c', 'sys/kern/mm/paging.c', 'sys/kern/mm/physmem.c', 'sys/kern/mm/pgalloc.c',
+    'sys/kern/kstring_c.c', 'tools/ppc/kboot_boot_guest.c']
 
 
 def build(out, negative=0, mutation=None):
@@ -48,7 +48,7 @@ def build(out, negative=0, mutation=None):
             src.write_text(text.replace(mutation[2],mutation[3]))
         command([str(CROSS)+'gcc', *flags, '-c', src, '-o', obj])
     ld=out/'kernel.ld'
-    command([str(CROSS)+'gcc', *flags, '-E','-P','-x','c', ROOT/'arch/ppc/kernel.ld', '-o', ld])
+    command([str(CROSS)+'gcc', *flags, '-E','-P','-x','c', ROOT/'sys/arch/ppc/kernel.ld', '-o', ld])
     elf=out/'BOOT.ELF'
     command([str(CROSS)+'gcc', *flags, '-no-pie', '-Wl,--gc-sections',
         '-Wl,--wrap=ppc_kernel_real_start',
@@ -103,20 +103,20 @@ def observe(out, elf, cpu, negative, red=None):
 
 # name, product file, unique anchor, replacement, guest probe, stop + reached marks.
 MUTATIONS = [
- ('no-alias','platform/powermac/kernel_boot.c','        install_alias(root, &escc_alias);',
+ ('no-alias','sys/platform/powermac/kernel_boot.c','        install_alias(root, &escc_alias);',
   '        /* mutant: omit ESCC */',0,('ppc_boot_walk_stop',[b'TAKEOVER'])),
- ('hpt-present','platform/powermac/kernel_boot.c','            *leaf(root, a) = 0;',
+ ('hpt-present','sys/platform/powermac/kernel_boot.c','            *leaf(root, a) = 0;',
   '            *leaf(root, a) = a | PAGE_RW;',0,('ppc_boot_walk_stop',[b'TAKEOVER'])),
- ('of-after-detach','platform/powermac/kernel_boot.c','    info->of_calls_at_detach = ofw_detach();',
+ ('of-after-detach','sys/platform/powermac/kernel_boot.c','    info->of_calls_at_detach = ofw_detach();',
   '    info->of_calls_at_detach = ofw_detach();\n    ofw_write(e.out, mark, sizeof(mark)-1);',
   0,('ofw_detached_stop',[b'TAKEOVER'])),
- ('no-bat-retirement','platform/powermac/kernel_boot.c','    ppc_cpu_disable_bats(pvr);',
+ ('no-bat-retirement','sys/platform/powermac/kernel_boot.c','    ppc_cpu_disable_bats(pvr);',
   '    (void)pvr;',1,('fixture_fail',[b'TAKEOVER',b'PAGING:MAIN',b'PROBE:LOW',b'FAIL:SURVIVED'])),
 ]
 
 def host(out, bad, mutant=False, shell=False, full_mutation=None, via_case=None):
     out.mkdir(parents=True,exist_ok=True)
-    src=(ROOT/'platform/powermac/kernel_boot.c').read_text()
+    src=(ROOT/'sys/platform/powermac/kernel_boot.c').read_text()
     if mutant:
         anchor='        if (!boot_walk_valid(root)) ppc_boot_walk_stop();'
         require(src.count(anchor)==1,'unique walk anchor')
@@ -133,7 +133,7 @@ def host(out, bad, mutant=False, shell=False, full_mutation=None, via_case=None)
         '-I'+str(ROOT/'arch/ppc'),'-I'+str(ROOT/'platform/powermac'),
         *([f'-DVIA_CASE={via_case}'] if via_case is not None else []),
         *include_flags(ROOT), ROOT/'tools/ppc/kboot_boot_host.c',
-        ROOT/'arch/ppc/pd_walk.c', *([ROOT/'platform/powermac/rh_observe.c', ROOT/'platform/powermac/ofw.c', ROOT/'lib/kstring_c.c'] if shell else []), '-o',exe])
+        ROOT/'sys/arch/ppc/pd_walk.c', *([ROOT/'sys/platform/powermac/rh_observe.c', ROOT/'sys/platform/powermac/ofw.c', ROOT/'sys/kern/kstring_c.c'] if shell else []), '-o',exe])
     p=subprocess.run(['qemu-i386',str(exe)],capture_output=True,text=True,timeout=30)
     expected=full_mutation[2] if full_mutation else 31 if mutant else 0
     require(p.returncode==expected and 'REACHED:ALIAS' in p.stdout and
@@ -145,7 +145,7 @@ def host(out, bad, mutant=False, shell=False, full_mutation=None, via_case=None)
 
 def lan_host(out, case, mutation=None):
     out.mkdir(parents=True, exist_ok=True)
-    src=(ROOT/'platform/powermac/kernel_boot.c').read_text()
+    src=(ROOT/'sys/platform/powermac/kernel_boot.c').read_text()
     if mutation:
         require(src.count(mutation[0]) == 1, 'unique LAN mutation')
         src=src.replace(mutation[0], mutation[1])
@@ -157,7 +157,7 @@ def lan_host(out, case, mutation=None):
         '-D__cdecl=','-DBOOT_BAD_WALK=0','-DLAN_CASE='+str(case), '-I'+str(out),
         '-I'+str(ROOT/'arch/ppc'),'-I'+str(ROOT/'platform/powermac'),
         *include_flags(ROOT), ROOT/'tools/ppc/kboot_boot_host.c',
-        ROOT/'arch/ppc/pd_walk.c','-o',exe])
+        ROOT/'sys/arch/ppc/pd_walk.c','-o',exe])
     p=subprocess.run(['qemu-i386',str(exe)],capture_output=True,text=True,timeout=30)
     if mutation:
         require(p.returncode == mutation[2] and mutation[3] in p.stdout and

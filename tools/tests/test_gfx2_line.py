@@ -7,7 +7,7 @@ import host32
 from mutpar import build_in_tree
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'gfx/v2/sw_line.c'
+SOURCE = 'sys/hal/gfx/v2/sw_line.c'
 OLD = 'if (e > 0) {'
 NEW = 'if (e >= 0) {'
 

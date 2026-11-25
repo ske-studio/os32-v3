@@ -3,7 +3,7 @@
 Record: tools/tests/e82557_desc_tdd.md
 """
 CHECK = dict(name='e82557-desc-host', tier=1,
-    covers=['drivers/net/e82557/e82557_desc.c', 'drivers/net/e82557/e82557_desc.h', 'drivers/net/e82557/e82557_regs.h', 'drivers/net/e82557/e82557.c', 'tools/tests/e82557_desc_host.c', 'tools/tests/test_e82557_drv.py', 'tools/tests/host32.py', 'drivers/net/e82557/e82557_eeprom.c', 'drivers/pci/pci_bind_match.c', 'drivers/pci/pci_decode.c', 'drivers/net/e82557/lan_module.c', 'tools/tests/e82557_drv_host.c', 'arch/x86/kernel/isr_handlers.c', 'platform/pc98/lan_match.c', 'tools/tests/kernel_includes.py'],
+    covers=['sys/dev/net/e82557/e82557_desc.c', 'sys/dev/net/e82557/e82557_desc.h', 'sys/dev/net/e82557/e82557_regs.h', 'sys/dev/net/e82557/e82557.c', 'tools/tests/e82557_desc_host.c', 'tools/tests/test_e82557_drv.py', 'tools/tests/host32.py', 'sys/dev/net/e82557/e82557_eeprom.c', 'sys/dev/pci/pci_bind_match.c', 'sys/dev/pci/pci_decode.c', 'sys/dev/net/e82557/lan_module.c', 'tools/tests/e82557_drv_host.c', 'sys/arch/x86/kernel/isr_handlers.c', 'sys/platform/pc98/lan_match.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.5,
     kind='characterization',
 )
@@ -47,11 +47,11 @@ def build(tmp, mutation=None):
     source = ROOT / 'tools/tests/e82557_desc_host.c'
     if mutation:
         tree = pathlib.Path(tmp) / 'tree'
-        for rel in ('tools/tests/e82557_desc_host.c', 'drivers/net/e82557/e82557_desc.c', 'drivers/net/e82557/e82557_desc.h', 'drivers/net/e82557/e82557_regs.h'):
+        for rel in ('tools/tests/e82557_desc_host.c', 'sys/dev/net/e82557/e82557_desc.c', 'sys/dev/net/e82557/e82557_desc.h', 'sys/dev/net/e82557/e82557_regs.h'):
             target = tree / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             text = (ROOT / rel).read_text()
-            if rel == 'drivers/net/e82557/e82557_desc.c':
+            if rel == 'sys/dev/net/e82557/e82557_desc.c':
                 old, new, label = mutation
                 # Mask expression also occurs in decode; mutate stop predicate only.
                 if label == 'RU active accepted':

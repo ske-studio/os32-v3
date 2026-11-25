@@ -1,8 +1,8 @@
-# kdebug/gfinit.c — 設計
+# sys/dev/video/geforce/diag/gfinit.c — 設計
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
-ソース: `kdebug/gfinit.c`
+ソース: `sys/dev/video/geforce/diag/gfinit.c`
 
-**診断 owner/lease は `kdebug/gfinit.c` のまま**（F7）。核から `int gf_production_selected(void)` 一つを export し、GFX=geforce の起動では gfinit の入口で拒否する。本番の成否や GUI 終了後にも拒否を保ち、診断と本番は設定変更＋再起動で入れ替える。S0/緊急復帰入口は止めない。
+**診断 owner/lease は `sys/dev/video/geforce/diag/gfinit.c` のまま**（F7）。核から `int gf_production_selected(void)` 一つを export し、GFX=geforce の起動では gfinit の入口で拒否する。本番の成否や GUI 終了後にも拒否を保ち、診断と本番は設定変更＋再起動で入れ替える。S0/緊急復帰入口は止めない。
 共有 parser は一つ。診断用出力/接続・lifetime/stages・owner/lease は元の場所に残す。
 KDEBUG=0 fake 起動、初回 Command 書込みは 1 回・BAR 書込みは 0、0x0106→0x0102 の 16bit 確認と不一致時の停止、A2/main順・期限・各失敗出口、選択中 gfinit 拒否、再 devinit 無し
 
@@ -22,11 +22,11 @@ KDEBUG=0 fake 起動、初回 Command 書込みは 1 回・BAR 書込みは 0、
 
 ## GF6200_4C_DESIGN
 
-4a 合格を前提に、新しい同一試行の A2→main 0〜4→C を行う。旧 A4 は終端するので間に挟まない（`kdebug/gfinit.c` の `gf_c_only()`）。今回の VRAM 試験範囲は表示領域だけで、4a の容量試験を再実施したとはしない。
+4a 合格を前提に、新しい同一試行の A2→main 0〜4→C を行う。旧 A4 は終端するので間に挟まない（`sys/dev/video/geforce/diag/gfinit.c` の `gf_c_only()`）。今回の VRAM 試験範囲は表示領域だけで、4a の容量試験を再実施したとはしない。
 
-新opは**13の `gfinit modeset <sid> --allow-write` 1つ**。終了は既存abort。40B/version1・op5〜12・KAPI slotは維持（`kdebug/gfinit_wire.h` の `GF_INIT_MAINS`, `kdebug/kdebug_main.c`）。
+新opは**13の `gfinit modeset <sid> --allow-write` 1つ**。終了は既存abort。40B/version1・op5〜12・KAPI slotは維持（`sys/dev/video/geforce/diag/gfinit_wire.h` の `GF_INIT_MAINS`, `sys/platform/pc98/kdebug/kdebug_main.c`）。
 
-flagsはprepare時にownerへ保存しplan/hash/profile_crcへ反映。再送cacheはprepareのflagsも比較する（現状はop/mainのみ、`kdebug/gfinit.c`）。途中のflag変更や旧prepareからmodesetを受け付けない。
+flagsはprepare時にownerへ保存しplan/hash/profile_crcへ反映。再送cacheはprepareのflagsも比較する（現状はop/mainのみ、`sys/dev/video/geforce/diag/gfinit.c`）。途中のflag変更や旧prepareからmodesetを受け付けない。
 
 C実施時は同sid/next_main=5/PAUSEDを確認；旧verifyはMODE_Cでは使わず、通常prepareのA4は従来どおり。
 
@@ -38,7 +38,7 @@ C実施時は同sid/next_main=5/PAUSEDを確認；旧verifyはMODE_Cでは使わ
 
 ## GF6200_S7_SHELL
 
-- `kdebug/gfinit.h` は既存op5〜10と40B要求。`kdebug/gfinit.c` は版・内外size・旗・4096 steps・出力欄ゼロを検査する（r1確認時の行番号）。
+- `sys/dev/video/geforce/diag/gfinit.h` は既存op5〜10と40B要求。`sys/dev/video/geforce/diag/gfinit.c` は版・内外size・旗・4096 steps・出力欄ゼロを検査する（r1確認時の行番号）。
 
 - gfinit.hはwireをincludeし40B assertと関数宣言を保持。
 
@@ -82,7 +82,7 @@ timeout・送信失敗からの自動再Cは初版では行わず、既存のS0�
 
 | 実物・根拠 (file:line) | 確認したこと |
 | --- | --- |
-| `kdebug/gfinit.c`、`gfinit_owner()` | GF owner、ページ確保、開始と bind。ROM/decode/plan/flow は試行寿命、A1 成功時だけ次の準備まで一部保持 |
+| `sys/dev/video/geforce/diag/gfinit.c`、`gfinit_owner()` | GF owner、ページ確保、開始と bind。ROM/decode/plan/flow は試行寿命、A1 成功時だけ次の準備まで一部保持 |
 
 - PAUSED も lease と部品参照を保持。解放は局所 cleanup → 共通終端 → 結果保持 → plan/profile 参照解除 → 作業領域 free → lease 解放。A1 成功の ROM/decode 保持は既存例外として参照を残す。
 

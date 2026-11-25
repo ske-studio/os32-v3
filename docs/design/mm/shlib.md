@@ -1,6 +1,6 @@
-# mm/shlib.c — 設計
+# sys/kern/mm/shlib.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: MEMMAP_V3・DESIGN (D1 で移した)
-ソース: `mm/shlib.c`
+ソース: `sys/kern/mm/shlib.c`
 
 **世代の識別を 4 つ別に持つ** — OS32X ヘッダの形式版・**KAPI ABI 世代**・**メモリ配置世代**・**shlib プロトコル**。互換性を切る世代は一致を要求し、その世代の内側でだけ最低機能版 (min KAPI) を使う
 

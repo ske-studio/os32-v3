@@ -10,5 +10,5 @@
 
 ## 索引
 
-- [kernel/irq/irq.c](irq.md)
-- [kernel/irq/tick.c](tick.md)
+- [sys/kern/irq/irq.c](irq.md)
+- [sys/kern/irq/tick.c](tick.md)

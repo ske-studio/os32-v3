@@ -24,9 +24,9 @@ class Integration(unittest.TestCase):
             body = body.replace('@ONLINE@', 'online = 1;')
         with tempfile.TemporaryDirectory(prefix='os32-model-') as tmp:
             tmp = pathlib.Path(tmp)
-            source = (ROOT / 'mm/pgalloc.c').read_text()
+            source = (ROOT / 'sys/kern/mm/pgalloc.c').read_text()
             source = source.replace('#include "io.h"', '')
-            source += (ROOT / 'kernel/sys.c').read_text().replace('#include "io.h"', '')
+            source += (ROOT / 'sys/kern/sys.c').read_text().replace('#include "io.h"', '')
             # 旧 legacy pgalloc_init の代わりの足場 (T1a で製品から撤去)。
             source += (ROOT / 'tools/tests/pgalloc_host_fixture.h').read_text()
             pre = '''#include "types.h"
@@ -102,7 +102,7 @@ void _start(void) { int r = test(); __asm__ volatile("int $0x80" : : "a"(1), "b"
             cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-finstrument-functions', '-Wl,--gc-sections']
             cmd += LAYOUT_FLAGS
             cmd += include_flags(ROOT)
-            subprocess.run(cmd + list(flags) + [str(tmp / 'test.c'), str(ROOT / 'mm/physmem.c'), '-o', str(tmp / 'test')], check=True)
+            subprocess.run(cmd + list(flags) + [str(tmp / 'test.c'), str(ROOT / 'sys/kern/mm/physmem.c'), '-o', str(tmp / 'test')], check=True)
             result = host32.run([str(tmp / 'test')])
             self.assertEqual(result.returncode, 0, 'C CHECK failure (250 = IRQ/commit invariant): ' + str(result.returncode) + '\n' + (tmp / 'test.c').read_text())
 

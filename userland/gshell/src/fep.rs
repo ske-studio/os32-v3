@@ -2,7 +2,7 @@
 //!
 //! ## 誰がキーを読むか (2026-09-06 の K2 反映後)
 //!
-//! `drivers/input/kbd.c` は打鍵を 2 本の待ち行列へ積むが、**GUI モード中 (WM が
+//! `sys/platform/pc98/input/kbd.c` は打鍵を 2 本の待ち行列へ積むが、**GUI モード中 (WM が
 //! `gui_register` した間) は cooked (`kbd_buf`) に積まない** (K2)。したがって
 //! `ime_trygetkey()` / `ime_trygetchar()` は GUI 中いつでも -1 を返す —
 //! カーネル FEP は自分でキーを引けない。WM だけが raw を読む唯一の読み手になる。
@@ -18,7 +18,7 @@
 //!
 //! ### PM への申し送り 1 — `ime_feed_key` (K レーンへの依頼、G3 の前提)
 //!
-//! `kernel/ime/ime.c` の変換本体 `ime_process_key(keydata)` は static で、公開 API
+//! `sys/kern/ime/ime.c` の変換本体 `ime_process_key(keydata)` は static で、公開 API
 //! (`ime_getkey` 系) はどれも `kbd_trygetkey()` から自分でキーを引く。GUI 中は
 //! cooked が空なので**この経路が丸ごと死んでいる**。次の 1 本を足してほしい:
 //!
@@ -43,7 +43,7 @@
 //!
 //! ## 未確定文字列と候補窓の描画
 //!
-//! カーネルの FEP は `IME_Render` 関数表 (`kernel/ime/ime_render.h`) 越しに
+//! カーネルの FEP は `IME_Render` 関数表 (`sys/kern/ime/ime_render.h`) 越しに
 //! **80x25 のセル格子**へ描く。ここに GFX 版の関数表 [`GSHELL_IME_RENDER_GFX`] を
 //! 用意した (実体は gshell 側 = CPL=0 なのでカーネルから直接呼べる)。関数表は
 //! **画素を書かず、セル格子 (`Grid`) を更新するだけ**なので、X1 / X4 (ポンプ) から
@@ -70,7 +70,7 @@ pub const CELL_W: i32 = 8;
 pub const CELL_H: i32 = 16;
 pub const COLS: usize = 80;
 pub const ROWS: usize = 25;
-/// `kernel/ime/ime.c` の `IME_PREEDIT_ROW`。候補リストはこの上の行に出る。
+/// `sys/kern/ime/ime.c` の `IME_PREEDIT_ROW`。候補リストはこの上の行に出る。
 pub const PREEDIT_ROW: usize = 24;
 
 const NCELL: usize = COLS * ROWS;
@@ -91,7 +91,7 @@ const PAD: i32 = 2;
 const COMMIT_MAX: usize = 128;
 
 /* ================================================================ */
-/*  IME_Render 関数表 (kernel/ime/ime_render.h と同じ並び)               */
+/*  IME_Render 関数表 (sys/kern/ime/ime_render.h と同じ並び)               */
 /* ================================================================ */
 #[repr(C)]
 pub struct ImeRender {
@@ -517,7 +517,7 @@ fn flush_text_to(st: &mut GuiState, t: Option<input::Target>) {
 /*  フォーカス移動の前の確定 (票 KBD_NAV §1-6)                       */
 /* ================================================================ */
 
-/* KEY_RETURN と ASCII CR (drivers/input/kbd.h)。確定は「RETURN を 1 打」と同じ。 */
+/* KEY_RETURN と ASCII CR (sys/platform/pc98/input/kbd.h)。確定は「RETURN を 1 打」と同じ。 */
 const SC_RETURN: u8 = 0x1C;
 const CH_CR: u8 = 0x0D;
 /// フォーカス移動の前の確定で RETURN を流す回数の上限 (未確定行は 1 行 =
@@ -543,7 +543,7 @@ pub fn commit_to(st: &mut GuiState, win_id: u32) {
     let original = input::target_of(st, win_id);
     flush_text_to(st, original);
     /* RETURN 1 打では確定し切らないことがある: 候補の確定は最長一致で、
-     * 残りのかなを未確定へ戻す (kernel/ime/ime.c の commit_candidate)。素通り
+     * 残りのかなを未確定へ戻す (sys/kern/ime/ime.c の commit_candidate)。素通り
      * (= 未確定が無い) になるまで上限つきで繰り返す (代行レビュー P3-1)。 */
     let mut n = 0;
     while n < COMMIT_ROUNDS_MAX {
@@ -562,7 +562,7 @@ pub fn commit_to(st: &mut GuiState, win_id: u32) {
 /// 入力先の寿命終了。STOP と同じ取消で、確定も辞書アクセスもしない (X1 可)。
 /// 既に WM が集めた確定列・予約も次の入力先へ渡さない。
 pub fn cancel_input() {
-    const SC_STOP: i32 = 0x60; // drivers/input/kbd.h KEY_STOP
+    const SC_STOP: i32 = 0x60; // sys/platform/pc98/input/kbd.h KEY_STOP
     grid_clear_all(state());
     let _ = feed_kernel(SC_STOP << 8);
     let f = state();

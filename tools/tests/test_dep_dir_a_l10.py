@@ -1,6 +1,6 @@
 """L10 resident KCG controls; copied ILP32 controls and one scale mutant."""
 CHECK = dict(name='dep-dir-a-l10-host', tier=1,
-    covers=['platform/pc98/gfx_surfaces.c', 'include/callconv.h', 'platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'platform/pc98/legacy/lowmap.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/hwdev_layout.json', 'drivers/pci/pci.h', 'drivers/char/serial.h', 'hwdev/hwdev_imports.def', 'include/bootinfo.h', 'include/gf_production.h', 'include/kprintf.h', 'kdebug/kpeek.h', 'kdebug/recover.h', 'kernel/module/kdebug_imports.def', 'mm/pgalloc.h', 'lib/kstring.h', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/tests/hwdev_contract_fixture.py', 'include/types.h', 'include/platform_device.h', 'include/kcg_contract.h', 'include/pc98.h', 'drivers/video/kcg/kcg.h', 'drivers/video/kcg/kcg.c', 'drivers/video/kcg/kcg_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_snd2.h', 'sdk/include/os32/os32_in2.h', 'sdk/include/os32/os32_v86s.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_kapi_generated.h', 'kernel/dev/device_kcg.c', 'tools/tests/dep_dir_a_l10_host.c', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'drivers/video/kcg/kcg_module.c', 'platform/powermac/kcg.c', 'drivers/video/kcg/kcg_read_provider.inc', 'hwdev/generated/hwdev_contract.h', 'tools/tests/test_shm_user.py', 'tools/tests/test_dep_dir_a_l05a.py', 'tools/tests/fixtures/dep_dir_a/l05a.json', 'tools/tests/fixtures/dep_dir_a/l10.json', 'exec/exec.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'platform/pc98/kernel.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'platform/pc98/legacy/v86.c', 'platform/pc98/legacy/v86_mem.c', 'platform/pc98/bios_snapshot.c', 'kernel/dev/device_ide.c', 'tools/tests/dep_dir_a_l05a_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_layout.py', 'tools/tests/mutpar.py', 'tools/tests/shm_user_host.c', 'hwdev/generated/hwdev_imports.json', 'hwdev/generated/hwdev_layout.txt', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['sys/platform/pc98/gfx_surfaces.c', 'sys/include/callconv.h', 'sys/platform/pc98/bios_snapshot.h', 'sys/platform/pc98/boot_capture.c', 'sys/platform/pc98/bootinfo_wire.h', 'sys/platform/pc98/bootinfo_native.h', 'sys/platform/pc98/legacy/lowmap.c', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/hwdev_layout.json', 'sys/dev/pci/pci.h', 'sys/dev/char/serial.h', 'sys/dev/hwdev/hwdev_imports.def', 'sys/include/bootinfo.h', 'sys/include/gf_production.h', 'sys/include/kprintf.h', 'sys/platform/pc98/kdebug/kpeek.h', 'sys/dev/video/geforce/diag/recover.h', 'sys/kern/module/kdebug_imports.def', 'sys/kern/mm/pgalloc.h', 'sys/kern/kstring.h', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/tests/hwdev_contract_fixture.py', 'sys/include/types.h', 'sys/include/platform_device.h', 'sys/include/kcg_contract.h', 'sys/platform/pc98/pc98.h', 'sys/dev/video/kcg/kcg.h', 'sys/dev/video/kcg/kcg.c', 'sys/dev/video/kcg/kcg_module.h', 'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.h', 'sys/kern/module/module_schema.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_snd2.h', 'sdk/include/os32/os32_in2.h', 'sdk/include/os32/os32_v86s.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_kapi_generated.h', 'sys/dev/kcg/device_kcg.c', 'tools/tests/dep_dir_a_l10_host.c', 'sdk/kapi.json', 'sys/kapi/kapi_generated.c', 'sys/dev/video/kcg/kcg_module.c', 'sys/platform/powermac/kcg.c', 'sys/dev/video/kcg/kcg_read_provider.inc', 'sys/dev/hwdev/generated/hwdev_contract.h', 'tools/tests/test_shm_user.py', 'tools/tests/test_dep_dir_a_l05a.py', 'tools/tests/fixtures/dep_dir_a/l05a.json', 'tools/tests/fixtures/dep_dir_a/l10.json', 'sys/kern/exec/exec.c', 'sys/platform/pc98/video/backend_pegc.c', 'sys/hal/gfx/gfx_core.c', 'sys/platform/pc98/kernel.c', 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c', 'sys/kern/mm/physmem.c', 'sys/kern/mm/shm.c', 'sys/platform/pc98/legacy/v86.c', 'sys/platform/pc98/legacy/v86_mem.c', 'sys/platform/pc98/bios_snapshot.c', 'sys/dev/ide/device_ide.c', 'tools/tests/dep_dir_a_l05a_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_layout.py', 'tools/tests/mutpar.py', 'tools/tests/shm_user_host.c', 'sys/dev/hwdev/generated/hwdev_imports.json', 'sys/dev/hwdev/generated/hwdev_layout.txt', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=3.1,
     basis=['[ABI]', 'KAPI_SPEC §3-1'],
 )
@@ -18,16 +18,16 @@ from test_shm_user import function
 from test_dep_dir_a_l05a import digest, public_spec
 
 ROOT = Path(__file__).resolve().parents[2]
-COPIES = ('include/callconv.h',
-    'include/types.h', 'include/platform_device.h', 'include/kcg_contract.h',
-    'include/pc98.h', 'drivers/video/kcg/kcg.h', 'drivers/video/kcg/kcg.c',
-    'drivers/video/kcg/kcg_module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h',
-    'kernel/module/module_schema.h',
+COPIES = ('sys/include/callconv.h',
+    'sys/include/types.h', 'sys/include/platform_device.h', 'sys/include/kcg_contract.h',
+    'sys/platform/pc98/pc98.h', 'sys/dev/video/kcg/kcg.h', 'sys/dev/video/kcg/kcg.c',
+    'sys/dev/video/kcg/kcg_module.h', 'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.h',
+    'sys/kern/module/module_schema.h',
     'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_snd2.h', 'sdk/include/os32/os32_in2.h', 'sdk/include/os32/os32_v86s.h', 'sdk/include/os32/os32_host_notice.h',
     'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h',
     'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h',
     'sdk/include/os32/os32_kapi_generated.h',
-    'kernel/dev/device_kcg.c', 'tools/tests/dep_dir_a_l10_host.c',
+    'sys/dev/kcg/device_kcg.c', 'tools/tests/dep_dir_a_l10_host.c',
 )
 OLD = '    kcg_set_scale(scale);'
 NEW = '    (void)scale;'
@@ -37,7 +37,7 @@ def contracts():
     fixture = json.loads((ROOT / 'tools/tests/fixtures/dep_dir_a/l10.json').read_text())
     abi = json.loads((ROOT / 'tools/tests/fixtures/dep_dir_a/l05a.json').read_text())
     spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
-    generated = (ROOT / 'kapi/kapi_generated.c').read_text()
+    generated = (ROOT / 'sys/kapi/kapi_generated.c').read_text()
     wrappers = ''
     for name, expected in fixture['wrappers'].items():
         body = function(generated, 'wrap_' + name)
@@ -47,11 +47,11 @@ def contracts():
         wrappers += body + '\n'
     assert 'kcg.h' not in spec['includes'] and 'kcg_contract.h' in spec['includes']
     assert '#include "kcg_contract.h"' in generated and '#include "kcg.h"' not in generated
-    module = (ROOT / 'drivers/video/kcg/kcg_module.c').read_text()
+    module = (ROOT / 'sys/dev/video/kcg/kcg_module.c').read_text()
     assert '#include "kcg_contract.h"' in module and '#include "kcg.h"' not in module
-    shared = 'drivers/video/kcg/kcg_read_provider.inc'
+    shared = 'sys/dev/video/kcg/kcg_read_provider.inc'
     assert '#include "kcg_read_provider.inc"' in module
-    assert f'#include "{shared}"' in (ROOT / 'platform/powermac/kcg.c').read_text()
+    assert f'#include "{shared}"' in (ROOT / 'sys/platform/powermac/kcg.c').read_text()
     provider = (ROOT / shared).read_text()
     assert 'public_api()->read_ank(ch, buf);' in provider
     assert 'public_api()->read_kanji(jis, buf);' in provider
@@ -66,7 +66,7 @@ def build(folder, body, wrappers):
         dest = folder / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, dest)
-    (folder / 'kernel/dev/device_kcg.c').write_text(body)
+    (folder / 'sys/dev/kcg/device_kcg.c').write_text(body)
     (folder / 'wrappers.inc').write_text(wrappers)
     exe = folder / 'host-test'
     subprocess.run(['gcc', '-nostdinc', '-isystem', subprocess.check_output(
@@ -74,8 +74,8 @@ def build(folder, body, wrappers):
                     '-ffreestanding', '-nostdlib', '-static', '-fno-pie', '-no-pie',
                     '-fno-stack-protector',
                     *include_flags(folder),
-                    str(folder / 'kernel/dev/device_kcg.c'),
-                    str(folder / 'drivers/video/kcg/kcg.c'),
+                    str(folder / 'sys/dev/kcg/device_kcg.c'),
+                    str(folder / 'sys/dev/video/kcg/kcg.c'),
                     str(folder / 'tools/tests/dep_dir_a_l10_host.c'), '-o', str(exe)], check=True)
     return exe
 
@@ -86,7 +86,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     wrappers = contracts()
-    body = (ROOT / 'kernel/dev/device_kcg.c').read_text()
+    body = (ROOT / 'sys/dev/kcg/device_kcg.c').read_text()
     assert body.count(OLD) == 1
     with tempfile.TemporaryDirectory(prefix='dep-dir-a-l10-') as directory:
         folder = Path(directory)

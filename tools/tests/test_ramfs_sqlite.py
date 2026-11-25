@@ -17,7 +17,7 @@ def main(mutate):
         sqlite_cc.build(['gcc', '-std=gnu89', '-O0', '-include',
                          str(ROOT / 'lib/sqlite3/os32_sqlite_config.h'), '-c',
                          str(ROOT / 'lib/sqlite3/sqlite3.c'), '-o', obj], check=True)
-        source = (ROOT / 'fs/ramfs/ramfs.c').read_text()
+        source = (ROOT / 'sys/fs/ramfs/ramfs.c').read_text()
         anchor = '.sqlite = &ramfs_sqlite_ops'
         assert source.count(anchor) == 1
         for mutant in range(1 + mutate):
@@ -27,8 +27,8 @@ def main(mutate):
             subprocess.run(['gcc', '-std=gnu11', '-fno-builtin', '-ffunction-sections',
                             '-fdata-sections', '-Wl,--gc-sections', '-D__cdecl=',
                             '-I.', '-Ilib/sqlite3', *include_flags(ROOT),
-                            'tools/tests/ramfs_sqlite_host.c', str(path), 'fs/vfs.c',
-                            'fs/vfs_fd.c', 'lib/kstring_c.c', 'lib/sqlite3/os32_sqlite_vfs.c',
+                            'tools/tests/ramfs_sqlite_host.c', str(path), 'sys/fs/vfs.c',
+                            'sys/fs/vfs_fd.c', 'sys/kern/kstring_c.c', 'lib/sqlite3/os32_sqlite_vfs.c',
                             obj, '-o', str(exe)], cwd=ROOT, check=True)
             result = subprocess.run([exe], text=True, stderr=subprocess.PIPE)
             # The normal control always runs; the mutant only adds its own verdict.

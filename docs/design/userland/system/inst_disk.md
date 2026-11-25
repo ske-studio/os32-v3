@@ -1,8 +1,8 @@
 # userland/system/inst_disk.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_HDD_INSTALL 段 2 (9〜11、§1-v3 N4・N8) の契約を今のソースと照らして要約
-容量とパスの判定は `userland/system/inst_disk.c`。PC-98 の媒体判定・起動資材の大きさ・IPL 補正は `platform/pc98/install_disk.c`、
-CHS 計画と区画表の生成は hdprep と共用の `platform/pc98/install_plan.c` にある。区画表は `fs/pc98pt.c`、ext2 は
-`fs/ext2/ext2_layout.c` の計算を使う。
+容量とパスの判定は `userland/system/inst_disk.c`。PC-98 の媒体判定・起動資材の大きさ・IPL 補正は `sys/platform/pc98/install_disk.c`、
+CHS 計画と区画表の生成は hdprep と共用の `sys/platform/pc98/install_plan.c` にある。区画表は `sys/fs/pc98pt.c`、ext2 は
+`sys/fs/ext2/ext2_layout.c` の計算を使う。
 
 ## モード (`inst_classify(lba0, lba1, heads, spt, disk_total, expect_start, &mode)`)
 

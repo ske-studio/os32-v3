@@ -22,15 +22,15 @@ FG1 は協調切替を行わない通常文脈、IRQ は実打鍵を採取する
 
 |番号|設計の要求と基点の差|
 |---|---|
-|1|INPUT_KEYMAP_DESIGN.md §3・§7 (S4) の絶対操作は順序を持つ。input/hal/input_ime_gate.c の input_ime_cancel_capture・input_ime_cancel_take にある保留は取消一件だけで、ON/OFF の列を表せない。|
-|2|同設計 §7 (S4i) の FG1 adapter に対し kernel/ime/ime.c の ime_toggle・ime_set_mode は反転とモード指定。前者には辞書失敗・OFF 時確定があり、同じ目標の再要求を除く入口が要る。|
-|3|INPUT_BIND_M7_3_DESIGN.md の実打鍵採取の項 の実打鍵採取に対し drivers/input/kbd.c の kbd_deliver は HAL、V86、物理救済へ渡す。input/hal/input_ime_gate.c の input_ime_cancel_capture の取消口に、評価済みの実打鍵を渡す結線が要る。|
+|1|INPUT_KEYMAP_DESIGN.md §3・§7 (S4) の絶対操作は順序を持つ。sys/input/input_ime_gate.c の input_ime_cancel_capture・input_ime_cancel_take にある保留は取消一件だけで、ON/OFF の列を表せない。|
+|2|同設計 §7 (S4i) の FG1 adapter に対し sys/kern/ime/ime.c の ime_toggle・ime_set_mode は反転とモード指定。前者には辞書失敗・OFF 時確定があり、同じ目標の再要求を除く入口が要る。|
+|3|INPUT_BIND_M7_3_DESIGN.md の実打鍵採取の項 の実打鍵採取に対し sys/platform/pc98/input/kbd.c の kbd_deliver は HAL、V86、物理救済へ渡す。sys/input/input_ime_gate.c の input_ime_cancel_capture の取消口に、評価済みの実打鍵を渡す結線が要る。|
 |4|INPUT_BIND_DESIGN.md の世代照合の項 の世代照合に対し input_ime_gate.c の kbd_policy_ime_state・input_ime_snapshot は公開時に exec_gen を保存せず、読む時の同じ owner から補う。同じ番号の再利用で古い active に新世代が付く。|
-|5|INPUT_KEYMAP_DESIGN.md §4 の物理 Ctrl に対し drivers/input/kbd.c の kbd_deliver の kbd_shift_state も kbd_merge.c の物理集計由来。差は救済の判定式にある。S3x の前提差として追跡する。|
+|5|INPUT_KEYMAP_DESIGN.md §4 の物理 Ctrl に対し sys/platform/pc98/input/kbd.c の kbd_deliver の kbd_shift_state も kbd_merge.c の物理集計由来。差は救済の判定式にある。S3x の前提差として追跡する。|
 
 参照先は指定枝。M7[3] の確定票だけは指定枝にそのパスが無く、確定票の写し d53261df1 の同名文書を参照した。
-kernel/ime/ime.c の ime_publish_state の active は前編集・かな・変換の有無。ON の判定はime_is_active のモードであり、両者を使い分ける。
-input/hal/input_context.c の input_context_snapshotで前景の owner、exec_gen、command_gen、context、flags を同時に得る。
+sys/kern/ime/ime.c の ime_publish_state の active は前編集・かな・変換の有無。ON の判定はime_is_active のモードであり、両者を使い分ける。
+sys/input/input_context.c の input_context_snapshotで前景の owner、exec_gen、command_gen、context、flags を同時に得る。
 
 ## 2. 形
 
@@ -92,7 +92,7 @@ capture は CUI 操作専用。1=ON、2=OFF。非 NULL・有効 owner/exec を�
 成功 0、不正 -1、満杯 -2。満杯は新着を落として計数し、既存順を守る。いずれも操作キーを文字入口へ戻さない。
 take は FG1。先頭の after が popped と一致したら現 owner/exec/command と比較。一致で 1 と操作、不一致は捨てて次を調べる。
 空・まだ先の操作なら 0、不正引数 -1。成功以外は出力不変。peek/has は状態を進めない。
-kernel/input_wait.c に以下の私有口を置く。出力 key は KEY の時だけ有効。
+sys/kern/input_wait.c に以下の私有口を置く。出力 key は KEY の時だけ有効。
 
 ```c
 enum InputReadStep { IR_EMPTY, IR_KEY, IR_RECHECK, IR_INTERRUPTED };
@@ -140,23 +140,23 @@ PPC はリンク末尾と上限 0x275000 の差を前後で記録し、超過時
 
 |担当・段|ファイル|担当する変更|
 |---|---|---|
-|本線 S4 宣言|input/hal/input_context.h|action capture/take、flush、取消の非消費照会を宣言。|
-|本線 S4|input/hal/input_ime_gate.c|公開時世代、取消照会、操作列・宛先照合。|
-|本線 S4 ring|input/hal/legacy_ring.c|成功 push/pop 通番、flush、先頭操作と文字の排他。|
-|本線 S4 未 bind・表交換|input/hal/legacy_keymap.c|更新後の局所結果を共通配送口へ渡し、表交換時に操作列を破棄。|
-|本線 S4 配送|input/hal/kbd_merge.c|S3d の両入口から評価直後に採取。V86/GUI/救済と repeat を分岐。release と km_release_keys で抑止を解除。|
-|本線 S3x 前提|drivers/input/kbd.c|物理 Ctrl の救済、既存 GUI 抑止。S4 から重ねて要求しない。|
-|本線 私有契約|kernel/ime/fep_module.h|末尾に絶対操作関数ポインタ、私有世代を同期。|
+|本線 S4 宣言|sys/input/input_context.h|action capture/take、flush、取消の非消費照会を宣言。|
+|本線 S4|sys/input/input_ime_gate.c|公開時世代、取消照会、操作列・宛先照合。|
+|本線 S4 ring|sys/hal/input/legacy_ring.c|成功 push/pop 通番、flush、先頭操作と文字の排他。|
+|本線 S4 未 bind・表交換|sys/hal/input/legacy_keymap.c|更新後の局所結果を共通配送口へ渡し、表交換時に操作列を破棄。|
+|本線 S4 配送|sys/hal/input/kbd_merge.c|S3d の両入口から評価直後に採取。V86/GUI/救済と repeat を分岐。release と km_release_keys で抑止を解除。|
+|本線 S3x 前提|sys/platform/pc98/input/kbd.c|物理 Ctrl の救済、既存 GUI 抑止。S4 から重ねて要求しない。|
+|本線 私有契約|sys/kern/ime/fep_module.h|末尾に絶対操作関数ポインタ、私有世代を同期。|
 |本線 生成元|tools/module_schema.py|FEP ops 世代を進める。|
-|本線 生成物|kernel/module/module_schema.h|生成元から再生成。|
-|本線 私有 ops 実体|kernel/ime/fep_body.c|部品 ops initializer 末尾に adapter を登録。|
-|本線 S4i|kernel/ime/ime.c|adapter 実体、待機再判定、確定末尾の優先。|
-|本線 部品境界|kernel/ime/fep_module.c|公開中の ops 呼出し、失効時の flush。|
-|本線 待機|kernel/input_wait.c|try/wait の私有結果と公開 wrapper、待機中の provider pop を同じ境界へ統合。|
-|本線 読取り|kernel/input_legacy.c|実 pop 前の FG1 配送、待機中の再判定。peek は非消費。|
-|本線 モード|input/hal/legacy_mode.c|焦点・モード変更時の flush。表交換も同じ破棄口を利用。|
-|PowerPC USB|input/hal/usb_input.c|S2a が共通 capture を利用。S4 専用の USB 操作表は不要。|
-|PowerPC 起動|platform/powermac/input_usb.c|S3m の wrapper 経由で文字なしを確認。|
+|本線 生成物|sys/kern/module/module_schema.h|生成元から再生成。|
+|本線 私有 ops 実体|sys/kern/ime/fep_body.c|部品 ops initializer 末尾に adapter を登録。|
+|本線 S4i|sys/kern/ime/ime.c|adapter 実体、待機再判定、確定末尾の優先。|
+|本線 部品境界|sys/kern/ime/fep_module.c|公開中の ops 呼出し、失効時の flush。|
+|本線 待機|sys/kern/input_wait.c|try/wait の私有結果と公開 wrapper、待機中の provider pop を同じ境界へ統合。|
+|本線 読取り|sys/kern/input_legacy.c|実 pop 前の FG1 配送、待機中の再判定。peek は非消費。|
+|本線 モード|sys/hal/input/legacy_mode.c|焦点・モード変更時の flush。表交換も同じ破棄口を利用。|
+|PowerPC USB|sys/hal/input/usb_input.c|S2a が共通 capture を利用。S4 専用の USB 操作表は不要。|
+|PowerPC 起動|sys/platform/powermac/input_usb.c|S3m の wrapper 経由で文字なしを確認。|
 |本線 GUI 後続 G|userland/gshell/src/input.rs|評価済み意味と焦点世代を使用、旧 raw 再評価を終了。|
 
 S2/S3 は先に両像を単独 build。S4 は宣言、ゲート・ring・解除、共通配送の順に実体を揃え、最後に両入口へ結線して単独リンク可能とする。S4i は S4 に依存し、私有 ops の生成元・再生成・部品 initializer・resident と FG1 の両読取りを一括 build してからサービスを公開する。私有世代変更だけの単独 build は不可。PowerPC USB と後続 G はそれぞれ先行段の上で単独 build する。
@@ -197,8 +197,8 @@ build_compare は設計・試験だけなら x86 配布像一致。実装統合�
 ## 確定 (2026-11-21、sol 第 2 回「5 点を反映すれば可」、PM が反映)
 以下は本文に優先する。
 - **P1 待ちの口**: 待ち・非待ちの共通の内部の口に「取消による再判定を有効にするか」の引数を渡し、FEP の読み取りの時だけ有効にする (公開の wrapper は無効のまま渡す — 取消の印が残って空回りしない)。`input_wait_fg1(mode, interruptible, key)` の内側の口に 1 引数を足す形で、公開の待ちの戻り値は今のまま。
-- **P1 非待ちの道**: `ime_trygetkey()` は私有の try に直に結ばず、今の CUI の前景の poll の道 (kernel/ime/ime.c の trygetkey の今の入口と drivers/input/kbd.c の前景の poll) と端末の優先の順を保つ位置に置く。排他は取消の照会・due の判定・cooked の pop に限る。
-- **P1 未 bind の道**: kbd_merge.c が状態の更新の前に採った押下の状態と、イベントの源・世代を、局所の評価の口へ渡す署名にする (input/hal/in2_int.h を変更の表に加える)。repeat を通常の make と区別して渡す。
+- **P1 非待ちの道**: `ime_trygetkey()` は私有の try に直に結ばず、今の CUI の前景の poll の道 (sys/kern/ime/ime.c の trygetkey の今の入口と sys/platform/pc98/input/kbd.c の前景の poll) と端末の優先の順を保つ位置に置く。排他は取消の照会・due の判定・cooked の pop に限る。
+- **P1 未 bind の道**: kbd_merge.c が状態の更新の前に採った押下の状態と、イベントの源・世代を、局所の評価の口へ渡す署名にする (sys/hal/input/in2_int.h を変更の表に加える)。repeat を通常の make と区別して渡す。
 - **P2 PowerPC と段の順**: 既にある `input_capture_key` を再利用すると明記し、共通の配送の宣言と実体を、両方の入口の結線より先の段に置く。
 - **P2 容量の試験**: 通常の FIFO が満杯の時に取消を採った後は、「取消を 1 回取得 → 先の文字を全部順に読める → 最後に空」を確かめる (「次の読み取りは空」ではない)。
 - **S4 の実装の PM 決定 (2026-11-21)**: (1) FEP の部品から常駐側の待ち・非待ちの口を呼ぶため、前景の poll と端末の優先の順を保つ FEP 専用の私有の import を tools/prototypes/fep_imports.def に足し、import の側も再生成する (公開の kbd_getkey_wait・kbd_trygetkey の戻り値は今のまま、FEP の私有の世代は同期して進める)。(2) x86 の USB の LANG1/2 (0x90/0x91) は、今の hid_kbd.c が互換の sc に変えてから配るので S4 では識別しない — 本段の host の試験は既存の input_capture_key を入口とし、実の report からの LANG1/2 は TASK_USB の 1E の結線の後の受入に送る。

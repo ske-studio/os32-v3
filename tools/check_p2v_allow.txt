@@ -1,76 +1,76 @@
 # file:function:reason (function-scoped; line numbers intentionally omitted)
-gfx/v2/lock.c:gfx2_lock:gfx2_map が返す AS 私有の USER 仮想番地を公開 lock の出力にする。物理番地ではない
-kdebug/kselftest/heap.inc:test_heap:無効な仮想ポインタを渡すヒープ否定試験
-platform/pc98/legacy/v86.c:v86_ptr:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
-platform/pc98/legacy/v86.c:v86_do_int:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
-platform/pc98/legacy/v86.c:v86_smoke_test:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
-platform/pc98/legacy/v86.c:v86_disk_test:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
-platform/pc98/legacy/v86.c:v86_boot2:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
-platform/pc98/legacy/v86_bios.c:v86_bios_setup:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
-platform/pc98/legacy/v86_bios_sasi.inc:sasi_init:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
-platform/pc98/legacy/v86_bios_fdd_read.inc:disk_read_common:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
-platform/pc98/legacy/v86_bios_fdd_command.inc:disk_write:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
-platform/pc98/legacy/v86_bios_sasi.inc:sasi_rw:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
-kdebug/v86_gcap.c:gd_get:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
-kdebug/v86_gcap.c:gd_set:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
-kdebug/v86_gcap.c:gcap_rom:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
-kdebug/v86_gcap.c:v86_gdc_capture:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
-platform/pc98/legacy/v86_mem.c:v86_session_begin:ゲスト VA のリマップ検証。backing 物理は別に保持
-kapi/kapi_db.c:<file>:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
-kapi/kapi_db_selftest.inc:db_v50_selftest:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
-kapi/kapi_db_helpers.inc:db_shm_empty:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
-kapi/kapi_db_helpers.inc:db_shm_diag:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
-kapi/kapi_db_helpers.inc:shm_write_error_text:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
-kapi/kapi_db_helpers.inc:shm_write_row:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
-kapi/kapi_db.c:kapi_db_column_text:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
-platform/pc98/kernel.c:platform_boot_machine:KHEAP_BASE は __bss_end 由来の仮想ポインタ
-arch/x86/kernel/isr_handlers.c:exc_dump_stack_trace:例外時の仮想スタック番地。物理への変換をしない
-arch/x86/kernel/isr_handlers.c:exc_dump_stack:例外時の仮想スタック番地。物理への変換をしない
-mm/kmalloc.c:kheap_init:ヒープ内の仮想ポインタ算術 (整数幅・整列)
-mm/kmalloc.c:kheap_alloc:ヒープ内の仮想ポインタ算術 (整数幅・整列)
-mm/kmalloc.c:kheap_free:ヒープ内の仮想ポインタ算術 (整数幅・整列)
-mm/kmalloc.c:kheap_reset:ヒープ内の仮想ポインタ算術 (整数幅・整列)
-exec/exec.c:exec_init:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
-exec/exec_tramp_init.inc:ring3_trampoline_init:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
-kdebug/selftest_exec.c:kst_exec_kapi_layout:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
-kdebug/selftest_exec.c:kst_exec_tramp_user:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
-exec/exec_finish.inc:exec_restore_context:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
-exec/exec_syscall.inc:exec_syscall_dispatch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
-exec/ring3_ls.c:ring3_ls_dispatch:検証済みの論理値の path/out は USER 仮想番地。ring3_ls_window の caller access が所属・PTE を検証する
-exec/ring3_ls.c:ls_copy_path:USER パスの仮想番地の加算。copy_caller_bytes が所属・PTE を検証して物理へ変換する
-exec/exec_launch.inc:exec_launch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
-exec/exec_image.inc:exec_load_image:常駐 shell の BSS は ctx->load_addr の仮想番地。image の物理 backing は P2V
-exec/exec_tramp_strings.inc:tramp_copy:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
-exec/exec_heap.c:exec_heap_init_at:アプリ/シェルの仮想ヒープ先頭 (物理変換しない)
-exec/exec_heap.c:exec_heap_restore_state:アプリ/シェルの仮想ヒープ先頭 (物理変換しない)
-lib/kstring_c.c:kmemcpy:受け取った仮想ポインタの型変換 (文字列/メモリ操作)
-lib/kstring_c.c:kmemset:受け取った仮想ポインタの型変換 (文字列/メモリ操作)
-lib/kstring_c.c:memcmp:受け取った仮想ポインタの型変換 (文字列/メモリ操作)
-lib/kstring.c:memmove:受け取った仮想ポインタの型変換
-drivers/block/fdc_transfer.inc:fdc_read_sector_geom:呼び手の仮想バッファへの型変換。DMA は s_dma_pa
-drivers/block/fdc_transfer.inc:fdc_write_sector_geom:呼び手の仮想バッファへの型変換。DMA は s_dma_pa
-drivers/ata/atapi.c:atapi_packet_read:呼び手の仮想バッファ。PIO の CPU コピー
-drivers/hostdrv/hostdrvfs.c:hostdrv_hypercall:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
-drivers/hostdrv/hostdrvfs.c:session_begin:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
-drivers/hostdrv/hostdrvfs.c:session_set_path:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
-drivers/hostdrv/hostdrvfs.c:setup_create:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
-drivers/hostdrv/hostdrvfs.c:setup_cleanup:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
-drivers/hostdrv/hostdrvfs.c:setup_close:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
-drivers/hostdrv/hostdrvfs.c:setup_write:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
-drivers/hostdrv/hostdrvfs.c:setup_set_info:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
-drivers/hostdrv/hostdrvfs.c:setup_read:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
-drivers/hostdrv/hostdrvfs.c:setup_query_info:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
-drivers/hostdrv/hostdrvfs.c:setup_query_dir:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
-drivers/hostdrv/hostdrvfs.c:hostdrv_read:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
-kapi/kapi_db.c:kapi_db_exec:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換)
-kapi/kapi_db.c:slot_step_result:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換、prepare/step の共通処理)
-kapi/kapi_db.c:kapi_db_step:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換、active_stmt が無い DONE 経路)
-drivers/pci/pci.c:pci_get:呼び手の仮想出力ポインタの型変換
-gfx/gfx_core_bridge.inc:gfx_framebuffer_bridge:公開 USER 橋。lease 表の base + plane_offset はアプリの仮想番地。物理変換せず B1 出力値にする
-kapi/kapi_generated.c:wrap_mem_map:appmem_map が返すアプリ私有 VA (物理番地ではなく、kernel から参照しない)
-exec/exec_heap.c:user_view:所属 EXEC extent と PTE/owner を検証した USER 仮想ブロックの走査
-exec/exec_heap.c:exec_heap_user_init:起動時に map 済みの USER 初期 extent の仮想先頭
-exec/exec_heap.c:exec_heap_user_alloc:appmem_map が返した USER 仮想 arena の初期化
-exec/exec_heap.c:exec_heap_user_trim:全 arena の PTE/owner とブロック鎖の検証後に USER 仮想末尾を走査
-kdebug/kpeek.c:kpeek_load:計算した番地 (恒等の RAM、張ったばかりのデバイス窓の VA) を幅どおりに読む (TASK_KPEEK §2-4)
-drivers/video/trident/resources.c:trident_boot_reserve:memmap の固定 VA を paging_map_phys で BAR 実番地へ写像済み。物理番地からの変換ではない
+sys/hal/gfx/v2/lock.c:gfx2_lock:gfx2_map が返す AS 私有の USER 仮想番地を公開 lock の出力にする。物理番地ではない
+sys/kern/kdebug/kselftest/heap.inc:test_heap:無効な仮想ポインタを渡すヒープ否定試験
+sys/platform/pc98/legacy/v86.c:v86_ptr:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+sys/platform/pc98/legacy/v86.c:v86_do_int:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+sys/platform/pc98/legacy/v86.c:v86_smoke_test:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+sys/platform/pc98/legacy/v86.c:v86_disk_test:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+sys/platform/pc98/legacy/v86.c:v86_boot2:V86 のリマップ済みゲスト線形番地 (物理番地ではない)
+sys/platform/pc98/legacy/v86_bios.c:v86_bios_setup:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
+sys/platform/pc98/legacy/v86_bios_sasi.inc:sasi_init:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
+sys/platform/pc98/legacy/v86_bios_fdd_read.inc:disk_read_common:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
+sys/platform/pc98/legacy/v86_bios_fdd_command.inc:disk_write:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
+sys/platform/pc98/legacy/v86_bios_sasi.inc:sasi_rw:V86 ゲスト線形番地・ゲストページ 0 (リマップ先は backing)
+sys/platform/pc98/kdebug/v86_gcap.c:gd_get:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
+sys/platform/pc98/kdebug/v86_gcap.c:gd_set:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
+sys/platform/pc98/kdebug/v86_gcap.c:gcap_rom:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
+sys/platform/pc98/kdebug/v86_gcap.c:v86_gdc_capture:V86 ゲスト線形の IVT / コード / magic (リマップ済み)
+sys/platform/pc98/legacy/v86_mem.c:v86_session_begin:ゲスト VA のリマップ検証。backing 物理は別に保持
+sys/kapi/kapi_db.c:<file>:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+sys/kapi/kapi_db_selftest.inc:db_v50_selftest:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+sys/kapi/kapi_db_helpers.inc:db_shm_empty:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+sys/kapi/kapi_db_helpers.inc:db_shm_diag:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+sys/kapi/kapi_db_helpers.inc:shm_write_error_text:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+sys/kapi/kapi_db_helpers.inc:shm_write_row:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+sys/kapi/kapi_db.c:kapi_db_column_text:MEM_SHM_BASE はリンカ由来の仮想。DB_SHM_PTR のオフセットも仮想
+sys/platform/pc98/kernel.c:platform_boot_machine:KHEAP_BASE は __bss_end 由来の仮想ポインタ
+sys/arch/x86/kernel/isr_handlers.c:exc_dump_stack_trace:例外時の仮想スタック番地。物理への変換をしない
+sys/arch/x86/kernel/isr_handlers.c:exc_dump_stack:例外時の仮想スタック番地。物理への変換をしない
+sys/kern/mm/kmalloc.c:kheap_init:ヒープ内の仮想ポインタ算術 (整数幅・整列)
+sys/kern/mm/kmalloc.c:kheap_alloc:ヒープ内の仮想ポインタ算術 (整数幅・整列)
+sys/kern/mm/kmalloc.c:kheap_free:ヒープ内の仮想ポインタ算術 (整数幅・整列)
+sys/kern/mm/kmalloc.c:kheap_reset:ヒープ内の仮想ポインタ算術 (整数幅・整列)
+sys/kern/exec/exec.c:exec_init:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+sys/kern/exec/exec_tramp_init.inc:ring3_trampoline_init:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+sys/arch/x86/kdebug/selftest_exec.c:kst_exec_kapi_layout:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+sys/arch/x86/kdebug/selftest_exec.c:kst_exec_tramp_user:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+sys/kern/exec/exec_finish.inc:exec_restore_context:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+sys/kern/exec/exec_syscall.inc:exec_syscall_dispatch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+sys/kern/exec/ring3_ls.c:ring3_ls_dispatch:検証済みの論理値の path/out は USER 仮想番地。ring3_ls_window の caller access が所属・PTE を検証する
+sys/kern/exec/ring3_ls.c:ls_copy_path:USER パスの仮想番地の加算。copy_caller_bytes が所属・PTE を検証して物理へ変換する
+sys/kern/exec/exec_launch.inc:exec_launch:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+sys/kern/exec/exec_image.inc:exec_load_image:常駐 shell の BSS は ctx->load_addr の仮想番地。image の物理 backing は P2V
+sys/kern/exec/exec_tramp_strings.inc:tramp_copy:KAPI / トランポリン / アプリの仮想番地。PTE の物理引数だけ V2P
+sys/kern/exec/exec_heap.c:exec_heap_init_at:アプリ/シェルの仮想ヒープ先頭 (物理変換しない)
+sys/kern/exec/exec_heap.c:exec_heap_restore_state:アプリ/シェルの仮想ヒープ先頭 (物理変換しない)
+sys/kern/kstring_c.c:kmemcpy:受け取った仮想ポインタの型変換 (文字列/メモリ操作)
+sys/kern/kstring_c.c:kmemset:受け取った仮想ポインタの型変換 (文字列/メモリ操作)
+sys/kern/kstring_c.c:memcmp:受け取った仮想ポインタの型変換 (文字列/メモリ操作)
+sys/kern/kstring.c:memmove:受け取った仮想ポインタの型変換
+sys/dev/block/fdc_transfer.inc:fdc_read_sector_geom:呼び手の仮想バッファへの型変換。DMA は s_dma_pa
+sys/dev/block/fdc_transfer.inc:fdc_write_sector_geom:呼び手の仮想バッファへの型変換。DMA は s_dma_pa
+sys/dev/ata/atapi.c:atapi_packet_read:呼び手の仮想バッファ。PIO の CPU コピー
+sys/dev/hostdrv/hostdrvfs.c:hostdrv_hypercall:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
+sys/dev/hostdrv/hostdrvfs.c:session_begin:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
+sys/dev/hostdrv/hostdrvfs.c:session_set_path:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
+sys/dev/hostdrv/hostdrvfs.c:setup_create:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
+sys/dev/hostdrv/hostdrvfs.c:setup_cleanup:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
+sys/dev/hostdrv/hostdrvfs.c:setup_close:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
+sys/dev/hostdrv/hostdrvfs.c:setup_write:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
+sys/dev/hostdrv/hostdrvfs.c:setup_set_info:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
+sys/dev/hostdrv/hostdrvfs.c:setup_read:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
+sys/dev/hostdrv/hostdrvfs.c:setup_query_info:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
+sys/dev/hostdrv/hostdrvfs.c:setup_query_dir:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
+sys/dev/hostdrv/hostdrvfs.c:hostdrv_read:NP21/W IA32 は線形 (CR3 越し) で読む/書く — np21w-src/src/generic/hostdrvnt.c:945-983,3779-3784 → i386c/ia32/paging.h:360-371 (T1-U6、kernel 共有帯、計24件)
+sys/kapi/kapi_db.c:kapi_db_exec:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換)
+sys/kapi/kapi_db.c:slot_step_result:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換、prepare/step の共通処理)
+sys/kapi/kapi_db.c:kapi_db_step:MEM_SHM_BASE はリンカ由来の仮想 (DB_SHM_PTR の型変換、active_stmt が無い DONE 経路)
+sys/dev/pci/pci.c:pci_get:呼び手の仮想出力ポインタの型変換
+sys/hal/gfx/gfx_core_bridge.inc:gfx_framebuffer_bridge:公開 USER 橋。lease 表の base + plane_offset はアプリの仮想番地。物理変換せず B1 出力値にする
+sys/kapi/kapi_generated.c:wrap_mem_map:appmem_map が返すアプリ私有 VA (物理番地ではなく、kernel から参照しない)
+sys/kern/exec/exec_heap.c:user_view:所属 EXEC extent と PTE/owner を検証した USER 仮想ブロックの走査
+sys/kern/exec/exec_heap.c:exec_heap_user_init:起動時に map 済みの USER 初期 extent の仮想先頭
+sys/kern/exec/exec_heap.c:exec_heap_user_alloc:appmem_map が返した USER 仮想 arena の初期化
+sys/kern/exec/exec_heap.c:exec_heap_user_trim:全 arena の PTE/owner とブロック鎖の検証後に USER 仮想末尾を走査
+sys/platform/pc98/kdebug/kpeek.c:kpeek_load:計算した番地 (恒等の RAM、張ったばかりのデバイス窓の VA) を幅どおりに読む (TASK_KPEEK §2-4)
+sys/dev/video/trident/resources.c:trident_boot_reserve:memmap の固定 VA を paging_map_phys で BAR 実番地へ写像済み。物理番地からの変換ではない

@@ -1,13 +1,13 @@
 """HW-BASIC a0 contracts and shell-backend substrate self-test (no libc)."""
 CHECK = dict(name='hwb-wire-host', tier=1, budget=4.5, needs=[],
-    covers=['kdebug/hwb_wire.h', 'userland/shell/hwb.h',
-            'drivers/pci/pci_hwb.h', 'exec/exec_hwb.h',
+    covers=['sys/kern/kdebug/hwb_wire.h', 'userland/shell/hwb.h',
+            'sys/dev/pci/pci_hwb.h', 'sys/kern/exec/exec_hwb.h',
             'tools/tests/hwb_fake.h', 'tools/tests/hwb_host.py',
             'tools/tests/hwb_wire_host.c', 'tools/tests/host32.py',
             'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py',
-            'include/types.h', 'sdk/include/os32/os32_kapi_shared.h',
-            'kdebug/recover_wire.h', 'kdebug/gfinit_wire.h',
-            'kdebug/gf_foundation_wire.h', 'kdebug/gf_command_wire.h'],
+            'sys/include/types.h', 'sdk/include/os32/os32_kapi_shared.h',
+            'sys/kern/kdebug/recover_wire.h', 'sys/dev/video/geforce/diag/gfinit_wire.h',
+            'sys/dev/video/geforce/diag/gf_foundation_wire.h', 'sys/dev/video/geforce/diag/gf_command_wire.h'],
     basis=['HW_BASIC_DESIGN §2', 'HW_BASIC_DESIGN §3'],
 )
 
@@ -16,9 +16,9 @@ import hwb_host
 
 FIXTURE = 'tools/tests/hwb_wire_host.c'
 MUTATIONS = [
-    ('bdf-device-shift', 'kdebug/hwb_wire.h', '#define HW_BDF_DEV_SHIFT 3U',
+    ('bdf-device-shift', 'sys/kern/kdebug/hwb_wire.h', '#define HW_BDF_DEV_SHIFT 3U',
      '#define HW_BDF_DEV_SHIFT 4U', 'bdf'),
-    ('wire-write-action', 'kdebug/hwb_wire.h', 'HW_WRITE = 2', 'HW_WRITE = 4', 'wire'),
+    ('wire-write-action', 'sys/kern/kdebug/hwb_wire.h', 'HW_WRITE = 2', 'HW_WRITE = 4', 'wire'),
     ('call-depth', 'userland/shell/hwb.h', '#define HWB_CALL_DEPTH 8U',
      '#define HWB_CALL_DEPTH 7U', 'limits'),
     ('bad-wire-call', 'tools/tests/hwb_fake.h',

@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "drivers/net/gem/gem_mac.c"
+SOURCE = ROOT / "sys/dev/net/gem/gem_mac.c"
 HARNESS = r'''
 #include <stdio.h>
 #include "gem.h"

@@ -16,7 +16,7 @@ void platform_fault_cell(u32 pos, u16 code, u8 attr)
 }
 #include "v86_mem.h"
 #include "paging.c"
-#include "../../platform/pc98/legacy/lowmap.c"
+#include "../../sys/platform/pc98/legacy/lowmap.c"
 /* Layout symbols are supplied by kernel_layout.linker_flags(). */
 #include "pgalloc_host_source.c"
 #define HOST_POOL_IRQ_SAVE() 0U

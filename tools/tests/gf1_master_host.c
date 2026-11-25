@@ -1,6 +1,6 @@
-#include "hwdev/gf/foundation.h"
-#include "drivers/pci/pci.h"
-#include "kdebug/recover.h"
+#include "sys/dev/video/geforce/foundation.h"
+#include "sys/dev/pci/pci.h"
+#include "sys/dev/video/geforce/diag/recover.h"
 static u16 command, cache;
 static u32 status_writes, writes, fail_write, bad_command, bad_latency, bad_reads;
 static u8 header = 0x51, bist = 0xa7;

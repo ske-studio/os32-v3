@@ -1,6 +1,6 @@
 /* Production conversion, MMIO span, next-frame updates and wire sweep. */
-#include "kdebug/trident_command_test.c"
-#include "gfx/sync/sync_int.h"
+#include "sys/dev/video/trident/diag/trident_command_test.c"
+#include "sys/hal/gfx/sync/sync_int.h"
 u32 pgalloc_alloc_phys(u32 owner, int pages) { (void)owner; (void)pages; return 0; }
 int pgalloc_free_n_owner(u32 owner, u32 pfn, int pages)
 { (void)owner; (void)pfn; (void)pages; return 1; }

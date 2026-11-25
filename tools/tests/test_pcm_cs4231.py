@@ -3,8 +3,8 @@
 記録: tools/tests/pcm_cs4231_tdd.md
 票  : docs/tasks/v3/TASK_PCM_CS4231.md §2-3 (純粋関数) / §3 E1
 
-実物の drivers/sound/cs4231/pcm_cs4231_math.c と drivers/sound/cs4231/pcm_cs4231.c を**1 行も写さずに**
-#include して回す。include/io.h だけ tools/tests/pcm_hostshim/io.h で差し替え、
+実物の sys/dev/sound/cs4231/pcm_cs4231_math.c と sys/dev/sound/cs4231/pcm_cs4231.c を**1 行も写さずに**
+#include して回す。sys/include/io.h だけ tools/tests/pcm_hostshim/io.h で差し替え、
 ポート操作と割り込み禁止を試験側の模型へ回す (b8_hostdrv と同じ作法)。
 
 **NP21/W では踏めない分岐がここの主目的**:
@@ -21,7 +21,7 @@
   python3 -B tools/tests/test_pcm_cs4231.py --mutate   # 否定側 (変異が RED か)
 """
 CHECK = dict(name='pcm-cs4231-host', tier=1,
-    covers=['sound/hal/snd2_seg.c', 'sound/hal/snd2_int.h', 'sound/hal/snd2_stg.c', 'include/av_contract.h', 'sdk/include/os32/*.h', 'drivers/sound/cs4231/pcm_hw.h', 'sound/hal/snd2_ring_math.h', 'include/time_units.h', 'kernel/time/tick_clock.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_refill.h', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/mutpar.py', 'include/pcm_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/hal/sound/snd2_seg.c', 'sys/hal/sound/snd2_int.h', 'sys/hal/sound/snd2_stg.c', 'sys/include/av_contract.h', 'sdk/include/os32/*.h', 'sys/dev/sound/cs4231/pcm_hw.h', 'sys/hal/sound/snd2_ring_math.h', 'sys/include/time_units.h', 'sys/hal/time/tick_clock.h', 'sys/dev/sound/cs4231/pcm_cs4231.c', 'sys/dev/sound/cs4231/pcm_refill.h', 'sys/dev/sound/cs4231/pcm_cs4231_math.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/mutpar.py', 'sys/include/pcm_contract.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.5,
     basis=['docs/decisions/sound/AV_HAL_DESIGN.md §3-4・§12・§13-2',
            'docs/design/drivers/sound/cs4231/pcm_cs4231.md §2'],
@@ -38,9 +38,9 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/pcm_cs4231_host.c"
-SRC = ROOT / "drivers/sound/cs4231/pcm_cs4231_math.c"
-SEG_SOURCES = [ROOT / 'sound/hal/snd2_seg.c', ROOT / 'sound/hal/snd2_stg.c']
-TARGET_SRCS = ["drivers/sound/cs4231/pcm_cs4231_math.c", "drivers/sound/cs4231/pcm_cs4231.c"]
+SRC = ROOT / "sys/dev/sound/cs4231/pcm_cs4231_math.c"
+SEG_SOURCES = [ROOT / 'sys/hal/sound/snd2_seg.c', ROOT / 'sys/hal/sound/snd2_stg.c']
+TARGET_SRCS = ["sys/dev/sound/cs4231/pcm_cs4231_math.c", "sys/dev/sound/cs4231/pcm_cs4231.c"]
 
 CASES = ["cont", "refill", "drain", "drain_short", "start", "rate",
          "close_dl", "vol", "stg", "pack", "pos", "obs", "seq",
@@ -50,7 +50,7 @@ CASES = ["cont", "refill", "drain", "drain_short", "start", "rate",
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl="]
-# pcm_hostshim は**必ず先頭** — include/io.h を差し替えるため。
+# pcm_hostshim は**必ず先頭** — sys/include/io.h を差し替えるため。
 INCLUDES = ["-I" + str(ROOT / "tools/tests/pcm_hostshim"), *include_flags(ROOT)]
 
 # 否定側。実装 (純粋部) を 1 か所だけ壊して RED になることを見る。
@@ -129,7 +129,7 @@ MUTATIONS = [
 # 否定側 (driver)。foreground と tick の競合の修正 (Codex 実装レビュー
 # blocker 1〜5、2026-09-23) を 1 つずつ元に戻し、交互の台本のケースが RED に
 # なることを見る。1 本に複数の置き換えを持てる (修正が 2 重の守りのとき)。
-DRIVER = "drivers/sound/cs4231/pcm_cs4231.c"
+DRIVER = "sys/dev/sound/cs4231/pcm_cs4231.c"
 DRIVER_MUTATIONS = [
     ([(r"return \(\(\(unsigned long long\)hi << BITS_PER_U32\) \| lo\) \* PCM_US_PER_TICK;",
        "return (unsigned long long)tick_count * PCM_US_PER_TICK;")],
@@ -193,16 +193,16 @@ def host_build(tmp, source_text=None, driver_text=None):
         (mut / "pcm_cs4231_math.c").write_text(source_text, encoding="utf-8")
         (mut / "pcm_cs4231.c").write_text(driver_text, encoding="utf-8")
         (mut / "pcm_cs4231.h").write_text(
-            (ROOT / "drivers/sound/cs4231/pcm_cs4231.h").read_text(encoding="utf-8"),
+            (ROOT / "sys/dev/sound/cs4231/pcm_cs4231.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         for name in ("pcm_refill.h", "pcm_hw.h"):
             (mut / name).write_text((ROOT / DRIVER).with_name(name).read_text(), encoding="utf-8")
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8")
-            .replace('"../../drivers/sound/cs4231/pcm_cs4231_math.c"',
-                     '"drivers/sound/cs4231/pcm_cs4231_math.c"')
-            .replace('"../../drivers/sound/cs4231/pcm_cs4231.c"', '"drivers/sound/cs4231/pcm_cs4231.c"'),
+            .replace('"../../sys/dev/sound/cs4231/pcm_cs4231_math.c"',
+                     '"sys/dev/sound/cs4231/pcm_cs4231_math.c"')
+            .replace('"../../sys/dev/sound/cs4231/pcm_cs4231.c"', '"sys/dev/sound/cs4231/pcm_cs4231.c"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-DPCM_SEGMENT_TEST", "-I" + str(src_dir), "-I" + str(mut), *inc,
                str(shim), *SEG_SOURCES, "-o", str(exe)]

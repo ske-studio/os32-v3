@@ -3,8 +3,8 @@
 Record: tools/tests/display_cleanup_tdd.md
 """
 CHECK = dict(name='display-cleanup-host', tier=1,
-    covers=['tools/tests/gfx2_core_fake.h', 'tools/tests/gfx2_bridge_fake.h', 'hwdev/gf/stop_state.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'drivers/video/pc98/pc98_route.h', 'platform/pc98/legacy/v86.c', 'drivers/video/pc98/backend_pc98.c', 'gfx/gfx_core.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_selector_lifecycle.inc', 'platform/pc98/gfx_surfaces.c', 'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_dirty.c', 'gfx/gfx_present.c', 'platform/pc98/boot_splash.c', 'platform/pc98/legacy/v86_gcap.c', 'kdebug/v86_gcap.c', 'platform/pc98/legacy/v86_io.c', 'tools/tests/boot_splash_native_host.c', 'tools/tests/display_cleanup_host.c', 'tools/tests/host32.py', 'tools/tests/serial_diag_host.h', 'lib/serial_diag.h', 'exec/exec_kapi_init.inc', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/pc98.h', 'include/pegc.h', 'platform/pc98/legacy/v86_bios.h', 'kernel/console/display_restore.h', 'platform/pc98/display.c', 'platform/pc98/display_private.h', 'include/platform_splash.h', 'platform/pc98/splash.c', 'tools/tests/kernel_includes.py', 'drivers/video/pc98/splash_raster.c',
-            'drivers/video/pc98/splash_raster.h', 'gfx/gfx_osri.h', 'input/hal/input_context.h'],
+    covers=['tools/tests/gfx2_core_fake.h', 'tools/tests/gfx2_bridge_fake.h', 'sys/dev/video/geforce/stop_state.h', 'sys/hal/gfx/gfx_emergency.c', 'sys/hal/gfx/gfx_emergency.h', 'sys/platform/pc98/video/pc98_route.h', 'sys/platform/pc98/legacy/v86.c', 'sys/platform/pc98/video/backend_pc98.c', 'sys/hal/gfx/gfx_core.c', 'sys/platform/pc98/gfx_init.c', 'sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_selector_lifecycle.inc', 'sys/platform/pc98/gfx_surfaces.c', 'sys/platform/pc98/video/gfx_vram.c', 'sys/hal/gfx/gfx_dirty.c', 'sys/hal/gfx/gfx_present.c', 'sys/platform/pc98/boot_splash.c', 'sys/platform/pc98/legacy/v86_gcap.c', 'sys/platform/pc98/kdebug/v86_gcap.c', 'sys/platform/pc98/legacy/v86_io.c', 'tools/tests/boot_splash_native_host.c', 'tools/tests/display_cleanup_host.c', 'tools/tests/host32.py', 'tools/tests/serial_diag_host.h', 'lib/serial_diag.h', 'sys/kern/exec/exec_kapi_init.inc', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'sys/platform/pc98/pc98.h', 'sys/platform/pc98/pegc.h', 'sys/platform/pc98/legacy/v86_bios.h', 'sys/kern/console/display_restore.h', 'sys/platform/pc98/display.c', 'sys/platform/pc98/display_private.h', 'sys/include/platform_splash.h', 'sys/platform/pc98/splash.c', 'tools/tests/kernel_includes.py', 'sys/platform/pc98/video/splash_raster.c',
+            'sys/platform/pc98/video/splash_raster.h', 'sys/kern/gfx/osri/gfx_osri.h', 'sys/input/input_context.h'],
     needs=[], budget=4.2,
     basis=['[HW1]', 'AC-DISPLAY-1'],
 )
@@ -19,8 +19,8 @@ import tempfile
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET_SRCS = ('platform/pc98/legacy/v86_io.c', 'kdebug/v86_gcap.c', 'platform/pc98/boot_splash.c', 'gfx/gfx_core.c', 'platform/pc98/display.c', 'platform/pc98/splash.c',
-               'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c')  # [6]: planar の初期化の provider (第 5 段 B3)
+TARGET_SRCS = ('sys/platform/pc98/legacy/v86_io.c', 'sys/platform/pc98/kdebug/v86_gcap.c', 'sys/platform/pc98/boot_splash.c', 'sys/hal/gfx/gfx_core.c', 'sys/platform/pc98/display.c', 'sys/platform/pc98/splash.c',
+               'sys/platform/pc98/gfx_init.c', 'sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_surfaces.c')  # [6]: planar の初期化の provider (第 5 段 B3)
 
 
 def function(text, name):
@@ -44,7 +44,7 @@ def build_run(tree, kind, cases, execute=True):
             gcap = (tree / TARGET_SRCS[1]).read_text()
             names = ['io_out']
             core = (tree / TARGET_SRCS[4]).read_text()
-            body = function((tree / 'platform/pc98/legacy/v86.c').read_text(), 'v86_cui_display_restore') + ''.join(function(core, f) for f in ('display_out', 'display_text_start', 'display_restore_98', 'display_recover_ready', 'display_recover_cell_read', 'display_recover_cell_write')) + ''.join(function(io, name) for name in names + ['gfx_state_for_os32', 'v86_io_reset_policy'])
+            body = function((tree / 'sys/platform/pc98/legacy/v86.c').read_text(), 'v86_cui_display_restore') + ''.join(function(core, f) for f in ('display_out', 'display_text_start', 'display_restore_98', 'display_recover_ready', 'display_recover_cell_read', 'display_recover_cell_write')) + ''.join(function(io, name) for name in names + ['gfx_state_for_os32', 'v86_io_reset_policy'])
             if 'static void gcap_out(' in gcap:
                 body += function(gcap, 'gcap_out')
             body += function(gcap, 'gcap_cui_rebuild')
@@ -99,9 +99,9 @@ MUTATIONS = [
      'gfx_clear_planar_pages(GFX_PLANE_SZ_200);', 1, 'splash', 'FAIL: residual logo page=0'),
 ]
 MUTATIONS += [
-    ('init-no-clear', 'gfx/gfx_core_init.inc', '    gfx_clear_planar_pages(plane_sz);',
+    ('init-no-clear', 'sys/hal/gfx/gfx_core_init.inc', '    gfx_clear_planar_pages(plane_sz);',
      '    if (legacy200) gfx_clear_planar_pages(plane_sz);', 1, 'splash', 'FAIL: gfx_init residual page=0'),
-    ('init-200-no-clear', 'gfx/gfx_core_init.inc', '    gfx_clear_planar_pages(plane_sz);',
+    ('init-200-no-clear', 'sys/hal/gfx/gfx_core_init.inc', '    gfx_clear_planar_pages(plane_sz);',
      '    if (!legacy200) gfx_clear_planar_pages(plane_sz);', 1, 'splash', 'FAIL: gfx_init_200 residual page=0'),
 ]
 for plane in 'BRGI':
@@ -134,7 +134,7 @@ def main():
                     target.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(source, target)
         (tree / 'hwdev/gf').mkdir(parents=True)
-        shutil.copyfile(ROOT / 'hwdev/gf/stop_state.h', tree / 'hwdev/gf/stop_state.h')
+        shutil.copyfile(ROOT / 'sys/dev/video/geforce/stop_state.h', tree / 'sys/dev/video/geforce/stop_state.h')
         (tree / 'exec').mkdir(parents=True, exist_ok=True)
         for name in ('surface_query.h', 'surface_limits.h', 'lease.h', 'appslot.h', 'exec.h'):
             shutil.copyfile(ROOT / 'exec' / name, tree / 'exec' / name)

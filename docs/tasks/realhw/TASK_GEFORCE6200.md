@@ -90,7 +90,7 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 
 - 決定: [fixture](../../../tools/tests/gfinit_fixture.h) に 9 本・193 命令・27 種、main 順、表長、副作用候補 619 行を収録。NV_REG 圧縮 3 行は各 4 命令、COPY_NV_REG は E7FB。
 - N1: main3/E81E だけ cfg50/54・PBUS1850/1854=0 の前後確認・保持を条件とする旗。他の表示有効化・W 行不足は静的拒否。
-- S1追補: [recover GF profile](../../../kdebug/recover_gf.c) に target 145・rule 544（script 513＋固定/復元31）。619候補は rule 513／PLL 101／COPY 2／一時再生3／別名検査の欠け0に分類。残る106候補は拒否。
+- S1追補: [recover GF profile](../../../sys/dev/video/geforce/diag/recover_gf.c) に target 145・rule 544（script 513＋固定/復元31）。619候補は rule 513／PLL 101／COPY 2／一時再生3／別名検査の欠け0に分類。残る106候補は拒否。
 - 持越し: S2の実opcode layout・COPY/一時再生式、S4 PLL、S5 accessor。全ROM RUNは未許可。共有検査は実VGA別名portの重なりだけを拒否し、indexed EXPR READには全経路/実行時の先行SELECTを要求。固定SIZE_BARSは測定/復元trace、PREPAREはCR11のbind/実行まで確認。ROM実バイト・実機は未検証。
 - ノートで `python3 tools/gfinit_rom_check.py --list` が各 script の開始・長さ・IEEE CRC32 を表示。同スクリプトに private ROM のパスを渡して照合（ROM を出力・保存しない）。期待値は txt からの復元値で、ROM 由来の検証済み値ではない。
 - 証拠: 入力 `~/os32-tmp/run/gf6200_4a/nvbios/init_scripts.txt`、[照合試験](../../../tools/tests/test_gfinit_fixture.py)。ログは `~/os32-tmp/run/gf4a_s1/` の `kernel.log`・`fixture.log`・`mutate.log`・`lint.log`・`docs.log`・`ci-stab.log`（終了 rc を末尾に記録）。
@@ -98,7 +98,7 @@ VBIOS について分かっていること (表の地図・init script 9 本・2
 
 ### 4a S2 decode (2026-10-21)
 
-- [checked decode](../../../kdebug/gfinit_decode.c) と実27種のlayout、RMW/COPY式、命令内capture、ポート別SELECT記録を追加。e18の1850はliteral 0を維持。
+- [checked decode](../../../sys/dev/video/geforce/diag/gfinit_decode.c) と実27種のlayout、RMW/COPY式、命令内capture、ポート別SELECT記録を追加。e18の1850はliteral 0を維持。
 - S1の193命令を940 nodes・2418 args・19 ctx・5 entriesへ展開（main別220/459/122/138/1）。PLL内部101候補は含まず、2048上限内。
 - COPY 2行・一時再生3行とPLL入口3件は未結線inventoryとしてbind拒否。S3 executor、S4 PLL、S5 bus/cleanup、S6結線を本段で完了扱いしない。
 - 共有変更はprofile版3、capture/CRC、index保存分類と探索cache。設計決定の記録はアーカイブ。現行契約は [capture](../../design/kdebug/gfinit_plan.md)・[bind](../../design/kdebug/recover_plan/bind.md)、T3送り項目はS6前へ維持。

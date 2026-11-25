@@ -31,7 +31,7 @@ os32api_host.build(OUT)
 focus_obj = OUT / 'av_focus.o'
 run(['cc', '-std=gnu11', '-Wno-attributes', '-DOS32_HOOK_GUI=0',
      '-Iexec', '-Ikernel', '-Iinclude', '-Isdk/include/os32',
-     '-c', 'kernel/av_focus.c', '-o', str(focus_obj)])
+     '-c', 'sys/kern/av_focus.c', '-o', str(focus_obj)])
 # Use the guest build's shared-header reader for the host tests as well.
 run(['rustc', '--edition=2021', str(ROOT/'userland/gshell/build.rs'), '-o', str(OUT/'diag-build')])
 os.environ['OUT_DIR'] = str(OUT)

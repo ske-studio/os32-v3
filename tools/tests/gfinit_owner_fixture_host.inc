@@ -1,6 +1,6 @@
 /* Actual S6 owner/request/ROM lifetime code. Platform and trial engine are
  * injected contracts; bus/decoder/plan internals have separate real tests. */
-#include "../../kdebug/gfinit.c"
+#include "../../sys/dev/video/geforce/diag/gfinit.c"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wsign-compare"

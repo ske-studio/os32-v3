@@ -4,7 +4,7 @@ Only individual volatile stores are instrumented; formatting/loops remain
 product code. Both positive and mutation builds use an isolated header tree.
 """
 CHECK = dict(name='dep-dir-d-emergency-host', tier=1,
-    covers=['mm/paging_lowmap.h', 'mm/paging_lowmap.inc', 'platform/pc98/boot_display.c', 'arch/x86/kernel/isr_handlers.c', 'arch/x86/kernel/double_fault.c', 'platform/pc98/legacy/v86_mem.c', 'platform/pc98/emergency.c', 'kernel/*.h', 'platform/pc98/*.h', 'include/*.h', 'arch/x86/*.h', 'lib/*.h', 'sdk/include/os32/*.h', 'tools/tests/dep_dir_d_emergency_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'tools/tests/kernel_includes.py', 'mm/*.h', 'init/*.h', 'arch/x86/kernel/*.h', 'kernel/**/*.h', 'net/*.h', 'kapi/*.h', 'gfx/*.h', 'lib/sqlite3/*.h'],
+    covers=['sys/kern/mm/paging_lowmap.h', 'sys/kern/mm/paging_lowmap.inc', 'sys/platform/pc98/boot_display.c', 'sys/arch/x86/kernel/isr_handlers.c', 'sys/arch/x86/kernel/double_fault.c', 'sys/platform/pc98/legacy/v86_mem.c', 'sys/platform/pc98/emergency.c', 'kernel/*.h', 'platform/pc98/*.h', 'include/*.h', 'arch/x86/*.h', 'lib/*.h', 'sdk/include/os32/*.h', 'tools/tests/dep_dir_d_emergency_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'tools/tests/kernel_includes.py', 'mm/*.h', 'init/*.h', 'arch/x86/kernel/*.h', 'kernel/**/*.h', 'net/*.h', 'kapi/*.h', 'gfx/*.h', 'lib/sqlite3/*.h'],
     needs=[], budget=3.1,
     basis=['AC-DISPLAY-1', '[HW1]'],
 )
@@ -26,15 +26,15 @@ from build_profile import query
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/fixtures/dep_dir_d'
-SOURCES = ('platform/pc98/boot_display.c', 'arch/x86/kernel/isr_handlers.c',
-           'arch/x86/kernel/double_fault.c', 'platform/pc98/legacy/v86_mem.c', 'platform/pc98/emergency.c')
+SOURCES = ('sys/platform/pc98/boot_display.c', 'sys/arch/x86/kernel/isr_handlers.c',
+           'sys/arch/x86/kernel/double_fault.c', 'sys/platform/pc98/legacy/v86_mem.c', 'sys/platform/pc98/emergency.c')
 HEADER_DIRS = tuple(dict.fromkeys(include_dirs()))
 HARNESS = 'tools/tests/dep_dir_d_emergency_host.c'
 MUTATIONS = (
-    ('boot-width', 'platform/pc98/emergency.c',
+    ('boot-width', 'sys/platform/pc98/emergency.c',
      '*(volatile u8 *)P2V_IO(TVRAM_ATTR + offset) = color;',
      '*(volatile u16 *)P2V_IO(TVRAM_ATTR + offset) = color;'),
-    ('fault-width', 'platform/pc98/emergency.c',
+    ('fault-width', 'sys/platform/pc98/emergency.c',
      '((volatile u16 *)P2V_IO(TVRAM_ATTR))[pos] = (u16)attr;',
      '((volatile u8 *)P2V_IO(TVRAM_ATTR))[pos * TVRAM_CELL_BYTES] = attr;'),
 )
@@ -81,7 +81,7 @@ def pieces(parts):
     result = '#define EXC_HEX_PREFIX_COLS 2\n#define EXC_ATTR_LEGACY 0x07\n'
     result += '#define HEX32_DIGITS 8\n#define HEX_NIBBLE_BITS 4\n#define HEX_NIBBLE_MASK 15\n'
     result += '\n'.join(re.findall(r'enum \{.*?};', df + v86, re.S)) + '\n'
-    if 'platform/pc98/emergency.c' in parts:
+    if 'sys/platform/pc98/emergency.c' in parts:
         result += re.sub(r'^#include[^\n]*\n', '', parts[SOURCES[4]], flags=re.M)
     result += function(boot, 'tvram_print')
     for name in ('tvram_puts_at', 'tvram_put_hex32'):
@@ -101,7 +101,7 @@ def build(work, parts, omit_header=False):
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, dest)
     if omit_header:
-        (work / 'include/platform_emergency.h').unlink()
+        (work / 'sys/include/platform_emergency.h').unlink()
     for rel, source in parts.items():
         dest = work / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -124,7 +124,7 @@ def trace(exe):
 
 def resident_check(text):
     block = re.search(r'^C_KERNEL = (.*)$', text, re.M).group(1)
-    assert block.split().count('platform/pc98/emergency.c') == 1
+    assert block.split().count('sys/platform/pc98/emergency.c') == 1
 
 
 def verify():
@@ -158,7 +158,7 @@ def mutations(parts, expected):
     text = kernel_list()
     try:
         resident_check(re.sub(r'^C_KERNEL = (.*)$',
-                              lambda m: m[0].replace('platform/pc98/emergency.c ', '', 1),
+                              lambda m: m[0].replace('sys/platform/pc98/emergency.c ', '', 1),
                               text, count=1, flags=re.M))
     except AssertionError:
         pass

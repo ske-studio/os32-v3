@@ -11,7 +11,7 @@
 
 #include "input_boot.h"
 #include "input_service.h"
-#include "input/hal/in2_int.h"
+#include "sys/hal/input/in2_int.h"
 static int cooked(int sc, int c) { return (sc << 8) | c; }
 static const InputOps *ops;
 static int lan[256], ln, lp, polls;

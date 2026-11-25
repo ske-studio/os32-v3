@@ -19,14 +19,14 @@ int tick_register(unsigned int slot, tick_fn fn);
 int net_adapter_register(enum NetNicId id, const struct NetAdapter *adapter);
 int net_start(enum NetNicId id, const u8 peer[6]);
 void link_init(const u8 mac[ETH_ALEN]);
-#include "drivers/net/e82557/lan_module.h"
-#include "drivers/net/e82557/e82557.h"
-#include "drivers/net/e82557/e82557_regs.h"
-#include "kernel/module/module.h"
+#include "sys/dev/net/e82557/lan_module.h"
+#include "sys/dev/net/e82557/e82557.h"
+#include "sys/dev/net/e82557/e82557_regs.h"
+#include "sys/kern/module/module.h"
 #include "bootinfo.h"
 #include "bootinfo_native.h"
 #include "io.h"
-#include "net/rx_work.h"
+#include "sys/net/rx_work.h"
 extern const struct NetAdapter net_lgy98_adapter;
 void *kmemset(void *dst, int value, u32 n)
 { u8 *p = dst; for (u32 i = 0; i < n; i++) p[i] = (u8)value; return dst; }
@@ -129,7 +129,7 @@ int net_rx_take(u16 protocol, void *out, u32 cap, u32 *len)
 #define link_l1_bulk boot_real_link_l1_bulk
 #define link_l2_stream boot_real_link_l2_stream
 #define link_l3_service boot_real_link_l3_service
-#include "net/link.c"
+#include "sys/net/link.c"
 #undef link_selftest
 #undef link_l1_bulk
 #undef link_l2_stream

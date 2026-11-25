@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gfx2-check-op-host', tier=1, needs=[], budget=5,
-    covers=['gfx/v2/check_op.c', 'gfx/v2/gfx2_int.h', 'gfx/v2/gfx2_sw.h',
+    covers=['sys/hal/gfx/v2/check_op.c', 'sys/hal/gfx/v2/gfx2_int.h', 'sys/hal/gfx/v2/gfx2_sw.h',
             'include/**', 'tools/tests/gfx2_check_op_host.c',
             'tools/tests/test_gfx2_check_op.py', 'tools/tests/host32.py'],
     basis=['HAL_V2_DESIGN §4-2', 'HAL_V2_DESIGN §12-1'],

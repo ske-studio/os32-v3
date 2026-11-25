@@ -8,7 +8,7 @@ import json
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'arch/x86/kernel/x87.c'
+SOURCE = ROOT / 'sys/arch/x86/kernel/x87.c'
 MUTATIONS = (
     ('save-omitted', 'fnsave %0; fwait', 'fninit'),
     ('restore-omitted', 'frstor %0', 'fninit'),
@@ -32,7 +32,7 @@ def run(source, software=False, dispatch=None):
                     for n in ('decode', 'state', 'ops', 'esc03', 'esc47', 'exception', 'memory')]
             dispatch_file = tmp / 'dispatch.c'
             dispatch_file.write_text(dispatch if dispatch is not None else
-                (ROOT / 'arch/x86/kernel/x87_emu_dispatch.c').read_text())
+                (ROOT / 'sys/arch/x86/kernel/x87_emu_dispatch.c').read_text())
             cmd += [str(dispatch_file)]
             # Vendor sources retain their own warning policy, as in the build.
             for n in json.loads((ROOT/'lib/softfloat/UPSTREAM.json').read_text())['selected_sources']:
@@ -51,18 +51,18 @@ def run(source, software=False, dispatch=None):
 
 def boundary():
     """The common exec code names no x87: the save area and its three entry points
-    are arch-neutral (include/exec_arch.h), and both arch providers size them."""
-    for name in ('exec/appslot.h', 'exec/exec.c', 'exec/exec_launch.inc',
-                 'exec/exec_schedule.inc', 'exec/exec_syscall.inc'):
+    are arch-neutral (sys/include/exec_arch.h), and both arch providers size them."""
+    for name in ('sys/kern/exec/appslot.h', 'sys/kern/exec/exec.c', 'sys/kern/exec/exec_launch.inc',
+                 'sys/kern/exec/exec_schedule.inc', 'sys/kern/exec/exec_syscall.inc'):
         text = (ROOT / name).read_text()
         assert 'x87' not in text and 'X87' not in text, name
-    contract = (ROOT / 'include/exec_arch.h').read_text()
+    contract = (ROOT / 'sys/include/exec_arch.h').read_text()
     for word in ('struct arch_fp_context', 'void arch_fp_save(struct arch_fp_context *);',
                  'void arch_fp_restore(const struct arch_fp_context *);', 'void arch_fp_init(void);'):
         assert word in contract, word
-    x86 = (ROOT / 'arch/x86/arch_exec_storage.h').read_text()
+    x86 = (ROOT / 'sys/arch/x86/arch_exec_storage.h').read_text()
     assert '#define ARCH_FP_BYTES 108\n#define ARCH_FP_ALIGN 1\n' in x86
-    ppc = (ROOT / 'arch/ppc/arch_exec_storage.h').read_text()
+    ppc = (ROOT / 'sys/arch/ppc/arch_exec_storage.h').read_text()
     assert '#define ARCH_FP_BYTES ' in ppc and '#define ARCH_USER_BYTES 176\n' in ppc
 
 
@@ -73,7 +73,7 @@ def main():
         assert run(source, software) == 0, ('control failed', software)
         print('x87 nesting and park: GREEN ' + ('emu' if software else 'hw'))
     if '--mutate' in sys.argv:
-        dispatch = (ROOT / 'arch/x86/kernel/x87_emu_dispatch.c').read_text()
+        dispatch = (ROOT / 'sys/arch/x86/kernel/x87_emu_dispatch.c').read_text()
         anchor = 'res_owner_get() == appslot_cur() &&'
         assert dispatch.count(anchor) == 1
         rc = run(source, True, dispatch.replace(anchor,

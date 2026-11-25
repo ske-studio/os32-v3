@@ -1,8 +1,8 @@
 #include "rx_io_clock.h"
 /* A10: real LAN transport/protocol and A3 queues; fake hardware/clock only. */
-#include "fs/serialfs/sfs_lan.h"
-#include "net/nic_rx.h"
-#include "net/rx_work.h"
+#include "sys/fs/serialfs/sfs_lan.h"
+#include "sys/net/nic_rx.h"
+#include "sys/net/rx_work.h"
 #include "os32_kapi_shared.h"
 #define REQUIRE(e) do { if (!(e)) return __LINE__; } while (0)
 static const u8 local[6] = {2,0,0,0,0,1}, peer[6] = {2,0,0,0,0,2};

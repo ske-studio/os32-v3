@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Trident depth DAC tables, shadow/reload, overscan and I/O failures."""
 CHECK = dict(name='trident-palette', tier=1, needs=[], budget=3.6,
-    covers=['drivers/video/trident/palette.c', 'drivers/video/trident/trident.h',
+    covers=['sys/dev/video/trident/palette.c', 'sys/dev/video/trident/trident.h',
             'tools/tests/trident_palette_host.c', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_device_fake.h', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py', 'build/config.mk', 'gfx/palette.h'],
+            'tools/tests/kernel_includes.py', 'build/config.mk', 'sys/hal/gfx/palette.h'],
     basis=['TRIDENT_FULL_DESIGN §5', 'TRIDENT_S3_DESIGN §3'],
 )
 import argparse
@@ -16,7 +16,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = ROOT / 'drivers/video/trident/palette.c'
+PRODUCT = ROOT / 'sys/dev/video/trident/palette.c'
 MUTATIONS = (
     ('last_color', 'count > (int)TRI_DAC_COLORS - first', 'count >= (int)TRI_DAC_COLORS - first'),
     ('mask', 'TRI_DAC_MASK, 0xFF', 'TRI_DAC_MASK, 0xFE'),

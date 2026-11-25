@@ -89,7 +89,7 @@ FDD ブート (root = FAT) で `db_open_existing` が落ちていた。
 BUSY / pinned (使用中の SQLite DB・loop イメージ) は、FD を開いた名前と操作の名前を 1 バイトずつ
 (大文字小文字は `VfsOps.name_fold` で畳んで) 比べる。下の FS が「別の綴りを同じ実体」と読む名前は、
 この比較をすり抜けて使用中の実体を消せるので、**入口で `OS32_ERR_INVAL` で断る**
-(`fs/vfs_name_rules.inc`、FAT は `ff_make_path`、HostDrv は `hostdrv_create` と rename の宛先)。
+(`sys/fs/vfs_name_rules.inc`、FAT は `ff_make_path`、HostDrv は `hostdrv_create` と rename の宛先)。
 
 | 断るもの | FAT | HostDrv (Win32) |
 |---|---|---|
@@ -166,10 +166,10 @@ pinned の保護は**保証しない**:
 従来の unlink + add 経路のままで、上の保証は付かない。
 
 **例外**: 上の経路に入る条件は dirent の `file_type` が**両側とも
-`EXT2_FT_REG_FILE`** であること (`fs/ext2/ext2_dir.c`)。**FILETYPE 機能
+`EXT2_FT_REG_FILE`** であること (`sys/fs/ext2/ext2_dir.c`)。**FILETYPE 機能
 (`s_feature_incompat` の 0x0002) を持たない ext2 では `file_type` が常に 0** な
 ので条件が成立せず、**従来の経路 (宛先の名前を先に消す) に落ちる** — 途中で
-落ちると宛先の名前が消えた瞬間が存在する。OS32 の `fs/ext2/ext2_fmt.c` は
+落ちると宛先の名前が消えた瞬間が存在する。OS32 の `sys/fs/ext2/ext2_fmt.c` は
 FILETYPE を立てて作るので手元の NHD では起きないが、他所で作った媒体を
 マウントするときは付かない保証だと思うこと。
 
@@ -200,7 +200,7 @@ IDE HDD上のLinux ext2ファイルシステムを読み書きする。パーテ
 | ルートinode | 2 (`EXT2_ROOT_INO`) |
 | ブロックグループ | マルチグループ対応。1 グループ最大 8192 ブロック (`EXT2_BLOCKS_PER_GROUP_MAX`)、グループ数上限 32 (`EXT2_MAX_GROUPS`) |
 
-**API** (引数名の要約): `ctx` はマウントごとの `Ext2Ctx *`。正確な宣言は [fs/ext2/ext2.h](../fs/ext2/ext2.h) と [fs/ext2/ext2_priv.h](../fs/ext2/ext2_priv.h) を参照。`ext2_format` は内部で一時コンテキストを使う。
+**API** (引数名の要約): `ctx` はマウントごとの `Ext2Ctx *`。正確な宣言は [sys/fs/ext2/ext2.h](../sys/fs/ext2/ext2.h) と [sys/fs/ext2/ext2_priv.h](../sys/fs/ext2/ext2_priv.h) を参照。`ext2_format` は内部で一時コンテキストを使う。
 
 | 関数 | 説明 |
 |------|------|
@@ -334,7 +334,7 @@ NP21/WエミュレータのHostDrv機能を利用し、ホストPC (Windows) の
 | 関数 | 説明 |
 |------|------|
 公開エントリは `hostdrvfs_init` / `hostdrvfs_detect` の 2 つだけで、VfsOps に
-登録される実体は `hdrv_*` 接頭辞を持つ (`drivers/hostdrv/hostdrvfs.c`)。
+登録される実体は `hdrv_*` 接頭辞を持つ (`sys/dev/hostdrv/hostdrvfs.c`)。
 
 | 関数 | 説明 |
 |------|------|
@@ -354,7 +354,7 @@ NP21/WエミュレータのHostDrv機能を利用し、ホストPC (Windows) の
 - **fatfs/ + fatfs_vfs.c** — ELM FatFs (elm-chan.org) の移植 + VfsOps 統合ラッパー。ext2_vfs.c と同じマルチインスタンスパターン (FatFsCtx を kmalloc/kfree)。FDD ブート時のルートFSでもある (`root_fs = "fat"`)
 - FatFs のボリュームは pdrv 0/1 (fd0/fd1) の2つ。`fatfs_vfs_mount` は pdrv 単位の busy フラグで二重マウントを弾く (fd1 の自動マウント試行が fd0 のマウントを壊す経路があったため)
 - **FD の媒体を差し替えたら umount / mount する (契約)**。FD の読みはトラックの先読みとセクタキャッシュを
-  持ち (`drivers/block/fdc_track.c`、票 `docs/archive/realhw_v21/TASK_FDC_REALHW.md`)、FatFs も
+  持ち (`sys/dev/block/fdc_track.c`、票 `docs/archive/realhw_v21/TASK_FDC_REALHW.md`)、FatFs も
   マウント中は FAT とディレクトリを覚えている。捨てる合図は (1) `disk_initialize` (= マウント)、(2) 書き込みと
   SIS で見た Ready 変化による世代、(3) **最後の読みから 2 秒 (200 tick) 空いたとき** (MS-DOS と同じ考え方の
   「2 秒規則」)。FRY=1 では同じ形式の媒体の差し替えが Ready 変化にならず (io_fdd.md の 0094h)、NP21/W も

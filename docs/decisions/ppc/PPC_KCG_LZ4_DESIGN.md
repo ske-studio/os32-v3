@@ -1,6 +1,6 @@
 # PPC_KCG_LZ4_DESIGN — KCG1 のフォントを LZ4 で圧縮して RAM root を減らす (L0 生成・L1 読み込み)
 
-> 状態: **現行 (2026-11-13)** — KCG1 の flags=1 を単一の raw LZ4 block とし、生成は tools/gen_font16.py、読み込みは kernel/console/font_source_kcg.c が起動時に 1 回だけ伸長する。初段は PowerPC の RAM root。x86 は KCG1 を収録しないので生成物は変わらない。段の状態は票 TASK_PPC_SHELL が持つ。
+> 状態: **現行 (2026-11-13)** — KCG1 の flags=1 を単一の raw LZ4 block とし、生成は tools/gen_font16.py、読み込みは sys/kern/console/font_source_kcg.c が起動時に 1 回だけ伸長する。初段は PowerPC の RAM root。x86 は KCG1 を収録しないので生成物は変わらない。段の状態は票 TASK_PPC_SHELL が持つ。
 
 > 出所: ~/os32-tmp/run/fb-route/DESIGN.final.md (astra 起草 r1→r2、本線 PM 経由の Opus 第 2 回 条件付き確定、PM 反映)。中身は変えずに写す。前提の FB 文字端末は [PPC_FBCON_DESIGN](PPC_FBCON_DESIGN.md)。§5 の console_route は段 I へ送った将来案で、確定した契約ではない。
 2026-11-13。設計のみ。作業木は読み取り専用、実装・生成・ビルド・実機受入は未実施。
@@ -38,7 +38,7 @@ console_route・段 I・PLANAR4・FD フォント収録・実行中切替コマ�
 - header検査→出力P確保→圧縮時のみ入力C確保→全量read→lease validate→decode→fetched検査→close成功→差替え。
 - flags=0 は出力に直読。入力Cは公開前に解放する。失敗時は新入力・新出力・leaseを回収し、旧residentを保持する。
 - 成功時だけ既存の font_source_kcg.c と同じ順で旧resident解放→新resident代入→counter reset。再ロードを拒否しない。
-- bootの呼び手は platform/powermac/ppc_kernel.c の1か所。font成功後のunicode/target/FB準備順を維持する。
+- bootの呼び手は sys/platform/powermac/ppc_kernel.c の1か所。font成功後のunicode/target/FB準備順を維持する。
 - 初回loadの字形用最大同時確保はP+C=593,056B、再ロードは旧P込み888,996B＋管理分。他用途を含む1MiB arenaの高水位を測る。
 - 確保不能時はエラーで戻り、既存streamを継続する。公開kcg_load_fontのNOSYS、x86のROM/module選択は不変。
 
@@ -80,7 +80,7 @@ L0単独では非圧縮製品を保つ。圧縮製品への切替とL1収録を�
 | 再現性 | 固定版・同一入力の2回生成でbytesとSHA一致 | 予約欄を非0にして期待header検査がRED |
 
 ## 3. L1 — loader と収録（受け手: PowerPC）
-触るファイル: kernel/console/font_source_kcg.c、lib/lz4.cの冒頭注記、build/targets/ppc-powermac.mk、loader/統合試験。
+触るファイル: sys/kern/console/font_source_kcg.c、lib/lz4.cの冒頭注記、build/targets/ppc-powermac.mk、loader/統合試験。
 -O0は維持する。理由: lib/lz4.cの最適化不具合の注意を解除する根拠がないため。
 build/targets/ppc-powermac.mkのKB_Cへlib/lz4.cを追加し、専用objectに次の1行を置く（program用objectを流用しない）。
 ```make
@@ -113,8 +113,8 @@ R系の完了は前提にしない。build/targets/ppc-powermac.mkの他作業�
 ## 4. 文書訂正2点
 | ID・対象 | 訂正内容・確認 |
 |---|---|
-| D3: docs/decisions/gui/CONSOLE_DUAL_DESIGN.md | PPCはplatform/powermac/display_dual.cに実体あり、と古い注記を更新する |
-| D1: PM事前確認の記述 | platform/pc98/kernel_gfx_config.incでconfigure済み、kernel.cで呼出し/include済み。本設計を訂正記録とし、PM管理の元記録も訂正する |
+| D3: docs/decisions/gui/CONSOLE_DUAL_DESIGN.md | PPCはsys/platform/powermac/display_dual.cに実体あり、と古い注記を更新する |
+| D1: PM事前確認の記述 | sys/platform/pc98/kernel_gfx_config.incでconfigure済み、kernel.cで呼出し/include済み。本設計を訂正記録とし、PM管理の元記録も訂正する |
 文書訂正はPowerPCから本線PMへ渡す。D1を製品の結線欠落と扱わず、cfg読込みの追加実装はしない。
 
 ## 5. 段 I へ送る

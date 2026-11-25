@@ -24,7 +24,7 @@
 ## 起動媒体と対象 (`rc_check_media`)
 
 - `drive` は `hd0` だけ (省略時も `hd0`)。他は `unsupported drive`。
-- `st_dev` は VFS の `(dev_type << 8 | unit) + 1` を復号する (`RC_DEV_TYPE`・`RC_DEV_UNIT`、種別 HD = 0・FD = 1。外部プログラムからカーネルヘッダが見えないので写しを置く。正典は `fs/vfs.h`)。0 は不明。
+- `st_dev` は VFS の `(dev_type << 8 | unit) + 1` を復号する (`RC_DEV_TYPE`・`RC_DEV_UNIT`、種別 HD = 0・FD = 1。外部プログラムからカーネルヘッダが見えないので写しを置く。正典は `sys/fs/vfs.h`)。0 は不明。
 - `/` が FDD でなければ (`st_dev == 0` を含む) `recover-settings must run from the install floppy`。revert も同じ文言。
 - `/hd0` が未マウントなら回復専用に `sys_mount("/hd0", "hd0", "ext2")`、失敗は `cannot mount /hd0`。
 - `/hd0` と `/hd0/etc` の `st_dev` が HDD unit 0 でなければ `target /hd0 is not hd0`。stat の失敗は `stat failed (<path>)`。
@@ -75,5 +75,5 @@
 
 ## 検査
 
-`install-recover-host` (`tools/tests/test_install_recover.py`、本体 `tools/tests/install_recover_host.c`)。実物の `install_recover.inc`・`kapi/kapi_db.c`・SQLite・`os32_sqlite_vfs.c`・`fs/vfs_fd.c` を RAM の backend で組み、stat の三値・inode の共有・rename の中途半端・read の負・short write・unlink・sync・db close の失敗を注入する。
+`install-recover-host` (`tools/tests/test_install_recover.py`、本体 `tools/tests/install_recover_host.c`)。実物の `install_recover.inc`・`sys/kapi/kapi_db.c`・SQLite・`os32_sqlite_vfs.c`・`sys/fs/vfs_fd.c` を RAM の backend で組み、stat の三値・inode の共有・rename の中途半端・read の負・short write・unlink・sync・db close の失敗を注入する。
 各段の各失敗で「切り替え前なら元の対が 1 バイトも変わらない」「欠損は欠損のまま」「作った物だけ消える」「両名が残れば消さずに止まる」「journal が別の世代と混ざらない」を見る。連鎖 (失敗 → 再実行が門で止まる → revert → recover、recover → revert → recover、revert の途中の失敗 → 再 revert、`.new` の close 失敗 → 次回停止 → revert → `rm` → recover) も通す。

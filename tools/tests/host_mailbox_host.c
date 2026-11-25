@@ -1,6 +1,6 @@
 /* NOTICE unit: real mailbox, fixture-owned IF/heap/copyout seams; no libc. */
 #include "hostsvc_fixture.h"
-#include "lib/kstring.h"
+#include "sys/kern/kstring.h"
 #include "os32_kapi_shared.h"
 #define IO_H
 static unsigned int irq_save(void)

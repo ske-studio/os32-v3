@@ -68,7 +68,7 @@ REVIEWED_INVENTORY_SHA = 'ecf9f0b230b06169033123c7059dc1040ba8eb8522d56216d08b27
 
 
 def import_declarations(root):
-    entries = json.loads((root / 'hwdev/hwdev_imports.def').read_text())['imports']
+    entries = json.loads((root / 'sys/dev/hwdev/hwdev_imports.def').read_text())['imports']
     return ''.join(f'{e["index"]}:{e["symbol"]}:'
                    f'{"".join(declaration(e, root).split())}\n' for e in entries)
 
@@ -86,7 +86,7 @@ def assert_hwdev_contract(root):
     imports = json.loads((generated / 'hwdev_imports.json').read_text())
     assert values['HWDEV_CONTRACT_CRC'] == imports['module_abi_gen']
     assert values['HWDEV_LAYOUT_CRC'] == zlib.crc32((generated / 'hwdev_layout.txt').read_bytes())
-    entries = json.loads((root / 'hwdev/hwdev_imports.def').read_text())['imports']
+    entries = json.loads((root / 'sys/dev/hwdev/hwdev_imports.def').read_text())['imports']
     assert hashlib.sha256(import_declarations(root).encode()).hexdigest() == REVIEWED_IMPORT_DECLARATIONS_SHA, \
         'private HWDEV import indices/names/types changed'
     assert imports['imports'] == [dict(name=e['symbol'], index=e['index'], kind=1, type_ver=1)
@@ -100,6 +100,6 @@ if __name__ == '__main__':
     parser.add_argument('--snapshot', action='store_true', required=True)
     parser.parse_args()
     root = Path(__file__).resolve().parents[2]
-    print(f'REVIEWED_LAYOUT_CRC = 0x{zlib.crc32((root / "hwdev/generated/hwdev_layout.txt").read_bytes()):08x}')
+    print(f'REVIEWED_LAYOUT_CRC = 0x{zlib.crc32((root / "sys/dev/hwdev/generated/hwdev_layout.txt").read_bytes()):08x}')
     print(f'REVIEWED_IMPORT_DECLARATIONS_SHA = {hashlib.sha256(import_declarations(root).encode()).hexdigest()!r}')
     print(f'REVIEWED_INVENTORY_SHA = {hashlib.sha256((root / "tools/hwdev_layout.json").read_bytes()).hexdigest()!r}')

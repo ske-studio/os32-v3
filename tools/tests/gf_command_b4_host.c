@@ -1,6 +1,6 @@
-/* Link hwdev/gf/grctx.c separately; expectations come from the pinned
+/* Link sys/dev/video/geforce/grctx.c separately; expectations come from the pinned
  * independent MIT oracle. See gf_command_b4_fixture.h for regeneration. */
-#include "../../hwdev/gf/command.h"
+#include "../../sys/dev/video/geforce/command.h"
 
 static void fail(int line)
 { __asm__ volatile("int $0x80" : : "a"(1), "b"(line)); for (;;) {} }

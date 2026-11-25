@@ -1,10 +1,10 @@
-# kdebug/recover_virtual.c — 設計
+# sys/kern/kdebug/recover_virtual.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: RECOVER_T4B_INJECT.md (D1 で移した)
-ソース: `kdebug/recover_virtual.c`
+ソース: `sys/kern/kdebug/recover_virtual.c`
 
 ## RECOVER_T4B_INJECT
 
-- `kdebug/recover_virtual.c` に装置非依存の仮想試行を置く。核である kdebug に属し、hwdev.mod・GF・PCI 探索を必要としない。KDEBUG=1 のみリンクする。
+- `sys/kern/kdebug/recover_virtual.c` に装置非依存の仮想試行を置く。核である kdebug に属し、hwdev.mod・GF・PCI 探索を必要としない。KDEBUG=1 のみリンクする。
 
 - shell は `recover virtual begin <case>` / `recover virtual step <session>` / `recover virtual end <session>` を追加。case は固定列挙、一命令を承認として扱う。callback の shell 再入なし、RUNNING 中止は既存 abort フレーム。
 
@@ -38,7 +38,7 @@
 
 - 仮想 identity の boot/image/kdebug は保存しない RAM 試行の固定値1とし、装置欄は0、開始条件は借用元の start_ready と route_read の両方へ委譲する。
 
-- kdebug/recover.c: 仮想の identity は実装置と違うので、virtual begin のたびに GF の SIZE_BARS の BAR cache が 0 に戻る (後の GF PREPARE は再測定 — 安全側)。仕様として受け入れる。
+- sys/platform/pc98/kdebug/recover.c: 仮想の identity は実装置と違うので、virtual begin のたびに GF の SIZE_BARS の BAR cache が 0 に戻る (後の GF PREPARE は再測定 — 安全側)。仕様として受け入れる。
 
 - fault は begin で case_id を保存し (step 要求の case_id では上書きしない)、step の plan enter 後に既存 recover_record で inject BEGIN を送ってから callback が -1 を返す。
 

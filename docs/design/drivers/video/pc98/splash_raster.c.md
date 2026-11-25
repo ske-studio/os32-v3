@@ -1,7 +1,7 @@
-# drivers/video/pc98/splash_raster.c — 走査の判定・固定色・公開の表の再生
+# sys/platform/pc98/video/splash_raster.c — 走査の判定・固定色・公開の表の再生
 
 > 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
-ソース: `drivers/video/pc98/splash_raster.c`
+ソース: `sys/platform/pc98/video/splash_raster.c`
 
 ## 何をするか
 

@@ -25,7 +25,7 @@
 **実行中の追加は通常文脈 (syscall) でカーネルに借りる。カーネルの口は `mem_map(size)` / `mem_unmap(ptr)` の 2 つだけ**
 **失敗は NULL / −1 (ENOMEM)** で、スワップが無いのでアプリが扱う (縮小版で開く・断る)。**失敗の条件は 2 つ: 池の物理が足りない、または (map の場合) アプリ帯の仮想に連続した空きが無い**
 
-> [要確認] 現行 exec/appmem.h の内部口は appmem_map(...bytes, hint, map_flags, ...) と appmem_unmap(...base, bytes)。原文の mem_map(size) / mem_unmap(ptr) は現在の正確な引数宣言ではない。
+> [要確認] 現行 sys/kern/exec/appmem.h の内部口は appmem_map(...bytes, hint, map_flags, ...) と appmem_unmap(...base, bytes)。原文の mem_map(size) / mem_unmap(ptr) は現在の正確な引数宣言ではない。
 
 アプリのメモリは物理連続を要求しない
 **ページ単位の割り当てには外部断片化が起きない**。
@@ -77,11 +77,11 @@ BB は owner=boot → gshell (永続) の移譲 1 回だけで、GUI 終了 → 
 
 ## 索引
 
-- [exec/appslot.c](appslot.md)
-- [exec/exec.c](exec.md)
-- [exec/exec_heap.c](exec_heap.md)
-- [exec/lease.c](lease.md)
-- [exec/ring3_str.c](ring3_str.md)
+- [sys/kern/exec/appslot.c](appslot.md)
+- [sys/kern/exec/exec.c](exec.md)
+- [sys/kern/exec/exec_heap.c](exec_heap.md)
+- [sys/kern/exec/lease.c](lease.md)
+- [sys/kern/exec/ring3_str.c](ring3_str.md)
 - [surface_query.md](surface_query.md)
 - [appmem](appmem.md)
 - [appslot_transition](appslot_transition.md)

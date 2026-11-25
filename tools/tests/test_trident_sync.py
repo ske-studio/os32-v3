@@ -10,7 +10,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'drivers/video/trident/present.c'
+SOURCE = ROOT / 'sys/dev/video/trident/present.c'
 MUTANTS = [
     ('target-offset', '.va = d->res->lfb + v->off', '.va = d->res->lfb'),
     ('publish-head', 'gfx2_sync_publish(GFX2_KIND_TRIDENT, 0, d->sync_ctx)', 'gfx2_sync_publish(GFX2_KIND_TRIDENT, 1, d->sync_ctx)'),
@@ -42,7 +42,7 @@ def main():
                 '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
                 '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
                 '-I' + str(ROOT), '-I' + str(ROOT / 'drivers/video/trident'),
-                *include_flags(ROOT), str(path), str(ROOT / 'drivers/video/trident/regs.c'), str(ROOT / 'tools/tests/trident_device_fake.c'), str(ROOT / 'tools/tests/trident_sync_fake.c'),
+                *include_flags(ROOT), str(path), str(ROOT / 'sys/dev/video/trident/regs.c'), str(ROOT / 'tools/tests/trident_device_fake.c'), str(ROOT / 'tools/tests/trident_sync_fake.c'),
                 str(ROOT / 'tools/tests/trident_sync_host.c'), '-o', str(exe)], check=True)
             for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
                 result = host32.run([str(exe)], runner=runner, capture_output=True)

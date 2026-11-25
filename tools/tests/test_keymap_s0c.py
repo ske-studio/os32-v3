@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Exercise S0c state directly, without libc."""
 CHECK = dict(name='keymap-s0c', tier=1, budget=5, needs=[], covers=[
-    'input/hal/keymap_state.c', 'input/hal/keymap.h', 'input/hal/in2_int.h',
-    'include/types.h', 'include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h',
+    'sys/hal/input/keymap_state.c', 'sys/hal/input/keymap.h', 'sys/hal/input/in2_int.h',
+    'sys/include/types.h', 'sys/include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/keymap_s0c_host.c', 'tools/tests/test_keymap_s0c.py',
     'tools/tests/host32.py'], basis=['INPUT_KEYMAP_DESIGN §8, H0b'], kind='contract')
 from pathlib import Path
@@ -15,7 +15,7 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 
 def run(ctx):
-    product = (ctx.root / 'input/hal/keymap_state.c').read_text()
+    product = (ctx.root / 'sys/hal/input/keymap_state.c').read_text()
     with tempfile.TemporaryDirectory(prefix='keymap-s0c-') as td:
         tmp = Path(td)
         def build(source):

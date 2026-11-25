@@ -3,7 +3,7 @@ int input_display_restore_lock(unsigned int *flags) { *flags = 0; return 0; }
 void appslot_gfx_resource_acquire(int owner) { (void)owner; }
 int con_sink_is_enabled(void) { return 0; }
 int res_owner_get(void) { return 0; }
-#include "../../gfx/v2/gfx2_int.h"
+#include "../../sys/hal/gfx/v2/gfx2_int.h"
 #include "gfx2_bridge_fake.h"
 /* B3: real PC-98 planar bring-up provider; replace only port I/O and the
  * three memory windows it touches (text VRAM, attribute VRAM, graphics planes). */
@@ -70,8 +70,8 @@ static unsigned host_in(unsigned port)
 #define kmemset(d, v, n) host_clear((d), (v), (n))
 #include "gfx_init_source.inc"
 
-/* The common callers, extracted from the product text (gfx/gfx_core.c and
- * gfx/gfx_core_init.inc) by the test driver: everything they call that is not
+/* The common callers, extracted from the product text (sys/hal/gfx/gfx_core.c and
+ * sys/hal/gfx/gfx_core_init.inc) by the test driver: everything they call that is not
  * the provider is a recording fake, so the *executed* order is observed. */
 #include "gfx_hal.h"
 #include "palette.h"
@@ -131,7 +131,7 @@ void palette_init(void) { event(EV_CALL, F_PALETTE, 0); }
 void gfx_scroll_init(void) { event(EV_CALL, F_SCROLL, 0); }
 #include "gfx_core_slice.inc"
 
-/* B6: the common present path (gfx/gfx_present.c present_dirty, drivers/video/pc98/gfx_vram.c _flip_page),
+/* B6: the common present path (sys/hal/gfx/gfx_present.c present_dirty, sys/platform/pc98/video/gfx_vram.c _flip_page),
  * extracted from the product text; transfer steps are recording fakes. */
 enum { F_MERGE = 20, F_FLUSH };
 GfxCounters gfx_counters;

@@ -3,9 +3,9 @@
 /*  FDC_TRACK_HOST.C — FD のトラック単位の読み出しをホストで回す            */
 /*                                                                          */
 /*  実物を 1 行も写さずに #include する:                                    */
-/*    drivers/block/fdc_track.c  … 区切り・先読み・読み直し (純粋な層)            */
-/*    drivers/block/fdc_decide.c … 時間上限の式                                   */
-/*    drivers/block/fdc.c        … シークの省略・まとめ読み・覚えたシリンダの破棄 */
+/*    sys/dev/block/fdc_track.c  … 区切り・先読み・読み直し (純粋な層)            */
+/*    sys/dev/block/fdc_decide.c … 時間上限の式                                   */
+/*    sys/dev/block/fdc.c        … シークの省略・まとめ読み・覚えたシリンダの破棄 */
 /*  fdc.c のポートは tools/tests/fdc_hostshim/io.h が下の µPD765A の模型へ  */
 /*  回す。tick_count は -D で模型の時計に差し替える。既定は読むたびに      */
 /*  10ms、整定試験では 1ms 進め、tick 境界直前の待ちも再現する。           */
@@ -20,13 +20,13 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include "../../drivers/block/fdc_decide.c"
-#include "../../drivers/block/fdc_track.c"
+#include "../../sys/dev/block/fdc_decide.c"
+#include "../../sys/dev/block/fdc_track.c"
 /* fdc.c の DMA の窓の検査 (dma_range_ok) は dma_alloc と同じ関数 — 実物を通す
  * (TASK_T1_LEDGER §4-3)。 */
-#include "../../drivers/dma/dma8237_math.c"
+#include "../../sys/dev/dma/dma8237_math.c"
 #include "../../lib/dma_contract.c"
-#include "../../drivers/block/fdc.c"
+#include "../../sys/dev/block/fdc.c"
 /* 実表・公開順・2 巡・EOI 経路を同じ装置模型で通す。 */
 #include "irq_math.c"
 #define irq_register host_irq_register
@@ -35,7 +35,7 @@
 /* test_fdc_track.py が実 pic.c から切り出す EOI と ISR 操作。 */
 #include "fdc_pic_source.c"
 #include "clock_service.c"
-#include "../../drivers/block/fat_diskio.c"
+#include "../../sys/dev/block/fat_diskio.c"
 /* FatFs 本体も実物を通す (font_replay)。ff.c は外部のコードなので、試験側の
  * 厳しい警告だけ外す (カーネルのビルドでは元の警告のまま)。 */
 #pragma GCC diagnostic push
@@ -45,7 +45,7 @@
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
-#include "../../fs/fat/fatfs/ff.c"
+#include "../../sys/fs/fat/fatfs/ff.c"
 #pragma GCC diagnostic pop
 
 #define CHECK(x) do { if (!(x)) { \
@@ -1887,8 +1887,8 @@ static void sis_edge_limit(void)
 /*  取り出したファイル (FDC_TRACK_FONT)、その FatFs のパスは FDC_TRACK_PATH。*/
 /*  2026-09-25 に既定フォントが MINIMAL から外れて FD に載らなくなったので、*/
 /*  同じ読み方を FD に残る大きいファイル (/vmkrnl.lz4) で回す。         */
-/*  読み方: kernel/boot_font.c → drivers/video/kcg/kcg.c の kcg_load_font と           */
-/*  fs/vfs_fd.c / fs/fat/fatfs_vfs.c のとおり:                                  */
+/*  読み方: kernel/boot_font.c → sys/dev/video/kcg/kcg.c の kcg_load_font と           */
+/*  sys/fs/vfs_fd.c / sys/fs/fat/fatfs_vfs.c のとおり:                                  */
 /*    vfs_open        = stat + get_file_size (どちらも f_stat)               */
 /*    vfs_read_fd(16) = read_stream = rc_read (製品の保持・位置調整)        */
 /*    vfs_get_size    = f_stat                                               */
@@ -1896,7 +1896,7 @@ static void sis_edge_limit(void)
 /*  read_stream と同じ製品 helper を使うことは Python 側が静的に見る。      */
 /* ======================================================================== */
 #include "vfs.h"
-#include "../../fs/fat/fatfs_vfs_read_cache.inc"
+#include "../../sys/fs/fat/fatfs_vfs_read_cache.inc"
 static FatReadCache s_read_cache;
 static u8 *s_font;
 static long s_font_len;

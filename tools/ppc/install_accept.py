@@ -8,8 +8,8 @@ import keep_tmp
 from kboot_accept import build_media, mutant_settings
 from link_sh_run import ROOT, Session
 
-MGMT = 'kernel/dev/install_management.c'
-EXEC = 'exec/exec.c'
+MGMT = 'sys/kern/dev/install_management.c'
+EXEC = 'sys/kern/exec/exec.c'
 CASES = {
     'path': (EXEC, 'kstrcmp(absolute, paths[i]) == 0', 'absolute[0] != 0'),
     'owner': (MGMT, 'r->owner != res_owner_get() || start !=', '0 || start !='),
@@ -29,7 +29,7 @@ def build(out, case):
     user = out/'user'
     # Observe both real installer mains in their active USER frames at their
     # banner. During hdprep the child also attempts the parent's exact range.
-    printer = 'kapi/kapi_print.c'
+    printer = 'sys/kapi/kapi_print.c'
     anchor = '    console_vprintf((u8)fixed.value[0], format, args);'
     meter = out/'print.c'
     meter.write_text('#include "kstring.h"\n'

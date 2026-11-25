@@ -11,7 +11,7 @@
 ## 使い方と契約
 
 - `python3 tools/raster_splash_asset.py INPUT -o assets/splash/splash.osri --reference <基準の .osri> [--threads N] [--replace]`。
-- 生成器の入力 (`tools/img2osri.py`・`gfx/osri_profile.h`・`tools/osri_*`) がコミット済みと一致しなければ止める。
+- 生成器の入力 (`tools/img2osri.py`・`sys/kern/gfx/osri/osri_profile.h`・`tools/osri_*`) がコミット済みと一致しなければ止める。
 - 一時ディレクトリで `img2osri.py --encoder enc2 --outs <B> --band 1 --threads N` を呼び、独立の復号で全行の OUT ≤ B を確かめ、基準と全バイトを比べる。違えば止める (期待値を黙って更新しない、違いの由来を調べる)。
 - 既にある出力の置き換えは `--replace` を付けたときだけ。原画は変えない (生成中に変わったら止める)。
 - 同じ場所に `splash.manifest.json` を書く: 原画の SHA256・生成器のコミットと各入力の SHA256・引数・threads・Python/Pillow/NumPy の版・出力の SHA256/CRC/バイト数/件数/最大 OUT/総 OUT。OS は sidecar を読まない。

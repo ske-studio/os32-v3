@@ -19,7 +19,7 @@ def component(name, flags=(), mutation=None):
         exe=Path(td)/'host'
         sources = [ROOT/'tools/tests'/f'{name}_host.c']
         if name == 'backend_geforce' and mutation:
-            original = (ROOT/'drivers/video/geforce/backend_geforce.c').read_text()
+            original = (ROOT/'sys/dev/video/geforce/backend_geforce.c').read_text()
             old, new = mutation
             assert original.count(old) == 1
             original = original.replace(old, new, 1)
@@ -27,7 +27,7 @@ def component(name, flags=(), mutation=None):
             import re
             original = re.sub(r'^#include "([^"]+)"', lambda m: '#include "'+str((ROOT/'drivers/video/geforce'/m[1]).resolve())+'"' if m[1].startswith('../') else m[0], original, flags=re.M)
             backend.write_text(original)
-            fixture = (ROOT/'tools/tests/backend_geforce_host.c').read_text().replace('../../drivers/video/geforce/backend_geforce.c', str(backend))
+            fixture = (ROOT/'tools/tests/backend_geforce_host.c').read_text().replace('../../sys/dev/video/geforce/backend_geforce.c', str(backend))
             fixture = fixture.replace('#include "gf_startlog_host.h"', '#include "'+str(ROOT/'tools/tests/gf_startlog_host.h')+'"')
             host = Path(td)/'fixture.c'
             host.write_text(fixture)
@@ -185,7 +185,7 @@ void __cdecl kprintf(u8 a,const char *f,...)
         cases=cases.replace('#define GF_TEST_BAR2 0xe1000000U', '#define GF_TEST_BAR2 0x25000000U')
         cases=cases.replace('GF_TEST_BAR2,GF_TEST_BAR2,GF_PRODUCTION_BAR2_BYTES,1',
                             'GF_TEST_BAR2,GF_TEST_BAR2,BAR2_BYTES,1')
-        platform=(ROOT/'drivers/video/geforce/geforce_platform.c').read_text()
+        platform=(ROOT/'sys/dev/video/geforce/geforce_platform.c').read_text()
         if no_vram_pt:
             start=platform.index("    u32 view_phys =")
             end=platform.index("    platform.bar0_phys =", start)
@@ -210,15 +210,15 @@ void __cdecl kprintf(u8 a,const char *f,...)
         # Preserve source-relative header lookup when staging the product code.
         platform=platform.replace('"../../../', '"'+str(ROOT)+'/')
         (tmp/'geforce_platform.inc').write_text(platform)
-        cases=cases.replace('"../../drivers/video/geforce/geforce_platform.c"', '"geforce_platform.inc"')
+        cases=cases.replace('"../../sys/dev/video/geforce/geforce_platform.c"', '"geforce_platform.inc"')
         (tmp/'geforce_core_cases.inc').write_text(cases)
-        gui=(ROOT/'kernel/gui.c').read_text()
+        gui=(ROOT/'sys/kern/gui.c').read_text()
         (tmp/'geforce_gui_notice.inc').write_text(gui[gui.index('void gui_display_failed(void)'):])
-        source=(ROOT/'drivers/video/geforce/geforce_module.c').read_text()
+        source=(ROOT/'sys/dev/video/geforce/geforce_module.c').read_text()
         start=source.index('int geforce_boot_reserve(void)')
         end=source.index('static int geforce_return(',start)
         (tmp/'geforce_reserve.inc').write_text(source[start:end])
-        for rel in ('tools/tests/recover_gf_dev_stub.c','drivers/video/geforce/backend_geforce.c','tools/tests/gf_accel_unbound_stubs.c','hwdev/gf/service.c','hwdev/gf/accel_surface.c','hwdev/gf/display/modes.c','hwdev/gf/instmem_map.c','hwdev/gf/command_platform.c','hwdev/gf/vram_view.c'):
+        for rel in ('tools/tests/recover_gf_dev_stub.c','sys/dev/video/geforce/backend_geforce.c','tools/tests/gf_accel_unbound_stubs.c','sys/dev/video/geforce/service.c','sys/dev/video/geforce/accel_surface.c','sys/dev/video/geforce/display/modes.c','sys/dev/video/geforce/instmem_map.c','sys/dev/video/geforce/command_platform.c','sys/dev/video/geforce/vram_view.c'):
             sources.append(ROOT/rel)
         # Transfer is tested separately; this fixture tests the HAL's boundary.
         transfer=tmp/'transfer.c'
@@ -231,7 +231,7 @@ int gf_present_rect(const u8 *c,u32 cp,volatile u8 *d,u32 dp,volatile u8 *b,int 
         'if (!geforce_boot_reserve())\n            kprintf(KLOG_ATTR, "[gfx] geforce boot_reserve failed\\n");',
         '(void)geforce_boot_reserve();', '') if mutation == 'reserve-drop' else None
     result=run_case(caller_mutation,'qemu',fixture_body=fixture,stage=stage,extra_changes=[
-        ('gfx/gfx_core.c','static void _gfx_common_init(int plane_sz)\n{',
+        ('sys/hal/gfx/gfx_core.c','static void _gfx_common_init(int plane_sz)\n{',
          'static void _gfx_common_init(int plane_sz)\n{\n    extern int host_planar_inits; host_planar_inits++;')])
     assert result.returncode==(1 if mutation else 0),(init_fail,unsafe,missing,mutation,result.returncode,result.stdout,result.stderr)
     if mutation:
@@ -242,9 +242,9 @@ int gf_present_rect(const u8 *c,u32 cp,volatile u8 *d,u32 dp,volatile u8 *b,int 
 
 def unsafe_console(old=False):
     from test_dep_dir_d_console import grid_instrument
-    body=(ROOT/'kernel/console/console.c').read_text()
+    body=(ROOT/'sys/kern/console/console.c').read_text()
     if old:
-        body=subprocess.check_output(['git','show','HEAD:kernel/console/console.c'],cwd=ROOT,text=True)
+        body=subprocess.check_output(['git','show','HEAD:sys/kern/console/console.c'],cwd=ROOT,text=True)
     harness=(ROOT/'tools/tests/dep_dir_d_console_grid_host.c').read_text()
     harness='int safe=1; static int serial_count;\nint con_dual_cfg(void) { return 0; }\nvoid gfx_policy_reeval(void) {}\n'+harness
     harness=harness.replace('    if (address < TVRAM_CHAR_BASE',
@@ -271,7 +271,7 @@ def unsafe_console(old=False):
         tmp=Path(td); exe=tmp/'host'
         (tmp/'console_source.inc').write_text(grid_instrument(body))
         (tmp/'platform/pc98').mkdir(parents=True)
-        (tmp/'platform/pc98/console.c').write_text(grid_instrument((ROOT/'platform/pc98/console.c').read_text()))
+        (tmp/'sys/platform/pc98/console.c').write_text(grid_instrument((ROOT/'sys/platform/pc98/console.c').read_text()))
         (tmp/'host.c').write_text(harness)
         (tmp/'legacy_guest_fake.h').write_text((ROOT/'tools/tests/legacy_guest_fake.h').read_text())
         (tmp/'safe.c').write_text('extern int safe; int pc98_console_safe(void) { return safe; }')
@@ -360,7 +360,7 @@ def module_registration(mutation=None):
         exe=Path(td)/'host'
         fixture=ROOT/'tools/tests/geforce_module_host.c'
         if mutation:
-            source=ROOT/'drivers/video/geforce/geforce_module.c'
+            source=ROOT/'sys/dev/video/geforce/geforce_module.c'
             text=source.read_text()
             old,new=MUTATIONS[mutation]
             assert text.count(old)==1, mutation
@@ -372,8 +372,8 @@ def module_registration(mutation=None):
             (Path(td)/'module.c').write_text(text)
             fixture=Path(td)/'fixture.c'
             fixture.write_text((ROOT/'tools/tests/geforce_module_host.c').read_text().replace(
-                '../../drivers/video/geforce/geforce_module.c',str(Path(td)/'module.c')).replace(
-                '../../drivers/video/geforce/geforce_body.c',str(ROOT/'drivers/video/geforce/geforce_body.c')))
+                '../../sys/dev/video/geforce/geforce_module.c',str(Path(td)/'module.c')).replace(
+                '../../sys/dev/video/geforce/geforce_body.c',str(ROOT/'sys/dev/video/geforce/geforce_body.c')))
         from test_gf_display import gf4_sources
         flags = ['gcc', *runtime_flags, '-Wno-unused-parameter', *runtime_includes,
                  '-I'+str(ROOT), '-Igfx', '-Ibuild/out/geforce',
@@ -383,7 +383,7 @@ def module_registration(mutation=None):
                  'geforce_backend_wc_bind','geforce_backend_stop_bind','geforce_heat_stop_request')
         subprocess.run([*flags, '-DOS32_GEFORCE_MODULE',
             *['-D'+name+'=loader_real_'+name for name in aliases],
-            '-c', str(ROOT/'drivers/video/geforce/backend_geforce.c'),
+            '-c', str(ROOT/'sys/dev/video/geforce/backend_geforce.c'),
             '-o', str(real_backend)], cwd=ROOT, check=True)
         sources=gf4_sources(ROOT, 'c3', ROOT/'tools/tests/geforce_module_host.c')
         subprocess.run([*flags, str(fixture), *[str(ROOT/f) for f in sources],
@@ -401,7 +401,7 @@ def module_registration(mutation=None):
     print('PASS GF registration: missing stub, layer 3 hook validation, prepare required, lifetime pin',flush=True)
 
 def present_trace(mutation=None, byte=False):
-    source=(ROOT/'drivers/video/geforce/gf_present.c').read_text()
+    source=(ROOT/'sys/dev/video/geforce/gf_present.c').read_text()
     mutations={
         'bounds': ('while (n >= 4)', 'while (n > 0)'),
         'point': ('rc = point(opaque);', 'rc = row == 0 ? point(opaque) : 0;'),
@@ -415,7 +415,7 @@ def present_trace(mutation=None, byte=False):
     source=source.replace(drain, 'if (!rc) { trace_drain(); (void)*(volatile u32 *)(bar0 + GF_PRESENT_PFB_AMOUNT); }')
     harness=r'''
 #include "gfx_hal.h"
-#include "hwdev/gfinit_mode.h"
+#include "sys/dev/video/geforce/gfinit_mode.h"
 GfxCounters gfx_counters;
 static void trace_drain(void);
 #include "present.c"
@@ -453,7 +453,7 @@ void _start(void) {
 '''
     with tempfile.TemporaryDirectory(prefix='gf-trace-') as td:
         tmp=Path(td)
-        (tmp/'present.c').write_text(source.replace('#include "../../../gfx/gfx_internal.h"', '#include "gfx/gfx_internal.h"'))
+        (tmp/'present.c').write_text(source.replace('#include "../../../gfx/gfx_internal.h"', '#include "sys/hal/gfx/gfx_internal.h"'))
         (tmp/'host.c').write_text(harness)
         (tmp/'legacy_guest_fake.h').write_text((ROOT/'tools/tests/legacy_guest_fake.h').read_text())
         exe=tmp/'host'
@@ -579,7 +579,7 @@ def wc_recovery(path, bios=0, old=False, mutation=None):
     fixture=replace_function(fixture,'static void run(void)','    wc_recovery_run();')
     fixture=f'#define GF_RESERVATION_TEST 1\n#define INIT_FAIL 0\n#define BIOS_WC {bios}\n#define RECOVERY_PATH {path}\nunsigned int host_arch_if=0x202U;\n'+fixture
     def read(rel):
-        if old and rel in ('drivers/video/geforce/backend_geforce.c','kernel/gui.c'):
+        if old and rel in ('sys/dev/video/geforce/backend_geforce.c','sys/kern/gui.c'):
             return subprocess.check_output(['git','show','cead3085:'+rel],cwd=ROOT,text=True)
         value=(ROOT/rel).read_text()
         if mutation and rel==mutation[0]:
@@ -588,33 +588,33 @@ def wc_recovery(path, bios=0, old=False, mutation=None):
             value=value.replace(anchor,replacement,1)
         return value
     def stage(tmp,sources):
-        gui=read('kernel/gui.c')
+        gui=read('sys/kern/gui.c')
         (tmp/'geforce_gui_notice.inc').write_text(gui[gui.index('void gui_display_failed(void)'):])
-        source=(ROOT/'drivers/video/geforce/geforce_module.c').read_text()
+        source=(ROOT/'sys/dev/video/geforce/geforce_module.c').read_text()
         start=source.index('int geforce_boot_reserve(void)')
         (tmp/'geforce_reserve.inc').write_text(source[start:source.index('static int geforce_return(',start)])
         cases=(ROOT/'tools/tests/geforce_core_cases.inc').read_text()
         cases=cases.replace('int geforce_wc_start(void) { return 0; }\nint geforce_wc_stop(void) { return 0; }\nvoid geforce_wc_report(const char *s) { (void)s; }','')
         cases += '\n#include "gf_wc_recovery_host.inc"\n'
         (tmp/'geforce_recovery_cases.inc').write_text(cases)
-        body=(ROOT/'drivers/video/geforce/geforce_body.c').read_text()
+        body=(ROOT/'sys/dev/video/geforce/geforce_body.c').read_text()
         (tmp/'geforce_body.inc').write_text(ownerless_body(body, bind_f3=False))
-        wc=(ROOT/'drivers/video/geforce/gf_wc.c').read_text()
-        arch=(ROOT/'arch/x86/kernel/video_wc.c').read_text()
+        wc=(ROOT/'sys/dev/video/geforce/gf_wc.c').read_text()
+        arch=(ROOT/'sys/arch/x86/kernel/video_wc.c').read_text()
         (tmp/'gf_wc_stop.inc').write_text(function(arch,'arch_video_wc_stop')+'\n'+function(wc,'geforce_wc_stop'))
         exc=exec_source(ROOT)
         constants='\n'.join(l for l in exc.splitlines() if l.startswith(
             ('#define EXEC_LJ_', 'static volatile int g_pending_', 'static volatile int g_longjmp_')))
         names=('exec_notify_owned','exec_reclaim_owned','exec_finish','exec_pending_transfer',
                'exec_pending_finish','exec_fault_recover')
-        gui_facade=next(l for l in (ROOT/'exec/exec_gui.h').read_text().splitlines() if l.startswith('static inline void exec_gui_owner_exit'))
+        gui_facade=next(l for l in (ROOT/'sys/kern/exec/exec_gui.h').read_text().splitlines() if l.startswith('static inline void exec_gui_owner_exit'))
         (tmp/'gf_wc_fault_path.inc').write_text(function(gui,'gui_owner_exit')+'\n'+gui_facade+'\n'+constants+'\n'+
             '\n'.join(function(exc,n) for n in names))
         backend=tmp/'backend.c'
-        backend.write_text(read('drivers/video/geforce/backend_geforce.c').replace('"../../../gfx/', '"gfx/'))
-        sources.extend([backend, ROOT/'tools/tests/recover_gf_dev_stub.c', ROOT/'tools/tests/gf_accel_unbound_stubs.c', ROOT/'hwdev/gf/service.c', ROOT/'hwdev/gf/accel_surface.c', ROOT/'hwdev/gf/display/modes.c'])
+        backend.write_text(read('sys/dev/video/geforce/backend_geforce.c').replace('"../../../gfx/', '"gfx/'))
+        sources.extend([backend, ROOT/'tools/tests/recover_gf_dev_stub.c', ROOT/'tools/tests/gf_accel_unbound_stubs.c', ROOT/'sys/dev/video/geforce/service.c', ROOT/'sys/dev/video/geforce/accel_surface.c', ROOT/'sys/dev/video/geforce/display/modes.c'])
         asm=tmp/'setjmp.o'
-        subprocess.run(['nasm','-f','elf32',str(ROOT/'arch/x86/kernel/setjmp.asm'),'-o',str(asm)],cwd=ROOT,check=True)
+        subprocess.run(['nasm','-f','elf32',str(ROOT/'sys/arch/x86/kernel/setjmp.asm'),'-o',str(asm)],cwd=ROOT,check=True)
         sources.append(asm)
         transfer=tmp/'transfer.c'
         transfer.write_text('int gf_present_rect(void *a, unsigned b, void *c, unsigned d, void *e, int x, int y, int w, int h, void *p, void *o) { (void)a;(void)b;(void)c;(void)d;(void)e;(void)x;(void)y;(void)w;(void)h;(void)p;(void)o;return 0;}')
@@ -637,9 +637,9 @@ def main():
     for path in range(3):
         for bios in range(2): wc_recovery(path,bios)
     wc_lifecycle()
-    present_store_width(ROOT/'drivers/video/geforce/gf_present.c')
+    present_store_width(ROOT/'sys/dev/video/geforce/gf_present.c')
     present_trace()
-    present_store_width(ROOT/'drivers/video/geforce/gf_present.c', byte=True)
+    present_store_width(ROOT/'sys/dev/video/geforce/gf_present.c', byte=True)
     present_trace(byte=True)
     if '--mutate' in sys.argv:
         component('backend_geforce', ('-DOS32_GEFORCE_MODULE',), ('rc, stage, last, state, epoch, seq, ch_rc);', 'rc, stage, last, state, epoch, seq, 0); (void)ch_rc;'))
@@ -650,13 +650,13 @@ def main():
         core(fail_boot=True,mutation='reserve-drop')
         core(bar2_bytes=0x400000,mutation='instmem-overrun')
         core(diagnostic=True,mutation='gui-boot-reserve')
-        wc_recovery(0,mutation=('drivers/video/geforce/backend_geforce.c', '    if (!ok && active) geforce_fail();', '    (void)ok;'))
-        wc_recovery(2,mutation=('kernel/gui.c', '        if (kind != EXEC_KIND_EXITED) gfx_shutdown();', '        (void)kind;'))
+        wc_recovery(0,mutation=('sys/dev/video/geforce/backend_geforce.c', '    if (!ok && active) geforce_fail();', '    (void)ok;'))
+        wc_recovery(2,mutation=('sys/kern/gui.c', '        if (kind != EXEC_KIND_EXITED) gfx_shutdown();', '        (void)kind;'))
         for mutation in ('wc-load','wc-stop','wc-stop-normal','wc-repeat','wc-start','wc-alias','wc-flags','wc-capability','wc-vendor'): wc_lifecycle(mutation)
         for mutation in ('bounds', 'point'): present_trace(mutation)
         for mutation in ('alignment', 'tail'):
-            present_store_width(ROOT/'drivers/video/geforce/gf_present.c', mutation)
-        present_store_width(ROOT/'drivers/video/geforce/gf_present.c', 'byte', byte=True)
+            present_store_width(ROOT/'sys/dev/video/geforce/gf_present.c', mutation)
+        present_store_width(ROOT/'sys/dev/video/geforce/gf_present.c', 'byte', byte=True)
     unsafe_console()
     product()
     module_registration()

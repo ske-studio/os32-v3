@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """H5: production CPU/PTE checks and single video WC lease with host primitives."""
 CHECK = dict(name='sep5-wc-host', tier=1,
-    covers=['arch/x86/video/gf_accept_cpu.c', 'arch/ppc/video/gf_accept_cpu.c', 'arch/x86/kernel/video_wc.c', 'arch/ppc/video_wc.c', 'include/video_wc.h',
-            'drivers/video/geforce/gf_wc.c', 'tools/tests/test_sep5_wc.py',
+    covers=['sys/arch/x86/video/gf_accept_cpu.c', 'sys/arch/ppc/video/gf_accept_cpu.c', 'sys/arch/x86/kernel/video_wc.c', 'sys/arch/ppc/video_wc.c', 'sys/include/video_wc.h',
+            'sys/dev/video/geforce/gf_wc.c', 'tools/tests/test_sep5_wc.py',
             'tools/tests/gf_wc_host.c', 'tools/tests/recover_gf_dev_stub.c', 'tools/tests/kernel_includes.py',
             'tools/tests/gf_ownerless_fixture.py', 'tools/tests/gf_startlog_host.h',
-            'tools/tests/legacy_guest_fake.h', 'include/legacy_guest.h',
-            'drivers/video/geforce/geforce_body.c', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/backend_geforce.c',
-            'hwdev/gf/accel.h', 'gfx/gfx_policy.h', 'gfx/gfx_osri_view.h',
-            'arch/x86/kernel/mtrr_wc.c', 'arch/x86/kernel/mtrr_wc.h',
+            'tools/tests/legacy_guest_fake.h', 'sys/include/legacy_guest.h',
+            'sys/dev/video/geforce/geforce_body.c', 'sys/dev/video/geforce/geforce_module.c', 'sys/dev/video/geforce/backend_geforce.c',
+            'sys/dev/video/geforce/accel.h', 'sys/hal/gfx/gfx_policy.h', 'sys/kern/gfx/osri/gfx_osri_view.h',
+            'sys/arch/x86/kernel/mtrr_wc.c', 'sys/arch/x86/kernel/mtrr_wc.h',
             'tools/tests/test_mtrr_wc.py', 'tools/tests/host32.py'],
     needs=[], budget=12.0,
     basis=['PPC_SEP5_DESIGN §2.2'],
@@ -28,11 +28,11 @@ FLAGS = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
 INCLUDES = include_flags(ROOT)
 
 def wc_lifecycle(mutation=None):
-    source=(ROOT/'arch/x86/kernel/video_wc.c').read_text()
-    gpu=(ROOT/'drivers/video/geforce/gf_wc.c').read_text()
-    body=(ROOT/'drivers/video/geforce/geforce_body.c').read_text()
-    module=(ROOT/'drivers/video/geforce/geforce_module.c').read_text()
-    backend=(ROOT/'drivers/video/geforce/backend_geforce.c').read_text()
+    source=(ROOT/'sys/arch/x86/kernel/video_wc.c').read_text()
+    gpu=(ROOT/'sys/dev/video/geforce/gf_wc.c').read_text()
+    body=(ROOT/'sys/dev/video/geforce/geforce_body.c').read_text()
+    module=(ROOT/'sys/dev/video/geforce/geforce_module.c').read_text()
+    backend=(ROOT/'sys/dev/video/geforce/backend_geforce.c').read_text()
     targets={
         'wc-load': ('module', '    if (context.platform && context.platform->wc_start) (void)context.platform->wc_start();', ''),
         'wc-stop': ('body', 'int rc = !identify() && p && p->wc_stop ? p->wc_stop() : 0;', 'int rc = 0; (void)p;'),
@@ -65,8 +65,8 @@ def wc_lifecycle(mutation=None):
         end=module.index('    return 0;', start)
         call=module[start:end].replace('context.platform', 'ctx.platform')
         harness=harness.replace('static void load(void)', 'static void wc_registered_start(void)\n{\n'+call+'\n}\nstatic void load(void)')
-        harness=harness.replace('"../../drivers/video/geforce/geforce_body.c"','"geforce_body.inc"')
-        harness=harness.replace('"../../drivers/video/geforce/backend_geforce.c"','"backend.inc"')
+        harness=harness.replace('"../../sys/dev/video/geforce/geforce_body.c"','"geforce_body.inc"')
+        harness=harness.replace('"../../sys/dev/video/geforce/backend_geforce.c"','"backend.inc"')
         (tmp/'host.c').write_text(harness)
         (tmp/'legacy_guest_fake.h').write_text((ROOT/'tools/tests/legacy_guest_fake.h').read_text())
         host32.build(FLAGS+INCLUDES+['-I'+str(ROOT),'-I'+str(ROOT/'arch/x86/kernel'),'-I'+td,'-Wno-unused-function',str(tmp/'host.c'),str(ROOT/'tools/tests/recover_gf_dev_stub.c'),'-o',str(exe)],check=True)

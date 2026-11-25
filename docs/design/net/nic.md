@@ -1,16 +1,16 @@
-# net/nic.c — 1 枚の NIC を link と LAN 版 SFS で共用する (選択・寿命・受信の振り分け)
+# sys/net/nic.c — 1 枚の NIC を link と LAN 版 SFS で共用する (選択・寿命・受信の振り分け)
 
 > 状態: **現行 (2026-11-18)** — 出所: NET_HOSTSVC_DESIGN・TASK_NET_HOSTSVC (要約して移した)
-ソース: `net/nic.c`・`net/nic.h`・`net/nic_rx.c`・`net/nic_rx.h`・`net/rx_work.c`・`net/rx_work.h`・`drivers/net/ne2000/nic_lgy98.c`・`drivers/net/ne2000/lgy98.c`・`drivers/net/e82557/nic_e82557.c`・`drivers/net/e82557/lan_module.c`・`drivers/net/e82557/lan_module.h`・`tools/lan_bridge.py`
+ソース: `sys/net/nic.c`・`sys/net/nic.h`・`sys/net/nic_rx.c`・`sys/net/nic_rx.h`・`sys/net/rx_work.c`・`sys/net/rx_work.h`・`sys/dev/net/ne2000/nic_lgy98.c`・`sys/dev/net/ne2000/lgy98.c`・`sys/dev/net/e82557/nic_e82557.c`・`sys/dev/net/e82557/lan_module.c`・`sys/dev/net/e82557/lan_module.h`・`tools/lan_bridge.py`
 
 全体の形は `docs/design/net/README.md` の「Host Services の LAN の経路」。
 
 ## 何をするか
 
-- NIC を受信するのはここだけ。link (`net/link.c`) と LAN 版 SFS (`fs/serialfs/sfs_lan.c`) は NIC を直接読まず、`net_rx_take()` で自分の待ち行列から取る。
+- NIC を受信するのはここだけ。link (`sys/net/link.c`) と LAN 版 SFS (`sys/fs/serialfs/sfs_lan.c`) は NIC を直接読まず、`net_rx_take()` で自分の待ち行列から取る。
 - 送信は `net_tx()` (Ethernet のフレーム全体、FCS なし)。待たない。0 = 受理、`AGAIN` = 後でもう一度、未 bind は `HOSTDOWN`。
 
-## 装置の選択と寿命 (`net/nic.c` が持つ)
+## 装置の選択と寿命 (`sys/net/nic.c` が持つ)
 
 | 口 | 契約 |
 |---|---|
@@ -19,10 +19,10 @@
 | `net_bind(ops)` | 起動中に 1 回。`link_init()` をここで呼び、tick (`net_jiffy`) は常駐で 1 回だけ登録する。`link_init` 自身は tick を登録しない (二重登録で link が初期化されなくなるため) |
 | `net_unbind()` | 受信の処理中なら遅らせる。`bound` を下ろしてから両方の待ち行列を捨て、最後に task で `release`。tick は登録したまま `bound` で門を閉じる |
 
-- 起動時の選択の上書き (82557 と LGY-98 を設定で選ぶ) は実装していない。結線 (`platform/pc98/kernel_boot_memory.inc` の `kernel_boot_hostsvc`) は `NET_NIC_AUTO` だけを使う。
+- 起動時の選択の上書き (82557 と LGY-98 を設定で選ぶ) は実装していない。結線 (`sys/platform/pc98/kernel_boot_memory.inc` の `kernel_boot_hostsvc`) は `NET_NIC_AUTO` だけを使う。
 - vmkernel は lan.mod の記号とリンクできない。82557 の adapter と netcd の登録口は `LanModuleApi` の表の欄 (`adapter`・`netcd_register`) を通す。表を変えたら `LAN_MODULE_API_SLOTS`・`LAN_MODULE_OPS_VERSION` を上げる。
 
-## 受信の振り分け (`net/nic_rx.c`)
+## 受信の振り分け (`sys/net/nic_rx.c`)
 
 - 待ち行列はプロトコルごとに 4 枠 × 1514B (FCS なしのフレーム全体) を静的に持つ (`NET_RX_SFS`・`NET_RX_LINK`、EtherType ではない論理の番号)。
 - `net_rx_demux_budget()` の判定の順: Ethernet の長さ → EtherType 0x88B5 → 固定 peer なら送り手 → 宛先 (自分宛て、または broadcast) → payload の先頭 3 バイト。

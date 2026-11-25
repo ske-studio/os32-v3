@@ -1,4 +1,4 @@
-# fs/fat/fatfs_vfs.c — FatFs の VFS 接続
+# sys/fs/fat/fatfs_vfs.c — FatFs の VFS 接続
 
 > 状態: **現行 (2026-10-31)**
 
@@ -30,7 +30,7 @@ VFS close から backend への通知は増やさない。
 
 - **名前フィールドの境界**: 隣接する配列でも一方の境界を越えて他方を読むと C の未定義動作になり、最適化で名前が壊れうる。
   名前と拡張子を別配列で扱うコードでは各配列を独立して参照する。
-  現行の列挙は FatFs が返す `fno.fname` を VFS 名へ写す (`fs/fat/fatfs_vfs.c`)。
+  現行の列挙は FatFs が返す `fno.fname` を VFS 名へ写す (`sys/fs/fat/fatfs_vfs.c`)。
   過去の固定長構造を現行 FatFs の契約とみなさない。直接の配列境界回帰は未確認。
 
 ## 「在るか」を問う入口の誤りの写像 (`ff_stat_to_vfs`)
@@ -53,4 +53,4 @@ VFS close から backend への通知は増やさない。
 
 ## 検査
 
-`vfs-mount-dev-host` の中の `tools/tests/test_fatfs_stat.py` (本体 `tools/tests/fatfs_stat_host.c`)。実物の `fs/fat/fatfs_vfs.c` を `#include` し、FatFs の関数だけを贋物にする (`f_stat` は次の `FRESULT` を返す、`f_readdir` は台本を 1 段ずつ返す)。stat の写像 7 件と列挙 4 件。実 FatFs が 8.3 に収まらない名前で `FR_INVALID_NAME` を返すことは贋物で仮定している。
+`vfs-mount-dev-host` の中の `tools/tests/test_fatfs_stat.py` (本体 `tools/tests/fatfs_stat_host.c`)。実物の `sys/fs/fat/fatfs_vfs.c` を `#include` し、FatFs の関数だけを贋物にする (`f_stat` は次の `FRESULT` を返す、`f_readdir` は台本を 1 段ずつ返す)。stat の写像 7 件と列挙 4 件。実 FatFs が 8.3 に収まらない名前で `FR_INVALID_NAME` を返すことは贋物で仮定している。

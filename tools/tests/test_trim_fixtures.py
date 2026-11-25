@@ -35,7 +35,7 @@ def run(mutate=False):
             host32.run([str(exe)], check=True, timeout=30)
             print('PASS actual trim_' + name + ' fixture', flush=True)
             if mutate and name == 'back':
-                original = (ROOT / 'userland/tests/trim_back.c').read_text()
+                original = (ROOT / 'userland/diag/trim_back.c').read_text()
                 for label, old, new, expected in MUTANTS:
                     assert original.count(old) == 1, label
                     (tmp / 'trim_back_source.c').write_text(original.replace(old, new))

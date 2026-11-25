@@ -35,7 +35,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'platform/powermac/gmac_dma.c').read_text()
+    original = (ROOT / 'sys/platform/powermac/gmac_dma.c').read_text()
     with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as directory:
         temp = Path(directory)
         source = temp / 'gmac_dma.c'

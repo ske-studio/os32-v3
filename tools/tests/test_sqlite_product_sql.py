@@ -7,13 +7,13 @@ Application SQL is prepared and finalized without stepping; schema DDL alone
 is stepped to resolve tables and subsequent statements in schema batches.
 """
 CHECK = dict(name='sqlite-product-sql', tier=1, needs=[], budget=21.2,
-    covers=['exec/os32x_hdr.c', 'include/diag_stack.h', 'arch/*/arch_diag_stack.h', 'tools/tests/test_sqlite_product_sql.py', 'tools/tests/sqlite_product_host.c',
+    covers=['sys/kern/exec/os32x_hdr.c', 'sys/include/diag_stack.h', 'arch/*/arch_diag_stack.h', 'tools/tests/test_sqlite_product_sql.py', 'tools/tests/sqlite_product_host.c',
             'tools/tests/hsync_sqlite_product_host.c', 'sdk/include/os32/**',
             'lib/sqlite3/os32_sqlite_vfs.c', 'tools/mk_settings_db.py',
             'assets/settings/defaults.tsv',
             'lib/sqlite3/sqlite3.c', 'lib/sqlite3/sqlite3.h',
             'lib/sqlite3/os32_sqlite_config.h', 'userland/**',
-            'kernel/fep_boot.c', 'kernel/ime/ime_*.c', 'kapi/kapi_db.c'],
+            'sys/kern/fep_boot.c', 'kernel/ime/ime_*.c', 'sys/kapi/kapi_db.c'],
     kind='characterization',
 )
 import argparse
@@ -51,7 +51,7 @@ def literals(source):
 def collect(mutant=None):
     paths = sorted(set(ROOT.glob('userland/**/*.[ch]')) |
                    set(ROOT.glob('kernel/ime/ime_*.c')) |
-                   {ROOT / 'kernel/fep_boot.c', ROOT / 'kapi/kapi_db.c'})
+                   {ROOT / 'sys/kern/fep_boot.c', ROOT / 'sys/kapi/kapi_db.c'})
     rows = []
     for path in paths:
         source = path.read_text()
@@ -70,11 +70,11 @@ def collect(mutant=None):
         if mutant == 'hsync' and path == ROOT / 'userland/system/hsync.c':
             assert source.count(ANCHOR) == 1
             source = source.replace(ANCHOR, 'length(CAST(tval AS BLOB))')
-        if mutant == 'fep-meta' and path == ROOT / 'userland/tests/fep_meta_test.c':
+        if mutant == 'fep-meta' and path == ROOT / 'userland/diag/fep_meta_test.c':
             anchor = "SELECT ''||ival FROM settings"
             assert source.count(anchor) == 1
             source = source.replace(anchor, 'SELECT CAST(ival AS TEXT) FROM settings')
-        if mutant == 'fep-meta-value' and path == ROOT / 'userland/tests/fep_meta_test.c':
+        if mutant == 'fep-meta-value' and path == ROOT / 'userland/diag/fep_meta_test.c':
             anchor = "SELECT value FROM meta WHERE key='%s'"
             assert source.count(anchor) == 1
             source = source.replace(anchor, "SELECT CAST(value AS TEXT) FROM meta WHERE key='%s'")
@@ -95,11 +95,11 @@ def collect(mutant=None):
     assert any(ANCHOR in s or 'CAST(tval AS BLOB)' in s for _, _, s in rows)
     required = {'userland/system/hsync.c', 'userland/lib/cfg/cfg_init.c',
                 'userland/lib/cfg/libos32cfg.c', 'userland/lib/cfg/cfg_enum.c',
-                'kernel/fep_boot.c', 'kernel/ime/ime_dict.c',
-                'kernel/ime/ime_dict_info.c', 'kernel/ime/ime_user_store.c',
-                'kapi/kapi_db.c', 'userland/tests/db_v50_test.c',
-                'userland/tests/db_test.c', 'userland/tests/dbq.c',
-                'userland/tests/raw_wait_test.c', 'userland/tests/fep_meta_test.c'}
+                'sys/kern/fep_boot.c', 'sys/kern/ime/ime_dict.c',
+                'sys/kern/ime/ime_dict_info.c', 'sys/kern/ime/ime_user_store.c',
+                'sys/kapi/kapi_db.c', 'userland/diag/db_v50_test.c',
+                'userland/diag/db_test.c', 'userland/diag/dbq.c',
+                'userland/diag/raw_wait_test.c', 'userland/diag/fep_meta_test.c'}
     assert required <= {p for p, _, _ in rows}
     return rows
 
@@ -191,7 +191,7 @@ def check_sql(engine, rows):
                 ddl = [s for s in cfg_ddl if 'CREATE TABLE settings' in s] + ime_ddl
             for schema in ddl:
                 engine.prepare(db, schema, execute=True)
-            if '/ime_' in path or path in ('kernel/fep_boot.c', 'userland/tests/fep_meta_test.c'):
+            if '/ime_' in path or path in ('sys/kern/fep_boot.c', 'userland/diag/fep_meta_test.c'):
                 engine.prepare(db, 'CREATE TABLE dict(yomi TEXT,kanji TEXT,pos_id INTEGER,cost INTEGER)', execute=True)
             if not sql.startswith('CREATE '):
                 try:
@@ -272,8 +272,8 @@ def main():
         check_settings(engine, work, args.settings_copy)
         if args.mutate:
             for mutant, path in [('hsync', 'userland/system/hsync.c'),
-                                 ('fep-meta', 'userland/tests/fep_meta_test.c'),
-                                 ('fep-meta-value', 'userland/tests/fep_meta_test.c')]:
+                                 ('fep-meta', 'userland/diag/fep_meta_test.c'),
+                                 ('fep-meta-value', 'userland/diag/fep_meta_test.c')]:
                 try:
                     check_sql(engine, collect(mutant))
                 except AssertionError as err:

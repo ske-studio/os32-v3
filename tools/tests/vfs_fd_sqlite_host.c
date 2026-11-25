@@ -9,7 +9,7 @@ u32 kstrlen(const char *s);
 #ifndef OS32_SQLITE_DIRECT_TEST
 u32 kstrlen(const char *s) { return (u32)strlen(s); }
 #endif
-/* Match lib/kstring_c.c / kstring_asm.asm: capacity includes NUL, no padding. */
+/* Match sys/kern/kstring_c.c / kstring_asm.asm: capacity includes NUL, no padding. */
 char *kstrlcpy(char *dst, const char *src, u32 size)
 {
     u32 i;
@@ -21,7 +21,7 @@ char *kstrlcpy(char *dst, const char *src, u32 size)
 /* Routing/backend fixtures previously used the FD source's private helper. */
 static void str_cpy(char *dst, const char *src, int size)
 { kstrlcpy(dst, src, (u32)size); }
-#include "../../fs/vfs_fd.c"
+#include "../../sys/fs/vfs_fd.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); exit(1); \
@@ -32,7 +32,7 @@ static int mock_fs_calls;
  * (vfs_open_sqlite が広域 owner を動かさないことの確認)。S0-K の
  * kapi_db_v50_host.c だけが owner を渡り歩くのでここも一緒に動かす。 */
 static int resolve_owner = 2;
-/* 相対名に前置する cwd。fs/vfs.c の vfs_resolve_path は cwd + "/" + input を
+/* 相対名に前置する cwd。sys/fs/vfs.c の vfs_resolve_path は cwd + "/" + input を
  * VFS_MAX_PATH の作業バッファで連結して**切り詰めてから** `.` / `..` を畳む
  * ので、「入力は短いが解決名は上限」「溢れた入力が別の絶対名に化ける」の
  * どちらも作れる。F2a/F2b は "" のまま (絶対名しか渡さない)。 */
@@ -40,7 +40,7 @@ static const char *resolve_cwd = "";
 static VfsOps mock_ops;
 int res_owner_get(void) { return current_owner; }
 void res_owner_set(int owner) { owner_sets++; current_owner = owner; }
-/* fs/vfs.c の vfs_resolve_path の移植 (票 TASK_VFS_FD_PATH 以降の形)。
+/* sys/fs/vfs.c の vfs_resolve_path の移植 (票 TASK_VFS_FD_PATH 以降の形)。
  * 以前の写しは「cwd と input を VFS_MAX_PATH の tmp へ連結して切り詰めてから
  * 畳む」旧実装をなぞり、Codex 往復 3 の反例 (切り詰めた末尾が別の絶対名に
  * 化ける) を作れるようにしていた。実物は切り詰めずに断るようになったので、
@@ -124,7 +124,7 @@ VfsOps *vfs_route(const char *path, char *out, int size, void **ctx)
 { probes++; str_cpy(out, path, size); *ctx = &mock_ops; return &mock_ops; }
 #endif
 int vfs_path_kind(const char *path) { probes++; return VFS_KIND_FILE; }
-/* fs/vfs.c 側の実装 (マウント単位の st_dev)。ここでは固定値で足りる */
+/* sys/fs/vfs.c 側の実装 (マウント単位の st_dev)。ここでは固定値で足りる */
 u32 vfs_path_dev(const char *path) { return 1; }
 u32 vfs_path_mount_generation(const char *path) { return 1; }
 static int mock_size(void *ctx, const char *path, u32 *size)

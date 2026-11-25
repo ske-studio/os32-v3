@@ -4,7 +4,7 @@
 #include "gf_startlog_host.h"
 static void close_display(void);
 #ifdef OS32_GEFORCE_MODULE
-#include "hwdev/gf/accel.h"
+#include "sys/dev/video/geforce/accel.h"
 void gf_hook_scan_bind(bool active, const struct gf3_surface *scan)
 { if (active || scan) __builtin_trap(); }
 static int hook_fill_calls, hook_blit_calls;
@@ -61,7 +61,7 @@ static int fake_pal(struct video_device *d, u32 first, u32 count, const u8 *rgb)
 #define pc98_route_cell_check fake_cell
 #define pc98_route_to_gf fake_gf
 #define pc98_route_to_98 fake_98
-#include "../../drivers/video/geforce/backend_geforce.c"
+#include "../../sys/dev/video/geforce/backend_geforce.c"
 #ifdef OS32_GEFORCE_MODULE
 static struct gf2_chan log_chan;
 static struct gf4_ctx log_ctx;

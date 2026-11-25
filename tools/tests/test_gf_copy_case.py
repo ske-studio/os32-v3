@@ -3,10 +3,10 @@ CHECK = dict(name='gf-copy-case-host', tier=1, needs=[], budget=3.4,
     covers=['tools/tests/recover_gf_dev_stub.c', 'tools/tests/test_gf_copy_case.py', 'tools/tests/gf_copy_case_host.c',
             'tools/tests/gf_command_runtime_host.h', 'tools/tests/gf_command_host.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
-            'kdebug/gf_accel_test.c', 'kdebug/*.h', 'hwdev/gf/*.h',
+            'sys/dev/video/geforce/diag/gf_accel_test.c', 'kdebug/*.h', 'hwdev/gf/*.h',
             'hwdev/gf/display/*.h', 'hwdev/*.h', 'include/**', 'mm/*.h',
             'gfx/*.h', 'drivers/video/geforce/*.h', 'drivers/pci/*.h',
-            'lib/serial_diag.h', 'lib/crc32_core.inc', 'kernel/irq/irq.h'],
+            'lib/serial_diag.h', 'lib/crc32_core.inc', 'sys/kern/irq/irq.h'],
     basis=['GF_FEAT3_DESIGN §5', 'GF_FEAT3_DESIGN §13'],
 )
 
@@ -38,9 +38,9 @@ def execute(exe, green, label):
 
 
 MUTATIONS = [
-    ('original-11th-pitch', 'kdebug/gf_accel_test.c',
+    ('original-11th-pitch', 'sys/dev/video/geforce/diag/gf_accel_test.c',
      '#define TEST_COPY_DST_PITCH (3U * 64U)', '#define TEST_COPY_DST_PITCH 40U'),
-    ('missing-copy-input', 'kdebug/gf_accel_test.c',
+    ('missing-copy-input', 'sys/dev/video/geforce/diag/gf_accel_test.c',
      'serial_puts_polled("GF3 copy input");', 'serial_puts_polled("GF3 wrong input");'),
 ]
 

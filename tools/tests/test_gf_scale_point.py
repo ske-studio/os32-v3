@@ -3,10 +3,10 @@ CHECK = dict(name='gf-scale-point-host', tier=1, needs=[], budget=3.4,
     covers=['tools/tests/recover_gf_dev_stub.c', 'tools/tests/test_gf_scale_point.py', 'tools/tests/gf_scale_point_host.c',
             'tools/tests/gf_command_runtime_host.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
-            'kdebug/gf_accel_test.c', 'kdebug/*.h', 'hwdev/gf/*.h',
+            'sys/dev/video/geforce/diag/gf_accel_test.c', 'kdebug/*.h', 'hwdev/gf/*.h',
             'hwdev/gf/display/*.h', 'hwdev/*.h', 'include/**', 'mm/*.h',
             'gfx/*.h', 'drivers/video/geforce/*.h', 'drivers/pci/*.h',
-            'lib/serial_diag.h', 'lib/crc32_core.inc', 'kernel/irq/irq.h'],
+            'lib/serial_diag.h', 'lib/crc32_core.inc', 'sys/kern/irq/irq.h'],
     basis=['GF_FEAT3_DESIGN §8', 'GF_FEAT3_DESIGN §13'],
 )
 
@@ -20,7 +20,7 @@ import mutpar
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-MUTATION = ('point-floor', 'kdebug/gf_accel_test.c',
+MUTATION = ('point-floor', 'sys/dev/video/geforce/diag/gf_accel_test.c',
             'u32 point_bias = bilinear ? 0U : TEST_FRAC_ONE / 2U;',
             'u32 point_bias = 0U;')
 

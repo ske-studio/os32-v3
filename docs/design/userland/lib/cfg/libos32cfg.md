@@ -68,7 +68,7 @@ DELETE journal で rollback・I/O 失敗の伝播・通常の再 open の整合�
 
 ## 組み立て
 
-- KAPI の呼び出しは関数ポインタ表 `CfgBackend` (`cfg_internal.h`) に集める。ゲストの実体は `cfg_backend.c` (`kapi->db_*`)、ホスト試験は `cfg_backend_platform` を差し替えて実物の `kapi/kapi_db.c` へ向ける。library 本体に `#ifdef` の分岐は無い。
+- KAPI の呼び出しは関数ポインタ表 `CfgBackend` (`cfg_internal.h`) に集める。ゲストの実体は `cfg_backend.c` (`kapi->db_*`)、ホスト試験は `cfg_backend_platform` を差し替えて実物の `sys/kapi/kapi_db.c` へ向ける。library 本体に `#ifdef` の分岐は無い。
 - `libos32cfg.a` は翻訳単位を分ける: `libos32cfg.c` (open・get・set・txn)・`cfg_enum.c`・`cfg_tsv.c`・`cfg_init.c`・`cfg_import.c`・`cfg_json.c`・`cfg_backend.c`。読むだけのアプリ (libos32gui の `cfgro.rs`、gshell の起動時の読み込み) が列挙・生成の作業領域 (静的配列) を引き込まないため。
 
 ## schema の検査
@@ -111,4 +111,4 @@ DELETE journal で rollback・I/O 失敗の伝播・通常の再 open の整合�
 
 ## 検査
 
-`tools/tests/test_cfg.py` (本体 `tools/tests/cfg_host.c`): 実物の library・`userland/cmds/cfg.c`・`kapi/kapi_db.c`・SQLite・RAM の VFS を組み、`missing`・`corrupt`・`version`・`types`・`roundtrip`・`txn`・`limits`・`enum`・`meta`・`shm_copy`・`init`・`rename`・`tsv`・`args`・`cmd`・`list_big` などを見る。`--target` で i386-elf の `-Werror`、`--sanitize` で ASan と符号付き桁あふれ。
+`tools/tests/test_cfg.py` (本体 `tools/tests/cfg_host.c`): 実物の library・`userland/cmds/cfg.c`・`sys/kapi/kapi_db.c`・SQLite・RAM の VFS を組み、`missing`・`corrupt`・`version`・`types`・`roundtrip`・`txn`・`limits`・`enum`・`meta`・`shm_copy`・`init`・`rename`・`tsv`・`args`・`cmd`・`list_big` などを見る。`--target` で i386-elf の `-Werror`、`--sanitize` で ASan と符号付き桁あふれ。

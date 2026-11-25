@@ -2,7 +2,7 @@
 > 状態: **現行 (2026-11-18)** — 出所: TASK_DBGREF (§3-2・§3-6・§4) の契約を今のソースと照らして要約
 ソース: `tools/mkmod.py` (`build`・`pair_crc`・`main`)・`tools/module_schema.py` (`COMPONENTS`)
 
-VA 0 で `--emit-relocs` 付きでリンクした i386 ELF から、`/boot` の部品 (KMOD v1) の容器を作る。容器の形式の正典は `docs/08_build.md` §8-2「起動時に読む部品の形式 (KMOD v1)」、読む側の検査は `kernel/module/module_image.c`。
+VA 0 で `--emit-relocs` 付きでリンクした i386 ELF から、`/boot` の部品 (KMOD v1) の容器を作る。容器の形式の正典は `docs/08_build.md` §8-2「起動時に読む部品の形式 (KMOD v1)」、読む側の検査は `sys/kern/module/module_image.c`。
 作る側の合格は、ディスクから読んだ像が同じ内容である保証にはならないので、読む側も全部を検査し直す。
 
 ## 入力と世代

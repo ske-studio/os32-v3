@@ -10,7 +10,7 @@ static void bundle_root_check(unsigned long root);
 #include "display_provider.h"
 #include "surface_query.h"
 #include "v86_mem.h"
-#include "../../platform/pc98/legacy/lowmap.c"
+#include "../../sys/platform/pc98/legacy/lowmap.c"
 #include "platform_emergency.h"
 #include "memmap.h"
 #include "platform_boot_layout.h"

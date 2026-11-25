@@ -1,9 +1,9 @@
-"""FD のトラック単位の読み出し (drivers/block/fdc_track.c + drivers/block/fdc.c) のホスト試験。
+"""FD のトラック単位の読み出し (sys/dev/block/fdc_track.c + sys/dev/block/fdc.c) のホスト試験。
 
 記録: tools/tests/fdc_track_tdd.md
 票  : docs/archive/realhw_v21/TASK_FDC_REALHW.md (実機 PC-9821Ra266 の FD 起動が遅い件)
 
-実物の drivers/block/fdc_track.c / fdc_decide.c / fdc.c を 1 行も写さずに #include
+実物の sys/dev/block/fdc_track.c / fdc_decide.c / fdc.c を 1 行も写さずに #include
 して回す。fdc.c のポートは tools/tests/fdc_hostshim/io.h が試験側の µPD765A
 の模型へ回し、tick_count は既定 10ms 刻み、整定試験では 1ms 刻みの時計に差し替える。
 
@@ -17,7 +17,7 @@
 ない変異) は SURVIVED でなければならない。
 """
 CHECK = dict(name='fdc-track-host', tier=1,
-    covers=['lib/dma_contract.c', 'include/dma_contract.h', 'drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc_command.inc', 'drivers/block/fdc_sector_transfer.inc', 'drivers/block/fdc.h', 'kernel/irq/irq.c', 'kernel/irq/irq.h', 'kernel/irq/irq_math.c', 'kernel/irq/irq_math.h', 'arch/x86/kernel/idt.c', 'arch/x86/kernel/idt.h', 'arch/x86/kernel/isr_handlers.c', 'platform/pc98/kernel.c', 'arch/x86/kernel/isr_stub.asm', 'arch/x86/kernel/iret_user.inc', 'tools/tests/fdc_hostshim/**', 'drivers/block/fdc_decide.c', 'drivers/block/fdc_track.c', 'drivers/block/fat_diskio.c', 'fs/fat/fatfs/ff.c', 'fs/fat/fatfs_vfs.c', 'tools/tests/fdc_track_host.c', 'drivers/dma/dma8237_math.c', 'tools/check_artifacts.py', 'include/clock_service.h', 'kernel/time/clock_service.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['lib/dma_contract.c', 'sys/include/dma_contract.h', 'sys/dev/block/fdc.c', 'sys/dev/block/fdc_io.inc', 'sys/dev/block/fdc_seek_reset.inc', 'sys/dev/block/fdc_transfer.inc', 'sys/dev/block/fdc_command.inc', 'sys/dev/block/fdc_sector_transfer.inc', 'sys/dev/block/fdc.h', 'sys/kern/irq/irq.c', 'sys/kern/irq/irq.h', 'sys/kern/irq/irq_math.c', 'sys/kern/irq/irq_math.h', 'sys/arch/x86/kernel/idt.c', 'sys/arch/x86/kernel/idt.h', 'sys/arch/x86/kernel/isr_handlers.c', 'sys/platform/pc98/kernel.c', 'sys/arch/x86/kernel/isr_stub.asm', 'sys/arch/x86/kernel/iret_user.inc', 'tools/tests/fdc_hostshim/**', 'sys/dev/block/fdc_decide.c', 'sys/dev/block/fdc_track.c', 'sys/dev/block/fat_diskio.c', 'sys/fs/fat/fatfs/ff.c', 'sys/fs/fat/fatfs_vfs.c', 'tools/tests/fdc_track_host.c', 'sys/dev/dma/dma8237_math.c', 'tools/check_artifacts.py', 'sys/hal/time/clock_service.h', 'sys/hal/time/clock_service.c', 'sys/include/platform_irq.h', 'sys/platform/pc98/pic.c', 'sys/include/platform_device.h', 'sys/include/ide_contract.h', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=4.7,
     basis=['[HW2]'],
 )
@@ -34,8 +34,8 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/fdc_track_host.c"
 SHIM = ROOT / "tools/tests/fdc_hostshim"
-SOURCES = ["drivers/block/fdc_track.c", "drivers/block/fdc.c", "drivers/block/fdc_decide.c",
-           "drivers/block/fat_diskio.c"]
+SOURCES = ["sys/dev/block/fdc_track.c", "sys/dev/block/fdc.c", "sys/dev/block/fdc_decide.c",
+           "sys/dev/block/fat_diskio.c"]
 
 CASES = ["fdc_irq_registration", "split_2hd", "split_144", "readahead_count1", "cross_boundary",
          "fallback_single", "single_fail", "cache_rules", "oversize_geom",
@@ -203,7 +203,7 @@ def font_bounds(img, spt=8, heads=2):
 
 def check_read_stream_shape():
     """VFS と font_replay が同じ製品 rc_read を通すことを確認する。"""
-    src = (ROOT / "fs/fat/fatfs_vfs.c").read_text(encoding="utf-8")
+    src = (ROOT / "sys/fs/fat/fatfs_vfs.c").read_text(encoding="utf-8")
     def body(name):
         m = re.search(r"static int " + name + r"\(.*?\n\}", src, re.S)
         return m.group(0) if m else ""
@@ -217,13 +217,13 @@ def check_read_stream_shape():
     return (re.search(r"rc_read\(&fc->read_cache,.*?stream \? \(FSIZE_t\)offset : 0, &br\)",
                       helper, re.S) is not None
             and '#include "fatfs_vfs_read_cache.inc"' in src
-            and '#include "../../fs/fat/fatfs_vfs_read_cache.inc"' in replay
+            and '#include "../../sys/fs/fat/fatfs_vfs_read_cache.inc"' in replay
             and 'rc_read(&s_read_cache,' in replay)
 
 
 def check_irq_entry():
     """D1a の配線: 共通入口だけが深さ管理と配送を担い、EOI は C 側。"""
-    asm = (ROOT / "arch/x86/kernel/isr_stub.asm").read_text()
+    asm = (ROOT / "sys/arch/x86/kernel/isr_stub.asm").read_text()
     common = asm.split('%macro IRQ_COMMON 1', 1)[1].split('%endmacro', 1)[0]
     code = "\n".join(line.split(';;', 1)[0].strip() for line in common.splitlines())
     order = ['IRQ_ENTER', 'cld', 'call    irq_dispatch', 'IRQ_LEAVE', 'IRETD_USER']
@@ -231,11 +231,11 @@ def check_irq_entry():
     assert not re.search(r'\b(?:out|V86_REFLECT)\b', code)
     assert len(re.findall(r'^IRQ_COMMON 11\s', asm, re.M)) == 1
     assert 'irq_stub_11' not in asm and 'fdc_irq_handler' not in asm
-    idt = (ROOT / "arch/x86/kernel/idt.c").read_text()
+    idt = (ROOT / "sys/arch/x86/kernel/idt.c").read_text()
     assert re.search(r'idt_set_gate\(IRQ_TO_INT\(11\), irq_stub_common_11,', idt)
-    assert 'irq_enable(FDC_IRQ)' not in (ROOT / "platform/pc98/kernel.c").read_text()
-    assert 'fdc_irq' not in (ROOT / "arch/x86/kernel/isr_handlers.c").read_text()
-    assert 'fdc_irq_fired' not in (ROOT / "drivers/block/fdc.h").read_text()
+    assert 'irq_enable(FDC_IRQ)' not in (ROOT / "sys/platform/pc98/kernel.c").read_text()
+    assert 'fdc_irq' not in (ROOT / "sys/arch/x86/kernel/isr_handlers.c").read_text()
+    assert 'fdc_irq_fired' not in (ROOT / "sys/dev/block/fdc.h").read_text()
     print('IRQ11 common entry / no V86 reflection / single EOI owner PASS', flush=True)
 
 
@@ -275,96 +275,96 @@ def includes(first=None):
 # (ファイル, パターン, 置換, 説明)。複数ファイルはパターンと同じ順のタプル。
 # 最後の 1 本は対照 (何も変えない)。
 MUTATIONS = [
-    # --- 区切り・先読み・読み直し (drivers/block/fdc_track.c)
-    ("drivers/block/fdc_track.c",
+    # --- 区切り・先読み・読み直し (sys/dev/block/fdc_track.c)
+    ("sys/dev/block/fdc_track.c",
      r"in_track = \(count < left\) \? count : left;",
      "in_track = (count < left + 1) ? count : left + 1;",
      "トラックの境目を 1 つ越えて切る (EOT を越えたコマンドを出す)"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"left = spt - \(lba % spt\);",
      "left = spt * heads - (lba % (spt * heads));",
      "ヘッドの境目で切らない (MT 無しでヘッド 1 まで読もうとする)"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"if \(run->sect < t->first\) continue;",
      "",
      "持っていない手前のセクタを当てる"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"if \(t->geom != g\) continue;",
      "",
      "ジオメトリが変わっても中身を当てる"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"if \(t->drv != drv \|\| ",
      "if (",
      "別ドライブに中身を当てる"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"if \(t->gen != gen\) continue;",
      "",
      "世代 (書き込み / Ready 変化) が進んでも中身を当てる"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"            t->valid = 0;\n            mrc = \(eot > 0\)",
      "            mrc = (eot > 0)",
      "まとめ読みの前に捨てない (失敗しても古い中身が残る)"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"if \(fdc_track_read_singly\(ops, drv, g, &run, dst\) != 0\) \{\n                    return -1;",
      "if (1) {\n                    return -1;",
      "まとめ読みが失敗したら読み直さずに失敗にする"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"    return \(int\)g->spt;\n#else",
      "    return run->sect + run->count - 1;\n#else",
      "先読みしない (count=1 の連続が 1 セクタ 1 コマンドのまま)"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"if \(eot > want_last && fdc_track_is_bad\(c, drv, g, &run\)\) \{",
      "if (0) {",
      "先読みが落ちたトラックでも先読みを続ける (毎回失敗 + 1 セクタずつ)"),
     # --- セクタキャッシュ (2026-09-24 夕: VFS の開き直しで 4〜5 本を巡回)
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"int single = \(count == 1\);",
      "int single = 0;",
      "セクタキャッシュを使わない (6541ef1 の姿: 実物のフォントで multi 769)"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"if \(v < 0 \|\| c->sec\[j\]\.used < c->sec\[v\]\.used\) v = j;",
      "if (v < 0) v = j;",
      "セクタキャッシュが LRU でない (毎回使うディレクトリを追い出す)"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"if \(e->gen != gen \|\| e->geom != g\) continue;",
      "if (e->geom != g) continue;",
      "セクタキャッシュが世代を見ない (書いた後に古い中身)"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"if \(e->drv != drv \|\| e->lba != lba\) continue;",
      "if (e->drv != drv) continue;",
      "セクタキャッシュが LBA を見ない (別のセクタを返す)"),
-    # --- シークの省略・完了待ち (drivers/block/fdc.c)
-    ("drivers/block/fdc_seek_reset.inc",
+    # --- シークの省略・完了待ち (sys/dev/block/fdc.c)
+    ("sys/dev/block/fdc_seek_reset.inc",
      r"if \(drv >= 0 && drv < FDC_MAX_DRIVES && s_known_cyl\[drv\] == cyl\) \{\n        s_stats\.seek_skipped\+\+;\n        return 0;\n    \}",
      "",
      "同じシリンダでもシークする (直す前の姿)"),
-    ("drivers/block/fdc_seek_reset.inc",
+    ("sys/dev/block/fdc_seek_reset.inc",
      [(r"     \* 排水は pending 無しなら SIS 1 回 \(1 バイト応答\) で終わる。 \*/\n    \(void\)fdc_drain_interrupts\(\);",
        "     */"),
       (r"        s_stats\.seek_skipped\+\+;\n        return 0;\n    \}\n    fdc_forget_cyl\(drv\);",
        "        s_stats.seek_skipped++;\n        return 0;\n    }\n    (void)fdc_drain_interrupts();\n    fdc_forget_cyl(drv);")],
      None,
      "シークの省略を排水より先に置く (取り残しで INT 線が上がったまま)"),
-    ("drivers/block/fdc_seek_reset.inc",
+    ("sys/dev/block/fdc_seek_reset.inc",
      r"                s_stats\.sis_foreign\+\+;\n                continue;",
      "                s_stats.sis_foreign++;\n                break;",
      "1 本のエッジで 1 件しか読まない (別の通知の後ろの完了を期限まで待つ)"),
-    ("drivers/block/fdc_seek_reset.inc",
+    ("sys/dev/block/fdc_seek_reset.inc",
      r"    if \(\(u8\)\(st0 & FDC_ST0_IC_MASK\) == FDC_ST0_IC_RDYCHG\n        && \(st0 & FDC_ST0_SE\) == 0\) return 1;",
      "",
      "自ドライブの Ready 変化をシークの失敗として扱う"),
-    ("drivers/block/fdc_io.inc",
+    ("sys/dev/block/fdc_io.inc",
      r"        s_stats\.ready_change\+\+;\n        fdc_bump_gen\(d\);",
      "        s_stats.ready_change++;",
      "Ready 変化で世代を進めない (入れ替えた媒体に古い先読みを当てる)"),
-    ("drivers/block/fdc_sector_transfer.inc",
+    ("sys/dev/block/fdc_sector_transfer.inc",
      r"        fdc_bump_gen\(drv\);\n        s_stats\.writes\+\+;",
      "        s_stats.writes++;",
      "書き込みで世代を進めない (dev.c / KAPI の書き込みの後に古い先読み)"),
     # リセットの後は Ready 変化の通知も来て、SIS の側でも捨てる (三重)。
-    (("drivers/block/fdc_seek_reset.inc",
-      "drivers/block/fdc_seek_reset.inc",
-      "drivers/block/fdc_io.inc"),
+    (("sys/dev/block/fdc_seek_reset.inc",
+      "sys/dev/block/fdc_seek_reset.inc",
+      "sys/dev/block/fdc_io.inc"),
      [(r"    /\* ヘッドが動く。通るまでは知らないことにする。 \*/\n    fdc_note_drive\(drv\);\n    fdc_forget_cyl\(drv\);",
        "    fdc_note_drive(drv);"),
       (r"    /\* 2\. FDC をリセットして実行フェーズを畳む。覚えているシリンダも捨てる。 \*/\n    fdc_forget_all\(\);",
@@ -373,125 +373,125 @@ MUTATIONS = [
        "")],
      None,
      "リセットと RECALIBRATE で覚えた値を捨てない (RECALIBRATE が落ちても古い値を信じる)"),
-    ("drivers/block/fdc_transfer.inc",
+    ("sys/dev/block/fdc_transfer.inc",
      r"        fdc_abort_transfer\(\);\n        \(void\)fdc_recalibrate\(drv\);",
      "        fdc_abort_transfer();",
      "まとめ読みの失敗の後に RECALIBRATE しない"),
-    ("drivers/block/fdc.c",
+    ("sys/dev/block/fdc.c",
      r"    if \(drv != s_last_drv\) fdc_forget_all\(\);",
      "",
      "ドライブの切り替えで捨てない"),
-    ("drivers/block/fdc.c",
+    ("sys/dev/block/fdc.c",
      r"    s_geom\[drv\] = g;\n    /\* メディアが変わった。覚えているシリンダは信じず、先読みも捨てさせる。 \*/\n    fdc_forget_cyl\(drv\);",
      "    s_geom[drv] = g;",
      "メディアの変更で覚えたシリンダを捨てない"),
-    ("drivers/block/fdc_transfer.inc",
+    ("sys/dev/block/fdc_transfer.inc",
      r"if \(fdc_send_byte\(\(u8\)eot\) != 0\) goto fail;",
      "if (fdc_send_byte((u8)sect) != 0) goto fail;",
      "EOT を sect のまま出す (1 セクタしか読まない)"),
-    ("drivers/block/fdc_transfer.inc",
+    ("sys/dev/block/fdc_transfer.inc",
      r"if \(fdc_send_byte\(FDC_OPT_MF \| FDC_CMD_READ_DATA\) != 0\) goto fail;",
      "if (fdc_send_byte(FDC_OPT_MT | FDC_OPT_MF | FDC_CMD_READ_DATA) != 0) goto fail;",
      "MT を立てる"),
-    ("drivers/block/fdc_transfer.inc",
+    ("sys/dev/block/fdc_transfer.inc",
      r"if \(eot > \(int\)g->spt\) return FDC_MULTI_ERR_RANGE;",
      "",
      "トラックをまたぐ引数を断らない"),
-    ("drivers/block/fdc_transfer.inc",
+    ("sys/dev/block/fdc_transfer.inc",
      r"        if \(seek_rc == FDC_RC_NOT_READY\) \{\n            fdc_forget_cyl\(drv\);\n            s_stats\.multi_nr\+\+;\n            return FDC_MULTI_ERR_NOT_READY;\n        \}",
      "",
      "SEEK の NR をまとめ読みの失敗に数える (行も出す)"),
-    ("drivers/block/fdc_transfer.inc",
+    ("sys/dev/block/fdc_transfer.inc",
      r"        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            fdc_forget_cyl\(drv\);",
      "        if (0) {\n            fdc_forget_cyl(drv);",
      "READ の NR をまとめ読みの失敗に数える (行も出す)"),
     # --- ラリー 2 (Codex / Fable)
-    ("drivers/block/fdc_seek_reset.inc",
+    ("sys/dev/block/fdc_seek_reset.inc",
      r"            fdc_head_settle\(\);\n            fdc_note_cyl\(drv, 0\);",
      "            fdc_note_cyl(drv, 0);",
      "RECALIBRATE の後に整定しない (回復直後の C=0 の READ が整定前に出る)"),
     # 共通の NR 分岐を、方向ごとに無効にする。同じ目印が一意に当たり、
     # READ の変異は WRITE を、WRITE の変異は READ をそのまま残す。
-    ("drivers/block/fdc_sector_transfer.inc",
+    ("sys/dev/block/fdc_sector_transfer.inc",
      r"        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            dma_chan_mask\(FDC_DMA_CHANNEL\);",
      "        if (write && (results[0] & FDC_ST0_NR) != 0) {\n            dma_chan_mask(FDC_DMA_CHANNEL);",
      "単発の READ の NR で回復とリトライを踏む"),
-    ("drivers/block/fdc_sector_transfer.inc",
+    ("sys/dev/block/fdc_sector_transfer.inc",
      r"        if \(write && \(results\[1\] & FDC_ST1_NW\)\) \{",
      "        if (0) {",
      "WRITE の NW を通常エラーにして回復とリトライを踏む"),
-    ("drivers/block/fdc_sector_transfer.inc",
+    ("sys/dev/block/fdc_sector_transfer.inc",
      r"        if \(\(results\[0\] & FDC_ST0_NR\) != 0\) \{\n            dma_chan_mask\(FDC_DMA_CHANNEL\);",
      "        if (!write && (results[0] & FDC_ST0_NR) != 0) {\n            dma_chan_mask(FDC_DMA_CHANNEL);",
      "単発の WRITE の NR で回復とリトライを踏む"),
-    ("drivers/block/fdc_transfer.inc",
+    ("sys/dev/block/fdc_transfer.inc",
      r"        \(void\)fdc_recover\(drv\);\n    \} else \{\n        fdc_forget_cyl\(drv\);",
      "        fdc_forget_cyl(drv);\n    } else {\n        fdc_forget_cyl(drv);",
      "まとめ読みのシークの失敗で回復を通さない"),
-    ("drivers/block/fdc_seek_reset.inc",
+    ("sys/dev/block/fdc_seek_reset.inc",
      r"        if \(i == FDC_SIS_DRAIN_MAX\) more = 1;",
      "",
      "SIS を件数の上限で止めたら次のエッジを待つ (上限ちょうどの通知で期限切れ)"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"            \} else if \(mrc == FDC_MULTI_ERR_NOT_READY\) \{",
      "            } else if (0) {",
      "まとめ読みの NR で 1 セクタずつへ落ちる"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"    if \(c->touched && \(u32\)\(now - c->last_tick\) > \(u32\)FDC_TRACK_IDLE_TICKS\) \{",
      "    if (c->touched && (u32)(now - c->last_tick) > (u32)FDC_TRACK_IDLE_TICKS * 1000000UL) {",
      "2 秒規則を当てない (差し替えた媒体に古い中身を返し続ける)"),
-    ("drivers/block/fdc_track.c",
+    ("sys/dev/block/fdc_track.c",
      r"\(u32\)\(now - c->last_tick\) > \(u32\)FDC_TRACK_IDLE_TICKS",
      "(u32)(now - c->last_tick) >= (u32)FDC_TRACK_IDLE_TICKS",
      "2 秒規則の境目を 1 tick 早める"),
     # --- diskio.c の結線
-    ("drivers/block/fat_diskio.c",
+    ("sys/dev/block/fat_diskio.c",
      r"        fdc_track_invalidate\(&fdd_track\);\n        fdd_status = 0;",
      "        fdd_status = 0;",
      "disk_initialize で先読みを捨てない (Ready 変化の無い入れ替え)"),
-    # --- 純粋な判定 (drivers/block/fdc_decide.c)
-    ("drivers/block/fdc_decide.c",
+    # --- 純粋な判定 (sys/dev/block/fdc_decide.c)
+    ("sys/dev/block/fdc_decide.c",
      r"xfer = \(\(u32\)count \* rot_ticks \+ \(u32\)spt - 1\) / \(u32\)spt;",
      "xfer = ((u32)count * rot_ticks) / (u32)spt;",
      "時間上限の回転数を切り捨てる"),
-    ("drivers/block/fdc_decide.c",
+    ("sys/dev/block/fdc_decide.c",
      r"return \(t < floor_ticks\) \? floor_ticks : t;",
      "return t;",
      "時間上限が単発の値を下回る"),
-    ("drivers/block/fdc_decide.c",
+    ("sys/dev/block/fdc_decide.c",
      r"    if \(!fdc_crosses_bank\(start, slot\)\) \{",
      "    if (1) {",
      "DMA の窓を常に先頭に置く (境界をまたぐ)"),
-    ("drivers/block/fdc_seek_reset.inc",
+    ("sys/dev/block/fdc_seek_reset.inc",
      r"#define FDC_HEAD_SETTLE_TICKS  3",
      "#define FDC_HEAD_SETTLE_TICKS  2",
      "整定待ちが tick 境界直前では 15ms を下回る (修正前)"),
-    ("drivers/block/fdc_transfer.inc",
+    ("sys/dev/block/fdc_transfer.inc",
      r"        st0 = seek_st0;",
      "        st0 = s_last_seek_st0;",
      "回復 RECALIBRATE の ST0 を SEEK 失敗の原因として報告する (修正前)"),
-    ("drivers/block/fdc_command.inc",
+    ("sys/dev/block/fdc_command.inc",
      r"if \(fdc_send_byte\(\(u8\)sect\) != 0\) return -1;      /\* EOT = R \*/",
      "if (fdc_send_byte((u8)(sect + 1)) != 0) return -1; /* EOT */",
      "単発コマンドの EOT を R より先へ送る"),
-    ("drivers/block/fdc_command.inc",
+    ("sys/dev/block/fdc_command.inc",
      r"if \(fdc_send_byte\(g->gap3\) != 0\) return -1;",
      "(void)fdc_send_byte(g->gap3);",
      "GPL の送信失敗を無視して DTL も送ろうとする"),
-    ("drivers/block/fdc_sector_transfer.inc",
+    ("sys/dev/block/fdc_sector_transfer.inc",
      r"if \(!write\) s_stats\.single_retries\+\+;",
      "s_stats.single_retries++;",
      "WRITE の再試行も single_retries に数える"),
-    ("drivers/block/fdc_sector_transfer.inc",
+    ("sys/dev/block/fdc_sector_transfer.inc",
      r"    \} else \{\n        s_stats\.single_reads\+\+;\n    \}",
      "    }\n    s_stats.single_reads++;",
      "WRITE も single_reads に数える"),
-    ("drivers/block/fdc_sector_transfer.inc",
+    ("sys/dev/block/fdc_sector_transfer.inc",
      r"kmemcpy\(dma_buffer, \(const u8 \*\)write_buf, \(u32\)bps\);",
      "kmemset(dma_buffer, 0, (u32)bps);",
      "WRITE の入力を転送前に DMA へコピーしない"),
     # 対照: 何も変えない。SURVIVED でなければ試験が不安定 (偽の RED)。
-    ("drivers/block/fdc_track.c", r"(#include \"fdc_track.h\")", r"\1",
+    ("sys/dev/block/fdc_track.c", r"(#include \"fdc_track.h\")", r"\1",
      "対照 (何も変えない)"),
 ]
 CONTROL = len(MUTATIONS)
@@ -502,7 +502,7 @@ def host_build(tmp, mutated=None):
     mutated = {相対パス: 本文} なら、変異させた写しの木から組む。"""
     tmpd = pathlib.Path(tmp)
     exe = tmpd / "fdc-track-host"
-    source = (ROOT / "platform/pc98/pic.c").read_text()
+    source = (ROOT / "sys/platform/pc98/pic.c").read_text()
     # PIC command constants live in the platform implementation's idt.h.
     pic = ['#include "idt.h"', '#include "irq_policy.c"',
            '#include "irq_complete.c"']
@@ -519,15 +519,15 @@ def host_build(tmp, mutated=None):
         tree = tmpd / "tree"
         for sub in ("drivers", "tools/tests", "fs/fat/fatfs", "lib"):
             (tree / sub).mkdir(parents=True, exist_ok=True)
-        for rel_ in ("drivers/block/fdc_track.c", "drivers/block/fdc_track.h",
-                     "drivers/block/fdc.c", "drivers/block/fdc.h",
-                     "drivers/block/fdc_io.inc", "drivers/block/fdc_seek_reset.inc",
-                     "drivers/block/fdc_transfer.inc", "drivers/block/fdc_command.inc",
-                     "drivers/block/fdc_sector_transfer.inc",
-                     "drivers/block/fdc_decide.c", "drivers/block/fdc_decide.h",
-                     "drivers/dma/dma8237_math.c", "lib/dma_contract.c",
-                     "drivers/block/fat_diskio.c",
-                     "fs/fat/fatfs_vfs_read_cache.inc"):
+        for rel_ in ("sys/dev/block/fdc_track.c", "sys/dev/block/fdc_track.h",
+                     "sys/dev/block/fdc.c", "sys/dev/block/fdc.h",
+                     "sys/dev/block/fdc_io.inc", "sys/dev/block/fdc_seek_reset.inc",
+                     "sys/dev/block/fdc_transfer.inc", "sys/dev/block/fdc_command.inc",
+                     "sys/dev/block/fdc_sector_transfer.inc",
+                     "sys/dev/block/fdc_decide.c", "sys/dev/block/fdc_decide.h",
+                     "sys/dev/dma/dma8237_math.c", "lib/dma_contract.c",
+                     "sys/dev/block/fat_diskio.c",
+                     "sys/fs/fat/fatfs_vfs_read_cache.inc"):
             (tree / rel_).parent.mkdir(parents=True, exist_ok=True)
             (tree / rel_).write_text(
                 (ROOT / rel_).read_text(encoding="utf-8"), encoding="utf-8")
@@ -636,7 +636,7 @@ if __name__ == "__main__":
             build_target(tmp)
         rc = 0
         if not check_read_stream_shape():
-            print("FAIL fs/fat/fatfs_vfs.c の read_stream の形が変わった "
+            print("FAIL sys/fs/fat/fatfs_vfs.c の read_stream の形が変わった "
                   "(font_replay の写しを直す)", flush=True)
             rc += 1
         env = prepare_font(tmp)

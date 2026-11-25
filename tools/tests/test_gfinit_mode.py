@@ -1,6 +1,6 @@
 """4c/1: independent H/V equations, fixed C values/order, synthetic PLL only."""
 CHECK = dict(name='gfinit-mode-host', tier=1,
-    covers=['tools/tests/gfinit_mode_host.c', 'kdebug/gfinit_mode.c', 'hwdev/gfinit_mode.h', 'kdebug/recover_gf_c.h', 'tools/gfinit_mode_tables.py', 'tools/gen_recover_tables.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover_gf.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_pll/*.inc', 'tools/tests/recover_gf_host.c', 'hwdev/gf_load_state.c', 'hwdev/gf_load_state.h', 'hwdev/gf/display/calc.h', 'hwdev/gf/display/calc.c', 'hwdev/gf/display/timing.c', 'hwdev/gf/display/format.c', 'hwdev/gf/display/pitch.c', 'hwdev/gf/display/start.c', 'hwdev/gf/display/dac_format.c', 'hwdev/gf/display/output.c', 'hwdev/gf/display/cursor.c', 'hwdev/gf/display/fifo.c', 'hwdev/gf/display/extended.c', 'hwdev/gf/display/pll_program.c', 'hwdev/gf/quiesce_rows.h', 'tools/recover_tables/recover_tables_host.c', 'tools/recover_tables/recover_tables_oracle.c', 'tools/recover_tables/recover_tables_oracle.json', 'tools/recover_oracle.py', 'tools/tests/test_recover_tables.py'],
+    covers=['tools/tests/gfinit_mode_host.c', 'sys/dev/video/geforce/diag/gfinit_mode.c', 'sys/dev/video/geforce/gfinit_mode.h', 'sys/dev/video/geforce/diag/recover_gf_c.h', 'tools/gfinit_mode_tables.py', 'tools/gen_recover_tables.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sys/platform/pc98/kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'sys/dev/video/geforce/diag/recover_gf.c', 'sys/dev/video/geforce/diag/gfinit_pll.c', 'kdebug/gfinit_pll/*.inc', 'tools/tests/recover_gf_host.c', 'sys/dev/video/geforce/gf_load_state.c', 'sys/dev/video/geforce/gf_load_state.h', 'sys/dev/video/geforce/display/calc.h', 'sys/dev/video/geforce/display/calc.c', 'sys/dev/video/geforce/display/timing.c', 'sys/dev/video/geforce/display/format.c', 'sys/dev/video/geforce/display/pitch.c', 'sys/dev/video/geforce/display/start.c', 'sys/dev/video/geforce/display/dac_format.c', 'sys/dev/video/geforce/display/output.c', 'sys/dev/video/geforce/display/cursor.c', 'sys/dev/video/geforce/display/fifo.c', 'sys/dev/video/geforce/display/extended.c', 'sys/dev/video/geforce/display/pll_program.c', 'sys/dev/video/geforce/quiesce_rows.h', 'tools/recover_tables/recover_tables_host.c', 'tools/recover_tables/recover_tables_oracle.c', 'tools/recover_tables/recover_tables_oracle.json', 'tools/recover_oracle.py', 'tools/tests/test_recover_tables.py'],
     needs=[], budget=6.7,
     kind='characterization',
 )
@@ -200,16 +200,16 @@ MUTATIONS = [
     ('checker_polarity', '? GF_MODE_COLOR_BLACK : GF_MODE_COLOR_WHITE', '? GF_MODE_COLOR_WHITE : GF_MODE_COLOR_BLACK'),
     ('frame_bottom', 'y >= GF_MODE_HEIGHT - GF_MODE_FRAME_WIDTH)', 'y > GF_MODE_HEIGHT - GF_MODE_FRAME_WIDTH)'),
     ('immediate_verify', '0x0U, 0x1U, 0x0U},', '0x7ffffU, 0x1U, 0x0U},'),
-    ('cr05', 'mode_bit(t->hbe, 5, 7)', 'mode_bit(t->hbe, 5, 6)', 'hwdev/gf/display/timing.c'),
-    ('50c_bit28', 'o->pllsel = GF_MODE_PLL_SELECT;', 'o->pllsel = GF_MODE_PLL_SELECT & ~GF_MODE_PLLSEL_VPLL_A;', 'hwdev/gf/display/pll_program.c'),
-    ('single_stage', 'if (o->single) o->limits.vco2 = (struct gfinit_pll_vco){0};', '(void)o->single;', 'hwdev/gf/display/pll_program.c'),
+    ('cr05', 'mode_bit(t->hbe, 5, 7)', 'mode_bit(t->hbe, 5, 6)', 'sys/dev/video/geforce/display/timing.c'),
+    ('50c_bit28', 'o->pllsel = GF_MODE_PLL_SELECT;', 'o->pllsel = GF_MODE_PLL_SELECT & ~GF_MODE_PLLSEL_VPLL_A;', 'sys/dev/video/geforce/display/pll_program.c'),
+    ('single_stage', 'if (o->single) o->limits.vco2 = (struct gfinit_pll_vco){0};', '(void)o->single;', 'sys/dev/video/geforce/display/pll_program.c'),
 ]
 
 
 def mutation(item):
     name, old, new = item[:3]
     # The calc tail is split into .inc files included in place (kdebug/gfinit_mode/); the 4th item names it.
-    file = 'hwdev/generated/gf_mode_rows.inc' if name == 'immediate_verify' else (item[3] if len(item) == 4 else 'kdebug/gfinit_mode.c')
+    file = 'sys/dev/video/geforce/gf_mode_rows.inc' if name == 'immediate_verify' else (item[3] if len(item) == 4 else 'sys/dev/video/geforce/diag/gfinit_mode.c')
     source = (ROOT/file).read_text()
     if name == 'immediate_verify':
         old = next(line for line in source.splitlines() if '0x680508U' in line and line.endswith(old))
@@ -221,7 +221,7 @@ def mutation(item):
                                    [command(exe)],capture_output=True)
         # gcc -MM drives copies, including all new headers; assert they resolve
         # inside the mutant tree so a header-copy failure cannot look like RED.
-        for path in ('hwdev/gfinit_mode.h','hwdev/gf_load_state.c','hwdev/gf_load_state.h','hwdev/generated/gf_mode_rows.inc'):
+        for path in ('sys/dev/video/geforce/gfinit_mode.h','sys/dev/video/geforce/gf_load_state.c','sys/dev/video/geforce/gf_load_state.h','sys/dev/video/geforce/gf_mode_rows.inc'):
             assert (tree/path).is_file() and not (tree/path).is_symlink(), path
         run = host32.run([str(exe)],cwd=tree,timeout=60,capture_output=True)
         rc = run.returncode

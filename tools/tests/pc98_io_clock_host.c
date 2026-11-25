@@ -2,8 +2,8 @@
 #include "types.h"
 #include "pit.h"
 #include "platform_timer.h"
-#include "kernel/io_clock.h"
-#include "kernel/io_work.h"
+#include "sys/kern/io_clock.h"
+#include "sys/kern/io_work.h"
 #include "os32_kapi_shared.h"
 static void finish(int rc) __attribute__((noreturn));
 static void finish(int rc)
@@ -40,8 +40,8 @@ void platform_timer_sample(struct platform_timer_sample *out)
     *out = (struct platform_timer_sample){.count = phase, .p1 = pending, .p2 = samples <= retries};
 }
 void io_clock_set_ops(const struct io_clock_ops *ops) { CHECK(!enabled); installed = ops; }
-#include "platform/pc98/tsc_clock.c"
-#include "platform/pc98/clock_source.c"
+#include "sys/platform/pc98/tsc_clock.c"
+#include "sys/platform/pc98/clock_source.c"
 
 static void pit(u32 hz, u32 reload)
 {

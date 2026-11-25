@@ -4,7 +4,7 @@ int res_owner_get(void) { return 0; }
 int input_display_restore_lock(unsigned int *flags);
 void appslot_gfx_resource_acquire(int owner);
 /* C1 dependency fakes; no other HAL v2 stage is linked. */
-#include "gfx/v2/gfx2_int.h"
+#include "sys/hal/gfx/v2/gfx2_int.h"
 #include "module_runtime.h"
 #include "redir_access.h"
 #include "display_provider.h"
@@ -448,7 +448,7 @@ static void test_sync_caller(void)
            caller.as == (struct addrspace *)0x1234000 && caller_calls == 2);
 }
 /* Execute the actual gfx_core registration helpers, init and shutdown callers. */
-#include "gfx/gfx.h"
+#include "sys/hal/gfx/gfx.h"
 static int gfx_started, gfx_current_height, gfx_flip_enabled, gfx_display_page;
 static u32 gfx_init_gen;
 static u8 *bb[4];

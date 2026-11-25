@@ -1,15 +1,15 @@
 """F0s backend stop, probe latch and explicit temperature gate."""
 CHECK = dict(name='geforce-heat-backend', tier=1, needs=[], budget=3.4,
-             covers=['gfx/gfx_policy.h', 'gfx/gfx_osri_view.h', 'tools/tests/test_geforce_heat_backend.py',
+             covers=['sys/hal/gfx/gfx_policy.h', 'sys/kern/gfx/osri/gfx_osri_view.h', 'tools/tests/test_geforce_heat_backend.py',
                      'tools/tests/geforce_heat_backend_host.c',
                      'tools/tests/backend_geforce_host.c',
                      'tools/tests/gf_startlog_host.h',
                      'tools/tests/gf_accel_unbound_stubs.c',
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
                      'drivers/video/geforce/**', 'hwdev/gf/**', 'include/**',
-                     'gfx/gfx_internal.h', 'gfx/palette.h',
-                     'drivers/video/pc98/pc98_route.h', 'kernel/module/*.h',
-                     'lib/kstring.h', 'build/config.mk'],
+                     'sys/hal/gfx/gfx_internal.h', 'sys/hal/gfx/palette.h',
+                     'sys/platform/pc98/video/pc98_route.h', 'kernel/module/*.h',
+                     'sys/kern/kstring.h', 'build/config.mk'],
     basis=['GF_GUARD_THERM_DESIGN §5', 'GF_GUARD_THERM_DESIGN §6'],
 )
 import argparse
@@ -30,7 +30,7 @@ MUTATIONS = [
     ('force-stop', 'rc=gf_foundation_stop(feature5->ch->f);', 'rc=0;'),
 ]
 def case(folder, label, mutation=None):
-    path=ROOT/'drivers/video/geforce/backend_geforce.c'
+    path=ROOT/'sys/dev/video/geforce/backend_geforce.c'
     source=path.read_text()
     if mutation:
         old,new=mutation
@@ -42,7 +42,7 @@ def case(folder, label, mutation=None):
                   if (path.parent/m[1]).exists() else m[0],source)
     product=folder/'backend.c'; product.write_text(source)
     fixture=(ROOT/'tools/tests/backend_geforce_host.c').read_text().replace(
-        '../../drivers/video/geforce/backend_geforce.c',str(product))
+        '../../sys/dev/video/geforce/backend_geforce.c',str(product))
     (folder/'backend_geforce_host.c').write_text(fixture)
     fixture=(ROOT/'tools/tests/geforce_heat_backend_host.c').read_text()
     host=folder/'host.c'; host.write_text(fixture)

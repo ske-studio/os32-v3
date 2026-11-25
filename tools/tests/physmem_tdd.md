@@ -2,7 +2,7 @@
 
 ## 範囲・契約
 
-変更対象は `mm/physmem.c`、`mm/physmem.h`、
+変更対象は `sys/kern/mm/physmem.c`、`sys/kern/mm/physmem.h`、
 `tools/tests/test_physmem.py` と本記録のみ。
 既存の未コミット変更には触れていない。
 
@@ -55,13 +55,13 @@ source 判定だけを条件コンパイルで制限し、ヘッダーにフラ�
 ## ターゲット GNU89 コンパイル
 
 `~/opt/cross/bin/i386-elf-gcc -dumpmachine` → `i386-elf`。
-同コンパイラで `mm/physmem.c` 単体を一時ディレクトリにコンパイルした。
+同コンパイラで `sys/kern/mm/physmem.c` 単体を一時ディレクトリにコンパイルした。
 共通オプション:
 
 ```
 -std=gnu89 -Wall -Wextra -Werror -Wdeclaration-after-statement
 -ffreestanding -fno-builtin -fno-pie -fno-stack-protector
--Iinclude -Ikernel -c mm/physmem.c -o <temporary-object>
+-Iinclude -Ikernel -c sys/kern/mm/physmem.c -o <temporary-object>
 ```
 
 出力（exit 0、警告なし）:

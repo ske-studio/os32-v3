@@ -9,10 +9,10 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/tests'))
 import host32
 
-CHECK = {'id': 'ppc-lan-p21', 'covers': ['platform/powermac/lan_wire.c'],
-         'inputs': ['tools/ppc/lan_p21_fixture.c', 'platform/powermac/lan_boot.h',
-                    'include/types.h', 'lib/kstring.h']}
-SOURCE = ROOT / 'platform/powermac/lan_wire.c'
+CHECK = {'id': 'ppc-lan-p21', 'covers': ['sys/platform/powermac/lan_wire.c'],
+         'inputs': ['tools/ppc/lan_p21_fixture.c', 'sys/platform/powermac/lan_boot.h',
+                    'sys/include/types.h', 'sys/kern/kstring.h']}
+SOURCE = ROOT / 'sys/platform/powermac/lan_wire.c'
 MUTATIONS = [
     ('seq-le', 'put_be(dst + PLN1_OFF_SEQ, h->seq, 8);', 'for (i = 0; i < 8; ++i) dst[PLN1_OFF_SEQ + i] = (u8)(h->seq >> (8 * i));', 2),
     ('header', 'get_be(src + PLN1_OFF_HEADER_BYTES, 2) != PLN1_HEADER_BYTES ||', '0 ||', 19),

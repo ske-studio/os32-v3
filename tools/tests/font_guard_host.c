@@ -11,7 +11,7 @@ void idle_work_run(void) { }
 void arch_fp_save(struct arch_fp_context *p) { (void)p; }
 void geforce_foreground_poll(void) {}
 #include "exec.h"
-#include "net/nic.h"
+#include "sys/net/nic.h"
 int net_rx_recent(u32 ms) { (void)ms; return 0; }
 #include "io.h"
 #include "pgalloc.h"

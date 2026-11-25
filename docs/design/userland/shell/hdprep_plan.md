@@ -1,6 +1,6 @@
 # userland/shell/hdprep_plan.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_HDD_INSTALL 段 1 (§1-v3 N4〜N6) の契約を今のソースと照らして要約
-`userland/shell/cmd_hdprep.c` が確認と整形を担当する。サイズとマウントの判定は `userland/shell/hdprep_plan.c`、PC-98 の幾何・空ディスク検査・計画・区画表生成は `platform/pc98/install_plan.c`、セクタの書込みと照合は `platform/pc98/install_hdprep.c` にある。
+`userland/shell/cmd_hdprep.c` が確認と整形を担当する。サイズとマウントの判定は `userland/shell/hdprep_plan.c`、PC-98 の幾何・空ディスク検査・計画・区画表生成は `sys/platform/pc98/install_plan.c`、セクタの書込みと照合は `sys/platform/pc98/install_hdprep.c` にある。
 
 hd0 (DA 80h) に OS32 の置き場 (区画 + ext2) を作るときの「断る条件」と「計画」の純粋関数。シェルの `hdprep` と
 インストーラ (`userland/system/inst_hdd.c`) が同じものを使う。I/O は呼び手 (KAPI) が行う。
@@ -27,7 +27,7 @@ hdprep は**空のディスク専用**で、`--force` は無い。
 - 幾何は BIOS 幾何 (区画表と IPL の CHS)。cyl = heads × spt。
 - 開始 = LBA 1632 (`HDPREP_BOOT_RESERVE_LBA`) 以上の最初のシリンダ境界 (8/17 なら 1632、16/63 なら 2016)。
 - 上限 = BIOS の CX × cyl、IDENTIFY の総数、ATA の方式で指せる範囲 (LBA28 なら 2^28、現在の CHS ならその容量) の最小
-  (`drivers/ata/ide_addr.c` と同じ規則)。上限 ≤ 開始なら `E_TOO_SMALL`。
+  (`sys/dev/ata/ide_addr.c` と同じ規則)。上限 ≤ 開始なら `E_TOO_SMALL`。
 - 長さ = min(mb MiB, 上限 - 開始) をシリンダへ切り下げ。8MiB 未満になれば `E_TOO_SMALL`。終了シリンダが 16 ビットを
   超えれば `E_CYL`。
 - `probe_lba` = 予定域の最終セクタ。計画した区画は `pc98pt_make_os32` と固定点 (`ext2_layout_plan`) をそのまま通る。

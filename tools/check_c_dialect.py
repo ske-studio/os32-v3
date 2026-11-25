@@ -31,9 +31,9 @@ SQLITE_DIRS = ("userland/tests/sqlite_standalone/",)
 # make -n に必ず現れるはずの翻訳単位 (消えたら検査が空振りしている)
 REQUIRED_SRCS = SQLITE_SRCS + (
     "lib/sqlite3/os32_sqlite_test.c",
-    "userland/tests/sqlite_standalone/sqlite_standalone.c",
-    "userland/tests/sqlite_standalone/sqlite_user_vfs.c",
-    "platform/pc98/kernel.c",
+    "userland/diag/sqlite_standalone/sqlite_standalone.c",
+    "userland/diag/sqlite_standalone/sqlite_user_vfs.c",
+    "sys/platform/pc98/kernel.c",
     "boot/boot_main.c",
 )
 

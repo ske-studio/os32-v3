@@ -1,8 +1,8 @@
-# hwdev/gf/op/zm_tmds_group.c — TMDS literal group script instruction
+# sys/dev/video/geforce/op/op/zm_tmds_group.c — TMDS literal group script instruction
 
 > 状態: **現行 (2026-11-04)** — GF_FEAT4_DESIGN「TMDS の script の実行の口」C2-links-init。
 
-ソース: `hwdev/gf/op/zm_tmds_group.c`。opcode 0x50、3+2*count bytes:
+ソース: `sys/dev/video/geforce/op/op/zm_tmds_group.c`。opcode 0x50、3+2*count bytes:
 selector/count は +1/+2、各 address/value pair は +3 以降。
 
 MIT nouveau c03c1a1 `nvkm/subdev/bios/init.c:1121-1143` に従い、各 pair を

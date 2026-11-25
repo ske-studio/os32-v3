@@ -1,7 +1,7 @@
 """NV44 instance allocation and aperture access."""
 CHECK = dict(name='gf1-instmem-host', tier=1,
-             covers=['hwdev/gf/vram_layout.h', 'hwdev/gf/instmem.c', 'hwdev/gf/foundation.h',
-                     'hwdev/gf/internal.h', 'tools/tests/gf1_instmem_host.c',
+             covers=['sys/dev/video/geforce/vram_layout.h', 'sys/dev/video/geforce/instmem.c', 'sys/dev/video/geforce/foundation.h',
+                     'sys/dev/video/geforce/internal.h', 'tools/tests/gf1_instmem_host.c',
                      'tools/tests/test_gf1_instmem.py', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py'], needs=[], budget=2.8,
     basis=['GF_FEAT1_DESIGN §4'],
@@ -18,15 +18,15 @@ ROOT = Path(__file__).resolve().parents[2]
 def main():
     with tempfile.TemporaryDirectory(prefix='gf1-instmem-') as td:
         exe = Path(td) / 'host'
-        source = (ROOT / 'hwdev/gf/instmem.c').read_text()
-        layout = (ROOT / 'hwdev/gf/vram_layout.h').read_text()
+        source = (ROOT / 'sys/dev/video/geforce/instmem.c').read_text()
+        layout = (ROOT / 'sys/dev/video/geforce/vram_layout.h').read_text()
         def build(text, header=layout):
             header = header.replace('"../../include/', '"' + str(ROOT / 'include') + '/')
             (Path(td) / 'vram_layout.h').write_text(header)
             text = '#include "vram_layout.h"\n' + text
             path = Path(td) / 'instmem.c'
             path.write_text(text.replace('#include "foundation.h"',
-                '#include "' + str(ROOT / 'hwdev/gf/foundation.h') + '"'))
+                '#include "' + str(ROOT / 'sys/dev/video/geforce/foundation.h') + '"'))
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                             '-fno-pie', '-nostdlib', '-static', '-no-pie', *include_flags(ROOT),
                             str(ROOT / 'tools/tests/gf1_instmem_host.c'), str(path), '-o', str(exe)], check=True)

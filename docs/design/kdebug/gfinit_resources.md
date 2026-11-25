@@ -1,6 +1,6 @@
-# kdebug/gfinit_resources.c — 設計
+# sys/dev/video/geforce/diag/gfinit_resources.c — 設計
 > 状態: **現行 (2026-11-10)**
-ソース: `kdebug/gfinit_resources.c`、`drivers/pci/pci_barsize.c`
+ソース: `sys/dev/video/geforce/diag/gfinit_resources.c`、`sys/dev/pci/pci_barsize.c`
 
 BOOT_PCI_ENUM の列挙時に全装置の BAR を一度測り、GeForce の資源除外に使う。
 公開 `pci_dev` と KAPI の配置は保ち、長さ・種類・prefetch・未割当状態を核の別表に保存する。

@@ -61,9 +61,9 @@ KAPI の追加が必要なら予約番号を KAPI_SPEC §3-2 と調停する。v
 ### ターミナル
 
 - `docs/tasks/gui/v12/CONTRACTS.md` S1/S2: 外部アプリは1本。handler/X3/X4から直接execは禁止。
-- `fs/fd_redirect.c`: バッファ入力は空でEOF、出力は固定容量のshort write。対話ストリームではない。
-- 調査指摘: GUI中はraw入力で、既存CUIのcooked待機へ直接は届かない (`drivers/input/kbd.c`)。
-- 調査指摘: FD捕捉だけでは直接コンソール出力を拾えない (`kernel/console/console.c` の `putchar_raw()`)。
+- `sys/fs/fd_redirect.c`: バッファ入力は空でEOF、出力は固定容量のshort write。対話ストリームではない。
+- 調査指摘: GUI中はraw入力で、既存CUIのcooked待機へ直接は届かない (`sys/platform/pc98/input/kbd.c`)。
+- 調査指摘: FD捕捉だけでは直接コンソール出力を拾えない (`sys/kern/console/console.c` の `putchar_raw()`)。
 - 調査指摘: lconsoleは80×25・原点固定描画。窓内surface/clipへそのまま接続できない
   (`userland/lib/gfx/lconsole.h`, `userland/lib/gfx/text/lconsole.c` の `lcons_sync_vram()`)。
 
@@ -73,8 +73,8 @@ ROADMAPの「terminal app」との差異は未決であり、外部terminalか�
 
 ### 設定レジストリ
 
-- `kapi/kapi_db.c`: 現行openは `sqlite3_open` と `journal_mode=DELETE`。真のreadonly/no-create契約を提供していない。
-- `kapi/kapi_db.c`: execはSQLを固定バッファへコピーし、先頭statementだけprepare/stepする。
+- `sys/kapi/kapi_db.c`: 現行openは `sqlite3_open` と `journal_mode=DELETE`。真のreadonly/no-create契約を提供していない。
+- `sys/kapi/kapi_db.c`: execはSQLを固定バッファへコピーし、先頭statementだけprepare/stepする。
   `BEGIN; UPDATE; COMMIT` を1回渡す設計にしない。
 - 調査指摘: 通常NHD配備は対象を上書きする (`tools/nhd_deploy.py` の `do_deploy()`)。
   マスタを通常配備へ登録すると、ユーザー設定を保持する要求と衝突する。

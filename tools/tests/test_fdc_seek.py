@@ -1,9 +1,9 @@
-"""FDC の純粋な判定 (drivers/block/fdc_decide.c) のホスト試験。
+"""FDC の純粋な判定 (sys/dev/block/fdc_decide.c) のホスト試験。
 
 記録: tools/tests/fdc_seek_tdd.md
 票  : 実機 PC-9821Ra266 の FD 起動が MOUNT... の root panic になる件
 
-実物の drivers/block/fdc_decide.c を 1 行も写さずに #include して回す。
+実物の sys/dev/block/fdc_decide.c を 1 行も写さずに #include して回す。
 判定は I/O もタイマも触らないので模型は要らない。
 
   python3 -B tools/tests/test_fdc_seek.py            # ホストで全ケース
@@ -11,7 +11,7 @@
   python3 -B tools/tests/test_fdc_seek.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='fdc-seek-host', tier=1,
-    covers=['drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc_command.inc', 'drivers/block/fdc_sector_transfer.inc', 'drivers/block/fdc_decide.c', 'tools/tests/fdc_seek_host.c', 'tools/tests/kernel_includes.py'],
+    covers=['sys/dev/block/fdc.c', 'sys/dev/block/fdc_io.inc', 'sys/dev/block/fdc_seek_reset.inc', 'sys/dev/block/fdc_transfer.inc', 'sys/dev/block/fdc_command.inc', 'sys/dev/block/fdc_sector_transfer.inc', 'sys/dev/block/fdc_decide.c', 'tools/tests/fdc_seek_host.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.2,
     kind='characterization',
 )
@@ -25,11 +25,11 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/fdc_seek_host.c"
-SRC = ROOT / "drivers/block/fdc_decide.c"
+SRC = ROOT / "sys/dev/block/fdc_decide.c"
 # カーネルと同じ i386-elf で通す実ソース。
 TARGET_SRCS = [
-    "drivers/block/fdc_decide.c",
-    "drivers/block/fdc.c",
+    "sys/dev/block/fdc_decide.c",
+    "sys/dev/block/fdc.c",
 ]
 
 CASES = ["sis_len", "seek_ok", "seek_ec", "seek_pending", "seek_fail",
@@ -66,12 +66,12 @@ def host_build(tmp, source_text=None):
         mut.mkdir(parents=True, exist_ok=True)
         (mut / "fdc_decide.c").write_text(source_text, encoding="utf-8")
         (mut / "fdc_decide.h").write_text(
-            (ROOT / "drivers/block/fdc_decide.h").read_text(encoding="utf-8"),
+            (ROOT / "sys/dev/block/fdc_decide.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8").replace(
-                '"../../drivers/block/fdc_decide.c"', '"drivers/block/fdc_decide.c"'),
+                '"../../sys/dev/block/fdc_decide.c"', '"sys/dev/block/fdc_decide.c"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut),
                *INCLUDES, str(shim), "-o", str(exe)]
@@ -90,7 +90,7 @@ def run_cases(exe, cases):
 
 
 def build_target(tmp):
-    """カーネルと同じ i386-elf で drivers/block/fdc.c ごと通す。"""
+    """カーネルと同じ i386-elf で sys/dev/block/fdc.c ごと通す。"""
     for rel in TARGET_SRCS:
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
@@ -134,7 +134,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-fdc-seek-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real drivers/block/fdc_decide.c)",
+        print("HOST GNU11 -Werror compile PASS (real sys/dev/block/fdc_decide.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

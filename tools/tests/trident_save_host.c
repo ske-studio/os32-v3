@@ -52,7 +52,7 @@
  * Access wrappers stand in for parallel 3b regs.c, not a second device fake.
  */
 #include "tools/tests/trident_device_fake.h"
-#include "drivers/char/serial.h"
+#include "sys/dev/char/serial.h"
 const u8 trident_default_dac[TRI_DAC_BYTES] = {
     0, 0, 0, 0, 0, 42, 0, 42, 0, 0, 42, 42, 42, 0, 0, 42, 0, 42, 42, 21, 0, 42, 42, 42,
     21, 21, 21, 21, 21, 63, 21, 63, 21, 21, 63, 63, 63, 21, 21, 63, 21, 63, 63, 63, 21, 63, 63, 63,

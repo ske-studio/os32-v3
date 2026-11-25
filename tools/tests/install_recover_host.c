@@ -3,8 +3,8 @@
 /*  INSTALL_RECOVER_HOST.C — 票 S3-I §1h のホスト TDD                        */
 /*                                                                           */
 /*  実物だけを組む: 実 `userland/system/install_recover.inc` + 実             */
-/*  `kapi/kapi_db.c` + 実 `lib/sqlite3/sqlite3.c` + 実 `os32_sqlite_vfs.c` +  */
-/*  実 `fs/vfs_fd.c` + RAM バックエンド。模型は exec 側のポインタ検証、SHM の  */
+/*  `sys/kapi/kapi_db.c` + 実 `lib/sqlite3/sqlite3.c` + 実 `os32_sqlite_vfs.c` +  */
+/*  実 `sys/fs/vfs_fd.c` + RAM バックエンド。模型は exec 側のポインタ検証、SHM の  */
 /*  置き場、そして「その形でしか作れない障害」の注入 (stat の三値 / UNKNOWN /  */
 /*  st_ino 共有 / st_dev、rename の 2 つの中途半端、read の負 / short write / */
 /*  unlink / sync / db_close の失敗) だけ。                                   */
@@ -69,8 +69,8 @@ static const char *host_resolve(const char *path)
 int vfs_rm(const char *path) { probes++; return fixture_rm(host_resolve(path)); }
 
 /* ---- st_dev / st_ino の模型 ------------------------------------------- */
-/* fs/vfs.c の vfs_mount_dev_of と同じ式: (dev_type << 8 | unit) + 1。
- * 種別は fs/vfs.h の VFS_DEV_HD = 0 / VFS_DEV_FD = 1。 */
+/* sys/fs/vfs.c の vfs_mount_dev_of と同じ式: (dev_type << 8 | unit) + 1。
+ * 種別は sys/fs/vfs.h の VFS_DEV_HD = 0 / VFS_DEV_FD = 1。 */
 #define HOST_DEV(t, u) ((u32)((((t) & 0xFF) << 8) | ((u) & 0xFF)) + 1u)
 static u32 host_root_dev = HOST_DEV(1, 0);   /* 起動媒体 = fd0 */
 static u32 host_hd0_dev  = HOST_DEV(0, 0);   /* 対象 = hd0 */
@@ -136,12 +136,12 @@ static unsigned char test_shm[DB_SHM_BLOCK_SIZE + SHM_CANARY];
 /* Keep direct SQLite/VFS calls, but exercise the product KAPI public gate.
  * Boot itself is covered by sqlite_module_host with both paired images. */
 #include "../../lib/sqlite3/os32_sqlite_outer.h"
-#include "../../kernel/sqlite_engine.h"
+#include "../../sys/kern/sqlite_engine.h"
 #undef OS32_SQLITE_DIRECT_TEST
 int services_public = 1;
 enum services_stage services_stage = SERVICES_READY;
 #ifndef INSTALL_KAPI_DB_SOURCE
-#define INSTALL_KAPI_DB_SOURCE "../../kapi/kapi_db.c"
+#define INSTALL_KAPI_DB_SOURCE "../../sys/kapi/kapi_db.c"
 #endif
 #include INSTALL_KAPI_DB_SOURCE
 

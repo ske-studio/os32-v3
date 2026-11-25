@@ -1,6 +1,6 @@
-# kdebug/kdebug_module.c — 設計
+# sys/kern/kdebug/kdebug_module.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: VER_INFO_DESIGN・HWDEV_CORE_API・HWDEV_DESIGN (D1 で移した)
-ソース: `kdebug/kdebug_module.c`
+ソース: `sys/kern/kdebug/kdebug_module.c`
 
 kdebug_state_name()
 state<0 / 配列上限以上→UNKNOWN
@@ -19,7 +19,7 @@ KDEBUG=1 のみロード、PAIR は kernel 像 CRC。
 
 > 出所: TASK_DBGREF (§3-1・§3-4・§3-7) の契約を今のソースと照らして要約 (2026-11-18)
 
-ソース: `kdebug/kdebug_module.c` (`kdebug_load`・`kdebug_start`・`kdebug_state_name`)・`kdebug/kdebug_main.c` (`kdebug_init`)・`kernel/module/kdebug_call.c` (`kdebug_call`)。読み込みの共通の手順は `kernel/module/module_runtime.c` (`docs/design/kernel/module/module_runtime.md`)、形式と拒否の条件は `docs/08_build.md` §8-2「起動時に読む部品の形式 (KMOD v1)」。
+ソース: `sys/kern/kdebug/kdebug_module.c` (`kdebug_load`・`kdebug_start`・`kdebug_state_name`)・`sys/platform/pc98/kdebug/kdebug_main.c` (`kdebug_init`)・`sys/kern/module/kdebug_call.c` (`kdebug_call`)。読み込みの共通の手順は `sys/kern/module/module_runtime.c` (`docs/design/kernel/module/module_runtime.md`)、形式と拒否の条件は `docs/08_build.md` §8-2「起動時に読む部品の形式 (KMOD v1)」。
 
 - `system.cfg` の `KDEBUG` が **1 のときだけ** `/boot/kdebug.bin` を読む。0 やそれ以外の値なら開かず、owner も取らず、状態は OFF (0)。読むのは 1 回だけで、試みると `kdebug.open_count` が 1 になる。
 - 期待する ID・KAPI 版・layout 世代・`KDEBUG_ABI_GEN`・`KDEBUG_OPS_VERSION`・import の件数・本体の Image CRC (`boot_common_get` の `image_crc` / `image_valid`) は **本体の側** から渡す (像の自己申告で決めない)。

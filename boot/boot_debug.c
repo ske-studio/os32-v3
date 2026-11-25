@@ -15,11 +15,11 @@
 /* ======================================================================== */
 
 #include "boot_defs.h"
-#include "../platform/pc98/bootinfo_wire.h"
-#include "../include/pc98.h"
+#include "../sys/platform/pc98/bootinfo_wire.h"
+#include "../sys/platform/pc98/pc98.h"
 #include "pc98pt.h"   /* 区画表の共有部 (標準配置) */
 
-/* lib/kstring.h と同名の写し。boot の include パスは lib/ の型ヘッダを
+/* sys/kern/kstring.h と同名の写し。boot の include パスは lib/ の型ヘッダを
  * 読めないため独立させる。test_hdd_stage1.py の -Werror コンパイルで照合。 */
 #define HEX_NIBBLE_BITS   4
 #define HEX32_DIGITS      (BITS_PER_U32 / HEX_NIBBLE_BITS)
@@ -176,7 +176,7 @@ int boot_main(void)
             PC98PartEntry pe;
             unsigned long st, ln;
 
-            /* 標準配置で読む (fs/pc98pt.c、票 TASK_HDD_INSTALL 段 1-4) */
+            /* 標準配置で読む (sys/fs/pc98pt.c、票 TASK_HDD_INSTALL 段 1-4) */
             (void)pc98pt_get(buf, i, &pe);
             if (pc98pt_entry_range(&pe, param_heads, param_spt, 0,
                                    &st, &ln) == PC98PT_OK)

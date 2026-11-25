@@ -44,9 +44,9 @@ $(PPC_USER_OUT)/crt0_c.o: $(PPC_USER_START_SRC) $(SDK_KAPI_HDR) sdk/include/os32
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
 $(PPC_USER_OUT)/pathprob.o: lib/path.h
-$(PPC_USER_OUT)/pciprob.o: include/pci_dev_contract.h include/pci_bind_contract.h
-$(PPC_USER_OUT)/dispprb.o: include/app_ids.h
-$(PPC_USER_OUT)/fontprob.o: include/config.h
+$(PPC_USER_OUT)/pciprob.o: sys/include/pci_dev_contract.h sys/include/pci_bind_contract.h
+$(PPC_USER_OUT)/dispprb.o: sys/include/app_ids.h
+$(PPC_USER_OUT)/fontprob.o: sys/include/config.h
 
 $(addsuffix .o,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.o: userland/ppc/%.c | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
@@ -57,16 +57,16 @@ $(PPC_GUIPROB).o: userland/ppc/guiprob.c userland/ppc/guiprob_exclusive.h build/
 	$(CC) $(PPC_USER_FLAGS) $(if $(filter 1,$(PPC_C_GUI)),-DC_GUI_ACCEPT) -c $< -o $@
 
 # ISO 9660 level 1 uses the eight-character guest name snd2test.
-$(PPC_USER_OUT)/snd2test.o: userland/tests/snd2_test.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
+$(PPC_USER_OUT)/snd2test.o: userland/diag/snd2_test.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
-$(PPC_USER_OUT)/memstat.o: userland/tests/mem_stat_test.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
+$(PPC_USER_OUT)/memstat.o: userland/diag/mem_stat_test.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
-$(PPC_USER_OUT)/atadeny.o: tools/ppc/ata_deny.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
+$(PPC_USER_OUT)/atadeny.o: userland/diag/ata_deny.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
-$(PPC_USER_OUT)/learnprb.o: tools/ppc/learn_probe.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
+$(PPC_USER_OUT)/learnprb.o: userland/diag/learn_probe.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
 PPC_USER_APPS += $(PPC_USER_OUT)/snd2test $(PPC_GUIPROB) $(PPC_USER_OUT)/memstat $(PPC_USER_OUT)/atadeny $(PPC_USER_OUT)/learnprb
@@ -80,13 +80,13 @@ $(addsuffix .bin,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.bin: $(PPC_USER_OUT)/%.raw
 	python3 sdk/mkos32x.py $< $@ --target $(SDK_TARGET) --elf $(PPC_USER_OUT)/$*.elf
 
 PPC_INST_DIR := $(PPC_USER_OUT)/installer
-PPC_INST_SRC := platform/powermac/install_target.c userland/system/inst_hdd.c userland/system/inst_disk.c userland/shell/hdprep_plan.c fs/ext2/ext2_layout.c
+PPC_INST_SRC := sys/platform/powermac/install_target.c userland/system/inst_hdd.c userland/system/inst_disk.c userland/shell/hdprep_plan.c sys/fs/ext2/ext2_layout.c
 PPC_INST_COMMON := $(addprefix $(PPC_INST_DIR)/,$(PPC_INST_SRC:.c=.o))
 PPC_INST_EXTRA := userland/system/install.c userland/system/cdinst.c userland/lib/rt/pkg.c userland/lib/rt/dbgserial.c
 $(PPC_INST_DIR)/userland/system/install.o $(PPC_INST_DIR)/userland/lib/rt/pkg.o: private PPC_USER_FLAGS += -DOS32_VERIFY_INSTALLED_FILES
 $(PPC_INST_COMMON) $(addprefix $(PPC_INST_DIR)/,$(PPC_INST_EXTRA:.c=.o)): $(PPC_INST_DIR)/%.o: %.c build/ppc-user.mk $(PPC_INST_MUT_FILE)
 	@mkdir -p $(@D)
-	$(CC) $(PPC_USER_FLAGS) -DOS32_FEATURE_IDE=1 -Iplatform/powermac -I. -Iinclude -Iuserland/lib -Iuserland/lib/rt -Iuserland/system -c $(if $(filter $<,$(PPC_INST_MUT_SRC)),$(PPC_INST_MUT_FILE),$<) -o $@
+	$(CC) $(PPC_USER_FLAGS) -DOS32_FEATURE_IDE=1 -Iplatform/powermac -Isys/platform/powermac -I. -Iinclude -Isys/include -Isys/hal/time -Isys/hal/gfx -Isys/hal/input -Isys/platform/pc98 -Isys/hal/sound -Isys/arch/x86 -Iuserland/lib -Iuserland/lib/rt -Iuserland/system -c $(if $(filter $<,$(PPC_INST_MUT_SRC)),$(PPC_INST_MUT_FILE),$<) -o $@
 
 $(PPC_USER_OUT)/install.elf: $(PPC_INST_DIR)/userland/system/install.o
 $(PPC_USER_OUT)/cdinst.elf: $(PPC_INST_DIR)/userland/system/cdinst.o $(PPC_INST_DIR)/userland/lib/rt/pkg.o $(PPC_INST_DIR)/userland/lib/rt/dbgserial.o
@@ -120,16 +120,16 @@ $(PPC_USER_OUT)/fp_probe.bin: $(PPC_USER_OUT)/fp_probe.raw $(PPC_USER_OUT)/fp_pr
 
 # The resident shell uses the fixed break backend and the complete command set.
 PPC_RES_DIR := $(PPC_USER_OUT)/resident
-PPC_RES_SRC := $(wildcard userland/shell/*.c userland/lib/save/*.c) \
- drivers/pci/pci_decode.c fs/pc98pt.c userland/lib/filer/filer_draw.c \
+PPC_RES_SRC := $(wildcard userland/shell/*.c) $(wildcard userland/lib/save/*.c) \
+ sys/dev/pci/pci_decode.c sys/fs/pc98pt.c userland/lib/filer/filer_draw.c \
  userland/lib/filer/filer_core.c sdk/crt/syscalls.c sdk/allocator/nano_adapter.c
-PPC_RES_SRC += $(if $(filter 1,$(FEATURE_IDE)),platform/powermac/install_target.c)
+PPC_RES_SRC += $(if $(filter 1,$(FEATURE_IDE)),sys/platform/powermac/install_target.c)
 PPC_RES_OBJ := $(addprefix $(PPC_RES_DIR)/,$(PPC_RES_SRC:.c=.o))
 $(PPC_RES_OBJ): $(PPC_RES_DIR)/%.o: %.c build/ppc-user.mk $(SDK_KAPI_HDR) $(PPC_SH_MUT_FILE) $(PPC_RES_MUT_FILE)
 	@mkdir -p $(@D)
-	$(CC) $(PPC_USER_FLAGS) -DOS32_CRT_RESIDENT -DOS32_FEATURE_IDE=$(FEATURE_IDE) -Iplatform/powermac -I. -Iinclude -Iuserland/lib -Iuserland/shell -Iuserland/lib/filer -Iuserland/lib/gfx -Iuserland/lib/save -Idrivers -c $(if $(filter $<,$(PPC_RES_MUT_SRC)),$(PPC_RES_MUT_FILE),$(if $(filter $<,$(PPC_SH_MUT_SRC)),$(PPC_SH_MUT_FILE),$<)) -o $@
+	$(CC) $(PPC_USER_FLAGS) -DOS32_CRT_RESIDENT -DOS32_FEATURE_IDE=$(FEATURE_IDE) -Iplatform/powermac -Isys/platform/powermac -I. -Iinclude -Isys/include -Isys/hal/time -Isys/hal/gfx -Isys/hal/input -Isys/platform/pc98 -Isys/hal/sound -Isys/arch/x86 -Iuserland/lib -Iuserland/shell -Iuserland/lib/filer -Iuserland/lib/gfx -Iuserland/lib/save -Idrivers -c $(if $(filter $<,$(PPC_RES_MUT_SRC)),$(PPC_RES_MUT_FILE),$(if $(filter $<,$(PPC_SH_MUT_SRC)),$(PPC_SH_MUT_FILE),$<)) -o $@
 
-$(PPC_RES_DIR)/memmap_layout.h: include/memmap.h tools/gen_memmap.py
+$(PPC_RES_DIR)/memmap_layout.h: sys/include/memmap.h tools/gen_memmap.py
 	@mkdir -p $(@D)
 	python3 -B tools/gen_memmap.py --layout-header $@
 
@@ -149,11 +149,11 @@ $(PPC_USER_OUT)/shell.bin: $(PPC_USER_OUT)/shell.raw $(PPC_USER_OUT)/shell.elf s
 	python3 sdk/mkos32x.py $< $@ --target $(SDK_TARGET) --elf $(PPC_USER_OUT)/shell.elf --heap 0
 
 # The acceptance GUI uses the same resident CRT and fixed heap as the C shell.
-PPC_GUI_SRC := $(wildcard userland/lib/gfx/*.c userland/lib/gfx/draw/*.c userland/lib/gfx/text/*.c userland/lib/cfg/*.c) lib/utf8.c
+PPC_GUI_SRC := $(wildcard userland/lib/gfx/*.c) $(wildcard userland/lib/gfx/draw/*.c) $(wildcard userland/lib/gfx/text/*.c) $(wildcard userland/lib/cfg/*.c) lib/utf8.c
 PPC_GUI_OBJ := $(addprefix $(PPC_RES_DIR)/,$(PPC_GUI_SRC:.c=.o))
 $(PPC_GUI_OBJ): $(PPC_RES_DIR)/%.o: %.c build/ppc-user.mk $(SDK_KAPI_HDR)
 	@mkdir -p $(@D)
-	$(CC) $(PPC_USER_FLAGS) -ffunction-sections -fdata-sections -DOS32_CRT_RESIDENT -DOS32_GFX_PACKED_ONLY -I. -Iinclude -Iuserland/lib -Iuserland/lib/gfx -Iuserland/lib/cfg -Iuserland/lib/math -c $< -o $@
+	$(CC) $(PPC_USER_FLAGS) -ffunction-sections -fdata-sections -DOS32_CRT_RESIDENT -DOS32_GFX_PACKED_ONLY -I. -Iinclude -Isys/include -Isys/hal/time -Isys/hal/gfx -Isys/hal/input -Isys/platform/pc98 -Isys/hal/sound -Isys/arch/x86 -Iuserland/lib -Iuserland/lib/gfx -Iuserland/lib/cfg -Iuserland/lib/math -c $< -o $@
 
 PPC_GUI_LIB := $(PPC_RES_DIR)/cargo/powerpc-os32-none/release/libgshell.a
 .PHONY: ppc-gshell-cargo
@@ -188,7 +188,7 @@ PPC_SH_MUT_FILE ?=
 PPC_SH_RUNTIME_SRC ?= userland/ppc/sh/newlib_runtime.c
 PPC_SH_RT := $(addprefix $(PPC_SH_DIR)/,runtime.o)
 PPC_SH_PROFILE ?= userland/ppc/sh/profile.h
-PPC_SH_FLAGS := -Iplatform/powermac -include $(PPC_SH_PROFILE) $(PPC_USER_FLAGS) -I. -Iinclude -Isdk/include -Iuserland/lib -Iuserland/shell -Iuserland/lib/filer -Iuserland/lib/gfx -Idrivers
+PPC_SH_FLAGS := -Iplatform/powermac -Isys/platform/powermac -include $(PPC_SH_PROFILE) $(PPC_USER_FLAGS) -I. -Iinclude -Isys/include -Isys/hal/time -Isys/hal/gfx -Isys/hal/input -Isys/platform/pc98 -Isys/hal/sound -Isys/arch/x86 -Isdk/include -Iuserland/lib -Iuserland/shell -Iuserland/lib/filer -Iuserland/lib/gfx -Idrivers
 
 .PHONY: sh
 sh: $(PPC_USER_OUT)/sh.bin

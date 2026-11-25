@@ -1,15 +1,15 @@
-"""移植準備 順序 4-b: lib/kstring_asm.asm (x86) と lib/kstring_c.c (C 版) の答え合わせ。
+"""移植準備 順序 4-b: sys/kern/kstring_asm.asm (x86) と sys/kern/kstring_c.c (C 版) の答え合わせ。
 
-票:   移植準備 順序 4-b (lib/kstring_asm.asm の C 版を用意する)
+票:   移植準備 順序 4-b (sys/kern/kstring_asm.asm の C 版を用意する)
 
 **x86 の既定ビルドはアセンブリのまま。** ここで見るのは「C 版に差し替えても
 結果が 1 バイトも変わらない」ことだけで、切り替えは別の判断。
 
 やり方は tools/tests/kstring_c_host.c の頭に書いた。要点だけ:
 
-  * 実物の lib/kstring_asm.asm を nasm -f elf32 で組み、objcopy で 13 本の
+  * 実物の sys/kern/kstring_asm.asm を nasm -f elf32 で組み、objcopy で 13 本の
     シンボルを a_* に改名する。
-  * 実物の lib/kstring_c.c をホスト ILP32 GNU11 (-m32) でコンパイルし、同じ
+  * 実物の sys/kern/kstring_c.c をホスト ILP32 GNU11 (-m32) でコンパイルし、同じ
     13 本を c_* に改名する。
   * 両方を 1 つの実行ファイルにリンクし、同じ入力で**戻り値とバッファの
     全内容 (前後の番兵を含む)** を突き合わせる。食い違ったら C 版が悪い
@@ -17,7 +17,7 @@
 
 突き合わせる入力: 空 / 1 バイト / 4・8・16 の前後 / 0x80 以上のバイトを含む列
 (日本語の UTF-8) / n が長さより長い・短い・0 / 重なりコピー (前方・後方) /
-kstrncpy の埋め。kdebug/kselftest.c の test_str の既存ケースも両版で通す。
+kstrncpy の埋め。sys/platform/pc98/kdebug/kselftest.c の test_str の既存ケースも両版で通す。
 
   python3 -B tools/tests/test_kstring_c.py [--mutate]
 
@@ -41,17 +41,17 @@ import mutpar                                                   # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-ASM_SRC = ROOT / "lib/kstring_asm.asm"
-C_SRC = ROOT / "lib/kstring_c.c"
+ASM_SRC = ROOT / "sys/kern/kstring_asm.asm"
+C_SRC = ROOT / "sys/kern/kstring_c.c"
 HOST_SRC = ROOT / "tools/tests/kstring_c_host.c"
 
-# lib/kstring_asm.asm が global 宣言している 13 本。ここが増減したら
+# sys/kern/kstring_asm.asm が global 宣言している 13 本。ここが増減したら
 # 試験も追随させる (下の check_symbol_set が食い違いを検出する)。
 FUNCS = ["kmemcpy", "memcpy", "kmemset", "memset",
          "kstrlen", "strlen", "kstrcmp", "strcmp",
          "kstrncmp", "strncmp", "kstrcpy", "kstrncpy", "memcmp"]
 
-# u32 は unsigned long (include/types.h) なので **必ず ILP32 で組む**。
+# u32 は unsigned long (sys/include/types.h) なので **必ず ILP32 で組む**。
 # build/config.mk の CFLAGS_COMMON と同じ素性 (-fsigned-char / -fno-short-enums
 # を含む) に -Wextra -Werror を足したもの。
 COMMON_FLAGS = ["-std=gnu11", "-ffreestanding", "-fno-pie",
@@ -247,7 +247,7 @@ MUTATIONS = [
 
 def one_mutation(item):
     """変異 1 本: C 版の写し (一時ディレクトリの木) を壊して組んで回す。
-    実物の lib/kstring_c.c は読むだけ。(印字, 見逃し) を返す。"""
+    実物の sys/kern/kstring_c.c は読むだけ。(印字, 見逃し) を返す。"""
     name, old, new = item
     original = C_SRC.read_text(encoding="utf-8")
     if old not in original:

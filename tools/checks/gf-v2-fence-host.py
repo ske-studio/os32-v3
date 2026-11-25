@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gf-v2-fence-host', tier=1, needs=[], budget=5,
-    covers=['drivers/video/geforce/gf_v2_fence.c', 'drivers/video/geforce/gf_v2.h',
+    covers=['sys/dev/video/geforce/gf_v2_fence.c', 'sys/dev/video/geforce/gf_v2.h',
             'hwdev/gf/*.h', 'gfx/v2/*.h', 'include/*.h', 'arch/*/arch_copy.h',
             'sdk/include/os32/*.h', 'tools/tests/gf_v2_fence_host.c',
             'tools/tests/test_gf_v2_fence.py', 'tools/tests/host32.py',

@@ -1,12 +1,12 @@
-#include "input/hal/input_context.h"
+#include "sys/input/input_context.h"
 int input_context_snapshot(KbdPolicySnapshot *out) { (void)out; return -1; }
 void kbd_policy_ime_state(u32 active, u32 owner, u32 gen)
 { (void)active; (void)owner; (void)gen; }
 int input_ime_cancel_take(const KbdPolicySnapshot *current) { (void)current; return -1; }
 #include "kbd_capture_fixture_host.h"
-#include "../../input/hal/legacy_ring.c"
-#include "../../input/hal/legacy_mode.c"
-#include "../../kernel/input_legacy.c"
+#include "../../sys/hal/input/legacy_ring.c"
+#include "../../sys/hal/input/legacy_mode.c"
+#include "../../sys/kern/input_legacy.c"
 /* Compile real console/FM/serial/kbd/IME bodies and the rshell wrapper.
  * Replace device I/O, scheduler landings and dictionary storage. */
 #include "types.h"
@@ -82,36 +82,36 @@ void cpu_delay_us(u32 us) { (void)us; host_wait(); }
 #define io_wait_n(n) ((void)(n))
 #define _halt() host_wait()
 #include "console_source.inc"
-#include "../../platform/pc98/console.c"
+#include "../../sys/platform/pc98/console.c"
 #include "fm_source.inc"
 #include "serial_source.inc"
-#include "../../drivers/char/serial_plan.c"
+#include "../../sys/dev/char/serial_plan.c"
 unsigned long sysclk_hz(void) { return SYSCLK_2458; }
 int sysclk_is_8mhz(void) { return 0; }
 void irq_enable(unsigned int irq) { (void)irq; }
 void irq_disable(unsigned int irq) { (void)irq; }
 #include "ime_log_source.inc"
 #define KAPI_HIT(n) ((void)(n))
-#include "../../drivers/input/kbd.h"
-#include "../../drivers/input/kbd_dlog.c"
+#include "../../sys/platform/pc98/input/kbd.h"
+#include "../../sys/dev/input/kbd_dlog.c"
 static int injected_byte = -1;
 u32 kbd_inject_pending(void) { return injected_byte >= 0; }
 int kbd_inject_peek(u8 *out) { if (injected_byte < 0) return 0; *out = (u8)injected_byte; return 1; }
 void appslot_poll_yield_reset(void) {}
 #include "input_wait_source.inc"
 #include "kbd_source.inc"
-#include "../../platform/pc98/ime_display.c"
+#include "../../sys/platform/pc98/ime_display.c"
 #include "ime_source.inc"
-#include "../../kernel/input_service.c"
+#include "../../sys/hal/input/input_service.c"
 #include "port_source.inc"
-#include "../../kernel/serial_diag.c"
+#include "../../sys/kern/serial_diag.c"
 #include "pointer_fixture_host.h"
 /* This fixture exercises input/serial; supply a fake calendar provider. */
-#include "../../kernel/time/clock_service.c"
+#include "../../sys/hal/time/clock_service.c"
 const ClockOps pc98_clock = {
     .read_date = clock_empty_date, .read_legacy = clock_empty_legacy,
 };
-#include "../../platform/pc98/d2_bind.c"
+#include "../../sys/platform/pc98/d2_bind.c"
 void old_mml_target(const char *mml) { (void)mml; ports++; }
 #include "rshell_source.inc"
 #include "kstring.c"

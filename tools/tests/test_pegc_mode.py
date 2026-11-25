@@ -1,4 +1,4 @@
-"""PEGC 640x480 へ入る / 戻る OUT 列と GDC の FIFO・VSYNC 待ち (drivers/video/pc98/backend_pegc.c)。
+"""PEGC 640x480 へ入る / 戻る OUT 列と GDC の FIFO・VSYNC 待ち (sys/platform/pc98/video/backend_pegc.c)。
 
 受け入れ (A): 実機 PC-9821Ra266 の ROM の OUT 列 (v86 -g の記録) との突き合わせ
 (pegc_mode_host.c の ROM_S480 / ROM_BACK、票 TASK_PEGC480_REALHW §3-3・§5)。
@@ -6,7 +6,7 @@
 記録: tools/tests/pegc_mode_tdd.md
 票:   docs/tasks/realhw/TASK_PEGC480_REALHW.md (§2 H2・H3・H5、§4)
 
-tools/tests/pegc_mode_host.c が実物の drivers/video/pc98/backend_pegc.c を 1 行も写さずに
+tools/tests/pegc_mode_host.c が実物の sys/platform/pc98/video/backend_pegc.c を 1 行も写さずに
 #include し、ポート I/O だけを偽物 (tools/tests/pegc_hostshim/io.h) にして
 ILP32 で回す。送る OUT 列 (ポート・値・順序) を期待列と比べ、GDC への書き込みの
 直前に FIFO のステータスを見ていること・待ちに上限があることを確かめる。
@@ -17,7 +17,7 @@ ILP32 で回す。送る OUT 列 (ポート・値・順序) を期待列と比�
 組み、この試験が RED になることを見る。make・エミュレータ・配備には触れない。
 """
 CHECK = dict(name='pegc-mode-host', tier=1,
-    covers=['drivers/video/pc98/pegc_v2.c', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/palette.h', 'include/gfx_format.h', 'tools/tests/host32.py', 'drivers/video/pc98/backend_pegc.c', 'drivers/char/np2sysp.c', 'drivers/input/mouse_seamless.c', 'drivers/input/mouse.h', 'kernel/console/console.c', 'tools/tests/mutpar.py', 'tools/tests/pegc_mode_host.c', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'include/console_attr.h', 'tools/tests/kernel_includes.py', 'tools/tests/test_pegc_mode.py', 'drivers/video/pc98/backend_pegc_*.inc'],
+    covers=['sys/platform/pc98/video/pegc_v2.c', 'sys/hal/gfx/v2/gfx2_int.h', 'sys/include/gfx_sync.h', 'sys/hal/gfx/gfx_hal2.h', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/hal/gfx/palette.h', 'sys/include/gfx_format.h', 'tools/tests/host32.py', 'sys/platform/pc98/video/backend_pegc.c', 'sys/dev/char/np2sysp.c', 'sys/dev/input/mouse_seamless.c', 'sys/platform/pc98/input/mouse.h', 'sys/kern/console/console.c', 'tools/tests/mutpar.py', 'tools/tests/pegc_mode_host.c', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'sys/include/port_service.h', 'sys/include/console_output.h', 'sys/kern/port_service.c', 'sys/kern/console/console_backend.h', 'sys/platform/pc98/console.c', 'sys/include/console_attr.h', 'tools/tests/kernel_includes.py', 'tools/tests/test_pegc_mode.py', 'drivers/video/pc98/backend_pegc_*.inc'],
     needs=[], budget=3.5,
     basis=['HAL_V2_DESIGN §5', 'HAL_V2_DESIGN §6', 'HAL_V2_DESIGN §7'],
     kind='characterization',
@@ -42,11 +42,11 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
 TARGET_INCLUDES = include_flags(ROOT)
 SHIM = "-I" + str(ROOT / "tools/tests/pegc_hostshim")
 SRC = ROOT / "tools/tests/pegc_mode_host.c"
-MUT_TARGET = "drivers/video/pc98/backend_pegc.c"
-TIMING_TARGET = "drivers/video/pc98/backend_pegc_timing.inc"
-RESTORE_TARGET = "drivers/video/pc98/backend_pegc_restore.inc"
-DIAG_TARGET = "drivers/video/pc98/backend_pegc_diag.inc"
-HDR = "include/pegc.h"
+MUT_TARGET = "sys/platform/pc98/video/backend_pegc.c"
+TIMING_TARGET = "sys/platform/pc98/video/backend_pegc_timing.inc"
+RESTORE_TARGET = "sys/platform/pc98/video/backend_pegc_restore.inc"
+DIAG_TARGET = "sys/platform/pc98/video/backend_pegc_diag.inc"
+HDR = "sys/platform/pc98/pegc.h"
 
 
 def host_cmd(exe):
@@ -196,7 +196,7 @@ MUTATIONS = [
     ("cursor_before_start", RESTORE_TARGET,
      "    gdc_cmd(&s_gdc_text, PEGC_GDC_CMD_START2);\n    if (!con_sink_is_enabled()) console_hw_cursor_enable();\n",
      "    if (!con_sink_is_enabled()) console_hw_cursor_enable();\n    gdc_cmd(&s_gdc_text, PEGC_GDC_CMD_START2);\n"),
-    ("console_cursor_no_dc", "platform/pc98/console.c",
+    ("console_cursor_no_dc", "sys/platform/pc98/console.c",
      "    outp(GDC_TEXT_PARAM, (u8)((visible ? GDC_CSRFORM_DC : 0) | (GDC_TEXT_LINES_PER_ROW - 1)));",
      "    outp(GDC_TEXT_PARAM, (u8)((visible ? 0 : 0) | (GDC_TEXT_LINES_PER_ROW - 1)));"),
     ("cursor_in_gui", RESTORE_TARGET,
@@ -323,12 +323,12 @@ MUTATIONS = [
 
 
 V2_MUTATIONS = [
-    ('software-only', "drivers/video/pc98/pegc_v2.c", 'out->caps2d_sw = ops;', 'out->caps2d_sw = 0;'),
-    ('scanout-format', "drivers/video/pc98/pegc_v2.c", 'out->fmt_scanout = 1u << GFX2_FMT_INDEX8;', 'out->fmt_scanout = 1u << GFX2_FMT_RGB565;'),
-    ('empty-heap', "drivers/video/pc98/pegc_v2.c", '*base = *size = *phys = 0;', '*base = *size = *phys = 1;'),
-    ('kva', "drivers/video/pc98/pegc_v2.c", '*va = s->kva;', '*va = NULL;'),
-    ('completion', "drivers/video/pc98/pegc_v2.c", '*done = 0;', '*done = 1;'),
-    ('palette', "drivers/video/pc98/pegc_v2.c", '(xrgb[i] >> 20) & 15', '(xrgb[i] >> 16) & 15'),
+    ('software-only', "sys/platform/pc98/video/pegc_v2.c", 'out->caps2d_sw = ops;', 'out->caps2d_sw = 0;'),
+    ('scanout-format', "sys/platform/pc98/video/pegc_v2.c", 'out->fmt_scanout = 1u << GFX2_FMT_INDEX8;', 'out->fmt_scanout = 1u << GFX2_FMT_RGB565;'),
+    ('empty-heap', "sys/platform/pc98/video/pegc_v2.c", '*base = *size = *phys = 0;', '*base = *size = *phys = 1;'),
+    ('kva', "sys/platform/pc98/video/pegc_v2.c", '*va = s->kva;', '*va = NULL;'),
+    ('completion', "sys/platform/pc98/video/pegc_v2.c", '*done = 0;', '*done = 1;'),
+    ('palette', "sys/platform/pc98/video/pegc_v2.c", '(xrgb[i] >> 20) & 15', '(xrgb[i] >> 16) & 15'),
     ('publish-kind', MUT_TARGET, 'gfx2_sync_publish(GFX2_KIND_PEGC, 0, s_sync);', 'gfx2_sync_publish(GFX2_KIND_PC98, 0, s_sync);'),
     ('bind-fallback', MUT_TARGET, 's_probe_ok = 0;\n        return;', 's_probe_ok = 1;\n        return;'),
     ('fixed-shadow', MUT_TARGET, 'gfxsync_mode(s_sync) != GFXSYNC_SHADOW', 'gfxsync_mode(s_sync) == GFXSYNC_SHADOW'),
@@ -389,7 +389,7 @@ if __name__ == "__main__":
         tmp = pathlib.Path(tmp)
         exe = tmp / "pegc-mode"
         subprocess.run(host_cmd(exe), cwd=ROOT, check=True)
-        print("HOST ILP32 GNU11 COMPILE PASS (real drivers/video/pc98/backend_pegc.c)",
+        print("HOST ILP32 GNU11 COMPILE PASS (real sys/platform/pc98/video/backend_pegc.c)",
               flush=True)
         rc = host32.run([str(exe)], cwd=ROOT, timeout=60).returncode
         print("EXIT pegc_mode_host=%d" % rc, flush=True)

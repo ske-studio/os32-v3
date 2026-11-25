@@ -10,14 +10,14 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'platform/powermac/lan_gem_io.c'
+SOURCE = ROOT / 'sys/platform/powermac/lan_gem_io.c'
 PPC = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin'
 
 HARNESS = r'''
-#include "platform/powermac/lan_boot.h"
-#include "drivers/net/gem/gem.h"
-#include "arch/ppc/kernel_boot.h"
-#include "platform/powermac/kboot_info.h"
+#include "sys/platform/powermac/lan_boot.h"
+#include "sys/dev/net/gem/gem.h"
+#include "sys/arch/ppc/kernel_boot.h"
+#include "sys/platform/powermac/kboot_info.h"
 static int reads, writes, mode;
 static u32 written;
 static struct ppc_boot_devices dev = { .gmac_va=0x123000, .pci_addr_va=0x456000, .pci_data_va=0x457000 };

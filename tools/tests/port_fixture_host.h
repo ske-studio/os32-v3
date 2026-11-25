@@ -1,7 +1,7 @@
 /* Recording PC98 serial operations for the real platform table. */
-#include "../../drivers/char/serial.h"
-#include "../../kernel/port_service.c"
-#include "../../kernel/serial_diag.c"
+#include "../../sys/dev/char/serial.h"
+#include "../../sys/kern/port_service.c"
+#include "../../sys/kern/serial_diag.c"
 static int port_seen, port_char, emergency_seen, emergency_gate;
 static unsigned long port_baud;
 static const char *port_string;

@@ -33,8 +33,8 @@ def run(folder, image=None, mode_c=False):
     elf = module.mkmod.Elf((ROOT/'build/out/hwdev/hwdev.elf').read_bytes())
     header = '#define TRACE_IMPORT_SLOTS %dU\n' % elf.symbol('hwdev_import_slots')['value']
     if mode_c:
-        owner_source = (ROOT/'kdebug/gfinit.c').read_text()
-        header += '#include "hwdev/gf/foundation.h"\n#include "kdebug/gfinit_bus.h"\n#include "kdebug/gfinit_plan.h"\n#include "hwdev/owner.h"\n'
+        owner_source = (ROOT/'sys/dev/video/geforce/diag/gfinit.c').read_text()
+        header += '#include "sys/dev/video/geforce/foundation.h"\n#include "sys/dev/video/geforce/diag/gfinit_bus.h"\n#include "sys/dev/video/geforce/diag/gfinit_plan.h"\n#include "sys/dev/hwdev/owner.h"\n'
         header += re.search(r'struct gfinit_owner \{.*?\n\};', owner_source, re.S)[0] + '\n'
         # The decoder's local control() has the same name as the owner's BSS.
         symbols = {line.split()[-1]: int(line.split()[0],16) for line in
@@ -81,7 +81,7 @@ def run(folder, image=None, mode_c=False):
             '    adapter_cases();\n'
             '    pll_parser_tests(); pll_solver_tests(); pll_sequence_tests();\n'
             '    resource_tests(); accessor_tests(); production_plan(0); production_plan(RECOVER_CR1F_UNLOCKED);') + suffix
-    names = json.loads((ROOT/'hwdev/generated/hwdev_imports.json').read_text())['imports']
+    names = json.loads((ROOT/'sys/dev/hwdev/generated/hwdev_imports.json').read_text())['imports']
     core = {e['symbol'] for e in module.gen.slots() if e['group']=='core'} - {'kpeek_call', 'recover_hal_wait_frame'}
     source += '\nstatic void unused_import(void) { CHECK(0); }\n'
     # The loaded image resolves its own GF location, independently of the host
@@ -113,7 +113,7 @@ def run(folder, image=None, mode_c=False):
     command[command.index(str(ROOT/'tools/tests/gfinit_plan_host.c'))] = str(harness)
     if mode_c:
         command.insert(1, '-DHWDEV_SEQUENCE_IMAGE')
-    command[-2:-2] = [str(ROOT/'tools/tests/hwdev_trace_image.c'), str(ROOT/'kernel/module/module_image.c'),
+    command[-2:-2] = [str(ROOT/'tools/tests/hwdev_trace_image.c'), str(ROOT/'sys/kern/module/module_image.c'),
                       *module.INCLUDES, '-I'+str(folder), '-I'+str(ROOT/'build/out/hwdev')]
     subprocess.run(command, check=True)
     if image is None:

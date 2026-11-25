@@ -1,7 +1,7 @@
-# fs/vfs.c — パスの種別判定 (`vfs_path_kind`)
+# sys/fs/vfs.c — パスの種別判定 (`vfs_path_kind`)
 
 > 状態: **現行 (2026-11-18)** — 出所: HSYNC_IMPROVEMENT_PLAN (H1 の B6 / B7)・TASK_FS_TYPE の契約を今のソースと照らして要約
-ソース: `fs/vfs.c` (`vfs_path_kind`・`vfs_kind_probe_cb`・`vfs_chdir`)・`fs/vfs_fd.c` (`vfs_open_probe`)
+ソース: `sys/fs/vfs.c` (`vfs_path_kind`・`vfs_kind_probe_cb`・`vfs_chdir`)・`sys/fs/vfs_fd.c` (`vfs_open_probe`)
 
 `vfs_path_kind` はパスがディレクトリか通常ファイルかを返す。戻り値は `VFS_KIND_DIR` / `VFS_KIND_FILE` / 負値 (`VFS_ERR_*`)。
 原則は 1 つ: **「読めなかった」を「無い」「その型ではない」と読み替えない。** 負値は判定できなかったことを表し、受け手もそれを通す。

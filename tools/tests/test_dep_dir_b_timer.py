@@ -21,31 +21,31 @@ from test_dep_dir_b_io import trace
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/dep_dir_b_l13_baseline.json'
-SOURCES = ('platform/pc98/sysclk.c', 'platform/pc98/pit.c', 'kernel/time/ktime.c', 'platform/pc98/clock_source.c', 'platform/pc98/pit_time.c',
-           'platform/pc98/pit_math.c', 'kernel/time/time_math.c',
-           'platform/pc98/clock.c', 'platform/pc98/timer.c', 'platform/pc98/pic.c')
-HEADERS = ('platform/pc98/tsc_clock.h', 'platform/pc98/clock_source.h', 'kernel/io_clock.h', 'kernel/irq/tick_budget.h', 'include/platform_timer.h', 'include/clock_source.h', 'platform/pc98/pit_time.h', 'include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'include/kernel_tick.h',
-           'arch/x86/kernel/gdt.h', 'kernel/irq/irq_math.h', 'platform/pc98/pit_math.h', 'kernel/time/time_math.h',
-           'kernel/time/ktime.h', 'kernel/time/tick_clock.h',
-           'platform/pc98/sysclk.h', 'platform/pc98/legacy/v86_bios.h', 'platform/pc98/bios_snapshot.h', 'platform/pc98/platform_pic.h', 'include/irq_line.h')
+SOURCES = ('sys/platform/pc98/sysclk.c', 'sys/platform/pc98/pit.c', 'sys/kern/time/ktime.c', 'sys/platform/pc98/clock_source.c', 'sys/platform/pc98/pit_time.c',
+           'sys/platform/pc98/pit_math.c', 'sys/kern/time/time_math.c',
+           'sys/platform/pc98/clock.c', 'sys/platform/pc98/timer.c', 'sys/platform/pc98/pic.c')
+HEADERS = ('sys/platform/pc98/tsc_clock.h', 'sys/platform/pc98/clock_source.h', 'sys/kern/io_clock.h', 'sys/kern/irq/tick_budget.h', 'sys/include/platform_timer.h', 'sys/hal/time/clock_source.h', 'sys/platform/pc98/pit_time.h', 'sys/include/platform_irq.h', 'sys/platform/pc98/platform_irq_limits.h', 'sys/arch/x86/kernel/idt.h', 'sys/platform/pc98/pit.h', 'sys/include/kernel_tick.h',
+           'sys/arch/x86/kernel/gdt.h', 'sys/kern/irq/irq_math.h', 'sys/platform/pc98/pit_math.h', 'sys/kern/time/time_math.h',
+           'sys/kern/time/ktime.h', 'sys/hal/time/tick_clock.h',
+           'sys/platform/pc98/sysclk.h', 'sys/platform/pc98/legacy/v86_bios.h', 'sys/platform/pc98/bios_snapshot.h', 'sys/platform/pc98/platform_pic.h', 'sys/include/irq_line.h')
 MUTATIONS = (
-    ('platform/pc98/clock.c',
+    ('sys/platform/pc98/clock.c',
      'out->is_8mhz ? (unsigned long)SYSCLK_1997 : (unsigned long)SYSCLK_2458',
      'out->is_8mhz ? (unsigned long)SYSCLK_2458 : (unsigned long)SYSCLK_1997'),
-    ('platform/pc98/timer.c',
+    ('sys/platform/pc98/timer.c',
      '    outp(PIT_CNTR0, reload & 0xFF);\n    outp(PIT_CNTR0, (reload >> 8) & 0xFF);',
      '    outp(PIT_CNTR0, (reload >> 8) & 0xFF);\n    outp(PIT_CNTR0, reload & 0xFF);'),
-    ('platform/pc98/timer.c',
+    ('sys/platform/pc98/timer.c',
      '    out->p1 = platform_irq_timer_pending();',
      '    out->p1 = platform_irq_timer_pending();\n    out->p2 = platform_irq_timer_pending();'),
-    ('platform/pc98/clock_source.c', 'attempt < TIME_RETRY_MAX;', 'attempt <= TIME_RETRY_MAX;'),
-    ('platform/pc98/clock_source.c', '        platform_timer_sample(&hw);',
+    ('sys/platform/pc98/clock_source.c', 'attempt < TIME_RETRY_MAX;', 'attempt <= TIME_RETRY_MAX;'),
+    ('sys/platform/pc98/clock_source.c', '        platform_timer_sample(&hw);',
      '        tick_clock_raw(&raw_lo, &raw_hi);\n        platform_timer_sample(&hw);'),
-    ('platform/pc98/clock_source.c', '*lo = out_lo;', '*lo = out_lo ^ (attempt == 1);'),
-    ('platform/pc98/clock_source.c', '*hi = out_hi;', '*hi = out_hi ^ (attempt == 1);'),
-    ('kernel/time/ktime.c', 'if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;',
+    ('sys/platform/pc98/clock_source.c', '*lo = out_lo;', '*lo = out_lo ^ (attempt == 1);'),
+    ('sys/platform/pc98/clock_source.c', '*hi = out_hi;', '*hi = out_hi ^ (attempt == 1);'),
+    ('sys/kern/time/ktime.c', 'if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;',
      '(void)s_last_us;'),
-    ('kernel/time/ktime.c', 'if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;',
+    ('sys/kern/time/ktime.c', 'if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;',
      '(void)time_clamp(us, s_last_us, &us);'),
 )
 # Relocations remove the old operation, rather than adding another sample.
@@ -69,18 +69,18 @@ def build(work, clock_byte, mutation=None, baseline=None, retry_value=False):
         dest.write_text(text)
     (work / 'io.h').write_text((ROOT / 'tools/tests/dep_dir_b_io_shim.h').read_text())
     if baseline is None:
-        clock = (work / 'platform/pc98/sysclk.c').read_text()
-        pit = (work / 'platform/pc98/pit.c').read_text()
-        ktime = (work / 'platform/pc98/clock_source.c').read_text() + '\n' + (work / 'kernel/time/ktime.c').read_text()
+        clock = (work / 'sys/platform/pc98/sysclk.c').read_text()
+        pit = (work / 'sys/platform/pc98/pit.c').read_text()
+        ktime = (work / 'sys/platform/pc98/clock_source.c').read_text() + '\n' + (work / 'sys/kern/time/ktime.c').read_text()
     else:
         clock, idt, ktime = baseline
         pit = re.search(r'static struct pit_setup s_pit.*?^int pit_init\(unsigned int hz\)\n\{.*?^\}', idt, re.M | re.S)[0]
     for name, text in (('clock', clock), ('pit', pit), ('ktime', ktime)):
         (work / (name + '_source.inc')).write_text(text)
     exe = work / 'timer-test'
-    linked = ['platform/pc98/pit_math.c', 'kernel/time/time_math.c', 'platform/pc98/pit_time.c']
+    linked = ['sys/platform/pc98/pit_math.c', 'sys/kern/time/time_math.c', 'sys/platform/pc98/pit_time.c']
     if baseline is None:
-        linked += ['platform/pc98/clock.c', 'platform/pc98/timer.c', 'platform/pc98/pic.c']
+        linked += ['sys/platform/pc98/clock.c', 'sys/platform/pc98/timer.c', 'sys/platform/pc98/pic.c']
     libgcc = subprocess.check_output([str(Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc'), '-print-libgcc-file-name'], text=True).strip()
     subprocess.run([
         'gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',

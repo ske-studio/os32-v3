@@ -8,8 +8,8 @@ def main():
     pm = ROOT / 'platform/powermac'
     source = (pm / 'ver_backend.c').read_text()
     files = {'platform_ver.h': (pm / 'platform_ver.h').read_text(),
-             'formatter.c': (ROOT / 'kernel/ver_format.c').read_text(),
-             'ppc_trap.h': '#include "arch/ppc/ppc_trap.h"\n',
+             'formatter.c': (ROOT / 'sys/kern/ver_format.c').read_text(),
+             'ppc_trap.h': '#include "sys/arch/ppc/ppc_trap.h"\n',
              'mpic.h': 'u32 pm_mpic_source_count(void);\n'}
     cases = [(None, None, None)]
     if args.mutate:
@@ -18,14 +18,14 @@ def main():
                   ('; active', '; inactive', 'equal(out->lines[index].text, text)')]
     for old, new, failure in cases:
         files['backend.c'] = source
-        files['formatter.c'] = (ROOT / 'kernel/ver_format.c').read_text()
+        files['formatter.c'] = (ROOT / 'sys/kern/ver_format.c').read_text()
         if old:
             target = 'formatter.c' if old == '; active' else 'backend.c'
             assert files[target].count(old) == 1
             files[target] = files[target].replace(old, new)
         try:
             result = execute((ROOT / 'tools/tests/ppc_ver_host.c').read_text(),
-                             args.runner, files, assembly='lib/kstring_asm.asm')
+                             args.runner, files, assembly='sys/kern/kstring_asm.asm')
         except subprocess.CalledProcessError as exc:
             print(exc.stderr)
             raise

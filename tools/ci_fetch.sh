@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GitHub Actions (build.yml) が作った OS32 のビルド成果物を取ってくる (docs/08_build.md §8-6)。
+# GitHub Actions (restructure-build.yml) が作った OS32 のビルド成果物を取ってくる (docs/08_build.md §8-6)。
 #
 # 実機に繋がったホスト側で使う。要 gh CLI (`gh auth login` を 1 回。public repo でも
 # artifact の API ダウンロードには認証が要る)。
@@ -17,7 +17,7 @@
 set -euo pipefail
 
 REPO="ske-studio/os32-v3"
-WORKFLOW="build.yml"
+WORKFLOW="restructure-build.yml"
 BRANCH="main"
 BRANCH_SET=0
 SHA=""

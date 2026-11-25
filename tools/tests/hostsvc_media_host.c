@@ -1,9 +1,9 @@
 /* D4/D5 MEDIA: real ISO/VFS/Device, fake physical and network media.
  * Real Device dispatch and VFS refresh are connected by stage I. */
-#include "fs/isofs/iso9660.h"
-#include "fs/isofs/iso9660_media.h"
-#include "kernel/dev/dev.h"
-#include "lib/kstring.h"
+#include "sys/fs/isofs/iso9660.h"
+#include "sys/fs/isofs/iso9660_media.h"
+#include "sys/hal/block/dev.h"
+#include "sys/kern/kstring.h"
 #include "kmalloc.h"
 #include "endian_le.h"
 #define REQUIRE(x) do { if (!(x)) return (__LINE__ % 250) + 1; } while (0)
@@ -25,17 +25,17 @@ void real_fd_stale_mount(void *ctx);
 static void *staled;
 static unsigned stale_calls;
 void vfs_fd_stale_mount(void *ctx) { staled=ctx; stale_calls++; real_fd_stale_mount(ctx); }
-#include "fs/isofs/iso9660.c"
-#include "fs/vfs.c"
+#include "sys/fs/isofs/iso9660.c"
+#include "sys/fs/vfs.c"
 #define vfs_fd_stale_mount real_fd_stale_mount
-#include "fs/vfs_fd.c"
+#include "sys/fs/vfs_fd.c"
 #undef vfs_fd_stale_mount
 struct VfsStdinRead *exec_stdin_state(void) { return 0; }
 int input_getchar_kapi(void) { return -1; }
 int res_owner_get(void) { return 1; }
 int fd_is_redirected(int fd) { (void)fd; return 0; }
 int fd_redirect_read(int fd, void *b, u32 n) { (void)fd; (void)b; (void)n; return -1; }
-#include "platform/pc98/boot_names.c"
+#include "sys/platform/pc98/boot_names.c"
 
 #define SECTORS 40u
 static u8 images[2][SECTORS * ISO_SECTOR_SIZE];

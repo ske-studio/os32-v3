@@ -16,13 +16,13 @@ from usb_run import in2_observe
 
 
 IN2_MUTATIONS = {
-    'no-key': ('input/hal/usb_input.c', 'if (!input_capture_key(&key) && pause',
+    'no-key': ('sys/hal/input/usb_input.c', 'if (!input_capture_key(&key) && pause',
                'if (usage != 0x04 && !input_capture_key(&key) && pause'),
-    'no-button': ('input/hal/usb_input.c', '    input_capture(&e);\n    return 1;', '    return 1;'),
-    'no-local': ('platform/powermac/input_boot.c', 'return input_legacy_try(IL_LOCAL_CHAR);',
+    'no-button': ('sys/hal/input/usb_input.c', '    input_capture(&e);\n    return 1;', '    return 1;'),
+    'no-local': ('sys/platform/powermac/input_boot.c', 'return input_legacy_try(IL_LOCAL_CHAR);',
                  'return -1;'),
-    'no-abort': ('input/hal/usb_input.c', 'ring3_abort_request();', '(void)0;'),
-    'no-release': ('input/hal/in2_state.c', 'if (pointer_source_buttons(src)) input_capture(&e);',
+    'no-abort': ('sys/hal/input/usb_input.c', 'ring3_abort_request();', '(void)0;'),
+    'no-release': ('sys/hal/input/in2_state.c', 'if (pointer_source_buttons(src)) input_capture(&e);',
                    '(void)src;'),
 }
 
@@ -47,7 +47,7 @@ def main():
             'KB_ROOT_BINS='+str(user/'in2prob.bin')]
     # Count idle steps reached after an empty interruptible key read.
     anchor = '        p->wait_step();'
-    observation = mutant_settings(work, 'wait-observer', 'kernel/input_wait.c', anchor,
+    observation = mutant_settings(work, 'wait-observer', 'sys/kern/input_wait.c', anchor,
         '        extern volatile unsigned in2_wait_steps;\n'
         '        if (!gui && mode == IL_KEY && interruptible) ++in2_wait_steps;\n' + anchor)
     with Path(observation[1].split('=', 1)[1]).open('a') as source:

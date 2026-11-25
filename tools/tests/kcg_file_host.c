@@ -6,7 +6,7 @@ static u32 strlen(const char *s) { u32 n=0; while(s[n]) n++; return n; }
 static void *memcpy(void *d,const void *s,u32 n) { u8 *p=d; const u8 *q=s; while(n--) *p++=*q++; return d; }
 #define __KSTRING_H
 u32 kstrlen(const char *s) { return (u32)strlen(s); }
-/* Match lib/kstring_c.c / kstring_asm.asm: capacity includes NUL, no padding. */
+/* Match sys/kern/kstring_c.c / kstring_asm.asm: capacity includes NUL, no padding. */
 char *kstrlcpy(char *dst, const char *src, u32 size)
 {
     u32 i;
@@ -15,17 +15,17 @@ char *kstrlcpy(char *dst, const char *src, u32 size)
     dst[i] = '\0';
     return dst;
 }
-#include "../../fs/vfs_fd.c"
+#include "../../sys/fs/vfs_fd.c"
 #ifdef FONT_SOURCE_HOST_APP_TOTAL
 #undef VFS_FONT_FD_MAX_APP_TOTAL
 #define VFS_FONT_FD_MAX_APP_TOTAL FONT_SOURCE_HOST_APP_TOTAL
 #endif
-/* kernel/gui.h は ILP32 の構造体の大きさを STATIC_ASSERT するので 64 ビットの
+/* sys/kern/gui.h は ILP32 の構造体の大きさを STATIC_ASSERT するので 64 ビットの
  * ホストでは読めない。font_source.c が使うのは GUI_SHELL_OWNER だけなので、
- * 試験 py が kernel/gui.h から読んだ値を -DHOST_GUI_SHELL_OWNER で渡す */
+ * 試験 py が sys/kern/gui.h から読んだ値を -DHOST_GUI_SHELL_OWNER で渡す */
 #define __GUI_H
 #define GUI_SHELL_OWNER HOST_GUI_SHELL_OWNER
-#include "../../kernel/console/font_source.c"
+#include "../../sys/kern/console/font_source.c"
 #include "exec_font_lease.h"
 
 #define MOCK_FILE_SIZE 297133u
@@ -167,7 +167,7 @@ static int test_resident_close(u32 id) {
     return fail_close ? OS32_ERR_IO : rc;
 }
 #define font_lease_resident_close test_resident_close
-#include "../../kernel/console/font_source_kcg.c"
+#include "../../sys/kern/console/font_source_kcg.c"
 #undef font_lease_resident_close
 #undef font_lease_resident_read_at
 static void fixture(void) {

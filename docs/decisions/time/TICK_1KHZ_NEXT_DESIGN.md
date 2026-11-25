@@ -4,9 +4,9 @@
 # tick-b r3: 1kHz tick の次の段 (A2・B) と winmm のタイマ
 
 ## r2→r3 の変更 (REVIEW.r2.md の ID ごと、main 13a4ffdd)
-- P1-LINK_IDLE: `net/link.c` の `LINK_IDLE()` (`link_selftest.inc` の待ち) にも IF=1 の協調処理を入れる。既存の link の自己試験を受入に加える (§2-4・A2-c7・§6)。
+- P1-LINK_IDLE: `sys/net/link.c` の `LINK_IDLE()` (`link_selftest.inc` の待ち) にも IF=1 の協調処理を入れる。既存の link の自己試験を受入に加える (§2-4・A2-c7・§6)。
 - P1-IRQ の判定: IRQ 文脈かどうかは `kctx_irq_depth` だけで決める (`nic.in_irq` は使わない)。slot4 経由の送信 (`net_tx` → `ne2k_send`) を故障注入で確かめる (§2-4・§6)。
-- P1-IF=0 の経路: IF=0 の経路 (`net_tx` の `net/nic.c`、`ne2k_leave` の `ne2000.c`) では送信列に積むことと印だけを行い、重い再処理は IF=1 の bh に移す。故障試験は IF=0 の全経路を対象にする (§2-4・§6)。
+- P1-IF=0 の経路: IF=0 の経路 (`net_tx` の `sys/net/nic.c`、`ne2k_leave` の `ne2000.c`) では送信列に積むことと印だけを行い、重い再処理は IF=1 の bh に移す。故障試験は IF=0 の全経路を対象にする (§2-4・§6)。
 - P1-予算の上限: slot2〜4 の上限を、固定処理 (slot2・demux) と後続処理 (deadlines・timers・link_notify_tick) の最大費用を予約した形で定義し直した (§2-3・§6)。
 - P2-B6 のアンカー: B6 に、`test_time_math.py`・同ファイル内 を含む全アンカーと、fixture・期待値・tdd の更新 (time_math_host.c・pit_clock_host.c・dep_dir_b_timer_host.c・recover_t2_host.inc・splash_probe_host.c・*_tdd.md) を割り当てた (§5)。
 
@@ -38,13 +38,13 @@
 ## 1. 実物の確認 (食い違い 10 件)
 | # | 票・既存設計の前提 | 実物 (file:line) | 本稿の扱い |
 |---|---|---|---|
-| R1 | T1K §6: `kernel/time/pit.c`・`pit_math.c`・`time_math.c` を直す | PIT は `platform/pc98/pit.c`・`pit_math.c` (`hz != PIT_HZ` で拒否)・`pit_time.c` (`time_us_from`)・`clock_source.c` に移った。`kernel/time/time_math.c` は `time_clamp` だけ | §3 の変更先を platform/pc98 側に付け替える |
-| R2 | T1K §4: tick_count の定義は idt.c | 実際は `kernel/time/tick.c` | tick.c を tick_clock の置き場にする |
+| R1 | T1K §6: `kernel/time/pit.c`・`pit_math.c`・`time_math.c` を直す | PIT は `sys/platform/pc98/pit.c`・`pit_math.c` (`hz != PIT_HZ` で拒否)・`pit_time.c` (`time_us_from`)・`clock_source.c` に移った。`sys/kern/time/time_math.c` は `time_clamp` だけ | §3 の変更先を platform/pc98 側に付け替える |
+| R2 | T1K §4: tick_count の定義は idt.c | 実際は `sys/hal/time/tick.c` | tick.c を tick_clock の置き場にする |
 | R3 | T1K D4: ISR は isr_stub.asm〜468 | 実際は `isr_stub.asm` (inc)・`irq_stub_0` (timer_handler)・`irq_stub_0` (EOI)・`irq_stub_0` (V86_REFLECT)・`irq_stub_0` (timeout) | 行番号を更新する。手順は T1K §4 のまま |
 | R4 | T1K §4 は tick × period_us の積を禁じた | `pit_time.c` がまだ `tick × period_us`。1kHz では −100ppm ずつずれる | §3-3 で有理式に置き換える |
 | R5 | T1K §5 の監査台帳 | 台帳に無い C の利用者 5 件 (`geforce_module.c` の `foreground_deadline_update()`・`splash_raster_run.h` の `PL_RUN_TICK_US`・`kernel_boot_cpu.inc` の `kernel_boot_cpu()`・`sfs_proto.h` の `SFS_TICK_MS`・`kbd_watch.h`) と、`.rs` で get_tick を使う 19 ファイル。`snd_engine.c` は hal-av R0 で消える | §3-4 |
-| R6 | hal-av §9-4: 代替は「PIT のワンショット」 | IRQ に繋がるカウンタは #0 だけ (`include/pc98.h`、#1 はビープ、#2 は RS-232C)。#0 をワンショットにすると、mode 2 の固定周期とそれに依る補間時計 (sys_time_now)・ジフィとは**併用できない** (ワンショット自体は可能) | ユーザー決定で 1ms の期限照合に置き換えた (§3-5) |
-| R7 | 票 §1: A2 の削減値は A の実測後に決める | A1 は NIC 負荷を流していない。slot4 の 118.7µs は無負荷の値で、制御フレームの送信の PIO (`net/link.c` の `link_tx_control()` → `ne2000_data.inc`) と推測 | A2-a で測る |
+| R6 | hal-av §9-4: 代替は「PIT のワンショット」 | IRQ に繋がるカウンタは #0 だけ (`sys/platform/pc98/pc98.h`、#1 はビープ、#2 は RS-232C)。#0 をワンショットにすると、mode 2 の固定周期とそれに依る補間時計 (sys_time_now)・ジフィとは**併用できない** (ワンショット自体は可能) | ユーザー決定で 1ms の期限照合に置き換えた (§3-5) |
+| R7 | 票 §1: A2 の削減値は A の実測後に決める | A1 は NIC 負荷を流していない。slot4 の 118.7µs は無負荷の値で、制御フレームの送信の PIO (`sys/net/link.c` の `link_tx_control()` → `ne2000_data.inc`) と推測 | A2-a で測る |
 | R8 | 実機の NIC | Ra266 は Intel 82557 (bus master、RA266.md:29)。LGY-98 の PIO は NP21/W だけ | 契約は両方の機械に同じものを掛ける (U4=b) |
 | R9 | winmm に新しい KAPI が要る想定 | `sys_time_now` (kapi.json) と `sys_yield`  が既にある | KAPI の追加 0 (§4-1) |
 | R10 | 「GUI は park → WM が起こす」で 1ms になる想定 | WM は同じ tick に 2 回起こさない (`multiapp.rs`、`tick_now()`=get_tick 同ファイル内)。このままでは GUI の Sleep(1) は約 10ms になる | G1/G2 (§4-1) |
@@ -53,19 +53,19 @@
 
 ## 2. 段 A2: IRQ0 の負荷を減らす
 ### 2-1. 何が重いか
-- `net_tick` (`net/nic.c`) は IF=0 で動く。demux (memcpy で最大 8 件) → `link_tick` (`net/link.c`) の順に、rx_pump 16 件・deadlines・timers・tx_round・notify を回す。
+- `net_tick` (`sys/net/nic.c`) は IF=0 で動く。demux (memcpy で最大 8 件) → `link_tick` (`sys/net/link.c`) の順に、rx_pump 16 件・deadlines・timers・tx_round・notify を回す。
 - NE2K の PIO は 3 か所にある。slot2 の watchdog (`ne2000_irq.inc` → `ne2k_poll`)、IRQ5 (`ne2000_irq.inc` の `service(NE2K_IRQ_BUDGET)`)、IRQ0 の中の `link_tx_round` → `ne2k_send` → `dma_write`。どこからでも RDC 待ち 4ms (`ne2000.c`) と reset 待ち 20ms (`ne2000.c`、`ne2000_data.inc` → `ne2000_control.inc`) に到達し得る。
 - 二周期では slot はジフィ (10 IRQ に 1 回) だけ走る。問題は 1 回の最大と、そのせいで落ちる IRQ0。
 ### 2-2. A2-a 測る (診断像だけ)
 | 測る物 | 置き場 | 出力 |
 |---|---|---|
-| net_tick の 6 区間 (demux / rx_pump / deadlines / timers / tx_round / notify) | `net/nic.c`・`net/link.c` の `#ifdef TICK_PROBE` (TP_NET0..5) | **同じ呼出しの**区間の値と全体を 1 組で記録し、全体が worst の回の組を出す |
+| net_tick の 6 区間 (demux / rx_pump / deadlines / timers / tx_round / notify) | `sys/net/nic.c`・`sys/net/link.c` の `#ifdef TICK_PROBE` (TP_NET0..5) | **同じ呼出しの**区間の値と全体を 1 組で記録し、全体が worst の回の組を出す |
 | NE2K の rx_one・ne2k_send・dma_transfer | `ne2000_data.inc` (rx_one)・同ファイル内 (ne2k_send)・`ne2000.c` (dma_transfer) | PIO だけの時間と、RDC 待ち・再試行込みの時間を分けて記録。件数・バイト・呼んだ文脈 (IRQ0/IRQ5/foreground) |
 | IF=0 の worst の呼び手番地 | `tick_probe.c` の `tick_probe_if_begin` で `__builtin_return_address(0)` | 6115.8µs と 29.7ms (V86) の出所 |
 | 負荷の追加 | `~/os32-tmp/run/tick-a/harness/run_loads.py` に nic (lanfs 4MB) と serial (9600bps 受信 + SerialDiag) | A1 と同じ表 |
 ### 2-3. A2-b IRQ0 の予算
 ```c
-/* kernel/irq/tick_budget.h — 予算を数えるのは tick_dispatch の中だけ */
+/* sys/kern/irq/tick_budget.h — 予算を数えるのは tick_dispatch の中だけ */
 void tick_budget_config(void);    /* 時計設定後、IF=0/EE=0 で 4 定数を一度換算する */
 void tick_budget_begin(void);     /* 予算を分け合う最初の slot (ARCH_TICK_BUDGET_FIRST_SLOT、PC-98 は NE2K=2) の前。slot0・1 (FM・PCM) は B の外で、IRQ0 の worst の「他の slot」に入る。基点 = arch の count、active=1、taken=0 */
 void tick_budget_end(void);       /* tick_dispatch の最後。active=0 */
@@ -86,7 +86,7 @@ u32  tick_budget_cnt(u32 us);     /* B/2・B・tail_rx・tail_tx の換算済み
 - 経過は arch の口 (x86: PIT #0 の count、PowerPC: TB) から取る。tick_dispatch の中は 1 周期を超えないので、折り返しの補正は 1 回で足りる。
 ### 2-4. NE2K の重い所を協調処理へ (U4 = b、契約は緩めない)
 ```c
-/* kernel/idle_work.h — 協調処理の 1 口。_irq_enabled() && kctx_irq_depth==0 のときだけ動き、それ以外は何もせず戻る */
+/* sys/kern/idle_work.h — 協調処理の 1 口。_irq_enabled() && kctx_irq_depth==0 のときだけ動き、それ以外は何もせず戻る */
 void idle_work_run(void);          /* 登録された仕事を 1 巡する。再入はしない */
 int  idle_work_register(void (*fn)(void));   /* 最大 4 件 */
 /* drivers/net/ne2000: 重い処理 (rx_drain・dma_write・wait_rdc・hw_reset・reinit・service) を走らせてよいのは
@@ -100,7 +100,7 @@ int  idle_work_register(void (*fn)(void));   /* 最大 4 件 */
  * IRQ 文脈の判定は kctx_irq_depth だけで行う (nic.in_irq は slot2 の終わりで 0 に戻るので使わない) */
 int net_tx(const void *frame, u32 len);  /* irq_restore の後、kctx_irq_depth==0 なら idle_work_run() (IF=1 で送り出す) */
 ```
-- 呼ぶ所 (hlt の直前): `kernel/sys.c` (sys_halt。GUI の WM は 1 周ごとに通る)・`exec/exec_schedule.inc` (sys_yield の先頭、geforce_foreground_poll の隣)・`drivers/input/kbd.c`・**`net/link.c` の `LINK_IDLE()`** (`do { idle_work_run(); _idle(); } while (0)`。`link_selftest.inc` の待ちが、送受が進まずに timeout しないようにする。host 試験用の `link_test_idle` (`link_wait_status()`) は変えない)。
+- 呼ぶ所 (hlt の直前): `sys/kern/sys.c` (sys_halt。GUI の WM は 1 周ごとに通る)・`sys/kern/exec/exec_schedule.inc` (sys_yield の先頭、geforce_foreground_poll の隣)・`sys/platform/pc98/input/kbd.c`・**`sys/net/link.c` の `LINK_IDLE()`** (`do { idle_work_run(); _idle(); } while (0)`。`link_selftest.inc` の待ちが、送受が進まずに timeout しないようにする。host 試験用の `link_test_idle` (`link_wait_status()`) は変えない)。
 - 制限: アプリが syscall も待ちも無しに計算している間は NIC が止まる。リング 16KB が溢れたら、既存の OVW 復旧を次の協調処理で行い、link の RTO で再送される。この転送量は受入で測る。
 - e82557 (実機) は bus master なので PIO が無い。予算 (§2-3) だけ掛ける。異常復旧の待ちが IRQ の中に無いことは A2-a で確かめる。
 
@@ -109,10 +109,10 @@ int net_tx(const void *frame, u32 len);  /* irq_restore の後、kctx_irq_depth=
 | 名前 | 中身 | 使ってよい所 |
 |---|---|---|
 | **ジフィ** | `tick_count`・`get_tick`・`PIT_HZ`=`OS32_TICK_HZ`=100・`TICK_MS`=10 | 既存のすべて。新しいコードの期限も原則これ |
-| 物理 IRQ | raw 64bit・`PIT_IRQ_HZ` (x86)・`PM_DEC_HZ` (PowerPC) | tick.c・pit*.c・clock_source.c・recover_profile.c・kselftest、PowerPC の `kernel_dec.c`・`platform/powermac/clock.c`・`platform/powermac/ppc_kernel.c` の起動の照合だけ。時刻として数えない |
+| 物理 IRQ | raw 64bit・`PIT_IRQ_HZ` (x86)・`PM_DEC_HZ` (PowerPC) | tick.c・pit*.c・clock_source.c・recover_profile.c・kselftest、PowerPC の `kernel_dec.c`・`sys/platform/powermac/clock.c`・`sys/platform/powermac/ppc_kernel.c` の起動の照合だけ。時刻として数えない |
 | ms 時計 | `tick_clock_ms()`、u32 | 入力の時刻印・合成器の期限 |
 | µs 時計 | `sys_time_now` (公開) | 互換層・計測・WM の再開の印 |
-### 3-2. 状態と関数 (両 arch 共通の kernel/time/tick.c、新しい kernel/time/tick_clock.h)
+### 3-2. 状態と関数 (両 arch 共通の sys/hal/time/tick.c、新しい sys/hal/time/tick_clock.h)
 口・検査・呼び手は [TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §2 が正。物理の周期は num/den 秒で受ける。
 ```c
 #define TICK_STEP_JIFFY 1u
@@ -129,15 +129,15 @@ volatile u32 tick_count; static u32 tick_hi, raw_lo, raw_hi, jif_phase, ms_phase
  *       if (fast_fn) fast_fn(ms_now);  return r;   (step_ms = reload*1000 ≤ 24576000 で溢れない) */
 ```
 - x86 の ISR (`isr_stub.asm`): `inc` を `call tick_clock_step; test eax,1; jz .phys_only` に置き換える。ジフィの回は今の順 (timer_handler → EOI → V86_REFLECT → timeout) のまま。`.phys_only` は EOI だけを出して `.leave` へ。
-- PowerPC の DEC (`arch/ppc/kernel_dec.c`): 経過周期の loop で `if (tick_clock_step() & TICK_STEP_JIFFY) tick_dispatch();` ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §2-2)。
-- `pit_math.c` は 100 と 1000 を受け、reload は最近接 `(clk + hz/2)/hz`。`kernel_boot_cpu.inc` は `platform_clock_init(PIT_IRQ_HZ)` を呼ぶ。`tick_clock_config` は物理の時計を設定する側が呼ぶ: x86 は `platform/pc98/clock_source.c` の `platform_clock_init`、PowerPC は `ppc_dec_start`。
+- PowerPC の DEC (`sys/arch/ppc/kernel_dec.c`): 経過周期の loop で `if (tick_clock_step() & TICK_STEP_JIFFY) tick_dispatch();` ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §2-2)。
+- `pit_math.c` は 100 と 1000 を受け、reload は最近接 `(clk + hz/2)/hz`。`kernel_boot_cpu.inc` は `platform_clock_init(PIT_IRQ_HZ)` を呼ぶ。`tick_clock_config` は物理の時計を設定する側が呼ぶ: x86 は `sys/platform/pc98/clock_source.c` の `platform_clock_init`、PowerPC は `ppc_dec_start`。
 - 有効化の単位: 段 C1 (tick_clock.h・tick.c)・C2 (ISR・clock_source) は 1 本の統合の枝で一緒に入れる ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §5-1)。途中の像でも、未 config の分岐と旧 tick_count の読み出しが両立するので起動する。
 ### 3-3. µs 時計と PCM の fallback
 ```c
 void time_us_from64(u32 raw_lo, u32 raw_hi, unsigned count, unsigned reload, u32 clk_hz, u32 *lo, u32 *hi);
 /* cycles = raw*reload + (reload - count); us = cycles/clk*1e6 + (cycles%clk)*1e6/clk */
 ```
-- x86 の `clock_source.c` は `tick_clock_raw` を読む (B7')。PowerPC の µs 時計は TB のまま (`platform/powermac/clock.c`)。pending の加算は 64bit にする。period_us は表示だけに使う。
+- x86 の `clock_source.c` は `tick_clock_raw` を読む (B7')。PowerPC の µs 時計は TB のまま (`sys/platform/powermac/clock.c`)。pending の加算は 64bit にする。period_us は表示だけに使う。
 - PCM: `pcm_cs4231.c` の `tick_count * PCM_US_PER_TICK` を `tick_clock_jiffy64` × 10000 にする (497 日で戻らない)。`tools/prototypes/pcm_imports.def` に import を足し、生成器で追従させる。
 ### 3-4. 100Hz 前提の利用者 (T1K §5 + R5)
 | 所 | 処置 |
@@ -152,7 +152,7 @@ void time_us_from64(u32 raw_lo, u32 raw_hi, unsigned count, unsigned reload, u32
 | 周回比較 (rshell.c・hello/main.c:36) | 差分の比較に直す |
 ### 3-5. 合成器の起こし: 1ms の期限照合 (U3 = ユーザー決定)
 ```c
-void tick_fast_set(void (*fn)(u32 now_ms)); /* 所有者は 1 者だけ (drivers/sound/snd_wake_tick.c)。2 者目は BUSY */
+void tick_fast_set(void (*fn)(u32 now_ms)); /* 所有者は 1 者だけ (sys/hal/sound/snd_wake_tick.c)。2 者目は BUSY */
 /* snd_wake_tick.c: SndBackend の hw_timer_arm に CS4231 のタイマが無いときに使う */
 static volatile u32 due_ms; static volatile u8 armed;
 static void wake_fast(u32 now) { if (armed && (i32)(now - due_ms) >= 0) { armed = 0; v86_fm_timer_wake(); } }
@@ -203,35 +203,35 @@ typedef struct { u32 id, delay_us, next_lo, next_hi; MMT_CB cb; u32 user, missed
 ## 5. ファイルごとの変更 (1 ファイル = 1 段 = 1 実装者)
 | 段 | ファイル | 新/変 | 行 | 依存 |
 |---|---|---|---|---|
-| A2-a1〜a2 | kernel/time/tick_probe.h・tick_probe.c | 変 | +12・+45 | 先 |
-| A2-a3〜a4 | net/nic.c・net/link.c (計測点) | 変 | +8・+12 | a1 |
+| A2-a1〜a2 | sys/kern/time/tick_probe.h・tick_probe.c | 変 | +12・+45 | 先 |
+| A2-a3〜a4 | sys/net/nic.c・sys/net/link.c (計測点) | 変 | +8・+12 | a1 |
 | A2-a5〜a6 | ne2000_data.inc (`rx_drain()`・`ne2k_send()`)・ne2000.c (`dma_transfer()`) (計測点) | 変 | +8・+6 | a1 |
-| A2-a7 | kdebug/tick_probe.c | 変 | +35 | a1 |
+| A2-a7 | sys/kern/kdebug/tick_probe.c | 変 | +35 | a1 |
 | A2-a8 | run_loads.py (nic・serial) | 変 | +60 | PM |
-| A2-b1〜b2 | kernel/irq/tick_budget.h・.c | 新 | 30・55 | A2-a の後 |
-| A2-b3 | kernel/irq/tick.c (begin・end) | 変 | +3 | b1 |
-| A2-b4〜b5 | net/link_rx.inc・net/link.c (take) | 変 | +4・+6 | b1 |
-| A2-c1〜c2 | kernel/idle_work.h・.c | 新 | 20・40 | 先 |
-| A2-c3 | drivers/net/ne2000/ne2000_irq.inc (印だけ) | 変 | +25 | c1 |
-| A2-c4 | drivers/net/ne2000/ne2000_data.inc (送信列・bh) | 変 | +50 | c1 |
-| A2-c5 | drivers/net/ne2000/ne2000.c (bh の登録・`ne2k_leave` を印だけに・wait_rdc/hw_reset の入口で IF=1 と depth==0 を検査) | 変 | +30 | c4 |
-| A2-c6 | kernel/sys.c・exec/exec_schedule.inc・drivers/input/kbd.c (呼ぶ所、各 1 段) | 変 | +1・+1・+3 | c2 |
-| A2-c7 | net/link.c (`LINK_IDLE`) | 変 | +2 | c2 |
-| A2-c8 | net/nic.c (`net_tx` の後の idle_work_run) | 変 | +2 | c2 |
+| A2-b1〜b2 | sys/kern/irq/tick_budget.h・.c | 新 | 30・55 | A2-a の後 |
+| A2-b3 | sys/kern/irq/tick.c (begin・end) | 変 | +3 | b1 |
+| A2-b4〜b5 | sys/net/link_rx.inc・sys/net/link.c (take) | 変 | +4・+6 | b1 |
+| A2-c1〜c2 | sys/kern/idle_work.h・.c | 新 | 20・40 | 先 |
+| A2-c3 | sys/dev/net/ne2000/ne2000_irq.inc (印だけ) | 変 | +25 | c1 |
+| A2-c4 | sys/dev/net/ne2000/ne2000_data.inc (送信列・bh) | 変 | +50 | c1 |
+| A2-c5 | sys/dev/net/ne2000/ne2000.c (bh の登録・`ne2k_leave` を印だけに・wait_rdc/hw_reset の入口で IF=1 と depth==0 を検査) | 変 | +30 | c4 |
+| A2-c6 | sys/kern/sys.c・sys/kern/exec/exec_schedule.inc・sys/platform/pc98/input/kbd.c (呼ぶ所、各 1 段) | 変 | +1・+1・+3 | c2 |
+| A2-c7 | sys/net/link.c (`LINK_IDLE`) | 変 | +2 | c2 |
+| A2-c8 | sys/net/nic.c (`net_tx` の後の idle_work_run) | 変 | +2 | c2 |
 | A2-t1〜t2 | tools/tests/tick_budget_host.c・ne2k_bh_host.c (故障注入) | 新 | 130・150 | b2・c4 |
 | C1〜C3 | tick_clock の口・x86 の 100Hz の結線・host 試験 ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §5-1) | 新・変 | — | 先 |
-| B1 | include/memmap.h (`#ifndef PIT_IRQ_HZ` → 100)。`OS32_TICK_HZ` と assert は C1・C2 | 変 | +3 | C2 |
-| B5 | platform/pc98/pit_math.c + `test_pit_clock.py` のアンカー | 変 | +15・+6 | B1 |
-| B6 | platform/pc98/pit_time.c・.h + 変更する式を参照する全アンカー (`test_time_math.py`・同ファイル内 ほか)・fixture・期待値・tdd (time_math_host.c・pit_clock_host.c・dep_dir_b_timer_host.c・recover_t2_host.inc・splash_probe_host.c・time_math_tdd.md・pit_clock_tdd.md)。旧式のアンカーが 0 件で、全変異が実行時に RED になることを確かめる | 変 | +35・+40 | C1 |
-| B7' | platform/pc98/clock_source.c (`tick_clock_raw` を読む・64bit の pending) | 変 | +6 | B6 (同じ枝) |
-| B9〜B10 | kdebug/recover_profile.c・kselftest/pit_setup.inc | 変 | +40・+15 | B5 |
+| B1 | sys/include/memmap.h (`#ifndef PIT_IRQ_HZ` → 100)。`OS32_TICK_HZ` と assert は C1・C2 | 変 | +3 | C2 |
+| B5 | sys/platform/pc98/pit_math.c + `test_pit_clock.py` のアンカー | 変 | +15・+6 | B1 |
+| B6 | sys/platform/pc98/pit_time.c・.h + 変更する式を参照する全アンカー (`test_time_math.py`・同ファイル内 ほか)・fixture・期待値・tdd (time_math_host.c・pit_clock_host.c・dep_dir_b_timer_host.c・recover_t2_host.inc・splash_probe_host.c・time_math_tdd.md・pit_clock_tdd.md)。旧式のアンカーが 0 件で、全変異が実行時に RED になることを確かめる | 変 | +35・+40 | C1 |
+| B7' | sys/platform/pc98/clock_source.c (`tick_clock_raw` を読む・64bit の pending) | 変 | +6 | B6 (同じ枝) |
+| B9〜B10 | sys/platform/pc98/kdebug/recover_profile.c・kselftest/pit_setup.inc | 変 | +40・+15 | B5 |
 | B11 | rshell.c・hello/main.c | 変 | +8・+2 | 独立 |
 | B12 | 1kHz の結線の試験 (EOI 全 IRQ、V86 反射・timeout はジフィだけ)。純関数の試験は C3 | 新 | 80 | B6 |
 | B13 | 注記 4 件 + session.rs:41 | 変 | +5 | 独立 |
-| B15〜B16 | drivers/sound/cs4231/pcm_cs4231.c・tools/prototypes/pcm_imports.def | 変 | +3・+2 | C1 |
+| B15〜B16 | sys/dev/sound/cs4231/pcm_cs4231.c・tools/prototypes/pcm_imports.def | 変 | +3・+2 | C1 |
 | B17 | build/select.mk (`TICK1K=1` で -DPIT_IRQ_HZ=1000 の試験像を build/out/tick1k/ に)。独自の C の recipe を持つなら profile の旗と `\| $(ABI_CONTRACT_ORDER)`、受入に `check-type-contract` (末尾の追記) | 変 | +10 | B1 |
-| B14 | include/memmap.h の既定 100→1000 | 変 | 1 | B17 の像で全受入の後、PM |
-| S1 | drivers/sound/snd_wake_tick.c (§3-5) | 新 | 50 | C1、hal-av の V0 |
+| B14 | sys/include/memmap.h の既定 100→1000 | 変 | 1 | B17 の像で全受入の後、PM |
+| S1 | sys/hal/sound/snd_wake_tick.c (§3-5) | 新 | 50 | C1、hal-av の V0 |
 | G1〜G2 | userland/gshell/src/poll_clock.rs・multiapp.rs | 新・変 | 25・+4 | 独立 |
 | W1〜W4 | userland/lib/mmtime/mmtime.h・mmtime_clock.c・mmtime_event.c・mmtime_sleep.c | 新 | 50・70・170・45 | W1 が先 |
 | W5〜W7 | build/libs.mk・sdk.mk / tools/tests/mmtime_host.c・test_mmtime.py / userland/diag/mmtimetest.c。libmmtime・mmtimetest の規則は profile の旗と `\| $(ABI_CONTRACT_ORDER)`、W5 の受入に `check-type-contract` (末尾の追記) | 変・新 | 12 / 260・150 / 120 | W2〜W4 |
@@ -278,7 +278,7 @@ typedef struct { u32 id, delay_us, next_lo, next_hi; MMT_CB cb; u32 user, missed
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
 - **第 4 段 B の型の契約 (§5 の W5・W7・B17)**: `build/abi_contract.mk` が probe の order-only を製品の object 一覧と `userland/{cmds,tests,system}` の直の object に付け、`build/libs.mk` の共通の規則・各ライブラリの規則に `| $(ABI_CONTRACT_ORDER)` が付いた。`tools/tests/test_type_contract.py` は `make -n -B` の全 C の呼出しの char/enum の旗と probe の前提を検査する (covers `build/**/*.mk`、解析できない呼出しは fail closed)。W5 の libmmtime の規則・W7 の mmtimetest・B17 の `TICK1K=1` の別像は、既存の macro の規則を使えば自動で掛かる。手書きの recipe なら profile の旗と `| $(ABI_CONTRACT_ORDER)` を付ける。`check-type-contract` を W5・B17 の受入に加える。
-- **PowerPC でも組む (§5 の C1・A2-b3・A2-c6)**: `kernel/time/tick.c`・`kernel/irq/tick.c`・`kernel/sys.c` は PowerPC の像に入る共通のソース。新しいヘッダ `tick_clock.h` (`kernel/time/`)・`tick_budget.h`・`idle_work.h` は `kernel/` に置き、`arch/x86/`・`platform/pc98/`・`drivers/` のヘッダを include しない (include すると層の検査 `tools/check_layers.py` が止める)。tick_clock の置き場は [TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §3。
+- **PowerPC でも組む (§5 の C1・A2-b3・A2-c6)**: `sys/hal/time/tick.c`・`sys/kern/irq/tick.c`・`sys/kern/sys.c` は PowerPC の像に入る共通のソース。新しいヘッダ `tick_clock.h` (`kernel/time/`)・`tick_budget.h`・`idle_work.h` は `kernel/` に置き、`arch/x86/`・`platform/pc98/`・`drivers/` のヘッダを include しない (include すると層の検査 `tools/check_layers.py` が止める)。tick_clock の置き場は [TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §3。
 
 ### S1 の PM 決定 (2026-11-21)
 

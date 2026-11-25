@@ -1,6 +1,6 @@
-# mm/paging_map.inc — 設計
+# sys/kern/mm/paging_map.inc — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_T2D_T2H (§2-4・§2-5 e10a) の契約を今のソースと照らして要約
-ソース: `mm/paging_map.inc` (`mm/paging.c` が取り込む)
+ソース: `sys/kern/mm/paging_map.inc` (`sys/kern/mm/paging.c` が取り込む)
 
 master の共有 PT を書く汎用口と、SHM・トランポリンの USER を起動時に一度だけ立てる口、SHM の RW だけを切り替える専用口を持つ。
 
@@ -11,7 +11,7 @@ master の共有 PT を書く汎用口と、SHM・トランポリンの USER を
 
 ## 起動時の共有 USER (`paging_boot_user_shared`)
 
-- 呼ぶのは `shm_init` の**後**、最初の AS を作る**前**に 1 回だけ (`platform/pc98/kernel_boot_memory.inc`。失敗なら起動を止める)。2 回目・AS が生きている・paging が無効・トランポリンが非整列やカーネル像の外なら -1。
+- 呼ぶのは `shm_init` の**後**、最初の AS を作る**前**に 1 回だけ (`sys/platform/pc98/kernel_boot_memory.inc`。失敗なら起動を止める)。2 回目・AS が生きている・paging が無効・トランポリンが非整列やカーネル像の外なら -1。
 - SHM 全域 (`MEM_SHM_BASE` から `MEM_SHM_SIZE`) を `USER|RW` (WB、PCD なし)、トランポリンのページを `USER|RO` にする。以後の起動処理は SHM を supervisor に戻さない。exec ごとの共有 map は持たない。
 
 ## SHM の RW 切り替え (`paging_shm_set_rw`)
@@ -21,4 +21,4 @@ master の共有 PT を書く汎用口と、SHM・トランポリンの USER を
 
 ## 検査
 
-`tools/tests/test_shm_user.py` が実 `mm/paging.c`・`mm/pgalloc.c`・`mm/shm.c`・V86 の写像部を ILP32 で動かし、2 つの AS で SHM の lock・free・回収後の USER/RW/WB、2 本目の AS からの書込み、USER 欠落時の無変更拒否、live AS 中の汎用口の拒否、起動口の 1 回性と順序を確かめる。
+`tools/tests/test_shm_user.py` が実 `sys/kern/mm/paging.c`・`sys/kern/mm/pgalloc.c`・`sys/kern/mm/shm.c`・V86 の写像部を ILP32 で動かし、2 つの AS で SHM の lock・free・回収後の USER/RW/WB、2 本目の AS からの書込み、USER 欠落時の無変更拒否、live AS 中の汎用口の拒否、起動口の 1 回性と順序を確かめる。

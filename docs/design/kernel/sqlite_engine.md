@@ -1,4 +1,4 @@
-# kernel/sqlite_engine.c — SQLite エンジンの実行とモジュール管理
+# sys/kern/sqlite_engine.c — SQLite エンジンの実行とモジュール管理
 
 > 状態: **現行 (2026-10-31)**
 
@@ -26,16 +26,16 @@ APP+SYSTEM上限 (既定319,488B、予約の増減に追従) を守り、FEP取�
 |---|---|
 | MINIMAL | SQLite を読まないので取り分も無い (D21・D26) |
 
-- kernel/sqlite_engine.h に内部型 `ServicesVerState { u32 stack_used, stack_size, public; char state[24]; }` と `void services_ver_state(ServicesVerState *out);` を宣言する。
-- kernel/sqlite_engine.c が high_water、SQLITE_ENGINE_STACK_SIZE、services_public、既存 services_state_name() をコピー。getter は出力・I/O・割当なし。collector が一回呼ぶ。
+- sys/kern/sqlite_engine.h に内部型 `ServicesVerState { u32 stack_used, stack_size, public; char state[24]; }` と `void services_ver_state(ServicesVerState *out);` を宣言する。
+- sys/kern/sqlite_engine.c が high_water、SQLITE_ENGINE_STACK_SIZE、services_public、既存 services_state_name() をコピー。getter は出力・I/O・割当なし。collector が一回呼ぶ。
 
 ## 辞書の probe と起動の予約 (DICT_META)
 
-> 出所: DICT_META_DESIGN・TASK_DICT_META (2026-11-18 に要約して移した)。関係するソース: `kernel/sqlite_engine.c` (`services_boot`)・`kernel/fep_boot.c` (`services_settings`・`fep_meta_probe`・`fep_boot_config_get`・`fep_boot_user_path_get`)・`lib/sqlite3/os32_sqlite_vfs.c` (`os32_sqlite_boot_check`)
+> 出所: DICT_META_DESIGN・TASK_DICT_META (2026-11-18 に要約して移した)。関係するソース: `sys/kern/sqlite_engine.c` (`services_boot`)・`sys/kern/fep_boot.c` (`services_settings`・`fep_meta_probe`・`fep_boot_config_get`・`fep_boot_user_path_get`)・`lib/sqlite3/os32_sqlite_vfs.c` (`os32_sqlite_boot_check`)
 
 core は FEP 部品を読む前に辞書を検査し、FEP の予約を決めてから FEP を読む。辞書の形式は [システム辞書の形式](../tools/fep_to_sqlite.md)、FEP と共有する型は [ime_store.h の契約](ime/ime_store.md) にある。
 
-静的 SQLite の後続は `kernel/fep_boot.h` の `fep_boot_static()` を使う。呼出側は HDD の ext2 root、Unicode・L1、L2 pair の成立を確認する。
+静的 SQLite の後続は `sys/kern/fep_boot.h` の `fep_boot_static()` を使う。呼出側は HDD の ext2 root、Unicode・L1、L2 pair の成立を確認する。
 共通処理は load と start の各直前に `SERVICES_SQLITE_ONLY` と `services_public` を照合し、依存 handle を 0 個にする。PC-98 は RUNNING の SQLite handle を 1 個渡す。
 最終の接続数・予約の検査後に FEP を公開し、facade は RUNNING も照合する。静的構成の失敗時は入力を閉じて pending を失効させ、handle を回収し、設定の写しを無効にする。
 quiesce と接続・group の解放を確認できたときだけ予約を解除する。回収失敗は `MODULE_ISOLATED` を返し、SQL の owner と予約を保持する。

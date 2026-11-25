@@ -30,7 +30,7 @@
 |---|---|---|
 | 6a 再起動 (sys_reboot) | PowerPC | 装置手順・受入台本は実装済み (2d2736837)。製品シェルの reboot と再起動後の READY は PPC_RESET_DESIGN に従う |
 | 1d・3a・4a | PowerPC | 実装済み (b1437a4a3・720abc8ce・290c0e1eb) |
-| 1a・2a-i・2b・3b-i | 本線 | 済み (2026-11-21 に確かめた — lib/path.c・kernel/ver_collect.c・kernel/time/ktime.c は build/sources/common.mk の C_COMMON_EXEC、マウスは input/hal/mouse_pointer.c に分かれ、sdk/kapi_target_ppc.py の PROVIDER_GROUPS に path・ver・time・mouse の slot は残っていない) |
+| 1a・2a-i・2b・3b-i | 本線 | 済み (2026-11-21 に確かめた — lib/path.c・sys/kern/ver_collect.c・sys/kern/time/ktime.c は build/sources/common.mk の C_COMMON_EXEC、マウスは sys/hal/input/mouse_pointer.c に分かれ、sdk/kapi_target_ppc.py の PROVIDER_GROUPS に path・ver・time・mouse の slot は残っていない) |
 | 5b | 共通表示・PowerPC | A〜C 実装済み (e407702a0・caa544473・0227413b7) |
 | 5c・5d | 共通 HAL・シェル | 5c の B1〜B4 と 5c-A は実装済み。5d は PPC_SHELL_ALIGN_X86_DESIGN で owner 1 の起動・回収を揃え、通常のシェルで切替を受け入れる。|
 | 6b | SFS | 実装済み (2964a2003・2f4ed7d73)。既存の SHELL_REMOTE_SFS はシェル統合で整理する。|

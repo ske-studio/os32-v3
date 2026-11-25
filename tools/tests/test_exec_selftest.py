@@ -33,8 +33,8 @@ IMPORTS = (
 )
 
 MAIN = r'''
-#include "kdebug/generated/kdebug_import_macros.h"
-#include "kdebug/selftest_internal.h"
+#include "sys/platform/pc98/kdebug/generated/kdebug_import_macros.h"
+#include "sys/kern/kdebug/selftest_internal.h"
 #include "ring3_str.h"
 void host_init(void);
 void host_flags_set(u32);
@@ -117,7 +117,7 @@ class ExecSelftest(unittest.TestCase):
     def test_generated_import_execution(self):
         self.exercise()
         if MUTATE:
-            original = (ROOT / 'arch/x86/kernel/syscall_code.c').read_text()
+            original = (ROOT / 'sys/arch/x86/kernel/syscall_code.c').read_text()
             for old, new in (('st[6] = 0x80;', 'st[6] = 0x81;'),
                              ('i < l.stub_count;', 'i < l.stub_count && i < KAPI_FUNC_COUNT;')):
                 self.assertEqual(original.count(old), 1)
@@ -151,21 +151,21 @@ class ExecSelftest(unittest.TestCase):
             (out / 'main.c').write_text(main)
             # Keep real kernel implementations distinct from the module's stubs.
             kernel_sources = '\n'.join(read_text(ROOT / p) for p in (
-                'exec/exec.c', 'exec/ring3_str.c', 'exec/os32x_hdr.c',
+                'sys/kern/exec/exec.c', 'sys/kern/exec/ring3_str.c', 'sys/kern/exec/os32x_hdr.c',
                 'tools/tests/exec_selftest_host.c'))
             definitions = {e['name'] for e in entries if re.search(
                 r'\b' + re.escape(e['name']) + r'\s*\([^;{}]*\)\s*\{', kernel_sources)}
             renames = ['-D' + n + '=host_' + n for n in sorted(set(IMPORTS) | definitions)]
             (out / 'code.c').write_text(backend if backend is not None else
-                (ROOT / 'arch/x86/kernel/syscall_code.c').read_text())
+                (ROOT / 'sys/arch/x86/kernel/syscall_code.c').read_text())
             (out / 'path.c').write_text(path_source or (ROOT / 'lib/path.c').read_text())
             objects = []
             sources = [(out / 'path.c', renames), (ROOT / 'tools/tests/exec_selftest_host.c', renames),
-                       (ROOT / 'arch/x86/kernel/ring3_ls.S', []),
+                       (ROOT / 'sys/arch/x86/kernel/ring3_ls.S', []),
                        (out / 'code.c', renames),
-                       (ROOT / 'kdebug/selftest_exec.c', []),
-                       (ROOT / 'kdebug/generated/kdebug_import_slots.c', []),
-                       (ROOT / 'kdebug/generated/kdebug_import_stubs.S', []),
+                       (ROOT / 'sys/arch/x86/kdebug/selftest_exec.c', []),
+                       (ROOT / 'sys/platform/pc98/kdebug/generated/kdebug_import_slots.c', []),
+                       (ROOT / 'sys/arch/x86/kdebug/generated/kdebug_import_stubs.S', []),
                        (out / 'main.c', [])]
             for i, (source, extra) in enumerate(sources):
                 obj = out / f'{i}.o'

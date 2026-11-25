@@ -15,7 +15,7 @@
 - U1: ユーザー決定「段0を先に、足りれば終了」を採用。CPU の dword/WC で目標を満たせば GPU 加速は作らない。
 - P1-転送: byte UC → dword UC → dword WC を比較する段 0 を本票の中心とし、行端・写像属性・WC 排出を具体化。
 - P1-閾値: CPU の最良実測を基準に変更。レビューの帯域・所要時間は予測であり受入値にしない。
-- P2-Command: 後続の状態比較に bus/devinit だけでなく kdebug/gf_stage_state.c と recover_profile.c を含める。
+- P2-Command: 後続の状態比較に bus/devinit だけでなく sys/dev/video/geforce/diag/gf_stage_state.c と recover_profile.c を含める。
 - P2-BM: firmware の Command=0106h・latency=60h・PCI cache line size=0 を生データで確認し、計測欄に追加。
 - P2-RO: 後続の PCI 入力 DMA と push DMA を GPU 視点 RO に変更、flags0 の RO と flags2 の非 RW を対で設定。
 - P2-ring: 後続の ring/notify/試験面を BAR1+80000h 以降へ移し、表示用 512 KiB の WC 域と分離。
@@ -95,7 +95,7 @@ while (n) { *d++ = *s++; --n; }
 - SSE の SFENCE を要求しない。BAR1 の読み戻しも各行の drain も足さない。末尾 byte の残った WC buffer も最後の BAR0 read までを present 時間に含める。
 - point/identity 失敗後は BAR0 を追加で読まず、CPU 側の §3.3 の WBINVD を含む停止・復元を通す。送信済み書込みの取り消しは主張しない。
 ```c
-/* arch/x86/kernel/mtrr_wc.c が命令列、gf_wc.c が GF の適用条件・寿命を所有。 */
+/* sys/arch/x86/kernel/mtrr_wc.c が命令列、gf_wc.c が GF の適用条件・寿命を所有。 */
 struct x86_wc_lease { u32 slot, owned, active; u64 old_base, old_mask; };
 /* PTE/台帳は不変。release は借用時も CPU 側排出を行う。 */
 int x86_wc_acquire(u32 base, u32 bytes, struct x86_wc_lease *);
@@ -104,7 +104,7 @@ int x86_wc_release(struct x86_wc_lease *);
 int (*wc_start)(void); int (*wc_stop)(void);
 /* backend ops: .present_rect=geforce_present, .fill_rect=NULL, .blit=NULL */
 ```
-- lease・実効 WC の状態は kernel の arch/x86/kernel/video_wc.c に 1 個、gf_wc.c は装置の適用条件を確認し、部品は callback だけを持つ。KAPI/SDK は不変、内部 OPS_VERSION を更新し核と geforce.mod を対でビルドする。
+- lease・実効 WC の状態は kernel の sys/arch/x86/kernel/video_wc.c に 1 個、gf_wc.c は装置の適用条件を確認し、部品は callback だけを持つ。KAPI/SDK は不変、内部 OPS_VERSION を更新し核と geforce.mod を対でビルドする。
 - 起動時の module 初期化: BAR・台帳資源/領域・DISPLAY surface・PTE 写像の予約後、登録と復帰 callback の設定が成功した後に platform の wc_start を 1 回呼ぶ。1=WC、0=UC 継続、負値は active lease に保持して後の描画開始を失敗させる。
 - 起動中、割り込み有効化とスプラッシュの後に GFX が GeForce の場合だけ、GUI=0 の起動でも取得を 1 回試み、その 1 回は割り込みを約 2ms 停止する。
   登録が失敗した時は lease を取得せず、取得後の loader 失敗では解放を試み、復元失敗時は lease を保持する。
@@ -113,7 +113,7 @@ int (*wc_start)(void); int (*wc_stop)(void);
 - lease は最初の取得から起動中保持する。GeForce module/本番 context は起動中 pin され、通常停止・CUI・abort/回収では解放しない。再 GUI は active lease の前回結果 (復元未確認の負値を含む) を返し、再取得しない。identity 喪失時と再起動時に CPU 側で排出・復元する (BIOS WC は MSR を書かず借用解除)。受入版の明示的な wc_stop/wc_start は比較のため独立して行う。
 
 ## 5. 計測の口と進む条件
-- 受入用 gf_accept.c が実際の gf_present_rect を呼び、その直前/正常 drain 後を既存 sys_time_now(u32 lo,hi) で測る（hwdev/gf/native.c、部品 import 済み）。失敗 sample を成功群へ混ぜない。
+- 受入用 gf_accept.c が実際の gf_present_rect を呼び、その直前/正常 drain 後を既存 sys_time_now(u32 lo,hi) で測る（sys/dev/video/geforce/native.c、部品 import 済み）。失敗 sample を成功群へ混ぜない。
 - 同一ソース・同一最適化の受入 3 ビルド: byte UC / dword UC / dword WC。WC 不成立および BIOS WC のため UC を作れない比較は理由付き SKIP、実効型を確認してから比較。MTRR 切替時間は転送時間から除外する。
 - 固定 RAM パターン 0..255、全面640×480・320×200・640×16・32×32・16×16・(x=1,w=63)・1×480・端1px。ウォームアップ10回後100回×3、個々の経過 µs を RAM に保存する。
 - p50/p95 は昇順の nearest-rank（100個なら50/95番、合算300個なら150/285番）。中央値・p95・最大・転送 byte・point 回数・失敗数を出す。小矩形は時計の空測定も記録する。
@@ -235,7 +235,7 @@ WC不成立は理由付きSKIPで、比較の合格と数えない。レコー�
 - WC=[0,80000h)、ring=[80000h,88000h)、notify=[88000h,88020h)、試験面=[90000h,db000h)。BAR1先頭1MiB写像、ring等の実効型はUC、PRAMIN別予約。BIOSの広いWCがある場合もringの実効UCを確認する。
 - 32KiB連続・整列bounce、GPU視点ROのPCI snoop入力={2703dh,7fffh,phys,phys}。入力のROはflags0|4000h、flags2のRW bit2hを付けない（usernv04.c:119–127）。push DMA は H:1051–1053 の3語を維持し、flags0=3002h、limit=7fffh、flags2=80000h|2h とする。RO 7002h は今回は採らず、手本から外すなら理由を示して後続票でレビューする。宛先/notifierは書込み可能。
 - M2MFはE:399–427の0184/0188結線→030cから8word→notify/kick、GET==PUTかつPGRAPH idleまで待つ。bounce再利用・CPU fallbackの前にGPU停止を確認し、停止不能なら資源保持して既存失敗経路へ。
-- BM遷移0102→0106→0102はbus.c:29,109/devinitの期待値に加え kdebug/gf_stage_state.c・recover_profile.c を扱う。recoverへ渡す前にGPU停止と0102 readbackを完了させる境界を固定し、0106のまま旧profileを走らせない。
+- BM遷移0102→0106→0102はbus.c:29,109/devinitの期待値に加え sys/dev/video/geforce/diag/gf_stage_state.c・recover_profile.c を扱う。recoverへ渡す前にGPU停止と0102 readbackを完了させる境界を固定し、0106のまま旧profileを走らせない。
 - fill/copyはgf_accept.c内の非表示面検査だけ（F:32–73）、HALの能力は公開しない。IFC/SIFM/カーソル/3D/Xv/複数モードは範囲外。GPU停止→WC復元の順に寿命を拡張する。
 - 未決のユーザー判断は0件。性能・WC可否・容量は観測事項。段0合格なら本節のファイル・DMA buffer・objectは作らない。
 

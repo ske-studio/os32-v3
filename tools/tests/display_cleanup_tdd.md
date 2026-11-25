@@ -48,5 +48,5 @@ four mutation targets to the generated inventory without duplicating its table.
 
 boot_splash_native_host を使うこの実行器にも `--gc-sections` を付け、未結線の
 `.text.gfx_fb_bridge` を kernel と同じく除去する。変異用の写しには新しい include
-依存 `exec/appslot.h` も含める。変異の定義・置換文字列・期待 FAIL は変更しない。
+依存 `sys/kern/exec/appslot.h` も含める。変異の定義・置換文字列・期待 FAIL は変更しない。
 正常13条件・16/16変異runtime RED、qemu指定の単独再検査 rc=0。

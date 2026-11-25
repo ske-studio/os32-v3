@@ -1,4 +1,4 @@
-/* C1: the real kernel/console/console.c (generated include = product text) on a
+/* C1: the real sys/kern/console/console.c (generated include = product text) on a
  * recording backend whose grid is not 80x25. Out-of-grid access exits 98/99. */
 #include "types.h"
 #include "console_backend.h"

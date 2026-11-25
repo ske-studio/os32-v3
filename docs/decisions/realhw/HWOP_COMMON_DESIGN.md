@@ -28,21 +28,21 @@
 | 役目 | x86 の実コードと動作 | PowerMac の現状 |
 |---|---|---|
 | 入口 | userland/shell/cmd_hw.c shell_cmd_hw → hwb_exec.c の hwb_load / hwb_step。hw_find_id は pci_count / pci_get、BDF 指定はシェルで組み立てる。 | resident shell に同じソースが入る。PM の調査では最初の POINT が通らない。 |
-| 特権呼出し | cmd_hw.c hw_access → kapi/kapi_generated.c の wrap_kdebug_call → kernel/module/kdebug_call.c kdebug_call → ops.dbg_call → kdebug/kdebug_main.c recovery_call の HW_OP 分岐 → kdebug/hwb_access.c の hwb_access。 | platform/powermac/module_diag.c の diag_call は現在 PROBE_OP の LIST のみ。HW_OP を同じ hwb_access に渡し、LIST は既存経路を使う。 |
-| PCI | hwb_exec.c he_access → hwb_access → drivers/pci/pci_hwb.c の pci_hwb_read/write → access_cfg。IRQ 保存、CF8 保存、2 パターンで機構確認、アドレス選択、CFC + lane で指定幅の取引、CF8・IRQ 復元。 | platform/powermac/pci_config.c transaction は UniNorth の Type 0/1 と LE の 32 ビット取引。pci_backend.c の pci_config_write16 は Command 用。PC-98 でも platform/pc98/pci_config.c の列挙用口と HW-BASIC の E7 は別経路。 |
+| 特権呼出し | cmd_hw.c hw_access → sys/kapi/kapi_generated.c の wrap_kdebug_call → sys/kern/module/kdebug_call.c kdebug_call → ops.dbg_call → sys/platform/pc98/kdebug/kdebug_main.c recovery_call の HW_OP 分岐 → sys/kern/kdebug/hwb_access.c の hwb_access。 | sys/platform/powermac/module_diag.c の diag_call は現在 PROBE_OP の LIST のみ。HW_OP を同じ hwb_access に渡し、LIST は既存経路を使う。 |
+| PCI | hwb_exec.c he_access → hwb_access → sys/dev/pci/pci_hwb.c の pci_hwb_read/write → access_cfg。IRQ 保存、CF8 保存、2 パターンで機構確認、アドレス選択、CFC + lane で指定幅の取引、CF8・IRQ 復元。 | sys/platform/powermac/pci_config.c transaction は UniNorth の Type 0/1 と LE の 32 ビット取引。pci_backend.c の pci_config_write16 は Command 用。PC-98 でも sys/platform/pc98/pci_config.c の列挙用口と HW-BASIC の E7 は別経路。 |
 | BAR | hwb_exec.c he_bar が利用の都度 header type と BAR を実読。型別の本数、64 ビット BAR の対と上位、空間を検証し属性をマスク。he_address が offset を足し、末端・整列を検査してログ番地にする。 | OF の PCI バス番地と CPU 物理番地が異なり得る。生の pciread の答えは両機種とも構成値。 |
-| PHYS / IO | hwb_access.c の hwb_phys / hwb_block / hwb_io。kdebug/kdebug_window.c kdebug_window_begin と recover_window_cleanup が peek・recovery と所有権を共有。kdebug/kpeek.c の kpeek_mmio もこの窓を使う。kpeek_call は別 op の配送先。 | 既存の装置別マップはあるが HW_OP の一時窓は未接続。PC-98 のポート空間に相当する資源は無い。 |
+| PHYS / IO | hwb_access.c の hwb_phys / hwb_block / hwb_io。sys/arch/x86/kdebug/kdebug_window.c kdebug_window_begin と recover_window_cleanup が peek・recovery と所有権を共有。sys/platform/pc98/kdebug/kpeek.c の kpeek_mmio もこの窓を使う。kpeek_call は別 op の配送先。 | 既存の装置別マップはあるが HW_OP の一時窓は未接続。PC-98 のポート空間に相当する資源は無い。 |
 | 中止と記録 | hwb_exec.c he_point → cmd_hw.c hw_point → HW_POINT → exec_hwb_abort_take。hwb_step・he_wait_poll・fill 内の判定、hwb_log.c の begin/end/poll/finish → cmd_hw.c の hw_line / hw_log_flush が端末と -o を扱う。 | exec の印とログ整形を共有し、入力から中止要求を立てる部分とモジュールの型付き import を接続する。 |
 
 ## 2. 共通の契約と後端
 
-kdebug/hwb_wire.h をシェルと kdebug の私有 wire とする。HW_OP=18、version=1、通常要求は u32 8 語で 32 バイト、BLOCK8/16/32 のみ count・increment を末尾に持つ 40 バイト。同じ像の呼び手とモジュールが CPU の整数表現で渡す。装置のバイト順変換はこの境界の外に置く。
+sys/kern/kdebug/hwb_wire.h をシェルと kdebug の私有 wire とする。HW_OP=18、version=1、通常要求は u32 8 語で 32 バイト、BLOCK8/16/32 のみ count・increment を末尾に持つ 40 バイト。同じ像の呼び手とモジュールが CPU の整数表現で渡す。装置のバイト順変換はこの境界の外に置く。
 
 | 所有者・口（新設名は案） | 型と責任 | 失敗と値 |
 |---|---|---|
 | kdebug 共通 hwb_access | i32 (void *buf, u32 size)。NULL・サイズ・版を調べてから action を解釈する。status 入力 0、READ 入力値 0、幅 1/2/4 バイト、WRITE の値幅、space と BDF を検査。PCI は BDF 16 ビット、offset+幅が 256 以内かつ整列、IO は末端 0xffff 以内、PHYS は整列・末端 u32 以内。 | 壊れた外枠は OS32_ERR_INVAL、部品・op 不在は OS32_ERR_NOSYS。呼出し失敗なら出力を使わない。受理後は return 0 と status を別に返す。 |
 | 同上、値と POINT | HW_OK=0、HW_ARG=1、HW_NOSYS=2、HW_WINDOW=3、HW_IO_ERROR=4。READ 成功は幅でゼロ拡張、失敗は値 0。WRITE は入力値を保ち読戻しは明示命令のみ。POINT は未使用欄が全て 0 のとき印を一度消費し value=0/1。 | 不正な内容は ARG。ロード時に古い印を捨て、実行中は既存の点で ABORT。TIMEOUT・ABORT およびシェル終了値への変換はシェルに残す。 |
-| include/pci_hwb_contract.h | 現行の u32 pci_hwb_read(u32 bdf,u32 off,u32 width,u32 *out) と u32 pci_hwb_write(u32 bdf,u32 off,u32 width,u32 value)。装置側 pci_hwb.h も契約を読む。利用側には CPU 順の整数。 | 無効 ARG、機構無し NOSYS、機構ありで不在の関数を読むと OK と幅全部 1。取引自体の障害は IO_ERROR。 |
+| sys/include/pci_hwb_contract.h | 現行の u32 pci_hwb_read(u32 bdf,u32 off,u32 width,u32 *out) と u32 pci_hwb_write(u32 bdf,u32 off,u32 width,u32 value)。装置側 pci_hwb.h も契約を読む。利用側には CPU 順の整数。 | 無効 ARG、機構無し NOSYS、機構ありで不在の関数を読むと OK と幅全部 1。取引自体の障害は IO_ERROR。 |
 | 両 platform ディレクトリの固定名 platform_hwb.h、PCI 取引 | 読み書きの引数・戻りは上記と同型。PC-98 は E7 の probe と実幅取引、PowerMac は host bridge 選択と排他下の実幅 LE データ取引。8/16 ビット書込みは指定 lane のみを更新する。 | 機構の有無と装置の不在を区別する。32 ビット RMW は隣の W1C status まで書くため使えない。 |
 | 同ヘッダ、BAR 番地変換 | u32 platform_hwb_bar(u32 bdf,u32 bar,u32 space,u32 base,u32 offset,u32 bytes,u32 *addr)。共通の BAR 解読後、マスク済みの実 BAR 基点、相対 offset と全長を渡す。PC-98 は恒等。PowerMac は BDF の親橋と OF assigned-addresses / ranges を照合し、全区間を収める窓から CPU 物理番地を算出。 | 不正 BAR、幅・加算の桁あふれは ARG。対応窓無し・変換不能は WINDOW、PowerMac のポート要求は NOSYS。成功時のみ出力を使う。 |
 | 同ヘッダ、物理アクセス | u32 platform_hwb_phys(struct hw_req *r)、u32 platform_hwb_block(struct hw_block_req *b)。検証済みの番地・幅で窓を所有し、アクセス後に解放。バーストの count は 1..4096/幅、increment は 0/1。全長・整列・初期値幅を共通で検証。 | 窓の確保・復元失敗は WINDOW（復元失敗が優先）、アクセス失敗は IO_ERROR。失敗した read の部分値を公開しない。 |
@@ -50,11 +50,11 @@ kdebug/hwb_wire.h をシェルと kdebug の私有 wire とする。HW_OP=18、v
 
 ### 2.1 翻訳単位・リンク・型付き import
 
-両機種で同じ `kdebug/hwb_access.c` をコンパイルする。外枠、通常要求と block の内容検査、POINT、status/value の確定をこの翻訳単位に残す。固定名 `platform_hwb.h` 越しに検証済み要求を渡す。PC-98 の窓・生成 import のマクロ・ポート・stos の呼出列は `platform/pc98/platform_hwb.h` 内の私有実装へ移し、同じ hwb_access.o に展開する。窓の所有状態は従来の kdebug_window.c に一つだけ置く。PCI E7 の提供元は drivers/pci、x86 のポート機構を選ぶのは PC-98 側。共通 TU から PC-98 ヘッダや生成 import を直接読まない。
+両機種で同じ `sys/kern/kdebug/hwb_access.c` をコンパイルする。外枠、通常要求と block の内容検査、POINT、status/value の確定をこの翻訳単位に残す。固定名 `platform_hwb.h` 越しに検証済み要求を渡す。PC-98 の窓・生成 import のマクロ・ポート・stos の呼出列は `sys/platform/pc98/platform_hwb.h` 内の私有実装へ移し、同じ hwb_access.o に展開する。窓の所有状態は従来の kdebug_window.c に一つだけ置く。PCI E7 の提供元は drivers/pci、x86 のポート機構を選ぶのは PC-98 側。共通 TU から PC-98 ヘッダや生成 import を直接読まない。
 
-PPC の build/targets/ppc-powermac.mk の kdebug.elf は diag.o、共通ソースからモジュール用に組む hwb_access.o、lib/kstring_c.o をリンクする。PowerMac の platform_hwb.h は型付きスロットを呼び、IO は NOSYS を返す。OF 資源・PCI 排他・窓は同機種のカーネル、例外復帰命令は arch/ppc に置く。カーネル側とモジュール側で同じスロット構造宣言を使う。
+PPC の build/targets/ppc-powermac.mk の kdebug.elf は diag.o、共通ソースからモジュール用に組む hwb_access.o、sys/kern/kstring_c.o をリンクする。PowerMac の platform_hwb.h は型付きスロットを呼び、IO は NOSYS を返す。OF 資源・PCI 排他・窓は同機種のカーネル、例外復帰命令は arch/ppc に置く。カーネル側とモジュール側で同じスロット構造宣言を使う。
 
-platform/powermac/kdebug_imports.json の index 0 の snapshot を保ち、順に `u32 (*abort_take)(void)`、表の pci_hwb_read/write と同型の cfg_read/write、platform_hwb_bar と同型の bar、phys、block、phys_check を追加する（phys/block の型も表の通り）。abort_take の提供者は exec_hwb_abort_take。kdebug_imports.h の単一 snapshot 型の配列を異種の関数型を保持する export 表へ改める。各フィールドの型・順とスロット offset をビルドで検査し、梱包した import の index・名前の hash・kind・type_ver をローダで照合する。必須スロット不成立なら dbg_call を公開しない。公開 SDK や x86 の import 表への追加は不要。
+sys/platform/powermac/kdebug_imports.json の index 0 の snapshot を保ち、順に `u32 (*abort_take)(void)`、表の pci_hwb_read/write と同型の cfg_read/write、platform_hwb_bar と同型の bar、phys、block、phys_check を追加する（phys/block の型も表の通り）。abort_take の提供者は exec_hwb_abort_take。kdebug_imports.h の単一 snapshot 型の配列を異種の関数型を保持する export 表へ改める。各フィールドの型・順とスロット offset をビルドで検査し、梱包した import の index・名前の hash・kind・type_ver をローダで照合する。必須スロット不成立なら dbg_call を公開しない。公開 SDK や x86 の import 表への追加は不要。
 
 | PPC import index | 型付き slot（関数型は上表と共通） | カーネルの提供者・用途 |
 |---|---|---|
@@ -94,7 +94,7 @@ PC-98 は 0xFE000000 の窓で IRQ・元 PTE を保存し、PCD、書込み時�
 
 PowerMac は一時窓を排他し cache-inhibited・guarded でマップ、各出口でマップと割込み状態を復元する。CPU 順と装置順の変換、順序保証は後端で幅ごとに一度行う。PCI と OHCI の LE レジスタは PPC のネイティブロード値をそのまま返さない。block は全域を先に確保し、指定幅で連続ストア、値は幅内で巡回する。要素間の再マップ・関数呼出し・暗黙読戻しを挟まない。
 
-arch/ppc/kernel_trap.c の既存 onfault_data は一つの命令 PC・一つの DAR との完全一致である。単発 load/store と PCI の選択書込・フラッシュ・データ・解除の各命令は、EE=0 で命令ラベル、対象 VA、専用エラー復帰ラベルを arm してから実行する。保護枠が使用中なら未アクセスで失敗し、他者の枠を clear しない。正常出口は自分の登録を解除する。対象 supervisor DSI（miss/protect/io）のみトラップが登録を消費し SRR0 を復帰ラベルへ向ける。
+sys/arch/ppc/kernel_trap.c の既存 onfault_data は一つの命令 PC・一つの DAR との完全一致である。単発 load/store と PCI の選択書込・フラッシュ・データ・解除の各命令は、EE=0 で命令ラベル、対象 VA、専用エラー復帰ラベルを arm してから実行する。保護枠が使用中なら未アクセスで失敗し、他者の枠を clear しない。正常出口は自分の登録を解除する。対象 supervisor DSI（miss/protect/io）のみトラップが登録を消費し SRR0 を復帰ラベルへ向ける。
 
 block はループ前に一度、実ストアの PC とマップ済み VA 区間・幅・store 条件を登録する専用の範囲付き onfault を arch/ppc に追加する。DAR が対象要素の整列した番地で一致する場合だけループ外の cleanup へ戻す。無関係な PC・DAR・例外は通常の trap 経路へ渡す。失敗後は続行・再実行しない。既に完了したストアは残り、read は部分値を返さない。
 
@@ -128,7 +128,7 @@ block はループ前に一度、実ストアの PC とマップ済み VA 区間
 - 本稿は設計の静的照合。各段の x86 build_compare 差 0、変異試験、PowerMac QEMU と実機での観測は実装時に採取する。
 
 ## PM の確定 (2026-11-23、往復 3 回の後)
-- sol 第 3 回の残り 1 件 (P1、§2.2・§2.4・§3.6) は争点でなく足りない手順なので、PM が本書に取り込んで確定とする: 共用の構成の取引が DSI をエラーに変えるようになる段で、`pm_gmac_early_quiesce` (platform/powermac/pci_config.c) は GEM の停止の確かめ中に構成の取引 (Command の読み・bus master の解除の書き込み) が失敗したら起動の側へ負の値を返し、呼び出し (platform/powermac/ppc_kernel.c) は `memory_boot_init` に進まない。受入に、読み・解除の書き込みのそれぞれへ障害を注入して `memory_boot_init` に到達しないことを足す。
+- sol 第 3 回の残り 1 件 (P1、§2.2・§2.4・§3.6) は争点でなく足りない手順なので、PM が本書に取り込んで確定とする: 共用の構成の取引が DSI をエラーに変えるようになる段で、`pm_gmac_early_quiesce` (sys/platform/powermac/pci_config.c) は GEM の停止の確かめ中に構成の取引 (Command の読み・bus master の解除の書き込み) が失敗したら起動の側へ負の値を返し、呼び出し (sys/platform/powermac/ppc_kernel.c) は `memory_boot_init` に進まない。受入に、読み・解除の書き込みのそれぞれへ障害を注入して `memory_boot_init` に到達しないことを足す。
 - 段の担当: 本線 = 共通の HW_OP と x86 の後端の分離 (x86 の生成物の差 0)。PowerPC = PowerMac の後端 (UniNorth の構成の取引・OF の資源の表・物理の窓・DSI の回復・橋の隔離の共有・GEM の early quiesce の負の値)。
 
 ## PM の追記 (2026-11-23、本線の段の取り込みの時)

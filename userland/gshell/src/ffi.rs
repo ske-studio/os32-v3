@@ -24,11 +24,11 @@ extern "C" {
 }
 
 /* ================================================================ */
-/*  常駐 shell の内部入口 (T7b-b2、exec/shell_service.h)               */
+/*  常駐 shell の内部入口 (T7b-b2、sys/kern/exec/shell_service.h)               */
 /*                                                                  */
 /*  kernel は entry frame の 4 語目で表の番地を渡し、CRT0 の          */
 /*  `_start_c` がそれを `__os32_aux` に控える (app には 0)。KAPI      */
-/*  ではない。印 / 版 / 大きさは exec/shell_service.h から build.rs  */
+/*  ではない。印 / 版 / 大きさは sys/kern/exec/shell_service.h から build.rs  */
 /*  が写す ([C4])。font への接続 (呼ぶ側) は b3 — 呼ぶ関数は戻り値を  */
 /*  局所に受けて使ってから返す薄い `#[inline(never)]` 関数にする      */
 /*  (尾呼出しにすると kernel の段 A が戻り番地で断る、設計 §3-2)。    */
@@ -43,7 +43,7 @@ include!(concat!(env!("OUT_DIR"), "/shell_service.rs"));
 // OS32_ERR_NOSPC / NOSYS / BUSY (os32_kapi_shared.h から build.rs が写す、[C4])。
 include!(concat!(env!("OUT_DIR"), "/kapi_err.rs"));
 
-/// `exec/shell_service.h` の `ShellService` と同じ並び (i386 で 32 バイト、version 2)。
+/// `sys/kern/exec/shell_service.h` の `ShellService` と同じ並び (i386 で 32 バイト、version 2)。
 #[repr(C)]
 pub struct ShellService {
     pub magic: u32,

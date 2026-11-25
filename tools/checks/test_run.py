@@ -470,7 +470,7 @@ class RunnerTest(unittest.TestCase):
         self.assertEqual(set(docs.stage), {'a'})
         self.assertEqual(docs.mutations, docs.stage)
         for file in ('Makefile', 'build/kernel.mk', 'build/sdk.mk', 'sdk/kapi.json',
-                     'include/kapi_call_generated.h', 'sdk/gen_kapi.py', 'sdk/link/generations.ld', 'sdk/rust/abc/Cargo.toml',
+                     'sys/include/kapi_call_generated.h', 'sdk/gen_kapi.py', 'sdk/link/generations.ld', 'sdk/rust/abc/Cargo.toml',
                      'tools/checks/run.py'):
             with self.subTest(file=file):
                 result = self.plan(file)
@@ -493,14 +493,14 @@ class RunnerTest(unittest.TestCase):
     def test_input_covers_select_readers(self):
         cases = {
             'tools-host': ['tools/mk_blank_nhd.py', 'tools/emu_agent/agent.py', '.env.sample'],
-            'privileged': ['lib/kstring_asm.asm', 'lib/kstring_c.c', 'lib/kstring.h',
+            'privileged': ['sys/kern/kstring_asm.asm', 'sys/kern/kstring_c.c', 'sys/kern/kstring.h',
                            'lib/utf8.h', 'lib/lz4.h', 'lib/microtar/microtar.h',
                            'lib/sqlite3/sqlite3.c', 'lib/crc32_core.inc'],
-            'docs-links': ['drivers/hostdrv/hostdrvfs_proto.h'],
+            'docs-links': ['sys/dev/hostdrv/hostdrvfs_proto.h'],
         }
-        cases['privileged'] += ['drivers/pci/pci_decode.c', 'drivers/pci/pci_decode.h',
-                                'fs/pc98pt.c', 'fs/pc98pt.h',
-                                'fs/ext2/ext2_layout.c', 'fs/ext2/ext2_layout.h']
+        cases['privileged'] += ['sys/dev/pci/pci_decode.c', 'sys/dev/pci/pci_decode.h',
+                                'sys/fs/pc98pt.c', 'sys/fs/pc98pt.h',
+                                'sys/fs/ext2/ext2_layout.c', 'sys/fs/ext2/ext2_layout.h']
         actual = Path(__file__).resolve().parents[2]
         # Read the real CHECK declarations, but use empty source fixtures so a
         # missing declaration cannot be masked by transitive imports/includes.
@@ -677,12 +677,12 @@ class RunnerTest(unittest.TestCase):
 
     def test_build_source_lists_route_sources_and_artifacts(self):
         cases = (
-            ('build/kernel.mk', 'drivers/video/pc98/splash_raster_plan.c',
-             'C_KERNEL = \\\n    arch/x86/kernel/mtrr_wc.c\n',
-             'C_KERNEL = \\\n    drivers/video/pc98/splash_raster_plan.c \\\n    arch/x86/kernel/mtrr_wc.c\n'),
-            ('build/kernel.mk', 'drivers/video/pc98/splash_raster_image.c',
-             'C_KERNEL = \\\n    drivers/video/pc98/backend_pegc.c\n',
-             'C_KERNEL = \\\n    drivers/video/pc98/backend_pegc.c \\\n    drivers/video/pc98/splash_raster_image.c\n'),
+            ('build/kernel.mk', 'sys/platform/pc98/video/splash_raster_plan.c',
+             'C_KERNEL = \\\n    sys/arch/x86/kernel/mtrr_wc.c\n',
+             'C_KERNEL = \\\n    sys/platform/pc98/video/splash_raster_plan.c \\\n    sys/arch/x86/kernel/mtrr_wc.c\n'),
+            ('build/kernel.mk', 'sys/platform/pc98/video/splash_raster_image.c',
+             'C_KERNEL = \\\n    sys/platform/pc98/video/backend_pegc.c\n',
+             'C_KERNEL = \\\n    sys/platform/pc98/video/backend_pegc.c \\\n    sys/platform/pc98/video/splash_raster_image.c\n'),
             ('build/geforce-module.mk', 'hwdev/gf/new.c',
              'GEFORCE_SOURCES := $(wildcard hwdev/gf/*.c) hwdev/gf/old.c\n',
              'GEFORCE_SOURCES := $(wildcard hwdev/gf/*.c) hwdev/gf/old.c hwdev/gf/new.c\n'),
@@ -723,8 +723,8 @@ class RunnerTest(unittest.TestCase):
 
     def test_build_unresolved_registration_is_full(self):
         path = 'build/geforce-module.mk'
-        self.check('source', covers=['kdebug/gfinit_resources.c'])
-        self.write('kdebug/gfinit_resources.c', 'int probe;\n')
+        self.check('source', covers=['sys/dev/video/geforce/diag/gfinit_resources.c'])
+        self.write('sys/dev/video/geforce/diag/gfinit_resources.c', 'int probe;\n')
         before = ('GEFORCE_BOOT_OBJS := $(GEFORCE_OUT)/boot_resources.o '
                   '$(GEFORCE_OUT)/boot_scan.o\n')
         self.write(path, before)
@@ -1194,9 +1194,9 @@ def run_mutations():
     registrations = (
         ('blank-nhd-cover', 'tools-host', "'tools/mk_blank_nhd.py', ",
          'test_input_covers_select_readers'),
-        ('kstring-asm-cover', 'privileged', "'lib/kstring_asm.asm', ",
+        ('kstring-asm-cover', 'privileged', "'sys/kern/kstring_asm.asm', ",
          'test_input_covers_select_readers'),
-        ('pci-decode-cover', 'privileged', "'drivers/pci/pci_decode.c', ",
+        ('pci-decode-cover', 'privileged', "'sys/dev/pci/pci_decode.c', ",
          'test_input_covers_select_readers'),
     )
     read_text = Path.read_text

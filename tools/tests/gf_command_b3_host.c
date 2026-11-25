@@ -1,4 +1,4 @@
-#include "../../hwdev/gf/command.h"
+#include "../../sys/dev/video/geforce/command.h"
 
 #define GF2_HOST_B3
 #include "gf_command_host.h"

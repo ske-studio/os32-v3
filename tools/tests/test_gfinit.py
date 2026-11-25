@@ -20,23 +20,23 @@ def command(exe):
 # The decoder is split into .inc files included in place (kdebug/gfinit_op, kdebug/gfinit_decode);
 # each anchor names the file that holds it.
 MUTATIONS = [
-    ('kdebug/gfinit_op/repeat_decode.inc', 'repeat_zero', 'if (!o->count || o->count >= 255)', 'if (o->count >= 255)'),
-    ('kdebug/gfinit_op/repeat_decode.inc', 'repeat_c_overflow', 'if (!o->count || o->count >= 255)', 'if (!o->count)'),
-    ('kdebug/gfinit_decode.c', 'unknown_opcode', 'default: return -1;\n    }\n    if (span', 'default: fixed = 1; break;\n    }\n    if (span'),
-    ('kdebug/gfinit_decode.c', 'rom_crc', 'if (crc32_core_final(crc) != s->crc)', 'if (false && crc32_core_final(crc) != s->crc)'),
-    ('kdebug/gfinit_op/copy_decode.inc', 'copy_shift', 'if (!shift_ok(o->shift) || o->ref & 3U)', 'if ((!shift_ok(o->shift) && false) || o->ref & 3U)'),
-    ('kdebug/gfinit_op/condition_decode.inc', 'table_index', 'if (entry >= count)', 'if (false && entry >= count)'),
-    ('kdebug/gfinit_op/io_restrict_decode.inc', 'selection_coverage', '|| (o->mask >> o->shift) >= o->count', ''),
-    ('kdebug/gfinit_op/zm_reg_sequence_decode.inc', 'sequence_overflow', 'o->count - 1 > (0xffffffffU - o->target) / 4', 'false'),
+    ('sys/dev/video/geforce/gfinit_op/repeat_decode.inc', 'repeat_zero', 'if (!o->count || o->count >= 255)', 'if (o->count >= 255)'),
+    ('sys/dev/video/geforce/gfinit_op/repeat_decode.inc', 'repeat_c_overflow', 'if (!o->count || o->count >= 255)', 'if (!o->count)'),
+    ('sys/dev/video/geforce/diag/gfinit_decode.c', 'unknown_opcode', 'default: return -1;\n    }\n    if (span', 'default: fixed = 1; break;\n    }\n    if (span'),
+    ('sys/dev/video/geforce/diag/gfinit_decode.c', 'rom_crc', 'if (crc32_core_final(crc) != s->crc)', 'if (false && crc32_core_final(crc) != s->crc)'),
+    ('sys/dev/video/geforce/gfinit_op/copy_decode.inc', 'copy_shift', 'if (!shift_ok(o->shift) || o->ref & 3U)', 'if ((!shift_ok(o->shift) && false) || o->ref & 3U)'),
+    ('sys/dev/video/geforce/gfinit_op/condition_decode.inc', 'table_index', 'if (entry >= count)', 'if (false && entry >= count)'),
+    ('sys/dev/video/geforce/gfinit_op/io_restrict_decode.inc', 'selection_coverage', '|| (o->mask >> o->shift) >= o->count', ''),
+    ('sys/dev/video/geforce/gfinit_op/zm_reg_sequence_decode.inc', 'sequence_overflow', 'o->count - 1 > (0xffffffffU - o->target) / 4', 'false'),
 ]
 
 SHARED_MUTATIONS = [
-    ('kdebug/recover_plan/bind.inc', 'skip_head_flag', '(l->flags & REC_LAYOUT_SKIP_HEAD);', 'true;'),
-    ('kdebug/recover_plan/bind.inc', 'capture_ordinal', 'c->read_ordinal)', '0)'),
-    ('kdebug/recover_plan/bind.inc', 'capture_dominance', '!bit_get(in, plan->captures[j].producer_node)', 'false'),
-    ('kdebug/recover_plan/access.inc', 'capture_consumed', 'consumer_node == node) r->capture_valid &= ~(1ULL << i);',
+    ('sys/dev/video/geforce/diag/recover_plan/bind.inc', 'skip_head_flag', '(l->flags & REC_LAYOUT_SKIP_HEAD);', 'true;'),
+    ('sys/dev/video/geforce/diag/recover_plan/bind.inc', 'capture_ordinal', 'c->read_ordinal)', '0)'),
+    ('sys/dev/video/geforce/diag/recover_plan/bind.inc', 'capture_dominance', '!bit_get(in, plan->captures[j].producer_node)', 'false'),
+    ('sys/dev/video/geforce/diag/recover_plan/access.inc', 'capture_consumed', 'consumer_node == node) r->capture_valid &= ~(1ULL << i);',
      'consumer_node == node) r->capture_valid |= 1ULL << i;'),
-    ('kdebug/recover_plan/bind.inc', 'unresolved_bind', '!plan->entries || plan->unresolved_count ||', '!plan->entries ||'),
+    ('sys/dev/video/geforce/diag/recover_plan/bind.inc', 'unresolved_bind', '!plan->entries || plan->unresolved_count ||', '!plan->entries ||'),
 ]
 
 
@@ -174,7 +174,7 @@ def main():
         return int(bool(diagnostic_bad | mutpar.run_with_control(mutation,
             MUTATIONS +
             list(SHARED_MUTATIONS),
-            ('kdebug/gfinit_decode.c', 'control', '', ''))))
+            ('sys/dev/video/geforce/diag/gfinit_decode.c', 'control', '', ''))))
     return 0
 
 

@@ -41,7 +41,7 @@ HOST_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
               "-Wno-unused-parameter", "-Wno-sign-compare",
               "-D__cdecl="]
 SRC = ROOT / "tools/tests/ext2_empty_name_host.c"
-TARGET_SRCS = ["fs/ext2/ext2_dir.c", "fs/ext2/ext2_file.c", "fs/ext2/ext2_vfs.c", "fs/vfs.c"]
+TARGET_SRCS = ["sys/fs/ext2/ext2_dir.c", "sys/fs/ext2/ext2_file.c", "sys/fs/ext2/ext2_vfs.c", "sys/fs/vfs.c"]
 TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",

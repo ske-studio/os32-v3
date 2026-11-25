@@ -5,9 +5,9 @@ import tempfile
 
 CHECK = dict(name='snd2-reg-host', tier=1, needs=[], budget=3,
     covers=['tools/tests/snd2_reg_host.c', 'sound/hal/snd2*.c',
-            'sound/hal/snd2*.h', 'include/machcfg_contract.h', 'include/av_contract.h', 'lib/kstring.h',
-            'include/types.h', 'kapi/kapi_snd2*.c', 'include/user_read_contract.h',
-            'exec/exec.h', 'include/memmap.h', 'sdk/include/os32/*.h'],
+            'sound/hal/snd2*.h', 'sys/include/machcfg_contract.h', 'sys/include/av_contract.h', 'sys/kern/kstring.h',
+            'sys/include/types.h', 'kapi/kapi_snd2*.c', 'sys/include/user_read_contract.h',
+            'sys/kern/exec/exec.h', 'sys/include/memmap.h', 'sdk/include/os32/*.h'],
     basis=['docs/decisions/sound/AV_HAL_DESIGN.md §3, §13-2'])
 
 MUTATIONS = [

@@ -20,14 +20,14 @@ NULLABLE = {name: 1 for name in (
     'exec_start launch_req dev_blk_write').split()}
 NULLABLE.update(sys_rename=3, sys_redirect_fd=2,
                 sys_mount=7, sys_umount_checked=1)
-TARGET_SRC = [*walk.FILES.values(), 'kapi/kapi_strings.c', 'include/kapi_strings.h',
-              'exec/exec.c', 'sdk/kapi.json', 'exec/ring3_ls.c',
-              'userland/tests/kstr_boundary.c',
-              'build/app.conf', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
+TARGET_SRC = [*walk.FILES.values(), 'sys/kapi/kapi_strings.c', 'sys/include/kapi_strings.h',
+              'sys/kern/exec/exec.c', 'sdk/kapi.json', 'sys/kern/exec/ring3_ls.c',
+              'userland/diag/kstr_boundary.c',
+              'build/app.conf', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h']
 
 
 def guest_declarations():
-    boundary = (ROOT / 'userland/tests/kstr_boundary.c').read_text()
+    boundary = (ROOT / 'userland/diag/kstr_boundary.c').read_text()
     assert not re.search(r'\bv86_\w+\b', boundary), 'GUI fixture must not call V86'
     entries = [line.split() for line in (ROOT / 'build/app.conf').read_text().splitlines()
                if line.strip() and not line.lstrip().startswith('#')]
@@ -44,12 +44,12 @@ def exercise(args, mutant=None):
                           '#include "' + str(ROOT / 'tools/tests/pgalloc_host_fixture.h') + '"')
     setup = setup.replace('    caller_copy_tests();', '    caller_copy_tests();\n    die(0);')
     sources['setup'] = setup
-    sources['strings'] = (ROOT / 'kapi/kapi_strings.c').read_text()
+    sources['strings'] = (ROOT / 'sys/kapi/kapi_strings.c').read_text()
     dispatch = exec_source(ROOT)
-    sources['call'] = (ROOT / 'arch/x86/kernel/kapi_call.c').read_text()
+    sources['call'] = (ROOT / 'sys/arch/x86/kernel/kapi_call.c').read_text()
     cleanup = dispatch.index('static void exec_reclaim_resources(int id)\n{')
     sources['cleanup'] = dispatch[cleanup:dispatch.index('    /* (1)', cleanup)] + '    (void)id;\n}\n'
-    sources['ls'] = (ROOT / 'exec/ring3_ls.c').read_text().split('static int ls_copy_path', 1)[1].split('static void ls_collect_entry', 1)[0]
+    sources['ls'] = (ROOT / 'sys/kern/exec/ring3_ls.c').read_text().split('static int ls_copy_path', 1)[1].split('static void ls_collect_entry', 1)[0]
     sources['ls'] = 'static int ls_copy_path' + sources['ls']
     data = json.loads((ROOT / 'sdk/kapi.json').read_text())['api']
     group_names = GROUPS if args.group == 'all' else [args.group]

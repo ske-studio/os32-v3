@@ -8,7 +8,7 @@ unsigned int host_arch_if = 0x202U;
 #define LEASE_SELFTEST_AS (&space)
 #include "lease_selftest_host.h"
 #undef run
-#include "../../kernel/kselftest_report.c"
+#include "../../sys/kern/kselftest_report.c"
 /* This lifecycle fixture exercises the KDEBUG=0 reset path only. */
 struct kdebug kdebug;
 const char *kdebug_state_name(int state)

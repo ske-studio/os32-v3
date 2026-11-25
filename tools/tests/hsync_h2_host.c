@@ -273,7 +273,7 @@ static int fk_sys_is_mounted(const char *prefix)
 }
 
 /* vfs_devname: マウント点の完全一致でデバイス名、それ以外は ""
- * (fs/vfs.c と同じ)。ルートと、任意で 1 つのサブマウントを持つ */
+ * (sys/fs/vfs.c と同じ)。ルートと、任意で 1 つのサブマウントを持つ */
 static const char *fk_root_dev = "hd0";
 static const char *fk_sub_prefix = 0;
 static const char *fk_sub_dev = 0;

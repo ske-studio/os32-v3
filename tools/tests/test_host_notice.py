@@ -15,14 +15,14 @@ from kernel_includes import include_flags
 CHECK = dict(name='host-notice', tier=1, needs=[], covers=[
     'sdk/kapi.json', 'sdk/include/os32/os32_kapi_generated.h',
     'sdk/include/os32/os32_kapi_slots.h', 'sdk/rust/os32api/src/kapi_generated.rs',
-    'exec/exec_kapi_init.inc',
-    'kapi/range_internal.h', 'exec/exec.h', 'kapi/kapi_host_notice.c', 'kapi/kapi_host_notice.h', 'net/host_mailbox.c',
-    'net/host_mailbox.h', 'include/redir_access.h',
+    'sys/kern/exec/exec_kapi_init.inc',
+    'sys/kapi/range_internal.h', 'sys/kern/exec/exec.h', 'sys/kapi/kapi_host_notice.c', 'sys/kapi/kapi_host_notice.h', 'sys/net/host_mailbox.c',
+    'sys/net/host_mailbox.h', 'sys/include/redir_access.h',
     'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/host_notice_host.c', 'tools/tests/hostsvc_fixture.c',
     'tools/tests/hostsvc_fixture.h', 'tools/tests/host32.py',
-    'tools/tests/kernel_includes.py', 'build/config.mk', 'include/io.h',
-    'lib/kstring.h', 'mm/kmalloc.h'], budget=3.2,
+    'tools/tests/kernel_includes.py', 'build/config.mk', 'sys/include/io.h',
+    'sys/kern/kstring.h', 'sys/kern/mm/kmalloc.h'], budget=3.2,
     basis=['docs/design/net/host_mailbox.md 取り出す', '[ABI]'],
 )
 ROOT = Path(__file__).resolve().parents[2]
@@ -64,7 +64,7 @@ def fixed_slots():
     assert spec['version'] >= 82 and spec['func_capacity'] >= len(spec['api'])
     assert [a['name'] for a in spec['api'][259:261]] == ['host_notice_read', 'host_notice_serial']
     assert spec['api'][259]['out'] == 'target'
-    init = (ROOT / 'exec/exec_kapi_init.inc').read_text()
+    init = (ROOT / 'sys/kern/exec/exec_kapi_init.inc').read_text()
     rust = (ROOT / 'sdk/rust/os32api/src/kapi_generated.rs').read_text()
     for name in ('host_notice_read', 'host_notice_serial'):
         assert 'kapi->' + name + ' = wrap_' + name + ';' in init
@@ -79,7 +79,7 @@ def main():
     fixed_slots()
     with tempfile.TemporaryDirectory(prefix='host-notice-') as tmp:
         work = Path(tmp)
-        source = ROOT / 'kapi/kapi_host_notice.c'
+        source = ROOT / 'sys/kapi/kapi_host_notice.c'
         cross = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross')) / 'bin/i386-elf-gcc'
         subprocess.run([str(cross), '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
             '-ffreestanding', *include_flags(ROOT), '-c', str(source), '-o', str(work / 'target.o')], check=True)
@@ -92,9 +92,9 @@ def main():
                 mutant = work / 'mutant.c'
                 # Preserve relative includes for the substituted product source.
                 mutant.write_text(original.replace('#include "kapi_host_notice.h"',
-                    '#include "' + str(ROOT / 'kapi/kapi_host_notice.h') + '"').replace(
+                    '#include "' + str(ROOT / 'sys/kapi/kapi_host_notice.h') + '"').replace(
                     '#include "../net/host_mailbox.h"',
-                    '#include "' + str(ROOT / 'net/host_mailbox.h') + '"').replace(old, new))
+                    '#include "' + str(ROOT / 'sys/net/host_mailbox.h') + '"').replace(old, new))
                 rc = host32.run([str(build(work, mutant))], timeout=30).returncode
                 assert rc == 1, (name, rc)
                 print('RED ' + name + ' rc=' + str(rc), flush=True)

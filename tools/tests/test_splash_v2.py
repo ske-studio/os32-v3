@@ -1,13 +1,13 @@
 """Normal image owner: real preparation, bounded deadlines and cleanup."""
 CHECK = dict(name='splash-v2-host', tier=1,
-    covers=['platform/pc98/splash_image.c', 'include/platform_splash.h', 'platform/pc98/boot_splash.c',
-            'drivers/video/pc98/splash_raster_plan.c', 'drivers/video/pc98/splash_raster_play.h',
-            'drivers/video/pc98/splash_raster_image.h', 'drivers/video/pc98/splash_raster.h',
-            'drivers/video/pc98/splash_raster_run.c', 'drivers/video/pc98/splash_raster_run.h',
-            'gfx/gfx_osri.h', 'gfx/osri_profile.h', 'gfx/gfx.h', 'gfx/palette.h',
-            'include/memmap.h', 'include/pegc.h', 'include/pc98.h', 'include/types.h',
-            'include/io.h', 'include/gfx_hal.h', 'include/config.h',
-            'sdk/include/os32/os32_kapi_shared.h', 'fs/vfs.h', 'mm/kmalloc.h', 'include/kprintf.h', 'lib/kstring.h',
+    covers=['sys/platform/pc98/splash_image.c', 'sys/include/platform_splash.h', 'sys/platform/pc98/boot_splash.c',
+            'sys/platform/pc98/video/splash_raster_plan.c', 'sys/platform/pc98/video/splash_raster_play.h',
+            'sys/platform/pc98/video/splash_raster_image.h', 'sys/platform/pc98/video/splash_raster.h',
+            'sys/platform/pc98/video/splash_raster_run.c', 'sys/platform/pc98/video/splash_raster_run.h',
+            'sys/kern/gfx/osri/gfx_osri.h', 'sys/kern/gfx/osri/osri_profile.h', 'sys/hal/gfx/gfx.h', 'sys/hal/gfx/palette.h',
+            'sys/include/memmap.h', 'sys/platform/pc98/pegc.h', 'sys/platform/pc98/pc98.h', 'sys/include/types.h',
+            'sys/include/io.h', 'sys/include/gfx_hal.h', 'sys/include/config.h',
+            'sdk/include/os32/os32_kapi_shared.h', 'sys/fs/vfs.h', 'sys/kern/mm/kmalloc.h', 'sys/include/kprintf.h', 'sys/kern/kstring.h',
             'tools/tests/splash_v2_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.6,
     basis=['docs/design/platform/pc98/splash_image.c.md 手順と結果', 'docs/design/platform/pc98/splash_image.c.md 時間の予算', 'docs/design/drivers/video/pc98/splash_raster_run.c.md 口の契約'],
@@ -21,9 +21,9 @@ import tempfile
 import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
-OWNER = 'platform/pc98/splash_image.c'
-SOURCES = [OWNER, 'tools/tests/splash_v2_host.c', 'drivers/video/pc98/splash_raster_plan.c',
-           'drivers/video/pc98/splash_raster_run.c', 'drivers/video/pc98/splash_raster_run.h']
+OWNER = 'sys/platform/pc98/splash_image.c'
+SOURCES = [OWNER, 'tools/tests/splash_v2_host.c', 'sys/platform/pc98/video/splash_raster_plan.c',
+           'sys/platform/pc98/video/splash_raster_run.c', 'sys/platform/pc98/video/splash_raster_run.h']
 MUTATIONS = (
     ('reject dynamic', OWNER, 'if (image->count) {', 'if (image->count) goto done;\n    if (image->count) {'),
     ('omit plan free', OWNER, 'if (plan) kfree(plan);', '(void)plan;'),
@@ -33,14 +33,14 @@ MUTATIONS = (
     ('preview shortage', OWNER, 'SPLASH_RASTER_PREVIEW_MS * SPLASH_RASTER_US_PER_MS) goto done;', '1u) goto done;'),
     ('raster duration cap', OWNER, 'if (remaining_us > play_limit_us) remaining_us = play_limit_us;', '(void)play_limit_us;'),
     ('omit preview charge', OWNER, 'u32 prefix = play_start - start;', 'u32 prefix = 0;'),
-    ('omit drop charge', 'drivers/video/pc98/splash_raster_run.c', 'r->consumed += r->period;', 'if (frame == PL_FRAME_OK) r->consumed += r->period;'),
-    ('omit elapsed ticks', 'drivers/video/pc98/splash_raster_run.c', 'return elapsed > r->consumed ? elapsed : r->consumed;', 'return r->consumed; (void)elapsed;'),
-    ('double charge', 'drivers/video/pc98/splash_raster_run.c', 'return elapsed > r->consumed ? elapsed : r->consumed;', 'return elapsed + r->consumed;'),
+    ('omit drop charge', 'sys/platform/pc98/video/splash_raster_run.c', 'r->consumed += r->period;', 'if (frame == PL_FRAME_OK) r->consumed += r->period;'),
+    ('omit elapsed ticks', 'sys/platform/pc98/video/splash_raster_run.c', 'return elapsed > r->consumed ? elapsed : r->consumed;', 'return r->consumed; (void)elapsed;'),
+    ('double charge', 'sys/platform/pc98/video/splash_raster_run.c', 'return elapsed > r->consumed ? elapsed : r->consumed;', 'return elapsed + r->consumed;'),
     ('all drop succeeds', OWNER, 'if (run.good || !run.frames) rc = PLATFORM_SPLASH_DONE;', 'rc = PLATFORM_SPLASH_DONE;'),
     ('ignore no sync', OWNER, 'if (frame == PL_FRAME_NO_SYNC) goto play_done;', 'if (0 && frame == PL_FRAME_NO_SYNC) goto play_done;'),
     ('restart deadline', OWNER, '*end_tick = now + rest;', '*end_tick = now + PLATFORM_SPLASH_TICKS; (void)rest;'),
     ('omit model residual', OWNER, 'residual.consumed = model;', '(void)model;'),
-    ('round residual up', 'drivers/video/pc98/splash_raster_run.c', 'used + (unsigned long long)mid * unit_us', 'used + (unsigned long long)(mid - 1u) * unit_us'),
+    ('round residual up', 'sys/platform/pc98/video/splash_raster_run.c', 'used + (unsigned long long)mid * unit_us', 'used + (unsigned long long)(mid - 1u) * unit_us'),
     ('omit black cleanup', OWNER, 'if (transferred) image_black();', '(void)transferred;'),
 )
 
@@ -92,7 +92,7 @@ def no_division():
         assert not subprocess.check_output([nm, '-u', str(exe)], text=True).strip()
         assert host32.run([str(exe)], runner='qemu', capture_output=True).returncode == 0
     assert not any('platform_splash_try_image_until' in (ROOT/p).read_text() for p in
-                   ('include/platform_splash.h', OWNER, 'platform/pc98/boot_splash.c'))
+                   ('sys/include/platform_splash.h', OWNER, 'sys/platform/pc98/boot_splash.c'))
     print('GREEN owner object/disassembly/link without libgcc: no 64-bit division helpers; obsolete entry absent', flush=True)
 def main():
     p=argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true'); args=p.parse_args()

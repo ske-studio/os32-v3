@@ -1,6 +1,6 @@
-# drivers/char/serial_plan.c — 設計
+# sys/dev/char/serial_plan.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_SERIAL_VFAST §1・§2 の契約を今のソースと照らして要約
-ソース: `drivers/char/serial_plan.c`・`drivers/char/serial_plan.h` (`serial_plan`・`serial_vfast_div`・`serial_tx_budget_us`・`serial_tx_budget_ticks`・`serial_fifo_detected`・`serial_*_port`・`serial_*_mask`)・I/O と配線 `drivers/char/serial.c`・値の正典 `sdk/include/os32/os32_kapi_shared.h` (`KAPI_SER_*`)
+ソース: `sys/dev/char/serial_plan.c`・`sys/dev/char/serial_plan.h` (`serial_plan`・`serial_vfast_div`・`serial_tx_budget_us`・`serial_tx_budget_ticks`・`serial_fifo_detected`・`serial_*_port`・`serial_*_mask`)・I/O と配線 `sys/dev/char/serial.c`・値の正典 `sdk/include/os32/os32_kapi_shared.h` (`KAPI_SER_*`)
 
 シリアルの「速度をどう出すか」の純粋な判定。**NP21/W は通信速度を模擬しない**ので、分周表やビット位置を間違えても
 エミュレータでは動いてしまう。ここをホストで試験し、I/O の順番と IRQ の汲み出しは実機で確かめる。

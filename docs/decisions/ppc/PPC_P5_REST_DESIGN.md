@@ -61,12 +61,12 @@ D には K の診断回帰と R（host fixture）・C・O・U の個別受入後
 
 
 ## R の実装で決めたこと (2026-11-16、PM 決定、実装者の停止 2 回を受けて)
-- R1: link の capture の合格は HELLO/ALIVE の成立と LOG の完全さ (seq が 0 から連番、drop の報告、KBOOT の段階印の順)。PDIAG の診断は求めない (初期の link-SH の像に PDIAG が無い、platform/powermac/lan_service.c。5 つの診断は K が診断像で確かめる)。
+- R1: link の capture の合格は HELLO/ALIVE の成立と LOG の完全さ (seq が 0 から連番、drop の報告、KBOOT の段階印の順)。PDIAG の診断は求めない (初期の link-SH の像に PDIAG が無い、sys/platform/powermac/lan_service.c。5 つの診断は K が診断像で確かめる)。
 - R2: nest の結果と終了値 5 は RSH の本文で照合する。製品シェルの終了後は起動ループによる再起動を確認する。
 - R3: agent の API は足さない。client からは probe (世代・peer・hello)・LOG・RSH を取り、HELLO・ALIVE (ゲストの電文が 2 秒より長く途切れない)・session (不変)・SFS の CALL と応答は受け身の pcap の 0x88B5 の電文から読む。
 
 ## U の実装で決めたこと (2026-11-16、PM 決定)
 - U-c1: link の `--link --lan --mutate` の変異は no-service だけ。RED は「USB の列挙か打鍵が進まない」と「link の LOG・RSH が生きている」の両方を要し、片方は wrong-reason。syscall-ee は従来の `--cpu both --mutate` (PROBE の私用の写しで USB STALL ticks=0 を観測) に残す。初期の link-SH の像には syscall の入口の EE を観測する口が無く、差し込みは N2 に反するため。
-- U-b の直し: 抑止した SFS CALL では、host_agent の壁時計 1.0s (受付と本文の後の両方、tools/host_agent.py) を止める。-icount のゲスト時計は壁時計と食い違う (先走りと凍結) ので、区間はゲストの期限で終わらせる。期限切れの文は `Host is down` (fs/serialfs/sfs_client.c (sfs_exchange_deadline()))。
-- 受入の揺れのうち、受信が 1 件目で断られる誤りは共通の net/rx_work.c で本線が直した。
+- U-b の直し: 抑止した SFS CALL では、host_agent の壁時計 1.0s (受付と本文の後の両方、tools/host_agent.py) を止める。-icount のゲスト時計は壁時計と食い違う (先走りと凍結) ので、区間はゲストの期限で終わらせる。期限切れの文は `Host is down` (sys/fs/serialfs/sfs_client.c (sfs_exchange_deadline()))。
+- 受入の揺れのうち、受信が 1 件目で断られる誤りは共通の sys/net/rx_work.c で本線が直した。
 

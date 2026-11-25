@@ -10,8 +10,8 @@ from ver_test_utils import ROOT, arguments, execute, function
 
 GENERATED = [
     'sdk/include/os32/os32_kapi_generated.h',
-    'sdk/include/os32/os32_kapi_slots.h', 'kapi/kapi_generated.c',
-    'exec/exec_kapi_init.inc', 'sdk/rust/os32api/src/kapi_generated.rs',
+    'sdk/include/os32/os32_kapi_slots.h', 'sys/kapi/kapi_generated.c',
+    'sys/kern/exec/exec_kapi_init.inc', 'sdk/rust/os32api/src/kapi_generated.rs',
     'sdk/include/os32/os32_generations.h', 'sdk/os32_generations.py',
     'sdk/rust/os32api/src/generations.rs',
 ]
@@ -136,11 +136,11 @@ def run(source, build_source, offsets, runner):
     code = ''.join(function(build_source, sig) for sig in
                    ('void kapi_sys_build_time_copy(', 'void kapi_sys_get_build_info('))
     code += function(source, 'int __cdecl kapi_sys_ver_info(')
-    wrapper = function((ROOT/'kapi/kapi_generated.c').read_text(),
+    wrapper = function((ROOT/'sys/kapi/kapi_generated.c').read_text(),
                        'int __cdecl wrap_sys_ver_info(')
     try:
         return execute(FIXTURE, runner, {'api.inc': code, 'wrapper.inc': wrapper,
-                       'offsets.inc': offsets}, assembly='lib/kstring_asm.asm')
+                       'offsets.inc': offsets}, assembly='sys/kern/kstring_asm.asm')
     except subprocess.CalledProcessError as error:
         print(error.stderr)
         raise
@@ -149,7 +149,7 @@ def run(source, build_source, offsets, runner):
 def main():
     args = arguments()
     offsets = generated_layout(args.runner)
-    source = (ROOT/'kapi/kapi_sysinfo.c').read_text()
+    source = (ROOT/'sys/kapi/kapi_sysinfo.c').read_text()
     build_source = source
     assert run(source, build_source, offsets, args.runner).returncode == 0
     if args.mutate:

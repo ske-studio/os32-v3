@@ -1,14 +1,14 @@
 #include "gfx2_bridge_fake.h"
 /* G3: real scan publication, eligibility, policy, query and present; fake GPU. */
 #define OS32_GEFORCE_MODULE
-#include "../../drivers/video/geforce/backend_geforce.c"
+#include "../../sys/dev/video/geforce/backend_geforce.c"
 #undef gfx_backend_geforce
 #undef gfx_current_height
 #undef gfx_flip_enabled
 #undef gfx_display_page
-#include "../../gfx/gfx_policy.c"
-#include "../../drivers/video/geforce/gf_direct.c"
-#include "../../drivers/video/geforce/gf_hook.c"
+#include "../../sys/hal/gfx/gfx_policy.c"
+#include "../../sys/dev/video/geforce/gf_direct.c"
+#include "../../sys/dev/video/geforce/gf_hook.c"
 #undef gfx_counters
 
 static int v2_owned;

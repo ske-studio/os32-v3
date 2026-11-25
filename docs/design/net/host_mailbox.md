@@ -1,7 +1,7 @@
-# net/host_mailbox.c — 知らせのメールボックスと、ALIVE の非消費の観測
+# sys/net/host_mailbox.c — 知らせのメールボックスと、ALIVE の非消費の観測
 
 > 状態: **現行 (2026-11-18)** — 出所: NET_HOSTSVC_DESIGN・TASK_NET_HOSTSVC (要約して移した)
-ソース: `net/host_mailbox.c`・`net/host_mailbox.h`・`sdk/include/os32/os32_host_notice.h`・`kapi/kapi_host_notice.c`・`kapi/kapi_host_notice.h`・`include/remote_control.h`・`userland/gshell/src/wm.rs` (`deliver_host_notice`)・SDK は `userland/lib/host/host_call.c` (`os32_host_notice_read`)
+ソース: `sys/net/host_mailbox.c`・`sys/net/host_mailbox.h`・`sdk/include/os32/os32_host_notice.h`・`sys/kapi/kapi_host_notice.c`・`sys/kapi/kapi_host_notice.h`・`sys/include/remote_control.h`・`userland/gshell/src/wm.rs` (`deliver_host_notice`)・SDK は `userland/lib/host/host_call.c` (`os32_host_notice_read`)
 
 ## 何をするか
 
@@ -10,7 +10,7 @@
 
 ## 状態 (このファイルが単独で持つ)
 
-- 64 枠 × 256B (`HostNotice`) を起動時にヒープから 1 回確保する (`host_mailbox_init`、`platform/pc98/kernel_boot_memory.inc` の `kernel_boot_lan` が NIC を始める前に呼ぶ)。確保に失敗したら通知の口は `NOSYS`、通信そのものは続ける。像に初期化済みの配列を置かない。
+- 64 枠 × 256B (`HostNotice`) を起動時にヒープから 1 回確保する (`host_mailbox_init`、`sys/platform/pc98/kernel_boot_memory.inc` の `kernel_boot_lan` が NIC を始める前に呼ぶ)。確保に失敗したら通知の口は `NOSYS`、通信そのものは続ける。像に初期化済みの配列を置かない。
 - 到着順の添字の列、投入の通番 `serial` (1 から)、捨てた数 `dropped`、今の世代、最新の ALIVE の 1 枠、ALIVE の観測 (`struct HostAlive`)。
 - すべての読み書きは IF を保存して短い cli 区間で行う。IRQ0 (link の tick) からの `put` と task からの取り出しが交わるため。
 

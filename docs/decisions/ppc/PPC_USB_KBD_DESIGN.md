@@ -20,22 +20,22 @@ r1→r2 の変更
 
 | 境目 | 実物と根拠（現在の行番号） |
 |---|---|
-| LAN bytes の取り出し | `platform/powermac/input_boot.c` が terminal poll、`lan_key()` が `pm_terminal_trygetkey()`。通信側の内部は今回の読取範囲外 |
+| LAN bytes の取り出し | `sys/platform/powermac/input_boot.c` が terminal poll、`lan_key()` が `pm_terminal_trygetkey()`。通信側の内部は今回の読取範囲外 |
 | bytes → sh 用キー | 同 `:22` が `pm_input_decode(&decoder,c,now)` を呼ぶ。`:8` の先読みを peek / try / blocking で共有 |
-| Enter・BS・取消 | `platform/powermac/input_decode.c` の `pm_input_decode()` は取消通知・Ctrl-C→ESC、同ファイル内 は CRLF 統合、同ファイル内 は LF→CR、同ファイル内 は DEL→BS |
+| Enter・BS・取消 | `sys/platform/powermac/input_decode.c` の `pm_input_decode()` は取消通知・Ctrl-C→ESC、同ファイル内 は CRLF 統合、同ファイル内 は LF→CR、同ファイル内 は DEL→BS |
 | 履歴 | 同 `:24` は端末の ESC ` A/B を `0x3A00/0x3D00` にする。文字は下位 byte、特殊キーは上位 byte |
-| provider の登録 | `platform/powermac/input_boot.c` の InputOps を 同ファイル内 で登録。`lan_key()` はキー、`peek()` は下位8bitを返す |
-| kernel の中継 | `kernel/input_service.c` が provider を選択、同ファイル内 が getchar/getkey/KAPI/wait をそのまま委譲。変換器もキューも持たない |
+| provider の登録 | `sys/platform/powermac/input_boot.c` の InputOps を 同ファイル内 で登録。`lan_key()` はキー、`peek()` は下位8bitを返す |
+| kernel の中継 | `sys/hal/input/input_service.c` が provider を選択、同ファイル内 が getchar/getkey/KAPI/wait をそのまま委譲。変換器もキューも持たない |
 | USER sh 側の契約 | `docs/decisions/ppc/PPC_SHELL_SC_DESIGN.md`〜`:146` はキー形式／文字形式を provider が供給、既存 USER sh を使う契約。syscall 内部の行は今回未調査 |
-| kbd_inject の形 | `kernel/kbd_inject.c` は UTF-8 bytes を受ける。同ファイル内 は reader / owner を照合、同ファイル内 は宛先付き byte ring へ格納 |
+| kbd_inject の形 | `sys/kern/kbd_inject.c` は UTF-8 bytes を受ける。同ファイル内 は reader / owner を照合、同ファイル内 は宛先付き byte ring へ格納 |
 | kbd_inject の読出し | 同 `:248` は reader 指定で1 byte、`:272` は現在の reader。scan・make/break・修飾の解読はしない |
-| PPC の現経路 | `platform/powermac/input_boot.c`〜`peek()` に kbd_inject の呼出しはない。LAN→decoder→InputOps→既存 sh 入力契約が接続点 |
-| USB の現終点 | `platform/powermac/usb_platform.c` の `usbp_input_src_alloc()` / `usbp_input_key()` は key / repeat をログに出すだけ。`usbp_input_key_repeat()` は release のログと src 割当解除 |
-| scan の意味 | `include/kbd.h` の `KEY_ESC`〜`SHIFT_CTRL` は PC-98 定数。SHIFT=0x70、CAPS=0x71、KANA=0x72、GRPH=0x73、CTRL=0x74 |
-| HID の通知順 | `drivers/usb/hid_kbd.c`〜`kbd_done()` は0x70から走査し、make/break の両方で修飾を通常キーより先に通知する |
-| HID の写像 | `drivers/usb/hid_kbd_map.c` の `hid_kbd_sc()` は A→0x1d、同ファイル内 は Enter→0x1c、同ファイル内 は Caps→0x71、同ファイル内 は JIS と左右修飾 |
-| PC-98 側の変換 | [docs/decisions/usb/USB_DESIGN.md](../usb/USB_DESIGN.md) と `:566` が `drivers/input/kbd.c` の deliver と修飾状態を指す。Caps・カナを含む文字化はこの系統の責務 |
-| PPC での再利用 | PACK のリンク前提では `drivers/input/kbd.c` は入らない。指定範囲にその変換表本体はなく、関数名・Caps/カナの詳細動作・現在の行番号は未確認。既存変換器を呼べるとは扱わない |
+| PPC の現経路 | `sys/platform/powermac/input_boot.c`〜`peek()` に kbd_inject の呼出しはない。LAN→decoder→InputOps→既存 sh 入力契約が接続点 |
+| USB の現終点 | `sys/platform/powermac/usb_platform.c` の `usbp_input_src_alloc()` / `usbp_input_key()` は key / repeat をログに出すだけ。`usbp_input_key_repeat()` は release のログと src 割当解除 |
+| scan の意味 | `sys/include/kbd.h` の `KEY_ESC`〜`SHIFT_CTRL` は PC-98 定数。SHIFT=0x70、CAPS=0x71、KANA=0x72、GRPH=0x73、CTRL=0x74 |
+| HID の通知順 | `sys/dev/usb/hid_kbd.c`〜`kbd_done()` は0x70から走査し、make/break の両方で修飾を通常キーより先に通知する |
+| HID の写像 | `sys/dev/usb/hid_kbd_map.c` の `hid_kbd_sc()` は A→0x1d、同ファイル内 は Enter→0x1c、同ファイル内 は Caps→0x71、同ファイル内 は JIS と左右修飾 |
+| PC-98 側の変換 | [docs/decisions/usb/USB_DESIGN.md](../usb/USB_DESIGN.md) と `:566` が `sys/platform/pc98/input/kbd.c` の deliver と修飾状態を指す。Caps・カナを含む文字化はこの系統の責務 |
+| PPC での再利用 | PACK のリンク前提では `sys/platform/pc98/input/kbd.c` は入らない。指定範囲にその変換表本体はなく、関数名・Caps/カナの詳細動作・現在の行番号は未確認。既存変換器を呼べるとは扱わない |
 | USB サービス | [docs/decisions/usb/USB_DESIGN.md](../usb/USB_DESIGN.md) は tick slot 0 と、EE=0 の syscall 待ち中にも動く10ms単位の terminal poll。時計は timebase |
 | 今の受入 | `tools/ppc/usb_run.py` は LAN 接続待ちを削除、`settings()` は LAN byte 入力を probe に置換。`accept()` は scan ログを照合する |
 
@@ -49,9 +49,9 @@ r1→r2 の変更
 
 - 接続先は PowerMac の InputOps provider。USB は scan→キー値に変換して専用 ring、LAN は既存 decoder を通す。
 - `kbd_inject`、共通 `input_service`、PC-98 の `kbd_merge`、USER sh は変更しない。
-- 新 `platform/powermac/input_usb.c` が USB の押下状態・修飾状態・固定長キューを所有する。
+- 新 `sys/platform/powermac/input_usb.c` が USB の押下状態・修飾状態・固定長キューを所有する。
 - 新 `platform/powermac/input_keymap.c` は状態を持たない JIS scan→キー値の純粋変換だけを担当する。
-- 新 `platform/powermac/input_usb.h` に次の境界を置く（名前は提案、関数の責務は固定）。
+- 新 `sys/platform/powermac/input_usb.h` に次の境界を置く（名前は提案、関数の責務は固定）。
 
 ```c
 /* caller: USB service 内、IF=0（PowerPC では EE=0） */
@@ -90,7 +90,7 @@ void usbp_input_key_repeat(u8 src, u8 sc) {
 | 排他 | producer は既存 IF=0 契約。foreground の1件取出し・状態照会は irq_save/restore で元の EE を戻す。LAN poll を錠の中から呼ばない |
 | 初期化 | BSS のゼロ初期値を利用。provider 登録・sh 再起動で USB の down/ring を初期化し直さない。接続済み装置の押下と先行入力を保つ |
 
-- 同一 HID report の修飾先行は `drivers/usb/hid_kbd.c`〜`kbd_done()` で確認済み。`usb_run.py` の Shift make→A make と、修飾 break＋通常 make の結合試験で固定する。前景で遅れて修飾を読む設計にはしない。
+- 同一 HID report の修飾先行は `sys/dev/usb/hid_kbd.c`〜`kbd_done()` で確認済み。`usb_run.py` の Shift make→A make と、修飾 break＋通常 make の結合試験で固定する。前景で遅れて修飾を読む設計にはしない。
 - USB callback 内では LAN poll・sh・kbd_inject・待機を呼ばない。文字化は定数表の参照と整数判定だけで終える。
 
 | scan→キー | 初版の変換仕様 |
@@ -130,11 +130,11 @@ void usbp_input_key_repeat(u8 src, u8 sc) {
 
 | ファイル（新規は＋） | 1機能・変更範囲 |
 |---|---|
-| ＋platform/powermac/input_usb.c / .h | USB 状態と FIFO、および専用 API 宣言 |
+| ＋sys/platform/powermac/input_usb.c / .h | USB 状態と FIFO、および専用 API 宣言 |
 | ＋platform/powermac/input_keymap.c | PC-98 scan→sh キー形式の純粋変換。PC-98 ドライバや GPL 表を取り込まない |
-| platform/powermac/usb_platform.c | 既存 src 管理・ログを残したまま callback から接続、keyboard release を種類で分岐 |
-| platform/powermac/input_boot.c | LAN/USB の選択、先読み、drop 照会。input_decode.c の LAN 変換は維持 |
-| platform/powermac/shell_boot.c | 待ちを LAN OPEN または USB FIFO 非空に変更。最初の USB キーを保持 |
+| sys/platform/powermac/usb_platform.c | 既存 src 管理・ログを残したまま callback から接続、keyboard release を種類で分岐 |
+| sys/platform/powermac/input_boot.c | LAN/USB の選択、先読み、drop 照会。input_decode.c の LAN 変換は維持 |
+| sys/platform/powermac/shell_boot.c | 待ちを LAN OPEN または USB FIFO 非空に変更。最初の USB キーを保持 |
 | build/targets/ppc-powermac.mk | 上記2個の .c を sh 像だけに追加。対象の規則本体は実装時に確認する |
 | ＋tools/tests/ppc_input_usb_host.c | 状態・変換・FIFO・provider 合流の host 試験（製品関数を実行） |
 | ＋tools/checks/ver-ppc-input-usb.py | host の実行と一意な変異。CHECK に全製品入力・header・試験本体を列挙 |

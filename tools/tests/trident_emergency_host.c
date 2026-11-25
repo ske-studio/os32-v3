@@ -4,7 +4,7 @@ int input_display_restore_drain(void) { return 0; }
  * The shared device fake starts cold; the recovery callback models vtSema. */
 #include "types.h"
 #include "os32_kapi_shared.h"
-#include "gfx/gfx_emergency.h"
+#include "sys/hal/gfx/gfx_emergency.h"
 #include "trident_device_fake.h"
 #include "idt.h"
 #include "appslot.h"

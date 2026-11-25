@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gfx2-copy-host', tier=1, needs=[], budget=5,
-    covers=['gfx/v2/sw_copy.c', 'gfx/v2/gfx2_sw.h', 'include/gfx_sync.h',
+    covers=['sys/hal/gfx/v2/sw_copy.c', 'sys/hal/gfx/v2/gfx2_sw.h', 'sys/include/gfx_sync.h',
             'tools/tests/gfx2_copy_host.c', 'tools/tests/test_gfx2_copy.py',
             'tools/tests/host32.py'],
     basis=['HAL_V2_DESIGN §13-1'],

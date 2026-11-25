@@ -22,20 +22,20 @@ LAN の wire、KAPI、常駐 CLI の削除はこの段の変更対象外とす�
 
 |役目|PC-98|PowerMac|引き継ぐ所有者|
 |---|---|---|---|
-|起動|platform/pc98/kernel_boot_memory.inc の kernel_boot_lan の mailbox、module、PCI fallback|platform/powermac/ppc_kernel.c の platform_boot_services の boot token と GEM、platform/powermac/lan_service.c の pm_lan_poll の mailbox・adapter・start|装置発見は各機種、起動後の bind は net|
-|周期登録|platform/pc98/link_platform.c の link_platform_tick_register の PC98_TICK_LINK|platform/powermac/link_platform.c の link_platform_tick_register の PM_TICK_LINK|net/nic.c の net_bind の net_bind が一度だけ net_jiffy を登録|
-|前景 RX|net/nic.c の rx_service の有限 demux|同じ IO_SVC_NET_RX。別に GEM 状態機械を前景から駆動|共通 NIC|
-|HELLO・reopen|net/link.c の link_start_hello・link_resync の HELLO と再同期|同じ実体|net/link|
+|起動|sys/platform/pc98/kernel_boot_memory.inc の kernel_boot_lan の mailbox、module、PCI fallback|sys/platform/powermac/ppc_kernel.c の platform_boot_services の boot token と GEM、sys/platform/powermac/lan_service.c の pm_lan_poll の mailbox・adapter・start|装置発見は各機種、起動後の bind は net|
+|周期登録|sys/platform/pc98/link_platform.c の link_platform_tick_register の PC98_TICK_LINK|sys/platform/powermac/link_platform.c の link_platform_tick_register の PM_TICK_LINK|sys/net/nic.c の net_bind の net_bind が一度だけ net_jiffy を登録|
+|前景 RX|sys/net/nic.c の rx_service の有限 demux|同じ IO_SVC_NET_RX。別に GEM 状態機械を前景から駆動|共通 NIC|
+|HELLO・reopen|sys/net/link.c の link_start_hello・link_resync の HELLO と再同期|同じ実体|net/link|
 |切断・drop|net_unbind で NIC・RX を解除。再 bind の link_init で新 session|同じ実体。GEM 喪失時は lan_service.c から unbind|同一 session の保留破棄と epoch 更新は link_resync|
 |結果・世代|userland/shell/rshell_lan.c の rsh_lan_flush・rsh_lan_poll|製品シェルも同じ通知・capture・結果送信|シェルと agent|
-|idle と待ち|platform/pc98/link_platform.c の link_platform_idle の idle_wait_step|platform/powermac/link_platform.c の link_platform_idle の再入抑止付き待ち、同ファイルの保守処理 に USB と LAN 保守|待ちの入口と NIC の仕事を分ける|
-|診断|link の HELLO と host サービスの結果を観測|platform/powermac/lan_service.c の pm_lan_poll の TIME・LOG、同ファイルの診断処理 の PDIAG|wire は共通、GEM・PHY の観測は機種|
+|idle と待ち|sys/platform/pc98/link_platform.c の link_platform_idle の idle_wait_step|sys/platform/powermac/link_platform.c の link_platform_idle の再入抑止付き待ち、同ファイルの保守処理 に USB と LAN 保守|待ちの入口と NIC の仕事を分ける|
+|診断|link の HELLO と host サービスの結果を観測|sys/platform/powermac/lan_service.c の pm_lan_poll の TIME・LOG、同ファイルの診断処理 の PDIAG|wire は共通、GEM・PHY の観測は機種|
 
 票・設計からそのまま変更量や合否条件に使えない点は次の 4 件。
 
 1. docs/tasks/ppc/TASK_PPC_ALIGN_X86.md の 2. B — 揃えられる 2 重 は B04 全体を未着手とするが、docs/tasks/network/TASK_LAN_OPERATOR.md の 2. 分担 は P3 の一部と P5 transport・sd/fs の取込済みを記録する。実コードにも READY と結果送信がある。
-2. docs/decisions/ppc/ARCH_DRIFT_AUDIT.md の B　揃えられる二重実装・別経路 の「link シェルで idle に登録」は追加の保守 callback の条件。共通 NIC の登録自体は net/nic.c の net_bind から bind 時に行う。後者をシェル外へ移す変更は不要。
-3. docs/decisions/network/LAN_OPERATOR_DESIGN.md の W2: credit・RX 予算・link 進行の確定 の「同じ ms の再呼出は demux のみ」と異なり net/nic.c の rx_service 付近では最近 RX がある同一 ms にも poll できる。x86 実装の挙動を期待値にする。
+2. docs/decisions/ppc/ARCH_DRIFT_AUDIT.md の B　揃えられる二重実装・別経路 の「link シェルで idle に登録」は追加の保守 callback の条件。共通 NIC の登録自体は sys/net/nic.c の net_bind から bind 時に行う。後者をシェル外へ移す変更は不要。
+3. docs/decisions/network/LAN_OPERATOR_DESIGN.md の W2: credit・RX 予算・link 進行の確定 の「同じ ms の再呼出は demux のみ」と異なり sys/net/nic.c の rx_service 付近では最近 RX がある同一 ms にも poll できる。x86 実装の挙動を期待値にする。
 4. docs/decisions/network/LAN_OPERATOR_DESIGN.md の 5. PowerPC を link に統合する の端末入力 feed の流用は製品の行実行には不要。userland/shell/rshell_lan.c の rsh_lan_poll 以降が NOTIFY から行を直接検証して実行する。PLN1 の行編集は旧像限定。
 
 ### 統合判断（POLICY_DEV §1）
@@ -48,7 +48,7 @@ LAN の wire、KAPI、常駐 CLI の削除はこの段の変更対象外とす�
 
 |順|実行文脈|呼ぶ入口と次の状態|
 |---|---|---|
-|1|早期 boot|LOG リング登録（platform/powermac/ppc_kernel.c の platform_boot_machine）。PCI 列挙後に boot_token_init → boot_token_get(lan_boot.boot_id)（同ファイルの boot token 初期化）|
+|1|早期 boot|LOG リング登録（sys/platform/powermac/ppc_kernel.c の platform_boot_machine）。PCI 列挙後に boot_token_init → boot_token_get(lan_boot.boot_id)（同ファイルの boot token 初期化）|
 |2|製品の boot 前景|LAN・USB の進行を無効にして製品 callback を一枠登録。登録成功・GEM 検出・LOG 登録成功が揃えば pm_lan_start(&lan_boot) を一度呼び、rc を保持|
 |3|pre-user の 2 秒間|LAN 起動成功時は TB で直接 pm_lan_poll。callback 内の LAN はまだ無効|
 |4|RUNNING の初回|mailbox → GEM adapter 登録 → net_start → bind 内で共通前景・tick 登録|
@@ -110,7 +110,7 @@ void rsh_lan_reset(void);
 - bind が MAC と queue を初期化して link_init。link のタイマは jiffy の差で評価する。
 - 再同期は保留 handle・送信を失効させ、同じ session の次 epoch で HELLO を開く。
 - session 未成立、epoch の周回または rid 枯渇時は新 session。旧 epoch の応答を新 handle の完了に使わない。
-- NIC の poll と demux と link_tick は net/nic.c の rx_finish・rx_service・net_jiffy の排他と持越しを使う。
+- NIC の poll と demux と link_tick は sys/net/nic.c の rx_finish・rx_service・net_jiffy の排他と持越しを使う。
 - 前景の IRQ 禁止中または IRQ 文脈では schedule のみ。有限の work budget と tick rescue の既存機種条件を保つ。
 - 同一 ms の活動中 RX の追加 poll で link_due を新規に立てない。無通信時の空回りも増やさない。
 - READY は boot token・mode・直近 ID・状態を通知し、応答から host_generation と service を検証する。
@@ -150,10 +150,10 @@ void rsh_lan_reset(void);
 
 |段|担当|ファイル|種別・行数|内容|
 |---|---|---|---|---|
-|1|PowerPC|platform/powermac/link_platform.h|変更 5|機種内 製品 callback と進行条件 の宣言を製品 link から参照可能にする|
-|2|PowerPC|platform/powermac/lan_service.c|変更 10–20|像別の固定 peer 準備・選択と PDIAG 抑止を §5 に合わせる|
-|3|PowerPC|platform/powermac/link_platform.c|変更 15–30|TB 読みと再入抑止を 製品の一枠で共有し、USB・LAN を個別に進め、旧像入口は必要な構成だけに残す|
-|4|PowerPC|platform/powermac/ppc_kernel.c|変更 25–45|登録の時期と成否、USB、root 失敗後の待ちを結線|
+|1|PowerPC|sys/platform/powermac/link_platform.h|変更 5|機種内 製品 callback と進行条件 の宣言を製品 link から参照可能にする|
+|2|PowerPC|sys/platform/powermac/lan_service.c|変更 10–20|像別の固定 peer 準備・選択と PDIAG 抑止を §5 に合わせる|
+|3|PowerPC|sys/platform/powermac/link_platform.c|変更 15–30|TB 読みと再入抑止を 製品の一枠で共有し、USB・LAN を個別に進め、旧像入口は必要な構成だけに残す|
+|4|PowerPC|sys/platform/powermac/ppc_kernel.c|変更 25–45|登録の時期と成否、USB、root 失敗後の待ちを結線|
 |5|試験|tools/tests/test_net_link.py、test_net_rx_work.py、test_remote_x11.py、製品 QEMU 台本|変更|§7 の観測と変異。tools/ppc/test_lan_terminal_host.py は旧 PLN1 専用で維持|
 |6|本線|docs/decisions/network/LAN_OPERATOR_DESIGN.md|変更 5–10|同一 ms の活動中 poll、保守 callback の実際の所有者を反映|
 |7|本線|docs/decisions/ARCH_COMPAT_CONTRACT.md|変更 2–4|§9 に NIC・周期源の物理差を記録|
@@ -199,7 +199,7 @@ PowerPC CI の 7450・7455 と製品 QEMU 台本のログ、x86 の NP21/W・LGY
 ## 確定 (2026-11-21、sol 第 2 回「条件付きで可」、PM が反映)
 以下は本文に優先する。
 - **P1 (§4・§5) GUI の引渡しの契約**: 共通の通知・OUT・exit と、常駐版だけの ACCEPT・GUI の引渡しを分ける。今の製品の APP (SHELL_REMOTE_APP、userland/ppc/sh/link_profile.h) では rsh_lan_execute() が常に 0・rsh_lan_handoff() が OS32_ERR_NOSYS で ACCEPT の道に入らない (userland/shell/rshell_lan.c の 512–525 行付近)。ACCEPT・GUI の引渡しの受入は常駐版 (PowerPC の段 E の後の製品のシェル) に割り当て、段 E の前の製品の APP には当てない。
-- **P1 (§5・§6) 旧 kboot-sh の peer**: 旧 kboot-sh の行にも `pm_hfs_bind_peer(boot->peer_mac)` を明記する (今の KBOOT_SH は PLN1 でも呼ぶ、platform/powermac/lan_service.c の 233–235 行付近)。旧い像の /host の読み取りを退行の条件に加える。常駐 CLI と旧 kboot の像は最後に外すまで動くこと。
+- **P1 (§5・§6) 旧 kboot-sh の peer**: 旧 kboot-sh の行にも `pm_hfs_bind_peer(boot->peer_mac)` を明記する (今の KBOOT_SH は PLN1 でも呼ぶ、sys/platform/powermac/lan_service.c の 233–235 行付近)。旧い像の /host の読み取りを退行の条件に加える。常駐 CLI と旧 kboot の像は最後に外すまで動くこと。
 - **P2 (§6・§7) 再 bind の試験の置き場**: 登録 1 回と link_init() の呼び直しは今の NIC の fixture、HELLO の session の更新と旧い handle の失効は実の link を組む試験に (net_rx_work_host.c の link_init() は空の stub なので観測できない)。
 - **P2 (§7) 変異の意味**: 旧い boot の OUT の拒否と PLN1 の送信 0 を採取のデータに混ぜる物は「検査器の自己試験」と明記し、製品の側の 1 行の変異と対応する観測点を別に指定する。
 - **実装に出す前**: PowerPC の段 E が main に入った SHA で、製品の像の選び・peer・READY の持ち主を照合し直す (段 E の取り込みまで実装に出さない)。

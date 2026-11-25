@@ -24,7 +24,7 @@ void *kmemcpy(void *d, const void *s, u32 n) { return memcpy(d, s, n); }
 static unsigned int host_if = 1;
 static unsigned int irq_save(void) { unsigned int f = host_if; host_if = 0; return f; }
 static void irq_restore(unsigned int f) { assert(!host_if); host_if = f; }
-#include "../../exec/redir_access.c"
+#include "../../sys/kern/exec/redir_access.c"
 static AppSlot slots[APP_SLOT_COUNT], *g_cur_app;
 static struct addrspace spaces[APP_SLOT_COUNT];
 static int cur = 2, owner = 2, user_call = 1;
@@ -89,7 +89,7 @@ void v86_int80(u32 *frame) {
     assert(frame[V86I_EFLAGS] & EFLAGS_VM);
     guest_ints++;
 }
-/* T7b-b2: exec/shell_service.c の WM 区間の印 (ring3_wm_enter が深さ 1 で呼ぶ)。 */
+/* T7b-b2: sys/kern/exec/shell_service.c の WM 区間の印 (ring3_wm_enter が深さ 1 で呼ぶ)。 */
 volatile u32 ring3_wm_shell_gen;
 static int wm_marks;
 void shell_service_wm_mark(void) { wm_marks++; ring3_wm_shell_gen = 9; }

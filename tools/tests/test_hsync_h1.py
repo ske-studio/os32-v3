@@ -5,14 +5,14 @@
 
 tools/tests/hsync_h1_host.c が userland/system/hsync.c を 1 行も写さず
 そのまま #include し、KernelAPI だけをオンメモリの贋ファイルシステムへ
-差し替えて回す (模型ではない)。drivers/hostdrv/hostdrv_stat_rules.inc (HostDrv の
+差し替えて回す (模型ではない)。sys/dev/hostdrv/hostdrv_stat_rules.inc (HostDrv の
 stat 失敗の是正) も同じ翻訳単位で直接叩き、CRC は lib/crc32.c の既存
 一括版と同じ実行ファイルにリンクして値の一致を見る。
 
   python3 -B tools/tests/test_hsync_h1.py [--target]
 
 --target を付けると、実機と同じ i386-elf クロスコンパイラでも
-hsync.c / lib/crc32.c / drivers/hostdrv/hostdrvfs.c が -Werror で通ることを確かめる
+hsync.c / lib/crc32.c / sys/dev/hostdrv/hostdrvfs.c が -Werror で通ることを確かめる
 ([C1] GNU11)。make・エミュレータ・実配備には一切触れない。
 
 ビルドは 2 本:
@@ -54,16 +54,16 @@ TARGET_USER = TARGET_COMMON + [
 # カーネル (build/config.mk の KERNEL_CFLAGS + INC_KERNEL)。hostdrvfs.c は
 # 元から -Waddress-of-packed-member が出るので、そこだけ外して見る。
 TARGET_KERNEL = TARGET_COMMON + [
-    # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は固定名
+    # arch/x86 + platform/pc98: sys/include/io.h は契約だけで、実装は固定名
     # arch_io.h / platform_io.h を引く (順序 3)。
     "-D__KERNEL_BUILD__",
        *include_flags(ROOT)]
 
 
 def check_depth_constant():
-    """[C4]: hsync.c の HS_MAX_PATH_DEPTH は fs/vfs.h の VFS_MAX_PATH_DEPTH の写し。
+    """[C4]: hsync.c の HS_MAX_PATH_DEPTH は sys/fs/vfs.h の VFS_MAX_PATH_DEPTH の写し。
 
-    外部プログラムからは fs/vfs.h を引けないので写しを置くしかない。fs/vfs.c は
+    外部プログラムからは sys/fs/vfs.h を引けないので写しを置くしかない。sys/fs/vfs.c は
     上限を越えた要素を**黙って捨てる**ので、写しが本体より大きいと hsync は
     「化けたパス」を通してしまう (Codex 実装レビュー B2)。ここでずれを止める。
     """
@@ -74,12 +74,12 @@ def check_depth_constant():
             raise SystemExit("%s に %s が見つからない" % (path, name))
         return int(m.group(1))
 
-    vfs = grab("fs/vfs.h", "VFS_MAX_PATH_DEPTH")
+    vfs = grab("sys/fs/vfs.h", "VFS_MAX_PATH_DEPTH")
     hs = grab("userland/system/hsync.c", "HS_MAX_PATH_DEPTH")
     hsp = grab("userland/system/hsync_protect.inc", "HSP_MAX_DEPTH")
     if hs != vfs:
         raise SystemExit(
-            "HS_MAX_PATH_DEPTH=%d が fs/vfs.h の VFS_MAX_PATH_DEPTH=%d と違う"
+            "HS_MAX_PATH_DEPTH=%d が sys/fs/vfs.h の VFS_MAX_PATH_DEPTH=%d と違う"
             % (hs, vfs))
     if hsp > vfs:
         raise SystemExit(
@@ -112,9 +112,9 @@ def target_compile(tmp):
     print("TARGET i386-elf -Werror COMPILE PASS (lib/crc32.c)", flush=True)
     subprocess.run(["i386-elf-gcc", *TARGET_KERNEL,
                     "-Wno-address-of-packed-member", "-c",
-                    "drivers/hostdrv/hostdrvfs.c", "-o", str(tmp / "hostdrvfs.o")],
+                    "sys/dev/hostdrv/hostdrvfs.c", "-o", str(tmp / "hostdrvfs.o")],
                    cwd=ROOT, check=True)
-    print("TARGET i386-elf -Werror COMPILE PASS (drivers/hostdrv/hostdrvfs.c)", flush=True)
+    print("TARGET i386-elf -Werror COMPILE PASS (sys/dev/hostdrv/hostdrvfs.c)", flush=True)
 
 
 if __name__ == "__main__":

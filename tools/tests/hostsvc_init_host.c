@@ -1,14 +1,14 @@
 /* I1: execute the real boot helper with the real LAN MAC parser/initializer. */
-#include "fs/serialfs/serialfs.h"
-#include "fs/serialfs/sfs_lan.h"
-#include "net/nic.h"
-#include "net/host_mailbox.h"
+#include "sys/fs/serialfs/serialfs.h"
+#include "sys/fs/serialfs/sfs_lan.h"
+#include "sys/net/nic.h"
+#include "sys/net/host_mailbox.h"
 #include <stdarg.h>
-#include "init/sysconfig.h"
-#include "include/config.h"
-#include "lib/kstring.h"
+#include "sys/kern/init/sysconfig.h"
+#include "sys/include/config.h"
+#include "sys/kern/kstring.h"
 #include "kprintf.h"
-#include "platform/pc98/boot_platform.h"
+#include "sys/platform/pc98/boot_platform.h"
 #define CHECK(x) do { if (!(x)) fail(__LINE__); } while (0)
 static void fail(int line) { __asm__ volatile("int $0x80"::"a"(1),"b"(line % 250 + 1)); __builtin_unreachable(); }
 volatile u32 tick_count;

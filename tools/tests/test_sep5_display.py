@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """B1/B2: legacy palette/scroll state and fixed pre-separation PC-98 I/O trace."""
 CHECK = dict(name='sep5-display-host', tier=1, needs=[], budget=5,
-    covers=['gfx/palette.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c', 'kernel/console/display_restore.h',
-            'platform/pc98/display.c', 'platform/powermac/display.c', 'platform/powermac/display_provider.c',
+    covers=['sys/hal/gfx/palette.c', 'sys/hal/gfx/gfx_scroll.c', 'sys/platform/pc98/gfx_scroll.c', 'sys/platform/pc98/gfx_init.c', 'sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_surfaces.c', 'sys/kern/console/display_restore.h',
+            'sys/platform/pc98/display.c', 'sys/platform/powermac/display.c', 'sys/platform/powermac/display_provider.c',
             'build/platform/powermac.mk', 'tools/tests/sep5_display_host.c',
             'tools/tests/test_sep5_display.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk',
-            'gfx/palette.h', 'include/**', 'arch/x86/**', 'gfx/gfx_internal.h',
-            'gfx/gfx.h', 'platform/pc98/**', 'drivers/video/pc98/pc98_route.h',
-            'sdk/include/os32/**', 'exec/surface_limits.h'],
+            'sys/hal/gfx/palette.h', 'include/**', 'arch/x86/**', 'sys/hal/gfx/gfx_internal.h',
+            'sys/hal/gfx/gfx.h', 'platform/pc98/**', 'sys/platform/pc98/video/pc98_route.h',
+            'sdk/include/os32/**', 'sys/kern/exec/surface_limits.h'],
     basis=['PPC_SEP5_DESIGN §2.1'],
 )
 import argparse
@@ -58,10 +58,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    texts = dict(palette=(ROOT/'gfx/palette.c').read_text(),
-                 display=(ROOT/'platform/pc98/display.c').read_text(),
-                 scroll=(ROOT/'gfx/gfx_scroll.c').read_text(),
-                 scroll_provider=(ROOT/'platform/pc98/gfx_scroll.c').read_text())
+    texts = dict(palette=(ROOT/'sys/hal/gfx/palette.c').read_text(),
+                 display=(ROOT/'sys/platform/pc98/display.c').read_text(),
+                 scroll=(ROOT/'sys/hal/gfx/gfx_scroll.c').read_text(),
+                 scroll_provider=(ROOT/'sys/platform/pc98/gfx_scroll.c').read_text())
     with tempfile.TemporaryDirectory(prefix='sep5-display-') as directory:
         work = Path(directory)
         assert execute(texts, work) == 0

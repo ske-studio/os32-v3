@@ -36,8 +36,8 @@ def exercise(directory, source, expected=None, *, cases=(*range(34), 42, 43, 44,
             '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-fno-stack-protector',
             '-nostdinc', '-nostdlib', '-static', '-D__cdecl=',
             *['-I'+str(ROOT / p) for p in ('platform/powermac', 'arch/ppc', 'include', 'lib')],
-            str(source), str(ROOT / 'platform/powermac/gmac_tree.c'), str(via_source or ROOT / 'platform/powermac/via_tree.c'), str(ROOT / 'tools/ppc/kboot_capture_fake.c'),
-            str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)]
+            str(source), str(ROOT / 'sys/platform/powermac/gmac_tree.c'), str(via_source or ROOT / 'sys/platform/powermac/via_tree.c'), str(ROOT / 'tools/ppc/kboot_capture_fake.c'),
+            str(ROOT / 'sys/kern/kstring_c.c'), '-o', str(exe)]
     subprocess.run(argv, check=True, timeout=60)
     failed = []
     for case in cases:
@@ -54,7 +54,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    product = ROOT / 'platform/powermac/kboot_capture.c'
+    product = ROOT / 'sys/platform/powermac/kboot_capture.c'
     with tempfile.TemporaryDirectory(prefix='kboot-capture-') as temp:
         directory = Path(temp)
         failures = exercise(directory, product)

@@ -10,8 +10,8 @@
 struct module_record module_records[MODULE_RECORD_CAP];
 static u8 test_stack[128 * 1024] __attribute__((aligned(4096)));
 #define test_stack_top ((u32)test_stack + sizeof(test_stack) - 16)
-#include "kernel/kstack_hw.c"
-#include "arch/x86/kernel/tss.c"
+#include "sys/kern/kstack_hw.c"
+#include "sys/arch/x86/kernel/tss.c"
 
 static void finish(int code) __attribute__((noreturn));
 static void finish(int code)

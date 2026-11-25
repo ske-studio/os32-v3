@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """T_merge: source transitions, shared locks and V86 (freestanding ILP32)."""
-CHECK = dict(name='input-merge-host', tier=1, budget=10, needs=[], covers=['input/hal/input_context.h', 'input/hal/in2_excl.c', 'include/av_contract.h', 'input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c',
-    'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'input/hal/in2_state.c', 'input/hal/mouse_ext.c', 'input/hal/pointer_state.c', 'input/hal/kbd_merge.c', 'input/hal/in2_ring.c',
-    'include/types.h', 'include/io.h', 'include/kbd.h', 'include/legacy_guest.h',
+CHECK = dict(name='input-merge-host', tier=1, budget=10, needs=[], covers=['sys/input/input_context.h', 'sys/hal/input/in2_excl.c', 'sys/include/av_contract.h', 'sys/hal/input/legacy_keymap.c', 'sys/input/keymaps/pc98_jp.c', 'sys/hal/input/keymap_registry.c', 'sys/hal/input/keymap_eval.c', 'sys/hal/input/keymap_state.c',
+    'sys/hal/input/in2_int.h', 'sys/hal/input/in2_dev.c', 'sys/hal/input/keymap.h', 'sys/hal/input/in2_state.c', 'sys/hal/input/mouse_ext.c', 'sys/hal/input/pointer_state.c', 'sys/hal/input/kbd_merge.c', 'sys/hal/input/in2_ring.c',
+    'sys/include/types.h', 'sys/include/io.h', 'sys/include/kbd.h', 'sys/include/legacy_guest.h',
     'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/input_merge_host.c',
     'tools/tests/test_input_merge.py', 'tools/tests/host32.py'],
     basis=['INPUT_HAL_DESIGN §3', 'INPUT_HAL_DESIGN §8'], kind='contract')
@@ -21,8 +21,8 @@ def run(ctx):
     sources = [(ctx.root / 'input/hal' / name).read_text() for name in names]
     with tempfile.TemporaryDirectory(prefix='input-merge-') as td:
         tmp = Path(td)
-        (tmp / "keymap.h").write_text((ctx.root / "input/hal/keymap.h").read_text())
-        (tmp / 'in2_int.h').write_text((ctx.root / 'input/hal/in2_int.h').read_text())
+        (tmp / "keymap.h").write_text((ctx.root / "sys/hal/input/keymap.h").read_text())
+        (tmp / 'in2_int.h').write_text((ctx.root / 'sys/hal/input/in2_int.h').read_text())
         (tmp / 'io.h').write_text('extern unsigned test_irq;\nstatic inline unsigned irq_save(void) { unsigned f=test_irq; test_irq=0; return f; }\nstatic inline void irq_restore(unsigned f) { test_irq=f; }\n')
         files = [str(tmp / name) for name in names] + [str(ctx.root / 'tools/tests/input_merge_host.c')]
         flags = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-ffunction-sections', '-fdata-sections', '-fno-stack-protector',

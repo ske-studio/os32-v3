@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
-#include "drivers/net/gem/gem.h"
+#include "sys/dev/net/gem/gem.h"
 int ppc_dma_sync(void *, u32, enum dma_sync);
 static char events[128];
 static unsigned n;

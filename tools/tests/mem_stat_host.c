@@ -3,7 +3,7 @@
 #include "shell_service_stub_host.h"   /* T7b-b2 S3b: exec.c の結線の弱い贋物 */
 #include "wm_source.c"
 #define kstack_high_water actual_kstack_high_water
-#include "kernel/kstack_hw.c"
+#include "sys/kern/kstack_hw.c"
 #undef kstack_high_water
 static u32 expected_stack_water, stack_scans;
 static u32 saved_host_sp __attribute__((used));
@@ -145,7 +145,7 @@ void memory_boot_page_counts(u32 first, u32 pages, struct memory_page_counts *ou
     boot_page_input.kdebug_pages = pages;
     memory_boot_count_pages(&boot_page_input, out);
 }
-#include "init/kaudit_boot.c"
+#include "sys/kern/init/kaudit_boot.c"
 
 static void boot_page_status(void)
 {

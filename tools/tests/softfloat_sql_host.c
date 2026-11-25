@@ -3,7 +3,7 @@
 #include "lib/softfloat/softfloat.h"
 #include "lib/softfloat_bits.h"
 #include "lib/sqlite3/sqlite3.h"
-#include "lib/kstring.h"
+#include "sys/kern/kstring.h"
 typedef unsigned long long U64;
 typedef union { double d; U64 u; } Bits;
 extern double __adddf3(double, double), __subdf3(double, double);

@@ -1,6 +1,6 @@
 /* S02 construction/row-stride regression, no hardware result claimed. */
 #include "gf_command_runtime_host.h"
-#include "../../kdebug/gf_accel_test.c"
+#include "../../sys/dev/video/geforce/diag/gf_accel_test.c"
 
 static u8 vram[TEST_BYTES];
 static char output[32768];

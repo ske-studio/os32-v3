@@ -1,4 +1,4 @@
-#include "gfx/v2/gfx2_int.h"
+#include "sys/hal/gfx/v2/gfx2_int.h"
 static struct gfx2_heap h, saved;
 static void save(void)
 {

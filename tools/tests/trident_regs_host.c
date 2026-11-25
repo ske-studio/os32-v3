@@ -13,7 +13,7 @@ static void outp(unsigned int port, unsigned int value)
 {
     ++port_calls; port_at = port; port_value = value;
 }
-#include "drivers/video/trident/regs.c"
+#include "sys/dev/video/trident/regs.c"
 
 static struct trident_fake f;
 static struct trident_device d;

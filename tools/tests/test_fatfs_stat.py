@@ -2,7 +2,7 @@
 S3I2-K の列挙エラー伝播と、起動ログ (2026-09-25) の「f_close の失敗を
 fatfs_vfs_write が返す」も同じ贋物の FatFs で見る。
 
-実物の fs/fat/fatfs_vfs.c をそのまま取り込み、FatFs の f_* / Device / IDE /
+実物の sys/fs/fat/fatfs_vfs.c をそのまま取り込み、FatFs の f_* / Device / IDE /
 kmalloc だけを差し替える。実デバイス・実イメージ・実 FatFs には触らない。
 
 追う事象: FDD ブート (root = FAT、ffconf.h の FF_USE_LFN 0) で
@@ -35,7 +35,7 @@ CASES = ["stat_invalid_name_is_notfound",
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-Wno-unused-parameter", "-Wno-sign-compare",
          "-D__cdecl=",
-         "-DBOOTLOG_NO_IRQ_LOCK"]     # init/bootlog.c の錠をホストで空にする
+         "-DBOOTLOG_NO_IRQ_LOCK"]     # sys/kern/init/bootlog.c の錠をホストで空にする
 INCLUDES = include_flags(ROOT)
 
 if __name__ == "__main__":

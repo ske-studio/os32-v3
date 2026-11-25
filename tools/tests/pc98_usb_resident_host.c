@@ -1,19 +1,19 @@
-#include "input/hal/keymap.h"
+#include "sys/hal/input/keymap.h"
 #include "usb_resident.h"
 #include "platform_ver.h"
 #include "kstring.h"
 #include "usb_probe.h"
-#include "input/hal/in2_int.h"
-#include "drivers/usb/ohci_priv.h"
+#include "sys/hal/input/in2_int.h"
+#include "sys/dev/usb/ohci_priv.h"
 #include "kprintf.h"
-#include "drivers/pci/pci.h"
-#include "drivers/pci/pci_barsize.h"
-#include "drivers/usb/ohci_regs.h"
-#include "kernel/irq/irq.h"
+#include "sys/dev/pci/pci.h"
+#include "sys/dev/pci/pci_barsize.h"
+#include "sys/dev/usb/ohci_regs.h"
+#include "sys/kern/irq/irq.h"
 
-#include "kernel/irq/tick.h"
+#include "sys/kern/irq/tick.h"
 #include "tick_order.h"
-#include "kernel/irq/tick_budget.h"
+#include "sys/kern/irq/tick_budget.h"
 static tick_fn periodic;
 static int refuse_tick;
 static u32 remaining_us;

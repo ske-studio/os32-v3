@@ -1,8 +1,8 @@
 """M2: actual paging/ledger transactions, privileged instruction seams only."""
 CHECK = dict(name='paging-device-map-host', tier=1, budget=6.4,
-             covers=['mm/paging.c', 'mm/paging.h', 'mm/paging_*.inc',
-                     'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/pgalloc_*.inc',
-                     'mm/physmem.c', 'mm/physmem.h', 'include/memmap.h',
+             covers=['sys/kern/mm/paging.c', 'sys/kern/mm/paging.h', 'mm/paging_*.inc',
+                     'sys/kern/mm/pgalloc.c', 'sys/kern/mm/pgalloc.h', 'mm/pgalloc_*.inc',
+                     'sys/kern/mm/physmem.c', 'sys/kern/mm/physmem.h', 'sys/include/memmap.h',
                      'tools/tests/test_paging_device_map.py',
                      'tools/tests/paging_device_map_host.c',
                      'tools/tests/pgalloc_host_fixture.h',
@@ -23,7 +23,7 @@ from kernel_includes import include_flags
 from paging_source import paging_source
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'mm/paging_map.inc'
+PRODUCT = 'sys/kern/mm/paging_map.inc'
 MUTATIONS = [
     ('map-np', 'if (entry & PTE_PRESENT) return -1;',
      'if (0) return -1;'),
@@ -48,10 +48,10 @@ MUTATIONS = [
 
 def main():
     original = (ROOT / PRODUCT).read_text()
-    source = paging_source(ROOT / 'mm/paging.c')
+    source = paging_source(ROOT / 'sys/kern/mm/paging.c')
     with tempfile.TemporaryDirectory(prefix='paging-device-map-') as name:
         tmp = Path(name)
-        (tmp / 'pgalloc_source.c').write_text(paging_source(ROOT / 'mm/pgalloc.c'))
+        (tmp / 'pgalloc_source.c').write_text(paging_source(ROOT / 'sys/kern/mm/pgalloc.c'))
         cpu = (ROOT / 'tools/tests/host_arch/arch_cpu.h').read_text().replace(
             'static inline void arch_mmu_flush_tlb(void)\n{\n}',
             'static inline void arch_mmu_flush_tlb(void)\n{\n    host_flush();\n}')
@@ -68,7 +68,7 @@ def main():
                    '-I' + str(ROOT / 'tools/tests/host_arch'),
                    '-I' + str(ROOT / 'tools/tests'), *include_flags(ROOT),
                    str(ROOT / 'tools/tests/paging_device_map_host.c'),
-                   str(ROOT / 'mm/physmem.c'), '-o', str(exe)]
+                   str(ROOT / 'sys/kern/mm/physmem.c'), '-o', str(exe)]
 
         def build(body):
             (tmp / 'paging_source.c').write_text(source.replace(original, body))

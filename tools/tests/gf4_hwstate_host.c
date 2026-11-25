@@ -1,8 +1,8 @@
 /* GF_STOP_REF_DESIGN §5-2: independent register/plane oracle, real save/load. */
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
-#include "../../hwdev/gf/display/hw_state.h"
-#include "../../mm/pgalloc.h"
+#include "../../sys/dev/video/geforce/display/hw_state.h"
+#include "../../sys/kern/mm/pgalloc.h"
 static struct gf4_host h;
 static struct gf4_state state;
 static struct gf4_host_event events[20000];

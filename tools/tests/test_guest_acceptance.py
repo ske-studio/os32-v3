@@ -99,7 +99,7 @@ class AcceptanceTests(unittest.TestCase):
             self.assertEqual(case['expect']['completion'], 0)
             self.assertEqual(case['expect']['kill_delta'], 1)
             self.assertEqual(case['expect']['pf_error'], 7)
-        marker = (ROOT / 'userland/tests/ring3_marker.h').read_text()
+        marker = (ROOT / 'userland/diag/ring3_marker.h').read_text()
         row = next(l for l in marker.splitlines() if 'ring3_guard bb (E)' in l)
         self.assertIn('| 7', row)
         self.assertIn('kill +1', row)

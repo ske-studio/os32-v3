@@ -37,11 +37,11 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
 def fd_root_dev():
-    """platform/pc98/boot.c が FD 起動でルートに使うデバイス名 (試験で決め打ちしない)"""
-    src = (ROOT / "platform/pc98/boot.c").read_text(encoding="utf-8")
+    """sys/platform/pc98/boot.c が FD 起動でルートに使うデバイス名 (試験で決め打ちしない)"""
+    src = (ROOT / "sys/platform/pc98/boot.c").read_text(encoding="utf-8")
     m = re.search(r'BOOT_DRIVE_FDD[^{]*\{\s*ctx->root_dev\s*=\s*"(\w+)";', src)
     if not m:
-        sys.exit("platform/pc98/boot.c から FD ルートのデバイス名を読めない")
+        sys.exit("sys/platform/pc98/boot.c から FD ルートのデバイス名を読めない")
     return m.group(1)
 
 
@@ -53,7 +53,7 @@ INCLUDES = ["-I" + str(ROOT / "platform/pc98"), "-I" + str(ROOT / "sdk/include")
             "-I" + str(ROOT / "include"), "-I" + str(ROOT / "userland/shell"),
             # 段 4 で ui.c / rshell.c / cmd_filer.c を取り込んだぶん
             "-I" + str(ROOT / "userland/lib"),
-            # cmd_pci.c が "drivers/pci/pci_decode.h" を引く (実ビルドの
+            # cmd_pci.c が "sys/dev/pci/pci_decode.h" を引く (実ビルドの
             # PROGRAM_FLAGS の -I. と同じ)。L-A の lspci / pcidump。
             "-I" + str(ROOT),
             "-I" + str(ROOT / "userland/lib/filer")]

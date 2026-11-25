@@ -3,8 +3,8 @@
 票:   docs/archive/test/TASK_FSTAT_REDIR.md の受入 F4 / F5
 記録: tools/tests/fstat_redir_tdd.md
 
-tools/tests/fstat_redir_host.c が実物の fs/vfs.c + fs/vfs_fd.c +
-**fs/fd_redirect.c** をそのまま #include し、境界 (kstring / kmalloc /
+tools/tests/fstat_redir_host.c が実物の sys/fs/vfs.c + sys/fs/vfs_fd.c +
+**sys/fs/fd_redirect.c** をそのまま #include し、境界 (kstring / kmalloc /
 コンソール / キーボード) だけを同義の C で置く。リダイレクトは贋物を置かない
 — この票の主題そのものなので実物を通す。
 
@@ -17,8 +17,8 @@ tools/tests/fstat_redir_host.c が実物の fs/vfs.c + fs/vfs_fd.c +
 
   python3 -B tools/tests/test_fstat_redir.py [--target] [--mutate]
 
---target は実機と同じ i386-elf クロスコンパイラでも fs/vfs_fd.c /
-fs/fd_redirect.c が -Werror で通ることの確認 ([C1] GNU11)。
+--target は実機と同じ i386-elf クロスコンパイラでも sys/fs/vfs_fd.c /
+sys/fs/fd_redirect.c が -Werror で通ることの確認 ([C1] GNU11)。
 
 --mutate は**否定側**。票 §3-1 の根は「判定が 2 か所にあった」ことなので、
 (1) fstat だけリダイレクトを見ない版 (2026-09-17 の不具合そのもの)、
@@ -33,7 +33,7 @@ fs/fd_redirect.c が -Werror で通ることの確認 ([C1] GNU11)。
 make・エミュレータ・実配備には一切触れない。
 """
 CHECK = dict(name='fstat-redir-host', tier=1,
-    covers=['fs/fd_redirect.c', 'fs/vfs.c', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'tools/tests/fstat_redir_host.c', 'tools/tests/mutpar.py', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/fs/fd_redirect.c', 'sys/fs/vfs.c', 'sys/fs/vfs_fd.c', 'sys/fs/vfs_fd_stdin.inc', 'sys/fs/vfs_stdin.h', 'tools/tests/fstat_redir_host.c', 'tools/tests/mutpar.py', 'tools/tests/input_fixture_host.h', 'sys/hal/input/input_service.c', 'sys/hal/input/pointer_service.h', 'sys/hal/input/input_service.h', 'sys/include/kbd.h', 'sys/fs/vfs_device.h', 'sys/platform/pc98/boot_names.h', 'sys/platform/pc98/boot_names.c', 'sys/dev/ata/ide.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.6,
     basis=['KAPI_SPEC', '[ABI]'],
 )
@@ -87,8 +87,8 @@ def check_single_source():
     実行時の試験 (F5) は食い違いを捕まえるが、**2 か所に分かれたこと自体**は
     形で押さえておく — 分かれた瞬間に落ちるほうが、直す人に早く届く。
     """
-    vfs_fd = (ROOT / "fs/vfs_fd.c").read_text(encoding="utf-8")
-    redir = (ROOT / "fs/fd_redirect.c").read_text(encoding="utf-8")
+    vfs_fd = (ROOT / "sys/fs/vfs_fd.c").read_text(encoding="utf-8")
+    redir = (ROOT / "sys/fs/fd_redirect.c").read_text(encoding="utf-8")
 
     isatty = body_of(vfs_fd, "int vfs_isatty(int fd)")
     fstat = body_of(vfs_fd, "int vfs_fstat(int fd, OS32_Stat *buf)")
@@ -138,33 +138,33 @@ def build_host(tmp, name):
                     str(ROOT / "tools/tests/fstat_redir_host.c"),
                     "-o", str(exe)], cwd=ROOT, check=True)
     print("HOST GNU11 -Werror COMPILE PASS "
-          "(real fs/vfs.c + fs/vfs_fd.c + fs/fd_redirect.c)", flush=True)
+          "(real sys/fs/vfs.c + sys/fs/vfs_fd.c + sys/fs/fd_redirect.c)", flush=True)
     return exe
 
 
 MUTATIONS = [
-    ("stdin_interrupt", "fs/vfs_fd_stdin.inc",
+    ("stdin_interrupt", "sys/fs/vfs_fd_stdin.inc",
      "        if (c < 0) {", "        if (0) {"),
     # 変異 1: **2026-09-17 の不具合そのもの**。fstat だけリダイレクトを見ず、
     # fd 0/1/2 を無条件で S_IFCHR と答える。F4 も F5 も落ちなければならない。
-    ("fstat_always_chr", "fs/vfs_fd.c",
+    ("fstat_always_chr", "sys/fs/vfs_fd.c",
      "        u16 ifmt = fd_redirect_ifmt(fd, &file_fd);",
      "        u16 ifmt = OS_S_IFCHR;"),
     # 変異 2: **片方だけ直した形** (票 §4 の F5 が狙う的)。fstat は正しく
     # 実体を答えるのに isatty が「fd 0/1/2 は常に端末」に戻る。F4 は通って
     # しまうので、F5 が無ければ素通りする。
-    ("isatty_always_tty", "fs/vfs_fd.c",
+    ("isatty_always_tty", "sys/fs/vfs_fd.c",
      "        return (fd_redirect_ifmt(fd, (int *)0) == OS_S_IFCHR) ? 1 : 0;",
      "        return 1;"),
     # 変異 3: パイプをキャラクタデバイスと答える版。管理元が 1 本なので
     # isatty も一緒に「端末だ」と言い出す = 食い違いはしないが、**パイプを
     # 端末と呼ぶ**のは嘘なので、パイプの節が落ちる。
-    ("pipe_is_chr", "fs/fd_redirect.c",
+    ("pipe_is_chr", "sys/fs/fd_redirect.c",
      "        return OS_S_IFIFO;",
      "        return OS_S_IFCHR;"),
     # 変異 4: 種別だけ合わせて中身は作り話を返す版。F4 の「直に開いた FD の
     # fstat と 1 バイトも違わない」が止める。
-    ("file_stat_invented", "fs/vfs_fd.c",
+    ("file_stat_invented", "sys/fs/vfs_fd.c",
      "            return vfs_fstat(file_fd, buf);",
      "            {\n"
      "                int mi; u8 *mp = (u8 *)buf;\n"
@@ -196,7 +196,7 @@ def one_mutation(item):
         except subprocess.CalledProcessError:
             return "MUTATE %-20s RED (コンパイルが通らない)" % name, 0
         head = ("HOST GNU11 -Werror COMPILE PASS "
-                "(real fs/vfs.c + fs/vfs_fd.c + fs/fd_redirect.c)\n")
+                "(real sys/fs/vfs.c + sys/fs/vfs_fd.c + sys/fs/fd_redirect.c)\n")
         rc = subprocess.run([str(exe)], cwd=str(tree), timeout=120,
                             capture_output=True).returncode
     if rc == 0:
@@ -208,7 +208,7 @@ def one_mutation(item):
 def run_mutations(tmp):
     """否定側。変異は一時ディレクトリの写しにだけ当てる (mutpar で並列、
     実物のソースは読むだけ — check-par で回せる)。"""
-    return mutpar.run_with_control(one_mutation, MUTATIONS, ("control", "fs/vfs_fd.c", "", ""))
+    return mutpar.run_with_control(one_mutation, MUTATIONS, ("control", "sys/fs/vfs_fd.c", "", ""))
 
 
 if __name__ == "__main__":
@@ -224,7 +224,7 @@ if __name__ == "__main__":
         failed += rc != 0
 
         if "--target" in sys.argv:
-            for src in ("fs/vfs_fd.c", "fs/fd_redirect.c"):
+            for src in ("sys/fs/vfs_fd.c", "sys/fs/fd_redirect.c"):
                 subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c", src,
                                 "-o", str(tmp / (pathlib.Path(src).stem + ".o"))],
                                cwd=ROOT, check=True)

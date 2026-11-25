@@ -1,6 +1,6 @@
-# platform/pc98/console.c — 設計
+# sys/platform/pc98/console.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_T2D_T2H (T2e の KAPI の範囲検査の欠落の修正) の契約を今のソースと照らして要約
-ソース: `platform/pc98/console.c`
+ソース: `sys/platform/pc98/console.c`
 
 PC-98 のテキスト VRAM (TVRAM) へのセル単位の読み書き。KAPI の console 系の座標がそのまま届くので、TVRAM の外を指す番地を作らない。
 
@@ -17,4 +17,4 @@ PC-98 のテキスト VRAM (TVRAM) へのセル単位の読み書き。KAPI の 
 
 ## 検査
 
-`tools/tests/test_kapi_bounds.py` が実 `platform/pc98/console.c` を ILP32 で組み、TVRAM の両面とその間・外側の番兵、アクセス回数で確かめる。
+`tools/tests/test_kapi_bounds.py` が実 `sys/platform/pc98/console.c` を ILP32 で組み、TVRAM の両面とその間・外側の番兵、アクセス回数で確かめる。

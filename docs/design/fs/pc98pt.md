@@ -1,9 +1,9 @@
-# fs/pc98pt.c — 設計
+# sys/fs/pc98pt.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_HDD_INSTALL 段 1 (§1-v3 N3・N4) の契約を今のソースと照らして要約
-ソース: `fs/pc98pt.c`・`fs/pc98pt.h` (`PC98PartEntry`・`pc98pt_get`・`pc98pt_put`・`pc98pt_entry_range`・`pc98pt_find_os32`・`pc98pt_os32_is_legacy`・`pc98pt_make_os32`)・ホストの写し `tools/pc98pt.py` (`make_os32`・`find_os32`)
+ソース: `sys/fs/pc98pt.c`・`sys/fs/pc98pt.h` (`PC98PartEntry`・`pc98pt_get`・`pc98pt_put`・`pc98pt_entry_range`・`pc98pt_find_os32`・`pc98pt_os32_is_legacy`・`pc98pt_make_os32`)・ホストの写し `tools/pc98pt.py` (`make_os32`・`find_os32`)
 
 PC-98 の区画表 (LBA 1、32B × 16 項目) の読み書きを 1 か所に集めた純粋関数。読み手はカーネルの ext2
-(`ext2_find_partition`)・FAT (`fs/fat/fatfs_vfs.c`)・HDD ローダ (`boot/boot_main.c`)、書き手は hdprep・インストーラ
+(`ext2_find_partition`)・FAT (`sys/fs/fat/fatfs_vfs.c`)・HDD ローダ (`boot/boot_main.c`)、書き手は hdprep・インストーラ
 (`userland/system/inst_disk.c`)・`tools/nhd_deploy.py`。型は C の素の型だけで、ローダでも組める。
 
 ## 配置 (PC-98 標準配置)

@@ -15,7 +15,7 @@ from module_schema import COMPONENTS
 ROOT = Path(__file__).resolve().parents[1]
 DOC = ROOT / 'docs/design/hwdev/hwdev_imports.md'
 INVENTORY = ROOT / 'tools/hwdev_layout.json'
-OUT = ROOT / 'hwdev/generated'
+OUT = ROOT / 'sys/dev/hwdev/generated'
 PPC_OUT = ROOT / 'build/out/ppc-powermac/hwdev-layout'
 # docs/design/hwdev/hwdev_imports.md §§2-3: 26 core + 22 kernel imports.
 HWDEV_IMPORT_SLOTS = 26 + 22
@@ -29,7 +29,7 @@ def slots():
     doc = DOC.read_text()
     core = re.findall(r'^\| (\d+) \| `(\w+)` \| `([^`]+)` \|$',
                       doc.split('## 2.', 1)[1].split('## 3.', 1)[0], re.M)
-    imports = {e['symbol']: e for e in json.loads((ROOT/'kernel/module/kdebug_imports.def').read_text())['imports']}
+    imports = {e['symbol']: e for e in json.loads((ROOT/'sys/kern/module/kdebug_imports.def').read_text())['imports']}
     kernel = re.findall(r'^\| (\d+) \| (\w+) \| (\d+) \|$',
                         doc.split('## 3.', 1)[1].split('## 4.', 1)[0], re.M)
     result = []
@@ -43,7 +43,7 @@ def slots():
     result.sort(key=lambda e: e['index'])
     if [e['index'] for e in result] != list(range(HWDEV_IMPORT_SLOTS)):
         raise SystemExit('HWDEV slot order/count')
-    defined = json.loads((ROOT/'hwdev/hwdev_imports.def').read_text())['imports']
+    defined = json.loads((ROOT/'sys/dev/hwdev/hwdev_imports.def').read_text())['imports']
     keys = ('index', 'symbol', 'source', 'kind', 'group')
     if defined != [{k: e[k] for k in keys} for e in result]:
         raise SystemExit('HWDEV .def differs from core/kernel slot tables')
@@ -134,13 +134,13 @@ def generate(cc, flags, includes, out=None, inventory=INVENTORY, seed=False, *,
     objcopy = objcopy or str(Path(cc).with_name('i386-elf-objcopy'))
     entries = slots()
     core_entries = [e for e in entries if e['group'] == 'core']
-    headers = ['kdebug/recover.h', 'kdebug/recover_gf.h', 'kdebug/gf_stage_state.h']
+    headers = ['sys/dev/video/geforce/diag/recover.h', 'sys/dev/video/geforce/diag/recover_gf.h', 'sys/dev/video/geforce/diag/gf_stage_state.h']
     # gfinit.h already includes the private wire; keep the umbrella stable.
-    headers += [str(p.relative_to(ROOT)) for p in sorted((ROOT/'kdebug').glob('gfinit*.h'))
+    headers += [str(p.relative_to(ROOT)) for p in sorted((ROOT/'sys/dev/video/geforce/diag').glob('gfinit*.h'))
                 if p.name != 'gfinit_wire.h']
-    headers += ['kdebug/gf_command_test.h', 'kdebug/gf_foundation_test.h',
-                'hwdev/gf/gf1_test.h', 'hwdev/gf/gf2_test.h',
-                'hwdev/gf/production.h', 'kdebug/kpeek.h', 'hwdev/hwdev_private.h']
+    headers += ['sys/dev/video/geforce/diag/gf_command_test.h', 'sys/dev/video/geforce/diag/gf_foundation_test.h',
+                'sys/dev/video/geforce/gf1_test.h', 'sys/dev/video/geforce/gf2_test.h',
+                'sys/dev/video/geforce/production.h', 'sys/platform/pc98/kdebug/kpeek.h', 'sys/dev/hwdev/hwdev_private.h']
     headers += sorted({e['source'] for e in entries if e['group'] == 'kernel'})
     umbrella = ''.join(f'#include "{h}"\n' for h in dict.fromkeys(headers))
     table = 'struct hwdev_core_api {\n    u32 abi, size, contract_crc, layout_crc;\n'
@@ -182,7 +182,7 @@ def generate(cc, flags, includes, out=None, inventory=INVENTORY, seed=False, *,
         contract = ''.join(f'{e["group"]}:{e["index"]}:{e["symbol"]}:{normalize(e["declaration"])}\n' for e in entries)+normalize(preprocessed)
     component = next(row for row in COMPONENTS if row['name'] == 'HWDEV')
     contract += str(component['ops_version']) + repr(component['ops_names'])
-    contract += normalize((ROOT / 'include/debug_probe.h').read_text())
+    contract += normalize((ROOT / 'sys/include/debug_probe.h').read_text())
     out.mkdir(parents=True, exist_ok=True)
     crc = zlib.crc32(contract.encode()) & 0xffffffff
     lcrc = zlib.crc32(layout.encode()) & 0xffffffff
@@ -199,7 +199,7 @@ def generate(cc, flags, includes, out=None, inventory=INVENTORY, seed=False, *,
             (out/name).write_text(text)
         return
     files['hwdev_core.c'] = '#include "hwdev_contract.h"\nstatic const struct hwdev_core_api core = {\n    HWDEV_ABI, sizeof(core), HWDEV_CONTRACT_CRC, HWDEV_LAYOUT_CRC,\n'+''.join('    '+e['symbol']+',\n' for e in core_entries)+'};\nconst struct hwdev_core_api *hwdev_core_get(void) { return &core; }\n'
-    imports = ['#include "hwdev_contract.h"', '#include "kernel/module/module_image.h"',
+    imports = ['#include "hwdev_contract.h"', '#include "sys/kern/module/module_image.h"',
                'static const u8 hwdev_core_import[HWDEV_IMPORT_COUNT] = {' +
                ','.join('1' if e['group']=='core' else '0' for e in entries) + '};',
                'static const struct module_symbol_contract hwdev_import_contracts[] = {']

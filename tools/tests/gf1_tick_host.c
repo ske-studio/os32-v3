@@ -14,7 +14,7 @@ int tick_register(unsigned int slot, tick_fn fn) {
     return 0;
 }
 #ifndef GF_TICK_SOURCE
-#define GF_TICK_SOURCE "../../drivers/video/geforce/geforce_tick.c"
+#define GF_TICK_SOURCE "../../sys/platform/pc98/video/geforce/geforce_tick.c"
 #endif
 #include GF_TICK_SOURCE
 static void fail(int line) { __asm__ volatile("int $0x80" : : "a"(1), "b"(line)); for (;;) {} }

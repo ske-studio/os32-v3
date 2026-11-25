@@ -6,9 +6,9 @@
  *  拾うためで、sh_launch.inc / sh_redraw.inc と同じ理由。
  *
  *  なぜ sys_pipe_* をそのまま使えないか:
- *    `sys_pipe_get_buf()` が返すのは fs/pipe_buffer.c が kmalloc した
+ *    `sys_pipe_get_buf()` が返すのは sys/fs/pipe_buffer.c が kmalloc した
  *    **カーネル帯**のポインタ。それを `sys_redirect_fd_buf()` へ渡すと、
- *    kapi/kapi_generated.c のポインタ引数マスクに拾われて exec/exec.c の
+ *    sys/kapi/kapi_generated.c のポインタ引数マスクに拾われて sys/kern/exec/exec.c の
  *    `ring3_ptr_ok()` に落ち、`ring3_fault_kill()` で sh ごと畳まれる
  *    (`sh> echo a | cat` で強制終了)。常駐は CPL=0 なので通っていた経路を
  *    CPL=3 に持ち込んだときだけ壊れる。

@@ -1,181 +1,181 @@
 {
   "schema": 1,
   "contracts": [
-    "platform/pc98/legacy/v86_module.h",
-    "kernel/module/module.h"
+    "sys/platform/pc98/legacy/v86_module.h",
+    "sys/kern/module/module.h"
   ],
   "imports": [
     {
       "symbol": "console_hw_cursor_enable",
-      "source": "include/console.h",
+      "source": "sys/include/console.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "palette_init",
-      "source": "gfx/palette.h",
+      "source": "sys/hal/gfx/palette.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "fm_all_off",
-      "source": "include/fm_contract.h",
+      "source": "sys/include/fm_contract.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "ssg_all_off",
-      "source": "include/fm_contract.h",
+      "source": "sys/include/fm_contract.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "tss_iomap_allow",
-      "source": "arch/x86/kernel/tss.h",
+      "source": "sys/arch/x86/kernel/tss.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "tss_iomap_deny",
-      "source": "arch/x86/kernel/tss.h",
+      "source": "sys/arch/x86/kernel/tss.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "tss_iomap_deny_all",
-      "source": "arch/x86/kernel/tss.h",
+      "source": "sys/arch/x86/kernel/tss.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "v86_last_gp_cs",
-      "source": "platform/pc98/legacy/v86.h",
+      "source": "sys/platform/pc98/legacy/v86.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "v86_last_gp_ip",
-      "source": "platform/pc98/legacy/v86.h",
+      "source": "sys/platform/pc98/legacy/v86.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "v86_debug_ops",
-      "source": "platform/pc98/legacy/v86_module.h",
+      "source": "sys/platform/pc98/legacy/v86_module.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "v86_cui_display_restore",
-      "source": "platform/pc98/legacy/v86_io.h",
+      "source": "sys/platform/pc98/legacy/v86_io.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "v86_bios_real_lowmem",
-      "source": "platform/pc98/bios_snapshot.h",
+      "source": "sys/platform/pc98/bios_snapshot.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kmemcpy",
-      "source": "lib/kstring.h",
+      "source": "sys/kern/kstring.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_attach",
-      "source": "include/loop_contract.h",
+      "source": "sys/include/loop_contract.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "loop_dev_detach",
-      "source": "include/loop_contract.h",
+      "source": "sys/include/loop_contract.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "loop_dev_get_fd",
-      "source": "drivers/block/loop_dev.h",
+      "source": "sys/dev/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_get_format",
-      "source": "drivers/block/loop_dev.h",
+      "source": "sys/dev/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_get_geometry",
-      "source": "include/loop_contract.h",
+      "source": "sys/include/loop_contract.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_get_sec_n",
-      "source": "drivers/block/loop_dev.h",
+      "source": "sys/dev/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_is_hdd",
-      "source": "drivers/block/loop_dev.h",
+      "source": "sys/dev/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_is_writable",
-      "source": "include/loop_contract.h",
+      "source": "sys/include/loop_contract.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_read_chs",
-      "source": "include/loop_contract.h",
+      "source": "sys/include/loop_contract.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_read_lba",
-      "source": "include/loop_contract.h",
+      "source": "sys/include/loop_contract.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_seek_d88",
-      "source": "drivers/block/loop_dev.h",
+      "source": "sys/dev/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_track_id_d88",
-      "source": "drivers/block/loop_dev.h",
+      "source": "sys/dev/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_write_chs",
-      "source": "drivers/block/loop_dev.h",
+      "source": "sys/dev/block/loop_dev.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "loop_dev_write_lba",
-      "source": "include/loop_contract.h",
+      "source": "sys/include/loop_contract.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "vfs_read_fd",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal,exception",
       "irq": true
     },
     {
       "symbol": "vfs_seek",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal,exception",
       "irq": true
     }

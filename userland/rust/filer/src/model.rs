@@ -278,7 +278,7 @@ pub fn check_abs(path: &[u8]) -> Result<usize, i32> {
     Ok(n)
 }
 
-/// VFS と同じ規則で絶対パスを正規化する (`fs/vfs.c` の `vfs_resolve_path`)。
+/// VFS と同じ規則で絶対パスを正規化する (`sys/fs/vfs.c` の `vfs_resolve_path`)。
 ///
 /// 重複 `/` を畳み、`.` を捨て、`..` で 1 段戻る (根で `..` は no-op)。
 /// 深さ上限も VFS に合わせる (`VFS_MAX_PATH_DEPTH` = 32)。超える分は VFS 側でも
@@ -287,7 +287,7 @@ pub fn check_abs(path: &[u8]) -> Result<usize, i32> {
 /// **なぜ要るか**: filer の `check_abs` は先頭 `/` と長さしか見ず正規化しない。
 /// 一方 VFS は正規化する。生パスのまま比べると `/host/a.txt` と `/host/./a.txt`
 /// が別物に見えるのに、開く先は同じファイルになる。inode を返さない
-/// ファイルシステム (`drivers/hostdrv/hostdrvfs.c`) では inode 判定も効かないので、
+/// ファイルシステム (`sys/dev/hostdrv/hostdrvfs.c`) では inode 判定も効かないので、
 /// ここを揃えないと同一ファイルへのコピーが素通りする
 /// (2026-09-10 のレビュー指摘 P1/blocker)。
 ///

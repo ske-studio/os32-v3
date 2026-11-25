@@ -39,12 +39,12 @@
 
 ## 第1段　両 OF による配置の実証
 
-低位 PT_LOAD は 0x100000 起点、従来の PT_NOTE、BSS、ledger、起動 stack を含む。高位は専用 section の R 属性 PT_LOAD 一つ。候補は PA＝VA＝0x04800000。各 LOAD の整列合同、PA＝VA、非重複、ファイルに VA 差の穴がないことを readelf で確認する。像と chain の上限は include/memmap.h から生成される既存定数をそのまま使う。§9 への追加は不要。
+低位 PT_LOAD は 0x100000 起点、従来の PT_NOTE、BSS、ledger、起動 stack を含む。高位は専用 section の R 属性 PT_LOAD 一つ。候補は PA＝VA＝0x04800000。各 LOAD の整列合同、PA＝VA、非重複、ファイルに VA 差の穴がないことを readelf で確認する。像と chain の上限は sys/include/memmap.h から生成される既存定数をそのまま使う。§9 への追加は不要。
 
 1. 製品 kboot-link-sh と tools/accept/ppc_{boot_info,console_cells,db,display,display_lifecycle,font,fp,gfx2,kcg,loop,mouse,newlib,path,pci,port,rtc,sfs,shm,sqlite_stack,sqlite_static,surface,sysinfo,ver}.py の各 case（font は normal・range-end・font-absent）を列挙する。build/targets と tools/ppc の全受入入口から実際の ELF 生成引数を併合し、共用像を重複排除する。各像の resident_end、chain_end、高位枠、生 ISO 頁を表にし、列別の最大値と像名を保存する。低位 memsz と高位枠の各最大を同時に持つ診断像を作る。最終寸法が包絡を越えたら第1段を再実施する。
 2. PPC_BOOT_DESIGN §§2,6–7 の OF boot 経路を使う。mac99/OpenBIOS と QuickSilver OF 4.x（USB 鍵盤と screen を撮影）で entry、load-base/real-base、chosen mmu、RAM reg と available をロード前と最後の OF 問合せで採る。OF-PPC Binding 2.1 §8、OpenBSD macppc/stand/ofwmagic.S と macppc/ofw_machdep.c が NOTE・reg/available の根拠。二つの離れた LOAD の予約はファームウェアごとに実証する。
 3. 前に空いていた各 PA 頁が後に予約され、各 VA 頁の translate が期待 PA を返し、両端を含む固有パターンが全 file-backed 域で一致することを確認する。OF の一時ファイルコピー、既存予約、デバイス、隙間を覆う一括 claim を前後の地図・転送範囲と照合する。既占有で由来を区別できない候補は棄却。LOAD の再 claim はしない。候補の必要 RAM 終端は 0x04800000＋最大枠（製品見積りで 0x04850000）。連続 RAM を仮定せず reg で包含を検査。既存 mac99 受入の最小試験構成は 128 MiB。対応機の最小 RAM で同じ判定を通すまで採用番地は未確定。
-4. kboot_reserve.c の image_end＝window は最初の available まで最大 64 KiB 進むが、include/memmap.h の KHEAP_BASE は __kernel_resident_end から始まる。間の 32 KiB を allocator から除外しても heap が上書きする。両 LOAD の位置・寸法を振り、低位終端直後から chain の末尾までと、その先の既存 15 MiB 窓が連続 available、16～32 MiB に整列済み 128 KiB HPT を取れる組を両 OF で選ぶ。予約のある番地への試験書込みは禁止。実寸で配置が決まるまで接続へ進まない。
+4. kboot_reserve.c の image_end＝window は最初の available まで最大 64 KiB 進むが、sys/include/memmap.h の KHEAP_BASE は __kernel_resident_end から始まる。間の 32 KiB を allocator から除外しても heap が上書きする。両 LOAD の位置・寸法を振り、低位終端直後から chain の末尾までと、その先の既存 15 MiB 窓が連続 available、16～32 MiB に整列済み 128 KiB HPT を取れる組を両 OF で選ぶ。予約のある番地への試験書込みは禁止。実寸で配置が決まるまで接続へ進まない。
 5. 配置で解けない場合の再レビュー案は、低位 LOAD の物理終端を別記号にし、その外の 64 KiB を機種の予約として課金した先に論理 __kernel_resident_end を置く形。heap と全 chain をそこから導出し、二つの共通 ASSERT は予約込みで適用する。OF が実際にそこまでに収まり、以後の全窓が空くことを再実証する。低位 LOAD の memsz を伸ばすだけでは予約も後ろへ動く。
 
 ## 第2段　x86 の同一性付きの共通化
@@ -65,7 +65,7 @@ lib/crc32_core.inc と同じ配置で lib に共通 include を置く。boot/lz4
 
 ## 第4段　予約・写像・rd0 と退行検査
 
-- 最終 available で第1段の予約条件を再検査して detach。LOAD 範囲、予約値、機器との照合は PowerMac 内に閉じ、共通コードの機種選択には include/platform_module_pair.h を使う。低位 pool の採用端は 16 MiB。
+- 最終 available で第1段の予約条件を再検査して detach。LOAD 範囲、予約値、機器との照合は PowerMac 内に閉じ、共通コードの機種選択には sys/include/platform_module_pair.h を使う。低位 pool の採用端は 16 MiB。
 - 一時 VA は第1段の高位 VA と同値の専用頁枠。kernel_boot.c の ppc_boot_load_root で root 切替前に、必要 PDE 数ぶんの頁整列した専用 PT を低位 BSS に確保済みとし、容量集計にも含める。既存 PDE を上書きせず、VA/PA 両範囲について shell、固定帯、HPT、低位 pool、ESCC/MPIC/FB/clock/VIA/GMAC と交差、加算 wrap、既設 alias を拒否。supervisor RO・通常 RAM の WB で各頁を設定し、walk で PA と属性、書込・user 拒否を確認する。装置の RW/PCD 用 install_alias は使わない。
 - 機種側の unmap 入口が成功・失敗とも設置済み PTE を消し、該当 HPTE と TLB を無効化・同期して再 walk の不在を確認し、専用 PDE を外す。管理外の高位 PFN は free せず OF detach 後の release もしない。専用 BSS は常駐予算に残す。
 - ppc_kernel.c は allocator ONLINE 後に int pm_root_image(struct boot_root_image *out) を呼び、0 の時だけ pm_root_boot に進む。長さの正値、int と頁丸めの上限、圧縮長の枠内包含を確認して pgalloc_alloc_n_owner で LEDGER_OWNER_BOOT の低位恒等写像済み連続頁を得る。実圧縮長だけ入力し、生長まで展開。戻り値＝生長、全生バイトの CRC と entry の pair 合格後に boot_common と out を公開する。
@@ -81,14 +81,14 @@ lib/crc32_core.inc と同じ配置で lib に共通 include を置く。boot/lz4
 
 ## 確定 (2026-11-20 夜、sol 第 2 回、PM が反映)
 以下は本文に優先する。
-- **P1 (第 4 段、一時写像の書き込み保護)**: 圧縮の区画の一時写像に**ハードウェアの書き込み保護を求めない** (PM 決定)。理由: 現行の PowerPC の walk は supervisor の store で RW を見ず supervisor の頁を PP=0 にするので、RO の PTE は書き込みを止められない (arch/ppc/pd_walk.c の ppc_pd_lookup_read、arch/ppc/kernel_cpu.c の ppc_cpu_load_segments・SEG)。x86 も vmkernel.lz4 の置き場を書き込みから守っていない。シングルタスク・カーネルだけが触る区画なので、守りは**展開の後の CRC の照合** (生の root の CRC、本文の pair の契約) で取る。RO の属性・書き込みの実アクセスの受入・それの変異は本文から外す。写像の除去 (展開の後に一時写像を外す) と、除去の後の読みが失敗することの受入は残す。
+- **P1 (第 4 段、一時写像の書き込み保護)**: 圧縮の区画の一時写像に**ハードウェアの書き込み保護を求めない** (PM 決定)。理由: 現行の PowerPC の walk は supervisor の store で RW を見ず supervisor の頁を PP=0 にするので、RO の PTE は書き込みを止められない (sys/arch/ppc/pd_walk.c の ppc_pd_lookup_read、sys/arch/ppc/kernel_cpu.c の ppc_cpu_load_segments・SEG)。x86 も vmkernel.lz4 の置き場を書き込みから守っていない。シングルタスク・カーネルだけが触る区画なので、守りは**展開の後の CRC の照合** (生の root の CRC、本文の pair の契約) で取る。RO の属性・書き込みの実アクセスの受入・それの変異は本文から外す。写像の除去 (展開の後に一時写像を外す) と、除去の後の読みが失敗することの受入は残す。
 - **P2 (第 3〜4 段、root の無い像)**: RAM の root を持つのは KB_EXEC の像だけ (build/targets/ppc-powermac.mk の KB_EXEC・KB_INC_EXTRA・KB_EXTRA)。root の無い像は単一の LOAD と従来の道のまま — 二段の生成・高い LOAD の検証・予約の検査・一時写像はしない。選択は build の側の 1 か所 (KB_EXEC) で決め、ppc_kernel.c の起動の道は root の区画の有無を kboot の情報から読む (機種のマクロを足さない)。root の無い像も受入の像の一覧に入れ、単一の LOAD であることを host の検査で照らす。
-- **P2 (第 4 段、登録の前の失敗)**: pm_root_boot (platform/powermac/root_boot.c の pm_root_boot) は boot_root_fs_init の失敗でも登録の前に戻る。展開の入口から boot_root_mount (init/boot_root.c の boot_root_mount・boot_root_start) まで「rd0 に登録したか」の旗を戻り値で最上位まで返し、初期値は偽。旗が偽なら展開先の頁を返し、真なら rd0 が借りたまま (解放しない)。両方の道を host の試験で照らす。
+- **P2 (第 4 段、登録の前の失敗)**: pm_root_boot (sys/platform/powermac/root_boot.c の pm_root_boot) は boot_root_fs_init の失敗でも登録の前に戻る。展開の入口から boot_root_mount (sys/kern/init/boot_root.c の boot_root_mount・boot_root_start) まで「rd0 に登録したか」の旗を戻り値で最上位まで返し、初期値は偽。旗が偽なら展開先の頁を返し、真なら rd0 が借りたまま (解放しない)。両方の道を host の試験で照らす。
 - 両 OF の配置と最小の RAM は第 1 段の採用の条件 (第 1 段で解けなければ再レビューへ戻す)。G4 (QuickSilver) の実機の物理の操作はユーザーの承認を得てから (実機ノートへの依頼、[D2])。
 
 ## 本線のレビュー (2026-11-20 夜、本線 PM、可 — 第 1 段から)
 - 可: 第 2 段の build_compare --all のバイト一致 (boot/lz4_mini.c は PC-98 の起動の LDR なので、一致しない時は直すまで出さない)、LOAD の範囲・予約・機器との照合を PowerMac に閉じる、共通の LZ4 の本体は機種・装置のヘッダに依存ゼロ、L2 の pair は本線の口 `int platform_module_pair(u32 *out)` を変えずに PowerPC の中の wire を 2 つの LOAD に広げる (単一 LOAD の版を先に出さない)。
 - 記録 (1): L2 の確定設計は docs/decisions/ppc/PPC_MODULE_ALIGN_X86_DESIGN.md (wip/kfill-designs、末尾の確定の節に L2 の口の寄せの範囲・L1 の接続の PM 決定)、本線の側は main 87741a727 — 第 3 段の参照はこれ。
 - 記録 (2): 第 1 段の 5 の再レビュー案 (低位の物理の終端を別の記号にし __kernel_resident_end を予約込みに、共通の ASSERT を予約込みで当てる) を取る時は、共通の memmap の意味に触るので本線のレビューに戻す。
-- 記録 (3): 第 4 段の「共通コードの機種選択には include/platform_module_pair.h を使う」は取り消す。root の区画の有無は確定の P2 のとおり build の 1 か所 (KB_EXEC) と kboot の情報で決め、pair のヘッダには入れない。
+- 記録 (3): 第 4 段の「共通コードの機種選択には sys/include/platform_module_pair.h を使う」は取り消す。root の区画の有無は確定の P2 のとおり build の 1 か所 (KB_EXEC) と kboot の情報で決め、pair のヘッダには入れない。
 - PM の段の分け方: 第 1 段を 1a (QEMU の OpenBIOS — 像の一覧と最大、診断の像、配置の採取の台本) と 1b (G4 の OF 4.x — ユーザーの承認の後、実機ノートへの依頼、診断の像は自分で起こし直す作り) に分ける。

@@ -15,7 +15,7 @@
   python3 -B tools/tests/test_rshell_peek.py --mutate   # 否定側
 """
 CHECK = dict(name='rshell-peek-host', tier=1,
-    covers=['tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/rshell_serial.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'kdebug/kpeek.c', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h'],
+    covers=['tools/lanfs_host.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/rshell_peek.py', 'tools/rshell_hwb.py', 'tools/rshell_serial.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'sys/platform/pc98/kdebug/kpeek.c', 'sys/arch/x86/kdebug/kdebug_window.c', 'sys/arch/x86/kdebug/kdebug_window.h'],
     needs=[], budget=3.1,
     kind='characterization',
 )
@@ -105,7 +105,7 @@ GUEST_MAC = bytes.fromhex("00aa00112233")
 
 
 def dump_packet(tag, seq, addr, data, dst=OWN_MAC, ftype=None):
-    """kdebug/kpeek.c の組み方を独立に: Ethernet 14 + SFS (T_DUMP) + 60 B 詰め。"""
+    """sys/platform/pc98/kdebug/kpeek.c の組み方を独立に: Ethernet 14 + SFS (T_DUMP) + 60 B 詰め。"""
     body = sfs.encode(sfs.T_DUMP if ftype is None else ftype, tag, seq,
                       struct.pack("<I", addr) + data, sfs.LAN_MAX_PAYLOAD)
     return (dst + GUEST_MAC + b"\x88\xb5" + body).ljust(60, b"\0")

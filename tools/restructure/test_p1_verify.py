@@ -18,8 +18,8 @@ CLASSIFIER_PATH = verify.LAYER_BLOB.split(':', 1)[1]
 
 def fixture(root):
     subprocess.run(['git', 'init', '-q', str(root)], check=True)
-    for path in ('tools/ppc/ata_deny.c', 'tools/gfinit_rom_check.py', 'tools/fixture_source.py', 'code.c', 'tools/checks/fixture_runner.py', 'tools/restructure/inventory.py',
-                 'tools/checks/restructure_p0_987.py', 'include/pc98.h', 'platform/pc98/platform_console.h', 'build/arch/example.mk'):
+    for path in ('userland/diag/ata_deny.c', 'tools/gfinit_rom_check.py', 'tools/fixture_source.py', 'code.c', 'tools/checks/fixture_runner.py', 'tools/restructure/inventory.py',
+                 'tools/checks/restructure_p0_987.py', 'sys/platform/pc98/pc98.h', 'sys/platform/pc98/platform_console.h', 'build/arch/example.mk'):
         dest = root / path
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.touch()
@@ -60,9 +60,9 @@ def exercise(module, root, tree):
     rom = ['tools/gfinit_rom_check.py', 'P1-4', '検査の本体', '期待 CRC と照合', '', '開発・検査用実装']
     source = ['tools/fixture_source.py', 'P1-1', '運用の道具', '候補印=合否語、登録・check 目標・workflow の参照。入力を生成する', '', '開発・検査用実装']
     classifier = [CLASSIFIER_PATH, 'P1-4', '検査の本体', '層の分類', '', '開発・検査用実装']
-    header = ['include/pc98.h', 'P1-1', '製品', '名前つきヘッダ', '', '機種固有実装']
-    fixed = ['platform/pc98/platform_console.h', 'P1-1', '製品', '固定名の契約', '', '機種固有実装']
-    guest = ['tools/ppc/ata_deny.c', 'P1-1', '製品', 'PPC_USER_APPS の入力', '', '共通実装']
+    header = ['sys/platform/pc98/pc98.h', 'P1-1', '製品', '名前つきヘッダ', '', '機種固有実装']
+    fixed = ['sys/platform/pc98/platform_console.h', 'P1-1', '製品', '固定名の契約', '', '機種固有実装']
+    guest = ['userland/diag/ata_deny.c', 'P1-1', '製品', 'PPC_USER_APPS の入力', '', '共通実装']
     manifest = ['build/arch/example.mk', 'P1-1', 'ビルドの定義', '像の定義', '', 'ビルドの定義']
     footer = [verify.EXCLUDED, ['tools/checks/restructure_p0_987.py', '開発・検査用実装'],
               ['tools/restructure/inventory.py', '開発・検査用実装']]
@@ -87,7 +87,7 @@ def exercise(module, root, tree):
     check([product, runner, *footer], 1, ['PPC_USER_APPS の製品入力'])
     guest[1:3], guest[-1] = ['P1-1', '製品'], '共通実装'
     header[-1] = '共通実装'
-    check([product, runner, *footer], 1, ['include/pc98.h: 所属照合 機種固有実装 → 共通実装 の理由がない'])
+    check([product, runner, *footer], 1, ['sys/platform/pc98/pc98.h: 所属照合 機種固有実装 → 共通実装 の理由がない'])
     header[-1] = '機種固有実装'
     for row in (header, fixed):
         original = row.copy()

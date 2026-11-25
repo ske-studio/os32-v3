@@ -7,7 +7,7 @@
  * those entry points. See report-fix1.md for the product link set. */
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
-#include "../../hwdev/gf/internal.h"
+#include "../../sys/dev/video/geforce/internal.h"
 
 static struct gf4_host host;
 static struct gf4_state state;

@@ -138,7 +138,7 @@ struct bulk_rx { u32 total, base, next_write, grant, recv_bits, done_bits, due_u
 - CPU不足で未達なら内訳を報告する。入力・表示遅延を犠牲にして速度だけを合格にしない。
 ## 5. Tier との口・前景駆動・排他
 ```c
-#include "kernel/io_work.h" /* io-tier A1所有。LANはio_sliceの内部を複製・参照しない */
+#include "sys/kern/io_work.h" /* io-tier A1所有。LANはio_sliceの内部を複製・参照しない */
 int io_slice_begin(struct io_slice *s, u32 budget_us, u32 max_units); /* A1の口 */
 int lan_bulk_step(void *transfer, struct io_slice *s); /* IO_DONE/IO_MORE/IO_WAIT/負値 */
 /* bulk_work.c（LAN所有）。io_slice_beginの失敗は転送エラーへ。時計の取得はA1に任せる。 */
@@ -215,28 +215,28 @@ int lan_bulk_step(void *t, struct io_slice *s) { /* 擬似コード、所有者�
 |B2|net/bulk_rx.c 新280|受け手・順次保存・ACK、A後B1と並列可|
 |C|tools/host_bulk.py 新350|ホスト台帳・fd worker接続、A後B1/B2と並列可|
 |Cw|tools/host_bulk_io.py 新160|pwrite/close workerと完了キュー、Cの口確定後|
-|D|net/link_rx.inc 変更60|新op長さ/世代検証・dispatch、B後|
-|E0a|net/link.h 変更50|通常FG＋IRQ0救済の単一所有口/不変条件、A後|
-|E0b|net/link.c 変更180|通常dispatchをFG化・共有busy/最終FG時刻・救済、E0a後|
-|E0k|net/link_host_api.inc 変更100|KAPIをFG所有guardへ置換、E0b後|
-|E0c|net/nic.c 変更100|IRQ0の10jiffy/busy条件付きlink救済、既存RX接続、E0k/G後|
+|D|sys/net/link_rx.inc 変更60|新op長さ/世代検証・dispatch、B後|
+|E0a|sys/net/link.h 変更50|通常FG＋IRQ0救済の単一所有口/不変条件、A後|
+|E0b|sys/net/link.c 変更180|通常dispatchをFG化・共有busy/最終FG時刻・救済、E0a後|
+|E0k|sys/net/link_host_api.inc 変更100|KAPIをFG所有guardへ置換、E0b後|
+|E0c|sys/net/nic.c 変更100|IRQ0の10jiffy/busy条件付きlink救済、既存RX接続、E0k/G後|
 |E0c 試験|hostsvc-boot: `tools/tests/hostsvc_boot_host.c`|通常 FG 駆動と 10 jiffy 無活動時の IRQ0 救済を検証する|
 |E0c 試験|hostsvc-nic: `tools/tests/hostsvc_nic_host.c` の `link_tick()`・`tools/tests/test_hostsvc_nic.py`|通常 FG と IRQ0 救済の駆動・変異を分けて検証する|
 |E0c 試験|net-rx-work-host: `tools/tests/net_rx_work_host.c`|FG の LINK 消費と 10 jiffy 救済を検証し旧 wrapper 保証との世代差を解消する|
-|E|net/link.c 変更100|失効・送信優先・bulk接続、D/E0c後|
+|E|sys/net/link.c 変更100|失効・送信優先・bulk接続、D/E0c後|
 |F|tools/host_agent.py 変更100|bulk dispatch・LIST・送出、C後Eと並列可|
-|G|net/nic.h 変更70|W2容量予約・予算口とNetNicOps.fg_service、Bに先行可|
-|G1|drivers/net/ne2000/nic_lgy98.c 変更60|NE2Kのfg_serviceをne2k_bhへ接続、G後（adapter所在を実装時照合）|
-|H/H1|net/nic_rx.c 変更180|既存FG取り込み維持、link23枠/共有予約、G後|
-|H2a|drivers/net/e82557/e82557_regs.h 変更30|RFD23・DMAサイズ、G後|
-|H2b|drivers/net/e82557/e82557_desc.c 変更100|ring初期化/周回/回収、H2a後|
-|H2c|drivers/net/e82557/e82557.c 変更60|DMA領域確保・境界検証、H2b後|
-|H3|platform/powermac/nic_gem.c 変更120|4枠経路のadmission拡大、G/W2後|
+|G|sys/net/nic.h 変更70|W2容量予約・予算口とNetNicOps.fg_service、Bに先行可|
+|G1|sys/dev/net/ne2000/nic_lgy98.c 変更60|NE2Kのfg_serviceをne2k_bhへ接続、G後（adapter所在を実装時照合）|
+|H/H1|sys/net/nic_rx.c 変更180|既存FG取り込み維持、link23枠/共有予約、G後|
+|H2a|sys/dev/net/e82557/e82557_regs.h 変更30|RFD23・DMAサイズ、G後|
+|H2b|sys/dev/net/e82557/e82557_desc.c 変更100|ring初期化/周回/回収、H2a後|
+|H2c|sys/dev/net/e82557/e82557.c 変更60|DMA領域確保・境界検証、H2b後|
+|H3|sys/platform/powermac/nic_gem.c 変更120|4枠経路のadmission拡大、G/W2後|
 |H3 試験|gem-adapter-host: `tools/tests/gem_adapter_host.c` の `_start()`|公開 credit から満杯・解放・wrap を検証し、23 枠の受入を別に置く。tick 側 RX 所有を維持|
 |I|net/bulk_work.c 新180|io_slice_begin/idle_work・bulk自身の再入guard、B1/B2/H/E0cとio-tier A1・A3・T1・T2後、LAN専有|
 |J|fs/hostsvc/hostsvc.c 新380|VFS OPEN・fg_service/RXを回す共通FG1待ち、I/G1とio-tier A1・A3・T1・T2およびAC-CTX受入後|
 |K|tools/host_fs_meta.py 新250|stat/list等、A後並列可|
-|L|fs/serialfs/serialfs.c 変更80|serialを残す経路整理、J後|
+|L|sys/fs/serialfs/serialfs.c 変更80|serialを残す経路整理、J後|
 |M|tools/lanfs_host.py 変更60|旧LAN起動撤去・移行エラー、F/K後|
 |N|net/bulk_probe.c 新150|測定hook、B/H/I後|
 |O|userland/commands/lanbench.c 新180|ゲスト測定、N後|

@@ -10,13 +10,13 @@ def run_case_policy(runner, mutate=False):
     if mutate:
         for name, changes in [
             ('lease-entry-guards', [
-                ('exec/surface_query.c',
+                ('sys/kern/exec/surface_query.c',
                  '    if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;\n    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease(',
                  '    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease('),
-                ('exec/surface_query.c',
+                ('sys/kern/exec/surface_query.c',
                  '    if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;\n    int rc = gfx_surface_source(role, &source);',
                  '    int rc = gfx_surface_source(role, &source);')]),
-            ('bridge-guard', [('gfx/gfx_core.c',
+            ('bridge-guard', [('sys/hal/gfx/gfx_core.c',
                 '    if (gfx_policy_blocks_map(LEDGER_ROLE_CLIENT)) goto fail;', '')])]:
             result = run_case(None, runner, extra_changes=changes)
             assert result.returncode == 1 and 'FAIL ' in result.stdout, (name, result.stdout, result.stderr)

@@ -15,17 +15,17 @@ class Stage(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='os32-stage-') as d:
             d = pathlib.Path(d)
             for unit in ('paging', 'pgalloc', 'sys'):
-                s = (ROOT / ('kernel/sys.c' if unit == 'sys' else f'mm/{unit}.c')).read_text()
+                s = (ROOT / ('sys/kern/sys.c' if unit == 'sys' else f'mm/{unit}.c')).read_text()
                 s = s.replace('irq_save()', 'host_irq_save()').replace('irq_restore(flags)', 'host_irq_restore(flags)')
                 (d / f'{unit}_host_source.c').write_text(s)
             cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-DPHYSMEM_HOST_TEST=1', f'-DTEST_{case.upper()}', f'-DTEST_END={end}']
-            # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約
+            # arch/x86 + platform/pc98: sys/include/io.h / sys/include/cpu.h は契約
             # だけで、実装は固定名 arch_io.h / arch_cpu.h / platform_io.h を
             # 引く (順序 3・5)。CR0 / CR3 を触る arch_cpu.h だけは、ホストでは
             # tools/tests/host_arch/ の実装が先に見つかるようにする。
             cmd += ['-I' + str(ROOT / 'tools/tests/host_arch')]
             cmd += include_flags(ROOT) + ['-I' + str(d)]
-            subprocess.run(cmd + [str(ROOT / 'tools/tests/highram_stage_host.c'), str(ROOT / 'mm/physmem.c'), '-o', str(d / 'test')], check=True)
+            subprocess.run(cmd + [str(ROOT / 'tools/tests/highram_stage_host.c'), str(ROOT / 'sys/kern/mm/physmem.c'), '-o', str(d / 'test')], check=True)
             host32.run([str(d / 'test')], check=True, timeout=60)
 
     def test_irq_off(self):

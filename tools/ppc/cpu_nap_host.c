@@ -2,7 +2,7 @@
  * User decision 2026-11-16 and mainline PPC NAP assignment.
  * ILP32, no libc: real product C with fake privileged operations. */
 #include "ppc_trap.h"
-#include "kernel/irq/irq.h"
+#include "sys/kern/irq/irq.h"
 #include "exec_arch.h"
 volatile u32 kctx_irq_depth;
 static u32 hid, reads, writes, order, naps, enables;

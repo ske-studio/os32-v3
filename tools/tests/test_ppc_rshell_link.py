@@ -5,13 +5,13 @@
 PowerPC P3 の確定設計 §3「KAPI → platform → link/mailbox」(docs に写すまでは設計の約束として扱う)。
 """
 CHECK = dict(env=['ppc-cross'], name='ppc-rshell-link', tier=1, needs=[], budget=20,
-    covers=['kernel/dev/device_host.c', 'platform/powermac/host_unavailable.c',
-            'exec/absent/exec_reclaim.c', 'arch/ppc/exec_kapi.c', 'arch/ppc/arch_exec_kapi.h',
-            'tools/tests/test_ppc_rshell_link.py','include/platform_host.h', 'net/link.h', 'net/host_mailbox.h',
-            'kapi/kapi_host_notice.c', 'kapi/kapi_host_notice.h', 'exec/exec_reclaim.h',
-            'arch/ppc/kapi_table.h', 'include/redir_access.h',
-            'kapi/range_internal.h', 'lib/kstring_c.c', 'lib/kstring.h', 'exec/exec.h',
-            'kernel/idle_work.h', 'include/types.h', 'include/callconv.h',
+    covers=['sys/kern/dev/device_host.c', 'sys/platform/powermac/host_unavailable.c',
+            'sys/kern/exec/absent/exec_reclaim.c', 'sys/arch/ppc/exec_kapi.c', 'sys/arch/ppc/arch_exec_kapi.h',
+            'tools/tests/test_ppc_rshell_link.py','sys/include/platform_host.h', 'sys/net/link.h', 'sys/net/host_mailbox.h',
+            'sys/kapi/kapi_host_notice.c', 'sys/kapi/kapi_host_notice.h', 'sys/kern/exec/exec_reclaim.h',
+            'sys/arch/ppc/kapi_table.h', 'sys/include/redir_access.h',
+            'sys/kapi/range_internal.h', 'sys/kern/kstring_c.c', 'sys/kern/kstring.h', 'sys/kern/exec/exec.h',
+            'sys/kern/idle_work.h', 'sys/include/types.h', 'sys/include/callconv.h',
             'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_kapi_shared.h',
             'tools/tests/host32.py'], basis=['AC-CTX-1'])
 import os
@@ -26,15 +26,15 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def exercise(tmp, stub=False, mutation=None):
-    provider = 'platform/powermac/host_unavailable.c' if stub else 'kernel/dev/device_host.c'
-    paths = [provider, 'exec/absent/exec_reclaim.c', 'arch/ppc/exec_kapi.c']
+    provider = 'sys/platform/powermac/host_unavailable.c' if stub else 'sys/kern/dev/device_host.c'
+    paths = [provider, 'sys/kern/exec/absent/exec_reclaim.c', 'sys/arch/ppc/exec_kapi.c']
     text = '\n'.join((ROOT / p).read_text() for p in paths)
     if mutation:
         anchor, replacement = mutation
         assert text.count(anchor) == 1, anchor
         text = text.replace(anchor, replacement)
     if stub:
-        text += '\n' + (ROOT / 'kapi/kapi_host_notice.c').read_text()
+        text += '\n' + (ROOT / 'sys/kapi/kapi_host_notice.c').read_text()
     # Any attempted automatic interrupt enable is observable at runtime.
     text = '#include "os32_kapi_shared.h"\n#define arch_irq_enable() (++enables)\nstatic int enables;\n' + text
     harness = r'''

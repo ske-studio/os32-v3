@@ -6,29 +6,29 @@ The classifier, hook, rc handling and actual TVRAM calls remain product code.
 Hardware sequence assembly belongs to test_trident_lifecycle, in tri-life.
 """
 CHECK = dict(name='trident-emergency', tier=1, needs=['make:all'], budget=15.1,
-    covers=['tools/tests/gfx2_core_fake.h', 'tools/tests/gfx2_bridge_fake.h', 'include/copy_units.h', 'arch/*/arch_copy.h', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'tools/tests/recover_gf_dev_stub.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'gfx/gfx_core.c',
-            'gfx/gfx_core*.inc', 'drivers/video/cirrus/backend_cirrus.c',
-            'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c',
-            'drivers/video/pc98/backend_pegc.c', 'exec/access_walk.c', 'exec/lease.c',
-            'exec/redir_access.c', 'exec/surface_query.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_selector_lifecycle.inc', 'platform/pc98/gfx_surfaces.c', 'kernel/console/display_restore.h',
-            'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_dirty.c', 'gfx/gfx_present.c', 'kernel/sys.c', 'mm/paging.c', 'mm/pgalloc.c',
-            'mm/physmem.c', 'mm/shlib.c', 'tools/tests/mutpar.py', 'include/gfx_hal.h', 'build/kernel.mk',
-            'arch/x86/kernel/isr_handlers.c', 'arch/x86/kernel/idt.h',
-            'exec/exec_finish.inc', 'exec/appslot.h',
+    covers=['tools/tests/gfx2_core_fake.h', 'tools/tests/gfx2_bridge_fake.h', 'sys/include/copy_units.h', 'arch/*/arch_copy.h', 'sys/hal/gfx/sync/sync_int.h', 'sys/hal/gfx/v2/gfx2_int.h', 'sys/include/gfx_sync.h', 'sys/hal/gfx/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'tools/tests/recover_gf_dev_stub.c', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/hal/gfx/gfx_emergency.c', 'sys/hal/gfx/gfx_emergency.h', 'sys/hal/gfx/gfx_core.c',
+            'gfx/gfx_core*.inc', 'sys/dev/video/cirrus/backend_cirrus.c',
+            'sys/platform/pc98/video/cirrus/cirrus_identify.c', 'sys/platform/pc98/video/backend_pc98.c',
+            'sys/platform/pc98/video/backend_pegc.c', 'sys/kern/exec/access_walk.c', 'sys/kern/exec/lease.c',
+            'sys/kern/exec/redir_access.c', 'sys/kern/exec/surface_query.c', 'sys/hal/gfx/gfx_scroll.c', 'sys/platform/pc98/gfx_scroll.c', 'sys/platform/pc98/gfx_init.c', 'sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_selector_lifecycle.inc', 'sys/platform/pc98/gfx_surfaces.c', 'sys/kern/console/display_restore.h',
+            'sys/platform/pc98/video/gfx_vram.c', 'sys/hal/gfx/gfx_dirty.c', 'sys/hal/gfx/gfx_present.c', 'sys/kern/sys.c', 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c',
+            'sys/kern/mm/physmem.c', 'sys/kern/mm/shlib.c', 'tools/tests/mutpar.py', 'sys/include/gfx_hal.h', 'build/kernel.mk',
+            'sys/arch/x86/kernel/isr_handlers.c', 'sys/arch/x86/kernel/idt.h',
+            'sys/kern/exec/exec_finish.inc', 'sys/kern/exec/appslot.h',
             'tools/tests/trident_emergency_host.c', 'tools/tests/exec_gfx_exit_order_host.c', 'tools/tests/trident_core_host.c',
             'tools/tests/trident_surface_lifetime_host.c', 'drivers/video/trident/*.c',
-            'drivers/video/trident/probes.h',
-            'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'exec/surface_limits.h',
-            'drivers/video/trident/trident_module.h', 'lib/kstring.h',
-            'gfx/gfx.h', 'gfx/gfx_internal.h', 'gfx/palette.h', 'lib/serial_diag.h',
-            'mm/kmalloc.h', 'drivers/char/serial.h', 'userland/tests/hw/trident_mode.hwb',
+            'sys/dev/video/trident/probes.h',
+            'sys/dev/pci/pci.h', 'sys/dev/pci/pci_decode.h', 'sys/kern/exec/surface_limits.h',
+            'sys/dev/video/trident/trident_module.h', 'sys/kern/kstring.h',
+            'sys/hal/gfx/gfx.h', 'sys/hal/gfx/gfx_internal.h', 'sys/hal/gfx/palette.h', 'lib/serial_diag.h',
+            'sys/kern/mm/kmalloc.h', 'sys/dev/char/serial.h', 'userland/diag/hw/trident_mode.hwb',
             'tools/tests/trident_device_fake.c','tools/tests/trident_sync_fake.c', 'tools/tests/trident_device_fake.h',
-            'drivers/video/trident/trident.h', 'tools/tests/test_gfx_kernel_fb.py',
+            'sys/dev/video/trident/trident.h', 'tools/tests/test_gfx_kernel_fb.py',
             'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'tools/tests/kernel_layout.py',
             'tools/tests/paging_source.py', 'tools/tests/serial_diag_host.h',
             'tools/tests/host_arch/**', 'build/config.mk', 'include/**',
-            'sdk/include/os32/**', 'tools/tests/test_trident_emergency.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+            'sdk/include/os32/**', 'tools/tests/test_trident_emergency.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     basis=['TRIDENT_FULL_DESIGN §2', 'REALHW_RECOVER_DESIGN §2', 'REALHW_RECOVER_DESIGN §3', 'REALHW_RECOVER_DESIGN §4'],
 )
 import argparse
@@ -44,16 +44,16 @@ from kernel_includes import include_flags
 from test_gfx_kernel_fb import run_case
 
 ROOT = Path(__file__).resolve().parents[2]
-DISPATCH = 'gfx/gfx_emergency.c'
-ISR = 'arch/x86/kernel/isr_handlers.c'
-EXIT = 'exec/exec_finish.inc'
+DISPATCH = 'sys/hal/gfx/gfx_emergency.c'
+ISR = 'sys/arch/x86/kernel/isr_handlers.c'
+EXIT = 'sys/kern/exec/exec_finish.inc'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-Wno-unused-function', '-Wno-unused-parameter', '-Wno-unused-variable', '-ffreestanding', '-fno-pie',
          '-fno-stack-protector', '-nostdlib', '-static', '-no-pie']
 
 # Each literal product anchor must be unique. RED must come from execution.
 MUTATIONS = [
-    ('M_SELECT_RETRY', 'platform/pc98/gfx_selector.c',
+    ('M_SELECT_RETRY', 'sys/platform/pc98/gfx_selector.c',
      'if (want == &gfx_backend_trident && want && want->prepare) want->prepare();',
      'if (0) want->prepare();', 'core'),
     ('live-owner', DISPATCH, '!GFX_EMERGENCY_MATCHES_OWNER(owner, appslot_gfx_owner)',
@@ -86,22 +86,22 @@ MUTATIONS = [
      '    appslot_gfx_owner_exit(id);\n    int restore_rc = exec_gfx_return_emergency((u32)id, kind);', 'entries'),
     ('child-exit', EXIT, 'exec_gfx_return_emergency((u32)id, kind)',
      'exec_gfx_return_emergency(GFX_EMERGENCY_KERNEL_OWNER, kind)', 'entries'),
-    ('boot-hook', 'platform/pc98/gfx_surfaces.c',
+    ('boot-hook', 'sys/platform/pc98/gfx_surfaces.c',
      'if (pref == GFX_PREF_TRIDENT && trident_boot_reserve)',
      'if (pref == GFX_PREF_AUTO && trident_boot_reserve)', 'core'),
-    ('sf5', 'platform/pc98/gfx_selector.c',
+    ('sf5', 'sys/platform/pc98/gfx_selector.c',
      'be == &gfx_backend_trident ? LEDGER_SF_TRIDENT :',
      'be == &gfx_backend_trident ? LEDGER_SF_PC98 :', 'core'),
-    ('client-binding', 'gfx/gfx_core_framebuffer.inc',
+    ('client-binding', 'sys/hal/gfx/gfx_core_framebuffer.inc',
      'GfxBackend *backend = g_backend;',
      'GfxBackend *backend = DISPLAY_FALLBACK_BACKEND;', 'core'),
-    ('auto-probe', 'platform/pc98/gfx_selector.c',
+    ('auto-probe', 'sys/platform/pc98/gfx_selector.c',
      'g_backend_list[i] == &gfx_backend_trident) continue;',
      'g_backend_list[i] == &gfx_backend_pc98) continue;', 'core'),
-    ('drop-init-recovery', 'platform/pc98/gfx_selector.c',
+    ('drop-init-recovery', 'sys/platform/pc98/gfx_selector.c',
      'int restore_rc = gfx_return_emergency(GFX_EMERGENCY_KERNEL_OWNER, rc);',
      'int restore_rc = rc ? 0 : rc;', 'core'),
-    ('unsafe-fallback', 'platform/pc98/gfx_selector.c',
+    ('unsafe-fallback', 'sys/platform/pc98/gfx_selector.c',
      'if (restore_rc || (pc98_route_safe && !pc98_route_safe())) return -1;',
      'if (restore_rc && pc98_route_safe && pc98_route_safe()) return -1;', 'core'),
 ]
@@ -134,7 +134,7 @@ def entries(work, runner, mutation):
     finish = function(source(EXIT, mutation), 'exec_notify_owned')
     (work / 'trident_emergency_entries.inc').write_text(general + pf + finish)
     product = work / 'gfx_emergency.c'
-    product.write_text(source(DISPATCH, mutation).replace('"../exec/appslot.h"', '"' + str(ROOT / 'exec/appslot.h') + '"'))
+    product.write_text(source(DISPATCH, mutation).replace('"../exec/appslot.h"', '"' + str(ROOT / 'sys/kern/exec/appslot.h') + '"'))
     exe = work / 'emergency'
     subprocess.run(['gcc', *FLAGS, '-I' + str(work), '-I' + str(ROOT),
                     '-I' + str(ROOT / 'tools/tests'), '-I' + str(ROOT / 'gfx'),
@@ -149,7 +149,7 @@ def core(runner, mutation):
     if mutation:
         _, path, old, new, _ = mutation
         # run_case expands the production .inc files into gfx_core.c.
-        changes = [('gfx/gfx_core.c' if path.endswith('.inc') else path, old, new)]
+        changes = [('sys/hal/gfx/gfx_core.c' if path.endswith('.inc') else path, old, new)]
     def stage(tmp, sources):
         sources.append(ROOT / 'tools/tests/trident_device_fake.c')
         sources.append(ROOT / 'tools/tests/trident_sync_fake.c')
@@ -188,15 +188,15 @@ def lifetime(runner, mutation=None, fallback=1):
 
 
 LIFETIME_MUTATIONS = [
-    ('prepare-configure', 'drivers/video/trident/backend_trident.c',
+    ('prepare-configure', 'sys/dev/video/trident/backend_trident.c',
      'rc = r->configure(&provisional, bytes, false);', 'rc = 0;', 'lifetime'),
-    ('final-configure', 'drivers/video/trident/lifecycle.c',
+    ('final-configure', 'sys/dev/video/trident/lifecycle.c',
      'configure(&d->mode.selected, d->vram.first_off, true)',
      'configure(&d->mode.selected, d->vram.first_off, false)', 'lifetime'),
-    ('close-default', 'drivers/video/trident/backend_trident.c',
+    ('close-default', 'sys/dev/video/trident/backend_trident.c',
      'if (device.mode.valid) device.mode.selected = provisional;',
      'if (false) device.mode.selected = provisional;', 'lifetime'),
-    ('close-default-pitch', 'drivers/video/trident/backend_trident.c',
+    ('close-default-pitch', 'sys/dev/video/trident/backend_trident.c',
      'provisional.display_width = modes[i].pitch / (provisional.bpp / BITS_PER_BYTE);',
      'provisional.display_width = TRI_PITCH;', 'lifetime'),
 ]

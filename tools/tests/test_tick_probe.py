@@ -1,16 +1,16 @@
 """A1 real aggregation and boot call boundary, ILP32/qemu, runtime mutants."""
 CHECK = dict(name='tick-probe-host', tier=4, needs=[], budget=5,
-    covers=['include/snd_wake_contract.h', 'kernel/time/tick_probe.c', 'kernel/time/tick_probe.h', 'kernel/time/tick_probe_ids.h',
-            'net/link_platform.h', 'platform/pc98/platform_link_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/nic.c', 'drivers/net/ne2000/ne2000.c',
-            'drivers/net/ne2000/ne2000_data.inc',
-            'platform/pc98/kernel.c', 'tools/tests/tick_probe_host.c',
-            'arch/x86/kernel/isr_stub.asm', 'kernel/irq/tick.c',
-            'arch/x86/arch_io.h', 'kdebug/tick_probe.c',
+    covers=['sys/hal/sound/snd_wake_contract.h', 'sys/kern/time/tick_probe.c', 'sys/kern/time/tick_probe.h', 'sys/kern/time/tick_probe_ids.h',
+            'sys/hal/net/link_platform.h', 'sys/platform/pc98/platform_link_inline.h', 'sys/platform/pc98/link_platform.c', 'sys/net/link.c', 'sys/net/nic.c', 'sys/dev/net/ne2000/ne2000.c',
+            'sys/dev/net/ne2000/ne2000_data.inc',
+            'sys/platform/pc98/kernel.c', 'tools/tests/tick_probe_host.c',
+            'sys/arch/x86/kernel/isr_stub.asm', 'sys/kern/irq/tick.c',
+            'sys/arch/x86/arch_io.h', 'sys/kern/kdebug/tick_probe.c',
             'userland/diag/tickprobe.c', 'build/kernel.mk',
             'build/kernel-objects.mk', 'build/select.mk', 'build/kdebug.mk',
-            'kernel/module/debug_probe.c', 'kdebug/kdebug_main.c',
-            'platform/pc98/pit.c', 'arch/x86/kernel/mtrr_wc.c',
-            'drivers/net/e82557/e82557.c',
+            'sys/kern/module/debug_probe.c', 'sys/platform/pc98/kdebug/kdebug_main.c',
+            'sys/platform/pc98/pit.c', 'sys/arch/x86/kernel/mtrr_wc.c',
+            'sys/dev/net/e82557/e82557.c',
             'tools/tests/host32.py'],
     basis=['TICK_1KHZ_DESIGN', 'docs/decisions/sound/AV_HAL_DESIGN.md §13-3'],
 )
@@ -24,14 +24,14 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 
 def main():
-    original = (ROOT / 'kernel/time/tick_probe.c').read_text()
-    kernel = (ROOT / 'platform/pc98/kernel.c').read_text()
+    original = (ROOT / 'sys/kern/time/tick_probe.c').read_text()
+    kernel = (ROOT / 'sys/platform/pc98/kernel.c').read_text()
     begin = kernel.index('#ifdef TICK_PROBE\n    tick_probe_boot();')
     end = kernel.index('#endif', kernel.index('    tick_probe_splash(0);', begin))
     boundary = kernel[begin:end + len('#endif')] + '\n'
-    link_source = (ROOT / 'net/link.c').read_text()
+    link_source = (ROOT / 'sys/net/link.c').read_text()
     link = link_source[link_source.index('void link_tick(void)'):link_source.index('\n}', link_source.index('void link_tick(void)')) + 2]
-    tick_source = (ROOT / 'kernel/irq/tick.c').read_text()
+    tick_source = (ROOT / 'sys/kern/irq/tick.c').read_text()
     tick = tick_source[tick_source.index('void tick_dispatch(void)'):]
     with tempfile.TemporaryDirectory(prefix='tick-probe-') as td:
         work = Path(td)

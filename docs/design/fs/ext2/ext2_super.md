@@ -1,4 +1,4 @@
-# fs/ext2/ext2_super.c — ext2 スーパーブロックと I/O
+# sys/fs/ext2/ext2_super.c — ext2 スーパーブロックと I/O
 
 > 状態: **現行 (2026-10-31)**
 

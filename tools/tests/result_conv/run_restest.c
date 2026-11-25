@@ -7,6 +7,6 @@
 
 #define printf rconv_printf
 #define main   restest_main
-#include "../../../userland/tests/restest.c"
+#include "../../../userland/diag/restest.c"
 #undef main
 #undef printf

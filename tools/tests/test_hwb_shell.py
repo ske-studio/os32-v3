@@ -1,8 +1,8 @@
 """HW_BASIC_DESIGN §§2-7 real shell wiring and emitted serial records."""
 CHECK = dict(name='hwb-shell-host', tier=1, budget=115.9, needs=[], covers=[
     'userland/shell/cmd_hw.c', 'userland/shell/hwb*.c', 'userland/shell/hwb.h',
-    'userland/shell/shell.h', 'userland/shell/main.c', 'sdk/include/os32/*.h', 'include/types.h',
-    'include/pci_dev_contract.h', 'kdebug/probe_wire.h', 'kdebug/hwb_wire.h', 'userland/tests/hw/*.hwb',
+    'userland/shell/shell.h', 'userland/shell/main.c', 'sdk/include/os32/*.h', 'sys/include/types.h',
+    'sys/include/pci_dev_contract.h', 'sys/kern/kdebug/probe_wire.h', 'sys/kern/kdebug/hwb_wire.h', 'userland/tests/hw/*.hwb',
     'tools/rshell_hwb.py', 'tools/tests/hwb_shell_host.c', 'tools/tests/hwb_fake.h',
     'tools/tests/hwb_host.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py',
     'tools/tests/kernel_includes.py'],

@@ -2,7 +2,7 @@
 #include "gfx_hal.h"
 #include "memmap.h"
 #include "geforce_module.h"
-#include "hwdev/gfinit_mode.h"
+#include "sys/dev/video/geforce/gfinit_mode.h"
 static u8 vram[GF_MODE_VRAM_BYTES] __attribute__((aligned(4)));
 static u32 regs[0x100210U / 4U];
 static struct video_fb front;

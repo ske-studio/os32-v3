@@ -3,7 +3,7 @@
 --prepare builds a substituted copy with -Werror without executing a mutant.
 """
 CHECK = dict(name='dep-dir-a-l04-host', tier=1,
-    covers=['platform/pc98/gfx_surfaces.c', 'include/callconv.h', 'platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c', 'platform/pc98/legacy/lowmap.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/types.h', 'include/platform_device.h', 'include/loop_contract.h', 'kernel/dev/device_loop.c', 'platform/pc98/legacy/v86.c', 'platform/pc98/legacy/v86_bios.c', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_slots.h', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/tests/dep_dir_a_l04_host.c', 'tools/tests/fixtures/dep_dir_a/l04.json', 'tools/tests/test_shm_user.py', 'tools/tests/kernel_layout.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'exec/exec.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'platform/pc98/kernel.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'platform/pc98/legacy/v86_mem.c', 'platform/pc98/bios_snapshot.c', 'tools/tests/shm_user_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'platform/pc98/legacy/v86_bios_*.inc', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['sys/platform/pc98/gfx_surfaces.c', 'sys/include/callconv.h', 'sys/platform/pc98/bios_snapshot.h', 'sys/platform/pc98/boot_capture.c', 'sys/platform/pc98/legacy/lowmap.c', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/include/types.h', 'sys/include/platform_device.h', 'sys/include/loop_contract.h', 'sys/dev/loop/device_loop.c', 'sys/platform/pc98/legacy/v86.c', 'sys/platform/pc98/legacy/v86_bios.c', 'sdk/kapi.json', 'sys/kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_slots.h', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/tests/dep_dir_a_l04_host.c', 'tools/tests/fixtures/dep_dir_a/l04.json', 'tools/tests/test_shm_user.py', 'tools/tests/kernel_layout.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sys/kern/exec/exec.c', 'sys/platform/pc98/video/backend_pegc.c', 'sys/hal/gfx/gfx_core.c', 'sys/platform/pc98/kernel.c', 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c', 'sys/kern/mm/physmem.c', 'sys/kern/mm/shm.c', 'sys/platform/pc98/legacy/v86_mem.c', 'sys/platform/pc98/bios_snapshot.c', 'tools/tests/shm_user_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'platform/pc98/legacy/v86_bios_*.inc', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=2.7,
     basis=['[ABI]', 'KAPI_SPEC §3-1'],
 )
@@ -20,8 +20,8 @@ import tempfile
 from test_shm_user import function
 
 ROOT = Path(__file__).resolve().parents[2]
-COPIES = ('include/callconv.h', 'include/types.h', 'include/platform_device.h', 'include/loop_contract.h',
-          'kernel/dev/device_loop.c', 'tools/tests/dep_dir_a_l04_host.c')
+COPIES = ('sys/include/callconv.h', 'sys/include/types.h', 'sys/include/platform_device.h', 'sys/include/loop_contract.h',
+          'sys/dev/loop/device_loop.c', 'tools/tests/dep_dir_a_l04_host.c')
 OLD = 'return loop_dev_read_lba(slot, lba, count, buf);'
 NEW = 'return loop_dev_read_lba(slot ^ 1, lba, count, buf);'
 
@@ -31,13 +31,13 @@ def build(folder, body):
         dest = folder / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, dest)
-    (folder / 'kernel/dev/device_loop.c').write_text(body)
+    (folder / 'sys/dev/loop/device_loop.c').write_text(body)
     exe = folder / 'loop'
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                     '-ffreestanding', '-nostdlib', '-static', '-fno-pie', '-no-pie',
                     '-fno-stack-protector',
                     *include_flags(folder),
-                    str(folder / 'kernel/dev/device_loop.c'),
+                    str(folder / 'sys/dev/loop/device_loop.c'),
                     str(folder / 'tools/tests/dep_dir_a_l04_host.c'), '-o', str(exe)],
                    check=True)
     return exe
@@ -50,20 +50,20 @@ def digest(data):
 def fixed_contracts():
     fixture = json.loads((ROOT / 'tools/tests/fixtures/dep_dir_a/l04.json').read_text())
     spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
-    generated = (ROOT / 'kapi/kapi_generated.c').read_text()
+    generated = (ROOT / 'sys/kapi/kapi_generated.c').read_text()
     assert '"platform_device.h"' in generated
     for entry in spec['api']:
         if entry['name'] in ('loop_attach', 'loop_detach', 'loop_status'):
             target = 'platform_loop_dev_' + entry['name'].removeprefix('loop_')
             assert entry.pop('target') == target
             assert target + '(' in function(generated, 'wrap_' + entry['name'])
-    source = (ROOT / 'platform/pc98/legacy/v86.c').read_text()
+    source = (ROOT / 'sys/platform/pc98/legacy/v86.c').read_text()
     assert '#include "platform_device.h"' in source and '"loop_dev.h"' not in source
     for name, expected in fixture['v86_functions'].items():
         body = function(source, name)
         assert body.count('platform_loop_dev_') == (2 if name == 'v86_disk_test' else 3)
         assert digest(body.replace('platform_loop_dev_', 'loop_dev_').encode()) == expected
-    hle = (ROOT / 'platform/pc98/legacy/v86_bios.c').read_text()
+    hle = (ROOT / 'sys/platform/pc98/legacy/v86_bios.c').read_text()
     hle += ''.join((ROOT / 'platform/pc98/legacy' / name).read_text() for name in (
         'v86_bios_fdd_read.inc', 'v86_bios_fdd_command.inc', 'v86_bios_sasi.inc'))
     assert 'platform_device.h' not in hle and 'platform_loop_dev_' not in hle
@@ -79,7 +79,7 @@ def main():
     parser.add_argument('--prepare', action='store_true')
     args = parser.parse_args()
     fixed_contracts()
-    body = (ROOT / 'kernel/dev/device_loop.c').read_text()
+    body = (ROOT / 'sys/dev/loop/device_loop.c').read_text()
     assert body.count(OLD) == 1
     with tempfile.TemporaryDirectory(prefix='dep-dir-a-l04-') as directory:
         folder = Path(directory)

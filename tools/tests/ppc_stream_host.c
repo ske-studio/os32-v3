@@ -2,9 +2,9 @@
  * synchronously as the cooperative foreground poll would do. */
 #include "console.h"
 #include "console_output.h"
-#include "platform/powermac/lan_boot.h"
-#include "platform/powermac/ofw.h"
-#include "arch/ppc/kernel_boot.h"
+#include "sys/platform/powermac/lan_boot.h"
+#include "sys/platform/powermac/ofw.h"
+#include "sys/arch/ppc/kernel_boot.h"
 static struct ppc_boot_devices devices;
 static const ConOutputOps *output;
 int boot_serial_mirror, rshell_active;

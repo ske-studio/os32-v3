@@ -1,4 +1,4 @@
-#include "userland/tests/h3/protocol.h"
+#include "userland/diag/h3/protocol.h"
 #if defined(H3_SLOT_TEST)
 #include "os32api.h"
 static KernelAPI table;
@@ -21,7 +21,7 @@ static int self_identity(unsigned long *app, unsigned long *owner, unsigned long
 }
 #define H3_SELF_IDENTITY self_identity
 #endif
-#include "userland/tests/h3/state.inc"
+#include "userland/diag/h3/state.inc"
 static void finish(int code)
 {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(code) : "memory");

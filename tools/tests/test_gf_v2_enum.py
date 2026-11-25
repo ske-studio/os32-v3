@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Direct freestanding G10 enumeration contract test."""
 CHECK = dict(name='gf-v2-enum-host', tier=1, needs=[], budget=5,
-    covers=['drivers/video/geforce/gf_v2_enum.c', 'drivers/video/geforce/gf_v2.h',
+    covers=['sys/dev/video/geforce/gf_v2_enum.c', 'sys/dev/video/geforce/gf_v2.h',
             'tools/tests/gf_v2_enum_host.c', 'tools/tests/test_gf_v2_enum.py',
             'tools/tests/host32.py'],
     basis=['HAL_V2_DESIGN §9-1'],
@@ -31,7 +31,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'drivers/video/geforce/gf_v2_enum.c').read_text()
+    source = (ROOT / 'sys/dev/video/geforce/gf_v2_enum.c').read_text()
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         assert observe(work, source) == 0

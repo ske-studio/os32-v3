@@ -6,8 +6,8 @@
 #define GF3_CINT_C2
 #define GF3_CINT_WIRE
 #include "gf_accel_c1_host.c"
-#include "../../hwdev/gf/command_test.c"
-#include "../../hwdev/gf/display/modes.c"
+#include "../../sys/dev/video/geforce/command_test.c"
+#include "../../sys/dev/video/geforce/display/modes.c"
 
 struct gf1_test_ops gf1_module_ops;
 GfxCounters gfx_counters;

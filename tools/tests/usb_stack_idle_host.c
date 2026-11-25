@@ -1,5 +1,5 @@
 /* Drive the PC-98 callback pair against a permanently exhausted IRQ0 budget. */
-#include "platform/pc98/usb_resident.c"
+#include "sys/platform/pc98/usb_resident.c"
 
 int kbd_shim_irq_depth;
 u32 tick_budget_cnt(u32 us) { return us; }

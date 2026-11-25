@@ -1,5 +1,5 @@
 /* G5 contract tests: fake F2 and instmem, real G5 translation unit. */
-#include "drivers/video/geforce/gf_v2.h"
+#include "sys/dev/video/geforce/gf_v2.h"
 /* Compiler support for large aggregate zeroing; no libc is linked. */
 void *memset(void *ptr, int value, unsigned int n)
 {

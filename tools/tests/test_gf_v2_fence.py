@@ -7,7 +7,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'drivers/video/geforce/gf_v2_fence.c'
+SOURCE = ROOT / 'sys/dev/video/geforce/gf_v2_fence.c'
 
 def observe(work, source):
     path = work / 'fence.c'

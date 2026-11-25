@@ -9,8 +9,8 @@ import tempfile
 import subprocess
 import host32
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-TARGET_SRC = ['kernel/sqlite_engine.c', 'kernel/sqlite_outer.c', 'exec/exec.c',
-              'arch/x86/kernel/isr_handlers.c', 'lib/sqlite3/sqlite_stack.asm', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
+TARGET_SRC = ['sys/kern/sqlite_engine.c', 'sys/kern/sqlite_outer.c', 'sys/kern/exec/exec.c',
+              'sys/arch/x86/kernel/isr_handlers.c', 'lib/sqlite3/sqlite_stack.asm', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h']
 
 BODY_MUTATIONS = {
     'keep init flag': ('    init_called = 0;', ''),
@@ -62,7 +62,7 @@ def run(runner, mutant=None):
         src = exec_source(ROOT)
         a = src.index('void ring3_abort_check(void)\n{')
         (tmp / 'stop_source.c').write_text(src[a:src.index('\n}', a)+2])
-        src = (ROOT / 'arch/x86/kernel/isr_handlers.c').read_text()
+        src = (ROOT / 'sys/arch/x86/kernel/isr_handlers.c').read_text()
         a = src.index('void sqlite_engine_fault(')
         fault = src[a:src.index('\n}', a)+2]
         gates = [fault]
@@ -110,7 +110,7 @@ def run(runner, mutant=None):
         (tmp / 'stub_calls.c').write_text('\n'.join(stub_calls))
         (tmp / 'refused_calls.c').write_text('\n'.join(refused_calls))
         (tmp / 'io_refused_calls.c').write_text('\n'.join(io_refused_calls))
-        outer = (ROOT / 'kernel/sqlite_outer.c').read_text()
+        outer = (ROOT / 'sys/kern/sqlite_outer.c').read_text()
         outer = outer.replace('../lib/sqlite3/generated/', str(ROOT / 'lib/sqlite3/generated')+'/')
         generated = (ROOT / 'lib/sqlite3/generated/sqlite_outer_calls.inc').read_text()
         if mutant == 'direct call':

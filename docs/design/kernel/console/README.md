@@ -10,7 +10,7 @@
 ### display_restore
 
 ```c
-/* kernel/console/display_restore.h: 既存5関数の署名を保ち、機種includeを除く。 */
+/* sys/kern/console/display_restore.h: 既存5関数の署名を保ち、機種includeを除く。 */
 void display_text_start(void);
 void display_restore_98(void);
 int display_recover_ready(void);
@@ -20,5 +20,5 @@ int display_recover_cell_write(u32 value);
 
 ## 索引
 
-- [kernel/console/console.c](console.md)
-- [kernel/console/console_backend.h](console_backend.md)
+- [sys/kern/console/console.c](console.md)
+- [sys/kern/console/console_backend.h](console_backend.md)

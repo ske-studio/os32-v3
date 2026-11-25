@@ -7,10 +7,10 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 
 CHECK = dict(name='snd2-seg-host', tier=4, needs=[], budget=3,
-             covers=['include/exec_wait_contract.h', 'sound/hal/snd2.h', 'sound/hal/snd2_pos.c', 'include/io.h',
-                     'kernel/time/tick_clock.h', 'include/kernel_tick.h', 'sound/hal/snd2_seg.c', 'sound/hal/snd2_stg.c',
-                     'sound/hal/snd2_int.h', 'sound/hal/snd2_ring_math.h',
-                     'include/av_contract.h', 'lib/kstring.h', 'mm/kmalloc.h', 'include/types.h',
+             covers=['sys/include/exec_wait_contract.h', 'sys/hal/sound/snd2.h', 'sys/hal/sound/snd2_pos.c', 'sys/include/io.h',
+                     'sys/hal/time/tick_clock.h', 'sys/include/kernel_tick.h', 'sys/hal/sound/snd2_seg.c', 'sys/hal/sound/snd2_stg.c',
+                     'sys/hal/sound/snd2_int.h', 'sys/hal/sound/snd2_ring_math.h',
+                     'sys/include/av_contract.h', 'sys/kern/kstring.h', 'sys/kern/mm/kmalloc.h', 'sys/include/types.h',
                      'sdk/include/os32/*.h', 'tools/tests/snd2_seg_host.c',
                      'tools/tests/test_snd2_seg.py', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'build/config.mk'],

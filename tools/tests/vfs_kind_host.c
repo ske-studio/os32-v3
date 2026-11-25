@@ -7,7 +7,7 @@
  *  実行: python3 -B tools/tests/test_vfs_kind.py
  *  記録: tools/tests/h1_tdd.md
  *
- *  実物の fs/vfs.c をそのまま #include し、境界 (kstring / kmalloc) だけを
+ *  実物の sys/fs/vfs.c をそのまま #include し、境界 (kstring / kmalloc) だけを
  *  同義の C で置く。FS ドライバは合成した VfsOps で、stat / list_dir /
  *  get_file_size の戻り値を 1 つずつ指定できる。
  *
@@ -20,7 +20,7 @@
  *  ext2 / FAT / ISO9660 の既存の判定が変わらないことも、同じ合成ドライバで
  *  「stat が答えるドライバ」として押さえる (4 つとも stat を持っている)。
  *
- *  さらに **実物の fs/vfs_fd.c も同じ翻訳単位に取り込み**、`vfs_open()` が
+ *  さらに **実物の sys/fs/vfs_fd.c も同じ翻訳単位に取り込み**、`vfs_open()` が
  *  種別の判定結果をどう使うかまで通す (往復 4 の B7)。`vfs_path_kind` の
  *  戻り値までしか見ていなかったことが、B7 の検出漏れの原因だった。
  *
@@ -33,7 +33,7 @@
 
 #include "vfs.h"
 
-/* ---- fs/vfs.c の境界 (lib/kstring_asm.asm / kmalloc はホストで組めない) ---- */
+/* ---- sys/fs/vfs.c の境界 (sys/kern/kstring_asm.asm / kmalloc はホストで組めない) ---- */
 void *kzalloc(u32 size) { return calloc(1, size); }
 void kfree(void *p) { free(p); }
 void *kmemset(void *dst, int val, u32 n) { return memset(dst, val, n); }
@@ -55,10 +55,10 @@ char *kstrncat(char *dst, const char *src, u32 n)
     return dst;
 }
 
-#include "../../fs/vfs.c"
+#include "../../sys/fs/vfs.c"
 #include "../platform/pc98/boot_names.c"
 
-/* ---- fs/vfs_fd.c の境界 (コンソール / リダイレクト / 所有者タグ) ---- */
+/* ---- sys/fs/vfs_fd.c の境界 (コンソール / リダイレクト / 所有者タグ) ---- */
 int fd_is_redirected(int fd) { (void)fd; return 0; }
 u16 fd_redirect_ifmt(int fd, int *out_file_fd)
 { (void)fd; if (out_file_fd) *out_file_fd = -1; return OS_S_IFCHR; }
@@ -72,7 +72,7 @@ void console_write(const char *buf, u32 size, u8 color)
 int res_owner_get(void) { return 0; }
 
 /* open の**受け手**まで実物を通す (票 H1 / 往復 4 の B7) */
-#include "../../fs/vfs_fd.c"
+#include "../../sys/fs/vfs_fd.c"
 
 /* ------------------------------------------------------------------------ */
 
@@ -142,7 +142,7 @@ static int drv_is_mounted(void *ctx) { (void)ctx; return 1; }
 static VfsOps drv_ops_with_stat;
 static VfsOps drv_ops_no_stat;
 
-/* fs/vfs_fd.c の FD 表を空にする (実物を #include しているので直に触れる)。
+/* sys/fs/vfs_fd.c の FD 表を空にする (実物を #include しているので直に触れる)。
  * generation は据え置き — 使い切りの検査はここの対象ではない。 */
 static void vfs_fd_reset_for_test(void)
 {
@@ -150,7 +150,7 @@ static void vfs_fd_reset_for_test(void)
     for (i = 0; i < VFS_MAX_OPEN_FILES; i++) open_files[i].in_use = 0;
 }
 
-/* fs/vfs.c の静的な登録表とマウント表を試験のたびに空にする
+/* sys/fs/vfs.c の静的な登録表とマウント表を試験のたびに空にする
  * (実物を #include しているので直に触れる)。 */
 static void reset(int has_stat)
 {

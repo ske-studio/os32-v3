@@ -29,7 +29,7 @@
 
 ## 2. 共通境界・所有・誤りコード
 ```c
-/* 新 hwdev/gf/display/api.h。surfaceはF3 accel.hを共用、offはVRAM byte。 */
+/* 新 sys/dev/video/geforce/display/api.h。surfaceはF3 accel.hを共用、offはVRAM byte。 */
 enum gf4_rc { GF4_OK=0, GF4_EINVAL=-401, GF4_ERANGE=-402,
  GF4_EFORMAT=-403, GF4_EPLL=-404, GF4_EDDC=-405, GF4_EEDID=-406,
  GF4_ENOSPC=-407, GF4_ESTATE=-408, GF4_ETIME=-409,
@@ -57,7 +57,7 @@ int gf4_gamma(struct gf4_ctx *,u8 head,const u16 rgb[3][256]);
 - VRAM予約はF2 push開始B未満の共通台帳: 表示面1〜2枚/head→2KiB整列cursor 16KiB/head→F3試験面。末尾instmem・pushを侵さない。面末尾はoff<=limitかつbytes<=limit-offで検査。一般heapは不要、mode変更前に新予約を試算する。
 - set_mode/DPMSはflip受付停止→F2 reference drain→cursor hide→表示状態変更。失敗は旧timing/PLL/base/LUT/routeを既存recover方式で復元、復元失敗ならreusable=false→既存GF停止/PC-98経路へ。旧面は表示停止が確定するまで解放しない。
 - 停止順: 層4 (flip受付停止・進行中処理を完了/打切り→エンコーダーの DPMS OFF (`drm_helper_force_disable_all` 相当)→エンコーダーの restore (V/disp.c:196-197)→CRTC の restore (`nv_crtc_restore` V/crtc.c:692-706 = `nouveau_hw_load_state(saved)` V/hw.c:827-835))→層3 fini→VGA フォントの復元 (V/disp.c:202、F3 fini の fence の後、diagnostic_saved の間は保留)→gf2_stop (drain→channel停止)（内部でF1 stop）→冪等foundation_stop cleanup→quiesce rows (局所復元)→route_to_98。restore の値は module で最初の devinit の直後に 1 回だけ保存した値 (V/disp.c:245・297-302、D/hw_state.c の static)。停止の道で DPMS ON を書かない (手本に無い、ユーザー決定 2026-11-12)。F1 stop後はVBLANKを待たない。失敗時は既存の所有保持/復元規約に従う。
-- 表示の保存値は module の寿命で 1 つで、svc_rom の devinit の直後に 1 回だけ取る。保存に失敗しても開始は続ける (devinit の acquire は 1 回しか試せない、hwdev/gf/devinit.c。手本も V/hw.c:330-334 で記録して続ける)。フォントが取れなければ fonts_valid=false でフォントだけ復元しない。crtc・enc が取れなければ valid=false で、停止は restore しない。valid・fonts_valid を落とすのは module の終了だけ。restore も production の io (l->io) を使う。
+- 表示の保存値は module の寿命で 1 つで、svc_rom の devinit の直後に 1 回だけ取る。保存に失敗しても開始は続ける (devinit の acquire は 1 回しか試せない、sys/dev/video/geforce/devinit.c。手本も V/hw.c:330-334 で記録して続ける)。フォントが取れなければ fonts_valid=false でフォントだけ復元しない。crtc・enc が取れなければ valid=false で、停止は restore しない。valid・fonts_valid を落とすのは module の終了だけ。restore も production の io (l->io) を使う。
 ```c
 /* HAL共有型。任意hookをGfxBackend末尾に追加、NULLはNOSYS。 */
 struct GfxCursorImage { const u32 *argb_pm; u32 bytes,pitch,width,height;
@@ -193,28 +193,28 @@ struct gf4_test_ops { struct gf4_ctx *ctx;
 ## 11. ファイルごとの変更一覧 (O/相対、1機能1ファイル)
 | 段 / ファイル | 機能・依存・行目安 |
 |---|---|
-| A0 hwdev/gf/display/api.h 新、hwdev/gfinit_mode.h・kdebug/gfinit_* 変 | API/型/定数/出典表、head別snapshotに全呼出し/fixtureを追随、hwdev.mk:126のVPLL probeも再compile / F1〜3 / 180＋追随分 |
+| A0 sys/dev/video/geforce/display/api.h 新、sys/dev/video/geforce/gfinit_mode.h・kdebug/gfinit_* 変 | API/型/定数/出典表、head別snapshotに全呼出し/fixtureを追随、hwdev.mk:126のVPLL probeも再compile / F1〜3 / 180＋追随分 |
 | A1 tools/tests/gf_display_host.h 新 | 偽MMIO indexed/AR/LUT/時刻/IRQ counter/VRAMとI2C slave骨格 / A0 / 220 |
 | A2 tools/tests/test_gf_display.py 新 | 部品link・fixture・変異登録・image/import計測骨格 / A1 / 100 |
-| A3 kdebug/gf_display_test.c 新 | serial dispatch/復元/カメラ用case番号の骨格、試験ops bind / A0 / 100 |
-| B0 hwdev/gf/display/modes.c 変 | 候補/ID/能力/容量検査 / A0 / 130 |
-| B1 hwdev/gf/display/timing.c,format.c,fifo.c 変 | 各既存責務の引数化・pitch/depth/FIFO / B0 / 計180 |
-| B2 hwdev/gf/display/pll_program.c 変 | 目標clock/head・共有PLLSEL再生成・bit9保持 / B0 / 70 |
-| B3 hwdev/gf/display/ddc.c 新 | bitbang/EDID block / A0 / 180 |
-| B4 drivers/video/geforce/edid.c 新 (kernel専用) | EDID解析・mode生成、C4のdata ops経由 / B3 / 350 |
-| B5 hwdev/gf/display/dpms.c 新、blank.c 変 | sync状態機械 / B1 / 100＋15 |
-| B6 hwdev/gf/display/cursor.c 変 | 画像/offset/位置/表示 / F3 V0の独立VRAM窓 / 150 |
-| B7 hwdev/gf/display/flip.c 新 | vblank wait/base/面寿命 / F1 snapshot,F2 fence / 170 |
-| B8 hwdev/gf/display/gamma.c 新、palette.c 変 | gamma shadow/LUT loader共有 / B1 / 90＋20 |
-| B9 hwdev/gf/display/output.c 変 | DCB route/analog/共有DAC所有 / B0 / 100 |
-| B10 hwdev/gf/display/tmds.c 新 | FP timing/TMDS/script/DPMS / B9 / 240 |
-| B11 hwdev/gf/display/tv.c 新、drivers/video/geforce/tv_data.c 新 (kernel専用) | 前者はTV MMIO/DPMS、後者はnorm表/state/rescale純計算、C4経由 / B9 / 計300＋係数表 |
-| B12 hwdev/gf/display/heads.c 新 | 2head状態/共有clock競合/owner / B9 / 100 |
-| C0 hwdev/gf/display/modeset.c 変 | 準備→load→復元transaction / B群 / 100 |
-| C1 drivers/video/geforce/backend_geforce.c 変、include/gfx_hal.h 変 | HAL adapters/記述子/既存route維持、hook追加 / C0 / 140＋35 |
-| C2 hwdev/gf/production.h,service.c,display/quiesce.c 変 | ctx/予約/epoch/stop・callback解除 / C0 / 計65 |
+| A3 sys/dev/video/geforce/diag/gf_display_test.c 新 | serial dispatch/復元/カメラ用case番号の骨格、試験ops bind / A0 / 100 |
+| B0 sys/dev/video/geforce/display/modes.c 変 | 候補/ID/能力/容量検査 / A0 / 130 |
+| B1 sys/dev/video/geforce/display/timing.c,format.c,fifo.c 変 | 各既存責務の引数化・pitch/depth/FIFO / B0 / 計180 |
+| B2 sys/dev/video/geforce/display/pll_program.c 変 | 目標clock/head・共有PLLSEL再生成・bit9保持 / B0 / 70 |
+| B3 sys/dev/video/geforce/display/ddc.c 新 | bitbang/EDID block / A0 / 180 |
+| B4 sys/dev/video/geforce/edid.c 新 (kernel専用) | EDID解析・mode生成、C4のdata ops経由 / B3 / 350 |
+| B5 sys/dev/video/geforce/display/dpms.c 新、blank.c 変 | sync状態機械 / B1 / 100＋15 |
+| B6 sys/dev/video/geforce/display/cursor.c 変 | 画像/offset/位置/表示 / F3 V0の独立VRAM窓 / 150 |
+| B7 sys/dev/video/geforce/display/flip.c 新 | vblank wait/base/面寿命 / F1 snapshot,F2 fence / 170 |
+| B8 sys/dev/video/geforce/display/gamma.c 新、palette.c 変 | gamma shadow/LUT loader共有 / B1 / 90＋20 |
+| B9 sys/dev/video/geforce/display/output.c 変 | DCB route/analog/共有DAC所有 / B0 / 100 |
+| B10 sys/dev/video/geforce/display/tmds.c 新 | FP timing/TMDS/script/DPMS / B9 / 240 |
+| B11 sys/dev/video/geforce/display/tv.c 新、sys/dev/video/geforce/tv_data.c 新 (kernel専用) | 前者はTV MMIO/DPMS、後者はnorm表/state/rescale純計算、C4経由 / B9 / 計300＋係数表 |
+| B12 sys/dev/video/geforce/display/heads.c 新 | 2head状態/共有clock競合/owner / B9 / 100 |
+| C0 sys/dev/video/geforce/display/modeset.c 変 | 準備→load→復元transaction / B群 / 100 |
+| C1 sys/dev/video/geforce/backend_geforce.c 変、sys/include/gfx_hal.h 変 | HAL adapters/記述子/既存route維持、hook追加 / C0 / 140＋35 |
+| C2 sys/dev/video/geforce/production.h,service.c,display/quiesce.c 変 | ctx/予約/epoch/stop・callback解除 / C0 / 計65 |
 | C3 drivers/video/geforce/geforce_module.c/.h、tools/module_schema.py、build/geforce-module.mk・hwdev.mk、docs/08_build.md 変 | ABI宣言を前倒し: accel_out/foundation_outを保持して版4→5、display欄と前方宣言のfeature5_outを追加 (F5 A0待ちなし)。PM決定（1）: schema:188のimage_max/mem_maxを各163840B (160KiB)、load_span_maxを212992B (208KiB)へ拡大し容量表へGEFORCE行を同期。根拠はmodule_runtime.c:73–78の一般割当域からの連続頁取得で、固定帯域・常駐予約は無い。header/schema/loader/manifest期待値を同一所有者が揃え、生成物再作成はPM登録段。リンク分離・像検査・全backend再ビルドは統合後 / 宣言を先行、登録はF3 C3後 / 計90＋容量表 |
-| C4 drivers/video/geforce/gf_display_data.c 新、kernelのソース列 変 | helper ops/state所有・bind、B4/B11 kernel部分だけをkernelにlink、moduleに重複linkしない / B4,B11 / 60 |
+| C4 sys/dev/video/geforce/gf_display_data.c 新、kernelのソース列 変 | helper ops/state所有・bind、B4/B11 kernel部分だけをkernelにlink、moduleに重複linkしない / B4,B11 / 60 |
 - C3のhwdev.mkは新規ddc/dpms/flip/gamma/tmds/tv/heads.cを全てfilter-out (全てgeforce.mod専用)、edid.c/tv_data.c/gf_display_data.cはkernel専用。既存cursor.cは診断のhide列を維持し独立VRAM窓を使う画像APIをGF_PRODUCTION_MODULE内に限定。既存modes/modeset/output/palette/blank/service/quiesceのF1〜3・helper参照も同条件に置き、hwdev側は従来診断列。timing/format/fifo/PLLは共有純計算/MMIOを維持。hwdev/R1/VPLL/GFA/非module backendの実linkで未解決参照を検出。
 - 各Bでtools/tests/gf_display_b<N>_host.cを同時作成、実部品をlink、A1で依存を偽装し各40〜100行。A3へ各caseを追加、共有登録はC段で直列統合。kdebug/gfinit_pll/は既存純整数solverを再利用、同じ計算の別実装を増やさない。
 
@@ -294,11 +294,11 @@ F4 A0はF3の面/窓契約後、C3のABI宣言はF5 A0を待たず先行する�
 
 | ファイル／型・定数 | A0に書く定義・責任 |
 |---|---|
-| `hwdev/gf/display/api.h` 既決公開型・関数 | §2のgf4_rc/dpms/mode/cursor（timingはdata.hからinclude）、gf4_modes/set_mode/ddc_read/dpms_set/cursor_image/move/show/vblank_wait/flip/gamma/mode_calc/mode_load/test_opsをその型のまま収録。timing.flagsはNEG_H=1、NEG_V=2、INTERLACE=4、DBLSCAN=8。HEADS=2、TIMINGS=32、MODES=96、CURSOR_BYTES=16384、CURSOR_ALIGN=4096（HW最小は2048）。 |
-| `hwdev/gf/display/data.h` `gf4_route` | 既決u8 connector,head,type,or_mask,i2c_index,locationに、u8 head_mask,ext_type; bool dual_link; u32 max_khz,tv_normを追加。typeはDCB値のANALOG=0/TV=1/TMDS=2/LVDS=3。tv_normはN/dispnv04/tvnv17.h:56–70の12値順、非TVは0。DCB route配列はproductionが解析して貸し、未配線と未対応encoderを区別する。 |
-| `hwdev/gf/display/data.h` `gf4_edid_state` | u32 version,size,ntiming,preferred,extensions,next_block,min_v_hz,max_v_hz,min_h_khz,max_h_khz,max_khz; bool base_valid,digital,range_valid,truncated; i32 last_rc; struct gf4_timing timing[32]。version=1、preferredは添字／不在U32_MAX。B4が所有する逐次parserの値状態であり、MMIO・pointer・予約を持たない。 |
-| `hwdev/gf/display/data.h` `gf4_tv_state` | u32 version,size,norm; u8 enc[64]; u32 hfilter[4][7],hfilter2[4][7],vfilter[4][7],ptv[14],ctv[38]。ctvはTV規格表の値をkernelのtv_data.cで埋め、data_ops.tv_stateの出力としてmoduleへ渡す。gfinit_modeには重複保持しない。ptv順=200,204,208,20c,304,500,504,508,600,604,608,60c,610,614（hex）。version=1。N/dispnv04/tvnv17.h:30–54、tvmodesnv17.c:406–434。 |
-| `hwdev/gf/display/data.h` `gf4_data_ops` | u32 version,size; i32 (*edid_modes)(const u8 block[128],u32 block_no,struct gf4_edid_state *); i32 (*tv_state)(u32 norm,const struct gf4_timing *,struct gf4_tv_state *)。旧void *parser/stateをこの型へ置換しversion=1で固定。block0でparserを初期化、以後順次追加、失敗blockは既存正常timingを保持。TVは成功時だけ全出力確定。 |
+| `sys/dev/video/geforce/display/api.h` 既決公開型・関数 | §2のgf4_rc/dpms/mode/cursor（timingはdata.hからinclude）、gf4_modes/set_mode/ddc_read/dpms_set/cursor_image/move/show/vblank_wait/flip/gamma/mode_calc/mode_load/test_opsをその型のまま収録。timing.flagsはNEG_H=1、NEG_V=2、INTERLACE=4、DBLSCAN=8。HEADS=2、TIMINGS=32、MODES=96、CURSOR_BYTES=16384、CURSOR_ALIGN=4096（HW最小は2048）。 |
+| `sys/dev/video/geforce/display/data.h` `gf4_route` | 既決u8 connector,head,type,or_mask,i2c_index,locationに、u8 head_mask,ext_type; bool dual_link; u32 max_khz,tv_normを追加。typeはDCB値のANALOG=0/TV=1/TMDS=2/LVDS=3。tv_normはN/dispnv04/tvnv17.h:56–70の12値順、非TVは0。DCB route配列はproductionが解析して貸し、未配線と未対応encoderを区別する。 |
+| `sys/dev/video/geforce/display/data.h` `gf4_edid_state` | u32 version,size,ntiming,preferred,extensions,next_block,min_v_hz,max_v_hz,min_h_khz,max_h_khz,max_khz; bool base_valid,digital,range_valid,truncated; i32 last_rc; struct gf4_timing timing[32]。version=1、preferredは添字／不在U32_MAX。B4が所有する逐次parserの値状態であり、MMIO・pointer・予約を持たない。 |
+| `sys/dev/video/geforce/display/data.h` `gf4_tv_state` | u32 version,size,norm; u8 enc[64]; u32 hfilter[4][7],hfilter2[4][7],vfilter[4][7],ptv[14],ctv[38]。ctvはTV規格表の値をkernelのtv_data.cで埋め、data_ops.tv_stateの出力としてmoduleへ渡す。gfinit_modeには重複保持しない。ptv順=200,204,208,20c,304,500,504,508,600,604,608,60c,610,614（hex）。version=1。N/dispnv04/tvnv17.h:30–54、tvmodesnv17.c:406–434。 |
+| `sys/dev/video/geforce/display/data.h` `gf4_data_ops` | u32 version,size; i32 (*edid_modes)(const u8 block[128],u32 block_no,struct gf4_edid_state *); i32 (*tv_state)(u32 norm,const struct gf4_timing *,struct gf4_tv_state *)。旧void *parser/stateをこの型へ置換しversion=1で固定。block0でparserを初期化、以後順次追加、失敗blockは既存正常timingを保持。TVは成功時だけ全出力確定。 |
 | 同 `gf4_head_image` | bool enabled,blank,cursor_visible,lut_dirty; struct gf4_mode mode; struct gf4_route route; struct gf3_surface front,back; struct gf_vram_reservation cursor; i32 x,y,hot_x,hot_y; u32 cursor_w,cursor_h,fp_on; enum gf4_dpms dpms; u8 palette[768]; u16 gamma[3][256]。CPU画像pointerは保存せずcursor予約内のGPU形式像をF5が退避。 |
 | 同 `gf4_flip_hold` / `gf4_saved` | hold={bool pending,base_written; struct gf3_surface old_front,new_front; u32 after;}。saved={u32 version,size,wanted_fifo,wanted_graph,wanted_heads; struct gf4_head_image head[2]; struct gf4_flip_hold hold[2];}。version=1。node/窓/opsを含まない値コピー。表示保存後もhold両面は所有者ctxに残す。 |
 | 同 `gf4_state`（kernel所有） | u32 version,size,nmodes; struct gf4_mode modes[96]; u8 mode_connector[96]; struct gf4_edid_state edid; struct gf4_head_image head[2]; struct gf4_tv_state tv[2]; struct gfinit_mode work[2]; struct gf4_saved rollback。version=1。mode列はconnector別に連続、1表合計32timing×3format、満杯時preferred優先。kernel RAM見積りは約17.2KiBへ訂正（ctv重複除去前の保守値、除去分304B、最終sizeofで確定）。rollbackのpalette/gammaは保持する。 |
@@ -307,9 +307,9 @@ F4 A0はF3の面/窓契約後、C3のABI宣言はF5 A0を待たず先行する�
 | 同 F4→F5保存口（C2実装） | `i32 gf4_display_save(struct gf4_ctx *,struct gf4_saved *,u32 dl); i32 gf4_display_restore(struct gf4_ctx *,const struct gf4_saved *,u32 dl);` saveは受付閉・drain後に論理値保存→blank/IRQ抑止→全cursor_viewをunmap（予約保持）。unmap失敗は所有保持で返しF2停止へ進まない。restoreは受付閉のままcursor_viewを再mapしてから保存されたshowを再適用し、map失敗では公開しない。最終公開はF5統括だけ。F4単体停止も同じ寿命規約。 |
 | 同 部品間口（定義は各所有B/C） | `i32 gf4_surface_check(struct gf4_ctx *,const struct gf3_surface *,const struct gf4_mode *);` B0所有、BYTESのF3検査後に表示3format/pitch64B/開始4B/CR field幅を検査。`i32 gf4_route_check(struct gf4_ctx *,const struct gf4_route *);` B9所有。`i32 gf4_lut_load(struct gf4_ctx *,u8);` B8所有、palette/gammaが共用。`i32 gf4_heads_apply(struct gf4_ctx *,u32 heads);` B12所有、F1 wanted_headsとch->headsを一致させる。 |
 | 同 計算／encoder口 | `i32 gf4_timing_calc(const struct gf4_mode *,struct gfinit_mode *); i32 gf4_format_calc(const struct gf4_mode *,const struct gf3_surface *,struct gfinit_mode *); void gf4_fifo_calc(struct gfinit_mode *); i32 gf4_pll_calc(const struct gf4_mode *,const struct gf4_route *,const struct gfinit_mode_saved *,const struct gfinit_pll_limits *,struct gfinit_mode *);` 各B1/B2所有。B9/B10/B11は `i32 gf4_{analog,tmds,tv}_load(struct gf4_ctx *,const struct gf4_route *,const struct gfinit_mode *,u32 dl)` と同形の `_dpms`（mode引数をenum gf4_dpmsへ置換）。 |
-| `hwdev/gfinit_mode.h`、`display/calc.h`、`kdebug/gfinit_*` | `gfinit_mode_head_saved={u8 cr1c,cr33,cr3c,cr4b,cr52; u32 gpio_ext,crtc850;}`、`gfinit_mode_saved={struct gfinit_mode_head_saved head[2]; u32 pllsel,sel_clk;}`へ置換。gfinit_modeにu8 head; u32 fp_horiz[7],fp_vert[7],dither,dither_regs[6],fp_debug[3],fp_margin,tv_vtotal,tv_vskew,tv_vsync_delay,tv_htotal,tv_hskew,tv_hsync_delay,tv_hsync_delay2を追加（N/dispnv04/disp.h:30–75）。rollbackの全体像はstate.work/rollbackと既存recover機構が持つ。旧診断gfinit_mode_calcはhead0既定modeのラッパー、旧gf_mode_*呼出しも既定ラッパーを保持し全fixtureを追随。 |
-| gfinit_mode追従の担当 | F4 A0: hwdev/gfinit_mode.h、hwdev/gf/display/{calc.h,state.h,baseline.c,extended.c,pll_program.c,calc.c}、hwdev/gf/internal.h、kdebug/gfinit_*（特にgfinit_plan_c.c:225）のhead別参照・offsetofを更新。tools/tests/{gf_display_host.c,gfinit_mode_host.c}の位置指定初期化を欄名指定へ変更。同じF4 A0がtools/tests/test_gf_display.pyのprevious_calcを修正し、基点の源とともに `git show 13bc5619:hwdev/gfinit_mode.h` で得たヘッダーを一時include木へ配置して基点TUだけに優先適用する（現行TUは現行ヘッダー）。A0のhead[2]変更と同時に取り込み、A2待ちにしない。A2はこの分離を維持して登録を引き継ぐ。PM登録段: tools/hwdev_layout.jsonの旧684/20と生成hwdev_contract.hのsizeof/offset契約を再生成・同期。旧定数を手で残さない。 |
-| `include/gfx_hal.h` / `geforce_module.h`・schema | §2のGfxCursorImage/GfxScanout・8hookを末尾に追加。GfxScanoutはID不再利用を使いctx内の同IDからgenerationを得る。Contextは既存accel_out/foundation_outを保持してdisplay_data/state/out,feature5_out追加、版4→5はF4 C3宣言担当だけ。F5で再変更しない。 |
+| `sys/dev/video/geforce/gfinit_mode.h`、`display/calc.h`、`kdebug/gfinit_*` | `gfinit_mode_head_saved={u8 cr1c,cr33,cr3c,cr4b,cr52; u32 gpio_ext,crtc850;}`、`gfinit_mode_saved={struct gfinit_mode_head_saved head[2]; u32 pllsel,sel_clk;}`へ置換。gfinit_modeにu8 head; u32 fp_horiz[7],fp_vert[7],dither,dither_regs[6],fp_debug[3],fp_margin,tv_vtotal,tv_vskew,tv_vsync_delay,tv_htotal,tv_hskew,tv_hsync_delay,tv_hsync_delay2を追加（N/dispnv04/disp.h:30–75）。rollbackの全体像はstate.work/rollbackと既存recover機構が持つ。旧診断gfinit_mode_calcはhead0既定modeのラッパー、旧gf_mode_*呼出しも既定ラッパーを保持し全fixtureを追随。 |
+| gfinit_mode追従の担当 | F4 A0: sys/dev/video/geforce/gfinit_mode.h、hwdev/gf/display/{calc.h,state.h,baseline.c,extended.c,pll_program.c,calc.c}、sys/dev/video/geforce/internal.h、kdebug/gfinit_*（特にgfinit_plan_c.c:225）のhead別参照・offsetofを更新。tools/tests/{gf_display_host.c,gfinit_mode_host.c}の位置指定初期化を欄名指定へ変更。同じF4 A0がtools/tests/test_gf_display.pyのprevious_calcを修正し、基点の源とともに `git show 13bc5619:sys/dev/video/geforce/gfinit_mode.h` で得たヘッダーを一時include木へ配置して基点TUだけに優先適用する（現行TUは現行ヘッダー）。A0のhead[2]変更と同時に取り込み、A2待ちにしない。A2はこの分離を維持して登録を引き継ぐ。PM登録段: tools/hwdev_layout.jsonの旧684/20と生成hwdev_contract.hのsizeof/offset契約を再生成・同期。旧定数を手で残さない。 |
+| `sys/include/gfx_hal.h` / `geforce_module.h`・schema | §2のGfxCursorImage/GfxScanout・8hookを末尾に追加。GfxScanoutはID不再利用を使いctx内の同IDからgenerationを得る。Contextは既存accel_out/foundation_outを保持してdisplay_data/state/out,feature5_out追加、版4→5はF4 C3宣言担当だけ。F5で再変更しない。 |
 | `production.h` / `gf_display_data.c` | productionにはgf4_ctxのみ埋込み、state/helperはkernelが貸す。大きいmode/LUT/TV/rollbackをmoduleへ複製しない。C4がversion/size検査してbind、C2がready成功後公開。全backend追随と生成はPM統合段。 |
 
 ### 所有・範囲の欠けを埋める（G3）
@@ -335,7 +335,7 @@ F4 A0はF3の面/窓契約後、C3のABI宣言はF5 A0を待たず先行する�
 | stub選択 | 必須GF4_HOST_UNIT=0..12（B番号）、13=C0、14=依存stubなし。製品TU自身の関数は定義しない。B0:FORMAT/SURFACE/MATCH/EDID、B1/B3/B4:外部依存なし＋io、B2:既存PLL parser/solver実物、B5:FENCE/WAIT/encoder DPMS、B6:MATCH/MAP/UNMAP、B7:FENCE/WAIT/FAULT＋gf4_surface_check＋SNAPSHOT、B8:ioのみ、B9〜B11:ROUTE/TV/SCRIPT/EXTERNAL（製品自身除外）、B12:IRQ/SNAPSHOT、C0:各Bの公開口。B1/B11のファイル分割は補助リンク一覧で選択し重複stubを禁止。全stubはapi.h/F1〜3の実宣言を使う。 |
 | oracle・登録 | B単独はgolden MMIO／呼出し順／所有遷移で合否判定。GPU画像の生成を仮定しない。packet/画像参照は必要な結合に限定。read script・EDID規格fixture・MIT列の出典と再生成法をrepoに置きCIはrefsを読まない。A2は既存tools/tests/test_gf_display.pyへの追記（CHECK名gf-display-host、BASE 13bc5619照合、previous_calcの基点ヘッダー分離はA0担当）で、層2caseとgf_display_{host,modes_host,blank_host,palette_host}.cを保持。B0/B5/B8がmodes.c/blank.c/palette.c変更に伴う既存試験追従を担当。A2が依存link/CHECK/変異登録を一元所有、-m32/-nostdlib・自前_start、heap/VLA/libcなし。 |
 
-| 64bit型・除算（F4/F5共通） | PMが統合段でinclude/types.hへtypedef unsigned long long u64; typedef long long i64;を1回追加。os32_kapi_shared.hは変更なし、hostdrvfs_proto.hの同一typedefはC11で許容。製品TUでは64bitの除算・剰余を書かず、PLL誤差0.5%等は範囲を確認した乗算比較で表現し、vmap符号付き式・cursor・tile計算もこの制約を守る。各Bが製品側の計算を所有し、hostの-m32/-nostdlibとlibgccをリンクしない.modの双方で__udivdi3/__divdi3等を要求しない。2026-11-04ユーザー決定に従いkernelもlibgccを前提にしない。F4 A1がF3 A1の1ff4e2d2（gf_accel_host.h）の64bit除算helperを試験コード専用として共通土台へ再利用し、F5 A1も同じ定義を使う（1リンク1定義）。host helperで製品側の依存を隠さず、A2/A3のリンク確認では製品TUの当該未解決symbolが無いことも確認する。 |
+| 64bit型・除算（F4/F5共通） | PMが統合段でsys/include/types.hへtypedef unsigned long long u64; typedef long long i64;を1回追加。os32_kapi_shared.hは変更なし、hostdrvfs_proto.hの同一typedefはC11で許容。製品TUでは64bitの除算・剰余を書かず、PLL誤差0.5%等は範囲を確認した乗算比較で表現し、vmap符号付き式・cursor・tile計算もこの制約を守る。各Bが製品側の計算を所有し、hostの-m32/-nostdlibとlibgccをリンクしない.modの双方で__udivdi3/__divdi3等を要求しない。2026-11-04ユーザー決定に従いkernelもlibgccを前提にしない。F4 A1がF3 A1の1ff4e2d2（gf_accel_host.h）の64bit除算helperを試験コード専用として共通土台へ再利用し、F5 A1も同じ定義を使う（1リンク1定義）。host helperで製品側の依存を隠さず、A2/A3のリンク確認では製品TUの当該未解決symbolが無いことも確認する。 |
 
 F4のF3待ちは機能結合5段＋共有登録1段＝6段（上表）。A0/Bコード作成には0段。実機受入は別枠。PEGC/EGC、新たなIRQ callback・lock/refcount・nouveauに無い監視や能力bitは追加しない。
 
@@ -366,7 +366,7 @@ F4のF3待ちは機能結合5段＋共有登録1段＝6段（上表）。A0/Bコ
 | `gf5_links`（既決5口を具体化） | `i32 (*drain_pause)(void *); i32 (*unpause)(void *); i32 (*display_save)(void *,struct gf5_image *); i32 (*display_restore)(void *,const struct gf5_image *); i32 (*memory_script)(void *,u16 pc); void *owner;` 保持。display adapterはimage.displayとF4保存口を対応。dlはgf5.deadlineを読む。 |
 | 同 linksへの必要な資源・結線口 | `i32 (*admission)(void *,bool open); i32 (*drain)(void *,u32 dl); i32 (*stop)(void *,u32 dl); i32 (*restart)(void *,u32 dl); i32 (*copy_extent)(void *,const struct gf_vram_reservation *,u8 *ram,bool to_vram); i32 (*alloc)(void *,u32 bytes,void **out); void (*free)(void *,void *); i32 (*clock64)(void *,u64 *);` 追加。alloc成功時だけ出力更新、freeは非NULLの成功確保に1回。stop/restart/copyはC2、malloc汎用dispatcherにしない。 |
 | `enum gf5_phase` / `struct gf5` | phase={GF5_RUN,GF5_SAVING,GF5_SAVED,GF5_RESTORING,GF5_FAULT}。gf5={struct gf2_chan *ch; struct gf3_ctx *accel; struct gf4_ctx *display; struct gf5_links links; struct gf5_rom_view rom; struct gf5_vid_ops vid; struct gf5_emergency_ops emergency; enum gf5_phase phase; u32 deadline; i32 last_rc,source_rc; bool accepting,busy; struct gf5_fan_saved fan; u64 next_auto,next_step,next_sensor,next_toggle; struct gf5_tile tile[12]; bool tile_live[12]; struct gf5_image *image;}。productionが所有、imageは借用。常駐1KiB目安に収まるか実測し、trip/ROMは動的RAMを別計上。 |
-| ROM／前景service宣言 | `i32 gf5_rom_acquire(struct gf5 *,const u8 *,u32,const struct gf_init_program *); void gf5_rom_release(struct gf5 *); i32 gf5_service_poll(struct gf5 *);` acquireは成功時に必要ROM/span/programを別所有、releaseは停止とsnapshot破棄後だけ。pollはclock64→fan_tick、busy/非RUNなら無処理、IRQから呼ばない。PM決定: drivers/video/geforce/backend_geforce.cのgeforce_presentとHAL hookの前景入口、およびkdebug/gf5_test.cの診断待ちから呼ぶ。kernel idle hookは新設せず、geforce_tick.c/IRQから呼ばない。描画・診断待ちが無い間はAUTOの見直しが止まる。 |
+| ROM／前景service宣言 | `i32 gf5_rom_acquire(struct gf5 *,const u8 *,u32,const struct gf_init_program *); void gf5_rom_release(struct gf5 *); i32 gf5_service_poll(struct gf5 *);` acquireは成功時に必要ROM/span/programを別所有、releaseは停止とsnapshot破棄後だけ。pollはclock64→fan_tick、busy/非RUNなら無処理、IRQから呼ばない。PM決定: sys/dev/video/geforce/backend_geforce.cのgeforce_presentとHAL hookの前景入口、およびsys/dev/video/geforce/diag/gf5_test.cの診断待ちから呼ぶ。kernel idle hookは新設せず、geforce_tick.c/IRQから呼ばない。描画・診断待ちが無い間はAUTOの見直しが止まる。 |
 | `gf5_test_ops` | struct gf5 *ctx; 上記の全公開操作とperf_count/get,tile_find,service_pollを `__typeof__(&gf5_関数名)` の同名（gf5_を除く）欄で列挙。`i32 (*last_rc)(struct gf5 *);` 追加。gf5_linksの内側やraw MMIOは公開しない。save時slotは閉じるため、診断側がimageを保持しrestore/freeだけを許す専用管理dispatchを再読する（次行）。 |
 | 診断slotの保存中の寿命 | feature5_outはmodule生存中の管理口。SAVING/RESTORING中はNULL、SAVEDで再公開しphase検査でrestore/free/last_rc以外をESTATEにする。FAIL後も資源を持つ間は管理口を保持し、再restore/破棄の受付可否をphaseで判断。unload前は必ずNULL、slotを跨ぐops pointer保持禁止。F3/F4描画slotは最終RUN成功までNULL。 |
 
@@ -411,7 +411,7 @@ F5のF3待ちは機能結合4段＋共有登録1段＝5段。F4と合計 **11段
 - P3-b: 「ctv 重複除去前の保守値」の注記は、r3 で重複していた分 (304B) を gfinit_mode の work[2] から外した、と読む。数字は最終の sizeof で確定する。
 
 ## 追記 (2026-11-04、A1 の欠け — IRQ の snapshot の失敗の注入、PM 決定)
-- `gf_irq_snapshot` は実物で `void`、出力を必ず写す (hwdev/gf/irq.c)。試験の土台の失敗の注入は実物の契約に合わせる (先回りの点検の決まり) ので、`D_SNAPSHOT` は `gf4_host_fail_at` の対象から外す。土台の snapshot は常に出力を写し、rc を持たない。snapshot の中身を変えて試したい場合は、注入ではなく偽の IRQ の状態 (counter・pending) を先に設定して表す。実物に無い失敗を作らない。
+- `gf_irq_snapshot` は実物で `void`、出力を必ず写す (sys/dev/video/geforce/irq.c)。試験の土台の失敗の注入は実物の契約に合わせる (先回りの点検の決まり) ので、`D_SNAPSHOT` は `gf4_host_fail_at` の対象から外す。土台の snapshot は常に出力を写し、rc を持たない。snapshot の中身を変えて試したい場合は、注入ではなく偽の IRQ の状態 (counter・pending) を先に設定して表す。実物に無い失敗を作らない。
 - (同日、A1 の欠け 2、PM 決定) event の記録の配列 `p[]` (pointer の引数) と `a[]` (値の引数) は、層 4 の A0 で宣言した公開口の中で一番多い引数の数に合わせる (今の宣言では pointer が gf4_mode_calc の 6 個が最大 → `p[8]`、値は宣言を数えて同じ考えで)。大きさは名前付きの定数で、根拠 (どの関数が最大か) を注記に。event を分けたり別の記録方式にしたりしない。同じ種類の機械的な大きさの決めごとは、A1 の担当が宣言を数えて決め、報告に書けばよい。
 
 ## 追記 (2026-11-04、層 4 第 1 波の欠け)
@@ -481,7 +481,7 @@ struct gf4_restore_ops { struct gf4_ctx *ctx;
 /* gf4_test_ops末尾に __typeof__(&gf4_関数名) 欄を追加:
    modes,detect,dpms_set,cursor_image,cursor_move,cursor_show,vblank_wait,gamma,
    display_save,palette_set,scan_prepare,scan_discard。既存set_mode/ddc_read/flip/last_rcは保持。 */
-/* kdebug/gf_display_test.h（A3） */
+/* sys/dev/video/geforce/diag/gf_display_test.h（A3） */
 i32 gf_display_test(u32 session);
 /* gf4_display_fake.h（A1） */
 void gf4_host_write_applied_error(struct gf4_host *,u32 nth,i32 rc);
@@ -524,7 +524,7 @@ rc共通: 0成功、必須NULL/範囲外head/不正列挙値EINVAL=-401、数値
 | scan_prepare / scan_discard / links.scan_changed | D/scan.c | C2-scan | 7（scan_changed） |
 | geforce_display_ops / geforce_display_restore_ops（gf4_なし） | K/geforce_module.c | C3 | — |
 | data_bind | K/gf_display_data.c | C4 | — |
-| gf_display_test（gf4_なし） | kdebug/gf_display_test.c | A3 | — |
+| gf_display_test（gf4_なし） | sys/dev/video/geforce/diag/gf_display_test.c | A3 | — |
 
 ### 段カード（行数はterraの追加・変更Cコードの目安、関数所有は上表）
 
@@ -536,7 +536,7 @@ rc共通: 0成功、必須NULL/範囲外head/不正列挙値EINVAL=-401、数値
   IDはctx.next_mode_id=1から単調増加、再検出でも再利用/折返しなし、枯渇ENOSPC。失敗時nmodes=0・非公開なので半表を返さず、再試行可。DDC/EDID失敗は理由をlast_rcに残し既定3depthで検出成功、TVは後述norm表。C:129–151と§3候補規則に対応、DRM mode listを固定96件表に置換。
 - **B2-a（100〜150行）: PLLSEL純計算** — gf4_pll_calcは従来署名で自headのPLLと要求maskだけ計算。C0はstate.nextに旧head[2]をコピーして対象変更を反映し、gf4_pllsel_calc(next,&value)で最終PLLSELを一度だけ合成、両workのpllselへ同値を設定する。無効headのmaskは0、DPMS OFFでもenabledならPLL要求は保持。savedの古いhead/TV maskは使わずC:688→153→162通り、NV44はbit2＋有効headのVPLL mask＋TVの要求mask。ただしNV44内蔵nv17 TV/CTVのTV maskは0（T:403–577はPLLSELを設定しない）。
   N/dispnv04/tvnv04.c:68–100の外付け旧TV用maskを内蔵TVへ流用しない、head0のbit9を保持。未知route EUNSUPPORTED、共有出力競合EBUSY。単体B2は相手headを推測しない。
-- **B2-b（100〜180行）: 共有PLL helper拡張、PMが直列化** — kdebug/gfinit_pll.hにGF_PLL_VIDEO_B=0x680520を追加、sequence.incの既存gfinit_pll_sequence署名を保持しA/Bを識別。A/Bのstageは共通0x680580、single bitは8/28、coeffは0x680578/0x68057c、gate 0xc040のmaskは3<<16 / 3<<18、VPLLは0x680508/0x680520。gate退避→stage RMW→coeff→VPLL→gate復元の5-write、他head bit保持。根拠N/nvkm/subdev/devinit/nv04.c:184–193,198–273。
+- **B2-b（100〜180行）: 共有PLL helper拡張、PMが直列化** — sys/dev/video/geforce/diag/gfinit_pll.hにGF_PLL_VIDEO_B=0x680520を追加、sequence.incの既存gfinit_pll_sequence署名を保持しA/Bを識別。A/Bのstageは共通0x680580、single bitは8/28、coeffは0x680578/0x68057c、gate 0xc040のmaskは3<<16 / 3<<18、VPLLは0x680508/0x680520。gate退避→stage RMW→coeff→VPLL→gate復元の5-write、他head bit保持。根拠N/nvkm/subdev/devinit/nv04.c:184–193,198–273。
   parse.incもVIDEO_Bを受け、ROMの該当reg→無ければ既存先頭entry fallbackを維持。helperの不成立-1をB2がEPLLへ変換、bus rcはそのまま。B2の編集範囲をこの共有3ファイル（header/sequence/parse）とhost fixtureまで拡大し、PMがF5 PLL担当との順序を直列化。
 - **B3（100〜180行）: I2C値取得からbitbang** — links.i2c_port(owner,index,&port)をB3が開始前に呼ぶ。C2-linksがctx.dcbの値から指定indexのdrive/senseだけ返す。DCB優先、BMPはent+4..7を先に読み、各byteが0のときだけindex0=3f/3e、1=37/36を使う。BMPが無い場合や他indexへ既定を流用しない。不在ENODEV、非NV04 bus EUNSUPPORTED、破損EDDC。値コピーなのでB3はROM寿命を持たない。N/nvkm/subdev/bios/i2c.c:64–76,120–155、同i2c/busnv04.c:41–70と同じhead0経路・owner/drive復元。
 - **B5（100〜150行）: DPMSとblank、blank.cは旧入口の委譲だけ** — gf4_service_bindでlegacy.display4とctx.legacyを相互接続、完全停止後解除。productionの旧gf_display_blankは接続中gf4_blank_set(head0)へ委譲、成功時だけlegacy.blankを同期。非module診断列は従来通り。正本はhead.blank、物理SR1 bit5=(blank || dpms!=ON)。OFF中blank解除で点灯しない。初回startで旧blank/paletteをhead0へ取り込み、restoreも両正本を同期する。L/display/blank.c:14–33とC:175–233、H:110–124を合成、独立した二つのshadow更新はしない。
@@ -600,8 +600,8 @@ A1のD_WRITE注入は従来「書かずに失敗」に加え、宣言節のgf4_h
 - **B5 の host 試験**: A1 の UNIT 5 に gf4_change_begin / gf4_change_end の境界の stub を置いた (35cec902)。change_end は注入した rc があればそれを、無ければ操作の rc を返す。UNIT 13 は確定 (a) のとおり stub を置かない。
 - **B3 の大きさ**: カードの行数は目安で、超えても止めない。B3 (I2C の bitbang 一式) は sol に替えて書き切る。
 - **B0 の route.max_khz**: DCB は encoder ごとの上限を持たない (nvkm/subdev/bios/dcb.c:121-193)。nouveau の TMDS も 165MHz を上限にせず dual link に切り替えるだけ (dispnv04/dfp.c:343-358)。だから D0 は max_khz=0 を書き、0 は「encoder 固有の上限なし」と読む。B0 の判定は PLL limits と data の limits.max_khz (data.h の limits) だけで行う。0 で候補を落とさない。
-- **B5 の旧入口の期限**: 旧 gf_display_blank(ctx, blank) は期限を持たないので、委譲の前に既存の型どおり `ctx->io.timing.clock_us` で now を取り、`now + GF3_TIMEOUT_US` を dl にする (hwdev/gf/service.c と同じ)。clock が無いか失敗したら GF2_EIO を返し、委譲しない。ctx.deadline は流用しない。
-- **B5 の display4 の欄**: `struct gf_display_context` の末尾に `struct gf4_ctx *display4;` を足した (hwdev/gf/internal.h、wt/gf-l4)。結線は C2-service。
+- **B5 の旧入口の期限**: 旧 gf_display_blank(ctx, blank) は期限を持たないので、委譲の前に既存の型どおり `ctx->io.timing.clock_us` で now を取り、`now + GF3_TIMEOUT_US` を dl にする (sys/dev/video/geforce/service.c と同じ)。clock が無いか失敗したら GF2_EIO を返し、委譲しない。ctx.deadline は流用しない。
+- **B5 の display4 の欄**: `struct gf_display_context` の末尾に `struct gf4_ctx *display4;` を足した (sys/dev/video/geforce/internal.h、wt/gf-l4)。結線は C2-service。
 - **B0 の色深度の枠**: 色深度ごとに VRAM と pitch で判定し、収まる色深度だけ公開する (§3)。先頭の timing の「3 色深度の必須枠」は、収まる色深度の分だけ確保する。どの色深度も収まらない timing は公開しない。ENOSPC は mode 表の容量が尽きたときだけ返す。connector どうしの枠の配分は、先頭 timing の枠を先に全 connector に確保してから残りを順に詰める。
 - **B7 の待ちの間の再入**: OS32 はシングルタスクで協調切替なので、fence 待ち・VBLANK 待ちの間に同じ head の flip が再入することは考えない。専用の状態は足さない。pending はカードどおり base を書く直前に立てる。
 - **止める欠けの範囲 (層 4 の残りの段に共通)**: 止めるのは、宣言・試験の土台への追加か、既存の状態の持ち主の変更が要る欠けだけ。そのほかの細かな判断は §3〜§9 と手本に沿って実装者が決め、報告の「実装者が決めたこと」に 1 行ずつ書く (レビューで確かめる)。
@@ -614,13 +614,13 @@ A1のD_WRITE注入は従来「書かずに失敗」に加え、宣言節のgf4_h
 ## 追記 (2026-11-04、層 3 の実物との照合 X1〜X4)
 
 設計追記。X1〜X4について旧記述より本追記を優先する。実装済みとは扱わない。F4/F5の既決機能・協調切替を維持し、新しい待ち・監視・lock・refcount・期限引数を既存下位APIへ足さない。
-照合: O=/home/hight/os32-v3、D=hwdev/gf/display、K=drivers/video/geforce。RECHECK.mdのO/serviceはhwdev/gf/service.c。Lはgf4-a0xからgit showで読んだwt/gf-l4（19f8f911）。N=/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau（c03c1a1）。
+照合: O=/home/hight/os32-v3、D=hwdev/gf/display、K=drivers/video/geforce。RECHECK.mdのO/serviceはsys/dev/video/geforce/service.c。Lはgf4-a0xからgit showで読んだwt/gf-l4（19f8f911）。N=/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau（c03c1a1）。
 対象根拠: O/hwdev/gf/{accel_service.h,service.c,command_test.c,command.c,fifo.c,vram_view.c}、D/quiesce.c、L/D/{save,transaction,modeset}.c。段カードと末尾PM決定を維持する。
 
 ### X1 — 予約の所有と現行面
 
 正: F4結線後はctx.scan/scan_next/cursor/testが予約を所有する。F3 serviceのscan/testは値の写しで、nodeの所有権ではない。ctx.accelはproduction.accelの借用を続ける。
-追加宣言（hwdev/gf/accel_service.h、実装hwdev/gf/service.c、共有編集担当C2-service-f3）:
+追加宣言（sys/dev/video/geforce/accel_service.h、実装sys/dev/video/geforce/service.c、共有編集担当C2-service-f3）:
 ```c
 i32 gf3_service_surfaces(struct gf3_service *s,
                          const struct gf3_surface *scan,
@@ -657,7 +657,7 @@ suspendは受付閉→F4前処理（pending収束/不能時hold保持）→窓cl
 restartは閉鎖のままBM先行→必要devinit→F1/F2開始→objects_init→保持面のmatch/surfacesまで。F4 epochを新ch.epochに合わせreadyを復元し、saved_closed/diagnostic_savedは変更しない。再開失敗でも予約と部分生成物を保持する。restart は表示の保存をし直さない (保存は svc_rom の 1 か所だけ。restart の未初期化の枝は、restart が hold_saved → suspend → ready → initialized を要するので到達しない)。理由: 実機 (2026-11-12、S0) で 2 回目の開始の値が前の停止の後の GUI の mode (CR17=c3・VPLL 21a07) だったため。OS32 は 2 回目以降に devinit を走らせないので、nouveau の init・resume の保存し直し (V/disp.c:112-121) を写すと GUI の mode を保存してしまう。
 両口は必須NULL/必須結線欠落GF4_EINVAL=-401、不正状態GF4_ESTATE=-408、既存changing競合GF4_EBUSY=-411、下位負値は保存して伝播、成功0。OFFでない停止は元rcまたはGF2_ESTOP。suspend完了はF2 OFFを別途確認し、OFF＋旧fault負rcを成功に丸めない。
 F4 recoverはgf4_display_saveを呼ばず、受付閉でstate.head/holdとwanted IRQ値をgf4_savedへ値コピー（version/sizeを設定、node/窓はコピーしない）→suspend→restart→同一予約match→低水準display_restore/IRQ→最終公開。fault中はpendingのfence待ち・drainを省きholdを保持、finiも既存規約でfenceを省く。OFF確認後は旧fault由来のstop負rcを記録して復旧を続ける（suspend自体の負rcは丸めず、close/cleanup失敗・非OFFなら中断）。restoreが立てるsaved_closedは成功後recover自身が入口の値へ戻す。diagnostic_savedとその保存像を上書きせず、A3保存中も同じ値コピーで復旧し、入口のsaved_closed && diagnostic_saved==NULLなら復旧後も非公開、それ以外は最終admission(true)（A3の再公開はC2-saveの管理経路）とする。失敗時は閉鎖・予約保持。F5のlinks.stop/restartは上の2口へ型付きadapterで結線し、既存gf3_service_start/recoverを丸ごと呼ばない。F5の全extent列挙/画像転送は既決C2 adapterに残す。
-F5 C2は新hwdev/gf/feature5_links.cに `i32 gf5_link_stop(void *owner, u32 dl); i32 gf5_link_restart(void *owner, u32 dl); i32 gf5_link_admission(void *owner, bool open);` を所有しfeature5.hへ宣言、gf5_linksへbindする。ownerは常駐struct gf5の借用、NULLはGF5_EINVAL=-501、停止/再開はowner->displayへ上記口を委譲し下位負値を保持する。admissionは既決F5 phase/管理slot契約を適用してF4 links.admissionへ委譲する。
+F5 C2は新sys/dev/video/geforce/feature5_links.cに `i32 gf5_link_stop(void *owner, u32 dl); i32 gf5_link_restart(void *owner, u32 dl); i32 gf5_link_admission(void *owner, bool open);` を所有しfeature5.hへ宣言、gf5_linksへbindする。ownerは常駐struct gf5の借用、NULLはGF5_EINVAL=-501、停止/再開はowner->displayへ上記口を委譲し下位負値を保持する。admissionは既決F5 phase/管理slot契約を適用してF4 links.admissionへ委譲する。
 C2-saveはL/save.cの低水準restoreが公開もsaved_closed解除もしないことを維持。F5は性能/thermal/tile→VRAM→F4 restore/IRQまで成功後だけsaved_closedを解除し全slot/scanを公開、失敗時は閉鎖/FAULTを保持する。
 C2-linksのF4 admission(false)にもF3 admission(false)を結線する（旧「F4 slotだけ」を訂正）。trueは既決のsaved_closed && diagnostic_saved==NULL中はGF4_ESTATE、診断の再公開はC2-save所有、F5の最終公開はF5統括だけが解除後に依頼する。F5 phaseはF4へ持ち込まない。
 C3は既存accel/foundation slotを保持してContext版5の通常/復元slotを貸す。変更/保存/復元の処理中は管理slotも閉じ、成功・失敗後の管理口はC2-save/F5の既決寿命に従って再公開する。通常slotが閉じているだけでmodule/予約を解放しない。
@@ -701,31 +701,31 @@ F3単体stopの既存期限生成を保持。GF2_EIO/ETIME/ESTOP等の下位負�
 
 | 関数（callbackも完全名） | ファイル | 段 | stub UNIT／結合 |
 |---|---|---|---|
-| gf3_service_surfaces / objects_init / admission / owner_bind、既存start/stop/recover/closeの分離 | hwdev/gf/service.c、accel_service.h | C2-service-f3（F3共有編集） | —、14で実service/V0結合 |
+| gf3_service_surfaces / objects_init / admission / owner_bind、既存start/stop/recover/closeの分離 | sys/dev/video/geforce/service.c、accel_service.h | C2-service-f3（F3共有編集） | —、14で実service/V0結合 |
 | gf4_service_suspend / gf4_service_restart / gf4_service_recover / links.failed | D/recover.c、api.h | C2-recover | failedは5,13、他は—/14 |
 | gf4_service_start / stop / bind、owner.start/stop/recover adapter | D/service.c | C2-service | —/14 |
 | geforce_module_initのgf3_service_bind直後のgf3_service_owner_bind | K/geforce_body.c | C3（tableはC2-service所有） | —/14 |
 | gf_display_stop / gf_display_quiesce | D/quiesce.c、internal.h | C2-service-stop（共有編集） | —/14、F4無し既存試験も維持 |
-| gf_command_testのproduction START/STOP/RECOVER | hwdev/gf/command_test.c | C2-service-stop、C3は既定wire登録のみ | —/14、診断chの既存試験維持 |
+| gf_command_testのproduction START/STOP/RECOVER | sys/dev/video/geforce/command_test.c | C2-service-stop、C3は既定wire登録のみ | —/14、診断chの既存試験維持 |
 | links.scan_changed / gf4_scan_prepare / discard | D/scan.c | C2-scan | scan_changedは7、他は—/14 |
 | links.admission、全slot/scanの閉開 | D/links.c | C2-links、slot貸出しはC3 | admissionは5,13、実公開は14 |
 | gf4_display_restore / gf4_diagnostic_restoreの最終公開結線 | D/save.c | C2-save（統合済みへの結合） | —/14 |
 | HALのmode/flip metadataと形式別scan hook | K/backend_geforce.c、gf_hook.c | C1 | —/14 |
-| gf5_link_stop / gf5_link_restart / gf5_link_admission | hwdev/gf/feature5_links.c（新規、feature5.hに宣言） | F5 C2（F4境界統合後） | F5 UNIT6は既決links stub、実結合はF4 UNIT14 |
+| gf5_link_stop / gf5_link_restart / gf5_link_admission | sys/dev/video/geforce/feature5_links.c（新規、feature5.hに宣言） | F5 C2（F4境界統合後） | F5 UNIT6は既決links stub、実結合はF4 UNIT14 |
 
 A1はUNIT番号を増やさず、既存admission/scan_changed stubを本契約へ追随。UNIT14で実service/V0と結合し、F3単体開始・試験面不足、F4初回開始/16・32bit mode/flip、F5予約キー不変・restart途中非公開、診断STOP→STARTで予約/mode保持、BAD_METHOD→RECOVERとA3保存中RECOVER、video停止→再開始→停止、test固定容量、close/fini失敗・OFF＋負rc・期限据置を正常対照付きで確認する。新口だけの架空失敗eventは足さない。
 未決（ユーザー判断）: 0件。静的照合のみ。リポジトリ編集・ビルド・試験は未実施、実装後の結合/実機/容量検証は既存の受入に残す。
 反論: 0件。
 
 ### 確定 (2026-11-04、Opus 第 2 回の条件付き承認、PM が反映)
-- N1 (P1) 通常の video の入口: `gf_start` (hwdev/gf/service.c) を C2-service-f3 の行に足す。F4 へ回すかの判定は **display4 の 1 つ**にする。display4 は module の終了まで保持し (C2-service の完全停止でも解除しない)、`gf_start` と `gf_display_stop` は、どちらも display4 があれば `gf4_service_start` / `gf4_service_stop` へ回す。`gf3_service_start` は owner があれば GF3_ESTATE を返す (`gf3_service_stop` と同じ扱い。呼び出し元は層 3 単体の構成だけになる)。
+- N1 (P1) 通常の video の入口: `gf_start` (sys/dev/video/geforce/service.c) を C2-service-f3 の行に足す。F4 へ回すかの判定は **display4 の 1 つ**にする。display4 は module の終了まで保持し (C2-service の完全停止でも解除しない)、`gf_start` と `gf_display_stop` は、どちらも display4 があれば `gf4_service_start` / `gf4_service_stop` へ回す。`gf3_service_start` は owner があれば GF3_ESTATE を返す (`gf3_service_stop` と同じ扱い。呼び出し元は層 3 単体の構成だけになる)。
 - N2 (P2) 保持の置き場: `struct gf4_ctx` に常駐の `struct gf4_saved hold_saved` を 1 つ置き、recover の値の写しと診断の STOP→START の保持が共有する (同時に使う場面は無い、シングルタスク)。持ち主は C2-recover。`state.rollback` は使わない。宣言の追加は C2-recover の段で api.h に足す。
 - N3 (P3) suspend の前の値: STOP→START で戻す論理 head・DPMS・hold・IRQ は、suspend の前処理 (pending の収束・cursor hide) より前に `hold_saved` へ取る。
 - N4 (P3) test 面の pitch: `GF3_TEST_PITCH_ALIGN` は service.c の static なので D/scan.c から使わない。pitch=640 (64 の倍数) と直接書き、根拠を注記する。
-- **C2 の境界の宣言 (C2-service・C2-scan の欠け、PM 決定)**: wt/gf-l4 に 3 つ足した。(1) `const struct gf3_service_owner *gf4_service_owner_table(void)` — C2-service (D/service.c) が常駐の owner の表を持ち、C3 が module の initialize で `gf3_service_owner_bind` に渡す。(2) `i32 gf4_scan_reserve_initial(struct gf4_ctx *, u32 dl)` と `i32 gf4_scan_release_all(struct gf4_ctx *, u32 dl)` — C2-scan (D/scan.c) が持ち、C2-service の start が初回の scan・cursor・test の予約に、完全停止の後に全部の返却に呼ぶ (X1・X3)。`gf4_scan_prepare/discard` は mode 変更の候補だけのまま。(3) `void gf_hook_scan_changed(u8 head, const struct gf3_surface *front, u32 mode_id)` (hwdev/gf/accel.h) — C1 (backend_geforce.c・gf_hook.c) が持ち、C2-scan の links.scan_changed が確定した scan の変更を HAL の記述子と形式別の hook に伝える。head 0 だけを扱う。
+- **C2 の境界の宣言 (C2-service・C2-scan の欠け、PM 決定)**: wt/gf-l4 に 3 つ足した。(1) `const struct gf3_service_owner *gf4_service_owner_table(void)` — C2-service (D/service.c) が常駐の owner の表を持ち、C3 が module の initialize で `gf3_service_owner_bind` に渡す。(2) `i32 gf4_scan_reserve_initial(struct gf4_ctx *, u32 dl)` と `i32 gf4_scan_release_all(struct gf4_ctx *, u32 dl)` — C2-scan (D/scan.c) が持ち、C2-service の start が初回の scan・cursor・test の予約に、完全停止の後に全部の返却に呼ぶ (X1・X3)。`gf4_scan_prepare/discard` は mode 変更の候補だけのまま。(3) `void gf_hook_scan_changed(u8 head, const struct gf3_surface *front, u32 mode_id)` (sys/dev/video/geforce/accel.h) — C1 (backend_geforce.c・gf_hook.c) が持ち、C2-scan の links.scan_changed が確定した scan の変更を HAL の記述子と形式別の hook に伝える。head 0 だけを扱う。
 - **C 群の宣言 (C3・C1 の欠け、PM 決定)**: C 群の部品の段の前に宣言の段 A0z を置く (PORT_FLOW §3 の追記の後の宣言の段)。
-  - HAL: §2 の `struct GfxCursorImage`・`struct GfxScanout` と 8 hook を `include/gfx_hal.h` の `GfxBackend` の末尾に足す (NULL は NOSYS)。
-  - 形式の番号: 16/32bit の HAL の形式は公開 SDK (os32_kapi_shared.h・kapi.json) に足さず、カーネル専用の `include/gfx_format.h` に `GFX_FMT_RGB565 2`・`GFX_FMT_XRGB8888 3` を置く (今の GUI は使わないので KAPI と ABI の版は変えない)。SDK に出すときは同じ番号を使うと注記する。`GfxScanout.format` はこの番号。
+  - HAL: §2 の `struct GfxCursorImage`・`struct GfxScanout` と 8 hook を `sys/include/gfx_hal.h` の `GfxBackend` の末尾に足す (NULL は NOSYS)。
+  - 形式の番号: 16/32bit の HAL の形式は公開 SDK (os32_kapi_shared.h・kapi.json) に足さず、カーネル専用の `sys/include/gfx_format.h` に `GFX_FMT_RGB565 2`・`GFX_FMT_XRGB8888 3` を置く (今の GUI は使わないので KAPI と ABI の版は変えない)。SDK に出すときは同じ番号を使うと注記する。`GfxScanout.format` はこの番号。
   - Context の版 5: `geforce_module.h` の Context に display_data・display_state・display_out・feature5_out を末尾に足し、版を 4→5 (§310 の行)。`geforce_display_ops`・`geforce_display_restore_ops` の宣言も同じヘッダーに。
   - production の ctx: C2-service (D/service.c) が常駐の `struct gf4_ctx` を 1 つ持ち、`i32 gf4_service_init(struct gf_production *, struct gf_display_context *legacy)` で ctx・legacy・links (C2-links の `const struct gf4_links *gf4_links_table(void)`) を結ぶ。C3 は module の initialize で `gf3_service_bind` の後にこれ (`gf4_service_init`) を呼び、その後で `gf3_service_owner_bind(…, gf4_service_owner_table())` を呼ぶ (owner 表の getter は owner 未設定なら常駐 ctx を補うため、逆順の bind が必ず EINVAL になるわけではない。この順は、初期化済みの ctx・links・exec へ結線するために守る — 層 5 の照合 D4)。production.h には欄を足さない。
 - **links と exec の表、初期の結線の順 (C2-links の欠け、PM 決定)**: C2-links (D/links.c) が常駐の `struct gf4_links` と `struct gf4_exec_ops` を持ち、`struct gf4_links *gf4_links_table(void)` と `const struct gf4_exec_ops *gf4_exec_table(void)` で渡す (wt/gf-l4 0a6d9b9b、A0z の const の宣言を書き換えた — 実装前)。`gf4_service_init` (C2-service) の順: 常駐 ctx を初期化 → ctx->links = gf4_links_table()、ctx->exec = gf4_exec_table() → links->owner = ctx → gf4_service_bind(ctx, legacy, links)。links.failed の実体は C2-recover の `gf4_service_failed(void *owner, i32 cause, u32 dl)` (宣言を足した)。
@@ -738,18 +738,18 @@ N には nouveau_bios.c が無いため、その関数の出典だけ V を使�
 
 ### 宣言と持ち主
 ```c
-/* hwdev/gf/internal.h：新段 C2-links-init が層2の共有ファイルを一括所有。 */
+/* sys/dev/video/geforce/internal.h：新段 C2-links-init が層2の共有ファイルを一括所有。 */
 enum gf_init_script_rc { GF_SCRIPT_OK=0, GF_SCRIPT_EIO=-1, GF_SCRIPT_ETIME=-5 };
 int gf_init_run_script(struct gf_init_context *ctx, struct gf_init_program *work,
                        u32 pc, u8 head, u8 or_mask, u32 dl);
-/* kdebug/gfinit_decode.h：既存 decoder の共通本体を使う表示script用入口。 */
+/* sys/dev/video/geforce/diag/gfinit_decode.h：既存 decoder の共通本体を使う表示script用入口。 */
 int gfinit_decode_script_instruction(const u8 *rom, u32 size, u32 init_table,
                                      u32 pc, struct gfinit_instruction *out);
-/* hwdev/gf/display/api.h：純解析、C2-links-b、実体は display/links.c。 */
+/* sys/dev/video/geforce/display/api.h：純解析、C2-links-b、実体は display/links.c。 */
 i32 gf4_tmds_script_select(const u8 *rom, u32 size,
                            const struct gf4_route *route, u32 khz, u32 *pc);
 ```
-- C2-links-init → C2-links-b の順に直列。前者は internal.h、runner.c、kdebug/gfinit_decode.h/.c と gfinit_op/*.inc、hwdev/gf/op/ の必要な拡張・dispatch、devinit.c の借用分岐・hwdev/gf/rom.inc の共通 BIT 探索・対応する試験、docs/design/hwdev/gf/op/tmds_reg.md・zm_tmds_group.md、gen_hwdev_contract による hwdev/generated/* の再生成（layout と STATIC_ASSERT の整合）を所有する。共有ファイルの担当を他段へ分散しない。
+- C2-links-init → C2-links-b の順に直列。前者は internal.h、runner.c、kdebug/gfinit_decode.h/.c と gfinit_op/*.inc、hwdev/gf/op/ の必要な拡張・dispatch、devinit.c の借用分岐・sys/dev/video/geforce/rom.inc の共通 BIT 探索・対応する試験、docs/design/hwdev/gf/op/tmds_reg.md・zm_tmds_group.md、gen_hwdev_contract による hwdev/generated/* の再生成（layout と STATIC_ASSERT の整合）を所有する。共有ファイルの担当を他段へ分散しない。
 - 宣言はこの追記で凍結。api.h の select 宣言も C2-links-init が先に置き、links.c の実装は C2-links-b。PM が既存 internal.h 編集段・B2-b と直列化する。
 - ctx に `u8 or_mask; bool display_script; u32 deadline;` を追加。OR は DCB の生 mask、ffs の結果や head 番号へ変換しない。ROM/io は acquire の借用、work はその窓内の既存 scratch を再利用し、常駐 ROM・別 IR・別 interpreter を作らない。
 
@@ -759,9 +759,9 @@ i32 gf4_tmds_script_select(const u8 *rom, u32 size,
 - runner.c の実行ループを内部共通化する。run_one は従来どおり main_pc[main_id]・head=0 で入り、新入口は指定 PC/head で入る。命令実行による head 変更は既存 opcode の意味に従う。
 - run/prepare/run_one の署名、S1 span/CRC、診断承認、main0〜4 の trace・戻り値 0/-1・総予算を変更しない。旧入口では display_script=false とし OR/外側期限を参照しない。
 - 新入口の prepare は選択 PC から DONE まで命令長で読み、SUB/SUB_DIRECT の到達先も既存 work に一度ずつ収める。REPEAT は各逐次列内で対応付け、calls を展開せず、SUB 表の値 0 は nouveau と同じく呼ばずに飛ばす。既存容量/深さ/step/wait 上限を共用し、第二の実行計画を作らない。
-- 新 decoder は旧 decoder と opcode 本体・命令型を共用。表示用の SUB/CONDITION/IO_FLAG_CONDITION/MACRO の参照表だけ引数 init_table（BIT 'I' のデータ先頭）の +0/+6/+10/+4 から解決し、ROM 境界で検査する。'i'/'I'/'T' の探索は hwdev/gf/rom.inc の共通処理に集約し、'I' の範囲・長さを一度検証して prepare/実行へ渡す。命令ごとの探索はしない。旧 S1 の固定表・SUB 番号制限は旧入口だけに残す。PLL は既存 acquire が検証する既知 ROM の limits/helper を使い、別 ROM 世代の対応を増やさない。
+- 新 decoder は旧 decoder と opcode 本体・命令型を共用。表示用の SUB/CONDITION/IO_FLAG_CONDITION/MACRO の参照表だけ引数 init_table（BIT 'I' のデータ先頭）の +0/+6/+10/+4 から解決し、ROM 境界で検査する。'i'/'I'/'T' の探索は sys/dev/video/geforce/rom.inc の共通処理に集約し、'I' の範囲・長さを一度検証して prepare/実行へ渡す。命令ごとの探索はしない。旧 S1 の固定表・SUB 番号制限は旧入口だけに残す。PLL は既存 acquire が検証する既知 ROM の limits/helper を使い、別 ROM 世代の対応を増やさない。
 - decoder の新入口は 0/-1。切れた命令/表/不整合 REPEAT、未対応 opcode/表形式、work/stack 容量超過、実行先不正はすべて -1 とし、未知命令を成功として読み飛ばさない。run_script は成功0、期限/実行予算の消費 GF_SCRIPT_ETIME、それ以外 -1。
-- 0x4f/0x50 を共通 decoder と既存 dispatch に追加（長さ5 / 3+2*count）。実体はそれぞれ hwdev/gf/op/tmds_reg.c と hwdev/gf/op/zm_tmds_group.c。skip 中は MMIO なし、OR 参照は ctx->or_mask、0x80/0x81 は手本の offset 表と XOR 8、直接 selector 0..3 は同じ base 表を用いる。
+- 0x4f/0x50 を共通 decoder と既存 dispatch に追加（長さ5 / 3+2*count）。実体はそれぞれ sys/dev/video/geforce/op/op/tmds_reg.c と sys/dev/video/geforce/op/op/zm_tmds_group.c。skip 中は MMIO なし、OR 参照は ctx->or_mask、0x80/0x81 は手本の offset 表と XOR 8、直接 selector 0..3 は同じ base 表を用いる。
 - 0x4f は address|0x10000 → data=(old&mask)|value → address、0x50 は組ごと DATA → address。未知 selector は -1。head stride を OR 由来の TMDS base に重ねて足さない。
 - 新経路では prepare 中と各命令の前後・待ち chunk の前後に同じ dl を検査（clock_us と `(i32)(now-dl)>=0`）。dl=0 も通常の絶対期限であり無期限ではない。期限は ETIME、既存 io の失敗は EIO=-1、既存実行上限の消費は ETIME。途中で dl を作り直さない。
 - gf_init_wait の署名・旧経路の 0/-1 は維持。表示経路の期限理由を ctx->last_rc に保存し、既存 opcode が -1 へ畳んでも新入口はその理由を返す。fail_pc は失敗命令、成功 last_rc=0。

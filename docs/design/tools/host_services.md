@@ -1,7 +1,7 @@
 # tools/host_services.py — サービスの名前と一覧 (LIST)、os32. の予約
 
 > 状態: **現行 (2026-11-18)** — 出所: NET_HOSTSVC_DESIGN・TASK_NET_HOSTSVC (要約して移した)
-ソース: `tools/host_services.py` (`Registry`)・`tools/host_agent.py` (`_serve`)・`include/remote_control.h`・SDK は `userland/lib/host/host_call.c`
+ソース: `tools/host_services.py` (`Registry`)・`tools/host_agent.py` (`_serve`)・`sys/include/remote_control.h`・SDK は `userland/lib/host/host_call.c`
 
 ## 要求の行と名前
 

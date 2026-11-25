@@ -5,7 +5,7 @@ Product functions are extracted verbatim; mutations must compile and fail a
 named runtime assertion (compiler failure is never RED).
 """
 CHECK = dict(name='mem-stat-host', tier=1,
-    covers=['tools/tests/font_guard_inactive.h', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'mm/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'exec/appmem.h', 'mm/paging_app.h', 'mm/paging.c', 'mm/paging.h', 'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h', 'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h', 'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/text_screen.h', 'arch/x86/kernel/gdt.h', 'arch/x86/kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/x86_flags.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c', 'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'platform/pc98/platform_io.h', 'kapi/kapi_sysinfo.c', 'platform/pc98/platform_build_info.h', 'platform/pc98/platform_mem_stat.h', 'platform/powermac/platform_mem_stat.h', 'tools/tests/mem_stat_source.py', 'kernel/sqlite_engine.c', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h', 'userland/shell/cmd_sys.c', 'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'exec/ring3_str.c', 'userland/tests/mem_stat_test.c', 'userland/tests/mem_stat_compat_test.c', 'userland/tests/kdebug_probe.c', 'userland/shell/cmd_base.c', 'userland/shell/shell.h', 'kernel/module/module.h', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'init/kaudit_boot.c', 'kernel/kselftest.h', 'mm/memory_boot.c', 'mm/memory_boot.h', 'include/platform_memory.h', 'platform/pc98/platform_memory_desc.h', 'include/kprintf.h', 'init/sysconfig.c', 'exec/owner_diag.h', 'kernel/kstack_hw.c', 'kernel/kstack_hw.h', 'platform/pc98/kernel.c', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['tools/tests/font_guard_inactive.h', 'sys/kern/exec/exec_heap.c', 'sys/kern/exec/exec_heap.h', 'sys/kern/mm/kmalloc.c', 'sys/kern/mm/kmalloc.h', 'sys/kern/exec/redir_access.c', 'sys/kern/exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'sys/kapi/kapi_generated.c', 'sys/kern/exec/exec.c', 'sys/kern/exec/appslot.c', 'sys/kern/exec/lease.c', 'sys/kern/exec/appslot.h', 'sys/kern/exec/appmem.c', 'sys/kern/mm/paging_app.c', 'sys/kern/exec/appmem_map.c', 'sys/kern/exec/appmem_unmap.c', 'sys/kern/exec/appmem.h', 'sys/kern/mm/paging_app.h', 'sys/kern/mm/paging.c', 'sys/kern/mm/paging.h', 'sys/kern/mm/pgalloc.c', 'sys/kern/mm/pgalloc.h', 'sys/kern/mm/physmem.c', 'sys/kern/mm/physmem.h', 'sys/include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'sys/include/types.h', 'sys/include/memmap.h', 'sys/include/io.h', 'sys/include/cpu.h', 'sys/platform/pc98/pc98.h', 'sys/include/sys.h', 'sys/include/text_screen.h', 'sys/arch/x86/kernel/gdt.h', 'sys/arch/x86/kernel/tss.h', 'sys/arch/x86/arch_cpu.h', 'sys/arch/x86/x86_flags.h', 'sys/arch/x86/arch_io.h', 'sys/kern/kstring.h', 'tools/tests/appmem_map_host.c', 'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sys/platform/pc98/platform_io.h', 'sys/kapi/kapi_sysinfo.c', 'sys/platform/pc98/platform_build_info.h', 'sys/platform/pc98/platform_mem_stat.h', 'sys/platform/powermac/platform_mem_stat.h', 'tools/tests/mem_stat_source.py', 'sys/kern/sqlite_engine.c', 'sys/kern/sqlite_engine.h', 'sys/kern/sqlite_engine_body.h', 'userland/shell/cmd_sys.c', 'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'sys/kern/exec/ring3_str.c', 'userland/diag/mem_stat_test.c', 'userland/diag/mem_stat_compat_test.c', 'userland/diag/kdebug_probe.c', 'userland/shell/cmd_base.c', 'userland/shell/shell.h', 'sys/kern/module/module.h', 'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.h', 'sys/kern/init/kaudit_boot.c', 'sys/kern/kselftest.h', 'sys/kern/mm/memory_boot.c', 'sys/kern/mm/memory_boot.h', 'sys/include/platform_memory.h', 'sys/platform/pc98/platform_memory_desc.h', 'sys/include/kprintf.h', 'sys/kern/init/sysconfig.c', 'sys/kern/exec/owner_diag.h', 'sys/kern/kstack_hw.c', 'sys/kern/kstack_hw.h', 'sys/platform/pc98/kernel.c', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=6.6,
     basis=['KAPI_SPEC §3-3', 'KAPI_SPEC §4-12'],
 )
@@ -27,12 +27,12 @@ import test_appmem_map as base
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRCS = base.TARGET_SRCS + [
-    'kapi/kapi_sysinfo.c', 'platform/pc98/platform_build_info.h', 'platform/pc98/platform_mem_stat.h', 'platform/powermac/platform_mem_stat.h', 'include/user_read_contract.h', 'userland/shell/cmd_sys.c', 'userland/shell/cmd_base.c', 'kernel/module/module.h',
+    'sys/kapi/kapi_sysinfo.c', 'sys/platform/pc98/platform_build_info.h', 'sys/platform/pc98/platform_mem_stat.h', 'sys/platform/powermac/platform_mem_stat.h', 'sys/include/user_read_contract.h', 'userland/shell/cmd_sys.c', 'userland/shell/cmd_base.c', 'sys/kern/module/module.h',
     'tools/tests/mem_stat_host.c', 'tools/tests/kdebug_cli_host.c', 'tools/tests/test_mem_stat.py',
-    'kernel/sqlite_engine.c', 'init/sysconfig.c', 'init/kaudit_boot.c', 'mm/memory_boot.c',
-    'mm/memory_boot.h', 'kernel/kselftest.h', 'include/kprintf.h',
-    'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h',
-    'include/platform_memory.h', 'platform/pc98/platform_memory_desc.h',
+    'sys/kern/sqlite_engine.c', 'sys/kern/init/sysconfig.c', 'sys/kern/init/kaudit_boot.c', 'sys/kern/mm/memory_boot.c',
+    'sys/kern/mm/memory_boot.h', 'sys/kern/kselftest.h', 'sys/include/kprintf.h',
+    'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.h', 'sys/kern/sqlite_engine.h', 'sys/kern/sqlite_engine_body.h',
+    'sys/include/platform_memory.h', 'sys/platform/pc98/platform_memory_desc.h',
 ]
 
 
@@ -51,8 +51,8 @@ def build_fixture(tmp):
     def read(p):
         return (ROOT / p).read_text()
     exe = exec_source(ROOT, read)
-    slot = read('exec/appslot.c')
-    gen = read('kapi/kapi_generated.c')
+    slot = read('sys/kern/exec/appslot.c')
+    gen = read('sys/kapi/kapi_generated.c')
     fixture = read('tools/tests/appmem_map_host.c').replace('void _start(void)', 'void map_fixture_start(void)')
     # Use the product slot lookup, including FREE filtering, not its fixture double.
     fixture = fixture.replace(function(fixture, 'AppSlot *appslot_get('), function(slot, 'AppSlot *appslot_get('))
@@ -73,15 +73,15 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) {
 }
 """)
     (tmp / 'services_report_source.c').write_text(
-        function(read('kernel/sqlite_engine.c'), 'void services_report('))
+        function(read('sys/kern/sqlite_engine.c'), 'void services_report('))
     (tmp / 'build_info_source.c').write_text(
-        function(read('kapi/kapi_sysinfo.c'), 'void kapi_sys_build_time_copy(') + '\n' +
-        function(read('kapi/kapi_sysinfo.c'), 'void kapi_sys_get_build_info('))
+        function(read('sys/kapi/kapi_sysinfo.c'), 'void kapi_sys_build_time_copy(') + '\n' +
+        function(read('sys/kapi/kapi_sysinfo.c'), 'void kapi_sys_get_build_info('))
     (tmp / 'mem_fixture.c').write_text(fixture)
     heap = read('tools/tests/exec_heap_host.h')
     heap = heap.replace(function(heap, 'AppSlot *appslot_at('), function(slot, 'AppSlot *appslot_at('))
     heap = heap.replace(function(heap, 'int ring3_call_from_user('),
-                        function(read('exec/ring3_str.c'), 'int ring3_guard_active(') + '\n' + function(exe, 'int ring3_call_from_user('))
+                        function(read('sys/kern/exec/ring3_str.c'), 'int ring3_guard_active(') + '\n' + function(exe, 'int ring3_call_from_user('))
     (tmp / 'exec_heap_host.h').write_text(heap)
     io = read('tools/tests/host_arch/arch_io.h').replace(
         'static unsigned int host_arch_if = 0x202U;', 'extern unsigned int host_arch_if;')
@@ -99,7 +99,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) {
     parts.append('static void host_syscall_tail(struct arch_user_context *frame) { int io_owner = appslot_cur(); int prev_caller=0, prev_in_syscall=0; struct arch_syscall *prev_frame=0; struct arch_syscall call = { frame->opaque }; u32 result = HOST_FRAME(*frame)[7];\n' + tail + '\n}')
     (tmp / 'exec_source.c').write_text(exec_fixture_preamble() + '\n'.join(parts))
     (tmp / 'abort_clear_source.c').write_text(function(slot, 'int appslot_abort_clear('))
-    lease = read('exec/lease.c')
+    lease = read('sys/kern/exec/lease.c')
     (tmp / 'lease_revoke_source.c').write_text(
         'volatile u32 lease_revoke_fail_count, lease_revoke_all_fail_count;\n' +
         '\n'.join(function(lease, sig) for sig in
@@ -108,7 +108,7 @@ void __cdecl kprintf(u8 attr, const char *fmt, ...) {
         ('const u16 kapi_argptr[KAPI_FUNC_COUNT] = ', 'void * __cdecl wrap_mem_map(', 'int __cdecl wrap_mem_unmap(')))
     (tmp / 'heap_wrap_source.c').write_text('\n'.join(function(gen, sig) for sig in
         ('void * __cdecl wrap_mem_alloc(', 'void __cdecl wrap_mem_free(')))
-    (tmp / 'heap_source.c').write_text(read('exec/exec_heap.c'))
+    (tmp / 'heap_source.c').write_text(read('sys/kern/exec/exec_heap.c'))
     context = function(exe, 'static void exec_restore_context(').replace('exec_restore_context', 'heap_restore_context')
     a = exe.index('        if (want_ring3) paging_load_cr3(ctx->as->pd_phys);')
     b = exe.index('        if (want_ring3) exec_selftest_run_audit', a)
@@ -168,25 +168,25 @@ def run_body(runner, mutate):
     exe = exec_source(ROOT)
     assert 'if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);' in exe
     assert exe.index('appslot_start_commit(id, gui, need_pages);') < exe.index('if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);')
-    boot = (ROOT / 'platform/pc98/kernel.c').read_text()
+    boot = (ROOT / 'sys/platform/pc98/kernel.c').read_text()
     assert boot.count('kstack_hw_init();') == 1 and boot.index('kstack_hw_init();') < boot.index('platform_boot_capture();')
-    source = mem_stat_source((ROOT / 'kapi/kapi_sysinfo.c').read_text())
+    source = mem_stat_source((ROOT / 'sys/kapi/kapi_sysinfo.c').read_text())
     with tempfile.TemporaryDirectory(prefix='memstat-') as directory:
         tmp = pathlib.Path(directory)
         cc = build_fixture(tmp)
         # Select the copied provider in normal and mutant stages; the
         # extracted counter uses platform geometry (L14).
         cc[1:1] = ['-I' + str(tmp / 'platform/pc98')]
-        for rel in ('include/platform_memory.h', 'platform/pc98/platform_memory_desc.h'):
+        for rel in ('sys/include/platform_memory.h', 'sys/platform/pc98/platform_memory_desc.h'):
             dest = tmp / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / rel, dest)
-        memory = (ROOT / 'mm/memory_boot.c').read_text()
-        (tmp / 'page_count_source.c').write_text('#include "include/platform_memory.h"\n' + '\n'.join(function(memory, sig) for sig in
+        memory = (ROOT / 'sys/kern/mm/memory_boot.c').read_text()
+        (tmp / 'page_count_source.c').write_text('#include "sys/include/platform_memory.h"\n' + '\n'.join(function(memory, sig) for sig in
             ('static u32 memory_page_overlap(', 'void memory_boot_count_pages(')))
         objs = []
-        for i, path in enumerate(['exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
-                                  'mm/paging_app.c', 'mm/physmem.c']):
+        for i, path in enumerate(['sys/kern/exec/appmem.c', 'sys/kern/exec/appmem_map.c', 'sys/kern/exec/appmem_unmap.c',
+                                  'sys/kern/mm/paging_app.c', 'sys/kern/mm/physmem.c']):
             obj = tmp / f'part{i}.o'
             host32.build(cc + ['-c', str(ROOT / path), '-o', str(obj)], check=True, capture_output=True, text=True)
             objs.append(str(obj))
@@ -211,17 +211,17 @@ def run_body(runner, mutate):
                 print('RED:', name)
             # The same runtime fixture observes product serial and stack/heap diagnostics.
             variants = [
-                ('exec/owner_diag.h', 'owner_diag.h',
+                ('sys/kern/exec/owner_diag.h', 'owner_diag.h',
                  'if (kctx_irq_depth || kctx_exc_depth) return;', '', 'owner context gate'),
-                ('exec/owner_diag.h', 'owner_diag.h',
+                ('sys/kern/exec/owner_diag.h', 'owner_diag.h',
                  'a->as->generation, pages, leftover,', 'a->as->generation, leftover, pages,', 'owner wire'),
-                ('kernel/kstack_hw.c', 'kernel/kstack_hw.c',
+                ('sys/kern/kstack_hw.c', 'sys/kern/kstack_hw.c',
                  'while (p < low[index] &&', 'while (p < end &&', 'stack retained after marker reuse'),
-                ('kernel/kstack_hw.c', 'kernel/kstack_hw.c',
+                ('sys/kern/kstack_hw.c', 'sys/kern/kstack_hw.c',
                  'stack_water(SHELL_STACK_BASE, MEM_SHELL_STACK_TOP, 1)', '0U', 'shell stack under 4KiB'),
-                ('exec/exec_heap.c', 'heap_source.c',
+                ('sys/kern/exec/exec_heap.c', 'heap_source.c',
                  'resident_heap_fail++;', '(void)0;', 'resident failure'),
-                ('exec/exec_heap.c', 'heap_source.c',
+                ('sys/kern/exec/exec_heap.c', 'heap_source.c',
                  'resident_heap_peak = exec_heap.used;', 'resident_heap_peak = 0;', 'resident peak'),
             ]
             for path, target, old, new, label in variants:
@@ -516,7 +516,7 @@ def run_kdebug_cli(runner, mutate=False):
     sys_source = (ROOT / 'userland/shell/cmd_sys.c').read_text()
     cfg_defines = '\n'.join(re.findall(r'^#define CFG_.*$', sys_source, re.M))
     shell_max = int(re.search(r'^#define CFG_READ_MAX\s+(\d+)', sys_source, re.M)[1])
-    kernel_source = (ROOT / 'init/sysconfig.c').read_text()
+    kernel_source = (ROOT / 'sys/kern/init/sysconfig.c').read_text()
     kernel_max = int(re.search(r'^#define SYSCONFIG_MAX\s+(\d+)', kernel_source, re.M)[1])
     assert shell_max == kernel_max, 'shell/boot system.cfg read limits differ [C4]'
     table = base_source[base_source.index('static const char *const kdebug_state_names'):base_source.index('int shell_print_kdebug(')]

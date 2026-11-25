@@ -11,8 +11,8 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='remote-x3', tier=1, needs=[], budget=3,
-             covers=['tools/host_notify.py', 'include/remote_control.h',
-                     'net/link.h', 'tools/tests/test_remote_x3.py'],
+             covers=['tools/host_notify.py', 'sys/include/remote_control.h',
+                     'sys/net/link.h', 'tools/tests/test_remote_x3.py'],
     basis=['LAN_OPERATOR_DESIGN §2', 'docs/design/tools/host_notify.md 何をするか'],
 )
 
@@ -21,8 +21,8 @@ def test(path):
     spec = importlib.util.spec_from_file_location('host_notify_x3', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    header = (ROOT / 'include/remote_control.h').read_text()
-    link = (ROOT / 'net/link.h').read_text()
+    header = (ROOT / 'sys/include/remote_control.h').read_text()
+    link = (ROOT / 'sys/net/link.h').read_text()
     def value(text, name):
         return int(re.search(r'^#define\s+' + name + r'\s+(\d+)', text, re.M).group(1))
     service = value(header, 'REMOTE_SVC_RSHELL')

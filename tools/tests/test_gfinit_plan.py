@@ -11,7 +11,7 @@ def command(exe, probe=False):
     return ['gcc', *(['-DGF_VPLL_PROBE=1'] if probe else []), '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-m32', '-march=i386',
             '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-O2', '-nostdlib',
             '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-I'+str(ROOT/'tools/tests/recover_hostshim'),
-            '-I'+str(ROOT/'include'), '-I'+str(ROOT/'platform/pc98'), '-I'+str(ROOT/'sdk/include/os32'), str(ROOT/'tools/tests/gfinit_plan_host.c'), str(ROOT/'tools/tests/recover_gf_dev_stub.c'), *[str(ROOT / p) for p in ('hwdev/gf/runner.c','hwdev/gf/save.c','hwdev/gf/pll.c')], *map(str, sorted((ROOT/'hwdev/gf/op').glob('*.c'))), '-o', str(exe)]
+            '-I'+str(ROOT/'include'), '-I'+str(ROOT/'platform/pc98'), '-I'+str(ROOT/'sdk/include/os32'), str(ROOT/'tools/tests/gfinit_plan_host.c'), str(ROOT/'tools/tests/recover_gf_dev_stub.c'), *[str(ROOT / p) for p in ('sys/dev/video/geforce/runner.c','sys/dev/video/geforce/save.c','sys/dev/video/geforce/pll.c')], *map(str, sorted((ROOT/'hwdev/gf/op').glob('*.c'))), '-o', str(exe)]
 MUTATIONS = [
     ('compare', 'if (args[i] != args[i+1]) *value = 0;', 'if (args[i] != args[i+1] && 0) *value = 0;'),
     ('capacity_branch', '*value=bytes>=4 && args[2]<=bytes-4;', '*value=1; (void)bytes;'),
@@ -21,8 +21,8 @@ MUTATIONS = [
 ]
 
 SHARED_MUTATIONS = [
-    ('kdebug/recover_plan/step.inc', 'check_required', '(l->dir_substep != RECOVER_NONE || (l->flags & REC_LAYOUT_CHECK_EXPR))', '(l->dir_substep != RECOVER_NONE)'),
-    ('kdebug/recover_plan/step.inc', 'check_reads', 'else if (bus_read(r, a->value, &values[i])) return access_error(r, a->value);', 'else values[i]=0;'),
+    ('sys/dev/video/geforce/diag/recover_plan/step.inc', 'check_required', '(l->dir_substep != RECOVER_NONE || (l->flags & REC_LAYOUT_CHECK_EXPR))', '(l->dir_substep != RECOVER_NONE)'),
+    ('sys/dev/video/geforce/diag/recover_plan/step.inc', 'check_reads', 'else if (bus_read(r, a->value, &values[i])) return access_error(r, a->value);', 'else values[i]=0;'),
 ]
 
 def mutation(item):
@@ -48,6 +48,6 @@ def main():
         result=host32.run([str(exe)],cwd=ROOT,timeout=60)
         if result.returncode:return result.returncode
     if '--mutate' in sys.argv:
-        return int(bool(mutpar.run_with_control(mutation,[('kdebug/gfinit_plan.c',*item) for item in MUTATIONS]+list(SHARED_MUTATIONS),('kdebug/gfinit_plan.c','control','',''))))
+        return int(bool(mutpar.run_with_control(mutation,[('sys/dev/video/geforce/diag/gfinit_plan.c',*item) for item in MUTATIONS]+list(SHARED_MUTATIONS),('sys/dev/video/geforce/diag/gfinit_plan.c','control','',''))))
     return 0
 if __name__=='__main__':sys.exit(main())

@@ -1,7 +1,7 @@
 ; Named constants; C mirrors are checked by test_boot_named_constants.py.
 %ifndef OS32_BOOT_PC98_DEFS_INC
 %define OS32_BOOT_PC98_DEFS_INC
-; Canonical: include/pc98.h
+; Canonical: sys/platform/pc98/pc98.h
 TVRAM_CHAR_BASE EQU 0xA0000
 TVRAM_ATTR_BASE EQU 0xA2000
 TVRAM_COLS EQU 80

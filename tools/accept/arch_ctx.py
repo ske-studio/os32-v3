@@ -116,7 +116,7 @@ def image(work, mutation):
         command(['python3', 'sdk/mkos32x.py', base.with_suffix('.raw'), base.with_suffix('.bin'),
                  '--elf', base.with_suffix('.elf'), '--target', 'ppc-powermac'])
         residents.append(str(base.with_suffix('.bin')))
-    trap = (ROOT/'arch/ppc/kernel_trap.c').read_text()
+    trap = (ROOT/'sys/arch/ppc/kernel_trap.c').read_text()
     trap = '#include "ppc_trap.h"\n#include "exec_arch.h"\nvoid ctx_irq(struct ppc_frame *, void (*)(struct ppc_frame *));\nvoid ctx_syscall(struct arch_syscall *);\nvoid ctx_exit_arm(void);\nextern volatile u32 ctx_started;\n'+trap
     trap = 'struct ppc_frame; void ctx_fault(struct ppc_frame *);\n'+trap
     trap = once(trap, '        ppc_user_fault_kill();',
@@ -127,7 +127,7 @@ def image(work, mutation):
     trap = once(trap, '            exec_syscall_dispatch(&call);', '            ctx_syscall(&call);')
     trap = once(trap, '            (void)ppc_irq_save();\n            return;',
                 '            (void)ppc_irq_save();\n            ctx_exit_arm();\n            return;')
-    vectors = (ROOT/'arch/ppc/kernel_vectors.S').read_text()
+    vectors = (ROOT/'sys/arch/ppc/kernel_vectors.S').read_text()
     head, vectors = vectors.split('ppc_kernel_vector_return:\n', 1)
     vectors = v.user_exit_enable(vectors)
     # Each boundary uses scratch r3/r4 before register/SRR restoration.
@@ -200,8 +200,8 @@ def image(work, mutation):
     shell.write_text(f'#define CTX_USER_TRAP {user_trap:#x}U\n#define CTX_OUTSIDE {outside}\n#include "'+str(ROOT/'tools/accept/arch_ctx_probe.c')+'"\n')
     t = work/'trap.c'; t.write_text(trap)
     # Link the same measured entry and longjmp bodies in every fixture.
-    entry = (ROOT/'arch/ppc/exec_enter.S').read_text()
-    jump = (ROOT/'arch/ppc/setjmp.S').read_text()
+    entry = (ROOT/'sys/arch/ppc/exec_enter.S').read_text()
+    jump = (ROOT/'sys/arch/ppc/setjmp.S').read_text()
     jump = jump[jump.index('    .globl exec_longjmp'):]
     entry = once(entry, '    mr 30,3',
                  '    cmpwi 4,0\n    beq ctx_bad_root_branch\n    mr 30,3')
@@ -236,23 +236,23 @@ def image(work, mutation):
     opts = ['-j6', 'KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=exec_longjmp,'
                     '--wrap=arch_cpu_halt,--wrap=ppc_write_dec', 'KBOOT_SH=1', 'KBOOT_LINK=0',
                  'KB_ROOT_BINS='+' '.join(residents+[str(work/'ctx.bin')]),
-                 'KB_MUT_SRC=platform/powermac/shell_loop_ops.c', 'KB_MUT_FILE='+str(shell),
-                 'KB_MUT_EXTRA_SRC=arch/ppc/kernel_trap.c', 'KB_MUT_EXTRA_FILE='+str(t),
-                 'KB_MUT_THIRD_SRC=arch/ppc/kernel_vectors.S', 'KB_MUT_THIRD_FILE='+str(vectors_file)]
+                 'KB_MUT_SRC=sys/platform/powermac/shell_loop_ops.c', 'KB_MUT_FILE='+str(shell),
+                 'KB_MUT_EXTRA_SRC=sys/arch/ppc/kernel_trap.c', 'KB_MUT_EXTRA_FILE='+str(t),
+                 'KB_MUT_THIRD_SRC=sys/arch/ppc/kernel_vectors.S', 'KB_MUT_THIRD_FILE='+str(vectors_file)]
     elf = build(work/'image', *opts)
     changes = {
-        'parent-root': ('exec/exec.c', '#include "exec_finish.inc"', None),
-        'dec-rearm': ('arch/ppc/kernel_dec.c', '    ppc_write_dec((u32)remaining);', '    extern volatile u32 ctx_started;\n    if (!ctx_started) ppc_write_dec((u32)remaining);'),
-        'halt-ee': ('kernel/idle_work.c', '    idle_work_run();\n    if (!net_rx_recent(NET_RX_ACTIVE_MS)) _idle();',
+        'parent-root': ('sys/kern/exec/exec.c', '#include "exec_finish.inc"', None),
+        'dec-rearm': ('sys/arch/ppc/kernel_dec.c', '    ppc_write_dec((u32)remaining);', '    extern volatile u32 ctx_started;\n    if (!ctx_started) ppc_write_dec((u32)remaining);'),
+        'halt-ee': ('sys/kern/idle_work.c', '    idle_work_run();\n    if (!net_rx_recent(NET_RX_ACTIVE_MS)) _idle();',
                     '    idle_work_run();\n    if (!net_rx_recent(NET_RX_ACTIVE_MS)) { _disable(); for (;;) _halt(); }'),
-        'resume-result': ('exec/exec.c', '#include "exec_schedule.inc"', None),
+        'resume-result': ('sys/kern/exec/exec.c', '#include "exec_schedule.inc"', None),
     }
     if mutation in changes:
         source, old, new = changes[mutation]
         text = (ROOT/source).read_text()
         if mutation == 'parent-root':
             inc = work/'finish.inc'
-            inc.write_text(once((ROOT/'exec/exec_finish.inc').read_text(),
+            inc.write_text(once((ROOT/'sys/kern/exec/exec_finish.inc').read_text(),
                                 '        g_cur_app = 0;\n        paging_load_cr3(paging_kernel_pd_phys());',
                                 '        g_cur_app = 0;\n'
                                 '        AppSlot *child = appslot_at(APP_ID_SHELL + 1);\n'
@@ -260,7 +260,7 @@ def image(work, mutation):
             new = '#include "'+str(inc)+'"'
         if mutation == 'resume-result':
             schedule = work/'schedule.inc'
-            schedule.write_text(once((ROOT/'exec/exec_schedule.inc').read_text(),
+            schedule.write_text(once((ROOT/'sys/kern/exec/exec_schedule.inc').read_text(),
                                       'arch_user_result(&a->frame, 0);',
                                       'arch_user_result(&a->frame, 1);'))
             new = '#include "'+str(schedule)+'"'
@@ -426,16 +426,16 @@ def x86_image(work, mutation='normal'):
         if font.is_file(): shutil.copy2(font, tree/'assets/fonts'/font.name)
     def patch(name, old, new):
         path = tree/name; path.write_text(once(path.read_text(), old, new))
-    patch('arch/x86/kernel/syscall_entry.c', 'extern void ring3_fault_kill(void);',
-          '#include "arch/x86/arch_ctx_probe.c"\nextern void ring3_fault_kill(void);')
-    patch('arch/x86/kernel/syscall_entry.c', '    exec_syscall_dispatch(&call);', '    ctx_syscall(&call);')
-    patch('kernel/idle_work.c', '    running = 1;',
+    patch('sys/arch/x86/kernel/syscall_entry.c', 'extern void ring3_fault_kill(void);',
+          '#include "sys/arch/x86/arch_ctx_probe.c"\nextern void ring3_fault_kill(void);')
+    patch('sys/arch/x86/kernel/syscall_entry.c', '    exec_syscall_dispatch(&call);', '    ctx_syscall(&call);')
+    patch('sys/kern/idle_work.c', '    running = 1;',
           '    extern void ctx_shell_poll(void); ctx_shell_poll();\n    running = 1;')
-    patch('kernel/irq/tick.c', '            slots[slot].fn();',
+    patch('sys/kern/irq/tick.c', '            slots[slot].fn();',
           '            extern void ctx_tick_slot(unsigned); ctx_tick_slot(slot);\n            slots[slot].fn();')
-    patch('kernel/idle_work.c', '        work[i]();',
+    patch('sys/kern/idle_work.c', '        work[i]();',
           '        { extern void ctx_foreground(void); ctx_foreground(); work[i](); }')
-    asm = tree/'arch/x86/kernel/isr_stub.asm'
+    asm = tree/'sys/arch/x86/kernel/isr_stub.asm'
     text = asm.read_text().replace('%macro IRQ_ENTER 0', '%macro IRQ_ENTER 1')
     lines, irq = [], None
     for line in text.splitlines(True):
@@ -462,26 +462,26 @@ def x86_image(work, mutation='normal'):
         call ctx_irq_leave
         popad''')
     asm.write_text(text)
-    patch('arch/x86/kernel/ring3_entry.asm', 'extern ring3_syscall_dispatch', 'extern ctx_boundary\nextern ring3_syscall_dispatch')
+    patch('sys/arch/x86/kernel/ring3_entry.asm', 'extern ring3_syscall_dispatch', 'extern ctx_boundary\nextern ring3_syscall_dispatch')
     for old, offset in [('        popad                           ;; eax = 戻り値 (dispatcher が frame[7] に格納)', 0),
                         ('        IRETD_USER', 4)]:
-        patch('arch/x86/kernel/ring3_entry.asm', old,
+        patch('sys/arch/x86/kernel/ring3_entry.asm', old,
               f'        pushfd\n        pop dword [ss:ctx_boundary+{offset}]\n'+old)
-    patch('arch/x86/kernel/iret_user.inc', '        iretd',
+    patch('sys/arch/x86/kernel/iret_user.inc', '        iretd',
           '        pushfd\n        pop dword [ss:ctx_boundary+8]\n        iretd')
     # Every translation unit expanding IRETD_USER needs this diagnostic symbol.
-    p = tree/'arch/x86/kernel/iret_user.inc'
+    p = tree/'sys/arch/x86/kernel/iret_user.inc'
     p.write_text('extern ctx_boundary\n'+p.read_text())
     mutations = {
-        'sti': ('arch/x86/kernel/ring3_entry.asm', '        sti\n', '        nop\n'),
-        'depth': ('arch/x86/kernel/isr_stub.asm', '        inc     dword [ss:kctx_irq_depth]',
+        'sti': ('sys/arch/x86/kernel/ring3_entry.asm', '        sti\n', '        nop\n'),
+        'depth': ('sys/arch/x86/kernel/isr_stub.asm', '        inc     dword [ss:kctx_irq_depth]',
                   '        cmp dword [ss:ctx_record+4], 1\n        je %%ctx_skip_depth\n'
                   '        inc     dword [ss:kctx_irq_depth]\n%%ctx_skip_depth:'),
-        'sentinel': ('arch/x86/arch_ctx_probe.c', '        kmemcpy(ctx_saved, f, sizeof(ctx_saved));',
+        'sentinel': ('sys/arch/x86/arch_ctx_probe.c', '        kmemcpy(ctx_saved, f, sizeof(ctx_saved));',
                      '        kmemcpy(ctx_saved, f, sizeof(ctx_saved));\n        ctx_saved[0] ^= 1;'),
     }
     if mutation != 'normal': patch(*mutations[mutation])
-    (tree/'userland/tests/ring3_hello.c').write_text(X86_USER)
+    (tree/'userland/diag/ring3_hello.c').write_text(X86_USER)
     env = dict(os.environ, OS32_BUILD_COMMIT='ctx-x86-'+mutation)
     with (work/'build.log').open('w') as log:
         subprocess.run(['make', 'kernel', 'ring3_hello'], cwd=tree, env=env,
@@ -511,7 +511,7 @@ def x86_host(mutate):
         for name, args in [('normal', '512,0,0,1,0'), ('normal-irq', '0,0,1,1,1'), ('sti', '0,0,0,1,0'),
                            ('depth', '0,0,0,1,1'), ('depth-leave', '512,0,1,1,0'),
                            ('sentinel', '0,0,1,0,1')][:6 if mutate else 2]:
-            source = '#define CTX_HOST\n#include "'+str(ROOT/'arch/x86/arch_ctx_probe.c')+'"\n'
+            source = '#define CTX_HOST\n#include "'+str(ROOT/'sys/arch/x86/arch_ctx_probe.c')+'"\n'
             source += 'void _start(void) { int rc = !ctx_valid('+args+'); __asm__ volatile("int $0x80" :: "a"(1), "b"(rc)); }\n'
             (work/'test.c').write_text(source)
             command(['gcc', '-m32', '-std=gnu11', '-O2', '-ffreestanding', '-nostdlib', '-static', '-no-pie',
@@ -527,7 +527,7 @@ def x86_host(mutate):
             try: x86_columns(bad)
             except CriterionFailure: continue
             raise RuntimeError('accepted bad column '+str(field))
-        gate = (ROOT/'arch/x86/arch_ctx_probe.c').read_text()
+        gate = (ROOT/'sys/arch/x86/arch_ctx_probe.c').read_text()
         for altered in range(2 if mutate else 1):
             source = once(gate, 'depth == 1', 'depth >= 0') if altered else gate
             (work/'gate.c').write_text(source)

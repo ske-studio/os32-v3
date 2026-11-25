@@ -1,12 +1,12 @@
-# kernel/ime/ime_store.h — 辞書の接続の内部契約 (core と FEP 部品の共有)
+# sys/kern/ime/ime_store.h — 辞書の接続の内部契約 (core と FEP 部品の共有)
 
 > 状態: **現行 (2026-11-18)** — 出所: DICT_META_DESIGN・TASK_DICT_META (要約して移した)
-ソース: `kernel/ime/ime_store.h`・`kernel/ime/ime_conn.c`
+ソース: `sys/kern/ime/ime_store.h`・`sys/kern/ime/ime_conn.c`
 
 ## 何をするか
 
 かな漢字変換 (FEP) が使う 2 つの DB 接続 — システム辞書 (読み取り専用) と学習 DB (読み書き) — の型・定数・誤りの意味を 1 か所に決める。
-カーネル本体 (`kernel/sqlite_engine.c`、以下 core) と FEP 部品 (`fep.mod`) の両方がこのヘッダを読む。
+カーネル本体 (`sys/kern/sqlite_engine.c`、以下 core) と FEP 部品 (`fep.mod`) の両方がこのヘッダを読む。
 KAPI には出さない。SQLite のポインタも接続も、アプリへは渡らない。
 GNU11・libc なしで組める形にしてある (host 試験も libc なしで組む)。
 
@@ -58,11 +58,11 @@ GNU11・libc なしで組める形にしてある (host 試験も libc なしで
 
 | 口 | 実体 | 境目 |
 |---|---|---|
-| `fep_meta_probe`・`fep_boot_config_get`・`fep_boot_user_path_get` | `kernel/sqlite_engine.c` (core) | FEP は `tools/prototypes/fep_imports.def` の import で呼ぶ。生成した表は手で直さない |
-| `fep_store_open`・`fep_store_switch`・`fep_store_close`・`fep_store_live_connections`・`fep_store_search`・`fep_store_learn`・`fep_store_user_*` | `kernel/ime/ime_dict.c` | 検索の合成と、接続ごとの回復 |
-| `fep_user_open` | `kernel/ime/ime_user_store.c` | 学習 DB の検査と作成 |
-| `fep_conn_close`・`fep_conn_ready` | `kernel/ime/ime_conn.c` | 両接続が共有する寿命 |
-| `fep_store_info` | `kernel/ime/ime_dict_info.c` | KAPI `ime_dict_info` の本体 |
+| `fep_meta_probe`・`fep_boot_config_get`・`fep_boot_user_path_get` | `sys/kern/sqlite_engine.c` (core) | FEP は `tools/prototypes/fep_imports.def` の import で呼ぶ。生成した表は手で直さない |
+| `fep_store_open`・`fep_store_switch`・`fep_store_close`・`fep_store_live_connections`・`fep_store_search`・`fep_store_learn`・`fep_store_user_*` | `sys/kern/ime/ime_dict.c` | 検索の合成と、接続ごとの回復 |
+| `fep_user_open` | `sys/kern/ime/ime_user_store.c` | 学習 DB の検査と作成 |
+| `fep_conn_close`・`fep_conn_ready` | `sys/kern/ime/ime_conn.c` | 両接続が共有する寿命 |
+| `fep_store_info` | `sys/kern/ime/ime_dict_info.c` | KAPI `ime_dict_info` の本体 |
 | `hsp_set_fep_user_path` | `userland/system/hsync_protect.inc` | 宣言だけここに置く (契約の試験用)。hsync はこのヘッダを読まない |
 
 ## 検査

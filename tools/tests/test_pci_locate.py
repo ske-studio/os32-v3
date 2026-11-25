@@ -1,7 +1,7 @@
 """Raw PCI location and GeForce cache behavior."""
 CHECK = dict(name='pci-locate-host', tier=1, needs=[], budget=4,
-             covers=['drivers/pci/pci_locate.c', 'drivers/pci/pci_locate.h',
-                     'kdebug/recover_gf_locate.c', 'kdebug/recover.h',
+             covers=['sys/dev/pci/pci_locate.c', 'sys/dev/pci/pci_locate.h',
+                     'sys/dev/video/geforce/diag/recover_gf_locate.c', 'sys/dev/video/geforce/diag/recover.h',
                      'tools/tests/pci_locate_host.c', 'tools/tests/test_pci_locate.py'],
     kind='characterization',
 )
@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ('drivers/pci/pci_locate.c', 'kdebug/recover_gf_locate.c')
+SOURCES = ('sys/dev/pci/pci_locate.c', 'sys/dev/video/geforce/diag/recover_gf_locate.c')
 MUTATIONS = [
     ('M1', 1, 'return gf_loc.found ? gf_loc.dev : RECOVER_GF_DEV_FALLBACK;', 'return RECOVER_GF_DEV_FALLBACK;'),
     ('M2', 0, 'if (!out->found) { out->found = 1; out->dev = (u8)dev; }', 'if (1) { out->found = 1; out->dev = (u8)dev; }'),
@@ -27,7 +27,7 @@ def build_and_run(td, mutation=None):
             _, _, old, new = mutation
             assert source.count(old) == 1
             source = source.replace(old, new, 1)
-        source = source.replace('#include "pci_locate.h"', '#include "'+str(ROOT/'drivers/pci/pci_locate.h')+'"').replace('#include "pci.h"', '#include "'+str(ROOT/'drivers/pci/pci.h')+'"').replace('#include "recover.h"', '#include "'+str(ROOT/'kdebug/recover.h')+'"').replace('#include "../drivers/pci/pci_locate.h"', '#include "'+str(ROOT/'drivers/pci/pci_locate.h')+'"')
+        source = source.replace('#include "pci_locate.h"', '#include "'+str(ROOT/'sys/dev/pci/pci_locate.h')+'"').replace('#include "pci.h"', '#include "'+str(ROOT/'sys/dev/pci/pci.h')+'"').replace('#include "recover.h"', '#include "'+str(ROOT/'sys/dev/video/geforce/diag/recover.h')+'"').replace('#include "../drivers/pci/pci_locate.h"', '#include "'+str(ROOT/'sys/dev/pci/pci_locate.h')+'"')
         p=Path(td)/Path(rel).name; p.write_text(source); sources.append(str(p))
     exe=Path(td)/'test'
     subprocess.run(['gcc','-std=gnu11','-Wall','-Wextra','-Werror',

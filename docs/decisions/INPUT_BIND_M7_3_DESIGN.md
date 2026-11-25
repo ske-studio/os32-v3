@@ -19,19 +19,19 @@ PowerPC の部品形式と公開順は PPC_MODULE_ALIGN_X86_DESIGN の確定節�
 
 ## 1. 11-17 版との食い違い（3 件）
 
-1. 505fdd1c1 の build/features/pc98-devices.mk の装置選択規則は gate を PC-98 装置の列に入れた。
+1. 505fdd1c1 の sys/conf/features/pc98-devices.mk の装置選択規則は gate を PC-98 装置の列に入れた。
    gate の持ち主は共通入力で、M5 は 4512a11af の build/sources/common.mk の C_COMMON_EXEC にある。
    gate も同じ共通列で選び、build/sources/order.mk の C_ORDER_LEGACY は x86 のリンク順だけを担う。
 2. 旧 build/ppc-kboot.mk の旧ソース一覧 は PowerPC の個別ソース列にも gate を追加した。
-   現行の構成は共通ソースを使う。build/features/fep.mk の C_FEATURES・MODULE_MK_fep は facade の選択と x86 の pack を区別する。
+   現行の構成は共通ソースを使う。sys/conf/features/fep.mk の C_FEATURES・MODULE_MK_fep は facade の選択と x86 の pack を区別する。
    L1・L2 の取り込みだけでは PowerMac の FEP は公開されない。PPC 個別列への二重登録を廃する。
-3. 旧 kernel/ime/ime.c の ime_boot_abort の init からの状態公開は、部品の初期化と入力サービス公開の間を区別できない。
-   kernel/ime/fep_module.c の public_api・ime_init・fep_start は候補を非公開で初期化し、RUNNING と services_public の両方で公開する。
-   kernel/module/module_runtime.c の module_load は init より前に import を埋める。この時点の関数番地は公開の証明にならない。
+3. 旧 sys/kern/ime/ime.c の ime_boot_abort の init からの状態公開は、部品の初期化と入力サービス公開の間を区別できない。
+   sys/kern/ime/fep_module.c の public_api・ime_init・fep_start は候補を非公開で初期化し、RUNNING と services_public の両方で公開する。
+   sys/kern/module/module_runtime.c の module_load は init より前に import を埋める。この時点の関数番地は公開の証明にならない。
 
 ## 2. 常駐側と部品側の境界
 
-次の三つを両 CPU 共通の FEP import とする。型の正典は input/hal/input_context.h。
+次の三つを両 CPU 共通の FEP import とする。型の正典は sys/input/input_context.h。
 末尾への追加順を宣言順に固定する。いずれも通常文脈で呼ぶ。
 
 ```c
@@ -96,14 +96,14 @@ M5 と 4512a11af の取り込み後に開始。各行は製品 1 ファイル、
 |B3|本線 build/fep-module.mk|宣言ヘッダと schema を生成依存に含め、増分ビルドでも再生成|
 |B4|本線 tools/prototypes/fep_imports.def|三 import を末尾に追加、宣言元を contracts に追加|
 |B5|本線 tools/module_schema.py|FEP の ops_version を 5 にする|
-|B6|本線 kernel/module/module_schema.h|B5 の C ビューを再生成|
-|B7|本線 kernel/ime/fep_module.h|facade の世代を 5 に同期|
-|M7[3]|本線 kernel/ime/ime.c|公開後の状態通知と FG1 の接続、既存取消との合流。内部試験後に B と組で像を検証|
-|B8|本線 kernel/ime/fep_module.c|失敗・停止の全経路で常駐側が公開を閉じ、inactive を通知し、全ゼロの KbdPolicySnapshot で take してから後始末。候補なし・quiesce 前の終了も同順|
-|B-P|PowerPC build/features/fep.mk|HDD root 後の FEP 実装段で対象 pack を選択、同じ定義の生成 provider を製品リンク|
+|B6|本線 sys/kern/module/module_schema.h|B5 の C ビューを再生成|
+|B7|本線 sys/kern/ime/fep_module.h|facade の世代を 5 に同期|
+|M7[3]|本線 sys/kern/ime/ime.c|公開後の状態通知と FG1 の接続、既存取消との合流。内部試験後に B と組で像を検証|
+|B8|本線 sys/kern/ime/fep_module.c|失敗・停止の全経路で常駐側が公開を閉じ、inactive を通知し、全ゼロの KbdPolicySnapshot で take してから後始末。候補なし・quiesce 前の終了も同順|
+|B-P|PowerPC sys/conf/features/fep.mk|HDD root 後の FEP 実装段で対象 pack を選択、同じ定義の生成 provider を製品リンク|
 
 B-P は確定済み FEP 段の登録を兼ねる。同段の対象別 make 規則に生成依存を渡す。
-B-P の request・公開判定・失効は kernel/ime/fep_module.c、静的起動は kernel/sqlite_static.c、予約と最終検査は kernel/sqlite_engine.c の担当とする。PowerPC 側でも常駐で公開を閉じる → inactive → 全ゼロ snapshot で take → 取得済み handle を一度だけ後始末の順。全接続・group 解放後に予約解除し、後始末に失敗したら確定設計どおり隔離する。
+B-P の request・公開判定・失効は sys/kern/ime/fep_module.c、静的起動は sys/kern/sqlite_static.c、予約と最終検査は sys/kern/sqlite_engine.c の担当とする。PowerPC 側でも常駐で公開を閉じる → inactive → 全ゼロ snapshot で take → 取得済み handle を一度だけ後始末の順。全接続・group 解放後に予約解除し、後始末に失敗したら確定設計どおり隔離する。
 S4 は実打鍵 STOP/ETX から capture を呼び、両入力経路への配送をゲストで受け入れる。M7[3] は試験から capture で pending を直接入れる。新設の host 試験は作成段で CHECK と入力・basis を登録する。
 M7 は新しい STOP 割込みを有効化しない。後続の S3 → S4 → S4i の依存を守る。
 
@@ -147,5 +147,5 @@ B-P 後は製品 map で同じ三 import の実体を確認し、HDD root の辞
 以下は本文に優先する。
 - **P1 (§2・§4) 待ちのループの取消の合流**: getchar・getkey の待ちのループでは、pending で取り消した後に次のキーで新しい変換が始まり、同じ呼び出しの後の待ちが負の値で戻り得る。呼び出し全体の「取消済み」の旗は使わない — **負の値を返す待ちの戻りの直後に実行した取消だけ** を KAPI 側の既存の取消と合わせる。試験は両 KAPI で「取消 → 再入力 → 次の待ちで負の値」を照合する。
 - **P1 (§2–3、B-P) 学習のパス**: load の前に `fep_boot_user_path_set()` と `fep_boot_user_rc_set()` で学習のパスと取得の結果を設定し、失敗の時は snapshot と一緒に消す (確定設計 PPC_MODULE_ALIGN_X86_DESIGN の確定 §1 と同じ)。担当は PowerPC の FEP の段。
-- **P2 (§3、B-P) ファイルの担当**: B-P の製品の選択は build/features/fep.mk の 1 行に寄せず、確定設計 PPC_MODULE_ALIGN_X86_DESIGN の FEP の段のファイル (build/sources/hooks.mk・build/ppc-fep-module.mk・静的 SQL の後の起動の接続) に、生成の依存・pack・起動の接続の担当を 1 対 1 で結ぶ。
+- **P2 (§3、B-P) ファイルの担当**: B-P の製品の選択は sys/conf/features/fep.mk の 1 行に寄せず、確定設計 PPC_MODULE_ALIGN_X86_DESIGN の FEP の段のファイル (build/sources/hooks.mk・build/ppc-fep-module.mk・静的 SQL の後の起動の接続) に、生成の依存・pack・起動の接続の担当を 1 対 1 で結ぶ。
 - **P2 (§4) 試験の置き場**: 最終検査の前の開門と失効の漏れの 2 つの変異は ppc-input-usb-host (USB の入力の検査) ではなく、PowerPC の静的 SQL の構成を組む FEP の境界の試験に割り当て、公開の状態と旧い pending の残りをそれぞれ観測する。

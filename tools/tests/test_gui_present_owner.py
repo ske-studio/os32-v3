@@ -6,28 +6,28 @@ from kernel_includes import include_flags
 from mutpar import build_in_tree
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ['tools/tests/gui_present_owner_host.c', 'kernel/gui.c', 'exec/appslot.c',
-           'gfx/gfx_present.c']
+SOURCES = ['tools/tests/gui_present_owner_host.c', 'sys/kern/gui.c', 'sys/kern/exec/appslot.c',
+           'sys/hal/gfx/gfx_present.c']
 CHECK = dict(name='gui-present-owner-host', tier=1, needs=[], budget=5,
-             covers=['tools/tests/gui_present_owner_host.c', 'kernel/gui.c', 'exec/appslot.c',
-                 'gfx/gfx_present.c', 'tools/tests/test_gui_present_owner.py', 'tools/tests/host32.py',
+             covers=['tools/tests/gui_present_owner_host.c', 'sys/kern/gui.c', 'sys/kern/exec/appslot.c',
+                 'sys/hal/gfx/gfx_present.c', 'tools/tests/test_gui_present_owner.py', 'tools/tests/host32.py',
                  'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py', 'tools/tests/host_arch/**',
                  'tools/tests/gfx2_bridge_fake.h', 'tools/tests/font_guard_inactive.h',
-                 'exec/appslot*.inc', 'exec/appslot.h', 'exec/exec_fault.inc',
-                 'kernel/gui.h', 'gfx/*.h', 'include/**', 'platform/pc98/platform_display_fallback.h'],
+                 'exec/appslot*.inc', 'sys/kern/exec/appslot.h', 'sys/kern/exec/exec_fault.inc',
+                 'sys/kern/gui.h', 'gfx/*.h', 'include/**', 'sys/platform/pc98/platform_display_fallback.h'],
              basis=['docs/design/kernel/gui.md 同期 COMMIT の描画主体'])
 
 MUTATIONS = [
-    ('pump grant', 'kernel/gui.c', 'return g_gui_pump ? gui_run_pump : 0;', 'return g_gui_pump;'),
-    ('pump return', 'kernel/gui.c', '((void (*)(void))g_gui_pump)();\n    appslot_gui_draw_leave(previous);',
+    ('pump grant', 'sys/kern/gui.c', 'return g_gui_pump ? gui_run_pump : 0;', 'return g_gui_pump;'),
+    ('pump return', 'sys/kern/gui.c', '((void (*)(void))g_gui_pump)();\n    appslot_gui_draw_leave(previous);',
      '((void (*)(void))g_gui_pump)();'),
-    ('normal return', 'kernel/gui.c', '    appslot_gui_draw_leave(previous);\n    appslot_gui_op_leave();',
+    ('normal return', 'sys/kern/gui.c', '    appslot_gui_draw_leave(previous);\n    appslot_gui_op_leave();',
      '    (void)previous;\n    appslot_gui_op_leave();'),
-    ('park', 'exec/appslot_transition.inc', 'appslot_gui_draw_leave(0);', ''),
-    ('fault', 'exec/exec_fault.inc', 'appslot_gui_draw_leave(0);', ''),
-    ('registration', 'exec/appslot.c', 'handler_generation[g_cur] == registered_generation',
+    ('park', 'sys/kern/exec/appslot_transition.inc', 'appslot_gui_draw_leave(0);', ''),
+    ('fault', 'sys/kern/exec/exec_fault.inc', 'appslot_gui_draw_leave(0);', ''),
+    ('registration', 'sys/kern/exec/appslot.c', 'handler_generation[g_cur] == registered_generation',
      'handler_generation[g_cur] != 0'),
-    ('child present', 'exec/appslot.c', 'return appslot_present_owner() == g_gfx_owner;', 'return 1;'),
+    ('child present', 'sys/kern/exec/appslot.c', 'return appslot_present_owner() == g_gfx_owner;', 'return 1;'),
 ]
 
 

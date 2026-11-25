@@ -5,30 +5,30 @@
 CHECK = dict(env=['ppc-cross'], name='arch-compat-host', tier=2, budget=30, needs=[], covers=[
     'tools/tests/test_arch_compat.py', 'tools/tests/arch_compat_vectors.c',
     'tools/tests/host32.py', 'docs/decisions/ARCH_COMPAT_CONTRACT.md',
-    'platform/pc98/link_platform.c', 'platform/powermac/link_platform.c',
-    'net/link_platform.h', 'include/types.h', 'include/kernel_tick.h',
-    'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
-    'platform/powermac/mpic.c', 'platform/powermac/mpic.h',
-    'platform/powermac/mpic_tree.h', 'arch/ppc/ppc_frame.h',
-    'arch/ppc/ppc_trap.h', 'include/platform_irq.h',
-    'platform/powermac/platform_irq_limits.h', 'kernel/irq/irq_math.h',
-    'kernel/idle_work.h', 'arch/ppc/arch_io.h', 'arch/ppc/kernel_dec.c',
-    'arch/ppc/ppc_oea.h',
-    'arch/ppc/ppc_pd.h', 'kernel/time/tick_clock.h',
-    'platform/powermac/kboot_info.h', 'kernel/irq/irq.h',
-    'platform/pc98/d2_bind.c', 'platform/powermac/input_boot.c',
-    'platform/powermac/input_boot.h', 'platform/powermac/input_usb.h',
-    'platform/powermac/input_decode.c', 'platform/powermac/lan_boot.h',
-    'kernel/cli/resident_cli.h', 'kernel/input_service.c', 'kernel/input_legacy.c',
-    'kernel/input_wait.c', 'input/hal/in2_int.h', 'include/con_sink.h', 'exec/exec.h',
-    'include/input_service.h', 'include/pointer_service.h', 'include/kbd.h',
-    'include/clock_source.h', 'sdk/include/os32/os32_kapi_shared.h',
+    'sys/platform/pc98/link_platform.c', 'sys/platform/powermac/link_platform.c',
+    'sys/hal/net/link_platform.h', 'sys/include/types.h', 'sys/include/kernel_tick.h',
+    'sys/kern/irq/tick.h', 'sys/platform/pc98/tick_order.h',
+    'sys/platform/powermac/mpic.c', 'sys/platform/powermac/mpic.h',
+    'sys/platform/powermac/mpic_tree.h', 'sys/arch/ppc/ppc_frame.h',
+    'sys/arch/ppc/ppc_trap.h', 'sys/include/platform_irq.h',
+    'sys/platform/powermac/platform_irq_limits.h', 'sys/kern/irq/irq_math.h',
+    'sys/kern/idle_work.h', 'sys/arch/ppc/arch_io.h', 'sys/arch/ppc/kernel_dec.c',
+    'sys/arch/ppc/ppc_oea.h',
+    'sys/arch/ppc/ppc_pd.h', 'sys/hal/time/tick_clock.h',
+    'sys/platform/powermac/kboot_info.h', 'sys/kern/irq/irq.h',
+    'sys/platform/pc98/d2_bind.c', 'sys/platform/powermac/input_boot.c',
+    'sys/platform/powermac/input_boot.h', 'sys/platform/powermac/input_usb.h',
+    'sys/platform/powermac/input_decode.c', 'sys/platform/powermac/lan_boot.h',
+    'sys/kern/cli/resident_cli.h', 'sys/hal/input/input_service.c', 'sys/kern/input_legacy.c',
+    'sys/kern/input_wait.c', 'sys/hal/input/in2_int.h', 'sys/include/con_sink.h', 'sys/kern/exec/exec.h',
+    'sys/hal/input/input_service.h', 'sys/hal/input/pointer_service.h', 'sys/include/kbd.h',
+    'sys/hal/time/clock_source.h', 'sdk/include/os32/os32_kapi_shared.h',
     'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_host_notice.h',
     'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_surface.h',
     'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_gfx2.h',
-    'sdk/include/os32/os32_kapi_generated.h', 'include/memmap.h',
+    'sdk/include/os32/os32_kapi_generated.h', 'sys/include/memmap.h',
     'sdk/gen_kapi.py', 'sdk/kapi_target_ppc.py', 'sdk/kapi_abi_x86.py',
-    'sdk/target_profile.py', 'sdk/kapi.json', 'kapi/kapi_generated.c',
+    'sdk/target_profile.py', 'sdk/kapi.json', 'sys/kapi/kapi_generated.c',
     'sdk/include/os32/os32_kapi_slots.h'],
     basis=['ARCH_COMPAT_CONTRACT §4', 'docs/decisions/sound/AV0_V90_ADDENDUM.md §5'],
 )
@@ -55,7 +55,7 @@ REQUIRED = {'AC-TIME-1', 'AC-TIME-2', 'AC-TIME-3',
 def input_kapi(root, work, vectors, mutation=None):
     """Real provider/table + generated wrappers; fake keyboard/USB/LAN ingress."""
     sources = {p: (root / p).read_text() for p in (
-        'platform/pc98/d2_bind.c', 'platform/powermac/input_boot.c',
+        'sys/platform/pc98/d2_bind.c', 'sys/platform/powermac/input_boot.c',
         'sdk/gen_kapi.py', 'sdk/kapi_target_ppc.py')}
     if mutation:
         path, old, new = mutation
@@ -76,7 +76,7 @@ def input_kapi(root, work, vectors, mutation=None):
             '--target', target, '--out-dir', str(output), str(root / 'sdk/kapi.json')],
             cwd=root, check=True, stdout=subprocess.DEVNULL)
         slots.append((output / 'sdk/include/os32/os32_kapi_slots.h').read_bytes())
-        generated = (output / 'kapi/kapi_generated.c').read_text()
+        generated = (output / 'sys/kapi/kapi_generated.c').read_text()
         selected = []
         for name in ('wrap_' + n for n in names):
             match = re.search(r'^[^\n]*\b' + name + r'\([^\n]*\)\n\{.*?^\}', generated, re.M | re.S)
@@ -84,10 +84,10 @@ def input_kapi(root, work, vectors, mutation=None):
             selected.append(match[0])
         (work / 'kapi.inc').write_text('\n'.join(selected))
         if provider == 'pc98':
-            source = sources['platform/pc98/d2_bind.c']
+            source = sources['sys/platform/pc98/d2_bind.c']
             source = source[source.index('static u8 pc98_shift_state'):source.index('static const PointerOps')]
         else:
-            source = sources['platform/powermac/input_boot.c']
+            source = sources['sys/platform/powermac/input_boot.c']
         (work / 'input.inc').write_text(source)
         (work / 'input-vectors.c').write_text(vectors)
         exe = work / ('input-' + provider)
@@ -97,7 +97,7 @@ def input_kapi(root, work, vectors, mutation=None):
             '-I' + str(root / 'sdk/include/os32'), '-I' + str(root / 'platform/powermac'),
             '-DINPUT_SOURCE="input.inc"', '-DKAPI_SOURCE="kapi.inc"', '-DTRY_SLOT=' + str(slot),
             *(['-DPC98_INPUT', '-DKBD_IRQ=1'] if provider == 'pc98' else []),
-            str(work / 'input-vectors.c'), str(root / 'platform/powermac/input_decode.c'),
+            str(work / 'input-vectors.c'), str(root / 'sys/platform/powermac/input_decode.c'),
             '-o', str(exe)], check=True)
         try:
             rc = subprocess.run(['qemu-i386', str(exe)], timeout=2).returncode
@@ -119,25 +119,25 @@ def check_input_kapi(root, work, vectors, mutate):
     print('UNIMPL AC-KAPI-1/all-groups-void-query-pairs-context (F8); IDs remain open', flush=True)
     if mutate:
         mutations = (
-            ('pc98-try-blocks', 'platform/pc98/d2_bind.c',
+            ('pc98-try-blocks', 'sys/platform/pc98/d2_bind.c',
              '.trygetkey = kbd_trygetkey,', '.trygetkey = kbd_getkey,', {'pc98': 'timeout', 'powermac': 0}),
-            ('pc98-char-wiring', 'platform/pc98/d2_bind.c',
+            ('pc98-char-wiring', 'sys/platform/pc98/d2_bind.c',
              '.trygetchar = kbd_trygetchar,', '.trygetchar = kbd_trygetkey,', {'pc98': 64, 'powermac': 0}),
-            ('ppc-empty', 'platform/powermac/input_boot.c',
+            ('ppc-empty', 'sys/platform/powermac/input_boot.c',
              'return key >= 0 ? key : pm_input_usb_peek();', 'return key >= 0 ? key : 0;', {'pc98': 0, 'powermac': 64}),
-            ('ppc-consume', 'platform/powermac/input_boot.c',
+            ('ppc-consume', 'sys/platform/powermac/input_boot.c',
              'return pm_input_usb_take();', 'return pm_input_usb_peek();', {'pc98': 0, 'powermac': 64}),
-            ('ppc-usb-lost', 'platform/powermac/input_boot.c',
+            ('ppc-usb-lost', 'sys/platform/powermac/input_boot.c',
              'return pm_input_usb_take();', 'return -1;', {'pc98': 0, 'powermac': 64}),
-            ('ppc-peek-consumes', 'platform/powermac/input_boot.c',
+            ('ppc-peek-consumes', 'sys/platform/powermac/input_boot.c',
              'return key >= 0 ? key : pm_input_usb_peek();', 'return key >= 0 ? key : pm_input_usb_take();', {'pc98': 0, 'powermac': 64}),
-            ('ppc-cancel', 'platform/powermac/input_boot.c',
+            ('ppc-cancel', 'sys/platform/powermac/input_boot.c',
              '.wait_pending = ring3_wait_pending,', '.wait_pending = 0,', {'pc98': 0, 'powermac': 1}),
-            ('ppc-raw', 'platform/powermac/input_boot.c',
+            ('ppc-raw', 'sys/platform/powermac/input_boot.c',
              '.trygetrawkey = legacy_raw_take', '.trygetrawkey = pm_input_usb_peek', {'pc98': 0, 'powermac': 64}),
-            ('ppc-pressed', 'platform/powermac/input_boot.c',
+            ('ppc-pressed', 'sys/platform/powermac/input_boot.c',
              '&& input_key_pressed(scancode)', '&& 0', {'pc98': 0, 'powermac': 4}),
-            ('ppc-modifiers', 'platform/powermac/input_boot.c',
+            ('ppc-modifiers', 'sys/platform/powermac/input_boot.c',
              'return input_key_mods();', 'return 0;', {'pc98': 0, 'powermac': 8}),
             ('db-pointer-absent', 'sdk/kapi_target_ppc.py',
              'PROVIDER_GROUPS = {', "PROVIDER_GROUPS = {\n    'db': ({'db_last_error'}, set()),", {'pc98': 0, 'powermac': 64}),
@@ -157,7 +157,7 @@ def check_input_kapi(root, work, vectors, mutate):
 
 
 def exercise(root, work, vectors, mpic=None, idle=None, provider_text=None):
-    product = (root / 'arch/ppc/kernel_dec.c').read_text()
+    product = (root / 'sys/arch/ppc/kernel_dec.c').read_text()
     start = product.index('void arch_cpu_idle(void)')
     end = product.index('void arch_cpu_halt(void)', start)
     (work / 'idle.c').write_text(idle if idle is not None else product[start:end])
@@ -179,7 +179,7 @@ def exercise(root, work, vectors, mpic=None, idle=None, provider_text=None):
             '-no-pie', '-fno-stack-protector', '-I' + str(work), '-I' + str(root),
             '-I' + str(root / 'include'), '-DPROVIDER_SOURCE="' + str(source) + '"',
             '-DIDLE_SOURCE="' + str(work / 'idle.c') + '"',
-            *(['-DPM_MPIC_HOST_TEST', '-DMPIC_SOURCE="' + str(mpic or root / 'platform/powermac/mpic.c') + '"',
+            *(['-DPM_MPIC_HOST_TEST', '-DMPIC_SOURCE="' + str(mpic or root / 'sys/platform/powermac/mpic.c') + '"',
                '-I' + str(root / 'arch/ppc'), '-I' + str(root / 'platform/powermac')]
               if provider == 'powermac' else []), str(src), '-o', str(exe)], check=True)
         try:
@@ -227,16 +227,16 @@ def run(ctx):
             subprocess.run([str(cc), '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                 '-ffreestanding', '-I' + str(ctx.root), '-I' + str(ctx.root / 'include'),
                 '-I' + str(ctx.root / 'arch/ppc'), '-c',
-                str(ctx.root / 'platform/powermac/link_platform.c'), '-o', str(work / 'ppc.o')], check=True)
+                str(ctx.root / 'sys/platform/powermac/link_platform.c'), '-o', str(work / 'ppc.o')], check=True)
             subprocess.run([str(cc), '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                 '-ffreestanding', '-I' + str(ctx.root), '-I' + str(ctx.root / 'include'),
                 '-I' + str(ctx.root / 'arch/ppc'),
                 '-I' + str(ctx.root / 'platform/powermac'), '-c',
-                str(ctx.root / 'arch/ppc/kernel_dec.c'),
+                str(ctx.root / 'sys/arch/ppc/kernel_dec.c'),
                 '-o', str(work / 'dec.o')], check=True)
             print('PASS PowerPC provider + real idle cross compile', flush=True)
         if ctx.mutate:
-            product = (ctx.root / 'platform/powermac/mpic.c').read_text()
+            product = (ctx.root / 'sys/platform/powermac/mpic.c').read_text()
             for label, old, new in (
                 ('claim-zero', ')) return IRQ_ERR_INVAL;', ')) return 0;'),
                 ('missing-finish', '*out = (struct irq_claim){token, token, 1, 1};',
@@ -249,7 +249,7 @@ def run(ctx):
                     'struct irq_claim claim;', 'struct irq_claim claim = {0};'))
                 assert not exercise(ctx.root, work, vectors, mutant_path)
                 print('RED runtime: ' + label, flush=True)
-            product = (ctx.root / 'arch/ppc/kernel_dec.c').read_text()
+            product = (ctx.root / 'sys/arch/ppc/kernel_dec.c').read_text()
             a = product.index('void arch_cpu_idle(void)')
             b = product.index('void arch_cpu_halt(void)', a)
             idle = product[a:b]
@@ -266,7 +266,7 @@ def run(ctx):
             assert not exercise(ctx.root, work, vectors,
                                 idle=idle.replace(anchor_nap, '    /* mutation: spin */'))
             print('RED runtime: idle does not nap', flush=True)
-            provider = (ctx.root / 'platform/powermac/link_platform.c').read_text()
+            provider = (ctx.root / 'sys/platform/powermac/link_platform.c').read_text()
             anchor_work = '    idle_wait_step();'
             assert provider.count(anchor_work) == 1
             assert not exercise(ctx.root, work, vectors,

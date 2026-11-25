@@ -1,14 +1,14 @@
 # `db_last_error()` / `db_column_text()` の返り先 (ホスト試験の記録)
 
 - 契約: `docs/design/kapi/kapi_db.md` の「診断文と空文字列の置き場」(出所は票 TASK_DB_ERRSTR の §4 / §5)
-- 対象: [`kapi/kapi_db.c`](../../kapi/kapi_db.c) の `kapi_db_last_error` /
+- 対象: [`sys/kapi/kapi_db.c`](../../sys/kapi/kapi_db.c) の `kapi_db_last_error` /
   `kapi_db_column_text` と、結果データの上限を見ている 5 か所
 - 領域の管理元: [`sdk/include/os32/os32_kapi_shared.h`](../../sdk/include/os32/os32_kapi_shared.h)
   の `DB_SHM_DIAG_*` / `DB_SHM_RESULT_LIMIT` ([C4])
 - 実行: `python3 -B tools/tests/test_db_errstr.py [--target] [--mutate] [case ...]`
   (`make check-db-errstr-host` が `--target` 付きで回す)
-- 試験: [`db_errstr_host.c`](db_errstr_host.c) — 実物の `kapi/kapi_db.c` +
-  実 SQLite + 実 `os32_sqlite_vfs.c` + 実 `fs/vfs_fd.c` を 1 行も写さずに
+- 試験: [`db_errstr_host.c`](db_errstr_host.c) — 実物の `sys/kapi/kapi_db.c` +
+  実 SQLite + 実 `os32_sqlite_vfs.c` + 実 `sys/fs/vfs_fd.c` を 1 行も写さずに
   `#include` し、模型は exec 側のポインタ検証と SHM の置き場だけ。
   DB は `:memory:` で開くのでホストの FS には触らない
 - KAPI の型・スロット・版数は動かしていない (v55 のまま)。変えたのは
@@ -63,7 +63,7 @@ FAIL errstr_truncate:300: IN_SHM(m)
 FAIL result_bound:360: IN_SHM(m)
 FAIL diag_layout:445: db_v50_selftest() == 0
 SUMMARY -1/5 PASS
-FAIL SOURCE: kapi/kapi_db.c は DB_SHM_BLOCK_SIZE から直接引いている
+FAIL SOURCE: sys/kapi/kapi_db.c は DB_SHM_BLOCK_SIZE から直接引いている
              (行 218, 252, 255, 316, 366, 1194, 1195, 1196)
 ```
 
@@ -109,7 +109,7 @@ SOURCE: kapi_db.c は上限を DB_SHM_RESULT_LIMIT からだけ引く (10 箇所
 広がっても、そこへ届く行はその前に `SQLITE_TOOBIG` で落ちているため。
 
 そこで票 §4 の「`DB_SHM_BLOCK_SIZE` を直接引き算している箇所を残さないこと」を
-そのまま規則にした。`check_no_block_size()` が `kapi/kapi_db.c` にこの名前が
+そのまま規則にした。`check_no_block_size()` が `sys/kapi/kapi_db.c` にこの名前が
 **1 回も出ない**ことを見る。5 か所のどれを戻しても、その時点で RED になる。
 
 ## 5. 実装で決めたこと

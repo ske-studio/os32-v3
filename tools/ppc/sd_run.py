@@ -220,7 +220,7 @@ def accept(media, cpu, out, mutation='normal'):
 
 # Link acceptance reuses the existing QMP/RSHELL/HostAgent mechanism. PLN1
 # remains the default until the operator transport switch is accepted.
-LINK_NONCE = ('fs/serialfs/serialfs_persistent.c',
+LINK_NONCE = ('sys/fs/serialfs/serialfs_persistent.c',
               'nonce = sfs_crc32(token, sizeof(token));', 'nonce = 0;')
 
 

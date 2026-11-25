@@ -114,7 +114,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 - `userland/ppc/nest.c` は USER から `exec_run("/bin/hello.bin")` を呼ぶ。
 - 直後に結果種別・コードを読み、stream に表示し、同じ子をもう一度起動する。
 - 親の局所値・USER の復帰位置が保たれ、2回とも子の結果が得られることを確認する。
-- `arch/ppc/exec_context.c` の `arch_priv_save()` と `exec_launch.inc` の `exec_launch()` の既存退避・復元を使う。
+- `sys/arch/ppc/exec_context.c` の `arch_priv_save()` と `exec_launch.inc` の `exec_launch()` の既存退避・復元を使う。
 - arch の仕組みを新設する段ではなく、USER→USER の実動作を確かめる段とする。
 - 試験専用 root に nest を加え、既存 CLI 像の配布用 root は変更しない。
 - QEMU 受入の1行は「CLI → nest → hello → nest → hello → nest → CLI、2回とも EXITED/7」。
@@ -157,7 +157,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 
 - **P03 で fd1 の既定出力を接続する。console_write を stream とログへ二重投入しない。**
 - `kboot_console.c` の変更だけでは kernel kprintf も stream へ移るため、分離が必要。
-- 第3像だけ `lib/kprintf.c` の TU 内の console_write 参照をログ専用関数へ結び替える。
+- 第3像だけ `sys/kern/kprintf.c` の TU 内の console_write 参照をログ専用関数へ結び替える。
 - その結び替えは make の当該 object 専用定義とし、共通 C ソースは変更しない。
 - kboot console の shell_print 系はログを維持し、kprintf の文字列・数値部分もログにそろえる。
 - 通常の console_write は第3像だけ console_stream_write を呼び、他の2像は現行どおり。
@@ -182,7 +182,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 - 公開 KAPI の slot・型・世代は変更せず、不在群から戻す必須 slot は0本とする。
 - 共通 sh の登録列・runtime・clear・環境値は CPU 非依存の選択口にする。
 - 環境値は `SH_DEFAULT_PATH/HOME/SHELL` を使い、既定値を既存 `SYS_DEFAULT_*` にする。
-- `include/config.h` の無条件定義は再定義しない。PPC profile は SH 側だけ指定する。
+- `sys/include/config.h` の無条件定義は再定義しない。PPC profile は SH 側だけ指定する。
 
 **6. 大きさの予算**
 
@@ -217,7 +217,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 |N01|`userland/ppc/nest.c`、`tools/ppc/sc_run.py`、`build/ppc-user.mk`、`build/targets/ppc-powermac.mk` (root に足す bin の変数と試験用の出力先)|≤300|最初|PPC専用|なし|試験用root・nest反復・既存hello/fault|nest QEMU、USER build、L|
 |P01|`userland/ppc/sh/profile.h`|≤80|なし|専用|なし|S01/S02 の既定展開・選択契約|X、L|
 |P02|`input_decode.c`、`input_boot.c`、`input_boot.h`（platform/powermac）|≤365|なし|専用|なし|I、既存LAN入力試験|I、L|
-|P03|`platform/powermac/kboot_console.c`、`build/targets/ppc-powermac.mk`|≤120|N01 (同じ mk、直列)|PPC専用|なし|O、既存kboot出力・変異|O、既存対象試験、L|
+|P03|`sys/platform/powermac/kboot_console.c`、`build/targets/ppc-powermac.mk`|≤120|N01 (同じ mk、直列)|PPC専用|なし|O、既存kboot出力・変異|O、既存対象試験、L|
 |P04|`exec_boot.c`、`shell_boot.c`、`shell_boot.h`（platform/powermac）|≤130|P02/P03|専用|なし|接続待ち・exit再起動・ロード失敗|SC、L|
 |U01|`runtime.c`、`format.c`、`runtime.h`（userland/ppc/sh）|≤300|P01|専用|なし|R、g_api/kapi一致、help色出力|R、L|
 |U02|`stdio.c`、`include/stdio.h`（同上）|≤220|U01|専用|なし|R、短いwrite・redirect・無操作stdio|R、L|
@@ -225,7 +225,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 |S01|`main.c`、`cmd_base.c`、`cmd_env.c`（userland/shell）|約120|P01/U01|共|なし|ver/hwb/about/mem、sh_shell、ver-shell-host|対象host試験、x86 programs、L|
 |S02|`userland/shell/sh_exec.inc`、`sh_launch.inc`|≤120|N01/P01|共|なし|sh_launch/status/truncation、X|対象host試験、x86 programs、L|
 |B01|`build/ppc-user.mk`|≤120|U01–03/S01–02|PPC専用|なし|R、既存ls/help、hello/fault|sh＋hello/fault build、R、L|
-|B02|`build/targets/ppc-powermac.mk`、`platform/powermac/ppc_kernel.c`|≤180|P02–04/B01|PPC専用|なし|三像・NEGATIVE・既存消費者|三像build、対象kboot/LAN試験、L|
+|B02|`build/targets/ppc-powermac.mk`、`sys/platform/powermac/ppc_kernel.c`|≤180|P02–04/B01|PPC専用|なし|三像・NEGATIVE・既存消費者|三像build、対象kboot/LAN試験、L|
 |T01|`tools/tests/ppc_sh_runtime.py`、`ppc_sh_input.py`|≤400|U/P|試験|なし|R/I の実ソース試験と変異|R/I --mutate、L|
 |T02|`test_ver_shell.py`、`test_hwb_shell.py`、`test_about_info.py`|≤200|S01|試験|なし|旧anchor・include・固定hash・dep-dir|各変更試験 --mutate、L|
 |T03|`test_mem_stat.py`、`sh_shell_host.c`、`tools/checks/ver-shell-host.py`|≤200|S01|試験|なし|同上、CHECK の入力追従|mem/sh-shell/ver-shell-host、L|
@@ -279,7 +279,7 @@ r1→r2 の変更の数 13 / 反論の数 0
 
 ## 確定 (2026-11-12、Opus 5.5 の第 2 回の条件付き確定を PM が反映)
 - N2 (P2): N01 のファイルに build/targets/ppc-powermac.mk (root に足す bin の変数と試験用の出力先) を加え、同じ mk を触る P03・B02 と直列にした (§7 の表)。
-- N3 (P3、PM 決定): fd1 の既定の出力を端末へ向ける結び替えは **fs/vfs_fd.c (vfs_write_fd()) の 1 か所 (fd1 の既定の出力) だけ**にする。console_write と kernel の kprintf はログのまま。PPC の第 3 像の build で fs/vfs_fd.o にだけ置き換えの名前を渡すか、platform の provider を介すかは P03 の実装で決める (kboot_accept の変異 build (build/targets/ppc-powermac.mk-104) でも同じ形で組まれること)。共通の C のソースは変えない。
+- N3 (P3、PM 決定): fd1 の既定の出力を端末へ向ける結び替えは **sys/fs/vfs_fd.c (vfs_write_fd()) の 1 か所 (fd1 の既定の出力) だけ**にする。console_write と kernel の kprintf はログのまま。PPC の第 3 像の build で sys/fs/vfs_fd.o にだけ置き換えの名前を渡すか、platform の provider を介すかは P03 の実装で決める (kboot_accept の変異 build (build/targets/ppc-powermac.mk-104) でも同じ形で組まれること)。共通の C のソースは変えない。
 - N4 (P3): N01 を前提にするのは S02・B01・B02 だけ。P01・P02・U01〜U03 は依存なしで並列に出せる (§7 の表を直した)。
 - N5 (P3): SH_LAUNCH_SYNC の選択は sh_exec.inc の `#ifndef SHELL_AS_APP` と sh_launch.inc 末尾の sh_exec_result の 2 か所。既定値は userland/ppc/sh/profile.h (P01) が与え、shell.h には置かない (x86 は未定義 = 今の展開)。
 - N6 (P3): 端末の接続の判定は、platform/powermac の中に「接続しているか」を返す小さな関数を置く (pm_term_state は STATE の message を組み立てる関数なので使わない)。P04 に含める。
@@ -287,9 +287,9 @@ r1→r2 の変更の数 13 / 反論の数 0
 
 ## 確定の後の追記 1 (実装と受入で決めたこと)
 
-- N01 で見つかった USER の入れ子の不具合を `arch/ppc/exec_context.c` で修正。
+- N01 で見つかった USER の入れ子の不具合を `sys/arch/ppc/exec_context.c` で修正。
 - R01 で ramfs の FD の口を用意。
-- P03 の fd1 の結び替えは `fs/vfs_fd.c` の 1 か所 (`platform_fd1_write`、機種ごとの `platform_console.h`)。
+- P03 の fd1 の結び替えは `sys/fs/vfs_fd.c` の 1 か所 (`platform_fd1_write`、機種ごとの `platform_console.h`)。
 - 受入アプリは 8.3 名 `outprobe` を使う。
 - serial 版の試験は停止の前に EE=0 とする。
 - K01 の時計の検査は TB の読み 2 回で挟み、周期は変えない。

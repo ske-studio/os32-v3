@@ -81,7 +81,7 @@ def main():
             options.extend(['PPC_LOOP_SAMPLE=' + str(sample), str(sample)])
         settings = []
         if case == 'total':
-            settings = mutant_settings(folder, case, 'drivers/block/loop_dev.c',
+            settings = mutant_settings(folder, case, 'sys/dev/block/loop_dev.c',
                                        '*out_total = s->total_lba;', '*out_total = s->total_lba + 1;')
         elif case == 'loop-absent':
             kernel.mkdir()
@@ -89,7 +89,7 @@ def main():
         elif disabled:
             # Keep the product shell and select the absent provider in this control only.
             profile = folder / 'loop-disabled.mk'
-            profile.write_text('include build/images/ppc-flags.mk\noverride FEATURE_LOOP := 0\n')
+            profile.write_text('include sys/conf/images/ppc-flags.mk\noverride FEATURE_LOOP := 0\n')
             settings = ['PPC_FLAGS_MK=' + str(profile)]
         media = build_media(kernel, *options, *settings, 'kb-user', 'kernel')
         if case == 'normal':

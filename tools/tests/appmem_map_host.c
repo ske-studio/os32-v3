@@ -1,5 +1,5 @@
 #include "gfx2_bridge_fake.h"
-#include "gfx/v2/gfx2_int.h"
+#include "sys/hal/gfx/v2/gfx2_int.h"
 /* This memory fixture has no active display adapter. */
 struct gfx2_adapter *gfx2_active(void) { return 0; }
 int gfx2_head_restore_v1(struct gfx2_adapter *a, u32 head)

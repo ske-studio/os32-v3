@@ -1,10 +1,10 @@
-"""T9-K R1: KAPI が CPL=3 へ返す文字列の置き場を実物の exec/ring3_str.c で確かめる。
+"""T9-K R1: KAPI が CPL=3 へ返す文字列の置き場を実物の sys/kern/exec/ring3_str.c で確かめる。
 
 票:   docs/archive/gui_v13/TASK_T9_sh.md §12 R1 (Codex 網羅レビュー 往復 7)
 記録: tools/tests/t9_tdd.md
 
-sys_getcwd は fs/vfs.c の static cwd (カーネル帯) をそのまま返していた。
-カーネル帯の PTE には USER ビットが無い (mm/paging.c が phys | PAGE_RW で
+sys_getcwd は sys/fs/vfs.c の static cwd (カーネル帯) をそのまま返していた。
+カーネル帯の PTE には USER ビットが無い (sys/kern/mm/paging.c が phys | PAGE_RW で
 張る) ので、CPL=3 の sh.bin が `cd` / `pwd` で戻り値を読むと #PF → fault kill
 になる。写し先は KAPI トランポリンページ (RO+USER) の、表とスタブの後ろの空き。
 
@@ -13,7 +13,7 @@ test_launch.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと�
 ([C1] GNU11)。Make・エミュレータ・libc は使わない。
 """
 CHECK = dict(name='ring3-str-host', tier=1,
-    covers=['tools/tests/host32.py', 'exec/ring3_str.c', 'tools/tests/ring3_str_host.c', 'tools/tests/kernel_includes.py'],
+    covers=['tools/tests/host32.py', 'sys/kern/exec/ring3_str.c', 'tools/tests/ring3_str_host.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.0,
     basis=['KAPI_SPEC §4'],
 )
@@ -30,7 +30,7 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
 INCLUDES = include_flags(ROOT)
 HOST_SRC = ROOT / "tools/tests/ring3_str_host.c"
-KERNEL_SRC = ROOT / "exec/ring3_str.c"
+KERNEL_SRC = ROOT / "sys/kern/exec/ring3_str.c"
 
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-ring3-str-") as tmp:

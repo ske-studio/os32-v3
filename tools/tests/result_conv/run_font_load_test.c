@@ -5,6 +5,6 @@
 
 #define printf rconv_printf
 #define main   font_load_test_main
-#include "../../../userland/tests/font_load_test.c"
+#include "../../../userland/diag/font_load_test.c"
 #undef main
 #undef printf

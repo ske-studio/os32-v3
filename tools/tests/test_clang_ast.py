@@ -134,9 +134,9 @@ if __name__ == '__main__':
 
     def test_declared_powerpc_compiler_is_not_silently_dropped(self):
         from clang_ast.build import parse_compile_lines, dependency_files
-        line = '/cross/bin/powerpc-elf-gcc -mbig-endian -c lib/kstring_c.c -o out.o'
+        line = '/cross/bin/powerpc-elf-gcc -mbig-endian -c sys/kern/kstring_c.c -o out.o'
         units = parse_compile_lines(line, declared_cc='/cross/bin/powerpc-elf-gcc')
-        self.assertEqual([u['src'] for u in units], ['lib/kstring_c.c'])
+        self.assertEqual([u['src'] for u in units], ['sys/kern/kstring_c.c'])
         self.assertEqual(parse_compile_lines(line), [])
         self.assertEqual(parse_compile_lines('gcc -c wrong.c -o out.o', declared_cc='/cross/bin/powerpc-elf-gcc'), [])
         self.assertIsNone(dependency_files(['build/arch/ppc.mk']))
@@ -273,7 +273,7 @@ if __name__ == '__main__':
                 # driver inputs keep their repository-relative paths.
                 if source.is_absolute():
                     self.assertTrue((source.parent / (source.parent.name + '_imports.h')).is_file())
-        self.assertTrue({'platform/pc98/kernel.c', 'boot/boot_main.c',
+        self.assertTrue({'sys/platform/pc98/kernel.c', 'boot/boot_main.c',
                          'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c',
                          'sdk/allocator/nano_adapter.c'} <= sources)
         self.assertTrue(any(u['src'] == 'sdk/crt/syscalls.c' and
@@ -374,7 +374,7 @@ if __name__ == '__main__':
 
     def test_review_physical_api_position(self):
         # Use the real header, including the pstart spelling from the review.
-        tu = self.tu('#include "mm/paging.h"\n'
+        tu = self.tu('#include "sys/kern/mm/paging.h"\n'
             'void probe(struct addrspace *as, void *p) { '
             'paging_addrspace_map_user_range_phys(as, 0, 0, (u32)p, 0); }',
             ['-I.','-Iinclude'])

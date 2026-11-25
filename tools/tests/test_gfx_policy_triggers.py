@@ -7,19 +7,19 @@ import tempfile
 import host32
 
 CHECK = dict(name='gfx-policy-triggers-host', tier=1, needs=[], budget=5, covers=[
-    'gfx/gfx_core.c', 'kernel/console/console.c', 'exec/appslot.c',
+    'sys/hal/gfx/gfx_core.c', 'sys/kern/console/console.c', 'sys/kern/exec/appslot.c',
     'tools/tests/test_gfx_policy_triggers.py', 'tools/tests/host32.py'],
     basis=['GFX_ACCEL_HAL_DESIGN §3-4', 'GFX_ACCEL_HAL_DESIGN §7'],
 )
 ROOT = Path(__file__).resolve().parents[2]
 CASES = [
-    ('console-scanout', 'gfx/gfx_core.c', 'if (display_provider_console_owns_scanout()) goto rebind;'),
-    ('console-return', 'gfx/gfx_core.c', '    display_provider_console_return();'),
-    ('claim', 'gfx/gfx_core.c', '        gfx_policy_reeval();'),
-    ('shutdown', 'gfx/gfx_core.c', '    gfx_policy_reeval();\n    gfx_reinit_surfaces(0);'),
-    ('gui-enter', 'kernel/console/console.c', '    gfx_policy_reeval();\n    if (legacy_active()) return;'),
-    ('gui-exit', 'kernel/console/console.c', '    gfx_policy_reeval();\n    /* 票 K7'),
-    ('owner-exit', 'exec/appslot.c', '    if (returned) exec_surface_policy_reeval();'),
+    ('console-scanout', 'sys/hal/gfx/gfx_core.c', 'if (display_provider_console_owns_scanout()) goto rebind;'),
+    ('console-return', 'sys/hal/gfx/gfx_core.c', '    display_provider_console_return();'),
+    ('claim', 'sys/hal/gfx/gfx_core.c', '        gfx_policy_reeval();'),
+    ('shutdown', 'sys/hal/gfx/gfx_core.c', '    gfx_policy_reeval();\n    gfx_reinit_surfaces(0);'),
+    ('gui-enter', 'sys/kern/console/console.c', '    gfx_policy_reeval();\n    if (legacy_active()) return;'),
+    ('gui-exit', 'sys/kern/console/console.c', '    gfx_policy_reeval();\n    /* 票 K7'),
+    ('owner-exit', 'sys/kern/exec/appslot.c', '    if (returned) exec_surface_policy_reeval();'),
 ]
 
 def function(source, signature):
@@ -111,13 +111,13 @@ def run_case(runner, mutation):
         name, path, anchor = mutation
         assert sources[path].count(anchor) == 1, name
         sources[path] = sources[path].replace(anchor, anchor.replace('if (display_provider_console_owns_scanout())', 'if (0)', 1).replace('display_provider_console_return();', '(void)0;', 1).replace('exec_surface_policy_reeval();', '(void)0;', 1).replace('gfx_policy_reeval();', '(void)0;', 1), 1)
-    code = PRELUDE + '\n' + function((ROOT / 'exec/exec_surface.h').read_text(), 'static inline void exec_surface_policy_reeval(') + '\n' + '\n'.join([
-        function(sources['gfx/gfx_core.c'], 'static int gfx_kapi_claim(void)'),
-        function(sources['gfx/gfx_core.c'], 'void gfx_shutdown(void)'),
-        function(sources['kernel/console/console.c'], 'void console_text_gdc_stop(void)'),
-        function(sources['kernel/console/console.c'], 'void console_text_gdc_start(void)'),
-        function(sources['exec/appslot.c'], 'static void gfx_owner_cleanup(int id)'),
-        function(sources['exec/appslot.c'], 'void appslot_gfx_owner_exit(int id)'),
+    code = PRELUDE + '\n' + function((ROOT / 'sys/kern/exec/exec_surface.h').read_text(), 'static inline void exec_surface_policy_reeval(') + '\n' + '\n'.join([
+        function(sources['sys/hal/gfx/gfx_core.c'], 'static int gfx_kapi_claim(void)'),
+        function(sources['sys/hal/gfx/gfx_core.c'], 'void gfx_shutdown(void)'),
+        function(sources['sys/kern/console/console.c'], 'void console_text_gdc_stop(void)'),
+        function(sources['sys/kern/console/console.c'], 'void console_text_gdc_start(void)'),
+        function(sources['sys/kern/exec/appslot.c'], 'static void gfx_owner_cleanup(int id)'),
+        function(sources['sys/kern/exec/appslot.c'], 'void appslot_gfx_owner_exit(int id)'),
     ]) + POSTLUDE
     with tempfile.TemporaryDirectory(prefix='gfx-policy-triggers-') as td:
         src = Path(td) / 'test.c'; exe = Path(td) / 'test'

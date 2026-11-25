@@ -2,7 +2,7 @@
 Normal controls always run before compiled runtime-RED mutations.
 """
 CHECK = dict(name='v86-call-host', tier=1,
-    covers=['arch/x86/kernel/kapi_call.c', 'include/kapi_call.h', 'include/kapi_call_generated.h', 'include/v86_call.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'platform/pc98/legacy/v86_call.c', 'exec/redir_access.c', 'exec/exec.c', 'platform/pc98/legacy/v86.c', 'platform/pc98/legacy/v86_module.c', 'userland/tests/kstr_v86.c', 'tools/tests/v86_call_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['sys/arch/x86/kernel/kapi_call.c', 'sys/include/kapi_call.h', 'sys/include/kapi_call_generated.h', 'sys/arch/x86/v86_call.h', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/platform/pc98/legacy/v86_call.c', 'sys/kern/exec/redir_access.c', 'sys/kern/exec/exec.c', 'sys/platform/pc98/legacy/v86.c', 'sys/platform/pc98/legacy/v86_module.c', 'userland/diag/kstr_v86.c', 'tools/tests/v86_call_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=[], budget=3.1,
     basis=['KAPI_SPEC', 'AC-KAPI-1'],
 )
@@ -37,9 +37,9 @@ MUTANTS = [
 
 
 def main():
-    sources = {'arch_call': (ROOT / 'arch/x86/kernel/kapi_call.c').read_text(), 'call': (ROOT / 'platform/pc98/legacy/v86_call.c').read_text(),
-               'redir': (ROOT / 'exec/redir_access.c').read_text(),
-               'guest': (ROOT / 'userland/tests/kstr_v86.c').read_text().replace(
+    sources = {'arch_call': (ROOT / 'sys/arch/x86/kernel/kapi_call.c').read_text(), 'call': (ROOT / 'sys/platform/pc98/legacy/v86_call.c').read_text(),
+               'redir': (ROOT / 'sys/kern/exec/redir_access.c').read_text(),
+               'guest': (ROOT / 'userland/diag/kstr_v86.c').read_text().replace(
                    '#include <string.h>', '')}
     with tempfile.TemporaryDirectory(prefix='v86-call-') as td:
         folder = Path(td)

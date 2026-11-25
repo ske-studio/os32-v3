@@ -29,7 +29,7 @@
 #include "rt/dbgserial.h"
 #include "rt/pkg.h"
 #include "inst_hdd.h"
-#include "include/platform_install_boot.h"
+#include "sys/include/platform_install_boot.h"
 
 #define CD_MOUNT "/cd0"
 #define HDD_MOUNT "/hd0"

@@ -9,7 +9,7 @@ unsigned int host_arch_if = 0x202U;
 #include "gfx_kernel_fb_host.c"
 #undef run
 #include "guard_platform.c"
-#include "../../hwdev/gf/command.h"
+#include "../../sys/dev/video/geforce/command.h"
 #include "shlib.h"
 int kselftest_run_audit(const char *tag)
 { (void)tag; return paging_master_audit(exec_tramp_page_addr()); }

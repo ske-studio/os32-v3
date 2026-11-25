@@ -15,7 +15,7 @@
 | R5-P1-2 | R0c のビルドと配置: build/libs.mk の旧アーカイブ、build/sdk.mk のヘッダのコピー、userland/deploy.yaml の 3 バイナリ |
 | R5-P2-1 | tools/hwdev_layout.json は KernelAPI のメンバーの一覧なので**廃止の 10 欄も残す**。AV0 の後の実際の構造体から再生成 (tools/gen_hwdev_contract.py の DWARF 照合) |
 | R5-P2-2 | 試験と登録: gshell の host 試験 (wm_tests.rs、mocks.rs) の snd_focus を av_focus_set に、test_v86_module.py の import の期待を全キーオフに、test_packages.py の sndctl、build/kernel-objects.mk・tools/checks/run.py の登録 |
-| 独立の洗い出し | 廃止の名前を grep で洗い直し、上に無かった 9 か所を足した (README.md・build/packages.yaml・exec/exec_kapi_init.inc・hwdev/generated/hwdev_layout.txt・sdk/rust/os32api/src/kapi_generated.rs・display_cleanup_host.c・v86_gcap_abort_host.c・k5b_gshell_tdd.md・gshell/src/wm.rs・shell/sh_exec.inc の注記) |
+| 独立の洗い出し | 廃止の名前を grep で洗い直し、上に無かった 9 か所を足した (README.md・build/packages.yaml・sys/kern/exec/exec_kapi_init.inc・sys/dev/hwdev/generated/hwdev_layout.txt・sdk/rust/os32api/src/kapi_generated.rs・display_cleanup_host.c・v86_gcap_abort_host.c・k5b_gshell_tdd.md・gshell/src/wm.rs・shell/sh_exec.inc の注記) |
 
 ## r4→r5 の変更
 
@@ -95,7 +95,7 @@
 
 | 物 | 所在 | 設計での扱い |
 |---|---|---|
-| 割込み間の frame 数 = I14/I15 (NS-1)、今は 2047 | drivers/sound/cs4231/pcm_cs4231.h | 区間の長さ (period) を開く時に書く |
+| 割込み間の frame 数 = I14/I15 (NS-1)、今は 2047 | sys/dev/sound/cs4231/pcm_cs4231.h | 区間の長さ (period) を開く時に書く |
 | リング 4096 frame・16KB、REFILL_MARGIN 512 | pcm_cs4231.h | リングの大きさは変えない |
 | 連続性は DMA の位置だけで判定 | pcm_cs4231.h、pcm_cs4231_math.c (`pcm_cont`) | 区間の番号へ一般化 |
 | 補充は半面の交代時だけ 2048 frame | pcm_cs4231_math.c (`pcm_obs`) | 区間 + 途中の追補へ作り替え (P1-1) |
@@ -104,17 +104,17 @@
 | close: OPEN なら開始して drain、RUNNING は DRAINING | pcm_cs4231.c | 同上 |
 | 回収: 止めて証拠 (INIT=0・PEN=0)、無ければ FAULTED と DMA 隔離 | pcm_cs4231.c (`pcm_release`)・746-779 (`pcm_reclaim`) | 証拠の取り方は backend に残し、順は `snd2_teardown` 1 か所 |
 | 部品の取り外しは静止を確かめる | pcm_cs4231.c (`pcm_module_quiet`) | FAULTED なら取り外さない (ctx の寿命) |
-| 状態 PCM_ST_CLOSED〜FAULTED | include/pcm_contract.h | 内部の状態はこれを使い続ける |
-| 回収の並び (6) snd_owner_exit・(6b) pcm_reclaim | exec/exec_finish.inc (exec_reclaim_resources()) | (6b) を `snd2_reclaim` に置き換え、(6c) `in2_reclaim` |
-| snd_focus に呼び手の検査は無い | kapi/kapi_generated.c、drivers/sound/fm/snd_engine.c | av_focus は呼び手を検査する (P1-6) |
-| WM の識別 `GUI_SHELL_OWNER 1`・`gui_register` は shell 帯だけ | kernel/gui.h | 前景を変える権限の判定に使う |
-| raw キー 128 件、満杯でも CTRL+STOP は末尾を置き換え | input/hal/legacy_ring.c (入力の HAL 3a) | 同じ作法を WM の退避にも |
+| 状態 PCM_ST_CLOSED〜FAULTED | sys/include/pcm_contract.h | 内部の状態はこれを使い続ける |
+| 回収の並び (6) snd_owner_exit・(6b) pcm_reclaim | sys/kern/exec/exec_finish.inc (exec_reclaim_resources()) | (6b) を `snd2_reclaim` に置き換え、(6c) `in2_reclaim` |
+| snd_focus に呼び手の検査は無い | sys/kapi/kapi_generated.c、drivers/sound/fm/snd_engine.c | av_focus は呼び手を検査する (P1-6) |
+| WM の識別 `GUI_SHELL_OWNER 1`・`gui_register` は shell 帯だけ | sys/kern/gui.h | 前景を変える権限の判定に使う |
+| raw キー 128 件、満杯でも CTRL+STOP は末尾を置き換え | sys/hal/input/legacy_ring.c (入力の HAL 3a) | 同じ作法を WM の退避にも |
 | 本体の鍵盤の配り `kbd_deliver(scancode)` | kbd.c | ここで src 0 として in2 へ (USB の後は kbd_merge_event の頭) |
 | WM の退避 pending_raw と STOP の除去 | userland/gshell/src/input.rs | 境目の掃除に同じ形を使う |
 | WM のマウスの取り込み | input.rs:209・278-281 (`capture`・`release_capture`) | 独占中は配らない |
-| マウス `MouseState`・`mouse_poll` | include/pointer_service.h、drivers/input/mouse.c | mouse_poll は変えない |
-| V86 の I/O の許可表と分岐 | platform/pc98/legacy/v86_io.c (v86_io_allow()) (0188h–018Fh を素通し)・`v86_io_apply_policy()` (bitmap)・`v86_io_in()` (gcap・観測が先) | §9-1 |
-| V86 の実行 | platform/pc98/legacy/v86.c (`v86_run(ctx)`)・同ファイル内 (`v86_run_limit`)・同ファイル内 (`v86_boot2` は毎回 IPL を読み終わりに teardown)、userland/cmds/v86.c | §9-2 |
+| マウス `MouseState`・`mouse_poll` | sys/hal/input/pointer_service.h、sys/platform/pc98/input/mouse.c | mouse_poll は変えない |
+| V86 の I/O の許可表と分岐 | sys/platform/pc98/legacy/v86_io.c (v86_io_allow()) (0188h–018Fh を素通し)・`v86_io_apply_policy()` (bitmap)・`v86_io_in()` (gcap・観測が先) | §9-1 |
+| V86 の実行 | sys/platform/pc98/legacy/v86.c (`v86_run(ctx)`)・同ファイル内 (`v86_run_limit`)・同ファイル内 (`v86_boot2` は毎回 IPL を読み終わりに teardown)、userland/cmds/v86.c | §9-2 |
 | 合成器の契約 (DMA 時計 D・Ptarget=D+6144・owned submit) | docs/decisions/sound/SYNTH_OPNA_DESIGN.md | §8 で置き換え |
 | USB の入力の入口 | ~/os32-tmp/run/usb/DESIGN.r5.md:191-195・§4-8 | src ごとに in2 へ (§5-4) |
 
@@ -137,11 +137,11 @@
  │ libos32in2map: PC-98 の sc → DIK・VK の表                               │
  └─┬──────────────────────────────────────────────────────────────────┘
  ══╪════ KAPI (os32_snd2.h・os32_in2.h・av_focus、C89) ════════════════
- ┌─┴ sound/hal/ (カーネル、共通) ─┐ ┌ input/hal/ (カーネル、共通) ─┐ kernel/av_focus.c
+ ┌─┴ sound/hal/ (カーネル、共通) ─┐ ┌ input/hal/ (カーネル、共通) ─┐ sys/kern/av_focus.c
  │ 列挙・能力・PCM 1 本・位置・DSP │ │ 装置・raw 128・独占・パッド 4 │
  │ **ミキサ無し**                  │ │                               │
  └─┬ SndBackend ─────────────────┘ └─┬ in2_src_* ──────────────────┘
- drivers/sound/cs4231/pcm_hw.c       drivers/input/kbd_hal.c・mouse_hal.c・(USB の後) xgip/xusb/hid_pad
+ sys/dev/sound/cs4231/pcm_hw.c       sys/platform/pc98/input/kbd_hal.c・mouse_hal.c・(USB の後) xgip/xusb/hid_pad
 ```
 
 | 境目 | 内側が持つ | 外側が持つ |
@@ -264,7 +264,7 @@ int snd2_stream_volume(u32 stream, u32 left, u32 right);       /* 0..volume_step
 int snd2_stream_close(u32 stream, u32 how);                    /* SND2_CLOSE_DRAIN 0・ABORT 1 */
 ```
 ```c
-typedef struct Snd2Stream {          /* sound/hal/snd2_int.h。書くのは sound/hal だけ */
+typedef struct Snd2Stream {          /* sys/hal/sound/snd2_int.h。書くのは sound/hal だけ */
     u32 gen; u8 state, paused, v1, closing; int owner;   /* 前景の文脈が書く */
     SND2_Fmt fmt; u32 period, nseg, lead, cap, margin;   /* open で決め、閉じるまで不変 */
     u32 written;                     /* 前景が IF=0 の短い区間で publish */
@@ -282,7 +282,7 @@ typedef struct Snd2Stream {          /* sound/hal/snd2_int.h。書くのは soun
 - epoch が変わったら互換層は位置の対応を取り直す (WAVEHDR の完了は played で判定するので、失った区間の分は遅れて完了する)。
 
 ### 3-6. v1 (pcm_*) の統合 (P1-4)
-| v1 の口 | 統合した口 (sound/hal/snd2_v1.c) |
+| v1 の口 | 統合した口 (sys/hal/sound/snd2_v1.c) |
 |---|---|
 | pcm_open(rate) | `open({rate,16,2,S16LE}, period 2048, lead 1, v1=1)`、cap 8192 |
 | pcm_write | stream_write と同じ。IDLE で `written − played ≥ 4096` になったら start (pcm_cs4231.c の再現) |
@@ -294,7 +294,7 @@ typedef struct Snd2Stream {          /* sound/hal/snd2_int.h。書くのは soun
 
 ### 3-7. backend と後片付け 1 か所 (P1-5)
 ```c
-typedef struct SndBackend {          /* sound/hal/snd2_int.h、SND_HAL2_ABI 1 */
+typedef struct SndBackend {          /* sys/hal/sound/snd2_int.h、SND_HAL2_ABI 1 */
     u32 abi;
     int  (*caps)(void *ctx, SND2_Caps *o);
     int  (*hw_open)(void *ctx, const SND2_Fmt *f, u32 period, u8 **ring);   /* リングは [HW2] を守った DMA の面 */
@@ -320,7 +320,7 @@ static void snd2_teardown(Snd2Stream *s, int why);   /* 唯一の後片付け */
 - `snd2_teardown` の順 (close(ABORT)・DRAIN の終わり・期限切れ・回収・open の失敗・unregister の全部がここ): IF=0 で `closing=1` (以後 advance は装置にもリングにも触らない) → `hw_stop` → 証拠 → IF を戻す → `hw_release(leak = 証拠なし)` → ステージングを kfree → `gen++`・`owner=0` → 証拠ありは IDLE の装置へ、無しは装置を FAULTED (以後の open は IO、unregister は BUSY、`pcm_module_quiet` は 0 を返して部品は残る)。今の pcm_release (pcm_cs4231.c) と同じ証拠・隔離の規則で、置き場が 1 か所になる。
 - 割込みでする事: `hw_ack`・`snd2_advance` (観測・区間の通過・写し ≤ lead×period)。遅らせる事: 無い (変換・混ぜ・合成はカーネルに無い)。
 
-## 4. 前景 (kernel/av_focus.c、P1-6)
+## 4. 前景 (sys/kern/av_focus.c、P1-6)
 ```c
 int  av_focus_set(int owner);  /* KAPI。res_owner_get()==GUI_SHELL_OWNER かつ gui_register 済みだけ。他は INVAL */
 int  av_focus_get(void);       /* KAPI。0 = 前景なし */
@@ -400,7 +400,7 @@ int in2_wm_state(IN2_WmState *o);   /* KAPI。WM (GUI_SHELL_OWNER) だけ */
 - 退避が満杯の時 (input.rs:366 で読む前に止まる所): 独占中か境目の記録がある間は、満杯でも raw を読み、残すキー (STOP の CTRL 付き make・GRPH・TAB・CTRL) だけを退避の末尾の残すキー以外と置き換えて取り込み、他は数えて捨てる (独占中の kbd_raw_buf には残すキーしか来ないので、捨てるのは境目の前の物だけ)。
 - CTRL+STOP は ISR の中断要求 (kbd.c) のまま、GRPH+TAB は WM の kbdnav のまま。切替で前景が替われば独占は解ける (§5-6)。
 
-### 5-4. 入口 (input/hal/in2_int.h、P1-9)
+### 5-4. 入口 (sys/hal/input/in2_int.h、P1-9)
 ```c
 #define IN2_MAX_DEV 16
 int  in2_src_alloc(u8 dev_kind, u8 source, const IN2_DevInfo *info); /* 戻り dev 1..IN2_MAX_DEV、全枠使用中なら FULL */
@@ -452,7 +452,7 @@ void in2_on_focus(int old, int neu);   /* av_focus から */
 XInput は in2_pad_* をそのまま / DI8 のキーボードは in2_key_state・in2_read + libos32in2map (sc → DIK) / マウスは in2_mouse_state・in2_read / ジョイスティックは XInput の状態から組み立てる / GetDeviceData は time_ms・seq / SetCooperativeLevel は in2_acquire と focus_gen / FF は作らない、束ねは libos32input。
 
 ## 6. 時刻 (I5、r1 と同じ)
-`u32 in2_time_ms(void)`: 段 B の前は `tick_count * TICK_MS`、段 B の後は ktime の物理 1kHz。差し替えは input/hal/in2_time.c の 1 行。SND2_Pos.time_ms も同じ。
+`u32 in2_time_ms(void)`: 段 B の前は `tick_count * TICK_MS`、段 B の後は ktime の物理 1kHz。差し替えは sys/hal/input/in2_time.c の 1 行。SND2_Pos.time_ms も同じ。
 
 ## 7. HAL ライブラリ libos32snd (U-2層、ユーザー空間、/sys の共有ライブラリ)
 
@@ -552,28 +552,28 @@ int sndl_midi_long(u32 h, const void *p, u32 n);  int sndl_midi_reset(u32 h);  i
 | KAPI `snd_bgm_is_playing` | `ret: zero` (0 = 鳴っていない) |
 | KAPI `snd_focus` (kapi.json) | `ret: nosys` (OS32_ERR_NOSYS) |
 | KAPI `fm_note_on`・`fm_note_off`・`fm_set_tone_num`・`ssg_tone`・`ssg_volume`・`ssg_all_off` (kapi.json〜1078) | **残す** (HW の FM を直に叩く口で MML ではない) |
-| 生成物 kapi/kapi_generated.c・include/kapi_call_generated.h・sdk/include/os32/os32_kapi_generated.h | 再生成 (clean → all) |
+| 生成物 sys/kapi/kapi_generated.c・sys/include/kapi_call_generated.h・sdk/include/os32/os32_kapi_generated.h | 再生成 (clean → all) |
 | drivers/sound/fm/snd_engine.c・snd_engine.h | 削除 |
-| drivers/sound/fm/fm_body.c | `.fm_startup_sound`・`.fm_play_mml`・`.fm_play_mml_kapi`・`.snd_*` の 13 個と `.tick = snd_tick`・`snd_init()` を外す (tick は無し、`.quiet = fm_quiet` は残す) |
-| drivers/sound/fm/fm_module.h | `#include "snd_engine.h"` を外し、ops の構造体から同じ欄を外して `FM_MODULE_OPS_VERSION` を 1→2 |
-| drivers/sound/fm/fm_module.c〜 | `snd_tick`・`fm_startup_sound`・`fm_play_mml(_kapi)`・`snd_*` の包みを削除 |
-| drivers/sound/fm/fm_module.c | `candidate.tick` の取得と `tick_target` を外す。取り外しの静止 (`fm_quiesce()` の `candidate.snd_set_master(0)`) は `candidate.fm_all_off(); candidate.ssg_all_off();` と `quiet` に。`tick_register(PC98_TICK_SND, snd_tick)` (`fm_module_load()`) の登録を外す (番号の定義は残してよい) |
-| exec/exec_kapi_init.inc〜 | 廃止の口の `wrap_*` の extern はそのまま (wrap は R0a の生成の body として残る) |
-| drivers/sound/fm/fm.c、include/fm_contract.h | `fm_startup_sound`・`fm_play_mml_wait`・`fm_play_mml(_kapi)` と宣言を削除 (`fm_all_off`・`ssg_all_off` は残す) |
-| platform/pc98/kernel.c | include を外し、起動の記録の文言を「fm module」に |
-| exec/exec.c | `#include "snd_engine.h"` を外す |
-| exec/exec_finish.inc (exec_reclaim_resources()) | (6) `snd_owner_exit` の行を削除 |
-| platform/pc98/legacy/v86_io.c (`snd_state_for_guest`)・264-267 (`snd_state_for_os32`) | include を fm_contract.h に。往復の**両方**を `fm_all_off(); ssg_all_off();` に (ゲストに渡す前と戻った後の全キーオフ。BGM の機関は無いので master の 0→1 は要らない) |
+| sys/dev/sound/fm/fm_body.c | `.fm_startup_sound`・`.fm_play_mml`・`.fm_play_mml_kapi`・`.snd_*` の 13 個と `.tick = snd_tick`・`snd_init()` を外す (tick は無し、`.quiet = fm_quiet` は残す) |
+| sys/dev/sound/fm/fm_module.h | `#include "snd_engine.h"` を外し、ops の構造体から同じ欄を外して `FM_MODULE_OPS_VERSION` を 1→2 |
+| sys/dev/sound/fm/fm_module.c〜 | `snd_tick`・`fm_startup_sound`・`fm_play_mml(_kapi)`・`snd_*` の包みを削除 |
+| sys/dev/sound/fm/fm_module.c | `candidate.tick` の取得と `tick_target` を外す。取り外しの静止 (`fm_quiesce()` の `candidate.snd_set_master(0)`) は `candidate.fm_all_off(); candidate.ssg_all_off();` と `quiet` に。`tick_register(PC98_TICK_SND, snd_tick)` (`fm_module_load()`) の登録を外す (番号の定義は残してよい) |
+| sys/kern/exec/exec_kapi_init.inc〜 | 廃止の口の `wrap_*` の extern はそのまま (wrap は R0a の生成の body として残る) |
+| sys/dev/sound/fm/fm.c、sys/include/fm_contract.h | `fm_startup_sound`・`fm_play_mml_wait`・`fm_play_mml(_kapi)` と宣言を削除 (`fm_all_off`・`ssg_all_off` は残す) |
+| sys/platform/pc98/kernel.c | include を外し、起動の記録の文言を「fm module」に |
+| sys/kern/exec/exec.c | `#include "snd_engine.h"` を外す |
+| sys/kern/exec/exec_finish.inc (exec_reclaim_resources()) | (6) `snd_owner_exit` の行を削除 |
+| sys/platform/pc98/legacy/v86_io.c (`snd_state_for_guest`)・264-267 (`snd_state_for_os32`) | include を fm_contract.h に。往復の**両方**を `fm_all_off(); ssg_all_off();` に (ゲストに渡す前と戻った後の全キーオフ。BGM の機関は無いので master の 0→1 は要らない) |
 | sdk/kapi.json の includes の "snd_engine.h" | 外す (R0a) |
 | tools/prototypes/v86_imports.def | `snd_set_master` を `fm_all_off`・`ssg_all_off` に |
 | tools/prototypes/fm_imports.def、build/fm-module.mk | snd_engine.h を FM_DEF_SOURCES から、snd_engine.o を FM_OBJS から、その規則を削除 |
-| tools/hwdev_layout.json → hwdev/generated/hwdev_contract.h・hwdev_layout.txt | KernelAPI のメンバーの一覧なので**廃止の 10 欄も残す** (番号を残すのと同じ)。AV0 の後の実際の構造体から再生成し、tools/gen_hwdev_contract.py の DWARF 照合を通す (R5-P2-1) |
+| tools/hwdev_layout.json → sys/dev/hwdev/generated/hwdev_contract.h・hwdev_layout.txt | KernelAPI のメンバーの一覧なので**廃止の 10 欄も残す** (番号を残すのと同じ)。AV0 の後の実際の構造体から再生成し、tools/gen_hwdev_contract.py の DWARF 照合を通す (R5-P2-1) |
 | sdk/rust/os32api/src/kapi_generated.rs | 生成物。R0a の再生成で retired の口も型どおり残る |
 | build/kernel-objects.mk | CORE_KERNEL_INCLUDES の snd_engine の登録を外す |
 | tools/check_arm_compile.py、tools/tests/fixtures (dep_dir_a/l01.json・dep_dir_c/manifest.json・build_profile_x86.json)、tools/tests/test_src_layout.py | snd_engine の行を外す |
 | userland/shell/cmd_base.c (beep = fm_startup_sound)・cmd_sys.c (play = fm_play_mml) | コマンドと help の行を削除 (呼び手の除去) |
-| userland/tests/bench/main.c (test_fm()) | FM の MML の計測の項を削除 |
-| userland/tests/raw_wait_test.c の `fm` のモード | モードを削除 (STOP で待ちを抜ける試験は kbd・serial・db・log のモードで残る)。tools/tests/raw_wait_guest_host.c の fm の場合も削除 |
+| userland/diag/bench/main.c (test_fm()) | FM の MML の計測の項を削除 |
+| userland/diag/raw_wait_test.c の `fm` のモード | モードを削除 (STOP で待ちを抜ける試験は kbd・serial・db・log のモードで残る)。tools/tests/raw_wait_guest_host.c の fm の場合も削除 |
 | tools/tests/test_raw_wait.py (`mml wait probe`・`mml key off` の CASES) と `main()` (audit.MUTATIONS から next() で取る所)、tools/tests/raw_wait_tdd.md の fm のモードの記述 | 2 件を CASES と変異の一覧から削除し (next() が見つからずに落ちないよう両方から)、raw_wait_tdd.md の記述も外す (R0c) |
 | userland/gshell/src/multiapp.rs `sync_snd_focus` | `av_focus_set` だけを呼ぶ |
 | userland/lib/snd の旧 libos32snd.c・libos32snd.h・userland/system/sndctl.c・sndtest.c・sndtest2.c | 削除 (ディレクトリ userland/lib/snd と名前 libos32snd は L1〜L5 の新しい HAL ライブラリが引き継ぐ。R0c と L5 の間は libos32snd が無い期間で、使う側も R0c で消えるので壊れない) |
@@ -591,7 +591,7 @@ int sndl_midi_long(u32 h, const void *p, u32 n);  int sndl_midi_reset(u32 h);  i
 | README.md:117 | コマンドの一覧から `sndctl`・`play` を外す |
 | userland/shell/sh_exec.inc | 注記の例を sndctl でない物に |
 | userland/rust/gui_demo/src/lib.rs (set_bgm()) | BGM の行を削除 |
-| userland/tests/audit_test.c・kstr_boundary.c | 口ごとの期待値 (void は戻ること・is_playing は 0・snd_focus は NOSYS) に直す。kstr の文字列引数の検査から fm_play_mml を外す |
+| userland/diag/audit_test.c・kstr_boundary.c | 口ごとの期待値 (void は戻ること・is_playing は 0・snd_focus は NOSYS) に直す。kstr の文字列引数の検査から fm_play_mml を外す |
 | 試験: tools/tests/test_fm_module.py・fm_module_host.c (snd の欄の検査と変異を外し OPS_VERSION 2 を確かめる)、fm_playback_host.c (MML の再生の試験、削除)、kapi_audit_host.c・test_kapi_audit.py (retired の 3 種の期待値)、test_kapi_strings.py (fm_play_mml の文字列の検査を外す)、test_tick.py (snd_tick を外す)、test_exec_r1.py・test_exec_hwb_abort.py・exec_image_host.c (snd_owner_exit の期待を外す)、x87_lifecycle_host.c・font_source_host.c (snd の偽の実体を外す) | 各ファイルの CHECK と変異のうち snd/MML を対象にする物は削除、残す物は廃止の応答を期待に |
 | SYNTH §6 の snd の SOFT・persist・借用 ch | 設計から外す (§8) |
 - 再開する時は libos32snd の上にユーザー空間の MML として作る (別票)。
@@ -618,7 +618,7 @@ int sndl_midi_long(u32 h, const void *p, u32 n);  int sndl_midi_reset(u32 h);  i
 | §5 の private の timer/CSM の ABI (`opna_timer_write`・`opna_timer_count`・`opna_apply_csm`) | コアの FFI | **コアに残す** (宣言は lib/os32_opna/opna.h、段 A)。カーネルの模型 (V1) は C で別に持つので timer_write/count は使わない。CSM_KEYON は L2 が `opna_apply_csm` で反映 (R3-P2-2) | A・L2 |
 | §4 表・ビルド・障害 | 最終の synth.elf・再配置・カーネルの panic の終端 | ユーザーの共有ライブラリとして結ぶ (再配置は SDK の共有ライブラリの規則)。Rust の panic はアプリの異常終了 (カーネルの panic にしない) | L5 |
 | [LD1](SNDL_LOAD_DESIGN.md) | SDK の音枠・依存印・リンク/pack・旧世代互換と表の検算 | L5 | 枠契約 | 100〜160 | IL | メモリ契約の決定 |
-| [LD2](SNDL_LOAD_DESIGN.md) | mm/shlib.c の枠別原本、初回読込、attach/detach と RO 判定 | LD1 | 原本・AS の付着集合 | 120〜200 | IL | LD1 |
+| [LD2](SNDL_LOAD_DESIGN.md) | sys/kern/mm/shlib.c の枠別原本、初回読込、attach/detach と RO 判定 | LD1 | 原本・AS の付着集合 | 120〜200 | IL | LD1 |
 | [LD3](SNDL_LOAD_DESIGN.md) | exec の要求検証・初回取得・公開後の予算検査（空き 0 を含む）・待機後の ID 予約と巻戻し | LD2 | 起動計画 | 70〜120 | IL | LD2 |
 | [LD4](SNDL_LOAD_DESIGN.md) | SDK の sndl stub、音表と init、ゲスト sndl_test・対象 host 試験 | LD1〜3・L2/L3/L6 | アプリの bind 状態 | 160〜270 | IL | ソフト音源と PCM の接続 |
 | §5 DMA 時計・PCM の接続・所有者 (サービスの部分) | D・Ptarget=D+6144・owned submit・PCM と排他 | 削除 (上の private の ABI は残す)。量は §7-1 の空き、時刻は §7-4、所有は PCM の流れ | L2・L3 |
@@ -637,7 +637,7 @@ int sndl_midi_long(u32 h, const void *p, u32 n);  int sndl_midi_reset(u32 h);  i
 
 形: V86 を動かすアプリ (userland/cmds/v86.c) が実行のループを持ち、カーネルの V86 は FM のポートの書きを snd2_fmq に積んでアプリへ返す。アプリが libos32snd の合成器へ渡し pump する。V86 もアプリとして PCM を占有する。
 
-### 9-1. 捕捉 (platform/pc98/legacy/v86_io.c、R2-P1-4)
+### 9-1. 捕捉 (sys/platform/pc98/legacy/v86_io.c、R2-P1-4)
 - 今は v86_io.c の許可表が 0188h–018Fh を TSS で素通しにし (読みの BUSY のポーリングを速くするため)、`v86_io_apply_policy()` 以降で bitmap に立てる。分岐は `v86_io_in()` (gcap) → `v86_io_in()` (観測) が先。
 - SOFT のセッション (`v86s_begin` の flags に FM_SOFT) では: bitmap を作る所で **0188h–018Fh と A460h を拒否** (セッションの終わりに今の表へ戻す、v86_io_reset_policy と同じ所)。`v86_io_in/out` の**先頭**に `if (v86_fm_soft && v86_fm_is_port(port)) return v86_fm_in/out(...)` (gcap・観測より先)。
 - 新 platform/pc98/legacy/v86_fm_io.c: 幅 2/4 は連続 byte に分けて順に。0188h/018Ah = bank0 の addr/data、018Ch/018Eh = bank1 の addr/data、奇数のポートは読み FF・書き捨て。A460h は SYNTH §6 の規則 (ID 70h|bit0、bit0 だけ保持、0 なら bank1 を mask: 読み FF・書き無視)。bank ごとの addr の latch。
@@ -658,7 +658,7 @@ int v86s_end(u32 sid);                              /* 今の boot2 の終わり
 - 保存: セッションの間、カーネルが `struct v86_context` (汎用レジスタ・セグメント・EFLAGS・仮想 IF と STI の影)・v86 の PIC・PIT・鍵盤・メモリの写像・FM の模型と bank の latch を持ち続ける。run の間に teardown しない。今の `v86_run_limit(ctx, tick_limit)` (v86.c:470) を「戻った時に ctx を書き戻す」形にして使う。
 - 戻る所は命令の境目だけ: (a) FM の OUT を**終えた後**、FIFO が半分以上 → FIFO。(b) PIT の tick の割込みで V86 から監視へ来た時に slice を過ぎていれば → SLICE (I/O の無い busy loop もこれで戻る)。(c) §9-3 の同期の読み → IOREAD。(d) FIFO が満杯の時の FM の OUT は実行せずに FIFO で戻る (次の run で再実行、落とさない)。
 - 幅の結線 (R4-P2-2): v86.c:247 は 66h で `opsize16 = 0` にするが :265 の `v86_gp_emulate(frame, pc, len)` に渡していない。`v86_gp_emulate(frame, pc, len, opsize16)` にし、E5・ED (IN) と E7・EF (OUT) は `opsize16 ? 2 : 4` の幅で `v86_set_ax` / `v86_set_eax` (新、EAX 全体) を使う。幅 4 の IN は 4 つの連続ポート (例: DX=0188h なら 0188h・0189h・018Ah・018Bh)。
-- IOREAD の結線 (R3-P1-3、platform/pc98/legacy/v86_gp_emulate.inc の IN の 4 形): `v86_io_in` を `v86_io_in2(port, size, &v)` (戻り 0 = 値あり・1 = 保留) にし、保留なら **AL/AX/EAX も EIP も変えずに** `V86_EMU_PEND` を返す。監視は IOREAD で run を戻る (Exit の `port・width・nq・q[]` に、幅 2/4 の IN を byte に分けた中で同期が要る byte だけ。他の byte はカーネルが答える)。次の run で `reply_valid=1` なら、`v86_fm_io` が reply を「この IN の答え」として持ち、**同じ IN を再実行**して完了させ EIP を進める (命令の途中の状態を持たない)。reply は使った時に消す。INS (文字列の IN) の FM のポートは同期せず影の値で答える (資料のある使い方が無い)。
+- IOREAD の結線 (R3-P1-3、sys/platform/pc98/legacy/v86_gp_emulate.inc の IN の 4 形): `v86_io_in` を `v86_io_in2(port, size, &v)` (戻り 0 = 値あり・1 = 保留) にし、保留なら **AL/AX/EAX も EIP も変えずに** `V86_EMU_PEND` を返す。監視は IOREAD で run を戻る (Exit の `port・width・nq・q[]` に、幅 2/4 の IN を byte に分けた中で同期が要る byte だけ。他の byte はカーネルが答える)。次の run で `reply_valid=1` なら、`v86_fm_io` が reply を「この IN の答え」として持ち、**同じ IN を再実行**して完了させ EIP を進める (命令の途中の状態を持たない)。reply は使った時に消す。INS (文字列の IN) の FM のポートは同期せず影の値で答える (資料のある使い方が無い)。
 - 検査: size・sid・呼び手が begin の owner (他は INVAL)・reply_valid は IOREAD の直後だけ (他は INVAL)・max ≤ 512。アプリの終了で `v86s_end` 相当を回収の並び (exec_finish.inc の V86 の行) で。STOP は今の V86 の中断と同じ。
 - 今の `v86_boot2` は残す (FM_SOFT 無しの begin→run(無期限)→end と同じ振る舞い)。
 
@@ -700,7 +700,7 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | in2_pad_state (20B 出) / pad_caps (64B 出) / pad_vibrate (4B 入) | slot < 4 | 書かない |
 | in2_dev_count / dev_info (32B 出) / read (max ≤ 128、16 × max 出) / key_state (128B 出) / mouse_state (16B 出) / acquire / unacquire / status (32B 出) / wm_state (16B 出、WM だけ) | — | 書かない |
 - 計 33 口 (snd2 15・av 2・in2 12・v86s 4)。MML の 10 口は番号を残して NOSYS (§7-6)。pcm_* の 5 口は番号を変えず target を snd2_v1.c へ。版は 1 つ上げる (仮 84→85)。
-- CPL=3 のポインタ検証は kapi/kapi_snd2.c・kapi/kapi_in2.c (kapi_sys.c の形)。順は「長さの計算 (溢れ) → 範囲の検証 → 実体」。
+- CPL=3 のポインタ検証は sys/kapi/kapi_snd2.c・sys/kapi/kapi_in2.c (kapi_sys.c の形)。順は「長さの計算 (溢れ) → 範囲の検証 → 実体」。
 - AV0 が受け持つ: kapi.json の追記と生成 (ラッパー・C89 ヘッダ・Rust の os32api の束縛)、`make clean` → `make all` の通過 ([ABI])、ヘッダの C89 の検査。
 
 ## 11. 大きさの見積もり
@@ -729,31 +729,31 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 |---|---|---|---|---|---|---|
 | AV0 | §10 の全ヘッダ・kapi.json と生成物・a0_weak.c ×2・tools/tests/av_abi_host.c・tools/check_av_portable.py・tools/checks/av_wiring.txt・av_no_weak.sh | — | — | 750 | — | HAL v2 A0 |
 | AV0 試験 | dep-dir-a-l01-host: `tools/tests/test_dep_dir_a_l01.py`・`tools/tests/fixtures/dep_dir_a/l01.json` は公開 ABI 保持と内部 FM ops 世代変更を分けて検証する | — | — | 試験 | IA | AV0/R0a |
-| F1 | kernel/av_focus.c (+exec の入口・出口 2 行) | in2_on_focus・gui の登録状態 | `av_fg_owner` | 110 | IA | AV0 |
-| N1 | input/hal/in2_dev.c | — | `in2_srcs[IN2_MAX_DEV]` | 130 | IA | AV0 |
-| N2 | input/hal/in2_ring.c (128・seq・合算・LOST・STOP) | in2_time_ms | ring・drop | 190 | IA | AV0 |
-| N3 | input/hal/in2_excl.c (acquire・wm_state・境目) | F1・N2・kbd_raw_purge_keep | acq・gen・focus_gen | 150 | IA | AV0 |
-| N4 | input/hal/in2_state.c (押下表・macc) | — | `keys[IN2_MAX_DEV][128]`・macc | 110 | IA | AV0 |
+| F1 | sys/kern/av_focus.c (+exec の入口・出口 2 行) | in2_on_focus・gui の登録状態 | `av_fg_owner` | 110 | IA | AV0 |
+| N1 | sys/hal/input/in2_dev.c | — | `in2_srcs[IN2_MAX_DEV]` | 130 | IA | AV0 |
+| N2 | sys/hal/input/in2_ring.c (128・seq・合算・LOST・STOP) | in2_time_ms | ring・drop | 190 | IA | AV0 |
+| N3 | sys/hal/input/in2_excl.c (acquire・wm_state・境目) | F1・N2・kbd_raw_purge_keep | acq・gen・focus_gen | 150 | IA | AV0 |
+| N4 | sys/hal/input/in2_state.c (押下表・macc) | — | `keys[IN2_MAX_DEV][128]`・macc | 110 | IA | AV0 |
 | N5 | input/hal/pad2_core.c | F1 | `pad2_slots[4]` | 180 | IA | AV0 |
-| N6 | input/hal/in2_time.c | tick_count | — | 30 | IA | AV0 |
-| N7 | input/hal/in2_reclaim.c (reclaim・on_focus) | N2〜N5 | §5-6 の表 | 100 | IA | AV0 |
-| D1 | drivers/input/kbd_hal.c (+kbd.c の 1 行・purge の口、kbd.h 128。kbd.c から同数の行を移す) | N1〜N4 | — | 150 | IA | AV0 |
-| D2 | drivers/input/mouse_hal.c (+mouse_bus.c の ISR の 1 行・in2_tick のシームレス) | N1・N2・N4 | `abs_prev` | 130 | IA | AV0 |
-| K2 | kapi/kapi_in2.c (+av_focus) | N*・F1 | — | 170 | IA | AV0 |
+| N6 | sys/hal/input/in2_time.c | tick_count | — | 30 | IA | AV0 |
+| N7 | sys/hal/input/in2_reclaim.c (reclaim・on_focus) | N2〜N5 | §5-6 の表 | 100 | IA | AV0 |
+| D1 | sys/platform/pc98/input/kbd_hal.c (+kbd.c の 1 行・purge の口、kbd.h 128。kbd.c から同数の行を移す) | N1〜N4 | — | 150 | IA | AV0 |
+| D2 | sys/platform/pc98/input/mouse_hal.c (+mouse_bus.c の ISR の 1 行・in2_tick のシームレス) | N1・N2・N4 | `abs_prev` | 130 | IA | AV0 |
+| K2 | sys/kapi/kapi_in2.c (+av_focus) | N*・F1 | — | 170 | IA | AV0 |
 | G1 | userland/gshell/src/excl.rs (+input.rs・multiapp.rs の呼ぶ行) | in2_wm_state・av_focus_set | WM の配った押下の表 | 200 | IA | K2 |
-| S1 | sound/hal/snd2_reg.c (登録・unregister・FAULTED) | be->caps | `snd2_devs[]` | 150 | IS | 段 B |
-| S2 | sound/hal/snd2_caps.c (形式・周期の検査) | S1 | dev.caps | 110 | IS | 段 B |
-| S3 | sound/hal/snd2_seg.c (区間・カーソル・連続性、pcm_cs4231_math.c の pcm_obs・pcm_cont を一般化して移す) | — | played・copied・seg_* | 300 | IS | 段 B |
-| S4 | sound/hal/snd2_stg.c (ステージング 8192、played まで保持、pcm_stg_* を移す) | — | stg | 120 | IS | 段 B |
-| S5 | sound/hal/snd2_stream.c (状態表・open・write・start・pause・close・advance・teardown) | S1〜S4・be->hw_* | state・gen・owner・written | 320 | IS | 段 B |
-| S6 | sound/hal/snd2_pos.c (pos・wait) | S5 | — | 100 | IS | 段 B |
-| S7 | sound/hal/snd2_dsp.c | S1・be->dsp_* | — | 120 | IS | 段 B |
-| S8 | sound/hal/snd2_v1.c (pcm_* の再現) | S5・S6 | — | 150 | IS | 段 B |
+| S1 | sys/hal/sound/snd2_reg.c (登録・unregister・FAULTED) | be->caps | `snd2_devs[]` | 150 | IS | 段 B |
+| S2 | sys/hal/sound/snd2_caps.c (形式・周期の検査) | S1 | dev.caps | 110 | IS | 段 B |
+| S3 | sys/hal/sound/snd2_seg.c (区間・カーソル・連続性、pcm_cs4231_math.c の pcm_obs・pcm_cont を一般化して移す) | — | played・copied・seg_* | 300 | IS | 段 B |
+| S4 | sys/hal/sound/snd2_stg.c (ステージング 8192、played まで保持、pcm_stg_* を移す) | — | stg | 120 | IS | 段 B |
+| S5 | sys/hal/sound/snd2_stream.c (状態表・open・write・start・pause・close・advance・teardown) | S1〜S4・be->hw_* | state・gen・owner・written | 320 | IS | 段 B |
+| S6 | sys/hal/sound/snd2_pos.c (pos・wait) | S5 | — | 100 | IS | 段 B |
+| S7 | sys/hal/sound/snd2_dsp.c | S1・be->dsp_* | — | 120 | IS | 段 B |
+| S8 | sys/hal/sound/snd2_v1.c (pcm_* の再現) | S5・S6 | — | 150 | IS | 段 B |
 | S8 試験 | pcm-cs4231-host: `tools/tests/pcm_cs4231_host.c` は半面一括の action/filled に代えて区間・途中追補を検証する | — | — | 試験 | IS | S8 |
 | S8 試験 | pcm-refill-host: `tools/tests/pcm_refill_host.c` の `verify()` は補充期限・未再生領域の保護・再同期を検証する | — | — | 試験 | IS | S8 |
-| S9 | drivers/sound/cs4231/pcm_hw.c (SndBackend、pcm_cs4231.c の装置の列・証拠・IRQ を残し中核を S3〜S5 へ移す。pcm_body.c の表を差し替え) | — | 装置の内部 | 250 | IS | 段 B |
-| K1 | kapi/kapi_snd2.c | S* | — | 200 | IS | 段 B |
-| E1 | exec/exec_finish.inc ((6b) を snd2_reclaim、(6c) in2_reclaim) | S5・N7 | — | 4 | IA/IS | — |
+| S9 | sys/dev/sound/cs4231/pcm_hw.c (SndBackend、pcm_cs4231.c の装置の列・証拠・IRQ を残し中核を S3〜S5 へ移す。pcm_body.c の表を差し替え) | — | 装置の内部 | 250 | IS | 段 B |
+| K1 | sys/kapi/kapi_snd2.c | S* | — | 200 | IS | 段 B |
+| E1 | sys/kern/exec/exec_finish.inc ((6b) を snd2_reclaim、(6c) in2_reclaim) | S5・N7 | — | 4 | IA/IS | — |
 | P0〜P5 | tools/gen_padmap.py・input/hal/pad2_map.c・drivers/usb/xgip_pad.c・xusb_pad.c・hid_report.c・hid_pad.c | in2_pad_* | — | 1,300 | IP | USB 段 1 |
 | L1 | userland/lib/snd/mix.c (voice の表・16.16・dB 表・飽和の足し算・stop/reset/delete) | — | voice の表 | 380 | IL | 照らし直し |
 | L2 | userland/lib/snd/fmvoice.c (コアの FFI の adapter・§7-4 の時刻・samples の読み・read/status) | lib/os32_opna | — | 300 | IL | 照らし直し・コア段 D |
@@ -771,7 +771,7 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | V2 | platform/pc98/legacy/v86_fm_io.c (+v86_io.c の bitmap の拒否と戻し・in/out の先頭の分岐 2 行、`v86_io_in2` の保留・reply・影の有効性) | V1・Q1 | latch・FIFO・reply | 260 | IL | V1 |
 | V3 | platform/pc98/legacy/v86_session.c (begin/run/end・ctx の書き戻し・IOREAD・SLICE・`v86_fm_session_end`) + v86_gp_emulate.inc の IN/OUT の幅 (opsize16・EAX・幅 4) と IN 4 形の保留 (EIP を進めない)・v86.c:265 の opsize16 の受け渡し・v86.c:503 の SOFT の分岐・run_limit の呼ぶ行 | V2 | セッション | 320 | IL | V2 |
 | V4 | drivers/sound/cs4231/pcm_timer.c (hw_timer_arm・解除・hw_timer_ack と IRQ の要因の分け) | — | 装置の内部 | 130 | IL | V0・IS |
-| V5 | kapi/kapi_v86s.c (§10 の検査) + `platform/pc98/legacy/v86_call.c` の slot の switch に v86s_* の 4 口、`platform/none/legacy_guest.c` で断る (末尾の追記) | V3 | — | 130 | IL | V3 |
+| V5 | kapi/kapi_v86s.c (§10 の検査) + `sys/platform/pc98/legacy/v86_call.c` の slot の switch に v86s_* の 4 口、`sys/platform/none/legacy_guest.c` で断る (末尾の追記) | V3 | — | 130 | IL | V3 |
 | V6 | userland/cmds/v86.c (実行のループ: run → drain → F_r への反映 → IOREAD の答え・影と shadow_seq → pump) | v86s_*・sndl_* | — | 170 | IL | V5・L3 |
 - 1,000 行を超えるファイルは無い。gshell の input.rs (1,269)・multiapp.rs (1,433) は呼ぶ行だけ、中身は excl.rs。
 
@@ -872,7 +872,7 @@ period 256・lead 3 で 60 秒、underrun 0 と IF=0 の全区間の最大時間
 ### 0. 実物 (main 3ebbd208)
 | 事実 | 所 |
 |---|---|
-| 26K (YM2203) 専用。ポートは 0188h/018Ah だけ、bank1 (018Ch/018Eh)・A460h の定義が無い | drivers/sound/fm/fm.h |
+| 26K (YM2203) 専用。ポートは 0188h/018Ah だけ、bank1 (018Ch/018Eh)・A460h の定義が無い | sys/dev/sound/fm/fm.h |
 | 検出が無く opn_init は無条件。BUSY の待ちは 1 書き 10ms の上限で、失敗を捨てて次を書く → FM の無い Ra266 では 1 書きごとに 10ms 止まる | fm.c |
 | 部品 fm.mod、KAPI の fm_note_*・ssg_* は fm_module.c の包み。R0b の後の形が土台 | fm_body.c・fm_module.c (opn_write())・177・212 |
 | V86 は 0188h–018Fh を TSS で素通し、往復で全キーオフ | v86_io.c (v86_io_allow())・328・377 |
@@ -982,7 +982,7 @@ int sndl_chip_read(u32 h, u32 bank, u32 what, u32 reg);  int sndl_chip_close(u32
 | 部品: fm_start | C0 の probe → 見つかれば `snd2_chip_register` |
 | 部品: fm_quiesce/detach (fm_module.c) | 占有中なら close の列 → `snd2_chip_unregister` (BUSY なら detach を失敗にして本体を残す) |
 ```c
-typedef struct SndChipBackend { u32 abi;                                  /* sound/hal/snd2_int.h */
+typedef struct SndChipBackend { u32 abi;                                  /* sys/hal/sound/snd2_int.h */
     int (*caps)(void *c, SND2_ChipCaps *o);  int (*open)(void *c);  int (*close)(void *c);   /* open: A460h 保存・bit0=1・静止 */
     int (*write)(void *c, const SND2_RegW *w, u32 n);  int (*read)(void *c, u32 bank, u32 what, u32 reg);
     int (*quiet)(void *c);   /* 静止の列。0 = 証拠あり */
@@ -997,15 +997,15 @@ int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i)
 | snd2_chip_open (4B 出) | dev が FM/PSG | 書かない |
 | snd2_chip_write (n ≤ 256、4n 入) | h の owner、全件の bank を先に検査 | 事前の失敗は 1 件も書かない |
 | snd2_chip_read / reset / close | h の owner、what ∈ {1,2} | — |
-- 計 6 口 (§10 の 33 → 39)。旧の 6 口は番号・型そのまま (include/fm_contract.h・kapi.json と照合)。検証は kapi/kapi_snd2_chip.c (長さ → 範囲 → 実体)。
+- 計 6 口 (§10 の 33 → 39)。旧の 6 口は番号・型そのまま (sys/include/fm_contract.h・kapi.json と照合)。検証は sys/kapi/kapi_snd2_chip.c (長さ → 範囲 → 実体)。
 
 ### 7. 段・試験・変異
 | 段 | ファイル | 呼ぶ | 書く共有の状態 | 行 | I | 前提 |
 |---|---|---|---|---|---|---|
-| C0 | drivers/sound/fm/opn_probe.c・opn_probe.h (SYNTH §6 の probe、0188h だけ。fm.h に bank1・A460h・クロック。29h・分周は資料で確かめ本書に追記) | inp/outp | 検出の結果 | 180 | IS | R0b |
-| C1 | drivers/sound/fm/opn_chip.c (SndChipBackend: 扱いの表・bank1・read・open/close・静止の列。opn_write_checked を bank つきに) | C0 | 装置の内部 | 240 | IS | C0 |
-| C2 | sound/hal/snd2_chip.c (登録・owner・gen・implicit・FAULTED・reclaim の FM の行、CPU 非依存) | be->* | `snd2_chips[]` | 170 | IS | S1 |
-| C3 | kapi/kapi_snd2_chip.c | C2 | — | 120 | IS | C2・AV0 |
+| C0 | sys/dev/sound/fm/opn_probe.c・opn_probe.h (SYNTH §6 の probe、0188h だけ。fm.h に bank1・A460h・クロック。29h・分周は資料で確かめ本書に追記) | inp/outp | 検出の結果 | 180 | IS | R0b |
+| C1 | sys/dev/sound/fm/opn_chip.c (SndChipBackend: 扱いの表・bank1・read・open/close・静止の列。opn_write_checked を bank つきに) | C0 | 装置の内部 | 240 | IS | C0 |
+| C2 | sys/hal/sound/snd2_chip.c (登録・owner・gen・implicit・FAULTED・reclaim の FM の行、CPU 非依存) | be->* | `snd2_chips[]` | 170 | IS | S1 |
+| C3 | sys/kapi/kapi_snd2_chip.c | C2 | — | 120 | IS | C2・AV0 |
 | C4 | fm_body.c・fm_module.c (start の登録・detach の解除・旧 6 口の包みに implicit と即戻り)・fm.c (失敗で即戻る)・fm の imports.def (snd2_chip_register/unregister/implicit)・fm-module.mk・tools/checks/av_wiring.txt と a0_weak・av_no_weak.sh IS に snd2_chip_* | C1・C2 | — | 80 | IS | C1〜C3 |
 | L6 | userland/lib/snd/chip.c (sndl_chip_*・合成順・資源・FALLDOWN の濾し・PCM の参照数・read の反映) | snd2_chip_*・L1〜L3 | h の表・参照数 | 260 | IL | C3・L3 |
 | L7 | userland/lib/snd/midi_fm.c (GM → OPN、L2 から分ける、出口は L6) | L6 | voice の割当 | 250 | IL | L6 |
@@ -1034,7 +1034,7 @@ int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i)
 | 書きの適用の時点: t=100 の reset と t=50 の load が保留の時、t=80 の read は load だけ反映し flag の時刻は load の時点から、t=100 以降は reset が効く・同じ at_us の 2 件は積んだ順 | sndl_fmtime_host | 適用の前に模型を進めない / at_us > r も反映 / 同時刻を後ろから |
 | write の n=257・4n の溢れ | kapi_audit_host | 上限を外す |
 - NP21/W: SNDboard を 26K・86・無しの 3 構成 (ini は --live-apply + restore) で probe・caps、/api/sound で HW の書きが鳴る、V86 の HW で FM のゲーム 1 本、86 + `--fm=soft` で SOFT。実機 Ra266: 不在の記録、fm_note_on 100 回の時間 (10ms × 回でない)、sndl_chip が SOFT。シリアルで判定。
-- C0 で資料を確かめた結果 (2026-11-24、Bible 2-13_FM音源・UNDOCUMENTED io_sound・Yamaha YM2608 Application Manual・BSD-3 の ymfm、GPL は見ない): OPNA の 29h は D7 が SCH (6ch の許可)、D1 が Timer B、D0 が Timer A の IRQ の出力の許可。HAL は OPNA の open 時に前の所有者の 29h 書込みシャドウから D1:D0 を落とし、D7 を含む残りを保つ。以後の 29h 書込みにも同じマスクをかける。BSD-3 ymfm の [src/ymfm_opn.cpp](https://github.com/aaronsgiles/ymfm/blob/main/src/ymfm_opn.cpp) では、`ym2608::write_data` が 29h の IRQ マスクを設定し、`ym2608::clock_fm_and_adpcm` が D7 で FM のチャンネル数を選び、`ym2608::read_status` が Timer A/B の flag を返す。27h の flag の許可と stop/reset は別の機能なので、IRQ を抑えてもタイマの flag は polling できる。既定のプリスケーラでは 26K の 3,993,600 / 72 と 86 の 7,987,200 / 144 がともに 55,466⅔ Hz で、同じ BLOCK と F-number が同じ音程を与える (72・144 は FM 全体の実効の分周、2Dh の選択値そのものではない)。SSG は別の計算で、既定の実効の入力クロックが等しい。probe の宣言は `drivers/sound/fm/opn_probe.h` (fm.h に置くと FM の部品の ABI の識別値が変わるため)。Timer B を始めた後は BUSY の固着でも停止と 29h の戻しを試み、戻せなければ UNKNOWN・contained=0 を返して呼び手が IRQ の mask を保つ。
+- C0 で資料を確かめた結果 (2026-11-24、Bible 2-13_FM音源・UNDOCUMENTED io_sound・Yamaha YM2608 Application Manual・BSD-3 の ymfm、GPL は見ない): OPNA の 29h は D7 が SCH (6ch の許可)、D1 が Timer B、D0 が Timer A の IRQ の出力の許可。HAL は OPNA の open 時に前の所有者の 29h 書込みシャドウから D1:D0 を落とし、D7 を含む残りを保つ。以後の 29h 書込みにも同じマスクをかける。BSD-3 ymfm の [src/ymfm_opn.cpp](https://github.com/aaronsgiles/ymfm/blob/main/src/ymfm_opn.cpp) では、`ym2608::write_data` が 29h の IRQ マスクを設定し、`ym2608::clock_fm_and_adpcm` が D7 で FM のチャンネル数を選び、`ym2608::read_status` が Timer A/B の flag を返す。27h の flag の許可と stop/reset は別の機能なので、IRQ を抑えてもタイマの flag は polling できる。既定のプリスケーラでは 26K の 3,993,600 / 72 と 86 の 7,987,200 / 144 がともに 55,466⅔ Hz で、同じ BLOCK と F-number が同じ音程を与える (72・144 は FM 全体の実効の分周、2Dh の選択値そのものではない)。SSG は別の計算で、既定の実効の入力クロックが等しい。probe の宣言は `sys/dev/sound/fm/opn_probe.h` (fm.h に置くと FM の部品の ABI の識別値が変わるため)。Timer B を始めた後は BUSY の固着でも停止と 29h の戻しを試み、戻せなければ UNKNOWN・contained=0 を返して呼び手が IRQ の mask を保つ。
 - 足す行 約 1,350 (§11 の計に足す)。1,000 行を超えるファイルは無い。
 
 ### 8. 決定 (PM 決定、推奨の (a))
@@ -1062,5 +1062,5 @@ int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i)
 - **MML の KAPI の 10 欄**: §7-6 の「中身の無い欄として残す」は v3 の最後の KAPI の整理で**削除する対象**。それまでは NOSYS の本体のまま。
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
-- **v86s_* の KAPI の通り道 (§9-2・§10、V3・V5)**: V86 を走らせる口は今 `exec/exec_syscall.inc` の `legacy_call_dispatch(slot, wrapper, src, count, result)` → `platform/pc98/legacy/guest.c` → `v86_call_dispatch` (`platform/pc98/legacy/v86_call.c` の slot の switch) を通り、`arch_kapi_read_block`・`shared_stack`・呼び手の pin を検査してから `arch_kapi_invoke` する (第 3 段 D2 で引数が `args, bytes` → `struct kapi_arg_source *src, unsigned count` に変わった)。v86s_* の 4 口の slot は `KAPI_SLOT_V86_BOOT2` と同じくこの switch に足す (begin は path 2 本を持つ 136B の構造体 1 本、run は 3 引数)。PPC は `platform/none/legacy_guest.c-` の switch で断る。`kapi/kapi_v86s.c` は検査だけを持ち、`platform/pc98/legacy` を直に呼ばない。
+- **v86s_* の KAPI の通り道 (§9-2・§10、V3・V5)**: V86 を走らせる口は今 `sys/kern/exec/exec_syscall.inc` の `legacy_call_dispatch(slot, wrapper, src, count, result)` → `sys/platform/pc98/legacy/guest.c` → `v86_call_dispatch` (`sys/platform/pc98/legacy/v86_call.c` の slot の switch) を通り、`arch_kapi_read_block`・`shared_stack`・呼び手の pin を検査してから `arch_kapi_invoke` する (第 3 段 D2 で引数が `args, bytes` → `struct kapi_arg_source *src, unsigned count` に変わった)。v86s_* の 4 口の slot は `KAPI_SLOT_V86_BOOT2` と同じくこの switch に足す (begin は path 2 本を持つ 136B の構造体 1 本、run は 3 引数)。PPC は `platform/none/legacy_guest.c-` の switch で断る。`kapi/kapi_v86s.c` は検査だけを持ち、`platform/pc98/legacy` を直に呼ばない。
 - **第 4 段 B の型の契約 (§7-6・§12 の R0c・L5・合成器の段)**: `build/abi_contract.mk` が C のコンパイル規則に order-only の `| $(ABI_CONTRACT_ORDER)` を付け、`test_type_contract.py` (covers `build/**/*.mk`) が `make -n -B` の全 C の呼出しの char/enum の旗と probe の前提を検査する (解析できない呼出しは fail closed)。R0c で外す `build/libs.mk` の範囲は不変 (同ファイル内 の規則に `| $(ABI_CONTRACT_ORDER)` が付いた)。L5 で足し直す libs.mk の規則と新しい `build/os32snd.mk` (と合成器の段の .mk) の C の規則は、`KERNEL_CFLAGS`/`CFLAGS_BASE`/`PROGRAM_FLAGS` 由来の profile の旗と `| $(ABI_CONTRACT_ORDER)` を持ち、object を `ALL_TARGET_OBJECTS` 等の一覧に載せる。`check-type-contract` (`tools/checks/run.py`) を L5・合成器の段の受入に加える。

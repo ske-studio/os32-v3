@@ -5,12 +5,12 @@ trident_dac.c:253-271,564-908, trident_pll.c:42-135 and
 vgaHW.c:1185-1353,1391-1468. No PM-local files needed at runtime.
 """
 CHECK = dict(name='trident-mode', tier=1, needs=[], budget=27.4,
-    covers=['drivers/video/trident/mode_640.c', 'drivers/video/trident/vram.c',
-            'drivers/video/trident/trident.h', 'tools/tests/trident_mode_host.c',
+    covers=['sys/dev/video/trident/mode_640.c', 'sys/dev/video/trident/vram.c',
+            'sys/dev/video/trident/trident.h', 'tools/tests/trident_mode_host.c',
             'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'build/config.mk', 'include/types.h', 'include/memmap.h',
-            'gfx/palette.h', 'include/pegc.h'],
+            'build/config.mk', 'sys/include/types.h', 'sys/include/memmap.h',
+            'sys/hal/gfx/palette.h', 'sys/platform/pc98/pegc.h'],
     basis=['TRIDENT_FULL_DESIGN §5', 'TRIDENT_S3_DESIGN §1', 'TRIDENT_S3_DESIGN §3'],
 )
 import argparse
@@ -24,7 +24,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'drivers/video/trident/mode_640.c'
+PRODUCT = 'sys/dev/video/trident/mode_640.c'
 HOST = 'tools/tests/trident_mode_host.c'
 FAKE = 'tools/tests/trident_device_fake.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
@@ -252,7 +252,7 @@ def build(work, product, fallback):
                     '-I' + str(work), '-I' + str(ROOT),
                     '-I' + str(ROOT / 'drivers/video/trident'), *include_flags(ROOT),
                     '-nostdlib', '-static', '-no-pie', str(ROOT / HOST),
-                    str(ROOT / FAKE), str(ROOT / 'drivers/video/trident/vram.c'), str(product), '-o', str(exe)], check=True)
+                    str(ROOT / FAKE), str(ROOT / 'sys/dev/video/trident/vram.c'), str(product), '-o', str(exe)], check=True)
     return exe
 
 

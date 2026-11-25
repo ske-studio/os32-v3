@@ -9,7 +9,7 @@ import host32
 from mutpar import build_in_tree
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'include/gfx_format.h'
+SOURCE = 'sys/include/gfx_format.h'
 OLD = 'width / BITS_PER_BYTE + (width % BITS_PER_BYTE != 0)'
 NEW = 'width / 2'
 

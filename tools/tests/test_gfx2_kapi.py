@@ -2,7 +2,7 @@
 """Run generated gfx2 guards against exact boundary ranges before target calls."""
 CHECK = dict(name='gfx2-kapi-host', tier=1, needs=[], budget=5,
     covers=['tools/tests/test_gfx2_kapi.py', 'tools/tests/host32.py',
-            'sdk/kapi.json', 'kapi/kapi_generated.c',
+            'sdk/kapi.json', 'sys/kapi/kapi_generated.c',
             'sdk/include/os32/os32_gfx2.h'],
     basis=['HAL_V2_DESIGN §11-1', '[ABI]', 'KAPI_SPEC §3-1'],
 )
@@ -83,7 +83,7 @@ static int ring3_user_ranges_writable(u32 p,u32 n,u32 q,u32 m) {
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    generated = (ROOT / 'kapi/kapi_generated.c').read_text()
+    generated = (ROOT / 'sys/kapi/kapi_generated.c').read_text()
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         assert observe(work, generated) == 0

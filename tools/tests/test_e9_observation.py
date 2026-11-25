@@ -388,7 +388,7 @@ def main():
             return subprocess.check_output(['git', 'show', 'HEAD:' + path], cwd=ROOT, text=True)
         return (ROOT / path).read_text()
     shell = read('userland/shell/rshell.c')
-    header = (ROOT / 'userland/tests/ring3_marker.h').read_text()
+    header = (ROOT / 'userland/diag/ring3_marker.h').read_text()
     runner = host32.selected_runner()
     cases = [('tvdump wire/copy', tvdump(shell))]
     sources = {}
@@ -401,13 +401,13 @@ def main():
     if not args.baseline:
         for revoke, bad in ((False, False), (True, False), (False, True)):
             cases.append((f'CLIENT F revoke={revoke} bad_fb={bad}', client_marker(sources['ring3_guard'], header, revoke, bad)))
-        child = (ROOT / 'userland/tests/shm_reuse_child.c').read_text()
+        child = (ROOT / 'userland/diag/shm_reuse_child.c').read_text()
         cases.append(('SHM reuse child phases/errors', reuse(child)))
         for sel in ('first', 'last'):
             for survive, failed in ((False, False), (True, False), (False, True)):
                 cases.append((f'SHM lockwrite {sel} survive={survive} lock_fail={failed}',
                               lockwrite(child, header, sel, survive, failed)))
-        parent = (ROOT / 'userland/tests/shm_reuse_test.c').read_text()
+        parent = (ROOT / 'userland/diag/shm_reuse_test.c').read_text()
         cases.append(('SHM reuse parent verdicts/errors/reset', reuse_parent(parent)))
     for name, code in cases:
         rc = run(code, runner, tvdump_wire=(name == 'tvdump wire/copy'))

@@ -3,10 +3,10 @@ CHECK = dict(name='gf-prim-bench-host', tier=1, needs=[], budget=30,
     covers=['tools/tests/test_gf_prim_bench.py', 'tools/tests/gf_prim_bench_host.c',
             'tools/tests/gf_command_runtime_host.h', 'tools/tests/gf_command_host.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
-            'kdebug/gf_prim_bench.c', 'kdebug/*.h', 'hwdev/gf/*.h',
+            'sys/dev/video/geforce/diag/gf_prim_bench.c', 'kdebug/*.h', 'hwdev/gf/*.h',
             'hwdev/gf/display/*.h', 'hwdev/*.h', 'include/**', 'mm/*.h',
             'gfx/*.h', 'drivers/video/geforce/*.h', 'drivers/pci/*.h',
-            'lib/serial_diag.h', 'lib/crc32_core.inc', 'kernel/irq/irq.h'],
+            'lib/serial_diag.h', 'lib/crc32_core.inc', 'sys/kern/irq/irq.h'],
     basis=['GF_FEAT3_DESIGN §10', 'GF_FEAT3_DESIGN §13'],
 )
 
@@ -38,13 +38,13 @@ def execute(exe, green, label):
 
 
 MUTATIONS = [
-    ('half-copy', 'kdebug/gf_prim_bench.c', 'r.h = s.height / 2U;', 'r.h = s.height;'),
-    ('force-m2mf', 'kdebug/gf_prim_bench.c', 'item == 6U, dl', 'item == 5U, dl'),
-    ('warmup', 'kdebug/gf_prim_bench.c', 'group <= BENCH_GROUPS', 'group < BENCH_GROUPS'),
-    ('fault-guard', 'kdebug/gf_prim_bench.c', 'o->ctx->ch->fault.latched)', 'false)'),
-    ('bar-offset', 'kdebug/gf_prim_bench.c', '#define BENCH_BAR0_BOOT 0U', '#define BENCH_BAR0_BOOT 4U'),
-    ('buffer-leak', 'kdebug/gf_prim_bench.c', 'if (phys) {', 'if (false) {'),
-    ('full-estimate', 'kdebug/gf_prim_bench.c', '2000U / BENCH_BATCH', '1000U / BENCH_BATCH'),
+    ('half-copy', 'sys/dev/video/geforce/diag/gf_prim_bench.c', 'r.h = s.height / 2U;', 'r.h = s.height;'),
+    ('force-m2mf', 'sys/dev/video/geforce/diag/gf_prim_bench.c', 'item == 6U, dl', 'item == 5U, dl'),
+    ('warmup', 'sys/dev/video/geforce/diag/gf_prim_bench.c', 'group <= BENCH_GROUPS', 'group < BENCH_GROUPS'),
+    ('fault-guard', 'sys/dev/video/geforce/diag/gf_prim_bench.c', 'o->ctx->ch->fault.latched)', 'false)'),
+    ('bar-offset', 'sys/dev/video/geforce/diag/gf_prim_bench.c', '#define BENCH_BAR0_BOOT 0U', '#define BENCH_BAR0_BOOT 4U'),
+    ('buffer-leak', 'sys/dev/video/geforce/diag/gf_prim_bench.c', 'if (phys) {', 'if (false) {'),
+    ('full-estimate', 'sys/dev/video/geforce/diag/gf_prim_bench.c', '2000U / BENCH_BATCH', '1000U / BENCH_BATCH'),
 ]
 
 

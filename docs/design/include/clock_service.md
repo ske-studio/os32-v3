@@ -1,10 +1,10 @@
-# include/clock_service.h — 設計
+# sys/hal/time/clock_service.h — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_D2_DESIGN (D1 で移した)
-ソース: `include/clock_service.h`
+ソース: `sys/hal/time/clock_service.h`
 
 ```c
 void clock_register(const ClockOps *ops);
-/* include/clock_service.h: legacy ABI型と内部の西暦型を区別。 */
+/* sys/hal/time/clock_service.h: legacy ABI型と内部の西暦型を区別。 */
 typedef struct { u8 year, month, day, wday, hour, min, sec; } RTC_Time;
 typedef struct { int year; u8 month, day, wday, hour, min, sec; } ClockDate;
 typedef struct ClockOps {

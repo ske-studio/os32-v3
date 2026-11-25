@@ -1,6 +1,6 @@
 """D04: execute real NE2000 DMA, OVW, TX timeout and initialization paths."""
 CHECK = dict(name='ne2000-dma-host', tier=4,
-    covers=['tools/tests/rx_io_clock.h', 'tools/tests/idle_io_sources.py', 'kernel/io_work.[ch]', 'kernel/io_policy.[ch]', 'kernel/io_clock.h', 'exec/appslot.h', 'net/nic.h', 'net/rx_work.h', 'net/rx_work.c', 'include/clock_source.h', 'include/kernel_tick.h', 'kernel/irq/tick_budget.h', 'drivers/net/ne2000/ne2000.c', 'drivers/net/ne2000/ne2000_control.inc', 'drivers/net/ne2000/ne2000_data.inc', 'drivers/net/ne2000/ne2000_irq.inc', 'drivers/net/ne2000/ne2000.h', 'drivers/net/ne2000/ne2000_regs.h', 'drivers/net/ne2000/ne2000_ring.h', 'drivers/net/ne2000/ne2000_ring.c', 'arch/x86/x86_flags.h', 'include/types.h', 'include/net_eth.h', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'arch/x86/kernel/idt.h', 'kernel/irq/irq.h', 'include/kprintf.h', 'lib/kstring.h', 'kernel/time/cpu_calibrate.h', 'include/io.h', 'platform/pc98/platform_io.h', 'include/cpu.h', 'arch/x86/arch_cpu.h', 'kernel/idle_work.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_generations.h', 'tools/tests/ne2000_dma_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/net_m2_test.py', 'tools/net_m4_test.py', 'tools/net_l1_test.py', 'tools/net_l2_test.py'],
+    covers=['tools/tests/rx_io_clock.h', 'tools/tests/idle_io_sources.py', 'kernel/io_work.[ch]', 'kernel/io_policy.[ch]', 'sys/kern/io_clock.h', 'sys/kern/exec/appslot.h', 'sys/net/nic.h', 'sys/net/rx_work.h', 'sys/net/rx_work.c', 'sys/hal/time/clock_source.h', 'sys/include/kernel_tick.h', 'sys/kern/irq/tick_budget.h', 'sys/dev/net/ne2000/ne2000.c', 'sys/dev/net/ne2000/ne2000_control.inc', 'sys/dev/net/ne2000/ne2000_data.inc', 'sys/dev/net/ne2000/ne2000_irq.inc', 'sys/dev/net/ne2000/ne2000.h', 'sys/dev/net/ne2000/ne2000_regs.h', 'sys/dev/net/ne2000/ne2000_ring.h', 'sys/dev/net/ne2000/ne2000_ring.c', 'sys/arch/x86/x86_flags.h', 'sys/include/types.h', 'sys/include/net_eth.h', 'sys/kern/irq/tick.h', 'sys/platform/pc98/tick_order.h', 'sys/arch/x86/kernel/idt.h', 'sys/kern/irq/irq.h', 'sys/include/kprintf.h', 'sys/kern/kstring.h', 'sys/hal/time/cpu_calibrate.h', 'sys/include/io.h', 'sys/platform/pc98/platform_io.h', 'sys/include/cpu.h', 'sys/arch/x86/arch_cpu.h', 'sys/kern/idle_work.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_generations.h', 'tools/tests/ne2000_dma_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/net_m2_test.py', 'tools/net_m4_test.py', 'tools/net_l1_test.py', 'tools/net_l2_test.py'],
     needs=['make:all'], budget=3.4,
     basis=['TICK_1KHZ_NEXT_DESIGN §2-4', 'TICK_T123_DESIGN §3'],
 )
@@ -18,7 +18,7 @@ from kernel_includes import include_flags
 from idle_io_sources import idle_io_sources
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'drivers/net/ne2000/ne2000.c'
+SOURCE = ROOT / 'sys/dev/net/ne2000/ne2000.c'
 HARNESS = ROOT / 'tools/tests/ne2000_dma_host.c'
 MUTATIONS = [
     ('rounding', '(u16)((len + 1) & ~1)', 'len'),

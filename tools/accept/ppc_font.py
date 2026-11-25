@@ -92,7 +92,7 @@ def main():
         mutation = []
         if case == 'range-end':
             mutation = mutant_settings(
-                folder, case, 'fs/vfs_fd.c',
+                folder, case, 'sys/fs/vfs_fd.c',
                 'if (offset > f->size || len > f->size - offset) return VFS_ERR_INVAL;',
                 'if (offset >= f->size || len > f->size - offset) return VFS_ERR_INVAL;')
         elif case == 'font-absent':

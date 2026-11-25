@@ -25,7 +25,7 @@ python3 -B tools/tests/test_cfg.py --sanitize s5_pure s5_bench s5_pool cmd
 
 | | |
 |---|---|
-| 対象 (1) | `userland/tests/cfg_bench.c` — CPL=3 の OS32X。[CRT が `main` を名前で呼ぶ (関数順序は自由)](../../sdk/README.md#アプリを書くときの約束)、`libos32cfg` を静的リンク |
+| 対象 (1) | `userland/diag/cfg_bench.c` — CPL=3 の OS32X。[CRT が `main` を名前で呼ぶ (関数順序は自由)](../../sdk/README.md#アプリを書くときの約束)、`libos32cfg` を静的リンク |
 | 対象 (2) | `userland/cmds/cfg.c` — `cfg status` の末尾に ` pool <db_mem_used> B` |
 | ハーネス | 既存の `tools/tests/cfg_host.c` を流用。実 SQLite + 実 `os32_sqlite_vfs.c` + 実 `kapi_db.c` + 実 `libos32cfg` + 実 `cfg.c` の上に **実 `cfg_bench.c` をそのまま載せる** (`#define main bench_main`) |
 | 贋物 | `host_api.db_mem_used = kapi_db_mem_used` — 実 `sqlite3_memory_used()` なので**実値**。`host_api.version = 50`。`host_gettick` に `host_tick_step` を足し、S5 の試験だけが tick を進める (既定 0 なので S2 までの見え方は不変) |
@@ -145,7 +145,7 @@ ASAN (`--sanitize s5_pure s5_bench s5_pool cmd`) も 4/4 PASS、検出なし。
 
 ```bash
 make build/out/lib/libos32cfg.a sdk/crt/crt0.o sdk/crt/crt0_c.o sdk/crt/syscalls.o sdk/crt/help.o
-i386-elf-gcc $(PROGRAM_FLAGS) -c userland/tests/cfg_bench.c -o /tmp/cfg_bench.o
+i386-elf-gcc $(PROGRAM_FLAGS) -c userland/diag/cfg_bench.c -o /tmp/cfg_bench.o
 i386-elf-ld $(PROGRAM_LDFLAGS) -o /tmp/cfg_bench.elf $(CRT0_OBJ) /tmp/cfg_bench.o \
       --start-group build/out/lib/libos32cfg.a --end-group -lc -lgcc
 # => text 14009  data 1648  bss 736
@@ -166,7 +166,7 @@ san = ["-fsanitize=address,signed-integer-overflow",
        "-fno-sanitize-recover=signed-integer-overflow", "-fno-omit-frame-pointer"]
 ```
 
-`undefined` を丸ごと付けると `kapi/kapi_db.c` の SHM レイアウト (ゲストでは詰めた
+`undefined` を丸ごと付けると `sys/kapi/kapi_db.c` の SHM レイアウト (ゲストでは詰めた
 バイト列) が alignment 検査に引っかかるので、この 1 種だけを有効にした。
 
 ### 直した内容
@@ -200,7 +200,7 @@ san = ["-fsanitize=address,signed-integer-overflow",
 | B4 | 1KB ごとの yield を止める | `FAIL c_s5_bench: cap_yields >= 2` |
 | B4b | 最後の吐き切りを止める | `FAIL c_s5_bench: cap_yields == 1` |
 
-**ホストで踏めなかった 1 件** ([V4]): B3 の「平均の丸めの桁あふれ」。`include/types.h`
+**ホストで踏めなかった 1 件** ([V4]): B3 の「平均の丸めの桁あふれ」。`sys/include/types.h`
 の `u32` は `unsigned long` で、**ホスト (LP64) では 64bit** になるため
 `(t_sum + n/2)` が巻き戻らない。i386 の 32bit でしか起きない。ホストでは
 「`t_sum = 4294967295, n = 2` → `avg 2147483648`」という**値**だけを固定し

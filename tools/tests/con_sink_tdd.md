@@ -1,14 +1,14 @@
 # con_sink (K6C) — ホスト TDD の記録
 
 契約: `docs/KAPI_SPEC.md` (console シンク)
-実装: `kernel/console/con_sink.c` / `include/con_sink.h` / `sdk/include/os32/os32_kapi_shared.h` の `CON_SINK_*`
+実装: `sys/kern/console/con_sink.c` / `sys/include/con_sink.h` / `sdk/include/os32/os32_kapi_shared.h` の `CON_SINK_*`
 試験: `tools/tests/con_sink_host.c` + `tools/tests/test_con_sink.py` (`make check-con-sink-host`)
 
 ## 様式
 
 `test_multiapp_model.py` / `test_ext2_read_bound.py` と同じ形で、**模型ではなく実物**を見る:
 
-1. `con_sink_host.c` が `kernel/console/con_sink.c` を `#include` する (1 行も写さない)。
+1. `con_sink_host.c` が `sys/kern/console/con_sink.c` を `#include` する (1 行も写さない)。
 2. ホスト ILP32 GNU89 (`gcc -m32 -march=i386 -ffreestanding -Werror -nostdlib`) で走らせる。
    libc は使わず、Linux の `int 0x80` で `write`/`exit` するだけ。
 3. **同じソース**をカーネルと同じフラグの `i386-elf-gcc -Werror` でもコンパイルする ([C1])。
@@ -35,7 +35,7 @@ IF の有効・無効、ネスト、エラーで戻る経路の保存と復元�
 ## 過去の RED → GREEN (自己診断の撤去前)
 
 実装を 1 か所ずつ「ありそうな間違い」に差し替えて、試験が**その間違いだけ**を捕まえることを見た。
-差し替えは全部戻してある (`kernel/console/con_sink.c` は GREEN の形)。
+差し替えは全部戻してある (`sys/kern/console/con_sink.c` は GREEN の形)。
 
 ### R1 — あふれをバイト単位で捨てる (レコード枠を持たない環)
 
@@ -168,14 +168,14 @@ EXIT con_sink_host=0
   「錠の中でしか状態を動かさない」というソースの形だけ。撤去した
   `con_sink_selftest()` も同じ単一文脈の確認で、実 IRQ の試験ではなかった。
 - KAPI 経由 (CPL=3 の `int 0x80`、ディスパッチャのポインタ検証) は通っていない — 受入 C3。
-- **`EXIT` を積む側の実物 (`exec/exec.c` の `exec_reclaim_owned`) は通っていない。**
+- **`EXIT` を積む側の実物 (`sys/kern/exec/exec.c` の `exec_reclaim_owned`) は通っていない。**
   `exec.c` はカーネル一式を引くのでホストへ持ち込めず、`con_sink_host.c` の
   `reclaim_con_sink()` は同じ 3 行を**写した**もの。ずれたら試験は気付かない
   (気付くのは受入 T1)。3 経路 (正常終了 / `exec_kill` / fault) が
   `exec_reclaim_owned` を通ることも、ここではなく `exec.c` の読みで確かめた。
 - 端末側のパーサ (`t5a_display/src/sink.rs`) は別票 (E4)。**いまは未知 type で
   `Stop::Unknown` して解析を止める**ので、E4 が入るまで `EXIT` は端末を固める。
-- `kernel/console/console.c` の 6 入口からの差し込みが漏れていないかは、ここでは見ていない
+- `sys/kern/console/console.c` の 6 入口からの差し込みが漏れていないかは、ここでは見ていない
   (差し込み先はホストに持ち込めない TVRAM / GDC と混ざっている)。受入 C1 / C2 の担当。
 
 ## E08: 純リング試験のホスト専用化 (2026-10-30)

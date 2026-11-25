@@ -1,6 +1,6 @@
 # TASK_HPT370 — HighPoint HPT370 (PCI の IDE RAID カード) で大きな HDD と DVD マルチドライブを使う
 
-> 状態: **計画 (2026-11-05)** — 読むだけの調べの台本 `userland/tests/hw/hpt370_probe.hwb` (HW-BASIC) を用意した段階。実機で流した結果を見てから設計の往復に出す。
+> 状態: **計画 (2026-11-05)** — 読むだけの調べの台本 `userland/diag/hw/hpt370_probe.hwb` (HW-BASIC) を用意した段階。実機で流した結果を見てから設計の往復に出す。
 > 上位: [RA266](../../decisions/realhw/RA266.md) §1-1 (0:12.0 1103:0004 rev 03、irq 5、io 0x6020/0x6028/0x6030/0x602c/0xc000)。道具: [HW_BASIC_DESIGN](../../decisions/realhw/HW_BASIC_DESIGN.md)。
 
 ## 0. ユーザー決定 (2026-11-05)

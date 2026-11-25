@@ -10,8 +10,8 @@
 
 ## 0. 正直に書く ([V4])
 
-**試験は実装のあとに書いた。** `hsync.c` / `drivers/hostdrv/hostdrv_stat_rules.inc` /
-`fs/vfs.c` / `fs/ext2/ext2_vfs.c` / `kapi/kapi_sysinfo.c` を先に直し、そのあとで
+**試験は実装のあとに書いた。** `hsync.c` / `sys/dev/hostdrv/hostdrv_stat_rules.inc` /
+`sys/fs/vfs.c` / `sys/fs/ext2/ext2_vfs.c` / `sys/kapi/kapi_sysinfo.c` を先に直し、そのあとで
 `tools/tests/hsync_h3_host.c` と `tools/tests/vfs_set_mtime_host.c` を書いた。
 だから「先に RED を見た」とは書けない。
 
@@ -27,8 +27,8 @@
 | ファイル | 中身 |
 |---|---|
 | `tools/tests/hsync_h3_host.c` | 実物の `userland/system/hsync.c` を 1 行も写さず `#include` し、KernelAPI だけを贋物に差し替える。贋 FS は**ノードごとに mtime を持ち**、`sys_set_mtime` の成功 / `NOSYS` / I/O 失敗を注入できる。`sys_read` / `sys_write` / `sys_set_mtime` の**呼び出し回数**を数える |
-| ↑ の A16 | `drivers/hostdrv/hostdrv_stat_rules.inc` の `hdrv_filetime_to_unix` / `hdrv_stat_mtime` を同じ翻訳単位で直接叩く (純関数) |
-| `tools/tests/vfs_set_mtime_host.c` | 実物の `fs/vfs.c` を `#include` し、合成 `VfsOps` で `vfs_set_mtime()` の振り分け (`NOSYS` / `INVAL` / `NOMOUNT` / エラーの素通し) を見る |
+| ↑ の A16 | `sys/dev/hostdrv/hostdrv_stat_rules.inc` の `hdrv_filetime_to_unix` / `hdrv_stat_mtime` を同じ翻訳単位で直接叩く (純関数) |
+| `tools/tests/vfs_set_mtime_host.c` | 実物の `sys/fs/vfs.c` を `#include` し、合成 `VfsOps` で `vfs_set_mtime()` の振り分け (`NOSYS` / `INVAL` / `NOMOUNT` / エラーの素通し) を見る |
 | `tools/tests/test_hsync_h3.py` | 2 本のビルドと実行、`--target` のクロスコンパイル確認、`--mutate` の否定側、`[ABI]`/`[ABI]` の静的検査 (`sys_set_mtime` が **slot 213 から動いていないか** / その前の並びが変わっていないか / 版が揃うか / 生成ヘッダの `KAPI_FUNC_COUNT` が 一致するか / `build/app.conf` の要求版) |
 
 贋 FS の `sys_write` は本物と同じく**書き込みのたびに mtime を現在時刻
@@ -42,16 +42,16 @@ KAPI SLOT PASS (sys_set_mtime = slot 213, v52, app.conf hsync>=52)
 HOST GNU89 -Werror COMPILE PASS (tools/tests/hsync_h3_host.c)
 103 checks, 0 failures
 EXIT hsync_h3_host=0
-HOST GNU89 -Werror COMPILE PASS (real fs/vfs.c)
+HOST GNU89 -Werror COMPILE PASS (real sys/fs/vfs.c)
 17 checks, 0 failures
 EXIT vfs_set_mtime_host=0
 TARGET i386-elf -Werror COMPILE PASS (userland/system/hsync.c)
-TARGET i386-elf -Werror COMPILE PASS (drivers/hostdrv/hostdrvfs.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/ext2/ext2_vfs.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/fat/fatfs_vfs.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/isofs/iso9660.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/vfs.c)
-TARGET i386-elf -Werror COMPILE PASS (kapi/kapi_sysinfo.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/dev/hostdrv/hostdrvfs.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/fs/ext2/ext2_vfs.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/fs/fat/fatfs_vfs.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/fs/isofs/iso9660.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/fs/vfs.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/kapi/kapi_sysinfo.c)
 ```
 
 ### A16 の基準値 (独立に出したもの)
@@ -99,7 +99,7 @@ H1 のホスト試験 (`hsync_h1_host.c`) は同じ `.inc` を取り込むが時
 呼ばないので、`-Wunused-function` で**ビルドが落ちた**。
 
 ```
-drivers/hostdrv/hostdrv_stat_rules.inc: error: 'hdrv_stat_mtime' defined but not used
+sys/dev/hostdrv/hostdrv_stat_rules.inc: error: 'hdrv_stat_mtime' defined but not used
 ```
 
 直し方: `.inc` は「純規則の置き場」で取り込む側が全部を使うとは限らないので、
@@ -125,12 +125,12 @@ drivers/hostdrv/hostdrv_stat_rules.inc: error: 'hdrv_stat_mtime' defined but not
 ### R3. `VfsOps` にフィールドを足したら既存ドライバが `-Werror` で落ちた
 
 ```
-drivers/hostdrv/hostdrvfs.c: error: missing initializer for field 'set_mtime' of 'VfsOps'
+sys/dev/hostdrv/hostdrvfs.c: error: missing initializer for field 'set_mtime' of 'VfsOps'
 ```
 
 `-Wextra` の `-Wmissing-field-initializers`。C89 の規則では書かなかった
 メンバはゼロになるので**動作は正しい**が、「書き忘れ」と区別が付かない。
-`drivers/hostdrv/hostdrvfs.c` / `fs/fat/fatfs_vfs.c` / `fs/isofs/iso9660.c` に**明示的な `0`** と
+`sys/dev/hostdrv/hostdrvfs.c` / `sys/fs/fat/fatfs_vfs.c` / `sys/fs/isofs/iso9660.c` に**明示的な `0`** と
 理由のコメントを置いた。ゼロになること自体は
 `tools/tests/vfs_set_mtime_host.c` が位置指定の初期化子で固定している。
 
@@ -232,12 +232,12 @@ H1 側からも押さえる形になった。時刻を使う試験は H3 側が�
 
 実装:
 
-- `drivers/hostdrv/hostdrv_stat_rules.inc` — FILETIME → Unix 秒の純関数 (`hdrv_filetime_to_unix` / `hdrv_stat_mtime`)
-- `drivers/hostdrv/hostdrvfs.c` — `hdrv_stat()` が `LastWriteTime` を値として退避し `st_mtime` に返す
-- `fs/vfs.h` / `fs/vfs.c` — `VfsOps.set_mtime` (任意実装) と `vfs_set_mtime()`、`VFS_ERR_NOSYS`
-- `fs/ext2/ext2_vfs.c` — `ext2_vfs_set_mtime()` (ext2 のみ実装)
-- `fs/fat/fatfs_vfs.c` / `fs/isofs/iso9660.c` / `drivers/hostdrv/hostdrvfs.c` — `VfsOps` に明示的な `0`
-- `kapi/kapi_sysinfo.c` — `kapi_sys_set_mtime()` (CPL=3 のポインタ検証と写し)
+- `sys/dev/hostdrv/hostdrv_stat_rules.inc` — FILETIME → Unix 秒の純関数 (`hdrv_filetime_to_unix` / `hdrv_stat_mtime`)
+- `sys/dev/hostdrv/hostdrvfs.c` — `hdrv_stat()` が `LastWriteTime` を値として退避し `st_mtime` に返す
+- `sys/fs/vfs.h` / `sys/fs/vfs.c` — `VfsOps.set_mtime` (任意実装) と `vfs_set_mtime()`、`VFS_ERR_NOSYS`
+- `sys/fs/ext2/ext2_vfs.c` — `ext2_vfs_set_mtime()` (ext2 のみ実装)
+- `sys/fs/fat/fatfs_vfs.c` / `sys/fs/isofs/iso9660.c` / `sys/dev/hostdrv/hostdrvfs.c` — `VfsOps` に明示的な `0`
+- `sys/kapi/kapi_sysinfo.c` — `kapi_sys_set_mtime()` (CPL=3 のポインタ検証と写し)
 - `sdk/kapi.json` (v51 → v52、`api` 末尾に `sys_set_mtime`) と生成物
 - `sdk/include/os32/os32_kapi_shared.h` — `KAPI_VERSION` 52
 - `userland/system/hsync.c` — 日時の前置判定、`--verify`、`metadata_updated`
@@ -270,7 +270,7 @@ vfs_mount_dev_host.c:(.text+0x31e7): undefined reference to `ext2_current_time'
 vfs_mount_dev_host.c:(.text+0x320e): undefined reference to `ext2_write_inode'
 ```
 
-`tools/tests/vfs_mount_dev_host.c` は実物の `fs/ext2/ext2_vfs.c` を取り込んで
+`tools/tests/vfs_mount_dev_host.c` は実物の `sys/fs/ext2/ext2_vfs.c` を取り込んで
 ext2 本体を贋物で埋めているが、H3 で足した `ext2_vfs_set_mtime()` が
 `ext2_read_inode` → **`ext2_write_inode`** → `ext2_sync` と進み、時刻を
 **`ext2_current_time()`** から取るので、埋まっていない 2 本が未定義になった。
@@ -284,7 +284,7 @@ ext2 本体を贋物で埋めているが、H3 で足した `ext2_vfs_set_mtime(
 
 ### (2) `test_kapi_db_v50` — 22/23。`db_v50_selftest:426`
 
-`kapi/kapi_db.c` の
+`sys/kapi/kapi_db.c` の
 
 ```c
 if (KAPI_SLOT_COUNT != KAPI_SLOT_HOST_CLOSE + 1) bad |= 1u << 0;
@@ -301,7 +301,7 @@ if (KAPI_SLOT_COUNT != KAPI_SLOT_HOST_CLOSE + 1) bad |= 1u << 0;
 表がそこで終わっていることではない。
 
 **直し方**: 判定を純関数 `db_slot_layout_ok(int slot_count)` に切り出し
-(`kapi/kapi_db.c` / `kapi/kapi_db.h`)、
+(`sys/kapi/kapi_db.c` / `sys/kapi/kapi_db.h`)、
 
 - 長さは **下限だけ** 見る (`slot_count <= KAPI_SLOT_HOST_CLOSE` なら偽)。
   末尾に何本足されても真。
@@ -352,21 +352,21 @@ FAIL slot_layout_append:448: db_slot_layout_ok(KAPI_SLOT_COUNT + 1)
 (`--include=*.c --include=*.h --include=*.inc --include=*.py --include=*.rs
 --include=*.asm`、生成物と `sdk/gen_kapi.py` を除く)。
 
-**該当は `kapi/kapi_db.c` の 1 か所だけ**だった。他の利用は全部
+**該当は `sys/kapi/kapi_db.c` の 1 か所だけ**だった。他の利用は全部
 「表の長さから導く」形で、末尾追記に対して正しい:
 
 | 箇所 | 使い方 | 追記で壊れるか |
 |---|---|---|
-| `exec/exec.c` | `for (i = 0; i < KAPI_FUNC_COUNT; i++)` (トランポリンのスタブ生成) | 壊れない |
-| `exec/exec.c` の `ring3_trampoline_init()` | `tbl[2 + KAPI_FUNC_COUNT + 0/1]` (データフィールドの位置) | 壊れない |
-| `exec/exec.c` | スタブ帯の大きさ `KAPI_FUNC_COUNT * 8` | 壊れない |
-| `exec/exec.c` | `if (slot >= (u32)KAPI_FUNC_COUNT)` (ディスパッチャの範囲検査) | 壊れない |
-| `exec/ring3_str.h` | `RING3_USTR_OFF` の式 | 壊れない |
-| `kapi/kapi_generated.c` (生成物) | `kapi_argsize[KAPI_FUNC_COUNT]` / `kapi_argptr[...]` | 壊れない |
+| `sys/kern/exec/exec.c` | `for (i = 0; i < KAPI_FUNC_COUNT; i++)` (トランポリンのスタブ生成) | 壊れない |
+| `sys/kern/exec/exec.c` の `ring3_trampoline_init()` | `tbl[2 + KAPI_FUNC_COUNT + 0/1]` (データフィールドの位置) | 壊れない |
+| `sys/kern/exec/exec.c` | スタブ帯の大きさ `KAPI_FUNC_COUNT * 8` | 壊れない |
+| `sys/kern/exec/exec.c` | `if (slot >= (u32)KAPI_FUNC_COUNT)` (ディスパッチャの範囲検査) | 壊れない |
+| `sys/kern/exec/ring3_str.h` | `RING3_USTR_OFF` の式 | 壊れない |
+| `sys/kapi/kapi_generated.c` (生成物) | `kapi_argsize[KAPI_FUNC_COUNT]` / `kapi_argptr[...]` | 壊れない |
 | `tools/tests/ring3_str_host.c` | `KAPI_FUNC_COUNT * 8` の式 | 壊れない |
 | `tools/tests/test_hsync_h3.py` | 生成ヘッダと `kapi.json` の件数一致 (再生成忘れの検出) | **そういう検査なので正しい** |
 
-`KAPI_SLOT_<NAME>` を固定値と比べる行 (`kapi/kapi_db.c` ほか) は
+`KAPI_SLOT_<NAME>` を固定値と比べる行 (`sys/kapi/kapi_db.c` ほか) は
 **既存スロットが動いていないこと**の検査で、末尾追記では変化しない。残した。
 
 #### 追記 (2026-09-16) — この調査は**同じ誤りの別の綴り**を取りこぼしていた
@@ -461,7 +461,7 @@ digest は「slot 213 までの名前」なので**末尾追記では動かな�
 ### 追加で触ったファイル (この節の分)
 
 - `tools/tests/vfs_mount_dev_host.c` — `ext2_write_inode` / `ext2_current_time` の贋物
-- `kapi/kapi_db.c` — `db_slot_layout_ok()` の切り出しと下限判定化、host 帯の位置を明示
-- `kapi/kapi_db.h` — `db_slot_layout_ok()` の宣言
+- `sys/kapi/kapi_db.c` — `db_slot_layout_ok()` の切り出しと下限判定化、host 帯の位置を明示
+- `sys/kapi/kapi_db.h` — `db_slot_layout_ok()` の宣言
 - `tools/tests/kapi_db_v50_host.c` — `slot_layout_append` ケース
 - `tools/tests/test_db_errstr.py` — `CASES` に `slot_layout_append`

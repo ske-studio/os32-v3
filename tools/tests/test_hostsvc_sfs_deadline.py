@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """C3 absolute deadlines and caller-owned replies, libc-free ILP32 runtime."""
 CHECK = dict(name='hostsvc-sfs-deadline', tier=1, needs=[], budget=4.0, covers=[
-    'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_client.h',
-    'fs/serialfs/serialfs.h', 'fs/serialfs/sfs_proto.c', 'fs/serialfs/sfs_proto.h',
-    'fs/vfs.h', 'include/types.h', 'include/time_units.h',
-    'net/nic.h', 'net/link.h', 'drivers/net/ne2000/ne2000.h',
+    'sys/fs/serialfs/sfs_client.c', 'sys/fs/serialfs/sfs_client.h',
+    'sys/fs/serialfs/serialfs.h', 'sys/fs/serialfs/sfs_proto.c', 'sys/fs/serialfs/sfs_proto.h',
+    'sys/fs/vfs.h', 'sys/include/types.h', 'sys/include/time_units.h',
+    'sys/net/nic.h', 'sys/net/link.h', 'sys/dev/net/ne2000/ne2000.h',
     'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h',
     'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_sfs_deadline_host.c', 'tools/tests/hostsvc_fixture.h',
@@ -58,7 +58,7 @@ def build_run(work, source):
     subprocess.run(['gcc', *FLAGS, '-I' + str(ROOT),
                     *include_flags(ROOT), '-nostdlib', '-static', '-no-pie',
                     str(src), str(ROOT / 'tools/tests/hostsvc_fixture.c'),
-                    str(ROOT / 'fs/serialfs/sfs_proto.c'), str(ROOT / 'lib/crc32.c'),
+                    str(ROOT / 'sys/fs/serialfs/sfs_proto.c'), str(ROOT / 'lib/crc32.c'),
                     str(ROOT / 'tools/tests/hostsvc_sfs_deadline_host.c'), '-o', str(exe)],
                    check=True, cwd=ROOT)
     return host32.run([str(exe)], cwd=ROOT).returncode
@@ -68,7 +68,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'fs/serialfs/sfs_client.c').read_text()
+    original = (ROOT / 'sys/fs/serialfs/sfs_client.c').read_text()
     with tempfile.TemporaryDirectory(prefix='hostsvc-sfs-deadline-') as tmp:
         work = Path(tmp)
         rc = build_run(work, original)

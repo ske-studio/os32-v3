@@ -3,8 +3,8 @@
 契約: [`docs/05_drivers.md`](../../docs/05_drivers.md) §5-5 の「PEGC の 480 ラインへの出入りは起動時の BIOS 状態に頼らず、実機 ROM の OUT 列に合わせる」の節
 (順序と中身・FIFO の待ち・09A8h・ROM の記録が期待値・除外表)。出所の票は TASK_PEGC480_REALHW (§2 の H2・H3・H5、§4) と
 TASK_PEGC_RA266_TIMING (§4)。下の「票 §N」は TASK_PEGC480_REALHW の節
-実装: `drivers/video/pc98/backend_pegc.c` の `pegc_apply_timing()` / `gdc_send()` / `pegc_boot_sync_record()` / `pegc_text_sync_400()`、
-値は `include/pegc.h` §10 (実機の記録で差し替える 1 か所)・§11・§12
+実装: `sys/platform/pc98/video/backend_pegc.c` の `pegc_apply_timing()` / `gdc_send()` / `pegc_boot_sync_record()` / `pegc_text_sync_400()`、
+値は `sys/platform/pc98/pegc.h` §10 (実機の記録で差し替える 1 か所)・§11・§12
 試験: `tools/tests/pegc_mode_host.c` + `tools/tests/test_pegc_mode.py` + `tools/tests/pegc_hostshim/io.h`
 (`make check-pegc-mode-host`)
 
@@ -21,11 +21,11 @@ TASK_PEGC_RA266_TIMING (§4)。下の「票 §N」は TASK_PEGC480_REALHW の節
 
 ## 様式
 
-実物の `drivers/video/pc98/backend_pegc.c` を 1 行も写さずに `#include` し、`io.h` だけを `-I` の先に置いた偽物へ差し替える
+実物の `sys/platform/pc98/video/backend_pegc.c` を 1 行も写さずに `#include` し、`io.h` だけを `-I` の先に置いた偽物へ差し替える
 (`atapi_hostshim` と同じ作法)。偽の I/O は IN / OUT を順に記録し、GDC のステータスはケースごとに
 「FULL を返す回数」「EMPTY を返さない回数」「コマンドを書いた直後から FULL にする回数」を決めて返す。
 09A0h は sel 09h のとき bit0 = CLOCK-1、常に bit1 = CLOCK-2 を返す ([U] io_disp.md I/O 09A0h)。
-期待列は試験側で `pegc_apply_timing` の順序を**独立に書き下し**、値は `include/pegc.h` のマクロから組む
+期待列は試験側で `pegc_apply_timing` の順序を**独立に書き下し**、値は `sys/platform/pc98/pegc.h` のマクロから組む
 (実機の値へ差し替えても期待列は直さなくてよい。`defaults` だけが NP21/W の数値を固定する)。
 
 ## ケース (10 本、1 実行で全部)
@@ -80,7 +80,7 @@ SCROLL は常に IM=0 だった。起動時 2.5MHz の機械 (NP21/W もこれ) 
 IM=1 が失われる。最後にグラフィック GDC を STOP するので、CUI が見えることでは成功を確かめられない。
 **期待列をヘッダの定数から組んでいたので、ヘッダの選び方の誤りは試験に見えなかった。**
 
-- 直し: `include/pegc.h` §10 に 24kHz / 31kHz × 2.5MHz / 5MHz の 4 組 (グラフィック SYNC) と SCROLL 2 組 (IM=0 / 1)。
+- 直し: `sys/platform/pc98/pegc.h` §10 に 24kHz / 31kHz × 2.5MHz / 5MHz の 4 組 (グラフィック SYNC) と SCROLL 2 組 (IM=0 / 1)。
   24kHz の 2 組は [B] 2-6 表2-27 と一致 (NP21/W 24-L / 24-M)、31kHz は NP21/W 31-L / 31-M。`pegc_text_sync_400` は
   起動時のクロック (両方 5MHz かどうか) で組を選ぶ。記録が無いときは従来の組。
 - 試験: `restore_matrix` が出た OUT からグラフィック GDC の SYNC・SCROLL・PITCH と 6Ah を拾い、**試験側に直に書いた資料の
@@ -145,7 +145,7 @@ FIFO 9 / VSYNC 7 / 順序と ROM の列 26 / 値 11 / 戻りの組 6 / ヘッダ
   意味を変えるとの記述なし、DFh はコマンドより先のパラメータ) ので**送らないまま**、試験の `EDIT_COMMON` の 4 行を `UNRESOLVED:` と明記した
   (未解明の差分)。`defaults` が「UNRESOLVED は ROM の 8〜11 行目の 4 行だけ」を確かめる。RESET1 で打ち消されるという主張は取り下げた。
 - **P2-2 (カーソル復帰の OUT が比較から漏れていた)**: 試験は `console_hw_cursor_enable()` を OUT の無い印に置き換えていた。
-  **実物の kernel/console/console.c を #include** し (カーネルは -Wall だけで組むので、試験の -Wextra -Werror で出る console.c 側の 2 警告だけ
+  **実物の sys/kern/console/console.c を #include** し (カーネルは -Wall だけで組むので、試験の -Wextra -Werror で出る console.c 側の 2 警告だけ
   pragma で止める)、CSRFORM + CSRW の実際の OUT を期待列に `ADD_CURSOR` (意図的な追加) として足した。論理カーソルは (5, 3) に置いて
   CSRW の番地 00F5h まで見る。GUI から抜ける途中 (シンク有効) と V86 中 (FALLBACK の口) では出ないことも見る。FIFO の門は
   backend_pegc.c が出す分 (最後の 62h 6Bh まで) だけを見る (console.c は従来から FIFO を見ない — 範囲外)。

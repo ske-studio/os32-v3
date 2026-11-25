@@ -1,12 +1,12 @@
 /* =========================================================================
  *  VFS_EXCL_HOST.C — 排他的作成 O_EXCL (票 H2 §2-1、KAPI v53) を
- *                    **実物の fs/vfs.c + fs/vfs_fd.c** で確かめる
+ *                    **実物の sys/fs/vfs.c + sys/fs/vfs_fd.c** で確かめる
  *
  *  票:   docs/archive/shell/TASK_H2.md §2-1 / §4-1 の X1 X2
  *  実行: python3 -B tools/tests/test_vfs_excl.py [--target]
  *  記録: tools/tests/vfs_excl_tdd.md
  *
- *  vfs_kind_host.c と同じ作法: 実物の fs/vfs.c と fs/vfs_fd.c をそのまま
+ *  vfs_kind_host.c と同じ作法: 実物の sys/fs/vfs.c と sys/fs/vfs_fd.c をそのまま
  *  #include し、境界 (kstring / kmalloc / コンソール) だけを同義の C で置く。
  *  FS ドライバは合成した VfsOps で、
  *    - create_excl を**持つ**もの (ext2 相当) と**持たない**もの (HostDrv 相当)
@@ -34,7 +34,7 @@
 
 #include "vfs.h"
 
-/* ---- fs/vfs.c の境界 (lib/kstring_asm.asm / kmalloc はホストで組めない) ---- */
+/* ---- sys/fs/vfs.c の境界 (sys/kern/kstring_asm.asm / kmalloc はホストで組めない) ---- */
 void *kzalloc(u32 size) { return calloc(1, size); }
 void kfree(void *p) { free(p); }
 void *kmemset(void *dst, int val, u32 n) { return memset(dst, val, n); }
@@ -56,10 +56,10 @@ char *kstrncat(char *dst, const char *src, u32 n)
     return dst;
 }
 
-#include "../../fs/vfs.c"
+#include "../../sys/fs/vfs.c"
 #include "../platform/pc98/boot_names.c"
 
-/* ---- fs/vfs_fd.c の境界 (コンソール / リダイレクト / 所有者タグ) ---- */
+/* ---- sys/fs/vfs_fd.c の境界 (コンソール / リダイレクト / 所有者タグ) ---- */
 int fd_is_redirected(int fd) { (void)fd; return 0; }
 u16 fd_redirect_ifmt(int fd, int *out_file_fd)
 { (void)fd; if (out_file_fd) *out_file_fd = -1; return OS_S_IFCHR; }
@@ -72,7 +72,7 @@ void console_write(const char *buf, u32 size, u8 color)
 { (void)buf; (void)size; (void)color; }
 int res_owner_get(void) { return 0; }
 
-#include "../../fs/vfs_fd.c"
+#include "../../sys/fs/vfs_fd.c"
 
 /* ------------------------------------------------------------------------ */
 

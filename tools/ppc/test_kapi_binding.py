@@ -253,7 +253,7 @@ def insert_group(helper, mutation, group):
 def verify(source, entries, extra_present=frozenset()):
     if any('#include "' + header + '"' not in source for header in ('gfx_hal.h', 'palette.h')):
         return False
-    reference = (ROOT / 'kapi/kapi_generated.c').read_text()
+    reference = (ROOT / 'sys/kapi/kapi_generated.c').read_text()
     for slot in PRESENT_SLOTS | GUI_SLOTS | PUBLISHED_GFX | {'gfx_osri_show', 'kdebug_call', 'gfx_set_palette', 'gfx_get_palette'} | extra_present:
         wrapper = re.search(r'(?:void|int|i32) __cdecl wrap_' + slot + r'\([^)]*\)\n\{.*?\n\}', reference, re.S)
         if not wrapper or wrapper.group() not in source:
@@ -394,7 +394,7 @@ def run_binding_probe(out, cc, dirs):
     flags = ['-ffreestanding', '-D__KERNEL_BUILD__', '-D__cdecl=', '-I' + str(out / 'include')]
     subprocess.run([cc, *flags, *['-I' + str(ROOT / d) for d in dirs],
                     '-DOS32_HOOK_KAPI_DB=0', '-ffunction-sections', '-c',
-                    out / 'kapi/kapi_generated.c', '-o', obj], check=True)
+                    out / 'sys/kapi/kapi_generated.c', '-o', obj], check=True)
     undefined = subprocess.check_output([cc.with_name('powerpc-elf-nm'), '-u', obj], text=True)
     if re.search(r'\bkapi_db_\w+', undefined):
         return 'provider reference'
@@ -472,7 +472,7 @@ void _start(void)
 def check_planar_link(tmp, cc, dirs):
     flags = ['-ffreestanding', '-D__KERNEL_BUILD__', '-D__cdecl=']
     flags += ['-I' + str(ROOT / d) for d in dirs]
-    provider = ROOT / 'platform/powermac/display_provider.c'
+    provider = ROOT / 'sys/platform/powermac/display_provider.c'
     anchor = 'void gfx_planar_present_dirty(int sync) { (void)sync; }'
     source = provider.read_text()
     if source.count(anchor) != 1:
@@ -481,7 +481,7 @@ def check_planar_link(tmp, cc, dirs):
     mutant.write_text(source.replace(anchor, ''))
     for path in (provider, mutant):
         obj = tmp / 'present.o'
-        subprocess.run([cc, *flags, '-nostdlib', '-r', ROOT / 'gfx/gfx_present.c',
+        subprocess.run([cc, *flags, '-nostdlib', '-r', ROOT / 'sys/hal/gfx/gfx_present.c',
                         path, '-o', obj], check=True)
         undefined = subprocess.check_output([cc.with_name('powerpc-elf-nm'), '-u', obj],
                                             text=True).split()
@@ -507,7 +507,7 @@ def main():
         ime_slots = {api['name'] for api in entries if api['name'].startswith('ime_')}
         (tmp / 'fep').mkdir()
         product = generate(tmp / 'fep', link=False, fep=True)
-        source = (product / 'kapi/kapi_generated.c').read_text()
+        source = (product / 'sys/kapi/kapi_generated.c').read_text()
         if not verify(source, [api for api in entries if api['name'] not in ime_slots], ime_slots | {'ime_getkey'}):
             print('FEP provider bindings differ from the shared ABI')
             return 1
@@ -522,7 +522,7 @@ def main():
             if any((profile / path).read_bytes() != (ROOT / path).read_bytes() for profile in (x86, out, linked)):
                 print('target ABI mismatch:', header)
                 return 1
-        source = (out / 'kapi/kapi_generated.c').read_text()
+        source = (out / 'sys/kapi/kapi_generated.c').read_text()
         if not verify(source, entries):
             print('binding verification failed'); return 1
         dirs = ['.', 'include', 'arch/ppc', 'platform/powermac', 'sdk/include',
@@ -548,17 +548,17 @@ def main():
             generated = generate(profile, link=link, ide=ide)
             present = sfs_slots if link else ide_slots
             absent = [api for api in entries if api['name'] not in present]
-            if not verify((generated / 'kapi/kapi_generated.c').read_text(), absent, present):
+            if not verify((generated / 'sys/kapi/kapi_generated.c').read_text(), absent, present):
                 print(f'binding verification failed: LINK={int(link)} IDE={int(ide)}')
                 return 1
-        linked_source = (linked / 'kapi/kapi_generated.c').read_text()
+        linked_source = (linked / 'sys/kapi/kapi_generated.c').read_text()
         absent = [api for api in entries if api['name'] not in sfs_slots | ide_slots]
         if not verify(linked_source, absent, ide_slots):
             return 1
         subprocess.run([str(cc), '-std=gnu11', '-Werror=implicit-function-declaration', '-ffreestanding', '-D__KERNEL_BUILD__',
                         '-D__cdecl=', '-I' + str(out / 'include')]
                        + ['-I' + str(ROOT / d) for d in dirs]
-                       + ['-c', str(linked / 'kapi/kapi_generated.c'), '-o', str(tmp / 'kapi.o')], check=True)
+                       + ['-c', str(linked / 'sys/kapi/kapi_generated.c'), '-o', str(tmp / 'kapi.o')], check=True)
         nm = cc.with_name('powerpc-elf-nm')
         undefined = {line.split()[-1] for line in subprocess.check_output(
             [str(nm), '-u', str(tmp / 'kapi.o')], text=True).splitlines()}
@@ -602,7 +602,7 @@ def main():
                 path = tmp / mutation
                 path.mkdir()
                 mutated = generate(path, mutation, link=False)
-                if verify((mutated / 'kapi/kapi_generated.c').read_text(), entries):
+                if verify((mutated / 'sys/kapi/kapi_generated.c').read_text(), entries):
                     print(mutation + ': SURVIVED'); return 1
                 print(mutation + ': RED')
             for mutation, expected in [('absent-sound-count', 21), ('retired-focus-result', 20), ('db-null-nosys', 10), ('db-hook-inverted', 'provider reference')]:

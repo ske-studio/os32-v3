@@ -1,4 +1,4 @@
-#include "../../userland/tests/pcm_wav.h"
+#include "../../userland/diag/pcm_wav.h"
 enum {
     RIFF_HEADER_SIZE = 12, CHUNK_HEADER_SIZE = 8, FMT_SIZE = 16,
     FMT_FORMAT = 0, FMT_CHANNELS = 2, FMT_RATE = 4,

@@ -1,7 +1,7 @@
 /* exec fixture のカーネル側。モジュール側は生成した import 表と stub を通る。 */
-#include "exec/exec.c"
-#include "exec/ring3_str.c"
-#include "exec/os32x_hdr.c"
+#include "sys/kern/exec/exec.c"
+#include "sys/kern/exec/ring3_str.c"
+#include "sys/kern/exec/os32x_hdr.c"
 
 /* KAPI の番地を ILP32 のプロセスの普通のメモリで裏打ちする。 */
 u8 host_arena[KHEAP_SIZE + MEM_KAPI_SIZE + PAGE_SIZE]

@@ -1,6 +1,6 @@
 /* Freestanding ILP32: real metadata reader, connection readiness and getter.
  * Ordered SQLite replies use A's shared substrate, starting from BSS. */
-#include "kernel/ime/ime_store.h"
+#include "sys/kern/ime/ime_store.h"
 #include "redir_access.h"
 #include "kstring.h"
 #include "tools/tests/fep_store_fixture.c"

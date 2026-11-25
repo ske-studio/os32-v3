@@ -5,17 +5,17 @@ import tempfile
 
 CHECK = dict(name='ppc-kboot-capture', tier=2, budget=180, needs=[],
              basis=['docs/decisions/realhw/HWOP_COMMON_DESIGN.md §2.3'],
-             covers=['tools/checks/ppc-kboot-capture.py', 'platform/powermac/pci_hosts.inc',
-                     'tools/ppc/pci_hosts_fake.c', 'arch/ppc/kernel_boot.h', 'mm/paging.h',
-                     'platform/powermac/gmac_tree.c', 'platform/powermac/lan_boot.h',
-                     'platform/powermac/pci_capture.inc', 'platform/powermac/pci_capture.h',
-                     'platform/powermac/via_tree.c', 'platform/powermac/via_window.h',
-                     'include/memmap.h', 'platform/powermac/kboot_capture.c', 'platform/powermac/kboot_info.h',
+             covers=['tools/checks/ppc-kboot-capture.py', 'sys/platform/powermac/pci_hosts.inc',
+                     'tools/ppc/pci_hosts_fake.c', 'sys/arch/ppc/kernel_boot.h', 'sys/kern/mm/paging.h',
+                     'sys/platform/powermac/gmac_tree.c', 'sys/platform/powermac/lan_boot.h',
+                     'sys/platform/powermac/pci_capture.inc', 'sys/platform/powermac/pci_capture.h',
+                     'sys/platform/powermac/via_tree.c', 'sys/platform/powermac/via_window.h',
+                     'sys/include/memmap.h', 'sys/platform/powermac/kboot_capture.c', 'sys/platform/powermac/kboot_info.h',
                      'tools/ppc/kboot_capture.py', 'tools/ppc/kboot_capture_fake.c',
-                     'platform/powermac/ofw.h', 'platform/powermac/platform_of_layout.h',
-                     'arch/ppc/ppc_boot.h', 'arch/ppc/ppc_pmap.h', 'arch/ppc/ppc_oea.h',
-                     'include/types.h', 'include/callconv.h', 'lib/kstring.h',
-                     'lib/kstring_c.c', 'tools/tests/host32.py'])
+                     'sys/platform/powermac/ofw.h', 'sys/platform/powermac/platform_of_layout.h',
+                     'sys/arch/ppc/ppc_boot.h', 'sys/arch/ppc/ppc_pmap.h', 'sys/arch/ppc/ppc_oea.h',
+                     'sys/include/types.h', 'sys/include/callconv.h', 'sys/kern/kstring.h',
+                     'sys/kern/kstring_c.c', 'tools/tests/host32.py'])
 
 
 def run(ctx):

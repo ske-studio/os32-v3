@@ -1,5 +1,5 @@
 /* HWOP_COMMON_DESIGN §2.1: LIST and POINT use the published typed imports. */
-#include "kdebug/hwb_wire.h"
+#include "sys/kern/kdebug/hwb_wire.h"
 #include "arch_exec_kapi.h"
 #include "kapi_table.h"
 #include "kstring.h"
@@ -7,8 +7,8 @@
 #include "platform_module_pair.h"
 #include "arch_exec_cache.h"
 #include "probe_data.h"
-#include "kernel/module/module.h"
-#include "kdebug/probe_wire.h"
+#include "sys/kern/module/module.h"
+#include "sys/kern/kdebug/probe_wire.h"
 
 static unsigned probe_starts;
 static int probe_value;

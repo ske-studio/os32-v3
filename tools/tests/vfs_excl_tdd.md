@@ -1,7 +1,7 @@
 # vfs_excl TDD 記録 — 排他的作成 `O_EXCL` (票 H2 §2-1、KAPI v53)
 
 契約: [vfs_fd_open「排他的作成 O_EXCL」](../../docs/design/fs/vfs_fd_open.md#排他的作成-o_excl-kapi-v53) の **X1 / X2** (出所は票 TASK_H2 §2-1)
-試験: `tools/tests/vfs_excl_host.c` (実物の `fs/vfs.c` + `fs/vfs_fd.c` を `#include`)
+試験: `tools/tests/vfs_excl_host.c` (実物の `sys/fs/vfs.c` + `sys/fs/vfs_fd.c` を `#include`)
 実行: `python3 -B tools/tests/test_vfs_excl.py [--target] [--mutate]` / `make check-vfs-excl-host`
 
 基点: `feat/gui` = `15c5edf`。
@@ -20,12 +20,12 @@ FS ドライバは合成 `VfsOps`。`create_excl` を**持つもの** (ext2 相�
 
 ## RED (実装前)
 
-`sdk/kapi.json` / `os32_kapi_shared.h` / `fs/vfs.h` に **定数 `KAPI_O_EXCL` と
-`VfsOps.create_excl` の口だけ**を入れ、`fs/vfs_fd.c` の分岐と ext2 の実装は入れない状態。
+`sdk/kapi.json` / `os32_kapi_shared.h` / `sys/fs/vfs.h` に **定数 `KAPI_O_EXCL` と
+`VfsOps.create_excl` の口だけ**を入れ、`sys/fs/vfs_fd.c` の分岐と ext2 の実装は入れない状態。
 
 ```
 KAPI FLAG PASS (KAPI_O_EXCL=0x400, v53, スロット 214 本のまま)
-HOST GNU89 -Werror COMPILE PASS (real fs/vfs.c + fs/vfs_fd.c)
+HOST GNU89 -Werror COMPILE PASS (real sys/fs/vfs.c + sys/fs/vfs_fd.c)
 === 票 H2 §2-1: 排他的作成 O_EXCL (KAPI v53) ===
 == X1: O_CREAT|O_EXCL は既存を EXIST、判定不能はその負値 ==
   FAIL 既存ファイル -> VFS_ERR_EXIST
@@ -78,18 +78,18 @@ KAPI_O_EXCL が 0x0400 ではない: None
 
 ```
 KAPI FLAG PASS (KAPI_O_EXCL=0x400, v53, スロット 214 本のまま)
-HOST GNU89 -Werror COMPILE PASS (real fs/vfs.c + fs/vfs_fd.c)
+HOST GNU89 -Werror COMPILE PASS (real sys/fs/vfs.c + sys/fs/vfs_fd.c)
 === 票 H2 §2-1: 排他的作成 O_EXCL (KAPI v53) ===
   (33 件すべて ok)
 
 33 checks, 0 failures
 EXIT vfs_excl_host=0
-TARGET i386-elf -Werror COMPILE PASS (fs/vfs.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/vfs_fd.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/ext2/ext2_vfs.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/ext2/ext2_dir.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/ext2/ext2_file.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/ext2/ext2_super.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/fs/vfs.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/fs/vfs_fd.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/fs/ext2/ext2_vfs.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/fs/ext2/ext2_dir.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/fs/ext2/ext2_file.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/fs/ext2/ext2_super.c)
 ```
 
 ## 変異試験 (`--mutate`、否定側)

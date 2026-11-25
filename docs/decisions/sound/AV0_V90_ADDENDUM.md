@@ -21,13 +21,13 @@
 ## 1. 確定設計と現状の食い違い（8 件）
 
 1. 原設計 §10（AV_HAL_DESIGN.md）の仮番号は失効した。sdk/kapi.json の generations・version・func_capacity で ABI 世代 2・v89・容量 384、同じ表の io_pump が slot 297。v90 は 337 口使用、残り 47 口となる。
-2. N1・N4 は新設扱いだった。input/hal/in2_dev.c の sources は 16 枠と再利用時の generation を持ち、同じファイルの input_src_releaseは世代を照合して入力状態も回収する。N4 の状態更新は input/hal/in2_state.c の input_capture にある。公開の列挙用情報をここに足す。
-3. N2 のリングと公開イベントは別形式。input/hal/in2_int.h の InputEvent の内部形式は offset 4 が generation、原設計の IN2_Event の公開形式は seq。input/hal/in2_ring.c の sequences の別配列から seq を得て、種別ごとに公開形式へ写す。
-4. N6 の時計は input/hal/in2_time.c の in2_time_ms で tick_clock_ms() に接続済み。AV0 の weak 定義・新しい時刻源は不要。音と入力の時刻を同じ口から取る。
+2. N1・N4 は新設扱いだった。sys/hal/input/in2_dev.c の sources は 16 枠と再利用時の generation を持ち、同じファイルの input_src_releaseは世代を照合して入力状態も回収する。N4 の状態更新は sys/hal/input/in2_state.c の input_capture にある。公開の列挙用情報をここに足す。
+3. N2 のリングと公開イベントは別形式。sys/hal/input/in2_int.h の InputEvent の内部形式は offset 4 が generation、原設計の IN2_Event の公開形式は seq。sys/hal/input/in2_ring.c の sequences の別配列から seq を得て、種別ごとに公開形式へ写す。
+4. N6 の時計は sys/hal/input/in2_time.c の in2_time_ms で tick_clock_ms() に接続済み。AV0 の weak 定義・新しい時刻源は不要。音と入力の時刻を同じ口から取る。
 5. 原設計 §7-6 が外すとした KAPI include の実名は sdk/kapi.json の includes の snd_contract.h。廃止 body の生成後、残る宣言の利用先を確かめて includes から外す。
 6. FM 部品の build/fm-module.mk の FM_DEF_SOURCES・FM_OBJS・snd_engine.o の規則 に加え、build/kernel-objects.mk の CORE_KERNEL_INCLUDES は CORE に snd_engine.o 自体をリンクする。ヘッダ一覧だけの掃除では CORE が組めない。
 7. 原設計 §7-6 の since 85 と追記 3 の最終整理予定は、v90 着手時の整理時期を §5 のとおり適用する。sdk/kapi.json の version の版と POLICY_DEV §10 に合わせ、今回の実装案は §5 に示す。
-8. 原設計の段の表 の D1/D2 新設時の前提から入力側が進んだ。未統合の wip/s4-impl は f13232896（M5/M6）、4512a11af・2800873d3（M7）、f673a4678（S4/S4i）を含む。既設の生産経路は drivers/input/kbd.c の kbd_deliver と drivers/input/mouse_bus.c の mouse_hal_capture 呼び出し。AV0 に枝の配送処理を取り込まない。
+8. 原設計の段の表 の D1/D2 新設時の前提から入力側が進んだ。未統合の wip/s4-impl は f13232896（M5/M6）、4512a11af・2800873d3（M7）、f673a4678（S4/S4i）を含む。既設の生産経路は sys/platform/pc98/input/kbd.c の kbd_deliver と sys/platform/pc98/input/mouse_bus.c の mouse_hal_capture 呼び出し。AV0 に枝の配送処理を取り込まない。
 
 ## 2. v90 の公開宣言
 
@@ -99,7 +99,7 @@ R0a → AV0 → R0b・R0c の順に統合する。R0b は以下の FM → V86 �
 生成物は入力ファイルを変えた段で一括更新する。途中の分割を個別の公開版にはせず、統合した一組だけを v90 として配備する。185 の廃止だけを先行配備せず、F1 の強い実体と gshell の切替を初回配備の条件とする。
 
 - **R0a・生成器**　sdk/gen_kapi.py に retired の処理を追加。通常の引数検査や target 呼び出しの前に、型どおりの廃止 body を生成する。
-- **R0a・定義**　sdk/kapi.json の 42・43・118・119・121〜124 は void の無作用、120 は 0、185 は NOSYS。since は 90。同じ段で kapi/kapi_strings.c の 43・118 と JSON の対応する文字列注記を外し、syscall 入口から文字列を読まない。126〜131 の直接 FM/SSG 6 口はそのまま使う。
+- **R0a・定義**　sdk/kapi.json の 42・43・118・119・121〜124 は void の無作用、120 は 0、185 は NOSYS。since は 90。同じ段で sys/kapi/kapi_strings.c の 43・118 と JSON の対応する文字列注記を外し、syscall 入口から文字列を読まない。126〜131 の直接 FM/SSG 6 口はそのまま使う。
 - **AV0・宣言**　公開の音・入力・前景・V86 型と内部の backend 契約を各ヘッダの所有者で定義する。入力 HAL の既存内部ヘッダには公開型との変換に要る宣言だけを追加する。
 - **AV0・実体**　音と入力の a0_weak.c に未実装の口だけを定義する。共有の前景と V86 の仮口も所有者を一つに定め、両機種の実リンクから到達させる。
 - **AV0・生成**　sdk/kapi.json 末尾に §2 を追加し、version と os32_kapi_shared.h の KAPI_VERSION を 90 にする。容量 384、データ開始 0x608、ABI 世代 2、crt 実名 os32_kapi_v89 を保つ。
@@ -107,7 +107,7 @@ R0a → AV0 → R0b・R0c の順に統合する。R0b は以下の FM → V86 �
 - **AV0・配置**　HWDEV の構造体表と指紋を実配置から再生成し DWARF と照合する。PowerPC の生成表・呼出規約も同じ番号と型で確認する。
 - **R0b・FM**　fm_body.c、fm_module.h、fm_module.c の提供側・利用側・登録と CORE 内蔵版を一緒に変更する。ops 世代を 2 とし、MML、tick 登録と master を除き、quiet と全キーオフ、直接操作を残す。
 - **R0b・回収**　起動音、exec 終了時の snd_owner_exit、FM 部品と CORE のリンク・import・ヘッダ参照を外してから snd_engine.c/.h を削除。PCM の回収は維持する。
-- **R0b・V86**　platform/pc98/legacy/v86_io.c の snd_state_for_guest・snd_state_for_os32 の両方で fm_all_off()、ssg_all_off() を呼ぶ。fm_contract.h と v86_imports.def を合わせ、往復双方の既存の静止関数名を保つ。
+- **R0b・V86**　sys/platform/pc98/legacy/v86_io.c の snd_state_for_guest・snd_state_for_os32 の両方で fm_all_off()、ssg_all_off() を呼ぶ。fm_contract.h と v86_imports.def を合わせ、往復双方の既存の静止関数名を保つ。
 - **V5 への引渡し**　AV0 は v86s_* を宣言して NOSYS まで。V5 が legacy_call_dispatch と PC-98 の slot switch で owner・引数を検査し、PowerPC の platform/none は NOSYS を返す。
 - **R0c・利用側**　shell の play・MML に依存する beep、bench、sndctl・sndtest 群を外す。F1 の強い set/get と同じ着地で gshell は av_focus_set に切り替え、WM の偽実体と期待も同じ段で移す。
 - **R0c・配布**　旧 userland/lib/snd のヘッダ・実体、libs.mk、SDK と配布一覧、試験登録を利用側と合わせて除く。L1〜L5 が userland/lib/snd と libos32snd の名を引き継ぐ。
@@ -117,7 +117,7 @@ R0a → AV0 → R0b・R0c の順に統合する。R0b は以下の FM → V86 �
 
 | 段 | PC-98 通常・R1 | PowerMac |
 |---|---|---|
-|AV0|build/sources/common.mk と order.mk に共有仮口・ガードを登録し、生成 wrap からリンク|C_COMMON_EXEC と arch/ppc/kapi_call.c のアダプタから共有口へ接続し、V86 は platform/none 経由|
+|AV0|build/sources/common.mk と order.mk に共有仮口・ガードを登録し、生成 wrap からリンク|C_COMMON_EXEC と sys/arch/ppc/kapi_call.c のアダプタから共有口へ接続し、V86 は platform/none 経由|
 |R0b FM|build/fm-module.mk の部品と build/kernel-objects.mk の内蔵版で ops v2 を同時更新|PC-98 FM はリンク対象外。共有契約を再コンパイル|
 |R0b V86|往復の静止、提供側、v86_imports.def の import と部品を同時更新|platform/none のリンクを維持|
 |R0b 回収|最後の参照と両リンク一覧の snd_engine を同時に削除|共有 exec 終了経路を旧音源への参照なしでリンク|
@@ -162,6 +162,6 @@ tools/build_compare.sh の build/out 全対象（.o/.elf/.bin/.mod/.lz4/.a、kde
 ## F1・R0c・7b の実装で PM が決めたこと (2026-11-21〜22)
 以下は本文と上の「確定」の読み替え。実装者が設計の欠けで止まった所を、既存の型と後で決まった入力の HAL の設計に合わせて PM が決めた。
 - **in2_on_focus の受け口 (F1)**: F1 の段では N 系 (独占・リング) がまだ無いので、AV0 の不在の提供と同じ流儀で input/hal/a0_weak.c に何もしない弱い実体を置いた。強い実体は入力の段 7b (N3・N7) で入る。上の「P1 R0c と入力の順」の「in2_on_focus の接続」は、F1 が in2_on_focus を呼ぶことで満たし、強い実体は R0c の初回の配備の条件に含めない。
-- **av_focus_set の門 (§4)**: 「res_owner_get()==GUI_SHELL_OWNER かつ gui_register 済み」は、kernel/kbd_inject.c と同じ型に読み替える — gui_register 済み かつ (ring3_wm_depth > 0 (gui_call の中の WM、アプリの OP_WAIT の中を含む) または (owner 1 かつ ring3_call_from_user() が偽))。アプリの CPL3 の syscall から直は INVAL。gshell は av_focus_set が成功した時だけ通知済みを更新する。
+- **av_focus_set の門 (§4)**: 「res_owner_get()==GUI_SHELL_OWNER かつ gui_register 済み」は、sys/kern/kbd_inject.c と同じ型に読み替える — gui_register 済み かつ (ring3_wm_depth > 0 (gui_call の中の WM、アプリの OP_WAIT の中を含む) または (owner 1 かつ ring3_call_from_user() が偽))。アプリの CPL3 の syscall から直は INVAL。gshell は av_focus_set が成功した時だけ通知済みを更新する。
 - **kbd_raw_purge_keep の置き場 (§5-3)**: 「kbd.c 経由」は、入力の HAL の設計 (raw のリングは共通層の所有、共通から装置のシンボルを使わない) に従い、共通層の raw リングの持ち主 (legacy_ring.c) に置いて in2_excl.c から直に呼ぶ。パッドの振動の停止 (§5-6) はパッドの段で入る。
 - **受入の「机で前景 0」(F1)**: 今の WM には窓を残したまま机へ前景を移す操作が無く、前景が 0 になるのは窓が 1 枚も無い時 (wm_tests.rs と同じ)。v90 の受入 (2026-11-22、NP21/W 依頼 26) は「窓が無い時 0・窓の切り替えで前景の id が替わる」で合格とした。

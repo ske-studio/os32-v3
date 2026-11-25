@@ -1,9 +1,9 @@
 /* NOTICE unit, libc-free ILP32. Real B2 + B3, shared IF/clock/failure seams. */
 #include "hostsvc_fixture.h"
-#include "lib/kstring.h"
+#include "sys/kern/kstring.h"
 #include "lib/le_internal.h"
-#include "net/link.h"
-#include "net/host_mailbox.h"
+#include "sys/net/link.h"
+#include "sys/net/host_mailbox.h"
 #include "os32_kapi_shared.h"
 #define IO_H
 static unsigned int irq_save(void)
@@ -36,7 +36,7 @@ void *kmemcpy(void *dst, const void *src, u32 n)
     for (u32 i = 0; i < n; i++) p[i] = q[i];
     return dst;
 }
-#include "net/host_mailbox.c"
+#include "sys/net/host_mailbox.c"
 #include PRODUCT_SOURCE
 /* One tick may issue at most ACK + WINDOW. Records describe successful TX;
  * injected nic.tx errors are returned unchanged and consume no record. */

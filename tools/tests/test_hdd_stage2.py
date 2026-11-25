@@ -62,9 +62,9 @@ ROOM_SIZES = [16652, 20160, 36000, 62496]
 # (mutate は TimeoutExpired を RED と数える)
 CASE_TIMEOUT = 120
 
-SHARED = ["userland/system/inst_disk.c", "platform/pc98/install_disk.c", "fs/pc98pt.c",
-          "userland/shell/hdprep_plan.c", "platform/pc98/install_plan.c", "fs/ext2/ext2_layout.c"]
-INS_SHARED = ["userland/system/inst_hdd.c", "platform/pc98/install_target.c"] + SHARED
+SHARED = ["userland/system/inst_disk.c", "sys/platform/pc98/install_disk.c", "sys/fs/pc98pt.c",
+          "userland/shell/hdprep_plan.c", "sys/platform/pc98/install_plan.c", "sys/fs/ext2/ext2_layout.c"]
+INS_SHARED = ["userland/system/inst_hdd.c", "sys/platform/pc98/install_target.c"] + SHARED
 
 HOST = ["gcc", "-std=gnu11", "-Wall", "-Wextra", "-Werror",
         "-D__cdecl="]
@@ -73,14 +73,14 @@ ILP32 = ["gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie
          "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter", "-Wno-sign-compare",
          "-Wno-unused-function", "-D__cdecl="]
 
-MIRROR = ["include/types.h", "platform/pc98/install_geometry.h", "platform/pc98/platform_install_layout.h", "include/ide_contract.h", "include/platform_install_boot.h", 'platform/pc98/bootinfo_wire.h', 'include/callconv.h', "userland/system/inst_disk.c", "platform/pc98/install_disk.c", "userland/system/inst_disk.h",
-          "userland/system/inst_hdd.c", "platform/pc98/install_target.c", "userland/system/inst_hdd.h",
+MIRROR = ["sys/include/types.h", "sys/platform/pc98/install_geometry.h", "sys/platform/pc98/platform_install_layout.h", "sys/include/ide_contract.h", "sys/include/platform_install_boot.h", 'sys/platform/pc98/bootinfo_wire.h', 'sys/include/callconv.h', "userland/system/inst_disk.c", "sys/platform/pc98/install_disk.c", "userland/system/inst_disk.h",
+          "userland/system/inst_hdd.c", "sys/platform/pc98/install_target.c", "userland/system/inst_hdd.h",
           "userland/system/cdinst.c", "userland/system/install.c",
           "userland/system/install_recover.inc",
-          "userland/shell/hdprep_plan.c", "platform/pc98/install_plan.c", "userland/shell/hdprep_plan.h",
-          "fs/pc98pt.c", "fs/pc98pt.h", "fs/ext2/ext2_layout.c", "fs/ext2/ext2_layout.h", "fs/ext2/ext2.h",
+          "userland/shell/hdprep_plan.c", "sys/platform/pc98/install_plan.c", "userland/shell/hdprep_plan.h",
+          "sys/fs/pc98pt.c", "sys/fs/pc98pt.h", "sys/fs/ext2/ext2_layout.c", "sys/fs/ext2/ext2_layout.h", "sys/fs/ext2/ext2.h",
           "boot/ext2_mini.c", "boot/boot_defs.h",
-          "include/bootinfo.h", "include/types.h",
+          "sys/include/bootinfo.h", "sys/include/types.h",
           "userland/lib/rt/pkg.c", "userland/lib/rt/pkg.h", "userland/lib/rt/dbgserial.h"]
 
 
@@ -114,9 +114,9 @@ HARNESS_KEYS = ("pure", "cdi", "ins", "mini")
 # ケースも回さない (同じ実行ファイル・同じ入力なので結果も同じ)。表に無いファイルは
 # 全部組む。表が gcc -MM の依存より狭ければ mutate() が落ちる (mutpar.check_rebuild_table)。
 REBUILD = {
-    "platform/pc98/install_target.c": ("cdi", "ins"),
-    "platform/pc98/install_disk.c": ("pure", "cdi", "ins"),
-    "platform/pc98/install_plan.c": ("pure", "cdi", "ins"),
+    "sys/platform/pc98/install_target.c": ("cdi", "ins"),
+    "sys/platform/pc98/install_disk.c": ("pure", "cdi", "ins"),
+    "sys/platform/pc98/install_plan.c": ("pure", "cdi", "ins"),
     "userland/system/inst_disk.c": ("pure", "cdi", "ins"),
     "userland/system/inst_hdd.c": ("cdi", "ins"),
     "userland/system/cdinst.c": ("cdi",),
@@ -255,12 +255,12 @@ def consts_cross_check(pure_exe):
     kmax, lmax, groups, off_h, off_s = (int(x) for x in got)
     bad = 0
     expr = subprocess.check_output(
-        ["cpp", "-E", "-P", "-imacros", str(ROOT / "include/memmap.h"),
+        ["cpp", "-E", "-P", "-imacros", str(ROOT / "sys/include/memmap.h"),
          "-imacros", str(ROOT / "boot/boot_defs.h"), "-"],
         input="MAX_IMAGE_SIZE\n", text=True).strip()
     expr = re.sub(r"(?<=[0-9a-fA-F])[uUlL]+", "", expr)
     bad += eval(expr, {"__builtins__": {}}, {}) != kmax
-    ctx = (ROOT / "fs/ext2/ext2_ctx.h").read_text(encoding="utf-8")
+    ctx = (ROOT / "sys/fs/ext2/ext2_ctx.h").read_text(encoding="utf-8")
     m = re.search(r"#define\s+EXT2_MAX_GROUPS\s+(\d+)", ctx)
     bad += not (m and int(m.group(1)) == groups)
     nhd = (ROOT / "tools/nhd_deploy.py").read_text(encoding="utf-8")
@@ -307,7 +307,7 @@ def real_pkg_paths(pure_exe):
 # 往復 2 (Fable) で path_get_drive / path_get_cwd も同じ手で直した。
 USER_SAFE_STR_TARGETS = {"vfs_cwd_user", "vfs_devname_user", "path_get_drive_user",
                          "path_get_cwd_user", "kapi_db_last_error", "kapi_db_column_text"}
-# トランポリンの写しを返す実体 (exec/exec.c)
+# トランポリンの写しを返す実体 (sys/kern/exec/exec.c)
 TRAMP_TARGETS = {"vfs_cwd_user", "vfs_devname_user", "path_get_drive_user", "path_get_cwd_user"}
 
 
@@ -334,16 +334,16 @@ def str_return_guard():
     for name, tgt in sorted(strfn.items()):
         if tgt not in USER_SAFE_STR_TARGETS:
             bad.append(f"sdk/kapi.json: {name} -> {tgt} (カーネル帯を返し得る)")
-    gen = (ROOT / "kapi/kapi_generated.c").read_text(encoding="utf-8")
+    gen = (ROOT / "sys/kapi/kapi_generated.c").read_text(encoding="utf-8")
     for name, tgt in strfn.items():
         m = re.search(r"wrap_%s\([^)]*\)\n\{(.*?)\n\}" % name, gen, re.S)
         if not m or f"return {tgt}(" not in m.group(1):
-            bad.append(f"kapi/kapi_generated.c: wrap_{name} が {tgt} を通らない (make all の前?)")
+            bad.append(f"sys/kapi/kapi_generated.c: wrap_{name} が {tgt} を通らない (make all の前?)")
     exe = exec_source(ROOT)
     for tgt in sorted(TRAMP_TARGETS):
         m = re.search(r"const char \*%s\([^)]*\)\s*\{(.*?)\}" % tgt, exe, re.S)
         if not m or ("ring3_user_str(ring3_in_syscall" not in m.group(1) and "tramp_copy(" not in m.group(1)):
-            bad.append(f"exec/exec.c: {tgt} がトランポリンの写しを返さない")
+            bad.append(f"sys/kern/exec/exec.c: {tgt} がトランポリンの写しを返さない")
     calls = 0
     for f in sorted((ROOT / "userland").rglob("*")):
         if f.suffix not in (".c", ".inc", ".h") or "target" in f.parts:
@@ -369,7 +369,7 @@ def build_target(tmp):
             "-O2", "-Wall", "-Wextra", "-Werror", 
             "-D__OS32_USERLAND__", "-Iplatform/pc98", "-I.", "-Iinclude", "-Isdk/include", "-Isdk/include/os32",
             "-Iuserland/lib"]
-    for rel in ("userland/system/inst_disk.c", "userland/system/inst_hdd.c", "platform/pc98/install_target.c",
+    for rel in ("userland/system/inst_disk.c", "userland/system/inst_hdd.c", "sys/platform/pc98/install_target.c",
                 "userland/system/cdinst.c", "userland/system/install.c"):
         extra = ["-Wno-unused-function"] if rel.endswith("install.c") else []
         run([*base, *extra, "-c", rel, "-o", str(pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o"))],
@@ -404,36 +404,36 @@ MUTATIONS = [
      "if (preflight(choice, &boot, &tgt) != 0) return 1;",
      "if (preflight(choice, &boot, &tgt) != 0) return 0;", "failure-zero"),
 
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "if (api->ide_write_sectors(t->plan.drive, 0, 0, NULL) != 0)",
      "if (0)", "installer ignores disk authorization denial"),
-    ("platform/pc98/install_disk.c",
+    ("sys/platform/pc98/install_disk.c",
      "        if (lba0[510] == 0x55 && lba0[511] == 0xAA) return HDPREP_E_MBR_SIG;",
      "        (void)0;", "空の表で LBA 0 の 55AA を見ない"),
-    ("platform/pc98/install_disk.c", "    if (used != 1) return INST_E_MULTI;",
+    ("sys/platform/pc98/install_disk.c", "    if (used != 1) return INST_E_MULTI;",
      "    if (used < 1) return INST_E_MULTI;", "2 項目以上を作り直す"),
-    ("platform/pc98/install_disk.c",
+    ("sys/platform/pc98/install_disk.c",
      "    if (e.sys_id != PC98PT_SID_OS32 || !name_is_os32(raw)) return INST_E_FOREIGN;",
      "    if (e.sys_id != PC98PT_SID_OS32 || (!name_is_os32(raw) && 0)) return INST_E_FOREIGN;",
      "名前 OS32 を見ない"),
-    ("platform/pc98/install_disk.c",
+    ("sys/platform/pc98/install_disk.c",
      "    if (e.sys_id != PC98PT_SID_OS32 || !name_is_os32(raw)) return INST_E_FOREIGN;",
      "    if (!name_is_os32(raw)) return INST_E_FOREIGN;", "sid を見ない (未知の区画を消す)"),
-    ("platform/pc98/install_disk.c",
+    ("sys/platform/pc98/install_disk.c",
      "        if (st != expect_start) return INST_E_START;\n        *out_mode = INST_MODE_RECREATE;",
      "        *out_mode = INST_MODE_RECREATE;", "標準配置の開始を見ない"),
-    ("platform/pc98/install_disk.c",
+    ("sys/platform/pc98/install_disk.c",
      "        if (st != expect_start) return INST_E_START;\n        *out_mode = INST_MODE_RECREATE_OLD;",
      "        *out_mode = INST_MODE_RECREATE_OLD;", "旧配置の開始を見ない (16/63 のシリンダ 12 を消す)"),
-    ("platform/pc98/install_disk.c", "    if (pc98pt_os32_is_legacy(lba1, heads, spt, disk_total)) {",
+    ("sys/platform/pc98/install_disk.c", "    if (pc98pt_os32_is_legacy(lba1, heads, spt, disk_total)) {",
      "    if (0) {", "旧配置の NHD を入れ直せない"),
-    ("platform/pc98/install_disk.c", "        if (c != ' ' && c != 0) return 0;", "        (void)c;",
+    ("sys/platform/pc98/install_disk.c", "        if (c != ' ' && c != 0) return 0;", "        (void)c;",
      "名前の後ろ (OS32X) を見ない"),
-    ("platform/pc98/install_disk.c", "loader_len > INST_LOADER_MAX)", "loader_len > INST_LOADER_MAX + 1UL)",
+    ("sys/platform/pc98/install_disk.c", "loader_len > INST_LOADER_MAX)", "loader_len > INST_LOADER_MAX + 1UL)",
      "ローダ 8193 B を通す"),
-    ("platform/pc98/install_disk.c", "kernel_len > INST_KERNEL_MAX)", "kernel_len > INST_KERNEL_MAX + 1UL)",
+    ("sys/platform/pc98/install_disk.c", "kernel_len > INST_KERNEL_MAX)", "kernel_len > INST_KERNEL_MAX + 1UL)",
      "vmkernel 508KiB + 1 を通す"),
-    ("platform/pc98/install_disk.c", "ipl_len > INST_IPL_MAX)", "ipl_len > INST_IPL_MAX + 1UL)",
+    ("sys/platform/pc98/install_disk.c", "ipl_len > INST_IPL_MAX)", "ipl_len > INST_IPL_MAX + 1UL)",
      "IPL 513 B を通す"),
     ("userland/system/inst_disk.c", "    if (data > 12UL) meta += 1UL;", "    (void)0;",
      "単一間接ブロックを数えない"),
@@ -441,21 +441,21 @@ MUTATIONS = [
      "ブロックの不足を見ない"),
     ("userland/system/inst_disk.c", "    if (need_inodes > free_inodes) return INST_E_INODES;\n", "",
      "inode の不足を見ない"),
-    ("platform/pc98/install_disk.c", "    ipl[INST_IPL_OFF_HEADS] = (unsigned char)heads;",
+    ("sys/platform/pc98/install_disk.c", "    ipl[INST_IPL_OFF_HEADS] = (unsigned char)heads;",
      "    ipl[INST_IPL_OFF_HEADS] = (unsigned char)(heads * 0UL + 8UL);", "IPL のヘッド数を 8 に固定 (旧 cdinst)"),
-    ("platform/pc98/install_plan.c", "    for (i = 0; i < PC98PT_SECTOR_SIZE; i++) sect[i] = 0;",
+    ("sys/platform/pc98/install_plan.c", "    for (i = 0; i < PC98PT_SECTOR_SIZE; i++) sect[i] = 0;",
      "    for (i = 0; i < 0; i++) sect[i] = 0;",
      "区画表の残りの項目を消さない"),
     ("userland/system/inst_disk.c", "    meta += EXT2L_FIRST_DATA_BLOCK + EXT2L_ROOT_DATA_BLOCKS;",
      "    meta += EXT2L_FIRST_DATA_BLOCK;", "空きの見積もりがルートのブロックを数えない"),
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "    if (rc != 0 || !ih_memeq(ih_sect, ih_back, IH_SECT)) {\n        inst_hdd_incomplete(api, \"partition table",
      "    if (rc != 0) {\n        inst_hdd_incomplete(api, \"partition table", "区画表を読み戻して比べない"),
     ("userland/system/inst_hdd.c", "    rc = api->sys_mount(INST_MOUNT, INST_DEV, \"ext2\");",
      "    rc = 0;", "通常のマウントで確かめない"),
-    ("platform/pc98/install_target.c", "    rc = api->sys_umount_checked(INST_MOUNT);", "    rc = 0;",
+    ("sys/platform/pc98/install_target.c", "    rc = api->sys_umount_checked(INST_MOUNT);", "    rc = 0;",
      "マウント中の hd0 を外さない"),
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "    if (api->dev_mount_count(INST_DRIVE) != 0) {\n        if (unmounted) {",
      "    if (api->dev_mount_count(INST_DRIVE) > 1) {\n        if (unmounted) {",
      "外した後にマウントが 1 つ残っていても書く"),
@@ -463,10 +463,10 @@ MUTATIONS = [
      "    root_hd0 = (rootdev && ih_streq(rootdev, INST_DEV)) ? 1 : 0;",
      "    root_hd0 = (rootdev && 0) ? 1 : 0;",
      "ルートの hd0 を書く"),
-    ("platform/pc98/install_target.c", "    inst_patch_ipl(ih_sect, t->plan.heads, t->plan.spt);",
+    ("sys/platform/pc98/install_target.c", "    inst_patch_ipl(ih_sect, t->plan.heads, t->plan.spt);",
      "    HddGeom ata; api->hdd_geom_info(INST_DRIVE, &ata);\n    inst_patch_ipl(ih_sect, ata.ata_def_heads, ata.ata_def_spt);",
      "IPL に IDENTIFY の幾何を書く (旧 install、F15)"),
-    ("platform/pc98/install_target.c", "    return ih_memeq(buf, ih_back, IH_SECT) ? 0 : -1;", "    return 0;",
+    ("sys/platform/pc98/install_target.c", "    return ih_memeq(buf, ih_back, IH_SECT) ? 0 : -1;", "    return 0;",
      "ローダ / IPL を読み戻して比べない"),
     ("userland/system/inst_hdd.c", "    rc = api->ext2_format_at(t->plan.drive, t->plan.start, t->plan.len);",
      "    rc = api->ext2_format_at(t->plan.drive, t->plan.start, t->plan.disk_limit - t->plan.start);",
@@ -474,7 +474,7 @@ MUTATIONS = [
     ("userland/system/inst_hdd.c",
      "    if (rc != 0) { ih_refuse(api, rc); return rc; }\n    return 0;\n}\n\nint inst_hdd_prepare",
      "    (void)rc;\n    return 0;\n}\n\nint inst_hdd_prepare", "容量の不足を断らない"),
-    ("platform/pc98/install_target.c", "    if (t->mode != INST_MODE_EMPTY)\n", "    if (0)\n",
+    ("sys/platform/pc98/install_target.c", "    if (t->mode != INST_MODE_EMPTY)\n", "    if (0)\n",
      "作り直しでデータが消えることを表示しない"),
     ("userland/system/inst_hdd.c", "    t->mounts = api->dev_mount_count(t->plan.drive);",
      "    t->mounts = 0;", "検査でマウントを数えない (外さずに書きに行く)"),
@@ -538,14 +538,14 @@ MUTATIONS = [
      "P2-4 1 ファイルの上限を数えない"),
     ("userland/system/inst_disk.c", "    if (n->too_big) return INST_E_FILE_SIZE;\n", "",
      "P2-4 1 ファイルの上限で断らない"),
-    ("platform/pc98/install_target.c", "REBOOT, then run the installer again", "Run the installer again",
+    ("sys/platform/pc98/install_target.c", "REBOOT, then run the installer again", "Run the installer again",
      "P2-6 再起動を案内しない"),
-    ("platform/pc98/install_target.c", "            ih_host_hint(api);           /* OS32 の項目が中途半端",
+    ("sys/platform/pc98/install_target.c", "            ih_host_hint(api);           /* OS32 の項目が中途半端",
      "            (void)0;           /* OS32 の項目が中途半端",
      "P2-6 直せない表にホスト側の手当てを案内しない"),
     ("userland/system/inst_hdd.c", "        if (t->mounts == 1 && dev && ih_streq(dev, INST_DEV)) {",
      "        if (dev && ih_streq(dev, INST_DEV)) {", "Fable 別の prefix にもマウントされた hd0 を承認後に外しに行く"),
-    ("platform/pc98/install_target.c", "        target_refuse(api, INST_E_GEOM);", "        target_refuse(api, INST_E_ARG);",
+    ("sys/platform/pc98/install_target.c", "        target_refuse(api, INST_E_GEOM);", "        target_refuse(api, INST_E_ARG);",
      "Fable hdd_geom_info の失敗を bad argument と出す"),
     ("userland/system/inst_disk.c", "    need_inodes = n->files + n->dirs + INST_SPACE_MARGIN_INODES;",
      "    need_inodes = n->files + n->dirs;", "Fable 自動で作る親ディレクトリの inode の余白を持たない"),
@@ -569,7 +569,7 @@ MUTATIONS = [
     ("userland/system/install.c",
      "        if (api->sys_stat(DST_SHELL, &st) != 0 || (st.st_mode & OS_S_IFMT) != OS_S_IFREG ||\n            st.st_size != sizes[MEDIA_SHELL]) {",
      "        if (api->sys_stat(DST_SHELL, &st) != 0 && 0) {", "R2 P1-2 install が写した shell の実物を見ない"),
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "        if (rc == INST_E_FOREIGN || rc == INST_E_MULTI || rc == HDPREP_E_MBR_SIG)",
      "        if (0)", "R2 Fable 他の OS の区画にも「表を消せ」と案内する"),
     # ---- ERASE (N4 の例外、2026-09-25。順序は Codex レビュー後の PM 決定:
@@ -610,84 +610,84 @@ MUTATIONS = [
     ("userland/system/inst_hdd.c", "        if (ch >= 0) ih_pushed = ch;     /* 別の字なら戻す */",
      "        (void)ch;", "CR の後に覗いた別の字を捨てる"),
     # 順序: 消すのは全検査・y・ERASE・マウントの検査の後
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "        t->erase_needed = 1;\n        t->erase_code = rc;\n        t->mode = INST_MODE_EMPTY;\n    }",
      "        t->erase_code = rc;\n        t->mode = INST_MODE_EMPTY;\n"
      "        if (t->umount_hd0) { (void)ih_umount_hd0(api); t->umount_hd0 = 0; }\n"
      "        if (ih_erase(api, t) != 0) return rc;\n    }",
      "検査の中で消す (y/N と ERASE の前、旧順序)"),
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "    if (t->umount_hd0) {\n        rc = ih_umount_hd0(api);\n        if (rc != 0) return rc;\n        t->umount_hd0 = 0;\n        unmounted = 1;\n    }",
      "    if (t->erase_needed && ih_erase(api, t) != 0) return -1;\n    t->erase_needed = 0;\n"
      "    if (t->umount_hd0) {\n        rc = ih_umount_hd0(api);\n        if (rc != 0) return rc;\n        t->umount_hd0 = 0;\n        unmounted = 1;\n    }",
      "マウントの検査より前に消す"),
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "        rc = ih_umount_hd0(api);\n        if (rc != 0) return rc;\n        t->umount_hd0 = 0;",
      "        rc = 0;\n        (void)rc;", "/hd0 の hd0 を外さずに消す・書く"),
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "    if (api->dev_mount_count(INST_DRIVE) != 0) {\n        if (unmounted) {",
      "    if (0) {\n        if (unmounted) {", "外したのにマウントが残っていても消す・書く"),
-    ("platform/pc98/install_target.c", "    if (t->erase_needed) return ih_erase(api, t);\n    return 0;",
+    ("sys/platform/pc98/install_target.c", "    if (t->erase_needed) return ih_erase(api, t);\n    return 0;",
      "    return 0;", "ERASE を受けても消さない"),
     ("userland/system/inst_hdd.c", "    return ih_check_mounts(api, t);\n}",
      "    t->erase_needed = 1;\n    return ih_check_mounts(api, t);\n}", "空のディスク・作り直しでも ERASE を聞く"),
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "    rc = ih_write_verify(api, 0, ih_sect);\n    if (rc == 0) rc = ih_write_verify(api, PC98PT_LBA, ih_sect);",
      "    rc = api->ide_write_sector(INST_DRIVE, 0, ih_sect);\n"
      "    if (rc == 0) rc = api->ide_write_sector(INST_DRIVE, PC98PT_LBA, ih_sect);",
      "消した LBA 0/1 を読み戻して比べない"),
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "    rc = ih_write_verify(api, 0, ih_sect);\n    if (rc == 0) rc = ih_write_verify(api, PC98PT_LBA",
      "    rc = 0;\n    if (rc == 0) rc = ih_write_verify(api, PC98PT_LBA", "LBA 0 (55AA) を消さない"),
-    ("platform/pc98/install_target.c", "    if (rc == 0) rc = ih_write_verify(api, PC98PT_LBA, ih_sect);\n", "",
+    ("sys/platform/pc98/install_target.c", "    if (rc == 0) rc = ih_write_verify(api, PC98PT_LBA, ih_sect);\n", "",
      "LBA 1 (区画表) を消さない"),
-    ("platform/pc98/install_target.c", "    for (i = 0; i < IH_SECT; i++) ih_sect[i] = 0;", "    (void)i;",
+    ("sys/platform/pc98/install_target.c", "    for (i = 0; i < IH_SECT; i++) ih_sect[i] = 0;", "    (void)i;",
      "0 で埋めずに前のセクタの中身を書く"),
-    ("platform/pc98/install_target.c", "    ih_erased = 1;\n    t->erased = 1;\n", "    t->erased = 1;\n",
+    ("sys/platform/pc98/install_target.c", "    ih_erased = 1;\n    t->erased = 1;\n", "    t->erased = 1;\n",
      "消したことを記録しない (format の失敗で「空のディスク」と案内しない)"),
-    ("platform/pc98/install_target.c", "    return code == INST_E_FOREIGN || code == INST_E_MULTI",
+    ("sys/platform/pc98/install_target.c", "    return code == INST_E_FOREIGN || code == INST_E_MULTI",
      "    return code == INST_E_MULTI", "FOREIGN (実機の -40) で ERASE を聞かない (断る)"),
-    ("platform/pc98/install_target.c", "           code == INST_E_BROKEN || code == INST_E_START;",
+    ("sys/platform/pc98/install_target.c", "           code == INST_E_BROKEN || code == INST_E_START;",
      "           code == INST_E_START;", "壊れた項目で ERASE を聞かない"),
-    ("platform/pc98/install_target.c", "code == HDPREP_E_MBR_SIG ||\n", "\n", "55AA だけのディスクで ERASE を聞かない"),
-    ("platform/pc98/install_target.c", "    ih_erased = 0;\n    ih_pt_written = 0;\n", "",
+    ("sys/platform/pc98/install_target.c", "code == HDPREP_E_MBR_SIG ||\n", "\n", "55AA だけのディスクで ERASE を聞かない"),
+    ("sys/platform/pc98/install_target.c", "    ih_erased = 0;\n    ih_pt_written = 0;\n", "",
      "前の実行の「消した」を持ち越す"),
-    ("platform/pc98/install_target.c", "    if (ih_erased && !ih_pt_written) ih_erased_hint(api);",
+    ("sys/platform/pc98/install_target.c", "    if (ih_erased && !ih_pt_written) ih_erased_hint(api);",
      "    if (ih_erased) ih_erased_hint(api);", "区画表を書いた後も「空のディスク」と案内する"),
-    ("platform/pc98/install_target.c", "    if (ih_erased && !ih_pt_written) ih_erased_hint(api);", "",
+    ("sys/platform/pc98/install_target.c", "    if (ih_erased && !ih_pt_written) ih_erased_hint(api);", "",
      "format の失敗で「空のディスクとして入れ直せる」と案内しない"),
-    ("platform/pc98/install_target.c", "                     i, (u32)e.bootable, (u32)e.sys_id, name);",
+    ("sys/platform/pc98/install_target.c", "                     i, (u32)e.bootable, (u32)e.sys_id, name);",
      "                     i, (u32)e.bootable, (u32)e.bootable, name);", "要約の sid が mid"),
-    ("platform/pc98/install_target.c", "                     (u32)e.start_cyl, (u32)e.end_cyl,\n",
+    ("sys/platform/pc98/install_target.c", "                     (u32)e.start_cyl, (u32)e.end_cyl,\n",
      "                     (u32)e.start_cyl, (u32)e.start_cyl,\n", "要約の終了シリンダが開始"),
-    ("platform/pc98/install_target.c", "            name[k] = (c >= 0x20 && c <= 0x7E) ? (char)c : '.';",
+    ("sys/platform/pc98/install_target.c", "            name[k] = (c >= 0x20 && c <= 0x7E) ? (char)c : '.';",
      "            name[k] = (c >= 0x20 && c <= 0x7E) ? '.' : '.';", "要約に区画の名前を出さない"),
-    ("platform/pc98/install_target.c", "        ih_show_disk(api, t, geometry.ata_total);\n", "", "確認の前に LBA 0/1 の要約を出さない"),
-    ("platform/pc98/install_target.c", "        t->mode = INST_MODE_EMPTY;\n", "",
+    ("sys/platform/pc98/install_target.c", "        ih_show_disk(api, t, geometry.ata_total);\n", "", "確認の前に LBA 0/1 の要約を出さない"),
+    ("sys/platform/pc98/install_target.c", "        t->mode = INST_MODE_EMPTY;\n", "",
      "消す予定でも元の断りのモードのまま (確認画面が空のディスクでない)"),
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "    if (t->erase_needed) {\n        api->kprintf(ATTR_RED,\n                     \"  hd0 holds another",
      "    if (0) {\n        api->kprintf(ATTR_RED,\n                     \"  hd0 holds another",
      "確認画面に「y の後に ERASE」を出さない"),
     ("userland/system/inst_hdd.c", "    if (!t->erase_needed) return 0;\n", "    return 0;\n",
      "ERASE を聞かずに消す (打鍵なしで消える)"),
     # 読み戻しの比較の長さ (Codex: 末尾の 511 バイト目)
-    ("platform/pc98/install_target.c", "    return ih_memeq(buf, ih_back, IH_SECT) ? 0 : -1;",
+    ("sys/platform/pc98/install_target.c", "    return ih_memeq(buf, ih_back, IH_SECT) ? 0 : -1;",
      "    return ih_memeq(buf, ih_back, IH_SECT - 1) ? 0 : -1;",
      "読み戻しの比較を 511 バイトに縮める (ローダ / IPL / 消去)"),
-    ("platform/pc98/install_target.c", "    if (rc != 0 || !ih_memeq(ih_sect, ih_back, IH_SECT)) {",
+    ("sys/platform/pc98/install_target.c", "    if (rc != 0 || !ih_memeq(ih_sect, ih_back, IH_SECT)) {",
      "    if (rc != 0 || !ih_memeq(ih_sect, ih_back, IH_SECT - 1)) {",
      "区画表の読み戻しの比較を 511 バイトに縮める"),
     # LBA ごとの write / read の失敗で後続の書き込みが止まる (Codex)
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "            inst_hdd_incomplete(api, \"loader write/readback failed\", rc);\n            return rc < 0 ? rc : -1;",
      "            inst_hdd_incomplete(api, \"loader write/readback failed\", rc);\n            rc = 0;",
      "ローダの書き込みの失敗の後も書き続ける"),
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "        inst_hdd_incomplete(api, \"IPL write/readback failed\", rc);\n        return rc < 0 ? rc : -1;",
      "        inst_hdd_incomplete(api, \"IPL write/readback failed\", rc);\n        (void)0;",
      "IPL の書き込みの失敗の後も展開する"),
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "        ih_host_hint(api);\n        return rc < 0 ? rc : -1;\n    }\n    api->kprintf(ATTR_GREEN, \"%s\", \"  Partition table written and verified.\\n\");",
      "        ih_host_hint(api);\n        (void)0;\n    }\n    api->kprintf(ATTR_GREEN, \"%s\", \"  Partition table written and verified.\\n\");",
      "区画表の書き込みの失敗の後もマウントしに行く"),
@@ -740,21 +740,21 @@ MUTATIONS = [
      "    if (ch == '\\r' || ch == '\\n' || ch == 0x1B) ch = inst_hdd_getkey(api);",
      "選択の後の ESC を捨てる (ESC は答え = 取り消し)"),
     # umount の後の断りの表示 (Codex 2 回目 P2-2)
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "                 \"  Nothing was erased or formatted. (Unmounting may have flushed\\n\"\n"
      "                 \"  hd0's file system data, as any umount does.)\\n\");",
      "                 \"  Nothing was written.\\n\");",
      "umount の後の断りでも Nothing was written と言う"),
-    ("platform/pc98/install_target.c",
+    ("sys/platform/pc98/install_target.c",
      "        api->kprintf(ATTR_RED, \"Refused: umount /hd0 failed (rc=%d).\\n\", rc);\n"
      "        ih_refused_after_umount(api);",
      "        api->kprintf(ATTR_RED,\n"
      "                     \"Refused: umount /hd0 failed (rc=%d). Nothing was written.\\n\", rc);",
      "umount の失敗で Nothing was written と言う (旧)"),
-    ("platform/pc98/install_target.c", "        if (unmounted) {\n            api->kprintf(ATTR_RED, \"Refused: %s",
+    ("sys/platform/pc98/install_target.c", "        if (unmounted) {\n            api->kprintf(ATTR_RED, \"Refused: %s",
      "        if (unmounted && 0) {\n            api->kprintf(ATTR_RED, \"Refused: %s",
      "umount の後もマウントが残る断りで Nothing was written と言う"),
-    ("platform/pc98/install_target.c", "        if (unmounted) {\n            api->kprintf(ATTR_RED, \"Refused: %s",
+    ("sys/platform/pc98/install_target.c", "        if (unmounted) {\n            api->kprintf(ATTR_RED, \"Refused: %s",
      "        if (unmounted || 1) {\n            api->kprintf(ATTR_RED, \"Refused: %s",
      "umount を呼ぶ前の断りでも「sync はあり得る」と言う (何も書いていないのに)"),
     ("boot/ext2_mini.c", "    if (file_size > max_size) return EXT2M_ERR_TOO_BIG;",

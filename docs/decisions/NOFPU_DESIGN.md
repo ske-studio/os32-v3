@@ -15,25 +15,25 @@
 
 | file:line | 確認結果と設計への反映 |
 |---|---|
-| `arch/x86/kernel/boot_after_paging.c` | EM/TS を無条件解除。probe 結果で確定する処理へ置換 |
-| `arch/x86/kernel/x87.c` の `x87_probe()` | 初手のメモリ宛て FNSTSW を AX 宛てに変更、probe 中の限定 #NM 復帰を用意 |
-| `arch/x86/kernel/x87.c` | save/restore/init は現在 present guard 内。absent 側へ software state 操作を追加 |
-| `platform/pc98/kernel_boot_memory.inc` | paging 後、SQLite より前に probe を完了させる |
+| `sys/arch/x86/kernel/boot_after_paging.c` | EM/TS を無条件解除。probe 結果で確定する処理へ置換 |
+| `sys/arch/x86/kernel/x87.c` の `x87_probe()` | 初手のメモリ宛て FNSTSW を AX 宛てに変更、probe 中の限定 #NM 復帰を用意 |
+| `sys/arch/x86/kernel/x87.c` | save/restore/init は現在 present guard 内。absent 側へ software state 操作を追加 |
+| `sys/platform/pc98/kernel_boot_memory.inc` | paging 後、SQLite より前に probe を完了させる |
 | `lib/sqlite3/os32_sqlite_config.h` | soft-float 使用というコメントと実際の x86 flags が不一致。実装して一致させる |
 | `build/config.mk`、`build/sqlite-proto.mk` | SQLite の gnu89/機械 flags を維持し、soft 専用 flags を加える |
 | `build/sqlite-proto.mk` | module wrapper は CFLAGS_BASE。sqlite3.o だけ soft にしては ABI が壊れる |
 | `tools/prototypes/sqlite_imports.def` | column_double の返値が double。部品境界を u64 の binary64 bit 列へ変更 |
 | `tools/gen_sqlite_imports.py` | facade/stub/call frame/module adapter を同じ定義から生成する |
-| `lib/sqlite3/os32_sqlite_outer.h`、`kernel/sqlite_outer.c` | 外側 double 宣言と生成 wrapper の両方を整数 ABI へ変更 |
-| `kapi/kapi_db_helpers.inc` | SQLITE_FLOAT の double→i32 変換が resident x87 を生成。bit 列→soft 変換へ変更 |
+| `lib/sqlite3/os32_sqlite_outer.h`、`sys/kern/sqlite_outer.c` | 外側 double 宣言と生成 wrapper の両方を整数 ABI へ変更 |
+| `sys/kapi/kapi_db_helpers.inc` | SQLITE_FLOAT の double→i32 変換が resident x87 を生成。bit 列→soft 変換へ変更 |
 | `sdk/include/os32/os32_kapi_shared.h` | 現行 DB_TYPE_FLOAT の payload は i32。今回もこの公開形式を維持 |
 | `lib/kmath.c` | fabs(double) も対象。部品内の FP 呼出し先を含めて soft ABI を閉じる |
 | `lib/sqlite3/os32_sqlite_vfs.c` | xCurrentTime は double の Julian day を書く。VFS も soft でコンパイル |
 | `lib/sqlite3/sqlite3.c` | libc gmtime/strftime を使う短縮 currentTimeFunc は OMIT_DATETIME 時だけ |
 | `build/programs.mk` | 単体版 SQLite は別の userland ビルド。newlib と通常 x87 ABI を維持 |
-| `userland/tests/fp_stop.c` | FNSTENV/FLDENV も必須。`main()` は CW と非空 stack を用いる停止/復帰試験 |
-| `arch/x86/kernel/isr_stub.asm`、`isr_common` | #NM は現在共通例外へ。成功時 IRET に戻る専用入口を設ける |
-| `exec/access_walk.c` | owner/USER/書込み権限を検査する as_access_page を emulator のアクセス基盤に使う |
+| `userland/diag/fp_stop.c` | FNSTENV/FLDENV も必須。`main()` は CW と非空 stack を用いる停止/復帰試験 |
+| `sys/arch/x86/kernel/isr_stub.asm`、`isr_common` | #NM は現在共通例外へ。成功時 IRET に戻る専用入口を設ける |
+| `sys/kern/exec/access_walk.c` | owner/USER/書込み権限を検査する as_access_page を emulator のアクセス基盤に使う |
 
 - `/home/hight/os32-v3/build/out` の11月12日既存 ELF を読取り測定。worktree の最新ビルド合格を意味しない。
 - kernel.elf: **17命令** = x87.c の7 + slot_step_result の5 + os32_sqlite_column_double の3 + call/stub の2。
@@ -240,7 +240,7 @@
 
 | 部品 | 版 | ライセンス | 置き場 | 改変 | 原文の所在 |
 |---|---|---|---|---|---|
-| NP21/W x87命令処理 | HEAD a535090400660e8b37350d91aa959a9a2442b7ba | BSD-2-Clause | arch/x86/kernel/x87_emu_*.c | Eの命令処理をCへ分割、CPU/memory/exceptionの置換、対象外機能削除、精度/commit修正。対応表はUPSTREAM.json | arch/x86/kernel/x87_emu_vendor/LICENSE-I386C-FPU.TXT と各移植ファイル冒頭 |
+| NP21/W x87命令処理 | HEAD a535090400660e8b37350d91aa959a9a2442b7ba | BSD-2-Clause | arch/x86/kernel/x87_emu_*.c | Eの命令処理をCへ分割、CPU/memory/exceptionの置換、対象外機能削除、精度/commit修正。対応表はUPSTREAM.json | sys/arch/x86/kernel/x87_emu_vendor/LICENSE-I386C-FPU.TXT と各移植ファイル冒頭 |
 | Berkeley SoftFloat（NP21/W同梱） | Release 3e、同じNP21/W HEAD | BSD-3-Clause | lib/softfloat/ | NP21のsw型名/i16変換等を保持、OS32 port/選択buildを追加。公式無改変とはしない | lib/softfloat/COPYING.txt と各原本冒頭 |
 
 - `x87_emu_vendor/UPSTREAM.json` は source_root、git_head、source_file、line_start/end、raw_sha256、encoding=CP932、destination、change_summary を各移植片に記録。
@@ -288,47 +288,47 @@
 
 | 段 | ファイル | 一機能/受渡し |
 |---|---|---|
-| A1 | `arch/x86/kernel/x87_emu.h`（新） | trap/decode/state/結果型と commit 契約 |
+| A1 | `sys/arch/x86/kernel/x87_emu.h`（新） | trap/decode/state/結果型と commit 契約 |
 | A2 | `lib/softfloat/UPSTREAM.json`（新） | NP21同梱3eの原本/hash/選択閉包/port差分、vendor配置とCOPYINGは同担当 |
 | B1 | `lib/softfloat_abi.c`（新） | GCC helper、soft flags で自己再帰なし |
 | A6 | `lib/softfloat_bits.h`（新） | integer bit API の宣言、公開 SDK には露出させない |
 | B2 | `lib/softfloat_bits.c`（新） | u64 bit API と DB 切捨て変換 |
-| B3 | `arch/x86/kernel/x87_emu_decode.c`（新） | prefix/ModRM/SIB/length、純粋 decode |
-| B4 | `arch/x86/kernel/x87_emu_state.c`（新） | 108byte codec、TOP/TW、環境命令/初期化 |
+| B3 | `sys/arch/x86/kernel/x87_emu_decode.c`（新） | prefix/ModRM/SIB/length、純粋 decode |
+| B4 | `sys/arch/x86/kernel/x87_emu_state.c`（新） | 108byte codec、TOP/TW、環境命令/初期化 |
 | B5 | `arch/x86/kernel/x87_emu_arith.c`（新） | 四則/逆算/FSQRT/FRNDINT、RC/PC |
 | B6 | `arch/x86/kernel/x87_emu_compare.c`（新） | FCOM/FUCOM/FTST/FXAMと条件bit |
 | B7 | `arch/x86/kernel/x87_emu_convert.c`（新） | load/store/int変換、80bit分類 |
-| B8 | `arch/x86/kernel/x87_emu_memory.c`（新） | user segment/page検証と二段階copy |
-| B9 | `arch/x86/kernel/x87_emu_exception.c`（新） | sticky/pending/mask、例外別commit規則 |
-| C1 | `arch/x86/kernel/x87_emu_dispatch.c`（新） | decode→execute→commit、ownerと再入制御 |
-| B10 | `arch/x86/kernel/x87.c` | AX probe/限定復帰・CR0・hw/software保存切替 |
-| A3 | `arch/x86/kernel/x87.h` | 内部getterとprobe guard宣言のみ |
-| C2 | `arch/x86/kernel/boot_after_paging.c` | 一元化した初期化を呼ぶ |
-| C3 | `arch/x86/kernel/isr_stub.asm` | #NM専用保存/復帰、元segmentを保持 |
-| C4 | `arch/x86/kernel/isr_handlers.c` | probe優先→user emu成功return→既存fault |
+| B8 | `sys/arch/x86/kernel/x87_emu_memory.c`（新） | user segment/page検証と二段階copy |
+| B9 | `sys/arch/x86/kernel/x87_emu_exception.c`（新） | sticky/pending/mask、例外別commit規則 |
+| C1 | `sys/arch/x86/kernel/x87_emu_dispatch.c`（新） | decode→execute→commit、ownerと再入制御 |
+| B10 | `sys/arch/x86/kernel/x87.c` | AX probe/限定復帰・CR0・hw/software保存切替 |
+| A3 | `sys/arch/x86/kernel/x87.h` | 内部getterとprobe guard宣言のみ |
+| C2 | `sys/arch/x86/kernel/boot_after_paging.c` | 一元化した初期化を呼ぶ |
+| C3 | `sys/arch/x86/kernel/isr_stub.asm` | #NM専用保存/復帰、元segmentを保持 |
+| C4 | `sys/arch/x86/kernel/isr_handlers.c` | probe優先→user emu成功return→既存fault |
 | A4 | `tools/prototypes/sqlite_imports.def` | column_f64_bits の wire 定義 |
 | B11 | `tools/gen_sqlite_imports.py` | bit codec adapter/OPS世代を生成、全生成物更新 |
 | B12 | `lib/sqlite3/os32_sqlite_outer.h` | u64宣言/aliasへ変更 |
-| C5 | `kernel/sqlite_outer.c` | 生成整数wrapperを取り込み、型assert |
+| C5 | `sys/kern/sqlite_outer.c` | 生成整数wrapperを取り込み、型assert |
 | C6 | `lib/sqlite3/os32_sqlite_module.c` | bit adapter結合、内部soft ABI型確認 |
-| C7 | `kapi/kapi_db_helpers.inc` | double排除、既存i32 payload維持 |
+| C7 | `sys/kapi/kapi_db_helpers.inc` | double排除、既存i32 payload維持 |
 | B13 | `lib/sqlite3/os32_sqlite_config.h` | OMIT不採用、REAL/日時とsoft方針を記載 |
 | B14 | `build/sqlite-proto.mk` | 全FP翻訳単位とhelperのflags/閉包を統一 |
 | B15 | `build/softfloat.mk`（新） | kernel/module用subset、FAST_INT64統一、整数helper閉包、flags規則 |
 | C8 | `build/config.mk` | 新build規則を読込む位置を固定 |
 | C9 | `build/sources/order.mk` | 新規resident sourceとABI順序登録 |
-| A5 | `kernel/ver_info.h` | 私有snapshotへFPU欄 |
-| B16 | `kernel/ver_collect.c` | 確定値を収集 |
-| B17 | `kernel/ver_format.c` | hw/none(emu)表示、長さ制限維持 |
+| A5 | `sys/kern/ver_info.h` | 私有snapshotへFPU欄 |
+| B16 | `sys/kern/ver_collect.c` | 確定値を収集 |
+| B17 | `sys/kern/ver_format.c` | hw/none(emu)表示、長さ制限維持 |
 | B18 | `tools/tests/x87_emu_host.c`（新） | libcなしの実x87対照・状態/境界fixture |
 | B19 | `tools/tests/test_nofpu.py`（新） | 命令棚卸し/ABI/日時/変異runner |
 | C10 | `tools/checks/nofpu-host.py`（新） | CHECK inputs/依存宣言 |
 | C11 | `tools/tests/test_x87.py` | 既存host試験のprivileged probeをhook化、hw/emu両系 |
-| C12 | `userland/tests/fp_stop.c` | 既存check/loopを両系で共通期待、停止復元検証 |
+| C12 | `userland/diag/fp_stop.c` | 既存check/loopを両系で共通期待、停止復元検証 |
 | C13 | `tools/tests/guest_tests.txt` | fp_stop checkは無しでもPASS 3/3、skip/kill期待を禁止 |
 | C14 | `docs/09_exec.md` | software state/例外/通常KAPIの契約 |
 | C15 | `docs/tasks/DEFERRED_TESTS.md` | 17/582からの除去結果と残る実機検証を記録 |
-| A7 | `arch/x86/kernel/x87_emu_vendor/UPSTREAM.json`（新） | 関数別由来/hash/行/派生先と原文LICENSEを保存 |
+| A7 | `sys/arch/x86/kernel/x87_emu_vendor/UPSTREAM.json`（新） | 関数別由来/hash/行/派生先と原文LICENSEを保存 |
 | C16 | `THIRD_PARTY.md` | §4.4の二部品を登録、配布ライセンスの所在を記載 |
 
 - §4.2の移植先ごとに担当を分け、Cへの分割/境界置換/修正履歴を残す。原本LICENSE/追加headerの所有者も固定し同じファイルを分担しない。
@@ -408,7 +408,7 @@
 - A2: 同梱 3e の §3 root から i386/gnu89/Os/soft-float の object 未解決 symbol 閉包を採る。platform の builtin CLZ だけを無効化し、両 header の FAST_INT64/LITTLEENDIAN と 8086 specialize を保持、選択原本・全 hash・port 差分・除外一覧・symbol 集合は UPSTREAM.json に固定する (像へのリンクは B15)。
 - A7: CP932 原本の関数ごとの行範囲・その生 byte SHA256・派生予定先を記録する。除外関数も destination=null で区別し、原文 LICENSE とファイル冒頭の著作権/許諾を byte 不変で保存する。B/C の派生 C がまだ存在しないことを台帳に明記する。
 
-A1 の宣言 (実装者が使う正本は `arch/x86/kernel/x87_emu.h`):
+A1 の宣言 (実装者が使う正本は `sys/arch/x86/kernel/x87_emu.h`):
 
 ```c
 /* OS32-owned x87 integration contract. No native FP types or packed C ABI.
@@ -531,7 +531,7 @@ enum x87_emu_result x87_emu_dispatch(struct x87_emu_trap *trap,
 #endif
 ```
 
-A3 の宣言 (`arch/x86/kernel/x87.h` に追加):
+A3 の宣言 (`sys/arch/x86/kernel/x87.h` に追加):
 
 ```c
 int arch_fp_present(void);
@@ -584,7 +584,7 @@ C1 照合に使い、FISTTP opcode は従来どおり公開しない。B10/C3/C4
 - B10/C4: 別段の像への結線まで `OS32_X87_EMU_LINKED` を未定義とし、software codec/dispatch の呼出しだけを条件付きで実装する。未結線の #NM は既存 fault へ流し、ビルド側でこの旗とエミュレータ全体を同時に有効にする。
 - B10: software の active state は x87.c が一つ所有し、108 byte の保存・復元は codec を通す。save は FNSAVE 同様環境を初期化し payload を保持、新規 owner の init は全域を初期化する。
 - C3/C4: #NM は元の GS/FS/ES/DS を common frame の手前に各 4 byte 保存する。VM は既存 V86 fault へ、CPL3 のみ user ESP/SS を読む。成功時だけ GPR/EIP/EFLAGS を書き戻し、segment は元値を pop、専用 IRETD で戻る。
-- 試験版の段: `arch/x86/kernel/x87.c` の `OS32_TEST_NOFPU` を隔離試験ビルド専用とする。`OS32_X87_EMU_LINKED` 必須 (無ければコンパイルエラー)、probe 後にソフト経路を選び EM/MP/TS=1 を要求する。通常の build 設定には追加しない。
+- 試験版の段: `sys/arch/x86/kernel/x87.c` の `OS32_TEST_NOFPU` を隔離試験ビルド専用とする。`OS32_X87_EMU_LINKED` 必須 (無ければコンパイルエラー)、probe 後にソフト経路を選び EM/MP/TS=1 を要求する。通常の build 設定には追加しない。
 - B17: CPU 行は 52 桁の制約内に収めるため `x86 32-bit; calib=...; FPU=...` とする。PPC の収集は hw 固定。
 - P3: FLDCW の予約 CW bit を codec と同じ `(cw & 0x1f3f) | 0x0040` に正規化する。
 

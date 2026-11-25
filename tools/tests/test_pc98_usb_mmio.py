@@ -8,11 +8,11 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'platform/pc98/pci_mmio.c'
+SOURCE = 'sys/platform/pc98/pci_mmio.c'
 HOST = 'tools/tests/pc98_usb_mmio_host.c'
 CHECK = dict(name='pc98-usb-mmio-host', tier=1, needs=[], budget=15,
-             covers=['platform/pc98/pci_mmio.c', 'tools/tests/pc98_usb_mmio_host.c', 'tools/tests/test_pc98_usb_mmio.py',
-                     'platform/pc98/pci_resources.h', 'drivers/pci/*.h', 'drivers/pci/pci_decode.c', 'mm/*.h',
+             covers=['sys/platform/pc98/pci_mmio.c', 'tools/tests/pc98_usb_mmio_host.c', 'tools/tests/test_pc98_usb_mmio.py',
+                     'sys/platform/pc98/pci_resources.h', 'drivers/pci/*.h', 'sys/dev/pci/pci_decode.c', 'mm/*.h',
                      'include/*.h', 'tools/tests/host_arch/*.h',
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
              basis=['USB_DESIGN §5-3'])
@@ -38,7 +38,7 @@ def run(ctx):
             exe = tmp / 'mmio'
             subprocess.run(['gcc', '-m32', '-ffreestanding', '-nostdlib', '-fno-pie', '-no-pie',
                             '-I' + td, '-Itools/tests/host_arch', '-Iplatform/pc98',
-                            *include_flags(ROOT), HOST, 'drivers/pci/pci_decode.c', '-o', str(exe)], check=True, cwd=ROOT)
+                            *include_flags(ROOT), HOST, 'sys/dev/pci/pci_decode.c', '-o', str(exe)], check=True, cwd=ROOT)
             rc = host32.run([str(exe)]).returncode
             if pair and not 0 < rc < 128 or not pair and rc:
                 raise RuntimeError(f'{pair}: rc={rc}')

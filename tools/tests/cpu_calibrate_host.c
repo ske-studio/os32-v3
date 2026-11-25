@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  CPU_CALIBRATE_HOST.C — kernel/time/cpu_calibrate_math.c をホストで回す       */
+/*  CPU_CALIBRATE_HOST.C — sys/kern/time/cpu_calibrate_math.c をホストで回す       */
 /*                                                                          */
 /*  実物の判定を 1 行も写さずに #include する。tick_count も I/O も触らない */
 /*  ので模型は 1 つも要らない。                                             */
@@ -16,7 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../kernel/time/cpu_calibrate_math.c"
+#include "../../sys/kern/time/cpu_calibrate_math.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \
@@ -148,7 +148,7 @@ static void give_up(void)
 /* ------------------------------------------------------------------ */
 static void delay_scale(void)
 {
-    /* cpu_delay_us の式 (kernel/time/cpu_calibrate.c):
+    /* cpu_delay_us の式 (sys/platform/pc98/time/cpu_calibrate.c):
      *   loops = (lpt / 100) * us / 100        (1 tick = 10,000µs)
      * 実機 266MHz で正しい lpt = 200 万のとき、5µs は 1000 ループ。 */
     u32 good = 2000000UL;
@@ -161,8 +161,8 @@ static void delay_scale(void)
           == 10UL * ((bad / 100UL) * 5UL / 100UL));
 
     /* **つまり cpu_delay_us の利用者は実待ちが 10 倍に伸びる。**
-     * drivers/char/serial.c (TxRDY のポーリング間隔)、drivers/net/ne2000/ne2000.c
-     * (RDC / RESET / OVW)、drivers/video/pc98/gfx_vram.c (RASTER_LINE_US) の 3 つ。
+     * sys/dev/char/serial.c (TxRDY のポーリング間隔)、sys/dev/net/ne2000/ne2000.c
+     * (RDC / RESET / OVW)、sys/platform/pc98/video/gfx_vram.c (RASTER_LINE_US) の 3 つ。
      * いままで**短すぎた**ので、伸びるのが正しい向き。 */
     CHECK(good > bad);
 }

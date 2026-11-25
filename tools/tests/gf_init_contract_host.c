@@ -1,6 +1,6 @@
 /* P0 executable contract examples, NOT the future P2 runner. Real decoder,
  * fake runs + adapter: exercise pair supplementation, shared waits and undo. */
-#include "hwdev/gf/internal.h"
+#include "sys/dev/video/geforce/internal.h"
 
 static void fail(void) __attribute__((noreturn));
 static void fail(void)

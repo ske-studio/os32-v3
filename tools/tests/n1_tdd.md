@@ -1,4 +1,4 @@
-# N1 — Host Services 基盤 (ワイヤ v2 / `net/link.c` 非ブロッキング / KAPI v51 / Agent v2) の TDD 記録
+# N1 — Host Services 基盤 (ワイヤ v2 / `sys/net/link.c` 非ブロッキング / KAPI v51 / Agent v2) の TDD 記録
 
 契約: ワイヤ v2・HELLO・駆動・状態機械は [`docs/design/net/link_wire.md`](../../docs/design/net/link_wire.md)、
 KAPI の口は [`docs/design/net/link_host_api.md`](../../docs/design/net/link_host_api.md)、
@@ -10,7 +10,7 @@ Agent のセッション採番と rid 台帳は [`docs/design/tools/host_agent.m
 | 実行 | 何を動かすか |
 |---|---|
 | `python3 -B tools/tests/test_host_agent.py` (`make check-host-agent`) | 実 `tools/host_agent.py` の `HostAgent`。贋 OS32 が **フレームを直接組む** (Agent の直列化を借りない) |
-| `python3 -B tools/tests/test_net_link.py --target` (`make check-net-link-host`) | 実 `net/link.c` + 実 `kapi/kapi_host.c` を `#include`。NIC / cli-sti / 100Hz タイマ / ディスパッチャだけ贋物。対向は **実 Agent** (`host_agent.py` を UNIX ソケットで子プロセス起動) か台本 |
+| `python3 -B tools/tests/test_net_link.py --target` (`make check-net-link-host`) | 実 `sys/net/link.c` + 実 `sys/kapi/kapi_host.c` を `#include`。NIC / cli-sti / 100Hz タイマ / ディスパッチャだけ贋物。対向は **実 Agent** (`host_agent.py` を UNIX ソケットで子プロセス起動) か台本 |
 
 エミュレータ・ネットワーク・`make` には触っていない (Agent は `--offline` で起動する)。
 
@@ -89,8 +89,8 @@ Agent のセッション採番と rid 台帳は [`docs/design/tools/host_agent.m
 - `check_reclaim_has_host_owner_exit()` — `exec_reclaim_owned` の `host_owner_exit(id)` が
   `launch_owner_exit` と `con_sink_owner_exit` の**間**にある。
 - `check_timer_calls_link_tick()` — `timer_handler` が `ne2k_timer_tick()` の**直後**に
-  `link_tick()` を呼び、`kapi/kapi_host.c` が `link_tick` を呼ばず、`net/link.c` の中にも
-  呼び出しが無く (定義 1 か所だけ)、`drivers/net/ne2000/lgy98.c` が反射モードで `link_init` を止めている。
+  `link_tick()` を呼び、`sys/kapi/kapi_host.c` が `link_tick` を呼ばず、`sys/net/link.c` の中にも
+  呼び出しが無く (定義 1 か所だけ)、`sys/dev/net/ne2000/lgy98.c` が反射モードで `link_init` を止めている。
 
 ---
 
@@ -124,7 +124,7 @@ SUMMARY 21/25 PASS
 
 GREEN: `SUMMARY 25/25 PASS`。
 
-### 2b. 段 2・3・4 (`net/link.c` / KAPI v51 / ハーネス)
+### 2b. 段 2・3・4 (`sys/net/link.c` / KAPI v51 / ハーネス)
 
 最初の実行 (ケース 29 本):
 
@@ -134,7 +134,7 @@ SUMMARY 27/29 PASS
   FAIL r4_hello_stage_losses: SYN 再送で nonce が進んでいない / CONFIRM が出ない
 ```
 
-どちらも **`net/link.c` の欠陥**で、試験は正しかった:
+どちらも **`sys/net/link.c` の欠陥**で、試験は正しかった:
 
 1. **NO_SLOT の扱い** (`link_on_response`)。「そのハンドルの `rel_pending` を立て直す」と
    書いていたが、未達の RELEASE は **NO_SLOT を受けた rid のハンドルのものとは限らない**
@@ -157,9 +157,9 @@ GREEN: `SUMMARY 29/29 PASS` + `TARGET i386-elf GNU89 -Werror COMPILE PASS`。
    後者 (往復 4 の反映) を採り、**SYN 0 / SYN-ACK 6 / CONFIRM 0 / ESTABLISHED 2** とした
    (ESTABLISHED の 2B は `agent`。OS32 が世代を確定できるようにする)。
    今は拡張の長さ (SYN-ACK 12 / ESTABLISHED 8、ホストの世代と ALIVE の番号を足した形) も受ける。
-   両端の検査表: `net/link.c` の `link_paylen_ok`、`tools/host_agent.py` の `HELLO_PAYLEN`。
+   両端の検査表: `sys/net/link.c` の `link_paylen_ok`、`tools/host_agent.py` の `HELLO_PAYLEN`。
 2. **制御 RESPONSE の符号**: `PROCESSING = 1` / `TOMBSTONE = 2` / `NO_SLOT = 3`
-   (`net/link.h` の `LINK_CTL_*`、`host_agent.py` の `CTL_*`)。N0 は名前だけを決めていた。
+   (`sys/net/link.h` の `LINK_CTL_*`、`host_agent.py` の `CTL_*`)。N0 は名前だけを決めていた。
    業務側の HTTP ステータスとは flags bit0 で分かれるので値の衝突は起きない。
 3. **宣言長の読み方**: 要求行の動詞で決める — `ECHO <len>` は 2 番目の語、
    `CLIP PUT <len>` / `PRINT DATA <id> <len>` / `PUT <path> <len>` は**末尾の語**。
@@ -167,7 +167,7 @@ GREEN: `SUMMARY 29/29 PASS` + `TARGET i386-elf GNU89 -Werror COMPILE PASS`。
 4. **`link_tick` は `ne2k_poll()` を呼ばない**。直前に走る `ne2k_timer_tick()` が
    リング回収をするので、リンク層は `ne2k_recv` でホストキューを drain するだけ
    (1 周回 `LINK_RX_BUDGET` = 16 フレーム)。
-5. **反射モードの止め方**: `drivers/net/ne2000/lgy98.c` が `LGY98_FLAG_REFLECT` のとき `link_init` を
+5. **反射モードの止め方**: `sys/dev/net/ne2000/lgy98.c` が `LGY98_FLAG_REFLECT` のとき `link_init` を
    呼ばない → `link_ready == 0` → `link_tick` が即 return。`timer_handler` の並びは
    1 本のままで済む。
 6. **`host_open` の TX 満杯**: ハンドルごとに REQUEST の枠が 1 つあるので、
@@ -209,7 +209,7 @@ GREEN: `SUMMARY 29/29 PASS` + `TARGET i386-elf GNU89 -Werror COMPILE PASS`。
 | `link_l1_done` / `link_l2_eof` | EOF を受けた (0/1)。**完了判定には使わない** (完了は `recv_bytes == length`) |
 | `link_l2_bytes` / `_read` / `_gaps` / `_bad` / `_overflow` | 同じ |
 | `link_l3_*` (8 本) | 同じ |
-| **新規** `link_sess` / `link_agent_gen` / `link_resyncs` / `link_tombstones` / `link_no_slots` / `link_processing` / `link_tx_deferred` | v2 の観測点 (`net/link.h` 末尾) |
+| **新規** `link_sess` / `link_agent_gen` / `link_resyncs` / `link_tombstones` / `link_no_slots` / `link_processing` / `link_tx_deferred` | v2 の観測点 (`sys/net/link.h` 末尾) |
 
 消えたシンボル: `link_tx_seq` / `link_rx_ack` / `link_last_resp*` (static だったので
 `kernel.map` には出ない)。公開関数では `link_poll` / `link_hello` / `link_request` /
@@ -217,7 +217,7 @@ GREEN: `SUMMARY 29/29 PASS` + `TARGET i386-elf GNU89 -Werror COMPILE PASS`。
 `net/l*_test.py` はどれもカウンタしか読まないので参照は無い
 (`grep -rn 'link_' tools/net_l*_test.py` で確認済み)。
 
-`check-net-m2` の反射試験は、`drivers/net/ne2000/lgy98.c` で `LGY98_FLAG_REFLECT` のとき
+`check-net-m2` の反射試験は、`sys/dev/net/ne2000/lgy98.c` で `LGY98_FLAG_REFLECT` のとき
 `link_init` を呼ばなくしたので **v1 と同じ動作** (RX の消費者は反射だけ)。
 
 ---
@@ -233,7 +233,7 @@ SUMMARY 25/25 PASS
 $ python3 -B tools/tests/test_net_link.py --target
 ORDER SOURCE: host_owner_exit between launch/con_sink PASS
 DRIVE SOURCE: link_tick only from timer_handler PASS
-HOST GNU89 -Werror compile PASS (real net/link.c + kapi/kapi_host.c)
+HOST GNU89 -Werror compile PASS (real sys/net/link.c + sys/kapi/kapi_host.c)
 TARGET i386-elf GNU89 -Werror COMPILE PASS
   ok   r2_R1_agent_request_response_body
   ... (29 本)
@@ -246,9 +246,9 @@ KAPI_SPEC.md の関数表: kapi.json と一致
 ```
 
 個別のカーネル側コンパイル (`i386-elf-gcc -Wall -Wextra -Werror`) も通した:
-`net/link.c` / `kapi/kapi_host.c` / `exec/exec.c` / `arch/x86/kernel/isr_handlers.c` /
-`drivers/net/ne2000/lgy98.c` / `kapi/kapi_generated.c`、および
-`userland/tests/host_test.c` (ユーザランドのフラグ)。
+`sys/net/link.c` / `sys/kapi/kapi_host.c` / `sys/kern/exec/exec.c` / `sys/arch/x86/kernel/isr_handlers.c` /
+`sys/dev/net/ne2000/lgy98.c` / `sys/kapi/kapi_generated.c`、および
+`userland/diag/host_test.c` (ユーザランドのフラグ)。
 
 **やっていないこと** ([V4]): `make all` / `make check` / `make clean` / 配備 /
 エミュレータでの実行 / `check-net-l0`〜`l3` / `check-net-m2` / `host_test` の実機実行。
@@ -263,7 +263,7 @@ TASK_N1 §4 の blocker F1 / F2 / F4 / N2 と non-blocker N3 / F5 を実装。RE
 
 ### 6-1. F1 (kselftest 86/1 — v51 で v50 検査が崩れる)
 
-`kapi/kapi_db.c` の `db_v50_selftest()` (0) が slot 件数を数値直書きしていた:
+`sys/kapi/kapi_db.c` の `db_v50_selftest()` (0) が slot 件数を数値直書きしていた:
 `KAPI_SLOT_COUNT != 208` と `KAPI_SLOT_DB_ERROR_CODE != KAPI_SLOT_COUNT - 1`。
 v51 で `KAPI_SLOT_COUNT` = 213・`DB_ERROR_CODE` = 207・末尾は `HOST_CLOSE` に変わり bit0 が立つ。
 → ヘッダ定数から導く形に ([C4]): `KAPI_SLOT_COUNT != KAPI_SLOT_HOST_CLOSE + 1` と
@@ -283,7 +283,7 @@ v51 で `KAPI_SLOT_COUNT` = 213・`DB_ERROR_CODE` = 207・末尾は `HOST_CLOSE`
 
 ### 6-3. F4 (`link_retransmits=32` — 未送信フレームに RTO)
 
-`net/link.c` の RTO 判定 3 か所 (RELEASE / REQUEST / WDATA) にハンドシェイクと同じ
+`sys/net/link.c` の RTO 判定 3 か所 (RELEASE / REQUEST / WDATA) にハンドシェイクと同じ
 `!e->rel_due` / `!e->req_due` / `!e->w_due` ガードを追加し、`host_open` / `host_write` /
 `link_free_handle` の `last_tx_tick` / `rel_tick = tick_count - LINK_RTO_TICKS` の前倒しを外した
 (初回送信は `due=1` が担保、RTO は NIC 受理 tick から)。

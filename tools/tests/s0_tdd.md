@@ -369,19 +369,19 @@ python3 -B tools/tests/test_db_errstr.py
 
 ### 1. 何を実物で組んだか (S0-K)
 
-`tools/tests/kapi_db_v50_host.c` は **実 `kapi/kapi_db.c` + 実 `lib/sqlite3/sqlite3.c`
-+ 実 `lib/sqlite3/os32_sqlite_vfs.c` + 実 `fs/vfs_fd.c` + RAM バックエンド**
+`tools/tests/kapi_db_v50_host.c` は **実 `sys/kapi/kapi_db.c` + 実 `lib/sqlite3/sqlite3.c`
++ 実 `lib/sqlite3/os32_sqlite_vfs.c` + 実 `sys/fs/vfs_fd.c` + RAM バックエンド**
 (`sqlite_groups_backend.h`) を組む。ホストのファイルシステムには触らない。
 模型は次の 6 つ。それ以外はすべて実物を組む:
 
 - `ring3_user_range_ok` — 許可帯と PTE はカーネルの番地とページテーブルに依存する。
   ホストでは 1 本の帯 + 1 枚の「非 present なページ」に見立てた等価な判定を置く。
-  実物の帯判定は `exec/exec.c` にあり、CPL=3 の受入 (`userland/tests/db_v50_test.c`) が踏む。
+  実物の帯判定は `sys/kern/exec/exec.c` にあり、CPL=3 の受入 (`userland/diag/db_v50_test.c`) が踏む。
 - `MEM_SHM_BASE` — 試験側の配列へ向け、16KB の **後ろに 256B の番兵**を置く。
 - `vfs_stat` / `vfs_rm` — RAM の fixture を見る試験側の実装。実物と同じく
   **中で `vfs_resolve_path` を呼ぶ**ので、相対名 + cwd の連結と切り詰めは再現する。
   障害注入の口 (`stat_fail_on` / `stat_fail_rc`) を持つ。
-- `vfs_resolve_path` — `vfs_fd_sqlite_host.c` に **fs/vfs.c を移植**した
+- `vfs_resolve_path` — `vfs_fd_sqlite_host.c` に **sys/fs/vfs.c を移植**した
   もの。連結 → `VFS_MAX_PATH` での切り詰め → `.` / `..` / 連続 `/` の正規化 →
   `VFS_MAX_PATH_DEPTH` (32) の成分表、という**順序と上限がそのまま**なので、
   「切り詰めた末尾が別の絶対名になる」も「溢れた成分が捨てられた後の `..` が
@@ -390,7 +390,7 @@ python3 -B tools/tests/test_db_errstr.py
   「長さはあるのにポインタが返らない」(確保の失敗) を決定的に作る。実 SQLite では
   ホストの潤沢なメモリのせいで `sqlite3_step` の方が先に落ち、この形にできない
   (実機の MEMSYS5 384KB では accessor 側で起きうる)。
-- ホストの `u32` / `i32` は `include/types.h` のとおり `unsigned long` / `long` で、
+- ホストの `u32` / `i32` は `sys/include/types.h` のとおり `unsigned long` / `long` で、
   ホストでは **64bit**。32bit の折り返しに依る判定はホスト幅で踏み直している。
 
 ### 2. RED → GREEN
@@ -446,12 +446,12 @@ python3 -B tools/tests/test_db_errstr.py
 |---|---|---|---|
 | 1 | 切り詰め済みの絶対名を信頼して **別の DB** を開ける | `resolve_truncate` | `db_resolve_fits` の検査を外す → `FAIL resolve_truncate:1063: kapi_db_open_existing(evil, 1) == -1` (cwd `/tmp` + `"./"×122 + "a/../b.db"` が `/tmp/b` に化け、RW handle が返る) |
 
-`fs/vfs.c` の `vfs_resolve_path` は VFS_MAX_PATH の作業領域に `cwd + "/" + input` を
+`sys/fs/vfs.c` の `vfs_resolve_path` は VFS_MAX_PATH の作業領域に `cwd + "/" + input` を
 **strlcat で切り詰めてから** `.` / `..` を畳む。だから溢れた入力は「短い別の絶対名」
 として返り、**解決結果を見ても切り詰めは分からない**。そこで resolve の前に
 `kstrlen(cwd) + 1 + kstrlen(path) + 1 <= VFS_MAX_PATH` (絶対名は cwd 抜き) を数えて
 `SQLITE_CANTOPEN` で断る。正規化で短くなる入力も巻き添えで断る (安全側)。
-ホストの `vfs_resolve_path` 模型は **fs/vfs.c と同じ順序** (連結 → 切り詰め → 正規化)
+ホストの `vfs_resolve_path` 模型は **sys/fs/vfs.c と同じ順序** (連結 → 切り詰め → 正規化)
 に書き直した (`tools/tests/vfs_fd_sqlite_host.c`)。順序が違うとこの反例は作れない。
 
 ### 2e. ユーザー承認の最終往復 (Codex、`c24f058`) の blocker 1 件 — RED → GREEN
@@ -460,7 +460,7 @@ python3 -B tools/tests/test_db_errstr.py
 |---|---|---|---|
 | 1 | パスの**深さ**超過で別の DB を開ける | `resolve_depth` | `db_resolve_fits` から深さの検査を外す → `FAIL resolve_depth:1124: kapi_db_open_existing(evil, 1) == -1` (`("/a"×32) + "/x/.." + ("/.."×31) + "/b.db"` が `/b.db` に化け、RW handle が返る) |
 
-`fs/vfs.c` の成分表は `VFS_MAX_PATH_DEPTH` (32) 本しかなく、溢れた成分は
+`sys/fs/vfs.c` の成分表は `VFS_MAX_PATH_DEPTH` (32) 本しかなく、溢れた成分は
 **黙って捨てられる**。捨てられた後ろに `..` があると、それは捨てられた成分では
 なく **保持済みの成分**を 1 つ消す。上の入力は正しくは `/a/b.db` だが `/b.db` に
 なる。長さは 167B なので往復 3 の検査では捕まらない。
@@ -493,7 +493,7 @@ RO open の時点で成立していなければならない):
 | slot 満杯 (`:936`) | **除外**。FULL(13) |
 | `sqlite3_open_v2` の失敗 (`:955`) | **除外**。ここへ着くには `vfs_stat` が「存在する」と答える必要があるが、同じ試験の assertion 3 (`sys_stat(missing) != 0`、`sys_stat` の target は `vfs_stat` そのもの) が**通っている** = NOTFOUND |
 | `db_journal_mode_check` (`:973`) | **除外**。RW 専用で、RO open では通らない |
-| `db_error_code(-1)` の owner 範囲外 | **除外**。owner を書くのは `exec/appslot.c` だけで、値は ID の池 (0〜5) < `DB_OWNER_SLOTS` (6) |
+| `db_error_code(-1)` の owner 範囲外 | **除外**。owner を書くのは `sys/kern/exec/appslot.c` だけで、値は ID の池 (0〜5) < `DB_OWNER_SLOTS` (6) |
 | **path のポインタ検証 (`:881` → `db_user_str_copy` → `ring3_user_range_ok`)** | **残るのはこれだけ** |
 
 **ホスト側で分かったこと**:
@@ -588,10 +588,10 @@ fault_kill_count = 0   kselftest 87/0
 **根拠のある結論** (コードで確定できた):
 
 - `paging_current_cr3()` は `mov %%cr3, %0` で**レジスタを直接読む**
-  (`mm/paging.c`)。控えではないので疑い (1) は外れ。
+  (`sys/kern/mm/paging.c`)。控えではないので疑い (1) は外れ。
 - 疑い (2) が当たり。カーネルはページテーブルを「**物理番地 = 仮想番地**」で
   読む。ところが PD もアプリ PT も `pgalloc` から取られ、
-  **`PGALLOC_BASE` は 0x400000 = `MEM_APP_BAND_BASE`** (`mm/pgalloc.h`)
+  **`PGALLOC_BASE` は 0x400000 = `MEM_APP_BAND_BASE`** (`sys/kern/mm/pgalloc.h`)
   — つまり **アプリ帯そのもの**。
   `exec_run` は CPL=3 アプリでは `pgalloc_mark_used` で帯を押さえない
   (`exec_cpl0_claim` は CPL=0 の子だけ) ので、PD / PT の物理はふつうに
@@ -627,7 +627,7 @@ kill する — `kprintf` の可変長 `%s` など他の KAPI と同じ既定の
 **残した番人**: `tools/tests/paging_bounds_host.c` の項を
 「`PGALLOC_BASE == MEM_APP_BAND_BASE` であること」と「exec と同じ順序で組んだ
 AS では、アプリ PT の物理番地がアプリ PD の下で**別の物理**に解決される
-(= 歩けない)」を固定する形に置き換えた。`mm/paging.h` にも
+(= 歩けない)」を固定する形に置き換えた。`sys/kern/mm/paging.h` にも
 「走っているアプリの PD を、そのアプリの syscall 中に歩いてはならない」を
 警告として書いた。計器 (`ring3_range_reject_*`) はそのまま残す
 (方針 B が効いていれば `count` は 0 のままになる)。
@@ -666,13 +666,13 @@ AS では、アプリ PT の物理番地がアプリ PD の下で**別の物理*
   `SQLITE_MAX_COLUMN` は **100** (`lib/sqlite3/os32_sqlite_config.h`) なので
   実接続では到達できない (SQL の 1024B 上限より前にこちらで止まる)。
   純関数 `shm_row_fits_n` の算術だけで覆ってある。
-- `p + len` の **32bit** overflow。`include/types.h` の `u32` はホストでは `unsigned long`
+- `p + len` の **32bit** overflow。`sys/include/types.h` の `u32` はホストでは `unsigned long`
   (64bit) なので、ホスト幅の端で同じ経路を踏むように書き換えてある。
 - **rollback が本体ファイルを縮めること**。`os32 SQLite VFS` の `xTruncate` はまだ
   no-op 成功 (票 F3a が未実施) なので、どちらの回収順でもサイズは戻らない。
   だから順序の判定は「戻り値が成功か」ではなく「後始末がバックエンドに届いたか」で行う。
 - 許可帯と PTE の**実物**の判定 (`ring3_ptr_ok` / `paging_current_pte_flags`)。
-  ホストにページテーブルが無い。CPL=3 の受入 `userland/tests/db_v50_test.c` (K2) と
+  ホストにページテーブルが無い。CPL=3 の受入 `userland/diag/db_v50_test.c` (K2) と
   ブート時の `kselftest` が実機側の担当で、**どちらもまだ実行していない**
   (コーダーは `make`・配備・エミュレータを行わない)。
   K2 の PTE 検査ケースは実装レビュー 往復 1 の指摘で、**許可帯の外**を指す番地から
@@ -687,7 +687,7 @@ AS では、アプリ PT の物理番地がアプリ PD の下で**別の物理*
   実機の MEMSYS5 (384KB) で accessor 側が落ちる形は、accessor を 1 対だけ
   差し替えた (b) で決定的に踏んでいる。
 - `vfs_route` の **mount 解決**。模型は path をそのまま 1 つのバックエンドへ渡す。
-  `vfs_resolve_path` の方は fs/vfs.c から移植してあるので、切り詰めも深さ超過も
+  `vfs_resolve_path` の方は sys/fs/vfs.c から移植してあるので、切り詰めも深さ超過も
   実物と同じ形で踏めている (`resolve_truncate` / `resolve_depth`)。
 - `PDE.PS` (4MB ページ) の経路。この OS は一度も 4MB ページを張らないので
   ホストでも実機でも作れない。`paging_current_pte_flags` は**明示的に**

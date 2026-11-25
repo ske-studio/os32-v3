@@ -6,7 +6,7 @@
 #define _start unused_save_start
 #include "gf4_c2save_host.c"
 #undef _start
-#include "../../drivers/video/geforce/leave_log.h"
+#include "../../sys/dev/video/geforce/leave_log.h"
 static void check_leave(void)
 {
     setup();

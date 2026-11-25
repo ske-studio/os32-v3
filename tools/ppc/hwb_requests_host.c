@@ -3,7 +3,7 @@
 #include "diag_slots.h"
 #include "os32_kapi_shared.h"
 #include "pci_hwb_contract.h"
-#include "platform/powermac/hwb_resource.c"
+#include "sys/platform/powermac/hwb_resource.c"
 static unsigned checks, accesses, windows, stores;
 static u8 backing[16] = {0x10};
 static struct pm_kboot_info info;
@@ -43,8 +43,8 @@ static u32 phys(struct hw_req *req)
     return pm_hwb_phys(req);
 }
 struct pm_diag_slots kdebug_import_slots = {.phys_check = range_check, .phys = phys, .block = pm_hwb_block};
-#include "drivers/pci/pci_hwb.c"
-#include "kdebug/hwb_access.c"
+#include "sys/dev/pci/pci_hwb.c"
+#include "sys/kern/kdebug/hwb_access.c"
 
 /* Install two orders in turn in this TU's private resource table. Production
  * OF capture only admits the two documented read-only device profiles. */

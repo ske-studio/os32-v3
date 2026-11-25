@@ -1,17 +1,17 @@
 /* Real side-effect-free init, and every S1 import replaced with a counter. */
-#include "kernel/module/module.h"
-#include "kernel/kselftest.h"
+#include "sys/kern/module/module.h"
+#include "sys/kern/kselftest.h"
 #include "kprintf.h"
-#include "platform/pc98/legacy/v86_gcap.h"
-#include "kdebug/kpeek.h"
-#include "kdebug/hwb_wire.h"
-#include "kdebug/trident_command_test.h"
-#include "kdebug/recover.h"
-#include "kdebug/recover_diag.h"
-#include "drivers/char/serial.h"
-#include "hwdev/hwdev_private.h"
-#include "kdebug/gfinit.h"
-#include "kdebug/recover_wire.h"
+#include "sys/platform/pc98/legacy/v86_gcap.h"
+#include "sys/platform/pc98/kdebug/kpeek.h"
+#include "sys/kern/kdebug/hwb_wire.h"
+#include "sys/dev/video/trident/diag/trident_command_test.h"
+#include "sys/dev/video/geforce/diag/recover.h"
+#include "sys/kern/kdebug/recover_diag.h"
+#include "sys/dev/char/serial.h"
+#include "sys/dev/hwdev/hwdev_private.h"
+#include "sys/dev/video/geforce/diag/gfinit.h"
+#include "sys/kern/kdebug/recover_wire.h"
 static unsigned calls;
 static unsigned status_diag_lines;
 const struct rec_tx_diag *recover_diag_get(void)
@@ -53,7 +53,7 @@ void v86_gcap_detach(void) { calls++; }
 void v86_gcap_release(void) { calls++; }
 i32 probe_call(void *buf, u32 size) { (void)buf; (void)size; calls++; return 0; }
 /* HW access must also stay dormant during init. */
-#ifndef HWB_ACCESS_REAL /* tools/tests/hwb_access_host.c links the real kdebug/hwb_access.c */
+#ifndef HWB_ACCESS_REAL /* tools/tests/hwb_access_host.c links the real sys/kern/kdebug/hwb_access.c */
 i32 hwb_access(void *buf, u32 size) { (void)buf; (void)size; calls++; return 0; }
 #endif
 i32 trident_command_call(void *buf, u32 size) { (void)buf; (void)size; calls++; return -1; }

@@ -2,8 +2,8 @@
 
 契約: [`docs/05_drivers.md`](../../docs/05_drivers.md) §5-5 の「PEGC 480 ラインの SYNC を実機の ROM から採る — `v86 -g`」の節
 (出所の票 TASK_PEGC480_REALHW §3 段 1。下の「票 §3 段 1」はその節)
-対象: `kdebug/v86_gcap_math.c` (記録・通すポート・打ち切る命令・並びの判定・戻しの判定) /
-`kdebug/v86_gcap.c` (段取り、`--target` で i386-elf に通すだけ) / `kdebug/v86_test16_gcap.asm` (ゲスト)
+対象: `sys/platform/pc98/kdebug/v86_gcap_math.c` (記録・通すポート・打ち切る命令・並びの判定・戻しの判定) /
+`sys/platform/pc98/kdebug/v86_gcap.c` (段取り、`--target` で i386-elf に通すだけ) / `sys/platform/pc98/kdebug/v86_test16_gcap.asm` (ゲスト)
 試験: `tools/tests/test_v86_gcap.py` + `tools/tests/v86_gcap_host.c`
 実行: `make check-v86-gcap-host` (`check-par` の列)
 

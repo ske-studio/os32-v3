@@ -1,11 +1,11 @@
 /* ========================================================================
  *  tools/tests/kbd_hostshim/io.h — ホスト試験用の io.h 差し替え
  *
- *  include/io.h は inp / outp / irq_save を特権命令のインライン asm で定義
- *  するので、drivers/input/kbd.c (IRQ1 ハンドラ) をホストで走らせるために -I で
+ *  sys/include/io.h は inp / outp / irq_save を特権命令のインライン asm で定義
+ *  するので、sys/platform/pc98/input/kbd.c (IRQ1 ハンドラ) をホストで走らせるために -I で
  *  先に置いて差し替え、ポート操作を試験側の 8251 の模型
  *  (tools/tests/kbd_dlog_host.c) へ回す。pcm_hostshim/io.h と同じ作法。
- *  RING_DEQUEUE は include/io.h の写し (kbd.c が使う)。
+ *  RING_DEQUEUE は sys/include/io.h の写し (kbd.c が使う)。
  *
  *  [C1] C89 / GNU89。
  * ======================================================================== */

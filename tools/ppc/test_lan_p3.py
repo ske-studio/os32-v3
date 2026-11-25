@@ -38,9 +38,9 @@ def exercise(source, directory, case=None):
                     '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie',
                     '-fno-stack-protector', '-nostdlib', '-static', '-D__cdecl=', '-DPM_PCI_FAKE_MMIO', '-DPM_PCI_FAKE_LANE',
                     '-I'+str(ROOT), *['-I'+str(ROOT / p) for p in ('platform/powermac', 'arch/ppc', 'include', 'lib')],
-                    str(source), str(ROOT / 'platform/powermac/pci_config.c'),
+                    str(source), str(ROOT / 'sys/platform/powermac/pci_config.c'),
                     str(ROOT / 'tools/ppc/lan_p3_fake.c'),
-                    str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)], check=True, timeout=60)
+                    str(ROOT / 'sys/kern/kstring_c.c'), '-o', str(exe)], check=True, timeout=60)
     failures = []
     for index in (range(26) if case is None else [case]):
         result = host32.run([str(exe), str(index)], capture_output=True, timeout=10)
@@ -54,12 +54,12 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='lan-p3-') as temp:
-        failures = exercise(ROOT / 'platform/powermac/gmac_tree.c', Path(temp))
+        failures = exercise(ROOT / 'sys/platform/powermac/gmac_tree.c', Path(temp))
         if failures:
             raise RuntimeError(f'baseline failures: {failures}')
         print('GREEN: 26 firmware-tree cases')
         if args.mutate:
-            product = (ROOT / 'platform/powermac/gmac_tree.c').read_text()
+            product = (ROOT / 'sys/platform/powermac/gmac_tree.c').read_text()
             for name, old, new, case, diagnostic in MUTATIONS:
                 if product.count(old) != 1:
                     raise RuntimeError(f'{name}: anchor is not unique')

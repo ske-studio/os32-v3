@@ -1,6 +1,6 @@
-# include/video_service.h — 設計
+# sys/include/video_service.h — 設計
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
-ソース: `include/video_service.h`
+ソース: `sys/include/video_service.h`
 
 HAL に GF のレジスタ・ROM・recover token を出さない。
 ```c

@@ -18,14 +18,14 @@ from test_dep_dir_b_io import trace
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/dep_dir_b_l12_baseline.json'
-SOURCES = ('kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'platform/pc98/pic.c', 'platform/pc98/irq_policy.c', 'platform/pc98/irq_complete.c')
-HEADERS = ('include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'include/kernel_tick.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
-           'arch/x86/kernel/idt.h', 'platform/pc98/platform_pic.h', 'include/irq_line.h', 'platform/pc98/pit.h', 'include/kernel_tick.h', 'arch/x86/kernel/gdt.h', 'platform/pc98/pit_math.h')
+SOURCES = ('sys/kern/irq/irq.c', 'sys/kern/irq/irq_math.c', 'sys/platform/pc98/pic.c', 'sys/platform/pc98/irq_policy.c', 'sys/platform/pc98/irq_complete.c')
+HEADERS = ('sys/include/platform_irq.h', 'sys/platform/pc98/platform_irq_limits.h', 'sys/include/kernel_tick.h', 'sys/kern/irq/irq.h', 'sys/kern/irq/irq_math.h',
+           'sys/arch/x86/kernel/idt.h', 'sys/platform/pc98/platform_pic.h', 'sys/include/irq_line.h', 'sys/platform/pc98/pit.h', 'sys/include/kernel_tick.h', 'sys/arch/x86/kernel/gdt.h', 'sys/platform/pc98/pit_math.h')
 MUTATIONS = (
-    ('platform/pc98/pic.c', 'outp(PIC1_DATA, ICW3_MASTER);', 'outp(PIC1_DATA, ICW3_SLAVE);'),
-    ('platform/pc98/pic.c', '    irq_restore(flags);', '    (void)flags; /* restore removed */'),
-    ('platform/pc98/pic.c', '    outp(PIC2_CMD, OCW3_IRR);\n    return', '    /* IRR restore removed */\n    return'),
-    ('platform/pc98/irq_complete.c', '        platform_irq_eoi_master();', '        pic_eoi(claim->line);'),
+    ('sys/platform/pc98/pic.c', 'outp(PIC1_DATA, ICW3_MASTER);', 'outp(PIC1_DATA, ICW3_SLAVE);'),
+    ('sys/platform/pc98/pic.c', '    irq_restore(flags);', '    (void)flags; /* restore removed */'),
+    ('sys/platform/pc98/pic.c', '    outp(PIC2_CMD, OCW3_IRR);\n    return', '    /* IRR restore removed */\n    return'),
+    ('sys/platform/pc98/irq_complete.c', '        platform_irq_eoi_master();', '        pic_eoi(claim->line);'),
 )
 
 
@@ -46,12 +46,12 @@ def build(work, mutation=None, baseline=None):
             m = re.search(r'^void ' + name + r'\([^\n]*\)\n\{.*?^\}', idt, re.M | re.S)
             assert m, name
             funcs.append(m[0])
-        (work / 'platform/pc98/pic.c').write_text(
+        (work / 'sys/platform/pc98/pic.c').write_text(
             '#include "idt.h"\n#include "io.h"\n' + '\n'.join(funcs) +
             '\nint platform_irq_timer_pending(void) {\n'
             'outp(PIC1_CMD, OCW3_IRR);\n'
             'return (inp(PIC1_CMD) & 0x01) ? 1 : 0;\n}\n')
-        (work / 'kernel/irq/irq.c').write_text(irq)
+        (work / 'sys/kern/irq/irq.c').write_text(irq)
     (work / 'io.h').write_text((ROOT / 'tools/tests/dep_dir_b_io_shim.h').read_text() + '\n#define _stop _halt\n')
     exe = work / 'pic-test'
     subprocess.run([

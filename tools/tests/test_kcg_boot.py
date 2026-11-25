@@ -12,12 +12,12 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
-    ('init-keeps-scale', 'drivers/video/kcg/kcg.c',
+    ('init-keeps-scale', 'sys/dev/video/kcg/kcg.c',
      '    kcg_scale = 1;', '', 'FAIL init resets scale'),
-    ('old-font-fallback', 'drivers/video/kcg/kcg.c',
+    ('old-font-fallback', 'sys/dev/video/kcg/kcg.c',
      '    return OS32_ERR_NOSYS;',
      '    return vfs_open(path, 0);', 'FAIL legacy VFS untouched'),
-    ('old-low-cache', 'drivers/video/kcg/kcg.c',
+    ('old-low-cache', 'sys/dev/video/kcg/kcg.c',
      '    kcg_rom_read_ank(ch, buf);',
      '    (void)ch; buf[0] = *(u8 *)P2V(0x01000UL);', 'FAIL ROM ANK bytes'),
 )
@@ -25,15 +25,15 @@ MUTATIONS = (
 
 
 def run(runner, mutation=None):
-    sources = {p: (ROOT / p).read_text() for p in ('drivers/video/kcg/kcg.c',)}
+    sources = {p: (ROOT / p).read_text() for p in ('sys/dev/video/kcg/kcg.c',)}
     if mutation:
         name, path, old, new, expected = mutation
         assert sources[path].count(old) == 1, name + ': mutation target'
         sources[path] = sources[path].replace(old, new, 1)
     with tempfile.TemporaryDirectory(prefix='e8b-kcg-') as directory:
         work = Path(directory)
-        shutil.copyfile(ROOT / 'include/kcg_contract.h', work / 'kcg_contract.h')
-        source = sources['drivers/video/kcg/kcg.c'].replace('"../fs/vfs.h"', '"vfs.h"').replace(
+        shutil.copyfile(ROOT / 'sys/include/kcg_contract.h', work / 'kcg_contract.h')
+        source = sources['sys/dev/video/kcg/kcg.c'].replace('"../fs/vfs.h"', '"vfs.h"').replace(
             '"../lib/lz4.h"', '"lz4.h"')
         (work / 'kcg_source.inc').write_text(source)
         cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O0', '-Wall', '-Wextra',

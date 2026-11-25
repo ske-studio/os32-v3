@@ -4,7 +4,7 @@ Compile failures and signals are never mutation kills.
 """
 from paging_source import paging_source
 from kernel_includes import include_flags
-TARGET_SRC = ['exec/surface_query.c', 'exec/redir_access.c', 'exec/access_walk.c', 'mm/paging.c', 'mm/pgalloc.c']
+TARGET_SRC = ['sys/kern/exec/surface_query.c', 'sys/kern/exec/redir_access.c', 'sys/kern/exec/access_walk.c', 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c']
 from kernel_layout import linker_flags
 import host32
 import argparse
@@ -62,12 +62,12 @@ def main():
     p.add_argument('--runner', choices=['native', 'qemu'], default='native')
     args = p.parse_args()
     host32.begin_control(args.mutate, args.runner, ROOT)
-    paths = [ROOT / v for v in walk.FILES.values()] + [ROOT / 'exec/surface_query.c']
-    paths += [ROOT / x for x in ('exec/surface_query.h', 'tools/tests/surface_query_host.c',
+    paths = [ROOT / v for v in walk.FILES.values()] + [ROOT / 'sys/kern/exec/surface_query.c']
+    paths += [ROOT / x for x in ('sys/kern/exec/surface_query.h', 'tools/tests/surface_query_host.c',
                                  'tools/tests/test_surface_query.py', 'tools/tests/access_walk_host.c')]
     hashes = {f: hashlib.sha256(f.read_bytes()).digest() for f in paths}
     sources = {k: paging_source(ROOT / v) for k, v in walk.FILES.items()}
-    sources['surface_query'] = (ROOT / 'exec/surface_query.c').read_text()
+    sources['surface_query'] = (ROOT / 'sys/kern/exec/surface_query.c').read_text()
     with tempfile.TemporaryDirectory(prefix='os32-e1-') as directory:
         tmp = pathlib.Path(directory)
         for key, body in sources.items():
@@ -87,7 +87,7 @@ def main():
               '-DHOST_HIGH_ENTRY_STACK=1', '-I' + str(tmp),
               *(['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch')] + include_flags(ROOT))]
         for src, obj in [(tmp / 'fixture.c', tmp / 'fixture.o'),
-                         (ROOT / 'mm/physmem.c', tmp / 'physmem.o')]:
+                         (ROOT / 'sys/kern/mm/physmem.c', tmp / 'physmem.o')]:
             host32.build(cc + ['-c', str(src), '-o', str(obj)], check=True,
                            capture_output=True, text=True)
         def run(body, key):

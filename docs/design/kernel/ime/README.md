@@ -4,7 +4,7 @@
 
 ### fep_module
 
-- kernel/ime/fep_module.cのshift getterとfallback/関数表をinputへ。`getkey_wait(1)`→負値→abort_check、con_sink時の生バイト、拡張キー除外を維持。fep.mod import名・世代は変更しない。
+- sys/kern/ime/fep_module.cのshift getterとfallback/関数表をinputへ。`getkey_wait(1)`→負値→abort_check、con_sink時の生バイト、拡張キー除外を維持。fep.mod import名・世代は変更しない。
 
 | 段 | 内容 |
 |---|---|

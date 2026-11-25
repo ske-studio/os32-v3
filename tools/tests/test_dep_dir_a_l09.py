@@ -1,6 +1,6 @@
 """L09 NP2/host boundaries; copied ILP32 controls and one owner-exit mutant."""
 CHECK = dict(name='dep-dir-a-l09-host', tier=1,
-    covers=['platform/pc98/gfx_surfaces.c', 'include/callconv.h', 'platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'platform/pc98/legacy/lowmap.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/hwdev_layout.json', 'drivers/pci/pci.h', 'drivers/char/serial.h', 'hwdev/hwdev_imports.def', 'include/bootinfo.h', 'include/gf_production.h', 'include/kprintf.h', 'kdebug/kpeek.h', 'kdebug/recover.h', 'kernel/module/kdebug_imports.def', 'mm/pgalloc.h', 'lib/kstring.h', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/tests/hwdev_contract_fixture.py', 'include/memmap.h', 'include/platform_device.h', 'include/time_units.h', 'include/types.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_snd2.h', 'sdk/include/os32/os32_in2.h', 'sdk/include/os32/os32_v86s.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'tools/tests/test_dep_dir_a_l05a.py', 'tools/tests/fixtures/dep_dir_a/l05a.json', 'tools/tests/test_shm_user.py', 'tools/tests/kernel_layout.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sdk/include/os32/os32_kapi_slots.h', 'sdk/rust/os32api/src/kapi_generated.rs', 'hwdev/generated/hwdev_contract.h', 'exec/exec.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'platform/pc98/kernel.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shm.c', 'platform/pc98/legacy/v86.c', 'platform/pc98/legacy/v86_mem.c', 'platform/pc98/bios_snapshot.c', 'tools/tests/shm_user_host.c', 'kernel/dev/device_ide.c', 'tools/tests/dep_dir_a_l05a_host.c', 'include/platform_host.h', 'include/net_eth.h', 'drivers/char/np2sysp.h', 'net/link.h', 'platform/pc98/device_host.c', 'kernel/dev/device_host.c', 'tools/tests/dep_dir_a_l09_host.c', 'kapi/kapi_host.c', 'kapi/range_internal.h', 'tools/tests/fixtures/dep_dir_a/l09.json', 'hwdev/generated/hwdev_imports.json', 'hwdev/generated/hwdev_layout.txt', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['sys/platform/pc98/gfx_surfaces.c', 'sys/include/callconv.h', 'sys/platform/pc98/bios_snapshot.h', 'sys/platform/pc98/boot_capture.c', 'sys/platform/pc98/bootinfo_wire.h', 'sys/platform/pc98/bootinfo_native.h', 'sys/platform/pc98/legacy/lowmap.c', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/hwdev_layout.json', 'sys/dev/pci/pci.h', 'sys/dev/char/serial.h', 'sys/dev/hwdev/hwdev_imports.def', 'sys/include/bootinfo.h', 'sys/include/gf_production.h', 'sys/include/kprintf.h', 'sys/platform/pc98/kdebug/kpeek.h', 'sys/dev/video/geforce/diag/recover.h', 'sys/kern/module/kdebug_imports.def', 'sys/kern/mm/pgalloc.h', 'sys/kern/kstring.h', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/module_schema.py', 'tools/tests/hwdev_contract_fixture.py', 'sys/include/memmap.h', 'sys/include/platform_device.h', 'sys/include/time_units.h', 'sys/include/types.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_snd2.h', 'sdk/include/os32/os32_in2.h', 'sdk/include/os32/os32_v86s.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/kapi.json', 'sys/kapi/kapi_generated.c', 'tools/tests/test_dep_dir_a_l05a.py', 'tools/tests/fixtures/dep_dir_a/l05a.json', 'tools/tests/test_shm_user.py', 'tools/tests/kernel_layout.py', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sdk/include/os32/os32_kapi_slots.h', 'sdk/rust/os32api/src/kapi_generated.rs', 'sys/dev/hwdev/generated/hwdev_contract.h', 'sys/kern/exec/exec.c', 'sys/platform/pc98/video/backend_pegc.c', 'sys/hal/gfx/gfx_core.c', 'sys/platform/pc98/kernel.c', 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c', 'sys/kern/mm/physmem.c', 'sys/kern/mm/shm.c', 'sys/platform/pc98/legacy/v86.c', 'sys/platform/pc98/legacy/v86_mem.c', 'sys/platform/pc98/bios_snapshot.c', 'tools/tests/shm_user_host.c', 'sys/dev/ide/device_ide.c', 'tools/tests/dep_dir_a_l05a_host.c', 'sys/include/platform_host.h', 'sys/include/net_eth.h', 'sys/dev/char/np2sysp.h', 'sys/net/link.h', 'sys/platform/pc98/device_host.c', 'sys/kern/dev/device_host.c', 'tools/tests/dep_dir_a_l09_host.c', 'sys/kapi/kapi_host.c', 'sys/kapi/range_internal.h', 'tools/tests/fixtures/dep_dir_a/l09.json', 'sys/dev/hwdev/generated/hwdev_imports.json', 'sys/dev/hwdev/generated/hwdev_layout.txt', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=3.2,
     basis=['[ABI]', 'KAPI_SPEC §3-1'],
 )
@@ -20,15 +20,15 @@ from test_shm_user import function
 from test_dep_dir_a_l05a import digest, public_spec
 
 ROOT = Path(__file__).resolve().parents[2]
-COPIES = ('include/callconv.h',
-    'include/types.h', 'include/platform_device.h', 'include/platform_host.h',
-    'include/net_eth.h', 'drivers/char/np2sysp.h', 'net/link.h',
-    'include/memmap.h', 'include/time_units.h',
+COPIES = ('sys/include/callconv.h',
+    'sys/include/types.h', 'sys/include/platform_device.h', 'sys/include/platform_host.h',
+    'sys/include/net_eth.h', 'sys/dev/char/np2sysp.h', 'sys/net/link.h',
+    'sys/include/memmap.h', 'sys/include/time_units.h',
     'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_snd2.h', 'sdk/include/os32/os32_in2.h', 'sdk/include/os32/os32_v86s.h', 'sdk/include/os32/os32_host_notice.h',
     'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h',
     'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h',
     'sdk/include/os32/os32_kapi_generated.h',
-    'platform/pc98/device_host.c', 'kernel/dev/device_host.c', 'tools/tests/dep_dir_a_l09_host.c',
+    'sys/platform/pc98/device_host.c', 'sys/kern/dev/device_host.c', 'tools/tests/dep_dir_a_l09_host.c',
 )
 OLD = '    link_host_owner_exit(owner);'
 NEW = '    (void)owner;'
@@ -49,7 +49,7 @@ def contracts():
     fixture = json.loads((ROOT / 'tools/tests/fixtures/dep_dir_a/l09.json').read_text())
     abi = json.loads((ROOT / 'tools/tests/fixtures/dep_dir_a/l05a.json').read_text())
     spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
-    generated = (ROOT / 'kapi/kapi_generated.c').read_text()
+    generated = (ROOT / 'sys/kapi/kapi_generated.c').read_text()
     wrappers = ''
     for name, expected in fixture['wrappers'].items():
         body = function(generated, 'wrap_' + name)
@@ -57,10 +57,10 @@ def contracts():
         assert entry['target'] == 'platform_' + name
         assert body.replace('platform_' + name + '(', name + '(') == expected
         wrappers += body + '\n'
-    text = (ROOT / 'kapi/kapi_host.c').read_text()
+    text = (ROOT / 'sys/kapi/kapi_host.c').read_text()
     for name, expected in fixture['host'].items():
         if name == 'host_range_ok':
-            body = host_function((ROOT / 'kapi/range_internal.h').read_text(), 'kapi_user_range_ok')
+            body = host_function((ROOT / 'sys/kapi/range_internal.h').read_text(), 'kapi_user_range_ok')
             body = body.replace('kapi_user_range_ok', name)
         else:
             body = host_function(text, name).replace('kapi_user_range_ok', 'host_range_ok')
@@ -81,14 +81,14 @@ def build(folder, body, wrappers):
         dest = folder / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, dest)
-    (folder / 'kernel/dev/device_host.c').write_text(body)
+    (folder / 'sys/kern/dev/device_host.c').write_text(body)
     (folder / 'wrappers.inc').write_text(wrappers)
     exe = folder / 'host-test'
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                     '-ffreestanding', '-nostdlib', '-static', '-fno-pie', '-no-pie',
                     '-fno-stack-protector',
                     *include_flags(folder),
-                    str(folder / 'platform/pc98/device_host.c'), str(folder / 'kernel/dev/device_host.c'),
+                    str(folder / 'sys/platform/pc98/device_host.c'), str(folder / 'sys/kern/dev/device_host.c'),
                     str(folder / 'tools/tests/dep_dir_a_l09_host.c'), '-o', str(exe)], check=True)
     return exe
 
@@ -99,7 +99,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     wrappers = contracts()
-    body = (ROOT / 'kernel/dev/device_host.c').read_text()
+    body = (ROOT / 'sys/kern/dev/device_host.c').read_text()
     assert body.count(OLD) == 1
     with tempfile.TemporaryDirectory(prefix='dep-dir-a-l09-') as directory:
         folder = Path(directory)

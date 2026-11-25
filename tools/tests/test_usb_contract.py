@@ -16,9 +16,9 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 # The declaration lists transitive
 # repository headers and the runner actually used by the executable fixtures.
-CHECK = dict(env=['ppc-cross'], name='usb-contract', tier=1, needs=[], budget=5, covers=['include/endian_dma.h', 'arch/*/arch_endian_dma.h',
-                     'include/usb_platform.h', 'drivers/usb/*.[ch]',
-                     'tools/check_usb_portable.py', 'include/types.h', 'include/callconv.h', 'include/endian_le.h',
+CHECK = dict(env=['ppc-cross'], name='usb-contract', tier=1, needs=[], budget=5, covers=['sys/include/endian_dma.h', 'arch/*/arch_endian_dma.h',
+                     'sys/include/usb_platform.h', 'drivers/usb/*.[ch]',
+                     'tools/check_usb_portable.py', 'sys/include/types.h', 'sys/include/callconv.h', 'sys/include/endian_le.h',
                      'tools/tests/usb_contract_host.c', 'tools/tests/test_usb_contract.py',
                      'tools/tests/host32.py', 'tools/tests/cc_cache.py'],
     basis=['USB_DESIGN §2', 'USB_DESIGN §4'],
@@ -30,7 +30,7 @@ def command(argv, **kwargs):
 
 
 def guard(root, source, expected):
-    path = root / 'drivers/usb/ohci_init.c'
+    path = root / 'sys/dev/usb/ohci_init.c'
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(source)
     result = subprocess.run([sys.executable, '-B', 'tools/check_usb_portable.py',
@@ -68,26 +68,26 @@ def check(mutate):
             result = host32.run([str(exe)], runner='qemu')
             assert result.returncode == 0, (arch, result.returncode)
             print('runtime:', arch, 'OK')
-        guard(tmp, '#include "usb_platform.h"\n#include "drivers/usb/ohci_regs.h"\n', 0)
+        guard(tmp, '#include "usb_platform.h"\n#include "sys/dev/usb/ohci_regs.h"\n', 0)
         guard(tmp, '/* #include "bad.h" .raw */\nconst char *s = ".raw";\n', 0)
         # S2h permits the common keymap ABI only in its HID table adapter.
-        adapter = tmp / 'drivers/usb/hid_kbd_map.c'
-        adapter.write_text('#include "input/hal/keymap.h"\n')
+        adapter = tmp / 'sys/dev/usb/hid_kbd_map.c'
+        adapter.write_text('#include "sys/hal/input/keymap.h"\n')
         guard(tmp, '', 0)
-        guard(tmp, '#include "input/hal/keymap.h"\n', 1)
-        adapter.write_text('#include "mm/dma_pool.h"\n')
+        guard(tmp, '#include "sys/hal/input/keymap.h"\n', 1)
+        adapter.write_text('#include "sys/kern/mm/dma_pool.h"\n')
         guard(tmp, '', 1)
         adapter.unlink()
         # Shells are excluded from the include rule, but not raw access.
         shell = tmp / 'drivers/usb/usb_module.c'
-        shell.write_text('#include "mm/dma_pool.h"\n')
+        shell.write_text('#include "sys/kern/mm/dma_pool.h"\n')
         guard(tmp, '', 0)
         if mutate:
             # Copy only the accessor dependency closure. Mutations never touch
             # the working tree; each compiles and must fail at runtime.
             copy = tmp / 'mutant'
-            for rel in ('include/endian_dma.h', 'include/types.h', 'include/callconv.h',
-                        'arch/x86/arch_endian_dma.h', 'arch/ppc/arch_endian_dma.h'):
+            for rel in ('sys/include/endian_dma.h', 'sys/include/types.h', 'sys/include/callconv.h',
+                        'sys/arch/x86/arch_endian_dma.h', 'sys/arch/ppc/arch_endian_dma.h'):
                 dest = copy / rel
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(ROOT / rel, dest)
@@ -112,16 +112,16 @@ def check(mutate):
                 assert result.returncode in (1, 2, 3, 4), (anchor, result.returncode)
                 print('RED runtime:', arch, anchor, 'rc=' + str(result.returncode))
                 header.write_text(original)
-            header = tmp / 'drivers/usb/ohci_priv.h'
-            header.write_text('#include "drivers/usb/usb_core.h"\n')
+            header = tmp / 'sys/dev/usb/ohci_priv.h'
+            header.write_text('#include "sys/dev/usb/usb_core.h"\n')
             guard(tmp, '', 0)
-            header.write_text('#include "mm/dma_pool.h"\n')
+            header.write_text('#include "sys/kern/mm/dma_pool.h"\n')
             guard(tmp, '', 1)  # A2: headers also enforce the boundary
             header.unlink()
-            guard(tmp, '#include "mm/dma_pool.h"\n', 1)  # A2
+            guard(tmp, '#include "sys/kern/mm/dma_pool.h"\n', 1)  # A2
             guard(tmp, 'void f(void) { ed->headp.raw = x; }\n', 1)  # A1
             guard(tmp, 'void f(void) { p->raw = 0; }\n', 1)
-            guard(tmp, '# include \\\n"mm/dma_pool.h"\n', 1)
+            guard(tmp, '# include \\\n"sys/kern/mm/dma_pool.h"\n', 1)
             guard(tmp, '#include PLATFORM_HEADER\n', 1)
             guard(tmp, '#include "drivers/usb/../../mm/dma_pool.h"\n', 1)
             guard(tmp, '', 0)

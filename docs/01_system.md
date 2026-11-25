@@ -100,7 +100,7 @@ loader_fat_new.asm (16bit → 32bit) — 第2段階
 
 ### §1-3 レイヤー構造と垂直依存性
 
-上位レイヤーは下位レイヤーの機能を利用するが、下位レイヤーが上位レイヤーの具体的な実装に依存すること（逆参照）は原則として禁止する。番地の定義は [include/memmap.h](../include/memmap.h)、配置の説明は [§2-1](02_memory.md) を参照。
+上位レイヤーは下位レイヤーの機能を利用するが、下位レイヤーが上位レイヤーの具体的な実装に依存すること（逆参照）は原則として禁止する。番地の定義は [sys/include/memmap.h](../sys/include/memmap.h)、配置の説明は [§2-1](02_memory.md) を参照。
 
 ```text
 [ アプリケーション層 ] (userland/, apps/, game/)   CPL=3、PD 分離
@@ -135,22 +135,22 @@ loader_fat_new.asm (16bit → 32bit) — 第2段階
 #### デバイスドライバ (drivers/)
 *   **依存先:** `include/`, `kernel/`, `mm/` (kmalloc), `lib/` (kprintf)
 *   **役割:** ハードウェア（KBD, FDC, IDE, ATAPI, RTC, Serial, KCG）の直接制御。`drivers/` の下は装置の種類ごと (`base/` `ata/` `block/` `char/` `input/` `video/` など、[08 §8-3](08_build.md))。
-*   **特記事項:** `drivers/video/kcg/kcg.c` は `gfx/` の描画機能を利用せず、自前でピクセル描画（またはバックバッファ操作）を行う。
+*   **特記事項:** `sys/dev/video/kcg/kcg.c` は `gfx/` の描画機能を利用せず、自前でピクセル描画（またはバックバッファ操作）を行う。
 
 #### カーネルコア (init/, kernel/, mm/, arch/x86/kernel/)
 *   **依存先:** `include/`, `drivers/` (serial, console用)
-*   **役割:** `platform/pc98/kernel.c` (起動の順序), `arch/x86/kernel/idt.c`・`isr_handlers.c` (中断処理), `mm/paging.c`・`mm/kmalloc.c` (メモリ管理), `kernel/console/console.c`。`kernel/` の下は `irq/` `time/` `module/` `console/` `ime/` `v86/`
+*   **役割:** `sys/platform/pc98/kernel.c` (起動の順序), `sys/arch/x86/kernel/idt.c`・`isr_handlers.c` (中断処理), `sys/kern/mm/paging.c`・`sys/kern/mm/kmalloc.c` (メモリ管理), `sys/kern/console/console.c`。`kernel/` の下は `irq/` `time/` `module/` `console/` `ime/` `v86/`
 
 #### ファイルシステム (fs/)
-*   **依存先:** `include/`, `drivers/block/disk.h`, `drivers/ata/atapi.h`, `kernel/`
+*   **依存先:** `include/`, `sys/dev/block/disk.h`, `sys/dev/ata/atapi.h`, `kernel/`
 *   **役割:** VFS（仮想ファイルシステム）による抽象化 (`fs/` 直下) と、FS ごとの下 (`ext2/` `fat/` `isofs/` `hostdrv/` `serialfs/`) の実装。
 
 #### グラフィックス (gfx/)
-*   **依存先:** `include/`, `drivers/video/kcg/kcg.h`, `kernel/`
+*   **依存先:** `include/`, `sys/dev/video/kcg/kcg.h`, `kernel/`
 *   **役割:** 描画 HAL の共通層 (バックバッファ管理、VRAM転送、スプライト・図形描画)。高速化のためアセンブラルーチンを利用。バックエンドは `drivers/video/<装置>/` の装置の隣。
 
 #### プログラムローダー (exec/)
-*   **依存先:** `fs/`, `mm/paging.h`, `kapi/`
+*   **依存先:** `fs/`, `sys/kern/mm/paging.h`, `kapi/`
 *   **役割:** 外部実行ファイル（.EXE/OS32X）のロード、仮想メモリ展開、実行。ヒープ管理（`exec_heap.c`）。
 
 #### KernelAPI (kapi/)

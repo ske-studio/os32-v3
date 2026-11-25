@@ -7,7 +7,7 @@ import host32
 from mutpar import build_in_tree
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'gfx/v2/sw_rop.c'
+SOURCE = 'sys/hal/gfx/v2/sw_rop.c'
 OLD = '(i & 4 ? p : ~p) & (i & 2 ? s : ~s) & (i & 1 ? d : ~d)'
 NEW = '(i & 1 ? p : ~p) & (i & 2 ? s : ~s) & (i & 4 ? d : ~d)'
 

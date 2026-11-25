@@ -99,33 +99,33 @@ def main():
         kernel = folder / 'kernel'
         mutation = []
         if case == 'swap-time':
-            mutation = mutant_settings(folder, case, 'kapi/kapi_sysinfo.c',
+            mutation = mutant_settings(folder, case, 'sys/kapi/kapi_sysinfo.c',
                                        'sys_time_now(&snap_lo, &snap_hi)',
                                        'sys_time_now(&snap_hi, &snap_lo)')
         elif case == 'empty-build':
-            mutation = mutant_settings(folder, case, 'kapi/kapi_sysinfo.c',
+            mutation = mutant_settings(folder, case, 'sys/kapi/kapi_sysinfo.c',
                                        'kapi_sys_build_time_copy(buf, (u32)size);',
                                        "buf[0] = 0;")
         elif case == 'boundary':
-            mutation = mutant_settings(folder, case, 'kapi/kapi_sysinfo.c',
+            mutation = mutant_settings(folder, case, 'sys/kapi/kapi_sysinfo.c',
                                        'size < MEMSTAT_MIN', 'size <= MEMSTAT_MIN')
         elif case == 'size133':
-            mutation = mutant_settings(folder, case, 'kapi/kapi_sysinfo.c',
+            mutation = mutant_settings(folder, case, 'sys/kapi/kapi_sysinfo.c',
                                        'snap.size = size <', 'snap.size = size == 133 ? 132 : size <')
         elif case == 'copy133':
-            mutation = mutant_settings(folder, case, 'kapi/kapi_sysinfo.c',
+            mutation = mutant_settings(folder, case, 'sys/kapi/kapi_sysinfo.c',
                                        'kmemcpy(out, &snap, snap.size);',
                                        'kmemcpy(out, &snap, size == 133 ? 132 : snap.size);')
         elif case == 'peak':
-            mutation = mutant_settings(folder, case, 'kapi/kapi_sysinfo.c',
+            mutation = mutant_settings(folder, case, 'sys/kapi/kapi_sysinfo.c',
                                        'snap.kheap_peak = kmalloc_peak_bytes;', 'snap.kheap_peak = 0;')
         elif case == 'diag':
-            header = 'platform/powermac/platform_mem_stat.h'
+            header = 'sys/platform/powermac/platform_mem_stat.h'
             before = 'platform_mem_stat_diag(MemStat *snap)\n{\n    (void)snap;'
             settings = mutant_settings(folder, case, header, before,
                                        before.replace('(void)snap;', 'snap->kdebug_state = 1;'))
             mutated_header = settings[1].split('=', 1)[1]
-            mutation = mutant_settings(folder, 'include-diag', 'kapi/kapi_sysinfo.c',
+            mutation = mutant_settings(folder, 'include-diag', 'sys/kapi/kapi_sysinfo.c',
                                        '"platform_mem_stat.h"', f'"{mutated_header}"')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen', 'mem_stat' if args.memstat else 'sys_time_now')

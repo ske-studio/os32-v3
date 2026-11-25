@@ -4,15 +4,15 @@ import tempfile
 from pathlib import Path
 
 CHECK = dict(name='snd-writer-probe-host', tier=4, needs=[], budget=2,
-             covers=['platform/pc98/snd_writer_probe.c', 'platform/pc98/tsc_clock.h',
-                     'include/snd_writer_probe.h', 'include/types.h',
+             covers=['sys/platform/pc98/snd_writer_probe.c', 'sys/platform/pc98/tsc_clock.h',
+                     'sys/include/snd_writer_probe.h', 'sys/include/types.h',
                      'tools/tests/snd_writer_probe_host.c', 'tools/tests/test_snd_writer_probe.py'],
              basis=['docs/decisions/sound/AV_HAL_DESIGN.md §13-3'])
 
 
 def run(ctx):
     root = ctx.root
-    source = (root / 'platform/pc98/snd_writer_probe.c').read_text()
+    source = (root / 'sys/platform/pc98/snd_writer_probe.c').read_text()
     with tempfile.TemporaryDirectory() as tmp:
         unit = Path(tmp) / 'probe.c'
         exe = Path(tmp) / 'test'

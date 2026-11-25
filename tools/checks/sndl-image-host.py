@@ -6,7 +6,7 @@ import tempfile
 
 CHECK = dict(name='sndl-image-host', tier=1, needs=['make:all'], budget=3,
              covers=['tools/tests/sndl_image_host.c', 'tools/tests/host32.py',
-                     'userland/tests/sndl_test.c', 'sdk/sndl/stub.c', 'sdk/include/os32/*.h',
+                     'userland/diag/sndl_test.c', 'sdk/sndl/stub.c', 'sdk/include/os32/*.h',
                      'userland/lib/snd/**', 'sdk/mkos32x.py', 'sdk/link/shlib.ld',
                      'tools/accept/snd2/verify_soft.py', 'tools/accept/snd2/verify_wave.py',
                      'tools/accept/snd2/soft_tone.cpp', 'lib/os32_opna/upstream/**',

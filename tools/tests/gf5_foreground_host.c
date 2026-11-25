@@ -38,15 +38,15 @@ static void u6_halt(void);
 #define geforce_heat_stop_request u6_resident_request
 #define _disable u6_disable
 #define _halt u6_halt
-#include "../../drivers/video/geforce/geforce_module.c"
+#include "../../sys/dev/video/geforce/geforce_module.c"
 #undef _halt
 #undef _disable
 #undef geforce_heat_stop_request
 
-#include "../../hwdev/gf/gf2_test.h"
-#include "../../exec/appslot.h"
-#include "../../exec/exec.h"
-#include "../../kernel/gui.h"
+#include "../../sys/dev/video/geforce/gf2_test.h"
+#include "../../sys/kern/exec/appslot.h"
+#include "../../sys/kern/exec/exec.h"
+#include "../../sys/kern/gui.h"
 #include "serial_diag_host.h"
 
 static bool u6_safe=true, u6_emergency_halt;
@@ -60,7 +60,7 @@ volatile u32 ring3_park_reject_count;
 static GeforceModuleContext u6_module;
 volatile u32 tick_count;
 static bool kbd_gui_mode;
-#include "../../drivers/input/kbd_fgpoll.inc"
+#include "../../sys/platform/pc98/input/kbd_fgpoll.inc"
 
 int pc98_route_safe(void) { return u6_safe; }
 int gf_production_return(void) { return geforce_return(&c1_platform); }
@@ -122,7 +122,7 @@ void ring3_wm_leave(void) { assert(u6_wm); u6_wm=false; }
  * gui_display_failed and appslot_abort_request bodies, extracted verbatim.
  * CPU halt alone is substituted by the driver. */
 #include "exec_gfx_poll.h"
-#include "net/nic.h"
+#include "sys/net/nic.h"
 int net_rx_recent(u32 ms) { (void)ms; return 0; }
 void idle_wait_step(void) { idle_work_run(); u6_halt(); }
 #include "gf5_foreground_entries.h"

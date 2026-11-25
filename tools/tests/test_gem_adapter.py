@@ -1,10 +1,10 @@
 """Borrowed GEM operations and tick-only bounded hardware access."""
 CHECK = dict(env=['ppc-cross'], name='gem-adapter-host', tier=2, budget=10, needs=[], covers=[
-    'platform/powermac/nic_gem.c', 'platform/powermac/nic_gem.h',
-    'platform/powermac/lan_boot.h', 'platform/powermac/lan_service.c',
-    'platform/powermac/rh_observe.h', 'net/link.h', 'include/net_eth.h', 'drivers/net/gem/gem.h', 'net/nic.h', 'include/types.h',
+    'sys/platform/powermac/nic_gem.c', 'sys/platform/powermac/nic_gem.h',
+    'sys/platform/powermac/lan_boot.h', 'sys/platform/powermac/lan_service.c',
+    'sys/platform/powermac/rh_observe.h', 'sys/net/link.h', 'sys/include/net_eth.h', 'sys/dev/net/gem/gem.h', 'sys/net/nic.h', 'sys/include/types.h',
     'tools/tests/gem_adapter_host.c', 'tools/tests/test_gem_adapter.py',
-    'tools/tests/host32.py', 'include/callconv.h',
+    'tools/tests/host32.py', 'sys/include/callconv.h',
     'sdk/include/os32/os32_kapi_shared.h',
     'sdk/include/os32/os32_kapi_generated.h',
     'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_gfx2.h',
@@ -21,7 +21,7 @@ import host32
 
 
 def run(ctx):
-    original = (ctx.root / 'platform/powermac/nic_gem.c').read_text()
+    original = (ctx.root / 'sys/platform/powermac/nic_gem.c').read_text()
     with tempfile.TemporaryDirectory(prefix='gem-adapter-') as td:
         work = Path(td)
         source, exe = work / 'nic_gem.c', work / 'probe'
@@ -66,7 +66,7 @@ def run(ctx):
             return 0
         subprocess.run([str(cc), '-std=gnu11', '-Wall', '-Wextra', '-Werror',
             '-ffreestanding', '-D__cdecl=', *includes, '-c',
-            str(ctx.root / 'platform/powermac/nic_gem.c'),
+            str(ctx.root / 'sys/platform/powermac/nic_gem.c'),
             '-o', str(work / 'ppc.o')], check=True)
         print('GREEN PowerPC standalone object', flush=True)
     return 0

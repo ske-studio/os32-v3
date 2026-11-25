@@ -1,6 +1,6 @@
 """票 TASK_DB_ERRSTR: `db_last_error()` / `db_column_text()` の返り先のホスト TDD。
 
-実 SQLite + 実 os32 SQLite VFS + 実 FD 表 + 実 `kapi/kapi_db.c` を RAM の
+実 SQLite + 実 os32 SQLite VFS + 実 FD 表 + 実 `sys/kapi/kapi_db.c` を RAM の
 バックエンドに載せて回す。DB は `:memory:` で開くので、ホストのファイル
 システム・sudo・mount・配備・エミュレータには一切触らない。
 記録は tools/tests/db_errstr_tdd.md、tools/tests/kapi_db_owned_tdd.md。
@@ -26,11 +26,11 @@ TT2: 旧 db-v50 の API 25 ケース・回収順の番人・変異 3 本と、
 `remaining`) と中間の溢れ検査 (`shm_row_check`) を戻しても行は書かれない。
 そこは静的な番人 (`check_no_block_size`) が受け持つ: 票 §4 の
 「`DB_SHM_BLOCK_SIZE` を直接引き算している箇所を残さない」をそのまま
-規則にして、`kapi/kapi_db.c` がこの名前を 1 回も出さないことを見る。
+規則にして、`sys/kapi/kapi_db.c` がこの名前を 1 回も出さないことを見る。
 """
 import sqlite_cc
 CHECK = dict(name='db-errstr-host', tier=1,
-    covers=['include/app_ids.h', 'tools/tests/sqlite_bits_host.h', 'lib/softfloat/**', 'lib/softfloat_bits.c', 'lib/softfloat_bits.h', 'tools/tests/sqlite_cc.py', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kapi/kapi_db.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/db_errstr_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/mutpar.py', 'exec/exec.c', 'exec/appslot.h', 'include/memmap.h', 'include/appmem_types.h', 'include/ksetjmp.h', 'mm/paging.h', 'mm/physmem.h', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'tools/tests/kapi_db_v50_host.c', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'kernel/ime/ime_store.h', 'tools/tests/fep_store_host.h', 'lib/kstring.h', 'kernel/ime/ime.h', 'tools/tests/kapi_db_owned_host.c', 'tools/tests/db_group_shim.h', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'kapi/kapi_db_*.inc', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['sys/include/app_ids.h', 'tools/tests/sqlite_bits_host.h', 'lib/softfloat/**', 'lib/softfloat_bits.c', 'lib/softfloat_bits.h', 'tools/tests/sqlite_cc.py', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/fs/vfs_fd.c', 'sys/fs/vfs_fd_stdin.inc', 'sys/fs/vfs_stdin.h', 'sys/kern/exec/exec.h', 'sys/kapi/kapi_db.c', 'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/db_errstr_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/mutpar.py', 'sys/kern/exec/exec.c', 'sys/kern/exec/appslot.h', 'sys/include/memmap.h', 'sys/include/appmem_types.h', 'sys/include/ksetjmp.h', 'sys/kern/mm/paging.h', 'sys/kern/mm/physmem.h', 'sys/platform/pc98/kdebug/kselftest.c', 'kdebug/kselftest/**', 'sys/kern/mm/paging.c', 'tools/tests/kapi_db_v50_host.c', 'sys/kern/ime/ime_dict.c', 'sys/kern/ime/ime_conn.c', 'sys/kern/ime/ime_user_store.c', 'sys/kern/ime/ime_store.h', 'tools/tests/fep_store_host.h', 'sys/kern/kstring.h', 'sys/kern/ime/ime.h', 'tools/tests/kapi_db_owned_host.c', 'tools/tests/db_group_shim.h', 'tools/tests/input_fixture_host.h', 'sys/hal/input/input_service.c', 'sys/hal/input/pointer_service.h', 'sys/hal/input/input_service.h', 'sys/include/kbd.h', 'tools/tests/serial_emergency_host.h', 'sys/kern/serial_diag.c', 'sys/include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'kapi/kapi_db_*.inc', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=[], budget=9.6,
     kind='characterization',
 )
@@ -72,10 +72,10 @@ INC = include_flags(ROOT)
 CONFIG = str(ROOT / "lib/sqlite3/os32_sqlite_config.h")
 
 SHIMS = {
-    "exec/exec.h": "#include \"vfs_stdin.h\"\nVfsStdinRead *exec_stdin_state(void);\n",
+    "sys/kern/exec/exec.h": "#include \"vfs_stdin.h\"\nVfsStdinRead *exec_stdin_state(void);\n",
     # kapi_db.c は SHM を MEM_SHM_BASE で引く。ホストでは試験側の配列へ向ける。
     "memmap.h": "extern unsigned char test_shm[];\n#define MEM_SHM_BASE test_shm\n#define MEM_SHM_DB_OFFSET 0UL\n#define MEM_SHM_DB_BASE (MEM_SHM_BASE + MEM_SHM_DB_OFFSET)\n",
-    # exec/exec.c 側の口だけを模型にする (帯と PTE はカーネル番地に依存する)。
+    # sys/kern/exec/exec.c 側の口だけを模型にする (帯と PTE はカーネル番地に依存する)。
     "exec.h": "int ring3_user_range_ok(u32 p, u32 len);\n",
 }
 
@@ -88,7 +88,7 @@ HOST_FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
 def check_reclaim_order():
     """exec_reclaim_resources が DB を FD より先に回収しているか (票 §1c)。
 
-    並び自体は exec/exec.c の中の 1 か所にしかない。ホストでは exec.c を
+    並び自体は sys/kern/exec/exec.c の中の 1 か所にしかない。ホストでは exec.c を
     そのままリンクできないので、ここは**本文の並び**を読んで固定する。
     順序が入れ替わったら気付ける最小の番人。
     """
@@ -138,7 +138,7 @@ def run_owned_cases(mutate):
         subprocess.run([str(exe)], check=True, cwd=ROOT)
         if mutate:
             fixture_text = (ROOT / "tools/tests/kapi_db_owned_host.c").read_text()
-            paths = ['kapi/kapi_db.c']
+            paths = ['sys/kapi/kapi_db.c']
             for path in paths:
                 source = (ROOT / path).read_text()
                 for name in ("kapi_db_helpers.inc", "kapi_db_v50.inc", "kapi_db_selftest.inc"):
@@ -182,21 +182,21 @@ def run_owned_cases(mutate):
 
 
 def check_no_block_size(root=ROOT):
-    """kapi/kapi_db.c が `DB_SHM_BLOCK_SIZE` を名指ししていないこと (票 §4 の 1)。
+    """sys/kapi/kapi_db.c が `DB_SHM_BLOCK_SIZE` を名指ししていないこと (票 §4 の 1)。
 
     結果データの上限は 5 か所で見ている。1 か所でも 16KB から直接引くと
     結果が診断文を踏み潰すが、**事前検査が先に断つ経路は実行時に見えない**。
     だから「その名前を使わない」を規則そのものとして固定する。上限は
     `DB_SHM_RESULT_LIMIT` (= 診断領域を除いた分) からだけ導く。
     """
-    src = (root / "kapi/kapi_db.c").read_text(encoding="utf-8")
+    src = (root / "sys/kapi/kapi_db.c").read_text(encoding="utf-8")
     for name in ("kapi_db_helpers.inc", "kapi_db_v50.inc", "kapi_db_selftest.inc"):
         src = src.replace('#include "' + name + '"',
                           (root / "kapi" / name).read_text(encoding="utf-8"))
     hits = [n for n, line in enumerate(src.splitlines(), 1)
             if "DB_SHM_BLOCK_SIZE" in line]
     if hits:
-        print("FAIL SOURCE: kapi/kapi_db.c は DB_SHM_BLOCK_SIZE から直接引いている "
+        print("FAIL SOURCE: sys/kapi/kapi_db.c は DB_SHM_BLOCK_SIZE から直接引いている "
               "(行 %s) — DB_SHM_RESULT_LIMIT を使う" % ", ".join(map(str, hits)),
               flush=True)
         return 1
@@ -228,7 +228,7 @@ def build_api(tmp, sqlite_obj, san):
 
 
 def run_api_mutations(tmp, sqlite_obj, exe):
-    original = (ROOT / "kapi/kapi_db.c").read_text()
+    original = (ROOT / "sys/kapi/kapi_db.c").read_text()
     for name in ("kapi_db_helpers.inc", "kapi_db_v50.inc", "kapi_db_selftest.inc"):
         original = original.replace('#include "' + name + '"',
                                     (ROOT / "kapi" / name).read_text(encoding="utf-8"))
@@ -236,21 +236,21 @@ def run_api_mutations(tmp, sqlite_obj, exe):
              "        !sql_copy_buf[0]) return -1;")
     assert original.count(guard) == 3
     vfs_original = (ROOT / "lib/sqlite3/os32_sqlite_vfs.c").read_text()
-    appslot = (ROOT / "include/app_ids.h").read_text()
+    appslot = (ROOT / "sys/include/app_ids.h").read_text()
     pool = "#define APP_MAX_APPS     4"
     assert appslot.count(pool) == 1
     mutations = [
-        ("DB diagnostics must cover app ID pool", "include/app_ids.h",
+        ("DB diagnostics must cover app ID pool", "sys/include/app_ids.h",
          appslot.replace(pool, "#define APP_MAX_APPS     5"), "v50_selftest"),
-        ("finalize before copy refusal", "kapi/kapi_db.c", original.replace(guard, "    if (slot->active_stmt) { sqlite3_finalize(slot->active_stmt); slot->active_stmt = 0; }\n" + guard), "prepare_replaces"),
-        ("SQL truncation", "kapi/kapi_db.c", original.replace(guard, "    if (!sql) return -1;\n    kstrncpy(sql_copy_buf, sql, SQL_COPY_BUF_SIZE);\n    if (!sql_copy_buf[0]) return -1;"), "prepare_replaces"),
+        ("finalize before copy refusal", "sys/kapi/kapi_db.c", original.replace(guard, "    if (slot->active_stmt) { sqlite3_finalize(slot->active_stmt); slot->active_stmt = 0; }\n" + guard), "prepare_replaces"),
+        ("SQL truncation", "sys/kapi/kapi_db.c", original.replace(guard, "    if (!sql) return -1;\n    kstrncpy(sql_copy_buf, sql, SQL_COPY_BUF_SIZE);\n    if (!sql_copy_buf[0]) return -1;"), "prepare_replaces"),
         ("late journal current owner", "lib/sqlite3/os32_sqlite_vfs.c", vfs_original.replace("vfs_open_sqlite(zName, oflags, g->owner,", "vfs_open_sqlite(zName, oflags, res_owner_get(),"), "group_callers"),
     ]
     for name, path, changed, case in mutations:
         mutant = tmp / pathlib.Path(path).name
         mutant.write_text(changed)
         fixture = (ROOT / "tools/tests/kapi_db_v50_host.c").read_text()
-        if path == 'include/app_ids.h':
+        if path == 'sys/include/app_ids.h':
             fixture = '#include "' + str(mutant) + '"\n' + fixture
         fixture = fixture.replace('../../' + path, str(mutant))
         fixture = fixture.replace('"../../', '"' + str(ROOT) + '/')
@@ -283,52 +283,52 @@ def run_cases(exe, cases, root=ROOT):
 #   "source" 静的な番人が捕まえる (事前検査が先に断つので実行時には見えない)
 MUTATIONS = [
     # T4c-1: an unavailable module must return a readable SHM diagnostic.
-    ("kapi/kapi_db.c",
+    ("sys/kapi/kapi_db.c",
      '    if (!DB_MODULE_READY()) return db_shm_diag("SQLite module unavailable");',
      '    if (!DB_MODULE_READY()) return 0;',
      "run"),
     # 1. 上限の引き算を 1 か所だけ元に戻す (事前検査の payload 側)。
     #    → 上限を超える行が ROW として通り、診断領域を勘定に入れなくなる。
-    ("kapi/kapi_db_helpers.inc",
+    ("sys/kapi/kapi_db_helpers.inc",
      "    if (payload > (u32)DB_SHM_RESULT_LIMIT - need) return 0;",
      "    if (payload > (u32)DB_SHM_BLOCK_SIZE - need) return 0;",
      "run"),
     # 2. 1 回の db_exec のエラー欄の上限を元に戻す。
     #    → 長い診断文がそのまま診断領域へ流れ込む。
-    ("kapi/kapi_db_helpers.inc",
+    ("sys/kapi/kapi_db_helpers.inc",
      "    max_len = DB_SHM_RESULT_LIMIT - data_start - 1;",
      "    max_len = DB_SHM_BLOCK_SIZE - data_start - 1;",
      "run"),
     # 3. writer 側の残り容量を元に戻す。事前検査が先に断つので**実行時には
     #    見えない** — 静的な番人だけが捕まえる (この試験の要点の 1 つ)。
-    ("kapi/kapi_db_helpers.inc",
+    ("sys/kapi/kapi_db_helpers.inc",
      "        i32 remaining = DB_SHM_RESULT_LIMIT - data_offset;",
      "        i32 remaining = DB_SHM_BLOCK_SIZE - data_offset;",
      "source"),
     # 4. db_last_error の「範囲外の handle」経路をカーネル番地のまま返す。
-    ("kapi/kapi_db.c",
+    ("sys/kapi/kapi_db.c",
      '    if (!slot) return db_shm_diag("invalid handle");',
      '    if (!slot) return "invalid handle";',
      "run"),
     # 5. db_last_error の sqlite3_errmsg 経路を SQLite の帯のまま返す。
-    ("kapi/kapi_db.c",
+    ("sys/kapi/kapi_db.c",
      "    return db_shm_diag(sqlite3_errmsg(slot->db));",
      "    return sqlite3_errmsg(slot->db);",
      "run"),
     # 6. db_column_text のエラー経路を `return "";` に戻す。
-    ("kapi/kapi_db.c",
+    ("sys/kapi/kapi_db.c",
      "    if (info->data_offset <= 0 || (u32)info->data_offset >= DB_SHM_RESULT_LIMIT)\n"
      "        return db_shm_empty();",
      "    if (info->data_offset <= 0 || (u32)info->data_offset >= DB_SHM_RESULT_LIMIT)\n"
      '        return "";',
      "run"),
     # 7. 切り詰めで NUL を置き忘れる (切った側)。
-    ("kapi/kapi_db_helpers.inc",
+    ("sys/kapi/kapi_db_helpers.inc",
      "    dst[len + mark] = '\\0';",
      "    if (len == 0u) dst[len + mark] = '\\0';",
      "run"),
     # 8. 切り詰めの上限を診断領域いっぱいに広げる (空文字列の 1 バイトを潰す)。
-    ("kapi/kapi_db_helpers.inc",
+    ("sys/kapi/kapi_db_helpers.inc",
      "    u32 cap = (u32)DB_SHM_ERRSTR_MAX - 1u;",
      "    u32 cap = (u32)DB_SHM_DIAG_SIZE;",
      "run"),
@@ -337,9 +337,9 @@ MUTATIONS = [
 
 def run_mutations(tmp, sqlite_obj, san):
     """Each mutation lives in an isolated tree, including the static guard input."""
-    real = {"tools/tests/db_errstr_host.c", "kapi/kapi_db.c",
-            "kapi/kapi_db_helpers.inc", "kapi/kapi_db_v50.inc",
-            "kapi/kapi_db_selftest.inc"}
+    real = {"tools/tests/db_errstr_host.c", "sys/kapi/kapi_db.c",
+            "sys/kapi/kapi_db_helpers.inc", "sys/kapi/kapi_db_v50.inc",
+            "sys/kapi/kapi_db_selftest.inc"}
     control = mutpar.mutant_tree(ROOT, tmp / "control-tree", {}, real=real)
     exe = build(tmp, "control", sqlite_obj, san, root=control)
     if exe is None or run_cases(exe, CASES, root=control) or check_no_block_size_quiet(control):
@@ -413,7 +413,7 @@ if __name__ == "__main__":
                             "-nostdlib", "-msoft-float", "-Os", "-Wall",
                             "-D__KERNEL_BUILD__",
                              *include_flags(ROOT),
-                            "-c", str(ROOT / "kapi/kapi_db.c"),
+                            "-c", str(ROOT / "sys/kapi/kapi_db.c"),
                             "-o", str(tmp / "kapi_db.o")], check=True, cwd=ROOT)
             print("TARGET i386-elf GNU11 compile PASS", flush=True)
 

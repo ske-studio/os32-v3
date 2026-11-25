@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """IO_TIER_DESIGN §8 rows 1–4: execute the actual dispatcher, including mutants."""
 CHECK = dict(name='io-work-host', tier=3, budget=20, needs=[], covers=[
-    'kernel/idle_work.c', 'net/nic.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
-    'platform/pc98/platform_link_inline.h', 'platform/pc98/tick_order.h', 'net/link_platform.h',
-    'include/platform_irq.h', 'platform/pc98/platform_irq_limits.h', 'include/kernel_tick.h', 'kernel/irq/tick.h', 'kernel/idle_work.h', 'kernel/io_work.c', 'kernel/io_work.h', 'kernel/io_clock.h', 'kernel/io_policy.h',
+    'sys/kern/idle_work.c', 'sys/net/nic.h', 'sys/kern/irq/irq.h', 'sys/kern/irq/irq_math.h',
+    'sys/platform/pc98/platform_link_inline.h', 'sys/platform/pc98/tick_order.h', 'sys/hal/net/link_platform.h',
+    'sys/include/platform_irq.h', 'sys/platform/pc98/platform_irq_limits.h', 'sys/include/kernel_tick.h', 'sys/kern/irq/tick.h', 'sys/kern/idle_work.h', 'sys/kern/io_work.c', 'sys/kern/io_work.h', 'sys/kern/io_clock.h', 'sys/kern/io_policy.h',
     'tools/tests/io_work_host.c', 'tools/tests/test_io_work.py', 'tools/tests/host32.py',
-            'include/types.h', 'include/callconv.h',
+            'sys/include/types.h', 'sys/include/callconv.h',
             'sdk/include/os32/os32_kapi_shared.h'],
     basis=['IO_TIER_DESIGN §4', '§5', '§8'])
 from pathlib import Path
@@ -72,7 +72,7 @@ def exercise(root, work, product):
 
 
 def run(ctx):
-    product = (ctx.root / 'kernel/io_work.c').read_text()
+    product = (ctx.root / 'sys/kern/io_work.c').read_text()
     with tempfile.TemporaryDirectory(prefix='io-work-') as td:
         work = Path(td)
         assert exercise(ctx.root, work, product) == 0, 'normal control'

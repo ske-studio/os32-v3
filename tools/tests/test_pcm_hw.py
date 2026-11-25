@@ -6,7 +6,7 @@ import tempfile
 from test_pcm_cs4231 import FLAGS, INCLUDES, ROOT
 
 CHECK = dict(name='pcm-hw-host', tier=4, needs=[], budget=6,
-             covers=['drivers/sound/cs4231/*.[ch]', 'sound/hal/*.[ch]', 'include/av_contract.h',
+             covers=['drivers/sound/cs4231/*.[ch]', 'sound/hal/*.[ch]', 'sys/include/av_contract.h',
                      'tools/tests/pcm_hw_host.c', 'tools/tests/test_pcm_hw.py',
                      'tools/tests/test_pcm_cs4231.py', 'tools/tests/mutpar.py', 'tools/tests/pcm_cs4231_host.c',
                      'tools/tests/pcm_hostshim/io.h', 'tools/tests/kernel_includes.py',
@@ -45,8 +45,8 @@ def run(ctx):
                     source = source.replace(old, new)
                 (work / unit).write_text(source)
             fixture = (ROOT / 'tools/tests/pcm_cs4231_host.c').read_text()
-            fixture = fixture.replace('../../drivers/sound/cs4231/pcm_cs4231.c', 'pcm_cs4231.c')
-            fixture = fixture.replace('../../drivers/sound/cs4231/pcm_cs4231_math.c',
+            fixture = fixture.replace('../../sys/dev/sound/cs4231/pcm_cs4231.c', 'pcm_cs4231.c')
+            fixture = fixture.replace('../../sys/dev/sound/cs4231/pcm_cs4231_math.c',
                                       str(driver / 'pcm_cs4231_math.c'))
             (work / 'pcm_cs4231_host.c').write_text(fixture)
             (work / 'test.c').write_text((ROOT / 'tools/tests/pcm_hw_host.c').read_text())

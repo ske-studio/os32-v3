@@ -1,7 +1,7 @@
 """Resident GeForce tick callback lifetime."""
 CHECK = dict(name='gf1-tick-host', tier=3,
-    covers=['drivers/video/geforce/geforce_tick.[ch]', 'kernel/irq/tick.h',
-            'platform/pc98/tick_order.h', 'tools/tests/gf1_tick_host.c',
+    covers=['drivers/video/geforce/geforce_tick.[ch]', 'sys/kern/irq/tick.h',
+            'sys/platform/pc98/tick_order.h', 'tools/tests/gf1_tick_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.6,
     basis=['GF_FEAT1_DESIGN §5'],
@@ -16,7 +16,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'drivers/video/geforce/geforce_tick.c'
+SOURCE = ROOT / 'sys/platform/pc98/video/geforce/geforce_tick.c'
 
 def main():
     with tempfile.TemporaryDirectory(prefix='gf1-tick-') as td:

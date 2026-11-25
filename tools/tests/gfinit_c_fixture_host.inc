@@ -6,13 +6,13 @@
 #define GF_S5_ENTRY c_old_bus_entry
 #include "gfinit_bus_host.c"
 #undef GF_S5_ENTRY
-#include "../../kdebug/gfinit_plan.c"
-#include "../../kdebug/gfinit_mode.c"
+#include "../../sys/dev/video/geforce/diag/gfinit_plan.c"
+#include "../../sys/dev/video/geforce/diag/gfinit_mode.c"
 #include "gf_display_calc_host.inc"
-#include "../../hwdev/gf_load_state.c"
-#include "../../kdebug/gfinit_plan_c.c"
-#include "../../kdebug/gfinit_verify.inc"
-#include "../../kdebug/recover_profile.c"
+#include "../../sys/dev/video/geforce/gf_load_state.c"
+#include "../../sys/dev/video/geforce/diag/gfinit_plan_c.c"
+#include "../../sys/dev/video/geforce/diag/gfinit_verify.inc"
+#include "../../sys/platform/pc98/kdebug/recover_profile.c"
 static struct gfinit_plan composed;
 static u8 frame[GF_MODE_VRAM_BYTES];
 static u32 frame_writes, frame_reads, drains, frame_fail_at, frame_abort_at, frame_points;
@@ -179,5 +179,5 @@ static bool frame_contains(const char *s,const char *part)
     }
     return false;
 }
-#include "../../kdebug/gf_stage_state.c"
+#include "../../sys/dev/video/geforce/diag/gf_stage_state.c"
 #pragma GCC diagnostic pop

@@ -24,7 +24,7 @@ def function(text, name):
 ROOT = Path(__file__).resolve().parents[2]
 
 # Keep the original three-guard mutant as one unique, contiguous source span.
-_paging = paging_source(ROOT/'mm/paging.c')
+_paging = paging_source(ROOT/'sys/kern/mm/paging.c')
 _generic_start = _paging.index('int paging_set_page(')
 _generic_end = _paging.index('    if (npages >', _generic_start)
 GENERIC_LIVE = _paging[_generic_start:_generic_end]
@@ -32,75 +32,75 @@ GENERIC_GUARD = '    if (live_addrspaces && (flags & PTE_USER)) return -1;\n'
 assert GENERIC_LIVE.count(GENERIC_GUARD) == 3
 
 MUTATIONS = (
-    ('return-audit', 'platform/pc98/legacy/v86_mem.c', '    kselftest_audit_v86_return();', '', 'FAIL V86 return audited'),
-    ('return-gfx', 'platform/pc98/legacy/v86_mem.c', '    gfx_v86_return();', '', 'FAIL audit after gfx return'),
-    ('kill-gcap-release', 'platform/pc98/legacy/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'FAIL kill gcap release audited'),
-    ('end-guest-iopl', 'platform/pc98/legacy/v86_mem.c', 'flags = (v86_session.saved_eflags & ~EFLAGS_IF) | (flags & EFLAGS_IF);', 'flags = flags;', 'FAIL kill restores caller IOPL'),
-    ('direct-kill-no-end', 'exec/exec.c', '    exec_legacy_end();\n    ring3_context_clear();\n    exec_legacy_cleanup();\n    exec_finish', '    ring3_context_clear();\n    exec_legacy_cleanup();\n    exec_finish', 'FAIL direct kill closes session'),
-    ('end-reentry', 'platform/pc98/legacy/v86_mem.c', 'if (v86_session.closing) { irq_restore(flags); return; }', 'if (0) { irq_restore(flags); return; }', 'FAIL end recursion'),
-    ('landing-if', 'exec/exec.c', '    _enable();\n    exec_legacy_end();', '    exec_legacy_end();\n    _enable();', 'FAIL release IF enabled'),
-    ('restore-flush', 'mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = saved; arch_mmu_flush_tlb();', 'FAIL V86 active TLB'),
-    ('restore-current-pde', 'mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = saved; if (saved & PTE_USER) ((u32 *)P2V(paging_current_cr3()))[0] |= PTE_USER;', 'FAIL unrelated current PDE unchanged'),
-    ('int80-offset', 'platform/pc98/legacy/v86.c', 'V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS,\n                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0)', 'V86F_EIP, V86F_CS, V86F_EFLAGS, V86F_ESP, V86F_SS,\n                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0)', 'FAIL int80 IVT target'),
+    ('return-audit', 'sys/platform/pc98/legacy/v86_mem.c', '    kselftest_audit_v86_return();', '', 'FAIL V86 return audited'),
+    ('return-gfx', 'sys/platform/pc98/legacy/v86_mem.c', '    gfx_v86_return();', '', 'FAIL audit after gfx return'),
+    ('kill-gcap-release', 'sys/platform/pc98/legacy/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'FAIL kill gcap release audited'),
+    ('end-guest-iopl', 'sys/platform/pc98/legacy/v86_mem.c', 'flags = (v86_session.saved_eflags & ~EFLAGS_IF) | (flags & EFLAGS_IF);', 'flags = flags;', 'FAIL kill restores caller IOPL'),
+    ('direct-kill-no-end', 'sys/kern/exec/exec.c', '    exec_legacy_end();\n    ring3_context_clear();\n    exec_legacy_cleanup();\n    exec_finish', '    ring3_context_clear();\n    exec_legacy_cleanup();\n    exec_finish', 'FAIL direct kill closes session'),
+    ('end-reentry', 'sys/platform/pc98/legacy/v86_mem.c', 'if (v86_session.closing) { irq_restore(flags); return; }', 'if (0) { irq_restore(flags); return; }', 'FAIL end recursion'),
+    ('landing-if', 'sys/kern/exec/exec.c', '    _enable();\n    exec_legacy_end();', '    exec_legacy_end();\n    _enable();', 'FAIL release IF enabled'),
+    ('restore-flush', 'sys/kern/mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = saved; arch_mmu_flush_tlb();', 'FAIL V86 active TLB'),
+    ('restore-current-pde', 'sys/kern/mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = saved; if (saved & PTE_USER) ((u32 *)P2V(paging_current_cr3()))[0] |= PTE_USER;', 'FAIL unrelated current PDE unchanged'),
+    ('int80-offset', 'sys/platform/pc98/legacy/v86.c', 'V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS,\n                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0)', 'V86F_EIP, V86F_CS, V86F_EFLAGS, V86F_ESP, V86F_SS,\n                    (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0)', 'FAIL int80 IVT target'),
 
-    ('exec-gate', 'exec/exec.c', '    if (exec_legacy_lowmap_busy()) return EXEC_ERR_INVALID;', '', 'FAIL session exec gate'),
-    ('resume-gate', 'exec/exec.c', '    if (exec_legacy_lowmap_busy()) return OS32_ERR_BUSY;', '', 'FAIL session exec gate'),
-    ('kill-no-release', 'exec/exec.c', '    exec_legacy_end();\n    exec_legacy_cleanup();\n    exec_finish(id, EXEC_ERR_FAULT, kind);', '    exec_finish(id, EXEC_ERR_FAULT, kind);', 'FAIL kill release before owner reclaim'),
-    ('release-on-exception', 'platform/pc98/legacy/v86_mem.c', 'if (kctx_irq_depth || kctx_exc_depth) goto done;', '', 'FAIL gcap release normal context'),
-    ('page0-forget', 'platform/pc98/bios_snapshot.c', '    kmemcpy(P2V(0), real_lowmem, REAL_SNAPSHOT_SIZE);', '    kmemcpy(P2V(0), real_lowmem, REAL_SNAPSHOT_SIZE);\n    real_saved = 0;', 'FAIL V86 second original valid'),
-    ('consumer-direct', 'platform/pc98/gfx_surfaces.c', 'v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', '*(volatile u8 *)P2V_IO(PEGC_BIOS_ARCH_FLAG)', 'FAIL BIOS gfx candidate immutable'),
-    ('page0-short', 'platform/pc98/bios_snapshot.c', '#define REAL_SNAPSHOT_SIZE PAGE_SIZE', '#define REAL_SNAPSHOT_SIZE 0x600', 'FAIL V86 original immutable'),
-    ('kill-no-end', 'exec/exec.c', '    exec_legacy_end();\n    ring3_context_clear();\n    g_pending_id', '    ring3_context_clear();\n    g_pending_id', 'FAIL kill ends session before app jump'),
-    ('fixed-restore', 'mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = i * PAGE_SIZE | PAGE_RW; (void)saved;', 'FAIL unexpected restore fail-stop'),
-    ('active-pde', 'mm/paging.c', '    ((u32 *)P2V(s->root))[0] = s->active_pde;', '', 'FAIL unexpected restore fail-stop'),
-    ('session-gate', 'mm/paging.c', '!lowmap_token || lowmap_token != s || base >= end', 'base >= end', 'FAIL V86 outside session unchanged'),
-    ('restore-count', 'mm/paging.c', 'if (lowmap_token != s) bad++;', 'if (lowmap_token != s) (void)0;', 'FAIL restore mismatch must fail-stop'),
-    ('db-unreserved', 'mm/shm.c',
+    ('exec-gate', 'sys/kern/exec/exec.c', '    if (exec_legacy_lowmap_busy()) return EXEC_ERR_INVALID;', '', 'FAIL session exec gate'),
+    ('resume-gate', 'sys/kern/exec/exec.c', '    if (exec_legacy_lowmap_busy()) return OS32_ERR_BUSY;', '', 'FAIL session exec gate'),
+    ('kill-no-release', 'sys/kern/exec/exec.c', '    exec_legacy_end();\n    exec_legacy_cleanup();\n    exec_finish(id, EXEC_ERR_FAULT, kind);', '    exec_finish(id, EXEC_ERR_FAULT, kind);', 'FAIL kill release before owner reclaim'),
+    ('release-on-exception', 'sys/platform/pc98/legacy/v86_mem.c', 'if (kctx_irq_depth || kctx_exc_depth) goto done;', '', 'FAIL gcap release normal context'),
+    ('page0-forget', 'sys/platform/pc98/bios_snapshot.c', '    kmemcpy(P2V(0), real_lowmem, REAL_SNAPSHOT_SIZE);', '    kmemcpy(P2V(0), real_lowmem, REAL_SNAPSHOT_SIZE);\n    real_saved = 0;', 'FAIL V86 second original valid'),
+    ('consumer-direct', 'sys/platform/pc98/gfx_surfaces.c', 'v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', '*(volatile u8 *)P2V_IO(PEGC_BIOS_ARCH_FLAG)', 'FAIL BIOS gfx candidate immutable'),
+    ('page0-short', 'sys/platform/pc98/bios_snapshot.c', '#define REAL_SNAPSHOT_SIZE PAGE_SIZE', '#define REAL_SNAPSHOT_SIZE 0x600', 'FAIL V86 original immutable'),
+    ('kill-no-end', 'sys/kern/exec/exec.c', '    exec_legacy_end();\n    ring3_context_clear();\n    g_pending_id', '    ring3_context_clear();\n    g_pending_id', 'FAIL kill ends session before app jump'),
+    ('fixed-restore', 'sys/kern/mm/paging.c', '        page_tables[0][i] = saved;', '        page_tables[0][i] = i * PAGE_SIZE | PAGE_RW; (void)saved;', 'FAIL unexpected restore fail-stop'),
+    ('active-pde', 'sys/kern/mm/paging.c', '    ((u32 *)P2V(s->root))[0] = s->active_pde;', '', 'FAIL unexpected restore fail-stop'),
+    ('session-gate', 'sys/kern/mm/paging.c', '!lowmap_token || lowmap_token != s || base >= end', 'base >= end', 'FAIL V86 outside session unchanged'),
+    ('restore-count', 'sys/kern/mm/paging.c', 'if (lowmap_token != s) bad++;', 'if (lowmap_token != s) (void)0;', 'FAIL restore mismatch must fail-stop'),
+    ('db-unreserved', 'sys/kern/mm/shm.c',
      '         i < SHM_DB_BLOCK_FIRST + SHM_DB_BLOCK_COUNT; i++) {\n        shm_state[i] = SHM_RESERVED;',
      '         i < SHM_DB_BLOCK_FIRST + SHM_DB_BLOCK_COUNT; i++) {', 'FAIL first allocation excludes DB'),
-    ('db-shifted', 'mm/shm.c',
+    ('db-shifted', 'sys/kern/mm/shm.c',
      '         i < SHM_DB_BLOCK_FIRST + SHM_DB_BLOCK_COUNT; i++) {\n        shm_state[i] = SHM_RESERVED;',
      '         i < SHM_DB_BLOCK_FIRST + SHM_DB_BLOCK_COUNT; i++) {\n        shm_state[i + 1] = SHM_RESERVED;', 'FAIL first allocation excludes DB'),
-    ('lock-user', 'mm/shm.c',
+    ('lock-user', 'sys/kern/mm/shm.c',
      'paging_shm_set_rw(addr, addr + (u32)span * SHM_BLOCK_SIZE, 0)',
      'paging_map_range(addr, addr + (u32)span * SHM_BLOCK_SIZE, addr, PAGE_RO)', 'FAIL lock USER'),
-    ('free-user', 'mm/shm.c',
+    ('free-user', 'sys/kern/mm/shm.c',
      'paging_shm_set_rw(addr, addr + (u32)span * SHM_BLOCK_SIZE, 1)',
      'paging_map_range(addr, addr + (u32)span * SHM_BLOCK_SIZE, addr, PAGE_RW)', 'FAIL free USER'),
-    ('owned-user', 'mm/shm.c',
+    ('owned-user', 'sys/kern/mm/shm.c',
      '\n        if (paging_shm_set_rw(blk_start, blk_start + SHM_BLOCK_SIZE, 1) != 0)',
      '\n        if (paging_map_range(blk_start, blk_start + SHM_BLOCK_SIZE, blk_start, PAGE_RW) != 0)', 'FAIL owned USER'),
-    ('cleanup-user', 'mm/shm.c',
+    ('cleanup-user', 'sys/kern/mm/shm.c',
      '            if (paging_shm_set_rw(blk_start, blk_start + SHM_BLOCK_SIZE, 1) != 0)',
      '            if (paging_map_range(blk_start, blk_start + SHM_BLOCK_SIZE, blk_start, PAGE_RW) != 0)', 'FAIL cleanup USER'),
-    ('generic-live', 'mm/paging.c',
+    ('generic-live', 'sys/kern/mm/paging.c',
      GENERIC_LIVE, GENERIC_LIVE.replace(GENERIC_GUARD, ''), 'FAIL generic set rejects USER'),
-    ('boot-once', 'mm/paging.c', 'boot_user_shared_done || live_addrspaces || !pg_enabled',
+    ('boot-once', 'sys/kern/mm/paging.c', 'boot_user_shared_done || live_addrspaces || !pg_enabled',
      'live_addrspaces || !pg_enabled', 'FAIL boot once'),
-    ('shm-range', 'mm/paging.c',
+    ('shm-range', 'sys/kern/mm/paging.c',
      'if (base < MEM_SHM_BASE || end > MEM_SHM_BASE + MEM_SHM_SIZE ||',
      # Accept the foreign range before the SHM audit bitmap is indexed.
      # Deleting the guard now crashes there instead of reaching the assertion.
      'if (base < MEM_SHM_BASE || end > MEM_SHM_BASE + MEM_SHM_SIZE) return 0;\n    if (',
      'FAIL SHM foreign USER range'),
-    ('shm-user-missing', 'mm/paging.c', 'if (!(entry & PTE_USER))', 'if (0)', 'FAIL missing USER atomic reject'),
-    ('v86-restore', 'mm/paging.c', '    page_directory[0] = s->master_pde;', '    page_directory[0] &= ~PTE_USER;', 'FAIL unexpected restore fail-stop'),
-    ('boot-order', 'platform/pc98/kernel.c', '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();',
+    ('shm-user-missing', 'sys/kern/mm/paging.c', 'if (!(entry & PTE_USER))', 'if (0)', 'FAIL missing USER atomic reject'),
+    ('v86-restore', 'sys/kern/mm/paging.c', '    page_directory[0] = s->master_pde;', '    page_directory[0] &= ~PTE_USER;', 'FAIL unexpected restore fail-stop'),
+    ('boot-order', 'sys/platform/pc98/kernel.c', '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();',
      '    if (kdebug.state == KDEBUG_RUNNING) kdebug.ops.selftest_run();', 'FAIL boot before AS'),
-    ('launch-TVRAM', 'exec/exec.c', '        /* --- K3:',
+    ('launch-TVRAM', 'sys/kern/exec/exec.c', '        /* --- K3:',
      '        paging_addrspace_map_user_range(ctx->as, TVRAM_CHAR_BASE, GVRAM_BRG_END, PAGE_RW | PTE_USER);\n        /* --- K3:',
      'FAIL launch TVRAM removed'),
-    ('launch-font', 'exec/exec.c', '        /* --- K3:',
+    ('launch-font', 'sys/kern/exec/exec.c', '        /* --- K3:',
      '        paging_addrspace_map_user_range(ctx->as, 0x01000UL, 0x4A000UL, PAGE_RW | PTE_USER);\n        /* --- K3:',
      'FAIL launch font removed'),
-    ('launch-shm', 'exec/exec.c', '        /* --- K3:',
+    ('launch-shm', 'sys/kern/exec/exec.c', '        /* --- K3:',
      '        paging_addrspace_map_user_range(ctx->as, MEM_SHM_BASE, MEM_SHM_BASE + MEM_SHM_SIZE, PAGE_RW | PTE_USER);\n        /* --- K3:',
      'FAIL launch SHM removed'),
 )
 
 
 def wiring(sources):
-    e = sources['exec/exec.c']
+    e = sources['sys/kern/exec/exec.c']
     for name, guard in (('exec_launch', 'if (exec_legacy_lowmap_busy()) return EXEC_ERR_INVALID;'),
                         ('exec_resume', 'if (exec_legacy_lowmap_busy()) return OS32_ERR_BUSY;')):
         body = function(e, name)
@@ -112,7 +112,7 @@ def wiring(sources):
     boot = 'paging_boot_user_shared(exec_tramp_page_addr(), 2)'
     assert boot in k and k.index('shm_init();') < k.index(boot) < k.index('kdebug.ops.selftest_run();'), 'FAIL boot before AS'
     assert k.count(boot) == 1, 'FAIL boot once'
-    e = function(sources['exec/exec.c'], 'exec_launch')
+    e = function(sources['sys/kern/exec/exec.c'], 'exec_launch')
     # f12 removed the tier bookkeeping after the three private mappings.
     # LD3 adds a conditional sound attach alongside the GUI attach. Bound
     # this interval by the GUI call itself, independent of the compound guard.
@@ -125,7 +125,7 @@ def wiring(sources):
 
 
 def run(runner, mutation=None):
-    paths = ('mm/paging.c', 'mm/shm.c', 'platform/pc98/legacy/v86_mem.c', 'platform/pc98/kernel.c', 'exec/exec.c', 'platform/pc98/legacy/v86.c', 'platform/pc98/bios_snapshot.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'platform/pc98/gfx_surfaces.c')
+    paths = ('sys/kern/mm/paging.c', 'sys/kern/mm/shm.c', 'sys/platform/pc98/legacy/v86_mem.c', 'sys/platform/pc98/kernel.c', 'sys/kern/exec/exec.c', 'sys/platform/pc98/legacy/v86.c', 'sys/platform/pc98/bios_snapshot.c', 'sys/platform/pc98/video/backend_pegc.c', 'sys/hal/gfx/gfx_core.c', 'sys/platform/pc98/gfx_surfaces.c')
     sources = {p: paging_source(ROOT/p) for p in paths}
     if mutation:
         name, path, old, new, expected = mutation
@@ -145,14 +145,14 @@ def run(runner, mutation=None):
     with tempfile.TemporaryDirectory(prefix='e10a-shm-') as directory:
         work = Path(directory)
         (work/'platform_emergency.h').write_text(
-            (ROOT/'include/platform_emergency.h').read_text())
-        (work/'v86_bios_slice.inc').write_text('static int real_saved;\nstatic u8 real_lowmem[PAGE_SIZE];\n' + function(sources['platform/pc98/bios_snapshot.c'], 'platform_bios_ready') + re.search(r'^#define REAL_SNAPSHOT_SIZE .*$', sources['platform/pc98/bios_snapshot.c'], re.M)[0] + '\n' + (function(sources['platform/pc98/bios_snapshot.c'], 'v86_bios_save_real') + function(sources['platform/pc98/bios_snapshot.c'], 'v86_bios_restore_real') + function(sources['platform/pc98/bios_snapshot.c'], 'v86_bios_real_lowmem')).replace('P2V(0)', 'host_page0').replace('P2V_BOOT(0)', 'host_page0'))
-        consumer = function(sources['drivers/video/pc98/backend_pegc.c'], 'bios_flag')
-        consumer += function(sources['drivers/video/pc98/backend_pegc.c'], 'pegc_identify')
-        consumer += function(sources['platform/pc98/gfx_surfaces.c'], 'gfx_identify_candidates')
+            (ROOT/'sys/include/platform_emergency.h').read_text())
+        (work/'v86_bios_slice.inc').write_text('static int real_saved;\nstatic u8 real_lowmem[PAGE_SIZE];\n' + function(sources['sys/platform/pc98/bios_snapshot.c'], 'platform_bios_ready') + re.search(r'^#define REAL_SNAPSHOT_SIZE .*$', sources['sys/platform/pc98/bios_snapshot.c'], re.M)[0] + '\n' + (function(sources['sys/platform/pc98/bios_snapshot.c'], 'v86_bios_save_real') + function(sources['sys/platform/pc98/bios_snapshot.c'], 'v86_bios_restore_real') + function(sources['sys/platform/pc98/bios_snapshot.c'], 'v86_bios_real_lowmem')).replace('P2V(0)', 'host_page0').replace('P2V_BOOT(0)', 'host_page0'))
+        consumer = function(sources['sys/platform/pc98/video/backend_pegc.c'], 'bios_flag')
+        consumer += function(sources['sys/platform/pc98/video/backend_pegc.c'], 'pegc_identify')
+        consumer += function(sources['sys/platform/pc98/gfx_surfaces.c'], 'gfx_identify_candidates')
         (work/'bios_consumer_slice.inc').write_text(consumer.replace('P2V_IO(PEGC_BIOS_ARCH_FLAG)', '(host_page0 + PEGC_BIOS_ARCH_FLAG)'))
-        (work/'v86_unwind_slice.inc').write_text(function(sources['platform/pc98/legacy/v86.c'], 'v86_runtime_end') + function(sources['exec/exec.c'], 'exec_pending_transfer') + function(sources['exec/exec.c'], 'exec_pending_finish') + function(sources['exec/exec.c'], 'exec_exit') + function(sources['exec/exec.c'], 'ring3_kill_kind'))
-        (work/'v86_int_slice.inc').write_text((function(sources['platform/pc98/legacy/v86.c'], 'v86_do_int') + function(sources['platform/pc98/legacy/v86.c'], 'v86_int80')).replace('(const u16 *)(vector * V86_IVT_ENTRY_BYTES)', '(const u16 *)(host_page0 + vector * V86_IVT_ENTRY_BYTES)'))
+        (work/'v86_unwind_slice.inc').write_text(function(sources['sys/platform/pc98/legacy/v86.c'], 'v86_runtime_end') + function(sources['sys/kern/exec/exec.c'], 'exec_pending_transfer') + function(sources['sys/kern/exec/exec.c'], 'exec_pending_finish') + function(sources['sys/kern/exec/exec.c'], 'exec_exit') + function(sources['sys/kern/exec/exec.c'], 'ring3_kill_kind'))
+        (work/'v86_int_slice.inc').write_text((function(sources['sys/platform/pc98/legacy/v86.c'], 'v86_do_int') + function(sources['sys/platform/pc98/legacy/v86.c'], 'v86_int80')).replace('(const u16 *)(vector * V86_IVT_ENTRY_BYTES)', '(const u16 *)(host_page0 + vector * V86_IVT_ENTRY_BYTES)'))
         arch = (ROOT/'tools/tests/host_arch/arch_cpu.h').read_text()
         arch = arch.replace('static inline void arch_mmu_flush_tlb(void)\n{\n}',
                             'static inline void arch_mmu_flush_tlb(void)\n{\n    host_flushes++; host_flushed_cr3 = host_cr3;\n}')
@@ -160,10 +160,10 @@ def run(runner, mutation=None):
         for p in paths[:3]:
             source = sources[p]
             # Linux low bytes are modeled here; v86_low_host executes real low RAM.
-            if p == 'platform/pc98/legacy/v86_mem.c':
+            if p == 'sys/platform/pc98/legacy/v86_mem.c':
                 source = source.replace('P2V(V86_REMAP_START)', 'host_low').replace('P2V(MEM_AUTOPLAY_MAILBOX_BASE)', '(host_low + MEM_AUTOPLAY_MAILBOX_BASE)')
             (work/Path(p).name).write_text(source)
-        alloc = paging_source(ROOT/'mm/pgalloc.c')
+        alloc = paging_source(ROOT/'sys/kern/mm/pgalloc.c')
         alloc = alloc.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
         (work/'pgalloc_host_source.c').write_text(alloc)
         cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
@@ -172,7 +172,7 @@ def run(runner, mutation=None):
                '-Wl,--gc-sections', '-DPHYSMEM_HOST_TEST=1']
         cmd += ['-I'+str(work)] + (['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests')] + include_flags(ROOT))
         exe = work/'fixture'
-        result = host32.build(cmd + [str(ROOT/'tools/tests/shm_user_host.c'), str(ROOT/'mm/physmem.c'), '-o', str(exe)], capture_output=True, text=True)
+        result = host32.build(cmd + [str(ROOT/'tools/tests/shm_user_host.c'), str(ROOT/'sys/kern/mm/physmem.c'), '-o', str(exe)], capture_output=True, text=True)
         if result.returncode:
             raise RuntimeError('build failure is not RED\n'+result.stderr)
         result = host32.run([str(exe)], runner=runner, capture_output=True, text=True)

@@ -6,12 +6,12 @@ No local reference checkout or 32-bit libc is needed by CI. Production
 regs/lifecycle/module assembly belongs to their subsequent integration test.
 """
 CHECK = dict(name='trident-route', tier=1, needs=[], budget=9.1,
-    covers=['drivers/video/trident/route_ra266.c',
-            'drivers/video/trident/trident.h',
+    covers=['sys/platform/pc98/video/route_ra266.c',
+            'sys/dev/video/trident/trident.h',
             'tools/tests/trident_route_host.c',
             'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'build/config.mk', 'include/types.h', 'include/memmap.h', 'gfx/palette.h'],
+            'build/config.mk', 'sys/include/types.h', 'sys/include/memmap.h', 'sys/hal/gfx/palette.h'],
     basis=['TRIDENT_S3_DESIGN §1', 'TRIDENT_S3_DESIGN §3'],
 )
 
@@ -25,7 +25,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'drivers/video/trident/route_ra266.c'
+PRODUCT = 'sys/platform/pc98/video/route_ra266.c'
 HOST = 'tools/tests/trident_route_host.c'
 FAKE = 'tools/tests/trident_device_fake.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',

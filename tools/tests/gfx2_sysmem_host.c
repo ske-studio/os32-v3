@@ -1,4 +1,4 @@
-#include "gfx/v2/gfx2_int.h"
+#include "sys/hal/gfx/v2/gfx2_int.h"
 #include "paging.h"
 
 static u8 pages[PAGE_SIZE * 3] __attribute__((aligned(PAGE_SIZE)));

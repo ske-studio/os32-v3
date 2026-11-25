@@ -15,8 +15,8 @@
 #define U32_DEC_BUFSIZE (10 + 1)
 #endif
 
-#include "../../kernel/ime/ime_conn.c"
-#include "../../kernel/ime/ime_user_store.c"
+#include "../../sys/kern/ime/ime_conn.c"
+#include "../../sys/kern/ime/ime_user_store.c"
 
 static u32 fep_host_probe_reserve_kb = FEP_DICT_RESERVE_KB;
 

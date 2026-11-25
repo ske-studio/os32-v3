@@ -1,6 +1,6 @@
 """GF rule evidence and real recover trace, without real opcode layouts (S2)."""
 CHECK = dict(name='recover-gf', tier=1,
-    covers=['kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'kdebug/recover_gf.c', 'kdebug/recover_gf_expand.h', 'kdebug/recover_gf.h', 'tools/tests/recover_gf_host.c', 'tools/tests/recover_gf_inventory.h', 'tools/tests/gfinit_fixture.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'include/types.h', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'kdebug/gf_stage_state.h', 'kdebug/gfinit_pll.h', 'hwdev/gf_load_state.c', 'hwdev/gf_load_state.h', 'hwdev/gf/quiesce_rows.h'],
+    covers=['sys/platform/pc98/kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'sys/dev/video/geforce/diag/recover.h', 'sys/dev/video/geforce/diag/recover_gf.c', 'sys/dev/video/geforce/diag/recover_gf_expand.h', 'sys/dev/video/geforce/diag/recover_gf.h', 'tools/tests/recover_gf_host.c', 'tools/tests/recover_gf_inventory.h', 'tools/tests/gfinit_fixture.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sys/include/types.h', 'sys/platform/pc98/kdebug/recover_cleanup.h', 'sys/kern/kdebug/recover_diag.h', 'sys/dev/video/geforce/diag/gf_stage_state.h', 'sys/dev/video/geforce/diag/gfinit_pll.h', 'sys/dev/video/geforce/gf_load_state.c', 'sys/dev/video/geforce/gf_load_state.h', 'sys/dev/video/geforce/quiesce_rows.h'],
     needs=[], budget=3.9,
     basis=['REALHW_RECOVER_DESIGN §5'],
 )
@@ -23,37 +23,37 @@ def command(exe):
             '-o', str(exe)]
 
 MUTATIONS = [
-    ('cleanup_capacity_instead_actual', 'kdebug/recover_cleanup.h',
+    ('cleanup_capacity_instead_actual', 'sys/platform/pc98/kdebug/recover_cleanup.h',
      'cleanup_budget_compute(r, p, false, &next)', 'cleanup_budget_compute(r, p, true, &next)'),
-    ('cleanup_old_4096_pre', 'kdebug/recover_cleanup.h',
+    ('cleanup_old_4096_pre', 'sys/platform/pc98/kdebug/recover_cleanup.h',
      '    cb = next;', '    next.bytes = next.s0_bytes + 4096; cb = next;'),
-    ('cleanup_reserve_invaded', 'kdebug/recover_common/clock.inc',
+    ('cleanup_reserve_invaded', 'sys/kern/kdebug/recover_common/clock.inc',
      'if (!r->in_s0) bytes -= cb.s0_bytes;', 'if (!r->in_s0) bytes -= 0;'),
-    ('cleanup_missing_local', 'kdebug/recover_cleanup.h',
+    ('cleanup_missing_local', 'sys/platform/pc98/kdebug/recover_cleanup.h',
      'i < r->local_saved_count; i++', 'i < 0 * r->local_saved_count; i++'),
-    ('cleanup_cr1f_once', 'kdebug/recover_cleanup.h',
+    ('cleanup_cr1f_once', 'sys/platform/pc98/kdebug/recover_cleanup.h',
      'pairs += t->index == RECOVER_CR1F ? 2 * n : n;', 'pairs += n;'),
-    ('cleanup_overflow_allowed', 'kdebug/recover_cleanup.h',
+    ('cleanup_overflow_allowed', 'sys/platform/pc98/kdebug/recover_cleanup.h',
      'count >= RECOVER_HALF_TICKS', 'false'),
-    ('indexed_read_rejected', 'kdebug/recover_plan/bind.inc',
+    ('indexed_read_rejected', 'sys/dev/video/geforce/diag/recover_plan/bind.inc',
      'return a->value < p->target_count && p->targets[a->value].read_safe;',
      'return a->value < p->target_count && p->targets[a->value].read_safe && p->targets[a->value].space != REC_VGA_INDEXED;'),
-    ('raw_alias_aperture', 'kdebug/recover_plan/profile.inc',
+    ('raw_alias_aperture', 'sys/platform/pc98/kdebug/recover_plan/profile.inc',
      '/* Actual PRMVIO/PRMCIO ports, not the intervening PCRTC regs.',
      'if (off >= RECOVER_PRMCIO && off < RECOVER_PRMCIO + 2 * RECOVER_HEAD_STRIDE) return -1;\n            /* Actual PRMVIO/PRMCIO ports, not the intervening PCRTC regs.'),
-    ('n1_before', 'kdebug/recover_plan/access.inc', 'if (!guards(r, w, REC_BEFORE))',
+    ('n1_before', 'sys/dev/video/geforce/diag/recover_plan/access.inc', 'if (!guards(r, w, REC_BEFORE))',
      'if (false && !guards(r, w, REC_BEFORE))'),
-    ('n1_after', 'kdebug/recover_plan/access.inc', 'if (!guards(r, w, REC_AFTER))',
+    ('n1_after', 'sys/dev/video/geforce/diag/recover_plan/access.inc', 'if (!guards(r, w, REC_AFTER))',
      'if (false && !guards(r, w, REC_AFTER))'),
-    ('alias', 'kdebug/recover_plan/profile.inc', '? RECOVER_PRMCIO : RECOVER_PRMVIO',
+    ('alias', 'sys/platform/pc98/kdebug/recover_plan/profile.inc', '? RECOVER_PRMCIO : RECOVER_PRMVIO',
      '? RECOVER_PRMVIO : RECOVER_PRMVIO'),
-    ('index_data', 'kdebug/recover_plan/profile.inc', 't->space == REC_VGA_INDEXED && dir != REC_SELECT',
+    ('index_data', 'sys/platform/pc98/kdebug/recover_plan/profile.inc', 't->space == REC_VGA_INDEXED && dir != REC_SELECT',
      't->space == REC_VGA_INDEXED && dir == REC_SELECT'),
-    ('dependency', 'kdebug/recover_gf.c', 'static const u32 dep_1[] = {REC_GF_R_PREPARE_PBUS1854};',
+    ('dependency', 'sys/dev/video/geforce/diag/recover_gf.c', 'static const u32 dep_1[] = {REC_GF_R_PREPARE_PBUS1854};',
      'static const u32 dep_1[] = {2};'),
-    ('n1_cfg_guard', 'kdebug/recover_gf.c',
+    ('n1_cfg_guard', 'sys/dev/video/geforce/diag/recover_gf.c',
      '{REC_GF_T_CFG50, 0xffffffffU, 0, REC_BEFORE | REC_AFTER}', '{REC_GF_T_CFG50, 0xffffffffU, 0, REC_BEFORE}'),
-    ('unclassified', 'kdebug/recover_plan/bind.inc',
+    ('unclassified', 'sys/dev/video/geforce/diag/recover_plan/bind.inc',
      'if (!w || !node_rule(n, w) || w->key != args[0].value || n->expr_id != w->value.expr_id ||',
      'if (!w) return true;\n    if (!node_rule(n, w) || w->key != args[0].value || n->expr_id != w->value.expr_id ||'),
 ]
@@ -83,11 +83,11 @@ def main():
             return result.returncode
         subprocess.run([str(pathlib.Path(os.environ['CROSS_DIR'])/'bin/i386-elf-gcc'),
                         *FLAGS, '-O2', '-I'+str(ROOT/'include'), '-c',
-                        str(ROOT/'kdebug/recover_gf.c'), '-o', str(pathlib.Path(td)/'profile.o')], check=True)
+                        str(ROOT/'sys/dev/video/geforce/diag/recover_gf.c'), '-o', str(pathlib.Path(td)/'profile.o')], check=True)
         print('TARGET GF profile compile PASS', flush=True)
     if '--mutate' in sys.argv:
         return int(bool(mutpar.run_with_control(mutation, MUTATIONS,
-                         ('control', 'kdebug/recover_gf.c', '', ''))))
+                         ('control', 'sys/dev/video/geforce/diag/recover_gf.c', '', ''))))
     return 0
 
 if __name__ == '__main__':

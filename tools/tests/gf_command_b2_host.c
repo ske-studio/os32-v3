@@ -1,4 +1,4 @@
-#include "../../hwdev/gf/command.h"
+#include "../../sys/dev/video/geforce/command.h"
 
 static void fail(int line)
 { __asm__ volatile("int $0x80" : : "a"(1), "b"(line)); for (;;) {} }

@@ -5,7 +5,7 @@
 
 ## 1. 実物 (origin/main `75c7c6f69`)
 
-- x86-pc98: `C_SELECTED = C_COMMON C_ARCH C_PLATFORM C_FEATURES`、`C_KERNEL = filter(C_SELECTED, C_ORDER_LEGACY C_ARCH_NEW C_PLATFORM_NEW) C_PLATFORM_NEW C_DIAGNOSTICS` (`build/select.mk`)。そのあと `build/kernel-objects.mk` が `platform/pc98/tsc_math.c`・`tsc_clock.c`・`net/rx_work.c` を後ろに足す。`build_profile.py` の `C_KERNEL` は 376 本で、`tools/tests/fixtures/build_profile_x86.json` が並びを固定している。共通の場所の物は 164 本。
+- x86-pc98: `C_SELECTED = C_COMMON C_ARCH C_PLATFORM C_FEATURES`、`C_KERNEL = filter(C_SELECTED, C_ORDER_LEGACY C_ARCH_NEW C_PLATFORM_NEW) C_PLATFORM_NEW C_DIAGNOSTICS` (`build/select.mk`)。そのあと `build/kernel-objects.mk` が `sys/platform/pc98/tsc_math.c`・`tsc_clock.c`・`sys/net/rx_work.c` を後ろに足す。`build_profile.py` の `C_KERNEL` は 376 本で、`tools/tests/fixtures/build_profile_x86.json` が並びを固定している。共通の場所の物は 164 本。
 - PowerPC の製品の像は、この時点では独立の Makefile の手書きの一覧 (段 5 で `build/targets/ppc-powermac.mk` に畳んだ)。`KBOOT_LINK ?= 1` なので旗が無い時の像は link。
 
   | 像 | 旗 | 出力 (`build/out/` の下) | .S | .c |
@@ -47,7 +47,7 @@ SerialFS の入口 `serialfs_session.c` は USERSHELL で共有する。前景�
 | `kboot-link-sh` | `KBOOT_SH=1` | 1 | 1 | 1 | 1 | 0 | 0 | kboot |
 
 ```make
-# build/images/kboot-link-sh.mk
+# sys/conf/images/kboot-link-sh.mk
 IMAGE_ORDER = kboot
 FEATURE_LINK = 1
 FEATURE_EXEC = 1
@@ -57,7 +57,7 @@ FEATURE_CLI = 0
 FEATURE_PC98_PENDING = 0
 ```
 
-像の機能の値は像のファイルだけが決める。コマンドラインで `FEATURE_LINK=0` のように上書きすると `select.mk` が止める (組み方を変える時は `IMAGE` を選ぶ)。PowerPC の像は名前 (`IMAGE=kboot-*`) でも旗 (`KBOOT_LINK`・`KBOOT_SH`・`KBOOT_SHELL`) でも選べる。対応は `build/images/ppc-flags.mk` が持ち、`select.mk` が ARCH=ppc の時に像のファイルより先に読む: 名前だけなら旗を名前から決め、旗だけなら像を旗から決め、両方をコマンドラインで与えて食い違えば止める (出力の置き場と中身が食い違わないように)。
+像の機能の値は像のファイルだけが決める。コマンドラインで `FEATURE_LINK=0` のように上書きすると `select.mk` が止める (組み方を変える時は `IMAGE` を選ぶ)。PowerPC の像は名前 (`IMAGE=kboot-*`) でも旗 (`KBOOT_LINK`・`KBOOT_SH`・`KBOOT_SHELL`) でも選べる。対応は `sys/conf/images/ppc-flags.mk` が持ち、`select.mk` が ARCH=ppc の時に像のファイルより先に読む: 名前だけなら旗を名前から決め、旗だけなら像を旗から決め、両方をコマンドラインで与えて食い違えば止める (出力の置き場と中身が食い違わないように)。
 
 - 像の機能は `IMAGE_FEATURES = LINK EXEC USERSHELL USB CLI LOOP PC98_PENDING` として、今の 15 個 (`FEATURES`) と別の一覧に持つ。値の検査 (0 か 1)・未知の `FEATURE_*` の検査は両方を見る。`build/targets/x86-pc98.mk` の「0 があれば止める」は今の 15 個だけを見る (下の `KNOWN_FEATURE_VARIABLES` の項)。
 - 依存: `USERSHELL`・`CLI` は `EXEC` が要る。`USERSHELL` と `CLI` は同時に 1 にできない。`select.mk` の今の依存の検査と同じ書き方で足す。
@@ -70,12 +70,12 @@ FEATURE_PC98_PENDING = 0
 
 ```make
 # build/sources/common.mk
-C_COMMON_CORE = <両 arch の全部の像に入る 18 本> lib/kstring_c.c
-C_COMMON_LINK = kernel/dev/device_host.c net/link.c net/link_notify.c net/host_mailbox.c net/nic_rx.c net/rx_work.c
-C_COMMON_EXEC = kernel/dev/device_fs.c <今 C_COMMON にあり PowerPC の exec の像に入る 93 本> drivers/base/dev.c input/hal/legacy_ring.c input/hal/legacy_mode.c kernel/port_service.c kernel/serial_diag.c
-C_COMMON_USERSHELL = fs/serialfs/serialfs.c fs/serialfs/serialfs_persistent.c fs/serialfs/sfs_client.c fs/serialfs/sfs_proto.c lib/crc32.c
-C_COMMON_USB = $(wildcard drivers/usb/usb_*.c drivers/usb/ohci_*.c drivers/usb/hid_*.c) drivers/usb/ehci_quiesce.c
-C_COMMON_CLI = kernel/cli/resident_cli.c
+C_COMMON_CORE = <両 arch の全部の像に入る 18 本> sys/kern/kstring_c.c
+C_COMMON_LINK = sys/kern/dev/device_host.c sys/net/link.c sys/net/link_notify.c sys/net/host_mailbox.c sys/net/nic_rx.c sys/net/rx_work.c
+C_COMMON_EXEC = sys/kern/dev/device_fs.c <今 C_COMMON にあり PowerPC の exec の像に入る 93 本> sys/dev/base/dev.c sys/hal/input/legacy_ring.c sys/hal/input/legacy_mode.c sys/kern/port_service.c sys/kern/serial_diag.c
+C_COMMON_USERSHELL = sys/fs/serialfs/serialfs.c sys/fs/serialfs/serialfs_persistent.c sys/fs/serialfs/sfs_client.c sys/fs/serialfs/sfs_proto.c lib/crc32.c
+C_COMMON_USB = $(wildcard drivers/usb/usb_*.c drivers/usb/ohci_*.c drivers/usb/hid_*.c) sys/dev/usb/ehci_quiesce.c
+C_COMMON_CLI = sys/kern/cli/resident_cli.c
 C_COMMON_PC98_PENDING = <49 本>
 C_COMMON = $(C_COMMON_CORE) $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$(FEATURE_$(f))),$(C_COMMON_$(f))))
 ```
@@ -86,14 +86,14 @@ arch・platform の物は、その持ち主のファイルが機能ごとの組�
 
 ```make
 # build/platform/powermac.mk (kboot の像の分)
-C_PLATFORM_CORE = platform/powermac/rh_observe.c ... drivers/net/gem/gem_reset.c ... lib/lz4.c platform/powermac/ppc_kernel.c
-C_PLATFORM_LINK = platform/powermac/link_platform.c platform/powermac/nic_gem.c platform/powermac/link_log.c platform/powermac/link_diag.c
-C_PLATFORM_NOLINK = platform/powermac/lan_wire.c platform/powermac/lan_terminal.c platform/powermac/terminal_input.c platform/powermac/host_unavailable.c
-C_PLATFORM_EXEC = platform/powermac/root_boot.c ... kernel/console/fbcon.c gfx/gfx_console.c kernel/console/font_source_kcg.c drivers/video/of_fb/backend_of_fb.c drivers/video/of_fb/of_fb_v2.c kernel/dev/ram_ro.c fs/ramfs/ramfs.c fs/isofs/iso9660.c fs/isofs/iso9660_media.c init/boot_root.c
-C_PLATFORM_NOEXEC = platform/powermac/kboot_console.c
-C_PLATFORM_USERSHELL = platform/powermac/shell_boot.c platform/powermac/input_boot.c platform/powermac/input_decode.c platform/powermac/hostfs_boot.c input/keymaps/hid_jp.c $(if $(filter 1,$(FEATURE_LINK)),platform/powermac/hostfs_link_io.c platform/powermac/hostfs_link_peer.c,platform/powermac/hostfs_io.c platform/powermac/hostfs_peer.c)
-C_PLATFORM_USB = platform/powermac/input_usb.c platform/powermac/input_keymap.c platform/powermac/usb_tree.c platform/powermac/usb_platform.c platform/powermac/usb_boot.c
-C_PLATFORM_CLI = platform/powermac/cli_boot.c
+C_PLATFORM_CORE = sys/platform/powermac/rh_observe.c ... sys/dev/net/gem/gem_reset.c ... lib/lz4.c sys/platform/powermac/ppc_kernel.c
+C_PLATFORM_LINK = sys/platform/powermac/link_platform.c sys/platform/powermac/nic_gem.c sys/platform/powermac/link_log.c sys/platform/powermac/link_diag.c
+C_PLATFORM_NOLINK = sys/platform/powermac/lan_wire.c sys/platform/powermac/lan_terminal.c sys/platform/powermac/terminal_input.c sys/platform/powermac/host_unavailable.c
+C_PLATFORM_EXEC = sys/platform/powermac/root_boot.c ... sys/kern/console/fbcon.c sys/kern/console/gfx_console.c sys/kern/console/font_source_kcg.c sys/dev/video/of_fb/backend_of_fb.c sys/dev/video/of_fb/of_fb_v2.c sys/kern/dev/ram_ro.c sys/fs/ramfs/ramfs.c sys/fs/isofs/iso9660.c sys/fs/isofs/iso9660_media.c sys/kern/init/boot_root.c
+C_PLATFORM_NOEXEC = sys/platform/powermac/kboot_console.c
+C_PLATFORM_USERSHELL = sys/platform/powermac/shell_boot.c sys/platform/powermac/input_boot.c sys/platform/powermac/input_decode.c sys/platform/powermac/hostfs_boot.c sys/input/keymaps/hid_jp.c $(if $(filter 1,$(FEATURE_LINK)),sys/platform/powermac/hostfs_link_io.c sys/platform/powermac/hostfs_link_peer.c,sys/platform/powermac/hostfs_io.c sys/platform/powermac/hostfs_peer.c)
+C_PLATFORM_USB = sys/platform/powermac/input_usb.c platform/powermac/input_keymap.c sys/platform/powermac/usb_tree.c sys/platform/powermac/usb_platform.c sys/platform/powermac/usb_boot.c
+C_PLATFORM_CLI = sys/platform/powermac/cli_boot.c
 # build/select.mk — 像の順の式が kboot の時だけ足す
 C_PLATFORM += $(C_PLATFORM_CORE) $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$(FEATURE_$(f))),$(C_PLATFORM_$(f)),$(C_PLATFORM_NO$(f))))
 C_ARCH     += $(C_ARCH_CORE)     $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$(FEATURE_$(f))),$(C_ARCH_$(f)),$(C_ARCH_NO$(f))))
@@ -104,16 +104,16 @@ GAS_SELECTED = $(GAS_ARCH_CORE)  $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$
 
 | ソース | x86 | PowerPC | 理由 |
 |---|---|---|---|
-| `input/keymaps/hid_jp.c` | `C_PLATFORM` (pc98.mk、今のまま) | `C_PLATFORM_USERSHELL` (powermac.mk) | 今の x86 の持ち主が platform。置き場と持ち主の食い違いは置き場の段で直す |
-| `kernel/time/cpu_calibrate.c` | `C_ARCH` (x86-sources.mk、今のまま) | `C_ARCH_EXEC` (ppc-sources.mk) | 同上 (今の持ち主が arch) |
-| `net/nic.c` | `C_COMMON_CORE` (pc98-devices.mk から外す) | 同じ | 両 arch の全部の像に入る |
-| `net/link.c`・`link_notify.c`・`host_mailbox.c`・`nic_rx.c`、`drivers/base/dev.c`、`input/hal/legacy_*`、`kernel/port_service.c`・`serial_diag.c` | `C_COMMON_LINK`・`C_COMMON_EXEC` (pc98-devices.mk から外す) | 同じ | PowerPC の像も使う共通の物 |
-| `net/rx_work.c` | `C_COMMON_LINK`。`kernel-objects.mk` の足しは消し、並びは §4 の末尾の一覧で保つ | 同じ | |
-| `platform/pc98/tsc_math.c`・`tsc_clock.c` | `C_PLATFORM` (pc98.mk)。`kernel-objects.mk` の足しは消す | — | rx_work と同じ末尾の一覧で並びを保つ |
-| `lib/kstring_c.c` | `C_COMMON_CORE` に在り、x86 は順の一覧に無いので今までどおり落ちる (`KSTRING_C_SRC` の仕組みは変えない) | kboot の順の一覧に在る | 今の振る舞いを保つ |
-| `kapi/kapi_generated.c` | `C_COMMON_PC98_PENDING` | 入らない (生成した物を `KB_EXTRA` で組む、今のまま) | |
-| `platform/none/legacy_guest.c` | `FEATURE_V86=0` かつ `FEATURE_EXEC=1` の時 (`select.mk` に EXEC の条件を足す) | 同じ式で shell・sh・link-sh にだけ入る | core・link には今も入っていない |
-| `kernel/cli/resident_cli.c`、USB 21 本 | `CLI=0`・`USB=0` なので選ばれない | `C_COMMON_CLI`・`C_COMMON_USB` | x86 は USB を部品として組む |
+| `sys/input/keymaps/hid_jp.c` | `C_PLATFORM` (pc98.mk、今のまま) | `C_PLATFORM_USERSHELL` (powermac.mk) | 今の x86 の持ち主が platform。置き場と持ち主の食い違いは置き場の段で直す |
+| `sys/platform/pc98/time/cpu_calibrate.c` | `C_ARCH` (x86-sources.mk、今のまま) | `C_ARCH_EXEC` (ppc-sources.mk) | 同上 (今の持ち主が arch) |
+| `sys/net/nic.c` | `C_COMMON_CORE` (pc98-devices.mk から外す) | 同じ | 両 arch の全部の像に入る |
+| `sys/net/link.c`・`link_notify.c`・`host_mailbox.c`・`nic_rx.c`、`sys/dev/base/dev.c`、`input/hal/legacy_*`、`sys/kern/port_service.c`・`serial_diag.c` | `C_COMMON_LINK`・`C_COMMON_EXEC` (pc98-devices.mk から外す) | 同じ | PowerPC の像も使う共通の物 |
+| `sys/net/rx_work.c` | `C_COMMON_LINK`。`kernel-objects.mk` の足しは消し、並びは §4 の末尾の一覧で保つ | 同じ | |
+| `sys/platform/pc98/tsc_math.c`・`tsc_clock.c` | `C_PLATFORM` (pc98.mk)。`kernel-objects.mk` の足しは消す | — | rx_work と同じ末尾の一覧で並びを保つ |
+| `sys/kern/kstring_c.c` | `C_COMMON_CORE` に在り、x86 は順の一覧に無いので今までどおり落ちる (`KSTRING_C_SRC` の仕組みは変えない) | kboot の順の一覧に在る | 今の振る舞いを保つ |
+| `sys/kapi/kapi_generated.c` | `C_COMMON_PC98_PENDING` | 入らない (生成した物を `KB_EXTRA` で組む、今のまま) | |
+| `sys/platform/none/legacy_guest.c` | `FEATURE_V86=0` かつ `FEATURE_EXEC=1` の時 (`select.mk` に EXEC の条件を足す) | 同じ式で shell・sh・link-sh にだけ入る | core・link には今も入っていない |
+| `sys/kern/cli/resident_cli.c`、USB 21 本 | `CLI=0`・`USB=0` なので選ばれない | `C_COMMON_CLI`・`C_COMMON_USB` | x86 は USB を部品として組む |
 
 x86-pc98 の既定の `C_KERNEL` 376 本は並びごと変えない (`build_profile_x86.json` を 1 字も変えない)。`FEATURE_PC98_DEVICES=0` などを付けた問い合わせでは、移した 10 本が残る (機種の装置ではないので、それが正しい)。
 
@@ -121,10 +121,10 @@ x86-pc98 の既定の `C_KERNEL` 376 本は並びごと変えない (`build_prof
 
 ```make
 # build/sources/order.mk に足す
-C_ORDER_TAIL = platform/pc98/tsc_math.c platform/pc98/tsc_clock.c net/rx_work.c
+C_ORDER_TAIL = sys/platform/pc98/tsc_math.c sys/platform/pc98/tsc_clock.c sys/net/rx_work.c
 # build/select.mk
 ifeq ($(IMAGE_ORDER),kboot)
-# PowerPC の像: 並びは所有者集合の順。arch/ppc/kernel.ld が入口を .text.entry で先頭に置くので、
+# PowerPC の像: 並びは所有者集合の順。sys/arch/ppc/kernel.ld が入口を .text.entry で先頭に置くので、
 # 並びに意味は無い。順の一覧は持たない。
 C_KERNEL = $(C_SELECTED)
 GAS_KERNEL = $(GAS_SELECTED)
@@ -134,16 +134,16 @@ C_KERNEL = $(filter $(C_SELECTED),$(C_ORDER)) $(C_PLATFORM_NEW) $(C_DIAGNOSTICS)
 endif
 ```
 
-legacy の式は今の `select.mk` に末尾の一覧を足しただけ (x86 の並びは `… C_PLATFORM_NEW C_DIAGNOSTICS tsc_math tsc_clock rx_work` で今と同じ)。「順に無いソースで止める」検査は kboot の像だけに入れる (x86 は `lib/kstring_c.c` が今も黙って落ちる)。
+legacy の式は今の `select.mk` に末尾の一覧を足しただけ (x86 の並びは `… C_PLATFORM_NEW C_DIAGNOSTICS tsc_math tsc_clock rx_work` で今と同じ)。「順に無いソースで止める」検査は kboot の像だけに入れる (x86 は `sys/kern/kstring_c.c` が今も黙って落ちる)。
 
 ## 5. 段
 
 ### 段 1a — PowerPC の一覧を所有者集合から引く
 
-- PowerPC の像の規則 (`build/targets/ppc-powermac.mk`) は一覧 (`KB_ASM`・`KB_ARCH`・`KB_PLATFORM`・`KB_COMMON`・`KB_GEM`・`KB_C` の足し引き) を持たず、`select.mk` の `GAS_KERNEL`・`C_KERNEL` を引く。旗から `IMAGE` を決めるのは `build/images/ppc-flags.mk`。**変数・既定 (`KBOOT_LINK ?= 1`)・出力の置き場は変えない**。
+- PowerPC の像の規則 (`build/targets/ppc-powermac.mk`) は一覧 (`KB_ASM`・`KB_ARCH`・`KB_PLATFORM`・`KB_COMMON`・`KB_GEM`・`KB_C` の足し引き) を持たず、`select.mk` の `GAS_KERNEL`・`C_KERNEL` を引く。旗から `IMAGE` を決めるのは `sys/conf/images/ppc-flags.mk`。**変数・既定 (`KBOOT_LINK ?= 1`)・出力の置き場は変えない**。
 
   ```make
-  # build/images/ppc-flags.mk
+  # sys/conf/images/ppc-flags.mk
   KB_IMAGE := $(if $(filter 1,$(KBOOT_SH)),$(if $(filter 1,$(KBOOT_LINK)),kboot-link-sh,kboot-sh),$(if $(filter 1,$(KBOOT_SHELL)),kboot-shell,$(if $(filter 1,$(KBOOT_LINK)),kboot-link,kboot-core)))
   override IMAGE := $(KB_IMAGE)
   # build/targets/ppc-powermac.mk
@@ -155,9 +155,9 @@ legacy の式は今の `select.mk` に末尾の一覧を足しただけ (x86 の
 - 確かめ:
   - x86: `build_profile_x86.json` が不変 (`build-selection-host`)。手元で `tools/build_compare.py` で kernel.bin と部品が一致。
   - PowerPC: 6 像の `KB_ASM`・`KB_C` の並びを `tools/tests/fixtures/build_profile_ppc.json` に固定し、`test_build_selection.py` が `make ARCH=ppc PLATFORM=powermac` から引いて比べる (段の前の木で取った値を fixture にする)。手元で 6 像の `PPCKERN.ELF` の sha256 が前後で同じ。今の `test_build_selection.py` がそのまま通る)。
-  - `tools/tests/test_remote_x9.py` (`build/targets/ppc-powermac.mk` の本文に `kernel/console/con_sink.c` があること) は、`select.mk` から引いた `kboot-link-sh` の `C_KERNEL` に在ることに書き換える。
+  - `tools/tests/test_remote_x9.py` (`build/targets/ppc-powermac.mk` の本文に `sys/kern/console/con_sink.c` があること) は、`select.mk` から引いた `kboot-link-sh` の `C_KERNEL` に在ることに書き換える。
   - CI: check (ppc-compile・ppc-qemu)・build。
-- 触るファイル: `build/images/*.mk` (7)、`build/sources/common.mk`・`order.mk`、`build/select.mk`、`build/features/pc98-devices.mk`、`build/platform/pc98.mk`・`powermac.mk`、`build/arch/ppc-sources.mk`、`build/kernel-objects.mk`、`build/targets/ppc-powermac.mk`、`tools/tests/test_build_selection.py`・`test_remote_x9.py`・`fixtures/build_profile_ppc.json`、`tools/check_arm_compile.py` は触らない (`KSTRING_C_SRC` の前提は同じ。`config.mk` だけの問い合わせの対象集合には、`kernel-objects.mk` が後から足していた `tsc_math.c`・`tsc_clock.c`・`rx_work.c` の 3 本が増え、実際の `C_KERNEL` と同じになる)。`build/targets/ppc-powermac.mk` の .o と `PPCKERN.ELF` は、一覧と順を持つ .mk (`KB_SELECT_MK`) を前提に持つ (一覧を変えたら組み直される)。
+- 触るファイル: `build/images/*.mk` (7)、`build/sources/common.mk`・`order.mk`、`build/select.mk`、`sys/conf/features/pc98-devices.mk`、`build/platform/pc98.mk`・`powermac.mk`、`build/arch/ppc-sources.mk`、`build/kernel-objects.mk`、`build/targets/ppc-powermac.mk`、`tools/tests/test_build_selection.py`・`test_remote_x9.py`・`fixtures/build_profile_ppc.json`、`tools/check_arm_compile.py` は触らない (`KSTRING_C_SRC` の前提は同じ。`config.mk` だけの問い合わせの対象集合には、`kernel-objects.mk` が後から足していた `tsc_math.c`・`tsc_clock.c`・`rx_work.c` の 3 本が増え、実際の `C_KERNEL` と同じになる)。`build/targets/ppc-powermac.mk` の .o と `PPCKERN.ELF` は、一覧と順を持つ .mk (`KB_SELECT_MK`) を前提に持つ (一覧を変えたら組み直される)。
 
 ### 段 1b — compile だけの計測を消し、`make ARCH=ppc` を製品の入口にする
 
@@ -174,7 +174,7 @@ legacy の式は今の `select.mk` に末尾の一覧を足しただけ (x86 の
 |---|---|---|---|
 | 2 (済) | `exec_*.h` 16 組を arch の軸から外す。フックの 14 組は `exec/exec_<名>.h` と `exec/absent/exec_<名>.c`、CPU・配置の 2 組は契約の固定名 `arch_exec_cache.h`・`arch_exec_kapi.h`。設計は [exec/exec_hooks.md](../exec/exec_hooks.md) | 機械語は変わらない → `tools/build_compare.py` で全部一致 | `.o` が置き場の名前を除いて前と一致、ppc-qemu |
 | 3 (済) | 順の一覧を 1 本に: PowerPC の像は順の一覧を持たず、所有者集合の順で並べる (`C_ORDER_KBOOT`・`GAS_ORDER_KBOOT` を削除)。順の一覧は x86 の `C_ORDER_LEGACY` だけ | 不変 | 配置が変わる → PowerPC の検査 (QEMU を含む) の全部 |
-| 4 (済) | `-D` の名前の差し替え 11 件を口へ: `kprintf` はカーネルの診断の出力で行き先は機種が決め、端末に必ず出す物は `console_printf` (PowerMac の exec を持つ像は `platform/powermac/log_printf.c` が `kprintf` を作る)。コンソールの鏡・UTF-8 の道・fd 1 の出力先は機種ごとの固定名 `platform_console.h`。設計は [lib/kprintf.md](../lib/kprintf.md) | 機械語は名前と契約の指紋だけが変わる (`tools/build_compare.py`) | 配置が変わる → PowerPC の検査 (QEMU を含む) |
+| 4 (済) | `-D` の名前の差し替え 11 件を口へ: `kprintf` はカーネルの診断の出力で行き先は機種が決め、端末に必ず出す物は `console_printf` (PowerMac の exec を持つ像は `sys/platform/powermac/log_printf.c` が `kprintf` を作る)。コンソールの鏡・UTF-8 の道・fd 1 の出力先は機種ごとの固定名 `platform_console.h`。設計は [lib/kprintf.md](../lib/kprintf.md) | 機械語は名前と契約の指紋だけが変わる (`tools/build_compare.py`) | 配置が変わる → PowerPC の検査 (QEMU を含む) |
 | 5 (済) | 像の規則を `build/targets/ppc-powermac.mk` に畳み、独立の Makefile を削除。道具は `make ARCH=ppc PLATFORM=powermac` に旗か `IMAGE=<名>` を付けて呼ぶ。試験が規則・旗の対応の写しを差し替える口は `TARGET_MK`・`PPC_FLAGS_MK`。出力の置き場 `build/out/ppc-kboot/<像>/` は変えない | 不変 | PowerPC の `.o` が前と同じ (workflow `sep`)、ppc-compile・ppc-qemu |
 | 後 | `PC98_PENDING` の 49 本を include を直した順に本来の機能へ。入口の統合で `#if KBOOT_*` を機能の値に | | |
 

@@ -91,7 +91,7 @@ def case_interpretation(tmp):
     """(b) len / size / unit の解釈と検査順"""
     rc, out, d = gen(tmp, SYNTH)
     assert rc == 0, "生成が落ちた: %s" % out
-    c = (d / "kapi/kapi_generated.c").read_text(encoding="utf-8")
+    c = (d / "sys/kapi/kapi_generated.c").read_text(encoding="utf-8")
 
     w = wrapper(c, "t_len_u")
     assert "KAPI_OUT_LEN(buf, size)" in w, w
@@ -161,7 +161,7 @@ def case_refuse(tmp):
         rc, out, outdir = gen(tmp, d)
         ok = rc != 0 and needle in out
         # 落ちたときは**生成物を 1 バイトも書かない** (半分だけ新しい木を残さない)
-        if ok and (outdir / "kapi/kapi_generated.c").exists():
+        if ok and (outdir / "sys/kapi/kapi_generated.c").exists():
             ok = False
             out += "\n(検査に落ちたのに kapi_generated.c を書いている)"
         print("  %-28s %s" % (why, "RED (落ちた)" if ok else "**通った (見逃し)**"),

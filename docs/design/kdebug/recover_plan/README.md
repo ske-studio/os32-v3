@@ -4,13 +4,13 @@
 
 ## 索引
 
-- [kdebug/recover_plan/access.inc](access.md)
-- [kdebug/recover_plan/bind.inc](bind.md)
-- [kdebug/recover_plan/profile.inc](profile.md)
+- [sys/dev/video/geforce/diag/recover_plan/access.inc](access.md)
+- [sys/dev/video/geforce/diag/recover_plan/bind.inc](bind.md)
+- [sys/platform/pc98/kdebug/recover_plan/profile.inc](profile.md)
 
 ### step.inc
 
-ソース: `kdebug/recover_plan/step.inc`
+ソース: `sys/dev/video/geforce/diag/recover_plan/step.inc`
 
 - 4aはopcode/substep前にenter、終了時にleaveを呼び、recoverが現在入口/辺・ctxを管理する。条件readと選択値は共有accessorから得て、leaveでは選択されたnext[0]/next[1]の辺であることだけを確認する（両辺は静的全経路検査済み）。実アクセスは現在nodeのphase/main/pc/substep/head・rule・引数と完全一致させる。非実行nodeではW不可（RESET等のforceはr2の許可付きW node）、辺の飛越し/再実行は拒否する。 cleanup中はcursor無効のためaccessのnode=NONEとし、前記RESTORE/QUIESCEのrule・既存前提検査を適用する。
 
@@ -20,6 +20,6 @@
 
 ### access_idle_read.inc
 
-ソース: `kdebug/recover_plan/access_idle_read.inc`
+ソース: `sys/kern/kdebug/recover_plan/access_idle_read.inc`
 
 - INSPECTはbind済みprofileのread_safeな非indexed READのみ。SELECTによる読取り準備はINSPECTに含めない。

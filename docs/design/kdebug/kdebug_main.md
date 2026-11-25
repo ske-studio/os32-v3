@@ -1,6 +1,6 @@
-# kdebug/kdebug_main.c — 設計
+# sys/platform/pc98/kdebug/kdebug_main.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: GF6200_4A_DESIGN.md・GF6200_RECLOG_DESIGN.md・GF6200_S7_SHELL.md・HWDEV_CORE_API.md・HWDEV_DESIGN.md・RECOVER_ROUTE_TEST.md・RECOVER_T4B_INJECT.md (D1 で移した)
-ソース: `kdebug/kdebug_main.c`
+ソース: `sys/platform/pc98/kdebug/kdebug_main.c`
 
 ## GF6200_4A_DESIGN
 
@@ -20,13 +20,13 @@
 
 ## GF6200_S7_SHELL
 
-- `kdebug/kdebug_main.c` はGFを一般PAUSED門より先にhwdevへ渡す。GF自身のsession・状態・main順序検査を維持する。
+- `sys/platform/pc98/kdebug/kdebug_main.c` はGFを一般PAUSED門より先にhwdevへ渡す。GF自身のsession・状態・main順序検査を維持する。
 
 ## HWDEV_CORE_API
 
 | 境界 | 契約 |
 | --- | --- |
-| kdebug import 268 | `const struct hwdev_ops *hwdev_module_ops(void)` (`hwdev/hwdev_module.h`)、S5 の末尾追加。既存 0〜267 は不変、private import 契約 CRC は生成器で更新 |
+| kdebug import 268 | `const struct hwdev_ops *hwdev_module_ops(void)` (`sys/dev/hwdev/hwdev_module.h`)、S5 の末尾追加。既存 0〜267 は不変、private import 契約 CRC は生成器で更新 |
 | op 5〜10 | 公開済み ops を取得し、未読み込み・非公開なら `-1`、要求を書き換えず recovery_attach も実行しない。取得後は既存の attach と 6 引数を維持して `ops->call` |
 | op 3/4 | S0 の attach・recover と結果を維持。op 4 の recover が成功または状態遷移した後だけ、公開済みなら `ops->release_work`。部品なしでは解放呼出しなし |
 
@@ -34,7 +34,7 @@
 
 | 実物・根拠 (file:line) | 確認したこと |
 | --- | --- |
-| `kdebug/kdebug_main.c` | dbg_call が recover と gfinit を振り分け、外部 recover 後に GF 所有領域を解放 (`recovery_attach()`)。単なる表の移動では済まない |
+| `sys/platform/pc98/kdebug/kdebug_main.c` | dbg_call が recover と gfinit を振り分け、外部 recover 後に GF 所有領域を解放 (`recovery_attach()`)。単なる表の移動では済まない |
 
 ## RECOVER_ROUTE_TEST
 
@@ -48,7 +48,7 @@
 
 | 実物 | 確認と今回埋める境界 |
 | --- | --- |
-| `kernel/module/kdebug_call.c`、`kdebug/kdebug_main.c`、`userland/shell/cmd_recover.c` | kernel→既存dbg_call。GF分岐後にPAUSED門、shellはstatus/now（op 3/4）のみ |
+| `sys/kern/module/kdebug_call.c`、`sys/platform/pc98/kdebug/kdebug_main.c`、`userland/shell/cmd_recover.c` | kernel→既存dbg_call。GF分岐後にPAUSED門、shellはstatus/now（op 3/4）のみ |
 
 - PAUSED 門は kdebug_main.c の位置のまま。既存 now 例外に `op==11 && action∈{step,end} && 仮想owner` だけ追加（payload のサイズ・版を先に照合）。GF 5〜10 は従来どおり `recovery_attach()` で hwdev へ渡し、GF_OP_ABORT 等の許可表を kdebug に持ち込まない。
 

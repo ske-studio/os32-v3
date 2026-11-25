@@ -9,14 +9,14 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='input-keymap-decl', tier=1, needs=[], budget=10,
-    covers=['tools/tests/test_input_keymap_decl.py', 'include/usb_platform.h',
-            'drivers/usb/hid_boot.h', 'drivers/usb/usb_core.h',
-            'drivers/usb/usb_desc.h', 'include/types.h', 'include/callconv.h',
-            'include/endian_le.h'],
+    covers=['tools/tests/test_input_keymap_decl.py', 'sys/include/usb_platform.h',
+            'sys/dev/usb/hid_boot.h', 'sys/dev/usb/usb_core.h',
+            'sys/dev/usb/usb_desc.h', 'sys/include/types.h', 'sys/include/callconv.h',
+            'sys/include/endian_le.h'],
     basis=['INPUT_KEYMAP_DESIGN §7 H-usb・H-hid'])
 
 SOURCE = '''/* INPUT_KEYMAP_DESIGN §7 H-usb・H-hid */
-#include "drivers/usb/hid_boot.h"
+#include "sys/dev/usb/hid_boot.h"
 #define TYPE(fn, type) _Static_assert(\\
     __builtin_types_compatible_p(__typeof__(&(fn)), type), #fn)
 TYPE(usbp_input_usage, void (*)(u8, u8, int));
@@ -38,7 +38,7 @@ def check(mutate):
         subprocess.run(command, cwd=ROOT, check=True)
         print('GREEN declaration types (no libc, no symbol references)')
         if mutate:
-            header = (ROOT / 'include/usb_platform.h').read_text()
+            header = (ROOT / 'sys/include/usb_platform.h').read_text()
             anchor = 'void usbp_input_usage(u8 src, u8 usage, int down);'
             assert header.count(anchor) == 1, anchor
             (tmp / 'usb_platform.h').write_text(header.replace(

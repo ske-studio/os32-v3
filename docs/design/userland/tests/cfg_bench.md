@@ -1,7 +1,7 @@
-# userland/tests/cfg_bench.c — 設計
+# userland/diag/cfg_bench.c — 設計
 
 > 状態: **現行 (2026-11-18)** — 出所: TASK_S5 の契約を今のソースと照らして要約
-ソース: `userland/tests/cfg_bench.c`
+ソース: `userland/diag/cfg_bench.c`
 
 設定レジストリの実測用の CPL=3 アプリ。`libos32cfg` を静的リンクし、接続 1 回あたりの tick と SQLite のプールの使用量を測る。library の約束 (open から close の間に yield しない) は `docs/design/userland/lib/cfg/libos32cfg.md` の「設定レジストリの全体の約束」。
 

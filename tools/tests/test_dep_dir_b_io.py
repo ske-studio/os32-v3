@@ -1,7 +1,7 @@
 """L11 fixed baseline I/O trace; no git or fixture generation at test time.
 
-Fixture capture (once, before changing sys.c): obtain kernel/sys.c with
-`git show 12b7e2fe:kernel/sys.c`, pass that text as build(..., baseline=text),
+Fixture capture (once, before changing sys.c): obtain sys/kern/sys.c with
+`git show 12b7e2fe:sys/kern/sys.c`, pass that text as build(..., baseline=text),
 then trace() for TEST_IF=0 and 1. Store those rows, SHA and empty read input
 list in dep_dir_b_l11_baseline.json. The same C harness/shim records both
 versions. 12b7e2fe and step base 6e880821 have identical kernel/sys.c.
@@ -19,16 +19,16 @@ import tempfile
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ('kernel/sys.c', 'platform/pc98/system.c')
-HEADERS = ('include/platform_sys.h',)
+SOURCES = ('sys/kern/sys.c', 'sys/platform/pc98/system.c')
+HEADERS = ('sys/include/platform_sys.h',)
 FIXTURE = ROOT / 'tools/tests/dep_dir_b_l11_baseline.json'
 MUTATIONS = (
-    ('kernel/sys.c', '    geforce_foreground_poll();',
+    ('sys/kern/sys.c', '    geforce_foreground_poll();',
      '    (void)0;'),
-    ('platform/pc98/system.c',
+    ('sys/platform/pc98/system.c',
      '    outp(SYSPORT_C_BSR, BSR_SHUT0_SET);\n    outp(SYSPORT_C_BSR, BSR_SHUT1_SET);',
      '    outp(SYSPORT_C_BSR, BSR_SHUT1_SET);\n    outp(SYSPORT_C_BSR, BSR_SHUT0_SET);'),
-    ('platform/pc98/system.c', 'outp(SYSPORT_C_BSR, BSR_BUZ_ON);',
+    ('sys/platform/pc98/system.c', 'outp(SYSPORT_C_BSR, BSR_BUZ_ON);',
      'outp(SYSPORT_C_BSR, BSR_BUZ_OFF);'),
 )
 
@@ -53,8 +53,8 @@ def build(work, enabled, mutation=None, baseline=None):
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(text)
     (work / 'io.h').write_text((ROOT / 'tools/tests/dep_dir_b_io_shim.h').read_text())
-    source = baseline if baseline is not None else (work / 'kernel/sys.c').read_text()
-    includes = '' if baseline is not None else '#include "platform_sys.h"\n#include "kernel/idle_work.h"\n'
+    source = baseline if baseline is not None else (work / 'sys/kern/sys.c').read_text()
+    includes = '' if baseline is not None else '#include "platform_sys.h"\n#include "sys/kern/idle_work.h"\n'
     (work / 'sys_control.inc').write_text(includes + control_functions(source))
     exe = work / 'io-test'
     cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
@@ -63,7 +63,7 @@ def build(work, enabled, mutation=None, baseline=None):
            '-I' + str(work), '-I' + str(ROOT), *include_flags(work), '-I' + str(ROOT / 'include'),
            str(ROOT / 'tools/tests/dep_dir_b_io_host.c')]
     if baseline is None:
-        cmd.append(str(work / 'platform/pc98/system.c'))
+        cmd.append(str(work / 'sys/platform/pc98/system.c'))
     subprocess.run([*cmd, '-o', str(exe)], check=True)
     return exe
 

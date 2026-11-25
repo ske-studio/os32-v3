@@ -190,13 +190,13 @@ class AboutMatchesVer(unittest.TestCase):
         if r.returncode:
             raise AssertionError(r.stderr)
         files = {
-            'ver_format_source.c': pc98_format_source() + (ROOT / 'kernel/ver_format.c').read_text(),
-            'ver_state_source.c': function((ROOT / 'kdebug/kdebug_module.c').read_text(),
+            'ver_format_source.c': pc98_format_source() + (ROOT / 'sys/kern/ver_format.c').read_text(),
+            'ver_state_source.c': function((ROOT / 'sys/kern/kdebug/kdebug_module.c').read_text(),
                                           'const char *kdebug_state_name('),
             'ver_shell_source.c': function(CMD_BASE_C.read_text(), 'static int cmd_ver('),
         }
         r = execute((ROOT / 'tools/tests/ver_about_host.c').read_text(),
-                    'qemu', files, assembly='lib/kstring_asm.asm')
+                    'qemu', files, assembly='sys/kern/kstring_asm.asm')
         if r.returncode:
             raise AssertionError(r.stderr + r.stdout)
         cls.cases = []

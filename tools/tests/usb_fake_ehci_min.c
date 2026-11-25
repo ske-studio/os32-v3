@@ -1,6 +1,6 @@
 /* EHCI 1.0 §2.3: a deliberately small independent register model.
  * Reset while running is an error even when hardware would tolerate it. */
-#include "drivers/usb/ohci_priv.h"
+#include "sys/dev/usb/ohci_priv.h"
 static unsigned int regs[64];
 static u32 bad, reset_running, stuck_halt, stuck_reset, sticky_cf, bm_cleared;
 static u32 stage, writes;

@@ -1,6 +1,6 @@
 """L16a/L16b: immutable pre-move attribute/grid/cursor traces and isolated closure."""
 CHECK = dict(name='dep-dir-d-console-host', tier=1,
-    covers=['platform/pc98/platform_console.h', 'platform/pc98/tvram_private.h', 'gfx/gfx_policy.h', 'include/callconv.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/console_attr.h', 'include/types.h', 'include/pc98.h', 'include/kprintf.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_snd2.h', 'sdk/include/os32/os32_in2.h', 'sdk/include/os32/os32_v86s.h', 'sdk/include/os32/os32_host_notice.h', 'lib/kprintf_attr.c', 'platform/pc98/console_attr.c', 'tools/tests/dep_dir_d_console_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_kapi_generated.h', 'kernel/console/console_backend.h', 'kernel/console/console_dual.h', 'platform/pc98/console.c', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'include/bootlog.h', 'include/con_sink.h', 'include/config.h', 'include/console.h', 'include/console_output.h', 'include/io.h', 'include/kbd_inject.h', 'include/memmap.h', 'include/text_screen.h', 'kernel/console/console.c', 'lib/kstring.h', 'lib/utf8.h', 'platform/pc98/platform_io.h', 'tools/tests/dep_dir_d_console_grid_host.c', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/platform/pc98/platform_console.h', 'sys/platform/pc98/tvram_private.h', 'sys/hal/gfx/gfx_policy.h', 'sys/include/callconv.h', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/include/console_attr.h', 'sys/include/types.h', 'sys/platform/pc98/pc98.h', 'sys/include/kprintf.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_snd2.h', 'sdk/include/os32/os32_in2.h', 'sdk/include/os32/os32_v86s.h', 'sdk/include/os32/os32_host_notice.h', 'sys/kern/kprintf_attr.c', 'sys/platform/pc98/console_attr.c', 'tools/tests/dep_dir_d_console_host.c', 'tools/tests/host32.py', 'tools/tests/fixtures/dep_dir_d/**', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_kapi_generated.h', 'sys/kern/console/console_backend.h', 'sys/kern/console/console_dual.h', 'sys/platform/pc98/console.c', 'sys/arch/x86/arch_io.h', 'sys/arch/x86/x86_flags.h', 'sys/include/bootlog.h', 'sys/include/con_sink.h', 'sys/include/config.h', 'sys/include/console.h', 'sys/include/console_output.h', 'sys/include/io.h', 'sys/include/kbd_inject.h', 'sys/include/memmap.h', 'sys/include/text_screen.h', 'sys/kern/console/console.c', 'sys/kern/kstring.h', 'lib/utf8.h', 'sys/platform/pc98/platform_io.h', 'tools/tests/dep_dir_d_console_grid_host.c', 'sys/platform/pc98/video/pc98_route.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.3,
     basis=['AC-DISPLAY-1', '[HW1]'],
 )
@@ -23,11 +23,11 @@ from build_profile import query
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'tools/tests/fixtures/dep_dir_d'
-BACKEND = 'platform/pc98/console_attr.c'
-HEADER = 'include/console_attr.h'
+BACKEND = 'sys/platform/pc98/console_attr.c'
+HEADER = 'sys/include/console_attr.h'
 HARNESS = 'tools/tests/dep_dir_d_console_host.c'
-FILES = ('include/callconv.h', BACKEND, HEADER, HARNESS, 'lib/kprintf_attr.c', 'include/types.h',
-         'include/pc98.h', 'include/kprintf.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_snd2.h', 'sdk/include/os32/os32_in2.h', 'sdk/include/os32/os32_v86s.h', 'sdk/include/os32/os32_host_notice.h',
+FILES = ('sys/include/callconv.h', BACKEND, HEADER, HARNESS, 'sys/kern/kprintf_attr.c', 'sys/include/types.h',
+         'sys/platform/pc98/pc98.h', 'sys/include/kprintf.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_snd2.h', 'sdk/include/os32/os32_in2.h', 'sdk/include/os32/os32_v86s.h', 'sdk/include/os32/os32_host_notice.h',
          'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_generations.h',
          'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h',
          'sdk/include/os32/os32_kapi_generated.h')
@@ -57,7 +57,7 @@ def build(work, source, omit_header=False):
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra',
                     '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                     '-nostdlib', '-static', '-no-pie', '-I' + str(work / 'include'),
-                    str(work / HARNESS), str(work / 'lib/kprintf_attr.c'),
+                    str(work / HARNESS), str(work / 'sys/kern/kprintf_attr.c'),
                     str(work / BACKEND), '-o', str(exe)], check=True)
     return exe
 
@@ -129,11 +129,11 @@ def main():
         mutations(source, expected)
 
 
-GRID_FILES = ('platform/pc98/tvram_private.h', 'platform/pc98/platform_console.h', 'gfx/gfx_policy.h', 'include/callconv.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'drivers/video/pc98/pc98_route.h', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h', 'include/bootlog.h', 'include/con_sink.h', 'include/config.h', 'include/console.h', 'include/console_attr.h', 'include/console_output.h', 'include/io.h', 'include/kbd_inject.h', 'include/kprintf.h', 'include/memmap.h', 'include/pc98.h', 'include/text_screen.h', 'include/types.h', 'kernel/console/console.c', 'kernel/console/console_backend.h', 'kernel/console/console_dual.h', 'lib/kstring.h', 'lib/utf8.h', 'platform/pc98/console.c', 'platform/pc98/platform_io.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_snd2.h', 'sdk/include/os32/os32_in2.h', 'sdk/include/os32/os32_v86s.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_console_grid_host.c')
+GRID_FILES = ('sys/platform/pc98/tvram_private.h', 'sys/platform/pc98/platform_console.h', 'sys/hal/gfx/gfx_policy.h', 'sys/include/callconv.h', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/platform/pc98/video/pc98_route.h', 'sys/arch/x86/arch_io.h', 'sys/arch/x86/x86_flags.h', 'sys/include/bootlog.h', 'sys/include/con_sink.h', 'sys/include/config.h', 'sys/include/console.h', 'sys/include/console_attr.h', 'sys/include/console_output.h', 'sys/include/io.h', 'sys/include/kbd_inject.h', 'sys/include/kprintf.h', 'sys/include/memmap.h', 'sys/platform/pc98/pc98.h', 'sys/include/text_screen.h', 'sys/include/types.h', 'sys/kern/console/console.c', 'sys/kern/console/console_backend.h', 'sys/kern/console/console_dual.h', 'sys/kern/kstring.h', 'lib/utf8.h', 'sys/platform/pc98/console.c', 'sys/platform/pc98/platform_io.h', 'sdk/include/os32/os32_generations.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_snd2.h', 'sdk/include/os32/os32_in2.h', 'sdk/include/os32/os32_v86s.h', 'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_gfx2.h', 'sdk/include/os32/os32_ls.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/dep_dir_d_console_grid_host.c')
 
-GRID = 'platform/pc98/console.c'
-GRID_KERNEL = 'kernel/console/console.c'
-GRID_HEADER = 'kernel/console/console_backend.h'
+GRID = 'sys/platform/pc98/console.c'
+GRID_KERNEL = 'sys/kern/console/console.c'
+GRID_HEADER = 'sys/kern/console/console_backend.h'
 GRID_HARNESS = 'tools/tests/dep_dir_d_console_grid_host.c'
 GRID_MUTATIONS = (
     (GRID, '*p ^= TATTR_REVERSE;', '*p |= TATTR_REVERSE;'),

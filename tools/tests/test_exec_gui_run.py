@@ -43,7 +43,7 @@ def run(source):
                         str(src), '-o', str(exe)], check=True)
         return host32.run([str(exe)], timeout=30).returncode
 
-source = (ROOT / 'exec/exec.c').read_text()
+source = (ROOT / 'sys/kern/exec/exec.c').read_text()
 assert run(source) == 0
 print('GUI exec_run: GREEN')
 if '--mutate' in sys.argv:

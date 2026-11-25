@@ -1,6 +1,6 @@
-# fs/serialfs/sfs_client.c — 設計
+# sys/fs/serialfs/sfs_client.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_SERIAL_HOSTFS 部品 B (§1-v2 B-5'・B-7'、§1-v3) の契約を今のソースと照らして要約
-ソース: `fs/serialfs/sfs_client.c`・`fs/serialfs/sfs_client.h` (`sfs_client_call`・`sfs_client_hello`・`sfs_client_quiesce`)・形式 `fs/serialfs/sfs_proto.h`・`fs/serialfs/sfs_proto.c` (フレームの組み立て・受信器・期限の式)・ホスト `tools/serialfs_host.py` (`serve_line`)・`tools/rshell_serial.py --serve-host`
+ソース: `sys/fs/serialfs/sfs_client.c`・`sys/fs/serialfs/sfs_client.h` (`sfs_client_call`・`sfs_client_hello`・`sfs_client_quiesce`)・形式 `sys/fs/serialfs/sfs_proto.h`・`sys/fs/serialfs/sfs_proto.c` (フレームの組み立て・受信器・期限の式)・ホスト `tools/serialfs_host.py` (`serve_line`)・`tools/rshell_serial.py --serve-host`
 
 SerialFS (シリアル越しの `/host`) の要求 / 応答。この文書は UART の経路を扱う。LAN の常駐の期限と再送は
 `docs/design/fs/serialfs/serialfs_persistent.md`。

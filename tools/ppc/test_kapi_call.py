@@ -107,7 +107,7 @@ def execute(source, tmp):
                     '-fno-stack-protector', '-D__cdecl=', '-I' + str(tmp / 'gen/include'),
                     '-I' + str(ROOT / 'arch/ppc'), '-I' + str(ROOT / 'include'),
                     '-I' + str(ROOT / 'sdk/include/os32'), str(tmp / 'call.c'),
-                    str(tmp / 'test.c'), str(ROOT / 'kapi/kapi_print.c'), '-I' + str(ROOT / 'lib'), '-I' + str(ROOT / 'mm'), '-o', str(tmp / 'test')], check=True)
+                    str(tmp / 'test.c'), str(ROOT / 'sys/kapi/kapi_print.c'), '-I' + str(ROOT / 'lib'), '-I' + str(ROOT / 'mm'), '-o', str(tmp / 'test')], check=True)
     return host32.run([str(tmp / 'test')], capture_output=True, text=True)
 
 def main():
@@ -121,7 +121,7 @@ def main():
                         '--target', 'ppc-powermac', '--out-dir', str(tmp / 'gen'),
                         str(ROOT / 'sdk/kapi.json')], check=True, cwd=ROOT)
         (tmp / 'test.c').write_text(HARNESS.replace('frame.gpr[0] = 0;', f'frame.gpr[0] = {slot};'))
-        source = (ROOT / 'arch/ppc/kapi_call.c').read_text()
+        source = (ROOT / 'sys/arch/ppc/kapi_call.c').read_text()
         result = execute(source, tmp)
         if result.returncode != 0:
             print(result.stdout, result.stderr); return 1

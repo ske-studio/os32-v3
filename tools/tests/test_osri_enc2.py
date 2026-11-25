@@ -1,6 +1,6 @@
 """S1 integer oracle, timing/prefix, two-sided planning and v2 round trips."""
 CHECK = dict(name='osri-enc2', tier=1, needs=['make:osri-enc2-core'], budget=33.1,
-             covers=['gfx/osri_profile.h', 'tools/osri_profile.py', 'tools/osri_enc2_spec.py', 'tools/osri_enc2_master.py',
+             covers=['sys/kern/gfx/osri/osri_profile.h', 'tools/osri_profile.py', 'tools/osri_enc2_spec.py', 'tools/osri_enc2_master.py',
                      'tools/osri_enc2_tree.py', 'tools/osri_enc2_row.py',
                      'tools/osri_enc2_plan.py', 'tools/osri_enc2_order.py',
                      'tools/osri_enc2_native.py',
@@ -387,7 +387,7 @@ def main():
             shutil.copy(ROOT / 'tools/img2osri.py', tools / 'img2osri.py')
             shutil.copy(ROOT / 'tools/osri_profile.py', tools / 'osri_profile.py')
             (tools.parent / 'gfx').mkdir()
-            shutil.copy(ROOT / 'gfx/osri_profile.h', tools.parent / 'gfx/osri_profile.h')
+            shutil.copy(ROOT / 'sys/kern/gfx/osri/osri_profile.h', tools.parent / 'sys/kern/gfx/osri/osri_profile.h')
             for name, module, old, new in MUTATIONS:
                 path = tools / f'osri_enc2_{module}.py'
                 source = path.read_text()

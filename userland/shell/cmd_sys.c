@@ -13,10 +13,10 @@ extern void os32_resident_sbrk_stats(u32 out[3]); /* private resident CRT */
 /*  システム操作モジュール (cmd_sys.c)                                      */
 /* ======================================================================== */
 
-/* I-1: drivers/ata/ide.h の IdeInfo と**同じ並び**でなければならない。
+/* I-1: sys/dev/ata/ide.h の IdeInfo と**同じ並び**でなければならない。
  * ide_identify はカーネル側の定義 (96B) で書くので、ここが 92B のままだと
  * phys_sector_size の 2 バイトが呼び手のスタックを踏む (`ide 0` で発現)。
- * drivers/ata/ide.h はカーネル内部ヘッダで外部プログラムからは引けないため、
+ * sys/dev/ata/ide.h はカーネル内部ヘッダで外部プログラムからは引けないため、
  * 写しをここに置く — ide.h を変えたら必ず一緒に直すこと。 */
 typedef struct {
     u32 total_sectors;
@@ -229,7 +229,7 @@ static int cmd_format(int argc, char **argv)
 /* /etc/system.cfg の読み書きバッファ幅 ([C4])。読みは実効 CFG_READ_MAX - 1。 */
 #define CFG_READ_MAX     1024
 #define CFG_OUT_MAX      1152
-/* 起動パーサ (init/sysconfig.c) が読める全体の長さ。ホスト試験で照合。 */
+/* 起動パーサ (sys/kern/init/sysconfig.c) が読める全体の長さ。ホスト試験で照合。 */
 #define CFG_WRITE_MAX    (CFG_READ_MAX - 1)
 /* 秒×100 tick の期限を符号付き差分で比較できる範囲。 */
 #define GSERIAL_TIMEOUT_MAX (0x7FFFFFFFUL / 100UL)

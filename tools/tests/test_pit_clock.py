@@ -1,9 +1,9 @@
-"""PIT の分周 (platform/pc98/pit_math.c) のホスト試験。
+"""PIT の分周 (sys/platform/pc98/pit_math.c) のホスト試験。
 
 記録: tools/tests/pit_clock_tdd.md
 票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-0 (PIT の分周をクロック判定に合わせる)
 
-実物の platform/pc98/pit_math.c を 1 行も写さずに #include して回す。算数だけなので
+実物の sys/platform/pc98/pit_math.c を 1 行も写さずに #include して回す。算数だけなので
 I/O もタイマも触らず、模型は 1 つも要らない。
 
 **NP21/W は 1.9968MHz 固定なので、2.4576MHz 系の分岐はエミュレータでは
@@ -14,7 +14,7 @@ I/O もタイマも触らず、模型は 1 つも要らない。
   python3 -B tools/tests/test_pit_clock.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='pit-clock-host', tier=4,
-    covers=['kdebug/kselftest/pit_setup.inc', 'include/time_units.h', 'arch/x86/kernel/idt.c', 'platform/pc98/pit_math.c', 'platform/pc98/sysclk.c', 'tools/tests/pit_clock_host.c', 'include/platform_irq.h', 'platform/pc98/pic.c', 'include/platform_timer.h', 'platform/pc98/clock.c', 'platform/pc98/pit.c', 'platform/pc98/timer.c', 'tools/tests/kernel_includes.py'],
+    covers=['sys/platform/pc98/kdebug/kselftest/pit_setup.inc', 'sys/include/time_units.h', 'sys/arch/x86/kernel/idt.c', 'sys/platform/pc98/pit_math.c', 'sys/platform/pc98/sysclk.c', 'tools/tests/pit_clock_host.c', 'sys/include/platform_irq.h', 'sys/platform/pc98/pic.c', 'sys/include/platform_timer.h', 'sys/platform/pc98/clock.c', 'sys/platform/pc98/pit.c', 'sys/platform/pc98/timer.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.2,
     basis=['AC-TIME-1', 'AC-TIME-2'],
 )
@@ -28,18 +28,18 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/pit_clock_host.c"
-SRC = ROOT / "platform/pc98/pit_math.c"
-SETUP = ROOT / "kdebug/kselftest/pit_setup.inc"
+SRC = ROOT / "sys/platform/pc98/pit_math.c"
+SETUP = ROOT / "sys/platform/pc98/kdebug/kselftest/pit_setup.inc"
 # カーネルと同じ i386-elf で通す実ソース。idt.c まで入れるのは、
 # pit_init が pit_compute と sysclk_hz を**実際に**呼ぶ形を固定するため。
 # STATIC_ASSERT (中間積が 32bit に収まるか) が効くのもこちら側。
 TARGET_SRCS = [
-    ("platform/pc98/pit_math.c", []),
-    ("platform/pc98/sysclk.c", []),
-    ("arch/x86/kernel/idt.c", []),
-    ("platform/pc98/pit.c", []),
-    ("platform/pc98/clock.c", []),
-    ("platform/pc98/timer.c", []),
+    ("sys/platform/pc98/pit_math.c", []),
+    ("sys/platform/pc98/sysclk.c", []),
+    ("sys/arch/x86/kernel/idt.c", []),
+    ("sys/platform/pc98/pit.c", []),
+    ("sys/platform/pc98/clock.c", []),
+    ("sys/platform/pc98/timer.c", []),
 ]
 
 CASES = ["selftest_setup", "both_clocks", "reject_hz", "reject_clock", "no_overflow",
@@ -95,16 +95,16 @@ def host_build(tmp, source_text=None, setup_text=None):
         mut.mkdir(parents=True, exist_ok=True)
         (mut / "pit_math.c").write_text(source_text if source_text is not None else SRC.read_text(encoding="utf-8"), encoding="utf-8")
         (mut / "pit_math.h").write_text(
-            (ROOT / "platform/pc98/pit_math.h").read_text(encoding="utf-8"),
+            (ROOT / "sys/platform/pc98/pit_math.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8").replace(
-                '"../../platform/pc98/pit_math.c"', '"platform/pc98/pit_math.c"'),
+                '"../../sys/platform/pc98/pit_math.c"', '"sys/platform/pc98/pit_math.c"'),
             encoding="utf-8")
         (mut.parent.parent / "kdebug/kselftest").mkdir(parents=True, exist_ok=True)
-        (mut.parent.parent / "kdebug/kselftest/pit_setup.inc").write_text(setup_text if setup_text is not None else SETUP.read_text(encoding="utf-8"), encoding="utf-8")
-        shim.write_text(shim.read_text(encoding="utf-8").replace('"../../kdebug/kselftest/pit_setup.inc"', '"kdebug/kselftest/pit_setup.inc"'), encoding="utf-8")
+        (mut.parent.parent / "sys/platform/pc98/kdebug/kselftest/pit_setup.inc").write_text(setup_text if setup_text is not None else SETUP.read_text(encoding="utf-8"), encoding="utf-8")
+        shim.write_text(shim.read_text(encoding="utf-8").replace('"../../sys/platform/pc98/kdebug/kselftest/pit_setup.inc"', '"sys/platform/pc98/kdebug/kselftest/pit_setup.inc"'), encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut),
                *include_flags(ROOT), str(shim), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
@@ -122,7 +122,7 @@ def run_cases(exe, cases):
 
 
 def build_target(tmp):
-    """カーネルと同じ i386-elf で arch/x86/kernel/idt.c ごと通す。"""
+    """カーネルと同じ i386-elf で sys/arch/x86/kernel/idt.c ごと通す。"""
     for rel, extra in TARGET_SRCS:
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
@@ -173,7 +173,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-pit-clock-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real platform/pc98/pit_math.c)",
+        print("HOST GNU11 -Werror compile PASS (real sys/platform/pc98/pit_math.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

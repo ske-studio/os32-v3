@@ -2,7 +2,7 @@
 Port I/O and relocated init are explicit host seams; no hardware claim.
 """
 CHECK = dict(name='pcm-module-host', tier=1,
-    covers=['platform/pc98/tsc_clock.h', 'include/exec_wait_contract.h', 'sound/hal/*.[ch]', 'drivers/sound/cs4231/pcm_hw.c', 'sound/hal/snd2_seg.c', 'sound/hal/snd2_stg.c', 'drivers/sound/cs4231/pcm_hw.h', 'sound/hal/snd2_int.h', 'sdk/include/os32/os32_snd2.h', 'sound/hal/snd2_ring_math.h', 'platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'include/time_units.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'drivers/sound/cs4231/pcm_module.c', 'drivers/sound/cs4231/pcm_module.h', 'drivers/sound/cs4231/pcm_body.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/pcm_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/pcm_module_host.c', 'build/pcm-module.ld', 'kernel/time/tick_clock.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'drivers/sound/cs4231/pcm_cs4231.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'mm/dma_pool.h', 'drivers/dma/dma8237.h', 'mm/kmalloc.h', 'include/sys.h', 'include/kprintf.h', 'tools/tests/pcm_module_playback_host.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/test_pcm_cs4231.py', 'tools/tests/pcm_hostshim/io.h', 'tools/tests/mutpar.py', 'kernel/module/kdebug_imports.def', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/pcm/*', 'build/out/pcm.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/pcm_contract.h', 'include/dma_contract.h', 'tools/tests/kernel_includes.py', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
+    covers=['sys/platform/pc98/tsc_clock.h', 'sys/include/exec_wait_contract.h', 'sound/hal/*.[ch]', 'sys/dev/sound/cs4231/pcm_hw.c', 'sys/hal/sound/snd2_seg.c', 'sys/hal/sound/snd2_stg.c', 'sys/dev/sound/cs4231/pcm_hw.h', 'sys/hal/sound/snd2_int.h', 'sdk/include/os32/os32_snd2.h', 'sys/hal/sound/snd2_ring_math.h', 'sys/platform/pc98/module_pair.c', 'sys/include/platform_module_pair.h', 'sys/platform/pc98/bootinfo_wire.h', 'sys/platform/pc98/bootinfo_native.h', 'sys/kern/irq/tick.c', 'sys/kern/irq/tick.h', 'sys/platform/pc98/tick_order.h', 'sys/include/time_units.h', 'sys/kern/module/module_runtime.c', 'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.c', 'sys/kern/module/module_image.h', 'sys/kern/module/module_schema.h', 'sys/kern/mm/pgalloc.h', 'sys/include/types.h', 'sys/include/memmap.h', 'sys/fs/vfs.c', 'sys/fs/vfs.h', 'sys/dev/base/dev.c', 'sys/hal/block/dev.h', 'sys/dev/block/disk.h', 'sys/dev/ata/atapi.h', 'sys/dev/block/fdc.h', 'sys/include/console.h', 'sys/include/kbd.h', 'sys/platform/pc98/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'sys/kern/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'sys/dev/sound/cs4231/pcm_module.c', 'sys/dev/sound/cs4231/pcm_module.h', 'sys/dev/sound/cs4231/pcm_body.c', 'sys/include/config.h', 'sdk/include/os32/os32_generations.h', 'sys/include/bootinfo.h', 'tools/prototypes/pcm_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/pcm_module_host.c', 'build/pcm-module.ld', 'sys/hal/time/tick_clock.h', 'sys/dev/sound/cs4231/pcm_cs4231.c', 'sys/dev/sound/cs4231/pcm_cs4231_math.c', 'sys/dev/sound/cs4231/pcm_cs4231.h', 'sys/kern/irq/irq.h', 'sys/kern/irq/irq_math.h', 'sys/kern/mm/dma_pool.h', 'sys/dev/dma/dma8237.h', 'sys/kern/mm/kmalloc.h', 'sys/include/sys.h', 'sys/include/kprintf.h', 'tools/tests/pcm_module_playback_host.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/test_pcm_cs4231.py', 'tools/tests/pcm_hostshim/io.h', 'tools/tests/mutpar.py', 'sys/kern/module/kdebug_imports.def', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/pcm/*', 'build/out/pcm.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'sys/fs/vfs_device.h', 'sys/platform/pc98/boot_names.h', 'sys/platform/pc98/boot_names.c', 'sys/dev/ata/ide.h', 'sys/include/pcm_contract.h', 'sys/include/dma_contract.h', 'tools/tests/kernel_includes.py', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
     needs=['make:all'], budget=5.8,
     kind='characterization',
 )
@@ -18,7 +18,7 @@ import host32
 from test_module_runtime import FLAGS, INCLUDES, image
 from test_module_image import build_validator, validate, fnv, crc, word
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'drivers/sound/cs4231/pcm_module.c'
+SOURCE = ROOT / 'sys/dev/sound/cs4231/pcm_module.c'
 CASES = ['normal-detach-reload', 'failure-after-irq', 'dma-stop-failure-isolates',
          'prefix-failure', 'irq-line-failures-detach-reload', 'irq-detach-failure-retains']
 
@@ -52,7 +52,7 @@ def product_image(folder):
                  'dma_alloc', 'dma_free', 'irq_register', 'vfs_read'):
         assert name in core.symbols, name
     # h4's core VFS/DMA imports and S4's PCM imports retain their addresses.
-    imports = (ROOT / 'kernel/module/kdebug_imports.def').read_text()
+    imports = (ROOT / 'sys/kern/module/kdebug_imports.def').read_text()
     for name in ('pcm_open', 'pcm_state', 'dma_alloc', 'dma_free', 'vfs_read'):
         assert '"symbol": "' + name + '"' in imports
     exe = build_validator(folder)
@@ -82,7 +82,7 @@ def driver_checks(folder, omit_evidence):
     Model I/O is not a claim of PCM transfer on NP21/W or real hardware.
     """
     from test_pcm_cs4231 import FLAGS as PCM_FLAGS, INCLUDES as PCM_INCLUDES
-    driver = (ROOT / 'drivers/sound/cs4231/pcm_cs4231.c').read_text()
+    driver = (ROOT / 'sys/dev/sound/cs4231/pcm_cs4231.c').read_text()
     if omit_evidence:
         old = "evid = pcm_abort_proven();"
         assert driver.count(old) == 1
@@ -93,8 +93,8 @@ def driver_checks(folder, omit_evidence):
     harness = harness.replace('"pcm_cs4231_host.c"', '"' + str(ROOT / 'tools/tests/pcm_cs4231_host.c') + '"')
     # Include the fixture with its actual driver replaced, without a second body.
     fixture = (ROOT / 'tools/tests/pcm_cs4231_host.c').read_text()
-    fixture = fixture.replace('"../../drivers/sound/cs4231/pcm_cs4231.c"', '"' + str(source) + '"')
-    fixture = fixture.replace('"../../drivers/sound/cs4231/pcm_cs4231_math.c"', '"' + str(ROOT / 'drivers/sound/cs4231/pcm_cs4231_math.c') + '"')
+    fixture = fixture.replace('"../../sys/dev/sound/cs4231/pcm_cs4231.c"', '"' + str(source) + '"')
+    fixture = fixture.replace('"../../sys/dev/sound/cs4231/pcm_cs4231_math.c"', '"' + str(ROOT / 'sys/dev/sound/cs4231/pcm_cs4231_math.c') + '"')
     local = folder / 'pcm-fixture.c'
     local.write_text(fixture)
     harness = harness.replace('"' + str(ROOT / 'tools/tests/pcm_cs4231_host.c') + '"', '"' + str(local) + '"')
@@ -131,9 +131,9 @@ def main():
                             '-DPCM_ADAPTER="' + str(source) + '"',
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/pcm_module_host.c',
-                            ROOT / 'drivers/sound/cs4231/pcm_hw.c', *hal_objects,
-                            ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
-                            ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c', '-o', exe], check=True)
+                            ROOT / 'sys/dev/sound/cs4231/pcm_hw.c', *hal_objects,
+                            ROOT / 'sys/kern/module/module_runtime.c', ROOT / 'sys/kern/module/module_image.c',
+                            ROOT / 'sys/fs/vfs.c', ROOT / 'sys/dev/base/dev.c', '-o', exe], check=True)
         def run(modes, expected=0):
             for mode in modes:
                 payload = struct.pack('<2I', 10 if mode == 3 else 0, mode) + image()

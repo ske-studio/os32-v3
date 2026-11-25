@@ -1,17 +1,17 @@
 /* Expectations: PPC_RESET_DESIGN 確定後の追記, §2 and §7, and HW_OP §5 6b.
  * Linux/PPC user-mode fixture, with real platform code and fake hardware. */
 #include <kernel_boot.c>
-#include "drivers/usb/ohci_regs.h"
-#include "drivers/net/gem/gem.h"
+#include "sys/dev/usb/ohci_regs.h"
+#include "sys/dev/net/gem/gem.h"
 #include "pci_config_contract.h"
-#include "kdebug/hwb_wire.h"
-#include "drivers/usb/usb_core.h"
+#include "sys/kern/kdebug/hwb_wire.h"
+#include "sys/dev/usb/usb_core.h"
 #include "endian_dma.h"
 #include "kprintf.h"
 #include "tick.h"
 #include "mouse_pointer_contract.h"
-#include "input/hal/keymap.h"
-#include "input/hal/usb_input.h"
+#include "sys/hal/input/keymap.h"
+#include "sys/hal/input/usb_input.h"
 
 #define VIA_FIRST_PA 0x80016000u
 #define VIA_LAST_PA  0x80018000u

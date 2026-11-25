@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise Y4 binding and configuration fallback."""
 CHECK = dict(name='gfxsync-bind-host', tier=1, needs=[], budget=5,
-    covers=['gfx/sync/sync_bind.c', 'gfx/sync/sync_int.h', 'include/gfx_sync.h',
+    covers=['sys/hal/gfx/sync/sync_bind.c', 'sys/hal/gfx/sync/sync_int.h', 'sys/include/gfx_sync.h',
             'tools/tests/gfxsync_bind_host.c', 'tools/tests/test_gfxsync_bind.py', 'tools/tests/host32.py'],
     basis=['HAL_V2_DESIGN §10'],
 )
@@ -26,7 +26,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/sync/sync_bind.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/sync/sync_bind.c').read_text()
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         assert observe(work, source) == 0

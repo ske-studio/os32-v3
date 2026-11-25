@@ -1,6 +1,6 @@
-# kdebug/recover_plan/profile.inc — 設計
+# sys/platform/pc98/kdebug/recover_plan/profile.inc — 設計
 > 状態: **現行 (2026-10-31)** — 出所: GF6200_4A_DESIGN.md・HWDEV_DESIGN.md・REALHW_RECOVER_ADDENDUM.md・REALHW_RECOVER_ADDENDUM_R2.md (D1 で移した)
-ソース: `kdebug/recover_plan/profile.inc`
+ソース: `sys/platform/pc98/kdebug/recover_plan/profile.inc`
 
 ## GF6200_4A_DESIGN
 

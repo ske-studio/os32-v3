@@ -3,7 +3,7 @@
 #define GF_S2_ENTRY s2_entry
 #include "gfinit_host.c"
 #undef GF_S2_ENTRY
-#include "../../kdebug/gfinit_exec.c"
+#include "../../sys/dev/video/geforce/diag/gfinit_exec.c"
 #define TRACE_MAX 8192U
 struct trace_item {u32 dir,key,value;};
 static struct trace_item actual[TRACE_MAX];

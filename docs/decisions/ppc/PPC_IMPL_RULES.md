@@ -18,7 +18,7 @@ CI は統合の枝で os32-v3 の PM が 1 回だけ回すので、PowerPC の�
 | 4 | 写しの木で組む試験 (subprocess で gcc、HEADERS/TREE_FILES/MIRROR/FILES の一覧、関数の切り出し、自前の -I、間接 include、.c の include、`__ASSEMBLER__` で cpu.h を読む物) | 触ったヘッダ・ソースの名前を tools/・build/・Makefile・docs/ で grep し、全部追従 |
 | 5 | tools/checks/*.py と試験の CHECK の covers/inputs が、どのファイルにも当たらない glob になる (check-map が落ちる) | 新しいファイルを covers に足す。covers の衝突は ast で 3 方向の和にして検算する (正規表現で切ると `[ch]` の glob で壊れる) |
 | 6 | tools/source_roots.py の SCAN_ROOTS (新しい置き場が走査の外) | 新しい置き場を足す |
-| 7 | kdebug の import (kernel/module/kdebug_imports.def の source 欄、slot は詰めない・並べ替えない) と tools/tests/fixtures/dep_dir_a/l01.json の指紋。FEP の MODULE_ABI_GEN の指紋 (部品の contracts の字面から計算) | 指紋を変えない。contracts のヘッダはコメント 1 字も触らない |
+| 7 | kdebug の import (sys/kern/module/kdebug_imports.def の source 欄、slot は詰めない・並べ替えない) と tools/tests/fixtures/dep_dir_a/l01.json の指紋。FEP の MODULE_ABI_GEN の指紋 (部品の contracts の字面から計算) | 指紋を変えない。contracts のヘッダはコメント 1 字も触らない |
 | 8 | tools/tests/test_ci_stab.py の規則 (`if not mutant:` を書かない、covers に足す、試験の補助関数に `run` という名前を使わない) | `python3 -B tools/tests/test_ci_stab.py` |
 | 9 | 新しい host32 の試験が 32 ビットの libc (crt1.o) に頼る (CI と WSL に無い、この PC にはあるので手元では通る) | `gcc -m32 -ffreestanding -fno-pie -no-pie -nostdlib -static`、`_start` から exit (手本 tools/tests/test_abi_boundary.py、tools/tests/host32.py) |
 | 10 | 層の検査 (共通のソースが機種のヘッダを読む辺、tools/layers_baseline.json) | 像を組んでから `python3 -B tools/check_layers.py` で増やさない。減らした段は同じ変更で `--write-baseline` |

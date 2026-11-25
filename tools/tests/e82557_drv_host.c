@@ -88,14 +88,14 @@ static void fprintf(int fd, const char *fmt, ...)
 __asm__(".global _start\n_start:\n"
         "mov (%esp), %eax\nlea 4(%esp), %edx\npush %edx\npush %eax\ncall main\n"
         "mov %eax, %ebx\nmov $1, %eax\nint $0x80\n");
-#include "../../drivers/pci/pci_decode.c"
+#include "../../sys/dev/pci/pci_decode.c"
 #define e82557_ee_read_word real_ee_read_word
-#include "../../drivers/net/e82557/e82557_eeprom.c"
+#include "../../sys/dev/net/e82557/e82557_eeprom.c"
 #undef e82557_ee_read_word
-#include "../../fs/vfs.h"
-#include "../../drivers/net/e82557/e82557.h"
-#include "../../kernel/module/module.h"
-#include "../../include/bootinfo.h"
+#include "../../sys/fs/vfs.h"
+#include "../../sys/dev/net/e82557/e82557.h"
+#include "../../sys/kern/module/module.h"
+#include "../../sys/include/bootinfo.h"
 _Static_assert(sizeof(u32) == 4, "ILP32 required");
 static int failed;
 #define CHECK(x) do { if (!(x)) { fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; } } while (0)
@@ -130,7 +130,7 @@ static int swi_lost, irq0_first, irq_deliveries, runtime, inject_rus, inject_res
 static int yield_mode, ack_repeat, status_reads, cb_completed;
 static u32 ru_pointer, model_ticks;
 static u8 rx_frame[1600];
-#include "../../kernel/irq/irq.h"
+#include "../../sys/kern/irq/irq.h"
 static irq_handler_fn handler;
 static void model_assert_ring(u32 pa);
 static void yield_event(void);
@@ -223,7 +223,7 @@ int vfs_rm(const char *path)
 { CHECK(!irq_depth); fs_calls++; rm_calls++; CHECK(!strcmp(path,"/var/log/lan.try")); if(remove_fail) return VFS_ERR_IO; files[0].present=0; return 0; }
 void __cdecl kprintf(u8 attr, const char *fmt, ...)
 { va_list ap; size_t n=strlen(output); (void)attr; va_start(ap,fmt); vsnprintf(output+n,sizeof(output)-n,fmt,ap); va_end(ap); }
-#include "../../drivers/pci/pci_bind_match.c"
+#include "../../sys/dev/pci/pci_bind_match.c"
 static u32 irq_save(void) { u32 f=irq_depth?0:0x200; irq_depth++; return f; }
 static void irq_restore(u32 flags) { CHECK(irq_depth>0); irq_depth--; CHECK(!!(flags&0x200)==!irq_depth); }
 static void trace(u32 stage)
@@ -366,16 +366,16 @@ int e82557_ee_read_word(const struct e82557_ee_pins *p,int mode,int *width,u16 a
     if (command) { (void)inp(0x6002); (void)inp(0x6002); (void)inp(0x6002); }
     CHECK(!cu_base && (!ru_base || post_busy==2) && (!command || post_busy==2)); ee_calls++; *word=words[addr%3]; *dummy=0; return E82557_OK;
 }
-#include "../../include/config.h"
+#include "../../sys/include/config.h"
 #define kstrncmp strncmp
 #define kstrcmp strcmp
-#include "../../mm/dma_pool.h"
+#include "../../sys/kern/mm/dma_pool.h"
 static void desc_event(const volatile void *p,u32 n,int write);
 static void barrier_event(void) { last_barrier=++event_seq; }
 #define E82557_BARRIER() barrier_event()
 #define E82557_DESC_ACCESS(p,n,w) desc_event(p,n,w)
 #define E82557_HOST_YIELD() yield_event()
-#include "../../drivers/net/e82557/e82557_desc.c"
+#include "../../sys/dev/net/e82557/e82557_desc.c"
 u32 pci_cfg_read32(u32 bus,u32 dev,u32 fn,u32 reg)
 { CHECK(!bus && dev==11 && !fn && reg==4); return pci_command; }
 int pci_cfg_write16(u32 bus,u32 dev,u32 fn,u32 reg,u16 value)
@@ -410,7 +410,7 @@ int kutoa_dec(u32 value,char *buf,int cap) { return snprintf(buf,cap,"%u",value)
 #include "kernel_tick.h"   /* 本物の宣言を先に読んでおく (下の差し替えの後では読ませない) */
 #define tick_count fake_ticks()
 #define E82557_HOST_TEST
-#include "../../drivers/net/e82557/e82557.c"
+#include "../../sys/dev/net/e82557/e82557.c"
 #include "pci_table.h"
 static void check_pending(void)
 {

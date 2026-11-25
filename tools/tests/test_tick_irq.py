@@ -1,7 +1,7 @@
 """Run the real IRQ0 branch as i386 NASM with host substitutes for I/O and frame."""
 CHECK = dict(name='tick-irq-host', tier=4, needs=[], budget=3,
-    covers=['kernel/time/tick.c', 'kernel/time/tick_clock.h', 'kernel/time/tick_probe_ids.h', 'include/kernel_tick.h',
-            'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kernel_includes.py', 'arch/x86/kernel/isr_stub.asm', 'tools/tests/tick_irq_host.c',
+    covers=['sys/hal/time/tick.c', 'sys/hal/time/tick_clock.h', 'sys/kern/time/tick_probe_ids.h', 'sys/include/kernel_tick.h',
+            'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kernel_includes.py', 'sys/arch/x86/kernel/isr_stub.asm', 'tools/tests/tick_irq_host.c',
             'tools/tests/test_tick_irq.py', 'tools/tests/host32.py'],
     basis=['TICK_1KHZ_DESIGN', 'TICK_ARCH_DESIGN §5-3'],
 )
@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main(mutate=False):
-    asm = (ROOT / 'arch/x86/kernel/isr_stub.asm').read_text()
+    asm = (ROOT / 'sys/arch/x86/kernel/isr_stub.asm').read_text()
     macro = asm[asm.index('%macro V86_REFLECT 1'):asm.index('%endmacro', asm.index('%macro V86_REFLECT 1')) + len('%endmacro')]
     start = asm.index('        call    tick_clock_step', asm.index('irq_stub_0:'))
     body = asm[start:asm.index('.done:', start)]
@@ -52,7 +52,7 @@ def main(mutate=False):
                       '%macro TP_END 1\n pushad\n push dword %1\n call probe_end\n add esp,4\n popad\n%endmacro\n'
                       '%macro TP_LEAVE 1\n%endmacro\n' + macro + '\n'
                       'global irq_body\nirq_body:\n' + code + '.done:\n ret\n')
-            clock = (ROOT / 'kernel/time/tick.c').read_text()
+            clock = (ROOT / 'sys/hal/time/tick.c').read_text()
             if late_path is not None:
                 # Defer the real notification to just after the selected EOI.
                 anchor = 'return notify_step(result);'
@@ -66,7 +66,7 @@ def main(mutate=False):
             clock_src.write_text(clock)
             source = source.replace('[esp + ISR_IRQ_EFLAGS_OFF]', '[frame_flags]')
             src = work / 'irq.asm'; src.write_text(subprocess.check_output(
-                ['cpp', '-traditional-cpp', '-P', '-include', str(ROOT / 'kernel/time/tick_probe_ids.h'), '-'],
+                ['cpp', '-traditional-cpp', '-P', '-include', str(ROOT / 'sys/kern/time/tick_probe_ids.h'), '-'],
                 input=source, text=True))
             obj = work / 'irq.o'; exe = work / 'irq'
             subprocess.run(['nasm', '-f', 'elf32', str(src), '-o', str(obj)], check=True)

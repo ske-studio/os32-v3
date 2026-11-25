@@ -1,6 +1,6 @@
 """T5c-6 table validation and conformance of existing policy consumers."""
 CHECK = dict(name='module-policy-host', tier=1,
-    covers=['tools/prototypes/usb_imports.def', 'build/out/usb/usb_imports.json', 'tools/tests/host_arch/arch_io.h', 'drivers/video/geforce/geforce_module.c', 'hwdev/hwdev_module.c', 'tools/tests/module_pair_request_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'include/platform_module_pair.h', 'exec/os32x_hdr.c', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'kernel/module/module_schema.h', 'include/config.h', 'build/core.yaml', 'platform/pc98/kernel.c', 'platform/pc98/usb_load.c', 'kernel/sqlite_engine.c', 'userland/system/hsync.c', 'userland/shell/ui.c', 'kdebug/kdebug_module.c', 'kernel/ime/fep_module.c', 'drivers/ata/cd_module.c', 'drivers/video/kcg/kcg_module.c', 'drivers/sound/fm/fm_module.c', 'drivers/sound/cs4231/pcm_module.c', 'platform/pc98/legacy/v86_module.c', 'drivers/net/e82557/lan_module.c', 'drivers/video/cirrus/cirrus_module.c', 'drivers/video/trident/trident_module.c', 'build/kernel.*', 'build/out/*'],
+    covers=['tools/prototypes/usb_imports.def', 'build/out/usb/usb_imports.json', 'tools/tests/host_arch/arch_io.h', 'sys/dev/video/geforce/geforce_module.c', 'sys/dev/hwdev/hwdev_module.c', 'tools/tests/module_pair_request_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'sys/include/platform_module_pair.h', 'sys/kern/exec/os32x_hdr.c', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'sys/kern/module/module_schema.h', 'sys/include/config.h', 'build/core.yaml', 'sys/platform/pc98/kernel.c', 'sys/platform/pc98/usb_load.c', 'sys/kern/sqlite_engine.c', 'userland/system/hsync.c', 'userland/shell/ui.c', 'sys/kern/kdebug/kdebug_module.c', 'sys/kern/ime/fep_module.c', 'sys/dev/ata/cd_module.c', 'sys/dev/video/kcg/kcg_module.c', 'sys/dev/sound/fm/fm_module.c', 'sys/dev/sound/cs4231/pcm_module.c', 'sys/platform/pc98/legacy/v86_module.c', 'sys/dev/net/e82557/lan_module.c', 'sys/dev/video/cirrus/cirrus_module.c', 'sys/dev/video/trident/trident_module.c', 'build/kernel.*', 'build/out/*'],
     needs=['make:all'], budget=4.3,
     kind='characterization',
 )
@@ -109,7 +109,7 @@ def check_pair_request(stem, adapter):
 
 def conformance():
     assert gen_module_schema.OUTPUT.read_text() == gen_module_schema.render(), 'stale schema'
-    config = (ROOT / 'include/config.h').read_text()
+    config = (ROOT / 'sys/include/config.h').read_text()
     deployed = yaml.safe_load((ROOT / 'build/core.yaml').read_text())['filesystem']['files']
     assert schema.MODULE_FORMATS['x86-pc98'] == (1, 3, 1, 0, 4)
     assert schema.MODULE_FORMATS['ppc-powermac'] == (2, 20, 2, 20, 12)
@@ -149,11 +149,11 @@ def conformance():
         if row['name'] == 'HWDEV':
             assert row['dependencies'] == (schema.CONSTANTS['ID_KDEBUG'],)
             assert '.dependencies = &core_handle, .dependency_count = 1' in source
-            assert '(void)hwdev_module_load(handle);' in (ROOT/'kdebug/kdebug_module.c').read_text()
+            assert '(void)hwdev_module_load(handle);' in (ROOT/'sys/kern/kdebug/kdebug_module.c').read_text()
         elif row['dependencies']:
             assert row['dependencies'] == (schema.CONSTANTS['ID_SQLITE'],)
             assert '.dependencies = sqlite, .dependency_count = sqlite ? 1 : 0' in source
-            engine = (ROOT / 'kernel/sqlite_engine.c').read_text()
+            engine = (ROOT / 'sys/kern/sqlite_engine.c').read_text()
             assert engine.index('rc = os32_sqlite_start();') < engine.index('rc = fep_boot_start(&sqlite_handle, no_dictionary, &reserve);')
         else:
             assert '.dependencies =' not in source, row
@@ -164,7 +164,7 @@ def conformance():
     assert 'kdebug.bin / sqlite.mod' not in hsync
     # Core splash returns into unconditional boot continuation. SerialFS's FS
     # registration is earlier; actual serial/rshell service starts in shell ui.
-    kernel = (ROOT / 'platform/pc98/kernel.c').read_text()
+    kernel = (ROOT / 'sys/platform/pc98/kernel.c').read_text()
     assert kernel.count('    boot_splash();') == 1
     assert kernel.index('    boot_splash();') < kernel.index('shell_loop_run(&ops);')
     ui = (ROOT / 'userland/shell/ui.c').read_text()

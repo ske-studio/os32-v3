@@ -3,7 +3,7 @@
 /* ======================================================================== */
 
 #include "path.h"
-#include "kstring.h"
+#include "../sys/kern/kstring.h"
 
 /* ======== コールバック ======== */
 static PathDeviceValidator device_validator = (PathDeviceValidator)0;

@@ -8,8 +8,8 @@ import host32
 from kernel_includes import include_flags
 
 CHECK = dict(name='ext2-block-io-host', tier=1, budget=3.0,
-             covers=['fs/ext2/ext2_super.c', 'fs/ext2/ext2_super_block_io.inc',
-                     'fs/ext2/ext2_priv.h', 'tools/tests/ext2_block_io_host.c',
+             covers=['sys/fs/ext2/ext2_super.c', 'sys/fs/ext2/ext2_super_block_io.inc',
+                     'sys/fs/ext2/ext2_priv.h', 'tools/tests/ext2_block_io_host.c',
                      'tools/tests/test_ext2_block_io.py', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py'], needs=[],
     kind='characterization',
@@ -42,7 +42,7 @@ def build(source, exe):
 def main(args):
     with tempfile.TemporaryDirectory(prefix='os32-ext2-bio-') as tmp:
         exe = Path(tmp) / 'ext2-block-io'
-        build(ROOT / 'fs/ext2/ext2_super.c', exe)
+        build(ROOT / 'sys/fs/ext2/ext2_super.c', exe)
         result = host32.run([str(exe)], cwd=ROOT)
         if result.returncode:
             return result.returncode

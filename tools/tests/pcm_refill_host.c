@@ -1,4 +1,4 @@
-#include "sound/hal/snd2_int.h"
+#include "sys/hal/sound/snd2_int.h"
 #include "kstring.h"
 
 #define REQUIRE(x) do { if (!(x)) return 1; } while (0)

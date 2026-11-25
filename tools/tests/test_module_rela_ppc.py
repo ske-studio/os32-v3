@@ -14,7 +14,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 PACK = ROOT / 'tools/ppc/module_rela.py'
-FIXUP = ROOT / 'kernel/module/module_fixup_ppc.inc'
+FIXUP = ROOT / 'sys/kern/module/module_fixup_ppc.inc'
 POLICY = dict(init_symbol='entry', ops_symbol='ops', ops_slots=1, reloc_max=8)
 
 

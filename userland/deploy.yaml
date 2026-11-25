@@ -11,32 +11,32 @@
 #  **tags: は CD のパッケージの振り分けも決める** (build/packages.yaml、
 #  tools/mkpkg.py --plan)。core / base → MINIMAL、gui → GUI、
 #  programs / docs / data → NORMAL、test → DEBUG。MINIMAL は FD の中身と同じ
-#  集合 (FD も同じ構成から作る。core / base に足すと FD にも入る)。userland/tests/ 由来の行は必ず [test] にする (make
+#  集合 (FD も同じ構成から作る。core / base に足すと FD にも入る)。userland/diag/ 由来の行は必ず [test] にする (make
 #  check-packages-host が検査する)。行ごとにタグは 1 つ。
 # ============================================================================
 
 filesystem:
   files:
-    - host: userland/tests/crtexit.bin
+    - host: userland/diag/crtexit.bin
       guest: /usr/bin/
       tags: [test]
     - host: userland/diag/mmtimetest.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/gfx2_rh.bin
+    - host: userland/diag/gfx2_rh.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/gfx2_i3.bin
+    - host: userland/diag/gfx2_i3.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/gfx2_i2.bin
+    - host: userland/diag/gfx2_i2.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/gfx2_i1.bin
+    - host: userland/diag/gfx2_i1.bin
       guest: /usr/bin/
       tags: [test]
     # Includes trident_mode.hwb, tri_w32.hwb and tri_burst[2-6].hwb; disk/CD test payload only.
-    - host: "userland/tests/hw/*.hwb"
+    - host: "userland/diag/hw/*.hwb"
       guest: /test/hw/
       type: glob
       tags: [test]
@@ -80,19 +80,19 @@ filesystem:
     - host: userland/system/install.bin
       guest: /sbin/
       tags: [base]
-    - host: userland/tests/crash.bin
+    - host: userland/diag/crash.bin
       guest: /sbin/
       tags: [test]
-    - host: userland/tests/bench.bin
+    - host: userland/diag/bench.bin
       guest: /sbin/
       tags: [test]
-    - host: userland/tests/restest.bin
+    - host: userland/diag/restest.bin
       guest: /sbin/
       tags: [test]
     # 終了コードを返すだけの試験バイナリ (票 TASK_EXIT_STATUS §4-2)。
     # **/usr/bin ではなく /sbin に 1 本だけ**置く — 受入 S2b が
     # 「1 コピーで実行回数 1」を数えるので、2 か所に置かない。
-    - host: userland/tests/t_exit.bin
+    - host: userland/diag/t_exit.bin
       guest: /sbin/
       tags: [test]
     - host: userland/system/cdinst.bin
@@ -104,261 +104,261 @@ filesystem:
     - host: userland/system/hsync.bin
       guest: /sbin/
       tags: [base]
-    - host: userland/tests/bench_scale2x.bin
+    - host: userland/diag/bench_scale2x.bin
       guest: /usr/bin/
       tags: [test]
     # Acceptance harness: DEBUG only, never part of the boot FD.
-    - host: userland/tests/hwscroll_probe.bin
+    - host: userland/diag/hwscroll_probe.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/gfx200_test.bin
+    - host: userland/diag/gfx200_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/fep_meta_test.bin
+    - host: userland/diag/fep_meta_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/gfx_demo200.bin
+    - host: userland/diag/gfx_demo200.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/mouse_test.bin
+    - host: userland/diag/mouse_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/gui_call_test.bin
+    - host: userland/diag/gui_call_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- T2h/h3 park → resume 後の fault / STOP fixture ---
-    - host: userland/tests/h3a.bin
+    - host: userland/diag/h3a.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/h3b.bin
+    - host: userland/diag/h3b.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/fp_stop.bin
+    - host: userland/diag/fp_stop.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/stop_loop.bin
+    - host: userland/diag/stop_loop.bin
       guest: /usr/bin/
       tags: [test]
     # --- T2g / GK-3 cooperative trim fixtures (interactive) ---
-    - host: userland/tests/trim_back.bin
+    - host: userland/diag/trim_back.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/trim_front.bin
+    - host: userland/diag/trim_front.bin
       guest: /usr/bin/
       tags: [test]
     # --- K2 の完了条件アプリ (計算中の syscall 境界ポンプ、--nokapi で CTRL+STOP 脱出) ---
-    - host: userland/tests/gui_busy.bin
+    - host: userland/diag/gui_busy.bin
       guest: /usr/bin/
       tags: [test]
     # CPL3 probes for PRIO-3 / KAPI-AUDIT-FIX.
-    - host: userland/tests/audit_test.bin
+    - host: userland/diag/audit_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/raw_wait_test.bin
+    - host: userland/diag/raw_wait_test.bin
       guest: /usr/bin/
       tags: [test]
     # T2h/h3b: sequential owner probes and the v86 -b IPL image.
-    - host: userland/tests/pipe_owner_test.bin
+    - host: userland/diag/pipe_owner_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/shutdown_probe.bin
+    - host: userland/diag/shutdown_probe.bin
       guest: /usr/bin/
       tags: [test]
     - host: build/out/int80.img
       guest: /test/int80.img
       tags: [test]
       host_only: true
-    - host: userland/tests/blit_test.bin
+    - host: userland/diag/blit_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/blit_test2.bin
+    - host: userland/diag/blit_test2.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/demo_tile.bin
+    - host: userland/diag/demo_tile.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/tile_bench.bin
+    - host: userland/diag/tile_bench.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/rotate_test.bin
+    - host: userland/diag/rotate_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/klibc_test.bin
+    - host: userland/diag/klibc_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/db_test.bin
+    - host: userland/diag/db_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/dbq.bin
+    - host: userland/diag/dbq.bin
       guest: /usr/bin/
       tags: [test]
     # --- stat_t / test2 (第 1 陣の試験。ビルドはされていたがマニフェストへの登録が
     #     漏れていて、ゲストで走らせられなかった。TASK_TEST_RESULT §4) ---
-    - host: userland/tests/stat_t.bin
+    - host: userland/diag/stat_t.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/test2.bin
+    - host: userland/diag/test2.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/faultprobe.bin
+    - host: userland/diag/faultprobe.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/nop.bin
+    - host: userland/diag/nop.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/shm_reuse_test.bin
+    - host: userland/diag/shm_reuse_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/shm_reuse_child.bin
+    - host: userland/diag/shm_reuse_child.bin
       guest: /usr/bin/
       tags: [test]
     # --- ring3_hello (CPL=3 検証, v2 M1) ---
-    - host: userland/tests/ring3_hello.bin
+    - host: userland/diag/ring3_hello.bin
       guest: /usr/bin/
       tags: [test]
     # --- ring3_fault (CPL=3 フォールト kill 検証, v2 M1e) ---
-    - host: userland/tests/ring3_fault.bin
+    - host: userland/diag/ring3_fault.bin
       guest: /usr/bin/
       tags: [test]
     # --- faulttest (CPL=3 の #GP/#DE/#UD/#PF kill と CTRL+STOP、票 TASK_T1_LEDGER §4-2-N) ---
-    - host: userland/tests/faulttest.bin
+    - host: userland/diag/faulttest.bin
       guest: /usr/bin/
       tags: [test]
     # --- KAPI-CALLBACK: callback CPL=3 / ctx / mid-enumeration kill ---
-    - host: userland/tests/kcallback_test.bin
+    - host: userland/diag/kcallback_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- ring3_guard (M3 heap/stack ガード検証) ---
-    - host: userland/tests/ring3_guard.bin
+    - host: userland/diag/ring3_guard.bin
       guest: /usr/bin/
       tags: [test]
     # --- T2d d0a: parent/child private buffers at the same VA ---
-    - host: userland/tests/d0a_test.bin
+    - host: userland/diag/d0a_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- T2h h2 stack preparation, default 256KiB / explicit 512KiB ---
-    - host: userland/tests/sndl_test.bin
+    - host: userland/diag/sndl_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/h2_stack.bin
+    - host: userland/diag/h2_stack.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/h2_stack512.bin
+    - host: userland/diag/h2_stack512.bin
       guest: /usr/bin/
       tags: [test]
     # T2h 8MB shapes: CUI keyboard launch, free0 argv, P1/continue stdin.
-    - host: userland/tests/h5_shape_i.bin
+    - host: userland/diag/h5_shape_i.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/h5_shape_ii.bin
+    - host: userland/diag/h5_shape_ii.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/h5_shape_iii.bin
+    - host: userland/diag/h5_shape_iii.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/mem_stat_compat_test.bin
+    - host: userland/diag/mem_stat_compat_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/loopfmt_test.bin
+    - host: userland/diag/loopfmt_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/kdebug_probe.bin
+    - host: userland/diag/kdebug_probe.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/mem_stat_test.bin
+    - host: userland/diag/mem_stat_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/mem_map_test.bin
+    - host: userland/diag/mem_map_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- T7b-b1 app 用 font read lease (KAPI v77)。other は自分を子として起こす ---
-    - host: userland/tests/font_lease_test.bin
+    - host: userland/diag/font_lease_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- f9 exec heap parent and --child use the same registered binary ---
-    - host: userland/tests/layout_cycle_test.bin
+    - host: userland/diag/layout_cycle_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/exec_heap_test.bin
+    - host: userland/diag/exec_heap_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- T3c3 F-9 allocator measurement ---
-    - host: userland/tests/allocator_bench.bin
+    - host: userland/diag/allocator_bench.bin
       guest: /usr/bin/
       tags: [test]
     # --- f7 USER nano secondary arena ---
-    - host: userland/tests/malloc_arena_test.bin
+    - host: userland/diag/malloc_arena_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- f6 USER sbrk EXACT growth ---
-    - host: userland/tests/sbrk_grow_test.bin
+    - host: userland/diag/sbrk_grow_test.bin
       guest: /usr/bin/
       tags: [test]
 
     # --- heap_test (子プロセス帯レイアウト検証: sbrk / exec_heap の位置と重なり) ---
-    - host: userland/tests/heap_test.bin
+    - host: userland/diag/heap_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- hal_test (KAPI v40 GUI HAL 枠: screen_info / hw_* の NOSYS 確認) ---
-    - host: userland/tests/hal_test.bin
+    - host: userland/diag/hal_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- pegcchk (PEGC 640x480 の出入りを画面を見ずに確かめる、票 TASK_PEGC480_REALHW §5) ---
-    - host: userland/tests/pegcchk.bin
+    - host: userland/diag/pegcchk.bin
       guest: /usr/bin/
       tags: [test]
     # --- hello (KAPI 最小テスト、登録 2026-10-10) ---
-    - host: userland/tests/hello.bin
+    - host: userland/diag/hello.bin
       guest: /usr/bin/
       tags: [test]
     # --- hello_r3 (M2 KAPI トランポリン検証, ソース無変更 hello の CPL=3 版) ---
-    - host: userland/tests/hello_r3.bin
+    - host: userland/diag/hello_r3.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/math_test.bin
+    - host: userland/diag/math_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/input_test.bin
+    - host: userland/diag/input_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- kbd_echo (票 K7 の I1/I2/I3 — 打鍵を 1 バイトずつ表示する CUI 試験) ---
-    - host: userland/tests/kbd_echo.bin
+    - host: userland/diag/kbd_echo.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/cfg_bench.bin
+    - host: userland/diag/cfg_bench.bin
       guest: /usr/bin/
       tags: [test]
     # Raw disk authorization: explicit harmless LBA, PM acceptance only.
-    - host: userland/tests/disk_auth_test.bin
+    - host: userland/diag/disk_auth_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- time_test (票 TASK_HAL_WIRING §1-5 / 受入 W4: µs 時計 sys_time_now の
     #     CPL=3 受入。カーネル側 kselftest は CPL=0 なのでポインタ契約を踏めない。
     #     `time_test ro` は**わざとアプリを殺す**ので既定では走らない) ---
-    - host: userland/tests/time_test.bin
+    - host: userland/diag/time_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/kapi_cost.bin
+    - host: userland/diag/kapi_cost.bin
       guest: /usr/bin/
       tags: [test]
     # --- text_ro_test (アプリの .text・.rodata は読み取り専用、.data は書ける。
     #     `text` と `rodata` は**わざとアプリを殺す**) ---
-    - host: userland/tests/text_ro_test.bin
+    - host: userland/diag/text_ro_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- pcm_test (票 TASK_PCM_CS4231 §3 E3 / E5: CS4231 再生の CPL=3 受入。
     #     左 = 1kHz 正弦 / 右 = frame 番号なので、採った PCM から左右の
     #     取り違えと欠落が見分けられる。`short` / `nodev` の引数あり) ---
-    - host: userland/tests/pcm_test.bin
+    - host: userland/diag/pcm_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/av_test.bin
+    - host: userland/diag/av_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/snd2_test.bin
+    - host: userland/diag/snd2_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/pcm_play.bin
+    - host: userland/diag/pcm_play.bin
       guest: /usr/bin/
       tags: [test]
     # --- kout_test (票 TASK_KAPI_OUTPUT_GUARD 受入 G2/G4: 出力ポインタの
@@ -366,67 +366,67 @@ filesystem:
     #     NULL の意味が変わっていないことを代表 6 本で見る。
     #     **読み取り専用の shlib .text を渡す**試験はアプリ側から安全に作れない
     #     ので含まない (PM が NP21/W で手で見る)) ---
-    - host: userland/tests/kout_test.bin
+    - host: userland/diag/kout_test.bin
       guest: /usr/bin/
       tags: [test]
     # T4b-8: normal display and deliberate format/string/word/window faults.
-    - host: userland/tests/kprint_boundary.bin
+    - host: userland/diag/kprint_boundary.bin
       guest: /usr/bin/
       tags: [test]
     # T4b-8b: remaining B1 input groups, faults and FM STOP.
-    - host: userland/tests/kstr_boundary.bin
+    - host: userland/diag/kstr_boundary.bin
       guest: /usr/bin/
       tags: [test]
     # T4b-8c: CUI-only boot2 second-input fault, before entering V86.
-    - host: userland/tests/kstr_v86.bin
+    - host: userland/diag/kstr_v86.bin
       guest: /usr/bin/
       tags: [test]
     # --- kstr_bench (票 TASK_KSTRING_BENCH: kstring の asm 版と C 版を実機で測る。
     #     出力は `KSTR ...` の固定書式で、集計は tools/kstr_bench_report.py) ---
-    - host: userland/tests/kstr_bench.bin
+    - host: userland/diag/kstr_bench.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/db_v50_test.bin
+    - host: userland/diag/db_v50_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- host_test (票 N1: KAPI v51 の CPL=3 受入。host_agent.py v2 が対向) ---
-    - host: userland/tests/host_test.bin
+    - host: userland/diag/host_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/asset_test.bin
+    - host: userland/diag/asset_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/asset_demo.bin
+    - host: userland/diag/asset_demo.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/ecs_test.bin
+    - host: userland/diag/ecs_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/save_test.bin
+    - host: userland/diag/save_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/mgx_test.bin
+    - host: userland/diag/mgx_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/hello_gfx.bin
+    - host: userland/diag/hello_gfx.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/trim_back_rs.bin
+    - host: userland/diag/trim_back_rs.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/alloc_demo.bin
+    - host: userland/diag/alloc_demo.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/math_test_rs.bin
+    - host: userland/diag/math_test_rs.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/e2test.bin
+    - host: userland/diag/e2test.bin
       guest: /sbin/
       tags: [test]
-    - host: userland/tests/e2seek.bin
+    - host: userland/diag/e2seek.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/sqlite_standalone/sqlite_standalone.bin
+    - host: userland/diag/sqlite_standalone/sqlite_standalone.bin
       guest: /usr/bin/sqlite_standalone.bin
       tags: [test]
     # --- LZ4 圧縮/展開コマンド → /bin/ ---
@@ -504,19 +504,19 @@ filesystem:
       guest: /db/fep.db
       tags: [data]
     # --- テスト用ファイル ---
-    - host: userland/tests/data/test.txt
+    - host: userland/diag/data/test.txt
       guest: /home/user/test.txt
       tags: [test]
-    - host: userland/tests/data/test_utf8.txt
+    - host: userland/diag/data/test_utf8.txt
       guest: /home/user/test_utf8.txt
       tags: [test]
-    - host: userland/tests/data/test_pager.txt
+    - host: userland/diag/data/test_pager.txt
       guest: /home/user/test_pager.txt
       tags: [test]
-    - host: userland/tests/data/test_script.bat
+    - host: userland/diag/data/test_script.bat
       guest: /home/user/test_script.bat
       tags: [test]
-    - host: userland/tests/data/hello.sh
+    - host: userland/diag/data/hello.sh
       guest: /test/hello.sh
       tags: [test]
 
@@ -548,19 +548,19 @@ filesystem:
     # /data/Inconsolata-Regular.ttf・/data/ipaexg.ttf (任意) を読む。使う人が
     # tools/fetch_fonts.py で取った原本を hsync などで /data に置く。サブセット TTF は廃止。
     # --- フォントテスト ---
-    - host: userland/tests/font_test.bin
+    - host: userland/diag/font_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- GUI デモ (libos32gui) ---
-    - host: userland/tests/gui_demo.bin
+    - host: userland/diag/gui_demo.bin
       guest: /usr/bin/
       tags: [test]
     # --- GUI v1.2 client API 試験 (C4: modal_result / session_launch / icon16) ---
-    - host: userland/tests/v12_api_test.bin
+    - host: userland/diag/v12_api_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- 端末アプリ (K6C-A: con_sink を吸って端末窓に描く) ---
-    - host: userland/tests/t5a_display.bin
+    - host: userland/diag/t5a_display.bin
       guest: /usr/bin/
       tags: [test]
     # --- GUI v1.2 File Manager (C5、Start → File Manager が起動する) ---
@@ -576,16 +576,16 @@ filesystem:
       guest: /usr/bin/
       tags: [gui]
     # --- GUI G1 ゲート描画テスト (libos32gui) ---
-    - host: userland/tests/gdi_test.bin
+    - host: userland/diag/gdi_test.bin
       guest: /usr/bin/
       tags: [test]
     # --- GUI C2: パレットリース検証 (W2) と入力→表示の測定器 (契約 P2) ---
-    - host: userland/tests/lease_test.bin
+    - host: userland/diag/lease_test.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/gui_bench.bin
+    - host: userland/diag/gui_bench.bin
       guest: /usr/bin/
       tags: [test]
-    - host: userland/tests/font_load_test.bin
+    - host: userland/diag/font_load_test.bin
       guest: /usr/bin/
       tags: [test]

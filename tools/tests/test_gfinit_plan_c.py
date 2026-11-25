@@ -72,61 +72,61 @@ def check_output(text, verbose=True):
 
 
 MUTATIONS = [
-    ('kdebug/gfinit_plan_c/checks.inc', 'command_run_stop',
+    ('sys/dev/video/geforce/gfinit_plan_c/checks.inc', 'command_run_stop',
      'b->baseline ? RECOVER_COMMAND_STOP : RECOVER_COMMAND_RUN',
      'b->baseline ? RECOVER_COMMAND_RUN : RECOVER_COMMAND_STOP'),
-    ('kdebug/recover_plan/access.inc', 'rmw_destination_sample',
+    ('sys/dev/video/geforce/diag/recover_plan/access.inc', 'rmw_destination_sample',
      'if (a->value == w->key) *old = values[i];', '(void)old;'),
-    ('kdebug/recover_gf_stage/c.inc', 'record_cell_required',
+    ('sys/dev/video/geforce/recover_gf_stage/c.inc', 'record_cell_required',
      'source != REC_CHECK_TARGET;', 'false;'),
-    ('kdebug/recover_gf_stage/c.inc', 'route_readback_mask',
+    ('sys/dev/video/geforce/recover_gf_stage/c.inc', 'route_readback_mask',
      '((actual ^ RECOVER_ROUTE_RGB_IN) & RECOVER_ROUTE_MASK)',
      '((actual ^ RECOVER_ROUTE_RGB_IN) & 0U)'),
     ('lib/pc98_cell.h', 'cell_skip_restore',
      'access(opaque, 5, true, &saved)',
      'access(opaque, 5, true, &test)'),
-    ('kdebug/recover_gf_stage/c.inc', 'route_callback_scope',
+    ('sys/dev/video/geforce/recover_gf_stage/c.inc', 'route_callback_scope',
      'r->node_layout[r->cursor]->flags==REC_LAYOUT_MODE_ROUTE &&',
      'r->node_layout[r->cursor]->flags!=REC_LAYOUT_MODE_ROUTE &&'),
-    ('hwdev/gf/display/checks.inc', 'check_pll_mask',
+    ('sys/dev/video/geforce/display/checks.inc', 'check_pll_mask',
      'CHECK_MMIO(GF_PLL_VIDEO,~GF_PLL_VIDEO_KEEP,q[C_PLL_PRIMARY_WRITE].value);',
      'CHECK_MMIO(GF_PLL_VIDEO,0,q[C_PLL_PRIMARY_WRITE].value);'),
-    ('hwdev/gf/display/checks.inc', 'check_test_sense',
+    ('sys/dev/video/geforce/display/checks.inc', 'check_test_sense',
      'CHECK_MMIO(C_TEST,GF_MODE_TEST_CONTROL,m->test_control);',
      'CHECK_MMIO(C_TEST,~0U,m->test_control);'),
-    ('kdebug/recover_gf_stage/c.inc', 'wait_short',
+    ('sys/dev/video/geforce/recover_gf_stage/c.inc', 'wait_short',
      'recover_delay_ms(r,ms,r->ops->mode_wait,r->opaque);',
      'recover_delay_ms(r,ms-1,r->ops->mode_wait,r->opaque);'),
-    ('kdebug/gfinit_bus.c', 'ar_reset',
+    ('sys/dev/video/geforce/diag/gfinit_bus.c', 'ar_reset',
      'mode_byte(b,base,GF_MODE_AR_STATUS,false,&ignored)', 'mode_byte(b,base,GF_MODE_AR_PORT,false,&ignored)'),
-    ('kdebug/gfinit_bus.c', 'dac_palette',
+    ('sys/dev/video/geforce/diag/gfinit_bus.c', 'dac_palette',
      'gfinit_mode_palette(i,rgb);', 'gfinit_mode_palette(0,rgb);'),
-    ('kdebug/gfinit_plan_c.c', 'pll_restore_live',
+    ('sys/dev/video/geforce/diag/gfinit_plan_c.c', 'pll_restore_live',
      'expr=GF_C_EXPR_SAVED;producer=b->pll_first;', 'expr=GF_C_EXPR_LIVE;producer=b->pll_first;'),
-    ('kdebug/gfinit_bus.c', 'misc_read_alias',
+    ('sys/dev/video/geforce/diag/gfinit_bus.c', 'misc_read_alias',
      'offset += RECOVER_MISC_READ - RECOVER_MISC_WRITE;', 'offset += 0;'),
-    ('kdebug/gfinit_plan_c.c', 'vram_last_row',
+    ('sys/dev/video/geforce/diag/gfinit_plan_c.c', 'vram_last_row',
      'y < GF_MODE_HEIGHT; y++', 'y + 1 < GF_MODE_HEIGHT; y++'),
-    ('kdebug/gfinit_bus.c', 'vram_compare',
+    ('sys/dev/video/geforce/diag/gfinit_bus.c', 'vram_compare',
      '!write && value != wanted && *bad_offset == RECOVER_NONE',
      '!write && value != wanted && *bad_offset != RECOVER_NONE'),
 ]
 
 STAGE_MUTATIONS = [
-    ('kdebug/gfinit_plan_c/checks.inc', 'c_only_command_stopped',
+    ('sys/dev/video/geforce/gfinit_plan_c/checks.inc', 'c_only_command_stopped',
      'b->baseline ? RECOVER_COMMAND_STOP : RECOVER_COMMAND_RUN',
      'b->baseline ? RECOVER_COMMAND_RUN : RECOVER_COMMAND_RUN', 's0'),
-    ('kdebug/gf_stage_state.c', 'entry_command',
+    ('sys/dev/video/geforce/diag/gf_stage_state.c', 'entry_command',
      'command != s->foundation->expected_command', 'false', 's0'),
-    ('kdebug/gf_stage_state.c', 'entry_revoked',
+    ('sys/dev/video/geforce/diag/gf_stage_state.c', 'entry_revoked',
      's->foundation->revoked ||', '', 's0'),
-    ('kdebug/gf_stage_state.c', 'baseline_once',
+    ('sys/dev/video/geforce/diag/gf_stage_state.c', 'baseline_once',
      'if (s->initialized) return 0;', 'if (false) return 0;', 'c_only'),
-    ('kdebug/gf_stage_state.c', 'entry_pmc',
+    ('sys/dev/video/geforce/diag/gf_stage_state.c', 'entry_pmc',
      'value != s->foundation->expected_pmc', 'false', 's0'),
-    ('kdebug/gf_stage_state.h', 'entry_last_s0',
+    ('sys/dev/video/geforce/diag/gf_stage_state.h', 'entry_last_s0',
      'r->gf_stage->s0_ok && r->s0_verified', 'r->gf_stage->s0_ok', 'c_only'),
-    ('kdebug/recover_common/session.inc', 'cold_retained',
+    ('sys/dev/video/geforce/diag/recover_common/session.inc', 'cold_retained',
      'r->cold_latched = r->cold_latched || p->cold_required;', 'r->cold_latched = false;', 'c_only'),
 ]
 
@@ -145,8 +145,8 @@ def mutation(item):
         except subprocess.CalledProcessError as exc:
             return name + ': compile failed ' + str(exc.stderr), 1
         # gcc dependency closure must copy the new units, not follow source-tree symlinks.
-        for dependency in ('kdebug/gfinit_plan_c.c', 'kdebug/gfinit_plan_c.h',
-                           'hwdev/gfinit_mode.h', 'hwdev/generated/gf_mode_rows.inc'):
+        for dependency in ('sys/dev/video/geforce/diag/gfinit_plan_c.c', 'sys/dev/video/geforce/diag/gfinit_plan_c.h',
+                           'sys/dev/video/geforce/gfinit_mode.h', 'sys/dev/video/geforce/gf_mode_rows.inc'):
             assert (tree / dependency).is_file() and not (tree / dependency).is_symlink()
         result = host32.run([str(exe)], cwd=tree, timeout=60, capture_output=True)
         failed = result.returncode != 0
@@ -173,7 +173,7 @@ def main():
         check_output(result.stdout.decode())
     if '--mutate' in sys.argv:
         return int(bool(mutpar.run_with_control(mutation, MUTATIONS,
-                        ('kdebug/gfinit_plan_c.c', 'control', '', ''))))
+                        ('sys/dev/video/geforce/diag/gfinit_plan_c.c', 'control', '', ''))))
     return 0
 
 

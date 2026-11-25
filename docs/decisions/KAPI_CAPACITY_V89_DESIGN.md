@@ -56,7 +56,7 @@ v89 は JSON の version=89、func_capacity=384、kapi_abi=2、crt_kapi_symbol=o
 |---|---|
 |通常アプリ|exec_launch.inc が AS 確保・entry 前に os32x_layout_check。旧 0x4b8 / 世代 1 は OS32X_LAYOUT_MISMATCH → EXEC_ERR_INVALID。パス、bin/kernel の変位と「KAPI data layout mismatch; rebuild required」を表示。変位だけ一致して世代違いなら「KAPI ABI generation mismatch; rebuild required」。|
 |常駐シェル|同じ入口で g_layout_reject を立てる。旧 gshell は rebuild required を表示して CUI へ。旧 CUI シェルも実行せず、起動媒体のフォールバックでも同じ照合を行う。|
-|GUI 共有ライブラリ|mm/shlib.c の shlib_init が頁確保前に SHLIB_REJECT_LAYOUT、戻り値 -1。PC-98 は「GUI shlib: rebuild required (KAPI data layout) -> CUI shell」を表示。要求版超過は SHLIB_REJECT_MIN_API でカーネル更新を案内。|
+|GUI 共有ライブラリ|sys/kern/mm/shlib.c の shlib_init が頁確保前に SHLIB_REJECT_LAYOUT、戻り値 -1。PC-98 は「GUI shlib: rebuild required (KAPI data layout) -> CUI shell」を表示。要求版超過は SHLIB_REJECT_MIN_API でカーネル更新を案内。|
 |逆向き|世代 2 のアプリを v88 が配置違いで拒否する。v89 上の v90 必須アプリは要求版超過で EXEC_ERR_INVALID。|
 
 既存の exec_run（FD シェルも通る）と shlib_init の早期照合を使う。有効な形式の入力では変位、ABI 世代、要求版の順に最初の不一致を報告する。前二者は再構築、要求版だけが高ければ要求版と実行中の版を示してカーネル更新を案内する。シェルのフォールバックも理由を保持する。
@@ -81,9 +81,9 @@ hostdrv は絞り込み後の全転送候補を列挙し、各 OS32X 本体の�
 |sdk/include/os32/os32_kapi_shared.h|本線 A|版を同期|
 |sdk/include/os32/os32_kapi_generated.h|本線 A|JSON から再生成。構造体・予約・刻印・CRT 参照を検査|
 |sdk/include/os32/os32_kapi_slots.h|本線 A|JSON から再生成。構造体・予約・刻印・CRT 参照を検査|
-|kapi/kapi_generated.c|本線 A|JSON から再生成。構造体・予約・刻印・CRT 参照を検査|
-|exec/exec_kapi_init.inc|本線 A|JSON から再生成。構造体・予約・刻印・CRT 参照を検査|
-|include/kapi_call_generated.h|本線 A|JSON から再生成。構造体・予約・刻印・CRT 参照を検査|
+|sys/kapi/kapi_generated.c|本線 A|JSON から再生成。構造体・予約・刻印・CRT 参照を検査|
+|sys/kern/exec/exec_kapi_init.inc|本線 A|JSON から再生成。構造体・予約・刻印・CRT 参照を検査|
+|sys/include/kapi_call_generated.h|本線 A|JSON から再生成。構造体・予約・刻印・CRT 参照を検査|
 |include/ppc_kapi_adapter_generated.h|本線 A|JSON から再生成。構造体・予約・刻印・CRT 参照を検査|
 |sdk/rust/os32api/src/kapi_generated.rs|本線 A|JSON から再生成。構造体・予約・刻印・CRT 参照を検査|
 |sdk/include/os32/os32_generations.h|本線 A|JSON から再生成。構造体・予約・刻印・CRT 参照を検査|
@@ -100,25 +100,25 @@ hostdrv は絞り込み後の全転送候補を列挙し、各 OS32X 本体の�
 |sdk/crt/crt0_c.c|本線 A|新 CRT 実名で定義・参照を照合。Rust の export_name を同期|
 |userland/rust/libos32gui/src/cfgro.rs|本線 A|新 CRT 実名で定義・参照を照合。Rust の export_name を同期|
 |userland/rust/libos32gui/src/shlib.rs|本線 A|新 CRT 実名で定義・参照を照合。Rust の export_name を同期|
-|include/syscall_code.h|本線 A|§1 の layout・emit・publish の宣言と成功規約|
-|exec/exec.h|本線 A|早期構築の返値を機種側へ公開|
+|sys/include/syscall_code.h|本線 A|§1 の layout・emit・publish の宣言と成功規約|
+|sys/kern/exec/exec.h|本線 A|早期構築の返値を機種側へ公開|
 
-|exec/exec.c|本線 A|新配置の §1 の式、確保・公開範囲、x86 shim の表参照を照合|
-|exec/ring3_str.h|本線 A|新配置の §1 の式、確保・公開範囲、x86 shim の表参照を照合|
-|exec/exec_tramp_init.inc|本線 A|新配置の §1 の式、確保・公開範囲、x86 shim の表参照を照合|
-|exec/exec_tramp_strings.inc|本線 A|新配置の §1 の式、確保・公開範囲、x86 shim の表参照を照合|
-|exec/exec_finish.inc|本線 A|新配置の §1 の式、確保・公開範囲、x86 shim の表参照を照合|
-|arch/x86/kernel/syscall_code.c|本線 A|新配置の §1 の式、確保・公開範囲、x86 shim の表参照を照合|
-|arch/x86/kernel/ring3_ls.S|本線 A|新配置の §1 の式、確保・公開範囲、x86 shim の表参照を照合|
-|mm/paging_map.inc|本線 A|両頁の写像・権限・監査を §1 に揃える|
-|mm/paging.c|本線 A|両頁の写像・権限・監査を §1 に揃える|
-|mm/paging.h|本線 A|両頁の写像・権限・監査を §1 に揃える|
-|exec/access_walk.c|本線 A|両頁の写像・権限・監査を §1 に揃える|
-|kernel/kaudit.c|本線 A|両頁の写像・権限・監査を §1 に揃える|
-|platform/pc98/kernel_boot_memory.inc|本線 A|両頁の写像・権限・監査を §1 に揃える|
-|platform/powermac/ppc_kernel.c|PPC A|2 頁の初期化引数、PPC 分岐・publish、実表サイズを照合|
-|arch/ppc/syscall_code.c|PPC A|2 頁の初期化引数、PPC 分岐・publish、実表サイズを照合|
-|arch/ppc/exec_kapi.c|PPC A|2 頁の初期化引数、PPC 分岐・publish、実表サイズを照合|
+|sys/kern/exec/exec.c|本線 A|新配置の §1 の式、確保・公開範囲、x86 shim の表参照を照合|
+|sys/kern/exec/ring3_str.h|本線 A|新配置の §1 の式、確保・公開範囲、x86 shim の表参照を照合|
+|sys/kern/exec/exec_tramp_init.inc|本線 A|新配置の §1 の式、確保・公開範囲、x86 shim の表参照を照合|
+|sys/kern/exec/exec_tramp_strings.inc|本線 A|新配置の §1 の式、確保・公開範囲、x86 shim の表参照を照合|
+|sys/kern/exec/exec_finish.inc|本線 A|新配置の §1 の式、確保・公開範囲、x86 shim の表参照を照合|
+|sys/arch/x86/kernel/syscall_code.c|本線 A|新配置の §1 の式、確保・公開範囲、x86 shim の表参照を照合|
+|sys/arch/x86/kernel/ring3_ls.S|本線 A|新配置の §1 の式、確保・公開範囲、x86 shim の表参照を照合|
+|sys/kern/mm/paging_map.inc|本線 A|両頁の写像・権限・監査を §1 に揃える|
+|sys/kern/mm/paging.c|本線 A|両頁の写像・権限・監査を §1 に揃える|
+|sys/kern/mm/paging.h|本線 A|両頁の写像・権限・監査を §1 に揃える|
+|sys/kern/exec/access_walk.c|本線 A|両頁の写像・権限・監査を §1 に揃える|
+|sys/kern/kaudit.c|本線 A|両頁の写像・権限・監査を §1 に揃える|
+|sys/platform/pc98/kernel_boot_memory.inc|本線 A|両頁の写像・権限・監査を §1 に揃える|
+|sys/platform/powermac/ppc_kernel.c|PPC A|2 頁の初期化引数、PPC 分岐・publish、実表サイズを照合|
+|sys/arch/ppc/syscall_code.c|PPC A|2 頁の初期化引数、PPC 分岐・publish、実表サイズを照合|
+|sys/arch/ppc/exec_kapi.c|PPC A|2 頁の初期化引数、PPC 分岐・publish、実表サイズを照合|
 |sdk/link_guard.py|本線 A|旧入力を拒否し新 ELF の刻印を配布まで照合。定数は生成値を使用|
 |sdk/rustc_stamp.py|本線 A|旧入力を拒否し新 ELF の刻印を配布まで照合。定数は生成値を使用|
 |sdk/os32x_hdr.py|本線 A|旧入力を拒否し新 ELF の刻印を配布まで照合。定数は生成値を使用|
@@ -127,14 +127,14 @@ hostdrv は絞り込み後の全転送候補を列挙し、各 OS32X 本体の�
 |tools/hostdrv_deploy.py|本線 A|旧入力を拒否し新 ELF の刻印を配布まで照合。定数は生成値を使用|
 |userland/system/hsync.c|本線 A|旧入力を拒否し新 ELF の刻印を配布まで照合。定数は生成値を使用|
 |build/ppc-user.mk|PPC A|既存の mkos32x.py 共通経路で ELF のターゲット順を読み LE 包装。PPC CRT・ASM の各 object は実際に使う生成ヘッダ・刻印に依存させ、世代変更のみでも再組立・再リンク|
-|exec/os32x_hdr.c|本線 A|§2 の拒否経路と案内を照合|
-|exec/exec_launch.inc|本線 A|§2 の拒否経路と案内を照合|
-|mm/shlib.c|本線 A|§2 の拒否経路と案内を照合|
-|platform/pc98/kernel_gui_shlib.inc|本線 A|§2 の拒否経路と案内を照合|
-|platform/pc98/kernel_shell_fdd.inc|本線 A|§2 の拒否経路と案内を照合|
+|sys/kern/exec/os32x_hdr.c|本線 A|§2 の拒否経路と案内を照合|
+|sys/kern/exec/exec_launch.inc|本線 A|§2 の拒否経路と案内を照合|
+|sys/kern/mm/shlib.c|本線 A|§2 の拒否経路と案内を照合|
+|sys/platform/pc98/kernel_gui_shlib.inc|本線 A|§2 の拒否経路と案内を照合|
+|sys/platform/pc98/kernel_shell_fdd.inc|本線 A|§2 の拒否経路と案内を照合|
 |tools/hwdev_layout.json|本線 A|予約を含むメンバー一覧を更新し DWARF から layout・CRC を再生成|
-|hwdev/generated/hwdev_contract.h|本線 A|予約を含むメンバー一覧を更新し DWARF から layout・CRC を再生成|
-|hwdev/generated/hwdev_layout.txt|本線 A|予約を含むメンバー一覧を更新し DWARF から layout・CRC を再生成|
+|sys/dev/hwdev/generated/hwdev_contract.h|本線 A|予約を含むメンバー一覧を更新し DWARF から layout・CRC を再生成|
+|sys/dev/hwdev/generated/hwdev_layout.txt|本線 A|予約を含むメンバー一覧を更新し DWARF から layout・CRC を再生成|
 |tools/tests/hwdev_contract_fixture.py|本線 A|生成差分をレビューして HWDEV・FEP の変化した指紋を更新|
 |tools/tests/test_ime_display_boundary.py|本線 A|生成差分をレビューして HWDEV・FEP の変化した指紋を更新|
 |tools/tests/test_kapi_layout.py|本線 A/B|現行期待は JSON と配置式から導出。300・0x4b8・旧 CRT 実名は v88 拒否 fixture に限り、関連する変異の目印を更新|
@@ -180,7 +180,7 @@ ROLES §6 に従い、本計画の承認後、実装前に PM がその時点の
 
 ## 確定 (2026-11-21、sol 第 2 回「4 点を反映すれば可」、PM が反映)
 以下は本文に優先する。
-- **P1 初期化の順**: 早い構築が kapi を読むが、実の表の取得と初期化は両機種とも後の exec_init() にある (exec/exec.c、exec/exec_tramp_init.inc、platform/powermac/exec_boot.c)。実の表の初期化を exec_init() から分け、「実の表の初期化 → トランポリンの構築と公開 → 写像」の順を両機種で固定する。
+- **P1 初期化の順**: 早い構築が kapi を読むが、実の表の取得と初期化は両機種とも後の exec_init() にある (sys/kern/exec/exec.c、sys/kern/exec/exec_tramp_init.inc、sys/platform/powermac/exec_boot.c)。実の表の初期化を exec_init() から分け、「実の表の初期化 → トランポリンの構築と公開 → 写像」の順を両機種で固定する。
 - **P1 hsync・HostDrv の事前の照合**: 期待する変位と世代の取得元を経路ごとに決める — 名札 (manifest) がある時はそれ、名札が無い時 (HostDrv の絞り込みの配備で名札を消す時・hsync の名札なしの経路) は配る物の os32x のヘッダの世代と変位を読んで照らし、合えば通す。受入は正常の転送と、不適合の時の書き込み 0 の両方を試す。
 - **P2 部品の組の CRC**: 今の照合は MODULE_FLAG_PAIR が立つ時だけ。kdebug・FEP・HWDEV の 3 つの包装ではこの旗を必須にし、CRC の不一致の試験は旗つきの入力で行う。
 - **P2 境界の検査**: tools/tests/test_kapi_layout.py の旧い 1 頁の式 `12R + 272 <= 4096` は R=384 で落ちるので、§1 の表と文字列の頁・スタブと shim の頁のそれぞれの境界の検査に置き換える。

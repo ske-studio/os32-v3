@@ -13,7 +13,7 @@ import pathlib
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 from recover_oracle import extract_oracle
 
-OUTPUT = ROOT / 'kdebug/generated/recover_gf_tables.inc'
+OUTPUT = ROOT / 'sys/dev/video/geforce/diag/generated/recover_gf_tables.inc'
 NONE = 0xffffffff
 
 
@@ -95,7 +95,7 @@ def main():
     data = json.loads(args.input.read_text()) if args.input else extract_oracle()
     result = generate(data)
     from gfinit_mode_tables import generate as generate_mode
-    mode_output = ROOT / "hwdev/generated/gf_mode_rows.inc"
+    mode_output = ROOT / "sys/dev/video/geforce/gf_mode_rows.inc"
     mode_result = generate_mode()
     if args.check:
         if not OUTPUT.exists() or OUTPUT.read_text() != result:

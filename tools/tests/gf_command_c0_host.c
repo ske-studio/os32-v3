@@ -1,12 +1,12 @@
 /* C0 lifecycle oracle, GF_FEAT2_DESIGN sections 6/9 and INIT addendum.
  * Include the real command.c (override GF2_COMMAND_SOURCE for mutations),
- * and link the real hwdev/gf/fence.c to test old-epoch rejection too.
+ * and link the real sys/dev/video/geforce/fence.c to test old-epoch rejection too.
  * A2's GF2_HOST_B0..B9 fixtures have no C0 selector: dependency fakes below
  * are local until A2 incorporates them. No ports or privileged instructions.
  * Test names use underscores in C: c0-stop-order -> c0_stop_order, etc. */
 #define IO_H
 #include "gf_command_runtime_host.h"
-#include "../../hwdev/gf/command.h"
+#include "../../sys/dev/video/geforce/command.h"
 #ifdef NDEBUG
 #error "C0's ownership and ordering oracle requires assertions"
 #endif
@@ -16,7 +16,7 @@ static unsigned irq_save(void)
 static void irq_restore(unsigned saved)
 { assert(!(c0_if & 0x200U)); c0_if = saved; }
 #ifndef GF2_COMMAND_SOURCE
-#define GF2_COMMAND_SOURCE "../../hwdev/gf/command.c"
+#define GF2_COMMAND_SOURCE "../../sys/dev/video/geforce/command.c"
 #endif
 #include "gf_startlog_host.h"
 int serial_gate_active(void) { return 1; }

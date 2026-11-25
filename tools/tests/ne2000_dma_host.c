@@ -4,7 +4,7 @@
 #include "types.h"
 static unsigned int inp(unsigned int port);
 static void outp(unsigned int port, unsigned int value);
-#include "../../arch/x86/x86_flags.h"
+#include "../../sys/arch/x86/x86_flags.h"
 #include "cpu.h"
 /* Supply IF at the existing CPU boundary, including IF=0 waits. */
 static unsigned int host_if_mask = EFLAGS_IF;
@@ -17,7 +17,7 @@ static unsigned int irq_save(void)
 }
 static void irq_restore(unsigned int flags) { host_if_mask = flags; }
 #ifndef NE2000_SOURCE
-#define NE2000_SOURCE "../../drivers/net/ne2000/ne2000.c"
+#define NE2000_SOURCE "../../sys/dev/net/ne2000/ne2000.c"
 #endif
 #include NE2000_SOURCE
 

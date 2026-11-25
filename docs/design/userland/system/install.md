@@ -33,7 +33,7 @@ FDD (FAT12) から起動して hd0 にシステムを入れる `install` (無印
 
 ## `IdeInfo` の型
 
-`ide_identify` はカーネルの `drivers/ata/ide.h` の `IdeInfo` (i386 で 96 byte、末尾 `phys_sector_size` が offset 92) で書く。外部プログラムからカーネルヘッダは見えないので `install.c` に同じ並びの写しを置く。小さい型で受けると呼び手の領域を踏む。`ide.h` を変えたら写し (`userland/shell/cmd_sys.c` にもある) を一緒に直す。
+`ide_identify` はカーネルの `sys/dev/ata/ide.h` の `IdeInfo` (i386 で 96 byte、末尾 `phys_sector_size` が offset 92) で書く。外部プログラムからカーネルヘッダは見えないので `install.c` に同じ並びの写しを置く。小さい型で受けると呼び手の領域を踏む。`ide.h` を変えたら写し (`userland/shell/cmd_sys.c` にもある) を一緒に直す。
 
 ## 検査
 

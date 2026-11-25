@@ -1,6 +1,6 @@
-# kdebug/gfinit_plan_c.c — 設計
+# sys/dev/video/geforce/diag/gfinit_plan_c.c — 設計
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
-ソース: `kdebug/gfinit_plan_c.c`
+ソース: `sys/dev/video/geforce/diag/gfinit_plan_c.c`
 
 record でも ID/BAR/legacy/範囲/route/セル/バス失敗は止める。必須 CHECK と任意観測を区別し、全レジスタ readback を追加しない。
 診断の node 生成接続、446 の呼出し、rows/build/control/vram/color は元の場所に残す（N3）。
@@ -8,7 +8,7 @@ record でも ID/BAR/legacy/範囲/route/セル/バス失敗は止める。必�
 ## 落とし穴
 
 - **必須照合と観測**: 書込み後の全レジスタを必須照合すると、読戻し値が異なる箇所で停止し、残りを調べられない。
-  `kdebug/gfinit_plan_c.c` はルールに verify mask を持たせ、必須 CHECK と記録を区別する。
+  `sys/dev/video/geforce/diag/gfinit_plan_c.c` はルールに verify mask を持たせ、必須 CHECK と記録を区別する。
   診断では `--verify record|required` と実行時の除外ファイルを選べる (`userland/shell/cmd_gfinit.c`)。
   除外は実際に読戻しを保証できない範囲に限り、`tools/tests/gfinit_plan_c_host.c` で計画の照合を検査する。
 
@@ -16,7 +16,7 @@ record でも ID/BAR/legacy/範囲/route/セル/バス失敗は止める。必�
 
 VRAMはQ→Pで停止後・Dより前にBAR1+[0,4B000h)の307,200 Bを予約してCPU転送。1行640 Bの固定試験データを480行、全行書込み後に全域比較、posted write排出は既存の安全なGPU読取り。VRAM容量/窓の下限と書込範囲をplanで確定（`docs/design/kdebug/gfinit_plan.md`）。
 
-HWDEV側 `gfinit_plan` に A2+main+固定C節を最初からbind。Cは入口CHECK→Q→P→VRAM→S/D→L1/2/3→C→R→出口CHECK→NONE、成功はPAUSED。失敗は既存trial_end、途中再開なし（`kdebug/gfinit.c`）。
+HWDEV側 `gfinit_plan` に A2+main+固定C節を最初からbind。Cは入口CHECK→Q→P→VRAM→S/D→L1/2/3→C→R→出口CHECK→NONE、成功はPAUSED。失敗は既存trial_end、途中再開なし（`sys/dev/video/geforce/diag/gfinit.c`）。
 
 307,200 BをDWORDごとのplan/RECへ展開しない。固定640 B行の有限転送/比較を内部操作として追加し、方向ごとにgf_bus BEGIN/ENDを1組（転送全域で1組・比較全域で1組、先頭・長さ・方向、最初の不一致番地/値だけ記録）、途中の既存safe point・窓復元を持つ。DAC768 byteも固定有限列。汎用bulk APIにはしない。
 

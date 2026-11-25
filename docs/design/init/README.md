@@ -7,7 +7,7 @@
 tvram_print と tv_cat 系は内部 boot_display.c/.h に移して共用し、表示コードを複製しない。
 
 ```c
-/* platform/pc98/boot_display.c: 既存名・引数・呼出側を残す */
+/* sys/platform/pc98/boot_display.c: 既存名・引数・呼出側を残す */
 void tvram_print(int x, int y, const char *s, u8 attr) {
     platform_boot_puts(x, y, s, attr);
 }
@@ -39,7 +39,7 @@ bootinfo_report は BIOS 行→IDENTIFY 行（BOOTINFO_NDRIVES=2）の順・書�
 /* 終了のkernel側: clear_pages→gfx_shutdown→palette_init→tvram_clear */
 ```
 
-- glyph配列、配置、整数HSV、gradient、palette設定、dirty矩形、3秒/tickループ、終了時期はplatform/pc98/boot_splash.cに残す。
+- glyph配列、配置、整数HSV、gradient、palette設定、dirty矩形、3秒/tickループ、終了時期はsys/platform/pc98/boot_splash.cに残す。
 
 ## 索引
 

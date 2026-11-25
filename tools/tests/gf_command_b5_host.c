@@ -1,6 +1,6 @@
-/* Link hwdev/gf/gr.c only; A2 supplies B0/B3/B4 and foundation stubs.
+/* Link sys/dev/video/geforce/gr.c only; A2 supplies B0/B3/B4 and foundation stubs.
  * B4 separately checks the real generator against the independent MIT oracle. */
-#include "../../hwdev/gf/command.h"
+#include "../../sys/dev/video/geforce/command.h"
 
 static void fail(int line)
 { __asm__ volatile("int $0x80" : : "a"(1), "b"(line)); for (;;) {} }

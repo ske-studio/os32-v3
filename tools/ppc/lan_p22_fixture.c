@@ -1,4 +1,4 @@
-#include "platform/powermac/lan_boot.h"
+#include "sys/platform/powermac/lan_boot.h"
 static void out(const char *s, int n) { __asm__ volatile("int $0x80" : : "a"(4), "b"(1), "c"(s), "d"(n)); }
 void *memset(void *p,int c,u32 n) { u8 *x=p; while(n--) *x++=c; return p; }
 void *kmemset(void *p, int c, u32 n) { return memset(p, c, n); }

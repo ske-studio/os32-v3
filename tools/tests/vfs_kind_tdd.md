@@ -6,7 +6,7 @@
 - 上位の記録: [`h1_tdd.md`](h1_tdd.md) — H1 全体の RED→GREEN はそちら
 - 実行: `python3 -B tools/tests/test_vfs_kind.py [--target]`
   (`make check-fs-kind-host` が同じものを `--target` 付きで回す)
-- 対象: `fs/vfs.c` / `fs/vfs_fd.c` (実物を `#include`)
+- 対象: `sys/fs/vfs.c` / `sys/fs/vfs_fd.c` (実物を `#include`)
 - 仕様: [`docs/06_filesystem.md`](../../docs/06_filesystem.md) §6-1 (VFS エラーと種別)
 
 ## 0. 正直に書く ([V4])
@@ -21,7 +21,7 @@
 
 ## 1. 何を確かめる試験か
 
-`tools/tests/vfs_kind_host.c` が実物の `fs/vfs.c` をそのまま `#include` し、
+`tools/tests/vfs_kind_host.c` が実物の `sys/fs/vfs.c` をそのまま `#include` し、
 境界 (kstring / kmalloc) だけを同義の C で置く。FS ドライバは合成した `VfsOps` で、
 `stat` / `list_dir` / `get_file_size` の戻り値を**1 つずつ**指定できる。
 
@@ -37,17 +37,17 @@ stat が IO で失敗
 ```
 
 往復 4 の **B7** は「`vfs_path_kind` の戻り値までしか見ていなかった」ことが
-検出漏れの原因だったので、**実物の `fs/vfs_fd.c` も同じ翻訳単位に取り込み、
+検出漏れの原因だったので、**実物の `sys/fs/vfs_fd.c` も同じ翻訳単位に取り込み、
 `vfs_open()` まで通す**。種別の判定は、それを**消費する側**まで試験する。
 
 ## 2. GREEN (現状)
 
 ```
-HOST GNU89 -Werror COMPILE PASS (real fs/vfs.c)
+HOST GNU89 -Werror COMPILE PASS (real sys/fs/vfs.c)
 35 checks, 0 failures
 EXIT vfs_kind_host=0
-TARGET i386-elf -Werror COMPILE PASS (fs/vfs.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/vfs_fd.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/fs/vfs.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/fs/vfs_fd.c)
 ```
 
 | 節 | 見ているもの |

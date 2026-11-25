@@ -103,7 +103,7 @@ def main():
     if defects:
         parser.error('; '.join(defects) + '; run make kernel')
     _, symbols = read_elf(elf)
-    macros = Macros(read_defines(args.root / 'include/memmap.h'), symbols)
+    macros = Macros(read_defines(args.root / 'sys/include/memmap.h'), symbols)
     k = {name: macros.get(name) for name in macros.defines}
     ptes = pte_all(args.snapshot_dir, k['MEM_FIXED_BOOT_PT_COUNT'])
     total = 0

@@ -4,7 +4,7 @@
 
 ### baseline.inc
 
-ソース: `kdebug/gfinit_plan_c/baseline.inc`
+ソース: `sys/dev/video/geforce/gfinit_plan_c/baseline.inc`
 
 s(1C/33/3C/4B/52/60081C/600850/680524)を採取
 
@@ -14,7 +14,7 @@ CR52は毎回 `(初回s+4)&FF`、C040の復元先も初回値で固定する。
 
 ### checks.inc
 
-ソース: `kdebug/gfinit_plan_c/checks.inc`
+ソース: `sys/dev/video/geforce/gfinit_plan_c/checks.inc`
 
 入口CHECK：ID/BAR/Command=0102、cfg50/54と1850/1854=0、route&3=0、main4完了。1854の再書込みは不要。
 

@@ -13,7 +13,7 @@ void gfx_policy_reeval(void) {}
  *
  *  K5a の tools/tests/multiapp_model_host.c は「設計の模型」で、状態機械を
  *  その場に手書きしていた。こちらは **実物の AppSlot 管理コード**
- *  (exec/appslot.c) をそのままコンパイルして、同じ 84 検査を回す。
+ *  (sys/kern/exec/appslot.c) をそのままコンパイルして、同じ 84 検査を回す。
  *  番号と検査名は模型と 1 対 1 で対応させてあるので、落ちた検査名で
  *  「模型のどの規則が実装で崩れたか」がそのまま分かる。
  *
@@ -33,7 +33,7 @@ void gfx_policy_reeval(void) {}
 #include "types.h"
 
 /* ---- 実物のカーネルコード (ハードウェアには一切触らない部分) ---------- */
-/* T9 §12 T1: 標準 FD のリダイレクト表も **実物** (fs/fd_redirect.c) を
+/* T9 §12 T1: 標準 FD のリダイレクト表も **実物** (sys/fs/fd_redirect.c) を
  * そのまま取り込む。park / resume で ID ごとに持ち替わることを、模型では
  * なく実物の表で見るため。res_owner_set/get の実体もこちらにあるので、
  * ハーネス側の写しは持たない (所有者タグが本物になる)。
@@ -74,7 +74,7 @@ void vfs_close(int fd)
     host_fd_open[fd] = 0;
 }
 
-/* fs/vfs_fd.c の vfs_close_owned の偽物 (exec_reclaim_owned の (2))。
+/* sys/fs/vfs_fd.c の vfs_close_owned の偽物 (exec_reclaim_owned の (2))。
  * 実物と同じく「その owner が開いた、まだ開いている FD」を閉じる。 */
 static void host_vfs_close_owned(int owner)
 {
@@ -110,7 +110,7 @@ int vfs_write_fd(int fd, const void *buf, u32 size)
 #include "redir_access_stub.h"
 
 /* fd_redirect.c の書き込み時の再検査 (票 TASK_KAPI_OUTPUT_GUARD、実装レビュー 4)
- * が引く exec/exec.c の 5 本。ホストではユーザ帯の番地は無いので
+ * が引く sys/kern/exec/exec.c の 5 本。ホストではユーザ帯の番地は無いので
  * ring3_ptr_ok は常に 0 (= 再検査を通らない)。呼ばれたら落ちる側は数える。 */
 static int host_fault_kills = 0;
 int ring3_ptr_ok(u32 p) { (void)p; return 0; }
@@ -125,16 +125,16 @@ void ring3_fault_kill(void) { host_fault_kills++; for (;;) { } }
 
 #include "appslot.c"
 
-/* K7: 注入リングは **実物** (kernel/kbd_inject.c) をそのまま取り込む。
+/* K7: 注入リングは **実物** (sys/kern/kbd_inject.c) をそのまま取り込む。
  * 権限の照合相手だけハーネスが持つ (con_sink はここでは要らない —
  * 「読み手だけが注げる」は tools/tests/kbd_inject_host.c が本物の
- * kernel/console/con_sink.c と組んで見ている)。 */
+ * sys/kern/console/con_sink.c と組んで見ている)。 */
 static int host_reader = 2;
 int con_sink_reader_get(void) { return host_reader; }
 volatile int ring3_wm_depth;
 #include "kbd_inject.c"
 
-/* T9: 起動要求表も **実物** (exec/launch.c) をそのまま取り込む。要るのは
+/* T9: 起動要求表も **実物** (sys/kern/exec/launch.c) をそのまま取り込む。要るのは
  * GUI 判定と kstrncpy だけ (表そのものの検査は tools/tests/launch_host.c)。
  * ここで見るのは exec_kill の連鎖 (D8) と sys_yield の resume (D5) — 表と
  * AppSlot が噛み合う所。 */
@@ -152,7 +152,7 @@ char *kstrncpy(char *dst, const char *src, u32 n)
 
 /* ---- 試験ハーネス ----------------------------------------------------- */
 
-#define MA_SLOT_MAX   4              /* = include/memmap.h の GUI_SLOT_MAX */
+#define MA_SLOT_MAX   4              /* = sys/include/memmap.h の GUI_SLOT_MAX */
 
 #define MA_RES_FD     0
 #define MA_RES_PIPE   1
@@ -178,7 +178,7 @@ typedef struct {
     int  derived_ready[APP_SLOT_COUNT];
     int  turn_used[APP_SLOT_COUNT];
     u32  free_pages;
-    int  cpl0_children;               /* exec/exec.c の g_cpl0_children */
+    int  cpl0_children;               /* sys/kern/exec/exec.c の g_cpl0_children */
     int  last_run;
     int  focus;
     int  input_streak;
@@ -307,7 +307,7 @@ static int ma_resume(int id)
 }
 
 /* ---- K7: 第 2 の park 点 (GUI 中の kbd 待ち) --------------------------- */
-/* 表 (appslot.c) は実物。CR3 / フレーム / longjmp を持つ exec/exec.c は
+/* 表 (appslot.c) は実物。CR3 / フレーム / longjmp を持つ sys/kern/exec/exec.c は
  * ホストに持ち込めないので、exec_park_kbd / exec_resume の **kbd 分岐だけ**
  * をここに写す (ケース 12〜16 が gshell の選択規則を写しているのと同じ扱い)。
  * 写した部分は 3 行 — 印を見て注入リングから 1 バイト取り、EAX に入れ、
@@ -341,11 +341,11 @@ static int ma_resume_kbd(int id)
 }
 
 /* ---- T8 §7 D8: 第 3 の park 点 (GUI 中のポーリング型の協調 yield) ------ */
-/* K7 の 2 本と同じ扱い。表 (appslot.c) は実物で、exec/exec.c の
+/* K7 の 2 本と同じ扱い。表 (appslot.c) は実物で、sys/kern/exec/exec.c の
  * exec_park_poll / exec_resume の **poll 分岐だけ** をここに写す。写した分は
  * 3 行 — 印を見て注入リングから 1 バイト取り、空なら **-1 (キーなし)** を
  * EAX に入れる (WAIT_KEY と違い、空でも起こす)。
- * now_tick は drivers/input/kbd.c が tick_count から渡す値の差し替え。 */
+ * now_tick は sys/platform/pc98/input/kbd.c が tick_count から渡す値の差し替え。 */
 static int ma_park_poll(u32 now_tick)
 {
     int rc = appslot_park_poll_check(now_tick);
@@ -363,7 +363,7 @@ static int ma_resume_poll(int id)
     int rc = appslot_resume_check(id);
     if (rc < 0) return rc;
     a = appslot_get(id);
-    /* exec/exec.c の exec_resume と同じく、EAX の出所は印から導く。
+    /* sys/kern/exec/exec.c の exec_resume と同じく、EAX の出所は印から導く。
      * 明示的な譲り (T9 D5) は注入リングを読まず 0 を入れる。 */
     switch (appslot_resume_source(id)) {
     case APP_RESUME_SRC_YIELD:
@@ -398,14 +398,14 @@ static int ma_res_add(int kind, int n)
 static void ma_reclaim_res(int id)
 {
     int k;
-    /* exec/exec.c の exec_reclaim_owned (1)。いまの表からその ID のものを外す。 */
+    /* sys/kern/exec/exec.c の exec_reclaim_owned (1)。いまの表からその ID のものを外す。 */
     fd_redirect_reset_owned(id);
-    /* exec/exec.c の exec_reclaim_owned (2) vfs_close_owned。park したまま
+    /* sys/kern/exec/exec.c の exec_reclaim_owned (2) vfs_close_owned。park したまま
      * 畳まれた ID のリダイレクトの file_fd は「いまの表」に無いが、FD 自体は
      * その ID の owner タグを持っているのでここで閉じる (票 §12 T1)。
      * appslot_reclaim は枠を **空にするだけ** — 閉じると二重 close になる。 */
     host_vfs_close_owned(id);
-    /* exec/exec.c の exec_reclaim_owned (9b)。ID だけを使う (票 T9 D3)。 */
+    /* sys/kern/exec/exec.c の exec_reclaim_owned (9b)。ID だけを使う (票 T9 D3)。 */
     launch_owner_exit(id);
     appslot_gfx_owner_exit(id);
     for (k = 0; k < MA_RES_KINDS; k++) H.res[id][k] = 0;
@@ -437,12 +437,12 @@ static int ma_abort_request(void)
     return appslot_abort_request() ? 0 : OS32_ERR_INVAL;
 }
 
-/* exec/exec.c の ring3_abort_request (IRQ1 の ISR から呼ばれる) を**そのまま
+/* sys/kern/exec/exec.c の ring3_abort_request (IRQ1 の ISR から呼ばれる) を**そのまま
  * 写した**形 (exec.c はカーネル一式を引くのでホストへ #include できない)。
  * GUI 判定 (con_sink_is_enabled) と tick (tick_count) は呼び出し側が渡す。
  * 上の ma_abort_request はこの関門を通らない直呼び = gfx 拒否 (T8 D1a) と
  * V86 の脱出の経路。 */
-/* exec/exec.c の ring3_syscall_dispatch の**入口の 1 行**を写した形
+/* sys/kern/exec/exec.c の ring3_syscall_dispatch の**入口の 1 行**を写した形
  * (票 §12 S6b)。走っているアプリが KAPI を 1 本呼んだ = カーネルへ入った。
  * 実物は g_cur_app (CPL=3 で走っているスロット) を見るので、ここも
  * アプリ ID (2〜5) のときだけ控える。 */
@@ -483,7 +483,7 @@ static int ma_kill(int id)
     return 0;
 }
 
-/* 第 4 の park 点 (票 T9 D5)。exec/exec.c の exec_sys_yield の表の部分。 */
+/* 第 4 の park 点 (票 T9 D5)。sys/kern/exec/exec.c の exec_sys_yield の表の部分。 */
 static int ma_park_yield(void)
 {
     int rc = appslot_park_yield_check();
@@ -492,7 +492,7 @@ static int ma_park_yield(void)
     return 0;
 }
 
-/* exec/exec.c の exec_kill (票 T9 D8) の**連鎖の部分をそのまま写した**形
+/* sys/kern/exec/exec.c の exec_kill (票 T9 D8) の**連鎖の部分をそのまま写した**形
  * (exec.c はカーネル一式を引くのでホストへ #include できない)。畳む 1 本分は
  * 既存の ma_kill と同じ手順 (回収 → スロット返却)。順番が効く: 末尾から
  * 畳まないと、各段の回収通知が親の表を DONE にする前に親が消える。 */
@@ -1347,7 +1347,7 @@ static void case_wait_key(void)
 /*  全画面 GFX プログラムが gshell 配下で走ると、画面の持ち主が 1 本に決まり  */
 /*  ((a) 遷移)、宣言していないプログラムは画面を取れず ((b) 拒否)、VRAM を    */
 /*  直接触る --cpl0 は GUI から起動できない ((c))。3 つとも実物の            */
-/*  exec/appslot.c を叩く。                                                  */
+/*  sys/kern/exec/appslot.c を叩く。                                                  */
 /* ======================================================================== */
 static void case_gfx_screen_owner(void)
 {
@@ -1768,7 +1768,7 @@ static void case_yield_and_kill_chain(void)
 /* ========================================================================
  *  24. 標準 FD のリダイレクト表は ID の文脈 (票 T9 §12 T1)
  *
- *  表 (fs/fd_redirect.c) は FD 0/1/2 の 3 本しかなく全アプリ共有だった。
+ *  表 (sys/fs/fd_redirect.c) は FD 0/1/2 の 3 本しかなく全アプリ共有だった。
  *  park してある sh のリダイレクトが生きたままなので:
  *    反例 1: WM の Start → Run で起動した別アプリの printf が sh の
  *            `> /tmp/out` に入る
@@ -2078,7 +2078,7 @@ int main(void)
 {
     failures = 0;
     checks = 0;
-    report("multiapp impl (K5b-K, exec/appslot.c)\n");
+    report("multiapp impl (K5b-K, sys/kern/exec/appslot.c)\n");
     case_fifth_refused();
     case_exit_reclaims_one();
     case_switch_only_in_op_wait();

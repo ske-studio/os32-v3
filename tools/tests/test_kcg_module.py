@@ -1,6 +1,6 @@
 """T5c-1: real KCG body, typed adapter/runtime, paired product and runtime RED."""
 CHECK = dict(name='kcg-module-host', tier=1,
-    covers=['platform/pc98/platform_install_layout.h', 'include/platform_install_boot.h', 'platform/pc98/install_geometry.h', 'platform/pc98/install_hdprep.c', 'platform/pc98/install_plan.c', 'platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'tools/tests/recover_gf_dev_stub.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'tools/tests/paging_source.py', 'kdebug/kselftest.c', 'tools/tests/kcg_display_host.c', 'mm/paging.h', 'gfx/gfx.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/video/kcg/kcg.h', 'drivers/video/kcg/kcg.c', 'tools/tests/kcg_body_host.c', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'drivers/video/kcg/kcg_body.c', 'drivers/video/kcg/kcg_module.c', 'drivers/video/kcg/kcg_read_provider.inc', 'platform/pc98/kernel.c', 'init/shell_loop.c', 'drivers/video/kcg/kcg_module.h', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/kcg_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/kcg_module_host.c', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/gfx_kernel_fb_host.c', 'gfx/gfx_core.c', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c', 'kernel/console/display_restore.h', 'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_dirty.c', 'gfx/gfx_present.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kernel/sys.c', 'tools/tests/mutpar.py', 'tools/tests/kernel_layout.py', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'gfx/gfx_internal.h', 'build/kcg-module.ld', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/kcg/*', 'build/out/kcg.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'fs/pc98pt.c', 'drivers/pci/pci_decode.c', 'tools/tests/sh_truncation_host.c', 'tools/tests/test_sh_truncation.py', 'userland/shell/cmd_base.c', 'userland/shell/cmd_dir.c', 'userland/shell/cmd_env.c', 'userland/shell/cmd_file.c', 'userland/shell/cmd_filer.c', 'userland/shell/cmd_fs_shared.c', 'userland/shell/cmd_hdprep.c', 'userland/shell/cmd_mnt.c', 'userland/shell/cmd_pci.c', 'userland/shell/cmd_script.c', 'userland/shell/cmd_sys.c', 'userland/shell/cmd_gf1.c', 'userland/shell/cmd_gf2.c', 'userland/shell/cmd_tri.c', 'kdebug/tri_command_wire.h', 'kdebug/gf_foundation_wire.h', 'kdebug/gf_command_wire.h', 'userland/shell/hdprep_plan.c', 'userland/shell/kbd_watch.c', 'userland/shell/main.c', 'userland/shell/pci_verbose.c', 'userland/shell/rshell.c', 'userland/shell/serial_watchdog.c', 'userland/shell/ui.c', 'exec/exec.h', 'include/pc98.h', 'include/io.h', 'platform/pc98/platform_io.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'platform/pc98/boot.c', 'include/platform_display.h', 'platform/pc98/display.c', 'include/kcg_contract.h', 'tools/tests/kernel_includes.py', 'kernel/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
+    covers=['sys/platform/pc98/platform_install_layout.h', 'sys/include/platform_install_boot.h', 'sys/platform/pc98/install_geometry.h', 'sys/platform/pc98/install_hdprep.c', 'sys/platform/pc98/install_plan.c', 'sys/platform/pc98/module_pair.c', 'sys/include/platform_module_pair.h', 'tools/tests/recover_gf_dev_stub.c', 'sys/platform/pc98/bootinfo_wire.h', 'sys/platform/pc98/bootinfo_native.h', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/hal/gfx/gfx_emergency.c', 'sys/hal/gfx/gfx_emergency.h', 'tools/tests/paging_source.py', 'sys/platform/pc98/kdebug/kselftest.c', 'tools/tests/kcg_display_host.c', 'sys/kern/mm/paging.h', 'sys/hal/gfx/gfx.h', 'sys/kern/module/module_runtime.c', 'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.c', 'sys/kern/module/module_image.h', 'sys/kern/module/module_schema.h', 'sys/kern/mm/pgalloc.h', 'sys/include/types.h', 'sys/include/memmap.h', 'sys/fs/vfs.c', 'sys/fs/vfs.h', 'sys/dev/base/dev.c', 'sys/hal/block/dev.h', 'sys/dev/block/disk.h', 'sys/dev/video/kcg/kcg.h', 'sys/dev/video/kcg/kcg.c', 'tools/tests/kcg_body_host.c', 'sys/dev/block/fdc.h', 'sys/include/console.h', 'sys/include/kbd.h', 'sys/platform/pc98/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'sys/kern/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'sys/dev/video/kcg/kcg_body.c', 'sys/dev/video/kcg/kcg_module.c', 'sys/dev/video/kcg/kcg_read_provider.inc', 'sys/platform/pc98/kernel.c', 'sys/kern/init/shell_loop.c', 'sys/dev/video/kcg/kcg_module.h', 'sys/include/config.h', 'sdk/include/os32/os32_generations.h', 'sys/include/bootinfo.h', 'tools/prototypes/kcg_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/kcg_module_host.c', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/gfx_kernel_fb_host.c', 'sys/hal/gfx/gfx_core.c', 'sys/kern/exec/access_walk.c', 'sys/kern/exec/lease.c', 'sys/kern/exec/redir_access.c', 'sys/kern/exec/surface_query.c', 'sys/dev/video/cirrus/backend_cirrus.c', 'sys/platform/pc98/video/cirrus/cirrus_identify.c', 'sys/platform/pc98/video/backend_pc98.c', 'sys/platform/pc98/video/backend_pegc.c', 'sys/hal/gfx/gfx_scroll.c', 'sys/platform/pc98/gfx_scroll.c', 'sys/platform/pc98/gfx_init.c', 'sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_surfaces.c', 'sys/kern/console/display_restore.h', 'sys/platform/pc98/video/gfx_vram.c', 'sys/hal/gfx/gfx_dirty.c', 'sys/hal/gfx/gfx_present.c', 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c', 'sys/kern/mm/physmem.c', 'sys/kern/mm/shlib.c', 'sys/kern/sys.c', 'tools/tests/mutpar.py', 'tools/tests/kernel_layout.py', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'sys/hal/gfx/gfx_internal.h', 'build/kcg-module.ld', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/kcg/*', 'build/out/kcg.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'sys/fs/pc98pt.c', 'sys/dev/pci/pci_decode.c', 'tools/tests/sh_truncation_host.c', 'tools/tests/test_sh_truncation.py', 'userland/shell/cmd_base.c', 'userland/shell/cmd_dir.c', 'userland/shell/cmd_env.c', 'userland/shell/cmd_file.c', 'userland/shell/cmd_filer.c', 'userland/shell/cmd_fs_shared.c', 'userland/shell/cmd_hdprep.c', 'userland/shell/cmd_mnt.c', 'userland/shell/cmd_pci.c', 'userland/shell/cmd_script.c', 'userland/shell/cmd_sys.c', 'userland/shell/cmd_gf1.c', 'userland/shell/cmd_gf2.c', 'userland/shell/cmd_tri.c', 'sys/dev/video/trident/diag/tri_command_wire.h', 'sys/dev/video/geforce/diag/gf_foundation_wire.h', 'sys/dev/video/geforce/diag/gf_command_wire.h', 'userland/shell/hdprep_plan.c', 'userland/shell/kbd_watch.c', 'userland/shell/main.c', 'userland/shell/pci_verbose.c', 'userland/shell/rshell.c', 'userland/shell/serial_watchdog.c', 'userland/shell/ui.c', 'sys/kern/exec/exec.h', 'sys/platform/pc98/pc98.h', 'sys/include/io.h', 'sys/platform/pc98/platform_io.h', 'sys/fs/vfs_device.h', 'sys/platform/pc98/boot_names.h', 'sys/platform/pc98/boot_names.c', 'sys/dev/ata/ide.h', 'sys/platform/pc98/boot.c', 'sys/include/platform_display.h', 'sys/platform/pc98/display.c', 'sys/include/kcg_contract.h', 'tools/tests/kernel_includes.py', 'sys/kern/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
     needs=['make:all'], budget=8.6,
     kind='characterization',
 )
@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def display_diagnostic(folder, blank_line=False):
-    source = (ROOT / 'kdebug/kselftest/kcg_display_return.inc').read_text()
+    source = (ROOT / 'sys/platform/pc98/kdebug/kselftest/kcg_display_return.inc').read_text()
     if blank_line:
         assert source.count('DIAG_LINE = 4') == 1
         source = source.replace('DIAG_LINE = 4', 'DIAG_LINE = 0')
@@ -84,7 +84,7 @@ static void run(void)
     changes = []
     if mutation:
         old, new = mutation
-        changes = [('gfx/gfx_core.c', old, new)]
+        changes = [('sys/hal/gfx/gfx_core.c', old, new)]
     for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
         result = run_case(None, runner, fixture_body='unsigned int host_arch_if = 0x202U;\n' + fixture,
                           extra_changes=changes)
@@ -104,7 +104,7 @@ def boot_notice(folder, remove_notice=False):
     """
     import re
     from test_sh_truncation import HOST_SRC, build_host, write_shims
-    kernel = (ROOT / 'init/shell_loop.c').read_text()
+    kernel = (ROOT / 'sys/kern/init/shell_loop.c').read_text()
     assert 'reason == 1' in kernel
     assert '? SYS_SHELL_BIN " --kcg-unavailable" : cur_shell' in kernel
     source = HOST_SRC.read_text()
@@ -195,17 +195,17 @@ def product(folder):
 def main():
     with tempfile.TemporaryDirectory(prefix='kcg-module-') as td:
         folder = Path(td)
-        shutil.copyfile(ROOT / 'include/platform_display.h', folder / 'platform_display.h')
+        shutil.copyfile(ROOT / 'sys/include/platform_display.h', folder / 'platform_display.h')
         product(folder)
         display_diagnostic(folder)
-        adapter = (ROOT / 'drivers/video/kcg/kcg_module.c').read_text()
-        display = (ROOT / 'platform/pc98/display.c').read_text()
+        adapter = (ROOT / 'sys/dev/video/kcg/kcg_module.c').read_text()
+        display = (ROOT / 'sys/platform/pc98/display.c').read_text()
         signature = 'void platform_display_kcg_code(void)\n{'
         assert display.count(signature) == 1
         start = display.index(signature)
         end = display.index('\n}', start) + 2
         (folder / 'kcg_display_code.inc').write_text(display[start:end] + '\n')
-        body = (ROOT / 'drivers/video/kcg/kcg_body.c').read_text()
+        body = (ROOT / 'sys/dev/video/kcg/kcg_body.c').read_text()
 
         # AC-GLYPH-1: cdecl providers fill 16 ANK or 32 JIS bytes in module text.
         payload_image = bytearray(image())
@@ -221,8 +221,8 @@ def main():
             if kind == 'body':
                 (folder / 'adapter.c').write_text(adapter)
             exe = folder / kind
-            extra = ([f'-DKCG_ADAPTER="{path}"', ROOT / 'kernel/module/module_runtime.c',
-                      ROOT / 'kernel/module/module_image.c', ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c']
+            extra = ([f'-DKCG_ADAPTER="{path}"', ROOT / 'sys/kern/module/module_runtime.c',
+                      ROOT / 'sys/kern/module/module_image.c', ROOT / 'sys/fs/vfs.c', ROOT / 'sys/dev/base/dev.c']
                      if kind == 'module' else [f'-DKCG_ADAPTER="{folder / "adapter.c"}"'])
             result = subprocess.run(['gcc', *FLAGS, '-nostdinc', '-isystem', compiler_headers, '-Wno-unused-parameter', *INCLUDES,
                                      '-I'+str(ROOT/'drivers/video/kcg'), '-I'+str(ROOT/'build/out/kcg'), '-I'+str(folder),
@@ -249,7 +249,7 @@ def main():
             graphics_boundary(('if (!kcg_module_ready()) {', 'if (0) {'))
             graphics_boundary(('kapi_sys_exit(1);', 'appslot_abort_request();'))
             boot_notice(folder, remove_notice=True)
-            provider = ROOT / 'drivers/video/kcg/kcg_read_provider.inc'
+            provider = ROOT / 'sys/dev/video/kcg/kcg_read_provider.inc'
             local = folder / provider.name
             for call, pattern in (('public_api()->read_ank(ch, buf);', b'0x41'),
                                   ('public_api()->read_kanji(jis, buf);', b'0x62')):

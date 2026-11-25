@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Compile the internal keymap declaration contract without libc."""
 CHECK = dict(name='input-keymap-h0b', tier=1, budget=5, needs=[], covers=[
-    'input/hal/keymap.h', 'include/types.h', 'include/callconv.h',
-    'tools/tests/test_input_keymap_h0b.py', 'input/hal/in2_dev.c', 'input/hal/in2_int.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/host32.py'],
+    'sys/hal/input/keymap.h', 'sys/include/types.h', 'sys/include/callconv.h',
+    'tools/tests/test_input_keymap_h0b.py', 'sys/hal/input/in2_dev.c', 'sys/hal/input/in2_int.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/host32.py'],
     basis=['INPUT_KEYMAP_DESIGN H0b'], kind='contract')
 import os
 from pathlib import Path
@@ -93,13 +93,13 @@ void _start(void) {
 '''
 
 def run(ctx):
-    header = (ctx.root / 'input/hal/keymap.h').read_text()
+    header = (ctx.root / 'sys/hal/input/keymap.h').read_text()
     with tempfile.TemporaryDirectory(prefix='input-keymap-decl-') as td:
         tmp = Path(td)
         (tmp / 'test.c').write_text(SOURCE)
-        (tmp / 'in2_int.h').write_text((ctx.root / 'input/hal/in2_int.h').read_text())
+        (tmp / 'in2_int.h').write_text((ctx.root / 'sys/hal/input/in2_int.h').read_text())
         (tmp / 'io.h').write_text('static inline unsigned irq_save(void) { return 0; }\nstatic inline void irq_restore(unsigned f) { (void)f; }\n')
-        product = (ctx.root / 'input/hal/in2_dev.c').read_text()
+        product = (ctx.root / 'sys/hal/input/in2_dev.c').read_text()
         (tmp / 'in2_dev.c').write_text(product)
         def build(h):
             assert h.count('    km_registry_source_released(src, generation);') == 1

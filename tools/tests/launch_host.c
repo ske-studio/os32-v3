@@ -5,16 +5,16 @@ void gfx_policy_reeval(void) {}
 /* ========================================================================
  *  launch_host.c — 起動要求表を **実物のソースで** 確かめる
  *
- *  契約:   include/launch.h (起動要求表)
+ *  契約:   sys/include/launch.h (起動要求表)
  *  実行:   python3 -B tools/tests/test_launch.py
  *  記録:   tools/tests/t9_tdd.md
  *
- *  exec/launch.c と exec/appslot.c を 1 行も写さずそのまま #include する
+ *  sys/kern/exec/launch.c と sys/kern/exec/appslot.c を 1 行も写さずそのまま #include する
  *  (模型ではない)。カーネル帯の代わりにハーネスが持つのは 3 つだけ:
- *    - 所有者 res_owner_get/set (fs/fd_redirect.c)
- *    - GUI 中かどうか con_sink_is_enabled (kernel/console/con_sink.c)
- *    - kstrncpy (lib/kstring_asm.asm。n は**バッファ全体サイズ**)
- *  スロットは実物の AppSlot を直に組み立てる (exec/exec.c の起動経路は
+ *    - 所有者 res_owner_get/set (sys/fs/fd_redirect.c)
+ *    - GUI 中かどうか con_sink_is_enabled (sys/kern/console/con_sink.c)
+ *    - kstrncpy (sys/kern/kstring_asm.asm。n は**バッファ全体サイズ**)
+ *  スロットは実物の AppSlot を直に組み立てる (sys/kern/exec/exec.c の起動経路は
  *  CR3 / pgalloc を引くのでホストへは持ち込めない)。
  *
  *  tools/tests/con_sink_host.c と同じ様式 — ホスト ILP32 GNU11 で走らせ、
@@ -42,7 +42,7 @@ char *kstrncpy(char *dst, const char *src, u32 n)
 }
 
 /* appslot.c が引く (票 T9 §12 T1: リダイレクト表を ID の文脈にする)。
- * この票の対象外なので空の錠にする — 表そのものは実物の fs/fd_redirect.c と
+ * この票の対象外なので空の錠にする — 表そのものは実物の sys/fs/fd_redirect.c と
  * 組んで tools/tests/multiapp_impl_host.c のケース 24 が見ている。 */
 #include "fd_redirect.h"
 void fd_redirect_save(FdRedirectState *out)         { (void)out; }

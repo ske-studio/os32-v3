@@ -2,7 +2,7 @@
  * exec_init and shell_loop_run. The host checks the entire disposable disk. */
 #include "arch_exec_kapi.h"
 #include "kapi_table.h"
-#include "drivers/ata/ide.h"
+#include "sys/dev/ata/ide.h"
 #include "kstring.h"
 
 #include "install_apm.h"

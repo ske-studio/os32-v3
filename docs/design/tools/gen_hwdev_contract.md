@@ -21,7 +21,7 @@ const struct hwdev_core_api *(__cdecl *hwdev_core_get)(void);
 
 ## 8. M1 固定の G4 生成・照合手順 (M2/M3a の入力契約)
 
-1. 生成入力は `hwdev/hwdev_imports.def` (§2 の順序・§3 の kernel import 順と完全一致を検査)、共有ヘッダの umbrella、配置 inventory。既存宣言を取得する方式は `gen_kdebug_imports.py` を再利用し、型の独自 parser は追加しない。
+1. 生成入力は `sys/dev/hwdev/hwdev_imports.def` (§2 の順序・§3 の kernel import 順と完全一致を検査)、共有ヘッダの umbrella、配置 inventory。既存宣言を取得する方式は `gen_kdebug_imports.py` を再利用し、型の独自 parser は追加しない。
 2. umbrella は `recover.h`, `recover_gf.h`, `gf_stage_state.h`, 辞書順の `gfinit*.h`, `kpeek.h`, 新設する `hwdev_private.h` と kernel import の宣言元を各一度 include。両像とも同じ生成物と i386 の machine/ABI flags、`__KERNEL_BUILD__` でコンパイルする。`RECOVER_MODULE` 等の像固有定義は契約生成に渡さない。
 3. 配置 inventory は umbrella が宣言する共有の全 struct/union と全メンバ (配列自体、関数ポインタも含む)、全 enum の列挙子。`recover` から到達する型だけを推測で間引かない。新 private 型も対象。名前の inventory をヘッダ変更と同時に更新し、コンパイラの DWARF (`-g -fno-eliminate-unused-debug-types`) と突き合わせて欠落・余剰を失敗にする。DWARF は列挙の照合用で、型の再実装には使わない。
 4. inventory から `sizeof(T)`, `__alignof__(T)`, `offsetof(T, member)`, `sizeof(((T *)0)->member)`、enum 値の定数表を C で生成し、対象クロスコンパイラが出す ELF32 の専用 section から little-endian u32 を読む (ゲスト実行不要)。名前は型名/メンバ名の ASCII 辞書順、enum は列挙子名順。負の enum は u32 の2の補数。値から `STATIC_ASSERT` 全行を生成し、両像の実ビルドで include する。値の変化を片側だけ再生成して通してはいけない。

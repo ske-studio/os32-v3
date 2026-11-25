@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='shlib-high-host', tier=1,
-    covers=['exec/appslot.c', 'sdk/include/os32/os32_sndl_table.h', 'kernel/idle_work.h', 'tools/tests/paging_source.py', 'tools/tests/host32.py', 'tools/tests/test_shlib_high.py', 'tools/tests/shlib_high_host.c', 'mm/shlib.c', 'exec/os32x_hdr.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py'],
+    covers=['sys/kern/exec/appslot.c', 'sdk/include/os32/os32_sndl_table.h', 'sys/kern/idle_work.h', 'tools/tests/paging_source.py', 'tools/tests/host32.py', 'tools/tests/test_shlib_high.py', 'tools/tests/shlib_high_host.c', 'sys/kern/mm/shlib.c', 'sys/kern/exec/os32x_hdr.c', 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c', 'sys/kern/mm/physmem.c', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=3.2,
     kind='characterization',
 )

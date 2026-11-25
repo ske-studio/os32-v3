@@ -11,11 +11,11 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-sh-input', tier=1, budget=60, needs=[],
-             covers=['platform/powermac/input_usb.h', 'tools/tests/host32.py', 'platform/powermac/terminal_fifo.inc', 'platform/powermac/terminal_input.c', 'platform/powermac/input_boot.c', 'platform/powermac/input_boot.h',
-                     'platform/powermac/input_decode.c', 'kernel/input_legacy.c', 'kernel/input_wait.c'],
-             inputs=['tools/tests/ppc_sh_input.py', 'platform/powermac/terminal_input.c',
-                     'platform/powermac/lan_boot.h', 'kernel/cli/resident_cli.h',
-                     'include/input_service.h', 'include/clock_source.h', 'include/types.h'])
+             covers=['sys/platform/powermac/input_usb.h', 'tools/tests/host32.py', 'sys/platform/powermac/terminal_fifo.inc', 'sys/platform/powermac/terminal_input.c', 'sys/platform/powermac/input_boot.c', 'sys/platform/powermac/input_boot.h',
+                     'sys/platform/powermac/input_decode.c', 'sys/kern/input_legacy.c', 'sys/kern/input_wait.c'],
+             inputs=['tools/tests/ppc_sh_input.py', 'sys/platform/powermac/terminal_input.c',
+                     'sys/platform/powermac/lan_boot.h', 'sys/kern/cli/resident_cli.h',
+                     'sys/hal/input/input_service.h', 'sys/hal/time/clock_source.h', 'sys/include/types.h'])
 HARNESS = r'''
 static void exit(int code) __attribute__((noreturn));
 static void exit(int code) { __asm__ volatile("int $0x80" : : "a"(1), "b"(code)); __builtin_unreachable(); }
@@ -85,7 +85,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'platform/powermac/input_decode.c').read_text()
+    source = (ROOT / 'sys/platform/powermac/input_decode.c').read_text()
     mutations = [('arrows', "byte == 'A' ? 0x3A00 : 0x3D00", "byte == 'A' ? 0x3D00 : 0x3A00", 11, 'cancel-ok\narrows-fail\n'),
                  ('cancel', '        d->state = d->after_cr = 0;\n        return ESC;', '        d->state = d->after_cr = 0;\n        return -1;', 12, 'cancel-fail\n')]
     mutations.append(('late', '    if (d->state && (u32)(now - d->started) >= ESC_TIMEOUT_US)', '    if (byte < 0 && d->state && (u32)(now - d->started) >= ESC_TIMEOUT_US)', 14, 'cancel-ok\narrows-ok\ntimeout-ok\nlate-fail\n'))
@@ -102,8 +102,8 @@ def main():
             (d / 'decode.c').write_text(code)
             subprocess.run(['gcc', '-m32', '-nostdinc', '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-DPM_TERMINAL_TEST',
                             '-I.', '-Iinclude', '-Iarch/ppc', '-Isdk/include/os32', '-Idrivers/input', '-Iplatform/powermac',
-                            str(d / 'harness.c'), str(d / 'decode.c'), 'platform/powermac/input_boot.c',
-                            'platform/powermac/terminal_input.c', 'kernel/input_legacy.c', 'kernel/input_wait.c', '-o', str(d / 'test')], cwd=ROOT, check=True)
+                            str(d / 'harness.c'), str(d / 'decode.c'), 'sys/platform/powermac/input_boot.c',
+                            'sys/platform/powermac/terminal_input.c', 'sys/kern/input_legacy.c', 'sys/kern/input_wait.c', '-o', str(d / 'test')], cwd=ROOT, check=True)
             result = host32.run([str(d / 'test')], runner='qemu', capture_output=True, text=True, timeout=10)
             if result.returncode != expected or result.stderr != marker:
                 raise RuntimeError(f'{name}: exit {result.returncode}: {result.stderr!r}')

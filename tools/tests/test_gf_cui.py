@@ -3,9 +3,9 @@ CHECK = dict(name='gf-cui-host', tier=1, needs=[], budget=3.1,
     covers=['tools/tests/test_gf_cui.py', 'tools/tests/gf_cui_shell_host.c',
             'tools/tests/gf_command_runtime_host.h', 'tools/tests/host32.py',
             'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py',
-            'userland/shell/cmd_gf2.c', 'kdebug/gf_command_wire.h',
+            'userland/shell/cmd_gf2.c', 'sys/dev/video/geforce/diag/gf_command_wire.h',
             'hwdev/gf/*.h', 'hwdev/gf/display/*.h',
-            'exec/appslot.c', 'include/types.h', 'sdk/include/os32/os32_kapi_shared.h'],
+            'sys/kern/exec/appslot.c', 'sys/include/types.h', 'sdk/include/os32/os32_kapi_shared.h'],
     kind='characterization',
 )
 from pathlib import Path
@@ -29,7 +29,7 @@ MUTATIONS = [
      'if (q.test > GF6_PRIM)', 'if (q.test >= GF5_FEATURE)'),
     ('operand-width', 'userland/shell/cmd_gf2.c',
      'operand[1] << GF5_WIRE_VALUE_SHIFT', 'operand[1] << GF5_WIRE_INDEX_SHIFT'),
-    ('cleanup-notification', 'exec/appslot.c',
+    ('cleanup-notification', 'sys/kern/exec/appslot.c',
      'if (gf_display_owner_exit) gf_display_owner_exit(id);',
      'if (gf_display_owner_exit) gf_display_owner_exit(id + 1);'),
 ]
@@ -44,7 +44,7 @@ def run_case(root, directory):
     if result.returncode:
         return result
     # Execute the shipped notification body with an observable GF callback.
-    text = (root/'exec/appslot.c').read_text()
+    text = (root/'sys/kern/exec/appslot.c').read_text()
     body = text.split('static void gfx_resource_reserve(int id)\n', 1)[1].split('int appslot_gfx_owner_exit_if', 1)[0]
     source = directory/'cleanup.c'
     source.write_text('''#include "tools/tests/gf_command_runtime_host.h"
@@ -56,7 +56,7 @@ static void irq_restore(unsigned int flags) { (void)flags; }
 #define GFX_OWNER_WM 1
 void gf_display_owner_exit(int id) { ++calls; last_id = id; }
 void gfx_policy_reeval(void) {}
-'''+'static inline void exec_surface_policy_reeval' + (root/'exec/exec_surface.h').read_text().split('static inline void exec_surface_policy_reeval', 1)[1].split('\n', 1)[0] + '\n'+'''static void gfx_resource_reserve(int id)
+'''+'static inline void exec_surface_policy_reeval' + (root/'sys/kern/exec/exec_surface.h').read_text().split('static inline void exec_surface_policy_reeval', 1)[1].split('\n', 1)[0] + '\n'+'''static void gfx_resource_reserve(int id)
 '''+body+'''
 void _start(void) {
     g_gfx_owner=2;appslot_gfx_owner_exit(3);

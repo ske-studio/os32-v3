@@ -1,6 +1,6 @@
 /* PowerMac HW_OP design §5 5c: master PT ownership and supervisor-only
  * window translations. The walker reads real host-backed software tables. */
-#include "mm/paging.h"
+#include "sys/kern/mm/paging.h"
 #include "ppc_pd.h"
 static u32 master[PDE_COUNT] __attribute__((aligned(4096)));
 static u32 table[PTE_COUNT] __attribute__((aligned(4096)));

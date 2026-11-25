@@ -1,6 +1,6 @@
 """OSRI conversion and legacy loader tests with generated images and VFS stub."""
 CHECK = dict(name='osri-host', tier=1,
-             covers=['tools/osri_profile.py', 'gfx/osri_profile.h', 'gfx/gfx_osri.c', 'gfx/gfx_osri.h', 'tools/img2osri.py',
+             covers=['tools/osri_profile.py', 'sys/kern/gfx/osri/osri_profile.h', 'sys/kern/gfx/osri/gfx_osri.c', 'sys/kern/gfx/osri/gfx_osri.h', 'tools/img2osri.py',
                      'tools/osri_enc2_*.py',
                      'tools/raster_obs_assets.py', 'lib/le_internal.h',
                      'lib/crc32_core.inc', 'tools/tests/host32.py'], needs=['make:osri-enc2-core'], budget=23.0,
@@ -127,7 +127,7 @@ def run_loader(td, data, expected):
     struct.pack_into('<H', data, 44, 4)
     data[48:52] = bytes(4)
     struct.pack_into('<I', data, 48, zlib.crc32(data))
-    src = Path(os.environ.get('OSRI_TEST_SOURCE', ROOT / 'gfx/gfx_osri.c')).read_text()
+    src = Path(os.environ.get('OSRI_TEST_SOURCE', ROOT / 'sys/kern/gfx/osri/gfx_osri.c')).read_text()
     wrapper = td / 'wrap.c'; wrapper.write_text(WRAPPER)
     blob = td / 'data.bin'; blob.write_bytes(data + b'X' + bytes(8*6385))
     expected_blob = td / 'expected.bin'; expected_blob.write_bytes(expected)
@@ -440,14 +440,14 @@ def main():
     args = parser.parse_args(); check()
     if args.mutate:
         mutations = [
-            ('v2-same-color', 'gfx/gfx_osri.c', 'version != OSRI_VERSION_2 && current[ev->index]', '1 && current[ev->index]', 'OSRI_TEST_SOURCE'),
-            ('v2-max-plus-one', 'gfx/gfx_osri.c', 'OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS)', 'OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS + 1)', 'OSRI_TEST_SOURCE'),
-            ('v2-count', 'gfx/gfx_osri.c', 'version == OSRI_VERSION_1 ? OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS', 'OSRI_V1_MAX_EVENTS', 'OSRI_TEST_SOURCE'),
-            ('version', 'gfx/gfx_osri.c', '(version != OSRI_VERSION_1 && version != OSRI_VERSION_2)', '0', 'OSRI_TEST_SOURCE'),
-            ('crc', 'gfx/gfx_osri.c', 'crc32_core_final(crc) != expected', '0', 'OSRI_TEST_SOURCE'),
-            ('reserved', 'gfx/gfx_osri.c', 'le_read16(h + 42)', '0', 'OSRI_TEST_SOURCE'),
-            ('end', 'gfx/gfx_osri.c', 'tail != 0', '0', 'OSRI_TEST_SOURCE'),
-            ('planes', 'gfx/gfx_osri.c', 'dst->planes[i], plane, &crc', 'dst->planes[i ^ 1], plane, &crc', 'OSRI_TEST_SOURCE'),
+            ('v2-same-color', 'sys/kern/gfx/osri/gfx_osri.c', 'version != OSRI_VERSION_2 && current[ev->index]', '1 && current[ev->index]', 'OSRI_TEST_SOURCE'),
+            ('v2-max-plus-one', 'sys/kern/gfx/osri/gfx_osri.c', 'OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS)', 'OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS + 1)', 'OSRI_TEST_SOURCE'),
+            ('v2-count', 'sys/kern/gfx/osri/gfx_osri.c', 'version == OSRI_VERSION_1 ? OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS', 'OSRI_V1_MAX_EVENTS', 'OSRI_TEST_SOURCE'),
+            ('version', 'sys/kern/gfx/osri/gfx_osri.c', '(version != OSRI_VERSION_1 && version != OSRI_VERSION_2)', '0', 'OSRI_TEST_SOURCE'),
+            ('crc', 'sys/kern/gfx/osri/gfx_osri.c', 'crc32_core_final(crc) != expected', '0', 'OSRI_TEST_SOURCE'),
+            ('reserved', 'sys/kern/gfx/osri/gfx_osri.c', 'le_read16(h + 42)', '0', 'OSRI_TEST_SOURCE'),
+            ('end', 'sys/kern/gfx/osri/gfx_osri.c', 'tail != 0', '0', 'OSRI_TEST_SOURCE'),
+            ('planes', 'sys/kern/gfx/osri/gfx_osri.c', 'dst->planes[i], plane, &crc', 'dst->planes[i ^ 1], plane, &crc', 'OSRI_TEST_SOURCE'),
             ('converter-crc', 'tools/img2osri.py', "struct.pack_into('<I', data, 48, crc)", 'pass', 'OSRI_CONVERTER_SOURCE'),
             ('converter-version', 'tools/img2osri.py', "b'OSRI', 2, 64, W, H", "b'OSRI', 1, 64, W, H", 'OSRI_CONVERTER_SOURCE'),
             ('vertical-carry', 'tools/img2osri.py', 'error = nxt', 'error = [[0, 0, 0] for _ in range(W + 2)]', 'OSRI_CONVERTER_SOURCE'),

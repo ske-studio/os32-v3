@@ -13,7 +13,7 @@ Verify with this test and test_hostsvc_contracts.py; do not refresh old_generati
 --prepare only compiles copied mutation units; it never executes a mutant.
 """
 CHECK = dict(name='dep-dir-a-l01-host', tier=1,
-    covers=['include/callconv.h', 'platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/hwdev_layout.json', 'drivers/pci/pci.h', 'drivers/char/serial.h', 'hwdev/hwdev_imports.def', 'include/bootinfo.h', 'include/gf_production.h', 'include/kprintf.h', 'kdebug/kpeek.h', 'kdebug/recover.h', 'kernel/module/kdebug_imports.def', 'mm/pgalloc.h', 'lib/kstring.h', 'tools/gen_kdebug_imports.py', 'tools/tests/hwdev_contract_fixture.py', 'tools/tests/dep_dir_a_l01_host.c', 'tools/tests/fixtures/dep_dir_a/l01.json', 'tools/tests/test_dma8237.py', 'tools/tests/test_dma_pool.py', 'tools/tests/dma8237_host.c', 'tools/tests/dma_pool_host.c', 'tools/tests/dma_boot_host.c', 'include/dma_contract.h', 'include/pcm_contract.h', 'include/fm_contract.h', 'include/lan_contract.h', 'include/types.h', 'drivers/sound/cs4231/pcm_module.h', 'drivers/sound/fm/fm_module.h', 'drivers/net/e82557/lan_module.h', 'mm/dma_pool.h', 'mm/dma_pool_math.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'kernel/irq/irq.h', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.h', 'lib/dma_contract.c', 'drivers/dma/dma8237.h', 'drivers/dma/dma8237_math.c', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/kapi.json', 'tools/prototypes/pcm_imports.def', 'tools/prototypes/fm_imports.def', 'tools/prototypes/lan_imports.def', 'hwdev/generated/hwdev_contract.h', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'tools/mkmod.py', 'tools/module_schema.py', 'kernel/module/module_image.c', 'kdebug/generated/kdebug_imports.json', 'build/out/*/*_imports.h', 'build/out/*/*_imports.json', 'build/out/*.mod', 'build/out/vmkernel.lz4', 'build/out/kdebug.bin', 'drivers/dma/dma8237.c', 'drivers/block/fdc.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/dma_pool.c', 'platform/pc98/kernel.c', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'hwdev/generated/hwdev_imports.json', 'hwdev/generated/hwdev_layout.txt', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
+    covers=['sys/include/callconv.h', 'sys/platform/pc98/boot_capture.c', 'sys/platform/pc98/bootinfo_wire.h', 'sys/platform/pc98/bootinfo_native.h', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/hwdev_layout.json', 'sys/dev/pci/pci.h', 'sys/dev/char/serial.h', 'sys/dev/hwdev/hwdev_imports.def', 'sys/include/bootinfo.h', 'sys/include/gf_production.h', 'sys/include/kprintf.h', 'sys/platform/pc98/kdebug/kpeek.h', 'sys/dev/video/geforce/diag/recover.h', 'sys/kern/module/kdebug_imports.def', 'sys/kern/mm/pgalloc.h', 'sys/kern/kstring.h', 'tools/gen_kdebug_imports.py', 'tools/tests/hwdev_contract_fixture.py', 'tools/tests/dep_dir_a_l01_host.c', 'tools/tests/fixtures/dep_dir_a/l01.json', 'tools/tests/test_dma8237.py', 'tools/tests/test_dma_pool.py', 'tools/tests/dma8237_host.c', 'tools/tests/dma_pool_host.c', 'tools/tests/dma_boot_host.c', 'sys/include/dma_contract.h', 'sys/include/pcm_contract.h', 'sys/include/fm_contract.h', 'sys/include/lan_contract.h', 'sys/include/types.h', 'sys/dev/sound/cs4231/pcm_module.h', 'sys/dev/sound/fm/fm_module.h', 'sys/dev/net/e82557/lan_module.h', 'sys/kern/mm/dma_pool.h', 'sys/kern/mm/dma_pool_math.c', 'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.h', 'sys/kern/module/module_schema.h', 'sys/kern/irq/irq.h', 'sys/fs/serialfs/sfs_lan.h', 'sys/fs/serialfs/sfs_client.h', 'sys/fs/serialfs/sfs_proto.h', 'lib/dma_contract.c', 'sys/dev/dma/dma8237.h', 'sys/dev/dma/dma8237_math.c', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/kapi.json', 'tools/prototypes/pcm_imports.def', 'tools/prototypes/fm_imports.def', 'tools/prototypes/lan_imports.def', 'sys/dev/hwdev/generated/hwdev_contract.h', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'tools/mkmod.py', 'tools/module_schema.py', 'sys/kern/module/module_image.c', 'sys/platform/pc98/kdebug/generated/kdebug_imports.json', 'build/out/*/*_imports.h', 'build/out/*/*_imports.json', 'build/out/*.mod', 'build/out/vmkernel.lz4', 'build/out/kdebug.bin', 'sys/dev/dma/dma8237.c', 'sys/dev/block/fdc.c', 'sys/platform/pc98/kdebug/kselftest.c', 'kdebug/kselftest/**', 'sys/kern/mm/dma_pool.c', 'sys/platform/pc98/kernel.c', 'sys/include/pci_dev_contract.h', 'sys/include/pci_bind_contract.h', 'sys/dev/hwdev/generated/hwdev_imports.json', 'sys/dev/hwdev/generated/hwdev_layout.txt', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
     needs=['make:all'], budget=6.5,
     basis=['[ABI]', '[HW2]'],
     pins=['AV_HAL_DESIGN'],
@@ -40,8 +40,8 @@ NEW = 'if (dma_crosses_64k(pa, size) && 0) return 0;'
 def build_dma(folder, body):
     folder.mkdir(parents=True, exist_ok=True)
     # Self-contained copied contract: no fallback to the repository include path.
-    shutil.copy(ROOT / 'include/dma_contract.h', folder)
-    for rel in ('include/types.h', 'include/callconv.h'):
+    shutil.copy(ROOT / 'sys/include/dma_contract.h', folder)
+    for rel in ('sys/include/types.h', 'sys/include/callconv.h'):
         target = folder / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, target)
@@ -78,7 +78,7 @@ def abi(folder, fixture):
                     *include_flags(ROOT),
                     str(folder / 'abi.c')], check=True)
     for name in ('pcm', 'fm', 'lan'):
-        headers = [f'include/{name}_contract.h'] + (['include/dma_contract.h'] if name == 'pcm' else [])
+        headers = [f'include/{name}_contract.h'] + (['sys/include/dma_contract.h'] if name == 'pcm' else [])
         definition = json.loads((ROOT / f'tools/prototypes/{name}_imports.def').read_text())
         for header in headers:
             assert header in definition['contracts']
@@ -102,7 +102,7 @@ def generations(folder, fixture):
     spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
     pair = mkmod.pair_crc((ROOT / 'build/out/vmkernel.lz4').read_bytes())
     for name, module_id in (('pcm', 7), ('fm', 6), ('lan', 9), ('kdebug', 1)):
-        metadata_path = ('kdebug/generated/kdebug_imports.json' if name == 'kdebug'
+        metadata_path = ('sys/platform/pc98/kdebug/generated/kdebug_imports.json' if name == 'kdebug'
                          else f'build/out/{name}/{name}_imports.json')
         metadata = json.loads((ROOT / metadata_path).read_text())
         rows = [{k: v for k, v in e.items() if k != 'source'} for e in metadata['imports']]

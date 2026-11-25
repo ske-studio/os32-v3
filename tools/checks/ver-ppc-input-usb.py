@@ -6,13 +6,13 @@ import sys
 import tempfile
 
 CHECK = dict(name='ppc-input-usb-host', tier=1, budget=60, needs=[],
-    covers=['platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap_backend.c', 'platform/powermac/usb_key_report.c', 'input/hal/*.c', 'input/hal/*.h', 'input/keymaps/*.c', 'include/**', 'sdk/include/os32/**', 'tools/tests/host_arch/**', 'platform/powermac/platform_io.h',
-            'platform/powermac/usb_boot.h', 'arch/ppc/kernel_boot.h', 'platform/powermac/input_boot.c', 'tools/tests/ppc_input_usb_host.c',
-            'tools/checks/ver-ppc-input-usb.py','platform/powermac/input_boot.h', 'platform/powermac/input_decode.c',
-            'include/types.h', 'include/kbd.h', 'include/input_service.h', 'include/clock_source.h',
-            'platform/powermac/lan_boot.h', 'kernel/cli/resident_cli.h',
-            'tools/tests/host32.py', 'include/io.h', 'arch/ppc/arch_io.h',
-            'kernel/input_legacy.c', 'kernel/input_wait.c', 'input/hal/in2_int.h'],
+    covers=['platform/powermac/input_usb.[ch]', 'sys/platform/powermac/input_keymap_backend.c', 'sys/platform/powermac/usb_key_report.c', 'input/hal/*.c', 'input/hal/*.h', 'input/keymaps/*.c', 'include/**', 'sdk/include/os32/**', 'tools/tests/host_arch/**', 'sys/platform/powermac/platform_io.h',
+            'sys/platform/powermac/usb_boot.h', 'sys/arch/ppc/kernel_boot.h', 'sys/platform/powermac/input_boot.c', 'tools/tests/ppc_input_usb_host.c',
+            'tools/checks/ver-ppc-input-usb.py','sys/platform/powermac/input_boot.h', 'sys/platform/powermac/input_decode.c',
+            'sys/include/types.h', 'sys/include/kbd.h', 'sys/hal/input/input_service.h', 'sys/hal/time/clock_source.h',
+            'sys/platform/powermac/lan_boot.h', 'sys/kern/cli/resident_cli.h',
+            'tools/tests/host32.py', 'sys/include/io.h', 'sys/arch/ppc/arch_io.h',
+            'sys/kern/input_legacy.c', 'sys/kern/input_wait.c', 'sys/hal/input/in2_int.h'],
     basis=['PPC_USB_KBD_DESIGN §2', 'PPC_USB_KBD_DESIGN §5', 'PPC_P3_DESIGN §5 ③b-2'],
     env_limit='製品USB入力Cの修飾・release・FIFO・LAN優先を確認するが、実USB/HCとLANのIRQ競合は再現しない。',
 )
@@ -61,7 +61,7 @@ def main(mutate=False):
                 '-nostdinc','-ffreestanding','-fno-builtin','-fno-pie','-no-pie','-nostdlib','-static',
                 '-DHOST_ARCH_SHARED_IF','-DINPUT_COOKED_MODS=1','-ffunction-sections','-fdata-sections','-Wl,--gc-sections','-Itools/tests/host_arch','-Iinput/hal','-Iinclude','-Iarch/ppc','-Iplatform/powermac','-Isdk/include/os32','-Idrivers/input','-I.',
                 str(ROOT/'tools/tests/ppc_input_usb_host.c'),*[str(work/n) for n in sources],
-                'platform/powermac/input_decode.c','kernel/input_legacy.c','kernel/input_wait.c','input/keymaps/hid_jp.c','input/keymaps/pc98_jp.c','-o',str(exe)], cwd=ROOT, check=True)
+                'sys/platform/powermac/input_decode.c','sys/kern/input_legacy.c','sys/kern/input_wait.c','sys/input/keymaps/hid_jp.c','sys/input/keymaps/pc98_jp.c','-o',str(exe)], cwd=ROOT, check=True)
             result = host32.run([str(exe)], runner='qemu', capture_output=True, text=True, timeout=10)
             marker = reached + ('FAIL\n' if expected else '')
             if result.returncode != expected or result.stdout != marker:

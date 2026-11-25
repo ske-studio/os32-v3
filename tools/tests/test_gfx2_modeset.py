@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Exercise mode transition failure atomicity."""
 CHECK = dict(name='gfx2-modeset-host', tier=1, needs=[], budget=5,
-    covers=['platform/pc98/platform_display_fallback.h', 'platform/powermac/platform_display_fallback.h',
-            'include/display_provider.h', 'gfx/v2/modeset.c', 'gfx/v2/gfx2_int.h',
+    covers=['sys/platform/pc98/platform_display_fallback.h', 'sys/platform/powermac/platform_display_fallback.h',
+            'sys/include/display_provider.h', 'sys/hal/gfx/v2/modeset.c', 'sys/hal/gfx/v2/gfx2_int.h',
             'tools/tests/gfx2_modeset_host.c', 'tools/tests/test_gfx2_modeset.py',
             'tools/tests/host32.py'],
     basis=['HAL_V2_DESIGN §9-3'],
@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def observe(work, source, machine="pc98"):
     path = work / 'modeset.c'
-    path.write_text(source.replace('#include "../gfx_policy.h"', '#include "gfx/gfx_policy.h"').replace('#include "../gfx.h"', '#include "gfx/gfx.h"'))
+    path.write_text(source.replace('#include "../gfx_policy.h"', '#include "sys/hal/gfx/gfx_policy.h"').replace('#include "../gfx.h"', '#include "sys/hal/gfx/gfx.h"'))
     exe = work / 'test'
     flags = ['-I' + str(ROOT / p) for p in ('.', f'platform/{machine}', 'include', 'sdk/include', 'sdk/include/os32', 'mm', 'gfx/v2')]
     if machine == "powermac":
@@ -28,7 +28,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/v2/modeset.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/v2/modeset.c').read_text()
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         assert observe(work, source) == 0

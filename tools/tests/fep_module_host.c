@@ -1,8 +1,8 @@
 /* Paired API: exercise the production full-slot validator and private boot relay. */
-#include "kernel/ime/fep_module.c"
+#include "sys/kern/ime/fep_module.c"
 static KbdPolicySnapshot foreground = {.owner=1, .exec_gen=7, .command_gen=3};
 int input_context_snapshot(KbdPolicySnapshot *out) { *out = foreground; return 0; }
-#include "input/hal/input_ime_gate.c"
+#include "sys/input/input_ime_gate.c"
 static struct module_record running = {.state = MODULE_RUNNING};
 struct module_record *module_record_get(struct module_handle h) { (void)h; return &running; }
 static int cleanup_saw_closed;

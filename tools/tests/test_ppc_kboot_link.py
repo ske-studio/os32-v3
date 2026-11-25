@@ -20,8 +20,8 @@ CHECK = dict(name='ppc-kboot-link', tier=1, budget=20,
             'tools/ppc/kboot_mutations.py', 'tools/ppc_lan_host.py',
             'tools/host_agent.py', 'tools/host_operator_socket.py', 'tools/host_rshell.py',
             'tools/ppc_link_transport.py', 'tools/remote_transport.py', 'tools/*host*.py',
-            'platform/powermac/**', 'arch/ppc/**', 'platform/powermac/ppc_kernel.c', 'tools/lan_bridge.py',
-            'build/targets/ppc-powermac.mk', 'arch/ppc/kernel.ld'],
+            'platform/powermac/**', 'arch/ppc/**', 'sys/platform/powermac/ppc_kernel.c', 'tools/lan_bridge.py',
+            'build/targets/ppc-powermac.mk', 'sys/arch/ppc/kernel.ld'],
     basis=['PPC_P5_REST_DESIGN §2 K・§5'])
 
 
@@ -48,7 +48,7 @@ def fixture(elf):
                    memory=memory, **{'read-diag': bytes(diag), 'peek': bytes(range(256))})
     return dict(a=prelude+a, b=b'', logs=[dict(seq=i, drop_records=0, drop_bytes=0) for i in range(3)],
                 payload=a.replace(b'\r\n', b'\n')+b'LINK HEAP used=1024\n', replies=replies,
-                elf=elf, mapping=' .bss.pool 0x200000 0x1000 platform/powermac/gmac_dma.o\n'
+                elf=elf, mapping=' .bss.pool 0x200000 0x1000 sys/platform/powermac/gmac_dma.o\n'
                 '0x100000 __kernel_image_start\n0x110000 __kernel_resident_end\n',
                 result=dict(hello=1, alive=1, tick_samples=[dict(tick=100, tb=100000000),
                                                                        dict(tick=200, tb=200000000)]))

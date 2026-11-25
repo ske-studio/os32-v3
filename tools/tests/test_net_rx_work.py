@@ -1,15 +1,15 @@
 """Finite cooperative RX and bounded e82557 IRQ rescue, without libc."""
 CHECK = dict(name='net-rx-work-host', tier=4, needs=[], budget=8,
     covers=['tools/tests/rx_io_clock.h', 'tools/tests/idle_io_sources.py', 'kernel/io_work.[ch]',
-            'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'exec/appslot.h',
-            'kernel/time/tick_clock.h', 'net/link_platform.h', 'platform/pc98/platform_link_inline.h', 'net/nic.c', 'net/nic.h', 'net/nic_rx.c', 'net/nic_rx.h',
-            'net/rx_work.c', 'net/rx_work.h', 'net/link.h',
-            'kernel/idle_work.c', 'kernel/idle_work.h', 'kernel/irq/tick.h',
-            'kernel/irq/tick_budget.h', 'kernel/irq/tick_budget.c',
-            'arch/x86/arch_tick_budget.h', 'kernel/irq/irq.h',
-            'include/kernel_tick.h', 'include/clock_source.h', 'include/types.h',
-            'include/net_eth.h', 'include/kprintf.h', 'lib/kstring.h',
-            'platform/pc98/tick_order.h', 'sdk/include/os32/os32_kapi_shared.h',
+            'sys/kern/io_clock.h', 'kernel/io_policy.[ch]', 'sys/kern/exec/appslot.h',
+            'sys/hal/time/tick_clock.h', 'sys/hal/net/link_platform.h', 'sys/platform/pc98/platform_link_inline.h', 'sys/net/nic.c', 'sys/net/nic.h', 'sys/net/nic_rx.c', 'sys/net/nic_rx.h',
+            'sys/net/rx_work.c', 'sys/net/rx_work.h', 'sys/net/link.h',
+            'sys/kern/idle_work.c', 'sys/kern/idle_work.h', 'sys/kern/irq/tick.h',
+            'sys/kern/irq/tick_budget.h', 'sys/kern/irq/tick_budget.c',
+            'sys/arch/x86/arch_tick_budget.h', 'sys/kern/irq/irq.h',
+            'sys/include/kernel_tick.h', 'sys/hal/time/clock_source.h', 'sys/include/types.h',
+            'sys/include/net_eth.h', 'sys/include/kprintf.h', 'sys/kern/kstring.h',
+            'sys/platform/pc98/tick_order.h', 'sdk/include/os32/os32_kapi_shared.h',
             'tools/tests/net_rx_work_host.c', 'tools/tests/test_net_rx_work.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk'],
     basis=['TICK_T123_DESIGN §3'],
@@ -26,51 +26,51 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
-    ('net/nic_rx.c', 'if (len < ETH_HLEN || len > sizeof(rx_frame)) continue;',
+    ('sys/net/nic_rx.c', 'if (len < ETH_HLEN || len > sizeof(rx_frame)) continue;',
      'net_rx_note(); if (len < ETH_HLEN || len > sizeof(rx_frame)) continue;'),
-    ('net/nic.c', '(u32)(tick_clock_ms() - last_rx_ms) < window_ms', '(u32)(tick_clock_ms() - last_rx_ms) <= window_ms'),
-    ('net/nic.c', '(u32)(tick_clock_ms() - last_rx_ms) < window_ms', '(i32)(tick_clock_ms() - last_rx_ms) < (i32)window_ms'),
-    ('net/nic.c', 'idle_ms_valid = 0;\n            rx_ms_valid = 0;', 'idle_ms_valid = 0;'),
-    ('net/nic.c', '    rx_ms_valid = 0;\n    owner = 0;', '    owner = 0;'),
-    ('net/nic_rx.c', '        net_rx_note();', '        (void)0;'),
-    ('net/nic.c', '(u32)(tick_clock_ms() - last_rx_ms) < window_ms', '(u32)(tick_clock_ms() - last_rx_ms) >= window_ms'),
-    ('net/nic.c', 'last_rx_ms = tick_clock_ms();', 'last_rx_ms = 0;'),
-    ('net/nic.c', 'rx_ms_valid = 1;', 'rx_ms_valid = 0;'),
-    ('net/nic.c', 'else if (net_rx_recent(NET_RX_ACTIVE_MS))', 'else if (0)'),
-    ('net/rx_work.c', 'b->max_units = NET_RX_SCAN_MAX;', 'b->max_units = NET_RX_SCAN_MAX + 1;'),
-    ('net/rx_work.c', 'if (b->used >= b->max_units) return 0;', 'if (0) return 0;'),
-    ('kernel/io_work.c', 'if (idle_work_compat_count() == 0 && !any_pending()) return 0;',
+    ('sys/net/nic.c', '(u32)(tick_clock_ms() - last_rx_ms) < window_ms', '(u32)(tick_clock_ms() - last_rx_ms) <= window_ms'),
+    ('sys/net/nic.c', '(u32)(tick_clock_ms() - last_rx_ms) < window_ms', '(i32)(tick_clock_ms() - last_rx_ms) < (i32)window_ms'),
+    ('sys/net/nic.c', 'idle_ms_valid = 0;\n            rx_ms_valid = 0;', 'idle_ms_valid = 0;'),
+    ('sys/net/nic.c', '    rx_ms_valid = 0;\n    owner = 0;', '    owner = 0;'),
+    ('sys/net/nic_rx.c', '        net_rx_note();', '        (void)0;'),
+    ('sys/net/nic.c', '(u32)(tick_clock_ms() - last_rx_ms) < window_ms', '(u32)(tick_clock_ms() - last_rx_ms) >= window_ms'),
+    ('sys/net/nic.c', 'last_rx_ms = tick_clock_ms();', 'last_rx_ms = 0;'),
+    ('sys/net/nic.c', 'rx_ms_valid = 1;', 'rx_ms_valid = 0;'),
+    ('sys/net/nic.c', 'else if (net_rx_recent(NET_RX_ACTIVE_MS))', 'else if (0)'),
+    ('sys/net/rx_work.c', 'b->max_units = NET_RX_SCAN_MAX;', 'b->max_units = NET_RX_SCAN_MAX + 1;'),
+    ('sys/net/rx_work.c', 'if (b->used >= b->max_units) return 0;', 'if (0) return 0;'),
+    ('sys/kern/io_work.c', 'if (idle_work_compat_count() == 0 && !any_pending()) return 0;',
      'if (idle_work_compat_count() == 0 && !any_pending()) { int i = find(IO_SVC_NET_RX); if (i < 0) return 0; io_request(IO_SVC_NET_RX); }'),
-    ('net/nic.c', 'io_request(IO_SVC_NET_RX); /* bind */', '(void)0; /* bind */'),
-    ('net/nic.c', 'io_request(IO_SVC_NET_RX); /* deferred unbind */', '(void)0;'),
-    ('net/nic.c', 'io_request(IO_SVC_NET_RX); /* unbind */', '(void)0;'),
-    ('net/nic.c', 'io_request(IO_SVC_NET_RX); /* TX completion/cooperative point */', '(void)0;'),
-    ('net/nic.c', 'io_request(IO_SVC_NET_RX); /* IRQ mark or exhausted receive scan */', '(void)0;'),
-    ('net/nic.c', 'if (bound) io_request(IO_SVC_NET_RX); /* net_tick, including deferred poll */', '(void)0;'),
-    ('net/nic.c', 'if (bound) io_request(IO_SVC_NET_RX); /* net_jiffy, including link_due */', '(void)0;'),
-    ('net/nic.c', 'return bound ? IO_MORE : IO_DONE;', 'return bound ? IO_WAIT : IO_DONE;'),
-    ('net/nic.c', 'if (ticking || batch_depth) return IO_MORE;', 'if (ticking || batch_depth) return IO_WAIT;'),
+    ('sys/net/nic.c', 'io_request(IO_SVC_NET_RX); /* bind */', '(void)0; /* bind */'),
+    ('sys/net/nic.c', 'io_request(IO_SVC_NET_RX); /* deferred unbind */', '(void)0;'),
+    ('sys/net/nic.c', 'io_request(IO_SVC_NET_RX); /* unbind */', '(void)0;'),
+    ('sys/net/nic.c', 'io_request(IO_SVC_NET_RX); /* TX completion/cooperative point */', '(void)0;'),
+    ('sys/net/nic.c', 'io_request(IO_SVC_NET_RX); /* IRQ mark or exhausted receive scan */', '(void)0;'),
+    ('sys/net/nic.c', 'if (bound) io_request(IO_SVC_NET_RX); /* net_tick, including deferred poll */', '(void)0;'),
+    ('sys/net/nic.c', 'if (bound) io_request(IO_SVC_NET_RX); /* net_jiffy, including link_due */', '(void)0;'),
+    ('sys/net/nic.c', 'return bound ? IO_MORE : IO_DONE;', 'return bound ? IO_WAIT : IO_DONE;'),
+    ('sys/net/nic.c', 'if (ticking || batch_depth) return IO_MORE;', 'if (ticking || batch_depth) return IO_WAIT;'),
 
-    ('net/rx_work.c', 'if (!io_slice_take(b->slice) && b->used) return 0;', 'if (0) return 0;'),
-    ('net/rx_work.c', 'if (!io_slice_take(b->slice) && b->used) return 0;', 'if (!io_slice_take(b->slice)) return 0;'),
-    ('net/nic.c', '!_irq_enabled() || kctx_irq_depth != 0', 'kctx_irq_depth != 0'),
-    ('net/nic.c', '!_irq_enabled() || kctx_irq_depth != 0', '!_irq_enabled()'),
-    ('net/nic.c', '!bound || ticking || unbind_due', '!bound || unbind_due'),
-    ('net/nic.c', 'if (!batch_depth++)', 'if (++batch_depth)'),
-    ('net/nic.c', 'if (!ticking) return 0;', 'return 0;'),
-    ('net/nic.c', 'if (link_due && bound)', 'if (0 && link_due && bound)'),
-    ('net/nic.c', 'if (bound && ticking) poll_due = 1;', 'if (bound && ticking) poll_due = 0;'),
-    ('net/nic.c', 'if (poll_due && bound)', 'if (0 && poll_due && bound)'),
-    ('net/nic.c', '        poll_due = 0;\n        bound->poll();\n        net_rx_schedule();\n    }',
+    ('sys/net/rx_work.c', 'if (!io_slice_take(b->slice) && b->used) return 0;', 'if (0) return 0;'),
+    ('sys/net/rx_work.c', 'if (!io_slice_take(b->slice) && b->used) return 0;', 'if (!io_slice_take(b->slice)) return 0;'),
+    ('sys/net/nic.c', '!_irq_enabled() || kctx_irq_depth != 0', 'kctx_irq_depth != 0'),
+    ('sys/net/nic.c', '!_irq_enabled() || kctx_irq_depth != 0', '!_irq_enabled()'),
+    ('sys/net/nic.c', '!bound || ticking || unbind_due', '!bound || unbind_due'),
+    ('sys/net/nic.c', 'if (!batch_depth++)', 'if (++batch_depth)'),
+    ('sys/net/nic.c', 'if (!ticking) return 0;', 'return 0;'),
+    ('sys/net/nic.c', 'if (link_due && bound)', 'if (0 && link_due && bound)'),
+    ('sys/net/nic.c', 'if (bound && ticking) poll_due = 1;', 'if (bound && ticking) poll_due = 0;'),
+    ('sys/net/nic.c', 'if (poll_due && bound)', 'if (0 && poll_due && bound)'),
+    ('sys/net/nic.c', '        poll_due = 0;\n        bound->poll();\n        net_rx_schedule();\n    }',
      '        poll_due = 0;\n        bound->poll();\n        bound->poll();\n        net_rx_schedule();\n    }'),
-    ('net/nic.c', '(u32)(link_platform_now() - last_idle_jiffy) >= LINK_RX_IDLE_RESCUE_JIFFIES', '1'),
-    ('net/nic.c', 'owner && (owner == adapters[NET_NIC_E82557] ||\n                (LINK_PLATFORM_TICK_RX_LGY98_SLOT && owner == adapters[NET_NIC_LGY98]))', 'owner'),
-    ('net/nic.c', 'if (idle) last_idle_jiffy = link_platform_now();', 'if (idle) last_idle_jiffy += 0;'),
-    ('net/nic.c', 'last_idle_jiffy = link_platform_now();\n            bound = ops;',
+    ('sys/net/nic.c', '(u32)(link_platform_now() - last_idle_jiffy) >= LINK_RX_IDLE_RESCUE_JIFFIES', '1'),
+    ('sys/net/nic.c', 'owner && (owner == adapters[NET_NIC_E82557] ||\n                (LINK_PLATFORM_TICK_RX_LGY98_SLOT && owner == adapters[NET_NIC_LGY98]))', 'owner'),
+    ('sys/net/nic.c', 'if (idle) last_idle_jiffy = link_platform_now();', 'if (idle) last_idle_jiffy += 0;'),
+    ('sys/net/nic.c', 'last_idle_jiffy = link_platform_now();\n            bound = ops;',
      'last_idle_jiffy = 0;\n            bound = ops;'),
-    ('net/nic.c', 'if (ticking) {\n        unbind_due = 1;', 'if (0) {\n        unbind_due = 1;'),
-    ('net/nic_rx.c', 'if (!(tick_budget_peek(', 'if (0 && !(tick_budget_peek('),
-    ('net/nic.c', 'tick_budget_peek(', 'tick_budget_take('),
+    ('sys/net/nic.c', 'if (ticking) {\n        unbind_due = 1;', 'if (0) {\n        unbind_due = 1;'),
+    ('sys/net/nic_rx.c', 'if (!(tick_budget_peek(', 'if (0 && !(tick_budget_peek('),
+    ('sys/net/nic.c', 'tick_budget_peek(', 'tick_budget_take('),
 )
 
 
@@ -85,13 +85,13 @@ def verify(work, mutation=None, link=False):
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(source)
     # Override only the platform scheduling constant, retaining PC-98 host IRQs.
-    header = (ROOT / 'platform/pc98/platform_link_inline.h').read_text()
+    header = (ROOT / 'sys/platform/pc98/platform_link_inline.h').read_text()
     anchor = '#define LINK_PLATFORM_TICK_RX_LGY98_SLOT 0'
     assert header.count(anchor) == 1
     (work / 'platform_link_inline.h').write_text(header.replace(
         anchor, '#define LINK_PLATFORM_TICK_RX_LGY98_SLOT ' + str(int(link))))
-    product = (ROOT / 'kernel/io_work.c').read_text()
-    if mutation and mutation[0] == 'kernel/io_work.c':
+    product = (ROOT / 'sys/kern/io_work.c').read_text()
+    if mutation and mutation[0] == 'sys/kern/io_work.c':
         assert product.count(mutation[1]) == 1
         product = product.replace(mutation[1], mutation[2])
     exe = work / 'host'
@@ -111,7 +111,7 @@ def main(mutate=False):
         assert verify(work, link=True) == 0
         print('GREEN GEM tick RX and cooperative RX, batch, idle, reentry, rescue, wrap', flush=True)
         if mutate:
-            mutation = ('net/nic.c', 'LINK_PLATFORM_TICK_RX_LGY98_SLOT && owner == adapters[NET_NIC_LGY98]',
+            mutation = ('sys/net/nic.c', 'LINK_PLATFORM_TICK_RX_LGY98_SLOT && owner == adapters[NET_NIC_LGY98]',
                         '0')
             assert verify(work, mutation, link=True) == 1
             print('RED runtime GEM tick RX disabled', flush=True)

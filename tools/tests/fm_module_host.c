@@ -9,14 +9,14 @@
 #define irq_save() 0U
 #define irq_restore(f) ((void)(f))
 #ifndef FM_ADAPTER
-#define FM_ADAPTER "../../drivers/sound/fm/fm_module.c"
+#define FM_ADAPTER "../../sys/dev/sound/fm/fm_module.c"
 #endif
 static int load_fixture(const struct module_request *q, struct module_handle *out);
 #define module_load load_fixture
 #include FM_ADAPTER
 #undef module_load
 #include "tick_order.h"
-#include "../../kernel/irq/tick.c"
+#include "../../sys/kern/irq/tick.c"
 volatile u32 kctx_irq_depth;
 const u32 fm_kexports[] = {0};
 const struct module_symbol_contract fm_import_contracts[] = {{0}};
@@ -151,7 +151,7 @@ void _start(void)
     finish(0);
 }
 
-#include "../../platform/pc98/module_pair.c"
+#include "../../sys/platform/pc98/module_pair.c"
 
 const struct boot_common *boot_common_get(void) {
     static struct boot_common info;

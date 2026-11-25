@@ -7,12 +7,12 @@ from pathlib import Path
 import subprocess
 import sys
 
-# Layout inputs of arch/ppc/kernel.ld and build/targets/ppc-powermac.mk,
+# Layout inputs of sys/arch/ppc/kernel.ld and build/targets/ppc-powermac.mk,
 # including ram-root.mk, the ELF/root pair and the acceptance image recipes.
 # sdk/kapi.json carries the fixed KAPI data fields that move with the KAPI
 # table version (mainline plan v89), so its push must measure every image.
 LAYOUT_PATTERNS = """
-    arch/ppc/*.ld sdk/link/ppc/*.ld include/memmap.h platform/*/platform_*_layout.h
+    arch/ppc/*.ld sdk/link/ppc/*.ld sys/include/memmap.h platform/*/platform_*_layout.h
     build/images/* build/targets/ppc-powermac.mk Makefile build/select.mk build/sources/*
     build/ppc* build/ram-root.mk build/font-fetch.mk assets/fonts/* tools/gen_font16.py
     tools/gen_unicode.c lib/unicode_jis_table.h tools/mkroot_image.py tools/gen_memmap.py

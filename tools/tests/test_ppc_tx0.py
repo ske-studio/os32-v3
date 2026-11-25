@@ -19,7 +19,7 @@ CHECK = dict(name='ppc-tx0', tier=1, budget=10,
 
 
 def exercise(work, mutate):
-    original = (ROOT/'build/images/ppc-flags.mk').read_text()
+    original = (ROOT/'sys/conf/images/ppc-flags.mk').read_text()
     def selection(source):
         mk = work/'default.mk'; mk.write_text(source)
         rule = 'selection:;@echo $(KBOOT_LINK) $(KB_OUT)'

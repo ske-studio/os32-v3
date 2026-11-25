@@ -3,13 +3,13 @@ import struct
 import re
 from pathlib import Path
 
-MEMMAP = (Path(__file__).resolve().parents[2] / 'include/memmap.h').read_text()
+MEMMAP = (Path(__file__).resolve().parents[2] / 'sys/include/memmap.h').read_text()
 
 
 def layout_constant(name):
     match = re.search(r'^#define\s+' + name + r'\s+(0[xX][0-9a-fA-F]+|[0-9]+)[uUlL]*\s*(?:/\*.*?\*/)?$', MEMMAP, re.M)
     if not match:
-        raise ValueError(f'expected integer constant {name} in include/memmap.h')
+        raise ValueError(f'expected integer constant {name} in sys/include/memmap.h')
     return int(match[1], 0)
 
 

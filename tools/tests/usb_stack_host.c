@@ -1,7 +1,7 @@
 /* USB_DESIGN §11: real HCD/core/classes; hardware-level device responses. */
 #define USB_STACK
 #include "usb_fake_ohci.c"
-#include "drivers/usb/usb_walk.h"
+#include "sys/dev/usb/usb_walk.h"
 static u8 address[2][7], selected[2], setup_bytes[2][128][8];
 static u8 report[7][2][8], ready[7][2], sources[2];
 static u32 hub_ports[4], keys, releases, mice, callbacks, irq_depth;

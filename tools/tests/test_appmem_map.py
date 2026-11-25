@@ -3,7 +3,7 @@
 Only intended runtime FAIL labels count as RED; errors/timeouts are separate.
 """
 CHECK = dict(name='appmem-map-host', tier=1,
-    covers=['tools/tests/font_guard_inactive.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/lease.c', 'exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'tools/tests/appmem_map_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'exec/appslot.c', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'exec/owner_diag.h', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['tools/tests/font_guard_inactive.h', 'sdk/kapi.json', 'sys/kapi/kapi_generated.c', 'sys/kern/exec/exec.c', 'sys/kern/exec/lease.c', 'sys/kern/exec/appmem.c', 'sys/kern/exec/appmem_map.c', 'sys/kern/exec/appmem_unmap.c', 'sys/kern/mm/paging_app.c', 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c', 'sys/kern/mm/physmem.c', 'tools/tests/appmem_map_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sys/kern/exec/appslot.c', 'sys/kern/exec/exec_heap.c', 'sys/kern/exec/exec_heap.h', 'sys/kern/mm/kmalloc.c', 'sys/kern/mm/kmalloc.h', 'sys/kern/exec/redir_access.c', 'sys/kern/exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sys/kern/exec/owner_diag.h', 'tools/tests/kernel_layout.py', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=5.9,
     basis=['KAPI_SPEC §3-3', 'KAPI_SPEC §4-10', 'KAPI_SPEC §4-11'],
 )
@@ -24,16 +24,16 @@ import host32
 from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ['exec/appmem.c', 'mm/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging.c', 'exec/exec.c', 'exec/appslot.c', 'kapi/kapi_generated.c', 'exec/exec_heap.c']
-TARGET_SRCS = ['include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'tools/tests/host_arch/arch_abi.h', 'exec/exec_heap.c', 'exec/exec_heap.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'exec/redir_access.c', 'exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'exec/exec.c', 'exec/appslot.c', 'exec/lease.c', 'exec/appslot.h', 'exec/appmem.c', 'mm/paging_app.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c',
-    'exec/appmem.h', 'mm/paging_app.h', 'mm/paging.c', 'mm/paging.h',
-    'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h',
-    'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h', 'include/memmap.h', 'include/io.h',
-    'include/cpu.h', 'include/pc98.h', 'include/sys.h', 'include/text_screen.h',
-    'arch/x86/kernel/gdt.h', 'arch/x86/kernel/tss.h', 'arch/x86/arch_cpu.h', 'arch/x86/arch_io.h', 'lib/kstring.h', 'tools/tests/appmem_map_host.c',
+SOURCES = ['sys/kern/exec/appmem.c', 'sys/kern/mm/paging_app.c', 'sys/kern/exec/appmem_map.c', 'sys/kern/exec/appmem_unmap.c', 'sys/kern/mm/paging.c', 'sys/kern/exec/exec.c', 'sys/kern/exec/appslot.c', 'sys/kapi/kapi_generated.c', 'sys/kern/exec/exec_heap.c']
+TARGET_SRCS = ['sys/include/callconv.h', 'sys/include/abi.h', 'sys/arch/x86/arch_abi.h', 'tools/tests/host_arch/arch_abi.h', 'sys/kern/exec/exec_heap.c', 'sys/kern/exec/exec_heap.h', 'sys/kern/mm/kmalloc.c', 'sys/kern/mm/kmalloc.h', 'sys/kern/exec/redir_access.c', 'sys/kern/exec/access_walk.c', 'tools/tests/exec_heap_host.h', 'sdk/kapi.json', 'sys/kapi/kapi_generated.c', 'sys/kern/exec/exec.c', 'sys/kern/exec/appslot.c', 'sys/kern/exec/lease.c', 'sys/kern/exec/appslot.h', 'sys/kern/exec/appmem.c', 'sys/kern/mm/paging_app.c', 'sys/kern/exec/appmem_map.c', 'sys/kern/exec/appmem_unmap.c',
+    'sys/kern/exec/appmem.h', 'sys/kern/mm/paging_app.h', 'sys/kern/mm/paging.c', 'sys/kern/mm/paging.h',
+    'sys/kern/mm/pgalloc.c', 'sys/kern/mm/pgalloc.h', 'sys/kern/mm/physmem.c', 'sys/kern/mm/physmem.h',
+    'sys/include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'sys/include/types.h', 'sys/include/memmap.h', 'sys/include/io.h',
+    'sys/include/cpu.h', 'sys/platform/pc98/pc98.h', 'sys/include/sys.h', 'sys/include/text_screen.h',
+    'sys/arch/x86/kernel/gdt.h', 'sys/arch/x86/kernel/tss.h', 'sys/arch/x86/arch_cpu.h', 'sys/arch/x86/arch_io.h', 'sys/kern/kstring.h', 'tools/tests/appmem_map_host.c',
     'tools/tests/test_appmem_map.py', 'tools/tests/pgalloc_host_fixture.h',
     'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h',
-    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'platform/pc98/platform_io.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
+    'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sys/platform/pc98/platform_io.h', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h']
 DATA_ABORT = '''    for (u32 va = tx->base; va < tx->end; va += PAGE_SIZE) {
         u32 *entry = app_entry(tx, va);
         if (entry && *entry) {
@@ -184,7 +184,7 @@ def main():
     args = parser.parse_args()
     host32.begin_control(args.mutate, args.runner, ROOT)
     before = {p: hashlib.sha256((ROOT / p).read_bytes()).digest() for p in TARGET_SRCS}
-    bodies = [paging_source(ROOT / p) if str(p).endswith('mm/paging.c') else read_text(ROOT / p) for p in SOURCES]
+    bodies = [paging_source(ROOT / p) if str(p).endswith('sys/kern/mm/paging.c') else read_text(ROOT / p) for p in SOURCES]
     cc = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-builtin',
           '-fno-pie', '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
           '-Wall', '-Wextra', '-Werror', '-Werror=implicit-function-declaration',
@@ -237,7 +237,7 @@ def main():
             (tmp / 'exec_source.c').write_text(exec_parts(bodies[5]))
             (tmp / 'heap_context_source.c').write_text(heap_context_parts(bodies[5]))
             (tmp / 'abort_clear_source.c').write_text(function(bodies[6], 'int appslot_abort_clear('))
-            lease_source = (ROOT / 'exec/lease.c').read_text()
+            lease_source = (ROOT / 'sys/kern/exec/lease.c').read_text()
             parts = ['volatile u32 lease_revoke_fail_count, lease_revoke_all_fail_count;']
             for signature in ('static int context(', 'int lease_release(', 'int lease_revoke_sid(', 'int lease_revoke_all('):
                 begin = lease_source.index(signature)
@@ -290,7 +290,7 @@ def main():
                 return obj
 
             objects = []
-            for key, path in [('fixture', 'tools/tests/appmem_map_host.c'), ('physmem', 'mm/physmem.c')]:
+            for key, path in [('fixture', 'tools/tests/appmem_map_host.c'), ('physmem', 'sys/kern/mm/physmem.c')]:
                 obj = tmp / (key + '.o')
                 host32.build(cc + ['-c', str(ROOT / path), '-o', str(obj)], check=True,
                                capture_output=True, text=True, timeout=30)

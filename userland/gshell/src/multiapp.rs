@@ -60,10 +60,10 @@ use crate::{damage, ring, session, timer};
 use os32api::gui::proto::{GUI_MAX_WINDOWS, OS32_ERR_AGAIN};
 
 /* ================================================================ */
-/*  定数 (カーネル exec/appslot.h と同じ値)                          */
+/*  定数 (カーネル sys/kern/exec/appslot.h と同じ値)                          */
 /* ================================================================ */
 
-/// シェル帯 (CUI シェル / gshell)。`kernel/gui.h` の `GUI_SHELL_OWNER` と同値。
+/// シェル帯 (CUI シェル / gshell)。`sys/kern/gui.h` の `GUI_SHELL_OWNER` と同値。
 pub const APP_ID_SHELL: i32 = 1;
 /// 同時に生きる非シェル ID の本数 (`APP_MAX_APPS`)。
 pub const MAX_APPS: usize = 4;
@@ -74,7 +74,7 @@ pub const APP_ID_MAX: i32 = APP_ID_MIN + MAX_APPS as i32 - 1;
 #[allow(dead_code)] /* 試験・診断用 (ゲストからは呼ばない) */
 pub const APP_STATE_PARKED: i32 = 2;
 /// `exec_app_state` が返す「kbd 待ち」(`APP_STATE_WAIT_KEY`、KAPI v47)。
-/// カーネル `exec/appslot.h` と同じ値で、**既存の 0/1/2 の意味は動かない**
+/// カーネル `sys/kern/exec/appslot.h` と同じ値で、**既存の 0/1/2 の意味は動かない**
 /// (票 K7 §5 指摘 C: 値の追加は互換)。GUI 中に `kbd_getchar` を呼んだ
 /// CUI プログラムはここで止まる — 第 2 の park 点 (票 K7 D1)。
 pub const APP_STATE_WAIT_KEY: i32 = 3;
@@ -83,7 +83,7 @@ pub const APP_STATE_WAIT_KEY: i32 = 3;
 /// `kbd_trygetkey` / `kbd_has_key` を回す全画面 GFX プログラムを、カーネルが
 /// tick に 1 回だけ止めて WM に譲らせる第 3 の park 点。
 ///
-/// **カーネル側 (`exec/appslot.h` の定義と park / resume) は別票 T8-3 K** で、
+/// **カーネル側 (`sys/kern/exec/appslot.h` の定義と park / resume) は別票 T8-3 K** で、
 /// そこに入るまでヘッダに無いのでここはリテラル 4 を持つ (入った後も同値。
 /// 既存の 0〜3 の意味は動かないので値の追加は互換 — 票 K7 §5 指摘 C と同じ)。
 pub const APP_STATE_WAIT_POLL: i32 = 4;

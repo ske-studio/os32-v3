@@ -1,6 +1,6 @@
-# kdebug/gfinit_mode.c — 設計
+# sys/dev/video/geforce/diag/gfinit_mode.c — 設計
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
-ソース: `kdebug/gfinit_mode.c`
+ソース: `sys/dev/video/geforce/diag/gfinit_mode.c`
 
 mode_bit と zero 初期化は共有、集約関数は呼出しだけ。palette:112–123 と模様 row:124–141 は診断に残す。
 
@@ -10,6 +10,6 @@ mode_bit と zero 初期化は共有、集約関数は呼出しだけ。palette:
 
 [HW1]の通常描画はbackbuffer→gfx_present/dirtyのHAL経路（`docs/CONSTRAINTS.md`）。本票は既存A4と同じ専有VRAMへの診断パターン転送として扱う明示差分で、CUIのHALを切り替えない。白枠は外周8px、市松は内側左上64×64px、残りは80px幅8帯；通常アプリ描画への流用は後段。
 
-- 市松は **1 マス 8×8 px** (64×64 px の中に 8×8 マス)、**左上のマスは白**で白・黒を交互 (palette の番号は段 1 の kdebug/gfinit_mode.c の表で白=4・黒=0)。位置は外周の白枠 (8 px) の内側の左上 x=8〜71・y=8〜71。
+- 市松は **1 マス 8×8 px** (64×64 px の中に 8×8 マス)、**左上のマスは白**で白・黒を交互 (palette の番号は段 1 の sys/dev/video/geforce/diag/gfinit_mode.c の表で白=4・黒=0)。位置は外周の白枠 (8 px) の内側の左上 x=8〜71・y=8〜71。
 
 - 重なりの優先は **白枠 > 市松 > 縦の帯** (帯は全幅 640 px に 80 px ずつ 8 色を敷き、市松と枠が上書きする)。行のデータは y ごとにこの規則で決まる 640 B の固定の列 (480 行で 3 種類: 枠の行 (y<8・y>=472)・市松の行 (8<=y<72)・帯の行)。

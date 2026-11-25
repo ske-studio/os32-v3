@@ -2,20 +2,20 @@
 """3b PC98 Init: full independent MMIO trace and runtime mutations, no libc.
 
 The C oracle is transcribed from MIT trident_driver-1.4.0.c:616-692 and
-userland/tests/hw/trident_mode.hwb:499-577; no external reference file is
+userland/diag/hw/trident_mode.hwb:499-577; no external reference file is
 needed in CI. regs.c link doubles are stateless adapters to the shared fake.
 Production regs_bind/module wiring remains the wiring-stage acceptance test.
 """
 CHECK = dict(name='trident-pc98init', tier=1, needs=[], budget=7.5,
-    covers=['drivers/video/trident/pc98_init.c',
-            'drivers/video/trident/trident.h',
+    covers=['sys/dev/video/trident/pc98_init.c',
+            'sys/dev/video/trident/trident.h',
             'tools/tests/trident_pc98init_host.c',
             'tools/tests/trident_device_fake.c',
             'tools/tests/trident_device_fake.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'build/config.mk', 'include/types.h', 'include/memmap.h',
-            'gfx/palette.h', 'include/pegc.h',
-            'userland/tests/hw/trident_mode.hwb'],
+            'build/config.mk', 'sys/include/types.h', 'sys/include/memmap.h',
+            'sys/hal/gfx/palette.h', 'sys/platform/pc98/pegc.h',
+            'userland/diag/hw/trident_mode.hwb'],
     basis=['TRIDENT_S3_DESIGN §1', 'TRIDENT_S3_DESIGN §3', 'TRIDENT_FULL_DESIGN §2'],
 )
 import argparse
@@ -28,7 +28,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'drivers/video/trident/pc98_init.c'
+PRODUCT = 'sys/dev/video/trident/pc98_init.c'
 HOST = 'tools/tests/trident_pc98init_host.c'
 FAKE = 'tools/tests/trident_device_fake.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',

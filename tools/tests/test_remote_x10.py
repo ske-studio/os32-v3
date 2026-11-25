@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 CHECK = dict(name='remote-x10', tier=1, needs=[], budget=12,
     covers=['userland/shell/rshell_lan.c', 'userland/shell/shell.h',
-            'include/remote_control.h', 'include/con_sink.h',
-            'net/host_mailbox.h', 'net/link.h', 'include/net_eth.h', 'include/types.h',
+            'sys/include/remote_control.h', 'sys/include/con_sink.h',
+            'sys/net/host_mailbox.h', 'sys/net/link.h', 'sys/include/net_eth.h', 'sys/include/types.h',
             'userland/lib/host/libos32host.h', 'sdk/include/os32/os32api.h',
             'sdk/include/os32/ls.h', 'sdk/include/os32/os32_kapi_shared.h',
             'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_host_notice.h',

@@ -5,7 +5,7 @@ Hardware IRQ delivery, IRET/CR3 and visible restoration need NP21/W.
 Normal controls always run before compiled runtime-RED omissions.
 """
 CHECK = dict(name='v86-gcap-abort-host', tier=1,
-    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/font_guard_inactive.h', 'arch/x86/kernel/isr_handlers.c', 'platform/pc98/legacy/v86_mem.*', 'platform/pc98/legacy/v86.c', 'platform/pc98/legacy/v86.h', 'platform/pc98/legacy/v86_gcap.*', 'platform/pc98/legacy/v86_io.*', 'kernel/module/module.h', 'platform/pc98/legacy/v86_call.c', 'exec/exec.c', 'exec/appslot.h', 'kdebug/v86_gcap.c', 'kdebug/v86_gcap_math.c', 'kdebug/v86_gcap_diag.h', 'platform/pc98/legacy/v86_gcap_math.h', 'include/**', 'arch/x86/**', 'platform/pc98/**', 'tools/tests/host_arch/**', 'tools/tests/host32.py', 'tools/tests/v86_gcap_abort_host.c', 'include/platform_emergency.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/font_guard_inactive.h', 'sys/arch/x86/kernel/isr_handlers.c', 'platform/pc98/legacy/v86_mem.*', 'sys/platform/pc98/legacy/v86.c', 'sys/platform/pc98/legacy/v86.h', 'platform/pc98/legacy/v86_gcap.*', 'platform/pc98/legacy/v86_io.*', 'sys/kern/module/module.h', 'sys/platform/pc98/legacy/v86_call.c', 'sys/kern/exec/exec.c', 'sys/kern/exec/appslot.h', 'sys/platform/pc98/kdebug/v86_gcap.c', 'sys/platform/pc98/kdebug/v86_gcap_math.c', 'sys/platform/pc98/kdebug/v86_gcap_diag.h', 'sys/platform/pc98/legacy/v86_gcap_math.h', 'include/**', 'arch/x86/**', 'platform/pc98/**', 'tools/tests/host_arch/**', 'tools/tests/host32.py', 'tools/tests/v86_gcap_abort_host.c', 'sys/include/platform_emergency.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=[], budget=4.1,
     basis=['KAPI_SPEC', 'AC-CTX-7'],
 )
@@ -38,49 +38,49 @@ GP_GATE = '''    if (kdebug.ops.gcap_insn_abort && kdebug.ops.gcap_insn_abort(op
 
     return v86_gp_emulate(frame, pc, len);'''
 MUTATIONS = (
-    ('platform/pc98/legacy/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();', '', 'detach'),
-    ('platform/pc98/legacy/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'release'),
-    ('kdebug/v86_gcap.c', 'void v86_gcap_detach(void)\n{\n    v86_gcap_rec = 0;\n    gcap_ops = 0;',
+    ('sys/platform/pc98/legacy/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_detach) kdebug.ops.gcap_detach();', '', 'detach'),
+    ('sys/platform/pc98/legacy/v86_mem.c', '    if (v86_session.aborting && kdebug.ops.gcap_release) kdebug.ops.gcap_release();', '', 'release'),
+    ('sys/platform/pc98/kdebug/v86_gcap.c', 'void v86_gcap_detach(void)\n{\n    v86_gcap_rec = 0;\n    gcap_ops = 0;',
      'void v86_gcap_detach(void)\n{\n    v86_gcap_rec = 0;', 'ops'),
-    ('kdebug/v86_gcap.c', '    g->restore = V86G_RST_FALLBACK;', '', 'interrupted-ROM-sync'),
-    ('kdebug/v86_gcap.c', '    tv_restore(tv);', '    (void)tv;', 'TVRAM-tail'),
-    ('kdebug/v86_gcap.c', '    if (v86_session.aborting) v86_io_reset_policy();', '', 'post-session-policy'),
-    ('platform/pc98/legacy/v86.c', 'return v86_gp_emulate(frame, pc, len);',
+    ('sys/platform/pc98/kdebug/v86_gcap.c', '    g->restore = V86G_RST_FALLBACK;', '', 'interrupted-ROM-sync'),
+    ('sys/platform/pc98/kdebug/v86_gcap.c', '    tv_restore(tv);', '    (void)tv;', 'TVRAM-tail'),
+    ('sys/platform/pc98/kdebug/v86_gcap.c', '    if (v86_session.aborting) v86_io_reset_policy();', '', 'post-session-policy'),
+    ('sys/platform/pc98/legacy/v86.c', 'return v86_gp_emulate(frame, pc, len);',
      'return v86_gp_emulate(frame, pc, 0);', 'GP-prefix-length-handoff'),
-    ('platform/pc98/legacy/v86.c', 'return v86_gp_emulate(frame, pc, len);',
+    ('sys/platform/pc98/legacy/v86.c', 'return v86_gp_emulate(frame, pc, len);',
      'return v86_gp_emulate(frame, pc + len, len);', 'GP-pc-handoff'),
-    ('platform/pc98/legacy/v86.c', GP_GATE,
+    ('sys/platform/pc98/legacy/v86.c', GP_GATE,
      '    int result = v86_gp_emulate(frame, pc, len);\n' +
      GP_GATE.replace('return v86_gp_emulate(frame, pc, len);', 'return result;'),
      'GP-capture-after-dispatch'),
-    ('platform/pc98/legacy/v86_gp_emulate.inc',
+    ('sys/platform/pc98/legacy/v86_gp_emulate.inc',
      'v86_set_al(frame, v86_io_in(port, 1));\n        v86_advance_ip(frame, len + 2);',
      'v86_set_al(frame, v86_io_in(port, 1));\n        v86_advance_ip(frame, len + 1);',
      'GP-immediate-IP-increment'),
-    ('platform/pc98/legacy/v86_gp_emulate.inc', 'if (!v86_inject_int(frame, vec)) {',
+    ('sys/platform/pc98/legacy/v86_gp_emulate.inc', 'if (!v86_inject_int(frame, vec)) {',
      'if (v86_inject_int(frame, vec)) {', 'GP-INT-failure'),
-    ('platform/pc98/legacy/v86_gp_emulate.inc', 'v86_exit_reason = V86_EXIT_HLT;\n        return 1;',
+    ('sys/platform/pc98/legacy/v86_gp_emulate.inc', 'v86_exit_reason = V86_EXIT_HLT;\n        return 1;',
      'v86_exit_reason = V86_EXIT_HLT;\n        return 0;', 'GP-HLT-return'),
 )
 
 
 def main():
-    paths = ('platform/pc98/legacy/v86_mem.c', 'kdebug/v86_gcap.c', 'exec/exec.c',
-             'platform/pc98/legacy/v86_call.c', 'platform/pc98/legacy/v86_gcap.c', 'platform/pc98/legacy/v86_io.c',
-             'arch/x86/kernel/isr_handlers.c', 'platform/pc98/legacy/v86.c',
-             'platform/pc98/legacy/v86_gp_emulate.inc')
+    paths = ('sys/platform/pc98/legacy/v86_mem.c', 'sys/platform/pc98/kdebug/v86_gcap.c', 'sys/kern/exec/exec.c',
+             'sys/platform/pc98/legacy/v86_call.c', 'sys/platform/pc98/legacy/v86_gcap.c', 'sys/platform/pc98/legacy/v86_io.c',
+             'sys/arch/x86/kernel/isr_handlers.c', 'sys/platform/pc98/legacy/v86.c',
+             'sys/platform/pc98/legacy/v86_gp_emulate.inc')
     sources = {p: read_text(ROOT / p) for p in paths}
     with tempfile.TemporaryDirectory(prefix='v86-gcap-abort-') as td:
         work = Path(td)
         def run(parts, label=None):
-            gp = parts['platform/pc98/legacy/v86.c']
+            gp = parts['sys/platform/pc98/legacy/v86.c']
             (work / 'gp.inc').write_text(
                 ''.join(line for line in gp.splitlines(keepends=True)
                         if line.startswith(('#define V86_FETCH_BYTES ', '#define V86_PREFIX_MAX '))) +
                 ''.join(function(gp, n) for n in (
                     'v86_ptr', 'v86_advance_ip', 'v86_set_al', 'v86_set_ax')) +
-                parts['platform/pc98/legacy/v86_gp_emulate.inc'] + function(gp, 'v86_gp_handler'))
-            for rel in ('include/platform_emergency.h', 'platform/pc98/emergency.c'):
+                parts['sys/platform/pc98/legacy/v86_gp_emulate.inc'] + function(gp, 'v86_gp_handler'))
+            for rel in ('sys/include/platform_emergency.h', 'sys/platform/pc98/emergency.c'):
                 (work / Path(rel).name).write_text((ROOT / rel).read_text())
             (work / 'session.c').write_text(parts[paths[0]])
             # The production import thunks are replaced by direct fixture edges;
@@ -113,7 +113,7 @@ def main():
                    '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections', '-I' + str(work)]
             cmd += (['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'kdebug')] + include_flags(ROOT))
             subprocess.run(cmd + [str(ROOT / 'tools/tests/v86_gcap_abort_host.c'),
-                                 str(ROOT / 'kdebug/v86_gcap_math.c'), '-o', str(exe)], check=True)
+                                 str(ROOT / 'sys/platform/pc98/kdebug/v86_gcap_math.c'), '-o', str(exe)], check=True)
             result = subprocess.run(['qemu-i386', '-B', '0x100000000', str(exe)],
                                     capture_output=True, text=True, timeout=host32.RUN_TIMEOUT)
             assert result.returncode == (1 if label else 0), (label, result)

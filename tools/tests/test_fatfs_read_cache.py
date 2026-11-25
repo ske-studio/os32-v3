@@ -2,10 +2,10 @@
 CHECK = dict(name='fatfs-read-cache-host', tier=1,
              covers=['tools/tests/fatfs_read_cache_host.c',
                      'tools/tests/kernel_includes.py',
-                     'fs/fat/fatfs_vfs.c', 'fs/fat/fatfs_vfs_read_cache.inc',
-                     'fs/fat/fatfs/ff.c', 'fs/fat/fatfs/ff.h',
-                     'fs/fat/fatfs/ffconf.h', 'fs/fat/fatfs/diskio.h',
-                     'fs/pc98pt.c'],
+                     'sys/fs/fat/fatfs_vfs.c', 'sys/fs/fat/fatfs_vfs_read_cache.inc',
+                     'sys/fs/fat/fatfs/ff.c', 'sys/fs/fat/fatfs/ff.h',
+                     'sys/fs/fat/fatfs/ffconf.h', 'sys/fs/fat/fatfs/diskio.h',
+                     'sys/fs/pc98pt.c'],
              needs=[], budget=4.1,
     kind='characterization',
 )
@@ -39,7 +39,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='fatfs-read-cache-') as tmp:
         tmp = pathlib.Path(tmp)
         source = tmp / 'instrument.c'
-        source.write_text('#include "fs/fat/fatfs/ff.c"\n'
+        source.write_text('#include "sys/fs/fat/fatfs/ff.c"\n'
                           'void *test_get_fat_address(void) { return (void *)get_fat; }\n')
         flags = ['gcc', '-std=gnu11', '-g', '-O0', '-D__cdecl=',
                  '-I' + str(ROOT), *include_flags(ROOT)]
@@ -52,18 +52,18 @@ def main():
                         str(ROOT / 'tools/tests/fatfs_read_cache_host.c'),
                         str(tmp / 'ff.o'), '-o', str(exe)], check=True)
         subprocess.run([str(exe)], check=True)
-        cache = ROOT / 'fs/fat/fatfs_vfs_read_cache.inc'
+        cache = ROOT / 'sys/fs/fat/fatfs_vfs_read_cache.inc'
         if '--mutate' in sys.argv:
             original = cache.read_text()
             # Copy the whole wrapper and include, rebasing only local includes.
-            wrapper = (ROOT / 'fs/fat/fatfs_vfs.c').read_text()
+            wrapper = (ROOT / 'sys/fs/fat/fatfs_vfs.c').read_text()
             wrapper = wrapper.replace('"../vfs.h"', '"vfs.h"').replace(
                 '"../vfs_name_rules.inc"', '"vfs_name_rules.inc"')
             (tmp / 'fatfs_vfs.c').write_text(wrapper)
             fixture = (ROOT / 'tools/tests/fatfs_read_cache_host.c').read_text()
-            fixture = fixture.replace('"../../fs/pc98pt.c"',
-                                      '"fs/pc98pt.c"').replace(
-                '"../../fs/fat/fatfs_vfs.c"', '"fatfs_vfs.c"')
+            fixture = fixture.replace('"../../sys/fs/pc98pt.c"',
+                                      '"sys/fs/pc98pt.c"').replace(
+                '"../../sys/fs/fat/fatfs_vfs.c"', '"fatfs_vfs.c"')
             (tmp / 'fixture.c').write_text(fixture)
             for name, old, new, case in MUTANTS:
                 assert original.count(old) == 1, name
@@ -77,7 +77,7 @@ def main():
                     name, result.stdout, result.stderr)
                 print('MUTANT', name, 'runtime RED', flush=True)
         layout = tmp / 'layout.c'
-        layout.write_text('#include "fs/fat/fatfs_vfs.c"\n'
+        layout.write_text('#include "sys/fs/fat/fatfs_vfs.c"\n'
                           '_Static_assert(sizeof(FIL) == 40, "FIL");\n'
                           '_Static_assert(sizeof(FatReadSlot) == 304, "slot");\n'
                           '_Static_assert(sizeof(FatReadCache) == 1220, "cache");\n')
@@ -89,9 +89,9 @@ def main():
         # Use the actual include, but change only the test configuration.
         if cache.exists():
             guard = tmp / 'guard.c'
-            guard.write_text('#include "fs/fat/fatfs/ff.h"\n'
+            guard.write_text('#include "sys/fs/fat/fatfs/ff.h"\n'
                              '#undef FF_FS_LOCK\n#define FF_FS_LOCK 1\n'
-                             '#include "fs/fat/fatfs_vfs_read_cache.inc"\n')
+                             '#include "sys/fs/fat/fatfs_vfs_read_cache.inc"\n')
             result = subprocess.run([*flags, '-fsyntax-only', str(guard)],
                                     text=True, capture_output=True)
             assert result.returncode != 0

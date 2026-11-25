@@ -81,10 +81,10 @@ int  ime_switch_dict(int variant);   /* 0=S,1=M,2=L → reopen */
 
 | 対象 | 変更 |
 |------|------|
-| `kernel/ime/ime_dict.c` | `ime_dict_reopen` / `ime_user_*` 実装 |
-| `kernel/ime/ime.c` / `ime.h` | `ime_switch_dict` ファサード、`IME_UserEntry` |
-| `kapi/kapi_generated.c` (生成物) | `__cdecl` ラッパー |
-| `exec/exec_kapi_init.inc` (生成物) | KAPI 登録 (手編集しない) |
+| `sys/kern/ime/ime_dict.c` | `ime_dict_reopen` / `ime_user_*` 実装 |
+| `sys/kern/ime/ime.c` / `ime.h` | `ime_switch_dict` ファサード、`IME_UserEntry` |
+| `sys/kapi/kapi_generated.c` (生成物) | `__cdecl` ラッパー |
+| `sys/kern/exec/exec_kapi_init.inc` (生成物) | KAPI 登録 (手編集しない) |
 | `sdk/kapi.json` | KAPI 定義追記 |
 | `sdk/include/os32/os32_kapi_shared.h` | 共有型定義 + `IME_UserEntry` |
 | `userland/cmds/ime.c` | シェルコマンド本体 |

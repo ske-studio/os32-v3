@@ -30,7 +30,7 @@ def check(root):
                           "src = ROOT / 'arch' / 'unit.c'\n"
                           "if '--mutate' in args: src.replace(anchor, '')\n",
         'docs/tasks/restructure/P3.md': 'Move mm/unit.c next.\n',
-        'gfx/v2/format.c': 'int format(void) {return 1;}\n',
+        'sys/hal/gfx/v2/format.c': 'int format(void) {return 1;}\n',
         'docs/guide.md': 'See mm/unit.c or prefix/mm/unit.c\n',
         'build/list.mk': 'objs := $(OUT)/obj/mm/unit.o arch/unit.d\n',
     }.items():
@@ -57,13 +57,13 @@ def check(root):
     (build / 'deploy-set.json').write_text('{"files":[{"host":"build/out/unit.o"}]}')
     command = ['cc', '-g', '-c', 'mm/unit.c', '-o', 'build/out/unit.o']
     run(*command)
-    gfx_command = ['cc', '-c', 'gfx/v2/format.c', '-o', 'gfx/v2/format.o']
+    gfx_command = ['cc', '-c', 'sys/hal/gfx/v2/format.c', '-o', 'sys/hal/gfx/v2/format.o']
     run(*gfx_command)
     (out / 'build.log').write_text(' '.join(command) + '\n' + ' '.join(gfx_command))
     run(sys.executable, '-B', 'tools/restructure/artifact_paths.py', str(out))
     rows = read_rows(out / 'artifact_paths.tsv')
-    assert any(r['product'] == 'gfx/v2/format.o' and r['kind'] == 'STT_FILE'
-               and r['source'] == 'gfx/v2/format.c' for r in rows), 'gfx object'
+    assert any(r['product'] == 'sys/hal/gfx/v2/format.o' and r['kind'] == 'STT_FILE'
+               and r['source'] == 'sys/hal/gfx/v2/format.c' for r in rows), 'gfx object'
     assert any(r['kind'] == 'STT_FILE' and r['source'] == 'mm/unit.c' for r in rows), 'object attribution'
     assert any(r['kind'].startswith('runtime string') and r['spelling'] == 'mm/unit.c' for r in rows), 'runtime path'
     assert any(r['kind'] == 'DW_AT_name' for r in rows), 'debug info'

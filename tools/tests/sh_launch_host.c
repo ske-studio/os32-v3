@@ -402,7 +402,7 @@ static void case_req_nogui(void)
 /* ========================================================================
  *  8. T11 / U12 — 256 バイト以上の行は **launch_req を呼ばずに** 断る
  *
- *  カーネル (exec/launch.c) は len >= LAUNCH_CMDLINE_MAX を OS32_ERR_INVAL
+ *  カーネル (sys/kern/exec/launch.c) は len >= LAUNCH_CMDLINE_MAX を OS32_ERR_INVAL
  *  で返すが、sh.bin はその INVAL を「GUI 外」と読むので理由が入れ替わる。
  *  送る前に測って断ること。上限ちょうど (255) は今までどおり通る。
  * ======================================================================== */

@@ -4,7 +4,7 @@ python3 -B tools/tests/test_src_layout.py [--mutate]
 Mutants run the same normal cases in small independent trees.
 """
 CHECK = dict(name='src-layout-host', tier=1,
-    covers=['platform/pc98/ver_backend.c', 'hwdev/hwdev_module.c', 'platform/pc98/sysclk.c', 'platform/pc98/kernel.c', 'platform/pc98/boot_display.c', 'platform/pc98/boot_platform.c', 'platform/pc98/boot_splash.c', 'platform/pc98/boot_*.h', 'platform/pc98/*.inc', 'platform/powermac/ppc_kernel.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c', 'platform/pc98/boot_capture.c', 'platform/pc98/bios_snapshot.c', 'platform/pc98/bootinfo_report.c', 'platform/pc98/bootinfo_geom.c', 'platform/pc98/bootinfo_check.c', 'platform/pc98/bootinfo_capture.c', 'drivers/video/geforce/gf_accept.c', 'drivers/video/geforce/gf_wc.c', 'kernel/module/kdebug_imports.def', 'tools/source_roots.py', 'tools/check_arm_compile.py', 'platform/pc98/kernel.c', 'mm/paging.c', 'arch/x86/kernel/idt.c', 'drivers/ata/ide.c', 'drivers/ata/cd_module.c', 'drivers/video/geforce/geforce_platform.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/cirrus/cirrus_identify.c', 'fs/ext2/ext2_super.c', 'fs/fat/fatfs/ff.c', 'fs/serialfs/serialfs_session.c', 'fs/serialfs/sfs_session_fg.c', 'tools/move_files.py', 'tools/include_resolve.py', 'tools/build_compare.sh', 'tools/build_compare.py', 'tools/gen_build_id.py', 'kdebug/kdebug_module.c', 'kernel/ver_format.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/test_ver_version.py', 'tools/tests/ver_test_utils.py', 'tools/tests/kernel_includes.py', 'arch/x86/kernel/kentry.asm', 'boot/loader_fat_new.asm', 'build/kernel.mk', 'build/os32.ld', 'drivers/ata/cd_body.c', 'drivers/block/fdc.c', 'drivers/block/loop_dev.c', 'drivers/input/mouse.c', 'drivers/net/e82557/lan_body.c', 'drivers/net/e82557/lan_module.c', 'drivers/net/ne2000/lgy98.c', 'drivers/net/ne2000/ne2000.c', 'drivers/sound/cs4231/pcm_body.c', 'drivers/sound/cs4231/pcm_module.c', 'drivers/sound/fm/fm_body.c', 'drivers/sound/fm/fm_module.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_body.c', 'drivers/video/cirrus/cirrus_module.c', 'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/geforce_body.c', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/gf_present.c', 'drivers/video/kcg/kcg_body.c', 'drivers/video/kcg/kcg_module.c', 'drivers/video/pc98/backend_pegc.c', 'drivers/video/pc98/pc98_route.c', 'fs/fd_redirect.c', 'fs/pipe_buffer.c', 'kapi/kapi_generated.c', 'lib/lz4.c', 'lib/sqlite3/os32_sqlite_test.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'mm/shm.c', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/generations.ld', 'sdk/link/shlib.ld', 'sdk/os32_generations.py', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/generations.rs', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/check_artifacts.py', 'tools/clang_ast/build.py', 'tools/gen_hwdev_pair.py', 'tools/gen_kdebug_imports.py', 'tools/gen_memmap.py', 'tools/gen_sqlite_imports.py', 'tools/mkmod.py', 'tools/mkshlib.py', 'tools/module_schema.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'platform/pc98/ime_display.c', 'platform/pc98/ime_render_tvram.c'],
+    covers=['sys/platform/pc98/ver_backend.c', 'sys/dev/hwdev/hwdev_module.c', 'sys/platform/pc98/sysclk.c', 'sys/platform/pc98/kernel.c', 'sys/platform/pc98/boot_display.c', 'sys/platform/pc98/boot_platform.c', 'sys/platform/pc98/boot_splash.c', 'platform/pc98/boot_*.h', 'platform/pc98/*.inc', 'sys/platform/powermac/ppc_kernel.c', 'sys/platform/pc98/gfx_scroll.c', 'sys/platform/pc98/gfx_init.c', 'sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_surfaces.c', 'sys/platform/pc98/boot_capture.c', 'sys/platform/pc98/bios_snapshot.c', 'sys/platform/pc98/bootinfo_report.c', 'sys/platform/pc98/bootinfo_geom.c', 'sys/platform/pc98/bootinfo_check.c', 'sys/platform/pc98/bootinfo_capture.c', 'sys/dev/video/geforce/gf_accept.c', 'sys/dev/video/geforce/gf_wc.c', 'sys/kern/module/kdebug_imports.def', 'tools/source_roots.py', 'tools/check_arm_compile.py', 'sys/platform/pc98/kernel.c', 'sys/kern/mm/paging.c', 'sys/arch/x86/kernel/idt.c', 'sys/dev/ata/ide.c', 'sys/dev/ata/cd_module.c', 'sys/dev/video/geforce/geforce_platform.c', 'sys/platform/pc98/video/backend_pc98.c', 'sys/platform/pc98/video/cirrus/cirrus_identify.c', 'sys/fs/ext2/ext2_super.c', 'sys/fs/fat/fatfs/ff.c', 'sys/fs/serialfs/serialfs_session.c', 'sys/fs/serialfs/sfs_session_fg.c', 'tools/move_files.py', 'tools/include_resolve.py', 'tools/build_compare.sh', 'tools/build_compare.py', 'tools/gen_build_id.py', 'sys/kern/kdebug/kdebug_module.c', 'sys/kern/ver_format.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/test_ver_version.py', 'tools/tests/ver_test_utils.py', 'tools/tests/kernel_includes.py', 'sys/arch/x86/kernel/kentry.asm', 'boot/loader_fat_new.asm', 'build/kernel.mk', 'build/os32.ld', 'sys/dev/ata/cd_body.c', 'sys/dev/block/fdc.c', 'sys/dev/block/loop_dev.c', 'sys/platform/pc98/input/mouse.c', 'sys/dev/net/e82557/lan_body.c', 'sys/dev/net/e82557/lan_module.c', 'sys/dev/net/ne2000/lgy98.c', 'sys/dev/net/ne2000/ne2000.c', 'sys/dev/sound/cs4231/pcm_body.c', 'sys/dev/sound/cs4231/pcm_module.c', 'sys/dev/sound/fm/fm_body.c', 'sys/dev/sound/fm/fm_module.c', 'sys/dev/video/cirrus/backend_cirrus.c', 'sys/dev/video/cirrus/cirrus_body.c', 'sys/dev/video/cirrus/cirrus_module.c', 'sys/dev/video/geforce/backend_geforce.c', 'sys/dev/video/geforce/geforce_body.c', 'sys/dev/video/geforce/geforce_module.c', 'sys/dev/video/geforce/gf_present.c', 'sys/dev/video/kcg/kcg_body.c', 'sys/dev/video/kcg/kcg_module.c', 'sys/platform/pc98/video/backend_pegc.c', 'sys/platform/pc98/video/pc98_route.c', 'sys/fs/fd_redirect.c', 'sys/fs/pipe_buffer.c', 'sys/kapi/kapi_generated.c', 'lib/lz4.c', 'lib/sqlite3/os32_sqlite_test.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'sys/kern/mm/shm.c', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/generations.ld', 'sdk/link/shlib.ld', 'sdk/os32_generations.py', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/generations.rs', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/check_artifacts.py', 'tools/clang_ast/build.py', 'tools/gen_hwdev_pair.py', 'tools/gen_kdebug_imports.py', 'tools/gen_memmap.py', 'tools/gen_sqlite_imports.py', 'tools/mkmod.py', 'tools/mkshlib.py', 'tools/module_schema.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'sys/platform/pc98/ime_display.c', 'sys/platform/pc98/ime_render_tvram.c'],
     needs=['make:all'], budget=3.7,
     kind='characterization',
 )
@@ -113,19 +113,19 @@ class LayoutTools(unittest.TestCase):
                                        if p.endswith('.c') and (ROOT / p).is_file()))
         self.assertTrue(all((ROOT / name).is_file() for name in files))
         for path, expected in (
-                ('platform/pc98/kernel.c', 'INC_KERNEL'), ('mm/paging.c', 'INC_KERNEL'),
-                ('arch/x86/kernel/idt.c', 'INC_KERNEL'),
-                ('drivers/ata/ide.c', 'INC_DRIVERS'),
-                ('drivers/ata/cd_module.c', 'INC_KERNEL'),
-                ('drivers/video/geforce/geforce_platform.c', 'INC_KERNEL'),
-                ('drivers/video/geforce/gf_wc.c', 'INC_DRIVERS'),
-                ('drivers/video/geforce/gf_accept.c', 'INC_DRIVERS'),
-                ('drivers/video/pc98/backend_pc98.c', 'INC_GFX'),
-                ('drivers/video/cirrus/cirrus_identify.c', 'INC_GFX'),
-                ('fs/ext2/ext2_super.c', 'INC_FS'),
-                ('fs/fat/fatfs/ff.c', 'INC_FATFS'),
-                ('fs/serialfs/serialfs_session.c', 'INC_FS'),
-                ('fs/serialfs/sfs_session_fg.c', 'INC_KERNEL')):
+                ('sys/platform/pc98/kernel.c', 'INC_KERNEL'), ('sys/kern/mm/paging.c', 'INC_KERNEL'),
+                ('sys/arch/x86/kernel/idt.c', 'INC_KERNEL'),
+                ('sys/dev/ata/ide.c', 'INC_DRIVERS'),
+                ('sys/dev/ata/cd_module.c', 'INC_KERNEL'),
+                ('sys/dev/video/geforce/geforce_platform.c', 'INC_KERNEL'),
+                ('sys/dev/video/geforce/gf_wc.c', 'INC_DRIVERS'),
+                ('sys/dev/video/geforce/gf_accept.c', 'INC_DRIVERS'),
+                ('sys/platform/pc98/video/backend_pc98.c', 'INC_GFX'),
+                ('sys/platform/pc98/video/cirrus/cirrus_identify.c', 'INC_GFX'),
+                ('sys/fs/ext2/ext2_super.c', 'INC_FS'),
+                ('sys/fs/fat/fatfs/ff.c', 'INC_FATFS'),
+                ('sys/fs/serialfs/serialfs_session.c', 'INC_FS'),
+                ('sys/fs/serialfs/sfs_session_fg.c', 'INC_KERNEL')):
             self.assertIn(path, files)
             self.assertEqual(module.inc_var_for(path), expected, path)
 
@@ -151,10 +151,10 @@ class LayoutTools(unittest.TestCase):
         self.write('tools/test.py', "p = ROOT / 'kernel' / 'main.c'\n")
         self.write('docs/archive/old.txt', 'kernel/main.c\n')
         self.write('third_party/vendor.c', '/* kernel/main.c */\n')
-        self.write('fs/fat/fatfs/ff.c', '/* kernel/main.c */\n')
-        self.write('kernel/module/kdebug_imports.def', '#include "kernel/local.h"\n')
-        self.write('kdebug/generated/kdebug_imports.h', '#include "../../kernel/local.h"\n')
-        self.write('Makefile', 'kdebug/generated/kdebug_imports.h: kernel/module/kdebug_imports.def\n'
+        self.write('sys/fs/fat/fatfs/ff.c', '/* kernel/main.c */\n')
+        self.write('sys/kern/module/kdebug_imports.def', '#include "kernel/local.h"\n')
+        self.write('sys/platform/pc98/kdebug/generated/kdebug_imports.h', '#include "../../kernel/local.h"\n')
+        self.write('Makefile', 'sys/platform/pc98/kdebug/generated/kdebug_imports.h: sys/kern/module/kdebug_imports.def\n'
                    '\tsed \'s|include "|include "../../|\' $< > $@\n')
         self.write('build/config.mk', 'INC_KERNEL = -Iinclude -Ikernel -Idrivers\n')
         command('git', 'add', '.', cwd=self.root)
@@ -185,9 +185,9 @@ class LayoutTools(unittest.TestCase):
         self.assertIn('R  kernel/main.c -> mm/main.c', command('git', 'status', '--short', cwd=self.root).stdout)
         self.assertEqual((self.root / 'docs/archive/old.txt').read_text(), 'kernel/main.c\n')
         self.assertEqual((self.root / 'third_party/vendor.c').read_text(), '/* kernel/main.c */\n')
-        self.assertEqual((self.root / 'fs/fat/fatfs/ff.c').read_text(), '/* kernel/main.c */\n')
+        self.assertEqual((self.root / 'sys/fs/fat/fatfs/ff.c').read_text(), '/* kernel/main.c */\n')
         self.assertIn('-Ikernel -Imm', (self.root / 'build/config.mk').read_text())
-        self.assertIn('../../kernel/local.h', (self.root / 'kdebug/generated/kdebug_imports.h').read_text())
+        self.assertIn('../../kernel/local.h', (self.root / 'sys/platform/pc98/kdebug/generated/kdebug_imports.h').read_text())
         command('make', *plan['regenerate'], cwd=self.root)
         after = self.include_rows()
         mapping = {m['from']: m['to'] for m in moves}
@@ -218,7 +218,7 @@ class LayoutTools(unittest.TestCase):
     def test_move_output_prefixed_objects_and_report_unresolved_paths(self):
         self.write('kernel/module.c', '/* module */\n')
         # The OBJECTS line reproduces tools/tests/test_ver_version.py:14.
-        source = "OBJECTS = ('build/out/obj/kernel/ver_format.o', 'build/out/obj/kernel/module.o')\n"
+        source = "OBJECTS = ('build/out/obj/sys/kern/ver_format.o', 'build/out/obj/kernel/module.o')\n"
         prefixes = ('build/out/obj/', 'build/out/r1/obj/', 'build/out/kernel-r1/obj/', 'custom/output/obj/',
                     'obj/', '../build/out/obj/', '/tmp/layout-output/obj/',
                     '$(BUILD_OUT)/obj/', '${BUILD_OUT}/obj/', '$BUILD_OUT/obj/')
@@ -226,8 +226,8 @@ class LayoutTools(unittest.TestCase):
                           for prefix in prefixes for suffix in ('.o', '.d'))
         source += "'build/out/obj/kernel/module.obj' 'build/out/obj/kernel/module.o.extra'\n"
         source += "'build/out/obj/mykernel/module.o'\n"
-        expected = source.replace("obj/kernel/module.o'", "obj/kdebug/kdebug_module.o'")
-        expected = expected.replace("obj/kernel/module.d'", "obj/kdebug/kdebug_module.d'")
+        expected = source.replace("obj/kernel/module.o'", "obj/sys/kern/kdebug/kdebug_module.o'")
+        expected = expected.replace("obj/kernel/module.d'", "obj/sys/kern/kdebug/kdebug_module.d'")
         unresolved = ("p = ROOT / 'build/out/obj' / 'kernel' / 'module.o'",
                       "p = ROOT / 'kernel' / 'module.d'",
                       "p = 'unrecognized/kernel/module.o'",
@@ -237,19 +237,19 @@ class LayoutTools(unittest.TestCase):
         self.write('tools/tests/test_ver_version.py', source)
         command('git', 'add', '.', cwd=self.root)
         mapping = self.write('moves.json', json.dumps([
-            {'from': 'kernel/module.c', 'to': 'kdebug/kdebug_module.c'}]))
+            {'from': 'kernel/module.c', 'to': 'sys/kern/kdebug/kdebug_module.c'}]))
         dry = command(sys.executable, TOOLS / 'move_files.py', '--root', self.root, '--dry-run', mapping)
         report = json.loads(dry.stdout)
         self.assertTrue(report['replacements'], 'output-prefixed object references were not replaced')
         edit = next(e for e in report['replacements'] if e['file'] == 'tools/tests/test_ver_version.py')
-        self.assertIn("+OBJECTS = ('build/out/obj/kernel/ver_format.o', 'build/out/obj/kdebug/kdebug_module.o')",
+        self.assertIn("+OBJECTS = ('build/out/obj/sys/kern/ver_format.o', 'build/out/obj/sys/kern/kdebug/kdebug_module.o')",
                       edit['diff'])
         self.assertEqual((self.root / 'tools/tests/test_ver_version.py').read_text(), source)
         applied = command(sys.executable, TOOLS / 'move_files.py', '--root', self.root, mapping)
         self.assertEqual(json.loads(applied.stdout), report)
         self.assertEqual((self.root / 'tools/tests/test_ver_version.py').read_text(), expected)
         self.assertFalse((self.root / 'kernel/module.c').exists())
-        self.assertTrue((self.root / 'kdebug/kdebug_module.c').is_file())
+        self.assertTrue((self.root / 'sys/kern/kdebug/kdebug_module.c').is_file())
         warnings = report['split_paths'] + report['unresolved_paths']
         self.assertEqual({r['text'] for r in warnings}, set(unresolved))
         for row in warnings:

@@ -1,4 +1,4 @@
-# exec/exec_stdin.inc — GUI stdin の syscall 再実行
+# sys/kern/exec/exec_stdin.inc — GUI stdin の syscall 再実行
 
 > 状態: **現行 (2026-11-08)**
 

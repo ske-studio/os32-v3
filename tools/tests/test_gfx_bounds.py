@@ -6,21 +6,21 @@ from pathlib import Path
 import test_gfx_kernel_fb as base
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = [
- ('pegc', 'drivers/video/pc98/backend_pegc.c',
+ ('pegc', 'sys/platform/pc98/video/backend_pegc.c',
   '    if (!gfx_clip_screen(&x, &y, &w, &h, mode->width, mode->height)) return;',
   '''    if (x < 0) { w += x; x = 0; }
     if (y < 0) { h += y; y = 0; }
     if (x + w > mode->width) w = mode->width - x;
     if (y + h > mode->height) h = mode->height - y;
     if (w <= 0 || h <= 0) return;'''),
- ('cirrus', 'drivers/video/cirrus/backend_cirrus.c',
+ ('cirrus', 'sys/dev/video/cirrus/backend_cirrus.c',
   '    return gfx_clip_screen(x, y, w, h, mode->width, mode->height);',
   '''    if (*x < 0) { *w += *x; *x = 0; }
     if (*y < 0) { *h += *y; *y = 0; }
     if (*x + *w > mode->width) *w = mode->width - *x;
     if (*y + *h > mode->height) *h = mode->height - *y;
     return *w > 0 && *h > 0;'''),
- ('scroll', 'gfx/gfx_scroll.c', 'vram_scroll_y += lines % gfx_current_height;',
+ ('scroll', 'sys/hal/gfx/gfx_scroll.c', 'vram_scroll_y += lines % gfx_current_height;',
   'vram_scroll_y += lines;'),
 ]
 

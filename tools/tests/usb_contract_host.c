@@ -1,9 +1,9 @@
 #include "endian_dma.h"
 #include "usb_platform.h"
-#include "drivers/usb/usb_core.h"
-#include "drivers/usb/usb_desc.h"
-#include "drivers/usb/ohci_regs.h"
-#include "drivers/usb/ohci_priv.h"
+#include "sys/dev/usb/usb_core.h"
+#include "sys/dev/usb/usb_desc.h"
+#include "sys/dev/usb/ohci_regs.h"
+#include "sys/dev/usb/ohci_priv.h"
 /* Compile contracts for the fields shared by core, HCD and HID. */
 #define SAME_TYPE(expr, type) __builtin_types_compatible_p(__typeof__(expr), type)
 STATIC_ASSERT(SAME_TYPE(((struct usb_xfer *)0)->setup, struct usb_setup), xfer_setup);

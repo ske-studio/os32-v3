@@ -51,7 +51,7 @@
 make・エミュレータ・実配備には一切触れない。
 """
 CHECK = dict(name='result-conv-host', tier=1,
-    covers=['userland/tests/*.c', 'tools/tests/result_conv/run_font_load_test.c', 'tools/tests/result_conv/run_klibc_test.c', 'tools/tests/result_conv/run_restest.c', 'tools/tests/result_conv/run_stat_t.c', 'tools/tests/result_conv/run_test2.c', 'tools/tests/test_result_conv_host.c', 'userland/rust/alloc_demo/src/lib.rs', 'userland/tests/asset_test.c', 'userland/tests/font_load_test.c', 'userland/tests/klibc_test.c', 'userland/tests/restest.c', 'userland/tests/ring3_fault.c', 'userland/tests/ring3_guard.c', 'userland/tests/ring3_hello.c', 'userland/tests/stat_t.c', 'userland/tests/test2.c', 'tools/tests/mutpar.py', 'userland/tests/ring3_marker.h', 'userland/tests/nop.c', 'userland/tests/shm_reuse_test.c', 'userland/tests/shm_reuse_child.c'],
+    covers=['userland/tests/*.c', 'tools/tests/result_conv/run_font_load_test.c', 'tools/tests/result_conv/run_klibc_test.c', 'tools/tests/result_conv/run_restest.c', 'tools/tests/result_conv/run_stat_t.c', 'tools/tests/result_conv/run_test2.c', 'tools/tests/test_result_conv_host.c', 'userland/rust/alloc_demo/src/lib.rs', 'userland/diag/asset_test.c', 'userland/diag/font_load_test.c', 'userland/diag/klibc_test.c', 'userland/diag/restest.c', 'userland/diag/ring3_fault.c', 'userland/diag/ring3_guard.c', 'userland/diag/ring3_hello.c', 'userland/diag/stat_t.c', 'userland/diag/test2.c', 'tools/tests/mutpar.py', 'userland/diag/ring3_marker.h', 'userland/diag/nop.c', 'userland/diag/shm_reuse_test.c', 'userland/diag/shm_reuse_child.c'],
     needs=[], budget=7.6,
     kind='characterization',
 )
@@ -437,7 +437,7 @@ MUTATIONS = [
      "        done = len;"),
     # 変異 3: 行と終了コードを**別々の呼び出しで**作る。ヘッダの内部を呼んで
     #         自前で出すと、出し口がまた呼び手任せに戻る。
-    ("userland/tests/stat_t.c",
+    ("userland/diag/stat_t.c",
      "    return os32_test_summary(api, \"stat_t\", g_passed, g_total);",
      "    {\n"
      "        char line[OS32_TEST_LINE_MAX];\n"
@@ -456,16 +456,16 @@ MUTATIONS = [
 
     # --- 票 §2 (終了コードと集計行の一致) の否定側 ------------------------
     # 変異 5: 予約値 (127 = 実行ファイルが見つからない) を返す。
-    ("userland/tests/font_load_test.c",
+    ("userland/diag/font_load_test.c",
      '    return os32_test_summary(api, "font_load_test", (ret == OS32_ERR_NOSYS) ? 1 : 0, 1);',
      '    os32_test_summary(api, "font_load_test", (ret == OS32_ERR_NOSYS) ? 1 : 0, 1);\n'
      '    return 127;'),
     # 変異 6: `void main` に戻す (終了コードが eax の残骸になる)。
-    ("userland/tests/asset_test.c",
+    ("userland/diag/asset_test.c",
      "int main(int argc, char **argv, KernelAPI *sys_api)",
      "void main(int argc, char **argv, KernelAPI *sys_api)"),
     # 変異 7: 集計行の名前を argv[0] 由来にする。
-    ("userland/tests/restest.c",
+    ("userland/diag/restest.c",
      "    return os32_test_summary(api, \"restest\", g_passed, g_total);",
      "    return os32_test_summary(api, argv[0], g_passed, g_total);"),
     # 変異 8: 約束事の本体を壊す — 総数 0 を合格にする (集計変数が初期値の
@@ -593,12 +593,12 @@ def run_target(tmp):
                        cwd=ROOT, check=True)
     print("TARGET i386-elf -Werror COMPILE PASS (%d sources)"
           % len(conforming_sources()), flush=True)
-    for src in ("userland/tests/ring3_hello.c", "userland/tests/ring3_fault.c",
-                "userland/tests/ring3_guard.c", "userland/tests/nop.c",
-                "userland/tests/shm_reuse_child.c", "userland/tests/audit_test.c",
-                "userland/tests/blit_test.c", "userland/tests/heap_test.c",
-                "userland/tests/kout_test.c", "userland/tests/pcm_test.c",
-                "userland/tests/av_test.c", "userland/tests/time_test.c"):
+    for src in ("userland/diag/ring3_hello.c", "userland/diag/ring3_fault.c",
+                "userland/diag/ring3_guard.c", "userland/diag/nop.c",
+                "userland/diag/shm_reuse_child.c", "userland/diag/audit_test.c",
+                "userland/diag/blit_test.c", "userland/diag/heap_test.c",
+                "userland/diag/kout_test.c", "userland/diag/pcm_test.c",
+                "userland/diag/av_test.c", "userland/diag/time_test.c"):
         subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c", src,
                         "-o", str(tmp / (pathlib.Path(src).stem + ".o"))],
                        cwd=ROOT, check=True)

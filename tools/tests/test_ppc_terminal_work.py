@@ -2,16 +2,16 @@
 """期待の出所: AC-CTX-1 と P3 確定設計 v2 §2 の PLN1 work・入口/endpoint の別計数。"""
 CHECK = dict(name='ppc-terminal-work', env=['ppc-cross'], tier=1, needs=[], budget=30,
     covers=['tools/tests/idle_io_sources.py', 'kernel/io_work.[ch]',
-            'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'exec/appslot.h',
+            'sys/kern/io_clock.h', 'kernel/io_policy.[ch]', 'sys/kern/exec/appslot.h',
             'tools/tests/test_ppc_terminal_work.py', 'tools/tests/host32.py',
-            'platform/powermac/terminal_fifo.inc', 'platform/powermac/terminal_input.c',
-            'platform/powermac/lan_boot.h', 'platform/powermac/usb_boot.h',
-            'platform/powermac/usb_boot.c', 'platform/powermac/lan_service.c',
-            'platform/powermac/ppc_kernel.c', 'build/targets/ppc-powermac.mk', 'net/nic.c', 'net/link.c', 'kernel/idle_work.c',
-            'kernel/idle_work.h', 'net/nic.h', 'kernel/cli/resident_cli.h', 'include/types.h',
-            'include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h',
-            'arch/ppc/kernel_boot.h', 'arch/ppc/exec_kapi.c', 'arch/ppc/arch_exec_kapi.h',
-            'arch/ppc/kapi_table.h', 'exec/exec_syscall.inc'], basis=['AC-CTX-1'])
+            'sys/platform/powermac/terminal_fifo.inc', 'sys/platform/powermac/terminal_input.c',
+            'sys/platform/powermac/lan_boot.h', 'sys/platform/powermac/usb_boot.h',
+            'sys/platform/powermac/usb_boot.c', 'sys/platform/powermac/lan_service.c',
+            'sys/platform/powermac/ppc_kernel.c', 'build/targets/ppc-powermac.mk', 'sys/net/nic.c', 'sys/net/link.c', 'sys/kern/idle_work.c',
+            'sys/kern/idle_work.h', 'sys/net/nic.h', 'sys/kern/cli/resident_cli.h', 'sys/include/types.h',
+            'sys/include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h',
+            'sys/arch/ppc/kernel_boot.h', 'sys/arch/ppc/exec_kapi.c', 'sys/arch/ppc/arch_exec_kapi.h',
+            'sys/arch/ppc/kapi_table.h', 'sys/kern/exec/exec_syscall.inc'], basis=['AC-CTX-1'])
 from idle_io_sources import idle_io_sources
 import os
 from pathlib import Path
@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def exercise(tmp, mutation=None):
-    terminal = (ROOT / 'platform/powermac/terminal_input.c').read_text()
+    terminal = (ROOT / 'sys/platform/powermac/terminal_input.c').read_text()
     if mutation:
         anchor, replacement = mutation
         assert terminal.count(anchor) == 1, anchor
@@ -33,17 +33,17 @@ def exercise(tmp, mutation=None):
     # Compile the actual idle-work implementation against observable IRQ state.
     (tmp / 'io.h').write_text('extern int enabled; void _idle(void);\n#define _irq_enabled() (enabled)\n')
     (tmp / 'irq.h').write_text('extern unsigned int kctx_irq_depth;\n')
-    idle = (ROOT / 'kernel/idle_work.c').read_text()
+    idle = (ROOT / 'sys/kern/idle_work.c').read_text()
     (tmp / 'idle.c').write_text(idle)
     # The production USB poll body is tested with a fake clock and service sink.
-    usb = (ROOT / 'platform/powermac/usb_boot.c').read_text()
+    usb = (ROOT / 'sys/platform/powermac/usb_boot.c').read_text()
     usb = usb[usb.index('void pm_usb_poll(void)'):].replace('void pm_usb_poll(', 'static void usb_poll_impl(')
     # Exercise the production LAN admission gate. The state-machine body is a
     # step counter here: this test measures admission, not MMIO/state transitions.
-    lan = (ROOT / 'platform/powermac/lan_service.c').read_text()
+    lan = (ROOT / 'sys/platform/powermac/lan_service.c').read_text()
     lan = lan[lan.index('void pm_lan_poll(u64 now)'):]
     lan = lan[:lan.index('    switch (s.state)')] + '    ++lan_steps;\n}\n'
-    entry = (ROOT / 'exec/exec_syscall.inc').read_text()
+    entry = (ROOT / 'sys/kern/exec/exec_syscall.inc').read_text()
     anchor = '    if (slot != KAPI_SLOT_IO_PUMP) idle_work_run(); /* IO_PUMP_ONCE */'
     assert entry.count(anchor) == 1
     entry = anchor
@@ -117,7 +117,7 @@ void _start(void) { int rc = run(); __asm__ volatile("int $0x80" : : "a"(1), "b"
 '''
     # Use the actual shared error value rather than a duplicated numeric ABI.
     harness = harness.replace('!= -19', '!= OS32_ERR_EXIST')
-    source = '#include "os32_kapi_shared.h"\n' + (ROOT / 'arch/ppc/exec_kapi.c').read_text()
+    source = '#include "os32_kapi_shared.h"\n' + (ROOT / 'sys/arch/ppc/exec_kapi.c').read_text()
     for key, value in [('USB', usb), ('LAN', lan), ('TERMINAL', terminal), ('ENTRY', entry)]:
         harness = harness.replace('\n' + key + '\n', '\n' + value + '\n')
     (tmp / 'test.c').write_text(source + harness)
@@ -142,11 +142,11 @@ def main():
     for image, expected in [(['KBOOT_SH=1', 'KBOOT_LINK=0'], True), (['KBOOT_LINK=1'], False)]:
         manifest = subprocess.check_output(['make', '-s', 'ARCH=ppc', 'PLATFORM=powermac', *image,
             '--eval=work-manifest:;@echo $(KB_C)', 'work-manifest'], cwd=ROOT, text=True).split()
-        assert 'platform/powermac/terminal_input.c' not in manifest
-        assert 'net/nic.c' in manifest  # idle_wait_step uses the common RX predicate.
-        assert 'net/link.c' in manifest
-        assert ('platform/powermac/usb_boot.c' in manifest) == expected
-    boot = (ROOT / 'platform/powermac/ppc_kernel.c').read_text()
+        assert 'sys/platform/powermac/terminal_input.c' not in manifest
+        assert 'sys/net/nic.c' in manifest  # idle_wait_step uses the common RX predicate.
+        assert 'sys/net/link.c' in manifest
+        assert ('sys/platform/powermac/usb_boot.c' in manifest) == expected
+    boot = (ROOT / 'sys/platform/powermac/ppc_kernel.c').read_text()
     # Select the PLN1 branch, then match the complete ordered startup block.
     pln = boot.replace('#if !KBOOT_LINK\n', '#if 1\n')
     pln = pln.replace('#if KBOOT_LINK\n        int work_rc = idle_work_register(pm_link_service_once);\n#else\n', '')

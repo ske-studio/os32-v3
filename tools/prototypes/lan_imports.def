@@ -1,165 +1,165 @@
 {
   "schema": 1,
   "contracts": [
-    "include/lan_contract.h",
-    "include/pci_dev_contract.h",
-    "include/pci_bind_contract.h",
-    "drivers/net/e82557/lan_module.h"
+    "sys/include/lan_contract.h",
+    "sys/include/pci_dev_contract.h",
+    "sys/include/pci_bind_contract.h",
+    "sys/dev/net/e82557/lan_module.h"
   ],
   "imports": [
     {
       "symbol": "lan_module_irq_register",
-      "source": "drivers/net/e82557/lan_module.h",
+      "source": "sys/dev/net/e82557/lan_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "lan_module_irq_unregister",
-      "source": "drivers/net/e82557/lan_module.h",
+      "source": "sys/dev/net/e82557/lan_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "lan_module_dma_alloc",
-      "source": "drivers/net/e82557/lan_module.h",
+      "source": "sys/dev/net/e82557/lan_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "lan_module_dma_free",
-      "source": "drivers/net/e82557/lan_module.h",
+      "source": "sys/dev/net/e82557/lan_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "lan_module_trace",
-      "source": "drivers/net/e82557/lan_module.h",
+      "source": "sys/dev/net/e82557/lan_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "dma_mark_leaked",
-      "source": "mm/dma_pool.h",
+      "source": "sys/kern/mm/dma_pool.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "cpu_delay_us",
-      "source": "kernel/time/cpu_calibrate.h",
+      "source": "sys/hal/time/cpu_calibrate.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "pci_cfg_read32",
-      "source": "include/pci_contract.h",
+      "source": "sys/include/pci_contract.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_cfg_write16",
-      "source": "drivers/pci/pci.h",
+      "source": "sys/dev/pci/pci.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_bar_base",
-      "source": "drivers/pci/pci_decode.h",
+      "source": "sys/dev/pci/pci_decode.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_bar_kind",
-      "source": "drivers/pci/pci_decode.h",
+      "source": "sys/dev/pci/pci_decode.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_bind_set_reason",
-      "source": "drivers/pci/pci_bind.h",
+      "source": "sys/dev/pci/pci_bind.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sysconfig_get_int",
-      "source": "init/sysconfig.h",
+      "source": "sys/kern/init/sysconfig.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_mkdir",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_read",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_write",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_sync",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_rm",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "boot_image_info",
-      "source": "include/bootinfo.h",
+      "source": "sys/include/bootinfo.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kstrncmp",
-      "source": "lib/kstring.h",
+      "source": "sys/kern/kstring.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kutoa_dec",
-      "source": "include/kprintf.h",
+      "source": "sys/include/kprintf.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kprintf",
-      "source": "include/kprintf.h",
+      "source": "sys/include/kprintf.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sfs_dec_reset",
-      "source": "fs/serialfs/sfs_proto.h",
+      "source": "sys/fs/serialfs/sfs_proto.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sfs_dec_feed",
-      "source": "fs/serialfs/sfs_proto.h",
+      "source": "sys/fs/serialfs/sfs_proto.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sfs_get32",
-      "source": "fs/serialfs/sfs_proto.h",
+      "source": "sys/fs/serialfs/sfs_proto.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sfs_ms_ticks",
-      "source": "fs/serialfs/sfs_proto.h",
+      "source": "sys/fs/serialfs/sfs_proto.h",
       "context": "normal",
       "irq": false
     },
@@ -171,116 +171,116 @@
     },
     {
       "symbol": "kstrcmp",
-      "source": "lib/kstring.h",
+      "source": "sys/kern/kstring.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "net_adapter_register",
-      "source": "net/nic.h",
+      "source": "sys/net/nic.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "net_rx_take",
-      "source": "net/nic.h",
+      "source": "sys/net/nic.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "net_rx_reset",
-      "source": "net/nic.h",
+      "source": "sys/net/nic.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "net_tx",
-      "source": "net/nic.h",
+      "source": "sys/net/nic.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "net_mac",
-      "source": "net/nic.h",
+      "source": "sys/net/nic.h",
       "context": "normal",
       "irq": true,
       "declaration": "int net_mac(u8 out[6]);"
     },
     {
       "symbol": "lan_module_session_acquire",
-      "source": "include/lan_contract.h",
+      "source": "sys/include/lan_contract.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "lan_module_session_release",
-      "source": "include/lan_contract.h",
+      "source": "sys/include/lan_contract.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sfs_ensure_session",
-      "source": "fs/serialfs/serialfs.h",
+      "source": "sys/fs/serialfs/serialfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sfs_persistent_client",
-      "source": "fs/serialfs/serialfs.h",
+      "source": "sys/fs/serialfs/serialfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sfs_persistent_stale",
-      "source": "fs/serialfs/serialfs.h",
+      "source": "sys/fs/serialfs/serialfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sfs_client_call_deadline",
-      "source": "fs/serialfs/sfs_client.h",
+      "source": "sys/fs/serialfs/sfs_client.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sfs_put16",
-      "source": "fs/serialfs/sfs_proto.h",
+      "source": "sys/fs/serialfs/sfs_proto.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sfs_put32",
-      "source": "fs/serialfs/sfs_proto.h",
+      "source": "sys/fs/serialfs/sfs_proto.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "host_alive_snapshot",
-      "source": "net/host_mailbox.h",
+      "source": "sys/net/host_mailbox.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kstrlen",
-      "source": "lib/kstring.h",
+      "source": "sys/kern/kstring.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kstrncpy",
-      "source": "lib/kstring.h",
+      "source": "sys/kern/kstring.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "dev_find",
-      "source": "kernel/dev/dev.h",
+      "source": "sys/hal/block/dev.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "dev_register",
-      "source": "kernel/dev/dev.h",
+      "source": "sys/hal/block/dev.h",
       "context": "normal",
       "irq": false
     }

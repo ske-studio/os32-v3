@@ -1,6 +1,6 @@
 /* Minimal HC contract model: no OHCI implementation linked into core tests. */
-#include "drivers/usb/usb_walk.h"
-#include "drivers/usb/ohci_regs.h"
+#include "sys/dev/usb/usb_walk.h"
+#include "sys/dev/usb/ohci_regs.h"
 #include "endian_dma.h"
 static void failure(const char *text, u32 len)
 {

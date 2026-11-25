@@ -1,30 +1,30 @@
 #!/usr/bin/env python3
 """C2: real FEP generator contracts and unsupported display provider."""
 CHECK = dict(name='ime-display-boundary-host', tier=1, needs=['make:all'], budget=2,
-    covers=['platform/pc98/kernel.c', 'include/ime_boot.h', 'kernel/ime/ime.h', 'tools/tests/kernel_includes.py', 'tools/tests/test_ime_display_boundary.py', 'kernel/ime/ime_display_private.h',
-            'include/ime_control.h', 'platform/*/platform_ime_render.h',
-            'platform/powermac/ime_display.c', 'kernel/ime/ime_render.h',
+    covers=['sys/platform/pc98/kernel.c', 'sys/include/ime_boot.h', 'sys/kern/ime/ime.h', 'tools/tests/kernel_includes.py', 'tools/tests/test_ime_display_boundary.py', 'sys/kern/ime/ime_display_private.h',
+            'sys/include/ime_control.h', 'platform/*/platform_ime_render.h',
+            'sys/platform/powermac/ime_display.c', 'sys/kern/ime/ime_render.h',
             'tools/prototypes/fep_imports.def', 'tools/gen_sqlite_imports.py',
             'tools/gen_kdebug_imports.py', 'tools/tests/host32.py',
-            'drivers/char/serial.h',
-            'drivers/input/kbd.h',
-            'exec/exec.h',
-            'fs/fd_redirect.h',
-            'fs/vfs.h',
-            'include/con_sink.h',
-            'include/kprintf.h',
-            'include/redir_access.h',
-            'include/text_screen.h',
-            'include/types.h',
-            'kernel/ime/fep_module.h',
-            'kernel/ime/ime_store.h',
-            'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h',
-            'lib/kstring.h',
+            'sys/dev/char/serial.h',
+            'sys/platform/pc98/input/kbd.h',
+            'sys/kern/exec/exec.h',
+            'sys/fs/fd_redirect.h',
+            'sys/fs/vfs.h',
+            'sys/include/con_sink.h',
+            'sys/include/kprintf.h',
+            'sys/include/redir_access.h',
+            'sys/include/text_screen.h',
+            'sys/include/types.h',
+            'sys/kern/ime/fep_module.h',
+            'sys/kern/ime/ime_store.h',
+            'sys/kern/sqlite_engine.h', 'sys/kern/sqlite_engine_body.h',
+            'sys/kern/kstring.h',
             'lib/sqlite3/os32_sqlite_outer.h',
             'lib/utf8.h',
-            'mm/kmalloc.h',
+            'sys/kern/mm/kmalloc.h',
             'sdk/include/os32/os32_kapi_shared.h',
-            'tools/module_schema.py', 'tools/mkmod.py', 'tools/prototypes/sqlite_imports.def', 'kernel/module/kdebug_imports.def',
+            'tools/module_schema.py', 'tools/mkmod.py', 'tools/prototypes/sqlite_imports.def', 'sys/kern/module/kdebug_imports.def',
             'lib/sqlite3/os32_sqlite_vfs.c', 'sdk/kapi.json'],
     kind='characterization',
 )
@@ -66,7 +66,7 @@ def main():
         verify(output)
         print('GREEN FEP contract fingerprint', flush=True)
         if args.mutate:
-            contract = tree / 'kernel/ime/ime_render.h'
+            contract = tree / 'sys/kern/ime/ime_render.h'
             text = contract.read_text()
             assert text.count('IME_RENDER') > 0
             assert text.count('IME_RENDER.H') == 1
@@ -79,7 +79,7 @@ def main():
                 print('RED runtime ime_render.h one-character comment: real generated fingerprint', flush=True)
             else:
                 raise AssertionError('contract mutation survived')
-        boot = (ROOT / 'platform/pc98/kernel.c').read_text()
+        boot = (ROOT / 'sys/platform/pc98/kernel.c').read_text()
         anchor = '#include "ime_boot.h"'
         assert boot.count(anchor) == 1
         boot_source = work / 'kernel.c'
@@ -90,7 +90,7 @@ def main():
                                             *include_flags(ROOT), str(boot_source)], text=True)
         def check_boot(text):
             deps = boot_dependencies(text)
-            assert 'kernel/ime/ime.h' not in deps, 'boot depends on ime.h'
+            assert 'sys/kern/ime/ime.h' not in deps, 'boot depends on ime.h'
         check_boot(boot)
         if args.mutate:
             try:
@@ -101,9 +101,9 @@ def main():
             else:
                 raise AssertionError('boot dependency mutation survived')
         source = work / 'provider.c'
-        source.write_text('''#include "include/ime_control.h"
+        source.write_text('''#include "sys/include/ime_control.h"
 #include <platform_ime_render.h>
-#include "platform/powermac/ime_display.c"
+#include "sys/platform/powermac/ime_display.c"
 void _start(void) {
     int bad = IME_DEFAULT_RENDER != 0 || ime_display_boot(0) != 0 ||
         ime_display_bytes() != 0 || ime_display_save(0, 3) || ime_display_restore(0, 3);

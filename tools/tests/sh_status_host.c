@@ -665,7 +665,7 @@ static struct {
 } g_progs[PROG_MAX];
 static int g_prog_count;
 
-/* カーネル側の記録に相当 (exec/exec.c の g_last_kind / g_last_code) */
+/* カーネル側の記録に相当 (sys/kern/exec/exec.c の g_last_kind / g_last_code) */
 static int g_rec_kind = EXEC_KIND_NONE;
 static int g_rec_code;
 /* 「記録が無い」を演じる窓 (受入 S15: 前の記録を読まない) */
@@ -758,7 +758,7 @@ static int exec_tried(const char *want)
     return 0;
 }
 
-/* 起動しなかったときの戻り値 (exec/exec.c の exec_map_launch_err の逆) */
+/* 起動しなかったときの戻り値 (sys/kern/exec/exec.c の exec_map_launch_err の逆) */
 static int kind_to_rc(int kind, int code)
 {
     switch (kind) {
@@ -1197,19 +1197,19 @@ int shell_cmd_hw(int argc, char **argv)
 int shell_cmd_gfinit(int argc, char **argv) { (void)argc; (void)argv; return 0; }
 /* cmd_pci.c (lspci / pcidump、票 TASK_LAN_82557 L-A)。main.c が
  * shell_cmd_pci_init() を呼ぶので**取り込まないとリンクが通らない**。
- * 復号の実体 drivers/pci/pci_decode.c は実ビルドでも同じ 1 本をリンクする
+ * 復号の実体 sys/dev/pci/pci_decode.c は実ビルドでも同じ 1 本をリンクする
  * (build/programs.mk の PCI_DECODE_USER_OBJ)。 */
 #include "../../userland/shell/cmd_pci.c"
-#include "../../drivers/pci/pci_decode.c"
+#include "../../sys/dev/pci/pci_decode.c"
 #include "../../userland/shell/pci_verbose.c"   /* lspci -v の行づくり */
 /* cmd_hdprep.c (hdprep、票 TASK_HDD_INSTALL 段 1) も同じ理由 — main.c が
  * shell_cmd_hdprep_init() を呼ぶ。判定の純粋部と区画表の共有部も実ビルドと同じ 1 本
  * (build/programs.mk の PC98PT_USER_OBJ)。 */
 #include "../../userland/shell/cmd_hdprep.c"
 #include "../../userland/shell/hdprep_plan.c"
-#include "../../platform/pc98/install_plan.c"
-#include "../../platform/pc98/install_hdprep.c"
-#include "../../fs/pc98pt.c"
+#include "../../sys/platform/pc98/install_plan.c"
+#include "../../sys/platform/pc98/install_hdprep.c"
+#include "../../sys/fs/pc98pt.c"
 #include "../../userland/shell/cmd_filer.c"
 void rsh_lan_reset(void) {}
 int rsh_lan_poll(void) { return OS32_ERR_AGAIN; }

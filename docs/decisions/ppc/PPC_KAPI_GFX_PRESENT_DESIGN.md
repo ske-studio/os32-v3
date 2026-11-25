@@ -13,7 +13,7 @@
 | P1 PPC の公開条件 | §2-6 を新設。PowerMac だけ 6 本の入口に門 (所有者 + 端末が戻っていない) を置く。x86 は定数 1 で命令列を変えない。受入 A11・A12 を追加 |
 | P1 取り込み順 | §4 の段を組み直し。口の宣言 + PowerMac の空実装を先 (5b-A)、共通の TU と gfx_vram.c の削りと build-selection の fixture を 1 単位 (5b-B) |
 | P2 7 件の照合 | 食い違い 3 を「幅を使うのは add_dirty_rect と全画面の present の 2 入口、present_rect は引数のまま」に直し、§2-3 の断片を gfx_v1_present_rect の直呼びと明記 |
-| P2 境界と x86 の差 | 口のヘッダを include/gfx_present_contract.h に替え、型の依存と呼ぶ条件を書いた。ラスタの移す範囲を行番号でなく「commits++ から pc98_splash_raster_table の呼び出しまで」に。§3 に実測と既存トレースの照合を追加 |
+| P2 境界と x86 の差 | 口のヘッダを sys/hal/gfx/gfx_present_contract.h に替え、型の依存と呼ぶ条件を書いた。ラスタの移す範囲を行番号でなく「commits++ から pc98_splash_raster_table の呼び出しまで」に。§3 に実測と既存トレースの照合を追加 |
 | P2 転送カウンタ | §2-5 に計数の責務の行を追加。5b では OF FB の計数を変えず、5c (gfx_stats の公開) へ申し送り |
 | P2 既存試験の追従 | 5b-B に test_sep5_gfx_init.py の抽出名と test_boot_splash_native.py の fixture の追従、既存変異の実行時 RED の確認を追加 |
 | P2 ゲスト受入と変異 | A4〜A6 を dispprb の画素の観測に書き直し (800x600x8、x=799、640 より右、番兵、7450・7455)。A5 の「構成が無ければ未確認」を削除 |
@@ -28,27 +28,27 @@ PM 決定 (r1 の未決 2 件は確定): gfx_init_200 は PowerMac で実寸で�
 
 | # | 計画の前提 | 実物 | 設計への効き |
 |---|---|---|---|
-| 1 | 5b の本線の対象は gfx/gfx_core.c | present の 6 本は全部 drivers/video/pc98/gfx_vram.c (add_dirty_rect、present_dirty、present_nosync、present、present_rect、present_raster)。この TU は build/features/pc98-devices.mk の C_FEATURES で PC-98 だけが組む。gfx_core.c に present は無く、持つのは列の実体 (gfx/gfx_core.c の dirty_queue・prev_dirty dirty_queue・prev_dirty) だけ | 「gfx_core が渡す」でなく、**gfx_vram.c の機種に依らない半分を新しい共通 TU へ移す**段になる |
-| 2 | INDEX8 の変換は既存 OF FB を使う | 変換は無い。OF FB は深さ 8 だけ受ける (platform/powermac/display_provider.c の display_provider_boot_reserve `fb->depth != 8` で不採用)。影 (PACKED8) → 表示は同じ形式の 32 ビット語の写し (backend_of_fb.c の of_fb_copy)。pitch は影 = 表示 = fb->stride | 5b で変換の部品は作らない。pitch は既存の of_fb_copy に任せる |
-| 3 | (暗黙) 変更矩形の切り詰めは機種に依らない | 幅を使う入口は 2 個: gfx_add_dirty_rect (drivers/video/pc98/gfx_vram.c の 設計時の gfx_add_dirty_rect) と全画面の gfx_present (gfx_present) が GFX_WIDTH = 640 (gfx/gfx.h の GFX_WIDTH) に固定。gfx_present_rect は引数をそのまま後端へ渡す (切り詰めは後端)。OF FB の幅は 4 の倍数なら何でも通る (platform/powermac/display_provider.c の display_provider_boot_reserve) | そのまま移すと 640 を超える FB で右側が出ない。幅の出所を口にする (§2-3) |
-| 4 | 200 行指定の実現範囲を照会 | gfx_mode_pick (include/gfx_hal.h の gfx_mode_pick) が 200 行を選ぶのは PLANAR4 の 200 行のモードがある時だけ。OF FB のモードは PACKED8 の 1 個 (backend_of_fb.c の of_fb_bind) なので legacy200 は既定のモードに落ちる。gfx/gfx_core_init.inc の packed モードの初期化「packed 系はどちらの入口でも native 解像度」 | PowerMac の gfx_init_200 は今のコードのまま gfx_init と同じ結果 (x86 の PEGC・Cirrus と同じ規則)。足すコードは 0 行 (§2-5) |
-| 5 | PPC の側は display_provider.c に後端を作る | 後端の present_rect は既にある (drivers/video/of_fb/backend_of_fb.c の present、表 の present_rect)。PPC は gfx_core.c・gfx_dirty.c を既に組む (build/sources/common.mk)。flip・VSYNC・プレーンの空の実装も既にある (platform/powermac/display.c の display_flip_pages・display_planar_plane) | PowerPC の仕事は公開表と受入が中心。display_provider.c に足すのは planar の口の空実装だけ |
-| 6 | present は共通へ素直に移せる | gfx_present・_rect・_dirty は末尾で gfx_diag_px (drivers/video/pc98/gfx_vram.c の gfx_diag_px) を呼ぶ。中身は PEGC の窓を読む診断 (pegc.h・serial_diag.h) | 診断は装置に残し、共通から口 1 本で呼ぶ |
-| 7 | gfx2 の present は of_fb_v2 の ops | gfx2_present (gfx/v2/display.c の gfx2_present) は ops を通らず gfxsync_write_rows。PowerMac の同期の先は**影** (platform/powermac/display_provider.c の init `.va = saved.shadow`、注記「generic sync writes never target this device」)。表示へ届くのは of_fb_copy (v1 の present_rect・shim_flip・shim_mode_set) だけ | 5b では触らない。**5c への申し送り**: gfx2_present を公開する前に、影 → 表示の写しを誰が呼ぶかを決める (ここでは display.c と provider の init しか読んでいない) |
+| 1 | 5b の本線の対象は sys/hal/gfx/gfx_core.c | present の 6 本は全部 sys/platform/pc98/video/gfx_vram.c (add_dirty_rect、present_dirty、present_nosync、present、present_rect、present_raster)。この TU は sys/conf/features/pc98-devices.mk の C_FEATURES で PC-98 だけが組む。gfx_core.c に present は無く、持つのは列の実体 (sys/hal/gfx/gfx_core.c の dirty_queue・prev_dirty dirty_queue・prev_dirty) だけ | 「gfx_core が渡す」でなく、**gfx_vram.c の機種に依らない半分を新しい共通 TU へ移す**段になる |
+| 2 | INDEX8 の変換は既存 OF FB を使う | 変換は無い。OF FB は深さ 8 だけ受ける (sys/platform/powermac/display_provider.c の display_provider_boot_reserve `fb->depth != 8` で不採用)。影 (PACKED8) → 表示は同じ形式の 32 ビット語の写し (backend_of_fb.c の of_fb_copy)。pitch は影 = 表示 = fb->stride | 5b で変換の部品は作らない。pitch は既存の of_fb_copy に任せる |
+| 3 | (暗黙) 変更矩形の切り詰めは機種に依らない | 幅を使う入口は 2 個: gfx_add_dirty_rect (sys/platform/pc98/video/gfx_vram.c の 設計時の gfx_add_dirty_rect) と全画面の gfx_present (gfx_present) が GFX_WIDTH = 640 (sys/hal/gfx/gfx.h の GFX_WIDTH) に固定。gfx_present_rect は引数をそのまま後端へ渡す (切り詰めは後端)。OF FB の幅は 4 の倍数なら何でも通る (sys/platform/powermac/display_provider.c の display_provider_boot_reserve) | そのまま移すと 640 を超える FB で右側が出ない。幅の出所を口にする (§2-3) |
+| 4 | 200 行指定の実現範囲を照会 | gfx_mode_pick (sys/include/gfx_hal.h の gfx_mode_pick) が 200 行を選ぶのは PLANAR4 の 200 行のモードがある時だけ。OF FB のモードは PACKED8 の 1 個 (backend_of_fb.c の of_fb_bind) なので legacy200 は既定のモードに落ちる。sys/hal/gfx/gfx_core_init.inc の packed モードの初期化「packed 系はどちらの入口でも native 解像度」 | PowerMac の gfx_init_200 は今のコードのまま gfx_init と同じ結果 (x86 の PEGC・Cirrus と同じ規則)。足すコードは 0 行 (§2-5) |
+| 5 | PPC の側は display_provider.c に後端を作る | 後端の present_rect は既にある (sys/dev/video/of_fb/backend_of_fb.c の present、表 の present_rect)。PPC は gfx_core.c・gfx_dirty.c を既に組む (build/sources/common.mk)。flip・VSYNC・プレーンの空の実装も既にある (sys/platform/powermac/display.c の display_flip_pages・display_planar_plane) | PowerPC の仕事は公開表と受入が中心。display_provider.c に足すのは planar の口の空実装だけ |
+| 6 | present は共通へ素直に移せる | gfx_present・_rect・_dirty は末尾で gfx_diag_px (sys/platform/pc98/video/gfx_vram.c の gfx_diag_px) を呼ぶ。中身は PEGC の窓を読む診断 (pegc.h・serial_diag.h) | 診断は装置に残し、共通から口 1 本で呼ぶ |
+| 7 | gfx2 の present は of_fb_v2 の ops | gfx2_present (sys/hal/gfx/v2/display.c の gfx2_present) は ops を通らず gfxsync_write_rows。PowerMac の同期の先は**影** (sys/platform/powermac/display_provider.c の init `.va = saved.shadow`、注記「generic sync writes never target this device」)。表示へ届くのは of_fb_copy (v1 の present_rect・shim_flip・shim_mode_set) だけ | 5b では触らない。**5c への申し送り**: gfx2_present を公開する前に、影 → 表示の写しを誰が呼ぶかを決める (ここでは display.c と provider の init しか読んでいない) |
 
 ### 1-2. 食い違いでない確認
 
-- 変更矩形の列の処理は 5a-ii で gfx/gfx_dirty.c に入っている (gfx_dirty.h: gfx_dirty_add・gfx_dirty_merge・gfx_dirty_at)。
+- 変更矩形の列の処理は 5a-ii で sys/hal/gfx/gfx_dirty.c に入っている (gfx_dirty.h: gfx_dirty_add・gfx_dirty_merge・gfx_dirty_at)。
 - PowerPC の「無いはず」は gfx 19 本・gfx2 4 本 (sdk/kapi_target_ppc.py の PROVIDER_GROUPS、tools/ppc/test_kapi_binding.py の EXPECTED_ABSENT_SLOTS)。
-- check_op: 規則は共通の check() (gfx/v2/check_op.c の shadow・check)、装置の答えは be->check。OF FB の shim_check (drivers/video/of_fb/of_fb_v2.c の shim_check、表 の check) は NOSYS を返すが、共通の規則は条件により SW と答える (レビューの照合)。**5b は check_op.c に触らない。x86 の答えは変わらない**。
+- check_op: 規則は共通の check() (sys/hal/gfx/v2/check_op.c の shadow・check)、装置の答えは be->check。OF FB の shim_check (sys/dev/video/of_fb/of_fb_v2.c の shim_check、表 の check) は NOSYS を返すが、共通の規則は条件により SW と答える (レビューの照合)。**5b は check_op.c に触らない。x86 の答えは変わらない**。
 
 ### 1-3. 統合の判断 3 点 (POLICY_DEV §1)
 
 | 点 | 判断 |
 |---|---|
 | 同じ責務の実装が既にあるか | ある (gfx_vram.c の packed の道 present_dirty_packed と present・present_rect)。PowerMac 用に 2 個目を書かず、これを共通へ移して両機種で使う |
-| 口は既存の物で足りるか | 後端への渡しは GfxBackend.present_rect (include/gfx_hal.h の GfxBackend) で足りる。GfxBackend に欄は足さない (Cirrus・GeForce・Trident のモジュールと構造体の形を共有するため)。planar と診断はリンク時の口 3 本 |
-| 既存の計画・確定設計と合うか | 計画 §2 の gfx の行「C は present 系と dirty の共通方針を先に移設」と段 5a の続き。AC-KAPI-1 (型別の欠如: 残り 12 本は不在のまま、通常・欠如の両方を試験)、AC-DISPLAY-2 (能力差: ラスタ・VSYNC・200 行は PowerMac で能力どおり) を両像の同じ host 試験 (A1〜A3) に掛ける。DISPLAY_HOOKS §3「shutdown の後の present は端末の画素を変えない」は §2-6 の門で満たす。置き場: 共通 = gfx/gfx_present.c (新、1 機能 1 ファイル)、装置 = gfx_vram.c、機種 = platform/powermac |
+| 口は既存の物で足りるか | 後端への渡しは GfxBackend.present_rect (sys/include/gfx_hal.h の GfxBackend) で足りる。GfxBackend に欄は足さない (Cirrus・GeForce・Trident のモジュールと構造体の形を共有するため)。planar と診断はリンク時の口 3 本 |
+| 既存の計画・確定設計と合うか | 計画 §2 の gfx の行「C は present 系と dirty の共通方針を先に移設」と段 5a の続き。AC-KAPI-1 (型別の欠如: 残り 12 本は不在のまま、通常・欠如の両方を試験)、AC-DISPLAY-2 (能力差: ラスタ・VSYNC・200 行は PowerMac で能力どおり) を両像の同じ host 試験 (A1〜A3) に掛ける。DISPLAY_HOOKS §3「shutdown の後の present は端末の画素を変えない」は §2-6 の門で満たす。置き場: 共通 = sys/hal/gfx/gfx_present.c (新、1 機能 1 ファイル)、装置 = gfx_vram.c、機種 = platform/powermac |
 
 ## 2. 口の形
 
@@ -56,14 +56,14 @@ PM 決定 (r1 の未決 2 件は確定): gfx_init_200 は PowerMac で実寸で�
 
 | 物 | 持ち主 | 置き場 |
 |---|---|---|
-| 列の実体 dirty_queue・prev_dirty | 共通 | gfx/gfx_core.c の dirty_queue・prev_dirty (動かさない) |
-| 列の足し・併合 | 共通 | gfx/gfx_dirty.c (5a-ii、動かさない) |
-| KAPI の入口 6 本、v1 の橋 (gfx_v1_present_rect)、packed の列の掃き出し | 共通 | **gfx/gfx_present.c (新)** |
-| planar の転送・ステイルページの併合・flip・VSYNC 待ち・ラスタの再生・PEGC の診断 | 装置 | drivers/video/pc98/gfx_vram.c (残す) |
-| 影 → 表示の写し、保護行、語の端の扱い | 装置 | drivers/video/of_fb/backend_of_fb.c (変えない) |
-| planar の口の空実装、v1 の幅、公開の門 | 機種 | platform/powermac/display_provider.c・platform_display_fallback.h |
+| 列の実体 dirty_queue・prev_dirty | 共通 | sys/hal/gfx/gfx_core.c の dirty_queue・prev_dirty (動かさない) |
+| 列の足し・併合 | 共通 | sys/hal/gfx/gfx_dirty.c (5a-ii、動かさない) |
+| KAPI の入口 6 本、v1 の橋 (gfx_v1_present_rect)、packed の列の掃き出し | 共通 | **sys/hal/gfx/gfx_present.c (新)** |
+| planar の転送・ステイルページの併合・flip・VSYNC 待ち・ラスタの再生・PEGC の診断 | 装置 | sys/platform/pc98/video/gfx_vram.c (残す) |
+| 影 → 表示の写し、保護行、語の端の扱い | 装置 | sys/dev/video/of_fb/backend_of_fb.c (変えない) |
+| planar の口の空実装、v1 の幅、公開の門 | 機種 | sys/platform/powermac/display_provider.c・platform_display_fallback.h |
 
-### 2-2. 共通と装置の境目 (新しいヘッダ include/gfx_present_contract.h)
+### 2-2. 共通と装置の境目 (新しいヘッダ sys/hal/gfx/gfx_present_contract.h)
 
 ```c
 #include "os32_kapi_shared.h"   /* GFX_RasterPalTable, GFX_RASTER_MAX_ENTRIES。型の依存はこれだけ */
@@ -77,7 +77,7 @@ void gfx_planar_present_raster(GFX_RasterPalTable *t);/* 旧 gfx_present_raster 
 void gfx_present_diag(void);                          /* 旧 gfx_diag_px。無い機種は空 */
 ```
 
-### 2-3. 共通の TU (gfx/gfx_present.c) — 中身は gfx_vram.c から字面のまま移す
+### 2-3. 共通の TU (sys/hal/gfx/gfx_present.c) — 中身は gfx_vram.c から字面のまま移す
 
 ```c
 #include "gfx_dirty.h"            /* gfx_internal.h: bb_b, dirty_queue, prev_dirty */
@@ -108,14 +108,14 @@ void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
 }
 ```
 
-幅の口 (機種のヘッダ platform_display_fallback.h。include/display_provider.h の platform_display_fallback.h の取り込み の「-Iplatform/$(PLATFORM) で選ぶ」既存の形に 1 行ずつ足す):
+幅の口 (機種のヘッダ platform_display_fallback.h。sys/include/display_provider.h の platform_display_fallback.h の取り込み の「-Iplatform/$(PLATFORM) で選ぶ」既存の形に 1 行ずつ足す):
 
 ```c
 /* platform/pc98:     */ #define DISPLAY_V1_WIDTH GFX_WIDTH      /* 定数のまま = x86 の命令列は変わらない */
 /* platform/powermac: */ #define DISPLAY_V1_WIDTH ((int)gfx_backend_mode(g_backend)->width)
 ```
 
-- PowerMac の g_backend は of_fb か "none" (platform/powermac/display_provider.c の gfx_backend_unsupported)。"none" はモードを持たず gfx_backend_mode が NULL を返すが、その時は bb_b == 0 なので式に届かない (入口 6 本は全部 bb_b を先に見る)。実装者はこの順を崩さない。
+- PowerMac の g_backend は of_fb か "none" (sys/platform/powermac/display_provider.c の gfx_backend_unsupported)。"none" はモードを持たず gfx_backend_mode が NULL を返すが、その時は bb_b == 0 なので式に届かない (入口 6 本は全部 bb_b を先に見る)。実装者はこの順を崩さない。
 - GFX_RASTER_MAX_ENTRIES と GFX_RasterPalTable は os32_kapi_shared.h (共通)。splash_raster.h は共通へ持ち込まない。
 
 ### 2-4. 装置の側 (gfx_vram.c に残る形)
@@ -131,21 +131,21 @@ void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
 | 項目 | 形 |
 |---|---|
 | present・present_rect | 共通 → g_backend->present_rect → of_fb_copy。切り詰め・保護行 (protected_rows)・語の端は of_fb_copy が持つ。コードの追加なし |
-| add_dirty_rect・present_dirty・present_nosync | 共通の列 → packed の掃き出し → present_rect を矩形ごとに。commits は 1 回ぶんに揃う (移した字面のまま)。sync は無視される (OF に VSYNC 待ちが無い。gfx/v2/display.c の gfx2_flip_poll が空) |
+| add_dirty_rect・present_dirty・present_nosync | 共通の列 → packed の掃き出し → present_rect を矩形ごとに。commits は 1 回ぶんに揃う (移した字面のまま)。sync は無視される (OF に VSYNC 待ちが無い。sys/hal/gfx/v2/display.c の gfx2_flip_poll が空) |
 | present_raster | packed なので列の掃き出しだけ。パレットの表は使わない = x86 の PEGC・Cirrus と同じ答え (計画 §5「非対応 raster は能力に一致」) |
 | planar の口 3 本 | display_provider.c に空実装 3 行 (呼ばれない。--no-undefined のため) |
-| 計数 (契約 G7) | OF FB の present_rect は commits も present_bytes も数えない (drivers/video/of_fb/backend_of_fb.c の present)。5b の後は列の掃き出しだけ commits が 1 増え、直接の present・present_rect は 0 のまま、present_bytes は常に 0 (gfx_diag_first_present の差も 0)。**5b では変えない** (gfx_stats は不在のままで、アプリから見えない)。gfx_stats を公開する 5c で OF FB の計数の責務 (of_fb_copy が書いた語数、直接の present の commits) を決める |
+| 計数 (契約 G7) | OF FB の present_rect は commits も present_bytes も数えない (sys/dev/video/of_fb/backend_of_fb.c の present)。5b の後は列の掃き出しだけ commits が 1 増え、直接の present・present_rect は 0 のまま、present_bytes は常に 0 (gfx_diag_first_present の差も 0)。**5b では変えない** (gfx_stats は不在のままで、アプリから見えない)。gfx_stats を公開する 5c で OF FB の計数の責務 (of_fb_copy が書いた語数、直接の present の commits) を決める |
 | gfx_init_200 | **足すコードなし**。門 (gfx_kapi_init_200) → gfx_init_mode(1) → OF FB の 1 個のモード。高さは実寸 (gfx_screen_info・gfx_get_framebuffer が返す値)。行を 2 度打ちする 200 行の見かけは作らない (未決 1) |
 
 ### 2-6. PowerMac の公開の門 (shutdown の後・非所有者)
 
-実物: gfx_shutdown の後、端末の復帰 (platform/powermac/console_text.c の display_provider_console_return) が gfx_init() を呼ぶので bb_b と gfx_started は有効に戻る。present の生成ラッパーに所有者の門は無く、gfx_v1_present_rect は v1_bridge_begin の戻り値を捨てる。門が無いと shutdown したアプリ・所有者でないアプリの present が端末の画素を書き換える。
+実物: gfx_shutdown の後、端末の復帰 (sys/platform/powermac/console_text.c の display_provider_console_return) が gfx_init() を呼ぶので bb_b と gfx_started は有効に戻る。present の生成ラッパーに所有者の門は無く、gfx_v1_present_rect は v1_bridge_begin の戻り値を捨てる。門が無いと shutdown したアプリ・所有者でないアプリの present が端末の画素を書き換える。
 
 ```c
-/* platform/pc98/platform_display_fallback.h     */ #define DISPLAY_V1_PRESENT_OK() 1   /* x86 は今のまま */
-/* platform/powermac/platform_display_fallback.h */ int display_provider_present_ok(void);
+/* sys/platform/pc98/platform_display_fallback.h     */ #define DISPLAY_V1_PRESENT_OK() 1   /* x86 は今のまま */
+/* sys/platform/powermac/platform_display_fallback.h */ int display_provider_present_ok(void);
                                                     #define DISPLAY_V1_PRESENT_OK() display_provider_present_ok()
-/* platform/powermac/display_provider.c */
+/* sys/platform/powermac/display_provider.c */
 int display_provider_present_ok(void)
 {   /* 許す条件: 呼んだアプリが画面の所有者で、かつ端末が FB に戻っていない */
     return !pm_console_text_ready() && appslot_gfx_owner() >= 0 &&
@@ -155,18 +155,18 @@ int display_provider_present_ok(void)
 
 - 共通の 6 本は `if (!bb_b)` の所を `if (!bb_b || !DISPLAY_V1_PRESENT_OK())` にする。断った時は何もせず戻る (6 本とも void。列も触らない)。
 - 「表示セッションの世代」は端末の状態で代える: shutdown → 復帰で pm_console_text_ready() が真になり、同じアプリがもう一度 gfx_init (門 gfx_kapi_init) を通るまで偽に戻らない。所有者は終了で外れる (display_provider_owner_exit、appslot_gfx_owner_exit)。
-- カーネル内部: PowerMac のカーネルはこの 6 本を呼ばない (今は組まれていない)。端末の描画は今のまま後端を直に使う。x86 のカーネル内部の呼び出し (スプラッシュ、drivers/video/pc98/backend_pc98_osri.c の pc98_osri_show ほか) は門が定数 1 なので変わらない。
-- 実装の前に確かめる 3 点 (読んでいない): <今のアプリの番号> の取得口の名前 (exec/appslot.h・exec.h の既存の物を使い、足さない)、gfx_init の enter (display_text_hide) で pm_console_text_ready() が偽になること、起動の端末の用意 (pm_console_text_start) が 6 本を呼ばないこと。どれかが違えば止めて報告。
+- カーネル内部: PowerMac のカーネルはこの 6 本を呼ばない (今は組まれていない)。端末の描画は今のまま後端を直に使う。x86 のカーネル内部の呼び出し (スプラッシュ、sys/platform/pc98/video/backend_pc98_osri.c の pc98_osri_show ほか) は門が定数 1 なので変わらない。
+- 実装の前に確かめる 3 点 (読んでいない): <今のアプリの番号> の取得口の名前 (sys/kern/exec/appslot.h・exec.h の既存の物を使い、足さない)、gfx_init の enter (display_text_hide) で pm_console_text_ready() が偽になること、起動の端末の用意 (pm_console_text_start) が 6 本を呼ばないこと。どれかが違えば止めて報告。
 
 ## 3. 部品の大きさと x86 の差の見込み
 
 | 部品 | 行 (見込み) | 備考 |
 |---|---|---|
-| gfx/gfx_present.c (新) | 約 95 | うち約 80 が移動 |
-| include/gfx_present_contract.h (新) | 約 15 | |
-| drivers/video/pc98/gfx_vram.c | 264 → 約 185 | |
+| sys/hal/gfx/gfx_present.c (新) | 約 95 | うち約 80 が移動 |
+| sys/hal/gfx/gfx_present_contract.h (新) | 約 15 | |
+| sys/platform/pc98/video/gfx_vram.c | 264 → 約 185 | |
 | platform_display_fallback.h ×2 | +2 / +3 | 幅と門 |
-| platform/powermac/display_provider.c | 125 → 約 137 | 空実装 3 本、門、include |
+| sys/platform/powermac/display_provider.c | 125 → 約 137 | 空実装 3 本、門、include |
 | build/sources/common.mk・order.mk | +1 語ずつ | build/sources/order.mk の C_ORDER_LEGACY は gfx_dirty.c の隣 |
 
 x86 の build_compare の見込み: **関数差 0 にはならない。移すだけの差**。
@@ -182,12 +182,12 @@ x86 の build_compare の見込み: **関数差 0 にはならない。移すだ
 
 | 段 | 担当 | ファイル (1 ファイル = 1 コミット、取り込みは段の単位) | 中身 |
 |---|---|---|---|
-| 5b-A1 | 本線 | include/gfx_present_contract.h (新) | 口 3 本の宣言と呼ぶ条件 (§2-2) |
-| 5b-A2 | 本線 | platform/pc98/platform_display_fallback.h | DISPLAY_V1_WIDTH・DISPLAY_V1_PRESENT_OK (定数) |
-| 5b-A3 | PowerPC | platform/powermac/platform_display_fallback.h | 同じ 2 個 (モードの幅、門の宣言) |
-| 5b-A4 | PowerPC | platform/powermac/display_provider.c | 空実装 3 本と display_provider_present_ok (§2-6) |
-| 5b-B1 | 本線 | drivers/video/pc98/gfx_vram.c | 共通の分を削り、planar の口 3 本を外部に (§2-4) |
-| 5b-B2 | 本線 | gfx/gfx_present.c (新) + common.mk・order.mk + 両像の build-selection の fixture | §2-3・§2-6 |
+| 5b-A1 | 本線 | sys/hal/gfx/gfx_present_contract.h (新) | 口 3 本の宣言と呼ぶ条件 (§2-2) |
+| 5b-A2 | 本線 | sys/platform/pc98/platform_display_fallback.h | DISPLAY_V1_WIDTH・DISPLAY_V1_PRESENT_OK (定数) |
+| 5b-A3 | PowerPC | sys/platform/powermac/platform_display_fallback.h | 同じ 2 個 (モードの幅、門の宣言) |
+| 5b-A4 | PowerPC | sys/platform/powermac/display_provider.c | 空実装 3 本と display_provider_present_ok (§2-6) |
+| 5b-B1 | 本線 | sys/platform/pc98/video/gfx_vram.c | 共通の分を削り、planar の口 3 本を外部に (§2-4) |
+| 5b-B2 | 本線 | sys/hal/gfx/gfx_present.c (新) + common.mk・order.mk + 両像の build-selection の fixture | §2-3・§2-6 |
 | 5b-B3 | 本線 | tools/tests/: 新しい host 試験 gfx_present_host.c、test_sep5_gfx_init.py (関数抽出 が `_present_dirty` を名前で抜く → gfx_planar_present_dirty と共通の present_dirty へ)、test_boot_splash_native.py (fixture に gfx_present.c、変異の当て先 present の変異)、tools/tests/test_gfx_attach.py の TARGET_SRCS・tools/tests/test_gfx_boot.py の test_present_lifecycle のソースの列 | A1〜A3・A9 |
 | 5b-C1 | PowerPC | sdk/kapi_target_ppc.py、tools/ppc/test_kapi_binding.py | PROVIDER_GROUPS['gfx'] の不在の集合から 7 本を外す (19 → 12) |
 | 5b-C2 | PowerPC | dispprb (ゲストの観測プログラム) と tools/accept/ppc_display.py | A4〜A6・A11・A12 |

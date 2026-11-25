@@ -1,8 +1,8 @@
-# gfx/gfx_core_surface.inc — 設計
+# sys/hal/gfx/gfx_core_surface.inc — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_T2D_T2H (§2-2・§2-3・§2-5 e5) の契約を今のソースと照らして要約
-ソース: `gfx/gfx_core_surface.inc` (`gfx/gfx_core.c` が取り込む)
+ソース: `sys/hal/gfx/gfx_core_surface.inc` (`sys/hal/gfx/gfx_core.c` が取り込む)
 
-起動時の SURFACE 予約の入口、query/lease の公開元、再 init・V86 帰りの revoke → regen、CLIENT の gshell への移譲を持つ。予約の表と手順は platform の provider (PC-98 は `platform/pc98/gfx_surfaces.c`) が持つ。
+起動時の SURFACE 予約の入口、query/lease の公開元、再 init・V86 帰りの revoke → regen、CLIENT の gshell への移譲を持つ。予約の表と手順は platform の provider (PC-98 は `sys/platform/pc98/gfx_surfaces.c`) が持つ。
 
 ## 公開元 (`gfx_surface_source`)
 

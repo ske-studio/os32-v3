@@ -1,4 +1,4 @@
-"""K7-K: 打鍵の注入リングを実物の kernel/kbd_inject.c で確かめる。
+"""K7-K: 打鍵の注入リングを実物の sys/kern/kbd_inject.c で確かめる。
 
 票:   docs/archive/gui_v13/TASK_K7_input.md §1 D2〜D5 / §5 (R1 / R2 / B)
 記録: tools/tests/k7_tdd.md
@@ -7,7 +7,7 @@ test_con_sink.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと
 ソースがカーネルと同じフラグの i386-elf-gcc -Werror でも通ることを別に
 見る ([C1] GNU11)。Make・エミュレータ・libc は使わない。
 
-kbd_inject_host.c は kernel/console/con_sink.c も同じ翻訳単位へ入れる: 注入の権限は
+kbd_inject_host.c は sys/kern/console/con_sink.c も同じ翻訳単位へ入れる: 注入の権限は
 「con_sink の読み手 1 本」なので、そこを模型に置き換えると試験の意味が消える。
 
 con_sink は IRQ 状態を持つ host arch_io.h を使う。
@@ -23,14 +23,14 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
-# arch/x86 + platform/pc98: include/io.h は契約だけで、実装は固定名
+# arch/x86 + platform/pc98: sys/include/io.h は契約だけで、実装は固定名
 # arch_io.h / platform_io.h を引く (順序 3)。build/config.mk の INC_COMMON と
 # 同じものをここでも渡す。
 INCLUDES = (['-I' + str(ROOT / p) for p in ('kdebug',)] + include_flags(ROOT))
 HOST_SRC = ROOT / "tools/tests/kbd_inject_host.c"
-KERNEL_SRC = ROOT / "kernel/kbd_inject.c"
+KERNEL_SRC = ROOT / "sys/kern/kbd_inject.c"
 
-MOVED_SRC = ROOT / "kdebug/selftest_kbd_inject.c"
+MOVED_SRC = ROOT / "sys/kern/kdebug/selftest_kbd_inject.c"
 
 def run(tmp, source, moved):
     (tmp / "kbd_inject.c").write_text(source)

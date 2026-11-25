@@ -8,20 +8,20 @@ from test_exec_hwb_abort import FLAGS
 CHECK = dict(name='ppc-hwb-session', tier=1, needs=[], budget=6,
     covers=['exec/**', 'gfx/**', 'mm/**', 'input/**', 'init/**', 'kernel/**',
         'include/**', 'arch/x86/**', 'platform/pc98/**', 'sdk/include/os32/**',
-        'kapi/**', 'fs/**', 'lib/**', 'kdebug/hwb_wire.h', 'userland/shell/hwb.h',
+        'kapi/**', 'fs/**', 'lib/**', 'sys/kern/kdebug/hwb_wire.h', 'userland/shell/hwb.h',
         'tools/tests/host_arch/**', 'tools/tests/host_exec*.h', 'tools/tests/hwb_fake.h',
         'tools/tests/exec_hwb_abort_host.c', 'tools/tests/hwb_host.py', 'tools/tests/host32.py',
         'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py', 'build/config.mk',
         'tools/tests/test_exec_hwb_abort.py', 'tools/tests/ppc_hwb_session_host.c',
-        'kernel/module/kdebug_call.c', 'kernel/module/*.h',
-        'platform/powermac/platform_hwb_session.h', 'platform/powermac/terminal_fifo.inc', 'platform/powermac/terminal_input.c',
-        'platform/powermac/lan_boot.h', 'platform/powermac/usb_boot.h',
-        'kernel/idle_work.h', 'kernel/cli/resident_cli.h', 'arch/ppc/kernel_boot.h'],
+        'sys/kern/module/kdebug_call.c', 'kernel/module/*.h',
+        'sys/platform/powermac/platform_hwb_session.h', 'sys/platform/powermac/terminal_fifo.inc', 'sys/platform/powermac/terminal_input.c',
+        'sys/platform/powermac/lan_boot.h', 'sys/platform/powermac/usb_boot.h',
+        'sys/kern/idle_work.h', 'sys/kern/cli/resident_cli.h', 'sys/arch/ppc/kernel_boot.h'],
     basis=['docs/decisions/realhw/HWOP_COMMON_DESIGN.md §2.2'])
 FIXTURE = 'tools/tests/ppc_hwb_session_host.c'
 SESSION_FLAGS = FLAGS + ('-DPM_LOAD_KDEBUG=1', '-DKBOOT_SH=1', '-nostdinc', '-isystem',
                          subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip())
-MUTATIONS = [('sticky', 'exec/exec_abort.inc',
+MUTATIONS = [('sticky', 'sys/kern/exec/exec_abort.inc',
               'u32 pending = g_hwb_abort_pending;\n    g_hwb_abort_pending = 0;',
               'u32 pending = g_hwb_abort_pending;', 'take-clear')]
 
@@ -31,7 +31,7 @@ for name, keep_active in (
         ('fault-exit', 'g_last_kind == EXEC_KIND_FAULT'),
         ('ctrl-stop-exit', 'g_last_kind == EXEC_KIND_EXITED && !g_hwb_abort_pending'),
         ('terminal-exit', 'g_hwb_abort_pending')):
-    MUTATIONS.append((name, 'exec/exec_abort.inc', '        hwb_active = 0;',
+    MUTATIONS.append((name, 'sys/kern/exec/exec_abort.inc', '        hwb_active = 0;',
                       f'        if (!({keep_active})) hwb_active = 0;', name))
 
 if __name__ == '__main__':

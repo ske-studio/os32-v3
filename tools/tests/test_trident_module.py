@@ -3,9 +3,9 @@
 Includes real device initialization and core drawing dispatch over fake hardware.
 """
 CHECK = dict(name='trident-module', tier=1, needs=['make:all'], budget=8.9,
-    covers=['platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'platform/pc98/platform_display_fallback.h', 'tools/tests/gfx2_bridge_fake.h', 'include/copy_units.h', 'arch/*/arch_copy.h', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'init/sysconfig.h', 'kernel/time/cpu_calibrate.h', 'drivers/video/trident/*.c', 'drivers/video/trident/*.h',
+    covers=['sys/platform/pc98/module_pair.c', 'sys/include/platform_module_pair.h', 'sys/platform/pc98/platform_display_fallback.h', 'tools/tests/gfx2_bridge_fake.h', 'sys/include/copy_units.h', 'arch/*/arch_copy.h', 'sys/hal/gfx/sync/sync_int.h', 'sys/hal/gfx/v2/gfx2_int.h', 'sys/include/gfx_sync.h', 'sys/hal/gfx/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'sys/kern/init/sysconfig.h', 'sys/hal/time/cpu_calibrate.h', 'drivers/video/trident/*.c', 'drivers/video/trident/*.h',
             'tools/tests/trident_module_host.c', 'tools/tests/test_trident_module.py',
-            'tools/tests/trident_device_fake.c','tools/tests/trident_sync_fake.c', 'tools/tests/trident_device_fake.h', 'gfx/gfx_core_api.inc',
+            'tools/tests/trident_device_fake.c','tools/tests/trident_sync_fake.c', 'tools/tests/trident_device_fake.h', 'sys/hal/gfx/gfx_core_api.inc',
             'tools/tests/test_module_runtime.py', 'tools/tests/test_module_image.py',
             'tools/tests/module_image_host.c', 'tools/tests/kernel_includes.py',
             'tools/tests/host32.py', 'tools/tests/mutpar.py',
@@ -13,17 +13,17 @@ CHECK = dict(name='trident-module', tier=1, needs=['make:all'], budget=8.9,
             'tools/gen_sqlite_imports.py', 'tools/gen_kdebug_imports.py',
             'tools/prototypes/trident_imports.def', 'tools/mkmod.py',
             'kernel/module/*.h', 'kernel/module/*.c',
-            'drivers/base/dev.c', 'fs/vfs.c', 'kernel/module/kdebug_imports.def',
+            'sys/dev/base/dev.c', 'sys/fs/vfs.c', 'sys/kern/module/kdebug_imports.def',
             'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def',
-            'tools/tests/module_runtime_host.c', 'lib/kstring.c', 'lib/kstring.h',
-            'lib/serial_diag.h', 'mm/kmalloc.h', 'exec/appslot.h',
-            'include/*.h', 'gfx/gfx_internal.h', 'gfx/gfx_emergency.h', 'gfx/palette.h',
+            'tools/tests/module_runtime_host.c', 'sys/kern/kstring.c', 'sys/kern/kstring.h',
+            'lib/serial_diag.h', 'sys/kern/mm/kmalloc.h', 'sys/kern/exec/appslot.h',
+            'include/*.h', 'sys/hal/gfx/gfx_internal.h', 'sys/hal/gfx/gfx_emergency.h', 'sys/hal/gfx/palette.h',
             'build/trident-module.mk', 'build/trident-module.ld', 'build/kernel.mk',
             'build/config.mk', 'build/core.yaml', 'build/packages.yaml', 'Makefile',
-            'platform/pc98/kernel.c', 'platform/pc98/kernel_gfx_config.inc', 'platform/pc98/boot_names.c', 'userland/shell/cmd_sys.c',
+            'sys/platform/pc98/kernel.c', 'sys/platform/pc98/kernel_gfx_config.inc', 'sys/platform/pc98/boot_names.c', 'userland/shell/cmd_sys.c',
             'sdk/kapi.json', 'sdk/include/os32/*.h',
             'build/out/trident/*', 'build/out/trident.mod',
-            'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+            'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     basis=['TRIDENT_FULL_DESIGN §2', 'TRIDENT_FULL_DESIGN §9', '[ABI]'],
 )
 import os
@@ -78,7 +78,7 @@ def build(work, changed=None):
         'state_save','state_restore','pc98_init','vram','accel','cursor','ddc1','mode_640','route_ra266','present','palette','screen','video','dpms','lifecycle')]
     cmd=['gcc',*FLAGS,'-I.','-I'+DIR,'-Ibuild/out/trident',
          *include_flags(ROOT),'-nostdlib','-static','-no-pie',
-         '-Wl,--gc-sections','tools/tests/trident_module_host.c',*sources,'lib/kstring.c','tools/tests/trident_device_fake.c','tools/tests/trident_sync_fake.c','-Wl,--wrap=trident_regs_bind','-o',str(exe)]
+         '-Wl,--gc-sections','tools/tests/trident_module_host.c',*sources,'sys/kern/kstring.c','tools/tests/trident_device_fake.c','tools/tests/trident_sync_fake.c','-Wl,--wrap=trident_regs_bind','-o',str(exe)]
     changes={}
     if changed:
         path,old,new=changed; original=(ROOT/path).read_text()
@@ -131,7 +131,7 @@ def product(work,runners):
 
 def boot_order(work, runners):
     # Execute the real boot call sequence with observers for module publication.
-    source=(ROOT/'platform/pc98/kernel.c').read_text()
+    source=(ROOT/'sys/platform/pc98/kernel.c').read_text()
     start=source.index('    if (kdebug.ops.crt_diag_bootlog)')
     end=source.index('    kaudit_post_probe();', start)
     fixture=r'''#include "gfx_hal.h"

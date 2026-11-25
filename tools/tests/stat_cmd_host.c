@@ -127,7 +127,7 @@ static int lines(void)
     return n;
 }
 
-/* VFS の st_dev と同じ式 (fs/vfs.c の vfs_mount_dev_of): (type << 8 | unit) + 1 */
+/* VFS の st_dev と同じ式 (sys/fs/vfs.c の vfs_mount_dev_of): (type << 8 | unit) + 1 */
 #define DEV(t, u) ((u32)((((t) & 0xFF) << 8) | ((u) & 0xFF)) + 1u)
 
 /* ========================================================================= */
@@ -157,7 +157,7 @@ static void case_dev(void)
     check(run(2, av) == 0, "dev: hd1 exit 0");
     check(has("dev=2(hd1)"), "dev: hd1 raw+decode");
 
-    /* 残りの既知の種別 (fs/vfs.h VFS_DEV_*) */
+    /* 残りの既知の種別 (sys/fs/vfs.h VFS_DEV_*) */
     fake_reset();
     fake_ok("/", (u16)OS_S_IFDIR, DEV(2, 0), 2u, 0u);
     check(run(2, av) == 0 && has("dev=513(ser0)"), "dev: serial");

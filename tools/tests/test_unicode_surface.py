@@ -4,7 +4,7 @@ The host maps separate lease VAs; no hardware or emulator is accessed.
 Mutants must fail at the named runtime assertion (compile failures are errors).
 """
 CHECK = dict(name='unicode-surface-host', tier=1,
-    covers=['include/display_provider.h', 'tools/tests/recover_gf_dev_stub.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'tools/tests/paging_source.py', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c', 'kernel/console/display_restore.h', 'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_dirty.c', 'gfx/gfx_present.c', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kernel/sys.c', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/kernel_layout.py', 'tools/tests/gfx_attach_host.c', 'tools/tests/test_gfx_attach.py', 'userland/lib/gfx/**', 'tools/tests/test_gfx_reattach.py', 'tools/tests/gfx_reattach_host.c', 'exec/system_surface.c', 'lib/utf8.c', 'tools/tests/unicode_surface_host.c', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'tools/gen_unicode.c', 'lib/unicode_jis_table.h', 'tools/tests/test_unicode_lookup.py', 'build/programs.mk', 'build/deploy.mk', 'kapi/kapi_generated.c', 'tools/tests/unicode_lookup_host.c', 'tools/tests/unicode_lookup_sdk.c', 'kernel/console/console_backend.h', 'platform/pc98/console.c', 'include/console_attr.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/include/display_provider.h', 'tools/tests/recover_gf_dev_stub.c', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/hal/gfx/gfx_emergency.c', 'sys/hal/gfx/gfx_emergency.h', 'tools/tests/paging_source.py', 'sys/kern/exec/access_walk.c', 'sys/kern/exec/lease.c', 'sys/kern/exec/redir_access.c', 'sys/kern/exec/surface_query.c', 'sys/dev/video/cirrus/backend_cirrus.c', 'sys/platform/pc98/video/cirrus/cirrus_identify.c', 'sys/platform/pc98/video/backend_pc98.c', 'sys/platform/pc98/video/backend_pegc.c', 'sys/hal/gfx/gfx_core.c', 'sys/hal/gfx/gfx_scroll.c', 'sys/platform/pc98/gfx_scroll.c', 'sys/platform/pc98/gfx_init.c', 'sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_surfaces.c', 'sys/kern/console/display_restore.h', 'sys/platform/pc98/video/gfx_vram.c', 'sys/hal/gfx/gfx_dirty.c', 'sys/hal/gfx/gfx_present.c', 'sys/kern/mm/paging.c', 'sys/platform/pc98/platform_memory_desc.h', 'sys/include/platform_memory.h', 'sys/kern/mm/pgalloc.c', 'sys/kern/mm/physmem.c', 'sys/kern/mm/shlib.c', 'sys/kern/sys.c', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/kernel_layout.py', 'tools/tests/gfx_attach_host.c', 'tools/tests/test_gfx_attach.py', 'userland/lib/gfx/**', 'tools/tests/test_gfx_reattach.py', 'tools/tests/gfx_reattach_host.c', 'sys/kern/exec/system_surface.c', 'lib/utf8.c', 'tools/tests/unicode_surface_host.c', 'sys/kern/console/unicode_file.c', 'sys/kern/console/unicode_file.h', 'tools/gen_unicode.c', 'lib/unicode_jis_table.h', 'tools/tests/test_unicode_lookup.py', 'build/programs.mk', 'build/deploy.mk', 'sys/kapi/kapi_generated.c', 'tools/tests/unicode_lookup_host.c', 'tools/tests/unicode_lookup_sdk.c', 'sys/kern/console/console_backend.h', 'sys/platform/pc98/console.c', 'sys/include/console_attr.h', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=6.4,
     basis=['KAPI_SPEC §4-13', 'GFX_ACCEL_HAL_DESIGN §2'],
 )
@@ -22,25 +22,25 @@ from test_gfx_kernel_fb import ROOT, run_case
 from mutpar import run_ordered
 
 FIXTURE = 'tools/tests/unicode_surface_host.c'
-SYSTEM = 'exec/system_surface.c'
+SYSTEM = 'sys/kern/exec/system_surface.c'
 UTF8 = 'lib/utf8.c'
 TARGET_SRCS = [
-    'gfx/gfx_core.c', 'gfx/gfx_emergency.c',
-    'drivers/video/pc98/backend_pc98.c',
-    'drivers/video/pc98/backend_pegc.c',
-    'drivers/video/cirrus/backend_cirrus.c',
-    'drivers/video/cirrus/cirrus_identify.c',
-    'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_dirty.c', 'gfx/gfx_present.c',
-    'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c',
-    'exec/surface_query.c',
-    'exec/lease.c',
-    'exec/access_walk.c',
-    'exec/redir_access.c',
-    'mm/shlib.c',
-    'mm/paging.c',
-    'mm/pgalloc.c',
-    'kernel/sys.c',
-    'mm/physmem.c',
+    'sys/hal/gfx/gfx_core.c', 'sys/hal/gfx/gfx_emergency.c',
+    'sys/platform/pc98/video/backend_pc98.c',
+    'sys/platform/pc98/video/backend_pegc.c',
+    'sys/dev/video/cirrus/backend_cirrus.c',
+    'sys/platform/pc98/video/cirrus/cirrus_identify.c',
+    'sys/platform/pc98/video/gfx_vram.c', 'sys/hal/gfx/gfx_dirty.c', 'sys/hal/gfx/gfx_present.c',
+    'sys/hal/gfx/gfx_scroll.c', 'sys/platform/pc98/gfx_scroll.c', 'sys/platform/pc98/gfx_init.c', 'sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_surfaces.c',
+    'sys/kern/exec/surface_query.c',
+    'sys/kern/exec/lease.c',
+    'sys/kern/exec/access_walk.c',
+    'sys/kern/exec/redir_access.c',
+    'sys/kern/mm/shlib.c',
+    'sys/kern/mm/paging.c',
+    'sys/kern/mm/pgalloc.c',
+    'sys/kern/sys.c',
+    'sys/kern/mm/physmem.c',
     'userland/lib/gfx/libos32gfx_core.c',
     'userland/lib/gfx/draw/gfx_draw.c',
     'userland/lib/gfx/draw/gfx_blt.c',
@@ -60,18 +60,18 @@ TARGET_SRCS = [
     'userland/lib/math/libos32math.h',
     'lib/utf8.c',
     'lib/utf8.h',
-    'kernel/console/unicode_file.c',
-    'kernel/console/unicode_file.h',
-    'exec/system_surface.c',
-    'exec/system_surface.h',
+    'sys/kern/console/unicode_file.c',
+    'sys/kern/console/unicode_file.h',
+    'sys/kern/exec/system_surface.c',
+    'sys/kern/exec/system_surface.h',
     'tools/tests/unicode_surface_host.c',
     'tools/tests/gfx_kernel_fb_host.c',
     'tools/tests/gfx_attach_host.c',]
 assert set(ATTACH_SRCS) <= set(TARGET_SRCS)
 MUTANTS = [
     ('sdk-no-kapi', UTF8, 'return kapi->unicode_to_jis(cp);', '(void)cp; return 0;', 'FAIL unicode_to_jis(0x3041)==0x2421'),
-    ('tvram-gui', 'exec/surface_query.c', '        if (gui) return OS32_ERR_INVAL;', '        if (0) return OS32_ERR_INVAL;', 'FAIL tvram_gui_denied'),
-    ('slot-unready', 'mm/pgalloc.c', '    gfx_surface_unready &= ~(1U << i);', '', 'FAIL slot_ready'),
+    ('tvram-gui', 'sys/kern/exec/surface_query.c', '        if (gui) return OS32_ERR_INVAL;', '        if (0) return OS32_ERR_INVAL;', 'FAIL tvram_gui_denied'),
+    ('slot-unready', 'sys/kern/mm/pgalloc.c', '    gfx_surface_unready &= ~(1U << i);', '', 'FAIL slot_ready'),
 ]
 
 
@@ -115,7 +115,7 @@ def main():
                         dest = destdir/pathlib.Path(path).name
                         dest.write_text(body)
                         if path in SDK_SRCS: sources.append(dest)
-                for path in (SYSTEM, 'kernel/console/unicode_file.c'):
+                for path in (SYSTEM, 'sys/kern/console/unicode_file.c'):
                     dest=tmp/('kernel_'+pathlib.Path(path).name)
                     dest.write_text(texts[path]);sources.append(dest)
                 generator=tmp/'gen_unicode'

@@ -49,8 +49,8 @@ if __name__ == "__main__":
         def table(name):
             with (tree / name).open() as f:
                 return list(csv.DictReader(f, delimiter="\t"))
-        headers = {"exec/appslot.h", "include/app_ids.h", "include/memmap.h", "include/con_sink.h",
-                   "kernel/module/module_runtime.h", "kernel/module/module_schema.h"}
+        headers = {"sys/kern/exec/appslot.h", "sys/include/app_ids.h", "sys/include/memmap.h", "sys/include/con_sink.h",
+                   "sys/kern/module/module_runtime.h", "sys/kern/module/module_schema.h"}
         assert headers <= {r["パス"] for r in table("paths.tsv") if r["相手"] == "pc98emu" and
                            r["判定"] == "変わる" and "tools/np21w_mcp/gui.py:" in r["参照元"]}
         notice = next(r for r in table("notify.tsv") if r["知らせる相手"] == "pc98emu" and r["判定"] == "変わる")

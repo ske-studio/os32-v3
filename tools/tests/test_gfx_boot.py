@@ -4,8 +4,8 @@
   python3 -B tools/tests/test_gfx_boot.py --mutate   # 否定側 + 肯定側
 
 票 docs/archive/v3/TASK_T1_LEDGER.md §3-3 ⑥・⑨、§3-6、§3-8、§4-5。
-tools/tests/gfx_boot_host.c が実物の mm/paging.c・pgalloc.c・sys.c・
-physmem.c を ILP32 で組み、段つき起動で台帳を ONLINE にしてから、gfx/gfx_core.c
+tools/tests/gfx_boot_host.c が実物の sys/kern/mm/paging.c・pgalloc.c・sys.c・
+physmem.c を ILP32 で組み、段つき起動で台帳を ONLINE にしてから、sys/hal/gfx/gfx_core.c
 から切り出した本物の gfx_boot_reserve / gfx_bb_phys_range /
 gfx_client_to_gshell を 1 構成 1 プロセスで走らせる (見るものはそのファイルの
 冒頭)。切り出しは台帳・写像の呼び出しを記録係へ付け替えるだけで、記録係は
@@ -43,11 +43,11 @@ import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-PROVIDER = 'platform/pc98/gfx_surfaces.c'   # ⑥ の表と手順 (第 5 段 B5 で gfx_core から移った)
-SELECTOR = 'platform/pc98/gfx_selector.c'
-SOURCES = ('gfx/gfx_core.c', PROVIDER, SELECTOR, 'mm/paging.c', 'mm/pgalloc.c',
-           'kernel/sys.c',
-           'kdebug/kselftest/gfx_ledger.inc')
+PROVIDER = 'sys/platform/pc98/gfx_surfaces.c'   # ⑥ の表と手順 (第 5 段 B5 で gfx_core から移った)
+SELECTOR = 'sys/platform/pc98/gfx_selector.c'
+SOURCES = ('sys/hal/gfx/gfx_core.c', PROVIDER, SELECTOR, 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c',
+           'sys/kern/sys.c',
+           'sys/platform/pc98/kdebug/kselftest/gfx_ledger.inc')
 HOST = ROOT / 'tools/tests/gfx_boot_host.c'
 
 SLICE_BEGIN = 'enum { GFX_RES_PEGC'
@@ -105,7 +105,7 @@ def load(mutation=None):
     texts = {rel: paging_source(ROOT / rel) for rel in SOURCES}
     if mutation:
         _, rel, old, new = mutation
-        if rel == 'gfx/gfx_core.c' and texts[rel].count(old) == 0:
+        if rel == 'sys/hal/gfx/gfx_core.c' and texts[rel].count(old) == 0:
             # ⑥ の行は provider にある。希望の値は引数 pref で届く。
             rel, old, new = PROVIDER, old.replace('g_backend_pref', 'pref'), new.replace('g_backend_pref', 'pref')
         if texts[rel].count(old) != 1:
@@ -116,12 +116,12 @@ def load(mutation=None):
 
 def slice_gfx(core):
     if core.count(SLICE_BEGIN) != 1 or core.count(SLICE_END) != 1:
-        raise SystemExit('gfx/gfx_core.c: 切り出しの目印が 1 個ずつではない')
+        raise SystemExit('sys/hal/gfx/gfx_core.c: 切り出しの目印が 1 個ずつではない')
     body = core.split(SLICE_BEGIN, 1)[1].split(SLICE_END, 1)[0]
     body = SLICE_BEGIN + body + SLICE_END
     for old, new in HOOKS:
         body = body.replace(old, new)
-    return '#include \"geforce_module.h\"\n/* 生成物。gfx/gfx_core.c から test_gfx_boot.py が切り出した。 */\n' + body
+    return '#include \"geforce_module.h\"\n/* 生成物。sys/hal/gfx/gfx_core.c から test_gfx_boot.py が切り出した。 */\n' + body
 
 
 def build(texts, tmp):
@@ -134,9 +134,9 @@ def build(texts, tmp):
     start = selector.index('u32 display_provider_ledger(')
     end = selector.index('\n}', start) + 2
     (tmp / 'gfx_boot_slice.inc').write_text(
-        selector[start:end] + '\n' + slice_gfx(gfx_text(texts['gfx/gfx_core.c'], texts[PROVIDER])))
+        selector[start:end] + '\n' + slice_gfx(gfx_text(texts['sys/hal/gfx/gfx_core.c'], texts[PROVIDER])))
     # Execute the real planar boot assertion before and after owner transfer.
-    selftest = texts['kdebug/kselftest/gfx_ledger.inc'].split('static void __attribute__((cold)) test_gfx_ledger(void)', 1)[1]
+    selftest = texts['sys/platform/pc98/kdebug/kselftest/gfx_ledger.inc'].split('static void __attribute__((cold)) test_gfx_ledger(void)', 1)[1]
     start = selftest.index('    check(p &&')
     end = selftest.index('"gfx:planar surface");', start) + len('"gfx:planar surface");')
     (tmp / 'gfx_planar_selftest.inc').write_text(selftest[start:end])
@@ -158,7 +158,7 @@ def run_case(texts, name, defs):
         tmp = pathlib.Path(tmp)
         cmd = build(texts, tmp)
         cmd += ['-D%s=%d' % kv for kv in defs.items()]
-        out = subprocess.run(cmd + [str(HOST), str(ROOT / 'mm/physmem.c'),
+        out = subprocess.run(cmd + [str(HOST), str(ROOT / 'sys/kern/mm/physmem.c'),
                                     '-o', str(tmp / 'test')], capture_output=True, text=True)
         if out.returncode:
             return 'compile', out.stderr
@@ -170,13 +170,13 @@ def run_case(texts, name, defs):
 
 def text_problems():
     problems = []
-    core = gfx_text(paging_source(ROOT / 'gfx/gfx_core.c'), paging_source(ROOT / PROVIDER))
+    core = gfx_text(paging_source(ROOT / 'sys/hal/gfx/gfx_core.c'), paging_source(ROOT / PROVIDER))
     body = core.split(SLICE_BEGIN, 1)[-1].split(SLICE_END, 1)[0]
     for old, _ in HOOKS:
         if old not in body:
-            problems.append('gfx/gfx_core.c: 切り出しに %r が無い (記録係へ付け替えられない)' % old)
-    for rel in ('drivers/video/pc98/backend_pegc.c',
-                'drivers/video/cirrus/backend_cirrus.c'):
+            problems.append('sys/hal/gfx/gfx_core.c: 切り出しに %r が無い (記録係へ付け替えられない)' % old)
+    for rel in ('sys/platform/pc98/video/backend_pegc.c',
+                'sys/dev/video/cirrus/backend_cirrus.c'):
         if 'paging_map_phys(' in paging_source(ROOT / rel):
             problems.append('%s が自分で写像している (予約・写像は ⑥ の 1 回だけ)' % rel)
     for d in ('kernel', 'gfx', 'include', 'exec', 'drivers', 'kapi'):
@@ -196,7 +196,7 @@ def text_problems():
         is_gui = k.rindex('if (is_gui) {', 0, to_gshell)
         run_shell = k.index('boot_diag_exec(cur_shell, 0, 0, 0);')
     except ValueError as e:
-        return problems + ['platform/pc98/kernel.c: 目印が見つからない (%s)' % e]
+        return problems + ['sys/platform/pc98/kernel.c: 目印が見つからない (%s)' % e]
     if not gfx_cfg < reserve < exec_init:
         problems.append('kernel.c: GFX= の読み取り → gfx_boot_reserve → exec_init の順でない')
     if not is_gui < to_gshell < run_shell:
@@ -214,7 +214,7 @@ class GfxBoot(unittest.TestCase):
         cls.texts = load()
 
     def test_present_lifecycle(self):
-        # Includes the real gfx/gfx_present.c present entries alongside gfx_core.
+        # Includes the real sys/hal/gfx/gfx_present.c present entries alongside gfx_core.
         from test_gfx_kernel_fb import run_case as lifecycle
         out = lifecycle(None, host32.selected_runner())
         self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
@@ -246,84 +246,84 @@ def _swap_reserve_and_map():
 RESERVE_THEN_MAP, MAP_THEN_RESERVE = _swap_reserve_and_map()
 
 MUTATIONS = [
-    ('selftest-old-planar-address', 'kdebug/kselftest/gfx_ledger.inc',
+    ('selftest-old-planar-address', 'sys/platform/pc98/kdebug/kselftest/gfx_ledger.inc',
      'p->first >= MEM_POOL_BASE / PAGE_SIZE',
      'p->first * PAGE_SIZE == 0x6A000UL'),
-    ('selftest-fixed-planar-ram', 'kdebug/kselftest/gfx_ledger.inc',
+    ('selftest-fixed-planar-ram', 'sys/platform/pc98/kdebug/kselftest/gfx_ledger.inc',
      'p->backing == LEDGER_SB_RAM &&',
      'p->backing == LEDGER_SB_FIXED_RAM &&'),
-    ('selftest-boot-owner-only', 'kdebug/kselftest/gfx_ledger.inc',
+    ('selftest-boot-owner-only', 'sys/platform/pc98/kdebug/kselftest/gfx_ledger.inc',
      '(p->owner == LEDGER_OWNER_BOOT || p->owner == LEDGER_OWNER_GSHELL)',
      '(p->owner == LEDGER_OWNER_BOOT)'),
-    ('planar-pool-fails', 'gfx/gfx_core.c',
+    ('planar-pool-fails', 'sys/hal/gfx/gfx_core.c',
      'if (!pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)sf.npages,',
      'if (1 || !pgalloc_alloc_n_owner(LEDGER_OWNER_BOOT, (int)sf.npages,'),
-    ('planar-failure-leaks', 'gfx/gfx_core.c',
+    ('planar-failure-leaks', 'sys/hal/gfx/gfx_core.c',
      '(void)pgalloc_free_n_owner(sf.owner, sf.first, (int)sf.npages);',
      '(void)sf;'),
 
-    ('pegc-alt-resource-missing', 'gfx/gfx_core.c',
+    ('pegc-alt-resource-missing', 'sys/hal/gfx/gfx_core.c',
      'for (i = n = 0; m && i < GFX_RES_COUNT; i++)',
      'for (i = n = 0; m && i < 3; i++)'),
-    ('pegc-alt-map-missing', 'gfx/gfx_core.c',
+    ('pegc-alt-map-missing', 'sys/hal/gfx/gfx_core.c',
      'if ((m & gfx_cand_of(i)) && r->map_first < r->map_end &&',
      'if (i != 3 && (m & gfx_cand_of(i)) && r->map_first < r->map_end &&'),
-    ('planar-plane-stride-rounded', 'gfx/gfx_core.c',
+    ('planar-plane-stride-rounded', 'sys/hal/gfx/gfx_core.c',
      '.plane_offset = {0, GFX_BPL * GFX_HEIGHT, 2 * GFX_BPL * GFX_HEIGHT,\n                       3 * GFX_BPL * GFX_HEIGHT}',
      '.plane_offset = {0, GVRAM_PLANE_SIZE, 2 * GVRAM_PLANE_SIZE, 3 * GVRAM_PLANE_SIZE}'),
-    ('planar-display-UC-lost', 'gfx/gfx_core.c',
+    ('planar-display-UC-lost', 'sys/hal/gfx/gfx_core.c',
      '.format = GFX_BB_PLANAR4, .planes = 1, .cache = LEDGER_CACHE_UC',
      '.format = GFX_BB_PLANAR4, .planes = 1, .cache = LEDGER_CACHE_WB'),
-    ('planar-last-plane-missing', 'gfx/gfx_core.c',
+    ('planar-last-plane-missing', 'sys/hal/gfx/gfx_core.c',
      'for (i = 0; i < GVRAM_PLANES; i++) {\n        sf = gfx_planar_display;',
      'for (i = 0; i < 3; i++) {\n        sf = gfx_planar_display;'),
     # BB の探索範囲を池全体にする (高位 RAM へ行く、X14)
-    ('bb-whole-pool', 'gfx/gfx_core.c',
+    ('bb-whole-pool', 'sys/hal/gfx/gfx_core.c',
      'pgalloc_arena_end(),\n                              LEDGER_TOP_DOWN',
      'pgalloc_limit_pfn(),\n                              LEDGER_TOP_DOWN'),
     # 1 つの窓の写像失敗で候補を全部捨てる (B3: Xe10 の失敗が PEGC を妨げる)
-    ('map-failure-drops-all', 'gfx/gfx_core.c',
+    ('map-failure-drops-all', 'sys/hal/gfx/gfx_core.c',
      'r->map_end - r->map_first, PAGE_RW | PTE_PCD) != 0)\n            m &= ~gfx_cand_of(i);',
      'r->map_end - r->map_first, PAGE_RW | PTE_PCD) != 0)\n            m = 0;'),
     # 写像を予約より先に行う (識別 → 予約 → 写像の順、D33)
-    ('map-before-reserve', 'gfx/gfx_core.c', RESERVE_THEN_MAP, MAP_THEN_RESERVE),
+    ('map-before-reserve', 'sys/hal/gfx/gfx_core.c', RESERVE_THEN_MAP, MAP_THEN_RESERVE),
     # アリーナの上端を凍結しない (CPL=0 の子が BB まで伸びる)
-    ('no-freeze', 'gfx/gfx_core.c', '    ledger_arena_freeze();\n', ''),
+    ('no-freeze', 'sys/hal/gfx/gfx_core.c', '    ledger_arena_freeze();\n', ''),
     # BB を 0 で埋めない (前の中身が CPL=3 に見える)
-    ('bb-not-zeroed', 'gfx/gfx_core.c',
+    ('bb-not-zeroed', 'sys/hal/gfx/gfx_core.c',
      '        kmemset(P2V(pfn * PAGE_SIZE), 0, (u32)MEM_GFX_BB8_SIZE);\n',
      '        (void)0;\n'),
     # PEGC が候補でなくても BB を取る (量が候補の最大でない)
-    ('bb-always', 'gfx/gfx_core.c',
+    ('bb-always', 'sys/hal/gfx/gfx_core.c',
      '    if ((m & GFX_CAND_PEGC) &&\n        pgalloc_alloc_n_owner',
      '    if ((m | 1) &&\n        pgalloc_alloc_n_owner'),
     # GFX=pc98 でも識別して予約する
-    ('pc98-pref-ignored', 'gfx/gfx_core.c',
+    ('pc98-pref-ignored', 'sys/hal/gfx/gfx_core.c',
      '    if (g_backend_pref == GFX_PREF_PC98 || g_backend_pref == GFX_PREF_GEFORCE ||\n',
      '    if (0 || g_backend_pref == GFX_PREF_GEFORCE ||\n'),
     # e11a: authorized DISPLAY lease must now be possible
-    ('display-unlendable', 'gfx/gfx_core.c',
+    ('display-unlendable', 'sys/hal/gfx/gfx_core.c',
      '.planes = 1, .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_RW }',
      '.planes = 1, .cache = LEDGER_CACHE_UC, .perm_max = LEDGER_PERM_NONE }'),
     # gfx_bb_phys_range が選択中の backend を見ない
-    ('phys-range-not-selected', 'gfx/gfx_core.c',
+    ('phys-range-not-selected', 'sys/hal/gfx/gfx_core.c',
      '        ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);\n    if (base)',
      '        ledger_surface_find(LEDGER_SF_PC98, LEDGER_ROLE_CLIENT);\n    if (base)'),
     # ⑨ が選択中でない CLIENT を移す
-    ('gshell-wrong-client', 'gfx/gfx_core.c',
+    ('gshell-wrong-client', 'sys/hal/gfx/gfx_core.c',
      '        ledger_surface_find(gfx_sf_backend(), LEDGER_ROLE_CLIENT);\n    u32 owner = sf ? sf->owner : 0, gen = sf ? sf->gen : 0;',
      '        ledger_surface_find(LEDGER_SF_PEGC, LEDGER_ROLE_CLIENT);\n    u32 owner = sf ? sf->owner : 0, gen = sf ? sf->gen : 0;'),
     # RAM の面の移譲で L2 のページを移さない
-    ('transfer-surface-only', 'mm/pgalloc.c',
+    ('transfer-surface-only', 'sys/kern/mm/pgalloc.c',
      '    ok = from == to || sf->backing != LEDGER_SB_RAM ||\n'
      '         ledger_transfer(sf->first, (int)sf->npages, from, to);',
      '    ok = 1;'),
     # 凍結が AS owner のページも「永続確保」に数える
-    ('freeze-counts-as', 'mm/pgalloc.c',
+    ('freeze-counts-as', 'sys/kern/mm/pgalloc.c',
      '        if (o && ledger_owners[o].kind == LEDGER_KIND_PERSIST) arena_top = p;',
      '        if (o) arena_top = p;'),
     # sys_usable_mem_end がアリーナの上端を見ない (旧 sys_reserve_top の役が消える)
-    ('usable-ignores-arena', 'kernel/sys.c',
+    ('usable-ignores-arena', 'sys/kern/sys.c',
      '    return top && top < sys_frozen_exec ? top : sys_frozen_exec;',
      '    (void)top; return sys_frozen_exec;'),
 ]

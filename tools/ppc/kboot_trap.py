@@ -10,14 +10,14 @@ sys.dont_write_bytecode = True
 import kboot_vectors as v
 from run import command, require, CriterionFailure
 CHECK = dict(name='kboot-trap',tier=2,budget=600,
-             covers=v.CHECK['covers']+['arch/ppc/kernel_trap.c','tools/ppc/kboot_trap*'],needs=[])
+             covers=v.CHECK['covers']+['sys/arch/ppc/kernel_trap.c','tools/ppc/kboot_trap*'],needs=[])
 
 def host(out, source, expected=None):
     out.mkdir(parents=True,exist_ok=True)
     command(['gcc','-m32','-ffreestanding','-fno-pie','-no-pie','-nostdlib','-static','-std=gnu11','-O2','-Wall','-Wextra','-Werror',
              '-DPPC_TRAP_HOST_TEST','-I'+str(v.ROOT/'arch/ppc'),
              '-I'+str(v.ROOT/'include'),'-I'+str(v.ROOT/'platform/powermac'),
-             '-I'+str(v.ROOT),source,v.ROOT/'arch/ppc/pd_walk.c',
+             '-I'+str(v.ROOT),source,v.ROOT/'sys/arch/ppc/pd_walk.c',
              v.ROOT/'tools/ppc/kboot_trap_host.c','-o',out/'host'])
     p=subprocess.run(['qemu-i386',out/'host'],stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
     (out/'host.log').write_bytes(p.stdout)
@@ -99,9 +99,9 @@ void fixture_main(void)
 ''')
     fixture=out/'fixture.c'; fixture.write_text(text)
     old_product,old_flags=v.PRODUCT,v.FLAGS
-    v.PRODUCT=[p for p in old_product if p not in ('tools/ppc/kboot_vectors_fixture.c','arch/ppc/kernel_trap.c')]+[str(fixture),str(source)]
+    v.PRODUCT=[p for p in old_product if p not in ('tools/ppc/kboot_vectors_fixture.c','sys/arch/ppc/kernel_trap.c')]+[str(fixture),str(source)]
     v.FLAGS=old_flags+['-DTRAP_CASE='+str(case)]
-    try: return v.build(out,v.ROOT/'arch/ppc/kernel_vectors.S')
+    try: return v.build(out,v.ROOT/'sys/arch/ppc/kernel_vectors.S')
     finally: v.PRODUCT,v.FLAGS=old_product,old_flags
 
 def observe(out,elf,case, red=None):
@@ -153,7 +153,7 @@ def main():
         print('SKIP kboot-trap: unavailable ' + ', '.join(missing), flush=True)
         return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
     v.CROSS = cross
-    out=v.ROOT/'build/out/ppc/kboot-trap'; source=v.ROOT/'arch/ppc/kernel_trap.c'
+    out=v.ROOT/'build/out/ppc/kboot-trap'; source=v.ROOT/'sys/arch/ppc/kernel_trap.c'
     host(out/'host',source)
     for case in range(1,7):
         dest=out/str(case); elf=image(dest,source,case)

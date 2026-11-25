@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gfx2-ckey-host', tier=1,
-    covers=['gfx/v2/sw_ckey.c', 'gfx/v2/gfx2_int.h', 'include/**', 'gfx/v2/gfx2_sw.h', 'include/gfx_sync.h',
+    covers=['sys/hal/gfx/v2/sw_ckey.c', 'sys/hal/gfx/v2/gfx2_int.h', 'include/**', 'sys/hal/gfx/v2/gfx2_sw.h', 'sys/include/gfx_sync.h',
             'tools/tests/gfx2_ckey_host.c', 'tools/tests/test_gfx2_ckey.py',
             'tools/tests/host32.py', 'tools/tests/mutpar.py'],
     needs=[], budget=3.0,

@@ -4,8 +4,8 @@
  * cmd_hw owns source/program heap storage until unload/replacement. */
 #ifndef SHELL_HWB_H
 #define SHELL_HWB_H
-#include "kdebug/hwb_wire.h"
-#include "kdebug/probe_wire.h"
+#include "sys/kern/kdebug/hwb_wire.h"
+#include "sys/kern/kdebug/probe_wire.h"
 
 #define HWB_VARIABLES 64U
 #define HWB_ARRAY_ELEMENTS 16384U

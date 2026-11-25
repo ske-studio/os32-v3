@@ -5,8 +5,8 @@
 ## 1. RAM の root とフォント
 
 - PowerPC の RAM の root (埋め込み ISO、ISO level 1 の 8.3 名) は `build/targets/ppc-powermac.mk` が `ROOT_MANIFEST=build/ppc-ram-root.json` で中身を足す。共通の `build/ram-root.mk` は呼び手が指定した時だけ manifest を使う。PC-98 の root は変えない。
-- 収録: `/fonts/shino16.kcg` (東雲 16 の 16px EBDT から作る KCG1、LZ4 の flags=1 で 187,980B 前後、展開後 295,940B)・`/fonts/shino16.txt` (東雲のライセンス)・`/sys/unicode.bin` (漢字の道 unicode_to_jis が読む)。パスは `include/config.h` の `SYS_FB_FONT`・`SYS_FB_FONT_LICENSE`・`SYS_UNICODE_BIN`。
-- 字形の源は 2026-11-13 のユーザー決定「KCG の口 + 東雲 16 から作る .kcgfont」。ROM の無い機種の KCG の本体 `kernel/console/font_source_kcg.c` が KcgModuleApi と同じ口で返す。PC-98 は今までどおり CG ROM と `/boot/kcg.mod`、旧 `.kcgfont` の配布と `kcg_load_font` の NOSYS は変えない。
+- 収録: `/fonts/shino16.kcg` (東雲 16 の 16px EBDT から作る KCG1、LZ4 の flags=1 で 187,980B 前後、展開後 295,940B)・`/fonts/shino16.txt` (東雲のライセンス)・`/sys/unicode.bin` (漢字の道 unicode_to_jis が読む)。パスは `sys/include/config.h` の `SYS_FB_FONT`・`SYS_FB_FONT_LICENSE`・`SYS_UNICODE_BIN`。
+- 字形の源は 2026-11-13 のユーザー決定「KCG の口 + 東雲 16 から作る .kcgfont」。ROM の無い機種の KCG の本体 `sys/kern/console/font_source_kcg.c` が KcgModuleApi と同じ口で返す。PC-98 は今までどおり CG ROM と `/boot/kcg.mod`、旧 `.kcgfont` の配布と `kcg_load_font` の NOSYS は変えない。
 - KCG1: 16B の LE ヘッダ (`KCG1`・展開後サイズ・flags)、94×94×32B の漢字・fetched、256×16B の ANK・fetched。flags は 0 (非圧縮) と 1 (本体全体が 1 つの LZ4 block) だけを受け、他は拒否する ([PPC_KCG_LZ4_DESIGN](PPC_KCG_LZ4_DESIGN.md))。製品の生成は `python3 tools/gen_font16.py --ebdt <JF-Dot-Shinonome16.ttf> <out> --lz4` (`build/font-fetch.mk`、Python の lz4 が要る)。派生物は git に入れない。
 - 作業木でフォントが無いときは `tools/preflight.sh --fix-fonts` (主の作業木から SHA-256 を照合してコピー)。ネットワークの無い所で `make all` が Inconsolata・東雲の取得で落ちるのはこれで避ける。
 
@@ -44,7 +44,7 @@ QEMU の sungem は、受信リングが満杯の間に来た電文を溜め、R
 - QEMU では眠りが効く。64KiB の /host の cp の間、時間の 9 割を眠る。DEC (1 kHz) の割り込みで起き、1 回の眠りは最長約 4 ms (1 tick の 10 ms 未満)。起きた後の tick と TB は壁時計と合う。
 - QEMU は割り込みの入口で MSR[POW] を落とし、SRR1 に POW を残さない。実機の 7450 で SRR1 に POW が残るか (残れば戻りでまた眠るので入口で消す処理が要る) は未確認。
 - 今の作り (GEM の割り込みは INTMASK=~0 で止め、受信は tick の poll) では遅くなる。64KiB の cp が 24.8 s → 32.1〜32.2 s。電文が来ても、次の DEC か tick まで前景が進まないためと見ている (未確認)。眠りを使うなら、GEM の受信の割り込みと組にする設計が要る。ユーザー決定 (2026-11-16「実機で測ってからがだめ」「そう言う意味ではcpuは休ませないと」): 実機の数字を待たずに、次の形 4 を入れる。
-- 形 4: 前景の待ちで poll と link_tick を進め (1 ms に 1 回まで、共通 net/nic.c、本線の段 lo-fgtick)、仕事が無ければ NAP する (段 ppc-cpu-nap)。
+- 形 4: 前景の待ちで poll と link_tick を進め (1 ms に 1 回まで、共通 sys/net/nic.c、本線の段 lo-fgtick)、仕事が無ければ NAP する (段 ppc-cpu-nap)。
 - 使い捨ての木で測った 64KiB の cp: 前景で poll だけなら 24.8 s、poll + NAP は 27.5 s、poll + link_tick (眠らない) は 29.7 s、poll + link_tick + NAP は 21.7 s で、眠りは 8 割。
 - 受信の割り込みを開ける設計は要らない。G4 の実機では、/host の cp と SRR1 の POW を確かめる。
 

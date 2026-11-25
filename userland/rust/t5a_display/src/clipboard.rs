@@ -24,7 +24,7 @@ use libos32term::model::Cell;
 /// CLIP PUT / 保留貼り付けの上限 (`HOST_CLIP_MAX` と同じ 4096B、票 §2)。
 pub const CLIP_MAX: usize = 4096;
 
-/// 注入リングの容量 (`include/kbd_inject.h` の `KBD_INJECT_RING_SIZE`)。
+/// 注入リングの容量 (`sys/include/kbd_inject.h` の `KBD_INJECT_RING_SIZE`)。
 /// ここは写し — ホスト試験から見えないといけないので自前で置く。
 pub const INJECT_RING_SIZE: usize = 256;
 

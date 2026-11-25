@@ -4,7 +4,7 @@
  *  実行:   python3 -B tools/tests/test_hdd_stage1.py
  *  記録:   tools/tests/hdd_stage1_tdd.md
  *
- *  実物の fs/ext2/ext2_super.c / ext2_fmt.c / ext2_layout.c と fs/pc98pt.c を
+ *  実物の sys/fs/ext2/ext2_super.c / ext2_fmt.c / ext2_layout.c と sys/fs/pc98pt.c を
  *  そのまま取り込み、Device API・IDE・区画表の幾何 (bootinfo_part_geom) だけを
  *  贋物にする。見るのは:
  *    - ext2_find_partition が (開始, 長さ) を返し、見つからない / 読めない /
@@ -23,8 +23,8 @@
 #include "ide_contract.h"
 #include "platform_device.h"
 #include "kmalloc.h"
-#include "../../fs/pc98pt.h"
-#include "../../fs/pc98pt.c"
+#include "../../sys/fs/pc98pt.h"
+#include "../../sys/fs/pc98pt.c"
 #include "ext2_layout.c"
 
 /* ======================================================================== */
@@ -312,14 +312,14 @@ static void observe_mount_reset(void)
     ext2_read_cache_reset();
 }
 #define ext2_read_cache_reset observe_mount_reset
-#include "../../fs/ext2/ext2_super.c"
+#include "../../sys/fs/ext2/ext2_super.c"
 #undef ext2_read_cache_reset
-#include "../../fs/ext2/ext2_time.c"
-#include "../../fs/ext2/ext2_inode.c"
-#include "../../fs/ext2/ext2_dir.c"
-#include "../../fs/ext2/ext2_file.c"
-#include "../../fs/ext2/ext2_medium_ide.c"
-#include "../../fs/ext2/ext2_fmt.c"
+#include "../../sys/fs/ext2/ext2_time.c"
+#include "../../sys/fs/ext2/ext2_inode.c"
+#include "../../sys/fs/ext2/ext2_dir.c"
+#include "../../sys/fs/ext2/ext2_file.c"
+#include "../../sys/platform/pc98/storage/ext2_medium_ide.c"
+#include "../../sys/fs/ext2/ext2_fmt.c"
 
 /* ======================================================================== */
 /*  足場                                                                    */
@@ -739,7 +739,7 @@ static void observe_reset(void)
     if (g_fmt_trace) g_pending_resets++;
     ext2_medium_ide_ops.after_write();
 }
-#include "../../fs/ext2/ext2_medium_loop.c"
+#include "../../sys/dev/block/ext2_medium_loop.c"
 #include "../../tools/tests/ext2_medium_host.c"
 
 int os32_main(int argc, char **argv)

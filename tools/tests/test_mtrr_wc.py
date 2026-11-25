@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """MTRR WC lease: compile the real C with fake CPU primitives, run as ILP32."""
 CHECK = dict(name='mtrr-wc-host', tier=1,
-    covers=['arch/x86/kernel/mtrr_wc.c', 'arch/x86/kernel/mtrr_wc.h',
-            'include/types.h', 'tools/tests/host32.py'],
+    covers=['sys/arch/x86/kernel/mtrr_wc.c', 'sys/arch/x86/kernel/mtrr_wc.h',
+            'sys/include/types.h', 'tools/tests/host32.py'],
     needs=[], budget=3.4,
     basis=['PPC_SEP5_DESIGN §2.2', 'PPC_SEP5_DESIGN §2.3', 'PPC_SEP5_DESIGN §6'],
 )
@@ -14,8 +14,8 @@ import tempfile
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'arch/x86/kernel/mtrr_wc.c'
-HEADER = ROOT / 'arch/x86/kernel/mtrr_wc.h'
+SOURCE = ROOT / 'sys/arch/x86/kernel/mtrr_wc.c'
+HEADER = ROOT / 'sys/arch/x86/kernel/mtrr_wc.h'
 FLAGS = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
          '-nostdlib', '-static', '-no-pie', '-I' + str(ROOT / 'include')]

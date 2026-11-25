@@ -1,8 +1,8 @@
 """Execute the x86 context provider with observable TSS/resume hooks (ILP32)."""
 CHECK = dict(name='exec-context-host', tier=1,
-    covers=['tools/tests/cc_cache.py', 'include/types.h', 'include/callconv.h',
-            'include/exec_arch.h', 'arch/x86/arch_exec_storage.h',
-            'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h',
+    covers=['tools/tests/cc_cache.py', 'sys/include/types.h', 'sys/include/callconv.h',
+            'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h',
+            'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h',
             'tools/tests/test_exec_context.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py'], needs=[], budget=2.0,
     kind='characterization',
@@ -91,7 +91,7 @@ def execute(source, folder):
 
 
 def main():
-    source = (ROOT / 'arch/x86/kernel/exec_context.c').read_text()
+    source = (ROOT / 'sys/arch/x86/kernel/exec_context.c').read_text()
     with tempfile.TemporaryDirectory(prefix='exec-context-') as temporary:
         folder = Path(temporary)
         assert execute(source, folder) == 0

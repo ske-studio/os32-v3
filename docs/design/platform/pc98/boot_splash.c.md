@@ -1,12 +1,12 @@
-# platform/pc98/boot_splash.c — 起動のスプラッシュの全体の流れと内蔵のロゴ
+# sys/platform/pc98/boot_splash.c — 起動のスプラッシュの全体の流れと内蔵のロゴ
 
 > 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
-ソース: `platform/pc98/boot_splash.c`・`platform/pc98/boot_splash.h`
+ソース: `sys/platform/pc98/boot_splash.c`・`sys/platform/pc98/boot_splash.h`
 
 ## 何をするか
 
 `boot_splash()` は起動の前景で 1 回だけ呼ばれ、画像があれば画像を、無ければ内蔵の「OS32」ロゴと虹色のスクロールを見せ、最後にテキストの画面へ戻す。
-呼ぶのは `platform/pc98/kernel.c` で、root の mount と割り込みの有効化の後 (通常部品の登録 → splash → rshell/SerialFS → shell の順)。Host Services や遅れて mount するものは待たない。
+呼ぶのは `sys/platform/pc98/kernel.c` で、root の mount と割り込みの有効化の後 (通常部品の登録 → splash → rshell/SerialFS → shell の順)。Host Services や遅れて mount するものは待たない。
 
 ## 流れ
 

@@ -1,4 +1,4 @@
-#include "kernel/dev/ram_ro.h"
+#include "sys/kern/dev/ram_ro.h"
 #include "os32_kapi_shared.h"
 #include <string.h>
 

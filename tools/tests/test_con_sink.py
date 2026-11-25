@@ -1,4 +1,4 @@
-"""K6C: console シンクのリングを実物の kernel/console/con_sink.c で確かめる。
+"""K6C: console シンクのリングを実物の sys/kern/console/con_sink.c で確かめる。
 
 契約: docs/KAPI_SPEC.md (console シンク)
 記録: tools/tests/con_sink_tdd.md
@@ -8,7 +8,7 @@ test_multiapp_model.py と同じ様式 — ホスト ILP32 GNU11 で走らせた
 別に見る ([C1] GNU11)。Make・エミュレータ・libc は使わない。
 
 ホスト側は arch_io.h を IRQ 状態を持つ模型へ差し替える。
-クロス側は include/io.h の本番の実装をコンパイルする。
+クロス側は sys/include/io.h の本番の実装をコンパイルする。
 """
 from kernel_includes import include_flags
 import argparse
@@ -20,22 +20,22 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
-# arch/x86 + platform/pc98: include/io.h は契約だけで、実装は固定名
+# arch/x86 + platform/pc98: sys/include/io.h は契約だけで、実装は固定名
 # arch_io.h / platform_io.h を引く (順序 3)。build/config.mk の INC_COMMON と
 # 同じものをここでも渡す。
 INCLUDES = include_flags(ROOT)
 HOST_SRC = ROOT / "tools/tests/con_sink_host.c"
-KERNEL_SRC = ROOT / "kernel/console/con_sink.c"
-# K6C-2: 描画抑止は kernel/console/console.c 側なので、そちらもカーネルと同じ
+KERNEL_SRC = ROOT / "sys/kern/console/con_sink.c"
+# K6C-2: 描画抑止は sys/kern/console/console.c 側なので、そちらもカーネルと同じ
 # フラグでクロスコンパイルする (ホスト側は con_sink_host.c が取り込む)。
-CONSOLE_SRC = ROOT / "kernel/console/console.c"
+CONSOLE_SRC = ROOT / "sys/kern/console/console.c"
 
 
 def run(tmp, source, runner, console_source=None, boot_source=None):
     (tmp / "con_sink.c").write_text(source)
     (tmp / "console.c").write_text(console_source or CONSOLE_SRC.read_text())
-    (tmp / "boot_serial.inc").write_text(boot_source or (ROOT / "platform/pc98/boot_serial.inc").read_text())
-    fixture = HOST_SRC.read_text().replace('"../../kernel/console/console.c"', '"console.c"').replace('"../../platform/pc98/boot_serial.inc"', '"boot_serial.inc"').replace('"../../platform/pc98/console.c"', '"' + str(ROOT / "platform/pc98/console.c") + '"')
+    (tmp / "boot_serial.inc").write_text(boot_source or (ROOT / "sys/platform/pc98/boot_serial.inc").read_text())
+    fixture = HOST_SRC.read_text().replace('"../../sys/kern/console/console.c"', '"console.c"').replace('"../../sys/platform/pc98/boot_serial.inc"', '"boot_serial.inc"').replace('"../../sys/platform/pc98/console.c"', '"' + str(ROOT / "sys/platform/pc98/console.c") + '"')
     (tmp / "fixture.c").write_text(fixture)
     exe = tmp / "con-sink"
     subprocess.run(["gcc", *FLAGS, "-O0",
@@ -59,7 +59,7 @@ if __name__ == "__main__":
         print(result.stdout, end='', flush=True)
         assert result.returncode == 0, result.stderr
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
-        # 本番の割込み禁止区間 (include/io.h) を含む形でクロスコンパイル
+        # 本番の割込み禁止区間 (sys/include/io.h) を含む形でクロスコンパイル
         subprocess.run(["i386-elf-gcc", *FLAGS, "-D__KERNEL_BUILD__",
                         *INCLUDES, "-O2", "-c", str(KERNEL_SRC),
                         "-o", str(tmp / "con_sink.o")], cwd=ROOT, check=True)
@@ -99,7 +99,7 @@ if __name__ == "__main__":
                 assert result.returncode == 1 and expected in result.stdout, result.stdout
                 print('RED runtime:', expected, flush=True)
             console = CONSOLE_SRC.read_text()
-            boot = (ROOT / "platform/pc98/boot_serial.inc").read_text()
+            boot = (ROOT / "sys/platform/pc98/boot_serial.inc").read_text()
             for label, old, new in [
                 ("print", "if (rshell_active || boot_serial_mirror) con_output_putchar(*str);", "if (rshell_active) con_output_putchar(*str);"),
                 ("utf8", "if (rshell_active || boot_serial_mirror) {\n        const char *s", "if (rshell_active) {\n        const char *s"),

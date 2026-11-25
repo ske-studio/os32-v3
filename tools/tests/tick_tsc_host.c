@@ -2,8 +2,8 @@
 #include "types.h"
 #include "pit.h"
 #include "os32_kapi_shared.h"
-#include "kernel/io_work.h"
-#include "kernel/io_policy.h"
+#include "sys/kern/io_work.h"
+#include "sys/kern/io_policy.h"
 static u32 fake_flags, mutable_id, max_leaf, fake_features, cpuid_calls;
 static u32 fake_ms, rdtsc_calls, endpoint_cycles = 100;
 static unsigned long long counter, pit_us;
@@ -46,8 +46,8 @@ static void dispatch(void)
     requested = 0;
     if (provider->step(provider->state, 0) == IO_MORE) io_request(provider->id);
 }
-#include "platform/pc98/tsc_math.c"
-#include "platform/pc98/tsc_clock.c"
+#include "sys/platform/pc98/tsc_math.c"
+#include "sys/platform/pc98/tsc_clock.c"
 
 static void reset(void)
 {

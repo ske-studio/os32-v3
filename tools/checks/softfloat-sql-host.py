@@ -4,8 +4,8 @@ CHECK = dict(name='softfloat-sql-host', tier=1,
             'tools/tests/host32.py', 'tools/tests/softfloat_x87_reference.c', 'lib/softfloat/**', 'lib/softfloat_abi.c',
             'lib/softfloat_bits.c', 'lib/softfloat_bits.h', 'build/softfloat.mk',
             'build/sqlite-proto.mk', 'build/config.mk', 'lib/sqlite3/**',
-            'lib/kstring.c', 'lib/kstring_c.c', 'lib/kmath.c', 'lib/divdi3.c',
-            'include/types.h', 'lib/kstring.h', 'sdk/link/generations.ld'],
+            'sys/kern/kstring.c', 'sys/kern/kstring_c.c', 'lib/kmath.c', 'lib/divdi3.c',
+            'sys/include/types.h', 'sys/kern/kstring.h', 'sdk/link/generations.ld'],
     needs=['make:sqlite-module-proto'], budget=15,
     basis=['[L1]', '[ABI]'])
 

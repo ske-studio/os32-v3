@@ -9,15 +9,15 @@ sys.path[:0] = [str(ROOT/'tools/ppc'), str(ROOT/'tools')]
 import link_sh_run as meter
 
 CHECK = dict(name='ppc-link-sh-meter', env=['ppc-cross'], tier=1, budget=20, needs=['make:ppc-ci-image'],
-    covers=['exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'fs/serialfs/serialfs_persistent.c', 'tools/tests/test_ppc_link_sh_run.py','tools/ppc/link_sh_run.py','tools/ppc/run.py','tools/ppc/link_run.py','tools/ppc/kboot_accept.py',
+    covers=['sys/kern/exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'sys/fs/serialfs/serialfs_persistent.c', 'tools/tests/test_ppc_link_sh_run.py','tools/ppc/link_sh_run.py','tools/ppc/run.py','tools/ppc/link_run.py','tools/ppc/kboot_accept.py',
             'tools/ppc/kboot_run.py','tools/ppc/usb_run.py','tools/ppc/sb_run.py',
             'tools/ppc_lan_host.py','tools/host_agent.py','tools/host_operator_socket.py',
             'tools/host_rshell.py','tools/ppc_link_transport.py','tools/remote_transport.py',
-            'userland/shell/rshell_lan.c','kernel/console/con_sink.c','mm/kmalloc.c',
-            'platform/powermac/shell_boot.c','kernel/console/console.c',
-            'build/ppc-user.mk','build/targets/ppc-powermac.mk','kernel/console/fbcon.h',
-            'kernel/console/console_backend.h','tools/*.py','tools/ppc/**',
-            'platform/powermac/**','arch/ppc/**','platform/powermac/ppc_kernel.c'],
+            'userland/shell/rshell_lan.c','sys/kern/console/con_sink.c','sys/kern/mm/kmalloc.c',
+            'sys/platform/powermac/shell_boot.c','sys/kern/console/console.c',
+            'build/ppc-user.mk','build/targets/ppc-powermac.mk','sys/kern/console/fbcon.h',
+            'sys/kern/console/console_backend.h','tools/*.py','tools/ppc/**',
+            'platform/powermac/**','arch/ppc/**','sys/platform/powermac/ppc_kernel.c'],
     basis=['PPC_P3_DESIGN v2 §6 and appendix A-6 T2/T3/T4'])
 
 
@@ -57,10 +57,10 @@ def main():
             assert len([v for v in opts if v.startswith('KB_MUT_') and 'SRC=' in v])<=3
             assert any(v.startswith('PPC_SH_MUT_FILE=') for v in opts)
     # QMP shadow layout is an explicit PPC32 ABI assumption, pinned here.
-    fb=(ROOT/'kernel/console/fbcon.h').read_text()
+    fb=(ROOT/'sys/kern/console/fbcon.h').read_text()
     assert 'struct fbcon_cell { u16 code; u8 attr, part; };' in fb
     assert 'struct fbcon_cell *cells, *drawn;\n    struct con_geometry geometry;' in fb
-    assert 'struct con_geometry { int cols, rows; };' in (ROOT/'kernel/console/console_backend.h').read_text()
+    assert 'struct con_geometry { int cols, rows; };' in (ROOT/'sys/kern/console/console_backend.h').read_text()
     if '--mutate' in sys.argv:
         source=Path(meter.__file__).read_text()
         for before,after in (

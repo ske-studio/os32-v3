@@ -1,6 +1,6 @@
-# kdebug/selftest_kbd_inject.c — 設計
+# sys/kern/kdebug/selftest_kbd_inject.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: SLIM_KERNEL_DESIGN.md・SLIM_KERNEL_IMPORTS.md (D1 で移した)
-ソース: `kdebug/selftest_kbd_inject.c`
+ソース: `sys/kern/kdebug/selftest_kbd_inject.c`
 
 ## SLIM_KERNEL_DESIGN
 

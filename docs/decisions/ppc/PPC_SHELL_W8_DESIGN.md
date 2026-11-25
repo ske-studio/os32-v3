@@ -16,14 +16,14 @@
 
 |番号|計画と実物の食い違い・制約|実物と処置|
 |---|---|---|
-|D1|N1のhost_*はFSの口ではない|HOST_SERVICES_PLAN.md:64、net/link_host_api.inc (link_host_open())。W8はVFS→SerialFSを使う|
-|D2|HostDrvFSは一般的なHost Services FSではない|drivers/hostdrv/hostdrvfs.cはNP21/W専用I/O。PowerPCには組まない|
+|D1|N1のhost_*はFSの口ではない|HOST_SERVICES_PLAN.md:64、sys/net/link_host_api.inc (link_host_open())。W8はVFS→SerialFSを使う|
+|D2|HostDrvFSは一般的なHost Services FSではない|sys/dev/hostdrv/hostdrvfs.cはNP21/W専用I/O。PowerPCには組まない|
 |D3|ops登録・mountだけでは動かない|serialfs.cのSERIAL型・permitと、persistent所有者・SfsIoが必要|
 |D4|PowerPC端末はゲストのUDP protocolではない|ppc_lan_host.pyのUDPはEthernet搬送、lan_service.cはEtherType判定|
 |D5|現行PLN1は型8まで・payload256B|lan_boot.h、lan_wire.c。FS最大1044Bを通常messageへコピーしない|
 |D6|既存mnt群を丸ごと登録できない|PPC profileにmntなし。cmd_mnt.cは3引数必須・serialfs拒否・他コマンドも登録|
 |D7|旧§8のram0/cd0は現行名ではない|PPC_SHELL_DESIGN.md:369、root_boot.cのrd0/rd1を維持|
-|D8|素のServerだけではLANの遅延複製を防げない|tools/lanfs_host.pyのLanServerとfs/serialfs/sfs_lan.cを手本にする|
+|D8|素のServerだけではLANの遅延複製を防げない|tools/lanfs_host.pyのLanServerとsys/fs/serialfs/sfs_lan.cを手本にする|
 
 - W8の方向は `docs/decisions/ppc/PPC_SHELL_DESIGN.md` と一致する。
 - SerialFSのFS本体・既存VfsOps・resource generationを再利用し、輸送と接続先観測を差し替える。
@@ -258,18 +258,18 @@ if reply is not None:
 
 |段|ファイル|変更・依存|行予算／x86|
 |---|---|---|---|
-|P01|platform/powermac/hostfs.h 新規|輸送・起動・観測の宣言、P04〜08へ結線|70／不変|
-|P02|platform/powermac/lan_boot.h|256B維持、FS型・header型・外部payload API|80／不変|
-|P03|platform/powermac/lan_wire.c|header decode・外部encode・既存wrapper、P02|140／不変|
-|P04|platform/powermac/hostfs_io.c 新規|TB・SfsIo・完全RX・期限TX、P01〜03/P12|300／不変|
-|P05|platform/powermac/hostfs_peer.c 新規|FS_OPEN/RSP観測・HostAlive、P01|150／不変|
-|P06|platform/powermac/lan_service.c|FS直接RX・外部payload TX・状態gate、P04/05|150／不変|
-|P07|platform/powermac/root_boot.c|COM1追加・sizeofで登録個数算出|10／不変|
-|P08|platform/powermac/hostfs_boot.c 新規|FS登録・時計設定・persistent開始|50／不変|
-|P09|platform/powermac/ppc_kernel.c|第3像のroot後・sh前にP08を呼ぶ|20／不変|
+|P01|sys/platform/powermac/hostfs.h 新規|輸送・起動・観測の宣言、P04〜08へ結線|70／不変|
+|P02|sys/platform/powermac/lan_boot.h|256B維持、FS型・header型・外部payload API|80／不変|
+|P03|sys/platform/powermac/lan_wire.c|header decode・外部encode・既存wrapper、P02|140／不変|
+|P04|sys/platform/powermac/hostfs_io.c 新規|TB・SfsIo・完全RX・期限TX、P01〜03/P12|300／不変|
+|P05|sys/platform/powermac/hostfs_peer.c 新規|FS_OPEN/RSP観測・HostAlive、P01|150／不変|
+|P06|sys/platform/powermac/lan_service.c|FS直接RX・外部payload TX・状態gate、P04/05|150／不変|
+|P07|sys/platform/powermac/root_boot.c|COM1追加・sizeofで登録個数算出|10／不変|
+|P08|sys/platform/powermac/hostfs_boot.c 新規|FS登録・時計設定・persistent開始|50／不変|
+|P09|sys/platform/powermac/ppc_kernel.c|第3像のroot後・sh前にP08を呼ぶ|20／不変|
 |P10|build/targets/ppc-powermac.mk|FS閉包・provider・既存除算helper確認、P09|65／不変|
-|P11|arch/ppc/kernel_trap.c|DEC/外部IRQの私有depth・照会関数|25／不変|
-|P12|arch/ppc/ppc_trap.h|P11の照会宣言、P04へ結線|5／不変|
+|P11|sys/arch/ppc/kernel_trap.c|DEC/外部IRQの私有depth・照会関数|25／不変|
+|P12|sys/arch/ppc/ppc_trap.h|P11の照会宣言、P04へ結線|5／不変|
 |H01|tools/ppc_hostfs.py 新規|LanServer契約再利用・1028B・boot reset|280／不変|
 |H02|tools/ppc_lan_host.py|codec・オプション・boot追従・初期化表|180／不変|
 |T01|tools/tests/ppc_hostfs_wire.py 新規|C/Python境界・外部payload・256B保護|330／不変|
@@ -328,6 +328,6 @@ r1→r2 の変更の数 8 / 反論の数 0
 ## 実装で決めたこと (2026-11-12、PM)
 - 段の分け方: A (P02・P03・T01) → C (H01・H02・T04) → B (P01・P04・P11・P12・T02・T03) → D (P05〜P10) → E (T05・D02)。T05 の置き場は sb_run・sc_run と並べて `tools/ppc/sd_run.py` (表の tools/accept/ppc_sd.py から変更)、検査名 ppc-sd。T01 は検査 ppc-hostfs-wire、T02/T03 は ppc-hostfs-io。
 - P11: kctx_irq_depth の定義を持たない試験の fixture 4 本 (kboot_vectors_fixture.c・kboot_trap_host.c・test_user_trap_host.c・test_lan_p22d_host.c) には試験の側に定義を足した。製品の共有の所は変えない。P12 は変更なし。
-- 共通の fs/serialfs/sfs_proto.h の `SFS_TICK_MS` を `TICK_MS` から `10u` に (SfsIo.now の 10ms の約束)。PowerPC の像の監査 (PIT_HZ の利用者の禁止) に当たったため。本線 PM 了承、x86 の生成物は不変。x86 の SfsIo.now の供給元は tick_count (serialfs_session.c の sio_now、kernel_boot_memory.inc の boot_sfs_now)。TICK_MS・PIT_HZ のほかの利用者は本線の段 L。
+- 共通の sys/fs/serialfs/sfs_proto.h の `SFS_TICK_MS` を `TICK_MS` から `10u` に (SfsIo.now の 10ms の約束)。PowerPC の像の監査 (PIT_HZ の利用者の禁止) に当たったため。本線 PM 了承、x86 の生成物は不変。x86 の SfsIo.now の供給元は tick_count (serialfs_session.c の sio_now、kernel_boot_memory.inc の boot_sfs_now)。TICK_MS・PIT_HZ のほかの利用者は本線の段 L。
 - P06・P07: lan_service.c・root_boot.c の追加は KBOOT_SH の像だけに入れ、診断・CLI の像を不変に保つ。hostfs.h に pm_hostfs_boot・pm_hfs_bind_peer・pm_hfs_peer を足した。FS_REQ の宛先は最後に観測した FS の peer、未観測なら boot の peer_mac。
 - T05 の変異 no-boot-follow は「ホストは boot2 を採用するが FS の Server/adapter と FS の nonce を持ち越す」形 (レビュー第 1 回の指摘で変更)。不在の時のエラーまで約 1.0 秒。

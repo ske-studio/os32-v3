@@ -1,8 +1,8 @@
 /* B4 with the real B3 mailbox and fixture-controlled caller copy. */
 #include "hostsvc_fixture.h"
-#include "lib/kstring.h"
+#include "sys/kern/kstring.h"
 #include "redir_access.h"
-#include "net/host_mailbox.h"
+#include "sys/net/host_mailbox.h"
 #include "os32_kapi_shared.h"
 #define IO_H
 static unsigned int irq_save(void) { unsigned int f = hs_if(); hs_set_if(0); return f; }
@@ -11,7 +11,7 @@ static unsigned char heap[64 * sizeof(HostNotice)];
 void *kmalloc(u32 n) { return n == sizeof(heap) ? heap : 0; }
 void *kmemset(void *d, int v, u32 n) { u8 *p = d; while (n--) *p++ = v; return d; }
 void *kmemcpy(void *d, const void *s, u32 n) { u8 *p = d; const u8 *q = s; while (n--) *p++ = *q++; return d; }
-#include "net/host_mailbox.c"
+#include "sys/net/host_mailbox.c"
 static u32 capacity;
 static int identity = 1;
 static int direct_range = 1, direct_checks, caller_copies;

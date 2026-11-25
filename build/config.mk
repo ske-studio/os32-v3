@@ -35,7 +35,7 @@ export CROSS_DIR
 PROJDIR = .
 
 # === 移植の 2 本の軸 (CPU と機種) ===
-# include/io.h は原始命令の **契約** だけを持ち、実装は固定名
+# sys/include/io.h は原始命令の **契約** だけを持ち、実装は固定名
 # "arch_io.h" / "platform_io.h" を引く。どの実装が来るかは下の 2 つが
 # 決める INC_COMMON の -I だけで決まるので、アーキテクチャや機種を足す作業は
 # ディレクトリを 1 つ足すことに閉じ、既存ファイルに #ifdef が増えない。
@@ -60,9 +60,9 @@ SDK_INC    = -Isdk/include -Isdk/include/os32
 
 # SDK の契約ヘッダ。KernelAPI 構造体の唯一の定義元 (sdk/kapi.json から生成)。
 SDK_KAPI_HDR = sdk/include/os32/os32_kapi_shared.h
-# -Iarch/$(ARCH) -Iplatform/$(PLATFORM): include/io.h が末尾で引く固定名
+# -Isys/arch/$(ARCH) -Isys/platform/$(PLATFORM): sys/include/io.h が末尾で引く固定名
 # "arch_io.h" / "platform_io.h" をここで解決する。
-INC_COMMON = -I. -Iinclude -Iarch/$(ARCH) -Iplatform/$(PLATFORM) $(SDK_INC)
+INC_COMMON = -I. -Iinclude -Isys/arch/x86 -Isys/hal/gfx -Isys/hal/input -Isys/hal/sound -Isys/hal/time -Isys/include -Isys/platform/pc98 -Isys/arch/$(ARCH) -Isys/platform/$(PLATFORM) $(SDK_INC)
 
 include build/softfloat.mk
 include build/select.mk
@@ -70,32 +70,32 @@ KERNEL_SRC_INCLUDES = $(addprefix -I,$(KERNEL_SRC_DIRS))
 
 # カーネルコア: 自身 + ドライバ + fs + exec + shell + gfx + lib + kapi
 # (kernel.c は全サブシステムの初期化を行うため全モジュールを参照)
-INC_KERNEL = $(INC_COMMON) $(KERNEL_SRC_INCLUDES) -Idrivers -Inet -Ifs -Iexec -Igfx -Ilib -Ikapi -Ilib/sqlite3
+INC_KERNEL = $(INC_COMMON) $(KERNEL_SRC_INCLUDES) -Isys/dev -Inet -Isys/hal/net -Isys/net -Ifs -Isys/fs -Iexec -Isys/kern/exec -Igfx -Isys/hal/gfx -Isys/kern/console -Isys/kern/gfx/osri -Ilib -Isys/kern -Ikapi -Isys/kapi -Ilib/sqlite3
 
 # ドライバ: 共通 + 自身 + gfx (kcg->gfx依存)
-INC_DRIVERS = $(INC_COMMON) -Idrivers -Igfx -Ilib $(KERNEL_SRC_INCLUDES)
+INC_DRIVERS = $(INC_COMMON) -Isys/dev -Igfx -Isys/hal/gfx -Isys/kern/console -Isys/kern/gfx/osri -Ilib -Isys/kern $(KERNEL_SRC_INCLUDES)
 
 # GFX: 共通 + 自身 + ドライバ (palette依存) + FS (dump時のファイル出力)
-INC_GFX = $(INC_COMMON) -Igfx -Idrivers -Ifs -Ilib $(KERNEL_SRC_INCLUDES)
+INC_GFX = $(INC_COMMON) -Igfx -Isys/hal/gfx -Isys/kern/console -Isys/kern/gfx/osri -Isys/dev -Ifs -Isys/fs -Ilib -Isys/kern $(KERNEL_SRC_INCLUDES)
 
 # FS: 共通 + 自身 + ドライバ (disk/ide依存)
-INC_FS = $(INC_COMMON) -Ifs -Ifs/fat/fatfs -Idrivers $(KERNEL_SRC_INCLUDES) -Ilib
+INC_FS = $(INC_COMMON) -Ifs -Isys/fs -Ifs/fat/fatfs -Isys/fs/fat/fatfs -Isys/dev $(KERNEL_SRC_INCLUDES) -Ilib -Isys/kern
 
 # FatFS: fs/fat/fatfs/ ディレクトリ内のソースを独自の string.h スタブで解決
-# -Ifs/fat/fatfs を先頭に指定して <string.h> → fs/fat/fatfs/string.h へ誘導
-INC_FATFS = -Ifs/fat/fatfs $(INC_COMMON) -Ifs -Idrivers $(KERNEL_SRC_INCLUDES) -Ilib
+# -Ifs/fat/fatfs -Isys/fs/fat/fatfs を先頭に指定して <string.h> → sys/fs/fat/fatfs/string.h へ誘導
+INC_FATFS = -Ifs/fat/fatfs -Isys/fs/fat/fatfs $(INC_COMMON) -Ifs -Isys/fs -Isys/dev $(KERNEL_SRC_INCLUDES) -Ilib -Isys/kern
 
 # exec: 共通 + exec + kapi + fs + gfx + ドライバ (kbd依存)
-INC_EXEC = $(INC_COMMON) -Iexec -Ikapi -Ifs -Igfx -Idrivers -Ilib $(KERNEL_SRC_INCLUDES)
+INC_EXEC = $(INC_COMMON) -Iexec -Isys/kern/exec -Ikapi -Isys/kapi -Ifs -Isys/fs -Igfx -Isys/hal/gfx -Isys/kern/console -Isys/kern/gfx/osri -Isys/dev -Ilib -Isys/kern $(KERNEL_SRC_INCLUDES)
 
 # KAPI: 全モジュール (全APIラッパーのため)
-INC_KAPI = $(INC_COMMON) -Ikapi $(KERNEL_SRC_INCLUDES) -Idrivers -Inet -Ifs -Iexec -Igfx -Ilib -Ilib/sqlite3
+INC_KAPI = $(INC_COMMON) -Ikapi -Isys/kapi $(KERNEL_SRC_INCLUDES) -Isys/dev -Inet -Isys/hal/net -Isys/net -Ifs -Isys/fs -Iexec -Isys/kern/exec -Igfx -Isys/hal/gfx -Isys/kern/console -Isys/kern/gfx/osri -Ilib -Isys/kern -Ilib/sqlite3
 
 # lib: 共通 + 自身 (汎用ライブラリ: カーネル依存なし)
-INC_LIB = $(INC_COMMON) -Ilib
+INC_LIB = $(INC_COMMON) -Ilib -Isys/kern
 
 # SQLite: カーネルFS/ドライバ + SQLiteヘッダ (VFS実装用)
-INC_SQLITE = $(INC_COMMON) -Ilib/sqlite3 -Ifs -Idrivers -Ilib $(KERNEL_SRC_INCLUDES)
+INC_SQLITE = $(INC_COMMON) -Ilib/sqlite3 -Ifs -Isys/fs -Isys/dev -Ilib -Isys/kern $(KERNEL_SRC_INCLUDES)
 
 # === コンパイルフラグ ===
 # -MMD -MP: ヘッダ依存を .d ファイルに出力する (Makefile 末尾で -include する)。
@@ -123,14 +123,14 @@ C_DIALECT_ERRORS = -Werror=implicit-function-declaration -Werror=implicit-int -W
 #
 # -fsigned-char / -fno-short-enums は **ABI の前提を明示に固定する** ためのもの。
 # どちらも i386 GCC では既定と同じなので、付けても生成物は 1 バイトも変わらない
-# (i386-elf-gcc でカーネル C 92 本 (順序 4-b で lib/kstring_c.c が加わり 93 本)を新旧フラグでコンパイルし、.o の md5 が
+# (i386-elf-gcc でカーネル C 92 本 (順序 4-b で sys/kern/kstring_c.c が加わり 93 本)を新旧フラグでコンパイルし、.o の md5 が
 #  全本一致することを確認済み)。目的は今の挙動を変えることではなく、
 # **暗黙の既定に頼っている箇所を将来 ARM で黙って壊させない** ことにある。
 #
 #   -fsigned-char    ARM EABI は `char` が **unsigned** が既定。今のコードが
 #                    符号に依存している箇所は見つかっていない (utf8.c は
 #                    `& 0x80`、iso9660.c は `(unsigned char)` に明示キャスト) が、
-#                    `kstrcmp` はまだ lib/kstring_asm.asm の x86 アセンブリで、
+#                    `kstrcmp` はまだ sys/kern/kstring_asm.asm の x86 アセンブリで、
 #                    これを C 版に起こす (順序 4) と `*a - *b` の符号で
 #                    0x80 以上のバイト = 日本語ファイル名の**並び順が変わる**。
 #                    移植の最中に既定が裏返らないよう、今のうちに固定しておく。
@@ -157,7 +157,7 @@ KERNEL_CFLAGS += -DOS32_FEATURE_USERSHELL=$(FEATURE_USERSHELL) $(KERNEL_CFLAGS_E
 #   選択は $(LGY98_STAMP) に残るので以後の make kernel / deploy-nhd も同じ設定でビルドする。
 #   BASE / IRQ / FLAGS は LGY98_BASE / LGY98_IRQ / LGY98_FLAGS で上書きできる
 #   (既定は NP21/W の値。FLAGS = LGY98_FLAG_* の和。DIAG 1 / LOOPBACK 2 / REFLECT 4 / LINKTEST 8)。
-#   読むのは drivers/net/ne2000/lgy98.c だけで、設定の変化時にその .o を組み直す (build/kernel.mk)。
+#   読むのは sys/dev/net/ne2000/lgy98.c だけで、設定の変化時にその .o を組み直す (build/kernel.mk)。
 LGY98_STAMP = $(BUILD_OUT)/lgy98.flags
 LGY98_BASE  ?= 0x10D0
 LGY98_IRQ   ?= 5
@@ -197,17 +197,17 @@ LDFLAGS = -m $(ELF_EMULATION) -T $(BUILD_OUT)/os32.ld -Map=$(BUILD_OUT)/kernel.m
 # === 外部プログラム用フラグ ===
 # 外部プログラムの素のインクルードパス。
 #   -Iuserland/lib   ランタイム小物を "rt/dbgserial.h" 形式で引く
-#   -Iinclude        include/os32_kapi_shared.h ほか
+#   -Iinclude -Isys/arch/x86 -Isys/hal/gfx -Isys/hal/input -Isys/hal/sound -Isys/hal/time -Isys/include -Isys/platform/pc98        include/os32_kapi_shared.h ほか
 # ライブラリ固有の -I はここには置かない。build/libs.mk の INC_<lib> を
 # 必要なターゲットだけに渡すこと (一括で並べると層の逆流が隠れる)。
 #
-# -Iarch/$(ARCH) -Iplatform/$(PLATFORM) は **足さない**。外部プログラムは
-# CPL=3 で走り、in/out も cli/sti も #GP になるので include/io.h を引く
+# -Isys/arch/$(ARCH) -Isys/platform/$(PLATFORM) は **足さない**。外部プログラムは
+# CPL=3 で走り、in/out も cli/sti も #GP になるので sys/include/io.h を引く
 # ソースが 1 本も無い (2026-09-15 に全ツリーを grep して確認。番人は
 # tools/check_privileged.py)。もし将来ユーザーランドが io.h を引くように
 # なったら、それは特権命令を呼ぼうとしている印なので、-I を足す前に
 # 「なぜ CPL=3 のコードが原始命令を要るのか」を先に疑うこと。
-PROGRAM_FLAGS = $(USER_CFLAGS) -I. -Iinclude $(SDK_INC) -Iuserland/lib -I$(CROSS_DIR)/i386-elf/include
+PROGRAM_FLAGS = $(USER_CFLAGS) -I. -Iinclude -Isys/arch/x86 -Isys/hal/gfx -Isys/hal/input -Isys/hal/sound -Isys/hal/time -Isys/include -Isys/platform/pc98 $(SDK_INC) -Iuserland/lib -I$(CROSS_DIR)/i386-elf/include
 PROGRAM_LDFLAGS = -m $(ELF_EMULATION) -T $(SDK_TARGET_APP_LINK) -nostdlib --nmagic --gc-sections \
 	-L$(LIBDIR) -L$(CROSS_DIR)/i386-elf/lib -L$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0
 

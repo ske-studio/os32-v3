@@ -39,7 +39,7 @@ def main():
     if '--mutate' in sys.argv:
         # The control uses the same stage compiler/runner as its mutations.
         return int(bool(mutpar.run_with_control(mutation, STAGE_MUTATIONS,
-                        ('kdebug/gfinit_plan_c.c', 'control', '', '', 'c_only'))))
+                        ('sys/dev/video/geforce/diag/gfinit_plan_c.c', 'control', '', '', 'c_only'))))
     return 0
 
 

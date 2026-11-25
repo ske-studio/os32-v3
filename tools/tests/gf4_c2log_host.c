@@ -96,7 +96,7 @@ static bool log_after_pll,log_after_lut;
 #define gf4_cursor_apply(...) (log_gate("cursor") ? LOG_INJECT : gf4_cursor_apply(__VA_ARGS__))
 #define gf_irq_enable(...) (log_gate("heads_irq") ? LOG_INJECT : gf_irq_enable(__VA_ARGS__))
 #define gf_vram_match(...) (log_gate("restore_matches") ? LOG_INJECT : gf_vram_match(__VA_ARGS__))
-#include "../../hwdev/gf/display/save.c"
+#include "../../sys/dev/video/geforce/display/save.c"
 #undef gf_vram_match
 #undef gf2_fence_emit
 #undef gf4_route_check

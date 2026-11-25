@@ -7,7 +7,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='gshell-excl-host', tier=1,
-    covers=['kapi/kapi_in2.c', 'input/hal/*.h', 'input/hal/in2_excl.c', 'platform/pc98/platform_input_caps.h', 'platform/pc98/platform_io.h', 'tools/tests/host_arch/**', 'include/**', 'kernel/av_focus.c', 'include/av_contract.h', 'exec/exec_gui.h', 'exec/exec_hooks.h', 'input/hal/in2_int.h', 'include/app_ids.h', 'include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h', 'userland/gshell/**', 'sdk/rust/os32api/**', 'sdk/rust/os32api/src/ls.rs', 'tools/tests/os32api_host.py', 'exec/shell_service.h', 'userland/lib/font/**', 'sdk/include/os32/os32_kapi_shared.h', 'tools/fetch_fonts.py', 'tools/tests/g16_fixture.py', 'tools/gen_g16.py', 'tools/g16/**', 'assets/ipadic/*.csv', 'tools/tests/test_gshell_excl.py', 'sdk/include/os32/**', 'include/remote_control.h', 'net/link.h', 'assets/fonts/**'],
+    covers=['sys/kapi/kapi_in2.c', 'input/hal/*.h', 'sys/hal/input/in2_excl.c', 'sys/platform/pc98/platform_input_caps.h', 'sys/platform/pc98/platform_io.h', 'tools/tests/host_arch/**', 'include/**', 'sys/kern/av_focus.c', 'sys/include/av_contract.h', 'sys/kern/exec/exec_gui.h', 'sys/kern/exec/exec_hooks.h', 'sys/hal/input/in2_int.h', 'sys/include/app_ids.h', 'sys/include/callconv.h', 'sys/include/abi.h', 'sys/arch/x86/arch_abi.h', 'userland/gshell/**', 'sdk/rust/os32api/**', 'sdk/rust/os32api/src/ls.rs', 'tools/tests/os32api_host.py', 'sys/kern/exec/shell_service.h', 'userland/lib/font/**', 'sdk/include/os32/os32_kapi_shared.h', 'tools/fetch_fonts.py', 'tools/tests/g16_fixture.py', 'tools/gen_g16.py', 'tools/g16/**', 'assets/ipadic/*.csv', 'tools/tests/test_gshell_excl.py', 'sdk/include/os32/**', 'sys/include/remote_control.h', 'sys/net/link.h', 'assets/fonts/**'],
     needs=[], budget=12.5,
     basis=['docs/decisions/sound/AV_HAL_DESIGN.md §5-3, G1', 'docs/decisions/INPUT_HAL_DESIGN.md 7d'],
 )
@@ -109,7 +109,7 @@ ENTRY_MUTATIONS = [
 def run(ctx):
     with tempfile.TemporaryDirectory() as temporary:
         flags = ['--cfg', 'public_input_kernel']
-        for source in ('kapi/kapi_in2.c', 'input/hal/in2_excl.c', 'userland/gshell/host/input_fixture.c'):
+        for source in ('sys/kapi/kapi_in2.c', 'sys/hal/input/in2_excl.c', 'userland/gshell/host/input_fixture.c'):
             obj = Path(temporary) / (Path(source).stem + '.o')
             subprocess.run(['cc', '-std=gnu11', '-ffunction-sections', '-Wno-attributes',
                 '-Itools/tests/host_arch', '-Iinput/hal', '-Iinclude', '-Iplatform/pc98',

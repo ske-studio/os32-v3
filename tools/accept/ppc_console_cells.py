@@ -23,7 +23,7 @@ def image(folder, case):
     settings = ['IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                 'KB_ROOT_BINS=' + str(user / 'celltest.bin')]
     if case == 'scroll-two':
-        settings += mutant_settings(folder, case, 'kernel/console/fbcon.c',
+        settings += mutant_settings(folder, case, 'sys/kern/console/fbcon.c',
                                     'fbcon_scroll_n(c, rows, 1);',
                                     'fbcon_scroll_n(c, rows, 2);')
     if case == 'putchar-absent':

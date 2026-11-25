@@ -3,7 +3,7 @@
 票:   docs/archive/shell/TASK_H2.md §2-1 / §4-1 の X1 X2
 記録: tools/tests/vfs_excl_tdd.md
 
-tools/tests/vfs_excl_host.c が実物の fs/vfs.c と fs/vfs_fd.c をそのまま
+tools/tests/vfs_excl_host.c が実物の sys/fs/vfs.c と sys/fs/vfs_fd.c をそのまま
 #include し、境界 (kstring / kmalloc / コンソール) だけを同義の C で置く。
 FS ドライバは合成した VfsOps で、create_excl を**持つ / 持たない**両方と、
 create_excl / get_file_size / write_file の戻り値と呼び出し回数を指定できる。
@@ -17,8 +17,8 @@ create_excl / get_file_size / write_file の戻り値と呼び出し回数を指
 
   python3 -B tools/tests/test_vfs_excl.py [--target] [--mutate]
 
---target は実機と同じ i386-elf クロスコンパイラでも fs/vfs.c / fs/vfs_fd.c /
-fs/ext2/ext2_vfs.c が -Werror で通ることの確認 ([C1] GNU11)。
+--target は実機と同じ i386-elf クロスコンパイラでも sys/fs/vfs.c / sys/fs/vfs_fd.c /
+sys/fs/ext2/ext2_vfs.c が -Werror で通ることの確認 ([C1] GNU11)。
 
 --mutate は**否定側**。この票の中心規則は「読めなかったを無いと読まない」と
 「非対応を先に断る」なので、それを崩した版で試験が確かに落ちることを見る。
@@ -26,7 +26,7 @@ fs/ext2/ext2_vfs.c が -Werror で通ることの確認 ([C1] GNU11)。
 make・エミュレータ・実配備には一切触れない。
 """
 CHECK = dict(name='vfs-excl-host', tier=1,
-    covers=['fs/ext2/ext2_dir.c', 'fs/ext2/ext2_file.c', 'fs/ext2/ext2_super.c', 'fs/ext2/ext2_time.c', 'fs/ext2/ext2_vfs.c', 'fs/vfs.c', 'fs/vfs_fd.c', 'tools/tests/vfs_excl_host.c', 'tools/tests/mutpar.py', 'sdk/kapi.json', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/fs/ext2/ext2_dir.c', 'sys/fs/ext2/ext2_file.c', 'sys/fs/ext2/ext2_super.c', 'sys/fs/ext2/ext2_time.c', 'sys/fs/ext2/ext2_vfs.c', 'sys/fs/vfs.c', 'sys/fs/vfs_fd.c', 'tools/tests/vfs_excl_host.c', 'tools/tests/mutpar.py', 'sdk/kapi.json', 'tools/tests/input_fixture_host.h', 'sys/hal/input/input_service.c', 'sys/hal/input/pointer_service.h', 'sys/hal/input/input_service.h', 'sys/include/kbd.h', 'sys/fs/vfs_device.h', 'sys/platform/pc98/boot_names.h', 'sys/platform/pc98/boot_names.c', 'sys/dev/ata/ide.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=4.8,
     basis=['KAPI_SPEC', '[ABI]'],
 )
@@ -98,7 +98,7 @@ def check_flag_constant():
     # 「sys_set_mtime が**永遠に末尾**であること」を要求してしまう。[ABI] が
     # 禁じるのは既存スロットを動かす / 消すことで、**末尾への追記は正当**なので、
     # その形は KAPI が 1 本増えるたびに必ず落ちる (2026-09-16、kbd_peekkey で
-    # `make check` が実際に落ちた。`kapi/kapi_db.c` の `db_slot_layout_ok` が
+    # `make check` が実際に落ちた。`sys/kapi/kapi_db.c` の `db_slot_layout_ok` が
     # 同じ形を踏んで下限比較に直した前例がある)。
     #
     # H2 の意図は「v53 の時点でスロットが増えていない」= **sys_set_mtime (v52)
@@ -123,7 +123,7 @@ def build_host(tmp, name, src="tools/tests/vfs_excl_host.c"):
     exe = tmp / name
     subprocess.run(["gcc", *HOST_FLAGS, *HOST_INC, str(ROOT / src),
                     "-o", str(exe)], cwd=ROOT, check=True)
-    print("HOST GNU11 -Werror COMPILE PASS (real fs/vfs.c + fs/vfs_fd.c)",
+    print("HOST GNU11 -Werror COMPILE PASS (real sys/fs/vfs.c + sys/fs/vfs_fd.c)",
           flush=True)
     return exe
 
@@ -156,7 +156,7 @@ MUTATIONS = [
 ]
 
 
-MUT_TARGET = "fs/vfs_fd.c"
+MUT_TARGET = "sys/fs/vfs_fd.c"
 
 
 def host_cmd(exe, src="tools/tests/vfs_excl_host.c"):
@@ -177,7 +177,7 @@ def one_mutation(item):
                 [host_cmd(exe)])
         except subprocess.CalledProcessError:
             return "MUTATE %-22s RED (コンパイルが通らない)" % name, 0
-        head = "HOST GNU11 -Werror COMPILE PASS (real fs/vfs.c + fs/vfs_fd.c)\n"
+        head = "HOST GNU11 -Werror COMPILE PASS (real sys/fs/vfs.c + sys/fs/vfs_fd.c)\n"
         rc = subprocess.run([str(exe)], cwd=str(tree), timeout=120,
                             capture_output=True).returncode
     if rc == 0:
@@ -205,8 +205,8 @@ if __name__ == "__main__":
         failed += rc != 0
 
         if "--target" in sys.argv:
-            for src in ("fs/vfs.c", "fs/vfs_fd.c", "fs/ext2/ext2_vfs.c",
-                        "fs/ext2/ext2_dir.c", "fs/ext2/ext2_file.c", "fs/ext2/ext2_super.c", "fs/ext2/ext2_time.c"):
+            for src in ("sys/fs/vfs.c", "sys/fs/vfs_fd.c", "sys/fs/ext2/ext2_vfs.c",
+                        "sys/fs/ext2/ext2_dir.c", "sys/fs/ext2/ext2_file.c", "sys/fs/ext2/ext2_super.c", "sys/fs/ext2/ext2_time.c"):
                 subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, "-c", src,
                                 "-o", str(tmp / (pathlib.Path(src).stem + ".o"))],
                                cwd=ROOT, check=True)

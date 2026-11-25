@@ -27,7 +27,7 @@ contracts の文字列 FNV により CIRRUS_MODULE_ABI_GEN は自動更新（too
 
 `kapi_reserved_nosys` の宣言は既存の exec.c に残し、生成器の source=.c 経路で取得する。
 
-- 宣言は既存ヘッダから抽出。ring3_ls_start/endはexec/ring3_ls.hのconst u8配列、__kernel_resident_endはinclude/memmap.hのu32単体としてPTR生成。
+- 宣言は既存ヘッダから抽出。ring3_ls_start/endはsys/kern/exec/ring3_ls.hのconst u8配列、__kernel_resident_endはsys/include/memmap.hのu32単体としてPTR生成。
 
 - kapi_reserved_nosysの宣言が元.cだけにある分は既存生成器のsource=.c経路を使う。
 

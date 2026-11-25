@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Freestanding ILP32 production FEP facade validation and boot count relay."""
 CHECK = dict(name='fep-module', tier=1, needs=[], budget=3.3,
-    covers=['tools/tests/host_arch/arch_io.h', 'input/hal/input_ime_gate.c', 'input/hal/input_context.h', 'kernel/ime/fep_module.c', 'kernel/ime/fep_module.h',
-            'kernel/ime/fep_body.c', 'kernel/ime/ime.h', 'kernel/ime/ime_store.h',
+    covers=['tools/tests/host_arch/arch_io.h', 'sys/input/input_ime_gate.c', 'sys/input/input_context.h', 'sys/kern/ime/fep_module.c', 'sys/kern/ime/fep_module.h',
+            'sys/kern/ime/fep_body.c', 'sys/kern/ime/ime.h', 'sys/kern/ime/ime_store.h',
             'tools/tests/fep_module_host.c',
             'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk',
-            'lib/kstring.c', 'lib/kstring_c.c'],
+            'sys/kern/kstring.c', 'sys/kern/kstring_c.c'],
     basis=['docs/design/kernel/ime/ime_dict_info.md 仕組み', 'docs/design/kernel/ime/ime_dict.md core との境目'],
 )
 import argparse
@@ -19,7 +19,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'kernel/ime/fep_module.c'
+PRODUCT = 'sys/kern/ime/fep_module.c'
 OLD = 'return candidate_valid ? candidate.boot_connections() : stub_api.boot_connections();'
 NEW = 'return candidate_valid ? 0 : stub_api.boot_connections();'
 
@@ -32,7 +32,7 @@ def main():
         work = Path(tmp)
         # Import metadata belongs to the loader suite; no load is invoked here.
         (work / 'fep_imports.h').write_text(
-            '#include "input/hal/input_context.h"\n#define FEP_IMPORT_COUNT 0u\n#define FEP_MODULE_ABI_GEN 1u\n')
+            '#include "sys/input/input_context.h"\n#define FEP_IMPORT_COUNT 0u\n#define FEP_MODULE_ABI_GEN 1u\n')
         flags = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                  '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                  '-ffunction-sections', '-fdata-sections', '-Wall', '-Wextra',
@@ -41,7 +41,7 @@ def main():
                  '-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)]
         body = work / 'body.o'
         subprocess.run([*flags, '-Dime_boot_connections=body_boot_connections',
-                        '-c', str(ROOT / 'kernel/ime/fep_body.c'), '-o', str(body)], check=True)
+                        '-c', str(ROOT / 'sys/kern/ime/fep_body.c'), '-o', str(body)], check=True)
         product = (ROOT / PRODUCT).read_text()
         harness = (ROOT / 'tools/tests/fep_module_host.c').read_text()
         cases = [('normal', product, 0)]
@@ -62,11 +62,11 @@ def main():
                 cases.append((label, product.replace(old, new), expected_rc))
         for label, code, expected_rc in cases:
             unit = work / 'module.c'
-            unit.write_text(harness.replace('#include "kernel/ime/fep_module.c"', code))
+            unit.write_text(harness.replace('#include "sys/kern/ime/fep_module.c"', code))
             exe = work / label
             subprocess.run([*flags, '-nostdlib', '-static', '-no-pie',
                             '-Wl,--gc-sections', str(unit), str(body),
-                            str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)], check=True)
+                            str(ROOT / 'sys/kern/kstring_c.c'), '-o', str(exe)], check=True)
             rc = host32.run([str(exe)], cwd=ROOT).returncode
             if rc != expected_rc:
                 raise RuntimeError(f'{label}: expected runtime rc={expected_rc}, got {rc}')

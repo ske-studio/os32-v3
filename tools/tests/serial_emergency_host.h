@@ -3,4 +3,4 @@
 const EmergencyOps emergency_output = {
     .puts_polled = pc98_serial_puts_polled, .gate_active = pc98_serial_gate_active,
 };
-#include "../../kernel/serial_diag.c"
+#include "../../sys/kern/serial_diag.c"

@@ -1,15 +1,15 @@
 """Wave A declaration ABI, executed as an ILP32 ELF without libc."""
 CHECK = dict(name='nofpu-decl', tier=1, needs=[], budget=3,
-    covers=['arch/x86/arch_exec_storage.h',
- 'arch/x86/kernel/x87.h',
- 'arch/x86/kernel/x87_emu.h',
+    covers=['sys/arch/x86/arch_exec_storage.h',
+ 'sys/arch/x86/kernel/x87.h',
+ 'sys/arch/x86/kernel/x87_emu.h',
  'build/config.mk',
  'docs/decisions/NOFPU_DESIGN.md',
- 'include/callconv.h',
- 'include/exec_arch.h',
- 'include/types.h',
- 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h',
- 'kernel/ver_info.h',
+ 'sys/include/callconv.h',
+ 'sys/include/exec_arch.h',
+ 'sys/include/types.h',
+ 'sys/kern/sqlite_engine.h', 'sys/kern/sqlite_engine_body.h',
+ 'sys/kern/ver_info.h',
  'lib/softfloat_bits.h',
  'sdk/include/os32/os32_generations.h',
  'sdk/include/os32/os32_gfx2.h',
@@ -34,7 +34,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / 'arch/x86/kernel/x87_emu.h'
+HEADER = ROOT / 'sys/arch/x86/kernel/x87_emu.h'
 MUTATIONS = (
     ('operand-buffer-short', '#define X87_EMU_MEMORY_BYTES 108',
      '#define X87_EMU_MEMORY_BYTES 107', 1),

@@ -1,9 +1,9 @@
-"""シリアルの速度判定 (drivers/char/serial_plan.c) のホスト試験。
+"""シリアルの速度判定 (sys/dev/char/serial_plan.c) のホスト試験。
 
 記録: tools/tests/serial_vfast_tdd.md
 票  : docs/archive/realhw_v21/TASK_SERIAL_VFAST.md (実機を 115200bps まで上げる)
 
-実物の drivers/char/serial_plan.c を 1 行も写さずに #include して回す。判定は
+実物の sys/dev/char/serial_plan.c を 1 行も写さずに #include して回す。判定は
 I/O もタイマも触らないので模型は要らない。
 
 **ここはエミュレータでは踏めない。** NP21/W は通信速度を模擬しないので
@@ -15,7 +15,7 @@ I/O もタイマも触らないので模型は要らない。
   python3 -B tools/tests/test_serial_vfast.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='serial-vfast-host', tier=1,
-    covers=['drivers/char/serial_kapi.h', 'include/time_units.h', 'drivers/char/serial.c', 'drivers/char/serial_plan.c', 'tools/tests/serial_vfast_host.c', 'userland/shell/serial_watchdog.c', 'drivers/char/serial.h', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/dev/char/serial_kapi.h', 'sys/include/time_units.h', 'sys/dev/char/serial.c', 'sys/dev/char/serial_plan.c', 'tools/tests/serial_vfast_host.c', 'userland/shell/serial_watchdog.c', 'sys/dev/char/serial.h', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.2,
     kind='characterization',
 )
@@ -31,14 +31,14 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/serial_vfast_host.c"
 # 変異させる実ソース。どちらも純粋 (I/O も KAPI も触らない)。
 SRCS = {
-    "drivers/char/serial_plan.c": ROOT / "drivers/char/serial_plan.c",
+    "sys/dev/char/serial_plan.c": ROOT / "sys/dev/char/serial_plan.c",
     "userland/shell/serial_watchdog.c":
         ROOT / "userland/shell/serial_watchdog.c",
 }
 # カーネルと同じ i386-elf で通す実ソース。serial.c は判定を使う側。
 TARGET_SRCS = [
-    ("drivers/char/serial_plan.c", []),
-    ("drivers/char/serial.c", []),
+    ("sys/dev/char/serial_plan.c", []),
+    ("sys/dev/char/serial.c", []),
 ]
 
 CASES = ["vfast_table", "compat_exact", "compat_inexact", "mode_choice",
@@ -55,40 +55,40 @@ INCLUDES = include_flags(ROOT)
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 # (ソース, パターン, 置換, 説明)
 MUTATIONS = [
-    ("drivers/char/serial_plan.c",
+    ("sys/dev/char/serial_plan.c",
      r"\{ 115200UL, SER_VFAST_DIV_115200 \},",
      "{ 115200UL, SER_VFAST_DIV_57600  },",
      "V･FAST の表を 1 行ずらす (115200 のつもりで 57600 が出る)"),
-    ("drivers/char/serial_plan.c",
+    ("sys/dev/char/serial_plan.c",
      r"\{   9600UL, SER_VFAST_DIV_9600   \}",
      "{   4800UL, SER_VFAST_DIV_9600   }",
      "表に無い速度を足す (9600 の戻しが V･FAST に入らなくなる)"),
-    ("drivers/char/serial_plan.c",
+    ("sys/dev/char/serial_plan.c",
      r"return \(u8\)\(\(mode == SER_MODE_VFAST\) \? SER_FSTS_RXRDY : STS_RXRDY\);",
      "return (u8)((mode == SER_MODE_VFAST) ? STS_RXRDY : STS_RXRDY);",
      "FIFO の RxRDY を互換のビット位置 (bit1) で見る"),
-    ("drivers/char/serial_plan.c",
+    ("sys/dev/char/serial_plan.c",
      r"return \(u8\)\(\(mode == SER_MODE_VFAST\) \? SER_FSTS_TXRDY : STS_TXRDY\);",
      "return (u8)((mode == SER_MODE_VFAST) ? SER_FSTS_TXEMP : STS_TXRDY);",
      "FIFO の TxRDY を TxEMP (bit0) と取り違える"),
-    ("drivers/char/serial_plan.c",
+    ("sys/dev/char/serial_plan.c",
      r"if \(us < SER_TX_BUDGET_MIN_US\) \{\n        us = SER_TX_BUDGET_MIN_US;\n    \}",
      "",
      "予算の下限を外す (速い速度で 0µs になり、直す前の hlt 待ちに戻る)"),
-    ("drivers/char/serial_plan.c",
+    ("sys/dev/char/serial_plan.c",
      r"if \(want_vfast && has_fifo\) \{",
      "if (want_vfast || has_fifo) {",
      "FIFO があれば明示指定なしでも V･FAST に入る (起動時の既定 9600 が"
      "互換で上がらなくなる / FIFO 非搭載機でも 013Ah を叩く)"),
-    ("drivers/char/serial_plan.c",
+    ("sys/dev/char/serial_plan.c",
      r"out->exact = \(u8\)\(\(out->actual == baud\) \? 1 : 0\);",
      "out->exact = 1;",
      "割り切れない分周を「ちょうど出る」と答える (38400 → 41600 を見逃す)"),
-    ("drivers/char/serial_plan.c",
+    ("sys/dev/char/serial_plan.c",
      r"    ticks \+= SER_TX_BUDGET_EDGE_TICKS;\n",
      "",
      "tick の境界ずれを足さない (1 tick の予算は実時間 0 になりうる)"),
-    ("drivers/char/serial_plan.c",
+    ("sys/dev/char/serial_plan.c",
      r"    if \(ticks < SER_TX_BUDGET_TICKS_MIN\) \{\n"
      r"        ticks = SER_TX_BUDGET_TICKS_MIN;\n    \}\n",
      "",
@@ -163,8 +163,8 @@ def host_build(tmp, mutated=None):
 
     # ハーネスが #include している 2 本と、その巻き込むヘッダを写す。
     tree = src_dir / "tree"
-    for rel in ("drivers/char/serial_plan.c", "drivers/char/serial_plan.h",
-                "drivers/char/serial.h", "lib/serial_diag.h",
+    for rel in ("sys/dev/char/serial_plan.c", "sys/dev/char/serial_plan.h",
+                "sys/dev/char/serial.h", "lib/serial_diag.h",
                 "tools/tests/serial_diag_host.h",
                 "userland/shell/serial_watchdog.c",
                 "userland/shell/serial_watchdog.h"):
@@ -199,7 +199,7 @@ def run_cases(exe, cases):
 
 
 def build_target(tmp):
-    """カーネルと同じ i386-elf で drivers/char/serial.c ごと通す。"""
+    """カーネルと同じ i386-elf で sys/dev/char/serial.c ごと通す。"""
     for rel, extra in TARGET_SRCS:
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
@@ -242,7 +242,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-serial-vfast-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real drivers/char/serial_plan.c)",
+        print("HOST GNU11 -Werror compile PASS (real sys/dev/char/serial_plan.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

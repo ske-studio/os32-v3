@@ -1,7 +1,7 @@
 /* C0 sequencing oracle. B components are contract fakes; no native I/O. */
 #define IO_H
 #include "types.h"
-#include "hwdev/gf/foundation.h"
+#include "sys/dev/video/geforce/foundation.h"
 static void fail(int line)
 {
     __asm__ volatile("int $0x80" : : "a"(1), "b"(line % 250 + 1));
@@ -14,7 +14,7 @@ static unsigned irq_save(void)
 static void irq_restore(unsigned v)
 { CHECK(!host_if); host_if = v; restores++; }
 #ifndef GF1_FOUNDATION_SOURCE
-#define GF1_FOUNDATION_SOURCE "../../hwdev/gf/foundation.c"
+#define GF1_FOUNDATION_SOURCE "../../sys/dev/video/geforce/foundation.c"
 #endif
 #include GF1_FOUNDATION_SOURCE
 

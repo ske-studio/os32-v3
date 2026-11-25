@@ -94,13 +94,13 @@ def main():
             path = folder / 'root.json'
             path.write_text(json.dumps(manifest))
             hook = '    kcg_file_unload();'
-            mutation = mutant_settings(folder, 'observe', 'platform/powermac/console_text.c',
+            mutation = mutant_settings(folder, 'observe', 'sys/platform/powermac/console_text.c',
                                        hook, hook + '\n    extern int kcg_module_ready(void);'
                                        '\n    kprintf(KBOOT_ATTR, "KCG ready=%d\\r\\n", kcg_module_ready());')
             mutation.append('ROOT_MANIFEST=' + str(path))
             if case == 'ready':
                 mutation.extend(item.replace('KB_MUT_', 'KB_MUT_EXTRA_') for item in
-                                mutant_settings(folder, case, 'platform/powermac/kcg.c',
+                                mutant_settings(folder, case, 'sys/platform/powermac/kcg.c',
                                                 'return kcg_file_ready();', 'return 1;'))
         elif case == 'offset':
             # Inject the wrong offset byte order into the font consumer only.

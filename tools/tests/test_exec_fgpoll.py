@@ -4,12 +4,12 @@ The scheduler and resident poll are boundary stubs. Full thermal/module
 composition belongs to U6; no sensor timing or IRQ execution is modeled here.
 """
 CHECK = dict(name='exec-fgpoll-host', tier=1, budget=2.7,
-             covers=['kernel/idle_work.h', 'net/nic.h', 'tools/tests/test_exec_fgpoll.py',
-                     'exec/exec_schedule.inc', 'exec/appslot.h', 'exec/exec.h',
+             covers=['sys/kern/idle_work.h', 'sys/net/nic.h', 'tools/tests/test_exec_fgpoll.py',
+                     'sys/kern/exec/exec_schedule.inc', 'sys/kern/exec/appslot.h', 'sys/kern/exec/exec.h',
                      'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
                      'build/config.mk', 'include/**', 'arch/x86/**',
                      'sdk/include/os32/**', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py',
-                     'mm/paging.h', 'fs/vfs_stdin.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+                     'sys/kern/mm/paging.h', 'sys/fs/vfs_stdin.h', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     basis=['AC-CTX-4', 'IO_TIER_DESIGN §2'],
 )
 
@@ -25,7 +25,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'exec/exec_schedule.inc'
+SOURCE = ROOT / 'sys/kern/exec/exec_schedule.inc'
 
 
 def function(source, name):
@@ -35,7 +35,7 @@ def function(source, name):
 
 
 HOST = r'''
-#include "net/nic.h"
+#include "sys/net/nic.h"
 void idle_work_run(void) { }
 static int enabled = 1, recent;
 int _irq_enabled(void) { return enabled; }

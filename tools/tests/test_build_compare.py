@@ -30,7 +30,7 @@ def check_moves():
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b'fixture')
         old = Path('build/out/obj/kernel/v86/v86.o')
-        new = Path('build/out/obj/platform/pc98/legacy/v86.o')
+        new = Path('build/out/obj/sys/platform/pc98/legacy/v86.o')
         def assemble(root, rel, label, symbol='callee', opcode='0xc3', data_symbol='data_callee'):
             path = root / rel
             path.parent.mkdir(parents=True, exist_ok=True)

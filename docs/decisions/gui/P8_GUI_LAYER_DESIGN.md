@@ -26,7 +26,7 @@
 ## 1. 実物の確認
 | # | 票の前提と実コードの差 | 反映 |
 |---|---|---|
-| D1 | P8のPCMリングは未起票だが、`drivers/sound/cs4231/pcm_cs4231.h` 以降にDMA・ステージング各4096 frameが存在。`pcm_cs4231.c` は単一ownerのopen/write | リングを重複新設しない |
+| D1 | P8のPCMリングは未起票だが、`sys/dev/sound/cs4231/pcm_cs4231.h` 以降にDMA・ステージング各4096 frameが存在。`pcm_cs4231.c` は単一ownerのopen/write | リングを重複新設しない |
 | D2 | `pcm_cs4231.c` は4096 frameで自動開始、`pcm_close()` はcloseで短音を開始。writeだけでは短い操作音が始まらない | 明示startと破棄停止abortを追加し、既存closeのdrainを維持 |
 | D3 | `V3_PLAN.md:41` でmicroUIは廃止。`gshell/src/kbdnav.rs:860` 以降のWMマウスキーは同周期にdown/upを発生 | WM宛ての同周期クリックを保持する。microUI接続は実装しない |
 | D4 | `docs/09_exec.md` の「OP_POLLはリングを読む」は概略。`userland/rust/libos32gui/src/client.rs` はOP_POLL後にclientがSHMをコピーしheadを進める | consumerはclient、WMはtailの所有者と明記 |
@@ -141,12 +141,12 @@ Button down受理後だけcaptureを保持。upは元owner/窓/世代へ。owner
 | ファイル（+は新規） | 機能・規模 | 並列条件 |
 |---|---|---|
 | +`drivers/sound/cs4231/pcm_stream.c` | 既存ownerに接続するAPI/finish/status、200–300行 | PCM口固定後 |
-| `drivers/sound/cs4231/pcm_cs4231.c` | start/stop/drain内部口抽出、差分80–120行 | stream担当と直列 |
-| `drivers/sound/cs4231/pcm_cs4231_math.c` | cursor・短音開始、差分40–80行 | PCM担当 |
-| `drivers/sound/cs4231/pcm_cs4231.h` | 共通定数/内部宣言、差分30行 | PCM担当 |
-| `drivers/sound/cs4231/pcm_module.h` | private表末尾追加・版更新、差分20行 | PCM口固定後 |
-| `drivers/sound/cs4231/pcm_module.c` | facade接続、差分40行 | 同上 |
-| `drivers/sound/cs4231/pcm_body.c` | export接続、差分15行 | 同上 |
+| `sys/dev/sound/cs4231/pcm_cs4231.c` | start/stop/drain内部口抽出、差分80–120行 | stream担当と直列 |
+| `sys/dev/sound/cs4231/pcm_cs4231_math.c` | cursor・短音開始、差分40–80行 | PCM担当 |
+| `sys/dev/sound/cs4231/pcm_cs4231.h` | 共通定数/内部宣言、差分30行 | PCM担当 |
+| `sys/dev/sound/cs4231/pcm_module.h` | private表末尾追加・版更新、差分20行 | PCM口固定後 |
+| `sys/dev/sound/cs4231/pcm_module.c` | facade接続、差分40行 | 同上 |
+| `sys/dev/sound/cs4231/pcm_body.c` | export接続、差分15行 | 同上 |
 | +`userland/gshell/src/input_queue.rs` | append失敗計上/capture取消、80–120行 | PCMと並列可 |
 | `userland/gshell/src/input.rs` | 統一emit/論理ボタン、差分80–120行 | queue後 |
 | `userland/gshell/src/wm.rs` | 共有状態・回収接続、差分30行 | 共有束の例外 |
@@ -187,6 +187,6 @@ NHD配備はNP21/W停止と既存承認範囲を守り、実機物理操作は�
 なし（0件）。
 
 ## 確定 (2026-11-05、Opus の r3 の確認で Approve、PM が反映 — この節が本文より優先)
-- P1 (P3、合成器との順序): drivers/sound/cs4231/pcm_cs4231.c、pcm_module.h/.c、pcm_body.c は、P8 の段 A (pcm_reclaim の内部停止関数への抽出、drain_begin/drain_poll、private 表の末尾追加) を先に取り込む。合成器の段 E はその後に末尾へ足し、pcm_module の版は段ごとに上げる。合成器の source の finish/abort も、P8 で抜き出した同じ内部停止・drain の経路を使い、別の停止列を作らない。
+- P1 (P3、合成器との順序): sys/dev/sound/cs4231/pcm_cs4231.c、pcm_module.h/.c、pcm_body.c は、P8 の段 A (pcm_reclaim の内部停止関数への抽出、drain_begin/drain_poll、private 表の末尾追加) を先に取り込む。合成器の段 E はその後に末尾へ足し、pcm_module の版は段ごとに上げる。合成器の source の finish/abort も、P8 で抜き出した同じ内部停止・drain の経路を使い、別の停止列を作らない。
 - 未決 0 件 (microUI はユーザー決定で廃止)。
 - ユーザー決定 (2026-11-05): 「microUIは廃止です。すでにos32guiがあるので」。§8 の未決は 0 件のまま。

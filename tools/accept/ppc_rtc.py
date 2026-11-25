@@ -101,10 +101,10 @@ def main():
         kernel = folder / 'kernel'
         settings = []
         if case == 'year':
-            settings = mutant_settings(folder, case, 'platform/powermac/system.c',
+            settings = mutant_settings(folder, case, 'sys/platform/powermac/system.c',
                                        'date->year = year;', 'date->year = year + 1;')
         elif case == 'swap-opcodes':
-            settings = mutant_settings(folder, case, 'drivers/macintosh/via.c',
+            settings = mutant_settings(folder, case, 'sys/dev/macintosh/via.c',
                                        'PMU_READ_RTC = 0x38, CUDA_GET_TIME = 0x03',
                                        'PMU_READ_RTC = 0x03, CUDA_GET_TIME = 0x38')
         elif case == 'rtc-absent':

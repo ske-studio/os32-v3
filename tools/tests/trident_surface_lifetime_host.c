@@ -1,7 +1,7 @@
 /* Real core, resources, ledger, lease, HAL and lifecycle. Only PCI/MMIO/ports
  * and Linux's MMU are seams; SPR and mode preparation remain product code. */
 #include "trident_device_fake.h"
-#include "drivers/video/trident/trident_module.h"
+#include "sys/dev/video/trident/trident_module.h"
 #define run regression_run
 #define HOST_OWN_PC98_ROUTE 1
 #include "lifetime_kernel_host.c"

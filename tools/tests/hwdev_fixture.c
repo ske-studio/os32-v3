@@ -5,7 +5,7 @@ volatile u32 fixture_probe_count = 1;
 static i32 get_probe_decls(const struct probe_decl **t, u32 *n)
 { *t=fixture_decls; *n=fixture_probe_count; return 0; }
 /* Synthetic M2 body: no hardware, allocation, core calls or GF code. */
-#include "hwdev/generated/hwdev_contract.h"
+#include "sys/dev/hwdev/generated/hwdev_contract.h"
 u32 hwdev_import_slots[HWDEV_IMPORT_COUNT]
     __attribute__((section(".data.kdebug_import_slots"), aligned(4))) = {0};
 static int call(u32 op, void *req, u32 size, const struct recover_ops *base,

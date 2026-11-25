@@ -1,7 +1,7 @@
 /* ========================================================================
  *  tools/tests/pcm_hostshim/io.h — ホスト試験用の io.h 差し替え
  *
- *  include/io.h は inp / outp / irq_save を**特権命令のインライン asm**で
+ *  sys/include/io.h は inp / outp / irq_save を**特権命令のインライン asm**で
  *  定義するので、ホストでそのまま走らせると落ちる。この版を -I で先に置いて
  *  差し替え、ポート操作を試験側の模型へ回す
  *  (tools/tests/hostdrv_hostshim/io.h と同じ作法)。

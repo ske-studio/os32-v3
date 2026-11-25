@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """B4: the display provider keeps the pre-separation backend selection table."""
 CHECK = dict(name='sep5-provider-host', tier=1, needs=[], budget=5,
-    covers=['platform/pc98/gfx_selector.c', 'platform/pc98/gfx_selector_lifecycle.inc', 'platform/pc98/platform_display_fallback.h',
-            'include/display_provider.h', 'include/gfx_hal.h', 'gfx/gfx_core.c',
-            'gfx/gfx_core_framebuffer.inc', 'gfx/gfx_core_surface.inc', 'gfx/gfx_internal.h',
+    covers=['sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_selector_lifecycle.inc', 'sys/platform/pc98/platform_display_fallback.h',
+            'sys/include/display_provider.h', 'sys/include/gfx_hal.h', 'sys/hal/gfx/gfx_core.c',
+            'sys/hal/gfx/gfx_core_framebuffer.inc', 'sys/hal/gfx/gfx_core_surface.inc', 'sys/hal/gfx/gfx_internal.h',
             'tools/tests/sep5_provider_client_host.c', 'tools/tests/sep5_provider_host.c',
             'tools/tests/test_sep5_provider.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/**',
-            'arch/x86/**', 'platform/pc98/**', 'mm/pgalloc.h', 'sdk/include/os32/**'],
+            'arch/x86/**', 'platform/pc98/**', 'sys/kern/mm/pgalloc.h', 'sdk/include/os32/**'],
     basis=['PPC_SEP5_DESIGN §2.1', 'AC-DISPLAY-2'],
 )
 import argparse
@@ -17,8 +17,8 @@ import tempfile
 import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
-PROVIDER = 'platform/pc98/gfx_selector.c'
-CORE = 'gfx/gfx_core.c'
+PROVIDER = 'sys/platform/pc98/gfx_selector.c'
+CORE = 'sys/hal/gfx/gfx_core.c'
 # (name, unique anchor, replacement, exit code of the first expectation that
 # must fail). Any other exit code is a test error, not a kill.
 MUTATIONS = (
@@ -85,10 +85,10 @@ def execute(text, work, unlinked=False):
 
 
 def execute_client(work, mutation=None):
-    kind = (ROOT / 'gfx/gfx_core_surface.inc').read_text()
+    kind = (ROOT / 'sys/hal/gfx/gfx_core_surface.inc').read_text()
     start = kind.index('u32 gfx_sf_backend(void)')
     kind = kind[start:kind.index('\n}', start)+2]
-    binding = (ROOT / 'gfx/gfx_core_framebuffer.inc').read_text()
+    binding = (ROOT / 'sys/hal/gfx/gfx_core_framebuffer.inc').read_text()
     if mutation:
         old, new = mutation
         assert binding.count(old) == 1

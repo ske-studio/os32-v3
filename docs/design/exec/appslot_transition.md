@@ -1,7 +1,7 @@
-# exec/appslot_transition.inc — 設計
+# sys/kern/exec/appslot_transition.inc — 設計
 
 > 状態: **現行 (2026-11-18)** — 出所: TASK_K5_multiapp (D0 の C1〜C6)・TASK_K5B_kernel・TASK_K7_input (D1・D5、§5 B〜D)・TASK_T8_fullscreen_gfx (§7 D8) の契約を今のソースと照らして要約
-ソース: `exec/appslot_transition.inc` (`exec/appslot.c` が取り込む)・`exec/exec_schedule.inc` (`exec_resume`)
+ソース: `sys/kern/exec/appslot_transition.inc` (`sys/kern/exec/appslot.c` が取り込む)・`sys/kern/exec/exec_schedule.inc` (`exec_resume`)
 
 協調切替の park (アプリが WM へ制御を返す) と resume (WM がアプリを再開する) の可否を、AppSlot の表だけで決める。WM の行儀を信じず、カーネルが弾く。走っているアプリは常に 1 本で、切替は park → WM top-level → resume の往復だけ (プリエンプションは無い)。各入口の更新の順は `docs/design/exec/appslot_park.md`。
 
@@ -51,8 +51,8 @@
 
 ## 畳む
 
-止めてあるアプリ (PARKED・WAIT_KEY・WAIT_POLL) は WM top-level の `exec_kill` で畳める。走っている本人は `exec_kill` できず (`OS32_ERR_STALE`)、CTRL+STOP の経路で畳む (`appslot_kill_check`、`exec/appslot.c`)。畳んだら WM top-level へ戻る。
+止めてあるアプリ (PARKED・WAIT_KEY・WAIT_POLL) は WM top-level の `exec_kill` で畳める。走っている本人は `exec_kill` できず (`OS32_ERR_STALE`)、CTRL+STOP の経路で畳む (`appslot_kill_check`、`sys/kern/exec/appslot.c`)。畳んだら WM top-level へ戻る。
 
 ## 検査
 
-`tools/tests/test_multiapp_impl.py` (`multiapp_impl_host.c`)。実物の `exec/appslot.c` と `kernel/kbd_inject.c` を取り込む。`exec_resume` の kbd 分岐はホストに持ち込めないので、ハーネスの `ma_resume_kbd` に写してある (写した部分の正しさは言わない)。
+`tools/tests/test_multiapp_impl.py` (`multiapp_impl_host.c`)。実物の `sys/kern/exec/appslot.c` と `sys/kern/kbd_inject.c` を取り込む。`exec_resume` の kbd 分岐はホストに持ち込めないので、ハーネスの `ma_resume_kbd` に写してある (写した部分の正しさは言わない)。

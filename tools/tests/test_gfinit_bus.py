@@ -13,7 +13,7 @@ FLAGS = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-m32', '-march=i386',
 
 def command(exe):
     return ['gcc', *FLAGS, '-O2', '-ffunction-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
-            '-I'+str(ROOT/'tools/tests/recover_hostshim'), '-I'+str(ROOT/'include'), '-I'+str(ROOT/'sdk/include/os32'), str(ROOT/'tools/tests/gfinit_bus_host.c'), str(ROOT/'tools/tests/recover_gf_dev_stub.c'), *[str(ROOT / p) for p in ('hwdev/gf/runner.c','hwdev/gf/save.c','hwdev/gf/pll.c')], *map(str, sorted((ROOT/'hwdev/gf/op').glob('*.c'))), '-o', str(exe)]
+            '-I'+str(ROOT/'tools/tests/recover_hostshim'), '-I'+str(ROOT/'include'), '-I'+str(ROOT/'sdk/include/os32'), str(ROOT/'tools/tests/gfinit_bus_host.c'), str(ROOT/'tools/tests/recover_gf_dev_stub.c'), *[str(ROOT / p) for p in ('sys/dev/video/geforce/runner.c','sys/dev/video/geforce/save.c','sys/dev/video/geforce/pll.c')], *map(str, sorted((ROOT/'hwdev/gf/op').glob('*.c'))), '-o', str(exe)]
 
 
 MUTATIONS = [
@@ -35,36 +35,36 @@ MUTATIONS = [
     ('bus_command_width', 'if (a->width == 2)', 'if (a->width == 1)'),
 ]
 SHARED_MUTATIONS = [
-    ('kdebug/recover.c', 'resource_overlap_left', '(unsigned long long)base < (unsigned long long)exclude[i].base + exclude[i].len', 'false'),
-    ('kdebug/recover.c', 'resource_overlap_right', '(unsigned long long)exclude[i].base < (unsigned long long)base + length', 'false'),
-    ('kdebug/recover_plan/access.inc', 'cr1f_verify', 'value == RECOVER_CR1F_UNLOCK ?\n        RECOVER_CR1F_UNLOCKED : 0', 'value == RECOVER_CR1F_UNLOCK ?\n        RECOVER_CR1F_UNLOCK : 0'),
-    ('kdebug/recover_plan/access.inc', 'cr1f_saved', 'RECOVER_CR1F_UNLOCK : RECOVER_CR1F_LOCK) : value;', 'RECOVER_CR1F_UNLOCK : 0) : value;'),
-    ('kdebug/recover_plan/access_saved_matches.inc', 'local_select', 'v->key == target && value == t->index && t->access == REC_RW) found = true;',
+    ('sys/platform/pc98/kdebug/recover.c', 'resource_overlap_left', '(unsigned long long)base < (unsigned long long)exclude[i].base + exclude[i].len', 'false'),
+    ('sys/platform/pc98/kdebug/recover.c', 'resource_overlap_right', '(unsigned long long)exclude[i].base < (unsigned long long)base + length', 'false'),
+    ('sys/dev/video/geforce/diag/recover_plan/access.inc', 'cr1f_verify', 'value == RECOVER_CR1F_UNLOCK ?\n        RECOVER_CR1F_UNLOCKED : 0', 'value == RECOVER_CR1F_UNLOCK ?\n        RECOVER_CR1F_UNLOCK : 0'),
+    ('sys/dev/video/geforce/diag/recover_plan/access.inc', 'cr1f_saved', 'RECOVER_CR1F_UNLOCK : RECOVER_CR1F_LOCK) : value;', 'RECOVER_CR1F_UNLOCK : 0) : value;'),
+    ('sys/kern/kdebug/recover_plan/access_saved_matches.inc', 'local_select', 'v->key == target && value == t->index && t->access == REC_RW) found = true;',
      'v->key == target && value == t->index && t->access == REC_RW) found = false;'),
 ]
 RESOURCE_MUTATIONS = [
-    ('kdebug/gfinit_resources/windows.inc', 'resource_window_len', 'len > 0xffffffffU', 'false'),
-    ('kdebug/gfinit_resources/windows.inc', 'resource_count', '*used == RECOVER_RANGE_MAX', '*used >= RECOVER_RANGE_MAX - 1U'),
-    ('kdebug/gfinit_resources/bars.inc', 'resource_alignment', '(r.base & (r.len - 1U))', 'false'),
-    ('kdebug/gfinit_resources/bars.inc', 'resource_exclude_count', 'if (*used >= RECOVER_RANGE_MAX)', 'if (false)'),
-    ('kdebug/gfinit_resources/bounds.inc', 'resource_multifunction', 'return pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;', '(void)hdr0; return PCI_FN_COUNT;'),
-    ('kdebug/gfinit_resources/bounds.inc', 'resource_absent_fn0', 'if ((id & 0xffffU) == PCI_VENDOR_NONE) return 0;', 'if ((id & 0xffffU) == PCI_VENDOR_NONE) { (void)id; }'),
-    ('kdebug/gfinit_resources/bounds.inc', 'resource_log', 'reason, dev, fn, reg, raw);', '"unknown", dev, fn, reg, raw); (void)reason;'),
-    ('kdebug/gfinit_resources/bounds.inc', 'resource_log_raw', 'reason, dev, fn, reg, raw);', 'reason, dev, fn, reg, raw ^ 1U);'),
-    ('kdebug/gfinit_resources/windows.inc', 'resource_window_granule', 'last + PCI_BRIDGE_WINDOW_GRANULE - base', 'last - base'),
-    ('drivers/pci/pci_barsize.c', 'restore_order', 'pci_cfg_write32(bus, dev, fn, reg, r->raw);', 'if (!rom) pci_cfg_write16(bus, dev, fn, PCI_CFG_COMMAND, cmd);\n    pci_cfg_write32(bus, dev, fn, reg, r->raw);'),
-    ('drivers/pci/pci_barsize.c', 'measure_irq', 'unsigned int flags = irq_save();', 'unsigned int flags = irq_state;'),
+    ('sys/dev/video/geforce/gfinit_resources/windows.inc', 'resource_window_len', 'len > 0xffffffffU', 'false'),
+    ('sys/dev/video/geforce/gfinit_resources/windows.inc', 'resource_count', '*used == RECOVER_RANGE_MAX', '*used >= RECOVER_RANGE_MAX - 1U'),
+    ('sys/dev/video/geforce/gfinit_resources/bars.inc', 'resource_alignment', '(r.base & (r.len - 1U))', 'false'),
+    ('sys/dev/video/geforce/gfinit_resources/bars.inc', 'resource_exclude_count', 'if (*used >= RECOVER_RANGE_MAX)', 'if (false)'),
+    ('sys/dev/video/geforce/gfinit_resources/bounds.inc', 'resource_multifunction', 'return pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;', '(void)hdr0; return PCI_FN_COUNT;'),
+    ('sys/dev/video/geforce/gfinit_resources/bounds.inc', 'resource_absent_fn0', 'if ((id & 0xffffU) == PCI_VENDOR_NONE) return 0;', 'if ((id & 0xffffU) == PCI_VENDOR_NONE) { (void)id; }'),
+    ('sys/dev/video/geforce/gfinit_resources/bounds.inc', 'resource_log', 'reason, dev, fn, reg, raw);', '"unknown", dev, fn, reg, raw); (void)reason;'),
+    ('sys/dev/video/geforce/gfinit_resources/bounds.inc', 'resource_log_raw', 'reason, dev, fn, reg, raw);', 'reason, dev, fn, reg, raw ^ 1U);'),
+    ('sys/dev/video/geforce/gfinit_resources/windows.inc', 'resource_window_granule', 'last + PCI_BRIDGE_WINDOW_GRANULE - base', 'last - base'),
+    ('sys/dev/pci/pci_barsize.c', 'restore_order', 'pci_cfg_write32(bus, dev, fn, reg, r->raw);', 'if (!rom) pci_cfg_write16(bus, dev, fn, PCI_CFG_COMMAND, cmd);\n    pci_cfg_write32(bus, dev, fn, reg, r->raw);'),
+    ('sys/dev/pci/pci_barsize.c', 'measure_irq', 'unsigned int flags = irq_save();', 'unsigned int flags = irq_state;'),
 
-    ('drivers/pci/pci_barsize.c', 'restore_decode', 'PCI_CFG_COMMAND, cmd);', 'PCI_CFG_COMMAND, cmd & ~3U);'),
-    ('drivers/pci/pci_barsize.c', 'restore_bar', 'reg, r->raw);', 'reg, 0);'),
-    ('drivers/pci/pci_barsize.c', 'restore_high', 'reg + PCI_CFG_BAR_STRIDE, r->high);', 'reg + PCI_CFG_BAR_STRIDE, 0);'),
-    ('drivers/pci/pci_barsize.c', 'upper_size', 'reg + PCI_CFG_BAR_STRIDE, U32_MAX);', 'reg + PCI_CFG_BAR_STRIDE, 0);'),
-    ('drivers/pci/pci_barsize.c', 'size_mask', 'r->len = mask & (0ULL - mask);', 'r->len = 16;'),
-    ('drivers/pci/pci_barsize.c', 'rom_enable', 'PCI_ROM_SIZE_VALUE 0xfffffffeU', 'PCI_ROM_SIZE_VALUE 0xffffffffU'),
-    ('kdebug/gfinit_resources/scan.inc', 'resource_unknown', 'if (raw && !(raw & PCI_BAR_SPACE_IO))', 'if (raw && !(raw & PCI_BAR_SPACE_IO) && false)'),
-    ('kdebug/gfinit_resources/scan.inc', 'resource_function', 'if ((id & 0xffffU) == PCI_VENDOR_NONE) continue;', 'if (fn || (id & 0xffffU) == PCI_VENDOR_NONE) continue;'),
-    ('kdebug/gfinit_resources/windows.inc', 'resource_high', 'if (type && (pci_cfg_read32', 'if (false && (pci_cfg_read32'),
-    ('kdebug/gfinit_resources/bars.inc', 'unassigned', 'if (r.unassigned)', 'if (false)'),
+    ('sys/dev/pci/pci_barsize.c', 'restore_decode', 'PCI_CFG_COMMAND, cmd);', 'PCI_CFG_COMMAND, cmd & ~3U);'),
+    ('sys/dev/pci/pci_barsize.c', 'restore_bar', 'reg, r->raw);', 'reg, 0);'),
+    ('sys/dev/pci/pci_barsize.c', 'restore_high', 'reg + PCI_CFG_BAR_STRIDE, r->high);', 'reg + PCI_CFG_BAR_STRIDE, 0);'),
+    ('sys/dev/pci/pci_barsize.c', 'upper_size', 'reg + PCI_CFG_BAR_STRIDE, U32_MAX);', 'reg + PCI_CFG_BAR_STRIDE, 0);'),
+    ('sys/dev/pci/pci_barsize.c', 'size_mask', 'r->len = mask & (0ULL - mask);', 'r->len = 16;'),
+    ('sys/dev/pci/pci_barsize.c', 'rom_enable', 'PCI_ROM_SIZE_VALUE 0xfffffffeU', 'PCI_ROM_SIZE_VALUE 0xffffffffU'),
+    ('sys/dev/video/geforce/gfinit_resources/scan.inc', 'resource_unknown', 'if (raw && !(raw & PCI_BAR_SPACE_IO))', 'if (raw && !(raw & PCI_BAR_SPACE_IO) && false)'),
+    ('sys/dev/video/geforce/gfinit_resources/scan.inc', 'resource_function', 'if ((id & 0xffffU) == PCI_VENDOR_NONE) continue;', 'if (fn || (id & 0xffffU) == PCI_VENDOR_NONE) continue;'),
+    ('sys/dev/video/geforce/gfinit_resources/windows.inc', 'resource_high', 'if (type && (pci_cfg_read32', 'if (false && (pci_cfg_read32'),
+    ('sys/dev/video/geforce/gfinit_resources/bars.inc', 'unassigned', 'if (r.unassigned)', 'if (false)'),
 ]
 WINDOW_MUTATIONS = [
     ('window_busy', 'if (window_busy)', 'if (false)'),
@@ -97,11 +97,11 @@ def main():
             return result.returncode
     if '--mutate' in sys.argv:
         return int(bool(mutpar.run_with_control(mutation,
-            [('kdebug/gfinit_bus.c', *item) for item in MUTATIONS] +
+            [('sys/dev/video/geforce/diag/gfinit_bus.c', *item) for item in MUTATIONS] +
             list(SHARED_MUTATIONS) +
-            [('kdebug/kdebug_window.c', *item) for item in WINDOW_MUTATIONS] +
+            [('sys/arch/x86/kdebug/kdebug_window.c', *item) for item in WINDOW_MUTATIONS] +
             RESOURCE_MUTATIONS,
-            ('kdebug/gfinit_bus.c', 'control', '', ''))))
+            ('sys/dev/video/geforce/diag/gfinit_bus.c', 'control', '', ''))))
     return 0
 
 

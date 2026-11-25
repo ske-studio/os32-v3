@@ -68,7 +68,7 @@ def run_cases(mutate, build_only=False):
                 (gen/'mutant.stamp').touch()
                 settings = []
             else:
-                settings = mutant_settings(folder, mutation, 'drivers/macintosh/via.c',
+                settings = mutant_settings(folder, mutation, 'sys/dev/macintosh/via.c',
                                            'CUDA_RESET = 0x11', 'CUDA_RESET = 0xff')
             if mutation == 'cuda-reset-byte':
                 source = folder/'mutant-cuda-reset-byte.c'

@@ -1,13 +1,13 @@
 """LOG request, retry, session loss, and bounded foreground progress."""
 CHECK = dict(name='ppc-link-log-host', tier=2, budget=30, needs=[], covers=[
     'tools/lan_bridge.py', 'tools/lanfs_host.py', 'tools/serialfs_host.py',
-    'build/targets/ppc-powermac.mk', 'platform/powermac/link_log.c',
+    'build/targets/ppc-powermac.mk', 'sys/platform/powermac/link_log.c',
     'tools/ppc/link_*.py', 'tools/host_*.py', 'tools/tests/test_ppc_link_log.py',
     'tools/tests/ppc_link_log_host.c','include/*.h', 'platform/powermac/*.h', 'arch/ppc/*.h',
-            'net/*.h', 'mm/kmalloc.h', 'include/kprintf.h',
-            'drivers/net/gem/gem.h', 'sdk/include/os32/*.h',
+            'net/*.h', 'sys/kern/mm/kmalloc.h', 'sys/include/kprintf.h',
+            'sys/dev/net/gem/gem.h', 'sdk/include/os32/*.h',
             'tools/tests/host32.py', 'tools/tests/ppc_link_pressure_host.c',
-            'platform/powermac/log.c', 'platform/powermac/lan_log.c', 'platform/powermac/escc.c'],
+            'sys/platform/powermac/log.c', 'sys/platform/powermac/lan_log.c', 'sys/platform/powermac/escc.c'],
     basis=['LAN_OPERATOR_DESIGN §5'],
 )
 from pathlib import Path
@@ -20,7 +20,7 @@ from host_agent import HostAgent
 
 
 def run(ctx):
-    source = (ctx.root / 'platform/powermac/link_log.c').read_text()
+    source = (ctx.root / 'sys/platform/powermac/link_log.c').read_text()
     mutations = [
         ('if (!rc && status == 200)', 'if (!rc)'),
         ('status >= 400 && status < 500', 'status >= 500 && status < 500'),

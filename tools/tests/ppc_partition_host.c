@@ -1,7 +1,7 @@
 #include "apm.h"
 #include "platform_ext2.h"
 #include "ide_contract.h"
-#include "fs/ext2/ext2_priv.h"
+#include "sys/fs/ext2/ext2_priv.h"
 #include "kprintf.h"
 #include "kstring.h"
 

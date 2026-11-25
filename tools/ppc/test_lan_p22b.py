@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import tempfile
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT/'arch/ppc/kernel_probe.S'
+SOURCE = ROOT/'sys/arch/ppc/kernel_probe.S'
 CROSS = os.environ.get('PPC_CROSS_DIR','/home/hight/opt/cross-ppc')+'/bin/powerpc-elf-'
 
 def check(source):

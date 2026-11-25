@@ -1,8 +1,8 @@
 /* cmd_gfinit.c — `gfinit inspect <sid>` / `gfinit size-bars|prepare|modeset|verify|abort <sid> --allow-write` /
  * `gfinit prepare <sid> --mode-c --allow-write` / `gfinit run-one <sid> <main> --allow-write` (GF6200_S7_SHELL S7a/S7c)。
- * kdebug_call の私有 op (kdebug/gfinit_wire.h) を呼ぶ。試験: tools/tests/gfinit_owner_host.c */
+ * kdebug_call の私有 op (sys/dev/video/geforce/diag/gfinit_wire.h) を呼ぶ。試験: tools/tests/gfinit_owner_host.c */
 #include "shell.h"
-#include "../../kdebug/gfinit_wire.h"
+#include "../../sys/dev/video/geforce/diag/gfinit_wire.h"
 
 #define GFINIT_KAPI_MIN 78U /* kdebug_call (slot 253) の版 */
 

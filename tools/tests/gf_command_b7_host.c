@@ -1,6 +1,6 @@
 /* B7 includes the real component; A2 models F1 after ACK, MMIO,
  * IRQ save/restore and the polled serial facade. */
-#include "../../hwdev/gf/command.h"
+#include "../../sys/dev/video/geforce/command.h"
 static void fail(int line)
 { __asm__ volatile("int $0x80" : : "a"(1), "b"(line % 250 + 1)); for (;;) {} }
 #define CHECK(x) do { if (!(x)) fail(__LINE__); } while (0)
@@ -23,7 +23,7 @@ static const struct event { u32 kind, off, value; } expected[] = {
 #include "gf_command_host.h"
 
 #ifndef GF2_FAULT_SOURCE
-#define GF2_FAULT_SOURCE "../../hwdev/gf/fault.c"
+#define GF2_FAULT_SOURCE "../../sys/dev/video/geforce/fault.c"
 #endif
 #include GF2_FAULT_SOURCE
 

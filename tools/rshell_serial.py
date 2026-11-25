@@ -2,7 +2,7 @@
 """rshell_serial.py — 実機の OS32 リモートシェル (rshell) にシリアルで話す。
 
 ゲスト側 (userland/shell/rshell.c) の約束:
-  - 9600bps 8N1 (drivers/char/serial.c の既定)。
+  - 9600bps 8N1 (sys/dev/char/serial.c の既定)。
   - ホストは 1 行 (コマンド + '\\n') を送り、ゲストは応答の最後に EOT (0x04) を返す。
   - rshell に入った瞬間にも EOT を 1 つ送る (同期用)。
 NP21/W の aidebug が /api/cmd でやっていること (aidebug_api.cpp、timeout 15s) と同じ。
@@ -51,7 +51,7 @@ LAN 版は `--sfs-lan --timeout 600 cmd sfs run hsync boot`。
 ゲストの `sfs lan on` を先に設定し、ノートでは lanfs_host.py を別途起動する。
 `--sfs-lan` は `--serve-host` と排他。開始行・exit 行・echo・EOT を照合する。
 このどちらの指定も無い `sfs run` は送らずに断る。
-プロトコルは tools/serialfs_host.py と fs/serialfs/sfs_proto.h。
+プロトコルは tools/serialfs_host.py と sys/fs/serialfs/sfs_proto.h。
 NP21/W (ai-debug) では `--port aidebug:http://127.0.0.1:8025` で COM1 を HTTP の
 /api/serial/read・write 越しに使える (ini は変えない。/api/cmd と同時に使わない)。
 ⚠ 本文に EOT (0x04) を含む出力はセッション外では途中で切れる (既知の制約)。
@@ -102,7 +102,7 @@ except ImportError:  # pragma: no cover
 # `serial N` を送ってから閉じるまでの間合い [秒]。9600 で 14 文字 ≒ 15ms なので
 # 十分な余裕。短くすると行の途中でポートを閉じてゲストが切り替えを始めない。
 SPEED_SWITCH_SETTLE_S = 0.5
-# --fast が受ける速度 (drivers/char/serial_plan.c の表と同じ。V･FAST に入れるのは
+# --fast が受ける速度 (sys/dev/char/serial_plan.c の表と同じ。V･FAST に入れるのは
 # FIFO 搭載機だけで、入れなければゲストは互換モードのまま = 速度が合わなくなる)。
 FAST_BAUDS = (9600, 14400, 19200, 28800, 38400, 57600, 115200)
 # ---------------------------------------------------------------------------

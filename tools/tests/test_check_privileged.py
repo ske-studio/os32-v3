@@ -21,12 +21,12 @@ class PrivilegedTests(unittest.TestCase):
             source = Path(tmp) / 'probe.s'
             obj = Path(tmp) / 'probe.o'
             for name, instruction, count, expected in (
-                    ('userland/tests/faulttest.o', 'hlt', 1, 0),
-                    ('userland/tests/h3a.o', 'hlt', 1, 0),
-                    ('userland/tests/h3b.o', 'hlt', 1, 0),
+                    ('userland/diag/faulttest.o', 'hlt', 1, 0),
+                    ('userland/diag/h3a.o', 'hlt', 1, 0),
+                    ('userland/diag/h3b.o', 'hlt', 1, 0),
                     ('userland/tests/unallowed.o', 'hlt', 1, 1),
-                    ('userland/tests/faulttest.o', 'hlt', 2, 1),
-                    ('userland/tests/faulttest.o', 'cli', 1, 1),
+                    ('userland/diag/faulttest.o', 'hlt', 2, 1),
+                    ('userland/diag/faulttest.o', 'cli', 1, 1),
                     ('userland/tests/ordinary.o', 'nop', 1, 0)):
                 with self.subTest(name=name, instruction=instruction, count=count):
                     source.write_text('.text\n' + (instruction + '\n') * count)

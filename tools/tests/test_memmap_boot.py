@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""ブート順を実物 (mm/paging.c + mm/shm.c) で再生し、地図と PTE を照合する。
+"""ブート順を実物 (sys/kern/mm/paging.c + sys/kern/mm/shm.c) で再生し、地図と PTE を照合する。
 
 票 docs/archive/kernel_v21/TASK_KSTACK_USER.md §4 の 2・3 / 記録: tools/tests/memmap_tdd.md
 
@@ -35,8 +35,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 # build/config.mk の INC_KERNEL と同じ並び。ホスト側は模型のヘッダだけ先頭に足す。
 KERNEL_INCLUDES = include_flags(ROOT)
 HARNESS = ROOT / "tools/tests/memmap_boot_host.c"
-TARGET_SRCS = [ROOT / "mm/paging.c"]
-SHM_SRC = ROOT / "mm/shm.c"
+TARGET_SRCS = [ROOT / "sys/kern/mm/paging.c"]
+SHM_SRC = ROOT / "sys/kern/mm/shm.c"
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie',
          '-fno-stack-protector', '-Wall', '-Wextra', '-Werror']
 # -O0 では KHEAP_BASE (&__bss_end 由来) が畳まれず、shm.c の STATIC_ASSERT が
@@ -48,7 +48,7 @@ CASES = [("typical", 0x280000, 0, 0), ("empty SLACK", 0x375000, 0, 0)]
 
 MUTATIONS = {
     # 逆転を撥ねても数えない = 空振りが成功に見えていた元の姿
-    "no-reject": ("mm/paging.c",
+    "no-reject": ("sys/kern/mm/paging.c",
                   "int paging_set_not_present(u32 start, u32 end)\n"
                   "{\n    u32 pfn, last;\n"
                   "    if (start > end) { paging_range_reject_count++; return -1; }",
@@ -57,51 +57,51 @@ MUTATIONS = {
                   "    if (start > end) return -1;"),
     # 浮動番地 (SHM) の規則をカーネル帯域の外へも広げる。境界を固定番地として
     # 守らなくなるので、予算を超えた配置が「期待どおり」に見えてしまう。
-    "band-unbounded": ("mm/paging.c",
+    "band-unbounded": ("sys/kern/mm/paging.c",
                        "    if (a >= KERNEL_LOAD_ADDR && a <= MEM_KERNEL_BAND_END) {",
                        "    if (a >= KERNEL_LOAD_ADDR) {"),
-    "slack-old-np": ("mm/paging.c",
+    "slack-old-np": ("sys/kern/mm/paging.c",
         "        return MM_RW;                           /* SLACK */",
         "        return MM_NP;                           /* SLACK */"),
     # 食い違いを 1 本にまとめない = 区間の本数が意味を失う
-    "fixed-remap-missing": ("mm/paging.c",
+    "fixed-remap-missing": ("sys/kern/mm/paging.c",
         "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_FRAME_END,",
         "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_BASE,"),
-    "fixed-user": ("mm/paging.c",
+    "fixed-user": ("sys/kern/mm/paging.c",
         "MEM_FIXED_PAGING_BASE, PAGE_RW) != 0 ||",
         "MEM_FIXED_PAGING_BASE, PAGE_RW | PTE_USER) != 0 ||"),
-    "fixed-wrong-frame": ("mm/paging.c",
+    "fixed-wrong-frame": ("sys/kern/mm/paging.c",
         "page_directory[i] = V2P(page_tables[i]) | PAGE_RW;",
         "page_directory[i] = (V2P(page_tables[i]) + PAGE_SIZE) | PAGE_RW;"),
-    "fixed-not-wb": ("mm/paging.c",
+    "fixed-not-wb": ("sys/kern/mm/paging.c",
         "MEM_FIXED_PAGING_BASE, PAGE_RW) != 0 ||",
         "MEM_FIXED_PAGING_BASE, PAGE_RW | PTE_PCD) != 0 ||"),
-    "fixed-failure-if-lost": ("mm/paging.c",
+    "fixed-failure-if-lost": ("sys/kern/mm/paging.c",
         "        irq_restore(flags);\n        return; /* PG",
         "        (void)flags;\n        return; /* PG"),
-    "fixed-reinit": ("mm/paging.c",
+    "fixed-reinit": ("sys/kern/mm/paging.c",
         "if (pg_enabled) { irq_restore(flags); return; }",
         "if (0) { irq_restore(flags); return; }"),
-    "fixed-no-irq-save": ("mm/paging.c",
+    "fixed-no-irq-save": ("sys/kern/mm/paging.c",
         "unsigned int flags = irq_save();", "unsigned int flags = 0x202U;"),
-    "fixed-unconditional-sti": ("mm/paging.c",
+    "fixed-unconditional-sti": ("sys/kern/mm/paging.c",
         "    pg_enabled = 1;\n    irq_restore(flags);",
         "    pg_enabled = 1;\n    _enable();"),
-    "no-coalesce": ("mm/paging.c",
+    "no-coalesce": ("sys/kern/mm/paging.c",
                     "        for (j = i + 1; j < (MEM_DMA_POOL_END + 1) / PAGE_SIZE; j++) {",
                     "        for (j = i + 1; j < i + 1; j++) {"),
 }
 
 
 def check_shm_replay():
-    """ハーネスの shm_init_replay() が mm/shm.c の shm_init() の写しのままか。
+    """ハーネスの shm_init_replay() が sys/kern/mm/shm.c の shm_init() の写しのままか。
 
     ホストの gcc 15 は (u32)&__bss_end を含む定数式を畳まないので shm.c を
     そのまま #include できない (クロスの gcc 13.2 は畳む)。写しにする以上、
     **本物が変わったらここで気づく**ようにしておく。"""
     body = re.search(r"void shm_init\(void\)\s*\{(.*?)\n\}", SHM_SRC.read_text(encoding="utf-8"), re.S)
     if not body:
-        raise SystemExit("mm/shm.c の shm_init() が見つからない")
+        raise SystemExit("sys/kern/mm/shm.c の shm_init() が見つからない")
     calls = re.findall(r"paging_\w+", body.group(1))
     replay = re.findall(r"paging_\w+", HARNESS.read_text(encoding="utf-8")
                         .split("shm_init_replay")[1].split("}")[0])
@@ -117,7 +117,7 @@ def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
     name, bss, reject, bad = case
     tmp = pathlib.Path(tmp)
     sources = {}
-    for src in TARGET_SRCS + [ROOT / "mm/pgalloc.c",
+    for src in TARGET_SRCS + [ROOT / "sys/kern/mm/pgalloc.c",
                                ROOT / "tools/tests/layout_boot_fixture.h"]:
         sources[src] = paging_source(src)
     if mutation:
@@ -128,16 +128,16 @@ def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
             raise SystemExit("変異 %s の当て先が一意でない: %s (%d)"
                              % (mutation, rel, text.count(old)))
         sources[path] = text.replace(old, new, 1)
-    path = ROOT / 'mm/paging.c'
+    path = ROOT / 'sys/kern/mm/paging.c'
     sources[path] = sources[path].replace('P2V_BOOT(', 'host_boot_paging_ptr(')
     if case[0] == 'PG-failure':
-        path = ROOT / 'mm/paging.c'
+        path = ROOT / 'sys/kern/mm/paging.c'
         sources[path] = sources[path].replace(
             "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_FRAME_END,",
             "paging_map_range(MEM_FIXED_PAGING_BASE, MEM_FIXED_PAGING_BASE - PAGE_SIZE,")
-    (tmp / "paging_host_source.c").write_text(sources[ROOT / "mm/paging.c"],
+    (tmp / "paging_host_source.c").write_text(sources[ROOT / "sys/kern/mm/paging.c"],
                                               encoding="utf-8")
-    alloc = sources[ROOT / "mm/pgalloc.c"]
+    alloc = sources[ROOT / "sys/kern/mm/pgalloc.c"]
     for part in ('owner', 'resource', 'surface'):
         alloc = alloc.replace(
             f'#include "pgalloc_{part}.inc"', (ROOT / f'mm/pgalloc_{part}.inc').read_text())
@@ -155,8 +155,8 @@ def build_and_run(tmp, case, mutation=None, kb=8192, initial_if=0x202):
                '-DHOST_EXPECT_BAD=%d' % bad, f'-DHOST_RAM_KB={kb}', f'-DHOST_INITIAL_IF={initial_if}', f'-DHOST_EXPECT_INIT_FAIL={int(case[0] == "PG-failure")}']
     subprocess.run(['gcc', *FLAGS, *HOST_OPT, *defines, '-nostdlib', '-static', '-no-pie',
                     *includes, '-ffunction-sections', '-Wl,--gc-sections', str(HARNESS),
-                    str(ROOT / 'mm/physmem.c'), str(ROOT / 'mm/kmalloc.c'),
-                    str(ROOT / 'exec/exec_heap.c'),
+                    str(ROOT / 'sys/kern/mm/physmem.c'), str(ROOT / 'sys/kern/mm/kmalloc.c'),
+                    str(ROOT / 'sys/kern/exec/exec_heap.c'),
                     '-o', str(exe)], check=True)
     return host32.run([str(exe)], capture_output=True, timeout=60)
 
@@ -222,7 +222,7 @@ def main():
     target = ['-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-pie',
               '-fno-stack-protector', '-O2', '-Wall', '-D__KERNEL_BUILD__']
     with tempfile.TemporaryDirectory(prefix='os32-memmap-') as tmp:
-        for src in ('mm/paging.c', 'mm/shm.c'):
+        for src in ('sys/kern/mm/paging.c', 'sys/kern/mm/shm.c'):
             subprocess.run(['i386-elf-gcc', *target,
                             *KERNEL_INCLUDES,
                             '-c', str(ROOT / src),

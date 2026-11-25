@@ -13,23 +13,23 @@ import tempfile
 import host32
 
 CHECK = dict(name='powermac-reset', tier=1, needs=[], budget=40, env=['ppc-cross'], covers=[
-    'drivers/macintosh/via.c', 'drivers/macintosh/via.h',
-    'include/types.h', 'include/callconv.h',
+    'sys/dev/macintosh/via.c', 'sys/dev/macintosh/via.h',
+    'sys/include/types.h', 'sys/include/callconv.h',
     'tools/tests/test_powermac_reset.py', 'tools/tests/via_host.c',
     'tools/tests/host32.py', 'tools/ppc/kboot_capture.py',
-    'tools/ppc/kboot_capture_fake.c', 'platform/powermac/via_tree.c',
-    'platform/powermac/via_window.h', 'platform/powermac/kboot_capture.c',
-    'platform/powermac/gmac_tree.c', 'platform/powermac/kboot_info.h',
-    'platform/powermac/*.h', 'arch/ppc/*.h', 'include/memmap.h',
-    'lib/kstring.h', 'lib/kstring_c.c', 'lib/kprintf.c', 'lib/divdi3.c',
-    'arch/ppc/pd_walk.c', 'platform/powermac/kernel_boot.c',
-    'platform/powermac/pci_config.c', 'platform/powermac/pci_backend.c',
-    'platform/powermac/lan_gem_io.c', 'platform/powermac/pci_hosts.inc',
-    'platform/powermac/usb_boot.c', 'platform/powermac/usb_platform.c', 'platform/powermac/usb_tree.c',
-    'platform/powermac/input_keymap_backend.c', 'input/hal/keymap.h', 'input/hal/usb_input.h',
-    'tools/ppc/usb_via_overlap_host.c', 'drivers/usb/usb_core.h',
-    'drivers/usb/ohci_regs.h', 'include/endian_dma.h', 'include/usb_platform.h',
-    'include/kprintf.h', 'mm/paging.h', 'mm/kmalloc.h', 'kernel/irq/tick.h',
+    'tools/ppc/kboot_capture_fake.c', 'sys/platform/powermac/via_tree.c',
+    'sys/platform/powermac/via_window.h', 'sys/platform/powermac/kboot_capture.c',
+    'sys/platform/powermac/gmac_tree.c', 'sys/platform/powermac/kboot_info.h',
+    'platform/powermac/*.h', 'arch/ppc/*.h', 'sys/include/memmap.h',
+    'sys/kern/kstring.h', 'sys/kern/kstring_c.c', 'sys/kern/kprintf.c', 'lib/divdi3.c',
+    'sys/arch/ppc/pd_walk.c', 'sys/platform/powermac/kernel_boot.c',
+    'sys/platform/powermac/pci_config.c', 'sys/platform/powermac/pci_backend.c',
+    'sys/platform/powermac/lan_gem_io.c', 'sys/platform/powermac/pci_hosts.inc',
+    'sys/platform/powermac/usb_boot.c', 'sys/platform/powermac/usb_platform.c', 'sys/platform/powermac/usb_tree.c',
+    'sys/platform/powermac/input_keymap_backend.c', 'sys/hal/input/keymap.h', 'sys/hal/input/usb_input.h',
+    'tools/ppc/usb_via_overlap_host.c', 'sys/dev/usb/usb_core.h',
+    'sys/dev/usb/ohci_regs.h', 'sys/include/endian_dma.h', 'sys/include/usb_platform.h',
+    'sys/include/kprintf.h', 'sys/kern/mm/paging.h', 'sys/kern/mm/kmalloc.h', 'sys/kern/irq/tick.h',
 ], basis=['docs/decisions/ppc/PPC_RESET_DESIGN.md §2・§3・§7',
           'PPC_RESET_DESIGN 確定後の追記', 'docs/decisions/ppc/PPC_KAPI_FILL_DESIGN.md §5 clock'])
 
@@ -139,11 +139,11 @@ def usb_cases(folder, mutate):
         includes = ('.', 'include', 'arch/ppc', 'platform/powermac', 'sdk/include',
                     'sdk/include/os32', 'kernel', 'init', 'kernel/console',
                     'kernel/irq', 'kernel/time', 'mm', 'lib')
-        sources = ('tools/ppc/usb_via_overlap_host.c', 'platform/powermac/usb_boot.c',
-                   'platform/powermac/input_keymap_backend.c', 'arch/ppc/pd_walk.c',
-                   'platform/powermac/pci_config.c', 'platform/powermac/pci_backend.c',
-                   'platform/powermac/lan_gem_io.c',
-                   'lib/kstring_c.c', 'lib/kprintf.c', 'lib/divdi3.c')
+        sources = ('tools/ppc/usb_via_overlap_host.c', 'sys/platform/powermac/usb_boot.c',
+                   'sys/platform/powermac/input_keymap_backend.c', 'sys/arch/ppc/pd_walk.c',
+                   'sys/platform/powermac/pci_config.c', 'sys/platform/powermac/pci_backend.c',
+                   'sys/platform/powermac/lan_gem_io.c',
+                   'sys/kern/kstring_c.c', 'sys/kern/kprintf.c', 'lib/divdi3.c')
         subprocess.run(
             [str(cc), '-mcpu=7450', '-msdata=none', '-msoft-float', '-mno-altivec',
              '-std=gnu11', '-ffreestanding', '-fno-builtin', '-fno-pie',

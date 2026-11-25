@@ -1,7 +1,7 @@
 """Layer 1 PCI master and latency policy with a fake configuration space."""
 CHECK = dict(name='gf1-master-host', tier=1,
-    covers=['tools/tests/recover_gf_dev_stub.c', 'hwdev/gf/master.c', 'hwdev/gf/foundation.h', 'hwdev/gf/internal.h',
-            'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'kdebug/recover.h',
+    covers=['tools/tests/recover_gf_dev_stub.c', 'sys/dev/video/geforce/master.c', 'sys/dev/video/geforce/foundation.h', 'sys/dev/video/geforce/internal.h',
+            'sys/dev/pci/pci.h', 'sys/dev/pci/pci_decode.h', 'sys/dev/video/geforce/diag/recover.h',
             'tools/tests/gf1_master_host.c', 'tools/tests/test_gf1_master.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.8,
@@ -16,7 +16,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'hwdev/gf/master.c'
+SOURCE = ROOT / 'sys/dev/video/geforce/master.c'
 
 
 def main():
@@ -38,13 +38,13 @@ def main():
             assert original.count(old) == 1
             mutant = Path(td) / 'master.c'
             # Preserve relative includes when compiling the temporary source.
-            mutant.write_text(original.replace('#include "foundation.h"', '#include "' + str(ROOT / 'hwdev/gf/foundation.h') + '"').replace('#include "../../drivers/pci/pci.h"', '#include "' + str(ROOT / 'drivers/pci/pci.h') + '"').replace('#include "../../kdebug/recover.h"', '#include "' + str(ROOT / 'kdebug/recover.h') + '"').replace(old, new))
+            mutant.write_text(original.replace('#include "foundation.h"', '#include "' + str(ROOT / 'sys/dev/video/geforce/foundation.h') + '"').replace('#include "../../sys/dev/pci/pci.h"', '#include "' + str(ROOT / 'sys/dev/pci/pci.h') + '"').replace('#include "../../sys/dev/video/geforce/diag/recover.h"', '#include "' + str(ROOT / 'sys/dev/video/geforce/diag/recover.h') + '"').replace(old, new))
             assert run(mutant) != 0
             print('MUTATE RED Command DWORD write', flush=True)
             old = 'PCI_CFG_LATENCY_TIMER) < GF_LATENCY_MIN'
             new = 'PCI_CFG_CACHE_LINE) < GF_LATENCY_MIN'
             assert original.count(old) == 1
-            mutant.write_text(original.replace('#include "foundation.h"', '#include "' + str(ROOT / 'hwdev/gf/foundation.h') + '"').replace('#include "../../drivers/pci/pci.h"', '#include "' + str(ROOT / 'drivers/pci/pci.h') + '"').replace('#include "../../kdebug/recover.h"', '#include "' + str(ROOT / 'kdebug/recover.h') + '"').replace(old, new))
+            mutant.write_text(original.replace('#include "foundation.h"', '#include "' + str(ROOT / 'sys/dev/video/geforce/foundation.h') + '"').replace('#include "../../sys/dev/pci/pci.h"', '#include "' + str(ROOT / 'sys/dev/pci/pci.h') + '"').replace('#include "../../sys/dev/video/geforce/diag/recover.h"', '#include "' + str(ROOT / 'sys/dev/video/geforce/diag/recover.h') + '"').replace(old, new))
             assert run(mutant) != 0
             print('MUTATE RED latency read at 0Ch', flush=True)
 

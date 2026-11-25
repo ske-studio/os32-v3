@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Stage A: exercise the real preprocessor, assembler and header dependencies."""
 CHECK = dict(name='header-boundary', tier=1,
-    covers=['include/cpu.h', 'include/kernel_tick.h', 'include/types.h',
-            'arch/x86/**', 'arch/ppc/arch_cpu.h', 'include/bootlog.h',
-            'init/bootlog_save.c', 'arch/x86/kernel/ring3_ls.S', 'exec/ring3_ls.h',
+    covers=['sys/include/cpu.h', 'sys/include/kernel_tick.h', 'sys/include/types.h',
+            'arch/x86/**', 'sys/arch/ppc/arch_cpu.h', 'sys/include/bootlog.h',
+            'sys/kern/init/bootlog_save.c', 'sys/arch/x86/kernel/ring3_ls.S', 'sys/kern/exec/ring3_ls.h',
             'build/kernel-objects.mk', 'tools/tests/kernel_includes.py',
             'tools/tests/host_arch/arch_cpu.h', 'sdk/include/os32/**'],
     needs=[], budget=2.7,
@@ -44,25 +44,25 @@ def main():
     cc = str(Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross')) / 'bin/i386-elf-gcc')
     with tempfile.TemporaryDirectory(prefix='header-boundary-') as temp:
         directory = Path(temp)
-        cpu = (ROOT / 'include/cpu.h').read_text()
+        cpu = (ROOT / 'sys/include/cpu.h').read_text()
         assert probe(directory, cpu), 'flags leaked into a non-x86 architecture'
         print('PASS mock architecture dependencies (normal control)', flush=True)
         for label in ('normal', 'r1'):
             out = directory / (label + '.o')
             command([cc, '-m32', '-Iarch/x86', '-Iexec', '-Iarch/x86/kernel', '-Isdk/include/os32',
                      *(['-DOS32_R1_FIXTURE'] if label == 'r1' else []),
-                     '-c', 'arch/x86/kernel/ring3_ls.S', '-o', str(out)])
-            dep = command([cc, '-m32', '-Iarch/x86', '-Iexec', '-Iarch/x86/kernel', '-Isdk/include/os32', '-M', 'arch/x86/kernel/ring3_ls.S'])
+                     '-c', 'sys/arch/x86/kernel/ring3_ls.S', '-o', str(out)])
+            dep = command([cc, '-m32', '-Iarch/x86', '-Iexec', '-Iarch/x86/kernel', '-Isdk/include/os32', '-M', 'sys/arch/x86/kernel/ring3_ls.S'])
             assert 'x86_flags.h' not in dep, dep
             print('PASS ' + label + ' real ring3 ASM and dependencies', flush=True)
-        dep = command([cc, *include_flags(ROOT), '-M', 'init/bootlog_save.c'])
+        dep = command([cc, *include_flags(ROOT), '-M', 'sys/kern/init/bootlog_save.c'])
         assert 'kernel_tick.h' in dep and 'idt.h' not in dep and 'gdt.h' not in dep, dep
         print('PASS bootlog tick dependencies', flush=True)
         if args.mutate:
             anchor = '#define CPU_H\n'
             assert cpu.count(anchor) == 1
             # Use the same original include spelled absolutely in the isolated copy.
-            mutant = cpu.replace(anchor, anchor + '#include "' + str(ROOT / 'arch/x86/x86_flags.h') + '"\n')
+            mutant = cpu.replace(anchor, anchor + '#include "' + str(ROOT / 'sys/arch/x86/x86_flags.h') + '"\n')
             assert not probe(directory, mutant), 'flags re-entry mutation escaped'
             print('MUTATION flags re-entry RED (runtime dependency assertion)', flush=True)
     return 0

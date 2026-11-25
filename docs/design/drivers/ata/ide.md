@@ -1,4 +1,4 @@
-# drivers/ata/ide.c — IDE PIO の入口と検出
+# sys/dev/ata/ide.c — IDE PIO の入口と検出
 
 > 状態: **現行 (2026-10-31)**
 
@@ -7,10 +7,10 @@
 [ide_multiple](ide_multiple.md) が担当する。
 `ide.h` は 1 コマンド最大 256 セクタと失敗契約を定義する。
 
-デバイス層の窓口は `kernel/dev/device_ide.c` に置き、共通の宣言は
-`include/ide_contract.h` に置く。像の機能 `IDE` が窓口・検出・番地計算を選ぶ。
-`include/ide_bus.h` はバンク選択、taskfile、Alt Status、Device Control、Data の契約を定める。
-PC-98 の窓は `platform/pc98/platform_ide_bus.h`、ATAPI と共有する番地は同じ場所の
+デバイス層の窓口は `sys/dev/ide/device_ide.c` に置き、共通の宣言は
+`sys/include/ide_contract.h` に置く。像の機能 `IDE` が窓口・検出・番地計算を選ぶ。
+`sys/include/ide_bus.h` はバンク選択、taskfile、Alt Status、Device Control、Data の契約を定める。
+PC-98 の窓は `sys/platform/pc98/platform_ide_bus.h`、ATAPI と共有する番地は同じ場所の
 `platform_ide_ports.h` に置く。窓の無いバンクは Alt Status が 0xFF となり、検出を飛ばす。
 IDENTIFY は `ide_bus_data_word` の ATA 語の値から容量とモデル名を読む。
 セクタは奇数番地でも媒体のバイト順で読み書きする。
@@ -51,10 +51,10 @@ NetBSD のドライブ I/O 用 ATA_DELAY と同じ値を用いる。
 
 | ファイル | 関数 | 待つ状態 |
 |---|---|---|
-| drivers/ata/ide.c | ide_wait_bsy | 発行前・IDENTIFY 後の BSY 解除 |
-| drivers/ata/ide.c | ide_wait_drq | IDENTIFY の BSY 解除、次に DRQ の成立（2 ループ） |
-| drivers/ata/ide_pio.inc | ide_pio_wait_phase | データ相の BSY 解除と DRQ 成立 |
-| drivers/ata/ide_pio.inc | ide_pio_finish | 終了相の BSY・DRQ 解除。SET MULTIPLE も共用 |
+| sys/dev/ata/ide.c | ide_wait_bsy | 発行前・IDENTIFY 後の BSY 解除 |
+| sys/dev/ata/ide.c | ide_wait_drq | IDENTIFY の BSY 解除、次に DRQ の成立（2 ループ） |
+| sys/dev/ata/ide_pio.inc | ide_pio_wait_phase | データ相の BSY 解除と DRQ 成立 |
+| sys/dev/ata/ide_pio.inc | ide_pio_finish | 終了相の BSY・DRQ 解除。SET MULTIPLE も共用 |
 
 独立した DRDY 待ちはない。PC-98 は割込許可後、PowerMac は DEC の起動後に IDE を検出する。
 最初の tick の前や割込禁止中に時計が進まない場合は、従来の 50 万回（IDENTIFY の先頭と

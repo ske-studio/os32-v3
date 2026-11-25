@@ -6,14 +6,14 @@
 
 ### ide_limits
 
-`fs/ide_limits.h` は共通契約から上限を得て mask を維持（hd名/bootinfo幾何/MBR選択は変えない）。
+`sys/fs/ide_limits.h` は共通契約から上限を得て mask を維持（hd名/bootinfo幾何/MBR選択は変えない）。
 
 ### vfs_fd
 
 - stdinは既存canonical処理をVFSに残す。新しいTTY・Deviceインスタンスは不要。
 
 ```c
-/* fs/vfs_fd.c: リダイレクトの先行判定、size==0、部分読出しはそのまま。 */
+/* sys/fs/vfs_fd.c: リダイレクトの先行判定、size==0、部分読出しはそのまま。 */
 int c = input_getchar_kapi(); /* 従来kbd_getchar_kapiと同じprovider */
 if (c < 0) return i ? (int)i : c;
 if (c == '\r') c = '\n';
@@ -24,7 +24,7 @@ if (c == '\n') break;
 ### vfs_device
 
 ```c
-/* fs/vfs_device.h: VFS 内部契約。VFS_DEV_* の既存値は固定。 */
+/* sys/fs/vfs_device.h: VFS 内部契約。VFS_DEV_* の既存値は固定。 */
 enum vfs_name_mode { VFS_NAME_DIGIT_PREFIX, VFS_NAME_PREFIX, VFS_NAME_EXACT };
 struct vfs_device_name {
     const char *prefix;
@@ -35,7 +35,7 @@ void vfs_device_names_register(const struct vfs_device_name *rows, unsigned n);
 
 ### vfs
 
-- rows/件数を VFS が保持、実体は platform/pc98/boot_names.c。pc98_boot_bind で一括登録、確保不要。VFS/FS の通常 init でこの表を消さない。未登録時は parse/番号検証とも失敗。
+- rows/件数を VFS が保持、実体は sys/platform/pc98/boot_names.c。pc98_boot_bind で一括登録、確保不要。VFS/FS の通常 init でこの表を消さない。未登録時は parse/番号検証とも失敗。
 - 純粋な字句解決表であり、drivers/dev の実在 Device 表とは別。fd2/3 や不在 hd も旧来の parse は成功するため dev_find 成功を条件にしない。loop/lo は新規に受理しない。
 - DIGIT_PREFIX は prefix 直後の **1 桁だけ**を範囲検査し、末尾は無視。COM、COM0、COM9、COMxyz は全て SERIAL/1。hostdrv0 は失敗。大小文字は区別。成功するまで出力ポインタへ書かない。
 
@@ -48,9 +48,9 @@ void vfs_device_names_register(const struct vfs_device_name *rows, unsigned n);
 ## 索引
 
 - [fs/ext2/](ext2/README.md)
-- [fs/isofs/iso9660_media.c](isofs/iso9660_media.md)
-- [fs/serialfs/serialfs_persistent.c](serialfs/serialfs_persistent.md)
-- [fs/serialfs/sfs_block.c](serialfs/sfs_block.md)
+- [sys/fs/isofs/iso9660_media.c](isofs/iso9660_media.md)
+- [sys/fs/serialfs/serialfs_persistent.c](serialfs/serialfs_persistent.md)
+- [sys/fs/serialfs/sfs_block.c](serialfs/sfs_block.md)
 - [pc98pt](pc98pt.md)
 - [vfs_fd_open](vfs_fd_open.md)
 - [vfs_path_kind](vfs_path_kind.md)

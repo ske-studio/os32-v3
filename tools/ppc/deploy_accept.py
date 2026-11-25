@@ -12,7 +12,7 @@ from mkpkg import read_pkg
 from product_accept import catalog
 from root_lz4_layout import segments
 
-MANAGEMENT = 'kernel/dev/install_management.c'
+MANAGEMENT = 'sys/kern/dev/install_management.c'
 MUTATIONS = {
     'restore': ('rc = m->write(unit, s->lba, 1, s->bytes);',
                 'rc = s->lba == 1 ? 0 : m->write(unit, s->lba, 1, s->bytes);'),

@@ -1,6 +1,6 @@
-# drivers/sound/fm/fm.c — 設計
+# sys/dev/sound/fm/fm.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_T2D_T2H (T2e の KAPI の範囲検査の欠落の修正) の契約を今のソースと照らして要約
-ソース: `drivers/sound/fm/fm.c`
+ソース: `sys/dev/sound/fm/fm.c`
 
 ## 引数の範囲
 

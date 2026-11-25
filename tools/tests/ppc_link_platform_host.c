@@ -1,5 +1,5 @@
 #include "types.h"
-#include "kernel/irq/tick.h"
+#include "sys/kern/irq/tick.h"
 #define OS32_PPC_ARCH_IO_H
 #define EE 0x8000u
 static u32 msr;

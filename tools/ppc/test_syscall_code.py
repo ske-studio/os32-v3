@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'arch/ppc/syscall_code.c'
+SOURCE = ROOT / 'sys/arch/ppc/syscall_code.c'
 PPC = (os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin/powerpc-elf-objdump')
 HARNESS = r'''
 #include "syscall_code.h"

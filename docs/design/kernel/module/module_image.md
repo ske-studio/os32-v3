@@ -1,8 +1,8 @@
-# kernel/module/module_image.c — 設計
+# sys/kern/module/module_image.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_DBGREF (§3-2・§4) の契約を今のソースと照らして要約
-ソース: `kernel/module/module_image.c` (`module_image_header`・`module_image_validate`・`module_image_relocate`)・`kernel/module/module_image.h`・`kernel/module/module_schema.h` (生成元 `tools/module_schema.py`)
+ソース: `sys/kern/module/module_image.c` (`module_image_header`・`module_image_validate`・`module_image_relocate`)・`sys/kern/module/module_image.h`・`sys/kern/module/module_schema.h` (生成元 `tools/module_schema.py`)
 
-`/boot` の部品 (KMOD v1) を検査し、再配置する。ローダ (`kernel/module/module_runtime.c`) とホスト試験が同じ実装を使う。
+`/boot` の部品 (KMOD v1) を検査し、再配置する。ローダ (`sys/kern/module/module_runtime.c`) とホスト試験が同じ実装を使う。
 容器の並び・ヘッダの語・**拒否する条件の一覧の正典は `docs/08_build.md` §8-2「起動時に読む部品の形式 (KMOD v1)」**。ここは関数の約束だけを書く。
 
 ## 呼び手が決める期待 (`struct module_image_policy`)

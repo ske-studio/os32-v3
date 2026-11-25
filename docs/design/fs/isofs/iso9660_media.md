@@ -1,7 +1,7 @@
-# fs/isofs/iso9660_media.c — ISO の媒体の境目 (Device ごとの世代・FD の失効・載せ直し)
+# sys/fs/isofs/iso9660_media.c — ISO の媒体の境目 (Device ごとの世代・FD の失効・載せ直し)
 
 > 状態: **現行 (2026-11-18)** — 出所: NET_HOSTSVC_DESIGN・TASK_NET_HOSTSVC (要約して移した)
-ソース: `fs/isofs/iso9660_media.c`・`fs/isofs/iso9660_media.h`・`fs/isofs/iso9660.c`・`fs/vfs.h` (`resource_check`・`resource_refresh`・`vfs_fd_stale_mount`・`vfs_resource_stale_mount`)・`fs/vfs_fd.c`・`kernel/dev/dev.h` (`media_check`・`blk_read_u32`・`dev_media_check`)
+ソース: `sys/fs/isofs/iso9660_media.c`・`sys/fs/isofs/iso9660_media.h`・`sys/fs/isofs/iso9660.c`・`sys/fs/vfs.h` (`resource_check`・`resource_refresh`・`vfs_fd_stale_mount`・`vfs_resource_stale_mount`)・`sys/fs/vfs_fd.c`・`sys/hal/block/dev.h` (`media_check`・`blk_read_u32`・`dev_media_check`)
 
 ISO の読みとキャッシュの寿命そのものは [iso9660](iso9660.md)。ここは媒体が替わった・相手が落ちた時の扱い。
 

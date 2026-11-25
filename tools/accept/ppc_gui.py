@@ -385,13 +385,13 @@ def main():
         if case in wm_mutations:
             options += [wm_mutant(folder, case)]
         if case == 'no-button':
-            options += mutant_settings(folder, case, 'input/hal/in2_state.c',
+            options += mutant_settings(folder, case, 'sys/hal/input/in2_state.c',
                                        'if (!legacy_active()) input_emit_in2(&e);',
                                        'if (!legacy_active() && e.type != INPUT_EVENT_BUTTON) input_emit_in2(&e);')
         if case in ('no-key', 'no-release'):
             options += mutant_settings(folder, case, *IN2_MUTATIONS[case])
         if case == 'select':
-            options += mutant_settings(folder, case, 'init/shell_loop.c',
+            options += mutant_settings(folder, case, 'sys/kern/init/shell_loop.c',
                                        'ops->gui_default() ? SYS_GSHELL_BIN : SYS_SHELL_BIN', 'SYS_SHELL_BIN')
         if case == 'missing':
             options += ['KB_GUI_BINS=']
@@ -407,7 +407,7 @@ def main():
         if case == 'register':
             without_register(folder, kernel / 'gen')
         if case == 'consume':
-            options += mutant_settings(folder, case, 'init/shell_loop.c',
+            options += mutant_settings(folder, case, 'sys/kern/init/shell_loop.c',
                                        'cur_shell = consumed;', '/* keep current shell */')
         media = build_media(kernel, *options, 'kb-user', 'kernel')
         def payload(path):

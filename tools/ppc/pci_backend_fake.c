@@ -2,11 +2,11 @@
 #include "kboot_info.h"
 #include "ppc_trap.h"
 #include "kernel_boot.h"
-#include "kdebug/hwb_wire.h"
+#include "sys/kern/kdebug/hwb_wire.h"
 #include "kstring.h"
 #include "lan_boot.h"
 #include "pci_config_contract.h"
-#include "drivers/pci/pci_bind.h"
+#include "sys/dev/pci/pci_bind.h"
 
 static struct pm_bridge_state fixture_bridge = {.addr_va=0x1000, .data_va=0x2000};
 static u32 address, last_address, last_port, data, writes, reads, tree;

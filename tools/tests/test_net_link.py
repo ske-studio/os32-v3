@@ -1,4 +1,4 @@
-"""N1 段 4: net/link.c (ワイヤ v2) と kapi/kapi_host.c (KAPI v51) のホスト TDD。
+"""N1 段 4: sys/net/link.c (ワイヤ v2) と sys/kapi/kapi_host.c (KAPI v51) のホスト TDD。
 
 票:   docs/archive/network/TASK_N1.md 段 4 / 契約は TASK_N0.md §1a・§1b・§2
 記録: tools/tests/n1_tdd.md
@@ -26,7 +26,7 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HOST_SRC = ROOT / "tools/tests/net_link_host.c"
-GENERATED = ROOT / "kapi/kapi_generated.c"
+GENERATED = ROOT / "sys/kapi/kapi_generated.c"
 
 # ヘッダは実物の置き場を通す。ホストに持ち込めないものは net_link_host.c が
 # **include ガードを先に define して**中身を自前のものに差し替える。
@@ -39,7 +39,7 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie
                 "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-fcommon",
                 "-O2", "-Wall", "-Wextra", "-Werror",
                 "-D__KERNEL_BUILD__"]
-# arch/x86 + platform/pc98: include/io.h は契約だけで、実装は固定名
+# arch/x86 + platform/pc98: sys/include/io.h は契約だけで、実装は固定名
 # arch_io.h / platform_io.h を引く (順序 3)。build/config.mk の INC_KERNEL と
 # 同じものをクロス側へ渡す。ホスト側は platform の include 境界で差し替える。
 TARGET_INC = include_flags(ROOT)
@@ -96,7 +96,7 @@ MUTATIONS = (
 def check_mutations(tmp, cases):
     """Mutate full product files in isolation; a compile failure is not RED."""
     originals = {path.name: path.read_text() for path in
-                 (ROOT / 'net/link.c', *sorted((ROOT / 'net').glob('link_*.inc')))}
+                 (ROOT / 'sys/net/link.c', *sorted((ROOT / 'net').glob('link_*.inc')))}
     for name, filename, old, new, case in MUTATIONS:
         if cases and case not in cases:
             continue
@@ -146,7 +146,7 @@ def generated_open_guard(tmp):
 def check_reclaim_has_host_owner_exit():
     """exec_notify_owned が host_owner_exit を呼んでいるか (票 N1 段 3)。
 
-    並びは exec/exec.c の 1 か所にしかなく、ホストではリンクできない。
+    並びは sys/kern/exec/exec.c の 1 か所にしかなく、ホストではリンクできない。
     con_sink_owner_exit / launch_owner_exit と同じ位置にあることを本文で見る。
     """
     src = exec_source(ROOT)
@@ -162,7 +162,7 @@ def check_reclaim_has_host_owner_exit():
 
 def check_timer_calls_link_tick():
     """link_tick の枠順と登録の所有者を検査する。"""
-    order = (ROOT / "platform/pc98/tick_order.h").read_text()
+    order = (ROOT / "sys/platform/pc98/tick_order.h").read_text()
     assert order.index("PC98_TICK_NE2K") < order.index("PC98_TICK_LINK")
     registrations = []
     for directory in ("kernel", "drivers", "net"):
@@ -171,24 +171,24 @@ def check_timer_calls_link_tick():
             if re.search(r"tick_register\s*\([^,]+,\s*link_tick\s*\)", path.read_text()):
                 registrations.append(path.relative_to(ROOT).as_posix())
     assert registrations == [], registrations
-    nic = (ROOT / "net/nic.c").read_text()
+    nic = (ROOT / "sys/net/nic.c").read_text()
     assert "link_platform_tick_register(net_jiffy)" in nic
     assert "link_tick();" in nic
-    kapi = (ROOT / "kapi/kapi_host.c").read_text(encoding="utf-8")
+    kapi = (ROOT / "sys/kapi/kapi_host.c").read_text(encoding="utf-8")
     assert "link_tick" not in kapi, "KAPI ラッパーが link_tick を呼んでいる"
     link = "\n".join(path.read_text(encoding="utf-8") for path in
-                     (ROOT / "net/link.c", *sorted((ROOT / "net").glob("link_*.inc"))))
+                     (ROOT / "sys/net/link.c", *sorted((ROOT / "net").glob("link_*.inc"))))
     link = re.sub(r"/\*.*?\*/", "", link, flags=re.S)
     assert len(re.findall(r"\blink_tick\s*\(", link)) == 1, \
-        "net/link.c / link_*.inc の中から link_tick を呼んでいる (定義 1 か所だけのはず)"
-    lgy = (ROOT / "drivers/net/ne2000/lgy98.c").read_text(encoding="utf-8")
+        "sys/net/link.c / link_*.inc の中から link_tick を呼んでいる (定義 1 か所だけのはず)"
+    lgy = (ROOT / "sys/dev/net/ne2000/lgy98.c").read_text(encoding="utf-8")
     lgy = re.sub(r"/\*.*?\*/", "", lgy, flags=re.S)
     assert not re.search(r"\blink_init\s*\(", lgy), \
         "LGY が共有 NIC 所有者より先に link_init を呼んでいる"
     assert re.search(r"if \(!\(flags & LGY98_FLAG_REFLECT\)\)\s*\{\s*"
                      r"rc = net_adapter_register\(NET_NIC_LGY98, &net_lgy98_adapter\);", lgy), \
         "反射モードを共有 NIC として登録している"
-    print("DRIVE SOURCE: link_tick registered only by net/link.c PASS", flush=True)
+    print("DRIVE SOURCE: link_tick registered only by sys/net/link.c PASS", flush=True)
 
 
 def run_fixture(args, timeout=600, **kwargs):
@@ -227,10 +227,10 @@ if __name__ == "__main__":
         generated_open_guard(tmp)
         subprocess.run(["gcc", *FLAGS, *san, *argptr_defines(), *INC, "-I" + str(tmp),
                         str(HOST_SRC), "-o", exe], check=True, cwd=ROOT)
-        print("HOST GNU11 -Werror compile PASS (real net/link.c + kapi/kapi_host.c)",
+        print("HOST GNU11 -Werror compile PASS (real sys/net/link.c + sys/kapi/kapi_host.c)",
               flush=True)
         if "--target" in sys.argv:
-            for src in (ROOT / "net/link.c", ROOT / "kapi/kapi_host.c"):
+            for src in (ROOT / "sys/net/link.c", ROOT / "sys/kapi/kapi_host.c"):
                 subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, *TARGET_INC,
                                 "-c", str(src), "-o", str(tmp / (src.stem + ".o"))],
                                check=True, cwd=ROOT)

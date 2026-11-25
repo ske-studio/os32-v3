@@ -4,11 +4,11 @@ import subprocess
 import tempfile
 
 CHECK = dict(name='hdprep-command-host', tier=1, needs=[], budget=2,
-             covers=['platform/pc98/install_geometry.h', 'sdk/include/os32/*.h', 'tools/tests/hdprep_command_host.c', 'userland/shell/cmd_hdprep.c',
-                     'platform/pc98/install_hdprep.c',
-                     'platform/pc98/install_plan.c', 'platform/pc98/platform_install_layout.h',
-                     'userland/shell/hdprep_plan.c', 'fs/pc98pt.c', 'fs/pc98pt.h',
-                     'tools/tests/test_hdprep_command.py', 'include/platform_install_boot.h',
+             covers=['sys/platform/pc98/install_geometry.h', 'sdk/include/os32/*.h', 'tools/tests/hdprep_command_host.c', 'userland/shell/cmd_hdprep.c',
+                     'sys/platform/pc98/install_hdprep.c',
+                     'sys/platform/pc98/install_plan.c', 'sys/platform/pc98/platform_install_layout.h',
+                     'userland/shell/hdprep_plan.c', 'sys/fs/pc98pt.c', 'sys/fs/pc98pt.h',
+                     'tools/tests/test_hdprep_command.py', 'sys/include/platform_install_boot.h',
                      'userland/shell/shell.h', 'userland/system/inst_hdd.h',
                      'userland/system/inst_disk.h', 'userland/shell/hdprep_plan.h'],
              basis=['docs/design/userland/shell/hdprep_plan.md'])
@@ -16,7 +16,7 @@ MUTATIONS = [
     ('userland/shell/cmd_hdprep.c', 'if (!hp_ask_yes())', 'if (hp_ask_yes())'),
     ('userland/shell/cmd_hdprep.c', 'if (platform_hdprep_probe(g_api, &p) != 0)',
      'if (platform_hdprep_probe(g_api, &p) == 0)'),
-    ('platform/pc98/install_hdprep.c', 'if (rc != 0 || !disk_memeq(hp_sect, hp_back, HDPREP_SECT)) {\n        api->kprintf',
+    ('sys/platform/pc98/install_hdprep.c', 'if (rc != 0 || !disk_memeq(hp_sect, hp_back, HDPREP_SECT)) {\n        api->kprintf',
      'if (rc != 0) {\n        api->kprintf'),
 ]
 

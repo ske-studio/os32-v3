@@ -2,10 +2,10 @@
 """M6[2] interrupt capture, coalescing, and generation checks."""
 CHECK = dict(name='input-m6-2-host', tier=1, budget=3, needs=[],
     basis=['docs/decisions/INPUT_BIND_DESIGN.md'],
-    covers=['input/hal/input_interrupt.c', 'input/hal/input_context.c',
-            'input/hal/input_context.h', 'tools/tests/input_m6_2_host.c',
+    covers=['sys/input/input_interrupt.c', 'sys/input/input_context.c',
+            'sys/input/input_context.h', 'tools/tests/input_m6_2_host.c',
             'tools/tests/test_input_m6_2.py', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py', 'include/**', 'exec/appslot.h', 'mm/pgalloc.h',
+            'tools/tests/kernel_includes.py', 'include/**', 'sys/kern/exec/appslot.h', 'sys/kern/mm/pgalloc.h',
             'tools/tests/input_display_stubs.h', 'tools/tests/host_arch/**'])
 from pathlib import Path
 import subprocess, sys, tempfile
@@ -14,10 +14,10 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 def run(ctx):
-    source = (ctx.root / 'input/hal/input_interrupt.c').read_text()
+    source = (ctx.root / 'sys/input/input_interrupt.c').read_text()
     with tempfile.TemporaryDirectory(prefix='input-m6-2-') as directory:
         tmp = Path(directory)
-        (tmp / 'context.c').write_text((ctx.root / 'input/hal/input_context.c').read_text())
+        (tmp / 'context.c').write_text((ctx.root / 'sys/input/input_context.c').read_text())
         def execute(code):
             (tmp / 'interrupt.c').write_text(code)
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',

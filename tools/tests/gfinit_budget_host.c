@@ -3,7 +3,7 @@
 #define GF_C_ENTRY budget_old_entry
 #include "gfinit_plan_c_host.c"
 #undef GF_C_ENTRY
-#include "../../kdebug/gfinit_budget.inc"
+#include "../../sys/dev/video/geforce/diag/gfinit_budget.inc"
 
 static u32 run_rows,run_bytes,pre_rows,pre_bytes,s0_rows,s0_bytes,line_used;
 static u32 budget_fault,budget_tick,quiesce_seen,local_count,cleanup_p,cleanup_q;

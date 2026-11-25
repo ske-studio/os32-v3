@@ -44,11 +44,11 @@ MUTATIONS = [
 def slice_out(source, signature):
     """exec.c から 1 定義をテキストのまま取り出す (関数は最初の行頭 '}' まで)。"""
     if source.count(signature) != 1:
-        raise SystemExit('exec/exec.c: %r が 1 個ではない (実装が動いた?)' % signature)
+        raise SystemExit('sys/kern/exec/exec.c: %r が 1 個ではない (実装が動いた?)' % signature)
     body = source.split(signature, 1)[1]
     if signature.endswith('('):
         if '\n}' not in body:
-            raise SystemExit('exec/exec.c: %r の終端が見つからない' % signature)
+            raise SystemExit('sys/kern/exec/exec.c: %r の終端が見つからない' % signature)
         return signature + body.split('\n}', 1)[0] + '\n}\n'
     return signature + body.split('\n', 1)[0] + '\n'
 
@@ -56,12 +56,12 @@ def slice_out(source, signature):
 def define_line(source, prefix):
     line = next((l for l in source.splitlines() if l.startswith(prefix)), None)
     if line is None:
-        raise SystemExit('exec/exec.c: %r が見つからない' % prefix)
+        raise SystemExit('sys/kern/exec/exec.c: %r が見つからない' % prefix)
     return line
 
 
 def extract(source):
-    parts = ['/* 生成物。exec/exec.c から test_app_bb_overlap.py が切り出した。 */',
+    parts = ['/* 生成物。sys/kern/exec/exec.c から test_app_bb_overlap.py が切り出した。 */',
              'u32 sys_usable_mem_end(void);',
              'void gfx_bb_phys_range(u32 *base, u32 *size);']
     parts += [define_line(source, d) for d in DEFINES]
@@ -86,14 +86,14 @@ def run(mutation=None):
     with tempfile.TemporaryDirectory(prefix='os32-app-bb-') as tmp:
         tmp = pathlib.Path(tmp)
         (tmp / 'exec_bb_overlap.inc').write_text(extract(source))
-        (tmp / 'paging_host_source.c').write_text(paging_source(ROOT / 'mm/paging.c'))
-        allocator = (ROOT / 'mm/pgalloc.c').read_text()
+        (tmp / 'paging_host_source.c').write_text(paging_source(ROOT / 'sys/kern/mm/paging.c'))
+        allocator = (ROOT / 'sys/kern/mm/pgalloc.c').read_text()
         for part in ('owner', 'resource', 'surface'):
             allocator = allocator.replace(
                 f'#include "pgalloc_{part}.inc"', (ROOT / f'mm/pgalloc_{part}.inc').read_text())
         allocator = allocator.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
         (tmp / 'pgalloc_host_source.c').write_text(allocator)
-        heap_source = (ROOT / 'mm/kmalloc.c').read_text()
+        heap_source = (ROOT / 'sys/kern/mm/kmalloc.c').read_text()
         if mutation and mutation[0] == 'peak-common-update':
             _, old, new = mutation
             assert heap_source.count(old) == 1
@@ -103,7 +103,7 @@ def run(mutation=None):
         host_includes = ['-I' + str(ROOT / 'tools/tests/host_arch')] + includes
         exe = tmp / 'app_bb_overlap'
         cmd = ['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static', '-no-pie',
-               *host_includes, str(SRC), str(ROOT / 'mm/physmem.c'), str(tmp / 'kmalloc_host_source.c'), '-o', str(exe)]
+               *host_includes, str(SRC), str(ROOT / 'sys/kern/mm/physmem.c'), str(tmp / 'kmalloc_host_source.c'), '-o', str(exe)]
         build = subprocess.run(cmd, capture_output=bool(mutation))
         if build.returncode != 0:
             if mutation:

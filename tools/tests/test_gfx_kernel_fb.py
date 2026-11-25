@@ -14,16 +14,16 @@ import tempfile
 import host32
 from mutpar import run_ordered
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-TARGET_SRCS = ['gfx/gfx_core.c', 'gfx/gfx_emergency.c',
-               'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c',
-               'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_dirty.c', 'gfx/gfx_present.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c',
-               'exec/surface_query.c', 'exec/lease.c', 'exec/access_walk.c',
-               'exec/redir_access.c', 'mm/shlib.c', 'mm/paging.c',
-               'mm/pgalloc.c',
-               'kernel/sys.c', 'mm/physmem.c']
-MUTABLE = ('gfx/gfx_core.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c')
+TARGET_SRCS = ['sys/hal/gfx/gfx_core.c', 'sys/hal/gfx/gfx_emergency.c',
+               'sys/platform/pc98/video/backend_pc98.c', 'sys/platform/pc98/video/backend_pegc.c',
+               'sys/dev/video/cirrus/backend_cirrus.c', 'sys/platform/pc98/video/cirrus/cirrus_identify.c', 'sys/platform/pc98/video/gfx_vram.c', 'sys/hal/gfx/gfx_dirty.c', 'sys/hal/gfx/gfx_present.c', 'sys/hal/gfx/gfx_scroll.c', 'sys/platform/pc98/gfx_scroll.c', 'sys/platform/pc98/gfx_init.c', 'sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_surfaces.c',
+               'sys/kern/exec/surface_query.c', 'sys/kern/exec/lease.c', 'sys/kern/exec/access_walk.c',
+               'sys/kern/exec/redir_access.c', 'sys/kern/mm/shlib.c', 'sys/kern/mm/paging.c',
+               'sys/kern/mm/pgalloc.c',
+               'sys/kern/sys.c', 'sys/kern/mm/physmem.c']
+MUTABLE = ('sys/hal/gfx/gfx_core.c', 'sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_surfaces.c')
 MUTANTS = [
- # 第 5 段 B5: DISPLAY の記録の数と先頭は provider (platform/pc98/gfx_surfaces.c) が答える。
+ # 第 5 段 B5: DISPLAY の記録の数と先頭は provider (sys/platform/pc98/gfx_surfaces.c) が答える。
  ('display-records-one', '    return ledger_backend == LEDGER_SF_PC98 ? GVRAM_PLANES : 1;',
   '    return ledger_backend == LEDGER_SF_PC98 ? 1 : 1;',
   'FAIL source.count == (backend == LEDGER_SF_PC98 ? 4U : 1U)'),
@@ -140,10 +140,10 @@ static inline void io_wait_n(int n) {(void)n;}
                 hits = sum(texts[unit].count(old) for unit in MUTABLE)
                 assert hits == 1, (mutation[0], hits)
                 body = body.replace(old,new)
-            if path == 'gfx/gfx_core.c':
+            if path == 'sys/hal/gfx/gfx_core.c':
                 body = body.replace('v86_bios_real_lowmem()[PEGC_BIOS_ARCH_FLAG]', 'PEGC_BIOS_ARCH_EXTGFX')
                 body += '\nint host_select_and_init(void) { return gfx_select_and_init_backend(0); }\n'
-            if path == 'drivers/video/pc98/backend_pegc.c':
+            if path == 'sys/platform/pc98/video/backend_pegc.c':
                 body = replace_function(body,'int pegc_identify(void)','    return 1;')
                 body = replace_function(body,'static int pegc_probe(void)', '''
     extern int host_pegc_available;
@@ -153,9 +153,9 @@ static inline void io_wait_n(int n) {(void)n;}
         if (sf) s_bb_phys=sf->first*PAGE_SIZE;
     }
     return s_probe_ok && host_pegc_available;''')
-            if path == 'drivers/video/cirrus/cirrus_identify.c':
+            if path == 'sys/platform/pc98/video/cirrus/cirrus_identify.c':
                 body = replace_function(body,'int cirrus_identify(void)','    return 1;')
-            if path == 'drivers/video/cirrus/backend_cirrus.c':
+            if path == 'sys/dev/video/cirrus/backend_cirrus.c':
                 body = replace_function(body,'static int cirrus_probe(void)', '''
     extern int host_cirrus_available;
     if (!s_probed) {
@@ -166,11 +166,11 @@ static inline void io_wait_n(int n) {(void)n;}
             # Preserve source-relative include semantics for private copies.
             body = re.sub(r'#include "(\.\./[^"\n]+)"',
                           lambda m: '#include "'+str((ROOT/path).parent/m[1])+'"', body)
-            if path in ('mm/paging.c','mm/pgalloc.c','kernel/sys.c'):
+            if path in ('sys/kern/mm/paging.c','sys/kern/mm/pgalloc.c','sys/kern/sys.c'):
                 (tmp/(pathlib.Path(path).stem+'_host_source.c')).write_text(body)
             else:
                 # Preserve existing stage hooks' filenames; disambiguate the new provider.
-                dest = tmp/('pc98_gfx_scroll.c' if path == 'platform/pc98/gfx_scroll.c'
+                dest = tmp/('pc98_gfx_scroll.c' if path == 'sys/platform/pc98/gfx_scroll.c'
                             else pathlib.Path(path).name)
                 dest.write_text(body);sources.append(dest)
         fixture = 'unsigned int host_arch_if = 0x202U;\n#include "gfx_kernel_fb_host.c"\n'
@@ -222,14 +222,14 @@ def main():
             return 'RED '+m[0]
         for message in run_ordered(one,MUTANTS): print(message)
         for name,unit,old,new,expected in [
-            ('pc98-shutdown-height','drivers/video/pc98/backend_pc98.c',
+            ('pc98-shutdown-height','sys/platform/pc98/video/backend_pc98.c',
              'gfx_current_height = gfx_backend_mode(&gfx_backend_pc98)->height;',
              'gfx_current_height = GFX_HEIGHT_200;',
              'FAIL gfx_current_height == GFX_HEIGHT'),
-            ('display-authorization','exec/surface_query.c',
+            ('display-authorization','sys/kern/exec/surface_query.c',
              'if (!gfx || (gui && appslot_gfx_owner() != c.app_id))', 'if (0)',
              'FAIL surface_lease(&source,'),
-            ('map-range','mm/pgalloc.c',
+            ('map-range','sys/kern/mm/pgalloc.c',
              'first < end && first >= r->decode_first &&\n                               end <= r->decode_end',
              'first < end', 'FAIL !ledger_resource_set_map(0,rr->decode_first-1,rr->decode_end)')]:
             result=run_case(None,args.runner,[(unit,old,new)])
@@ -237,13 +237,13 @@ def main():
             print('RED '+name)
         for name, changes in [
             ('lease-entry-guards', [
-                ('exec/surface_query.c',
+                ('sys/kern/exec/surface_query.c',
                  '    if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;\n    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease(',
                  '    int rc = surface_api_source(role, &source);\n    return rc ? rc : surface_lease('),
-                ('exec/surface_query.c',
+                ('sys/kern/exec/surface_query.c',
                  '    if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;\n    int rc = gfx_surface_source(role, &source);',
                  '    int rc = gfx_surface_source(role, &source);')]),
-            ('bridge-guard', [('gfx/gfx_core.c',
+            ('bridge-guard', [('sys/hal/gfx/gfx_core.c',
                 '    if (gfx_policy_blocks_map(LEDGER_ROLE_CLIENT)) goto fail;', '')])]:
             result = run_case(None, args.runner, extra_changes=changes)
             assert result.returncode == 1 and 'FAIL ' in result.stdout, (name, result.stdout, result.stderr)

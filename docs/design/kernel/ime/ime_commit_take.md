@@ -1,6 +1,6 @@
 # 確定バイトの取得
 
-`kernel/ime/ime_commit_take.inc` は未読の確定バイトを符号なし整数で返し、
+`sys/kern/ime/ime_commit_take.inc` は未読の確定バイトを符号なし整数で返し、
 読出し位置を 1 バイト進める。未読がなければ位置を変えず -1 を返す。
 
 CUI の配送、Shift+Space による確定、GUI の確定列の回収で共用する。

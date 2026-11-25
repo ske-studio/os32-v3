@@ -7,10 +7,10 @@ import host32
 from kernel_includes import include_flags
 from mutpar import build_in_tree
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'userland/tests/gfx2_i3.c'
+SOURCE = 'userland/diag/gfx2_i3.c'
 CHECK = dict(name='gfx2-i3-guest-host', tier=1, needs=[], budget=20,
-    covers=['userland/tests/gfx2_i3.c', 'gfx/v2/v1_shim.c', 'gfx/v2/*.h', 'include/*.h',
-            'sdk/include/os32/*.h', 'lib/kstring_c.c', 'lib/kstring.h',
+    covers=['userland/diag/gfx2_i3.c', 'sys/hal/gfx/v2/v1_shim.c', 'gfx/v2/*.h', 'include/*.h',
+            'sdk/include/os32/*.h', 'sys/kern/kstring_c.c', 'sys/kern/kstring.h',
             'arch/*/arch_copy.h', 'mm/*.h',
             'tools/tests/gfx2_i3_guest_host.c', 'tools/tests/test_gfx2_i3_guest.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py'],
@@ -38,7 +38,7 @@ def observe(work, mutation=None):
         '-no-pie', '-nostdlib', '-static', '-ffunction-sections', '-fdata-sections',
         '-Wl,--gc-sections', '-I'+str(ROOT), '-I'+str(ROOT/'gfx/v2'), *include_flags(ROOT),
         str(ROOT / 'tools/tests/gfx2_i3_guest_host.c'),
-        str(ROOT / 'gfx/v2/v1_shim.c'), str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)]])
+        str(ROOT / 'sys/hal/gfx/v2/v1_shim.c'), str(ROOT / 'sys/kern/kstring_c.c'), '-o', str(exe)]])
     return host32.run([str(exe)]).returncode
 
 def main():

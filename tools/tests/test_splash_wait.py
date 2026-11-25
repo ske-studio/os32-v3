@@ -1,6 +1,6 @@
 """Check actual frame deadlines against Python integer arithmetic."""
 CHECK = dict(name='splash-wait-host', tier=1,
-    covers=['platform/pc98/splash.c', 'lib/divdi3.c',
+    covers=['sys/platform/pc98/splash.c', 'lib/divdi3.c',
             'tools/tests/splash_wait_host.c', 'tools/tests/kernel_includes.py',
             'tools/tests/host32.py'], needs=[], budget=3.1,
     kind='characterization',
@@ -17,9 +17,9 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
-    ('round deadline down', 'platform/pc98/splash.c',
+    ('round deadline down', 'sys/platform/pc98/splash.c',
      'SPLASH_RASTER_LINE_NUM_US + den - 1) / den', 'SPLASH_RASTER_LINE_NUM_US) / den'),
-    ('deadline one us late', 'platform/pc98/splash.c', 'if (now >= target)', 'if (now > target)'),
+    ('deadline one us late', 'sys/platform/pc98/splash.c', 'if (now >= target)', 'if (now > target)'),
 )
 
 
@@ -46,7 +46,7 @@ def vectors():
 def execute(mutation=None):
     with tempfile.TemporaryDirectory(prefix='splash-wait-') as td:
         work = Path(td)
-        for rel in ['platform/pc98/splash.c', 'lib/divdi3.c']:
+        for rel in ['sys/platform/pc98/splash.c', 'lib/divdi3.c']:
             source = (ROOT / rel).read_text()
             if mutation and rel == mutation[1]:
                 assert source.count(mutation[2]) == 1, mutation[0]
@@ -62,7 +62,7 @@ def execute(mutation=None):
             '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
             '-D__KERNEL_BUILD__', '-I' + str(work), '-I' + str(work / 'lib'),
             *include_flags(ROOT), str(ROOT / 'tools/tests/splash_wait_host.c'),
-            str(work / 'platform/pc98/splash.c'), str(work / 'lib/divdi3.c'),
+            str(work / 'sys/platform/pc98/splash.c'), str(work / 'lib/divdi3.c'),
             '-o', str(exe)], check=True)
         return host32.run([str(exe)], runner='qemu').returncode
 

@@ -1,4 +1,4 @@
-#include "../../hwdev/gf/foundation.h"
+#include "../../sys/dev/video/geforce/foundation.h"
 static u32 aperture[0x618000 / 4];
 static u32 vs_mask, vram = 0x4000000, fail_read, calls, map_fail;
 static int rd(void *p, u32 bar, u32 off, u32 width, u32 *v)

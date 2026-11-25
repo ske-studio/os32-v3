@@ -5,17 +5,17 @@ from ver_test_utils import ROOT, arguments, execute, function
 
 def pc98_format_source():
     """Compile the production formatting callbacks without collector hardware I/O."""
-    backend = (ROOT/'platform/pc98/ver_backend.c').read_text()
+    backend = (ROOT/'sys/platform/pc98/ver_backend.c').read_text()
     collect = function(backend, 'static void pc98_ver_collect(')
     return backend.replace(collect, '').replace('.collect = pc98_ver_collect,', '.collect = 0,')
 
 
 def run(source, runner):
-    names = function((ROOT/'kdebug/kdebug_module.c').read_text(), 'const char *kdebug_state_name(')
+    names = function((ROOT/'sys/kern/kdebug/kdebug_module.c').read_text(), 'const char *kdebug_state_name(')
     try:
         return execute((ROOT/'tools/tests/ver_format_host.c').read_text(), runner,
                        {'ver_format_source.c': source, 'ver_state_source.c': names},
-                       assembly='lib/kstring_asm.asm')
+                       assembly='sys/kern/kstring_asm.asm')
     except subprocess.CalledProcessError as error:
         print(error.stderr)
         raise
@@ -23,7 +23,7 @@ def run(source, runner):
 
 def main():
     args = arguments()
-    source = pc98_format_source() + (ROOT/'kernel/ver_format.c').read_text()
+    source = pc98_format_source() + (ROOT/'sys/kern/ver_format.c').read_text()
     for define in ('', '#define OS32_X87_EMU_LINKED\n'):
         assert run(define + source, args.runner).returncode == 0
     if args.mutate:

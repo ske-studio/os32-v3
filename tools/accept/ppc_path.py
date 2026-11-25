@@ -94,7 +94,7 @@ def main():
                                        '        if (!device_validator(name)) return -1;',
                                        '        if (!device_validator(name)) return 0;')
         elif case == 'unset-root-drive':
-            mutation = mutant_settings(folder, case, 'platform/powermac/root_boot.c',
+            mutation = mutant_settings(folder, case, 'sys/platform/powermac/root_boot.c',
                                        '    rc = path_set_drive(vfs_devname("/"));',
                                        '    rc = 0;')
         elif case == 'absent':

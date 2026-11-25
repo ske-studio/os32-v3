@@ -1,6 +1,6 @@
 """Freestanding WAV parser and runtime mutation checks."""
 CHECK = dict(name='pcm-wav-host', tier=1, covers=[
-    'userland/tests/pcm_wav.h', 'userland/tests/pcm_play.c',
+    'userland/diag/pcm_wav.h', 'userland/diag/pcm_play.c',
     'tools/tests/pcm_wav_host.c', 'tools/tests/test_pcm_wav.py'], needs=[], budget=2.9,
     kind='characterization',
 )
@@ -26,11 +26,11 @@ MUTATIONS = [
 def main(mutate):
     with tempfile.TemporaryDirectory(prefix='pcm-wav-') as tmp:
         tree = Path(tmp)
-        for name in ('userland/tests/pcm_wav.h', 'tools/tests/pcm_wav_host.c'):
+        for name in ('userland/diag/pcm_wav.h', 'tools/tests/pcm_wav_host.c'):
             dest = tree / name
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / name, dest)
-        header = tree / 'userland/tests/pcm_wav.h'
+        header = tree / 'userland/diag/pcm_wav.h'
         original = header.read_text()
         def run():
             exe = tree / 'test'

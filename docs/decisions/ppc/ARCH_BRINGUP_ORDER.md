@@ -24,7 +24,7 @@
 | 段 | 新しいアーキテクチャ側の用意 |
 |---|---|
 | 起動 | arch の入口・例外・割込み・時計と、platform の起動・診断出力・LAN provider を結ぶ。 |
-| インストール用 RAM root | root image の受渡しと装置名・FS の登録を platform に用意し、共通の `init/boot_root.c`・`build/ram-root.mk` を使う。 |
+| インストール用 RAM root | root image の受渡しと装置名・FS の登録を platform に用意し、共通の `sys/kern/init/boot_root.c`・`build/ram-root.mk` を使う。 |
 | USER アプリ 1 本 | arch の USER 遷移・例外・syscall・実行像の公開と platform の exec provider を用意する。 |
 | USER の入れ子 | arch の実行 context の保存・復帰と、子の資源・終了値を返す経路を通す。 |
 | 製品シェル | 端末の後端をつなぎ、外部シェルを共通の起動ループで選ぶ。 |

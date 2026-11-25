@@ -31,18 +31,18 @@ def check(condition, detail):
 
 
 MUTATIONS = {
-    'utf8-bytewise': ('kernel/console/console.c', '        cp = dec.codepoint;\n        p += dec.bytes_used;\n        remaining -= dec.bytes_used;',
+    'utf8-bytewise': ('sys/kern/console/console.c', '        cp = dec.codepoint;\n        p += dec.bytes_used;\n        remaining -= dec.bytes_used;',
                       '        cp = *p;\n        p += dec.bytes_used;\n        remaining -= dec.bytes_used;'),
-    'trace-screen': ('platform/powermac/console_text.c', '\n    kprintf(KBOOT_ATTR, "FB text ready',
+    'trace-screen': ('sys/platform/powermac/console_text.c', '\n    kprintf(KBOOT_ATTR, "FB text ready',
                      '\n    console_printf(KBOOT_ATTR, "FB text ready generation=%u\\n", target.generation);'
                      '\n    kprintf(KBOOT_ATTR, "FB text ready'),
-    'colors': ('platform/powermac/console_text.c', 'pm_console_set_colors(colors->foreground, colors->background);',
+    'colors': ('sys/platform/powermac/console_text.c', 'pm_console_set_colors(colors->foreground, colors->background);',
                'pm_console_set_colors(colors->background, colors->foreground);'),
-    'top': ('platform/powermac/console_text.c', 'pm_console_attach(&target, &kcg_file_api, PM_RH_FB_ROWS)',
+    'top': ('sys/platform/powermac/console_text.c', 'pm_console_attach(&target, &kcg_file_api, PM_RH_FB_ROWS)',
             'pm_console_attach(&target, &kcg_file_api, 0)'),
-    'scroll-minus': ('kernel/console/fbcon.c', 'fbcon_scroll_n(c, rows, 1);', 'fbcon_scroll_n(c, rows - 1, 1);'),
-    'scroll-plus': ('kernel/console/fbcon.c', 'fbcon_scroll_n(c, rows, 1);', 'fbcon_scroll_n(c, rows + 1, 1);'),
-    'start-consumed': ('platform/powermac/input_boot.c',
+    'scroll-minus': ('sys/kern/console/fbcon.c', 'fbcon_scroll_n(c, rows, 1);', 'fbcon_scroll_n(c, rows - 1, 1);'),
+    'scroll-plus': ('sys/kern/console/fbcon.c', 'fbcon_scroll_n(c, rows, 1);', 'fbcon_scroll_n(c, rows + 1, 1);'),
+    'start-consumed': ('sys/platform/powermac/input_boot.c',
                        'static int try_local_char(void) { return input_legacy_try(IL_LOCAL_CHAR); }',
                        'static int try_local_char(void) { static int lost; int k = input_legacy_try(IL_LOCAL_CHAR); '
                        'if (k >= 0 && !lost) { lost = 1; return -1; } return k; }'),

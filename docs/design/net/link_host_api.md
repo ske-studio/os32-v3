@@ -1,10 +1,10 @@
-# net/link_host_api.inc — Host Services の非同期の口 (KAPI v51 の実体) と、要求ごとの期限
+# sys/net/link_host_api.inc — Host Services の非同期の口 (KAPI v51 の実体) と、要求ごとの期限
 
 > 状態: **現行 (2026-11-18)** — 出所: NET_HOSTSVC_DESIGN・TASK_NET_HOSTSVC (要約して移した)
-ソース: `net/link_host_api.inc` (`net/link.c` が取り込む)・`net/link.h`・`net/link_rx.inc`・`kapi/kapi_host.c`・`sdk/include/os32/os32_kapi_shared.h`
+ソース: `sys/net/link_host_api.inc` (`sys/net/link.c` が取り込む)・`sys/net/link.h`・`sys/net/link_rx.inc`・`sys/kapi/kapi_host.c`・`sdk/include/os32/os32_kapi_shared.h`
 
 KAPI の `host_open`・`host_status`・`host_read`・`host_write`・`host_close` の実体。どれも待たない。
-プロトコルを進めるのは `link_tick()` だけで、ここは状態を読み書きするだけ。CPL3 のポインタの検査と写しは `kapi/kapi_host.c` が行う。
+プロトコルを進めるのは `link_tick()` だけで、ここは状態を読み書きするだけ。CPL3 のポインタの検査と写しは `sys/kapi/kapi_host.c` が行う。
 経路 (NIC・link・SFS) はアプリから隠す。要求の行は任意の `<service> <verb> [args]` で、KAPI は汎用のまま。
 
 ## 容量

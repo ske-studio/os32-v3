@@ -1,9 +1,9 @@
 /* Declaration-stage checks, not an Init oracle. No libc or guest execution. */
 #include "tools/tests/trident_device_fake.h"
-#include "drivers/video/trident/trident_module.h"
-#include "gfx/gfx_emergency.h"
-#include "mm/pgalloc.h"
-#include "gfx/palette.h"
+#include "sys/dev/video/trident/trident_module.h"
+#include "sys/hal/gfx/gfx_emergency.h"
+#include "sys/kern/mm/pgalloc.h"
+#include "sys/hal/gfx/palette.h"
 static struct trident_fake fake;
 static u8 storage[4194304];
 static struct trident_fake_event trace[32];

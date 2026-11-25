@@ -5,7 +5,7 @@
 #include "ppc_hpt.h"
 #include "exec_arch.h"
 #include "exec.h"
-#include "kernel/irq/irq.h"
+#include "sys/kern/irq/irq.h"
 #include "kernel_tick.h"
 #include "mpic.h"
 #include "platform_kboot_layout.h"
@@ -19,9 +19,9 @@
 #include "paging.h"
 #include "arch_exec_kapi.h"
 #include "kapi_table.h"
-#include "exec/appslot.h"
+#include "sys/kern/exec/appslot.h"
 #include "arch_ctx_observer.h"
-#include "fs/fd_redirect.h"
+#include "sys/fs/fd_redirect.h"
 #include "memmap.h"
 
 volatile u32 ctx_started;

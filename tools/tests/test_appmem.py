@@ -3,7 +3,7 @@
 Compile/link errors, signals, timeouts and unexpected FAIL labels are ERROR.
 """
 CHECK = dict(name='appmem-host', tier=1,
-    covers=['exec/appmem.c', 'tools/tests/appmem_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    covers=['sys/kern/exec/appmem.c', 'tools/tests/appmem_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.5,
     basis=['KAPI_SPEC §4-10', 'KAPI_SPEC §4-11'],
 )
@@ -22,8 +22,8 @@ import host32
 from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-TARGET_SRCS = ['include/callconv.h', 'exec/appmem.c', 'exec/appmem.h', 'include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/types.h',
-               'include/memmap.h', 'mm/paging.h',
+TARGET_SRCS = ['sys/include/callconv.h', 'sys/kern/exec/appmem.c', 'sys/kern/exec/appmem.h', 'sys/include/appmem_types.h', 'sdk/include/os32/os32_kapi_shared.h', 'sys/include/types.h',
+               'sys/include/memmap.h', 'sys/kern/mm/paging.h',
                'tools/tests/appmem_host.c', 'tools/tests/test_appmem.py',
                'tools/tests/host32.py', 'tools/tests/mutpar.py']
 MUTANTS = [
@@ -76,7 +76,7 @@ def main():
     args = parser.parse_args()
     host32.begin_control(args.mutate, args.runner, ROOT)
     before = {path: hashlib.sha256((ROOT / path).read_bytes()).digest() for path in TARGET_SRCS}
-    body = (ROOT / 'exec/appmem.c').read_text()
+    body = (ROOT / 'sys/kern/exec/appmem.c').read_text()
     cc = ['gcc', '-std=gnu11', '-m32', '-march=i386', '-ffreestanding', '-fno-builtin',
           '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror',
           '-Werror=implicit-function-declaration', '-Werror=implicit-int', '-Werror=vla',

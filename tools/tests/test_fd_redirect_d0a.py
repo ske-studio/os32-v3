@@ -11,35 +11,35 @@ from mutpar import run_ordered
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 # Read only the mutated implementation and fixture once, not a tree per variant.
-SOURCE_FILES = ("exec/redir_access.c", "fs/fd_redirect.c",
+SOURCE_FILES = ("sys/kern/exec/redir_access.c", "sys/fs/fd_redirect.c",
                 "tools/tests/fd_redirect_d0a_host.c")
 MUTATIONS = [
-    ("exec/redir_access.c", "if (ring3_call_from_user()) return caller_access_get_user(out);", "if (ring3_call_from_user()) return access_capture(out, CALLER_USER);", "registration recapture"),
-    ("exec/redir_access.c", " && a->generation != 0", "", "zero generation"),
-    ("exec/redir_access.c", " && a->pd_phys != 0", "", "zero PD"),
-    ("exec/redir_access.c", "slot->state == APP_STATE_ABORT_PENDING ||", "", "abort pending"),
-    ("exec/redir_access.c", "!slot || !slot->cpl3 || !slot->as || slot->as != a->as", "!slot || !slot->as || slot->as != a->as", "non-CPL3 registrant"),
-    ("exec/redir_access.c", " || a.pd_phys != paging_current_cr3()", "", "capture CR3 mismatch"),
-    ("exec/redir_access.c", "(va > MEM_APP_BAND_BASE || len > MEM_APP_BAND_BASE - va)", "0", "trusted range"),
-    ("fs/fd_redirect.c", "if (rc < 0 || (u32)rc < count) redir_refuse_count++;", "if (0) redir_refuse_count++;", "refusal counter"),
+    ("sys/kern/exec/redir_access.c", "if (ring3_call_from_user()) return caller_access_get_user(out);", "if (ring3_call_from_user()) return access_capture(out, CALLER_USER);", "registration recapture"),
+    ("sys/kern/exec/redir_access.c", " && a->generation != 0", "", "zero generation"),
+    ("sys/kern/exec/redir_access.c", " && a->pd_phys != 0", "", "zero PD"),
+    ("sys/kern/exec/redir_access.c", "slot->state == APP_STATE_ABORT_PENDING ||", "", "abort pending"),
+    ("sys/kern/exec/redir_access.c", "!slot || !slot->cpl3 || !slot->as || slot->as != a->as", "!slot || !slot->as || slot->as != a->as", "non-CPL3 registrant"),
+    ("sys/kern/exec/redir_access.c", " || a.pd_phys != paging_current_cr3()", "", "capture CR3 mismatch"),
+    ("sys/kern/exec/redir_access.c", "(va > MEM_APP_BAND_BASE || len > MEM_APP_BAND_BASE - va)", "0", "trusted range"),
+    ("sys/fs/fd_redirect.c", "if (rc < 0 || (u32)rc < count) redir_refuse_count++;", "if (0) redir_refuse_count++;", "refusal counter"),
     # These mutate the substitute as_access_page, not the production walk.
     # Production registrant-PD mutations live in test_access_walk.py (d3).
     ("tools/tests/fd_redirect_d0a_host.c", "as_va_to_pa(as->pd_phys, va, pa)", "as_va_to_pa(paging_current_cr3(), va, pa)", "substitute current PD write"),
     ("tools/tests/fd_redirect_d0a_host.c", "as_va_to_pa_read(as->pd_phys, va, pa)", "as_va_to_pa_read(paging_current_cr3(), va, pa)", "substitute current PD read"),
-    ("exec/redir_access.c", "kmemcpy(P2V(pa), bytes + done, n)", "kmemcpy((void *)(uptr)va, bytes + done, n)", "VA write"),
-    ("exec/redir_access.c", "kmemcpy(bytes + done, P2V(pa), n)", "kmemcpy(bytes + done, (void *)(uptr)va, n)", "VA read"),
-    ("exec/redir_access.c", "slot->as->generation == a->generation", "1", "generation reuse"),
-    ("exec/redir_access.c", "slot->as->owner == a->owner", "1", "owner mismatch"),
-    ("exec/redir_access.c", "slot->as->pd_phys == a->pd_phys", "1", "PD mismatch"),
-    ("exec/redir_access.c", "!slot || !slot->cpl3 || !slot->as || slot->as != a->as", "!slot || !slot->cpl3 || !slot->as", "AS identity"),
-    ("exec/redir_access.c", "if (!redir_live(a)) return 0;", "if (0 && !redir_live(a)) return 0;", "dead registrant"),
-    ("exec/redir_access.c", "as_access_page(a->as, va, write, pa)", "as_access_page(a->as, va, write ? 0 : 0, pa)", "RO output"),
-    ("exec/redir_access.c", "if (!redir_access_check(a, va, len, write)) return -1;", "if (0 && !redir_access_check(a, va, len, write)) return -1;", "no preflight"),
-    ("exec/redir_access.c", "irq_restore(flags);\n        done += n;", "irq_restore(1);\n        done += n;", "IF forced on"),
-    ("exec/redir_access.c", "while (done < len) {\n        u32 pa, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));", "while (done < len) {\n        u32 pa, n = len - done;", "unbounded IRQ copy"),
-    ("fs/fd_redirect.c", "out->fd[fd] = redir_table[fd];", "out->fd[fd] = redir_table[fd]; out->fd[fd].access = (RedirAccess){0};", "save loses identity"),
-    ("fs/fd_redirect.c", "redir_table[fd] = in->fd[fd];", "redir_table[fd] = in->fd[fd]; redir_table[fd].access = (RedirAccess){0};", "restore loses identity"),
-    ("fs/fd_redirect.c", "redir_table[fd].access = access;", "redir_table[fd].access = access; redir_table[fd].access.origin = REDIR_TRUSTED;", "origin lost"),
+    ("sys/kern/exec/redir_access.c", "kmemcpy(P2V(pa), bytes + done, n)", "kmemcpy((void *)(uptr)va, bytes + done, n)", "VA write"),
+    ("sys/kern/exec/redir_access.c", "kmemcpy(bytes + done, P2V(pa), n)", "kmemcpy(bytes + done, (void *)(uptr)va, n)", "VA read"),
+    ("sys/kern/exec/redir_access.c", "slot->as->generation == a->generation", "1", "generation reuse"),
+    ("sys/kern/exec/redir_access.c", "slot->as->owner == a->owner", "1", "owner mismatch"),
+    ("sys/kern/exec/redir_access.c", "slot->as->pd_phys == a->pd_phys", "1", "PD mismatch"),
+    ("sys/kern/exec/redir_access.c", "!slot || !slot->cpl3 || !slot->as || slot->as != a->as", "!slot || !slot->cpl3 || !slot->as", "AS identity"),
+    ("sys/kern/exec/redir_access.c", "if (!redir_live(a)) return 0;", "if (0 && !redir_live(a)) return 0;", "dead registrant"),
+    ("sys/kern/exec/redir_access.c", "as_access_page(a->as, va, write, pa)", "as_access_page(a->as, va, write ? 0 : 0, pa)", "RO output"),
+    ("sys/kern/exec/redir_access.c", "if (!redir_access_check(a, va, len, write)) return -1;", "if (0 && !redir_access_check(a, va, len, write)) return -1;", "no preflight"),
+    ("sys/kern/exec/redir_access.c", "irq_restore(flags);\n        done += n;", "irq_restore(1);\n        done += n;", "IF forced on"),
+    ("sys/kern/exec/redir_access.c", "while (done < len) {\n        u32 pa, n = PAGE_SIZE - (va & (PAGE_SIZE - 1));", "while (done < len) {\n        u32 pa, n = len - done;", "unbounded IRQ copy"),
+    ("sys/fs/fd_redirect.c", "out->fd[fd] = redir_table[fd];", "out->fd[fd] = redir_table[fd]; out->fd[fd].access = (RedirAccess){0};", "save loses identity"),
+    ("sys/fs/fd_redirect.c", "redir_table[fd] = in->fd[fd];", "redir_table[fd] = in->fd[fd]; redir_table[fd].access = (RedirAccess){0};", "restore loses identity"),
+    ("sys/fs/fd_redirect.c", "redir_table[fd].access = access;", "redir_table[fd].access = access; redir_table[fd].access.origin = REDIR_TRUSTED;", "origin lost"),
 ]
 
 

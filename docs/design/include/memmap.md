@@ -1,6 +1,6 @@
-# include/memmap.h — 設計
+# sys/include/memmap.h — 設計
 > 状態: **現行 (2026-10-31)** — 出所: MEMMAP_V3・API_CONTRACTS・DESIGN・GFX_MODES_DESIGN (D1 で移した)
-ソース: `include/memmap.h`
+ソース: `sys/include/memmap.h`
 
 **カーネル・シェル・通常 RAM は恒等写像 (supervisor)**、**アプリだけ 0x80000000〜 の私有写像**
 
@@ -61,7 +61,7 @@ shlib 0x80000000〜 (仮想 1MB、物理は実ページ数) → exec 0x80100000 
 
 ### 3-4. P2V / V2P への集約
 
-- **規則**: カーネルが物理番地をポインタとして触る箇所は `P2V(phys)` を通し、ポインタを装置 (DMA・ページ表・窓) に渡す箇所は `V2P(ptr)` を通す。恒等の v3 では両方とも**何もしない関数 (`static inline`) / マクロ** (`include/memmap.h` に 1 か所)。台帳の API は**物理 PFN / 物理番地を返す**ことにし、呼び手が P2V で触る形に揃える。
+- **規則**: カーネルが物理番地をポインタとして触る箇所は `P2V(phys)` を通し、ポインタを装置 (DMA・ページ表・窓) に渡す箇所は `V2P(ptr)` を通す。恒等の v3 では両方とも**何もしない関数 (`static inline`) / マクロ** (`sys/include/memmap.h` に 1 か所)。台帳の API は**物理 PFN / 物理番地を返す**ことにし、呼び手が P2V で触る形に揃える。
 
 `P2V` / `V2P` が使えるのは**恒等の supervisor 領域だけ** (カーネル帯・シェル帯・池・MMIO の恒等窓)。
 **アプリ帯と lease 窓は v3 でも非恒等**
@@ -78,7 +78,7 @@ shlib 0x80000000〜 (仮想 1MB、物理は実ページ数) → exec 0x80100000 
 | 0x500000–0x7EFFFF | 池 (集積移動・旧同梱予約は作らない) | — | 通常のowner割当 |
 | [0x7F0000,0x800000) | DMA専用予約 | 64KiB | 常駐、一般池へ配らない |
 
-SHM の容量と GUI 予約範囲の正典は [`include/memmap.h`](../../../include/memmap.h)
+SHM の容量と GUI 予約範囲の正典は [`sys/include/memmap.h`](../../../sys/include/memmap.h)
 (`MEM_SHM_SIZE` / `MEM_SHM_GUI_SIZE` / `MEM_SHM_GUI_OFFSET`)。
 
 - **16MB システム空間**: 16MB 以上積める機種では F00000h〜FFFFFFh をシステム用 (PEGC VRAM /

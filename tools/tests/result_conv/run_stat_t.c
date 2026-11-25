@@ -2,5 +2,5 @@
 #include "shim.h"
 
 #define main stat_t_main
-#include "../../../userland/tests/stat_t.c"
+#include "../../../userland/diag/stat_t.c"
 #undef main

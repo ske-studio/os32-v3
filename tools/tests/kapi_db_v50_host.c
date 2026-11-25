@@ -4,8 +4,8 @@ int services_public = 1;
 /* ========================================================================= */
 /*  KAPI_DB_V50_HOST.C — 票 S0-K §1d のホスト TDD                            */
 /*                                                                           */
-/*  実物だけを組む: 実 `kapi/kapi_db.c` + 実 `lib/sqlite3/sqlite3.c` +        */
-/*  実 `lib/sqlite3/os32_sqlite_vfs.c` + 実 `fs/vfs_fd.c` + RAM バックエンド。 */
+/*  実物だけを組む: 実 `sys/kapi/kapi_db.c` + 実 `lib/sqlite3/sqlite3.c` +        */
+/*  実 `lib/sqlite3/os32_sqlite_vfs.c` + 実 `sys/fs/vfs_fd.c` + RAM バックエンド。 */
 /*  模型にするのは exec 側のポインタ検証 (`ring3_user_range_ok`) と           */
 /*  SHM の置き場だけ — どちらもカーネル番地に依存してホストでは動かせない。    */
 /*  ホストのファイルシステムには 1 バイトも触らない。                          */
@@ -14,7 +14,7 @@ int services_public = 1;
 /* ========================================================================= */
 
 /* appslot.h の実定義を読む。SHM だけは既存のホスト配列を使う。 */
-#include "../../include/memmap.h"
+#include "../../sys/include/memmap.h"
 #undef MEM_SHM_BASE
 #undef MEM_SHM_DB_OFFSET
 #undef MEM_SHM_DB_BASE
@@ -47,7 +47,7 @@ volatile u32 tick_count;
 u32 sys_time(void) { return 0; }
 void kprintf(u8 color, const char *fmt, ...) { (void)color; (void)fmt; }
 int vfs_sync(void) { probes++; return 0; }
-/* fs/vfs.c の vfs_stat / vfs_rm は中で vfs_resolve_path を呼ぶ。相対名と
+/* sys/fs/vfs.c の vfs_stat / vfs_rm は中で vfs_resolve_path を呼ぶ。相対名と
  * cwd の連結・**切り詰め**はそこで起きるので、模型も同じ順で呼ぶ。 */
 static const char *host_resolve(const char *path)
 {
@@ -130,7 +130,7 @@ int ring3_user_range_ok(u32 p, u32 len)
 /* SHM の置き場。末尾に番兵を置いて「16KB を 1 バイトも越えない」を見る。 */
 #define SHM_CANARY 256
 static unsigned char test_shm[DB_SHM_BLOCK_SIZE + SHM_CANARY];
-#include "../../exec/appslot.h"
+#include "../../sys/kern/exec/appslot.h"
 
 /* 列値の実体化の境界 (往復 2 の B3)。SQLite は確保に失敗すると accessor で
  * NULL を返す。実機の MEMSYS5 (384KB) ではこれが起きうるが、ホストでは
@@ -151,7 +151,7 @@ static int host_ext_errcode(sqlite3 *db)
 #define sqlite3_errcode host_errcode
 #define sqlite3_extended_errcode host_ext_errcode
 #include "db_copy_shim.h"
-#include "../../kapi/kapi_db.c"
+#include "../../sys/kapi/kapi_db.c"
 #undef sqlite3_column_blob
 #undef sqlite3_column_text
 #undef sqlite3_errcode
@@ -1063,7 +1063,7 @@ static void materialize_fail(void)
 }
 
 /* ---- 19. journal 名の容量は **解決後** で見る (往復 2 の B4) ------------ */
-/*  入力が 4B でも、cwd を連結した解決名は上限まで伸びる。fs/vfs.c は
+/*  入力が 4B でも、cwd を連結した解決名は上限まで伸びる。sys/fs/vfs.c は
  *  VFS_MAX_PATH の作業バッファで連結して **切り詰める** ので、cwd が 251B
  *  (末尾 '/' 込み) だと `f.db-journal` の解決名が 255B に切られて
  *  `<cwd>f.db` = 本体とまったく同じ名前になる。相対名の長さだけを見る実装は
@@ -1139,7 +1139,7 @@ static void resolve_len(void)
 }
 
 /* ---- 20. 切り詰め済みの絶対名を信じない (往復 3) ----------------------- */
-/*  fs/vfs.c の vfs_resolve_path は VFS_MAX_PATH の作業領域に cwd と入力を
+/*  sys/fs/vfs.c の vfs_resolve_path は VFS_MAX_PATH の作業領域に cwd と入力を
  *  連結し、**切り詰めてから** `.` / `..` を畳む。溢れた入力は「短い別の
  *  絶対名」として返るので、解決結果だけを見ても切り詰めは分からない。
  *  cwd `/tmp` + `"./" × 122 + "a/../b.db"` は `/tmp/b` に化ける。         */
@@ -1196,7 +1196,7 @@ static void resolve_truncate(void)
 }
 
 /* ---- 21. 深さ超過で別の DB に化ける (最終往復) -------------------------- */
-/*  fs/vfs.c の成分表は VFS_MAX_PATH_DEPTH 本しかなく、溢れた成分は**黙って
+/*  sys/fs/vfs.c の成分表は VFS_MAX_PATH_DEPTH 本しかなく、溢れた成分は**黙って
  *  捨てられる**。その後ろの `..` は捨てられた成分ではなく **保持済みの成分**を
  *  1 つ消すので、`("/a"×32) + "/x/.." + ("/.."×31) + "/b.db"` は正しくは
  *  `/a/b.db` なのに `/b.db` に化ける。長さ (167B) では捕まらない。          */
@@ -1332,7 +1332,7 @@ int utf8_strlen(const u8 *s)
 { int n=0; while (*s) { if ((*s & 0xc0) != 0x80) n++; s++; } return n; }
 void *kzalloc(u32 n) { return calloc(1, n); }
 void kfree(void *p) { free(p); }
-#include "../../kernel/ime/ime_dict.c"
+#include "../../sys/kern/ime/ime_dict.c"
 #include "fep_store_host.h"
 static void group_callers(void)
 {

@@ -28,8 +28,8 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
 # lib/microtar/microtar.c の <stdio.h> / <stdlib.h> / <string.h> を埋める。
 INCLUDES = (['-I' + str(ROOT / p) for p in ('tools/tests/mtar_freestanding', 'lib/microtar')] + include_flags(ROOT))
 SRC = ROOT / "tools/tests/ext2_write_io_host.c"
-TARGET_SRCS = ["fs/ext2/ext2_super.c", "fs/ext2/ext2_time.c", "fs/ext2/ext2_inode.c", "fs/ext2/ext2_dir.c",
-               "fs/ext2/ext2_file.c", "fs/ext2/ext2_vfs.c"]
+TARGET_SRCS = ["sys/fs/ext2/ext2_super.c", "sys/fs/ext2/ext2_time.c", "sys/fs/ext2/ext2_inode.c", "sys/fs/ext2/ext2_dir.c",
+               "sys/fs/ext2/ext2_file.c", "sys/fs/ext2/ext2_vfs.c"]
 
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-ext2-wio-") as tmp:

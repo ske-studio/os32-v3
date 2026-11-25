@@ -1,7 +1,7 @@
 /* BLOCK: real protocol/client/deadlines, virtual SFS host and C1 boundary. */
 #include "hostsvc_fixture.h"
-#include "fs/serialfs/serialfs.h"
-#include "fs/serialfs/sfs_block.h"
+#include "sys/fs/serialfs/serialfs.h"
+#include "sys/fs/serialfs/sfs_block.h"
 #include "os32_kapi_shared.h"
 #define REQUIRE(e) do { if (!(e)) return __LINE__; } while (0)
 static SfsClient client;

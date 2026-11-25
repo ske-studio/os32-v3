@@ -1,115 +1,115 @@
 {
   "schema": 1,
   "contracts": [
-    "include/pcm_contract.h",
-    "include/dma_contract.h",
-    "drivers/sound/cs4231/pcm_module.h",
-    "drivers/sound/cs4231/pcm_cs4231.h",
-    "kernel/irq/irq.h",
-    "mm/dma_pool.h",
-    "sound/hal/snd2_int.h",
+    "sys/include/pcm_contract.h",
+    "sys/include/dma_contract.h",
+    "sys/dev/sound/cs4231/pcm_module.h",
+    "sys/dev/sound/cs4231/pcm_cs4231.h",
+    "sys/kern/irq/irq.h",
+    "sys/kern/mm/dma_pool.h",
+    "sys/hal/sound/snd2_int.h",
     "sdk/include/os32/os32_snd2.h"
   ],
   "imports": [
     {
       "symbol": "pcm_module_irq_register",
-      "source": "drivers/sound/cs4231/pcm_module.h",
+      "source": "sys/dev/sound/cs4231/pcm_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pcm_module_irq_unregister",
-      "source": "drivers/sound/cs4231/pcm_module.h",
+      "source": "sys/dev/sound/cs4231/pcm_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pcm_module_dma_alloc",
-      "source": "drivers/sound/cs4231/pcm_module.h",
+      "source": "sys/dev/sound/cs4231/pcm_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pcm_module_dma_free",
-      "source": "drivers/sound/cs4231/pcm_module.h",
+      "source": "sys/dev/sound/cs4231/pcm_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "dma_mark_leaked",
-      "source": "mm/dma_pool.h",
+      "source": "sys/kern/mm/dma_pool.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "dma_chan_mask",
-      "source": "drivers/dma/dma8237.h",
+      "source": "sys/dev/dma/dma8237.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "dma_chan_unmask",
-      "source": "drivers/dma/dma8237.h",
+      "source": "sys/dev/dma/dma8237.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "dma_chan_setup",
-      "source": "drivers/dma/dma8237.h",
+      "source": "sys/dev/dma/dma8237.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "dma_chan_remaining",
-      "source": "drivers/dma/dma8237.h",
+      "source": "sys/dev/dma/dma8237.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "dma_chan_ack_tc",
-      "source": "drivers/dma/dma8237.h",
+      "source": "sys/dev/dma/dma8237.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "kmalloc",
-      "source": "mm/kmalloc.h",
+      "source": "sys/kern/mm/kmalloc.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kfree",
-      "source": "mm/kmalloc.h",
+      "source": "sys/kern/mm/kmalloc.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kmemcpy",
-      "source": "lib/kstring.h",
+      "source": "sys/kern/kstring.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "kmemset",
-      "source": "lib/kstring.h",
+      "source": "sys/kern/kstring.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "kprintf",
-      "source": "include/kprintf.h",
+      "source": "sys/include/kprintf.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sys_time_now",
-      "source": "include/sys.h",
+      "source": "sys/include/sys.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "tick_clock_jiffy64",
-      "source": "kernel/time/tick_clock.h",
+      "source": "sys/hal/time/tick_clock.h",
       "context": "normal",
       "irq": true
     },
@@ -127,25 +127,25 @@
     },
     {
       "symbol": "snd2_register",
-      "source": "sound/hal/snd2_int.h",
+      "source": "sys/hal/sound/snd2_int.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "snd2_unregister",
-      "source": "sound/hal/snd2_int.h",
+      "source": "sys/hal/sound/snd2_int.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "snd2_advance",
-      "source": "sound/hal/snd2_int.h",
+      "source": "sys/hal/sound/snd2_int.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "pcm_module_refill_tick",
-      "source": "drivers/sound/cs4231/pcm_module.h",
+      "source": "sys/dev/sound/cs4231/pcm_module.h",
       "context": "normal",
       "irq": true
     }

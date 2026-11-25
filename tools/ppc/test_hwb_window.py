@@ -25,7 +25,7 @@ def host(work, source, expected, stale=False):
 def labels(work):
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin'
     obj = work / 'transfer.o'
-    subprocess.run([cross / 'powerpc-elf-gcc', '-c', 'arch/ppc/hwb_transfer.S', '-o', obj],
+    subprocess.run([cross / 'powerpc-elf-gcc', '-c', 'sys/arch/ppc/hwb_transfer.S', '-o', obj],
                    cwd=ROOT, check=True)
     dis = subprocess.check_output([cross / 'powerpc-elf-objdump', '-d', obj], text=True)
     for name, ops in [('read', ('lbz','lhz','lwz','lhbrx','lwbrx')),
@@ -40,14 +40,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'platform/powermac/hwb_window.c').read_text()
+    source = (ROOT / 'sys/platform/powermac/hwb_window.c').read_text()
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
         exe = work / 'paging'
         subprocess.run(['gcc', '-m32', '-nostdinc', '-nostdlib', '-ffreestanding',
                         '-static', '-fno-pie', '-no-pie', '-O2', '-Wall', '-Werror',
                         '-I.', '-Iinclude', '-Iarch/ppc', '-Iplatform/powermac',
-                        'arch/ppc/pd_walk.c', 'tools/ppc/hwb_paging_host.c', '-o', exe],
+                        'sys/arch/ppc/pd_walk.c', 'tools/ppc/hwb_paging_host.c', '-o', exe],
                        cwd=ROOT, check=True)
         subprocess.run(['qemu-i386', exe], check=True)
         labels(work)

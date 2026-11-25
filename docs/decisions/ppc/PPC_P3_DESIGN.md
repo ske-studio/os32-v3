@@ -13,21 +13,21 @@
 - N5: ③を a〜d に分割し、各小段を 1〜3 ファイル・400 行以下に制限。
 - N6: capture 期限を wait 開始起点に統一し、通知・BEGIN 起点 profile を削除。
 - N7: 入口と endpoint の 2 周の根拠、poll 間引き、周別の計数を明記。
-- N8: syscall 入口の idle_work_run の参照を exec/exec_syscall.inc に訂正。
+- N8: syscall 入口の idle_work_run の参照を sys/kern/exec/exec_syscall.inc に訂正。
 - N9: usb_boot.c の古い EE 注釈の修正と新規ソース一覧の追従を③の完了条件に追加。
 
 ## 1. 範囲と実物の確認
 - 材料は `in/P3_DESIGN.final.md` と `in/INPUT_HAL_DESIGN.r2.md`、同レビュー r1・r2 依頼。以下「final」「HAL r2」はこれらを指す。
 - 案 B、専用 link-SH、共通 rshell_lan.c/rshell.c、PLN1 退避像、HostFS 未提供、既定切替の条件、公開 ABI 不変更は final のとおり。
 - final §1 の E1〜E9、§2 の採用理由は維持。ただし EE=0 の syscall という根拠を本節で置換する。
-- `docs/decisions/ARCH_CTX_DESIGN.md`（AC-CTX-1）どおり、`arch/ppc/kernel_trap.c` の `ppc_trap_dispatch()` の USER syscall 分岐は 同ファイル内 で許可、同ファイル内 で dispatch、同ファイル内 で出口処理のため禁止する。
+- `docs/decisions/ARCH_CTX_DESIGN.md`（AC-CTX-1）どおり、`sys/arch/ppc/kernel_trap.c` の `ppc_trap_dispatch()` の USER syscall 分岐は 同ファイル内 で許可、同ファイル内 で dispatch、同ファイル内 で出口処理のため禁止する。
 - IRQ の深さは同 `:94–101` の外部/DEC handler だけで増減する。通常 syscall は IRQ 外、途中の IRQ は深さを戻して復帰する。
-- `kernel/idle_work.h` の「許可状態・IRQ 外」を満たす。実装 `kernel/idle_work.c` の `idle_work_run()` は許可・深さ・再入を確認して各登録を 1 回呼ぶ。既存のガードは変更しない。
-- `exec/exec_syscall.inc` の入口にも idle_work_run が既にある。W4 後は PPC でも有効であり、前景進行が halt/yield のみに限定されるとは扱わない。
+- `sys/kern/idle_work.h` の「許可状態・IRQ 外」を満たす。実装 `sys/kern/idle_work.c` の `idle_work_run()` は許可・深さ・再入を確認して各登録を 1 回呼ぶ。既存のガードは変更しない。
+- `sys/kern/exec/exec_syscall.inc` の入口にも idle_work_run が既にある。W4 後は PPC でも有効であり、前景進行が halt/yield のみに限定されるとは扱わない。
 
 ## 2. 前景 endpoint（final §3 の EE/N4 記述を全置換）
 ```c
-/* arch/ppc/exec_kapi.c、同 .h に宣言。生成器が halt/yield をここへ結ぶ。 */
+/* sys/arch/ppc/exec_kapi.c、同 .h に宣言。生成器が halt/yield をここへ結ぶ。 */
 i32 ppc_kapi_wait_once(void)
 {
     idle_work_run();
@@ -41,7 +41,7 @@ i32 ppc_kapi_wait_once(void)
 |---|---|---|
 | link-SH | pm_link_service_once | USB と LAN/mailbox の進行 |
 | PLN1 sh.bin | pm_terminal_poll 相当の idle_work 用 wrapper | USB と pm_lan_poll の進行。文字端末 provider の読出しとは独立 |
-- endpoint 1 回につき登録処理 1 周。halt/yield syscall 全体には入口の 1 周もあり、通常は計 2 周になり得る。x86 も kernel/sys.c の sys_halt と exec/exec_syscall.inc の入口で 2 周回り、pm_usb_poll は 10ms、pm_lan_poll は 1ms で間引くため、受入では入口/endpoint の周ごとに呼出し数と実処理数を分ける。
+- endpoint 1 回につき登録処理 1 周。halt/yield syscall 全体には入口の 1 周もあり、通常は計 2 周になり得る。x86 も sys/kern/sys.c の sys_halt と sys/kern/exec/exec_syscall.inc の入口で 2 周回り、pm_usb_poll は 10ms、pm_lan_poll は 1ms で間引くため、受入では入口/endpoint の周ごとに呼出し数と実処理数を分ける。
 - host/notice/status/入力 provider 自体から pump は呼ばない。それらの syscall に共通入口の進行があることとは区別する。
 - net_rx_idle と helper の 2 枠は final のとおり。HAL の入力 work が登録済みなら総枠数と登録結果を再確認し、USB poll の実行所有者を一本化する。
 - HAL が USB 進行を既存 work に移した場合、helper はその登録を重複せず LAN のみ担当する。単なる入力読出しから USB を再 poll しない。
@@ -53,7 +53,7 @@ i32 ppc_kapi_wait_once(void)
 - HAL r2 の InputLegacyProvider は terminal/注入/park の口であり、USB local の口はまだ宣言されていない。PPC の文字キューを移す前には下記の一時的な local provider が必要。
 - 下の追加宣言と mode は内部契約案。HAL 側で同名相当を確定し、P3 と別々の型を作らない。InputOps と SDK の署名は不変。
 ```c
-/* kernel/input_legacy.c が使用する共通内部口。local は cooked u16 または -1。 */
+/* sys/kern/input_legacy.c が使用する共通内部口。local は cooked u16 または -1。 */
 struct InputLegacyLocal {
     int (*try_key)(void);
     int (*peek_key)(void); /* 有限採取可、完成 key の消費・交互選択の更新は禁止 */
@@ -74,8 +74,8 @@ int input_legacy_wait(int mode, int interruptible);
 - provider 登録は起動時の常駐関数ポインタ。NULL は空/不在であり、共通部から PPC・serial・exec の装置固有 symbol を参照しない。
 - **link-SH では terminal_try/peek と inject_try/peek は NULL、terminal_enabled は常に偽**。LAN notice は host_mailbox → rsh_lan_poll へ渡す。PPC LAN だから terminal_try に結ぶ、という一律登録はしない。
 - PLN1 の旧文字端末を残す像だけ terminal provider に LAN byte stream を登録する。GUI 注入は別の宛先付きキューであり、LAN notice を inject_try へ載せない。
-- ~~旧 PLN1 に必要な交互選択・lookahead・escape decoder は共通 bridge の互換 profile に移す。~~ (2026-11-15 に改めた。末尾の「HAL 4c の順の入れ替えで決めたこと」と「③b-2 で決めたこと」) PLN1 は terminal=NULL とし、local を「LAN (escape decoder と完成 key 1 個の非消費の先読み、platform 側) が先、空なら USB」の 1 つの口にする。LAN と USB の交互選択はやめる。共通の wait(IL_KEY) は local だけを読むので (kernel/input_wait.c、x86 の kbd.c と同じ)、LAN を terminal にすると PLN1 の LAN のキーの待ちが止まるため。link-SH には decoder を有効化しない。x86 の serial 優先は変えない。
-- 現行の状態は `platform/powermac/input_boot.c`、実際の交互選択は `peek()`。terminal_input.c は byte ring と poll を持つ。移動元を取り違えない。
+- ~~旧 PLN1 に必要な交互選択・lookahead・escape decoder は共通 bridge の互換 profile に移す。~~ (2026-11-15 に改めた。末尾の「HAL 4c の順の入れ替えで決めたこと」と「③b-2 で決めたこと」) PLN1 は terminal=NULL とし、local を「LAN (escape decoder と完成 key 1 個の非消費の先読み、platform 側) が先、空なら USB」の 1 つの口にする。LAN と USB の交互選択はやめる。共通の wait(IL_KEY) は local だけを読むので (sys/kern/input_wait.c、x86 の kbd.c と同じ)、LAN を terminal にすると PLN1 の LAN のキーの待ちが止まるため。link-SH には decoder を有効化しない。x86 の serial 優先は変えない。
+- 現行の状態は `sys/platform/powermac/input_boot.c`、実際の交互選択は `peek()`。terminal_input.c は byte ring と poll を持つ。移動元を取り違えない。
 - 共通 bridge が選択状態・decoder・peek の整合・capture 入力期限・GUI policy を所有、HAL が物理状態/ring/keymap を所有する。provider は装置の byte/cooked 読出し・GUI 状態照会・park の口だけ、SH が半行/ID/実行状態を所有する。
 - PLN1 の peek/has_key は有限の採取（byte→decoder→完成 key の lookahead）を進めてよい。完成 key の消費と交互選択の順の更新は禁止し、try 成功時だけ消費・選択更新する。採取は既存キューから行い、装置 pump は前景 work が担当する。
 - input_boot.c は HAL 4c の共通 bridge へ provider を登録し、InputOps は薄く委譲する。PPC 専用 bridge や HAL 未着時の最小実装は作らない。
@@ -143,7 +143,7 @@ int input_legacy_wait(int mode, int interruptible);
 ## 確定の後に決めたこと (2026-11-15、PowerPC PM)
 - 段の順と HAL 4c: ③a は HAL 4c より先に出した (ユーザー決定 11-15、本線 PM の休止を受けて)。入力に触る③b 以降に HAL 4c を先行させる。
 - ②: PLN1 の像の host_mailbox_commit は、void の宣言のまま無処理にした (stage が NOSYS を返し、kapi_host_notice の本体が先に戻るので commit は呼ばれない)。
-- ③a: pm_link_service_once (link-SH の前景の仕事) は段 ⑤ に移した。今の link 像は shell の無い診断像で、USB を組まない (build/targets/ppc-powermac.mk の KBOOT_LINK と KBOOT_SH の排他)。⑤ で link-SH の像に USB を入れるときに、一緒に作って登録する。③a は、PLN1 の像 (KBOOT_SH=1) の terminal_service_once の登録 (platform/powermac/ppc_kernel.c、再入防止つき) と、usb_boot.c の注釈だけを入れた。各像の idle_work の登録数は、PLN1 の像が 1/4 (terminal_service_once)、link の診断像が 1/4 (net_rx_idle)。
+- ③a: pm_link_service_once (link-SH の前景の仕事) は段 ⑤ に移した。今の link 像は shell の無い診断像で、USB を組まない (build/targets/ppc-powermac.mk の KBOOT_LINK と KBOOT_SH の排他)。⑤ で link-SH の像に USB を入れるときに、一緒に作って登録する。③a は、PLN1 の像 (KBOOT_SH=1) の terminal_service_once の登録 (sys/platform/powermac/ppc_kernel.c、再入防止つき) と、usb_boot.c の注釈だけを入れた。各像の idle_work の登録数は、PLN1 の像が 1/4 (terminal_service_once)、link の診断像が 1/4 (net_rx_idle)。
 
 - **sys_yield の訂正 (2026-11-15):** §2 の「sys_halt は返値を捨て、sys_yield は返す」(両方を ppc_kapi_wait_once に結ぶ) は誤り。② でそのとおり結んだところ、arch-ctx-guest の lifecycle (exec_start の子が sys_yield で park して state 4 になる) が壊れた (② の a12d0ec8 から、CI の段 2 の準備で発見)。sys_yield は x86 と同じ exec_sys_yield (park の点、idle_work_run を自分で呼ぶ) に戻し、ppc_kapi_wait_once は sys_halt だけに結ぶ。
 - **HAL 4c の順の入れ替えで決めたこと (2026-11-15、本線 PM の依頼と Opus のレビュー F3・F4 を受けて PowerPC PM が反映):**

@@ -21,14 +21,14 @@
 ## 1. 実物の確認
 | 項目 | file:line と確認内容 |
 |---|---|
-| RTC | `drivers/char/rtc.c`: パラレルコマンド、48bit読出し、ClockOpsは読みだけ。書く口なし |
-| 年 | `drivers/char/rtc.h` の `RTC_YEAR_PIVOT`: pivot=80、1980〜2079。`rtc.c`: 不正日付の一部を丸めて正常に見せる |
-| tick/µs | `arch/x86/kernel/idt.c` はu32、`kernel/time/ktime.c` は10ms＋PIT補間、IRQ損失と約497日周回は未対応 |
-| KAPI | `sdk/kapi.json`: get_tick、rtc_read、sys_time_now。後者はUTCでなく起動からのµs（`include/sys.h`） |
-| sys_time | `sdk/kapi.json`、`kernel/sys.c`: ローカル暦をepochとするu32。newlib (`sdk/crt/syscalls.c`)・SQLite (`lib/sqlite3/os32_sqlite_vfs.c`)・FAT (`fatfs/diskio.c:393`) の時刻源 |
+| RTC | `sys/dev/char/rtc.c`: パラレルコマンド、48bit読出し、ClockOpsは読みだけ。書く口なし |
+| 年 | `sys/dev/char/rtc.h` の `RTC_YEAR_PIVOT`: pivot=80、1980〜2079。`rtc.c`: 不正日付の一部を丸めて正常に見せる |
+| tick/µs | `sys/arch/x86/kernel/idt.c` はu32、`sys/kern/time/ktime.c` は10ms＋PIT補間、IRQ損失と約497日周回は未対応 |
+| KAPI | `sdk/kapi.json`: get_tick、rtc_read、sys_time_now。後者はUTCでなく起動からのµs（`sys/include/sys.h`） |
+| sys_time | `sdk/kapi.json`、`sys/kern/sys.c`: ローカル暦をepochとするu32。newlib (`sdk/crt/syscalls.c`)・SQLite (`lib/sqlite3/os32_sqlite_vfs.c`)・FAT (`fatfs/diskio.c:393`) の時刻源 |
 | date/hdate | `userland/shell/cmd_base.c`: 引数無視、年を20xx固定表示。`userland/cmds/hdate.c`: ホスト表示のみ、RTC未更新 |
 | TIME | `tools/host_agent.py`: ローカル時刻の秒精度文字列、UTC offset・世代・送信時刻なし |
-| 設定 | `init/sysconfig.c` はsystem.cfg整数読出し。`kernel/sqlite_engine.c` はsettings.dbのsystem/ival。`userland/lib/cfg/libos32cfg.h` にDBの共通口 |
+| 設定 | `sys/kern/init/sysconfig.c` はsystem.cfg整数読出し。`sys/kern/sqlite_engine.c` はsettings.dbのsystem/ival。`userland/lib/cfg/libos32cfg.h` にDBの共通口 |
 | 設定設計票 | `docs/decisions/settings/DEVICE_RESERVATION_DESIGN.md` は資源予約・PCI configであり、時刻設定の永続化規約はない |
 | ホスト | `docs/archive/network/NET_HOSTSVC_DESIGN.md` 以降: 内部ALIVE非消費、IRQで同期しない、8要求、HOSTDOWN、LISTとhost_call |
 
@@ -171,25 +171,25 @@ int time_sync(void); /* 非待機受付、既に要求中はAGAIN、結果はtim
 | A2 sdk/include/os32/os32_kapi_shared.h | 公開型/flags/版、生成器管理箇所は生成する |
 | B1 新kernel/time/calendar_math.c | BCD境界・検証、暦変換はlib/os_time.cへ委譲 |
 | B1a lib/os_time.c | datetime_to_epoch再利用、必要な64bit暦拡張・整数除算を集約、旧u32契約維持 |
-| B2 kernel/time/ktime.c | 64bit tick基準とPIT pending桁上がり |
-| B2a kernel/time/time_math.c | time_decideのp1=1時t+1がFFFFFFFF→0となる繰上りをktime側へ伝え、IRQ側上位tickと二重加算しない |
-| B2b kernel/time/time_math.h | 既存time_snapshotにpending繰上りの内部契約を追加、wall_snapshotとは別型 |
-| B3 kernel/irq/tick.c | tick_dispatch先頭でktime tick延長呼出し、dueフラグ（実更新はisr_stub.asm:453） |
+| B2 sys/kern/time/ktime.c | 64bit tick基準とPIT pending桁上がり |
+| B2a sys/kern/time/time_math.c | time_decideのp1=1時t+1がFFFFFFFF→0となる繰上りをktime側へ伝え、IRQ側上位tickと二重加算しない |
+| B2b sys/kern/time/time_math.h | 既存time_snapshotにpending繰上りの内部契約を追加、wall_snapshotとは別型 |
+| B3 sys/kern/irq/tick.c | tick_dispatch先頭でktime tick延長呼出し、dueフラグ（実更新はisr_stub.asm:453） |
 | B4 新kernel/time/wallclock.c | UTC/media状態、slew、snapshot、手動設定 |
-| C1 drivers/char/rtc.c | checked readは現行パラレル、writeはシリアル（HW3照合後） |
-| C2 drivers/char/rtc.h | 新宣言・I/Oタイミング定数 |
+| C1 sys/dev/char/rtc.c | checked readは現行パラレル、writeはシリアル（HW3照合後） |
+| C2 sys/dev/char/rtc.h | 新宣言・I/Oタイミング定数 |
 | D1 新tools/host_time.py | NOW応答生成、整数採時、旧TIMEに影響なし |
 | D2 tools/host_agent.py | サービス/LIST登録、D1へdispatch |
 | D3 新kernel/time/host_time.c | 非待機同期、世代/操作通番、gate、期限 |
 | D4 新kernel/time/time_config.c | system.cfg読込とoffset差分保存、既存KEY=VALUE規約 |
-| E1 platform/pc98/kernel.c | 初期化・起動初回poll、設定読込順序 |
-| E2 exec/exec_schedule.inc | park_kbd/park_poll/sys_yieldのCUI分岐より前でpoll、再入回避 |
-| E3 net/link_host_api.inc | 再OPENのgate、TIME自身は内部フラグで通す |
-| E4 drivers/block/netcd.c（確定票の新設先） | BOPEN前gate |
-| E5 fs/serialfs/sfs_client.c | 再HELLO前gate、既存期限内で待つ |
+| E1 sys/platform/pc98/kernel.c | 初期化・起動初回poll、設定読込順序 |
+| E2 sys/kern/exec/exec_schedule.inc | park_kbd/park_poll/sys_yieldのCUI分岐より前でpoll、再入回避 |
+| E3 sys/net/link_host_api.inc | 再OPENのgate、TIME自身は内部フラグで通す |
+| E4 sys/dev/block/netcd.c（確定票の新設先） | BOPEN前gate |
+| E5 sys/fs/serialfs/sfs_client.c | 再HELLO前gate、既存期限内で待つ |
 | E6 tools/prototypes/lan_imports.def | netcdからtime_rebind_gateを輸入、部品契約世代更新 |
-| E7 kernel/time/clock_service.c | clock_read_dateは有効なローカル壁時計、未設定/無効時は従来RTC provider。legacyは物理読出しを維持 |
-| E8 kernel/sys.c | sys_timeのローカルepoch/u32契約を明記、clock_read_date→datetime_to_epochの処理維持 |
+| E7 sys/hal/time/clock_service.c | clock_read_dateは有効なローカル壁時計、未設定/無効時は従来RTC provider。legacyは物理読出しを維持 |
+| E8 sys/kern/sys.c | sys_timeのローカルepoch/u32契約を明記、clock_read_date→datetime_to_epochの処理維持 |
 | F0 sdk/crt/syscalls.c（変更不要） | _gettimeofdayはsys_timeとtv_usec=0を維持。UTC/µsは新APIで取得 |
 | F1 新kapi/kapi_time.c | CPL3検証、3 APIの実体 |
 | F2 sdk/kapi.json | 末尾追記、生成対象列挙、版同期 |

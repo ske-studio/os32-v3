@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gfx2-readback-host', tier=1,
-    covers=['gfx/v2/sw_readback.c', 'gfx/v2/gfx2_sw.h', 'gfx/v2/gfx2_int.h',
-            'include/gfx_sync.h', 'sdk/include/os32/os32_gfx2.h',
+    covers=['sys/hal/gfx/v2/sw_readback.c', 'sys/hal/gfx/v2/gfx2_sw.h', 'sys/hal/gfx/v2/gfx2_int.h',
+            'sys/include/gfx_sync.h', 'sdk/include/os32/os32_gfx2.h',
             'tools/tests/gfx2_readback_host.c', 'tools/tests/test_gfx2_readback.py',
             'tools/tests/host32.py', 'tools/tests/mutpar.py'],
     needs=[], budget=3.0,

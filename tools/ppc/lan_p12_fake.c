@@ -1,8 +1,8 @@
 /* PowerMac GEM layout (2026-11-21): OpenBSD gemvar.h RX count,
  * four reserved descriptors, and OS32 HW2 64 KiB DMA boundaries. */
-#include "platform/powermac/lan_boot.h"
-#include "drivers/net/gem/gem.h"
-#include "mm/paging.h"
+#include "sys/platform/powermac/lan_boot.h"
+#include "sys/dev/net/gem/gem.h"
+#include "sys/kern/mm/paging.h"
 static unsigned lines, syncs, maps, failmap, sync_lines, ptes, bad_pte;
 static u32 pte_addresses[16];
 static u32 base, flags;

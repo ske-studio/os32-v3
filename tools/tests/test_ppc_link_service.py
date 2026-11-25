@@ -1,12 +1,12 @@
 """P1g foreground ownership, bind ordering and HELLO observation."""
 CHECK = dict(name='ppc-link-service-host', tier=2, budget=30, needs=[], covers=[
-    'build/targets/ppc-powermac.mk', 'platform/powermac/lan_service.c',
-    'platform/powermac/link_log.c',
-    'platform/powermac/nic_gem.c', 'platform/powermac/rh_observe.c',
-    'net/nic.c', 'tools/tests/test_ppc_link_service.py',
+    'build/targets/ppc-powermac.mk', 'sys/platform/powermac/lan_service.c',
+    'sys/platform/powermac/link_log.c',
+    'sys/platform/powermac/nic_gem.c', 'sys/platform/powermac/rh_observe.c',
+    'sys/net/nic.c', 'tools/tests/test_ppc_link_service.py',
     'tools/tests/ppc_link_service_host.c','include/*.h', 'platform/powermac/*.h', 'arch/ppc/*.h',
-            'net/*.h', 'mm/kmalloc.h', 'include/kprintf.h',
-            'drivers/net/gem/gem.h', 'sdk/include/os32/*.h',
+            'net/*.h', 'sys/kern/mm/kmalloc.h', 'sys/include/kprintf.h',
+            'sys/dev/net/gem/gem.h', 'sdk/include/os32/*.h',
             'tools/tests/host32.py'],
     basis=['LAN_OPERATOR_DESIGN §5', 'AC-NET-2'],
 )
@@ -17,7 +17,7 @@ import host32
 
 
 def run(ctx):
-    source = (ctx.root / 'platform/powermac/lan_service.c').read_text()
+    source = (ctx.root / 'sys/platform/powermac/lan_service.c').read_text()
     mutations = [
         ('if (!link_bound) {', 'if (!link_bound) { gem_rx(&s.g, 0, 0, 0);'),
         ('s.state = RUNNING; rh_log();',

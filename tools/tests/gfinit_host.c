@@ -4,8 +4,8 @@ static unsigned lookup_steps;
 #define _start gf_profile_entry
 #include "recover_gf_host.c"
 #undef _start
-#include "../../kdebug/gfinit_pll.c"
-#include "../../kdebug/gfinit_decode.c"
+#include "../../sys/dev/video/geforce/diag/gfinit_pll.c"
+#include "../../sys/dev/video/geforce/diag/gfinit_decode.c"
 #define IMM(v) ((struct recover_plan_arg){REC_IMM,(v)})
 #define READ(v) ((struct recover_plan_arg){REC_ARG_READ,(v)})
 #define SAVED(v) ((struct recover_plan_arg){REC_ARG_SAVED,(v)})

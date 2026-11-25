@@ -2,7 +2,7 @@
 
 > 状態: **現行 (2026-10-31)** — 現行の決定だけを残した (設計は docs/design/、経緯はアーカイブの元の文書)
 
-> 正典の関係: 番地の正典は `include/memmap.h`、地図は `build/out/MEMMAP.md` ([02_memory.md §2-1](../02_memory.md) に説明と生成手順への入口)、v3 全体の柱と順序は 票 V3_PLAN §3・§4 (本案)、目標の 2 段は [V3_GOALS.md](V3_GOALS.md) §3 (論点の経緯は草案 `docs/archive/v3/V3_PLAN_DRAFT.md`)。
+> 正典の関係: 番地の正典は `sys/include/memmap.h`、地図は `build/out/MEMMAP.md` ([02_memory.md §2-1](../02_memory.md) に説明と生成手順への入口)、v3 全体の柱と順序は 票 V3_PLAN §3・§4 (本案)、目標の 2 段は [V3_GOALS.md](V3_GOALS.md) §3 (論点の経緯は草案 `docs/archive/v3/V3_PLAN_DRAFT.md`)。
 
 ## 0. 決定事項の一覧 (D1〜D36)
 
@@ -69,7 +69,7 @@
 | 論点 | 決定・根拠 | 反映・確認する段 (票の節) |
 |---|---|---|
 | **ユーザー決定 2026-10-19: Cirrus/Trident はソフトウェアの確認で足りる** | Cirrus は NP21/W の構成、Trident は実機の構成というだけ。描画の HAL の確認が NP21/W で取れれば、構成の組合せ (64MB+Cirrus など) や実機での WAB の追加確認は求めない | T5c-5b、台帳 H-4 の Cirrus 構成別・T4T7-RH の WAB 候補 |
-| **PM 決定 2026-10-19: splash は core のまま (アプリにしない)** | T5c-6 の容量プローブで、アプリ化は配布 +9,448 B (FD 空き 2HD -9,216 B)・常駐の空き差 0。得るものが無いので core の `platform/pc98/boot_splash.c` を維持し、T5c-6 は policy の一覧の統合だけ | T5c-6 (`~/os32-tmp/run/t5c6/report.md`)。起動順 splash→rshell/SerialFS→shell と表示失敗でも shell は既存の試験で維持 |
+| **PM 決定 2026-10-19: splash は core のまま (アプリにしない)** | T5c-6 の容量プローブで、アプリ化は配布 +9,448 B (FD 空き 2HD -9,216 B)・常駐の空き差 0。得るものが無いので core の `sys/platform/pc98/boot_splash.c` を維持し、T5c-6 は policy の一覧の統合だけ | T5c-6 (`~/os32-tmp/run/t5c6/report.md`)。起動順 splash→rshell/SerialFS→shell と表示失敗でも shell は既存の試験で維持 |
 | **ユーザー決定 2026-10-19: FD 起動は FEP なし (SQLite だけ)、recover-settings のため** | D21 を改訂。辞書 NOTFOUND は SQLite → settings close → SQLITE_ONLY (`db_*` 公開・IME stub・FEP予約0)。SQLite/FEP の実失敗は従来どおり MINIMAL。recover-settings の NOSYS 案内はインストール用 FD と `/boot/sqlite.mod` を確認する手順 | §3-4・本書 D21/§3-5 (必須/省略)。host は実部品起動と install の RAM backend、FD 実起動は PM が NP21/W で確認 |
 
 | **決定 (ユーザー 2026-10-16)**: X-11の共有サービスの呼出し主体 | 端末ごと・本人ごとの**新しい権限の分離は足さない** (単一利用者)。T4b-5 で通常の親子・park/resume の順を観測し、二重消費・別 owner への副作用・寿命の不具合が出たら、そこだけ直す。攻撃者を置かないことを理由に未観測の不具合を閉じない | T4b-5の契約を維持し、GUIRUNKEY-1・IMECAND/IMEIND・終了中STOPをT5a-3で回帰。IMEDUP-1の最初のゲスト確認はT5-0a |

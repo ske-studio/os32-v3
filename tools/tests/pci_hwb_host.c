@@ -26,7 +26,7 @@ static unsigned long inpd(unsigned int p) { io_count++; CHECK(!irq_on); return p
 static void outp(unsigned int p,unsigned int v) { io_count++; write_data(p,1,v); }
 static inline void outpw(unsigned int p,unsigned int v) { io_count++; write_data(p,2,v); }
 static void outpd(unsigned int p,unsigned long v) { io_count++; CHECK(!irq_on); if (p==TEST_CFG_ADDR) cf8=v; else write_data(p,4,v); }
-#include "drivers/pci/pci_hwb.c"
+#include "sys/dev/pci/pci_hwb.c"
 static void reset(void) { cf8=TEST_SAVED_CF8; initial_if=irq_on; mech=1; io_count=data_count=0; }
 static void restored(void) { CHECK(cf8==TEST_SAVED_CF8); CHECK(irq_on==initial_if); }
 static void tests(void) {

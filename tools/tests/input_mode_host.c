@@ -1,7 +1,7 @@
 #define legacy_cooked_flush real_cooked_flush
 #define legacy_raw_flush real_raw_flush
 #define kbd_raw_purge_keep real_raw_purge_keep
-#include "../../input/hal/legacy_ring.c"
+#include "../../sys/hal/input/legacy_ring.c"
 #undef legacy_cooked_flush
 #undef legacy_raw_flush
 #undef kbd_raw_purge_keep
@@ -17,7 +17,7 @@ volatile u32 tick_count;
 static int resets;
 void appslot_poll_yield_reset(void) { resets++; }
 #include "mode_source.inc"
-/* Oracle copied from 32e9fe0e:drivers/input/kbd.c, with fixture names. */
+/* Oracle copied from 32e9fe0e:sys/platform/pc98/input/kbd.c, with fixture names. */
 static volatile int old_mode, old_stop;
 static int old_cooked, old_raw, old_cd, old_rd, old_resets;
 static void old_set(int on)

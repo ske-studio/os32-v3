@@ -1,6 +1,6 @@
-# gfx/gfx_core_framebuffer.inc — 設計
+# sys/hal/gfx/gfx_core_framebuffer.inc — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_T2D_T2H (§2-3・§2-5 e4) の契約を今のソースと照らして要約
-ソース: `gfx/gfx_core_framebuffer.inc` (`gfx/gfx_core.c` が取り込む)
+ソース: `sys/hal/gfx/gfx_core_framebuffer.inc` (`sys/hal/gfx/gfx_core.c` が取り込む)
 
 カーネルの描画先 (内部 fb)、互換の `gfx_get_framebuffer`、旧 planar ポインタと backend の BB 記述子の結線を持つ。どれも SURFACE 台帳の CLIENT から引き、固定番地を持たない。
 
@@ -21,7 +21,7 @@
 - 旧 planar ポインタ `bb[0..3]`・`bb_b/r/g/i` と `g_backend` の `bb_base`・`bb_size`・`bb_pitch`・`bb_format` を、選択中 backend の CLIENT からまとめて設定する。ここが唯一の結線点。
 - モードが ready でない・CLIENT が無い・closing なら全ポインタを NULL・`bb_size` 0 にする (前のモードのポインタを残さない)。
 - 再 init の regen 後、init 後の probe 失敗で PC98 へ落ちた直後、prepare なしの backend 切り替えの後も必ずここを通り、選択中の CLIENT を指す。
-- `gfx_selected_selfcheck` (`gfx/gfx_core_surface.inc`) が結線と台帳の一致を検査する。
+- `gfx_selected_selfcheck` (`sys/hal/gfx/gfx_core_surface.inc`) が結線と台帳の一致を検査する。
 
 ## 検査
 

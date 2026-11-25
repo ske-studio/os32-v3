@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT/'arch/ppc/ppc_trap.h'
+HEADER = ROOT/'sys/arch/ppc/ppc_trap.h'
 def check(s):
     with tempfile.TemporaryDirectory() as d:
         p=Path(d); (p/'ppc_trap.h').write_text(s)

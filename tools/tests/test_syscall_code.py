@@ -1,9 +1,9 @@
 """H10: real ILP32 syscall emitter, all capacities, page bytes and publication."""
 CHECK = dict(name='syscall-code-host', tier=1,
-    covers=['include/syscall_code.h', 'arch/x86/kernel/syscall_code.c',
-            'platform/pc98/kernel_boot_memory.inc', 'platform/powermac/ppc_kernel.c',
-            'exec/exec_tramp_init.inc', 'exec/ring3_str.h', 'exec/ring3_ls.h',
-            'arch/x86/kernel/ring3_ls.S', 'tools/tests/syscall_code_host.c',
+    covers=['sys/include/syscall_code.h', 'sys/arch/x86/kernel/syscall_code.c',
+            'sys/platform/pc98/kernel_boot_memory.inc', 'sys/platform/powermac/ppc_kernel.c',
+            'sys/kern/exec/exec_tramp_init.inc', 'sys/kern/exec/ring3_str.h', 'sys/kern/exec/ring3_ls.h',
+            'sys/arch/x86/kernel/ring3_ls.S', 'tools/tests/syscall_code_host.c',
             'tools/tests/test_syscall_code.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'tools/tests/kernel_layout.py'],
     needs=['make:kernel'], budget=3,
@@ -17,10 +17,10 @@ import host32
 from kernel_includes import include_flags
 from kernel_layout import linker_flags
 ROOT = Path(__file__).resolve().parents[2]
-CODE = 'arch/x86/kernel/syscall_code.c'
-INIT = 'exec/exec_tramp_init.inc'
-PC98 = 'platform/pc98/kernel_boot_memory.inc'
-PPC = 'platform/powermac/ppc_kernel.c'
+CODE = 'sys/arch/x86/kernel/syscall_code.c'
+INIT = 'sys/kern/exec/exec_tramp_init.inc'
+PC98 = 'sys/platform/pc98/kernel_boot_memory.inc'
+PPC = 'sys/platform/powermac/ppc_kernel.c'
 MUTATIONS = (
     ('pc98-map-failure-ignored', PC98, 'paging_boot_user_shared(exec_tramp_page_addr(), 2) != 0',
      '(paging_boot_user_shared(exec_tramp_page_addr(), 2), 0)'),
@@ -60,7 +60,7 @@ def execute(changes=None):
             '-ffreestanding', '-fno-pie', '-no-pie', '-fno-stack-protector', '-nostdlib', '-static',
             '-D__KERNEL_BUILD__', '-I' + str(tmp), *include_flags(ROOT), *linker_flags(),
             str(ROOT / 'tools/tests/syscall_code_host.c'),
-            str(ROOT / 'arch/x86/kernel/ring3_ls.S'), '-o', str(exe)], capture_output=True, text=True)
+            str(ROOT / 'sys/arch/x86/kernel/ring3_ls.S'), '-o', str(exe)], capture_output=True, text=True)
         if result.returncode:
             raise RuntimeError(result.stderr)
         result = host32.run([str(exe)], capture_output=True, text=True, timeout=30)

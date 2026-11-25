@@ -22,7 +22,7 @@
 
 ## 1. 材料 (設計に入るときに読む)
 
-- 今の HAL: `include/gfx_hal.h`、設計記録 [gfx_hal.md](../../design/include/gfx_hal.md) (再描画モデル、HAL とバックエンドの表)。
+- 今の HAL: `sys/include/gfx_hal.h`、設計記録 [gfx_hal.md](../../design/include/gfx_hal.md) (再描画モデル、HAL とバックエンドの表)。
 - バックエンド: PC-98 (`drivers/video/pc98/`)、Cirrus (`drivers/video/cirrus/`)、GeForce (`drivers/video/geforce/`)、Trident (段 3、確定設計 [TRIDENT_S3_DESIGN](../../decisions/realhw/TRIDENT_S3_DESIGN.md))。
 - 上に載るもの: P8 の GUI 層 (TASK_P8_GUI_LAYER)、移植の候補 (PORT_CANDIDATES、SDL 1.2・VESA2 的な互換層)。
 - 入口の検査 (ガード) の基準: [gfx_hal.md](../../design/include/gfx_hal.md) §9 (2026-11-06 の方針。面は HAL が割り当て、制約の表を作るときに 1 回照合、HAL で担保できない物はドライバのレビュー)。

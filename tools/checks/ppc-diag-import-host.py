@@ -13,7 +13,7 @@ CHECK = dict(name='ppc-diag-import-host', tier=2, needs=[], budget=60,
             'tools/tests/host32.py', 'tools/mkmod.py', 'tools/ppc/module_rela.py',
             'tools/module_schema.py', 'Makefile', 'build/**', 'platform/powermac/**',
             'arch/ppc/**', 'kernel/module/**', 'lib/**', 'include/**', 'sdk/**',
-            'exec/exec_hwb.h', 'kdebug/**', 'drivers/pci/**'],
+            'sys/kern/exec/exec_hwb.h', 'kdebug/**', 'drivers/pci/**'],
     basis=['docs/decisions/realhw/HWOP_COMMON_DESIGN.md §2.1'])
 
 
@@ -26,7 +26,7 @@ def run(ctx):
         return 0
     with tempfile.TemporaryDirectory(prefix='diag-import-') as temp:
         out = Path(temp)
-        meta = Path('platform/powermac/kdebug_imports.json')
+        meta = Path('sys/platform/powermac/kdebug_imports.json')
         for case in (['normal', 'slot-swap', 'slot7-hash'] if ctx.mutate else ['normal']):
             if case == 'slot7-hash':
                 data = json.loads(meta.read_text())
@@ -54,7 +54,7 @@ def run(ctx):
                             '-ffreestanding', '-fno-pie', '-no-pie', '-static', '-D__cdecl=',
                             '-D__powerpc__', '-Iplatform/powermac', '-Ikernel/module', '-Iinclude',
                             '-Isdk/include/os32', '-Ilib', '-I.', 'tools/tests/ppc_diag_import_host.c',
-                            'kernel/module/module_image.c', str(asm), '-o', str(exe)], check=True)
+                            'sys/kern/module/module_image.c', str(asm), '-o', str(exe)], check=True)
             rc = host32.run([str(exe)]).returncode
             if rc != (0 if case == 'normal' else 12):
                 raise AssertionError((case, rc))

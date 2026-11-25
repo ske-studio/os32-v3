@@ -97,7 +97,7 @@ static void outp(unsigned int port, unsigned int value)
     clock_us++; /* nonzero OUT cost, including four-OUT critical sections */
 }
 
-#include "../../drivers/video/pc98/splash_raster.c"
+#include "../../sys/platform/pc98/video/splash_raster.c"
 static void setup(int mode, int vs_only)
 {
     clock_us = 0; den = mode ? 3147 : 2483; total = mode ? 449 : 440;

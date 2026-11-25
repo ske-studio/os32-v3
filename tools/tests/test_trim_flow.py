@@ -6,7 +6,7 @@ newlib nano objects retain their cross-toolchain ABI and are namespaced per
 application, just as separately linked USER images isolate allocator state.
 """
 CHECK = dict(name='trim-flow-host', tier=1,
-    covers=['kernel/av_focus.c', 'include/av_contract.h', 'exec/exec_gui.h', 'exec/exec_hooks.h', 'input/hal/in2_int.h', 'include/app_ids.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/font_guard_inactive.h', 'arch/x86/arch_cpu.h', 'arch/x86/x86_flags.h', 'arch/x86/arch_io.h', 'drivers/input/kbd.h', 'exec/access_walk.c', 'exec/appmem.c', 'exec/appmem.h', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'exec/appslot.c', 'exec/appslot.h', 'exec/exec.c', 'exec/exec.h', 'exec/exec_heap.c', 'exec/exec_heap.h', 'exec/lease.c', 'exec/redir_access.c', 'exec/ring3_str.c', 'fs/fd_redirect.h', 'include/appmem_types.h', 'include/cpu.h', 'include/io.h', 'include/memmap.h', 'include/pc98.h', 'include/redir_access.h', 'include/sys.h', 'include/text_screen.h', 'include/types.h', 'kapi/kapi_generated.c', 'kapi/kapi_sysinfo.c', 'platform/pc98/platform_mem_stat.h', 'platform/powermac/platform_mem_stat.h', 'tools/tests/mem_stat_source.py', 'kernel/sqlite_engine.c', 'arch/x86/kernel/gdt.h', 'kernel/gui.c', 'kernel/gui.h', 'kernel/ime/ime.h', 'include/ime_control.h', 'mm/kmalloc.c', 'mm/kmalloc.h', 'kdebug/kselftest.c', 'mm/paging.c', 'mm/paging.h', 'mm/paging_app.c', 'mm/paging_app.h', 'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h', 'arch/x86/kernel/tss.h', 'lib/kstring.h', 'platform/pc98/platform_io.h', 'sdk/allocator/**', 'sdk/include/os32/os32_gui_shared.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32api.h', 'sdk/kapi.json', 'tools/check_nano_inputs.py', 'tools/ci/build_cross.sh', 'tools/tests/appmem_map_host.c', 'tools/tests/exec_heap_host.h', 'tools/tests/host32.py', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/mem_stat_host.c', 'tools/tests/multiapp_model_host.c', 'tools/tests/mutpar.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/test_appmem_map.py', 'tools/tests/test_mem_stat.py', 'tools/tests/test_trim_kernel.py', 'tools/tests/trim_flow_host.c', 'tools/tests/trim_kernel_host.c', 'userland/shell/cmd_sys.c', 'tools/tests/g3fix_wm_probe.py', 'tools/tests/g3fix_wm_probe.rs', 'userland/gshell/src/**', 'userland/gshell/host/**', 'userland/gshell/build.rs', 'tools/tests/test_trim_fixtures.py', 'tools/tests/trim_fixtures_host.c', 'userland/tests/trim_front.c', 'userland/tests/trim_back.c', 'sdk/rust/os32api/src/av.rs', 'tools/tests/os32api_host.py', 'userland/rust/trim_back_rs/src/cache.rs', 'platform/pc98/kernel.c', 'kernel/kstack_hw.c', 'tools/tests/kdebug_cli_host.c', 'userland/shell/cmd_base.c', 'init/sysconfig.c', 'tools/tests/kernel_layout.py', 'init/kaudit_boot.c', 'mm/memory_boot.c', 'tools/fetch_fonts.py', 'tools/tests/g16_fixture.py', 'tools/gen_g16.py', 'tools/g16/**', 'assets/ipadic/*.csv', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['sys/kern/av_focus.c', 'sys/include/av_contract.h', 'sys/kern/exec/exec_gui.h', 'sys/kern/exec/exec_hooks.h', 'sys/hal/input/in2_int.h', 'sys/include/app_ids.h', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/font_guard_inactive.h', 'sys/arch/x86/arch_cpu.h', 'sys/arch/x86/x86_flags.h', 'sys/arch/x86/arch_io.h', 'sys/platform/pc98/input/kbd.h', 'sys/kern/exec/access_walk.c', 'sys/kern/exec/appmem.c', 'sys/kern/exec/appmem.h', 'sys/kern/exec/appmem_map.c', 'sys/kern/exec/appmem_unmap.c', 'sys/kern/exec/appslot.c', 'sys/kern/exec/appslot.h', 'sys/kern/exec/exec.c', 'sys/kern/exec/exec.h', 'sys/kern/exec/exec_heap.c', 'sys/kern/exec/exec_heap.h', 'sys/kern/exec/lease.c', 'sys/kern/exec/redir_access.c', 'sys/kern/exec/ring3_str.c', 'sys/fs/fd_redirect.h', 'sys/include/appmem_types.h', 'sys/include/cpu.h', 'sys/include/io.h', 'sys/include/memmap.h', 'sys/platform/pc98/pc98.h', 'sys/include/redir_access.h', 'sys/include/sys.h', 'sys/include/text_screen.h', 'sys/include/types.h', 'sys/kapi/kapi_generated.c', 'sys/kapi/kapi_sysinfo.c', 'sys/platform/pc98/platform_mem_stat.h', 'sys/platform/powermac/platform_mem_stat.h', 'tools/tests/mem_stat_source.py', 'sys/kern/sqlite_engine.c', 'sys/arch/x86/kernel/gdt.h', 'sys/kern/gui.c', 'sys/kern/gui.h', 'sys/kern/ime/ime.h', 'sys/include/ime_control.h', 'sys/kern/mm/kmalloc.c', 'sys/kern/mm/kmalloc.h', 'sys/platform/pc98/kdebug/kselftest.c', 'sys/kern/mm/paging.c', 'sys/kern/mm/paging.h', 'sys/kern/mm/paging_app.c', 'sys/kern/mm/paging_app.h', 'sys/kern/mm/pgalloc.c', 'sys/kern/mm/pgalloc.h', 'sys/kern/mm/physmem.c', 'sys/kern/mm/physmem.h', 'sys/arch/x86/kernel/tss.h', 'sys/kern/kstring.h', 'sys/platform/pc98/platform_io.h', 'sdk/allocator/**', 'sdk/include/os32/os32_gui_shared.h', 'sdk/include/os32/os32_kapi_generated.h', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32api.h', 'sdk/kapi.json', 'tools/check_nano_inputs.py', 'tools/ci/build_cross.sh', 'tools/tests/appmem_map_host.c', 'tools/tests/exec_heap_host.h', 'tools/tests/host32.py', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/mem_stat_host.c', 'tools/tests/multiapp_model_host.c', 'tools/tests/mutpar.py', 'tools/tests/pgalloc_host_fixture.h', 'tools/tests/test_appmem_map.py', 'tools/tests/test_mem_stat.py', 'tools/tests/test_trim_kernel.py', 'tools/tests/trim_flow_host.c', 'tools/tests/trim_kernel_host.c', 'userland/shell/cmd_sys.c', 'tools/tests/g3fix_wm_probe.py', 'tools/tests/g3fix_wm_probe.rs', 'userland/gshell/src/**', 'userland/gshell/host/**', 'userland/gshell/build.rs', 'tools/tests/test_trim_fixtures.py', 'tools/tests/trim_fixtures_host.c', 'userland/diag/trim_front.c', 'userland/diag/trim_back.c', 'sdk/rust/os32api/src/av.rs', 'tools/tests/os32api_host.py', 'userland/rust/trim_back_rs/src/cache.rs', 'sys/platform/pc98/kernel.c', 'sys/kern/kstack_hw.c', 'tools/tests/kdebug_cli_host.c', 'userland/shell/cmd_base.c', 'sys/kern/init/sysconfig.c', 'tools/tests/kernel_layout.py', 'sys/kern/init/kaudit_boot.c', 'sys/kern/mm/memory_boot.c', 'tools/fetch_fonts.py', 'tools/tests/g16_fixture.py', 'tools/gen_g16.py', 'tools/g16/**', 'assets/ipadic/*.csv', 'tools/tests/input_fixture_host.h', 'sys/hal/input/input_service.c', 'sys/hal/input/pointer_service.h', 'sys/hal/input/input_service.h', 'sys/include/kbd.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=30.8,
     kind='characterization',
 )
@@ -26,12 +26,12 @@ import test_trim_kernel as kernel
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET_SRCS = [
-    'exec/appslot.c', 'exec/exec.c', 'kernel/gui.c', 'kdebug/kselftest/appmem.inc',
-    'kapi/kapi_sysinfo.c', 'exec/exec_heap.c', 'exec/appmem.c', 'exec/appmem_map.c',
-    'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/physmem.c',
+    'sys/kern/exec/appslot.c', 'sys/kern/exec/exec.c', 'sys/kern/gui.c', 'sys/kern/kdebug/kselftest/appmem.inc',
+    'sys/kapi/kapi_sysinfo.c', 'sys/kern/exec/exec_heap.c', 'sys/kern/exec/appmem.c', 'sys/kern/exec/appmem_map.c',
+    'sys/kern/exec/appmem_unmap.c', 'sys/kern/mm/paging_app.c', 'sys/kern/mm/physmem.c',
     'sdk/allocator/nano_adapter.c',
     'tools/tests/trim_flow_host.c', 'tools/tests/multiapp_model_host.c',
- 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
+ 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h']
 CASES = ('success', 'noanswer', 'raw', 'cui', 'realloc', 'remark', 'blocked-primary', 'input-exception')
 MUTANTS = [
     ('poll-excludes-input', 7, 'tools/tests/multiapp_model_host.c',
@@ -42,11 +42,11 @@ MUTANTS = [
      'if (a->state != MA_PARKED && a->state != MA_WAIT_POLL) return 0;',
      'if (a->state != MA_PARKED) return 0;',
      'input exception ready includes requester'),
-    ('blocked-primary-drops-secondary-mark', 6, 'exec/appmem_map.c',
+    ('blocked-primary-drops-secondary-mark', 6, 'sys/kern/exec/appmem_map.c',
      'if (rc == APPMEM_ENOSPC) appslot_trim_request_as(as);',
      '/* omit the secondary arena pressure request */',
      'blocked primary marks before first yield'),
-    ('map-mid-pump', 0, 'exec/appmem_map.c',
+    ('map-mid-pump', 0, 'sys/kern/exec/appmem_map.c',
      'rc = paging_app_stage(&tx, as, plan.base, plan.end);',
      'rc = paging_app_stage(&tx, as, plan.base, plan.end);\n'
      '    extern void flow_pump_observe(void); flow_pump_observe();',
@@ -55,13 +55,13 @@ MUTANTS = [
      'if (FLOW_CASE == 2) p = map_at(3 * PAGE_SIZE, 0, 0);',
      'if (FLOW_CASE == 2) { p = map_at(3 * PAGE_SIZE, 0, 0); if (!p) flow_yield(); }',
      'raw map no yield'),
-    ('cui-self-delivery', 3, 'exec/appslot.c',
+    ('cui-self-delivery', 3, 'sys/kern/exec/appslot.c',
      'if (requester < 0) return;',
      'if (requester < 0) return;\n'
      '    if (!g_slot[requester].gui) { g_slot[requester].trim_pending = 1; '
      'g_slot[requester].trim_epoch = appslot_trim_epoch; }',
      'requester not marked'),
-    ('cui-drops-back-mark', 3, 'exec/appslot.c',
+    ('cui-drops-back-mark', 3, 'sys/kern/exec/appslot.c',
      'if (requester < 0) return;',
      'if (requester < 0 || !g_slot[requester].gui) return;',
      'mark target count'),
@@ -163,15 +163,15 @@ def build_fixture(tmp, sources):
     (tmp / 'trim_flow_source.c').write_text(sources['tools/tests/trim_flow_host.c'])
     (tmp / 'multiapp_model_host.c').write_text(sources['tools/tests/multiapp_model_host.c'])
     objects = []
-    for index, name in enumerate(('exec/appmem.c', 'exec/appmem_map.c',
-                                  'exec/appmem_unmap.c', 'mm/paging_app.c',
-                                  'mm/physmem.c')):
+    for index, name in enumerate(('sys/kern/exec/appmem.c', 'sys/kern/exec/appmem_map.c',
+                                  'sys/kern/exec/appmem_unmap.c', 'sys/kern/mm/paging_app.c',
+                                  'sys/kern/mm/physmem.c')):
         src, obj = tmp / f'part{index}.c', tmp / f'part{index}.o'
         src.write_text(sources[name])
         extra = []
-        if name == 'exec/appmem_map.c':
+        if name == 'sys/kern/exec/appmem_map.c':
             extra = ['-Dpaging_app_stage=flow_stage', '-Dappmem_publish=flow_publish']
-        if name == 'mm/paging_app.c':
+        if name == 'sys/kern/mm/paging_app.c':
             extra = ['-Dpgalloc_alloc_phys=map_alloc', '-Dpgalloc_free_n_owner=map_free']
         host32.build(cc + extra + ['-c', str(src), '-o', str(obj)],
                      check=True, capture_output=True, text=True)

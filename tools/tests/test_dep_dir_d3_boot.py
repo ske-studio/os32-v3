@@ -8,15 +8,15 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ('platform/pc98/boot.c', 'platform/pc98/boot_platform.c', 'platform/pc98/boot_display.c', 'platform/pc98/emergency.c')
-HEADERS = ('include/kernel_mount_children.h', 'include/ide_contract.h', 'platform/pc98/boot_platform.h', 'platform/pc98/boot_display.h', 'include/platform_emergency.h')
+SOURCES = ('sys/platform/pc98/boot.c', 'sys/platform/pc98/boot_platform.c', 'sys/platform/pc98/boot_display.c', 'sys/platform/pc98/emergency.c')
+HEADERS = ('sys/include/kernel_mount_children.h', 'sys/include/ide_contract.h', 'sys/platform/pc98/boot_platform.h', 'sys/platform/pc98/boot_display.h', 'sys/include/platform_emergency.h')
 
 
 def kernel_order(kernel=None, overrides=None):
     if kernel is None:
         kernel = kernel_source(ROOT, overrides)
     else:
-        kernel = kernel_source(ROOT, {'platform/pc98/kernel.c': kernel})
+        kernel = kernel_source(ROOT, {'sys/platform/pc98/kernel.c': kernel})
     lan = re.search(r'^static void kernel_boot_lan\(struct boot_context \*boot\)\n\{\n(.*?)^}\n',
                     kernel, re.M | re.S)
     assert lan, 'shared LAN boot helper'
@@ -85,7 +85,7 @@ def kernel_order(kernel=None, overrides=None):
 
 def build(work, mutation=None):
     # Positive and mutation copies use the same headers and include paths.
-    for rel in (*SOURCES, *HEADERS, 'platform/pc98/kernel.c', *kernel_parts(ROOT)):
+    for rel in (*SOURCES, *HEADERS, 'sys/platform/pc98/kernel.c', *kernel_parts(ROOT)):
         text = (ROOT / rel).read_text()
         if mutation and rel == mutation[0]:
             _, old, new = mutation
@@ -97,7 +97,7 @@ def build(work, mutation=None):
     for rel, out in zip(SOURCES[1:], ('boot_platform_source.inc', 'boot_display_source.inc', 'emergency_source.inc')):
         text = (work / rel).read_text()
         (work / out).write_text(re.sub(r'^#include[^\n]*\n', '', text, flags=re.M))
-    kernel = (work / 'platform/pc98/kernel.c').read_text()
+    kernel = (work / 'sys/platform/pc98/kernel.c').read_text()
     start = kernel.index('    {\n        int rc;', kernel.index('"MOUNT..."'))
     end = kernel.index('    boot_platform_run(BOOT_CLOCK, &boot);', start)
     (work / 'kernel_mount_source.inc').write_text(
@@ -121,7 +121,7 @@ def build(work, mutation=None):
 
 def main():
     kernel_order()
-    kernel = (ROOT / 'platform/pc98/kernel.c').read_text()
+    kernel = (ROOT / 'sys/platform/pc98/kernel.c').read_text()
     # Definitions can move without changing execution; follow the call sites.
     includes = [f'#include "{Path(p).name}"' for p in kernel_parts(ROOT)]
     assert len(includes) == 3
@@ -135,7 +135,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='dep-dir-d3-boot-') as td:
         subprocess.run([str(build(Path(td)))], check=True)
     if '--mutate' in sys.argv:
-        memory_path = 'platform/pc98/kernel_boot_memory.inc'
+        memory_path = 'sys/platform/pc98/kernel_boot_memory.inc'
         memory = (ROOT / memory_path).read_text()
         early_order = ('        kernel_boot_lan(boot);\n'
                        '        int rc = lan_module_netcd_register(netcd_alias);')
@@ -186,13 +186,13 @@ def main():
         init = '    fs_registration_failed |= serialfs_init() != VFS_OK;'
         register = '    serialfs_session_set_fg(&sfs_session_fg);'
         for mutation in (
-            ('platform/pc98/boot.c', register, ''),
-            ('platform/pc98/boot.c', init + '\n' + register, register + '\n' + init),
-            ('platform/pc98/boot.c',
+            ('sys/platform/pc98/boot.c', register, ''),
+            ('sys/platform/pc98/boot.c', init + '\n' + register, register + '\n' + init),
+            ('sys/platform/pc98/boot.c',
              'drive == BOOT_DRIVE_FDD || drive == BOOT_DRIVE_FDD_144',
              '(drive & BIOS_DA_TYPE_MASK) == BOOT_DRIVE_FDD || (drive & BIOS_DA_TYPE_MASK) == BOOT_DRIVE_FDD_144'),
-            ('include/kernel_mount_children.h', 'vfs_mount(mnt, dname, "ext2")', 'vfs_mount(mnt, dname, "iso9660")'),
-            ('include/kernel_mount_children.h', 'if (match) continue;', 'if (match && 0) continue;'),
+            ('sys/include/kernel_mount_children.h', 'vfs_mount(mnt, dname, "ext2")', 'vfs_mount(mnt, dname, "iso9660")'),
+            ('sys/include/kernel_mount_children.h', 'if (match) continue;', 'if (match && 0) continue;'),
         ):
             with tempfile.TemporaryDirectory(prefix='dep-dir-d3-c-mut-') as td:
                 rc = subprocess.run([str(build(Path(td), mutation))]).returncode

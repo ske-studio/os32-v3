@@ -3,24 +3,24 @@
 /* Expectations: characterization of the original word-copy behavior and
  * ppc-offb-fast PACK (2026-11-15): alignment must not change any output byte. */
 /* R3: real OF backend/provider, with ledger/firmware dependencies replaced. */
-#include "drivers/video/of_fb/backend_of_fb.h"
-#include "gfx/v2/gfx2_int.h"
+#include "sys/dev/video/of_fb/backend_of_fb.h"
+#include "sys/hal/gfx/v2/gfx2_int.h"
 #include "display_provider.h"
 #include "redir_access.h"
-#include "kernel/console/console_dual.h"
-#include "platform/powermac/rh_observe.h"
-#include "arch/ppc/kernel_boot.h"
+#include "sys/kern/console/console_dual.h"
+#include "sys/platform/powermac/rh_observe.h"
+#include "sys/arch/ppc/kernel_boot.h"
 #include "kstring.h"
 #include "paging.h"
-#include "gfx/palette.h"
-#include "platform/powermac/display_text.h"
+#include "sys/hal/gfx/palette.h"
+#include "sys/platform/powermac/display_text.h"
 
 GfxCounters gfx_counters;
 GfxBackend *g_backend = &gfx_backend_of_fb;
 static int gfx_started;
 int gfx_current_height, gfx_flip_enabled, gfx_display_page;
 u8 *bb_b;
-#include "gfx/gfx_core_api.inc"
+#include "sys/hal/gfx/gfx_core_api.inc"
 
 /* DESIGN.final §2/§4: only committed logical rows may reach scanout. */
 static u8 frame_storage[64 * PAGE_SIZE] __attribute__((aligned(4096)));
@@ -486,8 +486,8 @@ static void provider(void)
     EXPECT(display_provider_init_failed(&gfx_backend_of_fb) < 0 && !of_fb_ready());
 }
 /* OSRI contract, DESIGN.final §4. Observe native scanout at the wait boundary. */
-#include "gfx/gfx_osri.h"
-#include "gfx/gfx_osri_view.h"
+#include "sys/kern/gfx/osri/gfx_osri.h"
+#include "sys/kern/gfx/osri/gfx_osri_view.h"
 static u8 osri_screen[648 * 402] __attribute__((aligned(4)));
 static u8 osri_client[644 * 402], packed[GFX_WIDTH * GFX_HEIGHT];
 static u8 planes[4][GFX_PLANE_SZ], clut[256][3];

@@ -6,7 +6,7 @@
 ## 使い方
 
 - 既定: `python3 tools/img2osri.py INPUT -o OUTPUT.osri` で、enc2・B=31・band=1 の v2 を 1 本出す。明示する形は `--encoder enc2 --outs 31 --band 1 --threads N` (threads の既定は論理 CPU 数、1 は単一スレッド)。
-- B は `--outs` で 15/23/31/47 から選べる (`osri_enc2_spec.BUDGETS`)。既定の 31 は [gfx/osri_profile.h](../gfx/osri_profile.h.md) を読む。47 は比較用で、実機の再生は保証しない。絵を見て B や方式を自動で変えることはしない。
+- B は `--outs` で 15/23/31/47 から選べる (`osri_enc2_spec.BUDGETS`)。既定の 31 は [sys/kern/gfx/osri/osri_profile.h](../gfx/osri_profile.h.md) を読む。47 は比較用で、実機の再生は保証しない。絵を見て B や方式を自動で変えることはしない。
 - enc2 の本体は [osri_enc2](osri_enc2.md)。この入口は引数を検査して `osri_enc2_native.encode_image` を呼ぶだけ。
 
 ## 旧方式 (互換のために残す)
@@ -20,7 +20,7 @@
 - 透明な部分を黒に合成し、縦横比を保って 640×400 に縮め (LANCZOS)、黒の余白で中央に置く (`resize_image`)。
 - RGB888 → RGB444 は各成分 `(v*15+127)//255` の整数の丸め。
 - 画素は、確定した各行のパレットへ整数の Floyd–Steinberg (右 7・左下 3・下 5・右下 1、分母 16、負は 0 の方向へ切る、左→右、行の間で持ち越す) で割り当てる。最近色の同点は小さい index。
-- 出力は v2 のヘッダ・初期パレット・4 プレーン・イベント。CRC は `zlib.crc32`。形式は [gfx/gfx_osri.h](../gfx/gfx_osri.h.md)。
+- 出力は v2 のヘッダ・初期パレット・4 プレーン・イベント。CRC は `zlib.crc32`。形式は [sys/kern/gfx/osri/gfx_osri.h](../gfx/gfx_osri.h.md)。
 - 標準出力に件数・最大 OUT・B か N・CRC・Pillow/NumPy の版・引数を 1 行出す。プレビューの PNG は作らない (ユーザー決定「プレビューは消して良い」)。
 
 ## 検査

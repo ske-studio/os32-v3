@@ -19,8 +19,8 @@ from contextlib import ExitStack
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ('fs/pipe_buffer.c', 'platform/pc98/console.c', 'userland/tests/pipe_owner_test.c',
-           'userland/tests/audit_test.c', 'userland/tests/kout_test.c',
+SOURCES = ('sys/fs/pipe_buffer.c', 'sys/platform/pc98/console.c', 'userland/diag/pipe_owner_test.c',
+           'userland/diag/audit_test.c', 'userland/diag/kout_test.c',
            'tools/gen_v86_int80.py', 'tools/deploy_manifests.py', 'tools/hostdrv_deploy.py',
            'tools/nhd_deploy.py')
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -108,7 +108,7 @@ def function(source, name):
 def run_harness(mutation=None, pipe_mutation=None):
     with tempfile.TemporaryDirectory(prefix='os32-h3b-') as directory:
         tmp = Path(directory)
-        console = (ROOT / 'platform/pc98/console.c').read_text()
+        console = (ROOT / 'sys/platform/pc98/console.c').read_text()
         console = '\n'.join(function(console, name).replace(name, public, 1)
                             for name, public in (('con_backend_putchar', 'tvram_putchar_at'),
                             ('con_backend_putkanji', 'tvram_putkanji_at'),
@@ -119,15 +119,15 @@ def run_harness(mutation=None, pipe_mutation=None):
             assert console.count(old) == 1, old
             console = console.replace(old, new)
         (tmp / 'console_source.c').write_text(console)
-        pipe = (ROOT / 'fs/pipe_buffer.c').read_text()
+        pipe = (ROOT / 'sys/fs/pipe_buffer.c').read_text()
         if pipe_mutation:
             old, new = pipe_mutation
             assert pipe.count(old) == 1, old
             pipe = pipe.replace(old, new)
         (tmp / 'pipe_source.c').write_text(pipe)
-        (tmp / 'pipe_guest.c').write_text((ROOT / 'userland/tests/pipe_owner_test.c').read_text())
-        (tmp / 'audit_guest.c').write_text((ROOT / 'userland/tests/audit_test.c').read_text())
-        (tmp / 'kout_guest.c').write_text((ROOT / 'userland/tests/kout_test.c').read_text())
+        (tmp / 'pipe_guest.c').write_text((ROOT / 'userland/diag/pipe_owner_test.c').read_text())
+        (tmp / 'audit_guest.c').write_text((ROOT / 'userland/diag/audit_test.c').read_text())
+        (tmp / 'kout_guest.c').write_text((ROOT / 'userland/diag/kout_test.c').read_text())
         exe = tmp / 'h3b'
         command = ['gcc', '-std=gnu11', '-D__cdecl=', '-Wall', '-Wextra', '-Werror', '-Wno-unused-variable',
                    '-I' + str(tmp)]
@@ -155,21 +155,21 @@ def check_image_and_deploy():
         'read_before_teardown': True,
     }
     assert module.observation() == expected_metadata
-    header = (ROOT / 'platform/pc98/legacy/v86.h').read_text()
+    header = (ROOT / 'sys/platform/pc98/legacy/v86.h').read_text()
     assert re.search(r'#define V86_IPL_SEG\s+0x1FC0U', header)
-    memory = (ROOT / 'platform/pc98/legacy/v86_mem.c').read_text()
+    memory = (ROOT / 'sys/platform/pc98/legacy/v86_mem.c').read_text()
     assert 'paging_v86_map_range(PAGE_SIZE, V86_REMAP_END, PAGE_SIZE,' in memory
     geometry = re.search(r'\{\s*1261568,\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\s*\}',
-                         (ROOT / 'drivers/block/loop_dev_format.inc').read_text())
+                         (ROOT / 'sys/dev/block/loop_dev_format.inc').read_text())
     assert geometry and tuple(map(int, geometry.groups())) == (77, 2, 8, 1024)
     raw_table = re.search(r'\} known\[\] = \{(.*?)\n    \};',
-                         (ROOT / 'drivers/block/loop_dev_format.inc').read_text(), re.S)
+                         (ROOT / 'sys/dev/block/loop_dev_format.inc').read_text(), re.S)
     entries = re.findall(r'\{\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+)\s*\}',
                          raw_table.group(1))
     assert len(entries) == 7
     for size, c, h, s, bps in (map(int, entry) for entry in entries):
         assert size == c * h * s * bps, (size, c, h, s, bps)
-    boot = (ROOT / 'platform/pc98/legacy/v86.c').read_text().split('int v86_boot2(')[1]
+    boot = (ROOT / 'sys/platform/pc98/legacy/v86.c').read_text().split('int v86_boot2(')[1]
     assert 'loop_dev_read_chs(V86_DISK_SLOT, 0, 0, 1,' in boot
     assert len(module.IPL) <= module.SECTOR_BYTES
     with tempfile.TemporaryDirectory(prefix='os32-int80-') as directory:
@@ -228,7 +228,7 @@ def check_image_and_deploy():
             assert nhd_deploy.do_sync_from_hostdrv()
         assert not (dest / 'test/int80.img').exists()
         assert (dest / 'test/normal.txt').read_text() == 'control'
-    kout = (ROOT / 'userland/tests/kout_test.c').read_text()
+    kout = (ROOT / 'userland/diag/kout_test.c').read_text()
     for case in ('2d', '3c'):
         line = next(line for line in kout.splitlines() if f'"{case} NULL:' in line)
         assert 'N/A' in line and 'SKIP' not in line

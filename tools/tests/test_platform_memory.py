@@ -7,10 +7,10 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='platform-memory-host', tier=1,
-    covers=['include/callconv.h', 'tools/tests/test_platform_memory.py', 'include/platform_memory.h',
-            'include/types.h', 'include/memmap.h', 'include/pc98.h',
-            'platform/pc98/platform_memory_desc.h',
-            'platform/powermac/platform_memory_desc.h'], needs=[], budget=2.7,
+    covers=['sys/include/callconv.h', 'tools/tests/test_platform_memory.py', 'sys/include/platform_memory.h',
+            'sys/include/types.h', 'sys/include/memmap.h', 'sys/platform/pc98/pc98.h',
+            'sys/platform/pc98/platform_memory_desc.h',
+            'sys/platform/powermac/platform_memory_desc.h'], needs=[], budget=2.7,
     basis=['AC-MEM-1'],
 )
 
@@ -24,12 +24,12 @@ static const struct platform_memory_attributes platform_memory_attributes = {
 
 
 def probe(work, provider, expected, mutant=False):
-    header = (ROOT / 'include/platform_memory.h').read_text()
+    header = (ROOT / 'sys/include/platform_memory.h').read_text()
     old = '#include "platform_memory_desc.h"'
     assert header.count(old) == 1
     if mutant:
         header = header.replace(old, '#include "../platform/pc98/platform_memory_desc.h"')
-    (work / 'include/platform_memory.h').write_text(header)
+    (work / 'sys/include/platform_memory.h').write_text(header)
     (work / 'selected/platform_memory_desc.h').write_text(provider)
     # The genuine PC98 provider remains available to the wrong-include mutant;
     # compilation succeeds, and selecting its values must fail at runtime.
@@ -55,7 +55,7 @@ int main(void) {
     result = subprocess.run([str(work / 'probe')])
     assert result.returncode == (1 if mutant else 0), (mutant, result.returncode)
     deps = (work / 'probe.d').read_text()
-    assert ('platform/pc98/platform_memory_desc.h' in deps) == mutant
+    assert ('sys/platform/pc98/platform_memory_desc.h' in deps) == mutant
     assert mutant or 'selected/platform_memory_desc.h' in deps
     print('RED: wrong PC98 include (runtime)' if mutant else 'GREEN: selected provider')
 
@@ -65,14 +65,14 @@ def main(mutate=False):
         work = Path(directory)
         for sub in ('include', 'selected', 'platform/pc98'):
             (work / sub).mkdir(parents=True)
-        for rel in ('include/callconv.h', 'include/types.h', 'include/memmap.h', 'include/pc98.h',
-                    'platform/pc98/platform_memory_desc.h'):
+        for rel in ('sys/include/callconv.h', 'sys/include/types.h', 'sys/include/memmap.h', 'sys/platform/pc98/pc98.h',
+                    'sys/platform/pc98/platform_memory_desc.h'):
             (work / rel).parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / rel, work / rel)
         probe(work, MOCK, [11,22,33,44,55,1,2,3,4,5,6,7,8,9,10])
         if mutate:
             probe(work, MOCK, [11,22,33,44,55,1,2,3,4,5,6,7,8,9,10], True)
-        probe(work, (ROOT / 'platform/powermac/platform_memory_desc.h').read_text(), [0xf00000, 0xf00000, 0x1000000, 0x1000000, 0x1000000,
+        probe(work, (ROOT / 'sys/platform/powermac/platform_memory_desc.h').read_text(), [0xf00000, 0xf00000, 0x1000000, 0x1000000, 0x1000000,
             0, 0, 0, 0, 0, 0, 0xa0000, 0x100000, 0xa0000, 0x100000])
         # PC98 values are also covered against actual memory users by
         # test_dep_dir_c_memory and the strict x86 artifact comparison.

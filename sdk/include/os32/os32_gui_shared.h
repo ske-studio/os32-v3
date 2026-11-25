@@ -380,7 +380,7 @@ typedef struct { i32 result; i16 button; i16 _pad; } GuiRespModal;  /* MODAL_OPE
 typedef struct { u32 window; GuiRect16 rect; } GuiReqInvalidate;    /* INVALIDATE 12B */
 
 /* SHM 内の GUI 領域: スロットの番地 = kapi->shm_base + GUI_SHM_OFFSET + slot × GUI_SLOT_SIZE。
- * 正典は include/memmap.h (MEM_SHM_GUI_BASE / GUI_SLOT_SIZE)。C のアプリが自前定義しなくて
+ * 正典は sys/include/memmap.h (MEM_SHM_GUI_BASE / GUI_SLOT_SIZE)。C のアプリが自前定義しなくて
  * 済むよう写しを置く (K2 の申し送り、2026-09-06)。カーネル側は memmap.h が先に定義する。 */
 #define GUI_SHM_OFFSET  0x28000UL   /* MEM_SHM_BASE からのオフセット (末尾 4 ブロック = +160KB) */
 #define GUI_SLOT_MAX     4        /* スロット 0〜3 (契約 T2: 4 本)。Rust 側 proto.rs と同値 */

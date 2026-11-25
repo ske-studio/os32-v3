@@ -9,9 +9,9 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-kboot-root-image', tier=2, budget=60,
-             covers=['platform/powermac/root_image.c', 'tools/ppc/kboot_root_image.py'],
-             inputs=['arch/ppc/kernel.ld', 'platform/powermac/platform_kboot_layout.h',
-                     'include/memmap.h', 'tools/gen_memmap.py', 'include/boot_root.h'])
+             covers=['sys/platform/powermac/root_image.c', 'tools/ppc/kboot_root_image.py'],
+             inputs=['sys/arch/ppc/kernel.ld', 'sys/platform/powermac/platform_kboot_layout.h',
+                     'sys/include/memmap.h', 'tools/gen_memmap.py', 'sys/include/boot_root.h'])
 PREFIX = str(Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-')
 
 
@@ -67,7 +67,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='kboot-root-', dir=os.environ.get('TMPDIR')) as tmp:
         work = Path(tmp)
         command(['python3', '-B', 'tools/gen_memmap.py', '--layout-header', work/'memmap_layout.h'])
-        script = (ROOT/'arch/ppc/kernel.ld').read_text()
+        script = (ROOT/'sys/arch/ppc/kernel.ld').read_text()
         verify(work, script, False)
         verify(work, script, True)
         print('PASS empty and 4KiB root image')

@@ -55,10 +55,10 @@ GUI は SHM の末尾を予約し、`shm_alloc` の管理表で使用済みに�
 
 ## 索引
 
-- [mm/memory_boot.c](memory_boot.md)
-- [mm/paging.c](paging.md)
-- [mm/pgalloc.c](pgalloc.md)
-- [mm/shlib.c](shlib.md)
+- [sys/kern/mm/memory_boot.c](memory_boot.md)
+- [sys/kern/mm/paging.c](paging.md)
+- [sys/kern/mm/pgalloc.c](pgalloc.md)
+- [sys/kern/mm/shlib.c](shlib.md)
 - [paging_app](paging_app.md)
 - [shm](shm.md)
 - [paging_map](paging_map.md)

@@ -15,7 +15,7 @@
 #include "gf4_display_fake.h"
 
 #ifndef GF4_SERVICE_SOURCE
-#define GF4_SERVICE_SOURCE "../../hwdev/gf/display/service.c"
+#define GF4_SERVICE_SOURCE "../../sys/dev/video/geforce/display/service.c"
 #endif
 #include GF4_SERVICE_SOURCE
 

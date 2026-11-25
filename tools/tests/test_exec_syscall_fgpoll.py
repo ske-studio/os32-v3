@@ -5,11 +5,11 @@ checks the hot-path gate and delivery of a poll's abort before ring3 return.
 Full service/module composition remains U6's acceptance test.
 """
 CHECK = dict(name='exec-syscall-fgpoll-host', tier=1, budget=2.8,
-             covers=['arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h', 'tools/tests/host_exec_context.h', 'tools/tests/test_exec_syscall_fgpoll.py',
-                     'exec/exec_syscall.inc', 'drivers/video/geforce/geforce_module.h',
+             covers=['sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h', 'tools/tests/host_exec_context.h', 'tools/tests/test_exec_syscall_fgpoll.py',
+                     'sys/kern/exec/exec_syscall.inc', 'sys/dev/video/geforce/geforce_module.h',
                      'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'build/config.mk',
-                     'include/**', 'kernel/io_work.h', 'kernel/io_kapi.h', 'sdk/include/os32/os32_kapi_slots.h'],
+                     'include/**', 'sys/kern/io_work.h', 'sys/kern/io_kapi.h', 'sdk/include/os32/os32_kapi_slots.h'],
     basis=['AC-CTX-1', 'AC-CTX-4', 'AC-CTX-6', 'GF_GUARD_THERM_DESIGN §5'],
 )
 
@@ -133,7 +133,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'exec/exec_syscall.inc').read_text()
+    source = (ROOT / 'sys/kern/exec/exec_syscall.inc').read_text()
     with tempfile.TemporaryDirectory(prefix='syscall-fgpoll-') as td:
         folder = Path(td)
         run_case(folder, source, 'syscall-tail')

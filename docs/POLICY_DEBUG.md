@@ -32,7 +32,7 @@
 NHD の作業イメージは `build/nhd/os32.nhd`。停止 → 配備 → 起動を守る ([D1])。
 ゲストで書き換えたファイルは次の NHD 配備で消えるため、ホストの配備元にも反映する。
 
-カーネルの到達確認は `kdebug/kselftest.c` の起動時自己試験で行う。
+カーネルの到達確認は `sys/platform/pc98/kdebug/kselftest.c` の起動時自己試験で行う。
 `KDEBUG=1` では試験が走り、`KDEBUG=0` は skipped・計数 0/0 (監査は走る)。
 古い map の番地や初期化前のゼロ値を合格と判定しない。
 `kstring` / `kmalloc` / `kprintf` を触ったら kselftest に項目を足す。

@@ -25,7 +25,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/v2/surface.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/v2/surface.c').read_text()
     mutations = [
         ('heap rollback', 'if (surf_backing_free(a, s)) goto keep; /* creation rollback */', 'if (0) goto keep;'),
         ('bytes overflow', 'pitch > a->caps.max_pitch || pitch > ~0UL / h', 'pitch > a->caps.max_pitch'),

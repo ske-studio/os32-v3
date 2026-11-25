@@ -1,6 +1,6 @@
 /* docs/design/platform/powermac/root_pair.md: only a complete verified decode
  * transfers the output pages. All earlier failures leave the caller no image. */
-#include "platform/powermac/root_boot.h"
+#include "sys/platform/powermac/root_boot.h"
 #include "bootinfo.h"
 #include "crc32.h"
 #include "endian_le.h"

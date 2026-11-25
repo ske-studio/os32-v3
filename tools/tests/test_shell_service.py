@@ -1,9 +1,9 @@
-"""常駐 shell の内部入口 (T7b-b2 S3a) — 実物の exec/shell_service.c をホストで。
+"""常駐 shell の内部入口 (T7b-b2 S3a) — 実物の sys/kern/exec/shell_service.c をホストで。
 
 設計: ~/os32-tmp/run/t7bb12/DESIGN.final.md §3・§5 (b2① 段 A/B、b2③ WM 中の
 read、b2⑤ 印の 0、b2⑥ reload)。
 
-S3b: exec/exec.c の結線は、exec.c から関数・分岐を切り出して tmp の
+S3b: sys/kern/exec/exec.c の結線は、exec.c から関数・分岐を切り出して tmp の
 wire_*.inc に書き、shell_service_host.c が実物として #include する
 (ring3_wm_enter/leave、ring3_context_*、exec_run の shell 確定 = retire → publish、
 exec_finish の shell 分岐 = 回収の後に retire)。dispatch 入口の印の 0 と
@@ -14,7 +14,7 @@ aux の選択は実物 exec_launch の runtime 試験で確認する。
   (2) b2① 段 A (戻り番地が現行 shell text の中・登録中) / 段 B (文脈)
   (3) b2③ 登録済み WM 区間の read は通り、印の無い・旧世代の区間は断る
   (4) b2⑥ retire → publish で旧 lease は STALE、旧 text は INVAL
-加えて静的に: exec/shell_service.c の wrapper が noinline、build/kernel.mk が
+加えて静的に: sys/kern/exec/shell_service.c の wrapper が noinline、build/kernel.mk が
 このファイルを -fno-optimize-sibling-calls で組む (設計 §3-2)。
 
   python3 -B tools/tests/test_shell_service.py            # ホスト
@@ -22,7 +22,7 @@ aux の選択は実物 exec_launch の runtime 試験で確認する。
   python3 -B tools/tests/test_shell_service.py --mutate   # 否定側 (写しの上で変異)
 """
 CHECK = dict(name='shell-service-host', tier=1,
-    covers=['exec/os32x_hdr.c', 'tools/tests/exec_image_host.c', 'tools/tests/test_exec_image.py', 'exec/shell_service.c', 'exec/shell_service.h', 'exec/ring3_str.c', 'exec/ring3_str.h', 'exec/appslot.h', 'exec/exec.h', 'kernel/gui.h', 'fs/fd_redirect.h', 'kernel/console/font_source.h', 'build/kernel.mk', 'exec/exec.c', 'include/redir_access.h', 'arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/build_fixture.py', 'build/sdk-target.mk', 'sdk/target_profile_cli.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['sys/kern/exec/os32x_hdr.c', 'tools/tests/exec_image_host.c', 'tools/tests/test_exec_image.py', 'sys/kern/exec/shell_service.c', 'sys/kern/exec/shell_service.h', 'sys/kern/exec/ring3_str.c', 'sys/kern/exec/ring3_str.h', 'sys/kern/exec/appslot.h', 'sys/kern/exec/exec.h', 'sys/kern/gui.h', 'sys/fs/fd_redirect.h', 'sys/kern/console/font_source.h', 'build/kernel.mk', 'sys/kern/exec/exec.c', 'sys/include/redir_access.h', 'sys/arch/x86/kernel/tss.h', 'tools/tests/host32.py', 'tools/tests/shell_service_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/build_fixture.py', 'build/sdk-target.mk', 'sdk/target_profile_cli.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=[], budget=2.9,
     kind='characterization',
 )
@@ -41,9 +41,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-Wall", "-Wextra", "-Werror"]
 INC_DIRS = tuple(d for d in dict.fromkeys(include_dirs()) if d != '.')
-SRC = "exec/shell_service.c"
-HDR = "exec/shell_service.h"
-EXEC = "exec/exec.c"
+SRC = "sys/kern/exec/shell_service.c"
+HDR = "sys/kern/exec/shell_service.h"
+EXEC = "sys/kern/exec/exec.c"
 import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from build_profile import query
@@ -93,36 +93,36 @@ MUTATIONS = [
      "b3 S2 publish が font_guard_run を埋めない"),
     (HDR, "#define SHELL_SERVICE_VERSION 2u\n", "#define SHELL_SERVICE_VERSION 1u\n",
      "b3 S2 版を 1 のまま (欄を足したのに版を上げない)"),
-    # ---- S3b: exec/exec.c の結線 ----
-    ('exec/exec.c', "    if (ring3_wm_depth == 1) shell_service_wm_mark();\n", "",
+    # ---- S3b: sys/kern/exec/exec.c の結線 ----
+    ('sys/kern/exec/exec.c', "    if (ring3_wm_depth == 1) shell_service_wm_mark();\n", "",
      "b2③ ring3_wm_enter が印を立てない"),
-    ('exec/exec.c', "    if (ring3_wm_depth == 0) ring3_wm_shell_gen = 0;\n}", "\n}",
+    ('sys/kern/exec/exec.c', "    if (ring3_wm_depth == 0) ring3_wm_shell_gen = 0;\n}", "\n}",
      "ring3_wm_leave が深さ 0 で印を消さない"),
-    ('exec/exec.c', "    ring3_wm_depth = 0;\n    ring3_wm_shell_gen = 0;\n}", "    ring3_wm_depth = 0;\n}",
+    ('sys/kern/exec/exec.c', "    ring3_wm_depth = 0;\n    ring3_wm_shell_gen = 0;\n}", "    ring3_wm_depth = 0;\n}",
      "b2⑤ ring3_context_clear の shell_gen=0 を外す"),
-    ('exec/exec.c', "    ring3_wm_shell_gen = saved->wm_shell_gen;\n", "",
+    ('sys/kern/exec/exec.c', "    ring3_wm_shell_gen = saved->wm_shell_gen;\n", "",
      "ring3_context_restore が親の印を戻さない"),
-    ('exec/exec_syscall.inc', "    ring3_wm_shell_gen = 0;   /* T7b-b2: 深さと同じく WM の印も 0 から始まる */\n", "",
+    ('sys/kern/exec/exec_syscall.inc', "    ring3_wm_shell_gen = 0;   /* T7b-b2: 深さと同じく WM の印も 0 から始まる */\n", "",
      "b2⑤ dispatch 入口の印の 0 を外す"),
-    ('exec/exec_launch.inc', "            shell_service_retire();\n            shell_service_publish(load_base, text_sz);\n",
+    ('sys/kern/exec/exec_launch.inc', "            shell_service_retire();\n            shell_service_publish(load_base, text_sz);\n",
      "            shell_service_publish(load_base, text_sz);\n",
      "shell 確定で retire せずに publish (旧 lease が残る)"),
-    ('exec/exec_launch.inc', "            shell_service_retire();\n            shell_service_publish(load_base, text_sz);\n",
+    ('sys/kern/exec/exec_launch.inc', "            shell_service_retire();\n            shell_service_publish(load_base, text_sz);\n",
      "            shell_service_publish(load_base, text_sz);\n            shell_service_retire();\n",
      "shell 確定の順を publish → retire にする"),
-    ('exec/exec_finish.inc', "        exec_reclaim_owned(id, kind);\n        /* T7b-b2 §3-1: shell の内部入口を外し",
+    ('sys/kern/exec/exec_finish.inc', "        exec_reclaim_owned(id, kind);\n        /* T7b-b2 §3-1: shell の内部入口を外し",
      "        shell_service_retire();\n        exec_reclaim_owned(id, kind);\n"
      "        /* T7b-b2 §3-1: shell の内部入口を外し", "exec_finish の shell 分岐が回収より先に retire"),
-    ('exec/exec_finish.inc', "         * 次の shell の publish はこの後 (exec_run の appslot_shell_commit 直後)。 */\n"
+    ('sys/kern/exec/exec_finish.inc', "         * 次の shell の publish はこの後 (exec_run の appslot_shell_commit 直後)。 */\n"
            "        shell_service_retire();\n",
      "         * 次の shell の publish はこの後 (exec_run の appslot_shell_commit 直後)。 */\n",
      "exec_finish の shell 分岐が retire しない"),
-    ('exec/exec_launch.inc', "        args.aux = is_shell ? (u32)(uptr)&g_shell_service : 0;\n",
+    ('sys/kern/exec/exec_launch.inc', "        args.aux = is_shell ? (u32)(uptr)&g_shell_service : 0;\n",
      "        args.aux = (u32)(uptr)&g_shell_service;\n", "app にも service 表の番地を渡す"),
 
 ]
 
-# exec/exec.c の結線を切り出す (wire_*.inc)。(名前, 始まり, 終わり, 終わりを含むか)
+# sys/kern/exec/exec.c の結線を切り出す (wire_*.inc)。(名前, 始まり, 終わり, 終わりを含むか)
 WIRE = [
     ("wire_wm.inc", "void ring3_wm_enter(void)\n{", "\nvolatile u32 ring3_wm_depth_underflow", False),
     ("wire_wm.inc+", "void ring3_wm_leave(void)\n{", "\n}\n", True),
@@ -188,13 +188,13 @@ def static_checks(root, quiet=False):
         bad.append("build/kernel.mk が shell_service.o を -fno-optimize-sibling-calls で組まない")
     if "$(R1_OBJ)/exec/shell_service.o: private KERNEL_CFLAGS += -fno-optimize-sibling-calls" not in mk:
         bad.append("build/kernel.mk が r1 の shell_service.o を -fno-optimize-sibling-calls で組まない")
-    if "exec/shell_service.c" not in query(root, config_only=True)["C_KERNEL"] or "| $(SHELL_SERVICE_OBJ)" in mk:
+    if "sys/kern/exec/shell_service.c" not in query(root, config_only=True)["C_KERNEL"] or "| $(SHELL_SERVICE_OBJ)" in mk:
         bad.append("build/kernel.mk: shell_service.c が C_KERNEL に無い / 順序だけの前提が残る")
-    # S3b: exec/exec.c の字面 (組めない部分)
+    # S3b: sys/kern/exec/exec.c の字面 (組めない部分)
     ex = exec_source(root)
-    if not re.search(r"^#define EXEC_ENTRY_ARGS 4$", (root / "exec/exec.h").read_text(), re.M):
+    if not re.search(r"^#define EXEC_ENTRY_ARGS 4$", (root / "sys/kern/exec/exec.h").read_text(), re.M):
         bad.append("EXEC_ENTRY_ARGS must remain four words")
-    if not re.search(r"^#define ABI_STACK_ALIGN 16$", (root / "arch/x86/arch_abi.h").read_text(), re.M):
+    if not re.search(r"^#define ABI_STACK_ALIGN 16$", (root / "sys/arch/x86/arch_abi.h").read_text(), re.M):
         bad.append("ABI_STACK_ALIGN must remain sixteen bytes")
     disp = _func_body(ex, "void exec_syscall_dispatch(struct arch_syscall *view)")
     if "    ring3_wm_depth = 0;\n    ring3_wm_shell_gen = 0;" not in disp:
@@ -262,7 +262,7 @@ def mutate():
                 print("MUTATION %d SKIP (pattern not found once): %s" % (i, why))
                 return 1
             src.write_text(text.replace(old, new), encoding="utf-8")
-            if rel == 'exec/exec_launch.inc' and 'args.aux' in old:
+            if rel == 'sys/kern/exec/exec_launch.inc' and 'args.aux' in old:
                 from test_exec_image import run as execute_image
                 status, log = execute_image(source=exec_source(copy))
                 if status != 'runtime':

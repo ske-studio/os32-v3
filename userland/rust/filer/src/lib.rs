@@ -1085,7 +1085,7 @@ impl Filer {
          * 判定は 2 本立てにする:
          *   1. inode — `/a/./b` や余分な `/` のような別表記を捉えられる。
          *      ただし **inode を返さないファイルシステムがある**
-         *      (`drivers/hostdrv/hostdrvfs.c` は st_dev/st_ino を 0 のままにする)。
+         *      (`sys/dev/hostdrv/hostdrvfs.c` は st_dev/st_ino を 0 のままにする)。
          *      0 のまま比べると `/host` 配下の任意の 2 ファイルが「同一」に
          *      なって正当なコピーまで拒否するので、**非 0 のときだけ**信じる。
          *   2. パス — inode が使えないときの受け皿。**生の文字列では足りない**。
@@ -1725,7 +1725,7 @@ impl Filer {
 /*  小道具                                                           */
 /* ================================================================ */
 
-/// PC-98 スキャンコード (`drivers/input/kbd.h` KEY_F5。`libos32gui::widget` にない分)。
+/// PC-98 スキャンコード (`sys/platform/pc98/input/kbd.h` KEY_F5。`libos32gui::widget` にない分)。
 const SCAN_F5: u8 = 0x66;
 
 fn clamp(v: i32, lo: i32, hi: i32) -> i32 {

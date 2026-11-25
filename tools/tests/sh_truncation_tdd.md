@@ -264,7 +264,7 @@ Makefile と同じフラグ (`-O2 -Wall -Wdeclaration-after-statement`) で **�
 | T5 | `main.c:406-442` `split_pipeline` | 段数が `MAX_PIPE_STAGES` (8) を超える / **空の段がある** / 1 段が `seg_size - 1` に収まらない、のいずれかで `-1` を返す。呼び手 (`main.c:537-541`) は段を 1 つも実行しない |
 | T6 | `sh_args.inc`、`parse_args_and_glob()` | `mem_alloc` の失敗を `ctx.alloc_failed` で持ち帰り (コールバックの中では KAPI を呼ばない)、`sys_ls` が戻ってから赤字 1 行 + 印 + `-1`。確保済みは呼び手 `execute_single` が `allocated_strings` からまとめて解放する |
 | T7 | `sh_args.inc` `glob_copy_pattern` (新規)、`parse_args_and_glob()` | パターンが `GLOB_PATTERN_MAX - 1` (255) に収まらない / ディレクトリ部が `PATH_MAX_LEN - 1` (255) を超える → **`sys_ls` を呼ばずに**断る |
-| T11 | `sh_launch.inc` | `cmdline` の長さが `LAUNCH_CMDLINE_MAX` (256) 以上なら **`launch_req` を呼ばずに** 断る。カーネル (`exec/launch.c`) は 1 行も変えていない |
+| T11 | `sh_launch.inc` | `cmdline` の長さが `LAUNCH_CMDLINE_MAX` (256) 以上なら **`launch_req` を呼ばずに** 断る。カーネル (`sys/kern/exec/launch.c`) は 1 行も変えていない |
 | T13 | `main.c:316-322` (`execute_single`)、`:493-499` (`execute_command_line`) | 空行は今までどおり黙って戻り、`CMD_BUF_SIZE` (4096) 以上は断る。**空行と区別する**のがこの経路の全部 |
 | T17 | `sh_exec.inc` | PATH 項目の取り込みが `PATH_MAX_LEN - 2` (254) で止まったのに次の文字が `:` でも `\0` でもない = **区切りを見失っている** → 断る。`dir + '/' + name_buf` が `PATH_MAX_LEN - 1` (255) に収まらないときも、連結する**前**に断る |
 
@@ -651,7 +651,7 @@ RED で落ちた 65 件:
 | T8 | `cmd_env.c` `str_copy` (`env_set` 経由)、`env_expand()` (`ni < ENV_NAME_MAX - 1`)、`cmd_set()` (`vi < ENV_VALUE_MAX - 1`) | `ENV_NAME_MAX` 32 (実効 31) / `ENV_VALUE_MAX` 256 (実効 255) | 切った名前・値で**登録する** | **段 4 — 済み** (`3fd4da5` の次) | 票の訂正どおり。**さらに 1 つ**: `set <32 文字以上の名前>=VALUE` は名前の途中で `=` を見失うが、**引数が 3 個以上あると** `argc >= 3` の fallback (`cmd_env.c`) に落ちて `argv[2]` を値として登録する (引数 2 個なら「値の表示」分岐) |
 | T9 | `cmd_env.c` `env_expand` | `ENV_NAME_MAX - 1` = 31 | `${NAME}` も裸の `$NAME` も 31 文字で打ち切り、残り (と `}`) が**リテラルとして素通りする** | **段 4 — 済み** (`3fd4da5` の次) | 票どおり |
 | T10 | `rshell.c` (`rpos < 126`) | `rbuf[128]`、実効 126 | 126 文字で読み取りを止め、**その接頭辞を実行する**。残りは次の入力になる | **段 4 — 済み** (`3fd4da5` の次) | 票どおり。断るときも EOT (0x04) を返すこと (票 §2-2) |
-| T11 | `sh_launch.inc` `sh_launch` + `exec/launch.c` (`LAUNCH_CMDLINE_MAX` 256) | 256 | `launch_req` が `INVAL` を返し、`sh.bin` は「GUI 外」と読む (`sh_launch.inc`) | **段 3 — 済み** (`11705db` の次) | 票どおり。カーネルは変えない |
+| T11 | `sh_launch.inc` `sh_launch` + `sys/kern/exec/launch.c` (`LAUNCH_CMDLINE_MAX` 256) | 256 | `launch_req` が `INVAL` を返し、`sh.bin` は「GUI 外」と読む (`sh_launch.inc`) | **段 3 — 済み** (`11705db` の次) | 票どおり。カーネルは変えない |
 | T12 | `cmd_script.c` `cmd_if` の `join_args` | `CMD_BUF_SIZE` 4096 | 切れたコマンド行を実行する。到達するのは glob 展開で argv が伸びたとき | **段 4 — 済み** (`3fd4da5` の次) | 票どおり |
 | T13 | `main.c:423` `execute_command` / `:316` `execute_single` | `CMD_BUF_SIZE` 4096 | 空行と長大行を**同じ扱い**で黙って `return` | **段 3 — 済み** (`11705db` の次) | 票どおり (両方とも `>= CMD_BUF_SIZE`) |
 | T14 | `ui.c` `hist_add` (`j < HIST_LINE_MAX - 1`)、同ファイル内 `hist_load` (`li >= HIST_LINE_MAX` → 511) | `HIST_LINE_MAX` 512 (実効 511) | 512 バイト目以降を切って履歴に残す / 読み込む | **段 4 — 済み** (`3fd4da5` の次) | 票どおり。`hist_load` は `hist_save()` で `HIST_SIZE * HIST_LINE_MAX - 1` = 8191 バイトしか読まない (末尾の行も切れる) |
@@ -675,7 +675,7 @@ RED で落ちた 65 件:
 | `split_pipeline` の段バッファ | 「変更不要」 | **そのとおり** | 段ごとの幅は `CMD_BUF_SIZE` 4096 で、`execute_command` の入口 (T13) が同じ上限で先に断るので届かない。段**数** 8 は T5 |
 | `sh_stage_is_builtin` | 「変更不要」 | **そのとおり** | `main.c:272` の `name[PATH_MAX_LEN]` は先頭語を写すだけ。255 で切れても「内蔵か」の判定が保守側 (外部扱い) に倒れるだけで、切れた名前は実行に使われない |
 | `sh_path_normalize` | 「変更不要」 | **ほぼそのとおり。1 点だけ違う** | 出力側は `seg_start + sn >= max` で `-1` を返すので票の言うとおり。ただし**入力側** (`cmd_fs_shared.c`、`tmp[PATH_MAX_LEN * 2]`) は cwd + 引数が 511 バイトを超えると**黙って切る**。呼び手は `fs_same_file` だけで、切れた綴りが偶然一致すると「同じファイル」と誤判定して `cp` が中止される (安全側に倒れる) — 段 2〜4 では変えないが、表には残す |
-| カーネルのトークナイザ (`exec/exec.c`) | 「変更不要」 | **範囲外 (票 §3 でカーネルは変えない)** | 読むだけ |
+| カーネルのトークナイザ (`sys/kern/exec/exec.c`) | 「変更不要」 | **範囲外 (票 §3 でカーネルは変えない)** | 読むだけ |
 | `cmd_fs_shared.c` `fs_append_basename` / 同ファイル内 `fs_parse_two_args` | 「呼び手が無い」 | **そのとおり** | `userland/` `tools/` 全体を検索して、宣言 (`cmd_fs_shared.h`) 以外の参照は 0。どちらも溢れを見ない (`fs_parse_two_args` は 255 で黙って切る)。**削除するか段 4 で決める** |
 
 ### 2-3. 票に無かったもの (この洗い出しで足した)
@@ -764,9 +764,9 @@ ESC 以外の打鍵は条件に合わず**そのまま捨てられて**いた。
 
 | 場所 | 足したもの |
 |---|---|
-| `drivers/input/kbd.c` | `kbd_peekkey()` — 取り出さずに次のキーを返す (無ければ -1)。戻り値の形は `kbd_trygetkey` と同じ。源の見る順番も同じ (GUI の注入リング → rshell のシリアル → cooked リング) |
-| `drivers/char/serial.c` | `serial_peekchar()` — `ser_buf[ser_head]` を読むだけ |
-| `kernel/kbd_inject.c` | `kbd_inject_peek()` — 注入リングの先頭を読むだけ。自己診断にビット 5 を追加 |
+| `sys/platform/pc98/input/kbd.c` | `kbd_peekkey()` — 取り出さずに次のキーを返す (無ければ -1)。戻り値の形は `kbd_trygetkey` と同じ。源の見る順番も同じ (GUI の注入リング → rshell のシリアル → cooked リング) |
+| `sys/dev/char/serial.c` | `serial_peekchar()` — `ser_buf[ser_head]` を読むだけ |
+| `sys/kern/kbd_inject.c` | `kbd_inject_peek()` — 注入リングの先頭を読むだけ。自己診断にビット 5 を追加 |
 | `sdk/kapi.json` | `kbd_peekkey` を**末尾に追加** ([ABI])、版数 v53 → v54 ([ABI])。slot 214 = 0x360 |
 | `userland/shell/cmd_script.c` | 監視を `kbd_peekkey()` に差し替え、**ESC と分かってから** `kbd_trygetkey()` を 1 回呼んで取り除く |
 | `build/app.conf` | 要求 KAPI を `userland/shell` 46 → 54、`userland/sh` (同じソースの CPL=3 版) 49 → 54 |
@@ -776,11 +776,11 @@ ESC 以外の打鍵は条件に合わず**そのまま捨てられて**いた。
 `kbd_inject` は使えない。理由は 4 つで、どれも単独で決定的:
 
 1. **CUI では誰も読まない。** 注入リングを見るのは `kbd_gui_mode` のときだけ
-   (`drivers/input/kbd.c` の `kbd_trygetchar` / `kbd_trygetkey` の GUI 分岐)。
+   (`sys/platform/pc98/input/kbd.c` の `kbd_trygetchar` / `kbd_trygetkey` の GUI 分岐)。
    `source` の普通の経路 (CUI / rshell) は cooked リングを読むので、
    押し戻したバイトは**二度と読まれない** — バグは直らない。
 2. **所有権で断られる。** `kbd_inject` は `con_sink` の読み手からしか受けない
-   (`kernel/kbd_inject.c`、読み手が違えば `OS32_ERR_EXIST`)。GUI ではその読み手は
+   (`sys/kern/kbd_inject.c`、読み手が違えば `OS32_ERR_EXIST`)。GUI ではその読み手は
    端末アプリで、シェルではない。
 3. **順序が壊れる。** `inj_push` は末尾に積むので、取り出したキーを戻すと
    **既に並んでいるものの後ろ**に回る。
@@ -827,8 +827,8 @@ ESC 専用の検査を足すか)。今回は入れていない。逃げ道とし
 
 - **実機 (NP21/W) では 1 度も動かしていない。** `make clean` → `make all` → `make check`
   → `make external` も**未実施** (コーダーの禁止範囲)。[ABI] の clean ビルドは PM 待ち。
-- 通したのはホスト試験と、`drivers/input/kbd.c` / `drivers/char/serial.c` / `kernel/kbd_inject.c` の
-  `i386-elf-gcc -Wall -Wextra -Werror` 単体コンパイルだけ。`kapi/kapi_generated.c` は
+- 通したのはホスト試験と、`sys/platform/pc98/input/kbd.c` / `sys/dev/char/serial.c` / `sys/kern/kbd_inject.c` の
+  `i386-elf-gcc -Wall -Wextra -Werror` 単体コンパイルだけ。`sys/kapi/kapi_generated.c` は
   この場の `-I` では無関係な既存の implicit declaration が出るので `-Werror` 無しで通し、
   `kbd_peekkey` に関する警告が 0 であることだけ見た。
 - **GUI (`SHELL_AS_APP`) で実際に動かしていない。** `kbd_peekkey` は `exec_park_poll` を

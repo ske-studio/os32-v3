@@ -1,9 +1,9 @@
-"""動的 IRQ の判断 (kernel/irq/irq_math.c) のホスト試験。
+"""動的 IRQ の判断 (sys/kern/irq/irq_math.c) のホスト試験。
 
 記録: tools/tests/irq_math_tdd.md
 票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-1 (割り込みの動的登録)
 
-実物の kernel/irq/irq_math.c と irq.c を #include して回す。
+実物の sys/kern/irq/irq_math.c と irq.c を #include して回す。
 IF/PIC のハードウェア効果だけを差し替える。
 
 **ここで見る分岐は NP21/W でも実機でも狙って作れない** — 「A と B が同時に
@@ -16,7 +16,7 @@ IF/PIC のハードウェア効果だけを差し替える。
   python3 -B tools/tests/test_irq_math.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='irq-math-host', tier=1,
-    covers=['platform/pc98/irq_policy.c', 'platform/pc98/irq_complete.c', 'platform/pc98/platform_irq_limits.h', 'include/kernel_tick.h', 'kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'tools/tests/irq_math_host.c', 'include/pc98.h', 'include/platform_irq.h', 'platform/pc98/pic.c', 'tools/tests/kernel_includes.py', 'kdebug/kselftest/irq_dynamic.inc', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h'],
+    covers=['sys/platform/pc98/irq_policy.c', 'sys/platform/pc98/irq_complete.c', 'sys/platform/pc98/platform_irq_limits.h', 'sys/include/kernel_tick.h', 'sys/kern/irq/irq.c', 'sys/kern/irq/irq_math.c', 'tools/tests/irq_math_host.c', 'sys/platform/pc98/pc98.h', 'sys/include/platform_irq.h', 'sys/platform/pc98/pic.c', 'tools/tests/kernel_includes.py', 'sys/platform/pc98/kdebug/kselftest/irq_dynamic.inc', 'sys/kern/irq/irq.h', 'sys/kern/irq/irq_math.h'],
     needs=[], budget=3.1,
     basis=['AC-IRQ-1', 'ARCH_COMPAT_CONTRACT §4.1'],
 )
@@ -30,20 +30,20 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/irq_math_host.c"
-SRC = ROOT / "kernel/irq/irq_math.c"
+SRC = ROOT / "sys/kern/irq/irq_math.c"
 
 # カーネルと同じ i386-elf で通す実ソース。irq.c まで入れるのは、
 # 表・PIC のマスク・EOI が irq_math の決め事を**実際に**呼ぶ形を固定するため。
 TARGET_SRCS = [
-    ("kernel/irq/irq_math.c", []),
-    ("kernel/irq/irq.c", []),
+    ("sys/kern/irq/irq_math.c", []),
+    ("sys/kern/irq/irq.c", []),
 ]
 
 CASES = ["core_integration", "dispatch_two_pass", "register_rules", "storm", "eoi_plan"]
 
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl=",
-         '-DIRQ_CORE_SOURCE="' + str(ROOT / "kernel/irq/irq.c") + '"']
+         '-DIRQ_CORE_SOURCE="' + str(ROOT / "sys/kern/irq/irq.c") + '"']
 INCLUDES = include_flags(ROOT)
 
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
@@ -91,22 +91,22 @@ def host_build(tmp, source_text=None, core_text=None):
         mut.mkdir(parents=True, exist_ok=True)
         (mut / "irq_math.c").write_text(source_text, encoding="utf-8")
         (mut / "irq_math.h").write_text(
-            (ROOT / "kernel/irq/irq_math.h").read_text(encoding="utf-8"),
+            (ROOT / "sys/kern/irq/irq_math.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8").replace(
-                '"../../kernel/irq/irq_math.c"', '"kernel/irq/irq_math.c"').replace(
+                '"../../sys/kern/irq/irq_math.c"', '"sys/kern/irq/irq_math.c"').replace(
                 '"../../platform/pc98/', '"' + str(ROOT / 'platform/pc98') + '/'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut),
                *include_flags(ROOT), str(shim), "-o", str(exe)]
     if core_text is not None:
         core = src_dir / "irq.c"
-        core.write_text(core_text.replace('"../../arch/x86/kernel/idt.h"',
-                        '"' + str(ROOT / 'arch/x86/kernel/idt.h') + '"').replace(
-                        '"../../include/platform_irq.h"',
-                        '"' + str(ROOT / 'include/platform_irq.h') + '"'))
+        core.write_text(core_text.replace('"../../sys/arch/x86/kernel/idt.h"',
+                        '"' + str(ROOT / 'sys/arch/x86/kernel/idt.h') + '"').replace(
+                        '"../../sys/include/platform_irq.h"',
+                        '"' + str(ROOT / 'sys/include/platform_irq.h') + '"'))
         cmd = [arg for arg in cmd if not arg.startswith('-DIRQ_CORE_SOURCE=')]
         cmd.insert(1, '-DIRQ_CORE_SOURCE="' + str(core) + '"')
     subprocess.run(cmd, cwd=ROOT, check=True)
@@ -124,7 +124,7 @@ def run_cases(exe, cases):
 
 
 def build_target(tmp):
-    """カーネルと同じ i386-elf で kernel/irq/irq.c ごと通す。"""
+    """カーネルと同じ i386-elf で sys/kern/irq/irq.c ごと通す。"""
     for rel, extra in TARGET_SRCS:
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
@@ -159,7 +159,7 @@ def mutate(tmp):
         status = "RED" if hits else "**GREEN (見逃し)**"
         print(f"MUTATION {i} {status} ({hits} 件): {why}", flush=True)
         bad += not hits
-    original = (ROOT / "kernel/irq/irq.c").read_text()
+    original = (ROOT / "sys/kern/irq/irq.c").read_text()
     for old, new in [
         ('platform_irq_unmask(irq);', 'platform_irq_mask(irq);'),
         ('irq_slot_remove(ln, slot);', '(void)slot;'),
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-irq-math-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real kernel/irq/irq_math.c)",
+        print("HOST GNU11 -Werror compile PASS (real sys/kern/irq/irq_math.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

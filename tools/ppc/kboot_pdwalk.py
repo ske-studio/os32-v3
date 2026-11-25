@@ -34,7 +34,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    product = ROOT / 'arch/ppc/pd_walk.c'
+    product = ROOT / 'sys/arch/ppc/pd_walk.c'
     with tempfile.TemporaryDirectory(prefix='pdwalk-', dir=os.environ.get('TMPDIR')) as tmp:
         tmp = Path(tmp)
         result = execute(product, tmp / 'baseline')

@@ -1,7 +1,7 @@
 /* T1's synchronous boundary double, not an implementation of Y2/Y3. */
-#include "drivers/video/trident/trident.h"
-#include "gfx/sync/sync_int.h"
-#include "gfx/v2/gfx2_int.h"
+#include "sys/dev/video/trident/trident.h"
+#include "sys/hal/gfx/sync/sync_int.h"
+#include "sys/hal/gfx/v2/gfx2_int.h"
 GfxSyncCtx gfxsync_ctx_pool[4];
 static GfxSyncCtx *published;
 int tri_test_bind_rc, tri_test_write_rc, tri_test_publish_rc, tri_test_order_bad;

@@ -1,15 +1,15 @@
 """CW module dispatch, diagnostic lease adapter and page/IRQ operations."""
 CHECK = dict(name='gf1-dispatch-host', tier=1,
-    covers=['hwdev/gf/foundation_test.c', 'hwdev/gf/gf1_test.h', 'hwdev/gf/gf2_test.h',
-            'drivers/video/geforce/geforce_module.h',
-            'include/gfx_hal.h', 'include/gfx_format.h',
-            'kernel/module/module_runtime.h', 'kernel/module/module_image.h',
-            'hwdev/gf/foundation.h', 'hwdev/gf/internal.h',
-            'hwdev/gf/display/*.h', 'hwdev/gf_load_state.h',
-            'kdebug/gfinit_bus.h', 'kdebug/kdebug_window.h', 'kdebug/recover.h',
-            'kdebug/gfinit_decode.h', 'include/types.h', 'include/memmap.h',
-            'include/io.h', 'include/video_service.h', 'include/pci_dev_contract.h',
-            'arch/x86/arch_io.h', 'tools/tests/gf1_dispatch_host.c',
+    covers=['sys/dev/video/geforce/foundation_test.c', 'sys/dev/video/geforce/gf1_test.h', 'sys/dev/video/geforce/gf2_test.h',
+            'sys/dev/video/geforce/geforce_module.h',
+            'sys/include/gfx_hal.h', 'sys/include/gfx_format.h',
+            'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.h',
+            'sys/dev/video/geforce/foundation.h', 'sys/dev/video/geforce/internal.h',
+            'hwdev/gf/display/*.h', 'sys/dev/video/geforce/gf_load_state.h',
+            'sys/dev/video/geforce/diag/gfinit_bus.h', 'sys/arch/x86/kdebug/kdebug_window.h', 'sys/dev/video/geforce/diag/recover.h',
+            'sys/dev/video/geforce/diag/gfinit_decode.h', 'sys/include/types.h', 'sys/include/memmap.h',
+            'sys/include/io.h', 'sys/include/video_service.h', 'sys/include/pci_dev_contract.h',
+            'sys/arch/x86/arch_io.h', 'tools/tests/gf1_dispatch_host.c',
             'tools/tests/test_gf1_dispatch.py', 'tools/tests/gf_foundation_width_host.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py'], needs=[], budget=3.3,
     basis=['GF_FEAT1_DESIGN §2', 'GF_FEAT1_DESIGN §8'],
@@ -24,7 +24,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'hwdev/gf/foundation_test.c'
+SOURCE = ROOT / 'sys/dev/video/geforce/foundation_test.c'
 
 
 def main():
@@ -83,9 +83,9 @@ def main():
             for old, new, label in mutants:
                 assert original.count(old) == 1, label
                 text = original.replace(old, new, 1)
-                for header in ('gf1_test.h', '../../kdebug/gfinit_bus.h',
-                               '../../include/memmap.h', '../../include/io.h',
-                               '../../drivers/video/geforce/geforce_module.h'):
+                for header in ('gf1_test.h', '../../sys/dev/video/geforce/diag/gfinit_bus.h',
+                               '../../sys/include/memmap.h', '../../sys/include/io.h',
+                               '../../sys/dev/video/geforce/geforce_module.h'):
                     text = text.replace('#include "' + header + '"',
                                         '#include "' + str((SOURCE.parent / header).resolve()) + '"')
                 mutant = td / 'mutant.c'

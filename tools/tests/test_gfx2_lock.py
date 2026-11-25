@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """C7: real lock.c, freestanding ILP32 runtime and product-line mutations."""
 CHECK = dict(name='gfx2-lock-host', tier=1, needs=[], budget=15,
-    covers=['gfx/v2/lock.c', 'gfx/v2/gfx2_int.h', 'include/gfx_hal.h',
-            'include/gfx_hal2.h', 'include/gfx_sync.h', 'include/types.h',
-            'include/type_contract.h', 'include/memmap.h', 'mm/paging.h',
-            'mm/pgalloc.h', 'lib/kstring.h', 'sdk/include/os32/os32_gfx2.h',
+    covers=['sys/hal/gfx/v2/lock.c', 'sys/hal/gfx/v2/gfx2_int.h', 'sys/include/gfx_hal.h',
+            'sys/hal/gfx/gfx_hal2.h', 'sys/include/gfx_sync.h', 'sys/include/types.h',
+            'sys/include/type_contract.h', 'sys/include/memmap.h', 'sys/kern/mm/paging.h',
+            'sys/kern/mm/pgalloc.h', 'sys/kern/kstring.h', 'sdk/include/os32/os32_gfx2.h',
             'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/gfx2_lock_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'include/copy_units.h', 'arch/x86/arch_copy.h', 'arch/ppc/arch_copy.h'],
+            'sys/include/copy_units.h', 'sys/arch/x86/arch_copy.h', 'sys/arch/ppc/arch_copy.h'],
     basis=['HAL_V2_DESIGN §6-2', 'HAL_V2_DESIGN §7-5'],
 )
 from pathlib import Path
@@ -34,7 +34,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/v2/lock.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/v2/lock.c').read_text()
     mutations = [
         ('revoke-unmap', 'if (s->staging || s->map_as) rc = staging_unmap(s);', '(void)0;'),
         ('revoke-alias', 'if (!(s->flags & GFX2_SF_ALIAS)) return OS32_ERR_INVAL;', '(void)0;'),

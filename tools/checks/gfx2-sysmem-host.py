@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gfx2-sysmem-host', tier=1,
-    covers=['gfx/v2/sysmem.c', 'gfx/v2/gfx2_int.h', 'include/**', 'mm/pgalloc.h',
-            'mm/paging.h', 'lib/kstring.h', 'arch/*/arch_copy.h',
+    covers=['sys/hal/gfx/v2/sysmem.c', 'sys/hal/gfx/v2/gfx2_int.h', 'include/**', 'sys/kern/mm/pgalloc.h',
+            'sys/kern/mm/paging.h', 'sys/kern/kstring.h', 'arch/*/arch_copy.h',
             'tools/tests/gfx2_sysmem_host.c', 'tools/tests/test_gfx2_sysmem.py',
             'tools/tests/host32.py', 'tools/tests/mutpar.py'],
     needs=[], budget=3.0,

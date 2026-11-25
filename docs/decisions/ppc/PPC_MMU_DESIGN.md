@@ -14,7 +14,7 @@
 |食い違い（数える対象は D1～D7）|実物と設計上の帰結|
 |---|---|
 |D1 根は不透明、との契約|S/include/cpu.h に対して下表の直接参照。命令wrapperだけでは不足。Dなら根をソフトPDとして扱い、miss walkerまで実装する。|
-|D2 PPC の原始命令ヘッダは既存ではない|S/arch/ppc は entry.S 等だけ。`arch_io.h`・`arch_cpu.h`・`platform/powermac/platform_io.h` は無い。新規作成が必要。|
+|D2 PPC の原始命令ヘッダは既存ではない|S/arch/ppc は entry.S 等だけ。`arch_io.h`・`arch_cpu.h`・`sys/platform/powermac/platform_io.h` は無い。新規作成が必要。|
 |D3 アーキ独立ヘッダの依存|S/include/cpu.h は x86_flags.h の直接 include と cdecl の説明。この段では変更しない。定数includeはPPCの命令を生成しないが、cdeclをPPC ABIと同一視しない。|
 |D4 OF から完全に切れた状態ではない|S/arch/ppc/entry.S は元の MSR を戻す。S/platform/powermac/boot.c は送信失敗時 OF stdout へ戻る。切離し後には使えない。|
 |D5 BAT0 の 256MiB は物理 RAM 量ではない|S/platform/powermac/platform_of_layout.h (PM_BAT_RAM_LOWER)、entry.S。RAM の実在範囲は OF reg/available から別に得る。|
@@ -25,23 +25,23 @@
 
 |S 以下のファイル:行|呼び手が知る表の形・操作|
 |---|---|
-|mm/paging.c|キャッシュ属性、定数・配置の static assert、PD と PT ポインタ列。|
-|mm/paging.c|PD 複製・USER 伝播・アプリ帯試験、PD 切替、PDE/PT の直接比較・復元。|
-|mm/paging.c|PTE 権限分類、USER 書換、memmap/master/as audit が全 PDE/PT を走査。|
-|mm/paging_boot.inc|固定 PD/PT の位置と内容検証、1024 要素の生成、PFN→PTE、root ロード、identity 検証。|
-|mm/paging_map.inc|疎 PT 確保・ゼロ化、PDE 公開、PTE 書込、PDE に USER 伝播、flush。|
-|mm/paging_map.inc|device map 前検査と書換、SHM/共有ページの PDE/PTE 権限、PCD/PWT。|
-|mm/paging_map.inc|V86 の PD0/PT0 スナップショット・復元、current_root を P2V して PDE 書換。|
-|mm/paging_map.inc|RO/not-present、present/flags/raw の取得と raw 復元。|
-|mm/paging_addrspace.inc|P2V(pd_phys)→PDE→PTE の2段 walk、PRESENT/USER/RW の積、PS 拒否、root API 包装。|
-|mm/paging_addrspace.inc (paging_addrspace_create_n())|PD1ページの確保・全複写・帯の消去・所有検査・解放、私有 PT 確保と PTE/PDE 更新。|
-|mm/paging_addrspace.inc (addrspace_map_user_range())|範囲 map の PDE ごとの準備と再ロード、帯だけの PTE walk・解放。|
-|mm/paging_lease.inc|pd_phys の整列/所有/active、PDE/PT 一致、lease PT 確保・map/unmap、空 PT/PDE の回収。|
+|sys/kern/mm/paging.c|キャッシュ属性、定数・配置の static assert、PD と PT ポインタ列。|
+|sys/kern/mm/paging.c|PD 複製・USER 伝播・アプリ帯試験、PD 切替、PDE/PT の直接比較・復元。|
+|sys/kern/mm/paging.c|PTE 権限分類、USER 書換、memmap/master/as audit が全 PDE/PT を走査。|
+|sys/kern/mm/paging_boot.inc|固定 PD/PT の位置と内容検証、1024 要素の生成、PFN→PTE、root ロード、identity 検証。|
+|sys/kern/mm/paging_map.inc|疎 PT 確保・ゼロ化、PDE 公開、PTE 書込、PDE に USER 伝播、flush。|
+|sys/kern/mm/paging_map.inc|device map 前検査と書換、SHM/共有ページの PDE/PTE 権限、PCD/PWT。|
+|sys/kern/mm/paging_map.inc|V86 の PD0/PT0 スナップショット・復元、current_root を P2V して PDE 書換。|
+|sys/kern/mm/paging_map.inc|RO/not-present、present/flags/raw の取得と raw 復元。|
+|sys/kern/mm/paging_addrspace.inc|P2V(pd_phys)→PDE→PTE の2段 walk、PRESENT/USER/RW の積、PS 拒否、root API 包装。|
+|sys/kern/mm/paging_addrspace.inc (paging_addrspace_create_n())|PD1ページの確保・全複写・帯の消去・所有検査・解放、私有 PT 確保と PTE/PDE 更新。|
+|sys/kern/mm/paging_addrspace.inc (addrspace_map_user_range())|範囲 map の PDE ごとの準備と再ロード、帯だけの PTE walk・解放。|
+|sys/kern/mm/paging_lease.inc|pd_phys の整列/所有/active、PDE/PT 一致、lease PT 確保・map/unmap、空 PT/PDE の回収。|
 - 関連の別翻訳単位にも表形式が露出：S/mm/paging_app.c は同じ2段表を直接操作。S/mm/paging.h は1024×1024、VA>>22、(VA>>12)&1023、4KiB frame mask。`pd_phys` は単なる識別子ではなく pgalloc 所有の PD ページ。
 
-- mm 外の直接参照（実物を rg で照合）：`S/exec/access_walk.c`（PD/PT所有・PS・権限）、`exec/lease.c`（raw walk/cache/A・D除外）、`exec/ring3_str.c`、`exec/exec_image_map.inc`、`exec/exec_tramp_init.inc`、`platform/pc98/legacy/v86_mem.c`（low PTE）、`mm/shlib.c`（USERと先頭PT）、`kernel/kaudit.c`。
-- raw/cache の外部利用：`S/drivers/video/geforce/gf_wc.c`、`gf_accept.c`、`hwdev/gf/native.c`。kdebug の直接flags/raw操作7本は `kdebug_window.c`、`kpeek.c`、`selftest_exec.c`、`selftest_lease.c`、`kselftest/kcg_display_return.inc:13,34–38`、`gfx_ledger.inc`、`memmap_pool_user.inc` の `test_memmap_pool_user()`。表予算・定数利用は `caller_boot.inc`、`h4_backing.inc`、`ledger.inc` にもある。
-- root読書きの58参照行（rgは60一致、うち宣言2行を除く。コメント・mm内部を含み、58個の独立した呼び手ではない）：`S/exec/{appmem_map.c,redir_access.c,exec_heap.c,exec_finish.inc,exec_launch.inc,exec_syscall.inc,lease.c,v86_call.c}`、`drivers/video/{geforce/gf_wc.c:105,trident/resources.c:28}`、`kdebug/{selftest_lease.c,kselftest/caller_boot.inc:8,39}`、mm内部は上の表と `pgalloc_surface.inc; shlib.c; paging_app.c; paging.h`。入口への根引渡しは `exec/exec_launch.inc,exec_schedule.inc,exec.c`。
+- mm 外の直接参照（実物を rg で照合）：`S/exec/access_walk.c`（PD/PT所有・PS・権限）、`sys/kern/exec/lease.c`（raw walk/cache/A・D除外）、`sys/kern/exec/ring3_str.c`、`sys/kern/exec/exec_image_map.inc`、`sys/kern/exec/exec_tramp_init.inc`、`sys/platform/pc98/legacy/v86_mem.c`（low PTE）、`sys/kern/mm/shlib.c`（USERと先頭PT）、`sys/kern/kaudit.c`。
+- raw/cache の外部利用：`S/drivers/video/geforce/gf_wc.c`、`gf_accept.c`、`sys/dev/video/geforce/native.c`。kdebug の直接flags/raw操作7本は `kdebug_window.c`、`kpeek.c`、`selftest_exec.c`、`selftest_lease.c`、`kselftest/kcg_display_return.inc:13,34–38`、`gfx_ledger.inc`、`memmap_pool_user.inc` の `test_memmap_pool_user()`。表予算・定数利用は `caller_boot.inc`、`h4_backing.inc`、`ledger.inc` にもある。
+- root読書きの58参照行（rgは60一致、うち宣言2行を除く。コメント・mm内部を含み、58個の独立した呼び手ではない）：`S/exec/{appmem_map.c,redir_access.c,exec_heap.c,exec_finish.inc,exec_launch.inc,exec_syscall.inc,lease.c,v86_call.c}`、`drivers/video/{geforce/gf_wc.c:105,trident/resources.c:28}`、`kdebug/{selftest_lease.c,kselftest/caller_boot.inc:8,39}`、mm内部は上の表と `pgalloc_surface.inc; shlib.c; paging_app.c; paging.h`。入口への根引渡しは `sys/kern/exec/exec_launch.inc,exec_schedule.inc,exec.c`。
 - 操作別の詳細とBの移行範囲は `/home/hight/os32-tmp/run/ppc-mm-boundary/DESIGN.r1.md` §1・§5を参照。移設約2000行に加え実質変更1800～3000行、試験600～1000行であり、r1のmm中心800～1400行では足りない。
 
 ## 2. 案の比較と推奨
@@ -50,18 +50,18 @@
 |---|---|---|
 |A：rootロードでソフトPD/PT全走査→HPT再構築|mm 0、cpu.h 0も可能。PPC実装だけならx86不変|VSID allocator不要。疎な利用でも全走査し衝突/権限問題は残る。|
 |B：mmと全呼び手を意味APIへ分離→PPC pmap|§1の移設2000＋変更1800～3000行、試験600～1000行。x86命令列は最初の同文移設後には変わる|SMP/IPI不要。方針と表形式を分離できるが今回の到達点を超える。|
-|C：独立pmapでソフト写像→HPT、新context口|今段mm 0、cpu.h 0、README 0。x86実装0。`ppc_current_context/ppc_select_context` はarch/ppc/ppc_pmap.h内に閉じる|固定16写像・1context、逆写像/ページアウト/overflow/SMP/VSID allocator不要。mm接続は未達。|
+|C：独立pmapでソフト写像→HPT、新context口|今段mm 0、cpu.h 0、README 0。x86実装0。`ppc_current_context/ppc_select_context` はsys/arch/ppc/ppc_pmap.h内に閉じる|固定16写像・1context、逆写像/ページアウト/overflow/SMP/VSID allocator不要。mm接続は未達。|
 |D：PD/PTをソフト表、DSI/ISIでHPTへ遅延挿入|今段mm 0、cpu.h 0、README 0。READMEの4種への訂正はPMの枝 `wt/ppc-readme` で実施済み（取り込み待ち）。ほかのREADME訂正はこの段では不要。PPCのみならx86不変|共通HPT1個とcur、切替ごとに全消去。逆写像/ページアウト/SMP/VSID allocator不要、spill・追出しは必要。|
 
 |比較7点|C|D（実物と費用）|
 |---|---|---|
-|1 mm/のコンパイルとbit|独立mmuターゲットではmm非リンク、mm変更0。新pmapはPPC属性を内部で生成する。|`S/mm/paging.c`と4incを**未変更でコンパイル成功**。CR0は `paging_boot.inc` のコメントのみ。PRESENTはPDE/PTE両方、RW/USERは階層の積（`paging_addrspace.inc`）。PCD優先でPCD→I\|G、PWT→WはPCDが無いときだけ、通常RAM→M。W=I=1は使わない（PCD/PWTの両bitを立てるのはgf_wc.c:92だけ。根拠：N/sys/arch/powerpc/include/oea/pte.h:96–108）。PDEのPCD/PWTはx86では表walkのcacheで葉属性ではないため葉とORしない。PSは現コード同様拒否、葉bit7 PATはGF固有（gf_wc.c）で再解釈不可、PPC共通利用から外す。レビュアーは同じ試作で `mm/paging_app.c・pgalloc.c・physmem.c・shlib.c・shm.c・kmalloc.c・memory_boot.c・exec/access_walk.c・exec/ring3_str.c・kernel/kaudit.c` もコンパイルできた（exec/lease.cは未確認）。mm全体のリンク成功や配置互換を意味しない。|
-|2 権限・BAT・guard|BAT0内は固定RWのみ。RO/guard試験はBAT外aliasに限定。Cも既存mmのguardを満たしたとは言わない。|256MiB BATのままでは `S/mm/paging_boot.inc` の固定guardも `kernel/sqlite_engine.c` の動的guardもfaultしない。Dをmmに接続する前にRAM BATを撤去し、コード/stack/表/HPTをソフトPDへ恒等登録する案が必要（縮小だけでは将来の動的guardを保証しない）。x86はCR0.WP=0でsupervisorがROにも書けるため、`!USER→PP0`、`USER+RW→PP2`、`USER+RO→PP1`（N/sys/arch/powerpc/include/oea/pte.h:105、U:RO/S:RW）でx86の意味と一致し、Ks=0/Kp=1の1組で足りる。|
-|3 R/CとA/D読者|NP:788–825の無効化後R/C回収をmapping.rcへ保存。mmのA/Dとは結合しない。|A/Dの意味を使う読み手は無く、`S/mm/paging.c; paging_map.inc; paging_lease.inc; paging_app.c (paging_app_context()); exec/lease.c; kdebug/selftest_lease.c; kselftest/kcg_display_return.inc:35` は除外比較。`paging_pte_raw/flags`はrawを返すが現読者に参照頻度/dirty判定は無い。ソフトA/Dを更新せず0のままでも `d & ~(A\|D)` は成立。O/sys/arch/powerpc/powerpc/pmap.c:2533–2534の物理頁R/C保存はVM向け、OS32にその消費者は無い；A/D書戻しは不要、将来ページアウト導入時は再設計。|
+|1 mm/のコンパイルとbit|独立mmuターゲットではmm非リンク、mm変更0。新pmapはPPC属性を内部で生成する。|`S/mm/paging.c`と4incを**未変更でコンパイル成功**。CR0は `paging_boot.inc` のコメントのみ。PRESENTはPDE/PTE両方、RW/USERは階層の積（`paging_addrspace.inc`）。PCD優先でPCD→I\|G、PWT→WはPCDが無いときだけ、通常RAM→M。W=I=1は使わない（PCD/PWTの両bitを立てるのはgf_wc.c:92だけ。根拠：N/sys/arch/powerpc/include/oea/pte.h:96–108）。PDEのPCD/PWTはx86では表walkのcacheで葉属性ではないため葉とORしない。PSは現コード同様拒否、葉bit7 PATはGF固有（gf_wc.c）で再解釈不可、PPC共通利用から外す。レビュアーは同じ試作で `sys/kern/mm/paging_app.c・pgalloc.c・physmem.c・shlib.c・shm.c・kmalloc.c・memory_boot.c・sys/kern/exec/access_walk.c・sys/kern/exec/ring3_str.c・sys/kern/kaudit.c` もコンパイルできた（sys/kern/exec/lease.cは未確認）。mm全体のリンク成功や配置互換を意味しない。|
+|2 権限・BAT・guard|BAT0内は固定RWのみ。RO/guard試験はBAT外aliasに限定。Cも既存mmのguardを満たしたとは言わない。|256MiB BATのままでは `S/mm/paging_boot.inc` の固定guardも `sys/kern/sqlite_engine.c` の動的guardもfaultしない。Dをmmに接続する前にRAM BATを撤去し、コード/stack/表/HPTをソフトPDへ恒等登録する案が必要（縮小だけでは将来の動的guardを保証しない）。x86はCR0.WP=0でsupervisorがROにも書けるため、`!USER→PP0`、`USER+RW→PP2`、`USER+RO→PP1`（N/sys/arch/powerpc/include/oea/pte.h:105、U:RO/S:RW）でx86の意味と一致し、Ks=0/Kp=1の1組で足りる。|
+|3 R/CとA/D読者|NP:788–825の無効化後R/C回収をmapping.rcへ保存。mmのA/Dとは結合しない。|A/Dの意味を使う読み手は無く、`S/mm/paging.c; paging_map.inc; paging_lease.inc; paging_app.c (paging_app_context()); sys/kern/exec/lease.c; sys/arch/x86/kdebug/selftest_lease.c; kselftest/kcg_display_return.inc:35` は除外比較。`paging_pte_raw/flags`はrawを返すが現読者に参照頻度/dirty判定は無い。ソフトA/Dを更新せず0のままでも `d & ~(A\|D)` は成立。O/sys/arch/powerpc/powerpc/pmap.c:2533–2534の物理頁R/C保存はVM向け、OS32にその消費者は無い；A/D書戻しは不要、将来ページアウト導入時は再設計。|
 |4 flush費用|個別変更はNP:788–825の1 VA tlbie、context selectだけNP:548–575の全列。HPT全走査不要。|`S/mm/paging.c; paging_map.inc` の11箇所で全消去。128MiBならFP:825–842によりHPT=1MiB（131072 entry）；この大きさでは各flushが1MiBゼロ書込＋64 tlbie＋後続の再miss。1MiBは式の値で、PTEGCOUNT（FP:825–826）により64KiB〜への縮小も可能。切替は `exec_launch.inc; exec_finish.inc; lease.c; paging_app.c` 等、時分割の毎tickではないがmap/leaseにも掛かる。時間は未測定。C比でspill/追出し/PD fixture・受入に製品約200～350行、試験約150～250行増の見積り。さらに通常trapのframe構築をDR=0で行う約30～50行を加え、C計1500～1800行に対しD計1730～2200行程度。|
 |5 手本|FP:196–197,847–867,879–885のソフト写像/HPT、NP:837–868の挿入失敗を採る。有限wired写像なのでoverflowを呼ぶ上位層は不要。|`O/sys/arch/macppc/macppc/locore.S:853–947 → O/sys/arch/powerpc/powerpc/pmap.c:2236–2333`。pte_spill_rは低物理RAMを直接恒等化する分岐を持ち、それ以外はpte_spill_v→VP表walk（同:278–290）。**x86形PD/PTをソフト表として読む手本は無い**。理由はOS32既存表を保持するため。低RAMを無条件RW再生成する分岐はguardを破るのでDでは使えずPD/PT walkに替える必要がある。|
 |6 実missの順・満杯|FT:93–158,346–378でreal保存→IR/DR/RI→C。stack/表はBAT内で再帰faultしない。両PTEG満杯はNP:849–868の失敗を返す。|O/sys/arch/macppc/macppc/locore.S:853–892,918–947：DSISR/SRR1のtable-miss判定→物理spill stack→volatile/XER/LR/CTR退避→realのpte_spill_r→成功ならrfi（同:910–918）、不成功は通常trap。`S/include/memmap.h`のP2Vは恒等で、初期BAT内にPD/PT/HPTを置けるが、**DR=0での表読みにBATは不要**。RAM BAT撤去後も再帰翻訳faultが無いのはspill入口だけ。通常trapはFT:93–158でIR/DRを立ててからstackへ書くため入れ子のDSIが起きうる。Dではframe構築をDR=0で行う変更（約30～50行）が必要。O/sys/arch/powerpc/powerpc/pmap.c:2451–2552はprimary8→secondary8→TB低bitでvictim→pte_del（:842–854、V消去→sync→tlbie→eieio→tlbsync→sync）→R/C保存→新hi無効/lo→eieio→V→sync。Dは満杯停止ではなくこの追出しが必要。Oの:2293–2322のDABR・無効写像・RO store・実行可否判定も対応づけ、失敗なら通常faultへ渡し、保護違反を再挿入だけで再試行し続けない。|
-|7 旧契約・新宣言|根はPDではなくHPT/SRを持つcontext。旧rootは未提供、`ppc_current_context/ppc_select_context` を `arch/ppc/ppc_pmap.h` に閉じる（README:38–43、§4）。include/cpu.hに宣言を足さない。|`cur=r; HPT消去; 全TLB消去`、currentはcur、flushはcur不変、enableはIR/DRだけで旧4契約を表せる。SDR1はrootと別の固定ハード状態。新context宣言は不要。PPC内部補助はREADME:38–43に従いppc_名。HPT消去中はEE=0・IR/DR=0の恒等実行区間として再fillを止め、戻すMSRを保存する。|
+|7 旧契約・新宣言|根はPDではなくHPT/SRを持つcontext。旧rootは未提供、`ppc_current_context/ppc_select_context` を `sys/arch/ppc/ppc_pmap.h` に閉じる（README:38–43、§4）。sys/include/cpu.hに宣言を足さない。|`cur=r; HPT消去; 全TLB消去`、currentはcur、flushはcur不変、enableはIR/DRだけで旧4契約を表せる。SDR1はrootと別の固定ハード状態。新context宣言は不要。PPC内部補助はREADME:38–43に従いppc_名。HPT消去中はEE=0・IR/DR=0の恒等実行区間として再fillを止め、戻すMSRを保存する。|
 
 - コンパイル証拠：`tmp/compile-d/{arch_cpu.h,arch_io.h,platform_io.h,paging.o,compile.log}`。cross-ppc GCC 13.2.0、`build/ppc.mk`相当のfreestanding/O2/7450/BE32/soft-float/no-altivec、試作includeを先頭にして `-c S/mm/paging.c`。ログ空、readelfはELF32 big-endian PowerPC。外部ppc_*へつなぐ宣言の検証であり、実HPT実装をリンクした結果ではない。nmはlibgcc未参照、既存memset等は未解決のまま。再現用コマンドは `tmp/compile-d/command.sh`。
 - Dなら境界設計§2の意味API/transaction導入、§3のPD/PT raw隔離、§5の表形式を隠すためだけの移設・呼び手変更は不要になる。既存prepare/commit・owner/lease方針を保持できる。一方でplatformの地図、BAT/guard、V86・PAT/MTRR・特権入口の分離、PPC ABI修正は残る。B全体が不要と断言はしない。
@@ -90,8 +90,8 @@
 
 - OF quiesce の分岐も照合する：N/sys/arch/macppc/macppc/machdep.c:140–142 は PowerMac11,2 / 12,1 / 7,2 のみ、NO:186–187で実行。対象QuickSilver/mac99はこの条件外なので呼ばない。OF translations の取り込み（FP:896–937）も完全切離しのため採用しない。
 - HPT の配置は保存した available を使い、低256MiBとの積集合から low vectors、ELFの全load/BSS/stackを除外して FP:1995–2029 の整列・区間分割・不足停止を適用する。予約の確定とbase/maskの記録は順2a、ゼロ化は境界後。available取得後は割当系OF呼出を止めるためclaim/再呼出は要らない。HPTをELF内の巨大BSSに置かない。RAM全量の常駐マップは今段不要。
-- [C4] `platform/powermac/platform_of_layout.h` に低位予約端、BAT窓、試験VA、周期、`PM_DEC_DUMP_N=2`、写像容量、stack/ELF予算を一元化。SPR/MSR/PTEのビットは `arch/ppc/ppc_oea.h`。既存0x6000 ELF予算/0x10000 image予算（S/platform/powermac/platform_of_layout.h）は新独立ターゲット用に見積り直し、リンク ASSERT に反映。
-- [C5] `platform/powermac/ppc_memmap.h` を新設：`pm_p2v_ram(pa)`/`pm_v2p_ram(p)` は低256MiBの予約済み RAM 内だけ恒等、`pm_p2v_io(pa)` は下記固定 ESCC alias。pmap lookupは固定mapping16個を検索しoffsetを加算する内部関数（BATなら恒等）、追加の共通APIにはしない。S/include/memmap.h (MEM_PDE_SHIFT) の x86 配置は取り込まない。任意 alias に V2P キャストは禁止；pmap lookup を用いる。
+- [C4] `sys/platform/powermac/platform_of_layout.h` に低位予約端、BAT窓、試験VA、周期、`PM_DEC_DUMP_N=2`、写像容量、stack/ELF予算を一元化。SPR/MSR/PTEのビットは `sys/arch/ppc/ppc_oea.h`。既存0x6000 ELF予算/0x10000 image予算（S/platform/powermac/platform_of_layout.h）は新独立ターゲット用に見積り直し、リンク ASSERT に反映。
+- [C5] `sys/platform/powermac/ppc_memmap.h` を新設：`pm_p2v_ram(pa)`/`pm_v2p_ram(p)` は低256MiBの予約済み RAM 内だけ恒等、`pm_p2v_io(pa)` は下記固定 ESCC alias。pmap lookupは固定mapping16個を検索しoffsetを加算する内部関数（BATなら恒等）、追加の共通APIにはしない。S/include/memmap.h (MEM_PDE_SHIFT) の x86 配置は取り込まない。任意 alias に V2P キャストは禁止；pmap lookup を用いる。
 - I/O は DBAT にしない。ESCCの PA を4KiB単位で覆う PTE を `0xf0000000+ページ内offset` に設置（窓が跨げば2枚）、WIMG=I|G=0x28、PP=2。RAM alias は M=0x10、PP=2/3。根拠 NP と N/sys/arch/powerpc/include/oea/pte.h:77–108、FP:399–404。OF の I/O マップは捨てる。ESCC は byte load/store＋eieio（S/arch/ppc/entry.S）を維持。
 - 固定試験 VA は0x40000000（BAT0外）、VAの同じページ内offsetを保つ。RAM PAは予約済み試験ページ。HPT hi=`V | (vsid<<7) | H | ((va>>22)&0x3f)`、hash=`(vsid ^ ((va>>12)&0xffff)) & mask`、secondary=`hash^mask`、lo=`pa | WIMG | PP`。SR は T=0、Ks=0、Kp=1、N=0、VSID=(1<<4)|segment（FP:157 の生成式；単一固定contextはOS32の選択）。
 - PTE変更/削除は NP:788–825 をそのまま使う：有効性検査→shadow.V消去→sync→実PTE.V消去→sync→tlbie(VA)→sync→eieio→tlbsync→sync→R/C をshadowへ回収；再挿入は上表8。全消去だけで旧 HPT を残す unmap は禁止。
@@ -106,7 +106,7 @@
 ## 4. 部品の境目のコード断片
 
 ```c
-/* arch/ppc/ppc_pmap.h 内だけに宣言する。include/cpu.h は変更しない。 */
+/* sys/arch/ppc/ppc_pmap.h 内だけに宣言する。sys/include/cpu.h は変更しない。 */
 struct ppc_mmu_context;  /* 定義は arch 固有。物理根という約束はしない。 */
 struct ppc_mmu_context *ppc_current_context(void);
 void ppc_select_context(struct ppc_mmu_context *ctx);
@@ -190,17 +190,17 @@ void ppc_takeover(const struct pm_boot_info *info); /* 境界、戻らない */
 
 |新規ファイル／全原始命令|実装・ABI・この段の状態|
 |---|---|
-|arch/ppc/arch_io.h：_enable/_disable|mfmsr→EEのみOR/AND→mtmsr→isync、外部asm呼出境界（LTO無し）。NP:516–528、S/arch/ppc/entry.Sに対応。外部IRQは本段では有効化元を設定しない。|
+|sys/arch/ppc/arch_io.h：_enable/_disable|mfmsr→EEのみOR/AND→mtmsr→isync、外部asm呼出境界（LTO無し）。NP:516–528、S/arch/ppc/entry.Sに対応。外部IRQは本段では有効化元を設定しない。|
 |同：irq_save/irq_restore/_irq_enabled|保存値は不透明 MSR；save は旧MSR取得→EE消去、restoreは現在MSRのEEのみ保存値へ戻す、queryはmfmsrのみ。save中の割込みはmtmsr前なら全復帰後に継続するので禁止区間の始点はmtmsr。1つの外部asm関数内で完結しC操作の移動を防ぐ（LTO無し）。restoreのEE限定は旧値で変換状態を上書きしないOS32契約上の選択、手本NP:528は全MSR復元。|
-|同：_lidt|シグネチャは `void _lidt(void *ptr)`、内部で `struct ppc_vector_image *` と解釈して低位へコピー・同期、IP=0選択。EE=0/IR=DR=0でtakeoverから1回のみ。x86の6byte IDTRは受けない（include/io.hは形をarchへ委任）。|
+|同：_lidt|シグネチャは `void _lidt(void *ptr)`、内部で `struct ppc_vector_image *` と解釈して低位へコピー・同期、IP=0選択。EE=0/IR=DR=0でtakeoverから1回のみ。x86の6byte IDTRは受けない（sys/include/io.hは形をarchへ委任）。|
 |同：_halt/_idle|今段は未実装、両者とも未定義の `ppc_wait_not_available()` を参照して呼べばリンク失敗。EEを立ててからPOWにする実装は不可分性を満たさない。NAP不採用根拠NC:691。DEC試験は通常のbusy loopで待つ。|
 |同：_stop|EE消去→sync→自己分岐。S/arch/ppc/entry.Sを利用。呼び手のfor(;;)契約を変更しない。|
-|arch/ppc/arch_cpu.h：current_root/load_root|旧シグネチャのinline定義は置くが、本文は未定義 `ppc_legacy_root_not_available` へ。PPC呼び手はppc_pmap.hの `ppc_current_context/ppc_select_context` だけ使う。無言でSDR1をrootと返さない。|
+|sys/arch/ppc/arch_cpu.h：current_root/load_root|旧シグネチャのinline定義は置くが、本文は未定義 `ppc_legacy_root_not_available` へ。PPC呼び手はppc_pmap.hの `ppc_current_context/ppc_select_context` だけ使う。無言でSDR1をrootと返さない。|
 |同：flush_tlb/enable|§3のNP全列／IR・DRのみ変更。外部asm呼出境界。context設定済みは呼び手の前提。|
 |同：arch_enter_user/arch_call_on_stack|同引数マクロを定義し未定義関数参照で呼出時リンク失敗。後者の「全引数がstack上」はPPC ABIと不一致、将来専用ABI入口が要る。noreturn等を旧共通契約へ足さない。|
-|platform/powermac/platform_io.h：inp/outp|引数はMMIO仮想番地、lbz/stb→eieio、結果はzero extend。PC98ポート番号は解釈しない。|
+|sys/platform/powermac/platform_io.h：inp/outp|引数はMMIO仮想番地、lbz/stb→eieio、結果はzero extend。PC98ポート番号は解釈しない。|
 |同：inpw/outpw/inpd/outpd|今回は未定義リンク先へ。後段のPCI little-endian窓用 lhbrx/sthbrx/lwbrx/stwbrx＋eieioを別機能で実装する。ESCC以外のレジスタ幅/byte orderを推測して実装しない。|
-|同：io_wait/io_wait_n|今回は未定義リンク先へ。eieio はバス順序であり include/io.h の「短いウェイト」の代替にはしない。既存ESCCの期限付きpollを使用。|
+|同：io_wait/io_wait_n|今回は未定義リンク先へ。eieio はバス順序であり sys/include/io.h の「短いウェイト」の代替にはしない。既存ESCCの期限付きpollを使用。|
 - Cの原始操作は外部関数を呼び、host fakeが同名を提供する（手本S/arch/ppc/ppc_boot.h）：`ppc_load8/store8, ppc_sync, ppc_disable/enable/stop, ppc_irq_save/restore/enabled, ppc_vector_install, ppc_tlb_flush_all/one, ppc_sr_sdr1_load, ppc_enable_translation, ppc_cache_copy, ppc_read_pvr/hid0, ppc_write_hid0, ppc_read_dec/tb, ppc_write_dec, ppc_bat_reset/set, ppc_eieio/tlbsync/isync, ppc_hpt_ptr(pa)`。Cは `ppc_hpt_ptr(pa)` 経由でHPTへ触り、実機側はHPTの恒等アドレス、fake側は試験用領域を返す。build/ppc.mkの-I順では同名ヘッダを差し替えられないため、同名関数のリンク差し替えを用いる。CのCPU分岐は記録可能な外部関数経由、inline PPC asmを含むヘッダをfakeへ渡さない。takeover/frameの組立自体はfakeで代用せずobjdump＋QMPで検証。
 - FAKE-ABI：上の原始操作は `ppc_oea.h` のC専用宣言（asmは定数部のみ）を製品/fakeで共有する。既存 `ppc_boot.h` の `unsigned int ppc_load8(cell)` / `void ppc_store8(cell,unsigned int)` / `ppc_stop(void)` のnoreturnを保持する。追加分の形は次のとおり。HPTは実機BE/fake nativeのu32語として扱い、fixtureも同じ語で比較する（OF propertyだけはBE byte decode）。TBは診断用下位32bitで、64bit戻り値ABI/libgccを導入しない。
 ```c
@@ -239,19 +239,19 @@ volatile u32 *ppc_hpt_ptr(u32 pa); /* 語順はentryごとhi,lo、native u32 */
 
 |PPC独立枝（S以下）|新規/変更・目安行数／1機能|
 |---|---|
-|platform/powermac/mmu_boot.c|新180：OF情報の取得とhandoff、既存boot.cの診断停止までの経路は旧ターゲットとして保持|
-|platform/powermac/ppc_memmap.h / platform_of_layout.h|新35／変更20：RAM/MMIO変換／番地定数|
-|arch/ppc/takeover.S / cpu_setup.c|新80／新60：不可逆入口／PVRとHID設定|
-|arch/ppc/pmap.c / ppc_pmap.h|新250／新35：写像とHPT／型宣言|
-|arch/ppc/mmu.S / ppc_oea.h|新90／新70：SR/SDR1/TLB／OEA定数|
-|arch/ppc/vectors.S / ppc_frame.h|新250／新35：保存復帰とcopy／frame offset共有|
-|arch/ppc/exception.c / decrementer.c|新85／新55：fault診断／DEC再装填|
-|arch/ppc/cache_copy.S|新45：手本の32byte copy/sync|
-|arch/ppc/arch_io.h / arch_cpu.h|新65／新40：契約への薄い接続|
-|platform/powermac/platform_io.h / dump.c|新45／新60：MMIO接続／整数16進dump|
-|arch/ppc/entry.S / mmu.ld / build/ppc.mk|変更5／新45／変更40：新入口選択／配置／独立ppc-mmuターゲット（旧bootは維持）|
+|sys/platform/powermac/mmu_boot.c|新180：OF情報の取得とhandoff、既存boot.cの診断停止までの経路は旧ターゲットとして保持|
+|sys/platform/powermac/ppc_memmap.h / platform_of_layout.h|新35／変更20：RAM/MMIO変換／番地定数|
+|sys/arch/ppc/takeover.S / cpu_setup.c|新80／新60：不可逆入口／PVRとHID設定|
+|sys/arch/ppc/pmap.c / ppc_pmap.h|新250／新35：写像とHPT／型宣言|
+|sys/arch/ppc/mmu.S / ppc_oea.h|新90／新70：SR/SDR1/TLB／OEA定数|
+|sys/arch/ppc/vectors.S / ppc_frame.h|新250／新35：保存復帰とcopy／frame offset共有|
+|sys/arch/ppc/exception.c / decrementer.c|新85／新55：fault診断／DEC再装填|
+|sys/arch/ppc/cache_copy.S|新45：手本の32byte copy/sync|
+|sys/arch/ppc/arch_io.h / arch_cpu.h|新65／新40：契約への薄い接続|
+|sys/platform/powermac/platform_io.h / dump.c|新45／新60：MMIO接続／整数16進dump|
+|sys/arch/ppc/entry.S / mmu.ld / build/ppc.mk|変更5／新45／変更40：新入口選択／配置／独立ppc-mmuターゲット（旧bootは維持）|
 |tools/ppc/mmu_fake.c / mmu_fixture.h|新180／新80：libcなしfake／BSD順序の固定fixture|
-|tools/ppc/mmu_run.py / arch/ppc/mmu_probe.S|新160／新90：QEMU/QMP受入／faultとレジスタcanary|
+|tools/ppc/mmu_run.py / sys/arch/ppc/mmu_probe.S|新160／新90：QEMU/QMP受入／faultとレジスタcanary|
 
 ## 7. 受入・変異・段分け
 

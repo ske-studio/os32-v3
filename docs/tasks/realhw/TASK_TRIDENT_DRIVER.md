@@ -67,7 +67,7 @@ CPU の起動較正 (1 tick = 10ms) から `floor(loops_per_tick * ns / 10000000
 | `gfxmode pc98` (640x400x16、GDC 24kHz 系) | **正しく映る** | TASK_PEGC480 §0 |
 | 液晶の OSD (**CUI = 400 ライン表示中**、2026-09-29 ユーザー撮影) | **I-O DATA のフル HD 液晶** (型番は写真に無し。OSD の案内「パソコン側出力解像度は 1920x1080 60Hz をおすすめ」)、入力 **アナログ (D-Sub)**、OSD の表示 **「720x400 H: 31.5kHz V: 70.2Hz」** = モニタは VGA のテキストタイミング (720x400@70) として認識している | 実機 Ra266 で採取 (§9-3、写真 `lcd_osd_cui_2026-09-29.jpg`)。**GUI (pegc、480 ライン) の状態の OSD は未採取**。型番・対応周波数表は未記録 |
 | `gfxmode pegc` (640x480x256、GDC を 31kHz / 480 ラインへ切り替え) | **桁ずれ** (液晶が正しい位置で取り込めない) → **2026-09-30 に正しく映ることを目視** (段 2 の直しの後) | TASK_PEGC480 §0・末尾の記録 |
-| CUI (起動時の PEGC 準備が同期を触っていた頃) | 桁ずれ → `pegc_prepare` で同期を触らないようにして消えた | TASK_FDC_REALHW §9-1、`include/gfx_hal.h` の `prepare` 注記 |
+| CUI (起動時の PEGC 準備が同期を触っていた頃) | 桁ずれ → `pegc_prepare` で同期を触らないようにして消えた | TASK_FDC_REALHW §9-1、`sys/include/gfx_hal.h` の `prepare` 注記 |
 | `gfxmode cirrus` | Ra266 には CL-GD5430 (Xe10 型 ID 5Bh) が無いので probe が通らず PC98 (9801 標準) へ落ちる (ユーザー決定で Cirrus は NP21/W 専用) | io_wab.md の搭載表に Ra266 の行は無い |
 
 PEGC は実機 ROM の採取・比較と修正を終え、2026-09-30 に表示・CUI 復帰を目視確認済み。
@@ -142,7 +142,7 @@ PEGC の直しは完了し、両方を残す意味がある (§7 決裁 T1)。
 
 **事実** (config の値そのもの):
 
-- **BAR は 3 本とも memory (32 ビット、prefetch なし)**。I/O BAR は無い。この採取時点では大きさは未測定。起動時の列挙では `drivers/pci/pci_barsize.c` が長さを測って設定を復元する。
+- **BAR は 3 本とも memory (32 ビット、prefetch なし)**。I/O BAR は無い。この採取時点では大きさは未測定。起動時の列挙では `sys/dev/pci/pci_barsize.c` が長さを測って設定を復元する。
 - **Command = 0002: I/O Space Enable = 0、Memory Space Enable = 1、Bus Master = 0** (起動時点、OS32 は Command に書いていない)。
   0:7.0 (98 グラフィックス) は 0003 で I/O も Mem も有効。
 - Revision d3、class 03.00.00 (PCI class code の「VGA 互換コントローラ」— 一般、docs/hw に記述なし)、**subsystem 0000:0000 (9680 / 9682 の判別材料にならない)**。
@@ -297,7 +297,7 @@ PC/AT の番号 (3C0h 系) のまま出ているなら、Bible §4-3 の I/O マ
 | `trident -t` (新規) | 640x480x8 のモード設定 → リニア窓へ縦線と行番号のテスト画 (TASK_PEGC480 段 0 の絵と同じ) → 映像を切り替え → 98 側へ戻す。戻しは §3-5 の復帰処理 (専用コードを持たない) | 映像の切り替え | 2 (**前提 §5 が揃うまで禁止**) |
 | (任意) Windows 上の状態の採取 | Ra266 に Win9x が入れば、NEC のドライバが 640x480 / 800x600 を出している状態のレジスタを DOS 窓などから採る | ユーザーの環境次第 (T3) | 補助 |
 
-**BAR の長さは起動時の PCI 列挙で測る**。`drivers/pci/pci_barsize.c` が割り込み禁止の区間で設定を保存し、対応するデコードを停止して測定後に BAR・Command の順で復元する。診断はこの測定記録を利用する。
+**BAR の長さは起動時の PCI 列挙で測る**。`sys/dev/pci/pci_barsize.c` が割り込み禁止の区間で設定を保存し、対応するデコードを停止して測定後に BAR・Command の順で復元する。診断はこの測定記録を利用する。
 
 #### 3-4-1. 段 1 の読み取り
 
@@ -307,7 +307,7 @@ PC/AT の番号 (3C0h 系) のまま出ているなら、Bible §4-3 の I/O マ
 
 現行のカーネルには「Trident の出力中に止まったら 98 側へ戻す」経路が**無い**:
 
-- 致命的例外 (`arch/x86/kernel/isr_handlers.c` `exception_handler`) は `_disable()` → テキスト VRAM に表示 → `exec_nest_level > 0` なら
+- 致命的例外 (`sys/arch/x86/kernel/isr_handlers.c` `exception_handler`) は `_disable()` → テキスト VRAM に表示 → `exec_nest_level > 0` なら
   `exec_fault_recover()`、それ以外は `hlt` で停止。**`gfx_shutdown()` には接続されていない**。映像が Trident 側なら表示は見えず、
   rshell (シリアル) もこの停止からの復旧は保証しない。
 - 通常の戻しは KAPI `gfx_shutdown` → `backend->leave()` を**アプリ (gshell) が呼ぶ約束**。所有者の異常終了・CTRL+STOP で
@@ -434,14 +434,14 @@ PCI のグラフィックカードのドライバを作るとき、カードの�
 ### 4-1. 層 (DESIGN §6 の二層構造をそのまま使う)
 
 ```
-drivers/video/trident/backend_trident.c      GfxBackend (probe / prepare / init / query / present_rect / set_palette /
+sys/dev/video/trident/backend_trident.c      GfxBackend (probe / prepare / init / query / present_rect / set_palette /
                            enter / leave / panic_leave / fill_rect / blit / shutdown)。Cirrus と同じ「アクセラレータ系」
   ├─ drivers/video/trident/wab_tgui.c    チップドライバ: VGA の論理番号 (3C0h 系、wab_glue.h) と拡張レジスタだけを知る
   └─ drivers/video/trident/wab_glue_ra266.c (仮)  ボードグルー: PCI の BAR から窓の番地、ポートの翻訳 (§2-3 の結論)、
                            映像の切り替えと復帰 (§2-4・§3-5 の結論)。struct pci_driver の probe から見つける
 ```
 
-- **WabGlue の契約 (`drivers/video/cirrus/wab_glue.h`) で足りる見込み**: `out/in` (翻訳)、`relay` (映像の切り替え)、`lin_base/lin_size`、
+- **WabGlue の契約 (`sys/dev/video/cirrus/wab_glue.h`) で足りる見込み**: `out/in` (翻訳)、`relay` (映像の切り替え)、`lin_base/lin_size`、
   `mmio` (エンジンのレジスタが MMIO なら)。違うのは**番地が定数ではなく BAR から実行時に決まる**ことだけ。
   `lin_base/lin_size = bar0` は**条件付き** — bar0 の用途・安全なアクセス範囲・容量 (§2-1 の (i)〜(iii)) が確認できてから (P2-6)。
   §2-3 で (C) MMIO 経路になった場合は `out/in` を MMIO で実装する (契約は変えない)。
@@ -457,7 +457,7 @@ drivers/video/trident/backend_trident.c      GfxBackend (probe / prepare / init 
   - **復元できない失敗**では「98 側への復帰 (§3-5 R3、常に試みる)」と「Trident の再試行禁止 (ISOLATED)」を**別々に**扱う —
     前者は表示を守り、後者は未知の状態の装置に二度と触らないため。pci_bind の QUARANTINE (次の driver に渡さない) とは別の概念で、
     表示側の ISOLATED を pci_bind の記録に写す必要は無い (pci_bind は所有権の記録)。
-- 選択: `GFX_PREF_TRIDENT` (= 4) を `include/gfx_hal.h` に足し、`gfxmode trident` / `system.cfg GFX=trident` で強制。
+- 選択: `GFX_PREF_TRIDENT` (= 4) を `sys/include/gfx_hal.h` に足し、`gfxmode trident` / `system.cfg GFX=trident` で強制。
   強制指定の失敗は現行の規則どおり **PC98 (9801 標準) へ落ちる** (`gfx_select_backend`。PEGC には落ちない)。
   **auto の probe 順に入れるか**は決裁 T5。
 - 能力ビット: `TEXT_OVERLAY` 無し、`HW_FILL` / `HW_BLT` は段 5 でエンジンが動いてから。
@@ -465,7 +465,7 @@ drivers/video/trident/backend_trident.c      GfxBackend (probe / prepare / init 
 ### 4-2. メモリ・窓 (v3 の資源台帳と私有 lease)
 
 資源・面・lease の正典は MEMMAP_V3 §0 D33 (記録はアーカイブ) と
-[§2-2](../../design/exec/lease.md)。現行コードは `mm/paging.c` の私有 lease 窓、`exec/lease.c` と `platform/pc98/pci_resources.c`。
+[§2-2](../../design/exec/lease.md)。現行コードは `sys/kern/mm/paging.c` の私有 lease 窓、`sys/kern/exec/lease.c` と `sys/platform/pc98/pci_resources.c`。
 旧共有 PT 昇格案と変更経緯は 設計履歴 (アーカイブ: `docs/archive/realhw/TRIDENT_DESIGN_HISTORY_2026-09.md`) に保存した。
 
 **予約と準備 (Trident 固有部分は未実装)**
@@ -477,7 +477,7 @@ drivers/video/trident/backend_trident.c      GfxBackend (probe / prepare / init 
 
 **写像と面公開**
 
-- カーネルのデバイス窓は supervisor のままにする。仮想帯の定義は `include/memmap.h` の `MEM_DEVICE_APERTURE_*`。Trident LFB の候補枠は [0xFE400000, 0xFE800000)、確認済み MMIO は 0xFE800000 以降へページ単位で置く。これは実容量の認定ではない。Cirrus の先頭 4MB は維持し、追加 PT は準備境界で確保して予算に数える。
+- カーネルのデバイス窓は supervisor のままにする。仮想帯の定義は `sys/include/memmap.h` の `MEM_DEVICE_APERTURE_*`。Trident LFB の候補枠は [0xFE400000, 0xFE800000)、確認済み MMIO は 0xFE800000 以降へページ単位で置く。これは実容量の認定ではない。Cirrus の先頭 4MB は維持し、追加 PT は準備境界で確保して予算に数える。
 - 記述子は SURFACE 台帳への参照 (owner・面種別・形式・pitch・プレーン配置・権限・キャッシュ属性・世代)。CPL=3 への公開は **AS ごとの私有 lease PT** に行い、返す番地は呼出元 AS の lease 仮想番地とする。共有 PT の USER 昇格は使わない。
 - キャッシュ属性は書込先 PTE から継承せず台帳から取り、全 alias で一致させる。表示面・MMIO と client 面はページを共有しない。通常 GUI は client 面だけを貸し、表示面は明示された全画面 lease に限定する。MMIO は貸さない。
 - revoke は lease 解除 → TLB → 参照数 → 物理解放の順。他 AS に波及させない。分担は資源台帳・仮想枠の管理、paging の私有 PT、gfx_core の SURFACE、exec の lease、Trident グルーの BAR 検証・面配置。
@@ -519,7 +519,7 @@ drivers/video/trident/backend_trident.c      GfxBackend (probe / prepare / init 
 | **1** | 指定した番地を読み、手順と結果を記録する (§3-4-1) | 段 0 | 実機 + ホスト試験 | 小 |
 | **2** | `trident -t`: 640x480x8 のモード設定 → リニア窓へテスト画 → 映像を切り替え → §3-5 R3 で 98 側へ戻す (時間切れも失敗経路も同じ処理)。液晶の OSD を写真で | **§3-5 R1 が (a) 資料か (b') 段 2-X の記録で確定**、**R2〜R4** (フックの有効化時期と接続点の実装、ホスト試験)、**§4-2 の予約・写像・有効化の順序** (BAR の用途と decode 幅が確定、broker の拡張、T8 の境界での PT 確保)、**モード手順が資料で確定**、R5 をユーザーに伝えた | 実機 (写真、シリアルログ) | 中 (+ カーネル共通の R3/R4・記述子・paging の変種) |
 | **2-X** (探索試験、**ユーザー承認済み 2026-09-29**) | **復帰未確認・リセット前提の探索試験**: R1 の根拠が資料 (a) で得られないときだけ。`trident -t` と同じ経路で Trident 側へ切り替え → R3 で 98 側へ戻す **1 往復**。成功 / 失敗 (リセットした事実) を §9-1 の形で記録し、**成功の記録があって初めて R1 (b') を満たした扱い** → 段 2 へ | **§3-5 の段 2-X 開始条件 1〜6** (R1 以外の前提 + **固定した 1 組の操作と根拠・未確認点** + 全ポートの配送・他装置の確認 (3Cxh 禁止を含む) + 観測に基づく中止条件 + 記録 + 直前の告知) | 実機 (切替後のテスト画と復帰後の CUI の**写真**、シリアルログ、経過時間、リセットの有無・方法・復旧) | 段 2 と共通 |
-| **3** | `drivers/video/trident/backend_trident.c` (8bpp、CPU で present)。**`GFX=trident` 強制時だけ**。gshell の往復、CTRL+STOP、所有者の異常終了、カーネル停止時の戻し、`ring3_guard trident` | 段 2、予約・写像・例外復帰 (§3-5 R4 の (1)〜(4)、両ハンドラ) の接続、**カーネル致命的例外の誘発手段の確定** (§9 P2-d、Codex D6)、T7 | 実機 + NP21/W 回帰 (probe が落ちて **PC98** へ譲るだけ) | 中〜大 |
+| **3** | `sys/dev/video/trident/backend_trident.c` (8bpp、CPU で present)。**`GFX=trident` 強制時だけ**。gshell の往復、CTRL+STOP、所有者の異常終了、カーネル停止時の戻し、`ring3_guard trident` | 段 2、予約・写像・例外復帰 (§3-5 R4 の (1)〜(4)、両ハンドラ) の接続、**カーネル致命的例外の誘発手段の確定** (§9 P2-d、Codex D6)、T7 | 実機 + NP21/W 回帰 (probe が落ちて **PC98** へ譲るだけ) | 中〜大 |
 | **4** | 解像度 (800x600 / 1024x768、8bpp のまま) と GUI の G5 の確認 | 段 3、**モニタの対応 (型番・OSD)、pitch、VRAM 容量の実測、ページ単位の面隔離** (§4-3)。T6 (16bpp) は前提ではない | 実機。強制指定の失敗は **PC98** へ落ちることを期待結果にする | 中 |
 | **5** | エンジンで present (表示面 ← クライアント面) と HW_FILL / HW_BLT。**最後に置く** | 段 3、エンジンの資料、§4-5 の規則上の判断 | 実機、`gfx_stats`。受け入れに**エンジン待ちの時間切れ・CPU 描画との同期 (PCD、BLT 前の書き終わり)・失敗後の退避 (CPU present へ戻す)** を含める | 中 |
 

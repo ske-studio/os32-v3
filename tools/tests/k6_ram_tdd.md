@@ -10,7 +10,7 @@
 
 - 「16MB 超を丸ごと RAM にし、15〜16MB と最上位だけを予約として抜く」を先行。
   RED: `MEM_SYSTEM_SPACE_BASE` / `MEM_HIGH_RAM_BASE` / `MEM_PHYS_MMIO_TOP` が無く
-  コンパイル不能。`include/memmap.h` に 3 定数を足して GREEN。
+  コンパイル不能。`sys/include/memmap.h` に 3 定数を足して GREEN。
 - 128MB 相当 → `[16MB, 128MB)` が RAM、`[15MB, 16MB)` が RESERVED (RAM 0 ページ)。
 - 4GB 相当 → RAM = `(15MB - 4MB) + (MEM_PHYS_MMIO_TOP - 16MB)`、最上位は MMIO。
   `physmem_legacy_end()` は高位 RAM を足しても 0xF00 のまま = exec の連続アリーナ不変。
@@ -28,7 +28,7 @@
 ### 3. ブート結線 (`test_memory_boot.py::test_high_ram_above_16m`, 32768KB / 131072KB)
 
 - RED: `FAIL limit == TEST_KB / (PAGE_SIZE / 1024)` — 池の上端が 15MB で止まる。
-- `mm/memory_boot.c` に高位 RAM の登録 (`physmem_exclude` x2 + `physmem_add_trusted`)
+- `sys/kern/mm/memory_boot.c` に高位 RAM の登録 (`physmem_exclude` x2 + `physmem_add_trusted`)
   と workspace の動的サイズ決定を入れて GREEN。検査内容:
   - `pgalloc_limit_pfn()` が検出量ちょうど (人為的な切り詰めが無い)。
   - `[0xF00, 0x1000)` が RESERVED で、`pgalloc_alloc_n_pfn` がそこから 1 ページも返さない (M5)。
@@ -55,7 +55,7 @@
 ### 5. ブート順の固定 (`test_memory_boot.py::test_kernel_boot_order_and_failstop`)
 
 - `memory_boot_detect` → `paging_init` → `memory_boot_init` の順であることを
-  ソース上で検査する行を追加 (今は `platform/pc98/kernel_boot_memory.inc` にあり、
+  ソース上で検査する行を追加 (今は `sys/platform/pc98/kernel_boot_memory.inc` にあり、
   `tools/tests/kernel_boot_source.py` が `kernel.c` に展開して読む)。
 
 ## 実行結果 (2026-09-11)
@@ -75,7 +75,7 @@
 | `python3 tools/check_constraints.py` | EXIT=0 |
 | i386-elf-gcc `-Wall -Wextra` (kernel.c / paging.c / pgalloc.c / physmem.c / memory_boot.c / sys.c / backend_cirrus.c) | 新規警告ゼロ |
 
-`platform/pc98/kernel.c` に残る 2 件 (`TVRAM_BPR` の再定義、`kprintf` の暗黙宣言) は
+`sys/platform/pc98/kernel.c` に残る 2 件 (`TVRAM_BPR` の再定義、`kprintf` の暗黙宣言) は
 HEAD (`8d5ba3b`) でも同じく出る既存のもので、この票の変更とは無関係。
 
 ## ホスト試験で**証明していない**こと
@@ -91,12 +91,12 @@ HEAD (`8d5ba3b`) でも同じく出る既存のもので、この票の変更と
 
 PM 実測: 15MB (`ExMemory 16`) + `gfxmode pegc` + リセットで `hal_test` が
 `backend pc98 (planar 4bpp)`、`sys_top_reserved` = 0。BIOS の PEGC ビットは立っている。
-原因は `drivers/video/pc98/backend_pegc.c` の probe 段 2 `sys_get_mem_kb() * 1024 > PEGC_LINEAR_BASE` —
+原因は `sys/platform/pc98/video/backend_pegc.c` の probe 段 2 `sys_get_mem_kb() * 1024 > PEGC_LINEAR_BASE` —
 K6-RAM で上端の定義が「RAM の上端 / 1024」になり、15MB 機でも 17408 を返すようになったため。
 
 ### RED → GREEN
 
-- 新しい口: `mm/pgalloc.c` の `pgalloc_range_has_ram(first, end)` (PFN 半開)。
+- 新しい口: `sys/kern/mm/pgalloc.c` の `pgalloc_range_has_ram(first, end)` (PFN 半開)。
   ブート時に凍結した物理地図 `device_boot_map` を既存の `physmem_count(... PHYSMEM_RAM ...)` で
   見るだけで、状態は変えない。未初期化・範囲異常は保守的に真 (窓を張らせない)。
   `eligible` ビットマップではなく地図を見るので、他所の永久予約で `eligible` が落ちた RAM も
@@ -110,7 +110,7 @@ K6-RAM で上端の定義が「RAM の上端 / 1024」になり、15MB 機でも
 - `tools/tests/pgalloc_range_host.c` に `device_window_ram()`:
   8MiB → 窓に RAM 無し (真)、16MiB 丸ごと RAM の legacy モデル → 窓が RAM (偽)、
   部分一致 1 ページ (`[hi-1, hi)`) でも真、窓の外は無し、逆順範囲と未初期化は保守的に真。
-- `drivers/video/pc98/backend_pegc.c` は probe 段 2 を
+- `sys/platform/pc98/video/backend_pegc.c` は probe 段 2 を
   `pgalloc_range_has_ram(MEM_SYSTEM_SPACE_BASE / PAGE_SIZE, MEM_HIGH_RAM_BASE / PAGE_SIZE)` に置換。
   `backend_pegc.c` はホストへ持ち込めない (probe が `_out` / `_in` で実ポートを叩き、
   `boot_splash_native_host.c` が直リンクしているのは `gfx_core.c` だけ) ので、
@@ -129,7 +129,7 @@ K6-RAM で上端の定義が「RAM の上端 / 1024」になり、15MB 機でも
 | `tools/tests/test_paging_bounds.py` / `test_app_band_pde.py` | PASS |
 | `tools/tests/test_boot_splash_native.py` | PASS (2) |
 | `python3 tools/check_constraints.py` | EXIT=0 |
-| i386-elf-gcc `-Wall -Wextra` (`drivers/video/pc98/backend_pegc.c` / `mm/pgalloc.c`) | 警告ゼロ |
+| i386-elf-gcc `-Wall -Wextra` (`sys/platform/pc98/video/backend_pegc.c` / `sys/kern/mm/pgalloc.c`) | 警告ゼロ |
 
 ### ホスト試験で**証明していない**こと
 
@@ -137,5 +137,5 @@ K6-RAM で上端の定義が「RAM の上端 / 1024」になり、15MB 機でも
   `sys_top_reserved` が 300KB になるかは PM / テスターの受入でしか確かめられない。
 - `make` は一度も回していない (コーダーの禁止事項)。目標コンパイルは変更した 2 ファイルの
   単体 `i386-elf-gcc -c` のみ。
-- Cirrus の窓の判定はこの票では直していない。今は `drivers/video/cirrus/cirrus_identify.c` の
+- Cirrus の窓の判定はこの票では直していない。今は `sys/platform/pc98/video/cirrus/cirrus_identify.c` の
   `cirrus_win_usable()` が同じ `pgalloc_range_has_ram` を通っている。

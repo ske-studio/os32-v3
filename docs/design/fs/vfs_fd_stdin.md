@@ -1,9 +1,9 @@
-# fs/vfs_fd_stdin.inc — stdin の行読取と継続状態
+# sys/fs/vfs_fd_stdin.inc — stdin の行読取と継続状態
 
 > 状態: **現行 (2026-10-31)**
 
 未リダイレクトの fd=0 を、改行または要求長まで読む。リダイレクトと通常 FD の経路は `vfs_fd.c` に残す。
-内部型 `fs/vfs_stdin.h` の `VfsStdinRead` は `{buf, size, done, active}` の16バイト (ILP32)。
+内部型 `sys/fs/vfs_stdin.h` の `VfsStdinRead` は `{buf, size, done, active}` の16バイト (ILP32)。
 `buf` は呼出し元の仮想アドレス、`done` は書込み済みのバイト数で、カーネルの C スタックへの参照を保持しない。
 
 ## 開始・再実行・完了

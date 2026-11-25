@@ -27,7 +27,7 @@
 - `paging_addrspace_free_user_range()` (P6) — 張った物理だけを PTE を辿って返す
 
 **RED の作り方**: `tools/tests/app_band_pde_host.c` の新しい節 H を、実装前の
-`mm/paging.c` / `mm/paging.h` のスナップショットに対してビルドする
+`sys/kern/mm/paging.c` / `sys/kern/mm/paging.h` のスナップショットに対してビルドする
 (ホストハーネスの `paging_host_source.c` の差し替え元を旧ファイルにし、
 `-I` の先頭に旧 `paging.h` を置いたディレクトリを入れる)。
 
@@ -78,7 +78,7 @@ HOST ILP32 + TARGET GNU89 PASS
 `exec_exit` の回収 7 種を全部アプリ ID で回す。これが無いと、アプリ A の終了が
 アプリ B の SHM ブロックを巻き上げる (4 本同時では実際に起きる)。
 
-**RED の作り方**: `mm/shm.c` の `shm_free_owned` から
+**RED の作り方**: `sys/kern/mm/shm.c` の `shm_free_owned` から
 `if (shm_block_owner[i] != owner) continue;` の 1 行を削り (= 旧 `shm_cleanup_all`
 と同じ「所有者を見ない」挙動)、`tools/tests/owner_reclaim_host.c` をその
 `shm.c` に対してビルドする。
@@ -96,7 +96,7 @@ RED exit code: 1
 
 **GREEN**: `python3 -B tools/tests/test_owner_reclaim.py` → 27 検査 ALL PASS
 
-実物の `fs/fd_redirect.c` / `fs/pipe_buffer.c` / `mm/shm.c` をそのまま
+実物の `sys/fs/fd_redirect.c` / `sys/fs/pipe_buffer.c` / `sys/kern/mm/shm.c` をそのまま
 コンパイルしている (回収のロジックを試験側に写していない)。見ているもの:
 
 - ID 2 と ID 3 が redirect / pipe / SHM を持った状態で **ID 2 だけ**を畳むと、
@@ -114,12 +114,12 @@ FD (`vfs_close_owned`) と DB (`db_cleanup_owned`) は既に
 
 ## 回 3 — AppSlot と「OP_WAIT 由来」の印 (D0 の C1〜C6、受入 G7)
 
-**新しい挙動**: `exec_ctx_stack`(段のスタック) を **ID で引く表** (`exec/appslot.c`) に
+**新しい挙動**: `exec_ctx_stack`(段のスタック) を **ID で引く表** (`sys/kern/exec/appslot.c`) に
 置き換え、park は `gui_call(OP_WAIT)` の中からだけ、resume は
 「OP_WAIT で park された印のあるフレーム」に対してだけ成立させる。
 WM の行儀を信じるのではなく**カーネルが弾く**。
 
-**RED の作り方**: `exec/appslot.c` から
+**RED の作り方**: `sys/kern/exec/appslot.c` から
 (a) `appslot_park_check` の OP_WAIT ゲート (`if (!g_cur_op_is_wait || !a->in_op_wait) {...}`) と
 (b) `appslot_resume_check` の印判定 (`if (!a->parked_from_wait) {...}`) を削り、
 `tools/tests/multiapp_impl_host.c` をその `appslot.c` に対してビルドする。
@@ -196,8 +196,8 @@ check-multiapp-impl-host:
 
 > **今のコードにこの二段構えは無い**。`exec_sbrk_pick_tier`・`exec_sbrk_tier_last` と
 > `tools/tests/test_sbrk_tier.py`・`sbrk_tier_host.c` は撤去済みで、今の `exec_launch`
-> (`exec/exec_launch.inc`) は sbrk の初期量を本体の BSS 端 + 1 ページに置き、
-> 要るページ数を `exec_ring3_pages` (`exec/exec_image_map.inc`) の 1 本の式で勘定する。
+> (`sys/kern/exec/exec_launch.inc`) は sbrk の初期量を本体の BSS 端 + 1 ページに置き、
+> 要るページ数を `exec_ring3_pages` (`sys/kern/exec/exec_image_map.inc`) の 1 本の式で勘定する。
 > 以下 (回 4 と回 8) は当時の記録。
 
 | 回 | 対象 | RED | GREEN |
@@ -222,7 +222,7 @@ identity だった頃は帯の残りぜんぶ (≒1.4MB) が黙って sbrk に�
 - CUI (`exec_run` の入れ子) と GUI (`exec_start`) はどちらも `exec_launch()` の
   同じ場所を通るので、規則は 1 つ。
 
-判定は `exec/exec.c` の 2 関数に切り出した:
+判定は `sys/kern/exec/exec.c` の 2 関数に切り出した:
 
 ```c
 static u32 exec_ring3_pages(u32 load_base, u32 sbrk_end, u32 exec_heap_size,
@@ -252,8 +252,8 @@ volatile u32 exec_sbrk_tier_count[2];  /* [0] = 段 1 の累計、[1] = 段 2 �
 ## 試験 (`tools/tests/test_sbrk_tier.py` + `sbrk_tier_host.c`)
 
 `test_pgalloc_model.py` が `exec_child_claim` を切り出すのと同じ流儀で、
-**`exec/exec.c` の当該 2 関数をテキストのまま切り出して**ホストへ差し込み、
-`exec/appslot.c` と一緒に ILP32 freestanding でコンパイルして走らせる。
+**`sys/kern/exec/exec.c` の当該 2 関数をテキストのまま切り出して**ホストへ差し込み、
+`sys/kern/exec/appslot.c` と一緒に ILP32 freestanding でコンパイルして走らせる。
 並行して書いた別式ではなく、出荷するコードそのものを見ている。
 レイアウト (`code_end` / `guard_a` / `exec_heap_size`) は `exec_launch()` と
 同じ式でハーネスが 1 つ組む (帯 1 枚、text+bss = 64KB)。
@@ -268,7 +268,7 @@ volatile u32 exec_sbrk_tier_count[2];  /* [0] = 段 1 の累計、[1] = 段 2 �
 
 ### RED の作り方 (2 通り、どちらも実際に走らせた)
 
-RED 用のハーネスは置いていない。`exec/exec.c` / `exec/appslot.c` を一時的に
+RED 用のハーネスは置いていない。`sys/kern/exec/exec.c` / `sys/kern/exec/appslot.c` を一時的に
 K5b-K の状態へ戻して同じ試験を回す。
 
 1. `exec_sbrk_pick_tier()` の本体から段 1 の判定を落とし、常に
@@ -307,16 +307,16 @@ python3 -B tools/tests/test_sbrk_tier.py    # 回 4 (新規)
 `docs/design/fs/ext2/ext2_file.md` の「落とし穴」。
 実機の観測 (PM、NP21/W、15MB 構成): `kselftest_pass=44 kselftest_fail=0` でカーネルは
 起動しているのに、text VRAM 1 行目が `FATAL: shell.bin load failed` + shlib のロード
-報告、EIP = `kernel_main+0xd4c` (`platform/pc98/kernel.c` の停止ループ)。
+報告、EIP = `kernel_main+0xd4c` (`sys/platform/pc98/kernel.c` の停止ループ)。
 
 | 回 | 対象 | RED | GREEN |
 |---|---|---|---|
-| 5 | `ext2_read_file()` が `max_size` を越えて書く | 実装前の `fs/ext2/ext2_file.c` に戻すと 4 検査中 3 検査が FAIL (`resolved[]` が読んだファイルの中身で潰れる) | `tools/tests/test_ext2_read_bound.py` 4 検査 ALL PASS |
+| 5 | `ext2_read_file()` が `max_size` を越えて書く | 実装前の `sys/fs/ext2/ext2_file.c` に戻すと 4 検査中 3 検査が FAIL (`resolved[]` が読んだファイルの中身で潰れる) | `tools/tests/test_ext2_read_bound.py` 4 検査 ALL PASS |
 | 5' | シェル帯 (ID 1) が per-app 経路に入らない | — (境界を固定する追加検査。K5b-K でも GREEN) | `tools/tests/test_multiapp_impl.py` ケース 18 (13 検査) ALL PASS |
 
 ## 原因 (推測ではなく実ソースと `kernel.map` で確定)
 
-`fs/ext2/ext2_file.c` の `ext2_read_file()` (K5b-K 前からある行) —
+`sys/fs/ext2/ext2_file.c` の `ext2_read_file()` (K5b-K 前からある行) —
 
 ```c
 ret = ext2_read_block(ctx, phys, &dst[total_read]);   /* 端数ブロックでも 1KB 書く */
@@ -329,7 +329,7 @@ ret = ext2_read_block(ctx, phys, &dst[total_read]);   /* 端数ブロックで�
 
 K5b-K 前は exec が「ファイル全体をロード番地へ」読んでいたので、溢れ先は
 そのプログラム自身の帯の中で無害だった。K5b-K が D1 の手順 2 のためにヘッダを
-**先読み**するようにし (`exec/exec.c`)、宛先を
+**先読み**するようにし (`sys/kern/exec/exec.c`)、宛先を
 
 ```c
 static u8 hdrbuf[OS32X_HDR_V2_SIZE + 64];   /* = 108 バイト、カーネル .bss */
@@ -347,14 +347,14 @@ static u8 hdrbuf[OS32X_HDR_V2_SIZE + 64];   /* = 108 バイト、カーネル .b
 
 で、`hdrbuf` の 108 バイトの直後に **`resolved[]` (解決済みパス) が居た**。
 ヘッダ先読みが `resolved` をファイルの中身で塗り潰し、続く本体読み込み
-`vfs_read(resolved, file_buf, read_max)` (`exec/exec.c`) がゴミのパスを
+`vfs_read(resolved, file_buf, read_max)` (`sys/kern/exec/exec.c`) がゴミのパスを
 引くので `sz <= 0` → **`EXEC_ERR_NOT_FOUND`**。`/sys/shell.bin` も FDD
 フォールバック (`SYS_SHELL_BIN_FDD` は同じ綴り) も同じところで落ちるため、
-`platform/pc98/kernel.c` の `FATAL: shell.bin load failed` に落ちる。
+`sys/platform/pc98/kernel.c` の `FATAL: shell.bin load failed` に落ちる。
 `EXEC_ERR_NOMEM` の経路 (`[DBG] NOMEM: ...`) は**通っていない** — 画面に
 その行が 1 つも出ていないことと符合する。
 
-`14000` (実機の 2 行目) は別物ではなく、`mm/shlib.c` の
+`14000` (実機の 2 行目) は別物ではなく、`sys/kern/mm/shlib.c` の
 
 ```
 [shlib] /sys/lib/libos32gui.shlib v1 loaded: 101 funcs, text 20 pg, data 4 pg @414000
@@ -366,13 +366,13 @@ static u8 hdrbuf[OS32X_HDR_V2_SIZE + 64];   /* = 108 バイト、カーネル .b
 
 ## 直したもの
 
-1. `fs/ext2/ext2_file.c` — 端数ブロックは `ext2_g_blk` を中継して `to_copy` だけ写す
+1. `sys/fs/ext2/ext2_file.c` — 端数ブロックは `ext2_g_blk` を中継して `to_copy` だけ写す
    (`ext2_read_stream` が前からやっている約束と同じ。`ext2_g_aux` は `ext2_bmap`
    が使うので不可 — gotcha §4-24)。ブロック境界ちょうどの読みは経路が変わらない。
-2. `exec/exec.c` — 読み込み失敗時の `exec_cpl0_release()` を `!is_shell` で囲った。
+2. `sys/kern/exec/exec.c` — 読み込み失敗時の `exec_cpl0_release()` を `!is_shell` で囲った。
    claim しているのは CPL=0 の**子**だけで、シェルは通っていない (現状は
    `g_cpl0_children <= 0` の門で無害だが、左右が揃っていなかった)。
-3. `exec/appslot.c` / `.h` — `appslot_launch_is_app(is_shell, hdr_flags)` を足し、
+3. `sys/kern/exec/appslot.c` / `.h` — `appslot_launch_is_app(is_shell, hdr_flags)` を足し、
    `exec_launch` の `want_ring3` をこれに置き換えた。シェル帯とアプリ帯の
    分かれ道が 1 か所になり、ホストで押さえられる (ケース 18)。
 
@@ -384,7 +384,7 @@ static u8 hdrbuf[OS32X_HDR_V2_SIZE + 64];   /* = 108 バイト、カーネル .b
 ## RED の作り方 (実際に走らせた)
 
 ```bash
-git show HEAD:fs/ext2/ext2_file.c > fs/ext2/ext2_file.c     # K5b-K 時点へ戻す
+git show HEAD:sys/fs/ext2/ext2_file.c > sys/fs/ext2/ext2_file.c     # K5b-K 時点へ戻す
 python3 -B tools/tests/test_ext2_read_bound.py
 ```
 
@@ -451,7 +451,7 @@ K5b-K で登録されていなかった `test_multiapp_impl.py` / `test_owner_re
 
 ## 何が壊れていたか
 
-`--cpl0` の子 (`OS32X_FLAG_FORCE_CPL0`) は `exec/exec.c` の `exec_cpl0_claim()` で
+`--cpl0` の子 (`OS32X_FLAG_FORCE_CPL0`) は `sys/kern/exec/exec.c` の `exec_cpl0_claim()` で
 アプリ帯 `[MEM_EXEC_LOAD_ADDR, mem_end)` を identity で**丸ごと** `pgalloc_mark_used` し、
 `exec_cpl0_release()` で丸ごと `pgalloc_free_n` する。K5b-K 以後は CPL=3 アプリの
 per-app 物理も同じ pgalloc から取るので、GUI アプリが park 中に `--cpl0` の子を立てると
@@ -465,7 +465,7 @@ per-app 物理も同じ pgalloc から取るので、GUI アプリが park 中�
    `is_shell` は対象外 (シェル帯はアプリ帯を使わない)、それ以外は
    `appslot_live() > 0` なら `OS32_ERR_FULL`。**状態は 1 つも変えない**
    (`appslot_launch_is_app` / `appslot_start_admit` と同じ「判定だけ」の流儀)。
-2. `exec/exec.c` — `exec_launch` の `want_ring3 == 0` の枝 (= シェル or `--cpl0` の子) に
+2. `sys/kern/exec/exec.c` — `exec_launch` の `want_ring3 == 0` の枝 (= シェル or `--cpl0` の子) に
    `else if (appslot_cpl0_admit(is_shell) < 0)` を置き、`OS32_ERR_FULL` を返す。
    位置は `want_ring3` を決めた直後 = **`exec_cpl0_claim()` より前**で、
    `paging_addrspace_create_n` / `exec_heap_save_state` / `ring3_band_set` の
@@ -480,8 +480,8 @@ ID の池が尽きたときの `appslot_start_admit` も `OS32_ERR_FULL`、物�
 ## RED の作り方 (実際に走らせた)
 
 ```bash
-# exec/appslot.c の appslot_cpl0_admit() から判定行を外す (= 実装前の素通し)
-sed -i 's/    if (appslot_live() > 0) return OS32_ERR_FULL;//' exec/appslot.c
+# sys/kern/exec/appslot.c の appslot_cpl0_admit() から判定行を外す (= 実装前の素通し)
+sed -i 's/    if (appslot_live() > 0) return OS32_ERR_FULL;//' sys/kern/exec/appslot.c
 python3 -B tools/tests/test_multiapp_impl.py
 ```
 
@@ -506,7 +506,7 @@ RED では実際に「生きているアプリが居るのに `--cpl0` の子が
 
 ## 追加した検査 (ケース 19、26 検査)
 
-ハーネス側に `exec/exec.c` の CPL=0 経路を**順番のまま**写した
+ハーネス側に `sys/kern/exec/exec.c` の CPL=0 経路を**順番のまま**写した
 `ma_start_cpl0()` / `ma_cpl0_claim()` / `ma_cpl0_release()` / `ma_exit_cpl0()` を置き、
 「池の admit → `want_ring3` の判定 → cpl0 の admit → claim → commit」を通す。
 拒否が claim より前にあることは、`H.free_pages` と `H.cpl0_children` が動かないことで見る。
@@ -536,9 +536,9 @@ python3 -B tools/check_constraints.py            # EXIT=0
 - 全体ゲート (`make all` / `make external` / `make check`) は回していない。通したのは
   `make kernel` と `test_multiapp_impl` / `test_multiapp_model` / `test_owner_reclaim` /
   `test_sbrk_tier` / `tools/check_constraints.py`。
-- `make kernel` の警告: **`exec/exec.c` と `exec/appslot.c` からは 1 件も出ていない**。
-  フルビルドのログには既存の警告 (`include/pc98.h` の `TVRAM_BPR` 再定義、
-  `platform/pc98/legacy/v86_bios.c` の `-Warray-bounds`、`kernel/console/console.c` の暗黙宣言など) が
+- `make kernel` の警告: **`sys/kern/exec/exec.c` と `sys/kern/exec/appslot.c` からは 1 件も出ていない**。
+  フルビルドのログには既存の警告 (`sys/platform/pc98/pc98.h` の `TVRAM_BPR` 再定義、
+  `sys/platform/pc98/legacy/v86_bios.c` の `-Warray-bounds`、`sys/kern/console/console.c` の暗黙宣言など) が
   36 件残っているが、いずれも本変更の前からあるもので触っていない。
 - **`--cpl0` で作られている在庫バイナリは 1 つも無い** (下記)。したがって「アプリを
   閉じてから使え」の実害はいまのところゼロだが、これは実機で確かめていない。
@@ -553,7 +553,7 @@ python3 -B tools/check_constraints.py            # EXIT=0
 | `build/programs.mk` / `userland/*/Makefile` | `--cpl0` を渡している行は無い (`ring3_hello` / `ring3_fault` / `hello_r3` / `faultprobe_r3` はいずれも CPL=3 側の検証用) |
 | `apps/` (submodule) | `deploy.yaml` / `Makefile` / `app.conf` を含め `cpl0` の記述なし |
 | `game/` (submodule) | 同上、記述なし |
-| 消費側 | `exec/appslot.c` の `appslot_init()` `appslot_launch_is_app()` (`want_ring3` を落とす) と `mm/shlib.c` (CPL=0 プログラムは shlib の master をそのまま共有) |
+| 消費側 | `sys/kern/exec/appslot.c` の `appslot_init()` `appslot_launch_is_app()` (`want_ring3` を落とす) と `sys/kern/mm/shlib.c` (CPL=0 プログラムは shlib の master をそのまま共有) |
 
 つまり `--cpl0` は現在「手で `sdk/mkos32x.py --cpl0` を叩いたときだけ立つエスケープ
 ハッチ」で、標準の配備物には 1 本も無い。gshell 配下でこの拒否に当たるのは、その手製
@@ -568,11 +568,11 @@ python3 -B tools/check_constraints.py            # EXIT=0
 
 | 回 | 対象 | RED | GREEN |
 |---|---|---|---|
-| 7 | CTRL+STOP の要求を降ろす口 (契約 T6) | (a) `appslot_abort_clear()` を消した実装前の `exec/appslot.c` では**ハーネスがコンパイルできない** (`gcc -Werror` が非ゼロ終了) / (b) 空実装 (`return 0;` だけ) にすると 20 検査中 **4 検査が FAIL** (20c / 20h / 20o / 20q) | `tools/tests/test_multiapp_impl.py` 156 検査 ALL PASS |
+| 7 | CTRL+STOP の要求を降ろす口 (契約 T6) | (a) `appslot_abort_clear()` を消した実装前の `sys/kern/exec/appslot.c` では**ハーネスがコンパイルできない** (`gcc -Werror` が非ゼロ終了) / (b) 空実装 (`return 0;` だけ) にすると 20 検査中 **4 検査が FAIL** (20c / 20h / 20o / 20q) | `tools/tests/test_multiapp_impl.py` 156 検査 ALL PASS |
 
 ## 何が足りていなかったか
 
-CTRL+STOP は IRQ1 (`drivers/input/kbd.c` → `ring3_abort_request` → `appslot_abort_request`)
+CTRL+STOP は IRQ1 (`sys/platform/pc98/input/kbd.c` → `ring3_abort_request` → `appslot_abort_request`)
 の時点で **走っているアプリ** の `AppSlot.abort_req` を無条件に立てる。IRQ1 の時点で
 カーネルが知っているのはそれだけだからで、宛先は選べない。ところが契約 T6 の宛先は
 **フォーカス窓のアプリ**。4 本同時実行では両者が食い違い、WM (gshell) がフォーカス窓の
@@ -592,8 +592,8 @@ ID を `exec_kill` で畳むと、走っている本人の `abort_req` が立っ
 |---|---|
 | `sdk/kapi.json` | 末尾にスロット 186 `exec_abort_clear` を追記 ([ABI])、`version` 44 → 45 |
 | `sdk/include/os32/os32_kapi_shared.h` | `KAPI_VERSION` 45 |
-| `exec/appslot.c` / `.h` | `int appslot_abort_clear(void)` — 実体。owner 1 以外は `OS32_ERR_INVAL` |
-| `exec/exec.c` / `.h` | `i32 exec_abort_clear(void)` — KAPI の口。`appslot_abort_clear()` へ委譲 |
+| `sys/kern/exec/appslot.c` / `.h` | `int appslot_abort_clear(void)` — 実体。owner 1 以外は `OS32_ERR_INVAL` |
+| `sys/kern/exec/exec.c` / `.h` | `i32 exec_abort_clear(void)` — KAPI の口。`appslot_abort_clear()` へ委譲 |
 | `build/app.conf` | `userland/gshell` の要求 KAPI 版 44 → 45 (他の行は触っていない) |
 | `docs/KAPI_SPEC.md` | 表題 v45、§3-2 の予約表に v45 の行、§4 に `0x2F0 exec_abort_clear` とデータフィールドのオフセット繰り下げ (0x2F4 / 0x2F8) |
 
@@ -618,7 +618,7 @@ ID を `exec_kill` で畳むと、走っている本人の `abort_req` が立っ
 
 ```bash
 # (a) 実装前 = 関数が無い状態。ハーネスがビルドできない。
-#     exec/appslot.c から appslot_abort_clear() の定義を丸ごと削って
+#     sys/kern/exec/appslot.c から appslot_abort_clear() の定義を丸ごと削って
 python3 -B tools/tests/test_multiapp_impl.py
 #  → subprocess.CalledProcessError: gcc ... returned non-zero exit status 1
 
@@ -708,7 +708,7 @@ Error: shlib data attach failed (out of memory)
 | 場所 | 変更 |
 |---|---|
 | `mm/shlib.{c,h}` | `shlib_data_pages()` — attach 1 回あたりの `.data/.bss` ページ数 (未ロードなら 0) |
-| `exec/exec.c` | `exec_ring3_extra_pages()` を追加し、`exec_ring3_pages()` の合計に足す |
+| `sys/kern/exec/exec.c` | `exec_ring3_extra_pages()` を追加し、`exec_ring3_pages()` の合計に足す |
 
 足す場所を `exec_ring3_pages()` 1 か所にしたので、`exec_sbrk_pick_tier()` の段 1 判定・段 2 の枚数・
 `appslot_start_admit()` に渡す `need_pages`・`AppSlot.pages` のすべてに同時に効く。段 2 も同じ式なので、
@@ -742,7 +742,7 @@ sbrk を削って作った空きを使い切らない。shlib 未ロード (CUI 
 | 4j | 付随ページを含めても収まる空き (15MB 以上) なら従来どおり段 1 |
 | 4k-4l | shlib 未ロードなら枚数も段の選択も K7 以前と同じ (回帰なし) |
 
-判定関数は `test_sbrk_tier.py` が `exec/exec.c` から**テキストのまま**切り出す流儀のまま
+判定関数は `test_sbrk_tier.py` が `sys/kern/exec/exec.c` から**テキストのまま**切り出す流儀のまま
 (`WANTED` に `exec_ring3_extra_pages` を追加)。並行して書いた別式ではなく出荷するコードを見る。
 
 ## 実行コマンド
@@ -756,7 +756,7 @@ python3 -B tools/tests/test_pgalloc_model.py   # OK
 python3 -B tools/tests/test_app_band_pde.py    # PASS
 python3 -B tools/tests/test_paging_bounds.py   # PASS
 python3 -B tools/tests/test_memory_boot.py     # OK
-i386-elf-gcc <カーネルフラグ> -Wextra -c exec/exec.c mm/shlib.c   # 警告 0
+i386-elf-gcc <カーネルフラグ> -Wextra -c sys/kern/exec/exec.c sys/kern/mm/shlib.c   # 警告 0
 ```
 
 ## この追記で**測っていないこと** ([V4])
@@ -764,6 +764,6 @@ i386-elf-gcc <カーネルフラグ> -Wextra -c exec/exec.c mm/shlib.c   # 警�
 - **ゲストは未検証**。NP21/W では 1 度も動かしていない (コーダーはエミュレータ禁止)。
   8MB で `gui_demo` が実際に立つこと (受入 G6) は実機待ち。
 - `make` を 1 度も回していない (コーダー禁止)。通したのは上のホスト試験と、
-  `exec/exec.c` / `mm/shlib.c` を単体でクロスコンパイラに通したことだけ。
+  `sys/kern/exec/exec.c` / `sys/kern/mm/shlib.c` を単体でクロスコンパイラに通したことだけ。
 - 段 2 へ倒れた分だけ 8MB のアプリの sbrk は 256KB に固定される。その狭さで
   `gui_demo` が足りるかは実機でしか分からない。

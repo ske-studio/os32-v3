@@ -1,6 +1,6 @@
 /* Fake read-only VRAM, independent boundary fixtures; no GPU emulation. */
 #include "gf_command_runtime_host.h"
-#include "../../kdebug/gf_accel_test.c"
+#include "../../sys/dev/video/geforce/diag/gf_accel_test.c"
 
 static u8 vram[TEST_BYTES];
 static struct gf_foundation foundation;

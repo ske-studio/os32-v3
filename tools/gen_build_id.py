@@ -3,7 +3,7 @@
 #  gen_build_id.py -- カーネルに埋め込むコミット ID の小さな C を作る
 #
 #  票: docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md 部品 A-4 (ユーザー指示: ver に
-#  Commit を出す)。宣言は include/build_id.h。
+#  Commit を出す)。宣言は sys/include/build_id.h。
 #
 #    python3 tools/gen_build_id.py -o build/out/build_id.c   # 生成 (変化時だけ書く)
 #    python3 tools/gen_build_id.py --print                   # ID だけ表示
@@ -29,7 +29,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# include/build_id.h の BUILD_COMMIT_MAX (NUL を含む) と合わせる
+# sys/include/build_id.h の BUILD_COMMIT_MAX (NUL を含む) と合わせる
 COMMIT_MAX = 24
 HASH_MAX = COMMIT_MAX - 1 - len('-dirty')
 
@@ -63,7 +63,7 @@ def commit_id(cwd=ROOT):
 
 
 def render(cid):
-    return ('/* 生成物 (tools/gen_build_id.py)。手で編集しない。宣言は include/build_id.h */\n'
+    return ('/* 生成物 (tools/gen_build_id.py)。手で編集しない。宣言は sys/include/build_id.h */\n'
             '#include "build_id.h"\n'
             'const char os32_build_commit[BUILD_COMMIT_MAX] = "{}";\n'.format(cid))
 

@@ -14,7 +14,7 @@ if a.mutate:
     ):
         run(a.runner, (name, 'generated', old, new, '*code ==' if 'attr' not in name else '*attr =='), fixture_name='tvram_auth_host.c')
 
-    source = (ROOT/'exec/exec.c').read_text()
+    source = (ROOT/'sys/kern/exec/exec.c').read_text()
     start = source.index('int exec_tvram_read_allowed(void)')
     body = source[start:source.index('\n}', start)+2]
     for old, new in (

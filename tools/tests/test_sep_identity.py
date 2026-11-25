@@ -47,12 +47,12 @@ def suite(tool):
 
         def test_object_key(self):
             out = 'build/out/ppc-kboot/'
-            self.assertEqual(tool.object_key(out + 'mm/paging.o'), ('', 'mm/paging'))
+            self.assertEqual(tool.object_key(out + 'sys/kern/mm/paging.o'), ('', 'mm/paging'))
             self.assertEqual(tool.object_key(out + 'link-sh/exec/absent/moved_hook.o'),
                              ('link-sh', 'exec/absent/moved_hook'))
             self.assertEqual(tool.object_key(out + 'neg1/lib/lz4.o'), ('neg1', 'lib/lz4'))
             # 核の像は根の直下に出る: ソースの最上位が像の名前と同じ綴りで始まらない限り像は空。
-            self.assertEqual(tool.object_key(out + 'kernel/sys.o'), ('', 'kernel/sys'))
+            self.assertEqual(tool.object_key(out + 'sys/kern/sys.o'), ('', 'kernel/sys'))
 
         def test_compare_objects(self):
             base = {('', 'mm/paging'): 'a', ('sh', 'arch/ppc/moved_hook'): 'b', ('sh', 'exec/exec'): 'c',
@@ -71,12 +71,12 @@ def suite(tool):
             moved = {'platform/pc98/moved_main.c': 'init/moved_main.c', 'platform/pc98/note.md': 'init/note.md'}
             diff = ['build/out/obj/init/moved_main.o', 'build/out/obj/platform/pc98/moved_main.o',
                     'build/out/r1/obj/init/moved_main.o', 'build/out/r1/obj/platform/pc98/moved_main.o',
-                    'build/out/kernel.bin', 'build/out/obj/mm/paging.o']
+                    'build/out/kernel.bin', 'build/out/obj/sys/kern/mm/paging.o']
             pairs, rest = tool.moved_object_pairs(diff, moved)
             self.assertEqual(pairs, [('build/out/obj/init/moved_main.o', 'build/out/obj/platform/pc98/moved_main.o'),
                                      ('build/out/r1/obj/init/moved_main.o', 'build/out/r1/obj/platform/pc98/moved_main.o')])
             # 移していない物の違いと、出荷する生成物の違いは残る。
-            self.assertEqual(rest, ['build/out/kernel.bin', 'build/out/obj/mm/paging.o'])
+            self.assertEqual(rest, ['build/out/kernel.bin', 'build/out/obj/sys/kern/mm/paging.o'])
             # 基点の側の .o が違いに出ていなければ対にしない (新しく増えただけの .o は違いのまま)。
             self.assertEqual(tool.moved_object_pairs(['build/out/obj/platform/pc98/moved_main.o'], moved),
                              ([], ['build/out/obj/platform/pc98/moved_main.o']))
@@ -85,7 +85,7 @@ def suite(tool):
             with tempfile.TemporaryDirectory(prefix='os32-sep-identity-') as directory:
                 tree = Path(directory)
                 for name, data in (('sh/root_image_blob.o', b'iso'), ('sh/mm/paging.o', b'code'),
-                                   ('mm/paging.o', b'code')):
+                                   ('sys/kern/mm/paging.o', b'code')):
                     path = tree / 'build/out/ppc-kboot' / name
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_bytes(data)

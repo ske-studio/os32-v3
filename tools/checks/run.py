@@ -97,7 +97,7 @@ NOTEST = (
     ('tools/review_local.py', ()),
     ('tools/split_c_functions.py', ()),
     ('tools/sync_hwdocs.sh', ()),
-    ("userland/tests/bench_scale2x/main.c", ()),
+    ("userland/diag/bench_scale2x/main.c", ()),
     ("userland/cmds/**", tuple("userland/cmds/" + n + ".c" for n in
         ("cfg", "hclip", "hdate", "lpr", "stat", "tar", "wget"))),
     ("docs/manpages/*.1", ("docs/manpages/hsync.1",)),
@@ -115,9 +115,9 @@ OUTSIDE = frozenset(("arm-compile", "gfinit-fixture-host", "e10c-lifecycle",
     "host-agent", "host-lib-host", "net-link-host", "lan-bridge-host"))
 
 KAPI_GENERATED = (
-    "include/kapi_call_generated.h",
+    "sys/include/kapi_call_generated.h",
     "sdk/include/os32/os32_kapi_generated.h", "sdk/include/os32/os32_kapi_slots.h",
-    "kapi/kapi_generated.c", "exec/exec_kapi_init.inc",
+    "sys/kapi/kapi_generated.c", "sys/kern/exec/exec_kapi_init.inc",
     "sdk/include/os32/os32_generations.h", "sdk/os32_generations.py",
     "sdk/rust/os32api/src/generations.rs", "sdk/include/os32/os32_unit_stamp.h",
     "sdk/crt/generations.inc", "sdk/link/generations.ld",
@@ -412,7 +412,7 @@ PATH_AUDIT_ALLOW = {
     ("check-type-contract", "tools/build_compare.py"):
         "H5 calls compare on private fixture roots; snapshot/build main is never invoked",
     ("check-ppc-kboot-layout", "tools/gen_memmap.py"):
-        "--layout-header reads include/memmap.h and returns before artifact checks",
+        "--layout-header reads sys/include/memmap.h and returns before artifact checks",
     ("check-target-profile-host", "tools/gen_memmap.py"):
         "unsupported target is rejected before reading layout artifacts",
     "tools/tests/test_build_selection.py": "make fixture has a private build directory",

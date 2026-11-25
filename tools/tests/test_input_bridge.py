@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Provider contract and old/new nonblocking keyboard selection traces."""
 CHECK = dict(name='input-bridge-host', tier=1, budget=5, needs=[], covers=[
-    'input/hal/in2_int.h', 'include/types.h', 'tools/tests/test_input_bridge.py',
+    'sys/hal/input/in2_int.h', 'sys/include/types.h', 'tools/tests/test_input_bridge.py',
     'tools/tests/host32.py', 'tools/tests/input_bridge_host.c',
-    'kernel/input_legacy.c', 'kernel/input_wait.c', 'drivers/input/kbd.c'], basis=['INPUT_HAL_DESIGN §3', 'INPUT_HAL_DESIGN §5'])
+    'sys/kern/input_legacy.c', 'sys/kern/input_wait.c', 'sys/platform/pc98/input/kbd.c'], basis=['INPUT_HAL_DESIGN §3', 'INPUT_HAL_DESIGN §5'])
 
 import os
 from pathlib import Path
@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-# Selection functions from b27213d2:drivers/input/kbd.c; comments stripped.
+# Selection functions from b27213d2:sys/platform/pc98/input/kbd.c; comments stripped.
 OLD_KBD = r'''
 static int kbd_gui_trygetbyte(void)
 {
@@ -158,7 +158,7 @@ int fixture(void) { return probe(); }
 
 
 def bridge_cases(ctx, tmp):
-    kbd = (ctx.root / 'drivers/input/kbd.c').read_text()
+    kbd = (ctx.root / 'sys/platform/pc98/input/kbd.c').read_text()
     a = kbd.index('static int kbd_local_trykey(void)')
     b = kbd.index('#include "kbd_fgpoll.inc"', a)
     def function(name):
@@ -171,7 +171,7 @@ def bridge_cases(ctx, tmp):
         current += '\n' + kbd[start:kbd.index('\n}', start)+2]
     start = kbd.index('static int kbd_gui_trygetbyte(void)')
     current = kbd[start:kbd.index('\n}', start)+2] + '\n' + current
-    bridge = (ctx.root / 'kernel/input_legacy.c').read_text()
+    bridge = (ctx.root / 'sys/kern/input_legacy.c').read_text()
     bridge = bridge.replace('../input/hal/in2_int.h', 'in2_int.h')
     def execute(selection, product=None):
         (tmp / 'selected.inc').write_text(selection)
@@ -181,7 +181,7 @@ def bridge_cases(ctx, tmp):
             '-static', '-no-pie', '-I' + str(tmp), '-I' + str(ctx.root / 'include'),
             str(ctx.root / 'tools/tests/input_bridge_host.c')]
         if product is not None:
-            command += ['-DCURRENT', str(tmp / 'bridge.c'), str(ctx.root / 'kernel/input_wait.c')]
+            command += ['-DCURRENT', str(tmp / 'bridge.c'), str(ctx.root / 'sys/kern/input_wait.c')]
         subprocess.run(command + ['-o', str(tmp / 'trace')], check=True)
         result = host32.run([str(tmp / 'trace')], runner='qemu', capture_output=True, timeout=10)
         return result.returncode, result.stdout
@@ -218,7 +218,7 @@ def bridge_cases(ctx, tmp):
 
 
 def run(ctx):
-    header = (ctx.root / 'input/hal/in2_int.h').read_text()
+    header = (ctx.root / 'sys/hal/input/in2_int.h').read_text()
     cc = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
     with tempfile.TemporaryDirectory(prefix='input-bridge-') as td:
         tmp = Path(td)

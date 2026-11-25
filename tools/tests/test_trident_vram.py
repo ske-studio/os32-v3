@@ -3,14 +3,14 @@
 Production capacity_plan and register access run against the shared fake.
 """
 CHECK = dict(name='trident-vram', tier=1, needs=[], budget=4.3,
-    covers=['drivers/video/trident/vram.c', 'drivers/video/trident/trident.h',
-            'drivers/video/trident/regs.c', 'drivers/video/trident/pc98_init.c',
-            'drivers/video/trident/mode_640.c', 'drivers/video/trident/route_ra266.c',
+    covers=['sys/dev/video/trident/vram.c', 'sys/dev/video/trident/trident.h',
+            'sys/dev/video/trident/regs.c', 'sys/dev/video/trident/pc98_init.c',
+            'sys/dev/video/trident/mode_640.c', 'sys/platform/pc98/video/route_ra266.c',
             'tools/tests/trident_vram_host.c', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_device_fake.h', 'tools/tests/trident_pc98init_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'build/config.mk', 'include/types.h', 'include/memmap.h',
-            'include/io.h', 'gfx/palette.h', 'include/pegc.h', 'lib/serial_diag.h'],
+            'build/config.mk', 'sys/include/types.h', 'sys/include/memmap.h',
+            'sys/include/io.h', 'sys/hal/gfx/palette.h', 'sys/platform/pc98/pegc.h', 'lib/serial_diag.h'],
     basis=['TRIDENT_FULL_DESIGN §2', 'TRIDENT_FULL_DESIGN §5', 'TRIDENT_S3_DESIGN §4'],
 )
 import argparse
@@ -23,7 +23,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'drivers/video/trident/vram.c'
+PRODUCT = 'sys/dev/video/trident/vram.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 MUTATIONS = (
@@ -80,7 +80,7 @@ MUTATIONS = (
 def build(work, source):
     exe = work / 'vram'
     sources = ['tools/tests/trident_vram_host.c', 'tools/tests/trident_device_fake.c',
-               'drivers/video/trident/regs.c', 'drivers/video/trident/mode_640.c']
+               'sys/dev/video/trident/regs.c', 'sys/dev/video/trident/mode_640.c']
     subprocess.run(['gcc', *FLAGS,
                     '-I' + str(work), '-I' + str(ROOT), *include_flags(ROOT),
                     '-I' + str(ROOT / 'drivers/video/trident'),

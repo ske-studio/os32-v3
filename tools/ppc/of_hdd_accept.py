@@ -182,7 +182,7 @@ def main():
         fixture = work/'cmd_base.c'
         fixture.write_text('#include <string.h>\n'+shell.replace(anchor, anchor+'\n'+
                            (ROOT/'tools/ppc/of_hdd_probe.inc').read_text()))
-        device = 'drivers/base/dev.c'
+        device = 'sys/dev/base/dev.c'
         registrations = (ROOT/device).read_text()
         anchor = '    dev_table[dev_num] = dev;'
         assert registrations.count(anchor) == 1
@@ -196,11 +196,11 @@ def main():
             mutant = variant == 'no-number-check'
             out = work/variant
             out.mkdir()
-            settings = mutant_settings(out, 'number', 'platform/powermac/product_boot.c',
+            settings = mutant_settings(out, 'number', 'sys/platform/powermac/product_boot.c',
                         'if (p->root_partition != pm_expected_plan.root_partition)', 'if (0)') if mutant else []
             settings = [arg.replace('KB_MUT_', 'HD_MUT_', 1) for arg in settings]
             if variant == 'stale-root':
-                settings = mutant_settings(out, variant, 'platform/powermac/ide_tree.c',
+                settings = mutant_settings(out, variant, 'sys/platform/powermac/ide_tree.c',
                                            '#elif PM_INSTALL_MEDIA', '#elif 0')
             media = build_media(out, '-j6', 'IMAGE=powermac', 'KBOOT_USB_KEY_TRACE=1',
                                 'KB_ROOT_BINS='+str(work/'user/learnprb.bin'),

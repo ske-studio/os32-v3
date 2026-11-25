@@ -3,7 +3,7 @@
 票:   docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md (方針 v2 / v3 / ユーザー決裁)
 
 見るもの:
-  1. exec / shlib ローダ / 常駐シェルが使う判定関数 (exec/os32x_hdr.c) —
+  1. exec / shlib ローダ / 常駐シェルが使う判定関数 (sys/kern/exec/os32x_hdr.c) —
      tools/tests/os32x_layout_host.c が実物を #include して踏む
      (v2 → 断る / v3 値違い → 断る / 一致 → 通す、長さの境界)。
   2. sdk/gen_kapi.py が関数表の容量 (func_capacity) を超えたら生成を拒否する。
@@ -69,7 +69,7 @@ def run(cmd, **kw):
 
 
 # --------------------------------------------------------------------------
-#  1. 判定関数 (exec/os32x_hdr.c)
+#  1. 判定関数 (sys/kern/exec/os32x_hdr.c)
 # --------------------------------------------------------------------------
 
 def case_check_fn(tmp):
@@ -101,7 +101,7 @@ def case_check_fn(tmp):
              "-D__KERNEL_BUILD__",
              "-I" + str(ROOT / "include"), "-I" + str(ROOT / "arch/x86"), "-I" + str(ROOT / "sdk/include/os32"),
              "-I" + str(ROOT / "exec"),
-             "-c", str(ROOT / "exec/os32x_hdr.c"), "-o", str(tmp / "os32x_hdr.o")])
+             "-c", str(ROOT / "sys/kern/exec/os32x_hdr.c"), "-o", str(tmp / "os32x_hdr.o")])
     check(r.returncode == 0, "カーネルと同じ i386-elf-gcc -Werror でも通る")
     if r.returncode != 0:
         print(r.stderr)
@@ -147,7 +147,7 @@ KERNEL_CFLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pi
 
 
 def case_capacity_full(tmp, kj):
-    """関数数 = 容量 (予約 0 本) で生成し、exec/exec.c がコンパイルできるか。
+    """関数数 = 容量 (予約 0 本) で生成し、sys/kern/exec/exec.c がコンパイルできるか。
 
     生成器は予約 0 本なら kapi_reserved を作らない。kst_exec_kapi_layout が
     それを無条件に参照していると 300 本目の追加でカーネルが作れなくなる
@@ -160,7 +160,7 @@ def case_capacity_full(tmp, kj):
     shutil.copytree(ROOT / "sdk/include/os32", gk / "sdk/include/os32")
     for name in ("gen_kapi.py", "kapi_abi_x86.py", "target_profile.py"):
         shutil.copy(ROOT / "sdk" / name, gk / "sdk" / name)
-    shutil.copy(ROOT / "exec/exec.c", gk / "exec/exec.c")
+    shutil.copy(ROOT / "sys/kern/exec/exec.c", gk / "sys/kern/exec/exec.c")
     d = dict(kj)
     d["func_capacity"] = n
     (gk / "sdk/kapi.json").write_text(json.dumps(d), encoding="utf-8")
@@ -173,21 +173,21 @@ def case_capacity_full(tmp, kj):
     hdr = (gk / "sdk/include/os32/os32_kapi_generated.h").read_text(encoding="utf-8")
     check("kapi_reserved[" not in hdr and "#define KAPI_FUNC_RESERVED 0\n" in hdr,
           "予約 0 本なら kapi_reserved を作らず KAPI_FUNC_RESERVED は 0")
-    shutil.copy(ROOT / "include/kapi_call.h", gk / "include/kapi_call.h")
+    shutil.copy(ROOT / "sys/include/kapi_call.h", gk / "sys/include/kapi_call.h")
     inc = ["-I" + str(gk / "include"), "-I" + str(gk / "sdk/include"), "-I" + str(gk / "sdk/include/os32"),
            "-I" + str(gk / "exec")]
     inc += include_flags(ROOT)
-    r = run([TCC, *KERNEL_CFLAGS, *inc, "-fsyntax-only", gk / "exec/exec.c"])
+    r = run([TCC, *KERNEL_CFLAGS, *inc, "-fsyntax-only", gk / "sys/kern/exec/exec.c"])
     check(r.returncode == 0,
-          "予約 0 本の生成物で exec/exec.c がコンパイルできる "
+          "予約 0 本の生成物で sys/kern/exec/exec.c がコンパイルできる "
           "(kapi_reserved の参照は #if KAPI_FUNC_RESERVED > 0 の中)")
     if r.returncode != 0:
         print("\n".join(r.stderr.splitlines()[:8]))
     # kdebug へ移した kst_exec_kapi_layout も予約 0 本の生成物で構文検査する。
     moved = gk / "selftest_exec.c"
-    moved.write_text((ROOT / "kdebug/selftest_exec.c").read_text().replace(
+    moved.write_text((ROOT / "sys/arch/x86/kdebug/selftest_exec.c").read_text().replace(
         '#include "generated/kdebug_import_macros.h"',
-        '#include "kdebug/generated/kdebug_import_macros.h"'))
+        '#include "sys/platform/pc98/kdebug/generated/kdebug_import_macros.h"'))
     r = run([TCC, *KERNEL_CFLAGS, *inc, "-I" + str(ROOT / "kdebug"),
              "-Werror", "-fsyntax-only", moved])
     check(r.returncode == 0, "予約 0 本でも移植した kst_exec_kapi_layout がコンパイルできる")
@@ -662,7 +662,7 @@ def case_rename(tmp):
 # --------------------------------------------------------------------------
 
 MUTATIONS = [
-    ("exec/os32x_hdr.c", "decode_magic_be",
+    ("sys/kern/exec/os32x_hdr.c", "decode_magic_be",
      "h->magic = le32_rd(wire + 0);",
      "h->magic = ((u32)wire[0] << 24) | ((u32)wire[1] << 16) | ((u32)wire[2] << 8) | wire[3];"),
     ("sdk/mkos32x.py", "missing_text_end_allowed",
@@ -675,13 +675,13 @@ MUTATIONS = [
     ("sdk/mkos32x.py", "orphan_alloc_allowed", "if section['name'] not in ('.text', '.data', '.bss'):", "if False:"),
     ("sdk/mkos32x.py", "writable_code_allowed", "if section['flags'] & H.SHF_WRITE and start < text_end:", "if False:"),
     ("tools/mkshlib.py", "shlib_boundary_mismatch_allowed", "        if cur == want:", "        if cur != 0:\n            return want\n        if cur == want:"),
-    ("exec/os32x_hdr.c", "v4_accepted", "hdr->version != OS32X_HDR_VERSION", "(hdr->version != OS32X_HDR_VERSION && hdr->version != 4)"),
+    ("sys/kern/exec/os32x_hdr.c", "v4_accepted", "hdr->version != OS32X_HDR_VERSION", "(hdr->version != OS32X_HDR_VERSION && hdr->version != 4)"),
 
-    ("exec/os32x_hdr.c", "mismatch_accepted",
+    ("sys/kern/exec/os32x_hdr.c", "mismatch_accepted",
      "        return OS32X_LAYOUT_MISMATCH;", "        return OS32X_LAYOUT_OK;"),
-    ("exec/os32x_hdr.c", "short_read_trusted",
+    ("sys/kern/exec/os32x_hdr.c", "short_read_trusted",
      "    if (!hdr || read_len < OS32X_HDR_SIZE)", "    if (!hdr || (read_len < OS32X_HDR_SIZE && 0))"),
-    ("exec/os32x_hdr.c", "unknown_format_accepted",
+    ("sys/kern/exec/os32x_hdr.c", "unknown_format_accepted",
      "hdr->version != OS32X_HDR_VERSION", "hdr->version < OS32X_HDR_VERSION"),
     ("sdk/gen_kapi.py", "capacity_not_enforced",
      "    if n > cap:",
@@ -705,15 +705,15 @@ MUTATIONS = [
     ("sdk/os32x_hdr.py", "raw_elf_segments_skipped",
      "        if seg['type'] != PT_LOAD or seg['filesz'] == 0:",
      "        if True:"),
-    ("exec/os32x_hdr.c", "abi_generation_unchecked",
+    ("sys/kern/exec/os32x_hdr.c", "abi_generation_unchecked",
      "hdr->kapi_abi_generation != OS32_KAPI_ABI_GENERATION", "0"),
     ("sdk/kapi.json", "generation-held",
      '"shlib_protocol": 2', '"shlib_protocol": 1'),
     ("sdk/kapi.json", "memory_generation_rolled_back",
      '"memory_layout": 4', '"memory_layout": 3'),
-    ("exec/os32x_hdr.c", "memory_generation_unchecked",
+    ("sys/kern/exec/os32x_hdr.c", "memory_generation_unchecked",
      "hdr->memory_layout_generation != OS32_MEMORY_LAYOUT_GENERATION", "0"),
-    ("exec/os32x_hdr.c", "shlib_protocol_unchecked",
+    ("sys/kern/exec/os32x_hdr.c", "shlib_protocol_unchecked",
      "(hdr->shlib_protocol && hdr->shlib_protocol != OS32_SHLIB_PROTOCOL)", "0"),
     ("sdk/link_guard.py", "per_unit_note_unchecked",
      "def check_note(elf):", "def check_note(elf):\n    return"),
@@ -793,7 +793,7 @@ def run_mutations():
     """否定側。変異は一時ディレクトリの写しにだけ当てる (mutpar で並列、
     check-par で回せる)。"""
     return mutpar.run_with_control(one_mutation, MUTATIONS,
-                                   ("exec/os32x_hdr.c", "control", "", ""))
+                                   ("sys/kern/exec/os32x_hdr.c", "control", "", ""))
 
 
 if __name__ == "__main__":

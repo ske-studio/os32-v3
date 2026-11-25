@@ -25,8 +25,8 @@ MUTATIONS = [
 def run(mutation=None):
     with tempfile.TemporaryDirectory(prefix='os32-appband-') as tmp:
         tmp = pathlib.Path(tmp)
-        source = paging_source(ROOT / 'mm/paging.c')
-        ledger = (ROOT / 'kdebug/kselftest/ledger.inc').read_text()
+        source = paging_source(ROOT / 'sys/kern/mm/paging.c')
+        ledger = (ROOT / 'sys/arch/x86/kdebug/kselftest/ledger.inc').read_text()
         # This fixture tests ledger allocation/reclaim, not caller copies.
         # The real bounded boot helper is executed by test_access_walk.py.
         boot_include = '#include "caller_boot.inc"\n'
@@ -45,13 +45,13 @@ def run(mutation=None):
                 source = source.replace(old, new, 1)
         (tmp / 'paging_host_source.c').write_text(source)
         (tmp / 'kselftest_ledger_source.c').write_text(ledger)
-        allocator = (ROOT / 'mm/pgalloc.c').read_text()
+        allocator = (ROOT / 'sys/kern/mm/pgalloc.c').read_text()
         for part in ('owner', 'resource', 'surface'):
             allocator = allocator.replace(
                 f'#include "pgalloc_{part}.inc"', (ROOT / f'mm/pgalloc_{part}.inc').read_text())
         allocator = allocator.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
         (tmp / 'pgalloc_host_source.c').write_text(allocator)
-        # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約だけで、
+        # arch/x86 + platform/pc98: sys/include/io.h / sys/include/cpu.h は契約だけで、
         # 実装は固定名 arch_io.h / arch_cpu.h / platform_io.h を引く (順序 3・5)。
         # build/config.mk の INC_COMMON と同じものをここでも渡す。
         includes = include_flags(ROOT) + ['-I' + str(tmp)]
@@ -61,7 +61,7 @@ def run(mutation=None):
         exe = tmp / 'app_band_pde'
         build = subprocess.run(['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static', '-no-pie',
                         *host_includes, str(ROOT / 'tools/tests/app_band_pde_host.c'),
-                        str(ROOT / 'mm/physmem.c'), '-o', str(exe)], capture_output=bool(mutation))
+                        str(ROOT / 'sys/kern/mm/physmem.c'), '-o', str(exe)], capture_output=bool(mutation))
         if build.returncode:
             if mutation: return 'compile'
             raise RuntimeError('host compile failed')
@@ -73,7 +73,7 @@ def run(mutation=None):
             return 'runtime' if result.returncode else 'green'
         if result.returncode: raise RuntimeError('host execution failed')
         subprocess.run(['i386-elf-gcc', *FLAGS, '-O2', *includes, '-c',
-                        str(ROOT / 'mm/paging.c'), '-o', str(tmp / 'paging.o')], check=True)
+                        str(ROOT / 'sys/kern/mm/paging.c'), '-o', str(tmp / 'paging.o')], check=True)
         print('HOST ILP32 + TARGET GNU11 PASS')
 
 run()

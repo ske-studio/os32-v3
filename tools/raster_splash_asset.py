@@ -39,7 +39,7 @@ def generate(source, output, reference, *, threads=None, replace=False):
     workers = (os.cpu_count() or 1) if threads is None else threads
     if workers < 1:
         raise ValueError('threads must be positive')
-    inputs = ['tools/img2osri.py', 'gfx/osri_profile.h']
+    inputs = ['tools/img2osri.py', 'sys/kern/gfx/osri/osri_profile.h']
     inputs += [str(p.relative_to(ROOT)) for p in sorted((ROOT / 'tools').glob('osri_*'))
                if p.is_file()]
     if subprocess.check_output(['git', 'diff', 'HEAD', '--', *inputs], cwd=ROOT):

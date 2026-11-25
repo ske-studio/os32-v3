@@ -15,7 +15,7 @@ ARP/IP/ICMP/UDP/TCP、DHCP、DNS、ソケット、アプリケーションは別
 
 推奨構成は **転送と IRQ 入口を NASM、初期化・リング管理・復旧を GNU11 C** とする ([C1](../../CONSTRAINTS.md#c1-c11-gnu11-を内部実装の基準とする))。
 ベアメタルであることと、全処理をアセンブラで書くことは別の判断である。
-既存の `include/io.h` でも `in/out` と `rep insw` は直接生成される。
+既存の `sys/include/io.h` でも `in/out` と `rep insw` は直接生成される。
 全面 NASM 化で速度やサイズが必ず改善するとは現時点では断定できない。
 まず同じ転送命令を使う C と NASM を比較し、効果がある制御処理は追加で移す。
 全面 NASM を選ぶ場合も、以下の API・状態遷移・テスト条件を維持する。
@@ -55,11 +55,11 @@ EEPROM の未知のシーケンスを初期化の必須条件にしない。
 
 ### OS32 側
 
-- `arch/x86/kernel/idt.c` は IRQ3/5/6 を unexpected IRQ スタブに接続している。
+- `sys/arch/x86/kernel/idt.c` は IRQ3/5/6 を unexpected IRQ スタブに接続している。
   専用入口を登録し、デバイス初期化後に `irq_enable()` する必要がある。
-- `arch/x86/kernel/isr_stub.asm` のセグメント設定と `IRETD_USER` を使い、CPL3/V86 からの割り込みを壊さない。
+- `sys/arch/x86/kernel/isr_stub.asm` のセグメント設定と `IRETD_USER` を使い、CPL3/V86 からの割り込みを壊さない。
   NIC IRQ は OS32 が所有し、DOS ゲストへ反射しない。V86 の I/O ポリシーでも所有ポートを保護する。
-- `arch/x86/kernel/isr_handlers.c:timer_handler()` の現行処理は `snd_tick()`。
+- `sys/arch/x86/kernel/isr_handlers.c:timer_handler()` の現行処理は `snd_tick()`。
   常設のネットワーク worker があるとは仮定しない。
 - カーネル帯域と 16KB スタックには余裕が限られる。フレームをスタック上に置かず、
   `.text/.data/.bss` とリンク後の帯域を計測する。
@@ -71,13 +71,13 @@ EEPROM の未知のシーケンスを初期化の必須条件にしない。
 
 | 予定ファイル | 責務 |
 |---|---|
-| `drivers/net/ne2000/lgy98.c` | BASE/IRQ 検証、カード固有ポート、probe/reset、OS32 接続 |
-| `drivers/net/ne2000/ne2000.c` | 8390 初期化、TX/RX、Remote DMA 制御、エラー復旧、統計 |
-| `drivers/net/ne2000/ne2000_io.asm` | `rep insw` / `rep outsw` と奇数末尾の安全な転送 |
-| `drivers/net/ne2000/ne2000.h` | カーネル内部 API、状態、結果コード |
-| `drivers/net/ne2000/ne2000_regs.h` | レジスタ定数の正典。NASM が必要な定数は生成 include で共有 |
-| `arch/x86/kernel/isr_stub.asm` / `arch/x86/kernel/idt.c` | NIC IRQ 入口・登録・EOI の責任を一元化 |
-| `platform/pc98/kernel.c` / `include/config.h` | 無効が既定の起動設定、初期化順 |
+| `sys/dev/net/ne2000/lgy98.c` | BASE/IRQ 検証、カード固有ポート、probe/reset、OS32 接続 |
+| `sys/dev/net/ne2000/ne2000.c` | 8390 初期化、TX/RX、Remote DMA 制御、エラー復旧、統計 |
+| `sys/dev/net/ne2000/ne2000_io.asm` | `rep insw` / `rep outsw` と奇数末尾の安全な転送 |
+| `sys/dev/net/ne2000/ne2000.h` | カーネル内部 API、状態、結果コード |
+| `sys/dev/net/ne2000/ne2000_regs.h` | レジスタ定数の正典。NASM が必要な定数は生成 include で共有 |
+| `sys/arch/x86/kernel/isr_stub.asm` / `sys/arch/x86/kernel/idt.c` | NIC IRQ 入口・登録・EOI の責任を一元化 |
+| `sys/platform/pc98/kernel.c` / `sys/include/config.h` | 無効が既定の起動設定、初期化順 |
 | `build/kernel.mk` | C/ASM ソースと必要な include path・生成依存関係 |
 
 汎用ネットワークフレームワークや関数ポインタ式のバス抽象化は最初は作らない。
@@ -240,8 +240,8 @@ NHD/エミュレータ設定変更は実施時に該当する承認・停止手�
   §7 受信と overwrite recovery、§8 送信、§9 Remote DMA、§10 レジスタ、§11 初期化、§12 loopback。
 - ローカル NP21/W: `~/np21w-src/src/network/lgy98.c`、`lgy98.h`、`lgy98dev.h`。
   実装上の観測値を参照し、エミュレータ特有の省略を実カードの仕様にしない。
-- OS32: `include/io.h`、`arch/x86/kernel/idt.c`、`arch/x86/kernel/isr_stub.asm`、`arch/x86/kernel/isr_handlers.c`、
-  `kernel/time/cpu_calibrate.h`、`build/kernel.mk`、`build/os32.ld`。
+- OS32: `sys/include/io.h`、`sys/arch/x86/kernel/idt.c`、`sys/arch/x86/kernel/isr_stub.asm`、`sys/arch/x86/kernel/isr_handlers.c`、
+  `sys/hal/time/cpu_calibrate.h`、`build/kernel.mk`、`build/os32.ld`。
 - 制約: [CONSTRAINTS.md](../../CONSTRAINTS.md)、[POLICY_DEV.md](../../POLICY_DEV.md)。
 
 M0 はエミュレータ基準で凍結、M1〜M4 は実装・エミュレータ受入済み ([§9](#9-進捗と確定事項-2026-09-05-着手ブランチ-featlgy98))。
@@ -306,11 +306,11 @@ LAN の語があるだけ)。PC-98 固有部分の一次資料は §7 の simk98
 
 ### OS32 側で確認済みのこと
 
-- `include/io.h` には `insw_rep` (rep insw) だけがあり、`outsw` 系は無い。§3 の
-  `drivers/net/ne2000/ne2000_io.asm` で両方向を持つ方針と矛盾しない。
-- `arch/x86/kernel/idt.c` は IRQ 3/5/6 を `irq_stub_unexp_*` に接続している (§2 のとおり)。
+- `sys/include/io.h` には `insw_rep` (rep insw) だけがあり、`outsw` 系は無い。§3 の
+  `sys/dev/net/ne2000/ne2000_io.asm` で両方向を持つ方針と矛盾しない。
+- `sys/arch/x86/kernel/idt.c` は IRQ 3/5/6 を `irq_stub_unexp_*` に接続している (§2 のとおり)。
   IRQ12 は `irq_stub_12` (サウンドボード)。
-- `kernel/time/cpu_calibrate.h` (`cpu_delay_us`) と `include/io.h` の `irq_save/irq_restore` は存在する。
+- `sys/hal/time/cpu_calibrate.h` (`cpu_delay_us`) と `sys/include/io.h` の `irq_save/irq_restore` は存在する。
 - ドキュメント運用: 本計画が設計と進捗の正典 (INDEX.md「情報単位ごとの正典」の流儀)。
   実装完了後の現行仕様は `docs/05_drivers.md` へ、落とし穴の経緯は `POLICY_DEBUG.md §4` へ。
 
@@ -348,7 +348,7 @@ LAN の語があるだけ)。PC-98 固有部分の一次資料は §7 の simk98
 ### 実装上の決定 (計画からの差分)
 
 - **NASM の生成 include は不要**: `ne2000_io.asm` はポート番号を引数で受けるので、
-  レジスタ定数の正典は `drivers/net/ne2000/ne2000_regs.h` 1 か所で済む。
+  レジスタ定数の正典は `sys/dev/net/ne2000/ne2000_regs.h` 1 か所で済む。
 - **リング計算を `ne2000_ring.c` に分離**: I/O 無しの純粋関数にし、`tools/tests/ne2000_ring_test.c`
   をホスト gcc で `make check` から回す (実カード形式と NP21/W 形式の両方、ページ境界、PSTOP wrap、
   異常ヘッダ)。幾何だけでは count の形式違い (FCS の有無) は検出できないので、その判定は

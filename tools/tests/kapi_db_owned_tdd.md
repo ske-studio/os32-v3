@@ -1,6 +1,6 @@
 # F1 DB owner lifetime — host TDD evidence
 
-対象: 実 `kapi/kapi_db.c` をincludeする `kapi_db_owned_host.c`。
+対象: 実 `sys/kapi/kapi_db.c` をincludeする `kapi_db_owned_host.c`。
 実DB slot実装の複製はない。SQLite境界のfault injection、owner取得、SHMアドレス、
 kstring/kprintfのhost shimのみ。SQLiteの実VFS/実ファイル/exec終了は試験しない。
 
@@ -46,7 +46,7 @@ i386-elf-gcc -std=gnu89 -m32 -march=i386 -ffreestanding -fno-pie \
   -Wall -Wextra -Werror -Wdeclaration-after-statement -D__KERNEL_BUILD__ \
   -I. -Iinclude -Isdk/include -Isdk/include/os32 -Ikapi -Ikernel \
   -Idrivers -Ifs -Iexec -Igfx -Ilib -Ilib/sqlite3 \
-  -c kapi/kapi_db.c -o "$obj"
+  -c sys/kapi/kapi_db.c -o "$obj"
 file "$obj"
 i386-elf-nm "$obj"
 ```
@@ -59,7 +59,7 @@ i386-elf-nm "$obj"
 
 - hostはLP64。共有ヘッダのu32/i32はhostではlong幅となるため、hostのSHM構造サイズをguest ABI証拠にしない。
   この試験はslot寿命/制御順序/診断/prepare初回stepを対象とし、SHM列レイアウトはF5。
-- `exec/exec.c:exec_exit`の既存呼出しを調査: 汎用FD回収が先、後で`db_cleanup_all()`。
+- `sys/kern/exec/exec.c:exec_exit`の既存呼出しを調査: 汎用FD回収が先、後で`db_cleanup_all()`。
   呼出し元は変更していない。全active slot回収を残すため実子終了で親DBが生存する保証はまだない。
 - close失敗のslot隔離はFD保護ではない。main/journal/temp全体の追跡・隔離が汎用FD回収前に成立するまでF2統合blocked。
   mainだけprotect/全FD protectは実装しない。隔離slot/SQLite資源は未回収として保持し、回復・再試行APIは追加しない。

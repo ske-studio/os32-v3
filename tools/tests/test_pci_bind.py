@@ -1,9 +1,9 @@
-"""PCI の結線表 (drivers/pci/pci_bind_match.c) のホスト試験。
+"""PCI の結線表 (sys/dev/pci/pci_bind_match.c) のホスト試験。
 
 記録: tools/tests/pci_bind_tdd.md
 票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-4 (PCI デバイスの結線表)
 
-実物の drivers/pci/pci_bind_match.c を 1 行も写さずに #include して回す。
+実物の sys/dev/pci/pci_bind_match.c を 1 行も写さずに #include して回す。
 probe は呼び手が渡す関数ポインタなので、偽 driver を並べれば
 DECLINE → 次へ / QUARANTINE → 打ち切り の遷移は全部踏める。
 
@@ -16,7 +16,7 @@ DECLINE → 次へ / QUARANTINE → 打ち切り の遷移は全部踏める。
   python3 -B tools/tests/test_pci_bind.py --mutate   # 否定側
 """
 CHECK = dict(name='pci-bind-host', tier=4,
-    covers=['drivers/pci/pci_bind.c', 'drivers/pci/pci_bind_match.c', 'tools/tests/pci_bind_host.c', 'drivers/pci/pci.h', 'drivers/pci/pci_bind.h', 'drivers/pci/pci_decode.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'include/types.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/dev/pci/pci_bind.c', 'sys/dev/pci/pci_bind_match.c', 'tools/tests/pci_bind_host.c', 'sys/dev/pci/pci.h', 'sys/dev/pci/pci_bind.h', 'sys/dev/pci/pci_decode.h', 'sys/include/pci_dev_contract.h', 'sys/include/pci_bind_contract.h', 'sys/include/types.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.2,
     kind='characterization',
 )
@@ -30,8 +30,8 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/pci_bind_host.c"
-SRC = ROOT / "drivers/pci/pci_bind_match.c"
-TARGET_SRCS = ["drivers/pci/pci_bind_match.c", "drivers/pci/pci_bind.c"]
+SRC = ROOT / "sys/dev/pci/pci_bind_match.c"
+TARGET_SRCS = ["sys/dev/pci/pci_bind_match.c", "sys/dev/pci/pci_bind.c"]
 
 CASES = ["match_rules", "next_order", "decline_chain", "quarantine_stops",
          "reason_reset", "line_state", "multi_dev", "info_get"]
@@ -84,10 +84,10 @@ def host_build(tmp, source_text=None):
         # **実物のまま**絶対パスで引く — 相対のままだと tmp から辿れない。
         shim.write_text(
             HARNESS.read_text(encoding="utf-8")
-            .replace('"../../drivers/pci/pci_bind.c"',
+            .replace('"../../sys/dev/pci/pci_bind.c"',
                      '"%s/drivers/pci/pci_bind.c"' % ROOT)
-            .replace('"../../drivers/pci/pci_bind_match.c"',
-                     '"drivers/pci/pci_bind_match.c"'),
+            .replace('"../../sys/dev/pci/pci_bind_match.c"',
+                     '"sys/dev/pci/pci_bind_match.c"'),
             encoding="utf-8")
         cmd = ["gcc", *FLAGS, "-I" + str(src_dir), *INCLUDES, str(shim),
                "-o", str(exe)]
@@ -146,7 +146,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-pci-bind-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real drivers/pci/pci_bind_match.c)",
+        print("HOST GNU11 -Werror compile PASS (real sys/dev/pci/pci_bind_match.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

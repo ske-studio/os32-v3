@@ -1,7 +1,7 @@
 /* ======================================================================== */
 /*  PCM_CS4231_HOST.C — CS4231 再生ドライバをそのままホストで回す           */
 /*                                                                          */
-/*  実物 (drivers/sound/cs4231/pcm_cs4231_math.c と drivers/sound/cs4231/pcm_cs4231.c) を 1 行も写さずに */
+/*  実物 (sys/dev/sound/cs4231/pcm_cs4231_math.c と sys/dev/sound/cs4231/pcm_cs4231.c) を 1 行も写さずに */
 /*  #include する。装置・8237・プール・割り込み・時計は模型に差し替え、      */
 /*  **ポートアクセスを 1 回ずつ数える**。                                    */
 /*                                                                          */
@@ -369,8 +369,8 @@ void pcm_shim_preempt(int site)
 /* ======================================================================== */
 /*  2. 実物をそのまま取り込む                                                */
 /* ======================================================================== */
-#include "../../drivers/sound/cs4231/pcm_cs4231_math.c"
-#include "../../drivers/sound/cs4231/pcm_cs4231.c"
+#include "../../sys/dev/sound/cs4231/pcm_cs4231_math.c"
+#include "../../sys/dev/sound/cs4231/pcm_cs4231.c"
 
 /* 装置の 1 tick: 時計を進め、再生中 (PEN=1 かつ unmask) なら位置も進める。 */
 static void dev_tick(void)
@@ -675,7 +675,7 @@ static void case_pos(void)
 /* ======================================================================== */
 #ifdef PCM_SEGMENT_TEST
 /* S8: successive observations append queued frames to the same segment. */
-#include "sound/hal/snd2_int.h"
+#include "sys/hal/sound/snd2_int.h"
 
 static void case_obs(void)
 {

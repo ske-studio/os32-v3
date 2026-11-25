@@ -1,6 +1,6 @@
 /* Real KMOD relocation for the existing trace oracles. Hardware stays fake. */
-#include "kernel/module/module_image.h"
-#include "hwdev/generated/hwdev_imports.h"
+#include "sys/kern/module/module_image.h"
+#include "sys/dev/hwdev/generated/hwdev_imports.h"
 #include "hwdev_pair.h"
 #include "hwdev_trace_symbols.h"
 static u8 image[MODULE_IMAGE_MAX] __attribute__((aligned(4096)));

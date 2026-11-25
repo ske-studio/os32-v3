@@ -40,7 +40,7 @@ filesystem:
     - host: lib/softfloat/COPYING.txt
       guest: /sys/sfloat.txt
       tags: [core]
-    - host: arch/x86/kernel/x87_emu_vendor/LICENSE-I386C-FPU.TXT
+    - host: sys/arch/x86/kernel/x87_emu_vendor/LICENSE-I386C-FPU.TXT
       guest: /sys/x87emu.txt
       tags: [core]
     - host: assets/gfx/sync.cfg

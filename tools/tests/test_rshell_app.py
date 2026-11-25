@@ -13,7 +13,7 @@ CHECK = dict(name='rshell-app', tier=1, needs=[], budget=20,
             'userland/shell/serial_watchdog.c',
             'userland/shell/serial_watchdog.h', 'userland/ppc/sh/link_profile.h',
             'userland/ppc/sh/profile.h', 'tools/tests/test_rshell_app.py',
-            'tools/tests/host32.py', 'sdk/include/os32/*.h', 'include/types.h'],
+            'tools/tests/host32.py', 'sdk/include/os32/*.h', 'sys/include/types.h'],
     basis=['PPC_P3_DESIGN v2 §4, appendix A-3', 'PACK PM flag decision'])
 
 HARNESS = r'''

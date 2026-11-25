@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Verify the integration push evidence for a fast-forward to main."""
 import argparse
+import hashlib
+import io
+import zipfile
 import itertools
 import json
 import os
@@ -8,6 +11,7 @@ import re
 import subprocess
 import sys
 from urllib.parse import urlencode
+from pathlib import Path
 
 import yaml
 
@@ -109,39 +113,77 @@ def verdict(runs, jobs, expected):
     return failures or ['no qualifying push run']
 
 
-def verify(repo, sha, docs=False):
-    failures = []
+def digest(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def verify(repo, sha, evidence):
+    workflow = 'restructure-build.yml'
     base = f'repos/{repo}/actions'
-    for workflow in (('check.yml',) if docs else ('check.yml', 'build.yml')):
-        expected = {'static-check': False} if docs else expected_jobs(sha, workflow)
-        ident = number(api(f'{base}/workflows/{workflow}')['id'])
-        rows = pages(f'{base}/workflows/{ident}/runs', 'workflow_runs', {'head_sha': sha})
-        runs = [r for r in rows if eligible(r, repo, sha, ident, 'wt/' if docs else 'wt/int-')]
-        jobs = {}
-        for run in runs:
-            rid, attempt = number(run['id']), number(run['run_attempt'])
-            jobs[rid, attempt] = pages(f'{base}/runs/{rid}/attempts/{attempt}/jobs', 'jobs', {})
-        failures.extend(f'{workflow}: {error}' for error in verdict(runs, jobs, expected))
+    ident = number(api(f'{base}/workflows/{workflow}')['id'])
+    rid = number(evidence['run_id'])
+    attempt = number(evidence['attempt'])
+    run = api(f'{base}/runs/{rid}')
+    if (not eligible(run, repo, sha, ident, 'wt/') or number(run['run_attempt']) != attempt
+            or evidence['sha'] != sha):
+        raise ValueError('candidate SHA or successful latest run attempt does not match')
+    jobs = pages(f'{base}/runs/{rid}/attempts/{attempt}/jobs', 'jobs', {})
+    failures = verdict([run], {(rid, attempt): jobs}, expected_jobs(sha, workflow))
+    comparison = evidence['comparison']
+    baseline = command('git', 'rev-parse', 'v3-pre-restructure^{commit}').decode().strip()
+    if (comparison['sha'] != sha or comparison['base'] != baseline
+            or type(comparison['exit']) is not int or comparison['exit'] != 0
+            or not Path(comparison['log']).is_file()):
+        failures.append('missing successful baseline comparison')
+    for name in ('SHA256SUMS', 'PRESENCE'):
+        if digest(Path(comparison['baseline_dir']) / name) != comparison['hashes'][name]:
+            failures.append(f'baseline digest mismatch: {name}')
+    artifacts = pages(f'{base}/runs/{rid}/artifacts', 'artifacts', {})
+    machines = set()
+    for boot in evidence['boots']:
+        machine = boot['machine']
+        artifact = next((row for row in artifacts if row['id'] == number(boot['artifact_id'])), None)
+        if machine == 'pc98':
+            expected_name = f"os32-{run['head_branch'].replace('/', '-')}-{sha[:7]}"
+            filenames = {'os32_boot.d88', 'os32_boot.img', 'os32_boot144.img', 'os32_install.iso'}
+        elif machine == 'powermac' and boot['image'] in ('core', 'link', 'sh', 'link-sh', 'shell', 'neg1'):
+            expected_name = f"ppc-{boot['image']}-{sha}"
+            filenames = {'boot.iso'}
+        else:
+            raise ValueError('unrecognized boot machine or image')
+        if (not artifact or artifact['expired'] or artifact['name'] != expected_name
+                or boot['filename'] not in filenames):
+            raise ValueError('boot medium does not identify a candidate artifact')
+        archive = command('gh', 'api', f"{base}/artifacts/{artifact['id']}/zip")
+        if artifact['digest'] != 'sha256:' + hashlib.sha256(archive).hexdigest():
+            raise ValueError('downloaded artifact digest mismatch')
+        with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
+            with bundle.open(boot['filename']) as medium:
+                if hashlib.file_digest(medium, 'sha256').hexdigest() != boot['sha256']:
+                    raise ValueError('boot medium differs from CI output')
+        if (boot['sha'] != sha or number(boot['run_id']) != rid
+                or number(boot['attempt']) != attempt or boot['result'] != 'success'
+                or not boot['reached'] or not Path(boot['log']).is_file()
+                or digest(boot['media']) != boot['sha256']):
+            failures.append(f'invalid boot evidence: {machine}')
+        machines.add(machine)
+    if machines != {'pc98', 'powermac'}:
+        failures.append('both PC-98 and PowerMac boot records required')
     return failures
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('sha')
-    parser.add_argument('--via')
+    parser.add_argument('--evidence', required=True, type=Path)
     args = parser.parse_args()
     try:
-        for sha in filter(None, (args.sha, args.via)):
-            if not re.fullmatch('[0-9a-f]{40}', sha):
-                raise ValueError('expected a full commit SHA')
+        if not re.fullmatch('[0-9a-f]{40}', args.sha):
+            raise ValueError('expected a full candidate SHA')
+        evidence = json.loads(args.evidence.read_text())
         repo = os.environ.get('GITHUB_REPOSITORY') or command(
             'gh', 'repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner').decode().strip()
-        failures = verify(repo, args.via or args.sha)
-        if args.via:
-            paths = command('git', 'diff', '--no-renames', '--name-only', '-z', args.via, args.sha, '--')
-            failures.extend(os.fsdecode(p) for p in paths.split(b'\0') if p and not (
-                p.startswith((b'docs/', b'.claude/')) or p.endswith(b'.md')))
-            failures.extend(verify(repo, args.sha, docs=True))
+        failures = verify(repo, args.sha, evidence)
     except (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError, yaml.YAMLError) as exc:
         failures = [str(exc)]
     for error in failures:

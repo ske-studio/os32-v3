@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """T_pointer: source state, independent deltas and absolute coordinates."""
-CHECK = dict(name='input-pointer-host', tier=1, budget=10, needs=[], covers=['input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'tools/tests/input_unused_key_host.h',
-    'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'input/hal/in2_state.c',
-    'input/hal/kbd_merge.c', 'input/hal/mouse_ext.c', 'input/hal/pointer_state.c',
-    'drivers/input/mouse.c', 'input/hal/mouse_pointer.c', 'include/mouse_pointer_contract.h', 'include/kbd_contract.h', 'include/text_screen.h', 'drivers/input/kbd.h', 'tools/tests/input_poll_host.c',
-    'drivers/video/kcg/kcg.h', 'include/kcg_contract.h', 'drivers/char/np2sysp.h', 'include/kprintf.h',
+CHECK = dict(name='input-pointer-host', tier=1, budget=10, needs=[], covers=['sys/hal/input/legacy_keymap.c', 'sys/input/keymaps/pc98_jp.c', 'sys/hal/input/keymap_registry.c', 'sys/hal/input/keymap_eval.c', 'sys/hal/input/keymap_state.c', 'tools/tests/input_unused_key_host.h',
+    'sys/hal/input/in2_int.h', 'sys/hal/input/in2_dev.c', 'sys/hal/input/keymap.h', 'sys/hal/input/in2_state.c',
+    'sys/hal/input/kbd_merge.c', 'sys/hal/input/mouse_ext.c', 'sys/hal/input/pointer_state.c',
+    'sys/platform/pc98/input/mouse.c', 'sys/hal/input/mouse_pointer.c', 'sys/hal/input/mouse_pointer_contract.h', 'sys/include/kbd_contract.h', 'sys/include/text_screen.h', 'sys/platform/pc98/input/kbd.h', 'tools/tests/input_poll_host.c',
+    'sys/dev/video/kcg/kcg.h', 'sys/include/kcg_contract.h', 'sys/dev/char/np2sysp.h', 'sys/include/kprintf.h',
     'tools/tests/input_pointer_host.c', 'tools/tests/test_input_pointer.py',
-    'drivers/input/mouse_bus.c', 'drivers/input/mouse_hal.c', 'tools/tests/mouse_bus_host.c', 'drivers/input/mouse.h', 'include/pc98.h', 'include/pointer_service.h',
-    'tools/tests/host32.py', 'include/types.h', 'include/io.h', 'include/kbd.h',
-    'include/legacy_guest.h', 'sdk/include/os32/os32_kapi_shared.h'],
+    'sys/platform/pc98/input/mouse_bus.c', 'sys/platform/pc98/input/mouse_hal.c', 'tools/tests/mouse_bus_host.c', 'sys/platform/pc98/input/mouse.h', 'sys/platform/pc98/pc98.h', 'sys/hal/input/pointer_service.h',
+    'tools/tests/host32.py', 'sys/include/types.h', 'sys/include/io.h', 'sys/include/kbd.h',
+    'sys/include/legacy_guest.h', 'sdk/include/os32/os32_kapi_shared.h'],
     basis=['INPUT_HAL_DESIGN §3', 'INPUT_HAL_DESIGN §4', 'INPUT_HAL_DESIGN §8'], kind='contract')
 import re
 import subprocess
@@ -25,8 +25,8 @@ def run(ctx):
     sources = [(ctx.root / 'input/hal' / n).read_text() for n in names]
     with tempfile.TemporaryDirectory(prefix='input-pointer-') as td:
         tmp = Path(td)
-        (tmp / "keymap.h").write_text((ctx.root / "input/hal/keymap.h").read_text())
-        (tmp/'in2_int.h').write_text((ctx.root/'input/hal/in2_int.h').read_text())
+        (tmp / "keymap.h").write_text((ctx.root / "sys/hal/input/keymap.h").read_text())
+        (tmp/'in2_int.h').write_text((ctx.root/'sys/hal/input/in2_int.h').read_text())
         (tmp/'io.h').write_text('extern unsigned test_irq; extern void test_irq_restore(unsigned);\nstatic inline unsigned irq_save(void) { unsigned f=test_irq; test_irq=0; return f; }\nstatic inline void irq_restore(unsigned f) { test_irq_restore(f); }\nextern unsigned test_inp(unsigned); extern void test_outp(unsigned, unsigned);\n#define inp test_inp\n#define outp test_outp\n')
         files = [str(tmp/n) for n in names] + [str(ctx.root/'tools/tests/input_pointer_host.c')]
         def build(texts):
@@ -38,8 +38,8 @@ def run(ctx):
         def build_bus(texts):
             for name, source in zip(names, sources): (tmp/name).write_text(source)
             for name, source in zip(('mouse_bus.c', 'mouse_hal.c'), texts):
-                (tmp/name).write_text(source.replace('../../input/hal/in2_int.h', 'in2_int.h'))
-            (tmp/'mouse.h').write_text((ctx.root/'drivers/input/mouse.h').read_text().replace('../../include/pointer_service.h', 'pointer_service.h'))
+                (tmp/name).write_text(source.replace('../../sys/hal/input/in2_int.h', 'in2_int.h'))
+            (tmp/'mouse.h').write_text((ctx.root/'sys/platform/pc98/input/mouse.h').read_text().replace('../../sys/hal/input/pointer_service.h', 'pointer_service.h'))
             subprocess.run(['gcc', '-m32', '-fno-pie', '-nostdlib', '-nostdinc', '-static', '-no-pie', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-stack-protector', '-I'+str(tmp), '-I'+str(ctx.root/'include'), '-I'+str(ctx.root/'sdk/include/os32')] + [str(tmp/n) for n in names + ['mouse_bus.c', 'mouse_hal.c']] + [str(ctx.root/'tools/tests/mouse_bus_host.c'), '-o', str(tmp/'test')], check=True)
             return host32.run([str(tmp/'test')], runner='qemu').returncode
         assert build_bus(bus_sources) == 0
@@ -50,29 +50,29 @@ def run(ctx):
         symbols.update(('mouse_hal_init', 'mouse_hal_capture', 'bus_mouse_get'))
         prefix = ''.join('#define '+n+' ref_'+n+'\n' for n in sorted(symbols))
         def adapt_poll(source):
-            for rel in ('../../input/hal/in2_int.h', '../video/kcg/kcg.h', '../char/np2sysp.h'):
+            for rel in ('../../sys/hal/input/in2_int.h', '../video/kcg/kcg.h', '../char/np2sysp.h'):
                 source = source.replace(rel, str((ctx.root/'drivers/input'/rel).resolve()))
-            return source.replace('#include "idt.h"', 'void irq_enable(u8 irq);').replace('#include "kbd.h"', '#include "'+str(ctx.root/'drivers/input/kbd.h')+'"')
+            return source.replace('#include "idt.h"', 'void irq_enable(u8 irq);').replace('#include "kbd.h"', '#include "'+str(ctx.root/'sys/platform/pc98/input/kbd.h')+'"')
         for n, source in zip(('ref_mouse.c', 'ref_mouse_bus.c'), old):
             extra = '\nvoid ref_mouse_position(i16 *x, i16 *y) { *x = cursor_x; *y = cursor_y; }\n' if n == 'ref_mouse.c' else ''
             (tmp/n).write_text(prefix + adapt_poll(source) + extra)
         # This stage's exact base, independently namespaced for seamless comparison.
-        base_mouse = subprocess.check_output(['git', 'show', 'ef67e51c:drivers/input/mouse.c'], cwd=ctx.root, text=True)
-        base_state = subprocess.check_output(['git', 'show', 'ef67e51c:input/hal/pointer_state.c'], cwd=ctx.root, text=True)
+        base_mouse = subprocess.check_output(['git', 'show', 'ef67e51c:sys/platform/pc98/input/mouse.c'], cwd=ctx.root, text=True)
+        base_state = subprocess.check_output(['git', 'show', 'ef67e51c:sys/hal/input/pointer_state.c'], cwd=ctx.root, text=True)
         base_symbols = set(re.findall(r'^(?:void|int|u8) +(\w+)\(', base_mouse + '\n' + base_state, re.M))
         base_prefix = ''.join('#define '+n+' base_'+n+'\n' for n in sorted(base_symbols))
         base_prefix += '#define mouse_ext_mode ref_mouse_ext_mode\n'
         for n, body in [('base_mouse.c', adapt_poll(base_mouse)), ('base_state.c', base_state)]:
             (tmp/n).write_text(base_prefix + body)
-        poll_source = (ctx.root/'drivers/input/mouse.c').read_text()
-        pointer_source = (ctx.root/'input/hal/mouse_pointer.c').read_text()
+        poll_source = (ctx.root/'sys/platform/pc98/input/mouse.c').read_text()
+        pointer_source = (ctx.root/'sys/hal/input/mouse_pointer.c').read_text()
         def build_poll(source, state=sources[4], ext=sources[3], hal=bus_sources[1], pointer=pointer_source):
             for n, body in zip(names, sources): (tmp/n).write_text(body)
             (tmp/'pointer_state.c').write_text(state)
             (tmp/'mouse_ext.c').write_text(ext)
             (tmp/'mouse.c').write_text(adapt_poll(source))
             (tmp/'mouse_pointer.c').write_text(pointer)
-            (tmp/'mouse_hal.c').write_text(hal.replace('../../input/hal/in2_int.h', 'in2_int.h'))
+            (tmp/'mouse_hal.c').write_text(hal.replace('../../sys/hal/input/in2_int.h', 'in2_int.h'))
             files = names + ['mouse_bus.c', 'mouse_hal.c', 'mouse.c', 'mouse_pointer.c', 'ref_mouse.c', 'ref_mouse_bus.c', 'base_mouse.c', 'base_state.c']
             subprocess.run(['gcc', '-m32', '-fno-pie', '-nostdlib', '-nostdinc', '-static', '-no-pie', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-stack-protector', '-I'+str(tmp), '-I'+str(ctx.root/'include'), '-I'+str(ctx.root/'sdk/include/os32')] + [str(tmp/n) for n in files] + [str(ctx.root/'tools/tests/input_poll_host.c'), '-o', str(tmp/'poll')], check=True)
             return host32.run([str(tmp/'poll')], runner='qemu').returncode

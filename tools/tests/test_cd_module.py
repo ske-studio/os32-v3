@@ -5,7 +5,7 @@ checks rollback, retained mount callbacks and prefix failure, not hardware I/O.
 PIO, body init, corrupt ISO and package reads are covered by check-cd-read-host.
 """
 CHECK = dict(name='cd-module-host', tier=1,
-    covers=['platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'drivers/ata/cd_module.c', 'drivers/ata/cd_module.h', 'drivers/ata/cd_body.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'kernel/time/cpu_calibrate.h', 'tools/prototypes/cd_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/cd_module_host.c', 'build/cd-module.ld', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/cd/*', 'build/out/cd.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py', 'kernel/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
+    covers=['sys/platform/pc98/bootinfo_wire.h', 'sys/platform/pc98/bootinfo_native.h', 'sys/kern/module/module_runtime.c', 'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.c', 'sys/kern/module/module_image.h', 'sys/kern/module/module_schema.h', 'sys/kern/mm/pgalloc.h', 'sys/include/types.h', 'sys/include/memmap.h', 'sys/fs/vfs.c', 'sys/fs/vfs.h', 'sys/dev/base/dev.c', 'sys/hal/block/dev.h', 'sys/dev/block/disk.h', 'sys/dev/ata/atapi.h', 'sys/dev/block/fdc.h', 'sys/include/console.h', 'sys/include/kbd.h', 'sys/platform/pc98/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'sys/kern/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'sys/dev/ata/cd_module.c', 'sys/dev/ata/cd_module.h', 'sys/dev/ata/cd_body.c', 'sys/include/config.h', 'sdk/include/os32/os32_generations.h', 'sys/include/bootinfo.h', 'sys/hal/time/cpu_calibrate.h', 'tools/prototypes/cd_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/cd_module_host.c', 'build/cd-module.ld', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/cd/*', 'build/out/cd.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'sys/fs/vfs_device.h', 'sys/platform/pc98/boot_names.h', 'sys/platform/pc98/boot_names.c', 'sys/dev/ata/ide.h', 'tools/tests/kernel_includes.py', 'sys/kern/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
     needs=['make:all'], budget=4.9,
     kind='characterization',
 )
@@ -23,7 +23,7 @@ from test_module_runtime import FLAGS, INCLUDES, image
 from test_module_image import build_validator, validate, fnv, crc, word
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'drivers/ata/cd_module.c'
+SOURCE = ROOT / 'sys/dev/ata/cd_module.c'
 CASES = ['register-unmount-release', 'fs-full', 'device-full', 'init-failed',
          'no-drive-iso-available', 'prefix-return-failed', 'mounted-body-retained']
 
@@ -83,8 +83,8 @@ def main():
                             '-DCD_ADAPTER="' + str(source) + '"',
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/cd_module_host.c',
-                            ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
-                            ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c', '-o', exe], check=True)
+                            ROOT / 'sys/kern/module/module_runtime.c', ROOT / 'sys/kern/module/module_image.c',
+                            ROOT / 'sys/fs/vfs.c', ROOT / 'sys/dev/base/dev.c', '-o', exe], check=True)
 
         def run(modes, expected=0):
             for mode in modes:

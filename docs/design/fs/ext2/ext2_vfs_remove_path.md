@@ -1,4 +1,4 @@
-# fs/ext2/ext2_vfs_remove_path.inc — unlink/rmdir の親解決
+# sys/fs/ext2/ext2_vfs_remove_path.inc — unlink/rmdir の親解決
 
 > 状態: **現行 (2026-11-01)**
 

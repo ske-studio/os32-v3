@@ -11,7 +11,7 @@
 #include "module.h"
 #include "sqlite_engine.h"
 #include "dev.h"
-#include "../../fs/vfs.h"
+#include "../../sys/fs/vfs.h"
 #include "pc98.h"
 #include "boot_platform.h"
 #include "config.h"

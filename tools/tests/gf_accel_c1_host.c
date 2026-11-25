@@ -8,83 +8,83 @@
  * colliding private identifiers and privileged host IRQ primitives differ.
  * B4 must be linked as a real product (absent from the supplied base).
  * Tests check ownership/protocol, not GPU-rendered pixels. */
-#include "../../include/io.h"
+#include "../../sys/include/io.h"
 #define irq_save() 0U
 #define irq_restore(flags) ((void)(flags))
 #define GF3_HOST_UNIT 12
 #include "gf_accel_host.h"
-#include "../../hwdev/gf/production.h"
-#include "../../hwdev/gf/accel_service.h"
+#include "../../sys/dev/video/geforce/production.h"
+#include "../../sys/dev/video/geforce/accel_service.h"
 
-#include "../../hwdev/gf/master.c"
-#include "../../hwdev/gf/mc.c"
-#include "../../hwdev/gf/instmem.c"
-#include "../../hwdev/gf/instmem_map.c"
-#include "../../hwdev/gf/engine_stop.c"
+#include "../../sys/dev/video/geforce/master.c"
+#include "../../sys/dev/video/geforce/mc.c"
+#include "../../sys/dev/video/geforce/instmem.c"
+#include "../../sys/dev/video/geforce/instmem_map.c"
+#include "../../sys/dev/video/geforce/engine_stop.c"
 #define rd cint_irq_rd
 #define wr cint_irq_wr
 #define drain cint_irq_drain
-#include "../../hwdev/gf/irq.c"
+#include "../../sys/dev/video/geforce/irq.c"
 #undef drain
 #undef wr
 #undef rd
 #define release_instances cint_foundation_release_instances
-#include "../../hwdev/gf/foundation.c"
+#include "../../sys/dev/video/geforce/foundation.c"
 #undef release_instances
-#include "../../drivers/video/geforce/geforce_tick.c"
+#include "../../sys/platform/pc98/video/geforce/geforce_tick.c"
 
 #define rd cint_fifo_rd
 #define wr cint_fifo_wr
 #define stop cint_fifo_stop
-#include "../../hwdev/gf/fifo.c"
+#include "../../sys/dev/video/geforce/fifo.c"
 #undef stop
 #undef wr
 #undef rd
-#include "../../hwdev/gf/push.c"
-#include "../../hwdev/gf/dmaobj.c"
-#include "../../hwdev/gf/ramht.c"
-#include "../../hwdev/gf/grctx.c"
+#include "../../sys/dev/video/geforce/push.c"
+#include "../../sys/dev/video/geforce/dmaobj.c"
+#include "../../sys/dev/video/geforce/ramht.c"
+#include "../../sys/dev/video/geforce/grctx.c"
 #define rd cint_gr_rd
 #define wr cint_gr_wr
-#include "../../hwdev/gf/gr.c"
+#include "../../sys/dev/video/geforce/gr.c"
 #undef wr
 #undef rd
-#include "../../hwdev/gf/fence.c"
+#include "../../sys/dev/video/geforce/fence.c"
 #define rd cint_fault_rd
 #define wr cint_fault_wr
-#include "../../hwdev/gf/fault.c"
+#include "../../sys/dev/video/geforce/fault.c"
 #undef wr
 #undef rd
-#include "../../hwdev/gf/command_platform.c"
+#include "../../sys/dev/video/geforce/command_platform.c"
 #define release_instances cint_command_release_instances
-#include "../../hwdev/gf/command.c"
+#include "../../sys/dev/video/geforce/command.c"
 #undef release_instances
 
-#include "../../hwdev/gf/vram_view.c"
-#include "../../hwdev/gf/accel_objects.c"
-#include "../../hwdev/gf/accel_surface.c"
-#include "../../hwdev/gf/accel_rop.c"
-#include "../../hwdev/gf/accel_fill.c"
-#include "../../hwdev/gf/accel_mono.c"
-#include "../../hwdev/gf/accel_ifc.c"
-#include "../../hwdev/gf/accel_m2mf.c"
-#include "../../hwdev/gf/accel_transfer.c"
-#include "../../hwdev/gf/accel_scale.c"
-#include "../../drivers/video/geforce/gf_present_m2mf.c"
+#include "../../sys/dev/video/geforce/vram_view.c"
+#include "../../sys/dev/video/geforce/accel_objects.c"
+#include "../../sys/dev/video/geforce/accel_surface.c"
+#include "../../sys/dev/video/geforce/accel_rop.c"
+#include "../../sys/dev/video/geforce/accel_fill.c"
+#include "../../sys/dev/video/geforce/accel_mono.c"
+#include "../../sys/dev/video/geforce/accel_ifc.c"
+#include "../../sys/dev/video/geforce/accel_m2mf.c"
+#include "../../sys/dev/video/geforce/accel_transfer.c"
+#include "../../sys/dev/video/geforce/accel_scale.c"
+#include "../../sys/dev/video/geforce/gf_present_m2mf.c"
 GfxCounters gfx_counters;
-#include "../../drivers/video/geforce/gf_hook.c"
+#include "../../sys/dev/video/geforce/gf_hook.c"
 
 /* Use the real C0a getter and its borrowed metadata, not a custom getter. */
 #ifndef OS32_GEFORCE_MODULE
 #define OS32_GEFORCE_MODULE
 #endif
-#include "../../drivers/video/geforce/backend_geforce.c"
+#include "../../sys/dev/video/geforce/backend_geforce.c"
 #undef gfx_backend_geforce
 #undef gfx_current_height
 #undef gfx_flip_enabled
 #undef gfx_display_page
 #ifndef GF3_SERVICE_SOURCE
-#define GF3_SERVICE_SOURCE "../../hwdev/gf/service.c"
+#define GF3_SERVICE_SOURCE "../../sys/dev/video/geforce/service.c"
 #endif
 #include GF3_SERVICE_SOURCE
 #if !defined(GF4_REAL_DISPLAY)
@@ -95,7 +95,7 @@ i32 gf4_service_start(struct gf4_ctx *ctx,u32 dl)
 { (void)ctx;(void)dl;assert(false);return GF3_ESTATE; }
 #endif
 #ifndef GF3_QUIESCE_SOURCE
-#define GF3_QUIESCE_SOURCE "../../hwdev/gf/display/quiesce.c"
+#define GF3_QUIESCE_SOURCE "../../sys/dev/video/geforce/display/quiesce.c"
 #endif
 #include GF3_QUIESCE_SOURCE
 

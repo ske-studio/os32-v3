@@ -6,11 +6,11 @@
 #undef irq_restore
 #include "hwb_fake.h"
 #include "debug_probe.h"
-#include "kdebug/probe_wire.h"
-#include "kdebug/kdebug_window.h"
-#include "mm/paging.h"
-#include "lib/kstring.h"
-#include "drivers/char/serial.h"
+#include "sys/kern/kdebug/probe_wire.h"
+#include "sys/arch/x86/kdebug/kdebug_window.h"
+#include "sys/kern/mm/paging.h"
+#include "sys/kern/kstring.h"
+#include "sys/dev/char/serial.h"
 #include "kprintf.h"
 #define TEST_PAGE 0x12345000U
 #define TEST_INDEX 0x20U
@@ -34,7 +34,7 @@ int paging_pte_restore(u32 va,u32 raw)
 #define KPEEK_HOST
 #define KDEBUG_WINDOW_HOST
 #define recover_window_hal_init unused_real_hal_init
-#include "kdebug/kdebug_window.c"
+#include "sys/arch/x86/kdebug/kdebug_window.c"
 #undef recover_window_hal_init
 static unsigned int fake_inp(unsigned int port)
 {
@@ -102,9 +102,9 @@ i32 debug_probe_control(u32 op,void *arg,u32 size)
     for(u32 i=0;i<a->count;i++)attached_ids[i]=a->ids[i];
     return 0;
 }
-#include "kdebug/hwb_access.c"
-#include "kdebug/probe_index.c"
-#include "kdebug/probe.c"
+#include "sys/kern/kdebug/hwb_access.c"
+#include "sys/kern/kdebug/probe_index.c"
+#include "sys/dev/char/kdebug/probe.c"
 static struct probe_wire wire(u32 action)
 {return (struct probe_wire){.version=PROBE_VERSION,.size=PROBE_WIRE_BYTES,.action=action};}
 static struct probe_wire command(u32 action)

@@ -99,7 +99,7 @@ def main():
         kernel = folder / 'kernel'
         kernel.mkdir(parents=True)
         anchor = 'int sfs_persistent_start(const struct SfsPersistentConfig *cfg)\n{'
-        settings = mutant_settings(folder, 'init-meter', 'fs/serialfs/serialfs_persistent.c',
+        settings = mutant_settings(folder, 'init-meter', 'sys/fs/serialfs/serialfs_persistent.c',
                                    anchor, 'volatile unsigned sfs_probe_starts;\n' +
                                    anchor + '\n    ++sfs_probe_starts;' +
                                    ('\n    return OS32_ERR_NOSYS;' if case == 'unmounted' else ''))

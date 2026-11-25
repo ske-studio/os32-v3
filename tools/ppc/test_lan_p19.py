@@ -38,7 +38,7 @@ def instrument(source):
 
 def check(source, temp):
     exe = temp / 'test'
-    cmd = ['gcc', '-m32', '-nostdinc', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror', '-I.', '-Iinclude', '-Idrivers/net/gem', str(source), 'drivers/net/gem/gem_ring.c', 'tools/ppc/lan_p19_fake.c', '-o', str(exe)]
+    cmd = ['gcc', '-m32', '-nostdinc', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror', '-I.', '-Iinclude', '-Idrivers/net/gem', str(source), 'sys/dev/net/gem/gem_ring.c', 'tools/ppc/lan_p19_fake.c', '-o', str(exe)]
     build = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True)
     if build.returncode:
         raise RuntimeError('compile: ' + build.stderr)
@@ -48,7 +48,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'drivers/net/gem/gem_rx.c').read_text()
+    original = (ROOT / 'sys/dev/net/gem/gem_rx.c').read_text()
     with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as directory:
         temp = Path(directory)
         source = temp / 'gem_rx.c'

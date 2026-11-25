@@ -7,7 +7,7 @@
 `os32x_format` が変わる版 (例: 2026-11-08 の v4 → v5、アプリの .text を読み取り専用にした版) は、普段の手順で入らない。
 
 - 古い hsync は、配備元の `/host/sys/shell.bin` のヘッダが自分と同じ形でないと `reason=shell_header_unconfirmed … 0 files written` で断る (`userland/system/hsync.c` の `running_generation_gate`)。`--root` で同じディスクを指しても同じ。
-- 新しいカーネルは古い形式のアプリ (シェルを含む) を `rebuild required` で断る (`exec/os32x_hdr.c`)。
+- 新しいカーネルは古い形式のアプリ (シェルを含む) を `rebuild required` で断る (`sys/kern/exec/os32x_hdr.c`)。
 - 新しい hsync は新しい形式なので、古いカーネルでは動かない。
 
 KAPI の版が上がるだけの版、配置の世代 (`memory_layout`) が変わる版は、ここではなくスキル os32-realhw-update の世代の表に従う。
@@ -20,8 +20,8 @@ KAPI の版が上がるだけの版、配置の世代 (`memory_layout`) が変�
 
    | 写す物 | 理由 |
    |---|---|
-   | `/boot` の全部 (`vmkernel.lz4`・`kdebug.bin`・部品の `.mod` 全部) | 部品はカーネルの像の CRC と対で照合される (`kernel/module/module_image.c` の pair)。sqlite と fep は起動に要る |
-   | `/sys/shell.bin` | カーネルが起動で読む (`platform/pc98/kernel.c` の `exec_run(SYS_SHELL_BIN)`) |
+   | `/boot` の全部 (`vmkernel.lz4`・`kdebug.bin`・部品の `.mod` 全部) | 部品はカーネルの像の CRC と対で照合される (`sys/kern/module/module_image.c` の pair)。sqlite と fep は起動に要る |
+   | `/sys/shell.bin` | カーネルが起動で読む (`sys/platform/pc98/kernel.c` の `exec_run(SYS_SHELL_BIN)`) |
    | `/sys/lib/libos32gui.shlib` | GUI に要る (古いままだと CUI に落ちる)。シェルまでなら無くてもよい |
 
    ```

@@ -1,6 +1,6 @@
 """Built GF KMOD: loader/facade, relocated calls and existing trace oracles."""
 CHECK = dict(name='hwdev-image-host', tier=1,
-    covers=['platform/powermac/module_diag.c', 'platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'drivers/pci/pci_barsize.c', 'drivers/pci/pci_barsize.h', 'tools/tests/recover_gf_dev_stub.c', 'kernel/module/debug_probe.c', 'tools/tests/hwdev_contract_fixture.py', 'hwdev/**', 'tools/gen_hwdev_contract.py', 'tools/gen_hwdev_pair.py', 'tools/hwdev_layout.json', 'tools/gen_kdebug_imports.py', 'tools/module_schema.py', 'tools/mkmod.py', 'kernel/module/kdebug_imports.def', 'hwdev/hwdev_module.c', 'kernel/module/module_runtime.c', 'kernel/module/module_image.c', 'hwdev/hwdev_private.h', 'kdebug/gfinit*.c', 'kdebug/gfinit_decode/*.inc', 'kdebug/gfinit_op/*.inc', 'kdebug/gfinit/*.inc', 'kdebug/gfinit_plan_c/*.inc', 'kdebug/gfinit_pll/*.inc', 'kdebug/gfinit_resources/*.inc', 'kdebug/gfinit*.h', 'kdebug/recover*.h', 'kdebug/recover_gf.c', 'kdebug/kpeek.h', 'build/hwdev.ld', 'build/hwdev.mk', 'build/kdebug.mk', 'build/out/kdebug/*', 'build/out/kdebug.bin', 'build/out/*', 'sdk/link/generations.ld', 'sdk/kapi.json', 'sdk/include/os32/os32_unit_stamp.h', 'tools/tests/test_hwdev_module.py', 'tools/tests/hwdev_module_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'build/out/hwdev/*', 'build/module.ld', 'docs/design/hwdev/hwdev_imports.md', 'tools/tests/hwdev_fixture.c', 'tools/tests/test_hwdev_trace.py', 'tools/tests/hwdev_trace_image.c', 'tools/tests/test_hwdev_dispatch.py', 'tools/tests/kdebug_init_host.c', 'kdebug/kdebug_main.c', 'kdebug/tri_command_wire.h', 'kdebug/trident_command_test.h', 'hwdev/hwdev_module.h', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover_profile.c', 'tools/tests/gfinit_host.c', 'tools/gfinit_romfile_host.c', 'tools/tests/gfinit_fixture.h', 'tools/tests/test_gfinit.py', 'include/types.h', 'tools/tests/recover_gf_host.c', 'tools/tests/recover_gf_inventory.h', 'tools/tests/gfinit_exec_host.c', 'tools/tests/test_gfinit_exec.py', 'tools/tests/gfinit_pll_host.c', 'tools/tests/test_gfinit_pll.py', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'tools/tests/gfinit_bus_host.c', 'tools/tests/test_gfinit_bus.py', 'tools/tests/recover_hostshim/io.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/gfinit_plan_host.c', 'tools/tests/test_gfinit_plan.py', 'kdebug/recover_virtual.h', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'include/pci_dev_contract.h', 'kdebug/gf_stage_state.c', 'kdebug/gf_stage_state.h', 'tools/tests/gfinit_plan_c_host.c', 'kdebug/gfinit_plan_c.h', 'drivers/char/serial.h', 'hwdev/gf_load_state.c', 'hwdev/gf_load_state.h', 'hwdev/gf/quiesce_rows.h', 'include/gf_production.h', 'hwdev/gf/internal.h', 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/pll.c', 'hwdev/gf/op/*.c', 'hwdev/gf/scripts.h', 'tools/tests/gfinit_c_only_host.c', 'tools/tests/gfinit_init_host.c', 'tools/tests/gfinit_s0_host.c', 'tools/tests/gfinit_stages_host.c', 'tools/tests/test_gfinit_stages.py', 'tools/tests/kernel_includes.py', 'tools/tests/gfinit_mode_host.c', 'tools/tests/test_gfinit_mode.py', 'tools/tests/test_gfinit_plan_c.py'],
+    covers=['sys/platform/powermac/module_diag.c', 'sys/platform/pc98/module_pair.c', 'sys/include/platform_module_pair.h', 'sys/dev/pci/pci_barsize.c', 'sys/dev/pci/pci_barsize.h', 'tools/tests/recover_gf_dev_stub.c', 'sys/kern/module/debug_probe.c', 'tools/tests/hwdev_contract_fixture.py', 'hwdev/**', 'tools/gen_hwdev_contract.py', 'tools/gen_hwdev_pair.py', 'tools/hwdev_layout.json', 'tools/gen_kdebug_imports.py', 'tools/module_schema.py', 'tools/mkmod.py', 'sys/kern/module/kdebug_imports.def', 'sys/dev/hwdev/hwdev_module.c', 'sys/kern/module/module_runtime.c', 'sys/kern/module/module_image.c', 'sys/dev/hwdev/hwdev_private.h', 'kdebug/gfinit*.c', 'kdebug/gfinit_decode/*.inc', 'kdebug/gfinit_op/*.inc', 'kdebug/gfinit/*.inc', 'kdebug/gfinit_plan_c/*.inc', 'kdebug/gfinit_pll/*.inc', 'kdebug/gfinit_resources/*.inc', 'kdebug/gfinit*.h', 'kdebug/recover*.h', 'sys/dev/video/geforce/diag/recover_gf.c', 'sys/platform/pc98/kdebug/kpeek.h', 'build/hwdev.ld', 'build/hwdev.mk', 'build/kdebug.mk', 'build/out/kdebug/*', 'build/out/kdebug.bin', 'build/out/*', 'sdk/link/generations.ld', 'sdk/kapi.json', 'sdk/include/os32/os32_unit_stamp.h', 'tools/tests/test_hwdev_module.py', 'tools/tests/hwdev_module_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'build/out/hwdev/*', 'build/module.ld', 'docs/design/hwdev/hwdev_imports.md', 'tools/tests/hwdev_fixture.c', 'tools/tests/test_hwdev_trace.py', 'tools/tests/hwdev_trace_image.c', 'tools/tests/test_hwdev_dispatch.py', 'tools/tests/kdebug_init_host.c', 'sys/platform/pc98/kdebug/kdebug_main.c', 'sys/dev/video/trident/diag/tri_command_wire.h', 'sys/dev/video/trident/diag/trident_command_test.h', 'sys/dev/hwdev/hwdev_module.h', 'sys/platform/pc98/kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'sys/platform/pc98/kdebug/recover_profile.c', 'tools/tests/gfinit_host.c', 'tools/gfinit_romfile_host.c', 'tools/tests/gfinit_fixture.h', 'tools/tests/test_gfinit.py', 'sys/include/types.h', 'tools/tests/recover_gf_host.c', 'tools/tests/recover_gf_inventory.h', 'tools/tests/gfinit_exec_host.c', 'tools/tests/test_gfinit_exec.py', 'tools/tests/gfinit_pll_host.c', 'tools/tests/test_gfinit_pll.py', 'sys/arch/x86/kdebug/kdebug_window.c', 'sys/arch/x86/kdebug/kdebug_window.h', 'tools/tests/gfinit_bus_host.c', 'tools/tests/test_gfinit_bus.py', 'tools/tests/recover_hostshim/io.h', 'sys/dev/pci/pci.h', 'sys/dev/pci/pci_decode.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/gfinit_plan_host.c', 'tools/tests/test_gfinit_plan.py', 'sys/kern/kdebug/recover_virtual.h', 'sys/platform/pc98/kdebug/recover_cleanup.h', 'sys/kern/kdebug/recover_diag.h', 'sys/include/pci_dev_contract.h', 'sys/dev/video/geforce/diag/gf_stage_state.c', 'sys/dev/video/geforce/diag/gf_stage_state.h', 'tools/tests/gfinit_plan_c_host.c', 'sys/dev/video/geforce/diag/gfinit_plan_c.h', 'sys/dev/char/serial.h', 'sys/dev/video/geforce/gf_load_state.c', 'sys/dev/video/geforce/gf_load_state.h', 'sys/dev/video/geforce/quiesce_rows.h', 'sys/include/gf_production.h', 'sys/dev/video/geforce/internal.h', 'sys/dev/video/geforce/runner.c', 'sys/dev/video/geforce/save.c', 'sys/dev/video/geforce/pll.c', 'hwdev/gf/op/*.c', 'sys/dev/video/geforce/scripts.h', 'tools/tests/gfinit_c_only_host.c', 'tools/tests/gfinit_init_host.c', 'tools/tests/gfinit_s0_host.c', 'tools/tests/gfinit_stages_host.c', 'tools/tests/test_gfinit_stages.py', 'tools/tests/kernel_includes.py', 'tools/tests/gfinit_mode_host.c', 'tools/tests/test_gfinit_mode.py', 'tools/tests/test_gfinit_plan_c.py'],
     needs=['make:all'], budget=24.9,
     basis=['HWDEV_DESIGN §6', 'REALHW_RECOVER_DESIGN §5'],
 )
@@ -50,10 +50,10 @@ def contract_mutations(folder, cross):
     """Regenerate both sides in copies: mode edits GREEN, ABI edits RED."""
     gen = module.gen
     doc = 'docs/design/hwdev/hwdev_imports.md'
-    state = 'kdebug/gf_stage_state.h'
-    mode = 'hwdev/gfinit_mode.h'
-    header = 'kdebug/recover.h'
-    definition = 'hwdev/hwdev_imports.def'
+    state = 'sys/dev/video/geforce/diag/gf_stage_state.h'
+    mode = 'sys/dev/video/geforce/gfinit_mode.h'
+    header = 'sys/dev/video/geforce/diag/recover.h'
+    definition = 'sys/dev/hwdev/hwdev_imports.def'
 
     def edit(rel, old, new):
         text = (ROOT / rel).read_text()
@@ -93,8 +93,8 @@ def contract_mutations(folder, cross):
     includes = ['-I' + str(ROOT / arg[2:]) for arg in shlex.split(lines[1])]
     cc = str(cross / 'i386-elf-gcc')
     deps = module.mutpar.gcc_deps([cc, *flags, *includes,
-                                 '-x', 'c', str(ROOT / 'hwdev/generated/hwdev_contract.h')], ROOT)
-    current = json.loads((ROOT / 'hwdev/generated/hwdev_imports.json').read_text())['module_abi_gen']
+                                 '-x', 'c', str(ROOT / 'sys/dev/hwdev/generated/hwdev_contract.h')], ROOT)
+    current = json.loads((ROOT / 'sys/dev/hwdev/generated/hwdev_imports.json').read_text())['module_abi_gen']
     for label, edits, expected in cases:
         tree = module.mutpar.mutant_tree(ROOT, folder / label, edits,
                                         real=deps | {'hwdev/generated'})
@@ -121,9 +121,9 @@ def main():
     assert_hwdev_contract(ROOT)
     image = (OUT/'hwdev.mod').read_bytes()
     elf_data = (OUT/'hwdev/hwdev.elf').read_bytes()
-    meta = json.loads((ROOT/'hwdev/generated/hwdev_imports.json').read_text())
+    meta = json.loads((ROOT/'sys/dev/hwdev/generated/hwdev_imports.json').read_text())
     contract = int(re.search(r'#define HWDEV_CONTRACT_CRC (0x\w+)U',
-                   (ROOT/'hwdev/generated/hwdev_contract.h').read_text())[1], 16)
+                   (ROOT/'sys/dev/hwdev/generated/hwdev_contract.h').read_text())[1], 16)
     assert meta['module_abi_gen'] == struct.unpack_from('<I', image, 24)[0] == contract
     cross = Path(os.environ['CROSS_DIR'])/'bin'
     assert not subprocess.check_output([str(cross/'i386-elf-nm'), '-u', str(OUT/'hwdev/hwdev.elf')])
@@ -175,9 +175,9 @@ def main():
         folder = Path(td)
         # Seed a PAUSED bundle at the real private owner's layout. Only the
         # platform/trial callbacks are doubles; call/release execute KMOD code.
-        owner_source = (ROOT/'kdebug/gfinit.c').read_text()
+        owner_source = (ROOT/'sys/dev/video/geforce/diag/gfinit.c').read_text()
         owner_type = re.search(r'struct gfinit_owner \{.*?\n\};', owner_source, re.S)[0]
-        header = '#include "hwdev/gf/foundation.h"\n#include "kdebug/gfinit_bus.h"\n#include "kdebug/gfinit_plan.h"\n#include "hwdev/owner.h"\n' + owner_type + '\n'
+        header = '#include "sys/dev/video/geforce/foundation.h"\n#include "sys/dev/video/geforce/diag/gfinit_bus.h"\n#include "sys/dev/video/geforce/diag/gfinit_plan.h"\n#include "sys/dev/hwdev/owner.h"\n' + owner_type + '\n'
         for name in ('control', 'owner', 'gf_lease'):
             header += '#define IMAGE_' + name.upper() + ' ' + str(symbols[name]) + 'U\n'
         (folder/'hwdev_owner_fixture.h').write_text(header)

@@ -9,13 +9,13 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = {
-    'console_source.inc': 'kernel/console/console.c',
-    'console_dual_source.inc': 'kernel/console/console_dual.c',
-    'display_dual_source.inc': 'platform/pc98/display_dual.c',
-    'pc98_console_source.inc': 'platform/pc98/console.c',
+    'console_source.inc': 'sys/kern/console/console.c',
+    'console_dual_source.inc': 'sys/kern/console/console_dual.c',
+    'display_dual_source.inc': 'sys/platform/pc98/display_dual.c',
+    'pc98_console_source.inc': 'sys/platform/pc98/console.c',
     # 機種ごとの方針 (固定名 platform_console.h)。構成ごとに片方を選ぶ。
-    'platform_console_pc98.inc': 'platform/pc98/platform_console.h',
-    'platform_console_powermac.inc': 'platform/powermac/platform_console.h',
+    'platform_console_pc98.inc': 'sys/platform/pc98/platform_console.h',
+    'platform_console_powermac.inc': 'sys/platform/powermac/platform_console.h',
 }
 MUTANTS = [
     ('x86 default mirror enabled', 'platform_console_pc98.inc',
@@ -76,8 +76,8 @@ def build_run(tmp, sources, ppc):
         '-D__KERNEL_BUILD__', '-I' + str(tmp), '-I' + str(ROOT),
         '-I' + str(ROOT / 'tools/tests'), *include_flags(ROOT),
         str(ROOT / 'tools/tests/console_cui_route_host.c'),
-        str(ROOT / 'lib/utf8.c'), str(ROOT / 'lib/kprintf.c'), str(ROOT / 'lib/kprintf_attr.c'),
-        str(ROOT / 'platform/pc98/console_attr.c'), '-o', str(exe),
+        str(ROOT / 'lib/utf8.c'), str(ROOT / 'sys/kern/kprintf.c'), str(ROOT / 'sys/kern/kprintf_attr.c'),
+        str(ROOT / 'sys/platform/pc98/console_attr.c'), '-o', str(exe),
     ], cwd=ROOT, check=True)
     return host32.run([str(exe)], runner='qemu', capture_output=True, text=True)
 

@@ -5,7 +5,7 @@
 #include "kcg.h"
 #include "pc98.h"
 #include "paging.h"
-#include "gfx/gfx.h"
+#include "sys/hal/gfx/gfx.h"
 
 static u8 code_lo, code_hi, line_sel, mode = MFF1_KCG_CODE;
 static u32 misses, samples;

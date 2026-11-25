@@ -5,8 +5,8 @@ import tempfile
 
 CHECK = dict(name='snd2-chip-host', tier=1, needs=[], budget=3,
     covers=['tools/tests/snd2_chip_host.c', 'sound/hal/snd2*.c',
-            'sound/hal/snd2*.h', 'include/av_contract.h', 'lib/kstring.h',
-            'include/types.h', 'sdk/include/os32/*.h'],
+            'sound/hal/snd2*.h', 'sys/include/av_contract.h', 'sys/kern/kstring.h',
+            'sys/include/types.h', 'sdk/include/os32/*.h'],
     basis=['docs/decisions/sound/AV_HAL_DESIGN.md FM の確定版 §2, §5, §7'])
 
 MUTATIONS = [

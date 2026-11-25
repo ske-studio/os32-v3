@@ -13,58 +13,58 @@ from test_splash_wire import osri
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ['tools/tests/gfx2_bridge_fake.h', 'tools/tests/osri_view_host.c', 'tools/tests/splash_raster_host.c',
-           'platform/pc98/platform_osri.h', 'gfx/gfx_osri_view_internal.h', 'gfx/gfx_osri.c', 'gfx/gfx_osri_view.c', 'gfx/gfx_osri_view.h', 'gfx/gfx_internal.h',
-           'exec/appslot.h', 'exec/exec.h',
-           'kapi/kapi_osri.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pc98_osri.c',
-           'drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster_play.c',
-           'drivers/video/pc98/splash_raster_plan.c', 'drivers/video/pc98/splash_raster_run.c',
-           'drivers/video/pc98/splash_raster_run.h', 'drivers/video/pc98/splash_raster_play.h',
+           'sys/platform/pc98/platform_osri.h', 'sys/kern/gfx/osri/gfx_osri_view_internal.h', 'sys/kern/gfx/osri/gfx_osri.c', 'sys/kern/gfx/osri/gfx_osri_view.c', 'sys/kern/gfx/osri/gfx_osri_view.h', 'sys/hal/gfx/gfx_internal.h',
+           'sys/kern/exec/appslot.h', 'sys/kern/exec/exec.h',
+           'sys/kapi/kapi_osri.c', 'sys/platform/pc98/video/backend_pc98.c', 'sys/platform/pc98/video/backend_pc98_osri.c',
+           'sys/platform/pc98/video/splash_raster.c', 'sys/platform/pc98/video/splash_raster_play.c',
+           'sys/platform/pc98/video/splash_raster_plan.c', 'sys/platform/pc98/video/splash_raster_run.c',
+           'sys/platform/pc98/video/splash_raster_run.h', 'sys/platform/pc98/video/splash_raster_play.h',
            'lib/le_internal.h', 'lib/crc32_core.inc']
 # Each tuple's last member names the runtime assertion group it must kill.
 MUTATIONS = (
-    ('skip first expired present', 'drivers/video/pc98/backend_pc98_osri.c',
+    ('skip first expired present', 'sys/platform/pc98/video/backend_pc98_osri.c',
      '    struct PlV2Plan *plan = 0;',
      '    if (image->count && (unsigned long long)(tick_count - ctl->start) * PL_RUN_TICK_US >= '
      '(unsigned long long)ctl->duration_ms * 1000) return OS32_ERR_AGAIN;\n    struct PlV2Plan *plan = 0;',
      'deadlines'),
-    ('PCM running only', 'platform/pc98/platform_osri.h', 'pcm_state() != PCM_ST_CLOSED',
+    ('PCM running only', 'sys/platform/pc98/platform_osri.h', 'pcm_state() != PCM_ST_CLOSED',
      'pcm_state() == PCM_ST_RUNNING', 'entry_and_failures'),
-    ('serial gate omitted', 'gfx/gfx_osri_view_internal.h', 'serial_gate_active() ||',
+    ('serial gate omitted', 'sys/kern/gfx/osri/gfx_osri_view_internal.h', 'serial_gate_active() ||',
      '(0 && serial_gate_active()) ||', 'entry_and_failures'),
-    ('inverted time limit', 'kapi/kapi_osri.c', 'duration_ms > GFX_OSRI_SHOW_MAX_MS',
+    ('inverted time limit', 'sys/kapi/kapi_osri.c', 'duration_ms > GFX_OSRI_SHOW_MAX_MS',
      'duration_ms <= GFX_OSRI_SHOW_MAX_MS', 'entry_and_failures'),
-    ('omit copy', 'kapi/kapi_osri.c',
+    ('omit copy', 'sys/kapi/kapi_osri.c',
      '!copy_caller_bytes(&caller, path + i, copy + i, 1)',
      '(copy[i] = path[i], 0)', 'entry_and_failures'),
-    ('omit rebase', 'drivers/video/pc98/splash_raster_run.c',
+    ('omit rebase', 'sys/platform/pc98/video/splash_raster_run.c',
      'r->start = now;', '(void)now;', 'deadlines'),
-    ('stack extensions', 'drivers/video/pc98/splash_raster_run.c',
+    ('stack extensions', 'sys/platform/pc98/video/splash_raster_run.c',
      'remaining > extension_us ? remaining : extension_us',
      'remaining + extension_us', 'deadlines'),
-    ('double consume', 'drivers/video/pc98/backend_pc98_osri.c',
+    ('double consume', 'sys/platform/pc98/video/backend_pc98_osri.c',
      'int key = input_trygetkey();',
      'int key = input_trygetkey(); (void)input_trygetkey();', 'deadlines'),
-    ('ignore abort', 'drivers/video/pc98/backend_pc98_osri.c',
+    ('ignore abort', 'sys/platform/pc98/video/backend_pc98_osri.c',
      'if (gfx_osri_poll_abort(p->caller)) return 1;',
      'if (0 && gfx_osri_poll_abort(p->caller)) return 1;', 'deadlines'),
-    ('ignore Esc', 'drivers/video/pc98/backend_pc98_osri.c',
+    ('ignore Esc', 'sys/platform/pc98/video/backend_pc98_osri.c',
      'if ((key & 0xff) == OSRI_ESC_ASCII) return 1;',
      'if (0 && (key & 0xff) == OSRI_ESC_ASCII) return 1;', 'deadlines'),
-    ('GUI inject only', 'drivers/video/pc98/backend_pc98_osri.c',
+    ('GUI inject only', 'sys/platform/pc98/video/backend_pc98_osri.c',
      'int gui = con_sink_is_enabled();', 'int gui = 0;', 'gui_input'),
-    ('ignore stop pending', 'gfx/gfx_osri_view_internal.h',
+    ('ignore stop pending', 'sys/kern/gfx/osri/gfx_osri_view_internal.h',
      '|| appslot_stop_pending()', '|| (0 && appslot_stop_pending())', 'gui_input'),
-    ('omit owner', 'gfx/gfx_osri_view_internal.h',
+    ('omit owner', 'sys/kern/gfx/osri/gfx_osri_view_internal.h',
      '(con_sink_is_enabled() && (caller) != appslot_gfx_owner())',
      '(0 && con_sink_is_enabled() && (caller) != appslot_gfx_owner())', 'entry_and_failures'),
-    ('omit route', 'drivers/video/pc98/backend_pc98_osri.c',
+    ('omit route', 'sys/platform/pc98/video/backend_pc98_osri.c',
      '(image->count && pl_run_timing(state))',
      '(0 && image->count && pl_run_timing(state))', 'entry_and_failures'),
-    ('late poll', 'drivers/video/pc98/splash_raster_play.c',
+    ('late poll', 'sys/platform/pc98/video/splash_raster_play.c',
      'if (poll && poll(ctx)) return PL_FRAME_CANCEL;\n    unsigned int flags = irq_save();',
      'unsigned int flags = irq_save();\n    if (poll && poll(ctx)) { irq_restore(flags); return PL_FRAME_CANCEL; }',
      'boundaries_and_fixed'),
-    ('ignore poll cancel', 'drivers/video/pc98/splash_raster_play.c',
+    ('ignore poll cancel', 'sys/platform/pc98/video/splash_raster_play.c',
      'if (poll && poll(ctx)) return PL_FRAME_CANCEL;',
      'if (poll && poll(ctx)) { /* continue visible scan */ }', 'boundaries_and_fixed'),
 )
@@ -114,8 +114,8 @@ def execute(mutation=None):
 
 def powermac_view(mutate):
     """DESIGN.final §3: bind before VFS, private planes, user shell input."""
-    view = ROOT / 'platform/powermac/osri_view.c'
-    platform = (ROOT / 'platform/powermac/platform_osri.h').read_text()
+    view = ROOT / 'sys/platform/powermac/osri_view.c'
+    platform = (ROOT / 'sys/platform/powermac/platform_osri.h').read_text()
     variants = [('user shell', view.read_text(), platform, 0)]
     if mutate:
         anchor = 'if (generation != of_fb_osri_generation())'
@@ -143,8 +143,8 @@ def powermac_view(mutate):
                 '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-DKBOOT_LINK=1',
                 '-D__KERNEL_BUILD__', '-DKBOOT_SH=1', '-I' + str(work),
                 '-I' + str(ROOT / 'platform/powermac'), '-I' + str(ROOT), *include_flags(ROOT), '-I' + str(ROOT / 'arch/ppc'), str(tmp_view),
-                str(ROOT / 'kernel/serial_diag.c'), str(ROOT / 'platform/powermac/console_stream.c'),
-                str(ROOT / 'gfx/gfx_osri.c'), str(ROOT / 'tools/tests/powermac_osri_host.c'),
+                str(ROOT / 'sys/kern/serial_diag.c'), str(ROOT / 'sys/platform/powermac/console_stream.c'),
+                str(ROOT / 'sys/kern/gfx/osri/gfx_osri.c'), str(ROOT / 'tools/tests/powermac_osri_host.c'),
                 '-lgcc', '-o', str(exe)], check=True)
             assert host32.run([str(exe)], runner='qemu').returncode == expected, name
             print(('RED ' if expected else 'GREEN ') + 'PowerMac view ' + name, flush=True)
@@ -152,7 +152,7 @@ def powermac_view(mutate):
 def no_division():
     with tempfile.TemporaryDirectory(prefix='osri-symbols-') as td:
         cc = Path(os.environ['CROSS_DIR'])/'bin/i386-elf-gcc'
-        for rel in ['drivers/video/pc98/splash_raster_run.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pc98_osri.c']:
+        for rel in ['sys/platform/pc98/video/splash_raster_run.c', 'sys/platform/pc98/video/backend_pc98.c', 'sys/platform/pc98/video/backend_pc98_osri.c']:
             obj = Path(td)/'check.o'
             subprocess.run([str(cc), '-std=gnu11', '-O2', '-ffreestanding', '-D__KERNEL_BUILD__',
                 *include_flags(ROOT), '-I'+str(ROOT/'drivers/video/pc98'),

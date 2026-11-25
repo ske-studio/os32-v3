@@ -5,34 +5,34 @@
 > 今のコードとの違い: (1) CUI 中 (con_sink 無効) の `gfx_init` も所有者を記録する (今の 20d は
 > 「CUI 中も記録する」で、下の表の 20d と逆)。(2) `--cpl0` の判定 (`appslot_cpl0_admit`) は撤去済みで、
 > 非シェルはローダが CPL=3 だけを許す (20A〜20G は今の試験に無い)。
-実装: `exec/appslot.c` + `exec/appslot.h` (所有者の表と判定) / `exec/exec.c` (`hdr_flags` の控え・
-`--cpl0` の GUI 拒否・回収の並び) / `gfx/gfx_core.c` + `gfx/gfx.h` (KAPI の門) /
-`kdebug/kselftest.c` / `sdk/kapi.json` (v48)
+実装: `sys/kern/exec/appslot.c` + `sys/kern/exec/appslot.h` (所有者の表と判定) / `sys/kern/exec/exec.c` (`hdr_flags` の控え・
+`--cpl0` の GUI 拒否・回収の並び) / `sys/hal/gfx/gfx_core.c` + `sys/hal/gfx/gfx.h` (KAPI の門) /
+`sys/platform/pc98/kdebug/kselftest.c` / `sdk/kapi.json` (v48)
 試験: `tools/tests/multiapp_impl_host.c` のケース 20 (`python3 -B tools/tests/test_multiapp_impl.py`)
 
 ## 様式
 
 `k5b_kernel_tdd.md` / `k7_tdd.md` と同じで、**模型ではなく実物**を見る:
 
-1. `multiapp_impl_host.c` が実物の `exec/appslot.c` を `#include` する (1 行も写さない)。
+1. `multiapp_impl_host.c` が実物の `sys/kern/exec/appslot.c` を `#include` する (1 行も写さない)。
 2. ホスト ILP32 GNU89 (`gcc -m32 -march=i386 -ffreestanding -Werror -nostdlib`) で走らせ、
    **同じソース**をカーネルと同じフラグの `i386-elf-gcc -Werror` でもコンパイルする ([C1])。
 3. `make`・エミュレータ・配備は使わない。
 
-### なぜ所有者の表が `exec/appslot.c` にあるのか
+### なぜ所有者の表が `sys/kern/exec/appslot.c` にあるのか
 
 所有者そのものは GFX の持ち物に見えるが、**判定材料が 3 つとも AppSlot にある** —
 走っている ID (`res_owner_get()`)、その ID が CPL=3 か (`cpl3`)、その ID の OS32X ヘッダ flags
 (`hdr_flags`、T8 で追加)。GFX 側に置くと材料を取りに行く向きが逆になり、ホストで試験できない
-(`gfx/gfx_core.c` は VRAM とポート I/O に触るので持ち込めない)。
+(`sys/hal/gfx/gfx_core.c` は VRAM とポート I/O に触るので持ち込めない)。
 
 そこで判定を**純関数** `appslot_gfx_claim_check(gui_mode, caller, cpl3, hdr_flags)` に切り出し、
-状態を動かす `appslot_gfx_claim()` / `appslot_gfx_owner_exit()` と分けた。`gfx/gfx_core.c` に
+状態を動かす `appslot_gfx_claim()` / `appslot_gfx_owner_exit()` と分けた。`sys/hal/gfx/gfx_core.c` に
 残るのは KAPI の門 2 本 (`gfx_kapi_init` / `gfx_kapi_init_200`) と `gfx_screen_owner` だけで、
 どれも 3 行以下。`sdk/kapi.json` の `"target"` がスロット `gfx_init` / `gfx_init_200` を門へ
 向けているので、生成物は 1 行も手で触っていない ([ABI])。
 
-`exec/exec.c` はホストに持ち込めない (CR3 / setjmp / ページテーブル)。ケース 20 が実物を叩くのは
+`sys/kern/exec/exec.c` はホストに持ち込めない (CR3 / setjmp / ページテーブル)。ケース 20 が実物を叩くのは
 判定と回収の 2 つで、`exec_launch` が起動時に写す 2 語 (`ctx->cpl3` / `ctx->hdr_flags`) だけは
 ハーネスの `ma_start_gfx()` に写してある — 写した部分の正しさは言わない。
 
@@ -62,7 +62,7 @@ CUI 経路 (`gui = 0`) を明示して同じ検査を通してある。ハーネ
 「too few arguments to function」で落ちた (署名を広げた = K5b A1 の条件を広げた印)。
 
 そこから、実装を 1 か所ずつ「ありそうな間違い」に差し替えて、試験が**その間違いだけ**を
-捕まえることを見た。差し替えは全部戻してある (`exec/appslot.c` は GREEN の形)。
+捕まえることを見た。差し替えは全部戻してある (`sys/kern/exec/appslot.c` は GREEN の形)。
 
 | # | 差し替え | 落ちた検査 |
 |---|---|---|
@@ -94,18 +94,18 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 ## 巻き込み — `boot_splash_native_host.c` (2026-09-12、f19dd00 の後)
 
 `make check` の `check-boot-splash-host` が `undefined reference to 'con_sink_is_enabled'` /
-`appslot_gfx_claim` / `appslot_gfx_owner` で落ちた。このハーネスは `gfx/gfx_core.c` を
+`appslot_gfx_claim` / `appslot_gfx_owner` で落ちた。このハーネスは `sys/hal/gfx/gfx_core.c` を
 **ホストで直リンク**するので、T8 で門 (`gfx_kapi_init` / `gfx_kapi_init_200` /
 `gfx_screen_owner`) が増えた分だけ未定義参照が増える。
 
 直したのは試験側だけ (`tools/tests/boot_splash_native_host.c` にスタブ 3 本)。このハーネスが
 見るのはバックエンドの選択と 9801 のライフサイクルで、画面の所有者は対象外 — 所有者は
-ケース 20 が実物の `exec/appslot.c` で見る。なので「CUI 中 / 誰も所有していない」=
+ケース 20 が実物の `sys/kern/exec/appslot.c` で見る。なので「CUI 中 / 誰も所有していない」=
 門が素通しになる値 (`0` / `0` / `1`) を返すだけにした。**カーネル本体は 1 行も変えていない。**
 
 ## kselftest (ブート時、実機)
 
-`kdebug/kselftest.c` の `test_gfx_owner()` が `appslot_gfx_owner_selftest()` を呼び、2 項を見る:
+`sys/platform/pc98/kdebug/kselftest.c` の `test_gfx_owner()` が `appslot_gfx_owner_selftest()` を呼び、2 項を見る:
 
 - `gfx owner moves on claim, returns on exit` — CUI 中は動かず、GUI 中に宣言付きで呼べば移り、
   他人の回収では戻らず、本人の回収で WM へ戻る
@@ -134,9 +134,9 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 (拒否で `abort_req`)。出所は票 TASK_T8_fullscreen_gfx §6 の F5 / F1 後半。
 実装: `sdk/include/os32/os32_kapi_shared.h` (`OS32X_FLAG_CUI_ONLY` = 0x0010) / `sdk/mkos32x.py`
 (`--cui-only`) / `build/programs.mk` + `build/app.conf` (4 列目 `gfx`|`cui`) /
-`tools/check_manifests.py` §2b / `exec/appslot.c` + `exec/appslot.h` (`appslot_cui_only_admit`、
-拒否で `abort_req`) / `exec/exec.c` (`exec_launch` の砦) / `gfx/gfx_core.c` (門の文言) /
-`platform/pc98/legacy/v86.c` (`v86_gui_refuse`) / `kdebug/kselftest.c`
+`tools/check_manifests.py` §2b / `sys/kern/exec/appslot.c` + `sys/kern/exec/appslot.h` (`appslot_cui_only_admit`、
+拒否で `abort_req`) / `sys/kern/exec/exec.c` (`exec_launch` の砦) / `sys/hal/gfx/gfx_core.c` (門の文言) /
+`sys/platform/pc98/legacy/v86.c` (`v86_gui_refuse`) / `sys/platform/pc98/kdebug/kselftest.c`
 試験: `multiapp_impl_host.c` ケース 21 (`python3 -B tools/tests/test_multiapp_impl.py`)
 
 ## なぜ 2 つ足したのか
@@ -221,10 +221,10 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 
 契約の正典: `docs/design/exec/appslot_transition.md` (ポーリングの park と resume) と
 `docs/design/userland/gshell/src/multiapp.md` (ポーリング群)。出所は票 TASK_T8_fullscreen_gfx §7 D8 (受入 F8)。
-実装: `exec/appslot.c` + `exec/appslot.h` (状態 `APP_STATE_WAIT_POLL` = 4、印 `parked_from_poll`、
+実装: `sys/kern/exec/appslot.c` + `sys/kern/exec/appslot.h` (状態 `APP_STATE_WAIT_POLL` = 4、印 `parked_from_poll`、
 `appslot_park_poll_check/commit`、`appslot_poll_yield_reset`、カウンタ `ring3_poll_yield_count`) /
-`exec/exec.c` + `exec/exec.h` (`exec_park_poll` と `exec_resume` の poll 分岐) /
-`drivers/input/kbd.c` (`kbd_trygetchar` / `kbd_trygetkey` の GUI 分岐) / `kdebug/kselftest.c`
+`sys/kern/exec/exec.c` + `sys/kern/exec/exec.h` (`exec_park_poll` と `exec_resume` の poll 分岐) /
+`sys/platform/pc98/input/kbd.c` (`kbd_trygetchar` / `kbd_trygetkey` の GUI 分岐) / `sys/platform/pc98/kdebug/kselftest.c`
 試験: `multiapp_impl_host.c` ケース 22 (`python3 -B tools/tests/test_multiapp_impl.py`)
 **KAPI は 1 本も増やしていない** (v48 のまま。`kbd_trygetchar` / `kbd_trygetkey` の中身だけが変わる)。
 
@@ -251,8 +251,8 @@ CPU を独占したままになる (票 §7 の F1 後半)。
 走っているアプリは常に 1 本なので、弾かれた試みが「譲れたはずの誰か」の枠を食うことはない
 (弾かれる文脈はそもそも譲れない)。この順番だけを見る検査が 22M / 22N。
 
-`now_tick` を**引数で受ける**のは 2 つの理由: `exec/appslot.c` はハードウェアを知らない規約と、
-ホストで tick を差し替えられるようにするため (`drivers/input/kbd.c` が `tick_count` を読んで渡す)。
+`now_tick` を**引数で受ける**のは 2 つの理由: `sys/kern/exec/appslot.c` はハードウェアを知らない規約と、
+ホストで tick を差し替えられるようにするため (`sys/platform/pc98/input/kbd.c` が `tick_count` を読んで渡す)。
 
 ## `kbd_has_key` に譲りを入れなかった理由
 
@@ -321,13 +321,13 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 
 ```
 $ i386-elf-gcc -std=gnu89 -m32 -march=i386 -ffreestanding ... -O2 -Wall -Wextra -D__KERNEL_BUILD__ \
-    -c drivers/input/kbd.c exec/exec.c exec/appslot.c kernel/kselftest.c
+    -c sys/platform/pc98/input/kbd.c sys/kern/exec/exec.c sys/kern/exec/appslot.c kernel/kselftest.c
 (4 本とも警告 0)
 ```
 
 ## kselftest (ブート時、実機)
 
-`appslot_resume_mark_selftest()` に 2 項追加 (`kdebug/kselftest.c` の `test_resume_mark`):
+`appslot_resume_mark_selftest()` に 2 項追加 (`sys/platform/pc98/kdebug/kselftest.c` の `test_resume_mark`):
 
 - `resume needs the poll mark (WAIT_POLL)` — ビット 6。`WAIT_POLL` を `parked_from_wait` /
   `parked_from_kbd` の印では起こせず `OS32_ERR_STALE` + `bad_frame_count`、

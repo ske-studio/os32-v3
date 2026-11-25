@@ -58,7 +58,7 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 link の時計の約束 (ARCH_COMPAT_CONTRACT の「link_platform_now は論理 100Hz の jiffy」) の PowerPC の実測 (2026-11-14、QEMU mac99、TB 100MHz との比):
 - 7450 単体 (ネット無し): 99.97/s。
 - agent とつないだ状態: 7450 は 99.39〜100.26/s、7455 は 99.47〜100.23/s。
-- 満たし方: arch/ppc/kernel_dec.c の `tick_clock_config(1, tick_hz)` が、物理 1kHz の DEC を論理 100Hz の tick_count に変換する。link_platform_now は tick_count を返す。
+- 満たし方: sys/arch/ppc/kernel_dec.c の `tick_clock_config(1, tick_hz)` が、物理 1kHz の DEC を論理 100Hz の tick_count に変換する。link_platform_now は tick_count を返す。
 
 tools/ppc/test_lan_p1.py は、どの CHECK にも登録されていない。main の時点で pm_gmac_boot の offset と sizeof の静的 assert で落ちている (b77a94ad の RC の変更から)。PLN1 の試験として、既定を link に切り替える段で退役させる (退役予定・未登録)。
 
@@ -77,7 +77,7 @@ tools/ppc/test_lan_p1.py は、どの CHECK にも登録されていない。mai
 | W2 | S1 先行スモーク (取り込まない patch を ~/os32-tmp/run/ppc-lan-s1/ に) | P24a・P24c | terra が patch、PM が sandbox の外で QEMU | reset → MIF → PHY → ring → nonce 1 枚の TX と RX 1 枚を tools/ppc_lan_host.py --udp で見る |
 | W2 | M1 設計の追記 (LAN 印の一覧、P29〜P32 の受入の形) | なし | astra 起草 → Opus のサブエージェント (往復 3 回まで) | PM が確定して設計に追記 |
 | W3 | P24 lan_service.c + H24 | P24a・b・d (P24c は H24 で模型) | terra | H24 = service を製品の TU ごと (gem core・log・wire・monitor・diag) 組み、A8・A10・A11 の変異 |
-| W4 | P26 build/targets/ppc-powermac.mk → P25 platform/powermac/ppc_kernel.c (同じ作業木・同じ実装者・この順) | 6 本目 + S1 の直し | terra、UDP つきの QEMU は PM | 像の link、link map (pool の収容・禁止 symbol)、既存 9 印、PM の実測 A7・A8・A10・A11 |
+| W4 | P26 build/targets/ppc-powermac.mk → P25 sys/platform/powermac/ppc_kernel.c (同じ作業木・同じ実装者・この順) | 6 本目 + S1 の直し | terra、UDP つきの QEMU は PM | 像の link、link map (pool の収容・禁止 symbol)、既存 9 印、PM の実測 A7・A8・A10・A11 |
 | W4 | P33 PPC_KBOOT_DESIGN.md | なし | terra または PM (文書だけ、H は作らない = 確定の R3) | check-docs-tree |
 | W5 | P29 kboot_run.py + H29 | M1・P26 | terra、UDP の run は PM | 既定 sungem・LAN 無効の負経路・9 印と禁止語の維持 |
 | W6 | P30 kboot_mutations.py → P31 kboot_accept.py → P32 kboot_all.py | 直前の段 | terra (直列)、UDP の run は PM | 各 H --mutate、P32 の後に kboot_all 全体 (PM、外) |
@@ -86,7 +86,7 @@ tools/ppc/test_lan_p1.py は、どの CHECK にも登録されていない。mai
 - P24 は宣言が設計で決まっているので、P24d のレビューが 1 回通った時点で着手してよい。P24c を待たない。
 - H29 を fixture (保存済みの serial とホストの capture) で書けるなら、P29 は M1 の確定後に W4 と並べて前倒しする。
 - sandbox は AF_INET を作れない。P29 以降は「sandbox の中は fixture の H と rc=3 の別行、UDP つきの実行は PM」の往復になり、1 往復に PM の実行 5〜10 分が乗る。
-- P25 の挿入行は 5 本目が main に入った後の platform/powermac/ppc_kernel.c で照らし直す (DESIGN.final の行番号はレビュー時点)。
+- P25 の挿入行は 5 本目が main に入った後の sys/platform/powermac/ppc_kernel.c で照らし直す (DESIGN.final の行番号はレビュー時点)。
 
 ### 3.2 取り込みのまとめ
 

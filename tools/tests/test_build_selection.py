@@ -17,9 +17,9 @@ FEATURES = 'V86 X87 PC98_DEVICES GEFORCE TRIDENT CIRRUS PCM FM LAN KCG CD FEP SQ
 
 
 def check_sqlite(root):
-    c_units = {'kernel/sqlite_engine.c', 'kernel/sqlite_outer.c'}
+    c_units = {'sys/kern/sqlite_engine.c', 'sys/kern/sqlite_outer.c'}
     x86_stack = 'lib/sqlite3/sqlite_stack.asm'
-    ppc_stack = 'arch/ppc/sqlite_stack_ppc.S'
+    ppc_stack = 'sys/arch/ppc/sqlite_stack_ppc.S'
     ppc = ['ARCH=ppc', 'PLATFORM=powermac']
     for arch, options in [('x86', ['FEATURE_' + f + '=0' for f in FEATURES if f != 'SQLITE']),
                           ('ppc', [*ppc, 'IMAGE=kboot-link-sh'])]:
@@ -45,7 +45,7 @@ def check_loop(root):
         options = [] if image == 'pc98' else ['ARCH=ppc', 'PLATFORM=powermac']
         units = query(root, [*options, 'IMAGE=' + image], config_only=True)['C_KERNEL']
         enabled = image in ('pc98', 'kboot-shell', 'kboot-sh', 'kboot-link-sh')
-        for unit in ('kernel/dev/device_loop.c', 'drivers/block/loop_dev.c'):
+        for unit in ('sys/dev/loop/device_loop.c', 'sys/dev/block/loop_dev.c'):
             assert units.count(unit) == enabled, (image, unit)
 
 
@@ -55,11 +55,11 @@ def check_fep(root):
     for options in (x86, ppc):
         profiles = [query(root, [*options, 'FEATURE_SQLITE=1', f'FEATURE_FEP={enabled}'],
                           config_only=True) for enabled in (0, 1)]
-        units = {'kernel/fep_boot.c', 'kernel/ime/fep_module.c'}
+        units = {'sys/kern/fep_boot.c', 'sys/kern/ime/fep_module.c'}
         off, on = profiles
-        absent = 'exec/absent/exec_ime.c'
+        absent = 'sys/kern/exec/absent/exec_ime.c'
         if options == ppc:
-            units.add('platform/powermac/fep_imports.c')
+            units.add('sys/platform/powermac/fep_imports.c')
             assert off['C_KERNEL'].count(absent) == 1 and absent not in on['C_KERNEL']
         for unit in units:
             assert unit not in off['C_KERNEL'] and on['C_KERNEL'].count(unit) == 1
@@ -83,28 +83,28 @@ def check(root):
         root, ['-f', 'build/geforce-module.mk'])['GEFORCE_DISPLAY_STATE_SOURCES']
     for name, value in expected.items():
         assert actual[name] == value, name
-    assert actual['C_KERNEL'].count('kernel/sqlite_engine.c') == 1
+    assert actual['C_KERNEL'].count('sys/kern/sqlite_engine.c') == 1
     assert actual['ASM_KERNEL'].count('lib/sqlite3/sqlite_stack.asm') == 1
     assert not any('platform/powermac/hostfs' in name for name in actual['C_KERNEL'])
-    c = query(root, ['KSTRING_C_SRC=lib/kstring_c.c'])['C_KERNEL']
-    assert c.count('lib/kstring_c.c') == 1
-    assert c.index('lib/kstring_c.c') == c.index('lib/divdi3.c') + 1
+    c = query(root, ['KSTRING_C_SRC=sys/kern/kstring_c.c'])['C_KERNEL']
+    assert c.count('sys/kern/kstring_c.c') == 1
+    assert c.index('sys/kern/kstring_c.c') == c.index('lib/divdi3.c') + 1
     # Top-level ARCH=ppc selects the product default image (kboot-link-sh) from the same owner sets.
     ppc = query(root, ['ARCH=ppc', 'PLATFORM=powermac'], config_only=True)
     link = json.loads((ROOT / 'tools/tests/fixtures/build_profile_ppc.json').read_text())['link-sh']
     assert ppc['C_KERNEL'] == link['KB_C'] and ppc['GAS_KERNEL'] == link['KB_ASM'] and not ppc['ASM_KERNEL']
     for enabled in (0, 1):
         profile = query(root, ['ARCH=ppc', 'PLATFORM=powermac', f'FEATURE_KCG={enabled}'], config_only=True)
-        assert profile['C_KERNEL'].count('drivers/video/kcg/kcg.c') == enabled
-        assert profile['C_KERNEL'].count('kernel/dev/device_kcg.c') == enabled
-        assert 'drivers/video/kcg/kcg_module.c' not in profile['C_KERNEL']
-    assert 'exec/ring3_ls.c' in actual['C_KERNEL']
-    assert actual['C_KERNEL'].index('exec/ring3_ls.c') == expected['C_KERNEL'].index('exec/ring3_ls.c')
+        assert profile['C_KERNEL'].count('sys/dev/video/kcg/kcg.c') == enabled
+        assert profile['C_KERNEL'].count('sys/dev/kcg/device_kcg.c') == enabled
+        assert 'sys/dev/video/kcg/kcg_module.c' not in profile['C_KERNEL']
+    assert 'sys/kern/exec/ring3_ls.c' in actual['C_KERNEL']
+    assert actual['C_KERNEL'].index('sys/kern/exec/ring3_ls.c') == expected['C_KERNEL'].index('sys/kern/exec/ring3_ls.c')
     off = query(root, ['FEATURE_' + name + '=0' for name in FEATURES], config_only=True)
     assert not any(path in name for name in off['C_KERNEL'] for path in
                    ('kernel/v86/', 'platform/pc98/legacy/'))
-    assert off['C_KERNEL'].count('kernel/dev/device_kcg.c') == 1
-    assert 'drivers/video/kcg/kcg.c' not in off['C_KERNEL']
+    assert off['C_KERNEL'].count('sys/dev/kcg/device_kcg.c') == 1
+    assert 'sys/dev/video/kcg/kcg.c' not in off['C_KERNEL']
     assert not any('geforce/' in name for name in off['C_KERNEL'])
     for assignments in (['FEATURE_UNKNOWN=1'], ['ARCH=ppc','PLATFORM=powermac','FEATURE_V86=1'], ['FEATURE_KDEBUG=0'],
                         ['FEATURE_LINK=0'], ['IMAGE=kboot-link'], ['IMAGE=unknown'],
@@ -193,7 +193,7 @@ def check_kboot(root):
             if enabled:
                 disabled = subprocess.check_output([*command, *selector, 'FEATURE_SQLITE=0',
                                                     'kboot-query'], cwd=root, text=True)
-                assert 'arch/ppc/sqlite_stack_ppc.S' not in disabled
+                assert 'sys/arch/ppc/sqlite_stack_ppc.S' not in disabled
                 for key in ('KB_VFS', 'KB_SQLITE_INC', 'KB_SQLITE_AUDIT'):
                     assert key + '=\n' in disabled
             for key in ('KB_ASM', 'KB_C'):
@@ -312,42 +312,42 @@ if __name__ == '__main__':
         check_kboot(root)
         if args.mutate:
             for path, anchor, mutant, expected, label in (
-                    ('build/sources/common.mk', 'C_COMMON_EXEC = kernel/machcfg_root.c init/sysconfig.c',
-                     'C_COMMON_CORE += kernel/machcfg_root.c init/sysconfig.c\nC_COMMON_EXEC =',
+                    ('build/sources/common.mk', 'C_COMMON_EXEC = sys/kern/machcfg_root.c sys/kern/init/sysconfig.c',
+                     'C_COMMON_CORE += sys/kern/machcfg_root.c sys/kern/init/sysconfig.c\nC_COMMON_EXEC =',
                      AssertionError, 'root reader linked into FS-less PowerMac'),
-                    ('build/sources/common.mk', 'kernel/sqlite_engine.c $(C_EXT2_FORMATTER)',
-                     'kernel/sqlite_engine.c', AssertionError, 'formatter omitted from PowerPC compile'),
+                    ('build/sources/common.mk', 'sys/kern/sqlite_engine.c $(C_EXT2_FORMATTER)',
+                     'sys/kern/sqlite_engine.c', AssertionError, 'formatter omitted from PowerPC compile'),
                     ('build/sources/common.mk', 'C_COMMON_CORE = ', 'C_COMMON_CORE = $(C_EXT2_FORMATTER) ',
                      AssertionError, 'formatter linked into IDE-less PowerMac'),
-                    ('build/images/powermac.mk', 'FEATURE_LOOP = 1', 'FEATURE_LOOP = 0',
+                    ('sys/conf/images/powermac.mk', 'FEATURE_LOOP = 1', 'FEATURE_LOOP = 0',
                      AssertionError, 'loop disabled on kboot-sh'),
-                    ('build/images/ppc-flags.mk', 'override KBOOT_LINK := $(strip $(KBOOT_LINK))', '',
+                    ('sys/conf/images/ppc-flags.mk', 'override KBOOT_LINK := $(strip $(KBOOT_LINK))', '',
                      AssertionError, 'padded link flag bypasses NEGATIVE check'),
-                    ('build/images/ppc-flags.mk', '$(error KBOOT_SHELL does not support NEGATIVE)', '',
+                    ('sys/conf/images/ppc-flags.mk', '$(error KBOOT_SHELL does not support NEGATIVE)', '',
                      AssertionError, 'negative legacy shell accepted'),
                     ('build/select.mk', '$(error FEATURE_FEP requires FEATURE_SQLITE)', '',
                      AssertionError, 'missing FEP prerequisite'),
-                    ('build/features/fep.mk', 'kernel/ime/fep_module.c', '',
+                    ('sys/conf/features/fep.mk', 'sys/kern/ime/fep_module.c', '',
                      AssertionError, 'missing FEP kernel loader'),
                     ('build/select.mk', '$(error FEATURE_SQLITE requires FEATURE_EXEC)', '',
                      AssertionError, 'missing SQLite prerequisite'),
-                    ('build/features/sqlite.mk', 'ifeq ($(ARCH),ppc)', 'ifeq ($(ARCH),other)',
+                    ('sys/conf/features/sqlite.mk', 'ifeq ($(ARCH),ppc)', 'ifeq ($(ARCH),other)',
                      AssertionError, 'x86 SQLite stack on PowerPC'),
                     ('build/sources/hooks.mk', 'HOOK_gfx = $(FEATURE_EXEC)', 'HOOK_gfx = $(FEATURE_PC98_PENDING)',
                      AssertionError, 'PowerMac exec uses absent graphics hooks'),
-                    ('build/platform/powermac.mk', 'platform/powermac/rh_observe.c platform/powermac/ofw.c',
-                     'platform/powermac/ofw.c platform/powermac/rh_observe.c',
+                    ('build/platform/powermac.mk', 'sys/platform/powermac/rh_observe.c sys/platform/powermac/ofw.c',
+                     'sys/platform/powermac/ofw.c sys/platform/powermac/rh_observe.c',
                      AssertionError, 'reordered kboot sources'),
-                    ('build/platform/powermac.mk', ' platform/powermac/nic_gem.c', '',
+                    ('build/platform/powermac.mk', ' sys/platform/powermac/nic_gem.c', '',
                      AssertionError, 'dropped kboot owner entry'),
-                    ('build/sources/common.mk', 'C_COMMON_EXEC += init/shell_loop.c kernel/gui.c',
-                     'C_COMMON_EXEC += init/shell_loop.c kernel/gui.c kernel/cli/unordered.c',
+                    ('build/sources/common.mk', 'C_COMMON_EXEC += sys/kern/init/shell_loop.c sys/kern/gui.c',
+                     'C_COMMON_EXEC += sys/kern/init/shell_loop.c sys/kern/gui.c kernel/cli/unordered.c',
                      AssertionError, 'kboot source added to an owner set'),
-                    ('build/images/kboot-link.mk', 'FEATURE_LINK = 1', 'FEATURE_LINK = 0',
+                    ('sys/conf/images/kboot-link.mk', 'FEATURE_LINK = 1', 'FEATURE_LINK = 0',
                      AssertionError, 'kboot image feature value'),
-                    ('build/images/ppc-flags.mk', 'KBOOT_SH := $(if $(filter powermac kboot-sh kboot-link-sh,$(IMAGE)),1,0)',
+                    ('sys/conf/images/ppc-flags.mk', 'KBOOT_SH := $(if $(filter powermac kboot-sh kboot-link-sh,$(IMAGE)),1,0)',
                      'KBOOT_SH := 0', subprocess.CalledProcessError, 'image name no longer sets its flags'),
-                    ('build/images/ppc-flags.mk', 'ifneq ($(if $(filter powermac kboot-sh kboot-shell,$(IMAGE)),kboot-link-sh,$(IMAGE)),$(KB_IMAGE))', 'ifneq ($(IMAGE),$(IMAGE))',
+                    ('sys/conf/images/ppc-flags.mk', 'ifneq ($(if $(filter powermac kboot-sh kboot-shell,$(IMAGE)),kboot-link-sh,$(IMAGE)),$(KB_IMAGE))', 'ifneq ($(IMAGE),$(IMAGE))',
                      AssertionError, 'image name and flags may disagree')):
                 target = root / path
                 source = target.read_text()
@@ -358,7 +358,7 @@ if __name__ == '__main__':
                         check_loop(root)
                     elif 'FEP' in label:
                         check_fep(root)
-                    elif path in ('build/select.mk', 'build/features/sqlite.mk'):
+                    elif path in ('build/select.mk', 'sys/conf/features/sqlite.mk'):
                         check_sqlite(root)
                     else:
                         check_kboot(root)
@@ -382,9 +382,9 @@ if __name__ == '__main__':
             target.write_text(source)
             order = root / 'build/sources/order.mk'
             source = order.read_text()
-            anchor = 'kdebug/gf5_test.c kdebug/gf_display_test.c'
+            anchor = 'sys/dev/video/geforce/diag/gf5_test.c sys/dev/video/geforce/diag/gf_display_test.c'
             assert source.count(anchor) == 1
-            order.write_text(source.replace(anchor, 'kdebug/gf_display_test.c kdebug/gf5_test.c'))
+            order.write_text(source.replace(anchor, 'sys/dev/video/geforce/diag/gf_display_test.c sys/dev/video/geforce/diag/gf5_test.c'))
             try:
                 check(root)
             except AssertionError:

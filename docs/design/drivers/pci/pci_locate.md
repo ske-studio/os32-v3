@@ -1,11 +1,11 @@
-# drivers/pci/pci_locate.c — 1 本のバスの fn0 を ID で探す共通の口
+# sys/dev/pci/pci_locate.c — 1 本のバスの fn0 を ID で探す共通の口
 
 > 状態: **現行 (2026-11-18)** — 出所: GF_BDF_DESIGN・TASK_GF_BDF (要約して移した)
-ソース: `drivers/pci/pci_locate.c`・`drivers/pci/pci_locate.h`
+ソース: `sys/dev/pci/pci_locate.c`・`sys/dev/pci/pci_locate.h`
 
-起動時の PCI の表 (`drivers/pci/pci.c` の `g_pci`) を使わず、指定した 1 本のバスの dev 0〜31 の fn0 を生読みして、
+起動時の PCI の表 (`sys/dev/pci/pci.c` の `g_pci`) を使わず、指定した 1 本のバスの dev 0〜31 の fn0 を生読みして、
 vendor/device の dword が一致する装置を探す。CPU・機種・GeForce の名前を持たない。呼び手は今は GeForce の位置の解決
-([kdebug/recover_gf_locate.c](../../kdebug/recover_gf_locate.md)) だけ。
+([sys/dev/video/geforce/diag/recover_gf_locate.c](../../kdebug/recover_gf_locate.md)) だけ。
 
 ```c
 struct pci_locate { u8 found, dev, second_found, second; };
@@ -23,11 +23,11 @@ void pci_locate_fn0(u32 bus, u32 id, struct pci_locate *out); /* id = device<<16
 ## なぜ起動時の表を使わないか
 
 `g_pci` は `PCI_MAX_DEVS` (32) 件で、走査はブリッジで深さ優先に潜るため、溢れるとバス 0 の後ろの装置が落ちる。
-GeForce の資源の収集 (`kdebug/gfinit_resources/scan.inc`) も同じ理由で生読みにしている。
+GeForce の資源の収集 (`sys/dev/video/geforce/gfinit_resources/scan.inc`) も同じ理由で生読みにしている。
 
 ## 他の部品との境目
 
-- PCI config の backend (PC-98 は mech#1 のポート I/O、`drivers/pci/pci.c`) は機種・ホストブリッジの側、
+- PCI config の backend (PC-98 は mech#1 のポート I/O、`sys/dev/pci/pci.c`) は機種・ホストブリッジの側、
   割り込みの禁止などの CPU の原始操作は arch の側。この口は backend の上に乗るだけで、backend の分離はしない。
 - PowerPC (G4) でも backend が bus → host bridge を引ければそのまま使える。ただし G4 の GeForce は AGP の host bridge の下で
   bus 番号は bus-range から決まる (0 とは限らない、未確認)。G4 で探すときは呼び手が bus を OF の bus-range から渡すか、
@@ -37,7 +37,7 @@ GeForce の資源の収集 (`kdebug/gfinit_resources/scan.inc`) も同じ理由�
 ## 確かめ
 
 `make check-pci-locate-host` (`tools/tests/test_pci_locate.py` + `tools/tests/pci_locate_host.c`) が本物の
-`pci_locate.c` と `kdebug/recover_gf_locate.c` を偽の config 空間 (bus × dev × fn) で組んで回す。
+`pci_locate.c` と `sys/dev/video/geforce/diag/recover_gf_locate.c` を偽の config 空間 (bus × dev × fn) で組んで回す。
 
 | fixture | 期待 |
 |---|---|

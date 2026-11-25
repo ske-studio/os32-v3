@@ -1,4 +1,4 @@
-#include "drivers/net/gem/gem.h"
+#include "sys/dev/net/gem/gem.h"
 #define RESET_REG (GEM_PCI_BANK2_OFFSET + GEM_RESET)
 static u32 regs[0x10000 / 4], writes, last_rx_dma, last_tx_dma, tick;
 static u32 pending[0x10000 / 4], stuck, target[0x10000 / 4], reset_mode;

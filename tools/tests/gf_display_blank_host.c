@@ -1,4 +1,4 @@
-#include "hwdev/gf/internal.h"
+#include "sys/dev/video/geforce/internal.h"
 int gf_display_blank(struct gf_display_context *, int);
 
 struct event { u32 write, bar, offset, width, value; };

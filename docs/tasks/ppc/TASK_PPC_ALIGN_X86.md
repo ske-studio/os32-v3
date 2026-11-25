@@ -29,7 +29,7 @@
 | 順 | ID | 役目 | 重さ (調べの見込み) | 状態 |
 |---|---|---|---|---|
 | 1 | B15 | sys_switch_shell の提供の判定 (段 5d の門のマクロ) | 40–140 行、3–6 ファイル | 飛ばす (B03 と一緒に消える見込み、2026-11-20) |
-| 2 | B14 | KCG の提供者の接続 | 45–150 行、4–7 ファイル | 済み (2026-11-20、main 50691f607 — ANK・JIS の読み出しを drivers/video/kcg/kcg_read_provider.inc で x86 と PowerMac が共有、x86 の vmkernel.lz4・kcg.mod は一致、ARCH_COMPAT_CONTRACT §9 に行) |
+| 2 | B14 | KCG の提供者の接続 | 45–150 行、4–7 ファイル | 済み (2026-11-20、main 50691f607 — ANK・JIS の読み出しを sys/dev/video/kcg/kcg_read_provider.inc で x86 と PowerMac が共有、x86 の vmkernel.lz4・kcg.mod は一致、ARCH_COMPAT_CONTRACT §9 に行) |
 | 3 | B13 | exec の回収とカーネルの親の形 | 85–220 行、5–9 ファイル | 後回し (シェルの寄せ B03・B09 の設計の後、exec_nest_level を含む) |
 | 4 | B12 | SFS の scope の実行の包み | 90–240 行、4–8 ファイル | 後回し (シェルの寄せ B03・B09 の設計の後、rshell_lan.c の SHELL_REMOTE_SFS) |
 | 5 | B11 | ver/sysinfo とメモリの内訳 | 110–270 行、5–9 ファイル | 済み (2026-11-20、main fe906b179 — 共通の ver_info・ver_format・ver_backend_contract、x86 の関数差は許容の 4 つ、QEMU 3 本・NP21/W の mem_stat と互換の受入 PASS) |

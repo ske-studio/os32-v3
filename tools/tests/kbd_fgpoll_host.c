@@ -1,7 +1,7 @@
 #include "kbd_capture_fixture_host.h"
-#include "../../input/hal/legacy_ring.c"
-#include "../../input/hal/legacy_mode.c"
-#include "../../kernel/input_legacy.c"
+#include "../../sys/hal/input/legacy_ring.c"
+#include "../../sys/hal/input/legacy_mode.c"
+#include "../../sys/kern/input_legacy.c"
 /* F2/F2i: compile the real keyboard with a foreground/device boundary.
  * No drawing or real keyboard input is needed to advance the wait loops. */
 #include "types.h"

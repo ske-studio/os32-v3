@@ -48,7 +48,7 @@ def build_flags(forced=False):
 def main():
     out = ROOT / 'build/out'
     allowed = {line.split()[0] for line in
-               output('nm', '-P', '--defined-only', out/'obj/arch/x86/kernel/x87.o').splitlines()
+               output('nm', '-P', '--defined-only', out/'obj/sys/arch/x86/kernel/x87.o').splitlines()
                if line.split()[1] in ('T', 't')}
     for directory in (out, out/'testnofpu'):
         count = audit(directory/'kernel.elf', allowed)
@@ -83,7 +83,7 @@ def main():
     sys.path.insert(0, str(ROOT/'tools/tests'))
     from test_packages import fat12_files
     notices = {'/sys/sfloat.txt': ROOT/'lib/softfloat/COPYING.txt',
-               '/sys/x87emu.txt': ROOT/'arch/x86/kernel/x87_emu_vendor/LICENSE-I386C-FPU.TXT'}
+               '/sys/x87emu.txt': ROOT/'sys/arch/x86/kernel/x87_emu_vendor/LICENSE-I386C-FPU.TXT'}
     for image in ('os32_boot.img', 'os32_boot144.img'):
         files, free, total = fat12_files(str(ROOT/'images'/image))
         assert free >= 65536, (image, free)

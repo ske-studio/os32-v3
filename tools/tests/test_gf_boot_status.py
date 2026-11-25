@@ -2,10 +2,10 @@
 CHECK = dict(name='gf-boot-status-host', tier=1, needs=[], budget=3.2,
     covers=['tools/tests/recover_gf_dev_stub.c', 'tools/tests/test_gf_boot_status.py', 'tools/tests/gf_boot_status_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'kdebug/gf_foundation_test.c', 'kdebug/gf_foundation_test.h',
-            'kdebug/gfinit_bus.h', 'kdebug/gf_stage_state.h', 'kdebug/recover*.h',
-            'hwdev/gf/mc.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.h', 'hwdev/gfinit_mode.h',
-            'drivers/video/geforce/geforce_module.h', 'drivers/pci/pci.h',
+            'sys/dev/video/geforce/diag/gf_foundation_test.c', 'sys/dev/video/geforce/diag/gf_foundation_test.h',
+            'sys/dev/video/geforce/diag/gfinit_bus.h', 'sys/dev/video/geforce/diag/gf_stage_state.h', 'kdebug/recover*.h',
+            'sys/dev/video/geforce/mc.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.h', 'sys/dev/video/geforce/gfinit_mode.h',
+            'sys/dev/video/geforce/geforce_module.h', 'sys/dev/pci/pci.h',
             'lib/serial_diag.h', 'lib/crc32_core.inc', 'include/*.h', 'mm/*.h'],
     basis=['GF_FEAT1_DESIGN §2', 'GF_FEAT1_DESIGN §8'],
 )
@@ -23,9 +23,9 @@ ROOT = Path(__file__).resolve().parents[2]
 def main(mutate=False):
     with tempfile.TemporaryDirectory(prefix='gf-boot-status-') as td:
         tmp = Path(td)
-        source = ROOT/'kdebug/gf_foundation_test.c'
+        source = ROOT/'sys/dev/video/geforce/diag/gf_foundation_test.c'
         original = source.read_text()
-        mc_source = ROOT/'hwdev/gf/mc.c'
+        mc_source = ROOT/'sys/dev/video/geforce/mc.c'
         mc_original = mc_source.read_text()
         variants = [('control', original, mc_original)]
         if mutate:
@@ -43,7 +43,7 @@ def main(mutate=False):
                           lambda m: '#include "'+str((source.parent/m[1]).resolve())+'"', body)
             (tmp/'status.c').write_text(body)
             host = (ROOT/'tools/tests/gf_boot_status_host.c').read_text().replace(
-                '../../kdebug/gf_foundation_test.c', str(tmp/'status.c'))
+                '../../sys/dev/video/geforce/diag/gf_foundation_test.c', str(tmp/'status.c'))
             (tmp/'host.c').write_text(host)
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                             '-ffreestanding', '-fno-pie', '-fno-stack-protector',

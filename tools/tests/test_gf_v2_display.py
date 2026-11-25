@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Direct freestanding G2 display contract test."""
 CHECK = dict(name='gf-v2-display-host', tier=1, needs=[], budget=5,
-    covers=['drivers/video/geforce/gf_v2_display.c', 'drivers/video/geforce/gf_v2.h',
+    covers=['sys/dev/video/geforce/gf_v2_display.c', 'sys/dev/video/geforce/gf_v2.h',
             'tools/tests/gf_v2_display_host.c', 'tools/tests/test_gf_v2_display.py',
             'tools/tests/host32.py'],
     basis=['HAL_V2_DESIGN §9-2', 'HAL_V2_DESIGN §13-1'],
@@ -31,7 +31,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'drivers/video/geforce/gf_v2_display.c').read_text()
+    source = (ROOT / 'sys/dev/video/geforce/gf_v2_display.c').read_text()
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         assert observe(work, source) == 0

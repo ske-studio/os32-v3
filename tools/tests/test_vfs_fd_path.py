@@ -25,20 +25,20 @@ userland/lib/rt/pkg.c を取り込み、RAM 上の 8MB の ext2 で
   mkpkg … 実物の tools/mkpkg.py が 123/124 バイト (UTF-8)・128/129 項目で断る
   errno … 実物の sdk/crt/syscalls.c を newlib のヘッダでホストに組み、
           OS32 の負値が -1 + errno になる (tools/tests/newlib_errno_host.c)
-  ime   … 実物の kernel/ime/ime_dict.c + SQLite + os32_sqlite_vfs.c + vfs_fd.c で、
+  ime   … 実物の sys/kern/ime/ime_dict.c + SQLite + os32_sqlite_vfs.c + vfs_fd.c で、
           辞書の FD が失効したら接続ごと開き直す・1 回だけ・hot journal なら
           開かない・旧接続で SQL を流す前に失効を見る (B1)・管理 API も同じ
           (B5)・SQLite のファイルメソッドは失効で成功しない (B2)・長すぎる
           DB 名は開く時点で断る (tools/tests/ime_dict_host.c)
-  fatfold … fs/fat/fatfs_vfs.c の大文字化表が ff.c の TBL_CT437 と一致する
+  fatfold … sys/fs/fat/fatfs_vfs.c の大文字化表が ff.c の TBL_CT437 と一致する
   namerule / fatname / hostname … FatFs・Win32 が意味を変える名前 ("disk.img "、
           "d\\img.dat"、"db." …) を入口で INVAL で断る (ラリー 2 の blocker)。
-          fatname は実物の fs/fat/fatfs_vfs.c + fs/fat/fatfs/ff.c を RAM の FAT12 で回す
+          fatname は実物の sys/fs/fat/fatfs_vfs.c + sys/fs/fat/fatfs/ff.c を RAM の FAT12 で回す
           (FAT を "/" にマウントした 253/254/255 バイトと rmdir の種別 — ラリー 3)
   fatwp … 実物の diskio + FatFs + fatfs_vfs で NW の後も既存ファイルが読める。
           後続の書込みは FDC を呼ばず断り、再初期化後の作成・追記・削除は通る。
   utf8  … Win32 の名前の規則と lib/kutf16.c の変換が同じ集合を通し 1 対 1 (ラリー 3 B2)
-  hostwire … drivers/hostdrv/hostdrvfs.c の入口検査の配線 (本文の検査。ホストで組めないため)
+  hostwire … sys/dev/hostdrv/hostdrvfs.c の入口検査の配線 (本文の検査。ホストで組めないため)
 
   python3 -B tools/tests/test_vfs_fd_path.py [--target] [--mutants] [case]
 
@@ -53,7 +53,7 @@ userland/lib/rt/pkg.c を取り込み、RAM 上の 8MB の ext2 で
 """
 import sqlite_cc
 CHECK = dict(name='vfs-fd-path-host', tier=1,
-    covers=['platform/pc98/platform_install_layout.h', 'include/platform_install_boot.h', 'platform/pc98/install_disk.c', 'platform/pc98/install_geometry.h', 'platform/pc98/install_plan.c', 'platform/pc98/install_target.c', 'include/ext2_medium_contract.h', 'fs/ext2/ext2_medium_ide.c', 'tools/tests/sqlite_cc.py', 'fs/**', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'build/core.yaml', 'fs/pc98pt.c', 'fs/ext2/ext2_file.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs/ff.c', 'drivers/block/fat_diskio.c', 'fs/fat/fatfs/diskio_os32.h', 'drivers/block/fdc.h', 'drivers/block/fdc_track.c', 'drivers/block/fdc_track.h', 'drivers/char/rtc.h', 'fs/fat/fatfs_vfs.c', 'drivers/hostdrv/hostdrvfs.c', 'fs/isofs/iso9660.c', 'fs/vfs.c', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kernel/ime/ime_dict.c', 'kernel/ime/ime_conn.c', 'kernel/ime/ime_user_store.c', 'kernel/ime/ime_store.h', 'tools/tests/fep_store_host.h', 'lib/kstring.h', 'lib/kutf16.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/ime_dict_host.c', 'tools/tests/newlib_errno_host.c', 'tools/tests/vfs_fd_path_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/deploy.yaml', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'fs/ext2/ext2_dir.c', 'fs/ext2/ext2_fmt.c', 'fs/ext2/ext2_inode.c', 'fs/ext2/ext2_layout.c', 'fs/ext2/ext2_super.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'sdk/allocator/nano_adapter.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'include/clock_service.h', 'kernel/time/clock_service.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/platform_device.h', 'include/ide_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/platform/pc98/platform_install_layout.h', 'sys/include/platform_install_boot.h', 'sys/platform/pc98/install_disk.c', 'sys/platform/pc98/install_geometry.h', 'sys/platform/pc98/install_plan.c', 'sys/platform/pc98/install_target.c', 'sys/include/ext2_medium_contract.h', 'sys/platform/pc98/storage/ext2_medium_ide.c', 'tools/tests/sqlite_cc.py', 'fs/**', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'build/core.yaml', 'sys/fs/pc98pt.c', 'sys/fs/ext2/ext2_file.c', 'sys/fs/ext2/ext2_vfs.c', 'sys/fs/fat/fatfs/ff.c', 'sys/dev/block/fat_diskio.c', 'sys/fs/fat/fatfs/diskio_os32.h', 'sys/dev/block/fdc.h', 'sys/dev/block/fdc_track.c', 'sys/dev/block/fdc_track.h', 'sys/dev/char/rtc.h', 'sys/fs/fat/fatfs_vfs.c', 'sys/dev/hostdrv/hostdrvfs.c', 'sys/fs/isofs/iso9660.c', 'sys/fs/vfs.c', 'sys/fs/vfs_fd.c', 'sys/fs/vfs_fd_stdin.inc', 'sys/fs/vfs_stdin.h', 'sys/kern/exec/exec.h', 'sys/kern/ime/ime_dict.c', 'sys/kern/ime/ime_conn.c', 'sys/kern/ime/ime_user_store.c', 'sys/kern/ime/ime_store.h', 'tools/tests/fep_store_host.h', 'sys/kern/kstring.h', 'lib/kutf16.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'sdk/crt/syscalls.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/ime_dict_host.c', 'tools/tests/newlib_errno_host.c', 'tools/tests/vfs_fd_path_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/deploy.yaml', 'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c', 'sys/fs/ext2/ext2_dir.c', 'sys/fs/ext2/ext2_fmt.c', 'sys/fs/ext2/ext2_inode.c', 'sys/fs/ext2/ext2_layout.c', 'sys/fs/ext2/ext2_super.c', 'userland/system/inst_disk.c', 'userland/system/inst_hdd.c', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'sdk/allocator/nano_adapter.c', 'tools/tests/input_fixture_host.h', 'sys/hal/input/input_service.c', 'sys/hal/input/pointer_service.h', 'sys/hal/input/input_service.h', 'sys/include/kbd.h', 'sys/hal/time/clock_service.h', 'sys/hal/time/clock_service.c', 'tools/tests/serial_emergency_host.h', 'sys/kern/serial_diag.c', 'sys/include/console_output.h', 'lib/serial_diag.h', 'sys/fs/vfs_device.h', 'sys/platform/pc98/boot_names.h', 'sys/platform/pc98/boot_names.c', 'sys/dev/ata/ide.h', 'sys/include/platform_device.h', 'sys/include/ide_contract.h', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=14.6,
     kind='characterization',
 )
@@ -83,8 +83,8 @@ HOST_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
 SRC = ROOT / "tools/tests/vfs_fd_path_host.c"
 ERRNO_SRC = ROOT / "tools/tests/newlib_errno_host.c"
 SYSCALLS_SRC = ROOT / "sdk/crt/syscalls.c"
-TARGET_SRCS = ["fs/vfs.c", "fs/vfs_fd.c", "fs/ext2/ext2_vfs.c", "fs/ext2/ext2_file.c",
-               "fs/fat/fatfs_vfs.c", "drivers/hostdrv/hostdrvfs.c", "fs/isofs/iso9660.c", "lib/kutf16.c"]
+TARGET_SRCS = ["sys/fs/vfs.c", "sys/fs/vfs_fd.c", "sys/fs/ext2/ext2_vfs.c", "sys/fs/ext2/ext2_file.c",
+               "sys/fs/fat/fatfs_vfs.c", "sys/dev/hostdrv/hostdrvfs.c", "sys/fs/isofs/iso9660.c", "lib/kutf16.c"]
 TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",
@@ -99,85 +99,85 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
 # FDWP の (a) の読み失敗は「窓を捨てない」変異で再現する。
 # STA_PROTECT の変異は再マウントで読みが戻るため、FDC への再試行の数で殺す。
 MUTANTS = [
-    ("mount の失敗値", "fs/vfs.c", "if (!fs_ctx) return VFS_ERR_IO;",
+    ("mount の失敗値", "sys/fs/vfs.c", "if (!fs_ctx) return VFS_ERR_IO;",
      "if (!fs_ctx) return VFS_ERR_INVAL;"),
-    ("FDWP: 正常対照 (何も変えない)", "drivers/block/fat_diskio.c",
+    ("FDWP: 正常対照 (何も変えない)", "sys/dev/block/fat_diskio.c",
      "    fdd_status |= STA_PROTECT;", "    fdd_status |= STA_PROTECT;"),
-    ("FDWP: NW で STA_PROTECT を立てない", "drivers/block/fat_diskio.c",
+    ("FDWP: NW で STA_PROTECT を立てない", "sys/dev/block/fat_diskio.c",
      "    fdd_status |= STA_PROTECT;", "    /* NW を忘れる */"),
-    ("FDWP: 書込み失敗で汚れた窓を捨てない", "fs/fat/fatfs_vfs.c",
+    ("FDWP: 書込み失敗で汚れた窓を捨てない", "sys/fs/fat/fatfs_vfs.c",
      "    if (fr == FR_DISK_ERR || fr == FR_WRITE_PROTECTED) {",
      "    if (0) {"),
-    ("write が失効の印を見ない", "fs/vfs_fd.c",
+    ("write が失効の印を見ない", "sys/fs/vfs_fd.c",
      "    rc = fd_resource_check(f);\n    if (rc != VFS_OK) return rc;\n    if ((f->mode & KAPI_O_ACCMODE) == O_RDONLY) return VFS_ERR_INVAL; /* 読み込み専用 */",
      "    if ((f->mode & KAPI_O_ACCMODE) == O_RDONLY) return VFS_ERR_INVAL; /* 読み込み専用 */"),
-    ("read が失効の印を見ない", "fs/vfs_fd.c",
+    ("read が失効の印を見ない", "sys/fs/vfs_fd.c",
      "    rc = fd_resource_check(f);\n    if (rc != VFS_OK) return rc;\n    if ((f->mode & KAPI_O_ACCMODE) == O_WRONLY) return VFS_ERR_INVAL; /* 書き込み専用 */",
      "    if ((f->mode & KAPI_O_ACCMODE) == O_WRONLY) return VFS_ERR_INVAL; /* 書き込み専用 */"),
-    ("fstat が失効の印を見ない", "fs/vfs_fd.c",
+    ("fstat が失効の印を見ない", "sys/fs/vfs_fd.c",
      "    {\n        int rc = fd_resource_check(&open_files[fd]);\n        if (rc != VFS_OK) return rc;\n    }\n",
      ""),
-    ("seek が失効の印を見ない", "fs/vfs_fd.c",
+    ("seek が失効の印を見ない", "sys/fs/vfs_fd.c",
      "    rc = fd_resource_check(f);\n    if (rc != VFS_OK) return rc;\n\n    if (whence == SEEK_SET) {",
      "    rc = VFS_OK;\n    (void)rc;\n\n    if (whence == SEEK_SET) {"),
-    ("FD がパスで書く (inode を使わない)", "fs/vfs_fd.c",
+    ("FD がパスで書く (inode を使わない)", "sys/fs/vfs_fd.c",
      "    open_files[fd].has_ino = ops->ino ? 1 : 0;",
      "    open_files[fd].has_ino = 0;"),
-    ("unlink が印を付けない", "fs/vfs.c",
+    ("unlink が印を付けない", "sys/fs/vfs.c",
      "    if (has_ino) vfs_fd_invalidate_ino(fs_ctx, ino);\n    return rc;",
      "    return rc;"),
-    ("置き換え rename が印を付けない", "fs/vfs.c",
+    ("置き換え rename が印を付けない", "sys/fs/vfs.c",
      "    if (has_new && has_old) vfs_fd_invalidate_ino(old_ctx, new_ino);",
      ""),
-    ("rename の印を成功時だけにする", "fs/vfs.c",
+    ("rename の印を成功時だけにする", "sys/fs/vfs.c",
      "    if (has_new && has_old) vfs_fd_invalidate_ino(old_ctx, new_ino);",
      "    if (rc == VFS_OK && has_new && has_old) vfs_fd_invalidate_ino(old_ctx, new_ino);"),
-    ("rename(f,f) にも印を付ける", "fs/vfs.c",
+    ("rename(f,f) にも印を付ける", "sys/fs/vfs.c",
      "    if (has_new && has_old && old_ino == new_ino) has_new = 0;\n",
      ""),
-    ("umount が印を付けない", "fs/vfs.c",
+    ("umount が印を付けない", "sys/fs/vfs.c",
      "            vfs_fd_invalidate_mount(mounts[i].fs_ctx);\n",
      ""),
-    ("inode 取得の失敗で消してしまう", "fs/vfs.c",
+    ("inode 取得の失敗で消してしまう", "sys/fs/vfs.c",
      "    rc = vfs_target_ino(ops, fs_ctx, rel_path, &has_ino, &ino);\n    if (rc != VFS_OK) return rc;",
      "    rc = vfs_target_ino(ops, fs_ctx, rel_path, &has_ino, &ino);\n    has_ino = has_ino && rc == VFS_OK;"),
-    ("open が作ったものを消さない", "fs/vfs_fd.c",
+    ("open が作ったものを消さない", "sys/fs/vfs_fd.c",
      "            if (created && ops->unlink) (void)ops->unlink(fs_ctx, rel_path);\n",
      ""),
-    ("SQLite の rename を断らない", "fs/vfs.c",
+    ("SQLite の rename を断らない", "sys/fs/vfs.c",
      "    if (vfs_fd_rename_busy(old_ctx, old_rel, new_rel)) return VFS_ERR_BUSY;",
      ""),
-    ("ジャーナル名を見ない", "fs/vfs_fd.c",
+    ("ジャーナル名を見ない", "sys/fs/vfs_fd.c",
      "    return sfx[j] == '\\0' && rel[i + j] == '\\0';",
      "    return 0;"),
-    ("loop イメージの unlink を断らない", "fs/vfs.c",
+    ("loop イメージの unlink を断らない", "sys/fs/vfs.c",
      "    if (vfs_fd_pinned_busy(fs_ctx, has_ino, ino, rel_path)) return VFS_ERR_BUSY;",
      ""),
-    ("ext2_write_stream がディレクトリに書く", "fs/ext2/ext2_file.c",
+    ("ext2_write_stream がディレクトリに書く", "sys/fs/ext2/ext2_file.c",
      "    if ((ext2_write_work.inode.current.mode & EXT2_S_IFMT) != EXT2_S_IFREG) {\n        ext2_write_abort(ctx);\n        return EXT2_ERR_ISDIR;\n    }\n",
      ""),
-    ("ext2_read_stream がディレクトリを読む", "fs/ext2/ext2_file.c",
+    ("ext2_read_stream がディレクトリを読む", "sys/fs/ext2/ext2_file.c",
      "    if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFREG) return EXT2_ERR_ISDIR;\n\n    if (offset >= inode.size) return 0;",
      "\n    if (offset >= inode.size) return 0;"),
-    ("O_EXCL のマウント点を EXIST にしない", "fs/vfs_fd.c",
+    ("O_EXCL のマウント点を EXIST にしない", "sys/fs/vfs_fd.c",
      "        if (rel_path[0] == '/' && rel_path[1] == '\\0') return VFS_ERR_EXIST;\n",
      ""),
-    ("入力の長さを先に見ない", "fs/vfs.c",
+    ("入力の長さを先に見ない", "sys/fs/vfs.c",
      "    if (in_len >= VFS_MAX_PATH) return VFS_ERR_NAMETOOLONG;\n",
      ""),
-    ("溢れた要素を黙って捨てる", "fs/vfs.c",
+    ("溢れた要素を黙って捨てる", "sys/fs/vfs.c",
      "            if (num_parts >= VFS_MAX_PATH_DEPTH) return VFS_ERR_NAMETOOLONG;\n            parts[num_parts] = &tmp[start];\n            part_len[num_parts] = len;\n            num_parts++;",
      "            if (num_parts < VFS_MAX_PATH_DEPTH) { parts[num_parts] = &tmp[start];\n            part_len[num_parts] = len;\n            num_parts++; }"),
-    ("結果の長さを見ない (切り詰める)", "fs/vfs.c",
+    ("結果の長さを見ない (切り詰める)", "sys/fs/vfs.c",
      "    if (o + 1 > out_size) return VFS_ERR_NAMETOOLONG;\n",
      "    if (o + 1 > out_size) { output[0] = '/'; output[1] = '\\0'; return VFS_OK; }\n"),
-    ("rmdir の末尾 . を見ない", "fs/vfs.c",
+    ("rmdir の末尾 . を見ない", "sys/fs/vfs.c",
      "    /* `rmdir a/.` を正規化すると a 自体を消す。正規化の前に断る */\n    if (vfs_last_is_dot(path)) return VFS_ERR_INVAL;\n",
      ""),
-    ("rename の宛先の末尾 .. を見ない", "fs/vfs.c",
+    ("rename の宛先の末尾 .. を見ない", "sys/fs/vfs.c",
      "    if (vfs_last_is_dot(oldpath) || vfs_last_is_dot(newpath)) return VFS_ERR_INVAL;",
      "    if (vfs_last_is_dot(oldpath)) return VFS_ERR_INVAL;"),
-    ("mount prefix を切り詰めて登録する", "fs/vfs.c",
+    ("mount prefix を切り詰めて登録する", "sys/fs/vfs.c",
      "    if (i >= VFS_MAX_PATH) return VFS_ERR_NAMETOOLONG;\n\n    rc = vfs_dev_parse",
      "\n    rc = vfs_dev_parse"),
     ("pkg_parse が長いパスを切り詰める", "lib/rt/pkg.c",
@@ -195,10 +195,10 @@ MUTANTS = [
     ("pkg_extract が開けない失敗を飲む", "lib/rt/pkg.c",
      "            if (wfd < 0) { result = PKG_ERR_IO; break; }",
      "            if (wfd < 0) continue;"),
-    ("失効した SQLite FD を BUSY から外す", "fs/vfs_fd.c",
+    ("失効した SQLite FD を BUSY から外す", "sys/fs/vfs_fd.c",
      "        if (!f->in_use || !f->sqlite_db || f->fs_ctx != fs_ctx) continue;",
      "        if (!f->in_use || !f->sqlite_db || f->stale || f->fs_ctx != fs_ctx) continue;"),
-    ("名前比較が FS の規則を見ない", "fs/vfs_fd.c",
+    ("名前比較が FS の規則を見ない", "sys/fs/vfs_fd.c",
      "    return (ops && ops->name_fold) ? ops->name_fold((u8)c) : (u8)c;",
      "    return (u8)c;"),
     ("cdinst が NORMAL の失敗で止まらない", "system/cdinst.c",
@@ -216,45 +216,45 @@ MUTANTS = [
     ("cdinst が失敗しても完了を出す", "system/cdinst.c",
      "    ret = install_series(PKG_BASE_MINIMAL);\n    if (ret != PKG_OK) return ret;",
      "    ret = install_series(PKG_BASE_MINIMAL);\n    if (ret != PKG_OK) ret = PKG_OK;"),
-    ("FAT の入口が名前を見ない", "fs/fat/fatfs_vfs.c",
+    ("FAT の入口が名前を見ない", "sys/fs/fat/fatfs_vfs.c",
      "    rc = vfs_name_rule_check(path, VFS_NAME_RULE_FAT);\n",
      "    rc = VFS_OK; (void)path;\n"),
-    ("名前の規則が '\\' を通す", "fs/vfs_name_rules.inc",
+    ("名前の規則が '\\' を通す", "sys/fs/vfs_name_rules.inc",
      "        if (c == '\\\\') return VFS_ERR_INVAL;\n", ""),
-    ("名前の規則が制御文字を通す", "fs/vfs_name_rules.inc",
+    ("名前の規則が制御文字を通す", "sys/fs/vfs_name_rules.inc",
      "        if (c < 0x20) return VFS_ERR_INVAL;\n", ""),
-    ("FAT が途中の空白を通す", "fs/vfs_name_rules.inc",
+    ("FAT が途中の空白を通す", "sys/fs/vfs_name_rules.inc",
      "        if (c == ' ' && rule == VFS_NAME_RULE_FAT) return VFS_ERR_INVAL;\n", ""),
-    ("名前の規則が末尾の空白を通す", "fs/vfs_name_rules.inc",
+    ("名前の規則が末尾の空白を通す", "sys/fs/vfs_name_rules.inc",
      "                if (last == ' ') return VFS_ERR_INVAL;\n", ""),
-    ("名前の規則が末尾の '.' を通す", "fs/vfs_name_rules.inc",
+    ("名前の規則が末尾の '.' を通す", "sys/fs/vfs_name_rules.inc",
      "if (last == '.' && !dot_entry)", "if (last == '.' && !dot_entry && 0)"),
-    ("Win32 でも途中の空白を断る", "fs/vfs_name_rules.inc",
+    ("Win32 でも途中の空白を断る", "sys/fs/vfs_name_rules.inc",
      "if (c == ' ' && rule == VFS_NAME_RULE_FAT)", "if (c == ' ')"),
-    ("'.' / '..' の要素まで断る", "fs/vfs_name_rules.inc",
+    ("'.' / '..' の要素まで断る", "sys/fs/vfs_name_rules.inc",
      "if (last == '.' && !dot_entry)", "if (last == '.' && (dot_entry || 1))"),
     # ---- 実装レビュー ラリー 3 (B1 FAT の長いパス / rmdir、B2 HostDrv の名前) ----
-    ("FAT が \"0:\" 付きの長さを見ない (切り詰める)", "fs/fat/fatfs_vfs.c",
+    ("FAT が \"0:\" 付きの長さを見ない (切り詰める)", "sys/fs/fat/fatfs_vfs.c",
      "    if (max < 0 || need > (u32)max) return VFS_ERR_NAMETOOLONG;",
      "    if (max < 0 || need > (u32)max + 16u) return VFS_ERR_NAMETOOLONG;"),
-    ("FAT の rmdir が種別を見ない", "fs/fat/fatfs_vfs.c",
+    ("FAT の rmdir が種別を見ない", "sys/fs/fat/fatfs_vfs.c",
      "    if (!(fno.fattrib & AM_DIR)) return VFS_ERR_NOTDIR;\n", ""),
-    ("vfs_rmdir が pinned を見ない", "fs/vfs.c",
+    ("vfs_rmdir が pinned を見ない", "sys/fs/vfs.c",
      "    if (!ops->ino && vfs_fd_pinned_busy(fs_ctx, 0, 0, rel_path))\n        return VFS_ERR_BUSY;\n",
      ""),
-    ("Win32 の規則が ':' を通す", "fs/vfs_name_rules.inc",
+    ("Win32 の規則が ':' を通す", "sys/fs/vfs_name_rules.inc",
      "if (c == ':' || c == '*'", "if (c == '*'"),
-    ("Win32 の規則が UTF-8 を見ない", "fs/vfs_name_rules.inc",
+    ("Win32 の規則が UTF-8 を見ない", "sys/fs/vfs_name_rules.inc",
      "            if (n == 0) return VFS_ERR_INVAL;\n", "            if (n == 0) n = 1;\n"),
-    ("Win32 の規則が 2 バイトの冗長形を通す", "fs/vfs_name_rules.inc",
+    ("Win32 の規則が 2 バイトの冗長形を通す", "sys/fs/vfs_name_rules.inc",
      "    if (c >= UTF8_LEAD2_MIN && c <= UTF8_LEAD2_MAX)", "    if (c >= UTF8_LEAD2_TAG && c <= UTF8_LEAD2_MAX)"),
-    ("Win32 の規則が 3 バイトの冗長形を通す", "fs/vfs_name_rules.inc",
+    ("Win32 の規則が 3 バイトの冗長形を通す", "sys/fs/vfs_name_rules.inc",
      "        if (c == UTF8_LEAD3_MIN && p[1] < UTF8_SECOND3_MIN) return 0;", ""),
-    ("Win32 の規則がサロゲートを通す", "fs/vfs_name_rules.inc",
+    ("Win32 の規則がサロゲートを通す", "sys/fs/vfs_name_rules.inc",
      "        if (c == UTF8_LEAD3_SURROGATE && p[1] >= UTF8_SECOND3_MIN) return 0;", ""),
-    ("Win32 の規則が途中で切れた列を通す", "fs/vfs_name_rules.inc",
+    ("Win32 の規則が途中で切れた列を通す", "sys/fs/vfs_name_rules.inc",
      "        return UTF8_IS_CONT(p[1]) ? UTF8_LEN2 : 0;", "        return p[1] ? 2 : 1;"),
-    ("FAT にも UTF-8 の規則をかける", "fs/vfs_name_rules.inc",
+    ("FAT にも UTF-8 の規則をかける", "sys/fs/vfs_name_rules.inc",
      "        if (rule == VFS_NAME_RULE_WIN32) {", "        if (1) {"),
     ("変換が途中で切れた列で打ち切る", "lib/kutf16.c",
      "            if (!UTF8_IS_CONT(s[1])) return -1;\n            cp = ((u32)(c & UTF8_LEAD2_PAYLOAD_MASK) << UTF8_CONT_PAYLOAD_BITS)",
@@ -279,24 +279,24 @@ FILEDIR_MUTANTS = [
     ("EXT2DIR-1: " + fn, fname,
      "    if ((" + var + ".mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return EXT2_ERR_NOTDIR; /* " + fn + " */",
      "    /* removed directory guard */")
-    for fn, var, fname in (("ext2_find_entry_loc", "inode", "fs/ext2/ext2_dir.c"),
-                           ("ext2_add_entry", "dir_inode", "fs/ext2/ext2_dir.c"),
-                           ("ext2_delete_entry", "dir_inode", "fs/ext2/ext2_dir.c"),
-                           ("ext2_is_dir_empty", "inode", "fs/ext2/ext2_dir_directory.inc"),
-                           ("ext2_parent_of", "inode", "fs/ext2/ext2_dir_rename.inc"),
-                           ("ext2_set_dotdot", "inode", "fs/ext2/ext2_dir_rename.inc"),
-                           ("lookup", "inode", "fs/ext2/ext2_dir.c"))
+    for fn, var, fname in (("ext2_find_entry_loc", "inode", "sys/fs/ext2/ext2_dir.c"),
+                           ("ext2_add_entry", "dir_inode", "sys/fs/ext2/ext2_dir.c"),
+                           ("ext2_delete_entry", "dir_inode", "sys/fs/ext2/ext2_dir.c"),
+                           ("ext2_is_dir_empty", "inode", "sys/fs/ext2/ext2_dir_directory.inc"),
+                           ("ext2_parent_of", "inode", "sys/fs/ext2/ext2_dir_rename.inc"),
+                           ("ext2_set_dotdot", "inode", "sys/fs/ext2/ext2_dir_rename.inc"),
+                           ("lookup", "inode", "sys/fs/ext2/ext2_dir.c"))
 ] + [
-    ("EXT2DIR-1: list", "fs/ext2/ext2_dir.c",
+    ("EXT2DIR-1: list", "sys/fs/ext2/ext2_dir.c",
      "    if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFDIR) return EXT2_ERR_NOTDIR;\n",
      "    /* removed directory guard */\n"),
-    ("EXT2DIR-1: propagate dot prefix stat errors", "fs/vfs.c",
+    ("EXT2DIR-1: propagate dot prefix stat errors", "sys/fs/vfs.c",
      "    if (rc != VFS_OK) return VFS_OK;",
      "    if (rc == VFS_ERR_NOTFOUND) return VFS_OK;\n    if (rc != VFS_OK) return rc;"),
-    ("EXT2DIR-1: VFS dot prefix", "fs/vfs.c",
+    ("EXT2DIR-1: VFS dot prefix", "sys/fs/vfs.c",
      "int rc = vfs_check_dot_prefix(parts, part_len, num_parts);",
      "int rc = VFS_OK; (void)vfs_check_dot_prefix;"),
-    ("EXT2DIR-1: FatFs follow_path", "fs/fat/fatfs/ff.c",
+    ("EXT2DIR-1: FatFs follow_path", "sys/fs/fat/fatfs/ff.c",
      "if (!(dp->obj.attr & AM_DIR)) {\t/* It is not a sub-directory and cannot follow */",
      "if (0) { /* removed directory guard */"),
 ]
@@ -318,7 +318,7 @@ ERRNO_MUTANTS = [
 ]
 
 
-# kernel/ime/ime_dict.c の変異 (ime の段で落ちること)
+# sys/kern/ime/ime_dict.c の変異 (ime の段で落ちること)
 IME_MUTANTS = [
     ("io_once: evaluation error quarantines finalized statement",
      '            if (next != SQLITE_OK)\n                kprintf',
@@ -379,30 +379,30 @@ IME_MUTANTS = [
 
 # Focused stdin regressions: every marker is unique and must fail at runtime.
 STDIN_MUTANTS = [
-    ("STDIN: restart at zero", "fs/vfs_fd_stdin.inc",
+    ("STDIN: restart at zero", "sys/fs/vfs_fd_stdin.inc",
      "    if (state->active) {", "    if (state->active) { state->done = 0;"),
-    ("STDIN: discard progress on park", "fs/vfs_fd_stdin.inc",
+    ("STDIN: discard progress on park", "sys/fs/vfs_fd_stdin.inc",
      "        int c = input_getchar_kapi();", "        state->active = 0;\n        int c = input_getchar_kapi();"),
-    ("STDIN: lose CR normalization", "fs/vfs_fd_stdin.inc",
+    ("STDIN: lose CR normalization", "sys/fs/vfs_fd_stdin.inc",
      "        if (c == '\\r') c = '\\n';", "        /* no normalization */"),
-    ("STDIN: ignore newline", "fs/vfs_fd_stdin.inc",
+    ("STDIN: ignore newline", "sys/fs/vfs_fd_stdin.inc",
      "        if (c == '\\n') break;", "        /* keep reading */"),
-    ("STDIN: leave active on success", "fs/vfs_fd_stdin.inc",
+    ("STDIN: leave active on success", "sys/fs/vfs_fd_stdin.inc",
      "    result = (int)state->done;\n    state->active = 0;", "    result = (int)state->done;"),
-    ("STDIN: lose partial error count", "fs/vfs_fd_stdin.inc",
+    ("STDIN: lose partial error count", "sys/fs/vfs_fd_stdin.inc",
      "            result = state->done ? (int)state->done : c;", "            result = c;"),
-    ("STDIN: accept different buffer", "fs/vfs_fd_stdin.inc",
+    ("STDIN: accept different buffer", "sys/fs/vfs_fd_stdin.inc",
      "state->buf != buf || ", ""),
-    ("STDIN: accept different size", "fs/vfs_fd_stdin.inc",
+    ("STDIN: accept different size", "sys/fs/vfs_fd_stdin.inc",
      "state->size != size || ", ""),
-    ("STDIN: accept finished progress", "fs/vfs_fd_stdin.inc",
+    ("STDIN: accept finished progress", "sys/fs/vfs_fd_stdin.inc",
      "state->done >= size", "0"),
-    ("STDIN: retain mismatched state", "fs/vfs_fd_stdin.inc",
+    ("STDIN: retain mismatched state", "sys/fs/vfs_fd_stdin.inc",
      "            state->active = 0;\n            return VFS_ERR_INVAL;", "            return VFS_ERR_INVAL;"),
 ]
 MUTANTS += STDIN_MUTANTS
 
-# lib/sqlite3/os32_sqlite_vfs.c と fs/vfs_fd.c の変異 (ime の段で落ちること)
+# lib/sqlite3/os32_sqlite_vfs.c と sys/fs/vfs_fd.c の変異 (ime の段で落ちること)
 SQLITE_MUTANTS = [
     ("SQLite の入出力が失効を見ない", "lib/sqlite3/os32_sqlite_vfs.c",
      "    return p->fd >= 0 && !vfs_fd_is_stale(p->fd);", "    return p->fd >= 0;"),
@@ -420,13 +420,13 @@ SQLITE_MUTANTS = [
     ("xCheckReservedLock が失効を見ない", "lib/sqlite3/os32_sqlite_vfs.c",
      "    if (!file_live(f)) return SQLITE_IOERR_CHECKRESERVEDLOCK;",
      "    if (!file_valid(f)) return SQLITE_IOERR_CHECKRESERVEDLOCK;"),
-    ("close も失効で断る (FD を解放できない)", "fs/vfs_fd.c",
+    ("close も失効で断る (FD を解放できない)", "sys/fs/vfs_fd.c",
      "    if (vfs_validate_sqlite(lease) != VFS_OK) return VFS_ERR_INVAL;\n    f = &open_files[lease->fd];",
      "    if (vfs_validate_sqlite(lease) != VFS_OK) return VFS_ERR_INVAL;\n    f = &open_files[lease->fd];\n    if (f->stale) return VFS_ERR_STALE;"),
     ("journal 名の長さを見ない", "lib/sqlite3/os32_sqlite_vfs.c",
      "    if ((flags & SQLITE_OPEN_MAIN_DB) && !journal_name_fits(zName))",
      "    if ((flags & 0) && !journal_name_fits(zName))"),
-    ("失効した SQLite FD を BUSY から外す (ime)", "fs/vfs_fd.c",
+    ("失効した SQLite FD を BUSY から外す (ime)", "sys/fs/vfs_fd.c",
      "        if (!f->in_use || !f->sqlite_db || f->fs_ctx != fs_ctx) continue;",
      "        if (!f->in_use || !f->sqlite_db || f->stale || f->fs_ctx != fs_ctx) continue;"),
 ]
@@ -434,8 +434,8 @@ IME_SRC = ROOT / "tools/tests/ime_dict_host.c"
 
 
 def build_ime(tmp, ime_c=None, exe_name="ime", overrides=None):
-    """sqlite.o は 1 回だけ作る。ime_c を渡すとその kernel/ime/ime_dict.c を使う。
-    overrides = {"lib/sqlite3/os32_sqlite_vfs.c" / "fs/vfs_fd.c": 写しのパス}"""
+    """sqlite.o は 1 回だけ作る。ime_c を渡すとその sys/kern/ime/ime_dict.c を使う。
+    overrides = {"lib/sqlite3/os32_sqlite_vfs.c" / "sys/fs/vfs_fd.c": 写しのパス}"""
     shim = tmp / "ime_shim"
     shim.mkdir(exist_ok=True)
     memmap = "extern unsigned char test_shm[];\n#define MEM_SHM_BASE test_shm\n#define MEM_SHM_DB_OFFSET 0UL\n#define MEM_SHM_DB_BASE (MEM_SHM_BASE + MEM_SHM_DB_OFFSET)\n"
@@ -454,17 +454,17 @@ def build_ime(tmp, ime_c=None, exe_name="ime", overrides=None):
         src = tmp / f"{exe_name}_host.c"
         text = IME_SRC.read_text(encoding="utf-8")
         if ime_c is not None:
-            text = text.replace('#include "../../kernel/ime/ime_dict.c"',
+            text = text.replace('#include "../../sys/kern/ime/ime_dict.c"',
                                 f'#include "{ime_c}"')
         else:
-            text = text.replace('#include "../../kernel/ime/ime_dict.c"',
+            text = text.replace('#include "../../sys/kern/ime/ime_dict.c"',
                                 f'#include "{ROOT}/kernel/ime/ime_dict.c"')
         fdhost = f"{ROOT}/tools/tests/vfs_fd_sqlite_host.c"
-        if "fs/vfs_fd.c" in overrides:
+        if "sys/fs/vfs_fd.c" in overrides:
             fdhost = tmp / f"{exe_name}_fdhost.c"
             fdhost.write_text((ROOT / "tools/tests/vfs_fd_sqlite_host.c").read_text(
-                encoding="utf-8").replace('#include "../../fs/vfs_fd.c"',
-                                          f'#include "{overrides["fs/vfs_fd.c"]}"').replace(
+                encoding="utf-8").replace('#include "../../sys/fs/vfs_fd.c"',
+                                          f'#include "{overrides["sys/fs/vfs_fd.c"]}"').replace(
                 '#include "input_fixture_host.h"',
                 f'#include "{ROOT}/tools/tests/input_fixture_host.h"'),
                 encoding="utf-8")
@@ -540,7 +540,7 @@ def ime_mutants(tmp):
     """並列に回し (mutpar)、結果は番号順に出す。sqlite.o と shim は run_ime が先に作る。"""
     surv = []
     build_ime(tmp)
-    src = (ROOT / "kernel/ime/ime_dict.c").read_text(encoding="utf-8")
+    src = (ROOT / "sys/kern/ime/ime_dict.c").read_text(encoding="utf-8")
     items = [(tmp, src, i, m) for i, m in enumerate(IME_MUTANTS)]
     for s, line in mutpar.run_ordered(_ime_mutant_one, items):
         print(line, flush=True)
@@ -577,12 +577,12 @@ def sqlite_mutants(tmp):
 
 
 def check_fatfold():
-    """fs/fat/fatfs_vfs.c の fat_upper_ext が ff.c の TBL_CT437 と一致するか
+    """sys/fs/fat/fatfs_vfs.c の fat_upper_ext が ff.c の TBL_CT437 と一致するか
     (FatFs が名前を畳む規則と VFS の BUSY / pinned の比較を揃える、B4)"""
     import re
-    ff = (ROOT / "fs/fat/fatfs/ff.c").read_text(encoding="utf-8", errors="replace")
-    fv = (ROOT / "fs/fat/fatfs_vfs.c").read_text(encoding="utf-8")
-    conf = (ROOT / "fs/fat/fatfs/ffconf.h").read_text(encoding="utf-8", errors="replace")
+    ff = (ROOT / "sys/fs/fat/fatfs/ff.c").read_text(encoding="utf-8", errors="replace")
+    fv = (ROOT / "sys/fs/fat/fatfs_vfs.c").read_text(encoding="utf-8")
+    conf = (ROOT / "sys/fs/fat/fatfs/ffconf.h").read_text(encoding="utf-8", errors="replace")
     cp = re.search(r"#define\s+FF_CODE_PAGE\s+(\d+)", conf).group(1)
     m = re.search(r"#define\s+TBL_CT%s\s*\{(.*?)\}" % cp, ff, re.S)
     want = [int(v.strip(), 16) for v in m.group(1).replace("\\", "").split(",")]
@@ -594,7 +594,7 @@ def check_fatfold():
 
 
 def check_hostwire(text=None):
-    """drivers/hostdrv/hostdrvfs.c の名前の入口検査の配線 (実物はハイパーコールを叩くので
+    """sys/dev/hostdrv/hostdrvfs.c の名前の入口検査の配線 (実物はハイパーコールを叩くので
     ホストで組めない。規則そのものは段 namerule / hostname が回す)。
       - 名前をホストへ渡す口は setup_create → session_set_path だけで、
         setup_create を呼ぶのは hostdrv_create だけ
@@ -603,7 +603,7 @@ def check_hostwire(text=None):
       - パスを受け取る VfsOps の口は全部 hostdrv_create(path, …) を通る
         (rmdir/unlink は属性付きの hdrv_delete 経由)"""
     import re
-    src = text if text is not None else (ROOT / "drivers/hostdrv/hostdrvfs.c").read_text(encoding="utf-8")
+    src = text if text is not None else (ROOT / "sys/dev/hostdrv/hostdrvfs.c").read_text(encoding="utf-8")
     bad = []
 
     def body(name):
@@ -652,7 +652,7 @@ def check_hostwire(text=None):
         bad.append("hdrv_rename が hostdrv_create(old_path, …) を通らない")
     for m in bad:
         print("  FAIL hostwire: " + m)
-    print(f"case hostwire (drivers/hostdrv/hostdrvfs.c の入口検査の配線, {len(ops)} 口): "
+    print(f"case hostwire (sys/dev/hostdrv/hostdrvfs.c の入口検査の配線, {len(ops)} 口): "
           f"{'PASS' if not bad else 'FAIL'}")
     return not bad
 
@@ -800,15 +800,15 @@ def build(tmp, fsdir, libdir, exe_name="fdpath", extra=(), ffo=None):
     """ffo を渡すとその ff.o を使い、FatFs を組み直さない (変異が FatFs に触らないとき)。"""
     inc = ["-I" + str(ROOT / "tools/tests/mtar_freestanding"), "-I" + str(fsdir),
            "-I" + str(libdir)]
-    # FatFs の装置層 (drivers/block/fat_diskio.c)。変異の写しは fsdir の隣の drivers/block に置く。
+    # FatFs の装置層 (sys/dev/block/fat_diskio.c)。変異の写しは fsdir の隣の drivers/block に置く。
     inc += ["-I" + str(fsdir.parent / "drivers/block")]
     inc += ["-I" + str(fsdir / d) for d in ("ext2", "fat", "hostdrv", "isofs", "serialfs")]
     inc += (['-I' + str(ROOT / p) for p in ('userland/lib',)] + include_flags(ROOT))
     inc += ["-I" + str(ROOT / "platform/pc98"), "-I" + str(ROOT)]   # cdinst の共有部 (userland/shell/hdprep_plan.c 等)
     inc += ["-I" + str(ROOT / "drivers/block")]   # 変異の写しの fat_diskio.c が読む fdc.h など
     exe = tmp / exe_name
-    # 段 fatname は実物の FatFs (fs/fat/fatfs/ff.c) と組む。ff.c は別の翻訳単位で、
-    # <string.h> を fs/fat/fatfs/string.h (= kstring.h) に向ける (カーネルと同じ)。
+    # 段 fatname は実物の FatFs (sys/fs/fat/fatfs/ff.c) と組む。ff.c は別の翻訳単位で、
+    # <string.h> を sys/fs/fat/fatfs/string.h (= kstring.h) に向ける (カーネルと同じ)。
     # FatFs 本体は第三者のソースなので警告では落とさない (-w)。
     if ffo is None:
         ffo = tmp / f"{exe_name}_ff.o"
@@ -927,13 +927,13 @@ def target_compile(tmp):
 # "harness" だけのファイルは FatFs (ff.o) を組み直さず、実物で 1 回組んだ ff.o を使う。
 # 表に無いファイルは両方組む。表が gcc -MM の依存より狭ければ mutants() が落ちる。
 REBUILD = {
-    "fs/vfs.c": ("harness",),
-    "fs/vfs_fd.c": ("harness",),
-    "fs/vfs_fd_stdin.inc": ("harness",),
-    "fs/vfs_name_rules.inc": ("harness",),
-    "fs/ext2/ext2_file.c": ("harness",),
-    "fs/fat/fatfs_vfs.c": ("harness",),
-    "drivers/block/fat_diskio.c": ("harness",),
+    "sys/fs/vfs.c": ("harness",),
+    "sys/fs/vfs_fd.c": ("harness",),
+    "sys/fs/vfs_fd_stdin.inc": ("harness",),
+    "sys/fs/vfs_name_rules.inc": ("harness",),
+    "sys/fs/ext2/ext2_file.c": ("harness",),
+    "sys/fs/fat/fatfs_vfs.c": ("harness",),
+    "sys/dev/block/fat_diskio.c": ("harness",),
     "lib/kutf16.c": ("harness",),
     "lib/rt/pkg.c": ("harness",),
     "system/cdinst.c": ("harness",),
@@ -947,7 +947,7 @@ def _mutant_one(item):
     mdir = tmp / f"mut{i}"
     shutil.copytree(ROOT / "fs", mdir / "fs")
     (mdir / "drivers/block").mkdir(parents=True)
-    shutil.copy(ROOT / "drivers/block/fat_diskio.c", mdir / "drivers/block/fat_diskio.c")
+    shutil.copy(ROOT / "sys/dev/block/fat_diskio.c", mdir / "sys/dev/block/fat_diskio.c")
     shutil.copytree(ROOT / "userland/lib/rt", mdir / "lib/rt")
     (mdir / "system").mkdir()
     shutil.copy(ROOT / "userland/system/cdinst.c", mdir / "system/cdinst.c")

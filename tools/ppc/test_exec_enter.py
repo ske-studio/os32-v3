@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CROSS = Path((os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin'))
-SOURCE = ROOT / 'arch/ppc/exec_enter.S'
+SOURCE = ROOT / 'sys/arch/ppc/exec_enter.S'
 
 
 def inspect(source):

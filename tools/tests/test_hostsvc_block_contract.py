@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """D1 block wire contract, NET_HOSTSVC_DESIGN §4; libc-free ILP32 runtime."""
 CHECK = dict(name='hostsvc-block-contract', tier=1, needs=[], budget=3.1, covers=[
-    'fs/serialfs/sfs_proto.h', 'fs/serialfs/sfs_proto.c', 'lib/crc32.c',
-    'lib/crc32.h', 'lib/le_internal.h', 'include/types.h',
-    'include/time_units.h', 'include/memmap.h', 'tools/tests/host32.py',
+    'sys/fs/serialfs/sfs_proto.h', 'sys/fs/serialfs/sfs_proto.c', 'lib/crc32.c',
+    'lib/crc32.h', 'lib/le_internal.h', 'sys/include/types.h',
+    'sys/include/time_units.h', 'sys/include/memmap.h', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
     basis=['docs/design/fs/serialfs/sfs_block.md 通信の形式'],
 )
@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 SOURCE = r'''
-#include "fs/serialfs/sfs_proto.h"
+#include "sys/fs/serialfs/sfs_proto.h"
 static int test(void) {
     /* Fixed bytes come from §4, independently of the product offsets. */
     const u8 expected[] = {0x78,0x56,0x34,0x12, 0xef,0xcd,0xab,0x89, 2,0};
@@ -89,7 +89,7 @@ def build_run(work):
     exe = work / 'block'
     subprocess.run(['gcc', *FLAGS, '-I' + str(work), '-I' + str(ROOT),
                     *include_flags(ROOT), '-nostdlib', '-static', '-no-pie',
-                    str(src), str(ROOT / 'fs/serialfs/sfs_proto.c'),
+                    str(src), str(ROOT / 'sys/fs/serialfs/sfs_proto.c'),
                     str(ROOT / 'lib/crc32.c'), '-o', str(exe)], check=True, cwd=ROOT)
     return host32.run([str(exe)], cwd=ROOT).returncode
 
@@ -106,11 +106,11 @@ def main():
         print('GREEN D1 wire/layout/op collisions/LAN round trip; runner=' +
               host32.selected_runner(), flush=True)
         if args.mutate:
-            original = (ROOT / 'fs/serialfs/sfs_proto.h').read_text()
+            original = (ROOT / 'sys/fs/serialfs/sfs_proto.h').read_text()
             anchor = 'SFS_BREAD_COUNT_MAX          2'
             if original.count(anchor) != 1:
                 raise RuntimeError('mutation anchor is not unique')
-            header = work / 'fs/serialfs/sfs_proto.h'
+            header = work / 'sys/fs/serialfs/sfs_proto.h'
             header.parent.mkdir(parents=True)
             header.write_text(original.replace(anchor, 'SFS_BREAD_COUNT_MAX          1'))
             rc = build_run(work)

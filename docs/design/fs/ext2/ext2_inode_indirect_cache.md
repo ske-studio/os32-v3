@@ -1,4 +1,4 @@
-# fs/ext2/ext2_inode_indirect_cache.inc — 読取保持
+# sys/fs/ext2/ext2_inode_indirect_cache.inc — 読取保持
 
 > 状態: **現行 (2026-10-31)**
 

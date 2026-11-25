@@ -1,4 +1,4 @@
-"""kdebug の peek 本体 (kdebug/kpeek.c) のホスト試験。
+"""kdebug の peek 本体 (sys/platform/pc98/kdebug/kpeek.c) のホスト試験。
 
 票: docs/tasks/v3/TASK_KPEEK.md (詳細設計 §2-4・§2-5・§4)
 
@@ -18,7 +18,7 @@ LAN の出口 (T5、§2-8・§4): 偽 e82557_send でフレームを捕り、Eth
   python3 -B tools/tests/test_kpeek.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='kpeek-host', tier=1,
-    covers=['kdebug/kpeek.c', 'kdebug/kpeek.h', 'mm/paging.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'include/memmap.h', 'include/pc98.h', 'include/io.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kpeek_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'kdebug/kdebug_window.c', 'kdebug/kdebug_window.h', 'kdebug/recover.h', 'include/pci_dev_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/platform/pc98/kdebug/kpeek.c', 'sys/platform/pc98/kdebug/kpeek.h', 'sys/kern/mm/paging.h', 'sys/dev/pci/pci.h', 'sys/dev/pci/pci_decode.h', 'sys/include/memmap.h', 'sys/platform/pc98/pc98.h', 'sys/include/io.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kpeek_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sys/arch/x86/kdebug/kdebug_window.c', 'sys/arch/x86/kdebug/kdebug_window.h', 'sys/dev/video/geforce/diag/recover.h', 'sys/include/pci_dev_contract.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.6,
     kind='characterization',
 )
@@ -37,7 +37,7 @@ import mutpar                                                   # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "tools/tests/kpeek_host.c"
-KPEEK = "kdebug/kpeek.c"
+KPEEK = "sys/platform/pc98/kdebug/kpeek.c"
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror", "-Wno-attributes"]
 # build/config.mk の INC_KERNEL と同じ探索先 (+ kdebug)。
 INCLUDES = (['-I' + str(ROOT / p) for p in ('kdebug',)] + include_flags(ROOT))
@@ -63,7 +63,7 @@ MUTATIONS = [
     # (名前, 対象, 元, 変異後)
     ("chunk_ge", KPEEK,
      "req->len > KDEBUG_PEEK_CHUNK", "req->len >= KDEBUG_PEEK_CHUNK"),
-    ("no_restore", "kdebug/kdebug_window.c",
+    ("no_restore", "sys/arch/x86/kdebug/kdebug_window.c",
      "w->ops->unmap(w->opaque, w->va + i * MEM_PAGE_SIZE, w->raw[i])", "0"),
     ("present_first_only", KPEEK,
      "if (!paging_is_present(page))",
@@ -76,7 +76,7 @@ MUTATIONS = [
     ("no_legacy_deny", KPEEK,
      "        else if (page >= KPEEK_RAM_DENY_LO && page < KPEEK_RAM_DENY_HI)\n"
      "            st = KDEBUG_PEEK_DENY;\n", ""),
-    ("win_rw", "kdebug/kdebug_window.c",
+    ("win_rw", "sys/arch/x86/kdebug/kdebug_window.c",
      "(write ? PTE_RW : 0)", "(write ? PTE_RW : PTE_RW)"),
     # T5 (LAN の出口)
     ("lan_crc_shift", KPEEK,
@@ -125,7 +125,7 @@ def main():
         tmp = pathlib.Path(tmp)
         exe = tmp / "kpeek-host"
         subprocess.run(host_cmd(exe), cwd=ROOT, check=True)
-        print("HOST ILP32 GNU11 COMPILE PASS (real kdebug/kpeek.c)",
+        print("HOST ILP32 GNU11 COMPILE PASS (real sys/platform/pc98/kdebug/kpeek.c)",
               flush=True)
         rc = host32.run([str(exe)], cwd=ROOT, timeout=60).returncode
         if rc == 0:
@@ -138,7 +138,7 @@ def main():
             print("TARGET i386-elf-gcc が無い = FAIL (CROSS_DIR を渡す)")
             failed += 1
         else:
-            for src in (KPEEK, "kdebug/kdebug_window.c"):
+            for src in (KPEEK, "sys/arch/x86/kdebug/kdebug_window.c"):
                 subprocess.run([gcc, *FLAGS, "-m32", "-march=i386",
                                 "-ffreestanding", "-fno-pie",
                                 "-fno-stack-protector", "-O2",

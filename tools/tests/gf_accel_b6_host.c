@@ -1,7 +1,7 @@
 /* B6 packet oracle: xf86-video-nouveau/src/nv04_exa.c:312-374 (MIT),
  * GF_FEAT3_DESIGN section 7. Literal method/payload expectations are
  * intentionally independent of accel_ifc.c's aliases and packing loops.
- * Link this TU with hwdev/gf/accel_ifc.c, -m32 -nostdlib, no libc/CRT. */
+ * Link this TU with sys/dev/video/geforce/accel_ifc.c, -m32 -nostdlib, no libc/CRT. */
 #define GF3_HOST_UNIT 6
 #include "gf_accel_host.h"
 

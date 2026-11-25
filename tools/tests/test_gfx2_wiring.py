@@ -2,8 +2,8 @@
 """Exercise final-image checks with linked weak/strong and impostor objects."""
 CHECK = dict(name='gfx2-wiring-host', tier=1, needs=[], budget=5,
     covers=['tools/checks/gfx2_wiring.txt', 'tools/checks/gfx2_no_weak.sh',
-            'tools/tests/test_gfx2_wiring.py', 'gfx/v2/a0_weak.c',
-            'gfx/sync/a0_weak.c', 'drivers/video/geforce/gf_v2_weak.c'],
+            'tools/tests/test_gfx2_wiring.py', 'sys/hal/gfx/v2/a0_weak.c',
+            'sys/hal/gfx/sync/a0_weak.c', 'sys/dev/video/geforce/gf_v2_weak.c'],
     basis=['HAL_V2_DESIGN §11-7', 'HAL_V2_DESIGN §13-1'],
 )
 from pathlib import Path
@@ -60,7 +60,7 @@ def main():
         import re
         rows = [l.split() for l in (ROOT / 'tools/checks/gfx2_wiring.txt').read_text().splitlines() if l and not l.startswith('#')]
         actual = set()
-        for path in ('gfx/v2/a0_weak.c', 'gfx/sync/a0_weak.c', 'drivers/video/geforce/gf_v2_weak.c'):
+        for path in ('sys/hal/gfx/v2/a0_weak.c', 'sys/hal/gfx/sync/a0_weak.c', 'sys/dev/video/geforce/gf_v2_weak.c'):
             target = 'geforce' if 'gf_v2_weak' in path else 'kernel'
             actual.update((target, n) for n in re.findall(r'^__attribute__\(\(weak\)\).*?\b(\w+)\([^;]*?\)\n\{', (ROOT / path).read_text(), re.M))
         # C8 and C14 add strong internal entries with no A0 placeholder.

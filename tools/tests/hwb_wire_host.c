@@ -3,12 +3,12 @@
 #include "os32_kapi_shared.h"
 #endif
 #include "hwb_fake.h"
-#include "drivers/pci/pci_hwb.h"
-#include "exec/exec_hwb.h"
-#include "kdebug/recover_wire.h"
-#include "kdebug/gfinit_wire.h"
-#include "kdebug/gf_foundation_wire.h"
-#include "kdebug/gf_command_wire.h"
+#include "sys/dev/pci/pci_hwb.h"
+#include "sys/kern/exec/exec_hwb.h"
+#include "sys/kern/kdebug/recover_wire.h"
+#include "sys/dev/video/geforce/diag/gfinit_wire.h"
+#include "sys/dev/video/geforce/diag/gf_foundation_wire.h"
+#include "sys/dev/video/geforce/diag/gf_command_wire.h"
 
 /* Compile the private import/dispatch signatures without requiring bodies. */
 STATIC_ASSERT(__builtin_types_compatible_p(__typeof__(&pci_hwb_read),

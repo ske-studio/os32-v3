@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Legacy rings against the pre-move oracle at the designed capacity, without host libc."""
 CHECK = dict(name='input-legacy-host', tier=1, budget=3, needs=[], kind='characterization',
-    covers=['input/hal/legacy_ring.c', 'input/hal/in2_int.h', 'drivers/input/*.h',
+    covers=['sys/hal/input/legacy_ring.c', 'sys/hal/input/in2_int.h', 'drivers/input/*.h',
             'include/**', 'sdk/include/os32/**', 'tools/tests/host_arch/**',
-            'platform/pc98/platform_io.h', 'build/config.mk', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
+            'sys/platform/pc98/platform_io.h', 'build/config.mk', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
             'tools/tests/input_legacy_host.c', 'tools/tests/test_input_legacy.py'])
 from pathlib import Path
 import subprocess, sys, tempfile
@@ -12,7 +12,7 @@ import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 def run(ctx):
-    source = (ctx.root/'input/hal/legacy_ring.c').read_text()
+    source = (ctx.root/'sys/hal/input/legacy_ring.c').read_text()
     with tempfile.TemporaryDirectory(prefix='input-legacy-') as directory:
         tmp = Path(directory)
         def execute(code):

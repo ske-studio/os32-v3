@@ -66,7 +66,7 @@ def main():
     args = parser.parse_args()
     provenance = load_provenance()
     old_text = ORACLE.read_text()
-    source = ROOT / 'kdebug/recover_gf.c'
+    source = ROOT / 'sys/dev/video/geforce/diag/recover_gf.c'
     new_text = preprocess(source)
     old_funcs, new_funcs = expression_bodies(old_text), expression_bodies(new_text)
     if not old_funcs or any(new_funcs.get(name) != body for name, body in old_funcs.items()):
@@ -80,7 +80,7 @@ def main():
             units.append(str(unit))
         exe = temp / 'host'
         subprocess.run(['gcc', *FLAGS, '-nostdlib', '-static', '-no-pie',
-                        '-Wl,--gc-sections', *units, str(ROOT / 'kdebug/recover.c'),
+                        '-Wl,--gc-sections', *units, str(ROOT / 'sys/platform/pc98/kdebug/recover.c'),
                         str(DATA / 'recover_tables_host.c'), '-o', str(exe)], check=True)
         run = host32.run([str(exe)], cwd=ROOT, timeout=60, capture_output=True)
         if run.returncode:

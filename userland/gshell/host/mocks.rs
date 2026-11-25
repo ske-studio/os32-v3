@@ -854,7 +854,7 @@ unsafe extern "C" fn sys_read(_fd: i32, buf: *mut u8, size: u32) -> i32 {
 }
 unsafe extern "C" fn sys_close(_fd: i32) {}
 
-/// ゲストの `gfx_init` (`gfx/gfx_core.c`) は **VRAM の両ページをゼロクリア
+/// ゲストの `gfx_init` (`sys/hal/gfx/gfx_core.c`) は **VRAM の両ページをゼロクリア
 /// する**。「消えたのに描き直させない」不具合 (W-1) をホストで再現するには
 /// そこまで模す必要がある — 何もしない代用だと、画が消えたことを試験が
 /// 観測できず検査が空振りする。
@@ -1164,7 +1164,7 @@ unsafe extern "C" fn screen_info(out: *mut u8) {
 /*  lease は実ファイル (OS32_GSHELL_FONT_DIR の標準 set、integration */
 /*  .py が fetch_fonts で揃える) を名前の basename で開く。guard は   */
 /*  callback を 1 回呼ぶだけで、その中で read_at 以外が呼ばれたら     */
-/*  `violations` に数える (kernel/console/font_guard.h の約束)。               */
+/*  `violations` に数える (sys/kern/console/font_guard.h の約束)。               */
 /* ================================================================ */
 pub mod fontsvc {
     use super::lk;

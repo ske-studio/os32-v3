@@ -53,7 +53,7 @@ u32 vfs_get_size(int fd) { (void)fd; return file_size; }
 int vfs_seek(int fd, int offset, int whence)
 {
     (void)fd;
-    /* SEEK_SET follows fs/vfs_fd.c: a negative int leaves the position intact. */
+    /* SEEK_SET follows sys/fs/vfs_fd.c: a negative int leaves the position intact. */
     CHECK(whence == 0);
     if (offset < 0) return -1;
     position = (u32)offset;

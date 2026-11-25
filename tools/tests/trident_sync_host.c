@@ -1,6 +1,6 @@
 /* HAL v2 T1: target, publication lifetime, failures and diagnostic overrides. */
 #include "tools/tests/trident_device_fake.h"
-#include "gfx/sync/sync_int.h"
+#include "sys/hal/gfx/sync/sync_int.h"
 static struct trident_fake f;
 static struct trident_device d;
 static u8 vram[TRI_FAKE_REAL_BYTES], client[128];

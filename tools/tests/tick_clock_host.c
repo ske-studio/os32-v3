@@ -1,5 +1,5 @@
-#include "kernel/time/tick.c"
-#include "drivers/sound/snd_wake_tick.c"
+#include "sys/hal/time/tick.c"
+#include "sys/hal/sound/snd_wake_tick.c"
 #define CHECK(x) do { if (!(x)) return __LINE__; } while (0)
 
 static u32 marks, seen_ms, seen_jiffy;

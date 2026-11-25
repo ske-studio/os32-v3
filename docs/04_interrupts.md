@@ -28,16 +28,16 @@ PC-98のPICはPC/ATと異なるポートアドレスとカスケード構成を�
 |------|-----|
 | カウンタ#0 ポート | 0x71 |
 | モードレジスタ | 0x77 |
-| システムクロック | 1,996,800 Hz (8MHz系) / 2,457,600 Hz (10MHz系)。`platform/pc98/sysclk.c` が BIOS ワーク領域から判定 |
+| システムクロック | 1,996,800 Hz (8MHz系) / 2,457,600 Hz (10MHz系)。`sys/platform/pc98/sysclk.c` が BIOS ワーク領域から判定 |
 | 割り込み周波数 | 100 Hz |
-| カウント値 | 19,968 / 24,576 (両系とも 100 Hz、`platform/pc98/pit_math.c` の `pit_compute()`) |
+| カウント値 | 19,968 / 24,576 (両系とも 100 Hz、`sys/platform/pc98/pit_math.c` の `pit_compute()`) |
 | グローバル変数 | `tick_count` (volatile u32) |
 
 ---
 
 ### §4-4 割り込みの動的登録と `irq_dispatch` の約束
 
-実体は `kernel/irq/irq.c` / `kernel/irq/irq.h` / `kernel/irq/irq_math.c` (定数は `kernel/irq/irq_math.h`)。
+実体は `sys/kern/irq/irq.c` / `sys/kern/irq/irq.h` / `sys/kern/irq/irq_math.c` (定数は `sys/kern/irq/irq_math.h`)。
 
 - **登録できる線**は共通スタブに結んだ 3/5/6/8/9/10/11/14/15 だけ。固定スタブの線 (0/1/2/4/7/12/13) は `IRQ_ERR_NOTSUP` で断る。
 - **共有**: 2 つ目以降の登録は、既存の全登録者と新規の両方が `IRQ_F_SHARED` のときだけ受ける。1 線あたり最大 4 登録 (`IRQ_MAX_HANDLERS`)。PIC のマスクは登録数で持つ (最初の登録で開け、最後の解除で閉じる)。共有者は自分で `irq_disable` を呼ばない。

@@ -1,13 +1,13 @@
-# mm/pgalloc.h — 設計
+# sys/kern/mm/pgalloc.h — 設計
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
-ソース: `mm/pgalloc.h`
+ソース: `sys/kern/mm/pgalloc.h`
 
-SURFACE の GF 識別定数は既存 ID の末尾へ追加し、`mm/pgalloc.h`・`sdk/include/os32/os32_surface.h` の `OS32_SURFACE_CIRRUS`・`exec/surface_query.c` を追従する。
+SURFACE の GF 識別定数は既存 ID の末尾へ追加し、`sys/kern/mm/pgalloc.h`・`sdk/include/os32/os32_surface.h` の `OS32_SURFACE_CIRRUS`・`sys/kern/exec/surface_query.c` を追従する。
 
 ## 落とし穴
 
 - **RAM 上端と穴**: 高位 RAM の上端がデバイス窓より上でも、窓自体は RAM のない穴かもしれない。
-  `mm/pgalloc.c` の `pgalloc_range_has_ram(first, end)` に PFN 半開区間を渡し、凍結した物理地図で重複を調べる。
+  `sys/kern/mm/pgalloc.c` の `pgalloc_range_has_ram(first, end)` に PFN 半開区間を渡し、凍結した物理地図で重複を調べる。
   未初期化や不正な範囲も安全側で扱う。`tools/tests/test_pgalloc_range.py` が窓と境界を検査する。
 
 ## 内部設計と契約 (D1)
@@ -35,7 +35,7 @@ owner タグ: kernel / boot / shlib / gshell / AS ごと / モジュール名。
 
 > 出所: TASK_T1_LEDGER (§4-4、T1d) の契約を今のソースと照らして要約 (2026-11-18)
 
-ソース: `mm/pgalloc_resource.inc` (`ledger_reserve_set`・`ledger_resource_add`、`mm/pgalloc.c` が取り込む)・`mm/pgalloc_owner.inc` (`ledger_selfcheck`)・`mm/pgalloc.h` (`struct ledger_span`・`struct ledger_resource`・`LEDGER_SPAN_*`・`LEDGER_WB_*`・`LEDGER_R_*`・`LEDGER_MAX_SPANS`・`LEDGER_MAX_RESOURCES`)。PCI の BAR の取り込み (`ledger_resource_import_pci`) は `platform/pc98/pci_resources.c`。
+ソース: `sys/kern/mm/pgalloc_resource.inc` (`ledger_reserve_set`・`ledger_resource_add`、`sys/kern/mm/pgalloc.c` が取り込む)・`sys/kern/mm/pgalloc_owner.inc` (`ledger_selfcheck`)・`sys/kern/mm/pgalloc.h` (`struct ledger_span`・`struct ledger_resource`・`LEDGER_SPAN_*`・`LEDGER_WB_*`・`LEDGER_R_*`・`LEDGER_MAX_SPANS`・`LEDGER_MAX_RESOURCES`)。PCI の BAR の取り込み (`ledger_resource_import_pci`) は `sys/platform/pc98/pci_resources.c`。
 
 ### 資源レコード (`ledger_resource_add`)
 
@@ -56,4 +56,4 @@ owner タグ: kernel / boot / shlib / gshell / AS ごと / モジュール名。
 - 解除の口は無い。DEVICE owner の回収は断られ、MODULE の一括回収 (`ledger_reclaim_owner`) の後も DEVICE の区間と eligible の落としは残る。予約は写像ではない (PTE は変えない)。
 - `ledger_selfcheck` は区間の非重複の例外として、DEVICE が BACKGROUND に重なることだけを許す。
 
-検査: `tools/tests/test_device_reservation.py` (`check-memory-host` の中、`--mutate` 付き)。実物の `mm/pgalloc.c`・`platform/pc98/pci_resources.c` などを ILP32 で取り込み、`irq_restore` のたびに L1 / L2 の不変条件を全ページ検査する。失敗の後は表を中身まで比べる。
+検査: `tools/tests/test_device_reservation.py` (`check-memory-host` の中、`--mutate` 付き)。実物の `sys/kern/mm/pgalloc.c`・`sys/platform/pc98/pci_resources.c` などを ILP32 で取り込み、`irq_restore` のたびに L1 / L2 の不変条件を全ページ検査する。失敗の後は表を中身まで比べる。

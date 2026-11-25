@@ -1,7 +1,7 @@
-# kernel/ime/ime_user_store.c — 学習 DB (`/etc/fep_user.db`) の検査と作成
+# sys/kern/ime/ime_user_store.c — 学習 DB (`/etc/fep_user.db`) の検査と作成
 
 > 状態: **現行 (2026-11-18)** — 出所: DICT_META_DESIGN・TASK_DICT_META (要約して移した)
-ソース: `kernel/ime/ime_user_store.c`・`kernel/sqlite_engine.c` (`services_settings` が学習のパスを読む)
+ソース: `sys/kern/ime/ime_user_store.c`・`sys/kern/sqlite_engine.c` (`services_settings` が学習のパスを読む)
 
 型・定数・誤りの意味は [ime_store.h の契約](ime_store.md) にある。
 
@@ -53,11 +53,11 @@ CREATE INDEX idx_user_yomi ON dict_user(yomi);
 
 ## 他の部品との境目
 
-- 学習の SQL (検索・学習・一覧・削除・書き出し・全消去) は `kernel/ime/ime_dict.c` が持つ。ここは開くことと検査だけ。
+- 学習の SQL (検索・学習・一覧・削除・書き出し・全消去) は `sys/kern/ime/ime_dict.c` が持つ。ここは開くことと検査だけ。
 - 学習 DB は配布物 (deploy・packages) に入れない。hsync は学習 DB とそのジャーナル・一時の名前を上書きしない (`userland/system/hsync_protect.inc`)。
 
 ## 検査
 
 - `fep-user-store` (`tools/tests/test_fep_user_store.py`): 作成・検査・不一致・作りかけ・ROFS の故障の注入 (libc なし)。
 - `fep-store-search`: 学習の有無で接続数が 1/2、不一致で学習が止まり system の検索が続く。
-- ゲスト: `userland/tests/fep_meta_test.c` (専用の学習 DB で ID・品詞の版を一時に変えて学習が止まること)。
+- ゲスト: `userland/diag/fep_meta_test.c` (専用の学習 DB で ID・品詞の版を一時に変えて学習が止まること)。

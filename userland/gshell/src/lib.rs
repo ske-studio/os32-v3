@@ -117,7 +117,7 @@ static CUI_SHELL: &[u8] = b"/sys/shell.bin\0";
 const RUN_REFUSED: i32 = 0;
 
 /// 起動設定 (`GUI=0/1`)。CUI へ戻すときにここを書き換える (契約 S6 の 4)。
-/// 正典は `include/config.h` の `SYS_SYSTEM_CFG`。
+/// 正典は `sys/include/config.h` の `SYS_SYSTEM_CFG`。
 static SYSTEM_CFG: &[u8] = b"/etc/system.cfg\0";
 
 static LANTRACE_GS_PATH: &[u8] = b"/tmp/lantrace_gs.txt\0";
@@ -524,7 +524,7 @@ fn run_program(st: &mut wm::GuiState, path: &[u8; 256], via: LaunchVia) -> i32 {
     }
     /* 描画モードの復帰は **アプリが抜けたときだけ** (不具合 W-1、2026-09-11)。
      *
-     * `gfx_init` は VRAM の両ページをゼロクリアする (`gfx/gfx_core.c`)。
+     * `gfx_init` は VRAM の両ページをゼロクリアする (`sys/hal/gfx/gfx_core.c`)。
      * 塞ぐ `exec_run` の時代はアプリが**終わってから**しか戻らなかったので、
      * 消えるのは死んだアプリの画だけだった。`exec_start` は park した時点で
      * 戻る (決裁 D9-5) ので、同じことをすると**生きているアプリのクライアント
@@ -548,7 +548,7 @@ fn run_program(st: &mut wm::GuiState, path: &[u8; 256], via: LaunchVia) -> i32 {
 
 /// 画面を WM の手に戻す (票 T8 D4 の復帰、および不具合 W-1 の `rc <= 0` の枝)。
 ///
-/// `gfx_init` は VRAM の両ページをゼロクリアする (`gfx/gfx_core.c`) ので、
+/// `gfx_init` は VRAM の両ページをゼロクリアする (`sys/hal/gfx/gfx_core.c`) ので、
 /// **消した以上は生き残っているアプリ全部に全面を描き直させる**
 /// (`invalidate_all_clients`)。遮蔽は露出を生まないので
 /// `recompute_and_expose` だけでは dirty が 1 つも増えず、露出部が黒のまま残る。

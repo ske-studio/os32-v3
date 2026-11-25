@@ -1,9 +1,9 @@
 # time_math — RED → GREEN の記録
 
 票: [`docs/tasks/v3/TASK_HAL_WIRING.md`](../../docs/tasks/v3/TASK_HAL_WIRING.md) §1-5
-対象: `platform/pc98/pit_time.c` (判定と算数) / `platform/pc98/clock_source.c` (スナップショット) /
-`kernel/time/time_math.c` (クランプ) / `kernel/time/ktime.c` (呼出し側) /
-`kapi/kapi_sys.c` (CPL=3 の検証)
+対象: `sys/platform/pc98/pit_time.c` (判定と算数) / `sys/platform/pc98/clock_source.c` (スナップショット) /
+`sys/kern/time/time_math.c` (クランプ) / `sys/kern/time/ktime.c` (呼出し側) /
+`sys/kapi/kapi_sys.c` (CPL=3 の検証)
 試験: `tools/tests/test_time_math.py` + `tools/tests/time_math_host.c`
 実行: `make check-time-math-host` (`check-par` の列)
 
@@ -51,7 +51,7 @@ IRR bit0 (= IRQ0 が立っているか) で挟んで読む。
 
 NP21/W の kselftest はこれで **「1 万回連続読みで逆行しない」が FAIL** した。
 判定表はそのままにして、最後に**前回値でクランプ**する
-(`time_clamp`、書き手は `kernel/time/ktime.c` の `sys_time_now` だけ、
+(`time_clamp`、書き手は `sys/kern/time/ktime.c` の `sys_time_now` だけ、
 スナップショットと同じ `irq_save` の中)。押さえた回数は
 `ktime_clamp_count` に数え、kselftest が表示する (実機での回数は W4 の記録項目)。
 
@@ -60,7 +60,7 @@ NP21/W の kselftest はこれで **「1 万回連続読みで逆行しない」
 ### RED 1 — 実装が無い
 
 ```
-tools/tests/time_math_host.c: fatal error: ../../kernel/time/time_math.c: No such file or directory
+tools/tests/time_math_host.c: fatal error: ../../sys/kern/time/time_math.c: No such file or directory
 ```
 
 ### RED 2 — 直す前の姿 (変異 1)
@@ -81,7 +81,7 @@ tools/tests/time_math_host.c:(.text+0x10a8): undefined reference to `time_clamp'
 
 ```
 $ python3 -B tools/tests/test_time_math.py --mutate
-HOST GNU11 -Werror compile PASS (real kernel/time/time_math.c)
+HOST GNU11 -Werror compile PASS (real sys/kern/time/time_math.c)
 EXIT decide_table=0
 EXIT us_math=0
 EXIT no_u32_overflow=0
@@ -114,11 +114,11 @@ i386-elf の `--target` も GNU11 -Werror で通過。
 
 ## ここでは見られないもの (W4 = kselftest / NP21/W / 実機)
 
-- 実 PIT のラッチと IRR の実読み (`kdebug/kselftest/time_now.inc` の `test_time_now`)
+- 実 PIT のラッチと IRR の実読み (`sys/kern/kdebug/kselftest/time_now.inc` の `test_time_now`)
 - 1 万回連続読みの逆行 0、`cpu_delay_us(1000)` を挟んだ実測、
   `ktime_clamp_count` の実数 (NP21/W と実機でどれだけすり抜けるか)
 - **CPL=3 のポインタ契約** — `ring3_in_syscall` が 0 のあいだ検証は素通しなので、
-  カーネル内からは踏めない。`userland/tests/time_test.c` (CPL=3) が
+  カーネル内からは踏めない。`userland/diag/time_test.c` (CPL=3) が
   NULL・範囲の交差・ヒープ / スタックの正常系を見る。
   読み取り専用 USER ページの kill は `time_test ro` (**アプリを殺す**ので明示要求)。
 - PDE / PTE のビット判定表そのものは `tools/tests/ring3_str_host.c` のケース 5
@@ -137,7 +137,7 @@ CPL0 の1範囲・2範囲の素通しは `test_kapi_ranges.py` の実範囲関�
 
 ## 段 L B6・B7': raw の有理式
 
-算数は `platform/pc98/pit_time.c` の `time_us_from64`。
+算数は `sys/platform/pc98/pit_time.c` の `time_us_from64`。
 `cycles = raw * reload + (reload - count)` を 64bit で求め、
 `us = cycles / clk * 1000000 + (cycles % clk) * 1000000 / clk` とする。
 `count > reload` は経過0、`clk == 0` は時刻0。period_us は表示用だけ。

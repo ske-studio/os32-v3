@@ -2,10 +2,10 @@
 
 > 状態: **現行 (2026-11-01)**
 
-実物の `arch/x86/kernel/mtrr_wc.c` を読み、明示した CPU primitive 区間だけを
+実物の `sys/arch/x86/kernel/mtrr_wc.c` を読み、明示した CPU primitive 区間だけを
 fake CPUID/MSR/CR/EFLAGS/WBINVD/TLB に置換する。
 ID-bit の反転・復元、能力判定、組の選択、設定/復元/rollback は実物を実行する。
-実ヘッダと `include/types.h` を使い、freestanding の ILP32 ELF を host32 の
+実ヘッダと `sys/include/types.h` を使い、freestanding の ILP32 ELF を host32 の
 明示した runner で実行する。fixture はこの Python に含む。
 
 能力無しでは MSR write・CR4・WBINVD が無いことを検査する。

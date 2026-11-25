@@ -4,9 +4,9 @@
 票  : docs/archive/realhw_v21/TASK_HDD_INSTALL.md 段 1 / §1-v3 (N3〜N7、R3-1)
 
 実物を 1 行も写さずに回す:
-  tools/tests/hdd_stage1_host.c  fs/pc98pt.c・drivers/ata/ide_addr.c・
-                                 fs/ext2/ext2_layout.c・userland/shell/hdprep_plan.c
-  tools/tests/ext2_part_host.c   fs/ext2/ext2_super.c・ext2_fmt.c (区画探索と format_at)
+  tools/tests/hdd_stage1_host.c  sys/fs/pc98pt.c・sys/dev/ata/ide_addr.c・
+                                 sys/fs/ext2/ext2_layout.c・userland/shell/hdprep_plan.c
+  tools/tests/ext2_part_host.c   sys/fs/ext2/ext2_super.c・ext2_fmt.c (区画探索と format_at)
   tools/pc98pt.py / tools/nhd_deploy.py (migrate-pt) — Python 側
 見るもの:
   - 区画表の標準配置 (8/17・16/63)、fatfs の PC98PartEntry との一致、C と Python の
@@ -42,12 +42,12 @@ sys.path.insert(0, str(ROOT / "tools"))
 import gen_memmap as gen
 HARNESS = ROOT / "tools/tests/hdd_stage1_host.c"
 PART_HARNESS = ROOT / "tools/tests/ext2_part_host.c"
-PT_SRC = ROOT / "fs/pc98pt.c"
-ADDR_SRC = ROOT / "drivers/ata/ide_addr.c"
-LAYOUT_SRC = ROOT / "fs/ext2/ext2_layout.c"
+PT_SRC = ROOT / "sys/fs/pc98pt.c"
+ADDR_SRC = ROOT / "sys/dev/ata/ide_addr.c"
+LAYOUT_SRC = ROOT / "sys/fs/ext2/ext2_layout.c"
 HDPREP_SRC = ROOT / "userland/shell/hdprep_plan.c"
-SUPER_SRC = ROOT / "fs/ext2/ext2_super.c"
-FMT_SRC = ROOT / "fs/ext2/ext2_fmt.c"
+SUPER_SRC = ROOT / "sys/fs/ext2/ext2_super.c"
+FMT_SRC = ROOT / "sys/fs/ext2/ext2_fmt.c"
 PY_PT = ROOT / "tools/pc98pt.py"
 PY_NHD = ROOT / "tools/nhd_deploy.py"
 
@@ -70,137 +70,137 @@ PART_INC_DIRS = ["include", "fs", "lib", "kernel", "drivers", "sdk/include/os32"
 
 # ---- 否定側 (C): (ファイル, 前, 後, 説明) -----------------------------------
 C_MUTATIONS = [
-    ("fs/pc98pt.h", "#define PC98PT_OFF_SSECT      8", "#define PC98PT_OFF_SSECT      6",
+    ("sys/fs/pc98pt.h", "#define PC98PT_OFF_SSECT      8", "#define PC98PT_OFF_SSECT      6",
      "開始セクタを旧配置の +6 で読み書きする"),
-    ("fs/pc98pt.c", "    if (disk_total != 0 && end_excl > disk_total) return PC98PT_ERR_RANGE;",
+    ("sys/fs/pc98pt.c", "    if (disk_total != 0 && end_excl > disk_total) return PC98PT_ERR_RANGE;",
      "    if (0 && disk_total != 0 && end_excl > disk_total) return PC98PT_ERR_RANGE;",
      "終わりがディスクの外でも通す"),
-    ("fs/pc98pt.c", "    if (end_excl <= start) return PC98PT_ERR_RANGE;\n", "",
+    ("sys/fs/pc98pt.c", "    if (end_excl <= start) return PC98PT_ERR_RANGE;\n", "",
      "終わり <= 開始を通す (旧配置を別の場所として読む)"),
-    ("fs/pc98pt.c", "    if ((start % cylsz) != 0 || (len % cylsz) != 0) return PC98PT_ERR_ALIGN;\n", "",
+    ("sys/fs/pc98pt.c", "    if ((start % cylsz) != 0 || (len % cylsz) != 0) return PC98PT_ERR_ALIGN;\n", "",
      "シリンダ境界に無い区画を書く"),
-    ("fs/pc98pt.c", "        if (e.sys_id != PC98PT_SID_OS32) continue;", "        if (e.sys_id == 0) continue;",
+    ("sys/fs/pc98pt.c", "        if (e.sys_id != PC98PT_SID_OS32) continue;", "        if (e.sys_id == 0) continue;",
      "OS32 以外 (FAT) の項目を ext2 として拾う"),
-    ("fs/pc98pt.c", "    if (head >= heads || sect >= spt || cyl > PC98PT_MAX_CYL)\n        return PC98PT_ERR_RANGE;\n", "",
+    ("sys/fs/pc98pt.c", "    if (head >= heads || sect >= spt || cyl > PC98PT_MAX_CYL)\n        return PC98PT_ERR_RANGE;\n", "",
      "開始ヘッド・セクタが幾何の外でも通す"),
-    ("drivers/ata/ide_addr.c", "IDE_DRVHEAD_BASE | IDE_DRVHEAD_LBA | slave |", "IDE_DRVHEAD_BASE | slave |",
+    ("sys/dev/ata/ide_addr.c", "IDE_DRVHEAD_BASE | IDE_DRVHEAD_LBA | slave |", "IDE_DRVHEAD_BASE | slave |",
      "LBA28 なのに DRV/HEAD の bit6 を立てない (CHS として解釈される)"),
-    ("drivers/ata/ide_addr.c", "    if (count > limit - lba) return 0;\n", "",
+    ("sys/dev/ata/ide_addr.c", "    if (count > limit - lba) return 0;\n", "",
      "lba + count の末尾を見ない"),
-    ("drivers/ata/ide_addr.c", "        if (limit == 0 || limit > IDE_LBA28_LIMIT) limit = IDE_LBA28_LIMIT;",
+    ("sys/dev/ata/ide_addr.c", "        if (limit == 0 || limit > IDE_LBA28_LIMIT) limit = IDE_LBA28_LIMIT;",
      "        if (limit == 0) limit = IDE_LBA28_LIMIT;",
      "LBA28 の上限を見ない (lba=268435456 が LBA 0 に化ける)"),
-    ("drivers/ata/ide_addr.c", "    } else if ((g->w53 & 0x0001) &&", "    } else if (0 && (g->w53 & 0x0001) &&",
+    ("sys/dev/ata/ide_addr.c", "    } else if ((g->w53 & 0x0001) &&", "    } else if (0 && (g->w53 & 0x0001) &&",
      "現在の幾何 (word 53-56) を無視して既定で CHS にする (F13)"),
-    ("fs/ext2/ext2_layout.c", "        if (l.num_groups <= 1) return EXT2L_ERR_SMALL;\n        tb = EXT2L_FIRST_DATA_BLOCK",
+    ("sys/fs/ext2/ext2_layout.c", "        if (l.num_groups <= 1) return EXT2L_ERR_SMALL;\n        tb = EXT2L_FIRST_DATA_BLOCK",
      "        *out = l;\n        return EXT2L_OK;\n        tb = EXT2L_FIRST_DATA_BLOCK",
      "最終グループが足りなくても落とさない (F12)"),
-    ("fs/ext2/ext2_layout.c", "    if (last == 0) l->last_group_need += EXT2L_ROOT_DATA_BLOCKS;\n", "",
+    ("sys/fs/ext2/ext2_layout.c", "    if (last == 0) l->last_group_need += EXT2L_ROOT_DATA_BLOCKS;\n", "",
      "グループ 0 のルートのデータを数えない"),
-    ("fs/ext2/ext2_layout.c", "    if (ext2_layout_is_sparse(g)) n += 1UL + l->gdt_blocks;",
+    ("sys/fs/ext2/ext2_layout.c", "    if (ext2_layout_is_sparse(g)) n += 1UL + l->gdt_blocks;",
      "    if (0 && ext2_layout_is_sparse(g)) n += 1UL + l->gdt_blocks;",
      "スパースグループの SB / GDT を数えない"),
-    ("fs/ext2/ext2_layout.c", "    if (l->num_groups > max_groups) return EXT2L_ERR_GROUPS;",
+    ("sys/fs/ext2/ext2_layout.c", "    if (l->num_groups > max_groups) return EXT2L_ERR_GROUPS;",
      "    if (0 && l->num_groups > max_groups) return EXT2L_ERR_GROUPS;",
      "32 グループの上限を見ない"),
-    ("platform/pc98/install_plan.c", "    if (g->addr_mode != HDPREP_AMODE_LBA28 &&",
+    ("sys/platform/pc98/install_plan.c", "    if (g->addr_mode != HDPREP_AMODE_LBA28 &&",
      "    if (0 && g->addr_mode != HDPREP_AMODE_LBA28 &&",
      "LBA も現在の CHS も無いドライブに書く"),
-    ("platform/pc98/install_plan.c", "    if (lba0[510] == 0x55 && lba0[511] == 0xAA) return HDPREP_E_MBR_SIG;\n", "",
+    ("sys/platform/pc98/install_plan.c", "    if (lba0[510] == 0x55 && lba0[511] == 0xAA) return HDPREP_E_MBR_SIG;\n", "",
      "LBA 0 の 55AA を見ない"),
     ("userland/shell/hdprep_plan.c", "    if (root_is_hd0) return HDPREP_E_ROOT;",
      "    if (0 && root_is_hd0) return HDPREP_E_ROOT;",
      "ルートの hd0 を外しに行く"),
-    ("platform/pc98/install_plan.c", "    if (g->bios_seclen != HDPREP_SECLEN) return HDPREP_E_SECLEN;\n", "",
+    ("sys/platform/pc98/install_plan.c", "    if (g->bios_seclen != HDPREP_SECLEN) return HDPREP_E_SECLEN;\n", "",
      "BX ≠ 512 を通す"),
-    ("platform/pc98/install_plan.c",
+    ("sys/platform/pc98/install_plan.c",
      "    start = ((HDPREP_BOOT_RESERVE_LBA + cyl - 1UL) / cyl) * cyl;",
      "    start = HDPREP_BOOT_RESERVE_LBA;",
      "開始をシリンダ境界に揃えない (16/63 で 1632)"),
-    ("platform/pc98/install_plan.c",
+    ("sys/platform/pc98/install_plan.c",
      "    if (g->ata_total < limit) limit = g->ata_total;\n", "",
      "IDENTIFY の総数を見ない"),
-    ("platform/pc98/install_plan.c", "    if (pc98pt_count_used(lba1) != 0) return HDPREP_E_PT_USED;\n", "",
+    ("sys/platform/pc98/install_plan.c", "    if (pc98pt_count_used(lba1) != 0) return HDPREP_E_PT_USED;\n", "",
      "既存の区画項目を上書きする"),
-    ("fs/ext2/ext2_medium_ide.c",
+    ("sys/platform/pc98/storage/ext2_medium_ide.c",
      "        return EXT2_ERR_NOPART;\n    }\n\n    *out_start",
      "        start = 1088; len = 16384;\n    }\n\n    *out_start",
      "見つからないとき LBA 1088 にフォールバックする (旧動作)"),
-    ("fs/ext2/ext2_medium_ide.c", "    src = bootinfo_part_geom(ide_drive, &heads, &spt);\n",
+    ("sys/platform/pc98/storage/ext2_medium_ide.c", "    src = bootinfo_part_geom(ide_drive, &heads, &spt);\n",
      "    src = bootinfo_part_geom(ide_drive, &heads, &spt);\n"
      "    heads = info.heads; spt = info.sectors;\n",
      "区画表の CHS を IDENTIFY の幾何で LBA にする (F4)"),
-    ("fs/ext2/ext2_super.c", "if (ctx->part_len < EXT2_MIN_PART_SECTORS) return EXT2_ERR_NOPART;",
+    ("sys/fs/ext2/ext2_super.c", "if (ctx->part_len < EXT2_MIN_PART_SECTORS) return EXT2_ERR_NOPART;",
      "if (ctx->part_len < EXT2_MIN_PART_SECTORS) return EXT2_ERR_IO;", "短い区画の直接 rc"),
-    ("fs/ext2/ext2_super.c", "ctx->sb_info.total_blocks, ctx->part_len);\n        return EXT2_ERR_NOPART;",
+    ("sys/fs/ext2/ext2_super.c", "ctx->sb_info.total_blocks, ctx->part_len);\n        return EXT2_ERR_NOPART;",
      "ctx->sb_info.total_blocks, ctx->part_len);\n        return EXT2_ERR_IO;", "容量超過の直接 rc"),
-    ("fs/ext2/ext2_super.c", "exceeds partition (%u sectors)", "exceeds disk (%u sectors)", "容量超過の診断"),
-    ("fs/ext2/ext2_super.c", "ext2_read_cache_reset();\n    if (ctx->mounted) ext2_unmount(ctx);",
+    ("sys/fs/ext2/ext2_super.c", "exceeds partition (%u sectors)", "exceeds disk (%u sectors)", "容量超過の診断"),
+    ("sys/fs/ext2/ext2_super.c", "ext2_read_cache_reset();\n    if (ctx->mounted) ext2_unmount(ctx);",
      "if (ctx->mounted) ext2_unmount(ctx);\n    ext2_read_cache_reset();", "unmount の後に reset"),
-    ("fs/ext2/ext2_medium_ide.c", "migrate it (host:", "repair it (host:", "旧配置の案内"),
-    ("fs/ext2/ext2_medium_ide.c", '? "BIOS" : "IDENTIFY"', '? "IDENTIFY" : "BIOS"', "幾何の出所"),
-    ("fs/ext2/ext2_super_block_io.inc", "    if (first >= limit || blocks > limit - first) return 0;", "    (void)limit; /* mutation: ignore partition bounds */",
+    ("sys/platform/pc98/storage/ext2_medium_ide.c", "migrate it (host:", "repair it (host:", "旧配置の案内"),
+    ("sys/platform/pc98/storage/ext2_medium_ide.c", '? "BIOS" : "IDENTIFY"', '? "IDENTIFY" : "BIOS"', "幾何の出所"),
+    ("sys/fs/ext2/ext2_super_block_io.inc", "    if (first >= limit || blocks > limit - first) return 0;", "    (void)limit; /* mutation: ignore partition bounds */",
      "ブロック I/O が区画の外を書ける"),
-    ("fs/ext2/ext2_super.c", "    if (ctx->sb_info.total_blocks > ctx->part_len / (unsigned int)EXT2_SECTORS_PER_BLOCK) {",
+    ("sys/fs/ext2/ext2_super.c", "    if (ctx->sb_info.total_blocks > ctx->part_len / (unsigned int)EXT2_SECTORS_PER_BLOCK) {",
      "    if (0) {", "FS が区画より大きくてもマウントする"),
-    ("fs/ext2/ext2_medium_ide.c", "    if (dev_blk_read_lba(dev, PC98PT_LBA, 1, pt_sect) != 0) return EXT2_ERR_IO;\n",
+    ("sys/platform/pc98/storage/ext2_medium_ide.c", "    if (dev_blk_read_lba(dev, PC98PT_LBA, 1, pt_sect) != 0) return EXT2_ERR_IO;\n",
      "    (void)dev_blk_read_lba(dev, PC98PT_LBA, 1, pt_sect);\n",
      "区画表が読めなくても続ける"),
-    ("fs/ext2/ext2_fmt.c", "    if (length > disk_sectors - start_lba) return EXT2_ERR_INVAL;\n", "",
+    ("sys/fs/ext2/ext2_fmt.c", "    if (length > disk_sectors - start_lba) return EXT2_ERR_INVAL;\n", "",
      "format_at がディスクの外まで書く"),
-    ("fs/ext2/ext2_fmt.c", "    if (start_lba < ops->min_lba) return EXT2_ERR_INVAL;\n", "",
+    ("sys/fs/ext2/ext2_fmt.c", "    if (start_lba < ops->min_lba) return EXT2_ERR_INVAL;\n", "",
      "format_at が IPL / 区画表 / ローダを潰す"),
-    ("fs/ext2/ext2_fmt.c", "    if (sectors > part_len) sectors = part_len;\n", "",
+    ("sys/fs/ext2/ext2_fmt.c", "    if (sectors > part_len) sectors = part_len;\n", "",
      "ext2_format が区画の長さで頭打ちにしない"),
-    ("platform/pc98/install_plan.c", "    if (g->ata_total == 0) return HDPREP_E_NO_TOTAL;", "",
+    ("sys/platform/pc98/install_plan.c", "    if (g->ata_total == 0) return HDPREP_E_NO_TOTAL;", "",
      "総数の申告が無いドライブに探りを書く (C3)"),
-    ("platform/pc98/install_plan.c", "        if (chs < limit) limit = chs;", "        (void)chs;",
+    ("sys/platform/pc98/install_plan.c", "        if (chs < limit) limit = chs;", "        (void)chs;",
      "現在の CHS の容量を計画の上限にしない (C4)"),
-    ("platform/pc98/install_plan.c", "        if (limit > HDPREP_LBA28_LIMIT) limit = HDPREP_LBA28_LIMIT;",
+    ("sys/platform/pc98/install_plan.c", "        if (limit > HDPREP_LBA28_LIMIT) limit = HDPREP_LBA28_LIMIT;",
      "        (void)0;", "LBA28 の上限を計画の上限にしない (C4)"),
-    ("fs/ext2/ext2_fmt.c", "    if (!ops->range_ok(ide_drive, start_lba, length)) return EXT2_ERR_INVAL;\n", "",
+    ("sys/fs/ext2/ext2_fmt.c", "    if (!ops->range_ok(ide_drive, start_lba, length)) return EXT2_ERR_INVAL;\n", "",
      "format_at が ATA の方式の上限を見ない (C4)"),
-    ("fs/ext2/ext2_medium_ide.c", "    if (src != BOOTINFO_GEOM_BIOS) {", "        if (0) {",
+    ("sys/platform/pc98/storage/ext2_medium_ide.c", "    if (src != BOOTINFO_GEOM_BIOS) {", "        if (0) {",
      "ext2_format が IDENTIFY の幾何で見つけた区画に書く (m3)"),
-    ("fs/ext2/ext2_fmt.c", "    if (total_sectors > EXT2L_MAX_SECTORS(EXT2_MAX_GROUPS))\n", "    if (0)\n",
+    ("sys/fs/ext2/ext2_fmt.c", "    if (total_sectors > EXT2L_MAX_SECTORS(EXT2_MAX_GROUPS))\n", "    if (0)\n",
      "ext2_format が 32 グループを超える区画で頭打ちにせず断る (m2)"),
-    ("fs/pc98pt.c", "        return 1;\n    }\n    return 0;\n}\n\nint pc98pt_make_os32(",
+    ("sys/fs/pc98pt.c", "        return 1;\n    }\n    return 0;\n}\n\nint pc98pt_make_os32(",
      "        return 0;\n    }\n    return 0;\n}\n\nint pc98pt_make_os32(",
      "旧配置を検出しない (カーネルが移行の案内を出せない、M2)"),
-    ("fs/ext2/ext2_fmt.c", "    if (!ops->range_ok(ide_drive, base_lba, lay.total_blocks * (unsigned long)EXT2_SECTORS_PER_BLOCK))\n        return EXT2_ERR_INVAL;\n", "",
+    ("sys/fs/ext2/ext2_fmt.c", "    if (!ops->range_ok(ide_drive, base_lba, lay.total_blocks * (unsigned long)EXT2_SECTORS_PER_BLOCK))\n        return EXT2_ERR_INVAL;\n", "",
      "ext2_format の頭打ちの後の範囲を ATA の上限と照合しない (ラリー 2 の 3)"),
-    ("fs/pc98pt.c", "            return 0;                       /* 標準配置で読める */",
+    ("sys/fs/pc98pt.c", "            return 0;                       /* 標準配置で読める */",
      "            (void)0;", "標準配置の表を旧配置と誤認する"),
-    ("fs/ext2/ext2_fmt.c", "return media[EXT2_MEDIUM_LOOP];", "return media[EXT2_MEDIUM_HD];", "A9: always use HD"),
-    ("fs/ext2/ext2_fmt.c", "drv >= 0x0600 && drv <= 0x0603", "(drv & 0xffff) >= 0x0600 && (drv & 0xffff) <= 0x0603", "A3: ignore high bits"),
-    ("fs/ext2/ext2_fmt.c", "drv >= 0x0600", "drv >= 0x05ff", "A3: include slot below lower bound"),
-    ("fs/ext2/ext2_medium_loop.c", " || !loop_dev_lba_writable(slot)", "", "A4b: accept read-only media"),
-    ("fs/ext2/ext2_fmt.c", "return ext2_format_range(ops, ide_drive, start_lba, length, length, 0);",
+    ("sys/fs/ext2/ext2_fmt.c", "return media[EXT2_MEDIUM_LOOP];", "return media[EXT2_MEDIUM_HD];", "A9: always use HD"),
+    ("sys/fs/ext2/ext2_fmt.c", "drv >= 0x0600 && drv <= 0x0603", "(drv & 0xffff) >= 0x0600 && (drv & 0xffff) <= 0x0603", "A3: ignore high bits"),
+    ("sys/fs/ext2/ext2_fmt.c", "drv >= 0x0600", "drv >= 0x05ff", "A3: include slot below lower bound"),
+    ("sys/dev/block/ext2_medium_loop.c", " || !loop_dev_lba_writable(slot)", "", "A4b: accept read-only media"),
+    ("sys/fs/ext2/ext2_fmt.c", "return ext2_format_range(ops, ide_drive, start_lba, length, length, 0);",
      "return ext2_format_range(ops, ide_drive, 0, length, length, 0);", "A9: ignore start LBA"),
-    ("fs/ext2/ext2_fmt.c", "    u32 disk_sectors;", "    u32 disk_sectors;\n    ide_drive &= 0xff;", "A6: HD の drv を切り出す"),
-    ("fs/ext2/ext2_fmt.c", "    if (media[kind]) return -1;", "", "A7: 二重登録を許す"),
-    ("fs/ext2/ext2_fmt.c", "static u8 fmt_blk[EXT2_BLOCK_SIZE];", "#define fmt_blk ext2_g_blk",
+    ("sys/fs/ext2/ext2_fmt.c", "    u32 disk_sectors;", "    u32 disk_sectors;\n    ide_drive &= 0xff;", "A6: HD の drv を切り出す"),
+    ("sys/fs/ext2/ext2_fmt.c", "    if (media[kind]) return -1;", "", "A7: 二重登録を許す"),
+    ("sys/fs/ext2/ext2_fmt.c", "static u8 fmt_blk[EXT2_BLOCK_SIZE];", "#define fmt_blk ext2_g_blk",
      "A5: formatter が下の ext2 と作業域を共有する"),
-    ("fs/ext2/ext2_fmt.c", "    if (ctx->ops->after_write) ctx->ops->after_write();", "",
+    ("sys/fs/ext2/ext2_fmt.c", "    if (ctx->ops->after_write) ctx->ops->after_write();", "",
      "A8: 書き込み前の破棄を省く"),
-    ("fs/ext2/ext2_fmt.c", "        ctx->ops->after_write(); /* raw read failure */", "",
+    ("sys/fs/ext2/ext2_fmt.c", "        ctx->ops->after_write(); /* raw read failure */", "",
      "A8: 読み込み失敗時の破棄を省く"),
-    ("fs/ext2/ext2_fmt.c", "    if (ret && ctx->ops->after_write) ctx->ops->after_write();", "",
+    ("sys/fs/ext2/ext2_fmt.c", "    if (ret && ctx->ops->after_write) ctx->ops->after_write();", "",
      "A8: 書き込み失敗時の破棄を省く"),
     # E03a: 抽出境界の順と失敗伝播 (format_io_order が実 I/O で検出)。
-    ("fs/ext2/ext2_fmt.c", "    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
+    ("sys/fs/ext2/ext2_fmt.c", "    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
      "    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
      "E03a: GDT/free count 更新より先に backup を作る"),
-    ("fs/ext2/ext2_fmt.c", "    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_init_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
+    ("sys/fs/ext2/ext2_fmt.c", "    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_init_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
      "    ret = fmt_init_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n\n    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
      "E03a: backup と bitmap/itable 初期化の順を逆にする"),
-    ("fs/ext2/ext2_fmt.c", "    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
+    ("sys/fs/ext2/ext2_fmt.c", "    ret = fmt_write_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
      "    (void)fmt_write_groups(&fmt_ctx, &lay);\n",
      "E03a: fmt_write_groups の I/O 失敗後も次段へ進む"),
-    ("fs/ext2/ext2_fmt.c", "    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
+    ("sys/fs/ext2/ext2_fmt.c", "    ret = fmt_write_backups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
      "    (void)fmt_write_backups(&fmt_ctx, &lay);\n",
      "E03a: fmt_write_backups の I/O 失敗後も次段へ進む"),
-    ("fs/ext2/ext2_fmt.c", "    ret = fmt_init_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
+    ("sys/fs/ext2/ext2_fmt.c", "    ret = fmt_init_groups(&fmt_ctx, &lay);\n    if (ret != 0) return EXT2_ERR_IO;\n",
      "    (void)fmt_init_groups(&fmt_ctx, &lay);\n",
      "E03a: fmt_init_groups の I/O 失敗後も次段へ進む"),
 ]
@@ -871,14 +871,14 @@ def build_target(tmp):
             "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone",
             "-fcommon", "-O2", "-Wall", "-Werror",
             "-D__KERNEL_BUILD__", *include_flags(ROOT)]
-    for rel in ("fs/pc98pt.c", "drivers/ata/ide_addr.c", "fs/ext2/ext2_layout.c",
+    for rel in ("sys/fs/pc98pt.c", "sys/dev/ata/ide_addr.c", "sys/fs/ext2/ext2_layout.c",
                 "userland/shell/hdprep_plan.c"):
         out = pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o")
         run([*base, "-c", str(ROOT / rel), "-o", str(out)], check=True)
     # ローダと同じフラグ (-Os、-Iboot の型) でも共有部が通る
     for rel in ("boot/boot_main.c", "boot/boot_debug.c"):
         # 同名の HEX_* の写しが正典と違えば macro redefinition が -Werror で落ちる。
-        extra = ["-Iinclude", "-include", "lib/kstring.h"] if rel.endswith("boot_debug.c") else []
+        extra = ["-Iinclude", "-include", "sys/kern/kstring.h"] if rel.endswith("boot_debug.c") else []
         run(["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
              "-fno-pie", "-fno-stack-protector", "-nostdlib", "-mno-red-zone", "-Os",
              "-Wall", "-Werror", "-fcommon", "-Iboot", *include_flags(ROOT),
@@ -892,13 +892,13 @@ def build_target(tmp):
 #  変異                                                                     #
 # ======================================================================== #
 
-MIRROR = ["platform/pc98/platform_install_layout.h", "platform/pc98/install_plan.c", "tools/tests/ext2_medium_host.c", "include/loop_contract.h", "fs/ext2/ext2_medium_loop.c", "fs/ext2/ext2_medium_ide.c", "include/ext2_medium_contract.h", "include/platform_device.h", "include/ide_contract.h", "drivers/ata/ide.h", "fs/pc98pt.c", "fs/pc98pt.h", "drivers/ata/ide_addr.c",
-          "drivers/ata/ide_addr.h", "fs/ext2/ext2_layout.c", "fs/ext2/ext2_layout.h",
+MIRROR = ["sys/platform/pc98/platform_install_layout.h", "sys/platform/pc98/install_plan.c", "tools/tests/ext2_medium_host.c", "sys/include/loop_contract.h", "sys/dev/block/ext2_medium_loop.c", "sys/platform/pc98/storage/ext2_medium_ide.c", "sys/include/ext2_medium_contract.h", "sys/include/platform_device.h", "sys/include/ide_contract.h", "sys/dev/ata/ide.h", "sys/fs/pc98pt.c", "sys/fs/pc98pt.h", "sys/dev/ata/ide_addr.c",
+          "sys/dev/ata/ide_addr.h", "sys/fs/ext2/ext2_layout.c", "sys/fs/ext2/ext2_layout.h",
           "userland/shell/hdprep_plan.c", "userland/shell/hdprep_plan.h",
-          "fs/ext2/ext2_super.c", "fs/ext2/ext2_time.c", "fs/ext2/ext2_super_block_io.inc", "fs/ext2/ext2_fmt.c", "fs/ext2/ext2_inode.c", "fs/ext2/ext2_dir.c",
-          "fs/ext2/ext2_dir_directory.inc", "fs/ext2/ext2_dir_rename.inc",
-          "fs/ext2/ext2_file.c", "fs/ext2/ext2_fmt_write_groups.inc",
-          "fs/ext2/ext2_fmt_write_backups.inc", "fs/ext2/ext2_fmt_init_groups.inc"]
+          "sys/fs/ext2/ext2_super.c", "sys/fs/ext2/ext2_time.c", "sys/fs/ext2/ext2_super_block_io.inc", "sys/fs/ext2/ext2_fmt.c", "sys/fs/ext2/ext2_inode.c", "sys/fs/ext2/ext2_dir.c",
+          "sys/fs/ext2/ext2_dir_directory.inc", "sys/fs/ext2/ext2_dir_rename.inc",
+          "sys/fs/ext2/ext2_file.c", "sys/fs/ext2/ext2_fmt_write_groups.inc",
+          "sys/fs/ext2/ext2_fmt_write_backups.inc", "sys/fs/ext2/ext2_fmt_init_groups.inc"]
 PY_MIRROR = ["tools/pc98pt.py", "tools/nhd_deploy.py", "tools/deploy_protect.py",
              "tools/deploy_manifests.py", "tools/nhd_profile.py"]
 
@@ -928,15 +928,15 @@ def _controls(mutations):
 # 回さない。表に無いファイル (ヘッダなど) は両方組む。表が gcc -MM の依存より狭ければ
 # mutate_c() が落ちる (mutpar.check_rebuild_table)。
 REBUILD = {
-    "fs/pc98pt.c": ("pure", "part"),
-    "drivers/ata/ide_addr.c": ("pure",),
-    "fs/ext2/ext2_layout.c": ("pure", "part"),
+    "sys/fs/pc98pt.c": ("pure", "part"),
+    "sys/dev/ata/ide_addr.c": ("pure",),
+    "sys/fs/ext2/ext2_layout.c": ("pure", "part"),
     "userland/shell/hdprep_plan.c": ("pure",),
-    "fs/ext2/ext2_super.c": ("part",),
-    "fs/ext2/ext2_super_block_io.inc": ("part",),
-    "fs/ext2/ext2_medium_loop.c": ("part",),
-    "fs/ext2/ext2_medium_ide.c": ("part",),
-    "fs/ext2/ext2_fmt.c": ("part",),
+    "sys/fs/ext2/ext2_super.c": ("part",),
+    "sys/fs/ext2/ext2_super_block_io.inc": ("part",),
+    "sys/dev/block/ext2_medium_loop.c": ("part",),
+    "sys/platform/pc98/storage/ext2_medium_ide.c": ("part",),
+    "sys/fs/ext2/ext2_fmt.c": ("part",),
 }
 C_HARNESS = {"pure": (_pure_cmd, PURE_CASES), "part": (_part_cmd, PART_CASES)}
 

@@ -1,7 +1,7 @@
 /* Real recover checker with the GF table; synthetic layouts only (S2 owns ROM
  * layouts). No physical I/O. ILP32 qemu runner. */
-#include "../../kdebug/recover.c"
-#include "../../kdebug/recover_gf.c"
+#include "../../sys/platform/pc98/kdebug/recover.c"
+#include "../../sys/dev/video/geforce/diag/recover_gf.c"
 #include "gfinit_fixture.h"
 #include "recover_gf_inventory.h"
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))

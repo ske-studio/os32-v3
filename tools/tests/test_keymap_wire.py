@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """S1pt/S1x/S0d: actual capture, pinned legacy exit and release lifecycle."""
 CHECK = dict(name='keymap-wire', tier=1, budget=20, needs=[], kind='contract',
-    covers=['tools/tests/input_s3_differences.tsv', 'docs/decisions/INPUT_BIND_DESIGN.md', 'tools/tests/input_pc98_compat_host.c', 'tools/tests/kernel_includes.py', 'input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'input/hal/keymap*.c', 'input/hal/keymap.h', 'input/hal/in2_int.h',
-            'input/hal/in2_dev.c', 'input/hal/kbd_merge.c', 'input/keymaps/*.c',
-            'platform/pc98/input_keymap.c', 'tools/kbd_import.py', 'tools/keymap/pc98_s1p.c',
+    covers=['tools/tests/input_s3_differences.tsv', 'docs/decisions/INPUT_BIND_DESIGN.md', 'tools/tests/input_pc98_compat_host.c', 'tools/tests/kernel_includes.py', 'sys/hal/input/legacy_keymap.c', 'sys/input/keymaps/pc98_jp.c', 'input/hal/keymap*.c', 'sys/hal/input/keymap.h', 'sys/hal/input/in2_int.h',
+            'sys/hal/input/in2_dev.c', 'sys/hal/input/kbd_merge.c', 'input/keymaps/*.c',
+            'sys/platform/pc98/input_keymap.c', 'tools/kbd_import.py', 'tools/keymap/pc98_s1p.c',
             'tools/tests/keymap_wire_host.c', 'tools/tests/test_keymap_wire.py',
             'tools/tests/host32.py', 'tools/tests/keymap_s3_oracle.py', 'tools/tests/input_pc98_bsd_fixture.kbd', 'tools/tests/test_input_pc98_bsd.py', 'include/**', 'sdk/include/os32/**'],
     basis=['INPUT_KEYMAP_DESIGN §2 §4 §7 §8 H0b'])
@@ -21,10 +21,10 @@ REGISTRATION_HOST = '#include "keymap.h"\n#include "in2_int.h"\n#include "os32_k
 def run(ctx):
     paths = ['input/hal/'+n+'.c' for n in
              ('in2_dev', 'kbd_merge', 'legacy_keymap', 'keymap_registry', 'keymap_eval', 'keymap_state')]
-    paths += ['input/keymaps/pc98_jp.c', 'input/keymaps/hid_jp.c', 'platform/pc98/input_keymap.c']
+    paths += ['sys/input/keymaps/pc98_jp.c', 'sys/input/keymaps/hid_jp.c', 'sys/platform/pc98/input_keymap.c']
     sources = {p: (ctx.root/p).read_text() for p in paths}
-    assert sources['input/keymaps/pc98_jp.c'] == (ctx.root/'tools/keymap/pc98_s1p.c').read_text().replace('s1p_pc98_backend', 'pc98_jp_backend')
-    old = subprocess.check_output(['git', 'show', 'eeeb90673:input/hal/kbd_merge.c'], cwd=ctx.root, text=True)
+    assert sources['sys/input/keymaps/pc98_jp.c'] == (ctx.root/'tools/keymap/pc98_s1p.c').read_text().replace('s1p_pc98_backend', 'pc98_jp_backend')
+    old = subprocess.check_output(['git', 'show', 'eeeb90673:sys/hal/input/kbd_merge.c'], cwd=ctx.root, text=True)
     old = '#include "in2_int.h"\n#include "kbd.h"\n' + old[old.index('static const u8 scancode_to_ascii['):old.index('void input_emit_legacy_repeat')].replace('input_emit_legacy_key(', 'wire_old_emit(')
     with tempfile.TemporaryDirectory(prefix='keymap-wire-') as directory:
         tmp = Path(directory)
@@ -46,7 +46,7 @@ def run(ctx):
                     assert text.count(anchor) == 1
                     text = text.replace('void km_state_snapshot(KmState *out)', 'extern unsigned wire_snapshot_calls, wire_snapshot_visits;\nvoid km_state_snapshot(KmState *out)')
                     text = text.replace('    if (!out) return;', '    ++wire_snapshot_calls;\n    if (!out) return;').replace(anchor, anchor+'\n        ++wire_snapshot_visits;')
-                text = text.replace('../../input/hal/keymap.h', 'keymap.h').replace('../../input/hal/in2_int.h', 'in2_int.h')
+                text = text.replace('../../sys/hal/input/keymap.h', 'keymap.h').replace('../../sys/hal/input/in2_int.h', 'in2_int.h')
                 target.write_text(text); files.append(str(target))
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                             '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
@@ -56,7 +56,7 @@ def run(ctx):
                             '-o', str(tmp/'test')], check=True)
             return host32.run([str(tmp/'test')], runner='qemu').returncode
         (tmp/'register_host.c').write_text(REGISTRATION_HOST)
-        (tmp/'register.c').write_text(sources['platform/pc98/input_keymap.c'].replace('../../input/hal/keymap.h', 'keymap.h').replace('../../input/hal/in2_int.h', 'in2_int.h'))
+        (tmp/'register.c').write_text(sources['sys/platform/pc98/input_keymap.c'].replace('../../sys/hal/input/keymap.h', 'keymap.h').replace('../../sys/hal/input/in2_int.h', 'in2_int.h'))
         subprocess.run(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                         '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
                         '-I'+str(tmp), '-I'+str(ctx.root/'include'), '-I'+str(ctx.root/'sdk/include/os32'),
@@ -68,12 +68,12 @@ def run(ctx):
         print('MEASURE capture: 2 snapshots: 32 state visits + 32 boot-lock visits with 16 live sources; 0 key scans')
         if ctx.mutate:
             for path, anchor, replacement in [
-                ('input/hal/kbd_merge.c', 'if (!down && cnt[sc] == 0)', 'if (!down)'),
-                ('input/hal/kbd_merge.c', '++release_gen[sc];', '(void)sc;'),
-                ('input/hal/kbd_merge.c', 'if (sc < 128 && old != key->down) update_count(sc, key->down);', 'if (sc < 128 && old != key->down) if (key->down) update_count(sc, 1);'),
-                ('input/hal/kbd_merge.c', 'if (legacy_active()) return 1;', 'if (0) return 1;'),
-                ('input/hal/keymap_registry.c', '    km_release_keys(src, generation);', '    (void)src;'),
-                ('input/hal/kbd_merge.c', 'old = input_held_key(key->src, key->keycode);', 'old = 0;')]:
+                ('sys/hal/input/kbd_merge.c', 'if (!down && cnt[sc] == 0)', 'if (!down)'),
+                ('sys/hal/input/kbd_merge.c', '++release_gen[sc];', '(void)sc;'),
+                ('sys/hal/input/kbd_merge.c', 'if (sc < 128 && old != key->down) update_count(sc, key->down);', 'if (sc < 128 && old != key->down) if (key->down) update_count(sc, 1);'),
+                ('sys/hal/input/kbd_merge.c', 'if (legacy_active()) return 1;', 'if (0) return 1;'),
+                ('sys/hal/input/keymap_registry.c', '    km_release_keys(src, generation);', '    (void)src;'),
+                ('sys/hal/input/kbd_merge.c', 'old = input_held_key(key->src, key->keycode);', 'old = 0;')]:
                 assert sources[path].count(anchor) == 1
                 mutant = dict(sources); mutant[path] = mutant[path].replace(anchor, replacement)
                 rc = build(mutant); assert 0 < rc < 128, (anchor, rc)

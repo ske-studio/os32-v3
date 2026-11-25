@@ -11,8 +11,8 @@ def idle_io_sources(root, work, product=None, compat=True):
         'static inline unsigned int irq_save(void) { return 0; }\n'
         'static inline void irq_restore(unsigned int f) { (void)f; }\n')
     (directory / 'io_work.c').write_text(product if product is not None else
-                                       (root / 'kernel/io_work.c').read_text())
-    (directory / 'io_policy.c').write_text((root / 'kernel/io_policy.c').read_text())
+                                       (root / 'sys/kern/io_work.c').read_text())
+    (directory / 'io_policy.c').write_text((root / 'sys/kern/io_policy.c').read_text())
     extra = []
     if not compat:
         seam = directory / 'compat.c'

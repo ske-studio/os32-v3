@@ -5,12 +5,12 @@ Trace fixtures live in trident_regs_host.c; no external reference checkout is
 needed in CI. Privileged outp alone is replaced for the production host run.
 """
 CHECK = dict(name='trident-regs', tier=1, needs=[], budget=4.8,
-    covers=['drivers/video/trident/regs.c', 'drivers/video/trident/trident.h',
+    covers=['sys/dev/video/trident/regs.c', 'sys/dev/video/trident/trident.h',
             'tools/tests/trident_regs_host.c', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_device_fake.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk',
-            'include/types.h', 'include/memmap.h', 'gfx/palette.h', 'include/io.h',
-            'arch/x86/arch_io.h', 'platform/pc98/platform_io.h'],
+            'sys/include/types.h', 'sys/include/memmap.h', 'sys/hal/gfx/palette.h', 'sys/include/io.h',
+            'sys/arch/x86/arch_io.h', 'sys/platform/pc98/platform_io.h'],
     basis=['TRIDENT_S3_DESIGN §1', 'TRIDENT_S3_DESIGN §3'],
 )
 import argparse
@@ -23,7 +23,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'drivers/video/trident/regs.c'
+PRODUCT = 'sys/dev/video/trident/regs.c'
 HOST = 'tools/tests/trident_regs_host.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector']

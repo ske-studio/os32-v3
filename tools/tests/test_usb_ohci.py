@@ -15,9 +15,9 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCES = ['usb_dmamem.c', 'ohci_init.c', 'usb_hc_dead.c', 'ohci_sched.c',
            'ohci_done.c', 'ohci_unlink.c', 'ohci_roothub.c', 'ehci_quiesce.c']
 CHECK = dict(name='usb-ohci', tier=1, needs=[], budget=20,
-             covers=['drivers/usb/*.[ch]', 'include/usb_platform.h',
-                     'include/endian_dma.h', 'include/endian_le.h', 'include/types.h',
-                     'include/callconv.h', 'arch/*/arch_endian_dma.h',
+             covers=['drivers/usb/*.[ch]', 'sys/include/usb_platform.h',
+                     'sys/include/endian_dma.h', 'sys/include/endian_le.h', 'sys/include/types.h',
+                     'sys/include/callconv.h', 'arch/*/arch_endian_dma.h',
                      'tools/tests/test_usb_ohci.py', 'tools/tests/usb_fake_ohci.c',
                      'tools/tests/usb_fake_ehci_min.c', 'tools/tests/host32.py',
                      'tools/tests/cc_cache.py'],
@@ -98,7 +98,7 @@ def check(mutate):
         (fake / 'arch_endian_dma.h').write_text(
             '#define mmio_rd32_le usb_fake_native_rd\n'
             '#define mmio_wr32_le usb_fake_native_wr\n'
-            f'#include "{tree / "arch/x86/arch_endian_dma.h"}"\n'
+            f'#include "{tree / "sys/arch/x86/arch_endian_dma.h"}"\n'
             '#undef mmio_rd32_le\n#undef mmio_wr32_le\n'
             'u32 mmio_rd32_le(const volatile void *p);\n'
             'void mmio_wr32_le(volatile void *p, u32 v);\n')

@@ -35,7 +35,7 @@ def run(source):
         (tmp / 'exec.c').write_text(source)
         obj = tmp / 'setjmp.o'
         result = subprocess.run(['nasm', '-f', 'elf32',
-                                 'arch/x86/kernel/setjmp.asm', '-o', str(obj)],
+                                 'sys/arch/x86/kernel/setjmp.asm', '-o', str(obj)],
                                 cwd=ROOT, capture_output=True, text=True)
         if result.returncode:
             return 'compile', result.stderr
@@ -48,7 +48,7 @@ def run(source):
             '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
             '-I' + str(tmp), '-I' + str(ROOT / 'tools/tests/host_arch'),
             '-I' + str(ROOT / 'exec'), *include_flags(ROOT),
-            str(ROOT / 'tools/tests/x87_lifecycle_host.c'), str(ROOT / 'kernel/av_focus.c'),
+            str(ROOT / 'tools/tests/x87_lifecycle_host.c'), str(ROOT / 'sys/kern/av_focus.c'),
             str(obj), '-o', str(exe),
         ], capture_output=True, text=True)
         if result.returncode:

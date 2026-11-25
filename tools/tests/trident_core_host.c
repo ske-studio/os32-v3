@@ -1,7 +1,7 @@
 /* Real gfx core + ledger, fake HAL callbacks. Device I/O and lifecycle
  * sequences are tested separately by tri-life using the same 3a device fake. */
 #include "trident_device_fake.h"
-#include "gfx/gfx_emergency.h"
+#include "sys/hal/gfx/gfx_emergency.h"
 #define run regression_run
 #define HOST_OWN_PC98_ROUTE 1
 #include "gfx_kernel_fb_host.c"

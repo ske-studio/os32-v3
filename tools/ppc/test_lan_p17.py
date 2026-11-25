@@ -39,7 +39,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'drivers/net/gem/gem_phy.c').read_text()
+    original = (ROOT / 'sys/dev/net/gem/gem_phy.c').read_text()
     with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as d:
         temp = Path(d)
         source = temp / 'gem_phy.c'

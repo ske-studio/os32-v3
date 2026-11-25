@@ -46,49 +46,49 @@ MUTATIONS = [
      "CHECK(physmem_reserve_ram(&supply, first / LF_PAGE, f->slack_end / LF_PAGE));",
      ("layout", 8192)),
     # §4-1 変異 2: exec の上端を workspace の位置から決める旧式に戻す (B2)。
-    ("frozen-exec-ws", "kernel/sys.c",
+    ("frozen-exec-ws", "sys/kern/sys.c",
      "    sys_frozen_exec = pgalloc_arena_end() * PAGE_SIZE;\n    sys_frozen_end = top * PAGE_SIZE;\n    sys_model_staged = 1;",
      "    sys_frozen_exec = l->workspace_first * PAGE_SIZE;\n    sys_frozen_end = top * PAGE_SIZE;\n    sys_model_staged = 1;",
      ("fixed", 8192)),
     # FIXED / ARENA_TOP の境界を 1 PFN ずらす (3,075 PFN が FIXED に落ちる)。
-    ("arena-boundary", "mm/memory_boot.c",
+    ("arena-boundary", "sys/kern/mm/memory_boot.c",
      "        top - pages - ws_pages >= MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE) {",
      "        top - pages - ws_pages > MEM_PHYS_WORKSPACE_FLOOR / PAGE_SIZE) {",
      ("arena", 12300)),
     # D11 (T1a の Codex P3、T1b で追加): プローブの上限を外す (2GB を越えて数える)。
-    ("detect-cap-removed", "platform/pc98/memory.c",
+    ("detect-cap-removed", "sys/platform/pc98/memory.c",
      "    if (reported > (platform_memory_geometry.ram_ceiling - platform_memory_geometry.high_first) / MEM_1MB)\n"
      "        reported = (platform_memory_geometry.ram_ceiling - platform_memory_geometry.high_first) / MEM_1MB;\n",
      "", ("detect_cap", 16384)),
     # exec の最小域の fail-stop の境界を 1 ページずらす (0x550000 で起動してしまう)。
-    ("minimum-off-by-page", "kernel/sys.c",
+    ("minimum-off-by-page", "sys/kern/sys.c",
      "    } else if (l->kind == PGALLOC_BACKING_FIXED) {\n        if (top < minimum) goto done;",
      "    } else if (l->kind == PGALLOC_BACKING_FIXED) {\n        if (top + 1 < minimum) goto done;",
      ("minimum_short", 5440)),
     # 同梱域の申告の範囲検査を外す (同梱域の外の申告を受け付けてしまう)。
-    ("staging-unreserved", "mm/memory_boot.c",
+    ("staging-unreserved", "sys/kern/mm/memory_boot.c",
      "if (platform_boot_staging_in_use())", "if (0)", ("staging", 16384)),
-    ("bundle-range-blind", "mm/memory_boot.c",
+    ("bundle-range-blind", "sys/kern/mm/memory_boot.c",
      "    if (first >= end || first < lo || end > hi) return 0;",
      "    if (first >= end) return 0;", ("bundle", 16384)),
     # FIXED の metadata / workspace が RAM (RESERVED でない) でも受け付けてしまう。
-    ("fixed-meta-on-ram", "mm/pgalloc.c",
+    ("fixed-meta-on-ram", "sys/kern/mm/pgalloc.c",
      "            !all_reserved(m, first, first + pages)) goto done;",
      "            0) goto done;", ("fixed_reject", 8192)),
-    ("fixed-ws-on-ram", "mm/pgalloc.c",
+    ("fixed-ws-on-ram", "sys/kern/mm/pgalloc.c",
      "                !all_reserved(&next, ws_first, ws_end)) goto done;",
      "                0) goto done;", ("fixed_reject", 8192)),
 ]
 
 
 MUTATIONS += [
-    ('v5-metadata-double', 'mm/memory_boot.c',
+    ('v5-metadata-double', 'sys/kern/mm/memory_boot.c',
      '{ KERNEL_LOAD_ADDR, MEM_LEDGER_META_BASE }',
      '{ KERNEL_LOAD_ADDR, MEM_LEDGER_META_END }', ('ledger', 8192)),
-    ('v5-old-pool-floor', 'mm/pgalloc.c',
+    ('v5-old-pool-floor', 'sys/kern/mm/pgalloc.c',
      'MEM_SHM_RESV_START / PAGE_SIZE,',
      'MEM_POOL_BASE / PAGE_SIZE,', ('fixed_paging', 8192)),
-    ('v5-dma-missing', 'mm/pgalloc.c',
+    ('v5-dma-missing', 'sys/kern/mm/pgalloc.c',
      'int dma = ws_first &&', 'int dma = 0 && ws_first &&', ('ledger', 8192)),
 ]
 
@@ -102,12 +102,12 @@ def run_case(case='default', kb=16384, defines=(), mutation=None, compile_only=F
         (d / 'include').mkdir()
         (d / 'mm').mkdir()
         (d / 'platform/pc98').mkdir(parents=True)
-        for rel in ('include/platform_memory.h',
-                    'platform/pc98/platform_memory_desc.h'):
+        for rel in ('sys/include/platform_memory.h',
+                    'sys/platform/pc98/platform_memory_desc.h'):
             shutil.copyfile(ROOT / rel, d / rel)
         texts = {}
-        for rel in ('mm/paging.c', 'mm/pgalloc.c', 'kernel/sys.c',
-                    'mm/memory_boot.c', 'platform/pc98/memory.c', 'include/memmap.h',
+        for rel in ('sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c', 'sys/kern/sys.c',
+                    'sys/kern/mm/memory_boot.c', 'sys/platform/pc98/memory.c', 'sys/include/memmap.h',
                     'tools/tests/layout_boot_fixture.h'):
             texts[rel] = paging_source(ROOT / rel)
         if mutation:
@@ -116,11 +116,11 @@ def run_case(case='default', kb=16384, defines=(), mutation=None, compile_only=F
                 raise SystemExit('変異 %s の当て先が見つからない: %s' % (mutation[0], rel))
             texts[rel] = texts[rel].replace(old, new, 1)
         for unit in ('paging', 'pgalloc', 'sys'):
-            s = texts['kernel/sys.c' if unit == 'sys' else f'mm/{unit}.c']
+            s = texts['sys/kern/sys.c' if unit == 'sys' else f'mm/{unit}.c']
             s = s.replace('irq_save()', 'host_irq_save()').replace('irq_restore(flags)', 'host_irq_restore(flags)')
             (d / 'kernel' / f'{unit}_host_source.c').write_text(s)
         # 写しの memmap.h を -I の先頭に置く (変異を当てたときだけ中身が違う)。
-        (d / 'memmap.h').write_text(texts['include/memmap.h'])
+        (d / 'memmap.h').write_text(texts['sys/include/memmap.h'])
         (d / 'layout_boot_fixture.h').write_text(texts['tools/tests/layout_boot_fixture.h'])
         kernel = kernel_source(ROOT)
         start = kernel.index('    if (!memory_boot_init(mem_kb))')
@@ -132,20 +132,20 @@ def run_case(case='default', kb=16384, defines=(), mutation=None, compile_only=F
             'static void __attribute__((unused)) host_kernel_boot(u32 mem_kb) {\n'
             '#define kprintf(...) ((void)0)\n#define shm_init() die(7)\n' + gate +
             '\n#undef kprintf\n#undef shm_init\n}\n')
-        probe = texts['platform/pc98/memory.c']
+        probe = texts['sys/platform/pc98/memory.c']
         if case == 'detect_cap':
             # BIOS ワークと書き込み検証をホストの配列で受ける (memory_boot_host.c)。
             if probe.count('P2V_BOOT(') != 3:
                 raise AssertionError('P2V_BOOT probe sites changed')
             probe = probe.replace('P2V_BOOT(', 'host_boot_ptr(')
         (d / 'platform/pc98/memory_host_source.c').write_text(probe)
-        (d / 'kernel/memory_boot_host_source.c').write_text(texts['mm/memory_boot.c'])
-        selftest = (ROOT / 'kdebug/kselftest/slack_cycle.inc').read_text()
+        (d / 'kernel/memory_boot_host_source.c').write_text(texts['sys/kern/mm/memory_boot.c'])
+        selftest = (ROOT / 'sys/kern/kdebug/kselftest/slack_cycle.inc').read_text()
         (d / 'slack_cycle_host_source.c').write_text(selftest)
-        audit = (ROOT / 'init/kaudit_boot.c').read_text()
+        audit = (ROOT / 'sys/kern/init/kaudit_boot.c').read_text()
         (d / 'boot_pages_host_source.c').write_text(audit[audit.index('u32 boot_pages_audit_runs,'):])
         cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', f'-DTEST_{case.upper()}', f'-DTEST_KB={kb}UL'] + list(defines)
-        # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約
+        # arch/x86 + platform/pc98: sys/include/io.h / sys/include/cpu.h は契約
         # だけで、実装は固定名 arch_io.h / arch_cpu.h / platform_io.h を
         # 引く (順序 3・5)。CR0 / CR3 を触る arch_cpu.h だけは、ホストでは
         # tools/tests/host_arch/ の実装が先に見つかるようにする。
@@ -154,8 +154,8 @@ def run_case(case='default', kb=16384, defines=(), mutation=None, compile_only=F
         cmd += ['-nostdinc', '-isystem', builtin]
         cmd += include_flags(ROOT)
         # physmem.c も写しから組む ("memmap.h" を同じ写しで引かせるため)。
-        physmem = d / 'mm/physmem.c'
-        physmem.write_text((ROOT / 'mm/physmem.c').read_text())
+        physmem = d / 'sys/kern/mm/physmem.c'
+        physmem.write_text((ROOT / 'sys/kern/mm/physmem.c').read_text())
         build = subprocess.run(cmd + [str(ROOT / 'tools/tests/memory_boot_host.c'), str(physmem), '-o', str(d / 'test')],
                                capture_output=bool(mutation))
         if build.returncode != 0:
@@ -179,7 +179,7 @@ class MemoryBoot(unittest.TestCase):
         self.assertLess(kernel.index('    kdebug_load();'), kernel.index('    kaudit_boot_pages();'))
         self.assertLess(kernel.index('    gfx_boot_reserve();'), kernel.index('    kaudit_boot_pages();'))
         self.assertLess(kernel.index('    kaudit_boot_pages();'), kernel.index('    exec_init();'))
-        selftest = (ROOT / 'kdebug/kselftest.c').read_text().split('int kselftest_run_post_exec(void)', 1)[1]
+        selftest = (ROOT / 'sys/platform/pc98/kdebug/kselftest.c').read_text().split('int kselftest_run_post_exec(void)', 1)[1]
         self.assertIn('    test_slack_cycle();', selftest.split('\n}', 1)[0])
         for kb in (8192, 12296, 65536):
             with self.subTest(kb=kb):
@@ -245,21 +245,21 @@ class MemoryBoot(unittest.TestCase):
         # 割り込みを禁じたまま止まること (io.h の _stop() = cli; hlt)。
         # 眠って起きる _halt() ではいけない — 先へ進んでしまう。
         self.assertIn('for (;;) { _stop(); }', s[start:downstream])
-        self.assertIn('mm/memory_boot.c', query(ROOT, config_only=True)['C_KERNEL'])
+        self.assertIn('sys/kern/mm/memory_boot.c', query(ROOT, config_only=True)['C_KERNEL'])
 
     def test_legacy_allocator_is_gone(self):
         # D32 / T1a: legacy の口は製品のどこにも残っていない。
-        alloc = paging_source(ROOT / 'mm/pgalloc.c')
-        header = (ROOT / 'mm/pgalloc.h').read_text()
+        alloc = paging_source(ROOT / 'sys/kern/mm/pgalloc.c')
+        header = (ROOT / 'sys/kern/mm/pgalloc.h').read_text()
         self.assertNotRegex(alloc, r'\bvoid\s+pgalloc_init\s*\(')
         self.assertNotRegex(header, r'\bpgalloc_init\s*\(')
         self.assertNotIn('legacy_metadata', alloc)
         self.assertNotIn('PGALLOC_BASE', header + alloc)
-        paging = paging_source(ROOT / 'mm/paging.c')
+        paging = paging_source(ROOT / 'sys/kern/mm/paging.c')
         body = paging.split('static u32 *reserve_table(void)', 1)[1].split('\n}', 1)[0]
         self.assertNotIn('pgalloc_alloc_n_pfn', body)
         self.assertIn('pgalloc_alloc_pt', body)
-        self.assertNotIn('pgalloc_init(', (ROOT / 'mm/memory_boot.c').read_text())
+        self.assertNotIn('pgalloc_init(', (ROOT / 'sys/kern/mm/memory_boot.c').read_text())
 
     def test_high_ram_source_is_memory_boot_only(self):
         # D32: 高位 RAM の登録源は memory_boot_detect (0594h + 書き込み検証) だけ。
@@ -276,8 +276,8 @@ class MemoryBoot(unittest.TestCase):
                 text = paging_source(f)
                 if re.search(r'\bphysmem_add_trusted\s*\(', text) and f.name != 'physmem.c':
                     callers.append(str(f.relative_to(ROOT)))
-        self.assertEqual(callers, ['mm/memory_boot.c'])
-        text = (ROOT / 'mm/memory_boot.c').read_text()
+        self.assertEqual(callers, ['sys/kern/mm/memory_boot.c'])
+        text = (ROOT / 'sys/kern/mm/memory_boot.c').read_text()
         calls = re.findall(r'physmem_add_trusted\s*\(([^;]*)\);', text)
         self.assertEqual(len(calls), 1)
         self.assertIn('PHYSMEM_SOURCE_MACHINE', calls[0])

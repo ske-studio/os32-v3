@@ -17,9 +17,9 @@
 
 基準は origin/main の 69d9cef40。ここでいう同じ gshell.bin は同じ Rust/C ソース・同じ公開 ABI・同じ配置名から作る各 ISA の実行像を指す。
 
-1. 同じ役目は既にある。x86 は exec/exec_kapi_init.inc の関数表から kapi/kapi_generated.c:wrap_gui_register / wrap_gui_call / wrap_sys_switch_shell を経て kernel/gui.c の同名の本体へ入る。gui_register は shell owner 1・特権呼出し・非 NULL handler を要求し、pump を保存して入力を raw にする。gui_call は呼出元 owner を WM に渡し、WAIT と WM の文脈を囲う。gui_owner_exit は子の窓を回収し、WM 終了なら登録・pump・入力モードを戻す。build/sources/common.mk の COMMON_EXEC と hooks.mk の HOOK_gui は **既に PPC にも有効**。欠けるのは sdk/kapi_target_ppc.py の absent 指定を通る利用者側の入口。
-2. 実装は一つにする。gfx/gfx_present.c の v1、gfx/v2、kernel/console の font source、exec と WM は共通。platform/powermac/display_provider.c:display_provider_select が drivers/video/of_fb/backend_of_fb.c:gfx_backend_of_fb を返す。5b/5c の INDEX8 RAM shadow・同期・世代・幅・保護行を使う。機種に残すのは OF 表示の取得・色設定と FB 転送。USB は in2 に入り、WM が入力を読む。
-3. AC-DISPLAY-1～3 と AC-INPUT-1 に沿う。ARCH_DRIFT_AUDIT の B02 は owner の履歴、B03 は段 E より前の記録。現在の platform/powermac/shell_loop_ops.c:gui_default は常に 0、prepare(1) は常に 2。init/shell_loop.c:shell_loop_run と userland/shell/cmd_sys.c の os32gui は既存。USB 設計の C-GUI は KAPI 結線後、製品 GUI 有効化前に両 G4 で行う。独占能力の有効化は D で行う。
+1. 同じ役目は既にある。x86 は sys/kern/exec/exec_kapi_init.inc の関数表から sys/kapi/kapi_generated.c:wrap_gui_register / wrap_gui_call / wrap_sys_switch_shell を経て sys/kern/gui.c の同名の本体へ入る。gui_register は shell owner 1・特権呼出し・非 NULL handler を要求し、pump を保存して入力を raw にする。gui_call は呼出元 owner を WM に渡し、WAIT と WM の文脈を囲う。gui_owner_exit は子の窓を回収し、WM 終了なら登録・pump・入力モードを戻す。build/sources/common.mk の COMMON_EXEC と hooks.mk の HOOK_gui は **既に PPC にも有効**。欠けるのは sdk/kapi_target_ppc.py の absent 指定を通る利用者側の入口。
+2. 実装は一つにする。sys/hal/gfx/gfx_present.c の v1、gfx/v2、kernel/console の font source、exec と WM は共通。sys/platform/powermac/display_provider.c:display_provider_select が sys/dev/video/of_fb/backend_of_fb.c:gfx_backend_of_fb を返す。5b/5c の INDEX8 RAM shadow・同期・世代・幅・保護行を使う。機種に残すのは OF 表示の取得・色設定と FB 転送。USB は in2 に入り、WM が入力を読む。
+3. AC-DISPLAY-1～3 と AC-INPUT-1 に沿う。ARCH_DRIFT_AUDIT の B02 は owner の履歴、B03 は段 E より前の記録。現在の sys/platform/powermac/shell_loop_ops.c:gui_default は常に 0、prepare(1) は常に 2。sys/kern/init/shell_loop.c:shell_loop_run と userland/shell/cmd_sys.c の os32gui は既存。USB 設計の C-GUI は KAPI 結線後、製品 GUI 有効化前に両 G4 で行う。独占能力の有効化は D で行う。
 
 sdk/kapi_target_ppc.py の gfx 群は 7 口。gshell/src/wm.rs は set/get_palette、lease.rs は lease_palette、userland/lib/gfx/draw/gfx_cmd.c は hw_submit/get を使う。hardware_scroll・osri_show と gfx2 群唯一の gfx2_check_op は直接の GUI 起動要件から外す。最終 ELF の到達可能な呼出しで照合する。既存の gfx_init・screen_info・dirty/present は再実装不要。
 
@@ -31,7 +31,7 @@ sdk/kapi_target_ppc.py の gfx 群は 7 口。gshell/src/wm.rs は set/get_palet
     set_palette → gfx_set_palette_hal    get_palette → palette_get
     lease_palette → gfx_lease_palette    hw_submit/get → gfx_hw_submit/get
 
-生成元で対象だけ absent から除き、同じ群に残る absent が必要な実提供者ヘッダまで抑制しないよう include 集合も分割する。sdk/kapi.json の out/in 長検査を保ち、生成器で再生成。gfx/gfx_hw_submit.c と gfx_hw_mono_cpu.c を pending から EXEC へ移す。対応 op は既存のソフト処理と HAL の能力判定を使い、未対応 op の完了件数・戻り値を維持する。
+生成元で対象だけ absent から除き、同じ群に残る absent が必要な実提供者ヘッダまで抑制しないよう include 集合も分割する。sdk/kapi.json の out/in 長検査を保ち、生成器で再生成。sys/hal/gfx/gfx_hw_submit.c と gfx_hw_mono_cpu.c を pending から EXEC へ移す。対応 op は既存のソフト処理と HAL の能力判定を使い、未対応 op の完了件数・戻り値を維持する。
 
     gfx::init → gfx_init → display_provider_public_init_ok()
     gfx_present_dirty → DISPLAY_V1_PRESENT_OK() → gfx_v1_present_rect
@@ -64,13 +64,13 @@ PPC の gui_default は x86 同様 SYSTEM.CFG の GUI を読む。prepare は利
 |---|---|---|
 |1|build/sources/common.mk|HW コマンドと MONO の共通提供者を EXEC 像で解決|
 |2|sdk/kapi_target_ppc.py|上記 8 口が実提供者へ解決。生成物は生成器の出力として機械更新|
-|3|drivers/video/of_fb/backend_of_fb.h|固定 CLUT の受渡しを記述|
-|4|platform/powermac/display_provider.c|OF 初期化から CLUT と可用性を受け渡し、世代・owner の門を照合|
-|5|drivers/video/of_fb/backend_of_fb.c|set/query/copy が同じ変換表を使用、保護行と padding を保存|
+|3|sys/dev/video/of_fb/backend_of_fb.h|固定 CLUT の受渡しを記述|
+|4|sys/platform/powermac/display_provider.c|OF 初期化から CLUT と可用性を受け渡し、世代・owner の門を照合|
+|5|sys/dev/video/of_fb/backend_of_fb.c|set/query/copy が同じ変換表を使用、保護行と padding を保存|
 |6|sdk/rust/powerpc-os32-none.json（新規）|32 bit BE SysV。整数・ポインタ・浮動小数点 ABI を PPC_USER_ABI と照合|
 |7|build/ppc-user.mk|同じ userland/gshell を明示 cargo target で staticlib 化。PPC 用 gfx・cfg、resident CRT、syscalls、既存 newlib nano/allocator と libgcc で app_sys.ld にリンク。shell と同じ guard・objcopy・mkos32x。未解決 extern、x86 asm、SHM の endian 固定を参照元単位で解消|
 |8|build/targets/ppc-powermac.mk|kb-user と root の依存に gshell.bin を追加。像更新時に root 再生成|
-|9|platform/powermac/shell_loop_ops.c|設定値と実能力により GUI 起動、失敗時に CUI を再利用|
+|9|sys/platform/powermac/shell_loop_ops.c|設定値と実能力により GUI 起動、失敗時に CUI を再利用|
 |10|tools/tests/test_of_fb.py|色・世代・部分転送を host fixture で照合|
 |11|tools/accept/ppc_gui.py（新規）|既存 ppc_mouse の build / Session を使い製品経路の起動・復帰を照合|
 
@@ -90,7 +90,7 @@ PowerPC 担当は OF FB と PPC 常駐像・受入用 root を用意し、本線
 - 7450・7455 の各々で C-GUI 専用構成から二つの失敗試験を別々に冷起動する。どちらも /sys/shell.bin は通常の CUI 像とし、prepare(1) 通過後の Loading /bin/gshell.bin を観測する。欠落試験では /bin/gshell.bin だけを root から除き、読込失敗の次の起動が /sys/shell.bin であることを照合する。fault 試験では /bin/gshell.bin に起動ごとに fault する試験像を置く。切替要求を挟まず同パスの起動と EXEC_ERR_FAULT が 3 回続き、最初の 2 回は再試行、3 回目の直後に /sys/shell.bin が起動することを照合する。各試行で物理キーから入力した CUI コマンドの応答まで確認する。D の HID 独占・焦点変更・解放は USB in2 設計に従う。
 C-GUI は QMP の各入力をゲストの観測応答で区切る。前景 probe が列挙した dev で A make、保持、break を照合し、押下照会が 1→0、WM の raw が make→break、保持中の in2 KEY 反復が 0 件となることを確認する。相対移動 (+12,−7)、左押下、解除は別々に送り、probe の MOVE・BUTTON と WM のポインタ状態を照合する。別窓をクリックし、前景交代の通知後に次のキーが新しい前景へ届くこと、ドラッグ解除後は移動だけで窓が動かないことを確認する。WM から CUI への切り替えを要求して終了した後 (普通の終了だけではループが同じ GUI の像を起動し直す) は CUI で物理キーからコマンドを入力し、cooked 入力の復帰を応答で判定する。
 
-origin/main の 56d7be02d にある kernel/gui.c と kernel/av_focus.c を基準に、次を両機種の公開入口から試す。
+origin/main の 56d7be02d にある sys/kern/gui.c と sys/kern/av_focus.c を基準に、次を両機種の公開入口から試す。
 
 |入口|操作と期待値|
 |---|---|

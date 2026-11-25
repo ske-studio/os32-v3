@@ -1,8 +1,8 @@
 /* 32-bit, libc-free observer. Link actual HPT and C1 walker; fake only
  * privileged operations and observe stores (no replacement insertion/walk). */
-#include "arch/ppc/ppc_hpt.h"
-#include "arch/ppc/ppc_frame.h"
-#include "mm/paging.h"
+#include "sys/arch/ppc/ppc_hpt.h"
+#include "sys/arch/ppc/ppc_frame.h"
+#include "sys/kern/mm/paging.h"
 static void exit_code(int code) __attribute__((noreturn));
 static void exit_code(int code)
 {

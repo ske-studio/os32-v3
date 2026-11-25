@@ -60,7 +60,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'arch/ppc/dma_cache.c').read_text()
+    original = (ROOT / 'sys/arch/ppc/dma_cache.c').read_text()
     with tempfile.TemporaryDirectory() as directory:
         temp = Path(directory)
         source = temp / 'dma_cache.c'

@@ -1,6 +1,6 @@
-# hwdev/hwdev_module.c — 設計
+# sys/dev/hwdev/hwdev_module.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: HWDEV_CORE_API・HWDEV_DESIGN (D1 で移した)
-ソース: `hwdev/hwdev_module.c`
+ソース: `sys/dev/hwdev/hwdev_module.c`
 
 ```c
 /* facade 内の接続順序 (擬似コード、各失敗は登録前に拒否) */

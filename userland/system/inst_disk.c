@@ -1,7 +1,7 @@
 /* Shared installer capacity estimates and destination path checks. */
 
 #include "inst_disk.h"
-#include "fs/ext2/ext2_layout.h"
+#include "sys/fs/ext2/ext2_layout.h"
 
 void inst_need_init(InstNeed *n)
 {

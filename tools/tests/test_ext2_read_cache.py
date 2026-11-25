@@ -9,12 +9,12 @@ import host32
 from kernel_includes import include_flags
 
 CHECK = dict(name='ext2-read-cache-host', tier=1, budget=4.2,
-             covers=['include/ext2_medium_contract.h', 'fs/ext2/ext2_medium_ide.c', 'fs/ext2/*.c', 'fs/ext2/*.inc', 'fs/ext2/*.h',
+             covers=['sys/include/ext2_medium_contract.h', 'sys/platform/pc98/storage/ext2_medium_ide.c', 'fs/ext2/*.c', 'fs/ext2/*.inc', 'fs/ext2/*.h',
                      'tools/tests/ext2_read_cache_host.c',
                      'tools/tests/test_ext2_read_cache.py', 'tools/tests/host32.py',
                      'tools/tests/hdd_pt_fake.h', 'tools/tests/kernel_includes.py',
-                     'fs/pc98pt.c', 'fs/pc98pt.h', 'include/ide_contract.h',
-                     'include/platform_device.h'], needs=[],
+                     'sys/fs/pc98pt.c', 'sys/fs/pc98pt.h', 'sys/include/ide_contract.h',
+                     'sys/include/platform_device.h'], needs=[],
     kind='characterization',
 )
 ROOT = Path(__file__).resolve().parents[2]

@@ -5,7 +5,7 @@
  *  実行:   python3 -B tools/tests/test_ring3_str.py
  *  記録:   tools/tests/t9_tdd.md
  *
- *  exec/ring3_str.c を 1 行も写さずそのまま #include する (模型ではない)。
+ *  sys/kern/exec/ring3_str.c を 1 行も写さずそのまま #include する (模型ではない)。
  *  カーネル帯の代わりに要るのは kstrncpy だけ。トランポリンページは
  *  ホストの 4KB 配列で代用し、**番地の式は実物のマクロ** を使う
  *  (RING3_USTR_STUB_OFF / RING3_USTR_OFF / RING3_USTR_CAP)。
@@ -37,8 +37,8 @@ char *kstrncpy(char *dst, const char *src, u32 n)
 /* 実物 */
 #include "ring3_str.c"
 
-/* 写し場がスタブの後ろで 1 ページに収まる (exec/exec.c と同じ検査)。
- * PAGE_SIZE は mm/paging.h だが、ここでは番地の式だけを見たいので
+/* 写し場がスタブの後ろで 1 ページに収まる (sys/kern/exec/exec.c と同じ検査)。
+ * PAGE_SIZE は sys/kern/mm/paging.h だが、ここでは番地の式だけを見たいので
  * 値を持ち込まずに 4096 を使う (i386 の 4KB ページは動かない)。 */
 #define HOST_PAGE_SIZE 4096u
 STATIC_ASSERT(RING3_USTR_OFF >= sizeof(KernelAPI), host_ustr_after_table);
@@ -75,7 +75,7 @@ static void check(int cond, const char *name)
 
 /* トランポリンページの代わり (番地は実物のマクロで引く)。 */
 static u8 host_page[HOST_PAGE_SIZE];
-/* fs/vfs.c の static cwd の代わり (カーネル帯 = CPL=3 からは読めない番地)。 */
+/* sys/fs/vfs.c の static cwd の代わり (カーネル帯 = CPL=3 からは読めない番地)。 */
 static char host_cwd[RING3_USTR_CAP];
 
 static char *scratch(void)

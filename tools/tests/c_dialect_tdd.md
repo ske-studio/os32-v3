@@ -12,9 +12,9 @@
 
 1. `make -n -B all` のコンパイル行 (`i386-elf-gcc … -c`) を読み、旗の組 (−I・依存生成・`-c`・`-o`・ソースを除いたもの) ごとに
    `-E -dM` で `__STDC_VERSION__` / `__STRICT_ANSI__` を聞く。期待は SQLite 系 (`lib/sqlite3/{sqlite3,os32_sqlite_vfs}.c` とビルドが作るその写し、
-   `userland/tests/sqlite_standalone/`) が gnu89、それ以外 (`lib/sqlite3/os32_sqlite_test.c` を含む) が gnu11。SQLite 系・`platform/pc98/kernel.c`・`boot/boot_main.c` がコンパイル行に無ければ落ちる (空振りの番人)。
+   `userland/tests/sqlite_standalone/`) が gnu89、それ以外 (`lib/sqlite3/os32_sqlite_test.c` を含む) が gnu11。SQLite 系・`sys/platform/pc98/kernel.c`・`boot/boot_main.c` がコンパイル行に無ければ落ちる (空振りの番人)。
 2. gnu11 の旗の組ごとに探りを 5 本コンパイルする: VLA・暗黙の関数宣言・暗黙 int・偽の `STATIC_ASSERT` は**期待する診断の文言つきで**拒否、
-   真の `STATIC_ASSERT` は通る。`STATIC_ASSERT` は木の `include/types.h` の実物のマクロを使う。
+   真の `STATIC_ASSERT` は通る。`STATIC_ASSERT` は木の `sys/include/types.h` の実物のマクロを使う。
 3. 公開 SDK ヘッダ (`sdk/include/os32/*.h`。`os32_kapi_shared.h` もここ) は `-std=gnu89 -Wc90-c99-compat -Wc99-c11-compat
    -Wdeclaration-after-statement -Wlong-long -Werror` と `-std=gnu11 -Werror` の両方で取り込む (行コメント・宣言位置・`_Bool`・
    指示付き初期化子・`restrict`・`_Static_assert`・`long long` はコンパイラが拒否する)。加えて前処理後の出力 (下の 4 と同じ読み方) で、

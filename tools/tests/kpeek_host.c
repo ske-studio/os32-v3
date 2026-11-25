@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  kpeek_host.c — kdebug の peek 本体 (kdebug/kpeek.c) の    */
+/*  kpeek_host.c — kdebug の peek 本体 (sys/platform/pc98/kdebug/kpeek.c) の    */
 /*  ホスト試験 (TASK_KPEEK §4)                                              */
 /*                                                                          */
 /*  実物の kpeek.c を 1 行も写さずに #include し、import   */
@@ -20,7 +20,7 @@
 #include "memmap.h"
 #include "pc98.h"
 #include "paging.h"
-#include "drivers/pci/pci.h"
+#include "sys/dev/pci/pci.h"
 
 /* ---- 出力と終了 (libc なし、ILP32 の int 0x80 — cirrus_win_host.c と同じ) ---- */
 static void output(const char *s)
@@ -165,8 +165,8 @@ int sfs_lan_peer_mac(u8 *out)
 }
 
 #define KDEBUG_WINDOW_HOST 1
-#include "../../kdebug/kdebug_window.c"
-#include "../../kdebug/kpeek.c"
+#include "../../sys/arch/x86/kdebug/kdebug_window.c"
+#include "../../sys/platform/pc98/kdebug/kpeek.c"
 
 /* ---- 道具 ---------------------------------------------------------- */
 #define NV_BAR0 0x24000000U

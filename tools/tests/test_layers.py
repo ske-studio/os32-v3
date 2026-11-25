@@ -56,19 +56,19 @@ def suite(tool):
         def test_common_rules_on_matching_image(self):
             files = {
                 'kernel/a.c': inc('arch_io.h', 'idt.h', 'pit.h', 'fdc.h', 'pc98.h', 'ok.h'),
-                'arch/x86/arch_io.h': inc('x86_flags.h'), 'arch/x86/x86_flags.h': '',
-                'arch/x86/kernel/idt.h': '', 'platform/pc98/pit.h': '',
-                'platform/pc98/platform_io.h': '', 'drivers/block/fdc.h': inc('platform_io.h'),
-                'include/pc98.h': '', 'include/ok.h': '',
+                'sys/arch/x86/arch_io.h': inc('x86_flags.h'), 'sys/arch/x86/x86_flags.h': '',
+                'sys/arch/x86/kernel/idt.h': '', 'sys/platform/pc98/pit.h': '',
+                'sys/platform/pc98/platform_io.h': '', 'sys/dev/block/fdc.h': inc('platform_io.h'),
+                'sys/platform/pc98/pc98.h': '', 'include/ok.h': '',
             }
-            words = ['kernel/a.c', 'arch/x86/arch_io.h', 'arch/x86/x86_flags.h',
-                     'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'platform/pc98/platform_io.h',
-                     'drivers/block/fdc.h', 'include/pc98.h', 'include/ok.h']
+            words = ['kernel/a.c', 'sys/arch/x86/arch_io.h', 'sys/arch/x86/x86_flags.h',
+                     'sys/arch/x86/kernel/idt.h', 'sys/platform/pc98/pit.h', 'sys/platform/pc98/platform_io.h',
+                     'sys/dev/block/fdc.h', 'sys/platform/pc98/pc98.h', 'include/ok.h']
             self.assertEqual(self.edges('x86-pc98', files, {'obj/kernel/a.d': words}), {
-                ('R1', 'kernel/a.c', 'arch/x86/kernel/idt.h'): 1,
-                ('R2', 'kernel/a.c', 'platform/pc98/pit.h'): 1,
-                ('R3', 'kernel/a.c', 'drivers/block/fdc.h'): 1,
-                ('R4', 'kernel/a.c', 'include/pc98.h'): 1,
+                ('R1', 'kernel/a.c', 'sys/arch/x86/kernel/idt.h'): 1,
+                ('R2', 'kernel/a.c', 'sys/platform/pc98/pit.h'): 1,
+                ('R3', 'kernel/a.c', 'sys/dev/block/fdc.h'): 1,
+                ('R4', 'kernel/a.c', 'sys/platform/pc98/pc98.h'): 1,
             })
 
         def test_device_and_arch_readers(self):
@@ -76,19 +76,19 @@ def suite(tool):
                 'drivers/net/n.c': inc('idt.h', 'pit.h', 'arch_cpu.h'),
                 'arch/x86/kernel/v.c': inc('bios.h', 'platform_io.h', 'gdt.h'),
                 'platform/pc98/p.c': inc('gdt.h', 'bios.h'),
-                'arch/x86/kernel/idt.h': '', 'arch/x86/kernel/gdt.h': '', 'arch/x86/arch_cpu.h': '',
-                'platform/pc98/pit.h': '', 'platform/pc98/bios.h': '', 'platform/pc98/platform_io.h': '',
+                'sys/arch/x86/kernel/idt.h': '', 'sys/arch/x86/kernel/gdt.h': '', 'sys/arch/x86/arch_cpu.h': '',
+                'sys/platform/pc98/pit.h': '', 'platform/pc98/bios.h': '', 'sys/platform/pc98/platform_io.h': '',
             }
             deps = {
-                'lan/n.d': ['drivers/net/n.c', 'arch/x86/kernel/idt.h', 'platform/pc98/pit.h',
-                            'arch/x86/arch_cpu.h'],
+                'lan/n.d': ['drivers/net/n.c', 'sys/arch/x86/kernel/idt.h', 'sys/platform/pc98/pit.h',
+                            'sys/arch/x86/arch_cpu.h'],
                 'obj/arch/v.d': ['arch/x86/kernel/v.c', 'platform/pc98/bios.h',
-                                 'platform/pc98/platform_io.h', 'arch/x86/kernel/gdt.h'],
-                'obj/platform/p.d': ['platform/pc98/p.c', 'arch/x86/kernel/gdt.h',
+                                 'sys/platform/pc98/platform_io.h', 'sys/arch/x86/kernel/gdt.h'],
+                'obj/platform/p.d': ['platform/pc98/p.c', 'sys/arch/x86/kernel/gdt.h',
                                      'platform/pc98/bios.h'],
             }
             self.assertEqual(self.edges('x86-pc98', files, deps), {
-                ('R5', 'drivers/net/n.c', 'arch/x86/kernel/idt.h'): 1,
+                ('R5', 'drivers/net/n.c', 'sys/arch/x86/kernel/idt.h'): 1,
                 ('R7', 'arch/x86/kernel/v.c', 'platform/pc98/bios.h'): 1,
             })
 
@@ -98,30 +98,30 @@ def suite(tool):
                                                          'legacy_guest.h', 'kbd.h'),
                 'gfx/h.c': inc('g.h', 'stub.h'), 'drivers/video/fb.c': inc('pc98.h'),
                 'arch/x86/kernel/x.c': '', 'platform/none/stub.h': '',
-                'include/pc98.h': '', 'include/v86_call.h': '', 'arch/x86/arch_io.h': '',
-                'include/legacy_guest.h': '', 'include/kbd.h': '', 'platform/none/null_provider.c': '',
+                'sys/platform/pc98/pc98.h': '', 'sys/arch/x86/v86_call.h': '', 'sys/arch/x86/arch_io.h': '',
+                'sys/include/legacy_guest.h': '', 'sys/include/kbd.h': '', 'platform/none/null_provider.c': '',
                 'gfx/only_shell.c': inc('pc98.h'), 'gfx/only_neg.c': inc('pc98.h'),
                 OUT + '/ppc-kboot/gen/exports.c': inc('pc98.h'),
-                'gfx/old.h': inc('wab_xe10.h'), 'include/wab_xe10.h': '',
+                'gfx/old.h': inc('wab_xe10.h'), 'sys/platform/pc98/wab_xe10.h': '',
             }
             deps = {
-                'ppc-kboot/gfx/g.d': ['gfx/g.c', 'gfx/g.h', 'include/pc98.h', 'include/v86_call.h',
-                                      'arch/x86/arch_io.h', 'include/legacy_guest.h', 'include/kbd.h'],
+                'ppc-kboot/gfx/g.d': ['gfx/g.c', 'gfx/g.h', 'sys/platform/pc98/pc98.h', 'sys/arch/x86/v86_call.h',
+                                      'sys/arch/x86/arch_io.h', 'sys/include/legacy_guest.h', 'sys/include/kbd.h'],
                 'ppc-kboot/platform/none/l.d': ['platform/none/null_provider.c'],
-                'ppc-kboot/shell/gfx/s.d': ['gfx/only_shell.c', 'include/pc98.h'],
-                'ppc-kboot/neg1/gfx/n.d': ['gfx/only_neg.c', 'include/pc98.h'],
-                'ppc-kboot/gen/exports.d': [OUT + '/ppc-kboot/gen/exports.c', 'include/pc98.h'],
-                'ppc-kboot/gfx/gone.d': ['gfx/gone.c', 'gfx/old.h', 'include/wab_xe10.h'],
-                'ppc-kboot/sh/gfx/h.d': ['gfx/h.c', 'gfx/g.h', 'include/pc98.h',
+                'ppc-kboot/shell/gfx/s.d': ['gfx/only_shell.c', 'sys/platform/pc98/pc98.h'],
+                'ppc-kboot/neg1/gfx/n.d': ['gfx/only_neg.c', 'sys/platform/pc98/pc98.h'],
+                'ppc-kboot/gen/exports.d': [OUT + '/ppc-kboot/gen/exports.c', 'sys/platform/pc98/pc98.h'],
+                'ppc-kboot/gfx/gone.d': ['gfx/gone.c', 'gfx/old.h', 'sys/platform/pc98/wab_xe10.h'],
+                'ppc-kboot/sh/gfx/h.d': ['gfx/h.c', 'gfx/g.h', 'sys/platform/pc98/pc98.h',
                                          'platform/none/stub.h'],
-                'ppc-kboot/drivers/fb.d': ['drivers/video/fb.c', 'include/pc98.h'],
+                'ppc-kboot/drivers/fb.d': ['drivers/video/fb.c', 'sys/platform/pc98/pc98.h'],
                 'ppc-kboot/arch/x.d': ['arch/x86/kernel/x.c'],
             }
             self.assertEqual(self.edges('ppc-powermac', files, deps), {
-                ('R6', 'gfx/g.h', 'include/pc98.h'): 2,
-                ('R6', 'gfx/g.c', 'include/v86_call.h'): 1,
-                ('R6', 'gfx/g.c', 'arch/x86/arch_io.h'): 1,
-                ('R6', 'drivers/video/fb.c', 'include/pc98.h'): 1,
+                ('R6', 'gfx/g.h', 'sys/platform/pc98/pc98.h'): 2,
+                ('R6', 'gfx/g.c', 'sys/arch/x86/v86_call.h'): 1,
+                ('R6', 'gfx/g.c', 'sys/arch/x86/arch_io.h'): 1,
+                ('R6', 'drivers/video/fb.c', 'sys/platform/pc98/pc98.h'): 1,
                 ('R6', 'arch/x86/kernel/x.c', '-'): 1,
                 ('R2', 'gfx/h.c', 'platform/none/stub.h'): 1,
             })
@@ -133,11 +133,11 @@ def suite(tool):
                 'net/b.c': inc('<render.h>', '<stdint.h>'), 'net/render.h': '',
                 'platform/pc98/render.h': '',
                 'net/clock.h': '', 'platform/pc98/clock.h': '', 'gfx/v2/deep.h': inc('clock.h'),
-                'arch/x86/kernel/idt.h': '', 'platform/pc98/absent.h': '',
+                'sys/arch/x86/kernel/idt.h': '', 'platform/pc98/absent.h': '',
                 'platform/pc98/sysclock.h': '',
             }
             words = ['net/a.c', 'net/clock.h', 'platform/pc98/clock.h', 'gfx/v2/deep.h',
-                     'arch/x86/kernel/idt.h', 'platform/pc98/sysclock.h']
+                     'sys/arch/x86/kernel/idt.h', 'platform/pc98/sysclock.h']
             deps = {'obj/net/a.d': words,
                     'sqlite-proto/b.d': ['net/b.c', 'net/render.h', 'platform/pc98/render.h',
                                          '/usr/include/stdint.h']}
@@ -149,19 +149,19 @@ def suite(tool):
         def test_generated_kapi_and_build_headers(self):
             for profile in ('ppc-kboot/sh', 'ppc-powermac'):
                 gen = OUT + '/' + profile + '/gen/'
-                source = gen + 'kapi/kapi_generated.c'
+                source = gen + 'sys/kapi/kapi_generated.c'
                 dep = profile + '/gen/kapi/kapi_generated.d'
-                words = [source, gen + 'gen.h', 'include/pc98.h', '/usr/include/x.h']
+                words = [source, gen + 'gen.h', 'sys/platform/pc98/pc98.h', '/usr/include/x.h']
                 build(self.root, {source: inc('gen.h'), gen + 'gen.h': inc('pc98.h'),
-                                  'include/pc98.h': ''}, {dep: words})
+                                  'sys/platform/pc98/pc98.h': ''}, {dep: words})
             build(self.root, {'userland/shell/command.c': inc('pc98.h')},
-                  {'ppc-powermac/user/command.d': ['userland/shell/command.c', 'include/pc98.h']})
-            clean = ({}, {'kapi/kapi_generated.c'}, [])
+                  {'ppc-powermac/user/command.d': ['userland/shell/command.c', 'sys/platform/pc98/pc98.h']})
+            clean = ({}, {'sys/kapi/kapi_generated.c'}, [])
             self.assertEqual(tool.measure(self.root, 'ppc-powermac'), clean)
-            build(self.root, {source: inc('gen.h', 'wab_xe10.h'), 'include/wab_xe10.h': ''},
-                  {dep: words + ['include/wab_xe10.h']})
+            build(self.root, {source: inc('gen.h', 'wab_xe10.h'), 'sys/platform/pc98/wab_xe10.h': ''},
+                  {dep: words + ['sys/platform/pc98/wab_xe10.h']})
             found, units, empty = tool.measure(self.root, 'ppc-powermac')
-            self.assertEqual(set(found), {('R6', 'kapi/kapi_generated.c', 'include/wab_xe10.h')})
+            self.assertEqual(set(found), {('R6', 'sys/kapi/kapi_generated.c', 'sys/platform/pc98/wab_xe10.h')})
             self.assertEqual((units, empty), (clean[1], []))
             build(self.root, {source: inc('gen.h')}, {dep: words})
             self.assertEqual(tool.measure(self.root, 'ppc-powermac'), clean)
@@ -173,28 +173,28 @@ def suite(tool):
             return rc, out.getvalue()
 
         def test_baseline_ratchet(self):
-            build(self.root, {'kernel/a.c': inc('pit.h'), 'platform/pc98/pit.h': ''},
-                  {name + '/a.d': ['kernel/a.c', 'platform/pc98/pit.h']
+            build(self.root, {'kernel/a.c': inc('pit.h'), 'sys/platform/pc98/pit.h': ''},
+                  {name + '/a.d': ['kernel/a.c', 'sys/platform/pc98/pit.h']
                    for name in tool.IMAGES['x86-pc98'][2]})
             path = self.root / 'tools/layers_baseline.json'
             path.parent.mkdir()
-            kept = [['R6', 'gfx/g.h', 'include/pc98.h']]
+            kept = [['R6', 'gfx/g.h', 'sys/platform/pc98/pc98.h']]
             path.write_text(json.dumps({'ppc-powermac': kept}))
             rc, text = self.run_tool('--image', 'x86-pc98')
             self.assertEqual(rc, 1)
-            self.assertIn('new violation: R2 kernel/a.c platform/pc98/pit.h', text)
+            self.assertIn('new violation: R2 kernel/a.c sys/platform/pc98/pit.h', text)
             self.assertEqual(self.run_tool('--image', 'x86-pc98', '--write-baseline')[0], 0)
             data = json.loads(path.read_text())
             self.assertEqual(data, {'ppc-powermac': kept,
-                                    'x86-pc98': [['R2', 'kernel/a.c', 'platform/pc98/pit.h']]})
+                                    'x86-pc98': [['R2', 'kernel/a.c', 'sys/platform/pc98/pit.h']]})
             rc, text = self.run_tool('--image', 'x86-pc98')
             self.assertEqual(rc, 0)
             self.assertIn('x86-pc98: units=1 edges=1 R2=1', text)
-            data['x86-pc98'].append(['R1', 'kernel/a.c', 'arch/x86/kernel/idt.h'])
+            data['x86-pc98'].append(['R1', 'kernel/a.c', 'sys/arch/x86/kernel/idt.h'])
             path.write_text(json.dumps(data))
             rc, text = self.run_tool('--image', 'x86-pc98')
             self.assertEqual(rc, 1)
-            self.assertIn('stale baseline (remove): R1 kernel/a.c arch/x86/kernel/idt.h', text)
+            self.assertIn('stale baseline (remove): R1 kernel/a.c sys/arch/x86/kernel/idt.h', text)
 
         def test_unbuilt_image_fails(self):
             build(self.root, {'kernel/a.c': ''}, {'obj/a.d': ['kernel/a.c']})
@@ -220,7 +220,7 @@ MUTANTS = [
     ("if mark == '\"' and local in files:", "if False:"),
     ("path == tail or path.endswith('/' + tail)", "path.endswith(os.path.basename(tail))"),
     ("INCLUDE.findall(COMMENT.sub(' ', text))", "INCLUDE.findall(text)"),
-    ("unit = 'kapi/kapi_generated.c'", "continue"),
+    ("unit = 'sys/kapi/kapi_generated.c'", "continue"),
     ("edges.setdefault(('R6', unit, '-'), set()).add(unit)", "pass"),
     ("reader = unit if path == real else path", "reader = unit"),
     ("if path.startswith('build/') and path != real:", "if False:"),

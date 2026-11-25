@@ -1,4 +1,4 @@
-#include "input/hal/keymap.h"
+#include "sys/hal/input/keymap.h"
 extern const KmBackend s1p_pc98_backend;
 extern const KmExactCell expected[128][8];
 extern const u8 expected_flags[128];

@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "fs/vfs_device.h"
-#include "fs/ramfs/ramfs.h"
+#include "sys/fs/vfs_device.h"
+#include "sys/fs/ramfs/ramfs.h"
 #include "sqlite3.h"
 #include "os32_sqlite_vfs.h"
 

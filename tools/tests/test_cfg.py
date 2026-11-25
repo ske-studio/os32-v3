@@ -10,7 +10,7 @@ sudo・mount・配備・エミュレータには一切触らない (tsv fixture 
 """
 import sqlite_cc
 CHECK = dict(name='cfg-host', tier=1,
-    covers=['tools/tests/sqlite_bits_host.h', 'lib/softfloat/**', 'lib/softfloat_bits.c', 'lib/softfloat_bits.h', 'tools/tests/sqlite_cc.py', 'assets/settings/defaults.tsv', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kapi/kapi_db.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/mk_settings_db.py', 'tools/tests/cfg_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/cmds/cfg.c', 'userland/lib/cfg/cfg_backend.c', 'userland/lib/cfg/cfg_enum.c', 'userland/lib/cfg/cfg_import.c', 'userland/lib/cfg/cfg_init.c', 'userland/lib/cfg/cfg_json.c', 'userland/lib/cfg/cfg_tsv.c', 'userland/lib/cfg/libos32cfg.c', 'userland/tests/cfg_bench.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h'],
+    covers=['tools/tests/sqlite_bits_host.h', 'lib/softfloat/**', 'lib/softfloat_bits.c', 'lib/softfloat_bits.h', 'tools/tests/sqlite_cc.py', 'assets/settings/defaults.tsv', 'sys/fs/vfs_fd.c', 'sys/fs/vfs_fd_stdin.inc', 'sys/fs/vfs_stdin.h', 'sys/kern/exec/exec.h', 'sys/kapi/kapi_db.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/mk_settings_db.py', 'tools/tests/cfg_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/cmds/cfg.c', 'userland/lib/cfg/cfg_backend.c', 'userland/lib/cfg/cfg_enum.c', 'userland/lib/cfg/cfg_import.c', 'userland/lib/cfg/cfg_init.c', 'userland/lib/cfg/cfg_json.c', 'userland/lib/cfg/cfg_tsv.c', 'userland/lib/cfg/libos32cfg.c', 'userland/diag/cfg_bench.c', 'tools/tests/input_fixture_host.h', 'sys/hal/input/input_service.c', 'sys/hal/input/pointer_service.h', 'sys/hal/input/input_service.h', 'sys/include/kbd.h'],
     needs=[], budget=14.0,
     kind='characterization',
 )
@@ -91,7 +91,7 @@ INC = ["-I" + str(ROOT / p) for p in
 CONFIG = str(ROOT / "lib/sqlite3/os32_sqlite_config.h")
 
 SHIMS = {
-    "exec/exec.h": "#include \"vfs_stdin.h\"\nVfsStdinRead *exec_stdin_state(void);\n",
+    "sys/kern/exec/exec.h": "#include \"vfs_stdin.h\"\nVfsStdinRead *exec_stdin_state(void);\n",
     "memmap.h": "extern unsigned char test_shm[];\n#define MEM_SHM_BASE test_shm\n#define MEM_SHM_DB_OFFSET 0UL\n#define MEM_SHM_DB_BASE (MEM_SHM_BASE + MEM_SHM_DB_OFFSET)\n",
     "exec.h": "int ring3_user_range_ok(u32 p, u32 len);\n",
 }
@@ -213,7 +213,7 @@ def target_compile(tmp):
             "userland/lib/cfg/cfg_tsv.c", "userland/lib/cfg/cfg_init.c",
             "userland/lib/cfg/cfg_json.c", "userland/lib/cfg/cfg_import.c",
             "userland/lib/cfg/cfg_backend.c", "userland/cmds/cfg.c",
-            "userland/tests/cfg_bench.c"]
+            "userland/diag/cfg_bench.c"]
     for src in srcs:
         extra = ["-Iuserland/lib/cfg"] if src.startswith("userland/lib") else []
         subprocess.run(["i386-elf-gcc", *flags, *extra, "-c", src,

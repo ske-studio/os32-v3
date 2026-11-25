@@ -2,7 +2,7 @@
 
 > 状態: **現行 (2026-10-31)** — 設計: gpt-6-astra、確定設計 IMETAB
 
-ソース: `kernel/ime/ime_delivery.inc`、接続: `kernel/ime/ime.c`。
+ソース: `sys/kern/ime/ime_delivery.inc`、接続: `sys/kern/ime/ime.c`。
 
 候補確定後の更新列は [ime_candidate_commit](ime_candidate_commit.md)、
 確定バイトの取得は [ime_commit_take](ime_commit_take.md)、

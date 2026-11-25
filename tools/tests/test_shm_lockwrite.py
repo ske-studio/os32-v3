@@ -17,7 +17,7 @@ p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--runner', default='qemu')
 p.add_argument('--mutate', action='store_true')
 a = p.parse_args()
-s = (ROOT/'userland/tests/shm_reuse_child.c').read_text()
+s = (ROOT/'userland/diag/shm_reuse_child.c').read_text()
 check(s)
 print('PASS lockwrite guest wiring')
 if a.mutate:

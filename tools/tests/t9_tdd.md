@@ -1,6 +1,6 @@
 # T9 ホスト TDD の記録 (K = 起動要求表 / W = WM 側の仲介)
 
-契約: `include/launch.h` の起動要求表・所有・完了通知。
+契約: `sys/include/launch.h` の起動要求表・所有・完了通知。
 実行: `make check-launch-host` (= `python3 -B tools/tests/test_launch.py`) と
 `make check-multiapp-model-host` (その中の `test_multiapp_impl.py`)。
 
@@ -29,16 +29,16 @@ GUI 端末の sh から外部プログラムを起動して終了後にプロン
 
 | ハーネス | 取り込む実物 | 見るもの |
 |---|---|---|
-| `tools/tests/launch_host.c` | `exec/launch.c` + `exec/appslot.c` | 要求表の遷移・権限・token の照合・連鎖の解決 |
-| `tools/tests/multiapp_impl_host.c` (ケース 23 を追加) | 同上 + `kernel/kbd_inject.c` | `sys_yield` の park / resume (EAX 0・注入リング不変) と `exec_kill` の連鎖 |
+| `tools/tests/launch_host.c` | `sys/kern/exec/launch.c` + `sys/kern/exec/appslot.c` | 要求表の遷移・権限・token の照合・連鎖の解決 |
+| `tools/tests/multiapp_impl_host.c` (ケース 23 を追加) | 同上 + `sys/kern/kbd_inject.c` | `sys_yield` の park / resume (EAX 0・注入リング不変) と `exec_kill` の連鎖 |
 
 カーネル帯の代わりにハーネスが持つのは 3 つだけ: 所有者 (`res_owner_get/set`)、
 GUI 判定 (`con_sink_is_enabled`)、`kstrncpy`。スロットは実物の `AppSlot` を組み立てる
-(`exec/exec.c` の起動経路は CR3 / pgalloc を引くのでホストへは持ち込めない)。
+(`sys/kern/exec/exec.c` の起動経路は CR3 / pgalloc を引くのでホストへは持ち込めない)。
 
 ## 2. RED → GREEN
 
-`exec/launch.c` を書いたあとに `launch_host.c` を書いたため、初回実行は最初から
+`sys/kern/exec/launch.c` を書いたあとに `launch_host.c` を書いたため、初回実行は最初から
 全項目 GREEN だった。**「試験が仕様を捕まえているか」を別に確かめる**ため、
 実装へ 3 つの欠陥を 1 つずつ埋め込んで RED を確認し、戻して GREEN に戻した
 (いずれも票の non-blocker / blocker が実際に指摘した壊れ方)。
@@ -75,7 +75,7 @@ GUI 判定 (`con_sink_is_enabled`)、`kstrncpy`。スロットは実物の `AppS
 | 23J〜23O | `exec_kill(端末)` は子孫ごと、**末尾から**畳む (`ma_kill_order` が `[sh, 端末]`)。畳み終えた後に表が 1 本も残らない |
 | 23P〜23U | 譲れない文脈: WM top-level と CUI の入れ子 `exec_run` の子。どちらも `OS32_ERR_INVAL` で `ring3_park_reject_count` に載り、入れ子の子からの `launch_req` も断られる |
 
-`ma_resume_poll` と `ma_reclaim_res` と `ma_kill_chain` は、`exec/exec.c` の
+`ma_resume_poll` と `ma_reclaim_res` と `ma_kill_chain` は、`sys/kern/exec/exec.c` の
 `exec_resume` / `exec_reclaim_owned` / `exec_kill` の該当部分を**そのまま写した**形
 (exec.c はカーネル一式を引くのでホストへ `#include` できない)。印から EAX の出所を導く
 対応表そのものは `appslot_resume_source()` として実物に置いたので、写しているのは
@@ -83,7 +83,7 @@ GUI 判定 (`con_sink_is_enabled`)、`kstrncpy`。スロットは実物の `AppS
 
 ## 4b. Codex 実装レビュー 往復 1/3 の修正 (2026-09-13)
 
-blocker 3 件はいずれも `exec/launch.c` の §1a からの逸脱。直したあと、**3 点を元に戻すと
+blocker 3 件はいずれも `sys/kern/exec/launch.c` の §1a からの逸脱。直したあと、**3 点を元に戻すと
 RED になる**ことを確認してから GREEN に戻した (下の「落ちた検査」は実際の出力)。
 
 | 直したところ | 落ちた検査 (戻したとき) |
@@ -99,14 +99,14 @@ RED になる**ことを確認してから GREEN に戻した (下の「落ち�
 
 ## 4c. Codex 網羅レビュー 往復 7 の R1 (2026-09-13)
 
-`sys_getcwd` が `fs/vfs.c` の static `cwd` (カーネル帯) をそのまま返していた。
+`sys_getcwd` が `sys/fs/vfs.c` の static `cwd` (カーネル帯) をそのまま返していた。
 カーネル帯の PTE に USER ビットは無いので、CPL=3 の `cd` / `pwd` が戻り値を
 読むと #PF → fault kill。写し先は KAPI トランポリンページ (RO+USER) の
-「表 + スタブ」の後ろ (`exec/ring3_str.h` の `RING3_USTR_OFF`)。
+「表 + スタブ」の後ろ (`sys/kern/exec/ring3_str.h` の `RING3_USTR_OFF`)。
 
 | ハーネス | 取り込む実物 | 見るもの |
 |---|---|---|
-| `tools/tests/ring3_str_host.c` | `exec/ring3_str.c` | 経路の分岐・上書き・上限長・写し場が無いとき |
+| `tools/tests/ring3_str_host.c` | `sys/kern/exec/ring3_str.c` | 経路の分岐・上書き・上限長・写し場が無いとき |
 
 ホスト試験は 4 ケース 20 検査:
 
@@ -125,16 +125,16 @@ RED になる**ことを確認してから GREEN に戻した (下の「落ち�
 ページ属性 (PTE の USER ビット) はホストでは踏めないので、カーネル側の
 `exec_tramp_user_selftest()` (3 項) を `kselftest_run_post_exec()` から呼ぶ。
 `kselftest_run()` は `exec_init()` より**前**に走りトランポリンページがまだ
-無いため、この項だけ `platform/pc98/kernel.c` が `exec_init()` の直後に別口で回す。
+無いため、この項だけ `sys/platform/pc98/kernel.c` が `exec_init()` の直後に別口で回す。
 **この 3 項は実機でしか踏めない (未実施)。**
 
 ## 4d. Codex 網羅レビュー 往復 8 の T1 (2026-09-13)
 
-標準 FD のリダイレクト表 (`fs/fd_redirect.c`) が全アプリ共有で、park/resume でも
-切り替わらなかった。表を **ID ごとの枠** (`exec/appslot.c` の `g_redir[]`) にして、
+標準 FD のリダイレクト表 (`sys/fs/fd_redirect.c`) が全アプリ共有で、park/resume でも
+切り替わらなかった。表を **ID ごとの枠** (`sys/kern/exec/appslot.c` の `g_redir[]`) にして、
 park で走っていた ID の枠へ移し resume で戻す。
 
-`tools/tests/multiapp_impl_host.c` は **実物の `fs/fd_redirect.c` を取り込む**ように
+`tools/tests/multiapp_impl_host.c` は **実物の `sys/fs/fd_redirect.c` を取り込む**ように
 した (`res_owner_set/get` の実体もそちらへ移り、所有者タグが本物になる)。VFS は
 この票の対象外なので `vfs_open` / `vfs_close` / `vfs_seek` / `vfs_read_fd` /
 `vfs_write_fd` だけ最小の偽物を置き、「どの表に書き込みが入ったか」「何回閉じたか」を
@@ -155,7 +155,7 @@ RED は「修正を戻すと落ちる」形で確認した (実際の出力):
 | park / resume の持ち替え (`redir_switch_out` / `_in`) を効かなくする | `24f` `24h` `24i` `24m` `24r` `24t` `24u` `24x` |
 | `appslot_reclaim` の枠の後始末 (`fd_redirect_clear_state`) を外す | `24D2` |
 
-`exec/appslot.c` が `fd_redirect.h` を引くようになったので、`appslot.c` を取り込む
+`sys/kern/exec/appslot.c` が `fd_redirect.h` を引くようになったので、`appslot.c` を取り込む
 他のハーネス (`launch_host.c` / `sbrk_tier_host.c`) には空の錠 (4 本) を置き、
 それぞれの runner の include に `fs` を足した。
 
@@ -164,7 +164,7 @@ RED は「修正を戻すと落ちる」形で確認した (実際の出力):
 4d の初版は `appslot_reclaim` が `fd_redirect_close_state()` で枠の `file_fd` を
 閉じていたが、その `file_fd` は `fd_redirect_to_file` の `vfs_open` が **その ID の
 owner タグ**で取ったものなので、`exec_reclaim_owned` の (2) `vfs_close_owned(id)`
-(`exec/exec.c`) が先に同じ FD を閉じている。つまり park 中 kill では同じ FD に
+(`sys/kern/exec/exec.c`) が先に同じ FD を閉じている。つまり park 中 kill では同じ FD に
 `vfs_close` が 2 回掛かっていた (いまの `vfs_close` と回収順では間に FD 再利用が
 入る反例は無いが、「二重 close しない」という説明が実態と違った)。
 
@@ -372,7 +372,7 @@ $ python3 -B tools/check_constraints.py
 指摘: **ESC の `STALE` 経路で要求表が残り、以後の起動が `FULL` に固着する**。
 反例 = 子が終了 → 次の 100ms poll より先に ESC → `launch_cancel` が `OS32_ERR_STALE`
 → 旧実装は `Step::Finish` で token を捨ててプロンプトへ。K の契約
-(`include/launch.h`) では **完了した表は `launch_poll` が消費して初めて `IDLE`**
+(`sys/include/launch.h`) では **完了した表は `launch_poll` が消費して初めて `IDLE`**
 なので、以後その表は誰にも消費されず、同じ端末の `launch_req` が常に `FULL`。
 
 直し: `Attach::cancelled()` は `STALE` でも token を捨てず `Cancel::Armed` に
@@ -697,8 +697,8 @@ RED で本当に回り続けることが見える:
 ### 往復 5/5 の追加 (2026-09-13)
 
 **パイプバッファがカーネル帯**。`sys_pipe_get_buf()` が返すのは
-`fs/pipe_buffer.c` が kmalloc した番地で、それを `sys_redirect_fd_buf()` へ渡すと
-`exec/exec.c` の `ring3_ptr_ok` に落ちて CPL=3 の sh が `ring3_fault_kill()` される
+`sys/fs/pipe_buffer.c` が kmalloc した番地で、それを `sys_redirect_fd_buf()` へ渡すと
+`sys/kern/exec/exec.c` の `ring3_ptr_ok` に落ちて CPL=3 の sh が `ring3_fault_kill()` される
 (`sh> echo a | cat` で強制終了)。`sh_pipe.inc` を「`g_api->sys_pipe_*` をそのまま
 返す」= 直す前の形に戻し、ハーネスの偽 KAPI に**カーネル帯に見立てた別の配列**を
 返させた RED:

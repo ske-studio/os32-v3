@@ -1,7 +1,7 @@
-# gfx/gfx_osri.h — `.osri` 形式 (v1・v2) と画像記述
+# sys/kern/gfx/osri/gfx_osri.h — `.osri` 形式 (v1・v2) と画像記述
 
 > 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
-ソース: `gfx/gfx_osri.h`
+ソース: `sys/kern/gfx/osri/gfx_osri.h`
 
 ## 何をするか
 

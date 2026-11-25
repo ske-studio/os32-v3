@@ -1,7 +1,7 @@
 # fs/ext2 — 読み取りの失敗を「無い」「未割当」と区別する
 
 > 状態: **現行 (2026-11-18)** — 出所: TASK_FS_TYPE (B8) の契約を今のソースと照らして要約
-ソース: `fs/ext2/ext2_inode.c` (`ext2_bmap`)・`fs/ext2/ext2_dir.c` (`ext2_find_entry`・`ext2_lookup`・`ext2_list_dir`・`ext2_add_entry`・`ext2_delete_entry`)・`fs/ext2/ext2_dir_directory.inc` (`ext2_mkdir`・`ext2_rmdir`)・`fs/ext2/ext2_dir_rename.inc` (`ext2_rename`・`ext2_parent_of`・`ext2_is_self_or_descendant`)・`fs/ext2/ext2_file.c` (`ext2_create`・`ext2_get_size_ino`・`ext2_write_stream`)・`fs/ext2/ext2_vfs.c` (`ext2_to_vfs_err`・`ext2_resolve_path`)・`fs/ext2/ext2_super.c` (`ext2_fs_error`・`ext2_check_writable`)
+ソース: `sys/fs/ext2/ext2_inode.c` (`ext2_bmap`)・`sys/fs/ext2/ext2_dir.c` (`ext2_find_entry`・`ext2_lookup`・`ext2_list_dir`・`ext2_add_entry`・`ext2_delete_entry`)・`sys/fs/ext2/ext2_dir_directory.inc` (`ext2_mkdir`・`ext2_rmdir`)・`sys/fs/ext2/ext2_dir_rename.inc` (`ext2_rename`・`ext2_parent_of`・`ext2_is_self_or_descendant`)・`sys/fs/ext2/ext2_file.c` (`ext2_create`・`ext2_get_size_ino`・`ext2_write_stream`)・`sys/fs/ext2/ext2_vfs.c` (`ext2_to_vfs_err`・`ext2_resolve_path`)・`sys/fs/ext2/ext2_super.c` (`ext2_fs_error`・`ext2_check_writable`)
 
 一度だけ読めなかった間接ブロックやディレクトリブロックを「未割当」「名前が無い」と読むと、
 その先の段で `NOTFOUND` になり、open の `O_CREAT` が既存のファイルを作り直す・`cat <ディレクトリ>` が通る、などの被害になる。

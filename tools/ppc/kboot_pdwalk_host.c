@@ -1,5 +1,5 @@
 /* Host observer; links the actual product walker. No simulated walker body. */
-#include "arch/ppc/ppc_pd.h"
+#include "sys/arch/ppc/ppc_pd.h"
 #define abort() exit_code(99)
 static void exit_code(int code) __attribute__((noreturn));
 static void exit_code(int code)

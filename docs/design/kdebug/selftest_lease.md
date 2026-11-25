@@ -1,6 +1,6 @@
-# kdebug/selftest_lease.c — 設計
+# sys/arch/x86/kdebug/selftest_lease.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: SLIM_KERNEL_DESIGN.md・SLIM_KERNEL_IMPORTS.md (D1 で移した)
-ソース: `kdebug/selftest_lease.c`
+ソース: `sys/arch/x86/kdebug/selftest_lease.c`
 
 ## SLIM_KERNEL_DESIGN
 
@@ -11,7 +11,7 @@
 kdi_selftest_lease_result((u32)rc);
 ```
 
-- `kdi_selftest_lease_result` は `exec/lease.c` に既存観測変数への 1 代入として置く。shlib callback は付表どおり KDI_ADDR を使い、tables_image と既存の判定・復元順序・token の副作用は変えない。
+- `kdi_selftest_lease_result` は `sys/kern/exec/lease.c` に既存観測変数への 1 代入として置く。shlib callback は付表どおり KDI_ADDR を使い、tables_image と既存の判定・復元順序・token の副作用は変えない。
 
 ## SLIM_KERNEL_IMPORTS
 

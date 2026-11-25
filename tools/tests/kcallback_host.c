@@ -29,7 +29,7 @@ void *kmemcpy(void *d, const void *s, u32 n) { u8 *a = d; const u8 *b = s; while
 void *kmemset(void *d, int v, u32 n) { u8 *a = d; while (n--) *a++ = v; return d; }
 char *kstrncpy(char *d, const char *s, u32 n) { u32 i = 0; if (n) { while (i + 1 < n && s[i]) { d[i] = s[i]; i++; } d[i] = 0; } return d; }
 int caller_access_get_user(struct caller_access *c) { assert(user_call); kmemset(c, 0, sizeof(*c)); c->origin = CALLER_USER; return !reject_identity; }
-/* The enumeration side models caller_access_get (same meaning as exec/redir_access.c); the real WM semantics are checked on the identity side (public_surface_host). */
+/* The enumeration side models caller_access_get (same meaning as sys/kern/exec/redir_access.c); the real WM semantics are checked on the identity side (public_surface_host). */
 int caller_access_get(struct caller_access *c) { if (ring3_wm_depth || !user_call) { kmemset(c, 0, sizeof(*c)); c->origin = CALLER_TRUSTED; return 1; } return caller_access_get_user(c); }
 int copy_caller_bytes(const struct caller_access *c, const void *s, void *d, u32 n) { (void)c; assert(!fs_active); if (reject_input) return 0; if (read_end) assert((const u8 *)s + n <= read_end); kmemcpy(d, s, n); return 1; }
 int copy_caller_cstr(const struct caller_access *c, const char *s, char *d, u32 cap) { for (u32 i = 0; i < cap; i++) { if (!copy_caller_bytes(c, s + i, d + i, 1)) return 0; if (!d[i]) return 1; } return 0; }

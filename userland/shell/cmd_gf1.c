@@ -1,6 +1,6 @@
 /* Shared CUI/GUI terminal entry for the foreground layer-1 observations. */
 #include "shell.h"
-#include "../../kdebug/gf_foundation_wire.h"
+#include "../../sys/dev/video/geforce/diag/gf_foundation_wire.h"
 
 #define GF1_KAPI_MIN 78U /* kdebug_call */
 

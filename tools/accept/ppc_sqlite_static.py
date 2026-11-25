@@ -14,7 +14,7 @@ from ppc_shm import guest_available
 
 
 def probe_source():
-    source = (ROOT / 'kernel/sqlite_static.c').read_text()
+    source = (ROOT / 'sys/kern/sqlite_static.c').read_text()
     anchor = '            services_public = 1;'
     if source.count(anchor) != 1:
         raise ValueError('SQLite boot publication point changed')
@@ -77,12 +77,12 @@ def main():
         if case != 'normal':
             src = folder / 'sqlite_static_probe.c'
             src.write_text(probe_source())
-            settings = ['KB_MUT_SRC=kernel/sqlite_static.c', 'KB_MUT_FILE=' + str(src)]
+            settings = ['KB_MUT_SRC=sys/kern/sqlite_static.c', 'KB_MUT_FILE=' + str(src)]
         if case == 'sync-fail':
             anchor = 'static int ramfs_sync(void *ctx)\n{\n    (void)ctx;'
             failure = (anchor + '\n    extern volatile int sqlite_probe_commit;'
                        '\n    if (sqlite_probe_commit) { sqlite_probe_commit = 0; return VFS_ERR_NOSYS; }')
-            extra = mutant_settings(folder, case, 'fs/ramfs/ramfs.c', anchor, failure)
+            extra = mutant_settings(folder, case, 'sys/fs/ramfs/ramfs.c', anchor, failure)
             settings.extend(item.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for item in extra)
         media = build_media(kernel, 'IMAGE=kboot-link-sh', 'KB_SH_OUT=' + str(user),
                     *settings, 'kb-user', 'kernel')

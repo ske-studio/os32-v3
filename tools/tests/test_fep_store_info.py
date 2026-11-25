@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """FEP system metadata reader and caller boundary, freestanding ILP32."""
 CHECK = dict(name='fep-store-info', tier=1, needs=[], budget=3.5,
-    covers=['kernel/ime/ime_dict_info.c', 'kernel/ime/ime.c',
-            'kernel/ime/ime_conn.c', 'kernel/ime/ime.h', 'kernel/ime/ime_store.h', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h',
+    covers=['sys/kern/ime/ime_dict_info.c', 'sys/kern/ime/ime.c',
+            'sys/kern/ime/ime_conn.c', 'sys/kern/ime/ime.h', 'sys/kern/ime/ime_store.h', 'sys/kern/sqlite_engine.h', 'sys/kern/sqlite_engine_body.h',
             'tools/tests/fep_store_info_host.c', 'tools/tests/fep_store_fixture.c',
             'tools/tests/fep_store_fixture.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk',
             'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.h',
-            'include/redir_access.h', 'sdk/include/os32/os32_kapi_shared.h'],
+            'sys/include/redir_access.h', 'sdk/include/os32/os32_kapi_shared.h'],
     basis=['docs/design/kernel/ime/ime_dict_info.md 口', 'docs/design/kernel/ime/ime_dict_info.md 状態と誤り', 'docs/design/kernel/ime/ime_dict_info.md 仕組み'],
 )
 import argparse
@@ -23,17 +23,17 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'kernel/ime/ime_dict_info.c'
+PRODUCT = 'sys/kern/ime/ime_dict_info.c'
 # Each product anchor is unique; compile failures never count as runtime RED.
 MUTANTS = [
-    ('current-store', 'kernel/ime/ime.c', 'return &g_ime.store;', 'return NULL;', 'store dictionary owner'),
+    ('current-store', 'sys/kern/ime/ime.c', 'return &g_ime.store;', 'return NULL;', 'store dictionary owner'),
     ('capacity', PRODUCT, 'if (n > capacity - 1) n = capacity - 1;', 'if (n > capacity - 1) n = capacity;', 'chunk bounds'),
     ('byte-offset', PRODUCT, '(const char *)value + offset', '(const char *)value', 'UTF-8 full reassembly'),
     ('missing-meta', PRODUCT, 'if (rc == SQLITE_DONE) result = OS32_ERR_IO;', 'if (rc == SQLITE_DONE) result = ime_info_slice("", 0, offset, out, capacity);', 'required missing key'),
     ('finalize', PRODUCT, 'if (sqlite3_finalize(stmt) != SQLITE_OK) result = OS32_ERR_IO; /* store */', '(void)sqlite3_finalize(stmt); /* store */', 'finalize error preserves out'),
     ('legacy-variant', PRODUCT, 'if (!kstrcmp(s->system.path, FEP_DICT_PATH_S)) value = "S";', 'if (!kstrcmp(s->system.path, FEP_DICT_PATH_S)) value = "M";', 'legacy S'),
     ('system-only', PRODUCT, 'ime_meta_read(&s->system, key, offset, staging, capacity)', 'ime_meta_read(&s->user, key, offset, staging, capacity)', 'system handle'),
-    ('stale', 'kernel/ime/ime_conn.c', 'if (vfs_fd_is_stale(fd)) return OS32_ERR_STALE;', 'if (vfs_fd_is_stale(fd)) return 0;', 'no SQL after stale'),
+    ('stale', 'sys/kern/ime/ime_conn.c', 'if (vfs_fd_is_stale(fd)) return OS32_ERR_STALE;', 'if (vfs_fd_is_stale(fd)) return 0;', 'no SQL after stale'),
 ]
 
 
@@ -44,14 +44,14 @@ def main():
     with tempfile.TemporaryDirectory(prefix='fep-store-info-') as tmp:
         work = Path(tmp)
         src = (ROOT / 'tools/tests/fep_store_info_host.c').read_text()
-        paths = [PRODUCT, 'kernel/ime/ime_conn.c', 'kernel/ime/ime.c']
+        paths = [PRODUCT, 'sys/kern/ime/ime_conn.c', 'sys/kern/ime/ime.c']
         products = {p: (ROOT / p).read_text() for p in paths}
         def build(codes):
-            main = codes['kernel/ime/ime.c']
+            main = codes['sys/kern/ime/ime.c']
             getters = main[main.index('FepStore *ime_current_store(void)'):main.index('static int g_ime_reader_owner;')]
             unit = work / 'info.c'
             code = src.replace('/* CURRENT_GETTERS */', getters)
-            for marker, path in [('PRODUCT_INFO', PRODUCT), ('PRODUCT_CONN', 'kernel/ime/ime_conn.c')]:
+            for marker, path in [('PRODUCT_INFO', PRODUCT), ('PRODUCT_CONN', 'sys/kern/ime/ime_conn.c')]:
                 code = code.replace('/* ' + marker + ' */', codes[path].replace('../../lib/', str(ROOT / 'lib') + '/'))
             unit.write_text(code)
             exe = work / 'info'

@@ -35,9 +35,9 @@ from host_rshell import RSHELL, EXECUTE
 from usb_run import USB_QEMU_CLOCK
 
 USER = 'userland/shell/rshell_lan.c'
-SINK = 'kernel/console/con_sink.c'
-HEAP = 'mm/kmalloc.c'
-BOOT = 'platform/powermac/shell_loop_ops.c'
+SINK = 'sys/kern/console/con_sink.c'
+HEAP = 'sys/kern/mm/kmalloc.c'
+BOOT = 'sys/platform/powermac/shell_loop_ops.c'
 # 110 lines x 81 bytes = 8910 B, just past the 8 KiB sink; each line scrolls the
 # OF framebuffer (~2.7 s under -icount), so allow ~5 minutes plus margin.
 OVERFLOW_LINES = 110
@@ -52,7 +52,7 @@ MUTATIONS = {
                     'if (!attempted)', 'ready-retry'),
     'duplicate': (USER, 'if (have_id && id <= last_id) return OS32_ERR_EXIST;',
                   '/* duplicate guard removed */', 'duplicate'),
-    'print-twice': ('kernel/console/console.c', '    con_sink_push_print(buf, size, color);',
+    'print-twice': ('sys/kern/console/console.c', '    con_sink_push_print(buf, size, color);',
                     '    con_sink_push_print(buf, size, color); con_sink_push_print(buf, size, color);', 'output'),
     'drop-compare': (SINK, 'if (con_sink_drop_count != g_capture_drop_start) rc = OS32_ERR_NOSPC;',
                      '/* drop comparison removed */', 'freeze-drop'),
@@ -147,7 +147,7 @@ P3_STIMULUS
         source.write_text(sources.pop(extra_user))
         opts.extend(['PPC_RES_MUT_SRC='+extra_user, 'PPC_RES_MUT_FILE='+str(source)])
     if observe_flow:
-        source = 'exec/exec.c'
+        source = 'sys/kern/exec/exec.c'
         observer = ROOT/'tools/accept/ppc_shell_flow.inc'
         sources[source] = (ROOT/source).read_text() + '\n#include "'+str(observer)+'"\n'
         opts.append('KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=ppc_trap_dispatch,--wrap=exec_run')
@@ -593,7 +593,7 @@ def accept(media,cpu,out,timeout,late=False,verdict=None,overflow_mode="lines"):
             require(s.ready(),verdict)
         else: s.wait(s.ready,'HELLO to cui READY',60)
         require(s.agent.operator.ready['mode']=='cui','autostart')
-        # include/config.h and cmd_env.c define the initial resident environment.
+        # sys/include/config.h and cmd_env.c define the initial resident environment.
         s.cmd('pwd', b'/\n')
         s.cmd('echo $PATH', b'/bin:/sbin:/usr/bin\n')
         s.cmd('echo $HOME', b'/home/user\n')
@@ -813,7 +813,7 @@ FLOW_CASES = ('root-branch', 'missing-aux', 'restore-root', 'return-target')
 
 def flow_settings(folder, case):
     """Observe child teardown and exercise the selected entry or return decision."""
-    source = (ROOT/'exec/exec.c').read_text()
+    source = (ROOT/'sys/kern/exec/exec.c').read_text()
     source = 'volatile unsigned shell_flow_error, shell_child_returning, shell_return_target, shell_valid_root;\n' + source
     guard = 'do { shell_flow_error = %d; for (;;) __asm__ volatile("" ::: "memory"); } while (0);'
     for fragment in ('exec_launch.inc', 'exec_finish.inc'):
@@ -839,7 +839,7 @@ def flow_settings(folder, case):
         (folder/fragment).write_text(text)
     observer = ROOT/'tools/accept/ppc_shell_flow.inc'
     (folder/'exec.c').write_text(source + '\n#include "' + str(observer) + '"\n')
-    entry = (ROOT/'arch/ppc/exec_enter.S').read_text()
+    entry = (ROOT/'sys/arch/ppc/exec_enter.S').read_text()
     # Record the actual branch before an invalid root can be used by the MMU.
     branch = 'bne' if case == 'root-branch' else 'beq'
     entry = replace_once(entry, 'beq .Lresident', branch + ' .Lresident\n'
@@ -851,8 +851,8 @@ def flow_settings(folder, case):
     (folder/'exec_enter.S').write_text(entry)
     user = folder/'user'
     return ['IMAGE=kboot-link-sh', 'KB_SH_OUT='+str(user), 'KB_ROOT_BINS='+str(user/'hello.bin'),
-            'KB_MUT_SRC=exec/exec.c', 'KB_MUT_FILE='+str(folder/'exec.c'),
-            'KB_MUT_EXTRA_SRC=arch/ppc/exec_enter.S', 'KB_MUT_EXTRA_FILE='+str(folder/'exec_enter.S'),
+            'KB_MUT_SRC=sys/kern/exec/exec.c', 'KB_MUT_FILE='+str(folder/'exec.c'),
+            'KB_MUT_EXTRA_SRC=sys/arch/ppc/exec_enter.S', 'KB_MUT_EXTRA_FILE='+str(folder/'exec_enter.S'),
             'KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=ppc_trap_dispatch,--wrap=exec_run']
 
 

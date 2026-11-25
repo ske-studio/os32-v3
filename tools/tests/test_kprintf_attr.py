@@ -1,10 +1,10 @@
-"""kprintf の属性変換 (lib/kprintf_attr.c) のホスト試験。
+"""kprintf の属性変換 (sys/kern/kprintf_attr.c) のホスト試験。
 
 記録: tools/tests/kprintf_attr_tdd.md
 票  : 実機 PC-9821Ra266 の FD 起動が root panic になり、しかも kprintf の
       診断行 ([fdc] / [ide]) が画面に 1 行も出なかった件
 
-実物の lib/kprintf_attr.c を 1 行も写さずに #include して回す。
+実物の sys/kern/kprintf_attr.c を 1 行も写さずに #include して回す。
 変換は I/O も VRAM も触らないので模型は要らない。
 
 **エミュレータでは踏めない**。NP21/W の /api/tvram は文字コードだけを返し、
@@ -16,7 +16,7 @@
   python3 -B tools/tests/test_kprintf_attr.py --mutate   # 否定側 (変異が RED か)
 """
 CHECK = dict(name='kprintf-attr-host', tier=4,
-    covers=['include/callconv.h', 'lib/kprintf.c', 'lib/kprintf_attr.c', 'include/console_attr.h', 'platform/pc98/console_attr.c', 'tools/tests/kprintf_attr_host.c', 'include/types.h', 'include/pc98.h', 'include/kprintf.h', 'sdk/include/os32/*.h'],
+    covers=['sys/include/callconv.h', 'sys/kern/kprintf.c', 'sys/kern/kprintf_attr.c', 'sys/include/console_attr.h', 'sys/platform/pc98/console_attr.c', 'tools/tests/kprintf_attr_host.c', 'sys/include/types.h', 'sys/platform/pc98/pc98.h', 'sys/include/kprintf.h', 'sdk/include/os32/*.h'],
     needs=[], budget=3.0,
     basis=['KAPI_SPEC'],
 )
@@ -29,13 +29,13 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/kprintf_attr_host.c"
-SRC = ROOT / "platform/pc98/console_attr.c"
+SRC = ROOT / "sys/platform/pc98/console_attr.c"
 
 # カーネルと同じ i386-elf で通す実ソース。
 TARGET_SRCS = [
-    ("lib/kprintf_attr.c", []),
-    ("platform/pc98/console_attr.c", []),
-    ("lib/kprintf.c", []),
+    ("sys/kern/kprintf_attr.c", []),
+    ("sys/platform/pc98/console_attr.c", []),
+    ("sys/kern/kprintf.c", []),
 ]
 
 CASES = ["real_callers", "pc98_passthrough", "invariants", "cga_bits"]
@@ -69,19 +69,19 @@ def host_build(tmp, source_text=None):
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "kprintf-attr-host"
     # Copy the complete closure, also for mutants; no original include paths.
-    files = ('include/callconv.h', "tools/tests/kprintf_attr_host.c", "lib/kprintf_attr.c",
-             "platform/pc98/console_attr.c", "include/console_attr.h",
-             "include/types.h", "include/pc98.h", "include/kprintf.h")
+    files = ('sys/include/callconv.h', "tools/tests/kprintf_attr_host.c", "sys/kern/kprintf_attr.c",
+             "sys/platform/pc98/console_attr.c", "sys/include/console_attr.h",
+             "sys/include/types.h", "sys/platform/pc98/pc98.h", "sys/include/kprintf.h")
     sdk_headers = (ROOT / "sdk/include/os32").glob("*.h")
     for rel in (*files, *(header.relative_to(ROOT) for header in sdk_headers)):
         dest = src_dir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes((ROOT / rel).read_bytes())
     if source_text is not None:
-        (src_dir / "platform/pc98/console_attr.c").write_text(source_text)
+        (src_dir / "sys/platform/pc98/console_attr.c").write_text(source_text)
     cmd = ["gcc", *FLAGS, "-I" + str(src_dir / "include"),
            str(src_dir / "tools/tests/kprintf_attr_host.c"),
-           str(src_dir / "platform/pc98/console_attr.c"), "-o", str(exe)]
+           str(src_dir / "sys/platform/pc98/console_attr.c"), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
 
@@ -97,7 +97,7 @@ def run_cases(exe, cases):
 
 
 def build_target(tmp):
-    """カーネルと同じ i386-elf で lib/kprintf.c ごと通す。"""
+    """カーネルと同じ i386-elf で sys/kern/kprintf.c ごと通す。"""
     for rel, extra in TARGET_SRCS:
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
@@ -121,7 +121,7 @@ def check_entry():
     下流 (shell_print / console_write) は全部 kprintf の attr を使うので、
     入口の 1 行があることを見れば足りる。
     """
-    text = (ROOT / "lib/kprintf_format.inc").read_text(encoding="utf-8")
+    text = (ROOT / "sys/kern/kprintf_format.inc").read_text(encoding="utf-8")
     n = text.count("attr = kprintf_attr_to_pc98(attr);")
     print(f"ENTRY kprintf applies conversion x{n}", flush=True)
     return 0 if n == 1 else 1
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-kprintf-attr-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real lib/kprintf_attr.c)",
+        print("HOST GNU11 -Werror compile PASS (real sys/kern/kprintf_attr.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

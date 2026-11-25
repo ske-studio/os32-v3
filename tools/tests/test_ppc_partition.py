@@ -7,9 +7,9 @@ import tempfile
 import host32
 
 root = Path(__file__).resolve().parents[2]
-view = root / 'platform/powermac/partition_view.c'
-apm = root / 'platform/powermac/apm.c'
-superblock = root / 'fs/ext2/ext2_super.c'
+view = root / 'sys/platform/powermac/partition_view.c'
+apm = root / 'sys/platform/powermac/apm.c'
+superblock = root / 'sys/fs/ext2/ext2_super.c'
 block_io = superblock.with_name('ext2_super_block_io.inc')
 cases = [('normal', view, None, None, 0), ('product', view, None, None, 0)]
 if '--mutate' in sys.argv:
@@ -57,8 +57,8 @@ with tempfile.TemporaryDirectory() as tmp:
         subprocess.run(['cc', '-m32', '-nostdinc', '-nostdlib', '-static', '-ffreestanding', '-fno-pie', '-ffunction-sections', '-fdata-sections',
                         '-Wl,--gc-sections', '-DPM_PRODUCT_BOOT=' + str(int(name.startswith('product'))), '-DOS32_FEATURE_IDE=1', '-Ifs/ext2', '-D__cdecl=', '-I.', '-I'+tmp, '-Imm', '-Iinclude', '-Iplatform/powermac',
                         '-Ikernel/dev', '-Ilib', '-Isdk/include/os32', '-Iarch/ppc',
-                        'tools/tests/ppc_partition_host.c', *sources, 'platform/powermac/root_boot.c',
-                        'lib/kstring_c.c', '-o', exe], cwd=root, check=True)
+                        'tools/tests/ppc_partition_host.c', *sources, 'sys/platform/powermac/root_boot.c',
+                        'sys/kern/kstring_c.c', '-o', exe], cwd=root, check=True)
         rc = host32.run([exe]).returncode
         assert rc == expected, (name, rc, expected)
         print(name, 'RED' if rc else 'OK', rc)

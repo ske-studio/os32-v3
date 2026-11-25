@@ -1,4 +1,4 @@
-#include "gfx/v2/gfx2_sw.h"
+#include "sys/hal/gfx/v2/gfx2_sw.h"
 static u8 src[64], dst[64], mask[8];
 u8 gfx2_sw_rowbuf[2][GFX2_SW_ROW_BYTES];
 int gfx2_fmt_info(u32 f, struct gfx2_fmt_info *o) { (void)f; o->cpp = 1; return 0; }

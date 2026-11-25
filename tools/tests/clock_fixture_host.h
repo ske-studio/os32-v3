@@ -1,6 +1,6 @@
 /* RTC hardware result, fed through the real PC98 adapter and service. */
-#include "../../drivers/char/rtc.h"
-#include "../../kernel/time/clock_service.c"
+#include "../../sys/dev/char/rtc.h"
+#include "../../sys/hal/time/clock_service.c"
 #include "os_time.h"
 #include "../../lib/os_time.c"
 static RTC_Time clock_sample;

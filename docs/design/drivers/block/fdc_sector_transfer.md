@@ -1,4 +1,4 @@
-# drivers/block/fdc_sector_transfer.inc — 単発セクタ転送
+# sys/dev/block/fdc_sector_transfer.inc — 単発セクタ転送
 
 > 状態: **現行 (2026-11-01)**
 

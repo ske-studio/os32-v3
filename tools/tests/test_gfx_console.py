@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """Console target: real HAL surface lifetime and synchronous scanout contract."""
 CHECK = dict(name='gfx-console-host', tier=1, needs=[], budget=20,
-    covers=['tools/tests/of_fb_osri_fake.h', 'gfx/gfx_console.c', 'gfx/gfx_console.h', 'gfx/v2/surface.c',
-            'gfx/v2/gfx2_int.h', 'include/gfx_hal.h', 'include/gfx_hal2.h',
-            'include/gfx_sync.h', 'include/types.h', 'include/memmap.h',
-            'include/gfx_mode.h', 'include/gfx_format.h', 'include/callconv.h',
-            'arch/x86/arch_abi.h', 'include/abi.h', 'include/config.h',
-            'mm/pgalloc.h', 'lib/kstring.h', 'sdk/include/os32/**',
+    covers=['tools/tests/of_fb_osri_fake.h', 'sys/kern/console/gfx_console.c', 'sys/kern/console/gfx_console.h', 'sys/hal/gfx/v2/surface.c',
+            'sys/hal/gfx/v2/gfx2_int.h', 'sys/include/gfx_hal.h', 'sys/hal/gfx/gfx_hal2.h',
+            'sys/include/gfx_sync.h', 'sys/include/types.h', 'sys/include/memmap.h',
+            'sys/include/gfx_mode.h', 'sys/include/gfx_format.h', 'sys/include/callconv.h',
+            'sys/arch/x86/arch_abi.h', 'sys/include/abi.h', 'sys/include/config.h',
+            'sys/kern/mm/pgalloc.h', 'sys/kern/kstring.h', 'sdk/include/os32/**',
             'tools/tests/gfx_console_host.c', 'tools/tests/gfx2_surface_host.c',
             'tools/tests/test_gfx_console.py', 'tools/tests/host32.py',
             'tools/tests/fbcon_contract_host.c', 'tools/tests/kernel_includes.py',
-            'kernel/console/fbcon.c', 'kernel/console/fbcon.h',
-            'kernel/console/console_backend.h', 'platform/powermac/console.c',
-            'platform/powermac/pm_console.h', 'platform/powermac/rh_observe.h',
-            'drivers/video/of_fb/**', 'drivers/video/pc98/backend_pc98.c',
-            'drivers/video/kcg/kcg_module.h', 'gfx/v2/v1_shim.c',
-            'gfx/v2/enum.c', 'gfx/v2/caps.c', 'gfx/palette.h', 'gfx/gfx_internal.h'],
+            'sys/kern/console/fbcon.c', 'sys/kern/console/fbcon.h',
+            'sys/kern/console/console_backend.h', 'sys/platform/powermac/console.c',
+            'sys/platform/powermac/pm_console.h', 'sys/platform/powermac/rh_observe.h',
+            'drivers/video/of_fb/**', 'sys/platform/pc98/video/backend_pc98.c',
+            'sys/dev/video/kcg/kcg_module.h', 'sys/hal/gfx/v2/v1_shim.c',
+            'sys/hal/gfx/v2/enum.c', 'sys/hal/gfx/v2/caps.c', 'sys/hal/gfx/palette.h', 'sys/hal/gfx/gfx_internal.h'],
     basis=['HAL_V2_DESIGN §6-2', 'HAL_V2_DESIGN §7-3', 'CONSOLE_DUAL_DESIGN §2-1'],
 )
 from pathlib import Path
@@ -35,7 +35,7 @@ MUTATIONS = [
 ]
 def main():
     p=argparse.ArgumentParser(); p.add_argument('--mutate', action='store_true'); args=p.parse_args()
-    body=(ROOT/'gfx/gfx_console.c').read_text()
+    body=(ROOT/'sys/kern/console/gfx_console.c').read_text()
     with tempfile.TemporaryDirectory() as td:
         work=Path(td)
         fixture=(ROOT/'tools/tests/gfx2_surface_host.c').read_text().replace('static u8 ram[128];','static u8 ram[4096];')
@@ -46,7 +46,7 @@ def main():
             flags=['gcc','-m32','-std=gnu11','-Wall','-Wextra','-Werror','-Wno-unused-function',
                    '-ffreestanding','-fno-builtin','-fno-pie','-no-pie','-fno-stack-protector','-nostdlib','-nostdinc','-static']
             flags += ['-I'+str(ROOT/x) for x in ('gfx','gfx/v2','include','mm','lib','arch/x86','sdk/include/os32')]
-            host32.build(flags+['-I'+str(work),str(work/'console.c'),str(ROOT/'gfx/v2/surface.c'),
+            host32.build(flags+['-I'+str(work),str(work/'console.c'),str(ROOT/'sys/hal/gfx/v2/surface.c'),
                                str(ROOT/'tools/tests/gfx_console_host.c'),'-o',str(exe)],check=True)
             return host32.run([str(exe)],runner='qemu').returncode
         assert run(body)==0
@@ -60,8 +60,8 @@ def main():
     return 0
 
 def contract(work, mutate):
-    console=(ROOT/'gfx/gfx_console.c').read_text()
-    fbcon=(ROOT/'kernel/console/fbcon.c').read_text()
+    console=(ROOT/'sys/kern/console/gfx_console.c').read_text()
+    fbcon=(ROOT/'sys/kern/console/fbcon.c').read_text()
     variants=[('baseline', console, fbcon)]
     if mutate:
         for name,old,new in [
@@ -78,9 +78,9 @@ def contract(work, mutate):
     fixture=(ROOT/'tools/tests/gfx2_surface_host.c').read_text().replace(
         'static u8 ram[128];','static u8 ram[16384];')
     (work/'surface_fixture.inc').write_text(fixture)
-    sources=['gfx/v2/surface.c','gfx/v2/caps.c','gfx/v2/enum.c','gfx/v2/v1_shim.c',
-             'drivers/video/of_fb/backend_of_fb.c','drivers/video/of_fb/of_fb_v2.c',
-             'drivers/video/pc98/backend_pc98.c','platform/powermac/console.c',
+    sources=['sys/hal/gfx/v2/surface.c','sys/hal/gfx/v2/caps.c','sys/hal/gfx/v2/enum.c','sys/hal/gfx/v2/v1_shim.c',
+             'sys/dev/video/of_fb/backend_of_fb.c','sys/dev/video/of_fb/of_fb_v2.c',
+             'sys/platform/pc98/video/backend_pc98.c','sys/platform/powermac/console.c',
              'tools/tests/fbcon_contract_host.c']
     for name,ct,ft in variants:
         (work/'console.c').write_text(ct); (work/'fbcon.c').write_text(ft)

@@ -8,7 +8,7 @@
 
 - D: MIT/X11 `trident_driver-1.4.0.c`、PC98 対応の版。
 - X: MIT/X11 `xf86-video-trident/src/` の `trident_dac.c`、`trident_pll.c`、`trident_video.c`、`trident_shadow.c`。
-- V: `xorg-vgahw/vgaHW.c`。著作権・許諾全文は `drivers/video/trident/trident.h` と移植したファイルに保持する。
+- V: `xorg-vgahw/vgaHW.c`。著作権・許諾全文は `sys/dev/video/trident/trident.h` と移植したファイルに保持する。
 - メーカー資料: NEC LCD172VXM/192VXM 取扱説明書 p.20 の同期条件。9682 レジスタ仕様書は未入手。未入手部分を推測した手順で埋めない。
 
 9682 は非 Cyber、非 3D、旧 PLL。25.175MHz、8bpp、開始位置0、非 interlace、非 MUX、PCI/MMIO/linear の枝を採る。
@@ -50,7 +50,7 @@ Enable/Disable は D:699-775 の 68h、6Ah、0FACh、CR23/29、拡張 DAC[4] を
 
 SaveScreen は V:618-635 の SR1 読取 → SR0=1 → SR1 bit5 設定 → SR0=3。OUTB の対で書く。
 AdjustFrame は D:1182-1190 の CR0C/0D を OUTW、CR1E bit5 と CR27 bits0..2 を OUTB の RMW で更新。
-blank は gfx/gfx_core_init.inc の enter → ModeInit の unprotect → Enable の SR01=00 で解除する。
+blank は sys/hal/gfx/gfx_core_init.inc の enter → ModeInit の unprotect → Enable の SR01=00 で解除する。
 開始0でも後半の手順を省かない。後の HAL present が blank の解除を暗黙に行う契約はない。
 
 ## 4. 容量・転送・資源

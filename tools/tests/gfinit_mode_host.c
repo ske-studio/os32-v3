@@ -2,10 +2,10 @@
 #define _start gf_old_tests
 #include "recover_gf_host.c"
 #undef _start
-#include "../../kdebug/gfinit_pll.c"
-#include "../../kdebug/gfinit_mode.c"
+#include "../../sys/dev/video/geforce/diag/gfinit_pll.c"
+#include "../../sys/dev/video/geforce/diag/gfinit_mode.c"
 #include "gf_display_calc_host.inc"
-#include "../../hwdev/gf_load_state.c"
+#include "../../sys/dev/video/geforce/gf_load_state.c"
 static void number(u32 x)
 {
     char b[16]; u32 n = 0;

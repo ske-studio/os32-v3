@@ -7,7 +7,7 @@ import tempfile
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'gfx/v2/caps.c'
+SOURCE = ROOT / 'sys/hal/gfx/v2/caps.c'
 MUTATIONS = [
     ('size-cap', 'size < sizeof(c) ? size : sizeof(c)', 'sizeof(c)'),
     ('sw-ops', 'GFX2_CAP2D(GFX2_OP_MAX + 1) - 2', 'GFX2_CAP2D(GFX2_OP_MAX) - 2'),

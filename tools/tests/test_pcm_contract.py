@@ -5,15 +5,15 @@ Only module publication, user-range validation and device I/O are host seams.
 # 期待の出所: 現状記録 (characterization、2026-11-14)。設計の約束ではなく、AV_HAL へ移る前の今の PCM の振る舞いを写した基準。
 # AV_HAL §3 (共通の stream の状態・snd2_v1 bridge) で意図して変える振る舞い (満杯での自動開始の閾値など) は、設計の決定に合わせて期待を直してよい。
 CHECK = dict(name='pcm-contract-host', tier=1,
-    covers=['sound/hal/*.[ch]', 'include/av_contract.h', 'sdk/include/os32/os32_snd2.h', 'tools/tests/test_pcm_contract.py', 'tools/tests/pcm_contract_host.c',
+    covers=['sound/hal/*.[ch]', 'sys/include/av_contract.h', 'sdk/include/os32/os32_snd2.h', 'tools/tests/test_pcm_contract.py', 'tools/tests/pcm_contract_host.c',
             'tools/tests/pcm_cs4231_host.c', 'tools/tests/pcm_hostshim/io.h',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'drivers/sound/cs4231/*', 'include/pcm_contract.h', 'include/types.h',
-            'include/time_units.h', 'include/dma_contract.h', 'include/memmap.h',
-            'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'kernel/time/tick_clock.h',
-            'kernel/module/module_runtime.h', 'kernel/module/module_image.h',
-            'mm/dma_pool.h', 'mm/kmalloc.h', 'lib/kstring.h',
-            'kapi/kapi_generated.c', 'sdk/gen_kapi.py', 'sdk/kapi.json',
+            'drivers/sound/cs4231/*', 'sys/include/pcm_contract.h', 'sys/include/types.h',
+            'sys/include/time_units.h', 'sys/include/dma_contract.h', 'sys/include/memmap.h',
+            'sys/kern/irq/irq.h', 'sys/kern/irq/irq_math.h', 'sys/hal/time/tick_clock.h',
+            'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.h',
+            'sys/kern/mm/dma_pool.h', 'sys/kern/mm/kmalloc.h', 'sys/kern/kstring.h',
+            'sys/kapi/kapi_generated.c', 'sdk/gen_kapi.py', 'sdk/kapi.json',
             'sdk/kapi_target_ppc.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py',
             'sdk/kapi_rust_gen.py', 'sdk/include/os32/os32_kapi_shared.h',
             'sdk/include/os32/os32_generations.h'], needs=[], budget=5,
@@ -29,8 +29,8 @@ import tempfile
 import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
-DRIVER = 'drivers/sound/cs4231/pcm_cs4231.c'
-BRIDGE = 'sound/hal/snd2_v1.c'
+DRIVER = 'sys/dev/sound/cs4231/pcm_cs4231.c'
+BRIDGE = 'sys/hal/sound/snd2_v1.c'
 
 
 def section(text, start, end):
@@ -44,18 +44,18 @@ def main():
         subprocess.run([sys.executable, '-B', 'sdk/gen_kapi.py', '--target',
                         'ppc-powermac', '--out-dir', str(tmp)], cwd=ROOT,
                        check=True, stdout=subprocess.DEVNULL)
-        wrappers = section((ROOT / 'kapi/kapi_generated.c').read_text(),
+        wrappers = section((ROOT / 'sys/kapi/kapi_generated.c').read_text(),
                            'int __cdecl wrap_pcm_open(', 'int __cdecl wrap_kbd_diag(')
-        ppc = section((tmp / 'kapi/kapi_generated.c').read_text(),
+        ppc = section((tmp / 'sys/kapi/kapi_generated.c').read_text(),
                       'int __cdecl wrap_pcm_open(', 'int __cdecl wrap_kbd_diag(')
         (tmp / 'ppc.c').write_text(ppc.replace('wrap_pcm_', 'ppc_pcm_'))
         (tmp / 'wrappers.c').write_text(wrappers)
         fixture = (ROOT / 'tools/tests/pcm_cs4231_host.c').read_text()
         for header in ('stdio.h', 'stdlib.h', 'string.h'):
             fixture = fixture.replace('#include <' + header + '>', '')
-        fixture = fixture.replace('../../drivers/sound/cs4231/pcm_cs4231.c', str(tmp / 'driver.c'))
-        fixture = fixture.replace('../../drivers/sound/cs4231/pcm_cs4231_math.c',
-                                  str(ROOT / 'drivers/sound/cs4231/pcm_cs4231_math.c'))
+        fixture = fixture.replace('../../sys/dev/sound/cs4231/pcm_cs4231.c', str(tmp / 'driver.c'))
+        fixture = fixture.replace('../../sys/dev/sound/cs4231/pcm_cs4231_math.c',
+                                  str(ROOT / 'sys/dev/sound/cs4231/pcm_cs4231_math.c'))
         (tmp / 'fixture.c').write_text(fixture)
         driver = (ROOT / DRIVER).read_text()
         bridge = (ROOT / BRIDGE).read_text()
@@ -64,7 +64,7 @@ def main():
         def module_source(source):
             return re.sub(r'\bpcm_(open|close|status|write|write_check|set_volume|reclaim)\b',
                           r'module_pcm_\1', source)
-        stream = (ROOT / 'sound/hal/snd2_stream.c').read_text()
+        stream = (ROOT / 'sys/hal/sound/snd2_stream.c').read_text()
         def run(label, drv, v1, expected, stream_source=stream):
             (tmp / 'stream.c').write_text(stream_source)
             (tmp / 'driver.c').write_text(module_source(drv))
@@ -76,7 +76,7 @@ def main():
                             '-D__cdecl=', '-I' + str(tmp),
                             '-I' + str(ROOT / 'tools/tests/pcm_hostshim'), *include_flags(ROOT),
                             '-I' + str(ROOT / 'sound/hal'), str(ROOT / 'tools/tests/pcm_contract_host.c'),
-                            str(tmp / 'bridge.c'), str(ROOT / 'drivers/sound/cs4231/pcm_hw.c'),
+                            str(tmp / 'bridge.c'), str(ROOT / 'sys/dev/sound/cs4231/pcm_hw.c'),
                             *[str(ROOT / f'sound/hal/snd2_{unit}.c') for unit in
                               ('caps', 'reg', 'stg', 'seg')], str(tmp / 'stream.c'),
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',

@@ -57,7 +57,7 @@ NP21/W の受入と実機の更新は、CI の artifacts のジョブが作っ�
 - `CHECK` の `covers` と依存抽出に入力が無く、変更しても試験が選ばれない。
 - 作業木の `assets/fonts` に IPAex が無い (同意済みの main から写す、gitignore)。
 - CI だけ落ちる: CI は 32bit の試験を native で走らせる (手元は qemu)。`HOST32_RUNNERS="native qemu"` で再現する。
-- 自分が書いていない変更がコミットに紛れる: 作業木はほかのエージェントも書ける。`git add -A` の前に `git status --short` を読み、覚えの無いファイルは外して出所を確かめる (2026-11-17、`userland/tests/hw/tri_burst.hwb` の 18 行が紛れて検査が落ちた)。
+- 自分が書いていない変更がコミットに紛れる: 作業木はほかのエージェントも書ける。`git add -A` の前に `git status --short` を読み、覚えの無いファイルは外して出所を確かめる (2026-11-17、`userland/diag/hw/tri_burst.hwb` の 18 行が紛れて検査が落ちた)。
 - CI が 1 本も起動しない: コミットの本文に、CI を飛ばす印 (角括弧つきの skip ci) の文字列が説明としてでも入っていると、GitHub は CI を飛ばす。印の名前を文に書く時は角括弧を付けない。空のコミット・同じ木の force-push では build が起動しない (`gh workflow run build.yml --ref <枝>`)。変更が文書だけの時も build は起動しないが、それで正しい — 文書だけは check の success で取り込み、build は手で起こさない (ユーザー決定 2026-11-19)。push の直後に `gh run list --branch <枝>` で起動を確かめる (2026-11-18)。
 - CI の待ち: `gh run watch` を何本も裏で回さない (3 秒ごとに問い合わせて、API の上限 1 時間 5,000 回を使い切る)。`gh run list` を数分おきに 1 回。
 - 揺れる試験: 回し直し (`gh run rerun <id> --failed`) で通したら、検査の名前・落ち方・日付を `docs/tasks/DEFERRED_TESTS.md` に行で残す。同じ検査の 2 回目が出たら、直すまで行を閉じない (回し直しで通す運用を常態にしない)。

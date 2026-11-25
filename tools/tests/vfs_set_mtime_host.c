@@ -1,12 +1,12 @@
 /* =========================================================================
  *  VFS_SET_MTIME_HOST.C — `vfs_set_mtime()` の振り分け規則を
- *                          **実物の fs/vfs.c で** 確かめる
+ *                          **実物の sys/fs/vfs.c で** 確かめる
  *
  *  票:   H3 (docs/archive/shell/TASK_H3.md §4)
  *  実行: python3 -B tools/tests/test_vfs_set_mtime.py [--target]
  *  記録: tools/tests/h3_tdd.md
  *
- *  実物の fs/vfs.c をそのまま #include し、境界 (kstring / kmalloc) だけを
+ *  実物の sys/fs/vfs.c をそのまま #include し、境界 (kstring / kmalloc) だけを
  *  同義の C で置く (tools/tests/vfs_kind_host.c と同じ作法)。FS ドライバは
  *  合成した VfsOps で、`set_mtime` を**持つ / 持たない**の両方を作れる。
  *
@@ -29,7 +29,7 @@
 
 #include "vfs.h"
 
-/* ---- fs/vfs.c の境界 (lib/kstring_asm.asm / kmalloc はホストで組めない) ---- */
+/* ---- sys/fs/vfs.c の境界 (sys/kern/kstring_asm.asm / kmalloc はホストで組めない) ---- */
 void *kzalloc(u32 size) { return calloc(1, size); }
 void kfree(void *p) { free(p); }
 void *kmemset(void *dst, int val, u32 n) { return memset(dst, val, n); }
@@ -51,9 +51,9 @@ char *kstrncat(char *dst, const char *src, u32 n)
     return dst;
 }
 
-#include "../../fs/vfs.c"
+#include "../../sys/fs/vfs.c"
 #include "../platform/pc98/boot_names.c"
-/* fs/vfs_fd.c の FD 表側 (票 TASK_VFS_FD_PATH)。この試験は FD を開かない */
+/* sys/fs/vfs_fd.c の FD 表側 (票 TASK_VFS_FD_PATH)。この試験は FD を開かない */
 void vfs_fd_invalidate_ino(void *c, u32 i) { (void)c; (void)i; }
 void vfs_fd_invalidate_mount(void *c) { (void)c; }
 void vfs_fd_stale_mount(void *c) { (void)c; }

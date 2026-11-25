@@ -1,6 +1,6 @@
-# include/kselftest_probe.h — 設計
+# sys/include/kselftest_probe.h — 設計
 > 状態: **現行 (2026-10-31)** — 出所: SLIM_KERNEL_DESIGN (D1 で移した)
-ソース: `include/kselftest_probe.h`
+ソース: `sys/include/kselftest_probe.h`
 
 ```c
 #define KSELFTEST_PROBE_VERSION 1u

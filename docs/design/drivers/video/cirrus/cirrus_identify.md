@@ -1,7 +1,7 @@
-# drivers/video/cirrus/cirrus_identify.c — 設計
+# sys/platform/pc98/video/cirrus/cirrus_identify.c — 設計
 
 > 状態: **現行 (2026-11-18)** — 出所: TASK_S5 (§6 の R2 の観測) の契約を今のソースと照らして要約
-ソース: `drivers/video/cirrus/cirrus_identify.c` (`cirrus_win_usable`・`cirrus_identify`)・`include/wab_xe10.h`
+ソース: `sys/platform/pc98/video/cirrus/cirrus_identify.c` (`cirrus_win_usable`・`cirrus_identify`)・`sys/platform/pc98/wab_xe10.h`
 
 ポートを叩かずに、Cirrus (Xe10) の窓を張ってよいかを決める。Cirrus は NP21/W 互換のためだけに持つ。
 
@@ -18,9 +18,9 @@
 2. リニア窓 (`WAB_XE10_LINEARWIN_BASE`) が張れること。張れないと CPU 描画面を出せないので PEGC・9801 に譲る。
 3. リニア窓の先頭がページ境界で、使う VRAM (表示面 + 非表示面 + パターン) が窓に収まること。
 
-## リニア窓の置き場 (`include/wab_xe10.h`)
+## リニア窓の置き場 (`sys/platform/pc98/wab_xe10.h`)
 
-- 番地は v3 のデバイス窓の帯 (`include/memmap.h` の `MEM_DEVICE_APERTURE_*`、物理地図で MMIO) の先頭。`WAB_XE10_LINEARWIN_SEL` = 帯の先頭 >> 24 = FEh で、窓は FE000000h。使うのは 2MB、窓として出る 4MB (`WAB_XE10_LINEARWIN_DECODE`) が帯と帯の静的 PT に収まることは `drivers/video/cirrus/wab_glue_xe10.c` の STATIC_ASSERT が見る。
+- 番地は v3 のデバイス窓の帯 (`sys/include/memmap.h` の `MEM_DEVICE_APERTURE_*`、物理地図で MMIO) の先頭。`WAB_XE10_LINEARWIN_SEL` = 帯の先頭 >> 24 = FEh で、窓は FE000000h。使うのは 2MB、窓として出る 4MB (`WAB_XE10_LINEARWIN_DECODE`) が帯と帯の静的 PT に収まることは `sys/platform/pc98/video/cirrus/wab_glue_xe10.c` の STATIC_ASSERT が見る。
 - 旧番地 01000000h は 16MB を超える RAM と重なるので使わない。
 
 ## 検査

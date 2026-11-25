@@ -5,7 +5,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = (ROOT / 'exec/exec_image.inc').read_text()
+SOURCE = (ROOT / 'sys/kern/exec/exec_image.inc').read_text()
 ANCHOR = '        arch_exec_publish(P2V(pa), n);'
 HARNESS = r'''
 #include <stdint.h>

@@ -5,7 +5,7 @@
 
 tools/tests/b8_open_host.c が
 
-  * 実物の fs/ext2/ext2_super.c / ext2_inode.c / ext2_dir.c / ext2_file.c /
+  * 実物の sys/fs/ext2/ext2_super.c / ext2_inode.c / ext2_dir.c / ext2_file.c /
     ext2_fmt.c / ext2_vfs.c / vfs.c / vfs_fd.c をそのまま #include し、
   * 贋物は Device API と IDE だけ、
   * RAM 上の 8MB ディスクを実物の ext2_format() で作って、
@@ -49,7 +49,7 @@ import b8_e2fsck  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
-# u32 は unsigned long (include/types.h) なので **必ず ILP32 で組む**。
+# u32 は unsigned long (sys/include/types.h) なので **必ず ILP32 で組む**。
 # ext2 のオンディスク配置を実物の構造体で扱うため、ここは譲れない。
 HOST_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
               "-fno-stack-protector", "-nostdlib", "-static", "-O1",
@@ -60,14 +60,14 @@ INCLUDES = include_flags(ROOT)
 SRC = ROOT / "tools/tests/b8_open_host.c"
 
 # 票 B8 で触ったカーネル側。実ビルドと同じ素性で -Werror を通す ([C1])。
-TARGET_SRCS = ["fs/ext2/ext2_inode.c", "fs/ext2/ext2_dir.c", "fs/ext2/ext2_file.c",
-               "fs/ext2/ext2_vfs.c", "fs/ext2/ext2_super.c", "fs/ext2/ext2_time.c", "fs/vfs.c", "fs/vfs_fd.c"]
+TARGET_SRCS = ["sys/fs/ext2/ext2_inode.c", "sys/fs/ext2/ext2_dir.c", "sys/fs/ext2/ext2_file.c",
+               "sys/fs/ext2/ext2_vfs.c", "sys/fs/ext2/ext2_super.c", "sys/fs/ext2/ext2_time.c", "sys/fs/vfs.c", "sys/fs/vfs_fd.c"]
 TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",
                 "-Wall", "-Wextra", "-Werror",
                 "-Wno-sign-compare", "-Wno-unused-parameter",
-                # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は
+                # arch/x86 + platform/pc98: sys/include/io.h は契約だけで、実装は
                 # 固定名 arch_io.h / platform_io.h を引く (順序 3)。
                 "-D__KERNEL_BUILD__",
                     *include_flags(ROOT)]

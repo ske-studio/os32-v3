@@ -25,7 +25,7 @@ Emulator, real hardware, loader integration and product linkage are outside S0.
 ## T4a-1 common schema / ID policy
 
 `tools/module_schema.py` is consumed by mkmod and generates
-`kernel/module/module_schema.h` through `tools/gen_module_schema.py`. The independent
+`sys/kern/module/module_schema.h` through `tools/gen_module_schema.py`. The independent
 wire fixture above keeps its explicit byte offsets. Caller-selected IDs must
 match the image and an admitted policy row (`MODULE_COMPONENT_POLICIES`, generated
 from `COMPONENTS`; SQLITE and the later components have rows).

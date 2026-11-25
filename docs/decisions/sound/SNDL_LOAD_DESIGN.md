@@ -4,12 +4,12 @@
 
 ## 1. 設計基点の経路
 
-比較基点は origin/main（8232174f）、音側は指定作業木（1ab4ac70）。mm/shlib.c、exec、sdk/link/shlib.ld は両者で同じ。以下はソースから読んだ契約。
+比較基点は origin/main（8232174f）、音側は指定作業木（1ab4ac70）。sys/kern/mm/shlib.c、exec、sdk/link/shlib.ld は両者で同じ。以下はソースから読んだ契約。
 
 | 境界 | x86 で現在行われる処理 |
 |---|---|
-| 媒体 → 原本 | platform/pc98/kernel.c の shlib_init が VFS 初期化後に include/config.h の SYS_SHLIB_GUI（/sys/lib/libos32gui.shlib）を開く。mm/shlib.c は単一のページ配列とロード状態を所有。/sys/lib は配備先で、走査も名前解決もない。L5 は userland/deploy.yaml に音像の配備を登録している。 |
-| ファイル → 検証 | 外側は OS32X v5、64 B、LE。exec/os32x_hdr.c が CPU・既知 flags、KAPI 配置・ABI 世代、メモリ世代、共通 shlib protocol、最低 KAPI 版を照合。mm は SHLIB 専用 flag、固定 load_addr、entry_offset=0、ページ境界の code_size、本文＋BSS の上限を検査する。 |
+| 媒体 → 原本 | sys/platform/pc98/kernel.c の shlib_init が VFS 初期化後に sys/include/config.h の SYS_SHLIB_GUI（/sys/lib/libos32gui.shlib）を開く。sys/kern/mm/shlib.c は単一のページ配列とロード状態を所有。/sys/lib は配備先で、走査も名前解決もない。L5 は userland/deploy.yaml に音像の配備を登録している。 |
+| ファイル → 検証 | 外側は OS32X v5、64 B、LE。sys/kern/exec/os32x_hdr.c が CPU・既知 flags、KAPI 配置・ABI 世代、メモリ世代、共通 shlib protocol、最低 KAPI 版を照合。mm は SHLIB 専用 flag、固定 load_addr、entry_offset=0、ページ境界の code_size、本文＋BSS の上限を検査する。 |
 | 原本 → 呼出表 | 内側の先頭 4 KiB は SLIB。32 B の先頭部は magic、ライブラリ版、nfunc、data_vaddr、data_pages、text_pages、予約 2 語（先頭は共通 protocol）。+32 から 32 bit 絶対関数番地。各入口はヘッダの次頁から RO 部終端まで。外側の text_size は初期 data も含む。 |
 | アプリ → exec | 通常アプリは sdk/link/app.ld で 0x80100000 にリンク。mkos32x.py は ELF の __os32_shlib_dependency から protocol を刻印する。非ゼロは実質 GUI が必要という意味で、常駐 shell の依存は拒否。crt0.asm が BSS を消し、_start_c が argc/argv/KAPI/aux を受け、_init、main、sys_exit へ進む。 |
 | exec → アドレス空間 | exec_image_map.inc が GUI 私有頁と PT を予算化。exec_launch.inc は ring 3 の起動時に、依存印の有無によらず、ロード済み GUI を attach。master CR3 で RO+USER のヘッダ・text・rodata に同じ物理頁を張り、data/BSS は原本から AS 所有の RW+USER 頁へ複製。原本の直接写像は supervisor。 |
@@ -47,12 +47,12 @@
    | 0x0180 | 2 | GUI と音 |
 
    WITH_GUI 単独、音要求かつ protocol=0、未知 protocol、非 ring 3・常駐 shell・SHLIB 本体への新規 bit は入口前に拒否する。SHLIB 本体は従来の protocol 検証を通す。exec_image_map.inc の「非ゼロなら GUI 必須」は表の必須集合で判定する。暗黙 attach と必須判定を区別する。
-3. **互換性と実機配備。** exec/os32x_hdr.c の os32x_layout_check は known を GFX/RING3/SHLIB/CUI_ONLY/LAUNCHER/PPC32 の論理和とし、flags & ~known なら OS32X_LAYOUT_OLD を返す。旧カーネルは新しい音アプリを入口前で拒否し、新カーネルは旧アプリ・GUI の番地、上限、依存印、SLIB 表形式を維持する。よって memory_layout_generation=4、shlib_protocol=2、OS32X v5、KAPI ABI=2 を据え置く。音表 v1 の既存 8 口を固定し、同 major の入口は末尾に追加する。実機は通常の boot 先行同期で新カーネルを先に入れ、音像・音アプリを同期して再起動する。旧 boot に戻しても旧 GUI/CUI が使える。
+3. **互換性と実機配備。** sys/kern/exec/os32x_hdr.c の os32x_layout_check は known を GFX/RING3/SHLIB/CUI_ONLY/LAUNCHER/PPC32 の論理和とし、flags & ~known なら OS32X_LAYOUT_OLD を返す。旧カーネルは新しい音アプリを入口前で拒否し、新カーネルは旧アプリ・GUI の番地、上限、依存印、SLIB 表形式を維持する。よって memory_layout_generation=4、shlib_protocol=2、OS32X v5、KAPI ABI=2 を据え置く。音表 v1 の既存 8 口を固定し、同 major の入口は末尾に追加する。実機は通常の boot 先行同期で新カーネルを先に入れ、音像・音アプリを同期して再起動する。旧 boot に戻しても旧 GUI/CUI が使える。
 4. **初回読込。** exec_launch.inc の static resolved と static hdrbuf を呼出し単位の起動コンテキストへ移す。パス探索から同じファイルの本文読了まで保持し、待機中に別 exec が双方を書き換えられないようにする。音 ID ごとに短い排他区間で未読→読込中を取得した一人だけが、固定パスを開き、一時 descriptor に全頁を取得し、内外ヘッダ・番地・音表・入口を検査する。VFS I/O・頁確保中は排他を解く。後着は同じ試行に待ち登録し、状態検査と睡眠登録を不可分にして CPU を譲る。成功時は排他下で完成 descriptor を一度だけ公開して全待機者を起こす。失敗時は fd・仮頁を全回収して未読に戻す。待機者には参加した試行の結果を保持して返し、次の独立した exec が再試行する。待機者の取消は他の要求を取り消さず、読込所有者の中断も同じ失敗後始末を通す。
    LD3 では通常アプリのスロット取得を読込・待機の完了後へ移す。現行の appslot_start_admit() は空き ID を返すだけで予約せず、後段の予算検査で返す ID も使われない。起動前半は呼出し元 ID と起動計画だけを保持する。公開後、§3.5 の予算検査を通った呼出しが、全起動経路に共通の短い排他区間で空き ID を選び、同時に予約済みにする。空きがなければ OS32_ERR_FULL。予約した呼出しだけがその ID の ctx を初期化し、起動成功で実行中に移す。失敗・取消時はその予約に属する資源を回収してから ID を空きに戻す。常駐 shell は従来の専用 ID を使う。
 5. **予算と回収。** 公開後に「ロード済み GUI＋要求した音」の同一集合で私有頁と重複しない PT を含む必要総頁数を算定する。LD3 は ring 3 の実測空き頁が必要頁数を下回れば、スロット予約・AS 確保の前に EXEC_ERR_NOMEM を返す。公開直後の空き 0 頁もこの比較に含める。appslot_start_admit() の free_pages == 0 は予算検査を省く合図なので、実測値との比較は独立して行う。予算通過後は予約した ID の AS に master 上で attach する。AS ごとに進捗を記録し、途中失敗・終了・kill は逆順で写像、私有頁、不要 PT を回収する。read_page と監査は検証済み VA/frame を照合する。公開した音原本は起動予算不足でも再起動まで常駐する。L5 計測値は 33 頁（132 KiB）、音利用 AS の追加私有分は 5 頁。初回失敗が公開前か公開後かで回復すべき空き頁の基準が異なる。
 6. **呼出し。** SDK の C89 ヘッダと型付き C stub（Rust は同じ C ABI）を entries.inc と同一の番号定義に結ぶ。初回 bind で表を照合し、新設の init 入口へアプリの KernelAPI を渡す。失敗時は後続入口を呼ばない。chip_open/write/close、pump、stream の open/close 等の公開分だけを追加し、OPNA のレジスタ実装・Rust 状態はライブラリ内部に保つ。
-7. **PPC と後続設計。** POLICY_DEV §10 に従い公開関数・失敗条件・所有・PCM の s16le を x86 に揃える。PPC は現在 exec/absent/exec_shlib.c で未提供。音依存は入口前に拒否する。対応時は PPC32 フラグ付き像、PPC 用リンク・呼出規約・ページ保護・コードキャッシュ同期と、外包み LE／内表の byte order の明示的な encode/decode を用意する。共通部へ x86 CR3 操作を持ち込まない。
+7. **PPC と後続設計。** POLICY_DEV §10 に従い公開関数・失敗条件・所有・PCM の s16le を x86 に揃える。PPC は現在 sys/kern/exec/absent/exec_shlib.c で未提供。音依存は入口前に拒否する。対応時は PPC32 フラグ付き像、PPC 用リンク・呼出規約・ページ保護・コードキャッシュ同期と、外包み LE／内表の byte order の明示的な encode/decode を用意する。共通部へ x86 CR3 操作を持ち込まない。
 8. **P7 への引継ぎ。** LIBC_SHLIB_DESIGN §3–4 の 2 MiB 帯、shlib.idx、(id, major) の依存表は後続の一括切替。上記の音番地は P7 の libc.2 予定枠と重なる。P7 の同一世代一括切替で音を枠 3 の 0x80180000 に移し、枠 1 を libc.2 に渡す。P7 の配置規則で音 data を 0x801F0000 起点、終端を 0x801FF000 以下（60 KiB）として時計頁を除外する。現行私有 20 KiB は収まる。P7 の表・依存 ID に移して SDK・アプリ・全像を再リンクし、リンク時・読込時に両端を検査する。既に使われている OS32X v5 を P7 の新形式番号に流用しない。今回の IL は libc 共有化を前提にしない。
 
 ## 4. 実装段と合格条件
@@ -62,7 +62,7 @@ AV_HAL_DESIGN §12 の段に対応する。担当は主変更点で分け、L6/L
 | 段 | 主変更点 | 依存 | 保持する状態 | 行目安 | 統合 | 着手前提 |
 |---|---|---|---|---:|---|---|
 | LD1 | SDK の音枠・依存印・リンク/pack・旧世代互換と表の検算 | L5 | 枠契約 | 100〜160 | IL | メモリ契約の決定 |
-| LD2 | mm/shlib.c の枠別原本、初回読込、attach/detach と RO 判定 | LD1 | 原本・AS の付着集合 | 120〜200 | IL | LD1 |
+| LD2 | sys/kern/mm/shlib.c の枠別原本、初回読込、attach/detach と RO 判定 | LD1 | 原本・AS の付着集合 | 120〜200 | IL | LD1 |
 | LD3 | exec の要求検証・初回取得・公開後の予算検査（空き 0 を含む）・待機後の ID 予約と巻戻し | LD2 | 起動計画 | 70〜120 | IL | LD2 |
 | LD4 | SDK の sndl stub、音表と init、ゲスト sndl_test・対象 host 試験 | LD1〜3・L2/L3/L6 | アプリの bind 状態 | 160〜270 | IL | ソフト音源と PCM の接続 |
 

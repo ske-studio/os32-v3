@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """B3: PC-98 planar bring-up provider keeps the pre-separation I/O and memory trace."""
 CHECK = dict(name='sep5-gfx-init-host', tier=1, needs=[], budget=5,
-    covers=['gfx/palette.c', 'platform/pc98/gfx_init.c', 'kernel/console/display_restore.h',
-            'gfx/gfx_core.c', 'gfx/gfx_core_init.inc', 'gfx/gfx_core_api.inc', 'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_present.c', 'gfx/gfx_internal.h', 'gfx/gfx.h',
-            'platform/powermac/display.c', 'platform/powermac/display_provider.c', 'tools/tests/sep5_gfx_init_host.c',
+    covers=['sys/hal/gfx/palette.c', 'sys/platform/pc98/gfx_init.c', 'sys/kern/console/display_restore.h',
+            'sys/hal/gfx/gfx_core.c', 'sys/hal/gfx/gfx_core_init.inc', 'sys/hal/gfx/gfx_core_api.inc', 'sys/platform/pc98/video/gfx_vram.c', 'sys/hal/gfx/gfx_present.c', 'sys/hal/gfx/gfx_internal.h', 'sys/hal/gfx/gfx.h',
+            'sys/platform/powermac/display.c', 'sys/platform/powermac/display_provider.c', 'tools/tests/sep5_gfx_init_host.c',
             'tools/tests/test_sep5_gfx_init.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/**',
-            'arch/x86/**', 'platform/pc98/**', 'lib/kstring.h', 'sdk/include/os32/**',
-            'gfx/palette.h', 'drivers/video/pc98/splash_raster.h', 'exec/surface_limits.h'],
+            'arch/x86/**', 'platform/pc98/**', 'sys/kern/kstring.h', 'sdk/include/os32/**',
+            'sys/hal/gfx/palette.h', 'sys/platform/pc98/video/splash_raster.h', 'sys/kern/exec/surface_limits.h'],
     basis=['PPC_SEP5_DESIGN §2.1'],
 )
 import argparse
@@ -18,7 +18,7 @@ import tempfile
 import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
-PROVIDER = 'platform/pc98/gfx_init.c'
+PROVIDER = 'sys/platform/pc98/gfx_init.c'
 # (name, file, unique anchor, replacement): provider mutants must fail the host
 # trace at run time.
 MUTATIONS = (
@@ -39,7 +39,7 @@ MUTATIONS = (
      'VRAM_PLANE_B, VRAM_PLANE_G, VRAM_PLANE_R, VRAM_PLANE_I\n    };\n    return'),
     ('clear-one-page', PROVIDER, '    _out(GDC_ACCESS_PAGE, GDC_PAGE_1);\n    kmemset', '    _out(GDC_ACCESS_PAGE, GDC_PAGE_0);\n    kmemset'),
 )
-CORE = {'present': 'gfx/gfx_present.c', 'api': 'gfx/gfx_core_api.inc', 'core': 'gfx/gfx_core.c', 'init': 'gfx/gfx_core_init.inc', 'vram': 'drivers/video/pc98/gfx_vram.c'}
+CORE = {'present': 'sys/hal/gfx/gfx_present.c', 'api': 'sys/hal/gfx/gfx_core_api.inc', 'core': 'sys/hal/gfx/gfx_core.c', 'init': 'sys/hal/gfx/gfx_core_init.inc', 'vram': 'sys/platform/pc98/video/gfx_vram.c'}
 # The common callers are extracted from the product text and *executed* with
 # recording fakes; these mutants must fail that executed trace.
 CORE_MUTATIONS = (
@@ -113,7 +113,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     texts = dict(provider=(ROOT / PROVIDER).read_text(),
-                 palette=(ROOT / 'gfx/palette.c').read_text(),
+                 palette=(ROOT / 'sys/hal/gfx/palette.c').read_text(),
                  **{key: (ROOT / path).read_text() for key, path in CORE.items()})
     with tempfile.TemporaryDirectory(prefix='sep5-gfx-init-') as directory:
         work = Path(directory)

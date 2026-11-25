@@ -29,7 +29,7 @@ def observe(work, source):
     flags = ['-I' + str(ROOT / p) for p in ('.', 'include', 'lib', 'sdk/include', 'sdk/include/os32', 'mm', 'gfx/v2')]
     host32.build(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-O0',
                   '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static',
-                  *flags, str(path), str(ROOT / 'gfx/v2/check_op.c'), str(ROOT / 'gfx/v2/sw_table.c'),
+                  *flags, str(path), str(ROOT / 'sys/hal/gfx/v2/check_op.c'), str(ROOT / 'sys/hal/gfx/v2/sw_table.c'),
                   str(ROOT / 'tools/tests/gfx2_submit_host.c'), '-o', str(exe)], check=True)
     return host32.run([str(exe)]).returncode
 
@@ -37,7 +37,7 @@ def observe(work, source):
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/v2/submit.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/v2/submit.c').read_text()
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         rc = observe(work, source)

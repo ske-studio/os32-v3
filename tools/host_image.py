@@ -8,7 +8,7 @@ import os
 import struct
 from typing import Mapping
 
-# fs/serialfs/sfs_proto.h D1 wire constants; checked by test_hostsvc_image.py.
+# sys/fs/serialfs/sfs_proto.h D1 wire constants; checked by test_hostsvc_image.py.
 SFS_T_BOPEN = 0x30
 SFS_T_BREAD = 0x31
 SFS_T_BCLOSE = 0x32

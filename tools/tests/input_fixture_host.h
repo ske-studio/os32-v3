@@ -6,7 +6,7 @@ struct VfsStdinRead *exec_stdin_state(void) { return 0; }
 
 /* Fill every unused operation with the production nonblocking null provider.
  * Define INPUT_FIXTURE_SETUP to connect only this fixture's recording fakes. */
-#include "../../kernel/input_service.c"
+#include "../../sys/hal/input/input_service.c"
 static InputOps fixture_input;
 static void input_fixture_init(void)
 {

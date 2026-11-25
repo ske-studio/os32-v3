@@ -5,15 +5,15 @@
  *  実行:   python3 -B tools/tests/test_kbd_inject.py
  *  記録:   tools/tests/k7_tdd.md
  *
- *  kernel/kbd_inject.c を 1 行も写さずそのまま #include する (模型ではない)。
- *  **kernel/console/con_sink.c も同じ翻訳単位へ入れる** — 注入の権限は「con_sink の
+ *  sys/kern/kbd_inject.c を 1 行も写さずそのまま #include する (模型ではない)。
+ *  **sys/kern/console/con_sink.c も同じ翻訳単位へ入れる** — 注入の権限は「con_sink の
  *  読み手 1 本」(票 §5 R2) で、そこを模型に置き換えると試験の意味が消える
  *  ため。読み手の確立は本物の con_sink_read() で行う。
  *
  *  カーネル帯に要るものは 2 つだけ (con_sink_host.c と同じ):
  *    - 割込み禁止区間: ホストは CPL=3 で cli/popfl を実行できないので
  *      con_sink は arch_io.h の状態模型、注入は既存の空の錠を使う。
- *    - 所有者: fs/fd_redirect.c の res_owner_get/set をここで持つ。
+ *    - 所有者: sys/fs/fd_redirect.c の res_owner_get/set をここで持つ。
  *
  *  libc は使わない (-nostdlib、Linux の int 0x80 で write/exit するだけ)。
  *  C89 ([C1])。

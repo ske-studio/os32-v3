@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """S0a registry contract, linked without libc."""
 CHECK = dict(name='keymap-s0a', tier=1, budget=10, needs=[], covers=[
-    'input/hal/keymap_registry.c', 'input/hal/keymap.h', 'input/hal/in2_int.h',
-    'input/keymaps/hid_jp.c', 'include/types.h', 'include/io.h',
+    'sys/hal/input/keymap_registry.c', 'sys/hal/input/keymap.h', 'sys/hal/input/in2_int.h',
+    'sys/input/keymaps/hid_jp.c', 'sys/include/types.h', 'sys/include/io.h',
     'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/keymap_s0a_host.c',
     'tools/tests/test_keymap_s0a.py', 'tools/tests/host32.py'],
     basis=['INPUT_KEYMAP_DESIGN §8, H0b'], kind='contract')
@@ -17,13 +17,13 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 
 def run(ctx):
-    source = (ctx.root / 'input/hal/keymap_registry.c').read_text()
+    source = (ctx.root / 'sys/hal/input/keymap_registry.c').read_text()
     with tempfile.TemporaryDirectory(prefix='keymap-s0a-') as td:
         tmp = Path(td)
         for name in ('keymap.h', 'in2_int.h'):
             (tmp / name).write_text((ctx.root / 'input/hal' / name).read_text())
         (tmp / 'io.h').write_text('static inline unsigned irq_save(void) { return 0; }\nstatic inline void irq_restore(unsigned f) { (void)f; }\n')
-        files = [tmp/'registry.c', ctx.root/'input/keymaps/hid_jp.c', ctx.root/'tools/tests/keymap_s0a_host.c']
+        files = [tmp/'registry.c', ctx.root/'sys/input/keymaps/hid_jp.c', ctx.root/'tools/tests/keymap_s0a_host.c']
         includes = ['-I'+str(tmp), '-I'+str(ctx.root), '-I'+str(ctx.root/'include'), '-I'+str(ctx.root/'sdk/include/os32')]
         common = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding'] + includes
         def build(s):

@@ -8,11 +8,11 @@ import hal_inventory as inv
 
 
 def check():
-    source = {'include/fdc_contract.h': 'int fdc_status(void);',
+    source = {'sys/include/fdc_contract.h': 'int fdc_status(void);',
               'drivers/block/unit.c': 'int fdc_status(void) { return 1; }',
               'fs/use.inc': 'int use(void) { /* fdc_status(); */\nreturn fdc_status(); }',
               'gfx/opaque.c': 'const char *s = "struct GfxBackend {";',
-              'include/input_service.h': 'struct InputOps { int (*get)(void); };',
+              'sys/hal/input/input_service.h': 'struct InputOps { int (*get)(void); };',
               'platform/test.c': 'const InputOps io = { .get = fetch };',
               'hwdev/gf/unit.c': 'void unit(void) {}'}
     hal, calls, gf = inv.inventory({p: inv.mask(s) for p, s in source.items()})
@@ -42,15 +42,15 @@ def check():
                                    {'entry': ['platform/unit.o']})
     assert nm_calls[0][4] == 'platform/unit.o:nm'
     contract = {
-        'include/clock_source.h': 'int platform_clock_read_us(void);',
+        'sys/hal/time/clock_source.h': 'int platform_clock_read_us(void);',
         'platform/test_a/unit.c': 'int platform_clock_read_us(void) { return 0; }',
         'platform/test_b/unit.c': 'int platform_clock_read_us(void) { return 1; }',
-        'include/geforce_contract.h': 'void geforce_foreground_poll(void);',
+        'sys/include/geforce_contract.h': 'void geforce_foreground_poll(void);',
         'drivers/video/geforce/poll.c': 'void geforce_foreground_poll(void) {}',
         'kernel/poll.c': 'void poll(void) { platform_clock_read_us(); geforce_foreground_poll(); }',
     }
     assert [(r[2], r[5]) for r in inv.inventory(contract)[1]] == [('geforce_foreground_poll', 'P8候補')]
-    del contract['include/clock_source.h']
+    del contract['sys/hal/time/clock_source.h']
     assert any(r[2] == 'platform_clock_read_us' for r in inv.inventory(contract)[1])
     fixture['include/alternate.h'] = '#define set_size(n) (0)'
     assert inv.inventory(fixture)[1][0][5] == '未確定'

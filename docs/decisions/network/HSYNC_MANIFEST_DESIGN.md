@@ -31,9 +31,9 @@
 - report.md は /home/hight/os32-tmp/run/hsync-measure-x86/report.md。実測値とコードの直接矛盾は認めない。
 - big_changed は 260 件中 same_content=255。全件の本文が変わった試験ではない（report.md:8–11）。
 - compare_files は 32 KiB 要求と末尾 1 B 確認。SFS はその内部で小分けする（hsync.c）。
-- SerialFS READ は 508 B、LAN/link は 1024 B（fs/serialfs/serialfs.c）。
+- SerialFS READ は 508 B、LAN/link は 1024 B（sys/fs/serialfs/serialfs.c）。
 - open 用 get_file_size も STAT を呼ぶ（同:181）。明示的 sys_stat を消すだけでは STAT=0 にならない。
-- LIST の各項目には日時がない（fs/serialfs/sfs_proto.h）。既存 LIST の再利用だけでは不足。
+- LIST の各項目には日時がない（sys/fs/serialfs/sfs_proto.h）。既存 LIST の再利用だけでは不足。
 - lib/crc32.c (crc32_calc()) は共通核の公開窓口。hsync は既に同じ核を直接組み込む。
 - docs/design/fs/serialfs/sfs_block.md「不変条件」は、/host のファイルをパス+offset で要求し遠隔 file handle を持たないと規定。
 - docs/decisions/network/LAN_OPERATOR_DESIGN.md は共通 backend と CALL ごとの 1000 ms 期限を規定。

@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'platform/powermac/lan_log.c'
+SOURCE = ROOT / 'sys/platform/powermac/lan_log.c'
 MUTATIONS = [
     ('stats-consume', '*next = next_seq; *records = drop_records; *bytes = drop_bytes; *status = flags;', '*next = next_seq; *records = drop_records; *bytes = drop_bytes; *status = flags; if (count) { head = (head + 1) % LOG_SLOTS; count--; }', 'reached=stats-full', 'H:stats-preserve'),
     ('stats-swap', '*records = drop_records; *bytes = drop_bytes; *status = flags;\n    ppc_irq_restore(saved);\n}\nvoid pm_lan_log_complete', '*records = drop_bytes; *bytes = drop_records; *status = flags;\n    ppc_irq_restore(saved);\n}\nvoid pm_lan_log_complete', 'reached=stats-full', 'H:stats-values'),

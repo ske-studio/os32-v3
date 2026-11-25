@@ -14,7 +14,7 @@ CHECK = dict(name='keymap-s1p', tier=1, budget=20,
             'tools/keymap/pc98_s1p_sources.json', 'tools/tests/keymap_s1p_host.c',
             'tools/tests/test_keymap_s1p.py', 'tools/tests/host32.py',
             'tools/tests/input_pc98_bsd_fixture.kbd',
-            'input/hal/keymap.h', 'include/types.h', 'include/callconv.h'],
+            'sys/hal/input/keymap.h', 'sys/include/types.h', 'sys/include/callconv.h'],
     basis=['INPUT_KEYMAP_DESIGN §3 §8 S1p', 'INPUT_BIND_DESIGN §2a',
            'FreeBSD jp.pc98.kbd d869f4ade283'])
 
@@ -69,7 +69,7 @@ def run(ctx):
             assert regenerated.read_text() == text
         else:
             print('SKIP source regeneration: FreeBSD reference absent')
-        expected = ['#include "input/hal/keymap.h"', 'const KmExactCell expected[128][8] = {']
+        expected = ['#include "sys/hal/input/keymap.h"', 'const KmExactCell expected[128][8] = {']
         expected += ['{' + ','.join('{%d,%d,%d}' % cell for cell in row) + '},' for row in rows]
         expected += ['};', 'const u8 expected_flags[128] = {' + ','.join(map(str, flags)) + '};']
         (tmp/'expected.c').write_text('\n'.join(expected))

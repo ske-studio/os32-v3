@@ -8,6 +8,6 @@
 
 #define printf rconv_printf
 #define main   klibc_test_main
-#include "../../../userland/tests/klibc_test.c"
+#include "../../../userland/diag/klibc_test.c"
 #undef main
 #undef printf

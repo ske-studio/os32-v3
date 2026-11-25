@@ -10,7 +10,7 @@ import host32
 from test_exec_r1 import function
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('kernel/console/console.c', 'drivers/sound/fm/fm.c', 'drivers/char/serial.c', 'kapi/kapi_generated.c', 'drivers/input/kbd.c', 'kernel/ime/ime.c', 'exec/exec.c', 'kernel/ime/ime_dict.c', 'kernel/input_wait.c', 'kernel/port_service.c')
+SOURCES = ('sys/kern/console/console.c', 'sys/dev/sound/fm/fm.c', 'sys/dev/char/serial.c', 'sys/kapi/kapi_generated.c', 'sys/platform/pc98/input/kbd.c', 'sys/kern/ime/ime.c', 'sys/kern/exec/exec.c', 'sys/kern/ime/ime_dict.c', 'sys/kern/input_wait.c', 'sys/kern/port_service.c')
 MUTATIONS = [
     ('cursor x low', 0, 'if (x < 0) x = 0;', ''),
     ('cursor x high', 0, 'if (x >= CON_COLS) x = CON_COLS - 1;', ''),

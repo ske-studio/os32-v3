@@ -17,7 +17,7 @@ def replace_once(source, old, new):
 
 
 def image(out, user, shell, case):
-    kernel = 'platform/powermac/ppc_kernel.c'
+    kernel = 'sys/platform/powermac/ppc_kernel.c'
     code = (ROOT / kernel).read_text()
     # Register a readable ISO child at the last block-registration step.
     # It borrows the read-only media already held by rd0.
@@ -37,14 +37,14 @@ def image(out, user, shell, case):
         code = replace_once(code, host, host + '\n' + mount)
     probe_host = '        kprintf(7, "CHILD before host child=%d\\r\\n", vfs_is_mounted("/rd1"));'
     source.write_text(replace_once(code, host, probe_host + '\n' + host))
-    header = Path('include/kernel_mount_children.h')
+    header = Path('sys/include/kernel_mount_children.h')
     code = (ROOT / header).read_text()
     if case == 'invert-root':
         code = replace_once(code, 'if (match) continue;', 'if (!match) continue;')
     (out / header.name).write_text(code)
 
     # Observe the VFS duplicate-device rejection, independent of the enumerator.
-    vfs = 'fs/vfs.c'
+    vfs = 'sys/fs/vfs.c'
     reject = 'mounts[i].dev_id == dev_id)\n            return VFS_ERR_EXIST;'
     copy = out / 'vfs.c'
     copy.write_text('#include "kprintf.h"\n' + replace_once((ROOT / vfs).read_text(), reject,
@@ -54,7 +54,7 @@ def image(out, user, shell, case):
 
     # The resident shell issues this open from main. Report the real return value
     # via the kernel serial log since shell console output goes to the framebuffer.
-    fd = 'fs/vfs_fd.c'
+    fd = 'sys/fs/vfs_fd.c'
     entry = 'int vfs_open(const char *path, int mode)\n{'
     probe = '''
     if (path && !kstrcmp(path, "/rd1/sys/shell.bin")) {

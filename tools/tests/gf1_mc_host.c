@@ -1,4 +1,4 @@
-#include "../../hwdev/gf/foundation.h"
+#include "../../sys/dev/video/geforce/foundation.h"
 struct event { u32 write, bar, off, width, value; };
 static struct event events[7];
 static unsigned count, fail_at;

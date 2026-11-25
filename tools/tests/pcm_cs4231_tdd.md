@@ -1,7 +1,7 @@
 # TDD 記録 — CS4231 (MATE-X PCM) 再生ドライバ
 
 設計: [`docs/design/drivers/sound/cs4231/pcm_cs4231.md`](../../docs/design/drivers/sound/cs4231/pcm_cs4231.md#確かめ)
-対象: `drivers/sound/cs4231/pcm_cs4231_math.c` (純粋部) と `drivers/sound/cs4231/pcm_cs4231.c` (I/O と状態機械)
+対象: `sys/dev/sound/cs4231/pcm_cs4231_math.c` (純粋部) と `sys/dev/sound/cs4231/pcm_cs4231.c` (I/O と状態機械)
 走らせ方: `make check-pcm-cs4231-host` (= `python3 -B tools/tests/test_pcm_cs4231.py --target --mutate`)
 
 ## なぜホストで回すのか
@@ -18,7 +18,7 @@ NP21/W では**踏めない分岐**がこの層の中心にある。
 | close / reclaim が各状態から **1 度だけ**解放すること | 二重解放はプールの `bad_free` にしか出ず、状態を跨いで撃ち分けられない |
 | `dma_chan_setup` / `irq_register` / `kmalloc` の失敗の巻き戻し | エミュレータでは失敗させられない |
 
-実物を**1 行も写さずに** `#include` する。`include/io.h` だけを
+実物を**1 行も写さずに** `#include` する。`sys/include/io.h` だけを
 `tools/tests/pcm_hostshim/io.h` で差し替えて、ポート I/O と `irq_save` を模型へ回す
 (`tools/tests/hostdrv_hostshim/io.h` と同じ作法)。`dma8237.h` / `irq_math.h` /
 `pcm_cs4231.h` は**実物をそのまま**使うので、定数がずれればコンパイルで落ちる。
@@ -79,7 +79,7 @@ NP21/W では**踏めない分岐**がこの層の中心にある。
 
 ## 変異 (否定側)
 
-`--mutate` は `drivers/sound/cs4231/pcm_cs4231_math.c` を**写しの上で 1 か所だけ**壊し、
+`--mutate` は `sys/dev/sound/cs4231/pcm_cs4231_math.c` を**写しの上で 1 か所だけ**壊し、
 どれか 1 つのケースが RED になることを見る。24 本。
 
 **driver の変異 6 本 (25〜30、2026-09-23)** は上の競合の修正を 1 つずつ元に戻す
@@ -146,5 +146,5 @@ NP21/W では**踏めない分岐**がこの層の中心にある。
 - 割り込みが入り得る点は模型では `irq_restore` と `PCM_PREEMPT` だけ。**置いていない
   場所の競合はこの試験では見えない** — 見ているのはレビューが名指しした 4 つの順序
 - IF=0 の実時間 (restart のリングクリア 16KB + 写し 16KB) → NP21/W / 実機の測定 (未)
-- KAPI wrapper の本体 (`kapi/kapi_generated.c`) はホストで回していない。driver 側の
+- KAPI wrapper の本体 (`sys/kapi/kapi_generated.c`) はホストで回していない。driver 側の
   `pcm_write_check` / NULL 拒否だけを `write_contract` で見る

@@ -1,7 +1,7 @@
-# drivers/hostdrv/hostdrv_list_rules.inc — HostDrv の列挙ループ
+# sys/dev/hostdrv/hostdrv_list_rules.inc — HostDrv の列挙ループ
 
 > 状態: **現行 (2026-11-18)** — 出所: HSYNC_IMPROVEMENT_PLAN (H1 の「I/O 失敗を成功にしない」) の契約を今のソースと照らして要約
-ソース: `drivers/hostdrv/hostdrv_list_rules.inc` (`hdrv_list_run`・`HDRV_LIST_ERR_IO`・`HDRV_LIST_ERR_CAPPED`)・`drivers/hostdrv/hostdrvfs.c` (`hdrv_list_dir`・`hdrv_list_step`・`hdrv_list_emit`・`HOSTDRV_MAX_DIR_ENTRIES`)
+ソース: `sys/dev/hostdrv/hostdrv_list_rules.inc` (`hdrv_list_run`・`HDRV_LIST_ERR_IO`・`HDRV_LIST_ERR_CAPPED`)・`sys/dev/hostdrv/hostdrvfs.c` (`hdrv_list_dir`・`hdrv_list_step`・`hdrv_list_emit`・`HOSTDRV_MAX_DIR_ENTRIES`)
 
 HostDrv の一覧は「1 件ずつ問い合わせ、終わりの応答が来るまで繰り返す」。ハイパーコールはホストで組めないので、
 ループの規則だけを純関数 `hdrv_list_run` に切り出し、`hdrv_list_dir` は 1 件の取得 (`hostdrv_query_dir`) と

@@ -17,7 +17,7 @@
 #define GF3_HOST_UNIT 12
 #endif
 #include "gf_accel_host.h"
-#include "../../hwdev/gf/display/api.h"
+#include "../../sys/dev/video/geforce/display/api.h"
 #if !defined(GF4_HOST_UNIT) || GF4_HOST_UNIT < 0 || GF4_HOST_UNIT > 14
 #error "GF4_HOST_UNIT must select B0..B12, C0, or no stubs (0..14)"
 #endif

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gfx2-sw-rop-host', tier=1,
-    covers=['gfx/v2/sw_rop.c', 'gfx/v2/gfx2_sw.h', 'gfx/v2/gfx2_int.h', 'sdk/include/os32/os32_gfx2.h', 'include/**', 'mm/pgalloc.h',
-            'mm/paging.h', 'lib/kstring.h', 'arch/*/arch_copy.h',
+    covers=['sys/hal/gfx/v2/sw_rop.c', 'sys/hal/gfx/v2/gfx2_sw.h', 'sys/hal/gfx/v2/gfx2_int.h', 'sdk/include/os32/os32_gfx2.h', 'include/**', 'sys/kern/mm/pgalloc.h',
+            'sys/kern/mm/paging.h', 'sys/kern/kstring.h', 'arch/*/arch_copy.h',
             'tools/tests/gfx2_sw_rop_host.c', 'tools/tests/test_gfx2_sw_rop.py',
             'tools/tests/host32.py', 'tools/tests/mutpar.py'],
     needs=[], budget=3.0,

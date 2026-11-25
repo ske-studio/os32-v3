@@ -10,7 +10,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='remote-x1', tier=1, needs=[], budget=5,
-             covers=['tools/host_services.py', 'include/remote_control.h',
+             covers=['tools/host_services.py', 'sys/include/remote_control.h',
                      'tools/tests/test_remote_x1.py'],
     basis=['LAN_OPERATOR_DESIGN §2', 'LAN_OPERATOR_DESIGN §7'],
 )
@@ -20,7 +20,7 @@ def test(path):
     spec = importlib.util.spec_from_file_location('host_services_x1', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    header = (ROOT / 'include/remote_control.h').read_text()
+    header = (ROOT / 'sys/include/remote_control.h').read_text()
     def value(name):
         return int(re.search(r'^#define\s+' + name + r'\s+(\d+)u', header, re.M).group(1))
     limit = value('REMOTE_SVC_REGISTRY_MAX')

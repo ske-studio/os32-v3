@@ -1,9 +1,9 @@
-# kdebug/gfinit_decode.c — 設計
+# sys/dev/video/geforce/diag/gfinit_decode.c — 設計
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
-ソース: `kdebug/gfinit_decode.c`
+ソース: `sys/dev/video/geforce/diag/gfinit_decode.c`
 
-**解読は現行の switch と `.inc` をそのまま共有する**。実 ROM で確認済みの解読を 27 本へ配り直さない（F3、`kdebug/gfinit_decode.c`）。
-OS32 固有差分も保持：PMC_ENABLE bit0 を立てる、RESET 後 1850 は 0、CR3C の組を確認する。根拠は `kdebug/gfinit_op/pll2_zm_reg_decode.inc`、`reset_expand.inc:10`、`docs/design/kdebug/recover_gf.md`。nouveau 全機種対応への拡張はしない。
+**解読は現行の switch と `.inc` をそのまま共有する**。実 ROM で確認済みの解読を 27 本へ配り直さない（F3、`sys/dev/video/geforce/diag/gfinit_decode.c`）。
+OS32 固有差分も保持：PMC_ENABLE bit0 を立てる、RESET 後 1850 は 0、CR3C の組を確認する。根拠は `sys/dev/video/geforce/gfinit_op/pll2_zm_reg_decode.inc`、`reset_expand.inc:10`、`docs/design/kdebug/recover_gf.md`。nouveau 全機種対応への拡張はしない。
 下層 A の契約は `int gf_op_<name>_run(struct gf_init_context *, const struct gf_instruction *)`。解読は現行 `decode_instruction` と `.inc` の一つの実体を共有し、命令別 decode API は増やさない。
 switch と既存 include 構成を保って共有。recover 型からの切離しは薄い接続だけ。27 本へ再分配しない。
 
@@ -38,11 +38,11 @@ switch と既存 include 構成を保って共有。recover 型からの切離�
 
 - BIT Iの追加unknown script（`/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/nvkm/subdev/bios/init.c:430,2344`）が非零なら5本だけで完了とせず、manifestへ取り込みレビューするまで拒否。encoded MMIO番地のhead/OR補正（`/home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/nvkm/subdev/bios/init.c:144–179`）も展開後に許可検査し、出力依存で解決不能なら停止する。
 
-> [要確認] 現行は診断も hwdev/gf/runner.c を使い、main 境界の 5 node を生成する。原文の静的展開・ordinal・verify 規則を現行実装と同一とは扱えない。
+> [要確認] 現行は診断も sys/dev/video/geforce/runner.c を使い、main 境界の 5 node を生成する。原文の静的展開・ordinal・verify 規則を現行実装と同一とは扱えない。
 
 ## GF6200_4A_S2_LAYOUT
 
-参照：`/home/hight/os32-v3/{kdebug/recover.h,kdebug/recover_gf.c,tools/tests/gfinit_fixture.h}`、`gf6200_4a/nvbios/init_scripts.txt`、MIT nouveau `nvkm/subdev/bios/init.c` の各該当handler。x86コードは扱わない。
+参照：`/home/hight/os32-v3/{sys/dev/video/geforce/diag/recover.h,sys/dev/video/geforce/diag/recover_gf.c,tools/tests/gfinit_fixture.h}`、`gf6200_4a/nvbios/init_scripts.txt`、MIT nouveau `nvkm/subdev/bios/init.c` の各該当handler。x86コードは扱わない。
 
 | 記号 | 固定契約 |
 | --- | --- |

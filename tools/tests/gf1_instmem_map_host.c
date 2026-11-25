@@ -8,7 +8,7 @@ static u32 host_cr3;
 #include "pgalloc_source.c"
 #include "pgalloc_host_fixture.h"
 #include "geforce_platform_source.c"
-#include "../../hwdev/gf/foundation.h"
+#include "../../sys/dev/video/geforce/foundation.h"
 __asm__(".globl __bss_end\n.set __bss_end, 0x180000\n"
         ".globl __kernel_resident_end\n.set __kernel_resident_end, 0x261000\n"
         ".globl __ledger_fixed_start\n.set __ledger_fixed_start, 0x17D000\n"

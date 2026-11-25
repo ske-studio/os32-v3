@@ -11,6 +11,6 @@
 #ifdef HOST_EXEC_ENTRY_SOURCE
 #include HOST_EXEC_ENTRY_SOURCE
 #else
-#include "../../arch/x86/kernel/exec_entry.c"
+#include "../../sys/arch/x86/kernel/exec_entry.c"
 #endif
 #endif

@@ -387,7 +387,7 @@ def build_from_yaml(yaml_paths, output_dir, base_dir):
 # PKG のベース名の上限。ISO 9660 の 8.3 に収め、分割の連番 1 桁を足せるように
 PKG_BASE_NAME_MAX = 7
 # userland/tests/ 由来の行は DEBUG へ (試験バイナリが NORMAL に混ざらないように)
-TEST_HOST_PREFIX = 'userland/tests/'
+TEST_HOST_PREFIX = 'userland/diag/'
 TEST_TAG = 'test'
 
 

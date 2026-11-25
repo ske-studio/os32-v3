@@ -2,7 +2,7 @@
 #include "fep_boundary_runtime.h"
 #define IME_DICT_HOST_MAIN legacy_main
 #include "ime_dict_host.c"
-#include "kernel/ime/ime_conn.c"
+#include "sys/kern/ime/ime_conn.c"
 #include "user_product.c"
 
 /* Core probe is a separately tested boundary. This fixture supplies the

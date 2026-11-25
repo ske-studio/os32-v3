@@ -1,7 +1,7 @@
-# drivers/block/netcd.c — ネットワーク越しの CD (ホストの ISO 像を cd0 として読む)
+# sys/dev/block/netcd.c — ネットワーク越しの CD (ホストの ISO 像を cd0 として読む)
 
 > 状態: **現行 (2026-11-18)** — 出所: NET_HOSTSVC_DESIGN・TASK_NET_HOSTSVC (要約して移した)
-ソース: `drivers/block/netcd.c`・`drivers/block/netcd.h`・`drivers/net/e82557/lan_module.h` (`netcd_register` の欄)・`platform/pc98/kernel_boot_memory.inc`・`include/config.h` (`SYS_NETCD_CFG`)・`drivers/ata/cd_module.c`・`kernel/dev/dev.h` (`dev_register_cd`・`media_check`)・`tools/fd_netcd_config.py`・`build/packages.yaml` (`fd.only`)・`userland/system/install.c` (`fd_only`)
+ソース: `sys/dev/block/netcd.c`・`sys/dev/block/netcd.h`・`sys/dev/net/e82557/lan_module.h` (`netcd_register` の欄)・`sys/platform/pc98/kernel_boot_memory.inc`・`sys/include/config.h` (`SYS_NETCD_CFG`)・`sys/dev/ata/cd_module.c`・`sys/hal/block/dev.h` (`dev_register_cd`・`media_check`)・`tools/fd_netcd_config.py`・`build/packages.yaml` (`fd.only`)・`userland/system/install.c` (`fd_only`)
 
 ## 何をするか
 

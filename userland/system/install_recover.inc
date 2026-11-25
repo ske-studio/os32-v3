@@ -106,9 +106,9 @@ static const char *const rc_phase_name[RC_PH_COUNT] = {
     "none", "backup", "switching", "switched", "failed", "reverting", "done"
 };
 
-/* VFS の st_dev は (dev_type << 8 | unit) + 1 (fs/vfs.c の vfs_mount_dev_of、
- * 種別は fs/vfs.h の VFS_DEV_*)。カーネルヘッダは外部プログラムから見えない
- * ので、ここが唯一の写し ([C4] の但し書き: 正典は fs/vfs.h)。0 = 不明。 */
+/* VFS の st_dev は (dev_type << 8 | unit) + 1 (sys/fs/vfs.c の vfs_mount_dev_of、
+ * 種別は sys/fs/vfs.h の VFS_DEV_*)。カーネルヘッダは外部プログラムから見えない
+ * ので、ここが唯一の写し ([C4] の但し書き: 正典は sys/fs/vfs.h)。0 = 不明。 */
 #define RC_DEV_HD          0
 #define RC_DEV_FD          1
 #define RC_DEV_TYPE(x)     ((int)((((x) - 1u) >> 8) & 0xFFu))

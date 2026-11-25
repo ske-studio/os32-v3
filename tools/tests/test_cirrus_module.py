@@ -2,7 +2,7 @@
 The existing Cirrus windows and three-backend suites cover drawing/lease paths.
 """
 CHECK = dict(name='cirrus-module-host', tier=1,
-    covers=['platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'gfx/gfx_emergency.c', 'gfx/gfx_emergency.h', 'tools/tests/paging_source.py', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'drivers/video/cirrus/cirrus_module.c', 'drivers/video/cirrus/cirrus_module.h', 'drivers/video/cirrus/cirrus_body.c', 'platform/pc98/kernel.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/gfx_format.h', 'gfx/gfx_internal.h', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'drivers/video/cirrus/wab_cirrus.c', 'drivers/video/cirrus/wab_cirrus.h', 'drivers/video/cirrus/wab_glue_xe10.c', 'drivers/video/cirrus/wab_glue_xe10.h', 'drivers/video/cirrus/wab_glue.h', 'tools/prototypes/cirrus_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/cirrus_module_host.c', 'build/cirrus-module.ld', 'build/cirrus-module.mk', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/cirrus/*', 'build/out/cirrus.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'drivers/video/pc98/backend_pc98.c', 'drivers/video/pc98/backend_pegc.c', 'gfx/gfx_core.c', 'gfx/gfx_scroll.c', 'platform/pc98/gfx_scroll.c', 'platform/pc98/gfx_init.c', 'platform/pc98/gfx_selector.c', 'platform/pc98/gfx_surfaces.c', 'kernel/console/display_restore.h', 'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_dirty.c', 'gfx/gfx_present.c', 'mm/paging.c', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'kernel/sys.c', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/mutpar.py', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/kernel_layout.py', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'tools/tests/cirrus_win_host.c', 'tools/tests/test_cirrus_win.py', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py', 'kernel/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
+    covers=['sys/platform/pc98/bootinfo_wire.h', 'sys/platform/pc98/bootinfo_native.h', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/hal/gfx/gfx_emergency.c', 'sys/hal/gfx/gfx_emergency.h', 'tools/tests/paging_source.py', 'sys/kern/module/module_runtime.c', 'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.c', 'sys/kern/module/module_image.h', 'sys/kern/module/module_schema.h', 'sys/kern/mm/pgalloc.h', 'sys/include/types.h', 'sys/include/memmap.h', 'sys/fs/vfs.c', 'sys/fs/vfs.h', 'sys/dev/base/dev.c', 'sys/hal/block/dev.h', 'sys/dev/block/disk.h', 'sys/dev/ata/atapi.h', 'sys/dev/block/fdc.h', 'sys/include/console.h', 'sys/include/kbd.h', 'sys/platform/pc98/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'sys/kern/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'sys/dev/video/cirrus/cirrus_module.c', 'sys/dev/video/cirrus/cirrus_module.h', 'sys/dev/video/cirrus/cirrus_body.c', 'sys/platform/pc98/kernel.c', 'sys/include/config.h', 'sdk/include/os32/os32_generations.h', 'sys/include/bootinfo.h', 'sys/include/gfx_hal.h', 'sys/include/gfx_mode.h', 'sys/include/gfx_format.h', 'sys/hal/gfx/gfx_internal.h', 'sys/dev/video/cirrus/backend_cirrus.c', 'sys/platform/pc98/video/cirrus/cirrus_identify.c', 'sys/dev/video/cirrus/wab_cirrus.c', 'sys/dev/video/cirrus/wab_cirrus.h', 'sys/platform/pc98/video/cirrus/wab_glue_xe10.c', 'sys/platform/pc98/video/cirrus/wab_glue_xe10.h', 'sys/dev/video/cirrus/wab_glue.h', 'tools/prototypes/cirrus_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/cirrus_module_host.c', 'build/cirrus-module.ld', 'build/cirrus-module.mk', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/cirrus/*', 'build/out/cirrus.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'sys/kern/exec/access_walk.c', 'sys/kern/exec/lease.c', 'sys/kern/exec/redir_access.c', 'sys/kern/exec/surface_query.c', 'sys/platform/pc98/video/backend_pc98.c', 'sys/platform/pc98/video/backend_pegc.c', 'sys/hal/gfx/gfx_core.c', 'sys/hal/gfx/gfx_scroll.c', 'sys/platform/pc98/gfx_scroll.c', 'sys/platform/pc98/gfx_init.c', 'sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_surfaces.c', 'sys/kern/console/display_restore.h', 'sys/platform/pc98/video/gfx_vram.c', 'sys/hal/gfx/gfx_dirty.c', 'sys/hal/gfx/gfx_present.c', 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c', 'sys/kern/mm/physmem.c', 'sys/kern/mm/shlib.c', 'sys/kern/sys.c', 'tools/tests/gfx_kernel_fb_host.c', 'tools/tests/mutpar.py', 'tools/tests/test_gfx_kernel_fb.py', 'tools/tests/kernel_layout.py', 'lib/serial_diag.h', 'tools/tests/serial_diag_host.h', 'tools/tests/cirrus_win_host.c', 'tools/tests/test_cirrus_win.py', 'sys/fs/vfs_device.h', 'sys/platform/pc98/boot_names.h', 'sys/platform/pc98/boot_names.c', 'sys/dev/ata/ide.h', 'tools/tests/kernel_includes.py', 'sys/kern/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
     needs=['make:all'], budget=9.8,
     kind='characterization',
 )
@@ -18,7 +18,7 @@ import host32
 from test_module_runtime import FLAGS, INCLUDES, image
 from test_module_image import build_validator, validate, fnv, crc, word
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'drivers/video/cirrus/cirrus_body.c'
+SOURCE = ROOT / 'sys/dev/video/cirrus/cirrus_body.c'
 CASES = ['register-detach', 'failure-after-registration', 'selected-isolation', 'prefix-failure']
 
 def product_image(folder):
@@ -26,7 +26,7 @@ def product_image(folder):
     spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
     metadata = json.loads((ROOT / 'build/out/cirrus/cirrus_imports.json').read_text())
     planned = subprocess.check_output(
-        ['make', '-n', '-W', 'include/gfx_mode.h', 'build/out/cirrus/cirrus_imports.h'],
+        ['make', '-n', '-W', 'sys/include/gfx_mode.h', 'build/out/cirrus/cirrus_imports.h'],
         cwd=ROOT, text=True)
     assert 'tools/gen_sqlite_imports.py --module cirrus' in planned
     data = (ROOT / 'build/out/cirrus.mod').read_bytes()
@@ -76,7 +76,7 @@ def hal_context(unguarded=False, cui_first=False):
     """
     from test_gfx_kernel_fb import run_case
     fixture = (ROOT / 'tools/tests/gfx_kernel_fb_host.c').read_text()
-    glue = '#include "' + str(ROOT / 'drivers/video/cirrus/cirrus_body.c') + '"\n' + """
+    glue = '#include "' + str(ROOT / 'sys/dev/video/cirrus/cirrus_body.c') + '"\n' + """
 GfxBackend gfx_backend_cirrus;
 static void (*boundary_real_init)(void);
 static int boundary_init_calls;
@@ -93,7 +93,7 @@ static const CirrusModuleContext fixture_context = {
     fixture = fixture.replace('static void run(void)\n{', glue +
                               'static void run(void)\n{\n    cirrus_module_init(&gfx_backend_cirrus, &fixture_context);')
     # Compile the actual kernel GUI boundary statement into the real HAL fixture.
-    boot = (ROOT / 'platform/pc98/kernel.c').read_text()
+    boot = (ROOT / 'sys/platform/pc98/kernel.c').read_text()
     start = boot.index('static void pc98_shell_loading(')
     boundary = boot[start:boot.index('gfx_client_to_gshell();', start)]
     boundary = next(line.strip() for line in boundary.splitlines()
@@ -122,7 +122,7 @@ static const CirrusModuleContext fixture_context = {
     CHECK(boundary_init_calls == 1);
     gfx_backend_cirrus.init = boundary_real_init;
 """ + marker)
-    change = ('drivers/video/cirrus/backend_cirrus.c', '#include "cirrus_module.h"',
+    change = ('sys/dev/video/cirrus/backend_cirrus.c', '#include "cirrus_module.h"',
               '#define OS32_CIRRUS_MODULE 1\n#include "cirrus_module.h"')
     for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
         result = run_case(None, runner, extra_changes=[change],
@@ -138,13 +138,13 @@ static const CirrusModuleContext fixture_context = {
 def identify_enable_mutant(folder):
     from test_cirrus_win import host_cmd
     from mutpar import build_in_tree
-    source = (ROOT / 'drivers/video/cirrus/cirrus_identify.c').read_text()
+    source = (ROOT / 'sys/platform/pc98/video/cirrus/cirrus_identify.c').read_text()
     old = 'int cirrus_identify(void)\n{'
     assert source.count(old) == 1
     source = source.replace(old, old + '\n    gfx_backend_cirrus.init();')
     exe = folder / 'identify-enable'
     tree = build_in_tree(ROOT, folder / 'identify-tree',
-                         {'drivers/video/cirrus/cirrus_identify.c': source}, [host_cmd(exe)],
+                         {'sys/platform/pc98/video/cirrus/cirrus_identify.c': source}, [host_cmd(exe)],
                          capture_output=True)  # A compile failure is a failure, never RED.
     for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
         result = host32.run([str(exe)], cwd=str(tree), runner=runner, capture_output=True)
@@ -159,7 +159,7 @@ def main():
         hal_context()
         hal_context(cui_first=True)
         # Real boot call order: reserve/mapping before AS; no body at boot probe.
-        boot = (ROOT / 'platform/pc98/kernel.c').read_text()
+        boot = (ROOT / 'sys/platform/pc98/kernel.c').read_text()
         assert boot.index('    gfx_boot_reserve();') < boot.index('    exec_init();')
         assert boot.index('    gfx_prepare_backend();') < boot.index('    cirrus_module_load();')
         boundary = boot.index('static void pc98_shell_loading(')
@@ -171,8 +171,8 @@ def main():
                             '-DCIRRUS_BODY="' + str(source) + '"',
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/cirrus_module_host.c',
-                            ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
-                            ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c', '-o', exe], check=True)
+                            ROOT / 'sys/kern/module/module_runtime.c', ROOT / 'sys/kern/module/module_image.c',
+                            ROOT / 'sys/fs/vfs.c', ROOT / 'sys/dev/base/dev.c', '-o', exe], check=True)
         def run(modes, expected=0):
             for mode in modes:
                 payload = struct.pack('<2I', 10 if mode == 3 else 0, mode) + image()

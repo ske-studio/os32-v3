@@ -8,7 +8,7 @@ void gfx_policy_reeval(void) {}
  *  票:   docs/tasks/realhw/TASK_PEGC480_REALHW.md (§3-3 比較表、§4、§5)
  *        docs/archive/realhw_v21/TASK_PEGC_RA266_TIMING.md
  *
- *  実物の drivers/video/pc98/backend_pegc.c を 1 行も写さずに #include し、ポート I/O だけを
+ *  実物の sys/platform/pc98/video/backend_pegc.c を 1 行も写さずに #include し、ポート I/O だけを
  *  偽物 (tools/tests/pegc_hostshim/io.h → pegc_shim_inp / pegc_shim_outp) に
  *  する。偽の I/O は IN / OUT / 待ち (cpu_delay_us) を順に記録し、GDC の
  *  ステータス (60h / A0h) はケースごとに「FIFO が詰まっている回数」と VSYNC の
@@ -45,18 +45,18 @@ static volatile void *host_pegc_window(u32 pa)
 }
 #define P2V_IO(pa) host_pegc_window(pa)
 
-#include "../../drivers/video/pc98/backend_pegc.c"
-#include "../../drivers/video/pc98/pegc_v2.c"
-#include "../../drivers/char/np2sysp.c"
-#include "../../drivers/input/mouse_seamless.c"
+#include "../../sys/platform/pc98/video/backend_pegc.c"
+#include "../../sys/platform/pc98/video/pegc_v2.c"
+#include "../../sys/dev/char/np2sysp.c"
+#include "../../sys/dev/input/mouse_seamless.c"
 /* 戻りの後のカーソル復帰 (console_hw_cursor_enable) も実物の OUT を記録する */
 /* カーネルは -Wall だけで組む (build/config.mk)。この試験の -Wextra -Werror で
  * console.c 側の既存の警告 2 種を止める (console.c そのものは写さず変えない)。 */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsign-compare"
 #pragma GCC diagnostic ignored "-Wunused-variable"
-#include "../../kernel/console/console.c"
-#include "../../platform/pc98/console.c"
+#include "../../sys/kern/console/console.c"
+#include "../../sys/platform/pc98/console.c"
 #pragma GCC diagnostic pop
 
 /* ---- 出力と終了 (libc なし、ILP32 の int 0x80) ---- */
@@ -282,7 +282,7 @@ void con_sink_push_cursor(int x, int y) { (void)x; (void)y; }
 void kbd_inject_discard(void) { }
 u32 kstrlen(const char *s) { u32 n = 0; while (s[n]) n++; return n; }
 int kutoa_dec(u32 val, char *buf, int bufsz) { (void)val; if (bufsz > 0) buf[0] = 0; return 0; }
-#include "../../kernel/port_service.c"
+#include "../../sys/kern/port_service.c"
 int ring3_wait_pending(void) { return 0; }
 void ring3_abort_check(void) { __builtin_trap(); }
 static int capture_putchar(char c) { (void)c; return 0; }
@@ -373,7 +373,7 @@ void palette_shadow_set(int i, u8 r, u8 g, u8 b) { (void)i; (void)r; (void)g; (v
  *  pass = hw (実機へ通した) のものを、s480 / back の順のまま全部 (各 94 行)。
  *  pass = emu の行 (063Ch・A46Eh・A660h) は実機へ通していないので載せない
  *  (記録器が偽の読み FFh を返した上での ROM の書き込み — 票 §3-3)。
- *  **include/pegc.h を見ずに数値を直に書く** — ヘッダの値を差し替え損ねても
+ *  **sys/platform/pc98/pegc.h を見ずに数値を直に書く** — ヘッダの値を差し替え損ねても
  *  ここで落ちる。
  * ======================================================================== */
 typedef struct { u16 port; u8 val; } PV;
@@ -450,7 +450,7 @@ static const Edit EDIT_BACK[] = {
 static const PV ADD_S480[] = { {0xA2,0x6B}, {0x62,0x6B} };
 static const PV ADD_BACK[] = { {0x62,0x6B} };
 /* CUI へ戻るとき (GUI のシンクが無効で V86 中でない) は、続けて実物の
- * console_hw_cursor_enable() (kernel/console/console.c) がカーソルを戻す OUT を出す:
+ * console_hw_cursor_enable() (sys/kern/console/console.c) がカーソルを戻す OUT を出す:
  * CSRFORM (DC=1 | L/R 0Fh、上端 14、下端 15<<3 | 3) と CSRW (論理カーソルの
  * 番地)。ROM の CSRFORM がカーソル非表示 (CS=0) なので要る — 意図的な追加。
  * 試験は論理カーソルを (5, 3) に置く = 番地 3*80+5 = 00F5h。 */
@@ -1131,7 +1131,7 @@ static void case_vsync_stuck(void)
  *   [B] 2-7: SCROLL 第 4 バイト bit6 (IM) は 2.5MHz で 0、5MHz で 1。
  *            PITCH は 2.5MHz で 40、5MHz で 80。
  *   実機の記録: SCROLL の SAD は 0、LEN は 3FFh。
- * 数値はここに直に書く (include/pegc.h を見ない)。 */
+ * 数値はここに直に書く (sys/platform/pc98/pegc.h を見ない)。 */
 #define R_CR_2M5   0x26
 #define R_CR_5M    0x4E
 #define R_IM       0x40

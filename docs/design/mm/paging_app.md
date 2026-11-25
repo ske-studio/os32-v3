@@ -1,8 +1,8 @@
-# mm/paging_app.c — 設計
+# sys/kern/mm/paging_app.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_T2D_T2H (§3-2・§3-5 f3〜f5) の契約を今のソースと照らして要約
-ソース: `mm/paging_app.c`・`mm/paging_app.h`
+ソース: `sys/kern/mm/paging_app.c`・`sys/kern/mm/paging_app.h`
 
-アプリ帯 (`MEM_APP_BAND_BASE` から `MEM_APP_BAND_MAX_PDES` 枚の PDE) の私有 PT に、map の取引でデータページを張り、unmap の取引で外す。extent 表の計画は `exec/appmem.c` (設計は `docs/design/exec/appmem.md`) が持ち、ここは PTE・PDE・物理ページの順序だけを持つ。
+アプリ帯 (`MEM_APP_BAND_BASE` から `MEM_APP_BAND_MAX_PDES` 枚の PDE) の私有 PT に、map の取引でデータページを張り、unmap の取引で外す。extent 表の計画は `sys/kern/exec/appmem.c` (設計は `docs/design/exec/appmem.md`) が持ち、ここは PTE・PDE・物理ページの順序だけを持つ。
 
 ## 文脈 (`paging_app_context`)
 
@@ -25,7 +25,7 @@
 
 ## unmap: prepare → withdraw → free
 
-- `paging_app_unmap_prepare`: 書く前に全ページを検査する。PT が無い・PTE の下位ビットが A/D を除いて `RW|USER|PRESENT` 以外 (0・NP・RO・PS・PCD・PWT)・所有者違い・生きている SURFACE の物理 (lease の対象) なら EINVAL で、`paging_app_unmap_reject_count` を増やす。範囲の外に PTE が残らない PT を「空」として記録する。**`app_pt_phys[0]` は空でも残す** (`mm/shlib.c` が使う)。
+- `paging_app_unmap_prepare`: 書く前に全ページを検査する。PT が無い・PTE の下位ビットが A/D を除いて `RW|USER|PRESENT` 以外 (0・NP・RO・PS・PCD・PWT)・所有者違い・生きている SURFACE の物理 (lease の対象) なら EINVAL で、`paging_app_unmap_reject_count` を増やす。範囲の外に PTE が残らない PT を「空」として記録する。**`app_pt_phys[0]` は空でも残す** (`sys/kern/mm/shlib.c` が使う)。
 - `paging_app_unmap_withdraw` (呼び手が IRQ を保存): 空の PT は PDE を 0 にするだけで中の PTE は触らない。残る PT の対象 PTE だけ NP にする。active なら CR3 を 1 回再ロード。IRQ 区間の作業量は残る PT の対象ページ数で抑える。
 - `paging_app_unmap_free` (IF=1): 対象 PTE を NP にし、frame を 1 枚ずつ所有者付きで返してから PTE を 0 にする。次に空の PT を返して `app_pt_phys[k]` を 0 にする。順序は **NP → TLB 同期 → データ返却 → PT 返却**。
 
@@ -36,4 +36,4 @@
 
 ## 検査
 
-`tools/tests/test_appmem_map.py` が実 `mm/paging_app.c`・`exec/appmem*.c`・paging・pgalloc・physmem を連結し、全確保位置への失敗注入、IRQ 区間の状態、CR3 再ロードの回数、返却の順序を確かめる。
+`tools/tests/test_appmem_map.py` が実 `sys/kern/mm/paging_app.c`・`exec/appmem*.c`・paging・pgalloc・physmem を連結し、全確保位置への失敗注入、IRQ 区間の状態、CR3 再ロードの回数、返却の順序を確かめる。

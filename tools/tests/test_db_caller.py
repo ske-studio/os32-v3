@@ -1,5 +1,5 @@
 """T2d d5: real wrappers/copy/walk, SQLite entry-only, small source closure."""
-TARGET_SRC = ['kapi/kapi_db.c', 'kapi/kapi_db_helpers.inc', 'kapi/kapi_db_v50.inc', 'kapi/kapi_db_selftest.inc', 'kapi/kapi_strings.c', 'include/kapi_strings.h', 'exec/exec.c', 'exec/redir_access.c', 'exec/access_walk.c', 'fs/vfs.c', 'kapi/kapi_generated.c', 'kdebug/kselftest/caller_boot.inc', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
+TARGET_SRC = ['sys/kapi/kapi_db.c', 'sys/kapi/kapi_db_helpers.inc', 'sys/kapi/kapi_db_v50.inc', 'sys/kapi/kapi_db_selftest.inc', 'sys/kapi/kapi_strings.c', 'sys/include/kapi_strings.h', 'sys/kern/exec/exec.c', 'sys/kern/exec/redir_access.c', 'sys/kern/exec/access_walk.c', 'sys/fs/vfs.c', 'sys/kapi/kapi_generated.c', 'sys/arch/x86/kdebug/kselftest/caller_boot.inc', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h']
 
 from exec_source import exec_source
 from syscall_source import syscall_providers
@@ -22,16 +22,16 @@ def sources():
     trim_start = result['guards'].index('i32 exec_trim_done(')
     trim_end = result['guards'].index('\n}', trim_start) + 2
     result['guards'] = result['guards'][:trim_start] + result['guards'][trim_end:]
-    result['db'] = (walk.ROOT / 'kapi/kapi_db.c').read_text()
+    result['db'] = (walk.ROOT / 'sys/kapi/kapi_db.c').read_text()
     for name in ('kapi_db_helpers.inc', 'kapi_db_v50.inc', 'kapi_db_selftest.inc'):
         result['db'] = result['db'].replace('#include "' + name + '"',
                                             (walk.ROOT / 'kapi' / name).read_text())
-    result['strings'] = (walk.ROOT / 'kapi/kapi_strings.c').read_text()
+    result['strings'] = (walk.ROOT / 'sys/kapi/kapi_strings.c').read_text()
     start = src.index('int exec_disk_write_allowed(void)')
     result['disk_policy'] = src[start:src.index('\n}', start) + 2]
-    result['str'] = (walk.ROOT / 'exec/ring3_str.c').read_text()
-    result['vfs'] = (walk.ROOT / 'fs/vfs.c').read_text()
-    generated = (walk.ROOT / 'kapi/kapi_generated.c').read_text()
+    result['str'] = (walk.ROOT / 'sys/kern/exec/ring3_str.c').read_text()
+    result['vfs'] = (walk.ROOT / 'sys/fs/vfs.c').read_text()
+    generated = (walk.ROOT / 'sys/kapi/kapi_generated.c').read_text()
     result['out_wrapper'] = generated[generated.index('#define KAPI_OUT_LEN('):generated.index('static u32 kapi_out_mul')]
     for name in ('wrap_sys_stat', 'wrap_db_bind_text', 'wrap_sys_mount', 'wrap_sys_umount_checked', 'wrap_dev_blk_write'):
         start = generated.index('int __cdecl ' + name + '(')
@@ -40,7 +40,7 @@ def sources():
     result['dispatch'] = '#include "exec_legacy.h"\n#include "exec_gfx_poll.h"\nstatic void exec_cui_display_abort(void) {}\n' + syscall_providers(walk.ROOT) + src[start:src.index('\n}', start) + 2]
     end = generated.index('};', generated.index('const u16 kapi_argptr')) + 2
     result['arg_tables'] = generated[generated.index('const u16 kapi_argsize'):end]
-    guest = (walk.ROOT / 'userland/tests/db_v50_test.c').read_text()
+    guest = (walk.ROOT / 'userland/diag/db_v50_test.c').read_text()
     assert 'api->db_bind_text(h, 1, (const char *)UNLEASED_VRAM, 1) < 0' in guest
     assert 'VRAM_END' not in guest
     assert 'api->db_bind_text(h, 1, (const char *)last, 1) == 0' in guest
@@ -90,8 +90,8 @@ def main():
     args = parser.parse_args()
     host32.begin_control(args.mutate, args.runner, walk.ROOT)
     paths = [walk.ROOT / p for p in list(walk.FILES.values()) +
-             ['exec/exec.c', 'exec/ring3_str.c', 'kapi/kapi_db.c', 'kapi/kapi_db_helpers.inc', 'kapi/kapi_db_v50.inc', 'kapi/kapi_db_selftest.inc', 'kapi/kapi_strings.c', 'fs/vfs.c',
-              'kapi/kapi_generated.c', 'userland/tests/db_v50_test.c', 'tools/tests/db_caller_host.c']]
+             ['sys/kern/exec/exec.c', 'sys/kern/exec/ring3_str.c', 'sys/kapi/kapi_db.c', 'sys/kapi/kapi_db_helpers.inc', 'sys/kapi/kapi_db_v50.inc', 'sys/kapi/kapi_db_selftest.inc', 'sys/kapi/kapi_strings.c', 'sys/fs/vfs.c',
+              'sys/kapi/kapi_generated.c', 'userland/diag/db_v50_test.c', 'tools/tests/db_caller_host.c']]
     hashes = {p: hashlib.sha256(p.read_bytes()).digest() for p in paths}
     src = sources()
     with host32.control(args.mutate, args.runner, walk.ROOT) as normal:

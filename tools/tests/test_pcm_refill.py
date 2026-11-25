@@ -7,9 +7,9 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 
 CHECK = dict(name='pcm-refill-host', tier=4, needs=[], budget=3,
-             covers=['sound/hal/snd2_seg.c', 'sound/hal/snd2_stg.c',
-                     'sound/hal/snd2_int.h', 'sound/hal/snd2_ring_math.h',
-                     'include/av_contract.h', 'lib/kstring.h', 'mm/kmalloc.h', 'include/types.h',
+             covers=['sys/hal/sound/snd2_seg.c', 'sys/hal/sound/snd2_stg.c',
+                     'sys/hal/sound/snd2_int.h', 'sys/hal/sound/snd2_ring_math.h',
+                     'sys/include/av_contract.h', 'sys/kern/kstring.h', 'sys/kern/mm/kmalloc.h', 'sys/include/types.h',
                      'sdk/include/os32/*.h', 'tools/tests/pcm_refill_host.c',
                      'tools/tests/test_pcm_refill.py', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'build/config.mk'],

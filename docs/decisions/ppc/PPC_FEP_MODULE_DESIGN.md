@@ -6,7 +6,7 @@
 ## 11-21 の本線のレビューとの突き合わせ
 
 - P1（7a）　§3 段3で load・start の各直前に静的 SQL の ready を照合し、最終検査と RUNNING を公開条件にした。失敗時の pending 失効と handle 回収の順も境界試験で確認する。
-- P2（7a）　origin/main 56d7be02d の kernel/ime/fep_module.h で FEP_MODULE_OPS_VERSION は 6u。M7[3] の v5 移行は統合済み。§3 の段表と §4 で共通化を先に承認し、その直後を B-P 単独の x86 差ゼロ比較の基点とした。
+- P2（7a）　origin/main 56d7be02d の sys/kern/ime/fep_module.h で FEP_MODULE_OPS_VERSION は 6u。M7[3] の v5 移行は統合済み。§3 の段表と §4 で共通化を先に承認し、その直後を B-P 単独の x86 差ゼロ比較の基点とした。
 
 ## 確定版 (11-21) → r4 の変更
 
@@ -30,13 +30,13 @@
 
 ### FEP
 
-main の build/fep-module.mk の本体一覧、tools/prototypes/fep_imports.def の順序、kernel/ime/fep_body.c の fep_module_init、kernel/ime/ime.c の変換・ime_apply_absolute、辞書・学習処理を共用する。/boot/fep.mod は同じソース・同じ私有契約から CPU 別に作り、各 kernel と pair を合わせる。PPC 版も L2 からロードする。常駐側では kernel/ime/fep_module.c の public_api、stub_api、fep_close_input の flush・policy 無効化、focus 登録を継承する。私有表の検査は現行ヘッダ全体に従う。
+main の build/fep-module.mk の本体一覧、tools/prototypes/fep_imports.def の順序、sys/kern/ime/fep_body.c の fep_module_init、sys/kern/ime/ime.c の変換・ime_apply_absolute、辞書・学習処理を共用する。/boot/fep.mod は同じソース・同じ私有契約から CPU 別に作り、各 kernel と pair を合わせる。PPC 版も L2 からロードする。常駐側では sys/kern/ime/fep_module.c の public_api、stub_api、fep_close_input の flush・policy 無効化、focus 登録を継承する。私有表の検査は現行ヘッダ全体に従う。
 
-直すのは fep_module_load の依存列と公開条件、kernel/sqlite_engine.c の services_boot が所有する設定・辞書準備の切出し。共通処理は kernel/fep_boot.c に一組置く。x86 は実 SQLite handle 1 個、PPC は sqlite_static_boot 成功後に依存 0 個で同じ loader request を作る。candidate は最終検査まで private。public_api と body の fep_services_public は同じ公開状態を読み、失敗時は先に閉じる。x86 は従来の SQLite 起動・自己試験、FEP abort、外側 boot_check、SQLite abort、stub 復帰の順、失敗 stage と隔離集計を維持する。切出した関数・呼出元の kernel 機械語と配置は変わり得る。x86 用 import stub・fep.mod・KAPI の生成差は予定しない。
+直すのは fep_module_load の依存列と公開条件、sys/kern/sqlite_engine.c の services_boot が所有する設定・辞書準備の切出し。共通処理は sys/kern/fep_boot.c に一組置く。x86 は実 SQLite handle 1 個、PPC は sqlite_static_boot 成功後に依存 0 個で同じ loader request を作る。candidate は最終検査まで private。public_api と body の fep_services_public は同じ公開状態を読み、失敗時は先に閉じる。x86 は従来の SQLite 起動・自己試験、FEP abort、外側 boot_check、SQLite abort、stub 復帰の順、失敗 stage と隔離集計を維持する。切出した関数・呼出元の kernel 機械語と配置は変わり得る。x86 用 import stub・fep.mod・KAPI の生成差は予定しない。
 
 ### ext2
 
-fs/ext2/ext2_super.c の ext2_mount の superblock 以降の検証、LE 読取り、ext2_sync、fs/ext2/ext2_fmt.c の ext2_format_at → ext2_format_range を共用する。変更境界は ext2_find_partition_ex が LBA 1・BIOS CHS・pc98pt_find_os32 を仮定する箇所。HDD root 担当が機種側で検証した開始 LBA と長さを共通 mount に渡す。読取り失敗・媒体外・短い区画は書込み前に拒否。x86 は従来の区画探索、旧配置の診断、format 範囲を維持し、抽出した mount 呼出とリンク配置に差が出得る。段7a 自体で ext2 を分岐させない。
+sys/fs/ext2/ext2_super.c の ext2_mount の superblock 以降の検証、LE 読取り、ext2_sync、sys/fs/ext2/ext2_fmt.c の ext2_format_at → ext2_format_range を共用する。変更境界は ext2_find_partition_ex が LBA 1・BIOS CHS・pc98pt_find_os32 を仮定する箇所。HDD root 担当が機種側で検証した開始 LBA と長さを共通 mount に渡す。読取り失敗・媒体外・短い区画は書込み前に拒否。x86 は従来の区画探索、旧配置の診断、format 範囲を維持し、抽出した mount 呼出とリンク配置に差が出得る。段7a 自体で ext2 を分岐させない。
 
 ### hdprep
 
@@ -58,7 +58,7 @@ userland/system/install.c の confirm_install、copy_file、copy_directory と V
 | 段4で共有 KAPI 生成器・描画権限口に変更が及ぶ場合は本線で先に統合する。 | 描画権限口を使う段2、生成器を使う段4 |
 
 1. **生成**　build/ppc-fep-module.mk が共通本体一覧と import 定義を使い、PPC ELF を L2 用に pack する（ID 3）。既存 root 像の pair 確定・再 bind に載せる。check-ppc-fep-import は最終像の部品を mac99 の試験 loader で呼び、型・順序、可変引数、戻り先、pair 不一致の start 前拒否、HDD コピーの byte 一致を観測する。C04 の台帳・cache 同期・再配置を再利用し、診断像は既存 kdebug_call を通す。
-2. **入力と表示**　USB 枝の platform/powermac/input_usb.c の pm_input_usb_take が legacy_cooked_take_mods で消費したキーと修飾を結ぶ。LAN の消費時は pm_input_usb_note_remote。peek は由来を変えない。local の切替は既存 policy と FEP action の経路で一回だけ適用し、remote は変換中も全幅の元キーを返す。redirect・空・中断は現行契約。in2 の独占取得は開かない。STOP 通知後、既存終了 hook から境界以前の未読入力・LAN の部分列を破棄し、後着分を残す。ime_display.c は初描画時にセル・属性・カーソル位置と可視状態を owner・世代付きで保存。gui_ime_set_render は owner 1 の非ユーザー呼出だけ許可。exec_ime_owner_exit は通常・STOP・fault 共通で読者の変換を取消し、終了 owner の callback を外し、その保存行を一度復帰する。check-ppc-fep-io は実部品と USB/LAN 入力で未公開・公開、remote、終了時の復帰を観測する。
+2. **入力と表示**　USB 枝の sys/platform/powermac/input_usb.c の pm_input_usb_take が legacy_cooked_take_mods で消費したキーと修飾を結ぶ。LAN の消費時は pm_input_usb_note_remote。peek は由来を変えない。local の切替は既存 policy と FEP action の経路で一回だけ適用し、remote は変換中も全幅の元キーを返す。redirect・空・中断は現行契約。in2 の独占取得は開かない。STOP 通知後、既存終了 hook から境界以前の未読入力・LAN の部分列を破棄し、後着分を残す。ime_display.c は初描画時にセル・属性・カーソル位置と可視状態を owner・世代付きで保存。gui_ime_set_render は owner 1 の非ユーザー呼出だけ許可。exec_ime_owner_exit は通常・STOP・fault 共通で読者の変換を取消し、終了 owner の callback を外し、その保存行を一度復帰する。check-ppc-fep-io は実部品と USB/LAN 入力で未公開・公開、remote、終了時の復帰を観測する。
 3. **静的 SQL 後の起動（B-P）**　製品選択は build/sources/hooks.mk と build/ppc-fep-module.mk、呼出は静的 SQL 後・shell 前に置く。pm_root_boot の rd0 登録や RAM の /db・/dbu は HDD 成功信号に使わず、HDD ext2 が実際に / に mount された結果を受ける。Unicode・L1、静的 SQL、L2 pair と HDD root が成立したら settings を読み close と残接続を検査。辞書不在は SQL のみ。meta の版・下限・桁あふれを検査して予約し、snapshot と fep_boot_user_path_set・fep_boot_user_rc_set で学習先と取得結果を load 前に渡す。未指定だけ /etc/fep_user.db とし読出しエラーは保存する。load と start の各直前に静的 SQL の ready（SERVICES_SQLITE_ONLY と services_public）を再照合し、失敗した時点で起動を打ち切る。候補 start 後に os32_sqlite_outer_boot_check(ime_boot_connections(), reserve) が成功して初めて fep_services_public を開き、facade はこれと RUNNING の両方を確認する。失敗時は常駐側で公開を閉じ、inactive を通知し、全フィールド 0 の snapshot で take して pending を失効させ、取得済み handle を一度だけ回収する。設定・snapshot を無効化し、quiesce・close 成功かつ接続と group 解放確認後だけ boot_check(0, 0) で予約解除。回収失敗なら予約保持・隔離、静的 SQL は継続する。独立の KCG は自身の前提で判定する。静的 SQL の境界試験で各直前の ready 喪失を個別に注入し、対応する load／start が呼ばれないこと、公開条件が片方だけなら stub を返すこと、上記の失効順と回収回数を観測する。併せて load 時の値、最終検査失敗、close/quiesce 失敗時の stub・残予約・SQL 操作を確認する。
 4. **公開と製品受入**　sdk/kapi_target_ppc.py と sdk/gen_kapi.py の PPC target 選択を修正し正規生成する。ime_getchar/getkey、try 系、feed_key、toggle、active、mode、set_render、辞書切替・suspend、user_list/delete/export/clear、dict_info は sdk/kapi.json の x86 target と同じものを使う。userland/shell/ui.c の常駐 sh_getkey → ime_getkey をそのまま通し、同じ slot が未公開では input_getkey_kapi、公開後は変換済み入力を返すことを確認する。端末の子 sh.bin の入力経路は維持する。
 

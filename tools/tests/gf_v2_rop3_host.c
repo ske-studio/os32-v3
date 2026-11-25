@@ -1,4 +1,4 @@
-#include "hwdev/gf/accel.h"
+#include "sys/dev/video/geforce/accel.h"
 static struct gf3_ctx ctx;
 static struct gf2_chan ch;
 static struct gf3_pattern p;

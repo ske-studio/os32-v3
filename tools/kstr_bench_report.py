@@ -13,7 +13,7 @@ kstr_bench_report.py — kstr_bench の出力を読んで「C 版 / asm 版」�
 全体の中央値・全体の最悪・関数ごとの最大 — をそのまま並べるだけで、
 「切り替えてよい」とは書かない。決めるのは票を持っている側 (§0)。
 
-読む行 (userland/tests/kstr_bench.c の固定書式):
+読む行 (userland/diag/kstr_bench.c の固定書式):
 
     KSTR <関数> <asm|c> <長さ> <ずれ> <ティック> <回数>
     KSTR MISMATCH <関数> <長さ> <ずれ>

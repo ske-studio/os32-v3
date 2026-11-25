@@ -3,7 +3,7 @@
  * C1's real registry and core callers are tested by gfx2-backend-reg-host. */
 #ifndef TEST_GFX2_CORE_FAKE_H
 #define TEST_GFX2_CORE_FAKE_H
-#include "../../gfx/v2/gfx2_int.h"
+#include "../../sys/hal/gfx/v2/gfx2_int.h"
 int gfx2_adapter_register(GfxBackend *v1, u32 kind, u32 flags)
 { (void)v1; (void)kind; (void)flags; return OS32_ERR_NOSYS; }
 struct gfx2_adapter *gfx2_active(void) { return NULL; }

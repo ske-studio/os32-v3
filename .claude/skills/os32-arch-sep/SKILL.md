@@ -24,9 +24,9 @@ description: CPU・機種・装置の分離を壊さずにコードを足す・�
 |---|---|
 | 共通が装置の関数・型を使う | 共通が要る宣言だけを `include/<名>_contract.h` に置き、装置のヘッダがそれを include する。共通は contract だけを読む |
 | 機種ごとに実装が違う小さい物 (インライン・定数・表) | 固定名 `platform/<機種>/platform_<名>.h`。`-Iplatform/$(PLATFORM)` が実装を選ぶ。**両方の機種に同じ名前で置く** |
-| 共通が CPU の関数を使う | 契約のヘッダ (`include/cpu.h`・`include/io.h` など) に宣言、実装は固定名 `arch/<cpu>/arch_<名>.h` |
+| 共通が CPU の関数を使う | 契約のヘッダ (`sys/include/cpu.h`・`sys/include/io.h` など) に宣言、実装は固定名 `arch/<cpu>/arch_<名>.h` |
 | 共通が機種の定数を使う | 共通の側に機種に依らない名前で値を持ち、機種のソースに `_Static_assert` で一致を固定する |
-| 機種だけの番地 | 機種のヘッダに置く (PC-98 の起動と低位メモリは `platform/pc98/platform_boot_layout.h`)。OS の配置は `include/memmap.h`。地図の道具 `tools/gen_memmap.py` は両方を読む (`PLATFORM_HDR_RELS`) |
+| 機種だけの番地 | 機種のヘッダに置く (PC-98 の起動と低位メモリは `sys/platform/pc98/platform_boot_layout.h`)。OS の配置は `sys/include/memmap.h`。地図の道具 `tools/gen_memmap.py` は両方を読む (`PLATFORM_HDR_RELS`) |
 | `-D` で名前を差し替えたい | しない。口 (関数・固定名のヘッダ) にする |
 
 ## 3. 確かめる

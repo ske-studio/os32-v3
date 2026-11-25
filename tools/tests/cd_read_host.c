@@ -1,10 +1,10 @@
 /* ========================================================================
- *  cd_read_host.c — CD の読み (drivers/ata/atapi.c + fs/isofs/iso9660.c) のホスト試験
+ *  cd_read_host.c — CD の読み (sys/dev/ata/atapi.c + sys/fs/isofs/iso9660.c) のホスト試験
  *
  *  実行:  python3 -B tools/tests/test_cd_read.py [--target] [--mutate] [case ...]
  *  記録:  tools/tests/cd_read_tdd.md
  *
- *  実物の drivers/ata/atapi.c と fs/isofs/iso9660.c を 1 行も写さずに #include する。
+ *  実物の sys/dev/ata/atapi.c と sys/fs/isofs/iso9660.c を 1 行も写さずに #include する。
  *  atapi.c のポートは tools/tests/atapi_hostshim/io.h がここの ATAPI デバイスの
  *  模型へ回す。模型は PACKET (0xA0) → 12 バイトの CDB → DRQ ごとのデータ、を
  *  レジスタの粒度で写し、READ(10) の回数・セクタ数・(LBA, 数) の列を数える。
@@ -21,10 +21,10 @@
 #include <stdarg.h>
 
 #include "vfs.h"
-#include "../../platform/pc98/boot_names.c"
+#include "../../sys/platform/pc98/boot_names.c"
 #include "dev.h"
 #include "kmalloc.h"
-#include "lib/kstring.h"
+#include "sys/kern/kstring.h"
 #include "cpu_calibrate.h"
 #include "pc98.h"
 #include "platform_ide_ports.h"
@@ -37,7 +37,7 @@ u32 kstrlen(const char *s) { return (u32)strlen(s); }
 int kstrcmp(const char *a, const char *b) { return strcmp(a, b); }
 char *kstrncpy(char *dst, const char *src, u32 n)
 {
-    /* n はバッファ全体の大きさ (lib/kstring.h の注記) */
+    /* n はバッファ全体の大きさ (sys/kern/kstring.h の注記) */
     if (n == 0) return dst;
     strncpy(dst, src, (size_t)n - 1);
     dst[n - 1] = '\0';
@@ -46,7 +46,7 @@ char *kstrncpy(char *dst, const char *src, u32 n)
 void *kmemcpy(void *dst, const void *src, u32 n) { return memcpy(dst, src, (size_t)n); }
 void *kmalloc(u32 size) { return g_kmalloc_fail ? (void *)0 : malloc((size_t)size); }
 /* 校正済みの µs 待ちの贋物: 待った合計を数えるだけ (NOT READY の出し直しの間、
- * SRST の後)。実物 (kernel/time/cpu_calibrate.c) どおり 1 回 CPU_DELAY_US_MAX (100ms) で
+ * SRST の後)。実物 (sys/platform/pc98/time/cpu_calibrate.c) どおり 1 回 CPU_DELAY_US_MAX (100ms) で
  * 丸める — 丸めを知らずに 250ms を 1 回で頼む書き方はここで待ちが足りなくなる */
 static unsigned long g_delay_us;
 static unsigned long g_delay_calls;
@@ -87,11 +87,11 @@ void ide_multiple_reset_bank(int bank)
 }
 
 /* ---- 実物 ---- */
-#include "../../drivers/ata/atapi.c"
+#include "../../sys/dev/ata/atapi.c"
 void vfs_fd_stale_mount(void *ctx) { (void)ctx; }
-#include "../../fs/isofs/iso9660_media.c"
-#include "../../fs/isofs/iso9660.c"
-#include "../../drivers/ata/cd_body.c"
+#include "../../sys/fs/isofs/iso9660_media.c"
+#include "../../sys/fs/isofs/iso9660.c"
+#include "../../sys/dev/ata/cd_body.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); exit(1); \

@@ -1,6 +1,6 @@
 /* ========================================================================
  *  b8_hostdrv_host.c — HostDrv の「OPEN の失敗を全部 NOTFOUND に畳む」
- *  経路 (票 B8 / Codex 実装レビュー P1-4) を **実物の drivers/hostdrv/hostdrvfs.c** で見る
+ *  経路 (票 B8 / Codex 実装レビュー P1-4) を **実物の sys/dev/hostdrv/hostdrvfs.c** で見る
  *
  *  票:   docs/archive/shell/TASK_FS_TYPE.md §2
  *  実行: python3 -B tools/tests/test_b8_hostdrv.py
@@ -20,12 +20,12 @@
  *
  *  どうやってホストで動かすか
  *  --------------------------
- *  drivers/hostdrv/hostdrvfs.c はハイパーコール (I/O ポート) でエミュレータと話す。
- *  include/io.h の inp / outp は特権命令のインライン asm なのでホストでは
+ *  sys/dev/hostdrv/hostdrvfs.c はハイパーコール (I/O ポート) でエミュレータと話す。
+ *  sys/include/io.h の inp / outp は特権命令のインライン asm なのでホストでは
  *  走らない。tools/tests/hostdrv_hostshim/io.h を -I で**先に**置いて
  *  差し替え、コマンド列が完成した時点で**贋の NP21/W** が応答を書く。
  *  贋物は「次の CREATE が返す NTSTATUS」「次の QUERY が返す中身」を
- *  試験から指定できるだけの最小のもの。**drivers/hostdrv/hostdrvfs.c は 1 行も写さない。**
+ *  試験から指定できるだけの最小のもの。**sys/dev/hostdrv/hostdrvfs.c は 1 行も写さない。**
  *
  *  [C1] C89 / GNU89。u32 は unsigned long なので**必ず ILP32 で組む**
  *  (Np2* 構造体のオフセットが変わるため)。libc は使わない。
@@ -179,7 +179,7 @@ int vfs_register_fs(VfsOps *ops) { (void)ops; return VFS_OK; }
 /* ======================================================================== */
 
 #include "../../lib/kutf16.c"
-#include "../../drivers/hostdrv/hostdrvfs.c"
+#include "../../sys/dev/hostdrv/hostdrvfs.c"
 
 /* ======================================================================== */
 /*  贋の NP21/W (ハイパーコールの受け手)                                    */
@@ -512,7 +512,7 @@ static void case_no_truncate_on_open_failure(void)
     CHECK(t_setinfo_calls == 1);        /* EndOfFile を 0 にする */
 
     /* サイズ取得の OPEN だけが失敗 -> **NOTFOUND ではない**ので、
-     * fs/vfs_fd.c の O_CREAT 分岐 (NOTFOUND 限定) には入れない。
+     * sys/fs/vfs_fd.c の O_CREAT 分岐 (NOTFOUND 限定) には入れない。
      * ここでは get_file_size の戻り値がその条件を満たさないことと、
      * get_file_size 自身が何も壊さないことを見る。 */
     t_reset();

@@ -10,19 +10,19 @@ import host32
 from kernel_includes import include_flags
 
 CHECK = dict(name='hostsvc-open', tier=1, needs=[], budget=4.0, covers=[
-    'fs/serialfs/serialfs_persistent.c', 'include/boot_token.h', 'fs/serialfs/serialfs.h',
-    'fs/serialfs/serialfs.c', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_client.h',
-    'fs/serialfs/sfs_proto.c', 'fs/serialfs/sfs_proto.h',
-    'fs/vfs.c', 'fs/vfs.h', 'fs/vfs_device.h',
-    'net/host_mailbox.c', 'net/host_mailbox.h', 'net/nic.h',
+    'sys/fs/serialfs/serialfs_persistent.c', 'sys/include/boot_token.h', 'sys/fs/serialfs/serialfs.h',
+    'sys/fs/serialfs/serialfs.c', 'sys/fs/serialfs/sfs_client.c', 'sys/fs/serialfs/sfs_client.h',
+    'sys/fs/serialfs/sfs_proto.c', 'sys/fs/serialfs/sfs_proto.h',
+    'sys/fs/vfs.c', 'sys/fs/vfs.h', 'sys/fs/vfs_device.h',
+    'sys/net/host_mailbox.c', 'sys/net/host_mailbox.h', 'sys/net/nic.h',
     'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_fixture.c', 'tools/tests/hostsvc_fixture.h',
-    'tools/tests/hostsvc_open_host.c', 'fs/vfs_fd.c',
-    'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'fs/fd_redirect.h', 'tools/tests/host32.py',
+    'tools/tests/hostsvc_open_host.c', 'sys/fs/vfs_fd.c',
+    'sys/fs/vfs_fd_stdin.inc', 'sys/fs/vfs_stdin.h', 'sys/fs/fd_redirect.h', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk',
-    'include/types.h', 'include/io.h', 'mm/kmalloc.h',
-    'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h', 'lib/kstring.h',
-    'lib/kstring_asm.asm', 'include/console.h', 'include/memmap.h'],
+    'sys/include/types.h', 'sys/include/io.h', 'sys/kern/mm/kmalloc.h',
+    'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h', 'sys/kern/kstring.h',
+    'sys/kern/kstring_asm.asm', 'sys/include/console.h', 'sys/include/memmap.h'],
     basis=['docs/design/fs/serialfs/serialfs_persistent.md セッションと世代'],
 )
 ROOT = Path(__file__).resolve().parents[2]
@@ -38,7 +38,7 @@ def build_run(work, source):
     src = work / 'vfs_fd.c'
     src.write_text(source)
     exe = work / 'open-test'
-    subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'lib/kstring_asm.asm'),
+    subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'sys/kern/kstring_asm.asm'),
                     '-o', str(work / 'kstring.o')], check=True)
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O0',
         '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-ffreestanding',
@@ -48,8 +48,8 @@ def build_run(work, source):
         '-DPRODUCT_SOURCE="' + str(src) + '"',
         *[str(ROOT / p) for p in [
             'tools/tests/hostsvc_open_host.c', 'tools/tests/hostsvc_fixture.c',
-            'fs/vfs.c', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c',
-            'fs/serialfs/serialfs.c', 'lib/crc32.c']],
+            'sys/fs/vfs.c', 'sys/fs/serialfs/sfs_client.c', 'sys/fs/serialfs/sfs_proto.c',
+            'sys/fs/serialfs/serialfs.c', 'lib/crc32.c']],
         str(work / 'kstring.o'), '-o', str(exe)], check=True)
     return host32.run([str(exe)], timeout=30).returncode
 
@@ -58,7 +58,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'fs/vfs_fd.c').read_text()
+    original = (ROOT / 'sys/fs/vfs_fd.c').read_text()
     with tempfile.TemporaryDirectory(prefix='hostsvc-open-') as tmp:
         work = Path(tmp)
         rc = build_run(work, original)

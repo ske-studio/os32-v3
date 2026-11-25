@@ -1,8 +1,8 @@
 /* CW foreground bridge: fake B components, real prepare and dispatcher. */
 #define IO_H
 #include "types.h"
-#include "hwdev/gf/gf1_test.h"
-#include "kdebug/gfinit_bus.h"
+#include "sys/dev/video/geforce/gf1_test.h"
+#include "sys/dev/video/geforce/diag/gfinit_bus.h"
 #include "memmap.h"
 static void fail(int line)
 {
@@ -14,7 +14,7 @@ static unsigned host_if=1, saves, restores;
 unsigned irq_save(void) { unsigned v=host_if;host_if=0;saves++;return v; }
 static void irq_restore(unsigned v) { CHECK(!host_if);host_if=v;restores++; }
 #ifndef GF1_DISPATCH_SOURCE
-#define GF1_DISPATCH_SOURCE "../../hwdev/gf/foundation_test.c"
+#define GF1_DISPATCH_SOURCE "../../sys/dev/video/geforce/foundation_test.c"
 #endif
 #include GF1_DISPATCH_SOURCE
 #ifdef GF_WIDTH_TRACE

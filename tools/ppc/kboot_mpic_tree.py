@@ -11,14 +11,14 @@ sys.path.insert(0, str(ROOT / 'tools/tests'))
 import host32
 
 CHECK = dict(name='ppc-kboot-mpic-tree', tier=2, budget=60,
-             covers=['platform/powermac/via_tree.c', 'platform/powermac/via_window.h',
-                     'include/memmap.h', 'platform/powermac/mpic_tree.c', 'platform/powermac/mpic_tree.h',
+             covers=['sys/platform/powermac/via_tree.c', 'sys/platform/powermac/via_window.h',
+                     'sys/include/memmap.h', 'sys/platform/powermac/mpic_tree.c', 'sys/platform/powermac/mpic_tree.h',
                      'tools/ppc/kboot_mpic_tree.py', 'tools/ppc/kboot_mpic_tree_fake.c',
-                     'platform/powermac/kboot_capture.c', 'platform/powermac/kboot_info.h',
-                     'platform/powermac/gmac_tree.c',
+                     'sys/platform/powermac/kboot_capture.c', 'sys/platform/powermac/kboot_info.h',
+                     'sys/platform/powermac/gmac_tree.c',
                      'tools/ppc/kboot_capture_fake.c', 'platform/powermac/*.h',
-                     'arch/ppc/*.h', 'include/types.h', 'include/callconv.h',
-                     'lib/kstring.h', 'lib/kstring_c.c', 'tools/tests/host32.py'])
+                     'arch/ppc/*.h', 'sys/include/types.h', 'sys/include/callconv.h',
+                     'sys/kern/kstring.h', 'sys/kern/kstring_c.c', 'tools/tests/host32.py'])
 MUTATIONS = [
     ('end-overflow', 'size && a>=base &&', 'size && size<=0xffffffffUL-base && a>=base &&'),
     ('empty-width', 'if ((bus->ac==3 || parent->ac==3) && bus->ac!=parent->ac)', 'if (bus->ac!=parent->ac)'),
@@ -39,10 +39,10 @@ def exercise(directory, source):
             '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-fno-stack-protector',
             '-nostdlib', '-static', '-D__cdecl=',
             *['-I'+str(ROOT / p) for p in ('platform/powermac', 'arch/ppc', 'include', 'lib')],
-            str(source), str(ROOT / 'platform/powermac/kboot_capture.c'),
-            str(ROOT / 'platform/powermac/gmac_tree.c'), str(ROOT / 'platform/powermac/via_tree.c'),
+            str(source), str(ROOT / 'sys/platform/powermac/kboot_capture.c'),
+            str(ROOT / 'sys/platform/powermac/gmac_tree.c'), str(ROOT / 'sys/platform/powermac/via_tree.c'),
             str(ROOT / 'tools/ppc/kboot_mpic_tree_fake.c'),
-            str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)]
+            str(ROOT / 'sys/kern/kstring_c.c'), '-o', str(exe)]
     subprocess.run(argv, check=True, timeout=60)
     failed = []
     for case in range(32):
@@ -60,7 +60,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    product = ROOT / 'platform/powermac/mpic_tree.c'
+    product = ROOT / 'sys/platform/powermac/mpic_tree.c'
     with tempfile.TemporaryDirectory(prefix='kboot-capture-') as temp:
         directory = Path(temp)
         failures = exercise(directory, product)

@@ -19,7 +19,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'sdk'))
 import os32x_hdr as H
 
-TARGET_SRC = [ROOT / 'userland/tests/h2_stack.c', ROOT / 'userland/tests/h2_stack_probe.inc',
+TARGET_SRC = [ROOT / 'userland/diag/h2_stack.c', ROOT / 'userland/diag/h2_stack_probe.inc',
               ROOT / 'tools/gen_h2_fixtures.py']
 MUTANTS = [
     ('pattern write', 'a[i] = (unsigned char)(H2_PATTERN ^ (i / H2_PAGE_BYTES));', 'a[i] = 0;'),
@@ -49,7 +49,7 @@ def require(cond, message):
 
 def compile_probe(tmp, body):
     (tmp / 'h2_stack_probe.inc').write_text(body)
-    (tmp / 'h2_stack_probe.h').write_bytes((ROOT / 'userland/tests/h2_stack_probe.h').read_bytes())
+    (tmp / 'h2_stack_probe.h').write_bytes((ROOT / 'userland/diag/h2_stack_probe.h').read_bytes())
     (tmp / 'probe.c').write_bytes((ROOT / 'tools/tests/h2_stack_host.c').read_bytes())
     exe = tmp / 'probe'
     r = run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
@@ -132,7 +132,7 @@ def test_fixtures(tmp):
     for name, record in records.items():
         heads.append('{' + ','.join(str(v) for v in (out / name).read_bytes()[:H.OS32X_HDR_SIZE]) + '}')
         verdicts.append(expected[name])
-    src.write_text('#include "exec/os32x_hdr.c"\n'
+    src.write_text('#include "sys/kern/exec/os32x_hdr.c"\n'
                    'static const unsigned char heads[][OS32X_HDR_SIZE]={' + ','.join(heads) + '};\n'
                    'static const int expected[]={' + ','.join(map(str, verdicts)) + '};\n'
                    'void _start(void) { OS32Header h; unsigned int i,j; int rc=0; '
@@ -193,7 +193,7 @@ def main():
         test_built(tmp)
         test_fixtures(tmp)
         test_old_object(tmp)
-        body = (ROOT / 'userland/tests/h2_stack_probe.inc').read_text()
+        body = (ROOT / 'userland/diag/h2_stack_probe.inc').read_text()
         exe = compile_probe(tmp, body)
         r = host32.run([str(exe)], capture_output=True, text=True)
         require(r.returncode == 0, 'live ILP32 probe: ' + str(r.returncode))

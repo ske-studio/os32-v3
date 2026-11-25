@@ -1,4 +1,4 @@
-# kdebug/gfinit_resources/scan.inc — 設計
+# sys/dev/video/geforce/gfinit_resources/scan.inc — 設計
 > 状態: **現行 (2026-11-10)**
 
 bus 0 の fn0 不在と multifunction に従って全 function の生 config を読む。

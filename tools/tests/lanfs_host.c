@@ -1,6 +1,6 @@
 /* Real SfsClient + LAN transport; only NIC, clock and UART observation are fake. */
 #include "sfs_lan.h"
-#include "net/nic.h"
+#include "sys/net/nic.h"
 #include "serialfs.h"
 int vfs_register_fs(VfsOps *ops) { (void)ops; return VFS_OK; }
 #include "os32_kapi_shared.h"

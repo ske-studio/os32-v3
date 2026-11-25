@@ -10,7 +10,7 @@
 #define GF4_C1_ENTRY scanlog_unused_c1_start
 #include "gf4_c1_host.c"
 #undef GF4_C1_ENTRY
-#include "../../hwdev/gfinit_mode.h"
+#include "../../sys/dev/video/geforce/gfinit_mode.h"
 /* gf4_c2svc_host.c already includes the real F5 service for this fixture. */
 
 /* Scanlog supplies synthetic PCI and host mmap, rather than kernel PTEs. */

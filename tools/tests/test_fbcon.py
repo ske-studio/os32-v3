@@ -29,7 +29,7 @@ MUTANTS = [
     ('scroll long', 'i < cols * (rows - n)', 'i < cols * rows'),
     ('old cursor', 'redraw_cursor(c, ox, oy);', '(void)ox; (void)oy;'),
 ]
-TEXT = ROOT / 'platform/powermac/console_text.c'
+TEXT = ROOT / 'sys/platform/powermac/console_text.c'
 TEXT_MUTANTS = [
     ('nonowner exit', 'id == appslot_gfx_owner()', '(void)id, 1'),
     ('duplicate return', '!pm_text_was_up || pm_console_text_ready()', '!pm_text_was_up'),
@@ -44,17 +44,17 @@ def build_run(tmp, source, console_text):
         '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
         '-Wall', '-Wextra', '-Werror', '-Wno-sign-compare', '-D__KERNEL_BUILD__',
         '-I'+str(tmp), '-I'+str(ROOT/'platform/powermac'), '-I'+str(ROOT), '-I'+str(ROOT/'tools/tests'), *include_flags(ROOT),
-        str(tmp/'console_text.c'), str(ROOT/'platform/powermac/display.c'),
-        str(ROOT/'tools/tests/fbcon_host.c'), str(ROOT/'platform/powermac/console.c'),
-        str(ROOT/'kernel/console/console.c'), str(ROOT/'lib/utf8.c'), str(ROOT/'lib/kstring_c.c'),
-        str(ROOT/'kernel/console/font_source_kcg.c'), str(ROOT/'lib/lz4.c'), '-o',str(exe)],check=True)
+        str(tmp/'console_text.c'), str(ROOT/'sys/platform/powermac/display.c'),
+        str(ROOT/'tools/tests/fbcon_host.c'), str(ROOT/'sys/platform/powermac/console.c'),
+        str(ROOT/'sys/kern/console/console.c'), str(ROOT/'lib/utf8.c'), str(ROOT/'sys/kern/kstring_c.c'),
+        str(ROOT/'sys/kern/console/font_source_kcg.c'), str(ROOT/'lib/lz4.c'), '-o',str(exe)],check=True)
     return host32.run([str(exe)], runner='qemu', capture_output=True,text=True)
 def cross_compile(tmp):
     cc = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
     if not cc.is_file():
         print('SKIP fbcon PPC cross gcc unavailable', flush=True)
         return
-    for source in ('kernel/console/fbcon.c', 'platform/powermac/console.c'):
+    for source in ('sys/kern/console/fbcon.c', 'sys/platform/powermac/console.c'):
         subprocess.run([str(cc), '-std=gnu11', '-mcpu=7450', '-m32', '-mbig-endian',
             '-msoft-float', '-mno-altivec', '-msdata=none', '-ffreestanding',
             '-fno-pie', '-fno-builtin', '-fno-stack-protector', '-nostdlib',
@@ -69,7 +69,7 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--mutate',action='store_true')
     args=parser.parse_args()
-    source=(ROOT/'kernel/console/fbcon.c').read_text()
+    source=(ROOT/'sys/kern/console/fbcon.c').read_text()
     with tempfile.TemporaryDirectory(prefix='fbcon-') as directory:
         tmp=Path(directory)
         cross_compile(tmp)

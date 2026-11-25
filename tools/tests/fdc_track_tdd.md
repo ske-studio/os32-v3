@@ -10,10 +10,10 @@
   1 セクタの窓 (count=1) で回す。フォントは 16B のヘッダの後に 1024B ずつ読む
   (`kernel/boot_font.c` の `kcg_read_chunked`) ので、**要求は全部 count=1**。そこで
   要求したセクタからトラックの終わり (EOT = spt) までを 1 回で読み、残りを持っておく
-- 対象: [`drivers/block/fdc_track.c`](../../drivers/block/fdc_track.c) (区切り・先読み・読み直しの純粋な層)、
-  [`drivers/block/fdc.c`](../../drivers/block/fdc.c) (`fdc_read_sectors`、覚えたシリンダ)、
-  [`drivers/block/fdc_decide.c`](../../drivers/block/fdc_decide.c) (`fdc_rw_timeout_ticks`)、
-  [`drivers/block/fat_diskio.c`](../../drivers/block/fat_diskio.c) (結線と、書き込み・再初期化での破棄)
+- 対象: [`sys/dev/block/fdc_track.c`](../../sys/dev/block/fdc_track.c) (区切り・先読み・読み直しの純粋な層)、
+  [`sys/dev/block/fdc.c`](../../sys/dev/block/fdc.c) (`fdc_read_sectors`、覚えたシリンダ)、
+  [`sys/dev/block/fdc_decide.c`](../../sys/dev/block/fdc_decide.c) (`fdc_rw_timeout_ticks`)、
+  [`sys/dev/block/fat_diskio.c`](../../sys/dev/block/fat_diskio.c) (結線と、書き込み・再初期化での破棄)
 - 実行: `python3 -B tools/tests/test_fdc_track.py [--target] [--mutate] [case ...]`
   (`make check-fdc-track-host` が `--target --mutate` 付きで回す)
 - 試験: [`fdc_track_host.c`](fdc_track_host.c) — 実物を `#include` する。
@@ -66,7 +66,7 @@ PM の実測: フォントの読み込みは 4a8fad4 とほぼ同じ約 3 分。
   Ready 変化は SIS のどこで見ても世代を進め、覚えたシリンダを捨てる
   (`readychange_invalidates`)
 - 起動時に `[fdc] font: seek= skip= recal= tmo= foreign= rdy= multi=ok/fail nr= single= retry= write=`
-  を 1 行出す (`platform/pc98/kernel.c`、FD に触っていなければ出ない)
+  を 1 行出す (`sys/platform/pc98/kernel.c`、FD に触っていなければ出ない)
 
 ## 0-2. 6541ef1 の実測 (2026-09-24 夜) — まだ当たっていなかった理由と直したもの
 
@@ -75,8 +75,8 @@ PM の実測 (NP21/W、FD 起動): フォントの読み込み約 92 秒 (187 �
 tmo=0 で IRQ の取りこぼしは消えたが、**まとめ読み 767 回・シーク 751 回**で先読みが
 ほぼ当たっていない。
 
-- **原因**: VFS が 1 回の読みごとにファイルを開き直す。`fs/vfs_fd.c` の `vfs_read_fd` →
-  `fs/fat/fatfs_vfs.c` の `fatfs_vfs_read_stream` が毎回 `f_open` → `f_lseek` → `f_read` →
+- **原因**: VFS が 1 回の読みごとにファイルを開き直す。`sys/fs/vfs_fd.c` の `vfs_read_fd` →
+  `sys/fs/fat/fatfs_vfs.c` の `fatfs_vfs_read_stream` が毎回 `f_open` → `f_lseek` → `f_read` →
   `f_close` を回すので、1KB のチャンクごとにパスをたどり直す。実物のイメージでは
   ルートディレクトリ (LBA 5 = C0H0)、`/SYS` (LBA 15 = C0H1)、`/SYS/FONT` (LBA 997 = C62H0)、
   FAT (LBA 2 = C0H0)、データ (LBA 998〜1181 = C62〜C73 の 24 トラック) の

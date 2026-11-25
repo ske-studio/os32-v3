@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """D3 network CD with real persistent session, block RPC and wire protocol."""
 CHECK = dict(name='hostsvc-netcd', tier=1, needs=[], budget=31.5, covers=[
-    'drivers/block/netcd.c', 'drivers/block/netcd.h', 'kernel/dev/dev.h',
-    'fs/serialfs/sfs_block.c', 'fs/serialfs/sfs_block.h',
-    'fs/serialfs/serialfs_persistent.c', 'include/boot_token.h', 'fs/serialfs/serialfs.h',
-    'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_client.h',
-    'fs/serialfs/sfs_proto.c', 'fs/serialfs/sfs_proto.h',
-    'net/host_mailbox.h', 'net/nic.h', 'fs/vfs.h',
+    'sys/dev/block/netcd.c', 'sys/dev/block/netcd.h', 'sys/hal/block/dev.h',
+    'sys/fs/serialfs/sfs_block.c', 'sys/fs/serialfs/sfs_block.h',
+    'sys/fs/serialfs/serialfs_persistent.c', 'sys/include/boot_token.h', 'sys/fs/serialfs/serialfs.h',
+    'sys/fs/serialfs/sfs_client.c', 'sys/fs/serialfs/sfs_client.h',
+    'sys/fs/serialfs/sfs_proto.c', 'sys/fs/serialfs/sfs_proto.h',
+    'sys/net/host_mailbox.h', 'sys/net/nic.h', 'sys/fs/vfs.h',
     'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_netcd_host.c', 'tools/tests/hostsvc_fixture.c',
     'tools/tests/hostsvc_fixture.h', 'tools/tests/host32.py',
-    'tools/tests/kernel_includes.py', 'build/config.mk', 'include/types.h',
+    'tools/tests/kernel_includes.py', 'build/config.mk', 'sys/include/types.h',
     'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h',
-    'lib/kstring.h', 'lib/kstring_asm.asm'],
+    'sys/kern/kstring.h', 'sys/kern/kstring_asm.asm'],
     env=[], basis=['PACK ppc-sfs-deadline PM condition B', 'LAN_OPERATOR_DESIGN §5', 'docs/design/drivers/block/netcd.md 読みと媒体の確かめ'],
     env_limit='fake network/NIC/mediaでsession・世代・期限を確認するが、実ネットワークと実媒体の障害は再現しない。',
 )
@@ -62,8 +62,8 @@ def build_run(work, source):
         '-DPRODUCT_SOURCE="' + str(src) + '"',
         *[str(ROOT / p) for p in [
             'tools/tests/hostsvc_netcd_host.c', 'tools/tests/hostsvc_fixture.c',
-            'fs/serialfs/serialfs_persistent.c', 'fs/serialfs/sfs_block.c',
-            'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'lib/crc32.c']],
+            'sys/fs/serialfs/serialfs_persistent.c', 'sys/fs/serialfs/sfs_block.c',
+            'sys/fs/serialfs/sfs_client.c', 'sys/fs/serialfs/sfs_proto.c', 'lib/crc32.c']],
         str(work / 'kstring.o'), '-o', str(exe)], check=True, cwd=ROOT)
     return host32.run([str(exe)], cwd=ROOT, timeout=120).returncode
 
@@ -72,10 +72,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'drivers/block/netcd.c').read_text()
+    source = (ROOT / 'sys/dev/block/netcd.c').read_text()
     with tempfile.TemporaryDirectory(prefix='hostsvc-netcd-') as tmp:
         work = Path(tmp)
-        subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'lib/kstring_asm.asm'),
+        subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'sys/kern/kstring_asm.asm'),
                         '-o', str(work / 'kstring.o')], check=True)
         rc = build_run(work, source)
         if rc:

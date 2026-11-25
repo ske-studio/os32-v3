@@ -1,4 +1,4 @@
-#include "platform/powermac/lan_boot.h"
+#include "sys/platform/powermac/lan_boot.h"
 static u32 reg, reads, writes, bad_va, reject;
 u32 pm_clock_read(u32 va) { if (va != 0x1000u) bad_va++; reads++; return reg; }
 void pm_clock_write(u32 va, u32 value) { if (va != 0x1000u) bad_va++; writes++; if (!reject) reg = value; }

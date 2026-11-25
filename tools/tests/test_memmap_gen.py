@@ -6,7 +6,7 @@
 
   python3 -B tools/tests/test_memmap_gen.py [--mutate]
 
-**実物の include/memmap.h をそのまま使い、kernel.map だけを差し替える。**
+**実物の sys/include/memmap.h をそのまま使い、kernel.map だけを差し替える。**
 番地の計算は全部 `__bss_end` から芋づるなので、これだけで「壊れた地図」と
 「直った地図」の両方を作れる。試験が実物のツリーの状態に依存しないので、
 票 §4 の 4 で番地を直しても腐らない。
@@ -83,10 +83,10 @@ def _unused_mirrors(root, m):"""),
 
 
 # memmap.h の値を写している場所 (gen_memmap.py の MIRRORS / ASM_SYMBOLIC と同じ顔ぶれ)
-MIRROR_FILES = ("sdk/include/os32/os32_sndl_table.h", "build/os32.ld", "arch/x86/kernel/kentry.asm",
+MIRROR_FILES = ("sdk/include/os32/os32_sndl_table.h", "build/os32.ld", "sys/arch/x86/kernel/kentry.asm",
                 "sdk/include/os32/os32_gui_shared.h",
                 "sdk/rust/os32api/src/gui/proto.rs",
-                # ホスト試験が mm/shm.c を組むための偽 memmap.h を持つ。
+                # ホスト試験が sys/kern/mm/shm.c を組むための偽 memmap.h を持つ。
                 # 2026-09-17 に実際にずれたので写しの照合対象に入っている。
                 "tools/tests/test_owner_reclaim.py",
                 # ローダ (NASM) のブート情報域の番地 (票 TASK_HDD_INSTALL 段 0)
@@ -105,8 +105,8 @@ def make_tree(tmp, bss_end):
         dst = root / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, dst)
-    shutil.copy(ROOT / "include/memmap.h", root / "include/memmap.h")
-    shutil.copy(ROOT / "include/pegc.h", root / "include/pegc.h")
+    shutil.copy(ROOT / "sys/include/memmap.h", root / "sys/include/memmap.h")
+    shutil.copy(ROOT / "sys/platform/pc98/pegc.h", root / "sys/platform/pc98/pegc.h")
     shutil.copy(ROOT / "docs/02_memory.md", root / "docs/02_memory.md")
     for rel in MIRROR_FILES:
         dst = root / rel
@@ -158,7 +158,7 @@ def cases(script):
     # GUI 子領域の末尾を親の SHM 領域から 1 ページはみ出させる。
     with tempfile.TemporaryDirectory(prefix="os32-genmm-escape-") as tmp:
         root = make_tree(tmp, CLEAN)
-        header = root / "include/memmap.h"
+        header = root / "sys/include/memmap.h"
         original = header.read_text()
         header.write_text(re.sub(r'(^#define\s+MEM_SHM_GUI_BASE\s+).*$',
                                  r'\1(MEM_SHM_BASE + MEM_SHM_GUI_OFFSET + MEM_GUARD_SIZE)',
@@ -228,7 +228,7 @@ def cases(script):
         # ASM が数値直書きに戻ったら気づく
         with tempfile.TemporaryDirectory(prefix="os32-genmm-asm-") as directory:
             root2 = make_tree(directory, CLEAN)
-            asm = root2 / "arch/x86/kernel/kentry.asm"
+            asm = root2 / "sys/arch/x86/kernel/kentry.asm"
             asm.write_text(asm.read_text(encoding="utf-8")
                            .replace("mov     esp, LAYOUT_MEM_KSTACK_TOP",
                                     "mov     esp, 002FFFFCh"), encoding="utf-8")
@@ -270,7 +270,7 @@ def fixed_paging_cases(script):
     for label, name, expr in changes:
         with tempfile.TemporaryDirectory(prefix='os32-fixed-map-') as tmp:
             root = make_tree(tmp, CLEAN)
-            header = root / 'include/memmap.h'
+            header = root / 'sys/include/memmap.h'
             header.write_text(re.sub(r'(^#define\s+' + name + r'\s+).*$',
                                      lambda m: m[1] + expr, header.read_text(), flags=re.M))
             # 写し一致の偶然の拒否で済ませず、境界の検査だけでも拒否させる。
@@ -325,9 +325,9 @@ def link_fixture(root, core_end=0x2bc060):
                        capture_output=True)
     sys.path.insert(0, str(ROOT / 'tools'))
     import gen_memmap
-    source = (root / 'build/os32.ld').read_text().replace('arch/x86/kernel/kentry.o', 'build/out/obj/arch/x86/kernel/kentry.o')
+    source = (root / 'build/os32.ld').read_text().replace('sys/arch/x86/kernel/kentry.o', 'build/out/obj/sys/arch/x86/kernel/kentry.o')
     (root / 'build/out/fixture.ld').write_text(gen_memmap.preprocess_layout(root, source))
-    return subprocess.run([str(ld), '-T', 'build/out/fixture.ld' , 'build/out/obj/arch/x86/kernel/kentry.o', '-o', 'build/out/fixture.elf'],
+    return subprocess.run([str(ld), '-T', 'build/out/fixture.ld' , 'build/out/obj/sys/arch/x86/kernel/kentry.o', '-o', 'build/out/fixture.elf'],
                           cwd=root, capture_output=True, text=True)
 
 
@@ -375,7 +375,7 @@ def layout_cases(script):
               for name in ('.bss', '.ledger_fixed')), 'BSS must be NOLOAD')
     log = ['LAYOUT real ELF/map/manifest + objdump PASS; code/data/BSS/NOLOAD half-open PASS']
 
-    defines = gen.read_defines(ROOT / 'include/memmap.h')
+    defines = gen.read_defines(ROOT / 'sys/include/memmap.h')
     macros = gen.Macros(defines, symbols)
     for name in ('MEM_FIXED_PAGING_GUARD_BASE',):
         limit = macros.get(name)

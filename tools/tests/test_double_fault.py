@@ -15,8 +15,8 @@ from mkmod import Elf
 
 
 def run(folder, mutant=None):
-    (folder / 'platform_emergency.h').write_text((ROOT / 'include/platform_emergency.h').read_text())
-    (folder / 'emergency.c').write_text((ROOT / 'platform/pc98/emergency.c').read_text())
+    (folder / 'platform_emergency.h').write_text((ROOT / 'sys/include/platform_emergency.h').read_text())
+    (folder / 'emergency.c').write_text((ROOT / 'sys/platform/pc98/emergency.c').read_text())
     for name in ('gdt', 'tss', 'idt', 'double_fault'):
         source = (ROOT / 'arch/x86/kernel' / (name + '.c')).read_text()
         if mutant == 'interrupt gate' and name == 'idt':
@@ -34,9 +34,9 @@ def run(folder, mutant=None):
         'static u8 inp(u16 p) {(void)p; return 0;}\n'
         'static void outp(u16 p, u8 v) {(void)p;(void)v;}\n'
         'static u32 irq_save(void) {return 0;}\nstatic void irq_restore(u32 f) {(void)f;}\n#endif\n')
-    stubs = re.findall(r'extern void (\w+)\(void\);', (ROOT / 'arch/x86/kernel/idt.c').read_text())
+    stubs = re.findall(r'extern void (\w+)\(void\);', (ROOT / 'sys/arch/x86/kernel/idt.c').read_text())
     (folder / 'stubs.c').write_text('\n'.join('void '+n+'(void) {}' for n in stubs))
-    cpu = (ROOT / 'arch/x86/arch_cpu.h').read_text()
+    cpu = (ROOT / 'sys/arch/x86/arch_cpu.h').read_text()
     cpu = cpu.replace('mov %1, %%cr3', 'mov %1, host_observed_cr3')
     (folder / 'cpu_shadow.h').write_text(cpu)
     (folder / 'arch_cpu.h').write_text(cpu)
@@ -61,7 +61,7 @@ def run(folder, mutant=None):
 def check_asm_constants(folder):
     values = {name: int(value, 0) for name, value in re.findall(
         r'^%define (\w+) (0x[0-9a-fA-F]+|[0-9]+)$',
-        (ROOT / 'arch/x86/kernel/cpu_flags.inc').read_text(), re.M)}
+        (ROOT / 'sys/arch/x86/kernel/cpu_flags.inc').read_text(), re.M)}
     source = ('#define __ASSEMBLER__ 1\n#include "cpu.h"\n#include "types.h"\n'
               '#include "x86_flags.h"\n#include "tss.h"\n#include "ksetjmp.h"\n#include <stddef.h>\n')
     for name in ('EFLAGS_IF', 'EFLAGS_VM', 'EFLAGS_RESERVED1', 'ABI_STACK_ALIGN'):
@@ -124,17 +124,17 @@ def check_entry_layout(folder):
         'V86_CTX_GS': 'offsetof(struct v86_context, gs)',
     }
     definitions = set(re.findall(r'^%define (\w+) .+$',
-        (ROOT / 'arch/x86/kernel/entry_layout.inc').read_text(), re.M))
+        (ROOT / 'sys/arch/x86/kernel/entry_layout.inc').read_text(), re.M))
     assert definitions == set(expressions), (definitions ^ set(expressions))
     asm = folder / 'entry_layout.asm'
-    asm.write_text('%include "arch/x86/kernel/entry_layout.inc"\n' +
+    asm.write_text('%include "sys/arch/x86/kernel/entry_layout.inc"\n' +
                    ''.join('dd ' + name + '\n' for name in expressions))
     binary = folder / 'entry_layout.bin'
     subprocess.run(['nasm', '-f', 'bin', str(asm), '-o', str(binary)],
                    cwd=ROOT, check=True)
     values = struct.unpack('<' + 'I' * len(expressions), binary.read_bytes())
     source = ('#include "cpu.h"\n#include "idt.h"\n#include "tss.h"\n'
-              '#include "v86.h"\n#include "exec/appslot.h"\n#include <stddef.h>\n')
+              '#include "v86.h"\n#include "sys/kern/exec/appslot.h"\n#include <stddef.h>\n')
     for (name, expression), value in zip(expressions.items(), values):
         source += f'STATIC_ASSERT(({expression}) == {value}, entry_{name});\n'
     path = folder / 'entry_layout.c'

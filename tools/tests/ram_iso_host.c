@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include "fs/vfs_device.h"
-#include "fs/isofs/iso9660.h"
-#include "kernel/dev/ram_ro.h"
-#include "lib/kstring.h"
+#include "sys/fs/vfs_device.h"
+#include "sys/fs/isofs/iso9660.h"
+#include "sys/kern/dev/ram_ro.h"
+#include "sys/kern/kstring.h"
 
 volatile u32 tick_count;
 void *kmalloc(u32 n) { return malloc(n); }

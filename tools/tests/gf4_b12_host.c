@@ -13,7 +13,7 @@ static struct gf4_host h;
 static struct gf4_state state;
 static struct gf4_host_event events[16];
 
-#include "../../hwdev/gf/display/heads.c"
+#include "../../sys/dev/video/geforce/display/heads.c"
 static void observe(struct gf4_host *host, const struct gf4_host_event *e)
 {
     (void)host;

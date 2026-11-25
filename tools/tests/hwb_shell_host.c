@@ -12,7 +12,7 @@
 #include "userland/shell/shell.h"
 #include "pci_dev_contract.h"
 #include "hwb_shell_scripts.h"
-/* userland/tests/hw/np21w_tvram.hwb・np21w_poll.hwb が触る TVRAM の番地 (文字の領域の末尾、PM 決定 P11)。 */
+/* userland/diag/hw/np21w_tvram.hwb・np21w_poll.hwb が触る TVRAM の番地 (文字の領域の末尾、PM 決定 P11)。 */
 #define TVRAM_SPARE 0xA1FFEUL
 
 int strcmp(const char *a, const char *b)

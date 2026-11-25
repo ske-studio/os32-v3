@@ -7,7 +7,7 @@
 #undef _start
 #undef vfs_open
 #ifndef KCG_ADAPTER
-#define KCG_ADAPTER "../../drivers/video/kcg/kcg_module.c"
+#define KCG_ADAPTER "../../sys/dev/video/kcg/kcg_module.c"
 #endif
 #define IO_H
 void platform_display_kcg_code(void) {}
@@ -102,7 +102,7 @@ void _start(void)
     empty(); finish(0);
 }
 
-#include "../../platform/pc98/module_pair.c"
+#include "../../sys/platform/pc98/module_pair.c"
 
 const struct boot_common *boot_common_get(void) {
     static struct boot_common info;

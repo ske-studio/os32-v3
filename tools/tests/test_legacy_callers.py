@@ -1,8 +1,8 @@
 """Optional legacy provider links and genuine caller admission/unwind slices."""
 CHECK = dict(name='legacy-callers-host', tier=1,
-    covers=['mm/paging_lowmap.h', 'mm/paging_lowmap.inc', 'include/legacy_guest.h', 'arch/x86/**', 'platform/pc98/**', 'exec/*.h', 'mm/*.h',
-            'kernel/v86/*.h', 'kernel/module/*.h', 'platform/none/legacy_guest.c',
-            'exec/exec_*.inc', 'exec/lease.c', 'kernel/kaudit.c', 'kernel/console/console.c',
+    covers=['sys/kern/mm/paging_lowmap.h', 'sys/kern/mm/paging_lowmap.inc', 'sys/include/legacy_guest.h', 'arch/x86/**', 'platform/pc98/**', 'exec/*.h', 'mm/*.h',
+            'kernel/v86/*.h', 'kernel/module/*.h', 'sys/platform/none/legacy_guest.c',
+            'exec/exec_*.inc', 'sys/kern/exec/lease.c', 'sys/kern/kaudit.c', 'sys/kern/console/console.c',
             'tools/tests/legacy_callers_host.c', 'tools/tests/legacy_guest_fake.h',
             'tools/tests/test_legacy_callers.py', 'tools/tests/kernel_includes.py',
             'tools/tests/host32.py', 'include/**', 'sdk/include/os32/**'],
@@ -35,15 +35,15 @@ def sources():
     read = lambda p: (ROOT / p).read_text()
     # Preserve the complete admission prefix of the real launch function;
     # image I/O after admission is covered by exec_image, not mocked here.
-    launch = function(read('exec/exec_launch.inc'), 'exec_launch')
+    launch = function(read('sys/kern/exec/exec_launch.inc'), 'exec_launch')
     launch = launch[:launch.index('    /* longjmp')] + '    (void)cmdline; (void)gui_arg; return 0;\n}\n'
-    return dict(callers=launch + function(read('exec/exec_finish.inc'), 'exec_exit') +
-        '\n'.join(function(read('kernel/console/console.c'), n) for n in
+    return dict(callers=launch + function(read('sys/kern/exec/exec_finish.inc'), 'exec_exit') +
+        '\n'.join(function(read('sys/kern/console/console.c'), n) for n in
                   ['console_render_allowed', 'console_hw_cursor_sync',
                    'console_hw_cursor_enable', 'console_text_gdc_stop']) +
-        function(read('exec/lease.c'), 'lease_audit_all') +
-        function(read('kernel/kaudit.c'), 'kselftest_run_audit'),
-        on=read('platform/pc98/legacy/guest.c') + function(read('platform/pc98/legacy/lowmap.c'), 'legacy_lowmap_busy'), off=read('platform/none/legacy_guest.c'))
+        function(read('sys/kern/exec/lease.c'), 'lease_audit_all') +
+        function(read('sys/kern/kaudit.c'), 'kselftest_run_audit'),
+        on=read('sys/platform/pc98/legacy/guest.c') + function(read('sys/platform/pc98/legacy/lowmap.c'), 'legacy_lowmap_busy'), off=read('sys/platform/none/legacy_guest.c'))
 
 MUTANTS = [
     ('on', 'return v86_session.open;', 'return v86_is_active();', 'open-independent'),

@@ -1,9 +1,9 @@
-#define KBD_MERGE_SOURCE "input/hal/kbd_merge.c"
+#define KBD_MERGE_SOURCE "sys/hal/input/kbd_merge.c"
 #include "kbd_capture_fixture_host.h"
-#include "../../input/hal/legacy_ring.c"
-#include "../../input/hal/legacy_mode.c"
-#include "../../kernel/input_legacy.c"
-#include "../../kernel/input_wait.c"
+#include "../../sys/hal/input/legacy_ring.c"
+#include "../../sys/hal/input/legacy_mode.c"
+#include "../../sys/kern/input_legacy.c"
+#include "../../sys/kern/input_wait.c"
 /* No device callbacks are registered in this boundary fixture. */
 void idle_work_run(void) { }
 /* ======================================================================== */
@@ -11,8 +11,8 @@ void idle_work_run(void) { }
 /*  `kbdstat -w` の行をそのままホストで回す                                 */
 /*                                                                          */
 /*  実物を 1 行も写さずに #include する (-I で解決。変異は写しの上で):       */
-/*    drivers/input/kbd_dlog.c      リングの純粋部                                */
-/*    drivers/input/kbd.c           IRQ1 ハンドラ (0043h / 0041h は模型へ回す —   */
+/*    sys/dev/input/kbd_dlog.c      リングの純粋部                                */
+/*    sys/platform/pc98/input/kbd.c           IRQ1 ハンドラ (0043h / 0041h は模型へ回す —   */
 /*                            tools/tests/kbd_hostshim/io.h) と kbd_diag_log */
 /*    userland/shell/kbd_watch.c  kbdstat -w の行の組み立て                 */
 /*  見るのは (票 docs/tasks/gui/TASK_KBD_NAV.md §3、記録 kbd_dlog_tdd.md):    */
@@ -39,12 +39,12 @@ void idle_work_run(void) { }
 #define KBD_HOST_TEST 1
 u8 kbd_host_bios_shift;
 
-#include "drivers/input/kbd_status.c"
-#include "drivers/input/kbd_dlog.c"
-#include "drivers/input/kbd.c"
+#include "sys/dev/input/kbd_status.c"
+#include "sys/dev/input/kbd_dlog.c"
+#include "sys/platform/pc98/input/kbd.c"
 #include "userland/shell/kbd_watch.c"
-#include "drivers/input/mouse.c"
-#include "input/hal/mouse_pointer.c"
+#include "sys/platform/pc98/input/mouse.c"
+#include "sys/hal/input/mouse_pointer.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \

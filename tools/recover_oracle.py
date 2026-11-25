@@ -74,7 +74,7 @@ def extract_oracle():
             '    recover_tables_dump_product();', ''))
         exe = temp / 'extract'
         subprocess.run(['gcc', *FLAGS, '-nostdlib', '-static', '-no-pie',
-                        '-Wl,--gc-sections', str(unit), str(ROOT / 'kdebug/recover.c'),
+                        '-Wl,--gc-sections', str(unit), str(ROOT / 'sys/platform/pc98/kdebug/recover.c'),
                         str(main), '-o', str(exe)], check=True)
         run = run_extractor(exe)
         if run.returncode or not run.stdout.endswith(b'END\n'):

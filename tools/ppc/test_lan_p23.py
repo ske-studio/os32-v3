@@ -14,8 +14,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'tools/ppc_lan_host.py'
 CHECK = dict(name='ppc-lan-p23', tier=1, budget=60, needs=[],
              covers=['tools/ppc_lan_host.py'],
-             inputs=['tools/ppc/test_lan_p23.py', 'platform/powermac/lan_boot.h',
-                     'platform/powermac/lan_wire.c', 'include/types.h', 'lib/kstring.h'])
+             inputs=['tools/ppc/test_lan_p23.py', 'sys/platform/powermac/lan_boot.h',
+                     'sys/platform/powermac/lan_wire.c', 'sys/include/types.h', 'sys/kern/kstring.h'])
 MUTATIONS = [
     ('foreign-boot', 'if boot != self.boot:', 'if False:', 'H:A9 foreign-boot'),
     ('double-drop', "seq - self.high - 1}')", "seq - self.high - 1 + m['drop_records']}')", 'H:gap double-drop'),
@@ -56,7 +56,7 @@ def require(condition, label):
 
 def exercise(path, directory):
     m = load(path)
-    header = (ROOT / 'platform/powermac/lan_boot.h').read_text()
+    header = (ROOT / 'sys/platform/powermac/lan_boot.h').read_text()
     for name, value in [('MAGIC', m.MAGIC), ('VERSION', m.VERSION), ('ETHERTYPE', m.ETHERTYPE),
                         ('HEADER_BYTES', m.HEADER_BYTES), ('PAYLOAD_MAX', m.PAYLOAD_MAX)]:
         import re
@@ -103,7 +103,7 @@ if (pm_lan_encode(b, sizeof(b), &m, &n)) return 1; return write(1, b, n) != (lon
              '-Werror=implicit-function-declaration', '-Werror=int-conversion',
              '-I', str(ROOT), '-I', str(ROOT / 'include'),
              '-I', str(ROOT / 'platform/powermac'), str(driver),
-             str(ROOT / 'platform/powermac/lan_wire.c'), '-o', str(binary)])
+             str(ROOT / 'sys/platform/powermac/lan_wire.c'), '-o', str(binary)])
     guest_frame = checked([str(binary)])
     h.receive(frame(guest_frame))
     metadata = json.loads((pathlib.Path(directory) / (boot.hex() + '.jsonl')).read_text().splitlines()[-1])

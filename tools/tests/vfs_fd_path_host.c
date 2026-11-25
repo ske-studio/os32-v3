@@ -17,8 +17,8 @@
  *            使用中の loop イメージの unlink / 置き換えは BUSY
  *    dot   … 最終要素の "." / ".." (rmdir / rename 両引数 / unlink / mkdir)
  *    path  … 255/256 バイト、32/33 要素、相対パス + 長い cwd、mount prefix
- *    namerule … fs/vfs_name_rules.inc の表 (FAT / Win32 が意味を変える綴り)
- *    fatname  … 実物の fs/fat/fatfs_vfs.c + fs/fat/fatfs/ff.c (RAM の FAT12) で、
+ *    namerule … sys/fs/vfs_name_rules.inc の表 (FAT / Win32 が意味を変える綴り)
+ *    fatname  … 実物の sys/fs/fat/fatfs_vfs.c + sys/fs/fat/fatfs/ff.c (RAM の FAT12) で、
  *               "disk.img " / "d\img.dat" / "db." などを INVAL で断り、
  *               BUSY / pinned の実体が消えない・動かない (ラリー 2 blocker)
  *    fatroot  … (fatname の中) FAT を "/" にマウントして 253/254/255 バイト、
@@ -225,7 +225,7 @@ int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
     return IDE_OK;
 }
 
-/* ---- fs/vfs_fd.c の境界 ---- */
+/* ---- sys/fs/vfs_fd.c の境界 ---- */
 static int stdin_redirected;
 int fd_is_redirected(int fd) { (void)fd; return stdin_redirected; }
 u16 fd_redirect_ifmt(int fd, int *out_file_fd)
@@ -1256,11 +1256,11 @@ static int __cdecl f_vfs_sync(void) { return vfs_sync(); }
  * ext2_layout.c は hdd_pt_fake.h が取り込み済み。ここの段は install_packages と
  * report_missing_packages だけを回す (hd0 の手順の試験は test_hdd_stage2.py) */
 #include "../system/inst_hdd.c"
-#include "platform/pc98/install_target.c"
+#include "sys/platform/pc98/install_target.c"
 #include "../system/inst_disk.c"
-#include "platform/pc98/install_disk.c"
+#include "sys/platform/pc98/install_disk.c"
 #include "userland/shell/hdprep_plan.c"   /* -I のリポジトリ根から */
-#include "platform/pc98/install_plan.c"
+#include "sys/platform/pc98/install_plan.c"
 
 static void cdinst_setup(const char *set)
 {
@@ -1355,12 +1355,12 @@ static void case_cdinst(void)
 
 #ifndef FDP_RED
 /* ======================================================================== */
-/*  段 fatname: 実物の fs/fat/fatfs_vfs.c + fs/fat/fatfs/ff.c (RAM の FAT12) で、    */
+/*  段 fatname: 実物の sys/fs/fat/fatfs_vfs.c + sys/fs/fat/fatfs/ff.c (RAM の FAT12) で、    */
 /*  FatFs が「別の綴りを同じ名前」と読む名前を入口で断る (TASK_VFS_FD_PATH  */
 /*  実装レビュー ラリー 2 の blocker)。旧実装は vfs_rm("/fd0/disk.img ") が   */
 /*  BUSY の比較 (1 バイトの fold) をすり抜け、FatFs が DISK.IMG を消した。  */
 /*  段 hostname: Win32 の規則 (末尾の空白と '.'、'\') を合成ドライバで。     */
-/*  段 namerule: 規則そのもの (fs/vfs_name_rules.inc) の表。                 */
+/*  段 namerule: 規則そのもの (sys/fs/vfs_name_rules.inc) の表。                 */
 /* ======================================================================== */
 
 #include "fatfs/ff.h"
@@ -1412,7 +1412,7 @@ static void fat_clock_date(ClockDate *t)
 static void fat_clock_legacy(RTC_Time *t)
 { kmemset(t, 0, sizeof(*t)); t->year = 26; t->month = 10; t->day = 17; }
 static const ClockOps fat_clock = { fat_clock_date, fat_clock_legacy };
-#include "drivers/block/fdc_track.c"
+#include "sys/dev/block/fdc_track.c"
 #define disk_write fatwp_disk_write_impl
 #include "fat_diskio.c"   /* -I <木>/drivers/block (変異の写しが先に当たる) */
 #undef disk_write
@@ -1928,9 +1928,9 @@ static void case_fatname(void)
 }
 
 /* 合成ドライバ: ext2 の口の前に Win32 (HostDrv) の名前の入口検査を置く。
- * 実物の drivers/hostdrv/hostdrvfs.c はハイパーコールを叩くのでホストで組めない。
+ * 実物の sys/dev/hostdrv/hostdrvfs.c はハイパーコールを叩くのでホストで組めない。
  * 規則は同じ vfs_name_rule_check (配線は test_vfs_fd_path.py の hostwire 段が
- * drivers/hostdrv/hostdrvfs.c の本文で確かめる)。 */
+ * sys/dev/hostdrv/hostdrvfs.c の本文で確かめる)。 */
 static VfsOps g_win_ops;
 #define WIN_CHK(p) do { int r_ = vfs_name_rule_check((p), VFS_NAME_RULE_WIN32); \
                         if (r_ != VFS_OK) return r_; } while (0)

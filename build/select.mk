@@ -4,15 +4,15 @@ $(error unsupported PLATFORM $(PLATFORM))
 endif
 # 像の構成 (docs/design/build/select.md §3-1): 像が機能の値と順の式を決める。
 # PowerPC は旗 (KBOOT_*) でも像を選べるので、先に旗と IMAGE を突き合わせる。
-PPC_FLAGS_MK ?= build/images/ppc-flags.mk
+PPC_FLAGS_MK ?= sys/conf/images/ppc-flags.mk
 ifeq ($(ARCH),ppc)
 include $(PPC_FLAGS_MK)
 endif
 IMAGE ?= $(PLATFORM)
-ifeq ($(wildcard build/images/$(IMAGE).mk),)
+ifeq ($(wildcard sys/conf/images/$(IMAGE).mk),)
 $(error unknown IMAGE $(IMAGE))
 endif
-include build/images/$(IMAGE).mk
+include sys/conf/images/$(IMAGE).mk
 ifneq ($(ARCH)-$(PLATFORM),$(IMAGE_TARGET))
 $(error IMAGE $(IMAGE) is for $(IMAGE_TARGET), not $(ARCH)-$(PLATFORM))
 endif
@@ -40,9 +40,9 @@ ifeq ($(FEATURE_V86),1)
 ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
 $(error unsupported FEATURE_V86 on $(ARCH)-$(PLATFORM))
 endif
-include build/features/v86.mk
+include sys/conf/features/v86.mk
 else ifeq ($(FEATURE_EXEC),1)
-C_FEATURES += platform/none/legacy_guest.c
+C_FEATURES += sys/platform/none/legacy_guest.c
 endif
 FEATURE_X87 ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_X87))),1)
@@ -52,7 +52,7 @@ ifeq ($(FEATURE_X87),1)
 ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
 $(error unsupported FEATURE_X87 on $(ARCH)-$(PLATFORM))
 endif
-include build/features/x87.mk
+include sys/conf/features/x87.mk
 endif
 FEATURE_PC98_DEVICES ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_PC98_DEVICES))),1)
@@ -62,7 +62,7 @@ ifeq ($(FEATURE_PC98_DEVICES),1)
 ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
 $(error unsupported FEATURE_PC98_DEVICES on $(ARCH)-$(PLATFORM))
 endif
-include build/features/pc98-devices.mk
+include sys/conf/features/pc98-devices.mk
 endif
 FEATURE_GEFORCE ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_GEFORCE))),1)
@@ -72,7 +72,7 @@ ifeq ($(FEATURE_GEFORCE),1)
 ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
 $(error unsupported FEATURE_GEFORCE on $(ARCH)-$(PLATFORM))
 endif
-include build/features/geforce.mk
+include sys/conf/features/geforce.mk
 endif
 FEATURE_TRIDENT ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_TRIDENT))),1)
@@ -82,7 +82,7 @@ ifeq ($(FEATURE_TRIDENT),1)
 ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
 $(error unsupported FEATURE_TRIDENT on $(ARCH)-$(PLATFORM))
 endif
-include build/features/trident.mk
+include sys/conf/features/trident.mk
 endif
 FEATURE_CIRRUS ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_CIRRUS))),1)
@@ -92,7 +92,7 @@ ifeq ($(FEATURE_CIRRUS),1)
 ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
 $(error unsupported FEATURE_CIRRUS on $(ARCH)-$(PLATFORM))
 endif
-include build/features/cirrus.mk
+include sys/conf/features/cirrus.mk
 endif
 FEATURE_PCM ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_PCM))),1)
@@ -102,7 +102,7 @@ ifeq ($(FEATURE_PCM),1)
 ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
 $(error unsupported FEATURE_PCM on $(ARCH)-$(PLATFORM))
 endif
-include build/features/pcm.mk
+include sys/conf/features/pcm.mk
 endif
 FEATURE_FM ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_FM))),1)
@@ -112,7 +112,7 @@ ifeq ($(FEATURE_FM),1)
 ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
 $(error unsupported FEATURE_FM on $(ARCH)-$(PLATFORM))
 endif
-include build/features/fm.mk
+include sys/conf/features/fm.mk
 endif
 FEATURE_LAN ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_LAN))),1)
@@ -122,14 +122,14 @@ ifeq ($(FEATURE_LAN),1)
 ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
 $(error unsupported FEATURE_LAN on $(ARCH)-$(PLATFORM))
 endif
-include build/features/lan.mk
+include sys/conf/features/lan.mk
 endif
 FEATURE_KCG ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_KCG))),1)
 $(error invalid FEATURE_KCG)
 endif
 ifeq ($(FEATURE_KCG),1)
-include build/features/kcg.mk
+include sys/conf/features/kcg.mk
 endif
 FEATURE_CD ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_CD))),1)
@@ -139,14 +139,14 @@ ifeq ($(FEATURE_CD),1)
 ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
 $(error unsupported FEATURE_CD on $(ARCH)-$(PLATFORM))
 endif
-include build/features/cd.mk
+include sys/conf/features/cd.mk
 endif
 FEATURE_FEP ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_FEP))),1)
 $(error invalid FEATURE_FEP)
 endif
 ifeq ($(FEATURE_FEP),1)
-include build/features/fep.mk
+include sys/conf/features/fep.mk
 endif
 FEATURE_SQLITE ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_SQLITE))),1)
@@ -157,7 +157,7 @@ ifeq ($(FEATURE_SQLITE),1)
 ifneq ($(FEATURE_EXEC),1)
 $(error FEATURE_SQLITE requires FEATURE_EXEC)
 endif
-include build/features/sqlite.mk
+include sys/conf/features/sqlite.mk
 endif
 FEATURE_HWDEV ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_HWDEV))),1)
@@ -167,7 +167,7 @@ ifeq ($(FEATURE_HWDEV),1)
 ifneq ($(ARCH)-$(PLATFORM),x86-pc98)
 $(error unsupported FEATURE_HWDEV on $(ARCH)-$(PLATFORM))
 endif
-include build/features/hwdev.mk
+include sys/conf/features/hwdev.mk
 endif
 FEATURE_KDEBUG ?= $(DEFAULT_FEATURE_VALUE)
 ifneq ($(words $(filter 0 1,$(FEATURE_KDEBUG))),1)
@@ -178,9 +178,9 @@ ifeq ($(ARCH)-$(PLATFORM),ppc-powermac)
 ifneq ($(FEATURE_EXEC),1)
 $(error FEATURE_KDEBUG requires FEATURE_EXEC)
 endif
-C_FEATURES += kdebug/kdebug_module.c kernel/module/debug_probe.c
+C_FEATURES += sys/kern/kdebug/kdebug_module.c sys/kern/module/debug_probe.c
 else
-include build/features/kdebug.mk
+include sys/conf/features/kdebug.mk
 endif
 endif
 ifeq ($(FEATURE_V86),1)
@@ -251,7 +251,7 @@ C_COMMON_EXEC_HOOKS = $(if $(filter 1,$(FEATURE_EXEC)),$(C_COMMON_HOOKS_ABSENT))
 C_SELECTED = $(C_COMMON) $(C_COMMON_EXEC_HOOKS) $(C_ARCH) $(C_PLATFORM) $(C_FEATURES)
 ifeq ($(IMAGE_ORDER),kboot)
 # kboot の像: arch・platform の持ち物も像の機能ごとの組から選ぶ。リンクの並びは所有者集合の順
-# (arch/ppc/kernel.ld が入口を .text.entry で先頭に置くので、並びに意味は無い。順の一覧は持たない)。
+# (sys/arch/ppc/kernel.ld が入口を .text.entry で先頭に置くので、並びに意味は無い。順の一覧は持たない)。
 image_owned = $($(1)_CORE) $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$(FEATURE_$(f))),$($(1)_$(f)),$($(1)_NO$(f))))
 C_ARCH += $(call image_owned,C_ARCH)
 C_PLATFORM += $(call image_owned,C_PLATFORM)
@@ -272,7 +272,7 @@ ifeq ($(TICK_PROBE_BUILD),1)
 ifneq ($(ARCH)-$(PLATFORM)-$(FEATURE_KDEBUG),x86-pc98-1)
 $(error tick probe requires x86-pc98 kdebug)
 endif
-DIAGNOSTIC_TICK_PROBE_BUILD = kernel/time/tick_probe.c platform/pc98/snd_writer_probe.c
+DIAGNOSTIC_TICK_PROBE_BUILD = sys/kern/time/tick_probe.c sys/platform/pc98/snd_writer_probe.c
 endif
 # KNOWN_FEATURE_VARIABLES は今の 15 個のまま (build/targets/x86-pc98.mk の「0 があれば止める」が読む)。
 KNOWN_FEATURE_VARIABLES = $(addprefix FEATURE_,$(shell echo $(FEATURES) | tr 'a-z-' 'A-Z_'))

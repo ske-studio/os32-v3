@@ -1,6 +1,6 @@
-#include "../../drivers/pci/pci_locate.h"
-#include "../../kdebug/recover.h"
-#include "../../drivers/pci/pci.h"
+#include "../../sys/dev/pci/pci_locate.h"
+#include "../../sys/dev/video/geforce/diag/recover.h"
+#include "../../sys/dev/pci/pci.h"
 
 static u32 cfg[2][32][8];
 static u32 reads;

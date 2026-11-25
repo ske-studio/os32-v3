@@ -10,16 +10,16 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/tests'))
 import host32
 CHECK = dict(name='ppc-kboot-reserve', tier=2, budget=60, covers=[
-    'platform/powermac/via_tree.c', 'platform/powermac/via_window.h',
-    'platform/powermac/kboot_reserve.c', 'platform/powermac/kboot_capture.c',
-    'platform/powermac/gmac_tree.c',
-    'platform/powermac/kboot_info.h', 'platform/powermac/platform_kboot_layout.h',
+    'sys/platform/powermac/via_tree.c', 'sys/platform/powermac/via_window.h',
+    'sys/platform/powermac/kboot_reserve.c', 'sys/platform/powermac/kboot_capture.c',
+    'sys/platform/powermac/gmac_tree.c',
+    'sys/platform/powermac/kboot_info.h', 'sys/platform/powermac/platform_kboot_layout.h',
     'tools/ppc/kboot_reserve.py', 'tools/ppc/kboot_reserve_fake.c',
-    'tools/ppc/kboot_capture_fake.c', 'platform/powermac/ofw.h',
-    'platform/powermac/platform_of_layout.h', 'arch/ppc/ppc_boot.h',
-    'arch/ppc/ppc_pmap.h', 'arch/ppc/ppc_oea.h', 'include/memmap.h',
-    'include/types.h', 'include/callconv.h', 'lib/kstring.h',
-    'lib/kstring_c.c', 'tools/tests/host32.py', 'tools/ppc/kboot_layout.py', 'tools/ppc/kboot_root_image.py'])
+    'tools/ppc/kboot_capture_fake.c', 'sys/platform/powermac/ofw.h',
+    'sys/platform/powermac/platform_of_layout.h', 'sys/arch/ppc/ppc_boot.h',
+    'sys/arch/ppc/ppc_pmap.h', 'sys/arch/ppc/ppc_oea.h', 'sys/include/memmap.h',
+    'sys/include/types.h', 'sys/include/callconv.h', 'sys/kern/kstring.h',
+    'sys/kern/kstring_c.c', 'tools/tests/host32.py', 'tools/ppc/kboot_layout.py', 'tools/ppc/kboot_root_image.py'])
 MUTATIONS = [
     ('ignore-hole', 'if (r->v[i].start>first) return 0;', 'if (0) return 0;', {17: (77, 'CR0'), 1: (77, 'CR0'), 6: (77, 'CR0'), 7: (77, 'CR0'), 11: (77, 'CR0'), 15: (77, 'CR0')}),
     ('image-unowned', 'if (r->start<end && r->start+r->size>first)',
@@ -48,9 +48,9 @@ def exercise(directory, source, expected, end=0x300000, cases=range(18)):
                     '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie',
                     '-fno-stack-protector', '-nostdlib', '-nostdinc', '-static', f'-DRESIDENT_END={end}U', '-D__cdecl=',
                     *['-I'+str(ROOT / p) for p in ('platform/powermac', 'arch/ppc', 'include', 'lib')],
-                    str(source), str(ROOT / 'platform/powermac/kboot_capture.c'),
-                    str(ROOT / 'platform/powermac/gmac_tree.c'), str(ROOT / 'platform/powermac/via_tree.c'),
-                    str(fixture), str(ROOT / 'lib/kstring_c.c'),
+                    str(source), str(ROOT / 'sys/platform/powermac/kboot_capture.c'),
+                    str(ROOT / 'sys/platform/powermac/gmac_tree.c'), str(ROOT / 'sys/platform/powermac/via_tree.c'),
+                    str(fixture), str(ROOT / 'sys/kern/kstring_c.c'),
                     '-Wl,--defsym,__kernel_image_start=0x100000',
                     f'-Wl,--defsym,__kernel_resident_end={end}', '-o', str(exe)],
                    check=True, timeout=60)
@@ -76,7 +76,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--product', type=Path, help='use linked product layout in OF fixtures')
     args = parser.parse_args()
-    product = ROOT / 'platform/powermac/kboot_reserve.c'
+    product = ROOT / 'sys/platform/powermac/kboot_reserve.c'
     with tempfile.TemporaryDirectory(prefix='kboot-reserve-') as temp:
         directory = Path(temp)
         exercise(directory, product, {})

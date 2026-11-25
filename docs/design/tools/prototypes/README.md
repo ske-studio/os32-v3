@@ -4,6 +4,6 @@
 
 ### cirrus_imports
 
-tools/prototypes/cirrus_imports.def の contracts に include/gfx_mode.h を追加する。
+tools/prototypes/cirrus_imports.def の contracts に sys/include/gfx_mode.h を追加する。
 
 > [要確認: 計画の時制?]

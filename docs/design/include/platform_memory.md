@@ -1,6 +1,6 @@
-# include/platform_memory.h — 設計
+# sys/include/platform_memory.h — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_C_DESIGN (D1 で移した)
-ソース: `include/platform_memory.h`
+ソース: `sys/include/platform_memory.h`
 
 内部専用、全区間は半開区間
 
@@ -20,5 +20,5 @@ struct platform_memory_attributes {
 ```
 
 - 実装では3をヘッダの配列長定数に集約（新規番地定数は作らない）。PWT=0を維持し、WB/UCの再解釈をしない。
-- 固定名ヘッダはplatform_io.hと同じ寄せ方で正典ヘッダを内部includeし、include/platform_memory.h経由で参照する。
+- 固定名ヘッダはplatform_io.hと同じ寄せ方で正典ヘッダを内部includeし、sys/include/platform_memory.h経由で参照する。
 .cに外部実体は置かない。

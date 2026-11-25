@@ -1,7 +1,7 @@
 /* Shared CUI/GUI terminal entry for layer-2 serial acceptance. */
 #include "shell.h"
-#include "../../kdebug/gf_command_wire.h"
-#include "../../hwdev/gf/feature5.h"
+#include "../../sys/dev/video/geforce/diag/gf_command_wire.h"
+#include "../../sys/dev/video/geforce/feature5.h"
 
 #define GF2_KAPI_MIN 78U
 

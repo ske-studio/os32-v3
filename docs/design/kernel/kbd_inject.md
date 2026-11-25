@@ -1,7 +1,7 @@
-# kernel/kbd_inject.c — 設計
+# sys/kern/kbd_inject.c — 設計
 
 > 状態: **現行 (2026-11-18)** — 出所: TASK_K7_input (§1 D1〜D7、§5 R1・R2・B・C・D) の契約を今のソースと照らして要約
-ソース: `kernel/kbd_inject.c`・`include/kbd_inject.h`
+ソース: `sys/kern/kbd_inject.c`・`sys/include/kbd_inject.h`
 
 GUI 中の打鍵の注入リング。GUI 中は IRQ1 が raw リングにしか積まず、打鍵は WM (gshell) が受けてフォーカス窓の端末アプリへ配る。端末アプリはそれを UTF-8 のバイト列のまま `kbd_inject` で積み、GUI 中の `kbd_getchar`・`kbd_getkey` (と、その待ちから起こされた `exec_resume`) はこのリングだけを読む。
 
@@ -42,8 +42,8 @@ GUI 中の打鍵の注入リング。GUI 中は IRQ1 が raw リングにしか�
 
 ## 自己試験
 
-`kdebug/selftest_kbd_inject.c` の `kst_kbd_inject()` は、ブート時にリングと `kbd_inject_drop_count` を保存して試し、元に戻す。ホスト試験でも同じものを呼び、ビットマスク 0 と、終わった後のリングが空・捨てた累計が戻っていることを見る。
+`sys/kern/kdebug/selftest_kbd_inject.c` の `kst_kbd_inject()` は、ブート時にリングと `kbd_inject_drop_count` を保存して試し、元に戻す。ホスト試験でも同じものを呼び、ビットマスク 0 と、終わった後のリングが空・捨てた累計が戻っていることを見る。
 
 ## 検査
 
-`tools/tests/test_kbd_inject.py` (`kbd_inject_host.c`)。`kernel/kbd_inject.c` と `kernel/console/con_sink.c` を同じ翻訳単位に取り込み、読み手の確立は本物の `con_sink_read()` で行う。park・resume の側は `docs/design/exec/appslot_transition.md`。
+`tools/tests/test_kbd_inject.py` (`kbd_inject_host.c`)。`sys/kern/kbd_inject.c` と `sys/kern/console/con_sink.c` を同じ翻訳単位に取り込み、読み手の確立は本物の `con_sink_read()` で行う。park・resume の側は `docs/design/exec/appslot_transition.md`。

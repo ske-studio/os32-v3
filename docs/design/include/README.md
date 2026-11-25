@@ -15,7 +15,7 @@ DMA プールは 64KB 整列、ISA の 16MB 未満・境界は割当条件 (`dma
 
 ### pcm_contract
 
-`include/pcm_contract.h`
+`sys/include/pcm_contract.h`
 利用側が要る型/公開状態値/関数宣言だけ
 ハードレジスタ・PCMシーケンサ内部構造は移さない。
 
@@ -53,16 +53,16 @@ void platform_host_owner_exit(int owner);
 
 ### kcg_contract
 
-KCGの共通宣言を `include/kcg_contract.h` に分離
+KCGの共通宣言を `sys/include/kcg_contract.h` に分離
 読み出しKAPIの寸法定数も同契約へ。
 
 ### pci_dev_contract
 
-`include/pci_dev_contract.h` (struct pci_dev と PCI_DEV_STRUCT_SIZE などの公開定数だけ、drivers/pci/pci.h が読む)
+`sys/include/pci_dev_contract.h` (struct pci_dev と PCI_DEV_STRUCT_SIZE などの公開定数だけ、sys/dev/pci/pci.h が読む)
 
 ### pci_bind_contract
 
-`include/pci_bind_contract.h` (struct pci_driver・struct pci_bind_info などの bind と診断の型、drivers/net/e82557/lan_module.c・platform/pc98 の機種の配線・kapi の診断が読む)
+`sys/include/pci_bind_contract.h` (struct pci_driver・struct pci_bind_info などの bind と診断の型、sys/dev/net/e82557/lan_module.c・platform/pc98 の機種の配線・kapi の診断が読む)
 
 ### platform_sys
 
@@ -110,7 +110,7 @@ typedef struct PointerOps {
 } PointerOps;
 ```
 
-- `MouseState`（i16×4+u8×2=10B）、ボタン・モード・カーソルの公開値は `include/pointer_service.h` へ。ドライバ内部のバスマウス/NP21操作は移さない。
+- `MouseState`（i16×4+u8×2=10B）、ボタン・モード・カーソルの公開値は `sys/hal/input/pointer_service.h` へ。ドライバ内部のバスマウス/NP21操作は移さない。
 
 ### port_service
 
@@ -128,7 +128,7 @@ typedef struct PortOps {
 ### kbd
 
 ```c
-/* include/kbd.h: 共通キー値・SHIFT_*・RAW_*のみ。driverをincludeしない。 */
+/* sys/include/kbd.h: 共通キー値・SHIFT_*・RAW_*のみ。driverをincludeしない。 */
 ```
 
 ### bootinfo
@@ -157,9 +157,9 @@ u8 con_backend_printf_attr(u8 input); /* 純粋変換、通常raw属性とは別
 
 - raw_attrは無変換。kprintfだけ従来どおり変換してからsink等へ渡す。shell入力や障害属性を二重変換しない。
 
-属性の口の宣言は **include/console_attr.h** に置く
-lib/kprintf_attr.c は `#include "console_attr.h"`。
-kernel/console/console_backend.h は L16b の grid・カーソルの口だけを持ち、属性の口は include/console_attr.h を読む。
+属性の口の宣言は **sys/include/console_attr.h** に置く
+sys/kern/kprintf_attr.c は `#include "console_attr.h"`。
+sys/kern/console/console_backend.h は L16b の grid・カーソルの口だけを持ち、属性の口は sys/include/console_attr.h を読む。
 
 ### platform_display
 
@@ -182,13 +182,13 @@ void platform_splash_clear_pages(void);
 
 ### kbd_inject
 
-drop 観測変数の既存実体はカーネルに残し、宣言を `include/kbd_inject.h` に置いて GETTER/SETTER を生成する。
+drop 観測変数の既存実体はカーネルに残し、宣言を `sys/include/kbd_inject.h` に置いて GETTER/SETTER を生成する。
 
 ### config
 
 | 候補 | 決定と理由 |
 |---|---|
-| include/config.h の SYS_VERSION | 採用。機械が読む唯一の製品版。確定値は `3.0-dev`（§8） |
+| sys/include/config.h の SYS_VERSION | 採用。機械が読む唯一の製品版。確定値は `3.0-dev`（§8） |
 | VERSIONS.md | 系列・リリース判断の説明。製品版文字列の抽出元にせず、SYS_VERSION を参照すると明記 |
 | ビルド生成 | 製品版については不要。config.h への通常の依存でカーネルを再構築 |
 | git タグ／describe | リリース照合には使えるが、浅い clone・タグなしで表示が変わるため値の供給元にしない |
@@ -208,18 +208,18 @@ drop 観測変数の既存実体はカーネルに残し、宣言を `include/kb
 
 ## 索引
 
-- [include/clock_service.h](clock_service.md)
-- [include/console_output.h](console_output.md)
+- [sys/hal/time/clock_service.h](clock_service.md)
+- [sys/include/console_output.h](console_output.md)
 - [gf_production.md](gf_production.md)
-- [include/gfx_format.h](gfx_format.md)
-- [include/gfx_hal.h](gfx_hal.md)
-- [include/gfx_mode.h](gfx_mode.md)
-- [include/input_service.h](input_service.md)
+- [sys/include/gfx_format.h](gfx_format.md)
+- [sys/include/gfx_hal.h](gfx_hal.md)
+- [sys/include/gfx_mode.h](gfx_mode.md)
+- [sys/hal/input/input_service.h](input_service.md)
 - [io.md](io.md)
-- [include/kselftest_probe.h](kselftest_probe.md)
-- [include/memmap.h](memmap.md)
-- [include/pegc.h](pegc.md)
-- [include/platform_device.h](platform_device.md)
-- [include/platform_memory.h](platform_memory.md)
+- [sys/include/kselftest_probe.h](kselftest_probe.md)
+- [sys/include/memmap.h](memmap.md)
+- [sys/platform/pc98/pegc.h](pegc.md)
+- [sys/include/platform_device.h](platform_device.md)
+- [sys/include/platform_memory.h](platform_memory.md)
 - [platform_splash.h.md](platform_splash.h.md)
 - [video_service.md](video_service.md)

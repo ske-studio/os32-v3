@@ -1,8 +1,8 @@
 /* Freestanding test of the actual transfer with fake memory and safe point. */
 #include "gfx_hal.h"
-#include "hwdev/gfinit_mode.h"
+#include "sys/dev/video/geforce/gfinit_mode.h"
 GfxCounters gfx_counters;
-#include "../../drivers/video/geforce/gf_present.c"
+#include "../../sys/dev/video/geforce/gf_present.c"
 
 #define SOURCE_PITCH (GF_MODE_WIDTH + 7U)
 #define DISPLAY_PITCH (GF_MODE_WIDTH + 11U)

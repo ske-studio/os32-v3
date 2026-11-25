@@ -10,8 +10,8 @@ from kernel_includes import include_flags
 from mutpar import build_in_tree
 
 CHECK = dict(name='gfx-policy-host', tier=1, needs=[], budget=15, covers=[
-    'gfx/gfx_policy.c', 'gfx/gfx_policy.h', 'gfx/gfx_internal.h', 'gfx/gfx.h',
-    'include/gfx_hal.h', 'include/con_sink.h', 'mm/pgalloc.h', 'exec/appslot.h',
+    'sys/hal/gfx/gfx_policy.c', 'sys/hal/gfx/gfx_policy.h', 'sys/hal/gfx/gfx_internal.h', 'sys/hal/gfx/gfx.h',
+    'sys/include/gfx_hal.h', 'sys/include/con_sink.h', 'sys/kern/mm/pgalloc.h', 'sys/kern/exec/appslot.h',
     'tools/tests/gfx_policy_host.c', 'tools/tests/test_gfx_policy.py',
     'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
     basis=['GFX_ACCEL_HAL_DESIGN §3-4'],
@@ -48,7 +48,7 @@ def run_case(folder, runner, mutation=None):
     edits = {}
     if mutation:
         name, old, new = mutation
-        path = "gfx/gfx_policy.c"
+        path = "sys/hal/gfx/gfx_policy.c"
         source = (ROOT / path).read_text()
         assert source.count(old) == 1, name
         edits[path] = source.replace(old, new)
@@ -58,7 +58,7 @@ def run_case(folder, runner, mutation=None):
                '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
                *include_flags(ROOT),
                str(ROOT / 'tools/tests/gfx_policy_host.c'),
-               str(ROOT / 'gfx/gfx_policy.c'), '-o', str(exe)]
+               str(ROOT / 'sys/hal/gfx/gfx_policy.c'), '-o', str(exe)]
     build_in_tree(ROOT, folder, edits, [command])
     result = host32.run([str(exe)], runner=runner, capture_output=True, text=True)
     assert result.returncode == (1 if mutation else 0), result

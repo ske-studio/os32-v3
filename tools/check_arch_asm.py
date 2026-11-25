@@ -79,7 +79,7 @@ def main():
     except RuntimeError as e:
         errors.append('clang parse failure: ' + str(e))
     for rel,ln,mn in sorted(hits):
-        print(f'{rel}:{ln}: inline asm `{mn}`; use include/io.h')
+        print(f'{rel}:{ln}: inline asm `{mn}`; use sys/include/io.h')
     for e in errors:
         print(e)
     print(f'arch asm: {len(hits)} violations; {len(errors)} parse failures')

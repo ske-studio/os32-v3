@@ -14,9 +14,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def run(runner, mutation=None):
-    service = (ROOT / 'kernel/input_service.c').read_text()
-    bind = (ROOT / 'platform/pc98/d2_bind.c').read_text()
-    wrappers = (ROOT / 'kapi/kapi_generated.c').read_text()
+    service = (ROOT / 'sys/hal/input/input_service.c').read_text()
+    bind = (ROOT / 'sys/platform/pc98/d2_bind.c').read_text()
+    wrappers = (ROOT / 'sys/kapi/kapi_generated.c').read_text()
     spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
     entries = [(i, e) for i, e in enumerate(spec['api'])
                if e.get('target', '').startswith('input_')]
@@ -101,7 +101,7 @@ def run(runner, mutation=None):
         call = f'wrap_{name}({call_args})'
         port_checks.append((f'CHECK({call} == {result});' if result else call + ';') +
                            f'CHECK({check} && hit == {slot});')
-    port_source = (ROOT / 'kapi/kapi_port.c').read_text()
+    port_source = (ROOT / 'sys/kapi/kapi_port.c').read_text()
     diag_body = re.search(r'^int kapi_serial_diag\([^\n]*\)\n\{.*?^\}', port_source, re.M | re.S)
     assert diag_body
     port_selected.insert(0, diag_body[0])
@@ -122,7 +122,7 @@ def run(runner, mutation=None):
     elif mutation == 'target':
         assert 'input_getchar_kapi()' in selected[1]
         selected[1] = selected[1].replace('input_getchar_kapi()', 'kbd_getchar_kapi()')
-    rtc = (ROOT / 'drivers/char/rtc.c').read_text()
+    rtc = (ROOT / 'sys/dev/char/rtc.c').read_text()
     adapter = rtc[rtc.index('static void pc98_read_date('):]
     if mutation == 'clock_pivot':
         assert 'time.year < RTC_YEAR_PIVOT' in adapter
@@ -132,23 +132,23 @@ def run(runner, mutation=None):
     clock_wrapper = re.search(r'^void __cdecl wrap_rtc_read\([^\n]*\)\n\{.*?^\}', wrappers, re.M | re.S)
     assert clock_wrapper
     sys_time = re.search(r'^os_time_t sys_time\(void\)\n\{.*?^\}',
-                         (ROOT / 'kernel/sys.c').read_text(), re.M | re.S)
-    diskio = (ROOT / 'drivers/block/fat_diskio.c').read_text()
+                         (ROOT / 'sys/kern/sys.c').read_text(), re.M | re.S)
+    diskio = (ROOT / 'sys/dev/block/fat_diskio.c').read_text()
     fattime = re.search(r'^DWORD get_fattime\(void\)\n\{.*?^\}', diskio, re.M | re.S)
     assert sys_time and fattime
     constants = '\n'.join(re.findall(r'^#define DOS_.*$', diskio, re.M))
     with tempfile.TemporaryDirectory(prefix='d2-input-') as directory:
         work = Path(directory)
         fixture = (ROOT / 'tools/tests/d2_services_host.c').read_text()
-        fixture = fixture.replace('#include "../../kernel/input_service.c"', service)
-        fixture = fixture.replace('#include "../../platform/pc98/d2_bind.c"', bind)
-        fixture = fixture.replace('#include "../../drivers/input/kbd.h"', '#include "' + str(ROOT / 'drivers/input/kbd.h') + '"')
-        fixture = fixture.replace('#include "../../drivers/input/mouse.h"', '#include "' + str(ROOT / 'drivers/input/mouse.h') + '"')
+        fixture = fixture.replace('#include "../../sys/hal/input/input_service.c"', service)
+        fixture = fixture.replace('#include "../../sys/platform/pc98/d2_bind.c"', bind)
+        fixture = fixture.replace('#include "../../sys/platform/pc98/input/kbd.h"', '#include "' + str(ROOT / 'sys/platform/pc98/input/kbd.h') + '"')
+        fixture = fixture.replace('#include "../../sys/platform/pc98/input/mouse.h"', '#include "' + str(ROOT / 'sys/platform/pc98/input/mouse.h') + '"')
         fixture = fixture.replace('#include \"pointer_fixture_host.h\"', '#include \"' + str(ROOT / 'tools/tests/pointer_fixture_host.h') + '\"')
         fixture = fixture.replace('#include "port_fixture_host.h"', '#include "' + str(ROOT / 'tools/tests/port_fixture_host.h') + '"')
-        fixture = fixture.replace('#include "../../drivers/char/serial.h"', '#include "' + str(ROOT / 'drivers/char/serial.h') + '"')
+        fixture = fixture.replace('#include "../../sys/dev/char/serial.h"', '#include "' + str(ROOT / 'sys/dev/char/serial.h') + '"')
         fixture = fixture.replace('#include "clock_fixture_host.h"', '#include "' + str(ROOT / 'tools/tests/clock_fixture_host.h') + '"')
-        fixture = fixture.replace('#include "../../drivers/char/rtc.h"', '#include "' + str(ROOT / 'drivers/char/rtc.h') + '"')
+        fixture = fixture.replace('#include "../../sys/dev/char/rtc.h"', '#include "' + str(ROOT / 'sys/dev/char/rtc.h') + '"')
         (work / 'clock_adapter.inc').write_text(adapter)
         (work / 'clock_consumers.inc').write_text('typedef u32 DWORD;\n' + constants + '\n' + sys_time[0] + '\n' + fattime[0])
         (work / 'clock_wrapper.inc').write_text(f'#define CLOCK_SLOT {clock_slot}\n' + clock_wrapper[0])
@@ -157,7 +157,7 @@ def run(runner, mutation=None):
         (work / 'input_wrappers.inc').write_text(helper + '\n'.join(selected))
         (work / 'input_wrapper_checks.inc').write_text('\n'.join(checks))
         shift = re.search(r'^u8 fep_kbd_shift_state\(void\).*$',
-                          (ROOT / 'kernel/ime/fep_module.c').read_text(), re.M)
+                          (ROOT / 'sys/kern/ime/fep_module.c').read_text(), re.M)
         assert shift
         (work / 'input_shift.inc').write_text(shift[0])
         (work / 'port_wrappers.inc').write_text('\n'.join(port_selected))
@@ -177,27 +177,27 @@ def run(runner, mutation=None):
 
 
 def contracts():
-    boot = (ROOT / 'platform/pc98/kernel.c').read_text()
+    boot = (ROOT / 'sys/platform/pc98/kernel.c').read_text()
     assert re.search(r'kstack_hw_init\(\);\s*pc98_boot_bind\(&boot, boot_drive\);', boot)
-    platform = (ROOT / 'platform/pc98/boot.c').read_text()
+    platform = (ROOT / 'sys/platform/pc98/boot.c').read_text()
     assert '    pc98_d2_bind();' in platform
     assert boot.index('pc98_boot_bind(&boot, boot_drive);') < boot.index('boot_platform_run(BOOT_INPUT, &boot);')
-    for name in ('fs/vfs_fd.c', 'exec/exec.c', 'kernel/gui.c', 'kernel/ime/fep_module.c'):
+    for name in ('sys/fs/vfs_fd.c', 'sys/kern/exec/exec.c', 'sys/kern/gui.c', 'sys/kern/ime/fep_module.c'):
         source = read_text(ROOT / name)
         assert '#include "input_service.h"' in source
         assert not re.search(r'#include.*drivers/(kbd|mouse)\.h', source)
         code = re.sub(r'/\*.*?\*/|//[^\n]*', '', source, flags=re.S)
         assert not re.search(r'\bkbd_(?:getchar|getkey|set_gui_mode|discard_stop)\s*\(', code)
-    for name, header in (('kernel/ime/ime.c', 'kbd_contract.h'),
-                         ('kdebug/kselftest.c', '../drivers/input/kbd.h')):
+    for name, header in (('sys/kern/ime/ime.c', 'kbd_contract.h'),
+                         ('sys/platform/pc98/kdebug/kselftest.c', '../drivers/input/kbd.h')):
         assert '#include "' + header + '"' in read_text(ROOT / name)
-    assert '#include "../../drivers/input/mouse.h"' in platform
-    assert 'drivers/input/mouse.h' not in boot and 'drivers/input/kbd.h' not in boot
-    assert '#include "../../include/pointer_service.h"' in (ROOT / 'drivers/input/mouse.h').read_text()
-    assert 'drivers/' not in (ROOT / 'include/pointer_service.h').read_text()
-    common = (ROOT / 'include/kbd.h').read_text()
+    assert '#include "../../sys/platform/pc98/input/mouse.h"' in platform
+    assert 'sys/platform/pc98/input/mouse.h' not in boot and 'sys/platform/pc98/input/kbd.h' not in boot
+    assert '#include "../../sys/hal/input/pointer_service.h"' in (ROOT / 'sys/platform/pc98/input/mouse.h').read_text()
+    assert 'drivers/' not in (ROOT / 'sys/hal/input/pointer_service.h').read_text()
+    common = (ROOT / 'sys/include/kbd.h').read_text()
     assert 'drivers/' not in common and 'kbd_init' not in common and 'KBD_DATA' not in common
-    assert '#include "../../include/kbd.h"' in (ROOT / 'drivers/input/kbd.h').read_text()
+    assert '#include "../../sys/include/kbd.h"' in (ROOT / 'sys/platform/pc98/input/kbd.h').read_text()
     # The common header must resolve without the drivers include search path.
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-Werror', '-fsyntax-only', '-x', 'c',
                     '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'sdk/include/os32'), '-'],
@@ -206,15 +206,15 @@ def contracts():
         obj = Path(directory) / 'input_service.o'
         subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie',
                         *include_flags(ROOT),
-                        '-c', str(ROOT / 'kernel/input_service.c'), '-o', str(obj)], check=True)
+                        '-c', str(ROOT / 'sys/hal/input/input_service.c'), '-o', str(obj)], check=True)
         symbols = subprocess.check_output(['nm', '-u', str(obj)], text=True)
         assert not symbols.strip(), symbols
-    bind = (ROOT / 'platform/pc98/d2_bind.c').read_text()
+    bind = (ROOT / 'sys/platform/pc98/d2_bind.c').read_text()
     for registration in ('port_register(&pc98_port);', 'con_output_register(&pc98_console_output);'):
         assert registration in bind
     assert 'const EmergencyOps emergency_output' in bind
-    for name in ('kernel/console/console.c', 'kernel/ver_collect.c', 'kapi/kapi_port.c',
-                 'exec/exec.c', 'arch/x86/kernel/isr_handlers.c', 'arch/x86/kernel/double_fault.c'):
+    for name in ('sys/kern/console/console.c', 'sys/kern/ver_collect.c', 'sys/kapi/kapi_port.c',
+                 'sys/kern/exec/exec.c', 'sys/arch/x86/kernel/isr_handlers.c', 'sys/arch/x86/kernel/double_fault.c'):
         source = read_text(ROOT / name)
         assert not re.search(r'#include[^\n]*["/]serial\.h"', source), name
     for header in ('port_service.h', 'console_output.h'):
@@ -224,17 +224,17 @@ def contracts():
             obj = Path(directory) / (source + '.o')
             subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie',
                             *include_flags(ROOT), '-c',
-                            str(ROOT / ('kernel/time/clock_service.c' if source == 'clock_service' else 'kernel/' + source + '.c')), '-o', str(obj)], check=True)
+                            str(ROOT / ('sys/hal/time/clock_service.c' if source == 'clock_service' else 'kernel/' + source + '.c')), '-o', str(obj)], check=True)
             symbols = subprocess.check_output(['nm', '-u', str(obj)], text=True)
             allowed = {'port_service': ['ring3_abort_check', 'ring3_wait_pending'],
                        'serial_diag': ['emergency_output'], 'clock_service': []}
             assert symbols.split() == [part for name in allowed[source] for part in ('U', name)], symbols
     assert 'clock_register(&pc98_clock);' in bind
-    for name in ('kernel/sys.c', 'drivers/block/fat_diskio.c'):
+    for name in ('sys/kern/sys.c', 'sys/dev/block/fat_diskio.c'):
         source = read_text(ROOT / name)
         assert '#include "clock_service.h"' in source
         assert 'RTC_YEAR_' not in source and 'rtc_read(' not in source
-    assert 'drivers/' not in (ROOT / 'include/clock_service.h').read_text()
+    assert 'drivers/' not in (ROOT / 'sys/hal/time/clock_service.h').read_text()
     print('PASS D2 A/B/C dependency, symbols and boot wiring contracts')
 
 
@@ -261,10 +261,10 @@ def generation_contract():
         source.write_text(json.dumps(spec))
         old = generate()
         for name, data in first.items():
-            if name != 'kapi/kapi_generated.c':
+            if name != 'sys/kapi/kapi_generated.c':
                 assert old[name] == data, name
-        assert b'clock_read_legacy((RTC_Time *)rtc_time);' in first['kapi/kapi_generated.c']
-        assert b'rtc_read((RTC_Time *)rtc_time);' in old['kapi/kapi_generated.c']
+        assert b'clock_read_legacy((RTC_Time *)rtc_time);' in first['sys/kapi/kapi_generated.c']
+        assert b'rtc_read((RTC_Time *)rtc_time);' in old['sys/kapi/kapi_generated.c']
     print('PASS D2 clock generator target-only change and repeat generation')
 
 if __name__ == '__main__':

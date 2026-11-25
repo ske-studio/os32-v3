@@ -34,7 +34,7 @@ OS32カーネルは内蔵シェルを持たず、起動時に外部プログラ�
 | `os32gui` | `os32gui [on\|off]` | GUI シェル (/bin/gshell.bin) へ切り替え / 起動時 GUI の既定を `/etc/system.cfg` に書く (GUI v1.1 K4) |
 | `gfxmode` | `gfxmode pc98\|pegc\|cirrus\|auto` | 次回起動のグラフィクスバックエンドを `/etc/system.cfg` の `GFX=` に書く (GUI v1.1 H2b) |
 | `kdebug` | `kdebug [on\|off]` | 設定値と部品の実状態を表示 / 次回起動の `KDEBUG=1`・`0` を `/etc/system.cfg` に書く (KAPI v75) |
-| `peek` | `peek [-k\|-p\|-m] [-w1\|-w2\|-w4] [-l[<mac>]\|--lan] addr [len]` | kdebug 部品でメモリを読んで 16 進で出す (`KDEBUG=1` のときだけ、読むだけ、KAPI v78 `kdebug_call`)。番地空間・拒否は [kpeek.c](../kdebug/kpeek.c)、ホストの採取・照合は [rshell_peek.py](../tools/rshell_peek.py) 冒頭 |
+| `peek` | `peek [-k\|-p\|-m] [-w1\|-w2\|-w4] [-l[<mac>]\|--lan] addr [len]` | kdebug 部品でメモリを読んで 16 進で出す (`KDEBUG=1` のときだけ、読むだけ、KAPI v78 `kdebug_call`)。番地空間・拒否は [kpeek.c](../sys/platform/pc98/kdebug/kpeek.c)、ホストの採取・照合は [rshell_peek.py](../tools/rshell_peek.py) 冒頭 |
 | `kbdstat` | `kbdstat [-w]` | キーボード 8251 の診断カウンタ (IRQ1 回数・空 IRQ・エラー・オーバーラン・起動時の 0043h・書いたコマンド語・直近のステータスとスキャンコード・いまの 0043h) を 1 行で。KAPI v62 `kbd_diag`。**`-w`** は受信 1 バイトごとの行 (`seq` / 生の `code` と make・break / 処理後の修飾) を ESC か 30 秒まで出し続ける (KAPI v67 `kbd_diag_log`、seq が飛べば `LOST` 行)。rshell から読める。読み方は [POLICY_DEBUG §4-57](POLICY_DEBUG.md#4-57-キーボード-8251-の信号線) |
 
 **GeForce の CUI 受入** (`cmd_gf1.c` / `cmd_gf2.c`、`kdebug_call`):
@@ -52,7 +52,7 @@ CTRL+STOP・fault は既存の owner 回収から退場する。
 `save` / `restore` / `free`、`poll` / `wait` / `last-rc`。
 引数は既存の診断 operand 0〜7へ、`gf2 feature arg-lo <番号> <下位16bit>` と
 `gf2 feature arg-hi <番号> <上位16bit>` で十進数を設定する。各 operand の意味は
-[wire 定義](../kdebug/gf_command_wire.h)、受入条件は
+[wire 定義](../sys/dev/video/geforce/diag/gf_command_wire.h)、受入条件は
 [層5設計 §10](decisions/realhw/GF_FEAT5_DESIGN.md#10-受入--試験と変異)を参照。
 例えば `gf2 enter` → `gf2 feature therm` → `gf2 feature save` →
 `gf2 feature restore` → `gf2 feature free` → `gf2 leave`。

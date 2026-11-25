@@ -4,7 +4,7 @@
 
 ### io_restrict_decode.inc
 
-ソース: `kdebug/gfinit_op/io_restrict_decode.inc`
+ソース: `sys/dev/video/geforce/gfinit_op/io_restrict_decode.inc`
 
 | opcode / 名称 | 件数 | 意味・OS32実装 | MIT根拠 |
 | --- | --- | --- | --- |
@@ -15,7 +15,7 @@
 | --- | --- |
 | 32 IO_RESTRICT_PROG | 11+4n：p16@1,i8@3,m8@4,s8@5,n8@6,d32@7,値32[]@11 |
 
-> [要確認] 現行は診断も hwdev/gf/runner.c を使い、main 境界の 5 node を生成する。原文の静的展開・ordinal・verify 規則を現行実装と同一とは扱えない。
+> [要確認] 現行は診断も sys/dev/video/geforce/runner.c を使い、main 境界の 5 node を生成する。原文の静的展開・ordinal・verify 規則を現行実装と同一とは扱えない。
 
 | op / 名前 | 長さ・復号配置（+offset） |
 | --- | --- |
@@ -23,7 +23,7 @@
 
 ### repeat_decode.inc
 
-ソース: `kdebug/gfinit_op/repeat_decode.inc`
+ソース: `sys/dev/video/geforce/gfinit_op/repeat_decode.inc`
 
 | opcode / 名称 | 件数 | 意味・OS32実装 | MIT根拠 |
 | --- | --- | --- | --- |
@@ -35,7 +35,7 @@
 
 ### copy_decode.inc
 
-ソース: `kdebug/gfinit_op/copy_decode.inc`
+ソース: `sys/dev/video/geforce/gfinit_op/copy_decode.inc`
 
 | opcode / 名称 | 件数 | 意味・OS32実装 | MIT根拠 |
 | --- | --- | --- | --- |
@@ -49,7 +49,7 @@
 
 ### condition_decode.inc
 
-ソース: `kdebug/gfinit_op/condition_decode.inc`
+ソース: `sys/dev/video/geforce/gfinit_op/condition_decode.inc`
 
 | opcode / 名称 | 件数 | 意味・OS32実装 | MIT根拠 |
 | --- | --- | --- | --- |
@@ -65,7 +65,7 @@
 
 ### pll2_zm_reg_decode.inc
 
-ソース: `kdebug/gfinit_op/pll2_zm_reg_decode.inc`
+ソース: `sys/dev/video/geforce/gfinit_op/pll2_zm_reg_decode.inc`
 
 | opcode / 名称 | 件数 | 意味・OS32実装 | MIT根拠 |
 | --- | --- | --- | --- |
@@ -79,7 +79,7 @@
 
 ### cr_index_address_latched_decode.inc
 
-ソース: `kdebug/gfinit_op/cr_index_address_latched_decode.inc`
+ソース: `sys/dev/video/geforce/gfinit_op/cr_index_address_latched_decode.inc`
 
 | opcode / 名称 | 件数 | 意味・OS32実装 | MIT根拠 |
 | --- | --- | --- | --- |
@@ -91,7 +91,7 @@
 
 ### cr_decode.inc
 
-ソース: `kdebug/gfinit_op/cr_decode.inc`
+ソース: `sys/dev/video/geforce/gfinit_op/cr_decode.inc`
 
 | opcode / 名称 | 件数 | 意味・OS32実装 | MIT根拠 |
 | --- | --- | --- | --- |
@@ -105,7 +105,7 @@
 
 ### zm_reg_sequence_decode.inc
 
-ソース: `kdebug/gfinit_op/zm_reg_sequence_decode.inc`
+ソース: `sys/dev/video/geforce/gfinit_op/zm_reg_sequence_decode.inc`
 
 | opcode / 名称 | 件数 | 意味・OS32実装 | MIT根拠 |
 | --- | --- | --- | --- |
@@ -117,7 +117,7 @@
 
 ### index_io_decode.inc
 
-ソース: `kdebug/gfinit_op/index_io_decode.inc`
+ソース: `sys/dev/video/geforce/gfinit_op/index_io_decode.inc`
 
 | opcode / 名称 | 件数 | 意味・OS32実装 | MIT根拠 |
 | --- | --- | --- | --- |
@@ -131,7 +131,7 @@
 
 ### reset_nv_reg_decode.inc
 
-ソース: `kdebug/gfinit_op/reset_nv_reg_decode.inc`
+ソース: `sys/dev/video/geforce/gfinit_op/reset_nv_reg_decode.inc`
 
 | opcode / 名称 | 件数 | 意味・OS32実装 | MIT根拠 |
 | --- | --- | --- | --- |
@@ -145,7 +145,7 @@
 
 ### sub_decode.inc
 
-ソース: `kdebug/gfinit_op/sub_decode.inc`
+ソース: `sys/dev/video/geforce/gfinit_op/sub_decode.inc`
 
 | opcode / 名称 | 件数 | 意味・OS32実装 | MIT根拠 |
 | --- | --- | --- | --- |

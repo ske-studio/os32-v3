@@ -2,7 +2,7 @@
 /* FreeBSD、BSD-2-Clause (kbdtables.h) */
 /* FreeBSD releng/10.4 d869f4ade283f4691dc249e435376a5883824be2 */
 /* jp.pc98.kbd SHA256 354468f80d0ec869f28d867bcb819e0c04c78eb1e001232303c81e9684007433 */
-#include "input/hal/keymap.h"
+#include "sys/hal/input/keymap.h"
 
 static const KmEntry s1p_entries[128] = {
     {0xf500, {0x001b, 0x001b}, {0x001b, 0x001b}},

@@ -32,7 +32,7 @@ static STORAGE: Storage = Storage::new();
 const TIMER_SINK: u8 = 1;
 const TIMER_TICKS: u16 = 10;
 
-/// コピー / 貼り付けのキー (票 N4b §2 / §5)。`drivers/input/kbd.h` の `KEY_F9` / `KEY_F10`。
+/// コピー / 貼り付けのキー (票 N4b §2 / §5)。`sys/platform/pc98/input/kbd.h` の `KEY_F9` / `KEY_F10`。
 ///
 /// F キーは `inject::from_key` が空を返す (注入しない) 上、gshell は F キーを
 /// `GUI_EV_KEY` でフォーカス窓へ配る (`gshell/src/input.rs::capture_keyboard` は
@@ -92,7 +92,7 @@ pub fn run(api: *mut KernelAPI) -> i32 {
     };
     /* 票 §5 R2: **イベントループ (とタイマ) に入る前に** con_sink_read を 1 回
      * 呼び、読み手権限を確立する。`kbd_inject` はこれを済ませた者しか受け付け
-     * ない (kernel/kbd_inject.c の con_sink_reader_get 照合)。先客がいれば
+     * ない (sys/kern/kbd_inject.c の con_sink_reader_get 照合)。先客がいれば
      * OS32_ERR_EXIST が返り、以後この端末は**注入しない** — 打鍵は捨て、
      * 状態行は busy のままにする。ここで読めたレコードは捨てずに画面へ入れる。 */
     let _ = app.pump();
@@ -424,7 +424,7 @@ impl DisplayApp<'_> {
     /// 接続モードで ESC を受けた (票 T9 D9)。`launch_cancel` を 1 回だけ出し、
     /// 接続モードのまま `DONE` を待つ (連打は `Attach` の印がまとめる)。
     /// `OS32_ERR_STALE` (もう完了している) でも **token は捨てない** — 完了は
-    /// `launch_poll` が消費して初めて表が空く (`include/launch.h`)。
+    /// `launch_poll` が消費して初めて表が空く (`sys/include/launch.h`)。
     fn escape(&mut self, ui: &mut Ui) {
         let Some(mut attach) = self.attach else {
             /* 表を持っていないのに接続モードに居る = 取りこぼし。固まらない

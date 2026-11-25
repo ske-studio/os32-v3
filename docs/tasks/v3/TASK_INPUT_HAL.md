@@ -14,7 +14,7 @@
 
 ## 1. 詳細設計 (確定) の要約
 - 層: 装置 (PC-98 鍵盤・バスマウス・USB の OHCI/HID) → 入力元ごとのイベント (16B) → 共通の入力状態 (入力元ごとの押下の表・合成・焦点・独占) → 出口 (今の InputOps/PointerOps の互換、in2)。PowerPC の usbp_input_key/mouse/release の切り目を採る。
-- 文字端末 bridge (kernel/input_legacy.c): serial の混入・GUI への注入・park・待ちの期限を共通に。serial と注入は provider の関数ポインタ。
+- 文字端末 bridge (sys/kern/input_legacy.c): serial の混入・GUI への注入・park・待ちの期限を共通に。serial と注入は provider の関数ポインタ。
 - 段の表は設計の §7、受入は §8。段 0 は T1b (main) が担う。
 
 - [M7[3] の IME 接続と登録 B](../../decisions/INPUT_BIND_M7_3_DESIGN.md)

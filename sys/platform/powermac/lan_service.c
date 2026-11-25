@@ -1,0 +1,370 @@
+/* Cooperative early LAN service; all wire fields are encoded as bytes. */
+#include "lan_boot.h"
+#include "sys/dev/net/gem/gem.h"
+#include "sys/arch/ppc/kernel_boot.h"
+#include "kprintf.h"
+#if KBOOT_SH
+#include "hostfs.h"
+#endif
+
+#if KBOOT_LINK
+#include "nic_gem.h"
+#include "sys/net/link.h"
+#include "sys/net/host_mailbox.h"
+#include "rh_observe.h"
+#include "kmalloc.h"
+#include "os32/os32_kapi_shared.h"
+static int link_bound;
+static i32 time_handle = -1;
+u32 pm_link_time_bytes, pm_link_time_ok;
+static void link_diagnostic(void)
+{
+    const u8 *data;
+    if (!link_hello_ok || pm_link_time_ok) return;
+    if (time_handle < 0) {
+        time_handle = link_host_open("TIME", 4, 0);
+        return;
+    }
+    u32 status;
+    i32 rc = link_host_status(time_handle, &status, 0, 0);
+    if (rc == OS32_ERR_AGAIN) return;
+    i32 n = rc ? rc : status == 200 ?
+        link_host_read_stage(time_handle, 64, &data, 0) : OS32_ERR_IO;
+    if (n > 0) pm_link_time_bytes += (u32)n;
+    if (n <= 0 && n != OS32_ERR_AGAIN) {
+        pm_link_time_ok = !n && pm_link_time_bytes != 0;
+        (void)link_host_close(time_handle, 0);
+        time_handle = -1;
+        if (!pm_link_time_ok) pm_link_time_bytes = 0;
+    }
+}
+#endif
+
+enum service_state { OFF = 0, RESETTING = 1, PREPARE = 2, PUBLISH = 3,
+                     PHY_WAIT = 4, RUNNING = 5, QUARANTINED = 6 };
+static struct {
+    enum service_state state;
+    struct gem g;
+    const struct pm_gmac_boot *boot;
+#if !KBOOT_LINK
+#if KBOOT_SH
+    u8 tx[14 + PLN1_HEADER_BYTES + PLN1_FS_FRAME_MAX], rx[1514];
+#else
+    u8 tx[14 + PLN1_HEADER_BYTES + PLN1_PAYLOAD_MAX], rx[1514];
+#endif
+    struct lan_message response;
+    u8 response_dst[6];
+#endif
+    u8 enabling;
+    u64 beacon_at, state_at, poll_at, phy_retry_at, request_drops, tx_at;
+    u8 out_turn, state_due;
+} s;
+
+static void (*phy_notify)(const struct gem_phy_sample *, int);
+static struct gem_phy_sample phy_sample;
+static int phy_rc;
+static u8 rh_logged;
+void pm_lan_phy_observer(void (*notify)(const struct gem_phy_sample *, int))
+{ phy_notify = notify; }
+static void rh_log(void)
+{
+    if (rh_logged) return;
+    rh_logged = 1;
+    const struct pm_gmac_rh_sample *q = pm_gmac_rh_sample();
+    if (q->valid)
+        kprintf(0x07, "RH QUIESCE command=%x tx=%u rx=%u\r\n", q->command, q->tx_enable, q->rx_enable);
+    kprintf(0x07, "RH PHY port=%u addr=%u id1=%x id2=%x bmsr=%x rc=%d\r\n",
+            phy_sample.port, phy_sample.addr, phy_sample.id1, phy_sample.id2, phy_sample.bmsr, phy_rc);
+}
+#if !KBOOT_LINK
+static int same(const u8 *a, const u8 *b, u32 n)
+{
+    for (u32 i = 0; i < n; ++i) if (a[i] != b[i]) return 0;
+    return 1;
+}
+static void copy(u8 *a, const u8 *b, u32 n)
+{ for (u32 i = 0; i < n; ++i) a[i] = b[i]; }
+#endif
+static void off(int code)
+{
+    s.state = OFF;
+    kprintf  (0x07, "LAN OFF code=%d\r\n", code);
+}
+static void reset(void)
+{
+    if (s.g.state != GEM_STATE_RESETTING) gem_enter_reset(&s.g);
+    s.state = RESETTING;
+}
+#if !KBOOT_LINK
+static int send(const u8 *dst, const struct lan_message *m)
+{
+    u32 used;
+    copy(s.tx, dst, 6); copy(s.tx + 6, s.boot->mac, 6);
+    s.tx[12] = PLN1_ETHERTYPE >> 8; s.tx[13] = PLN1_ETHERTYPE & 255;
+    if (pm_lan_encode(s.tx + 14, sizeof(s.tx) - 14, m, &used)) return GEM_EINVAL;
+    return gem_tx(&s.g, s.tx, used + 14);
+}
+#if KBOOT_SH
+int pm_lan_fs_running(void) { return s.state == RUNNING; }
+int pm_lan_fs_send(const u8 *frame, u32 len)
+{
+    struct lan_header h = {.type = PLN1_FS_REQ, .payload_bytes = (u16)len};
+    const u8 *dst;
+    u32 used;
+    int r;
+    if (!pm_lan_fs_running()) return LAN_ENODEV;
+    dst = pm_hfs_peer();
+    if (!dst) dst = s.boot->peer_mac;
+    copy(s.tx, dst, 6); copy(s.tx + 6, s.boot->mac, 6);
+    s.tx[12] = PLN1_ETHERTYPE >> 8; s.tx[13] = PLN1_ETHERTYPE & 255;
+    copy(h.boot_id, s.boot->boot_id, 16);
+    r = pm_lan_encode_payload(s.tx + 14, sizeof(s.tx) - 14, &h, frame, len, &used);
+    if (r) return r;
+    r = gem_tx(&s.g, s.tx, used + 14);
+    return r == GEM_AGAIN ? LAN_EBUSY : r;
+}
+#endif
+static int beacon(u64 now)
+{
+    struct lan_message m = {0};
+    const struct pm_lan_diag *d = pm_lan_diag_snapshot(s.boot, &s.g, s.state, s.request_drops);
+    u32 flags;
+    m.type = PLN1_TYPE_BEACON; m.payload_bytes = 68;
+    copy(m.boot_id, s.boot->boot_id, 16);
+    pm_lan_log_stats(&m.seq, &m.drop_records, &m.drop_bytes, &flags);
+    m.flags = (u16)flags;
+    if (!s.beacon_at) m.seq = 0;
+    copy(m.payload, d->diag, 68);
+    int r = send(s.boot->peer_mac, &m);
+    s.beacon_at = now + s.g.io.tb_hz;
+    return r;
+}
+static int logs(void)
+{
+    for (u32 i = 0; i < 4; ++i) {
+        struct lan_message m = {0}, out;
+        const u8 *data;
+        u32 len, flags;
+        int have_out = pm_term_tx_peek(&out);
+        int have_log = pm_lan_log_peek(&data, &len, &m.seq, &m.drop_records, &m.drop_bytes, &flags) == LAN_OK;
+        int use_out = have_out && (s.out_turn || !have_log);
+        int r;
+        if (!have_out && !have_log) break;
+        if (use_out) {
+            r = send(pm_term_peer(), &out);
+            if (r == GEM_OK) pm_term_tx_complete();
+        } else {
+            m.type = PLN1_TYPE_LOG; m.payload_bytes = (u16)len; m.flags = (u16)flags;
+            copy(m.boot_id, s.boot->boot_id, 16); copy(m.payload, data, len);
+            r = send(s.boot->peer_mac, &m);
+            pm_lan_log_complete(r);
+        }
+        s.out_turn = !use_out;
+        if (r != GEM_OK) return r;
+    }
+    return GEM_OK;
+}
+static int term_state(u64 now)
+{
+    struct lan_message m;
+    int r = GEM_OK;
+    if (pm_term_state(&m) == 1) r = send(pm_term_peer(), &m);
+    s.state_due = 0;
+    s.state_at = now + s.g.io.tb_hz;
+    return r;
+}
+static int receive(void)
+{
+    struct lan_message req, rsp;
+    const struct pm_lan_diag *d;
+    const u8 broadcast[6] = {255, 255, 255, 255, 255, 255};
+    u32 n, nonzero = 0;
+    int r = gem_rx(&s.g, s.rx, sizeof(s.rx), &n);
+    if (r != GEM_OK) return r;
+    if (n < 14 + PLN1_HEADER_BYTES || !same(s.rx, s.boot->mac, 6)) return GEM_OK;
+    for (u32 i = 0; i < 6; ++i) nonzero |= s.rx[6 + i];
+    if (!nonzero || (s.rx[6] & 1)) return GEM_OK;
+    if (s.rx[12] != (PLN1_ETHERTYPE >> 8) || s.rx[13] != (PLN1_ETHERTYPE & 255)) return GEM_OK;
+#if KBOOT_SH
+    struct lan_header h;
+    if (pm_lan_decode_header(s.rx + 14, n - 14, &h) ||
+        !same(h.boot_id, s.boot->boot_id, 16)) return GEM_OK;
+    if (h.type >= PLN1_FS_OPEN) {
+        pm_hfs_receive(&h, s.rx + 6, s.rx + 14 + PLN1_HEADER_BYTES);
+        return GEM_OK;
+    }
+#endif
+    if (pm_lan_decode(s.rx + 14, n - 14, &req) ||
+        !same(req.boot_id, s.boot->boot_id, 16)) return GEM_OK;
+    if (req.type == PLN1_TERM_OPEN || req.type == PLN1_TERM_IN) {
+        pm_term_receive(&req, s.rx + 6);
+        if (req.type == PLN1_TERM_OPEN && !req.payload_bytes && !req.seq) s.state_due = 1;
+        return GEM_OK;
+    }
+    if (req.type != PLN1_TYPE_REQ ||
+        (!same(s.boot->peer_mac, broadcast, 6) && !same(s.rx + 6, s.boot->peer_mac, 6))) return GEM_OK;
+    if (s.response.type) { ++s.request_drops; return GEM_OK; }
+    d = pm_lan_diag_snapshot(s.boot, &s.g, s.state, s.request_drops);
+    if (pm_lan_monitor(&req, s.rx + 6, d, &rsp) == 1) {
+        s.response = rsp; copy(s.response_dst, s.rx + 6, 6);
+    }
+    return GEM_OK;
+}
+#endif
+int pm_lan_start(const struct pm_gmac_boot *boot)
+{
+    const struct pm_gmac_rh_sample *q = pm_gmac_rh_sample();
+    if (q->clock_rc) {
+        kprintf(0x07, "RH CLOCK rc=%d\r\n", q->clock_rc);
+        off(q->clock_rc); return q->clock_rc;
+    }
+    struct pm_pci pci = {boot->bus_first, boot->bus_last, boot->bdf,
+                         pm_bridge_lookup(boot->root_node)};
+    u32 id, command;
+    int r;
+    if (boot->vendor_device != 0x0021106bu ||
+        pm_pci_read32(&pci, boot->bdf, 0, &id) || id != boot->vendor_device ||
+        pm_pci_access(&pci, boot->bdf, 4, 2, 0, &command) || (command & 4)) {
+        off(LAN_ENODEV); return LAN_ENODEV;
+    }
+    rh_logged = 0;
+    s.boot = boot;
+#if KBOOT_SH
+    pm_hfs_bind_peer(boot->peer_mac);
+#endif
+    r = pm_lan_gem_io(boot, &s.g.io);
+    if (r != LAN_OK) { off(r); return r; }
+    gem_enter_reset(&s.g); s.state = RESETTING;
+    kprintf(0x07, "LAN STATE state=%u link=%u\r\n", (u32)s.state, 0u);
+    return LAN_OK;
+}
+void pm_lan_poll(u64 now)
+{
+    enum service_state before = s.state;
+    struct gem_dma dma;
+    int r = GEM_AGAIN;
+    if (s.state == OFF || s.state == QUARANTINED) return;
+    if (s.poll_at && now < s.poll_at) return;
+    s.poll_at = now + s.g.io.tb_hz / 1000u + (s.g.io.tb_hz % 1000u != 0);
+    switch (s.state) {
+    case RESETTING:
+        r = gem_reset_step(&s.g, now);
+        if (r == GEM_OK) {
+            s.g.ring_prepare_step = s.g.ring_cursor = s.g.ring_publish_step = s.g.rx_head = 0;
+            r = gem_mif_init(&s.g);
+            phy_sample = (struct gem_phy_sample){.port=s.g.phy_port, .addr=s.g.phy_addr,
+                                                .id1=s.g.phy_id1, .id2=s.g.phy_id2};
+            phy_rc = r;
+            if (r == GEM_OK) phy_rc = gem_phy_sample(&s.g, &phy_sample);
+            if (phy_notify) phy_notify(&phy_sample, phy_rc);
+            if (r == GEM_OK) s.state = PREPARE;
+        }
+        break;
+    case PREPARE:
+        r = pm_gmac_dma_init(s.boot, &dma);
+        if (r == GEM_OK) r = gem_ring_prepare(&s.g, &dma);
+        if (r == GEM_OK) r = gem_mac_init(&s.g, s.boot->mac);
+        if (r == GEM_OK) s.state = PUBLISH;
+        break;
+    case PUBLISH:
+        r = gem_ring_publish(&s.g);
+        if (r == GEM_OK) { s.enabling = 0; s.phy_retry_at = 0; s.state = PHY_WAIT; }
+        break;
+    case PHY_WAIT:
+        if (!s.enabling && now >= s.phy_retry_at) {
+            r = gem_phy_step(&s.g, now);
+            if (r == GEM_OK) { s.g.step = 0; s.enabling = 1; }
+            else if (r < 0 && r != GEM_EUNSUPPORTED) { s.phy_retry_at = now + s.g.io.tb_hz; r = GEM_AGAIN; }
+        }
+        if (s.enabling) {
+            r = gem_mac_enable_step(&s.g, now);
+            if (r == GEM_OK) {
+                s.state = RUNNING; rh_log(); s.phy_retry_at = now + s.g.io.tb_hz;
+                /* G4 BCM5411: frames sent right after link-up never reached the
+                 * switch (11-13, beacon and log 0-2 lost); records wait in the ring. */
+                s.tx_at = now + 2u * s.g.io.tb_hz;
+            }
+        }
+        break;
+    case RUNNING:
+#if KBOOT_LINK
+        if (!pm_lan_running_gem(0)) {
+            if (link_bound) net_unbind();
+            link_bound = 0;
+            reset();
+            break;
+        }
+        if (!link_bound) {
+            r = host_mailbox_init();
+            if (!r) r = net_adapter_register(PM_NET_NIC_GEM, &net_gem_adapter);
+#if KBOOT_SH
+            if (!r) r = net_start(PM_NET_NIC_GEM, pm_hfs_link_allowed_peer());
+#else
+            if (!r) r = net_start(PM_NET_NIC_GEM, 0);
+#endif
+            if (r) { off(r); return; }
+            link_bound = 1;
+            kprintf(0x07, "LINK HEAP used=%u\r\n", kmalloc_used());
+        }
+        if (link_hello_ok) pm_rh_stage(PM_RH_LINK_HELLO_ESTABLISHED);
+        link_diagnostic();
+        pm_link_log_poll();
+#if !KBOOT_SH
+        /* The diagnostic image's PDIAG service announces RSH READY "diag". In
+         * link-SH the APP shell owns RSH READY ("cui"); two announcers on one
+         * boot would flip the operator's mode, so PDIAG stays diagnostic-only. */
+        pm_link_diag_poll(pm_lan_diag_snapshot(s.boot, &s.g, s.state, s.request_drops),
+                          now, s.g.io.tb_hz);
+#endif
+        r = GEM_AGAIN;
+#else
+        r = gem_poll(&s.g, now, 8);
+        if (s.g.state == GEM_STATE_RESETTING || r == GEM_EIO) { reset(); r = GEM_AGAIN; break; }
+        if (r < 0) break;
+        if (now >= s.phy_retry_at) {
+            s.phy_retry_at = now + s.g.io.tb_hz;
+            r = gem_phy_step(&s.g, now);
+            if (r == GEM_EIO) { reset(); r = GEM_AGAIN; break; }
+            if (r < 0) break;
+        }
+        if (now < s.tx_at) {
+            r = receive();
+            if (r == GEM_EIO) { reset(); r = GEM_AGAIN; }
+            else if (r >= 0) r = GEM_AGAIN;
+            break;
+        }
+        if (!s.beacon_at) { r = beacon(now); if (r != GEM_OK) break; }
+        r = receive();
+        if (r == GEM_EIO) { reset(); r = GEM_AGAIN; break; }
+        if (s.response.type) {
+            r = send(s.response_dst, &s.response);
+            if (r == GEM_OK) s.response.type = 0;
+            else break;
+        }
+        r = logs();
+        if (r != GEM_OK) break;
+        if (s.state_due || now >= s.state_at) {
+            r = term_state(now);
+            if (r != GEM_OK) break;
+        }
+        if (s.beacon_at && now >= s.beacon_at) { r = beacon(now); if (r != GEM_OK) break; }
+        r = GEM_AGAIN;
+#endif
+        break;
+    default: break;
+    }
+    if (r < 0) {
+        if (s.g.state == GEM_STATE_QUARANTINED) s.state = QUARANTINED;
+        else { off(r); return; }
+    }
+    if (s.state != before)
+        kprintf(0x07, "LAN STATE state=%u link=%u\r\n", (u32)s.state, (u32)(s.state == RUNNING));
+}
+
+/* P1g selects link or PLN1 ownership; this query never advances the service. */
+struct gem *pm_lan_running_gem(u8 mac[6])
+{
+    if (s.state != RUNNING || s.g.state != GEM_STATE_READY) return 0;
+    if (mac) for (u32 i = 0; i < 6; i++) mac[i] = s.boot->mac[i];
+    return &s.g;
+}

@@ -12,14 +12,14 @@ sys.dont_write_bytecode = True
 from run import ROOT, ROM, QMP, command, require, CriterionFailure
 
 CHECK = dict(name='kboot-vectors', tier=2, budget=600,
-             covers=['arch/ppc/kernel_vectors.S', 'arch/ppc/ppc_frame.h',
-                     'tools/ppc/kboot_vectors*','arch/ppc/entry.S', 'arch/ppc/ofw_note.S', 'arch/ppc/mmu.S',
-                     'arch/ppc/cache_copy.S', 'arch/ppc/kernel_hpt.c',
-                     'arch/ppc/pd_walk.c', 'arch/ppc/kernel_trap.c', 'arch/ppc/ppc_*.h', 'mm/paging.h',
-                     'platform/powermac/ofw.c', 'platform/powermac/escc*.c',
-                     'platform/powermac/ofw.h', 'platform/powermac/platform_of_layout.h',
-                     'lib/kstring_c.c', 'lib/kstring.h', 'include/types.h', 'include/callconv.h',
-                     'include/memmap.h', 'include/appmem_types.h',
+             covers=['sys/arch/ppc/kernel_vectors.S', 'sys/arch/ppc/ppc_frame.h',
+                     'tools/ppc/kboot_vectors*','sys/arch/ppc/entry.S', 'sys/arch/ppc/ofw_note.S', 'sys/arch/ppc/mmu.S',
+                     'sys/arch/ppc/cache_copy.S', 'sys/arch/ppc/kernel_hpt.c',
+                     'sys/arch/ppc/pd_walk.c', 'sys/arch/ppc/kernel_trap.c', 'arch/ppc/ppc_*.h', 'sys/kern/mm/paging.h',
+                     'sys/platform/powermac/ofw.c', 'platform/powermac/escc*.c',
+                     'sys/platform/powermac/ofw.h', 'sys/platform/powermac/platform_of_layout.h',
+                     'sys/kern/kstring_c.c', 'sys/kern/kstring.h', 'sys/include/types.h', 'sys/include/callconv.h',
+                     'sys/include/memmap.h', 'sys/include/appmem_types.h',
                      'tools/ppc/run.py', 'build/arch/ppc.mk'], needs=[])
 CROSS = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))/'bin/powerpc-elf-'
 FLAGS = ['-std=gnu11','-mcpu=7450','-m32','-mbig-endian','-msoft-float','-mno-altivec',
@@ -28,17 +28,17 @@ FLAGS = ['-std=gnu11','-mcpu=7450','-m32','-mbig-endian','-msoft-float','-mno-al
          '-Wall','-Wextra','-Werror','-D__cdecl=','-I'+str(ROOT),
          '-I'+str(ROOT/'arch/ppc'),'-I'+str(ROOT/'platform/powermac'),
          '-I'+str(ROOT/'include'),'-I'+str(ROOT/'lib')]
-PRODUCT = ['arch/ppc/entry.S','arch/ppc/ofw_note.S','arch/ppc/mmu.S',
-           'arch/ppc/kernel_trap.c','arch/ppc/cache_copy.S','arch/ppc/kernel_hpt.c','arch/ppc/pd_walk.c',
-           'platform/powermac/ofw.c','platform/powermac/escc_tree.c',
-           'platform/powermac/escc.c','lib/kstring_c.c',
+PRODUCT = ['sys/arch/ppc/entry.S','sys/arch/ppc/ofw_note.S','sys/arch/ppc/mmu.S',
+           'sys/arch/ppc/kernel_trap.c','sys/arch/ppc/cache_copy.S','sys/arch/ppc/kernel_hpt.c','sys/arch/ppc/pd_walk.c',
+           'sys/platform/powermac/ofw.c','sys/platform/powermac/escc_tree.c',
+           'sys/platform/powermac/escc.c','sys/kern/kstring_c.c',
            'tools/ppc/kboot_vectors_fixture.S','tools/ppc/kboot_vectors_fixture.c']
 
 
 def build(out, source, fixture=None):
     out.mkdir(parents=True,exist_ok=True)
     objects=[]
-    for i, name in enumerate(PRODUCT+['arch/ppc/kernel_vectors.S']):
+    for i, name in enumerate(PRODUCT+['sys/arch/ppc/kernel_vectors.S']):
         src=source if name.endswith('/kernel_vectors.S') else (
             fixture if fixture and name.endswith('/kboot_vectors_fixture.c') else ROOT/name)
         obj=out/f'{i}.o'; objects.append(obj)
@@ -204,7 +204,7 @@ def observe_slots(work, cpus, mutate):
     def once(text, old, new):
         require(text.count(old) == 1, "unique slot anchor "+old)
         return text.replace(old, new, 1)
-    source = ROOT/'arch/ppc/kernel_vectors.S'
+    source = ROOT/'sys/arch/ppc/kernel_vectors.S'
     for mode in ['normal', 'unsupported-nest'] + (['shared-slot'] if mutate else []):
         out = work/('spill-'+mode); out.mkdir()
         fixture = None
@@ -237,7 +237,7 @@ def main():
         print('SKIP kboot-vectors: toolchain/QEMU/OpenBIOS unavailable', flush=True)
         return int(os.environ.get('OS32_REQUIRE_PPC') == '1')
     out=ROOT/'build/out/ppc/kboot-vectors'
-    src=ROOT/'arch/ppc/kernel_vectors.S'
+    src=ROOT/'sys/arch/ppc/kernel_vectors.S'
     elf=build(out/'normal',src)
     static(out/'normal',elf); observe(out/'normal',elf)
     if a.mutate:

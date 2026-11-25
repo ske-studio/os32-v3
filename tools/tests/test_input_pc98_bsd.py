@@ -4,7 +4,7 @@ CHECK = dict(name='input-pc98-bsd-host', tier=1, budget=5, needs=[], kind='contr
     basis=['INPUT_BIND_DESIGN §1', 'INPUT_BIND_DESIGN §2a', 'INPUT_BIND_DESIGN §6 M0'],
     covers=['tools/tests/test_input_pc98_bsd.py', 'tools/tests/input_pc98_bsd_fixture.kbd',
             'tools/tests/input_pc98_compat_fixture.h', 'tools/tests/input_pc98_compat_host.c',
-            'input/hal/kbd_merge.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
+            'sys/hal/input/kbd_merge.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
             'docs/decisions/INPUT_BIND_DESIGN.md'])
 from pathlib import Path
 from types import SimpleNamespace
@@ -151,11 +151,11 @@ def pc98_bsd_check_legacy_columns(root, tmp, mutate):
     from kernel_includes import include_flags
     # Compile two pinned legacy implementations against the
     # same literal oracle. Mutants change one expected column, never product code.
-    source = subprocess.check_output(['git', 'show', '1b0fa106:input/hal/kbd_merge.c'], cwd=root, text=True)
+    source = subprocess.check_output(['git', 'show', '1b0fa106:sys/hal/input/kbd_merge.c'], cwd=root, text=True)
     host = (root/'tools/tests/input_pc98_compat_host.c').read_text()
-    old = subprocess.check_output(['git', 'show', '1b0fa106:input/hal/kbd_merge.c'], cwd=root, text=True)
+    old = subprocess.check_output(['git', 'show', '1b0fa106:sys/hal/input/kbd_merge.c'], cwd=root, text=True)
     old = old[old.index('static const u8 scancode_to_ascii['):old.index('void input_emit_legacy_repeat')]
-    old = '#include "in2_int.h"\n#include "drivers/input/kbd.h"\n' + old.replace('input_emit_legacy_key(', 'pc98_old_emit(')
+    old = '#include "in2_int.h"\n#include "sys/platform/pc98/input/kbd.h"\n' + old.replace('input_emit_legacy_key(', 'pc98_old_emit(')
     (tmp/'old.c').write_text(old)
     (tmp/'current.c').write_text('void input_emit_legacy_key(unsigned char, unsigned char, unsigned char);\nvoid input_emit_legacy_repeat(unsigned char, unsigned char);\n' + source)
     def execute(code):

@@ -1,5 +1,5 @@
 /* Freestanding tests of the GF mode information callbacks. */
-#include "hwdev/gf/internal.h"
+#include "sys/dev/video/geforce/internal.h"
 
 int gf_display_query(void *, struct video_info *);
 int gf_display_mode_info(void *, u32, struct video_mode *);

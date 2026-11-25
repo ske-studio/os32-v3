@@ -1,0 +1,143 @@
+/* ======================================================================== */
+/*  GFX.H — SDL風グラフィックAPI (640x400x16, CPU直接描画)                 */
+/*                                                                          */
+/*  GRCG/EGC不使用。全描画はシステムRAMバックバッファ上で行い、              */
+/*  gfx_present() でVRAMに一括転送する方式。                                */
+/* ======================================================================== */
+
+#ifndef __GFX_H
+#define __GFX_H
+
+#include "../../kern/exec/surface_limits.h"
+#include "types.h"  /* u8, u16, u32 */
+
+/* ======== 標準 planar の収納定数 (現在の表示寸法は mode から得る) ======== */
+#define GFX_WIDTH    640
+#define GFX_HEIGHT   400
+#define GFX_BPL      80     /* bytes per line (640/8) */
+#define GFX_WPL      40     /* words (16bit) per line */
+#define GFX_PLANE_SZ 32000  /* 80 * 400 = 32000 bytes/plane */
+
+/* 200ラインモード用定数 */
+#define GFX_HEIGHT_200   200
+#define GFX_PLANE_SZ_200 16000  /* 80 * 200 = 16000 bytes/plane */
+
+/* 16 色の planar の面の数 (B/R/G/I)。バックバッファの枚数。 */
+#define GFX_BB_PLANES 4
+
+/* ======== データ構造 ======== */
+
+#include "os32_kapi_shared.h"
+
+/* 上記のヘッダで GFX_Rect, GFX_Color, GFX_Surface, GFX_Sprite は定義される */  
+
+/* ======== 初期化・終了 ======== */
+/* 選択中 backend の台帳名 (LEDGER_SF_*)。通常文脈で source と照合する。 */
+u32 gfx_sf_backend(void);
+struct gfx_kernel_fb {
+    u32 width, height, pitch, format;
+    u8 *planes[SURFACE_QUERY_MAX];
+};
+int gfx_kernel_framebuffer(struct gfx_kernel_fb *out);
+struct surface_query_source;
+int gfx_surface_source(u32 role, struct surface_query_source *out);
+int gfx_selected_selfcheck(void);
+void gfx_init(void);       /* 選択モードで開始 (planar 400 / packed 480)、起動予約を使う */
+void gfx_init_200(void);   /* planar は200 (HW縦2倍)、packed は通常の480 */
+/* KAPI スロット gfx_init / gfx_init_200 の実体 (票 T8 D1 / D1a)。
+ * 画面の所有者を確かめてから本体を呼ぶ「門」で、sdk/kapi.json の
+ * "target" がここを指す。GUI 中に宣言 (OS32X_FLAG_GFX) の無い CPL=3 が
+ * 呼んだときは **何もしない** (戻り型は void のまま。拒否の数は
+ * カーネルシンボル gfx_init_reject_count)。カーネル内部から画面を
+ * 立て直すときは従来どおり gfx_init() を直接呼ぶ。 */
+void gfx_kapi_init(void);
+void gfx_kapi_init_200(void);
+/* 画面の所有者 (KAPI v48)。1 = シェル帯 (WM) / 2〜5 = アプリ。誰でも呼べる。 */
+i32  gfx_screen_owner(void);
+void gfx_shutdown(void);   /* テキスト復帰 */
+int  gfx_get_height(void); /* 現在のGFX高さ (planar は 200/400、packed は選択モードの高さ)、終了後は後端・機種の復帰が書く */
+
+/* ======== ハードウェアスクロール ======== */
+void gfx_hardware_scroll(int lines);
+
+/* ======== スクリーンショット ======== */
+int gfx_screenshot(const char *path);
+int gfx_load_vdp(const char *path);
+
+/* ======== 画面更新 (SDL_RenderPresent相当) ======== */
+/* バックバッファ → VRAM 一括転送 (rep movsw) */
+void gfx_present(void);
+/* ビューポート矩形転送 (X範囲も限定してVRAM転送量を削減) */
+void gfx_present_rect(int rx, int ry, int rw, int rh);
+/* ラスタパレット付きVRAM転送 (HBLANK同期でパレット書き換え) */
+void gfx_present_raster(GFX_RasterPalTable *table);
+/* VSYNC待ちなしVRAM転送 (自前フレームレート制御用) */
+void gfx_present_nosync(void);
+/* KAPI の実体 (gfx_core.c / gfx_vram.c)。kapi_generated.c の wrap_* が呼ぶ */
+void __cdecl gfx_get_framebuffer(GFX_Framebuffer *fb);
+void __cdecl gfx_add_dirty_rect(int x, int y, int w, int h);
+void __cdecl gfx_present_dirty(void);
+/* GUI HAL 枠 (KAPI v40): 能力の問い合わせと、アクセラレータ向けのハードウェア塗り/転送。
+ * CPU バックエンド (9801 プレーン / PEGC) では hw_* は OS32_ERR_NOSYS を返し、
+ * 共有ライブラリが CPU 実装へフォールバックする。 */
+void __cdecl gfx_screen_info(void *out);
+int  __cdecl gfx_hw_fill_rect(int x, int y, int w, int h, u8 color);
+int  __cdecl gfx_hw_blit(int dx, int dy, int sx, int sy, int w, int h);
+/* GUI HAL カウンタとパレットリース (KAPI v41、契約 G7 / G8)。
+ * gfx_stats は GFX_Stats を埋め、gfx_lease_palette は lease_mask の範囲内だけ
+ * パレットを差し替える。K1 が kapi.json に載せる弱既定を強シンボルで上書きする。 */
+int  __cdecl gfx_stats(void *out);
+int  __cdecl gfx_lease_palette(int first, int count, const u8 *rgb);
+void __cdecl gfx_set_palette_hal(int idx, u8 r, u8 g, u8 b);  /* KAPI gfx_set_palette の実体 (HAL 経由, レビュー ④) */
+
+/* ======== 描画プリミティブ (バックバッファ対象) ======== */
+void gfx_clear(u8 color);
+/* 矩形クリア (ビューポート限定で高速) */
+void gfx_clear_rect(int rx, int ry, int rw, int rh, u8 color);
+void gfx_pixel(int x, int y, u8 color);
+u8   gfx_get_pixel(int x, int y);
+void gfx_hline(int x, int y, int w, u8 color);
+void gfx_vline(int x, int y, int h, u8 color);
+void gfx_line(int x0, int y0, int x1, int y1, u8 color);
+void gfx_rect(int x, int y, int w, int h, u8 color);
+void gfx_fill_rect(int x, int y, int w, int h, u8 color);
+
+/* ======== サーフェス管理 (静的プール) ======== */
+GFX_Surface *gfx_create_surface(int w, int h);
+void         gfx_free_surface(GFX_Surface *surf);
+void         gfx_surface_clear(GFX_Surface *surf, u8 color);
+void         gfx_surface_pixel(GFX_Surface *surf, int x, int y, u8 color);
+
+/* ======== ブリット ======== */
+/* サーフェス → バックバッファに転送 (不透過) */
+void gfx_blit(int dx, int dy,
+              const GFX_Surface *src, const GFX_Rect *src_rect);
+
+/* サーフェス → バックバッファに転送 (透過色指定) */
+void gfx_blit_colorkey(int dx, int dy,
+                       const GFX_Surface *src, const GFX_Rect *src_rect,
+                       u8 colorkey);
+
+/* ======== スプライト ======== */
+GFX_Sprite *gfx_create_sprite(const GFX_Surface *src, u8 trans_color);
+void        gfx_free_sprite(GFX_Sprite *spr);
+void        gfx_draw_sprite(int x, int y, const GFX_Sprite *spr);
+/* KCG用フォント描画ラスタライザ (アセンブラ最適化版) */
+void        gfx_draw_font(int x, int y, const u8 *pat, int w_bytes, int h_lines, u8 fg);
+
+/* ======== パレット ======== */
+void gfx_set_palette(int idx, u8 r, u8 g, u8 b);
+void gfx_set_palette_all(const GFX_Color *pal);
+void gfx_set_default_palette(void);
+
+/* ======== テストパターン ======== */
+/* gfx_test_pattern: 外部プログラム化のため削除 */
+
+/* Compatibility bridge: gfx_get_framebuffer returns USER lease VA; CPL0 keeps aliases. */
+void gfx_framebuffer_bridge(void *out);
+extern volatile u32 gfx_bridge_fail_count, gfx_bridge_user_count, gfx_bridge_last_va;
+
+void gfx_reinit_tvram(void);
+void gfx_v86_return(void);
+
+#endif /* __GFX_H */

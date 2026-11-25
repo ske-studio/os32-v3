@@ -16,10 +16,10 @@ P1 の A1 で判断する対象は[配置台帳](data/layout.tsv)の各ファイ
 | D-8 | ゲスト診断を userland/diag/ にまとめる。build/programs.mk の ELF・BIN の規則、userland/deploy.yaml の test 区分、その入力・実機台本を同じ単位で追う。同じ配備物を生成する Rust クレートは現在の Cargo 入力位置に保つ。PPC_USER_APPS が組む atadeny.bin と learnprb.bin のソースも userland/diag/ に置く。ホストの QA は P1-4 が持つ。 |
 | D-9 | lib/os32_opna/upstream・lib/softfloat・userland/lib/font/vendor は各消費側の近くに保つ。上流からの更新単位と Cargo の相対依存を維持する。 |
 | D-10 | sdk/link、mkos32x.py、Rust のターゲット定義を SDK の配布単位に保つ。新しいアプリがリンク・包装・クロスビルドするための入力として扱う。 |
-| D-11 | P0-1 の候補9本のうち、kernel/v86/ の互換転送ヘッダ5本と include/vk32.h を別票の調査対象に残す。6 本とも build/kdebug.mk の HWDEV_HEADERS（kernel/v86/*.h と include/*.h）が拾い、HWDEV_GENERATED の前提になる。削除判断ではこの生成依存も調べる。個別のパスは台帳の「D-11 残骸の候補」で引ける。 |
+| D-11 | P0-1 の候補9本のうち、kernel/v86/ の互換転送ヘッダ5本と sys/include/vk32.h を別票の調査対象に残す。6 本とも build/kdebug.mk の HWDEV_HEADERS（kernel/v86/*.h と include/*.h）が拾い、HWDEV_GENERATED の前提になる。削除判断ではこの生成依存も調べる。個別のパスは台帳の「D-11 残骸の候補」で引ける。 |
 | D-12 | A3 で P1-4 が扱う。 |
 
-include/diag_stack.h は SQLite のトレース構成、include/snd_writer_probe.h は音声診断、include/type_contract.h は毎ビルドの abi-contract-probe が参照する。P0 の像の欄が空でも、これらの利用者がいる。tools/abi/type_contract.c は build/abi_contract.mk が読むので P1-1 に残す。
+sys/include/diag_stack.h は SQLite のトレース構成、sys/include/snd_writer_probe.h は音声診断、sys/include/type_contract.h は毎ビルドの abi-contract-probe が参照する。P0 の像の欄が空でも、これらの利用者がいる。tools/abi/type_contract.c は build/abi_contract.mk が読むので P1-1 に残す。
 
 仕様 §3.2 の直下名は kern、hal、arch、platform、dev、gfx、sound、input、fs、net、kapi、include、conf。sys/gfx/ と sys/sound/ は将来の置き場。今回の確定移動は両方とも 0 本で、P3 では作らない。
 

@@ -2,7 +2,7 @@
 #include "types.h"
 #include "os32_kapi_slots.h"
 #include "exec_arch.h"
-#include "arch/ppc/ppc_trap.h"
+#include "sys/arch/ppc/ppc_trap.h"
 static u32 msr;
 volatile u32 kctx_irq_depth;
 static int calls, pumps, common_calls, bad_enable, stopped, copy_result;

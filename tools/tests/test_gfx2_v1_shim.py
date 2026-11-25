@@ -7,7 +7,7 @@ import tempfile
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'gfx/v2/v1_shim.c'
+SOURCE = ROOT / 'sys/hal/gfx/v2/v1_shim.c'
 MUTATIONS = [
     ('empty-heap', '*base = *size = *phys = 0;', '*base = *size = *phys = 1;'),
     ('completion', '*done = a->fence.issued;', '*done = a->fence.issued + 1;'),

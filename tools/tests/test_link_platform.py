@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Compile the standalone link platform contract for host and PowerPC."""
 CHECK = dict(env=['ppc-cross'], name='link-platform-host', tier=2, budget=10, needs=[], covers=[
-    'platform/pc98/platform_link_inline.h', 'platform/pc98/link_platform.c', 'net/link_platform.h', 'net/link_selftest.inc', 'include/types.h', 'include/callconv.h',
+    'sys/platform/pc98/platform_link_inline.h', 'sys/platform/pc98/link_platform.c', 'sys/hal/net/link_platform.h', 'sys/net/link_selftest.inc', 'sys/include/types.h', 'sys/include/callconv.h',
     'tools/tests/test_link_platform.py', 'tools/tests/host32.py',
-    'kernel/idle_work.h', 'arch/x86/kernel/idt.h', 'include/io.h'],
+    'sys/kern/idle_work.h', 'sys/arch/x86/kernel/idt.h', 'sys/include/io.h'],
     basis=['LAN_OPERATOR_DESIGN §5', 'ARCH_COMPAT_CONTRACT §4.1'],
 )
 import os
@@ -14,7 +14,7 @@ import tempfile
 
 
 def run(ctx):
-    header = (ctx.root / 'net/link_platform.h').read_text()
+    header = (ctx.root / 'sys/hal/net/link_platform.h').read_text()
     # CI has no PPC toolchain (same rule as ppc-sc): host cc is required, PPC runs where present.
     ppc = str(Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
               / 'bin/powerpc-elf-gcc')
@@ -46,12 +46,12 @@ def run(ctx):
         (work / 'idt.h').write_text('#include "types.h"\nextern volatile u32 tick_count;\n')
         (work / 'io.h').write_text('unsigned int irq_save(void);\n'
             'void irq_restore(unsigned int); void _idle(void); int _irq_enabled(void);\n')
-        (work / 'kernel/idle_work.h').write_text('void idle_wait_step(void);\n')
-        probe = r'''#include "net/link_platform.h"
+        (work / 'sys/kern/idle_work.h').write_text('void idle_wait_step(void);\n')
+        probe = r'''#include "sys/hal/net/link_platform.h"
 #ifdef TEST_PC98_INLINE
-#include "platform/pc98/platform_link_inline.h"
+#include "sys/platform/pc98/platform_link_inline.h"
 #endif
-#include "kernel/irq/tick.h"
+#include "sys/kern/irq/tick.h"
 static unsigned int registered_slot;
 static tick_fn registered_fn;
 static void jiffy(void) {}
@@ -102,13 +102,13 @@ void _start(void) {
     __builtin_unreachable();
 }
 '''
-        selftest = (ctx.root / 'net/link_selftest.inc').read_text()
+        selftest = (ctx.root / 'sys/net/link_selftest.inc').read_text()
         start = selftest.index('static int link_wait_up(')
         end = selftest.index('\n}', start) + 2
         probe = probe.replace('/* BOOT_WAIT */', selftest[start:end])
         (work / 'runtime.c').write_text(probe)
-        products = [(ctx.root / 'platform/pc98/link_platform.c').read_text(),
-                    (ctx.root / 'platform/pc98/platform_link_inline.h').read_text()]
+        products = [(ctx.root / 'sys/platform/pc98/link_platform.c').read_text(),
+                    (ctx.root / 'sys/platform/pc98/platform_link_inline.h').read_text()]
         (work / 'platform/pc98').mkdir(parents=True)
         mutations = [
             ('return tick_register(PC98_TICK_LINK, fn);', 'return tick_register(0, fn);', 'tick slot'),
@@ -124,7 +124,7 @@ void _start(void) {
                 assert product.count(a) == 1
             for text, label in variants:
                 (work / 'platform.c').write_text(products[0] if inline else text)
-                (work / 'platform/pc98/platform_link_inline.h').write_text(
+                (work / 'sys/platform/pc98/platform_link_inline.h').write_text(
                     text if inline else products[1])
                 exe = work / 'runtime'
                 subprocess.run(['gcc', '-m32', '-std=gnu11', '-O2', '-Wall',

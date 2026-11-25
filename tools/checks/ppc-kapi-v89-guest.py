@@ -9,8 +9,8 @@ CHECK = dict(name='ppc-kapi-v89-guest', tier=2, needs=[], budget=1200,
     basis=['docs/decisions/KAPI_CAPACITY_V89_DESIGN.md §1, §2, §4 items 4–5',
            'docs/decisions/KAPI_CAPACITY_V89_DESIGN.md §2: 11-21 PM/mainline reading: both ranges prepared before USER PTE publication; failure stops before user entry',
            'sdk/kapi.json: slots 0 gfx_init and 297 io_pump; last published slot at api length - 1, reserved through func_capacity - 1',
-           'kernel/io_kapi.c: io_pump(0) returns OS32_ERR_INVAL (-9)',
-           'exec/exec_syscall.inc: first and last reserved guest slots: child fault, shell status 139', 'exec/exec_syscall.inc: slot >= KAPI_FUNC_COUNT',
+           'sys/kern/io_kapi.c: io_pump(0) returns OS32_ERR_INVAL (-9)',
+           'sys/kern/exec/exec_syscall.inc: first and last reserved guest slots: child fault, shell status 139', 'sys/kern/exec/exec_syscall.inc: slot >= KAPI_FUNC_COUNT',
            'userland/shell/sh_exec.inc: run_cmd_report', 'userland/shell/main.c: EXEC_KIND_FAULT'],
     env_limit='Requires mac99 QEMU and loopback UDP/TCP for link-sh RSH.')
 

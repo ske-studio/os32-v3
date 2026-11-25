@@ -21,7 +21,7 @@ int input_getchar_kapi(void) { return input->getchar_kapi(); }
 
 注入リングとownerは既存kernel。
 
-kernel/kbd_inject.c
+sys/kern/kbd_inject.c
 kbdはinj_pushと同じ呼出し条件
 
 kbdのpeek/take
@@ -29,35 +29,35 @@ kbdのpeek/take
 ### serial_diag
 
 ```c
-/* kernel/serial_diag.c: 既存名を共通の口として残す。 */
+/* sys/kern/serial_diag.c: 既存名を共通の口として残す。 */
 void serial_puts_polled(const char *s) { emergency_output.puts_polled(s); }
 int serial_gate_active(void) { return emergency_output.gate_active(); }
 ```
 
 ### kselftest_report
 
-`kernel/kselftest_report.c` の `kselftest_count()`
+`sys/kern/kselftest_report.c` の `kselftest_count()`
 結果・監査を外へ移さない。KDEBUG=0でも必要。
 
 kselftest_pass/fail等の観測シンボルはカーネルに残す。
 
 ### kaudit
 
-`kernel/kaudit.c` の `kselftest_run_audit()`
+`sys/kern/kaudit.c` の `kselftest_run_audit()`
 結果・監査を外へ移さない。KDEBUG=0でも必要。
 
 ## 索引
 
 - [kernel/console/](console/README.md)
-- [kernel/gui.c](gui.md)
+- [sys/kern/gui.c](gui.md)
 - [kernel/ime/](ime/README.md)
 - [kernel/irq/](irq/README.md)
 - [kernel/module/](module/README.md)
-- [kernel/sqlite_engine.c](sqlite_engine.md)
-- [kernel/sys.c](sys.md)
+- [sys/kern/sqlite_engine.c](sqlite_engine.md)
+- [sys/kern/sys.c](sys.md)
 - [kernel/time/](time/README.md)
 - [kernel/v86/](v86/README.md)
-- [kernel/ver_collect.c](ver_collect.md)
-- [kernel/ver_format.c](ver_format.md)
-- [kernel/ver_info.h](ver_info.md)
+- [sys/kern/ver_collect.c](ver_collect.md)
+- [sys/kern/ver_format.c](ver_format.md)
+- [sys/kern/ver_info.h](ver_info.md)
 - [kbd_inject](kbd_inject.md)

@@ -101,7 +101,7 @@ def main():
         settings = []
         if change:
             anchor = '    shell_layout_report(info);'
-            settings = mutant_settings(folder, name, 'platform/powermac/ppc_kernel.c',
+            settings = mutant_settings(folder, name, 'sys/platform/powermac/ppc_kernel.c',
                                        anchor, f'    paging_pte_restore({change});\n' + anchor)
         media = build_media(folder / 'kernel', '-j4', 'IMAGE=kboot-link-sh',
                     'KBOOT_SHELL_LAYOUT_DIAG=1', *settings, 'kernel')

@@ -6,17 +6,17 @@ uses the fixture's copied tree or mutated sources, never an unmutated fallback.
 import re
 
 EXEC_PARTS = (
-    'exec/exec_tramp_init.inc', 'exec/exec_tramp_strings.inc',
-    'exec/exec_abort.inc', 'exec/exec_image_map.inc', 'exec/exec_finish.inc',
-    'exec/exec_syscall.inc', 'exec/exec_stdin.inc', 'exec/exec_fault.inc', 'exec/exec_launch.inc',
-    'exec/exec_schedule.inc',
+    'sys/kern/exec/exec_tramp_init.inc', 'sys/kern/exec/exec_tramp_strings.inc',
+    'sys/kern/exec/exec_abort.inc', 'sys/kern/exec/exec_image_map.inc', 'sys/kern/exec/exec_finish.inc',
+    'sys/kern/exec/exec_syscall.inc', 'sys/kern/exec/exec_stdin.inc', 'sys/kern/exec/exec_fault.inc', 'sys/kern/exec/exec_launch.inc',
+    'sys/kern/exec/exec_schedule.inc',
 )
 
 
 def exec_source(root, read=None):
     if read is None:
         read = lambda path: (root / path).read_text()
-    source = read('exec/exec.c')
+    source = read('sys/kern/exec/exec.c')
     return re.sub(r'^#include "(exec_[^"\n]+\.inc)"\n',
                   lambda m: read('exec/' + m[1]) if 'exec/' + m[1] in EXEC_PARTS else m[0],
                   source, flags=re.M)

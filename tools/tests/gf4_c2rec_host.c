@@ -11,13 +11,13 @@
 #include "gf_accel_c1_host.c"
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
-#include "../../hwdev/gf/display/hw_state.h"
+#include "../../sys/dev/video/geforce/display/hw_state.h"
 
 /* Rebooted fixture storage needs the real F5 binding before stop retires
  * tiles (GF_GUARD_LIFETIME_DESIGN section 4). No thermal policy is faked. */
 #define service_check guard_f5_check
 #define service_publish guard_f5_publish
-#include "../../hwdev/gf/feature5_service.c"
+#include "../../sys/dev/video/geforce/feature5_service.c"
 #undef service_publish
 #undef service_check
 static const struct gf5_test_ops *guard_f5_slot;

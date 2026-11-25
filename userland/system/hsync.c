@@ -95,7 +95,7 @@
  * KAPI は増やさない — カーネル内の crc32_calc を番地で呼ぶのでもなく、
  * 同じ .inc をこちら側でもコンパイルして同じ値を得る。 */
 #include "lib/crc32_core.inc"
-#include "exec/os32x_hdr.c"
+#include "sys/kern/exec/os32x_hdr.c"
 
 /* `/boot/vmkernel.old` を作ってよいかの純規則 (票 TASK_SERIAL_HOSTFS §1-v3)。
  * ホスト試験は tools/tests/test_serialfs.py (hsync_bootold)。 */
@@ -179,7 +179,7 @@
 #define HR_ROOT_IS_SOURCE "root_is_source"  /* --root が同期元 (/host) 自身かその下 */
 #define HR_ROOT_STAT_FAIL "root_stat_failed" /* --root の根を stat できない (I/O 失敗・NOMOUNT) */
 
-/* ext2 のルート inode 番号。**fs/ext2/ext2.h の EXT2_ROOT_INO が正典**で、外部
+/* ext2 のルート inode 番号。**sys/fs/ext2/ext2.h の EXT2_ROOT_INO が正典**で、外部
  * プログラムからは引けないので写しを置く (ずれは tools/tests/test_hsync_h2.py
  * が両方を読んで突き合わせる、[C4])。
  *
@@ -191,17 +191,17 @@
  * カーネル内の vfs_fstype は KAPI に出ていない。 */
 #define HS_EXT2_ROOT_INO 2UL
 
-/* フロッピーのデバイス名の先頭 (drivers/base/dev.c の "fd0" / "fd1"、kernel.c の
+/* フロッピーのデバイス名の先頭 (sys/dev/base/dev.c の "fd0" / "fd1"、kernel.c の
  * FD 起動のルート root_dev = "fd0")。同期先のマウントがこれなら断る */
 #define HS_FD_DEV_PREFIX0 'f'
 #define HS_FD_DEV_PREFIX1 'd'
 
 
-/* VFS が 1 パスで扱える要素数。**fs/vfs.h の VFS_MAX_PATH_DEPTH が正典**で、
+/* VFS が 1 パスで扱える要素数。**sys/fs/vfs.h の VFS_MAX_PATH_DEPTH が正典**で、
  * 外部プログラムからはそのヘッダを引けないので写しを置く。ずれの検出は
  * tools/tests/test_hsync_h1.py が両方を読んで突き合わせる ([C4])。
  *
- * fs/vfs.c の正規化は上限を越えた要素を**黙って捨てる** (エラーを返さない)。
+ * sys/fs/vfs.c の正規化は上限を越えた要素を**黙って捨てる** (エラーを返さない)。
  * `/host` を前置すると同期元は指定より 1 要素深くなるので、32 要素ちょうどの
  * dir を渡すと 33 要素になり、VFS が末尾を落として**指定した親ディレクトリ**を
  * 列挙してしまう。宛先側も同じ理由で別のパスに化ける。何も同期していないのに
@@ -2348,7 +2348,7 @@ static void clean_temps(const char *dst_dir)
  *   0 = ディレクトリ、または不存在 (進んでよい)
  *  -1 = 通常ファイル等の型衝突 / stat 不能 (errors に数え済み)
  *
- * fs/ext2/ext2_dir.c の ext2_find_entry は**種別を問わず**名前があれば EXIST を
+ * sys/fs/ext2/ext2_dir.c の ext2_find_entry は**種別を問わず**名前があれば EXIST を
  * 返すので、sys_mkdir の OS32_ERR_EXIST だけでは「同じ名前の通常ファイル」を
  * 見分けられない。無条件に受理して再帰すると、`/host/usr/empty` が
  * ディレクトリ・`/usr/empty` が通常ファイルのまま errors=0 / 終了コード 0 で
@@ -2494,7 +2494,7 @@ static void sync_directory(const char *src_dir, const char *dst_dir, int depth)
         }
 
         /* ---- 要素数の検査 (B2) ----
-         * fs/vfs.c は上限を越えた要素を黙って捨てるので、越えたパスは
+         * sys/fs/vfs.c は上限を越えた要素を黙って捨てるので、越えたパスは
          * 「1 つ上のディレクトリ」を指す**別のパス**として成立してしまう。
          * 内容を開く前に断ち切る。 */
         if (hsp_depth(src_path) > HS_MAX_PATH_DEPTH ||

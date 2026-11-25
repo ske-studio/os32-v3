@@ -94,7 +94,7 @@ int sh_launch(const char *cmdline)
     #endif
 
     /* T11: カーネルの要求表が受け取るのは NUL 終端 1〜LAUNCH_CMDLINE_MAX-1
-     * バイトだけ (exec/launch.c の len 検査)。超えたまま launch_req を呼ぶと
+     * バイトだけ (sys/kern/exec/launch.c の len 検査)。超えたまま launch_req を呼ぶと
      * OS32_ERR_INVAL が返り、下の分岐がそれを「GUI 外」と読み違えて
      * "external programs need the GUI terminal" を出す — 理由が入れ替わる。
      * **送る前に**測って断る。カーネルの上限は変えない (票 §6)。 */

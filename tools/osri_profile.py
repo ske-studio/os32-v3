@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 
 OSRI_COMPARE_OUT_LIMIT = 47
-PROFILE_HEADER = Path(__file__).resolve().parents[1] / 'gfx/osri_profile.h'
+PROFILE_HEADER = Path(__file__).resolve().parents[1] / 'sys/kern/gfx/osri/osri_profile.h'
 
 
 def read_out_budget(path=PROFILE_HEADER):

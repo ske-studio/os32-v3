@@ -54,8 +54,8 @@ void io_clock_set_ops(const struct io_clock_ops *ops) { (void)ops; }
 int pc98_tsc_ready(void) { return tsc_ready; }
 int pc98_tsc_read_us(u32 *lo, u32 *hi)
 { if (tsc_rc) return tsc_rc; *lo = (u32)fake_tsc_us; *hi = (u32)(fake_tsc_us >> 32); return 0; }
-#include "../../platform/pc98/clock_source.c"
-#include "../../kernel/time/ktime.c"
+#include "../../sys/platform/pc98/clock_source.c"
+#include "../../sys/kern/time/ktime.c"
 static void call(int rc, unsigned int n, unsigned int old)
 {
     unsigned int before = saves;

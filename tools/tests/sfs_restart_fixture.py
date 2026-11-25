@@ -29,7 +29,7 @@ def nonces(work, source):
         '-fdata-sections', '-Wl,--gc-sections', '-I' + str(ROOT), *include_flags(ROOT),
         '-DPRODUCT_SOURCE="' + str(product) + '"',
         str(ROOT / 'tools/tests/sfs_boot_nonce_host.c'),
-        str(ROOT / 'fs/serialfs/sfs_proto.c'), str(ROOT / 'lib/crc32.c'), '-o', str(exe)], check=True)
+        str(ROOT / 'sys/fs/serialfs/sfs_proto.c'), str(ROOT / 'lib/crc32.c'), '-o', str(exe)], check=True)
     values = []
     for boot in ('1', '2'):
         result = host32.run([str(exe), boot], capture_output=True, check=True)
@@ -80,7 +80,7 @@ def scenario(work, values, link):
 
 
 def main(link):
-    source = (ROOT / 'fs/serialfs/serialfs_persistent.c').read_text()
+    source = (ROOT / 'sys/fs/serialfs/serialfs_persistent.c').read_text()
     with tempfile.TemporaryDirectory(prefix='sfs-restart-') as td:
         work = Path(td)
         scenario(work, nonces(work, source), link)

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """H1: isolated type contract, real product flags, and libc-free ILP32 runtime."""
 CHECK = dict(name='type-contract', tier=1, needs=[], budget=180,
-    covers=['include/type_contract.h', 'include/types.h', 'include/callconv.h',
-            'arch/x86/arch_type_contract.h', 'tools/abi/type_contract.c',
+    covers=['sys/include/type_contract.h', 'sys/include/types.h', 'sys/include/callconv.h',
+            'sys/arch/x86/arch_type_contract.h', 'tools/abi/type_contract.c',
             'tools/tests/test_type_contract.py', 'tools/tests/host32.py',
             'tools/build_compare.py', 'tools/gen_build_id.py',
             'Makefile', 'build/**/*.mk', 'sdk/include/os32/**',
-            'kernel/module/kdebug_imports.def', 'sdk/kapi.json',
-            'boot/*.c', 'fs/pc98pt.c', 'lib/sqlite3/sqlite3.c',
+            'sys/kern/module/kdebug_imports.def', 'sdk/kapi.json',
+            'boot/*.c', 'sys/fs/pc98pt.c', 'lib/sqlite3/sqlite3.c',
             'userland/tests/sqlite_standalone/*.c'],
     basis=['[C1]', '[ABI]', 'KAPI_SPEC §2'],
 )
@@ -194,12 +194,12 @@ def inspect_recipes(root, goals):
             boot_sources = {'boot/boot_main.c': 'boot_main.o',
                 'boot/boot_debug.c': 'boot_debug.o', 'boot/ext2_mini.c': 'ext2_mini.o',
                 'boot/lz4_mini.c': 'lz4_mini.o', 'boot/vk32_boot.c': 'vk32_boot.o',
-                'fs/pc98pt.c': 'pc98pt_boot.o'}
+                'sys/fs/pc98pt.c': 'pc98pt_boot.o'}
             boot = (len(sources) == 1 and sources[0] in boot_sources and
                     output == 'boot/' + boot_sources[sources[0]])
             standalone_sources = {'lib/sqlite3/sqlite3.c': 'sqlite3_user.o',
-                'userland/tests/sqlite_standalone/sqlite_user_vfs.c': 'sqlite_user_vfs.o',
-                'userland/tests/sqlite_standalone/sqlite_standalone.c': 'sqlite_standalone.o'}
+                'userland/diag/sqlite_standalone/sqlite_user_vfs.c': 'sqlite_user_vfs.o',
+                'userland/diag/sqlite_standalone/sqlite_standalone.c': 'sqlite_standalone.o'}
             standalone = (len(sources) == 1 and sources[0] in standalone_sources and
                 output == 'userland/tests/sqlite_standalone/' + standalone_sources[sources[0]])
             probe_defaults = (sources == ['tools/abi/type_contract.c'] and
@@ -391,7 +391,7 @@ def main():
             check_recipes(tree)
         arch = 'ppc' if args.ppc else 'x86'
         provider = (ROOT / f'arch/{arch}/arch_type_contract.h').read_text()
-        contract = (ROOT / 'include/type_contract.h').read_text()
+        contract = (ROOT / 'sys/include/type_contract.h').read_text()
         (directory / 'arch_type_contract.h').write_text(provider)
         (directory / 'type_contract.h').write_text(contract)
         profile = profiles(directory, args.ppc)

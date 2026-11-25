@@ -1,12 +1,12 @@
 """H4/H5: real production resource lookup, adapter and paging/ledger lifetime."""
 CHECK = dict(name='gf1-instmem-map-host', tier=1,
-             covers=['tools/tests/gf_guard_fake.h', 'hwdev/gf/instmem_map.c',
-                     'hwdev/gf/*.h', 'include/gf_production.h', 'include/memmap.h',
-                     'drivers/video/geforce/geforce_platform.c',
-                     'drivers/video/geforce/geforce_module.h',
-                     'mm/paging.c', 'mm/paging.h', 'mm/paging_*.inc',
-                     'mm/pgalloc.c', 'mm/pgalloc.h', 'mm/pgalloc_*.inc',
-                     'mm/physmem.c', 'mm/physmem.h',
+             covers=['tools/tests/gf_guard_fake.h', 'sys/dev/video/geforce/instmem_map.c',
+                     'hwdev/gf/*.h', 'sys/include/gf_production.h', 'sys/include/memmap.h',
+                     'sys/dev/video/geforce/geforce_platform.c',
+                     'sys/dev/video/geforce/geforce_module.h',
+                     'sys/kern/mm/paging.c', 'sys/kern/mm/paging.h', 'mm/paging_*.inc',
+                     'sys/kern/mm/pgalloc.c', 'sys/kern/mm/pgalloc.h', 'mm/pgalloc_*.inc',
+                     'sys/kern/mm/physmem.c', 'sys/kern/mm/physmem.h',
                      'tools/tests/gf1_instmem_map_host.c', 'tools/tests/test_gf1_instmem_map.py',
                      'tools/tests/pgalloc_host_fixture.h', 'tools/tests/paging_source.py',
                      'tools/tests/host_arch/arch_cpu.h', 'tools/tests/host_arch/arch_io.h',
@@ -25,9 +25,9 @@ from kernel_includes import include_flags
 from paging_source import paging_source
 
 ROOT = Path(__file__).resolve().parents[2]
-ADAPTER = 'hwdev/gf/instmem_map.c'
-PLATFORM = 'drivers/video/geforce/geforce_platform.c'
-PAGING = 'mm/paging_map.inc'
+ADAPTER = 'sys/dev/video/geforce/instmem_map.c'
+PLATFORM = 'sys/dev/video/geforce/geforce_platform.c'
+PAGING = 'sys/kern/mm/paging_map.inc'
 # Each anchor is unique in its product input. Builds must succeed and every
 # mutant must report an assertion failure at runtime, followed by a GREEN control.
 MUTATIONS = [
@@ -61,8 +61,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix='gf1-map-') as td:
         tmp = Path(td)
         exe = tmp / 'host'
-        paging = paging_source(ROOT / 'mm/paging.c')
-        (tmp / 'pgalloc_source.c').write_text(paging_source(ROOT / 'mm/pgalloc.c'))
+        paging = paging_source(ROOT / 'sys/kern/mm/paging.c')
+        (tmp / 'pgalloc_source.c').write_text(paging_source(ROOT / 'sys/kern/mm/pgalloc.c'))
         command = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                    '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
                    '-fno-stack-protector', '-ffunction-sections', '-fdata-sections',
@@ -71,7 +71,7 @@ def main():
                    '-I' + str(ROOT / 'tools/tests/host_arch'),
                    '-I' + str(ROOT / 'tools/tests'), *include_flags(ROOT),
                    str(ROOT / 'tools/tests/gf1_instmem_map_host.c'),
-                   str(tmp / 'instmem_map.c'), str(ROOT / 'mm/physmem.c'),
+                   str(tmp / 'instmem_map.c'), str(ROOT / 'sys/kern/mm/physmem.c'),
                    '-o', str(exe)]
 
         def build(inputs):

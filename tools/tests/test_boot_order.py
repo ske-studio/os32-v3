@@ -6,15 +6,15 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-PATHS = ['platform/pc98/kernel_boot_cpu.inc', 'platform/pc98/kernel_boot_memory.inc',
-         'arch/x86/kernel/boot_cpu.c', 'arch/x86/kernel/boot_after_paging.c',
-         'platform/pc98/boot_irq.c']
-CHECK = dict(name='boot-order-host', tier=1, covers=['include/clock_source.h', 'platform/pc98/kernel_boot_cpu.inc', 'platform/pc98/kernel_boot_memory.inc',
-    'arch/x86/kernel/boot_cpu.c', 'arch/x86/kernel/boot_after_paging.c',
-    'platform/pc98/boot_irq.c',
+PATHS = ['sys/platform/pc98/kernel_boot_cpu.inc', 'sys/platform/pc98/kernel_boot_memory.inc',
+         'sys/arch/x86/kernel/boot_cpu.c', 'sys/arch/x86/kernel/boot_after_paging.c',
+         'sys/platform/pc98/boot_irq.c']
+CHECK = dict(name='boot-order-host', tier=1, covers=['sys/hal/time/clock_source.h', 'sys/platform/pc98/kernel_boot_cpu.inc', 'sys/platform/pc98/kernel_boot_memory.inc',
+    'sys/arch/x86/kernel/boot_cpu.c', 'sys/arch/x86/kernel/boot_after_paging.c',
+    'sys/platform/pc98/boot_irq.c',
     'tools/tests/test_boot_order.py',
-    'include/boot_cpu.h', 'include/platform_boot.h', 'include/fault_fixture.h',
-    'arch/x86/kernel/fault_fixture.c'], needs=[], budget=2.8,
+    'sys/include/boot_cpu.h', 'sys/include/platform_boot.h', 'sys/include/fault_fixture.h',
+    'sys/arch/x86/kernel/fault_fixture.c'], needs=[], budget=2.8,
     kind='characterization',
 )
 

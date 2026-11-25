@@ -11,15 +11,15 @@ from kernel_includes import include_flags
 from mutpar import build_in_tree
 
 CHECK = dict(name='gfx2-backend-reg-host', tier=1, needs=[], budget=20,
-    covers=['gfx/v2/backend_reg.c', 'gfx/v2/gfx2_int.h',
-            'platform/pc98/gfx_selector.c', 'gfx/gfx_core.c', 'gfx/gfx_core_init.inc',
+    covers=['sys/hal/gfx/v2/backend_reg.c', 'sys/hal/gfx/v2/gfx2_int.h',
+            'sys/platform/pc98/gfx_selector.c', 'sys/hal/gfx/gfx_core.c', 'sys/hal/gfx/gfx_core_init.inc',
             'tools/tests/gfx2_backend_reg_host.c', 'tools/tests/test_gfx2_backend_reg.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py'],
     basis=['HAL_V2_DESIGN §11-7'],
 )
 ROOT = Path(__file__).resolve().parents[2]
-REG = 'gfx/v2/backend_reg.c'
-PROVIDER = 'platform/pc98/gfx_selector.c'
+REG = 'sys/hal/gfx/v2/backend_reg.c'
+PROVIDER = 'sys/platform/pc98/gfx_selector.c'
 MUTATIONS = (
     ('head-count', REG, 'a->heads = a->caps.heads < 2 ? a->caps.heads : 2;', 'a->heads = a->caps.heads;'),
     ('abi', REG, 'be->abi != GFX_HAL2_ABI', '0'),
@@ -38,10 +38,10 @@ MUTATIONS = (
     ('caller-owner', REG, 'c->owner = caller.owner;', 'c->owner = 0;'),
     ('sync-mode', REG, '*mode = (u32)gfxsync_mode(*ctx);', '*mode = GFXSYNC_DIRECT;'),
     ('sync-publish', REG, 'sync_tab[kind][head] = ctx;', 'if (!sync_tab[kind][head]) sync_tab[kind][head] = ctx;'),
-    ('init-register', 'gfx/gfx_core_init.inc', '    gfx2_register_selected();', '    (void)0;'),
-    ('init-palette', 'gfx/gfx_core_init.inc', '    gfx2_pal_reset16();', '    (void)0;'),
-    ('shutdown-register', 'gfx/gfx_core.c', '        gfx2_register_selected();', '        (void)0;'),
-    ('shutdown-detach', 'gfx/gfx_core.c', 'gfx2_head_detach(a, h);', '(void)h;'),
+    ('init-register', 'sys/hal/gfx/gfx_core_init.inc', '    gfx2_register_selected();', '    (void)0;'),
+    ('init-palette', 'sys/hal/gfx/gfx_core_init.inc', '    gfx2_pal_reset16();', '    (void)0;'),
+    ('shutdown-register', 'sys/hal/gfx/gfx_core.c', '        gfx2_register_selected();', '        (void)0;'),
+    ('shutdown-detach', 'sys/hal/gfx/gfx_core.c', 'gfx2_head_detach(a, h);', '(void)h;'),
     ('provider-selected', PROVIDER, 'if (be == g_backend) fn(be, arg);', 'if (be != g_backend) fn(be, arg);'),
 )
 
@@ -68,10 +68,10 @@ def observe(folder, mutation=None):
 
     # Execute the complete functions, preserving every product call and branch.
     (folder / 'gfx2_core_calls.inc').write_text(
-        function('gfx/gfx_core.c', 'gfx2_register_other') +
-        function('gfx/gfx_core.c', 'gfx2_register_selected') +
-        function('gfx/gfx_core.c', 'gfx_shutdown') +
-        function('gfx/gfx_core_init.inc', 'gfx_init_mode'))
+        function('sys/hal/gfx/gfx_core.c', 'gfx2_register_other') +
+        function('sys/hal/gfx/gfx_core.c', 'gfx2_register_selected') +
+        function('sys/hal/gfx/gfx_core.c', 'gfx_shutdown') +
+        function('sys/hal/gfx/gfx_core_init.inc', 'gfx_init_mode'))
     exe = folder / 'registry'
     command = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall',
                '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-no-pie',

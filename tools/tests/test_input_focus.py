@@ -2,8 +2,8 @@
 CHECK = dict(name='input-focus-host', tier=1, needs=[], budget=15,
     covers=['tools/tests/test_input_focus.py', 'tools/tests/input_focus_host.c',
             'platform/*/platform_input_caps.h', 'build/targets/ppc-powermac.mk', 'build/config.mk',
-            'platform/pc98/platform_io.h', 'tools/tests/host_arch/**', 'include/**', 'exec/exec_gui.h', 'exec/exec_hooks.h',
-            'kernel/av_focus.c', 'kapi/kapi_in2.c', 'input/hal/*.[ch]', 'input/keymaps/*.c', 'platform/pc98/input_keymap.c', 'sdk/include/os32/**'],
+            'sys/platform/pc98/platform_io.h', 'tools/tests/host_arch/**', 'include/**', 'sys/kern/exec/exec_gui.h', 'sys/kern/exec/exec_hooks.h',
+            'sys/kern/av_focus.c', 'sys/kapi/kapi_in2.c', 'input/hal/*.[ch]', 'input/keymaps/*.c', 'sys/platform/pc98/input_keymap.c', 'sdk/include/os32/**'],
     basis=['docs/decisions/INPUT_HAL_DESIGN.md 7d', 'docs/decisions/sound/AV_HAL_DESIGN.md §5-3, §5-6'])
 from pathlib import Path
 import subprocess
@@ -12,9 +12,9 @@ import os
 
 
 def run(ctx):
-    sources = ['kernel/av_focus.c', 'kapi/kapi_in2.c'] + ['input/hal/' + name + '.c' for name in
+    sources = ['sys/kern/av_focus.c', 'sys/kapi/kapi_in2.c'] + ['input/hal/' + name + '.c' for name in
         ('kbd_merge', 'keymap_eval', 'keymap_state', 'keymap_registry', 'legacy_keymap', 'legacy_mode', 'in2_excl', 'in2_reclaim', 'legacy_ring', 'mouse_ext', 'in2_ring', 'in2_dev', 'in2_export')]
-    sources += ['input/keymaps/pc98_jp.c', 'input/keymaps/hid_jp.c', 'platform/pc98/input_keymap.c']
+    sources += ['sys/input/keymaps/pc98_jp.c', 'sys/input/keymaps/hid_jp.c', 'sys/platform/pc98/input_keymap.c']
     cases = []
     if ctx.mutate:
         cases = [
@@ -79,7 +79,7 @@ def run(ctx):
                 f'extern int snapshot_path; if (snapshot_path != {path}) {anchor}'))
         # Each public entry must reach its own provider at runtime.
         import re
-        api = (ctx.root / 'kapi/kapi_in2.c').read_text()
+        api = (ctx.root / 'sys/kapi/kapi_in2.c').read_text()
         for body in re.findall(r'int in2_\w+\([^)]*\)\n\{.*?\n\}', api, re.S):
             signature, rest = body.split('{', 1)
             cases.append(('kapi_in2.c', body, signature + '{ return OS32_ERR_NOSYS; }'))

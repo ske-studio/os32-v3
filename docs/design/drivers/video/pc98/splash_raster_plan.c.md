@@ -1,7 +1,7 @@
-# drivers/video/pc98/splash_raster_plan.c — 画像の全行の OUT 列を前もって作る
+# sys/platform/pc98/video/splash_raster_plan.c — 画像の全行の OUT 列を前もって作る
 
 > 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
-ソース: `drivers/video/pc98/splash_raster_plan.c` (型と宣言は `drivers/video/pc98/splash_raster_play.h`)
+ソース: `sys/platform/pc98/video/splash_raster_plan.c` (型と宣言は `sys/platform/pc98/video/splash_raster_play.h`)
 
 ## 口の契約
 

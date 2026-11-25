@@ -140,7 +140,7 @@ def measure(root, image):
                 continue  # 消した・改名したソースの古い .d は数えない
             real = words[0]
             if real.endswith(GENERATED_KAPI):
-                unit = 'kapi/kapi_generated.c'
+                unit = 'sys/kapi/kapi_generated.c'
             elif not inside(real) or real.startswith('build/'):
                 continue
             else:

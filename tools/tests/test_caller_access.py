@@ -55,7 +55,7 @@ def sources():
     s = exec_source(ROOT)
     a = s.index("void exec_syscall_dispatch(struct arch_syscall *view)")
     b = s.index("\n}", a) + 2
-    return {"access": (ROOT / "exec/redir_access.c").read_text(),
+    return {"access": (ROOT / "sys/kern/exec/redir_access.c").read_text(),
             "dispatch": 'static void exec_cui_display_abort(void) {}\n' + syscall_providers(ROOT) + s[a:b],
             "wm": function(s, "ring3_wm_enter") + "\n" + function(s, "ring3_wm_leave"),
             "host": (ROOT / "tools/tests/caller_access_host.c").read_text()}
@@ -66,7 +66,7 @@ def run(src, quiet=False):
         tmp = pathlib.Path(folder)
         (tmp / "exec").mkdir()
         (tmp / "tools/tests").mkdir(parents=True)
-        (tmp / "exec/redir_access.c").write_text(src["access"])
+        (tmp / "sys/kern/exec/redir_access.c").write_text(src["access"])
         host = tmp / "tools/tests/caller_access_host.c"
         host.write_text(src["host"])
         (host.parent / "legacy_guest_fake.h").write_text((ROOT / "tools/tests/legacy_guest_fake.h").read_text())

@@ -1,5 +1,5 @@
 /* Compile the product lifetime code with typed outer/VFS fault injection. */
-#include "kernel/ime/ime_conn.c"
+#include "sys/kern/ime/ime_conn.c"
 static int order, bad, begin_rc, close_rc, finish_rc, stale, fd = 7, available = 1;
 static void expect(int step) { if (++order != step) bad = 1; }
 int sqlite_engine_available(int io) { return available && io; }

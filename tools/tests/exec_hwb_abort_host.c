@@ -9,13 +9,13 @@ static unsigned int observed_save(void);
 static void observed_restore(unsigned int flags);
 #define irq_save observed_save
 #define irq_restore observed_restore
-#include "exec/exec.c"
+#include "sys/kern/exec/exec.c"
 #undef irq_save
 #undef irq_restore
-#include "exec/appslot.c"
-#include "input/hal/input_context.c"
-#include "input/hal/input_interrupt.c"
-#include "exec/ring3_str.c"
+#include "sys/kern/exec/appslot.c"
+#include "sys/input/input_context.c"
+#include "sys/input/input_interrupt.c"
+#include "sys/kern/exec/ring3_str.c"
 volatile u32 kctx_irq_depth, kctx_exc_depth;
 
 volatile u32 tick_count;

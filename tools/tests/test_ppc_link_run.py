@@ -1,13 +1,13 @@
 """Acceptance predicates and QMP waiting must preserve agent progress."""
 CHECK = dict(name='ppc-link-run-host', tier=2, budget=30, needs=[], covers=[
     'tools/ppc/link_run.py', 'tools/ppc/link_diag_run.py', 'tools/ppc/run.py', 'tools/ppc_lan_host.py',
-    'tools/host_*.py', 'tools/ppc_link_transport.py', 'net/link_platform.h',
-    'platform/powermac/link_platform.c', 'tools/tests/test_ppc_link_run.py',
+    'tools/host_*.py', 'tools/ppc_link_transport.py', 'sys/hal/net/link_platform.h',
+    'sys/platform/powermac/link_platform.c', 'tools/tests/test_ppc_link_run.py',
     'tools/lan_bridge.py', 'tools/lanfs_host.py', 'tools/ppc_hostfs.py',
     'tools/remote_transport.py', 'tools/serialfs_host.py',
-    'arch/ppc/entry.S', 'arch/ppc/ofw_note.S', 'platform/powermac/boot.c',
-    'platform/powermac/escc.c', 'platform/powermac/escc_tree.c',
-    'platform/powermac/ofw.c'],
+    'sys/arch/ppc/entry.S', 'sys/arch/ppc/ofw_note.S', 'sys/platform/powermac/boot.c',
+    'sys/platform/powermac/escc.c', 'sys/platform/powermac/escc_tree.c',
+    'sys/platform/powermac/ofw.c'],
     basis=['LAN_OPERATOR_DESIGN §7', 'AC-NET-3'],
 )
 import os

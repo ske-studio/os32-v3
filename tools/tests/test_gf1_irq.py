@@ -1,11 +1,11 @@
 """B2 real IRQ component: shared registration, bounded W1C and tick recovery."""
 CHECK = dict(name='gf1-irq-host', tier=1,
-    covers=['hwdev/gf/irq.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.h',
-            'hwdev/gf_load_state.h', 'kdebug/gfinit_decode.h', 'kdebug/recover.h',
-            'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'drivers/pci/pci.h',
-            'drivers/pci/pci_decode.h', 'include/types.h', 'include/io.h',
-            'lib/serial_diag.h', 'include/video_service.h',
-            'include/pci_dev_contract.h', 'tools/tests/gf1_irq_host.c',
+    covers=['sys/dev/video/geforce/irq.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.h',
+            'sys/dev/video/geforce/gf_load_state.h', 'sys/dev/video/geforce/diag/gfinit_decode.h', 'sys/dev/video/geforce/diag/recover.h',
+            'sys/kern/irq/irq.h', 'sys/kern/irq/irq_math.h', 'sys/dev/pci/pci.h',
+            'sys/dev/pci/pci_decode.h', 'sys/include/types.h', 'sys/include/io.h',
+            'lib/serial_diag.h', 'sys/include/video_service.h',
+            'sys/include/pci_dev_contract.h', 'tools/tests/gf1_irq_host.c',
             'tools/tests/test_gf1_irq.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py'],
     needs=[], budget=3.7,
@@ -21,7 +21,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'hwdev/gf/irq.c'
+SOURCE = ROOT / 'sys/dev/video/geforce/irq.c'
 
 
 def main():

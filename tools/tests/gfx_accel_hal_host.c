@@ -16,7 +16,7 @@ static void finish(int rc)
 } } while (0)
 
 #include "os32_kapi_slots.h"
-#include "../../gfx/v2/gfx2_int.h"
+#include "../../sys/hal/gfx/v2/gfx2_int.h"
 static u32 bridge_access;
 static int bridge_active, bridge_begins, bridge_ends;
 int v1_bridge_begin(u32 role, u32 access)

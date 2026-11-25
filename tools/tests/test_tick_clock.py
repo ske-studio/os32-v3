@@ -1,8 +1,8 @@
 """Exercise the common physical-to-logical clock without libc."""
 CHECK = dict(name='tick-clock-host', tier=4,
-    covers=['include/snd_wake_contract.h', 'drivers/sound/snd_wake_tick.c', 'drivers/sound/snd_wake_tick.h',
-            'kernel/time/tick.c', 'kernel/time/tick_clock.h',
-            'include/kernel_tick.h', 'sdk/include/os32/os32_kapi_shared.h',
+    covers=['sys/hal/sound/snd_wake_contract.h', 'sys/hal/sound/snd_wake_tick.c', 'sys/hal/sound/snd_wake_tick.h',
+            'sys/hal/time/tick.c', 'sys/hal/time/tick_clock.h',
+            'sys/include/kernel_tick.h', 'sdk/include/os32/os32_kapi_shared.h',
             'tools/tests/tick_clock_host.c', 'tools/tests/test_tick_clock.py',
             'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
     needs=[], budget=3.0,
@@ -33,8 +33,8 @@ MUTATIONS = (
 
 
 def verify(work, mutation=None):
-    paths = ['kernel/time/tick.c', 'kernel/time/tick_clock.h',
-             'drivers/sound/snd_wake_tick.c', 'drivers/sound/snd_wake_tick.h']
+    paths = ['sys/hal/time/tick.c', 'sys/hal/time/tick_clock.h',
+             'sys/hal/sound/snd_wake_tick.c', 'sys/hal/sound/snd_wake_tick.h']
     sources = {path: (ROOT / path).read_text() for path in paths}
     if mutation:
         assert sum(source.count(mutation[0]) for source in sources.values()) == 1

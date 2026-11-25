@@ -9,7 +9,7 @@
  * and gf5_host_fail_at remain valid for their existing fixture operations. */
 #ifndef TOOLS_TESTS_GF_GUARD_FAKE_H
 #define TOOLS_TESTS_GF_GUARD_FAKE_H
-#include "../../hwdev/gf/feature5.h"
+#include "../../sys/dev/video/geforce/feature5.h"
 
 struct gf3_host;
 struct gf4_host;

@@ -122,7 +122,7 @@ include build/ppc-root-pair.mk
 
 
 def root_image_failures(work, mutate):
-    source = (ROOT/'platform/powermac/root_image.c').read_text()
+    source = (ROOT/'sys/platform/powermac/root_image.c').read_text()
     variants = [('normal', source, 0)]
     if mutate:
         for name, old, new, status in [
@@ -171,7 +171,7 @@ def test(work, mutate):
     paired_iso(work, gcc, mod)
     make_pair_recovery(work)
     root_image_failures(work, mutate)
-    source = ROOT/'platform/powermac/module_pair.c'
+    source = ROOT/'sys/platform/powermac/module_pair.c'
     digests = set()
     def guest(src, rc, fixture='bytes.o', *flags):
         run([gcc, '-O2', '-msdata=none', '-ffreestanding', '-nostdinc', '-nostdlib',

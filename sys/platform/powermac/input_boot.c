@@ -1,0 +1,143 @@
+/* PLN1 local provider: decoded LAN first, then USB. */
+#include "input_boot.h"
+#include "input_usb.h"
+#include "kbd_inject.h"
+#include "kbd_contract.h"
+#ifdef KBOOT_USB_KEY_TRACE
+#include "port_service.h"
+#endif
+#include "input_service.h"
+#include "clock_source.h"
+#include "lan_boot.h"
+#include "sys/hal/input/in2_int.h"
+#include "con_sink.h"
+#include "sys/kern/exec/exec.h"
+#include "sys/kern/idle_work.h"
+#if !KBOOT_LINK
+#include "io.h"
+static PmInputDecoder decoder = { .pending = -1 };
+static int lan_lookahead = -1;
+
+static int lan_key(void)
+{
+    for (unsigned n = 0; n < 32; n++) {
+        int c;
+        u32 now, hi;
+        if (decoder.pending >= 0) {
+            c = decoder.pending;
+            decoder.pending = -1;
+        } else c = pm_terminal_trygetkey();
+        platform_clock_read_us(&now, &hi);
+        int key = pm_input_decode(&decoder, c, now);
+        if (key >= 0 || c < 0) return key;
+    }
+    return -1;
+}
+/* Finite byte collection is allowed; a completed LAN key stays until try. */
+static int lan_peek(void)
+{
+    if (lan_lookahead >= 0) return lan_lookahead;
+    lan_lookahead = lan_key();
+    return lan_lookahead;
+}
+static int peek(void)
+{
+    int key = lan_peek();
+    return key >= 0 ? key : pm_input_usb_peek();
+}
+static int try_key(void)
+{
+    int key = lan_peek();
+    if (key >= 0) {
+        u32 flags = irq_save();
+        lan_lookahead = -1;
+        pm_input_usb_note_remote();
+        irq_restore(flags);
+        return key;
+    }
+    return pm_input_usb_take();
+}
+#endif
+static u32 wait_ticks(void) { u32 lo = 0, hi; platform_clock_read_us(&lo, &hi); return lo; }
+static u32 wait_timeout(void) { return 30000000u; }
+static void wait_step(void) { idle_wait_step(); }
+static int gui_active(void) { return kbd_gui_mode; }
+static int inject_peek(void)
+{
+    u8 b;
+    return kbd_inject_peek(&b) ? b : -1;
+}
+static int inject_try(void)
+{
+    u8 b;
+    if (!kbd_inject_take(&b)) return -1;
+    pm_input_usb_note_remote();
+    return b;
+}
+static const struct InputLegacyProvider provider = {
+#if KBOOT_LINK
+    .try_key = pm_input_usb_take, .peek_key = pm_input_usb_peek,
+#else
+    .try_key = try_key, .peek_key = peek,
+#endif
+    .gui_active = gui_active, .inject_peek = inject_peek, .inject_try = inject_try,
+    .terminal_try = NULL, .terminal_peek = NULL, .terminal_enabled = NULL,
+    .wait_ticks = wait_ticks, .wait_timeout_ticks = wait_timeout,
+    .capture_active = con_sink_capture_active, .wait_pending = ring3_wait_pending,
+    .wait_step = wait_step,
+};
+static int key(void) { return input_legacy_wait(IL_KEY, 0); }
+static int try_key_bridge(void) { return input_legacy_try(IL_KEY); }
+static int try_local_char(void) { return input_legacy_try(IL_LOCAL_CHAR); }
+static int try_char(void) { return input_legacy_try(IL_CHAR); }
+static int character(void) { return input_legacy_wait(IL_CHAR, 0); }
+static int wait_key(int interruptible) { return input_legacy_wait(IL_KEY, interruptible); }
+static int character_kapi(void) { return input_legacy_wait(IL_CHAR, 1); }
+static int key_kapi(void)
+{
+    int key = input_legacy_wait(IL_KEY, 1);
+#ifdef KBOOT_USB_KEY_TRACE
+    /* A pending CUI abort can unwind the app at syscall exit. Observe the
+     * actual wait result and FIFO here, while that app still owns the call. */
+    if (key == -1 && pm_input_usb_peek() == -1) {
+        const char *message = "IN2 INTERRUPTED -1 EMPTY\n";
+        while (*message) port_putchar_kapi(*message++);
+    }
+#endif
+    return key;
+}
+/* Busy pollers (e.g. a CUI script checking for ESC) never halt, so advance the
+ * foreground work once per peek; idle_work_run refuses EE=0, IRQ and re-entry. */
+static int peek_key(void)
+{
+#if !KBOOT_LINK
+    idle_work_run();
+#endif
+    return input_legacy_peek(IL_KEY);
+}
+static int has_key(void) { return peek_key() >= 0; }
+static int pressed(int scancode)
+{
+    return (unsigned)scancode < 128 && input_key_pressed(scancode);
+}
+static u32 modifiers(void) { return input_key_mods(); }
+static int diag(KbdDiag *out) { (void)out; return OS32_ERR_NOSYS; }
+static int diag_log(u32 seq, KbdDiagLogEnt *out, int max)
+{ (void)seq; (void)out; (void)max; return OS32_ERR_NOSYS; }
+static const InputOps ops = {
+    .getchar = character, .getkey = key, .trygetchar = try_char,
+    .trygetkey = try_key_bridge, .peekkey = peek_key, .trygetchar_local = try_local_char,
+    .getchar_kapi = character_kapi, .getkey_kapi = key_kapi, .getkey_wait = wait_key,
+    .has_key = has_key, .is_pressed = pressed, .trygetrawkey = legacy_raw_take,
+    .modifiers = modifiers, .dropped_count = pm_input_usb_dropped, .shift_state = platform_fep_key_shift,
+    .gui_mode = kbd_set_gui_mode, .discard_stop = kbd_discard_stop, .diag = diag, .diag_log = diag_log,
+};
+void pm_input_boot(void)
+{
+#if !KBOOT_LINK
+    decoder = (PmInputDecoder){ .pending = -1 };
+    lan_lookahead = -1;
+#endif
+    input_legacy_register(&provider);
+    input_register(&ops);
+}

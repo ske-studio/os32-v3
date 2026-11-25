@@ -1,9 +1,9 @@
 /* Real kprintf -> real console -> serial capture, with rendering suppressed. */
-#include "../../lib/kprintf_attr.c"
-#include "../../kernel/console/console.c"
+#include "../../sys/kern/kprintf_attr.c"
+#include "../../sys/kern/console/console.c"
 static char serial_output[4096];
 static u32 serial_length;
-#include "../../kernel/port_service.c"
+#include "../../sys/kern/port_service.c"
 static int capture_putchar(char c)
 {
     if (serial_length + 1 < sizeof(serial_output)) {

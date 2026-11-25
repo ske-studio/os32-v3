@@ -1,10 +1,10 @@
 /* ========================================================================
- *  shell_service_stub_host.h — exec/exec.c を切り出して組むホスト試験向けの
+ *  shell_service_stub_host.h — sys/kern/exec/exec.c を切り出して組むホスト試験向けの
  *  T7b-b1/b2 S3b 結線の弱い贋物
  *
  *  exec.c の ring3_wm_enter / leave・ring3_context_*・dispatch 入口・
  *  exec_run / exec_finish の shell 分岐・exec_reclaim_resources は S3b から
- *  exec/shell_service.c (WM 区間の印、publish / retire) と kernel/console/font_source.c
+ *  sys/kern/exec/shell_service.c (WM 区間の印、publish / retire) と sys/kern/console/font_source.c
  *  (exec_font_lease_close_owned) を引く。それらを見ない試験は、切り出した部分を
  *  #include する前にこれを #include する。弱い定義なので、実物か試験自身の
  *  定義があればそちらが勝つ。実物の振る舞いは shell_service_host.c と

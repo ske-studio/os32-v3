@@ -1,5 +1,5 @@
 #include "in2_int.h"
-#include "kernel/time/tick_clock.h"
+#include "sys/hal/time/tick_clock.h"
 #include "kbd.h"
 
 static int test(void)

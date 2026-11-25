@@ -1,7 +1,7 @@
-# net/link_notify.c — ホストからの知らせ (NOTIFY) の受け手と、HELLO の伸長
+# sys/net/link_notify.c — ホストからの知らせ (NOTIFY) の受け手と、HELLO の伸長
 
 > 状態: **現行 (2026-11-18)** — 出所: NET_HOSTSVC_DESIGN・TASK_NET_HOSTSVC (要約して移した)
-ソース: `net/link_notify.c`・`net/link_notify.h`・`net/link.h`・`net/link_rx.inc`・`net/link.c` (`link_notify_control`)・送り手は `tools/host_notify.py` ([tools/host_notify](../tools/host_notify.md))
+ソース: `sys/net/link_notify.c`・`sys/net/link_notify.h`・`sys/net/link.h`・`sys/net/link_rx.inc`・`sys/net/link.c` (`link_notify_control`)・送り手は `tools/host_notify.py` ([tools/host_notify](../tools/host_notify.md))
 
 ホストが自分から送る知らせを、要求のハンドルとは別の系列で受け、`docs/design/net/host_mailbox.md` に入れる。
 状態機械を進めるのは `link_tick()` の中だけ。task の側から呼ぶ口は無い。

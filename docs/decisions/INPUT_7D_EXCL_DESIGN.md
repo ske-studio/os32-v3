@@ -43,7 +43,7 @@
 ## 2. カーネル側
 
 - kbd_merge.c が既存の合算 cnt と同じ添字で u32 の離し世代を所有する。input_merge_key と input_capture_key の有効な compat_sc の増減を同じ関数にまとめる。反復・途中の一台の離しでは進めない。切断の疑似離しも通常の減算を通す。
-- 既存の int input_key_pressed(u8 sc)（input/hal/kbd_merge.c の input_key_pressed）と、新設の u32 input_key_release_gen(u8 sc)、int in2_excl_drop_raw(u8 sc, int is_break) を内部で使う。新設二口の宣言は input/hal/in2_int.h。添字は 0..127、範囲外は 0 を返し配列に触れない。合算更新側と前景の記録側が irq_save/restore を所有し、照会関数は呼出元の排他内で読む。legacy_raw_push（input/hal/legacy_ring.c の legacy_raw_push）は IRQ 排他内で drop 判定が真なら戻る。in2_excl.c の valid・saved_gen は前景側だけが書く。
+- 既存の int input_key_pressed(u8 sc)（sys/hal/input/kbd_merge.c の input_key_pressed）と、新設の u32 input_key_release_gen(u8 sc)、int in2_excl_drop_raw(u8 sc, int is_break) を内部で使う。新設二口の宣言は sys/hal/input/in2_int.h。添字は 0..127、範囲外は 0 を返し配列に触れない。合算更新側と前景の記録側が irq_save/restore を所有し、照会関数は呼出元の排他内で読む。legacy_raw_push（sys/hal/input/legacy_ring.c の legacy_raw_push）は IRQ 排他内で drop 判定が真なら戻る。in2_excl.c の valid・saved_gen は前景側だけが書く。
 
 ```c
 /* 合算を更新する既存の IRQ 排他内、old != down の時だけ */
@@ -114,9 +114,9 @@ raw と pending_raw は、満杯でも境目・独占中の重要入力を読み
 |A|input/hal の kbd_merge.c・in2_int.h・in2_excl.c・legacy_ring.c・in2_reclaim.c。解除世代、両リングのうちカーネル raw の優先、回収順。|7c の後。B と並列可。|
 |B|userland/gshell/src の 新設 excl.rs（同段で userland/gshell/src/lib.rs の mod input に並べて mod excl;）・wm.rs・input.rs。状態取得、observed・settled、配送記録と ring.rs の append 成否接続。|内部状態の形を固定して C へ。|
 |C|input.rs・kbdnav.rs・cursor.rs・multiapp.rs・wm.rs。満杯退避、物理同期、取消、再描画、前景通知とバッチ打切り。|B と直列。同じ input.rs を並列編集しない。|
-|D|kapi/kapi_in2.c の 7c の閉じを PC-98 構成でだけ開く。PowerMac は閉じた戻り値と状態を維持。各段で追加した host 試験を公開入口から接続。|A〜C の後に直列。公開 ABI・生成欄の変更なし。|
+|D|sys/kapi/kapi_in2.c の 7c の閉じを PC-98 構成でだけ開く。PowerMac は閉じた戻り値と状態を維持。各段で追加した host 試験を公開入口から接続。|A〜C の後に直列。公開 ABI・生成欄の変更なし。|
 
-7c HEAD の kapi/kapi_in2.c の in2_acquire・in2_unacquire を取り込んでから A を開始する。A〜C は IN2_PUBLIC_EXCLUSIVE=0。公開 acquire は引数検査前に OS32_ERR_NOSYS を返し、owner・excl・gen・キューに副作用なし。unacquire は既存の所有検査と解除を通す。D で新設の機種別 platform_input_caps.h を共通 KAPI が同名 include し、PC-98 版で 1、PowerMac 版で 0 を宣言する。PowerMac の根拠は platform/powermac/input_usb.c の pm_input_usb_key、platform/powermac/input_boot.c の pressed、platform/powermac/usb_platform.c の usbp_input_key・usbp_input_mouse・usbp_input_release。
+7c HEAD の sys/kapi/kapi_in2.c の in2_acquire・in2_unacquire を取り込んでから A を開始する。A〜C は IN2_PUBLIC_EXCLUSIVE=0。公開 acquire は引数検査前に OS32_ERR_NOSYS を返し、owner・excl・gen・キューに副作用なし。unacquire は既存の所有検査と解除を通す。D で新設の機種別 platform_input_caps.h を共通 KAPI が同名 include し、PC-98 版で 1、PowerMac 版で 0 を宣言する。PowerMac の根拠は sys/platform/powermac/input_usb.c の pm_input_usb_key、sys/platform/powermac/input_boot.c の pressed、sys/platform/powermac/usb_platform.c の usbp_input_key・usbp_input_mouse・usbp_input_release。
 ## 5. 受入と変異
 
 各行は host で左を観測し、右の変異で実行時 RED を確認する。

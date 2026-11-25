@@ -1,6 +1,6 @@
-# hwdev/hwdev_imports.def — 設計
+# sys/dev/hwdev/hwdev_imports.def — 設計
 > 状態: **現行 (2026-10-31)** — 出所: HWDEV_CORE_API (D1 で移した)
-ソース: `hwdev/hwdev_imports.def`
+ソース: `sys/dev/hwdev/hwdev_imports.def`
 
 ## 2. 核の関数の slot (26 関数、既存宣言と同型)
 
@@ -8,32 +8,32 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 
 | slot | 関数 | 宣言元 |
 |---|---|---|
-| 0 | `trial_begin` | `kdebug/recover.h` |
-| 1 | `trial_step` | `kdebug/recover.h` |
-| 2 | `trial_end` | `kdebug/recover.h` |
-| 3 | `recover_owner` | `kdebug/recover.h` |
-| 4 | `recover_owner_configure` | `kdebug/recover.h` |
-| 5 | `recover_safe_point` | `kdebug/recover.h` |
-| 6 | `recover_plan_enter` | `kdebug/recover.h` |
-| 7 | `recover_plan_leave` | `kdebug/recover.h` |
-| 8 | `recover_plan_access` | `kdebug/recover.h` |
-| 9 | `recover_plan_check` | `kdebug/recover.h` |
-| 10 | `recover_bind_plan` | `kdebug/recover.h` |
-| 11 | `recover_budget_apply` | `kdebug/recover.h` |
-| 12 | `recover_bar_probe` | `kdebug/recover.h` |
-| 13 | `recover_profile_crc` | `kdebug/recover.h` |
-| 14 | `recover_access` | `kdebug/recover.h` |
-| 15 | `recover_restore_point` | `kdebug/recover.h` |
-| 16 | `recover_target_address` | `kdebug/recover.h` |
-| 17 | `recover_window_hal_init` | `kdebug/recover.h` |
-| 18 | `recover_window_access` | `kdebug/recover.h` |
-| 19 | `recover_window_cleanup` | `kdebug/recover.h` |
-| 20 | `recover_gf_pre` | `kdebug/recover.h` |
-| 21 | `recover_gf_result` | `kdebug/recover.h` |
-| 22 | `recover_gf_screen_safe` | `kdebug/recover.h` |
-| 23 | `recover_hal_wait_frame` | `kdebug/recover.h` |
-| 24 | `kpeek_call` | `kdebug/kpeek.h` |
-| 36 | `recover_gf_runner_access` | `kdebug/recover.h` |
+| 0 | `trial_begin` | `sys/dev/video/geforce/diag/recover.h` |
+| 1 | `trial_step` | `sys/dev/video/geforce/diag/recover.h` |
+| 2 | `trial_end` | `sys/dev/video/geforce/diag/recover.h` |
+| 3 | `recover_owner` | `sys/dev/video/geforce/diag/recover.h` |
+| 4 | `recover_owner_configure` | `sys/dev/video/geforce/diag/recover.h` |
+| 5 | `recover_safe_point` | `sys/dev/video/geforce/diag/recover.h` |
+| 6 | `recover_plan_enter` | `sys/dev/video/geforce/diag/recover.h` |
+| 7 | `recover_plan_leave` | `sys/dev/video/geforce/diag/recover.h` |
+| 8 | `recover_plan_access` | `sys/dev/video/geforce/diag/recover.h` |
+| 9 | `recover_plan_check` | `sys/dev/video/geforce/diag/recover.h` |
+| 10 | `recover_bind_plan` | `sys/dev/video/geforce/diag/recover.h` |
+| 11 | `recover_budget_apply` | `sys/dev/video/geforce/diag/recover.h` |
+| 12 | `recover_bar_probe` | `sys/dev/video/geforce/diag/recover.h` |
+| 13 | `recover_profile_crc` | `sys/dev/video/geforce/diag/recover.h` |
+| 14 | `recover_access` | `sys/dev/video/geforce/diag/recover.h` |
+| 15 | `recover_restore_point` | `sys/dev/video/geforce/diag/recover.h` |
+| 16 | `recover_target_address` | `sys/dev/video/geforce/diag/recover.h` |
+| 17 | `recover_window_hal_init` | `sys/dev/video/geforce/diag/recover.h` |
+| 18 | `recover_window_access` | `sys/dev/video/geforce/diag/recover.h` |
+| 19 | `recover_window_cleanup` | `sys/dev/video/geforce/diag/recover.h` |
+| 20 | `recover_gf_pre` | `sys/dev/video/geforce/diag/recover.h` |
+| 21 | `recover_gf_result` | `sys/dev/video/geforce/diag/recover.h` |
+| 22 | `recover_gf_screen_safe` | `sys/dev/video/geforce/diag/recover.h` |
+| 23 | `recover_hal_wait_frame` | `sys/dev/video/geforce/diag/recover.h` |
+| 24 | `kpeek_call` | `sys/platform/pc98/kdebug/kpeek.h` |
+| 36 | `recover_gf_runner_access` | `sys/dev/video/geforce/diag/recover.h` |
 
 核の型付き表では core 関数だけを表の順に並べる (最後のポインタは 26 番目)。
 

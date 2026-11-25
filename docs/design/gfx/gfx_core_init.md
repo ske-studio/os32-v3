@@ -1,4 +1,4 @@
-# gfx/gfx_core_init.inc — 400/200 行初期化の共通部
+# sys/hal/gfx/gfx_core_init.inc — 400/200 行初期化の共通部
 
 > 状態: **現行 (2026-11-01)**。
 

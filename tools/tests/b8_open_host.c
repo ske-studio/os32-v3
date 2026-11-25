@@ -16,8 +16,8 @@
  *  2 つの土台を 1 本の実行ファイルに載せる。
  *
  *   段 A: **実物の ext2** (fs/ext2_*.c) を RAM ディスク上で実物の ext2_format()
- *         が作った 8MB のファイルシステムに載せ、**実物の fs/vfs.c と
- *         fs/vfs_fd.c** から vfs_open() で叩く。贋物は Device API と IDE だけ。
+ *         が作った 8MB のファイルシステムに載せ、**実物の sys/fs/vfs.c と
+ *         sys/fs/vfs_fd.c** から vfs_open() で叩く。贋物は Device API と IDE だけ。
  *         - §2-2a: **間接ブロックを使う大きなディレクトリ** (直接 12 本を
  *           越えた /big) の間接ブロック読み取りを**一度だけ**失敗させ、
  *           ext2_bmap -> find_entry -> lookup -> stat -> open の全段で
@@ -35,7 +35,7 @@
  *  エミュレータ・実デバイス・実イメージ・make には一切触れない。
  *
  *  [C1] C89 / GNU89。宣言はブロック先頭、`//` コメント無し。
- *  u32 は `unsigned long` (include/types.h) なので**必ず ILP32 で組む**。
+ *  u32 は `unsigned long` (sys/include/types.h) なので**必ず ILP32 で組む**。
  *  libc は使わない (-nostdlib、Linux の int 0x80 で write/exit するだけ)。
  * ======================================================================== */
 
@@ -264,7 +264,7 @@ static int g_wfail_nth;       /* 0 = armed のあいだずっと */
 static int g_wfail_seen;
 static int g_wfail_fired;
 /* 票 H2 X3b (ii) / 往復 3 所見 2: **媒体へ写した後で失敗を返す**模様。
- * drivers/ata/ide.c は状態レジスタをデータ転送の**後**に見るので、
+ * sys/dev/ata/ide.c は状態レジスタをデータ転送の**後**に見るので、
  * 「書き込みが失敗した = 媒体は未変更」は成り立たない。従来の注入は写す前に
  * 返していたので、この形は 1 度も作れていなかった。 */
 static int g_wfail_land;
@@ -459,7 +459,7 @@ int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
 /*  実物のソース                                                            */
 /* ======================================================================== */
 
-/* ---- fs/vfs_fd.c の境界 (コンソール / リダイレクト / 所有者タグ) ---- */
+/* ---- sys/fs/vfs_fd.c の境界 (コンソール / リダイレクト / 所有者タグ) ---- */
 int fd_is_redirected(int fd) { (void)fd; return 0; }
 u16 fd_redirect_ifmt(int fd, int *out_file_fd)
 { (void)fd; if (out_file_fd) *out_file_fd = -1; return OS_S_IFCHR; }
@@ -472,22 +472,22 @@ void console_write(const char *buf, u32 size, u8 color)
 { (void)buf; (void)size; (void)color; }
 int res_owner_get(void) { return 0; }
 
-/* HostDrv 側のサイズ取得の純規則も実物を取り込む (③、drivers/hostdrv/hostdrvfs.c が使う)。
+/* HostDrv 側のサイズ取得の純規則も実物を取り込む (③、sys/dev/hostdrv/hostdrvfs.c が使う)。
  * hostdrvfs.c 本体はハイパーコールを叩くのでホストでは組めないが、
  * 判定はこの .inc の純関数に切り出してある (票 H1 と同じ作法)。 */
-#include "../../drivers/hostdrv/hostdrv_stat_rules.inc"
+#include "../../sys/dev/hostdrv/hostdrv_stat_rules.inc"
 
-#include "../../fs/ext2/ext2_super.c"
-#include "../../fs/ext2/ext2_time.c"
-#include "../../fs/ext2/ext2_inode.c"
+#include "../../sys/fs/ext2/ext2_super.c"
+#include "../../sys/fs/ext2/ext2_time.c"
+#include "../../sys/fs/ext2/ext2_inode.c"
 #include "ext2_dir.c"
-#include "../../fs/ext2/ext2_file.c"
-#include "../../fs/ext2/ext2_medium_ide.c"
-#include "../../fs/ext2/ext2_fmt.c"
-#include "../../fs/ext2/ext2_vfs.c"
+#include "../../sys/fs/ext2/ext2_file.c"
+#include "../../sys/platform/pc98/storage/ext2_medium_ide.c"
+#include "../../sys/fs/ext2/ext2_fmt.c"
+#include "../../sys/fs/ext2/ext2_vfs.c"
 #include "../platform/pc98/boot_names.c"
-#include "../../fs/vfs.c"
-#include "../../fs/vfs_fd.c"
+#include "../../sys/fs/vfs.c"
+#include "../../sys/fs/vfs_fd.c"
 
 /* ======================================================================== */
 /*  足場                                                                    */
@@ -563,7 +563,7 @@ static u32 keep_ino(void)
 }
 
 /* inode 番号 -> その inode が載っている **1KB ブロックの先頭セクタ LBA**。
- * fs/ext2/ext2_inode.c の ext2_read_inode と同じ式。 */
+ * sys/fs/ext2/ext2_inode.c の ext2_read_inode と同じ式。 */
 static u32 lba_of_inode(u32 ino)
 {
     u32 group = (ino - 1) / g_ec->sb_info.inodes_per_group;
@@ -1253,7 +1253,7 @@ static void case_write_stream_inode_failure(void)
 }
 
 /* ブロックがまだ「使用中」かをビットマップで直に見る
- * (fs/ext2/ext2_inode.c の ext2_alloc_block と同じ式)。
+ * (sys/fs/ext2/ext2_inode.c の ext2_alloc_block と同じ式)。
  * **解放したかどうかは inode を見ても分からない** — 呼び手が失敗して
  * inode を書き戻さなければ媒体上の inode は元のままだからである。
  * 漏れ (解放したのに誰も指していない) を捕まえるにはここを見るしかない。 */
@@ -4969,7 +4969,7 @@ static void synth_normal(void)
  * 成功し、NT はディレクトリにもサイズを返す**。 */
 static void stage_c(void)
 {
-    report("== 段 C: HostDrv のサイズ取得の純規則 (drivers/hostdrv/hostdrv_stat_rules.inc) ==\n");
+    report("== 段 C: HostDrv のサイズ取得の純規則 (sys/dev/hostdrv/hostdrv_stat_rules.inc) ==\n");
     report("  [C1] hdrv_size_result\n");
 
     /* 通常ファイル: 問い合わせが通っていればサイズを返してよい */

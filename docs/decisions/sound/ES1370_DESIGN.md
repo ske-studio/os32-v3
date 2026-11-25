@@ -114,7 +114,7 @@ int es_volume(void *ctx, u32 l, u32 r);
 一致した PCI function ごとに ctx を持ち、snd2_register で PCM_OUT を公開。初版の能力は 44100 Hz、S16LE、左右各1。
 DAC2 分周は整数 1411200 / 44100 − 2 = 30。要求外の形式は open 前に拒否する。DAC1、ADC、MIDI、DSP は公開しない。
 PCI 発見は既存の列挙結果を使う。e82557_eeprom.c の pci_bar_kind/base と同じ検査を行う。
-構成アクセスは include/pci_config_contract.h 経由。platform/{pc98,powermac}/pci_config.c が橋へ配送する。
+構成アクセスは sys/include/pci_config_contract.h 経由。platform/{pc98,powermac}/pci_config.c が橋へ配送する。
 資源ハンドルは root・BDF・BAR・種別・base/length を保持し、LE32 読書きと codec 用 LE16 書込みを自然整列・範囲検査付きで提供。リング公開前と各補充後に DMA 用 release barrier、隔離済み割当は機種の池へ戻さない。
 PC-98 はポート I/O、PowerMac は OF ranges で PCI I/O→CPU 窓へ変換し LE32 と順序保証を提供する。
 音声ドライバに機種ヘッダを入れず、台本とドライバで同じ資源翻訳を使用する。
@@ -171,7 +171,7 @@ weights.json に登録し、同じ runner で初回3回の経過と WAV サイ�
 |段・工数|新規／変更予定ファイルと概算行数|完了条件・依存|
 |---|---|---|
 |1a 半日|新 userland/tests/hw/es1370_probe.hwb +45、既存像の台本収録表 +1|cfg 採取、橋・I/O 資源・不足する読取り口を特定|
-|1b 1日|変更 platform/powermac/hwb_resource.c +40、hwb_window.c +35、新 platform/powermac/pci_io.c +90、新 platform/pc98/hwb_bar_window.c +60 と PC-98 HW_OP 配送の接続 +10|PC-98 は window bar → BDF 資源照合 → 窓 handle → mmioread32 → 検査済み base+off の inl。両機種で BAR 指定 I/O 窓で段1の値を観測。TICK 待ちなし|
+|1b 1日|変更 sys/platform/powermac/hwb_resource.c +40、hwb_window.c +35、新 platform/powermac/pci_io.c +90、新 platform/pc98/hwb_bar_window.c +60 と PC-98 HW_OP 配送の接続 +10|PC-98 は window bar → BDF 資源照合 → 窓 handle → mmioread32 → 検査済み base+off の inl。両機種で BAR 指定 I/O 窓で段1の値を観測。TICK 待ちなし|
 |2a 半日|新 include/pci_io_contract.h +25、platform/pc98/pci_io.c +35、両機種の DMA アダプタ各 +35|範囲・LE・bus 翻訳・coherent 契約を模型で確認|
 |2b 1日|新 drivers/sound/es1370/regs.h +65、pcm_hw.c +260、tools/tests/es1370_host.c +180|観測後に装置列を実装。HAL と時計は模型で代替可能| 段2出口で停止証拠・F・初期位相の観測記録を確認。一つでも確定できなければ当該構成の PCM 統合と段4受入を保留する。
 |3 1日|変更 両機種の PCI bind 各 +15、sound/hal の期限配送・位置対・補充判定・DRAIN 保存口 +85、build/targets/ppc-powermac.mk と PC-98 の対象規則各 +10|TICK 段 B の残りと SndBackend 中核、PPC の期限配送・KAPI 結線後に実機像へ統合|

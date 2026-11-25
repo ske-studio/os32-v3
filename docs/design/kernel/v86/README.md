@@ -24,4 +24,4 @@ V86失敗はline→残列空白の順で同口を使う。
 
 ## 索引
 
-- [platform/pc98/legacy/v86.c](v86.md)
+- [sys/platform/pc98/legacy/v86.c](v86.md)

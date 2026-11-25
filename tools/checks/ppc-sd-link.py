@@ -3,11 +3,11 @@
 icount is only for USB typing tests; HostFS acceptance runs without icount."""
 CHECK = dict(name='ppc-sd-link', env=['ppc-cross', 'qemu-ppc'], tier=2,
     needs=['make:ppc-ci-image'], budget=1800, full_only=True,
-    covers=['exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/checks/ppc-sd-link.py', 'tools/tests/test_ppc_sd_run.py',
+    covers=['sys/kern/exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/checks/ppc-sd-link.py', 'tools/tests/test_ppc_sd_run.py',
             'tools/ppc/**', 'tools/*.py', 'build/targets/ppc-powermac.mk', 'build/ppc-user.mk',
             'fs/serialfs/*.[ch]', 'platform/powermac/**', 'arch/ppc/**',
-            'userland/shell/rshell_lan.c', 'kernel/console/**', 'mm/kmalloc.c',
-            'platform/powermac/ppc_kernel.c'],
+            'userland/shell/rshell_lan.c', 'kernel/console/**', 'sys/kern/mm/kmalloc.c',
+            'sys/platform/powermac/ppc_kernel.c'],
     basis=['LAN_OPERATOR_DESIGN §5 P5-sd/fs'],
     pins=['LAN_OPERATOR_DESIGN', 'LAN_BULK_DESIGN'],
     env_limit='mac99 QEMU link only; denied UDP/TCP sockets are unverified, never PASS.')

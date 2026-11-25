@@ -1,13 +1,13 @@
-# drivers/video/pc98/splash_raster_run.c — 画像の再生の残り時間を有理数で管理する
+# sys/platform/pc98/video/splash_raster_run.c — 画像の再生の残り時間を有理数で管理する
 
 > 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
-ソース: `drivers/video/pc98/splash_raster_run.c`・`drivers/video/pc98/splash_raster_run.h`
+ソース: `sys/platform/pc98/video/splash_raster_run.c`・`sys/platform/pc98/video/splash_raster_run.h`
 
 ## 何をするか
 
 `docs/design/drivers/video/pc98/splash_raster_play.c.md` のフレームを何回まわしてよいかを決める。
 可視区間は IF=0 なので PIT の tick が遅れる。そのため、実際の tick の経過とフレーム数から求めたモデルの経過の大きい方を「使った時間」とする。
-起動 (`platform/pc98/splash_image.c`) とビューアー (`drivers/video/pc98/backend_pc98_osri.c`) が共有する。
+起動 (`sys/platform/pc98/splash_image.c`) とビューアー (`sys/platform/pc98/video/backend_pc98_osri.c`) が共有する。
 
 ## データの形と単位
 

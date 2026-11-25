@@ -10,9 +10,9 @@ from kernel_includes import include_flags
 from mutpar import build_in_tree
 
 CHECK = dict(name='gfx-accel-a0-host', tier=1, needs=[], budget=10, covers=[
-    'gfx/gfx_policy.h', 'gfx/gfx_policy.c', 'gfx/gfx_hw_mono_cpu.h',
-    'gfx/gfx_hw_mono_cpu.c', 'gfx/gfx_internal.h', 'include/gfx_hal.h',
-    'drivers/video/geforce/geforce_module.h', 'hwdev/gf/accel.h',
+    'sys/hal/gfx/gfx_policy.h', 'sys/hal/gfx/gfx_policy.c', 'sys/hal/gfx/gfx_hw_mono_cpu.h',
+    'sys/hal/gfx/gfx_hw_mono_cpu.c', 'sys/hal/gfx/gfx_internal.h', 'sys/include/gfx_hal.h',
+    'sys/dev/video/geforce/geforce_module.h', 'sys/dev/video/geforce/accel.h',
     'userland/lib/gfx/gfx_direct_internal.h', 'userland/lib/gfx/libos32gfx.h',
     'userland/lib/gfx/draw/gfx_cmd.c', 'userland/lib/gfx/draw/gfx_copy.c',
     'tools/tests/gfx_accel_a0_host.c', 'tools/tests/test_gfx_accel_a0.py',
@@ -21,13 +21,13 @@ CHECK = dict(name='gfx-accel-a0-host', tier=1, needs=[], budget=10, covers=[
 )
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
-    ('policy-gen-type', 'gfx/gfx_policy.h',
+    ('policy-gen-type', 'sys/hal/gfx/gfx_policy.h',
      'extern u16 gfx_policy_gen;', 'extern u32 gfx_policy_gen;'),
     ('client-gen-type', 'userland/lib/gfx/gfx_direct_internal.h',
      'extern u16 gfx_gen;', 'extern u32 gfx_gen;'),
-    ('copy-const-backend', 'include/gfx_hal.h',
+    ('copy-const-backend', 'sys/include/gfx_hal.h',
      'extern GfxBackend *g_backend;', 'extern const GfxBackend *g_backend;'),
-    ('direct-ops-const', 'drivers/video/geforce/geforce_module.h',
+    ('direct-ops-const', 'sys/dev/video/geforce/geforce_module.h',
      'extern const GfxDirectOps gf_direct_ops;', 'extern GfxDirectOps gf_direct_ops;'),
 )
 
@@ -39,12 +39,12 @@ def run_case(folder, runner, mutation=None):
         source = (ROOT / path).read_text()
         assert source.count(old) == 1, name
         if name == 'policy-gen-type':
-            edits['gfx/gfx_policy.c'] = (ROOT / 'gfx/gfx_policy.c').read_text().replace(
+            edits['sys/hal/gfx/gfx_policy.c'] = (ROOT / 'sys/hal/gfx/gfx_policy.c').read_text().replace(
                 'u16 gfx_policy_gen = 1;', 'u32 gfx_policy_gen = 1;')
         if name == 'copy-const-backend':
             # Keep the linked implementation buildable; TYPE still observes
             # the mutated public declaration at runtime.
-            edits['gfx/gfx_policy.c'] = (ROOT / 'gfx/gfx_policy.c').read_text().replace(
+            edits['sys/hal/gfx/gfx_policy.c'] = (ROOT / 'sys/hal/gfx/gfx_policy.c').read_text().replace(
                 'g_backend', '((GfxBackend *)g_backend)')
         edits[path] = source.replace(old, new)
     exe = folder / 'hal-host'
@@ -53,8 +53,8 @@ def run_case(folder, runner, mutation=None):
                '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
                *include_flags(ROOT),
                str(ROOT / 'tools/tests/gfx_accel_a0_host.c'),
-               str(ROOT / 'gfx/gfx_policy.c'),
-               str(ROOT / 'gfx/gfx_hw_mono_cpu.c'),
+               str(ROOT / 'sys/hal/gfx/gfx_policy.c'),
+               str(ROOT / 'sys/hal/gfx/gfx_hw_mono_cpu.c'),
                str(ROOT / 'userland/lib/gfx/draw/gfx_cmd.c'),
                str(ROOT / 'userland/lib/gfx/draw/gfx_copy.c'), '-o', str(exe)]
     build_in_tree(ROOT, folder, edits, [command])

@@ -1,6 +1,6 @@
-# drivers/video/geforce/gf_wc.c — 設計
+# sys/dev/video/geforce/gf_wc.c — 設計
 > 状態: **現行 (2026-11-01)** — GF_ACCEL_DESIGN §3–4 の S10
-ソース: `drivers/video/geforce/gf_wc.c`
+ソース: `sys/dev/video/geforce/gf_wc.c`
 
 起動中、割り込み有効化とスプラッシュの後に GFX が GeForce の場合だけ、GUI=0 の起動でも取得を 1 回試み、その 1 回は割り込みを約 2ms 停止する。
 登録が失敗した時は lease を取得せず、取得後の loader 失敗では解放を試み、復元失敗時は lease を保持する。

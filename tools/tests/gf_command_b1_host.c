@@ -1,6 +1,6 @@
-/* Link only the real hwdev/gf/push.c; A2 supplies dependencies and
+/* Link only the real sys/dev/video/geforce/push.c; A2 supplies dependencies and
  * observes actual CPU reads of va[0] before each PUT. */
-#include "hwdev/gf/command.h"
+#include "sys/dev/video/geforce/command.h"
 
 #define REQUIRE(expr) do { if (!(expr)) return __LINE__; } while (0)
 #define GF2_HOST_B1

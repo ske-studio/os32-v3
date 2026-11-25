@@ -7,7 +7,7 @@ import host32
 from mutpar import build_in_tree
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'gfx/v2/sw_readback.c'
+SOURCE = 'sys/hal/gfx/v2/sw_readback.c'
 OLD = 'u8 *dst = kbuf + y * op->pitch;'
 NEW = 'u8 *dst = kbuf + y * op->sw * info.cpp;'
 

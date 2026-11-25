@@ -2,7 +2,7 @@
 Port I/O and relocated init are explicit host seams; no hardware claim.
 """
 CHECK = dict(name='fm-module-host', tier=1,
-    covers=['sound/hal/snd2_chip.c', 'drivers/sound/fm/opn_chip.h', 'drivers/sound/fm/opn_probe.h', 'drivers/sound/cs4231/pcm_cs4231.h', 'sdk/include/os32/*.h', 'sound/hal/snd2_int.h', 'include/av_contract.h', 'platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'drivers/sound/fm/fm_module.c', 'drivers/sound/fm/fm_module.h', 'drivers/sound/fm/fm_body.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/fm_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/fm_module_host.c', 'build/fm-module.ld', 'drivers/sound/fm/fm.c', 'drivers/sound/fm/fm.h', 'tools/tests/fm_playback_host.c', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/fm/*', 'build/out/fm.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/fm_contract.h', 'tools/tests/kernel_includes.py', 'kernel/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
+    covers=['sys/hal/sound/snd2_chip.c', 'sys/dev/sound/fm/opn_chip.h', 'sys/dev/sound/fm/opn_probe.h', 'sys/dev/sound/cs4231/pcm_cs4231.h', 'sdk/include/os32/*.h', 'sys/hal/sound/snd2_int.h', 'sys/include/av_contract.h', 'sys/platform/pc98/module_pair.c', 'sys/include/platform_module_pair.h', 'sys/platform/pc98/bootinfo_wire.h', 'sys/platform/pc98/bootinfo_native.h', 'sys/kern/irq/tick.c', 'sys/kern/irq/tick.h', 'sys/platform/pc98/tick_order.h', 'sys/kern/module/module_runtime.c', 'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.c', 'sys/kern/module/module_image.h', 'sys/kern/module/module_schema.h', 'sys/kern/mm/pgalloc.h', 'sys/include/types.h', 'sys/include/memmap.h', 'sys/fs/vfs.c', 'sys/fs/vfs.h', 'sys/dev/base/dev.c', 'sys/hal/block/dev.h', 'sys/dev/block/disk.h', 'sys/dev/ata/atapi.h', 'sys/dev/block/fdc.h', 'sys/include/console.h', 'sys/include/kbd.h', 'sys/platform/pc98/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'sys/kern/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'sys/dev/sound/fm/fm_module.c', 'sys/dev/sound/fm/fm_module.h', 'sys/dev/sound/fm/fm_body.c', 'sys/include/config.h', 'sdk/include/os32/os32_generations.h', 'sys/include/bootinfo.h', 'tools/prototypes/fm_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/fm_module_host.c', 'build/fm-module.ld', 'sys/dev/sound/fm/fm.c', 'sys/dev/sound/fm/fm.h', 'tools/tests/fm_playback_host.c', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/fm/*', 'build/out/fm.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'sys/fs/vfs_device.h', 'sys/platform/pc98/boot_names.h', 'sys/platform/pc98/boot_names.c', 'sys/dev/ata/ide.h', 'sys/include/fm_contract.h', 'tools/tests/kernel_includes.py', 'sys/kern/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
     needs=['make:all'], budget=5.5,
     basis=['docs/decisions/sound/AV_HAL_DESIGN.md 追記2 §2・§5'],
     pins=['AV_HAL_DESIGN'],
@@ -19,7 +19,7 @@ import host32
 from test_module_runtime import FLAGS, INCLUDES, image
 from test_module_image import build_validator, validate, fnv, crc, word
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'drivers/sound/fm/fm_module.c'
+SOURCE = ROOT / 'sys/dev/sound/fm/fm_module.c'
 CASES = ['normal-detach', 'failure-after-tick', 'key-off-timeout-isolates', 'prefix-failure', 'unregister-failure']
 
 def product_image(folder):
@@ -78,8 +78,8 @@ def main():
                             '-DFM_ADAPTER="' + str(source) + '"',
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/fm_module_host.c',
-                            ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
-                            ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c', '-o', exe], check=True)
+                            ROOT / 'sys/kern/module/module_runtime.c', ROOT / 'sys/kern/module/module_image.c',
+                            ROOT / 'sys/fs/vfs.c', ROOT / 'sys/dev/base/dev.c', '-o', exe], check=True)
         def run(modes, expected=0):
             for mode in modes:
                 payload = struct.pack('<2I', 10 if mode == 3 else 0, mode) + image()
@@ -92,12 +92,12 @@ def main():
         build(SOURCE)
         run(range(len(CASES)))
         playback = folder / 'playback'
-        def run_playback(source, expected, body_source=ROOT / 'drivers/sound/fm/fm_body.c'):
+        def run_playback(source, expected, body_source=ROOT / 'sys/dev/sound/fm/fm_body.c'):
             subprocess.run(['gcc', *FLAGS, '-Wno-unused-parameter', *INCLUDES,
                             '-I' + str(ROOT), '-DBODY_SOURCE="' + str(body_source) + '"',
                             '-DFM_SOURCE="' + str(source) + '"',
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
-                            ROOT / 'tools/tests/fm_playback_host.c', ROOT / 'sound/hal/snd2_chip.c', '-o', playback], check=True)
+                            ROOT / 'tools/tests/fm_playback_host.c', ROOT / 'sys/hal/sound/snd2_chip.c', '-o', playback], check=True)
             for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
                 if not expected:
                     quiet = host32.run([str(playback)], runner=runner, input=b'q', capture_output=True)
@@ -107,7 +107,7 @@ def main():
                 if expected:
                     assert b'FAIL ' in result.stdout, result
 
-        fm = ROOT / 'drivers/sound/fm/fm.c'
+        fm = ROOT / 'sys/dev/sound/fm/fm.c'
         run_playback(fm, 0)
         print('PASS real FM/SSG quiet, restart and BUSY timeout', flush=True)
         if '--mutate' in sys.argv:
@@ -124,7 +124,7 @@ def main():
             mutant.write_text(body.replace(start, start.replace('if (!legacy_write', '(void)legacy_write').replace(') return;', ';')))
             run_playback(mutant, 1)
             print('MUTATE first failed register write RED', flush=True)
-            module_body = (ROOT / 'drivers/sound/fm/fm_body.c').read_text()
+            module_body = (ROOT / 'sys/dev/sound/fm/fm_body.c').read_text()
             for old, new in [('device = snd2_chip_register(&opn_chip_backend, &chip, &info);', '(void)info; device = 0;'),
                              ('device >= 0 && snd2_chip_unregister(device) < 0', '0'),
                              ('report_fault(device);', '(void)device;')]:

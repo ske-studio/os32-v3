@@ -9,7 +9,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 HARNESS = r'''
 #include "lan_boot.h"
-#include "kernel/cli/resident_cli.h"
+#include "sys/kern/cli/resident_cli.h"
 u64 pm_terminal_tb(void) { return 1; }
 void pm_usb_poll(void) {}
 int idle_work_register(void (*f)(void)) { (void)f; return 0; }
@@ -59,7 +59,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'platform/powermac/terminal_fifo.inc').read_text()
+    source = (ROOT / 'sys/platform/powermac/terminal_fifo.inc').read_text()
     old = "        if (discard) {\n            if (c == '\\n') discard = 0;\n            continue;\n        }"
     if source.count(old) != 1:
         raise RuntimeError('mutation anchor is not unique')
@@ -74,7 +74,7 @@ def main():
         (d / 'harness.c').write_text(HARNESS)
         for name, code, expected, marker in cases:
             (d / 'input.c').write_text(code)
-            subprocess.run(['gcc-13', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-fno-builtin', '-Wall', '-Wextra', '-Werror', '-nostdinc', '-DPM_TERMINAL_TEST', '-DPM_LOAD_KDEBUG=1', '-DKBOOT_SH=1', '-I.', '-Iinclude', '-Iplatform/powermac', str(d / 'harness.c'), str(d / 'input.c'), 'platform/powermac/lan_terminal.c', 'lib/kstring_c.c', '-o', str(d / 'test')], cwd=ROOT, check=True, timeout=60)
+            subprocess.run(['gcc-13', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-fno-builtin', '-Wall', '-Wextra', '-Werror', '-nostdinc', '-DPM_TERMINAL_TEST', '-DPM_LOAD_KDEBUG=1', '-DKBOOT_SH=1', '-I.', '-Iinclude', '-Iplatform/powermac', str(d / 'harness.c'), str(d / 'input.c'), 'sys/platform/powermac/lan_terminal.c', 'sys/kern/kstring_c.c', '-o', str(d / 'test')], cwd=ROOT, check=True, timeout=60)
             result = subprocess.run(['qemu-i386', str(d / 'test')], capture_output=True, text=True, timeout=60)
             if result.returncode != expected or marker not in result.stderr:
                 raise RuntimeError(f'{name}: unexpected exit {result.returncode}: {result.stderr}')

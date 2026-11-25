@@ -5,7 +5,7 @@
  * gf_load_state.c supplies the shared descriptor order. */
 #define GF4_HOST_UNIT 13
 #include "gf4_display_fake.h"
-#include "../../hwdev/gf/internal.h"
+#include "../../sys/dev/video/geforce/internal.h"
 #define REQUIRE(x) do { assert(x); } while (0)
 /* hw.h:70-124 / crtc.c:91-102: independent expected register addresses. */
 /* crtc.c:334-337: SR1 CLKDIV2 and character-clock bit. */

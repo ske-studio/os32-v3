@@ -1,7 +1,7 @@
 /* Real CRT reader/formatter and bootlog storage, ILP32 without libc.
  * 記録: tools/tests/crt_diag_tdd.md */
 #define BOOTLOG_NO_IRQ_LOCK
-#include "../../init/bootlog.c"
+#include "../../sys/kern/init/bootlog.c"
 #include "memmap.h"
 
 #define FAKE_SIZE 0x100000
@@ -12,7 +12,7 @@ static int mem_io[EVENT_MAX], mem_n;
 static void *fake_map(u32 pa, int io);
 #define P2V(pa) fake_map((pa), 0)
 #define P2V_IO(pa) fake_map((pa), 1)
-#include "../../kdebug/crt_diag.c"
+#include "../../sys/platform/pc98/kdebug/crt_diag.c"
 static u8 boot_snapshot[PAGE_SIZE];
 const u8 *v86_bios_real_lowmem(void) { return boot_snapshot; }
 

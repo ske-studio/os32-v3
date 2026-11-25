@@ -1,6 +1,6 @@
-# kernel/time/cpu_calibrate.c — 設計
+# sys/platform/pc98/time/cpu_calibrate.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_SERIAL_VFAST §4 (往復 3「固定費の原因」) の契約を今のソースと照らして要約
-ソース: `kernel/time/cpu_calibrate.c` (`cpu_calibrate`・`cpu_delay_us`・`cpu_calibrate_used_fallback`)・`kernel/time/cpu_calibrate_math.c`・`kernel/time/cpu_calibrate_math.h` (`cpu_calibrate_enough`・`cpu_calibrate_compute`)
+ソース: `sys/platform/pc98/time/cpu_calibrate.c` (`cpu_calibrate`・`cpu_delay_us`・`cpu_calibrate_used_fallback`)・`sys/kern/time/cpu_calibrate_math.c`・`sys/kern/time/cpu_calibrate_math.h` (`cpu_calibrate_enough`・`cpu_calibrate_compute`)
 
 `cpu_delay_us` の空回しの回数 (1 tick あたりのループ回数) を起動時に測る。「いつ止めるか」と「いくつか」は副作用の無い
 `cpu_calibrate_math.c` に切り出し、ホストで試験する (エミュレータでも 1 周では 5 tick に届かず、丸めは実機でしか目に見えない)。
@@ -22,7 +22,7 @@
 
 ## 校正に寄りかからない所
 
-送信の待ち予算 (`drivers/char/serial_plan.c`) と ATAPI の上限は、校正の誤差 (±10% 程度) を上限の余裕で吸う。シリアルの送信予算は
+送信の待ち予算 (`sys/dev/char/serial_plan.c`) と ATAPI の上限は、校正の誤差 (±10% 程度) を上限の余裕で吸う。シリアルの送信予算は
 校正に依存させず tick で測る。
 
 ## 確かめ

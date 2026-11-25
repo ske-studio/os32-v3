@@ -21,7 +21,7 @@
 /*  名前」としてホストに届き、VFS の BUSY / pinned (名前の比較) をすり抜けて */
 /*  使用中の実体を消せた (TASK_VFS_FD_PATH 実装レビュー ラリー 3、Codex B2 — */
 /*  "disk.img\xC2" が "disk.img" に、"\xC1\xA4isk.img" が "disk.img" に、  */
-/*  絵文字 2 種が同じ U+FFFD に)。名前の入口検査 (fs/vfs_name_rules.inc の   */
+/*  絵文字 2 種が同じ U+FFFD に)。名前の入口検査 (sys/fs/vfs_name_rules.inc の   */
 /*  VFS_NAME_RULE_WIN32) と同じ規則なので、検査を通った名前はここで必ず     */
 /*  1 対 1 に変換される。                                                   */
 /* ------------------------------------------------------------------------ */

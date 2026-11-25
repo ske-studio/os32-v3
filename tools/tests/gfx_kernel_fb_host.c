@@ -251,7 +251,7 @@ void console_hw_cursor_enable(void) { }
 volatile u32 tick_count;
 void cpu_delay_us(u32 n) {(void)n; tick_count++;}
 /* Timing is covered by the real scan fixture in boot_splash_native_host.c. */
-#include "../../drivers/video/pc98/splash_raster.h"
+#include "../../sys/platform/pc98/video/splash_raster.h"
 void pc98_splash_raster_reset(void) { }
 struct SplashRaster *pc98_splash_raster_state(void) { return 0; }
 int pc98_splash_raster_table(struct SplashRaster *s, const GFX_RasterPalTable *t)

@@ -10,18 +10,18 @@ import host32
 from kernel_includes import include_flags
 
 CHECK = dict(name='hostsvc-serialfs', tier=1, needs=[], budget=4.1, covers=[
-    'fs/serialfs/serialfs_persistent.c', 'include/boot_token.h', 'fs/serialfs/serialfs.h',
-    'fs/serialfs/serialfs.c', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_client.h',
-    'fs/serialfs/sfs_proto.c', 'fs/serialfs/sfs_proto.h',
-    'fs/vfs.c', 'fs/vfs.h', 'fs/vfs_device.h',
-    'net/host_mailbox.c', 'net/host_mailbox.h', 'net/nic.h',
+    'sys/fs/serialfs/serialfs_persistent.c', 'sys/include/boot_token.h', 'sys/fs/serialfs/serialfs.h',
+    'sys/fs/serialfs/serialfs.c', 'sys/fs/serialfs/sfs_client.c', 'sys/fs/serialfs/sfs_client.h',
+    'sys/fs/serialfs/sfs_proto.c', 'sys/fs/serialfs/sfs_proto.h',
+    'sys/fs/vfs.c', 'sys/fs/vfs.h', 'sys/fs/vfs_device.h',
+    'sys/net/host_mailbox.c', 'sys/net/host_mailbox.h', 'sys/net/nic.h',
     'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_fixture.c', 'tools/tests/hostsvc_fixture.h',
     'tools/tests/hostsvc_serialfs_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk',
-    'include/types.h', 'include/io.h', 'mm/kmalloc.h',
-    'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h', 'lib/kstring.h',
-    'lib/kstring_asm.asm', 'include/console.h', 'include/memmap.h'],
+    'sys/include/types.h', 'sys/include/io.h', 'sys/kern/mm/kmalloc.h',
+    'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h', 'sys/kern/kstring.h',
+    'sys/kern/kstring_asm.asm', 'sys/include/console.h', 'sys/include/memmap.h'],
     env=[], basis=['docs/design/fs/serialfs/serialfs_persistent.md 期限', 'AC-SFS-1',
         'LAN_OPERATOR_DESIGN §5', 'PACK ppc-sfs-deadline PM conditions A/B'],
 )
@@ -50,7 +50,7 @@ MUTATIONS = (
 def build(work, source):
     exe = work / 'serialfs'
     (work / 'io.h').write_text('/* IRQ is provided by the fixture. */\n')
-    subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'lib/kstring_asm.asm'),
+    subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'sys/kern/kstring_asm.asm'),
                     '-o', str(work / 'kstring.o')], check=True)
     result = host32.build(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O0',
         '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
@@ -60,8 +60,8 @@ def build(work, source):
         '-I' + str(work), '-I' + str(ROOT), *include_flags(ROOT),
         *[str(ROOT / p) for p in [
             'tools/tests/hostsvc_serialfs_host.c', 'tools/tests/hostsvc_fixture.c',
-            'fs/vfs.c', 'fs/serialfs/sfs_client.c',
-            'fs/serialfs/sfs_proto.c', 'lib/crc32.c']],
+            'sys/fs/vfs.c', 'sys/fs/serialfs/sfs_client.c',
+            'sys/fs/serialfs/sfs_proto.c', 'lib/crc32.c']],
         str(source), str(work / 'kstring.o'), '-o', str(exe)], capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(result.stderr)
@@ -72,7 +72,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = ROOT / 'fs/serialfs/serialfs.c'
+    source = ROOT / 'sys/fs/serialfs/serialfs.c'
     with tempfile.TemporaryDirectory(prefix='hostsvc-serialfs-') as tmp:
         work = Path(tmp)
         cross = Path(os.environ['CROSS_DIR']) / 'bin/i386-elf-gcc'

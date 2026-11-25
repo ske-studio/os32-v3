@@ -27,19 +27,19 @@ int main(void) {
 def check(mutant):
     with tempfile.TemporaryDirectory(prefix='ppc-exec-target-') as directory:
         tmp = Path(directory)
-        header = (ROOT / 'arch/ppc/arch_exec_image.h').read_text()
+        header = (ROOT / 'sys/arch/ppc/arch_exec_image.h').read_text()
         if mutant:
             old = '(flags & OS32X_FLAG_PPC32) != 0'
             assert header.count(old) == 1
             header = header.replace(old, '(flags & OS32X_FLAG_PPC32) == 0')
         (tmp / 'arch/ppc').mkdir(parents=True)
-        (tmp / 'arch/ppc/arch_exec_image.h').write_text(header)
+        (tmp / 'sys/arch/ppc/arch_exec_image.h').write_text(header)
         (tmp / 'main.c').write_text(SOURCE)
         exe = tmp / 'test'
         cmd = ['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-D__cdecl=',
                '-I' + str(tmp / 'arch/ppc'), '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'arch/ppc'),
                '-I' + str(ROOT / 'exec'), '-I' + str(ROOT / 'sdk/include/os32'),
-               str(ROOT / 'exec/os32x_hdr.c'), str(tmp / 'main.c'), '-o', str(exe)]
+               str(ROOT / 'sys/kern/exec/os32x_hdr.c'), str(tmp / 'main.c'), '-o', str(exe)]
         subprocess.run(cmd, check=True)
         result = subprocess.run([str(exe)], check=False)
         expected = 1 if mutant else 0

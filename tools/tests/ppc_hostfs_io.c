@@ -1,11 +1,11 @@
 /* Real transport/client/protocol, with only TB, LAN and privilege observation fake. */
-#include "platform/powermac/hostfs.h"
+#include "sys/platform/powermac/hostfs.h"
 #include "os32_kapi_shared.h"
-#include "arch/ppc/ppc_trap.h"
+#include "sys/arch/ppc/ppc_trap.h"
 #include "exec_arch.h"
-#include "fs/serialfs/serialfs.h"
-#include "fs/vfs_device.h"
-#include "net/host_mailbox.h"
+#include "sys/fs/serialfs/serialfs.h"
+#include "sys/fs/vfs_device.h"
+#include "sys/net/host_mailbox.h"
 
 volatile u32 kctx_irq_depth;
 static u64 tb;

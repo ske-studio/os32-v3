@@ -9,14 +9,14 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ram-root', tier=1, budget=60, needs=[],
-             covers=['fs/ramfs/ramfs.c', 'tools/tests/test_ram_root.py', 'fs/ramfs/ramfs.h',
-                     'fs/vfs.c', 'fs/vfs_fd.c', 'fs/vfs.h', 'fs/vfs_device.h', 'lib/kstring_c.c'],
+             covers=['sys/fs/ramfs/ramfs.c', 'tools/tests/test_ram_root.py', 'sys/fs/ramfs/ramfs.h',
+                     'sys/fs/vfs.c', 'sys/fs/vfs_fd.c', 'sys/fs/vfs.h', 'sys/fs/vfs_device.h', 'sys/kern/kstring_c.c'],
     basis=['PPC_SHELL_DESIGN §8'],
     env_limit='hostの実VFS/ramfsのshort writeとtruncateを確認するが、RAM root全体の実起動は保証しない。',
 )
 SOURCE = r'''
-#include "fs/vfs_device.h"
-#include "fs/ramfs/ramfs.h"
+#include "sys/fs/vfs_device.h"
+#include "sys/fs/ramfs/ramfs.h"
 #include "kstring.h"
 #include "os32_kapi_shared.h"
 struct VfsStdinRead;
@@ -78,7 +78,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'fs/ramfs/ramfs.c').read_text()
+    original = (ROOT / 'sys/fs/ramfs/ramfs.c').read_text()
     with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as tmp:
         d = Path(tmp)
         (d / 'test.c').write_text(SOURCE)
@@ -101,7 +101,7 @@ def main():
                 source = source.replace(old, 'kmemcpy(file->data, buf, size);')
             (d / 'ramfs.c').write_text(source)
             result = command([*flags, str(d / 'test.c'), str(d / 'ramfs.c'),
-                              'fs/vfs.c', 'fs/vfs_fd.c', 'lib/kstring_c.c', '-o', str(d / 'test')])
+                              'sys/fs/vfs.c', 'sys/fs/vfs_fd.c', 'sys/kern/kstring_c.c', '-o', str(d / 'test')])
             if result.returncode:
                 raise RuntimeError(result.stderr)
             result = command(['qemu-i386', str(d / 'test')])

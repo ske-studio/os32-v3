@@ -1,4 +1,4 @@
-# fs/ext2/ext2_file_write_batch.inc — 同期書込みの64ブロック窓
+# sys/fs/ext2/ext2_file_write_batch.inc — 同期書込みの64ブロック窓
 
 > 状態: **現行 (2026-10-31)**
 

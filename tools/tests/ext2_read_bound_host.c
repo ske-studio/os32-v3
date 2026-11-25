@@ -14,7 +14,7 @@
  *  shell.bin の読み込みが NOT_FOUND になった (= 実機の
  *  「FATAL: shell.bin load failed」)。
  *
- *  実物の fs/ext2/ext2_file.c をそのまま取り込み、境界 (ブロック I/O、inode、
+ *  実物の sys/fs/ext2/ext2_file.c をそのまま取り込み、境界 (ブロック I/O、inode、
  *  bmap) だけを差し替える。実デバイス・実イメージには一切触れない。
  *  C89 ([C1])。
  * ======================================================================== */
@@ -78,7 +78,7 @@ int ext2_read_inode(Ext2Ctx *ctx, u32 ino, Ext2Inode *inode)
     return 0;
 }
 
-/* 票 B8 で「未割当」と「読めなかった」を分ける形になった (fs/ext2/ext2_priv.h)。
+/* 票 B8 で「未割当」と「読めなかった」を分ける形になった (sys/fs/ext2/ext2_priv.h)。
  * 試験で指定したブロックに限り hole または I/O 失敗を注入する。 */
 int ext2_bmap(Ext2Ctx *ctx, const Ext2Inode *inode, u32 file_block,
               u32 *out_phys)
@@ -92,7 +92,7 @@ int ext2_bmap(Ext2Ctx *ctx, const Ext2Inode *inode, u32 file_block,
 }
 
 /* 票 B8 往復 5: ファイルの中身の I/O はデータ用の関数を通るようになった
- * (fs/ext2/ext2_priv.h)。読み取りは上と同じ「必ず 1KB 書く」贋物へ回す —
+ * (sys/fs/ext2/ext2_priv.h)。読み取りは上と同じ「必ず 1KB 書く」贋物へ回す —
  * この試験が見ているのはまさに端数ブロックのデータ読み取りなので。 */
 int ext2_read_data_block(Ext2Ctx *ctx, u32 block_num, void *buf)
 { return ext2_read_block(ctx, block_num, buf); }
@@ -117,7 +117,7 @@ int ext2_write_inode(Ext2Ctx *c, u32 i, const Ext2Inode *n)
 { (void)c; (void)i; (void)n; return 0; }
 int ext2_alloc_block(Ext2Ctx *c) { (void)c; return 0; }
 /* 票 B8 往復 3: 解放は戻り値を持ち、順序付きの 2 関数になった
- * (fs/ext2/ext2_priv.h)。この試験は解放経路を動かさないので常に成功。 */
+ * (sys/fs/ext2/ext2_priv.h)。この試験は解放経路を動かさないので常に成功。 */
 int ext2_free_block(Ext2Ctx *c, u32 b) { (void)c; (void)b; return EXT2_OK; }
 int ext2_alloc_inode(Ext2Ctx *c) { (void)c; return 0; }
 int ext2_free_inode(Ext2Ctx *c, u32 i) { (void)c; (void)i; return EXT2_OK; }
@@ -165,7 +165,7 @@ int ext2_write_bmap_commit(Ext2Ctx *c)
 int ext2_write_inode_commit(Ext2Ctx *c)
 { (void)c; return unexpected_write(); }
 
-#include "../../fs/ext2/ext2_file.c"
+#include "../../sys/fs/ext2/ext2_file.c"
 
 /* ======================================================================== */
 /*  試験本体                                                                */
@@ -249,7 +249,7 @@ static void case_bound_aligned(void)
 }
 
 /* R4: 実機で壊れた並び — 108 バイトのヘッダバッファの直後に解決済みパス。
- *     exec/exec.c の hdrbuf.2 / resolved.3 が .bss で隣接していた形。 */
+ *     sys/kern/exec/exec.c の hdrbuf.2 / resolved.3 が .bss で隣接していた形。 */
 static void case_exec_bss_neighbour(void)
 {
     static struct {

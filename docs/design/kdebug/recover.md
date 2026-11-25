@@ -1,18 +1,18 @@
-# kdebug/recover.c — 設計
+# sys/platform/pc98/kdebug/recover.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: BARLEN_DESIGN.md・GF6200_4A_DESIGN.md・GF6200_4A_S2_LAYOUT.md・GF6200_RECLOG_DESIGN.md・GF_STAGES_DESIGN.md・HWDEV_CORE_API.md・HWDEV_DESIGN.md・REALHW_RECOVER_ADDENDUM.md・REALHW_RECOVER_ADDENDUM_R2.md・REALHW_RECOVER_DESIGN.md・RECOVER_ROUTE_TEST.md・RECOVER_T4B_INJECT.md (D1 で移した)
-ソース: `kdebug/recover.c`
+ソース: `sys/platform/pc98/kdebug/recover.c`
 
 ## BARLEN_DESIGN
 
 | 定数の置き場 | 内容 |
 | --- | --- |
-| `kdebug/recover.h` | 既存 RECOVER_RANGE_MAX を利用。終端は既存 RECOVER_ADDRESS_END を利用 |
+| `sys/dev/video/geforce/diag/recover.h` | 既存 RECOVER_RANGE_MAX を利用。終端は既存 RECOVER_ADDRESS_END を利用 |
 
 - 他装置どうしの区間重複は本変更では判定しない。bridge窓とその子の重複・alias で誤拒否しない。
 
 - GPU 対各除外区間は正確長または上限を使った半開区間 `[base,base+len)`。`a < b_end && b < a_end` のときだけ拒否、隣接は許可。
 
-- 比較は `kdebug/recover.c` に既存、全加算は64bit整数。GPU長はA1で測り、snapshotのBAR値から作らない。
+- 比較は `sys/platform/pc98/kdebug/recover.c` に既存、全加算は64bit整数。GPU長はA1で測り、snapshotのBAR値から作らない。
 
 ## GF6200_4A_DESIGN
 
@@ -42,7 +42,7 @@ RESETはe14内READ ordinal0、CR57はQ0 ordinal0を指定。SAVEDのidentity式�
 
 COPY2件も登録EXPR＋読取元分類＋既存mask/range検査が揃うまでDENY。mainの未知exprをhost専用合成式で許可しない。
 
-> [要確認] 現行は診断も hwdev/gf/runner.c を使い、main 境界の 5 node を生成する。原文の静的展開・ordinal・verify 規則を現行実装と同一とは扱えない。
+> [要確認] 現行は診断も sys/dev/video/geforce/runner.c を使い、main 境界の 5 node を生成する。原文の静的展開・ordinal・verify 規則を現行実装と同一とは扱えない。
 
 ## GF6200_RECLOG_DESIGN
 
@@ -293,11 +293,11 @@ T5 の 1 回は、現在値が 00b でも 00h を書く経路・mask 読戻し�
 
 `route_test_once` と承認は recover.c のファイル内 static とし、入口関数 (例 `recover_route_test_session`) が立て、全出口で false に戻す。§2 の「route_write_approved=true を設定」は、この static の承認を screen() が route_write_approved と OR して読む形に読み替える (configure の永続値は false のまま)。
 
-- `recover_route_test_session` (kdebug/recover.c) の IDLE・session の検査は kdebug_main.c の op 12 の門と重なる。害は無いので残す。
+- `recover_route_test_session` (sys/platform/pc98/kdebug/recover.c) の IDLE・session の検査は kdebug_main.c の op 12 の門と重なる。害は無いので残す。
 
 ## RECOVER_T4B_INJECT
 
 | 実物 | 確認と今回埋める境界 |
 | --- | --- |
-| `kdebug/recover.c` | boot 寿命の owner、bind 済み plan 必須の begin、承認済み step、共通 end。FAILED を再開始で消せない |
-| `kdebug/recover.c` | profile に target 必須。trial/opcode 期限、step poll 上限、独立 UART poll 上限がある |
+| `sys/platform/pc98/kdebug/recover.c` | boot 寿命の owner、bind 済み plan 必須の begin、承認済み step、共通 end。FAILED を再開始で消せない |
+| `sys/platform/pc98/kdebug/recover.c` | profile に target 必須。trial/opcode 期限、step poll 上限、独立 UART poll 上限がある |

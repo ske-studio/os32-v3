@@ -9,16 +9,16 @@ KernelAPIポインタを引数として実行する。
 |------|------|
 | バイナリ形式 | OS32X v5 (64バイトヘッダ + フラットバイナリ)。`sdk/mkos32x.py` が付与 |
 | ヘッダマジック | 0x4F533332 ('OS32') |
-| ソースファイル | `exec/exec.c` / `exec/exec.h` / `exec/exec_heap.c` |
+| ソースファイル | `sys/kern/exec/exec.c` / `sys/kern/exec/exec.h` / `sys/kern/exec/exec_heap.c` |
 | KAPIラッパー | `kapi/kapi_*.c` (自動生成分 + 手動分)。版は [KAPI_SPEC.md](KAPI_SPEC.md) |
 | KAPIテーブルアドレス | 動的算出 (KHEAP_BASE + KHEAP_SIZE) |
 | ロードアドレス | USER は `MEM_EXEC_LOAD_ADDR` = 0x80100000。常駐 shell は低位配置。OS32X v5 のロード番地・4世代を完全一致検査し、不一致は `EXEC_ERR_INVALID` |
-| 特権レベル | **既定で CPL=3** (v2 M1〜M3, 2026-09-03)。例外は常駐 shell (CPL=0)。受理するフラグは `exec/os32x_hdr.c` の `os32x_layout_check()` を参照 |
+| 特権レベル | **既定で CPL=3** (v2 M1〜M3, 2026-09-03)。例外は常駐 shell (CPL=0)。受理するフラグは `sys/kern/exec/os32x_hdr.c` の `os32x_layout_check()` を参照 |
 | アドレス空間 | プログラムごとに PD。APP_BAND より下 (カーネル帯 0x100000〜・シェル帯 0x400000〜0x4FFFFF を含む) は全 PD 共有・非 USER。USER にするのは下の「Ring3 の USER 写像」の範囲だけ |
-| 共有ライブラリ | 0x80000000〜0x800FFFFF に `/sys/lib/libos32gui.shlib` が常駐 (`mm/shlib.c`)。.text/.rodata はアプリ間で共有 (RO+USER)、.data/.bss はアプリ PD ごとに複製 (`shlib_addrspace_attach`、失敗は `EXEC_ERR_NOMEM`)。アプリは stub (ジャンプ表への薄いスタブ) を静的リンクし、版は先頭 4KB の `OS32ShlibHeader` で照合 |
+| 共有ライブラリ | 0x80000000〜0x800FFFFF に `/sys/lib/libos32gui.shlib` が常駐 (`sys/kern/mm/shlib.c`)。.text/.rodata はアプリ間で共有 (RO+USER)、.data/.bss はアプリ PD ごとに複製 (`shlib_addrspace_attach`、失敗は `EXEC_ERR_NOMEM`)。アプリは stub (ジャンプ表への薄いスタブ) を静的リンクし、版は先頭 4KB の `OS32ShlibHeader` で照合 |
 | ヒープ | USER の libc 初期末尾は `page_up(img_end)+PAGE_SIZE` (BSS 端の端数 + 1 page)、その直後に guard_a。exec_heap は別予約 `MEM_EXEC_HEAP_BASE` (0x88000000)、未指定64KiB・明示値はページ丸め/最低64KiB。実行中は EXACT 伸長・副 arena・大塊を `mem_map` で確保する。resident shell/gshell は固定 sbrk 上限0x4B5000、exec_heap 256KiB (小さい明示値のみ縮小) |
-| ネスト実行 | 最大 4 段 (ID の池 `exec/appslot.h` の `APP_MAX_APPS`)。深さと資源所有者のアプリ ID は別に管理する。**子が終了すると親に戻る** (親の exec_heap は `exec_heap_restore_state()` で復元) |
-| 資源の所有者 | FD / リダイレクト / パイプ / SHM は `res_owner_get()` のアプリ ID (カーネル 0、常駐シェル 1、アプリ 2〜5) でタグ付けし、終了する ID の分だけ回収。切替時に `appslot` が所有者を更新する (`exec/appslot.c`)。保護されたカーネル常駐 FD は回収しない |
+| ネスト実行 | 最大 4 段 (ID の池 `sys/kern/exec/appslot.h` の `APP_MAX_APPS`)。深さと資源所有者のアプリ ID は別に管理する。**子が終了すると親に戻る** (親の exec_heap は `exec_heap_restore_state()` で復元) |
+| 資源の所有者 | FD / リダイレクト / パイプ / SHM は `res_owner_get()` のアプリ ID (カーネル 0、常駐シェル 1、アプリ 2〜5) でタグ付けし、終了する ID の分だけ回収。切替時に `appslot` が所有者を更新する (`sys/kern/exec/appslot.c`)。保護されたカーネル常駐 FD は回収しない |
 | 不正ポインタ | ディスパッチャがアプリ帯 / SHM / VRAM の範囲で早期検証。検証しきれないものは「ring3 syscall 実行中フォールトガード」が捕捉し、**アプリだけ kill** (`fault_kill_count`)。設計: archive/kernel_v2/ (アーカイブ: `docs/archive/kernel_v2/PLAN.md`) |
 | プログラム専用スタック | CPL=3: `MEM_APP_STACK_TOP` (0x90000000) から可変量 (既定256KiB) を全 map、その直下に guard_b 1 page。常駐 shell/gshell は固定配置 |
 | 呼び出し規約 | カーネル側 GCC (System V) + `__cdecl` ラッパー、外部プログラム System V i386 ABI |
@@ -26,15 +26,15 @@ KernelAPIポインタを引数として実行する。
 保存済み USER 文脈は AppSlot が `arch_user_context` の値として所有する。
 D1 の汎用 syscall は arch の `read_block` で固定引数を一括コピーし、ポインタの早期範囲検証後に `arch_kapi_invoke` で呼ぶ。未 map の引数域は copy の失敗で FAULT kill するため、従来の呼出 ASM 内での #PF と異なり `[ring3] #PF ... err=` は出ない。kill の種別と子だけを終了する契約は同じ。予約 slot (`KAPI_FUNC_COUNT` 以上) も範囲拒否する。legacy・strings・print・private LS の raw 引数経路は D2/D3/E3 まで x86 adapter が維持する。
 
-USER の syscall コードページは `include/syscall_code.h` の layout → emit → publish
+USER の syscall コードページは `sys/include/syscall_code.h` の layout → emit → publish
 を通して作り、成功後に USER の関数表とページを公開する。x86 backend は
-`arch/x86/kernel/syscall_code.c`。予約 slot を含む 8B stub、文字列 scratch の固定位置、
+`sys/arch/x86/kernel/syscall_code.c`。予約 slot を含む 8B stub、文字列 scratch の固定位置、
 LS shim の192B枠を同じマクロで維持し、全区間が重ならず1ページに収まることを検査する。
 x86 の publish は no-op。命令キャッシュ同期が要る arch はこの口で同期を完了する。
 
-`include/exec_arch.h` の syscall view は生存中の入口スタックを借りるだけで、
+`sys/include/exec_arch.h` の syscall view は生存中の入口スタックを借りるだけで、
 AppSlot に保存しない。x86 の保存域は USER 52B/align4、親の特権 snapshot は
-4B/align4。実装は `arch/x86/kernel/exec_context.c` が持つ。親 snapshot は
+4B/align4。実装は `sys/arch/x86/kernel/exec_context.c` が持つ。親 snapshot は
 launch/resume の生存スタック上で setjmp 前に一度保存し、着地時の cleanup と
 x87 親復元の後、IRQ 禁止中に復元する。
 
@@ -42,14 +42,14 @@ x87 親復元の後、IRQ 禁止中に復元する。
 KBD は入力を消費して返す。未完了 stdin だけは非消費 peek の後、slot と引数を
 保ったまま `arch_user_restart` で syscall を一度だけ再実行する。
 
-初回入口は `include/exec_arch.h` の `arch_entry_prepare` / `arch_entry_enter`
+初回入口は `sys/include/exec_arch.h` の `arch_entry_prepare` / `arch_entry_enter`
 を通る。AppSlot が所有する `arch_entry_context` は x86 では16B/align4で、
 初回 SP・入口・モード・呼出元 SP を backend だけが解釈する。
 共通側は argv 文字列と AS を所有し、4引数 argc/argv/api/aux を選んで渡す。
 prepare は減算・整列の underflow と store の失敗を返し、commit 前に完了する。
 x86 は call 前の16B整列を保ち、USER はダミー ret を含む20B、CPL0 は16Bを保存する。
 argv/store → CR3 → heap → x87 → commit → entry の順を維持する。
-`arch/x86/kernel/exec_entry.c` は USER の CLI → ESP0 → CR3 → セグメント → iret
+`sys/arch/x86/kernel/exec_entry.c` は USER の CLI → ESP0 → CR3 → セグメント → iret
 を一続きに行う。USER は戻らず、CPL0 は ID 別の退避域から正常 return するか
 longjmp で親へ戻る。共通側へ TSS ポインタを渡さない。
 
@@ -110,7 +110,7 @@ KAPI の出力先に渡した場合は `ring3_user_ranges_writable` が拒否し
 
 SHM の先頭 1 ブロック (16KB) は DB 結果・エラー文用、末尾 4 ブロックは GUI 用に固定予約する。
 `shm_alloc` が配るのは残り 9 ブロックで、解放・所有者回収・全回収でも固定予約を維持する。
-PowerMac のシェル付きイメージも同じ `mm/shm.c` を `sys_shm_alloc`・`sys_shm_lock`・`sys_shm_free` に結線し、アプリ終了時にその所有者のブロックを回収する。
+PowerMac のシェル付きイメージも同じ `sys/kern/mm/shm.c` を `sys_shm_alloc`・`sys_shm_lock`・`sys_shm_free` に結線し、アプリ終了時にその所有者のブロックを回収する。
 
 通常の AS map/unmap は私有 PT だけを操作し、共有 PT に掛かる要求は無変更で拒否する。
 lease (0xF0000000〜 の私有窓、契約は [lease](design/exec/lease.md)、API は [KAPI_SPEC.md](KAPI_SPEC.md) の surface 系) と map の固定表は AS ごとに lease `MEM_LEASE_MAX` (8) 本・extent `APPMEM_EXTENT_MAX` (32) 本で、実行中に増やさない。静的リンクの libos32gfx と libos32gui.shlib の中の libos32gfx は別の実体なので、両方で描く GUI アプリは CLIENT lease を 2 本使う (8 本の内数)。
@@ -118,17 +118,17 @@ PTE の変更の TLB への反映は CR3 の読み直しで行い、`invlpg` を
 旧低位 USER を前提とした成果物は memory_layout 世代の完全一致検査で拒否する。現行世代・KAPI 版は [sdk/kapi.json](../sdk/kapi.json)、照合契約は [KAPI_SPEC.md §4](KAPI_SPEC.md#4-kernelapi-構造体レイアウト) を参照。
 
 V86 session の全出口 (正常・失敗・STOP・kill) で、低位の PTE の属性を戻し (VRAM/E の setup と teardown の両方で PCD を台帳と一致させる)、
-boot 原本の page 0 と開始時に退避した mailbox を書き戻す。低位 RAM は開始時にクリアしてそのまま使うので、開始前の内容は戻さない (`platform/pc98/legacy/v86_mem.c`)。
+boot 原本の page 0 と開始時に退避した mailbox を書き戻す。低位 RAM は開始時にクリアしてそのまま使うので、開始前の内容は戻さない (`sys/platform/pc98/legacy/v86_mem.c`)。
 SHM/トランポリン用の PDE USER も復元してから CR3 を読み直し、通常の地図を検査する。V86 中は通常 AS の実行・生成・検査をしない。
 V86 から戻った後の DISPLAY/TVRAM は lease を取り直す。拡張グラフィック対応機では出口で 6Ah に標準グラフィック (20h) を書いて戻す
-(`platform/pc98/legacy/v86.c`、拡張モードのまま戻ると A6h が効かず E0000h が MMIO のまま残るため、[U] 00A6h)。実機では未観測。
+(`sys/platform/pc98/legacy/v86.c`、拡張モードのまま戻ると A6h が効かず E0000h が MMIO のまま残るため、[U] 00A6h)。実機では未観測。
 
-### V86 セッションの入場と呼出元 (T7a、`platform/pc98/legacy/v86_call.c`)
+### V86 セッションの入場と呼出元 (T7a、`sys/platform/pc98/legacy/v86_call.c`)
 
 V86 に入るのは CPL=3 の `v86` コマンドが呼ぶ KAPI (`V86_SELFTEST` / `V86_DISKTEST` / `V86_BOOT` / `V86_BOOT2` / `V86_GDC_CAPTURE`) で、呼出元の AS があること自体は断る理由にしない。流れは CUI → 準備 → V86 → 復元 → CUI。
 
 - **入場の条件** (`v86_call_admit`): CUI (console シンク無効)・WM の入れ子なし・呼出元は GUI でない実行中のアプリで親がシェル・生きている AS は呼出元の 1 つだけ・ほかのアプリのスロットなし・セッションが開いていない。外れたら低位を触る前に `OS32_ERR_BUSY` で断る (シェルから直接起動するよう 1 行出す)。GUI 中は `v86_gui_refuse` が断って呼出元を畳む。
-- **準備**: mailbox (起動時に KHEAP へ 1 回だけ確保し core が持つ) が無ければ `OS32_ERR_NOSPC`。引数は呼出元からカーネルの置き場へ写す — パスは `VFS_MAX_PATH` の領域、画面取得は `V86Gcap` を確保し、書き戻し先が書けることを先に確かめる。引数の長さ違い・未終端や範囲外のパス・書けない書き戻し先は、低位を触る前に呼出元を終了させる (`ring3_fault_kill`、`exec/exec.c`)。NULL のパスと書き戻し先 NULL は従来の API どおりに扱う (必須の引数ならエラー、`V86_BOOT2` の 2 枚目の NULL は 2 枚目なし)。呼出元の CR3 を控えて固定 (pin) する。
+- **準備**: mailbox (起動時に KHEAP へ 1 回だけ確保し core が持つ) が無ければ `OS32_ERR_NOSPC`。引数は呼出元からカーネルの置き場へ写す — パスは `VFS_MAX_PATH` の領域、画面取得は `V86Gcap` を確保し、書き戻し先が書けることを先に確かめる。引数の長さ違い・未終端や範囲外のパス・書けない書き戻し先は、低位を触る前に呼出元を終了させる (`ring3_fault_kill`、`sys/kern/exec/exec.c`)。NULL のパスと書き戻し先 NULL は従来の API どおりに扱う (必須の引数ならエラー、`V86_BOOT2` の 2 枚目の NULL は 2 枚目なし)。呼出元の CR3 を控えて固定 (pin) する。
 - **実行**: 置き場と TSS.ESP0 が共有のカーネルスタック (`MEM_CONV_END` 以上、アプリ帯の手前) にあることを確かめ、master の CR3 へ切り替えて実行し、控えた CR3 へ戻す。master の間は呼出元の VA を参照しない。
 - **戻り**: 呼出元の AS と世代を照らし、違えば `OS32_ERR_STALE`。画面取得の結果は置き場から呼出元へ写す。最後に置き場を解放して固定を外す (`v86_call_cleanup`、例外の着地からも通る)。低位の復元は上の段落 (全出口で同じ復元を通す)。
 
@@ -150,7 +150,7 @@ V86 に入るのは CPL=3 の `v86` コマンドが呼ぶ KAPI (`V86_SELFTEST` /
 
 - **割当**: GUI アプリは起動直後に `gui_call(OP_INIT)` を呼び、戻り値でスロット番号 (0〜3、`GUI_SLOT_MAX` = 4) を受け取る。スロットの先頭は `shm_base + GUI_SHM_OFFSET + 番号 × GUI_SLOT_SIZE` (16KB)。WM はスロットを窓の所有者 (owner) に結び、同じ owner がもう一度 `OP_INIT` を呼べば同じ番号を返す。アプリの終了・kill で回収する。空きが無ければ `OS32_ERR_FULL` (5 本目は起動しない)。実体は `userland/gshell/src/handler.rs` の `op_init` と `wm.rs` の `alloc_slot`。
 - **配送**: イベントは窓の所有者のスロットのリングへ書く。`OP_POLL` は呼んだアプリのスロットだけを読む。フォーカスの切替で特別な処理は無い (リングはアプリごとに独立)。
-- **譲り合い** (協調切替、スレッドは無い): アプリが WM へ制御を返す (park する) のは `OP_WAIT`・kbd 待ち・polling・`sys_yield`・GUI STOP の WM 返却要求の 5 種だけ (`exec/appslot.c` の `parked_from_*`)。5 番目は次節の形で正常 syscall の完了後に退避する。起こす順は WM の `pick` / `should_park` (`userland/gshell/src/multiapp.rs`)。
+- **譲り合い** (協調切替、スレッドは無い): アプリが WM へ制御を返す (park する) のは `OP_WAIT`・kbd 待ち・polling・`sys_yield`・GUI STOP の WM 返却要求の 5 種だけ (`sys/kern/exec/appslot.c` の `parked_from_*`)。5 番目は次節の形で正常 syscall の完了後に退避する。起こす順は WM の `pick` / `should_park` (`userland/gshell/src/multiapp.rs`)。
 - **見え方**: SHM は全 PD 共有 + USER なので、アプリは他のアプリのスロットを読める。GUI の要求・イベントに秘密は無いので、今はこれを許す。
 
 ### GUI の KAPI-loop の STOP
@@ -184,7 +184,7 @@ USER の AS の割当て。閾値は 64KiB (`OS32_NANO_LARGE` / `MEM_EXEC_HEAP_M
 Rust は prefix・整列余白込みで `mem_alloc` に渡る実 byte 数で分ける。
 
 - **大塊 (64KiB 以上)**: C は prefix 付きで `mem_map(TOPDOWN)` に直接写し、失敗はそのまま ENOMEM (arena へ落とさない)。free は即 unmap。
-  kernel 側の `mem_alloc` (`exec/exec_heap.c`) は TOPDOWN の LARGE extent を取り、取れなければ既存 arena の空きだけを使う (新しい arena は作らない)。
+  kernel 側の `mem_alloc` (`sys/kern/exec/exec_heap.c`) は TOPDOWN の LARGE extent を取り、取れなければ既存 arena の空きだけを使う (新しい arena は作らない)。
 - **小塊**: C は主 arena を `_sbrk` の EXACT で伸ばし、続きが取れなければ flags=0 の副 arena (最小 64KiB、取れなければ必要量で 1 回) を作る。arena ごとに nano の状態を持ち、free list を跨いで繋がない。
   kernel 側は exec_heap の現在端へ EXACT、取れなければ TOPDOWN で arena (最小 64KiB) を足す。
 - 大小を跨ぐ realloc は新確保→copy→旧解放で、失敗は旧内容を保つ。完全に空いた副 arena と末尾の空きページは下の trim で返す。

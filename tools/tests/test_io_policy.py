@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """A4 runtime contract, no libc; PPC user-mode is optional on CI hosts."""
 CHECK = dict(name='io-policy-host', tier=1, budget=20, needs=[], covers=[
-    'kernel/io_policy.c', 'kernel/io_policy.h', 'tools/tests/io_policy_host.c',
-    'tools/tests/test_io_policy.py', 'tools/tests/host32.py', 'include/types.h',
-    'include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h', 'include/app_ids.h'],
+    'sys/kern/io_policy.c', 'sys/kern/io_policy.h', 'tools/tests/io_policy_host.c',
+    'tools/tests/test_io_policy.py', 'tools/tests/host32.py', 'sys/include/types.h',
+    'sys/include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h', 'sys/include/app_ids.h'],
     basis=['IO_TIER_DESIGN §4', '§8', 'AC-IO-2'],
     env_limit='PPC byte-order runtime needs powerpc-elf-gcc and qemu-ppc user mode')
 
@@ -65,7 +65,7 @@ def exercise(root, work, source, ppc=False, splice_only=False):
 
 
 def run(ctx):
-    source = (ctx.root / 'kernel/io_policy.c').read_text()
+    source = (ctx.root / 'sys/kern/io_policy.c').read_text()
     ppc_cc = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
     architectures = [False]
     if ppc_cc.is_file() and shutil.which('qemu-ppc'):

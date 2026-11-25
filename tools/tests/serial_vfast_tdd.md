@@ -2,8 +2,8 @@
 
 契約: `docs/design/drivers/char/serial_plan.md` (速度の決め方・FIFO 判定・ビット位置・送信予算)・
 `docs/design/userland/shell/serial_watchdog.md` (番犬と `serial ack`)
-対象: `drivers/char/serial_plan.c` (速度の決め事) / `userland/shell/serial_watchdog.c`
-      (切替後の番犬) / `drivers/char/serial.c` `userland/shell/rshell.c` (I/O と配線)
+対象: `sys/dev/char/serial_plan.c` (速度の決め事) / `userland/shell/serial_watchdog.c`
+      (切替後の番犬) / `sys/dev/char/serial.c` `userland/shell/rshell.c` (I/O と配線)
 試験: `tools/tests/test_serial_vfast.py` + `tools/tests/serial_vfast_host.c`
 実行: `make check-serial-vfast-host` (`check-par` の列)
 
@@ -15,22 +15,22 @@
 `0132h` の RxRDY を `0032h` のビット位置で見ても、NP21/W では動いてしまう。
 
 実機に出す前に押さえられるのは「決め事」だけなので、決め事を
-`drivers/char/serial_plan.c` に切り出してそこを試験する。I/O を伴う部分
+`sys/dev/char/serial_plan.c` に切り出してそこを試験する。I/O を伴う部分
 (`0138h` / `013Ah` を実際に叩く順番、IRQ ハンドラの汲み出し) は
 **実機での確認が要る** (TASK_SERIAL_VFAST の受入 S5 / S6)。ここで緑でも実機合格ではない ([V4])。
 
 ## RED
 
 1. ハーネス (`serial_vfast_host.c`) と `test_serial_vfast.py` を先に書いた。
-   `drivers/char/serial_plan.c` が無いのでコンパイルが通らない = RED。
+   `sys/dev/char/serial_plan.c` が無いのでコンパイルが通らない = RED。
 
    ```
-   serial_vfast_host.c:18:10: fatal error: ../../drivers/char/serial_plan.c:
+   serial_vfast_host.c:18:10: fatal error: ../../sys/dev/char/serial_plan.c:
    No such file or directory
    ```
 
 2. 実装後の否定側 (`--mutate`)。実物を 1 か所だけ壊して、どれも RED になることを見る。
-   **変異は写しの上で行う** (一時ディレクトリの `drivers/char/serial_plan.c` を先に
+   **変異は写しの上で行う** (一時ディレクトリの `sys/dev/char/serial_plan.c` を先に
    引かせる) ので、実物のソースは 1 バイトも動かない = `check-par` で並列に回せる。
 
    | # | 壊し方 | 結果 |
@@ -48,8 +48,8 @@
 ## GREEN
 
 ```
-HOST GNU89 -Werror compile PASS (real drivers/char/serial_plan.c)
-TARGET i386-elf GNU89 -Werror PASS      (drivers/char/serial_plan.c + drivers/char/serial.c)
+HOST GNU89 -Werror compile PASS (real sys/dev/char/serial_plan.c)
+TARGET i386-elf GNU89 -Werror PASS      (sys/dev/char/serial_plan.c + sys/dev/char/serial.c)
 SUMMARY 10/10 PASS
 MUTATION 1..9 すべて RED (どれも実行時。コンパイルエラーに逃げていない)
 ```
@@ -60,7 +60,7 @@ MUTATION 1..9 すべて RED (どれも実行時。コンパイルエラーに逃
 |---|---|---|
 | `vfast_table` | 速度 → `013Ah` bit3-0 の分周。表に無い速度は **0** | `io_rs.md` 352〜380 行 / NP21/W `speedtbl` |
 | `compat_exact` | 2.4576MHz なら 9600=16 / 19200=8 / **38400=count 4 ちょうど** | 実機 Ra266 (TASK_FDC_REALHW §9-1) |
-| `compat_inexact` | **1.9968MHz の 38400 は count 3 → 実効 41600 (+8.3%)**、`exact=0` | `drivers/char/serial.h` の表 |
+| `compat_inexact` | **1.9968MHz の 38400 は count 3 → 実効 41600 (+8.3%)**、`exact=0` | `sys/dev/char/serial.h` の表 |
 | `mode_choice` | V･FAST に入るのは **FIFO 搭載 × 明示指定 × 表にある速度** の 3 つ揃ったときだけ | `docs/design/drivers/char/serial_plan.md` |
 | `tx_budget` | 予算 = 2 × 10 ビット ÷ baud (9600→2083µs / 115200→173µs)、**0 にしない** | `docs/design/drivers/char/serial_plan.md` |
 | `tx_budget_ticks` | **予算は tick で測る**。標準速度は下限の 3 tick (保証 20ms ≥ FTDI の遅延タイマ 16ms)、遅い速度は切り上げ + 境界ずれで伸びる、1 にも 0 にもならない | 往復 3 |
@@ -95,7 +95,7 @@ MUTATION 1..9 すべて RED (どれも実行時。コンパイルエラーに逃
 
 **IF=0 で呼ばれたときは tick が進まない** ので、そこだけは回数上限
 (`SER_TX_SPIN_MAX` = 20 万) でスピンして諦める。`_halt()` は IF=0 では二度と
-起きないので踏まない。判定には `include/io.h` に足した `_irq_enabled()` を使う
+起きないので踏まない。判定には `sys/include/io.h` に足した `_irq_enabled()` を使う
 (`irq_save()` は cli する副作用があり、戻り値は不透明という契約なので使えない)。
 
 ## 設計変更 (往復 6) — 暗黙の推定をやめて `serial ack` にした
@@ -192,7 +192,7 @@ PM が設計を確定し、①〜⑥ を一度に閉じた。
   EOT の返しは実機。
   **FIFO 非搭載機を用意できないので、`serial 115200` が拒否される経路も実機待ち。**
 - **`gfx_present_raster` の IF を戻す窓** (B4)。待ちの途中で割り込みが入ると
-  ラスタの位置が数十µs ずれうる。呼び手は `platform/pc98/boot_splash.c` の 2 か所だけ
+  ラスタの位置が数十µs ずれうる。呼び手は `sys/platform/pc98/boot_splash.c` の 2 か所だけ
   なので、**スプラッシュの見た目**で確かめる (NP21/W)。
 - **ホスト道具の `Build:` 判定・EOT の吸い出し・エコー検査** (B3)。pyserial と
   実際の COM ポートが要る。

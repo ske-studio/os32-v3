@@ -1,7 +1,7 @@
 # fstat_redir TDD 記録 — `fstat` がリダイレクトを見ておらず `isatty` と食い違う
 
 契約: [`docs/design/fs/vfs_fd_fstat.md`](../../docs/design/fs/vfs_fd_fstat.md) (出所の票 TASK_FSTAT_REDIR。この試験はその受入 **F4 / F5**、下の「票 §N」はその票の節)
-試験: `tools/tests/fstat_redir_host.c` (実物の `fs/vfs.c` + `fs/vfs_fd.c` + `fs/fd_redirect.c` を `#include`)
+試験: `tools/tests/fstat_redir_host.c` (実物の `sys/fs/vfs.c` + `sys/fs/vfs_fd.c` + `sys/fs/fd_redirect.c` を `#include`)
 実行: `python3 -B tools/tests/test_fstat_redir.py [--target] [--mutate]` / `make check-fstat-redir-host`
 関連: `tools/tests/test_result_conv.py` (userland の `stat_t` を贋 KAPI で走らせる側)
 
@@ -16,7 +16,7 @@
 | 追加 | パイプ (`FD_TARGET_BUFFER`) の `fstat` | `S_IFIFO`。`st_size` は 0 |
 | F6 | `fd>=3` の `fstat` / 引数検査 / コンソールへの `write` | 従来どおり |
 
-リダイレクトは**贋物を置かない** — この票の主題そのものなので `fs/fd_redirect.c` を
+リダイレクトは**贋物を置かない** — この票の主題そのものなので `sys/fs/fd_redirect.c` を
 実物のまま同じ翻訳単位に取り込む。FS は合成 `VfsOps` で、`stat` が決まった
 大きさ (4096) と時刻 (`0x5EED0001` ほか) と inode (1234) を返す。
 
@@ -55,7 +55,7 @@
 そこで **「fd 0/1/2 はいま何に繋がっているか」に答える関数を 1 本だけ**置いた。
 
 ```
-fs/fd_redirect.c
+sys/fs/fd_redirect.c
     u16 fd_redirect_ifmt(int fd, int *out_file_fd)   <- 唯一の管理元
          FD_TARGET_CONSOLE -> OS_S_IFCHR
          FD_TARGET_FILE    -> OS_S_IFREG  (+ out_file_fd に実ファイルの FD)
@@ -63,7 +63,7 @@ fs/fd_redirect.c
       |
       +- int fd_is_redirected(int fd)   = (ifmt != OS_S_IFCHR)
       |
-fs/vfs_fd.c
+sys/fs/vfs_fd.c
       +- int vfs_isatty(int fd)         = (ifmt == OS_S_IFCHR)
       +- int vfs_fstat(int fd, ...)     = ifmt が REG なら vfs_fstat(file_fd)、
                                           他は ifmt をそのまま st_mode の種別へ
@@ -75,7 +75,7 @@ fs/vfs_fd.c
 
 ## RED (実装前)
 
-`fs/vfs_fd.c` と `fs/fd_redirect.c` を `d213e17` の内容に戻し
+`sys/fs/vfs_fd.c` と `sys/fs/fd_redirect.c` を `d213e17` の内容に戻し
 (`fd_redirect_ifmt` は常に `OS_S_IFCHR` を返す仮置き)、ヘッダの
 `OS_S_IFIFO` と試験だけを入れた状態。
 
@@ -115,11 +115,11 @@ EXIT=1
 
 ```
 C4 SINGLE-SOURCE PASS (isatty / fstat / is_redirected はすべて fd_redirect_ifmt() 由来、OS_S_IFIFO=0x1000)
-HOST GNU89 -Werror COMPILE PASS (real fs/vfs.c + fs/vfs_fd.c + fs/fd_redirect.c)
+HOST GNU89 -Werror COMPILE PASS (real sys/fs/vfs.c + sys/fs/vfs_fd.c + sys/fs/fd_redirect.c)
 66 件中 0 件 FAIL
 EXIT fstat_redir_host=0
-TARGET i386-elf -Werror COMPILE PASS (fs/vfs_fd.c)
-TARGET i386-elf -Werror COMPILE PASS (fs/fd_redirect.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/fs/vfs_fd.c)
+TARGET i386-elf -Werror COMPILE PASS (sys/fs/fd_redirect.c)
 ```
 
 ## 否定側 (`--mutate`)
@@ -137,7 +137,7 @@ TARGET i386-elf -Werror COMPILE PASS (fs/fd_redirect.c)
 
 ## userland 側 (`stat_t`) — 票 §3-2
 
-`userland/tests/stat_t.c` の主張を「特定の値」から「2 つの API の一致」へ
+`userland/diag/stat_t.c` の主張を「特定の値」から「2 つの API の一致」へ
 変えた。5 件のままで、内訳は:
 
 1. `stat /bin/sh.bin` が成功する
@@ -168,7 +168,7 @@ TARGET i386-elf -Werror COMPILE PASS (fs/fd_redirect.c)
   しない。ホストでは `> file` 相当を贋 KAPI で通してある (上の表) が、
   実物のカーネルで測ったわけではない。
 - `make all` / `make check` / `make external` は回していない (個別ターゲットのみ)。
-  `fs/vfs_fd.c` と `fs/fd_redirect.c` は `i386-elf-gcc -Werror` で**単体では**
+  `sys/fs/vfs_fd.c` と `sys/fs/fd_redirect.c` は `i386-elf-gcc -Werror` で**単体では**
   通ることを確認済み。カーネル全体のリンクと増分サイズは未測定。
 - パイプ中の `fstat` を実機で叩いたことはない (`cmd | stat_t` はゲストでのみ
   確かめられる)。ホストでは実物の `fd_redirect.c` を通して見ている。

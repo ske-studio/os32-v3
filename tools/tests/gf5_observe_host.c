@@ -3,12 +3,12 @@
  * first-stage N=20 M=2, optional second-stage N=2 M=1, P=1.
  * Recreate expectations by applying those integer divisions in that order.
  * No MMIO model, sensor initialization, program, or poll is supplied. */
-#include "../../hwdev/gf/feature5.h"
-#include "../../hwdev/gf/foundation.h"
-#include "../../hwdev/gf/command.h"
-#include "../../kdebug/gf5_test.h"
-#include "../../kdebug/gf_command_wire.h"
-#include "../../kdebug/gfinit_pll.h"
+#include "../../sys/dev/video/geforce/feature5.h"
+#include "../../sys/dev/video/geforce/foundation.h"
+#include "../../sys/dev/video/geforce/command.h"
+#include "../../sys/dev/video/geforce/diag/gf5_test.h"
+#include "../../sys/dev/video/geforce/diag/gf_command_wire.h"
+#include "../../sys/dev/video/geforce/diag/gfinit_pll.h"
 #include "serial_diag_host.h"
 static void __attribute__((noreturn)) quit(int rc)
 {

@@ -9,11 +9,11 @@
 #define irq_save() 0U
 #define irq_restore(f) ((void)(f))
 #ifndef PCM_ADAPTER
-#define PCM_ADAPTER "../../drivers/sound/cs4231/pcm_module.c"
+#define PCM_ADAPTER "../../sys/dev/sound/cs4231/pcm_module.c"
 #endif
 #include "pcm_hw.h"
 #include PCM_ADAPTER
-#include "../../kernel/irq/tick.c"
+#include "../../sys/kern/irq/tick.c"
 volatile u32 kctx_irq_depth;
 const u32 pcm_kexports[] = {0};
 const struct module_symbol_contract pcm_import_contracts[] = {{0}};
@@ -281,7 +281,7 @@ void _start(void)
     finish(0);
 }
 
-#include "../../platform/pc98/module_pair.c"
+#include "../../sys/platform/pc98/module_pair.c"
 
 const struct boot_common *boot_common_get(void) {
     static struct boot_common info;

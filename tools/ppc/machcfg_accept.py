@@ -113,23 +113,23 @@ def main():
                         ' ppc_sync(); ppc_isync();\n    ')
                 for name, read, expected in [('seed-nap', clear, 0),
                                              ('omit-clear', 'u32 hid = ppc_read_hid0();', 1)]:
-                    change = mutant_settings(work, name, 'arch/ppc/kernel_cpu.c',
+                    change = mutant_settings(work, name, 'sys/arch/ppc/kernel_cpu.c',
                                              clear, seed + read)
                     check(name, 'ok', 0, settings + change, nap7450=expected)
             if case == 'one':
-                ignore = mutant_settings(work, 'ignore-nap', 'arch/ppc/kernel_cpu.c',
+                ignore = mutant_settings(work, 'ignore-nap', 'sys/arch/ppc/kernel_cpu.c',
                                          'if (nap7450)', 'if (!nap7450)')
                 check('ignore-nap', 'ok', 1, settings + ignore, nap7450=0)
-                wrong = mutant_settings(work, 'host-path', 'kernel/machcfg_root.c',
+                wrong = mutant_settings(work, 'host-path', 'sys/kern/machcfg_root.c',
                                         'sysconfig_temp_begin(SYS_MACHINE_CFG)',
                                         'sysconfig_temp_begin("/host/etc/machine.cfg")')
                 check('host-path', 'none', 0, settings + wrong)
-                failed = mutant_settings(work, 'mount-failed', 'init/boot_root.c',
+                failed = mutant_settings(work, 'mount-failed', 'sys/kern/init/boot_root.c',
                                          'vfs_mount("/", "rd0", "iso9660")',
                                          'vfs_mount("/", "rd0", "absent")')
                 check('mount-failed', 'nofs', 0, settings + failed, False)
             if case == 'big':
-                trunc = mutant_settings(work, 'short-read', 'init/sysconfig.c',
+                trunc = mutant_settings(work, 'short-read', 'sys/kern/init/sysconfig.c',
                                         'vfs_read(path, sc_buf, SYSCONFIG_MAX);',
                                         'vfs_read(path, sc_buf, SYSCONFIG_MAX - 1);')
                 check('short-read', 'ok', 1, settings + trunc)

@@ -1,6 +1,6 @@
 /* Unit scenarios start at BSS through the shared stage-A fixture. */
-#include "kernel/ime/ime_user_store.c"
-#include "kernel/ime/ime_conn.c"
+#include "sys/kern/ime/ime_user_store.c"
+#include "sys/kern/ime/ime_conn.c"
 #include "tools/tests/fep_store_fixture.c"
 #include <stdarg.h>
 

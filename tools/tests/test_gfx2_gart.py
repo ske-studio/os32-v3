@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Exercise C6 directly with a freestanding fake allocator and backend."""
 CHECK = dict(name='gfx2-gart-host', tier=1, needs=[], budget=5,
-    covers=['gfx/v2/gart.c', 'gfx/v2/gfx2_int.h', 'include/gfx_hal2.h',
-            'include/dma_contract.h', 'mm/pgalloc.h', 'tools/tests/gfx2_gart_host.c',
+    covers=['sys/hal/gfx/v2/gart.c', 'sys/hal/gfx/v2/gfx2_int.h', 'sys/hal/gfx/gfx_hal2.h',
+            'sys/include/dma_contract.h', 'sys/kern/mm/pgalloc.h', 'tools/tests/gfx2_gart_host.c',
             'tools/tests/test_gfx2_gart.py', 'tools/tests/host32.py'],
     basis=['HAL_V2_DESIGN §8'],
 )
@@ -30,7 +30,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/v2/gart.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/v2/gart.c').read_text()
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         assert observe(work, source) == 0

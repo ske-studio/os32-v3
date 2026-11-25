@@ -557,5 +557,5 @@ bpp=3 で 96,000、bpp=2 で 64,000 バイト。`build/app.conf` の `apps/mgxvi
 | `userland/lib/mgx/mgx_blit.c` | プレーン転送とパレット変換 |
 | `lib/zlib/` | deflate 展開 (zlib 本体、無改変。`README.OS32` に出所) |
 | `apps/mgxview/mgxview.c` | ビューワ (ファイラは `libos32filer` を利用) |
-| `userland/tests/mgx_test.c` | ユニットテスト (56 項目) |
+| `userland/diag/mgx_test.c` | ユニットテスト (56 項目) |
 | `tools/img2mgx.py` | 画像 → MGX の変換 (サンプル・計測データはリポジトリにも配布物にも持たない。必要なら手元で作る) |

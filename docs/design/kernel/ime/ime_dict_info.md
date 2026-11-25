@@ -1,7 +1,7 @@
-# kernel/ime/ime_dict_info.c — 辞書のメタ情報を返す KAPI `ime_dict_info`
+# sys/kern/ime/ime_dict_info.c — 辞書のメタ情報を返す KAPI `ime_dict_info`
 
 > 状態: **現行 (2026-11-18)** — 出所: DICT_META_DESIGN・TASK_DICT_META (要約して移した)
-ソース: `kernel/ime/ime_dict_info.c`・`sdk/include/os32/os32_kapi_shared.h` (`IME_DICT_INFO_*`)・`sdk/kapi.json` (`ime_dict_info`)・`kernel/ime/fep_module.c` (stub)・`userland/cmds/ime_info.inc` (`ime info` の表示)
+ソース: `sys/kern/ime/ime_dict_info.c`・`sdk/include/os32/os32_kapi_shared.h` (`IME_DICT_INFO_*`)・`sdk/kapi.json` (`ime_dict_info`)・`sys/kern/ime/fep_module.c` (stub)・`userland/cmds/ime_info.inc` (`ime info` の表示)
 
 型と誤りの意味は [ime_store.h の契約](ime_store.md)、各キーの値は [システム辞書の形式](../../tools/fep_to_sqlite.md) にある。
 
@@ -50,8 +50,8 @@ license などそれ以外は `NOTFOUND`。偽の原文や件数 0 を返さな�
 
 ## 仕組み
 
-- KAPI の表 → `ime_dict_info_facade` (core の `kernel/ime/fep_module.c`) → FEP 部品の ops の `dict_info` → FEP の中の `ime_dict_info_facade` → `fep_store_info`。
-  FEP が無ければ core の stub が `NOSYS`。ops の並びを変えたら `FEP_MODULE_OPS_VERSION` (`kernel/ime/fep_module.h`) を上げる。
+- KAPI の表 → `ime_dict_info_facade` (core の `sys/kern/ime/fep_module.c`) → FEP 部品の ops の `dict_info` → FEP の中の `ime_dict_info_facade` → `fep_store_info`。
+  FEP が無ければ core の stub が `NOSYS`。ops の並びを変えたら `FEP_MODULE_OPS_VERSION` (`sys/kern/ime/fep_module.h`) を上げる。
 - 形式 1 は `SELECT value FROM meta WHERE key = ?` を 1 回 step し、`sqlite3_column_blob`・`sqlite3_column_bytes` で長さを取り、C の側で byte を切る。
   SQL で切らないのは、製品の SQLite が `CAST` を省き、outer の口に `bind_int64` が無いため。
 - SQLite の値は finalize の前に関数内の 256 byte の staging に写し、finalize の後に呼び手へ 1 回だけ写す (`copy_to_caller`)。
@@ -69,4 +69,4 @@ license などそれ以外は `NOTFOUND`。偽の原文や件数 0 を返さな�
 - `fep-store-info` (`tools/tests/test_fep_store_info.py`): 全キー、状態ごとの戻り、capacity 0/1/2/256/257、EOF・`INT_MAX`、UTF-8 の途中で切った原文の再結合、失効のとき SQL を流さないこと、呼び手の域。変異 (`info-*`) は `fep-boundary-host` にもある。
 - `fep-module` (`tools/tests/test_fep_module.py`): ops の表と stub の `NOSYS`、起動の接続数の中継。
 - `ime-info` (`tools/tests/test_ime_info.py`): 表示が byte で切った原文を壊さないこと。
-- ゲスト: `userland/tests/fep_meta_test.c` (20 キーの全 byte を辞書の meta と照合、`entry_count` が実数と一致)。
+- ゲスト: `userland/diag/fep_meta_test.c` (20 キーの全 byte を辞書の meta と照合、`entry_count` が実数と一致)。

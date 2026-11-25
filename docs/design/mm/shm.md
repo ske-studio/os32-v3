@@ -1,6 +1,6 @@
-# mm/shm.c — 設計
+# sys/kern/mm/shm.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_T2D_T2H (§2-4・§2-5 e10a) の契約を今のソースと照らして要約
-ソース: `mm/shm.c`・`mm/shm.h`
+ソース: `sys/kern/mm/shm.c`・`sys/kern/mm/shm.h`
 
 共有メモリ (SHM) のブロックの確保・lock・解放と、プログラム終了時の回収。SHM の全ページは起動時から全アプリに `USER` で見え (`docs/design/mm/paging_map.md`)、ここで変えるのは RW ビットだけ。
 

@@ -114,7 +114,7 @@ GUI は親がないので、`raw_wait_test log done` を事前に一度完了さ
   mode/辞書は保持。GUI の raw 待ちは WM 所有の composition を取り消さない契約なので、
   別の WM textbox の候補を誤って消していないことも確認する ([X-11](../../docs/KAPI_SPEC.md#共有サービス12口の契約-x-11--t4b-5))。
 - `parent` の exec_run に入る直前、子から戻った親の次の mem_stat wrapper 入口で
-  `kernel_tss.esp0` と `exec/redir_access.c` の `caller_frame` (origin/app_id/as/valid)、
+  `kernel_tss.esp0` と `sys/kern/exec/redir_access.c` の `caller_frame` (origin/app_id/as/valid)、
   `g_cur_frame` / `ring3_in_syscall` を採取。同じ親の値に戻り、mem_stat がその app を返すこと。
   fault/STOP/通常で比較する。GUI では終了後の WM の次 KAPI で元の WM esp0/caller を照合する。
 
@@ -125,7 +125,7 @@ READY と処理入口の間に STOP を送ってもこの受入の証拠には�
 `log stop` は以下の試験ビルドを使い、**ブレークせず**に注入する。通常ビルドの短いログと
 停止点でのキー注入の組合せは使わない (停止中はエミュレータの時刻が進まない)。
 
-1. `make -W kernel/ime/ime_dict.c all KERNEL_CFLAGS_EXTRA=-DOS32_RAW_WAIT_LOG_TICKS=1000 MUTATE=0`。
+1. `make -W sys/kern/ime/ime_dict.c all KERNEL_CFLAGS_EXTRA=-DOS32_RAW_WAIT_LOG_TICKS=1000 MUTATE=0`。
    試験フラグは USER 呼出しからの辞書成功ログだけを1000 tick (100Hzで約10秒) 延長する。
    KAPI の引数・版・slot は変えない。フラグ切替は make の依存に含まれないため `-W` は必須。
    PM がこのカーネルと対の kdebug/モジュール・fixture を停止→配備→起動し、hash/CRC を照合する。

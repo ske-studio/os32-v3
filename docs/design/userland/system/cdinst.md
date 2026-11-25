@@ -24,7 +24,7 @@ CD の `.PKG` から hd0 へ入れる。hd0 の扱い (順序・ERASE・鍵) は
 ## KAPI の返す文字列
 
 インストーラ (CPL=3) が呼ぶ `const char *` を返す KAPI は、CPL=3 に写しを返す実体につながっていること (`vfs_devname` →
-`vfs_devname_user` など、`exec/exec.c` の `*_user`)。カーネル帯の文字列をそのまま返すと fault kill になる。
+`vfs_devname_user` など、`sys/kern/exec/exec.c` の `*_user`)。カーネル帯の文字列をそのまま返すと fault kill になる。
 ホストの贋物では見えないので、試験は `sdk/kapi.json` の target と生成物を見る (str-return guard)。
 
 ## 確かめ

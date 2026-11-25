@@ -4,7 +4,7 @@ unsigned int host_arch_if = 0x202U;
 #include "gfx_kernel_fb_host.c"
 #undef run
 #define main shutdown_guest_main
-#include "../../userland/tests/shutdown_probe.c"
+#include "../../userland/diag/shutdown_probe.c"
 #undef main
 void *memset(void *p, int value, __SIZE_TYPE__ bytes)
 { return kmemset(p, value, bytes); }

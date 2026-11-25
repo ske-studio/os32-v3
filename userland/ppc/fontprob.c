@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include "os32api.h"
-#include "../../include/config.h"
+#include "../../sys/include/config.h"
 
 enum {
     APP_LEASES = 3,

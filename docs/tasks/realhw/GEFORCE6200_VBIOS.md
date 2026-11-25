@@ -188,7 +188,7 @@ fixture では CALL 先を script 番号 255 として扱う。命令数は圧�
 ### 5-1. 619 の書込み候補の分類
 
 fixture は 193 命令が起こしうる操作を 1 件ずつ並べ (索引レジスタの選択の書込みを含む)、**619 件の書込み候補**にした。
-これを戻す処理 (recover) の許可表 (`kdebug/recover_gf.c`、target 145・rule 544) に照らした分類 (4a S1 追補、ADDENDUM.final の末尾):
+これを戻す処理 (recover) の許可表 (`sys/dev/video/geforce/diag/recover_gf.c`、target 145・rule 544) に照らした分類 (4a S1 追補、ADDENDUM.final の末尾):
 
 | 分類 | 件数 | 中身 | 今の扱い |
 |---|---:|---|---|

@@ -31,8 +31,8 @@
 ## 1. 実物の確認 (r2 と同じ。r3 で足した行だけ)
 - r2 の §1-1〜§1-4 はそのまま有効。食い違いは 4 件 (GeForce の fill/blit の書き先、M2MF では CPU が空かない、gfx_hal.h、Trident の間隔: main は待ち無し・wt/tri-gap は 80ns)。
 - userland/lib/gfx/libos32gfx_core.c `libos32gfx_check`: CPL=0 で ready なら何も見ずに 0 を返す。同ファイル内 `gfx_present` は dirty を積むだけ。`libos32gfx_getchar()` の getchar・trygetchar・yield・halt は呼んだ後に `libos32gfx_check` を通る。
-- gfx/gfx_core_surface.inc `gfx_reinit_surface_roles`: (0) で `lease_revoke_surface` (写像を外す)、(1) で `ledger_surface_regen` (世代を上げる)、最後に `gfx_bind_client`。
-- exec/surface_query.c: `surface_query` も `surface_query_authorize`  を通る。lease は `surface_api_lease()`、bundle は `surface_api_bundle()`。
+- sys/hal/gfx/gfx_core_surface.inc `gfx_reinit_surface_roles`: (0) で `lease_revoke_surface` (写像を外す)、(1) で `ledger_surface_regen` (世代を上げる)、最後に `gfx_bind_client`。
+- sys/kern/exec/surface_query.c: `surface_query` も `surface_query_authorize`  を通る。lease は `surface_api_lease()`、bundle は `surface_api_bundle()`。
 - userland/gshell/src/visible.rs-: `recompute_and_expose` が全部の窓の vis を計算し直し、露出した所を dirty に足す。vis と dirty はクライアントのローカル座標 (wm.rs)。
 
 ## 2. 方式 (決定済み)
@@ -59,7 +59,7 @@
     int  (*mono)(int x, int y, int w, int h, const u8 *bits, u32 pitch, u8 fg, int bg,
                  int cx, int cy, int cw, int ch);  /* 不透明 (bg>=0) だけ。透過は呼ばない */
     int  (*get)(int x, int y, int w, int h, u8 *dst, u32 pitch);
-/* drivers/video/geforce/gf_direct.c */
+/* sys/dev/video/geforce/gf_direct.c */
 int gf_direct_ok(void)
 {
     return selected_front.fmt == GF3_INDEX8 && selected_front.width == GF_WIDTH &&
@@ -69,7 +69,7 @@ int gf_direct_ok(void)
 ```
 - DIRECT に必須の口は fill_rect・blit・fill_rop・put・get・direct_ok。**能力の検査は、backend が登録時に保存した DIRECT 用の hook の組 (`direct_ops`) に対して行う**。今の表の fill_rect・blit は見ない (SHADOW の間は NULL のため)。一つでも欠けると `gfx_policy_reeval` は SHADOW にし、kprintf を出す。表の hook は、切り替えが確定したときに gfx_policy.c だけが方式に合わせて書き換える (§3-4)。
 ```c
-/* include/gfx_hal.h、末尾追加。backend は prepare/init で 1 回だけ埋め、あとは書き換えない */
+/* sys/include/gfx_hal.h、末尾追加。backend は prepare/init で 1 回だけ埋め、あとは書き換えない */
 typedef struct GfxDirectOps {
     int (*fill_rect)(int, int, int, int, u8);
     int (*blit)(int, int, int, int, int, int);
@@ -100,7 +100,7 @@ int gfx_hw_submit(const GFX_Cmd *cmds, u32 n, u32 gen, u32 *done);   /* kapi.jso
 int gfx_hw_get(int x, int y, int w, int h, u8 *dst, u32 pitch, u32 gen);
 ```
 ```c
-/* gfx/gfx_hw_submit.c の入口 (この順) */
+/* sys/hal/gfx/gfx_hw_submit.c の入口 (この順) */
 int user = ring3_call_from_user();
 if (user && !ring3_user_range_writable((u32)done, sizeof(u32))) return OS32_ERR_INVAL; /* 何も実行しない */
 *done = 0;
@@ -111,7 +111,7 @@ if (n > GFX_CMD_MAX || (user && !ring3_user_range_ok((u32)cmds, n * sizeof(GFX_C
 for (u32 i = 0; i < n; i++) { int rc = submit_one(&cmds[i], user); if (rc) return rc; *done = i + 1; }
 return 0;
 ```
-- 命令ごとの検査は r2 の表のとおり。COPY は 2 つの矩形を一緒に削る。PUT は `w ≤ pitch` で範囲が `(h-1)*pitch+w`、MONO は `(w+7)/8 ≤ pitch`、GET は書けること。どれも u32 のあふれを見る。読みの検査は既存の `ring3_user_range_ok` (exec/exec.c) を使う (H2 の着地、gfx/gfx_hw_submit.c)。
+- 命令ごとの検査は r2 の表のとおり。COPY は 2 つの矩形を一緒に削る。PUT は `w ≤ pitch` で範囲が `(h-1)*pitch+w`、MONO は `(w+7)/8 ≤ pitch`、GET は書けること。どれも u32 のあふれを見る。読みの検査は既存の `ring3_user_range_ok` (sys/kern/exec/exec.c) を使う (H2 の着地、sys/hal/gfx/gfx_hw_submit.c)。
 - `*done` は全部終わった先頭の数。`cmds[*done]` は途中まで書いたかもしれないので、再送しない。
 
 ### 3-3. libos32gfx・libos32gui・WM の境目
@@ -172,7 +172,7 @@ static void push_rows(u16 op, ..., const u8 *src, u32 pitch, u32 rowbytes, int h
 - rowbytes の最大は PUT で 640、MONO で 80 なので、4096 に必ず 1 行は入る。
 - 一時の小片 (文字列の 1bpp、回転の RAM の小片) は push が返ったらすぐ使い回してよい。
 
-### 3-4. 方式の切り替え (gfx/gfx_policy.c の `gfx_policy_reeval`、入口はこれだけ)
+### 3-4. 方式の切り替え (sys/hal/gfx/gfx_policy.c の `gfx_policy_reeval`、入口はこれだけ)
 | いつ | 向き |
 |---|---|
 | GUI に入る・全画面から GUI に戻る・page_flip/set_mode で写像の中に戻る | 共通の条件 (下) を満たせば DIRECT |
@@ -212,7 +212,7 @@ static int gfx_policy_blocks_map(u32 role)
     return g_backend && g_backend->policy == GFX_POLICY_DIRECT &&
            (role == LEDGER_ROLE_CLIENT || role == LEDGER_ROLE_DISPLAY);
 }
-/* exec/surface_query.c surface_api_lease・:259 surface_api_bundle の先頭、
+/* sys/kern/exec/surface_query.c surface_api_lease・:259 surface_api_bundle の先頭、
    gfx_core_bridge.inc:9 と CPL=3 からの gfx_get_framebuffer: */
 if (gfx_policy_blocks_map(role)) return OS32_ERR_NOSYS;   /* bridge・get_framebuffer は 0 で埋める */
 ```
@@ -288,15 +288,15 @@ vmkernel +3KB (FD に入る。FD_MIN_FREE_KB=64 を check-packages-host で確�
 |---|---|---|---|---|
 | P0a | userland/gshell/src/typical_ops.rs (新、feature gf_accel_accept) | 6 操作の台本、区間は入力 → GPU の完了 (§4) | — | 180 |
 | P0b | drivers/video/geforce/gf_accept_prim.c (新) | t_f・t_k・t_d、全面の fill/copy、mono、put を CPU と M2MF で | — | 150 |
-| H1 | include/gfx_hal.h、sdk/kapi.json と生成物、os32_kapi_shared.h、tools/hwdev_layout.json、tools/module_schema.py の版 | §3-1・§3-2・§3-7 の宣言だけ (os32-kapi-add) | — | 90 |
-| H2 | gfx/gfx_hw_submit.c (新) | §3-2 の入口の順と命令ごとの検査、gfx_hw_get | H1 | 220 |
-| H2a | exec/exec.c | 不要で閉じた (H2 が読みに既存の `ring3_user_range_ok` を使って着地) | — | 0 |
-| H3 | gfx/gfx_hw_mono_cpu.c (新) | 透過も不透明も小片にまとめて put | H1 | 80 |
-| H4 | gfx/gfx_policy.c (新) | §3-4 の `gfx_direct_wanted`・`gfx_policy_reeval`・hook の差し替え・世代 | H1 | 140 |
-| H5 | exec/surface_query.c、gfx_core_bridge.inc、gfx_core_framebuffer.inc (gfx_get_framebuffer()) | `gfx_policy_blocks_map` (共通の認可には入れない) | H4 | 30 |
-| H6 | gfx/gfx_core.c | 全画面に入る・出る、GUI に入る・出る、shutdown から `gfx_policy_reeval` を呼ぶ | H4 | 20 |
-| G1 | drivers/video/geforce/gf_direct.c (新) | `gf_direct_ok` (写像の中という条件を含む)・put・get・`direct_ops` | H1 | 200 |
-| G2 | drivers/video/geforce/gf_hook.c | 書き先を DISPLAY に、fill_rop (GXcopy/GXxor)、hw_ops を数える | H1 | 50 |
+| H1 | sys/include/gfx_hal.h、sdk/kapi.json と生成物、os32_kapi_shared.h、tools/hwdev_layout.json、tools/module_schema.py の版 | §3-1・§3-2・§3-7 の宣言だけ (os32-kapi-add) | — | 90 |
+| H2 | sys/hal/gfx/gfx_hw_submit.c (新) | §3-2 の入口の順と命令ごとの検査、gfx_hw_get | H1 | 220 |
+| H2a | sys/kern/exec/exec.c | 不要で閉じた (H2 が読みに既存の `ring3_user_range_ok` を使って着地) | — | 0 |
+| H3 | sys/hal/gfx/gfx_hw_mono_cpu.c (新) | 透過も不透明も小片にまとめて put | H1 | 80 |
+| H4 | sys/hal/gfx/gfx_policy.c (新) | §3-4 の `gfx_direct_wanted`・`gfx_policy_reeval`・hook の差し替え・世代 | H1 | 140 |
+| H5 | sys/kern/exec/surface_query.c、gfx_core_bridge.inc、gfx_core_framebuffer.inc (gfx_get_framebuffer()) | `gfx_policy_blocks_map` (共通の認可には入れない) | H4 | 30 |
+| H6 | sys/hal/gfx/gfx_core.c | 全画面に入る・出る、GUI に入る・出る、shutdown から `gfx_policy_reeval` を呼ぶ | H4 | 20 |
+| G1 | sys/dev/video/geforce/gf_direct.c (新) | `gf_direct_ok` (写像の中という条件を含む)・put・get・`direct_ops` | H1 | 200 |
+| G2 | sys/dev/video/geforce/gf_hook.c | 書き先を DISPLAY に、fill_rop (GXcopy/GXxor)、hw_ops を数える | H1 | 50 |
 | G3 | backend_geforce.c (`gf_hook_scan_changed()`・`geforce_query()`・present)、geforce_module.c | 走査面が確定したら `gfx_policy_reeval()` を呼ぶ (向きは決めない)。表への直書きを外して `direct_ops` を登録、能力ビット、present は数えるだけ、新しい口の `module_text_contains` | G1・G2・H4 | 60 |
 | L0 | userland/lib/gfx/libos32gfx_core.c | §3-3a の check・take_regen、DIRECT の attach・detach、gfx_present・getchar・trygetchar・yield・halt の前に flush | H1 | 70 |
 | L1 | userland/lib/gfx/draw/gfx_cmd.c (新) | §3-3b の束・区画への写し・行での分け・gfx_flush | H1 | 170 |
@@ -314,7 +314,7 @@ vmkernel +3KB (FD に入る。FD_MIN_FREE_KB=64 を check-packages-host で確�
 | W2 | gshell/src/input.rs:896-926、wm.rs | W1 を呼ぶ、flush_present の前と各周の頭で check → take_regen → 描き直し | W1・L0 | 50 |
 | W3 | gshell/src/scroll_op.rs (新)・handler.rs の表・reqs.rs、os32_gui_shared.h・proto.rs | §3-6 の WM の式、GUI の proto の版を上げる | W1 | 140 |
 | W4 | gshell/src/cursor.rs | DIRECT の下地は gfx_hw_get を 1 回 (160B) | L1 | 30 |
-| S1 | drivers/video/pc98/gfx_vram.c・userland/gshell/src/damage.rs | D3 (中身は P0 の結果で票に書く)。gfx_vram.c は PPC の初回成功集合なので PPC でも組めるまま直す | P0 | 未定 |
+| S1 | sys/platform/pc98/video/gfx_vram.c・userland/gshell/src/damage.rs | D3 (中身は P0 の結果で票に書く)。gfx_vram.c は PPC の初回成功集合なので PPC でも組めるまま直す | P0 | 未定 |
 | G4m | drivers/video/geforce/gf_hook_mono.c (新) | D4: 不透明の mono を gf3_mono で | G3 | 60 |
 | G5m | drivers/video/geforce/gf_put_m2mf.c (新) | D5: 不透明の大きい put・get を gf3_upload/download で。大きさは P0 から PM が決める | G3・P0 | 70 |
 - 並列: P0a・P0b・H1・H2a は最初に同時に出せる。H1 の後に H2・H3・H4・G1・G2・L0・L1 を同時に。H4 の後に H5・H6。L1 の後に L2〜L7・U1・W4 を同時に。W1 の後に W2・W3。U2 は L0 と W3 の後で、U3・U4 はその後。G4m・G5m は G3 の後。
@@ -375,12 +375,12 @@ pub fn on_cycle_end(st: &mut GuiState);   // wm.rs の周の関数 (:1180 付近
 8. **触ってよいファイル**: typical_ops.rs (新)、gserial.rs (parse・dispatch の 2 行と `Cmd::Ops`)、wm.rs (GuiState のフィールド 1 つ・on_cycle_end の呼び出し 1 行)、lib.rs (`#[cfg(feature = "gf_accel_accept")] mod typical_ops;`)。ほかのファイルには触らない。host の試験は gshell/host/ に typical_ops_tests.rs を新しく足す (parse、終わりの 4 条件、打ち切り)。
 
 ## P0b HAL の素の時間 (DESIGN.final §7 P0b を置き換える)
-1. **置き場**: `drivers/video/geforce/gf_accept_prim.c` をやめ、**kdebug/gf_prim_bench.c (新、hwdev.mod)** にする。既存の層 3 の受入 (kdebug/gf_accel_test.c) と同じく、module の境界は `geforce_accel_ops()` (gf3_test_ops) と `geforce_foundation_ops()` だけを通る。dispatch の検査は gf_accel_test.c と同じ条件を自前で持つ (static は共有しない)。
-2. **線 (wire)**: kdebug/gf_command_wire.h の `enum gf2_case` の末尾に `GF6_PRIM` を足す。tools/hwdev_layout.json の enum の並びを作り直す。シェルは userland/shell/cmd_gf2.c の `cases[]` の末尾に `"prim"` を足し、`shell_cmd_gf2()` の上限を `GF6_PRIM` にする。`gf2 prim <項目>` の項目の番号は session に入れる。
-3. **振り分け** (kdebug/gf_command_test.c (phase())- に 1 つ足す):
+1. **置き場**: `drivers/video/geforce/gf_accept_prim.c` をやめ、**sys/dev/video/geforce/diag/gf_prim_bench.c (新、hwdev.mod)** にする。既存の層 3 の受入 (sys/dev/video/geforce/diag/gf_accel_test.c) と同じく、module の境界は `geforce_accel_ops()` (gf3_test_ops) と `geforce_foundation_ops()` だけを通る。dispatch の検査は gf_accel_test.c と同じ条件を自前で持つ (static は共有しない)。
+2. **線 (wire)**: sys/dev/video/geforce/diag/gf_command_wire.h の `enum gf2_case` の末尾に `GF6_PRIM` を足す。tools/hwdev_layout.json の enum の並びを作り直す。シェルは userland/shell/cmd_gf2.c の `cases[]` の末尾に `"prim"` を足し、`shell_cmd_gf2()` の上限を `GF6_PRIM` にする。`gf2 prim <項目>` の項目の番号は session に入れる。
+3. **振り分け** (sys/dev/video/geforce/diag/gf_command_test.c (phase())- に 1 つ足す):
 ```c
 if (q.size == sizeof(q) && q.test == GF6_PRIM && !q.rc) {
-    int rc = gf_prim_bench(q.session);   /* kdebug/gf_prim_bench.h: int gf_prim_bench(u32 item); */
+    int rc = gf_prim_bench(q.session);   /* sys/dev/video/geforce/diag/gf_prim_bench.h: int gf_prim_bench(u32 item); */
     request->session = 0; request->rc = rc; return rc;
 }
 ```
@@ -389,7 +389,7 @@ if (q.size == sizeof(q) && q.test == GF6_PRIM && !q.rc) {
 6. **時計と回数**: `f->io.timing.clock_us` (gf_accel_test.c と同じ)。1 本が短いので、100 本を 1 組として組の時間を測る。warmup 1 組の後に本番 50 組。
 7. **CPU の WC の put は測らない**: test_surface の写像は WC の窓 (512KiB) の外なので、値が違ってしまう。DESIGN の 24µs/KB (TASK_GF_ACCEL 段 0、全面 7.37ms) をそのまま使う。
 8. **出力**: `GFP1 <項目> <組> <組の µs> <1 本の ns> <rc>`。終わりに `GFP1 done rc=<rc>` (serial_puts_polled)。
-9. **t_k は CPL=3 の別の段 P0c で測る** (kdebug はカーネルの中なので測れない)。userland/tests/kapi_cost.c (新、40 行): `gfx_screen_info(&si)` を 1000 回呼び、前後を `sys_time_now` で測って 1 回の ns を出す。副作用の無い今の KAPI を使い、新しい submit は待たない。DIRECT の submit の実際の t_k は H2 の後に P0a を回し直して得る。
+9. **t_k は CPL=3 の別の段 P0c で測る** (kdebug はカーネルの中なので測れない)。userland/diag/kapi_cost.c (新、40 行): `gfx_screen_info(&si)` を 1000 回呼び、前後を `sys_time_now` で測って 1 回の ns を出す。副作用の無い今の KAPI を使い、新しい submit は待たない。DIRECT の submit の実際の t_k は H2 の後に P0a を回し直して得る。
 
 ## 追記 2 (2026-11-08、PEGC の実測と「書くだけの DIRECT」の方向)
 
@@ -401,11 +401,11 @@ if (q.size == sizeof(q) && q.test == GF6_PRIM && !q.rc) {
 
 2026-11-09。第 2 波の共有契約を以下に固定する。A0 は宣言・状態の置き場・リンクできる仮実装までで、方式切替・描画・束の実装は各所有者の段で置き換える。追記 2 の PEGC の「書くだけの DIRECT」は取り消し、PEGC は §2 の SHADOW のまま。
 
-- `include/gfx_hal.h` と `gfx/gfx_core.c` の `g_backend` は `GfxBackend *` に揃える。backend 自体は元から可変であり、表のコピーや別の切替入口は作らない。policy と方式に応じた active hook を更新するのは H4 の `gfx_policy_reeval` だけ (§3-4)。既存の初期化・登録経路の振る舞いは A0 では変えない。
-- `gfx/gfx_core_surface.inc` の既存 `void gfx_reinit_surface_roles(int finish, int display_only)` を非 static にし、`gfx/gfx_internal.h` に宣言する。所有者は core (H6 の接続、H4 から呼ぶ)。通常文脈で `finish=0` の revoke → `finish=1` の regen の順。`display_only=0` は CLIENT/DISPLAY、1 は DISPLAY だけ。既存の実体を使い、revoke/regen の処理は変更しない。
-- H4 の置き場は `gfx/gfx_policy.h` / `.c`。`extern u16 gfx_policy_gen` (初期値 1、世代は u16 で 0 を飛ばす)、`int gfx_direct_wanted(void)`、`void gfx_policy_reeval(void)`、`int gfx_policy_blocks_map(u32 role)`。wanted は真偽、blocks_map は LEDGER_ROLE_* に対する真偽で query の認可には使わない。A0 では wanted/blocks_map は 0、reeval は何もしない。
+- `sys/include/gfx_hal.h` と `sys/hal/gfx/gfx_core.c` の `g_backend` は `GfxBackend *` に揃える。backend 自体は元から可変であり、表のコピーや別の切替入口は作らない。policy と方式に応じた active hook を更新するのは H4 の `gfx_policy_reeval` だけ (§3-4)。既存の初期化・登録経路の振る舞いは A0 では変えない。
+- `sys/hal/gfx/gfx_core_surface.inc` の既存 `void gfx_reinit_surface_roles(int finish, int display_only)` を非 static にし、`sys/hal/gfx/gfx_internal.h` に宣言する。所有者は core (H6 の接続、H4 から呼ぶ)。通常文脈で `finish=0` の revoke → `finish=1` の regen の順。`display_only=0` は CLIENT/DISPLAY、1 は DISPLAY だけ。既存の実体を使い、revoke/regen の処理は変更しない。
+- H4 の置き場は `sys/hal/gfx/gfx_policy.h` / `.c`。`extern u16 gfx_policy_gen` (初期値 1、世代は u16 で 0 を飛ばす)、`int gfx_direct_wanted(void)`、`void gfx_policy_reeval(void)`、`int gfx_policy_blocks_map(u32 role)`。wanted は真偽、blocks_map は LEDGER_ROLE_* に対する真偽で query の認可には使わない。A0 では wanted/blocks_map は 0、reeval は何もしない。
 - H4 の同じヘッダに `int gfx_fullscreen_owner(void)` (GUI 以外の全画面所有者があれば非0、H4 が appslot の所有者から判断) と `extern int gfx_scan_changed` (H4 が実体を持つ、初期値0) も置く。H6/G3 は確定した走査面変更後に旗を 1 にして `gfx_policy_reeval()` を呼ぶ。H4 は同方式でも旗が立てば世代を上げ、処理後に旗を消す。向きを指定する別入口は作らない。A0 の fullscreen_owner は 0、通知・旗の消費は H6/G3・H4 の実装に残す。
-- H3 は `gfx/gfx_hw_mono_cpu.h` / `.c` の `int gfx_hw_mono_cpu(int x, int y, int w, int h, const u8 *bits, u32 pitch, u8 fg, int bg, int cx, int cy, int cw, int ch)` を実装し、H2 が検査後に呼ぶ。bits は MSB-first、pitch はバイト、bg=-1 は透過、他は INDEX8。clip は画面座標。選択 backend の put を同期的に使い、bits を返却後に保持しない。0 成功、負値失敗 (部分描画はありうる)。A0 は NOSYS。policy と mono の `.c` はカーネルの sources/common.mk・order.mk に登録済みで、H2 は H3/H4 の実装前でもリンクできる。
+- H3 は `sys/hal/gfx/gfx_hw_mono_cpu.h` / `.c` の `int gfx_hw_mono_cpu(int x, int y, int w, int h, const u8 *bits, u32 pitch, u8 fg, int bg, int cx, int cy, int cw, int ch)` を実装し、H2 が検査後に呼ぶ。bits は MSB-first、pitch はバイト、bg=-1 は透過、他は INDEX8。clip は画面座標。選択 backend の put を同期的に使い、bits を返却後に保持しない。0 成功、負値失敗 (部分描画はありうる)。A0 は NOSYS。policy と mono の `.c` はカーネルの sources/common.mk・order.mk に登録済みで、H2 は H3/H4 の実装前でもリンクできる。
 
 libos32gfx の内部共有ヘッダは `userland/lib/gfx/gfx_direct_internal.h`。L0 は `libos32gfx_core.c` の `int gfx_direct`、`u16 gfx_gen`、`int gfx_lost` の実体と attach/recovery を所有する (A0 は全て 0)。gfx_gen は screen_info.reserved[0] の非0世代で、KAPI の u32 gen に渡す際に拡張する。L1 は送信/GET の失敗時に gfx_lost を立て、回復と旗の消去は L0 に任せる。再描画旗は L0 の非公開状態とし、`int libos32gfx_take_regen(void)` で一度だけ取得・消去する (A0 は 0)。check → 成功 → take_regen → 再描画の順は §3-3a のまま。
 
@@ -426,7 +426,7 @@ void gfx_cmd_drop(void);
 - PUT/MONO は enqueue 中に 4KiB の区画へコピーし、呼出側のポインタを保持しない。行の分割と自動 flush は L1 が所有し、順序を保つ。検査に失敗する値や GFX_Cmd の i16 に表せない値を暗黙に切り詰めない。失敗前に先頭の命令が送信された可能性があるため、呼出側で再送しない。
 - GET は同期で、flush 成功後だけ KAPI の gfx_hw_get を呼び、dst を返却後に保持しない。drop は区画と命令を捨てるだけで送信しない。flush の失敗時は捨てて gfx_lost を立てる。A0 は空の flush が0、drop が何もしない、enqueue/get は NOSYS。
 - L6 の `int gfx_copy_rect(int dx, int dy, int sx, int sy, int w, int h)` は `draw/gfx_copy.c`、宣言は `libos32gfx.h`。同じ画面内の COPY を SHADOW/DIRECT に振り分ける口で、0 成功・負値失敗。A0 は NOSYS。`gfx_flush`・`libos32gfx_take_regen` と併せて後続の C/Rust/WM が呼ぶ入口で、共有ライブラリや Rust への結線は各後続段で行う。既存の check/attach/detach の宣言と動作は維持する。
-- G2 の `int geforce_fill_rop(int x, int y, int w, int h, u8 color, u8 rop)` は既存の fill/blit と同じ共有ヘッダ `hwdev/gf/accel.h`。G1 の `int gf_direct_ok(void)` と `extern const GfxDirectOps gf_direct_ops` は `drivers/video/geforce/geforce_module.h`。G1/G2 の実体をここに複製しない。`gf_direct.o` の build/geforce-module.mk への追加・登録・module text の検査は G3 の所有のまま。
+- G2 の `int geforce_fill_rop(int x, int y, int w, int h, u8 color, u8 rop)` は既存の fill/blit と同じ共有ヘッダ `sys/dev/video/geforce/accel.h`。G1 の `int gf_direct_ok(void)` と `extern const GfxDirectOps gf_direct_ops` は `sys/dev/video/geforce/geforce_module.h`。G1/G2 の実体をここに複製しない。`gf_direct.o` の build/geforce-module.mk への追加・登録・module text の検査は G3 の所有のまま。
 
 ## 追記 4 (2026-11-09、PM 決定)
 
@@ -435,6 +435,6 @@ void gfx_cmd_drop(void);
 - U1 の draw.rs は失敗時に窓 ID で INVALIDATE しない。失敗は `gfx_lost` に残り、次の check が `gfx_regen` を立てる。U2 の WAIT・POLL の戻りで check → take_regen → 自分の窓を全面 INVALIDATE の順に回復する。§7 の U1 の「失敗したら INVALIDATE」はこの意味に読み替える。
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
-- **H2a は不要で閉じる**: H2 は命令の読みの検査に既存の `ring3_user_range_ok` (`exec/exec.c`) を使って着地した (`gfx/gfx_hw_submit.c`)。「要れば `ring3_user_range_readable`」の条件は満たされないので H2a は出さない。§3-2 の断片と §7 の H2a の行を書き換えた (writable は今 `exec/exec.c`)。
-- **S1 と PPC**: `drivers/video/pc98/gfx_vram.c` は PC-98 の表示の装置のソース (PowerPC では組まない)。`_flush_dirty_queue()` の `_memcpy_w` は `arch_copy16` 経由。S1 は共通の `gfx/` に asm・pc98 のヘッダを足さない (足すと層の検査 `tools/check_layers.py` と PowerPC の `common-compile` が止める)。damage.rs のパスは `userland/gshell/src/damage.rs`。
-- **G4m・G5m の位置**: GeForce の PCI の位置は `recover_gf_dev()` (`kdebug/recover.h`) で決まる。新しい段は 0:13 の直値を書かない (`drivers/video/geforce/gf_accept.c` の型を真似ない)。
+- **H2a は不要で閉じる**: H2 は命令の読みの検査に既存の `ring3_user_range_ok` (`sys/kern/exec/exec.c`) を使って着地した (`sys/hal/gfx/gfx_hw_submit.c`)。「要れば `ring3_user_range_readable`」の条件は満たされないので H2a は出さない。§3-2 の断片と §7 の H2a の行を書き換えた (writable は今 `sys/kern/exec/exec.c`)。
+- **S1 と PPC**: `sys/platform/pc98/video/gfx_vram.c` は PC-98 の表示の装置のソース (PowerPC では組まない)。`_flush_dirty_queue()` の `_memcpy_w` は `arch_copy16` 経由。S1 は共通の `gfx/` に asm・pc98 のヘッダを足さない (足すと層の検査 `tools/check_layers.py` と PowerPC の `common-compile` が止める)。damage.rs のパスは `userland/gshell/src/damage.rs`。
+- **G4m・G5m の位置**: GeForce の PCI の位置は `recover_gf_dev()` (`sys/dev/video/geforce/diag/recover.h`) で決まる。新しい段は 0:13 の直値を書かない (`sys/dev/video/geforce/gf_accept.c` の型を真似ない)。

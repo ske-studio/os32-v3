@@ -11,16 +11,16 @@ import test_gfinit_plan_c
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 MUTATIONS = [
-    ('kdebug/gfinit_budget.inc', 'runner_bus_rows',
+    ('sys/dev/video/geforce/diag/gfinit_budget.inc', 'runner_bus_rows',
      'total += (unsigned long long)GF_INIT_MAINS * GF_INIT_SCHEDULE * GF_REC_NODE_ROWS;', 'total += 0;'),
-    ('kdebug/recover_common/session.inc', 'c_deadline_switch',
+    ('sys/dev/video/geforce/diag/recover_common/session.inc', 'c_deadline_switch',
      'r->budget=GF_C_EXEC_SECONDS * PIT_HZ; r->spent=0;', 'r->budget=1; r->spent=0;'),
-    ('kdebug/recover_common/session.inc', 'c_tx_reset',
+    ('sys/dev/video/geforce/diag/recover_common/session.inc', 'c_tx_reset',
      'r->log_limit=GF_C_TX_SECONDS * PIT_HZ; r->tx_ticks=0;', 'r->tx_ticks=0;'),
-    ('kdebug/recover_common/session.inc', 'c_poll_limit',
+    ('sys/dev/video/geforce/diag/recover_common/session.inc', 'c_poll_limit',
      'gf_stage_c_running(r) ? GF_C_EXEC_POLLS : r->profile->max_polls', 'r->profile->max_polls'),
 
-    ('kdebug/recover_cleanup.h', 'omit_local_targets',
+    ('sys/platform/pc98/kdebug/recover_cleanup.h', 'omit_local_targets',
      'pairs += t->index == RECOVER_CR1F ? 2 * n : n;',
      'pairs += t->index == RECOVER_CR1F ? 0 * n : 0 * n;'),
 ]
@@ -60,7 +60,7 @@ def main():
             return result.returncode
     if '--mutate' in sys.argv:
         return int(bool(mutpar.run_with_control(mutation, MUTATIONS,
-                        ('kdebug/gfinit_budget.inc', 'control', '', ''))))
+                        ('sys/dev/video/geforce/diag/gfinit_budget.inc', 'control', '', ''))))
     return 0
 
 

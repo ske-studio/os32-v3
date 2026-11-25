@@ -10,14 +10,14 @@ sys.dont_write_bytecode = True
 import kboot_vectors as v
 from run import command, require
 CHECK = dict(name='kboot-dec', tier=2, budget=600,
-             covers=v.CHECK['covers']+['arch/ppc/kernel_dec.c','arch/ppc/arch_io.h',
-                 'tools/ppc/kboot_dec*','platform/powermac/clock.c',
-                 'kernel/time/tick.c','kernel/irq/tick.c'],
-             inputs=['kernel/time/tick_clock.h','sdk/include/os32/os32_kapi_shared.h',
-                 'include/kernel_tick.h','kernel/irq/tick.h','kernel/irq/irq.h',
-                 'kernel/irq/irq_math.h','include/io.h',
-                 'include/clock_source.h','include/platform_timer.h',
-                 'platform/powermac/kboot_info.h','lib/divdi3.c'])
+             covers=v.CHECK['covers']+['sys/arch/ppc/kernel_dec.c','sys/arch/ppc/arch_io.h',
+                 'tools/ppc/kboot_dec*','sys/platform/powermac/clock.c',
+                 'sys/hal/time/tick.c','sys/kern/irq/tick.c'],
+             inputs=['sys/hal/time/tick_clock.h','sdk/include/os32/os32_kapi_shared.h',
+                 'sys/include/kernel_tick.h','sys/kern/irq/tick.h','sys/kern/irq/irq.h',
+                 'sys/kern/irq/irq_math.h','sys/include/io.h',
+                 'sys/hal/time/clock_source.h','sys/include/platform_timer.h',
+                 'sys/platform/powermac/kboot_info.h','lib/divdi3.c'])
 # Expected runtime diagnostic and the last reached check are both mandatory.
 MUTATIONS = [
     ('reload', 'ppc_write_dec((u32)remaining);', '(void)remaining;', 8),
@@ -41,8 +41,8 @@ def host(out, source, expected=0, idle=False):
              '-I'+str(out),'-I'+str(v.ROOT),'-I'+str(v.ROOT/'include'),
              '-I'+str(v.ROOT/'arch/ppc'),'-I'+str(v.ROOT/'platform/powermac'),
              '-I'+str(v.ROOT/'sdk/include/os32'),
-             source,v.ROOT/'arch/ppc/kernel_trap.c',v.ROOT/'arch/ppc/pd_walk.c',
-             v.ROOT/'kernel/time/tick.c',v.ROOT/'kernel/irq/tick.c',
+             source,v.ROOT/'sys/arch/ppc/kernel_trap.c',v.ROOT/'sys/arch/ppc/pd_walk.c',
+             v.ROOT/'sys/hal/time/tick.c',v.ROOT/'sys/kern/irq/tick.c',
              v.ROOT/'tools/ppc/kboot_dec_host.c',
              '-Wl,--wrap=tick_clock_config','-o',exe])
     result=subprocess.run(['qemu-i386',exe],capture_output=True,timeout=5)
@@ -71,10 +71,10 @@ def image(out, source):
     previous_flags=v.FLAGS
     v.FLAGS=previous_flags+['-I'+str(v.ROOT/'sdk/include/os32')]
     v.PRODUCT=[p for p in previous if p!='tools/ppc/kboot_vectors_fixture.c']+[
-        str(fixture),str(source),'platform/powermac/clock.c',
-        'kernel/time/tick.c','kernel/irq/tick.c','kernel/irq/tick_budget.c',
-        'platform/powermac/tick_budget.c','lib/divdi3.c']
-    try: return v.build(out,v.ROOT/'arch/ppc/kernel_vectors.S')
+        str(fixture),str(source),'sys/platform/powermac/clock.c',
+        'sys/hal/time/tick.c','sys/kern/irq/tick.c','sys/kern/irq/tick_budget.c',
+        'sys/platform/powermac/tick_budget.c','lib/divdi3.c']
+    try: return v.build(out,v.ROOT/'sys/arch/ppc/kernel_vectors.S')
     finally: v.PRODUCT=previous; v.FLAGS=previous_flags
 
 
@@ -123,7 +123,7 @@ def main():
         return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
     v.CROSS = cross
     out=v.ROOT/'build/out/ppc/kboot-dec'
-    source=v.ROOT/'arch/ppc/kernel_dec.c'
+    source=v.ROOT/'sys/arch/ppc/kernel_dec.c'
     host(out/'host',source)
     host(out/'idle',source,idle=True)
     elf=image(out/'normal',source)
@@ -145,7 +145,7 @@ def main():
                 diagnostic=b'F2-START-FAIL' if name=='1khz' else b'F2-RATE-FAIL'
                 observe(dest/'qemu',elf,('ppc_stop_loop',[b'F2-BEGIN',diagnostic]))
         dest=out/'idle-noop'; dest.mkdir(parents=True,exist_ok=True)
-        header=(v.ROOT/'arch/ppc/arch_io.h').read_text()
+        header=(v.ROOT/'sys/arch/ppc/arch_io.h').read_text()
         old='static inline void _idle(void) { arch_cpu_idle(); }'
         require(header.count(old)==1,'unique migrated idle anchor')
         (dest/'arch_io.h').write_text(header.replace(old,'static inline void _idle(void) { }'))

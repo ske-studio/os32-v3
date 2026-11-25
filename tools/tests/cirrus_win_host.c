@@ -4,7 +4,7 @@
  *  実行: python3 -B tools/tests/test_cirrus_win.py [--mutate]
  *  記録: tools/tests/cirrus_win_tdd.md
  *
- *  drivers/video/cirrus/backend_cirrus.c の cirrus_win_usable() は、窓 (バンク窓 F60000h /
+ *  sys/dev/video/cirrus/backend_cirrus.c の cirrus_win_usable() は、窓 (バンク窓 F60000h /
  *  リニア窓 01000000h) を張ってよいかを **RAM の上端** (sys_get_mem_kb) で
  *  決めていた。K6-RAM 以後、15MB + 高位 RAM の構成 (NP21/W の RAM
  *  17,408KB) では上端 17MB が 15-16MB の穴より上に出るので、穴の中の
@@ -24,8 +24,8 @@
 #include "types.h"
 #define NOINST __attribute__((no_instrument_function))
 
-#include "../../drivers/video/cirrus/cirrus_identify.c"
-#include "../../drivers/video/cirrus/backend_cirrus.c"
+#include "../../sys/platform/pc98/video/cirrus/cirrus_identify.c"
+#include "../../sys/dev/video/cirrus/backend_cirrus.c"
 #include "wab_xe10.h"     /* 実物の窓の番地 (贋グルーに入れる) */
 
 /* ---- 出力と終了 (libc なし、ILP32 の int 0x80) ---- */
@@ -69,7 +69,7 @@ static void map_add(u32 base, u32 end)
     ram_spans++;
 }
 
-/* 実物 (mm/pgalloc.c) と同じ約束: 範囲異常・未初期化は 1。 */
+/* 実物 (sys/kern/mm/pgalloc.c) と同じ約束: 範囲異常・未初期化は 1。 */
 int pgalloc_range_has_ram(u32 first, u32 end)
 {
     int i;

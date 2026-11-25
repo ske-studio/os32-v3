@@ -3,7 +3,7 @@
  * model an inaccessible/read-only byte, a stale output at copyout and IF explicitly;
  * SQL wrappers model the existing outer run/leave and inject ordinary errors.
  * This does not model #PF/IDT/IRQ hardware. */
-#include "input/hal/input_context.h"
+#include "sys/input/input_context.h"
 int input_context_snapshot(KbdPolicySnapshot *out) { (void)out; return -1; }
 void kbd_policy_ime_state(u32 active, u32 owner, u32 gen)
 { (void)active; (void)owner; (void)gen; }
@@ -145,7 +145,7 @@ int copy_to_caller(const struct caller_access *c, void *p, const void *s, u32 n)
     writes += n;
     return 1;
 }
-#include "platform/pc98/ime_display.c"
+#include "sys/platform/pc98/ime_display.c"
 #include "ime_source.inc"
 
 /* Boot imports copy the core snapshot; keep actual store/SQLite/VFS opens. */

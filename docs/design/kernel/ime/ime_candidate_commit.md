@@ -1,6 +1,6 @@
 # 候補確定後の入力表示への復帰
 
-`kernel/ime/ime_candidate_commit.inc` は数字選択・Enter・その他のキーで
+`sys/kern/ime/ime_candidate_commit.inc` は数字選択・Enter・その他のキーで
 共通の候補確定と表示更新を行う。`ime_convert.inc` が取り込む。
 
 候補コピー・学習・残りかなの移動の後、入力状態へ戻し、スクロール保護を

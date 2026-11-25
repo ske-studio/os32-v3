@@ -94,10 +94,10 @@ IPL はルートディレクトリを `0x6000` へ**一括で**読む。標準�
 | `boot/loader_fat_new.asm` | 同じ形。`DA_UA` がカーネルへ渡る `boot_drive` になる |
 | `build/boot.mk` | `boot_fat144.bin` / `loader_fat144.bin` を `-DFD144` で組む |
 | `build/image.mk` | ファイル一覧を `define FDD_IMAGE_ARGS` で 1 か所に。`images/os32_boot144.img` と `make fd144`。**1,474,560 でなければエラーで止める** |
-| `drivers/block/fdc.h` / `fdc.c` | `fdc_geom_144`、ドライブごとの現在ジオメトリ (`fdc_get_geom` / `fdc_set_media` / `fdc_set_media_by_daua`)、`fdc_set_3mode` (04BEh) |
-| `drivers/block/fat_diskio.c` | LBA→CHS と `GET_SECTOR_COUNT/SIZE` を**ジオメトリ駆動**に (マクロ直読みをやめた) |
-| `drivers/base/dev.c` | `dev_init()` が記述子を現在のジオメトリで書き直す |
-| `platform/pc98/kernel.c` | `boot_drive` の DA/UA でメディアを選ぶ。**`dev_init()` より前。** 3モードの状態を画面へ (`144M` / 赤い `144?`) |
+| `sys/dev/block/fdc.h` / `fdc.c` | `fdc_geom_144`、ドライブごとの現在ジオメトリ (`fdc_get_geom` / `fdc_set_media` / `fdc_set_media_by_daua`)、`fdc_set_3mode` (04BEh) |
+| `sys/dev/block/fat_diskio.c` | LBA→CHS と `GET_SECTOR_COUNT/SIZE` を**ジオメトリ駆動**に (マクロ直読みをやめた) |
+| `sys/dev/base/dev.c` | `dev_init()` が記述子を現在のジオメトリで書き直す |
+| `sys/platform/pc98/kernel.c` | `boot_drive` の DA/UA でメディアを選ぶ。**`dev_init()` より前。** 3モードの状態を画面へ (`144M` / 赤い `144?`) |
 
 ### 4-4. `read_sector` を `div` に統一した理由
 
@@ -144,8 +144,8 @@ spt=18 は 2 の冪ではないので、従来のシフト演算 (`and al,07h` /
 
 | 機能 | 無いときの挙動 | 根拠 |
 |---|---|---|
-| HostDrv (`/host`) | **静かに飛ばす**。`hostdrvfs_detect()` が I/O ポートを見て 0 を返し、`kernel.c` が `if (hostdrvfs_detect())` で囲っているのでマウントを試みない | `drivers/hostdrv/hostdrvfs.c`、`platform/pc98/kernel.c` |
-| サブマウント (hd0 / cd0 / lo*) | **失敗を無視**。ext2 → iso9660 → fat と試して全部落ちてもループが続く | `platform/pc98/kernel.c` |
+| HostDrv (`/host`) | **静かに飛ばす**。`hostdrvfs_detect()` が I/O ポートを見て 0 を返し、`kernel.c` が `if (hostdrvfs_detect())` で囲っているのでマウントを試みない | `sys/dev/hostdrv/hostdrvfs.c`、`sys/platform/pc98/kernel.c` |
+| サブマウント (hd0 / cd0 / lo*) | **失敗を無視**。ext2 → iso9660 → fat と試して全部落ちてもループが続く | `sys/platform/pc98/kernel.c` |
 | SerialFS | 明示的な `serial` コマンドのときだけ。失敗は `SerialFS mount skipped (%d)` | `userland/shell/rshell.c` |
 | Host Services | アプリが呼んだときに `-100` (`HOST_ELINK`)。起動経路は呼ばない | F11 の実測 |
 

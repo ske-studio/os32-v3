@@ -33,7 +33,7 @@
 
 | 実物との食い違い（4件、利用できると思い込みやすい境界） | 確認根拠と設計への反映 |
 |---|---|
-| D1 初期化PLLは動的変更関数ではない | `O/hwdev/gf/pll.c`、`kdebug/gfinit_pll/sequence.inc` の `gfinit_pll_sequence()` はdevinit用。Nの動的列を§2・3に新設する。 |
+| D1 初期化PLLは動的変更関数ではない | `O/hwdev/gf/pll.c`、`sys/dev/video/geforce/gfinit_pll/sequence.inc` の `gfinit_pll_sequence()` はdevinit用。Nの動的列を§2・3に新設する。 |
 | D2 ROM decoderは汎用perf表/任意script実行器ではない | `O/kdebug/gfinit_decode.c`、`gfinit_decode/tables.inc:1–13` は登録済みspan。表解読を新設し、BIT Mのscriptは検証済みspanへ追加する。 |
 | D3 refs欠落は解消（r1から訂正） | 追加された同じc03c1a1・MITのtherm/volt/gpioで§4・5を確定。clk上位の列も`N/nvkm/subdev/clk/base.c:159–215,266–305`に存在する。 |
 | D4 GFの終了/局所復元はOS suspendではない | 比較`:54`。Oのkernel・arch/x86/kernel・includeでsuspend/resume/ACPI/power_managementをgrepした結果はアプリ切替のみ。全ファイル名のACPI/APM/suspend/power/pm検索も該当なし。OS電源管理/サスペンド機構は確認範囲に無い。 |
@@ -43,7 +43,7 @@
 - 誤りは層5内部の負値、video境界は既存0/-1へ変換し`last_rc`をシリアルに残す。F1/F2の元rcも保存する。
 
 ```c
-/* 新規 hwdev/gf/feature5.h。内部ABI、全型は固定幅。 */
+/* 新規 sys/dev/video/geforce/feature5.h。内部ABI、全型は固定幅。 */
 enum gf5_rc { GF5_OK=0, GF5_EINVAL=-501, GF5_ENOTSUP=-502,
   GF5_EBIOS=-503, GF5_ERANGE=-504, GF5_EBUSY=-505,
   GF5_ETIME=-506, GF5_EIO=-507, GF5_ENOMEM=-508, GF5_ESTATE=-509 };
@@ -204,24 +204,24 @@ void gf5_state_free(struct gf5 *, struct gf5_image *); /* 復旧/破棄後 */
 ## 9. ファイルごとの変更一覧と段（以下は実装予定、リポジトリ未編集）
 | 段 | ファイル（O/相対、新規は＋） | 内容・概算行数 |
 |---|---|---|
-| A0 | ＋hwdev/gf/feature5.h | 上記型/adapter/rc、120行。F2停止口・F4保存型の凍結後。int unpause契約と前景poll呼出し箇所をPMレビューで凍結、F4 C3の前方宣言struct gf5_test_opsと整合 |
+| A0 | ＋sys/dev/video/geforce/feature5.h | 上記型/adapter/rc、120行。F2停止口・F4保存型の凍結後。int unpause契約と前景poll呼出し箇所をPMレビューで凍結、F4 C3の前方宣言struct gf5_test_opsと整合 |
 | A1 | ＋tools/tests/gf5_fake.h | MMIO/時間/ROM/extent/traceの試験骨格、160行。F5 A0統合後に発注 |
-| A2 | ＋kdebug/gf5_test.c | serial入口の骨格、info/clock/ram/therm/fan/volt/tile/save/restore dispatch、100行。F5 A0統合後に発注し、F4 C3のfeature5_out slotを使用 |
+| A2 | ＋sys/dev/video/geforce/diag/gf5_test.c | serial入口の骨格、info/clock/ram/therm/fan/volt/tile/save/restore dispatch、100行。F5 A0統合後に発注し、F4 C3のfeature5_out slotを使用 |
 | A3 | ＋tools/tests/test_gf5.py | CHECK登録・部品別host駆動・正常対照と変異、100行。未着手Bは未登録、追加済みBの欠落は失敗 |
-| B0 | ＋hwdev/gf/perf.c | 表列挙/状態選択、250行＋tools/tests/gf5_perf_host.c |
-| B1 | ＋hwdev/gf/clock.c | calc/read/prog、180行＋gf5_clock_host.c |
-| B2 | ＋hwdev/gf/ramclock.c | self-refresh/blank/script、220行＋gf5_ramclock_host.c |
-| B3 | ＋hwdev/gf/therm.c | 表/raw/換算/fan PWM・toggle/AUTO・閾値poll/設定保存、430行＋gf5_therm_host.c |
-| B4 | ＋hwdev/gf/volt.c | 表/vmap・ID選択/VID・共用GPIO列、280行＋gf5_volt_host.c |
-| B5 | ＋hwdev/gf/tile.c | 12枠/FB・GR同期、140行＋gf5_tile_host.c、確定整列契約と309e境界 |
-| B6 | ＋hwdev/gf/state.c | extent退避/再構成/状態遷移、250行＋gf5_state_host.c |
-| C0 | hwdev/gf/clock.c | 既存PLL limits/solverとのadapter（B1へ統合）、レジスタキー対応と同値回帰 |
-| C1 | kdebug/gfinit_decode/tables.inc | BIT Mの既存未登録spanが有れば追加、runner decode試験を伴う |
+| B0 | ＋sys/dev/video/geforce/perf.c | 表列挙/状態選択、250行＋tools/tests/gf5_perf_host.c |
+| B1 | ＋sys/dev/video/geforce/clock.c | calc/read/prog、180行＋gf5_clock_host.c |
+| B2 | ＋sys/dev/video/geforce/ramclock.c | self-refresh/blank/script、220行＋gf5_ramclock_host.c |
+| B3 | ＋sys/dev/video/geforce/therm.c | 表/raw/換算/fan PWM・toggle/AUTO・閾値poll/設定保存、430行＋gf5_therm_host.c |
+| B4 | ＋sys/dev/video/geforce/volt.c | 表/vmap・ID選択/VID・共用GPIO列、280行＋gf5_volt_host.c |
+| B5 | ＋sys/dev/video/geforce/tile.c | 12枠/FB・GR同期、140行＋gf5_tile_host.c、確定整列契約と309e境界 |
+| B6 | ＋sys/dev/video/geforce/state.c | extent退避/再構成/状態遷移、250行＋gf5_state_host.c |
+| C0 | sys/dev/video/geforce/clock.c | 既存PLL limits/solverとのadapter（B1へ統合）、レジスタキー対応と同値回帰 |
+| C1 | sys/dev/video/geforce/gfinit_decode/tables.inc | BIT Mの既存未登録spanが有れば追加、runner decode試験を伴う |
 | C2 | hwdev/gfのproduction所有者・F2 command境界・F4表示所有者 | links/save adapter/受付閉を結線（実装時の確定ファイルに1変更段ずつ割当） |
-| C2-ROM | ＋hwdev/gf/feature5_rom.c | 必要ROM/span/programの取得・所有・解放。devinit解放前の取得結線は共有ファイルごとにC2で直列 |
-| C2-service | ＋hwdev/gf/feature5_service.c | 前景fan poll adapter。PMがA0で呼出し箇所を凍結後、前景呼出し元の結線は別段 |
+| C2-ROM | ＋sys/dev/video/geforce/feature5_rom.c | 必要ROM/span/programの取得・所有・解放。devinit解放前の取得結線は共有ファイルごとにC2で直列 |
+| C2-service | ＋sys/dev/video/geforce/feature5_service.c | 前景fan poll adapter。PMがA0で呼出し箇所を凍結後、前景呼出し元の結線は別段 |
 | C3 | build/geforce-module.mk・tools/prototypes/geforce_imports.def | 新部品link、image/mem160KiB・load_span208KiB検査、F4 C3後に直列 |
-| C4 | kdebug/gf5_test.c | feature5_out slot経由でB試験入口を結線 (F5で版上げなし)、全機能serial台本、200行追加 |
+| C4 | sys/dev/video/geforce/diag/gf5_test.c | feature5_out slot経由でB試験入口を結線 (F5で版上げなし)、全機能serial台本、200行追加 |
 
 - B各段は対応するホスト試験・変異を同時に完成させる。A骨格だけで合格にしない。A→B（依存順）→C→実機受入。B3/B4/B5の温度/電圧/整列列は本書で確定済み。
 
@@ -238,7 +238,7 @@ void gf5_state_free(struct gf5 *, struct gf5_image *); /* 復旧/破棄後 */
 | 予算・非GUI | KDEBUG両像、image/mem<=160KiB・load_span<=208KiB、GUI参照追加0 | 0:13.0/0221を記録、stage/rc/元rc付きのPASS/FAIL |
 
 - 全実装後にPMが生成→まとめビルド→検査を実行し、check-changed MUTATE=0・各追加試験の一意anchor変異RED・lintを確認する。実機未実施は未実施と記録し、NP21/WでGPU実証したとしない。今回は設計のみでbuild/実機試験なし。
-- `CHECK=dict(name="gf5-host",tier=1,needs=[],budget=90.0,covers=["hwdev/gf/**","kdebug/gf5_test.c","tools/tests/gf5*","tools/tests/test_gf5.py"])`をA3で宣言。Bごとのhost.cは実部品をlink、依存はA1 stub、Aにも骨格の正常/変異を置く。
+- `CHECK=dict(name="gf5-host",tier=1,needs=[],budget=90.0,covers=["hwdev/gf/**","sys/dev/video/geforce/diag/gf5_test.c","tools/tests/gf5*","tools/tests/test_gf5.py"])`をA3で宣言。Bごとのhost.cは実部品をlink、依存はA1 stub、Aにも骨格の正常/変異を置く。
 - 各変異は無変更対照GREEN→一意anchorを1箇所変更→同じ試験が実行時RED→復元GREEN。compile失敗は検出成功に数えない。ゲスト入口は成功0/失敗1/実機未実施または機能不在77を返し、stage/rcをserialへ出す。77をPASSとして集計しない。
 - 実装のD段で`O/docs/tasks/DEFERRED_TESTS.md`へ次表を登録する（今回はリポジトリ未編集）。
 
@@ -266,9 +266,9 @@ void gf5_state_free(struct gf5 *, struct gf5_image *); /* 復旧/破棄後 */
 
 | 境目／持ち主 | 宣言段で凍結する追記 |
 |---|---|
-| ROM／A0・B0・B2・C1・C2 | `service.c:29`→`devinit.c`でROM/programは解放される。gf5の表viewをscratchへ残さない。production所有の必要ROM/spanとdecode済みBIT M programを動的確保し、devinit解放前に取得、F5停止・snapshot利用終了まで保持する。restoreのdevinit用一時programとは別寿命。新`hwdev/gf/feature5_rom.c`をC2から独立した段に割り当てる。 |
+| ROM／A0・B0・B2・C1・C2 | `service.c:29`→`devinit.c`でROM/programは解放される。gf5の表viewをscratchへ残さない。production所有の必要ROM/spanとdecode済みBIT M programを動的確保し、devinit解放前に取得、F5停止・snapshot利用終了まで保持する。restoreのdevinit用一時programとは別寿命。新`sys/dev/video/geforce/feature5_rom.c`をC2から独立した段に割り当てる。 |
 | 時計／A0・B3 | F2/F4はsys_time_nowの下位u32 µsで絶対期限、差はi32比較。F5 fan期限は同じsys_time_nowのhi/loからu64 µsを構成し、u32を単純拡張しない。5ms等は既存短waitを刻んで待つ。時計失敗は元rcを保存しEIO。 |
-| 前景fan／C2を分割 | `geforce_tick.c`・`foundation.c`はIRQ/tickのF1 polling口で、fanの前景入口ではない。新`hwdev/gf/feature5_service.c`がgf5_fan_tickを所有し、既存前景の協調地点・診断待機から型付きpollを呼ぶ結線を別段にする。**PM 決定（7）**: PMがF5 A0の宣言レビューで具体的呼出し箇所を決め、凍結するまでC2は出さない。IRQからfan処理・alloc・待ちを実行しない。 |
+| 前景fan／C2を分割 | `geforce_tick.c`・`foundation.c`はIRQ/tickのF1 polling口で、fanの前景入口ではない。新`sys/dev/video/geforce/feature5_service.c`がgf5_fan_tickを所有し、既存前景の協調地点・診断待機から型付きpollを呼ぶ結線を別段にする。**PM 決定（7）**: PMがF5 A0の宣言レビューで具体的呼出し箇所を決め、凍結するまでC2は出さない。IRQからfan処理・alloc・待ちを実行しない。 |
 | RAM/tile停止／A0・B2・B5 | drain_pauseは受付閉→dlでfence完了→F2独自2秒のFIFO pause→GR idle。unpauseは復帰失敗を返すint型としてF5 A0で凍結する。RAM区間だけCPU窓/present/描画/flipの受付を閉じる。clock単体にpauseを追加しない。現行referenceはMMIO読出し（fence.c:57）、IRQにはVRAM fence読出しが無いので存在しない処理への抑止hookは作らない。 |
 | save/restore／B6・C2 | snapshot所有者は呼出元、gf5は処理中借用し失敗時もfreeしない。停止前に全extent・metadataを確保。saveは受付閉→drain→表示保存/blank→CPU窓で退避→F3無効化→F2/F1停止。restoreはBM先行→必要devinit→F1/F2→F3 objects→性能/thermal/tile→同一offへ画像→F4論理状態→IRQ→受付公開。途中失敗はFAULT、未完了ticketは再送しない。 |
 | tileと309e／B5 | N/nvkm/subdev/fb/nv44.c:30–46とengine/gr/nv44.c:31–46のPFB→PGRAPH列を一停止区間で実施。309eは既にF2許可class（command.h）、PFB tileとは独立。層3設計に無いswizzled転送APIをB5の依存として増設しない。 |
@@ -288,7 +288,7 @@ F5 A0はF2停止口とF4保存型の凍結後、A1/A2はF5 A0統合後に発注�
 本追記r2が競合する旧記述に優先する。ここでのD1〜D4は層4実物との再照合の番号で、本文§1の同名番号とは別。O=`/home/hight/os32-v3/`、D=`O/hwdev/gf/display/`、K=`O/drivers/video/geforce/`、F4=`O/docs/decisions/realhw/GF_FEAT4_DESIGN.md`。Nは本文§1の指定MIT取得物。以下の新署名・結線は実装済みという意味ではない。
 
 ### D1〜D4の訂正と従うカード
-- **D1** 旧「`hwdev/gf/service.c`起点でdevinit解放前にROMを取得」→ 正：F4通常startは`D/service.c:191,212,216`の`svc_rom`でacquire→run→release、restartの一時取得は`D/recover.c:286`、解放実体は`O/hwdev/gf/devinit.c` → **A0、C2-ROM、C2-display-service、B0/B2/B6**。初回svc_romでgf_display_baseline成功後・release前にC2-display-serviceがBIT M専用programをprepareし、完成品とROM全体をF5へ複製する。元main programは流用しない。F5側失敗は部分確保を解放し、元scratchのreleaseも実施する。
+- **D1** 旧「`sys/dev/video/geforce/service.c`起点でdevinit解放前にROMを取得」→ 正：F4通常startは`D/service.c:191,212,216`の`svc_rom`でacquire→run→release、restartの一時取得は`D/recover.c:286`、解放実体は`O/hwdev/gf/devinit.c` → **A0、C2-ROM、C2-display-service、B0/B2/B6**。初回svc_romでgf_display_baseline成功後・release前にC2-display-serviceがBIT M専用programをprepareし、完成品とROM全体をF5へ複製する。元main programは流用しない。F5側失敗は部分確保を解放し、元scratchのreleaseも実施する。
 - **D2** 旧「decode済みconst M programを既存単一script口に渡して実行」→ 正：`O/hwdev/gf/runner.c`はwork.count=0からBIT I参照で再decodeし即実行、`O/hwdev/gf/internal.h`のconst口はmain用run_oneのみ → **A0-init、C1-runner、C2-ROM、B2**。下記prepare/executeへ既存処理を共有分離し、RAM切替前の検証と切替後の実行を分ける。別interpreter・main全体の再実行は作らない。
 - **D3** 旧「video境界は既存0/-1」→ 正：`O/hwdev/gf/service.c`と`D/quiesce.c:89`は0/下位負rcを返す → **A0、C2-links、C2-backend、B6、C4**。既存videoの負rcを一律-1に潰さない。F5公開操作の出口は共通gf5_rc_mapで分類しlast_rcに、変換前の負rcをsource_rcに保持する。stop/restart adapter自体は下位負rcを保持し、OFFでも負rcを成功に丸めない。
 - **D4** 旧「owner初期化前のbindは必ずEINVAL」→ 正：`D/service.c:49`のgetter自身がNULL ownerを常駐ctxへ補い、`O/hwdev/gf/service.c`のbindは受入れ得る → **C2-body、C2-service、A1/C4結合試験**。`K/geforce_body.c:51`のgf3_service_bind→gf4_service_init→gf3_service_owner_bindを維持する理由は初期化済みctxへの結線であり、逆順EINVALを受入条件にしない。
@@ -366,27 +366,27 @@ i32 gf5_link_clock64(void *owner, u64 *us);
 
 | 宣言／実装段 | ファイル | 凍結する型・関数・責任 |
 |---|---|---|
-| A0 | hwdev/gf/feature5.h | F4:356〜370のrc/clock/plan/perf_entry/rom_view/tile/fan_trip/fan_saved/thermal/fan_mode/emergency_ops/vid_ops/extent/image/phase/gf5/links/test_opsの全欄。本追記のu32 pcを優先、int→i32・slot→u32。全公開口・adapter・ROM/service・gf5_rc_map・gf5_links_tableの宣言を集約。 |
-| A0-init | hwdev/gf/internal.h | 上記prepare/executeの宣言、既存context/program/dispatch共有。 |
-| C1-runner | hwdev/gf/runner.c | prepare/executeの共有分離と既存run_script合成実装。 |
-| A0-production | hwdev/gf/production.h | `struct gf5 feature5`をgf_productionへ埋込み、feature5.hをinclude。ch/accel/displayは既存実体を借りる。 |
-| A0-module | drivers/video/geforce/geforce_module.h | `const struct gf5_test_ops *geforce_feature5_ops(void);`と`void geforce_backend_feature5_bind(struct gf5 *); void gf_hook_feature5_bind(struct gf5 *);`を宣言（gf5は前方宣言）。Context版5・予約済feature5_outを使い版上げなし。 |
-| B0 | hwdev/gf/perf.c | gf5_perf_count/get/select、gf5_perf_entry、表列挙と性能統括。 |
-| B1 → C0（同一所有者の直列追記） | hwdev/gf/clock.c | gf5_clock_read/calc/prog、既存PLL parser/solver adapter。 |
-| B2 | hwdev/gf/ramclock.c | gf5_ram_prog、上記M契約・既決RAM復旧列。 |
-| B3 | hwdev/gf/therm.c | gf5_therm_read、gf5_fan_mode_set/get/cstate/tick、fan_saved/trip。 |
-| B4 | hwdev/gf/volt.c | gf5_volt_get/set/id、gf5_gpio_find/get/set（B3も借用）。 |
-| B5 | hwdev/gf/tile.c | gf5_tile_find/set/clear、reservation_id/generation付きtile、12枠。 |
-| B6 | hwdev/gf/state.c | gf5_state_save/restore/free、image/extent、phase遷移・最終公開判断。 |
-| C2-ROM | hwdev/gf/feature5_rom.c | gf5_rom_acquire/release、ROM全体と完成M programの複製・動的所有、成功時公開。 |
-| C2-links | hwdev/gf/feature5_links.c | 上記全gf5_link_*、gf5_rc_map、gf5_links_table/実体、非公開GR idle。 |
-| C2-service | hwdev/gf/feature5_service.c | `i32 gf5_service_init(struct gf_production *,struct gf4_ctx *,const struct gf5_test_ops **slot);`、`i32 gf5_service_poll(struct gf5 *);`、第2引数はbind済みproduction.display.display4。test_ops実体/phase検査/slot管理、links表のowner設定。 |
-| C2-display-service | hwdev/gf/display/service.c | baseline後・release前のM prepare→acquire、部分確保解放、F5失敗時もF4継続。通常停止はROM保持。 |
-| C2-body | drivers/video/geforce/geforce_body.c | 既存F3→F4→owner順の後にgf5_service_init、初回video start前に所有/slot結線と両feature5_bind(&production.feature5)を呼ぶ。 |
-| C2-module | drivers/video/geforce/geforce_module.c | geforce_feature5_opsはregistered時のfeature5_slotを毎回読む。unload前NULL。 |
-| C2-backend | drivers/video/geforce/backend_geforce.c | geforce_backend_feature5_bindの借用先保持、present・set_mode/dpms/cursor_image/move/show/vsync/page_flip/gammaの前景poll。 |
-| C2-hook | drivers/video/geforce/gf_hook.c | gf_hook_feature5_bindの借用先保持、geforce_fill_rect/geforce_blitの前景poll。 |
-| A2 → C4（直列） | kdebug/gf5_test.c | feature5 accessor毎回再読、全公開操作dispatch・診断待ちpoll。 |
+| A0 | sys/dev/video/geforce/feature5.h | F4:356〜370のrc/clock/plan/perf_entry/rom_view/tile/fan_trip/fan_saved/thermal/fan_mode/emergency_ops/vid_ops/extent/image/phase/gf5/links/test_opsの全欄。本追記のu32 pcを優先、int→i32・slot→u32。全公開口・adapter・ROM/service・gf5_rc_map・gf5_links_tableの宣言を集約。 |
+| A0-init | sys/dev/video/geforce/internal.h | 上記prepare/executeの宣言、既存context/program/dispatch共有。 |
+| C1-runner | sys/dev/video/geforce/runner.c | prepare/executeの共有分離と既存run_script合成実装。 |
+| A0-production | sys/dev/video/geforce/production.h | `struct gf5 feature5`をgf_productionへ埋込み、feature5.hをinclude。ch/accel/displayは既存実体を借りる。 |
+| A0-module | sys/dev/video/geforce/geforce_module.h | `const struct gf5_test_ops *geforce_feature5_ops(void);`と`void geforce_backend_feature5_bind(struct gf5 *); void gf_hook_feature5_bind(struct gf5 *);`を宣言（gf5は前方宣言）。Context版5・予約済feature5_outを使い版上げなし。 |
+| B0 | sys/dev/video/geforce/perf.c | gf5_perf_count/get/select、gf5_perf_entry、表列挙と性能統括。 |
+| B1 → C0（同一所有者の直列追記） | sys/dev/video/geforce/clock.c | gf5_clock_read/calc/prog、既存PLL parser/solver adapter。 |
+| B2 | sys/dev/video/geforce/ramclock.c | gf5_ram_prog、上記M契約・既決RAM復旧列。 |
+| B3 | sys/dev/video/geforce/therm.c | gf5_therm_read、gf5_fan_mode_set/get/cstate/tick、fan_saved/trip。 |
+| B4 | sys/dev/video/geforce/volt.c | gf5_volt_get/set/id、gf5_gpio_find/get/set（B3も借用）。 |
+| B5 | sys/dev/video/geforce/tile.c | gf5_tile_find/set/clear、reservation_id/generation付きtile、12枠。 |
+| B6 | sys/dev/video/geforce/state.c | gf5_state_save/restore/free、image/extent、phase遷移・最終公開判断。 |
+| C2-ROM | sys/dev/video/geforce/feature5_rom.c | gf5_rom_acquire/release、ROM全体と完成M programの複製・動的所有、成功時公開。 |
+| C2-links | sys/dev/video/geforce/feature5_links.c | 上記全gf5_link_*、gf5_rc_map、gf5_links_table/実体、非公開GR idle。 |
+| C2-service | sys/dev/video/geforce/feature5_service.c | `i32 gf5_service_init(struct gf_production *,struct gf4_ctx *,const struct gf5_test_ops **slot);`、`i32 gf5_service_poll(struct gf5 *);`、第2引数はbind済みproduction.display.display4。test_ops実体/phase検査/slot管理、links表のowner設定。 |
+| C2-display-service | sys/dev/video/geforce/display/service.c | baseline後・release前のM prepare→acquire、部分確保解放、F5失敗時もF4継続。通常停止はROM保持。 |
+| C2-body | sys/dev/video/geforce/geforce_body.c | 既存F3→F4→owner順の後にgf5_service_init、初回video start前に所有/slot結線と両feature5_bind(&production.feature5)を呼ぶ。 |
+| C2-module | sys/dev/video/geforce/geforce_module.c | geforce_feature5_opsはregistered時のfeature5_slotを毎回読む。unload前NULL。 |
+| C2-backend | sys/dev/video/geforce/backend_geforce.c | geforce_backend_feature5_bindの借用先保持、present・set_mode/dpms/cursor_image/move/show/vsync/page_flip/gammaの前景poll。 |
+| C2-hook | sys/dev/video/geforce/gf_hook.c | gf_hook_feature5_bindの借用先保持、geforce_fill_rect/geforce_blitの前景poll。 |
+| A2 → C4（直列） | sys/dev/video/geforce/diag/gf5_test.c | feature5 accessor毎回再読、全公開操作dispatch・診断待ちpoll。 |
 | A1 | tools/tests/gf5_fake.h | F4実saved/slot/予約と結合するfake型・event。UNIT=0..6はB、7=stubなしを維持、8=ROM（ALLOC/FREE）、9=links（F2/F4・map・clock依存）。F4共有はUNIT14、自己実装stubは禁止。 |
 | A3 | tools/tests/test_gf5.py | CHECK・B各hostとC2-ROM/C2-links host登録、C1-runner-testの既存台本を検査対象へ登録。未着手Bを成功扱いしない。 |
 | B0-test | tools/tests/gf5_perf_host.c | B0本体の正常対照・変異。 |
@@ -402,7 +402,7 @@ i32 gf5_link_clock64(void *owner, u64 *us);
 | C3-link | build/geforce-module.mk | F5本体と共有decoderをgeforce.modへlink。 |
 | C3-import | tools/prototypes/geforce_imports.def | 必要importの生成元だけ編集、生成header手編集なし。 |
 
-- **PM 決定（10）**：include/types.hには足さない。feature5.hに`typedef unsigned long long u64; typedef long long i64;`を置く。既存modes.c・gf4_display_fake.hと同形で、gnu11での同一typedef再宣言を用いる。
+- **PM 決定（10）**：sys/include/types.hには足さない。feature5.hに`typedef unsigned long long u64; typedef long long i64;`を置く。既存modes.c・gf4_display_fake.hと同形で、gnu11での同一typedef再宣言を用いる。
 - 前景pollは`gf5_service_poll(g)`がclock64→gf5_fan_tick、busy/非RUNなら無処理。clock64はsys_time_nowのhi/loを合成する。上表のHAL関数の操作前と診断待ちの協調点で呼ぶ。int入口は負rcを伝播、void presentは記録して既存geforce_fail経路、診断はstage/last_rc/source_rcを報告する。module内HALは両bindで渡されたproductionの同一gf5を借用（static productionを直接参照しない）、kernel診断はaccessor経由。IRQ/geforce_tick/idle hookには結線せず、呼出しが無い間AUTO停止を維持する（`K/backend_geforce.c:445,491`、`K/gf_hook.c:67,81`）。
 - gf5_test_opsはF4:369の全公開関数＋perf_count/get・tile_find・service_pollを同名欄の`__typeof__(&gf5_関数名)`で宣言し`i32 (*last_rc)(struct gf5 *)`を足す。SAVING/RESTORINGはslot=NULL、SAVEDはrestore/free/last_rcのみ、FAULTでも資源保持中は管理口を保持。freeは借用を外して画像/trip/metadataを解放し、FAULTを理由とする新しい拒否条件を作らない。F3/F4描画slotは最終RUNまで閉鎖する。
 - 予算：GEFORCEはimage/mem各160KiB・load_span208KiB、HWDEVは各256KiB・320KiB（`O/tools/module_schema.py`）。F5 20KiB＋共有decoder 0〜4KiB、ROM/program・snapshot動的RAMは別計上。実装後のKDEBUG両像/import数/sizeof、全extent/V0・BIT M結合、実ROM表と実機挙動は未検証。ownerless F3 fixtureや合成ROMをその証明にしない。
@@ -418,17 +418,17 @@ i32 gf5_link_clock64(void *owner, u64 *us);
 7: prepareの予算/work初期化とexecuteの実行欄初期化、同一操作の予算継続を明記。
 8: PM 決定：F5取得/prepare失敗でもF4継続、NULL view・ENOTSUP・失敗記録。
 9: runner/ROM/linksの試験段、A1 UNIT8/9とA3登録を追加。
-10: PM 決定：u64/i64はfeature5.hに置き、include/types.hには追加しない。
+10: PM 決定：u64/i64はfeature5.hに置き、sys/include/types.hには追加しない。
 11: gf5_service_initの第2引数をproduction.display.display4と明記。
 12: PM 決定：restartで初devinit成功の場合もF5無効を維持、取得窓追加なし。
 
 ### 確定 (2026-11-04、Opus 第 2 回「確定可」、層 5 の機能 PM が反映)
 - 第 1 回の 12 件 (P1×5・P2×4・P3×3) は r2 で直った。gf5_rc_map の表の定数名 (foundation.h・command.h・accel.h・display/data.h・internal.h) と prepare/execute の欄名 (internal.h・runner.c) は実物と一致。
 - P3: C1-runner-test の段は tools/tests/gf_runner_host.c も持つ (試験の本体)。A3 は test_gf_runner.py を編集しない (持ち主は C1-runner-test の段だけ)。
-- PM 決定 (層 5 の機能 PM): (8) ROM の取得・prepare の失敗は F5 だけ無効で F4 は続ける。(10) u64/i64 は feature5.h に置き include/types.h に足さない。(12) restart で初めて devinit が通った場合も F5 は無効のまま。(13) 宣言の段 A0 は試験の土台 A1 (tools/tests/gf5_fake.h) を含めて 1 段で凍結する (PORT_FLOW §3「宣言の段に入れる範囲」(a))。(14) 共有の登録ファイル (build/geforce-module.mk・tools/prototypes/geforce_imports.def) と既存ファイルへの結線 (display/service.c・geforce_body.c・geforce_module.c・backend_geforce.c・gf_hook.c) は 1 本の結線の段 (wire) が持つ。
+- PM 決定 (層 5 の機能 PM): (8) ROM の取得・prepare の失敗は F5 だけ無効で F4 は続ける。(10) u64/i64 は feature5.h に置き sys/include/types.h に足さない。(12) restart で初めて devinit が通った場合も F5 は無効のまま。(13) 宣言の段 A0 は試験の土台 A1 (tools/tests/gf5_fake.h) を含めて 1 段で凍結する (PORT_FLOW §3「宣言の段に入れる範囲」(a))。(14) 共有の登録ファイル (build/geforce-module.mk・tools/prototypes/geforce_imports.def) と既存ファイルへの結線 (display/service.c・geforce_body.c・geforce_module.c・backend_geforce.c・gf_hook.c) は 1 本の結線の段 (wire) が持つ。
 
 ## 追記 (2026-11-04、層 5 第 1 波の欠け — 層 5 の機能 PM の決定)
-- **PM 決定 16** (C2-service・kd): feature5_service.c と kdebug/gf5_test.c は層 5 では host 試験の段を持たない (§9 の段表と末尾の追記の段表にも試験の段が無い)。gf5_fake.h の UNIT は B0〜B6・ROM・links の試験のためのもの。結合はまとめビルドと統合の検査、ゲストの診断は実機・エミュレータの受入 (上の PM)。DEFERRED_TESTS に未確認として残す。
+- **PM 決定 16** (C2-service・kd): feature5_service.c と sys/dev/video/geforce/diag/gf5_test.c は層 5 では host 試験の段を持たない (§9 の段表と末尾の追記の段表にも試験の段が無い)。gf5_fake.h の UNIT は B0〜B6・ROM・links の試験のためのもの。結合はまとめビルドと統合の検査、ゲストの診断は実機・エミュレータの受入 (上の PM)。DEFERRED_TESTS に未確認として残す。
 - **PM 決定 17** (B5): tile の範囲の検査は (1) match した予約の中に、64*pitch へ切り上げた全範囲が収まる、(2) ほかの生存 tile と重ならない、の 2 つ。予約どうしは台帳が重ならないことを保証するので、表示・cursor・ほかの F3 面が別の予約なら (1) で足りる。同じ予約の中の部分の配置は予約の持ち主 (tile を要求した呼出元) の責任で、B5 は照合しない (手本も tile 領域は bo 単位、N/nouveau_bo.c:178–188)。GF_FEAT4 の A0 完全共有境界・A1 の「他面侵入」は「予約の外への侵入」と読む。宣言は変えない。
 - **PM 決定 18** (B6→B3): B3 (therm.c) が `i32 gf5_therm_resume(struct gf5 *, const struct gf5_fan_saved *saved);` を持つ (feature5.h に宣言、A0x)。手本 N/nvkm/subdev/therm/base.c:376–394 nvkm_therm_init の順: sensor の setup (§4 の OLD_STYLE の init) → 保存 mode が MANUAL/AUTO なら保存 duty で fan を設定 → 保存 mode を設定 → sensor の poll と fan の期限を clock64 の現在時刻から再予約。saved のスカラーの欄を g->fan へ写し、trip は g->fan が既に持つ配列へ値を写す (ROM は restore の前後で同じなので ntrip が違えば GF5_ESTATE、配列を差し替えない・確保しない)。戻りは gf5_rc、失敗は last_rc/source_rc。B6 は §7 の「性能/thermal/tile 復旧」の thermal でこれを呼ぶ。UNIT6 に stub。
 - **PM 決定 19** (C1-runner-test): C1 の試験は既存の tools/tests/gf_runner_host.c・gf_runner_trace_fixture.h の流儀 (その fixture の中の io の point/restore の callback) を延ばす。gf5_fake.h は使わない (「局所の stub を作らない」は gf5_fake.h を使う新しい試験の規則)。
@@ -499,7 +499,7 @@ CRC 対象は診断所有の一定内容の領域とし、表示更新による�
 
 ### 4. 実装段・試験
 
-1ファイル1段: feature5.h（2宣言・契約）→state.c（深い差替え）→feature5_service.c（公開）→kdebug/gf5_test.c（A/B保持・手順・記録）。
+1ファイル1段: feature5.h（2宣言・契約）→state.c（深い差替え）→feature5_service.c（公開）→sys/dev/video/geforce/diag/gf5_test.c（A/B保持・手順・記録）。
 試験も tools/tests/gf5_state_host.c → tools/tests/gf5_service_live_host.c → 診断用 fixture → 各 Python 登録台本を各1ファイル別段とし、CHECK に入力を宣言する。
 試験: 実部品で A→restore→perf→B→差替え→restore を通し、深いコピー・可用性・B非性能部不変・性能列・上限・公開口・A/B解放を確認し、Ra266/NV44Aで3列とCRCを記録する。
 変異: trip浅写し／raw写し忘れ／available写し忘れ／B epoch上書き／公開未結線を一意anchorで各実行時REDにし、無変更GREEN→変異RED→復元GREEN（compile失敗は不可）を確認する。

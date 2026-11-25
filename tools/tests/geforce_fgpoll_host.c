@@ -5,7 +5,7 @@
  */
 static void host_disable(void);
 static void host_halt(void) __attribute__((noreturn));
-#include "../../drivers/video/geforce/geforce_module.c"
+#include "../../sys/dev/video/geforce/geforce_module.c"
 
 static void finish(int rc) __attribute__((noreturn));
 static void finish(int rc)

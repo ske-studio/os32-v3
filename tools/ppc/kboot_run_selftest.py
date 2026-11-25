@@ -15,9 +15,9 @@ from run import ROOT, command, CriterionFailure
 CHECK = dict(name='ppc-kboot-run-selftest', tier=2, budget=600,
              covers=['tools/ppc/kboot_run*.py', 'tools/ppc/kboot_mutations.py',
                      'tools/ppc/kboot_entry.py', 'tools/ppc/run.py',
-                     'arch/ppc/kernel_entry.*', 'arch/ppc/kernel.ld',
-                     'platform/powermac/**', 'lib/kstring*', 'include/types.h',
-                     'include/memmap.h', 'tools/gen_memmap.py', 'build/arch/ppc.mk'])
+                     'arch/ppc/kernel_entry.*', 'sys/arch/ppc/kernel.ld',
+                     'platform/powermac/**', 'lib/kstring*', 'sys/include/types.h',
+                     'sys/include/memmap.h', 'tools/gen_memmap.py', 'build/arch/ppc.mk'])
 LINES = [
  'OF-CAPTURE ram=134217728 admitted=67108864 tb_hz=100000000',
  'OF-OFF calls=1', 'MMU-D root=2097152 hpt=1048576 bytes=1048576 ram_bat=0',
@@ -102,7 +102,7 @@ def fixture(work, lines, alive, wait=True, stop=False, tail="", immediate=False)
         '@ALIVE@', 'emit("'+alive+'\\r\\n");'+('unsigned m; __asm__ volatile("mfmsr %0":"=r"(m)); m &= ~0x8000u; __asm__ volatile("mtmsr %0; isync"::"r"(m)); fixture_stop();' if stop else '')+tail)
     entry.OBSERVER = ASM
     try:
-        entry.build(work, (ROOT/'arch/ppc/kernel_entry.S').read_text())
+        entry.build(work, (ROOT/'sys/arch/ppc/kernel_entry.S').read_text())
     finally:
         entry.CANARY, entry.OBSERVER = saved_c, saved_s
     return work/'kernel.elf'

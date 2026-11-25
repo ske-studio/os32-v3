@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check CUI IME reservation and candidate restoration on host TVRAM."""
 CHECK = dict(name='ime-display-host', tier=1,
-    covers=['input/hal/input_context.h', 'tools/tests/con_sink_arch/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'kernel/ime/ime_display_private.h', 'platform/pc98/platform_ime_render.h', 'platform/pc98/ime_display.c', 'include/ime_control.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'drivers/video/pc98/pc98_route.h', 'tools/tests/ime_display_host.c', 'tools/tests/con_sink_host.c', 'tools/tests/host32.py', 'kernel/console/con_sink.c', 'kernel/port_service.c', 'kernel/ime/ime.c', 'kernel/ime/ime_render.inc', 'platform/pc98/ime_render_tvram.c', 'kernel/console/console.c', 'platform/pc98/console.c', 'tools/tests/kernel_includes.py'],
+    covers=['sys/input/input_context.h', 'tools/tests/con_sink_arch/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'sys/kern/ime/ime_display_private.h', 'sys/platform/pc98/platform_ime_render.h', 'sys/platform/pc98/ime_display.c', 'sys/include/ime_control.h', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/platform/pc98/video/pc98_route.h', 'tools/tests/ime_display_host.c', 'tools/tests/con_sink_host.c', 'tools/tests/host32.py', 'sys/kern/console/con_sink.c', 'sys/kern/port_service.c', 'sys/kern/ime/ime.c', 'sys/kern/ime/ime_render.inc', 'sys/platform/pc98/ime_render_tvram.c', 'sys/kern/console/console.c', 'sys/platform/pc98/console.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.1,
     basis=['PPC_SEP5_DESIGN §2.1', 'AC-DISPLAY-1'],
 )
@@ -62,19 +62,19 @@ def main():
     with tempfile.TemporaryDirectory(prefix='ime-display-') as directory:
         tmp = Path(directory)
         fixture = (ROOT / 'tools/tests/con_sink_host.c').read_text()
-        fixture = fixture.replace('../../kernel/console/console.c', str(tmp / 'console.c'))
+        fixture = fixture.replace('../../sys/kern/console/console.c', str(tmp / 'console.c'))
         fixture = fixture.replace('../../', str(ROOT) + '/')
         (tmp / 'con_sink_host.c').write_text(fixture)
         (tmp / 'legacy_guest_fake.h').write_text((ROOT / 'tools/tests/legacy_guest_fake.h').read_text())
         source = (ROOT / 'tools/tests/ime_display_host.c').read_text()
         source = source.replace('../../', str(ROOT) + '/')
-        source = source.replace(str(ROOT / 'kernel/ime/ime.c'), str(tmp / 'ime.c'))
-        source = source.replace(str(ROOT / 'platform/pc98/ime_display.c'), str(tmp / 'ime_display.c'))
-        source = source.replace(str(ROOT / 'platform/pc98/ime_render_tvram.c'), str(tmp / 'ime_render_tvram.c'))
+        source = source.replace(str(ROOT / 'sys/kern/ime/ime.c'), str(tmp / 'ime.c'))
+        source = source.replace(str(ROOT / 'sys/platform/pc98/ime_display.c'), str(tmp / 'ime_display.c'))
+        source = source.replace(str(ROOT / 'sys/platform/pc98/ime_render_tvram.c'), str(tmp / 'ime_render_tvram.c'))
         (tmp / 'ime_display_host.c').write_text(source)
-        originals = {'console.c': (ROOT / 'kernel/console/console.c').read_text(),
-                     'ime_display.c': (ROOT / 'platform/pc98/ime_display.c').read_text(),
-                     'ime_render_tvram.c': (ROOT / 'platform/pc98/ime_render_tvram.c').read_text()}
+        originals = {'console.c': (ROOT / 'sys/kern/console/console.c').read_text(),
+                     'ime_display.c': (ROOT / 'sys/platform/pc98/ime_display.c').read_text(),
+                     'ime_render_tvram.c': (ROOT / 'sys/platform/pc98/ime_render_tvram.c').read_text()}
         for name in ('ime.c', 'ime_render.inc', 'ime_convert.inc', 'ime_candidate_commit.inc', 'ime_dict_api.inc'):
             originals[name] = (ROOT / 'kernel/ime' / name).read_text()
         for mutation in [None] + (MUTATIONS if args.mutate else []):

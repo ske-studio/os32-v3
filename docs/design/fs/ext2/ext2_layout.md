@@ -1,9 +1,9 @@
-# fs/ext2/ext2_layout.c — 設計
+# sys/fs/ext2/ext2_layout.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_HDD_INSTALL 段 1 (§1-v3 N7) の契約を今のソースと照らして要約
-ソース: `fs/ext2/ext2_layout.c`・`fs/ext2/ext2_layout.h` (`ext2_layout_plan`・`ext2_layout_group_overhead`・`ext2_layout_is_sparse`・`EXT2L_MAX_SECTORS`)
+ソース: `sys/fs/ext2/ext2_layout.c`・`sys/fs/ext2/ext2_layout.h` (`ext2_layout_plan`・`ext2_layout_group_overhead`・`ext2_layout_is_sparse`・`EXT2L_MAX_SECTORS`)
 
 ext2 を一括で作るときの配置 (ブロック数・グループ数・inode 数・GDT と inode 表の大きさ) を決める純粋関数。
-`fs/ext2/ext2_fmt.c` はここで決まった値だけを書き、インストーラの容量の見積もり (`userland/system/inst_disk.c`
+`sys/fs/ext2/ext2_fmt.c` はここで決まった値だけを書き、インストーラの容量の見積もり (`userland/system/inst_disk.c`
 `inst_check_space`) も同じ値を使う。
 
 ## 前提

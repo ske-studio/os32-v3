@@ -30,8 +30,8 @@ python3 -B tools/tests/test_cfg.py missing corrupt # ケース指定
 |---|---|
 | `userland/lib/cfg/libos32cfg.c` / `cfg_enum.c` / `cfg_tsv.c` / `cfg_init.c` | `exec` のポインタ検証 `ring3_user_range_ok` |
 | `userland/cmds/cfg.c` (`main` を `cfg_main` に差し替えて丸ごと) | SHM の置き場 (`test_shm`) |
-| `kapi/kapi_db.c` (KAPI v50 の本物) | VFS の `stat` / `rename` / `unlink` / `open` / `read` (RAM fixture) |
-| `lib/sqlite3/sqlite3.c` + `os32_sqlite_vfs.c` + `fs/vfs_fd.c` + RAM backend | 「KAPI の `db_close` / `db_exec` / `db_prepare_only` が失敗する」の注入 |
+| `sys/kapi/kapi_db.c` (KAPI v50 の本物) | VFS の `stat` / `rename` / `unlink` / `open` / `read` (RAM fixture) |
+| `lib/sqlite3/sqlite3.c` + `os32_sqlite_vfs.c` + `sys/fs/vfs_fd.c` + RAM backend | 「KAPI の `db_close` / `db_exec` / `db_prepare_only` が失敗する」の注入 |
 
 ホストのファイルシステムには触らない。tsv の fixture は **stdin** から渡して RAM fixture に置く。
 
@@ -182,7 +182,7 @@ CR、コメント中の不正 UTF-8、末尾空欄、最大 blob 行、63B key�
 - **`.new` を隔離された接続が掴んだままの状態** — F1 の隔離 slot は同じプロセスからしか作れず、
   「別プロセスが掴んだ `.new`」はホストでは作れない。試験は「残骸があれば拒否して消さない」
   という**振る舞い**だけを固定している (票 §1-7c の根拠もそこにある)。
-- **ext2 の rename の実物** — `fs/ext2/ext2_dir.c` の「新名追加 → 旧名削除」を模型で注入している。
+- **ext2 の rename の実物** — `sys/fs/ext2/ext2_dir.c` の「新名追加 → 旧名削除」を模型で注入している。
   `st_nlink` は模型では常に 1 で、ライブラリは nlink を見ない (見ずに「両名あれば触らない」)。
 - **con_sink の溢れ** — `sys_write` はホストでは捕捉バッファなので、1KB ごとの yield が
   実機の端末で十分かはゲストでしか測れない。

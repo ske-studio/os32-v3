@@ -10,12 +10,12 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = {
-    'console_dual.c': 'kernel/console/console_dual.c',
-    'display_dual.c': 'platform/pc98/display_dual.c',
-    'console.c': 'kernel/console/console.c',
-    'route.c': 'drivers/video/pc98/pc98_route.c',
-    'kernel.c': 'platform/pc98/kernel.c',
-    'gfx_core.c': 'gfx/gfx_core.c',
+    'console_dual.c': 'sys/kern/console/console_dual.c',
+    'display_dual.c': 'sys/platform/pc98/display_dual.c',
+    'console.c': 'sys/kern/console/console.c',
+    'route.c': 'sys/platform/pc98/video/pc98_route.c',
+    'kernel.c': 'sys/platform/pc98/kernel.c',
+    'gfx_core.c': 'sys/hal/gfx/gfx_core.c',
 }
 # Each anchor must occur exactly once in the real source. Compile failures do
 # not count as RED; every mutant must reach a named runtime assertion.

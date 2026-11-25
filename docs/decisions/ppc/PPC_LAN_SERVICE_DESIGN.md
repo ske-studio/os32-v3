@@ -29,7 +29,7 @@ gem_rxは1呼出し最大8descriptorを消費する既存仕様を使う。MIF�
 補完はgem_phy.cのDONE観測とlan_log.cの統計口の2件。service・PPC gem_io・診断組立て・P25結線は新規。
 既存master_enable、boot snapshot/alias、codec、monitor、copy8を使用。P22e後のpeek_ig_ok/peek_denyは復活させない。
 ## 2. 境目のコード断片
-以下は内部実装案。pm_lan_gem_io と pm_lan_diag_snapshot の宣言は platform/powermac/lan_boot.h に置く (pm_lan_copy8 と同じ置き場。宣言だけの変更なので使う側の段 lan_gem_io.c・lan_diag.c と一緒に入れてよい、ROLES の R3)。内部の定数は各 .c の中に置く。
+以下は内部実装案。pm_lan_gem_io と pm_lan_diag_snapshot の宣言は sys/platform/powermac/lan_boot.h に置く (pm_lan_copy8 と同じ置き場。宣言だけの変更なので使う側の段 lan_gem_io.c・lan_diag.c と一緒に入れてよい、ROLES の R3)。内部の定数は各 .c の中に置く。
 ```c
 enum service_state { OFF, RESETTING, PREPARE, PUBLISH, PHY_WAIT, RUNNING, QUARANTINED };
 static struct {
@@ -124,7 +124,7 @@ alias有効・memory初期化済み・単回startをserviceで再検査しない
 |P24補助・lan_gem_io.c|新規70～100行。PPC I/O 実体、ppc_dma_sync のプロトタイプは .c の中。lan_boot.h の pm_lan_gem_io の宣言を同じ段で。|
 |P24補助・lan_diag.c|新規100～150行。固定scratch・2区間・診断組立て。lan_boot.h の pm_lan_diag_snapshot の宣言を同じ段で。|
 |P24・lan_service.c|新規210～240行見込み。7状態・L2・キュー結線。補助と各別段。|
-|P25＋P26・platform/powermac/ppc_kernel.c / build/targets/ppc-powermac.mk|+35～50 / +15～30行。LAN最後の同じ取り込みで結線・全必要TU/依存登録・link map確認。|
+|P25＋P26・sys/platform/powermac/ppc_kernel.c / build/targets/ppc-powermac.mk|+35～50 / +15～30行。LAN最後の同じ取り込みで結線・全必要TU/依存登録・link map確認。|
 |実機前の別段・clock alias/PA/先行呼出し|D1によるN2延期。今回の前提2段には含めない。|
 ## 5. 受入→試験→変異
 A8：実sinkのKBOOT全byte、PHY待ち、16KiB+256B、断線/再接続、AGAIN保持/OK除去、空FIFO統計をraw bytesと照合。再接続で初回seq=0を強制しない。変異はAGAIN除去・統計反映削除。

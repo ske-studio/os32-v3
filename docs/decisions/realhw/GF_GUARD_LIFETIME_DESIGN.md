@@ -29,8 +29,8 @@ r1→r2 の変更
 
 | # | 前提との食い違い（実コード） | この追記の処置 |
 |---|---|---|
-| 1 | F2 §4の部分extent所有に対し `mm/pgalloc.h` は単一区間。`instmem_map.c`（以下 hwdev/gf/）はPTEだけを開く。`mm/paging.c` は台帳外presentを拒否 | 静的区間＋厳密な動的区間集合を監査 |
-| 2 | F4 A3-case `GF_FEAT4_DESIGN.md:577` は成功復元後だけrelease。`kdebug/gf_display_test.c` は復元失敗後もshutdown、`display/service.c:467` はreadyを落とす。`display/save.c:72,377` は以後の復元を拒否 | 停止確認後の終端破棄を別経路化（§8決定）。-411の直接原因は `gf_display_test.c` の残存 `display_session.valid/display_cui_owner` |
+| 1 | F2 §4の部分extent所有に対し `sys/kern/mm/pgalloc.h` は単一区間。`instmem_map.c`（以下 hwdev/gf/）はPTEだけを開く。`sys/kern/mm/paging.c` は台帳外presentを拒否 | 静的区間＋厳密な動的区間集合を監査 |
+| 2 | F4 A3-case `GF_FEAT4_DESIGN.md:577` は成功復元後だけrelease。`sys/dev/video/geforce/diag/gf_display_test.c` は復元失敗後もshutdown、`display/service.c:467` はreadyを落とす。`display/save.c:72,377` は以後の復元を拒否 | 停止確認後の終端破棄を別経路化（§8決定）。-411の直接原因は `gf_display_test.c` の残存 `display_session.valid/display_cui_owner` |
 | 3 | A08: `tile.c` はpitch非ゼロだけ。X`nv_accel_common.c:94-100` のNV4x生成制約を満たさない値が通る | 生成範囲の境界検査 |
 | 4 | A09: `vram_view.c` は借用なしに予約解除。viewは で予約を見つけてもkeyを保存しない | 中央の借用記録を解除条件へ |
 | 5 | U09: `gr.c` は既存12slotを転記するが `tile.c` の空き判定はsoftwareだけ | devinit後・gf2_start前に全12枠ゼロprog |
@@ -42,21 +42,21 @@ r1→r2 の変更
 ## 2. 動的窓と監査（F2 §4への追記）
 
 ```c
-/* mm/pgalloc.h: 内部のみ。既存resourceの32B配置と静的map区間を維持。 */
+/* sys/kern/mm/pgalloc.h: 内部のみ。既存resourceの32B配置と静的map区間を維持。 */
 #define LEDGER_MAX_DEVICE_MAPS 64U
 struct ledger_device_map { u32 owner, rid, first, end; }; /* PFN半開区間 */
 int ledger_resource_page_mapped(u32 rid, u32 pfn); /* static OR dynamic */
-/* mm/paging.h: 恒等UC、supervisor RW専用。0成功/-1失敗 */
+/* sys/kern/mm/paging.h: 恒等UC、supervisor RW専用。0成功/-1失敗 */
 int paging_device_map(u32 owner, u32 rid, u32 first, u32 end);
 int paging_device_unmap(u32 owner, u32 rid, u32 first, u32 end);
 ```
 
 | 手順 | 所有・検査・失敗 | 手本と差分 |
 |---|---|---|
-| 起動 | BAR0とDISPLAYは既存static区間。BAR2/tailは共有PT準備とdecode予約だけ。資源rid/ownerはkernel台帳が所有 | O`drivers/video/geforce/geforce_platform.c`。N`nvkm/subdev/instmem/nv40.c:238-253` のmapを起動予約と動的mapへ分割するOS32既存方式 |
+| 起動 | BAR0とDISPLAYは既存static区間。BAR2/tailは共有PT準備とdecode予約だけ。資源rid/ownerはkernel台帳が所有 | O`sys/dev/video/geforce/geforce_platform.c`。N`nvkm/subdev/instmem/nv40.c:238-253` のmapを起動予約と動的mapへ分割するOS32既存方式 |
 | 開く前 | kernel内固定配列64件（1024B）。空き・device owner・regionのres_mask・decode内・UC・全共有PT・全PTE NPを検査。静的/動的区間の重複拒否、隣接は別件。容量超過は変更なし | N`nouveau_bo.c:669-680` のBO単位map。差分: TTMを用いず有限台帳。64件は上限であり足りない時に監査を緩めない |
-| 開く | irq保存→全前提再確認→PTE全頁書込み→TLB flush→台帳登録→irq復帰。成功後だけout公開。commit区間に確保・callback・yield・失敗点を置かない | O`mm/paging_map.inc` の準備後commitを専用APIへ。差分: 共有PTの事前確保を必須化して全成否を保証 |
-| 監査 | static∪dynamic内だけpresent必須、その外はNP必須。従来の恒等物理・U/S・RW・cache検査を維持。map区間を広げない。surfaceの照会も同じhelperを使用 | O`mm/paging.c`、`mm/pgalloc_surface.inc`。OS32固有監査で手本に同等口なし |
+| 開く | irq保存→全前提再確認→PTE全頁書込み→TLB flush→台帳登録→irq復帰。成功後だけout公開。commit区間に確保・callback・yield・失敗点を置かない | O`sys/kern/mm/paging_map.inc` の準備後commitを専用APIへ。差分: 共有PTの事前確保を必須化して全成否を保証 |
+| 監査 | static∪dynamic内だけpresent必須、その外はNP必須。従来の恒等物理・U/S・RW・cache検査を維持。map区間を広げない。surfaceの照会も同じhelperを使用 | O`sys/kern/mm/paging.c`、`sys/kern/mm/pgalloc_surface.inc`。OS32固有監査で手本に同等口なし |
 | 閉じる | owner/rid/開始/末尾が完全一致する1件だけ。全頁と共有PTを先に照合→irq区間で全NP→TLB flush→登録削除。失敗はPTE・登録・呼出し側所有を全部保持 | N`nouveau_bo.c:683-689` の対称unmap。差分: 下位の部分成功を許さず再試行可能にする |
 | 呼出し側 | `instmem_map.c` がgeforce予約から一意のrid/ownerを解決して専用APIを呼ぶ。BAR2/push/各viewで同じ経路。失敗は既存GF1/GF2_EMAPへ変換、詳細段/元rc記録 | O`instmem_map.c`。既存map_ops署名は維持し、kernel固定配列で追跡するため借用nodeのABI追加不要 |
 
@@ -69,7 +69,7 @@ int paging_device_unmap(u32 owner, u32 rid, u32 first, u32 end);
 ## 3. 予約の借用を中央で保持（F2/F5共通）
 
 ```c
-/* hwdev/gf/vram_view.h: nodeは呼出し側常駐、リンク中は移動禁止 */
+/* sys/dev/video/geforce/vram_view.h: nodeは呼出し側常駐、リンク中は移動禁止 */
 enum gf_vram_borrow_kind { GF_BORROW_VIEW, GF_BORROW_TILE };
 struct gf_vram_borrow {
     struct gf_vram_reservation key; u32 off, bytes;
@@ -153,25 +153,25 @@ void gf4_service_cleanup_reset(struct gf4_ctx *); /* release_all成功・診断�
 
 | 段 | ファイル | 機能 / 依存・並列 |
 |---|---|---|
-| D1 | mm/pgalloc.h | 動的map型/上限/helper宣言。先行 |
-| D2 | mm/paging.h | device map/unmap宣言。D1と並列可 |
-| D3 | hwdev/gf/vram_view.h | 借用型/view key宣言。先行 |
-| D4 | hwdev/gf/accel.h | EBUSY追加。D3と並列可 |
-| D5 | hwdev/gf/feature5.h | slot状態/旧新node/init/retire/保存値表。D3後 |
-| D6 | hwdev/gf/display/api.h | cleanup_pending/abandon/共通リセット/管理ops宣言 |
-| M1 | mm/pgalloc_resource.inc | 固定配列と登録照合/静的変更拒否。D1後 |
-| M2 | mm/paging_map.inc | 全検査後のPTE/台帳commit。M1後 |
-| M3 | mm/paging.c | 厳密な集合監査。M1後、M2と並列可 |
-| M4 | mm/pgalloc_surface.inc | 集合helperによる照会。M1後、M3と並列可 |
-| M4a | drivers/video/geforce/geforce_module.h | rid/owner照会宣言。M5前 |
-| M4b | drivers/video/geforce/geforce_platform.c | 予約成功時のrid保存と範囲照会。M4a後、M5前 |
-| M5 | hwdev/gf/instmem_map.c | production adapter結線。M2/M4b後 |
-| V1 | hwdev/gf/vram_view.c | 借用・予約解除の中央管理。D3/D4後 |
-| T1 | hwdev/gf/tile.c | pitch/init/transaction/retire。D5後、V1と並列可 |
-| T2 | hwdev/gf/state.c | slot値表の保存復元、借用保持。T1後 |
-| S1 | hwdev/gf/display/save.c | 終端abandonと元rc保持。D6/V1/T1後 |
-| S2 | hwdev/gf/display/service.c | init順序、quiesce後のretire、共通リセット、pendingによるenter拒否、管理slot寿命。T1/S1後 |
-| S3 | kdebug/gf_display_test.c | 失敗後cleanup、abandon成功時だけCUI owner/sessionをゼロ化。S1後、S2と並列可 |
+| D1 | sys/kern/mm/pgalloc.h | 動的map型/上限/helper宣言。先行 |
+| D2 | sys/kern/mm/paging.h | device map/unmap宣言。D1と並列可 |
+| D3 | sys/dev/video/geforce/vram_view.h | 借用型/view key宣言。先行 |
+| D4 | sys/dev/video/geforce/accel.h | EBUSY追加。D3と並列可 |
+| D5 | sys/dev/video/geforce/feature5.h | slot状態/旧新node/init/retire/保存値表。D3後 |
+| D6 | sys/dev/video/geforce/display/api.h | cleanup_pending/abandon/共通リセット/管理ops宣言 |
+| M1 | sys/kern/mm/pgalloc_resource.inc | 固定配列と登録照合/静的変更拒否。D1後 |
+| M2 | sys/kern/mm/paging_map.inc | 全検査後のPTE/台帳commit。M1後 |
+| M3 | sys/kern/mm/paging.c | 厳密な集合監査。M1後、M2と並列可 |
+| M4 | sys/kern/mm/pgalloc_surface.inc | 集合helperによる照会。M1後、M3と並列可 |
+| M4a | sys/dev/video/geforce/geforce_module.h | rid/owner照会宣言。M5前 |
+| M4b | sys/dev/video/geforce/geforce_platform.c | 予約成功時のrid保存と範囲照会。M4a後、M5前 |
+| M5 | sys/dev/video/geforce/instmem_map.c | production adapter結線。M2/M4b後 |
+| V1 | sys/dev/video/geforce/vram_view.c | 借用・予約解除の中央管理。D3/D4後 |
+| T1 | sys/dev/video/geforce/tile.c | pitch/init/transaction/retire。D5後、V1と並列可 |
+| T2 | sys/dev/video/geforce/state.c | slot値表の保存復元、借用保持。T1後 |
+| S1 | sys/dev/video/geforce/display/save.c | 終端abandonと元rc保持。D6/V1/T1後 |
+| S2 | sys/dev/video/geforce/display/service.c | init順序、quiesce後のretire、共通リセット、pendingによるenter拒否、管理slot寿命。T1/S1後 |
+| S3 | sys/dev/video/geforce/diag/gf_display_test.c | 失敗後cleanup、abandon成功時だけCUI owner/sessionをゼロ化。S1後、S2と並列可 |
 | H1 | tools/tests/test_gf_command.py | 実MM/production map結合、変異登録。M5後 |
 | H2 | tools/tests/test_gf_display.py | 停止失敗/回収/再enter結合、変異登録。S2/S3後 |
 | H3 | tools/tests/test_gf5.py | tile寿命/init/保存復元、変異登録。T2後 |

@@ -1,8 +1,8 @@
-# fs/serialfs/serialfs.c — 設計
+# sys/fs/serialfs/serialfs.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_SERIAL_HOSTFS 部品 B (§1-v2 B-3') の契約を今のソースと照らして要約
-ソース: `fs/serialfs/serialfs.c` (VfsOps・`sfs_status`)・形式 `fs/serialfs/sfs_proto.h`
+ソース: `sys/fs/serialfs/serialfs.c` (VfsOps・`sfs_status`)・形式 `sys/fs/serialfs/sfs_proto.h`
 
-SerialFS の VFS の口。要求 / 応答は `fs/serialfs/sfs_client.c`、セッションは `fs/serialfs/serialfs_session.c`。
+SerialFS の VFS の口。要求 / 応答は `sys/fs/serialfs/sfs_client.c`、セッションは `sys/fs/serialfs/serialfs_session.c`。
 hsync と push が使う操作を満たす。
 
 ## VFS の契約

@@ -22,12 +22,12 @@
 |---|---|
 | `tools/host_agent.py` は GET の第2語を取得先にするだけ | **差異1**: `GET --as text\|mgx` は未実装。手本にできるのは GET/非同期取得の境界のみ。旧GETへ変換オプションを黙って足さない。 |
 | `tools/img2mgx.py`、`userland/lib/mgx/libos32mgx.h` | **差異2**: 冒頭の「32B・1bpp」と違い実装は48B、1～4面、16段階グレー。既存 encode/decode を使う。 |
-| `gfx/gfx_osri.h` の `OSRI_HEADER_BYTES`、`gfx/gfx_osri.c` の `osri_load_checked()` | **差異3**: 任意サイズ形式ではない。640×400、4面128000B、RGB444、CRC、イベント。lib/にOSRI読込はなくgfx/が所有。 |
+| `sys/kern/gfx/osri/gfx_osri.h` の `OSRI_HEADER_BYTES`、`sys/kern/gfx/osri/gfx_osri.c` の `osri_load_checked()` | **差異3**: 任意サイズ形式ではない。640×400、4面128000B、RGB444、CRC、イベント。lib/にOSRI読込はなくgfx/が所有。 |
 | `tools/img2osri.py` | 既定enc2はラスタ色更新。入力は黒合成・中央配置。直接コピー用の静的16色出力と区別する。 |
-| `gfx/palette.c` の `default_palette()` | 16色は index=B+2R+4G+8I、暗7/明15、8も黒。VGA標準色とは異なる。 |
-| `drivers/video/pc98/backend_pegc.c` の `pegc_palette_init()`、`drivers/video/geforce/backend_geforce.c` | 256色は下位16システム色、16～231はRGB順6³立方体(0,51,…255)、232～255は灰8+10k。 |
-| `drivers/video/cirrus/backend_cirrus.c` | CirrusもPACKED8。現状の灰は6bitの2+2kでPEGCと不一致。PMの別修正 `wt/cirrus-gray` でPEGCへ統一することが本設計の前提。全装置で共通の論理既定色を使い、DAC精度差はバックエンドに従う。 |
-| `docs/05_drivers.md`、`drivers/video/geforce/backend_geforce.c` | **差異4**: 文書の3バックエンド表にはGeForceがないが実装はPACKED8を持つ。drivers/videoにTrident実装なし。機種名でなく面形式で要求する。 |
+| `sys/hal/gfx/palette.c` の `default_palette()` | 16色は index=B+2R+4G+8I、暗7/明15、8も黒。VGA標準色とは異なる。 |
+| `sys/platform/pc98/video/backend_pegc.c` の `pegc_palette_init()`、`sys/dev/video/geforce/backend_geforce.c` | 256色は下位16システム色、16～231はRGB順6³立方体(0,51,…255)、232～255は灰8+10k。 |
+| `sys/dev/video/cirrus/backend_cirrus.c` | CirrusもPACKED8。現状の灰は6bitの2+2kでPEGCと不一致。PMの別修正 `wt/cirrus-gray` でPEGCへ統一することが本設計の前提。全装置で共通の論理既定色を使い、DAC精度差はバックエンドに従う。 |
+| `docs/05_drivers.md`、`sys/dev/video/geforce/backend_geforce.c` | **差異4**: 文書の3バックエンド表にはGeForceがないが実装はPACKED8を持つ。drivers/videoにTrident実装なし。機種名でなく面形式で要求する。 |
 | `docs/05_drivers.md`、`docs/decisions/gui/OSRI_VIEWER_DESIGN.md` | 面間隔32000Bと現在の高さは別。CPL3はクライアント面を借りHALでpresent、表示VRAMの物理番地を渡さない。 |
 | `docs/archive/network/NET_HOSTSVC_DESIGN.md`「アプリの口」「サービスの一覧」 | 共通基盤は確定設計だがこの画像サービスは別設計枠。実装済みとは扱わない。 |
 ## 2. 要求の形
@@ -91,7 +91,7 @@ palette_bytes, payload_bytes, total_bytes, token
 | raw planar4 | B,R,G,Iの順に4面。各行MSBが左、最後の余剰bitは0。各面stride×h。RGBパレットは別領域。面へ行コピー後present。 |
 | raw packed8 | 1byte=index、各行stride。Cirrus/PEGC/GeForce等のPACKED8クライアント面へ行コピー。Tridentも将来同じ能力を公開すれば同経路。 |
 | raw plane1 | MSB左の1面。2色のindexは0/1固定。受け手が選んだ1面へコピーする用途、他の3面は受け手が初期化済みであること。 |
-| osri | 既存64Bヘッダ+32B RGB444+4×32000B、version=2、band=4、flags=0、event_count=0、計128096B（gfx/gfx_osri.c）。CRC等は既存仕様通り。外側paletteは無し。保存後既存OSRI読込／表示口へ渡す。 |
+| osri | 既存64Bヘッダ+32B RGB444+4×32000B、version=2、band=4、flags=0、event_count=0、計128096B（sys/kern/gfx/osri/gfx_osri.c）。CRC等は既存仕様通り。外側paletteは無し。保存後既存OSRI読込／表示口へ渡す。 |
 | mgx | 既存48Bヘッダ（32～47はグレー0～15）+1～4面、stored/zlib。既存encodeを利用しgraycode=Falseで番号を維持。外側palette無し。既存MGX decode/blitへ。 |
 - rawパレットはindex昇順RGB3byte（4bit値も各1byte）、送付時count×3B、省略READは0B。os32既定256色はF1修正後の共通論理RGB888を返し、再設定不要。DACのビット精度による丸めはバックエンドの責務。固定／最適化は現在のKAPIで設定可能な4bitを使う。
 - os32-256選択時はpalette_bits省略で8へ、明示4は400。fixed/optimizedの8は将来の8bit設定口向けで初版400。osri/planar4は4bit、mgxはgrayの4bitのみ。互換不能な指定は400。
@@ -199,7 +199,7 @@ int os32_host_image_release(Os32ImageInfo *image, u32 timeout);
 反論: 0件。
 
 ## 確定 (2026-11-05、Opus 第 2 回、PM が反映 — 本文と食い違う所はこの節を正とする)
-- G1 (P2) §3 のパレット変更: SDK は gfx_screen_info の lease_mask/first/count で全区間を先に検査し、全部通るときだけ区間ごとに gfx_lease_palette を呼ぶ。lease に取得・返却の概念は無い (gfx/gfx_core_api.inc は範囲を検査して即座に色を書くだけ、返却の API も無い)。「取得済みの lease を返す」の記述は無効。
+- G1 (P2) §3 のパレット変更: SDK は gfx_screen_info の lease_mask/first/count で全区間を先に検査し、全部通るときだけ区間ごとに gfx_lease_palette を呼ぶ。lease に取得・返却の概念は無い (sys/hal/gfx/gfx_core_api.inc は範囲を検査して即座に色を書くだけ、返却の API も無い)。「取得済みの lease を返す」の記述は無効。
 - G2 (P2) §2 index_mask・§4・§3 osri: mask の既定は今のまま (16 色 0xFF7E、packed8 16〜255) とし、0/7・0〜15 を含む mask も受理する (400 にしない — 自前の制限だった)。lease が断る index は、全画面のときだけ SDK が gfx_set_palette (gfx_core_api.inc、どの index でも書ける) で書く。静的 OSRI に 0/7 の保持は課さない。
 - G3 (P3) §4 optimized: 不透明画素を 1×n の RGB 画像に詰めて MEDIANCUT で quantize する。
 - G4 (P3) §6・§7 B2: B2 の前提は「NET_HOSTSVC の TIMEOUT/HOSTDOWN の番号の確保」。画像の SDK は status が要るので KAPI (host_open/host_status) を直接使い、NET_HOSTSVC の「用途別 API は host_call の上へ」の例外として NET_HOSTSVC 側の文書に 1 行足す (段 D1)。

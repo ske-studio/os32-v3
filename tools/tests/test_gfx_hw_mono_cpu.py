@@ -9,7 +9,7 @@ from kernel_includes import include_flags
 from mutpar import build_in_tree
 
 CHECK = dict(name='gfx-hw-mono-cpu-host', tier=1, needs=[], budget=10, covers=[
-    'gfx/gfx_hw_mono_cpu.c', 'gfx/gfx_hw_mono_cpu.h', 'include/gfx_hal.h',
+    'sys/hal/gfx/gfx_hw_mono_cpu.c', 'sys/hal/gfx/gfx_hw_mono_cpu.h', 'sys/include/gfx_hal.h',
     'tools/tests/gfx_hw_mono_cpu_host.c', 'tools/tests/test_gfx_hw_mono_cpu.py',
     'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
     basis=['GFX_ACCEL_HAL_DESIGN §3-1'],
@@ -27,15 +27,15 @@ def run_case(folder, runner, mutation=None):
     edits = {}
     if mutation:
         name, old, new = mutation
-        source = (ROOT / 'gfx/gfx_hw_mono_cpu.c').read_text()
+        source = (ROOT / 'sys/hal/gfx/gfx_hw_mono_cpu.c').read_text()
         assert source.count(old) == 1, name
-        edits['gfx/gfx_hw_mono_cpu.c'] = source.replace(old, new)
+        edits['sys/hal/gfx/gfx_hw_mono_cpu.c'] = source.replace(old, new)
     exe = folder / 'mono-host'
     command = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
                '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
                '-static', '-no-pie', *include_flags(ROOT),
                str(ROOT / 'tools/tests/gfx_hw_mono_cpu_host.c'),
-               str(ROOT / 'gfx/gfx_hw_mono_cpu.c'), '-o', str(exe)]
+               str(ROOT / 'sys/hal/gfx/gfx_hw_mono_cpu.c'), '-o', str(exe)]
     build_in_tree(ROOT, folder, edits, [command])
     result = host32.run([str(exe)], runner=runner, capture_output=True, text=True)
     assert result.returncode == (1 if mutation else 0), result

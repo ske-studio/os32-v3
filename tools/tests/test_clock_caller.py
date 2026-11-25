@@ -1,11 +1,11 @@
 """Real sys_time_now/provider contracts, including protected user outputs."""
 CHECK = dict(name='clock-caller-host', tier=4,
     covers=['lib/divdi3.c', 'tools/tests/test_clock_caller.py', 'tools/tests/clock_caller_host.c',
-            'kernel/time/ktime.c', 'kernel/time/ktime.h', 'kernel/time/time_math.c',
-            'kernel/time/time_math.h', 'platform/pc98/clock_source.c',
-            'platform/pc98/pit_time.c', 'platform/pc98/pit_time.h',
-            'platform/pc98/pit.h', 'platform/pc98/pit_math.h', 'platform/pc98/tsc_clock.h', 'platform/pc98/clock_source.h', 'kernel/io_clock.h',
-            'kernel/time/tick_clock.h', 'kernel/irq/tick_budget.h', 'include/clock_source.h', 'include/kernel_tick.h', 'include/platform_timer.h',
+            'sys/kern/time/ktime.c', 'sys/kern/time/ktime.h', 'sys/kern/time/time_math.c',
+            'sys/kern/time/time_math.h', 'sys/platform/pc98/clock_source.c',
+            'sys/platform/pc98/pit_time.c', 'sys/platform/pc98/pit_time.h',
+            'sys/platform/pc98/pit.h', 'sys/platform/pc98/pit_math.h', 'sys/platform/pc98/tsc_clock.h', 'sys/platform/pc98/clock_source.h', 'sys/kern/io_clock.h',
+            'sys/hal/time/tick_clock.h', 'sys/kern/irq/tick_budget.h', 'sys/hal/time/clock_source.h', 'sys/include/kernel_tick.h', 'sys/include/platform_timer.h',
             'tools/tests/dep_dir_b_io_shim.h', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
     needs=[], budget=2.9,
     basis=['AC-TIME-1', 'AC-TIME-2', 'KAPI_SPEC §3-3'],
@@ -18,30 +18,30 @@ from kernel_includes import include_flags
 from host32 import run as host_run
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
-    ('platform/pc98/clock_source.c', 'ready ? pc98_tsc_read_us(&l, &h) : pc98_pit_read_us(&l, &h)',
+    ('sys/platform/pc98/clock_source.c', 'ready ? pc98_tsc_read_us(&l, &h) : pc98_pit_read_us(&l, &h)',
      'ready ? pc98_pit_read_us(&l, &h) : pc98_pit_read_us(&l, &h)'),
-    ('platform/pc98/clock_source.c', 'if (pit_rebased) us = public_origin + (us - pit_origin);',
+    ('sys/platform/pc98/clock_source.c', 'if (pit_rebased) us = public_origin + (us - pit_origin);',
      '(void)public_origin; (void)pit_origin;'),
-    ('platform/pc98/clock_source.c', 'out->ready = ps->valid && clock_config_rc == 0;',
+    ('sys/platform/pc98/clock_source.c', 'out->ready = ps->valid && clock_config_rc == 0;',
      'out->ready = ps->valid;'),
-    ('platform/pc98/clock_source.c', 'clock_config_rc = tick_clock_config(ps->reload, ps->clk_hz);',
+    ('sys/platform/pc98/clock_source.c', 'clock_config_rc = tick_clock_config(ps->reload, ps->clk_hz);',
      '(void)tick_clock_config(ps->reload, ps->clk_hz); clock_config_rc = 0;'),
-    ('platform/pc98/clock_source.c', '        tick_clock_raw(&raw_lo, &raw_hi);',
+    ('sys/platform/pc98/clock_source.c', '        tick_clock_raw(&raw_lo, &raw_hi);',
      '        raw_lo = tick_count; raw_hi = 0;'),
-    ('platform/pc98/clock_source.c', '            raw += snap.tick;',
+    ('sys/platform/pc98/clock_source.c', '            raw += snap.tick;',
      '            raw = (raw & ~0xffffffffULL) | (unsigned int)((unsigned int)raw + snap.tick);'),
 
-    ('platform/pc98/clock_source.c', 'attempt < TIME_RETRY_MAX;', 'attempt < 1;'),
-    ('kernel/time/ktime.c', 'if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;',
+    ('sys/platform/pc98/clock_source.c', 'attempt < TIME_RETRY_MAX;', 'attempt < 1;'),
+    ('sys/kern/time/ktime.c', 'if (time_clamp(us, s_last_us, &us)) ktime_clamp_count++;',
      '(void)time_clamp;'),
-    ('kernel/time/ktime.c', '    irq_restore(saved);',
+    ('sys/kern/time/ktime.c', '    irq_restore(saved);',
      '    if (rc == 0 && lo) *lo = out_lo;\n    irq_restore(saved);'),
 )
 
 
 def verify(work, mutation=None):
-    for rel in ('platform/pc98/clock_source.c', 'kernel/time/ktime.c',
-                'platform/pc98/clock_source.h', 'include/clock_source.h', 'kernel/io_clock.h'):
+    for rel in ('sys/platform/pc98/clock_source.c', 'sys/kern/time/ktime.c',
+                'sys/platform/pc98/clock_source.h', 'sys/hal/time/clock_source.h', 'sys/kern/io_clock.h'):
         text = (ROOT / rel).read_text()
         if mutation and rel == mutation[0]:
             assert text.count(mutation[1]) == 1
@@ -56,8 +56,8 @@ def verify(work, mutation=None):
     subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                     '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
                     '-static', '-no-pie', '-D__cdecl=', '-I' + str(work), *include_flags(ROOT),
-                    str(harness), str(ROOT / 'platform/pc98/pit_time.c'),
-                    str(ROOT / 'kernel/time/time_math.c'), str(ROOT / 'lib/divdi3.c'),
+                    str(harness), str(ROOT / 'sys/platform/pc98/pit_time.c'),
+                    str(ROOT / 'sys/kern/time/time_math.c'), str(ROOT / 'lib/divdi3.c'),
                     '-o', str(exe)], check=True)
     return host_run([str(exe)], cwd=work).returncode
 

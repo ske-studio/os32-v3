@@ -31,8 +31,8 @@ POLICY_DEV §1 の HAL 中心期における「新装置に着手しない」の
 |---|---|
 | shell | userland/shell/cmd_sys.c の既存コマンドが g_api->sys_reboot() を呼ぶ。PPC も build/ppc-user.mk でこれを組む。 |
 | PPC ラッパ | sdk/kapi_target_ppc.py の提供者無し集合を sdk/gen_kapi.py が読み、void の空関数を生成する。 |
-| 共通 | kernel/sys.c は描画側の返却コールバック、platform_reset、永久 halt の順。コールバック未登録も処理済み。 |
-| 機種の口 | include/platform_sys.h は復帰可。PC-98 は platform/pc98/system.c の I/O 列。PPC は build/platform/powermac.mk に相当する提供者がない。 |
+| 共通 | sys/kern/sys.c は描画側の返却コールバック、platform_reset、永久 halt の順。コールバック未登録も処理済み。 |
+| 機種の口 | sys/include/platform_sys.h は復帰可。PC-98 は sys/platform/pc98/system.c の I/O 列。PPC は build/platform/powermac.mk に相当する提供者がない。 |
 
 依頼の略記と実物の食い違いは次の 4 件。
 1. 製品シェルの reboot を共通 RSH から一度実行し、再起動後に別 boot の READY と ver の応答を確認する。起動経路は PPC_SHELL_ALIGN_X86_DESIGN に従う。
@@ -49,7 +49,7 @@ POLICY_DEV §1 の HAL 中心期における「新装置に着手しない」の
 
 | 所有者 | 持つもの・読めるヘッダ |
 |---|---|
-| 共通 | kernel/sys.c と include/platform_sys.h は現行通り。共通に VIA 型を出さず、追加 contract は不要。 |
+| 共通 | sys/kern/sys.c と sys/include/platform_sys.h は現行通り。共通に VIA 型を出さず、追加 contract は不要。 |
 | PowerMac | OF の発見、物理窓から VA への対応、初期化結果、LOG、IRQ 制御、MMIO と時計の結線。装置ヘッダと共通・CPU の既存の口を読む。 |
 | 装置 | drivers/macintosh/ に VIA の byte 転送と機種に依らないプロトコルを置く。装置内ヘッダと共通型を読み、OF・PVR・仮想番地を知らない。 |
 | CPU | arch/ppc の既存 MSR、timebase、ページングを利用。VIA の識別・レジスタ・reset 命令列は置かない。 |
@@ -83,8 +83,8 @@ struct pm_via_boot {
 - 機種の PVR 表や /etc/machine.cfg は設定解決用（MACHCFG_DESIGN §3）。VIA の種類・番地は装置の識別結果であり、設定キーは設けない。
 - kernel_boot.c の ppc_boot_alias_plan と同じ方式で、使用範囲 0x1c01 byte の専用窓を計画。VA は PM_VIA_VA、ページ内 offset を保持。
 - 同 :164–175,187–210 の install と walk 検査に入れる。RAM、既存 MMIO、USB、FB の全構成と PA/VA の重なりをページ単位で検査し、PPC_BOOT_IO_ATTR で写す。
-- 機種内の静的状態に VA と結果を保持し、takeover 後のルートで検証した時だけ有効化。arch/ppc/kernel_boot.h の引渡しに機種の型を追加しない。
-- platform/powermac/via_window.h の定義は次の通り。kernel_boot.c の slots[] に { PM_VIA_VA, PM_VIA_BYTES } を追加。最大ページ内 offset 0xfff と使用長 0x1c01 の合計を 3 ページで収める。
+- 機種内の静的状態に VA と結果を保持し、takeover 後のルートで検証した時だけ有効化。sys/arch/ppc/kernel_boot.h の引渡しに機種の型を追加しない。
+- sys/platform/powermac/via_window.h の定義は次の通り。kernel_boot.c の slots[] に { PM_VIA_VA, PM_VIA_BYTES } を追加。最大ページ内 offset 0xfff と使用長 0x1c01 の合計を 3 ページで収める。
 
 ```c
 #define PM_VIA_VA    0xfe3c4000U
@@ -108,7 +108,7 @@ void platform_reset(void)
         /* ppc_kernel.c の既存ループと同じく TB の期限まで
            pm_lan_poll(now) を反復し、送信キューを進める。 */
     }
-}                                    /* kernel/sys.c が最後の待機を所有 */
+}                                    /* sys/kern/sys.c が最後の待機を所有 */
 ```
 
 ## 3. 送信の手順
@@ -194,15 +194,15 @@ Apple の Power Mac G4 (September 2002) Developer Note、vendor/text/apple-pmg4-
 
 | ファイル | 担当する差分 | 行 |
 |---|---|---:|
-| drivers/macintosh/via.h | 種類、I/O・時間の口、準備と再起動 | 26 |
-| drivers/macintosh/via.c | byte 操作、期限、PMU/Cuda の送受信とコマンド | 200 |
-| platform/powermac/via_tree.c | OF 一意照合と親経路の番地解決 | 75 |
-| platform/powermac/kboot_info.h | 種類は u8 で保持。via.h を include せず機種の capture 境界で種類値を対応づける | 8 |
-| platform/powermac/kboot_capture.c | OF 有効中の capture | 2 |
-| platform/powermac/via_window.h | PM_VIA_VA、窓の型と取得宣言 | 8 |
-| platform/powermac/kernel_boot.c | VA 窓・重複・PTE 検査と引渡し | 35 |
-| platform/powermac/system.c | 装置接続、準備、識別 LOG、platform_reset | 38 |
-| platform/powermac/ppc_kernel.c | takeover 後の準備呼出し | 2 |
+| sys/dev/macintosh/via.h | 種類、I/O・時間の口、準備と再起動 | 26 |
+| sys/dev/macintosh/via.c | byte 操作、期限、PMU/Cuda の送受信とコマンド | 200 |
+| sys/platform/powermac/via_tree.c | OF 一意照合と親経路の番地解決 | 75 |
+| sys/platform/powermac/kboot_info.h | 種類は u8 で保持。via.h を include せず機種の capture 境界で種類値を対応づける | 8 |
+| sys/platform/powermac/kboot_capture.c | OF 有効中の capture | 2 |
+| sys/platform/powermac/via_window.h | PM_VIA_VA、窓の型と取得宣言 | 8 |
+| sys/platform/powermac/kernel_boot.c | VA 窓・重複・PTE 検査と引渡し | 35 |
+| sys/platform/powermac/system.c | 装置接続、準備、識別 LOG、platform_reset | 38 |
+| sys/platform/powermac/ppc_kernel.c | takeover 後の準備呼出し | 2 |
 | build/platform/powermac.mk | 機種ソースとこの機種が使う装置ソースの明示列挙 | 1 |
 | sdk/kapi_target_ppc.py | sys の absent を 2 本にする | 1 |
 | tools/ppc/test_kapi_binding.py | stub・通常生成・nm、reboot を absent に戻す変異 | 12 |
@@ -249,7 +249,7 @@ Apple の Power Mac G4 (September 2002) Developer Note、vendor/text/apple-pmg4-
 反論なし。
 
 ## 確定 (2026-11-18、Opus 第 2 回、PM が反映)
-- P3-1: §6 の既存の host の土台と試験の一覧に足す — (a) kboot_info.h を読む tools/ppc/kboot_memory_host.c、(b) 本文の文字列を目印に読む tools/tests/test_ppc_terminal_work.py と tools/tests/test_arch_ctx.py (platform/powermac/ppc_kernel.c)、tools/tests/test_ppc_cpu_nap.py (platform/powermac/kernel_boot.c)、(c) tools/checks/ppc-rh-fb.py の covers (kernel_boot.c)。ppc_kernel.c は呼び出しを 1 行足すだけなので、各試験の目印が外れないかを実装者が grep と MUTATE=1 で確かめる。
+- P3-1: §6 の既存の host の土台と試験の一覧に足す — (a) kboot_info.h を読む tools/ppc/kboot_memory_host.c、(b) 本文の文字列を目印に読む tools/tests/test_ppc_terminal_work.py と tools/tests/test_arch_ctx.py (sys/platform/powermac/ppc_kernel.c)、tools/tests/test_ppc_cpu_nap.py (sys/platform/powermac/kernel_boot.c)、(c) tools/checks/ppc-rh-fb.py の covers (kernel_boot.c)。ppc_kernel.c は呼び出しを 1 行足すだけなので、各試験の目印が外れないかを実装者が grep と MUTATE=1 で確かめる。
 - P3-2: §3 via_command — Cuda の応答 frame を待つのは `in != NULL かつ cap > 0` の時だけ。それ以外は送信の完了で戻る。
 - P3-3: §2 platform_reset — 失敗の時に LAN の LOG を流し続ける期限は、ppc_kernel.c の既存の 2 秒の poll と同じ `2 × tb_hz` (TB の差) とする。
 - P3-4: §5 の「受信は 1 byte ずつ廃棄」「MMIO は通常 2 ページ」を、cap まで保存・窓 3 ページに直した (上の §5)。
@@ -315,6 +315,6 @@ R-b の直し一段。platform/powermac/{kernel_boot.c,via_window.h,usb_platform
 system.c は公開済み窓の利用者のまま。共通層・装置層・KAPI の変更は不要。
 
 ### 追記の確定 (2026-11-18、Opus 第 1 回、PM が反映)
-- R-b の astra のレビューの P2 3 件 — (a) platform/powermac/kernel_boot.c の install_via が pm_usb_roots の構成の窓 (usb_boot.c の root->pa+0x800000 と +0xc00000) と照合していない、(b) platform/powermac/via_tree.c の ranges が別 BDF・別 BAR でも数値が mac-io の BAR0 の内なら採用する (BAR トークン付きの親番地では BDF・BAR の一致を必須に)、(c) via_tree.c で ofw_child/ofw_peer の失敗 -1 を正常の終端 0 と同じに扱う (-1 は探索の失敗として伝播、候補の発見の後に失敗する fixture を足す) — は、この追記の範囲外で、R-b の実装の直しとして PM が出す ((a) はこの追記の照合と同じ段にまとめてよい)。
+- R-b の astra のレビューの P2 3 件 — (a) sys/platform/powermac/kernel_boot.c の install_via が pm_usb_roots の構成の窓 (usb_boot.c の root->pa+0x800000 と +0xc00000) と照合していない、(b) sys/platform/powermac/via_tree.c の ranges が別 BDF・別 BAR でも数値が mac-io の BAR0 の内なら採用する (BAR トークン付きの親番地では BDF・BAR の一致を必須に)、(c) via_tree.c で ofw_child/ofw_peer の失敗 -1 を正常の終端 0 と同じに扱う (-1 は探索の失敗として伝播、候補の発見の後に失敗する fixture を足す) — は、この追記の範囲外で、R-b の実装の直しとして PM が出す ((a) はこの追記の照合と同じ段にまとめてよい)。
 - 根拠の実物の値: QEMU mac99 で VIA は pa=80016000 (R-b の LOG)。OHCI の BAR0 の値は実装の段の QEMU で LOG に出して並べる。G4 の値は未確認。
 - 試験の土台 (PM 決定): 新しく tools/ppc/usb_via_overlap_host.c を作り、差し替える関数は paging_map_phys・usbp_cfg_read32・usbp_cfg_write32 (または今の cfg の書き込みの関数)・pm_usb_roots の窓・OHCI の start。登録は tools/tests/test_powermac_reset.py の CHECK (powermac-reset) に足す。

@@ -1,4 +1,4 @@
-# kernel/gui.c — 常駐 WM の登録と呼出し
+# sys/kern/gui.c — 常駐 WM の登録と呼出し
 
 > 状態: **現行 (2026-10-31)**
 
@@ -9,9 +9,9 @@ GUI 操作を登録された WM ハンドラへ転送する。
 
 - アプリが後で CPL=0 から呼ばれる関数表を登録できると、終了後の解放済みコードへ
   飛ぶこともある。`gui_register` と `gui_ime_set_render` は owner 1 かつ
-  ユーザーからの呼出しでないことを要求する (`kernel/gui.c` の `gui_register()`, `kernel/gui.c`)。
+  ユーザーからの呼出しでないことを要求する (`sys/kern/gui.c` の `gui_register()`, `sys/kern/gui.c`)。
   関数ポインタの番地だけで呼出し元の信頼性を判断しない。
-  `make check-ring3-guard-host` と `kdebug/kselftest/ime_render_gate.inc` が検査する。
+  `make check-ring3-guard-host` と `sys/kern/kdebug/kselftest/ime_render_gate.inc` が検査する。
 
 ## 内部設計と契約 (D1)
 
@@ -64,7 +64,7 @@ shell (owner 1) の異常終了は、通常文脈の所有者回収で WM 登録
 
 > 出所: TASK_KAPI_OUTPUT_GUARD (§6 の追補) の契約を今のソースと照らして要約 (2026-11-18)
 
-ソース: `kernel/gui.c` (`gui_call`・`gui_owner_exit`・`gui_register`・`gui_ime_set_render`)。深さの実体は `exec/exec.c` の `ring3_wm_depth`。
+ソース: `sys/kern/gui.c` (`gui_call`・`gui_owner_exit`・`gui_register`・`gui_ime_set_render`)。深さの実体は `sys/kern/exec/exec.c` の `ring3_wm_depth`。
 
 - `gui_call` はハンドラの呼び出しを `ring3_wm_enter` / `ring3_wm_leave` で挟む。ハンドラの中の深さは 1、ハンドラの中から入れ子で `gui_call` すると 2、戻って 1、抜けて 0。
 - `gui_owner_exit` も WM のハンドラを呼ぶ間だけ印を立てる。WM が登録されていなければ (ハンドラが NULL) 印も立てない。
@@ -72,7 +72,7 @@ shell (owner 1) の異常終了は、通常文脈の所有者回収で WM 登録
   - `gui_register`: 門に落ちたら・handler が NULL なら `OS32_ERR_INVAL` で、登録済みのハンドラは変えない。
   - `gui_ime_set_render`: 門に落ちたら表も NULL も黙って無視し (戻りは void)、`gui_ime_render_rejected` を数える。アプリの回収では描画先に触らず、gshell (owner 1) の終了で NULL (TVRAM 版) に戻る。
 
-検査: `make check-ring3-guard-host` (`tools/tests/test_ring3_guard.py`) と `kdebug/kselftest/ime_render_gate.inc`。
+検査: `make check-ring3-guard-host` (`tools/tests/test_ring3_guard.py`) と `sys/kern/kdebug/kselftest/ime_render_gate.inc`。
 
 ## 同期 COMMIT の描画主体
 

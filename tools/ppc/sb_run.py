@@ -25,13 +25,13 @@ def main():
     cases = [('normal',)]
     if args.mutate:
         cases.extend([
-            ('exit-status', 'arch/ppc/kapi_call.c',
+            ('exit-status', 'sys/arch/ppc/kapi_call.c',
              'return ppc_kapi_invoke(&api, current_slot, values);',
              'struct kapi_values changed = *values;\n'
              '    if (current_slot == (__builtin_offsetof(KernelAPI, sys_exit) - 8) / 4) changed.value[0] = 0;\n'
              '    return ppc_kapi_invoke(&api, current_slot, &changed);',
             ),
-            ('fault-exit', 'arch/ppc/kernel_trap.c',
+            ('fault-exit', 'sys/arch/ppc/kernel_trap.c',
              '        ppc_user_fault_kill();',
              '        extern void kapi_sys_exit(int);\n        kapi_sys_exit(0);',
             )

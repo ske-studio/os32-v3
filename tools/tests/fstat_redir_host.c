@@ -5,7 +5,7 @@
  *  実行: python3 -B tools/tests/test_fstat_redir.py [--target] [--mutate]
  *  記録: tools/tests/fstat_redir_tdd.md
  *
- *  実物の fs/vfs.c + fs/vfs_fd.c + **fs/fd_redirect.c** を同じ翻訳単位に
+ *  実物の sys/fs/vfs.c + sys/fs/vfs_fd.c + **sys/fs/fd_redirect.c** を同じ翻訳単位に
  *  取り込み、境界 (kstring / kmalloc / コンソール / キーボード) だけを同義の
  *  C で置く。FS ドライバは合成した VfsOps。
  *
@@ -31,7 +31,7 @@
 
 #include "vfs.h"
 
-/* ---- fs/vfs.c の境界 (lib/kstring_asm.asm / kmalloc はホストで組めない) ---- */
+/* ---- sys/fs/vfs.c の境界 (sys/kern/kstring_asm.asm / kmalloc はホストで組めない) ---- */
 void *kzalloc(u32 size) { return calloc(1, size); }
 void kfree(void *p) { free(p); }
 void *kmemset(void *dst, int val, u32 n) { return memset(dst, val, n); }
@@ -53,12 +53,12 @@ char *kstrncat(char *dst, const char *src, u32 n)
     return dst;
 }
 
-#include "../../fs/vfs.c"
+#include "../../sys/fs/vfs.c"
 #include "../platform/pc98/boot_names.c"
 
-/* ---- fs/vfs_fd.c の境界 (コンソール / キーボード) --------------------------
+/* ---- sys/fs/vfs_fd.c の境界 (コンソール / キーボード) --------------------------
  * リダイレクトは**贋物を置かない** — この票の主題そのものなので、
- * fs/fd_redirect.c を実物のまま下で取り込む。 */
+ * sys/fs/fd_redirect.c を実物のまま下で取り込む。 */
 static u32 con_written;
 static int stdin_prefix;
 static int stdin_interrupt;
@@ -72,11 +72,11 @@ int kbd_getchar_kapi(void)
 void console_write(const char *buf, u32 size, u8 color)
 { (void)buf; (void)color; con_written += size; }
 
-#include "../../fs/vfs_fd.c"
-#include "../../fs/fd_redirect.c"
+#include "../../sys/fs/vfs_fd.c"
+#include "../../sys/fs/fd_redirect.c"
 #include "redir_access_stub.h"
 
-/* fs/fd_redirect.c の書き込み時の再検査 (票 TASK_KAPI_OUTPUT_GUARD) が引く exec/exec.c
+/* sys/fs/fd_redirect.c の書き込み時の再検査 (票 TASK_KAPI_OUTPUT_GUARD) が引く sys/kern/exec/exec.c
  * の 5 本。ホストではユーザ帯の番地は無いので ring3_ptr_ok は常に 0 (= 再検査を通らない)。 */
 int ring3_ptr_ok(u32 p) { (void)p; return 0; }
 int ring3_user_ranges_writable(u32 pa, u32 la, u32 pb, u32 lb)

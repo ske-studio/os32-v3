@@ -1,7 +1,7 @@
-/* B1/C0 fixture: link clock.c and kdebug/gfinit_pll.c, -m32 -nostdlib. */
+/* B1/C0 fixture: link clock.c and sys/dev/video/geforce/diag/gfinit_pll.c, -m32 -nostdlib. */
 #define GF5_HOST_UNIT 1
 #include "gf5_fake.h"
-#include "../../kdebug/gfinit_decode.h"
+#include "../../sys/dev/video/geforce/diag/gfinit_decode.h"
 static struct gf5_host h;
 static struct gf4_state state;
 static struct gf4_host_event de[64];

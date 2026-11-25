@@ -30,7 +30,7 @@
 
 | 段 | 中身 | 状態 | コミット・証拠 |
 |---|---|---|---|
-| T1 | 契約と純粋状態機械 ([kdebug/recover.c](../../../kdebug/recover.c))、host 試験 check-recover-host | main | 0cf9c28、2e744f3 (astra レビュー P2 ×2) |
+| T1 | 契約と純粋状態機械 ([sys/platform/pc98/kdebug/recover.c](../../../sys/platform/pc98/kdebug/recover.c))、host 試験 check-recover-host | main | 0cf9c28、2e744f3 (astra レビュー P2 ×2) |
 | T1b | 共有 descriptor (target/rule/guard/plan/BAR 範囲/opcode layout)、bind と全経路・実行時の依存検査、local_cleanup の接続 | main | a4d37a9、92536c8 (後片付け)、85cda52 (Opus レビュー) |
 | T2 | 窓の PTE/IRQ 復元、GF descriptor と Command=0102h の override、98 画面の共通復帰 (0FACh・A0000h のセル検査・GUI 拒否)、暫定予算と ② の予約・poll 計数・UART 1 フレーム待ち | main | 4f8685b、f339944 (astra レビュー)、7e28d26、c76226e |
 | T3 | shell `recover status / now <session>`、ホストの [tools/rshell_recover.py](../../../tools/rshell_recover.py)、固定長 abort (10 B)、REC の連番・欠落・破棄量 | main | b14a905、34f7503 (後片付け)、07a9d83。取り込みの検査での試験の直し 02e08d3・a604c91 |
@@ -74,7 +74,7 @@ T4b 以降の段の並べ替え (2026-10-22、装置ごとの部分を別の部�
 - 「§2 追加」4 節・「§3 追加」— plan の入力と寿命、分岐・skip・呼出し・反復と全経路検査、世代をまたぐ依存と実行時照合、EXPR 引数、検証済み BAR 長、T1b と S2 以降の分担 (r4、Opus 3 回、確定 C1〜C3・D1〜D2)。
 - 「T1b の欠けの補完」— 他装置・bridge 窓の照合 (`recover_bar_probe`、範囲表 256 件)、opcode layout の型。
 - 「T1b の実装で設計者が決めたこと」— bus access の形、profile 版 2、局所 snapshot 32 件、local_cleanup の所有、N1 の 32bit tuple。
-- 「4a S1 追補で設計者が決めたこと」— GF 許可表 ([kdebug/recover_gf.c](../../../kdebug/recover_gf.c))、619 候補の分類、別名禁止の範囲。
+- 「4a S1 追補で設計者が決めたこと」— GF 許可表 ([sys/dev/video/geforce/diag/recover_gf.c](../../../sys/dev/video/geforce/diag/recover_gf.c))、619 候補の分類、別名禁止の範囲。
 - 「T3 の実装で設計者が決めたこと」— abort フレーム、部分フレームの寿命、owner の共有、`now 0`、shell の op 3/4、REC の採番、UART、ホストの単一所有。
 - 「4a S2 / S3 / S4 / S5 の実装で設計者が決めたこと」— profile 版 3・4、capture、index 保存、skip 中の head、実行器の課金、PLL の内部列、窓の共有 (kdebug_window)、COPY と一時再生の本番 rule、局所 cleanup の順。
 

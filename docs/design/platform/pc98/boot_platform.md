@@ -1,9 +1,9 @@
-# platform/pc98/boot_platform.c — 設計
+# sys/platform/pc98/boot_platform.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_D3_DESIGN (D1 で移した)
-ソース: `platform/pc98/boot_platform.c`
+ソース: `sys/platform/pc98/boot_platform.c`
 
 ```c
-/* platform/pc98/boot_platform.h: 内部専用。列挙値は下表の境目に1個ずつ。 */
+/* sys/platform/pc98/boot_platform.h: 内部専用。列挙値は下表の境目に1個ずつ。 */
 struct boot_context { u32 drive; const char *root_dev, *root_fs; };
 typedef void (*boot_step_fn)(const struct boot_context *);
 struct boot_platform { boot_step_fn step[BOOT_POINT_COUNT]; };

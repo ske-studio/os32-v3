@@ -4,6 +4,6 @@
 
 ### cirrus_module
 
-- 未登録 Cirrus（drivers/video/cirrus/cirrus_module.c）は modes=NULL のまま skip し、probe/enable を追加しない。
+- 未登録 Cirrus（sys/dev/video/cirrus/cirrus_module.c）は modes=NULL のまま skip し、probe/enable を追加しない。
 
 - [cirrus_identify](cirrus_identify.md)

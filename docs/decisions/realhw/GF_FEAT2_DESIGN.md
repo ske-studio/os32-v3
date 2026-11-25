@@ -200,28 +200,28 @@ int gf2_gr_init(struct gf2_chan *); /* grctx allocationも所有、失敗時逆�
 ## 8. ファイルごとの変更一覧 (O/相対、1行=1段=1実装者)
 | 段/ファイル | 役目 / 依存 / 増分行目安 |
 |---|---|
-| A0 hwdev/gf/command.h 新 | 上記全stateと型付き境界を凍結、「確定」節の fifo/fb のプロトタイプを含む / 層 1 の A0 (foundation.h) の取り込み後 / 240 |
-| A1 hwdev/gf/production.h 変 | gf2所有state / A0 / 8 |
+| A0 sys/dev/video/geforce/command.h 新 | 上記全stateと型付き境界を凍結、「確定」節の fifo/fb のプロトタイプを含む / 層 1 の A0 (foundation.h) の取り込み後 / 240 |
+| A1 sys/dev/video/geforce/production.h 変 | gf2所有state / A0 / 8 |
 | A2 tools/tests/gf_command_host.h 新 | 偽MMIO/PRAMIN/時計/IRQ骨格と部品stub、B群に依存しない / A0 / 140 |
-| B0 hwdev/gf/fifo.c 新 | PFIFO/RAMFC開始停止 / A0,F1 / 200 |
-| B1 hwdev/gf/push.c 新 | reserve/emit/wrap/kick / A0 / 180 |
-| B2 hwdev/gf/dmaobj.c 新 | DMA descriptor生成 / A0,F1 / 85 |
-| B3 hwdev/gf/ramht.c 新 | hash/add/del / A0,F1 / 100 |
-| B4 hwdev/gf/grctx.c 新 | MIT grctx generator (補助関数も同ファイル) / A0 / 600〜750 |
-| B5 hwdev/gf/gr.c 新 | PGRAPH init/context/class生成 / B4 / 210 |
-| B6 hwdev/gf/fence.c 新 | reference/期限 / B1 / 90 |
-| B7 hwdev/gf/fault.c 新 | 前景snapshot差分/詳細採取/要求閉/gate閉 / A0,F1 / 150 |
-| B8 hwdev/gf/command_platform.c 新 | 部分extent/長さ照合/VRAM map予約とDMA ops接続 / A0 / 100 |
-| B9 drivers/video/geforce/geforce_dma.c 新 | 常駐DMA ops実体 / A0 / 45 |
-| C0 hwdev/gf/command.c 新 | start/stop/recoverの寿命管理 / B群 / 160 |
-| C1 hwdev/gf/service.c 変 | F1開始後の層2開始 / C0 / 15 |
-| C2 hwdev/gf/display/quiesce.c 変 | 層2stop→F1stop、重複stopは冪等 / C0 / 15 |
-| C3 drivers/video/geforce/geforce_module.c 変 | detach時fault/所有資源残留を拒否 / C0 / 10 |
+| B0 sys/dev/video/geforce/fifo.c 新 | PFIFO/RAMFC開始停止 / A0,F1 / 200 |
+| B1 sys/dev/video/geforce/push.c 新 | reserve/emit/wrap/kick / A0 / 180 |
+| B2 sys/dev/video/geforce/dmaobj.c 新 | DMA descriptor生成 / A0,F1 / 85 |
+| B3 sys/dev/video/geforce/ramht.c 新 | hash/add/del / A0,F1 / 100 |
+| B4 sys/dev/video/geforce/grctx.c 新 | MIT grctx generator (補助関数も同ファイル) / A0 / 600〜750 |
+| B5 sys/dev/video/geforce/gr.c 新 | PGRAPH init/context/class生成 / B4 / 210 |
+| B6 sys/dev/video/geforce/fence.c 新 | reference/期限 / B1 / 90 |
+| B7 sys/dev/video/geforce/fault.c 新 | 前景snapshot差分/詳細採取/要求閉/gate閉 / A0,F1 / 150 |
+| B8 sys/dev/video/geforce/command_platform.c 新 | 部分extent/長さ照合/VRAM map予約とDMA ops接続 / A0 / 100 |
+| B9 sys/dev/video/geforce/geforce_dma.c 新 | 常駐DMA ops実体 / A0 / 45 |
+| C0 sys/dev/video/geforce/command.c 新 | start/stop/recoverの寿命管理 / B群 / 160 |
+| C1 sys/dev/video/geforce/service.c 変 | F1開始後の層2開始 / C0 / 15 |
+| C2 sys/dev/video/geforce/display/quiesce.c 変 | 層2stop→F1stop、重複stopは冪等 / C0 / 15 |
+| C3 sys/dev/video/geforce/geforce_module.c 変 | detach時fault/所有資源残留を拒否 / C0 / 10 |
 | C4 tools/prototypes/geforce_imports.def 変 | typed DMA ops取得を1 import / B9 / 15 |
 | C5 build/geforce-module.mk 変 | 部品配置、サイズ検査 / B群,C4 / 20 |
 | D0 docs/02_memory.md 変 | push用UC map 64KiB/16頁、仮想配置に応じ追加PT最大2頁を予算化し実測、予約/解除寿命 / B8 / 15 |
 | A3 tools/tests/test_gf_command.py 新 (旧 T1) | CHECK登録、部品別host駆動、変異実行。A 段に置き、B 段の登録は PM が直列に取り込む (ROLES §3-3) / A2 / 100 |
-| T2 kdebug/gf_command_test.c 新 | 非GUI serial受入入口 / C群 / 170 |
+| T2 sys/dev/video/geforce/diag/gf_command_test.c 新 | 非GUI serial受入入口 / C群 / 170 |
 - 各B段はtools/tests/gf_command_b<N>_host.cを同じ担当の成果物として追加 (各約40行、合計約400行)。依存部品はA2 stubで置換、対象部品は実コードをlinkし、当該Bだけで正常/変異を実行可能。
 - 定数は既存3層規則の正典→共通定義→部品aliasへ配置。新しい一般メモリ予約をmemmap.hに重複固定しない。Aで型を凍結、Bは部品別、Cは結合、Tで受入。各段は単独host検査可能にする。
 
@@ -236,7 +236,7 @@ int gf2_gr_init(struct gf2_chan *); /* grctx allocationも所有、失敗時逆�
 | B8 map | BAR1長不足/加算overflow/部分extentのbaseとlength/解除失敗時保持 | 64KiB mapのPT増分と予約解除を記録 / offset無視を殺す |
 | 最終 | KDEBUG=0本番link、image<=128KiB、全段rollback | 起動→投入→停止→再開、IRQ6共有/VBLANK増加、表示維持、0:13.0/0221一致 |
 - host試験はレジスタ副作用のモデルでありDMA到達性の証明ではない。実機試験を実装前の着手条件にしない。PCI転送の結合試験だけ層3M2MFに依存し、referenceまでの層2受入を先行する。
-- T1は`CHECK=dict(name='gf-command-host',tier=1,needs=[],budget=90.0,covers=['hwdev/gf/**','drivers/video/geforce/geforce_dma.c','tools/tests/gf_command*','tools/tests/test_gf_command.py'])`を宣言。未着手Bは登録せず、追加済みBの試験欠落は失敗。A時点で骨格の正常/変異を実行する。
+- T1は`CHECK=dict(name='gf-command-host',tier=1,needs=[],budget=90.0,covers=['hwdev/gf/**','sys/dev/video/geforce/geforce_dma.c','tools/tests/gf_command*','tools/tests/test_gf_command.py'])`を宣言。未着手Bは登録せず、追加済みBの試験欠落は失敗。A時点で骨格の正常/変異を実行する。
 - 各変異は無変更対照がGREEN→一意の目印で1箇所を変更→同じ対象試験が実行時RED→復元してGREENを要求。コンパイル失敗を検出成功に数えない。B担当が自身のfixture/変異をT1へ登録。
 - D1段: `docs/tasks/DEFERRED_TESTS.md`へ `GF-L2-Ra266 | 未実施 | Ra266 0:13.0/0221 | 10万reference・wrap・fault→recover・VBLANK・PCI往復(層3結合) | 実施担当/日付/serialログを実施時記入` の行を追加。host合格で実機済みにしない。
 - 各段の成果物: C1/GNU規則とMIT出所確認→局所host検査→前段と結合。実機配備/物理操作は本書の実行範囲外、D1/D2に従う。本書作成時はビルド/配備/リポジトリ編集を行っていない。
@@ -248,7 +248,7 @@ int gf2_gr_init(struct gf2_chan *); /* grctx allocationも所有、失敗時逆�
 反論: 0件。
 
 ## 確定 (2026-11-02、Opus 第 2 回の条件付き承認、PM が反映)
-- F2 (条件): B0 fifo.c の公開関数と NV44 FB 初期化の持ち主を A0 の command.h で凍結する。どれも B0 (hwdev/gf/fifo.c) の持ち:
+- F2 (条件): B0 fifo.c の公開関数と NV44 FB 初期化の持ち主を A0 の command.h で凍結する。どれも B0 (sys/dev/video/geforce/fifo.c) の持ち:
 ```c
 int  gf2_fb_init(struct gf2_chan *);                  /* 100850=80000000 → 100800=1 (fb/nv44.c:48-53)。PCI dmaobj の前、FIFO 停止ゲートの後 */
 int  gf2_fifo_init(struct gf2_chan *);                /* 3204=31→2100/2140→3200→3250→2500 (fifo/nv40.c:221-228)、RAMHT/RAMRO/RAMFC の 2210/2218/2220/2230 */
@@ -266,7 +266,7 @@ void gf2_fifo_resume(struct gf2_chan *);              /* PULL0=1→2500=1 */
 
 ## 追記: INIT のあいだの初回 reference (2026-11-03)
 
-> 出所: ~/os32-tmp/run/gf2-a0/ADDENDUM.md (A0 の sol の設計の欠け → astra 起草、Opus レビュー Approve)。**小段 A0b** (hwdev/gf/command.h、terra): 下の宣言 1 行を足し、gf2_emit のコメントを「non-RUN ESTATE; INIT/DRAIN reference goes through gf2_push_reference」に替える (Opus P3-1)。B1・B6・C0 は A0b の上に書く。P3-2 (fence_emit が常に push_reference を呼ぶ形) は採らず、追記のとおり。
+> 出所: ~/os32-tmp/run/gf2-a0/ADDENDUM.md (A0 の sol の設計の欠け → astra 起草、Opus レビュー Approve)。**小段 A0b** (sys/dev/video/geforce/command.h、terra): 下の宣言 1 行を足し、gf2_emit のコメントを「non-RUN ESTATE; INIT/DRAIN reference goes through gf2_push_reference」に替える (Opus P3-1)。B1・B6・C0 は A0b の上に書く。P3-2 (fence_emit が常に push_reference を呼ぶ形) は採らず、追記のとおり。
 
 状態は既存の `GF2_INIT=1` を維持（OFF=0/RUN=2/DRAIN=3/FAULT=4、新値・フラグなし）。C0 の start/recover は §2 の IRQ 開まで済ませてから初回 reference を発行する。
 B1 に固定 reference 専用の内部境界を置く（command.h の宣言追加1行、既存宣言変更0行）:
@@ -296,22 +296,22 @@ r1→r2 の変更: P2 の C0 呼出し順と §2 の解釈を明記し、P3 の 
 
 ## 追記: 障害の出力から handle を外す (2026-11-03)
 
-> 出所: ~/os32-tmp/run/gf2-b7/ADDENDUM.md (B7 の sol の設計の欠け → astra は確定本文 :183 を覆す必要ありとして停止)。**ユーザー決定 (2026-11-03)「handle を外す (推奨)」**: 障害の serial 出力は手本と同じく class・subc・method (既存の他の診断項目は維持)。subchannel→handle の追跡は足さない。**小段 A0c** (hwdev/gf/command.h、terra): 下の宣言の変更 2 行。B7 は A0c の上に書く。
+> 出所: ~/os32-tmp/run/gf2-b7/ADDENDUM.md (B7 の sol の設計の欠け → astra は確定本文 :183 を覆す必要ありとして停止)。**ユーザー決定 (2026-11-03)「handle を外す (推奨)」**: 障害の serial 出力は手本と同じく class・subc・method (既存の他の診断項目は維持)。subchannel→handle の追跡は足さない。**小段 A0c** (sys/dev/video/geforce/command.h、terra): 下の宣言の変更 2 行。B7 は A0c の上に書く。
 
 確定本文 GF_FEAT2_DESIGN.md:183 の handle 出力要求を覆す必要があるため、次の最小修正判断を記して停止する：handle を出力から外し、PGRAPH は class/subc/method（既存の他の診断項目は維持）を出す；根拠は /home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/nvkm/engine/gr/nv40.c:242–246,274–280（subc=(400704の値>>16)&7、method=同値&0x1ffc、class=read(0x400160+subc*4)&0xffff、object handle の出力なし）；subchannel→handle 追跡は追加しない；A0 command.h の宣言変更は2行（:122 の handle を削除、:127 の gr_handle を gr_class に改名）、B7 は上記採取値から subc/method を復号し、PFIFO に class/handle を推定補完しない；本文・宣言の実編集は未実施。
 
 ## 追記: C1・C2 から層 2 のチャネルに届く口 (2026-11-03)
 
-> 出所: ~/os32-tmp/run/gf2-c12/ADDENDUM.md (C1・C2 の terra の設計の欠け → astra 起草 r1・r2、Opus レビュー r1 直しが要る → r2 写してよい)。新しい小段 **A0d** (hwdev/gf/internal.h) と **C1a** (hwdev/gf/devinit.c)。
+> 出所: ~/os32-tmp/run/gf2-c12/ADDENDUM.md (C1・C2 の terra の設計の欠け → astra 起草 r1・r2、Opus レビュー r1 直しが要る → r2 写してよい)。新しい小段 **A0d** (sys/dev/video/geforce/internal.h) と **C1a** (sys/dev/video/geforce/devinit.c)。
 
-確定本文を覆す必要なし。以下の相対パスは /home/hight/wt/os32-v3/gf2-l2 基準。F1取得口は無く、既存境界は hwdev/gf/internal.h の owner hook → hwdev/gf/devinit.c の production adapter（service.c:37、display/quiesce.c:21）。
+確定本文を覆す必要なし。以下の相対パスは /home/hight/wt/os32-v3/gf2-l2 基準。F1取得口は無く、既存境界は sys/dev/video/geforce/internal.h の owner hook → sys/dev/video/geforce/devinit.c の production adapter（service.c:37、display/quiesce.c:21）。
 小段 A0d（internal.h、C1/C2の前提）で宣言を3行追加、既存宣言変更0行：前方宣言2行と gf_display_owner 末尾の任意ops 1行。command.h・production.h の宣言変更は0行。
 ```c
 struct gf2_chan;
 struct gf_foundation;
 struct gf2_chan *(*command_get)(struct gf_display_context *, struct gf_foundation **);
 ```
-小段 C1a（hwdev/gf/devinit.c、A0d/A1/B9の後）で static adapter と owner の指定初期化を接続：`struct gf_production *p=c->io.opaque; *out=&p->foundation; return &p->chan;`。取得は副作用なし、start前・失敗後にも同じ実体を返す。汎用側で opaque を cast しない。
+小段 C1a（sys/dev/video/geforce/devinit.c、A0d/A1/B9の後）で static adapter と owner の指定初期化を接続：`struct gf_production *p=c->io.opaque; *out=&p->foundation; return &p->chan;`。取得は副作用なし、start前・失敗後にも同じ実体を返す。汎用側で opaque を cast しない。
 C1a は既存 foundation_start の資源照合成功後、F1 start 前に `p->chan.map_ops=p->map_ops; p->chan.map_owner=p->map_owner; p->chan.bar1=c->bars[GF_MODE_VRAM_BAR]; p->chan.dma_ops=geforce_dma_ops();` を設定（devinit.c、production.h）。chan全体のzero化・失敗資源の上書きはしない；C0は渡された f を保存し借用adapterを停止完了まで保持する。
 C1/C2共通の取得は `struct gf_foundation *f=0; struct gf2_chan *ch=c->owner->command_get ? c->owner->command_get(c,&f) : 0;`。ch非NULLならfも有効という契約；層2を持たない診断owner・既存host fixtureはops未指定/NULLで層2を飛ばす。層2結合fixtureだけ自分のchan/fと偽adapterを返す。C1はF1開始成功後 `if (ch && (rc=gf2_start(ch,f))) { c->last_rc=rc; goto fail; }`。
 層2開始前の失敗は既存 `gf_failure → gf_display_stop → owner->foundation_stop(c)` がF1を回収する（service.c:3–10、devinit.cでF1 start前にもBM取得）；F1 start内部rollback（foundation.c (gf_foundation_start())）済みでも同hookを呼ぶ。C0の未開始/停止完了GF2_OFFは `gf2_stop(ch)==0`、I/O・解放なしとし、新しい開始済みフラグは足さない。
@@ -329,13 +329,13 @@ enum gf2_test_op { GF2T_START, GF2T_REFERENCE, GF2T_SNAPSHOT, GF2T_STOP, GF2T_RE
 struct gf2_test_request { u32 size; enum gf2_test_op op; u32 deadline_us; };
 struct gf2_test_reply { int rc, dma_rc; u32 state, epoch, seq, put, get, reference, B, ctx_off, ctx_bytes, ctx_words, fault_epoch, chid, fault_put, fault_get, fault_reference, caches, push1, cache_get, pull0, method, data, dma_state, dma_fetch, dma_push, dma_dcount, gr_trap, gr_method, gr_data, gr_class; bool latched; struct gf_irq_stats stats, first, latest; };
 struct gf2_test_ops { int (*prepare)(struct gf_foundation *, const struct recover_bar_extent *, u32); int (*call)(struct gf_foundation *, const struct gf2_test_request *, struct gf2_test_reply *); };
-const struct gf2_test_ops *command; /* gf1_test_ops 末尾へ追加（上の4宣言は hwdev/gf/gf2_test.h）。 */
+const struct gf2_test_ops *command; /* gf1_test_ops 末尾へ追加（上の4宣言は sys/dev/video/geforce/gf2_test.h）。 */
 ```
 所有：module 内 command_test.c に診断 chan を1個保持、prepare は C9 の準備済み foundation/lease を借り、f・BAR1・f の map_ops/map_owner・既存 geforce_dma_ops() を設定する。production は既存 production.chan を body から結ぶ。診断 f/bus/lease は層2 stop 成功・資源解放まで保持し、失敗時は再準備・再利用しない。前景のみ、C9 と同じ owner 選択で同時所有しない。
 call は f で上記 chan を選択し、START/STOP/RECOVER は既存 gf2_*、REFERENCE は fence_emit→wait（同一期限）、SNAPSHOT は前景 fault_check と観測値のコピー、BAD_* は§9の固定不正handle/範囲外method投入だけ（RUN の診断 owner 限定、既存 reserve/kick/待ち・fault経路使用）。失効後は保存値だけ返す。診断 cleanup は層2 stop→既存層1停止・lease解放、停止失敗時は所有を保持する。
-新小段 T2a0（宣言）：hwdev/gf/gf2_test.h の上記4宣言と gf1_test.h の末尾1行（A段と同じ扱い）。障害の handle は持たず gr_class を返し、subchannel→handle の追跡は足さない。
-新小段 T2a1（本体）：hwdev/gf/command_test.c。T2a2（結線・契約）：hwdev/gf/foundation_test.c、drivers/video/geforce/geforce_body.c、build/geforce-module.mk（宣言依存）、drivers/video/geforce/geforce_module.h の `#define GEFORCE_MODULE_OPS_VERSION 4u`（3→4）と既存契約生成・対の更新（tools/gen_hwdev_contract.py の型収集、hwdev_contract.h の gf1_test_ops sizeof=12→16 の assert を含む）。foundation_out→既存 geforce_foundation_ops()->command で授受し geforce_module.c の新slot不要、GeForce import は32/32のまま・export追加0・HWDEV import追加0。
-新小段 T2b（T2a0→T2a1→T2a2後、C9相当の結線）：userland/shell/cmd_gf2.c と既存shell登録/ビルド、kdebug/{gf_command_wire.h,gf_command_test.h,kdebug_main.c,gfinit.c}、build/hwdev.mk。GF_OP_COMMAND と専用要求型を追加し shell→kdebug_main→既存HWDEV gfinit振分け→T2へ接続、gfinitがowner準備/停止を担当。T2本体 kdebug/gf_command_test.c はT2a/b依存でserial受入を実装する。cmd_gf2.c を分ける場合だけ T2c とし、T2 は T2c にも依存。
+新小段 T2a0（宣言）：sys/dev/video/geforce/gf2_test.h の上記4宣言と gf1_test.h の末尾1行（A段と同じ扱い）。障害の handle は持たず gr_class を返し、subchannel→handle の追跡は足さない。
+新小段 T2a1（本体）：sys/dev/video/geforce/command_test.c。T2a2（結線・契約）：sys/dev/video/geforce/foundation_test.c、sys/dev/video/geforce/geforce_body.c、build/geforce-module.mk（宣言依存）、sys/dev/video/geforce/geforce_module.h の `#define GEFORCE_MODULE_OPS_VERSION 4u`（3→4）と既存契約生成・対の更新（tools/gen_hwdev_contract.py の型収集、hwdev_contract.h の gf1_test_ops sizeof=12→16 の assert を含む）。foundation_out→既存 geforce_foundation_ops()->command で授受し geforce_module.c の新slot不要、GeForce import は32/32のまま・export追加0・HWDEV import追加0。
+新小段 T2b（T2a0→T2a1→T2a2後、C9相当の結線）：userland/shell/cmd_gf2.c と既存shell登録/ビルド、kdebug/{gf_command_wire.h,gf_command_test.h,kdebug_main.c,gfinit.c}、build/hwdev.mk。GF_OP_COMMAND と専用要求型を追加し shell→kdebug_main→既存HWDEV gfinit振分け→T2へ接続、gfinitがowner準備/停止を担当。T2本体 sys/dev/video/geforce/diag/gf_command_test.c はT2a/b依存でserial受入を実装する。cmd_gf2.c を分ける場合だけ T2c とし、T2 は T2c にも依存。
 r1→r2 の変更：P2 の reply.handle 削除・gr_handle→gr_class、P3 の ops版3→4と契約再生成を明記、T2aをT2a0/T2a1/T2a2に分割（宣言の変更は5行＋版定義1行＝6行）、確定本文を覆す必要なし。
 
 ## 追記: T2 の ops の実体・BAD_* の固定値・診断の時計 (2026-11-03)
@@ -343,7 +343,7 @@ r1→r2 の変更：P2 の reply.handle 削除・gr_handle→gr_class、P3 の o
 > 出所: ~/os32-tmp/run/gf2-t2gap/ADDENDUM.md (T2a1・T2a2・T2b の設計の欠け → astra 起草 r1〜r3、Opus レビュー r1・r3)。**ユーザー指示「tick より短い関数を使用し直して」**: 診断の時計は sys_time_now (µs)。**Opus r3 の P2 (PM が注記)**: T2b が hwdev の import に sys_time_now を足すときは、docs/design/hwdev/hwdev_imports.md §3 の表に `| 39 | sys_time_now | 123 |` を足し (kdebug の index は 123)、同じ節の「kernel imports は **13**」を 14 に、tools/gen_hwdev_contract.py の `range(39)` を `range(40)` にする (.def だけを変えると生成器が止まる — 層 1 の C9b の直し 1 と同じ形)。P3: sys_time_now が OS32_ERR_AGAIN を返したら EIO で 1 回落ちる — 守りは足さず実機のログで見る。
 
 T2補遺：確定本文・handleを障害出力に出さない決定を覆す必要なし。以下の実装パスは /home/hight/wt/os32-v3/gf2-l2 基準。
-追加宣言は3行（下記、hwdev/gf/gf2_test.h、T2a1が先に追加しT2a2が利用）；既存宣言変更0行、既定のops版定義3→4の1行はT2a2のまま。gf2_test_opsの型・共有構造体の寸法は今回変えない。
+追加宣言は3行（下記、sys/dev/video/geforce/gf2_test.h、T2a1が先に追加しT2a2が利用）；既存宣言変更0行、既定のops版定義3→4の1行はT2a2のまま。gf2_test_opsの型・共有構造体の寸法は今回変えない。
 `struct gf2_chan;`
 `extern const struct gf2_test_ops gf2_module_ops;`
 `void gf2_test_bind_production(struct gf_foundation *, struct gf2_chan *);`
@@ -352,8 +352,8 @@ T2a1 BAD_HANDLE：診断RUN専用、RAMHTに登録しない固定handle `0xdeadb
 T2a1 BAD_METHOD：診断RUN専用、固定handle `0x80000100U`、class=`GF2_GR_M2MF`（0x0039）を `gf2_gr_object_new(ch,h,GF2_GR_M2MF,&test_object)` で作成→subc=0/method=0/data=hのbind→subc=0/method=0x1ffc/data=0を順にgf2_emit（各count=1、noninc=false、同一期限）→kick。「範囲外」はclassの未定義methodでありpacket encoding範囲外ではない；DMA context設定・転送開始は不要。test_objectはcommand_test.cのstatic実体とし、作成したepochを保存して同じepochでは再作成せずbindから始める；作り直すのはC0のrelease_instances（command.c）で回収された後だけ。
 BAD_*は各APIの失敗で打ち切り、kick後は既存 `gf2_fault_check(ch)` とfのclock/waitで同一期限まで障害を待つ（正常reference完了を障害成立の代わりにしない）；既存reserve/kick/fault経路だけを使い、raw投入API・subc→handle追跡・handle出力は追加しない。
 参照根は /home/hight/os32-tmp/refs/geforce6200/nouveau/drivers/gpu/drm/nouveau/：include/nvhw/class/cl0039.h:27–44（bind/定義method）、nvkm/engine/gr/nv40.c:455（class）, :242–246,274–280（trap出力）、nvkm/engine/fifo/nv04.c:282–291,331–339（bind/不正methodの処理）。この固定の障害投入列そのもののnouveau手本は確認できず、値と列はOS32の診断fixtureとしてここで決める。
-T2b（kdebug/gfinit.c）のstatic adapterは `static int gf2_diag_clock(void *opaque,u32 *out) { u32 lo,hi; (void)opaque; int rc=sys_time_now(&lo,&hi); if (rc) return rc; *out=lo; return 0; }`。include/sys.hのPITラッチ補間済みu64 µsの下位32bitを使い、hiは捨てる（自然wrap）；失敗時out不変、recover.spent・tick換算は使わない。grep確認：gfinit.cはHWDEV用importを選び、既存gf_clockはspent換算、µs取得口なし；kdebug importのsys_time_now（kernel/module/kdebug_imports.def）だけでは届かない。T2bがhwdev/hwdev_imports.def末尾へ `{ "index":39, "symbol":"sys_time_now", "source":"include/sys.h", "kind":"FUNC", "group":"kernel" }` 1本追加・既存生成経路で再生成（39→40/128）。
-T2bはgf_prepareで層1prepare成功後・層2prepare/start前に `g->foundation.io.timing.clock_us=gf2_diag_clock; g->foundation.io.timing.wait_us=recover_hal_wait_frame;` を設定。既存waitはtick待ちでなくPITラッチ差分の有限poll（kdebug/recover_profile.c、1count<1µs、0<us<10000）；層2は既存1–50µs（command.h）を使うので追加wait/import不要。両callbackはopaqueを使わず、f/bus/opsとcallbackは層2停止・解放まで存続；T2a1 prepareはtimingを保持しproductionのtimingは差し替えない。
+T2b（sys/dev/video/geforce/diag/gfinit.c）のstatic adapterは `static int gf2_diag_clock(void *opaque,u32 *out) { u32 lo,hi; (void)opaque; int rc=sys_time_now(&lo,&hi); if (rc) return rc; *out=lo; return 0; }`。sys/include/sys.hのPITラッチ補間済みu64 µsの下位32bitを使い、hiは捨てる（自然wrap）；失敗時out不変、recover.spent・tick換算は使わない。grep確認：gfinit.cはHWDEV用importを選び、既存gf_clockはspent換算、µs取得口なし；kdebug importのsys_time_now（sys/kern/module/kdebug_imports.def）だけでは届かない。T2bがsys/dev/hwdev/hwdev_imports.def末尾へ `{ "index":39, "symbol":"sys_time_now", "source":"sys/include/sys.h", "kind":"FUNC", "group":"kernel" }` 1本追加・既存生成経路で再生成（39→40/128）。
+T2bはgf_prepareで層1prepare成功後・層2prepare/start前に `g->foundation.io.timing.clock_us=gf2_diag_clock; g->foundation.io.timing.wait_us=recover_hal_wait_frame;` を設定。既存waitはtick待ちでなくPITラッチ差分の有限poll（sys/platform/pc98/kdebug/recover_profile.c、1count<1µs、0<us<10000）；層2は既存1–50µs（command.h）を使うので追加wait/import不要。両callbackはopaqueを使わず、f/bus/opsとcallbackは層2停止・解放まで存続；T2a1 prepareはtimingを保持しproductionのtimingは差し替えない。
 T2bは各要求直前に `f->io.timing.clock_us(f->io.opaque,&now)` 成功後だけ `q.deadline_us=now+GF2_TIMEOUT_US;`（期間<2^31）、期限比較はB6（fence.c:50）と同じ `(i32)(now-deadline_us)>=0`。同一期限をemit/kick後の待ちまで共有し更新しない；START/STOP/RECOVER内部も既存C0どおり同じfの時計。safe pointはC9同様REC_RUNNING時にcall外で実行、clock/wait内からcleanupを再入させず時計はsafe pointなしでも進む。T2a2の宣言依存・型収集・ops版4・契約/対生成は既定どおり；static adapterの公開宣言追加0、geforce.mod import32/32・export追加0。実装・実機検証は各小段担当とPM。
 r2→r3 の変更：P2の修正案どおり、BAD_METHODのtest_objectは作成epochを保存し、同じepochでは再作成せずbindから開始、C0のrelease_instancesで回収後だけ再作成する。(3)のsys_time_nowの時計はr2のまま；追加宣言3行・既存宣言変更0行、既定の版定義変更1行は維持、確定本文・handle非出力の決定を新たに覆す必要なし。
 

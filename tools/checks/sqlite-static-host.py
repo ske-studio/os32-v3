@@ -4,7 +4,7 @@ import sys
 import tempfile
 
 CHECK = dict(name='sqlite-static-host', tier=1, needs=[], budget=3,
-             covers=['kernel/sqlite_static.c', 'kernel/sqlite_engine*.h', 'lib/sqlite3/**',
+             covers=['sys/kern/sqlite_static.c', 'kernel/sqlite_engine*.h', 'lib/sqlite3/**',
                      'mm/*.h', 'include/*.h', 'tools/tests/sqlite_static_host.c',
                      'tools/tests/kernel_includes.py', 'tools/tests/host32.py'],
              basis=['PowerPC KAPI db 詳細設計 §2-2・§2-3 の表'])
@@ -15,7 +15,7 @@ def run(ctx):
     import host32
     from kernel_includes import include_flags
 
-    source = (ctx.root / 'kernel/sqlite_static.c').read_text()
+    source = (ctx.root / 'sys/kern/sqlite_static.c').read_text()
     cases = [('boot', source)]
     if ctx.mutate:
         for anchor, replacement in [

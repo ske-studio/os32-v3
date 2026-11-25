@@ -5,9 +5,9 @@
  *  実行: python3 -B tools/tests/test_gfx_boot.py [--mutate]
  *  票: docs/archive/v3/TASK_T1_LEDGER.md §3-3 ⑥・⑨、§3-6、§3-8、§4-5 (T1e)
  *
- *  実物の mm/paging.c + mm/pgalloc.c + kernel/sys.c + mm/physmem.c
+ *  実物の sys/kern/mm/paging.c + sys/kern/mm/pgalloc.c + sys/kern/sys.c + sys/kern/mm/physmem.c
  *  を ILP32 でそのまま組み、段つき起動 (sys_memory_bootstrap_model →
- *  sys_memory_stage_online) で台帳を ONLINE にしてから、gfx/gfx_core.c から
+ *  sys_memory_stage_online) で台帳を ONLINE にしてから、sys/hal/gfx/gfx_core.c から
  *  切り出した本物の gfx_boot_reserve / gfx_bb_phys_range /
  *  gfx_client_to_gshell (test_gfx_boot.py が生成する gfx_boot_slice.inc) を
  *  走らせる。切り出しは次の呼び出しを記録係 (host_*) へ付け替える — 記録係は
@@ -233,7 +233,7 @@ void host_freeze(void)
     ledger_arena_freeze();
 }
 
-#include "../../exec/surface_query.h"
+#include "../../sys/kern/exec/surface_query.h"
 static int gfx_started;
 static u32 gfx_reinit_pending;
 static volatile u32 gfx_reinit_fail_count;

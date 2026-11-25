@@ -6,9 +6,9 @@ CHECK = dict(name='gfx2-check-equiv-host', tier=2, needs=['make:all'], budget=20
             'tools/tests/test_gfx2_i1.py', 'tools/tests/gfx2_i1_host.c', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'tools/tests/kernel_layout.py', 'tools/tests/paging_source.py',
             'tools/tests/pgalloc_host_fixture.h', 'tools/tests/host_arch/**', 'gfx/v2/**',
-            'drivers/video/pc98/pegc_v2.c', 'drivers/video/of_fb/**', 'gfx/sync/**', 'gfx/palette*', 'gfx/gfx.h', 'gfx/gfx_policy.h', 'mm/**', 'include/**',
-            'sdk/include/**', 'lib/kstring*', 'lib/dma_contract.c', 'lib/divdi3.c', 'kernel/module/**', 'kernel/time/cpu_calibrate.h',
-            'gfx/gfx_core.c', 'userland/tests/gfx2_i1.c', 'exec/**', 'build/os32.ld', 'platform/pc98/kernel.c'],
+            'sys/platform/pc98/video/pegc_v2.c', 'drivers/video/of_fb/**', 'gfx/sync/**', 'gfx/palette*', 'sys/hal/gfx/gfx.h', 'sys/hal/gfx/gfx_policy.h', 'mm/**', 'include/**',
+            'sdk/include/**', 'lib/kstring*', 'lib/dma_contract.c', 'lib/divdi3.c', 'kernel/module/**', 'sys/hal/time/cpu_calibrate.h',
+            'sys/hal/gfx/gfx_core.c', 'userland/diag/gfx2_i1.c', 'exec/**', 'build/os32.ld', 'sys/platform/pc98/kernel.c'],
     kind='characterization',
 )
 

@@ -37,7 +37,7 @@ CD インストール (userland/system/cdinst.c) の .PKG は、配備の正典
 """
 
 CHECK = dict(name='packages-host', tier=0,
-    covers=['tools/fd_reader.py', 'lib/os32_opna/fmgen_readme*.txt', 'lib/os32_opna/README.OS32', 'platform/pc98/platform_install_layout.h', 'include/platform_install_boot.h', 'platform/pc98/install_geometry.h', 'include/ide_contract.h', 'apps', 'game', 'userland/deploy.yaml', 'docs/manpages/**', 'assets/**', 'build/core.yaml', 'build/deploy.mk', 'build/image.mk', 'build/packages.yaml', 'fs/pc98pt.c', 'fs/ext2/ext2_layout.c', 'fs/fat/fatfs_vfs.c', 'platform/pc98/kernel.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/install_fresh_host.c', 'userland/shell/cmd_filer.c', 'userland/shell/hdprep_plan.c', 'platform/pc98/install_plan.c', 'userland/system/cdinst.c', 'userland/system/inst_disk.c', 'platform/pc98/install_disk.c', 'userland/system/inst_hdd.c', 'platform/pc98/install_target.c', 'userland/system/install.c', 'tools/check_artifacts.py'],
+    covers=['tools/fd_reader.py', 'lib/os32_opna/fmgen_readme*.txt', 'lib/os32_opna/README.OS32', 'sys/platform/pc98/platform_install_layout.h', 'sys/include/platform_install_boot.h', 'sys/platform/pc98/install_geometry.h', 'sys/include/ide_contract.h', 'apps', 'game', 'userland/deploy.yaml', 'docs/manpages/**', 'assets/**', 'build/core.yaml', 'build/deploy.mk', 'build/image.mk', 'build/packages.yaml', 'sys/fs/pc98pt.c', 'sys/fs/ext2/ext2_layout.c', 'sys/fs/fat/fatfs_vfs.c', 'sys/platform/pc98/kernel.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/install_fresh_host.c', 'userland/shell/cmd_filer.c', 'userland/shell/hdprep_plan.c', 'sys/platform/pc98/install_plan.c', 'userland/system/cdinst.c', 'userland/system/inst_disk.c', 'sys/platform/pc98/install_disk.c', 'userland/system/inst_hdd.c', 'sys/platform/pc98/install_target.c', 'userland/system/install.c', 'tools/check_artifacts.py'],
     needs=['make:all'], budget=6.7,
     basis=['[C4]'],
 )
@@ -666,9 +666,9 @@ def run_install_fdset(install_src, fd_files):
         # install.c が繋ぐ hd0 の共有部 (票 TASK_HDD_INSTALL 段 2、
         # build/programs.mk の INST_OBJ と同じ顔ぶれ)
         shared = [os.path.join(ROOT, f) for f in
-                  ('userland/system/inst_hdd.c', 'platform/pc98/install_target.c', 'userland/system/inst_disk.c', 'platform/pc98/install_disk.c',
-                   'userland/shell/hdprep_plan.c', 'platform/pc98/install_plan.c', 'fs/pc98pt.c',
-                   'fs/ext2/ext2_layout.c')]
+                  ('userland/system/inst_hdd.c', 'sys/platform/pc98/install_target.c', 'userland/system/inst_disk.c', 'sys/platform/pc98/install_disk.c',
+                   'userland/shell/hdprep_plan.c', 'sys/platform/pc98/install_plan.c', 'sys/fs/pc98pt.c',
+                   'sys/fs/ext2/ext2_layout.c')]
         r = subprocess.run(['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                             '-Wno-unused-function',
                             '-Wno-pointer-to-int-cast', '-D__cdecl=',

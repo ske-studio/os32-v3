@@ -2,9 +2,9 @@
  * C0/B ownership and completion; no product source is included or replaced.
  * Test names match REVIEW_r1's proposed runtime mutation targets. */
 #include "gf_command_runtime_host.h"
-#include "../../hwdev/gf/command.h"
-#include "../../hwdev/gf/gf2_test.h"
-#include "../../hwdev/gf/accel_service.h"
+#include "../../sys/dev/video/geforce/command.h"
+#include "../../sys/dev/video/geforce/gf2_test.h"
+#include "../../sys/dev/video/geforce/accel_service.h"
 /* This layer-2 oracle has no registered layer 3. Real production lifecycle
  * is covered by gf_accel_wire_host with the actual service implementation. */
 struct gf3_service *gf3_service_get(struct gf2_chan *ch) { (void)ch; return 0; }

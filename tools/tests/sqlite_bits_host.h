@@ -3,7 +3,7 @@
 #ifndef SQLITE_BITS_HOST_H
 #define SQLITE_BITS_HOST_H
 #include "../../lib/sqlite3/sqlite3.h"
-#include "../../include/types.h"
+#include "../../sys/include/types.h"
 #include "../../lib/softfloat/f64_to_i32.c"
 #include "../../lib/softfloat/s_roundToI32.c"
 #include "../../lib/softfloat/softfloat_raiseFlags.c"

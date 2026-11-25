@@ -26,9 +26,9 @@ NO_DESCRIPTOR = object()  # Explicit v1 observation, without importing gui_desc.
 
 
 def _app_constants():
-    """exec/appslot.h plus the ID numbers it includes from include/app_ids.h."""
-    slot = c_constants(ROOT / 'exec/appslot.h')
-    ids = c_constants(ROOT / 'include/app_ids.h')
+    """sys/kern/exec/appslot.h plus the ID numbers it includes from include/app_ids.h."""
+    slot = c_constants(ROOT / 'sys/kern/exec/appslot.h')
+    ids = c_constants(ROOT / 'sys/include/app_ids.h')
 
     def app(name):
         try:
@@ -446,14 +446,14 @@ class Gui:
         failures retain v1 observations and their reason in v2_error.
         """
         kernel, shell = self.symbols()
-        mem = c_constants(ROOT / 'include/memmap.h', {name: kernel[name][0] for name in ('__bss_end', '__kernel_resident_end')})
+        mem = c_constants(ROOT / 'sys/include/memmap.h', {name: kernel[name][0] for name in ('__bss_end', '__kernel_resident_end')})
         app = _app_constants()
         count = app('APP_SLOT_COUNT')
         address, size = kernel['g_slot']
         if not size or size % count:
             raise ValueError('g_slot size is not divisible by APP_SLOT_COUNT')
         stride = size // count
-        offsets = c_word_offsets(ROOT / 'exec/appslot.h', 'AppSlot', 'in_op_wait')
+        offsets = c_word_offsets(ROOT / 'sys/kern/exec/appslot.h', 'AppSlot', 'in_op_wait')
         prefix_size = offsets['in_op_wait'] + struct.calcsize('<I')
         if prefix_size > stride:
             raise ValueError('AppSlot prefix exceeds g_slot stride')
@@ -521,9 +521,9 @@ class Gui:
 
     def _module_base(self, module_name):
         kernel = self.kernel_symbols()
-        header = ROOT / 'kernel/module/module_runtime.h'
+        header = ROOT / 'sys/kern/module/module_runtime.h'
         constants = c_constants(header)
-        schema = c_constants(ROOT / 'kernel/module/module_schema.h')
+        schema = c_constants(ROOT / 'sys/kern/module/module_schema.h')
         offsets = c_word_offsets(header, 'module_record', 'base')
         count = schema('MODULE_RECORD_CAP')
         address, size = kernel['module_records']
@@ -542,7 +542,7 @@ class Gui:
         return self.ime_mode() != 0
 
     def _restore_ime(self, mode):
-        # SHIFT+SPACE always reopens in hiragana (kernel/ime/ime.c:ime_toggle).
+        # SHIFT+SPACE always reopens in hiragana (sys/kern/ime/ime.c:ime_toggle).
         # No GUI key selects katakana; report the observed mismatch explicitly.
         result = {'before': mode, 'ok': False}
         try:
@@ -708,7 +708,7 @@ class Gui:
 
     def consink(self, since=None, grep=None):
         kernel = self.kernel_symbols()
-        size = c_constants(ROOT / 'include/con_sink.h')('CON_SINK_RING_SIZE')
+        size = c_constants(ROOT / 'sys/include/con_sink.h')('CON_SINK_RING_SIZE')
         def metadata():
             return {name: self.word(kernel['g_' + name][0])
                     for name in ('head', 'tail', 'count')}

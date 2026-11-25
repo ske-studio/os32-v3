@@ -25,7 +25,7 @@
  * nvkm/subdev/bios/dcb.c:28-95,121-193,221-244; i2c.c:29-104,136-163;
  * gpio.c:30-57,78-149 and include/nvkm/subdev/bios/gpio.h:8,10.
  * Expected records below are literal decoded values, not product formulas.
- * Link this TU with hwdev/gf/display/dcb.c, -nostdlib, GF4 UNIT 14.
+ * Link this TU with sys/dev/video/geforce/display/dcb.c, -nostdlib, GF4 UNIT 14.
  * Registration and mutation execution belong to PM/A2. */
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"

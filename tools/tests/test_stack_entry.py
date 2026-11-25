@@ -13,7 +13,7 @@ def run_case(work):
     work = pathlib.Path(work) / 'stack-entry'
     elf = fixture(work, core_bss=35)
     _, syms = gen.read_elf(elf)
-    m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), syms)
+    m = gen.Macros(gen.read_defines(ROOT / 'sys/include/memmap.h'), syms)
     guards = ['MEM_STACK_GUARD', 'MEM_SHELL_GUARD', 'MEM_SHM_GUARD_LO', 'MEM_SHM_GUARD_HI']
     guards += ['MEM_FIXED_PAGING_GUARD_BASE']
     header = ['static const unsigned long guard_ranges[][2] = {']
@@ -24,7 +24,7 @@ def run_case(work):
         header += ['#define %s %d' % (name, syms[symbol])]
     (work / 'fixture_values.h').write_text('\n'.join(header))
     (work / 'x86_desc.h').write_text('static void x86_load_tr(unsigned int sel) {(void)sel;}\n')
-    entry = (ROOT / 'arch/x86/kernel/kentry.asm').read_text()
+    entry = (ROOT / 'sys/arch/x86/kernel/kentry.asm').read_text()
     # Retain the complete BSS/ESP/argument path (the F6-removed x87 probe is gone).
     entry = entry.replace('__bss_start', 'fixture_bss_start')
     entry = entry.replace('extern kernel_main', 'extern host_kernel_main\n%define kernel_main entry_probe')
@@ -48,13 +48,13 @@ entry_bp: dd 0
     (work / 'entry.asm').write_text(gen.preprocess_layout(ROOT, entry, True))
     command(['nasm', '-f', 'elf32', work / 'entry.asm', '-o', work / 'entry.o'])
     command(['nasm', '-f', 'elf32', ROOT / 'lib/sqlite3/sqlite_stack.asm', '-o', work / 'sqlite_stack.o'])
-    command(['nasm', '-f', 'elf32', ROOT / 'arch/x86/kernel/setjmp.asm', '-o', work / 'setjmp.o'])
-    boot = (ROOT / 'arch/x86/kernel/boot_cpu.c').read_text()
+    command(['nasm', '-f', 'elf32', ROOT / 'sys/arch/x86/kernel/setjmp.asm', '-o', work / 'setjmp.o'])
+    boot = (ROOT / 'sys/arch/x86/kernel/boot_cpu.c').read_text()
     tss = re.search(r'tss_init\([^;]+;', boot).group()
     calls = ('\nstatic void boot_tss(void) { ' + tss + ' }\nstatic int boot_sqlite(void) { '
              'int result=0; sqlite_call_on_alt_stack(sqlite_body, test_stack_top, &result); return result; }\n')
     # Execute each product diagnostic classification block with boundary EIPs.
-    isr = (ROOT / 'arch/x86/kernel/isr_handlers.c').read_text()
+    isr = (ROOT / 'sys/arch/x86/kernel/isr_handlers.c').read_text()
     # The extracted recovery block also uses this product-local row constant.
     classify = re.search(r'^#define EXC_SCREEN_STATUS_ROW[^\n]+$', isr, re.M).group() + '\n'
     classify += '''

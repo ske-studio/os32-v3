@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise HAL v2 packed formats without libc."""
 CHECK = dict(name='gfx2-format-host', tier=1, needs=[], budget=10,
-    covers=['gfx/v2/gfx2_fmt.h', 'gfx/v2/format.c', 'gfx/v2/gfx2_sw.h', 'gfx/v2/gfx2_int.h',
+    covers=['sys/hal/gfx/v2/gfx2_fmt.h', 'sys/hal/gfx/v2/format.c', 'sys/hal/gfx/v2/gfx2_sw.h', 'sys/hal/gfx/v2/gfx2_int.h',
             'tools/tests/gfx2_format_host.c', 'tools/tests/test_gfx2_format.py',
             'tools/tests/host32.py'],
     basis=['HAL_V2_DESIGN §3-1', 'HAL_V2_DESIGN §3-2', 'HAL_V2_DESIGN §3-3'],
@@ -28,7 +28,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/v2/format.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/v2/format.c').read_text()
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         assert observe(work, source) == 0

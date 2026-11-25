@@ -12,13 +12,13 @@ import test_host_mailbox
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='remote-x2', tier=1, needs=[], budget=5, covers=[
-    'net/host_mailbox.c', 'net/host_mailbox.h', 'include/remote_control.h',
-    'net/link.h', 'sdk/include/os32/os32_host_notice.h',
+    'sys/net/host_mailbox.c', 'sys/net/host_mailbox.h', 'sys/include/remote_control.h',
+    'sys/net/link.h', 'sdk/include/os32/os32_host_notice.h',
     'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/host_mailbox_host.c',
     'tools/tests/hostsvc_fixture.c', 'tools/tests/hostsvc_fixture.h',
     'tools/tests/test_host_mailbox.py', 'tools/tests/test_remote_x2.py',
     'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk',
-    'include/io.h', 'lib/kstring.h', 'mm/kmalloc.h'],
+    'sys/include/io.h', 'sys/kern/kstring.h', 'sys/kern/mm/kmalloc.h'],
     basis=['LAN_OPERATOR_DESIGN §2', 'LAN_OPERATOR_DESIGN §5'],
 )
 
@@ -29,7 +29,7 @@ def main():
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='remote-x2-') as tmp:
         work = Path(tmp)
-        source = ROOT / 'net/host_mailbox.c'
+        source = ROOT / 'sys/net/host_mailbox.c'
         def run(path):
             exe = test_host_mailbox.build(work, path)
             return host32.run([str(exe), 'reserved', 'test'],

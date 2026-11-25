@@ -51,7 +51,7 @@ PRE = r'''
 bool geforce_fg_due(u32 now) { (void)now; return false; }
 
 void geforce_foreground_poll(void) {}
-#include "net/nic.h"
+#include "sys/net/nic.h"
 void idle_work_run(void) {}
 int _irq_enabled(void) { return 1; }
 int net_rx_recent(u32 ms) { (void)ms; return 0; }
@@ -182,7 +182,7 @@ static void shm_free_owned(int id) { resource(id, 4); }
 static void snd2_reclaim(int id) { resource(id, 5); }
 static void snd2_chip_reclaim(int id) { resource(id, 6); }
 static void in2_reclaim(int id) { resource(id, 7); }
-#include "input/hal/in2_int.h"
+#include "sys/hal/input/in2_int.h"
 #include "kbd_contract.h"
 /* One unread FEP action in the resident provider at child return. */
 static int pending_fep_action;
@@ -628,7 +628,7 @@ static void test_stdin_resume(void) {
 
 def run(source=None, irq=None, provider=None, ring=None):
     source = source or exec_source(ROOT)
-    irq = irq or (ROOT / 'kernel/irq/irq.c').read_text()
+    irq = irq or (ROOT / 'sys/kern/irq/irq.c').read_text()
     constants = '\n'.join(l for l in source.splitlines() if
                           l.startswith(('#define EXEC_LJ_', 'static volatile int g_pending_',
                                         'static volatile int g_longjmp_')))
@@ -639,7 +639,7 @@ def run(source=None, irq=None, provider=None, ring=None):
              'exec_finish', 'exec_exit', 'kapi_sys_exit', 'exec_last_result', 'exec_pending_transfer', 'exec_pending_finish',
              'exec_kill_one', 'exec_kill', 'exec_fault_recover', 'ring3_kill_kind', 'ring3_fault_kill', 'ring3_abort_kill')
     context = source[source.index('typedef struct {\n    CallerAccessFrame caller;'):source.index('} Ring3CallContext;') + len('} Ring3CallContext;')]
-    access = (ROOT / 'exec/redir_access.c').read_text()
+    access = (ROOT / 'sys/kern/exec/redir_access.c').read_text()
     stdin_start = source.index('VfsStdinRead *exec_stdin_state(')
     stdin_state = source[stdin_start:source.index('\n}', stdin_start) + 2]
     code = ('#include "types.h"\n#include "host_exec_context.h"\n' + constants + '\n' + PRE + '\n' + ACCESS_PRE + access + context + D2_PRE + '\n' + stdin_state + '\n' +
@@ -649,15 +649,15 @@ def run(source=None, irq=None, provider=None, ring=None):
             function(irq, 'irq_register') + '\n' + function(irq, 'irq_unregister') + STDIN_PRE + function(source, 'exec_resume') + STDIN_POST + END)
     with tempfile.TemporaryDirectory(prefix='os32-exec-r1-') as tmp:
         tmp = pathlib.Path(tmp)
-        ring_path = ROOT / 'input/hal/legacy_ring.c'
+        ring_path = ROOT / 'sys/hal/input/legacy_ring.c'
         if ring is not None:
             ring_path = tmp / 'legacy_ring.c'
             ring_path.write_text(ring)
         if provider is not None:
             (tmp / 'provider.c').write_text(provider)
             code = '#define HOST_EXEC_CONTEXT_SOURCE "' + str(tmp / 'provider.c') + '"\n' + code
-        (tmp / 't.c').write_text('#include "gfx/gfx_emergency.h"\nstatic inline void exec_gfx_owner_exit(int id) { (void)id; }\nstatic inline int exec_gfx_return_emergency(u32 owner, int reason) { return gfx_return_emergency(owner, reason); }\nint appslot_gfx_owner(void) { return 2; }\n' + code)
-        asm = (ROOT / 'arch/x86/kernel/setjmp.asm').read_text().replace('exec_longjmp', 'asm_longjmp')
+        (tmp / 't.c').write_text('#include "sys/hal/gfx/gfx_emergency.h"\nstatic inline void exec_gfx_owner_exit(int id) { (void)id; }\nstatic inline int exec_gfx_return_emergency(u32 owner, int reason) { return gfx_return_emergency(owner, reason); }\nint appslot_gfx_owner(void) { return 2; }\n' + code)
+        asm = (ROOT / 'sys/arch/x86/kernel/setjmp.asm').read_text().replace('exec_longjmp', 'asm_longjmp')
         (tmp / 's.asm').write_text(asm)
         r = subprocess.run(['nasm', '-f', 'elf32', str(tmp / 's.asm'), '-o', str(tmp / 's.o')],
                            capture_output=True, text=True)
@@ -668,8 +668,8 @@ def run(source=None, irq=None, provider=None, ring=None):
                             '-Wno-unused-function', '-ffreestanding', '-fno-pie',
                             '-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
                             '-DOS32_HOOK_IME=1', '-I' + str(ROOT / 'input/hal'), *inc, str(tmp / 't.c'), str(tmp / 's.o'),
-                            str(ring_path), str(ROOT / 'input/hal/legacy_mode.c'),
-                            str(ROOT / 'kernel/irq/irq_math.c'), str(ROOT / 'platform/pc98/irq_policy.c'), str(ROOT / 'exec/exec_heap.c'), str(ROOT / 'mm/kmalloc.c'), str(ROOT / 'gfx/gfx_emergency.c'), '-o', str(tmp / 't')],
+                            str(ring_path), str(ROOT / 'sys/hal/input/legacy_mode.c'),
+                            str(ROOT / 'sys/kern/irq/irq_math.c'), str(ROOT / 'sys/platform/pc98/irq_policy.c'), str(ROOT / 'sys/kern/exec/exec_heap.c'), str(ROOT / 'sys/kern/mm/kmalloc.c'), str(ROOT / 'sys/hal/gfx/gfx_emergency.c'), '-o', str(tmp / 't')],
                            capture_output=True, text=True)
         if r.returncode:
             return 'compile', r.stderr
@@ -794,7 +794,7 @@ if __name__ == '__main__':
     if not suite.result.wasSuccessful():
         sys.exit(1)
     if '--mutate' in sys.argv:
-        provider = (ROOT / 'arch/x86/kernel/exec_context.c').read_text()
+        provider = (ROOT / 'sys/arch/x86/kernel/exec_context.c').read_text()
         for name, old, new in (
                 ('provider-priv-restore', '    tss_set_esp0(esp0);', '    (void)esp0;'),
                 ('provider-restart', '    eip -= 2;', '    eip -= 0;')):
@@ -803,14 +803,14 @@ if __name__ == '__main__':
             print(name + ': ' + status)
             if status != 'runtime':
                 raise SystemExit(log or 'mutation must fail at runtime')
-        ring = (ROOT / 'input/hal/legacy_ring.c').read_text()
+        ring = (ROOT / 'sys/hal/input/legacy_ring.c').read_text()
         old = 'if (p && p->flush_actions) p->flush_actions();'
         assert ring.count(old) == 1
         status, log = run(ring=ring.replace(old, '(void)p;'))
         if status != 'runtime':
             raise SystemExit(log or 'retained FEP action must fail at runtime')
         print('aborted-fep-action-retained: runtime RED')
-        inject = (ROOT / 'kernel/kbd_inject.c').read_text()
+        inject = (ROOT / 'sys/kern/kbd_inject.c').read_text()
         old = '    got = inj_read(out, id, 0);'
         assert inject.count(old) == 1
         rc, log = run_inject(inject.replace(old, '    got = inj_read(out, id, 1);'))
@@ -845,7 +845,7 @@ if __name__ == '__main__':
             if status != 'runtime':
                 raise SystemExit(log or 'mutation must fail at runtime')
 
-        irq = (ROOT / 'kernel/irq/irq.c').read_text()
+        irq = (ROOT / 'sys/kern/irq/irq.c').read_text()
         assert irq.count('flags, kctx_irq_depth)') == 1
         assert irq.count('arg, kctx_irq_depth)') == 1
         status, log = run(irq=irq.replace('flags, kctx_irq_depth)', 'flags, 0)').replace('arg, kctx_irq_depth)', 'arg, 0)'))

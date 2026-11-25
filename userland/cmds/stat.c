@@ -14,11 +14,11 @@
 #include "os32api.h"
 #include <stdio.h>
 
-/* VFS の st_dev は (dev_type << 8 | unit) + 1 (fs/vfs.c の vfs_mount_dev_of)。
+/* VFS の st_dev は (dev_type << 8 | unit) + 1 (sys/fs/vfs.c の vfs_mount_dev_of)。
  * +1 は「不明」を表す 0 と衝突させないため (hd0 = 1、fd0 = 257)。種別の正典は
- * fs/vfs.h の VFS_DEV_* だが、カーネルヘッダは外部プログラムから見えないので
+ * sys/fs/vfs.h の VFS_DEV_* だが、カーネルヘッダは外部プログラムから見えないので
  * ここへ写す ([C4] の但し書き。同じ写しが userland/system/install_recover.inc
- * の RC_DEV_* にもある — 正典は fs/vfs.h の 1 か所)。 */
+ * の RC_DEV_* にもある — 正典は sys/fs/vfs.h の 1 か所)。 */
 #define STAT_DEV_UNKNOWN    0u
 #define STAT_DEV_HD         0
 #define STAT_DEV_FD         1

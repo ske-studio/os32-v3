@@ -8,13 +8,13 @@ import sys
 
 from test_remote_g3b import LAN, SERIAL, check
 
-CHECK = dict(name='remote-g2', tier=1, needs=[], budget=20, covers=['kernel/av_focus.c', 'include/av_contract.h', 'exec/exec_gui.h', 'exec/exec_hooks.h', 'input/hal/in2_int.h', 'include/app_ids.h',
+CHECK = dict(name='remote-g2', tier=1, needs=[], budget=20, covers=['sys/kern/av_focus.c', 'sys/include/av_contract.h', 'sys/kern/exec/exec_gui.h', 'sys/kern/exec/exec_hooks.h', 'sys/hal/input/in2_int.h', 'sys/include/app_ids.h',
     'userland/gshell/**', 'sdk/rust/os32api/**', 'userland/lib/font/**',
     'tools/tests/os32api_host.py', 'tools/tests/g16_fixture.py',
     'tools/fetch_fonts.py', 'tools/gen_g16.py', 'tools/g16/**',
-    'assets/fonts/**', 'assets/ipadic/*.csv', 'include/remote_control.h',
-    'include/callconv.h', 'include/abi.h', 'arch/x86/arch_abi.h',
-    'net/link.h', 'exec/shell_service.h',
+    'assets/fonts/**', 'assets/ipadic/*.csv', 'sys/include/remote_control.h',
+    'sys/include/callconv.h', 'sys/include/abi.h', 'sys/arch/x86/arch_abi.h',
+    'sys/net/link.h', 'sys/kern/exec/shell_service.h',
     'sdk/include/os32/**', 'tools/tests/test_remote_g2.py',
     'tools/tests/test_remote_g3.py', 'tools/tests/test_remote_g3b.py'],
     basis=['LAN_OPERATOR_DESIGN', 'docs/design/tools/host_notify.md 何をするか'],

@@ -4,7 +4,7 @@
 /*                                                                           */
 /*  実物は `userland/system/install.c` の **通常インストール経路** そのもの   */
 /*  (`#define main` で取り込む)。模型は KAPI の贋物だけ:                      */
-/*    - `ide_identify` は実型 (drivers/ata/ide.h の IdeInfo と同じ 96 B) を書く   */
+/*    - `ide_identify` は実型 (sys/dev/ata/ide.h の IdeInfo と同じ 96 B) を書く   */
 /*    - `ide_write_sectors` は (LBA, 本数) を記録するだけ                     */
 /*    - `sys_ls` は **FAT のように大文字** の名前を返す (FF_USE_LFN 0)        */
 /*    - 媒体側 (`/hd0` 以外) の名前引きは FAT のように大小文字を無視し、      */
@@ -24,7 +24,7 @@
 #include <stddef.h>
 
 #include "os32api.h"
-#include "fs/pc98pt.h"     /* 区画表を読み戻して確かめる (段 2) */
+#include "sys/fs/pc98pt.h"     /* 区画表を読み戻して確かめる (段 2) */
 #include "userland/system/inst_disk.h"
 
 /* ---- kprintf の捕捉 ---------------------------------------------------- */
@@ -175,7 +175,7 @@ static const char *inj_ls_size_name;  /* 列挙がこの名前に名乗らせる
 static u32  inj_ls_size;
 static int  inj_umount_fail;
 static int  inj_mount_stays;          /* umount しても hd0 のマウントが残る */
-/* 実物の umount (fs/vfs.c vfs_umount) は外す前に ops->sync() を呼び、ext2 の dirty な
+/* 実物の umount (sys/fs/vfs.c vfs_umount) は外す前に ops->sync() を呼び、ext2 の dirty な
  * メタデータを書き出し得る (成否に関わらず)。inj_umount_sync = 1 でそれを再現し、
  * umount_syncs に数える (インストーラの ide_write_sector = rec_wr_n とは別) */
 static int  inj_umount_sync, umount_syncs;
@@ -318,10 +318,10 @@ static int rec_has_exact(char list[][96], int n, const char *path)
 
 #define main install_main
 #include "../../userland/system/install.c"
-#include "include/ide_contract.h"
+#include "sys/include/ide_contract.h"
 #undef main
 
-/* drivers/ata/ide.h の IdeInfo と同じ並び (i386 では 96 B)。install.c 側の型が
+/* sys/dev/ata/ide.h の IdeInfo と同じ並び (i386 では 96 B)。install.c 側の型が
  * これより小さいと ide_identify が呼び手の領域外へ 2 バイト書く (票 §1 の B2)。
  * ホストは LP64 で u32 = unsigned long が 8 B なので「96」という数そのものは
  * 再現できない。ここでは **実型との一致** (大きさと全 offset) を見て、96 /
@@ -487,7 +487,7 @@ static const char *fake_vfs_devname(const char *pre)
     if (!strcmp(pre, "/")) return inj_root_hd0 ? "hd0" : "fd0";
     if (!strcmp(pre, "/hd0") && hd0_at_hd0) return "hd0";
     if (!strcmp(pre, "/hd0") && hd0_other_dev) return "hd1";
-    return "";                              /* 実物 (fs/vfs.c) と同じく未マウントは "" */
+    return "";                              /* 実物 (sys/fs/vfs.c) と同じく未マウントは "" */
 }
 
 static int fake_sys_mkdir(const char *path)

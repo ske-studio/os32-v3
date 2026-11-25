@@ -159,7 +159,7 @@ POSIX の `cat -n` は足さないが、シェルのプロンプトが行頭か�
 
 - **FD 0 を `sys_close` しない。** FD 0 はシェルの持ち物で、閉じると以降の
   リダイレクトが壊れる。`cat_stream` は FD を閉じず、閉じるのは開いた側だけ。
-- **`sys_isatty(0)` が真なら読みに行かない。** `fs/vfs_fd.c` の `vfs_read_fd` は
+- **`sys_isatty(0)` が真なら読みに行かない。** `sys/fs/vfs_fd.c` の `vfs_read_fd` は
   リダイレクトされていない FD 0 を `kbd_getchar()` で読み、**EOF を返す手が無い**。
   端末のまま読むと `cat` だけを打ったユーザーが戻れなくなるので、
   `grep` / `hexdump` (`userland/cmds/`) と同じく使い方を出して止める。

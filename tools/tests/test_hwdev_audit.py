@@ -33,7 +33,7 @@ def main():
                    'import hwdev_audit as a; a.DOC=sys.argv[1]; '
                    'a.audit(Path("build/out"),Path(sys.argv[2]))', str(document), os.environ['CROSS_DIR']]
         subprocess.run(command, cwd=ROOT, check=True)
-        document.write_text(source.replace('| 0 | `trial_begin` | `kdebug/recover.h` |', ''))
+        document.write_text(source.replace('| 0 | `trial_begin` | `sys/dev/video/geforce/diag/recover.h` |', ''))
         p = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
         assert p.returncode != 0 and 'core slot order/count' in p.stderr, p
         # Kernel getter must not collide with CORE runner slot 36.

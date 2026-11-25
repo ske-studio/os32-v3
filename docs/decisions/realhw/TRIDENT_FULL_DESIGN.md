@@ -26,13 +26,13 @@ X13=`/home/hight/os32-tmp/refs/trident/xf86-video-trident-1.3.8/xf86-video-tride
 ## 1. 実物の確認
 | # | 依頼の想定と実物の食い違い | 設計への反映 |
 |---|---|---|
-| 1 | HALのset_mode/DPMS/cursor欄は存在する (`include/gfx_hal.h`) が実機の呼び手は未接続 (`include/video_service.h`) | 登録に加えkdebugへgf2型のTrident診断口を作る。公開口はTASK_VIDEO_HALで決める |
+| 1 | HALのset_mode/DPMS/cursor欄は存在する (`sys/include/gfx_hal.h`) が実機の呼び手は未接続 (`sys/include/video_service.h`) | 登録に加えkdebugへgf2型のTrident診断口を作る。公開口はTASK_VIDEO_HALで決める |
 | 2 | mono expandはA:196-216,607-670で `#if 0`（手本自身がbuggyと記載） | 9682で実行される機能ではない。文字は既存CPU経路。勝手に有効化しない |
 | 3 | パターンはmono8×8が有効だが、color8×8はA:183-194,564-605で `#if 0` | monoだけ移す。カラーはCPU処理 |
 | 4 | 任意のHW clip callbackは無い。A:101-111とR:280-287は9682でクリップレジスタを書かず、OPERMODE bit8で無効化する | HALが矩形を切る。別チップのclip手順を9682へ追加しない |
 確認一致: O/backend_trident.c:122-130は640×480×8の1モード、O/mode_640.c:165はCR36=00、O/lifecycle.c:106-111にblank/viewport/video resetが既にある。
 `TRIDENT_S3_DESIGN.md:79-89` のNoAccel/SWCursor・present byte例外を基点とする。前回REPORTの「欠落」は調査時点の記録で、現行欠落として再計上しない。
-追加観測: HAL cursorはARGB PM型 (`include/gfx_hal.h` の `GfxCursorImage()`)。9682は64×64の2色source/mask型で、直接渡せない。HALの全色対応を申告しない。
+追加観測: HAL cursorはARGB PM型 (`sys/include/gfx_hal.h` の `GfxCursorImage()`)。9682は64×64の2色source/mask型で、直接渡せない。HALの全色対応を申告しない。
 
 ## 2. 接続契約・面・共通手順
 ```c
@@ -50,7 +50,7 @@ int tri_mode_set(struct trident_device *, const struct tri_mode *);
 - 加速時のdisplayWidth（画素）はD:GetAccelPitchValues:1691-1711,3155-3162の512/1024/2048/4096から選ぶ。byte pitchはdisplayWidth×cpp。640×480×8は加速時1024（CR13=128）、NoAccel時640（CR13=80）。D:3263-3276に640のGE符号は無い。bb_pitch・mode.pitch・ledger.pitchを選択枝のbyte pitchに揃える。
 - D:3534-3546,3637-3661に合わせ、加速経路は表示VRAMをCLIENTとしてアプリにも写像する（R3決定）。表示/CLIENTは同一描き先、非表示CLIENTとGE commitコピーは作らない。パターン・カーソル・動画はその後方に確保し、2D領域の高さはmin(VRAM/pitch,2047)、残りはlinear領域。
 - 2D面は同じcpp/pitchで全行単位に配置。patternは64byte単位(R:419-420)、cursorは1024byte、動画linearは16画素単位(V:588-602)。HALが配置し、呼び手に物理番地を指定させない。
-- ledgerはF12で同一所有者/Trident/同一VRAM範囲・形状・UCのDISPLAY/CLIENT対だけ重複を認める。既存mm/pgalloc_surface.incは重複を拒否するため変更が必要。leaseはCLIENT、表示参照はDISPLAYとし資源を二重解放しない。mode変更は既存lease回収後に両面を更新し世代を進める。
+- ledgerはF12で同一所有者/Trident/同一VRAM範囲・形状・UCのDISPLAY/CLIENT対だけ重複を認める。既存sys/kern/mm/pgalloc_surface.incは重複を拒否するため変更が必要。leaseはCLIENT、表示参照はDISPLAYとし資源を二重解放しない。mode変更は既存lease回収後に両面を更新し世代を進める。
 - 容量はSPR申告・既存の構成値・写像範囲を使う。2MiB実測と4MiB申告を混同せず、全域VERIFYを復活させない。領域不足なら手本のoffscreen確保失敗と同様に該当機能を使わない。
 - 現在はRAM CLIENT (`O/resources.c:129-150`)。F6で加速経路をVRAM CLIENTへ変更する。アプリの32bit CPU直接描画が動く前提で、commit前非表示契約はこの経路では外す（R3の明示決定）。NoAccelのモード（packed24を含む）も同じくVRAM CLIENTへ直接描く（GEを使わないだけ。手本のNoAccelはShadowFBではなくfb層がLFBへ直接書く D:3534-3546、ShadowFBはoption時だけ D:2226）。旧RAM CLIENT＋byte presentは、tri-w32の結論で32bit直接書きが不可と決まった場合の起動全体の退避構成に限る（mode単位でbackingを切り替えない）。
 - 同期はHAL hookが返る前に手本Sync相当を完了する形を選ぶ。A:141,226-277の「次にCPUが触る前」の待ちを、アプリが戻り直後に直接storeできるOS32ではhook出口に置く。手本の各操作末尾のSync/ClearSyncを保ち、ClearSync済copyはOPERMODEを変えず完了済として返す。CPU uploadの前もSyncで排他する。旧u8 fillはINDEX8のみ登録、新depth primitiveはHで決める。
@@ -131,7 +131,7 @@ int tri_cursor_show(struct trident_device *,bool show);
 - 各timing×INDEX8/RGB555/RGB565/packed24/XRGB8888を候補にし容量で選別。640画素の加速時displayWidth=1024、byte pitch=1024/2048/4096（8/16/32bpp）。NoAccel時displayWidth=640、pitch=640/1280/1920/2560（8/16/24/32bpp）。packed24は常にNoAccel。既定解像度/深度は640×480×8、加速時のpitchは1024へ変わる。
 - 手本のvgaHWInit相当の標準CRTC生成を既存640画像から一般化する。標準CRTCはhorizontalを8画素単位、vertical overflowをCR07/09とC:264-271の拡張へ分配し、sync極性はMISCへ。PC-98 routing列は変更しない。
 - set_modeは面割当/PLL画像作成→ModeInit/Enable→選択モード・query・pitch/CLIENT・能力更新。モード切替後のpalette再loadはD:3705-3719。既存palette callbackのdepth8制限を外す際はdepth15/16のDAC表もC:1259-1282に合わせる。
-- `include/gfx_hal.h`へ静的mode表・selected_mode・set_modeを接続。RGB555/packed24の形式IDやCPU描画はTASK_VIDEO_HAL側で追加、ドライバ固有IDを公開ABIへ流さない。
+- `sys/include/gfx_hal.h`へ静的mode表・selected_mode・set_modeを接続。RGB555/packed24の形式IDやCPU描画はTASK_VIDEO_HAL側で追加、ドライバ固有IDを公開ABIへ流さない。
 
 ## 6. DPMS（既存dpms.c＋HAL登録）
 | 手本 D:1299-1340 / O/dpms.c:52-73 | OS32 |
@@ -139,7 +139,7 @@ int tri_cursor_show(struct trident_device *,bool show);
 | active判定→SR0E保存/C2→拡張DAC[4],GR23読出→下位2bitクリア→状態設定→GR23→DAC[4]→SR0E復元 | 既存関数をそのまま呼ぶ。On=(3,0)、Standby=(2,1)、Suspend=(2,2)、Off=(0,3)（DAC,GRの順の値） |
 ```c
 /* backend_trident.c */
-int tri_hal_dpms(u8 head,u32 state); /* head0、On=0/Standby=1/Suspend=2/Off=3 (hwdev/gf/display/api.h) を検査→既存関数へ変換 */
+int tri_hal_dpms(u8 head,u32 state); /* head0、On=0/Standby=1/Suspend=2/Off=3 (sys/dev/video/geforce/display/api.h) を検査→既存関数へ変換 */
 /* .dpms=tri_hal_dpms。inactiveは手本どおり無操作。登録時に自動Onは送らない。 */
 ```
 
@@ -166,7 +166,7 @@ void tri_video_tick(struct trident_device *,u32 now_ms);
 ```
 - ドライバ内の口の案。**上位の口はHALの設計(TASK_VIDEO_HAL)で決める**。Hが面/clip/colorKeyと協調pollを供給する。直接描画経路は色key塗り→Sync→overlay表示、NoAccel経路はbyte present後に表示。Xのregion/adaptor/atomは持ち込まない。
 - uploadはCPUアクセス前にSyncし、手本Vのhelperと同じ転送/変換をする（32bit書込み可）。byte制約は残すpresent経路だけ。倍率補正や独自タイムアウトは追加しない。
-- V:1144-1182のtimer callbackに対応し、`tri_video_poll()`が新import `int sys_time_now(u32 *lo,u32 *hi)`（kernel/time/ktime.c）で64bit単調usを取り整数helperでmsへ変換してtri_video_tickへ渡す。F17診断の協調ループがPut/Stop後もOFF→FREE→解放までpollする。公開後はHのイベントループが同じpollを担当（IRQから呼ばない）。Leave/Closeはpollを外し手本のshutdown Stopで即時停止/解放、timerのためだけにpresentを要求しない。
+- V:1144-1182のtimer callbackに対応し、`tri_video_poll()`が新import `int sys_time_now(u32 *lo,u32 *hi)`（sys/kern/time/ktime.c）で64bit単調usを取り整数helperでmsへ変換してtri_video_tickへ渡す。F17診断の協調ループがPut/Stop後もOFF→FREE→解放までpollする。公開後はHのイベントループが同じpollを担当（IRQから呼ばない）。Leave/Closeはpollを外し手本のshutdown Stopで即時停止/解放、timerのためだけにpresentを要求しない。
 
 ## 8. I2C/DDCと残りの経路
 | 経路と根拠 | 移す/対象外・理由 |
@@ -199,16 +199,16 @@ void tri_video_tick(struct trident_device *,u32 now_ms);
 | F9 | lifecycle.c | 初期化順/Enter/Leave/Close同期・palette分離。F1〜F8後 |
 | F10 | backend_trident.c | F9後。HAL登録/query/caps/mode、選択modeのbb_pitch、u8 fill/blitとCPU復帰前同期、DPMS/cursor接続。診断ops/tickも出力する |
 | F11 | build/trident-module.mk | TRIDENT_PARTSへaccel/cursor追加。F1/F2後。resources.cとtrident_module.cはbuild/kernel.mkのcore側でありmod増分へ算入しない |
-| F12 | mm/pgalloc_surface.inc | F0後。上記の同一描き先alias登録を許可し既存の無関係な重複拒否を維持。pitchは可変値。ledger試験段で解放/世代も確認 |
-| F12a | gfx/gfx_core_surface.inc | F12後。直接描画のCLIENT/DISPLAY同一範囲と選択pitchをquery/attach/leaseへ通し、NoAccelと他backendの契約を維持 |
+| F12 | sys/kern/mm/pgalloc_surface.inc | F0後。上記の同一描き先alias登録を許可し既存の無関係な重複拒否を維持。pitchは可変値。ledger試験段で解放/世代も確認 |
+| F12a | sys/hal/gfx/gfx_core_surface.inc | F12後。直接描画のCLIENT/DISPLAY同一範囲と選択pitchをquery/attach/leaseへ通し、NoAccelと他backendの契約を維持 |
 | F13 | trident_module.c（core kernel） | F10後。`start()`-66の任意hook禁止を各hook NULLまたはmodule text内の検査へ変更。`start()`-77の1mode/選択0/640固定をmode配列範囲・選択index・depth別pitch/容量とbb整合の検査へ置換。必須hook・data境界検査は維持 |
 | F14 | tools/prototypes/trident_imports.def | sys_time_nowを追加し時刻importの型を既存GeForce importと揃える。F4のpoll用、公開KAPIは追加しない |
 | F15 | tools/module_schema.py | F14後。新import/診断ops契約に必要なschemaを更新し生成器で派生物を再生成（生成物は手編集しない） |
 | F16 | trident_module.h | F0後。診断ops/pollのcontext契約と版・サイズを宣言、F13がtext内検査して保持、F17から利用 |
-| F17 | kdebug/trident_command_test.c（新） | F13/F16後。gf_command_test.c型の診断。mode/depth・DPMS・cursor・動画poll・CPU32/GE交互描画を呼び結果を記録 |
-| F18 | kdebug/kdebug_main.c | F17後。Trident診断コマンドdispatchを追加。診断のビルド列はF18aで更新 |
+| F17 | sys/dev/video/trident/diag/trident_command_test.c（新） | F13/F16後。gf_command_test.c型の診断。mode/depth・DPMS・cursor・動画poll・CPU32/GE交互描画を呼び結果を記録 |
+| F18 | sys/platform/pc98/kdebug/kdebug_main.c | F17後。Trident診断コマンドdispatchを追加。診断のビルド列はF18aで更新 |
 | F18a | build/kdebug.mk | F17後。KDEBUG_OBJS  へ診断object追加 |
-| F18b | kernel/module/kdebug_imports.def | F13後。coreが保持する診断ops取得関数をkdebugへimportし、既存生成器で派生物を再生成。module未load時は診断不可として返す |
+| F18b | sys/kern/module/kdebug_imports.def | F13後。coreが保持する診断ops取得関数をkdebugへimportし、既存生成器で派生物を再生成。module未load時は診断不可として返す |
 | H | TASK_VIDEO_HALの担当ファイルごとに別段 | RGB555/packed24形式、16/32bit primitive、line/pattern/overlay口、SW cursor fallback。F0の型を入力として別設計で確定 |
 - dpms.c、state_save/restore.c、pc98_init.c、route_ra266.c、regs.cは既存処理を使う。無関係な再編をしない。試験追加も試験ファイルごとの独立段にし、製品実装者の同時編集を避ける。
 - trident.modは現状18.9KiB、GUIパッケージ（起動FDのMINIMALには無い）。増分見積: accel 4〜7KiB、cursor 2〜4KiB、mode/PLL 3〜6KiB、video 6〜10KiB、module内glue 2〜4KiB、計17〜31KiB。未ビルドの概算、画像領域を含めない。
@@ -250,7 +250,7 @@ hostはMMIO記録fakeで値/幅/順/分岐を比較し、GPU描画は実機で�
 
 ## 追記 (2026-11-07、表示と CLIENT の面の寿命 — astra 起草、Opus 第 1 回、PM が反映。実装中の PM 決定 F6 の 1〜3 を置き換える)
 
-2026-11-07。案3・単一タスク・協調切替を維持。共有 gfx/gfx_core.c は変更しない。
+2026-11-07。案3・単一タスク・協調切替を維持。共有 sys/hal/gfx/gfx_core.c は変更しない。
 根拠: DESIGN.final.md 末尾 F6 1〜4・F10・tri-w32、tt-life/report.md、tri-fixsel/report.md。
 手本 D は確定設計の略号。D:3534-3546 の直接描画、D:3637-3661 の固定仮想画面と後方 offscreen に対応する。
 
@@ -291,7 +291,7 @@ set_mode:
 prepare は resources の ready/regs/lfb/境界/configure を先に検査し、configure 成功後に client と bb を検査・公開する。
 configure は format を検査し、display_bytes の整列・境界・pitch×height の収容を検証する。npages=display_bytes/PAGE_SIZE。
 未確定→確定では両面 unready、lease_count=0 を必須とし、サイズが異なれば ledger_surface_release（free）+create。
-同サイズなら regen でよい。regen に npages 変更を期待しない（mm/pgalloc_surface.inc）。
+同サイズなら regen でよい。regen に npages 変更を期待しない（sys/kern/mm/pgalloc_surface.inc）。
 両面成功時だけ capacity_final=true と descriptor/SID/gen を公開する。途中失敗は候補を利用不能にし、片面を片付けて再試行可能にする。
 作り直し時の SID/世代の連続性は要求しない。lease は未公開なので失効したアプリの参照は存在しない。
 確定後は異なる display_bytes を拒否し、同じ値での形変更だけを許す。false の再呼出しは確定状態を戻さない。
@@ -308,11 +308,11 @@ GeForce の boot 面作成、Cirrus/PEGC の選択前 CLIENT と同じ選択契�
 4: 変更なし。INDEX8/RGB565/XRGB8888 のみ。RGB555/packed24 は TRI_E_NOSYS、HAL ID 追加まで延期。F10 overscan 決定も維持。
 
 ### 修正する段と検証
-F6h drivers/video/trident/trident.h: configure callback に final を追加（宣言変更は1件、公開 KAPI 変更なし）。
-F6 drivers/video/trident/resources.c: 暫定/確定状態、容量変更時の release+create、両面失敗処理、rollback の状態消去。
-F10 drivers/video/trident/backend_trident.c: 選択前 prepare の暫定作成・再呼出しの無変更、確定容量を渡す mode 切替、bb の更新。
-F9 drivers/video/trident/lifecycle.c: PreInit 後の確定 configure、Close の lease 無効化、再 init の固定容量維持。
-F5 drivers/video/trident/vram.c: usable に decode 上限も反映し、ページ切上げ後の収容検査、確定 B と first_off の一致を保証。
+F6h sys/dev/video/trident/trident.h: configure callback に final を追加（宣言変更は1件、公開 KAPI 変更なし）。
+F6 sys/dev/video/trident/resources.c: 暫定/確定状態、容量変更時の release+create、両面失敗処理、rollback の状態消去。
+F10 sys/dev/video/trident/backend_trident.c: 選択前 prepare の暫定作成・再呼出しの無変更、確定容量を渡す mode 切替、bb の更新。
+F9 sys/dev/video/trident/lifecycle.c: PreInit 後の確定 configure、Close の lease 無効化、再 init の固定容量維持。
+F5 sys/dev/video/trident/vram.c: usable に decode 上限も反映し、ページ切上げ後の収容検査、確定 B と first_off の一致を保証。
 試験: 実 resources と gfx_core を通す初回選択→init（prepare I/O=0）、再 init、8/16/32bit・NoAccel 切替、SPR で P と B が増減/一致する条件・容量不足・第二 create 失敗・lease 失効・offscreen 非重複を検査する。
 変異: prepare configure 削除、final 指定削除、再作成を regen に置換、npages/first_off を現 mode サイズに変更、SPR 制限無視、revoke 削除を各一意 anchor とし、それぞれ正常 GREEN→実行時 RED→復元 GREEN を確認する。
 本作業は設計追記のみ。製品・試験は未変更。基点 SHA の指定なしのため preflight、ビルド、実行試験、変異、lint は未実施。
@@ -329,7 +329,7 @@ F5 drivers/video/trident/vram.c: usable に decode 上限も反映し、ペー�
 ユーザー決定「退避の構成にして調べを続ける」により、§2 N1・§9 F6/F7 の既定を置き換える。
 シングルタスク・協調切替。burst・FIFO・ブリッジの調査は HW-BASIC で継続し、修復後は設定だけで案3へ戻す。
 根拠: 手本 D=xf86-video-trident 1.4.0 の trident_driver.c:2220-2230 (ShadowFB→NoAccel)、3534-3546 (RAM shadow/直接の分岐)、3721-3739 (refresh)。
-byte 転送は実機で映った `5a6d64a2:drivers/video/trident/present.c` の write8 列を使い、固定 TRI_PITCH/寸法は復活させない。
+byte 転送は実機で映った `5a6d64a2:sys/dev/video/trident/present.c` の write8 列を使い、固定 TRI_PITCH/寸法は復活させない。
 
 ### 描画と切替設定
 - 退避時は CLIENT=独立した RAM/WB、DISPLAY=LFB 先頭の VRAM/UC。アプリと CPU fill/blit は CLIENT に描く。
@@ -358,16 +358,16 @@ byte 転送は実機で映った `5a6d64a2:drivers/video/trident/present.c` の 
 - 成功時だけ descriptor/client ポインタ/gen/確定フラグを公開。失敗時は候補を unready にし、登録済み RAM は surface_release、未登録の確保だけは元 owner で free して二重解放を避け、再試行可能にする。
 - 確定後は異なる B を拒否。Close は面と RAM を保持し、復帰順も維持する。Close に revoke や configure を追加しない。通常の lease 回収・再公開は gfx_shutdown 等の既存 gfx_core 経路が担う。
 - Close 後の prepare は A1 通り既定 mode の形へ両面 regen、device.mode.selected も既定へ戻す。B と backing は維持。最終 rollback だけ disarm/lease ゼロ後に面 release→unmap、RAM と確定状態を解放する。
-- mm/pgalloc_surface.inc は既存 RAM/WB 検査・release 時 free・regen の容量不変をそのまま使う。案3用 VRAM alias の許可も保持する。共有 gfx_core と公開 KAPI は変更不要。
+- sys/kern/mm/pgalloc_surface.inc は既存 RAM/WB 検査・release 時 free・regen の容量不変をそのまま使う。案3用 VRAM alias の許可も保持する。共有 gfx_core と公開 KAPI は変更不要。
 
 ### 実装の段（各行1ファイル、同じ取り込みで結線）
-1. drivers/video/trident/resources.c: 既定設定、RAM CLIENT の P/B 確保・再作成・失敗回収・rollback、案3分岐を保持。
-2. drivers/video/trident/backend_trident.c: prepare の設定同期、RAM bb/モード表/GE hook の一致、mode 切替・Enter 完了時の全画面転送。
-3. drivers/video/trident/mode_640.c: ram_fallback を有効 NoAccel に含め、NoAccel pitch と機能へ反映。
-4. drivers/video/trident/accel.c: ram_fallback 時は初期化を無効にし、GE/pattern を使わせない。
-5. drivers/video/trident/present.c: 退避の可変 pitch/cpp byte 転送と案3の同期のみを分岐。
-6. drivers/video/trident/lifecycle.c: RAM 初期化後の全画面 byte present、既存 Close/再入場の列を保持。
-7. drivers/video/trident/trident.h: ram_fallback の既定・設定同期のコメントだけ追従（宣言変更0件）。
+1. sys/dev/video/trident/resources.c: 既定設定、RAM CLIENT の P/B 確保・再作成・失敗回収・rollback、案3分岐を保持。
+2. sys/dev/video/trident/backend_trident.c: prepare の設定同期、RAM bb/モード表/GE hook の一致、mode 切替・Enter 完了時の全画面転送。
+3. sys/dev/video/trident/mode_640.c: ram_fallback を有効 NoAccel に含め、NoAccel pitch と機能へ反映。
+4. sys/dev/video/trident/accel.c: ram_fallback 時は初期化を無効にし、GE/pattern を使わせない。
+5. sys/dev/video/trident/present.c: 退避の可変 pitch/cpp byte 転送と案3の同期のみを分岐。
+6. sys/dev/video/trident/lifecycle.c: RAM 初期化後の全画面 byte present、既存 Close/再入場の列を保持。
+7. sys/dev/video/trident/trident.h: ram_fallback の既定・設定同期のコメントだけ追従（宣言変更0件）。
 試験: 各試験ファイルを独立段で追従（test_trident_resources/present/mode/lifecycle、GE/HAL の既存 harness）。両構成の選択→init、3形式の端・dirty・非表示領域保持、P/B増減/一致、RAM不足/第二create失敗/SID不一致/解放、16bit→Close→再選択、Enter、GE不使用と案3無転送をhostで検査し、Ra266でGUI・CPU fill/blit・dirty更新・cursor/overlay/paletteの回帰を観測する。
 変異: RAMをVRAMへ置換、WB→UC、退避NoAccel判定削除、write8→32bit転送、固定pitch化、cpp乗算削除、初回全画面転送削除、regenで現mode容量化、RAM解放漏れを各一意anchorとし、正常GREEN→実行時RED→復元GREENを確認する。
 本作業は追記案だけ。製品・試験未変更、ビルド・実行試験・変異・lintは未実施。宣言の追加・変更は0件。

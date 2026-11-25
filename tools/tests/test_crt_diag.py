@@ -1,11 +1,11 @@
 """Read-only CRT diagnostic: design CRTFREQ_DESIGN.r2.md §3 tests ①–⑦.
 
-Real kdebug/crt_diag.c, independent I/O shim and protected 1MB BIOS memory.
+Real sys/platform/pc98/kdebug/crt_diag.c, independent I/O shim and protected 1MB BIOS memory.
 記録: tools/tests/crt_diag_tdd.md
 Run: python3 -B tools/tests/test_crt_diag.py [--mutate]
 """
 CHECK = dict(name='crt-diag-host', tier=1,
-    covers=['kdebug/generated/**', 'platform/pc98/legacy/v86_mem.h', 'kdebug/crt_diag.c', 'platform/pc98/kernel.c', 'init/bootlog.c', 'tools/tests/crt_diag_host.c', 'tools/tests/crt_diag_hostshim/io.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    covers=['kdebug/generated/**', 'sys/platform/pc98/legacy/v86_mem.h', 'sys/platform/pc98/kdebug/crt_diag.c', 'sys/platform/pc98/kernel.c', 'sys/kern/init/bootlog.c', 'tools/tests/crt_diag_host.c', 'tools/tests/crt_diag_hostshim/io.h', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.5,
     kind='characterization',
 )
@@ -22,7 +22,7 @@ import mutpar
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "tools/tests/crt_diag_host.c"
-TARGET_SRC = ROOT / "kdebug/crt_diag.c"
+TARGET_SRC = ROOT / "sys/platform/pc98/kdebug/crt_diag.c"
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror", "-O2"]
 INCLUDES = include_flags(ROOT)
@@ -53,7 +53,7 @@ def one_mutation(item):
     with tempfile.TemporaryDirectory(prefix="crt-mut-") as td:
         exe = pathlib.Path(td) / "crt-host"
         tree = mutpar.build_in_tree(
-            ROOT, td, {"kdebug/crt_diag.c": source.replace(old, new, 1) if old else source},
+            ROOT, td, {"sys/platform/pc98/kdebug/crt_diag.c": source.replace(old, new, 1) if old else source},
             [host_cmd(exe)], capture_output=True)
         result = host32.run([str(exe)], cwd=tree, capture_output=True, text=True)
     if result.returncode == 0:

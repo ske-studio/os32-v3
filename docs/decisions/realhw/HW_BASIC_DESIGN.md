@@ -22,15 +22,15 @@
 | 実物（基点からの file:line） | 確認と設計への反映 |
 |---|---|
 | userland/shell/cmd_sys.c (sys_cmds())、cmd_peek.c | 前者は登録表、実装は後者。`-k/-p` は同じ RAM 経路、`-m` のみ MMIO。 |
-| kdebug/kpeek.c | RAM は既存写像を読む。MMIO は許可表照合後に一時窓、最大要求単位は既存 CHUNK。書込み口なし。 |
+| sys/platform/pc98/kdebug/kpeek.c | RAM は既存写像を読む。MMIO は許可表照合後に一時窓、最大要求単位は既存 CHUNK。書込み口なし。 |
 | kdebug/kpeek_allow.c:12,55 | 現行木には GeForce の許可行と照合が残る。HW-BASIC と peek -m では撤去する。 |
-| kdebug/kdebug_window.c (recover_window_hal_init()) | 共用窓・元 PTE 保存・PCD・必要時 RW・IF 保存復元。単回 len≤4096、最大2ページ、失敗時 cleanup。 |
-| include/memmap.h (MEM_DEVICE_APERTURE_BASE) | 一時窓 VA は 0xFE000000。物理番地をそのままポインタへ変換しない。 |
-| sdk/kapi.json、kdebug/kpeek.c | KAPI slot 253 `kdebug_call` → ops slot 19 `dbg_call`。公開 KAPI の追加不要。 |
-| kdebug/kdebug_main.c | recovery_call が振分け、未知の通常 op は kpeek_call へ。HW op を独立分岐として追加。 |
+| sys/arch/x86/kdebug/kdebug_window.c (recover_window_hal_init()) | 共用窓・元 PTE 保存・PCD・必要時 RW・IF 保存復元。単回 len≤4096、最大2ページ、失敗時 cleanup。 |
+| sys/include/memmap.h (MEM_DEVICE_APERTURE_BASE) | 一時窓 VA は 0xFE000000。物理番地をそのままポインタへ変換しない。 |
+| sdk/kapi.json、sys/platform/pc98/kdebug/kpeek.c | KAPI slot 253 `kdebug_call` → ops slot 19 `dbg_call`。公開 KAPI の追加不要。 |
+| sys/platform/pc98/kdebug/kdebug_main.c | recovery_call が振分け、未知の通常 op は kpeek_call へ。HW op を独立分岐として追加。 |
 | userland/shell/cmd_pci.c | lspci は構成空間 read32 で復号、BAR サイズ測定なし。pcidump は既存観測に継続使用。 |
-| drivers/pci/pci.h | config #1、CF8/CFC 対を IF 保存で保護。write16 は W1C 回避のため32bit RMWで代用不可。 |
-| kdebug/gfinit_decode.c、gfinit_exec.c、kdebug_main.c | NV44A ROM 専用復号・recover 所有実行器。現在 hwdev に配送されるため移植せず、幅・期限・中止点の考えだけ採用。 |
+| sys/dev/pci/pci.h | config #1、CF8/CFC 対を IF 保存で保護。write16 は W1C 回避のため32bit RMWで代用不可。 |
+| sys/dev/video/geforce/diag/gfinit_decode.c、gfinit_exec.c、kdebug_main.c | NV44A ROM 専用復号・recover 所有実行器。現在 hwdev に配送されるため移植せず、幅・期限・中止点の考えだけ採用。 |
 | tools/rshell_peek.py | peek 専用の見出し・連番・CRC解析。HW ログをこの形式へ偽装しない。 |
 | docs/POLICY_DEBUG.md | 書込みの読戻し一致を必須にしない。明示 read/poll だけを実行。 |
 
@@ -94,7 +94,7 @@
 
 ## 3. 特権の境目と停止
 ```c
-/* 新規 kdebug/hwb_wire.h。公開SDKを変更しない固定長u32 wire。 */
+/* 新規 sys/kern/kdebug/hwb_wire.h。公開SDKを変更しない固定長u32 wire。 */
 #define HW_OP 18U /* 現行1..17と非衝突。統合時に再確認 */
 struct hw_req { u32 version, action, space, width, bdf, addr, value, status; };
 /* action: READ=1, WRITE=2, POINT=3; space: PCI=1, IO=2, PHYS=3 */
@@ -112,7 +112,7 @@ struct hw_req { u32 version, action, space, width, bdf, addr, value, status; };
 - PCI: 専用汎用アクセス関数でCF8保存→指定→CFC+laneへin/out幅どおり→CF8復元、IFを元へ。8/16書込みを32bit RMWにしない。
 - I/O: 単一in/out。複数のindex/data命令間はIF=1。既存割込み処理と同じ装置を触る場合はスクリプト前提に記載し、ドライバ所有権の拒否表を追加しない。
 - 待ちはshellでKAPI v59 `sys_time_now(&lo,&hi)`のµs時刻を64bit合成し、開始からの差で判定。wait/pollは最大10,000,000us。各反復でPOINT→時刻確認→`sys_yield()`、pollは読出し前にもPOINT。WAIT_SLICEは定義しない。POINTはCUIシェルの印を読んで消し、value=1ならshellはABORTで終了。毎命令（label/gotoも含む）とwait/poll反復で呼ぶ。run/load/対話実行の開始直前にPOINTを1回呼んで古い印だけ捨て、以後の要求は中止として扱う。
-- `exec/exec_abort.inc`のring3_abort_request先頭で`!con_sink_is_enabled() && appslot_cur()==APP_ID_SHELL`なら専用volatile印を立てreturn。それ以外の既存経路は保持。新内部関数`exec_hwb_abort_take()`はIRQ保存/停止→印の読出しと0化→IRQ復元で取りこぼしを防ぐ。KAPI追加なし、module importでPOINTから呼ぶ。
+- `sys/kern/exec/exec_abort.inc`のring3_abort_request先頭で`!con_sink_is_enabled() && appslot_cur()==APP_ID_SHELL`なら専用volatile印を立てreturn。それ以外の既存経路は保持。新内部関数`exec_hwb_abort_take()`はIRQ保存/停止→印の読出しと0化→IRQ復元で取りこぼしを防ぐ。KAPI追加なし、module importでPOINTから呼ぶ。
 - 時刻の精度は既存µs時計の契約（IRQ0を失わないこと）に従い、yield分だけ待ちは延び得る。要求usと実測elapsed_usをログへ出す。時計API失敗/逆行はIOで停止し、u32下位周回は64bit差で処理する。wait/pollは最大100万反復（poll読出しも最大100万）。時計停止でも上限でTIMEOUT。長いloopもPOINTを通り、ソフト停止応答は次のPOINTまでのaccess/yield/出力時間に依存する。
 - バスアクセス自体の停止・CPU fault後の帰還は保証しない（受容済み）。CTRL+STOPは「次の命令を止める」であり映像を戻す操作ではない。
 - undoの自動履歴は初版不要。write-only/read-clear/W1Cやindex付き装置を事前読出しする方が手順を変える。必要なら明示readで変数保存し、復元スクリプトを実行。
@@ -148,20 +148,20 @@ HW run=3 op=end rc=OK lines=10 writes=1
 ## 6. ファイルごとの段（この表は実装計画、今回は変更しない）
 | 段＝ファイル | 単一責務 | 依存 / 並列可否 |
 |---|---|---|
-| A kdebug/hwb_wire.h | wire/状態/限界定義 | 最初に固定 |
+| A sys/kern/kdebug/hwb_wire.h | wire/状態/限界定義 | 最初に固定 |
 | B userland/shell/hwb_parse.c | 行/式/ラベル構文検査 | A後、C/Dと並列可 |
 | C userland/shell/hwb_exec.c | 変数/PC/step/run/poll | A後、B/Dと並列可 |
-| D kdebug/hwb_access.c | wire受付、IO/MMIO、PCI/POINTの接続 | A後並列可 |
-| E drivers/pci/pci_hwb.c | 汎用幅付きconfig #1アクセス | Dと契約固定後並列可 |
-| F exec/exec_abort.inc | CUIシェル中止印・ring3_abort_request分岐・exec_hwb_abort_take | A後並列可、既存GUI/app中止経路保持 |
+| D sys/kern/kdebug/hwb_access.c | wire受付、IO/MMIO、PCI/POINTの接続 | A後並列可 |
+| E sys/dev/pci/pci_hwb.c | 汎用幅付きconfig #1アクセス | Dと契約固定後並列可 |
+| F sys/kern/exec/exec_abort.inc | CUIシェル中止印・ring3_abort_request分岐・exec_hwb_abort_take | A後並列可、既存GUI/app中止経路保持 |
 | G userland/shell/hwb_log.c | 1行整形・kprintfを1回呼ぶ | A後並列可 |
 | H userland/shell/cmd_hw.c | コマンド入口とファイル寿命 | B/C/G後 |
 | I userland/shell/hwb.h | shell内契約 | B着手時に固定 |
 | J userland/shell/cmd_sys.c | hw登録 | H後 |
 | K userland/shell/shell.h | コマンド宣言 | H後 |
-| L kdebug/kdebug_main.c | HW_OPを:133より前で振分け、REC_PAUSED判定から独立 | D後 |
-| M kernel/module/kdebug_imports.def | PCI/中止内部関数のimport | E/F後、生成物は生成器で作る |
-| N kdebug/kpeek.c | allow include/照合撤去 | A後独立、RAM専用の従来意味は保持、任意物理は-m |
+| L sys/platform/pc98/kdebug/kdebug_main.c | HW_OPを:133より前で振分け、REC_PAUSED判定から独立 | D後 |
+| M sys/kern/module/kdebug_imports.def | PCI/中止内部関数のimport | E/F後、生成物は生成器で作る |
+| N sys/platform/pc98/kdebug/kpeek.c | allow include/照合撤去 | A後独立、RAM専用の従来意味は保持、任意物理は-m |
 | O kdebug/kpeek_allow.c | 削除 | Nと同時 |
 | P kdebug/kpeek_allow.h | 削除、他利用の定数は必要箇所へ移す | 参照検索後N/O/Yと同時 |
 | Q build/kdebug.mk | hwb追加/allowオブジェクト撤去 | D/N後 |
@@ -172,7 +172,7 @@ HW run=3 op=end rc=OK lines=10 writes=1
 | V tools/tests/hwb_test.py | 下表のhost/変異とCHECK登録 | A後並列可 |
 | W tools/tests/kpeek_test.py（既存試験の実名は参照検索で確定） | allow撤去に当たる試験・変異アンカー更新 | N後 |
 | X test/hw/trident.hwb | §8のデータ（ゲスト/test/hwへ配備） | 文法固定後独立 |
-| Y kdebug/gfinit.c | kpeek_allow.h の include を外すだけ (KPEEK_NV_PROM_LEN は kdebug/recover.h、GF_ROM_MAX は hwdev/gf/production.h のまま通る) | N/O/Pと同時 |
+| Y sys/dev/video/geforce/diag/gfinit.c | kpeek_allow.h の include を外すだけ (KPEEK_NV_PROM_LEN は sys/dev/video/geforce/diag/recover.h、GF_ROM_MAX は sys/dev/video/geforce/production.h のまま通る) | N/O/Pと同時 |
 | AB tools/checks/run.py の CHECK の covers・tools/tests/test_kdebug_init.py | kpeek_allow.{c,h} を外す: covers に残る 6 本 (test_kdebug_init・test_geforce・test_gf_display・test_gf_command・gf-runner-host・gfinit-host) と、test_kdebug_init.py のコンパイルの一覧 | O/P と同時 (残すと run.py が missing input、`main()` はファイルが無くて止まる) |
 | Z docs/tasks/realhw/TASK_TRIDENT_DRIVER.md | §0-1の「許可表で照合」「許可リストで縛る」を削除し、任意番地と引数検査のみの方針に書換え（注記で残さない） | N後独立 |
 | AA TASK_KPEEK（実装時に所在確定） | §2-5の許可表前提を削除し、peek -mの任意番地・窓・引数検査へ本文を書換え | N後独立 |
@@ -289,10 +289,10 @@ HW run=3 op=end rc=OK lines=10 writes=1
 - N1 (P2): §6 に AB を足した (kpeek_allow を参照する CHECK の covers 6 本と test_kdebug_init.py を O/P と同時に外す)。
 - N2 (P3): Y を「include を外すだけ」に書き換えた。
 - N3 (P3、実装の段で直す): §7 の NP21/W の行は `device d = bdf 0:0.0` を置いてから `pciread32 d 0 -> x` と書く。
-- N4 (P3、実装の段で直す): F の段で exec/exec_abort.inc (ring3_abort_request())・appslot.c の「CUI 中は 1 バイトも変えない (K2)」のコメントを新しい印に合わせて書き換え、CUI で印以外は変わらないことを host 試験で確かめる。
+- N4 (P3、実装の段で直す): F の段で sys/kern/exec/exec_abort.inc (ring3_abort_request())・appslot.c の「CUI 中は 1 バイトも変えない (K2)」のコメントを新しい印に合わせて書き換え、CUI で印以外は変わらないことを host 試験で確かめる。
 
 ## PM 決定 (2026-11-05、HW-BASIC の機能 PM、実装の前)
-- P1 (段の分け方): §6 の 1 ファイル = 1 段を、実装者の単位で次の 10 段にまとめる。a0 = A・I と段をまたぐ宣言 (drivers/pci/pci_hwb.h・exec/exec_hwb.h) と host 試験の土台 (tools/tests/hwb_fake.h・tools/tests/hwb_host.py)。parse = B、exec = C、log = G、rshell = T・U、kd = D・L、pci = E、abort = F、allow = N・O・P・Y・AB・W・Z・AA と build/kdebug.mk の kpeek_allow.o の撤去、trident = X、wire = H・J・K・R・M・Q (hwb_access.o の追加)・S と追従の試験・本番の組み立ての試験。
+- P1 (段の分け方): §6 の 1 ファイル = 1 段を、実装者の単位で次の 10 段にまとめる。a0 = A・I と段をまたぐ宣言 (sys/dev/pci/pci_hwb.h・sys/kern/exec/exec_hwb.h) と host 試験の土台 (tools/tests/hwb_fake.h・tools/tests/hwb_host.py)。parse = B、exec = C、log = G、rshell = T・U、kd = D・L、pci = E、abort = F、allow = N・O・P・Y・AB・W・Z・AA と build/kdebug.mk の kpeek_allow.o の撤去、trident = X、wire = H・J・K・R・M・Q (hwb_access.o の追加)・S と追従の試験・本番の組み立ての試験。
 - P2 (試験の置き方): §6 の V (tools/tests/hwb_test.py 1 本) は、段ごとの `tools/tests/test_hwb_<部品>.py` (各自の CHECK と MUTATIONS) に分ける。共有の登録の衝突を避けるため (run.py の lint は 0 件に当たる covers の glob を missing input にする)。共通の組み立て・実行・変異は a0 の tools/tests/hwb_host.py。
 - P3 (N4 の appslot.c): 書き換えない。新しい印は exec_abort.inc の中だけにあり、appslot の状態は CUI で今までどおり 1 バイトも変わらないので、あのコメントは正しいまま。exec_abort.inc のコメントだけを書き換え、CUI で印以外が変わらないことは abort の host 試験で確かめる (wt/p6-close の exec/appslot との重なりも避ける)。
 - P4 (スクリプトの置き場): リポジトリの `userland/tests/hw/*.hwb` に置き、配備マニフェスト (userland/deploy.yaml、tags: [test]) でゲストの `/test/hw/` へ。§7 の NP21/W の試験のスクリプトも同じ所に置く。
@@ -301,7 +301,7 @@ HW run=3 op=end rc=OK lines=10 writes=1
 - P7 (§4 の seq の初期値、rshell の段の欠け): seq は run ごとに 1 から始め、命令ごとに 1 ずつ増やす (begin と end は同じ seq)。ホストの採取は最初の seq が 1 でなければ先頭の欠けとして扱う。
 - P8 (vgaHW.c の許諾、trident の段の欠け): vgaHW.c の冒頭は著作権表示だけで、許諾文は xserver の COPYING の XFree86 Project の項 (xorg-server-21.1.13 の COPYING:54-76、X11 型の MIT 系) が当たる。trident.hwb の注記には vgaHW.c の著作権表示とその許諾文を置く ([HW3] の BSD/MIT の参照、GPL ではない)。
 - P9 (§4 の begin と BAR の解決の順、exec の段のレビュー): BAR の解決 (config の読み直し) は宛先の解決であり、データのアクセスの begin の前に行う。begin の addr は常に解決した物理番地 (port・config offset)。解決で失敗したときは、その命令の begin (target は論理の宛先、addr は未解決と分かる書き方) と end (rc) を出してから止まる — 開始の記録の無い停止を作らない。poll の最終の行にも解決した番地を出す。
-- P10 (§5 の shell の大きさ、wire の段の逸脱): shell.bin の text の増分は実測 +23,936 B (116,004 → 139,940 B) で、§5 の設計予算 12〜20 KiB を 3,456 B 超える。上限は MEM_SHELL_MAX_SIZE (include/memmap.h、675,840 B) で、text+BSS 483,528 B は内にある。物理の制約に当たらないので受け入れる (上限は物理の制約が無ければ広げてよい)。kdebug.bin は image 129,156 B / mem 143,360 B (上限 262,144 B)、kernel.bin +576 B。
+- P10 (§5 の shell の大きさ、wire の段の逸脱): shell.bin の text の増分は実測 +23,936 B (116,004 → 139,940 B) で、§5 の設計予算 12〜20 KiB を 3,456 B 超える。上限は MEM_SHELL_MAX_SIZE (sys/include/memmap.h、675,840 B) で、text+BSS 483,528 B は内にある。物理の制約に当たらないので受け入れる (上限は物理の制約が無ければ広げてよい)。kdebug.bin は image 129,156 B / mem 143,360 B (上限 262,144 B)、kernel.bin +576 B。
 - P11 (§7 の NP21/W の TVRAM の行、NP21/W の受入で): TVRAM の先頭 (0xA0000) は記録の行の表示でコンソールが書き換えるので、write→read の照合に使えない (実測: 0x41 を書いた直後に 0x20)。TVRAM の試験と 10 秒の poll は、文字の領域の末尾の語 0xA1FFE (80x25 の外) を使う。§7 の「PCI 機構なし」は、この NP21/W では 0CF8h が値を保持する (機構 #1 の検出が通る) が装置は 0 件で、pciread32 0:0.0 は OK/全 1/終了値 0 (§3 の「機構ありで装置なし」) になる。NOSYS/終了値 3 の経路は host 試験で確かめる。
 
 ## mmiofill 拡張（Trident 段2a）

@@ -6,7 +6,7 @@
 #include "kboot_info.h"
 #include "kboot_log.h"
 #include "ppc_pd.h"
-#include "mm/paging.h"
+#include "sys/kern/mm/paging.h"
 #include <stdarg.h>
 
 static void out(const char *p) {

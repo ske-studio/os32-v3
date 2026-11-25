@@ -10,6 +10,6 @@
 
 ### kbd.h
 
-PC-98 の 7bit コード (`drivers/input/kbd.h` の `KEY_*`: F1〜F10 = 62h〜6Bh、VF1〜5、ROLL UP/DOWN、
+PC-98 の 7bit コード (`sys/platform/pc98/input/kbd.h` の `KEY_*`: F1〜F10 = 62h〜6Bh、VF1〜5、ROLL UP/DOWN、
 INS/DEL、HELP、XFER/NFER、COPY、STOP、テンキー)。
 修飾は `kbd_get_modifiers` の 5bit (SHIFT 01h / CAPS 02h / KANA 04h / GRPH 08h / CTRL 10h)。

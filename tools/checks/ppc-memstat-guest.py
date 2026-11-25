@@ -1,7 +1,7 @@
 CHECK = dict(name='ppc-memstat-guest', tier=2, needs=[], budget=1200,
     env=['ppc-cross', 'qemu-ppc', 'socket'], full_only=True,
     covers=['tools/checks/ppc-memstat-guest.py', 'tools/accept/ppc_sysinfo.py', 'tools/accept/ppc_shm.py',
-            'tools/ppc/**', 'tools/*.py', 'userland/tests/mem_stat_test.c', 'userland/ppc/**', 'userland/shell/**',
+            'tools/ppc/**', 'tools/*.py', 'userland/diag/mem_stat_test.c', 'userland/ppc/**', 'userland/shell/**',
             'Makefile', 'build/**', 'sdk/**', 'mm/**', 'exec/**', 'arch/ppc/**',
             'platform/powermac/**', 'include/**', 'init/**', 'kernel/**',
             'kapi/**', 'lib/**', 'fs/**', 'drivers/**', 'input/**', 'net/**',

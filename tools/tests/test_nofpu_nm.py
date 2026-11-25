@@ -1,16 +1,16 @@
 """CR0/probe/#NM integration: ILP32 product code, libc-free, privileged hooks."""
 CHECK = dict(name='nofpu-nm', tier=1, needs=[], budget=15,
-    covers=['lib/softfloat/**', 'exec/appslot.h', 'include/app_ids.h',
-            'include/appmem_types.h', 'include/ksetjmp.h', 'arch/x86/arch_jmp_storage.h',
-            'include/memmap.h', 'include/pc98.h', 'sdk/include/os32/*.h',
-            'arch/x86/kernel/x87*', 'arch/x86/kernel/isr_handlers.c',
-            'arch/x86/kernel/isr_stub.asm', 'arch/x86/kernel/entry_layout.inc',
-            'arch/x86/kernel/iret_user.inc', 'arch/x86/kernel/cpu_flags.inc',
-            'arch/x86/arch_cpu.h', 'arch/x86/arch_abi.h', 'arch/x86/arch_exec_storage.h',
-            'arch/x86/x86_flags.h', 'include/cpu.h', 'include/abi.h',
-            'include/callconv.h', 'include/exec_arch.h', 'include/types.h',
+    covers=['lib/softfloat/**', 'sys/kern/exec/appslot.h', 'sys/include/app_ids.h',
+            'sys/include/appmem_types.h', 'sys/include/ksetjmp.h', 'sys/arch/x86/arch_jmp_storage.h',
+            'sys/include/memmap.h', 'sys/platform/pc98/pc98.h', 'sdk/include/os32/*.h',
+            'arch/x86/kernel/x87*', 'sys/arch/x86/kernel/isr_handlers.c',
+            'sys/arch/x86/kernel/isr_stub.asm', 'sys/arch/x86/kernel/entry_layout.inc',
+            'sys/arch/x86/kernel/iret_user.inc', 'sys/arch/x86/kernel/cpu_flags.inc',
+            'sys/arch/x86/arch_cpu.h', 'sys/arch/x86/arch_abi.h', 'sys/arch/x86/arch_exec_storage.h',
+            'sys/arch/x86/x86_flags.h', 'sys/include/cpu.h', 'sys/include/abi.h',
+            'sys/include/callconv.h', 'sys/include/exec_arch.h', 'sys/include/types.h',
             'tools/tests/nofpu_nm_host.c', 'tools/tests/test_nofpu_nm.py',
-            'tools/tests/ver_test_utils.py', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py', 'build/config.mk', 'build/features/x87.mk'],
+            'tools/tests/ver_test_utils.py', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py', 'build/config.mk', 'sys/conf/features/x87.mk'],
     kind='contract')
 from pathlib import Path
 import subprocess
@@ -42,8 +42,8 @@ def asm_fixture(source):
     body=body.replace('        jnz     .from_v86','        jnz     bad')
     body=body.replace('        iretd', '        jmp finish')
     return r'''bits 32
-%include "arch/x86/kernel/cpu_flags.inc"
-%include "arch/x86/kernel/entry_layout.inc"
+%include "sys/arch/x86/kernel/cpu_flags.inc"
+%include "sys/arch/x86/kernel/entry_layout.inc"
 %macro EXC_ENTER 0
 %endmacro
 %macro EXC_LEAVE 0
@@ -135,15 +135,15 @@ def execute(base, status, control, linked=False, forced=False):
              '-DX87_HOST_TEST',f'-DEXPECT_PRESENT={int(not forced and status==0 and control&0x103f==0x3f)}',
              f'-DPROBE_STATUS={status}','-ffreestanding','-fno-pie','-fno-stack-protector',
              '-nostdlib','-static','-no-pie','-I'+str(tmp),*include_flags(ROOT),
-             str(tmp/'entry.o'), str(ROOT/'tools/tests/nofpu_nm_host.c'),str(ROOT/'arch/x86/kernel/x87_emu_decode.c'),'-o',str(exe)]
+             str(tmp/'entry.o'), str(ROOT/'tools/tests/nofpu_nm_host.c'),str(ROOT/'sys/arch/x86/kernel/x87_emu_decode.c'),'-o',str(exe)]
         if linked:
-            cmd += ['-DOS32_X87_EMU_LINKED',str(ROOT/'arch/x86/kernel/x87_emu_state.c')]
+            cmd += ['-DOS32_X87_EMU_LINKED',str(ROOT/'sys/arch/x86/kernel/x87_emu_state.c')]
         if forced: cmd += ['-DOS32_TEST_NOFPU']
         subprocess.run(cmd,check=True)
         return host32.run([str(exe)],timeout=30).returncode
 
 def main():
-    feature=(ROOT/'build/features/x87.mk').read_text()
+    feature=(ROOT/'sys/conf/features/x87.mk').read_text()
     for out in ('out', 'out/testnofpu-extra', 'testnofpu',
                 'out/testnofpu', '/tmp/os32/testnofpu'):
         result=subprocess.run(['make','--no-print-directory','-f','-',
@@ -156,8 +156,8 @@ def main():
             assert 'requires BUILD_OUT ending in /testnofpu' in result.stderr
     print('GREEN test-only build output isolation')
     base={n:(ROOT/'arch/x86/kernel'/n).read_text() for n in ('x87.c','x87_nm.h')}
-    base['asm']=(ROOT/'arch/x86/kernel/isr_stub.asm').read_text()
-    base['handler']=function((ROOT/'arch/x86/kernel/isr_handlers.c').read_text(),'void nm_handler(')
+    base['asm']=(ROOT/'sys/arch/x86/kernel/isr_stub.asm').read_text()
+    base['handler']=function((ROOT/'sys/arch/x86/kernel/isr_handlers.c').read_text(),'void nm_handler(')
     cases=[(0,0x37f),(0xffff,0xffff),(1,0x37f),(0,0xffff)]
     for status,control in cases: assert execute(base,status,control)==0,(status,control)
     assert execute(base,0xffff,0xffff,linked=True)==0

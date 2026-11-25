@@ -26,13 +26,13 @@
 
 | ID | 依頼の略記・既存説明 | 現物と設計への影響 |
 |---|---|---|
-| X1 | 時計を読む関数自体が IF=0 にする | `platform/pc98/clock_source.c` は再試行だけで irq_save がない。呼出し側の排他契約を維持し、内部状態の更新に必要な保存復元も境界に明記する |
-| X2 | net_tick は受信の監視 | `net/nic.c` は poll/demux と link_tick を実行。監視だけにするにはプロトコル駆動を別 callback に残す必要がある |
-| X3 | rxq を空ければ受信停滞が解消 | `net/nic_rx.c` の `RX_SLOTS` に各 4 枠の二次列と drop がある。満杯の移動を改善と数えない |
-| X4 | net_rx_take は取り出しだけ | `net/nic_rx.c` は IF=0 で net_nic_poll_once を呼ぶ。新しい協調処理をここから強制実行できない |
-| X5 | PCM slot1 の観測は毎物理 tick | `kernel/irq/tick.c` の `tick_dispatch()` は論理 dispatch、`pcm_cs4231.c` はそこから advance。救済の観測間隔は約 10ms。1ms と仮定しない |
+| X1 | 時計を読む関数自体が IF=0 にする | `sys/platform/pc98/clock_source.c` は再試行だけで irq_save がない。呼出し側の排他契約を維持し、内部状態の更新に必要な保存復元も境界に明記する |
+| X2 | net_tick は受信の監視 | `sys/net/nic.c` は poll/demux と link_tick を実行。監視だけにするにはプロトコル駆動を別 callback に残す必要がある |
+| X3 | rxq を空ければ受信停滞が解消 | `sys/net/nic_rx.c` の `RX_SLOTS` に各 4 枠の二次列と drop がある。満杯の移動を改善と数えない |
+| X4 | net_rx_take は取り出しだけ | `sys/net/nic_rx.c` は IF=0 で net_nic_poll_once を呼ぶ。新しい協調処理をここから強制実行できない |
+| X5 | PCM slot1 の観測は毎物理 tick | `sys/kern/irq/tick.c` の `tick_dispatch()` は論理 dispatch、`pcm_cs4231.c` はそこから advance。救済の観測間隔は約 10ms。1ms と仮定しない |
 | X6 | PCM の tick はコピーだけ | `pcm_cs4231.c` は PI ACK・停止・再始動も担う。コピーを外しても停止期限の進行は残す |
-| X7 | GEM も既存 net/nic の口 | `build/targets/ppc-powermac.mk` は専用 LAN と GEM、`platform/powermac/lan_service.c` は PLN1。`net/nic.c` の OS32 demux とは別プロトコル |
+| X7 | GEM も既存 net/nic の口 | `build/targets/ppc-powermac.mk` は専用 LAN と GEM、`sys/platform/powermac/lan_service.c` は PLN1。`sys/net/nic.c` の OS32 demux とは別プロトコル |
 | X8 | IRQ0 から IRQ10 へコピーを新設する | `pcm_cs4231.c` は既に IRQ10→advance→copy。IRQ0 のコピーは IF=0 窓で half を跨いだ場合。slot1 120µs の内訳は未測定なのでコピー元別に計測する |
 
 - 実測根拠: `RESULT_realhw2.md` 第4回（run/tick-a3）。IRQ0 最大 184.7µs、slot1 最大 120µs は余裕が小さい。PIT 読み平均 3.8µs（PCM 中 5.9µs）。
@@ -42,7 +42,7 @@
 
 ### 境界・状態
 ```c
-/* 新: platform/pc98/tsc_clock.h。全て内部、公開 clock_info の意味は変更しない。 */
+/* 新: sys/platform/pc98/tsc_clock.h。全て内部、公開 clock_info の意味は変更しない。 */
 struct tsc_epoch { u32 lo, hi, us_lo, us_hi, mult, shift; };
 int pc98_pit_read_us(u32 *lo, u32 *hi); /* clock_source.c の既存 PIT 本体、IF=0 */
 int pc98_tsc_init(void);             /* capability 検査、未校正は PIT */
@@ -58,7 +58,7 @@ u32 arch_tick_budget_cnt(u32 us);
 - read は epoch と 64bit TSC を短い irq_save 内で取得。変換は差分 × mult >> shift、32×32→64 の部分積を組み合わせる。64bit 差の上位も処理し、長い IF=0 や低位周回で時間を失わない。
 - epoch 更新時の小数剰余を保持する（更新時の丸め捨てによる累積誤差を防ぐ）。通常 read は閾値未満なら保存値を進めない。更新と read に同じ純粋整数 helper を使う。
 - Pentium の RDTSC は直列化命令ではない。起動校正の端点は CPUID/RDTSC で順序を固定し、通常読出しは volatile asm＋memory clobber、負差検査と単調 clamp。通常 read に CPUID を毎回入れない。
-- `arch/x86/arch_cpu.h` の arch_cpu_has_cpuid を使い、同ヘッダへ arch_cpu_has_tsc を追加する。leaf0 の最大 leaf ≥1 を確認してから leaf1 の TSC bit を検査。非対応なら RDTSC を一度も実行しない。`kernel/time/tick_probe.c` の既存 RDTSC 命令列を再利用し、invariant-TSC bit は必須にしない。
+- `sys/arch/x86/arch_cpu.h` の arch_cpu_has_cpuid を使い、同ヘッダへ arch_cpu_has_tsc を追加する。leaf0 の最大 leaf ≥1 を確認してから leaf1 の TSC bit を検査。非対応なら RDTSC を一度も実行しない。`sys/kern/time/tick_probe.c` の既存 RDTSC 命令列を再利用し、invariant-TSC bit は必須にしない。
 
 ### 校正と故障
 - PIT mode2 の reload/clk_hz（1997/1996800 等）を基準にする。1000µs ちょうどと仮定しない。装置設定と論理 tick を変更しない。
@@ -86,14 +86,14 @@ u32 arch_tick_budget_cnt(u32 us);
 
 ### 境界
 ```c
-/* 新: net/rx_work.h。装置やプロトコルに依存しない有限実行器。 */
+/* 新: sys/net/rx_work.h。装置やプロトコルに依存しない有限実行器。 */
 struct rx_work_budget { u32 start, used, max_frames, limit_us; };
 int rx_work_take(struct rx_work_budget *b); /* 1 frame 前に確認、最大8件/120us */
-/* net/nic.h の内部追加。nic.c が bound/ticking/pending を所有。 */
+/* sys/net/nic.h の内部追加。nic.c が bound/ticking/pending を所有。 */
 void net_rx_schedule(void);          /* IF=0/IRQ 可: pending=1 だけ */
 int net_rx_service(void);            /* IF=1・depth=0 だけ、demux まで */
 static void net_rx_idle(void);       /* nic.c 所有の永久 idle_work、残存を継続 */
-/* net/nic_rx.c: 既存 demux の有限版。残存可能なら pending を残す。 */
+/* sys/net/nic_rx.c: 既存 demux の有限版。残存可能なら pending を残す。 */
 u32 net_rx_demux_budget(const struct NetNicOps *ops,
     const u8 local[6], const u8 peer[6], struct rx_work_budget *b);
 ```
@@ -105,7 +105,7 @@ u32 net_rx_demux_budget(const struct NetNicOps *ops,
 - PIO／RDC／reset はこの 120µs の保証外で、現行の有限待ち・round 上限を維持。IF=0 の IRQ5・slot2・send・leave は印／ACK／ソフト TX 列だけという NEXT §2-4 の契約を厳守する。
 - net_rx_service の再入番人は irq_save 中に検査・取得し、IF を戻して demux、終了を短い irq_save で公開。IRQ 中の再入は schedule だけ。unbind/reset は番人中には実行せず deferred にする。
 - nic.c は bind 前に永久 net_rx_idle を 1 枠登録し、unbound 時は何もしない。登録失敗は bind 失敗として報告し、無処理の NIC を公開しない。T1 校正・既存 NE2K bh と合わせて idle_work の 4 枠内で割当を検証する。
-- e82557 は PC98_TICK_E82557 の受信生産を維持し、net_tick が schedule→net_rx_idle が同じ予算で demux。IRQ0 の demux は残さない。`drivers/net/e82557/nic_e82557.c` の空 poll や SFS 呼出しに進行を依存させず、SFS 無通信時も LINK 列へ供給する。
+- e82557 は PC98_TICK_E82557 の受信生産を維持し、net_tick が schedule→net_rx_idle が同じ予算で demux。IRQ0 の demux は残さない。`sys/dev/net/e82557/nic_e82557.c` の空 poll や SFS 呼出しに進行を依存させず、SFS 無通信時も LINK 列へ供給する。
 - net_tick は watchdog の poll と schedule だけ。登録する同じ slot の wrapper `net_jiffy` は `net_tick(); if (!ticking) link_tick();` とする。link の 100Hz の RX 消費・RTO・deadline・TX・notify を失わない。
 - wrapper は IF=0 で ticking を取得して link_tick を実行、終了時に解放。協調 demux 中の IRQ は link_due=1 を残す。service の終了時、番人を保持した IF=0 内で link_due を消費して link_tick を 1 回実行してから解放する。複数回分は絶対期限で集約し、保留回数・遅延を測る。再入 take は schedule のみとし service を再帰させない。
 - net_nic_poll_once は互換名を維持し、IF=1・depth=0 なら service、その他は schedule して 0 を返す。IF を勝手に立てない。
@@ -114,7 +114,7 @@ u32 net_rx_demux_budget(const struct NetNicOps *ops,
 - 二次列満杯では現行の drop 規約を維持し計数。rxq_full だけ下がって sfs/link_drop が増えた場合は不合格。プロトコル状態機械そのものを IF=1 へ移す変更はしない。
 
 ### PowerPC の道
-- **変更なし、既に前景で demux**。`platform/powermac/ppc_kernel.c` の poll と `lan_service.c` の 1 poll 1 frame→返信送信を維持する。
+- **変更なし、既に前景で demux**。`sys/platform/powermac/ppc_kernel.c` の poll と `lan_service.c` の 1 poll 1 frame→返信送信を維持する。
 - s.response は 1 枠で、送信前に複数 REQ を処理すると `lan_service.c` で drop するため 8 frame 化しない。GEM→PLN1 の道を維持し OS32 demux と共通化しない。
 - B7/B8 を削除し PPC の source/build 変更は 0。os32powerpc は既存 PPCKERN.ELF リンクと QEMU LAN／HFS／terminal の退行確認を担当する。
 
@@ -155,7 +155,7 @@ static int pcm_tick_rescue_due(u32 pos, u32 rate, u32 margin_us);
 | T3 期限判定・救済 | 1〜2 | <0.125 | pcm.mod。既存リング16KB／staging16KBの増設なし |
 | 診断カウンタ | <1 | <0.25 | 診断像だけ。kdebug に新コードは入れず既存の出力経路を使う |
 
-- x86 kernel 増分は最大約 10KiB を仮予約。`include/memmap.h` の resident 上限は 0x275000（2516KiB）、bss/配置丸めも数える。現物の空きは未測定で「収まる」とは判定しない。
+- x86 kernel 増分は最大約 10KiB を仮予約。`sys/include/memmap.h` の resident 上限は 0x275000（2516KiB）、bss/配置丸めも数える。現物の空きは未測定で「収まる」とは判定しない。
 - 起動 FD は kernel.bin 直置きではなく vmkernel.lz4＋対象 module 群（`build/image.mk`）。非圧縮増分の上限 12KiB＋ファイル丸めを予算とし、1232KB／1440KB 両媒体を実生成して残余 sector と loader の上限を検査する。
 - kdebug.bin の実装増分は 0、kernel 対応情報で再生成が必要。kdebug の個別容量制限・module arena・FD 合計を既存生成器／リンク検査で確認し、上限定数は緩めない。未測定の余白を既知扱いしない。
 - PPC は PPCKERN.ELF の map/未解決シンボルとロード区間を確認。PPC のコード・リンク入力が変更されていないことも検査する。
@@ -164,24 +164,24 @@ static int pcm_tick_rescue_due(u32 pos, u32 rate, u32 margin_us);
 
 | 段 | 新/変更・ファイル | 概算変更行 | 依存 |
 |---|---|---:|---|
-| A0 | 新 platform/pc98/tsc_clock.h | 40 | 口を先に固定 |
-| A1 | 新 platform/pc98/tsc_math.c | 180 | A0、部分積・係数計算だけ |
-| A2 | 新 platform/pc98/tsc_clock.c | 340 | A1、状態・校正・監視 |
-| A3 | 変更 platform/pc98/clock_source.c | 50 | A2、init/read/fallback |
-| A4 | 変更 platform/pc98/tick_budget.c | 45 | A2、µs 単位 |
-| A8 | 変更 arch/x86/arch_cpu.h | 25 | A2 の前提、既存 CPUID helper と最大 leaf/TSC bit 検査 |
+| A0 | 新 sys/platform/pc98/tsc_clock.h | 40 | 口を先に固定 |
+| A1 | 新 sys/platform/pc98/tsc_math.c | 180 | A0、部分積・係数計算だけ |
+| A2 | 新 sys/platform/pc98/tsc_clock.c | 340 | A1、状態・校正・監視 |
+| A3 | 変更 sys/platform/pc98/clock_source.c | 50 | A2、init/read/fallback |
+| A4 | 変更 sys/platform/pc98/tick_budget.c | 45 | A2、µs 単位 |
+| A8 | 変更 sys/arch/x86/arch_cpu.h | 25 | A2 の前提、既存 CPUID helper と最大 leaf/TSC bit 検査 |
 | A6 | 変更 build/kernel-objects.mk | 15 | A1/A2 の object 登録（現行列挙の入口へ） |
-| A7 | 変更 platform/pc98/tsc_clock.c | 40 | A3/A8、起動 idle_work 登録・初期化順の統合、A2 と直列 |
-| B0 | 新 net/rx_work.h | 35 | 口固定 |
-| B1 | 新 net/rx_work.c | 100 | B0、純粋な件数・経過管理 |
-| B2 | 変更 net/nic.h | 20 | B0、service の宣言 |
-| B3 | 変更 net/nic_rx.c | 110 | B0/B2、有限 demux・take・公開排他 |
-| B4 | 変更 net/nic.c | 190 | B3、ticking・wrapper・net_rx_idle・bind/unbind・N1 の e82557 救済 (net_jiffy、2 ジフィ) |
-| B5 | 変更 drivers/net/ne2000/ne2000_data.inc | 25 | B4、enqueue 後結線 |
-| B6 | 変更 drivers/net/ne2000/ne2000.c | 55 | B5、bh 共通予算・残存 drain |
+| A7 | 変更 sys/platform/pc98/tsc_clock.c | 40 | A3/A8、起動 idle_work 登録・初期化順の統合、A2 と直列 |
+| B0 | 新 sys/net/rx_work.h | 35 | 口固定 |
+| B1 | 新 sys/net/rx_work.c | 100 | B0、純粋な件数・経過管理 |
+| B2 | 変更 sys/net/nic.h | 20 | B0、service の宣言 |
+| B3 | 変更 sys/net/nic_rx.c | 110 | B0/B2、有限 demux・take・公開排他 |
+| B4 | 変更 sys/net/nic.c | 190 | B3、ticking・wrapper・net_rx_idle・bind/unbind・N1 の e82557 救済 (net_jiffy、2 ジフィ) |
+| B5 | 変更 sys/dev/net/ne2000/ne2000_data.inc | 25 | B4、enqueue 後結線 |
+| B6 | 変更 sys/dev/net/ne2000/ne2000.c | 55 | B5、bh 共通予算・残存 drain |
 | B9 | 変更 build/kernel-objects.mk | 5 | B1、A6 と直列 |
-| C0 | 新 drivers/sound/cs4231/pcm_refill.h | 100 | 位置と純粋な閾値計算、static inline |
-| C1 | 変更 drivers/sound/cs4231/pcm_cs4231.c | 120 | C0、origin・延期判定・既存停止契約・診断 |
+| C0 | 新 sys/dev/sound/cs4231/pcm_refill.h | 100 | 位置と純粋な閾値計算、static inline |
+| C1 | 変更 sys/dev/sound/cs4231/pcm_cs4231.c | 120 | C0、origin・延期判定・既存停止契約・診断 |
 | Q1a | 新 tools/tests/test_tick_tsc.py | 180 | A1〜A8（A5 除外）、CHECK・host32 runner・変異 |
 | Q1b | 新 tools/tests/tick_tsc_host.c | 360 | Q1a、libc なし校正・単調性模型 |
 | Q2a | 新 tools/tests/test_net_rx_work.py | 180 | B1〜B9（B7/B8 除外）、CHECK・runner・変異 |
@@ -249,7 +249,7 @@ PACK3 の T1/T2/T3 報告に対する追補。本節は §2 の欠落窓、§3 �
 
 ### T1: 欠落窓は端点から推定し、欠落の事実とは呼ばない
 
-- 「既知の欠落窓」は **PIT 周期欠落と区別できない窓（欠落疑い）** と読み替える。通知元・追加取得口は設けない。A2 `platform/pc98/tsc_clock.c` が既存の PIT 専用読出しと TSC の端点だけから判定・棄却・連続異常数を所有する。tick.c、IRQ0、IF 診断への結線は追加しない。
+- 「既知の欠落窓」は **PIT 周期欠落と区別できない窓（欠落疑い）** と読み替える。通知元・追加取得口は設けない。A2 `sys/platform/pc98/tsc_clock.c` が既存の PIT 専用読出しと TSC の端点だけから判定・棄却・連続異常数を所有する。tick.c、IRQ0、IF 診断への結線は追加しない。
 - 監視の開始間隔は従来の 1 秒、比較する窓長は校正と同じ約 200ms（許容 180〜220ms）とする。協調巡回が遅れて範囲外なら棄却し、新しい端点から取り直す。1 秒全体の差を使わない。1 秒では 0.1% が約 1 PIT 周期となり、基準誤差 550ppm の許容帯も隣の周期と重なるためである。待ちの間は IF=1、端点以外で割込みを禁止しない。
 - `P=reload*1000000/clk_hz` は有理数の PIT 周期、`W` は PIT 端点差 µs、`T` は固定係数で変換した TSC 端点差 µs、`D=T-W`（符号付き）とする。許容 `L=2×32+ceil(550*W/1000000)` µs。220ms でも L=185µs で P/2 未満となる設定だけを採用する。積は幅を確保し、自前整数 helper と交差乗算を使い、周期を 1000µs に丸めない。
 - **D が正で、整数 k≥1 に対して `abs(D-k*P)<=L`** なら欠落疑いとして棄却する。最も近い k を求めればよい。負偏差を欠落扱いせず、k=0 は正常帯の判定にのみ使う。読出し失敗・逆行・端点費用超過も先に棄却する。棄却では係数を学習し直さず、連続異常数を 0 に戻し、棄却理由を診断に残す。

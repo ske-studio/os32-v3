@@ -1,12 +1,12 @@
-# include/platform_splash.h — 起動のスプラッシュの入口と時間
+# sys/include/platform_splash.h — 起動のスプラッシュの入口と時間
 
 > 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
-ソース: `include/platform_splash.h`
+ソース: `sys/include/platform_splash.h`
 
 ## 何をするか
 
 起動の前景 (同期の呼び出しだけ) で使うスプラッシュの口と、表示時間の定数を決める。公開 KAPI ではなく、型・番号を変えない。
-走査の判定の状態はここで持たず、`drivers/video/pc98/splash_raster.h` の `pc98_splash_raster_state()` から借りる。
+走査の判定の状態はここで持たず、`sys/platform/pc98/video/splash_raster.h` の `pc98_splash_raster_state()` から借りる。
 
 ## 時間の定数
 
@@ -17,7 +17,7 @@
 | `PLATFORM_SPLASH_IMAGE_PLAY_SECONDS` | 6 | 画像の行ごとの再生 |
 | `PLATFORM_SPLASH_IMAGE_TICKS` | (2+6) 秒 | 画像の経路の入口からの枠。読み込み・準備・転送・前置き・再生を全部含む |
 
-前置きの 2000ms の実体は `SPLASH_RASTER_PREVIEW_MS` (`drivers/video/pc98/splash_raster_image.h`)。2 秒の値を変えるときは両方をそろえる。
+前置きの 2000ms の実体は `SPLASH_RASTER_PREVIEW_MS` (`sys/platform/pc98/video/splash_raster_image.h`)。2 秒の値を変えるときは両方をそろえる。
 
 ## 口の契約
 
@@ -27,4 +27,4 @@
 - `platform_splash_wait_frame(end_tick)`: 静止のロゴ・固定画像の、時計で 1 フレームぶん待つ歩調。使える時計が無ければ非 0。
 - `SPLASH_RASTER_OBS` の像だけ `platform_splash_observe()`、`SPLASH_RASTER_DIAG` の像だけ `platform_splash_probe_before()`・`platform_splash_probe()` がある。
 
-実体は [platform/pc98/splash.c](../platform/pc98/splash.c.md)・[splash_image.c](../platform/pc98/splash_image.c.md)・[splash_obs.c](../platform/pc98/splash_obs.c.md)・[splash_probe.c](../platform/pc98/splash_probe.c.md)。
+実体は [sys/platform/pc98/splash.c](../platform/pc98/splash.c.md)・[splash_image.c](../platform/pc98/splash_image.c.md)・[splash_obs.c](../platform/pc98/splash_obs.c.md)・[splash_probe.c](../platform/pc98/splash_probe.c.md)。

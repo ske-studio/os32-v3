@@ -17,14 +17,14 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-fp', env=['ppc-cross'], tier=2, budget=60, needs=[],
-    covers=['arch/ppc/arch_kernel_fp.h', 'tools/tests/test_ppc_fp.py', 'tools/tests/ppc_fp_guard_host.c', 'userland/ppc/fp_probe.S',
-            'arch/ppc/fp_context.S', 'arch/ppc/kernel_fp.[ch]',
-            'arch/ppc/arch_exec_storage.h', 'arch/ppc/ppc_oea.h',
-            'arch/ppc/exec_enter.S', 'arch/ppc/exec_resume.S',
-            'arch/ppc/kernel_vectors.S', 'arch/ppc/kernel_trap.c',
-            'arch/ppc/ppc_*.h', 'arch/ppc/pd_walk.c', 'include/**', 'mm/pgalloc.h',
-            'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
-            'platform/powermac/platform_irq_limits.h', 'build/arch/ppc.mk',
+    covers=['sys/arch/ppc/arch_kernel_fp.h', 'tools/tests/test_ppc_fp.py', 'tools/tests/ppc_fp_guard_host.c', 'userland/ppc/fp_probe.S',
+            'sys/arch/ppc/fp_context.S', 'arch/ppc/kernel_fp.[ch]',
+            'sys/arch/ppc/arch_exec_storage.h', 'sys/arch/ppc/ppc_oea.h',
+            'sys/arch/ppc/exec_enter.S', 'sys/arch/ppc/exec_resume.S',
+            'sys/arch/ppc/kernel_vectors.S', 'sys/arch/ppc/kernel_trap.c',
+            'arch/ppc/ppc_*.h', 'sys/arch/ppc/pd_walk.c', 'include/**', 'sys/kern/mm/pgalloc.h',
+            'sys/kern/irq/irq.h', 'sys/kern/irq/irq_math.h',
+            'sys/platform/powermac/platform_irq_limits.h', 'build/arch/ppc.mk',
             'build/targets/ppc-powermac.mk', 'tools/ppc/kboot_audit.py', 'tools/ppc/sqlite_attributes.py',
             'lib/sqlite3/sqlite3.c', 'lib/sqlite3/os32_sqlite_config.h',
             'tools/ppc/test_user_trap*', 'tools/ppc/test_exec_enter.py',
@@ -59,7 +59,7 @@ def main(argv=None):
         required = os.environ.get('OS32_REQUIRE_PPC') == '1'
         print(('FAIL' if required else 'SKIP')+': PPC FP dependencies unavailable: '+', '.join(missing))
         return int(required)
-    asm = (ROOT/'arch/ppc/fp_context.S').read_text()
+    asm = (ROOT/'sys/arch/ppc/fp_context.S').read_text()
     audit = load('fp_audit', 'tools/ppc/kboot_audit.py')
     entry = load('fp_entry', 'tools/ppc/test_exec_enter.py')
     assert entry.inspect(entry.SOURCE.read_text()) == 0xf032
@@ -82,7 +82,7 @@ def main(argv=None):
                 raise AssertionError('accepted unexpected PPC32 ABI attribute')
         # Real product wrapper is assembled and audited independently.
         obj = work/'fp.o'
-        call([prefix+'gcc', *flags, '-c', ROOT/'arch/ppc/fp_context.S', '-o', obj])
+        call([prefix+'gcc', *flags, '-c', ROOT/'sys/arch/ppc/fp_context.S', '-o', obj])
         assert not audit.forbidden(prefix+'objdump', str(obj), str(obj))[1]
         layout = work/'layout.c'
         layout.write_text('#include "exec_arch.h"\n_Static_assert(sizeof(struct arch_fp_context)==264,"size");\n'
@@ -133,7 +133,7 @@ def main(argv=None):
             within = audit.forbidden(prefix+'objdump', str(elf), str(obj), ranges=ranges)[1]
             assert bool(within) == (name == 'B1-altivec'), (name, within)
             print(name+': audit '+('RED' if bad else 'GREEN'), flush=True)
-        guard = (ROOT/'arch/ppc/kernel_fp.c').read_text()
+        guard = (ROOT/'sys/arch/ppc/kernel_fp.c').read_text()
         # Replace only the privileged MSR writer; FP save/restore models expose
         # all 264 bytes so the real guard sequencing is independently checked.
         begin = guard.index('static void set_msr(')
@@ -154,7 +154,7 @@ def main(argv=None):
             assert rc == expected, (name, rc, expected)
             print(name+': runtime rc='+str(rc), flush=True)
         trap = load('fp_trap', 'tools/ppc/test_user_trap.py')
-        source = (ROOT/'arch/ppc/kernel_trap.c').read_text()
+        source = (ROOT/'sys/arch/ppc/kernel_trap.c').read_text()
         trap.check(source, 0)
         if args.mutate:
             # Unconditional retry is observed as a returned unchanged frame;

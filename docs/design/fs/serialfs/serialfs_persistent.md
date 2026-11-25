@@ -1,7 +1,7 @@
-# fs/serialfs/serialfs_persistent.c — LAN 常駐の /host (共有の SFS client・mount の世代・期限)
+# sys/fs/serialfs/serialfs_persistent.c — LAN 常駐の /host (共有の SFS client・mount の世代・期限)
 
 > 状態: **現行 (2026-11-18)** — 出所: NET_HOSTSVC_DESIGN・TASK_NET_HOSTSVC (要約して移した)
-ソース: `fs/serialfs/serialfs_persistent.c`・`fs/serialfs/serialfs.h`・`fs/serialfs/serialfs.c` (`sfs_rpc`・`sfs_resource_check`)・`fs/serialfs/serialfs_session.c`・`fs/serialfs/sfs_client.c` (`sfs_request_deadline`・`sfs_client_call_deadline`・`sfs_client_hello_deadline`・`sfs_client_oneway_deadline`)・`fs/serialfs/sfs_client.h`・`fs/serialfs/sfs_lan.c` (`lan_put_until`)・`platform/pc98/kernel_boot_memory.inc` (`kernel_boot_hostsvc`)・ホストは `tools/lanfs_host.py` ([tools/lanfs_host](../../tools/lanfs_host.md))
+ソース: `sys/fs/serialfs/serialfs_persistent.c`・`sys/fs/serialfs/serialfs.h`・`sys/fs/serialfs/serialfs.c` (`sfs_rpc`・`sfs_resource_check`)・`sys/fs/serialfs/serialfs_session.c`・`sys/fs/serialfs/sfs_client.c` (`sfs_request_deadline`・`sfs_client_call_deadline`・`sfs_client_hello_deadline`・`sfs_client_oneway_deadline`)・`sys/fs/serialfs/sfs_client.h`・`sys/fs/serialfs/sfs_lan.c` (`lan_put_until`)・`sys/platform/pc98/kernel_boot_memory.inc` (`kernel_boot_hostsvc`)・ホストは `tools/lanfs_host.py` ([tools/lanfs_host](../../tools/lanfs_host.md))
 
 ## 何をするか
 

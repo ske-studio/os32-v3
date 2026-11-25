@@ -13,7 +13,7 @@ static u8 tx_frame[1520];
 u32 link_platform_lock(void) { unsigned int f = test_if; test_if = 0; return f; }
 void link_platform_unlock(u32 f) { test_if = f; }
 void link_platform_idle(void) { }
-#include "net/link.c"
+#include "sys/net/link.c"
 void *kmemcpy(void *dst, const void *src, u32 n)
 {
     u8 *d = dst; const u8 *s = src;
@@ -55,7 +55,7 @@ int net_rx_take(u16 protocol, void *out, u32 cap, u32 *len)
     rx_length = 0;
     return 0;
 }
-#include "net/link_notify.c"
+#include "sys/net/link_notify.c"
 int host_mailbox_put(u32 generation, u16 service, u16 kind,
                      const void *data, u16 len, int alive)
 {

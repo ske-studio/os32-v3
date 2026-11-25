@@ -8,7 +8,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'arch/ppc/setjmp.S'
+SOURCE = ROOT / 'sys/arch/ppc/setjmp.S'
 
 HARNESS = r'''
 #include "arch_jmp_storage.h"

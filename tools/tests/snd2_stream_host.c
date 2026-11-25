@@ -9,7 +9,7 @@ static int yields, drain_progress, start_calls;
 static SND2_StreamDesc desc;
 unsigned locked;
 #ifdef TICK_PROBE
-#include "kernel/time/tick_probe.h"
+#include "sys/kern/time/tick_probe.h"
 static unsigned probe_depth, metric, measured[TP_EXTRA_COUNT];
 void tick_probe_sound_begin(unsigned id)
 {

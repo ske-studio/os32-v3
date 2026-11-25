@@ -1,4 +1,4 @@
-#include "gfx/v2/gfx2_sw.h"
+#include "sys/hal/gfx/v2/gfx2_sw.h"
 static u8 dst[16], src[8] = {1, 3, 9, 9, 3, 4, 9, 9};
 static int sync_calls, fail;
 int gfx2_fmt_info(u32 f, struct gfx2_fmt_info *o) { if (f != GFX2_FMT_INDEX8) return OS32_ERR_INVAL; o->cpp = 1; return 0; }

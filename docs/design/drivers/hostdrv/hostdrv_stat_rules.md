@@ -1,7 +1,7 @@
-# drivers/hostdrv/hostdrv_stat_rules.inc — HostDrv の stat・サイズ・open 失敗・時刻の規則
+# sys/dev/hostdrv/hostdrv_stat_rules.inc — HostDrv の stat・サイズ・open 失敗・時刻の規則
 
 > 状態: **現行 (2026-11-18)** — 出所: HSYNC_IMPROVEMENT_PLAN・TASK_H3・TASK_FS_TYPE の契約を今のソースと照らして要約
-ソース: `drivers/hostdrv/hostdrv_stat_rules.inc` (`hdrv_stat_fill`・`hdrv_size_result`・`hdrv_create_status_to_vfs`・`hdrv_filetime_to_unix`・`hdrv_stat_mtime`)・`drivers/hostdrv/hostdrvfs.c` (`hdrv_stat`・`hdrv_get_file_size`・`hostdrv_create`)
+ソース: `sys/dev/hostdrv/hostdrv_stat_rules.inc` (`hdrv_stat_fill`・`hdrv_size_result`・`hdrv_create_status_to_vfs`・`hdrv_filetime_to_unix`・`hdrv_stat_mtime`)・`sys/dev/hostdrv/hostdrvfs.c` (`hdrv_stat`・`hdrv_get_file_size`・`hostdrv_create`)
 
 ハイパーコールを叩く `hostdrvfs.c` はホストで組めないので、応答から結果を決める規則だけを純関数にしてある。
 `hostdrvfs.c` はこの `.inc` を取り込んで呼ぶだけで、判定の写しを持たない。取り込む側が全部を使うとは限らないので、

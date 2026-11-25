@@ -1,7 +1,7 @@
-# fs/vfs_fd.c — open の作成・切り詰め・排他的作成
+# sys/fs/vfs_fd.c — open の作成・切り詰め・排他的作成
 
 > 状態: **現行 (2026-11-18)** — 出所: TASK_FS_TYPE (B8)・TASK_H2 (O_EXCL) の契約を今のソースと照らして要約
-ソース: `fs/vfs_fd.c` (`vfs_open_internal`・`vfs_open_probe`)・`fs/vfs.h` (`VfsOps.create_excl`)・`fs/ext2/ext2_vfs.c` (`ext2_vfs_create_excl`)・`sdk/include/os32/os32_kapi_shared.h` (`KAPI_O_EXCL`)
+ソース: `sys/fs/vfs_fd.c` (`vfs_open_internal`・`vfs_open_probe`)・`sys/fs/vfs.h` (`VfsOps.create_excl`)・`sys/fs/ext2/ext2_vfs.c` (`ext2_vfs_create_excl`)・`sdk/include/os32/os32_kapi_shared.h` (`KAPI_O_EXCL`)
 
 `vfs_open`・`vfs_open_sqlite` などの open はすべて `vfs_open_internal` を通る。
 原則: **作成へ進めるのは「本当に無い」と分かったときだけ。** 読めなかったことを「無い」と読み替えると、
@@ -39,7 +39,7 @@
 
 経路の解決とマウントの確認は 1 より前 (マウントの外は `NOMOUNT`)。
 
-`create_excl(ctx, path)` の契約 (`fs/vfs.h`): 「無いことの確認 → 作成」を**1 回の呼び出しの中で**行う。
+`create_excl(ctx, path)` の契約 (`sys/fs/vfs.h`): 「無いことの確認 → 作成」を**1 回の呼び出しの中で**行う。
 
 - `VFS_OK` — 長さ 0 の通常ファイルを作った。open はサイズ 0 の FD を返す (`get_file_size` を通らない)。`O_TRUNC` を併せても余計な書き込みをしない。
 - `VFS_ERR_EXIST` — 名前が既に在る。**種別を問わない** (ディレクトリでも `ISDIR` ではなく `EXIST`)。作らない・切り詰めない。

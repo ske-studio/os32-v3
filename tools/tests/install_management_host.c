@@ -185,7 +185,7 @@ static int ide_pio_command(int drive, const IdeAddr *a, u32 count, void *dst, co
     else memcpy(dst, disk[a->sect_num], count * 512);
     return IDE_OK;
 }
-#include "drivers/ata/ide_request.inc"
+#include "sys/dev/ata/ide_request.inc"
 
 static int sync_disk(u32 unit)
 {

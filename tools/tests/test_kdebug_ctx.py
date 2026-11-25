@@ -9,7 +9,7 @@ Other indirect call sites are rejected and require an explicit model update.
 --mutate checks direct, transitive, callback, missing-mark and missing-slot REDs.
 """
 CHECK = dict(name='kdebug-ctx-host', tier=1,
-    covers=['tools/module_schema.py', 'sdk/kapi.json', 'kdebug/v86_gcap.c', 'kdebug/v86_gcap_math.c', 'kdebug/v86_gcap_diag.h', 'kdebug/kdebug_main.c', 'kdebug/generated/**', 'platform/pc98/legacy/v86_gcap.c', 'platform/pc98/legacy/v86_gcap.h', 'platform/pc98/legacy/v86_gcap_math.h', 'kernel/module/module.h', 'kernel/module/kdebug_imports.def', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
+    covers=['tools/module_schema.py', 'sdk/kapi.json', 'sys/platform/pc98/kdebug/v86_gcap.c', 'sys/platform/pc98/kdebug/v86_gcap_math.c', 'sys/platform/pc98/kdebug/v86_gcap_diag.h', 'sys/platform/pc98/kdebug/kdebug_main.c', 'kdebug/generated/**', 'sys/platform/pc98/legacy/v86_gcap.c', 'sys/platform/pc98/legacy/v86_gcap.h', 'sys/platform/pc98/legacy/v86_gcap_math.h', 'sys/kern/module/module.h', 'sys/kern/module/kdebug_imports.def', 'tools/gen_kdebug_imports.py', 'tools/mkmod.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=3.1,
     basis=['KDBG_PROBE_DESIGN'],
 )
@@ -91,8 +91,8 @@ def audit(functions, addresses, entries, main):
 
 def slot239(folder):
     source = folder / 'slot239.c'
-    source.write_text('''#include "kernel/module/module.h"
-#include "platform/pc98/legacy/v86_gcap.h"
+    source.write_text('''#include "sys/kern/module/module.h"
+#include "sys/platform/pc98/legacy/v86_gcap.h"
 struct kdebug kdebug;
 static int calls;
 static int capture(int mode, V86Gcap *out) {
@@ -109,7 +109,7 @@ void _start(void) {
 ''')
     exe = folder / 'slot239'
     subprocess.run(['gcc', *FLAGS, *INCLUDES, '-nostdlib', '-static', '-no-pie',
-                    str(source), str(ROOT / 'platform/pc98/legacy/v86_gcap.c'), '-o', str(exe)], check=True)
+                    str(source), str(ROOT / 'sys/platform/pc98/legacy/v86_gcap.c'), '-o', str(exe)], check=True)
     for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
         assert host32.run([str(exe)], runner=runner).returncode == 0
     print('PASS slot 239: OFF NOSYS, ON dispatch with unchanged arguments')
@@ -118,7 +118,7 @@ void _start(void) {
 def main():
     entries = gen.load_def()
     sources = {n: (ROOT / 'kdebug' / n).read_text() for n in ('v86_gcap.c', 'v86_gcap_math.c')}
-    initializer = (ROOT / 'kdebug/kdebug_main.c').read_text()
+    initializer = (ROOT / 'sys/platform/pc98/kdebug/kdebug_main.c').read_text()
     with tempfile.TemporaryDirectory(prefix='kdebug-ctx-') as td:
         folder = Path(td)
         functions, addresses = graph(folder, sources)

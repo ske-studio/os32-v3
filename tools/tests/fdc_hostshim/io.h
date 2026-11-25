@@ -1,8 +1,8 @@
 /* ========================================================================
  *  tools/tests/fdc_hostshim/io.h — ホスト試験用の io.h 差し替え
  *
- *  include/io.h は inp / outp を特権命令のインライン asm で定義するので、
- *  ホストで drivers/block/fdc.c をそのまま走らせるために -I で先に置いて差し替え、
+ *  sys/include/io.h は inp / outp を特権命令のインライン asm で定義するので、
+ *  ホストで sys/dev/block/fdc.c をそのまま走らせるために -I で先に置いて差し替え、
  *  ポート操作を試験側の µPD765A の模型 (tools/tests/fdc_track_host.c) へ回す。
  *  pcm_hostshim/io.h と同じ作法。
  *

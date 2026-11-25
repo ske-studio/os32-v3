@@ -50,7 +50,7 @@ def snapshot(map_path, read_mem):
             raise ValueError("symbol missing from kernel.map: " + name)
         addresses[name] = address
     # page_directory is static and GNU ld's map does not export it.
-    header = (ROOT / "include/memmap.h").read_text()
+    header = (ROOT / "sys/include/memmap.h").read_text()
     match = re.search(r"^#define MEM_FIXED_PAGING_BASE\s+(0x[0-9a-fA-F]+)UL", header, re.M)
     if not match:
         raise ValueError("MEM_FIXED_PAGING_BASE definition missing")

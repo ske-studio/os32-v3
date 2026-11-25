@@ -1,4 +1,4 @@
-#include "drivers/usb/usb_core.h"
+#include "sys/dev/usb/usb_core.h"
 /* No libc (CI has no 32-bit libc/crt), as tick_probe_host.c: a zeroing bump
  * pool, local mem*, and exit through the i386 Linux syscall. */
 static unsigned char heap[65536] __attribute__((aligned(16)));

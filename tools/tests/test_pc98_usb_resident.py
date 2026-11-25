@@ -6,17 +6,17 @@ import tempfile
 import host32
 from kernel_includes import include_flags
 
-SOURCE = 'platform/pc98/usb_resident.c'
-PLATFORM = 'platform/pc98/usb_platform.c'
-BODY = 'platform/pc98/usb_module.c'
+SOURCE = 'sys/platform/pc98/usb_resident.c'
+PLATFORM = 'sys/platform/pc98/usb_platform.c'
+BODY = 'sys/platform/pc98/usb_module.c'
 HAL = ['in2_dev', 'in2_state', 'in2_ring', 'kbd_merge', 'pointer_state', 'mouse_ext',
        'legacy_keymap', 'keymap_registry', 'keymap_eval', 'keymap_state']
-SUPPORT = ['input/keymaps/hid_jp.c', 'kernel/module/module_runtime.c', 'lib/kstring_c.c',
+SUPPORT = ['sys/input/keymaps/hid_jp.c', 'sys/kern/module/module_runtime.c', 'sys/kern/kstring_c.c',
            *[f'input/hal/{name}.c' for name in HAL]]
 HOST = 'tools/tests/pc98_usb_resident_host.c'
 CHECK = dict(name='pc98-usb-resident-host', tier=1, needs=[], budget=16,
-             covers=['input/keymaps/hid_jp.c', 'kernel/module/module_runtime.c', 'lib/kstring_c.c', 'input/hal/*.c', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py', 'tools/tests/kbd_hostshim/io.h', 'lib/*.h', 'mm/*.h', 'fs/*.h', 'platform/pc98/usb_module.c', 'input/hal/*.h', 'platform/pc98/usb_resident.c', 'tools/tests/pc98_usb_resident_host.c', 'platform/pc98/usb_platform.c', 'platform/pc98/usb*.h',
-                     'platform/pc98/tick_order.h', 'platform/pc98/platform_ver.h', 'kernel/ver_info.h', 'kernel/sqlite_engine.h', 'kernel/idle_work.h', 'kernel/irq/*.h', 'kernel/module/*.h',
+             covers=['sys/input/keymaps/hid_jp.c', 'sys/kern/module/module_runtime.c', 'sys/kern/kstring_c.c', 'input/hal/*.c', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py', 'tools/tests/kbd_hostshim/io.h', 'lib/*.h', 'mm/*.h', 'fs/*.h', 'sys/platform/pc98/usb_module.c', 'input/hal/*.h', 'sys/platform/pc98/usb_resident.c', 'tools/tests/pc98_usb_resident_host.c', 'sys/platform/pc98/usb_platform.c', 'platform/pc98/usb*.h',
+                     'sys/platform/pc98/tick_order.h', 'sys/platform/pc98/platform_ver.h', 'sys/kern/ver_info.h', 'sys/kern/sqlite_engine.h', 'sys/kern/idle_work.h', 'kernel/irq/*.h', 'kernel/module/*.h',
                      'drivers/pci/*.h', 'drivers/usb/*.h', 'include/*.h', 'arch/x86/*.h',
                      'sdk/include/os32/*.h', 'tools/tests/test_pc98_usb_resident.py'],
              basis=['docs/decisions/usb/USB_DESIGN.md §4-1, §7-3'])
@@ -31,7 +31,7 @@ MUTANTS = [('if (active) core->service()', 'core->service()', 1),
 
 def run(ctx):
     root = Path(ctx.root)
-    paths = (SOURCE, PLATFORM, BODY, 'input/hal/usb_input.c')
+    paths = (SOURCE, PLATFORM, BODY, 'sys/hal/input/usb_input.c')
     originals = [(root / path).read_text() for path in paths]
     with tempfile.TemporaryDirectory() as tmp:
         sources = [Path(tmp) / Path(path).name for path in paths]

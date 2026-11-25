@@ -27,7 +27,7 @@ KAPI 変更後は `make clean` → `make all` ([ABI])。
 正典: [docs/CONSTRAINTS.md](docs/CONSTRAINTS.md)。
 
 - **[C1]** 内部は GNU11、公開 SDK ヘッダは C89/GNU89、SQLite は GNU89。暗黙の宣言・int、VLA 等を禁止。
-- **[C2]** カーネルの文字列操作は `lib/kstring.h` を使う。
+- **[C2]** カーネルの文字列操作は `sys/kern/kstring.h` を使う。
 - **[C4]** 番地・サイズ・パスは定数の 3 層管理に従う。
 - **[C5]** 物理番地とポインタの変換は `P2V` / `V2P` 等に集約する。
 - **[ABI]** `sdk/kapi.json` を正とし、末尾追加・版上げ・clean ビルドを行う。ラッパーは生成する。
@@ -49,7 +49,7 @@ KAPI 変更後は `make clean` → `make all` ([ABI])。
 |---|---|
 | 知らないサブシステムに触る | [`docs/WORK_GUIDE.md`](docs/WORK_GUIDE.md) (作業別の入口)・[`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) §2 (ファイル地図) |
 | **落とし穴を先に知る** (検証・配備 / 実機と NP21/W の差 / カーネル・FS / GUI・入力) | [`docs/POLICY_DEBUG.md`](docs/POLICY_DEBUG.md) §4 冒頭の「領域別の早見」 |
-| 番地・帯域 | [`docs/02_memory.md`](docs/02_memory.md) §2-1 (説明の正典。地図は `make docs-gen` → `build/out/MEMMAP.md`、定義は `include/memmap.h`、PC-98 の起動の番地は `platform/pc98/platform_boot_layout.h`) |
+| 番地・帯域 | [`docs/02_memory.md`](docs/02_memory.md) §2-1 (説明の正典。地図は `make docs-gen` → `build/out/MEMMAP.md`、定義は `sys/include/memmap.h`、PC-98 の起動の番地は `sys/platform/pc98/platform_boot_layout.h`) |
 | ビルド・配備・検証を選ぶ | [`docs/08_build.md`](docs/08_build.md) §8-4 |
 | KAPI の追加・変更 | スキル **[os32-kapi-add](.claude/skills/os32-kapi-add/SKILL.md)**、[`docs/KAPI_SPEC.md`](docs/KAPI_SPEC.md) §3-1 ([ABI]) |
 | 共通・CPU・機種・装置の境目に触る (層の検査、機種のヘッダ、ソースの移動) | スキル **[os32-arch-sep](.claude/skills/os32-arch-sep/SKILL.md)**、[`docs/design/tools/check_layers.md`](docs/design/tools/check_layers.md) §8 |

@@ -8,7 +8,7 @@ typedef uint32_t u32;
 #define ATTR_RED 1
 #define ATTR_WHITE 2
 #define str_eq(a,b) (strcmp(a,b) == 0)
-#include "../../kdebug/recover_wire.h"
+#include "../../sys/kern/kdebug/recover_wire.h"
 static char output[512];
 static u32 called, observed_op, observed_session;
 static int result;

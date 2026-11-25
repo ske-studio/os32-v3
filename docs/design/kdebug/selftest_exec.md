@@ -1,6 +1,6 @@
-# kdebug/selftest_exec.c — 設計
+# sys/arch/x86/kdebug/selftest_exec.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: SLIM_KERNEL_DESIGN.md・SLIM_KERNEL_IMPORTS.md (D1 で移した)
-ソース: `kdebug/selftest_exec.c`
+ソース: `sys/arch/x86/kdebug/selftest_exec.c`
 
 ## SLIM_KERNEL_DESIGN
 
@@ -10,7 +10,7 @@ struct kselftest_exec_view view;
 kdi_selftest_exec_view(&view);
 ```
 
-- exec の 2 本は `kdebug/selftest_exec.c` へ移し、各入口で snapshot を 1 回取る。
+- exec の 2 本は `sys/arch/x86/kdebug/selftest_exec.c` へ移し、各入口で snapshot を 1 回取る。
 
 ## SLIM_KERNEL_IMPORTS
 

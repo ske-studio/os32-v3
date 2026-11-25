@@ -1,9 +1,9 @@
 """TSC integer conversion, fake endpoints, calibration and permanent fallback."""
 CHECK = dict(name='tick-tsc-host', tier=4, needs=[], budget=5.0,
-    covers=['platform/pc98/tsc_clock.[ch]', 'platform/pc98/tsc_math.c',
-            'platform/pc98/pit.h', 'platform/pc98/pit_math.h',
-            'arch/x86/arch_cpu.h', 'kernel/io_work.h', 'kernel/io_policy.h', 'kernel/irq/irq.h',
-            'kernel/time/tick_clock.h', 'include/types.h', 'lib/divdi3.c',
+    covers=['platform/pc98/tsc_clock.[ch]', 'sys/platform/pc98/tsc_math.c',
+            'sys/platform/pc98/pit.h', 'sys/platform/pc98/pit_math.h',
+            'sys/arch/x86/arch_cpu.h', 'sys/kern/io_work.h', 'sys/kern/io_policy.h', 'sys/kern/irq/irq.h',
+            'sys/hal/time/tick_clock.h', 'sys/include/types.h', 'lib/divdi3.c',
             'tools/tests/tick_tsc_host.c', 'tools/tests/test_tick_tsc.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     basis=['TICK_T123_DESIGN §2'],
@@ -17,38 +17,38 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
-    ('platform/pc98/tsc_clock.c', 'if (tsc_busy) return IO_MORE;', 'if (0) return IO_MORE;'),
-    ('platform/pc98/tsc_clock.c', 'io_request(IO_SVC_TSC_CALIBRATE);', '(void)0;'),
-    ('platform/pc98/tsc_clock.c', 'state == TSC_CALIBRATING || state == TSC_READY ? IO_MORE : IO_DONE',
+    ('sys/platform/pc98/tsc_clock.c', 'if (tsc_busy) return IO_MORE;', 'if (0) return IO_MORE;'),
+    ('sys/platform/pc98/tsc_clock.c', 'io_request(IO_SVC_TSC_CALIBRATE);', '(void)0;'),
+    ('sys/platform/pc98/tsc_clock.c', 'state == TSC_CALIBRATING || state == TSC_READY ? IO_MORE : IO_DONE',
      'state == TSC_CALIBRATING || state == TSC_READY ? IO_DONE : IO_DONE'),
-    ('platform/pc98/tsc_clock.c', 'if ((int)(ms - next_work_ms) < 0) return;', 'if (0) return;'),
-    ('platform/pc98/tsc_clock.c', '++consecutive_rejects >= TSC_REJECT_LIMIT',
+    ('sys/platform/pc98/tsc_clock.c', 'if ((int)(ms - next_work_ms) < 0) return;', 'if (0) return;'),
+    ('sys/platform/pc98/tsc_clock.c', '++consecutive_rejects >= TSC_REJECT_LIMIT',
      'consecutive_rejects >= TSC_REJECT_LIMIT'),
-    ('platform/pc98/tsc_math.c', '(delta >> 32) * mult', '0ULL * mult'),
-    ('platform/pc98/tsc_clock.c', 'epoch_fraction = fraction;', 'epoch_fraction = 0;'),
-    ('platform/pc98/tsc_clock.c', 'if (!arch_cpu_has_tsc())', 'if (0)'),
-    ('platform/pc98/tsc_clock.c', 'if (now < origin)', 'if (0)'),
-    ('platform/pc98/tsc_clock.c', 'k >= 1 && k <= 2', 'k >= 1'),
-    ('platform/pc98/tsc_clock.c', 'distance <= limit', 'distance <= (limit & 0u)'),
-    ('platform/pc98/tsc_clock.c', 'if (++diag.missing == 1)', 'if (1)'),
-    ('platform/pc98/tsc_clock.c', 'diag.abnormal = 0;\n    if (reason', '(void)0;\n    if (reason'),
-    ('platform/pc98/tsc_clock.c', 't > w->us && missing_window(d, w->us)', 'missing_window(d, w->us)'),
-    ('platform/pc98/tsc_clock.c', '2u * TSC_ENDPOINT_US + (550ULL * us', '8u + (550ULL * us'),
-    ('platform/pc98/tsc_clock.c', 'w->cost <= allowance', 'w->cost < allowance'),
-    ('platform/pc98/tsc_clock.c', 'return w->cost <= allowance;', 'return w->cost <= allowance * 2;'),
-    ('platform/pc98/tsc_clock.c', 'high - low > low / 2000u', 'high - low > low'),
-    ('platform/pc98/tsc_clock.c', 'elapsed < TSC_WINDOW_MIN_US || elapsed > TSC_WINDOW_MAX_US',
+    ('sys/platform/pc98/tsc_math.c', '(delta >> 32) * mult', '0ULL * mult'),
+    ('sys/platform/pc98/tsc_clock.c', 'epoch_fraction = fraction;', 'epoch_fraction = 0;'),
+    ('sys/platform/pc98/tsc_clock.c', 'if (!arch_cpu_has_tsc())', 'if (0)'),
+    ('sys/platform/pc98/tsc_clock.c', 'if (now < origin)', 'if (0)'),
+    ('sys/platform/pc98/tsc_clock.c', 'k >= 1 && k <= 2', 'k >= 1'),
+    ('sys/platform/pc98/tsc_clock.c', 'distance <= limit', 'distance <= (limit & 0u)'),
+    ('sys/platform/pc98/tsc_clock.c', 'if (++diag.missing == 1)', 'if (1)'),
+    ('sys/platform/pc98/tsc_clock.c', 'diag.abnormal = 0;\n    if (reason', '(void)0;\n    if (reason'),
+    ('sys/platform/pc98/tsc_clock.c', 't > w->us && missing_window(d, w->us)', 'missing_window(d, w->us)'),
+    ('sys/platform/pc98/tsc_clock.c', '2u * TSC_ENDPOINT_US + (550ULL * us', '8u + (550ULL * us'),
+    ('sys/platform/pc98/tsc_clock.c', 'w->cost <= allowance', 'w->cost < allowance'),
+    ('sys/platform/pc98/tsc_clock.c', 'return w->cost <= allowance;', 'return w->cost <= allowance * 2;'),
+    ('sys/platform/pc98/tsc_clock.c', 'high - low > low / 2000u', 'high - low > low'),
+    ('sys/platform/pc98/tsc_clock.c', 'elapsed < TSC_WINDOW_MIN_US || elapsed > TSC_WINDOW_MAX_US',
      'elapsed < TSC_WINDOW_MIN_US || elapsed > TSC_BOOT_LIMIT_US'),
-    ('platform/pc98/tsc_clock.c', '++diag.late;', 'reject(REJECT_LENGTH);'),
-    ('platform/pc98/tsc_clock.c', 'diag.last_late_us = (u32)elapsed;',
+    ('sys/platform/pc98/tsc_clock.c', '++diag.late;', 'reject(REJECT_LENGTH);'),
+    ('sys/platform/pc98/tsc_clock.c', 'diag.last_late_us = (u32)elapsed;',
      'diag.last_late_us = (u32)elapsed; consecutive_rejects = 0;'),
-    ('platform/pc98/tsc_clock.c', 'if (!_irq_enabled() || kctx_irq_depth)', 'if (0)'),
+    ('sys/platform/pc98/tsc_clock.c', 'if (!_irq_enabled() || kctx_irq_depth)', 'if (0)'),
 )
 
 
 def verify(work, mutation=None):
-    for rel in ('platform/pc98/tsc_clock.c', 'platform/pc98/tsc_math.c',
-                'platform/pc98/tsc_clock.h'):
+    for rel in ('sys/platform/pc98/tsc_clock.c', 'sys/platform/pc98/tsc_math.c',
+                'sys/platform/pc98/tsc_clock.h'):
         source = (ROOT / rel).read_text()
         if mutation and rel == mutation[0]:
             assert source.count(mutation[1]) == 1, mutation
@@ -61,7 +61,7 @@ def verify(work, mutation=None):
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(source)
     # Model instruction results while executing the actual capability guards.
-    cpu = (ROOT / 'arch/x86/arch_cpu.h').read_text()
+    cpu = (ROOT / 'sys/arch/x86/arch_cpu.h').read_text()
     cpu = cpu[cpu.index('static inline int arch_cpu_has_cpuid'):cpu.index('#endif /* ARCH_CPU_H */')]
     cpu = cpu.replace('__asm__ volatile("pushfl; popl %0" : "=r"(old));', 'old = fake_flags;')
     cpu, n = re.subn(r'__asm__ volatile\("pushl %0; popfl; pushfl; popl %1; pushl %2; popfl".*?;',

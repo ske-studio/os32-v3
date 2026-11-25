@@ -6,8 +6,8 @@
 ## 何をするか
 
 IPADIC 2.7.0 の CSV から、かな漢字変換のシステム辞書を SQLite で作る。
-ゲストは辞書を読み取り専用で開き、ヘッダと meta を `kernel/sqlite_engine.c` の `fep_meta_probe` で検査する。
-この文書の形式を変えたら、その検査と `kernel/ime/ime_store.h` の定数も揃える。
+ゲストは辞書を読み取り専用で開き、ヘッダと meta を `sys/kern/sqlite_engine.c` の `fep_meta_probe` で検査する。
+この文書の形式を変えたら、その検査と `sys/kern/ime/ime_store.h` の定数も揃える。
 
 | 版 | 閾値 (正規化後の cost) | 生成先 | ゲストのパス |
 |---|---|---|---|
@@ -59,7 +59,7 @@ IPADIC 2.7.0 の CSV から、かな漢字変換のシステム辞書を SQLite 
 
 user_version が 0 で page_size が 1024、`dict` の 4 列が prepare できれば旧形式として開く。meta は無くてよい。
 2 以上は `INVAL` で断る。ヘッダが壊れた物を旧形式とみなさない。
-旧形式の既定値 (`dict_id`・品詞の版・尺度・予約 192・cache 16、variant はパスから) は `kernel/ime/ime_store.h` の定数。
+旧形式の既定値 (`dict_id`・品詞の版・尺度・予約 192・cache 16、variant はパスから) は `sys/kern/ime/ime_store.h` の定数。
 
 ## 検査
 

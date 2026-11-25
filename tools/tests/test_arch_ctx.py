@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """W4b C evidence; no ID is closed by these partial host vectors."""
 CHECK = dict(env=['ppc-cross'], name='arch-ctx-host', tier=2, budget=15, needs=[], covers=['tools/tests/idle_io_sources.py', 'kernel/io_work.[ch]',
-            'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'exec/appslot.h',
+            'sys/kern/io_clock.h', 'kernel/io_policy.[ch]', 'sys/kern/exec/appslot.h',
 
     'tools/tests/test_arch_ctx.py', 'tools/tests/arch_ctx_host.c',
     'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk',
-    'arch/ppc/kernel_trap.c', 'arch/ppc/*.h',
-    'arch/x86/kernel/syscall_entry.c', 'arch/x86/arch_exec_storage.h',
-    'exec/exec_syscall.inc', 'kernel/idle_work.[ch]', 'net/nic.h', 'kernel/irq/irq.h',
-    'platform/powermac/ppc_kernel.c', 'platform/powermac/lan_monitor.c', 'platform/powermac/platform_irq_limits.h',
+    'sys/arch/ppc/kernel_trap.c', 'arch/ppc/*.h',
+    'sys/arch/x86/kernel/syscall_entry.c', 'sys/arch/x86/arch_exec_storage.h',
+    'sys/kern/exec/exec_syscall.inc', 'kernel/idle_work.[ch]', 'sys/net/nic.h', 'sys/kern/irq/irq.h',
+    'sys/platform/powermac/ppc_kernel.c', 'sys/platform/powermac/lan_monitor.c', 'sys/platform/powermac/platform_irq_limits.h',
     'include/**', 'sdk/include/os32/**'],
     # W4c landed: the PPC vectors now assert the contract, so nothing here is pinned any more.
     basis=['AC-CTX-1', 'AC-CTX-5', 'AC-CTX-7'],
@@ -52,11 +52,11 @@ def exercise(root, work, provider, vector, trap, idle, product=None):
 
 def run(ctx):
     root = ctx.root
-    ppc = (root / 'arch/ppc/kernel_trap.c').read_text()
-    x86 = (root / 'arch/x86/kernel/syscall_entry.c').read_text()
-    idle = (root / 'kernel/idle_work.c').read_text()
-    common = (root / 'exec/exec_syscall.inc').read_text()
-    monitor = (root / 'platform/powermac/lan_monitor.c').read_text()
+    ppc = (root / 'sys/arch/ppc/kernel_trap.c').read_text()
+    x86 = (root / 'sys/arch/x86/kernel/syscall_entry.c').read_text()
+    idle = (root / 'sys/kern/idle_work.c').read_text()
+    common = (root / 'sys/kern/exec/exec_syscall.inc').read_text()
+    monitor = (root / 'sys/platform/powermac/lan_monitor.c').read_text()
     with tempfile.TemporaryDirectory(prefix='arch-ctx-') as td:
         work = Path(td)
         (work / 'io.h').write_text('int _irq_enabled(void); void _idle(void);\n')
@@ -65,7 +65,7 @@ def run(ctx):
         (work / 'ctx_entry.inc').write_text(common[start:common.index('    arch_kapi_source(', start)])
         start = monitor.index('int pm_lan_copy8(')
         (work / 'ctx_onfault.inc').write_text(monitor[start:monitor.index('\nvoid pm_lan_execute(', start)])
-        probes = (root / 'platform/powermac/ppc_kernel.c').read_text()
+        probes = (root / 'sys/platform/powermac/ppc_kernel.c').read_text()
         start = probes.index('static int probe_dsi(')
         (work / 'ctx_probes.inc').write_text(probes[start:probes.index('/* Remap one VA', start)])
         for provider, trap, vectors in [('ppc', ppc, VECTORS), ('x86', x86, (1, 4))]:
@@ -87,7 +87,7 @@ def run(ctx):
             subprocess.run([str(cc), '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                 '-ffreestanding', '-I' + str(root), '-I' + str(root / 'arch/ppc'),
                 '-I' + str(root / 'include'), '-I' + str(root / 'platform/powermac'),
-                '-c', str(root / 'arch/ppc/kernel_trap.c'),
+                '-c', str(root / 'sys/arch/ppc/kernel_trap.c'),
                 '-o', str(work / 'ppc.o')], check=True)
             print('PASS PowerPC real trap cross compile', flush=True)
         if ctx.mutate:
@@ -126,7 +126,7 @@ def run(ctx):
                 mutant = replace_once(idle, anchor, '')
                 assert exercise(root, work, 'ppc', 1, ppc, mutant) == 1
                 print('RED runtime: ' + label, flush=True)
-            product = (root / 'kernel/io_work.c').read_text()
+            product = (root / 'sys/kern/io_work.c').read_text()
             mutant = replace_once(product, 'if (running) return 0;', 'if (0) return 0;')
             assert exercise(root, work, 'ppc', 1, ppc, idle, mutant) == 1
             print('RED runtime: idle running (dispatcher)', flush=True)

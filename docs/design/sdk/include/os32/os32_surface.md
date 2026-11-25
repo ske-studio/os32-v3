@@ -2,4 +2,4 @@
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
 ソース: `sdk/include/os32/os32_surface.h`
 
-SURFACE の GF 識別定数は既存 ID の末尾へ追加し、`mm/pgalloc.h`・`sdk/include/os32/os32_surface.h` の `OS32_SURFACE_CIRRUS`・`exec/surface_query.c` を追従する。
+SURFACE の GF 識別定数は既存 ID の末尾へ追加し、`sys/kern/mm/pgalloc.h`・`sdk/include/os32/os32_surface.h` の `OS32_SURFACE_CIRRUS`・`sys/kern/exec/surface_query.c` を追従する。

@@ -1,4 +1,4 @@
-# kdebug/gfinit_resources/bars.inc — 設計
+# sys/dev/video/geforce/gfinit_resources/bars.inc — 設計
 > 状態: **現行 (2026-11-10)**
 
 `pci_bar_get` の記録から長さを取得し、元の BAR 値との一致を照合する。

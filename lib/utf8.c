@@ -22,7 +22,7 @@
 #include "utf8.h"
 #include "endian_le.h"
 #ifdef __KERNEL_BUILD__
-#include "../kernel/console/unicode_file.h"
+#include "../sys/kern/console/unicode_file.h"
 #else
 /* The CRT and shlib each supply their initialized KAPI pointer. */
 extern KernelAPI *kapi;
@@ -56,7 +56,7 @@ int utf8_char_bytes(const u8 *p)
  * **並びは CPU のバイト順ではなく、この関数が決めている** —
  * 先頭バイトが最下位、という約束は utf8_cmp32 の bswap32 と対になっていて、
  * 比較の正しさがそこに乗っている。だから素の `*(const u32 *)p` ではなく
- * le32_rd() を通す (include/endian_le.h)。x86 では同じ 1 命令に畳まれる。
+ * le32_rd() を通す (sys/include/endian_le.h)。x86 では同じ 1 命令に畳まれる。
  *
  * 注意: 呼び出し側でバッファ末尾の4B読み出し境界をチェックすること
  *       (le32_rd も 4 バイトを読む。ここは以前と同じ約束)。

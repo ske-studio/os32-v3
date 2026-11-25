@@ -11,10 +11,10 @@ sys.path.insert(0, str(ROOT / 'tools'))
 import ppc_lan_host as host
 
 CHECK = {'id': 'ppc-hostfs-wire', 'covers': ['tools/tests/ppc_hostfs_wire.py'],
-         'inputs': ['platform/powermac/lan_wire.c', 'platform/powermac/lan_boot.h',
-                    'include/types.h', 'lib/kstring.h', 'lib/kstring_c.c',
+         'inputs': ['sys/platform/powermac/lan_wire.c', 'sys/platform/powermac/lan_boot.h',
+                    'sys/include/types.h', 'sys/kern/kstring.h', 'sys/kern/kstring_c.c',
                     'tools/ppc_lan_host.py']}
-SOURCE = ROOT / 'platform/powermac/lan_wire.c'
+SOURCE = ROOT / 'sys/platform/powermac/lan_wire.c'
 
 class Header(ctypes.Structure):
     _fields_ = [('boot', ctypes.c_ubyte * 16), ('nonce', ctypes.c_ubyte * 16),
@@ -31,7 +31,7 @@ def exercise(source, directory):
     subprocess.run(['gcc', '-Wall', '-Wextra', '-Werror', '-shared', '-fPIC', '-std=gnu11',
                     '-I', str(ROOT), '-I', str(ROOT / 'include'),
                     '-I', str(ROOT / 'platform/powermac'), str(path / 'wire.c'),
-                    str(ROOT / 'lib/kstring_c.c'), '-o', str(lib)], check=True)
+                    str(ROOT / 'sys/kern/kstring_c.c'), '-o', str(lib)], check=True)
     c = ctypes.CDLL(str(lib))
     h = Header()
     h.kind, h.size = 10, 1044

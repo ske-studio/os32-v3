@@ -1,6 +1,6 @@
-# platform/pc98/pic.c — 設計
+# sys/platform/pc98/pic.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_B_DESIGN (D1 で移した)
-ソース: `platform/pc98/pic.c`
+ソース: `sys/platform/pc98/pic.c`
 
 ```c
 void pic_init(void);

@@ -3,14 +3,14 @@
  * child VAs backed by different owner pages. */
 #include "exec_heap.h"
 #define kfree heap_kernel_free
-#include "mm/kmalloc.c"
+#include "sys/kern/mm/kmalloc.c"
 #undef kfree
-#include "exec/access_walk.c"
+#include "sys/kern/exec/access_walk.c"
 int shlib_read_page(u32 va, u32 pa) { (void)va; (void)pa; return 0; }
 u32 exec_tramp_page_addr(void) { return 0; }
 volatile int ring3_wm_depth;
 int ring3_call_from_user(void) { return ring3_in_syscall && !ring3_wm_depth; }
-#include "exec/redir_access.c"
+#include "sys/kern/exec/redir_access.c"
 static u32 heap_page_walks;
 static int heap_access_page(const struct addrspace *as, u32 va, int write, u32 *pa) {
     heap_page_walks++;

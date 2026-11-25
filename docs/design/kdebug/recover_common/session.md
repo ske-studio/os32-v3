@@ -1,6 +1,6 @@
-# kdebug/recover_common/session.inc — 設計
+# sys/dev/video/geforce/diag/recover_common/session.inc — 設計
 > 状態: **現行 (2026-10-31)** — 出所: GF6200_4A_DESIGN.md・GF_STAGES_DESIGN.md・REALHW_RECOVER_ADDENDUM.md・REALHW_RECOVER_DESIGN.md (D1 で移した)
-ソース: `kdebug/recover_common/session.inc`
+ソース: `sys/dev/video/geforce/diag/recover_common/session.inc`
 
 ## GF6200_4A_DESIGN
 

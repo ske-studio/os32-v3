@@ -11,9 +11,9 @@ import kboot_vectors as v
 from run import command, require
 CHECK = dict(name='kboot-mpic', tier=2, budget=600, needs=[],
              covers=v.CHECK['covers']+['platform/powermac/mpic*',
-                     'platform/powermac/kboot_capture.c', 'platform/powermac/kboot_info.h',
-                     'platform/powermac/gmac_tree.c', 'platform/powermac/via_tree.c',
-                     'platform/powermac/via_window.h', 'include/memmap.h',
+                     'sys/platform/powermac/kboot_capture.c', 'sys/platform/powermac/kboot_info.h',
+                     'sys/platform/powermac/gmac_tree.c', 'sys/platform/powermac/via_tree.c',
+                     'sys/platform/powermac/via_window.h', 'sys/include/memmap.h',
                      'platform/powermac/ppc_pmap.h', 'tools/ppc/kboot_mpic*'])
 # Expected exit and reach marker are both mandatory; errors are not RED.
 MUTATIONS = [
@@ -93,9 +93,9 @@ void fixture_main(void)
     fixture=out/'fixture.c'; fixture.write_text(text)
     old=v.PRODUCT
     v.PRODUCT=[p for p in old if p!='tools/ppc/kboot_vectors_fixture.c']+[
-        str(fixture),str(source),'platform/powermac/mpic_tree.c','platform/powermac/kboot_capture.c',
-        'platform/powermac/via_tree.c', 'platform/powermac/gmac_tree.c']
-    try: return v.build(out,v.ROOT/'arch/ppc/kernel_vectors.S')
+        str(fixture),str(source),'sys/platform/powermac/mpic_tree.c','sys/platform/powermac/kboot_capture.c',
+        'sys/platform/powermac/via_tree.c', 'sys/platform/powermac/gmac_tree.c']
+    try: return v.build(out,v.ROOT/'sys/arch/ppc/kernel_vectors.S')
     finally: v.PRODUCT=old
 
 
@@ -126,7 +126,7 @@ def main():
         print('SKIP kboot-mpic: unavailable ' + ', '.join(missing), flush=True)
         return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
     v.CROSS = cross
-    out=v.ROOT/'build/out/ppc/kboot-mpic'; source=v.ROOT/'platform/powermac/mpic.c'
+    out=v.ROOT/'build/out/ppc/kboot-mpic'; source=v.ROOT/'sys/platform/powermac/mpic.c'
     host(out/'host',source)
     dest=out/'qemu'; elf=image(dest,source)
     header=command([str(v.CROSS)+'readelf','-hSWl',elf])

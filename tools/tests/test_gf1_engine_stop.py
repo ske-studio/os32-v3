@@ -1,7 +1,7 @@
 """Engine reset pulses and failure containment against fake MMIO."""
 CHECK = dict(name='gf1-engine-stop', tier=1,
-    covers=['hwdev/gf/engine_stop.c', 'hwdev/gf/foundation.h',
-            'hwdev/gf/internal.h', 'kdebug/recover.h', 'include/types.h',
+    covers=['sys/dev/video/geforce/engine_stop.c', 'sys/dev/video/geforce/foundation.h',
+            'sys/dev/video/geforce/internal.h', 'sys/dev/video/geforce/diag/recover.h', 'sys/include/types.h',
             'tools/tests/gf1_engine_stop_host.c', 'tools/tests/test_gf1_engine_stop.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.8,
@@ -17,7 +17,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'hwdev/gf/engine_stop.c'
+SOURCE = ROOT / 'sys/dev/video/geforce/engine_stop.c'
 
 
 def main():

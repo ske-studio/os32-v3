@@ -23,9 +23,9 @@
 
 P1-0 の個別の用途判断を先に適用し、製品にだけ P0-1 の層を使う。例えば試験が vendor を入力にしても vendor の所有は変わらない。末尾の棚卸し用ファイルも開発・検査用実装とし、P1 の配置作業の母数と分けて照合する。
 
-像の対象は、その構成が何をコンパイル・リンクするかで決める。所属は、実装が提供する機能と、その実装に必要な命令・機種仕様・装置で決める。例えば userland/ppc/hello.c は PPC 像に入るが SDK の呼出しだけなので共通実装。同じ場所の dbprob.c は FPSCR を操作するため CPU 固有。lib/kprintf.c は C_COMMON_CORE で書式処理を提供し、固定名 platform_kprintf.h を通じて機種に出力を委ねるため共通実装。
+像の対象は、その構成が何をコンパイル・リンクするかで決める。所属は、実装が提供する機能と、その実装に必要な命令・機種仕様・装置で決める。例えば userland/ppc/hello.c は PPC 像に入るが SDK の呼出しだけなので共通実装。同じ場所の dbprob.c は FPSCR を操作するため CPU 固有。sys/kern/kprintf.c は C_COMMON_CORE で書式処理を提供し、固定名 platform_kprintf.h を通じて機種に出力を委ねるため共通実装。
 
-P1 の照合は check_layers.owner の名前つきヘッダと配置、担当表の用途、基点の Make 所属集合に直接記されたソースを使う。すべての所属候補と記入値を照合し、食い違いをパスごとに表示する。NAMED のヘッダと固定名の契約ヘッダは、その宣言・配置が定める所属と異なれば根拠欄の記述にかかわらず失敗する。その他の食い違いでは採用した種類と理由を「所属判断=種類：理由」と根拠欄に記す。例えば drivers/pci/pci.c は C_COMMON_EXEC に入るが、PCI 装置の処理を提供する。条件式・wildcard を含む像の依存全体の展開は P4 の 3の問い合わせが扱う。
+P1 の照合は check_layers.owner の名前つきヘッダと配置、担当表の用途、基点の Make 所属集合に直接記されたソースを使う。すべての所属候補と記入値を照合し、食い違いをパスごとに表示する。NAMED のヘッダと固定名の契約ヘッダは、その宣言・配置が定める所属と異なれば根拠欄の記述にかかわらず失敗する。その他の食い違いでは採用した種類と理由を「所属判断=種類：理由」と根拠欄に記す。例えば sys/dev/pci/pci.c は C_COMMON_EXEC に入るが、PCI 装置の処理を提供する。条件式・wildcard を含む像の依存全体の展開は P4 の 3の問い合わせが扱う。
 
 ## P4 の 3の正本と問い合わせ
 
@@ -37,7 +37,7 @@ P4 の 3が作る入口は `python3 tools/ownership.py [--revision REV] -- PATH.
 {"path":"sdk/kapi.json","kind":"公開インターフェース","target":null,"header_role":null,"public":true,"images":[],"images_complete":false}
 ```
 
-P4 の 3 の層の検査 は同じ所属宣言の header_role を使う。P4 の 3への初期移行で NAMED の各ヘッダを named、fixed_name が認める実装ヘッダを fixed_contract、それ以外のヘッダを ordinary、ヘッダ以外を null とする。例えば include/pc98.h は named・機種 pc98 なので共通から読むと R4、platform_kprintf.h の各機種版は fixed_contract なので対応機種の共通から読める。異なる CPU・機種の target を読む辺にはどちらも先に R6 を適用する。移動後も宣言を引き継ぎ、検査側に旧パスの一覧を残さない。
+P4 の 3 の層の検査 は同じ所属宣言の header_role を使う。P4 の 3への初期移行で NAMED の各ヘッダを named、fixed_name が認める実装ヘッダを fixed_contract、それ以外のヘッダを ordinary、ヘッダ以外を null とする。例えば sys/platform/pc98/pc98.h は named・機種 pc98 なので共通から読むと R4、platform_kprintf.h の各機種版は fixed_contract なので対応機種の共通から読める。異なる CPU・機種の target を読む辺にはどちらも先に R6 を適用する。移動後も宣言を引き継ぎ、検査側に旧パスの一覧を残さない。
 
 sdk/include の 19 ヘッダでは public が true のまま images に依存先が入る。像ごとに展開した Make の入力・リンク順、コンパイラの include 依存、Cargo の crate・依存表、リンカスクリプト、生成・変換・媒体収録の前提を出力まで順方向に辿る。P0-2 の link_evidence と link_order はこの照合に使う。例えば loader.ld から通常・デバッグの ELF、boot_main.c から ELF を経た loader_hdd.bin への辺も拾う。未調査構成・解決できない条件があれば既知の辺を返し images_complete を false にする。空配列で true の場合だけ依存先が無いと言える。
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """A10 LAN transport with real shared RX queues, libc-free ILP32 runtime."""
 CHECK = dict(name='hostsvc-sfs-lan', tier=1, needs=[], budget=3.6, covers=['tools/tests/rx_io_clock.h', 'tools/tests/idle_io_sources.py',
-    'kernel/io_work.[ch]', 'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'kernel/idle_work.h', 'exec/appslot.h', 'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'kernel/irq/tick_budget.h',
-    'fs/serialfs/sfs_lan.c', 'fs/serialfs/sfs_lan.h',
-    'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.c', 'fs/serialfs/sfs_proto.h',
-    'net/nic_rx.c', 'net/nic.h', 'net/nic_rx.h', 'net/link.h',
-    'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h', 'lib/kstring.h',
-    'include/net_eth.h', 'include/types.h',
+    'kernel/io_work.[ch]', 'sys/kern/io_clock.h', 'kernel/io_policy.[ch]', 'sys/kern/idle_work.h', 'sys/kern/exec/appslot.h', 'sys/net/rx_work.c', 'sys/net/rx_work.h', 'sys/hal/time/clock_source.h', 'sys/kern/irq/tick_budget.h',
+    'sys/fs/serialfs/sfs_lan.c', 'sys/fs/serialfs/sfs_lan.h',
+    'sys/fs/serialfs/sfs_client.h', 'sys/fs/serialfs/sfs_proto.c', 'sys/fs/serialfs/sfs_proto.h',
+    'sys/net/nic_rx.c', 'sys/net/nic.h', 'sys/net/nic_rx.h', 'sys/net/link.h',
+    'lib/crc32.c', 'lib/crc32.h', 'lib/le_internal.h', 'sys/kern/kstring.h',
+    'sys/include/net_eth.h', 'sys/include/types.h',
     'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_sfs_lan_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
@@ -48,8 +48,8 @@ def build_run(work, source):
     exe = work / 'sfs-lan-test'
     subprocess.run(['gcc', *FLAGS, '-I' + str(work), '-I' + str(ROOT),
                     *include_flags(ROOT), '-nostdlib', '-static', '-no-pie',
-                    str(src), str(ROOT / 'net/nic_rx.c'), str(ROOT / 'net/rx_work.c'),
-                    str(ROOT / 'fs/serialfs/sfs_proto.c'), str(ROOT / 'lib/crc32.c'),
+                    str(src), str(ROOT / 'sys/net/nic_rx.c'), str(ROOT / 'sys/net/rx_work.c'),
+                    str(ROOT / 'sys/fs/serialfs/sfs_proto.c'), str(ROOT / 'lib/crc32.c'),
                     str(ROOT / 'tools/tests/hostsvc_sfs_lan_host.c'), *idle_io_sources(ROOT, work, compat=False), '-o', str(exe)],
                    check=True, cwd=ROOT)
     return host32.run([str(exe)], cwd=ROOT).returncode
@@ -59,7 +59,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'fs/serialfs/sfs_lan.c').read_text()
+    original = (ROOT / 'sys/fs/serialfs/sfs_lan.c').read_text()
     with tempfile.TemporaryDirectory(prefix='hostsvc-sfs-lan-') as tmp:
         work = Path(tmp)
         (work / 'io.h').write_text(

@@ -1,11 +1,11 @@
-"""DMA プールの表 (mm/dma_pool_math.c) のホスト試験。
+"""DMA プールの表 (sys/kern/mm/dma_pool_math.c) のホスト試験。
 
 記録: tools/tests/dma_pool_tdd.md
 票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-3 (DMA プール)、
       docs/archive/v3/TASK_T1_LEDGER.md §3-7 / §4-3 (T1c: dma_alloc の limit、
       {pa, va} の組、失敗時 *out 不変、R4 の最悪の並び)
 
-実物の mm/dma_pool_math.c と lib/dma_contract.c を 1 行も写さずに
+実物の sys/kern/mm/dma_pool_math.c と lib/dma_contract.c を 1 行も写さずに
 #include して回す。表を触るだけなので I/O も割り込みも要らない。
 
 **NP21/W では踏めない**のは 64KB またぎの飛ばし。エミュレータは 8237 の
@@ -18,7 +18,7 @@
   python3 -B tools/tests/test_dma_pool.py --mutate   # 否定側
 """
 CHECK = dict(name='dma-pool-host', tier=1,
-    covers=['include/kernel_mount_children.h', 'platform/pc98/boot_capture.c', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'drivers/dma/dma8237_math.c', 'mm/dma_pool.c', 'mm/dma_pool_math.c', 'tools/tests/dma_pool_host.c', 'tools/tests/dma_boot_host.c', 'platform/pc98/kernel.c', 'mm/dma_pool.h', 'include/memmap.h', 'drivers/block/fdc.c', 'drivers/block/fdc_io.inc', 'drivers/block/fdc_seek_reset.inc', 'drivers/block/fdc_transfer.inc', 'drivers/block/fdc.h', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/pgalloc.h', 'kernel/module/module.h', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h', 'kernel/dev/dev.h', 'fs/vfs.h', 'include/pc98.h', 'platform/pc98/boot_platform.h', 'platform/pc98/boot_platform.c', 'platform/pc98/boot_display.h', 'platform/pc98/boot_display.c', 'platform/pc98/boot.h', 'platform/pc98/boot.c', 'include/dma_contract.h', 'lib/dma_contract.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
+    covers=['sys/include/kernel_mount_children.h', 'sys/platform/pc98/boot_capture.c', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/dev/dma/dma8237_math.c', 'sys/kern/mm/dma_pool.c', 'sys/kern/mm/dma_pool_math.c', 'tools/tests/dma_pool_host.c', 'tools/tests/dma_boot_host.c', 'sys/platform/pc98/kernel.c', 'sys/kern/mm/dma_pool.h', 'sys/include/memmap.h', 'sys/dev/block/fdc.c', 'sys/dev/block/fdc_io.inc', 'sys/dev/block/fdc_seek_reset.inc', 'sys/dev/block/fdc_transfer.inc', 'sys/dev/block/fdc.h', 'sys/platform/pc98/kdebug/kselftest.c', 'kdebug/kselftest/**', 'sys/kern/mm/pgalloc.h', 'sys/kern/module/module.h', 'sys/kern/sqlite_engine.h', 'sys/kern/sqlite_engine_body.h', 'sys/hal/block/dev.h', 'sys/fs/vfs.h', 'sys/platform/pc98/pc98.h', 'sys/platform/pc98/boot_platform.h', 'sys/platform/pc98/boot_platform.c', 'sys/platform/pc98/boot_display.h', 'sys/platform/pc98/boot_display.c', 'sys/platform/pc98/boot.h', 'sys/platform/pc98/boot.c', 'sys/include/dma_contract.h', 'lib/dma_contract.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
     needs=[], budget=3.3,
     basis=['[HW2]', '[C5]'],
 )
@@ -34,11 +34,11 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/dma_pool_host.c"
-SRC = ROOT / "mm/dma_pool_math.c"
+SRC = ROOT / "sys/kern/mm/dma_pool_math.c"
 # dma_range_ok (dma_alloc と FDC の BSS が共有する検査) は独立契約にある。
 # 変異の 4 番目の要素でこちらを指す (無ければ SRC)。
 D8237 = ROOT / "lib/dma_contract.c"
-TARGET_SRCS = ["mm/dma_pool_math.c", "mm/dma_pool.c",
+TARGET_SRCS = ["sys/kern/mm/dma_pool_math.c", "sys/kern/mm/dma_pool.c",
                "lib/dma_contract.c"]
 
 CASES = ["layout", "sizes", "skip_boundary", "alignment", "frees",
@@ -114,7 +114,7 @@ def host_build(tmp, source_text=None, d8237_text=None):
         mut.mkdir(parents=True, exist_ok=True)
         (mut / "dma_pool_math.c").write_text(source_text, encoding="utf-8")
         (mut / "dma_pool.h").write_text(
-            (ROOT / "mm/dma_pool.h").read_text(encoding="utf-8"),
+            (ROOT / "sys/kern/mm/dma_pool.h").read_text(encoding="utf-8"),
             encoding="utf-8")
         shim = src_dir / "harness.c"
         # 変異させた写しを先に引かせる。共通実体も別に差し替えられるので、
@@ -122,7 +122,7 @@ def host_build(tmp, source_text=None, d8237_text=None):
         # 全部の変異が「コンパイルできない」で RED に見えてしまう。
         shim.write_text(
             HARNESS.read_text(encoding="utf-8")
-            .replace('"../../mm/dma_pool_math.c"', '"mm/dma_pool_math.c"')
+            .replace('"../../sys/kern/mm/dma_pool_math.c"', '"sys/kern/mm/dma_pool_math.c"')
             .replace('"../../lib/dma_contract.c"',
                      '"%s"' % d8237),
             encoding="utf-8")
@@ -144,13 +144,13 @@ def boot_gate(tmp):
     (d / "kernel_dma_gate.c").write_text(
         '#include "kprintf.h"\n#include "kernel_mount_children.h"\n' + lan_helper +
         'static void host_kernel_dma(u32 mem_kb) {\n' + gate + '\n}\n')
-    selftests = (ROOT / "kdebug/kselftest.c").read_text()
+    selftests = (ROOT / "sys/platform/pc98/kdebug/kselftest.c").read_text()
     helper = re.search(r"static int selftest_dma_available\(void\).*?\n}\n", selftests, re.S).group()
     gate = selftests[selftests.index('    if (selftest_dma_available()) test_dma_pool();'):]
     gate = gate[:gate.index('    test_irq_dynamic();')]
     (d / "selftest_dma_gate.c").write_text(
         helper + 'static void host_selftest_dma(void) {\n' + gate + '}\n')
-    (d / "dma_pool_source.c").write_text((ROOT / "mm/dma_pool.c").read_text())
+    (d / "dma_pool_source.c").write_text((ROOT / "sys/kern/mm/dma_pool.c").read_text())
     (d / "io.h").write_text(
         'static unsigned int irq_save(void) { return 0; }\n'
         'static void irq_restore(unsigned int f) { (void)f; }\n')
@@ -161,8 +161,8 @@ def boot_gate(tmp):
         subprocess.run([str(exe), case], check=True)
     # FDC's early boot buffer must stay independent of the pool.
     fdc = "\n".join((ROOT / path).read_text() for path in (
-        "drivers/block/fdc.c", "drivers/block/fdc_io.inc",
-        "drivers/block/fdc_seek_reset.inc", "drivers/block/fdc_transfer.inc"))
+        "sys/dev/block/fdc.c", "sys/dev/block/fdc_io.inc",
+        "sys/dev/block/fdc_seek_reset.inc", "sys/dev/block/fdc_transfer.inc"))
     assert 'static u8 s_fdbuf[FDC_BUF_BYTES]' in fdc
     assert not re.search(r'\bdma_(?:alloc|free)\s*\(', fdc)
     assert kernel.index('boot_platform_run(BOOT_FLOPPY, &boot)') < start
@@ -229,7 +229,7 @@ if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-dma-pool-") as tmp:
         boot_gate(tmp)
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real mm/dma_pool_math.c)",
+        print("HOST GNU11 -Werror compile PASS (real sys/kern/mm/dma_pool_math.c)",
               flush=True)
         if "--target" in args:
             build_target(tmp)

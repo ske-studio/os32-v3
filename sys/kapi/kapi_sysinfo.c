@@ -1,0 +1,260 @@
+#include "os32_kapi_shared.h"
+#include "vfs.h"
+#include "range_internal.h"
+#include "sys/kern/kstring.h"
+#include "platform_build_info.h"
+#include "sys.h"
+#include "exec.h"
+#include "kapi_sysinfo.h"
+#include "ver_info.h"
+#include "appslot.h"
+#include "redir_access.h"
+#include "exec_heap.h"
+#include "kmalloc.h"
+#include "pgalloc.h"
+#include "io.h"
+#include "platform_mem_stat.h"
+
+extern u32 exec_as_leftover_pages;
+extern volatile u32 fault_kill_count;
+
+extern volatile int ring3_in_syscall;
+
+i32 kapi_mem_stat(i32 app_id, void *out, u32 size) __attribute__((cold));
+
+STATIC_ASSERT(sizeof(MemStat) == 220, memstat_size);
+STATIC_ASSERT(__builtin_offsetof(MemStat, kstack_high_water) == 132, memstat_v73_prefix);
+STATIC_ASSERT(__builtin_offsetof(MemStat, kdebug_state) == 200, memstat_v74_prefix);
+STATIC_ASSERT(__builtin_offsetof(MemStat, owner_pages) == 196, memstat_owner_pages);
+STATIC_ASSERT(__builtin_offsetof(MemStat, extents_total) == MEMSTAT_MIN, memstat_min);
+STATIC_ASSERT(__builtin_offsetof(MemStat, img_end) == 80, memstat_layout);
+STATIC_ASSERT(__builtin_offsetof(MemStat, load_addr) == 96, memstat_slot);
+STATIC_ASSERT(__builtin_offsetof(MemStat, pressure_epoch) == 120, memstat_pressure_epoch);
+STATIC_ASSERT(__builtin_offsetof(MemStat, trim_pending_mask) == 124, memstat_trim_pending_mask);
+STATIC_ASSERT(__builtin_offsetof(MemStat, trim_epoch) == 128, memstat_trim_epoch);
+
+/* The generated wrapper validates the entire output first. Snapshot and
+ * copyout never yield, call USER code, or switch AS. Only snapshot holds IF. */
+i32 kapi_mem_stat(i32 app_id, void *out, u32 size)
+{
+    MemStat snap = {0};
+    struct caller_access caller;
+    AppSlot *slot;
+    unsigned int irq;
+    int result = OS32_ERR_INVAL;
+
+    if (!out || size < MEMSTAT_MIN || app_id < -1 || app_id > APP_ID_MAX ||
+        app_id == APP_ID_SHELL) return OS32_ERR_INVAL;
+    platform_mem_stat_pre(&snap, size);
+    snap.kheap_total = kmalloc_total();
+    snap.kheap_used = kmalloc_used();
+    snap.kheap_free = kmalloc_free();
+    irq = irq_save();
+    if (ring3_wm_depth > 0) {
+        if (app_id == -1) app_id = 0;
+    } else if (!ring3_in_syscall) {
+        slot = appslot_get(appslot_cur());
+        if (appslot_cur() != APP_ID_SHELL || !slot || slot->cpl3) goto done;
+        if (app_id == -1) app_id = 0;
+    } else {
+        if (!caller_access_get_user(&caller)) goto done;
+        if (app_id == -1) app_id = caller.app_id;
+        if (app_id != 0 && app_id != caller.app_id) goto done;
+    }
+    if (app_id) {
+        struct addrspace *as;
+        slot = appslot_get(app_id);
+        result = OS32_ERR_NOTFOUND;
+        if (!slot || !(as = slot->as) || !as->pd_phys) goto done;
+        snap.owner_pages = ledger_owner_pages(as->owner);
+        snap.state = slot->state;
+        snap.flags = MEMSTAT_HAS_AS;
+        if (slot->trim_pending) snap.flags |= MEMSTAT_TRIM_PENDING;
+        snap.trim_epoch = slot->trim_epoch;
+        if (as->appmem_poisoned) snap.flags |= MEMSTAT_POISONED;
+        if (as->exec_heap_used == ~(u32)0) snap.flags |= MEMSTAT_HEAP_INVALID;
+        else snap.exec_heap_used = as->exec_heap_used;
+        for (u32 i = 0; i < APPMEM_EXTENT_MAX; i++) {
+            u32 kind = as->appmem.e[i].kind;
+            if (kind >= APPMEM_LIBC_INITIAL && kind <= APPMEM_EXEC_LARGE) {
+                snap.extents_total++;
+                snap.extents[kind - 1]++;
+            }
+        }
+        snap.extents_free = APPMEM_EXTENT_MAX - snap.extents_total;
+        snap.arenas = snap.extents[APPMEM_ANON - 1] + snap.extents[APPMEM_EXEC_ARENA - 1];
+        snap.img_end = as->appmem_layout.img_end;
+        snap.primary_mapped_end = as->appmem_layout.primary_mapped_end;
+        snap.exec_heap_cur_end = as->appmem_layout.exec_heap_cur_end;
+        snap.guard_b = as->appmem_layout.guard_b;
+        snap.load_addr = slot->load_addr;
+        snap.sbrk_heap_limit = slot->sbrk_heap_limit;
+        snap.exec_heap_base = slot->exec_heap_base;
+        snap.exec_heap_size = slot->exec_heap_size;
+        snap.stack_top = slot->stack_top;
+        snap.stack_size = slot->stack_size;
+    }
+    snap.pressure_epoch = appslot_trim_epoch;
+    for (int id = APP_ID_MIN; id <= APP_ID_MAX; id++) {
+        slot = appslot_at(id);
+        if (slot->trim_pending) snap.trim_pending_mask |= 1UL << id;
+        if (slot->state != APP_STATE_FREE && slot->as)
+            for (u32 i = 0; i < MEM_LEASE_MAX; i++)
+                snap.lease_active += slot->as->leases[i].token != 0;
+    }
+    snap.kheap_peak = kmalloc_peak_bytes;
+    snap.resident_heap_peak = resident_heap_peak;
+    snap.resident_heap_fail = resident_heap_fail;
+    snap.leftover_pages = exec_as_leftover_pages;
+    snap.ledger_irq_ops = ledger_irq_ops;
+    snap.ledger_exc_ops = ledger_exc_ops;
+    snap.ledger_bad_free = ledger_bad_free;
+    snap.fault_kill_count = fault_kill_count;
+    snap.reclaim_count = appslot_reclaim_count;
+    snap.stop_park_count = ring3_stop_park_count;
+    platform_mem_stat_diag(&snap);
+    snap.size = size < sizeof(snap) ? size : sizeof(snap);
+    snap.app_id = app_id;
+    snap.phys_total_pages = pgalloc_total_pages();
+    snap.phys_free_pages = pgalloc_free_pages();
+    snap.resident_heap_total = exec_heap_total();
+    snap.resident_heap_used = exec_heap_used();
+    result = (int)snap.size;
+done:
+    irq_restore(irq);
+    if (result > 0) {
+        kmemcpy(out, &snap, snap.size);
+    }
+    return result;
+}
+
+/* ======================================================================== */
+/*  sys_set_mtime — 更新日時の設定 (票 H3 / KAPI v52)                        */
+/*                                                                          */
+/*  生成される __cdecl ラッパ (`wrap_sys_set_mtime`) がここを呼ぶ ([ABI])。    */
+/*                                                                          */
+/*  ここの仕事は 2 つだけ:                                                   */
+/*    (1) CPL=3 のポインタ検証 (kapi_host.c / kapi_db.c と同じ 2 段の 2 段目。 */
+/*        **先頭番地が帯外ならここへ来る前にディスパッチャが kill する** ―    */
+/*        `kapi_argptr` による早期検査。NUL がどこにあるかは分からないので     */
+/*        1 バイトずつ確かめながらカーネル側へ写す)                          */
+/*    (2) VFS への受け渡し                                                   */
+/*                                                                          */
+/*  時刻の意味づけ・FS ごとの可否は `sys/fs/vfs.c` の `vfs_set_mtime` が持つ。    */
+/*  非対応の FS は `OS32_ERR_NOSYS` (失敗ではなく「持っていない」)。          */
+/* ======================================================================== */
+
+/* 検証後の写し先。KAPI は再入しない (CPL=3 の呼び手は 1 本ずつ)。 */
+static char set_mtime_path[OS32_MAX_PATH];
+
+
+/* 上限 cap (NUL 込み) の中で NUL を探しながら dst へ写す。
+ * 1 バイトずつ検証するので、途中のページが非 present でもそこで止まる。
+ * 戻り値: 1 = 写した / 0 = NULL・帯外・cap 内に NUL が無い (切り詰めない)。 */
+static int set_mtime_user_str_copy(const char *src, char *dst, u32 cap)
+{
+    u32 i;
+
+    if (!src) return 0;
+    for (i = 0; i < cap; i++) {
+        if (!kapi_user_range_ok(src + i, 1)) return 0;
+        dst[i] = src[i];
+        if (dst[i] == '\0') return 1;
+    }
+    return 0;                               /* 切り詰めた別のパスを作らない */
+}
+
+int kapi_sys_set_mtime(const char *path, u32 mtime)
+{
+    if (!path) return OS32_ERR_INVAL;
+    /* 0 は「不明」の印。書かせない (vfs_set_mtime でも断るが、
+     * 引数不正はここで返して VFS を呼ばない) */
+    if (mtime == 0) return OS32_ERR_INVAL;
+    if (!set_mtime_user_str_copy(path, set_mtime_path,
+                                 (u32)sizeof(set_mtime_path)))
+        return OS32_ERR_INVAL;
+    return vfs_set_mtime(set_mtime_path, (os_time_t)mtime);
+}
+
+/* Copy this translation unit's kernel build time without diagnostic output. */
+void kapi_sys_build_time_copy(char *buf, u32 size)
+{
+    kstrncpy(buf, __DATE__ " " __TIME__, size);
+}
+
+/* カーネルビルド時の日時文字列を返す */
+void kapi_sys_get_build_info(char *buf, int size)
+{
+    /* int の size を無検証で u32 に渡すと負値が巨大長に化ける */
+    if (!buf || size <= 0) return;
+    kapi_sys_build_time_copy(buf, (u32)size);
+    platform_build_info_report();
+}
+
+/* ======================================================================== */
+/*  sys_time_now — µs 時計 (票 TASK_HAL_WIRING §1-5 / KAPI v59)             */
+/*                                                                          */
+/*  生成される __cdecl ラッパ (`wrap_sys_time_now`) がここを呼ぶ ([ABI])。    */
+/*  本体 (スナップショットの採り方) は sys/kern/time/ktime.c、判定と算数は          */
+/*  sys/kern/time/time_math.c。ここの仕事は CPL=3 のポインタ検証だけ。             */
+/*                                                                          */
+/*  **検証の範囲は限定** (往復 9 の中継 1)。帯の外の番地はディスパッチャの   */
+/*  早期検査 (`kapi_argptr` + `ring3_ptr_ok`) が他の KAPI と同じく           */
+/*  `ring3_fault_kill` する。非 present / 書けないページへの書き込みで出る    */
+/*  #PF も既存のフォールトガードがアプリの死として扱う — この KAPI だけ      */
+/*  特別扱いしない。ここが「負を返して出力を 1 バイトも書かない」と          */
+/*  約束するのは、早期検査を通った後に**この関数自身が判定できる**3 つだけ:  */
+/*    (1) lo / hi が NULL                                                   */
+/*    (2) どちらかの 4 バイトが帯の境界を跨ぐ                                */
+/*    (3) 2 本の 4 バイト範囲が**交差する** (lo == hi だけでなく差 1〜3 も。  */
+/*        重なっていると「上下が同じスナップショット」が壊れる)             */
+/* ======================================================================== */
+
+int kapi_sys_time_now(u32 *lo, u32 *hi)
+{
+    u32 a, b, diff;
+    u32 snap_lo = 0, snap_hi = 0;
+    int rc;
+
+    if (!lo || !hi) return OS32_ERR_INVAL;
+
+    a = (u32)lo;
+    b = (u32)hi;
+    diff = (a < b) ? (b - a) : (a - b);
+    if (diff < (u32)sizeof(u32)) return OS32_ERR_INVAL;   /* 交差 (lo == hi 込み) */
+
+    /* **書く前に 2 本とも検証する。** 2 本目だけ不正なときに 1 本目を
+     * 書いてしまうと、呼び手は「負が返ったのに片方だけ新しい」を見る。 */
+    if (!kapi_user_range_ok(lo, (u32)sizeof(u32))) return OS32_ERR_INVAL;
+    if (!kapi_user_range_ok(hi, (u32)sizeof(u32))) return OS32_ERR_INVAL;
+
+    /* **読み取り専用の USER ページ (共有ライブラリの .text) は kill** —
+     * 負ではない (往復 10)。OS32 は CR0.WP = 0 なので、ここで止めないと
+     * 全アプリ共有のコードをカーネルが書き換える。出力引数にコード番地を
+     * 渡すのはアプリのバグで、他の KAPI の帯違反と同じ扱いにする。
+     * `ring3_fault_kill()` は戻らない (longjmp)。 */
+    if (!ring3_user_ranges_writable((u32)lo, (u32)sizeof(u32),
+                                    (u32)hi, (u32)sizeof(u32))) {
+        ring3_fault_kill();
+    }
+
+    /* ローカルの 1 スナップショットへ受けてから 2 本へ写す
+     * (途中で時計が進んでも上下が食い違わない)。 */
+    rc = sys_time_now(&snap_lo, &snap_hi);
+    if (rc != 0) return rc;                 /* 負のときは出力を書かない */
+    *lo = snap_lo;
+    *hi = snap_hi;
+    return 0;
+}
+
+/* The generated __cdecl wrapper supplies the existing output-range check. */
+int __cdecl kapi_sys_ver_info(void *out, u32 size)
+{
+    VerSnapshot s;
+
+    if (!out || size != sizeof(OS32_VerInfo)) return OS32_ERR_INVAL;
+    ver_collect(&s);
+    kapi_sys_build_time_copy(s.build, sizeof(s.build));
+    ver_format(&s, (OS32_VerInfo *)out);
+    return 0;
+}

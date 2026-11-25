@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """A3 real receive demux/queues with fake NIC polling (ILP32)."""
 CHECK = dict(name='hostsvc-nic-rx', tier=1, needs=[], budget=3.5, covers=['tools/tests/rx_io_clock.h', 'tools/tests/idle_io_sources.py',
-    'kernel/io_work.[ch]', 'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'kernel/idle_work.h', 'exec/appslot.h', 'net/rx_work.c', 'net/rx_work.h', 'include/clock_source.h', 'kernel/irq/tick_budget.h',
-    'net/nic_rx.c', 'lib/kstring.h', 'net/nic.h', 'net/nic_rx.h', 'net/link.h', 'include/net_eth.h',
-    'kernel/irq/tick.h', 'platform/pc98/tick_order.h',
-    'drivers/net/e82557/e82557_regs.h',
+    'kernel/io_work.[ch]', 'sys/kern/io_clock.h', 'kernel/io_policy.[ch]', 'sys/kern/idle_work.h', 'sys/kern/exec/appslot.h', 'sys/net/rx_work.c', 'sys/net/rx_work.h', 'sys/hal/time/clock_source.h', 'sys/kern/irq/tick_budget.h',
+    'sys/net/nic_rx.c', 'sys/kern/kstring.h', 'sys/net/nic.h', 'sys/net/nic_rx.h', 'sys/net/link.h', 'sys/include/net_eth.h',
+    'sys/kern/irq/tick.h', 'sys/platform/pc98/tick_order.h',
+    'sys/dev/net/e82557/e82557_regs.h',
     'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_fixture.h', 'tools/tests/hostsvc_fixture.c',
     'tools/tests/hostsvc_nic_rx_host.c', 'tools/tests/host32.py',
@@ -47,7 +47,7 @@ def build_run(work, source):
     exe = work / 'nic-test'
     subprocess.run(['gcc', *FLAGS, '-I' + str(work), '-I' + str(ROOT),
                     '-I' + str(ROOT / 'tools/tests'), *include_flags(ROOT),
-                    '-nostdlib', '-static', '-no-pie', str(src), str(ROOT / 'net/rx_work.c'),
+                    '-nostdlib', '-static', '-no-pie', str(src), str(ROOT / 'sys/net/rx_work.c'),
                     str(ROOT / 'tools/tests/hostsvc_fixture.c'),
                     str(ROOT / 'tools/tests/hostsvc_nic_rx_host.c'), *idle_io_sources(ROOT, work, compat=False), '-o', str(exe)],
                    check=True, cwd=ROOT)
@@ -58,7 +58,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'net/nic_rx.c').read_text()
+    original = (ROOT / 'sys/net/nic_rx.c').read_text()
     with tempfile.TemporaryDirectory(prefix='hostsvc-nic-rx-') as tmp:
         work = Path(tmp)
         (work / 'io.h').write_text(
@@ -70,7 +70,7 @@ def main():
         cross = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))
         subprocess.run([str(cross / 'bin/i386-elf-gcc'), *FLAGS,
                         '-I' + str(ROOT), *include_flags(ROOT),
-                        '-c', str(ROOT / 'net/nic_rx.c'), '-o', str(work / 'nic.o')], check=True)
+                        '-c', str(ROOT / 'sys/net/nic_rx.c'), '-o', str(work / 'nic.o')], check=True)
         rc = build_run(work, original)
         if rc:
             print(f'FAIL control runtime rc={rc}', flush=True)

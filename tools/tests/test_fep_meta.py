@@ -5,12 +5,12 @@ CHECK = dict(name='fep-meta', tier=1, needs=[], budget=25.4, covers=['tools/test
     'tools/tests/fep_host_build.py', 'tools/tests/fep_boundary_runtime.h',
     'tools/tests/ime_dict_host.c', 'tools/tests/vfs_fd_sqlite_host.c',
     'tools/tests/sqlite_groups_backend.h', 'tools/tests/host32.py',
-    'tools/tests/kernel_includes.py', 'tools/tests/host_arch/**', 'arch/x86/arch_kernel_fp.h',
+    'tools/tests/kernel_includes.py', 'tools/tests/host_arch/**', 'sys/arch/x86/arch_kernel_fp.h',
     'tools/tests/input_fixture_host.h', 'tools/tests/serial_emergency_host.h',
-    'kernel/fep_boot.c', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h', 'kernel/ime/ime*.c',
-    'kernel/ime/ime*.h', 'kernel/input_service.c', 'kernel/serial_diag.c',
+    'sys/kern/fep_boot.c', 'sys/kern/sqlite_engine.h', 'sys/kern/sqlite_engine_body.h', 'kernel/ime/ime*.c',
+    'kernel/ime/ime*.h', 'sys/hal/input/input_service.c', 'sys/kern/serial_diag.c',
     'lib/sqlite3/**', 'lib/kstring*', 'lib/kmath.c', 'lib/divdi3.c',
-    'fs/vfs_fd.c', 'fs/vfs.h', 'include/**',
+    'sys/fs/vfs_fd.c', 'sys/fs/vfs.h', 'include/**',
     'sdk/include/os32/os32_kapi_shared.h', 'build/config.mk'],
     basis=['docs/design/tools/fep_to_sqlite.md 形式 1', 'docs/design/tools/fep_to_sqlite.md 旧形式', 'docs/design/kernel/sqlite_engine.md fep_meta_probe の契約', 'docs/design/kernel/ime/ime_dict.md 切替'],
 )
@@ -162,7 +162,7 @@ def main():
                 assert red.returncode == 1 and 'FAIL main:' in red.stderr, label
                 print('RED runtime ' + label, flush=True)
             (work / 'probe.c').write_text(probe)
-            product_path = ROOT / 'kernel/ime/ime_dict.c'
+            product_path = ROOT / 'sys/kern/ime/ime_dict.c'
             product = product_path.read_text()
             anchor = 'if (s->system.db && !kstrcmp(path, s->system.path))'
             assert product.count(anchor) == 1

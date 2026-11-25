@@ -7,12 +7,12 @@ import tempfile
 from kernel_includes import include_flags
 
 CHECK = dict(name='ide-pio-host', tier=1, budget=4.3,
-             covers=['kernel/time/tick_clock.h', 'include/ide_bus.h', 'platform/pc98/platform_ide_bus.h', 'platform/pc98/platform_ide_ports.h',
-                     'drivers/ata/ide.c', 'drivers/ata/ide.h',
-                     'drivers/ata/ide_addr.c', 'drivers/ata/ide_addr.h',
-                     'drivers/ata/ide_multiple.inc', 'drivers/ata/ide_pio.inc', 'drivers/ata/ide_request.inc',
+             covers=['sys/hal/time/tick_clock.h', 'sys/include/ide_bus.h', 'sys/platform/pc98/platform_ide_bus.h', 'sys/platform/pc98/platform_ide_ports.h',
+                     'sys/dev/ata/ide.c', 'sys/dev/ata/ide.h',
+                     'sys/dev/ata/ide_addr.c', 'sys/dev/ata/ide_addr.h',
+                     'sys/dev/ata/ide_multiple.inc', 'sys/dev/ata/ide_pio.inc', 'sys/dev/ata/ide_request.inc',
                      'tools/tests/ide_pio_host.c', 'tools/tests/ide_pio_host_multiple.inc', 'tools/tests/ide_hostshim/io.h',
-                     'platform/powermac/ide_compatible.h', 'tools/tests/ide_be_hostshim/kstring.h',
+                     'sys/platform/powermac/ide_compatible.h', 'tools/tests/ide_be_hostshim/kstring.h',
                      'tools/tests/ide_be_hostshim/platform_ide_bus.h', 'tools/tests/test_ide_pio.py', 'tools/tests/kernel_includes.py'], needs=[],
     basis=['docs/design/drivers/ata/ide.md', 'docs/ppc/ata.md §2'],
 )
@@ -87,17 +87,17 @@ def main(args):
         subprocess.run([str(exe), *[a for a in args if a != '--mutate']], check=True)
         be_tree = Path(tmp) / 'be'
         shutil.copytree(ROOT / 'drivers/ata', be_tree)
-        shutil.copy2(ROOT / 'include/ide_bus.h', be_tree)
+        shutil.copy2(ROOT / 'sys/include/ide_bus.h', be_tree)
         shutil.copy2(ROOT / 'tools/tests/ide_be_hostshim/platform_ide_bus.h', be_tree)
-        shutil.copy2(ROOT / 'platform/powermac/ide_compatible.h', be_tree)
+        shutil.copy2(ROOT / 'sys/platform/powermac/ide_compatible.h', be_tree)
         shutil.copy2(ROOT / 'tools/tests/ide_be_hostshim/kstring.h', be_tree)
         build(be_tree, exe, be=True)
         subprocess.run([str(exe), 'be'], check=True)
         if '--mutate' in args:
             mirror = Path(tmp) / 'ata'
             shutil.copytree(ROOT / 'drivers/ata', mirror)
-            for header in ('include/ide_bus.h', 'platform/pc98/platform_ide_bus.h',
-                           'platform/pc98/platform_ide_ports.h'):
+            for header in ('sys/include/ide_bus.h', 'sys/platform/pc98/platform_ide_bus.h',
+                           'sys/platform/pc98/platform_ide_ports.h'):
                 shutil.copy2(ROOT / header, mirror)
             # An unchanged copy must pass before runtime failures count as kills.
             build(mirror, exe)

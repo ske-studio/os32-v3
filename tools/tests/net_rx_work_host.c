@@ -2,24 +2,24 @@
 #define IO_H
 #include "types.h"
 #include "os32_kapi_shared.h"
-#include "kernel/irq/tick.h"
-#include "kernel/irq/irq.h"
+#include "sys/kern/irq/tick.h"
+#include "sys/kern/irq/irq.h"
 static unsigned int enabled = 1;
 static unsigned int irq_save(void) { unsigned int f = enabled; enabled = 0; return f; }
 static void irq_restore(unsigned int f) { enabled = f; }
 static int _irq_enabled(void) { return enabled != 0; }
 static void _idle(void) {}
-#include "kernel/io_work.h"
+#include "sys/kern/io_work.h"
 static void nic_request(u32 id);
 #define io_request nic_request
-#include "net/nic.c"
+#include "sys/net/nic.c"
 #undef io_request
 static u32 requests;
 static void nic_request(u32 id) { ++requests; io_request(id); }
-#include "net/nic_rx.c"
-#include "net/rx_work.c"
-#include "kernel/idle_work.c"
-#include "kernel/irq/tick_budget.c"
+#include "sys/net/nic_rx.c"
+#include "sys/net/rx_work.c"
+#include "sys/kern/idle_work.c"
+#include "sys/kern/irq/tick_budget.c"
 #define TEST_RX_CLOCK_LOCK irq_save
 #define TEST_RX_CLOCK_UNLOCK irq_restore
 #include "rx_io_clock.h"

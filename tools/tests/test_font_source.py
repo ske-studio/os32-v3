@@ -1,9 +1,9 @@
-"""font の read lease (T7b-b1) — 実物の fs/vfs_fd.c と kernel/console/font_source.c をホストで。
+"""font の read lease (T7b-b1) — 実物の sys/fs/vfs_fd.c と sys/kern/console/font_source.c をホストで。
 
 設計: ~/os32-tmp/run/t7bb12/DESIGN.final.md §2・§5 (b1①〜⑦、b2②④ の lease 表側)。
 S1 = VFS の内部 API (vfs_open_font / validate / read_at / close_font、公開経路の
 締め出し、vfs_close_owned、FD 予算)。S2 = lease 表・app の門 (public KAPI
-font_source_* の実体)・shell 側の段 C/D (lease_* の case)。S3b = exec/exec.c の
+font_source_* の実体)・shell 側の段 C/D (lease_* の case)。S3b = sys/kern/exec/exec.c の
 回収 hook (exec_reclaim_resources を exec.c から切り出して tmp の exec_reclaim.inc
 に書き、lease_reclaim が実物として呼ぶ)。lease_limit は
 app の合計上限だけを変えた変種 (VARIANT) でも回し、owner ごとの上限を見分ける。
@@ -13,7 +13,7 @@ app の合計上限だけを変えた変種 (VARIANT) でも回し、owner ご�
   python3 -B tools/tests/test_font_source.py --mutate   # 否定側 (写しの上で変異)
 """
 CHECK = dict(name='font-source-host', tier=1,
-    covers=['fs/vfs_fd.c', 'fs/vfs.h', 'kernel/console/font_source.c', 'kernel/console/font_source.h', 'kernel/gui.h', 'exec/exec.h', 'include/redir_access.h', 'fs/fd_redirect.h', 'exec/exec.c', 'tools/tests/font_source_host.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['sys/fs/vfs_fd.c', 'sys/fs/vfs.h', 'sys/kern/console/font_source.c', 'sys/kern/console/font_source.h', 'sys/kern/gui.h', 'sys/kern/exec/exec.h', 'sys/include/redir_access.h', 'sys/fs/fd_redirect.h', 'sys/kern/exec/exec.c', 'tools/tests/font_source_host.c', 'tools/tests/input_fixture_host.h', 'sys/hal/input/input_service.c', 'sys/hal/input/pointer_service.h', 'sys/hal/input/input_service.h', 'sys/include/kbd.h', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=[], budget=4.7,
     kind='characterization',
 )
@@ -40,9 +40,9 @@ FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-Wno-unused-parameter", "-Wno-sign-compare", "-D__cdecl="]
 INC_DIRS = tuple(d for d in dict.fromkeys(include_dirs()) if d != '.')
 HOST = "tools/tests/font_source_host.c"
-SRC = "fs/vfs_fd.c"
-LEASE = "kernel/console/font_source.c"
-EXEC = "exec/exec_finish.inc"
+SRC = "sys/fs/vfs_fd.c"
+LEASE = "sys/kern/console/font_source.c"
+EXEC = "sys/kern/exec/exec_finish.inc"
 # --target で kernel と同じ include の並び (build/config.mk の INC_KERNEL)
 
 # 否定側: 実物の 1 行を壊すと RED になることを見る (写しの上で。ソースは触らない)。
@@ -83,7 +83,7 @@ MUTATIONS = [
     # ---- S2 (S1 の取り込みで送られた項目) ----
     (SRC, "    open_files[fd].protect = (flags & VFS_FONT_OPEN_PROTECT) ? 1 : 0;\n",
      "    open_files[fd].protect = 0;\n", "protect=(flags&PROTECT) → 0"),
-    # ---- S2: lease 表と app の門 (kernel/console/font_source.c) ----
+    # ---- S2: lease 表と app の門 (sys/kern/console/font_source.c) ----
     (LEASE, "    if (ring3_call_from_user() == 0)\n",
      "    if (0)\n", "門 1 (CPL=3 の dispatch 中) を外す"),
     (LEASE, "    if (!caller_access_get(c) || c->origin != CALLER_USER ||\n",
@@ -140,10 +140,10 @@ MUTATIONS = [
      "段 C 登録世代の照合を外す"),
     (LEASE, "        if (s->kind == FONT_LEASE_SHELL) (void)font_lease_release(s);\n",
      "        if (0) (void)font_lease_release(s);\n", "close_shell が閉じない"),
-    # ---- S3b: exec/exec.c の回収 hook ----
-    ('exec/exec_finish.inc', "    exec_font_lease_close_owned(id);\n    vfs_close_owned(id);\n",
+    # ---- S3b: sys/kern/exec/exec.c の回収 hook ----
+    ('sys/kern/exec/exec_finish.inc', "    exec_font_lease_close_owned(id);\n    vfs_close_owned(id);\n",
      "    vfs_close_owned(id);\n", "b1⑤ exec_reclaim_resources の exec_font_lease_close_owned 呼出を外す"),
-    ('exec/exec_finish.inc', "    exec_font_lease_close_owned(id);\n    vfs_close_owned(id);\n    /* (4) パイプバッファ自動解放 */\n    pipe_free_owned(id);\n",
+    ('sys/kern/exec/exec_finish.inc', "    exec_font_lease_close_owned(id);\n    vfs_close_owned(id);\n    /* (4) パイプバッファ自動解放 */\n    pipe_free_owned(id);\n",
      "    vfs_close_owned(id);\n    /* (4) パイプバッファ自動解放 */\n    pipe_free_owned(id);\n    exec_font_lease_close_owned(id);\n",
      "exec_font_lease_close_owned を回収の後ろへずらす"),
 ]
@@ -165,9 +165,9 @@ def includes(root):
 
 
 def gui_shell_owner(root):
-    """kernel/gui.h の GUI_SHELL_OWNER (64 ビットのホストでは gui.h を読めない)"""
+    """sys/kern/gui.h の GUI_SHELL_OWNER (64 ビットのホストでは gui.h を読めない)"""
     m = re.search(r"^#define\s+GUI_SHELL_OWNER\s+(\d+)\b",
-                  (root / "kernel/gui.h").read_text(encoding="utf-8"), re.M)
+                  (root / "sys/kern/gui.h").read_text(encoding="utf-8"), re.M)
     return "-DHOST_GUI_SHELL_OWNER=" + m.group(1)
 
 

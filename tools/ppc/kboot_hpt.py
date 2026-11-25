@@ -8,10 +8,10 @@ import tempfile
 
 # Standalone stage check; deliberately outside tools/checks discovery.
 CHECK = dict(name='kboot-hpt', tier=1,
-             covers=['arch/ppc/kernel_hpt.c', 'arch/ppc/ppc_hpt.h',
-                     'arch/ppc/ppc_frame.h', 'arch/ppc/ppc_oea.h',
-                     'arch/ppc/ppc_boot.h', 'arch/ppc/ppc_pd.h', 'arch/ppc/pd_walk.c',
-                     'include/types.h', 'include/callconv.h', 'mm/paging.h',
+             covers=['sys/arch/ppc/kernel_hpt.c', 'sys/arch/ppc/ppc_hpt.h',
+                     'sys/arch/ppc/ppc_frame.h', 'sys/arch/ppc/ppc_oea.h',
+                     'sys/arch/ppc/ppc_boot.h', 'sys/arch/ppc/ppc_pd.h', 'sys/arch/ppc/pd_walk.c',
+                     'sys/include/types.h', 'sys/include/callconv.h', 'sys/kern/mm/paging.h',
                      'tools/ppc/kboot_hpt.py', 'tools/ppc/kboot_hpt_host.c'],
              needs=[], budget=5.0)
 
@@ -39,7 +39,7 @@ def execute(source, output):
     subprocess.run(['gcc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',
                     '-m32', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static',
                     '-DPPC_HPT_HOST_TEST', '-D__cdecl=', '-I.', '-Iinclude', '-Ilib',
-                    '-Iarch/ppc', str(source), 'arch/ppc/pd_walk.c',
+                    '-Iarch/ppc', str(source), 'sys/arch/ppc/pd_walk.c',
                     'tools/ppc/kboot_hpt_host.c', '-o', str(output)], cwd=ROOT, check=True)
     return subprocess.run(['qemu-i386', str(output)], cwd=ROOT, capture_output=True, text=True)
 
@@ -48,7 +48,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    product = ROOT / 'arch/ppc/kernel_hpt.c'
+    product = ROOT / 'sys/arch/ppc/kernel_hpt.c'
     with tempfile.TemporaryDirectory(prefix='hpt-', dir=os.environ.get('TMPDIR')) as tmp:
         tmp = Path(tmp)
         result = execute(product, tmp / 'baseline')

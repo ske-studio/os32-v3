@@ -184,26 +184,26 @@ def main(on_image=None):
         kernel = folder / 'kernel'
         mutation = []
         if case == 'false-valid':
-            mutation = mutant_settings(folder, case, 'platform/powermac/root_image.c',
+            mutation = mutant_settings(folder, case, 'sys/platform/powermac/root_image.c',
                                        '    struct boot_common info = {0};',
                                        '    struct boot_common info = {.image_valid = 1};')
         elif case == 'no-write':
-            mutation = mutant_settings(folder, case, 'init/bootinfo.c',
+            mutation = mutant_settings(folder, case, 'sys/kern/init/bootinfo.c',
                                        '    kmemset(out, 0, sizeof(*out));',
                                        '    return 0;')
         elif case in ('truncated', 'decode-failed'):
-            mutation = mutant_settings(folder, case, 'platform/powermac/root_image.c',
+            mutation = mutant_settings(folder, case, 'sys/platform/powermac/root_image.c',
                                        'lz4_decode(__root_image_start, packed, dst, length)',
                                        ('lz4_decode(__root_image_start, packed - 1, dst, length)'
                                         if case == 'truncated' else
                                         'lz4_decode(__root_image_start, packed, dst, 1)'))
         elif case in ('release-skipped', 'release-twice'):
             call = 'pgalloc_free_n_owner(LEDGER_OWNER_BOOT, frame_pfn, pages)'
-            mutation = mutant_settings(folder, case, 'platform/powermac/root_image.c',
+            mutation = mutant_settings(folder, case, 'sys/platform/powermac/root_image.c',
                                        call, '((void)frame_pfn, 1)' if case == 'release-skipped' else
                                        '(' + call + ' && ' + call + ')')
         elif case == 'overlap':
-            mutation = mutant_settings(folder, case, 'platform/powermac/kernel_boot.c',
+            mutation = mutant_settings(folder, case, 'sys/platform/powermac/kernel_boot.c',
                                        'int reserve_rc = pm_kboot_reserve(info);',
                                        'info->root_frame_bytes += 4096;\n'
                                        '    int reserve_rc = pm_kboot_reserve(info);\n'

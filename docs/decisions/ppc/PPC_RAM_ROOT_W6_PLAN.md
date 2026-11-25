@@ -29,9 +29,9 @@ r1 で確認済みの食い違い5件は維持する。未実装の接続とは�
 
 |番号|設計・前提|実物と計画への反映|
 |---|---|---|
-|差1|設計:164,168 は RAM root を cd0 とする|`kernel/dev/ram_ro.c` の `ram_ro_register()`、`init/boot_root.c` の rd0 を採用|
-|差2|設計:168 は boot_root 内で ISO 登録|現行登録は `platform/powermac/root_boot.c` の `pm_root_boot()`。共通 init へ移す|
-|差3|設計:369 は rdN 対応を追加する段を記載|`fs/isofs/iso9660.c` は既に `VFS_DEV_RAM` を受ける|
+|差1|設計:164,168 は RAM root を cd0 とする|`sys/kern/dev/ram_ro.c` の `ram_ro_register()`、`sys/kern/init/boot_root.c` の rd0 を採用|
+|差2|設計:168 は boot_root 内で ISO 登録|現行登録は `sys/platform/powermac/root_boot.c` の `pm_root_boot()`。共通 init へ移す|
+|差3|設計:369 は rdN 対応を追加する段を記載|`sys/fs/isofs/iso9660.c` は既に `VFS_DEV_RAM` を受ける|
 |差4|設計:180 は S-B で hello.bin 追加までを記載|`build/targets/ppc-powermac.mk` は hello.bin と fault.bin を同梱済み|
 |差5|設計:371 の vmkernel.lz4 293KiB|過去値としてのみ使用。現在の容量合格を意味しない|
 
@@ -39,12 +39,12 @@ r1 で確認済みの食い違い5件は維持する。未実装の接続とは�
 |---|---|
 |RAM block と root|`ram_ro.c` の範囲検査・write 拒否、`boot_root_mount()` の rd0 mount を再利用|
 |共通 ISO|既存 parser と `VFS_DEV_RAM=5` を使い、複製しない|
-|書込み先|`fs/ramfs/ramfs.c` の既存固定上限で `/tmp` を分離|
-|PC-98 初期化順|`platform/pc98/kernel.c` の root mount が同 の `kernel_boot_memory()` より先|
+|書込み先|`sys/fs/ramfs/ramfs.c` の既存固定上限で `/tmp` を分離|
+|PC-98 初期化順|`sys/platform/pc98/kernel.c` の root mount が同 の `kernel_boot_memory()` より先|
 |FD 搬送|`boot/loader_fat_new.asm` は ELF でなく VK32 の VMKRNL.LZ4 を読む|
 |入力制限|同:446 の508KiB、物理 `0x10000〜0x8EFFF`、64KiB 境界でセグメント更新|
-|別置き候補|`include/memmap.h` の `0x600000`、1MiB の boot bundle 帯|
-|boot wire|`platform/pc98/bootinfo_wire.h` は v2・64B、image 欄の予約は4B|
+|別置き候補|`sys/include/memmap.h` の `0x600000`、1MiB の boot bundle 帯|
+|boot wire|`sys/platform/pc98/bootinfo_wire.h` は v2・64B、image 欄の予約は4B|
 
 追加確認：`bootinfo_check.c` の `bootinfo_parse()` は単一版との一致判定で、現状のまま v3 は受理しない。
 `tools/mkmod.py` は VK32 全体の検証済み CRC を pair に使用する。
@@ -60,7 +60,7 @@ GPL の資料・コードおよび `docs/archive/` は参照していない。
 |---|---|---:|---|
 |C1 静的 ISO の build の口|新規 `build/ram-root.mk`、既存 ISO 非module経路|30〜60|有効化時★|
 |C2 root image/blob の build の口|同 mk、`build/targets/ppc-powermac.mk`。ISO と任意の blob object を生成|40〜70|有効化時★|
-|C3 共通初期化と mount|`include/boot_root.h`、`init/boot_root.c`、PowerMac wrapper|40〜70|接続時★|
+|C3 共通初期化と mount|`sys/include/boot_root.h`、`sys/kern/init/boot_root.c`、PowerMac wrapper|40〜70|接続時★|
 |C4 内容・容量・名前の契約|`mkroot_image.py`、mkpkg 連携、容量確認用 host check|50〜90|入力変更時★|
 
 C1：共通側は kernel 用 flags の静的リンク対象を提示する。
@@ -167,7 +167,7 @@ B の外側 FAT は loader・VMKRNL.LZ4・root image、内側 ISO は利用内�
 |子 mount・FD 自動探索|起動 FD を対象外にする。抜去済みでも probe/read を発生させない|
 |hsync `hsync.c`|同期元の root 読込みは rd0。rd0 への書込みは失敗のままにし、既存 FD 書込み拒否も維持|
 |filer `cmd_filer.c`|短名 fallback を今回の rd0 root に対応。`/etc` と `/` が同じ装置という条件を維持|
-|`drivers/base/dev.c` の fd0|装置登録は維持。登録と自動 mount を分け、明示利用だけを対象にする|
+|`sys/dev/base/dev.c` の fd0|装置登録は維持。登録と自動 mount を分け、明示利用だけを対象にする|
 |kcg の ROM/cache|`kcg.mod` は rd0 から読む。`kcg_body.c` の RAM cache と ROM glyph 読出しは FD I/O 対象外|
 |`pc98_boot_font()`|現行の KCG 初期化を維持し、cache を永続 FD storage として扱わない|
 |install|3入力とコピー対象を rd0 から読む。HDD への書込みは従来の承認手順を維持|
@@ -223,8 +223,8 @@ r1→r2 の変更の数 / 反論の数：10 / 0
 
 ## 確定 (2026-11-12、Opus 5.5 の第 2 回の条件付き Approve を PM が反映)
 - N1 (P2): B の FD のローダの段 (PB) の詳細設計の最初の確認項目に、1MB より上への転送の候補として (a) PC-98 の BIOS の拡張メモリへのブロック転送 (INT 1Fh AH=90h とされる。[HW3] に沿ってメーカー資料で確かめる)、(b) unreal mode、(c) r2 §4 の PM への往復 (最大の見積もり) を並べ、資料で確かめられた手段で見積もり直す。
-- N2 (P2): B は kernel を 2 回持つ (外の FAT と ISO の中)。2HD は 789KB + 293KiB + ISO の丸めで使える 1168KiB にほぼ届くか超える見込み (推定)、1.44MB は収まる見込み。2 回持つのを避ける案として「v2 の img_size (platform/pc98/bootinfo_wire.h) を使い、V86 より前に kernel が低位の VK32 を写して install に渡す (ISO に kernel を入れない)」を候補に足す。ユーザーへの推奨は「まず今の中身のまま B。2HD の実測で超えたらこの案か中身の削減を、容量と失う機能を示してユーザーが決める」の条件付きにする。
-- N3 (P3): MEM_BOOT_BUNDLE (include/memmap.h) は「ブート必須モジュールの展開先」として T5b/T6b が使う予定の帯。W6 の root に使うなら、P2 で用途を「W6 の root」に書き換えるか STAGING (0x500000) と分けて使うかを決め、memmap.h の注釈と tools/tests/memory_boot_host.c を追従させる。
+- N2 (P2): B は kernel を 2 回持つ (外の FAT と ISO の中)。2HD は 789KB + 293KiB + ISO の丸めで使える 1168KiB にほぼ届くか超える見込み (推定)、1.44MB は収まる見込み。2 回持つのを避ける案として「v2 の img_size (sys/platform/pc98/bootinfo_wire.h) を使い、V86 より前に kernel が低位の VK32 を写して install に渡す (ISO に kernel を入れない)」を候補に足す。ユーザーへの推奨は「まず今の中身のまま B。2HD の実測で超えたらこの案か中身の削減を、容量と失う機能を示してユーザーが決める」の条件付きにする。
+- N3 (P3): MEM_BOOT_BUNDLE (sys/include/memmap.h) は「ブート必須モジュールの展開先」として T5b/T6b が使う予定の帯。W6 の root に使うなら、P2 で用途を「W6 の root」に書き換えるか STAGING (0x500000) と分けて使うかを決め、memmap.h の注釈と tools/tests/memory_boot_host.c を追従させる。
 - 未決の振り分け: 本線 PM 3 件 (A か B か、pair の契約、CdModuleApi の版上げ。推奨は B・pair は今のまま・fs を外して版上げ)。B はローダと boot 情報 v3 で範囲が広がるので、本線 PM が B を採る時点でユーザーに知らせる (スコープの拡大)。ユーザー 1 件 (FD の中身を削るか、N2 の条件付き)。
 
 ## 本線のレビューと決定 (2026-11-12)
@@ -240,10 +240,10 @@ r1→r2 の変更の数 / 反論の数：10 / 0
 **本線の独立レビュー (Approve 条件付き、P1 なし) の指摘で、段を出す前に計画に入れる物**:
 - R-1 (P2): 1MB より上への転送は **(c) PM の往復**を採る。boot/loader_hdd.asm に実機で使っている往復 (pm16_trampoline・rm_trampoline、INT 1Bh) がある。(a) INT 1Fh AH=90h はミラーの Bible・UNDOCUMENTED で確かめられないので採らない ([HW3])。(b) unreal mode は推測に頼るので採らない。FD のローダを HDD と同じ形 (C を PM で動かし、INT 1Bh を往復で呼ぶ) に寄せる案も比べる。
 - R-2 (P2): 今の vmkernel.lz4 は約 330KiB で、2HD の空き約 443KB から 2 つ目の kernel を引くと 64KB の下限を割る見込み。**kernel を 2 回持たない形を前提**にする。候補: ローダが ROOT.ISO を高位へ運び、PM で ISO の root から VMKRNL.LZ4 の extent を探し、pm_vk32_boot の file 引数 (boot/loader_fat_new.asm) に高位の番地を渡す。
-- R-3 (P2): 今の bundle の予約 (mm/memory_boot.c) は中身を後で ledger_transfer で部品へ渡す契約 (`memory_boot_count_pages()`)。一生残る root の帯には専用の定数 (例 MEM_BOOT_ROOT_*) と owner を作り、LEDGER_RF_PERMANENT を付ける。申告は bootinfo v3 から渡す。T6b の同梱域とは別に置き、票 TASK_T4_T6_MODULES の 261 行目付近に依存を 1 行書く。(確定の N3 はこれに置き換える。)
+- R-3 (P2): 今の bundle の予約 (sys/kern/mm/memory_boot.c) は中身を後で ledger_transfer で部品へ渡す契約 (`memory_boot_count_pages()`)。一生残る root の帯には専用の定数 (例 MEM_BOOT_ROOT_*) と owner を作り、LEDGER_RF_PERMANENT を付ける。申告は bootinfo v3 から渡す。T6b の同梱域とは別に置き、票 TASK_T4_T6_MODULES の 261 行目付近に依存を 1 行書く。(確定の N3 はこれに置き換える。)
 - R-4 (P3): kernel が FAT から ROOT.ISO を 0x600000 へ読む案も比較表に 1 行足す (install 用の kernel が 2 回になるので落とす)。
 - R-5 (P3): HDD は bootinfo v2 のままで、配置の世代 (--layout-gen) も実機の HDD の配置も変わらない。
-- R-6 (P3): ramfs の上限 16 ファイル × 1KiB (fs/ramfs/ramfs.h) は FD 起動の /tmp (リダイレクト・エディタ) に足りない。PC-98 側の P3 で洗い出して上限を決め直す段を足す。
+- R-6 (P3): ramfs の上限 16 ファイル × 1KiB (sys/fs/ramfs/ramfs.h) は FD 起動の /tmp (リダイレクト・エディタ) に足りない。PC-98 側の P3 で洗い出して上限を決め直す段を足す。
 - R-7 (P3): 実機の受入は「FD の作成と抜き差しはユーザー、シリアルでの判定はノートのセッション」。
 - R-8 (P3): ★は「x86 の vmkernel.lz4 や FD の像のバイト列が変わる段」だけに付ける。
 

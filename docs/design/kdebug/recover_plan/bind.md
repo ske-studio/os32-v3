@@ -1,6 +1,6 @@
-# kdebug/recover_plan/bind.inc — 設計
+# sys/dev/video/geforce/diag/recover_plan/bind.inc — 設計
 > 状態: **現行 (2026-10-31)** — 出所: GF6200_4A_S2_LAYOUT.md・GF_STAGES_DESIGN.md・REALHW_RECOVER_ADDENDUM.md・REALHW_RECOVER_ADDENDUM_R2.md・SLIM_HWDEV_DESIGN.md (D1 で移した)
-ソース: `kdebug/recover_plan/bind.inc`
+ソース: `sys/dev/video/geforce/diag/recover_plan/bind.inc`
 
 ## GF6200_4A_S2_LAYOUT
 
@@ -26,7 +26,7 @@ builder・bind・契約生成を追従させる。
 
 - call/反復の新ctxに親/前回の成立集合を暗黙継承しない。ctxを戻したときは親自身の記録だけを使う。動的命令数・深さ・待ちの既存上限を経路ごとに検査し、静的node総数を実行stepsに数えない。展開表を確保できなければ開始拒否とし、上限や予算を拡大しない。
 
-> [要確認] 現行は診断も hwdev/gf/runner.c を使い、main 境界の 5 node を生成する。原文の静的展開・ordinal・verify 規則を現行実装と同一とは扱えない。
+> [要確認] 現行は診断も sys/dev/video/geforce/runner.c を使い、main 境界の 5 node を生成する。原文の静的展開・ordinal・verify 規則を現行実装と同一とは扱えない。
 
 - abort・失敗の時点でplanのcursorを無効にする。local_cleanup・①②はplanの辺を通らず、RESTORE/QUIESCE phaseのrule（SAVED・override）と既存の前提検査だけで動く。未成立のtrial依存を成功と仮定せず、独立に成立する②の経路とr2の予約/FAILED契約を維持する。
 

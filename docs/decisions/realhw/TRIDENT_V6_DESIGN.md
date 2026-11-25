@@ -17,7 +17,7 @@
 
 ## 1. v5 からの変更点と実物の確認
 
-以下の `T` は `docs/tasks/realhw/TASK_TRIDENT_DRIVER.md`、`H` は `docs/decisions/realhw/HW_BASIC_DESIGN.md`、`S` は `userland/tests/hw/trident.hwb`。リポジトリは指定された読み取り専用の木。
+以下の `T` は `docs/tasks/realhw/TASK_TRIDENT_DRIVER.md`、`H` は `docs/decisions/realhw/HW_BASIC_DESIGN.md`、`S` は `userland/diag/hw/trident.hwb`。リポジトリは指定された読み取り専用の木。
 参照略号: `D` = `/home/hight/os32-tmp/refs/trident/trident_driver-1.4.0.c`、`A` = `/home/hight/os32-tmp/refs/trident/xf86-video-trident/src/trident_dac.c`、`P` = 同 `trident_pll.c`、`R` = 同 `trident_regs.h`、`V` = `/home/hight/os32-tmp/refs/xorg-vgahw/vgaHW.c`。いずれも MIT 系。
 
 | # | 実物との食い違い・旧前提 | v6 の扱いと出典 |
@@ -34,7 +34,7 @@
 
 ## 2. 段 2 の HW-BASIC 版
 
-`userland/tests/hw/trident_mode.hwb` → `/test/hw/trident_mode.hwb`。mode=0 は識別/容量採取、mode=1 は下表の全列、mode=2 は S の Disable と同じ単独復帰、mode=3 は mode=1 と同じ列で順3 の GR06 だけ元値 (段 2b の比較用)。include は無いので S の protect/dac/Enable/Disable を出典・許諾付きで同ファイル内の label に展開し、末尾 end を return にする。
+`userland/diag/hw/trident_mode.hwb` → `/test/hw/trident_mode.hwb`。mode=0 は識別/容量採取、mode=1 は下表の全列、mode=2 は S の Disable と同じ単独復帰、mode=3 は mode=1 と同じ列で順3 の GR06 だけ元値 (段 2b の比較用)。include は無いので S の protect/dac/Enable/Disable を出典・許諾付きで同ファイル内の label に展開し、末尾 end を return にする。
 `v=BAR1`、`f=BAR0`。VGA 論理番号はすべて `v + 番号` の MMIO。実 I/O は既存列の 68h/6Ah/FACh のみ。BAR/Command/Bus Master/ROM は書き換えない。レジスタ書込みの自動 readback はしない。
 以下の SR/CR/GR は index をそれぞれ 3C4h/3D4h/3CEh へ write8、data を次バイトへ write8。AR は毎回 3DAh を read8 → 3C0h に index → 同じ 3C0h に data。8bit 書込みを基本にして順序を明示する。
 
@@ -170,7 +170,7 @@ trident_route_enable(&resident);
 | 段 | 変更するファイル（本票では変更しない） | 受入 → 試験 / 一意な変異の例 |
 |---|---|---|
 | 2a | docs/decisions/realhw/HW_BASIC_DESIGN.md、userland/shell/hwb.h・hwb_parse.c・hwb_exec.c・hwb_log.c | script作成前に汎用fillの文法/幅/回数/停止/ログを正典に追記して実装。既存tools/tests/test_hwb_scripts.pyへ実行器の偽bus試験を追加：8/16/32bitの連続値・終端、count=0/桁あふれ/不整列/幅外値は書込み0、途中失敗/中止の成功回数・後続停止、begin/endは1組 → 番地更新/回数/中止点/ログ集約を各別変異でRED |
-| 2a | userland/tests/hw/trident_mode.hwb、userland/deploy.yaml | 任意PCI窓で実行可能、全構文・上限・mode=2単独実行 → host偽busで本番script実行 / FAC=0を2へ変更して復帰traceがRED |
+| 2a | userland/diag/hw/trident_mode.hwb、userland/deploy.yaml | 任意PCI窓で実行可能、全構文・上限・mode=2単独実行 → host偽busで本番script実行 / FAC=0を2へ変更して復帰traceがRED |
 | 2a | 既存 tools/tests/test_hwb_scripts.py（CHECKに新script/実行器/ログ等のinputsを追加し、script一覧をCHECKの先頭7件から分離） | 本番scriptを実行する偽busモデルを追加。CRTCはタイミングとKGA式から期待値を算出、総幅/pitch/PLL旧式/AR/hidden DAC/CR3A=00、順6→protect_off→Enable→BAR0→palette→paint、fill画像/ログ量を検証 / CR03=80→82、CR05=1E→9E、protect_off後退、CR3A書込み削除、CR13/PLL/ARの変異を各別に実行しRED |
 | 2b | 同script、T §2-1/§9、必要なら docs/tasks/DEFERRED_TESTS.md | 実機のテスト画→5秒→98、LFB/容量結果、乱れの記録。冷間と再起動の証拠。写真はhost testで代用不可。GR06の元値維持（mode=3: mode=1 と同じ列で順3 の GR06 だけ元値を書く）/05h（mode=1）を毎回冷間起動から比較し、GR06/CR3A元値・画・復帰後の乱れ・シリアル行の表示を記録。元値が05hなら同条件で差を判別不能と記録 |
 | 2c | userland/tests/hw/trident_vram.hwb、同manifest/test | BAR幅・SPR・aliasを区別、全保存値復元 → 偽VRAMのwrap/非応答モデル / alias判定と復元を別々に除去しRED |

@@ -9,7 +9,7 @@ static void _idle(void) { ++waits; ticks += 10; }
 int net_rx_recent(u32 window_ms) { (void)window_ms; return 0; }
 volatile u32 kctx_irq_depth;
 #include "idle_work.c"
-#include "platform/pc98/platform_link_inline.h"
+#include "sys/platform/pc98/platform_link_inline.h"
 #define LINK_IDLE() link_platform_idle()
 static void compat(void) { ++compat_hits; ticks += 17; }
 

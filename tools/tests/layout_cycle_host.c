@@ -1,7 +1,7 @@
 /* Test the real guest fixture's verdicts with controlled KAPI observations.
  * This checks the observer, not kernel reclamation (PM runs that in NP21/W). */
 #define main guest_main
-#include "../../userland/tests/layout_cycle_test.c"
+#include "../../userland/diag/layout_cycle_test.c"
 #undef main
 #include "../../userland/lib/rt/dbgserial.c"
 

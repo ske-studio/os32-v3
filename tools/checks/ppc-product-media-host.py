@@ -1,7 +1,7 @@
 CHECK = dict(name='ppc-product-media-host', tier=1, needs=[], budget=10,
     covers=['tools/ppc/product_media_host.py', 'tools/ppc/product_media.py',
             'tools/ppc/root_lz4_layout.py', 'tools/ppc/root_pair.py', 'tools/mkmod.py',
-            'tools/module_schema.py', 'include/memmap.h', 'include/callconv.h', 'include/types.h'],
+            'tools/module_schema.py', 'sys/include/memmap.h', 'sys/include/callconv.h', 'sys/include/types.h'],
     basis=['docs/decisions/ppc/PPC_ROOT_MOUNT_ALIGN_X86_DESIGN.md §6'])
 
 

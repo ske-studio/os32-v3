@@ -10,7 +10,7 @@
 #undef _start
 #include "hwb_fake.h"
 #include "io.h"
-#include "mm/paging.h"
+#include "sys/kern/mm/paging.h"
 #include "memmap.h"
 
 /* Test addresses/data are arbitrary unregistered targets (design §7).
@@ -51,7 +51,7 @@ static void fake_outpd(unsigned int p, unsigned long v)
 #define outp fake_outp
 #define outpw fake_outpw
 #define outpd fake_outpd
-#include "kdebug/kdebug_main.c"
+#include "sys/platform/pc98/kdebug/kdebug_main.c"
 
 u32 pci_hwb_read(u32 bdf, u32 offset, u32 width, u32 *value)
 {
@@ -89,7 +89,7 @@ int paging_pte_restore(u32 va, u32 raw)
 #define KPEEK_HOST
 #define KDEBUG_WINDOW_HOST
 #define recover_window_hal_init unused_real_hal_init
-#include "kdebug/kdebug_window.c"
+#include "sys/arch/x86/kdebug/kdebug_window.c"
 #undef recover_window_hal_init
 static int fake_load(void *opaque, u32 va, u32 width, u32 *value)
 {
@@ -107,7 +107,7 @@ static const struct recover_window_ops fake_ops = {
 };
 void recover_window_hal_init(struct recover_window *w)
 { *w = (struct recover_window){.ops=&fake_ops, .va=aperture()}; }
-#include "kdebug/hwb_access.c"
+#include "sys/kern/kdebug/hwb_access.c"
 
 static struct hw_req request(u32 action, u32 space, u32 width)
 {

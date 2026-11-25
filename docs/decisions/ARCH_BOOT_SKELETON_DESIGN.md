@@ -47,12 +47,12 @@
 |シェル|11 kernel_shell_loop → shell_loop_run|10 shell_loop_run、root なし診断では LAN poll|製品の再実行規則は既に共通|
 
 PC-98 の 6 と 7 は同じ kernel_boot_memory 内で連続する。6 の入口で root は既に使用可能。
-両機種とも現在の共通入口は init/kernel_start.c:kernel_start の machine → _enable → services → run。
+両機種とも現在の共通入口は sys/kern/init/kernel_start.c:kernel_start の machine → _enable → services → run。
 
 調査記述と実物で修正する点は次の 2 件。
 
-1. order B1 の「呼び出しは確認できなかった」は製品に限る。platform/powermac/shell_boot.c:pm_shell_boot は tools/tests/ppc_sh_boot.py の test_main が直接呼ぶ。
-2. order A3 の置き場は翻訳単位と定義を区別する。gfx/gfx_core.c:gfx_prepare_backend と同じ翻訳単位でも、gfx_boot_reserve の本体は gfx/gfx_core_surface.inc:gfx_boot_reserve。
+1. order B1 の「呼び出しは確認できなかった」は製品に限る。sys/platform/powermac/shell_boot.c:pm_shell_boot は tools/tests/ppc_sh_boot.py の test_main が直接呼ぶ。
+2. order A3 の置き場は翻訳単位と定義を区別する。sys/hal/gfx/gfx_core.c:gfx_prepare_backend と同じ翻訳単位でも、gfx_boot_reserve の本体は sys/hal/gfx/gfx_core_surface.inc:gfx_boot_reserve。
 
 POLICY_DEV §1 の統合判断をこの変更に当てる。
 
@@ -148,7 +148,7 @@ const struct shell_loop_ops *platform_boot_shell_ops(void);
 
 ## 4. 診断像の切替
 
-build/images/ppc-flags.mk が入力を正規化し、ppc-powermac.mk と build/ppc-install-boot.mk が ELF ごとに入口をリンクする。
+sys/conf/images/ppc-flags.mk が入力を正規化し、ppc-powermac.mk と build/ppc-install-boot.mk が ELF ごとに入口をリンクする。
 製品は init/ の製品列を直接呼ぶ。診断は同じ段関数を選ぶ小さな PPC 専用入口で、製品の関数表に診断用空欄を足さない。
 
 |IMAGE 指定|現行の実効構成|移行後の終端・検査|
@@ -209,18 +209,18 @@ PPC は PPCKERN.ELF と root 像を別計測する。限界を超えた段はリ
 |単位・担当|新規または変更するファイル|規模と責務|
 |---|---|---|
 |T0 x86 本線|新 include/boot_machine_contract.h、init/boot_steps.h|各 30〜45 行。契約と共通段の宣言|
-|T1 x86 本線|変更 init/boot_root.c、新 init/boot_mount.c|各 10/65 行。媒体 mount、解放出口、設定、子 mount|
-|T2 x86 本線|変更 kernel/sqlite_engine.c、kernel/fep_boot.c の既存サービス提供口|約 20 行。既存の開始・巻戻しを呼ぶ|
+|T1 x86 本線|変更 sys/kern/init/boot_root.c、新 init/boot_mount.c|各 10/65 行。媒体 mount、解放出口、設定、子 mount|
+|T2 x86 本線|変更 sys/kern/sqlite_engine.c、sys/kern/fep_boot.c の既存サービス提供口|約 20 行。既存の開始・巻戻しを呼ぶ|
 |T3 x86 本線|新 init/boot_exec.c、init/boot_shared.c|各 15〜25 行。FD/pipe と SHM 公開を別ファイルに|
-|T4 x86 本線|変更 platform/pc98/kernel.c、kernel_boot_memory.inc、boot.c（後二者も同ディレクトリ）|各 130/65/30 行。旧三段を機能別に取り出す|
+|T4 x86 本線|変更 sys/platform/pc98/kernel.c、kernel_boot_memory.inc、boot.c（後二者も同ディレクトリ）|各 130/65/30 行。旧三段を機能別に取り出す|
 |T4 同担当|新 platform/pc98/boot_memory.c、boot_media.c、boot_console.c、platform_boot.h|各 40〜90 行。予約、媒体、画面・入力と機種内宣言|
-|T5 PowerPC|変更 platform/powermac/ppc_kernel.c、kernel_boot.c、ide_boot.c、root_boot.c|各 180/10/20/40 行。OF 引継ぎ、APM、解放の口|
+|T5 PowerPC|変更 sys/platform/powermac/ppc_kernel.c、kernel_boot.c、ide_boot.c、root_boot.c|各 180/10/20/40 行。OF 引継ぎ、APM、解放の口|
 |T5 同担当|変更 同 console_text.c、input_boot.c、exec_boot.c、shell_loop_ops.c|各 10〜35 行。文字資源、寸法、trap、ops を提供|
 |T5 同担当|新 同 boot_memory.c、boot_media.c、platform_boot.h|各 30〜80 行。製品と診断が使う機種側の段|
-|T6 PowerPC|新 同 boot_diag.c、変更 build/images/ppc-flags.mk、build/targets/ppc-powermac.mk、build/ppc-install-boot.mk|各 100/15/30 行。正規化後の入口を選択|
+|T6 PowerPC|新 同 boot_diag.c、変更 sys/conf/images/ppc-flags.mk、build/targets/ppc-powermac.mk、build/ppc-install-boot.mk|各 100/15/30 行。正規化後の入口を選択|
 |T6 同担当|変更 build/platform/powermac.mk、tools/accept/ppc_shell_layout.py と selector 試験|layout のコンパイル・リンク選択、既存の指定と変異を維持|
 |T6 同担当|削除 同 shell_boot.*、cli_boot.*、変更 §4 の直接試験 2 本|旧ファイル全行、試験各 30〜60 行|
-|T7 x86 本線|変更 init/kernel_start.c、新 init/boot_product.c、変更 build/sources/common.mk、order.mk、build/platform/pc98.mk と PPC のソース列|各 10/55/10 行。製品入口を切替|
+|T7 x86 本線|変更 sys/kern/init/kernel_start.c、新 init/boot_product.c、変更 build/sources/common.mk、order.mk、build/platform/pc98.mk と PPC のソース列|各 10/55/10 行。製品入口を切替|
 |T8 x86 本線|T4 で拡張する既存 tools/tests/test_boot_order.py と容量・契約試験|最終 fixture 比較。boot-order-host の登録を継承|
 
 ## 8. 受入・変異と着手順
@@ -267,7 +267,7 @@ PPC は PPCKERN.ELF と root 像を別計測する。限界を超えた段はリ
 
 ## 確定 (2026-11-24、sol 第 3 回「PM が 2 か所を直せば確定可」、PM が反映。本線は第 2 回で PC-98 の側を確定可、N1 は r3 で反映済み・再レビュー不要)
 
-- R3-1 (P2・§4 表): kboot-link-sh の行の失敗の扱いを「RAM 失敗時は LAN poll、HDD 選択・mount/path 失敗または解放異常は停止」に (現行 platform/powermac/ppc_kernel.c の platform_boot_services の HDD の失敗の出口)。
+- R3-1 (P2・§4 表): kboot-link-sh の行の失敗の扱いを「RAM 失敗時は LAN poll、HDD 選択・mount/path 失敗または解放異常は停止」に (現行 sys/platform/powermac/ppc_kernel.c の platform_boot_services の HDD の失敗の出口)。
 - R3-2 (P2・§8 PPC 媒体出口): RAM 登録失敗の注入 (`registered=0` で staging を解放、LAN poll、シェル未到達) を両像の受入に追加 (現行 ppc_kernel.c の RAM の失敗の出口)。
 
 状態: **設計まで (ユーザー 2026-11-24「実装はしないでね」)**。実装の段 (x86 は本線・PowerPC は PowerPC) は起こさない。

@@ -11,11 +11,11 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-sh-boot', tier=1, budget=60, needs=[],
-             covers=['platform/powermac/input_usb.h', 'tools/tests/host32.py', 'platform/powermac/shell_boot.c', 'platform/powermac/shell_boot.h',
-                     'platform/powermac/exec_boot.c', 'platform/powermac/lan_terminal.c',
-                     'arch/ppc/exec_context.c', 'arch/ppc/arch_exec_storage.h'],
-             inputs=['tools/tests/ppc_sh_boot.py', 'platform/powermac/lan_boot.h',
-                     'exec/exec.h', 'include/kprintf.h', 'kernel/console/console_stream.h'])
+             covers=['sys/platform/powermac/input_usb.h', 'tools/tests/host32.py', 'sys/platform/powermac/shell_boot.c', 'sys/platform/powermac/shell_boot.h',
+                     'sys/platform/powermac/exec_boot.c', 'sys/platform/powermac/lan_terminal.c',
+                     'sys/arch/ppc/exec_context.c', 'sys/arch/ppc/arch_exec_storage.h'],
+             inputs=['tools/tests/ppc_sh_boot.py', 'sys/platform/powermac/lan_boot.h',
+                     'sys/kern/exec/exec.h', 'sys/include/kprintf.h', 'sys/kern/console/console_stream.h'])
 HARNESS = r'''
 static void exit(int code) __attribute__((noreturn));
 static void exit(int code) { __asm__ volatile("int $0x80" : : "a"(1), "b"(code)); __builtin_unreachable(); }
@@ -68,7 +68,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'platform/powermac/shell_boot.c').read_text()
+    source = (ROOT / 'sys/platform/powermac/shell_boot.c').read_text()
     mutations = [('connect', '    while (!pm_term_connected() && !pm_input_usb_has_key()) pm_terminal_poll();', '    if (0) pm_terminal_poll();', 11, 'connect-fail\n'),
                  ('failure', '        if (kind != EXEC_KIND_EXITED) break;', '        if (kind != EXEC_KIND_EXITED) continue;', 12, 'connect-ok\nrestart-ok\nfailure-fail\n')]
     cases = [('normal', source, 0, 'connect-ok\nrestart-ok\nfailure-ok\n')]

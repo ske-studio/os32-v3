@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """C15 teardown contracts; compile the product TU without libc."""
 CHECK = dict(name='gfx2-owner-release-host', tier=1, needs=[], budget=10,
-    covers=['gfx/v2/owner_release.c', 'gfx/v2/gfx2_int.h', 'gfx/v2/gfx2_exec.h',
-            'include/gfx_hal.h', 'include/gfx_hal2.h', 'include/gfx_sync.h',
-            'include/types.h', 'include/memmap.h', 'include/type_contract.h',
-            'include/abi.h', 'include/callconv.h', 'include/copy_units.h',
-            'arch/*/arch_copy.h', 'arch/*/arch_abi.h', 'mm/pgalloc.h',
-            'mm/paging.h', 'include/appmem_types.h', 'sdk/include/os32/os32_gfx2.h',
+    covers=['sys/hal/gfx/v2/owner_release.c', 'sys/hal/gfx/v2/gfx2_int.h', 'sys/hal/gfx/v2/gfx2_exec.h',
+            'sys/include/gfx_hal.h', 'sys/hal/gfx/gfx_hal2.h', 'sys/include/gfx_sync.h',
+            'sys/include/types.h', 'sys/include/memmap.h', 'sys/include/type_contract.h',
+            'sys/include/abi.h', 'sys/include/callconv.h', 'sys/include/copy_units.h',
+            'arch/*/arch_copy.h', 'arch/*/arch_abi.h', 'sys/kern/mm/pgalloc.h',
+            'sys/kern/mm/paging.h', 'sys/include/appmem_types.h', 'sdk/include/os32/os32_gfx2.h',
             'tools/tests/gfx2_owner_release_host.c', 'tools/tests/test_gfx2_owner_release.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     basis=['HAL_V2_DESIGN §7-3', 'HAL_V2_DESIGN §7-4', 'HAL_V2_DESIGN §7-5'],
@@ -35,7 +35,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/v2/owner_release.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/v2/owner_release.c').read_text()
     mutations = [
         ('quarantine replaced by destroy', 'if (gfx2_surf_quarantine(s)) poison = 1;',
          'if (gfx2_surf_destroy(s)) poison = 1;'),

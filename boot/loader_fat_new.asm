@@ -35,7 +35,7 @@ cpu 386
 %include "boot/gdt_defs.inc"
 %include "boot/boot_probe.inc"
 
-; Canonical: include/bootinfo.h (checked by test_boot_named_constants.py).
+; Canonical: sys/include/bootinfo.h (checked by test_boot_named_constants.py).
 BOOTINFO_DA_HD1 EQU 0x81
 
 
@@ -71,7 +71,7 @@ ROOT_ENTS   EQU     192
 FAT_BUF     EQU     MEM_BOOT_FAT_BUF
 FAT_START   EQU     1
 
-;; ブート情報域 (0x7E00) の番地とオフセット。正典は include/bootinfo.h。
+;; ブート情報域 (0x7E00) の番地とオフセット。正典は sys/include/bootinfo.h。
 %include "boot/bootinfo.inc"
 
 section .text
@@ -342,7 +342,7 @@ pm_entry32:
         jnz     .vk32_fail
 
         ;; 起動したイメージの CRC をブート情報域のイメージ欄へ
-        ;; (include/bootinfo.h)。チェック語を**最後に**書く。
+        ;; (sys/include/bootinfo.h)。チェック語を**最後に**書く。
         mov     eax, [vk32_img_crc]
         mov     [MEM_BOOTINFO_BASE + BI_OFF_IMG_CRC], eax
         mov     edx, [var_size]

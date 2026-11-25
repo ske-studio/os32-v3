@@ -9,12 +9,12 @@
  *
  *  アプリが 4 本同時に生きると、exec_exit の回収 7 種のうち **所有者を見て
  *  いなかった 2 種** (SHM とサウンド) が他のアプリの資源を巻き上げる。
- *  ここでは実物の fs/fd_redirect.c / fs/pipe_buffer.c / mm/shm.c を
+ *  ここでは実物の sys/fs/fd_redirect.c / sys/fs/pipe_buffer.c / sys/kern/mm/shm.c を
  *  そのままコンパイルし、ID 2 と ID 3 が資源を持った状態で ID 2 だけを
  *  畳んで「2 の分だけ」消えることを見る。
  *
- *  FD (fs/vfs_fd.c の vfs_close_owned) は 共有 fixture tools/tests/vfs_fd_sqlite_host.c が、
- *  DB (kapi/kapi_db.c の db_cleanup_owned) は tools/tests/test_db_errstr.py
+ *  FD (sys/fs/vfs_fd.c の vfs_close_owned) は 共有 fixture tools/tests/vfs_fd_sqlite_host.c が、
+ *  DB (sys/kapi/kapi_db.c の db_cleanup_owned) は tools/tests/test_db_errstr.py
  *  が既に同じ形で見ているので、ここでは重複させない。
  * ======================================================================== */
 #include <stdio.h>
@@ -24,7 +24,7 @@
 #include "paging.h"
 
 /* ---- 実物が要る最小限のカーネル環境 --------------------------------
- * res_owner_set/get は fs/fd_redirect.c の実物をそのまま使う (この試験の
+ * res_owner_set/get は sys/fs/fd_redirect.c の実物をそのまま使う (この試験の
  * 主題そのものなので差し替えない)。 */
 
 /* paging: shm.c はブロックの R/W 属性を張り替えるだけ。回数を数えて、
@@ -61,7 +61,7 @@ void *kmalloc(u32 size)
 }
 void kfree(void *p) { if (p) g_live_allocs--; }
 
-/* fs/fd_redirect.c の書き込み時の再検査 (票 TASK_KAPI_OUTPUT_GUARD) が引く exec/exec.c
+/* sys/fs/fd_redirect.c の書き込み時の再検査 (票 TASK_KAPI_OUTPUT_GUARD) が引く sys/kern/exec/exec.c
  * の 5 本。ホストではユーザ帯の番地は無いので ring3_ptr_ok は常に 0 (= 再検査を通らない)。 */
 int ring3_ptr_ok(u32 p) { (void)p; return 0; }
 int ring3_user_ranges_writable(u32 pa, u32 la, u32 pb, u32 lb)
@@ -95,10 +95,10 @@ void test_shm_memset(void *d, int c, unsigned long n)
     g_last_zero_start = (unsigned int)(unsigned long)d;
 }
 
-#include "../../fs/fd_redirect.c"
+#include "../../sys/fs/fd_redirect.c"
 #include "redir_access_stub.h"
-#include "../../fs/pipe_buffer.c"
-#include "../../mm/shm.c"
+#include "../../sys/fs/pipe_buffer.c"
+#include "../../sys/kern/mm/shm.c"
 
 static int failures;
 static int checks;
@@ -114,7 +114,7 @@ static void check(int cond, const char *name)
     }
 }
 
-/* exec_exit / exec_kill の回収の並び (exec/exec.c の exec_reclaim_owned)。
+/* exec_exit / exec_kill の回収の並び (sys/kern/exec/exec.c の exec_reclaim_owned)。
  * ここで見るのは所有者付きの 3 種。 */
 static void reclaim_owned(int id)
 {

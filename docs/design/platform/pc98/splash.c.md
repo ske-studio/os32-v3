@@ -1,7 +1,7 @@
-# platform/pc98/splash.c — スプラッシュ用の表示の開始・描画・歩調
+# sys/platform/pc98/splash.c — スプラッシュ用の表示の開始・描画・歩調
 
 > 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
-ソース: `platform/pc98/splash.c`
+ソース: `sys/platform/pc98/splash.c`
 
 ## 何をするか
 

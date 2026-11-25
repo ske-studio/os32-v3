@@ -60,7 +60,7 @@ def exercise(directory, name, filename=None, before=None, after=None):
                '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'arch/ppc'),
                '-I' + str(ROOT / 'platform/powermac'),
                '-I' + str(ROOT / 'sdk/include/os32'),
-               str(ROOT / 'kernel/port_service.c'),
+               str(ROOT / 'sys/kern/port_service.c'),
                str(ROOT / 'tools/ppc/kboot_log_host.c'),
                str(directory / 'log.c'), str(directory / 'escc.c'), '-o', str(binary)]
     subprocess.run(command, check=True, timeout=60)

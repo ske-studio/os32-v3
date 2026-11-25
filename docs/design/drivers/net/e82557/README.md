@@ -15,6 +15,6 @@ pci_bind_all(drivers, sizeof(drivers) / sizeof(drivers[0]));
 
 | ファイル | 登録 |
 |---|---|
-| `drivers/net/e82557/lan_module.c` | `lan_module_load()` の先頭、同様に e82557 façade を登録 |
+| `sys/dev/net/e82557/lan_module.c` | `lan_module_load()` の先頭、同様に e82557 façade を登録 |
 
 - tick_register が失敗したときの load の戻り値は各部品の既存の初期化失敗の値 (FM/PCM/LAN の MODULE_INIT_FAILED 相当、今の load の失敗の経路と同じ)。

@@ -2,7 +2,7 @@
  * Trident mode changes revoke DISPLAY leases and replace the alias SID. */
 #include "gfx2_int.h"
 #define main guest_main
-#include "../../userland/tests/gfx2_i3.c"
+#include "../../userland/diag/gfx2_i3.c"
 #undef main
 #include <stdarg.h>
 #include "kstring.h"

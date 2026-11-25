@@ -1,4 +1,4 @@
-# exec/appslot_park.inc — park の共通更新
+# sys/kern/exec/appslot_park.inc — park の共通更新
 
 > 状態: **現行 (2026-11-01)** — L01b、既存の更新順を共用。
 

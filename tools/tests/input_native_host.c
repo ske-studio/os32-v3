@@ -1,5 +1,5 @@
 #include "in2_int.h"
-#include "drivers/input/kbd.h"
+#include "sys/platform/pc98/input/kbd.h"
 #include "io.h"
 #define T(c) do { if (!(c)) return __LINE__; } while (0)
 static int native_v86, native_abort, native_guest;

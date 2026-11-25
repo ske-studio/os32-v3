@@ -1,4 +1,4 @@
-#include "gfx/v2/gfx2_sw.h"
+#include "sys/hal/gfx/v2/gfx2_sw.h"
 static struct gfx2_adapter a;
 static int hw, calls, vis = 1, mode;
 static int backend_check(void *ctx, const struct gfx2_exec *ex)

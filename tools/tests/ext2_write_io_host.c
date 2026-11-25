@@ -5,7 +5,7 @@
  *  実行:   python3 -B tools/tests/test_ext2_write_io.py
  *  記録:   tools/tests/s6p_tdd.md
  *
- *  実物の fs/ext2/ext2_super.c / ext2_inode.c / ext2_dir.c / ext2_file.c /
+ *  実物の sys/fs/ext2/ext2_super.c / ext2_inode.c / ext2_dir.c / ext2_file.c /
  *  ext2_fmt.c / ext2_vfs.c をそのまま取り込み、境界は
  *    - Device API (dev_find / dev_blk_read_lba / dev_blk_write_lba)
  *    - ide_drive_present / ide_get_info
@@ -16,7 +16,7 @@
  *
  *  数えるのは **512B セクタ単位の I/O 回数** (= ide_read_sector_chs /
  *  ide_write_sector_chs の呼び出し回数)。ext2 の 1KB ブロック 1 本は必ず
- *  セクタ 2 本になる (fs/ext2/ext2_super.c の ext2_read_block / ext2_write_block)。
+ *  セクタ 2 本になる (sys/fs/ext2/ext2_super.c の ext2_read_block / ext2_write_block)。
  *
  *  tools/tests/con_sink_host.c と同じ様式 — ホスト ILP32 GNU89 で走らせ、
  *  同じソースが i386-elf-gcc -Werror でも通ることを別に見る ([C1])。
@@ -276,14 +276,14 @@ int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
 /* ======================================================================== */
 /*  実物のソース                                                            */
 /* ======================================================================== */
-#include "../../fs/ext2/ext2_super.c"
-#include "../../fs/ext2/ext2_time.c"
-#include "../../fs/ext2/ext2_inode.c"
-#include "../../fs/ext2/ext2_dir.c"
-#include "../../fs/ext2/ext2_file.c"
-#include "../../fs/ext2/ext2_medium_ide.c"
-#include "../../fs/ext2/ext2_fmt.c"
-#include "../../fs/ext2/ext2_vfs.c"
+#include "../../sys/fs/ext2/ext2_super.c"
+#include "../../sys/fs/ext2/ext2_time.c"
+#include "../../sys/fs/ext2/ext2_inode.c"
+#include "../../sys/fs/ext2/ext2_dir.c"
+#include "../../sys/fs/ext2/ext2_file.c"
+#include "../../sys/platform/pc98/storage/ext2_medium_ide.c"
+#include "../../sys/fs/ext2/ext2_fmt.c"
+#include "../../sys/fs/ext2/ext2_vfs.c"
 
 /* 書庫を作る側も実物 (票 S6-P 段 A)。MTAR_NO_STDIO は試験側が -D で渡す。 */
 #include "../../lib/microtar/microtar.c"
@@ -402,7 +402,7 @@ static void case_w1_append(void)
     disk_teardown();
 }
 
-/* P4: 後方 lseek は FS を触らない (fs/vfs_fd.c の vfs_seek は
+/* P4: 後方 lseek は FS を触らない (sys/fs/vfs_fd.c の vfs_seek は
  *     VfsFile.offset を書き換えるだけ) + 戻った先への 512B 書き直し */
 static void case_seek_back(void)
 {
@@ -436,11 +436,11 @@ static void case_seek_back(void)
  *
  *   I/O コールバックは userland/cmds/tar.c の mt_read / mt_write / mt_seek と
  *   同じ形 — ただし FD ではなく ext2_vfs_read_stream / ext2_vfs_write_stream を
- *   直に叩く (fs/vfs_fd.c の vfs_seek は offset を動かすだけなので、オフセット
+ *   直に叩く (sys/fs/vfs_fd.c の vfs_seek は offset を動かすだけなので、オフセット
  *   はここで持つ)。 */
 #define TAR_SIZE  2048u
 
-static u32 g_mt_off;         /* fs/vfs_fd.c の VfsFile.offset に相当 */
+static u32 g_mt_off;         /* sys/fs/vfs_fd.c の VfsFile.offset に相当 */
 static u32 g_mt_writes;      /* tar->write が呼ばれた回数 = sys_write の回数 */
 static u32 g_mt_bytes;
 static u32 g_mt_min;         /* いちばん小さかった書き込み */

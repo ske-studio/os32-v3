@@ -1,9 +1,9 @@
 # vfs_fd_path TDD 記録 — FD は inode で動いて失効する / 長いパスは切り詰めずに断る
 
 契約: `docs/06_filesystem.md` §6-1 の「FD の同一性と失効」「パスの長さと最終要素」「名前の規則 — FAT / HostDrv」、`docs/design/userland/lib/rt/pkg.md` (段 pkg)、`docs/design/tools/mkpkg.md` の「消費側の上限を作る側で守る」(段 mkpkg)、`docs/design/sdk/crt/syscalls.md` (段 errno)、`docs/design/kernel/ime/ime_dict.md` (段 ime の開き直し)。出所は票 TASK_VFS_FD_PATH (方針 v2 の 8〜12、v3、ラリー 3 とユーザー決裁 ①)
-試験: `tools/tests/vfs_fd_path_host.c` (実物の `fs/ext2/ext2_*.c` + `fs/vfs.c` + `fs/vfs_fd.c` + `userland/lib/rt/pkg.c` を `#include`)、
+試験: `tools/tests/vfs_fd_path_host.c` (実物の `fs/ext2/ext2_*.c` + `sys/fs/vfs.c` + `sys/fs/vfs_fd.c` + `userland/lib/rt/pkg.c` を `#include`)、
 `tools/tests/newlib_errno_host.c` (実物の `sdk/crt/syscalls.c` を newlib のヘッダで)、
-`tools/tests/ime_dict_host.c` (実物の `kernel/ime/ime_dict.c` + SQLite + `lib/sqlite3/os32_sqlite_vfs.c` + `fs/vfs_fd.c`)
+`tools/tests/ime_dict_host.c` (実物の `sys/kern/ime/ime_dict.c` + SQLite + `lib/sqlite3/os32_sqlite_vfs.c` + `sys/fs/vfs_fd.c`)
 実行: `python3 -B tools/tests/test_vfs_fd_path.py [--target] [--mutants] [--red[=REV]] [case]` / `make check-vfs-fd-path-host`
 
 基点: `wt/vfs-fd` = `6de1fea`。
@@ -73,14 +73,14 @@ ime の RED は組まない (修正前の `IME_Dict` に `io_retried` が無い)
 ```
 case errno (real sdk/crt/syscalls.c + newlib headers)   checks 78 failures 0
 case mkpkg (real tools/mkpkg.py)                         7 件 ok
-case ime (real kernel/ime/ime_dict.c + SQLite + vfs_fd.c)    SUMMARY ime_dict PASS (7 段)
+case ime (real sys/kern/ime/ime_dict.c + SQLite + vfs_fd.c)    SUMMARY ime_dict PASS (7 段)
 case fd     e2fsck -fn fd.img: clean
 case busy   e2fsck -fn busy.img: clean
 case dot    e2fsck -fn dot.img: clean
 case path   e2fsck -fn path.img: clean
 case pkg    e2fsck -fn pkg.img: clean
 checks 367 failures 0
-TARGET i386-elf -Werror compile PASS (fs/vfs.c, fs/vfs_fd.c, fs/ext2/ext2_vfs.c, fs/ext2/ext2_file.c, fs/fat/fatfs_vfs.c, drivers/hostdrv/hostdrvfs.c, fs/isofs/iso9660.c)
+TARGET i386-elf -Werror compile PASS (sys/fs/vfs.c, sys/fs/vfs_fd.c, sys/fs/ext2/ext2_vfs.c, sys/fs/ext2/ext2_file.c, sys/fs/fat/fatfs_vfs.c, sys/dev/hostdrv/hostdrvfs.c, sys/fs/isofs/iso9660.c)
 ```
 
 ## 変異 (`--mutants`、写しを変異させるので実物は書き換えない)
@@ -144,13 +144,13 @@ HostDrv の非 ASCII 名の畳み方 (ホスト側の変換に依る) は区別�
 FatFs (非 LFN) は `\` を区切り、0x20 以下で名前を打ち切り、`DISK.` を `DISK` と読む。
 Win32 は `\` を区切り、末尾の空白と `.` を落とす。BUSY / pinned は 1 バイトの fold で
 比べるので、`vfs_rm("/fd0/disk.img ")` が使用中の実体を消せた。規則は
-`fs/vfs_name_rules.inc` (FAT は途中の空白も断る、Win32 は末尾だけ) で、
-`fs/fat/fatfs_vfs.c` は `ff_make_path` (全入口が通る)、`drivers/hostdrv/hostdrvfs.c` は `hostdrv_create`
+`sys/fs/vfs_name_rules.inc` (FAT は途中の空白も断る、Win32 は末尾だけ) で、
+`sys/fs/fat/fatfs_vfs.c` は `ff_make_path` (全入口が通る)、`sys/dev/hostdrv/hostdrvfs.c` は `hostdrv_create`
 と `hdrv_rename` の宛先で INVAL を返す。
 
 | 項目 | 試験 | RED (bf0dc31 の fs/ + 規則ファイルだけ置いた写し) |
 |---|---|---|
-| FAT の入口 | 段 `fatname`: **実物の `fs/fat/fatfs_vfs.c` + `fs/fat/fatfs/ff.c`** を RAM の FAT12 (f_mkfs) で。pinned の `DISK.IMG` / `D/IMG.DAT` / `DISK` と開いている SQLite `DB` に `disk.img ` / `disk.img ignored` / `disk.img\x01` / `\disk.img` / `d\img.dat` / `disk.` / `db.` / `DB ` / `db\t` を rm / rename (両引数) → INVAL、open / stat / read / write / mkdir / rmdir / ls も INVAL、実体と中身は不変。正当な 8.3 名 (`/bin/ls.bin`、`/etc/system.cfg`、`.x`、大文字小文字違い)・根の ls・`settings.db-journal` の stat = NOTFOUND は従来どおり | 32 件落ちる。`fat_slurp("0:/DISK.IMG") == 9` 等 = **pinned の実体が消えた・動いた** |
+| FAT の入口 | 段 `fatname`: **実物の `sys/fs/fat/fatfs_vfs.c` + `sys/fs/fat/fatfs/ff.c`** を RAM の FAT12 (f_mkfs) で。pinned の `DISK.IMG` / `D/IMG.DAT` / `DISK` と開いている SQLite `DB` に `disk.img ` / `disk.img ignored` / `disk.img\x01` / `\disk.img` / `d\img.dat` / `disk.` / `db.` / `DB ` / `db\t` を rm / rename (両引数) → INVAL、open / stat / read / write / mkdir / rmdir / ls も INVAL、実体と中身は不変。正当な 8.3 名 (`/bin/ls.bin`、`/etc/system.cfg`、`.x`、大文字小文字違い)・根の ls・`settings.db-journal` の stat = NOTFOUND は従来どおり | 32 件落ちる。`fat_slurp("0:/DISK.IMG") == 9` 等 = **pinned の実体が消えた・動いた** |
 | HostDrv の規則 | 段 `hostname` (合成ドライバ: ext2 の口の前に Win32 の規則): 末尾の空白・`.`・`\`・制御文字が INVAL、`my file.txt` は通る | 合成ドライバなので RED は無い。配線は `hostwire` (本文の検査) と変異で見る |
 | 規則の表 | 段 `namerule`: 21 行 × 2 規則 | — |
 | hostdrvfs.c の配線 | `hostwire`: 名前をホストへ渡す口は setup_create → session_set_path だけ、hostdrv_create がその前に断る、rename の宛先は元を開く前、パスを受ける 10 口は全部 hostdrv_create(path) を通る | 検査を外した本文 3 通りで FAIL を確認 |
@@ -172,7 +172,7 @@ Win32 の他の別名 (8.3 の短い名前 `DISK~1.IMG`、`:` の代替データ
 |---|---|---|---|
 | B1 FAT の長いパス (Codex / Opus) | `ff_make_path` が `"0:"` + (先頭 `/` が無ければ 1) + パス + NUL を先に数え、器 (256) を超えれば `VFS_ERR_NAMETOOLONG`。全 11 呼び手は既に rc を返す | 段 `fatname` の中の `fatroot`: FAT を **`/` にマウント** (FD 起動と同じ)、`/abcdefgh/` × 27 (244 バイト) の下に 253 バイトの `disk1.img` を作って pinned。**255 バイトの `disk1.imgXY` で rm / rename (元・宛先) / open(O_CREAT\|O_TRUNC) / write / open → NAMETOOLONG**、254 バイトで rm / stat / open / write / read / mkdir / rmdir → NAMETOOLONG、253 は読み書きでき rm は BUSY、実体と中身は不変 | `vfs_rm(255 バイト)` が **0 (= 253 バイトの pinned の実体を消した)**、以後 15 件落ちる |
 | FAT の rmdir (Opus) | `fatfs_vfs_rmdir` が先に `f_stat` して `AM_DIR` でなければ `VFS_ERR_NOTDIR`。`vfs_rmdir` も inode を持たない FS で `vfs_fd_pinned_busy` (名前か祖先) → BUSY | 段 `fatname`: pinned の `disk.img` / `DISK.IMG` / `d/img.dat` / 祖先 `d` → BUSY、pinned でない `other` → NOTDIR で残る、無い名前 → NOTFOUND、空のディレクトリは消える | pinned への rmdir が 0 (実体が消える) |
-| B2 HostDrv の名前 (Codex) | `VFS_NAME_RULE_WIN32` に Win32 の禁止文字 `: * ? " < > \|` と、**最短形の正しい UTF-8 で BMP (サロゲートを除く)** 以外を INVAL。`kutf8_to_utf16le` も同じ規則で -1 (途中終了・冗長形の受理・U+FFFD 置換・収まらない入力の切り詰めを全部やめた)。`session_set_path` / `setup_create` は失敗を返し、`hostdrv_create` はハイパーコールしない。`hdrv_rename` は宛先の変換を元を開く**前に**行う。ntpath (260) に収まらない名前は NAMETOOLONG | 段 `namerule` (+37 行: 境界 U+0080 / U+07FF / U+0800 / U+D7FF / U+E000 / U+FFFF、切れた列、単独の継続バイト、冗長 2 / 3 バイト、サロゲート、4〜5 バイト、禁止文字、`+=[];,` は通る)。段 `utf8`: 規則と変換が **130^3 通りの総当たりで同じ集合**を通し、通ったものは逆変換で元のバイト列に戻る (1 対 1)。段 `hostname`: pinned の `disk.img` に Codex の反例 `disk.img\xc2` / `\xc1\xa4isk.img` / 絵文字 / `disk.img::$DATA` / `a\x80` で rm / rename (両引数) / open / write → INVAL、日本語 (3 バイト) の名前は作成・読み・改名・削除できる。**`tools/tests/b8_hostdrv_host.c` の [E6]** (実物の `drivers/hostdrv/hostdrvfs.c` + 贋 NP21/W): 13 種の不正な名前で unlink / stat / read_file / get_file_size / write_file / rmdir / rename (両引数) が INVAL で **CREATE / SET_INFORMATION / WRITE が 1 度も出ない**、変換の段だけでも断る、299 バイトは NAMETOOLONG でホストへ送らない、`/日本.txt` は `\日本.txt` の UTF-16 (Length 14) で届く | `utf8`: 10 件 (往復が崩れる・反例が変換を通る)。`hostname`: 13 件。`namerule`: 30 件超 |
+| B2 HostDrv の名前 (Codex) | `VFS_NAME_RULE_WIN32` に Win32 の禁止文字 `: * ? " < > \|` と、**最短形の正しい UTF-8 で BMP (サロゲートを除く)** 以外を INVAL。`kutf8_to_utf16le` も同じ規則で -1 (途中終了・冗長形の受理・U+FFFD 置換・収まらない入力の切り詰めを全部やめた)。`session_set_path` / `setup_create` は失敗を返し、`hostdrv_create` はハイパーコールしない。`hdrv_rename` は宛先の変換を元を開く**前に**行う。ntpath (260) に収まらない名前は NAMETOOLONG | 段 `namerule` (+37 行: 境界 U+0080 / U+07FF / U+0800 / U+D7FF / U+E000 / U+FFFF、切れた列、単独の継続バイト、冗長 2 / 3 バイト、サロゲート、4〜5 バイト、禁止文字、`+=[];,` は通る)。段 `utf8`: 規則と変換が **130^3 通りの総当たりで同じ集合**を通し、通ったものは逆変換で元のバイト列に戻る (1 対 1)。段 `hostname`: pinned の `disk.img` に Codex の反例 `disk.img\xc2` / `\xc1\xa4isk.img` / 絵文字 / `disk.img::$DATA` / `a\x80` で rm / rename (両引数) / open / write → INVAL、日本語 (3 バイト) の名前は作成・読み・改名・削除できる。**`tools/tests/b8_hostdrv_host.c` の [E6]** (実物の `sys/dev/hostdrv/hostdrvfs.c` + 贋 NP21/W): 13 種の不正な名前で unlink / stat / read_file / get_file_size / write_file / rmdir / rename (両引数) が INVAL で **CREATE / SET_INFORMATION / WRITE が 1 度も出ない**、変換の段だけでも断る、299 バイトは NAMETOOLONG でホストへ送らない、`/日本.txt` は `\日本.txt` の UTF-16 (Length 14) で届く | `utf8`: 10 件 (往復が崩れる・反例が変換を通る)。`hostname`: 13 件。`namerule`: 30 件超 |
 | 既知の制限 | 8.3 短名・予約名・ASCII 以外の大文字小文字は保証しない (ユーザー決裁)。`docs/06_filesystem.md` §6-1「名前の規則」に記載 | — | — |
 
 変異 (fs/ と lib/kutf16.c の写し。`mutants()` は `lib/kutf16.c` も写す): +15 本で計 58 本、全部落ちる —

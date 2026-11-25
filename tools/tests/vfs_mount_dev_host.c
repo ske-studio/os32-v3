@@ -1,5 +1,5 @@
 /* 2026-09-10 の ext2 スーパーブロック巻き戻しの回帰試験。
- * 実物の fs/vfs.c と fs/ext2/ext2_vfs.c を取り込み、境界 (ext2 本体・kmalloc) だけを
+ * 実物の sys/fs/vfs.c と sys/fs/ext2/ext2_vfs.c を取り込み、境界 (ext2 本体・kmalloc) だけを
  * 差し替える。ext2_mount() が受け取ったデバイス番号を記録して、fd0 の
  * マウント要求が hd0 に化けていないことを確かめる。 */
 #include <stdio.h>
@@ -8,9 +8,9 @@
 
 #include "vfs.h"
 #include "ext2_priv.h"
-#include "../../fs/vfs.c"
+#include "../../sys/fs/vfs.c"
 #include "../platform/pc98/boot_names.c"
-/* fs/vfs_fd.c の FD 表側 (票 TASK_VFS_FD_PATH)。この試験は FD を開かない */
+/* sys/fs/vfs_fd.c の FD 表側 (票 TASK_VFS_FD_PATH)。この試験は FD を開かない */
 void vfs_fd_invalidate_ino(void *c, u32 i) { (void)c; (void)i; }
 void vfs_fd_invalidate_mount(void *c) { (void)c; }
 void vfs_fd_stale_mount(void *c) { (void)c; }
@@ -105,16 +105,16 @@ int ext2_rename(Ext2Ctx *c, u32 od, const char *on, u32 nd, const char *nn)
  * set_mtime そのものの規則は tools/tests/vfs_set_mtime_host.c が見る。 */
 int ext2_write_inode(Ext2Ctx *c, u32 i, const Ext2Inode *o)
 { (void)c; (void)i; (void)o; return EXT2_OK; }
-/* 本物 (fs/ext2/ext2_super.c) と同じく定数を返す。ゲスト側の「いま」の代わり。 */
+/* 本物 (sys/fs/ext2/ext2_super.c) と同じく定数を返す。ゲスト側の「いま」の代わり。 */
 u32 ext2_current_time(void) { return 0x67E8E800UL; }
-/* 票 B8 往復 5: 書き込み系の入口の拒否 (エラー状態、fs/ext2/ext2_super.c)。
+/* 票 B8 往復 5: 書き込み系の入口の拒否 (エラー状態、sys/fs/ext2/ext2_super.c)。
  * この試験は mount 経路だけを見るので、エラー状態には入らない贋物 */
 int ext2_check_writable(Ext2Ctx *c) { (void)c; return EXT2_OK; }
 
 void *kzalloc(u32 size) { return calloc(1, size); }
 void kfree(void *p) { free(p); }
 
-/* lib/kstring_asm.asm の i386 実装はホストで組めないので同義の C で置く。
+/* sys/kern/kstring_asm.asm の i386 実装はホストで組めないので同義の C で置く。
  * kstrncpy / kstrncat の n はバッファ全体サイズ (BSD strlcpy 相当)。 */
 void *kmemset(void *dst, int val, u32 n) { return memset(dst, val, n); }
 int kstrcmp(const char *a, const char *b) { return strcmp(a, b); }
@@ -135,7 +135,7 @@ char *kstrncat(char *dst, const char *src, u32 n)
     return dst;
 }
 
-#include "../../fs/ext2/ext2_vfs.c"
+#include "../../sys/fs/ext2/ext2_vfs.c"
 
 static void reset(void)
 {

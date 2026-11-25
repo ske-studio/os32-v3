@@ -1,9 +1,9 @@
-# platform/pc98/bootinfo_check.c — 設計
+# sys/platform/pc98/bootinfo_check.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_HDD_INSTALL 段 0 (§1-v3 N1・N2) の契約を今のソースと照らして要約
-ソース: `platform/pc98/bootinfo_check.c` (`bootinfo_parse`・`bootinfo_drive_usable`・`bootinfo_sum`・`bootinfo_seal`・`bootinfo_seal_image`・表示行)・形式 `platform/pc98/bootinfo_wire.h`・誤りコード `platform/pc98/bootinfo_native.h`・写す側 `platform/pc98/bootinfo_capture.c` (`bootinfo_capture`)・ローダの手続き `boot/bootinfo_rm.inc`・NASM の写し `boot/bootinfo.inc`
+ソース: `sys/platform/pc98/bootinfo_check.c` (`bootinfo_parse`・`bootinfo_drive_usable`・`bootinfo_sum`・`bootinfo_seal`・`bootinfo_seal_image`・表示行)・形式 `sys/platform/pc98/bootinfo_wire.h`・誤りコード `sys/platform/pc98/bootinfo_native.h`・写す側 `sys/platform/pc98/bootinfo_capture.c` (`bootinfo_capture`)・ローダの手続き `boot/bootinfo_rm.inc`・NASM の写し `boot/bootinfo.inc`
 
 ローダ (FD・HDD) が実モードで INT 1Bh AH=84h を呼んだ結果を、ブート情報域 (`MEM_BOOTINFO_BASE` = 0x7E00、予約 256B、
-`include/memmap.h`) に書く。カーネルは最初に写して検証し、検証を通った値だけを BIOS 幾何として使う。
+`sys/include/memmap.h`) に書く。カーネルは最初に写して検証し、検証を通った値だけを BIOS 幾何として使う。
 0x7E00 はカーネルが後で別の用途に使う帯の中なので、検証を通らない値 (ゴミ・書きかけ・前回の残り) を幾何と読むと、
 区画表が別のシリンダ境界に書かれる。
 
@@ -76,6 +76,6 @@ word 53 bit0 が立っていれば `(valid)`、無ければ `(n/a)`。
 ## 確かめ
 
 - `make check-bootinfo-host` (`tools/tests/test_bootinfo.py`)。ケース `good`・`magic`・`check_word`・`version`・`sum`・
-  `rules`・`format`・`image`・`inc_mirror`。`--target` で `init/bootinfo.c` と `drivers/ata/ide.c` を i386-elf で組む。
+  `rules`・`format`・`image`・`inc_mirror`。`--target` で `sys/kern/init/bootinfo.c` と `sys/dev/ata/ide.c` を i386-elf で組む。
 - ローダの実モードの手続き (域へ書くこと、書く順序、HDD ローダの幾何の食い違いでの停止) はホストでは見られない。
   起動時は kselftest の `test_bootinfo()` が写したこと・magic を消したことを見る。

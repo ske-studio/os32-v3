@@ -1,8 +1,8 @@
 #include "types.h"
-#include "platform/powermac/lan_boot.h"
-#include "drivers/net/gem/gem.h"
+#include "sys/platform/powermac/lan_boot.h"
+#include "sys/dev/net/gem/gem.h"
 #include "os32/os32_kapi_shared.h"
-#include "net/link.h"
+#include "sys/net/link.h"
 #if KBOOT_LINK
 #include "rh_observe.h"
 static int hello_marks;

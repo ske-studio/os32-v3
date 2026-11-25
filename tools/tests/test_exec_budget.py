@@ -33,7 +33,7 @@ MUTANTS = [
 def extract(source):
     parts = [bb.slice_out(source, sig) for sig in ('static u32 exec_ring3_extra_pages(', 'static u32 exec_ring3_pages(')]
     parts.append(bb.slice_out(source, 'static int exec_shell_layout('))
-    parts.append(bb.slice_out((ROOT / 'exec/appmem.c').read_text(), 'void appmem_init('))
+    parts.append(bb.slice_out((ROOT / 'sys/kern/exec/appmem.c').read_text(), 'void appmem_init('))
     start = source.index('    want_ring3 = !is_shell;')
     end = source.index('    /* ======== setjmp', start)
     layout = source[source.index('    /* ====== Level に応じた'):source.index('    load_addr = (u8 *)load_base;')]
@@ -69,15 +69,15 @@ def run(source):
         (tmp / 'budget_fixture.c').write_text(fixture)
         (tmp / 'exec_bb_overlap.inc').write_text(bb.extract(source))
         (tmp / 'budget_launch.inc').write_text(extract(source))
-        shlib = (ROOT / 'mm/shlib.c').read_text()
+        shlib = (ROOT / 'sys/kern/mm/shlib.c').read_text()
         descriptor = shlib[shlib.index('struct shlib_image {'):shlib.index('static int load_image')]
         (tmp / 'budget_shlib.inc').write_text(descriptor + '\n'.join(bb.slice_out(shlib, sig) for sig in (
             'static int attach_image(', 'static void detach_image(', 'int shlib_addrspace_attach(',
             'void shlib_addrspace_detach(', 'int shlib_sound_attach(',
             'u32 shlib_sound_data_pages(')))
-        (tmp / 'budget_admit.inc').write_text(bb.slice_out((ROOT / 'exec/appslot.c').read_text(), 'int appslot_start_admit('))
-        (tmp / 'paging_host_source.c').write_text(paging_source(ROOT / 'mm/paging.c'))
-        (tmp / 'pgalloc_host_source.c').write_text(paging_source(ROOT / 'mm/pgalloc.c').replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags'))
+        (tmp / 'budget_admit.inc').write_text(bb.slice_out((ROOT / 'sys/kern/exec/appslot.c').read_text(), 'int appslot_start_admit('))
+        (tmp / 'paging_host_source.c').write_text(paging_source(ROOT / 'sys/kern/mm/paging.c'))
+        (tmp / 'pgalloc_host_source.c').write_text(paging_source(ROOT / 'sys/kern/mm/pgalloc.c').replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags'))
         try:
             gui = (ROOT / 'userland/tests/gui_demo.bin').read_bytes()
         except FileNotFoundError:
@@ -91,7 +91,7 @@ def run(source):
         exe = tmp / 'budget'
         cmd = ['gcc', *bb.linker_flags(), *bb.FLAGS, '-ffunction-sections', '-fdata-sections', '-DPHYSMEM_HOST_TEST=1',
                f'-DGUI_IMAGE_BYTES={image}', f'-DGUI_NEED_PAGES={need}', '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
-               *inc, '-I'+str(tmp), str(ROOT / 'tools/tests/exec_budget_host.c'), str(ROOT / 'mm/physmem.c'), str(ROOT / 'mm/kmalloc.c'), '-o', str(exe)]
+               *inc, '-I'+str(tmp), str(ROOT / 'tools/tests/exec_budget_host.c'), str(ROOT / 'sys/kern/mm/physmem.c'), str(ROOT / 'sys/kern/mm/kmalloc.c'), '-o', str(exe)]
         built = subprocess.run(cmd, capture_output=True, text=True)
         if built.returncode:
             raise RuntimeError('compile is not RED:\n'+built.stderr)

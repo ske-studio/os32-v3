@@ -1,7 +1,7 @@
-# fs/serialfs/sfs_block.c — SFS の上の読み取り専用のブロックの RPC (BOPEN・BREAD・BCLOSE)
+# sys/fs/serialfs/sfs_block.c — SFS の上の読み取り専用のブロックの RPC (BOPEN・BREAD・BCLOSE)
 
 > 状態: **現行 (2026-11-18)** — 出所: NET_HOSTSVC_DESIGN・TASK_NET_HOSTSVC (要約して移した)
-ソース: `fs/serialfs/sfs_block.c`・`fs/serialfs/sfs_block.h`・`fs/serialfs/sfs_proto.h` (`SFS_T_BOPEN` ほか、`SFS_BOPEN_*_OFF`・`SFS_BREAD_*`)・ホストは `tools/host_image.py` ([tools/lanfs_host](../../tools/lanfs_host.md))
+ソース: `sys/fs/serialfs/sfs_block.c`・`sys/fs/serialfs/sfs_block.h`・`sys/fs/serialfs/sfs_proto.h` (`SFS_T_BOPEN` ほか、`SFS_BOPEN_*_OFF`・`SFS_BREAD_*`)・ホストは `tools/host_image.py` ([tools/lanfs_host](../../tools/lanfs_host.md))
 
 ホストが別名 (alias) で公開した像を、512B のセクタ単位で読む。利用者は netcd だけ ([drivers/block/netcd](../../drivers/block/netcd.md))。
 このファイルは状態を持たない (lan.mod に置く)。セッションは常駐の client ([fs/serialfs/serialfs_persistent](serialfs_persistent.md)) のもの。

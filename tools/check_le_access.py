@@ -2,8 +2,8 @@
 """External LE formats: reject multibyte direct access independently of alignment."""
 import argparse
 import clang_ast as ast
-GUARDED = ['fs/ext2/ext2_super.c','fs/ext2/ext2_inode.c','fs/ext2/ext2_dir.c','fs/ext2/ext2_file.c',
-           'fs/ext2/ext2_fmt.c','fs/ext2/ext2_vfs.c','fs/isofs/iso9660.c','drivers/video/kcg/kcg.c','lib/utf8.c']
+GUARDED = ['sys/fs/ext2/ext2_super.c','sys/fs/ext2/ext2_inode.c','sys/fs/ext2/ext2_dir.c','sys/fs/ext2/ext2_file.c',
+           'sys/fs/ext2/ext2_fmt.c','sys/fs/ext2/ext2_vfs.c','sys/fs/isofs/iso9660.c','sys/dev/video/kcg/kcg.c','lib/utf8.c']
 
 
 def direct_access(c):

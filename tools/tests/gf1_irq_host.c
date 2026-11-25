@@ -1,9 +1,9 @@
 /* Real B2 code, fake level MMIO and shared IRQ registration. No native ports. */
 #define IO_H
 #include "types.h"
-#include "hwdev/gf/foundation.h"
-#include "kernel/irq/irq.h"
-#include "drivers/pci/pci.h"
+#include "sys/dev/video/geforce/foundation.h"
+#include "sys/kern/irq/irq.h"
+#include "sys/dev/pci/pci.h"
 static u32 host_if = 0x202U, saves, restores;
 static void fail(int line)
 {
@@ -16,7 +16,7 @@ static unsigned irq_save(void)
 static void irq_restore(unsigned v)
 { CHECK(!(host_if & 0x200U)); host_if = v; restores++; }
 #ifndef GF1_IRQ_SOURCE
-#define GF1_IRQ_SOURCE "../../hwdev/gf/irq.c"
+#define GF1_IRQ_SOURCE "../../sys/dev/video/geforce/irq.c"
 #endif
 #include GF1_IRQ_SOURCE
 

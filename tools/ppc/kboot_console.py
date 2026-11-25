@@ -7,8 +7,8 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-UNITS = ['platform/powermac/kboot_console.c', 'platform/powermac/log_printf.c', 'platform/powermac/log.c',
-         'platform/powermac/escc.c', 'lib/kprintf.c', 'lib/kstring_c.c']
+UNITS = ['sys/platform/powermac/kboot_console.c', 'sys/platform/powermac/log_printf.c', 'sys/platform/powermac/log.c',
+         'sys/platform/powermac/escc.c', 'sys/kern/kprintf.c', 'sys/kern/kstring_c.c']
 MUTATIONS = [
     ('sink-continuation', 'add_sat(&stats[i].dropped, n);', 'add_sat(&stats[i].dropped, n); return;', 46, 'REACHED sink continuation'),
     ('write-length', 'pm_log_write(buf, size);', 'pm_log_write(buf, size + 1);', 41, 'REACHED write-length'),
@@ -25,7 +25,7 @@ FLAGS = ['-std=gnu11', '-O2', '-ffreestanding', '-fno-builtin', '-fno-pie',
 
 
 def exercise(directory, name, before=None, after=None):
-    unit = 'platform/powermac/log.c' if name == 'sink-continuation' else UNITS[0]
+    unit = 'sys/platform/powermac/log.c' if name == 'sink-continuation' else UNITS[0]
     source = (ROOT / unit).read_text()
     if before is not None:
         assert source.count(before) == 1, 'mutation anchor must be unique'
@@ -50,7 +50,7 @@ def compiler_headers(cc):
 
 
 def check_format(directory, mutate):
-    source = (ROOT / 'platform/powermac/log_printf.c').read_text()
+    source = (ROOT / 'sys/platform/powermac/log_printf.c').read_text()
     cases = [('baseline', source, 0)]
     if mutate:
         anchor = 'pm_log_write(bytes, n);'
@@ -68,7 +68,7 @@ def check_format(directory, mutate):
             binary = directory / (runner + '-' + name)
             subprocess.run([cc, '-m32', *abi, *compiler_headers(cc), *FLAGS, '-nostdlib',
                             '-static', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
-                            *INCLUDES, str(copy), str(ROOT/'lib/kprintf.c'), str(ROOT/'lib/kstring_c.c'),
+                            *INCLUDES, str(copy), str(ROOT/'sys/kern/kprintf.c'), str(ROOT/'sys/kern/kstring_c.c'),
                             str(ROOT/'tools/ppc/kboot_format_host.c'), '-o', str(binary)], check=True)
             rc = subprocess.run([runner, binary], timeout=10).returncode
             assert rc == expected, (runner, name, rc, expected)

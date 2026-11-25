@@ -112,12 +112,12 @@ def main():
         mutation = []
         if case == 'normal':
             mutation = ppc_resource_owner.instrument(
-                folder, 'mm/shm.c', 'shm_block_owner[start + i] = res_owner_get();',
+                folder, 'sys/kern/mm/shm.c', 'shm_block_owner[start + i] = res_owner_get();',
                 'shm_block_owner[start + i]')
         elif case == 'skip-free':
             # Keep the boot-time kernel SHM round trip intact. The guest
             # must reach its own free before the mutation affects capacity.
-            mutation = mutant_settings(folder, case, 'mm/shm.c',
+            mutation = mutant_settings(folder, case, 'sys/kern/mm/shm.c',
                                        '\n        shm_state[idx + i] = SHM_FREE;',
                                        '\n        if (ring3_call_from_user()) return 0;'
                                        '\n        shm_state[idx + i] = SHM_FREE;')

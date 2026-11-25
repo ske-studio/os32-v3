@@ -22,21 +22,21 @@ def image(folder, user, case):
     changes = []
     if case == 'normal':
         changes = ppc_resource_owner.instrument(
-            folder, 'gfx/gfx_core.c', 'if (rc >= 0) {',
+            folder, 'sys/hal/gfx/gfx_core.c', 'if (rc >= 0) {',
             'appslot_gfx_owner()')
     elif case == 'no-return':
-        changes = mutant_settings(folder, case, 'gfx/gfx_core.c',
+        changes = mutant_settings(folder, case, 'sys/hal/gfx/gfx_core.c',
                                   '    display_provider_console_return();', '')
     elif case == 'no-exit':
-        source = 'exec/exec_finish.inc'
+        source = 'sys/kern/exec/exec_finish.inc'
         original = (ROOT / source).read_text()
         hook = '    exec_gfx_owner_exit(id);'
         require(original.count(hook) == 1, 'unique exit hook')
         (folder / 'exec_finish.inc').write_text(original.replace(hook, ''))
-        changes = mutant_settings(folder, case, 'exec/exec.c', '#include "exec_finish.inc"',
+        changes = mutant_settings(folder, case, 'sys/kern/exec/exec.c', '#include "exec_finish.inc"',
                                   '#include "' + str(folder / 'exec_finish.inc') + '"')
     elif case == 'any-owner':
-        changes = mutant_settings(folder, case, 'platform/powermac/console_text.c',
+        changes = mutant_settings(folder, case, 'sys/platform/powermac/console_text.c',
                                   'id == appslot_gfx_owner() && ', '(void)id, ')
     elif case == 'absent':
         absent_bindings(folder, kernel / 'gen', case, ('gfx2_surface_create',))

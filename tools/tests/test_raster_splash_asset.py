@@ -2,7 +2,7 @@
 CHECK = dict(name='raster-splash-asset-host', tier=1,
     covers=['.gitignore', 'tools/raster_splash_asset.py', 'build/core.yaml',
             'build/packages.yaml', 'tools/img2osri.py', 'tools/osri_*.py',
-            'tools/osri_enc2_core.c', 'gfx/osri_profile.h',
+            'tools/osri_enc2_core.c', 'sys/kern/gfx/osri/osri_profile.h',
             'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/hostdrv_deploy.py',
             'tools/nhd_deploy.py', 'tools/nhd_profile.py', 'tools/np21w_ctl.py',
             'tools/pc98pt.py', 'tools/gen_deploy_set.py',

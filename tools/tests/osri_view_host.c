@@ -11,22 +11,22 @@
 #include "splash_raster_play.h"
 #include "redir_access.h"
 #include "pcm_contract.h"
-#include "../../exec/appslot.h"
+#include "../../sys/kern/exec/appslot.h"
 #include "wire_data.h"
 
 static u16 text_attrs[TVRAM_COLS * TVRAM_ROWS];
 #undef P2V_IO
 #define P2V_IO(addr) ((void *)text_attrs)
-#include "../../drivers/video/pc98/splash_raster_run.c"
-#include "../../drivers/video/pc98/splash_raster_plan.c"
+#include "../../sys/platform/pc98/video/splash_raster_run.c"
+#include "../../sys/platform/pc98/video/splash_raster_plan.c"
 #define pl_v2_frame_poll real_frame_poll
-#include "../../drivers/video/pc98/splash_raster_play.c"
+#include "../../sys/platform/pc98/video/splash_raster_play.c"
 #undef pl_v2_frame_poll
-#include "../../gfx/gfx_osri.c"
-#include "../../gfx/gfx_osri_view.c"
-#include "../../drivers/video/pc98/backend_pc98.c"
-#include "../../drivers/video/pc98/backend_pc98_osri.c"
-#include "../../kapi/kapi_osri.c"
+#include "../../sys/kern/gfx/osri/gfx_osri.c"
+#include "../../sys/kern/gfx/osri/gfx_osri_view.c"
+#include "../../sys/platform/pc98/video/backend_pc98.c"
+#include "../../sys/platform/pc98/video/backend_pc98_osri.c"
+#include "../../sys/kapi/kapi_osri.c"
 
 volatile u32 tick_count;
 GfxBackend *g_backend = &gfx_backend_pc98;

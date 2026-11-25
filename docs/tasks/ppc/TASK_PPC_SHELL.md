@@ -26,10 +26,10 @@ W9 は子の終了値、シェル終了時の回収、次のシェルの起動�
 |---|---|
 | 棚卸し (sol) | 済 (2026-11-11、~/os32-tmp/run/ppc-shell/SURVEY.md) |
 | 計画と S-A の詳細設計の往復 | 済 (2026-11-11、r1 → r2 → final) |
-| W0 (宣言)・C2 (fs/vfs_fd.c の 1 行) | main (7e255783)。fs/vfs.h の VFS_DEV_RAM は x86 の生成物が変わる (CD module の契約値の入力) ので、iso9660_mount に rdN を受けさせる x86 の変わる段へ移した |
+| W0 (宣言)・C2 (sys/fs/vfs_fd.c の 1 行) | main (7e255783)。sys/fs/vfs.h の VFS_DEV_RAM は x86 の生成物が変わる (CD module の契約値の入力) ので、iso9660_mount に rdN を受けさせる x86 の変わる段へ移した |
 | W1 (A06+A07 LAN の端末、A08 ホストの端末モード、A10 RAM の装置 rd0、A11 root の image を作る道具、A12 開発用の小さな CLI、A27 /tmp の ramfs) | 実装・独立レビュー済 (2026-11-11、統合の枝 wt/ppc-shint2)。x86 のビルドには入らない。PPC の像は lan_wire.c (端末の型を通す) の分だけ変わる |
 | W2〜W3 (S-A) | 実装・独立レビュー済 (2026-11-11、作業の枝 wt/ppc-shw3、X1 の後に取り込み)。**中間の到達点 S-A に QEMU で到達** (7450・7455、CD を eject した後に LAN の端末から echo・診断の CLOCK・cat /etc/motd・echo a > /tmp/f・cat /tmp/f、tools/ppc/shell_run.py)。開発用の像は KBOOT_SHELL=1、今の像は LAN の端末だけ増える |
-| X1 (★ fs/vfs.h の VFS_DEV_RAM、iso9660_mount が rdN を受ける) | 実装・独立レビュー済 (wt/ppc-shint3)、本線で HAL v2 の I1 と一緒に NP21/W の受入待ち |
+| X1 (★ sys/fs/vfs.h の VFS_DEV_RAM、iso9660_mount が rdN を受ける) | 実装・独立レビュー済 (wt/ppc-shint3)、本線で HAL v2 の I1 と一緒に NP21/W の受入待ち |
 | W4 (S-B の詳細設計の往復) | 済 (2026-11-11、PPC_SHELL_EXEC_DESIGN)。exec の facade の段 (F) は HAL v2 の I1 が main に入った後の main を基点 |
 | W5 (S-B) | 全段 (facade F01〜F21・生成器 F10/F14/F15・B01〜B36、B21 はやめた) 実装・独立レビュー済 (2026-11-12)。**QEMU で受入に到達** (sb_run.py、7450・7455、LAN 込み)。B36 で docs/09_exec.md に PowerPC の USER の ABI |
 | W7 (S-C、既存のシェルを USER の sh.bin として起動) | 済 (QEMU、sc_run.py、7450・7455 の LAN)。設計は [PPC_SHELL_SC_DESIGN](../../decisions/ppc/PPC_SHELL_SC_DESIGN.md) |

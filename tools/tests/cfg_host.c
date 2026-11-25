@@ -5,8 +5,8 @@ int services_public = 1;
 /*  CFG_HOST.C — 票 S2-C §4 のホスト TDD                                     */
 /*                                                                           */
 /*  実物だけを組む: 実 `userland/lib/cfg/` 一式 + 実 `userland/cmds/cfg.c` +  */
-/*  実 `kapi/kapi_db.c` + 実 `lib/sqlite3/sqlite3.c` + 実 `os32_sqlite_vfs.c` */
-/*  + 実 `fs/vfs_fd.c` + RAM バックエンド。模型は exec 側のポインタ検証、     */
+/*  実 `sys/kapi/kapi_db.c` + 実 `lib/sqlite3/sqlite3.c` + 実 `os32_sqlite_vfs.c` */
+/*  + 実 `sys/fs/vfs_fd.c` + RAM バックエンド。模型は exec 側のポインタ検証、     */
 /*  SHM の置き場、VFS の rename / open / read / stat と「KAPI の close が     */
 /*  失敗する」の注入だけ — どれもカーネル番地か障害注入でしか作れない。       */
 /*  ホストのファイルシステムには 1 バイトも触らない (tsv は stdin から)。     */
@@ -76,7 +76,7 @@ int vfs_stat(const char *path, OS32_Stat *st)
         st->st_nlink = 1;
         st->st_dev = 1;
         /* fixture の並び順を inode 代わりにする (同一性の判定に使う)。
-         * `inj_no_ino` は FAT (`fs/fat/fatfs_vfs.c` は st_ino を 0 のまま返す)
+         * `inj_no_ino` は FAT (`sys/fs/fat/fatfs_vfs.c` は st_ino を 0 のまま返す)
          * の模型 — inode を供給しない FS。 */
         if (!inj_no_ino) st->st_ino = (u32)(f - fixture_files) + 1u;
     }
@@ -93,7 +93,7 @@ int ring3_user_range_ok(u32 p, u32 len)
 #define SHM_CANARY 256
 static unsigned char test_shm[DB_SHM_BLOCK_SIZE + SHM_CANARY];
 #include "db_copy_shim.h"
-#include "../../kapi/kapi_db.c"
+#include "../../sys/kapi/kapi_db.c"
 
 /* ========================================================================= */
 /*  libos32cfg の KAPI 境界 (差し替え先)                                     */
@@ -468,7 +468,7 @@ static KernelAPI host_api;
 /* 計測プログラムも同じ土台に載せる (票 S5-C)。純関数を直接叩けるよう、
  * 静的関数の名前は cfg.c と重ならない bn_ / bo_ 接頭辞にしてある。 */
 #define main bench_main
-#include "../../userland/tests/cfg_bench.c"
+#include "../../userland/diag/cfg_bench.c"
 #undef main
 
 /* ========================================================================= */

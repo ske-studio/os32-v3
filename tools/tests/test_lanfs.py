@@ -6,7 +6,7 @@ No raw sockets, emulator or UART. --mutate includes the unchanged controls;
 compile errors and mutation-anchor failures are errors, never kills.
 """
 CHECK = dict(name='lanfs-host', tier=1,
-    covers=['fs/serialfs/serialfs.h', 'net/nic.h', 'lib/le_internal.h', 'fs/serialfs/serialfs.c', 'fs/serialfs/sfs_lan.c', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'lib/crc32.c', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/tests/lanfs_host.c', 'tools/tests/lanfs_tdd.md'],
+    covers=['sys/fs/serialfs/serialfs.h', 'sys/net/nic.h', 'lib/le_internal.h', 'sys/fs/serialfs/serialfs.c', 'sys/fs/serialfs/sfs_lan.c', 'sys/fs/serialfs/sfs_lan.h', 'sys/fs/serialfs/sfs_client.c', 'sys/fs/serialfs/sfs_proto.c', 'lib/crc32.c', 'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py', 'tools/lan_bridge.py', 'tools/host_image.py', 'tools/tests/lanfs_host.c', 'tools/tests/lanfs_tdd.md'],
     needs=[], budget=3.6,
     kind='characterization',
     pins=['LAN_BULK_DESIGN'],
@@ -28,8 +28,8 @@ from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/lanfs_host.c"
-C_SRCS = ["fs/serialfs/sfs_lan.c", "fs/serialfs/sfs_lan.h", "fs/serialfs/sfs_client.c",
-          "fs/serialfs/sfs_client.h", "fs/serialfs/sfs_proto.c", "fs/serialfs/sfs_proto.h", "fs/serialfs/serialfs.c"]
+C_SRCS = ["sys/fs/serialfs/sfs_lan.c", "sys/fs/serialfs/sfs_lan.h", "sys/fs/serialfs/sfs_client.c",
+          "sys/fs/serialfs/sfs_client.h", "sys/fs/serialfs/sfs_proto.c", "sys/fs/serialfs/sfs_proto.h", "sys/fs/serialfs/serialfs.c"]
 PY_SRC = ROOT / "tools/lanfs_host.py"
 sys.path.insert(0, str(ROOT / "tools"))
 import serialfs_host as sfs
@@ -641,12 +641,12 @@ def trial(exe, py_path, root, timeout=10):
 
 def run_mutations(tmp, root):
     mutations = [
-        ("hello_limit", "fs/serialfs/sfs_client.c",
+        ("hello_limit", "sys/fs/serialfs/sfs_client.c",
          "        /* A smaller peer falls back to the serial wire limit. */\n"
          "        c->max_payload = SFS_MAX_PAYLOAD;",
          "        /* A smaller peer falls back to the serial wire limit. */\n"
          "        c->max_payload = SFS_LAN_MAX_PAYLOAD;"),
-        ("seq", "fs/serialfs/sfs_client.c", "f->sid != c->sid || f->seq != seq",
+        ("seq", "sys/fs/serialfs/sfs_client.c", "f->sid != c->sid || f->seq != seq",
          "f->sid != c->sid"),
         ("old_seq", "tools/lanfs_host.py", "elif fr.seq <= self.high_seq:",
          "elif False:"),
@@ -660,10 +660,10 @@ def run_mutations(tmp, root):
          "fr.type in BLOCK_OPS", "False"),
         ("image_close", "tools/lanfs_host.py",
          "self.image.close_session(fr.sid)", "self.image.open_session(fr.sid)"),
-        ("put_deadline", "fs/serialfs/sfs_lan.c",
+        ("put_deadline", "sys/fs/serialfs/sfs_lan.c",
          "for (;;) {\n        if ((i32)(lan_now(ctx) - limit) >= 0)",
          "for (;;) {\n        if (0)"),
-        ("uart_gate", "fs/serialfs/sfs_lan.c", "    (void)net_mac(lan->mac);",
+        ("uart_gate", "sys/fs/serialfs/sfs_lan.c", "    (void)net_mac(lan->mac);",
          "    extern void serial_gate_set(int on);\n"
          "    serial_gate_set(1);\n    (void)net_mac(lan->mac);"),
     ]

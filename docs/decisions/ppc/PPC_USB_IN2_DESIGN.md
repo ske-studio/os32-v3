@@ -19,11 +19,11 @@
 
 |入力|PC-98 の基準|PowerMac の現状|
 |---|---|---|
-|鍵盤|drivers/input/kbd_hal.c:kbd_hal_capture が上位ビットを break、下位7ビットを物理キーとして世代付き KmKey を input_capture_key に渡す。keymap 登録失敗時のみ sc の input_capture|drivers/usb/hid_kbd.c:kbd_done は usage を先に互換 sc に畳み、修飾を先に差分通知。platform/powermac/usb_platform.c:usbp_input_key から input_usb.c:pm_input_usb_key が専用 held・Caps・cooked FIFO を更新。break は FIFO に出ない|
-|反復|本体の typematic は再 make。input/hal/kbd_merge.c:input_capture_key が old と down を比較し、互換 sc がある遷移だけを in2 へ出す|hid_kbd.c:kbd_tick の期限で pm_input_usb_repeat が専用 FIFO へ再投入|
-|旧 API|drivers/input/kbd.c:kbd_local_trykey は共通 cooked を読む|input_boot.c:try_key は LAN 先行、USB は専用 FIFO。pressed・raw・modifiers は定数。input_decode.c:pm_input_decode は pm_terminal_trygetkey() が選ぶ LAN または ESCC のバイト列を処理|
-|マウス|drivers/input/mouse_hal.c:mouse_hal_capture が相対 MOVE と正論理 BUTTON を input_capture に渡す|hid_mouse.c:mouse_done の符号付き変位と下位3ボタンから usb_platform.c:usbp_input_mouse が mouse_ext_move と pointer_button を直接呼ぶ|
-|寿命|input/hal/in2_dev.c:input_src_release は世代を照合しキー・ボタンを解放|usb_platform.c:usbp_input_src_alloc は種類別に 1..4 を再利用。hid_boot.h の hid_gone・hid_stop から usbp_input_release が私有状態を解放|
+|鍵盤|sys/platform/pc98/input/kbd_hal.c:kbd_hal_capture が上位ビットを break、下位7ビットを物理キーとして世代付き KmKey を input_capture_key に渡す。keymap 登録失敗時のみ sc の input_capture|sys/dev/usb/hid_kbd.c:kbd_done は usage を先に互換 sc に畳み、修飾を先に差分通知。sys/platform/powermac/usb_platform.c:usbp_input_key から input_usb.c:pm_input_usb_key が専用 held・Caps・cooked FIFO を更新。break は FIFO に出ない|
+|反復|本体の typematic は再 make。sys/hal/input/kbd_merge.c:input_capture_key が old と down を比較し、互換 sc がある遷移だけを in2 へ出す|hid_kbd.c:kbd_tick の期限で pm_input_usb_repeat が専用 FIFO へ再投入|
+|旧 API|sys/platform/pc98/input/kbd.c:kbd_local_trykey は共通 cooked を読む|input_boot.c:try_key は LAN 先行、USB は専用 FIFO。pressed・raw・modifiers は定数。input_decode.c:pm_input_decode は pm_terminal_trygetkey() が選ぶ LAN または ESCC のバイト列を処理|
+|マウス|sys/platform/pc98/input/mouse_hal.c:mouse_hal_capture が相対 MOVE と正論理 BUTTON を input_capture に渡す|hid_mouse.c:mouse_done の符号付き変位と下位3ボタンから usb_platform.c:usbp_input_mouse が mouse_ext_move と pointer_button を直接呼ぶ|
+|寿命|sys/hal/input/in2_dev.c:input_src_release は世代を照合しキー・ボタンを解放|usb_platform.c:usbp_input_src_alloc は種類別に 1..4 を再利用。hid_boot.h の hid_gone・hid_stop から usbp_input_release が私有状態を解放|
 
 - 実物との差① 7d の PowerMac 用 platform_input_caps.h は照合時点にない。② ARCH_COMPAT_CONTRACT §9 の今回消す例外行も未着地。7d の取り込み後に実名を使って変更する。
 - 統合判断1（同じ役目） [INPUT_HAL_DESIGN](../INPUT_HAL_DESIGN.md) の 4a/4b と [INPUT_KEYMAP_DESIGN](../INPUT_KEYMAP_DESIGN.md) の S1m/S2a/S2u/S2m/S3m/S3b がこの接続を担当する。同じ作業として実装する。
@@ -79,18 +79,18 @@ clear_usb_slot(kind, handle);
 
 |ファイル|担当する変更|
 |---|---|
-|include/usb_platform.h|S2 の usage/usage_repeat 契約。全呼出元切替後に旧 sc 通知を削除|
-|drivers/usb/hid_kbd_map.c|互換 sc（診断用）、order、norepeat を生成表参照に統一|
-|drivers/usb/hid_kbd.c|usage 差分と反復。hid_mouse.c、hid_boot.h の報告長検査・停止順は流用|
-|platform/powermac/input_keymap_backend.c（新）|S1m の HID backend 起動登録|
-|input/hal/usb_input.c（新）|S2a の種類別ハンドルと HAL 源の寿命、鍵盤・ポインタの capture adapter|
-|platform/powermac/usb_platform.c|usbp を adapter に委譲。利用可否と診断はここで接続。既存 USB KEY/REPEAT の sc 表示を維持し usage を追記|
-|input/hal/legacy_ring.c、in2_int.h|cooked スロットの修飾と取得口を追加。従来の take の呼出契約を維持|
-|platform/powermac/input_usb.c、input_usb.h|FEP の最終消費情報だけ残し、B で私有 producer・キューを削除し共通リングへ委譲|
+|sys/include/usb_platform.h|S2 の usage/usage_repeat 契約。全呼出元切替後に旧 sc 通知を削除|
+|sys/dev/usb/hid_kbd_map.c|互換 sc（診断用）、order、norepeat を生成表参照に統一|
+|sys/dev/usb/hid_kbd.c|usage 差分と反復。hid_mouse.c、hid_boot.h の報告長検査・停止順は流用|
+|sys/platform/powermac/input_keymap_backend.c（新）|S1m の HID backend 起動登録|
+|sys/hal/input/usb_input.c（新）|S2a の種類別ハンドルと HAL 源の寿命、鍵盤・ポインタの capture adapter|
+|sys/platform/powermac/usb_platform.c|usbp を adapter に委譲。利用可否と診断はここで接続。既存 USB KEY/REPEAT の sc 表示を維持し usage を追記|
+|sys/hal/input/legacy_ring.c、in2_int.h|cooked スロットの修飾と取得口を追加。従来の take の呼出契約を維持|
+|sys/platform/powermac/input_usb.c、input_usb.h|FEP の最終消費情報だけ残し、B で私有 producer・キューを削除し共通リングへ委譲|
 |platform/powermac/input_keymap.c|削除。input_decode.c は LAN/ESCC 用に維持|
-|platform/powermac/input_boot.c|上記 provider・InputOps を登録。待機、IME・独占中の旧配送を共通ポリシーに従わせる|
+|sys/platform/powermac/input_boot.c|上記 provider・InputOps を登録。待機、IME・独占中の旧配送を共通ポリシーに従わせる|
 |PPC のビルド入力|下記の像別選択に従う。旧表をリンク対象から除去|
-|platform/powermac/platform_input_caps.h|7d の独占能力を最終段で 0 から 1 へ|
+|sys/platform/powermac/platform_input_caps.h|7d の独占能力を最終段で 0 から 1 へ|
 |[ARCH_COMPAT_CONTRACT](../ARCH_COMPAT_CONTRACT.md)|AC-INPUT-1 の実装欄と試験を更新し、§9 の PowerMac 独占例外行を削除|
 
 A の実装では hid_kbd.c の新 usage 通知を既存の H-usbp で受ける。鍵盤ごとに一報告を単位として変換する。報告境界を H-usbp に渡し、新旧 usage 集合を別々に互換 sc 集合に射影する。群順を保ち、新だけにある sc は make、旧だけにある sc は break、両方にある sc は無通知とする。repeat は保持中の対応 sc の旧 repeat に変換する。gone/stop で枠を初期化する。既存 cooked FIFO をここから駆動し、usb_stack_host.c と test_usb_hid.py も新通知に追従させる。B の 4b・S2m・S3m・S3b で暫定変換を除去し、HAL producer・backend・旧 API consumer を同時に有効化する。test_arch_compat.py の PPC 期待値 14→0、対応 XFAIL・pin・変異を同段で更新する。

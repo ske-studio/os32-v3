@@ -11,23 +11,23 @@ from kboot_accept import build_media, mutant_settings
 from kboot_run import require, serial, validate_root
 
 CHECK = dict(name='ppc-sc', tier=2, budget=900, needs=[],
-             covers=['platform/powermac/input_usb.[ch]', 'platform/powermac/input_keymap_backend.c', 'tools/ppc/sc_run.py', 'userland/ppc/nest.c'],
+             covers=['platform/powermac/input_usb.[ch]', 'sys/platform/powermac/input_keymap_backend.c', 'tools/ppc/sc_run.py', 'userland/ppc/nest.c'],
              inputs=['build/ppc-user.mk', 'build/targets/ppc-powermac.mk',
                      'tools/ppc/sb_run.py', 'tools/ppc/kboot_accept.py',
                      'tools/ppc/kboot_run.py', 'tools/ppc/run.py',
                      'tools/ppc_lan_host.py', 'tools/mkroot_image.py',
-                     'platform/powermac/cli_boot.c', 'arch/ppc/exec_context.c',
-                     'arch/ppc/kapi_call.c', 'platform/powermac/shell_boot.c',
-                     'platform/powermac/input_boot.c', 'platform/powermac/input_decode.c',
-                     'platform/powermac/console_stream.c', 'platform/powermac/kboot_console.c',
+                     'sys/platform/powermac/cli_boot.c', 'sys/arch/ppc/exec_context.c',
+                     'sys/arch/ppc/kapi_call.c', 'sys/platform/powermac/shell_boot.c',
+                     'sys/platform/powermac/input_boot.c', 'sys/platform/powermac/input_decode.c',
+                     'sys/platform/powermac/console_stream.c', 'sys/platform/powermac/kboot_console.c',
                      'userland/ppc/hello.c', 'tools/ppc/link_sh_run.py',
                      'tools/ppc/link_run.py', 'tools/ppc/usb_run.py',
                      'tools/host_agent.py', 'tools/host_operator_socket.py',
                      'tools/host_rshell.py', 'tools/ppc_link_transport.py',
-                     'kernel/console/con_sink.c', 'mm/kmalloc.c',
+                     'sys/kern/console/con_sink.c', 'sys/kern/mm/kmalloc.c',
                      'userland/shell/rshell_lan.c', 'userland/ppc/sh/link_profile.h',
-                     'fs/serialfs/serialfs_persistent.c', 'kernel/console/console.c',
-                     'platform/powermac/usb_boot.c', 'platform/powermac/usb_platform.c',
+                     'sys/fs/serialfs/serialfs_persistent.c', 'sys/kern/console/console.c',
+                     'sys/platform/powermac/usb_boot.c', 'sys/platform/powermac/usb_platform.c',
                      'tools/host_linux.py', 'tools/host_notify.py', 'tools/host_services.py',
                      'tools/host_sfs_link.py', 'tools/ppc/sd_run.py'])
 
@@ -106,7 +106,7 @@ def link_main(args):
         bins = ' '.join(str(folder/'user'/(n+'.bin')) for n in ('hello', 'nest'))
         opts = [o if not o.startswith('KB_ROOT_BINS=') else 'KB_ROOT_BINS='+bins for o in opts]
         if name == 'parent-result':
-            extra = mutant_settings(folder, name, 'arch/ppc/kapi_call.c',
+            extra = mutant_settings(folder, name, 'sys/arch/ppc/kapi_call.c',
                 'return ppc_kapi_invoke(&api, current_slot, values);',
                 'static unsigned reads;\n'
                 '    if (current_slot == (__builtin_offsetof(KernelAPI, exec_last_result) - 8) / 4 && ++reads == 2) return (u32)-1;\n'

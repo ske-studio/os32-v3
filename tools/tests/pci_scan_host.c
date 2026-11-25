@@ -1,6 +1,6 @@
 /* Real mechanism #1, boot scan, recording, sizing and resource collection.
  * Only the I/O ports and interrupt state are fake. */
-#include "../../drivers/pci/pci.h"
+#include "../../sys/dev/pci/pci.h"
 #include <stdarg.h>
 #define IO_H
 static int failed;
@@ -92,8 +92,8 @@ static int line_equals(const char *expected)
     while (expected[i] && expected[i] == boot_line[i]) i++;
     return expected[i] == boot_line[i];
 }
-#include "../../drivers/pci/pci_decode.c"
-#include "../../platform/pc98/pci_config.c"
+#include "../../sys/dev/pci/pci_decode.c"
+#include "../../sys/platform/pc98/pci_config.c"
 static u32 root_count;
 static int scan_root_bus(u32 idx, u32 *bus)
 {
@@ -103,12 +103,12 @@ static int scan_root_bus(u32 idx, u32 *bus)
     return 0;
 }
 #define pci_config_root_bus scan_root_bus
-#include "../../drivers/pci/pci.c"
+#include "../../sys/dev/pci/pci.c"
 #undef pci_config_root_bus
-#include "../../drivers/pci/pci_barsize.c"
+#include "../../sys/dev/pci/pci_barsize.c"
 u32 recover_gf_dev(void) { return 13; }
 #define GFINIT_RESOURCES_HOST 1
-#include "../../kdebug/gfinit_resources.c"
+#include "../../sys/dev/video/geforce/diag/gfinit_resources.c"
 static void setup(void)
 {
     clear(cfg,sizeof(cfg));clear(masks,sizeof(masks));

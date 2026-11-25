@@ -79,7 +79,7 @@ def hwdev_values(tools, profile, env):
                 'offset struct gf_production.feature5': 10944}
     for key, value in expected.items():
         assert rows[key] == value, (key, rows[key], value)
-    native = (ROOT / 'hwdev/generated/hwdev_layout.txt').read_text()
+    native = (ROOT / 'sys/dev/hwdev/generated/hwdev_layout.txt').read_text()
     assert [line for line in native.splitlines() if line.startswith('enum\t')] == [
         line for line in layout.splitlines() if line.startswith('enum\t')]
     crc = zlib.crc32((out / 'hwdev_layout.txt').read_bytes())

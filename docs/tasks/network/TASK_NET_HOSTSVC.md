@@ -8,7 +8,7 @@
 | 項目 | 決定 |
 |---|---|
 | 範囲 | 「範囲はすべてです。」— 実機の /host の常時マウントと読み書き、ネットワーク越しの CD で cdinst を変えずにインストール、TIME・CLIP・印刷・wget を 82557 の実機で |
-| プロトコル | リンク層 (net/link.c・host_agent.py) と SFS (fs/serialfs・lanfs_host.py) の 2 本を共存。「実装完了時には1本になることを目指します。とりあえず、通信の保護のために残します。」 |
+| プロトコル | リンク層 (sys/net/link.c・host_agent.py) と SFS (fs/serialfs・lanfs_host.py) の 2 本を共存。「実装完了時には1本になることを目指します。とりあえず、通信の保護のために残します。」 |
 | ホストの生存 | カーネルは「落ちている」状態を覚えず、要求ごとの短い期限で応答が無ければその要求を即座に HOSTDOWN で返す。再試行はアプリが決める |
 | 知らせ | ホストが自発的に送る NOTIFY をカーネルのメールボックス (64 通 × 256B、ヒープ) に溜め、アプリがサービス名で取り出す。ALIVE (起動と復帰) はその 1 つ。同じ世代の ALIVE は 1 枠に上書き |
 | 仮想デバイス | 「フロッピーディスクなどのブロックではなく、仮想デバイスで大丈夫です。」ホストの実機器はホスト側のラッパー。取り外せる媒体と同じ扱いで張り直し・同一性・媒体交換 |
@@ -27,16 +27,16 @@
 - ホストと切れている間は RTC と tick で進める。ホストの復帰 (ALIVE の世代の変化) を受けたら、ほかの張り直しより先に時刻を合わせて RTC へ書く。
 - 標準時はホストに従う (OS32 にタイムゾーンの表を持たない)。
 - ホストが無くても手で合わせられる (年・月・日・時・分、秒は 0)。シェルの `date` に設定の形、後でコントロールパネルから同じ口。
-- いま RTC の時刻を書く口は無い (drivers/char/rtc.c は読みとモードの切り替えだけ)。
+- いま RTC の時刻を書く口は無い (sys/dev/char/rtc.c は読みとモードの切り替えだけ)。
 
 ## 2. 段 (確定設計 §10・§11 の要約)
 
 | 群 | 中身 | 像 |
 |---|---|---|
-| A (NIC 境界) | net/nic.h・nic.c・nic_rx.c (1 本の受信を SFS とリンクへ振り分け)、LGY・82557 の adapter、link.c・link_rx.inc・sfs_lan.c の付け替え | vmkernel (82557 の adapter と sfs_lan は lan.mod) |
+| A (NIC 境界) | sys/net/nic.h・nic.c・nic_rx.c (1 本の受信を SFS とリンクへ振り分け)、LGY・82557 の adapter、link.c・link_rx.inc・sfs_lan.c の付け替え | vmkernel (82557 の adapter と sfs_lan は lan.mod) |
 | B (知らせ) | link.h の NOTIFY・HELLO の伸長、link_notify.c、host_mailbox.c (64 通・ALIVE の世代)、KAPI の取り出し、gshell の出来事 | vmkernel・gshell |
 | C (常駐の /host) | serialfs_persistent.c ほか (sfs run の外でも mount、期限・HOSTDOWN・世代と STALE、seq 0xF000 で張り直し) | vmkernel |
-| D (仮想 CD) | sfs_proto.h の BOPEN/BREAD/BCLOSE、sfs_block.c・drivers/block/netcd.c (lan.mod)、iso9660 の媒体の一般化、vfs_fd の失効、cd_body.c の空き cdN | lan.mod・vmkernel・cd.mod |
+| D (仮想 CD) | sfs_proto.h の BOPEN/BREAD/BCLOSE、sfs_block.c・sys/dev/block/netcd.c (lan.mod)、iso9660 の媒体の一般化、vfs_fd の失効、cd_body.c の空き cdN | lan.mod・vmkernel・cd.mod |
 | H (ホスト) | lanfs_host.py・host_image.py・host_notify.py・host_linux.py (Ubuntu の CLIP/PRINT)・host_agent.py・lan_bridge.py | ホスト |
 | I (統合) | kapi.json と生成物・誤り番号 (HOSTDOWN・TIMEOUT)・起動の登録・fd_netcd_config.py (起動前の FD の /etc/netcd.cfg)・packages.yaml・install.c の fd_only | — |
 | S (SDK) | host_call.c・libos32host.c・os32api の host.rs (os32_host_*、LIST で名前から番号) | SDK |

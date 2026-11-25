@@ -17,14 +17,14 @@ import test_usb_core
 ROOT = Path(__file__).resolve().parents[2]
 SOURCES = test_usb_ohci.SOURCES + [s + '.c' for s in test_usb_core.SOURCES] + [
     'hid_kbd.c', 'hid_kbd_map.c', 'hid_mouse.c']
-SOURCES = ['drivers/usb/' + s for s in SOURCES] + ['input/keymaps/hid_jp.c']
+SOURCES = ['drivers/usb/' + s for s in SOURCES] + ['sys/input/keymaps/hid_jp.c']
 CHECK = dict(env=['ppc-cross'], name='usb-stack', tier=1, needs=[], budget=60, covers=[
-    'platform/pc98/platform_ver.h', 'kernel/ver_info.h', 'kernel/sqlite_engine.h', 'tools/tests/usb_stack_idle_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/kbd_hostshim/io.h',
-    'platform/pc98/usb_resident.c', 'platform/pc98/*.h', 'kernel/*.h', 'kernel/irq/*.h',
+    'sys/platform/pc98/platform_ver.h', 'sys/kern/ver_info.h', 'sys/kern/sqlite_engine.h', 'tools/tests/usb_stack_idle_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/kbd_hostshim/io.h',
+    'sys/platform/pc98/usb_resident.c', 'platform/pc98/*.h', 'kernel/*.h', 'kernel/irq/*.h',
     'kernel/module/*.h', 'drivers/pci/*.h', 'arch/x86/*.h', 'include/*.h', 'sdk/include/os32/*.h',
-    'drivers/usb/*.[ch]', 'input/keymaps/hid_jp.c', 'input/hal/keymap.h', 'include/usb_platform.h', 'include/types.h',
-    'include/callconv.h', 'include/endian_le.h', 'include/endian_dma.h',
-    'arch/*/arch_endian_dma.h', 'lib/kstring.h',
+    'drivers/usb/*.[ch]', 'sys/input/keymaps/hid_jp.c', 'sys/hal/input/keymap.h', 'sys/include/usb_platform.h', 'sys/include/types.h',
+    'sys/include/callconv.h', 'sys/include/endian_le.h', 'sys/include/endian_dma.h',
+    'arch/*/arch_endian_dma.h', 'sys/kern/kstring.h',
     'tools/tests/test_usb_stack.py', 'tools/tests/usb_stack_host.c',
     'tools/tests/usb_fake_ohci.c', 'tools/tests/usb_fake_dev.c',
     'tools/tests/usb_fake_ehci_min.c', 'tools/tests/test_usb_ohci.py',
@@ -98,7 +98,7 @@ def cross_compile(tmp, tree):
             if label == 'FAIL':
                 raise RuntimeError('required PowerPC compiler missing')
             continue
-        for rel in ['tools/tests/usb_stack_host.c', 'drivers/usb/usb_hc_dead.c']:
+        for rel in ['tools/tests/usb_stack_host.c', 'sys/dev/usb/usb_hc_dead.c']:
             command([str(compiler), *FLAGS, '-I' + str(tmp / 'fake-arch'),
                      '-I' + str(tree / 'include'), '-I' + str(tree),
                      '-c', str(tree / rel), '-o', str(tmp / (arch + '.o'))])
@@ -113,7 +113,7 @@ def check(mutate):
         for rel in ['drivers/usb', 'include', 'arch/x86', 'arch/ppc', 'input/hal', 'input/keymaps']:
             shutil.copytree(ROOT / rel, tree / rel)
         (tree / 'lib').mkdir()
-        shutil.copyfile(ROOT / 'lib/kstring.h', tree / 'lib/kstring.h')
+        shutil.copyfile(ROOT / 'sys/kern/kstring.h', tree / 'sys/kern/kstring.h')
         (tree / 'tools/tests').mkdir(parents=True)
         for name in ['usb_stack_host.c', 'usb_fake_ohci.c']:
             shutil.copyfile(ROOT / 'tools/tests' / name, tree / 'tools/tests' / name)
@@ -123,9 +123,9 @@ def check(mutate):
             '#define mmio_rd32_le usb_fake_native_rd\n'
             '#define mmio_wr32_le usb_fake_native_wr\n'
             '#ifdef __powerpc__\n'
-            f'#include "{tree / "arch/ppc/arch_endian_dma.h"}"\n'
+            f'#include "{tree / "sys/arch/ppc/arch_endian_dma.h"}"\n'
             '#else\n'
-            f'#include "{tree / "arch/x86/arch_endian_dma.h"}"\n'
+            f'#include "{tree / "sys/arch/x86/arch_endian_dma.h"}"\n'
             '#endif\n'
             '#undef mmio_rd32_le\n#undef mmio_wr32_le\n'
             'u32 mmio_rd32_le(const volatile void *p);\n'

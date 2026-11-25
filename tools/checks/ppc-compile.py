@@ -1,6 +1,6 @@
 """Compile the complete PPC shell image on hosts with a PPC toolchain."""
 CHECK = dict(env=['ppc-cross'], name='ppc-compile', tier=1, budget=180, needs=['make:ppc-ci-image'],
-             covers=['exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c',
+             covers=['sys/kern/exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c',
         'userland/shell/rshell_lan.c',
         'tools/ppc/**', 'tools/prototypes/fep_imports.def',
         'tools/prototypes/sqlite_imports.def', 'exec/**',
@@ -19,7 +19,7 @@ CHECK = dict(env=['ppc-cross'], name='ppc-compile', tier=1, budget=180, needs=['
                      '.github/actions/gate-setup/action.yml', '.github/actions/build-setup/action.yml',
                      '.github/workflows/build.yml', '.github/workflows/check.yml',
                      'build/ppc*.mk', 'build/ppc-ram-root.json', 'build/ram-root.mk',
-                     'arch/ppc/**', 'platform/powermac/**', 'platform/powermac/ppc_kernel.c',
+                     'arch/ppc/**', 'platform/powermac/**', 'sys/platform/powermac/ppc_kernel.c',
                      'userland/ppc/**', 'lib/**', 'include/**', 'sdk/**',
                      'kernel/**', 'mm/**', 'fs/**', 'gfx/**', 'drivers/**',
                      'assets/fonts/**', 'tools/mkroot_image.py', 'tools/gen_unicode.c'],

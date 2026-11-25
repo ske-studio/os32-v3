@@ -1,6 +1,6 @@
-# kernel/irq/irq.c — 設計
+# sys/kern/irq/irq.c — 設計
 > 状態: **現行 (2026-11-07)** — 出所: DEP_DIR_B_DESIGN・DEP_DIR_D1_DESIGN (D1 で移した)
-ソース: `kernel/irq/irq.c`
+ソース: `sys/kern/irq/irq.c`
 
 - IRQ 表、登録数、共有配送、storm/quarantine は kernel 所有。線一覧・予約・EOI は platform 所有。
 - `irq_dispatch` は claim → deliver 時だけ共有配送 → needs_finish 時だけ complete → 未処理報告。claim 失敗時は配送も完了もしない。

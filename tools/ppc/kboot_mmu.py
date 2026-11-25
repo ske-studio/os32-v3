@@ -15,9 +15,9 @@ CHECK = dict(name='kboot-mmu', tier=2, budget=180,
              covers=['arch/ppc/**', 'platform/powermac/**',
                      'tools/ppc/kboot_mmu.py', 'tools/ppc/kboot_mmu_guest.c',
                      'tools/ppc/kboot_hpt.py', 'tools/ppc/kboot_hpt_host.c',
-                     'tools/ppc/run.py', 'build/ppc.mk', 'include/types.h',
-                     'include/callconv.h', 'mm/paging.h',
-                     'lib/kstring.h', 'lib/kstring_c.c'], needs=[])
+                     'tools/ppc/run.py', 'build/ppc.mk', 'sys/include/types.h',
+                     'sys/include/callconv.h', 'sys/kern/mm/paging.h',
+                     'sys/kern/kstring.h', 'sys/kern/kstring_c.c'], needs=[])
 PPC_CROSS_DIR = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
 CROSS = PPC_CROSS_DIR / 'bin/powerpc-elf-'
 MUTATIONS = [
@@ -139,14 +139,14 @@ def host(dis):
 
 
 def build_guest(out):
-    c=['platform/powermac/rh_observe.c','platform/powermac/ofw.c','platform/powermac/escc_tree.c',
-       'platform/powermac/escc.c','platform/powermac/mmu_boot.c',
-       'arch/ppc/cpu_setup.c','arch/ppc/pmap.c','arch/ppc/kernel_hpt.c',
-       'arch/ppc/pd_walk.c','lib/kstring_c.c','tools/ppc/kboot_mmu_guest.c']
+    c=['sys/platform/powermac/rh_observe.c','sys/platform/powermac/ofw.c','sys/platform/powermac/escc_tree.c',
+       'sys/platform/powermac/escc.c','sys/platform/powermac/mmu_boot.c',
+       'sys/arch/ppc/cpu_setup.c','sys/arch/ppc/pmap.c','sys/arch/ppc/kernel_hpt.c',
+       'sys/arch/ppc/pd_walk.c','sys/kern/kstring_c.c','tools/ppc/kboot_mmu_guest.c']
     # Mutant assembly lives in the output directory; make's pattern rules
     # expect repository-relative sources, so compile and link it separately.
-    asm=['arch/ppc/entry.S','arch/ppc/ofw_note.S','arch/ppc/takeover.S',
-         'arch/ppc/mmu.S','arch/ppc/cache_copy.S','arch/ppc/vectors.S']
+    asm=['sys/arch/ppc/entry.S','sys/arch/ppc/ofw_note.S','sys/arch/ppc/takeover.S',
+         'sys/arch/ppc/mmu.S','sys/arch/ppc/cache_copy.S','sys/arch/ppc/vectors.S']
     elf=out/'PPCMMU.ELF'
     command(['make','-f','build/ppc.mk',f'CROSS_DIR={PPC_CROSS_DIR}',
              'OUT='+str(out),'MMU_C='+' '.join(c),'MMU_S='+' '.join(asm),
@@ -191,7 +191,7 @@ def main():
     parser.add_argument('--mutate',action='store_true')
     args=parser.parse_args()
     out=Path(os.environ['TMPDIR'])/'kboot-mmu'; out.mkdir(parents=True,exist_ok=True)
-    source=ROOT/'arch/ppc/kernel_mmu.S'
+    source=ROOT/'sys/arch/ppc/kernel_mmu.S'
     host(assemble(source,out))
     # Execute the actual C2 clear implementation, not a Python substitute.
     print(command(['python3','-B','tools/ppc/kboot_hpt.py']),end='',flush=True)

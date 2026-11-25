@@ -1,6 +1,6 @@
-# kdebug/gfinit_exec.c — 設計
+# sys/dev/video/geforce/diag/gfinit_exec.c — 設計
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
-ソース: `kdebug/gfinit_exec.c`
+ソース: `sys/dev/video/geforce/diag/gfinit_exec.c`
 
 context は head/skip、有限の呼出し/反復 stack、ROM 借用参照、既存上限・時計・`gf_io`。bus は read/write（BAR/offset/width/値）、wait_us、point、局所復元。診断の記録・承認は adapter が担当する。
 診断の段別承認/記録/中断/S0 は adapter に残し、C plan・A1/A4/VPLL/virtual が使う汎用機能は維持する。
@@ -19,7 +19,7 @@ context は head/skip、有限の呼出し/反復 stack、ROM 借用参照、既
 
 - 上限はmain1本につき動的4096命令、call深さ16、repeat深さ8、待ち累計5秒、送信を除く実行経過60秒。各内部MMIO・macro要素・repeatも予算を減らす。0回repeatは静的拒否、再帰・終端無しはhostで拒否を検証。
 
-> [要確認] 現行は診断も hwdev/gf/runner.c を使い、main 境界の 5 node を生成する。原文の静的展開・ordinal・verify 規則を現行実装と同一とは扱えない。
+> [要確認] 現行は診断も sys/dev/video/geforce/runner.c を使い、main 境界の 5 node を生成する。原文の静的展開・ordinal・verify 規則を現行実装と同一とは扱えない。
 
 | 対象 | 実装・根拠 |
 | --- | --- |

@@ -7,11 +7,11 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/tests'))
 import host32
-CHECK = {'id': 'ppc-lan-p22', 'covers': ['platform/powermac/lan_monitor.c'],
-         'inputs': ['tools/ppc/lan_p22_fixture.c', 'platform/powermac/lan_wire.c',
-                    'platform/powermac/lan_boot.h', 'arch/ppc/kernel_probe.h',
-                    'arch/ppc/ppc_trap.h', 'arch/ppc/ppc_oea.h', 'lib/kstring.h']}
-SOURCE = ROOT / 'platform/powermac/lan_monitor.c'
+CHECK = {'id': 'ppc-lan-p22', 'covers': ['sys/platform/powermac/lan_monitor.c'],
+         'inputs': ['tools/ppc/lan_p22_fixture.c', 'sys/platform/powermac/lan_wire.c',
+                    'sys/platform/powermac/lan_boot.h', 'sys/arch/ppc/kernel_probe.h',
+                    'sys/arch/ppc/ppc_trap.h', 'sys/arch/ppc/ppc_oea.h', 'sys/kern/kstring.h']}
+SOURCE = ROOT / 'sys/platform/powermac/lan_monitor.c'
 MUTATIONS = [
  ('H:A10 read-range', 'if (!range) goto bad_range;', 'if (!range) range = &d->peek_ok[0];', 12),
  ('physical-range', '!contains(range, pa, 1)', '0', 17),
@@ -25,7 +25,7 @@ MUTATIONS = [
 def exercise(source, temp):
     path = pathlib.Path(temp); (path / 'monitor.c').write_text(source)
     binary = path / 'fixture'
-    subprocess.run(['gcc','-Wall','-Wextra','-Werror','-m32','-ffreestanding','-fno-pie','-no-pie','-nostdlib','-static','-fno-builtin','-std=gnu11','-I',str(ROOT),'-I',str(ROOT/'include'),'-I',str(ROOT/'platform/powermac'),str(path/'monitor.c'),str(ROOT/'platform/powermac/lan_wire.c'),str(ROOT/'tools/ppc/lan_p22_fixture.c'),'-o',str(binary)],check=True,timeout=60)
+    subprocess.run(['gcc','-Wall','-Wextra','-Werror','-m32','-ffreestanding','-fno-pie','-no-pie','-nostdlib','-static','-fno-builtin','-std=gnu11','-I',str(ROOT),'-I',str(ROOT/'include'),'-I',str(ROOT/'platform/powermac'),str(path/'monitor.c'),str(ROOT/'sys/platform/powermac/lan_wire.c'),str(ROOT/'tools/ppc/lan_p22_fixture.c'),'-o',str(binary)],check=True,timeout=60)
     return subprocess.run(host32.command([str(binary)]),capture_output=True,text=True,timeout=60)
 def main():
     source=SOURCE.read_text()

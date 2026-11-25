@@ -81,7 +81,7 @@ static int hsp_ieq(const char *a, const char *b)
 /* パスに '\' が混じっているか (1 = 混じっている)。
  *
  * OS32 の区切りは '/' だけなので、ここでは '\' は**普通の 1 文字**として
- * 要素名に収まる。ところが HostDrv の `session_set_path` (drivers/hostdrv/hostdrvfs.c) は
+ * 要素名に収まる。ところが HostDrv の `session_set_path` (sys/dev/hostdrv/hostdrvfs.c) は
  * '/' を '\' へ直したうえで他の文字をそのまま通すので、`/host/..\other` は
  * ホスト側で `C:\os32\..\other` になる。NP21/W の `hostdrvNT_getHostPath` は
  * `PathCanonicalizeW` で '..' を畳んだあと**境界を見ない前方一致**でルート検査を
@@ -102,7 +102,7 @@ static int hsp_has_backslash(const char *s)
 /* 正規形のパス ("/a/b" 形式、末尾 '/' 無し) の要素数。"/" と "" は 0。
  *
  * `hsp_normalize` の HSP_MAX_DEPTH は**この関数を通す前**の入力に掛かる上限で、
- * `/host` を前置したあとの深さは別に見る必要がある。fs/vfs.c の正規化は
+ * `/host` を前置したあとの深さは別に見る必要がある。sys/fs/vfs.c の正規化は
  * VFS_MAX_PATH_DEPTH を越えた要素を**黙って捨てる** (エラーを返さない) ので、
  * 越えたパスは「指定した親ディレクトリ」を指す別のパスに化ける
  * (Codex 実装レビュー B2)。呼び手は必ず上限と突き合わせること。 */

@@ -50,7 +50,7 @@ def probe_source(work, directory, symbols):
                      f'#define PROBE_{label}_SLOT {slot}'])
     data.append(f'#define PROBE_KAPI {json.loads((ROOT / "sdk/kapi.json").read_text())["version"]}')
     (work / 'fep_probe_data.h').write_text('\n'.join(data) + '\n')
-    source = (ROOT / 'platform/powermac/ppc_kernel.c').read_text()
+    source = (ROOT / 'sys/platform/powermac/ppc_kernel.c').read_text()
     anchor = '    if (root_ready) {'
     assert source.count(anchor) == 1
     path = work / 'ppc_kernel.c'
@@ -82,9 +82,9 @@ def main():
         settings = []
         if case == 'bypass':
             settings = [s.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for s in mutant_settings(
-                work, case, 'kernel/module/module_image.c', 'if (h[MI_PAIR_CRC] != policy->pair_image_crc)',
+                work, case, 'sys/kern/module/module_image.c', 'if (h[MI_PAIR_CRC] != policy->pair_image_crc)',
                 'if (0)')]
-        media = build_media(work / case, *common, 'KB_MUT_SRC=platform/powermac/ppc_kernel.c',
+        media = build_media(work / case, *common, 'KB_MUT_SRC=sys/platform/powermac/ppc_kernel.c',
                     f'KB_MUT_FILE={probe}', *settings, 'kb-user', 'kernel')
         module = media.elf.parent / 'fep/fep.mod'
         assert module.read_bytes() == (normal_dir / 'fep.mod').read_bytes()

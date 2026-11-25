@@ -16,9 +16,9 @@ int pc98_route_safe(void) { return decode_safe && !route; }
 int pc98_route_to_gf(void) { route_gf++; route=1; return 0; }
 int pc98_route_to_98(void) { route_98++; route=0; console_safe=decode_safe; return decode_safe ? 0 : -1; }
 int pc98_route_cell_check(void) { cell_checks++; return pc98_route_safe() ? 0 : -1; }
-#include "../../hwdev/gf/internal.h"
-#include "../../hwdev/gf/command.h"
-#include "../../hwdev/gf/vram_view.h"
+#include "../../sys/dev/video/geforce/internal.h"
+#include "../../sys/dev/video/geforce/command.h"
+#include "../../sys/dev/video/geforce/vram_view.h"
 /* This HAL fixture has no command owner. Unexpected layer-2 use must fail. */
 int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
 { (void)ch;(void)f;return GF2_ESTATE; }
@@ -45,7 +45,7 @@ int gf_display_palette(struct gf_display_context *c,u32 first,u32 count,const u8
 int gf_display_blank(struct gf_display_context *c,int v) { c->blank=v;return 0; }
 int gf_display_stop(void *v) { struct gf_display_context *c=v;stops++;c->active=false;return 0; }
 static struct video_device device_gf={&display_gf,&gf_video_ops};
-#include "../../hwdev/gf/production.h"
+#include "../../sys/dev/video/geforce/production.h"
 static int host_gf_selected=1;
 static u32 host_gf_probes;
 static int host_gf_identify_fail;
@@ -64,7 +64,7 @@ int gf_production_identify(struct gf_production_resources *r)
 int geforce_wc_start(void) { return 0; }
 int geforce_wc_stop(void) { return 0; }
 void geforce_wc_report(const char *s) { (void)s; }
-#include "../../drivers/video/geforce/geforce_platform.c"
+#include "../../sys/dev/video/geforce/geforce_platform.c"
 #include "geforce_reserve.inc"
 static void __attribute__((unused)) foundation_selection_test(void)
 {

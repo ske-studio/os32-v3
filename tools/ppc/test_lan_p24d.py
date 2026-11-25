@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'platform/powermac/lan_diag.c'
+SOURCE = ROOT / 'sys/platform/powermac/lan_diag.c'
 MUTATIONS = [
     ('range', 'status, 17, memory, 8, bytes, ranges, 2,', 'status, 17, memory, 8, bytes, ranges, 1,', 'range', 'H:A10 read-range'),
     ('hi-lo', 'status[offset] = (u32)(value >> 32);', 'status[offset] = (u32)value;', 'status', 'H:status'),

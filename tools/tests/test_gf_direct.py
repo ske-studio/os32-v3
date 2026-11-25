@@ -1,10 +1,10 @@
 """G1 DIRECT eligibility, CPU pixel transfers and interruption boundaries."""
 CHECK = dict(name='gf-direct', tier=1, needs=[], budget=8,
-             covers=['drivers/video/geforce/gf_direct.c',
+             covers=['sys/dev/video/geforce/gf_direct.c',
                      'tools/tests/test_gf_direct.py', 'tools/tests/gf_direct_host.c',
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-                     'drivers/video/geforce/geforce_module.h', 'hwdev/gf/**',
-                     'hwdev/gfinit_mode.h', 'include/**', 'gfx/gfx.h',
+                     'sys/dev/video/geforce/geforce_module.h', 'hwdev/gf/**',
+                     'sys/dev/video/geforce/gfinit_mode.h', 'include/**', 'sys/hal/gfx/gfx.h',
                      'kernel/module/*.h', 'build/config.mk'],
     basis=['GFX_ACCEL_HAL_DESIGN §3', 'GFX_ACCEL_HAL_DESIGN §4'],
 )
@@ -38,7 +38,7 @@ MUTATIONS = [
 
 
 def run_case(folder, mutation=None):
-    path = ROOT/'drivers/video/geforce/gf_direct.c'
+    path = ROOT/'sys/dev/video/geforce/gf_direct.c'
     source = path.read_text()
     if mutation:
         label, old, new = mutation

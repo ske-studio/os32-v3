@@ -1,6 +1,6 @@
-# platform/pc98/boot.c — 設計
+# sys/platform/pc98/boot.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_D3_DESIGN (D1 で移した)
-ソース: `platform/pc98/boot.c`
+ソース: `sys/platform/pc98/boot.c`
 
 root は FD「種別」判定でなく **BOOT_DRIVE_FDD/FDD_144 との完全一致**。
 - FDC 媒体指定は全起動で `fdc_set_media_by_daua(0, boot_drive)`。144 表示だけ TYPE_MASK と ALT を使う。root 判定と統一しない。
@@ -19,12 +19,12 @@ root は FD「種別」判定でなく **BOOT_DRIVE_FDD/FDD_144 との完全一�
 |PCI_RESOURCES|memory_boot_init 後、ROOT_READY/unicode 後 → BAR 取込＋ledger ログ＋line hook → LAN load/fallback|
 |NIC_LEGACY|snd module のログ後 → lgy98_init → IRQ_EN/enable/services_boot|
 
-- 表の各要素は platform/pc98/boot.c の小 wrapper。FS 初期化関数は既存 VFS 登録口をそのまま使い、二重の FS レジストリを作らない。
+- 表の各要素は sys/platform/pc98/boot.c の小 wrapper。FS 初期化関数は既存 VFS 登録口をそのまま使い、二重の FS レジストリを作らない。
 
 HostDrv は root 成功後だけ呼び、検出なし/HDRV --、mount 失敗/HDRV NG と継続を維持。
 
 ```c
-/* platform/pc98/boot.c: ローダ引数を保存。bootinfo source の代用にしない。 */
+/* sys/platform/pc98/boot.c: ローダ引数を保存。bootinfo source の代用にしない。 */
 ctx->drive = drive;
 int fd = drive == BOOT_DRIVE_FDD || drive == BOOT_DRIVE_FDD_144;
 ctx->root_dev = fd ? "fd0" : "hd0";

@@ -4,7 +4,7 @@ Only device/exec boundaries are faked; product control flow is compiled intact.
 Mutation compile failures and signals are errors, never runtime RED evidence.
 """
 CHECK = dict(name='kernel-shell-host', tier=1,
-    covers=['init/shell_loop.c', 'include/shell_loop.h', 'kernel/gui.h', 'platform/pc98/kernel.c', 'tools/tests/kernel_shell_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/kernel_shell_arch/arch_io.h', 'platform/pc98/kernel_*.inc', 'include/config.h', 'include/pc98.h', 'include/types.h', 'exec/exec.h', 'mm/shlib.h', 'mm/paging.h', 'sdk/include/os32/os32_kapi_shared.h'],
+    covers=['sys/kern/init/shell_loop.c', 'sys/include/shell_loop.h', 'sys/kern/gui.h', 'sys/platform/pc98/kernel.c', 'tools/tests/kernel_shell_host.c', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/host_arch/arch_cpu.h', 'tools/tests/kernel_shell_arch/arch_io.h', 'platform/pc98/kernel_*.inc', 'sys/include/config.h', 'sys/platform/pc98/pc98.h', 'sys/include/types.h', 'sys/kern/exec/exec.h', 'sys/kern/mm/shlib.h', 'sys/kern/mm/paging.h', 'sdk/include/os32/os32_kapi_shared.h'],
     needs=[], budget=3.1,
     kind='characterization',
 )
@@ -27,7 +27,7 @@ CASES = ('cui', 'gui', 'gui-probed', 'kcg', 'shlib-layout', 'shlib-api',
 
 
 def product_source():
-    paths = [ROOT / 'init/shell_loop.c', ROOT / 'platform/pc98/kernel.c', *sorted((ROOT / 'platform/pc98').glob('kernel_*.inc'))]
+    paths = [ROOT / 'sys/kern/init/shell_loop.c', ROOT / 'sys/platform/pc98/kernel.c', *sorted((ROOT / 'platform/pc98').glob('kernel_*.inc'))]
     return {path.name: path.read_text() for path in paths}
 
 

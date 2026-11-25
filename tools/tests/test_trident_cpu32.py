@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Run real CLIENT transfer comparisons with and without GE callbacks."""
 CHECK = dict(name='trident-cpu32', tier=1, needs=[], budget=4.2,
-    covers=['kdebug/trident_command_test.c', 'kdebug/trident_command_test.h',
-            'kdebug/tri_command_wire.h', 'kdebug/generated/**',
+    covers=['sys/dev/video/trident/diag/trident_command_test.c', 'sys/dev/video/trident/diag/trident_command_test.h',
+            'sys/dev/video/trident/diag/tri_command_wire.h', 'kdebug/generated/**',
             'tools/tests/trident_cpu32_host.c', 'tools/tests/test_trident_cpu32.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
             'drivers/video/trident/*.h', 'include/*.h', 'gfx/*.h',
-            'lib/serial_diag.h', 'drivers/char/serial.h', 'kernel/module/*.h',
+            'lib/serial_diag.h', 'sys/dev/char/serial.h', 'kernel/module/*.h',
             'sdk/include/os32/*.h', 'build/config.mk'],
     basis=['TRIDENT_FULL_DESIGN §3', 'TRIDENT_FULL_DESIGN §10'],
 )
@@ -18,7 +18,7 @@ import tempfile
 import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'kdebug/trident_command_test.c'
+PRODUCT = 'sys/dev/video/trident/diag/trident_command_test.c'
 MUTATIONS = [
     ('ram-count', 'int rc = setup;\n        for (u32 run = 0; !rc && run < TRI_PRESENT_RUNS; ++run)', 'int rc = setup;\n        for (u32 run = 0; !rc && run < TRI_PRESENT_RUNS - 1u; ++run)'),
     ('present-stop-on-mismatch', 'if (!rc && mismatches) rc = TRI_E_ACCESS;', 'if (!rc && mismatches) { d->present_method = saved; return TRI_E_ACCESS; }'),

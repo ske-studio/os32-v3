@@ -16,4 +16,4 @@ endif
 HOOK_gfx = $(FEATURE_EXEC)
 hook_macro = OS32_HOOK_$(shell echo $(1) | tr 'a-z' 'A-Z')
 HOOK_DEFS := $(foreach h,$(EXEC_HOOKS),-D$(call hook_macro,$(h))=$(HOOK_$(h)))
-C_COMMON_HOOKS_ABSENT = $(foreach h,$(EXEC_HOOKS),$(if $(filter 0,$(HOOK_$(h))),exec/absent/exec_$(h).c))
+C_COMMON_HOOKS_ABSENT = $(foreach h,$(EXEC_HOOKS),$(if $(filter 0,$(HOOK_$(h))),sys/kern/exec/absent/exec_$(h).c))

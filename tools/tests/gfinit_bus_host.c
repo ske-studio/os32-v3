@@ -3,8 +3,8 @@
 #include "gfinit_exec_host.c"
 #undef GF_S3_ENTRY
 #define KDEBUG_WINDOW_HOST 1
-#include "../../kdebug/kdebug_window.c"
-#include "../../kdebug/gfinit_bus.c"
+#include "../../sys/arch/x86/kdebug/kdebug_window.c"
+#include "../../sys/dev/video/geforce/diag/gfinit_bus.c"
 static int bus_foundation_call(struct gf_foundation *f, const struct gf1_test_request *q,
                                 struct gf1_test_reply *reply)
 { (void)reply;CHECK(q->op==GF1T_REVOKE);f->revoked=true;return 0; }
@@ -289,7 +289,7 @@ static void production_plan(u32 initial_lock)
 }
 /* Independently fake the live PCI configuration used for exclusions. */
 #define GFINIT_RESOURCES_HOST 1
-#include "../../kdebug/gfinit_resources.c"
+#include "../../sys/dev/video/geforce/diag/gfinit_resources.c"
 #include "gfinit_resources_ra266.h"
 static u32 resource_cfg[32][8][16], resource_masks[32][8][16];
 static u32 resource_writes, resource_sizing, resource_extra_reads, resource_absent_reads;
@@ -337,7 +337,7 @@ int pci_cfg_write16(u32 bus,u32 dev,u32 fn,u32 reg,u16 value)
  if(resource_write_count<ARRAY_SIZE(resource_write_order))
      resource_write_order[resource_write_count++]=(struct resource_write){dev,fn,reg,value};
  resource_cfg[dev][fn][1]=(resource_cfg[dev][fn][1]&0xffff0000U)|value;return 0;}
-#include "../../drivers/pci/pci_barsize.c"
+#include "../../sys/dev/pci/pci_barsize.c"
 static void resource_setup(void)
 {
     resource_writes=resource_sizing=resource_logs=0;resource_reason=0;resource_extra_reads=resource_absent_reads=resource_write_count=0;irq_state=1;pci_barsize_reset();

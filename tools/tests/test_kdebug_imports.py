@@ -118,8 +118,8 @@ class ImportsTests(unittest.TestCase):
         # Inspect actual product code, not the accessor/clear implementations
         # which must still reference the retained storage.
         for obj, function, retired in (
-                (ROOT / 'build/out/obj/kernel/time/ktime.o', 'sys_time_now', 'time_test_feed'),
-                (ROOT / 'build/out/obj/platform/pc98/pit_time.o', 'time_decide', 'time_branch_hits')):
+                (ROOT / 'build/out/obj/sys/kern/time/ktime.o', 'sys_time_now', 'time_test_feed'),
+                (ROOT / 'build/out/obj/sys/platform/pc98/pit_time.o', 'time_decide', 'time_branch_hits')):
             with self.subTest(function=function):
                 code = subprocess.check_output([
                     str(self.cross / 'i386-elf-objdump'), '-dr',
@@ -130,12 +130,12 @@ class ImportsTests(unittest.TestCase):
     def test_generated_abi_and_built_pair_match(self):
         # Stage 1 already marked the retired slots and changed the ABI hash.
         # Stage 2 preserves that contract; changed kernel code changes PAIR_CRC.
-        metadata = json.loads((ROOT / 'kdebug/generated/kdebug_imports.json').read_text())
+        metadata = json.loads((ROOT / 'sys/platform/pc98/kdebug/generated/kdebug_imports.json').read_text())
         self.assertEqual(metadata['imports'], self.entries)
         abi = gen.abi_hash(self.entries)
         self.assertEqual(metadata['module_abi_gen'], abi)
         self.assertIn(f'#define KDEBUG_ABI_GEN 0x{abi:08x}u',
-                      (ROOT / 'kdebug/generated/kdebug_imports.h').read_text())
+                      (ROOT / 'sys/platform/pc98/kdebug/generated/kdebug_imports.h').read_text())
         image = (ROOT / 'build/out/kdebug.bin').read_bytes()
         header = dict(zip(HEADER_FIELDS, struct.unpack_from('<36I', image)))
         self.assertEqual(header['ABI'], abi)
@@ -276,14 +276,14 @@ class ImportsTests(unittest.TestCase):
             ('S5', 'hwdev_module_ops'),
         ])
         self.assertEqual(self.entries[196]['name'], 'v86_cui_display_restore')
-        self.assertEqual(self.entries[196]['source'], 'platform/pc98/legacy/v86_io.h')
+        self.assertEqual(self.entries[196]['source'], 'sys/platform/pc98/legacy/v86_io.h')
         self.assertTrue(self.entries[196]['retained'])
         self.assertEqual(self.entries[244]['name'], 'display_text_start')
         for index, name in ((244, 'display_text_start'), (250, 'display_restore_98'),
                             (251, 'display_recover_ready'), (252, 'display_recover_cell_read'),
                             (253, 'display_recover_cell_write')):
             self.assertEqual((self.entries[index]['name'], self.entries[index]['source']),
-                             (name, 'kernel/console/display_restore.h'))
+                             (name, 'sys/kern/console/display_restore.h'))
         self.assertEqual(self.entries[0]['name'], 'kprintf')
         self.assertEqual(self.entries[205]['name'], 'kdi_ptr_v86_session')
         self.assertEqual({e['name'] for e in self.entries if e['context_safe']}, {
@@ -319,9 +319,9 @@ class ImportsTests(unittest.TestCase):
 
     def test_s6_preparation_with_future_contracts(self):
         # Exercise future kinds without adding unused imports to the live ABI.
-        additions = [('FUNC', 'os32x_layout_reason', 'exec/os32x_hdr.h'),
-                     ('GETTER', 'con_sink_drop_count', 'include/con_sink.h'),
-                     ('PTR', 'ring3_wm_shell_gen', 'exec/shell_service.h')]
+        additions = [('FUNC', 'os32x_layout_reason', 'sys/kern/exec/os32x_hdr.h'),
+                     ('GETTER', 'con_sink_drop_count', 'sys/include/con_sink.h'),
+                     ('PTR', 'ring3_wm_shell_gen', 'sys/kern/exec/shell_service.h')]
         with tempfile.TemporaryDirectory(prefix='kdebug-s6-') as folder:
             out = Path(folder)
             document = json.loads(gen.DEFAULT_DEF.read_text())
@@ -502,7 +502,7 @@ class ImportsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='kdebug-address-') as folder:
             root = Path(folder)
             (root / 'kdebug').mkdir()
-            source = root / 'kdebug/selftest_lease.c'
+            source = root / 'sys/arch/x86/kdebug/selftest_lease.c'
             source.write_text('return KDI_ADDR_shlib_read_page;\n')
             obj = root / 'build/out/kdebug/selftest_lease.o'
             self.assertEqual(gen.address_references(entries, [obj], root), {'shlib_read_page'})

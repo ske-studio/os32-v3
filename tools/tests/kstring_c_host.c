@@ -1,14 +1,14 @@
 /* ========================================================================
- *  kstring_c_host.c — lib/kstring_asm.asm (x86) と lib/kstring_c.c (C 版) を
+ *  kstring_c_host.c — sys/kern/kstring_asm.asm (x86) と sys/kern/kstring_c.c (C 版) を
  *  **同じ実行ファイルにリンクして同じ入力で突き合わせる** 答え合わせの試験。
  *
  *  票:   移植準備 順序 4-b
  *  駆動: tools/tests/test_kstring_c.py
  *
  *  やり方:
- *    * 実物の lib/kstring_asm.asm を nasm -f elf32 で組み、objcopy で
+ *    * 実物の sys/kern/kstring_asm.asm を nasm -f elf32 で組み、objcopy で
  *      13 本のシンボルを a_* に改名する。
- *    * 実物の lib/kstring_c.c をホスト ILP32 GNU89 でコンパイルし、同じ
+ *    * 実物の sys/kern/kstring_c.c をホスト ILP32 GNU89 でコンパイルし、同じ
  *      13 本を c_* に改名する。
  *    * この翻訳単位が両方を呼び、**戻り値とバッファの全内容 (前後の番兵を
  *      含む)** が 1 バイトも違わないことを見る。
@@ -16,7 +16,7 @@
  *  どちらの版も書き込み先は 4 バイト境界から始まる同じ大きさの領域で、
  *  作業域の前後に 0xA5 の番兵を置く。アセンブリ版は 4 バイト単位の
  *  バルク転送をするので、**重なりコピーは壊れ方まで一致していないといけない**
- *  (lib/kstring.h は重なりを保証しないと書いているが、C 版に差し替えた
+ *  (sys/kern/kstring.h は重なりを保証しないと書いているが、C 版に差し替えた
  *   瞬間に壊れ方が変わると、たまたま動いていた呼び出しが黙って壊れる)。
  *
  *  libc は使わない (-nostdlib、Linux の int 0x80 で write/exit するだけ)。

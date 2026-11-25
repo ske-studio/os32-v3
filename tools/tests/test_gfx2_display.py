@@ -29,7 +29,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/v2/display.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/v2/display.c').read_text()
     mutations = [
         ('pending reference', 'gfx2_scan_ref_get(s);\n    a->head[head].pend_sid = sid;', 'a->head[head].pend_sid = sid;'),
         ('palette bounds', 'count > 256 - first', 'count > 257 - first'),

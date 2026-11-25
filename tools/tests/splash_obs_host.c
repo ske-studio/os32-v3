@@ -69,14 +69,14 @@ static void irq_restore(unsigned int flags) { restores++; irq_on = flags; }
 
 #define now_us obs_host_now_us
 #define finish obs_host_image_finish
-#include "../../drivers/video/pc98/splash_raster_image.c"
-#include "../../drivers/video/pc98/splash_raster_plan.c"
-#include "../../drivers/video/pc98/splash_raster_play.c"
+#include "../../sys/platform/pc98/video/splash_raster_image.c"
+#include "../../sys/platform/pc98/video/splash_raster_plan.c"
+#include "../../sys/platform/pc98/video/splash_raster_play.c"
 #undef finish
 #undef now_us
-#include "../../gfx/gfx_osri.c"
-#include "../../platform/pc98/splash_obs.c"
-#include "../../platform/pc98/boot_splash.c"
+#include "../../sys/kern/gfx/osri/gfx_osri.c"
+#include "../../sys/platform/pc98/splash_obs.c"
+#include "../../sys/platform/pc98/boot_splash.c"
 #define plan guarded_plan.value
 
 struct SplashRaster *pc98_splash_raster_state(void) { return &state; }

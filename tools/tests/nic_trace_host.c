@@ -1,5 +1,5 @@
 /* Actual foreground trace: persistence ordering, identity and failure latch. */
-#include "../../kdebug/nic_trace.c"
+#include "../../sys/platform/pc98/kdebug/nic_trace.c"
 static u32 writes, syncs, logs, read_mode, fail_write, fail_sync, bad;
 static int full_width;
 static char saved[NIC_TRACE_CAP];

@@ -1,12 +1,12 @@
-"""起動ログ (init/bootlog.c) のホスト試験。
+"""起動ログ (sys/kern/init/bootlog.c) のホスト試験。
 
 記録: tools/tests/bootlog_tdd.md
 
-実物の init/bootlog.c を 1 行も写さずに tools/tests/bootlog_host.c が
+実物の sys/kern/init/bootlog.c を 1 行も写さずに tools/tests/bootlog_host.c が
 #include して回す。書き出しの手順は偽の VFS (呼ばれた順と段ごとの失敗注入)。
 ホスト側だけ -DBOOTLOG_NO_IRQ_LOCK (CPL=3 では cli/popfl を実行できない):
 錠は試験側が用意して、呼んだ回数・順序・札 (IF) の復元を数える。
-クロス側は付けないので、include/io.h の irq_save/irq_restore を使う本番の
+クロス側は付けないので、sys/include/io.h の irq_save/irq_restore を使う本番の
 形もカーネルと同じ i386-elf -Werror で通す。
 
   python3 -B tools/tests/test_bootlog.py            # ホストで全ケース + 静的検査
@@ -18,7 +18,7 @@ SKIP と出す)。恒等の対照 (何も変えない置換) は GREEN でなけ
 RED なら変異の仕組みそのものが壊れている。
 """
 CHECK = dict(name='bootlog-host', tier=1,
-    covers=['platform/pc98/boot_capture.c', 'fs/ext2/ext2_dir.c', 'fs/ext2/ext2_vfs.c', 'fs/fat/fatfs_vfs.c', 'init/bootlog.c', 'init/bootlog_save.c', 'kernel/console/console.c', 'platform/pc98/kernel.c', 'tools/tests/bootlog_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
+    covers=['sys/platform/pc98/boot_capture.c', 'sys/fs/ext2/ext2_dir.c', 'sys/fs/ext2/ext2_vfs.c', 'sys/fs/fat/fatfs_vfs.c', 'sys/kern/init/bootlog.c', 'sys/kern/init/bootlog_save.c', 'sys/kern/console/console.c', 'sys/platform/pc98/kernel.c', 'tools/tests/bootlog_host.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py'],
     needs=[], budget=3.2,
     kind='characterization',
 )
@@ -33,7 +33,7 @@ import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/bootlog_host.c"
-SRC = ROOT / "init/bootlog.c"
+SRC = ROOT / "sys/kern/init/bootlog.c"
 
 CASES = ["collect", "overflow", "utf8_latch", "stop", "header", "compose",
          "plan", "lock", "save", "save_mkdir", "write_rc", "reboots", "hardlink"]
@@ -164,7 +164,7 @@ def run_cases(exe, cases, quiet=False):
 
 
 def build_target(tmp):
-    for rel in ("init/bootlog.c", "init/bootlog_save.c"):
+    for rel in ("sys/kern/init/bootlog.c", "sys/kern/init/bootlog_save.c"):
         subprocess.run(["i386-elf-gcc", *TARGET_FLAGS, *TARGET_INCLUDES, "-c",
                         str(ROOT / rel),
                         "-o", str(pathlib.Path(tmp) / (pathlib.Path(rel).stem + ".o"))],
@@ -176,7 +176,7 @@ def build_target(tmp):
 def check_wiring():
     """結線の静的検査: console の入口 4 か所、kernel.c の呼ぶ位置、止める順。"""
     bad = 0
-    con = (ROOT / "kernel/console/console.c").read_text(encoding="utf-8")
+    con = (ROOT / "sys/kern/console/console.c").read_text(encoding="utf-8")
     sink = con.count("con_sink_push_print(")
     blog = con.count("bootlog_push(")
     print(f"WIRING console.c con_sink x{sink} bootlog x{blog}", flush=True)
@@ -196,7 +196,7 @@ def check_wiring():
               flush=True)
         bad += 1
 
-    sv = (ROOT / "init/bootlog_save.c").read_text(encoding="utf-8")
+    sv = (ROOT / "sys/kern/init/bootlog_save.c").read_text(encoding="utf-8")
     body = sv[sv.find("void bootlog_save(void)"):]
     stop = body.find("bootlog_stop();")
     first_io = min(i for i in (body.find("vfs_fstype"), body.find("kprintf"))
@@ -218,10 +218,10 @@ def fn_body(src, name):
 
 def check_write_contract():
     """bootlog_write_ok が前提にする vfs_write の FS ごとの戻り値が、実物の
-    fs/ext2/ext2_vfs.c / fs/fat/fatfs_vfs.c に今もあるか (偽の VFS はこれを写す)。"""
+    sys/fs/ext2/ext2_vfs.c / sys/fs/fat/fatfs_vfs.c に今もあるか (偽の VFS はこれを写す)。"""
     bad = 0
-    ext2 = fn_body((ROOT / "fs/ext2/ext2_vfs.c").read_text(encoding="utf-8"), "ext2_vfs_write")
-    fat_src = (ROOT / "fs/fat/fatfs_vfs.c").read_text(encoding="utf-8")
+    ext2 = fn_body((ROOT / "sys/fs/ext2/ext2_vfs.c").read_text(encoding="utf-8"), "ext2_vfs_write")
+    fat_src = (ROOT / "sys/fs/fat/fatfs_vfs.c").read_text(encoding="utf-8")
     fat = fn_body(fat_src, "ff_write_file")
     print("CONTRACT ext2_vfs_write / fatfs_vfs_write / ext2_rename の同一 inode", flush=True)
     if "return ext2_to_vfs_err(ext2_write(" not in ext2 or \
@@ -239,7 +239,7 @@ def check_write_contract():
        not re.search(r"if \(stream\) \{\s*fr = f_lseek\(&fil, \(FSIZE_t\)offset\);", fat):
         print("  FAIL FAT の一括は作り直し・seek 無し、stream は既存を残し offset へ移る", flush=True)
         bad += 1
-    d = (ROOT / "fs/ext2/ext2_dir_rename.inc").read_text(encoding="utf-8")
+    d = (ROOT / "sys/fs/ext2/ext2_dir_rename.inc").read_text(encoding="utf-8")
     if not re.search(r"if \(dst_ino == ino\) \{.*?return EXT2_OK;\s*/\*[^*]*ハードリンク同士", d, re.S):
         print("  FAIL ext2 の rename は元と宛先が同じ inode なら何もせず成功 (偽 FS はこれを写す)",
               flush=True)
@@ -291,7 +291,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-bootlog-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real init/bootlog.c)", flush=True)
+        print("HOST GNU11 -Werror compile PASS (real sys/kern/init/bootlog.c)", flush=True)
         if "--target" in args:
             build_target(tmp)
         rc = run_cases(exe, [a for a in args if not a.startswith("--")] or CASES)

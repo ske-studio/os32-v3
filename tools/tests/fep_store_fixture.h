@@ -6,7 +6,7 @@
  */
 #ifndef OS32_FEP_STORE_FIXTURE_H
 #define OS32_FEP_STORE_FIXTURE_H
-#include "kernel/ime/ime_store.h"
+#include "sys/kern/ime/ime_store.h"
 #include "lib/sqlite3/sqlite3.h"
 
 enum FepTestOp {

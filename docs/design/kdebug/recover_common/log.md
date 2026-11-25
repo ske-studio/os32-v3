@@ -1,6 +1,6 @@
-# kdebug/recover_common/log.inc — 設計
+# sys/dev/video/geforce/diag/recover_common/log.inc — 設計
 > 状態: **現行 (2026-10-31)** — 出所: GF6200_4A_DESIGN.md・GF6200_4C_DESIGN.md・GF6200_RECLOG_DESIGN.md・GF6200_VPLL_PROBE.md・HWDEV_DESIGN.md・REALHW_RECOVER_ADDENDUM.md・REALHW_RECOVER_DESIGN.md (D1 で移した)
-ソース: `kdebug/recover_common/log.inc`
+ソース: `sys/dev/video/geforce/diag/recover_common/log.inc`
 
 ## GF6200_4A_DESIGN
 
@@ -38,7 +38,7 @@ REC: `transport_state()` の `phase=state event=RESTORING` 行だけに必須u32
 
 ## GF6200_VPLL_PROBE
 
-現行verify=0のEND.readback=FFFFFFFFhは未採取であり実測ではない（kdebug/recover.c）。
+現行verify=0のEND.readback=FFFFFFFFhは未採取であり実測ではない（sys/platform/pc98/kdebug/recover.c）。
 
 ## HWDEV_DESIGN
 

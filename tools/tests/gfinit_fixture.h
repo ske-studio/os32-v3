@@ -13,7 +13,7 @@
  * Effects enumerate potential operations per static instruction, including
  * index writes; REPEAT is NOT dynamically expanded (MACRO2 runs ten times).
  * This is evidence, NOT a write allowlist. ALL effects retain DENY_W.
- * S1 follow-up rules live in kdebug/recover_gf.c; host inventory maps ordinals.
+ * S1 follow-up rules live in sys/dev/video/geforce/diag/recover_gf.c; host inventory maps ordinals.
  * Read safety and verify masks are unclassified; no REC_RW entry is created.
  */
 #ifndef TOOLS_TESTS_GFINIT_FIXTURE_H

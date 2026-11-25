@@ -5,8 +5,8 @@
 #include "gfx_policy.h"
 #include "gfx_hw_mono_cpu.h"
 #include "../../userland/lib/gfx/gfx_direct_internal.h"
-#include "../../drivers/video/geforce/geforce_module.h"
-#include "../../hwdev/gf/accel.h"
+#include "../../sys/dev/video/geforce/geforce_module.h"
+#include "../../sys/dev/video/geforce/accel.h"
 
 KernelAPI *gfx_api;
 int gfx_lost;

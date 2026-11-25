@@ -1,4 +1,4 @@
-/* Link hwdev/gf/display/modes.c; freestanding UNIT 0, no libc.
+/* Link sys/dev/video/geforce/display/modes.c; freestanding UNIT 0, no libc.
  * Independent oracles: GF_FEAT4_DESIGN §3 VGA fallback / final B0 card;
  * MIT nouveau c03c1a1 dispnv04/crtc.c:245-413 (CR field limits),
  * :838-903 (pitch and base). Expected VGA byte extents below are literal

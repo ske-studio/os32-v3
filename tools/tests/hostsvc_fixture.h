@@ -3,8 +3,8 @@
  * Reset product owners separately: reset never pretends to bind/HELLO/ALIVE. */
 #ifndef OS32_HOSTSVC_FIXTURE_H
 #define OS32_HOSTSVC_FIXTURE_H
-#include "net/nic.h"
-#include "fs/serialfs/sfs_client.h"
+#include "sys/net/nic.h"
+#include "sys/fs/serialfs/sfs_client.h"
 
 void hs_reset(u32 start_tick);
 void hs_advance(u32 ticks);

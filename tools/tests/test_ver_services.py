@@ -17,12 +17,12 @@ def run(source, runner):
     dependencies += function(source[source.index('/* Diagnostic only;'):], 'static const char *services_state_name(')
     dependencies += getter
     return execute((ROOT/'tools/tests/ver_services_host.c').read_text(), runner,
-                   {'services_source.c': dependencies}, assembly='lib/kstring_asm.asm')
+                   {'services_source.c': dependencies}, assembly='sys/kern/kstring_asm.asm')
 
 
 def main():
     args = arguments()
-    source = (ROOT/'kernel/sqlite_engine.c').read_text()
+    source = (ROOT/'sys/kern/sqlite_engine.c').read_text()
     result = run(source, args.runner)
     assert result.returncode == 0
     assert result.stdout.count('PASS services:') == 1 and result.stdout.count('\n') == 1

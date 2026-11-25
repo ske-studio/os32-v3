@@ -5,7 +5,7 @@
 nest の試験時計: FINDINGS / realhw_run.py の期限の契約。
 """
 CHECK = dict(name='ppc-realhw-link', tier=1, budget=10, needs=['make:all'],
-             covers=['exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/ppc/realhw_run.py', 'tools/tests/test_ppc_realhw_link.py',
+             covers=['sys/kern/exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/ppc/realhw_run.py', 'tools/tests/test_ppc_realhw_link.py',
                      'tools/ppc/sc_run.py', 'tools/ppc/sd_run.py',
                      'tools/ppc/kboot_run.py', 'tools/ppc/kboot_accept.py',
                      'tools/ppc/kboot_mutations.py', 'tools/ppc/sb_run.py',
@@ -14,9 +14,9 @@ CHECK = dict(name='ppc-realhw-link', tier=1, budget=10, needs=['make:all'],
                      'tools/ppc_hostfs.py', 'tools/host_agent_config.py',
                      'tools/ppc/*.py', 'tools/host*.py', 'tools/lan*.py',
                      'tools/serialfs_host.py', 'arch/ppc/*.[cSh]',
-                     'platform/powermac/*.[ch]', 'platform/powermac/ppc_kernel.c',
-                     'fs/serialfs/serialfs_persistent.c', 'kernel/console/con_sink.c',
-                     'kernel/console/console.c', 'mm/kmalloc.c',
+                     'platform/powermac/*.[ch]', 'sys/platform/powermac/ppc_kernel.c',
+                     'sys/fs/serialfs/serialfs_persistent.c', 'sys/kern/console/con_sink.c',
+                     'sys/kern/console/console.c', 'sys/kern/mm/kmalloc.c',
                      'userland/shell/rshell_lan.c', 'userland/ppc/*',
                      'build/**/*.mk', 'build/out/ppc-user/*'],
              basis=['PPC_P5_REST_DESIGN §2・§5'])

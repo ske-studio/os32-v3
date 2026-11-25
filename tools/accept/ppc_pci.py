@@ -111,7 +111,7 @@ def main():
         kernel = folder / 'kernel'
         mutation = []
         if case == 'bus-shift':
-            mutation = mutant_settings(folder, case, 'kernel/dev/device_pci.c',
+            mutation = mutant_settings(folder, case, 'sys/dev/pci/device_pci.c',
                                        'return pci_cfg_read32(bus, dev, fn, reg);',
                                        'return pci_cfg_read32(bus + 1, dev, fn, reg);')
         elif case == 'absent':

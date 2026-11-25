@@ -2,8 +2,8 @@
 
 ## Scope and finding
 
-Read `platform/pc98/kernel.c`, `init/boot_splash.c/.h`, `gfx/gfx_core.c`,
-`gfx/gfx_internal.h`, `include/gfx_hal.h`, PC98 backend and optional backend
+Read `sys/platform/pc98/kernel.c`, `init/boot_splash.c/.h`, `sys/hal/gfx/gfx_core.c`,
+`sys/hal/gfx/gfx_internal.h`, `sys/include/gfx_hal.h`, PC98 backend and optional backend
 init/shutdown paths before implementation. No `system.cfg` exists in this
 checkout (`git ls-files '*system*cfg*'` and recursive `Path.glob` returned none).
 The actual guest configuration was not read: emulator/network access is out of
@@ -73,11 +73,11 @@ optional-backend exclusions into verified results.
 
 ## Target compile and isolation
 
-`i386-elf-gcc` compiled `platform/pc98/boot_splash.c` and unchanged `gfx/gfx_core.c` to a
+`i386-elf-gcc` compiled `sys/platform/pc98/boot_splash.c` and unchanged `sys/hal/gfx/gfx_core.c` to a
 private TemporaryDirectory with repository kernel include paths and GNU89,
 i386 freestanding flags, plus `-Wall -Wextra -Werror
 -Wdeclaration-after-statement`. Both compiled without diagnostics.
-`git diff --check -- platform/pc98/boot_splash.c platform/pc98/boot_splash.h` passed.
+`git diff --check -- sys/platform/pc98/boot_splash.c sys/platform/pc98/boot_splash.h` passed.
 No shared object/build output, full build, deployment or emulator run was used.
 
 ## Outstanding lifecycle work (not implemented here)

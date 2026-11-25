@@ -458,18 +458,18 @@ class GuiTests(unittest.TestCase):
             root = Path(temp)
             (root / 'exec').mkdir()
             (root / 'include').mkdir()
-            source = (ROOT / 'exec/appslot.h').read_text()
-            (root / 'exec/appslot.h').write_text(source.replace('int  in_op_wait;',
+            source = (ROOT / 'sys/kern/exec/appslot.h').read_text()
+            (root / 'sys/kern/exec/appslot.h').write_text(source.replace('int  in_op_wait;',
                 'u32 added_field; int  in_op_wait;'))
-            (root / 'include/memmap.h').write_text((ROOT / 'include/memmap.h').read_text())
-            (root / 'include/app_ids.h').write_text((ROOT / 'include/app_ids.h').read_text())
+            (root / 'sys/include/memmap.h').write_text((ROOT / 'sys/include/memmap.h').read_text())
+            (root / 'sys/include/app_ids.h').write_text((ROOT / 'sys/include/app_ids.h').read_text())
             for owner in range(1, 6):
                 self.http.put(0x160000 + owner * 64 + 20, struct.pack('<II', 99, owner % 2))
             with patch.object(gui, 'ROOT', root):
                 self.assertEqual([item['in_op_wait'] for item in self.g.wm_state()['kernel']],
                                  [1, 0, 1, 0, 1])
             # Reject a layout the narrow reader cannot derive, rather than guessing.
-            (root / 'exec/appslot.h').write_text(source.replace('int  parent;', 'void *parent;'))
+            (root / 'sys/kern/exec/appslot.h').write_text(source.replace('int  parent;', 'void *parent;'))
             with patch.object(gui, 'ROOT', root), self.assertRaisesRegex(ValueError, 'layout'):
                 self.g.wm_state()
 
@@ -570,7 +570,7 @@ class GuiTests(unittest.TestCase):
             if data == {'seq': 'SHIFT+SPACE'}:
                 if restore_error and not current:
                     raise OSError('restore key rejected')
-                # kernel/ime/ime.c:ime_toggle: OFF -> HIRAGANA, any ON -> OFF.
+                # sys/kern/ime/ime.c:ime_toggle: OFF -> HIRAGANA, any ON -> OFF.
                 if not stuck:
                     self.http.put(IME_ADDRESS, struct.pack('<I', 0 if current else 1))
             if 'text' in data:

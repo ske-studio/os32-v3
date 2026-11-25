@@ -1,4 +1,4 @@
-# arch/x86/kernel/kentry.asm — カーネルのエントリ
+# sys/arch/x86/kernel/kentry.asm — カーネルのエントリ
 
 > 状態: **現行 (2026-10-31)**
 
@@ -8,5 +8,5 @@ C の初期化前に BSS を初期化する。
 ## 落とし穴
 
 - **BSS の初期化**: ベアメタルでは CRT が BSS を消さず、ゼロ初期値の大域変数が不定になる。
-  リンカの `__bss_start` から `__bss_end` までを C に入る前にゼロにする (`arch/x86/kernel/kentry.asm`)。
+  リンカの `__bss_start` から `__bss_end` までを C に入る前にゼロにする (`sys/arch/x86/kernel/kentry.asm`)。
   起動時の初期化順を変える場合もこの契約を保つ。直接の BSS 初期化試験は未確認。

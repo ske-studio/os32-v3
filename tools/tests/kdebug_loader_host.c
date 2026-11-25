@@ -1,20 +1,20 @@
 /* Real module.c + module_image.c, fake VFS/ledger and executable i386 body. */
-#include "kernel/module/module.h"
-#include "kernel/kselftest.h"
-#include "kernel/module/module_image.h"
-#include "mm/pgalloc.h"
-#include "init/sysconfig.h"
+#include "sys/kern/module/module.h"
+#include "sys/kern/kselftest.h"
+#include "sys/kern/module/module_image.h"
+#include "sys/kern/mm/pgalloc.h"
+#include "sys/kern/init/sysconfig.h"
 #include "bootinfo.h"
 #include "bootinfo_native.h"
 #include "config.h"
-#include "fs/vfs.h"
-#include "lib/kstring.h"
+#include "sys/fs/vfs.h"
+#include "sys/kern/kstring.h"
 #include "kprintf.h"
 #include "memmap.h"
 #include "kdebug_imports.h"
 #include <stdarg.h>
 #include "kernel_selftest_dispatch.h"
-#include "kdebug/recover_wire.h"
+#include "sys/kern/kdebug/recover_wire.h"
 
 #define CAP (MODULE_IMAGE_MAX + MODULE_PAGE_SIZE)
 /* File limit excludes the separately zeroed resident BSS. */
@@ -184,7 +184,7 @@ static void check_boot_dispatch(void)
         CHECK(not_run_logs == (state >= KDEBUG_NOT_FOUND));
     }
 }
-/* KAPI kdebug_call (kernel/module/kdebug_call.c): NOSYS without slot 19, else pass-through. */
+/* KAPI kdebug_call (sys/kern/module/kdebug_call.c): NOSYS without slot 19, else pass-through. */
 static u32 call_op, call_size;
 static void *call_buf;
 static i32 fake_dbg_call(u32 op, void *buf, u32 size)
@@ -255,7 +255,7 @@ int hwdev_module_load(struct module_handle core)
 { CHECK(kdebug.state == KDEBUG_RUNNING && module_exports(core) != 0);
   hwdev_loads++; return MODULE_NOT_FOUND; }
 
-#include "../../platform/pc98/module_pair.c"
+#include "../../sys/platform/pc98/module_pair.c"
 
 const struct boot_common *boot_common_get(void) {
     static struct boot_common info;

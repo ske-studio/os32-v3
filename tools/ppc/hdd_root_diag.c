@@ -1,5 +1,5 @@
 /* Compiled only into the disposable guest image, after root/path setup. */
-#include "fs/vfs.h"
+#include "sys/fs/vfs.h"
 #include "dev.h"
 #include "kstring.h"
 static void hdd_root_report(void)

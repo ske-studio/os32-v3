@@ -6,8 +6,8 @@
 #define GF5_HOST_UNIT 6
 #define GF5_HOST_REAL_CLOCK
 #include "gf5_fake.h"
-#include "../../kdebug/gfinit_pll.h"
-#include "../../kdebug/gfinit_decode.h"
+#include "../../sys/dev/video/geforce/diag/gfinit_pll.h"
+#include "../../sys/dev/video/geforce/diag/gfinit_decode.h"
 
 #define CORE_KHZ 200000U
 #define MEM_KHZ 400000U

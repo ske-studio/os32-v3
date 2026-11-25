@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'arch/ppc/exec_cache.c'
+SOURCE = ROOT / 'sys/arch/ppc/exec_cache.c'
 PPC = Path((os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc') + '/bin'))
 
 

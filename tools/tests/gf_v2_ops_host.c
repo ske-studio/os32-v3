@@ -1,7 +1,7 @@
 /* G1: real adapter, real ROP3/GX state setters and real G4 fence ring. */
-#include "../../drivers/video/geforce/gf_v2_ops.c"
-#include "drivers/video/geforce/geforce_module.h"
-#include "hwdev/gf/display/api.h"
+#include "../../sys/dev/video/geforce/gf_v2_ops.c"
+#include "sys/dev/video/geforce/geforce_module.h"
+#include "sys/dev/video/geforce/display/api.h"
 static struct gf_foundation f;
 static struct gf2_chan ch = {.f = &f, .state = GF2_RUN, .epoch = 1};
 static struct gf3_ctx g3 = {.ch = &ch, .ready = true, .epoch = 1};

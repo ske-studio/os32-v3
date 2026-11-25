@@ -215,7 +215,7 @@ int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
     return IDE_OK;
 }
 
-/* ---- fs/vfs_fd.c の境界 ---- */
+/* ---- sys/fs/vfs_fd.c の境界 ---- */
 int fd_is_redirected(int fd) { (void)fd; return 0; }
 u16 fd_redirect_ifmt(int fd, int *out_file_fd)
 { (void)fd; if (out_file_fd) *out_file_fd = -1; return OS_S_IFCHR; }

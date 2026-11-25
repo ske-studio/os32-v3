@@ -8,7 +8,7 @@ static unsigned int test_if = 1;
 u32 link_platform_lock(void) { unsigned int f = test_if; test_if = 0; return f; }
 void link_platform_unlock(u32 f) { test_if = f; }
 void link_platform_idle(void) { }
-#include "net/link.c"
+#include "sys/net/link.c"
 /* API-only fixture: B2 notification behavior is covered by link-core. */
 static int notify_resets;
 void link_notify_reset(void) { notify_resets++; }

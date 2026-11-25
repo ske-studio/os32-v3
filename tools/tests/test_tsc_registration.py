@@ -1,7 +1,7 @@
 """TSC descriptor must match the real IO policy and dispatcher."""
 CHECK = dict(name='tsc-registration-host', tier=3, budget=5, needs=[], covers=[
-    'platform/pc98/tsc_clock.[ch]', 'platform/pc98/tsc_math.c',
-    'kernel/io_work.[ch]', 'kernel/io_policy.[ch]', 'kernel/io_clock.h',
+    'platform/pc98/tsc_clock.[ch]', 'sys/platform/pc98/tsc_math.c',
+    'kernel/io_work.[ch]', 'kernel/io_policy.[ch]', 'sys/kern/io_clock.h',
     'tools/tests/tsc_registration_host.c', 'tools/tests/test_tsc_registration.py',
     'tools/tests/idle_io_sources.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'lib/divdi3.c'], basis=['IO_TIER_DESIGN P9'])
@@ -16,12 +16,12 @@ from kernel_includes import include_flags
 
 
 def exercise(root, work, mutant):
-    source = (root / 'platform/pc98/tsc_clock.c').read_text()
+    source = (root / 'sys/platform/pc98/tsc_clock.c').read_text()
     old = '.budget_min_us = 1, .budget_max_us = 500, .max_unit_us = 120,'
     assert source.count(old) == 1
     if mutant:
         source = source.replace(old, old.replace('500', '501'), 1)
-    target = work / 'platform/pc98/tsc_clock.c'
+    target = work / 'sys/platform/pc98/tsc_clock.c'
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(source)
     (work / 'io.h').write_text('unsigned int irq_save(void);\nvoid irq_restore(unsigned int);\nint _irq_enabled(void);\n')
@@ -31,7 +31,7 @@ def exercise(root, work, mutant):
         '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib',
         '-static', '-no-pie', '-I' + str(work), *include_flags(root),
         str(root / 'tools/tests/tsc_registration_host.c'), *idle_io_sources(root, work),
-        str(root / 'platform/pc98/tsc_math.c'), str(root / 'lib/divdi3.c'), '-o', str(exe)], check=True)
+        str(root / 'sys/platform/pc98/tsc_math.c'), str(root / 'lib/divdi3.c'), '-o', str(exe)], check=True)
     return host32.run([str(exe)]).returncode
 
 

@@ -1,6 +1,6 @@
-# drivers/video/pc98/backend_pc98.c — 設計
+# sys/platform/pc98/video/backend_pc98.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DESIGN (D1 で移した)
-ソース: `drivers/video/pc98/backend_pc98.c`
+ソース: `sys/platform/pc98/video/backend_pc98.c`
 
 - OS32 は主記憶のバックバッファに描いて `gfx_present_rect` で転送する方式なので、
   GRCG/EGC は転送量を減らせない (多色データはプレーンごとに別)。[HW1] の

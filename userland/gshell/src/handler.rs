@@ -1,6 +1,6 @@
 //! handler.rs — `gui_call` ハンドラ (契約 T1 / T8 の X1・X2・X3)。
 //!
-//! カーネル (`kernel/gui.c`) は `gui_call(op, arg)` を
+//! カーネル (`sys/kern/gui.c`) は `gui_call(op, arg)` を
 //! `handler(op, arg, res_owner_get())` へ転送するだけで、op の意味を知らない。
 //! ここが WM の唯一の入口。op → 関数表で引き、owner ↔ スロットを検証してから
 //! 各処理へ渡す (match の巨大化を避ける)。

@@ -1,4 +1,4 @@
-# fs/ext2/ext2_file_write_run.inc — 予約済みデータの範囲書込み
+# sys/fs/ext2/ext2_file_write_run.inc — 予約済みデータの範囲書込み
 
 > 状態: **現行 (2026-11-01)**
 

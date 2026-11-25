@@ -1,6 +1,6 @@
 #include "fep_probe_data.h"
 #include "platform_module_pair.h"
-#include "kernel/ime/fep_module.h"
+#include "sys/kern/ime/fep_module.h"
 static unsigned fep_probe_starts;
 
 static int fep_probe_start(struct module_record *record, u32 entry, u32 *exports)

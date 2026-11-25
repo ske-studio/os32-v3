@@ -19,23 +19,23 @@ from test_exec_r1 import function
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SOURCES = {
-    'wait_source.inc': 'kernel/input_wait.c',
-    'ime_gate_source.inc': 'input/hal/input_ime_gate.c',
-    'kbd_source.inc': 'drivers/input/kbd.c',
-    'kbd_merge_source.inc': 'input/hal/kbd_merge.c',
-    'legacy_keymap_source.inc': 'input/hal/legacy_keymap.c',
-    'ime_source.inc': 'kernel/ime/ime.c',
-    'ime_delivery.inc': 'kernel/ime/ime_delivery.inc',
-    'ime_cui_process.inc': 'kernel/ime/ime_cui_process.inc',
-    'ime_commit_take.inc': 'kernel/ime/ime_commit_take.inc',
-    'ime_convert.inc': 'kernel/ime/ime_convert.inc',
-    'ime_render.inc': 'kernel/ime/ime_render.inc',
-    'ime_dict_api.inc': 'kernel/ime/ime_dict_api.inc',
-    'gui_source.inc': 'kernel/gui.c',
-    'sink_source.inc': 'kernel/console/con_sink.c',
-    'inject_source.inc': 'kernel/kbd_inject.c',
-    'exec_source.inc': 'exec/exec.c',
-    'slot_source.inc': 'exec/appslot.c',
+    'wait_source.inc': 'sys/kern/input_wait.c',
+    'ime_gate_source.inc': 'sys/input/input_ime_gate.c',
+    'kbd_source.inc': 'sys/platform/pc98/input/kbd.c',
+    'kbd_merge_source.inc': 'sys/hal/input/kbd_merge.c',
+    'legacy_keymap_source.inc': 'sys/hal/input/legacy_keymap.c',
+    'ime_source.inc': 'sys/kern/ime/ime.c',
+    'ime_delivery.inc': 'sys/kern/ime/ime_delivery.inc',
+    'ime_cui_process.inc': 'sys/kern/ime/ime_cui_process.inc',
+    'ime_commit_take.inc': 'sys/kern/ime/ime_commit_take.inc',
+    'ime_convert.inc': 'sys/kern/ime/ime_convert.inc',
+    'ime_render.inc': 'sys/kern/ime/ime_render.inc',
+    'ime_dict_api.inc': 'sys/kern/ime/ime_dict_api.inc',
+    'gui_source.inc': 'sys/kern/gui.c',
+    'sink_source.inc': 'sys/kern/console/con_sink.c',
+    'inject_source.inc': 'sys/kern/kbd_inject.c',
+    'exec_source.inc': 'sys/kern/exec/exec.c',
+    'slot_source.inc': 'sys/kern/exec/appslot.c',
 }
 
 
@@ -62,8 +62,8 @@ def run(mutation=None, fg1=False):
         name, source, old, new, expected = mutation
         assert sources[source].count(old) == 1, (name, sources[source].count(old))
         sources[source] = sources[source].replace(old, new)
-    sources['slot_source.inc'] += (ROOT / 'exec/appslot_transition.inc').read_text().replace(
-        '#include "appslot_park.inc"', (ROOT / 'exec/appslot_park.inc').read_text())
+    sources['slot_source.inc'] += (ROOT / 'sys/kern/exec/appslot_transition.inc').read_text().replace(
+        '#include "appslot_park.inc"', (ROOT / 'sys/kern/exec/appslot_park.inc').read_text())
     sources['wait_source.inc'] = sources['wait_source.inc'].replace('../input/hal/', 'input/hal/')
     exec_sources(sources)
     with tempfile.TemporaryDirectory(prefix='x11-shared-') as directory:
@@ -77,7 +77,7 @@ def run(mutation=None, fg1=False):
             'static int g_last_kind, g_last_code;\n' + getter[0])
         includes = ['-I' + str(work), '-I' + str(ROOT / 'input/hal')] + ['-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)]
         exe = work / 'test'
-        subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'arch/x86/kernel/setjmp.asm'),
+        subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'sys/arch/x86/kernel/setjmp.asm'),
                         '-o', str(work / 'setjmp.o')], check=True)
         subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2',
                         '-DOS32_HOOK_IME=1', '-Wall', '-Wextra', '-Werror', '-Wno-unused-variable',
@@ -86,8 +86,8 @@ def run(mutation=None, fg1=False):
                         '-static', '-no-pie', '-Wl,--gc-sections',
                         *(['-DTEST_IME_FG1'] if fg1 else []), *includes, str(ROOT / 'tools/tests/x11_shared_host.c'),
                         str(work / 'setjmp.o'),
-                        *[str(ROOT / p) for p in ('lib/kstring.c', 'lib/kstring_c.c',
-                           'lib/utf8.c', 'kernel/ime/ime_romkana.c')],
+                        *[str(ROOT / p) for p in ('sys/kern/kstring.c', 'sys/kern/kstring_c.c',
+                           'lib/utf8.c', 'sys/kern/ime/ime_romkana.c')],
                         '-o', str(exe)], check=True)
         result = host32.run([str(exe)], capture_output=True, text=True, timeout=30)
         print(result.stdout, end='', flush=True)

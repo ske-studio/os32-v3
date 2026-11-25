@@ -168,7 +168,7 @@ def initializers():
 def generate():
     """Compile-evaluate the single hardware sequence; no recover metadata."""
     rows = initializers()
-    source = '#include "hwdev/gf_load_state.h"\n'
+    source = '#include "sys/dev/video/geforce/gf_load_state.h"\n'
     source += 'static const u32 rows[][11] = {\n'
     source += ''.join('{' + ','.join(row) + '},\n' for row in rows) + '};\n'
     source += '''void _start(void) { u32 rc;

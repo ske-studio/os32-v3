@@ -1,6 +1,6 @@
-#include "net/nic.h"
-#include "drivers/net/e82557/lan_module.h"
-#include "drivers/net/e82557/e82557_regs.h"
+#include "sys/net/nic.h"
+#include "sys/dev/net/e82557/lan_module.h"
+#include "sys/dev/net/e82557/e82557_regs.h"
 #include "os32/os32_kapi_shared.h"
 
 static int available, refs, acquires, releases, state, tx_rc, rx_rc, ticks;

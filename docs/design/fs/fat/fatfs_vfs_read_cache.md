@@ -1,4 +1,4 @@
-# fs/fat/fatfs_vfs_read_cache.inc — 読み取り FIL の保持
+# sys/fs/fat/fatfs_vfs_read_cache.inc — 読み取り FIL の保持
 
 > 状態: **現行 (2026-10-31)**
 

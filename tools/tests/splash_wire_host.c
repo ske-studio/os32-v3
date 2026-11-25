@@ -12,16 +12,16 @@ int sys_time_now(u32 *lo, u32 *hi);
 #include "config.h"
 #include "kstring.h"
 #include "wire_data.h"
-#include "../../gfx/gfx_osri.c"
+#include "../../sys/kern/gfx/osri/gfx_osri.c"
 #define platform_splash_wait_frame wire_wait_frame_real
-#include "../../platform/pc98/splash.c"
+#include "../../sys/platform/pc98/splash.c"
 #undef platform_splash_wait_frame
-#include "../../drivers/video/pc98/splash_raster_plan.c"
-#include "../../drivers/video/pc98/splash_raster_play.c"
-#include "../../drivers/video/pc98/splash_raster_image.c"
-#include "../../drivers/video/pc98/splash_raster_run.c"
-#include "../../platform/pc98/splash_image.c"
-#include "../../platform/pc98/boot_splash.c"
+#include "../../sys/platform/pc98/video/splash_raster_plan.c"
+#include "../../sys/platform/pc98/video/splash_raster_play.c"
+#include "../../sys/platform/pc98/video/splash_raster_image.c"
+#include "../../sys/platform/pc98/video/splash_raster_run.c"
+#include "../../sys/platform/pc98/splash_image.c"
+#include "../../sys/platform/pc98/boot_splash.c"
 
 static u8 wire_pixels[OSRI_PIXELS_BYTES];
 static struct OsriImage wire_image;

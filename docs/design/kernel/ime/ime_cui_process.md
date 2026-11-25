@@ -1,6 +1,6 @@
 # CUI のキー 1 件の変換
 
-`kernel/ime/ime_cui_process.inc` は取得済みの CUI キー 1 件を処理する。
+`sys/kern/ime/ime_cui_process.inc` は取得済みの CUI キー 1 件を処理する。
 Shift+Space は ON/OFF を切り替え、確定バイトがあれば 1 バイト返す。
 それ以外は OFF なら元のキーを返し、ON なら既存の配送処理を呼ぶ。
 

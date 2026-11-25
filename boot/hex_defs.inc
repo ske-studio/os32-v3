@@ -1,7 +1,7 @@
 ; Named constants; C mirrors are checked by test_boot_named_constants.py.
 %ifndef OS32_BOOT_HEX_DEFS_INC
 %define OS32_BOOT_HEX_DEFS_INC
-; Canonical widths: lib/kstring.h and include/types.h.
+; Canonical widths: sys/kern/kstring.h and include/types.h.
 BITS_PER_BYTE EQU 8
 HEX_NIBBLE_BITS EQU 4
 HEX_NIBBLE_SHIFT EQU 2

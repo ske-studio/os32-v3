@@ -1,6 +1,6 @@
 # PPC_SEP3_DESIGN — 分離の第 3 段 (文脈・起動引数・syscall)
 
-> 状態: **完了記録 (2026-11-08 確定、2026-11-17 に記録へ)** — 第 3 段は main に入った。分離の仕組みは 11-17 の作り直しで置き換わり、今の決まりは票 TASK_PPC_SEP の「現在地」(層の検査 `tools/check_layers.py`・所有者集合 `build/select.mk`・入口の骨格 `init/kernel_start.c`)。本文の selected の計測と known の表は今は無い。以下は確定した時の本文: 共通 C が x86 の文脈・フレーム・呼出規約を直接知っている所 (E1〜E7・A1・A2) を arch の口の後ろへ移す。x86 の KAPI・SDK・CRT の ABI は変えない。段の状態は票 TASK_PPC_SEP が持つ。
+> 状態: **完了記録 (2026-11-08 確定、2026-11-17 に記録へ)** — 第 3 段は main に入った。分離の仕組みは 11-17 の作り直しで置き換わり、今の決まりは票 TASK_PPC_SEP の「現在地」(層の検査 `tools/check_layers.py`・所有者集合 `build/select.mk`・入口の骨格 `sys/kern/init/kernel_start.c`)。本文の selected の計測と known の表は今は無い。以下は確定した時の本文: 共通 C が x86 の文脈・フレーム・呼出規約を直接知っている所 (E1〜E7・A1・A2) を arch の口の後ろへ移す。x86 の KAPI・SDK・CRT の ABI は変えない。段の状態は票 TASK_PPC_SEP が持つ。
 > 出所: ~/os32-tmp/run/ppc-sep3/DESIGN.final.md を 2026-11-08 に写した (gpt-6-astra 起草 r1〜r2、Opus 5.5 第 1・2 回、PM が N1〜N3 を反映)。
 ## r1→r2 の変更
 - R1：legacy→caller→abort/pump→private LS→範囲→guard→legacy/print/strings→ptrmask→invoke→出口をコード化。
@@ -21,29 +21,29 @@
 ## 1. 実物との対応と引渡し
 |項目|現 HEAD の根拠（調査時の行番号は追わず実位置を使用）|実装対象|
 |---|---|---|
-|E1|`exec/exec_launch.inc` argc/argv/api/aux、16B整列、ダミーret、ID別saved_esp|入口の配置・遷移を分離。argv文字列の作成とAS所有は共通|
-|E2|`exec/exec.c` gdt/tss、ESP0 snapshot、TSS引数付きresume|privileged snapshotと復帰、親文脈の寿命を分離|
-|E3|`exec/appslot.h` 13語/添字、`exec/exec_syscall.inc`、`exec/exec_schedule.inc`|保存結果操作、再実行。追加漏れは `exec/exec_stdin.inc` の `exec_stdin_state()` のslot照会|
-|E4|`exec/exec_tramp_init.inc` B8/LE32/CD80/C3、`exec/ring3_str.h` の `KAPI_STUB_SIZE` 8Bと写し場offset|容量・配置・emit・命令同期。予約関数にもstubを生成|
-|E5|`exec/exec_syscall.inc` USER ESP+4とptrmask、`arch/x86/kernel/ring3_entry.asm` memcpy/call|引数抽出とABI呼出。`sdk/gen_kapi.py` 固定引数数×4も分離|
-|E6|`exec/ring3_ls.S:3,17–92` .code32、`exec/ring3_ls.c` の `ring3_ls_dispatch()` ESP+4|shimをarchへ。値コピー/FS処理は共通|
-|E7|`include/ksetjmp.h` 8語、`arch/x86/kernel/setjmp.asm` 深さも保存|opaque型・archサイズ。`exec/exec_finish.inc` コピーも追従|
-|A1|`kapi/kapi_print.c` の `kapi_print_call()` fixed2語後のu32列|USER可変引数cursor。内部kvprintf用の検証済み列とは区別|
-|A2|`include/types.h`、`sdk/include/os32/os32_kapi_shared.h`|公開単独利用も可能な呼出属性の口|
-- E1〜E7/A1/A2 の指摘内容は9件とも存続（内容の食い違い0）。共通CPU定数は現在 `include/cpu.h`、VM判別は `platform/pc98/legacy/guest.c` に移っている。
+|E1|`sys/kern/exec/exec_launch.inc` argc/argv/api/aux、16B整列、ダミーret、ID別saved_esp|入口の配置・遷移を分離。argv文字列の作成とAS所有は共通|
+|E2|`sys/kern/exec/exec.c` gdt/tss、ESP0 snapshot、TSS引数付きresume|privileged snapshotと復帰、親文脈の寿命を分離|
+|E3|`sys/kern/exec/appslot.h` 13語/添字、`sys/kern/exec/exec_syscall.inc`、`sys/kern/exec/exec_schedule.inc`|保存結果操作、再実行。追加漏れは `sys/kern/exec/exec_stdin.inc` の `exec_stdin_state()` のslot照会|
+|E4|`sys/kern/exec/exec_tramp_init.inc` B8/LE32/CD80/C3、`sys/kern/exec/ring3_str.h` の `KAPI_STUB_SIZE` 8Bと写し場offset|容量・配置・emit・命令同期。予約関数にもstubを生成|
+|E5|`sys/kern/exec/exec_syscall.inc` USER ESP+4とptrmask、`sys/arch/x86/kernel/ring3_entry.asm` memcpy/call|引数抽出とABI呼出。`sdk/gen_kapi.py` 固定引数数×4も分離|
+|E6|`exec/ring3_ls.S:3,17–92` .code32、`sys/kern/exec/ring3_ls.c` の `ring3_ls_dispatch()` ESP+4|shimをarchへ。値コピー/FS処理は共通|
+|E7|`sys/include/ksetjmp.h` 8語、`sys/arch/x86/kernel/setjmp.asm` 深さも保存|opaque型・archサイズ。`sys/kern/exec/exec_finish.inc` コピーも追従|
+|A1|`sys/kapi/kapi_print.c` の `kapi_print_call()` fixed2語後のu32列|USER可変引数cursor。内部kvprintf用の検証済み列とは区別|
+|A2|`sys/include/types.h`、`sdk/include/os32/os32_kapi_shared.h`|公開単独利用も可能な呼出属性の口|
+- E1〜E7/A1/A2 の指摘内容は9件とも存続（内容の食い違い0）。共通CPU定数は現在 `sys/include/cpu.h`、VM判別は `sys/platform/pc98/legacy/guest.c` に移っている。
 - `legacy_trap(native_frame)` は **arch syscall入口で最初に**呼ぶ。VMの拡張フレームを52BのUSER保存型にコピーしない。VM処理済みなら共通dispatcherを呼ばず戻る。
 - 例外分類はx86に残す：`isr_stub.asm` のVM分岐、`isr_handlers.c` のfont/sqlite優先→USERまたはsyscall→kill、通常kernel例外→exec復帰/停止。例外フレームとsyscallフレームを同型にしない。
 - 親snapshotはlaunch/resumeの生存スタック上でsetjmp前に一度保存、volatile/noinline維持。dispatchの短命スタックに退避しない。着地clear→pending cleanup→x87親復元→親snapshot復元→IF許可の既存順を維持（`exec_schedule.inc`）。
 - `legacy_pinned` と `legacy_lowmap_busy` の入口拒否、closing中の解放禁止はそのまま。active/open/pin/busy/closingを統合しない。V86呼出中のpark拒否・end→cleanup・IF条件の試験を残す。
 - 引渡しの「syscall5 予約 slot」は予約 slot 範囲の意と PM が解釈。`KAPI_FUNC_COUNT..KAPI_FUNC_CAPACITY-1` の予約stub→範囲拒否を受入対象にし、slot 5 を特別扱いしない。
-- 食い違い②：`userland/tests/ring3_marker.h` はPF error_code非表示と記すが、`isr_handlers.c` は `err=` を出す。markerの値/kill差/実配置を正として受入し、コメント追従を最後の記録段へ。SURVEY指摘との食い違いに加えた現行コードと資料コメントの食い違いはこの1件。
+- 食い違い②：`userland/diag/ring3_marker.h` はPF error_code非表示と記すが、`isr_handlers.c` は `err=` を出す。markerの値/kill差/実配置を正として受入し、コメント追従を最後の記録段へ。SURVEY指摘との食い違いに加えた現行コードと資料コメントの食い違いはこの1件。
 - KAPI未変更の証拠は基点から採取：kapi.json、生成public宣言/slot/generations、KernelAPI sizeof/offset、SDK CRT入口/リンク成果物を比較保存。既存の「未変更」記述だけを証拠にしない。
 ## 2. 境界と所有（以下で境界型と順序を固定）
 ```c
-/* include/exec_arch.h: 容量/整列のみarch_exec_storage.hから選択 */
+/* sys/include/exec_arch.h: 容量/整列のみarch_exec_storage.hから選択 */
 struct arch_syscall { void *native; }; /* archだけが解釈、入口の生存中だけ借用 */
 void exec_syscall_dispatch(struct arch_syscall *);
-/* 定義は exec/exec.c の static (今の exec/exec.c と同じ置き場)。ヘッダには置かない */
+/* 定義は sys/kern/exec/exec.c の static (今の sys/kern/exec/exec.c と同じ置き場)。ヘッダには置かない */
 /* static struct arch_syscall *g_cur_frame;  共通execが親viewを保存・復元 */
 struct arch_user_context;            /* 完全型はopaque storage。AppSlotが値を所有 */
 struct arch_priv_context;            /* 親Ring3CallContextが所有 */
@@ -62,14 +62,14 @@ void arch_user_result(struct arch_user_context *, u32);
 void arch_user_restart(struct arch_user_context *); /* 一回のresumeにつき一回 */
 void arch_user_resume(const struct arch_user_context *, u32 address_space);
 ```
-- 完全型は `include/exec_arch.h` のbyte storage＋provider指定alignment。x86 user=52B/align4、priv=4B/align4で現配置を維持。commonは添字・SP・CS・VM・TSS・命令長を読まない。native viewの変換/borrowはarch入口のみ。
-- x86置場：`arch/x86/kernel/exec_entry.c`（配置とenter）、`exec_context.c`（snapshot/save/result/restart/resume）、`syscall_entry.c`（legacy先行・native view→共通dispatch）。`ring3_entry.asm` のint80/popad/iret/kapi_invokeはarch内で維持。
+- 完全型は `sys/include/exec_arch.h` のbyte storage＋provider指定alignment。x86 user=52B/align4、priv=4B/align4で現配置を維持。commonは添字・SP・CS・VM・TSS・命令長を読まない。native viewの変換/borrowはarch入口のみ。
+- x86置場：`sys/arch/x86/kernel/exec_entry.c`（配置とenter）、`exec_context.c`（snapshot/save/result/restart/resume）、`syscall_entry.c`（legacy先行・native view→共通dispatch）。`ring3_entry.asm` のint80/popad/iret/kapi_invokeはarch内で維持。
 - `arch_entry_prepare` はchecked subtraction/alignとstore失敗を返し、commit前に完了。x86 USERは現20B、CPL0は16Bを書き、auxとapi選択は共通入力。CPL0の正常return/longjmp両方を保持。ESP退避はentry context内、ID別・ネスト別に保持。
 - `arch_entry_enter` はUSERの場合noreturn、CPL0は戻り得る。arch内のCLI→ESP0→CR3→セグメント→iretを一続きにする。共通にTSS pointerを渡さない。既存のargv/store→CR3→heap→x87→commit→entry順は変更しない。
 - parkはopaque contextを値コピー→x87/heap保存→caller clear→kernel AS→park commit→親復元→longjmp。g_cur_frameはborrow viewに置換し通常出口で親viewを戻す。保存済みAppSlotにはview pointerを残さない。
 - resumeはKEEPなら結果変更なし、YIELD=0、POLL=文字/-1、KBD=take、stdin=peekのみ。stdinはslot番号と引数を保存したままx86 EIPを2戻す。commit→poison abort検査→exec復元→restart→atomic resume。PPCはSRR0を4戻せる口だが今回は未実装。
 ```c
-/* include/kapi_call.h: redir_access.hをincludeしcaller_access完全型を使用 */
+/* sys/include/kapi_call.h: redir_access.hをincludeしcaller_access完全型を使用 */
 struct kapi_arg_source { const struct arch_syscall *call;
     struct caller_access caller; unsigned next; int caller_valid; }; /* 完全型。borrowは呼出中のみ */
 struct kapi_values { u32 value[KAPI_FIXED_MAX]; }; /* 検証済み論理値、wireでない */
@@ -78,7 +78,7 @@ int arch_kapi_read_block(struct kapi_arg_source *, unsigned first,
                          unsigned count, struct kapi_values *out);
 u32 arch_kapi_invoke(void *wrapper, const struct kapi_values *, unsigned count);
 int arch_kapi_va_next(struct kapi_arg_source *, enum kapi_value_kind, u32 *value);
-/* include/syscall_code.h: codeとstring scratch/LS shimの区間を別々に返す */
+/* sys/include/syscall_code.h: codeとstring scratch/LS shimの区間を別々に返す */
 struct syscall_layout { u32 stub_off, stub_stride, stub_count;
     u32 scratch_off, scratch_bytes, ls_off, ls_bytes, total_bytes; };
 int arch_syscall_layout(unsigned capacity, struct syscall_layout *);
@@ -88,14 +88,14 @@ void arch_syscall_publish(void *dst, u32 bytes); /* 全命令書込後、公開�
 - source初期化はnext=0/caller_valid=0。初回readで `caller_access_get_user(&src->caller)` を呼び、失敗をread失敗として返す。read_blockは固定分を一度だけ `copy_caller_bytes` で取得し、count上限・加算/乗算overflowを先に拒否。x86はESP+4+first*4の連続範囲、PPC後段はr3〜r10＋stackを同じ論理valuesへ集める。read_block成功時だけnext=first+count、va_next成功時だけnext++。va_nextだけ要求語を逐次取得し未使用語を先読みしない。
 - `KAPI_FIXED_MAX` はJSONの現在最大固定引数数から生成し、private LSの3語も収まることをassert。整数/ポインタの引数種別・数・ptrmaskは共通metadata、nativeの位置/slot幅はarch。未知のby-value aggregate/64bit/FPU型を生成器で拒否し、勝手に4Bと数えない。可変引数はkprintf専用処理へ。
 - `sdk/gen_kapi.py` はJSON検証・slot/public wrapper生成を維持し、同ファイル内 のx86サイズ計算を新 `sdk/kapi_abi_x86.py` へ分離。初回は既存kapi_argsize出力をbyte一致で保つ。次に内部 `kapi_call_generated.h`（種別/数）を追加生成。target選択は既存profile経由、PPC選択は未対応として明示拒否。
-- x86呼出実体は `arch/x86/kernel/kapi_call.c` から既存 `kapi_invoke` ASMへ。以下は最終形（D1は旧処理をarch adapterで維持、D2/D3/E3で順次置換）。resultはローカルu32とsetterを使い、wrapperのout検証を維持する。
+- x86呼出実体は `sys/arch/x86/kernel/kapi_call.c` から既存 `kapi_invoke` ASMへ。以下は最終形（D1は旧処理をarch adapterで維持、D2/D3/E3で順次置換）。resultはローカルu32とsetterを使い、wrapperのout検証を維持する。
 ```c
-/* arch/x86/kernel/syscall_entry.c: ASMが呼ぶ既存cdecl symbol */
+/* sys/arch/x86/kernel/syscall_entry.c: ASMが呼ぶ既存cdecl symbol */
 void __cdecl ring3_syscall_dispatch(u32 *native) {
     if (legacy_trap(native)) return; /* VM拡張frameはここで完結 */
     struct arch_syscall call = { native }; exec_syscall_dispatch(&call);
 }
-/* exec/exec_syscall.inc: 順序は現行56–174行に対応 */
+/* sys/kern/exec/exec_syscall.inc: 順序は現行56–174行に対応 */
 void exec_syscall_dispatch(struct arch_syscall *call) {
     u32 slot = arch_syscall_slot(call), result, wrapptr;
     struct arch_syscall *prev_frame = g_cur_frame;
@@ -139,12 +139,12 @@ result_ready:
 ```
 - D2のlegacy口は `int legacy_call_dispatch(u32 slot, void *fn, struct kapi_arg_source *src, unsigned count, u32 *result)` とする。providerは対象判定→既存busy/CUI/admit/mailbox/caller/pin→read_block→values処理→cleanup。先にvaluesを作るとbusy＋不正引数の結果が変わるため遅延取得し、旧raw/bytes口は撤去。strings adapterも対象判別後に一括取得、未対象0/失敗負/完了正を維持。
 - 切替を小さくするため旧raw経路を一時的にx86 adapterへ閉じ込め、strings/legacy/printを順にvalues/cursorへ接続し、最後にraw口を撤去。移行中もcommonはnative引数番地を解釈しない。
-- `kapi/kapi_strings.c` はvaluesを受け、文字列の範囲検証・コピー・解放を維持しarch invokeへ。`platform/pc98/legacy/v86_call.c` はpin→checked copy→呼出→cleanupの現契約を維持するadapter。`include/legacy_guest.h` のcall口もsourceからgate後に論理valuesを取得する形に同期し、none providerを追従。
+- `sys/kapi/kapi_strings.c` はvaluesを受け、文字列の範囲検証・コピー・解放を維持しarch invokeへ。`sys/platform/pc98/legacy/v86_call.c` はpin→checked copy→呼出→cleanupの現契約を維持するadapter。`sys/include/legacy_guest.h` のcall口もsourceからgate後に論理valuesを取得する形に同期し、none providerを追従。
 - `kapi_print` はfixed2引数（色/format）をread、formatをstageし、rendererが消費する型についてのみva_next。14引数上限・format1024・string4096・NULL%s・失敗時一文字も出さず全解放を維持。cursorはUSER境界、`kvprintf` のu32列は検証済み整数/ポインタ値の内部境界。builtin va_listをUSERメモリだとして直接使用しない。
-- stub backendは `arch/x86/kernel/syscall_code.c`。8B stub、予約stub、LS192B、現string scratch位置を同値で返す。全区間の重複/overflowと合計PAGE_SIZE以内を検査。x86 publishはno-op、PPC後段はD-cache writeback/I-cache invalidate/orderが必要な実装口。共通はemit成功→publish→USER table利用の順。
-- LS：`exec/ring3_ls.S`→`arch/x86/kernel/ring3_ls.S` に同命令列で移設。`exec/ring3_ls.c` をvalues(path,skip,out)で受ける。公開slot12のcallback拒否とprivate RING3_LS_CALLは維持。FSがunwindした後CPL3でcallback、nested listing/park/killでもkernel cursorを残さない。
+- stub backendは `sys/arch/x86/kernel/syscall_code.c`。8B stub、予約stub、LS192B、現string scratch位置を同値で返す。全区間の重複/overflowと合計PAGE_SIZE以内を検査。x86 publishはno-op、PPC後段はD-cache writeback/I-cache invalidate/orderが必要な実装口。共通はemit成功→publish→USER table利用の順。
+- LS：`exec/ring3_ls.S`→`sys/arch/x86/kernel/ring3_ls.S` に同命令列で移設。`sys/kern/exec/ring3_ls.c` をvalues(path,skip,out)で受ける。公開slot12のcallback拒否とprivate RING3_LS_CALLは維持。FSがunwindした後CPL3でcallback、nested listing/park/killでもkernel cursorを残さない。
 ```c
-/* include/ksetjmp.h: arch_jmp_storage.hは容量と整列だけを供給 */
+/* sys/include/ksetjmp.h: arch_jmp_storage.hは容量と整列だけを供給 */
 typedef struct { unsigned char opaque[ARCH_JMP_BYTES]; }
     __attribute__((aligned(ARCH_JMP_ALIGN))) k_jmpbuf[1];
 int exec_setjmp(k_jmpbuf);
@@ -152,7 +152,7 @@ void exec_longjmp(k_jmpbuf);          /* 常に1で着地。IFは復元しない
 void k_jmp_copy(k_jmpbuf dst, const k_jmpbuf src);
 ```
 - `KSETJMP_BUF_LEN` はBで撤去し全利用者をk_jmpbufへ変更。x86は32B/align4、JB_*オフセットと深さ2語をarchでassert。既存ASMを変更不要とする。AppSlot・V86 session・g_exit_jmpbufを型置換し、終了前コピーもhelperへ。共通に余分なPPC最大配列を置かず、PPCの容量は後段でABIのcallee-save＋IRQ/EXC深さから決める。returns_twice追加は今回混ぜず、既存volatile規則を保持。
-- A2：新 `sdk/include/os32/os32_callconv.h` を公開の唯一の属性定義口にし、i386は現cdecl、他targetは通常C ABIを表す（未対応targetのビルド拒否はprofile側）。CPU条件分岐はこの新しい口だけ。types.h/shared.hはこれをinclude、SDK単独GNU89でも使える。共通ABI_WORD_*は新 `include/abi.h`→`arch_abi.h` 固定名に移し、x86=word bytes4/align4/stack align16（WORD_BITS=32）。Aで`arch/ppc/arch_abi.h`も同定数（ABI_WORD_BYTES=4、ABI_WORD_BITS=32、ABI_WORD_ALIGN=4、ABI_STACK_ALIGN=16）を供給し「暫定・PPC実走禁止」と記す。ASM入口の定数も同値assert。
+- A2：新 `sdk/include/os32/os32_callconv.h` を公開の唯一の属性定義口にし、i386は現cdecl、他targetは通常C ABIを表す（未対応targetのビルド拒否はprofile側）。CPU条件分岐はこの新しい口だけ。types.h/shared.hはこれをinclude、SDK単独GNU89でも使える。共通ABI_WORD_*は新 `sys/include/abi.h`→`arch_abi.h` 固定名に移し、x86=word bytes4/align4/stack align16（WORD_BITS=32）。Aで`sys/arch/ppc/arch_abi.h`も同定数（ABI_WORD_BYTES=4、ABI_WORD_BITS=32、ABI_WORD_ALIGN=4、ABI_STACK_ALIGN=16）を供給し「暫定・PPC実走禁止」と記す。ASM入口の定数も同値assert。
 - shared.h自身は `gen_kapi.py` の書出先でない。shared.hのinclude編集と、生成宣言/metadata変更は区別し、生成物は必ず生成器から作る。PPC用のpublic宣言を手書き複製しない。
 ## 3. BSD の形との照合（ローカルのBSD実装だけを参照）
 - N=`/home/hight/os32-tmp/ref/netbsd`、O=`/home/hight/os32-tmp/ref/openbsd`、F=`/home/hight/os32-tmp/ref/freebsd`。
@@ -180,20 +180,20 @@ void k_jmp_copy(k_jmpbuf dst, const k_jmpbuf src);
 - 実装者は変更したkernel/R1と該当userlandをビルド、触った試験の--mutateとlint。PMのlandingはCI check/build、全mutationはfull-check。check-changedを回さない。この設計作業ではいずれも未実施。
 ## 5. ファイル別台帳と容量
 - 新規：`include/{abi.h,exec_arch.h,kapi_call.h,syscall_code.h}`=15/100/60/40行、`sdk/include/os32/os32_callconv.h`=20、`arch/x86/{arch_abi.h,arch_exec_storage.h,arch_jmp_storage.h}`=15/25/10。
-- 新規：`arch/x86/kernel/{exec_entry.c,exec_context.c,kapi_call.c,syscall_code.c}`=110/110/140/100、`arch/x86/kernel/syscall_entry.c`=40、`sdk/kapi_abi_x86.py`=40。移設：ring3_ls.S=94。新規`arch/ppc/arch_abi.h`=15行（A）。新内部生成 `include/kapi_call_generated.h` は関数数比例（数百行）。
+- 新規：`arch/x86/kernel/{exec_entry.c,exec_context.c,kapi_call.c,syscall_code.c}`=110/110/140/100、`sys/arch/x86/kernel/syscall_entry.c`=40、`sdk/kapi_abi_x86.py`=40。移設：ring3_ls.S=94。新規`sys/arch/ppc/arch_abi.h`=15行（A）。新内部生成 `sys/include/kapi_call_generated.h` は関数数比例（数百行）。
 - 変更：`include/{cpu.h,types.h,ksetjmp.h,kapi_print.h,legacy_guest.h}`=8/5/25/8/10、`sdk/include/os32/os32_kapi_shared.h`=5、`sdk/gen_kapi.py`=75。
 - 変更：`exec/{exec.c,appslot.h,exec_launch.inc,exec_syscall.inc,exec_schedule.inc,exec_stdin.inc,exec_finish.inc,exec_tramp_init.inc,ring3_str.h,ring3_ls.c}`=40/15/90/110/30/4/10/45/20/20。
-- 変更：`kapi/{kapi_print.c,kapi_strings.c}`=35/35、`arch/x86/legacy/{v86_mem.h,v86_call.c,guest.c}`=4/25/10、`platform/none/legacy_guest.c`=10。`arch/x86/kernel/{ring3_entry.asm,setjmp.asm}`は必要な型/定数コメント・入口symbol接続各0〜10、命令は極力維持。
+- 変更：`kapi/{kapi_print.c,kapi_strings.c}`=35/35、`arch/x86/legacy/{v86_mem.h,v86_call.c,guest.c}`=4/25/10、`sys/platform/none/legacy_guest.c`=10。`arch/x86/kernel/{ring3_entry.asm,setjmp.asm}`は必要な型/定数コメント・入口symbol接続各0〜10、命令は極力維持。
 - 変更：`build/kernel.mk`=5〜10（D0で生成規則の前提にsdk/kapi_abi_x86.py、D1で新生成物を列挙、E1でcleanのshim objectパスを移設先へ）。
 - 変更：`build/arch/x86-sources.mk,build/sources/order.mk,build/kernel-objects.mk` 各5〜15（通常/R1 GASに同じinclude選択）、`tools/tests/fixtures/build_profile_x86.json`10、`arch/README.md`20、正典exec/KAPI文書各20。新host providerのヘッダ/関数を `tools/tests/host_arch/` に追加（約100）。
-- `exec/ring3_ls.c` は現在 `build/arch/x86-sources.mk` のC_ARCHに入る。E3で共通所有へ移し、GASだけをx86に残す（共通ソース所有リストも約5行追従）。RING3_LS_CALLの値は変えない。新backendをsource listだけに置いて未リンクのまま閉じない。
-- E2：`KAPI_STUB_SIZE/RING3_USTR_STUB_OFF/RING3_USTR_OFF/RING3_USTR_CAP/RING3_LS_SHIM_OFF`はコンパイル時マクロを維持。layoutは同マクロから構成し区間・定数をSTATIC_ASSERT、hostで返値との一致を検証。`kdebug/selftest_exec.c`・kcallback/ring3_str hostのbyte観測を維持。LS宣言は`exec/ring3_ls.h`に残すので`kdebug_imports.def:2479–2490`のsource/slotは不変。
-- A受入：selected 89 TUの実.dを採取し、特にexec/ring3_str.c・mm/paging.cからarch_abi.hへ到達すること、jmp/exec storageへ到達しないことを確認。到達すればAで最小PPC容量/整列providerを追加（実走禁止、実装を装うstubは禁止）。起草環境に既存.dはなく未検証。
+- `sys/kern/exec/ring3_ls.c` は現在 `build/arch/x86-sources.mk` のC_ARCHに入る。E3で共通所有へ移し、GASだけをx86に残す（共通ソース所有リストも約5行追従）。RING3_LS_CALLの値は変えない。新backendをsource listだけに置いて未リンクのまま閉じない。
+- E2：`KAPI_STUB_SIZE/RING3_USTR_STUB_OFF/RING3_USTR_OFF/RING3_USTR_CAP/RING3_LS_SHIM_OFF`はコンパイル時マクロを維持。layoutは同マクロから構成し区間・定数をSTATIC_ASSERT、hostで返値との一致を検証。`sys/arch/x86/kdebug/selftest_exec.c`・kcallback/ring3_str hostのbyte観測を維持。LS宣言は`sys/kern/exec/ring3_ls.h`に残すので`kdebug_imports.def:2479–2490`のsource/slotは不変。
+- A受入：selected 89 TUの実.dを採取し、特にsys/kern/exec/ring3_str.c・sys/kern/mm/paging.cからarch_abi.hへ到達すること、jmp/exec storageへ到達しないことを確認。到達すればAで最小PPC容量/整列providerを追加（実走禁止、実装を装うstubは禁止）。起草環境に既存.dはなく未検証。
 - 新x86 C/GASは全てarch/x86/kernel/に置き、tools/source_roots.pyのp2v/arm_compile走査内。SCAN_ROOTS追加なし。
 - 製品ソースは概ね1,300〜1,800変更行（元の600〜1,400見積りより周辺adapter分が増える）。試験追従/新試験は計700〜1,300行別枠、生成物行数も別枠。必要以上の全テスト書換えはしない。
 - kernel常駐textは増分0〜4KiB、metadata/一時storageは0〜2KiBを予算とする（未計測）。opaque user/jmp/privはx86で現52/32/4Bを保持、追加entry/values stackは各128B以内を目安にframe sizeを測る。heap allocation/parkごとの割当は増やさない。
 - 通常/R1ともlink mapのresident end・BSS・SHM基点、圧縮kernelとFD空き量を段ごと比較。R1のimageも変わり、起動FDの内容/圧縮サイズに影響するがloader/FD配置の変更は設計しない。stub pageは既存1ページ・LS192Bを厳守。溢れたら黙って容量/ABIを変えず段を止める。
-- known21組：GUI→IME3、sys→geforce1、init/kernel→17。exec由来の組は現在ゼロ。platform/pc98/kernel.cのidt（gdt間接）2組はinclude整理候補だが本段の契約切替には不要なので削減目標0、残21とする。double_fault/PC98boot/各module/IMEは後段。selected TUを除外して成功にしない。
+- known21組：GUI→IME3、sys→geforce1、init/kernel→17。exec由来の組は現在ゼロ。sys/platform/pc98/kernel.cのidt（gdt間接）2組はinclude整理候補だが本段の契約切替には不要なので削減目標0、残21とする。double_fault/PC98boot/各module/IMEは後段。selected TUを除外して成功にしない。
 - Fで `tools/ppc/check_compile.py --source-profile selected --accept --json` と実.dを記録し、実際に消えた組だけknownから減らす。新たにコンパイル可能になったexecの依存も記録。PPC provider未実装の失敗を隠す空実装は作らない。本体build/起動/ユーザ実行の到達点は別管理。
 ## 6. 受入 → host/NP21/W → 変異（各項一行）
 |項目|観測/試験|代表変異（hostでruntime RED、guestは通常像で確認）|
@@ -264,8 +264,8 @@ void k_jmp_copy(k_jmpbuf dst, const k_jmpbuf src);
 - 反論 R4（分類のみ）：multiapp_impl_host.cはg_cur_frameの自前定義ではなくAppSlot.frameのAPP_FRAME_EAX操作（329等）。legacy_callers_host.cはKSETJMP_BUF_LENでなく5語配列。いずれもB/C1追従対象に残す。
 
 ## 確定 (2026-11-08、Opus 5.5 第 2 回の条件付き可を PM が反映)
-- N1：g_cur_frame の定義はヘッダに置かず exec/exec.c の static とする (§2 の断片の注記を直した)。
+- N1：g_cur_frame の定義はヘッダに置かず sys/kern/exec/exec.c の static とする (§2 の断片の注記を直した)。
 - N2：引数域が写っていないときは copy の失敗で FAULT kill、PF のログは出ない。今との差として H7 の注記に記録。
 - N3：host の偽物の ring3_fault_kill は戻ってくるので、LS と read_block が失敗した後の経路で `result = OS32_ERR_INVAL` を入れる (C host を追従する担当への注記、D1/D2)。
 - 反論 R3 (件数)・R4 (分類) はレビュアーが妥当と認めた。追従の対象は変わらない。
-- PM 決定 (REVIEW.r1 末尾)：R12 (syscall5 は予約 slot 範囲の意)、R5 (arch/ppc/arch_abi.h を A で足す)、R6 (x86 実装は arch/x86/kernel/)、R8 (コンパイル時マクロを残す)。
+- PM 決定 (REVIEW.r1 末尾)：R12 (syscall5 は予約 slot 範囲の意)、R5 (sys/arch/ppc/arch_abi.h を A で足す)、R6 (x86 実装は arch/x86/kernel/)、R8 (コンパイル時マクロを残す)。

@@ -8,23 +8,23 @@ from kernel_includes import include_flags
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-PATHS = ['include/bootinfo.h', 'platform/pc98/bootinfo_wire.h',
-         'platform/pc98/bootinfo_native.h', 'platform/pc98/bootinfo_capture.c',
-         'platform/pc98/bootinfo_check.c', 'platform/pc98/bios_snapshot.c',
-         'platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c',
-         'platform/powermac/boot_capture.c', 'init/bootinfo.c']
-CHECK = dict(name='boot-readers-host', tier=1, covers=['platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c',
-         'kernel/module/module_image.c', 'kernel/module/module_image.h',
-         'kernel/module/module_schema.h', 'tools/module_schema.py',
-         'tools/gen_module_schema.py', 'include/bootinfo.h', 'platform/pc98/bootinfo_wire.h',
-         'platform/pc98/bootinfo_native.h', 'platform/pc98/bootinfo_capture.c',
-         'platform/pc98/bootinfo_check.c', 'platform/pc98/bios_snapshot.c',
-         'platform/pc98/bios_snapshot.h', 'platform/pc98/boot_capture.c',
-         'platform/powermac/boot_capture.c', 'platform/powermac/platform_kboot_layout.h', 'init/bootinfo.c',
+PATHS = ['sys/include/bootinfo.h', 'sys/platform/pc98/bootinfo_wire.h',
+         'sys/platform/pc98/bootinfo_native.h', 'sys/platform/pc98/bootinfo_capture.c',
+         'sys/platform/pc98/bootinfo_check.c', 'sys/platform/pc98/bios_snapshot.c',
+         'sys/platform/pc98/bios_snapshot.h', 'sys/platform/pc98/boot_capture.c',
+         'sys/platform/powermac/boot_capture.c', 'sys/kern/init/bootinfo.c']
+CHECK = dict(name='boot-readers-host', tier=1, covers=['sys/platform/pc98/module_pair.c', 'sys/include/platform_module_pair.h', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c',
+         'sys/kern/module/module_image.c', 'sys/kern/module/module_image.h',
+         'sys/kern/module/module_schema.h', 'tools/module_schema.py',
+         'tools/gen_module_schema.py', 'sys/include/bootinfo.h', 'sys/platform/pc98/bootinfo_wire.h',
+         'sys/platform/pc98/bootinfo_native.h', 'sys/platform/pc98/bootinfo_capture.c',
+         'sys/platform/pc98/bootinfo_check.c', 'sys/platform/pc98/bios_snapshot.c',
+         'sys/platform/pc98/bios_snapshot.h', 'sys/platform/pc98/boot_capture.c',
+         'sys/platform/powermac/boot_capture.c', 'sys/platform/powermac/platform_kboot_layout.h', 'sys/kern/init/bootinfo.c',
     'tools/tests/test_boot_readers.py', 'tools/tests/host32.py',
-    'tools/tests/kernel_includes.py', 'include/platform_boot.h',
-    'include/memmap.h', 'include/types.h', 'include/build_id.h',
-    'init/boot_disk.h', 'mm/paging.h', 'lib/kstring.h', 'lib/le_internal.h',
+    'tools/tests/kernel_includes.py', 'sys/include/platform_boot.h',
+    'sys/include/memmap.h', 'sys/include/types.h', 'sys/include/build_id.h',
+    'sys/kern/init/boot_disk.h', 'sys/kern/mm/paging.h', 'sys/kern/kstring.h', 'lib/le_internal.h',
     'sdk/include/os32/**'], needs=[], budget=3.2,
     basis=['AC-BOOT-1'],
 )
@@ -85,14 +85,14 @@ void _start(void) { int rc=test(); __asm__ volatile("int $0x80"::"a"(1),"b"(rc ?
 def run_case(mutation=None, none=False, bad_image=False, pair_probe=False):
     with tempfile.TemporaryDirectory(prefix='boot-readers-') as td:
         tmp=Path(td)
-        paths=['init/bootinfo.c']
+        paths=['sys/kern/init/bootinfo.c']
         if none:
-            paths+=['platform/powermac/boot_capture.c']
+            paths+=['sys/platform/powermac/boot_capture.c']
             body=BODY[BODY.index('void _start'):]
             body='__asm__(".globl __kernel_image_start\\n.set __kernel_image_start, 0x100000\\n.globl __kernel_file_end\\n.set __kernel_file_end, 0x170000\\n");\nstatic int test(void) { const struct boot_common value={1,2,3}; boot_common_set(&value,1); platform_boot_capture(); REQUIRE(!boot_common_get()->image_valid && !boot_common_get()->image_crc && boot_common_get()->image_size==0x70000); return 0; }\n'+body
         else:
-            paths+=['platform/pc98/module_pair.c','platform/pc98/bootinfo_check.c','platform/pc98/bootinfo_capture.c',
-                    'platform/pc98/bios_snapshot.c','platform/pc98/boot_capture.c']
+            paths+=['sys/platform/pc98/module_pair.c','sys/platform/pc98/bootinfo_check.c','sys/platform/pc98/bootinfo_capture.c',
+                    'sys/platform/pc98/bios_snapshot.c','sys/platform/pc98/boot_capture.c']
             body=BODY
         if bad_image:
             body=body.replace('    platform_boot_capture();', '    boot_wire[BI_OFF_IMG_CHECK] ^= 1;\n    platform_boot_capture();', 1)
@@ -113,10 +113,10 @@ def run_case(mutation=None, none=False, bad_image=False, pair_probe=False):
                 assert text.count(old)==1, old
                 text=text.replace(old,new)
             # Quoted relative includes resolve against the source file, not this fixture.
-            text=text.replace('"../../init/boot_disk.h"','"init/boot_disk.h"').replace('"../../mm/paging.h"','"mm/paging.h"')
-            if rel=='platform/pc98/bootinfo_capture.c':
+            text=text.replace('"../../sys/kern/init/boot_disk.h"','"sys/kern/init/boot_disk.h"').replace('"../../sys/kern/mm/paging.h"','"sys/kern/mm/paging.h"')
+            if rel=='sys/platform/pc98/bootinfo_capture.c':
                 source+='#define bootinfo_capture capture_impl\n'+text+'\n#undef bootinfo_capture\nvoid bootinfo_capture(void) { capture_sequence=capture_sequence*10+1; capture_impl(); }\n'
-            elif rel=='platform/pc98/bios_snapshot.c':
+            elif rel=='sys/platform/pc98/bios_snapshot.c':
                 source+='#define v86_bios_save_real save_impl\n'+text+'\n#undef v86_bios_save_real\nvoid v86_bios_save_real(void) { capture_sequence=capture_sequence*10+2; save_impl(); }\n'
             else:
                 source+=text+'\n'
@@ -159,13 +159,13 @@ def main():
     print('GREEN native image/ABI, immutable page0, capture order, feature-off and none')
     if '--mutate' in sys.argv:
         mutations=[
-            ('platform/pc98/module_pair.c', '*out = boot->image_crc;', '*out = 0;'),
-            ('platform/pc98/module_pair.c', 'if (!boot->image_valid) return 0;',
+            ('sys/platform/pc98/module_pair.c', '*out = boot->image_crc;', '*out = 0;'),
+            ('sys/platform/pc98/module_pair.c', 'if (!boot->image_valid) return 0;',
              'if (!boot->image_valid) { *out = 0; return 0; }'),
-            ('platform/pc98/bootinfo_check.c', 'out->magic = le_read32(raw + BI_OFF_MAGIC);', 'out->magic = __builtin_bswap32(le_read32(raw + BI_OFF_MAGIC));'),
-            ('platform/pc98/bootinfo_check.c', 'le_read32(raw + BI_OFF_IMG_CHECK) == BOOTINFO_IMG_CHECK_OF(crc, size)', '1'),
-            ('platform/pc98/boot_capture.c', '    bootinfo_capture();\n    v86_bios_save_real();', '    v86_bios_save_real();\n    bootinfo_capture();'),
-            ('platform/pc98/boot_capture.c', '    v86_bios_save_real();', '    /* optional guest disabled */'),
+            ('sys/platform/pc98/bootinfo_check.c', 'out->magic = le_read32(raw + BI_OFF_MAGIC);', 'out->magic = __builtin_bswap32(le_read32(raw + BI_OFF_MAGIC));'),
+            ('sys/platform/pc98/bootinfo_check.c', 'le_read32(raw + BI_OFF_IMG_CHECK) == BOOTINFO_IMG_CHECK_OF(crc, size)', '1'),
+            ('sys/platform/pc98/boot_capture.c', '    bootinfo_capture();\n    v86_bios_save_real();', '    v86_bios_save_real();\n    bootinfo_capture();'),
+            ('sys/platform/pc98/boot_capture.c', '    v86_bios_save_real();', '    /* optional guest disabled */'),
         ]
         for m in mutations:
             assert run_case(m, bad_image='IMG_CHECK' in m[1] or '!boot->image_valid' in m[1])==1, m

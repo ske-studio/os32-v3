@@ -27,20 +27,20 @@ REVIEW.r1 の末尾の PM 決定 4 つ (U1 = GMAC の root・窓が無ければ�
 
 | 依頼 | 実物 (file:line) | 判定 |
 |---|---|---|
-| 1 選択 | `build/features/pc98-devices.mk` が `drivers/pci/pci.c pci_barsize.c pci_hwb.c pci_decode.c pci_bind.c pci_bind_match.c` を選ぶ。`build/select.mk` で x86-pc98 以外は `$(error)` | 一致 (ただし E1) |
-| 2 転送 | `platform/pc98/device_pci.c` に 4 本。宣言は `include/platform_device.h`。KAPI の出口は `kapi/kapi_generated.c` (3 本) と `kapi/kapi_sys.c` の `kapi_pci_bind_info` (4 本目を :201 で呼ぶ) | 一致 (E2・E3) |
-| 3 走査 | 表示 `drivers/pci/pci.c` `"[pci] mech#1 absent"`・`:192` `"[pci] mech#1 ok"`。起点 `:194` `pci_scan_bus(0, 0)` (probe は `:186`)。後端の口は `include/pci_config_contract.h` の 4 本 | 一致 |
+| 1 選択 | `sys/conf/features/pc98-devices.mk` が `sys/dev/pci/pci.c pci_barsize.c pci_hwb.c pci_decode.c pci_bind.c pci_bind_match.c` を選ぶ。`build/select.mk` で x86-pc98 以外は `$(error)` | 一致 (ただし E1) |
+| 2 転送 | `platform/pc98/device_pci.c` に 4 本。宣言は `sys/include/platform_device.h`。KAPI の出口は `sys/kapi/kapi_generated.c` (3 本) と `sys/kapi/kapi_sys.c` の `kapi_pci_bind_info` (4 本目を :201 で呼ぶ) | 一致 (E2・E3) |
+| 3 走査 | 表示 `sys/dev/pci/pci.c` `"[pci] mech#1 absent"`・`:192` `"[pci] mech#1 ok"`。起点 `:194` `pci_scan_bus(0, 0)` (probe は `:186`)。後端の口は `sys/include/pci_config_contract.h` の 4 本 | 一致 |
 
 食い違い (8 件):
 
 - **E1** 本体は 2 ファイルでなく 5 ファイル。`pci.c` が `pci_barsize.c` を、`pci_bind.c` が `pci_bind_one`・`:98` が `pci_bind_info_compose` (どちらも `pci_bind_match.c`) を要る。`pci_decode.c` は `pci.c` が直に使う (`pci_extract8/16`・`pci_header_layout`・`pci_bar_kind` 等)。ほかの 3 本は `pci.h` 経由で読める形で、直の利用は数えていない。
 - **E2** KAPI が直に呼ぶ転送は 3 本。`pci_bind_info` の target は `kapi_pci_bind_info` (`sdk/kapi.json`) で、転送の 4 本目はその中から呼ばれる。
-- **E3** `kapi/kapi_sys.c`・`kapi/kapi_generated.c` は `C_COMMON_PC98_PENDING` (`build/sources/common.mk`) で、PowerPC の像に入っていない。PowerPC は別に生成したラッパー (`build/targets/ppc-powermac.mk`、`gen_kapi.py --target ppc-powermac`) をリンクし、`sdk/kapi_target_ppc.py` の `PROVIDER_GROUPS['pci']` で 4 スロットが不在の答え (`pci_count` は 0 (`:206`)、ほかは `OS32_ERR_NOSYS`) になっている。診断を kapi_sys.c に残すと PowerPC で出せない。
-- **E4** `platform/powermac/pci_config.c` は既に在るが、口は `pm_pci_read32(struct pm_pci *, bdf, reg, u32 *value)`・`pm_pci_write32(…, u32 value)` (`lan_boot.h`) で契約の 4 本ではない。`address()` は `bdf == p->target_bdf` を要り、GMAC の quiesce (`:86-126`) も同居。probe・write16 は無い。
+- **E3** `sys/kapi/kapi_sys.c`・`sys/kapi/kapi_generated.c` は `C_COMMON_PC98_PENDING` (`build/sources/common.mk`) で、PowerPC の像に入っていない。PowerPC は別に生成したラッパー (`build/targets/ppc-powermac.mk`、`gen_kapi.py --target ppc-powermac`) をリンクし、`sdk/kapi_target_ppc.py` の `PROVIDER_GROUPS['pci']` で 4 スロットが不在の答え (`pci_count` は 0 (`:206`)、ほかは `OS32_ERR_NOSYS`) になっている。診断を kapi_sys.c に残すと PowerPC で出せない。
+- **E4** `sys/platform/powermac/pci_config.c` は既に在るが、口は `pm_pci_read32(struct pm_pci *, bdf, reg, u32 *value)`・`pm_pci_write32(…, u32 value)` (`lan_boot.h`) で契約の 4 本ではない。`address()` は `bdf == p->target_bdf` を要り、GMAC の quiesce (`:86-126`) も同居。probe・write16 は無い。
 - **E5** PowerPC の設定空間の窓は 2 つ別に在る: GMAC 用 (`kernel_boot.c`、`gmac.root_pa`、起動時から `PPC_BOOT_PCI_ADDR_VA`) と USB 用 (`usb_boot.c`、`pm_usb_roots[]`、`PPC_BOOT_USB_VA`)。**2 つが同じ root かはコードが保証していない**。PM 決定の「GMAC・USB の載る 1 ドメイン」は実行時に確かめる物 (PM 決定 U1: 既定 = GMAC の root)。
-- **E6** `pci_bind_all` の呼び手は LAN 部品 `drivers/net/e82557/lan_module.c` だけ。PowerPC には呼び手が無く、そのままでは台帳が空で `pci_bind_info` は全 idx で失敗する。
-- **E7** `drivers/pci/pci_hwb.c` が mech1 の probe と取引を `io.h` で直に持つ (kdebug 用)。6d-i の後端と同じ手続きの 2 つ目が x86 に残っている。この段では動かさない (記録だけ、§6 の「動かさない物」)。
-- **E8** `pci.h` を読む上位装置は ne2k の PCI 版・OHCI・EHCI には無い (USB は `include/usb_platform.h` の口)。**直に include する**のは 17 ファイル (e82557 1 = `e82557_eeprom.h`・Trident 1・GeForce 2・hwdev/gf 5・kdebug 5・platform/pc98 3)。集計の範囲: 製品の木の `.c`・`.h` で `pci.h` を直に include する物。生成物 (`hwdev/generated/`・`kdebug/generated/`)・`drivers/pci/` の内部・`tools/` は除く。ヘッダ越しの間接は数えていない。全部 x86 だけの部品・機種の物。
+- **E6** `pci_bind_all` の呼び手は LAN 部品 `sys/dev/net/e82557/lan_module.c` だけ。PowerPC には呼び手が無く、そのままでは台帳が空で `pci_bind_info` は全 idx で失敗する。
+- **E7** `sys/dev/pci/pci_hwb.c` が mech1 の probe と取引を `io.h` で直に持つ (kdebug 用)。6d-i の後端と同じ手続きの 2 つ目が x86 に残っている。この段では動かさない (記録だけ、§6 の「動かさない物」)。
+- **E8** `pci.h` を読む上位装置は ne2k の PCI 版・OHCI・EHCI には無い (USB は `sys/include/usb_platform.h` の口)。**直に include する**のは 17 ファイル (e82557 1 = `e82557_eeprom.h`・Trident 1・GeForce 2・hwdev/gf 5・kdebug 5・platform/pc98 3)。集計の範囲: 製品の木の `.c`・`.h` で `pci.h` を直に include する物。生成物 (`hwdev/generated/`・`kdebug/generated/`)・`drivers/pci/` の内部・`tools/` は除く。ヘッダ越しの間接は数えていない。全部 x86 だけの部品・機種の物。
 
 統合の判断 3 点 (POLICY_DEV §1):
 
@@ -61,10 +61,10 @@ REVIEW.r1 の末尾の PM 決定 4 つ (U1 = GMAC の root・窓が無ければ�
 
 | 像 | 根拠 | 本体 5 + 転送 | 後端 |
 |---|---|---|---|
-| x86 通常 | `build/images/pc98.mk` EXEC=1 | ○ (今と同じ集合) | `platform/pc98/pci_config.c` |
+| x86 通常 | `sys/conf/images/pc98.mk` EXEC=1 | ○ (今と同じ集合) | `sys/platform/pc98/pci_config.c` |
 | x86 r1 | `build/kernel-objects.mk` が `C_KERNEL` を継ぐ | ○ (同じ) | 同上 |
 | x86 FD・MINIMAL | `build/image.mk` が通常の `vmkernel.lz4` を梱包 | ○ (通常と同じ物) | 同上 |
-| PPC kboot-sh / link-sh / shell | `build/images/kboot-*.mk:5` EXEC=1 | ○ | 新 `platform/powermac/pci_backend.c` (`C_PLATFORM_EXEC`) |
+| PPC kboot-sh / link-sh / shell | `build/images/kboot-*.mk:5` EXEC=1 | ○ | 新 `sys/platform/powermac/pci_backend.c` (`C_PLATFORM_EXEC`) |
 | PPC kboot-core / link | EXEC=0 | × | × (`pm_pci_boot` の空の対を `C_PLATFORM_NOEXEC` に。既存の `pci_config.c` は CORE のまま) |
 
 `pci.c`・`pci_bind.c` が今頼っている物と切り方:
@@ -72,19 +72,19 @@ REVIEW.r1 の末尾の PM 決定 4 つ (U1 = GMAC の root・窓が無ければ�
 | 頼り先 | 所 | 切り方 |
 |---|---|---|
 | `pci_config_contract.h` | `pci.c` | そのまま (口を 3 本足す、§3) |
-| `kprintf.h`・`ATTR_*`・`KLOG_ATTR` | `pci.c`、`pci_bind.c` | 共通 (`lib/kprintf.c` は CORE)。切らない |
-| `io.h` の `irq_save/irq_restore` | `pci_barsize.c` | `arch/ppc/arch_io.h` に実装が在る。切らない (PowerPC では測定を呼ばないので走らない) |
+| `kprintf.h`・`ATTR_*`・`KLOG_ATTR` | `pci.c`、`pci_bind.c` | 共通 (`sys/kern/kprintf.c` は CORE)。切らない |
+| `io.h` の `irq_save/irq_restore` | `pci_barsize.c` | `sys/arch/ppc/arch_io.h` に実装が在る。切らない (PowerPC では測定を呼ばないので走らない) |
 | `os32_kapi_shared.h` (`OS32_ERR_*`) | `pci.h` | 共通。切らない |
 | 線の様子の hook | `pci_bind_match.c` | hook が無ければ `PCI_LINE_OK`。PowerPC は登録しない |
 | `-Idrivers/pci` | `pc98-devices.mk` の `INCLUDE_FEATURES` | 本体は同じ場所のヘッダを `"..."` で読むので要らない。共通の転送は `include/` だけ読む |
-| mech1 の番地 (`PCI_CFG_ADDR_PORT` 等) | `pci_decode.h` | 本体は使わない (使うのは `platform/pc98/pci_config.c` と `pci_hwb.c`)。定数の移動は別段 |
+| mech1 の番地 (`PCI_CFG_ADDR_PORT` 等) | `pci_decode.h` | 本体は使わない (使うのは `sys/platform/pc98/pci_config.c` と `pci_hwb.c`)。定数の移動は別段 |
 | PC-98 の物 | — | **本体 5 ファイルに PC-98 のヘッダは無い** (`pci.h` 冒頭の説明文だけが PC-98 と mech#1 を名指し → 文言を直す) |
 
-x86 に残す物: `pci_hwb.c` (mech1 直叩き)・`pci_locate.c` (部品側)・`platform/pc98/pci_resources.c` (台帳への取り込み)。
+x86 に残す物: `pci_hwb.c` (mech1 直叩き)・`pci_locate.c` (部品側)・`sys/platform/pc98/pci_resources.c` (台帳への取り込み)。
 
 ## 3. 口の形
 
-`include/pci_config_contract.h` に足す 3 本と、既存の説明の直し:
+`sys/include/pci_config_contract.h` に足す 3 本と、既存の説明の直し:
 
 ```c
 /* 後端の名前。起動行に出す NUL 終端の定数文字列 (空・NULL は不可)。 */
@@ -99,7 +99,7 @@ int pci_config_bar_measure(void);
  * write16: **Command (04h) 専用**。今の呼び手は全部 Command。ほかの reg の結果は後端次第。 */
 ```
 
-`drivers/pci/pci.c` の変更 (4 か所):
+`sys/dev/pci/pci.c` の変更 (4 か所):
 
 ```c
 if (pci_config_bar_measure())                                   /* :85 */
@@ -112,11 +112,11 @@ for (i = 0; i < PCI_CONFIG_MAX_ROOTS && pci_config_root_bus(i, &bus) == 0; i++)
 
 | 後端 | name | root_bus | bar_measure | 取引 |
 |---|---|---|---|---|
-| PC-98 `platform/pc98/pci_config.c` | `"mech#1"` | idx 0 → bus 0、ほかは -1 | 1 | 今のまま |
-| PowerMac `platform/powermac/pci_backend.c` (新) | `"uni-north"` | idx 0 → 既定ドメインの `bus_first`、ほかは -1 | 0 | 下の規則で `pm_pci_read32/write32` を呼ぶ (取引は写さない) |
+| PC-98 `sys/platform/pc98/pci_config.c` | `"mech#1"` | idx 0 → bus 0、ほかは -1 | 1 | 今のまま |
+| PowerMac `sys/platform/powermac/pci_backend.c` (新) | `"uni-north"` | idx 0 → 既定ドメインの `bus_first`、ほかは -1 | 0 | 下の規則で `pm_pci_read32/write32` を呼ぶ (取引は写さない) |
 
 - **x86 の表示と測定は変わらない** (`"mech#1"` が後端から来る、`bar_measure` は 1)。NP21/W の受入の台本の文字列も変えない。
-- PowerPC の後端の入力: 機種の口 `void pm_pci_boot(const struct pm_pci *window, u32 probe_bdf);` (宣言は `platform/powermac/lan_boot.h`)。`ppc_kernel.c` の `if (dev->gmac_ready)` の中、early quiesce の直後に、同じ `pci` (`pci_addr_va`・`pci_data_va`・`lan_boot.bus_first/bus_last`) と `lan_boot.bdf` を渡して呼ぶ。後端は static に 1 組だけ写す。EXEC の無い像は `C_PLATFORM_NOEXEC` の空の `pm_pci_boot` (既存の `host_unavailable.c` と同じ作法)。
+- PowerPC の後端の入力: 機種の口 `void pm_pci_boot(const struct pm_pci *window, u32 probe_bdf);` (宣言は `sys/platform/powermac/lan_boot.h`)。`ppc_kernel.c` の `if (dev->gmac_ready)` の中、early quiesce の直後に、同じ `pci` (`pci_addr_va`・`pci_data_va`・`lan_boot.bus_first/bus_last`) と `lan_boot.bdf` を渡して呼ぶ。後端は static に 1 組だけ写す。EXEC の無い像は `C_PLATFORM_NOEXEC` の空の `pm_pci_boot` (既存の `host_unavailable.c` と同じ作法)。
 - 窓なし (`gmac_ready == 0`: GMAC の BAR か 3 つの alias のどれかが立たなかった、`kernel_boot.c`) → `pm_pci_boot` が呼ばれない → `pci_config_probe()` は 0 → `[pci] uni-north absent`、台数 0 (PM 決定 U1)。
 - probe: 窓が在り、`probe_bdf` の ID の読みが成功して `0xFFFFFFFF` でないこと。
 - BDF の組み立てと範囲: `bus > 255 || dev > 31 || fn > 7 || reg > 255` は読みが `U32_MAX`・書きは何もしない。`bdf = bus<<16 | dev<<11 | fn<<8`、`p.target_bdf = bdf`、`pm_pci_read32(&p, bdf, reg & ~3u, &v)`。`pm_pci_read32` の失敗 (`bus_first..bus_last` の外、root bus の dev < 11、`pci_config.c`) は `U32_MAX` (不在と同じ)。走査の `sec > bus` の規則と合わせて必ず終わる。
@@ -135,13 +135,13 @@ for (i = 0; i < PCI_CONFIG_MAX_ROOTS && pci_config_root_bus(i, &bus) == 0; i++)
 
 | 物 | 今 | 先 | 読むヘッダ |
 |---|---|---|---|
-| `platform_pci_count/get/cfg_read32/bind_info_get` | `platform/pc98/device_pci.c` | **`kernel/dev/device_pci.c`** (新、純移動) | `platform_device.h`・`pci_contract.h` (新)・`pci_bind_contract.h` |
-| `kapi_pci_bind_info` | `kapi/kapi_sys.c` | 同じ `kernel/dev/device_pci.c` (純移動、説明文ごと) | `user_read_contract.h`・`exec/exec.h` (`ring3_user_ranges_writable`・`ring3_fault_kill`) |
+| `platform_pci_count/get/cfg_read32/bind_info_get` | `platform/pc98/device_pci.c` | **`sys/dev/pci/device_pci.c`** (新、純移動) | `platform_device.h`・`pci_contract.h` (新)・`pci_bind_contract.h` |
+| `kapi_pci_bind_info` | `sys/kapi/kapi_sys.c` | 同じ `sys/dev/pci/device_pci.c` (純移動、説明文ごと) | `user_read_contract.h`・`sys/kern/exec/exec.h` (`ring3_user_ranges_writable`・`ring3_fault_kill`) |
 
-- 共通が装置の宣言を読むための契約 (check_layers R3): 新 `include/pci_contract.h` に `pci_count`・`pci_get`・`pci_cfg_read32`・`pci_init` を、既存 `include/pci_bind_contract.h` に `pci_bind_info_get`・`pci_bind_all` を移す。`drivers/pci/pci.h`・`pci_bind.h` は契約を include し、同じ宣言を消す (宣言は 1 か所)。`pci_find`・`pci_bar_get`・`pci_cfg_write*` は `pci.h` に残す。
-- **import の定義 (M2 に含める)**: 生成器 (`tools/gen_hwdev_contract.py`) は `.def` に書いた出所のヘッダを直に読むので、宣言を移すと旧ヘッダの指定で失敗する。`kernel/module/kdebug_imports.def` の `pci_get`・`pci_cfg_read32` (:1939 付近) と `hwdev/hwdev_imports.def` の `pci_cfg_read32` (:222 付近) の出所を `include/pci_contract.h` に直し、**スロットの番号と型を保って**再生成する。生成物の差は出所の欄だけであることを M2 の完了条件にする。`pci_find`・`pci_bar_get`・`pci_hwb_*` の定義は触らない。
-- PowerPC の結線 (段 P3): `sdk/kapi_target_ppc.py` の `PROVIDER_GROUPS['pci']` (:94-99) と `ZERO_SLOTS` の `pci_count` (:206) を外し、同時に `PROVIDER_EXTERNS` (:6-11) へ `extern int kapi_pci_bind_info(u32 idx, void *out);` を足す。`arch/ppc/exec_kapi.c` は手で触らない。`$(KB_GEN)/stamp` の経路で生成し直し、EXEC の 3 像 (sh・link-sh・shell) を全部リンクする。
-- 出力の保護 (`ring3_user_range_ok` は `include/user_read_contract.h`、`ring3_user_ranges_writable`・`ring3_fault_kill` は `exec/exec.h`) は、40 B の `pci_get` と 8 B の `pci_bind_info` のそれぞれを PowerPC のゲストで確かめる (A9)。働かなければ P3 で止めて戻す。
+- 共通が装置の宣言を読むための契約 (check_layers R3): 新 `sys/include/pci_contract.h` に `pci_count`・`pci_get`・`pci_cfg_read32`・`pci_init` を、既存 `sys/include/pci_bind_contract.h` に `pci_bind_info_get`・`pci_bind_all` を移す。`sys/dev/pci/pci.h`・`pci_bind.h` は契約を include し、同じ宣言を消す (宣言は 1 か所)。`pci_find`・`pci_bar_get`・`pci_cfg_write*` は `pci.h` に残す。
+- **import の定義 (M2 に含める)**: 生成器 (`tools/gen_hwdev_contract.py`) は `.def` に書いた出所のヘッダを直に読むので、宣言を移すと旧ヘッダの指定で失敗する。`sys/kern/module/kdebug_imports.def` の `pci_get`・`pci_cfg_read32` (:1939 付近) と `sys/dev/hwdev/hwdev_imports.def` の `pci_cfg_read32` (:222 付近) の出所を `sys/include/pci_contract.h` に直し、**スロットの番号と型を保って**再生成する。生成物の差は出所の欄だけであることを M2 の完了条件にする。`pci_find`・`pci_bar_get`・`pci_hwb_*` の定義は触らない。
+- PowerPC の結線 (段 P3): `sdk/kapi_target_ppc.py` の `PROVIDER_GROUPS['pci']` (:94-99) と `ZERO_SLOTS` の `pci_count` (:206) を外し、同時に `PROVIDER_EXTERNS` (:6-11) へ `extern int kapi_pci_bind_info(u32 idx, void *out);` を足す。`sys/arch/ppc/exec_kapi.c` は手で触らない。`$(KB_GEN)/stamp` の経路で生成し直し、EXEC の 3 像 (sh・link-sh・shell) を全部リンクする。
+- 出力の保護 (`ring3_user_range_ok` は `sys/include/user_read_contract.h`、`ring3_user_ranges_writable`・`ring3_fault_kill` は `sys/kern/exec/exec.h`) は、40 B の `pci_get` と 8 B の `pci_bind_info` のそれぞれを PowerPC のゲストで確かめる (A9)。働かなければ P3 で止めて戻す。
 
 ## 5. 大きさ
 
@@ -169,15 +169,15 @@ for (i = 0; i < PCI_CONFIG_MAX_ROOTS && pci_config_root_bus(i, &bus) == 0; i++)
 
 | 段 | 列 | ファイル | 中身 | x86 の build_compare |
 |---|---|---|---|---|
-| M1 | 本線 | `include/pci_config_contract.h`・`platform/pc98/pci_config.c`・`drivers/pci/pci.c`・`drivers/pci/pci.h` (説明文)・`tools/tests/pci_scan_host.c`・`tools/tests/test_pci_scan.py` | 口 3 本、PC-98 の後端 3 関数、`pci.c` の 4 か所。口と両側が 1 段でないと組めない。`pci.c` に条件が付くので、`test_pci_scan.py` の変異のアンカー (`record_missing`・`record_after_full` の旧い行) を新しい行に合わせ直す (変異の意味は変えない) | `pci.o`・`pci_config.o` だけ差。起動行の文字列は同じ |
-| M2 | 本線 | `include/pci_contract.h` (新)・`include/pci_bind_contract.h`・`drivers/pci/pci.h`・`pci_bind.h`・`kernel/module/kdebug_imports.def`・`hwdev/hwdev_imports.def` と再生成した `kdebug/generated/`・`hwdev/generated/` | 宣言の移動と import の出所の更新 (§4)。スロット・型は不変 | `.o` の差 0。生成物は出所の欄だけ |
-| P1 | PowerPC | `platform/powermac/pci_backend.c` (新)・`lan_boot.h` (宣言)・NOEXEC の空の対・偽 MMIO の host 試験 | 契約 7 本と `pm_pci_boot`・`pm_pci_enumerate`。**選ぶ行は入れない** (host 試験だけで完了) | 差なし |
-| M3 | 本線 | `kernel/dev/device_pci.c` (新)・`platform/pc98/device_pci.c` (消す)・`kapi/kapi_sys.c` (診断を抜く)・`build/platform/pc98.mk`・`build/sources/common.mk`・`build/sources/order.mk`・`build/features/pc98-devices.mk`・`tools/tests/test_dep_dir_a_l08.py` と `dep_dir_a_l08_host.c` | 純移動 + 選ぶ行の移動 (`C_COMMON_EXEC` に本体 5 + 転送)。`order.mk` は旧転送の位置を新しいパスに差し替える。L08 は入力 (`COPIES` に新パスと `pci_contract.h`)・診断の抽出先・既存の変異 (`reg ^ 4u`) を新パスへ | kernel は同じ並び。差が出たら配置の差だけと報告に書く |
+| M1 | 本線 | `sys/include/pci_config_contract.h`・`sys/platform/pc98/pci_config.c`・`sys/dev/pci/pci.c`・`sys/dev/pci/pci.h` (説明文)・`tools/tests/pci_scan_host.c`・`tools/tests/test_pci_scan.py` | 口 3 本、PC-98 の後端 3 関数、`pci.c` の 4 か所。口と両側が 1 段でないと組めない。`pci.c` に条件が付くので、`test_pci_scan.py` の変異のアンカー (`record_missing`・`record_after_full` の旧い行) を新しい行に合わせ直す (変異の意味は変えない) | `pci.o`・`pci_config.o` だけ差。起動行の文字列は同じ |
+| M2 | 本線 | `sys/include/pci_contract.h` (新)・`sys/include/pci_bind_contract.h`・`sys/dev/pci/pci.h`・`pci_bind.h`・`sys/kern/module/kdebug_imports.def`・`sys/dev/hwdev/hwdev_imports.def` と再生成した `kdebug/generated/`・`hwdev/generated/` | 宣言の移動と import の出所の更新 (§4)。スロット・型は不変 | `.o` の差 0。生成物は出所の欄だけ |
+| P1 | PowerPC | `sys/platform/powermac/pci_backend.c` (新)・`lan_boot.h` (宣言)・NOEXEC の空の対・偽 MMIO の host 試験 | 契約 7 本と `pm_pci_boot`・`pm_pci_enumerate`。**選ぶ行は入れない** (host 試験だけで完了) | 差なし |
+| M3 | 本線 | `sys/dev/pci/device_pci.c` (新)・`platform/pc98/device_pci.c` (消す)・`sys/kapi/kapi_sys.c` (診断を抜く)・`build/platform/pc98.mk`・`build/sources/common.mk`・`build/sources/order.mk`・`sys/conf/features/pc98-devices.mk`・`tools/tests/test_dep_dir_a_l08.py` と `dep_dir_a_l08_host.c` | 純移動 + 選ぶ行の移動 (`C_COMMON_EXEC` に本体 5 + 転送)。`order.mk` は旧転送の位置を新しいパスに差し替える。L08 は入力 (`COPIES` に新パスと `pci_contract.h`)・診断の抽出先・既存の変異 (`reg ^ 4u`) を新パスへ | kernel は同じ並び。差が出たら配置の差だけと報告に書く |
 | **L** | PM | M3 + P1 の選択 (`build/platform/powermac.mk` の `C_PLATFORM_EXEC`・`C_PLATFORM_NOEXEC`)・`build_profile_x86.json`・`build_profile_ppc.json` | **同じ着地**。M3 だけでは PowerPC の EXEC の像に本体が入って後端が無く、リンクできない。この時点で PowerPC は誰も `pci_init` を呼ばず、スロットは不在のまま | x86 は M3 と同じ |
-| P2 | PowerPC | `platform/powermac/ppc_kernel.c` | `pm_pci_boot` (:221 の直後) と `pm_pci_enumerate` の呼び出し。**完了条件: 6d-ii の BDF と項目順を QEMU の起動ログで確かめる** (GMAC の BDF が OF の値と同じ、idx の順は**既存の深さ優先** — ブリッヂを記録した直後に配下へ潜る (`pci.c`)。例 `00:0b.0 → 01:00.0 → 00:0c.0`。昇順ではない) | 差なし |
+| P2 | PowerPC | `sys/platform/powermac/ppc_kernel.c` | `pm_pci_boot` (:221 の直後) と `pm_pci_enumerate` の呼び出し。**完了条件: 6d-ii の BDF と項目順を QEMU の起動ログで確かめる** (GMAC の BDF が OF の値と同じ、idx の順は**既存の深さ優先** — ブリッヂを記録した直後に配下へ潜る (`pci.c`)。例 `00:0b.0 → 01:00.0 → 00:0c.0`。昇順ではない) | 差なし |
 | P3 | PowerPC | `sdk/kapi_target_ppc.py`・`tools/ppc/test_kapi_binding.py` (:44-45 の不在の期待と、:318 付近の未定義シンボルの固定の許可表) | 不在の組と `ZERO_SLOTS` から外し extern を足す (§4)。許可表に新しい提供者 4 本 (`platform_pci_count`・`platform_pci_get`・`platform_pci_cfg_read32`・`kapi_pci_bind_info`) を足す。P2 の後 (初期化前の空の列挙を公開しない) | 差なし |
-| P4 | PowerPC + 本線 (cmd_pci.c) | `userland/shell/cmd_pci.c` (文言のマクロ)・`userland/ppc/sh/profile.h` (`SH_REGISTER_COMMANDS` に pci、文言)・`build/ppc-user.mk` (`drivers/pci/pci_decode.c` のユーザー側の `.o`、`programs.mk` と同じ形)・ゲストの探針 | PPC のシェルに `lspci`・`pcidump`、KAPI の照合の探針 | `cmd_pci.o` の差 0 (文字列の連結の結果が同じ) |
-| P5 | PowerPC | `platform/powermac/usb_boot.c` | 別 root の USB の診断 1 行 (§3) | 差なし |
+| P4 | PowerPC + 本線 (cmd_pci.c) | `userland/shell/cmd_pci.c` (文言のマクロ)・`userland/ppc/sh/profile.h` (`SH_REGISTER_COMMANDS` に pci、文言)・`build/ppc-user.mk` (`sys/dev/pci/pci_decode.c` のユーザー側の `.o`、`programs.mk` と同じ形)・ゲストの探針 | PPC のシェルに `lspci`・`pcidump`、KAPI の照合の探針 | `cmd_pci.o` の差 0 (文字列の連結の結果が同じ) |
+| P5 | PowerPC | `sys/platform/powermac/usb_boot.c` | 別 root の USB の診断 1 行 (§3) | 差なし |
 
 - 順: M1 → (M2 ∥ P1) → M3 → L → P2 → P3 → P4。P5 は L の後ならいつでも。M1 だけが「その場の変更」で NP21/W の受入が要る。
 - 動かさない物: `pci_hwb.c` (E7)、`pci_locate.c`、`pci_resources.c`、E8 の 17 ファイル、`pci_decode.h` の mech1 の定数、PowerPC の `pci_config.c` (GMAC の quiesce との同居の解消は別の段)。
@@ -193,7 +193,7 @@ for (i = 0; i < PCI_CONFIG_MAX_ROOTS && pci_config_root_bus(i, &bus) == 0; i++)
 | A3b x86 は測定を続ける | host: 既存の `pci-scan-host` の測定の照合 (`record_missing` 等) がそのまま通る | PC-98 の `pci_config_bar_measure` を 0 に |
 | A4 x86 の不在の経路 | NP21/W: 起動ログに `[pci] mech#1 absent`、`lspci` が `no PCI (mechanism #1 not present)`、`pci_bind_info(0)` が失敗。**NP21/W は PCI を持たないので通るのはここまで** | (ゲストは変異なし。host の A1 が代わり) |
 | A5 x86 の在る経路 | 実機 Ra266: `DEFERRED_TESTS.md` の PCI-MECH1-REALHW に持ち越す (台数・BDF・BAR の測定・bind の行が更新前と同じ) | — (延期) |
-| A6 転送と診断が 1 か所 | host: L08 (`test_dep_dir_a_l08.py`) を新しいパスで — 40 B・8 B の写し、戻り値、失敗の時に出力が変わらないこと。層の検査が通る。両 arch の EXEC の像が二重定義なしでリンクできる | 既存の `reg ^ 4u` を `kernel/dev/device_pci.c` に掛ける / `kapi_pci_bind_info` の写しを 7 バイトに |
+| A6 転送と診断が 1 か所 | host: L08 (`test_dep_dir_a_l08.py`) を新しいパスで — 40 B・8 B の写し、戻り値、失敗の時に出力が変わらないこと。層の検査が通る。両 arch の EXEC の像が二重定義なしでリンクできる | 既存の `reg ^ 4u` を `sys/dev/pci/device_pci.c` に掛ける / `kapi_pci_bind_info` の写しを 7 バイトに |
 | A7 PowerPC の後端の番地とレーン | host (偽 MMIO、`tools/ppc/test_lan_p8_fake.c` と同じ型): 番地の語 (root bus は `1<<dev`、配下は type 1)、`reg` 0x0e・0x19・0x3d の読みが揃えた DWORD から正しいバイトを返す、多機能・ブリッヂ配下・**ブリッヂの後ろに続く root bus 上の装置**を含む偽の木で、列挙の台数と BDF を深さ優先の期待列 (`00:0b.0 → 01:00.0 → 00:0c.0` の形) と照合 | 後端の `reg & ~3u` を外す (0x0e が `U32_MAX` になり多機能と配下を見落とす) |
 | A7b バイト順 | host: 同じ偽 MMIO で vendor:device の値 | 後端で値を `__builtin_bswap32` にもう 1 回通す (確定設計 :262 の変異) |
 | A8 PowerPC は 1 ドメインだけ | host: `root_bus(1)` が -1、`bus_last` 越え・root bus の dev < 11 の読みが `U32_MAX` で MMIO に触らない、窓なしの probe が 0。**後段 (`pci_config.c`) が切り詰めて通してしまう入力**で後端の確かめを試す: `dev=32` (`<<11` で隣の bus の dev 0 に化ける)・`fn=8` (`<<8` で隣の dev の fn 0 に化ける) が `U32_MAX` で MMIO に触らない。`bus=256` も同じ結果 (これは後段の `bdf & 0xff0000ff` の確かめ (`pci_config.c`) でも落ちるので、検出は dev・fn の 2 つが持つ) | `dev > 31`・`fn > 7` の確かめを外す (`dev=32` が bus+1 の装置を返す) |

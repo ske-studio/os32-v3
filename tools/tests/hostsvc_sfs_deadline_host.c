@@ -1,5 +1,5 @@
 /* C3: real client/protocol, one virtual SfsIo, C1 boundary only is stubbed. */
-#include "fs/serialfs/serialfs.h"
+#include "sys/fs/serialfs/serialfs.h"
 #include "hostsvc_fixture.h"
 #include "os32_kapi_shared.h"
 #define REQUIRE(e) do { if (!(e)) return __LINE__; } while (0)

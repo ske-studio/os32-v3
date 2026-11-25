@@ -12,7 +12,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'platform/powermac/pci_config.c').read_text()
+    source = (ROOT / 'sys/platform/powermac/pci_config.c').read_text()
     with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as tmp:
         path = Path(tmp) / 'pci_config.c'
         path.write_text(source)

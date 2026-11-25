@@ -4,7 +4,7 @@
 gen_memmap.py — メモリ地図の生成と、重なり・逆転の検出
 
 手で書いた地図は必ず腐る。2026-09-17 時点で同じ地図が 3 か所に手書きされていて
-(`include/memmap.h` の先頭コメント、`docs/02_memory.md` §2-1、`CLAUDE.md` の帯の表)、
+(`sys/include/memmap.h` の先頭コメント、`docs/02_memory.md` §2-1、`CLAUDE.md` の帯の表)、
 3 つとも「カーネル本体 ~200KB」と書いていた。実測は **約 432KB**。
 しかもカーネルが育った結果、共有メモリ帯がカーネルスタックに食い込んでいたのに、
 どの地図も相対表記 (「+4KB - +260KB」) だったので誰も気づけなかった
@@ -12,7 +12,7 @@ gen_memmap.py — メモリ地図の生成と、重なり・逆転の検出
 
 そこでこの生成器を置く。
 
-  情報源   include/memmap.h の #define (番地の正典) と
+  情報源   sys/include/memmap.h の #define (番地の正典) と
            build/out/kernel.map の __bss_end
   出力先   build/out/MEMMAP.md (コミットしない)。表は全て **絶対番地**。
   検査     帯どうしの重なりと、start > end の逆転。今回の穴は両方ともこれで捕まる。
@@ -56,10 +56,10 @@ OUT_REL = "build/out/MEMMAP.md"
 MAP_REL = "build/out/kernel.map"
 ELF_REL = "build/out/kernel.elf"
 LAYOUT_REL = "build/out/layout-manifest.json"
-HDR_REL = "include/memmap.h"
+HDR_REL = "sys/include/memmap.h"
 # 機種の番地のヘッダ (PC-98 のリアルモードの起動と低位メモリ)。番地の正典の一部で、
-# 地図・重なりの検査・生成ヘッダは include/memmap.h と合わせて読む。
-PLATFORM_HDR_RELS = ("platform/pc98/platform_boot_layout.h",)
+# 地図・重なりの検査・生成ヘッダは sys/include/memmap.h と合わせて読む。
+PLATFORM_HDR_RELS = ("sys/platform/pc98/platform_boot_layout.h",)
 
 BEGIN = "<!-- 生成: tools/gen_memmap.py --write (この印の中は手で書かない) -->"
 END = "<!-- /生成: tools/gen_memmap.py -->"
@@ -120,9 +120,9 @@ def read_defines(header_path):
     # 試験の切り出したヘッダが include ツリーの写しを要らないようにする。
     if os.path.basename(header_path) == "memmap.h":
         # 機種の番地のヘッダを後ろに続けて、1 つの定義の集まりとして解く。
-        root = os.path.dirname(os.path.dirname(os.path.abspath(header_path)))
+        header_dir = os.path.dirname(os.path.abspath(header_path))
         for rel in PLATFORM_HDR_RELS:
-            extra = os.path.join(root, rel)
+            extra = os.path.join(header_dir, os.path.relpath(rel, os.path.dirname(HDR_REL)))
             if os.path.exists(extra):
                 with open(extra, encoding="utf-8") as f:
                     text += "\n" + re.sub(r"\\\n", " ", f.read())
@@ -436,7 +436,7 @@ def escaped_children(rows):
 def budget(m, sym):
     """カーネル本体に使える最大 (予算) と、実際の大きさ。
 
-    予算の式は **include/memmap.h の MEM_KERNEL_IMAGE_MAX が正典**。ここで
+    予算の式は **sys/include/memmap.h の MEM_KERNEL_IMAGE_MAX が正典**。ここで
     引き算をやり直すと 2 か所目の定義になるので、マクロの値をそのまま使う。
     超過の判定だけは __bss_end が要るのでここでやる (同じ判定を
     build/os32.ld の ASSERT がリンク時にもやる)。
@@ -518,7 +518,7 @@ MIRRORS = (
 )
 
 # ASM は値ではなくシンボルで引くこと。数値直書きに戻したらここで気づく。
-ASM_SYMBOLIC = (("arch/x86/kernel/kentry.asm", "mov     esp, LAYOUT_MEM_KSTACK_TOP",
+ASM_SYMBOLIC = (("sys/arch/x86/kernel/kentry.asm", "mov     esp, LAYOUT_MEM_KSTACK_TOP",
                  "ESP の初期値を数値で書かず生成ヘッダの "
                  "LAYOUT_MEM_KSTACK_TOP を使うこと"),)
 
@@ -737,7 +737,7 @@ def render(m, sym, rows, map_path, root):
     parts = []
     parts.append(BEGIN)
     parts.append("")
-    parts.append("番地の定義の正典は [`include/memmap.h`](../../include/memmap.h)。"
+    parts.append("番地の定義の正典は [`sys/include/memmap.h`](../../include/memmap.h)。"
                  "この表はそこと")
     parts.append("`%s` の `__bss_end` から "
                  "[`tools/gen_memmap.py`](../../tools/gen_memmap.py) が起こす。"
@@ -1010,7 +1010,7 @@ def layout_manifest(root, map_path, elf_path, limit_name=None):
 def load(root, map_path):
     sym = read_symbols(map_path)
     defines = read_defines(os.path.join(root, HDR_REL))
-    defines.update(read_defines(os.path.join(root, "include/pegc.h")))
+    defines.update(read_defines(os.path.join(root, "sys/platform/pc98/pegc.h")))
     m = Macros(defines, sym)
     return m, sym, bands(m, sym)
 
@@ -1045,7 +1045,7 @@ def main():
         return 0
     if args.root is None and args.map is None:
         from check_artifacts import require_fresh
-        require_fresh(root, [MAP_REL], ['build/os32.ld', 'include/memmap.h'],
+        require_fresh(root, [MAP_REL], ['build/os32.ld', 'sys/include/memmap.h'],
                       targets={MAP_REL: 'build/out/kernel.elf'})
     map_path = args.map or os.path.join(root, MAP_REL)
 
@@ -1098,7 +1098,7 @@ def main():
         for x in lines:
             print("gen_memmap: %s" % x)
         if lines:
-            print("地図に矛盾がある (%d 件)。番地の正典は include/memmap.h。" % len(lines))
+            print("地図に矛盾がある (%d 件)。番地の正典は sys/include/memmap.h。" % len(lines))
             return 1
         print("地図に矛盾なし (配置・予算・写し・定数を照合)")
         return 0

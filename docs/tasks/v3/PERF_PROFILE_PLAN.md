@@ -9,17 +9,17 @@ LAN と I/O の上限の多くは、いちばん遅い経路に合わせた 1 �
 
 | 定数 (main 2026-11-16) | 値 | 何に合わせた値か |
 |---|---|---|
-| `net/rx_work.h` NET_RX_WORK_LIMIT_US | 120µs | NE2000 の PIO の受信の 1 回の上限 (IO_TIER の X2)。PIO で 1514B を読むと 1 枚で越え得る |
-| `net/nic.h` NET_RX_SCAN_MAX | 8 | 1 回の振り分けで NIC から取り出す枚数 |
-| `net/nic_rx.c` RX_SLOTS | 4 | link・SFS の列の枠。2026-11-16 に満杯で捨てていた (f61ad39f で link は NIC に残す形へ) |
-| `platform/powermac/nic_gem.c` GEM_RX_SLOTS | 4 | GEM の受け取りの枠。link の WINDOW の credit もこの 4 枠だけを数える |
-| `drivers/net/e82557/e82557_regs.h` E82557_RFD_COUNT | 8 | 82557 の受信の記述子 (DMA の列) |
-| `net/link.h` LINK_WINDOW_LEN | 2 | link の窓 |
-| `net/link.h` LINK_RTO_TICKS・LINK_TRIES | 200ms・5 回 | 10ms の tick 基準の再送 |
-| `include/remote_control.h` REMOTE_SFS_CALL_MAX | 1044B | 1 回の SFS の呼び出し (LAN の 1KB) |
-| `fs/serialfs/sfs_proto.h` SFS_MAX_PAYLOAD・SFS_LAN_MAX_PAYLOAD | 512B・1028B | シリアルと LAN の 1 回の読み。1 本ずつ返事を待つ (stop-and-wait) |
-| `kernel/io_work.h` IO_PASS_US | 500µs | I/O の Tier の 1 巡の上限 |
-| `kernel/io_policy.c` の既定の予算 | 120µs ([推]) | NE2K・NIC・TSC の 1 回の予算 |
+| `sys/net/rx_work.h` NET_RX_WORK_LIMIT_US | 120µs | NE2000 の PIO の受信の 1 回の上限 (IO_TIER の X2)。PIO で 1514B を読むと 1 枚で越え得る |
+| `sys/net/nic.h` NET_RX_SCAN_MAX | 8 | 1 回の振り分けで NIC から取り出す枚数 |
+| `sys/net/nic_rx.c` RX_SLOTS | 4 | link・SFS の列の枠。2026-11-16 に満杯で捨てていた (f61ad39f で link は NIC に残す形へ) |
+| `sys/platform/powermac/nic_gem.c` GEM_RX_SLOTS | 4 | GEM の受け取りの枠。link の WINDOW の credit もこの 4 枠だけを数える |
+| `sys/dev/net/e82557/e82557_regs.h` E82557_RFD_COUNT | 8 | 82557 の受信の記述子 (DMA の列) |
+| `sys/net/link.h` LINK_WINDOW_LEN | 2 | link の窓 |
+| `sys/net/link.h` LINK_RTO_TICKS・LINK_TRIES | 200ms・5 回 | 10ms の tick 基準の再送 |
+| `sys/include/remote_control.h` REMOTE_SFS_CALL_MAX | 1044B | 1 回の SFS の呼び出し (LAN の 1KB) |
+| `sys/fs/serialfs/sfs_proto.h` SFS_MAX_PAYLOAD・SFS_LAN_MAX_PAYLOAD | 512B・1028B | シリアルと LAN の 1 回の読み。1 本ずつ返事を待つ (stop-and-wait) |
+| `sys/kern/io_work.h` IO_PASS_US | 500µs | I/O の Tier の 1 巡の上限 |
+| `sys/kern/io_policy.c` の既定の予算 | 120µs ([推]) | NE2K・NIC・TSC の 1 回の予算 |
 | `userland/system/hsync.c (FILE_BUF_SIZE)・107` FILE_BUF・CMP_BUF | 64KB・32KB | hsync の読み書きの単位 |
 
 ### 1-2. タイマーと時刻の系
@@ -27,16 +27,16 @@ LAN と I/O の上限の多くは、いちばん遅い経路に合わせた 1 �
 
 | 定数 (main 2026-11-16) | 値 | 何に合わせた値か |
 |---|---|---|
-| `include/memmap.h` PIT_HZ・`os32_kapi_shared.h` OS32_TICK_HZ | 100Hz | 論理 tick (公開の ABI)。物理は x86 で 1kHz (TASK_TICK_1KHZ の B14) |
-| `kernel/irq/tick_budget.h` IRQ0_SLOT_BUDGET_US | 120µs | IRQ0 の 1 回の枠の予算 (F_slot2 + F_demux = 25.4µs を基準) |
-| `kernel/irq/tick_budget.h` NET_TAIL_RX_US・NET_TAIL_TX_US | 23µs・17µs | 実測 14.9µs・11.0µs の 1.5 倍 (測った機体の CPU に合わせた値) |
-| `net/link.h` LINK_RTO_TICKS | 20 tick (200ms) | link の再送の間隔。LAN の往復は 1ms 未満でも 200ms 待つ |
-| `net/link.h` LINK_HELLO_IDLE_MS・LINK_PROBE_TICKS | 1s・1s | 相手の探し・生存の確かめ |
-| `fs/serialfs/sfs_proto.h` SFS_FIRST_BYTE_MS | 2s | 応答の始まりの期限 (シリアルの 9600bps を含む) |
-| `platform/pc98/tsc_clock.c` TSC_MONITOR_US・TSC_WINDOWS | 1s・5 窓 | TSC の校正と監視 |
-| `kernel/time/ktime.h` TIME_RETRY_MAX | 3 | 時計の読みの再試行 |
-| `net/nic.h` NET_RX_ACTIVE_MS | 5ms | 受信の直後に休ませない窓 (ユーザー決定 11-16。PowerPC の QEMU で測った値) |
-| `drivers/input/kbd.h` KBD_RSHELL_TIMEOUT_SEC | 30s | 遠隔の会話のキー待ちの上限 (人に見える時間。モードで変えない) |
+| `sys/include/memmap.h` PIT_HZ・`os32_kapi_shared.h` OS32_TICK_HZ | 100Hz | 論理 tick (公開の ABI)。物理は x86 で 1kHz (TASK_TICK_1KHZ の B14) |
+| `sys/kern/irq/tick_budget.h` IRQ0_SLOT_BUDGET_US | 120µs | IRQ0 の 1 回の枠の予算 (F_slot2 + F_demux = 25.4µs を基準) |
+| `sys/kern/irq/tick_budget.h` NET_TAIL_RX_US・NET_TAIL_TX_US | 23µs・17µs | 実測 14.9µs・11.0µs の 1.5 倍 (測った機体の CPU に合わせた値) |
+| `sys/net/link.h` LINK_RTO_TICKS | 20 tick (200ms) | link の再送の間隔。LAN の往復は 1ms 未満でも 200ms 待つ |
+| `sys/net/link.h` LINK_HELLO_IDLE_MS・LINK_PROBE_TICKS | 1s・1s | 相手の探し・生存の確かめ |
+| `sys/fs/serialfs/sfs_proto.h` SFS_FIRST_BYTE_MS | 2s | 応答の始まりの期限 (シリアルの 9600bps を含む) |
+| `sys/platform/pc98/tsc_clock.c` TSC_MONITOR_US・TSC_WINDOWS | 1s・5 窓 | TSC の校正と監視 |
+| `sys/kern/time/ktime.h` TIME_RETRY_MAX | 3 | 時計の読みの再試行 |
+| `sys/net/nic.h` NET_RX_ACTIVE_MS | 5ms | 受信の直後に休ませない窓 (ユーザー決定 11-16。PowerPC の QEMU で測った値) |
+| `sys/platform/pc98/input/kbd.h` KBD_RSHELL_TIMEOUT_SEC | 30s | 遠隔の会話のキー待ちの上限 (人に見える時間。モードで変えない) |
 
 - link の再送・生存の確かめ・期限の多くは 10ms の jiffy で数えている。Ra266 の LAN の往復は 1ms 未満なので、1 回の取りこぼしの回復に 200ms かかる。
 - µs の予算は、遅い CPU で測った値の 1.5 倍で決めてある。速い CPU では同じ予算で多くを処理できるが、件数の上限 (8 枚など) が先に効く。
@@ -97,9 +97,9 @@ LAN と I/O の上限の多くは、いちばん遅い経路に合わせた 1 �
 
 | 項目 | 今 | 改修の向き |
 |---|---|---|
-| PowerPC 7450 の NAP | `arch/ppc/kernel_cpu.c` の PVR の分岐 (7450 と 7455 に同じ HID0 の操作) | 機種の既定の表へ移す (TASK_MACHCFG の段 F・G)。実機の HID0 と /host の完走は票 TASK_PPC_REALHW §2 に戻す |
-| system.cfg の GFX・GUI・CONSOLE_DUAL・GFXDIAG | `platform/pc98/kernel_gfx_config.inc`・`platform/pc98/kernel.c` | バックエンドの指定 (機種による既定) と、表示・診断の利用者の設定を分ける。旧キーの互換と優先の順を別の段で決める |
-| system.cfg の BOOTSERIAL・E82557・E82557_PHYVENDOR・KDEBUG | `platform/pc98/boot_serial.inc`・`drivers/net/e82557/e82557.c`・`kdebug/kdebug_module.c` | 機種による既定か、利用者の指定かを分け、機種による物だけを移す候補にする |
-| SFS_LAN・SFS_LAN_PEER の二重 | `/etc/system.cfg` (`fs/serialfs/serialfs_session.c`) と `netcd.cfg` (`platform/pc98/kernel_boot_memory.inc`) の両方 | 置き場を 1 つにする |
-| netcd.cfg、PowerMac の SFS の既定 | `assets/netcd.cfg`、`platform/powermac/hostfs_boot.c` | 接続先 (利用者) と機種の差を切り分け、機種による既定だけを移す候補にする |
+| PowerPC 7450 の NAP | `sys/arch/ppc/kernel_cpu.c` の PVR の分岐 (7450 と 7455 に同じ HID0 の操作) | 機種の既定の表へ移す (TASK_MACHCFG の段 F・G)。実機の HID0 と /host の完走は票 TASK_PPC_REALHW §2 に戻す |
+| system.cfg の GFX・GUI・CONSOLE_DUAL・GFXDIAG | `sys/platform/pc98/kernel_gfx_config.inc`・`sys/platform/pc98/kernel.c` | バックエンドの指定 (機種による既定) と、表示・診断の利用者の設定を分ける。旧キーの互換と優先の順を別の段で決める |
+| system.cfg の BOOTSERIAL・E82557・E82557_PHYVENDOR・KDEBUG | `sys/platform/pc98/boot_serial.inc`・`sys/dev/net/e82557/e82557.c`・`sys/kern/kdebug/kdebug_module.c` | 機種による既定か、利用者の指定かを分け、機種による物だけを移す候補にする |
+| SFS_LAN・SFS_LAN_PEER の二重 | `/etc/system.cfg` (`sys/fs/serialfs/serialfs_session.c`) と `netcd.cfg` (`sys/platform/pc98/kernel_boot_memory.inc`) の両方 | 置き場を 1 つにする |
+| netcd.cfg、PowerMac の SFS の既定 | `assets/netcd.cfg`、`sys/platform/powermac/hostfs_boot.c` | 接続先 (利用者) と機種の差を切り分け、機種による既定だけを移す候補にする |
 | sync.cfg の PCI 別の待ち時間 | `assets/gfx/sync.cfg` (票 TASK_HAL_V2 の 2026-11-09 の行) | 装置の持ち物として残す。機種の値との持ち主の境だけ確かめる |

@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  PIT_CLOCK_HOST.C — platform/pc98/pit_math.c をそのままホストで回す             */
+/*  PIT_CLOCK_HOST.C — sys/platform/pc98/pit_math.c をそのままホストで回す             */
 /*                                                                          */
 /*  実物の算数を 1 行も写さずに #include する。pit_math.c は I/O も          */
 /*  tick_count も触らないので、模型は 1 つも要らない。                      */
@@ -14,8 +14,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../platform/pc98/pit_math.c"
-#include "../../platform/pc98/pit.h"
+#include "../../sys/platform/pc98/pit_math.c"
+#include "../../sys/platform/pc98/pit.h"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \
@@ -32,7 +32,7 @@ static unsigned long sysclk_hz(void) { return self_clock; }
 static void check(int ok, const char *why) { if (!ok) { fprintf(stderr, "FAIL %s\n", why); failed++; } }
 #undef PIT_IRQ_HZ
 #define PIT_IRQ_HZ self_rate
-#include "../../kdebug/kselftest/pit_setup.inc"
+#include "../../sys/platform/pc98/kdebug/kselftest/pit_setup.inc"
 
 static void selftest_setup(void)
 {
@@ -158,7 +158,7 @@ static void reject_clock(void)
 /*                                                                      */
 /*  ホストの unsigned long は 64bit なので、**溢れそのものはここでは      */
 /*  踏めない**。踏めるのは「中間積が 32bit の上限を越えないか」だけ。     */
-/*  i386 のビルドでは platform/pc98/pit_math.c の STATIC_ASSERT が同じことを     */
+/*  i386 のビルドでは sys/platform/pc98/pit_math.c の STATIC_ASSERT が同じことを     */
 /*  コンパイル時に見る (--target で通る)。                               */
 /* ------------------------------------------------------------------ */
 static void no_overflow(void)
@@ -192,7 +192,7 @@ static void real_hw_story(void)
     unsigned long before;
 
     /* 1. 0000:0501h bit7 = 0 → 2.4576MHz 系。
-     *    (判定そのものは platform/pc98/sysclk.c。ここは決まったあとの算数。) */
+     *    (判定そのものは sys/platform/pc98/sysclk.c。ここは決まったあとの算数。) */
     CHECK(pit_compute(SYSCLK_2458, (unsigned int)PIT_HZ, &s) == 0);
     CHECK(s.reload == RELOAD_2458);
     CHECK(s.period_us == PERIOD_100HZ);

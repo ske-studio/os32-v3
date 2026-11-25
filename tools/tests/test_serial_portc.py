@@ -1,10 +1,10 @@
-"""drivers/char/serial.c が 0035h (8255 ポート C) を丸ごと書かないことのホスト試験。
+"""sys/dev/char/serial.c が 0035h (8255 ポート C) を丸ごと書かないことのホスト試験。
 
 教訓: docs/POLICY_DEBUG.md#4-59-8255-ポート-c-の副作用 (実機 PC-9821Ra266 で rshell 中にビープが
 鳴り続けた、2026-09-24)。資料: docs/hw/undocumented/io_syste.md の I/O 0035h /
 0037h (BUZ は bit3 = 1 で停止、BSR 06h = 鳴動 / 07h = 停止)。
 
-実物の drivers/char/serial.c を #include し、include/io.h の実装側 (arch_io.h /
+実物の sys/dev/char/serial.c を #include し、sys/include/io.h の実装側 (arch_io.h /
 platform_io.h) だけをここで作る偽物に差し替える。偽物は 8255 のポート C を
 模型として持ち、0037h の BSR を 1 ビットずつ適用し、0035h への書き込みを
 違反として数える。
@@ -16,7 +16,7 @@ platform_io.h) だけをここで作る偽物に差し替える。偽物は 8255
   python3 -B tools/tests/test_serial_portc.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='serial-portc-host', tier=1,
-    covers=['drivers/char/serial_kapi.h', 'drivers/char/serial.c', 'drivers/char/serial.h', 'drivers/char/serial_plan.h', 'drivers/char/serial_plan.c', 'kernel/sys.c', 'tools/tests/serial_portc_host.c', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'include/platform_sys.h', 'platform/pc98/system.c', 'tools/tests/kernel_includes.py'],
+    covers=['sys/dev/char/serial_kapi.h', 'sys/dev/char/serial.c', 'sys/dev/char/serial.h', 'sys/dev/char/serial_plan.h', 'sys/dev/char/serial_plan.c', 'sys/kern/sys.c', 'tools/tests/serial_portc_host.c', 'tools/tests/serial_emergency_host.h', 'sys/kern/serial_diag.c', 'sys/include/console_output.h', 'lib/serial_diag.h', 'sys/include/platform_sys.h', 'sys/platform/pc98/system.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.0,
     kind='characterization',
 )
@@ -32,15 +32,15 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/serial_portc_host.c"
 SRCS = {
-    "drivers/char/serial.c": ROOT / "drivers/char/serial.c",
-    "include/pc98.h": ROOT / "include/pc98.h",
-    "platform/pc98/system.c": ROOT / "platform/pc98/system.c",
+    "sys/dev/char/serial.c": ROOT / "sys/dev/char/serial.c",
+    "sys/platform/pc98/pc98.h": ROOT / "sys/platform/pc98/pc98.h",
+    "sys/platform/pc98/system.c": ROOT / "sys/platform/pc98/system.c",
 }
 CASES = ["bsr_polarity", "init_bsr_only", "isr_edge_bsr", "real_hw_story",
          "init_from_all_ones", "isr_drain_limit_edge", "vfast_fifo_path",
          "sys_buz_values", "tx_stuck_story"]
 
-# platform/pc98/system.c の platform_buzzer_on/off の関数本体を
+# sys/platform/pc98/system.c の platform_buzzer_on/off の関数本体を
 # **そのまま**切り出して sys_buz.inc にする (転送関数を写さない)。
 BUZ_RE = re.compile(r"^void platform_buzzer_on\(void\)\n\{.*?^\}\n\s*^void platform_buzzer_off\(void\)\n\{.*?^\}\n",
                     re.S | re.M)
@@ -49,13 +49,13 @@ BUZ_RE = re.compile(r"^void platform_buzzer_on\(void\)\n\{.*?^\}\n\s*^void platf
 def extract_buz(sys_c):
     m = BUZ_RE.search(sys_c)
     if not m:
-        raise SystemExit("platform/pc98/system.c に platform_buzzer_on / platform_buzzer_off が見つからない")
+        raise SystemExit("sys/platform/pc98/system.c に platform_buzzer_on / platform_buzzer_off が見つからない")
     return m.group(0)
 FLAGS = ["-std=gnu11", "-Wall", "-Wextra", "-Werror",
          "-D__cdecl=",
          "-Wno-unused-function"]
 
-# include/io.h の契約をホストで満たす偽物。ポート I/O はハーネスの
+# sys/include/io.h の契約をホストで満たす偽物。ポート I/O はハーネスの
 # fake_inp / fake_outp へ回し、割り込み禁止と hlt は何もしない。
 FAKE_ARCH_IO = """#ifndef ARCH_IO_H
 #define ARCH_IO_H
@@ -96,47 +96,47 @@ static inline void io_wait_n(int n) { while (n-- > 0) io_wait(); }
 # 否定側。実装を 1 か所だけ壊して RED になることを見る。
 # (ソース, パターン, 置換, 説明)
 MUTATIONS = [
-    ("drivers/char/serial.c", r"    s_tx_stuck = 1;", "    s_tx_stuck = 0;",
+    ("sys/dev/char/serial.c", r"    s_tx_stuck = 1;", "    s_tx_stuck = 0;",
      "TX outage never latches: every byte pays the budget"),
-    ("drivers/char/serial.c", r"    s_tx_stuck = 0;", "    /* keep stuck */",
+    ("sys/dev/char/serial.c", r"    s_tx_stuck = 0;", "    /* keep stuck */",
      "TX recovery never clears: the next short stall drops a byte"),
-    ("drivers/char/serial.c",
+    ("sys/dev/char/serial.c",
      r"        u8 cur = \(u8\)\(inp\(SER_MASK\) & \(IEN_RX \| IEN_TXEMP \| IEN_TX\)\);\n"
      r"        ser_ien_bsr\(cur, 0\);\n",
      "        ser_ien_bsr((u8)(IEN_RX | IEN_TXEMP | IEN_TX), 0);\n",
      "初期化で 0 のビットにも落とす BSR を書く (TXRE への 04h が NP21/W で"
      "余分な IRQ4 を起こしうる)"),
-    ("platform/pc98/system.c",
+    ("sys/platform/pc98/system.c",
      r"(void platform_buzzer_off\(void\)\n\{\n    outp\(SYSPORT_C_BSR, )BSR_BUZ_OFF",
      r"\1BSR_BUZ_ON",
-     "platform/pc98/system.c の platform_buzzer_off() が 06h (鳴動) を書く (rshell が応答のたびに鳴らす)"),
-    ("drivers/char/serial.c",
+     "sys/platform/pc98/system.c の platform_buzzer_off() が 06h (鳴動) を書く (rshell が応答のたびに鳴らす)"),
+    ("sys/dev/char/serial.c",
      r"    ser_ien_bsr\(s_mask_ien, 0\);\n    ser_ien_bsr\(s_mask_ien, s_mask_ien\);\n",
      "    outp(SER_MASK, 0x00);\n    outp(SER_MASK, s_mask_ien);\n",
      "ISR のエッジ作りを直す前の 0035h 全体書き (0x00 → 許可) に戻す"
      " — 受信のたびに BUZ = 0 = 鳴動"),
-    ("drivers/char/serial.c",
+    ("sys/dev/char/serial.c",
      r"        u8 cur = \(u8\)\(inp\(SER_MASK\) & \(IEN_RX \| IEN_TXEMP \| IEN_TX\)\);\n"
      r"        ser_ien_bsr\(cur, 0\);\n",
      "        outp(SER_MASK, 0x00);\n",
      "初期化の全マスクを 0035h 全体書きに戻す (SHUT0/SHUT1/BUZ も 0 になる)"),
-    ("drivers/char/serial.c",
+    ("sys/dev/char/serial.c",
      r"    ser_ien_bsr\(s_mask_ien, 0\);\n    ser_ien_bsr\(s_mask_ien, s_mask_ien\);\n",
      "    ser_ien_bsr(s_mask_ien, s_mask_ien);\n",
      "ISR で許可を一度落とさない (Bible §2-10 のエッジ作りが消える)"),
-    ("drivers/char/serial.c",
+    ("sys/dev/char/serial.c",
      r"    if \(which & IEN_TX\)\n        outp",
      "    if (1)\n        outp",
      "許可していない TXRE も毎回 BSR で書く (NP21/W では IRQ4 を自作しうる)"),
-    ("drivers/char/serial.c",
+    ("sys/dev/char/serial.c",
      r"    outp\(SYSPORT_C_BSR, BSR_BUZ_OFF\);\n",
      "    outp(SYSPORT_C_BSR, BSR_BUZ_ON);\n",
      "初期化のブザー停止を 06h に戻す (Bible の向き = 実機では鳴動)"),
-    ("include/pc98.h",
+    ("sys/platform/pc98/pc98.h",
      r"#define BSR_BUZ_ON          0x06(.*)\n#define BSR_BUZ_OFF         0x07",
      r"#define BSR_BUZ_ON          0x07\1\n#define BSR_BUZ_OFF         0x06",
      "pc98.h の BUZ の名前を Bible の向きに戻す (platform_buzzer_off() が鳴らす)"),
-    ("drivers/char/serial.c",
+    ("sys/dev/char/serial.c",
      r"(ien & IEN_RX\)    \? )BSR_RXRE_ON : BSR_RXRE_OFF",
      r"\1BSR_TXEE_ON : BSR_RXRE_OFF",
      "RXRE を立てるつもりで TXEE を立てる (BSR の番号の取り違え)"),
@@ -159,7 +159,7 @@ def host_build(tmp, mutated=None):
     (work / "platform_io.h").write_text(FAKE_PLATFORM_IO, encoding="utf-8")
     for rel, path in SRCS.items():
         text = (mutated or {}).get(rel, path.read_text(encoding="utf-8"))
-        if rel == "platform/pc98/system.c":
+        if rel == "sys/platform/pc98/system.c":
             (work / "sys_buz.inc").write_text(extract_buz(text),
                                               encoding="utf-8")
             continue
@@ -222,7 +222,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-serial-portc-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real drivers/char/serial.c)",
+        print("HOST GNU11 -Werror compile PASS (real sys/dev/char/serial.c)",
               flush=True)
         rc = run_cases(exe, [a for a in args if not a.startswith("--")] or CASES)
         if "--mutate" in args:

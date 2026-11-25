@@ -67,16 +67,16 @@
 
 ## P0-5
 
-- **表から読める結論** (票を書いたセッションのレビュー 2026-11-25): (A) `include/` を移すと kdebug の生成物が変わる — kdebug.elf と kselftest.o に文字列 `include/memmap.h` が入る (artifact_paths.tsv の runtime string の行)。カーネル側の置き場のパスが出荷物に入るのは抜き取った範囲でこの 1 件。P3 の W9 はバイト一致にならず `Sep-Changes:` の宣言つきの波になる。(B) `userland/libos32gui.elf` に作業木の絶対パス (`…/rs-p0-rerun/userland/lib/font/src/raster.rs`) と rustup の置き場が入る — 置き場の移動と関係なく作業木が違えば生成物が変わる (POLICY_CI G11)。(C) `move_files.py` が置換できない所は unresolved.tsv 7,517 行。手で直すと確定しているのは split_paths 10 と unresolved_paths 312 (部品の .mk の .o のパスなど)。directory literal 2,923 と constructed expression 1,450 は使われ方が未確定で、P2-6 の予行で分かる。
+- **表から読める結論** (票を書いたセッションのレビュー 2026-11-25): (A) `include/` を移すと kdebug の生成物が変わる — kdebug.elf と kselftest.o に文字列 `sys/include/memmap.h` が入る (artifact_paths.tsv の runtime string の行)。カーネル側の置き場のパスが出荷物に入るのは抜き取った範囲でこの 1 件。P3 の W9 はバイト一致にならず `Sep-Changes:` の宣言つきの波になる。(B) `userland/libos32gui.elf` に作業木の絶対パス (`…/rs-p0-rerun/userland/lib/font/src/raster.rs`) と rustup の置き場が入る — 置き場の移動と関係なく作業木が違えば生成物が変わる (POLICY_CI G11)。(C) `move_files.py` が置換できない所は unresolved.tsv 7,517 行。手で直すと確定しているのは split_paths 10 と unresolved_paths 312 (部品の .mk の .o のパスなど)。directory literal 2,923 と constructed expression 1,450 は使われ方が未確定で、P2-6 の予行で分かる。
 - 生表は /home/hight/os32-tmp/run/restructure/p0-rerun/rerun-4146cf146/p0-5/。行数は見出しを除く。
 - 仮表 map.json は 1,802 ファイル。dry-run.jsonl は 4,648 実行、置換差分あり 2,731。dry-run-full.json は tools/tests/host_arch/arch_abi.h の全対応表による照合。
-- refs.tsv は 82,351 観測、うち根拠が未確定 22,883。path_refs.tsv は種類×根拠 23 行。現行票 P3.md の init/kernel_start.c は refs と dry-run の両方で確認。
+- refs.tsv は 82,351 観測、うち根拠が未確定 22,883。path_refs.tsv は種類×根拠 23 行。現行票 P3.md の sys/kern/init/kernel_start.c は refs と dry-run の両方で確認。
 - 種類別の出現数：__FILE__ source 21、allow 76、baseline 185、constructed path 3,243、covers 21,343、document 15,998、mutation context 221、mutation operand 9,248、skill 97、source/build 10,101、tools 21,774、workflow 44。
 - effective_covers.tsv は814 登録のうち covers が空の build-no-deploy を除く 813 検査・21,102 行。
 - unresolved.tsv は 7,517 行。constructed expression unchanged; evaluation 未確定 1,450、directory literal; use 未確定 2,923、excluded holder 463、glob outside literal map 1,838、include directory not supplemented by dry-run 521、split_paths 10、unresolved_paths 312。
 - products.tsv は 2,838 成果物。make のログ・.d・配布表・無視対象の生成物を走査。build-start は PC-98 の build.log 作成時刻で、以後に更新された .o・.elf・.a も対象。各行の product_evidence に選定根拠を記録。
 - 前回の PowerMac 像に加え、今回は ppc-ci-image の生成物も走査したため、成果物とシンボルの観測が増えた。
-- artifact_paths.tsv は 24,623 行。DWARF line CU 3,572、DWARF line file 2,856、DW_AT_comp_dir 171、DW_AT_name 3,572、STT_FILE 9,662、path bytes 4,758、runtime string .rodata 31、runtime string .rodata.str1.4 1。gfx/v2/format.o の STT_FILE format.c は build.log と gfx/v2/format.d から gfx/v2/format.c に帰属。
+- artifact_paths.tsv は 24,623 行。DWARF line CU 3,572、DWARF line file 2,856、DW_AT_comp_dir 171、DW_AT_name 3,572、STT_FILE 9,662、path bytes 4,758、runtime string .rodata 31、runtime string .rodata.str1.4 1。sys/hal/gfx/v2/format.o の STT_FILE format.c は build.log と sys/hal/gfx/v2/format.d から sys/hal/gfx/v2/format.c に帰属。
 - 生成物にスラッシュ付き表記が入る TU は 136、うち表記先も照合できた TU は 135。basename 等を含めると 1,148 TU。生成元が未確定の観測は 7,139 行。PC-98 と PowerMac の同一ソースは1回数えた。
 - 未確認：動的な式・変異の実行時の参照先、__FILE__ の展開由来、LLVM bitcode を含む書庫 12 件の非 ELF メンバー、圧縮内容の展開後だけに見える表記。全 CI・ゲスト受入は未実行。
 - 残る漏れ (読み手 2026-11-25): D88 の形の生成物は探索の対象から漏れる — images/os32_boot.d88 (build/image.mk) に fpdummy.c のパスが残るが products.tsv・artifact_paths.tsv に無く、集計の外。
@@ -92,17 +92,17 @@
 - ブロック　2／1／1／6／32
 - LAN　1／1／2／3／42
 - 時刻　2／2／1／5／11
-- HAL の移設判断は 未確定 317、移動のみ候補 33、P8候補 16。操作表を型で走査し、fs/ext2/ext2_medium_ide.c を収録。
-- drivers/ata/atapi.c は atapi_read_sectors の本体で atapi_read10 を呼ぶ。drivers/video/geforce/edid.c は gf4_edid_modes の本体で EDID の checksum を調べる。
+- HAL の移設判断は 未確定 317、移動のみ候補 33、P8候補 16。操作表を型で走査し、sys/platform/pc98/storage/ext2_medium_ide.c を収録。
+- sys/dev/ata/atapi.c は atapi_read_sectors の本体で atapi_read10 を呼ぶ。sys/dev/video/geforce/edid.c は gf4_edid_modes の本体で EDID の checksum を調べる。
 - p8.tsv は 452 呼出し式、63 ファイル、177 関数。P8候補 304、未確定 148。
-- fs/fat/fatfs_vfs.c → drivers/block/fat_diskio.c、kernel/sys.c の geforce_foreground_poll など、直接の呼び出しと定義の所在を確認、変え方（呼び出し口か内部の振り分けか）は未判断。
+- sys/fs/fat/fatfs_vfs.c → sys/dev/block/fat_diskio.c、sys/kern/sys.c の geforce_foreground_poll など、直接の呼び出しと定義の所在を確認、変え方（呼び出し口か内部の振り分けか）は未判断。
 - 追跡 C/H/INC の関数定義と build/out/obj の nm（外部 T/W）を照合。共通側にも定義がある名前、同名のマクロやヘッダ等の局所定義を把握した名前は未確定。
 - geforce.tsv は 244 ファイル。個別の役割は 未確定 199、実コード 45。群の役割は配置からの推測。
 - HAL の移設判断・P8 の変更判断は候補。間接呼出し、マクロ展開、全構成のリンク先、移設後の生成物一致は未確認。
 - include/ の共通ヘッダで宣言され、複数機種に定義がある契約の呼出しを63件除外。platform_clock_read_us は0件、geforce_foreground_poll は候補2件。
-- 残る漏れ：platform_irq_topology は include/platform_irq.h に宣言があるが、定義を確認できたのは platform/pc98/irq_policy.c の1機種のみ。4呼出しが候補に残る。
+- 残る漏れ：platform_irq_topology は sys/include/platform_irq.h に宣言があるが、定義を確認できたのは sys/platform/pc98/irq_policy.c の1機種のみ。4呼出しが候補に残る。
 - 表は /home/hight/os32-tmp/run/restructure/p0-rerun/rerun-4146cf146/p0-6/。
-- 残る漏れ (読み手 2026-11-25): 共通の契約 platform_host_owner_exit は kernel/dev/device_host.c と platform/powermac/host_unavailable.c に定義があり、片方が platform/ の外にあるため p8.tsv に未確定として残る。
+- 残る漏れ (読み手 2026-11-25): 共通の契約 platform_host_owner_exit は sys/kern/dev/device_host.c と sys/platform/powermac/host_unavailable.c に定義があり、片方が platform/ の外にあるため p8.tsv に未確定として残る。
 
 ## P0-7
 
@@ -158,5 +158,5 @@ remote.tsv（40行）は実機ノート・pc98emu への質問。実機とリモ
 - 仕様 §5 の 6 種類に当たらない物: build/ の .mk 74 とリンカスクリプト 16、assets/ 22、sample/ 10、文書 1,274。
 - 残骸の候補: kernel/v86 の .h 5 本、include/ の diag_stack.h・snd_writer_probe.h・type_contract.h・vk32.h はどの像の入力でもない。
 - P0-6・P0-7 の未確定は前と同じ (295・813・811)。HAL の表で役割または移設の判断が未確定の行は和で 326 (役割 295・移設 317)。
-- **外の利用者への質問の回答** (P0-8 の remote.tsv の 40 問、ユーザー承認 2026-11-25 で送付、同日に回答): 実機ノートは /opt/os32 (os32-v3 全体の git の作業木) の tools/ を常駐のサービスが使い、作業木の外に tools/ の写しが 37 個 (~/os32-tmp/tools-<8 桁>/、版の記録なし) と G4 の常駐 (~/os32-tmp/ppc-rh/wt-rd で tools/host_agent_service.py を相対パスで起こす) がある — tools/ を動かす・分ける時は知らせる。pc98emu は tools/ (np21w_ctl・np21w_mcp/np21w_client・gui_gate・ci_fetch・accept/snd2・ppc の 3 本) を sys.path と git archive で使い、ソースを実行時に読む道具が 4 本 (tools/ppc/root_lz4_layout が include/memmap.h、root_lz4_layout_run が tools/gen_memmap.py・lib/kstring_c.c・arch/ppc/ofw_note.S、link_sh_run が userland/shell と kernel/console/con_sink.c、accept/snd2/verify_soft が lib/os32_opna/upstream) — これらは木の中の道具なので P3 の波で一緒に直す。tests/ へ移る時に pc98emu の側で直すのは tools/tests/make_pcm_wav.py と pcm_play_guest.py の呼び出し 2 か所。回答の全文は PM の機械の ~/os32-tmp/run/restructure/remote-answers-*.md。
+- **外の利用者への質問の回答** (P0-8 の remote.tsv の 40 問、ユーザー承認 2026-11-25 で送付、同日に回答): 実機ノートは /opt/os32 (os32-v3 全体の git の作業木) の tools/ を常駐のサービスが使い、作業木の外に tools/ の写しが 37 個 (~/os32-tmp/tools-<8 桁>/、版の記録なし) と G4 の常駐 (~/os32-tmp/ppc-rh/wt-rd で tools/host_agent_service.py を相対パスで起こす) がある — tools/ を動かす・分ける時は知らせる。pc98emu は tools/ (np21w_ctl・np21w_mcp/np21w_client・gui_gate・ci_fetch・accept/snd2・ppc の 3 本) を sys.path と git archive で使い、ソースを実行時に読む道具が 4 本 (tools/ppc/root_lz4_layout が sys/include/memmap.h、root_lz4_layout_run が tools/gen_memmap.py・sys/kern/kstring_c.c・sys/arch/ppc/ofw_note.S、link_sh_run が userland/shell と sys/kern/console/con_sink.c、accept/snd2/verify_soft が lib/os32_opna/upstream) — これらは木の中の道具なので P3 の波で一緒に直す。tests/ へ移る時に pc98emu の側で直すのは tools/tests/make_pcm_wav.py と pcm_play_guest.py の呼び出し 2 か所。回答の全文は PM の機械の ~/os32-tmp/run/restructure/remote-answers-*.md。
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """D4/D5 Device media boundary, real ISO/VFS and libc-free ILP32 runtime."""
 CHECK = dict(name='hostsvc-media', tier=1, needs=[], budget=6.5, covers=[
-    'fs/isofs/iso9660_media.c', 'fs/isofs/iso9660_media.h',
-    'fs/isofs/iso9660.c', 'fs/isofs/iso9660.h', 'fs/isofs/*.inc',
-    'fs/vfs.c', 'fs/vfs.h', 'fs/vfs_device.h',
-    'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h',
-    'platform/pc98/boot_names.c', 'platform/pc98/boot_names.h',
-    'drivers/base/dev.c', 'kernel/dev/dev.h',
+    'sys/fs/isofs/iso9660_media.c', 'sys/fs/isofs/iso9660_media.h',
+    'sys/fs/isofs/iso9660.c', 'sys/fs/isofs/iso9660.h', 'fs/isofs/*.inc',
+    'sys/fs/vfs.c', 'sys/fs/vfs.h', 'sys/fs/vfs_device.h',
+    'sys/fs/vfs_fd.c', 'sys/fs/vfs_fd_stdin.inc', 'sys/fs/vfs_stdin.h', 'sys/kern/exec/exec.h',
+    'sys/platform/pc98/boot_names.c', 'sys/platform/pc98/boot_names.h',
+    'sys/dev/base/dev.c', 'sys/hal/block/dev.h',
     'tools/tests/hostsvc_media_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
     basis=['docs/design/fs/isofs/iso9660_media.md 不変条件', 'docs/design/drivers/block/netcd.md 読みと媒体の確かめ'],
@@ -75,15 +75,15 @@ OP_MUTATIONS = (
 
 
 WIRING_MUTATIONS = (
-    ('u32-priority', 'drivers/base/dev.c', 'if (dev->blk_read_u32)', 'if (0 && dev->blk_read_u32)'),
-    ('signed-range', 'drivers/base/dev.c', 'if (lba > S32_MAX || (count && (u32)(count - 1) > S32_MAX - lba))', 'if (0)'),
-    ('media-dispatch', 'drivers/base/dev.c', 'if (dev->media_check) return dev->media_check(dev, generation);', 'if (0 && dev->media_check) return dev->media_check(dev, generation);'),
-    ('path-check', 'fs/vfs.c', 'rc = ops->resource_check(ctx, &generation);', 'generation = 0; rc = VFS_OK;'),
-    ('next-refresh', 'fs/vfs.c', 'if (mnt->refresh_pending && ops->resource_refresh)', 'if (0 && mnt->refresh_pending && ops->resource_refresh)'),
-    ('refresh-result', 'fs/vfs.c', 'rc = ops->resource_refresh(ctx);', '(void)ops->resource_refresh(ctx); rc = VFS_OK;'),
-    ('dot-error', 'fs/vfs.c', 'if (rc == OS32_ERR_HOSTDOWN || rc == VFS_ERR_STALE) return rc;', ''),
-    ('root-error', 'fs/vfs.c', 'if (rc == VFS_ERR_STALE || rc == OS32_ERR_HOSTDOWN) return rc;', ''),
-    ('fd-next-path', 'fs/vfs.c', 'mounts[i].refresh_pending = 1;', 'mounts[i].refresh_pending = 0;'),
+    ('u32-priority', 'sys/dev/base/dev.c', 'if (dev->blk_read_u32)', 'if (0 && dev->blk_read_u32)'),
+    ('signed-range', 'sys/dev/base/dev.c', 'if (lba > S32_MAX || (count && (u32)(count - 1) > S32_MAX - lba))', 'if (0)'),
+    ('media-dispatch', 'sys/dev/base/dev.c', 'if (dev->media_check) return dev->media_check(dev, generation);', 'if (0 && dev->media_check) return dev->media_check(dev, generation);'),
+    ('path-check', 'sys/fs/vfs.c', 'rc = ops->resource_check(ctx, &generation);', 'generation = 0; rc = VFS_OK;'),
+    ('next-refresh', 'sys/fs/vfs.c', 'if (mnt->refresh_pending && ops->resource_refresh)', 'if (0 && mnt->refresh_pending && ops->resource_refresh)'),
+    ('refresh-result', 'sys/fs/vfs.c', 'rc = ops->resource_refresh(ctx);', '(void)ops->resource_refresh(ctx); rc = VFS_OK;'),
+    ('dot-error', 'sys/fs/vfs.c', 'if (rc == OS32_ERR_HOSTDOWN || rc == VFS_ERR_STALE) return rc;', ''),
+    ('root-error', 'sys/fs/vfs.c', 'if (rc == VFS_ERR_STALE || rc == OS32_ERR_HOSTDOWN) return rc;', ''),
+    ('fd-next-path', 'sys/fs/vfs.c', 'mounts[i].refresh_pending = 1;', 'mounts[i].refresh_pending = 0;'),
 )
 
 
@@ -98,7 +98,7 @@ def build_run(work, source, operation=None, wiring=None):
                 raise RuntimeError(f'{operation[0]}: mutation anchor not unique')
             data = data.replace(before, after)
         (tree / name).write_text(data)
-    for rel in ('fs/vfs.c', 'drivers/base/dev.c'):
+    for rel in ('sys/fs/vfs.c', 'sys/dev/base/dev.c'):
         dest = work / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         data = (ROOT / rel).read_text()
@@ -115,7 +115,7 @@ def build_run(work, source, operation=None, wiring=None):
     exe = work / 'media-test'
     subprocess.run(['gcc', *FLAGS, '-I' + str(work), '-I' + str(ROOT),
                     *include_flags(ROOT), '-I' + str(ROOT / 'drivers/base'), '-nostdlib', '-static', '-no-pie',
-                    str(src), str(work / 'drivers/base/dev.c'), str(harness),
+                    str(src), str(work / 'sys/dev/base/dev.c'), str(harness),
                     '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                     '-o', str(exe)], check=True, cwd=ROOT)
     return host32.run([str(exe)], cwd=ROOT).returncode
@@ -125,7 +125,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'fs/isofs/iso9660_media.c').read_text()
+    original = (ROOT / 'sys/fs/isofs/iso9660_media.c').read_text()
     with tempfile.TemporaryDirectory(prefix='hostsvc-media-') as tmp:
         work = Path(tmp)
         rc = build_run(work, original)

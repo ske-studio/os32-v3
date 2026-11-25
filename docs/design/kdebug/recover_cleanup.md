@@ -1,6 +1,6 @@
-# kdebug/recover_cleanup.h — 設計
+# sys/platform/pc98/kdebug/recover_cleanup.h — 設計
 > 状態: **現行 (2026-10-31)** — 出所: GF6200_4C_DESIGN.md・GF6200_RECLOG_DESIGN.md (D1 で移した)
-ソース: `kdebug/recover_cleanup.h`
+ソース: `sys/platform/pc98/kdebug/recover_cleanup.h`
 
 ## GF6200_4C_DESIGN
 

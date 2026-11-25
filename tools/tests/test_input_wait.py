@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Shared wait contract against the current x86 wait oracle."""
 CHECK = dict(name='input-wait-host', tier=1, budget=5, needs=[], covers=[
-    'input/hal/in2_int.h', 'include/types.h', 'kernel/input_legacy.c',
-    'kernel/input_wait.c', 'tools/tests/input_wait_host.c',
+    'sys/hal/input/in2_int.h', 'sys/include/types.h', 'sys/kern/input_legacy.c',
+    'sys/kern/input_wait.c', 'tools/tests/input_wait_host.c',
     'tools/tests/test_input_wait.py', 'tools/tests/host32.py',
-    'drivers/input/kbd.c', 'input/hal/keymap.h', 'input/hal/input_context.h'], kind='contract',
+    'sys/platform/pc98/input/kbd.c', 'sys/hal/input/keymap.h', 'sys/input/input_context.h'], kind='contract',
     basis=['INPUT_HAL_DESIGN §5', 'INPUT_HAL_DESIGN H7'])
 import os
 from pathlib import Path
@@ -14,7 +14,7 @@ import tempfile
 from types import SimpleNamespace
 import host32
 ROOT = Path(__file__).resolve().parents[2]
-# a822e11c:drivers/input/kbd.c, character/GUI waits (comments stripped).
+# a822e11c:sys/platform/pc98/input/kbd.c, character/GUI waits (comments stripped).
 OLD_CHAR = r"""
 static int old_gui(int interruptible)
 {
@@ -79,10 +79,10 @@ int old_key(int interruptible)
 """
 
 def run(ctx):
-    source = (ctx.root / 'kernel/input_wait.c').read_text()
+    source = (ctx.root / 'sys/kern/input_wait.c').read_text()
     with tempfile.TemporaryDirectory(prefix='input-wait-') as td:
         tmp = Path(td)
-        kbd = (ctx.root / 'drivers/input/kbd.c').read_text()
+        kbd = (ctx.root / 'sys/platform/pc98/input/kbd.c').read_text()
         old = [OLD_CHAR, OLD_KEY]
         (tmp / 'old_wait.inc').write_text('\n'.join(old))
         a = kbd.index('static int kbd_local_trykey(void)')
@@ -98,14 +98,14 @@ def run(ctx):
                    '-ffreestanding','-fno-pie','-fno-stack-protector','-nostdlib',
                    '-static','-no-pie','-I'+str(tmp),'-I'+str(ctx.root/'input/hal'),
                    '-I'+str(ctx.root/'include'),str(ctx.root/'tools/tests/input_wait_host.c'),
-                   str(ctx.root/'kernel/input_legacy.c'),str(tmp/'wait.c'),'-o',str(tmp/'test')]
+                   str(ctx.root/'sys/kern/input_legacy.c'),str(tmp/'wait.c'),'-o',str(tmp/'test')]
             subprocess.run(cmd, check=True)
             return host32.run([str(tmp/'test')], runner='qemu', timeout=10).returncode
         assert execute(source) == 0
         print('PASS libc-free wait: fixed oracle / real x86 provider, 960 character and 1920 key fixtures', flush=True)
         cc = Path(os.environ.get('PPC_CROSS_DIR','/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
         if cc.is_file() and os.access(cc, os.X_OK):
-            for src in [ctx.root/'tools/tests/input_wait_host.c', ctx.root/'kernel/input_wait.c']:
+            for src in [ctx.root/'tools/tests/input_wait_host.c', ctx.root/'sys/kern/input_wait.c']:
                 subprocess.run([str(cc),'-std=gnu11','-DOS32_HOOK_IME=1','-Wall','-Wextra','-Werror','-ffreestanding',
                     '-DPPC_COMPILE','-I'+str(tmp),'-I'+str(ctx.root/'input/hal'),'-I'+str(ctx.root/'include'),
                     '-c',str(src),'-o',str(tmp/(src.stem+'.o'))],check=True)

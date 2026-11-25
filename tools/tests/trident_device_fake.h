@@ -1,7 +1,7 @@
 /* libc-free host seam, TRIDENT_S3_DESIGN §5. No host-only product hooks. */
 #ifndef TRIDENT_DEVICE_FAKE_H
 #define TRIDENT_DEVICE_FAKE_H
-#include "drivers/video/trident/trident.h"
+#include "sys/dev/video/trident/trident.h"
 #define TRI_FAKE_BLOCKED_WORD 0xFA7F3F6Fu
 #define TRI_FAKE_REAL_BYTES 0x00200000u
 /* Trace records an actual access, never two synthetic bytes for OUTW.

@@ -3,7 +3,7 @@
 #include "gfinit_plan_c_host.c"
 /* Base implementation and header are compiled in a separate translation unit. */
 int gf_previous_bridge(const struct gfinit_pll_limits *,u8,u8,u8,u8,u8,u32,u32,u32,void *,u32 *);
-#include "../../hwdev/gf/command.h"
+#include "../../sys/dev/video/geforce/command.h"
 /* Display-only owner leaves command_get NULL; never accept a command call. */
 int gf2_start(struct gf2_chan *ch, struct gf_foundation *f)
 { (void)ch;(void)f;return GF2_ESTATE; }

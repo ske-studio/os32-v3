@@ -26,7 +26,7 @@
 | 段 | 中身 | 状態 |
 |---|---|---|
 | A | 周波数を変える前の実測 (診断像のみ: `tick_probe`、`isr_stub.asm` の計測点、スプラッシュ区間は別集計) | 済 (2026-11-13)。実測は §2 |
-| C | 両 arch 共通の tick_clock (C1: `kernel/time/tick_clock.h`・`tick.c`・SDK の `OS32_TICK_HZ`)、x86 の 100Hz のままの結線 (C2: `isr_stub.asm`・`clock_source.c`)、host 試験 (C3)。C1・C2 は 1 本の枝 | 済 (main) |
+| C | 両 arch 共通の tick_clock (C1: `sys/hal/time/tick_clock.h`・`tick.c`・SDK の `OS32_TICK_HZ`)、x86 の 100Hz のままの結線 (C2: `isr_stub.asm`・`clock_source.c`)、host 試験 (C3)。C1・C2 は 1 本の枝 | 済 (main) |
 | P | PowerPC の B29 の戻し: DEC を物理 1kHz (`PM_DEC_HZ`)、論理 100Hz は tick_clock_step、起動の `dec_rate` (raw と TB)、kboot の試験 (P1〜P3、os32powerpc)。C1 の後、A2 と並列 | 済 (main) |
 | A2 | NIC など阻害区間の解消: 計測 a・IRQ0 の予算 b・NE2K の重い所を協調処理へ c (スプラッシュ区間を除く、削減値は A2-a の実測後)。P と並列 | 設計は確定 (2026-11-09)、実装は未着手 |
 | 再測定 | A 再測定とゲート (閾値一式は全文 §2・§7、承認済み) | 済 (2026-11-13)。実機 Ra266 と NP21/W で満たした (§2) |

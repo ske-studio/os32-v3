@@ -1,4 +1,4 @@
-#include "gfx/v2/gfx2_sw.h"
+#include "sys/hal/gfx/v2/gfx2_sw.h"
 #include "kstring.h"
 static struct gfx2_adapter a;
 static struct gfx2_surf surfaces[3];

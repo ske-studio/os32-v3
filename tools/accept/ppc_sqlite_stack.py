@@ -16,10 +16,10 @@ from kboot_vectors import CROSS, FLAGS
 from run import QMP, ROM, ROOT, command, require
 
 SOURCES = (
-    'arch/ppc/entry.S', 'arch/ppc/ofw_note.S', 'platform/powermac/ofw.c',
-    'platform/powermac/escc_tree.c', 'platform/powermac/escc.c', 'lib/kstring_c.c',
-    'kernel/sqlite_engine.c', 'arch/ppc/sqlite_stack_ppc.S', 'arch/ppc/kernel_fp.c',
-    'arch/ppc/fp_context.S', 'arch/ppc/mmu.S', 'arch/ppc/cache_copy.S',
+    'sys/arch/ppc/entry.S', 'sys/arch/ppc/ofw_note.S', 'sys/platform/powermac/ofw.c',
+    'sys/platform/powermac/escc_tree.c', 'sys/platform/powermac/escc.c', 'sys/kern/kstring_c.c',
+    'sys/kern/sqlite_engine.c', 'sys/arch/ppc/sqlite_stack_ppc.S', 'sys/arch/ppc/kernel_fp.c',
+    'sys/arch/ppc/fp_context.S', 'sys/arch/ppc/mmu.S', 'sys/arch/ppc/cache_copy.S',
     'tools/tests/ppc_sqlite_stack_guest.c', 'tools/tests/ppc_sqlite_stack_regs.S',
 )
 ENGINE_INC = [
@@ -31,10 +31,10 @@ ENGINE_INC = [
 CC = str(CROSS) + 'gcc'
 BUILD_FLAGS = [*FLAGS, '-ffunction-sections', '-fdata-sections']
 MUTATIONS = (
-    ('bad-sp', 'arch/ppc/sqlite_stack_ppc.S', '    blr\n.size sqlite_call_on_alt_stack,',
+    ('bad-sp', 'sys/arch/ppc/sqlite_stack_ppc.S', '    blr\n.size sqlite_call_on_alt_stack,',
      '    addi 1,1,16\n    blr\n.size sqlite_call_on_alt_stack,'),
-    ('bad-fp', 'kernel/sqlite_engine.c', '    arch_kernel_fp_end(&guard);\n', ''),
-    ('bad-ee', 'kernel/sqlite_engine.c',
+    ('bad-fp', 'sys/kern/sqlite_engine.c', '    arch_kernel_fp_end(&guard);\n', ''),
+    ('bad-ee', 'sys/kern/sqlite_engine.c',
      '    sqlite_engine_active = 1;\n    irq_restore(flags);\n',
      '    sqlite_engine_active = 1;\n'),
 )
@@ -73,7 +73,7 @@ SECTIONS {
 def compile_object(out, name, source, extra_flags=()):
     obj = out / (Path(name).stem + '.o')
     flags = []
-    if name == 'kernel/sqlite_engine.c':
+    if name == 'sys/kern/sqlite_engine.c':
         flags = ENGINE_INC
     elif name == 'tools/tests/ppc_sqlite_stack_guest.c':
         flags = ['-I' + str(ROOT / 'kernel')]
@@ -84,8 +84,8 @@ def compile_object(out, name, source, extra_flags=()):
 def check_type_mutations(work):
     # The verdict matches GCC's English diagnostic; translated locales must not turn RED into an error.
     os.environ['LC_ALL'] = 'C'
-    engine = 'kernel/sqlite_engine.c'
-    header = ROOT / 'arch/ppc/arch_kernel_fp.h'
+    engine = 'sys/kern/sqlite_engine.c'
+    header = ROOT / 'sys/arch/ppc/arch_kernel_fp.h'
     original = header.read_text()
     for function, anchor, replacement in TYPE_MUTATIONS:
         out = work / (function + '-type')

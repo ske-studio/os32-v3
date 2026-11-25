@@ -13,13 +13,13 @@ NV44A のメーカー製プログラミングマニュアルは今回の参照�
 **決定**：下層＝初期化命令と表示操作の両方を 1 機能 1 ファイル、中層＝VBE に近い少数のサービス、上層＝OS32 HAL の三層にする。
 OS32 は単一利用者・単一タスク・協調切替。頑丈さの対象はハードの誤動作とバグであり、有限待ち・アクセス範囲・後始末・98 への復帰を守る。権限分離や攻撃者向けの検査は追加しない。
 **初版の決定範囲**は Ra266 の 0:13.0、10de:0221、subsys 10fc:1270 の NV44A、既知 ROM の 27 種・193 命令、head A・ANALOG OR0・RGB-IN。
-OS32 固有差分も保持：PMC_ENABLE bit0 を立てる、RESET 後 1850 は 0、CR3C の組を確認する。根拠は `kdebug/gfinit_op/pll2_zm_reg_decode.inc`、`reset_expand.inc:10`、`docs/design/kdebug/recover_gf.md`。nouveau 全機種対応への拡張はしない。
+OS32 固有差分も保持：PMC_ENABLE bit0 を立てる、RESET 後 1850 は 0、CR3C の組を確認する。根拠は `sys/dev/video/geforce/gfinit_op/pll2_zm_reg_decode.inc`、`reset_expand.inc:10`、`docs/design/kdebug/recover_gf.md`。nouveau 全機種対応への拡張はしない。
 > [要確認] CR3C の組の照合は、現行実装では COPY の直後に読み返していない。
 HAL に GF のレジスタ・ROM・recover token を出さない。
 
-これで再起動時は GF devinit に入らず 98 CUI へ戻れる。起動時上書きキー等の新しい脱出機構や auto 優先候補化は足さない（`platform/pc98/kernel.c` の `kernel_shell_loop()`）。
+これで再起動時は GF devinit に入らず 98 CUI へ戻れる。起動時上書きキー等の新しい脱出機構や auto 優先候補化は足さない（`sys/platform/pc98/kernel.c` の `kernel_shell_loop()`）。
 順番は **route00→ID/定数長/base/資源/写像確認→Command=0x0106 設定・生の 16bit 読戻し確認→ROM 採取・解読→A2 の legacy 無効化/解錠→main0〜4→基準値採取→mode 計算→共有列→必須 CHECK→層1 start→初回転送/セル→route01**。A1 は本番の全経路から外す。
-本番は既知 27 命令専用 runner。解読・整数 PLL・資源検査・A2 のハード手順・局所復元を共有し、recover の plan/node/capture/REC 実行器や kpeek を本番から呼ばない（`kdebug/gfinit_exec.c`、`gfinit.c`）。
+本番は既知 27 命令専用 runner。解読・整数 PLL・資源検査・A2 のハード手順・局所復元を共有し、recover の plan/node/capture/REC 実行器や kpeek を本番から呼ばない（`sys/dev/video/geforce/diag/gfinit_exec.c`、`gfinit.c`）。
 配置は **`geforce.mod`＋核の薄い予約/復帰口**（U5）。下層/中層は `hwdev/gf/`、HAL のバックエンドは `drivers/video/geforce/` (共通層は `gfx/`、TASK_SRC_LAYOUT L2 で移った)、診断 adapter は `kdebug/` と従来 hwdev.mod。本番は KDEBUG=0 で動く。
 層1 start は毎回 `gf_master_enable` → IRQ を閉じて MC 初期化 → instmem (容量計算・BAR2 map・固定領域確保) → tick bind → IRQ attach → running と source ACK/enable・PMC enable。Command の書き込みと `expected_command` の更新のあいだに MMIO を挟まない。再開始も同じ start に入る。
 終了/障害/reboot 前は **新規呼出し停止→層1 stop (running 停止・tick 解除・source mask/ACK → engine 停止・PMC 読取り → IRQ 解除 → BM 解除 → instmem 解放/unmap) →局所 index/lock/窓復元→1850=0→1854=0→PMC140=0→route00→decode 安全確認→98 復元・予約セル往復・再描画**（`docs/design/kdebug/recover_common/s0.md`）。
@@ -29,24 +29,24 @@ S0 は PLL/PFB/旧 timing の完全復元ではなく PARTIAL/S1 未保証を保
 
 層1 の部品（[確定設計](../../../decisions/realhw/GF_FEAT1_DESIGN.md) §7 と追記）:
 
-- `hwdev/gf/master.c` — PCI Bus Master / latency (B0)
-- `hwdev/gf/instmem.c` — instance 確保・解放・アクセス (B1)
-- `hwdev/gf/irq.c` — IRQ 登録・dispatch・ACK・統計 (B2)
-- `hwdev/gf/engine_stop.c` — engine 停止 (B3)
-- `hwdev/gf/mc.c` — NV44 MC 初期化 (B4)
-- `hwdev/gf/instmem_map.c` — BAR2 写像の生存期間 (B5)
-- `drivers/video/geforce/geforce_tick.c` — 常駐 tick 登録・参照管理 (B6)
-- `hwdev/gf/foundation.c` — 層1 の開始・停止 (C0)
-- `kdebug/gf_foundation_test.c` — serial `gf1` 試験 adapter (C9)。module 側の `hwdev/gf/foundation_test.c` が dispatch / prepare を持つ。
+- `sys/dev/video/geforce/master.c` — PCI Bus Master / latency (B0)
+- `sys/dev/video/geforce/instmem.c` — instance 確保・解放・アクセス (B1)
+- `sys/dev/video/geforce/irq.c` — IRQ 登録・dispatch・ACK・統計 (B2)
+- `sys/dev/video/geforce/engine_stop.c` — engine 停止 (B3)
+- `sys/dev/video/geforce/mc.c` — NV44 MC 初期化 (B4)
+- `sys/dev/video/geforce/instmem_map.c` — BAR2 写像の生存期間 (B5)
+- `sys/platform/pc98/video/geforce/geforce_tick.c` — 常駐 tick 登録・参照管理 (B6)
+- `sys/dev/video/geforce/foundation.c` — 層1 の開始・停止 (C0)
+- `sys/dev/video/geforce/diag/gf_foundation_test.c` — serial `gf1` 試験 adapter (C9)。module 側の `sys/dev/video/geforce/foundation_test.c` が dispatch / prepare を持つ。
 
 - [hwdev/gf/display/](display/README.md)
 - [hwdev/gf/op/](op/README.md)
 - [drivers/video/geforce/](../../drivers/video/geforce/README.md)
-- [hwdev/gf/internal.h](internal.md)
-- [hwdev/gf/runner.c](runner.md)
-- [hwdev/gf/save.c](save.md)
-- [hwdev/gf/pll.c](pll.md)
-- [include/video_service.h](../../include/video_service.md)
+- [sys/dev/video/geforce/internal.h](internal.md)
+- [sys/dev/video/geforce/runner.c](runner.md)
+- [sys/dev/video/geforce/save.c](save.md)
+- [sys/dev/video/geforce/pll.c](pll.md)
+- [sys/include/video_service.h](../../include/video_service.md)
 - [hwdev/gf/bus](bus.md)
 - [hwdev/gf/devinit](devinit.md)
 - [hwdev/gf/native](native.md)

@@ -28,7 +28,7 @@ API は Win16 の再現ではなく、その欠点を 386 で払える範囲の�
 | 再描画モデル | InvalidateRect 方式 (damage + commit)、window move は XOR 枠、全画面 backbuffer + clip |
 | GUI API | **libos32gui** — 非同期・ID参照・型付き16B event + retained widget tree + stateless drawing + box layout |
 | app ⇄ WM | KAPI `gui_call(op,arg)` 1 本 + GUI SHM slot 4 本。wire protocol に pointer を載せない |
-| GUI library | 私有 VA の shlib は 0x80000000、app image は 0x80100000 (正典: include/memmap.h / build/out/MEMMAP.md) |
+| GUI library | 私有 VA の shlib は 0x80000000、app image は 0x80100000 (正典: sys/include/memmap.h / build/out/MEMMAP.md) |
 | 色 | system 16色 + focused app の 14色 lease。lease 中 WM chrome は2色 |
 | CUI/GUI | `/etc/system.cfg` の GUI=0/1 は**次回 boot の既定値**。実行中 shell の切替は `sys_switch_shell` |
 | FEP | gshell が GFX renderer を保持。CUI へ戻る前に renderer callback を解除 |
@@ -50,7 +50,7 @@ API は Win16 の再現ではなく、その欠点を 386 で払える範囲の�
 
 ### CUI / GUI 切替フロー
 
-シェル帯の配置は [`include/memmap.h`](../include/memmap.h) の `MEM_SHELL_LOAD_ADDR`、実行モデルは [09_exec.md](09_exec.md) を参照。
+シェル帯の配置は [`sys/include/memmap.h`](../sys/include/memmap.h) の `MEM_SHELL_LOAD_ADDR`、実行モデルは [09_exec.md](09_exec.md) を参照。
 
 ```text
 [CUI -> GUI: 即時]
@@ -318,7 +318,7 @@ T0 の C11 移行は受入完了。現在の順序・決定は [V3_PLAN.md](task
 `docs/archive/portability/SURVEY_N1.md` に記す (観点は `docs/archive/network/TASK_N1.md` §0 段 7)。
 以後の票も同じ観点で `docs/tasks/portability/` に追記する。**移植準備の 4 段は 2026-09-15 に着地した**
 (ARM コンパイル計測 `make check-arm-compile` 55/93、`hlt`/`cli`/`sti` を `io.h` 経由に、`arch/x86` + `platform/pc98`
-の骨格、kstring の C 版、LE アクセサ `include/endian_le.h`。基準値と経過は [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md))。
+の骨格、kstring の C 版、LE アクセサ `sys/include/endian_le.h`。基準値と経過は [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md))。
 残りは `gdt`/`tss`/`cr3` と CPL=3 降下 asm の `arch/x86/` への移設、ARM 実装、KAPI 生成器の arch 対応 (**v3 まで保留**、ユーザー決裁)。
 **移植の必須項目 (ユーザー決定 2026-10-14、v4 のあたりで対応)**: 物理 RAM の登録上端を、32bit CPU の上限 (4GiB) まで使い切れる設計にする。今の v3 は `MEM_PHYS_RAM_CEILING` = 2GB (D11、`[2GB, 4GB)` は窓・MMIO の帯として RAM にしない) で、PC-98 の実機 (最大 512MB 程度) には足りるが、ほかのアーキテクチャへ移すときに上限になる。RAM と装置窓の帯の分け方 (固定の帯ではなく物理地図で決める) を合わせて見直す。
 

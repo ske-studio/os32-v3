@@ -1,4 +1,4 @@
-# fs/ext2/ext2_inode_write_cache.inc — 生 inode 表の保持
+# sys/fs/ext2/ext2_inode_write_cache.inc — 生 inode 表の保持
 
 > 状態: **現行 (2026-10-31)**
 

@@ -1,7 +1,7 @@
 /* Real input forwarding and PC98 binding, with recording device operations. */
 #include "input_service.h"
-#include "../../drivers/input/kbd.h"
-#include "../../kernel/input_service.c"
+#include "../../sys/platform/pc98/input/kbd.h"
+#include "../../sys/hal/input/input_service.c"
 static int seen, arg, discarded;
 static u32 sequence;
 static void *output;
@@ -31,7 +31,7 @@ int kbd_diag_log(u32 after_seq, KbdDiagLogEnt *out, int max)
 #include "port_fixture_host.h"
 int ring3_wait_pending(void) { return 0; }
 void ring3_abort_check(void) { __builtin_trap(); }
-#include "../../platform/pc98/d2_bind.c"
+#include "../../sys/platform/pc98/d2_bind.c"
 /* Generated wrappers retain real output guards and slot numbers. */
 static int hit;
 #define KAPI_HIT(n) (hit = (n))

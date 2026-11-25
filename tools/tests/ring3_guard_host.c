@@ -18,19 +18,19 @@
  *
  *  直し: 「カーネルが WM のコードへ入っている深さ」(ring3_wm_depth) を
  *  gui_call のハンドラ / ポンプ / owner_exit の前後で数え、門の判定は
- *  ring3_guard_active(in_syscall, wm_depth) (exec/ring3_str.c) に寄せる。
+ *  ring3_guard_active(in_syscall, wm_depth) (sys/kern/exec/ring3_str.c) に寄せる。
  *
  *  ここで実物のまま #include して見るのは 3 つ:
- *    (1) exec/ring3_str.c  — 判定表 (in_syscall × wm_depth)
- *    (2) kernel/gui.c      — 入口の配線: ハンドラの**中**では深さが 1 以上、
+ *    (1) sys/kern/exec/ring3_str.c  — 判定表 (in_syscall × wm_depth)
+ *    (2) sys/kern/gui.c      — 入口の配線: ハンドラの**中**では深さが 1 以上、
  *                            戻った後は元どおり。入れ子の gui_call でも同じ。
  *                            owner_exit も同じ印を立てる。
- *    (3) fs/fd_redirect.c  — 門は「ポインタの由来」で決める (代行レビュー P2):
+ *    (3) sys/fs/fd_redirect.c  — 門は「ポインタの由来」で決める (代行レビュー P2):
  *                            アプリが登録したバッファは WM の中 (深さ 1) でも
  *                            表を歩いて断る。WM が張ったバッファは素通し。
- *  kernel/gui.c の外部参照 (res_owner_get / appslot_gui_op_* / kbd_set_gui_mode
+ *  sys/kern/gui.c の外部参照 (res_owner_get / appslot_gui_op_* / kbd_set_gui_mode
  *  / ime_set_render / kstrncpy / kmemset / ring3_wm_enter / ring3_wm_leave) は
- *  ここで贋物にする。ring3_wm_enter / leave の贋物は exec/exec.c の実装の
+ *  ここで贋物にする。ring3_wm_enter / leave の贋物は sys/kern/exec/exec.c の実装の
  *  深さの部分と同じ 2 行 (深さ +1 / 0 で止める -1)。T7b-b2 の WM の印
  *  (ring3_wm_shell_gen) は持たない — 実物は shell_service_host.c が見る。
  *
@@ -58,10 +58,10 @@ void *kmemset(void *dst, int c, u32 n)
     return dst;
 }
 
-/* res_owner_get / res_owner_set は実物の fs/fd_redirect.c (下で #include)。
+/* res_owner_get / res_owner_set は実物の sys/fs/fd_redirect.c (下で #include)。
  * 試験は res_owner_set で「いま走っている ID」を差し替える。 */
 
-/* exec/appslot.c の OP_WAIT の控え — 呼ばれた回数だけ見る。 */
+/* sys/kern/exec/appslot.c の OP_WAIT の控え — 呼ばれた回数だけ見る。 */
 static int host_op_enter, host_op_leave;
 u32 appslot_gui_draw_enter(void) { return 0; }
 void appslot_gui_draw_leave(u32 previous) { (void)previous; }
@@ -72,7 +72,7 @@ static int host_trim_calls;
 i32 exec_trim_done(u32 epoch) { host_trim_calls++; return (i32)epoch; }
 
 void kbd_set_gui_mode(int on) { (void)on; }
-/* kernel/ime/ime.c の実物の代わり: 控えた表を覚えるだけ。初期値は「TVRAM 版」
+/* sys/kern/ime/ime.c の実物の代わり: 控えた表を覚えるだけ。初期値は「TVRAM 版」
  * の代わりの印 (NULL と区別する)。gui_ime_set_render の門の試験 (5) が読む。 */
 static int host_tvram_mark;
 static void *host_ime_render = &host_tvram_mark;
@@ -80,7 +80,7 @@ static int host_ime_set_calls, host_gfx_shutdowns;
 void gfx_shutdown(void) { host_gfx_shutdowns++; }
 void ime_set_render(void *r) { host_ime_set_calls++; host_ime_render = r; }
 
-/* exec/exec.c の ring3_wm_depth / enter / leave と同じ振る舞い。
+/* sys/kern/exec/exec.c の ring3_wm_depth / enter / leave と同じ振る舞い。
  * 深さは試験が読む。 */
 volatile int ring3_wm_depth = 0;
 static int host_enter_calls, host_leave_calls;
@@ -90,12 +90,12 @@ void ring3_wm_leave(void) { host_leave_calls++; if (ring3_wm_depth > 0) ring3_wm
 #include "ring3_str.h"   /* ring3_guard_active (実体は下で #include する実物) */
 #include "vfs.h"         /* 下の VFS の贋物の型 */
 
-/* ---- exec/exec.c の門 (fs/fd_redirect.c が引く 5 本) --------------------
+/* ---- sys/kern/exec/exec.c の門 (sys/fs/fd_redirect.c が引く 5 本) --------------------
  * 表の歩き (ring3_user_ranges_writable_always) は「app_page の中で、
  * host_page_rw が立っていれば書ける」だけの贋物。ページ属性が登録の後で
  * RO に変わる (sys_shm_lock / shlib .text) のは host_page_rw = 0 で装う。
- * 文脈つきの門と由来の問い合わせは exec/exec.c と同じ式 — 判定は実物の
- * ring3_guard_active (exec/ring3_str.c)。ring3_in_syscall は host_in_syscall。 */
+ * 文脈つきの門と由来の問い合わせは sys/kern/exec/exec.c と同じ式 — 判定は実物の
+ * ring3_guard_active (sys/kern/exec/ring3_str.c)。ring3_in_syscall は host_in_syscall。 */
 static u8  app_page[64];              /* アプリのユーザ帯の 1 ページの代わり */
 static u8  wm_buf[64];                /* シェル帯 (WM のバッファ) の代わり */
 static int host_page_rw = 1;
@@ -134,7 +134,7 @@ int ring3_call_from_user(void)
 /* 実物は戻らない (longjmp)。ホストでは数えて戻る — 呼ばれたかだけを見る。 */
 void ring3_fault_kill(void) { host_kills++; }
 
-/* fs/fd_redirect.c が引く VFS (ファイル型は使わない)。 */
+/* sys/fs/fd_redirect.c が引く VFS (ファイル型は使わない)。 */
 int vfs_open(const char *path, int mode) { (void)path; (void)mode; return -1; }
 void vfs_close(int fd) { (void)fd; }
 int vfs_seek(int fd, int off, int whence) { (void)fd; (void)off; (void)whence; return 0; }
@@ -326,7 +326,7 @@ static void case_owner_exit(void)
 
 /* ========================================================================
  *  4. 門はポインタの由来で決める — アプリが登録したバッファは WM の中でも歩く
- *     (2026-09-26、代行レビュー P2。fs/fd_redirect.c の最後の砦)
+ *     (2026-09-26、代行レビュー P2。sys/fs/fd_redirect.c の最後の砦)
  *
  *  筋書き: アプリ (ID 2) が fd 1 を自分のページへリダイレクト → そのページが
  *  RO になる (sys_shm_lock 等) → gui_call(OP_WAIT) → WM のハンドラ (深さ 1)
@@ -428,7 +428,7 @@ static void case_registered_ptr(void)
 
 /* ========================================================================
  *  5. ime_set_render の門 — 常駐側 (owner 1、CPL=0 の直呼び) だけが登録できる
- *     (2026-09-26、代行レビュー P2。kernel/gui.c の gui_ime_set_render)
+ *     (2026-09-26、代行レビュー P2。sys/kern/gui.c の gui_ime_set_render)
  *
  *  カーネルは控えた IME_Render 表の関数を以後ずっと CPL=0 で呼ぶ。アプリが
  *  自分のメモリの表を渡せると、そのコードが CPL=0 で走り、アプリが消えた
@@ -496,7 +496,7 @@ static void case_ime_render(void)
 
 /* ========================================================================
  *  6. gui_register の門 — ime_set_render と同じ「owner 1 かつ CPL=0 の直呼び」
- *     (2026-09-26、代行レビュー P3。kernel/gui.c の gui_register)
+ *     (2026-09-26、代行レビュー P3。sys/kern/gui.c の gui_register)
  *
  *  登録したハンドラ / ポンプは以後ずっと CPL=0 で呼ばれる。正当な呼び手は
  *  gshell の top-level (ディスパッチの外) だけで、それが通ることを固定する。

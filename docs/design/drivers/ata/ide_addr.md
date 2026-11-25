@@ -1,9 +1,9 @@
-# drivers/ata/ide_addr.c — 設計
+# sys/dev/ata/ide_addr.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_HDD_INSTALL 段 1 (§1-v3「ATA 側の変換」) の契約を今のソースと照らして要約
-ソース: `drivers/ata/ide_addr.c`・`drivers/ata/ide_addr.h` (`ide_addr_mode`・`ide_addr_range_ok`・`ide_addr_make`)・使う側 `drivers/ata/ide.c`
+ソース: `sys/dev/ata/ide_addr.c`・`sys/dev/ata/ide_addr.h` (`ide_addr_mode`・`ide_addr_range_ok`・`ide_addr_make`)・使う側 `sys/dev/ata/ide.c`
 
 ATA のセクタ指定 (LBA28 か CHS) を IDENTIFY の申告から決め、タスクファイルに書く値と範囲の検査を作る純粋関数。
-`drivers/ata/ide.c` がレジスタに書く値は全部ここで作る。区画表と IPL の CHS (BIOS 幾何) とは別の幾何で、ここは
+`sys/dev/ata/ide.c` がレジスタに書く値は全部ここで作る。区画表と IPL の CHS (BIOS 幾何) とは別の幾何で、ここは
 **ドライブの現在の変換**だけを扱う。
 
 ## 方式の選び方 (`ide_addr_mode`)

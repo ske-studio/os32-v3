@@ -4,10 +4,10 @@ include build/fep-common.mk
 
 FEP_OBJS := $(addprefix $(FEP_OUT)/,$(FEP_BODY_NAMES:=.o) $(FEP_DISPLAY_NAMES:=.o) fep_import_slots.o fep_import_stubs.o)
 FEP_INC := $(INC_KERNEL) -I. -I$(FEP_OUT)
-$(addprefix $(FEP_OUT)/,$(FEP_BODY_NAMES:=.o)): $(FEP_OUT)/%.o: kernel/ime/%.c $(FEP_GEN) build/config.mk build/fep-module.mk
+$(addprefix $(FEP_OUT)/,$(FEP_BODY_NAMES:=.o)): $(FEP_OUT)/%.o: sys/kern/ime/%.c $(FEP_GEN) build/config.mk build/fep-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_FEP_MODULE $(FEP_INC) -c $< -o $@
 # Display implementation remains private to the FEP module, with its basename.
-$(addprefix $(FEP_OUT)/,$(FEP_DISPLAY_NAMES:=.o)): $(FEP_OUT)/%.o: platform/$(PLATFORM)/%.c $(FEP_GEN) build/config.mk build/fep-module.mk
+$(addprefix $(FEP_OUT)/,$(FEP_DISPLAY_NAMES:=.o)): $(FEP_OUT)/%.o: sys/platform/$(PLATFORM)/%.c $(FEP_GEN) build/config.mk build/fep-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_FEP_MODULE $(FEP_INC) -c $< -o $@
 # 2026-11-10 第 5 段 C2 で platform/pc98 へ移設。差分ビルドの古い .d が旧パスを指すときの対策 (次の大きな整理で消してよい)。
 kernel/ime/ime_render_tvram.c: ;
@@ -22,8 +22,8 @@ $(FEP_OUT)/fep.elf: $(FEP_OBJS) build/fep-module.ld sdk/link/generations.ld
 C_KERNEL_OBJ += $(FEP_OUT)/fep_kexports.o
 R1_OBJECTS += $(FEP_OUT)/fep_kexports.o
 $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf: $(FEP_OUT)/fep_kexports.o
-$(KERNEL_OBJ_PREFIX)kernel/ime/fep_module.o $(R1_OBJ)/kernel/ime/fep_module.o: $(FEP_GEN)
-$(KERNEL_OBJ_PREFIX)kernel/ime/fep_module.o $(R1_OBJ)/kernel/ime/fep_module.o: private CFLAGS_BASE += -I$(FEP_OUT)
+$(KERNEL_OBJ_PREFIX)sys/kern/ime/fep_module.o $(R1_OBJ)/sys/kern/ime/fep_module.o: $(FEP_GEN)
+$(KERNEL_OBJ_PREFIX)sys/kern/ime/fep_module.o $(R1_OBJ)/sys/kern/ime/fep_module.o: private CFLAGS_BASE += -I$(FEP_OUT)
 
 define pack_fep
 	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --module-id 3 --elf $(FEP_OUT)/fep.elf --metadata $(FEP_OUT)/fep_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@

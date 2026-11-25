@@ -109,9 +109,9 @@ Rust の `alloc_demo` は C のヘッダを使えないので、書式・`PASS`/
     STATIC 16 sources, 0 violations
     RUST alloc_demo: 0 violations
     TARGET i386-elf -Werror COMPILE PASS (16 sources)
-    TARGET i386-elf -Werror COMPILE PASS (userland/tests/ring3_hello.c)
-    TARGET i386-elf -Werror COMPILE PASS (userland/tests/ring3_fault.c)
-    TARGET i386-elf -Werror COMPILE PASS (userland/tests/ring3_guard.c)
+    TARGET i386-elf -Werror COMPILE PASS (userland/diag/ring3_hello.c)
+    TARGET i386-elf -Werror COMPILE PASS (userland/diag/ring3_fault.c)
+    TARGET i386-elf -Werror COMPILE PASS (userland/diag/ring3_guard.c)
 
 ## 4. 否定側 (`--mutate`)
 
@@ -145,11 +145,11 @@ Rust の `alloc_demo` は C のヘッダを使えないので、書式・`PASS`/
 | 場所 | 欠陥 |
 |---|---|
 | `userland/rust/alloc_demo/src/lib.rs` | **何も検査していなかった**。常に 0 を返し、最後に無条件で `All tests passed!` を印字。`sum=285` はコメントだけ。回帰台本に偽の合格が 1 件混ざっていた (票 §5-1) |
-| `userland/tests/ring3_fault.c` / `ring3_hello.c` | `int 0x80` を `eax=0` で呼んでいた = スロット 0 = `gfx_init`。終了せず無限ループになる。`ring3_guard.c` で 2026-09-06 に直った修正から漏れていた (票 §5-2) |
-| `userland/tests/test2.c` | `sys_write` は**書けたバイト数**を返す (`fs/vfs_fd.c`) のに `wr == 0` を成功と読んでいた。11 バイト書けても `FAIL` を出していた (票に無い。作業中に発見) |
-| `userland/tests/save_test.c` | `/host` 決め打ち 9 か所。HostDrv の無い構成では全滅していた → 帯域を 1 か所にして `sys_is_mounted` で SKIP (票 §4) |
-| `userland/tests/klibc_test.c` | 集計カウンタを `main` で初期化していないので 2 回目以降の呼び出しで数が積み上がる (票に無い。ハーネスが 2 回走らせて発見) |
-| `userland/tests/save_test.c` | `test_peek()` が文の後ろで宣言していた ([C1] 違反。`-Werror` を付けたら落ちる) |
+| `userland/diag/ring3_fault.c` / `ring3_hello.c` | `int 0x80` を `eax=0` で呼んでいた = スロット 0 = `gfx_init`。終了せず無限ループになる。`ring3_guard.c` で 2026-09-06 に直った修正から漏れていた (票 §5-2) |
+| `userland/diag/test2.c` | `sys_write` は**書けたバイト数**を返す (`sys/fs/vfs_fd.c`) のに `wr == 0` を成功と読んでいた。11 バイト書けても `FAIL` を出していた (票に無い。作業中に発見) |
+| `userland/diag/save_test.c` | `/host` 決め打ち 9 か所。HostDrv の無い構成では全滅していた → 帯域を 1 か所にして `sys_is_mounted` で SKIP (票 §4) |
+| `userland/diag/klibc_test.c` | 集計カウンタを `main` で初期化していないので 2 回目以降の呼び出しで数が積み上がる (票に無い。ハーネスが 2 回走らせて発見) |
+| `userland/diag/save_test.c` | `test_peek()` が文の後ろで宣言していた ([C1] 違反。`-Werror` を付けたら落ちる) |
 
 ## 6. この試験がまだ見ていないこと
 

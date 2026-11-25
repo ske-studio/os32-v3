@@ -12,7 +12,7 @@ CHECK = dict(name='fep-import-deps-host', tier=1, needs=['make:kernel'], budget=
              kind='characterization',
              covers=['build/fep-common.mk', 'tools/gen_sqlite_imports.py',
                      'tools/gen_kdebug_imports.py', 'tools/module_schema.py', 'sdk/kapi.json',
-                     'kernel/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c',
+                     'sys/kern/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c',
                      'tools/mkmod.py', 'tools/prototypes/fep_imports.def',
                      'tools/prototypes/sqlite_imports.def', 'tools/tests/test_fep_import_deps.py'])
 ROOT = Path(__file__).resolve().parents[2]

@@ -22,7 +22,7 @@ INTERFACES = {
 RULES = [
     ('音', 'sound/hal/', '振り分け', r'->(?:hw_\w+|caps)\s*\('),
     ('音', 'sound/hal/', '共通処理', r'\bsnd2_(?:stg|seg|stream)_\w+\([^;{}]*\)\s*\{'),
-    ('入力', 'kernel/input_service.c', '振り分け', r'->(?:getkey|poll)\('),
+    ('入力', 'sys/hal/input/input_service.c', '振り分け', r'->(?:getkey|poll)\('),
     ('入力', 'input/hal/', '共通処理', r'\b(?:in2_ring_push|input_src_register)\([^;{}]*\)\s*\{'),
     ('描画', 'gfx/', '振り分け', r'->(?:enter|present|page_flip)\('),
     ('描画', 'gfx/', '共通処理', r'\b(?:gfx_dirty_\w+|gfx_reinit_surfaces)\([^;{}]*\)\s*\{'),

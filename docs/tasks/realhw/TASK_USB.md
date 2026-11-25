@@ -19,7 +19,7 @@
 ## 2. 段の状態
 | 段 | 状態 |
 |---|---|
-| 段 1: 1A (型と契約)・1B (OHCI)・1C (中核)・1D の HID の class・1P (PowerMac の殻と QEMU の受入) | os32powerpc、1A から着手 (2026-11-13)。共通の場所に入れる前に本線へ知らせる。memmap.h・kernel/irq/tick.h は触らない |
+| 段 1: 1A (型と契約)・1B (OHCI)・1C (中核)・1D の HID の class・1P (PowerMac の殻と QEMU の受入) | os32powerpc、1A から着手 (2026-11-13)。共通の場所に入れる前に本線へ知らせる。memmap.h・sys/kern/irq/tick.h は触らない |
 | 段 1: 1D の drivers/input/ の PC-98 の側・1E (常駐の部品・platform/pc98 の殻・pci_mmio・memmap.h・tick の枠・KAPI usb_stat_get・Ra266 の実機) | 本線、PowerPC の 1A〜1D の後 |
 | 段 2・3 | 未着手 (確定設計 §10・§11)、担当は段 1 の結果を見て決める |
 

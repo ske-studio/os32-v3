@@ -1,4 +1,4 @@
-#include "gfx/v2/gfx2_sw.h"
+#include "sys/hal/gfx/v2/gfx2_sw.h"
 u8 gfx2_sw_rowbuf[2][GFX2_SW_ROW_BYTES];
 static u8 pixels[32];
 static struct gfx2_surf surf;

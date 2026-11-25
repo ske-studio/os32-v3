@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Input source allocation and native event layout contract."""
 CHECK = dict(name='input-source-host', tier=1, budget=5, needs=[], covers=[
-    'input/hal/in2_int.h', 'input/hal/in2_dev.c', 'input/hal/keymap.h', 'include/types.h',
-    'include/io.h', 'sdk/include/os32/os32_kapi_shared.h',
+    'sys/hal/input/in2_int.h', 'sys/hal/input/in2_dev.c', 'sys/hal/input/keymap.h', 'sys/include/types.h',
+    'sys/include/io.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/input_source_host.c', 'tools/tests/test_input_source.py',
     'tools/tests/host32.py'], basis=['INPUT_HAL_DESIGN §3'], kind='contract')
 import os
@@ -16,11 +16,11 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 
 def run(ctx):
-    header = (ctx.root / 'input/hal/in2_int.h').read_text()
-    source = (ctx.root / 'input/hal/in2_dev.c').read_text()
+    header = (ctx.root / 'sys/hal/input/in2_int.h').read_text()
+    source = (ctx.root / 'sys/hal/input/in2_dev.c').read_text()
     with tempfile.TemporaryDirectory(prefix='input-source-') as td:
         tmp = Path(td)
-        (tmp / "keymap.h").write_text((ctx.root / "input/hal/keymap.h").read_text())
+        (tmp / "keymap.h").write_text((ctx.root / "sys/hal/input/keymap.h").read_text())
         (tmp / 'io.h').write_text('static inline unsigned irq_save(void) { return 0; }\nstatic inline void irq_restore(unsigned x) { (void)x; }\n')
         def build(h, s):
             (tmp / 'in2_int.h').write_text(h)

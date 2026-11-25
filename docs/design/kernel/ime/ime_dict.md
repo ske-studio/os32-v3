@@ -1,7 +1,7 @@
-# kernel/ime/ime_dict.c — システム辞書と学習 DB の 2 接続、検索の合成、切替
+# sys/kern/ime/ime_dict.c — システム辞書と学習 DB の 2 接続、検索の合成、切替
 
 > 状態: **現行 (2026-11-18)** — 出所: DICT_META_DESIGN・TASK_DICT_META (要約して移した)
-ソース: `kernel/ime/ime_dict.c`・`kernel/ime/ime_dict_api.inc`・`kernel/ime/ime_suspend.c`・`kernel/ime/ime.c` (`ime_dict_boot`)・`kernel/ime/fep_body.c`
+ソース: `sys/kern/ime/ime_dict.c`・`sys/kern/ime/ime_dict_api.inc`・`sys/kern/ime/ime_suspend.c`・`sys/kern/ime/ime.c` (`ime_dict_boot`)・`sys/kern/ime/fep_body.c`
 
 型・定数・誤りの意味は [ime_store.h の契約](ime_store.md)、学習 DB の中身は [ime_user_store](ime_user_store.md) にある。
 
@@ -83,4 +83,4 @@
 - `fep-meta` (`tools/tests/test_fep_meta.py`): 実物の SQLite で probe・切替・旧形式・未来版。
 - `fep-budget-host`・`fep-worst-load-host`・`fep-standard-host` (`tools/checks/`): 2 接続と probe の最大の使用量が予約に収まること。
 - `hsync-fep-host` (`tools/tests/test_hsync_fep.py`): 停止と再開を hsync から。
-- ゲスト: `userland/tests/fep_meta_test.c` (S→L→S で学習の頻度が残る、予約を超える切替で今の辞書が残る、ID・品詞の不一致で学習が止まり変換は続く)。
+- ゲスト: `userland/diag/fep_meta_test.c` (S→L→S で学習の頻度が残る、予約を超える切替で今の辞書が残る、ID・品詞の不一致で学習が止まり変換は続く)。

@@ -1,11 +1,11 @@
-# net/link.c のワイヤ v2 と状態機械 — 設計
+# sys/net/link.c のワイヤ v2 と状態機械 — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_N0 (第 5 版)・TASK_N1 の契約を今のソースと照らして要約
-ソース: `net/link.h`・`net/link.c`・`net/link_rx.inc`・`net/link_host_api.inc`
+ソース: `sys/net/link.h`・`sys/net/link.c`・`sys/net/link_rx.inc`・`sys/net/link_host_api.inc`
 
 Host Services の link (EtherType 0x88B5) のフレームの形、HELLO、再同期、ハンドルの状態機械 (OS32 側)。
 KAPI の口 (`host_open`〜`host_close` の戻り値・期限) は `docs/design/net/link_host_api.md`、
 ホスト側の rid 台帳とセッション採番は `docs/design/tools/host_agent.md`。
-試験は `tools/tests/net_link_host.c` (実 `net/link.c` + 実 `kapi/kapi_host.c`、対向は実 Agent か台本) と `tools/tests/test_host_agent.py`。
+試験は `tools/tests/net_link_host.c` (実 `sys/net/link.c` + 実 `sys/kapi/kapi_host.c`、対向は実 Agent か台本) と `tools/tests/test_host_agent.py`。
 
 ## 1. ヘッダ (20B、LE で明示的に直列化)
 

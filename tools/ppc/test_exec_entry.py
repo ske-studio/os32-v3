@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/tests"))
 import host32
-SOURCE = ROOT / 'arch/ppc/exec_entry.c'
+SOURCE = ROOT / 'sys/arch/ppc/exec_entry.c'
 HARNESS = r'''
 #include "exec_arch.h"
 struct view { u32 pc, sp; struct exec_entry_args args; };

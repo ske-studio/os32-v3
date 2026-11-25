@@ -1,7 +1,7 @@
 """M4 real surface static/dynamic membership, with runtime-only guard mutations."""
 CHECK = dict(name='ledger-surface-map-host', tier=1, budget=4.4,
-             covers=['mm/pgalloc.c', 'mm/pgalloc.h', 'mm/pgalloc_*.inc',
-                     'mm/physmem.c', 'mm/physmem.h', 'include/memmap.h',
+             covers=['sys/kern/mm/pgalloc.c', 'sys/kern/mm/pgalloc.h', 'mm/pgalloc_*.inc',
+                     'sys/kern/mm/physmem.c', 'sys/kern/mm/physmem.h', 'sys/include/memmap.h',
                      'tools/tests/ledger_surface_map_host.c',
                      'tools/tests/test_ledger_surface_map.py',
                      'tools/tests/pgalloc_host_fixture.h',
@@ -20,7 +20,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'mm/pgalloc_surface.inc'
+PRODUCT = 'sys/kern/mm/pgalloc_surface.inc'
 # A1 acceptance and A2 rejection, including resource provenance.
 # Mutations compile successfully and must fail in the C harness.
 MUTATIONS = [
@@ -39,7 +39,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='ledger-surface-map-') as name:
         tmp = Path(name)
         # Private copies preserve quoted includes and never mutate the tree.
-        (tmp / 'pgalloc.c').write_text((ROOT / 'mm/pgalloc.c').read_text().replace(
+        (tmp / 'pgalloc.c').write_text((ROOT / 'sys/kern/mm/pgalloc.c').read_text().replace(
             '#include "io.h"', '#include "arch_io.h"'))
         harness = ROOT / 'tools/tests/ledger_surface_map_host.c'
         exe = tmp / 'host'
@@ -55,7 +55,7 @@ def main():
                             '-Wl,--defsym=__kernel_resident_end=0x375000',
                             '-I' + str(ROOT / 'tools/tests/host_arch'),
                             '-I' + str(ROOT / 'tools/tests'), *include_flags(ROOT),
-                            str(harness), str(ROOT / 'mm/physmem.c'), '-o', str(exe)],
+                            str(harness), str(ROOT / 'sys/kern/mm/physmem.c'), '-o', str(exe)],
                            check=True)
 
         for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():

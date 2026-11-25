@@ -7,11 +7,11 @@ void gfx_policy_reeval(void) {}
  *  実行:   python3 -B tools/tests/test_con_sink.py
  *  記録:   tools/tests/con_sink_tdd.md
  *
- *  kernel/console/con_sink.c を 1 行も写さずそのまま #include する (模型ではない)。
+ *  sys/kern/console/con_sink.c を 1 行も写さずそのまま #include する (模型ではない)。
  *  カーネル帯に要るものは 2 つだけ:
  *    - 割込み禁止区間: ホストは CPL=3 で cli/popfl を実行できないので
  *      arch_io.h の IRQ 状態模型で保存・復元を観測する。
- *    - 所有者: fs/fd_redirect.c の res_owner_get/set をここで持つ。
+ *    - 所有者: sys/fs/fd_redirect.c の res_owner_get/set をここで持つ。
  *
  *  test_multiapp_model.py と同じ様式 — ホスト ILP32 GNU89 で走らせ、同じ
  *  ソースが i386-elf-gcc -Werror でも通ることを別に見る ([C1])。
@@ -32,7 +32,7 @@ void res_owner_set(int owner) { g_owner = owner; }
 #include "con_sink.c"
 
 /* ======================================================================== */
-/*  kernel/console/console.c も**実物のまま**取り込む (K6C-2)                        */
+/*  sys/kern/console/console.c も**実物のまま**取り込む (K6C-2)                        */
 /*                                                                          */
 /*  「シンク有効中は描画関数が TVRAM に触らない」を見るために要るのは 2 つ:  */
 /*    - テキスト VRAM: text_screen.h の TVRAM_BASE / TVRAM_ATTR はただの番地       */
@@ -73,7 +73,7 @@ static int g_v86;
 #define LEGACY_FAKE_ACTIVE g_v86
 #include "legacy_guest_fake.h"
 
-#include "../../kernel/port_service.c"
+#include "../../sys/kern/port_service.c"
 int ring3_wait_pending(void) { return 0; }
 void ring3_abort_check(void) { __builtin_trap(); }
 static char copied[128];
@@ -90,13 +90,13 @@ static const ConOutputOps capture_output = { .putchar = capture_putchar };
 static u32 g_inject_pending;
 void kbd_inject_discard(void) { g_inject_pending = 0; }
 
-/* --- 起動ログ (init/bootlog.c) の代わり --------------------------------
+/* --- 起動ログ (sys/kern/init/bootlog.c) の代わり --------------------------------
  * console.c の入口は con_sink と同じ 4 か所で bootlog_push も呼ぶ。この
  * 試験が見るのはシンクなので、起動ログは受け流す (実物の試験は
  * tools/tests/test_bootlog.py)。 */
 void bootlog_push(const char *buf, u32 len) { (void)buf; (void)len; }
 
-/* --- launch_req 表の launch_child の代わり (exec/launch.c は引けない) -----
+/* --- launch_req 表の launch_child の代わり (sys/kern/exec/launch.c は引けない) -----
  * 実物は「その ID の表が所有する子。不正 ID / 不在は 0」。ここでは読み手→子
  * の対応を 1 本の配列で持ち、同じ約束 (範囲外は 0) を守る。 */
 #define HOST_LC_MAX 64
@@ -145,8 +145,8 @@ void console_hw_cursor_enable(void);    /* console.c の中で前方参照され
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wsign-compare"
-#include "../../kernel/console/console.c"
-#include "../../platform/pc98/console.c"
+#include "../../sys/kern/console/console.c"
+#include "../../sys/platform/pc98/console.c"
 #pragma GCC diagnostic pop
 
 /* ---- 最小の報告系 (libc 無し) ------------------------------------------ */
@@ -208,7 +208,7 @@ static u32 drain(void)
     return total;
 }
 
-/* exec/exec.c の exec_reclaim_owned (9) の con_sink 部分を**そのまま写した**
+/* sys/kern/exec/exec.c の exec_reclaim_owned (9) の con_sink 部分を**そのまま写した**
  * 形 (exec.c はカーネル一式を引くのでホストへ #include できない)。順序が
  * 効く: con_sink_owner_exit で読み手が消えた後に判定すると、端末自身の
  * 退場でも EXIT を積んでしまう (受け取る相手はもう居ない)。 */
@@ -869,7 +869,7 @@ static void capture_init(u32 baud) { if (baud == SYS_SERIAL_BAUD) boot_serial_in
 static const PortOps capture_port = { .init = capture_init };
 const char *bootlog_compose(const char *header, u32 *len)
 { (void)header; *len = 4; return "old\n"; }
-#include "../../platform/pc98/boot_serial.inc"
+#include "../../sys/platform/pc98/boot_serial.inc"
 
 static void case_boot_serial(void)
 {

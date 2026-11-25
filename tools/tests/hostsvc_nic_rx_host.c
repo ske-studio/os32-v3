@@ -1,10 +1,10 @@
 #include "rx_io_clock.h"
 /* A3 real queues/demux, fake NIC boundary. Limits: design §2 and 82557 RFD ring. */
 #include "hostsvc_fixture.h"
-#include "net/nic_rx.h"
-#include "net/rx_work.h"
-#include "net/link.h"
-#include "drivers/net/e82557/e82557_regs.h"
+#include "sys/net/nic_rx.h"
+#include "sys/net/rx_work.h"
+#include "sys/net/link.h"
+#include "sys/dev/net/e82557/e82557_regs.h"
 #include "os32_kapi_shared.h"
 
 #define REQUIRE(e) do { if (!(e)) return __LINE__; } while (0)

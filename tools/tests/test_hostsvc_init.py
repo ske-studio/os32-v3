@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """I1 resident SFS boot wiring, borrowed lifetime and common peer (ILP32)."""
 CHECK = dict(name='hostsvc-init', tier=1, needs=[], budget=3.9, covers=[
-    'platform/pc98/kernel.c', 'platform/pc98/kernel_boot_memory.inc', 'init/sysconfig.h', 'platform/pc98/boot_platform.h',
-    'include/config.h', 'include/types.h', 'include/kprintf.h', 'include/net_eth.h',
-    'fs/serialfs/serialfs.h', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_lan.c',
-    'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.h', 'fs/vfs.h',
-    'net/nic.h', 'net/host_mailbox.c', 'net/host_mailbox.h',
-    'sdk/include/os32/os32_host_notice.h', 'mm/kmalloc.h', 'lib/kstring.h', 'sdk/include/os32/os32_kapi_shared.h',
+    'sys/platform/pc98/kernel.c', 'sys/platform/pc98/kernel_boot_memory.inc', 'sys/kern/init/sysconfig.h', 'sys/platform/pc98/boot_platform.h',
+    'sys/include/config.h', 'sys/include/types.h', 'sys/include/kprintf.h', 'sys/include/net_eth.h',
+    'sys/fs/serialfs/serialfs.h', 'sys/fs/serialfs/sfs_lan.h', 'sys/fs/serialfs/sfs_lan.c',
+    'sys/fs/serialfs/sfs_client.h', 'sys/fs/serialfs/sfs_proto.h', 'sys/fs/vfs.h',
+    'sys/net/nic.h', 'sys/net/host_mailbox.c', 'sys/net/host_mailbox.h',
+    'sdk/include/os32/os32_host_notice.h', 'sys/kern/mm/kmalloc.h', 'sys/kern/kstring.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_init_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
     basis=['docs/design/fs/serialfs/serialfs_persistent.md 何をするか'],
@@ -44,15 +44,15 @@ def build_run(work, source):
         '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
         '-ffunction-sections', '-fdata-sections', '-I'+str(work), '-I'+str(ROOT),
         *include_flags(ROOT), '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
-        str(ROOT / 'tools/tests/hostsvc_init_host.c'), str(work / 'lan.c'), str(ROOT / 'net/host_mailbox.c'), '-o', str(exe)], check=True)
+        str(ROOT / 'tools/tests/hostsvc_init_host.c'), str(work / 'lan.c'), str(ROOT / 'sys/net/host_mailbox.c'), '-o', str(exe)], check=True)
     return [host32.run([str(exe)], input=bytes([m]), capture_output=True).returncode for m in range(10)]
 def main():
-    source = (ROOT / 'platform/pc98/kernel_boot_memory.inc').read_text().split('static void kernel_boot_memory(')[0]
+    source = (ROOT / 'sys/platform/pc98/kernel_boot_memory.inc').read_text().split('static void kernel_boot_memory(')[0]
     with tempfile.TemporaryDirectory(prefix='hostsvc-init-') as td:
         work=Path(td)
         (work / 'io.h').write_text('static inline unsigned int irq_save(void) { return 0; }\n'
             'static inline void irq_restore(unsigned int f) { (void)f; }\n')
-        lan=(ROOT / 'fs/serialfs/sfs_lan.c').read_text()
+        lan=(ROOT / 'sys/fs/serialfs/sfs_lan.c').read_text()
         lan=lan.replace('sfs_lan_init', 'body_lan_init').replace('sfs_lan_set_peer', 'body_lan_peer').replace('sfs_lan_io', 'body_lan_io')
         (work / 'lan.c').write_text(lan)
         results=build_run(work,source)

@@ -12,8 +12,8 @@
 
 全文は [MACHCFG_DESIGN](../../decisions/settings/MACHCFG_DESIGN.md)。
 
-- 形: 既定は機種ごとのビルド時の表 (PowerMac は PVR → platform 既定、PC-98 は platform 既定の 1 行)。root が読めた後に `/etc/machine.cfg` (パスの正典は `include/config.h` の `SYS_MACHINE_CFG`) で上書きして 1 回だけ確定する。ファイルが無い・壊れた・FS の無い像では既定で確定し、起動は止めない。
-- 読みは既存の `init/sysconfig.c` を使う (新しいパーサは作らない、PM 決定)。sysconfig.c から gf_production の 2 関数を `init/gf_production_cfg.c` に出して、sysconfig.c を共通 (`C_COMMON_EXEC`) に移す。machine.cfg の厳しい検査は一時読取の間だけ効き、system.cfg の解釈は変えない。
+- 形: 既定は機種ごとのビルド時の表 (PowerMac は PVR → platform 既定、PC-98 は platform 既定の 1 行)。root が読めた後に `/etc/machine.cfg` (パスの正典は `sys/include/config.h` の `SYS_MACHINE_CFG`) で上書きして 1 回だけ確定する。ファイルが無い・壊れた・FS の無い像では既定で確定し、起動は止めない。
+- 読みは既存の `sys/kern/init/sysconfig.c` を使う (新しいパーサは作らない、PM 決定)。sysconfig.c から gf_production の 2 関数を `sys/kern/init/gf_production_cfg.c` に出して、sysconfig.c を共通 (`C_COMMON_EXEC`) に移す。machine.cfg の厳しい検査は一時読取の間だけ効き、system.cfg の解釈は変えない。
 - 最初の利用者: PowerPC 7450 の NAP (既定 0。早くに下ろし、確定後に 1 の時だけ立てる。`tools/ppc/cpu_nap_host.c` の期待を対で直す)。性能の段の要求値 `perf.profile` (暫定の既定 0 = 互換、PM 決定。自動の扱いは票 PERF_PROFILE_PLAN の判断)。
 - 契約: 内部契約 AC-BOOT-3 を第一候補 ([ARCH_COMPAT_CONTRACT](../../decisions/ARCH_COMPAT_CONTRACT.md))。公開 KAPI と hwdev の ABI は変えない。
 
@@ -24,7 +24,7 @@
 | 段 | 状態 |
 |---|---|
 | G-a・G1 | **完了 (2026-11-18、e196afb70、PowerPC の PM)**。7450 の NAP を設定に依らず下ろす。G4 実機で、設計の追記 P-R4 の順の 1 手目 (NAP=0) で固まりが無くなった (記録は票 TASK_PPC_REALHW §2) — 2 手目 (DPM と POW も外す) は要らない |
-| B・B1・C・M・M1 | **済 (2026-11-19、terra、astra のレビューの直し 1 回)**。契約 `include/machcfg_contract.h`・`include/config.h` の `SYS_MACHINE_CFG`・`kernel/machcfg.c`・host 試験 `machcfg-host`。段 J で kernel/machcfg.c をビルドに登録済み。設計の欠け 2 つは設計の末尾の「段 B・C の実装で埋めた設計の欠け」 |
+| B・B1・C・M・M1 | **済 (2026-11-19、terra、astra のレビューの直し 1 回)**。契約 `sys/include/machcfg_contract.h`・`sys/include/config.h` の `SYS_MACHINE_CFG`・`sys/kern/machcfg.c`・host 試験 `machcfg-host`。段 J で sys/kern/machcfg.c をビルドに登録済み。設計の欠け 2 つは設計の末尾の「段 B・C の実装で埋めた設計の欠け」 |
 | A・B2〜B4・D (D-i・D-ii)・E・H・J・K・N | 済 (main)。B・B1・C・M・M1 も main |
 | F・G-b・I・L・N1 | PowerPC の残り |
 

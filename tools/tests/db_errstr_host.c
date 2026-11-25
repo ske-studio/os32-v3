@@ -6,8 +6,8 @@
 /*  ホストでは番地の区別が付かないので「読めた」ではなく `test_shm` の        */
 /*  範囲の検査として書く (票 §5 の E6)。                                     */
 /*                                                                           */
-/*  実物だけを組む: 実 `kapi/kapi_db.c` + 実 `lib/sqlite3/sqlite3.c` +        */
-/*  実 `lib/sqlite3/os32_sqlite_vfs.c` + 実 `fs/vfs_fd.c`。模型は exec 側の    */
+/*  実物だけを組む: 実 `sys/kapi/kapi_db.c` + 実 `lib/sqlite3/sqlite3.c` +        */
+/*  実 `lib/sqlite3/os32_sqlite_vfs.c` + 実 `sys/fs/vfs_fd.c`。模型は exec 側の    */
 /*  ポインタ検証と SHM の置き場だけ — どちらもカーネル番地に依存する。        */
 /*  DB は `:memory:` で開くので、ホストのファイルシステムには触らない。       */
 /*                                                                           */
@@ -84,7 +84,7 @@ static unsigned char test_shm[DB_SHM_BLOCK_SIZE + SHM_CANARY];
 int services_public = 1;
 /* Internally running even while all public entries are stubs. */
 int sqlite_module_ready(void) { return 1; }
-#include "../../kapi/kapi_db.c"
+#include "../../sys/kapi/kapi_db.c"
 
 /* ========================================================================= */
 /*  判定の道具                                                               */

@@ -38,11 +38,11 @@ def fixture(work, core_bss=32, core_data=4, link_edit=None):
         f'global kentry\nsection .text\nkentry: nop\n'
         f'section .data align=4\ntimes {core_data} db 7\n'
         f'section .bss align=4\nresb {core_bss}\n')
-    obj = work / 'build/out/obj/arch/x86/kernel/kentry.o'
+    obj = work / 'build/out/obj/sys/arch/x86/kernel/kentry.o'
     obj.parent.mkdir(parents=True)
     command(['nasm', '-f', 'elf32', p.with_suffix('.asm'), '-o', obj])
     script = gen.preprocess_layout(ROOT, (ROOT / 'build/os32.ld').read_text())
-    script = script.replace('arch/x86/kernel/kentry.o', 'build/out/obj/arch/x86/kernel/kentry.o')
+    script = script.replace('sys/arch/x86/kernel/kentry.o', 'build/out/obj/sys/arch/x86/kernel/kentry.o')
     if link_edit:
         before, after = link_edit
         assert before in script
@@ -50,7 +50,7 @@ def fixture(work, core_bss=32, core_data=4, link_edit=None):
     (work / 'layout.ld').write_text(script)
     elf = work / 'kernel.elf'
     command(['ld', '-m', 'elf_i386', '-T', 'layout.ld', '-Map=kernel.map',
-             '-o', elf, 'build/out/obj/arch/x86/kernel/kentry.o'], cwd=work)
+             '-o', elf, 'build/out/obj/sys/arch/x86/kernel/kentry.o'], cwd=work)
     command(['objcopy', '-O', 'binary', elf, work / 'kernel.bin'])
     return elf
 
@@ -65,7 +65,7 @@ def generate(script, work, elf, *extra):
 def link_asserts(work, elf):
     """Execute ASSERTs against real section extents, not a parsed script string."""
     _, syms = gen.read_elf(elf)
-    m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), syms)
+    m = gen.Macros(gen.read_defines(ROOT / 'sys/include/memmap.h'), syms)
     assertions = []
     for lo, hi, section in (('__bss_start', '__bss_end', '.bss'),
                             ('__bss_start', '__bss_end', '.ledger_fixed')):
@@ -78,7 +78,7 @@ def link_asserts(work, elf):
             assertions.append(f'ASSERT({hi} <= {a} || {lo} >= {a+n}, "BSS guard")')
     (work / 'assert.ld').write_text('\n'.join(assertions))
     return command(['ld', '-m', 'elf_i386', '-T', 'layout.ld', '-T', 'assert.ld',
-                    '-o', work / 'assert.elf', 'build/out/obj/arch/x86/kernel/kentry.o'], cwd=work, ok=False)
+                    '-o', work / 'assert.elf', 'build/out/obj/sys/arch/x86/kernel/kentry.o'], cwd=work, ok=False)
 
 
 def edit_elf(elf, output, symbol=None, value=None, bss_end=None):
@@ -224,7 +224,7 @@ def run_cases(vk, exes, script, work, real=False):
     r = generate(script, d, bad)
     assert r.returncode != 0 and b'outside zero range' in r.stderr, 'BSS omission accepted'
     # Shift zeroing (not file bytes) across the existing stack guard.
-    m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), syms)
+    m = gen.Macros(gen.read_defines(ROOT / 'sys/include/memmap.h'), syms)
     guard_end = m.get('MEM_STACK_GUARD') + m.get('MEM_GUARD_SIZE')
     bad = edit_elf(elf, d/'guard.elf', '__bss_end', guard_end)
     r = generate(script, d, bad)

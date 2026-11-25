@@ -4,9 +4,9 @@ import host32
 from test_gfx_kernel_fb import run_case, ROOT
 
 HOOKS = [
-    ('gfx/gfx_core.c', 'if (g_backend && g_backend->leave) g_backend->leave();',
+    ('sys/hal/gfx/gfx_core.c', 'if (g_backend && g_backend->leave) g_backend->leave();',
      'if (g_backend && g_backend->leave) { extern void host_shutdown_event(int); host_shutdown_event(0); g_backend->leave(); }'),
-    ('gfx/gfx_core.c', 'if (g_backend && g_backend->shutdown) g_backend->shutdown();',
+    ('sys/hal/gfx/gfx_core.c', 'if (g_backend && g_backend->shutdown) g_backend->shutdown();',
      'if (g_backend && g_backend->shutdown) { extern void host_shutdown_event(int); host_shutdown_event(1); g_backend->shutdown(); }'),
 ]
 MUTANTS = [
@@ -39,7 +39,7 @@ def main():
             assert result.returncode == 0, result.returncode
     if args.mutate:
         for name, old, new in MUTANTS:
-            result = run_case(None, args.runner, HOOKS + [('gfx/gfx_core.c', old, new)], fixture, stage=stage)
+            result = run_case(None, args.runner, HOOKS + [('sys/hal/gfx/gfx_core.c', old, new)], fixture, stage=stage)
             assert result.returncode == 1 and 'FAIL' in result.stdout, (name, result)
             print('RED ' + name)
 

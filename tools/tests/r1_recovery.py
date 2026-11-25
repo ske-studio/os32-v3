@@ -9,8 +9,8 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET_SRCS = ['tools/tests/r1_recovery_host.c', 'tools/tests/r1_recovery.py',
-               'exec/appslot.c', 'exec/appslot.h', 'exec/owner_diag.h',
-               'mm/paging.c', 'exec/lease.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
+               'sys/kern/exec/appslot.c', 'sys/kern/exec/appslot.h', 'sys/kern/exec/owner_diag.h',
+               'sys/kern/mm/paging.c', 'sys/kern/exec/lease.c', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h']
 
 
 def recovery(tmp, function, runner, mutation=None):
@@ -25,10 +25,10 @@ def recovery(tmp, function, runner, mutation=None):
         text = text.replace('"../exec/appslot.h"', '"appslot.h"')
         text = text.replace('"../gfx/gfx.h"', '"gfx.h"')
         (tmp / name).write_text(text)
-    stage('paging_source.c', read('mm/paging.c'))
-    stage('pgalloc_source.c', read('mm/pgalloc.c'))
-    exe = read('exec/exec.c')
-    slot = read('exec/appslot.c')
+    stage('paging_source.c', read('sys/kern/mm/paging.c'))
+    stage('pgalloc_source.c', read('sys/kern/mm/pgalloc.c'))
+    exe = read('sys/kern/exec/exec.c')
+    slot = read('sys/kern/exec/appslot.c')
     stage('slot_source.c', '\n'.join(function(slot, sig) for sig in (
         'AppSlot *appslot_at(', 'AppSlot *appslot_get(', 'void appslot_resume_commit(',
         'int appslot_return_target(', 'void appslot_switch_to(', 'void appslot_mark_scheduled(')))
@@ -50,20 +50,20 @@ def recovery(tmp, function, runner, mutation=None):
           'static void host_resume_tail(int app_id) { AppSlot *a=appslot_get(app_id); int restart_stdin=0; int fp_depth=0;\n'
           + tail + '}\nstatic void host_syscall_tail(u32 *frame) { int io_owner = appslot_cur(); int prev_caller=0, prev_in_syscall=0; struct arch_syscall *prev_frame=0; struct arch_syscall call = { frame }; u32 result = frame[7];\n' + end + '}\n')
     # Linux cannot map guest page zero. Only BIOS/CPU/device edges are substitutes.
-    stage('v86_source.c', read('platform/pc98/legacy/v86_mem.c').replace(
+    stage('v86_source.c', read('sys/platform/pc98/legacy/v86_mem.c').replace(
         'P2V(V86_REMAP_START)', 'host_low').replace('P2V(MEM_AUTOPLAY_MAILBOX_BASE)', '(host_low + MEM_AUTOPLAY_MAILBOX_BASE)'))
-    entry = function(read('arch/x86/kernel/isr_handlers.c'), 'void exception_handler(')
+    entry = function(read('sys/arch/x86/kernel/isr_handlers.c'), 'void exception_handler(')
     entry = entry[:entry.index('    /* 画面上部クリア */')] + '}\n'
     entry = entry.replace('    const char *name;\n    int row = 0;', '    (void)error_code;')
     stage('entry_source.c', '#include "idt.h"\n' + entry)
-    stage('fixture_source.c', read('kernel/r1_fixture.c').replace('arch_fixture_ud()', 'host_raise_ud()'))
+    stage('fixture_source.c', read('sys/kern/r1_fixture.c').replace('arch_fixture_ud()', 'host_raise_ud()'))
     flags = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
              '-ffreestanding', '-fno-builtin', '-fno-pie', '-fno-stack-protector',
              '-ffunction-sections', '-fdata-sections', '-nostdlib', '-static', '-no-pie',
              '-Wl,--gc-sections', '-DOS32_R1_FIXTURE', '-DPHYSMEM_HOST_TEST=1', '-I'+str(tmp)]
     flags += (['-I' + str(ROOT / p) for p in ('tools/tests/host_arch', 'tools/tests')] + include_flags(ROOT))
     result = host32.build(flags + [str(ROOT/'tools/tests/r1_recovery_host.c'),
-                         str(ROOT/'mm/physmem.c'), '-o', str(tmp/'recovery')],
+                         str(ROOT/'sys/kern/mm/physmem.c'), '-o', str(tmp/'recovery')],
                          capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     return host32.run([str(tmp/'recovery')], runner=runner, capture_output=True, text=True, timeout=30)
@@ -73,16 +73,16 @@ def lease_recovery(function, runner, mutation=None):
     from test_gfx_attach import TARGET_SRCS as GFX_SRCS, SDK_SRCS, HEADERS, CORE
     from test_gfx_kernel_fb import run_case
     texts = {p: paging_source(ROOT/p) for p in GFX_SRCS}
-    fixture = (ROOT/'kernel/r1_fixture.c').read_text()
+    fixture = (ROOT/'sys/kern/r1_fixture.c').read_text()
     if mutation:
         path, old, new = mutation
-        if path == 'kernel/r1_fixture.c':
+        if path == 'sys/kern/r1_fixture.c':
             assert fixture.count(old) == 1
             fixture = fixture.replace(old, new)
         else:
             assert texts[path].count(old) == 1
             texts[path] = texts[path].replace(old, new)
-    texts['exec/lease.c'] = '#define OS32_R1_FIXTURE\n' + texts['exec/lease.c']
+    texts['sys/kern/exec/lease.c'] = '#define OS32_R1_FIXTURE\n' + texts['sys/kern/exec/lease.c']
     names = set(re.findall(r'\b(gfx_\w+)\s*\(', '\n'.join(texts[p] for p in SDK_SRCS+HEADERS)))
     names.discard('gfx_cpl')
     pattern = re.compile(r'(?<!->)(?<!\.)\b('+'|'.join(sorted(names))+r')\b')
@@ -106,39 +106,39 @@ def lease_recovery(function, runner, mutation=None):
 
 
 RECOVERY_MUTANTS = [
-    ('ready-injection', 'kernel/r1_fixture.c',
+    ('ready-injection', 'sys/kern/r1_fixture.c',
      'arch_fixture_ud(); /* CPL0, before entering the V86 guest. */',
      '(void)0; /* ready injection removed */', 'FAIL 0'),
-    ('K1-hook', 'platform/pc98/legacy/v86_mem.c', '    r1_fixture_v86_ready();', '    /* omitted */', 'FAIL 0'),
-    ('parent-hook', 'exec/exec.c', '        exec_r1_fixture_parent(id);', '        /* omitted */', 'FAIL g_slot[2].as->appmem_poisoned'),
-    ('parent-too-late', 'exec/exec.c',
+    ('K1-hook', 'sys/platform/pc98/legacy/v86_mem.c', '    r1_fixture_v86_ready();', '    /* omitted */', 'FAIL 0'),
+    ('parent-hook', 'sys/kern/exec/exec.c', '        exec_r1_fixture_parent(id);', '        /* omitted */', 'FAIL g_slot[2].as->appmem_poisoned'),
+    ('parent-too-late', 'sys/kern/exec/exec.c',
      '#ifdef OS32_R1_FIXTURE\n        exec_r1_fixture_parent(id);\n#endif\n        parent = appslot_return_target(id);',
      '        parent = appslot_return_target(id);\n#ifdef OS32_R1_FIXTURE\n        exec_r1_fixture_parent(id);\n#endif', 'FAIL g_slot[2].as->appmem_poisoned'),
-    ('parked-hook', 'exec/exec.c', '    exec_r1_fixture_resume((int)app_id);', '    /* omitted */', 'FAIL g_slot[id].as->appmem_poisoned'),
-    ('parked-too-late', 'exec/exec.c',
+    ('parked-hook', 'sys/kern/exec/exec.c', '    exec_r1_fixture_resume((int)app_id);', '    /* omitted */', 'FAIL g_slot[id].as->appmem_poisoned'),
+    ('parked-too-late', 'sys/kern/exec/exec.c',
      '#ifdef OS32_R1_FIXTURE\n    exec_r1_fixture_resume((int)app_id);\n#endif\n    appslot_resume_commit((int)app_id);',
      '    appslot_resume_commit((int)app_id);\n#ifdef OS32_R1_FIXTURE\n    exec_r1_fixture_resume((int)app_id);\n#endif', 'FAIL g_slot[id].as->appmem_poisoned'),
-    ('target-id', 'kernel/r1_fixture.c', 'r1_fixture_id[hook] != (u32)id ||', '0 ||', 'FAIL !spaces[2].appmem_poisoned'),
-    ('target-generation', 'kernel/r1_fixture.c', 'r1_fixture_generation[hook] != a->as->generation', '0', 'FAIL !spaces[2].appmem_poisoned'),
-    ('parked-mark', 'kernel/r1_fixture.c', 'a->state == APP_STATE_PARKED && a->parked_from_wait', 'a->state == APP_STATE_PARKED', 'FAIL !spaces[2].appmem_poisoned'),
-    ('parent-state', 'kernel/r1_fixture.c', 'parent->state == APP_STATE_RUNNING', '1', 'FAIL !spaces[2].appmem_poisoned'),
-    ('commit-loses-abort', 'exec/appslot.c', '    a->parked_from_wait = 0;      /* 印は 1 回きり (3 つの park 点すべてで) */',
+    ('target-id', 'sys/kern/r1_fixture.c', 'r1_fixture_id[hook] != (u32)id ||', '0 ||', 'FAIL !spaces[2].appmem_poisoned'),
+    ('target-generation', 'sys/kern/r1_fixture.c', 'r1_fixture_generation[hook] != a->as->generation', '0', 'FAIL !spaces[2].appmem_poisoned'),
+    ('parked-mark', 'sys/kern/r1_fixture.c', 'a->state == APP_STATE_PARKED && a->parked_from_wait', 'a->state == APP_STATE_PARKED', 'FAIL !spaces[2].appmem_poisoned'),
+    ('parent-state', 'sys/kern/r1_fixture.c', 'parent->state == APP_STATE_RUNNING', '1', 'FAIL !spaces[2].appmem_poisoned'),
+    ('commit-loses-abort', 'sys/kern/exec/appslot.c', '    a->parked_from_wait = 0;      /* 印は 1 回きり (3 つの park 点すべてで) */',
      '    a->abort_req = 0;\n    a->parked_from_wait = 0;', 'FAIL !forbid_app_pd'),
-    ('resume-abort', 'exec/exec.c', '    g_cur_app = a;\n    ring3_abort_check();', '    g_cur_app = a;', 'FAIL !forbid_app_pd'),
-    ('syscall-abort', 'exec/exec.c', '    /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */\n    ring3_abort_check();', '    /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */', 'FAIL 0'),
-    ('quarantine-account', 'exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);', '    /* omitted */', 'FAIL ledger_owner_pages(owner)==pages'),
-    ('quarantine-pages', 'exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);',
+    ('resume-abort', 'sys/kern/exec/exec.c', '    g_cur_app = a;\n    ring3_abort_check();', '    g_cur_app = a;', 'FAIL !forbid_app_pd'),
+    ('syscall-abort', 'sys/kern/exec/exec.c', '    /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */\n    ring3_abort_check();', '    /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */', 'FAIL 0'),
+    ('quarantine-account', 'sys/kern/exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);', '    /* omitted */', 'FAIL ledger_owner_pages(owner)==pages'),
+    ('quarantine-pages', 'sys/kern/exec/exec.c', '    exec_as_leftover_pages += ledger_owner_pages(a->as->owner);',
      '    u32 lost; ledger_reclaim_owner(a->as->owner, &lost);', 'FAIL ledger_owner_pages(owner)==pages'),
-    ('normal-context-release', 'platform/pc98/legacy/v86_mem.c',
+    ('normal-context-release', 'sys/platform/pc98/legacy/v86_mem.c',
      'if (kctx_irq_depth || kctx_exc_depth) goto done;',
      '/* exception-depth guard omitted */', 'FAIL !kctx_exc_depth'),
 ]
 LEASE_MUTANTS = [
-    ('lease-hook', 'exec/lease.c', '    if (exec_r1_fixture_lease(as, auth->role)) return LEASE_FULL;',
+    ('lease-hook', 'sys/kern/exec/lease.c', '    if (exec_r1_fixture_lease(as, auth->role)) return LEASE_FULL;',
      '    /* omitted */', 'FAIL libos32gfx_attach_checked()==OS32_ERR_FULL'),
-    ('lease-one-shot', 'kernel/r1_fixture.c', '    r1_fixture_arm[slot] = 0;',
+    ('lease-one-shot', 'sys/kern/r1_fixture.c', '    r1_fixture_arm[slot] = 0;',
      '    /* leave armed */', 'FAIL !r1_fixture_arm[R1_FIXTURE_LEASE_FAIL]'),
-    ('lease-role', 'kernel/r1_fixture.c', 'role == LEDGER_ROLE_CLIENT',
+    ('lease-role', 'sys/kern/r1_fixture.c', 'role == LEDGER_ROLE_CLIENT',
      '(role || 1)', 'FAIL !r1_fixture_lease(&space,LEDGER_ROLE_TVRAM)'),
     ('wait-no-retry', 'userland/lib/gfx/libos32gfx_core.c',
      '    gfx_api->sys_halt();\n    (void)libos32gfx_check();', '    gfx_api->sys_halt();',

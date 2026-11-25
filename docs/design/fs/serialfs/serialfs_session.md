@@ -1,6 +1,6 @@
-# fs/serialfs/serialfs_session.c — 設計
+# sys/fs/serialfs/serialfs_session.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_SERIAL_HOSTFS 部品 B (§1-v2 B-4'・B-6'、§1-v3、ユーザー決裁 1〜3) の契約を今のソースと照らして要約
-ソース: `fs/serialfs/serialfs_session.c` (`serialfs_session_begin`・`serialfs_session_end`)・PC-98 前景 `fs/serialfs/sfs_session_fg.c` (`sfs_finish`)・ゲート `drivers/char/serial.c` (`serial_gate_set`・`serial_gate_put`・`serial_gate_get`・`serial_hold_take`・`serial_hold_dropped`)・`sfs run` `userland/shell/rshell.c`・`userland/shell/serial_watchdog.c` (`rsh_sfs_child`・`rsh_esc_classify`)
+ソース: `sys/fs/serialfs/serialfs_session.c` (`serialfs_session_begin`・`serialfs_session_end`)・PC-98 前景 `sys/fs/serialfs/sfs_session_fg.c` (`sfs_finish`)・ゲート `sys/dev/char/serial.c` (`serial_gate_set`・`serial_gate_put`・`serial_gate_get`・`serial_hold_take`・`serial_hold_dropped`)・`sfs run` `userland/shell/rshell.c`・`userland/shell/serial_watchdog.c` (`rsh_sfs_child`・`rsh_esc_classify`)
 
 UART の SerialFS のセッションは常駐シェルの組込み **`sfs run <コマンド行>`** の 1 行の中でだけ開く (KAPI `sfs_begin` / `sfs_end`)。
 `mount /host COM1 serialfs` の単独実行は断る (`userland/shell/cmd_mnt.c`)。自動マウントはしない。LAN の常駐のときの
@@ -23,7 +23,7 @@ PowerMac の USERSHELL 像は前景を登録しない。常駐 LAN が無効な�
 - HELLO に答えが無ければセッションは始まっていない。フレームは送らず、隔離を済ませてからゲートを下ろし、溜めた文字を
   そのまま流す (相手が遅れて HELLO に答えた可能性を前提にする)。
 
-## ゲート (`drivers/char/serial.c`)
+## ゲート (`sys/dev/char/serial.c`)
 
 - 送信: セッション中は SerialFS の専用の口 (`serial_gate_put`) だけが線に出す。ほかの送信 (console の複写、KAPI の
   `serial_putchar` / `serial_puts`、ISR の kprintf) は保留リング (`SER_HOLD_SIZE` = 8KB) に溜める。溢れた分は数えて
@@ -42,5 +42,5 @@ PowerMac の USERSHELL 像は前景を登録しない。常駐 LAN が無効な�
 ## 確かめ
 
 `make check-serialfs-host` (`tools/tests/test_serialfs.py`) の C の段 (`tools/tests/serialfs_session_host.c`)・GATE の段
-(`serial_gate_host.c` が実物の `drivers/char/serial.c` を偽のポートで回す)。セッション中に rshell へフレームが漏れない、
+(`serial_gate_host.c` が実物の `sys/dev/char/serial.c` を偽のポートで回す)。セッション中に rshell へフレームが漏れない、
 セッション外の本文にフレームがあっても答えない、を見る。NP21/W と実機は残る。

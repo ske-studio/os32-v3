@@ -3,8 +3,8 @@
 CHECK = dict(name='ppc-rh-observe-host', tier=2, budget=30, needs=[], covers=[
     'platform/powermac/rh_observe.[ch]', 'platform/powermac/ofw.[ch]',
     'tools/ppc/rh_observe_host.c', 'tools/tests/test_ppc_rh_observe.py',
-    'arch/ppc/ppc_boot.h', 'platform/powermac/platform_of_layout.h',
-    'lib/kstring_c.c', 'lib/kstring.h', 'include/types.h', 'tools/tests/host32.py'],
+    'sys/arch/ppc/ppc_boot.h', 'sys/platform/powermac/platform_of_layout.h',
+    'sys/kern/kstring_c.c', 'sys/kern/kstring.h', 'sys/include/types.h', 'tools/tests/host32.py'],
     basis=['PPC_REALHW_G4_DESIGN §3', 'PPC_REALHW_G4_DESIGN §6'],
 )
 import os
@@ -19,8 +19,8 @@ import host32
 
 
 def main():
-    source = (ROOT/'platform/powermac/rh_observe.c').read_text()
-    ofw = (ROOT/'platform/powermac/ofw.c').read_text()
+    source = (ROOT/'sys/platform/powermac/rh_observe.c').read_text()
+    ofw = (ROOT/'sys/platform/powermac/ofw.c').read_text()
     with tempfile.TemporaryDirectory(prefix='rh-observe-') as td:
         work = Path(td)
         def evaluate(text, wrapper=ofw, link=False):
@@ -31,7 +31,7 @@ def main():
                 '-fno-builtin','-fno-pie','-no-pie','-nostdlib','-nostdinc','-static',
                 '-DKBOOT_LINK='+str(int(link)), '-D__cdecl=','-Iinclude','-Ilib','-Iarch/ppc','-Iplatform/powermac',
                 'tools/ppc/rh_observe_host.c',str(ofsrc),
-                'lib/kstring_c.c',str(src),'-o',str(exe)],cwd=ROOT,check=True)
+                'sys/kern/kstring_c.c',str(src),'-o',str(exe)],cwd=ROOT,check=True)
             return host32.run([str(exe)], runner='qemu').returncode
         assert evaluate(source)==0
         assert evaluate(source, link=True)==0

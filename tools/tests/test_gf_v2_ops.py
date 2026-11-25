@@ -7,7 +7,7 @@ import host32
 from kernel_includes import include_flags
 from mutpar import build_in_tree
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'drivers/video/geforce/gf_v2_ops.c'
+SOURCE = 'sys/dev/video/geforce/gf_v2_ops.c'
 MUTATIONS = (
     ('gart-dst-to-2d', 'ex->dst->pool == GFX2_POOL_GART)) {', '0)) {'),
     ('gart-src-to-2d', 'ex->src->pool == GFX2_POOL_GART || ex->dst->pool', '0 || ex->dst->pool'),
@@ -31,8 +31,8 @@ def observe(work, mutation=None):
     work = work / (mutation[0] if mutation else "normal-" + str(len(list(work.iterdir()))))
     work.mkdir()
     exe = work / 'ops'
-    sources = ['tools/tests/gf_v2_ops_host.c', 'drivers/video/geforce/gf_v2_weak.c',
-               'drivers/video/geforce/gf_v2_fence.c', 'drivers/video/geforce/gf_v2_life.c', 'hwdev/gf/accel_rop3.c', 'hwdev/gf/accel_rop.c', 'hwdev/gf/vram_view.c']
+    sources = ['tools/tests/gf_v2_ops_host.c', 'sys/dev/video/geforce/gf_v2_weak.c',
+               'sys/dev/video/geforce/gf_v2_fence.c', 'sys/dev/video/geforce/gf_v2_life.c', 'sys/dev/video/geforce/accel_rop3.c', 'sys/dev/video/geforce/accel_rop.c', 'sys/dev/video/geforce/vram_view.c']
     build_in_tree(ROOT, work, edits, [['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
         '-O0', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static',
         '-I'+str(ROOT), *include_flags(ROOT), *[str(ROOT / p) for p in sources], '-o', str(exe)]])

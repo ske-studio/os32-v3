@@ -14,12 +14,12 @@ CHECK = dict(name='remote-x11', tier=1, needs=[], budget=15,
         'tools/lanfs_host.py', 'tools/serialfs_host.py', 'tools/host_tree_manifest.py',
         'userland/shell/rshell_lan.c',
         'userland/shell/shell.h',
-        'include/remote_control.h',
-        'include/con_sink.h',
-        'net/host_mailbox.h',
-        'net/link.h',
-        'include/net_eth.h',
-        'include/types.h',
+        'sys/include/remote_control.h',
+        'sys/include/con_sink.h',
+        'sys/net/host_mailbox.h',
+        'sys/net/link.h',
+        'sys/include/net_eth.h',
+        'sys/include/types.h',
         'userland/lib/host/libos32host.h',
         'sdk/include/os32/os32api.h',
         'sdk/include/os32/ls.h',
@@ -33,7 +33,7 @@ CHECK = dict(name='remote-x11', tier=1, needs=[], budget=15,
         'userland/shell/ui.c',
         'userland/shell/serial_watchdog.c',
         'userland/shell/serial_watchdog.h',
-        'include/config.h',
+        'sys/include/config.h',
         'userland/lib/save/libos32save.h',
         'tools/tests/remote_x11_host.c',
         'tools/tests/test_remote_x11.py',
@@ -44,7 +44,7 @@ CHECK = dict(name='remote-x11', tier=1, needs=[], budget=15,
         'tools/host_notify.py',
         'tools/host_rshell.py',
         'tools/host_operator_socket.py',
-        'net/link_host_api.inc',
+        'sys/net/link_host_api.inc',
     ],
     basis=['LAN_OPERATOR_DESIGN §3', 'LAN_OPERATOR_DESIGN §4'],
 )
@@ -88,7 +88,7 @@ def guest_test(folder, mutation=None):
 
 
 def declaration_test(folder):
-    source = (ROOT / 'net/link_host_api.inc').read_text()
+    source = (ROOT / 'sys/net/link_host_api.inc').read_text()
     start = source.index('static int tok(')
     end = source.index('/* ======================================================================== */', start)
     code = '#include "remote_control.h"\n' + source[start:end] + r"""

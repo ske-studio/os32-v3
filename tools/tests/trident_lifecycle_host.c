@@ -1,9 +1,9 @@
 /* D ScreenInit/EnterVT option branches; X ResetVideo and D DPMS oracles.
  * MIT notices in drivers/video/trident/trident.h. */
 #include "trident_device_fake.h"
-#include "drivers/video/trident/trident_module.h"
+#include "sys/dev/video/trident/trident_module.h"
 #include "backend_under_test.c"
-#include "drivers/video/trident/probes.h"
+#include "sys/dev/video/trident/probes.h"
 #include "concrete_probe_broker.h"
 #define CHECK(x) do { if (!(x)) return __LINE__; } while (0)
 static struct trident_fake f;

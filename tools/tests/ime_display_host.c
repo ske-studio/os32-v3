@@ -1,7 +1,7 @@
 /* Real console, TVRAM renderer and candidate restoration on host planes. */
 #define main con_sink_fixture_main
 #define _start con_sink_fixture_start
-#include "input/hal/input_context.h"
+#include "sys/input/input_context.h"
 int input_context_snapshot(KbdPolicySnapshot *out) { (void)out; return -1; }
 void kbd_policy_ime_state(u32 active, u32 owner, u32 gen)
 { (void)active; (void)owner; (void)gen; }
@@ -9,15 +9,15 @@ int input_ime_cancel_take(const KbdPolicySnapshot *current) { (void)current; ret
 #include "con_sink_host.c"
 #undef main
 #undef _start
-#include "../../platform/pc98/ime_render_tvram.c"
-#include "../../platform/pc98/ime_display.c"
+#include "../../sys/platform/pc98/ime_render_tvram.c"
+#include "../../sys/platform/pc98/ime_display.c"
 /* Geometry is a provider seam; exercise common rendering with another size. */
 static int host_cols = 80, host_row = 24;
 static int test_display_cols(void) { return host_cols; }
 static int test_display_row(void) { return host_row; }
 #define ime_display_cols test_display_cols
 #define ime_display_preedit_row test_display_row
-#include "../../kernel/ime/ime.c"
+#include "../../sys/kern/ime/ime.c"
 #undef ime_display_cols
 #undef ime_display_preedit_row
 

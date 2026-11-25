@@ -1,8 +1,8 @@
 /* libc-free kernel API seam. PCI boot values come from the common device fake;
  * no fake register access is allowed during this core-only transaction. */
 #include "trident_device_fake.h"
-#include "drivers/pci/pci.h"
-#include "mm/pgalloc.h"
+#include "sys/dev/pci/pci.h"
+#include "sys/kern/mm/pgalloc.h"
 #include "gfx_hal.h"
 #include "kprintf.h"
 

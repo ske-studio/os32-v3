@@ -28,7 +28,7 @@ MUTATIONS = [
  ('no-private-copy', '        kmemcpy(P2V(phys), P2V(image->pages[image->text_pages + i]), PAGE_SIZE);', '        kmemset(P2V(phys), 0, PAGE_SIZE);'),
 ]
 def run(mutation=None):
-    source = (ROOT / 'mm/shlib.c').read_text()
+    source = (ROOT / 'sys/kern/mm/shlib.c').read_text()
     if mutation:
         _, old, new = mutation
         if source.count(old) != 1:
@@ -37,8 +37,8 @@ def run(mutation=None):
     with tempfile.TemporaryDirectory(prefix='os32-app-bb-') as tmp:
         tmp = pathlib.Path(tmp)
         (tmp / 'shlib_host_source.c').write_text(source)
-        (tmp / 'paging_host_source.c').write_text(paging_source(ROOT / 'mm/paging.c'))
-        allocator = (ROOT / 'mm/pgalloc.c').read_text()
+        (tmp / 'paging_host_source.c').write_text(paging_source(ROOT / 'sys/kern/mm/paging.c'))
+        allocator = (ROOT / 'sys/kern/mm/pgalloc.c').read_text()
         for part in ('owner', 'resource', 'surface'):
             allocator = allocator.replace(
                 f'#include "pgalloc_{part}.inc"', (ROOT / f'mm/pgalloc_{part}.inc').read_text())
@@ -48,7 +48,7 @@ def run(mutation=None):
         host_includes = ['-I' + str(ROOT / 'tools/tests/host_arch')] + includes
         exe = tmp / 'app_bb_overlap'
         cmd = ['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
-               *host_includes, str(SRC), str(ROOT / 'mm/physmem.c'), str(ROOT / 'exec/os32x_hdr.c'), str(ROOT / 'exec/appslot.c'), '-o', str(exe)]
+               *host_includes, str(SRC), str(ROOT / 'sys/kern/mm/physmem.c'), str(ROOT / 'sys/kern/exec/os32x_hdr.c'), str(ROOT / 'sys/kern/exec/appslot.c'), '-o', str(exe)]
         build = subprocess.run(cmd, capture_output=bool(mutation))
         if build.returncode != 0:
             if mutation:

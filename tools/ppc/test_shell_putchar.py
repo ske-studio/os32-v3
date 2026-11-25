@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'platform/powermac/shell_putchar.c'
+SOURCE = ROOT / 'sys/platform/powermac/shell_putchar.c'
 HARNESS = r'''
 #include "console.h"
 static unsigned char bytes[4];

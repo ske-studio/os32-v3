@@ -15,27 +15,27 @@ from kernel_includes import include_flags
 from mutpar import build_in_tree
 
 ROOT = Path(__file__).resolve().parents[2]
-BACKEND = 'drivers/video/of_fb/backend_of_fb.c'
-V2 = 'drivers/video/of_fb/of_fb_v2.c'
-SOURCES = [BACKEND, V2, 'platform/powermac/display_provider.c',
-           'platform/powermac/display_dual.c', 'platform/powermac/display.c', 'gfx/gfx_scroll.c']
+BACKEND = 'sys/dev/video/of_fb/backend_of_fb.c'
+V2 = 'sys/dev/video/of_fb/of_fb_v2.c'
+SOURCES = [BACKEND, V2, 'sys/platform/powermac/display_provider.c',
+           'sys/platform/powermac/display_dual.c', 'sys/platform/powermac/display.c', 'sys/hal/gfx/gfx_scroll.c']
 CHECK = dict(env=['ppc-cross'], name='of-fb-host', tier=1, needs=[], budget=30, covers=[
-    'drivers/video/of_fb/backend_of_fb.c', 'drivers/video/of_fb/of_fb_v2.c',
-    'drivers/video/of_fb/of_fb_osri.inc', 'gfx/gfx_osri.h', 'gfx/gfx_osri_view.h',
-    'gfx/osri_profile.h', 'kernel/idle_work.h', 'include/kernel_tick.h', 'mm/kmalloc.h',
-    'platform/powermac/display_provider.c', 'platform/powermac/display_dual.c',
-    'include/redir_access.h', 'gfx/v2/display.c', 'gfx/gfx_scroll.c', 'platform/powermac/display.c', 'drivers/video/of_fb/backend_of_fb.h',
-    'platform/powermac/platform_display_fallback.h', 'tools/tests/of_fb_host.c',
+    'sys/dev/video/of_fb/backend_of_fb.c', 'sys/dev/video/of_fb/of_fb_v2.c',
+    'sys/dev/video/of_fb/of_fb_osri.inc', 'sys/kern/gfx/osri/gfx_osri.h', 'sys/kern/gfx/osri/gfx_osri_view.h',
+    'sys/kern/gfx/osri/osri_profile.h', 'sys/kern/idle_work.h', 'sys/include/kernel_tick.h', 'sys/kern/mm/kmalloc.h',
+    'sys/platform/powermac/display_provider.c', 'sys/platform/powermac/display_dual.c',
+    'sys/include/redir_access.h', 'sys/hal/gfx/v2/display.c', 'sys/hal/gfx/gfx_scroll.c', 'sys/platform/powermac/display.c', 'sys/dev/video/of_fb/backend_of_fb.h',
+    'sys/platform/powermac/platform_display_fallback.h', 'tools/tests/of_fb_host.c',
     'tools/tests/test_of_fb.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
-    'gfx/palette.c', 'gfx/palette.h', 'gfx/gfx_core_api.inc', 'gfx/v2/palette_state.c', 'gfx/v2/caps.c', 'gfx/v2/enum.c', 'gfx/v2/backend_reg.c', 'gfx/v2/gfx2_int.h',
-    'platform/powermac/display_text.h', 'exec/appslot.h', 'include/gfx_present_contract.h',
-    'include/gfx_hal.h', 'include/gfx_hal2.h', 'include/gfx_mode.h',
-    'include/display_provider.h', 'platform/powermac/rh_observe.h',
-    'arch/ppc/kernel_boot.h', 'kernel/console/console_dual.h'],
+    'sys/hal/gfx/palette.c', 'sys/hal/gfx/palette.h', 'sys/hal/gfx/gfx_core_api.inc', 'sys/hal/gfx/v2/palette_state.c', 'sys/hal/gfx/v2/caps.c', 'sys/hal/gfx/v2/enum.c', 'sys/hal/gfx/v2/backend_reg.c', 'sys/hal/gfx/v2/gfx2_int.h',
+    'sys/platform/powermac/display_text.h', 'sys/kern/exec/appslot.h', 'sys/hal/gfx/gfx_present_contract.h',
+    'sys/include/gfx_hal.h', 'sys/hal/gfx/gfx_hal2.h', 'sys/include/gfx_mode.h',
+    'sys/include/display_provider.h', 'sys/platform/powermac/rh_observe.h',
+    'sys/arch/ppc/kernel_boot.h', 'sys/kern/console/console_dual.h'],
     basis=['PPC_FBCON_DESIGN §2', 'AC-DISPLAY-2', 'PPC_KAPI_GFX_REST_DESIGN 5c §2-5 A3 A8'],
 )
-OSRI = 'drivers/video/of_fb/of_fb_osri.inc'
+OSRI = 'sys/dev/video/of_fb/of_fb_osri.inc'
 MUTATIONS = (
     ('extension-disabled', OSRI, 'if (deadline < extension) deadline = extension;',
      'if (deadline < extension) deadline = elapsed;'),
@@ -46,10 +46,10 @@ MUTATIONS = (
     ('generation-lost', OSRI, 'if (of_fb_osri_generation() != bound)', 'if (!of_fb_osri_generation() && bound)'),
     ('fixed-deadline', OSRI, 'if (image->count && elapsed >= deadline) return GFX_OSRI_SHOW_DONE;',
      'if (elapsed >= deadline) return GFX_OSRI_SHOW_DONE;'),
-    ('public-color-rejected', 'gfx/gfx_core_api.inc',
+    ('public-color-rejected', 'sys/hal/gfx/gfx_core_api.inc',
      'if (DISPLAY_SET_PALETTE(g_backend, idx, 1, rgb)) return;',
      '(void)DISPLAY_SET_PALETTE(g_backend, idx, 1, rgb);'),
-    ('lease-rejected', 'gfx/gfx_core_api.inc',
+    ('lease-rejected', 'sys/hal/gfx/gfx_core_api.inc',
      'if (rc) return rc;\n    gfx2_pal_set_v1(first', '(void)rc;\n    gfx2_pal_set_v1(first'),
     ('palette-owner', BACKEND, 'if (!fb.palette_allowed || !fb.palette_allowed()) return OS32_ERR_BUSY;', ''),
     ('clut-index', BACKEND, 'scan_index[i] = best;', 'scan_index[i] = i;'),
@@ -62,22 +62,22 @@ MUTATIONS = (
     ('present-live', SOURCES[2], 'a->state == GFX2_AD_OK &&', ''),
     ('present-generation', SOURCES[2], 'present_generation == a->gen', '1'),
     ('present-reset', SOURCES[2], '{ present_owner = 0; }', '{ }'),
-    ('text-ready', 'platform/powermac/display_dual.c',
+    ('text-ready', 'sys/platform/powermac/display_dual.c',
      'pm_console_text_ready() && of_fb_ready()', 'of_fb_ready()'),
-    ('text-generation', 'platform/powermac/display_dual.c',
+    ('text-generation', 'sys/platform/powermac/display_dual.c',
      'text_gen == a->gen', '1'),
-    ('unverified-colors', 'platform/powermac/display_provider.c',
+    ('unverified-colors', 'sys/platform/powermac/display_provider.c',
      '(pm_rh_full_colors()->rc != PM_RH_COLOR_OK &&\n         pm_rh_full_colors()->rc != PM_RH_COLOR_WRITTEN) ||', ''),
-    ('pref', 'platform/powermac/display_provider.c',
+    ('pref', 'sys/platform/powermac/display_provider.c',
      'int display_provider_pref(int pref) { (void)pref; return GFX_PREF_AUTO; }',
      'int display_provider_pref(int pref) { return pref; }'),
-    ('absent-boot-bind', 'platform/powermac/display_provider.c',
+    ('absent-boot-bind', 'sys/platform/powermac/display_provider.c',
      '    if (saved.display || !fb || !dev || dev->fb_full_rc != PM_RH_FULL_OK ||',
      '    bind_client();\n    if (saved.display || !fb || !dev || dev->fb_full_rc != PM_RH_FULL_OK ||'),
-    ('display-records', 'platform/powermac/display_provider.c',
+    ('display-records', 'sys/platform/powermac/display_provider.c',
      'u32 display_provider_display_records(u32 backend) { (void)backend; return 1; }',
      'u32 display_provider_display_records(u32 backend) { return backend + 1; }'),
-    ('fallback-mode', 'platform/powermac/display_provider.c',
+    ('fallback-mode', 'sys/platform/powermac/display_provider.c',
      '    fn(&gfx_backend_unsupported, legacy200);', '    (void)0;'),
     ('pitch', BACKEND, 'dest_row * fb.pitch + first', 'dest_row * (src ? pitch : fb.width) + first'),
     ('aligned-last-word', BACKEND, 'i < words; i++) dest[i] = aligned[i]',
@@ -108,9 +108,9 @@ def observe(folder, mutation=None):
                '-nostdlib', '-nostdinc', '-static', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                '-I' + str(ROOT / 'platform/powermac'), '-I' + str(ROOT), *include_flags(ROOT),
                '-I' + str(ROOT / 'arch/ppc'),
-               str(ROOT / 'tools/tests/of_fb_host.c'), str(ROOT / 'gfx/v2/display.c'),
+               str(ROOT / 'tools/tests/of_fb_host.c'), str(ROOT / 'sys/hal/gfx/v2/display.c'),
                *(str(ROOT / path) for path in SOURCES),
-               str(ROOT / 'gfx/palette.c'), str(ROOT / 'gfx/v2/palette_state.c'), str(ROOT / 'gfx/v2/backend_reg.c'), str(ROOT / 'gfx/v2/caps.c'), str(ROOT / 'gfx/v2/enum.c'), '-o', str(exe)]
+               str(ROOT / 'sys/hal/gfx/palette.c'), str(ROOT / 'sys/hal/gfx/v2/palette_state.c'), str(ROOT / 'sys/hal/gfx/v2/backend_reg.c'), str(ROOT / 'sys/hal/gfx/v2/caps.c'), str(ROOT / 'sys/hal/gfx/v2/enum.c'), '-o', str(exe)]
     build_in_tree(ROOT, folder, edits, [command])
     result = host32.run([str(exe)], runner='qemu', capture_output=True, text=True)
     assert result.returncode == (1 if mutation else 0), (mutation, result)

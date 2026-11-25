@@ -3,133 +3,133 @@
   "imports": [
     {
       "symbol": "vfs_close",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_close_sqlite",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_count_sqlite",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_fd_is_stale",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_fd_set_sqlite_db",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_get_size",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_open",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_open_sqlite",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_quarantine_sqlite",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_read_fd",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_resolve_path",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_rm",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_seek",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_stat",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_sync",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_validate_sqlite",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_write_fd",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kprintf",
-      "source": "include/kprintf.h",
+      "source": "sys/include/kprintf.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sys_time",
-      "source": "include/sys.h",
+      "source": "sys/include/sys.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "malloc",
-      "source": "mm/kmalloc.h",
+      "source": "sys/kern/mm/kmalloc.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "free",
-      "source": "mm/kmalloc.h",
+      "source": "sys/kern/mm/kmalloc.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "realloc",
-      "source": "mm/kmalloc.h",
+      "source": "sys/kern/mm/kmalloc.h",
       "context": "normal",
       "irq": false
     },
@@ -141,37 +141,37 @@
     },
     {
       "symbol": "vfs_sqlite_backend",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_sqlite_writable",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_sqlite_fd_identity",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_sqlite_claim_main",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_resize_fd",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "vfs_sync_fd",
-      "source": "fs/vfs.h",
+      "source": "sys/fs/vfs.h",
       "context": "normal",
       "irq": false
     }

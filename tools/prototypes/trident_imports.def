@@ -1,37 +1,37 @@
 {
   "schema": 1,
   "contracts": [
-    "drivers/video/trident/trident_module.h",
-    "drivers/video/trident/trident.h",
-    "include/gfx_hal.h",
-    "include/gfx_mode.h",
-    "gfx/palette.h",
-    "include/debug_probe.h",
-    "include/gfx_sync.h",
-    "gfx/v2/gfx2_int.h"
+    "sys/dev/video/trident/trident_module.h",
+    "sys/dev/video/trident/trident.h",
+    "sys/include/gfx_hal.h",
+    "sys/include/gfx_mode.h",
+    "sys/hal/gfx/palette.h",
+    "sys/include/debug_probe.h",
+    "sys/include/gfx_sync.h",
+    "sys/hal/gfx/v2/gfx2_int.h"
   ],
   "imports": [
     {
       "symbol": "kmalloc",
-      "source": "mm/kmalloc.h",
+      "source": "sys/kern/mm/kmalloc.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kfree",
-      "source": "mm/kmalloc.h",
+      "source": "sys/kern/mm/kmalloc.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "palette_get_all",
-      "source": "gfx/palette.h",
+      "source": "sys/hal/gfx/palette.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "palette_shadow_set",
-      "source": "gfx/palette.h",
+      "source": "sys/hal/gfx/palette.h",
       "context": "normal",
       "irq": false
     },
@@ -49,73 +49,73 @@
     },
     {
       "symbol": "serial_puts",
-      "source": "include/serial_contract.h",
+      "source": "sys/include/serial_contract.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sys_time_now",
-      "source": "include/sys.h",
+      "source": "sys/include/sys.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfxsync_bind",
-      "source": "include/gfx_sync.h",
+      "source": "sys/include/gfx_sync.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfxsync_write_rows",
-      "source": "include/gfx_sync.h",
+      "source": "sys/include/gfx_sync.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfxsync_read_rows",
-      "source": "include/gfx_sync.h",
+      "source": "sys/include/gfx_sync.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfxsync_flush",
-      "source": "include/gfx_sync.h",
+      "source": "sys/include/gfx_sync.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfxsync_unbind",
-      "source": "include/gfx_sync.h",
+      "source": "sys/include/gfx_sync.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfx2_sync_publish",
-      "source": "gfx/v2/gfx2_int.h",
+      "source": "sys/hal/gfx/v2/gfx2_int.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfxsync_override",
-      "source": "include/gfx_sync.h",
+      "source": "sys/include/gfx_sync.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfxsync_override_clear",
-      "source": "include/gfx_sync.h",
+      "source": "sys/include/gfx_sync.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfxsync_gap_loops",
-      "source": "gfx/sync/sync_int.h",
+      "source": "sys/hal/gfx/sync/sync_int.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfx2_adapter_unregister",
-      "source": "gfx/v2/gfx2_int.h",
+      "source": "sys/hal/gfx/v2/gfx2_int.h",
       "context": "normal",
       "irq": false
     }

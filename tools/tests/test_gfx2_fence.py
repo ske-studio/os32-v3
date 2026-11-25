@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise C3 against a fake backend without libc."""
 CHECK = dict(name='gfx2-fence-host', tier=1, needs=[], budget=30,
-    covers=['gfx/v2/fence.c', 'gfx/v2/gfx2_int.h', 'tools/tests/gfx2_fence_host.c',
+    covers=['sys/hal/gfx/v2/fence.c', 'sys/hal/gfx/v2/gfx2_int.h', 'tools/tests/gfx2_fence_host.c',
             'tools/tests/test_gfx2_fence.py', 'tools/tests/host32.py'],
     basis=['HAL_V2_DESIGN §6-1', 'HAL_V2_DESIGN §6-2', 'HAL_V2_DESIGN §6-3'],
 )
@@ -24,7 +24,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/v2/fence.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/v2/fence.c').read_text()
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         rc = observe(work, source)

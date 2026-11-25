@@ -18,7 +18,7 @@ class DocumentationLinks(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.write('docs/archive/record.md', '[source](../../kernel/paging_app.c)\n')
-        self.write('mm/paging_app.c', '/* moved source */\n')
+        self.write('sys/kern/mm/paging_app.c', '/* moved source */\n')
         self.write('docs/current.md', '# Current\n')
 
     def write(self, name, text):
@@ -34,7 +34,7 @@ class DocumentationLinks(unittest.TestCase):
 
     def test_archived_source_link_resolves_to_existing_destination(self):
         self.assertEqual(self.check()[0], 0)
-        (self.root / 'mm/paging_app.c').unlink()
+        (self.root / 'sys/kern/mm/paging_app.c').unlink()
         result, output = self.check()
         self.assertEqual(result, 1)
         self.assertIn('paging_app.c', output)

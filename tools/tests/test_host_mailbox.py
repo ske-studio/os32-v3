@@ -15,12 +15,12 @@ import host32
 from kernel_includes import include_flags
 
 CHECK = dict(name='host-mailbox', tier=1, needs=[], covers=[
-    'net/host_mailbox.c', 'net/host_mailbox.h',
+    'sys/net/host_mailbox.c', 'sys/net/host_mailbox.h',
     'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/host_mailbox_host.c', 'tools/tests/hostsvc_fixture.c',
     'tools/tests/hostsvc_fixture.h', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk',
-    'include/io.h', 'lib/kstring.h', 'mm/kmalloc.h'], budget=3.3,
+    'sys/include/io.h', 'sys/kern/kstring.h', 'sys/kern/mm/kmalloc.h'], budget=3.3,
     basis=['docs/design/net/host_mailbox.md 入れる'],
 )
 ROOT = Path(__file__).resolve().parents[2]
@@ -66,7 +66,7 @@ def main():
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='host-mailbox-') as tmp:
         work = Path(tmp)
-        source = ROOT / 'net/host_mailbox.c'
+        source = ROOT / 'sys/net/host_mailbox.c'
         # Compile real privileged IO path with the kernel compiler as well.
         cross = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross')) / 'bin/i386-elf-gcc'
         subprocess.run([str(cross), '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',

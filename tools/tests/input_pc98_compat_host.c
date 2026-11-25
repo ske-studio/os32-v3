@@ -1,5 +1,5 @@
 #include "in2_int.h"
-#include "drivers/input/kbd.h"
+#include "sys/platform/pc98/input/kbd.h"
 #include "input_pc98_compat_fixture.h"
 #ifdef PC98_HISTORIC_ONLY
 void input_emit_legacy_key(u8 sc, u8 down, u8 mods);

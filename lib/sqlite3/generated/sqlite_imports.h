@@ -2,10 +2,10 @@
 #ifndef SQLITE_IMPORTS_GENERATED_H
 #define SQLITE_IMPORTS_GENERATED_H
 #include "types.h"
-#include "fs/vfs.h"
-#include "include/kprintf.h"
-#include "include/sys.h"
-#include "mm/kmalloc.h"
+#include "sys/fs/vfs.h"
+#include "sys/include/kprintf.h"
+#include "sys/include/sys.h"
+#include "sys/kern/mm/kmalloc.h"
 void vfs_close(int fd);
 int vfs_close_sqlite(const VfsSqliteLease *lease);
 int vfs_count_sqlite(const VfsSqliteCookie *cookie);

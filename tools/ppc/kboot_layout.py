@@ -129,14 +129,14 @@ def verify(work, script, cc, prefix):
              '-mno-altivec', '-msdata=none', '-ffreestanding', '-fno-pie',
              '-fno-stack-protector', '-nostdlib', '-fcommon', '-fsigned-char',
              '-fno-short-enums', '-D__cdecl=', '-Iinclude', '-Ilib', '-I.']
-    (work/'entry.c').write_text('''#include "platform/powermac/platform_kboot_layout.h"
+    (work/'entry.c').write_text('''#include "sys/platform/powermac/platform_kboot_layout.h"
 void ppc_kernel_entry(void) { for (;;) {} }
 unsigned char common_storage[123];
 const unsigned layout[] = {PM_KERNEL_BASE, PM_KERNEL_IMAGE_MAX,
  PM_KERNEL_CHAIN_LIMIT, PM_KERNEL_STACK_SIZE, PM_KERNEL_LEDGER_SIZE};
 ''')
     objects = []
-    for i, source in enumerate([work/'entry.c', ROOT/'lib/kstring_c.c',
+    for i, source in enumerate([work/'entry.c', ROOT/'sys/kern/kstring_c.c',
                                 ROOT/'lib/crc32.c']):
         obj = work/f'{i}.o'
         command([cc, *flags, '-c', source, '-o', obj])
@@ -204,7 +204,7 @@ def main():
     with keep_tmp.temporary_directory(prefix='kboot-layout-', dir=os.environ.get('TMPDIR')) as tmp:
         work = Path(tmp)
         command(['python3', '-B', 'tools/gen_memmap.py', '--layout-header', work/'memmap_layout.h'])
-        script = (ROOT/'arch/ppc/kernel.ld').read_text()
+        script = (ROOT/'sys/arch/ppc/kernel.ld').read_text()
         fixed_layout(work/'memmap_layout.h')
         verify(work, script, prefix+'gcc', prefix)
         destination = Path(os.environ.get('TMPDIR', str(work)))
@@ -213,11 +213,11 @@ def main():
         if args.acceptance_controls:
             check_acceptance_controls(work)
         if args.mutate:
-            header = (ROOT/'include/memmap.h').read_text()
+            header = (ROOT/'sys/include/memmap.h').read_text()
             anchor = '#define MEM_SHELL_MAX_SIZE 0x0A5000UL'
             assert header.count(anchor) == 1
             (work/'include').mkdir()
-            (work/'include/memmap.h').write_text(header.replace(anchor, anchor.replace('A5000', 'A4000')))
+            (work/'sys/include/memmap.h').write_text(header.replace(anchor, anchor.replace('A5000', 'A4000')))
             mutant = work/'smaller.h'
             command(['python3', '-B', 'tools/gen_memmap.py', '--root', work, '--layout-header', mutant])
             try:

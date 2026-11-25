@@ -1,5 +1,5 @@
 /* CPU drawing must remain observable when optional GE setup is unavailable. */
-#include "kdebug/trident_command_test.c"
+#include "sys/dev/video/trident/diag/trident_command_test.c"
 static u32 memory[TRI_WIDTH * 2];
 static int read_reports, ge_reports, phases, fills, copies, syncs, failed;
 static int fail_fill, fail_sync;

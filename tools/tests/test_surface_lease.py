@@ -1,14 +1,14 @@
 """T2e e2: real lease/query/B1/managed paging, ILP32 runtime mutations."""
 CHECK = dict(name='surface-lease-host', tier=1,
-    covers=['include/display_provider.h', 'arch/x86/kernel/kapi_call.c', 'include/kapi_call.h', 'include/syscall_code.h', 'arch/x86/kernel/syscall_code.c', 'platform/pc98/legacy/lowmap.c', 'mm/paging_lowmap.h', 'mm/paging_lowmap.inc', 'kdebug/selftest_lease.c', 'include/kselftest_probe.h', 'kdebug/selftest_internal.h', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'exec/access_walk.c', 'exec/lease.c', 'exec/redir_access.c', 'exec/surface_query.c', 'kdebug/kselftest.c', 'kdebug/kselftest/**', 'mm/paging.c', 'platform/pc98/platform_memory_desc.h', 'include/platform_memory.h', 'mm/pgalloc.c', 'mm/physmem.c', 'mm/shlib.c', 'tools/tests/access_walk_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/surface_lease_host.c', 'tools/tests/test_access_walk.py', 'tools/tests/kernel_layout.py', 'tools/tests/surface_bundle_host.c', 'sdk/kapi.json', 'kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ls.h', 'exec/lease.h', 'exec/surface_query.h', 'exec/ring3_ls.c', 'mm/shm.c', 'tools/tests/test_public_surface.py', 'tools/tests/public_surface_host.c', 'tools/check_kapi_version.py', 'docs/KAPI_SPEC.md', 'exec/exec.c', 'README.md', 'docs/INDEX.md', 'arch/x86/kernel/ring3_ls.S', 'fs/ext2/ext2_vfs.c', 'fs/vfs.c', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/tests/kcallback_host.c', 'tools/tests/kcallback_result_host.c', 'tools/tests/test_kcallback.py', 'userland/rust/libos32gui/src/cfgro.rs', 'userland/tests/kcallback_test.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['sys/include/display_provider.h', 'sys/arch/x86/kernel/kapi_call.c', 'sys/include/kapi_call.h', 'sys/include/syscall_code.h', 'sys/arch/x86/kernel/syscall_code.c', 'sys/platform/pc98/legacy/lowmap.c', 'sys/kern/mm/paging_lowmap.h', 'sys/kern/mm/paging_lowmap.inc', 'sys/arch/x86/kdebug/selftest_lease.c', 'sys/include/kselftest_probe.h', 'sys/kern/kdebug/selftest_internal.h', 'userland/lib/rt/ls.c', 'sdk/include/os32/ls.h', 'sys/kern/exec/access_walk.c', 'sys/kern/exec/lease.c', 'sys/kern/exec/redir_access.c', 'sys/kern/exec/surface_query.c', 'sys/platform/pc98/kdebug/kselftest.c', 'kdebug/kselftest/**', 'sys/kern/mm/paging.c', 'sys/platform/pc98/platform_memory_desc.h', 'sys/include/platform_memory.h', 'sys/kern/mm/pgalloc.c', 'sys/kern/mm/physmem.c', 'sys/kern/mm/shlib.c', 'tools/tests/access_walk_host.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/surface_lease_host.c', 'tools/tests/test_access_walk.py', 'tools/tests/kernel_layout.py', 'tools/tests/surface_bundle_host.c', 'sdk/kapi.json', 'sys/kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_surface.h', 'sdk/include/os32/os32_ls.h', 'sys/kern/exec/lease.h', 'sys/kern/exec/surface_query.h', 'sys/kern/exec/ring3_ls.c', 'sys/kern/mm/shm.c', 'tools/tests/test_public_surface.py', 'tools/tests/public_surface_host.c', 'tools/check_kapi_version.py', 'docs/KAPI_SPEC.md', 'sys/kern/exec/exec.c', 'README.md', 'docs/INDEX.md', 'sys/arch/x86/kernel/ring3_ls.S', 'sys/fs/ext2/ext2_vfs.c', 'sys/fs/vfs.c', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/kapi_generated.rs', 'tools/tests/kcallback_host.c', 'tools/tests/kcallback_result_host.c', 'tools/tests/test_kcallback.py', 'userland/rust/libos32gui/src/cfgro.rs', 'userland/diag/kcallback_test.c', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'tools/tests/paging_source.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=6.8,
     basis=['KAPI_SPEC §3-3'],
 )
 
 from paging_source import paging_source
 from kernel_includes import include_flags
-TARGET_SRC = ['exec/lease.c', 'exec/surface_query.c', 'exec/redir_access.c',
-              'exec/access_walk.c', 'mm/paging.c', 'mm/pgalloc.c']
+TARGET_SRC = ['sys/kern/exec/lease.c', 'sys/kern/exec/surface_query.c', 'sys/kern/exec/redir_access.c',
+              'sys/kern/exec/access_walk.c', 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c']
 from kernel_layout import linker_flags
 import argparse
 import host32
@@ -62,11 +62,11 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     host32.begin_control(args.mutate, args.runner, ROOT)
-    files = dict(walk.FILES, lease='exec/lease.c', surface_query='exec/surface_query.c')
+    files = dict(walk.FILES, lease='sys/kern/exec/lease.c', surface_query='sys/kern/exec/surface_query.c')
     files.update(extra_sources or {})
     providers = {key for key in files if key in ("pc98_bundle", "powermac_bundle")}
     paths = [ROOT / p for p in files.values()]
-    paths += [ROOT / p for p in ('exec/lease.h', 'exec/surface_query.h',
+    paths += [ROOT / p for p in ('sys/kern/exec/lease.h', 'sys/kern/exec/surface_query.h',
         'tools/tests/' + fixture_name, 'tools/tests/test_surface_lease.py',
         'tools/tests/access_walk_host.c')]
     hashes = {p: hashlib.sha256(p.read_bytes()).digest() for p in paths}
@@ -75,7 +75,7 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
         tmp = pathlib.Path(directory)
         if 'v86' in files:
             (tmp / 'platform_emergency.h').write_text(
-                (ROOT / 'include/platform_emergency.h').read_text())
+                (ROOT / 'sys/include/platform_emergency.h').read_text())
         def provider_source(unit, body):
             if unit in providers:
                 return '#define display_provider_bundle_ok ' + unit + '_ok\n' + body
@@ -102,7 +102,7 @@ def main(fixture_name="surface_lease_host.c", mutants=MUTANTS, extra_sources=Non
                            capture_output=True, text=True)
         objects = {}
         for key, src in [('fixture', tmp / 'fixture.c'),
-                         ('physmem', ROOT / 'mm/physmem.c')]:
+                         ('physmem', ROOT / 'sys/kern/mm/physmem.c')]:
             objects[key] = tmp / (key + '.o'); compile_source(src, objects[key])
         for key in ('lease', 'surface_query'):
             src = tmp / (key + '.c')

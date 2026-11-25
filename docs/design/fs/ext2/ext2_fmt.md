@@ -1,6 +1,6 @@
-# fs/ext2/ext2_fmt.c — 設計
+# sys/fs/ext2/ext2_fmt.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_HDD_INSTALL 段 1 (§1-v3 N5・N7) の契約を今のソースと照らして要約
-ソース: `fs/ext2/ext2_fmt.c` (`ext2_format`・`ext2_format_at`・`ext2_format_range`)・`fs/ext2/ext2.h` (`EXT2_FMT_MIN_LBA`)・配置 `fs/ext2/ext2_layout.c`
+ソース: `sys/fs/ext2/ext2_fmt.c` (`ext2_format`・`ext2_format_at`・`ext2_format_range`)・`sys/fs/ext2/ext2.h` (`EXT2_FMT_MIN_LBA`)・配置 `sys/fs/ext2/ext2_layout.c`
 
 ext2 を作る 2 つの入口。どちらも書く前に範囲を全部確かめ、外れたら **1 セクタも書かない**。大きさは
 `ext2_layout_plan` の固定点 (最終グループに全メタデータが入る長さへ切り下げ、`docs/design/fs/ext2/ext2_layout.md`)。

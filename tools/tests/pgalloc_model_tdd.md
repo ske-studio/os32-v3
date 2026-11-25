@@ -15,7 +15,7 @@ exec/shlib を永久 claim に移行して吸収する方針は撤回する。
 `pgalloc_reserve_pfn()` と model metadata は永久予約として分離する。
 
 製品変更前に、実 `pgalloc.c + physmem.c + sys.c` を使う次の RED を確認した。
-exec は `exec/exec.c` から **実際の `exec_child_claim` 関数と定数定義を抽出してコンパイル**し、式をテスト内に複製していない。
+exec は `sys/kern/exec/exec.c` から **実際の `exec_child_claim` 関数と定数定義を抽出してコンパイル**し、式をテスト内に複製していない。
 
 - 16MiB exec: A=`0x500000`/2431ページ、B=`0xf7f000`/65ページ、上端=`0xfc0000`。
   mark の重複後に A/B を free しても baseline に戻らず RED。
@@ -39,7 +39,7 @@ exec/shlib/PEGC 呼出元は変更なし。PEGC の `sys_reserve_top` が永久�
 - `python3 tools/tests/test_pgalloc_model.py -v`: RED 12件中4 failure → GREEN 12件全通過。
 - `python3 tools/tests/test_pgalloc_range.py`: RED generic baseline assertion → 全ケース GREEN。
 - 同 range runner の target GNU89 `-Werror` compile PASS。
-- `i386-elf-gcc -std=gnu89 -m32 -march=i386 -O2 -Wall -Wextra -Werror -Wdeclaration-after-statement -ffreestanding -fno-pie -fno-stack-protector -D__KERNEL_BUILD__ -Iinclude -Ikernel -Ilib -c mm/pgalloc.c`: 一時出力先で PASS。
+- `i386-elf-gcc -std=gnu89 -m32 -march=i386 -O2 -Wall -Wextra -Werror -Wdeclaration-after-statement -ffreestanding -fno-pie -fno-stack-protector -D__KERNEL_BUILD__ -Iinclude -Ikernel -Ilib -c sys/kern/mm/pgalloc.c`: 一時出力先で PASS。
 - 対象製品ファイルの `git diff --check`: PASS。
 - RED の実出力は `pgalloc_legacy_red_model.log` / `pgalloc_legacy_red_range.log`（要点抜粋）に保存。
 

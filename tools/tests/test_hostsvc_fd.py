@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """D6 FD resource generation with real C1 and libc-free ILP32 runtime."""
 CHECK = dict(name='hostsvc-fd', tier=1, needs=[], budget=4.1, covers=[
-    'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'fs/vfs.h',
-    'fs/serialfs/serialfs_persistent.c', 'include/boot_token.h', 'fs/serialfs/serialfs.h',
-    'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.h',
-    'net/host_mailbox.h', 'exec/exec.h',
+    'sys/fs/vfs_fd.c', 'sys/fs/vfs_fd_stdin.inc', 'sys/fs/vfs_stdin.h', 'sys/fs/vfs.h',
+    'sys/fs/serialfs/serialfs_persistent.c', 'sys/include/boot_token.h', 'sys/fs/serialfs/serialfs.h',
+    'sys/fs/serialfs/sfs_client.h', 'sys/fs/serialfs/sfs_proto.h',
+    'sys/net/host_mailbox.h', 'sys/kern/exec/exec.h',
     'tools/tests/hostsvc_fd_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
     basis=['docs/design/drivers/block/netcd.md 起動の手順と設定'],
@@ -55,7 +55,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'fs/vfs_fd.c').read_text()
+    original = (ROOT / 'sys/fs/vfs_fd.c').read_text()
     with tempfile.TemporaryDirectory(prefix='hostsvc-fd-') as tmp:
         work = Path(tmp)
         rc = build_run(work, original)

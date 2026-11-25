@@ -1,28 +1,28 @@
 """PowerMac link boundary, with fake MSR and resident tick registration."""
-CHECK = dict(env=['ppc-cross'], name='ppc-link-platform-host', tier=2, budget=10, needs=[], covers=['kernel/time/tick_clock.h',
-    'platform/powermac/platform_link_inline.h', 'net/nic.c', 'net/nic.h', 'net/link.c', 'net/link_rx.inc', 'net/link_host_api.inc', 'net/link_selftest.inc',
-    'platform/powermac/link_platform.c', 'net/link_platform.h', 'net/link.h',
-    'include/types.h', 'include/callconv.h', 'include/kernel_tick.h',
-    'include/net_eth.h', 'kernel/idle_work.h', 'kernel/irq/tick.h',
-    'arch/ppc/arch_io.h', 'arch/ppc/ppc_frame.h', 'arch/ppc/ppc_oea.h',
+CHECK = dict(env=['ppc-cross'], name='ppc-link-platform-host', tier=2, budget=10, needs=[], covers=['sys/hal/time/tick_clock.h',
+    'sys/platform/powermac/platform_link_inline.h', 'sys/net/nic.c', 'sys/net/nic.h', 'sys/net/link.c', 'sys/net/link_rx.inc', 'sys/net/link_host_api.inc', 'sys/net/link_selftest.inc',
+    'sys/platform/powermac/link_platform.c', 'sys/hal/net/link_platform.h', 'sys/net/link.h',
+    'sys/include/types.h', 'sys/include/callconv.h', 'sys/include/kernel_tick.h',
+    'sys/include/net_eth.h', 'sys/kern/idle_work.h', 'sys/kern/irq/tick.h',
+    'sys/arch/ppc/arch_io.h', 'sys/arch/ppc/ppc_frame.h', 'sys/arch/ppc/ppc_oea.h',
     'tools/tests/ppc_link_platform_host.c', 'tools/tests/test_ppc_link_platform.py',
-    'arch/ppc/ppc_boot.h',
-    'include/clock_source.h',
-    'include/io.h',
-    'include/kprintf.h',
-    'include/platform_irq.h',
-    'include/remote_control.h',
-    'kernel/irq/irq.h',
-    'kernel/irq/irq_math.h',
-    'kernel/irq/tick_budget.h',
-    'lib/kstring.h',
+    'sys/arch/ppc/ppc_boot.h',
+    'sys/hal/time/clock_source.h',
+    'sys/include/io.h',
+    'sys/include/kprintf.h',
+    'sys/include/platform_irq.h',
+    'sys/include/remote_control.h',
+    'sys/kern/irq/irq.h',
+    'sys/kern/irq/irq_math.h',
+    'sys/kern/irq/tick_budget.h',
+    'sys/kern/kstring.h',
     'lib/le_internal.h',
-    'net/host_mailbox.h',
-    'net/link_notify.h',
-    'net/nic_rx.h',
-    'net/rx_work.h',
-    'platform/powermac/platform_io.h',
-    'platform/powermac/platform_irq_limits.h',
+    'sys/net/host_mailbox.h',
+    'sys/net/link_notify.h',
+    'sys/net/nic_rx.h',
+    'sys/net/rx_work.h',
+    'sys/platform/powermac/platform_io.h',
+    'sys/platform/powermac/platform_irq_limits.h',
     'sdk/include/os32/os32_generations.h',
     'sdk/include/os32/os32_gfx2.h',
     'sdk/include/os32/os32_host_notice.h',
@@ -42,7 +42,7 @@ import host32
 
 
 def run(ctx):
-    original = (ctx.root / 'platform/powermac/link_platform.c').read_text()
+    original = (ctx.root / 'sys/platform/powermac/link_platform.c').read_text()
     with tempfile.TemporaryDirectory(prefix='ppc-link-') as td:
         work = Path(td)
         source = work / 'link_platform.c'
@@ -78,9 +78,9 @@ def run(ctx):
             return 1 if os.environ.get('OS32_REQUIRE_PPC') == '1' else 0
         subprocess.run([str(cc), '-std=gnu11',
             '-Wall', '-Wextra', '-Werror', '-ffreestanding', *includes,
-            '-c', str(ctx.root / 'platform/powermac/link_platform.c'),
+            '-c', str(ctx.root / 'sys/platform/powermac/link_platform.c'),
             '-o', str(work / 'ppc.o')], check=True)
-        for rel in ['net/link.c', 'net/nic.c']:
+        for rel in ['sys/net/link.c', 'sys/net/nic.c']:
             subprocess.run([str(cc), '-std=gnu11', '-O2', '-Wall', '-Wextra',
                 '-Werror', '-ffreestanding', '-D__cdecl=', *includes,
                 *['-I' + str(ctx.root / p) for p in ['platform/powermac',

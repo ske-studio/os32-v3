@@ -5,7 +5,7 @@ arithmetic execute the actual source. The collector is compiled as a whole TU.
 No probe, printing, allocation or scheduler symbols are provided to the link.
 """
 CHECK = dict(name='ver-collect-host', tier=4,
-    covers=['kernel/ver_format.c', 'arch/x86/kernel/x87.h', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'platform/pc98/boot_diag.c', 'platform/pc98/ver_backend.c', 'platform/pc98/platform_ver.h', 'platform/powermac/platform_ver.h', 'include/ver_backend_contract.h', 'include/boot_diag.h', 'kernel/ver_collect.c', 'kernel/ver_info.h', 'kernel/time/cpu_calibrate.c', 'kernel/time/cpu_calibrate.h', 'kernel/time/cpu_calibrate_math.c', 'kernel/time/cpu_calibrate_math.h', 'platform/pc98/pit_math.h', 'arch/x86/kernel/idt.h', 'platform/pc98/pit.h', 'include/kernel_tick.h', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h', 'drivers/char/serial.h', 'drivers/sound/cs4231/pcm_cs4231.h', 'include/bootinfo.h', 'include/gfx_hal.h', 'include/types.h', 'lib/kstring.h', 'lib/kstring_asm.asm', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/ver_collect_host.c', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'include/port_service.h', 'include/console_output.h', 'kernel/port_service.c', 'tools/tests/kernel_includes.py'],
+    covers=['sys/kern/ver_format.c', 'sys/arch/x86/kernel/x87.h', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'sys/platform/pc98/bootinfo_wire.h', 'sys/platform/pc98/bootinfo_native.h', 'sys/platform/pc98/boot_diag.c', 'sys/platform/pc98/ver_backend.c', 'sys/platform/pc98/platform_ver.h', 'sys/platform/powermac/platform_ver.h', 'sys/include/ver_backend_contract.h', 'sys/include/boot_diag.h', 'sys/kern/ver_collect.c', 'sys/kern/ver_info.h', 'sys/platform/pc98/time/cpu_calibrate.c', 'sys/hal/time/cpu_calibrate.h', 'sys/kern/time/cpu_calibrate_math.c', 'sys/kern/time/cpu_calibrate_math.h', 'sys/platform/pc98/pit_math.h', 'sys/arch/x86/kernel/idt.h', 'sys/platform/pc98/pit.h', 'sys/include/kernel_tick.h', 'sys/kern/sqlite_engine.h', 'sys/kern/sqlite_engine_body.h', 'sys/dev/char/serial.h', 'sys/dev/sound/cs4231/pcm_cs4231.h', 'sys/include/bootinfo.h', 'sys/include/gfx_hal.h', 'sys/include/types.h', 'sys/kern/kstring.h', 'sys/kern/kstring_asm.asm', 'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_ver_info.h', 'tools/tests/ver_collect_host.c', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'sys/include/port_service.h', 'sys/include/console_output.h', 'sys/kern/port_service.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=2.8,
     kind='characterization',
 )
@@ -75,16 +75,16 @@ def build_run(fixture, runner, collector=None, calibration=None, backend=None, n
                     '#include "ver_backend_contract.h"\n'
                     'static inline const struct ver_backend *platform_ver_backend(void) { return 0; }\n')
             else:
-                (tmp / 'platform_ver.h').write_bytes((ROOT / 'platform/pc98/platform_ver.h').read_bytes())
+                (tmp / 'platform_ver.h').write_bytes((ROOT / 'sys/platform/pc98/platform_ver.h').read_bytes())
                 (tmp / 'backend.c').write_text(backend if backend is not None else
-                    (ROOT / 'platform/pc98/ver_backend.c').read_text())
-                sources.extend([str(tmp / 'backend.c'), str(ROOT / 'kernel/ver_format.c')])
+                    (ROOT / 'sys/platform/pc98/ver_backend.c').read_text())
+                sources.extend([str(tmp / 'backend.c'), str(ROOT / 'sys/kern/ver_format.c')])
         if calibration is not None:
             (tmp / 'calibration.inc').write_text(calibration)
             (tmp / 'calibration_math.c').write_text(
-                (ROOT / 'kernel/time/cpu_calibrate_math.c').read_text())
+                (ROOT / 'sys/kern/time/cpu_calibrate_math.c').read_text())
         obj = tmp / 'kstring.o'
-        subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'lib/kstring_asm.asm'),
+        subprocess.run(['nasm', '-f', 'elf32', str(ROOT / 'sys/kern/kstring_asm.asm'),
                         '-o', str(obj)], check=True)
         cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall',
                '-Wextra', '-Werror', '-Wno-unused-function', '-ffreestanding',
@@ -100,9 +100,9 @@ def build_run(fixture, runner, collector=None, calibration=None, backend=None, n
 
 def main():
     args = arguments()
-    collector = (ROOT / 'kernel/ver_collect.c').read_text()
+    collector = (ROOT / 'sys/kern/ver_collect.c').read_text()
     fixture = (ROOT / 'tools/tests/ver_collect_host.c').read_text()
-    cpu = (ROOT / 'kernel/time/cpu_calibrate.c').read_text()
+    cpu = (ROOT / 'sys/platform/pc98/time/cpu_calibrate.c').read_text()
     # Keep actual saved-state initializers and all decision/recording code.
     state = cpu[cpu.index('static u32 s_loops_per_tick'):cpu.index('/* CALIBRATE_LOOPS')]
     calibration = state + ''.join(function(cpu, sig) for sig in
@@ -137,7 +137,7 @@ void _start(void) {
         assert result.returncode == 1 and 'FAIL: s->ser_ready ==' in result.stdout
         print('RED serial ready always 1')
         old_vector = 's->irq_master_vector = diag.irq_master_vector;'
-        backend = (ROOT / 'platform/pc98/ver_backend.c').read_text()
+        backend = (ROOT / 'sys/platform/pc98/ver_backend.c').read_text()
         assert backend.count(old_vector) == 1
         result = build_run(fixture, args.runner, collector=collector, backend=backend.replace(old_vector, 's->irq_master_vector = 0;'))
         assert result.returncode == 1 and 'FAIL:' in result.stdout

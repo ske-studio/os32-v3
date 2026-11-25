@@ -130,21 +130,21 @@ void probe(void) {
     def test_hostdrv_linear_exceptions_remain_scoped(self):
         # Exercise the real 24 address casts: audited linear ABI exceptions
         # must cover only the 12 named functions, not a new unaudited caller.
-        source = (ROOT / 'drivers/hostdrv/hostdrvfs.c').read_text()
+        source = (ROOT / 'sys/dev/hostdrv/hostdrvfs.c').read_text()
         entries = [line for line in (ROOT / 'tools/check_p2v_allow.txt').read_text().splitlines()
-                   if line.startswith('drivers/hostdrv/hostdrvfs.c:')]
+                   if line.startswith('sys/dev/hostdrv/hostdrvfs.c:')]
         self.assertEqual(len(entries), 12)
         with tempfile.TemporaryDirectory(prefix='os32-hostdrv-p2v-') as tmp:
             root = mutant_tree(ROOT, pathlib.Path(tmp) / 'tree', {},
-                               real={'drivers/hostdrv/hostdrvfs.c', 'tools/check_p2v_allow.txt'})
-            target = root / 'drivers/hostdrv/hostdrvfs.c'
+                               real={'sys/dev/hostdrv/hostdrvfs.c', 'tools/check_p2v_allow.txt'})
+            target = root / 'sys/dev/hostdrv/hostdrvfs.c'
             target.write_text(source)
             allow = root / 'tools/check_p2v_allow.txt'
             allow.write_text('\n'.join(entries) + '\n')
             # Parse the real HostDrv TU with its build flags and headers.
             # Limit this focused audit to HostDrv; other units retain their
             # own allowances in the full-tree test.
-            unit = next(u for u in checker.ast.units(root) if u['src'] == 'drivers/hostdrv/hostdrvfs.c')
+            unit = next(u for u in checker.ast.units(root) if u['src'] == 'sys/dev/hostdrv/hostdrvfs.c')
             def audit_hostdrv():
                 with patch.object(checker.ast, 'units', return_value=[unit]):
                     return checker.audit(root)
@@ -196,8 +196,8 @@ void probe(void) {
         body = ('\nvoid p1b_probe(void) {\n'
                 '    int *restrict p = (int *)0x123400;\n'
                 '    __asm__ volatile("cli"); (void)p;\n}\n')
-        other = 'platform/pc98/sysclk.c'
-        target = 'drivers/block/fdc.c'
+        other = 'sys/platform/pc98/sysclk.c'
+        target = 'sys/dev/block/fdc.c'
         with tempfile.TemporaryDirectory() as tmp:
             changed = 'drivers/block/p1b_probe.inc'
             edits = {other: (ROOT / other).read_text() + body,
@@ -229,9 +229,9 @@ def mutant(case):
     name, body, rule = case
     with tempfile.TemporaryDirectory(prefix='os32-p2v-') as tmp:
         root = pathlib.Path(tmp)
-        root = mutant_tree(ROOT, root / 'tree', {}, real={'platform/pc98/bootinfo_capture.c','platform/pc98/sysclk.c'})
+        root = mutant_tree(ROOT, root / 'tree', {}, real={'sys/platform/pc98/bootinfo_capture.c','sys/platform/pc98/sysclk.c'})
         if name.startswith('bootinfo-'):
-            target = root / 'platform/pc98/bootinfo_capture.c'
+            target = root / 'sys/platform/pc98/bootinfo_capture.c'
             original = 'volatile u8 *low = (volatile u8 *)P2V_IO(MEM_BOOTINFO_BASE);'
             source = target.read_text()
             if source.count(original) != 1:
@@ -239,7 +239,7 @@ def mutant(case):
             target.write_text(source.replace(original, body))
             expected = f'bootinfo_capture: {rule}'
         else:
-            target = root / 'platform/pc98/sysclk.c'
+            target = root / 'sys/platform/pc98/sysclk.c'
             params = 'void *p' if name == 'grouped-cr3-pointer' else 'void'
             target.write_text(target.read_text() + '\n'
                 + '#include "memmap.h"\n#include "platform_boot_layout.h"\n#define RING3_HEAP_TOP 0x800000u\nu32 buffer_phys; void paging_load_cr3(u32 pd_phys);\n'

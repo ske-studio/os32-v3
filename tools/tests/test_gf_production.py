@@ -1,7 +1,7 @@
 """KDEBUG=0 production startup, resource gate, cleanup and reboot order."""
 # B5 adds production fixtures; CI measured 77.81s for the expanded test.
 CHECK = dict(name='gf-production-host', tier=1,
-    covers=['drivers/video/geforce/gf_v2.h', 'gfx/v2/*.h', 'sdk/include/os32/os32_gfx2.h', 'tools/tests/cc_cache.py', 'drivers/pci/pci_barsize.h', 'drivers/pci/pci_barsize.c', 'drivers/pci/pci_locate.c', 'kdebug/recover_gf_locate.c', 'hwdev/gf/master.c', 'gfx/gfx_policy.h', 'gfx/gfx_osri_view.h', 'drivers/video/geforce/geforce_platform.c', 'tools/tests/test_gf_production.py', 'tools/tests/gf_ownerless_fixture.py', 'tools/tests/gf_accel_no_bind.h', 'tools/tests/gf_accel_unbound_stubs.c', 'include/io.h', 'arch/x86/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/gf_production_hal_host.inc', 'lib/serial_diag.h', 'include/kprintf.h', 'hwdev/gf/bus.c', 'hwdev/gf/devinit.c', 'hwdev/gf/native.c', 'hwdev/gf/pll.c', 'hwdev/gf/resources.c', 'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/service.c', 'hwdev/gf/accel_surface.c', 'hwdev/gf_load_state.c', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_resources.c', 'kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover_gf.c', 'kernel/sys.c', 'init/sysconfig.c', 'init/gf_production_cfg.c', 'include/machcfg_contract.h', 'tools/tests/gf_production_host.c', 'tools/tests/gf_foundation_width_host.h', 'tools/tests/gfinit_host.c', 'tools/tests/host32.py', 'tools/tests/recover_gf_host.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.c', 'hwdev/gf/display/*.h', 'hwdev/gf/op/*.c', 'include/gf_production.h', 'include/gfx_hal.h', 'gfx/gfx_internal.h', 'drivers/video/geforce/geforce_body.c', 'drivers/video/geforce/geforce_module.c', 'drivers/video/geforce/geforce_module.h', 'drivers/video/geforce/backend_geforce.c', 'drivers/video/geforce/gf_present.c', 'gfx/palette.h', 'drivers/video/pc98/pc98_route.h', 'tools/tests/kernel_includes.py', 'include/video_wc.h', 'arch/x86/kernel/video_wc.c', 'arch/ppc/video_wc.c'],
+    covers=['sys/dev/video/geforce/gf_v2.h', 'gfx/v2/*.h', 'sdk/include/os32/os32_gfx2.h', 'tools/tests/cc_cache.py', 'sys/dev/pci/pci_barsize.h', 'sys/dev/pci/pci_barsize.c', 'sys/dev/pci/pci_locate.c', 'sys/dev/video/geforce/diag/recover_gf_locate.c', 'sys/dev/video/geforce/master.c', 'sys/hal/gfx/gfx_policy.h', 'sys/kern/gfx/osri/gfx_osri_view.h', 'sys/dev/video/geforce/geforce_platform.c', 'tools/tests/test_gf_production.py', 'tools/tests/gf_ownerless_fixture.py', 'tools/tests/gf_accel_no_bind.h', 'tools/tests/gf_accel_unbound_stubs.c', 'sys/include/io.h', 'sys/arch/x86/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'tools/tests/gf_production_hal_host.inc', 'lib/serial_diag.h', 'sys/include/kprintf.h', 'sys/dev/video/geforce/bus.c', 'sys/dev/video/geforce/devinit.c', 'sys/dev/video/geforce/native.c', 'sys/dev/video/geforce/pll.c', 'sys/platform/pc98/geforce/resources.c', 'sys/dev/video/geforce/runner.c', 'sys/dev/video/geforce/save.c', 'sys/dev/video/geforce/service.c', 'sys/dev/video/geforce/accel_surface.c', 'sys/dev/video/geforce/gf_load_state.c', 'sys/dev/video/geforce/diag/gfinit_decode.c', 'sys/dev/video/geforce/diag/gfinit_pll.c', 'sys/dev/video/geforce/diag/gfinit_resources.c', 'sys/platform/pc98/kdebug/recover.c', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'sys/dev/video/geforce/diag/recover_gf.c', 'sys/kern/sys.c', 'sys/kern/init/sysconfig.c', 'sys/kern/init/gf_production_cfg.c', 'sys/include/machcfg_contract.h', 'tools/tests/gf_production_host.c', 'tools/tests/gf_foundation_width_host.h', 'tools/tests/gfinit_host.c', 'tools/tests/host32.py', 'tools/tests/recover_gf_host.c', 'hwdev/gf/*.h', 'hwdev/gf/display/*.c', 'hwdev/gf/display/*.h', 'hwdev/gf/op/*.c', 'sys/include/gf_production.h', 'sys/include/gfx_hal.h', 'sys/hal/gfx/gfx_internal.h', 'sys/dev/video/geforce/geforce_body.c', 'sys/dev/video/geforce/geforce_module.c', 'sys/dev/video/geforce/geforce_module.h', 'sys/dev/video/geforce/backend_geforce.c', 'sys/dev/video/geforce/gf_present.c', 'sys/hal/gfx/palette.h', 'sys/platform/pc98/video/pc98_route.h', 'tools/tests/kernel_includes.py', 'sys/include/video_wc.h', 'sys/arch/x86/kernel/video_wc.c', 'sys/arch/ppc/video_wc.c'],
     needs=[], budget=80.0,
     basis=['GF_FEAT1_DESIGN §2', 'GF_FEAT1_DESIGN §3', 'GF_FEAT1_DESIGN §8'],
     env_limit='偽clock/bus/moduleで資源gateとcleanupを確認するが、実IRQ・MMIO・cacheと出画は保証しない。',
@@ -49,7 +49,7 @@ def main(override=None, dev=13):
              *include_flags(ROOT)]
     with tempfile.TemporaryDirectory(prefix='gf-production-') as tmp:
         (Path(tmp)/'gf_ownerless_body.inc').write_text(ownerless_body(
-            (ROOT/'drivers/video/geforce/geforce_body.c').read_text(), bind_f3=False))
+            (ROOT/'sys/dev/video/geforce/geforce_body.c').read_text(), bind_f3=False))
         exe = Path(tmp) / 'host'
         native = Path(tmp) / 'native.o'
         # P5 owns module/build registration. Compile the new production TUs
@@ -63,9 +63,9 @@ def main(override=None, dev=13):
         cc_cache.build(['gcc', *flags, '-Dgf_production_mmio=gf_production_native_mmio',
                         '-Dgf_production_clock=gf_production_native_clock',
                         '-Dgf_production_wait=gf_production_native_wait',
-                        '-c', str(override[1] if override and override[0]=='hwdev/gf/native.c' else ROOT / 'hwdev/gf/native.c'), '-o', str(native)], check=True)
+                        '-c', str(override[1] if override and override[0]=='sys/dev/video/geforce/native.c' else ROOT / 'sys/dev/video/geforce/native.c'), '-o', str(native)], check=True)
         devinit = Path(tmp) / 'devinit.o'
-        devinit_source = override[1] if override and override[0]=='hwdev/gf/devinit.c' else ROOT/'hwdev/gf/devinit.c'
+        devinit_source = override[1] if override and override[0]=='sys/dev/video/geforce/devinit.c' else ROOT/'sys/dev/video/geforce/devinit.c'
         cc_cache.build(['gcc', *flags, '-fsanitize=kernel-address', '-c',
                         str(devinit_source), '-o', str(devinit)], check=True)
         mode = Path(tmp) / 'mode.o'
@@ -77,19 +77,19 @@ def main(override=None, dev=13):
             cc_cache.build(['gcc', *flags, '-DGF_PRODUCTION_MODULE',
                             '-Dgf_display_modeset=gf_unused_legacy_modeset',
                             '-c', str(source), '-o', str(obj)], check=True)
-        module=(override[1] if override and override[0]=='drivers/video/geforce/geforce_module.c' else ROOT/'drivers/video/geforce/geforce_module.c').read_text()
+        module=(override[1] if override and override[0]=='sys/dev/video/geforce/geforce_module.c' else ROOT/'sys/dev/video/geforce/geforce_module.c').read_text()
         a=module.index('static int geforce_return(')
         (Path(tmp)/'geforce_return.inc').write_text(module[a:module.index('static int geforce_start(',a)].replace('static GfxBackendV2 gf_v2_kcopy;', ''))
         backend=Path(tmp)/'backend.o'
         cc_cache.build(['gcc',*flags,'-Igfx','-DOS32_GEFORCE_MODULE','-c',
-                        str(ROOT/'drivers/video/geforce/backend_geforce.c'),'-o',str(backend)],check=True)
+                        str(ROOT/'sys/dev/video/geforce/backend_geforce.c'),'-o',str(backend)],check=True)
         if override:
             flags.append('-DGF_PRODUCTION_MUTANT')
-        sources = ['tools/tests/gf_accel_unbound_stubs.c', 'tools/tests/gf_production_host.c', 'kernel/sys.c',
-                   'hwdev/gf/bus.c', 'hwdev/gf/resources.c', 'hwdev/gf/master.c',
-                   'drivers/pci/pci_locate.c', 'kdebug/recover_gf_locate.c',
-                   'hwdev/gf/runner.c', 'hwdev/gf/save.c', 'hwdev/gf/pll.c',
-                   'hwdev/gf/service.c', 'hwdev/gf/accel_surface.c', 'hwdev/gf_load_state.c', 'kdebug/gfinit_resources.c']
+        sources = ['tools/tests/gf_accel_unbound_stubs.c', 'tools/tests/gf_production_host.c', 'sys/kern/sys.c',
+                   'sys/dev/video/geforce/bus.c', 'sys/platform/pc98/geforce/resources.c', 'sys/dev/video/geforce/master.c',
+                   'sys/dev/pci/pci_locate.c', 'sys/dev/video/geforce/diag/recover_gf_locate.c',
+                   'sys/dev/video/geforce/runner.c', 'sys/dev/video/geforce/save.c', 'sys/dev/video/geforce/pll.c',
+                   'sys/dev/video/geforce/service.c', 'sys/dev/video/geforce/accel_surface.c', 'sys/dev/video/geforce/gf_load_state.c', 'sys/dev/video/geforce/diag/gfinit_resources.c']
         # Ownerless legacy display composition: F4-only lifecycle TUs must
         # not override the trap for an unexpected gf4_service_start call.
         f4_only = {'dcb', 'ddc', 'dpms', 'flip', 'gamma', 'tmds', 'tv',
@@ -127,48 +127,48 @@ def main(override=None, dev=13):
 
 def mutations():
     rows = [
-        ('drivers/video/geforce/geforce_module.c',
+        ('sys/dev/video/geforce/geforce_module.c',
          'int rc = p->wc_stop && p->wc_stop() < 0 ? -1 : 0;',
          'int rc = 0;', 'return-wc-stop'),
-        ('hwdev/gf/master.c',
+        ('sys/dev/video/geforce/master.c',
          'pci_cfg_write16(RECOVER_GF_BUS, RECOVER_GF_DEV, RECOVER_GF_FN,\n                        PCI_CFG_COMMAND, RECOVER_COMMAND_RUN)',
          'pci_cfg_write16(RECOVER_GF_BUS, 13, RECOVER_GF_FN,\n                        PCI_CFG_COMMAND, RECOVER_COMMAND_RUN)', 'M9 master destination'),
-        ('hwdev/gf/native.c',
+        ('sys/dev/video/geforce/native.c',
          'u32 part=us>GF_INIT_WAIT_CHUNK_US ? GF_INIT_WAIT_CHUNK_US : us;',
          'u32 part=us;', 'native wait passed unsplit'),
-        ('hwdev/gf/native.c', '    while (us) {',
+        ('sys/dev/video/geforce/native.c', '    while (us) {',
          '    if (us>GF_INIT_WAIT_CHUNK_US) return -1;\n    while (us) {',
          'native wait long request rejected'),
-        ('hwdev/gf/native.c', '        us-=part;',
+        ('sys/dev/video/geforce/native.c', '        us-=part;',
          '        us=0;', 'native wait total truncated'),
-        ('hwdev/gf/native.c', 'return sys_time_now(value,&hi);',
+        ('sys/dev/video/geforce/native.c', 'return sys_time_now(value,&hi);',
          'return sys_time_now(value,&hi) ? -1 : 0;', 'native clock raw rc'),
-        ('hwdev/gf/native.c', 'int rc=gf_production_clock(opaque,&start);',
+        ('sys/dev/video/geforce/native.c', 'int rc=gf_production_clock(opaque,&start);',
          'int rc=gf_production_clock(opaque,&start) ? -1 : 0;', 'native wait start raw rc'),
-        ('hwdev/gf/native.c', 'rc=gf_production_clock(opaque,&now);',
+        ('sys/dev/video/geforce/native.c', 'rc=gf_production_clock(opaque,&now);',
          'rc=gf_production_clock(opaque,&now) ? -1 : 0;', 'native wait poll raw rc'),
-        ('hwdev/gf/display/modeset.c',
+        ('sys/dev/video/geforce/display/modeset.c',
          'u32 part=us>GF_INIT_WAIT_CHUNK_US ? GF_INIT_WAIT_CHUNK_US : us;',
          'u32 part=us;', 'mode_load outer deadline interval'),
-        ('hwdev/gf/devinit.c', 'p->foundation.expected_pmc=prepared_pmc;', '(void)prepared_pmc;', 'prepare PMC publication omitted'),
-        ('hwdev/gf/devinit.c', '.timing={foundation_clock,foundation_wait}', '.timing={0 ? foundation_clock : 0,0 ? foundation_wait : 0}', 'prepare timing omitted'),
-        ('hwdev/gf/devinit.c', 'u16 stopped=command&~PCI_CMD_BUS_MASTER;', 'u16 stopped=command;', 'prepare BM clear omitted'),
-        ('hwdev/gf/devinit.c', 'u16 stopped=command&~PCI_CMD_BUS_MASTER;', 'u16 stopped=RECOVER_COMMAND_STOP;', 'prepare other Command bits lost'),
-        ('hwdev/gf/runner.c', '    /* Production point reads the clock again and updates elapsed_us. */\n    if (!ctx->opcode_timing && ctx->elapsed_us >= GF_INIT_EXEC_US)', '    /* Production point reads the clock again and updates elapsed_us. */\n    if (0)', 'script point budget reported as EIO'),
-        ('hwdev/gf/devinit.c', 'if (p->foundation.revoked) c->engaged=false;', '(void)c;', 'revoked cleanup exception omitted'),
-        ('hwdev/gf/devinit.c', 'else *value=*(volatile u32 *)(f->bar0+off);', 'else *value=0;', 'resident MMIO read omitted'),
-        ('hwdev/gf/devinit.c', 'else *(volatile u32 *)(f->bar0+off)=value;', 'else (void)value;', 'resident MMIO write omitted'),
-        ('hwdev/gf/devinit.c', '    if (f->revoked) return -1;\n    if (width==1) *value=', '    if (width==1) *value=', 'revoked resident read allowed'),
-        ('hwdev/gf/devinit.c', '    if (f->revoked) return -1;\n    if (width==1) *(volatile', '    if (width==1) *(volatile', 'revoked resident write allowed'),
-        ('hwdev/gf/bus.c', '    gf_foundation_revoke(&p->foundation);', '    (void)p;', 'revoke publication omitted'),
-        ('hwdev/gf/devinit.c', 'gf_master_enable(&p->foundation)', '0', 'N1 BM enable omitted'),
-        ('hwdev/gf/devinit.c', '    u32 amount;\n    if (gf_production_decode_safe(p)', '    u32 amount,pmc;\n    if (gf_production_read(p,0,RECOVER_PMC_ENABLE,4,&pmc) || pmc!=p->foundation.expected_pmc || gf_production_decode_safe(p)', 'unverified PMC readback comparison restored'),
-        ('hwdev/gf/bus.c', '!=p->foundation.expected_command)', '!=RECOVER_COMMAND_STOP)', 'RUN transport rejected'),
-        ('hwdev/gf/devinit.c', 'if (width==1) *value=*(volatile u8 *)(f->bar0+off);', 'if (width==1) *value=*(volatile u32 *)(f->bar0+off);', 'resident u8 read widened'),
-        ('hwdev/gf/devinit.c', 'if (width==1) *value=*(volatile u8 *)(f->bar0+off);', 'if (width==1) *value=(u8)*(volatile u32 *)(f->bar0+off);', 'resident masked overread'),
-        ('hwdev/gf/devinit.c', 'if (width==1) *(volatile u8 *)(f->bar0+off)=(u8)value;', 'if (width==1) *(volatile u32 *)(f->bar0+off)=(u32)value;', 'resident u8 write widened'),
-        ('hwdev/gf/devinit.c', 'if (width==2) *value=*(volatile u16 *)(f->bar0+off);', 'if (width==2) *value=*(volatile u32 *)(f->bar0+off);', 'resident u16 read widened'),
-        ('hwdev/gf/devinit.c', 'if (width==2) *(volatile u16 *)(f->bar0+off)=(u16)value;', 'if (width==2) *(volatile u32 *)(f->bar0+off)=(u32)value;', 'resident u16 write widened'),
+        ('sys/dev/video/geforce/devinit.c', 'p->foundation.expected_pmc=prepared_pmc;', '(void)prepared_pmc;', 'prepare PMC publication omitted'),
+        ('sys/dev/video/geforce/devinit.c', '.timing={foundation_clock,foundation_wait}', '.timing={0 ? foundation_clock : 0,0 ? foundation_wait : 0}', 'prepare timing omitted'),
+        ('sys/dev/video/geforce/devinit.c', 'u16 stopped=command&~PCI_CMD_BUS_MASTER;', 'u16 stopped=command;', 'prepare BM clear omitted'),
+        ('sys/dev/video/geforce/devinit.c', 'u16 stopped=command&~PCI_CMD_BUS_MASTER;', 'u16 stopped=RECOVER_COMMAND_STOP;', 'prepare other Command bits lost'),
+        ('sys/dev/video/geforce/runner.c', '    /* Production point reads the clock again and updates elapsed_us. */\n    if (!ctx->opcode_timing && ctx->elapsed_us >= GF_INIT_EXEC_US)', '    /* Production point reads the clock again and updates elapsed_us. */\n    if (0)', 'script point budget reported as EIO'),
+        ('sys/dev/video/geforce/devinit.c', 'if (p->foundation.revoked) c->engaged=false;', '(void)c;', 'revoked cleanup exception omitted'),
+        ('sys/dev/video/geforce/devinit.c', 'else *value=*(volatile u32 *)(f->bar0+off);', 'else *value=0;', 'resident MMIO read omitted'),
+        ('sys/dev/video/geforce/devinit.c', 'else *(volatile u32 *)(f->bar0+off)=value;', 'else (void)value;', 'resident MMIO write omitted'),
+        ('sys/dev/video/geforce/devinit.c', '    if (f->revoked) return -1;\n    if (width==1) *value=', '    if (width==1) *value=', 'revoked resident read allowed'),
+        ('sys/dev/video/geforce/devinit.c', '    if (f->revoked) return -1;\n    if (width==1) *(volatile', '    if (width==1) *(volatile', 'revoked resident write allowed'),
+        ('sys/dev/video/geforce/bus.c', '    gf_foundation_revoke(&p->foundation);', '    (void)p;', 'revoke publication omitted'),
+        ('sys/dev/video/geforce/devinit.c', 'gf_master_enable(&p->foundation)', '0', 'N1 BM enable omitted'),
+        ('sys/dev/video/geforce/devinit.c', '    u32 amount;\n    if (gf_production_decode_safe(p)', '    u32 amount,pmc;\n    if (gf_production_read(p,0,RECOVER_PMC_ENABLE,4,&pmc) || pmc!=p->foundation.expected_pmc || gf_production_decode_safe(p)', 'unverified PMC readback comparison restored'),
+        ('sys/dev/video/geforce/bus.c', '!=p->foundation.expected_command)', '!=RECOVER_COMMAND_STOP)', 'RUN transport rejected'),
+        ('sys/dev/video/geforce/devinit.c', 'if (width==1) *value=*(volatile u8 *)(f->bar0+off);', 'if (width==1) *value=*(volatile u32 *)(f->bar0+off);', 'resident u8 read widened'),
+        ('sys/dev/video/geforce/devinit.c', 'if (width==1) *value=*(volatile u8 *)(f->bar0+off);', 'if (width==1) *value=(u8)*(volatile u32 *)(f->bar0+off);', 'resident masked overread'),
+        ('sys/dev/video/geforce/devinit.c', 'if (width==1) *(volatile u8 *)(f->bar0+off)=(u8)value;', 'if (width==1) *(volatile u32 *)(f->bar0+off)=(u32)value;', 'resident u8 write widened'),
+        ('sys/dev/video/geforce/devinit.c', 'if (width==2) *value=*(volatile u16 *)(f->bar0+off);', 'if (width==2) *value=*(volatile u32 *)(f->bar0+off);', 'resident u16 read widened'),
+        ('sys/dev/video/geforce/devinit.c', 'if (width==2) *(volatile u16 *)(f->bar0+off)=(u16)value;', 'if (width==2) *(volatile u32 *)(f->bar0+off)=(u32)value;', 'resident u16 write widened'),
     ]
     with tempfile.TemporaryDirectory(prefix='gf-cw-production-mut-') as td:
         # 正常対照 (ROLES §4-1): 変異の回と同じ組み方 (GF_PRODUCTION_MUTANT) で、手を入れていない写しが GREEN になること。

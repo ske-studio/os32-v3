@@ -10,14 +10,14 @@
 - R3: 静的 IP 形を未検証候補とし、BOOTP/DHCP の第二経路と U4 を追加。
 - R4: FB を上端の帯だけの 256KiB slot に限定し、VA と丸め込みの上限を明記。
 - R5: model と /uni-n の reg で clock profile を選び、QEMU の無呼出しを試験化。
-- R6: platform/powermac/ppc_kernel.c・kernel_boot.h の接続と既存 clock VA の再利用を追加。
+- R6: sys/platform/powermac/ppc_kernel.c・kernel_boot.h の接続と既存 clock VA の再利用を追加。
 - R7: 停止後は電源ボタンを 5 秒押して切り、再投入して OF に戻る。
 - R8: RH2 初回は FB で PHY ID 採取、適合 profile を加えた 2 回目で受入。
 - R9: RH_USER_EXIT の RED 判定を偽 Host の先行試験へ移す。
 - R10: devalias と enet の local-mac-address 採取を追加。
 - R11: OF の GMAC/DMA 使用と quiesce 前の TX/RX・PCI Command 採取を追加。
 - R12: 未知 PHY 拒否の参照を gem_phy.c (gem_mif_init()) に訂正。
-- 追記 ESCC: platform/powermac/ppc_kernel.c の停止経路も診断構成の対象へ追加。
+- 追記 ESCC: sys/platform/powermac/ppc_kernel.c の停止経路も診断構成の対象へ追加。
 - PM/U1〜U5: U2 は PM の日程通知、U3 はノートで確定、U1/U4/U5 は §7 に残す。
 
 - 基点: PACK 指定の main cf36ed92。設計のみ。実機の電源・ネットワークには未接続、未試験。
@@ -32,27 +32,27 @@
 
 | 台帳 | 実機で残る受入 | 実コードの所在 / 足りないもの |
 |---|---|---|
-| PPC-BOOT-RH (`DEFERRED_TESTS.md:37`) | Apple OF 4.x の ELF/NOTE、0x20000 非衝突、screen、非ページ境界の map、ch-a open | `platform/powermac/boot.c` に OF greeting、同 に tree/open/map 失敗。screen の実機確認は未実施 |
-| PPC-MMU-RH (:38) | 7450/7455 HIGH_BAT・HID0、DEC pending、cache/WIMG、ESCC 配線 | `platform/powermac/mmu_boot.c` は takeover 前の OF 出力。切離し後の実機表示を足す |
-| PPC-KBOOT-RH (:39) | 1MiB load/memsz、macio ranges、MPIC LE、TB、cache、HPT、1kHz の実時間 | `kboot_capture.c` は property/TB 採取、`platform/powermac/kernel_boot.c` は vector/HPT。観測は実機で要る |
+| PPC-BOOT-RH (`DEFERRED_TESTS.md:37`) | Apple OF 4.x の ELF/NOTE、0x20000 非衝突、screen、非ページ境界の map、ch-a open | `sys/platform/powermac/boot.c` に OF greeting、同 に tree/open/map 失敗。screen の実機確認は未実施 |
+| PPC-MMU-RH (:38) | 7450/7455 HIGH_BAT・HID0、DEC pending、cache/WIMG、ESCC 配線 | `sys/platform/powermac/mmu_boot.c` は takeover 前の OF 出力。切離し後の実機表示を足す |
+| PPC-KBOOT-RH (:39) | 1MiB load/memsz、macio ranges、MPIC LE、TB、cache、HPT、1kHz の実時間 | `kboot_capture.c` は property/TB 採取、`sys/platform/powermac/kernel_boot.c` は vector/HPT。観測は実機で要る |
 | PPC-LAN-RH (:40) | clock、PHY、DMA/cache、PCI domain、AF_PACKET | 下表。QEMU の sungem 合格では閉じない |
 
 | ID | 現物照合で訂正する前提（食い違い 7 件） | 根拠と対応 |
 |---|---|---|
 | D1 | 「clock gate が無い」ではなく関数は有るが未接続 | `gmac_clock.c` は native RMW/readback。`kernel_boot.c` の alias は GMAC/config だけ、`pci_config.c` は clock 未呼出し |
 | D2 | 「OF の画面の印が無い」ではない | `kernel_boot.c` の `TAKEOVER` は detach の前。これだけでは切離し成功を示さない |
-| D3 | 「ID を取っていない」ではなく取った未知 ID を拒否している | `drivers/net/gem/gem_phy.c` は ID 保存、同ファイル内 の表は BCM5201、`gem_mif_init()` は未知を拒否。外部へ ID を出す口が不足 |
+| D3 | 「ID を取っていない」ではなく取った未知 ID を拒否している | `sys/dev/net/gem/gem_phy.c` は ID 保存、同ファイル内 の表は BCM5201、`gem_mif_init()` は未知を拒否。外部へ ID を出す口が不足 |
 | D4 | 「切離し後も OF 画面でログが読める」ではない | `kernel_boot.c` の `ppc_kernel_start()` で detach、`kboot_console.c` は画面能力なし。FB の段表示が必要 |
 | D5 | 「USB PowerMac の殻はこれから全部作る」ではない | `kboot_capture.c` は sh 像で USB 採取、`usb_boot.c` の `takeover()` に OCR/IR 静止、`usb_platform.c` に専用 pool |
 | D6 | 「カメラが G4 を見ている」ではない | PACK の現状は左の PC-98。RA266 §3-1 の約 5fps の観測を右へ向けてから開始 |
-| D7 | RAM root は既に ELF に同梱済み | `arch/ppc/kernel.ld`、`build/targets/ppc-powermac.mk`、`root_image.c` の `pm_root_image()`、`root_boot.c` の `pm_root_boot()`。追加実装不要 |
+| D7 | RAM root は既に ELF に同梱済み | `sys/arch/ppc/kernel.ld`、`build/targets/ppc-powermac.mk`、`root_image.c` の `pm_root_image()`、`root_boot.c` の `pm_root_boot()`。追加実装不要 |
 
 - 上記の食い違いは設計上の前提の訂正数。実機の故障を検出した数ではない。
 - `gmac_tree.c` の root_pa は PCI bridge。clock の `0xf8000020` を root_pa+0x20 としてはいけない。
 - `gmac_tree.c` の `pm_gmac_capture()` の DMA 先頭 16MiB 窓、`gmac_dma.c` の `pm_dma_bus()` の bus 変換は実機の到達性を別途証明する。
 - `lan_service.c` の `pm_lan_poll()` の準備/公開、`pm_lan_poll()` の PHY 待ち/再確認を保ち、poll に長い同期待ちを足さない。
 - `ppc_lan_host.py` に AF_PACKET 実装済み。`main()` の `--peer` は必須で G4 の実 MAC が必要。
-- ESCC 失敗停止は `kernel_boot.c` と `platform/powermac/ppc_kernel.c` の両方。外部端子無しと ch-a open 失敗を区別し、診断構成では両経路を扱う。
+- ESCC 失敗停止は `kernel_boot.c` と `sys/platform/powermac/ppc_kernel.c` の両方。外部端子無しと ch-a open 失敗を区別し、診断構成では両経路を扱う。
 - `boot enet` では OF が直前まで GMAC/DMA を使用する。直接起動の QEMU 証拠では detach〜early_quiesce の安全性を閉じない。
 
 ## 2. RH0〜RH4 の実施計画
@@ -154,7 +154,7 @@
 ### RH1: OF の段印・切離し後の最小表示
 
 ```c
-/* 新規 platform/powermac/rh_observe.h: 所有者は rh_observe.c */
+/* 新規 sys/platform/powermac/rh_observe.h: 所有者は rh_observe.c */
 struct pm_rh_fb { u32 pa, bytes, stride, width, height, depth; };
 int pm_rh_capture(int stdout_ih); /* OF が生きている間に表示と translate を採取 */
 int pm_rh_of_mark(unsigned stage); /* stdout に大きい段名、detach 後は呼ばない */
@@ -167,7 +167,7 @@ void pm_rh_phy(u32 port, u32 addr, u32 id1, u32 id2); /* 大きい ID ページ 
 - OF MMU の translate で上端の帯だけ PA/連続性を解決。stride×表示行数と範囲の桁溢れを検査し、PA の頁内 offset を加えた頁丸め長 ≤256KiB とする（全画面は写さない）。
 - 最初は既知の 8/16/32bpp のみ (8bpp は G4 実機の OF の画面、640×480・linebytes 768、11-13 に確認)。未知形式では OF 段印と採取値を残して停止、GPU モード設定は足さない。
 - `kernel_boot.c` の ESCC 準備前に OF 印 0、capture 後に 1、reserve 後に 2、既存 TAKEOVER を最後に出す。
-- `kernel_boot.h` に `PPC_BOOT_FB_VA=(MEM_DEVICE_APERTURE_BASE + 0x200000U)` (=0xFE200000〜0xFE23FFFF、静的な PT がある先頭の 4MiB の中の空き。既存の別名は 0xFE300000 から上)、`kernel_boot.c` の slot 表に同 VA/256KiB を追加し、既存窓との非重複を検査して I/G 写像。devices に fb_va/clock_va を渡し、`platform/powermac/ppc_kernel.c` の paging 後・ESCC 初期化前で bind→stage(1)、OF 呼出し増分は 0。
+- `kernel_boot.h` に `PPC_BOOT_FB_VA=(MEM_DEVICE_APERTURE_BASE + 0x200000U)` (=0xFE200000〜0xFE23FFFF、静的な PT がある先頭の 4MiB の中の空き。既存の別名は 0xFE300000 から上)、`kernel_boot.c` の slot 表に同 VA/256KiB を追加し、既存窓との非重複を検査して I/G 写像。devices に fb_va/clock_va を渡し、`sys/platform/powermac/ppc_kernel.c` の paging 後・ESCC 初期化前で bind→stage(1)、OF 呼出し増分は 0。
 - detach〜paging の間に停止した場合は TAKEOVER が最後。FB 段 1 を偽造せず、その区間を未通過と扱う。
 - boot/mmu の診断像にも同じ表示口を接続するが、mmu 像の写像寿命に合わせ独立に I/G 窓を作る。
 - 毎フレーム描画せず段が進んだ時だけ更新し、上端の帯に全到達段を残す（PHY ID も同じ帯の固定ページ）（約 5fps で短い遷移を見失わない）。
@@ -189,7 +189,7 @@ int pm_gmac_quiesce_setup_rh(const struct pm_gmac_boot *b,
 - `gmac_clock.c` の native アクセス/RMW/readback を再利用。PCI/GEM の LE32 に変換しない。
 - clock profile は DMA の `profile=1` と独立：採取 model が検証済み QuickSilver の値に一致し、`/uni-n` の node/reg が 0xf8000000 と +0x20 を含む範囲を示す時だけ有効。条件を満たさなければ clock を呼ばずに先へ進む (QEMU も実機の未知の model も同じ。停止しない、固定番地へ書かない)。model の値は RH0 で採った文字列を入れる。
 - `kernel_boot.c` の alias 計画・重複検査・walk 検証へ clock を追加。clock と bridge config の PA を混同しない。
-- early_quiesce の所有者は `pci_config.c`。`platform/powermac/ppc_kernel.c` が dev->clock_va を setup に渡す。clock 後・quiesce 前の PCI Command と GEM TX/RX enable を RAM に保存して LAN 開通後に出す。採取のため静止を遅らせず service/GEM IO から clock を二重に呼ばない。
+- early_quiesce の所有者は `pci_config.c`。`sys/platform/powermac/ppc_kernel.c` が dev->clock_va を setup に渡す。clock 後・quiesce 前の PCI Command と GEM TX/RX enable を RAM に保存して LAN 開通後に出す。採取のため静止を遅らせず service/GEM IO から clock を二重に呼ばない。
 - clock 失敗は `RH CLOCK rc=...` と FB で示して LAN を無効化。BM 解除の readback=1 は既存どおり停止。
 
 ### RH2: PHY の採取と対応
@@ -251,17 +251,17 @@ int gem_phy_sample(struct gem *g, struct gem_phy_sample *out);
 |---|---|---|
 | 共通契約 | +platform/powermac/rh_observe.h、lan_boot.h、gem.h | 各ヘッダは自分の境界だけ。先に契約を固定 |
 | RH1-A | +platform/powermac/rh_observe.c | OF 採取・持続段表示。clock/PHY と独立に作業可能 |
-| RH1-B | platform/powermac/kernel_boot.c | OF 印の呼出し、FB/clock slot・alias・検証の統合。統合担当 1 人 |
-| RH1/RH2 接続 | arch/ppc/kernel_boot.h、platform/powermac/ppc_kernel.c | 前者は FB VA と devices の fb_va/clock_va、後者は FB 段 1・ESCC 診断分岐・clock_va を quiesce setup へ渡す |
-| RH1-C | platform/powermac/boot.c、mmu_boot.c | 各診断像の段印接続。ファイルごとに別差分 |
-| RH2-A | platform/powermac/gmac_tree.c | clock profile の採取だけ |
-| RH2-B | platform/powermac/pci_config.c | early_quiesce の clock→PCI 順。gmac_clock.c の既存処理を使用 |
-| RH2-C | drivers/net/gem/gem_phy.c | 標準読取 sample/採取 ID に合う profile、core に画面処理を入れない |
-| RH2-D | platform/powermac/lan_service.c | PHY 採取の通知・nonce/段ログ、既存 poll budget 維持 |
+| RH1-B | sys/platform/powermac/kernel_boot.c | OF 印の呼出し、FB/clock slot・alias・検証の統合。統合担当 1 人 |
+| RH1/RH2 接続 | sys/arch/ppc/kernel_boot.h、sys/platform/powermac/ppc_kernel.c | 前者は FB VA と devices の fb_va/clock_va、後者は FB 段 1・ESCC 診断分岐・clock_va を quiesce setup へ渡す |
+| RH1-C | sys/platform/powermac/boot.c、mmu_boot.c | 各診断像の段印接続。ファイルごとに別差分 |
+| RH2-A | sys/platform/powermac/gmac_tree.c | clock profile の採取だけ |
+| RH2-B | sys/platform/powermac/pci_config.c | early_quiesce の clock→PCI 順。gmac_clock.c の既存処理を使用 |
+| RH2-C | sys/dev/net/gem/gem_phy.c | 標準読取 sample/採取 ID に合う profile、core に画面処理を入れない |
+| RH2-D | sys/platform/powermac/lan_service.c | PHY 採取の通知・nonce/段ログ、既存 poll budget 維持 |
 | RH0-A | +tools/ppc/realhw_image.py | ELF/NOTE/link 範囲の配布検査。未知 NOTE 内容を捏造しない |
 | RH0-B | +tools/ppc/realhw_run.py | AF_PACKET を使う実機試験/証拠、QEMU runner と結果を分離 |
 | RH4-A | +platform/powermac/usb_rh_diag.c | PCI/HC の読取 snapshot |
-| RH4-B | platform/powermac/usb_boot.c | 必要な場合だけ NEC EHCI 静止/companion、既存 takeover 再利用 |
+| RH4-B | sys/platform/powermac/usb_boot.c | 必要な場合だけ NEC EHCI 静止/companion、既存 takeover 再利用 |
 
 - 表の独立束は契約確定後に並列で出せる。今回は設計だけで、担当生成・実装・リポジトリ変更はしていない。
 

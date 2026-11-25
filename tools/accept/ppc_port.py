@@ -166,12 +166,12 @@ def main():
         mutation = []
         if case == 'drop-rx':
             mutation = mutant_settings(
-                folder, case, 'platform/powermac/escc.c',
+                folder, case, 'sys/platform/powermac/escc.c',
                 '    int byte;\n    do {\n        byte = pm_escc_trygetchar();',
                 '    int byte;\n    while (pm_escc_trygetchar() < 0) {}\n'
                 '    do {\n        byte = pm_escc_trygetchar();')
         elif case == 'drop-char':
-            mutation = mutant_settings(folder, case, 'kernel/port_service.c',
+            mutation = mutant_settings(folder, case, 'sys/kern/port_service.c',
                                        '    while (*str) {', '    if (*str) ++str;\n    while (*str) {')
         elif case == 'absent':
             absent_bindings(folder, kernel / 'gen')

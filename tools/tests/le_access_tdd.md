@@ -1,6 +1,6 @@
 # 移植準備 順序 4-a — 外部形式 (LE) の直アクセス検査 (試験の記録)
 
-- 票: 移植準備 順序 4-a (媒体・書庫の上のバイト列を `include/endian_le.h` のアクセサへ統一する)。
+- 票: 移植準備 順序 4-a (媒体・書庫の上のバイト列を `sys/include/endian_le.h` のアクセサへ統一する)。
   数字の正典は [`docs/tasks/portability/ARM_GAUGE.md`](../../docs/tasks/portability/ARM_GAUGE.md) §9
   「順序 4-a でも数字は動かない — この計測器が測っていないものだから」
 - 実行: `python3 tools/check_le_access.py` (`make check-le-access`)
@@ -9,8 +9,8 @@
 
 ## 0. 正直に書く ([V4])
 
-**検査は置き換えのあとに書いた。** `fs/ext2_*.c` / `fs/isofs/iso9660.c` /
-`drivers/video/kcg/kcg.c` / `lib/utf8.c` の `*(u32 *)&buf[off]` を先にアクセサへ
+**検査は置き換えのあとに書いた。** `fs/ext2_*.c` / `sys/fs/isofs/iso9660.c` /
+`sys/dev/video/kcg/kcg.c` / `lib/utf8.c` の `*(u32 *)&buf[off]` を先にアクセサへ
 置き換え、そのあとで `tools/check_le_access.py` を書いて
 「置き換え漏れが 0 である」ことと「今後増えない」ことを固定した。
 だから「先に RED を見た」とは書けない。
@@ -34,7 +34,7 @@
 
 x86 ではどちらも成り立つので動いてしまう。ARM (`SCTLR.A=1`) では 2 で落ち、
 ビッグエンディアンの CPU では 1 で値が化ける。外部形式は
-`include/endian_le.h` の `le16_rd` / `le16_wr` / `le32_rd` / `le32_wr`
+`sys/include/endian_le.h` の `le16_rd` / `le16_wr` / `le32_rd` / `le32_wr`
 (バイト単位で組み立てる純 C) を通すこと。
 
 **この穴は ARM コンパイル計測 (`make check-arm-compile`) には現れない。**
@@ -63,13 +63,13 @@ x86 のホストで見張るには **`=strict` が要る**。フラグとイン�
 
 | ファイル | 順序 4-a の前 | 後 |
 |---|---|---|
-| `fs/ext2/ext2_dir.c` | 29 | 0 |
-| `fs/ext2/ext2_fmt.c` | 54 | 0 |
-| `fs/ext2/ext2_inode.c` | 46 | 0 |
-| `fs/ext2/ext2_super.c` | 28 | 0 |
-| `drivers/video/kcg/kcg.c` | 3 | 0 |
+| `sys/fs/ext2/ext2_dir.c` | 29 | 0 |
+| `sys/fs/ext2/ext2_fmt.c` | 54 | 0 |
+| `sys/fs/ext2/ext2_inode.c` | 46 | 0 |
+| `sys/fs/ext2/ext2_super.c` | 28 | 0 |
+| `sys/dev/video/kcg/kcg.c` | 3 | 0 |
 | `lib/utf8.c` | 3 | 0 |
-| `fs/ext2/ext2_file.c` / `fs/ext2/ext2_vfs.c` / `fs/isofs/iso9660.c` | 0 | 0 |
+| `sys/fs/ext2/ext2_file.c` / `sys/fs/ext2/ext2_vfs.c` / `sys/fs/isofs/iso9660.c` | 0 | 0 |
 | **計** | **163** | **0** |
 
 ## 3. GREEN (現状、2026-09-15)

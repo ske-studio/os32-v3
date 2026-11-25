@@ -1,13 +1,13 @@
 /* PowerMac HW_OP §5 5a and R3-P1/P2. Exercise the private dispatch, exec
  * ownership and terminal delivery together, with the existing host AppSlot. */
-#include "platform/powermac/platform_hwb_session.h"
+#include "sys/platform/powermac/platform_hwb_session.h"
 #define _start pc98_abort_control
 #include "exec_hwb_abort_host.c"
 #undef _start
 #define PM_KDEBUG
-#include "kernel/module/kdebug_call.c"
+#include "sys/kern/module/kdebug_call.c"
 #define PM_TERMINAL_TEST
-#include "platform/powermac/terminal_input.c"
+#include "sys/platform/powermac/terminal_input.c"
 
 ShellService g_shell_service;
 static unsigned forwarded;

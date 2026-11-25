@@ -31,7 +31,7 @@
 
 ### §2-1 物理メモリ配置
 
-> 番地の定義の正典は `include/memmap.h` (OS の配置) と `platform/pc98/platform_boot_layout.h` (PC-98 の起動と低位メモリ)。ここが食い違ったらそちらが正しい。
+> 番地の定義の正典は `sys/include/memmap.h` (OS の配置) と `sys/platform/pc98/platform_boot_layout.h` (PC-98 の起動と低位メモリ)。ここが食い違ったらそちらが正しい。
 > カーネルスタックは 0x90000 → 0x1FC000 (V86 ゲストに 640KB を渡すため) →
 > 0x2FC000 (2026-09-17 決裁 D1) → **0x3FC000** (T3ab、固定 PD/PT 枠の後) と動いてきた。D1 の移設は
 > 「浮いた番地と固定番地を同じ帯で隣り合わせにしない」ため —
@@ -47,7 +47,7 @@
 > 重なり・範囲の逆転・写しのずれ・定数の整合をまとめて見る。生成文書との一致は検査しない。
 
 実ビルドの地図は `build/out/MEMMAP.md` に生成する
-([生成文書の見方](INDEX.md#生成文書の見方))。定義は `include/memmap.h`、
+([生成文書の見方](INDEX.md#生成文書の見方))。定義は `sys/include/memmap.h`、
 実ビルドの数値は `build/out/kernel.map` の `__bss_end` / `__kernel_resident_end`から求める。
 表は全て絶対番地とし、カーネル本体の使用量・残り予算・成長時に動く帯も表示する。
 `__bss_end` が伸びると `KHEAP_BASE` 以降の KAPI / SHM / ガードも動くため、
@@ -81,7 +81,7 @@ T5-0b の #DF (vector 8) は専用 task gate (GDT末尾 idx6 / selector 0x30) �
 kernel/engine/unknown をシリアル・TVRAM に1行出して停止し、復帰・回収しない。
 EIP は #DF の仕様上再開点ではなく、CR2 は例外フレーム書込み失敗の番地にもなる。
 engine stack は製品設定の深度100のhost実測24,388Bに対して32KiB (残余 8,380 B、上限 100 を維持 — ユーザー決定 2026-10-18) を選択 (定義は
-`kernel/sqlite_engine.h`)、NP guard 1頁は変更しない。実guard配送の受入は台帳 KSTK-DF。
+`sys/kern/sqlite_engine.h`)、NP guard 1頁は変更しない。実guard配送の受入は台帳 KSTK-DF。
 
 `sys_usable_mem_end()` は `MEM_PHYS_EXEC_FLOOR` から最初の PERSIST 所有頁までの
 低位連続上端を返す（起動時の `ledger_arena_freeze()` で確定）。検出 RAM の最高番地ではない。
@@ -111,7 +111,7 @@ SLACK または pool の内数で、表ありは owner 使用頁 +7・空き頁 
 
 #### 動的レイアウト (番地が実行時に決まるので生成できない部分)
 
-生成される地図に出るのは `include/memmap.h` と `kernel.map` で決まる固定の番地だけ。
+生成される地図に出るのは `sys/include/memmap.h` と `kernel.map` で決まる固定の番地だけ。
 以下は搭載メモリ量・バイナリの大きさ・起動の仕方で変わるので手で持つ。
 
 ```
@@ -172,9 +172,9 @@ PEGC 候補は F00000h と FFF00000h の両窓 (各512KB) を supervisor + PCD �
 2026-09-29) に置く。RAM の量に関係なく RAM と重ならないよう物理地図で MMIO にし (RAM として登録できる上端 =
 `MEM_PHYS_RAM_CEILING` = 2GB、D11 — `[2GB, 4GB)` は窓の帯も含めて RAM にしない、T1a)、帯の先頭 4MB の PT を paging_init が**静的に 1 枚** (画像外の固定域) 持つ —
 新しい PDE は live AS が 0 の間しか足せないが、gfx の init は exec の後にも走るため。
-最上位4MB (FFC00000h〜FFFFFFFFh、PDE 0x3FF) にも静的 PT (003EB000h) を持ち、全アプリ PD に共有する。固定 PD/PT は 1/8/1/1 の11ページ。003FB000h はスタックガード (NP)、003FC000h〜003FFFFFh の4ページはカーネルスタック (RW)。定義は [include/memmap.h](../include/memmap.h)、保護属性の適用は `mm/paging.c` を参照。
+最上位4MB (FFC00000h〜FFFFFFFFh、PDE 0x3FF) にも静的 PT (003EB000h) を持ち、全アプリ PD に共有する。固定 PD/PT は 1/8/1/1 の11ページ。003FB000h はスタックガード (NP)、003FC000h〜003FFFFFh の4ページはカーネルスタック (RW)。定義は [sys/include/memmap.h](../sys/include/memmap.h)、保護属性の適用は `sys/kern/mm/paging.c` を参照。
 **固定 PD/PT 枠の並び (T3ab、半開区間)**: 見張り `[0x3E0000,0x3E1000)` (NP)、枠 `[0x3E1000,0x3FB000)` 26 頁 (`MEM_FIXED_PAGING_FRAME_PAGES`)、見張り `[0x3FB000,0x3FC000)` (NP)、カーネルスタック `[0x3FC000,0x400000)` 4 頁。枠のうち使うのは先頭の 11 頁 (PD `0x3E1000`、起動時の PT 8 枚 `0x3E2000`〜、デバイス窓の PT `0x3EA000`、最上位 4MB の PT `0x3EB000`) で、残りの予備 15 頁もカーネル所有のまま持ち、SLACK へ返さない。枠全体は恒等の supervisor/RW、NP は両側の見張りだけ。
-**DMA の池は固定 `[0x7F0000,0x800000)` の 64KiB** (`MEM_DMA_POOL_BASE`、[HW2] の 64KB 境界をまたがない)。一般の池や BB を配る前に台帳へ `LEDGER_R_DMA` / カーネル所有 / WB の恒久区間として登録し、通常 RAM として二重に配らない (`mm/pgalloc.c`)。検出した RAM がこの区間に届かず登録できなかった機械では、池の初期化・自己診断・PCI の結び付け・PCM を行わず、`[dma] RAM short; pool/PCI/PCM skipped` を 1 行出して起動を続ける (`platform/pc98/kernel.c`)。
+**DMA の池は固定 `[0x7F0000,0x800000)` の 64KiB** (`MEM_DMA_POOL_BASE`、[HW2] の 64KB 境界をまたがない)。一般の池や BB を配る前に台帳へ `LEDGER_R_DMA` / カーネル所有 / WB の恒久区間として登録し、通常 RAM として二重に配らない (`sys/kern/mm/pgalloc.c`)。検出した RAM がこの区間に届かず登録できなかった機械では、池の初期化・自己診断・PCI の結び付け・PCM を行わず、`[dma] RAM short; pool/PCI/PCM skipped` を 1 行出して起動を続ける (`sys/platform/pc98/kernel.c`)。
 PFN ごとの owner と pin 数 (各 1B/PFN、pin 上限 255) は、2 面の bitmap の直後に検出した `limit_pfn` 分だけ置く。`PGALLOC_META_BYTES` が全量を計算し、ページに切り上げて低位 RAM 末尾へ予約する。64MB 機では pin 表は 16KB (4 頁)、metadata 全体は 36KB (9 頁)。高位 RAM の登録量は、この metadata と恒等・デバイス窓用 PT がアプリ帯最大上端から 15MB までに収まる量にも制限される。
 
 **FIXED 型の台帳の置き場 (metadata 2 頁 + workspace 1 頁) はカーネルの BSS の末尾の専用区画 `.ledger_fixed`** (NOLOAD、頁整列) で、`MEM_LEDGER_META_BASE` はその先頭のリンカ記号 `__ledger_fixed_start`。起動時から恒等の supervisor/RW で present。ARENA_TOP 型の機械では動的な置き場を使い、この 3 頁は使わずにカーネル所有のまま持つ。最上位 PT は初期には全 NP、PEGC 候補の写像成功後だけ FFF00000h〜FFF7FFFFh の128ページを公開する。
@@ -206,11 +206,11 @@ PFN ごとの owner と pin 数 (各 1B/PFN、pin 上限 255) は、2 面の bit
 > `ring3_guard bb` は旧BB番地 (現在はV86_LOW) 0x6A000 への書込みで PF error=7、kill を期待し、
 > 正規 CLIENT lease の生存対照は `ring3_guard lease` が担う。
 
-> **CR0.WP = 0 で走る** (`arch/x86/arch_cpu.h` の MMU 有効化)。`mm/shlib.c` が
+> **CR0.WP = 0 で走る** (`sys/arch/x86/arch_cpu.h` の MMU 有効化)。`sys/kern/mm/shlib.c` が
 > 「カーネルからは RO の USER ページにも書ける」前提で共有ライブラリを張るため。
 > 裏返しとして **CPL=0 (KAPI の wrapper) は PTE の RO 保護を受けない** ので、CPL=3 が
 > 出力引数に共有ライブラリの `.text`/`.rodata` を渡しても #PF は起きない。出力ポインタは
-> 書く前に `exec/exec.c` の `ring3_user_ranges_writable()` で present + RW + USER を
+> 書く前に `sys/kern/exec/exec.c` の `ring3_user_ranges_writable()` で present + RW + USER を
 > 確かめる (生成される wrapper の先頭。票
 > `docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md`)。
 

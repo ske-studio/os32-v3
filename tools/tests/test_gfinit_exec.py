@@ -13,7 +13,7 @@ FLAGS = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-m32', '-march=i386',
 
 def command(exe, probe=False):
     return ['gcc', *FLAGS, *(['-DGF_VPLL_PROBE=1'] if probe else []), '-O2', '-nostdlib', '-static', '-no-pie',
-            '-I'+str(ROOT/'include'), '-I'+str(ROOT/'sdk/include/os32'), str(ROOT/'tools/tests/gfinit_exec_host.c'), *[str(ROOT / p) for p in ('hwdev/gf/runner.c','hwdev/gf/save.c','hwdev/gf/pll.c')], *map(str, sorted((ROOT/'hwdev/gf/op').glob('*.c'))), '-o', str(exe)]
+            '-I'+str(ROOT/'include'), '-I'+str(ROOT/'sdk/include/os32'), str(ROOT/'tools/tests/gfinit_exec_host.c'), *[str(ROOT / p) for p in ('sys/dev/video/geforce/runner.c','sys/dev/video/geforce/save.c','sys/dev/video/geforce/pll.c')], *map(str, sorted((ROOT/'hwdev/gf/op').glob('*.c'))), '-o', str(exe)]
 
 
 MUTATIONS = [
@@ -24,7 +24,7 @@ MUTATIONS = [
 
 
 SHARED_MUTATIONS = [
-    ('kdebug/recover_plan/access.inc', 'write_readback_unknown',
+    ('sys/dev/video/geforce/diag/recover_plan/access.inc', 'write_readback_unknown',
      'rc || write ? RECOVER_NONE : *value', 'rc ? RECOVER_NONE : *value'),
 ]
 
@@ -60,8 +60,8 @@ def main():
             return result.returncode
     if '--mutate' in sys.argv:
         return int(bool(mutpar.run_with_control(mutation,
-            [('kdebug/gfinit_exec.c', *item) for item in MUTATIONS] + SHARED_MUTATIONS,
-            ('kdebug/gfinit_exec.c', 'control', '', ''))))
+            [('sys/dev/video/geforce/diag/gfinit_exec.c', *item) for item in MUTATIONS] + SHARED_MUTATIONS,
+            ('sys/dev/video/geforce/diag/gfinit_exec.c', 'control', '', ''))))
     return 0
 
 

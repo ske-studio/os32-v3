@@ -47,7 +47,7 @@ CRC32 は zlib.crc32 と同じ。v1 の像はどちらのローダも `VK32_ERR_
 ## 写しの一致
 
 `boot/loader_fat_new.asm` の `VK32_*`・`MAX_IMAGE_SIZE` の EQU と `boot/boot_defs.h`、`boot_defs.h` のイメージ欄の写しと
-`platform/pc98/bootinfo_wire.h` は名前ごとに一致させる (試験 `mirror`)。
+`sys/platform/pc98/bootinfo_wire.h` は名前ごとに一致させる (試験 `mirror`)。
 
 ## 確かめ
 

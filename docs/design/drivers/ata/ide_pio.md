@@ -1,4 +1,4 @@
-# drivers/ata/ide_pio.inc — 1 コマンドの PIO 転送
+# sys/dev/ata/ide_pio.inc — 1 コマンドの PIO 転送
 
 > 状態: **現行 (2026-10-31)**
 

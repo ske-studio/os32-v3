@@ -27,19 +27,19 @@ AC-LIBC-1 (`docs/decisions/ARCH_COMPAT_CONTRACT.md`) と AC-BUILD-1 (:130) に�
 
 |ID|実物 (file:line)|到達点との差・処置|
 |---|---|---|
-|D1|`arch/ppc/exec_context.c`|FP 三関数が空。専用 .S へ移す|
-|D2|`arch/ppc/arch_exec_storage.h` の `ARCH_FP_BYTES`|保存域 1B/align1。264B/align8 にする|
-|D3|`arch/ppc/ppc_oea.h` の `PPC_MSR_POW`、`kernel_vectors.S`|FP/FE の定義と例外内 FP 有効化が無い。明示使用区間を設ける|
-|D4|`arch/ppc/kernel_trap.c` の `ppc_trap_dispatch()`|USER の 0x800 は汎用 kill、特権側は unknown。専用理由を付ける|
+|D1|`sys/arch/ppc/exec_context.c`|FP 三関数が空。専用 .S へ移す|
+|D2|`sys/arch/ppc/arch_exec_storage.h` の `ARCH_FP_BYTES`|保存域 1B/align1。264B/align8 にする|
+|D3|`sys/arch/ppc/ppc_oea.h` の `PPC_MSR_POW`、`kernel_vectors.S`|FP/FE の定義と例外内 FP 有効化が無い。明示使用区間を設ける|
+|D4|`sys/arch/ppc/kernel_trap.c` の `ppc_trap_dispatch()`|USER の 0x800 は汎用 kill、特権側は unknown。専用理由を付ける|
 |D5|`build/arch/ppc.mk`、`build/targets/ppc-powermac.mk`、`build/ppc.mk`|全体 soft-float、CPU は 7450。kernel は -mcpu=7450 維持。USER/SQLite TU を hard-float・750 互換にする|
 |D6|`build/ppc-user.mk`|libc/libgcc/adapter/syscalls がリンクされない|
 |D7|`sdk/crt/ppc/start.c` の `os32_start_c()` 対 `sdk/crt/crt0_c.c`|_init と help の共通動作が無い|
 |D8|`sdk/link/ppc/app.ld`|small-data/GOT/fixup の明示配置が無い|
 |D9|`sdk/allocator/build_nano.py`、`tools/check_nano_inputs.py`、`sdk/allocator/check_link.py`|i386 固定の3ファイルは変更せず、新規 PPC 道具から import する|
-|D10|`build/features/sqlite.mk`、`lib/sqlite3/sqlite_stack.asm`|別スタックは x86 のみ。PPC の口を先行して作る|
+|D10|`sys/conf/features/sqlite.mk`、`lib/sqlite3/sqlite_stack.asm`|別スタックは x86 のみ。PPC の口を先行して作る|
 
 追加の結線上の注意: `build/ppc-user.mk` の shell 専用 format/stdio/string/runtime は newlib と定義が重複しうる。N3 の provider 点検対象に含める。
-現行 `include/exec_arch.h` の「kernel integer-only」は FP 区間以外と読み替え、仕様コメントも直す。x86 の保存形式 108B は維持 (`arch/x86/kernel/x87.c`)。
+現行 `sys/include/exec_arch.h` の「kernel integer-only」は FP 区間以外と読み替え、仕様コメントも直す。x86 の保存形式 108B は維持 (`sys/arch/x86/kernel/x87.c`)。
 
 ## 2. FP の扱い (カーネル)
 ### 方針と手本の順序
@@ -80,7 +80,7 @@ int ppc_kernel_fp_begin(struct ppc_kernel_fp_guard *g);
 void ppc_kernel_fp_end(const struct ppc_kernel_fp_guard *g);
 ```
 - asm は FP=1/EE=0 で操作し sync 後に旧 MSR/isync。GPR/CR/LR の SysV 非揮発規則も守る。restore/init は FPR を置換する特殊口なので呼出し元を soft-float に限定する。
-- `AppSlot.fp_state` (`exec/appslot.h`) が休止 USER を所有。`fp_parent[exec_nest_level]` が親を所有し、像の書換えで共有一時バッファを使わない。
+- `AppSlot.fp_state` (`sys/kern/exec/appslot.h`) が休止 USER を所有。`fp_parent[exec_nest_level]` が親を所有し、像の書換えで共有一時バッファを使わない。
 - launch: `exec_launch.inc` 親 save → init → entry。park: `exec_syscall.inc` USER frame → FP 保存。resume: `exec_schedule.inc` 親 save → 子 restore。
 - 終了/fault/kill/park の longjmp 後は `exec_launch.inc` / `exec_schedule.inc` で親 restore。FP 保存域は slot と同寿命、reclaim/再使用での消去は不要。launch は init を使い、動的確保しない。
 - 通常 syscall では USER の FPR がハードウェアに残る。一般 kernel は soft-float のため触らず、SQLite だけ guard が退避する。非揮発 FPR と FPSCR が通常の syscall 往復でも保たれる。
@@ -150,10 +150,10 @@ void sqlite_call_on_alt_stack(void (*call)(void *), u32 top, void *frame);
 - `lib/sqlite3/sqlite_stack_ppc.S`: r3=call/r4=top/r5=frame。元 stack 上に16B整列フレームを確保し LR と使用する非揮発 GPR (例 r30/r31) を保存。未使用の r2/r13/CR 非揮発部を壊さない。
 - 旧 r1 と callback を非揮発 GPR に保持→新 r1=align_down(top,16)−16→backchain に旧 r1→LR 保存用 linkage を確保→r3=frame、mtctr/bctrl。
 - callback は hard-float SysV の非揮発 f14〜31 を保存する。trampoline 自身は FP を触らず、戻ったら旧 r1/LR/GPR を復元して blr。top の予約域/guard を越えない。
-- 呼出し前後の全 FP 保護は §2 の guard。`sqlite_engine_run` (`kernel/sqlite_engine.c`) の active/reentry/IRQ/exception 拒否を通過した後 begin。非0なら active を解除し0を返す。成功時だけ alt stack、end、active 解除の順。
+- 呼出し前後の全 FP 保護は §2 の guard。`sqlite_engine_run` (`sys/kern/sqlite_engine.c`) の active/reentry/IRQ/exception 拒否を通過した後 begin。非0なら active を解除し0を返す。成功時だけ alt stack、end、active 解除の順。
 - BSD の根拠: N `.../setjmp.S:36-66,76-104` は r1/非揮発 GPR/CR/LR を保持するが FP はコメントのみ。F `lib/libc/powerpc/gen/_setjmp.S:59,86` は f14〜31 を実保存する。
 - SQLite の stack swap 自体の手本はこれらには **無い**。OS32 x86 `sqlite_stack.asm:14-26` の「旧 stack 保持→整列した別 stack→復元」と `docs/ppc/abi.md` の根拠を使う。
-- build/features/sqlite.mk は ARCH により asm/.S を排他選択。今回は合成 callback だけをリンクする専用 test。SQLite 本体、辞書、IME provider の有効化は後段で、未提供を stub 成功にしない。
+- sys/conf/features/sqlite.mk は ARCH により asm/.S を排他選択。今回は合成 callback だけをリンクする専用 test。SQLite 本体、辞書、IME provider の有効化は後段で、未提供を stub 成功にしない。
 
 ## 6. 部品の大きさの見積もり
 数値は **KiB の予算**で実測ではない。現作業木に build/out が無く、基点 ELF の余裕は未測定。archive の disk 長 (libc 約4621KiB/libgcc 約741KiB) は像の増分ではない。
@@ -166,7 +166,7 @@ void sqlite_call_on_alt_stack(void (*call)(void *), u32 top, void *frame);
 |newlib/adapter/CRT|各 USER bin、root image 経由で kboot にも|小 app 20〜60KiB、%f 使用 app 40〜100KiB、shell 30〜100KiB (旧部品の減少を差引)|同梱 bin 数 × 増分が支配的|
 |SQLite 本体/別 stack|IME 段の kernel/module|今回0、本体は次段で実測|今回の余裕を本体込みと誤認しない|
 
-- `arch/ppc/kernel.ld` の file/resident/chain end を個別に記録し、常駐像サイズ (__kernel_resident_end - __kernel_image_start) の上限 `0x275000` と照合する。root_image_blob.o は、KB_EXEC が有効な像 (KBOOT_SH=1 か KBOOT_SHELL=1、build/targets/ppc-powermac.mk) では build/targets/ppc-powermac.mk の KB_EXTRA に常に入り、その増分も算入する。KBOOT_SH=0 の診断像には入らない。別に heap 等を含む最終 chain を PM_KERNEL_CHAIN_LIMIT と照合する (同じ上限と取り違えない)。
+- `sys/arch/ppc/kernel.ld` の file/resident/chain end を個別に記録し、常駐像サイズ (__kernel_resident_end - __kernel_image_start) の上限 `0x275000` と照合する。root_image_blob.o は、KB_EXEC が有効な像 (KBOOT_SH=1 か KBOOT_SHELL=1、build/targets/ppc-powermac.mk) では build/targets/ppc-powermac.mk の KB_EXTRA に常に入り、その増分も算入する。KBOOT_SH=0 の診断像には入らない。別に heap 等を含む最終 chain を PM_KERNEL_CHAIN_LIMIT と照合する (同じ上限と取り違えない)。
 - 上限は正典の layout 定数を使い、設計の値を build に複写しない。上限直前の予算だけで合格にせず linker ASSERT と iso/ELF の実サイズを通す。
 - N3 の全 USER を詰めた像で再測定し、超過なら test apps を外部試験媒体に置く。製品 shell の機能を削ったり窓を拡大して通さない。
 
@@ -175,18 +175,18 @@ void sqlite_call_on_alt_stack(void (*call)(void *), u32 top, void *frame);
 
 |波・段|ファイル|新/変・行数|機能/依存|
 |---|---|---|---|
-|A宣言|include/exec_arch.h|変8|FP 利用コメント、公開口は維持|
-|A保存域|arch/ppc/arch_exec_storage.h|変8|264B/align8|
-|Aビット|arch/ppc/ppc_oea.h|変6|FP/FE 定数|
-|A guard口|arch/ppc/kernel_fp.h|新35|guard layout/API|
-|B FP実体|arch/ppc/fp_context.S|新180|save/restore/init、A後|
-|B空実体除去|arch/ppc/exec_context.c|変3|旧三関数を除去、B統合時|
-|B guard|arch/ppc/kernel_fp.c|新85|明示区間、B FP後|
-|B初回entry|arch/ppc/exec_enter.S|変5|USER SRR1 合成に FP|
-|B resume|arch/ppc/exec_resume.S|変8|USER SRR1 正規化|
-|B通常復帰|arch/ppc/kernel_vectors.S|変8|USER SRR1 の FE をマスク|
-|B理由定義|arch/ppc/ppc_trap.h|変3|0x800 専用理由の enum 追加|
-|B fault|arch/ppc/kernel_trap.c|変12|0x800 専用理由|
+|A宣言|sys/include/exec_arch.h|変8|FP 利用コメント、公開口は維持|
+|A保存域|sys/arch/ppc/arch_exec_storage.h|変8|264B/align8|
+|Aビット|sys/arch/ppc/ppc_oea.h|変6|FP/FE 定数|
+|A guard口|sys/arch/ppc/kernel_fp.h|新35|guard layout/API|
+|B FP実体|sys/arch/ppc/fp_context.S|新180|save/restore/init、A後|
+|B空実体除去|sys/arch/ppc/exec_context.c|変3|旧三関数を除去、B統合時|
+|B guard|sys/arch/ppc/kernel_fp.c|新85|明示区間、B FP後|
+|B初回entry|sys/arch/ppc/exec_enter.S|変5|USER SRR1 合成に FP|
+|B resume|sys/arch/ppc/exec_resume.S|変8|USER SRR1 正規化|
+|B通常復帰|sys/arch/ppc/kernel_vectors.S|変8|USER SRR1 の FE をマスク|
+|B理由定義|sys/arch/ppc/ppc_trap.h|変3|0x800 専用理由の enum 追加|
+|B fault|sys/arch/ppc/kernel_trap.c|変12|0x800 専用理由|
 |B登録|build/targets/ppc-powermac.mk|変20|FP objects/audit登録、CPU 7450 維持|
 |B旗|build/arch/ppc.mk|変10|kernel 7450 維持、USER hard-float 分離|
 |B boot|build/ppc.mk|変更なし|7450、soft 維持|
@@ -201,8 +201,8 @@ void sqlite_call_on_alt_stack(void (*call)(void *), u32 top, void *frame);
 |N3 shell glue|userland/ppc/sh/newlib_runtime.c|新80以内|既存 runtime の固有役割だけ、定義棚卸し後|
 |N3結線|build/ppc-user.mk|変85|全USER/新glue/nano/syscalls/help、N1/N2後|
 |S stack|lib/sqlite3/sqlite_stack_ppc.S|新65|別 stack ABI、A後|
-|S guard結線|kernel/sqlite_engine.c|変12|PPC 条件の begin/end、B後|
-|S選択|build/features/sqlite.mk|変8|arch 排他選択|
+|S guard結線|sys/kern/sqlite_engine.c|変12|PPC 条件の begin/end、B後|
+|S選択|sys/conf/features/sqlite.mk|変8|arch 排他選択|
 |T FP host|tools/tests/test_ppc_fp.py|新180|保存layout/命令/旗/禁止範囲|
 |T nano host|tools/tests/test_nano_targets.py|新190|x86 bytes/cache と PPC provider|
 |T FP guest|userland/ppc/fp_probe.S|新180|全FPR/FPSCR/可変長 ABI helper|

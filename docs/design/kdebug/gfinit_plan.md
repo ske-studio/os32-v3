@@ -1,6 +1,6 @@
-# kdebug/gfinit_plan.c — 設計
+# sys/dev/video/geforce/diag/gfinit_plan.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: GF6200_4A_DESIGN.md・HWDEV_DESIGN.md・REALHW_RECOVER_ADDENDUM.md・REALHW_RECOVER_DESIGN.md・SLIM_HWDEV_DESIGN.md (D1 で移した)
-ソース: `kdebug/gfinit_plan.c`
+ソース: `sys/dev/video/geforce/diag/gfinit_plan.c`
 
 ## GF6200_4A_DESIGN
 

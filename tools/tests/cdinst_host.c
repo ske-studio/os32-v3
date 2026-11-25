@@ -5,8 +5,8 @@
  *  記録:   tools/tests/hdd_stage2_tdd.md
  *
  *  取り込む実物: userland/system/cdinst.c (main ごと)・inst_hdd.c・inst_disk.c・
- *  userland/lib/rt/pkg.c・userland/shell/hdprep_plan.c・fs/pc98pt.c・
- *  fs/ext2/ext2_layout.c。贋物は KAPI だけ:
+ *  userland/lib/rt/pkg.c・userland/shell/hdprep_plan.c・sys/fs/pc98pt.c・
+ *  sys/fs/ext2/ext2_layout.c。贋物は KAPI だけ:
  *    - /cd0 の .PKG は試験がバイト列で組む (無圧縮、PKG1 形式)
  *    - hd0 は LBA 0〜31 のセクタの模型 (区画表・IPL・ローダの帯)。ext2 の
  *      中身は ext2_format_at の呼び出しを記録するだけ (実物の format_at と
@@ -223,7 +223,7 @@ static int inj_read_fail_after_write; /* 1 = 最初の書き込みの後だけ (
 static int hd0_mounts, hd0_at_hd0, inj_root_hd0, inj_umount_fail;
 static int hd0_other_dev;             /* /hd0 には別のデバイス (hd1) がマウントされている */
 static int inj_mount_stays;           /* umount が成功しても hd0 のマウントが残る */
-/* 実物の umount (fs/vfs.c vfs_umount) は外す前に ops->sync() を呼び、ext2 の dirty な
+/* 実物の umount (sys/fs/vfs.c vfs_umount) は外す前に ops->sync() を呼び、ext2 の dirty な
  * メタデータを書き出し得る (成否に関わらず)。inj_umount_sync = 1 でそれを再現し、
  * umount_syncs に数える (インストーラの ide_write_sector = writes とは別) */
 static int inj_umount_sync, umount_syncs;
@@ -417,7 +417,7 @@ static const char *__cdecl f_vfs_devname(const char *pre)
     if (h_strcmp(pre, "/") == 0) return inj_root_hd0 ? "hd0" : "fd0";
     if (h_strcmp(pre, "/hd0") == 0 && hd0_at_hd0) return "hd0";
     if (h_strcmp(pre, "/hd0") == 0 && hd0_other_dev) return "hd1";
-    return "";                              /* 実物 (fs/vfs.c) と同じく未マウントは "" */
+    return "";                              /* 実物 (sys/fs/vfs.c) と同じく未マウントは "" */
 }
 static int __cdecl f_vfs_sync(void) { return inj_sync_fail ? -5 : 0; }
 static int keys_next(void)
@@ -456,14 +456,14 @@ static int __cdecl f_serial_trygetchar(void) { return keys_serial ? keys_next() 
 #include "../../userland/system/cdinst.c"
 #undef main
 #include "../../userland/system/inst_hdd.c"
-#include "../../platform/pc98/install_target.c"
+#include "../../sys/platform/pc98/install_target.c"
 #include "../../userland/system/inst_disk.c"
-#include "../../platform/pc98/install_disk.c"
+#include "../../sys/platform/pc98/install_disk.c"
 #include "../../userland/lib/rt/pkg.c"
 #include "../../userland/shell/hdprep_plan.c"
-#include "../../platform/pc98/install_plan.c"
-#include "../../fs/pc98pt.c"
-#include "../../fs/ext2/ext2_layout.c"
+#include "../../sys/platform/pc98/install_plan.c"
+#include "../../sys/fs/pc98pt.c"
+#include "../../sys/fs/ext2/ext2_layout.c"
 
 static KernelAPI g_api;
 

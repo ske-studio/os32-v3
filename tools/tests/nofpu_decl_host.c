@@ -2,7 +2,7 @@
 #include "x87_emu.h"
 #include "x87.h"
 #include "lib/softfloat_bits.h"
-#include "kernel/ver_info.h"
+#include "sys/kern/ver_info.h"
 #include <stddef.h>
 
 #define TYPE(fn, signature) STATIC_ASSERT( \

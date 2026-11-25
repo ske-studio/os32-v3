@@ -1,12 +1,12 @@
 """E4: real IRQ core + actual PCM I24 handler + diagnostic fake device."""
-CHECK = dict(name='pcm-e4-host', tier=1, covers=['drivers/sound/cs4231/pcm_hw.h',
+CHECK = dict(name='pcm-e4-host', tier=1, covers=['sys/dev/sound/cs4231/pcm_hw.h',
     'tools/tests/pcm_e4_host.c', 'tools/tests/pcm_cs4231_host.c',
     'tools/tests/pcm_hostshim/io.h', 'tools/tests/kernel_includes.py',
-    'platform/pc98/irq_policy.c', 'platform/pc98/irq_complete.c', 'platform/pc98/platform_irq_limits.h', 'include/platform_irq.h', 'include/kernel_tick.h', 'kernel/irq/irq.c', 'kernel/irq/irq_math.c', 'kernel/irq/tick.c',
-    'kernel/module/kdebug_call.c', 'drivers/sound/cs4231/pcm_module.c',
-    'kernel/time/tick_clock.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_refill.h', 'drivers/sound/cs4231/pcm_cs4231_math.c',
+    'sys/platform/pc98/irq_policy.c', 'sys/platform/pc98/irq_complete.c', 'sys/platform/pc98/platform_irq_limits.h', 'sys/include/platform_irq.h', 'sys/include/kernel_tick.h', 'sys/kern/irq/irq.c', 'sys/kern/irq/irq_math.c', 'sys/kern/irq/tick.c',
+    'sys/kern/module/kdebug_call.c', 'sys/dev/sound/cs4231/pcm_module.c',
+    'sys/hal/time/tick_clock.h', 'sys/dev/sound/cs4231/pcm_cs4231.c', 'sys/dev/sound/cs4231/pcm_refill.h', 'sys/dev/sound/cs4231/pcm_cs4231_math.c',
     'drivers/sound/cs4231/pcm_e4_*.c', 'drivers/sound/cs4231/pcm_e4_*.h',
-    'userland/tests/pcm_test.c', 'build/kernel.mk'], needs=[], budget=3.4,
+    'userland/diag/pcm_test.c', 'build/kernel.mk'], needs=[], budget=3.4,
     basis=['IO_TIER_DESIGN §1', 'IO_TIER_DESIGN §2', 'IO_TIER_DESIGN §6', 'AC-IRQ-1'],
 )
 
@@ -18,7 +18,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-IRQ = 'kernel/irq/irq_math.c'
+IRQ = 'sys/kern/irq/irq_math.c'
 MUTATIONS = [
     ('            round |= rc;', '            round |= rc; if (rc) break;',
      'stop the scan after the first claimant'),

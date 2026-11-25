@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  KPRINTF_ATTR_HOST.C — lib/kprintf_attr.c をそのままホストで回す         */
+/*  KPRINTF_ATTR_HOST.C — sys/kern/kprintf_attr.c をそのままホストで回す         */
 /*                                                                          */
 /*  実物の変換を 1 行も写さずに #include する。kprintf_attr_to_pc98 は      */
 /*  I/O も VRAM も触らない純粋関数なので、模型は 1 つも要らない。           */
@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../lib/kprintf_attr.c"
+#include "../../sys/kern/kprintf_attr.c"
 #include "pc98.h"
 #define KPRINTF_PC98_COLOR_MASK (TATTR_B_GREEN | TATTR_B_RED | TATTR_B_BLUE)
 

@@ -51,9 +51,9 @@ BIOS (INT 1Bh) を使用せず、I/Oポート直接制御および DMA (μPD8237
 | 項目 | 仕様 |
 |------|------|
 | I/Oポート | 0x90 (メインステータス `FDC_MSR`), 0x92 (データ `FDC_FIFO`), 0x94 (コントロール `FDC_CTRL`) |
-| 転送方式 | DMA (μPD8237A ch2)。アドレス 0x09 / カウント 0x0B / バンク 0x23 / マスク 0x15 / モード 0x17 / F-F クリア 0x19 (`drivers/block/fdc.h`) |
-| 割り込み | IRQ11 (`fdc_irq_fired`) を待つ。上限は**機構の最悪値**から導く: SEEK/RECALIBRATE 1.5s (SRT 8ms × 80 トラック)、READ/WRITE 1s (最大 2 回転 + ヘッドロード)、リセット 0.5s (`drivers/block/fdc.h`)。以前の 200ms 一本値は NP21/W 基準で実機のシークに足りなかった ([POLICY_DEBUG §4-51](POLICY_DEBUG.md#4-51-fdc-の時間と-dma)) |
-| 割り込みの回収 | SEEK/RECALIBRATE の前に SENSE INTERRUPT STATUS で未回収分を排水 (上限 4、ST0=80h で尽きる)。pending 無しの SIS は **ST0 1 バイトだけ**返るので PCN を読まない。タイムアウト後も SIS を 1 回出し、SE が立っていれば取りこぼしとして完了扱い。RECALIBRATE の EC は再試行の合図 (2 回まで)。判定は `drivers/block/fdc_decide.c` (純粋関数、ホスト試験 `make check-fdc-seek-host`) |
+| 転送方式 | DMA (μPD8237A ch2)。アドレス 0x09 / カウント 0x0B / バンク 0x23 / マスク 0x15 / モード 0x17 / F-F クリア 0x19 (`sys/dev/block/fdc.h`) |
+| 割り込み | IRQ11 (`fdc_irq_fired`) を待つ。上限は**機構の最悪値**から導く: SEEK/RECALIBRATE 1.5s (SRT 8ms × 80 トラック)、READ/WRITE 1s (最大 2 回転 + ヘッドロード)、リセット 0.5s (`sys/dev/block/fdc.h`)。以前の 200ms 一本値は NP21/W 基準で実機のシークに足りなかった ([POLICY_DEBUG §4-51](POLICY_DEBUG.md#4-51-fdc-の時間と-dma)) |
+| 割り込みの回収 | SEEK/RECALIBRATE の前に SENSE INTERRUPT STATUS で未回収分を排水 (上限 4、ST0=80h で尽きる)。pending 無しの SIS は **ST0 1 バイトだけ**返るので PCN を読まない。タイムアウト後も SIS を 1 回出し、SE が立っていれば取りこぼしとして完了扱い。RECALIBRATE の EC は再試行の合図 (2 回まで)。判定は `sys/dev/block/fdc_decide.c` (純粋関数、ホスト試験 `make check-fdc-seek-host`) |
 | リトライ | READ/WRITE は 3 回。失敗した試行の後に `fdc_recover()` (リセット → Specify → 排水 → recalibrate)。最終失敗だけ `[fdc] read fail ... st0/st1/st2` を 1 行出す ([V4]) |
 | DMAバッファ | 1 セクタ分 (1024B) を **1024B 境界に揃えた**静的バッファ — 64KB 境界をまたげない ([HW2])。`fdc_init()` が起動時に検査する |
 
@@ -123,7 +123,7 @@ KAPI の `serial_puts` は共通の port service で文字列を走査し、各�
 
 CPU直接描画＋バックバッファ方式。カーネル層 (`gfx/`) はバックバッファ管理とVRAM転送を担当し、高レベルな描画機能は外部プログラム用ライブラリ `libos32gfx` (`userland/lib/gfx/`) に分離されている。
 
-**HAL バックエンド表 (GUI v1.1、2026-09-06 現行)**: `include/gfx_hal.h` の `GfxBackend`
+**HAL バックエンド表 (GUI v1.1、2026-09-06 現行)**: `sys/include/gfx_hal.h` の `GfxBackend`
 (probe / init / query / present_rect / set_palette / fill_rect / blit / enter / leave / shutdown、
 `bb_base` / `bb_size` / `bb_pitch` / `bb_format`) を 3 枚持ち、`gfx_core.c` が **probe 順
 Cirrus → PEGC → 9801** で最初に通ったものを使う。`/etc/system.cfg` の `GFX=pc98|pegc|cirrus|auto`
@@ -148,12 +148,12 @@ KAPI の `gfx_get_framebuffer()`（従来の CPL0 呼出し）は開始前から
 (表示面へ直接描かせない = 契約 G4。写像の規則は [02 §2-1](02_memory.md))。counters
 (`gfx_stats`: present_bytes / hw_ops / io_accesses / commits) で「CPU が運んだ量」と
 「エンジンに任せた回数」を測る (NP21/W では時間が測れないため)。設計と経緯は
-設計 `docs/design/include/gfx_hal.md`、Cirrus の資料は `include/wab_xe10.h` と
+設計 `docs/design/include/gfx_hal.md`、Cirrus の資料は `sys/platform/pc98/wab_xe10.h` と
 `drivers/video/cirrus/wab_*`。NP21/W では Cirrus は ini の `USEGD5430=true` / `GD5430TYPE=91` (Xe10) を要する ([D2])。
 
 **PEGC 480 ラインの SYNC を実機の ROM から採る — `v86 -g`** (KAPI v68 `v86_gdc_capture`、
-`platform/pc98/legacy/v86_gcap.c`、採取の記録は `docs/archive/realhw/TASK_PEGC480_REALHW.md` §3):
-`include/pegc.h` の 480 ラインの SYNC は実機 Ra266 の ROM から採った値を使う。uPD7220 の SYNC は読み戻せないため、
+`sys/platform/pc98/legacy/v86_gcap.c`、採取の記録は `docs/archive/realhw/TASK_PEGC480_REALHW.md` §3):
+`sys/platform/pc98/pegc.h` の 480 ラインの SYNC は実機 Ra266 の ROM から採った値を使う。uPD7220 の SYNC は読み戻せないため、
 採取には V86 の監視部で**実機の ROM の INT 18h** を呼ぶ — AH=31h で今のモードを読み、その値の bit の並び
 (NP21/W の bit2 / Bible 3-2 の bit3。その並びとして正しい値になるのがちょうど 1 つのときだけ決め、決まらなければ 30h を呼ばない。
 AL bit0 = ラスタスキャンはどちらの並びでも許して 30h へ保つ — 実機 Ra266 は AL=0Dh を返す)
@@ -175,7 +175,7 @@ NP21/W の ROM は SYNC を内部状態へ直接書くので、エミュレー�
 `pegc_apply_timing` が 1 か所で 09A8h → 6Ah GDC クロック (83h・85h = 5MHz) → 両 GDC の SYNC → グラフィック GDC の
 PITCH (80) → SCROLL → 表示開始の順に書く (クロックは SYNC の前 — Bible 3-2 表3-2)。戻りは起動時に 09A0h
 (sel 09h の bit0 = CLOCK-1、読み値 bit1 = CLOCK-2) で読んだクロックへ戻し、PITCH (書き込み専用)・グラフィック GDC の SYNC・
-SCROLL の IM もそのクロックとの組で選ぶ (両方 5MHz なら PITCH 80・C/R 4Eh・IM 1、それ以外は 40・26h・0 — Bible 2-6 表2-27、2-7)。値は [include/pegc.h](../include/pegc.h) §10 に集約する。480 ラインと 400 ライン・31kHz の戻り (グラフィック GDC 2.5MHz) は実機 ROM の採取値。400 ライン・24kHz と 31kHz の 5MHz 用は実機未採取で、資料・NP21/W 由来の値を使う。GDC へは 1 バイトずつステータスの FIFO を見てから書く (コマンドの前は EMPTY、パラメータの前は FULL でない。
+SCROLL の IM もそのクロックとの組で選ぶ (両方 5MHz なら PITCH 80・C/R 4Eh・IM 1、それ以外は 40・26h・0 — Bible 2-6 表2-27、2-7)。値は [sys/platform/pc98/pegc.h](../sys/platform/pc98/pegc.h) §10 に集約する。480 ラインと 400 ライン・31kHz の戻り (グラフィック GDC 2.5MHz) は実機 ROM の採取値。400 ライン・24kHz と 31kHz の 5MHz 用は実機未採取で、資料・NP21/W 由来の値を使う。GDC へは 1 バイトずつステータスの FIFO を見てから書く (コマンドの前は EMPTY、パラメータの前は FULL でない。
 上限 2µs × 5000 回で打ち切って数える — `pegc_gdc_fifo_timeouts`、kernel.map から読める)。09A8h へは bit1,0 だけを書く
 (実機の読みは 81h だが bit7〜2 は「常に 0」、PLL を持つ機種がある)。ホスト試験は `make check-pegc-mode-host`。
 
@@ -244,7 +244,7 @@ IDEセカンダリバンクに接続されたATAPI CD-ROMデバイスをPIOモ�
 
 | 項目 | 仕様 |
 |------|------|
-| I/Oポート | タスクファイル 0x640-0x64E、代替ステータス/デバイス制御 0x74C。バンク切替は 0x430/0x432 (`IDE_BANK0`/`IDE_BANK1`) で、ここはポートではなくプライマリ/セカンダリの選択に使う (`platform/pc98/platform_ide_ports.h`) |
+| I/Oポート | タスクファイル 0x640-0x64E、代替ステータス/デバイス制御 0x74C。バンク切替は 0x430/0x432 (`IDE_BANK0`/`IDE_BANK1`) で、ここはポートではなくプライマリ/セカンダリの選択に使う (`sys/platform/pc98/platform_ide_ports.h`) |
 | コマンドプロトコル | ATA PACKET (0xA0) + SCSI CDB |
 | セクタサイズ | 2048バイト |
 | アドレッシング | LBA (READ(10) CDB) |
@@ -322,7 +322,7 @@ IDEセカンダリバンクに接続されたATAPI CD-ROMデバイスをPIOモ�
   `got` が n×2048 未満は転送が足りない
 - READ CAPACITY は 8 バイトちょうど来なければ失敗 (受け皿の残りを容量にしない)。有効バイト数は Byte Count
   (`xfer_size`) で数え、奇数バイトの DRQ で 1 ワード多く読んでも数に入れない (7 バイトを 8 と数えない)
-- **ドライブとの相性で困ったら `ATAPI_READ_MAX_SECTORS` を 1 にする** (`drivers/ata/atapi.h` の 1 か所、旧来の 1 セクタずつに戻る)
+- **ドライブとの相性で困ったら `ATAPI_READ_MAX_SECTORS` を 1 にする** (`sys/dev/ata/atapi.h` の 1 か所、旧来の 1 セクタずつに戻る)
 - **NP21/W は READ(10) で UNIT ATTENTION を返さない** (媒体の交換は TEST UNIT READY だけが報告する)。
   世代の経路は実機でしか踏まない。NP21/W の DRQ は 2048 バイトずつ
 - 試験: CD の読みの host 試験 `cd-read-host` は CI から外した (ユーザー決定 2026-11-20、持越し台帳 CI-DROP-CDREAD-1。組の C の `tools/tests/cd_read_host.c`・`cd_pkg_host.c` と記録 `tools/tests/cd_read_tdd.md` は戻す時のために残す)
@@ -374,7 +374,7 @@ TEXTモードではTVRAM属性反転 (ビット2 XOR) によるカーソル表�
 
 ### §5-9 漢字キャラクタジェネレータ (kcg.c / kcg.h)
 
-PC-98内蔵フォントROMの読み出しは `kcg.mod` が担い、64KiB のキャッシュは部品の BSS に持つ (`drivers/video/kcg/kcg_body.c`、facade は `drivers/video/kcg/kcg_module.c`)。
+PC-98内蔵フォントROMの読み出しは `kcg.mod` が担い、64KiB のキャッシュは部品の BSS に持つ (`sys/dev/video/kcg/kcg_body.c`、facade は `sys/dev/video/kcg/kcg_module.c`)。
 V86 の復帰口は部品の有無によらず core で 68h を CODE に戻し、搭載中の KCG facade の `invalidate` で ROM/CG RAM キャッシュを全失効する。失効では統計を消さず、次の読出しを miss として観測する。通常の CUI 復帰は保存済み BIOS の機能ビットで EGC/GRCG を停止し、9821 のみ 6Ah の標準・400ライン構成へ戻す。CG 窓 WB・VRAM UC は既存のページ属性を維持する。固定診断と根拠は票 TASK_T7_AND_FOLLOWUPS §1 が持つ。
 旧 `.kcgfont` の起動読込・低位 cache/scratch 参照と配布は撤去済み。`kcg_load_font` の旧 slot は起動中も NOSYS、副作用なし。部品欠落・確保失敗・init 失敗時は TVRAM の CUI を維持し、GUI シェルへ入らない。cache は満杯時も既存 slot を置換し、hit/miss は `kcg_cache_stats` で採る。
 

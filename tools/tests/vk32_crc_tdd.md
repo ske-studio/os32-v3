@@ -32,7 +32,7 @@ bits 32 で組み、2HD / 1.44MB の両ジオメトリの `MAX_CLUSTER` で回�
 
 | ケース | 内容 |
 |---|---|
-| mirror | ASM の `VK32_*` / `MAX_IMAGE_SIZE` の EQU と `boot/boot_defs.h`、`boot_defs.h` のイメージ欄と `include/bootinfo.h` が名前ごとに一致 (番地の 3 つは `tools/gen_memmap.py --check` の MIRRORS) |
+| mirror | ASM の `VK32_*` / `MAX_IMAGE_SIZE` の EQU と `boot/boot_defs.h`、`boot_defs.h` のイメージ欄と `sys/include/bootinfo.h` が名前ごとに一致 (番地の 3 つは `tools/gen_memmap.py --check` の MIRRORS) |
 | format | 生成物の `entry_crc` / `image_crc` / `image_size` / `header_size` を `zlib.crc32` と長さで突き合わせる |
 | good | C と ASM がどちらも 0 と同じ `image_crc` を返し、窓のエントリ部が元の kernel / sqlite と一致、外は 0xCC のまま |
 | corrupt (43 通り) | 空・15B・上限 +1・magic・version 1・entry_count 0 / 5・header_size (+1 / 旧形式 / 途中まで)・切り詰め (header だけ / 末尾 1B)・1B 足す・image_size +1・1 ビット反転 5 か所・data_offset (ファイル長 / +1 / header の中 / 桁あふれ)・compressed_size (+1 / 0xFFFFFFFF)・load_addr (帯の下 / 読み込み域 / 上端 / 末尾が上端 +1 / 桁あふれ)・重なり・raw_size 0 / +1 / -1・壊れた LZ4 列 7 種 (リテラル延長・マッチ延長の途中で尽きる、リテラルが入力より長い、offset が遠い / 0 / 途中で尽きる、マッチが出力を越える)・entry_crc 2 種。**C と ASM が同じ `VK32_ERR_*`** を返し、展開前に止まる 32 通りは窓を 1 バイトも書かない。展開の後に止まる 11 通りは、ヘッダのエントリ (壊した後の値) の外を 1 バイトも書かない (2026-09-24、Fable の指摘) |

@@ -44,7 +44,7 @@ def check_fixture(work):
     gen.write_layout_header(ROOT, header)
     assert not gen.layout_header_defects(ROOT, elf, header)
     sections, syms = gen.read_elf(elf)
-    m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), syms)
+    m = gen.Macros(gen.read_defines(ROOT / 'sys/include/memmap.h'), syms)
     for lo, hi in (('__bss_start', '__bss_end'),):
         assert syms[lo] <= syms[hi] and (syms[lo] | syms[hi]) & 3 == 0
     for s in sections:
@@ -106,7 +106,7 @@ def check_fixture(work):
 
 def check_generated(work):
     out = work / 'generated'
-    targets = [out / 'os32.ld', out / 'r1/os32.ld', out / 'obj/arch/x86/kernel/kentry.o',
+    targets = [out / 'os32.ld', out / 'r1/os32.ld', out / 'obj/sys/arch/x86/kernel/kentry.o',
                out / 'boot/loader_fat_new.bin', out / 'boot/vk32_boot.o', out / 'app_sys.ld']
     run(['make', '-s', 'BUILD_OUT=' + str(out), *targets])
     normal = targets[0].read_text().replace(str(out / 'obj') + '/', '')
@@ -140,7 +140,7 @@ def check_product(outputs):
         _, symbols = gen.read_elf(out / 'kernel.elf')
         header = out / 'memmap_layout.h' if (out / 'memmap_layout.h').exists() else out.parent / 'memmap_layout.h'
         assert not gen.layout_header_defects(ROOT, out / 'kernel.elf', header)
-        m = gen.Macros(gen.read_defines(ROOT / 'include/memmap.h'), symbols)
+        m = gen.Macros(gen.read_defines(ROOT / 'sys/include/memmap.h'), symbols)
         assert all(m.get(k) == v for k, v in EXPECTED.items()), rel
         assert m.get('MEM_SHM_RESV_START') <= m.get('MEM_FIXED_PAGING_GUARD_BASE')
         assert symbols['__ledger_fixed_end'] == symbols['__bss_end'] == symbols['__kernel_resident_end']

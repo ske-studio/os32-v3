@@ -2,9 +2,9 @@
 """S2x pinned old/new capture trace comparison with fixed BSD deltas and startup fault injection."""
 CHECK = dict(name='input-s2x-host', tier=1, budget=45, needs=[], kind='characterization',
     basis=['INPUT_KEYMAP_DESIGN §7 S2x/S3x, S2x へ送る項目'], covers=['tools/tests/input_s3_differences.tsv', 'docs/decisions/INPUT_BIND_DESIGN.md', 'tools/tests/input_pc98_compat_host.c', 'tools/tests/kernel_includes.py',
-    'drivers/input/kbd_hal.c', 'drivers/input/kbd.c', 'drivers/input/*.h',
-    'platform/pc98/input_keymap.c', 'input/keymaps/*.c', 'input/hal/*.c', 'input/hal/*.h',
-    'include/**', 'sdk/include/os32/**', 'tools/tests/host_arch/**', 'platform/pc98/platform_io.h',
+    'sys/platform/pc98/input/kbd_hal.c', 'sys/platform/pc98/input/kbd.c', 'drivers/input/*.h',
+    'sys/platform/pc98/input_keymap.c', 'input/keymaps/*.c', 'input/hal/*.c', 'input/hal/*.h',
+    'include/**', 'sdk/include/os32/**', 'tools/tests/host_arch/**', 'sys/platform/pc98/platform_io.h',
     'build/config.mk', 'tools/tests/kernel_includes.py', 'tools/tests/host32.py',
     'tools/tests/test_input_s2x.py', 'tools/tests/input_s2x_host.c', 'tools/tests/test_input_native.py',
     'tools/tests/input_native_host.c', 'tools/tests/keymap_s3_oracle.py',
@@ -21,10 +21,10 @@ from kernel_includes import include_flags
 from test_input_native import function
 ROOT = Path(__file__).resolve().parents[2]
 BASE = '028023fa'
-HAL = 'drivers/input/kbd_hal.c'
-MERGE = 'input/hal/kbd_merge.c'
-PATHS = [HAL, MERGE, 'input/hal/legacy_keymap.c', 'platform/pc98/input_keymap.c', 'input/keymaps/pc98_jp.c',
-         'input/keymaps/hid_jp.c'] + ['input/hal/' + n + '.c' for n in
+HAL = 'sys/platform/pc98/input/kbd_hal.c'
+MERGE = 'sys/hal/input/kbd_merge.c'
+PATHS = [HAL, MERGE, 'sys/hal/input/legacy_keymap.c', 'sys/platform/pc98/input_keymap.c', 'sys/input/keymaps/pc98_jp.c',
+         'sys/input/keymaps/hid_jp.c'] + ['input/hal/' + n + '.c' for n in
          ('in2_dev', 'in2_state', 'in2_ring', 'mouse_ext', 'pointer_state',
           'legacy_ring', 'legacy_mode', 'keymap_registry', 'keymap_eval', 'keymap_state')]
 WRAP = ['km_backend_register', 'input_src_register', 'km_source_bind', 'input_capture',
@@ -37,8 +37,8 @@ def run(ctx):
     for p in (HAL, MERGE):
         old[p] = subprocess.check_output(['git', 'show', BASE + ':' + p], cwd=root, text=True)
     # Baseline merge owns its own legacy functions.
-    old.pop('input/hal/legacy_keymap.c')
-    header = subprocess.check_output(['git', 'show', BASE + ':input/hal/in2_int.h'],
+    old.pop('sys/hal/input/legacy_keymap.c')
+    header = subprocess.check_output(['git', 'show', BASE + ':sys/hal/input/in2_int.h'],
                                      cwd=root, text=True)
     declarations = [line for line in header.splitlines()
                     if line.startswith('void input_emit_legacy_')]
@@ -46,7 +46,7 @@ def run(ctx):
     old[HAL] += '\nvoid input_legacy_keymap_set(const KmBackend *m) { (void)m; }\n'
     with tempfile.TemporaryDirectory(prefix='input-s2x-') as td:
         tmp = Path(td)
-        (tmp / 's2x_deliver.inc').write_text(function((root/'drivers/input/kbd.c').read_text(), 'kbd_deliver'))
+        (tmp / 's2x_deliver.inc').write_text(function((root/'sys/platform/pc98/input/kbd.c').read_text(), 'kbd_deliver'))
         def build(texts, name, previous=False):
             files = []
             for i, (p, source) in enumerate(texts.items()):

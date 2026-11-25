@@ -11,7 +11,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie',
          '-fno-stack-protector', '-ffunction-sections', '-fdata-sections', '-Wall', '-Wextra', '-Werror']
-SOURCES = ('mm/paging.c', 'mm/pgalloc.c', 'exec/lease.c')
+SOURCES = ('sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c', 'sys/kern/exec/lease.c')
 MUTANTS = [
     ('restore display', 2, 'restore = sf->role == LEDGER_ROLE_DISPLAY && sf->lease_count == 1;', 'restore = 0;'),
     ('allocation boundary', 2, 'base >= MEM_LEASE_ALLOC_END || sf->npages > (MEM_LEASE_ALLOC_END - base)', 'base >= MEM_LEASE_END || sf->npages > (MEM_LEASE_END - base)'),
@@ -62,7 +62,7 @@ def run(changes=None):
         exe = tmp / 'lease'
         subprocess.run(['gcc', *linker_flags(), *FLAGS, '-DPHYSMEM_HOST_TEST=1', '-nostdlib', '-static',
                         '-no-pie', '-Wl,--gc-sections', *includes, str(ROOT / 'tools/tests/m3_lease_host.c'),
-                        str(ROOT / 'mm/physmem.c'), '-o', str(exe)], check=True)
+                        str(ROOT / 'sys/kern/mm/physmem.c'), '-o', str(exe)], check=True)
         return host32.run([str(exe)], capture_output=True, text=True, timeout=60)
 
 p = run()

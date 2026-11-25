@@ -8,8 +8,8 @@ import host32
 from kernel_includes import include_flags
 
 CHECK = dict(name='gfxsync-cfg-host', tier=1, needs=[], budget=15,
-             covers=['gfx/sync/sync_cfg.c', 'gfx/sync/sync_int.h', 'include/gfx_sync.h',
-                     'include/config.h', 'fs/vfs.h', 'tools/tests/gfxsync_cfg_host.c',
+             covers=['sys/hal/gfx/sync/sync_cfg.c', 'sys/hal/gfx/sync/sync_int.h', 'sys/include/gfx_sync.h',
+                     'sys/include/config.h', 'sys/fs/vfs.h', 'tools/tests/gfxsync_cfg_host.c',
                      'tools/tests/test_gfxsync_cfg.py', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py'],
     basis=['HAL_V2_DESIGN §10'],
@@ -29,7 +29,7 @@ def main():
     args = parser.parse_args()
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        source = ROOT / 'gfx/sync/sync_cfg.c'
+        source = ROOT / 'sys/hal/gfx/sync/sync_cfg.c'
         assert run_one(work, source) == 0
         if args.mutate:
             body = source.read_text()

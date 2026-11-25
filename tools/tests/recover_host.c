@@ -1,8 +1,8 @@
 /* Real T1 core, fake bus/clock/serial. ILP32, no libc, host32 qemu runner. */
-#include "../../kdebug/recover.c"
+#include "../../sys/platform/pc98/kdebug/recover.c"
 #define KDEBUG_WINDOW_HOST 1
-#include "../../kdebug/kdebug_window.c"
-#include "../../kdebug/recover_profile.c"
+#include "../../sys/arch/x86/kdebug/kdebug_window.c"
+#include "../../sys/platform/pc98/kdebug/recover_profile.c"
 
 #define NREG 16U
 #define TRACE_MAX 256U

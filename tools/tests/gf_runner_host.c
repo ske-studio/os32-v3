@@ -2,9 +2,9 @@
  * oracle is the frozen pre-P6 expansion/executor trace. */
 #define GF_S3_ENTRY old_s3_entry
 #include "gfinit_exec_host.c"
-#include "../../hwdev/gf/runner.c"
-#include "../../hwdev/gf/save.c"
-#include "../../hwdev/gf/pll.c"
+#include "../../sys/dev/video/geforce/runner.c"
+#include "../../sys/dev/video/geforce/save.c"
+#include "../../sys/dev/video/geforce/pll.c"
 
 struct raw_event { u32 write, off, width, value, pc, op; };
 #include "gf_runner_trace_fixture.h"

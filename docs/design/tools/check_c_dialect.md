@@ -9,12 +9,12 @@
 
 - `make -n -B all` の出力から `i386-elf-gcc … -c` の行を拾い、旗の組 (`-I`・依存生成・`-c`・`-o`・ソースを除く。`-include` は残す) ごとにコンパイラへ `-E -dM` で `__STDC_VERSION__` / `__STRICT_ANSI__` を聞いて実際のモードを決める (`effective_std`)。`-std` が 2 つあれば後ろが効き、無ければコンパイラの既定 (gnu17) で、gnu11 とは読まない。
 - 期待 (`expected_std`): `lib/sqlite3/sqlite3.c`・`lib/sqlite3/os32_sqlite_vfs.c` (ビルドが `BUILD_OUT` に作る写しも同じ扱い)・`userland/tests/sqlite_standalone/` が **gnu89**、それ以外 (本体・ブート・userland・`lib/sqlite3/os32_sqlite_test.c`) が **gnu11**。
-- 空振りの番人: `REQUIRED_SRCS` (SQLite の 2 本と `os32_sqlite_test.c`、`sqlite_standalone` の 2 本、`platform/pc98/kernel.c`、`boot/boot_main.c`) がコンパイル行に無ければ落ちる。コンパイル行が 1 本も無くても落ちる。
+- 空振りの番人: `REQUIRED_SRCS` (SQLite の 2 本と `os32_sqlite_test.c`、`sqlite_standalone` の 2 本、`sys/platform/pc98/kernel.c`、`boot/boot_main.c`) がコンパイル行に無ければ落ちる。コンパイル行が 1 本も無くても落ちる。
 - `make -n` への引き継ぎ (`dry_run`): 親の `MAKEFLAGS` から並列の引き継ぎ (`-j…`・`--jobs`・`--jobserver-auth=…`・`--jobserver-fds=…`) だけを除き、残り (`e` などの単文字旗、` -- ` 以降の変数指定) はバイト列のまま子に渡す (エスケープの解釈は子の make に任せる)。`BUILD_OUT` はコマンドラインで一時ディレクトリに向ける (`-n` でも走る `$(shell mkdir …)` が実物の木に書かないように)。旗を変える保存設定 (`SAVED_SETTINGS` = `lgy98.flags`) は実物の `build/out` から一時の `BUILD_OUT` に写してから `make -n` する。
 
 ## 2. 拒否の探り
 
-gnu11 の旗の組ごとに小さな本文をコンパイルし、**期待する診断の文言つきで** 拒否されることを見る: VLA (`-Werror=vla`)・暗黙の関数宣言・暗黙の int・偽の `STATIC_ASSERT` (`include/types.h` の実物のマクロ)。真の `STATIC_ASSERT` は通ること。別の理由 (壊れた `-include` など) の失敗は拒否と数えない。
+gnu11 の旗の組ごとに小さな本文をコンパイルし、**期待する診断の文言つきで** 拒否されることを見る: VLA (`-Werror=vla`)・暗黙の関数宣言・暗黙の int・偽の `STATIC_ASSERT` (`sys/include/types.h` の実物のマクロ)。真の `STATIC_ASSERT` は通ること。別の理由 (壊れた `-include` など) の失敗は拒否と数えない。
 
 ## 3. 公開 SDK ヘッダと配るもの
 

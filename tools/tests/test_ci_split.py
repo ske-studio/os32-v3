@@ -203,8 +203,8 @@ def scope_cases(source):
     exec(compile(source, 'ppc_scope.py', 'exec'), scope)
     select = scope['layout_scope']
     layout_changes = """
-        arch/ppc/kernel.ld include/memmap.h platform/powermac/platform_kboot_layout.h
-        build/images/kboot-sh.mk build/targets/ppc-powermac.mk tools/mkroot_image.py
+        sys/arch/ppc/kernel.ld sys/include/memmap.h sys/platform/powermac/platform_kboot_layout.h
+        sys/conf/images/kboot-sh.mk build/targets/ppc-powermac.mk tools/mkroot_image.py
         build/ppc-ram-root.json tools/ppc/root_pair.py
     """.split()
     for path in layout_changes:

@@ -1,6 +1,6 @@
 # Sources are compiled with each platform's kernel flags, never module objects.
-RAM_ROOT_C := fs/isofs/iso9660.c fs/isofs/iso9660_media.c \
- kernel/dev/ram_ro.c init/boot_root.c fs/ramfs/ramfs.c
+RAM_ROOT_C := sys/fs/isofs/iso9660.c sys/fs/isofs/iso9660_media.c \
+ sys/kern/dev/ram_ro.c sys/kern/init/boot_root.c sys/fs/ramfs/ramfs.c
 
 # The caller supplies ROOT_ISO, ROOT_MOTD and ROOT_BINS. ROOT_BLOB is optional:
 # a platform transporting the ISO separately need only build ROOT_ISO.

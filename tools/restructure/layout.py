@@ -10,7 +10,7 @@ DATA = ROOT / 'docs/tasks/restructure/data'
 HEADER = ['パス', '行き先', '根拠']
 CONTRACTS = {'gfx_present_contract.h': 'gfx', 'mouse_pointer_contract.h': 'input',
              'snd_wake_contract.h': 'sound'}
-PPC_DIAGNOSTICS = {'tools/ppc/ata_deny.c', 'tools/ppc/learn_probe.c'}
+PPC_DIAGNOSTICS = {'userland/diag/ata_deny.c', 'userland/diag/learn_probe.c'}
 GEFORCE_RECOVERY = {
     'recover.h': 'NV44A の BAR0 レジスタ配置を定義',
     'recover_common/log.inc': 'gf_bus_record_at と GF_MODE_VRAM_OFFSET で記録',
@@ -48,9 +48,9 @@ def placement(path, hal, scope):
         h = hal[path]
         return (h['行き先の候補'] if h['移設'] in ('移すだけ', 'P8') else '保留',
                 h['移設'] + '：' + h['根拠'])
-    if path in {'include/pc98.h', 'include/pegc.h', 'include/wab_xe10.h'}:
+    if path in {'sys/platform/pc98/pc98.h', 'sys/platform/pc98/pegc.h', 'sys/platform/pc98/wab_xe10.h'}:
         return 'sys/platform/pc98/' + rest, 'check_layers.NAMED の PC-98 所有ヘッダ'
-    if path == 'include/v86_call.h':
+    if path == 'sys/arch/x86/v86_call.h':
         return 'sys/arch/x86/' + rest, 'check_layers.NAMED の x86 所有ヘッダ'
     if top == 'include' and rest in CONTRACTS:
         return 'sys/hal/' + CONTRACTS[rest] + '/' + rest, 'D-4：hal_layout.md の追加契約ヘッダ'
@@ -72,9 +72,9 @@ def placement(path, hal, scope):
         return 'sys/platform/pc98/' + path, 'D-3：' + scope['根拠'].split('所属判断=')[-1]
     if top == 'kdebug' and rest.startswith(('trident_command_', 'tri_command_')):
         return 'sys/dev/video/trident/diag/' + rest, 'D-3：Trident のコマンド診断とその通信形式'
-    if path == 'kdebug/kselftest/dma8237.inc':
+    if path == 'sys/dev/dma/kdebug/kselftest/dma8237.inc':
         return 'sys/dev/dma/' + path, 'D-3：dma8237_ready と DMA チャネルのマスクを検査'
-    if path == 'kdebug/probe.c':
+    if path == 'sys/dev/char/kdebug/probe.c':
         return 'sys/dev/char/' + path, 'D-3：serial_get_setup と serial_gate_active でシリアル診断を制御'
     if top == 'kdebug' and rest in GEFORCE_RECOVERY:
         return 'sys/dev/video/geforce/diag/' + rest, 'D-3：' + GEFORCE_RECOVERY[rest]

@@ -7,7 +7,7 @@ int services_public = 1;
 #include <string.h>
 #include "sqlite3.h"
 #include "db_copy_shim.h"
-#include "../../kapi/kapi_db.c"
+#include "../../sys/kapi/kapi_db.c"
 #include "db_group_shim.h"
 
 unsigned char test_shm[DB_SHM_BLOCK_SIZE];
@@ -28,7 +28,7 @@ int kprintf(int color, const char *fmt, ...) { return 0; }
 /* v50 (票 S0-K): kapi_db.c が使う exec / VFS の口。この票 (F1) の対象では
  * ないので素通しの模型にする。実物は tools/tests/kapi_db_v50_host.c が踏む。 */
 int ring3_user_range_ok(u32 p, u32 len) { return 1; }
-/* BSD strlcat 相当 (lib/kstring.h の kstrncat と同じく n はバッファ全体)。 */
+/* BSD strlcat 相当 (sys/kern/kstring.h の kstrncat と同じく n はバッファ全体)。 */
 char *host_strlcat(char *dst, const char *src, unsigned long n)
 {
     unsigned long used = strlen(dst);
@@ -69,7 +69,7 @@ int sqlite3_open_v2(const char *path, sqlite3 **out, int flags, const char *vfs)
 }
 int sqlite3_extended_errcode(sqlite3 *db) { return 0; }
 int sqlite3_errcode(sqlite3 *db) { return 0; }
-/* fs/vfs.c の cwd と path 正規化。この票 (F1) は絶対名しか使わないので
+/* sys/fs/vfs.c の cwd と path 正規化。この票 (F1) は絶対名しか使わないので
  * 素通し。解決の規則そのものは tools/tests/kapi_db_v50_host.c が踏む。 */
 const char *vfs_cwd(void) { return "/"; }
 int vfs_resolve_path(const char *in, char *out, int size)

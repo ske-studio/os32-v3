@@ -1,7 +1,7 @@
 # Device reservation CORE — TDD / host evidence
 
 > **2026-10-01 (T1d) 以降、この記録は履歴。** 核は台帳の `ledger_reserve_set`
-> (検証済み資源レコード・区間の表、`mm/pgalloc_resource.inc`) に載せ直し、
+> (検証済み資源レコード・区間の表、`sys/kern/mm/pgalloc_resource.inc`) に載せ直し、
 > `sys_device_reserve_core` / `pgalloc_device_reserve` は撤去した。今の契約は
 > `docs/design/mm/pgalloc.md` の「装置の予約 (`ledger_reserve_set`) と資源レコード」、
 > 今の試験と変異は `tools/tests/test_device_reservation.py` の docstring
@@ -9,8 +9,8 @@
 
 ## Scope
 
-Changes are limited to `kernel/sys.c`, `include/sys.h`, `mm/pgalloc.c`,
-`mm/pgalloc.h`, and the dedicated tests/this record. The pre-existing dirty
+Changes are limited to `sys/kern/sys.c`, `sys/include/sys.h`, `sys/kern/mm/pgalloc.c`,
+`sys/kern/mm/pgalloc.h`, and the dedicated tests/this record. The pre-existing dirty
 memory-model/staging work was retained. No backend, exec, paging implementation,
 boot activation, KAPI, device probe, deployment, emulator or network changes.
 

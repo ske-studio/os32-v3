@@ -2,12 +2,12 @@
  * remain real. Weak seams let the C1 fixture's observed PCI/IRQ model win.
  * Unexpected PCI writes and IRQ changes are failures, never fake success. */
 #include "gf_command_runtime_host.h"
-#include "../../drivers/pci/pci.h"
-#include "../../kernel/irq/irq.h"
-#include "../../drivers/video/geforce/geforce_module.h"
-#include "../../mm/pgalloc.h"
-#include "../../include/sys.h"
-#include "../../include/kprintf.h"
+#include "../../sys/dev/pci/pci.h"
+#include "../../sys/kern/irq/irq.h"
+#include "../../sys/dev/video/geforce/geforce_module.h"
+#include "../../sys/kern/mm/pgalloc.h"
+#include "../../sys/include/sys.h"
+#include "../../sys/include/kprintf.h"
 /* Output is asserted by the backend/command hosts; lifecycle hosts only
  * provide the kernel printing dependency. */
 __attribute__((weak)) void __cdecl kprintf(u8 attr, const char *fmt, ...)

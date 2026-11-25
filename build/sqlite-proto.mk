@@ -21,14 +21,17 @@ $(SQLITE_PROTO_OUT)/sqlite_import_slots.o $(SQLITE_PROTO_OUT)/sqlite_provider_ty
 	$(CC) $(CFLAGS_BASE) -Os -Werror $(SQLITE_PROTO_INC) -c $< -o $@
 $(SQLITE_PROTO_OUT)/sqlite_import_stubs.o: $(SQLITE_PROTO_OUT)/sqlite_import_stubs.S build/config.mk build/sqlite-proto.mk
 	$(CC) $(CFLAGS_MACHINE) -c $< -o $@
-$(SQLITE_PROTO_OUT)/kstring.o $(SQLITE_PROTO_OUT)/kstring_c.o $(SQLITE_PROTO_OUT)/kmath.o $(SQLITE_PROTO_OUT)/divdi3.o: $(SQLITE_PROTO_OUT)/%.o: lib/%.c build/config.mk build/sqlite-proto.mk
+$(SQLITE_PROTO_OUT)/kstring.o $(SQLITE_PROTO_OUT)/kstring_c.o: $(SQLITE_PROTO_OUT)/%.o: sys/kern/%.c build/config.mk build/sqlite-proto.mk
+	mkdir -p $(@D)
+	$(CC) $(CFLAGS_BASE) $(SOFTFLOAT_FLAGS) -Os $(INC_LIB) -c $< -o $@
+$(SQLITE_PROTO_OUT)/kmath.o $(SQLITE_PROTO_OUT)/divdi3.o: $(SQLITE_PROTO_OUT)/%.o: lib/%.c build/config.mk build/sqlite-proto.mk
 	mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) $(SOFTFLOAT_FLAGS) -Os $(INC_LIB) -c $< -o $@
 $(SQLITE_PROTO_OUT)/softfloat/%.o: lib/softfloat/%.c build/softfloat.mk
 	mkdir -p $(@D)
 	$(CC) $(SOFTFLOAT_CFLAGS) -Ilib/softfloat -c $< -o $@
 $(SQLITE_PROTO_OUT)/softfloat_abi.o: lib/softfloat_abi.c build/softfloat.mk
-	$(CC) $(SOFTFLOAT_CFLAGS) -Ilib -c $< -o $@
+	$(CC) $(SOFTFLOAT_CFLAGS) -Ilib -Isys/kern -c $< -o $@
 $(SQLITE_PROTO_OUT)/sqlite.elf: $(SQLITE_PROTO_OBJS) build/sqlite-module.ld sdk/link/generations.ld
 	$(MODULE_LD) $(MODULE_LDFLAGS) --gc-sections --undefined=sqlite_module_ops --emit-relocs -T build/sqlite-module.ld -Map=$(SQLITE_PROTO_OUT)/sqlite.map $(SQLITE_PROTO_OBJS) -o $@
 # Measurement consumes the already built VK32 without invoking its FORCE
@@ -48,7 +51,7 @@ $(SQLITE_KEXPORT_OBJ): $(SQLITE_GEN)/sqlite_kexports.c $(SQLITE_GEN)/sqlite_impo
 C_KERNEL_OBJ += $(SQLITE_KEXPORT_OBJ)
 R1_OBJECTS += $(SQLITE_KEXPORT_OBJ)
 $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf: $(SQLITE_KEXPORT_OBJ)
-$(KERNEL_OBJ_PREFIX)kernel/fep_boot.o $(R1_OBJ)/kernel/fep_boot.o $(KERNEL_OBJ_PREFIX)kernel/sqlite_engine.o $(KERNEL_OBJ_PREFIX)kernel/sqlite_outer.o $(R1_OBJ)/kernel/sqlite_engine.o $(R1_OBJ)/kernel/sqlite_outer.o: $(SQLITE_GENERATED)
+$(KERNEL_OBJ_PREFIX)sys/kern/fep_boot.o $(R1_OBJ)/sys/kern/fep_boot.o $(KERNEL_OBJ_PREFIX)sys/kern/sqlite_engine.o $(KERNEL_OBJ_PREFIX)sys/kern/sqlite_outer.o $(R1_OBJ)/sys/kern/sqlite_engine.o $(R1_OBJ)/sys/kern/sqlite_outer.o: $(SQLITE_GENERATED)
 $(SQLITE_PROTO_OUT)/sqlite_module.o: $(SQLITE_GENERATED)
 
 define pack_sqlite

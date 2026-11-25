@@ -3,7 +3,7 @@
 票:   docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md (H1) / Codex 実装レビュー 往復 3 の B6
 記録: tools/tests/h1_tdd.md
 
-tools/tests/vfs_kind_host.c が実物の fs/vfs.c をそのまま #include し、
+tools/tests/vfs_kind_host.c が実物の sys/fs/vfs.c をそのまま #include し、
 境界 (kstring / kmalloc) だけを同義の C で置く。FS ドライバは合成した
 VfsOps で、stat / list_dir / get_file_size の戻り値を 1 つずつ指定できる。
 
@@ -15,13 +15,13 @@ VfsOps で、stat / list_dir / get_file_size の戻り値を 1 つずつ指定�
 `stat` を持つドライバ (ext2 / FAT / ISO9660 / HostDrv の 4 つとも持つ) の
 判定が変わらないことも同じ合成ドライバで押さえる。
 
-**実物の fs/vfs_fd.c も同じ翻訳単位に取り込み、`vfs_open()` まで通す**
+**実物の sys/fs/vfs_fd.c も同じ翻訳単位に取り込み、`vfs_open()` まで通す**
 (票 H1 / 往復 4 の B7)。`vfs_path_kind` の戻り値までしか見ていなかったことが
 B7 の検出漏れの原因だったので、種別の判定を**消費する側**まで試験する。
 
   python3 -B tools/tests/test_vfs_kind.py [--target]
 
---target を付けると i386-elf クロスコンパイラでも fs/vfs.c が -Werror で
+--target を付けると i386-elf クロスコンパイラでも sys/fs/vfs.c が -Werror で
 通ることを確かめる。make・エミュレータ・実配備には一切触れない。
 """
 from kernel_includes import include_flags
@@ -42,10 +42,10 @@ TARGET_FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding",
                 "-fno-pie", "-fno-stack-protector", "-nostdlib",
                 "-mno-red-zone", "-fcommon", "-O2",
                 "-Wall", "-Wextra", "-Werror",
-                # fs/vfs_fd.c は元から出る 2 件 (vfs_fstat の sizeof 比較と
+                # sys/fs/vfs_fd.c は元から出る 2 件 (vfs_fstat の sizeof 比較と
                 # vfs_sys_compat_shell_print の attr) なのでそこだけ外す
                 "-Wno-sign-compare", "-Wno-unused-parameter",
-                # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は
+                # arch/x86 + platform/pc98: sys/include/io.h は契約だけで、実装は
                 # 固定名 arch_io.h / platform_io.h を引く (順序 3)。
                 "-D__KERNEL_BUILD__",
                     *include_flags(ROOT)]
@@ -59,12 +59,12 @@ if __name__ == "__main__":
         cc_cache.build(["gcc", *HOST_FLAGS, *HOST_INC,
                         str(ROOT / "tools/tests/vfs_kind_host.c"),
                         "-o", str(exe)], cwd=ROOT, check=True)
-        print("HOST GNU11 -Werror COMPILE PASS (real fs/vfs.c)", flush=True)
+        print("HOST GNU11 -Werror COMPILE PASS (real sys/fs/vfs.c)", flush=True)
         rc = subprocess.run([str(exe)], cwd=ROOT, timeout=60).returncode
         print("EXIT vfs_kind_host=%d" % rc, flush=True)
 
         if "--target" in sys.argv:
-            for src in ("fs/vfs.c", "fs/vfs_fd.c"):
+            for src in ("sys/fs/vfs.c", "sys/fs/vfs_fd.c"):
                 cc_cache.build(["i386-elf-gcc", *TARGET_FLAGS, "-c", src,
                                 "-o", str(tmp / (pathlib.Path(src).stem + ".o"))],
                                cwd=ROOT, check=True)

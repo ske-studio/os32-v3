@@ -13,14 +13,14 @@ OS32 に TCP/IP・DNS・HTTP・TLS・プリンタドライバを載せない。*
 ホスト側の実体は **Host Agent** (`tools/host_agent.py`、Python)。エミュレータでは NP21/W の LAN ソケットバックエンド経由、実機では LGY-98 の raw Ethernet で同じ Agent と話す。
 
 ```
-OS32 アプリ ── KAPI host_* ── net/link.c (L0〜L3) ── LGY-98 ── [NP21/W socket | 実 LAN] ── host_agent.py ── Windows (HTTP / プリンタ / 時計 / クリップボード / ファイル)
+OS32 アプリ ── KAPI host_* ── sys/net/link.c (L0〜L3) ── LGY-98 ── [NP21/W socket | 実 LAN] ── host_agent.py ── Windows (HTTP / プリンタ / 時計 / クリップボード / ファイル)
 ```
 
 ## 1. 実装・受入済みの構成
 
 | 層 | 状態 |
 |---|---|
-| ドライバ `drivers/net/ne2000/lgy98.c` `ne2000*.c` | M1〜M4 エミュレータ合格 (検出、送受信、IRQ5、リング溢れの安全網、100Hz 受信ウォッチドッグ)。**既定で有効** (設定は [PLAN §9](PLAN.md#実装上の決定-計画からの差分))。M5 (実カード: 受信 count の FCS、16KB RAM、8bit 転送) 未 |
+| ドライバ `sys/dev/net/ne2000/lgy98.c` `ne2000*.c` | M1〜M4 エミュレータ合格 (検出、送受信、IRQ5、リング溢れの安全網、100Hz 受信ウォッチドッグ)。**既定で有効** (設定は [PLAN §9](PLAN.md#実装上の決定-計画からの差分))。M5 (実カード: 受信 count の FCS、16KB RAM、8bit 転送) 未 |
 | リンク層 `net/link.{c,h}` | ワイヤ v2、絶対値 WINDOW、リングの順次消費と Go-Back-N。フレームは [LINK_PLAN §4](LINK_PLAN.md#4-フレーム形式-raw-ethernet-独自-ethertype)、非ブロッキング API と `link_tick` 駆動は [§3](#3-kapi-v51末尾追記abi13) |
 | Host Agent `tools/host_agent.py` | HELLO 応答、`GET /pattern/N`、`GET http(s)://…` (urllib)、`GET /file/<path>` (ホストのファイル読み)、`TIME`、L1/L2 の bulk / stream 配送 |
 | KAPI | **v51 で公開・受入済み**。5 本の非ブロッキング API は [§3](#3-kapi-v51末尾追記abi13) を参照 |
@@ -103,7 +103,7 @@ Agent は宣言長ぶん受け切ったら RESPONSE を返す。要求ごとに 
 | 票 | 内容 | 依存 | 受入 |
 |---|---|---|---|
 | **N0** | KAPI_SPEC §3-2 の予約を v43 → **v51** に改訂 (v43 は欠番のまま「使わない」と明記)、本書 §3 の ABI 表を §1a 形式で確定、Codex 設計レビュー | — | 表の照合 |
-| **N1 (K)** ✅ | v51 の 5 本、`net/link.c` の非ブロッキング化 (`link_request` の分割送信、状態機械)、`host_owner_exit`、ホスト TDD (`tools/tests/net_link_host.c` を L0〜L3 の試験から起こす)、`userland/tests/host_test.c` | N0、`kernel-lgy98-link` ビルド | `make check-net-l3` 相当を KAPI 経由で: GET /pattern/65536 の内容一致、404、TIME、AGAIN ループで WM が止まらない (GUI 配下で `gui_busy` と同時) |
+| **N1 (K)** ✅ | v51 の 5 本、`sys/net/link.c` の非ブロッキング化 (`link_request` の分割送信、状態機械)、`host_owner_exit`、ホスト TDD (`tools/tests/net_link_host.c` を L0〜L3 の試験から起こす)、`userland/diag/host_test.c` | N0、`kernel-lgy98-link` ビルド | `make check-net-l3` 相当を KAPI 経由で: GET /pattern/65536 の内容一致、404、TIME、AGAIN ループで WM が止まらない (GUI 配下で `gui_busy` と同時) |
 | **N2 (ホスト)** ✅ | `host_agent.py` に `PRINT OPEN/DATA/CLOSE/STATUS`、`CLIP GET/PUT` (WSL2 は clip.exe/powershell、無ければ 503)、`--spool-dir`/`--print-dir`/`--printer`/`--clip`、win32print/win32clipboard は任意依存。**`PUT /file/` は 501 で先送り (v1.4)** | — | Python 単体試験 (スプール、宣言長と WDATA の照合、閉じたジョブへの DATA 409、許可リスト外 403) |
 | **N3 (C)** ✅ | `libos32host` + `wget` / `lpr` / `hclip` / `hdate` | N1、N2 | 端末 (GUI) と CUI の両方で `wget http://example.com/ /tmp/x` が 559B、`lpr /etc/profile` がホストの `spool/` に落ちる (to-file)、`hclip` の往復 |
 | **N4 (W/apps)** ✅ | libos32gui 末尾追記、ファイラ「印刷」、端末のコピー / 貼り付け | N3 | GUI 受入 |
@@ -113,7 +113,7 @@ Agent は宣言長ぶん受け切ったら RESPONSE を返す。要求ごとに 
 
 ## 8. メモリ・性能の見積り
 
-- カーネル: `net/link.o` 10KB + ドライバ ≈ 20KB (既にビルド可)。KAPI 5 本 + 状態 ≈ 2KB。ストリーム 8KB は既存。
+- カーネル: `sys/net/link.o` 10KB + ドライバ ≈ 20KB (既にビルド可)。KAPI 5 本 + 状態 ≈ 2KB。ストリーム 8KB は既存。
 - アプリ側: `host_read` の buf だけ。`wget` は 4KB。
 - 速度: L2 の実測は NP21/W で 128KB を欠落回復込みで完走。実機 LGY-98 (10Mbps、PIO) では 100〜300KB/s 程度の見込み (M5 で実測)。印刷ジョブは数十 KB なので十分。
 

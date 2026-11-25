@@ -82,7 +82,7 @@ def read_max_image_size(path):
         raise ValueError('MAX_IMAGE_SIZE が見つからない: {}'.format(path))
     # A copied generator still resolves the units beside its limit header.
     units = os.path.join(os.path.dirname(os.path.abspath(path)), '..',
-                         'include', 'memmap.h')
+                         'sys', 'include', 'memmap.h')
     preincludes = ['-imacros', units] if os.path.isfile(units) else []
     expr = subprocess.check_output(
         ['cpp', '-E', '-P', *preincludes, '-imacros', os.path.abspath(path), '-'],
@@ -163,7 +163,7 @@ def elf_layout(path):
             if a < b and c < d and a < d and c < b:
                 raise ValueError('ELF: file/BSS overlap: {} / {}'.format(p, q))
     layout_root = os.path.dirname(os.path.dirname(os.path.abspath(gen_memmap.__file__)))
-    macros = Macros(read_defines(os.path.join(layout_root, 'include', 'memmap.h')), symbols)
+    macros = Macros(read_defines(os.path.join(layout_root, 'sys', 'include', 'memmap.h')), symbols)
     load_addr = macros.get('KERNEL_LOAD_ADDR')
     if load_addr is None:
         raise ValueError('ELF: unresolved KERNEL_LOAD_ADDR')

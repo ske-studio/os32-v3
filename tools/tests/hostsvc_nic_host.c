@@ -1,17 +1,17 @@
-#include "kernel/io_policy.h"
-#include "kernel/io_work.h"
+#include "sys/kern/io_policy.h"
+#include "sys/kern/io_work.h"
 #include "rx_io_clock.h"
 /* A2 NIC unit: real nic.c, fake adapter and A3/link boundaries.
  * No A3 filtering/queues or hardware behavior is claimed by this unit. */
 #include "hostsvc_fixture.h"
-#include "net/nic_rx.h"
-#include "net/rx_work.h"
-#include "kernel/irq/irq.h"
-#include "net/link.h"
-#include "kernel/irq/tick.h"
-#include "platform/pc98/tick_order.h"
+#include "sys/net/nic_rx.h"
+#include "sys/net/rx_work.h"
+#include "sys/kern/irq/irq.h"
+#include "sys/net/link.h"
+#include "sys/kern/irq/tick.h"
+#include "sys/platform/pc98/tick_order.h"
 #include "os32_kapi_shared.h"
-#include "drivers/net/e82557/e82557_regs.h"
+#include "sys/dev/net/e82557/e82557_regs.h"
 #include "kprintf.h"
 #include <stdarg.h>
 

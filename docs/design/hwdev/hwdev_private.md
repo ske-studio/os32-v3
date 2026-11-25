@@ -1,6 +1,6 @@
-# hwdev/hwdev_private.h — 設計
+# sys/dev/hwdev/hwdev_private.h — 設計
 > 状態: **現行 (2026-10-31)** — 出所: HWDEV_CORE_API・HWDEV_DESIGN (D1 で移した)
-ソース: `hwdev/hwdev_private.h`
+ソース: `sys/dev/hwdev/hwdev_private.h`
 
 核 (kdebug) と装置部品 (`/boot/hwdev.mod`) の境界の番号・型・定義だけを置く。
 i386 cdecl、u32 固定、size/version は完全一致で照合する。
@@ -8,7 +8,7 @@ i386 cdecl、u32 固定、size/version は完全一致で照合する。
 ## 1. private ABI の構造体
 
 ```c
-/* 新 private ABI の骨格 (hwdev/hwdev_private.h)。 */
+/* 新 private ABI の骨格 (sys/dev/hwdev/hwdev_private.h)。 */
 struct hwdev_identity {
     u32 abi, size, kind, build_id, profile_version;
     u32 kernel_pair_crc, core_image_crc, contract_crc;
@@ -19,7 +19,7 @@ struct hwdev_ops {
                        const struct recover_ops *base,
                        struct recover_transport *transport,
                        const struct recover_profile *s0);
-    /* G1: gfinit_call (kdebug/gfinit.h) と同じ 6 引数。wrapper は名前を変えずに素通しする
+    /* G1: gfinit_call (sys/dev/video/geforce/diag/gfinit.h) と同じ 6 引数。wrapper は名前を変えずに素通しする
        (GF は transport と S0 profile を受けて開始する、gfinit.c:154) */
     void (__cdecl *release_work)(void); /* cleanup 後のみ、HW 操作なし */
 };

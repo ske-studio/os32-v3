@@ -1,10 +1,10 @@
 """Boot-target A/B foreground commands, selection, availability and owner checks."""
 CHECK = dict(name='gf5-boot-target-diag', tier=1, needs=[], budget=4.1,
-             covers=['tools/tests/recover_gf_dev_stub.c', 'kdebug/gf5_test.c', 'kdebug/gf5_test.h',
-                     'kdebug/gf_command_wire.h', 'hwdev/gf/**',
-                     'drivers/video/geforce/geforce_module.h',
-                     'kdebug/gfinit_decode.h', 'kdebug/gfinit_pll.h', 'lib/serial_diag.h', 'lib/crc32_core.inc',
-                     'include/types.h', 'tools/tests/gf5_boot_target_diag_host.c', 'tools/tests/gf5_observe_host.c',
+             covers=['tools/tests/recover_gf_dev_stub.c', 'sys/dev/video/geforce/diag/gf5_test.c', 'sys/dev/video/geforce/diag/gf5_test.h',
+                     'sys/dev/video/geforce/diag/gf_command_wire.h', 'hwdev/gf/**',
+                     'sys/dev/video/geforce/geforce_module.h',
+                     'sys/dev/video/geforce/diag/gfinit_decode.h', 'sys/dev/video/geforce/diag/gfinit_pll.h', 'lib/serial_diag.h', 'lib/crc32_core.inc',
+                     'sys/include/types.h', 'tools/tests/gf5_boot_target_diag_host.c', 'tools/tests/gf5_observe_host.c',
                      'tools/tests/serial_diag_host.h', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
                      'tools/tests/test_gf5_boot_target_diag.py'],
@@ -20,7 +20,7 @@ import mutpar
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'kdebug/gf5_test.c'
+PRODUCT = 'sys/dev/video/geforce/diag/gf5_test.c'
 MUTATIONS = [
     ('slot', 'diagnostic.image[a[0]]) { rc = GF5_EBUSY;',
      'diagnostic.image[0]) { rc = GF5_EBUSY;'),
@@ -38,7 +38,7 @@ def command(exe):
             '-D__KERNEL_BUILD__', '-ffunction-sections', '-fdata-sections',
             '-Wl,--gc-sections', *include_flags(ROOT),
             str(ROOT / 'tools/tests/gf5_boot_target_diag_host.c'),
-            str(ROOT / 'hwdev/gf/state.c'),
+            str(ROOT / 'sys/dev/video/geforce/state.c'),
             str(ROOT / PRODUCT), str(ROOT / 'tools/tests/recover_gf_dev_stub.c'), '-o', str(exe)]
 
 

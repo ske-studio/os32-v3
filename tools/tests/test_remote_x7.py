@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 CHECK = dict(name='remote-x7', tier=1,
-    covers=['tools/tests/con_sink_arch/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'kernel/console/con_sink.c', 'include/con_sink.h',
+    covers=['tools/tests/con_sink_arch/arch_io.h', 'tools/tests/host_arch/arch_io.h', 'sys/kern/console/con_sink.c', 'sys/include/con_sink.h',
             'tools/tests/con_sink_host.c', 'tools/tests/test_con_sink.py',
-            'tools/tests/test_remote_x7.py', 'kernel/console/console.c',
-            'kernel/port_service.c', 'platform/pc98/console.c',
+            'tools/tests/test_remote_x7.py', 'sys/kern/console/console.c',
+            'sys/kern/port_service.c', 'sys/platform/pc98/console.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'], needs=[], budget=3.5,
     basis=['LAN_OPERATOR_DESIGN §3', 'KAPI_SPEC'],
 )

@@ -141,7 +141,7 @@ static void irq_restore(unsigned int flags)
     if (scan_us - test_closed_at > test_max_closed) test_max_closed = scan_us - test_closed_at;
     irq_on = flags; test_open_at = scan_us;
 }
-#include "../../drivers/video/pc98/splash_raster.c"
+#include "../../sys/platform/pc98/video/splash_raster.c"
 static u8 probe_bios_snapshot[PAGE_SIZE];
 static u32 probe_bios_reads;
 const u8 *v86_bios_real_lowmem(void)
@@ -182,7 +182,7 @@ static unsigned long long __attribute__((unused)) probe_host_pl_span(unsigned lo
     if (peak_fixture == 2) return 8;
     return i == 7 || i == 51 ? 12 : i == 23 ? 10 : 8;
 }
-#include "../../platform/pc98/splash_probe.c"
+#include "../../sys/platform/pc98/splash_probe.c"
 #undef pc98_splash_raster_table
 static int pl_fail_active(void)
 {

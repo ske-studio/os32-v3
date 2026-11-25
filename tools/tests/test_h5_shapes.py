@@ -2,7 +2,7 @@
 Compile/link failures and signals are errors, never mutation RED.
 """
 CHECK = dict(name='h5-shapes-host', tier=1,
-    covers=['userland/tests/h5_shape*.c', 'userland/deploy.yaml', 'tools/tests/h5_shapes_host.c', 'tools/tests/host32.py', 'exec/os32x_hdr.h', 'sdk/os32x_hdr.py', 'sdk/mkos32x.py', 'sdk/link/app.ld', 'sdk/crt/crt0.asm', 'sdk/crt/crt0_c.c', 'sdk/crt/syscalls.c', 'sdk/include/os32/**', 'include/memmap.h', 'include/types.h', 'exec/exec.c', 'exec/exec.h', 'exec/appslot.c', 'exec/appslot.h', 'tools/tests/kernel_includes.py', 'userland/lib/rt/ls.c', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['userland/tests/h5_shape*.c', 'userland/deploy.yaml', 'tools/tests/h5_shapes_host.c', 'tools/tests/host32.py', 'sys/kern/exec/os32x_hdr.h', 'sdk/os32x_hdr.py', 'sdk/mkos32x.py', 'sdk/link/app.ld', 'sdk/crt/crt0.asm', 'sdk/crt/crt0_c.c', 'sdk/crt/syscalls.c', 'sdk/include/os32/**', 'sys/include/memmap.h', 'sys/include/types.h', 'sys/kern/exec/exec.c', 'sys/kern/exec/exec.h', 'sys/kern/exec/appslot.c', 'sys/kern/exec/appslot.h', 'tools/tests/kernel_includes.py', 'userland/lib/rt/ls.c', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=[], budget=7.2,
     basis=['MEMMAP_V3'],
 )
@@ -25,10 +25,10 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'sdk'))
 import os32x_hdr as H
 
-TARGET_SRCS = ['userland/tests/h5_shape_i.c', 'userland/tests/h5_shape_ii.c',
-               'userland/tests/h5_shape_iii.c', 'userland/tests/h5_shape.inc',
+TARGET_SRCS = ['userland/diag/h5_shape_i.c', 'userland/diag/h5_shape_ii.c',
+               'userland/diag/h5_shape_iii.c', 'userland/diag/h5_shape.inc',
                'tools/tests/h5_shapes_host.c', 'tools/tests/test_h5_shapes.py',
-               'exec/exec.c', 'exec/appslot.c', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
+               'sys/kern/exec/exec.c', 'sys/kern/exec/appslot.c', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h']
 MUTANTS = [
     ('PT omitted', ' - p1;', ';'),
     ('PT twice', ' - p1;', ' - p1 - p1;'),
@@ -257,7 +257,7 @@ def main():
     args = ap.parse_args()
     host32.begin_control(args.mutate, args.runner, ROOT)
     headers = built()
-    body = (ROOT / 'userland/tests/h5_shape.inc').read_text()
+    body = (ROOT / 'userland/diag/h5_shape.inc').read_text()
     with tempfile.TemporaryDirectory(prefix='os32-h5-') as directory:
         tmp = pathlib.Path(directory)
         with host32.control(args.mutate, args.runner, ROOT) as normal:

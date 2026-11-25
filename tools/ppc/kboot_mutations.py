@@ -34,22 +34,22 @@ KERNEL_NEGATIVES = {'kernel-dsi': 1, 'kernel-sc': 2}
 TRAP = r'^KBOOT TRAP dsi=%s isi=%s guard=%s flush=%s$'
 KERNEL_MUTATIONS = (
     # Publish the observation ABI as usual, omit just the READY record.
-    ('ready-missing', 'platform/powermac/ppc_kernel.c',
+    ('ready-missing', 'sys/platform/powermac/ppc_kernel.c',
      '    pm_report_ready(start);',
      '    extern volatile unsigned long long kboot_ready_tb;\n    kboot_ready_tb = start;',
      'milestone 8 order/format', r'^KBOOT ALIVE tick_delta=\d+ tb_us=\d+ of_calls_delta=0$'),
-    ('ipi-masked', 'platform/powermac/mpic.c',
+    ('ipi-masked', 'sys/platform/powermac/mpic.c',
      'write_reg(IPI_VECTOR, PRIORITY_ONE | PM_MPIC_IPI_VECTOR);',
      'write_reg(IPI_VECTOR, MASK | PRIORITY_ONE | PM_MPIC_IPI_VECTOR);',
      'milestone 6 order/format', r'^KBOOT MPIC sources=\d+ priority=0 cpu=0 delivery=bad$'),
-    ('tpr-high', 'platform/powermac/mpic.c',
+    ('tpr-high', 'sys/platform/powermac/mpic.c',
      '    write_reg(TPR, 0);\n    return PM_MPIC_INIT_OK;',
      '    write_reg(TPR, 15);\n    return PM_MPIC_INIT_OK;',
      'milestone 6 order/format', r'^KBOOT MPIC sources=\d+ priority=0 cpu=0 delivery=bad$'),
-    ('half-rate', 'arch/ppc/kernel_dec.c',
+    ('half-rate', 'sys/arch/ppc/kernel_dec.c',
      '    period = tb_hz / tick_hz;', '    period = tb_hz / tick_hz * 2;',
      'forbidden diagnostic', r'^FATAL kboot dec_rate$'),
-    ('dec-100hz', 'arch/ppc/kernel_dec.c',
+    ('dec-100hz', 'sys/arch/ppc/kernel_dec.c',
      '''    if (fraction >= PM_DEC_HZ) {
         fraction -= PM_DEC_HZ;
         ++value;
@@ -87,33 +87,33 @@ int ppc_dec_start(u32 tb_hz, u32 tick_hz)
     remainder = tb_hz % 100;
 ''',
      'forbidden diagnostic', r'^FATAL kboot dec_rate$'),
-    ('onfault-reason', 'arch/ppc/kernel_trap.c',
+    ('onfault-reason', 'sys/arch/ppc/kernel_trap.c',
      'reason == PPC_TRAP_DSI_IO) : reason == probe.reason)',
      'reason == PPC_TRAP_DSI_IO) : reason != probe.reason)',
      'forbidden diagnostic', r'^FATAL trap vector=0x300 reason=0x2 addr=0x80000$'),
-    ('hpt-not-cleared', 'arch/ppc/kernel_mmu.S',
+    ('hpt-not-cleared', 'sys/arch/ppc/kernel_mmu.S',
      '    bl ppc_hpt_clear\n    sync\n', '    sync\n',
      'milestone 5 order/format', TRAP % ('pass', 'pass', 'pass', 'bad')),
     # Not a guard-mapping mutation (D3's kboot_boot.py owns those): this proves
     # the guard word is computed, i.e. a load that does not fault reports bad.
-    ('guard-probe-nonfault', 'platform/powermac/ppc_kernel.c',
+    ('guard-probe-nonfault', 'sys/platform/powermac/ppc_kernel.c',
      '    int guard = probe_dsi(MEM_STACK_GUARD);',
      '    int guard = probe_dsi((u32)flush_a);',
      'milestone 5 order/format', TRAP % ('pass', 'pass', 'bad', 'pass')),
-    ('shm-no-shared-user', 'platform/powermac/ppc_kernel.c',
+    ('shm-no-shared-user', 'sys/platform/powermac/ppc_kernel.c',
      '    int shared_user = paging_boot_user_shared((u32)user_gate, 1) == 0;',
      '    int shared_user = 1; (void)user_gate;',
      'milestone 4 order/format', r'^KBOOT MEMORY online=1 heap=1 shm=0$'),
-    ('clock-half-scale', 'platform/powermac/clock.c',
+    ('clock-half-scale', 'sys/platform/powermac/clock.c',
      '((delta % hz) * 1000000) / hz', '((delta % hz) * 500000) / hz',
      'forbidden diagnostic', r'^FATAL kboot clock_rate$'),
     # +85.9 s per read: 50*error would wrap to a tiny value in 32 bits.
-    ('clock-jump', 'platform/powermac/clock.c',
+    ('clock-jump', 'sys/platform/powermac/clock.c',
      '    unsigned long long delta = read_tb() - origin;',
      '    static unsigned long long skew;\n'
      '    unsigned long long delta = read_tb() - origin + (skew += 8589934600ULL);',
      'forbidden diagnostic', r'^FATAL kboot clock_rate$'),
-    ('clock-frozen', 'platform/powermac/clock.c',
+    ('clock-frozen', 'sys/platform/powermac/clock.c',
      '    unsigned long long delta = read_tb() - origin;',
      '    unsigned long long delta = 0;',
      'forbidden diagnostic', r'^FATAL kboot clock_rate$'),
@@ -121,13 +121,13 @@ int ppc_dec_start(u32 tb_hz, u32 tick_hz)
 
 # Audit mutations: the build itself must fail with exactly this audit finding.
 AUDIT_MUTATIONS = (
-    ('pit-direct', 'platform/powermac/ppc_kernel.c', '#define KBOOT_ATTR 0x07',
+    ('pit-direct', 'sys/platform/powermac/ppc_kernel.c', '#define KBOOT_ATTR 0x07',
      '#define KBOOT_ATTR (0x07 + 0 * PIT_HZ)', 'PIT_HZ user in the 1 kHz closure'),
-    ('pit-via-macro', 'platform/powermac/ppc_kernel.c', '#define KBOOT_ATTR 0x07',
+    ('pit-via-macro', 'sys/platform/powermac/ppc_kernel.c', '#define KBOOT_ATTR 0x07',
      '#define KBOOT_ATTR (0x07 + 0 * TICK_MS)', 'PIT_HZ user in the 1 kHz closure'),
-    ('float-insn', 'arch/ppc/kernel_probe.S', 'ppc_probe_syscall:\n    sc\n',
+    ('float-insn', 'sys/arch/ppc/kernel_probe.S', 'ppc_probe_syscall:\n    sc\n',
      'ppc_probe_syscall:\n    sc\n    fneg 1,1\n', 'floating-point/AltiVec instruction'),
-    ('altivec-insn', 'arch/ppc/kernel_probe.S', 'ppc_probe_syscall:\n    sc\n',
+    ('altivec-insn', 'sys/arch/ppc/kernel_probe.S', 'ppc_probe_syscall:\n    sc\n',
      'ppc_probe_syscall:\n    sc\n    vxor 0,0,0\n', 'floating-point/AltiVec instruction'),
 )
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Test calibrated sync gap conversion without libc."""
 CHECK = dict(name='gfxsync-gap', tier=1, needs=[], budget=5,
-    covers=['gfx/sync/sync_gap.c', 'gfx/sync/sync_int.h',
+    covers=['sys/hal/gfx/sync/sync_gap.c', 'sys/hal/gfx/sync/sync_int.h',
             'tools/tests/gfxsync_gap_host.c', 'tools/tests/test_gfxsync_gap.py',
             'tools/tests/host32.py'],
     basis=['HAL_V2_DESIGN §10'],
@@ -29,7 +29,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/sync/sync_gap.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/sync/sync_gap.c').read_text()
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         assert observe(work, source) == 0

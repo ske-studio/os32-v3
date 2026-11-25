@@ -1,6 +1,6 @@
-# kernel/console/console_backend.h — 設計
+# sys/kern/console/console_backend.h — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_D_DESIGN (D1 で移した)
-ソース: `kernel/console/console_backend.h`
+ソース: `sys/kern/console/console_backend.h`
 
 リンク時固定、全関数PC98常駐。
 

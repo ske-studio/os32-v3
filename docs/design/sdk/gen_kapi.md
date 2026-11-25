@@ -2,7 +2,7 @@
 > 状態: **現行 (2026-11-18)** — 出所: TASK_KAPI_OUTPUT_GUARD の契約を今のソースと照らして要約
 ソース: `sdk/gen_kapi.py` (`out_errors`・`input_errors`・`check_all_out`・`out_ranges_c`・`out_guard_c`)
 
-`sdk/kapi.json` の出力ポインタの申告 `out` を検査し、ラッパ (`kapi/kapi_generated.c`) の先頭に範囲の検査を出す。
+`sdk/kapi.json` の出力ポインタの申告 `out` を検査し、ラッパ (`sys/kapi/kapi_generated.c`) の先頭に範囲の検査を出す。
 `out` の書式と意味、検査の中身 (`ring3_user_ranges_writable`) の正典は `docs/KAPI_SPEC.md` §3-3。ここは生成器が守る規則だけを書く。
 
 ## 申告の検査 — 書き忘れで生成を落とす

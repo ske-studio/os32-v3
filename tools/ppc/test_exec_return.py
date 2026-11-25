@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'arch/ppc/exec_context.c'
+SOURCE = ROOT / 'sys/arch/ppc/exec_context.c'
 HARNESS = r'''
 #include "exec_arch.h"
 #include "ppc_frame.h"
@@ -63,7 +63,7 @@ def execute(source):
         (tmp / 'test.c').write_text(HARNESS)
         subprocess.run(['gcc', '-m32', '-ffreestanding', '-fno-builtin', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-fno-stack-protector', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                         '-I' + str(ROOT / 'arch/ppc'), '-I' + str(ROOT / 'include'),
-                        '-I' + str(ROOT / 'lib'), str(ROOT / 'lib/kstring_c.c'),
+                        '-I' + str(ROOT / 'lib'), str(ROOT / 'sys/kern/kstring_c.c'),
                         str(tmp / 'context.c'), str(tmp / 'test.c'),
                         '-o', str(tmp / 'test')], check=True)
         return subprocess.run(['qemu-i386', str(tmp / 'test')], capture_output=True, text=True)
@@ -139,7 +139,7 @@ def main():
     if result.returncode != 0 or result.stdout != 'reached=parent\n':
         print('baseline failed:', result.returncode, result.stdout, result.stderr)
         return 1
-    asm = (ROOT / 'arch/ppc/exec_resume.S').read_text()
+    asm = (ROOT / 'sys/arch/ppc/exec_resume.S').read_text()
     if not resume_check(asm):
         print('resume baseline failed')
         return 1

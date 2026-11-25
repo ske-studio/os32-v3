@@ -61,7 +61,7 @@ def fixtures(folder):
     subprocess.run([str(cross / 'i386-elf-ld'), '-m', 'elf_i386', '--emit-relocs',
                     '-e', 'hwdev_init', '-T', str(ROOT / 'build/module.ld'),
                     str(folder / 'fixture.o'), '-o', str(folder / 'fixture.elf')], check=True)
-    header = (ROOT / 'hwdev/generated/hwdev_contract.h').read_text()
+    header = (ROOT / 'sys/dev/hwdev/generated/hwdev_contract.h').read_text()
     contract = int(re.search(r'#define HWDEV_CONTRACT_CRC (0x\w+)U', header)[1], 16)
     meta = dict(module_abi_gen=contract,
                 imports=[dict(name=e['symbol'], kind=1, type_ver=1, index=e['index'])
@@ -149,8 +149,8 @@ def build(exe):
                                       'gf_production_selected')]
     builtin = subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip()
     return ['gcc', *FLAGS, *INCLUDES, '-nostdinc', '-isystem', builtin, '-nostdlib', '-static', '-no-pie',
-            str(ROOT / 'tools/tests/hwdev_module_host.c'), str(ROOT / 'kernel/module/module_runtime.c'),
-            str(ROOT / 'kernel/module/module_image.c'),
+            str(ROOT / 'tools/tests/hwdev_module_host.c'), str(ROOT / 'sys/kern/module/module_runtime.c'),
+            str(ROOT / 'sys/kern/module/module_image.c'),
             *['-Wl,--defsym,' + name + '=fixture_kernel' for name in aliases], '-o', str(exe)]
 
 
@@ -171,8 +171,8 @@ def main():
         subprocess.run(build(exe), check=True)
         run(exe, cases)
         if '--mutate' in sys.argv:
-            mutations = [('hwdev/hwdev_module.c', *mutation) for mutation in MUTATIONS]
-            mutations.append(('platform/powermac/module_diag.c', 'ppc-unsupported-action',
+            mutations = [('sys/dev/hwdev/hwdev_module.c', *mutation) for mutation in MUTATIONS]
+            mutations.append(('sys/platform/powermac/module_diag.c', 'ppc-unsupported-action',
                               'w->status = PROBE_NOSYS;', 'w->status = PROBE_OK;'))
             for path, name, old, new in mutations:
                 source = (ROOT / path).read_text()

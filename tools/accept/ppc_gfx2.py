@@ -133,11 +133,11 @@ def main():
         kernel = folder / 'kernel'
         mutation = []
         if case == 'mode-width':
-            mutation = mutant_settings(folder, case, 'gfx/v2/enum.c',
+            mutation = mutant_settings(folder, case, 'sys/hal/gfx/v2/enum.c',
                                        '    if (!rc) *out = v;',
                                        '    if (!rc) { v.w++; *out = v; }')
         elif case == 'shadow-fallback':
-            mutation = mutant_settings(folder, case, 'gfx/v2/display.c',
+            mutation = mutant_settings(folder, case, 'sys/hal/gfx/v2/display.c',
                                        'rc = DISPLAY_V2_SHADOW_PUSH(l, t, r - l, b - t);',
                                        'rc = OS32_ERR_NOSYS;')
         elif case == 'absent':

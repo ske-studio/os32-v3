@@ -1,9 +1,9 @@
 /* PACK ppc-sfs-deadline PM condition B; LAN_OPERATOR_DESIGN §5. */
 /* D3 BLOCK: real C1/C3/D2 and netcd, virtual wire/clock/ALIVE/device table. */
 #include "hostsvc_fixture.h"
-#include "fs/serialfs/serialfs.h"
-#include "net/host_mailbox.h"
-#include "lib/kstring.h"
+#include "sys/fs/serialfs/serialfs.h"
+#include "sys/net/host_mailbox.h"
+#include "sys/kern/kstring.h"
 #include "os32_kapi_shared.h"
 #include PRODUCT_SOURCE
 #define REQUIRE(e) do { if (!(e)) return __LINE__; } while (0)

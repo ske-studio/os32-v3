@@ -1,8 +1,8 @@
-# platform/pc98/platform_memory_desc.h — 設計
+# sys/platform/pc98/platform_memory_desc.h — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_C_DESIGN・MEMMAP_V3 (D1 で移した)
-ソース: `platform/pc98/platform_memory_desc.h`
+ソース: `sys/platform/pc98/platform_memory_desc.h`
 
-|geometry / attributes|platform/pc98/platform_memory_desc.h の static const、確保なし|登録前から参照可能、IRQ操作なし|
+|geometry / attributes|sys/platform/pc98/platform_memory_desc.h の static const、確保なし|登録前から参照可能、IRQ操作なし|
 
 ```c
 static const struct platform_memory_geometry platform_memory_geometry = {

@@ -10,7 +10,7 @@ import tempfile
 import host32
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCES = ('platform/pc98/console.c', 'drivers/sound/fm/fm.c', 'kapi/kapi_db.c', 'gfx/gfx_core.c', 'drivers/video/pc98/gfx_vram.c', 'gfx/gfx_dirty.c', 'gfx/gfx_present.c')
+SOURCES = ('sys/platform/pc98/console.c', 'sys/dev/sound/fm/fm.c', 'sys/kapi/kapi_db.c', 'sys/hal/gfx/gfx_core.c', 'sys/platform/pc98/video/gfx_vram.c', 'sys/hal/gfx/gfx_dirty.c', 'sys/hal/gfx/gfx_present.c')
 GUARD = '    if (x < 0 || x >= TVRAM_COLS || y < 0 || y >= TVRAM_ROWS) return;\n'
 MUTATIONS = [
     ('putchar', 0, 'con_backend_putchar', GUARD, '', 'putchar bounds'),

@@ -46,15 +46,15 @@ static void outp(unsigned int port, unsigned int value);
 #undef i32
 #undef u32
 #include "tvram_private.h"   /* PC-98 の番地 (第 5 段 C1) */
-#include "../../gfx/gfx_core.c"
+#include "../../sys/hal/gfx/gfx_core.c"
 int con_dual_cfg(void) { return 0; }
 int gfx2_head_info(u32 a, u32 h, GFX2_HeadInfo *info)
 { (void)a; (void)h; (void)info; return -1; }
-#include "../../platform/pc98/gfx_init.c"   /* 第 5 段 B3: planar の初期化の provider (製品) */
-#include "../../platform/pc98/gfx_selector.c"   /* 第 5 段 B4: backend の選択の provider (製品) */
-#include "../../platform/pc98/gfx_surfaces.c"   /* 第 5 段 B5: 起動時の SURFACE の予約の provider (製品) */
-#include "../../gfx/gfx_emergency.c"
-#include "../../drivers/video/pc98/backend_pc98.c"
+#include "../../sys/platform/pc98/gfx_init.c"   /* 第 5 段 B3: planar の初期化の provider (製品) */
+#include "../../sys/platform/pc98/gfx_selector.c"   /* 第 5 段 B4: backend の選択の provider (製品) */
+#include "../../sys/platform/pc98/gfx_surfaces.c"   /* 第 5 段 B5: 起動時の SURFACE の予約の provider (製品) */
+#include "../../sys/hal/gfx/gfx_emergency.c"
+#include "../../sys/platform/pc98/video/backend_pc98.c"
 const u8 *v86_bios_real_lowmem(void)
 {
     static const u8 bios[MEM_PAGE_SIZE] = {
@@ -64,17 +64,17 @@ const u8 *v86_bios_real_lowmem(void)
 }
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable" /* existing bottom in gfx_vram.c */
-#include "../../gfx/gfx_dirty.c"
-#include "../../drivers/video/pc98/gfx_vram.c"
-#include "../../gfx/gfx_present.c"
+#include "../../sys/hal/gfx/gfx_dirty.c"
+#include "../../sys/platform/pc98/video/gfx_vram.c"
+#include "../../sys/hal/gfx/gfx_present.c"
 /* OSRI is an ILP32 wire layout; keep its size assertions live on LP64. */
 #define u32 uint32_t
-#include "../../gfx/gfx_osri.h"
+#include "../../sys/kern/gfx/osri/gfx_osri.h"
 #undef u32
-#include "../../drivers/video/pc98/splash_raster.c"
+#include "../../sys/platform/pc98/video/splash_raster.c"
 #pragma GCC diagnostic pop
-#include "../../platform/pc98/splash.c"
-#include "../../platform/pc98/boot_splash.c"
+#include "../../sys/platform/pc98/splash.c"
+#include "../../sys/platform/pc98/boot_splash.c"
 
 GfxBackend gfx_backend_geforce = { .name = "geforce-unavailable" };
 void gui_display_failed(void) { abort(); }
@@ -168,7 +168,7 @@ void *kmemset(void *dst, int val, u32 n) { return memset(dst, val, n); }
 /* 票 T8 の門 (gfx_kapi_init / gfx_kapi_init_200 / gfx_screen_owner) が引く
  * カーネル側の 3 本。このハーネスが見るのはバックエンドの選択と 9801 の
  * ライフサイクルで、画面の所有者は対象外 (そちらは
- * tools/tests/multiapp_impl_host.c ケース 20 が実物の exec/appslot.c で見る)。
+ * tools/tests/multiapp_impl_host.c ケース 20 が実物の sys/kern/exec/appslot.c で見る)。
  * なので「CUI 中 / 誰も所有していない」= 門が素通しになる値を返す。 */
 int con_sink_is_enabled(void) { return 0; }
 int ring3_call_from_user(void) { return 0; }

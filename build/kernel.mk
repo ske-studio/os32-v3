@@ -1,10 +1,10 @@
 # x86 kernel products; source selection belongs to build/select.mk.
 
 $(BUILD_ID_OBJ): $(BUILD_ID_SRC)
-	$(CC) $(CFLAGS_BASE) -Iinclude -c $< -o $@
+	$(CC) $(CFLAGS_BASE) -Iinclude -Isys/include -Isys/hal/time -Isys/hal/gfx -Isys/hal/input -Isys/platform/pc98 -Isys/hal/sound -Isys/arch/x86 -c $< -o $@
 
 # kapi/ モジュール
-KAPI_GENERATED := include/kapi_call_generated.h kapi/kapi_generated.c exec/exec_kapi_init.inc \
+KAPI_GENERATED := sys/include/kapi_call_generated.h sys/kapi/kapi_generated.c sys/kern/exec/exec_kapi_init.inc \
     sdk/include/os32/os32_kapi_generated.h sdk/include/os32/os32_kapi_slots.h \
     sdk/include/os32/os32_generations.h sdk/include/os32/os32_unit_stamp.h \
     sdk/os32_generations.py sdk/rust/os32api/src/generations.rs \
@@ -24,7 +24,7 @@ $(BUILD_OUT)/kernel.bin: $(BUILD_OUT)/kernel.elf
 	$(OBJCOPY) -O binary $< $@
 
 # VK32 now contains only the resident core; SQLite is a paired /boot module.
-$(BUILD_OUT)/vmkernel.lz4: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/kernel.elf tools/mkvmkernel.py tools/gen_memmap.py include/memmap.h boot/boot_defs.h
+$(BUILD_OUT)/vmkernel.lz4: $(BUILD_OUT)/kernel.bin $(BUILD_OUT)/kernel.elf tools/mkvmkernel.py tools/gen_memmap.py sys/include/memmap.h boot/boot_defs.h
 	python3 tools/mkvmkernel.py --layout-header $(LAYOUT_HEADER) \
 		--elf $(BUILD_OUT)/kernel.elf --kernel $(BUILD_OUT)/kernel.bin -o $@
 
@@ -121,7 +121,7 @@ $(R1_OUT)/kernel.elf: $(R1_OBJECTS) $(R1_OUT)/os32.ld
 $(R1_OUT)/kernel.bin: $(R1_OUT)/kernel.elf
 	$(OBJCOPY) -O binary $< $@
 
-$(R1_OUT)/vmkernel.lz4: $(R1_OUT)/kernel.bin $(R1_OUT)/kernel.elf tools/mkvmkernel.py tools/gen_memmap.py include/memmap.h boot/boot_defs.h
+$(R1_OUT)/vmkernel.lz4: $(R1_OUT)/kernel.bin $(R1_OUT)/kernel.elf tools/mkvmkernel.py tools/gen_memmap.py sys/include/memmap.h boot/boot_defs.h
 	python3 tools/mkvmkernel.py --layout-header $(LAYOUT_HEADER) --elf $(R1_OUT)/kernel.elf --kernel $(R1_OUT)/kernel.bin -o $@
 
 R1_PAIRED_MODULES := $(patsubst $(BUILD_OUT)/%,$(R1_OUT)/%,$(KERNEL_PAIRED_MODULES))
@@ -133,7 +133,7 @@ kernel-r1: $(R1_OUT)/vmkernel.lz4 $(R1_PAIRED_MODULES)
 
 # One generated header drives C, ld and NASM; FORCE re-runs the generator
 # while write-if-changed keeps an unchanged build incremental.
-$(LAYOUT_HEADER): include/memmap.h tools/gen_memmap.py .FORCE
+$(LAYOUT_HEADER): sys/include/memmap.h tools/gen_memmap.py .FORCE
 	@python3 tools/gen_memmap.py --layout-header $@
 
 $(BUILD_OUT)/os32.raw.ld: build/os32.ld $(LAYOUT_HEADER)
@@ -178,7 +178,7 @@ kernel-tick-probe:
 tick-probe-image: $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES) $(BUILD_OUT)/tickprobe.bin $(BUILD_OUT)/snd2_test_diag.bin
 
 ifeq ($(TICK_PROBE_BUILD),1)
-$(BUILD_OUT)/snd2_test_diag.elf: userland/tests/snd2_test.c include/snd_writer_probe.h sound/hal/snd2_refill_diag.h sdk/link/app.ld $(CRT0_OBJ) $(BUILD_OUT)/lib/libos32nano.a
+$(BUILD_OUT)/snd2_test_diag.elf: userland/diag/snd2_test.c sys/include/snd_writer_probe.h sys/hal/sound/snd2_refill_diag.h sdk/link/app.ld $(CRT0_OBJ) $(BUILD_OUT)/lib/libos32nano.a
 	$(CC) $(PROGRAM_FLAGS) -DSND2_WRITER_DIAG -c $< -o $(BUILD_OUT)/snd2_test_diag.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) $(BUILD_OUT)/snd2_test_diag.o -lc -lgcc
 $(BUILD_OUT)/snd2_test_diag.raw: $(BUILD_OUT)/snd2_test_diag.elf
@@ -187,11 +187,11 @@ $(BUILD_OUT)/snd2_test_diag.bin: $(BUILD_OUT)/snd2_test_diag.raw $(BUILD_OUT)/sn
 	python3 sdk/mkos32x.py $< $@ --elf $(BUILD_OUT)/snd2_test_diag.elf --api 91
 endif
 
-$(BUILD_OUT)/snd2_test.bin: userland/tests/snd2_test.bin build/kernel.mk
+$(BUILD_OUT)/snd2_test.bin: userland/diag/snd2_test.bin build/kernel.mk
 	@mkdir -p $(dir $@)
 	cp $< $@
 
-$(BUILD_OUT)/tickprobe.elf: userland/diag/tickprobe.c kernel/time/tick_probe.h sdk/link/app.ld $(CRT0_OBJ) $(BUILD_OUT)/lib/libos32nano.a
+$(BUILD_OUT)/tickprobe.elf: userland/diag/tickprobe.c sys/kern/time/tick_probe.h sdk/link/app.ld $(CRT0_OBJ) $(BUILD_OUT)/lib/libos32nano.a
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $(BUILD_OUT)/tickprobe.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) $(BUILD_OUT)/tickprobe.o -lc -lgcc
 $(BUILD_OUT)/tickprobe.raw: $(BUILD_OUT)/tickprobe.elf
@@ -199,7 +199,7 @@ $(BUILD_OUT)/tickprobe.raw: $(BUILD_OUT)/tickprobe.elf
 $(BUILD_OUT)/tickprobe.bin: $(BUILD_OUT)/tickprobe.raw $(BUILD_OUT)/tickprobe.elf
 	python3 sdk/mkos32x.py $< $@ --elf $(BUILD_OUT)/tickprobe.elf --api 78 --cui-only
 
-$(C_KERNEL_OBJ) $(filter %.o,$(R1_OBJECTS)): include/kapi_call_generated.h
+$(C_KERNEL_OBJ) $(filter %.o,$(R1_OBJECTS)): sys/include/kapi_call_generated.h
 
 # Acceptance path (b): hardware FPU, all user x87/WAIT routed through #NM.
 # Keep objects, maps, compressed image and CRC-paired modules together.

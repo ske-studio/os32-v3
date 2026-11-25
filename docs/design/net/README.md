@@ -4,7 +4,7 @@
 
 ### link
 
-| `net/link.c` | `link_init()` で状態を有効化する前。失敗なら診断して return（初回は link_ready=0、既存状態を変更しない） |
+| `sys/net/link.c` | `link_init()` で状態を有効化する前。失敗なら診断して return（初回は link_ready=0、既存状態を変更しない） |
 
 link_init の登録の置き場は関数の先頭 (kmemcpy より前、登録が失敗したら状態を変えずに戻る)。
 
@@ -21,10 +21,10 @@ cdinst ─ /cd0 ─ iso9660 ─ netcd ─ SFS block ─────┤ NIC 共�
 
 | 経路 | ゲスト | ホスト | 運ぶ物 | 設計書 |
 |---|---|---|---|---|
-| 共用の NIC | `net/nic.c`・`net/nic_rx.c` | — | 先頭 3 バイト `05 53 46` で SFS、他は link | [nic](nic.md) |
-| link | `net/link.c`・`net/link_host_api.inc` | `tools/host_agent.py` | TIME・CLIP・PRINT・GET (`os32.http`)・LIST | [link_host_api](link_host_api.md)・[tools/host_agent](../tools/host_agent.md)・[tools/host_services](../tools/host_services.md) |
-| 知らせ | `net/link_notify.c`・`net/host_mailbox.c` | `tools/host_notify.py` | NOTIFY・ALIVE | [link_notify](link_notify.md)・[host_mailbox](host_mailbox.md)・[tools/host_notify](../tools/host_notify.md) |
-| LAN 版 SFS | `fs/serialfs/` (常駐の /host)・`drivers/block/netcd.c` | `tools/lanfs_host.py` | /host のファイル (パス + offset)・仮想 CD のブロック | [serialfs_persistent](../fs/serialfs/serialfs_persistent.md)・[sfs_block](../fs/serialfs/sfs_block.md)・[netcd](../drivers/block/netcd.md)・[tools/lanfs_host](../tools/lanfs_host.md) |
+| 共用の NIC | `sys/net/nic.c`・`sys/net/nic_rx.c` | — | 先頭 3 バイト `05 53 46` で SFS、他は link | [nic](nic.md) |
+| link | `sys/net/link.c`・`sys/net/link_host_api.inc` | `tools/host_agent.py` | TIME・CLIP・PRINT・GET (`os32.http`)・LIST | [link_host_api](link_host_api.md)・[tools/host_agent](../tools/host_agent.md)・[tools/host_services](../tools/host_services.md) |
+| 知らせ | `sys/net/link_notify.c`・`sys/net/host_mailbox.c` | `tools/host_notify.py` | NOTIFY・ALIVE | [link_notify](link_notify.md)・[host_mailbox](host_mailbox.md)・[tools/host_notify](../tools/host_notify.md) |
+| LAN 版 SFS | `fs/serialfs/` (常駐の /host)・`sys/dev/block/netcd.c` | `tools/lanfs_host.py` | /host のファイル (パス + offset)・仮想 CD のブロック | [serialfs_persistent](../fs/serialfs/serialfs_persistent.md)・[sfs_block](../fs/serialfs/sfs_block.md)・[netcd](../drivers/block/netcd.md)・[tools/lanfs_host](../tools/lanfs_host.md) |
 | SDK | `userland/lib/host/` | — | `host_call`・LIST の名前の解決 | [host_call](../userland/lib/host/host_call.md) |
 
 ### 共通の決まり
@@ -49,8 +49,8 @@ cdinst ─ /cd0 ─ iso9660 ─ netcd ─ SFS block ─────┤ NIC 共�
 
 ## 索引
 
-- [net/nic.c](nic.md)
-- [net/link_host_api.inc](link_host_api.md)
-- [net/link_notify.c](link_notify.md)
-- [net/host_mailbox.c](host_mailbox.md)
+- [sys/net/nic.c](nic.md)
+- [sys/net/link_host_api.inc](link_host_api.md)
+- [sys/net/link_notify.c](link_notify.md)
+- [sys/net/host_mailbox.c](host_mailbox.md)
 - [link_wire](link_wire.md)

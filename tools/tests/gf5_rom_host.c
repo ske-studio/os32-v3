@@ -1,6 +1,6 @@
 #define GF5_HOST_UNIT 8
 #include "gf5_fake.h"
-#include "../../hwdev/gf/internal.h"
+#include "../../sys/dev/video/geforce/internal.h"
 
 /* BIT fields: nouveau nvkm/subdev/bios/bit.c:31-42 and init.c:359-407.
  * The base and gaps are arbitrary fixture placement, not hardware limits. */

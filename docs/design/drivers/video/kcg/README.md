@@ -9,7 +9,7 @@
 ```
 
 ```c
-/* drivers/video/kcg/kcg_module.c: module状態とinvalidate呼出しは元の所有者 */
+/* sys/dev/video/kcg/kcg_module.c: module状態とinvalidate呼出しは元の所有者 */
 void kcg_v86_restore(void) {
     platform_display_kcg_code(); /* outp(MODE_FF1_PORT,MFF1_KCG_CODE); io_wait(); */
     public_api()->invalidate();

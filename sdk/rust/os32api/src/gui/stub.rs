@@ -60,7 +60,7 @@ pub const SIZE_ABSOLUTE: u32 = 2;
 /*  常駐先と先頭ページの形                                            */
 /* ================================================================ */
 
-/// 共有ライブラリの常駐先 (正典: `include/memmap.h` の `MEM_SHLIB_BASE`、K3)。
+/// 共有ライブラリの常駐先 (正典: `sys/include/memmap.h` の `MEM_SHLIB_BASE`、K3)。
 pub const MEM_SHLIB_BASE: u32 = 0x8000_0000;
 
 /// `'SLIB'` (リトルエンディアン)。正典: `os32_kapi_shared.h` `OS32_SHLIB_MAGIC`。

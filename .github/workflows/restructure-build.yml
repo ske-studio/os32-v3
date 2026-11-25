@@ -1,0 +1,151 @@
+name: restructure-build
+on:
+  push:
+    branches: [main, "wt/**"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: restructure-build-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  artifacts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: ./.github/actions/build-setup
+      - name: Build core (make all)
+        env:
+          OS32_ACCEPT_IPA_LICENSE: "1"
+        run: |
+          export PATH="$CROSS_DIR/bin:$PATH"
+          i386-elf-gcc --version | head -1
+          make -j"$(nproc)" all kernel-r1 CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
+
+      # ⑤ 成果物: カーネル・起動 FD・インストール ISO・パッケージ・実機更新用の配備元 (hostdrv.tar.gz)。
+      #    BUILD_INFO.txt と SHA256SUMS は tools/ci_fetch.sh が読む。
+      - name: Artifact name
+        id: name
+        run: echo "artifact=os32-${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # kapi_sys.o は make ごとに再コンパイルされる。FD / ISO / HostDrv を 1 呼出しで作る。
+      # deploy-u3 は FD を作ってから HostDrv を同期する (hsync の名札も含む)。
+      # 生 2HD は D88 の副生成物、ISO は phony の iso で必ず作り直す。
+      - name: Deploy set (same-build FD, ISO and HostDrv)
+        run: |
+          export PATH="$CROSS_DIR/bin:$PATH"
+          mkdir -p "$RUNNER_TEMP/hostdrv" "$RUNNER_TEMP/np21w"
+          make -j"$(nproc)" deploy-u3 iso CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w" \
+            HOSTDRV_DIR="$RUNNER_TEMP/hostdrv" NO_PRUNE=1
+          # make all の古い世代 hash を、今の成果物で更新する (make は再度呼ばない)。
+          python3 tools/gen_generation_manifest.py
+          python3 tools/gen_deploy_set.py
+          test -f "$RUNNER_TEMP/hostdrv/.deploy/manifest.txt"
+
+      - name: Collect outputs
+        run: |
+          set -euo pipefail
+          rm -rf out && mkdir -p out/packages
+          # kernel.elf: 実機の peek が記号名を引く (os32_build_commit と Image CRC の照合、TASK_KPEEK §3)。strip しない。
+          cp build/out/vmkernel.lz4 build/out/kernel.map build/out/kernel.elf out/
+          cp images/os32_boot.d88 images/os32_boot.img images/os32_boot144.img images/os32_install.iso out/
+          cp build/out/deploy-set.json out/
+          if [ -f build/out/generations-manifest.json ]; then
+            cp build/out/generations-manifest.json out/
+          fi
+          cp packages/*.PKG out/packages/
+          # 配布用の FAT12 / D88 reader で、配布する像の中身を読む。
+          python3 - "$RUNNER_TEMP/hostdrv" > "$RUNNER_TEMP/deploy-check.txt" <<'PY'
+          import hashlib
+          from pathlib import Path
+          import sys
+
+          sys.path.insert(0, "tools")
+          from fd_reader import d88_to_raw, fat12_files
+
+          host_sha = hashlib.sha256((Path(sys.argv[1]) / "boot/vmkernel.lz4").read_bytes()).hexdigest()
+          print(f"hostdrv boot/vmkernel.lz4 sha256: {host_sha}")
+          for name in ("os32_boot.img", "os32_boot144.img"):
+              files, _, _ = fat12_files(Path("out") / name)
+              fd_sha = hashlib.sha256(files["/VMKRNL.LZ4"]).hexdigest()
+              print(f"FD {name} VMKRNL.LZ4 sha256: {fd_sha}", flush=True)
+              if fd_sha != host_sha:
+                  raise SystemExit(f"FD / hostdrv kernel mismatch: {name}")
+          if d88_to_raw(Path("out/os32_boot.d88").read_bytes()) != Path("out/os32_boot.img").read_bytes():
+              raise SystemExit("D88 / raw FD mismatch")
+          if hashlib.sha256(Path("out/vmkernel.lz4").read_bytes()).hexdigest() != host_sha:
+              raise SystemExit("artifact / hostdrv kernel mismatch")
+          print("FD / hostdrv kernel sha256: MATCH; D88 / raw FD: MATCH")
+          PY
+          cat "$RUNNER_TEMP/deploy-check.txt"
+          if python3 tools/deploy_source_check.py --root "$RUNNER_TEMP/hostdrv" \
+              --deploy-set out/deploy-set.json > /dev/null; then
+            echo "deploy_source_check --deploy-set: rc=0 (FD / hostdrv / deploy-set: same build)" \
+              >> "$RUNNER_TEMP/deploy-check.txt"
+          else
+            rc=$?
+            echo "deploy_source_check --deploy-set: rc=$rc" >&2
+            exit "$rc"
+          fi
+          tar -C "$RUNNER_TEMP" -czf out/hostdrv.tar.gz hostdrv
+          {
+            echo "commit:  $GITHUB_SHA"
+            echo "ref:     $GITHUB_REF_NAME"
+            echo "built:   $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "run:     $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "gcc:     $("$CROSS_DIR/bin/i386-elf-gcc" -dumpversion)"
+            echo "rustc:   $(rustc --version)"
+            echo "external: 0 (apps/game are not built in v3 CI)"
+            cat "$RUNNER_TEMP/deploy-check.txt"
+            echo
+            echo "# size  path"
+            (cd out && find . -type f -printf '%s  %P\n' | sort -k2)
+          } > out/BUILD_INFO.txt
+          (cd out && find . -type f ! -name BUILD_INFO.txt ! -name SHA256SUMS -printf '%P\n' \
+             | sort | xargs sha256sum) > out/SHA256SUMS
+          cat out/BUILD_INFO.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.name.outputs.artifact }}
+          path: out/
+          retention-days: 30
+          if-no-files-found: error
+  powerpc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [core, link, sh, link-sh, shell, neg1]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: ./.github/actions/build-setup
+      - uses: ./.github/actions/ppc-setup
+      - name: Build PowerPC media
+        env:
+          IMAGE: ${{ matrix.image }}
+          OS32_ACCEPT_IPA_LICENSE: "1"
+        run: |
+          case "$IMAGE" in
+            core) flags=(KBOOT_LINK=0); dir=. ;;
+            link) flags=(KBOOT_LINK=1); dir=link ;;
+            sh) flags=(KBOOT_SH=1 KBOOT_LINK=0); dir=link-sh ;;
+            link-sh) flags=(KBOOT_SH=1); dir=link-sh ;;
+            shell) flags=(KBOOT_SHELL=1 KBOOT_LINK=0); dir=link-sh ;;
+            neg1) flags=(NEGATIVE=1 KBOOT_LINK=0); dir=neg1 ;;
+          esac
+          make -j"$(nproc)" ARCH=ppc PLATFORM=powermac "${flags[@]}" all iso
+          mkdir -p out
+          cp "build/out/ppc-kboot/$dir/"{PPCKERN.ELF,boot.iso} out/
+          (cd out && sha256sum PPCKERN.ELF boot.iso > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ppc-${{ matrix.image }}-${{ github.sha }}
+          path: out/
+          if-no-files-found: error

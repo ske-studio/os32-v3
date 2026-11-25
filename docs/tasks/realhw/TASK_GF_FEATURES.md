@@ -10,7 +10,7 @@
 - 「実際の動作確認は実装後のテストでもいいし実機でテストで動作チェックすればいいですが、基本的にすべての機能が同じレベル（GUI以外）には用意されるべきです。」
 - 範囲の選択: 「１から５で。それ以降は残タスクしてドキュメント化」 (1〜5 は §1 の表。3D・Xv・MPEG は §3 の残タスク)。
 - 「足りる」の基準を PM が決めない (票 TASK_GF_ACCEL の状態行の訂正、2026-11-02)。
-- 熱のしきい値ごとの処理 (2026-11-06、手本のガードの洗い出しの A11・A12)。最初の回答は「クロックを順次下げる」。その後、PM が VBIOS の熱の表の 4 つのしきい値 (低い順に fan_boost・downclock・critical・shutdown) を示した。このうち downclock と critical は、手本 (`therm/temp.c:104-130`) も OS32 (`hwdev/gf/therm.c`) も口 (emergency.downclock / pause) だけで中身がつながっていない。これを受けて「段階ごとに分ける」を選んだ:
+- 熱のしきい値ごとの処理 (2026-11-06、手本のガードの洗い出しの A11・A12)。最初の回答は「クロックを順次下げる」。その後、PM が VBIOS の熱の表の 4 つのしきい値 (低い順に fan_boost・downclock・critical・shutdown) を示した。このうち downclock と critical は、手本 (`therm/temp.c:104-130`) も OS32 (`sys/dev/video/geforce/therm.c`) も口 (emergency.downclock / pause) だけで中身がつながっていない。これを受けて「段階ごとに分ける」を選んだ:
   - fan_boost: ファン 100% (今のまま、手本どおり)。
   - downclock: クロックを順次下げ、下がれば段階的に戻す。
   - critical: 描画のエンジンを一時停止する (表示は保つ)。
@@ -37,7 +37,7 @@
 ## 2. Bus Master を切っていた理由と撤回
 
 - 電源投入時の Command は `0106h` (BIOS が Bus Master を立てる、実測 2026-10-15 の ra266_snapshot:228–232)。
-- `0102h` に固定したのは 4a の設計の Opus レビュー R4 (`~/os32-tmp/run/gf6200_4a/REVIEW.r1.md`): 「PMC_ENABLE を立てた engine が DMA を始めると RAM に書く恐れ (推測)。→ 4a の間は Command=0102h、BM は 4b の設計で」。仕様や実機の不具合が根拠ではなく、診断の段の暫定の決まりが見直されずに本番ドライバ (`docs/design/hwdev/gf/devinit.md` の N1)・復元 (`kdebug/recover.h`)・加速の設計 (GF_ACCEL_DESIGN §1) に残った。
+- `0102h` に固定したのは 4a の設計の Opus レビュー R4 (`~/os32-tmp/run/gf6200_4a/REVIEW.r1.md`): 「PMC_ENABLE を立てた engine が DMA を始めると RAM に書く恐れ (推測)。→ 4a の間は Command=0102h、BM は 4b の設計で」。仕様や実機の不具合が根拠ではなく、診断の段の暫定の決まりが見直されずに本番ドライバ (`docs/design/hwdev/gf/devinit.md` の N1)・復元 (`sys/dev/video/geforce/diag/recover.h`)・加速の設計 (GF_ACCEL_DESIGN §1) に残った。
 - 層 1 で撤回する。直す所は devinit・recover の override・設計書・試験の期待値。いつ立てるか (チャネルを作る前・PGRAPH を止めてから落とす順) は層 1 の設計で決める。
 
 ## 3. 残タスク (この票では作らない、ユーザー決定 2026-11-02)
@@ -62,5 +62,5 @@
 ### 実機の記録 (2026-11-04)
 
 - 本番のドライバが GeForce の画面への切り替えを実機で行ったことがあるか: ユーザー「いや、切り替えは行ったことがあります。ドキュメントに残しそびれているだけと思います。」(日付は不明、ユーザー談)。
-- main 5a29f69c での実機の受入は入口で止まった。`gf2 status` は precheck rc=-201 (本番の foundation の時計・待ちが未結線、`hwdev/gf/devinit.c`)、`gf1 status` は rc=-107 (起動前から Command 0106h = BusMaster を lspci で確認。OS32 は本番の start を一度もしていない)、`gf2 display 0` はシリアル・画面とも無出力。証拠はノートの `~/os32-tmp/evidence/2026-11-04/gf-accept-5a29f69c/`。
+- main 5a29f69c での実機の受入は入口で止まった。`gf2 status` は precheck rc=-201 (本番の foundation の時計・待ちが未結線、`sys/dev/video/geforce/devinit.c`)、`gf1 status` は rc=-107 (起動前から Command 0106h = BusMaster を lspci で確認。OS32 は本番の start を一度もしていない)、`gf2 display 0` はシリアル・画面とも無出力。証拠はノートの `~/os32-tmp/evidence/2026-11-04/gf-accept-5a29f69c/`。
 - 直しは wt/gf-prodtime (sol) が進行中。取り込みの後に層 1 から実機の受入をやり直す (立会いなし、カメラ)。

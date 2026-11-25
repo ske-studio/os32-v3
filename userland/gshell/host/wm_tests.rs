@@ -2070,7 +2070,7 @@ fn two_app_overlap_state(shm: &crate::mocks::Shm) {
 /// A (park 中、1 窓) の上に B の窓が開くと、A の**露出部**が黒いまま残る
 /// (実機 `gui_bench` + `gui_demo`、`ring3_switch_count` が動かない)。
 ///
-/// 仕掛けは `run_program` の `gfx_init()`。`gfx/gfx_core.c` の `gfx_init` は
+/// 仕掛けは `run_program` の `gfx_init()`。`sys/hal/gfx/gfx_core.c` の `gfx_init` は
 /// **VRAM の両ページをゼロクリアする**。`exec_run` の時代はアプリが終わって
 /// からしか戻らなかったので消えるのは死んだアプリの画だけだったが、
 /// `exec_start` は park した時点で戻る = **生きているアプリのクライアント面
@@ -2503,7 +2503,7 @@ fn a_single_app_keeps_the_old_ctrl_stop_path() {
 /*  未読バイト数 (`kbd_inject_pending`) が決める。                   */
 /* ================================================================ */
 
-/// カーネル `exec/appslot.h` の `APP_STATE_*` (`exec_app_state` の答え)。
+/// カーネル `sys/kern/exec/appslot.h` の `APP_STATE_*` (`exec_app_state` の答え)。
 const ST_PARKED: i32 = 2;
 const ST_WAIT_KEY: i32 = 3;
 

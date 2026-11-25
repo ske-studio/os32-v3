@@ -5,8 +5,8 @@
   **全部 `lzss: false`** = `pkg_extract` の無圧縮の経路) なので、実効は 20KB/s を切っている。
   NP21/W は CD のシークも回転も模擬しないので、エミュレータでは再現しない
 - 見立て (机上、**実機では測っていない**):
-  1. `drivers/ata/atapi.c` の `atapi_read_sectors` は count がいくつでも READ(10) を 1 セクタずつ出していた
-  2. `fs/isofs/iso9660.c` の `read_stream` は呼ばれるたびに `iso_resolve_path` で根からたどり直し
+  1. `sys/dev/ata/atapi.c` の `atapi_read_sectors` は count がいくつでも READ(10) を 1 セクタずつ出していた
+  2. `sys/fs/isofs/iso9660.c` の `read_stream` は呼ばれるたびに `iso_resolve_path` で根からたどり直し
      (根のディレクトリ = LBA 23 を 1 回読む)、それから 1 セクタずつ `iso_read_sector` を呼んでいた
   3. `userland/lib/rt/pkg.c` の無圧縮の展開は 4KB ずつ `sys_read` し、データ部の先頭 (表の後ろ) が
      セクタに揃っていないので 4KB の読みは 3 セクタに掛かる
@@ -14,8 +14,8 @@
   離れた位置へのシーク**。12MB で約 3000 区切り × 4 = 約 12000 コマンド、シーク約 6000 回。
   `pkg_parse` (事前検査と展開で 2 回) は 1B・パス長・5B の小さな `sys_read` を項目ごとに 3 回出すので、
   1 本の PKG で数百回ぶん「根を読む + データを 1 セクタ読む」を繰り返していた
-- 対象: [`drivers/ata/atapi.c`](../../drivers/ata/atapi.c) / [`atapi.h`](../../drivers/ata/atapi.h)、
-  [`fs/isofs/iso9660.c`](../../fs/isofs/iso9660.c) / [`iso9660.h`](../../fs/isofs/iso9660.h)、
+- 対象: [`sys/dev/ata/atapi.c`](../../sys/dev/ata/atapi.c) / [`atapi.h`](../../sys/dev/ata/atapi.h)、
+  [`sys/fs/isofs/iso9660.c`](../../sys/fs/isofs/iso9660.c) / [`iso9660.h`](../../sys/fs/isofs/iso9660.h)、
   [`userland/lib/rt/pkg.c`](../../userland/lib/rt/pkg.c)。KAPI は動かしていない
 - 実行: `python3 -B tools/tests/test_cd_read.py [--target] [--mutate] [case ...]`
   (`make check-cd-read-host` が `--target --mutate` 付きで回す)
@@ -205,13 +205,13 @@ SURVIVED でなければ試験が不安定。変異の一覧と結果は `test_c
 ## 3-5. 代行レビュー (Fable 5.1) 2 回目の P2 / P3 × 3
 
 - **P2** `ATAPI_READY_WAIT_US` (250ms) を `cpu_delay_us` に 1 回で渡していたが、`cpu_delay_us` は 1 回
-  100ms で丸める (`kernel/time/cpu_calibrate.c`)。実際の待ちは 16 × 100ms ≒ **1.6 秒** (文書は 4 秒) で、トレイを閉じた
+  100ms で丸める (`sys/platform/pc98/time/cpu_calibrate.c`)。実際の待ちは 16 × 100ms ≒ **1.6 秒** (文書は 4 秒) で、トレイを閉じた
   直後 (becoming ready 2〜5 秒) のスレーブを待ちきれず空のマスターに固定していた (選び直す経路は無い)。
-  → `atapi_delay_us` が `CPU_DELAY_US_MAX` (100ms。`kernel/time/cpu_calibrate.h` を直接 include する — 値を写さない) 以下の塊に分けて回す。
+  → `atapi_delay_us` が `CPU_DELAY_US_MAX` (100ms。`sys/hal/time/cpu_calibrate.h` を直接 include する — 値を写さない) 以下の塊に分けて回す。
   `ATAPI_READY_RETRIES` を 20 にして**待ちの合計は最大 20 × 250ms = 5.0 秒**。
   **tick_count で待たない理由**: tick は PIT の割り込み (IF=1) が前提で、呼ばれる文脈 (起動時の `atapi_init`、
   KAPI 経由の読み) で割り込みが開いていると決められない。`cpu_delay_us` は割り込み禁止でも待て、`atapi_init` は
-  `cpu_calibrate` の後 (`platform/pc98/kernel.c`)
+  `cpu_calibrate` の後 (`sys/platform/pc98/kernel.c`)
 - ホスト試験の贋物 `cpu_delay_us` を実物どおり `CPU_DELAY_US_MAX` で丸める形にした (以前は `g_delay_us += us`
   で丸めず、1 回 250ms の呼び方を見抜けなかった)
 - **P3** SRST を解いた直後、BSY の解除を待たずに DRV_HEAD を書いていた。→ `atapi_srst`: 解いて 2ms

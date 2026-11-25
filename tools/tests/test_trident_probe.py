@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Probe against the shared device fake; script expectations H:70-81."""
 CHECK = dict(name='trident-probe', tier=1, needs=[], budget=3.2,
-    covers=['drivers/video/trident/probe.c', 'drivers/video/trident/trident.h',
+    covers=['sys/dev/video/trident/probe.c', 'sys/dev/video/trident/trident.h',
             'tools/tests/trident_probe_host.c', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_device_fake.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py'],
@@ -16,7 +16,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = ROOT / 'drivers/video/trident/probe.c'
+PRODUCT = ROOT / 'sys/dev/video/trident/probe.c'
 MUTATIONS = [
     ('chip', 'chip != TRI_CHIP_9682', 'chip == TRI_CHIP_9682'),
     ('arm', '!d->pinned || !d->armed || !d->res->ready', 'false'),

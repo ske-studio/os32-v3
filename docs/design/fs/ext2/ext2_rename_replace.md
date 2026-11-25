@@ -1,7 +1,7 @@
-# fs/ext2/ext2_dir_rename.inc — 通常ファイル同士の置き換え rename
+# sys/fs/ext2/ext2_dir_rename.inc — 通常ファイル同士の置き換え rename
 
 > 状態: **現行 (2026-11-18)** — 出所: TASK_H2 (ext2 の置き換え順序と公開の 3 値) の契約を今のソースと照らして要約
-ソース: `fs/ext2/ext2_dir_rename.inc` (`ext2_rename`・`ext2_rename_replace`・`ext2_publish_entry`・`ext2_drop_replaced`)・`fs/ext2/ext2_super_block_io.inc` (`ext2_read_sector`・`ext2_write_sector`)・`fs/ext2/ext2_file.c` (`ext2_unlink`)
+ソース: `sys/fs/ext2/ext2_dir_rename.inc` (`ext2_rename`・`ext2_rename_replace`・`ext2_publish_entry`・`ext2_drop_replaced`)・`sys/fs/ext2/ext2_super_block_io.inc` (`ext2_read_sector`・`ext2_write_sector`)・`sys/fs/ext2/ext2_file.c` (`ext2_unlink`)
 
 `rename(S の名前, D の名前)` で宛先に通常ファイル D があり、移動元も通常ファイル S のとき、
 **宛先の名前を消さずに**、宛先の項目の inode 番号をその場で D から S へ書き換える。

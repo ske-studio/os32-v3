@@ -1,8 +1,8 @@
-# hwdev/gf/op/tmds_reg.c — TMDS register script instruction
+# sys/dev/video/geforce/op/op/tmds_reg.c — TMDS register script instruction
 
 > 状態: **現行 (2026-11-04)** — GF_FEAT4_DESIGN「TMDS の script の実行の口」C2-links-init。
 
-ソース: `hwdev/gf/op/tmds_reg.c`。opcode 0x4f、5 bytes:
+ソース: `sys/dev/video/geforce/op/op/tmds_reg.c`。opcode 0x4f、5 bytes:
 selector/address/mask/value は +1/+2/+3/+4。
 
 MIT nouveau c03c1a1 `nvkm/subdev/bios/init.c:539-572,1093-1119` に従い、

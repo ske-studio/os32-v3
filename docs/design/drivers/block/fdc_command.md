@@ -1,4 +1,4 @@
-# drivers/block/fdc_command.inc — 単発転送のコマンド送出
+# sys/dev/block/fdc_command.inc — 単発転送のコマンド送出
 
 > 状態: **現行 (2026-11-01)**
 

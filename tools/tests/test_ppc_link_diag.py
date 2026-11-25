@@ -1,11 +1,11 @@
 """Reserved NOTIFY decoding, diagnostic execution and asynchronous result delivery."""
 CHECK = dict(name='ppc-link-diag-host', tier=2, budget=30, needs=[], covers=[
-    'platform/powermac/link_diag.c', 'platform/powermac/lan_monitor.c',
+    'sys/platform/powermac/link_diag.c', 'sys/platform/powermac/lan_monitor.c',
     'tools/tests/test_ppc_link_diag.py', 'tools/tests/ppc_link_diag_host.c',
-    'platform/powermac/lan_boot.h', 'include/boot_token.h', 'include/remote_control.h',
-    'include/types.h', 'include/callconv.h', 'include/net_eth.h', 
-    'arch/ppc/kernel_probe.h', 'arch/ppc/ppc_trap.h', 'arch/ppc/ppc_oea.h',
-    'lib/kstring.h', 'net/host_mailbox.h', 'net/link.h',
+    'sys/platform/powermac/lan_boot.h', 'sys/include/boot_token.h', 'sys/include/remote_control.h',
+    'sys/include/types.h', 'sys/include/callconv.h', 'sys/include/net_eth.h', 
+    'sys/arch/ppc/kernel_probe.h', 'sys/arch/ppc/ppc_trap.h', 'sys/arch/ppc/ppc_oea.h',
+    'sys/kern/kstring.h', 'sys/net/host_mailbox.h', 'sys/net/link.h',
     'sdk/include/os32/os32_host_notice.h', 'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/host32.py'],
     basis=['LAN_OPERATOR_DESIGN §5'],
@@ -17,8 +17,8 @@ import host32
 
 
 def run(ctx):
-    adapter = (ctx.root / 'platform/powermac/link_diag.c').read_text()
-    monitor = (ctx.root / 'platform/powermac/lan_monitor.c').read_text()
+    adapter = (ctx.root / 'sys/platform/powermac/link_diag.c').read_text()
+    monitor = (ctx.root / 'sys/platform/powermac/lan_monitor.c').read_text()
     cases = [('baseline', adapter, monitor)]
     if ctx.mutate:
         for name, source, old, new in [

@@ -1,8 +1,8 @@
-# exec/appmem.c — 設計
+# sys/kern/exec/appmem.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_T2D_T2H (§3-2・§3-5 f2〜f5) の契約を今のソースと照らして要約
-ソース: `exec/appmem.c`・`exec/appmem_map.c`・`exec/appmem_unmap.c` (型と定数は `exec/appmem.h`・`include/appmem_types.h`)
+ソース: `sys/kern/exec/appmem.c`・`sys/kern/exec/appmem_map.c`・`sys/kern/exec/appmem_unmap.c` (型と定数は `sys/kern/exec/appmem.h`・`sys/include/appmem_types.h`)
 
-アプリ帯の仮想の使い道を AS ごとの **extent 表** で持ち、`mem_map` / `mem_unmap` (KAPI `wrap_mem_map`・`wrap_mem_unmap`) と exec_heap の伸長・返却がこの表を通る。PTE・PFN の操作は `mm/paging_app.c` (設計は `docs/design/mm/paging_app.md`) が持ち、この部品は表と計画だけを持つ。
+アプリ帯の仮想の使い道を AS ごとの **extent 表** で持ち、`mem_map` / `mem_unmap` (KAPI `wrap_mem_map`・`wrap_mem_unmap`) と exec_heap の伸長・返却がこの表を通る。PTE・PFN の操作は `sys/kern/mm/paging_app.c` (設計は `docs/design/mm/paging_app.md`) が持ち、この部品は表と計画だけを持つ。
 
 ## 表と型
 
@@ -67,4 +67,4 @@ EINVAL・ENOVA・EFULL は物理を確保する前に決まる。
 
 ## 検査
 
-`tools/tests/test_appmem.py` (表と計画、実 `exec/appmem.c` を ILP32 でリンク) と `tools/tests/test_appmem_map.py` (取引と teardown、実 paging・pgalloc と連結)。
+`tools/tests/test_appmem.py` (表と計画、実 `sys/kern/exec/appmem.c` を ILP32 でリンク) と `tools/tests/test_appmem_map.py` (取引と teardown、実 paging・pgalloc と連結)。

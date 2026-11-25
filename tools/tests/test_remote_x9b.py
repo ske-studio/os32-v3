@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='remote-x9b', tier=1, needs=[], budget=5,
-    covers=['kernel/boot_token.c', 'include/boot_token.h', 'kapi/kapi_generated.c',
+    covers=['sys/kern/boot_token.c', 'sys/include/boot_token.h', 'sys/kapi/kapi_generated.c',
             'sdk/kapi.json', 'tools/tests/remote_x9b_host.c', 'tools/tests/test_remote_x9b.py'],
     basis=['LAN_OPERATOR_DESIGN', 'KAPI_SPEC §3-3'],
 )
@@ -17,8 +17,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'kernel/boot_token.c').read_text()
-    generated = (ROOT / 'kapi/kapi_generated.c').read_text()
+    source = (ROOT / 'sys/kern/boot_token.c').read_text()
+    generated = (ROOT / 'sys/kapi/kapi_generated.c').read_text()
     match = re.search(r'void __cdecl wrap_boot_token_get\(u8 \*out\)\n\{.*?\n\}', generated, re.S)
     assert match
     wrapper = match.group().replace('__cdecl ', '').replace('KAPI_HIT(293);', '')

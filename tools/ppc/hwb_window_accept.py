@@ -13,9 +13,9 @@ def substitute(text, anchor, replacement):
 
 
 def build(out, mutant):
-    boot = 'platform/powermac/ppc_kernel.c'
-    window = 'platform/powermac/hwb_window.c'
-    trap = 'arch/ppc/kernel_trap.c'
+    boot = 'sys/platform/powermac/ppc_kernel.c'
+    window = 'sys/platform/powermac/hwb_window.c'
+    trap = 'sys/arch/ppc/kernel_trap.c'
     diag = (ROOT / 'tools/ppc/hwb_window_guest.c').read_text()
     source = (ROOT / boot).read_text()
     source = substitute(source, 'void platform_boot_run(void)', diag + '\nvoid platform_boot_run(void)')

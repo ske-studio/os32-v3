@@ -1,8 +1,8 @@
-# kernel/module/kdebug_imports.def — 設計
+# sys/kern/module/kdebug_imports.def — 設計
 > 状態: **現行 (2026-10-31)** — 出所: SLIM_KERNEL_DESIGN・SLIM_KERNEL_IMPORTS・HWDEV_CORE_API (D1 で移した)
-ソース: `kernel/module/kdebug_imports.def`
+ソース: `sys/kern/module/kdebug_imports.def`
 
-- 正典は `kernel/module/kdebug_imports.def`。生成JSONは編集しない（`tools/gen_kdebug_imports.py`）。
+- 正典は `sys/kern/module/kdebug_imports.def`。生成JSONは編集しない（`tools/gen_kdebug_imports.py`）。
 
 - FUNCは公開関数をカーネルで実行。元TUの私的関数やインライン化された公開関数の本体をkdebugへコピーしない。
 - GETTER/SETTERは値、PTRは番地。データの記号欄は元symbol、名前欄は生成する呼出し名。
@@ -99,4 +99,4 @@ GF だけが使っていた上の口は、既存 201 と同じ `.def` の `retai
 
 順序・型・実装を維持し、private 生成契約のみ再生成する (KAPI と ops の版は不変)。
 
-> [要確認] 現行 kernel/module/kdebug_imports.def は index 0〜308 の 309 枠。原文の旧件数は写さず保持契約だけを切り出した。
+> [要確認] 現行 sys/kern/module/kdebug_imports.def は index 0〜308 の 309 枠。原文の旧件数は写さず保持契約だけを切り出した。

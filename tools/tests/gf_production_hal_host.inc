@@ -1,7 +1,7 @@
 /* Ownerless platform adapter + real P4 owner/transport/runner, fake ports/copy.
  * F4 module initialization is covered separately by gf4_c3_host.c. */
-#include "drivers/video/geforce/geforce_module.h"
-#include "gfx/palette.h"
+#include "sys/dev/video/geforce/geforce_module.h"
+#include "sys/hal/gfx/palette.h"
 #define production prod
 #include "gf_ownerless_body.inc"
 #undef production
@@ -80,7 +80,7 @@ static int hal_wc_calls,hal_wc_fail;
 int geforce_wc_stop(void)
 { hal_wc_calls++;prod_event(0xface02);return hal_wc_fail ? -1 : 0; }
 void geforce_wc_report(const char *s) { (void)s; }
-#include "../../drivers/video/geforce/geforce_platform.c"
+#include "../../sys/dev/video/geforce/geforce_platform.c"
 static void prod_hal_cases(void)
 {
     prod_reset();

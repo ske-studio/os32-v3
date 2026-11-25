@@ -1,6 +1,6 @@
 # vfs mount デバイス種別 — TDD 記録 (2026-09-10)
 
-対象: `fs/vfs.h` / `fs/vfs.c` / `fs/ext2/ext2_vfs.c` / `fs/isofs/iso9660.c` / `fs/fat/fatfs_vfs.c`
+対象: `sys/fs/vfs.h` / `sys/fs/vfs.c` / `sys/fs/ext2/ext2_vfs.c` / `sys/fs/isofs/iso9660.c` / `sys/fs/fat/fatfs_vfs.c`
 試験: `tools/tests/test_vfs_mount_dev.py` + `tools/tests/vfs_mount_dev_host.c`
 登録: `make check` → `check-vfs-mount-dev-host`
 
@@ -39,7 +39,7 @@ mounts[1] prefix=/fd0  ctx=0x001562E0 dev=fd0(t1,i0) base_lba=1632 dev_ptr=0x001
 ## 原因
 
 `vfs_mount()` は `ops->mount((dev_type << 8) | dev_id)` と種別を上位バイトに
-載せて渡すが、`fs/vfs.c` のコメントは「既存FSドライバ (ext2等) は
+載せて渡すが、`sys/fs/vfs.c` のコメントは「既存FSドライバ (ext2等) は
 `dev_id & 0xFF` のみ参照するので互換」と書いていた。この前提が誤り。
 
 `fd0` は `dev_type=VFS_DEV_FD(1), dev_id=0` なので `0x100` が渡り、ext2 側では
@@ -49,7 +49,7 @@ mounts[1] prefix=/fd0  ctx=0x001562E0 dev=fd0(t1,i0) base_lba=1632 dev_ptr=0x001
 - `ext2_find_partition(0x100)` → `ide_get_info(0x100)` → `drive_info[0]` → base_lba 1632
 
 と**すべて種別が消えて hd0 に化ける**。ブート時の自動マウントループ
-(`platform/pc98/kernel.c`) が root 以外の全ブロックデバイスに ext2 を試すので、
+(`sys/platform/pc98/kernel.c`) が root 以外の全ブロックデバイスに ext2 を試すので、
 `/fd0` として 2 つ目の `Ext2Ctx` が必ずできる。
 
 `vfs_sync()` は全マウントを順に回すため:
@@ -88,12 +88,12 @@ SUMMARY 4/4 PASS
 
 ## 修正
 
-- `fs/vfs.h` — `VFS_DEV_*` と `VFS_MOUNT_DEV_ENCODE/TYPE/ID` を公開 (FS ドライバも見る)。
-  `fs/vfs.c` の private な定義は撤去。
-- `fs/ext2/ext2_vfs.c` — `VFS_MOUNT_DEV_TYPE != VFS_DEV_HD` を ext2 本体へ届く**前**に拒否。
-- `fs/isofs/iso9660.c` — 同じく `VFS_DEV_CD` 以外を拒否。
-- `fs/fat/fatfs_vfs.c` — 手書きのシフトを共通マクロに置換 (挙動は不変)。
-- `fs/vfs.c` — 同じ (ops, dev_type, dev_id) の二重マウントを `VFS_ERR_EXIST` で断る。
+- `sys/fs/vfs.h` — `VFS_DEV_*` と `VFS_MOUNT_DEV_ENCODE/TYPE/ID` を公開 (FS ドライバも見る)。
+  `sys/fs/vfs.c` の private な定義は撤去。
+- `sys/fs/ext2/ext2_vfs.c` — `VFS_MOUNT_DEV_TYPE != VFS_DEV_HD` を ext2 本体へ届く**前**に拒否。
+- `sys/fs/isofs/iso9660.c` — 同じく `VFS_DEV_CD` 以外を拒否。
+- `sys/fs/fat/fatfs_vfs.c` — 手書きのシフトを共通マクロに置換 (挙動は不変)。
+- `sys/fs/vfs.c` — 同じ (ops, dev_type, dev_id) の二重マウントを `VFS_ERR_EXIST` で断る。
   ext2 に限らずクラスごと止める二重の網。
 
 ついでに `fs/vfs_resolve_path()` の [C1] 違反 (宣言がブロック途中) を解消した。
@@ -114,8 +114,8 @@ SUMMARY 4/4 PASS
 
 `userland/rust/filer/src/lib.rs` の同一ファイル判定は
 `sst.st_ino != 0 && sst.st_dev == stbuf.st_dev && sst.st_ino == stbuf.st_ino`。
-ところが `st_dev` を埋める FS ドライバが 1 つも無い — `fs/ext2/ext2_vfs.c` と
-`fs/isofs/iso9660.c` は `st_dev = 0` 固定、`drivers/hostdrv/hostdrvfs.c` と `fs/fat/fatfs_vfs.c` は
+ところが `st_dev` を埋める FS ドライバが 1 つも無い — `sys/fs/ext2/ext2_vfs.c` と
+`sys/fs/isofs/iso9660.c` は `st_dev = 0` 固定、`sys/dev/hostdrv/hostdrvfs.c` と `sys/fs/fat/fatfs_vfs.c` は
 `kmemset` のまま。よって **hd0 と hd1 で inode 番号が一致すると、別ディスクの
 別ファイルが「同じファイル」になり、正当な上書きコピーまで拒まれる**。
 ext2 の inode 番号は FS 内でしか一意でないので、12 (lost+found の次) のような
@@ -174,11 +174,11 @@ SUMMARY 6/6 PASS
 
 ## 修正 (2 回目)
 
-- `fs/vfs.c` — `vfs_mount_dev_of()` / `vfs_dev_of_resolved()` / 公開の
+- `sys/fs/vfs.c` — `vfs_mount_dev_of()` / `vfs_dev_of_resolved()` / 公開の
   `vfs_path_dev()` を追加。`vfs_stat()` は成功時 (合成ルートを含む) に
   `buf->st_dev` を上書きする。
-- `fs/vfs.h` — `vfs_path_dev()` を宣言。
-- `fs/vfs_fd.c` — `open` 時のマウントを `VfsFile.dev` に控え、`vfs_fstat()` も
+- `sys/fs/vfs.h` — `vfs_path_dev()` を宣言。
+- `sys/fs/vfs_fd.c` — `open` 時のマウントを `VfsFile.dev` に控え、`vfs_fstat()` も
   同じ値を入れる。`stat` と `fstat` で `st_dev` が食い違うと同じ誤判定が戻る。
 - `userland/rust/filer` は**変更しない** (同一ファイル保護は維持。hostdrv の
   `st_ino = 0` は従来どおりパス比較へ落ちる)。
@@ -186,7 +186,7 @@ SUMMARY 6/6 PASS
 ## 既知の限界
 
 - **同じ物理ディスク上の別パーティションは区別しない。**
-  `fs/ext2/ext2_super.c` の `ext2_find_partition()` は PC-98 パーティション
+  `sys/fs/ext2/ext2_super.c` の `ext2_find_partition()` は PC-98 パーティション
   テーブルの最初のブート可能エントリ (`bootable & 0x80`) を見つけた時点で
   `break` するので、1 台の hd につき 1 パーティションしか触れない。さらに
   `vfs_mount()` が同じ `(ops, dev_type, dev_id)` の二重マウントを断るため、

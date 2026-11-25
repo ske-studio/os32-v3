@@ -4,7 +4,7 @@ Ticket: docs/archive/gui_v13/TASK_K5B_kernel.md (host tests, 2nd item)
 Design: TASK_K5_multiapp.md D3 (the `*_owned(id)` inventory, P3/P5)
 Log:    tools/tests/k5b_kernel_tdd.md
 
-Compiles the shipped fs/fd_redirect.c, fs/pipe_buffer.c and mm/shm.c
+Compiles the shipped sys/fs/fd_redirect.c, sys/fs/pipe_buffer.c and sys/kern/mm/shm.c
 (included verbatim by owner_reclaim_host.c) with a minimal kernel environment,
 then checks that folding ID 2 frees only ID 2's redirect / pipe / SHM.
 
@@ -35,15 +35,15 @@ class OwnerReclaimTests(unittest.TestCase):
     def test_host_cases(self):
         with tempfile.TemporaryDirectory(prefix="os32-owner-reclaim-") as tmp:
             tmp = pathlib.Path(tmp)
-            # mm/shm.c derives every address from MEM_SHM_BASE and the
+            # sys/kern/mm/shm.c derives every address from MEM_SHM_BASE and the
             # STATIC_ASSERTs need a constant expression, so keep the real
             # numeric shape. Nothing is dereferenced: kmemset is a recording
             # no-op and paging_map_range is stubbed in the host file.
             db_defines = "\n".join(line for line in
-                (ROOT / "include/memmap.h").read_text().splitlines()
+                (ROOT / "sys/include/memmap.h").read_text().splitlines()
                 if line.startswith("#define MEM_SHM_DB_")) + "\n"
             lease_defines = "\n".join(line for line in
-                (ROOT / "include/memmap.h").read_text().splitlines()
+                (ROOT / "sys/include/memmap.h").read_text().splitlines()
                 if line.startswith(("#define MEM_LEASE_", "#define MEM_PAGE_SIZE", "#define MEM_PDE_SHIFT", "#define KIB "))) + "\n"
             (tmp / "memmap.h").write_text(
                 "#ifndef OS32_TEST_MEMMAP_H\n"
@@ -58,12 +58,12 @@ class OwnerReclaimTests(unittest.TestCase):
                 "#define MEM_SHM_GUARD_HI   (MEM_SHM_BASE + MEM_SHM_SIZE)\n"
                 "#define GUI_SLOT_SIZE      0x4000U\n"
                 "#define GUI_SLOT_MAX       4\n"
-                # mm/paging.h (included by shm.c from its own directory,
+                # sys/kern/mm/paging.h (included by shm.c from its own directory,
                 # so the real header always wins) needs this one constant.
                 "#define MEM_APP_BAND_MAX_PDES 2UL\n"
                 + db_defines + lease_defines + "#endif\n")
             shim = (tmp / "memmap.h").read_text()
-            product = (ROOT / "include/memmap.h").read_text()
+            product = (ROOT / "sys/include/memmap.h").read_text()
             self.assert_shm_size_matches(shim, product)
             if os.environ.get("MUTATE") == "1":
                 anchor = "#define MEM_SHM_SIZE       0x038000U"
@@ -93,7 +93,7 @@ class OwnerReclaimTests(unittest.TestCase):
             subprocess.run([str(exe)], check=True, cwd=ROOT)
             if os.environ.get("MUTATE") == "1":
                 fixture_text = (ROOT / "tools/tests/owner_reclaim_host.c").read_text()
-                paths = ['fs/pipe_buffer.c', 'mm/shm.c']
+                paths = ['sys/fs/pipe_buffer.c', 'sys/kern/mm/shm.c']
                 for path in paths:
                     source = (ROOT / path).read_text()
                     # Mutate each public guard independently: omitted, inverted,

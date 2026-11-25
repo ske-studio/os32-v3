@@ -1,5 +1,5 @@
 /* Recording mouse provider for fixtures that include the real PC98 binding. */
-#include "../../drivers/input/mouse.h"
+#include "../../sys/platform/pc98/input/mouse.h"
 const MousePointerBackend pc98_mouse_backend = {0};
 static const MousePointerBackend *registered_mouse_backend;
 void mouse_pointer_backend_register(const MousePointerBackend *b) { registered_mouse_backend = b; }

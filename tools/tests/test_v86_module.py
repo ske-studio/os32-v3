@@ -4,7 +4,7 @@ No CPU exception is simulated by a host signal stack. Hardware entry is PM's
 NP21/W check; shm-user covers exact PTE/caller/ESP0 restoration separately.
 """
 CHECK = dict(name='v86-module-host', tier=1,
-    covers=['platform/pc98/bios_snapshot.h', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'platform/pc98/legacy/v86_module.c', 'platform/pc98/legacy/v86_module.h', 'platform/pc98/legacy/v86_body.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/v86_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/v86_module_host.c', 'build/v86-module.ld', 'platform/pc98/legacy/v86.c', 'platform/pc98/legacy/v86_entry.asm', 'platform/pc98/legacy/v86_mem.c', 'platform/pc98/legacy/v86_mem.h', 'platform/pc98/bios_snapshot.c', 'platform/pc98/legacy/v86_bios.c', 'platform/pc98/legacy/v86_bios_*.inc', 'platform/pc98/legacy/v86_bios.h', 'platform/pc98/legacy/v86_io.c', 'platform/pc98/legacy/v86_io.h', 'platform/pc98/legacy/v86_pic.c', 'platform/pc98/legacy/v86_pic.h', 'platform/pc98/legacy/v86_kbd.c', 'platform/pc98/legacy/v86_kbd.h', 'kernel/module/module.h', 'arch/x86/kernel/double_fault.c', 'arch/x86/kernel/tss.h', 'mm/paging.h', 'kernel/kselftest.h', 'gfx/gfx.h', 'drivers/block/loop_dev.h', 'include/loop_contract.h', 'include/pc98.h', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/v86/*', 'build/out/v86.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'drivers/video/kcg/kcg_module.h', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'kernel/console/display_restore.h', 'include/platform_display.h', 'platform/pc98/display.c', 'tools/tests/kernel_includes.py', 'kernel/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
+    covers=['sys/platform/pc98/bios_snapshot.h', 'sys/platform/pc98/bootinfo_wire.h', 'sys/platform/pc98/bootinfo_native.h', 'sys/kern/module/module_runtime.c', 'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.c', 'sys/kern/module/module_image.h', 'sys/kern/module/module_schema.h', 'sys/kern/mm/pgalloc.h', 'sys/include/types.h', 'sys/include/memmap.h', 'sys/fs/vfs.c', 'sys/fs/vfs.h', 'sys/dev/base/dev.c', 'sys/hal/block/dev.h', 'sys/dev/block/disk.h', 'sys/dev/ata/atapi.h', 'sys/dev/block/fdc.h', 'sys/include/console.h', 'sys/include/kbd.h', 'sys/platform/pc98/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'sys/kern/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'sys/platform/pc98/legacy/v86_module.c', 'sys/platform/pc98/legacy/v86_module.h', 'sys/platform/pc98/legacy/v86_body.c', 'sys/include/config.h', 'sdk/include/os32/os32_generations.h', 'sys/include/bootinfo.h', 'tools/prototypes/v86_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/v86_module_host.c', 'build/v86-module.ld', 'sys/platform/pc98/legacy/v86.c', 'sys/platform/pc98/legacy/v86_entry.asm', 'sys/platform/pc98/legacy/v86_mem.c', 'sys/platform/pc98/legacy/v86_mem.h', 'sys/platform/pc98/bios_snapshot.c', 'sys/platform/pc98/legacy/v86_bios.c', 'platform/pc98/legacy/v86_bios_*.inc', 'sys/platform/pc98/legacy/v86_bios.h', 'sys/platform/pc98/legacy/v86_io.c', 'sys/platform/pc98/legacy/v86_io.h', 'sys/platform/pc98/legacy/v86_pic.c', 'sys/platform/pc98/legacy/v86_pic.h', 'sys/platform/pc98/legacy/v86_kbd.c', 'sys/platform/pc98/legacy/v86_kbd.h', 'sys/kern/module/module.h', 'sys/arch/x86/kernel/double_fault.c', 'sys/arch/x86/kernel/tss.h', 'sys/kern/mm/paging.h', 'sys/kern/kselftest.h', 'sys/hal/gfx/gfx.h', 'sys/dev/block/loop_dev.h', 'sys/include/loop_contract.h', 'sys/platform/pc98/pc98.h', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'sdk/kapi.json', 'build/out/v86/*', 'build/out/v86.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'sys/dev/video/kcg/kcg_module.h', 'sys/fs/vfs_device.h', 'sys/platform/pc98/boot_names.h', 'sys/platform/pc98/boot_names.c', 'sys/dev/ata/ide.h', 'sys/kern/console/display_restore.h', 'sys/include/platform_display.h', 'sys/platform/pc98/display.c', 'tools/tests/kernel_includes.py', 'sys/kern/module/kdebug_imports.def', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
     needs=['make:all'], budget=4.6,
     kind='characterization',
     pins=['AV_HAL_DESIGN'],
@@ -80,7 +80,7 @@ def product_image(folder):
 
 def sound_handoff(folder, mutate):
     """Observe the two real handoff functions with recording FM and SSG outputs."""
-    source = (ROOT / 'platform/pc98/legacy/v86_io.c').read_text()
+    source = (ROOT / 'sys/platform/pc98/legacy/v86_io.c').read_text()
     functions = [re.search(r'static void snd_state_for_' + side + r'\(void\)\n\{.*?\n\}',
                            source, re.S)[0] for side in ('guest', 'os32')]
     cases = [('both directions', functions, 0)]
@@ -110,7 +110,7 @@ def main():
         sound_handoff(folder, '--mutate' in sys.argv)
         product_image(folder)
         exe = folder / 'v86-module'
-        source = (ROOT / 'platform/pc98/legacy/v86_mem.c').read_text()
+        source = (ROOT / 'sys/platform/pc98/legacy/v86_mem.c').read_text()
         def build(text):
             (folder / 'v86_mem.c').write_text(text)
             subprocess.run(['gcc', *FLAGS, '-Wno-unused-parameter', '-I' + str(folder),
@@ -118,8 +118,8 @@ def main():
                             '-I' + str(ROOT / 'build/out/v86'),
                             '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                             ROOT / 'tools/tests/v86_module_host.c',
-                            ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
-                            ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c', '-o', exe], check=True)
+                            ROOT / 'sys/kern/module/module_runtime.c', ROOT / 'sys/kern/module/module_image.c',
+                            ROOT / 'sys/fs/vfs.c', ROOT / 'sys/dev/base/dev.c', '-o', exe], check=True)
         def run(modes, expected=0):
             for mode in modes:
                 payload = struct.pack('<2I', 10 if mode == 3 else 0, mode) + image()

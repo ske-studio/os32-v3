@@ -15,7 +15,7 @@ def syscall_providers(root, read=None):
     ensure_call_metadata(root)
     if read is None:
         read = lambda path: (root / path).read_text()
-    dispatch = read('exec/exec_syscall.inc')
+    dispatch = read('sys/kern/exec/exec_syscall.inc')
     special = dispatch[dispatch.index('/* Keep the dispatcher'):dispatch.index('void exec_syscall_dispatch(')]
     return ('#if __SIZEOF_LONG__ != 4\n'
             '/* LP64 host substitutes for x86 providers; no product coverage. */\n' +
@@ -28,5 +28,5 @@ def syscall_providers(root, read=None):
             'u32 io_syscall_suspend(int owner) { (void)owner; return 0; }\n'
             'void io_syscall_resume(int owner, u32 depth) { (void)owner; (void)depth; }\n'
             'void io_kapi_owner_exit(int owner) { (void)owner; }\n' +
-            read('arch/x86/kernel/kapi_call.c') + '\n' +
-            read('arch/x86/kernel/syscall_entry.c') + '\n' + special)
+            read('sys/arch/x86/kernel/kapi_call.c') + '\n' +
+            read('sys/arch/x86/kernel/syscall_entry.c') + '\n' + special)

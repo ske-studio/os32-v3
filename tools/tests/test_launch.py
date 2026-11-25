@@ -1,6 +1,6 @@
-"""T9-K: 起動要求表を実物の exec/launch.c で確かめる。
+"""T9-K: 起動要求表を実物の sys/kern/exec/launch.c で確かめる。
 
-契約: include/launch.h (起動要求表)
+契約: sys/include/launch.h (起動要求表)
 記録: tools/tests/t9_tdd.md
 --mutate は子の回収・DONE の受渡し・孤児回収の故障を実ソースへ注入する。
 
@@ -8,12 +8,12 @@ test_con_sink.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと
 カーネルと同じフラグの i386-elf-gcc -Werror でも通ることを別に見る
 ([C1] GNU11)。Make・エミュレータ・libc は使わない。
 
-ホスト側は exec/appslot.c と exec/launch.c を tools/tests/launch_host.c が
+ホスト側は sys/kern/exec/appslot.c と sys/kern/exec/launch.c を tools/tests/launch_host.c が
 そのまま #include する (模型ではない)。カーネル帯の代わりに要るのは所有者
 (res_owner_get/set)・GUI 判定 (con_sink_is_enabled)・kstrncpy の 3 つだけ。
 """
 CHECK = dict(name='launch-host', tier=1,
-    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/host32.py', 'exec/launch.c', 'tools/tests/launch_host.c', 'exec/appslot.c', 'tools/tests/kernel_includes.py'],
+    covers=['sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'tools/tests/host32.py', 'sys/kern/exec/launch.c', 'tools/tests/launch_host.c', 'sys/kern/exec/appslot.c', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.3,
     basis=['KAPI_SPEC'],
 )
@@ -30,7 +30,7 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
 INCLUDES = ["-I"+str(ROOT/"tools/tests/host_arch"), *include_flags(ROOT)]
 HOST_SRC = ROOT / "tools/tests/launch_host.c"
-KERNEL_SRC = ROOT / "exec/launch.c"
+KERNEL_SRC = ROOT / "sys/kern/exec/launch.c"
 
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory(prefix="os32-launch-") as tmp:

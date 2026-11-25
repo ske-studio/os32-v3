@@ -16,17 +16,17 @@ T4の共通検証核を `/boot` のPOST_ROOT部品へ使う。
 
 | 実物・根拠 (file:line) | 確認したこと |
 |---|---|
-| `tools/mkmod.py`、`build()`、`kernel/module/module_image.c` の `module_image_header()` | ELF32、R_386_32/PC32、未解決参照拒否、生成 import 型契約、CRC・PAIR・範囲検査を再利用できるが、部品間 import の自動解決はない (§4 で接続) |
+| `tools/mkmod.py`、`build()`、`sys/kern/module/module_image.c` の `module_image_header()` | ELF32、R_386_32/PC32、未解決参照拒否、生成 import 型契約、CRC・PAIR・範囲検査を再利用できるが、部品間 import の自動解決はない (§4 で接続) |
 
 ### kdebug_call
 
 KDEBUGはビルド時の分岐ではなく起動設定なので同じ成果物を使い
-実物kernel/module/kdebug_call.cの未公開opsによるNOSYS
+実物sys/kern/module/kdebug_call.cの未公開opsによるNOSYS
 
 kernel→既存dbg_call。
 
 ## 索引
 
-- [kernel/module/kdebug_imports.def](kdebug_imports.md)
-- [kernel/module/module_runtime.c](module_runtime.md)
+- [sys/kern/module/kdebug_imports.def](kdebug_imports.md)
+- [sys/kern/module/module_runtime.c](module_runtime.md)
 - [module_image](module_image.md)

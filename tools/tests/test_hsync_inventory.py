@@ -2,7 +2,7 @@
 """Exercise the real inventory include with a freestanding ILP32 VFS fixture."""
 CHECK = dict(name='hsync-inventory', tier=1, needs=[], budget=60,
     covers=['userland/system/hsync_inventory.inc', 'userland/system/hsync.c',
-            'exec/os32x_hdr.c', 'lib/crc32_core.inc',
+            'sys/kern/exec/os32x_hdr.c', 'lib/crc32_core.inc',
             'tools/tests/test_hsync_inventory.py', 'tools/tests/host32.py'],
     basis=['HSYNC_MANIFEST_DESIGN §3', 'HSYNC_MANIFEST_DESIGN §8'])
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """F-9 observer/format tests. Host clock/backing are NOT performance evidence."""
 CHECK = dict(name='allocator-bench-host', tier=1,
-    covers=['userland/tests/allocator_bench.c', 'tools/tests/allocator_bench_host.c', 'sdk/allocator/**', 'tools/check_nano_inputs.py', 'tools/tests/host32.py', 'exec/appmem.c', 'exec/appmem.h', 'exec/exec.c', 'exec/appslot.h', 'mm/paging.h', 'include/ksetjmp.h', 'include/appmem_types.h', 'include/memmap.h', 'sdk/include/os32/os32_kapi_shared.h', 'build/app.conf', 'userland/deploy.yaml', 'tools/accept/t3c3.md', 'tools/tests/kernel_includes.py', 'tools/ci/build_cross.sh', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['userland/diag/allocator_bench.c', 'tools/tests/allocator_bench_host.c', 'sdk/allocator/**', 'tools/check_nano_inputs.py', 'tools/tests/host32.py', 'sys/kern/exec/appmem.c', 'sys/kern/exec/appmem.h', 'sys/kern/exec/exec.c', 'sys/kern/exec/appslot.h', 'sys/kern/mm/paging.h', 'sys/include/ksetjmp.h', 'sys/include/appmem_types.h', 'sys/include/memmap.h', 'sdk/include/os32/os32_kapi_shared.h', 'build/app.conf', 'userland/deploy.yaml', 'tools/accept/t3c3.md', 'tools/tests/kernel_includes.py', 'tools/ci/build_cross.sh', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=5.4,
     kind='characterization',
 )
@@ -115,7 +115,7 @@ def main():
               '-fno-builtin', '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra',
               '-Werror', '-Werror=vla', '-I' + str(tmp), *(['-I' + str(ROOT / p) for p in ('sdk/allocator',)] + include_flags(ROOT))]
         objects = []
-        for source in ('tools/tests/allocator_bench_host.c', 'exec/appmem.c'):
+        for source in ('tools/tests/allocator_bench_host.c', 'sys/kern/exec/appmem.c'):
             obj = tmp / (Path(source).stem + '.o')
             host32.build([*cc, '-c', str(ROOT / source), '-o', str(obj)], check=True)
             objects.append(str(obj))

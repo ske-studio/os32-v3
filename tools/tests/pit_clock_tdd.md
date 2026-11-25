@@ -1,13 +1,13 @@
 # pit_clock — RED → GREEN の記録
 
 票: [`docs/tasks/v3/TASK_HAL_WIRING.md`](../../docs/tasks/v3/TASK_HAL_WIRING.md) §1-0
-対象: `kernel/time/pit_math.c` (分周の算数) / `platform/pc98/sysclk.c` (クロック判定) / `arch/x86/kernel/idt.c` (積む側)
+対象: `kernel/time/pit_math.c` (分周の算数) / `sys/platform/pc98/sysclk.c` (クロック判定) / `sys/arch/x86/kernel/idt.c` (積む側)
 試験: `tools/tests/test_pit_clock.py` + `tools/tests/pit_clock_host.c`
 実行: `make check-pit-clock-host` (`check-par` の列)
 
 ## 何が起きていたか
 
-`arch/x86/kernel/idt.c` の `pit_init()` は `PIT_CLOCK` = 1,996,800Hz **決め打ち**で分周していた。
+`sys/arch/x86/kernel/idt.c` の `pit_init()` は `PIT_CLOCK` = 1,996,800Hz **決め打ち**で分周していた。
 
 ```c
 divisor = (u16)(PIT_CLOCK / hz);   /* 1996800 / 100 = 19968 */
@@ -25,7 +25,7 @@ PC-98 の 8253 TCU に入るクロックは機種で 2 通りある (`0000:0501h
 
 **NP21/W は 1.9968MHz 設定なので、エミュレータでは一度も踏めない** — §4-49・
 §4-51・§4-53 と同じ型 (エミュレータが模擬しない機種差)。クロック判定そのものは
-`drivers/char/serial.c` の `serial_detect_clock()` に既にあったが、呼ばれるのは
+`sys/dev/char/serial.c` の `serial_detect_clock()` に既にあったが、呼ばれるのは
 `kernel.c` = `pit_init` (194 行) の **34 行あと**で、PIT は見ていなかった。
 
 ## RED
@@ -92,7 +92,7 @@ MUTATION 5 RED (2 件): 断ったのに valid を立てる (呼び出し側が�
 
 ホスト試験は算数だけを見る。**判定 (`0000:0501h` bit7 の実読み) と、それが
 `pit_init` より前に走る順序**は実機/エミュレータでしか踏めないので、
-`kdebug/kselftest.c` の `test_pit_setup()` が起動ごとに見る
+`sys/platform/pc98/kdebug/kselftest.c` の `test_pit_setup()` が起動ごとに見る
 (`pit_get_setup()->valid` / `reload == sysclk_hz() / PIT_HZ` / `period_us == 10000`
 / `mode == PIT_MODE_TIMER0` / `sysclk_detected()`)。
 実時間そのものの照合は、実機で `tick_count` を 60 秒ぶん読んでホストの単調時計と

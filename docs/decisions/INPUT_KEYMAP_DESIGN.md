@@ -16,14 +16,14 @@
 |D1|H:149、B:49|PC-98 sc を共通表の添字に固定 → 表は backend 固有 keycode、sc は旧出口の互換属性|
 |D2|H:184、B:234（M2）|PC-98/JIS 文字化1本・FreeBSD8列本体 → keysym 評価器1本と PC98/HID の別表|
 |D3|B:55-65|照合前の左右/Enter/記号の合流、AT→PC98照合 → usage を保って評価し、旧rawだけ合流|
-|D4|B:61,63、`drivers/usb/hid_kbd_map.c`|0x90/91 DROP、Command欠落 → 英数/かな操作と独立Command修飾|
-|D5|`input/hal/kbd_merge.c`|自前の2表と小文字だけCtrl化 → backend の keysym と共通評価|
-|D6|`platform/powermac/usb_platform.c`、`input_usb.c` の `enqueue()`|sc化後の独自押下/文字ring → usage のまま共通 capture|
+|D4|B:61,63、`sys/dev/usb/hid_kbd_map.c`|0x90/91 DROP、Command欠落 → 英数/かな操作と独立Command修飾|
+|D5|`sys/hal/input/kbd_merge.c`|自前の2表と小文字だけCtrl化 → backend の keysym と共通評価|
+|D6|`sys/platform/powermac/usb_platform.c`、`input_usb.c` の `enqueue()`|sc化後の独自押下/文字ring → usage のまま共通 capture|
 |D7|`platform/powermac/input_keymap.c` の `pm_input_keymap()`|Ctrl+C=27、通常文字の上位scなし → 03 と全キーの互換sc|
-|D8|`platform/powermac/input_boot.c`|raw/pressed/modifiers の空実装 → 共通状態のprovider|
+|D8|`sys/platform/powermac/input_boot.c`|raw/pressed/modifiers の空実装 → 共通状態のprovider|
 
-- 食い違いは上記8件（同じ原因の複数行は1件）。調査票の `ime.c:286` は現物では STOP 判定が289行。 x86 は `drivers/input/kbd.c` → `drivers/input/kbd_hal.c` の `kbd_hal_capture()` → `input/hal/kbd_merge.c` の `input_merge_key()`。
-- PACK の `input/hal/kbd_hal.c` は存在せず、実物は `drivers/input/kbd_hal.c`。これは参照パスの訂正で件数に含めない。
+- 食い違いは上記8件（同じ原因の複数行は1件）。調査票の `ime.c:286` は現物では STOP 判定が289行。 x86 は `sys/platform/pc98/input/kbd.c` → `sys/platform/pc98/input/kbd_hal.c` の `kbd_hal_capture()` → `sys/hal/input/kbd_merge.c` の `input_merge_key()`。
+- PACK の `input/hal/kbd_hal.c` は存在せず、実物は `sys/platform/pc98/input/kbd_hal.c`。これは参照パスの訂正で件数に含めない。
 - PPC の LAN先行・USB後続は `input_boot.c` の `peek()` に既にある。これを壊さず USB の読み先だけ替える。 x86 uPD720101 の入力経路は未実装（調査票）。今回その完成を前提にせず、同じ HID 表を登録できる口を先に作る。
 
 ## 2. 共通の口
@@ -129,7 +129,7 @@ legacy_cooked_push(((u16)sc << 8) | byte);
 - is_modifier の定義 (PM 決定 2026-11-17): effect!=0、または CHAR で 0xf101〜0xf111、または互換 sc 70〜74。日本語キー 0xf112〜0xf116 は修飾ではない。
 - no_keydataはHID usage53のClear/NumLockで真、再配置後もkeydataを積まない（PM決定）。IME_ON/OFFの操作配送はこの文字抑止より先に行う。
 - compat_sc=ffは出口直前に0へ置換。scもbyteも0なら積まない（F13 usage68等）。非修飾nop/NULは有効な非0 scがあればentryを残す。 raw_dueは互換scのmake/最後のbreak/repeatの既存集計規則。GUIのSTOP filterをraw/意味イベントの前に適用し、二重配送しない。
-- `drivers/input/kbd.c` の救済判定も `kbd_shift_state & SHIFT_CTRL` から `input_key_pressed(KEY_CTRL)` へ変更。物理Ctrl+STOPはcookedへ積まない。
+- `sys/platform/pc98/input/kbd.c` の救済判定も `kbd_shift_state & SHIFT_CTRL` から `input_key_pressed(KEY_CTRL)` へ変更。物理Ctrl+STOPはcookedへ積まない。
 - 日本語/機能keysymの基本出口はbyte0+互換sc。Plain>=80は無文字（非byte確定列は既存IME/UTF-8配送経路）。 B§2aで確定済みの矢印等DOS byteはLEGACY_CONTROL例外として維持。RLDN=03をCHAR_ETXとして再解釈しない。
 - x86/PPCともSTOP=6000、XFER=3500、NFER=5100。STOPは `ime.c:289`、XFERは調査票の `ime_convert.inc` と一致。
 - UPは上位3A、LEFTは3B、HOMEは3E、DELは39。`userland/shell/ui.c` の比較はPPCでも成立する。 Ctrl+Cは互換sc2B/byte03。英数/かなはFG1で消費する操作であり、XFERへ化けさせてIME切替を代用しない。
@@ -180,33 +180,33 @@ legacy_cooked_push(((u16)sc << 8) | byte);
 
 |段|担当ファイル|責務・依存|
 |---|---|---|
-|H0|`input/hal/keymap.h` 新|型/登録/結果/拡張の内部契約を先に固定|
-|H-usb|`include/usb_platform.h` 変|os32powerpc、新 `usbp_input_usage(u8 src,u8 usage,int down)` / `usbp_input_usage_repeat(u8 src,u8 usage)` を宣言、旧sc口はS2mまで残す|
-|H-hid|`drivers/usb/hid_boot.h` 変|os32powerpc、hid_kbd_sc宣言を維持し `hid_kbd_norepeat(u8 usage)` / `hid_kbd_order(u8 usage)` の生成表参照口を追加|
-|S0a|`input/hal/keymap_registry.c` 新|H0→map登録/source bind|
-|S0b|`input/hal/keymap_eval.c` 新|H0→keysym/Ctrl/PC98 exact評価、arch依存なし|
-|S0c|`input/hal/keymap_state.c` 新|H0→make作用/lock/source release|
-|S0d|`input/hal/kbd_merge.c` 変|S0a〜c→usage状態と互換sc投影、旧文字化は移行中維持|
+|H0|`sys/hal/input/keymap.h` 新|型/登録/結果/拡張の内部契約を先に固定|
+|H-usb|`sys/include/usb_platform.h` 変|os32powerpc、新 `usbp_input_usage(u8 src,u8 usage,int down)` / `usbp_input_usage_repeat(u8 src,u8 usage)` を宣言、旧sc口はS2mまで残す|
+|H-hid|`sys/dev/usb/hid_boot.h` 変|os32powerpc、hid_kbd_sc宣言を維持し `hid_kbd_norepeat(u8 usage)` / `hid_kbd_order(u8 usage)` の生成表参照口を追加|
+|S0a|`sys/hal/input/keymap_registry.c` 新|H0→map登録/source bind|
+|S0b|`sys/hal/input/keymap_eval.c` 新|H0→keysym/Ctrl/PC98 exact評価、arch依存なし|
+|S0c|`sys/hal/input/keymap_state.c` 新|H0→make作用/lock/source release|
+|S0d|`sys/hal/input/kbd_merge.c` 変|S0a〜c→usage状態と互換sc投影、旧文字化は移行中維持|
 |S1p|`tools/kbd_import.py` 変/新|H0→PC98変換、出典/差分は別台帳段|
 |S1h|`tools/hid_keymap_import.py` 新|H0→NetBSD継承展開、LANG1/2を基底表へ、usage別norepeatビットと送出順metadataを同じ生成物に出力|
-|S1pt/S1ht|`input/keymaps/pc98_jp.c` / `input/keymaps/hid_jp.c` 各新|各々独立段、生成表。S1p/S1h後、同一ファイルを共同編集しない|
-|S1x|`platform/pc98/input_keymap.c` 新|本線、S1pt/S1ht→map1/2登録|
-|S1m|`platform/powermac/input_keymap_backend.c` 新|PPC、S1ht→map2登録、S1xと並列|
-|S2h|`drivers/usb/hid_kbd_map.c` 変|os32powerpc、S1ht/H-hid後→手書き表を撤去、compat_sc/norepeat/orderは生成表への参照だけ|
-|H-usbp|`platform/powermac/usb_platform.c` 変|os32powerpc、H-usb/S2h後→新usage口の暫定実体を追加、旧sc口へ明示変換（下記）。S2mと直列|
-|S2u[n]|`drivers/usb/hid_kbd.c`＋`tools/tests/usb_hid_host.c` 変|os32powerpc、H-usbp/H-hid/S2h後→usage送出とhost callback/期待を同段更新、norepeat/order参照|
-|S2a|`input/hal/usb_input.c` 変/新|os32powerpc、S0d/H-usb→usageからcapture、src/repeat/release|
-|S2x|`drivers/input/kbd_hal.c` 変|S1x/S0d→PC98 keycode入口。本体scのbreak分離|
-|S2m|`platform/powermac/usb_platform.c` 変|os32powerpc、H-usbp/S1m/S2a/S2u後→新usage口をcaptureへ結線、暫定変換と旧sc口を除去|
-|H-usb-clean|`include/usb_platform.h` 変|os32powerpc、S2m有効化後→旧sc口の宣言を除去、H-usbと直列|
-|S3|`input/hal/legacy_keymap.c` 新|S0b→由来付きkeysymから互換keydata|
-|S3d|`input/hal/kbd_merge.c` 変|S0d/S3→共通出口へ切替、旧文字表撤去。S0dと直列|
-|S3x|`drivers/input/kbd.c` 変|S3d/S2x/親3a,3c完了。X-cooked 接続を確認し、CTRL+STOP の救済を物理押下で判定|
-|S3m|`platform/powermac/input_usb.c` 変|S3d/S2m→独自ring/held/Caps撤去、共通出口wrapper|
-|S3b|`platform/powermac/input_boot.c` 変|S3m→provider raw/pressed/mods、LAN優先保持|
-|S4|`input/hal/input_ime_gate.c` 変|M7全小段完了・S3後に直列→IME_ON/OFF順序配送|
-|S4i|`kernel/ime/ime.c` 変|M7完了・S4後に直列→FG1の絶対ON/OFF adapter|
-|W[n]|`input/hal/input_policy.c` 変/新|v2 wire検証/交換/復元、旧M4の後継|
+|S1pt/S1ht|`sys/input/keymaps/pc98_jp.c` / `sys/input/keymaps/hid_jp.c` 各新|各々独立段、生成表。S1p/S1h後、同一ファイルを共同編集しない|
+|S1x|`sys/platform/pc98/input_keymap.c` 新|本線、S1pt/S1ht→map1/2登録|
+|S1m|`sys/platform/powermac/input_keymap_backend.c` 新|PPC、S1ht→map2登録、S1xと並列|
+|S2h|`sys/dev/usb/hid_kbd_map.c` 変|os32powerpc、S1ht/H-hid後→手書き表を撤去、compat_sc/norepeat/orderは生成表への参照だけ|
+|H-usbp|`sys/platform/powermac/usb_platform.c` 変|os32powerpc、H-usb/S2h後→新usage口の暫定実体を追加、旧sc口へ明示変換（下記）。S2mと直列|
+|S2u[n]|`sys/dev/usb/hid_kbd.c`＋`tools/tests/usb_hid_host.c` 変|os32powerpc、H-usbp/H-hid/S2h後→usage送出とhost callback/期待を同段更新、norepeat/order参照|
+|S2a|`sys/hal/input/usb_input.c` 変/新|os32powerpc、S0d/H-usb→usageからcapture、src/repeat/release|
+|S2x|`sys/platform/pc98/input/kbd_hal.c` 変|S1x/S0d→PC98 keycode入口。本体scのbreak分離|
+|S2m|`sys/platform/powermac/usb_platform.c` 変|os32powerpc、H-usbp/S1m/S2a/S2u後→新usage口をcaptureへ結線、暫定変換と旧sc口を除去|
+|H-usb-clean|`sys/include/usb_platform.h` 変|os32powerpc、S2m有効化後→旧sc口の宣言を除去、H-usbと直列|
+|S3|`sys/hal/input/legacy_keymap.c` 新|S0b→由来付きkeysymから互換keydata|
+|S3d|`sys/hal/input/kbd_merge.c` 変|S0d/S3→共通出口へ切替、旧文字表撤去。S0dと直列|
+|S3x|`sys/platform/pc98/input/kbd.c` 変|S3d/S2x/親3a,3c完了。X-cooked 接続を確認し、CTRL+STOP の救済を物理押下で判定|
+|S3m|`sys/platform/powermac/input_usb.c` 変|S3d/S2m→独自ring/held/Caps撤去、共通出口wrapper|
+|S3b|`sys/platform/powermac/input_boot.c` 変|S3m→provider raw/pressed/mods、LAN優先保持|
+|S4|`sys/input/input_ime_gate.c` 変|M7全小段完了・S3後に直列→IME_ON/OFF順序配送|
+|S4i|`sys/kern/ime/ime.c` 変|M7完了・S4後に直列→FG1の絶対ON/OFF adapter|
+|W[n]|`sys/input/input_policy.c` 変/新|v2 wire検証/交換/復元、旧M4の後継|
 |G[n]|`userland/lib/input/kbd_policy.c`、`userland/gshell/src/input.rs` 各別段|A0z後→評価済み意味イベント一回配送（WM評価器なし）、旧U1/U3gを更新|
 |D|`platform/powermac/input_keymap.c` 削除|全結線・policy受入後、旧4b-map。build除去は先行B|
 
@@ -214,7 +214,7 @@ legacy_cooked_push(((u16)sc << 8) | byte);
 - S2uの現物は `hid_kbd.c`。E0〜E7のmake/break→lock類（39/47/53/88等）→残り、各群内はusage昇順。Shift+AだけでなくCaps+Aも同一報告で大文字にする。生成orderの3群を使う。
 - S1hのnorepeatはE0〜E7・lock/Clear・IME_ON/OFF等で1、S2hは `(bits[usage>>3]>>(usage&7))&1` を返すだけ。S2uは候補設定/発火の両方で参照し、A保持中Capsを押してもrepeat候補はAのまま。表交換後のlogical修飾/操作repeatはHALでも抑止する。
 - H-usbpの暫定adapterはusage別heldから互換sc参照数を作り、旧 `usbp_input_key` へscを渡す（04→1D）。最後のalias解放だけbreak、repeatも明示sc変換。未写像usageは旧出口に渡さず、releaseで暫定状態も消す。
-- S2uでは `usb_hid_host.c` を新usage口の記録とE1/04等の期待へ同時更新。S2u単独の像も旧PPCのaを維持し、S2m/S3m以後に共通cookedへ移す。 S2mの新経路有効化はS3m/S3b受入と同時。宣言整理は後続H-usb-clean（include/usb_platform.h、旧口削除）を独立段とし、新旧両方へ同じ入力を送らない。
+- S2uでは `usb_hid_host.c` を新usage口の記録とE1/04等の期待へ同時更新。S2u単独の像も旧PPCのaを維持し、S2m/S3m以後に共通cookedへ移す。 S2mの新経路有効化はS3m/S3b受入と同時。宣言整理は後続H-usb-clean（sys/include/usb_platform.h、旧口削除）を独立段とし、新旧両方へ同じ入力を送らない。
 - prev/nowはusageごとの存在で比較、00は無入力、01〜03のrolloverは現行どおり報告全体を保留。repeat候補はu16/無効=0xffffとしusage ffと衝突させない。 互換scの唯一の実体はS1h生成のKmBackend.compat_sc（LANG1/2込み）。S2hに数値表を重複保持しない。本線1Eが後で同じS2aへx86 USBを接続。
 
 |旧段|置換先|
@@ -308,12 +308,12 @@ os32powerpc のレビュー (PPC の Opus が PPC の実物と照合、K1・K3�
   - norepeat は群 0 と群 1 の全部で 1。
 - KS の群に独自の番号は足さない (NetBSD の値だけ)。is_keypad は 0xf220〜0xf27f で固定。
 - 大きさ (32bit の nm で実測): entries 2560B、compat 256B、norepeat 32B、order 64B、actions 4B、no_keydata 32B、descriptor 16B、backend 20B。補助と descriptor の合計は 424B (os32powerpc の報告の値。compat 256B を含む)。
-- 生成器は tools/hid_keymap_import.py。原本は NetBSD 8a12c4d95f03 で、取得は tools/keymap/fetch_netbsd_wscons.sh、sha256 は netbsd_wscons_sources.json。生成物 input/keymaps/hid_jp.c は commit する。CI は自己照合だけを行い、原本から作り直して照らすのは原本がある機械だけ。
+- 生成器は tools/hid_keymap_import.py。原本は NetBSD 8a12c4d95f03 で、取得は tools/keymap/fetch_netbsd_wscons.sh、sha256 は netbsd_wscons_sources.json。生成物 sys/input/keymaps/hid_jp.c は commit する。CI は自己照合だけを行い、原本から作り直して照らすのは原本がある機械だけ。
 
 ## H0b: 本線の S0・S1p の内部契約 (設計者が決めたこと)
 
 2026-11-17。H0 の不足を補う内部契約。本文・ユーザー決定・K1〜K10 と
-KmHidExtensions は変更しない。以下は `input/hal/keymap.h` の宣言と一対一で対応する。
+KmHidExtensions は変更しない。以下は `sys/hal/input/keymap.h` の宣言と一対一で対応する。
 公開48Bイベントや IKM1 を native struct として扱う宣言ではない。
 
 ### 表と評価結果 (S1p → S0b)
@@ -534,7 +534,7 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 
 ## S2x の取り込みで後の段へ送る項目 (2026-11-17、Opus レビュー、どれも P3)
 
-- platform/pc98/input_keymap.c (pc98_input_keymap_register()): HID の backend の登録が失敗しても、先に登録した PC98 の backend は残す (解除の口は作らない、使う物も無い)。意図どおり。
+- sys/platform/pc98/input_keymap.c (pc98_input_keymap_register()): HID の backend の登録が失敗しても、先に登録した PC98 の backend は残す (解除の口は作らない、使う物も無い)。意図どおり。
 - 登録の失敗のログは /var/log/boot.log の 1 行だけで、画面には出さない。設計の「klog」はこの意味とする (PM 決定 2026-11-17)。
 - 試験: V86 の中で CAPS・KANA を押してから抜けた後の文字を、旧経路と比べる 1 件を、S3 の段の試験に足す。
 - kbd_hal_init を 2 回呼ぶと旧経路になり bindings[] が残る。呼ぶのは boot.c:53 の 1 回だけなので、今は起きない。2 回呼ぶ道を作るときに直す。
@@ -570,9 +570,9 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 |row.kind (u8)|1 META、2 KEYSYM、3 EXACT、4 ACCENT、5 TERM、6 EXT/COMPAT、7 FLAGS、8 KEY_ACTION|0は無効、9..255予約。§5の既定番号を維持。in2のevent/typeやdevice kindとは別|
 |row.profile (u8)|0 配列共通、1 PC98-CUI、2 PC98-GUI、3 Mac-CUI、4 Mac-GUI|0は「無し」ではない。5..255予約。B§4を維持。kind1..4/7は0、kind5/6/8は1..4。PC98機では1/2、PowerMacでは3/4だけ受理 (USBでも変えない)|
 |端末context (u8)|0 共通、1 LINE_EDIT、2 RUNNING、3 BYTE_INPUT、4 GUI|0は文脈共通、5..255予約。B§4を維持。kind5/6/8に使用。runtimeのcontext_setでは共通0を指定せず1..4|
-|map_id|1 PC98 (128キー)、2 HID (256キー)|0は無効、3..65535予約。`input/hal/keymap.h` の `KM_MAP_PC98 / KM_MAP_HID`、`input/hal/keymap_registry.c` の `valid_map`。kind1..4/7のcontext (u8) とkind8のselector (u16) に載せる。map1はPC98機だけ、map2は両機種|
+|map_id|1 PC98 (128キー)、2 HID (256キー)|0は無効、3..65535予約。`sys/hal/input/keymap.h` の `KM_MAP_PC98 / KM_MAP_HID`、`sys/hal/input/keymap_registry.c` の `valid_map`。kind1..4/7のcontext (u8) とkind8のselector (u16) に載せる。map1はPC98機だけ、map2は両機種|
 
-`legacy_mode.c` のGUI真偽値 (`input/hal/legacy_mode.c` の `kbd_set_gui_mode`) をprofile/contextの番号に転用しない。`input/hal/in2_int.h` の `InputEvent / INPUT_ORIGIN_* / INPUT_KIND_*` のevent・flags・origin・kindも独立。ゲームのINPUT_CTXはB§3のとおり独立。外枠のLE16B/16Bは `input/hal/input_policy.h` の `IKM_HEADER_SIZE / IKM_ROW_SIZE`、v2・header.flags=0・count≤8192は `input/hal/input_policy.c` の `ikm_wire_header` と一致する。`kernel/io_policy.c` の `read_le / write_le` には同じ大きさとLE処理があるが、I/Oのservice ID (`kernel/io_policy.h` の `IO_SVC_*`) は入力IDへ流用しない。
+`legacy_mode.c` のGUI真偽値 (`sys/hal/input/legacy_mode.c` の `kbd_set_gui_mode`) をprofile/contextの番号に転用しない。`sys/hal/input/in2_int.h` の `InputEvent / INPUT_ORIGIN_* / INPUT_KIND_*` のevent・flags・origin・kindも独立。ゲームのINPUT_CTXはB§3のとおり独立。外枠のLE16B/16Bは `sys/input/input_policy.h` の `IKM_HEADER_SIZE / IKM_ROW_SIZE`、v2・header.flags=0・count≤8192は `sys/input/input_policy.c` の `ikm_wire_header` と一致する。`sys/kern/io_policy.c` の `read_le / write_le` には同じ大きさとLE処理があるが、I/Oのservice ID (`sys/kern/io_policy.h` の `IO_SVC_*`) は入力IDへ流用しない。
 
 ### 2. 操作ID (1列挙)
 
@@ -581,7 +581,7 @@ kind6のEXT.value・kind8のvalue・評価済みイベント/action通知は同�
 |値|操作|由来・意味|
 |---|---|---|
 |0|NONE|既存の「操作なし」。明示行で指定可、既定操作を抑止する。欠落行による補完とは別|
-|1|IME_ON|既存。`input/hal/keymap.h` の `KmHidExtensions.actions / KmEvalResult.action`、S1hの決定|
+|1|IME_ON|既存。`sys/hal/input/keymap.h` の `KmHidExtensions.actions / KmEvalResult.action`、S1hの決定|
 |2|IME_OFF|既存。同上。ON/OFFを新番号へ移さない|
 |3|INTERRUPT|新規採番。実行中断 (LINE_EDITでの中断意味はCANCEL_LINE)|
 |4|CANCEL_LINE|新規採番。行の取り消し|
@@ -600,7 +600,7 @@ kind6のEXT.value・kind8のvalue・評価済みイベント/action通知は同�
 |17|CLOSE|新規採番|
 |18|BSD_SPECIAL|新規採番。BSD特殊IDとは別。特殊IDは評価由来の値として通知|
 
-19..0xffffffffは予約。受け手の未実装はB§3のUNSUPPORTEDであり、番号を削除しない。kind6/8にはBSD特殊IDを別途格納する欄を追加しない (kind6.aux=0、kind8.aux=修飾mask)。BSD特殊値そのものを表に載せるのはEXACTのopである。HID descriptorの疎なactions表は現契約どおり1/2のみ (`input/hal/keymap_registry.c` の `valid_map`)。wireの操作値域をその内部表の検査で代用しない。
+19..0xffffffffは予約。受け手の未実装はB§3のUNSUPPORTEDであり、番号を削除しない。kind6/8にはBSD特殊IDを別途格納する欄を追加しない (kind6.aux=0、kind8.aux=修飾mask)。BSD特殊値そのものを表に載せるのはEXACTのopである。HID descriptorの疎なactions表は現契約どおり1/2のみ (`sys/hal/input/keymap_registry.c` の `valid_map`)。wireの操作値域をその内部表の検査で代用しない。
 
 ### 3. TERMの編集制御ID (1列挙)
 
@@ -624,20 +624,20 @@ kind6のEXT.value・kind8のvalue・評価済みイベント/action通知は同�
 
 |名前空間|各bit/値|有効上限・予約・出典|
 |---|---|---|
-|操作照合mask|bit0=SHIFT (0x01)、bit1=CTRL (0x02)、bit2=ALT/GRPH (0x04)、bit4=COMMAND (0x10)|0は修飾なし。有効bit集合0x17、他bitは0。`input/hal/keymap.h` の `KmEffect / KM_MOD_*` に揃える。kind6.selectorおよびkind8.auxに使用。B§4に従いMODE (0x08)、META (0x20)、Caps/Num/Kana等のlockは含めない。完全一致はこの4bitに投影してから比較|
+|操作照合mask|bit0=SHIFT (0x01)、bit1=CTRL (0x02)、bit2=ALT/GRPH (0x04)、bit4=COMMAND (0x10)|0は修飾なし。有効bit集合0x17、他bitは0。`sys/hal/input/keymap.h` の `KmEffect / KM_MOD_*` に揃える。kind6.selectorおよびkind8.auxに使用。B§4に従いMODE (0x08)、META (0x20)、Caps/Num/Kana等のlockは含めない。完全一致はこの4bitに投影してから比較|
 |runtime context flags|bit0=ISIG (1)、bit1=ICANON (2)|今回新規採番。0は両方無効、上限3、bit2以上予約0。LINE_EDIT既定3、RUNNING既定1、BYTE_INPUT既定0。IKM1のrow.flagsには載せない|
-|EXACT用FLAGS.value|bit0=C (Caps対象)、bit1=N (Num対象)。O=0、C=1、N=2、B=3|0は対象lockなし、上限3、bit2..31予約0。`input/hal/keymap.h` の `KmPc98Extensions.flags`、`tools/kbd_import.py` の `parse`。C/Nが同時に該当してもShift列の反転は1回|
+|EXACT用FLAGS.value|bit0=C (Caps対象)、bit1=N (Num対象)。O=0、C=1、N=2、B=3|0は対象lockなし、上限3、bit2..31予約0。`sys/hal/input/keymap.h` の `KmPc98Extensions.flags`、`tools/kbd_import.py` の `parse`。C/Nが同時に該当してもShift列の反転は1回|
 
-header.flags (u32) のbit0..31とrow.flags (u8) のbit0..7は**全部予約0** (有効bit無し)。runtime flags、in2のSEAMLESS、BSDのspclを混ぜない。旧rawのSHIFT_CTRL=0x10等 (`include/kbd.h` の `SHIFT_*`) と操作maskは異なるので明示変換する。kind6.selector=0xffffはmaskではなくCOMPATの別形式であり、mask検査の前に分岐する。
+header.flags (u32) のbit0..31とrow.flags (u8) のbit0..7は**全部予約0** (有効bit無し)。runtime flags、in2のSEAMLESS、BSDのspclを混ぜない。旧rawのSHIFT_CTRL=0x10等 (`sys/include/kbd.h` の `SHIFT_*`) と操作maskは異なるので明示変換する。kind6.selector=0xffffはmaskではなくCOMPATの別形式であり、mask検査の前に分岐する。
 
 ### 5. セルkind・BSD特殊ID・META添字・セルselector (4列挙)
 
 |名前空間|数値と意味|0・上限・予約・出典|
 |---|---|---|
-|EXACT.aux低8bitのkind|0 CHAR、1 BSD_SPECIAL|0は文字 (NULも有効)。wireは上限1。2 LEGACY_CONTROLは出口専用、255 INHERITは内部bank1専用でwire拒否、3..254予約。`input/hal/keymap.h` の `KmExactCell / KM_CHAR / KM_BSD_SPECIAL`、H0b|
+|EXACT.aux低8bitのkind|0 CHAR、1 BSD_SPECIAL|0は文字 (NULも有効)。wireは上限1。2 LEGACY_CONTROLは出口専用、255 INHERITは内部bank1専用でwire拒否、3..254予約。`sys/hal/input/keymap.h` の `KmExactCell / KM_CHAR / KM_BSD_SPECIAL`、H0b|
 |EXACT.aux次8bitのop|BSD特殊ID (下表)。CHARでは0のみ|BSD_SPECIALの0はNOP。「無し」として捨てない。aux上位16bit予約0。valueはCHARならkeysym、BSD_SPECIALならKS_voidSymbol=0xf500 (`tools/kbd_import.py` の `VOID / SPECIAL`)|
 |META.index|0 N_KEYS、1 N_ACCS|0はキー数の宣言。2..65535予約。§5。selector/auxは0|
-|KEYSYM.selector|0 command、1 group1[0]、2 group1[1]、3 group2[0]、4 group2[1]|0はcommandセル。5..65535予約。§5、配置は `input/hal/keymap.h` の `KmEntry`|
+|KEYSYM.selector|0 command、1 group1[0]、2 group1[1]、3 group2[0]、4 group2[1]|0はcommandセル。5..65535予約。§5、配置は `sys/hal/input/keymap.h` の `KmEntry`|
 
 BSD特殊IDはB§1のFreeBSD値をそのまま使う。最大既知値0xa3、穴は0x01・0x7b..0x7f、0xa4..0xffは予約で全て拒否。通常文字の同じ数値と区別する。
 
@@ -658,7 +658,7 @@ BSD特殊IDはB§1のFreeBSD値をそのまま使う。最大既知値0xa3、穴
 
 B§3のCHAR_ETXはCHARで通常文字の評価が03になった由来を指す判定であり、新しいwireのセルkindを割り当てない (LEGACY_CONTROLの03とは区別)。
 
-既存実装の対応は `tools/kbd_import.py` の `SPECIAL / cell`、修飾作用は `input/hal/keymap_eval.c` の `cell_effect`。残りもB§1で既に定義済みで、新規採番ではない。受理して無視する値を、実装が無いという理由で予約値へ変更しない。
+既存実装の対応は `tools/kbd_import.py` の `SPECIAL / cell`、修飾作用は `sys/hal/input/keymap_eval.c` の `cell_effect`。残りもB§1で既に定義済みで、新規採番ではない。受理して無視する値を、実装が無いという理由で予約値へ変更しない。
 
 ### 6. W[2]の行ごとの判定 (上の13列挙を使う)
 

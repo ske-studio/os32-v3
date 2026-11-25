@@ -11,12 +11,12 @@ sys.path.insert(0, str(ROOT / 'tools/tests'))
 import host32
 CHECK = dict(name='ppc-kboot-clock', tier=2, budget=60,
              basis=['IO_TIER_DESIGN §5/P5 (PM 2026-11-16)'],
-             covers=['platform/powermac/ppc_kernel.c', 'platform/powermac/clock.c', 'platform/powermac/kboot_info.h',
+             covers=['sys/platform/powermac/ppc_kernel.c', 'sys/platform/powermac/clock.c', 'sys/platform/powermac/kboot_info.h',
                      'tools/ppc/kboot_clock*', 'lib/divdi3.c'],
-             inputs=['kernel/io_clock.h', 'include/types.h', 'include/callconv.h', 'include/clock_source.h',
-                     'include/platform_timer.h', 'platform/powermac/ofw.h',
-                     'platform/powermac/platform_of_layout.h', 'arch/ppc/ppc_boot.h',
-                     'arch/ppc/ppc_pmap.h', 'arch/ppc/ppc_oea.h',
+             inputs=['sys/kern/io_clock.h', 'sys/include/types.h', 'sys/include/callconv.h', 'sys/hal/time/clock_source.h',
+                     'sys/include/platform_timer.h', 'sys/platform/powermac/ofw.h',
+                     'sys/platform/powermac/platform_of_layout.h', 'sys/arch/ppc/ppc_boot.h',
+                     'sys/arch/ppc/ppc_pmap.h', 'sys/arch/ppc/ppc_oea.h',
                      'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/host32.py'])
 MUTATIONS = [
     # IO_TIER_DESIGN §5・P5 (本線 PM 決定 2026-11-16).
@@ -101,10 +101,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'platform/powermac/clock.c').read_text()
+    source = (ROOT / 'sys/platform/powermac/clock.c').read_text()
     with tempfile.TemporaryDirectory(prefix='kboot-clock-') as temp:
         directory = Path(temp)
-        rate_source = (ROOT / 'platform/powermac/ppc_kernel.c').read_text()
+        rate_source = (ROOT / 'sys/platform/powermac/ppc_kernel.c').read_text()
         if rate_test(directory, rate_source) != 0:
             raise RuntimeError('rate baseline failed')
         print('GREEN: bracketed clock rate')

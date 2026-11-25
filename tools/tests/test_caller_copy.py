@@ -1,5 +1,5 @@
 """T2d d4: real caller/copy + managed walk, with MMU/IRQ host boundaries."""
-TARGET_SRC = ['exec/redir_access.c', 'exec/access_walk.c', 'kdebug/kselftest/caller_boot.inc']
+TARGET_SRC = ['sys/kern/exec/redir_access.c', 'sys/kern/exec/access_walk.c', 'sys/arch/x86/kdebug/kselftest/caller_boot.inc']
 
 import host32
 import argparse

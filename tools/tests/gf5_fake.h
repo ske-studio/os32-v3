@@ -24,11 +24,11 @@
 #define GF4_HOST_UNIT 14
 #endif
 #include "gf4_display_fake.h"
-#include "../../hwdev/gf/feature5.h"
-#include "../../hwdev/gf/internal.h"
-#include "../../include/sys.h"
+#include "../../sys/dev/video/geforce/feature5.h"
+#include "../../sys/dev/video/geforce/internal.h"
+#include "../../sys/include/sys.h"
 #if GF5_HOST_UNIT == 9
-#include "../../mm/pgalloc.h"
+#include "../../sys/kern/mm/pgalloc.h"
 #endif
 
 /* Frozen event schema: 12 scalar and 4 pointer arguments. MATCH needs four

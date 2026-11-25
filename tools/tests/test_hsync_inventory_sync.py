@@ -6,7 +6,7 @@ CHECK = dict(name='hsync-inventory-sync', tier=1, needs=[], budget=60,
             'tools/tests/hsync_inventory_sync_host.c', 'tools/tests/hsync_h2_host.c',
             'tools/tests/hsync_shell_fixture.h', 'tools/tests/fep_boundary_runtime.h',
             'tools/tests/host32.py', 'sdk/include/os32/**', 'include/**',
-            'userland/lib/**', 'lib/kstring*', 'lib/crc32_core.inc', 'exec/os32x_hdr.c'],
+            'userland/lib/**', 'lib/kstring*', 'lib/crc32_core.inc', 'sys/kern/exec/os32x_hdr.c'],
     basis=['HSYNC_MANIFEST_DESIGN §4', 'HSYNC_MANIFEST_DESIGN §6',
            'HSYNC_MANIFEST_DESIGN §8'])
 import argparse
@@ -94,8 +94,8 @@ def main():
                 '-I' + str(work), *['-I' + str(ROOT / p) for p in
                  ('tools/tests', '.', 'include', 'arch/x86', 'sdk/include',
                   'sdk/include/os32', 'userland/lib', 'userland/system', 'lib')],
-                str(work / 'test.c'), str(ROOT / 'lib/kstring.c'),
-                str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)], check=True)
+                str(work / 'test.c'), str(ROOT / 'sys/kern/kstring.c'),
+                str(ROOT / 'sys/kern/kstring_c.c'), '-o', str(exe)], check=True)
             result = host32.run([str(exe)], capture_output=True, text=True, timeout=60)
             print(result.stdout + result.stderr, end='', flush=True)
             return result.returncode

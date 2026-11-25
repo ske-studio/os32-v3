@@ -1,10 +1,10 @@
-#include "sound/hal/snd2_refill_diag.h"
+#include "sys/hal/sound/snd2_refill_diag.h"
 /* Exercise the paired body and resident stream core through their normal entries. */
 #define PCM_HOST_HEAP_BYTES (8192U * PCM_FRAME_BYTES)
 #define main original_pcm_main
 #include "pcm_cs4231_host.c"
 #undef main
-#include "sound/hal/snd2.h"
+#include "sys/hal/sound/snd2.h"
 #include "pcm_module.h"
 
 static int physical_tick_active;

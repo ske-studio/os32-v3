@@ -6,21 +6,21 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-COVERS = ['platform/powermac/hostfs_io.c', 'platform/powermac/hostfs.h',
-          'platform/powermac/hostfs_peer.c', 'platform/powermac/hostfs_boot.c',
-          'arch/ppc/kernel_trap.c', 'tools/tests/ppc_hostfs_io.c',
+COVERS = ['sys/platform/powermac/hostfs_io.c', 'sys/platform/powermac/hostfs.h',
+          'sys/platform/powermac/hostfs_peer.c', 'sys/platform/powermac/hostfs_boot.c',
+          'sys/arch/ppc/kernel_trap.c', 'tools/tests/ppc_hostfs_io.c',
           'tools/tests/ppc_hostfs_io.py']
 CHECK = dict(name='ppc-hostfs-io', tier=1, budget=30, covers=COVERS,
-             inputs=['platform/powermac/lan_boot.h', 'fs/serialfs/sfs_client.c',
-                     'fs/serialfs/sfs_proto.c', 'fs/serialfs/*.h', 'fs/vfs*',
-                     'fs/serialfs/serialfs.c', 'fs/serialfs/serialfs_persistent.c', 'include/boot_token.h',
-                     'kernel/console/*.h', 'kernel/dev/dev.h', 'net/host_mailbox.h',
-                     'lib/kstring_c.c',
-                     'arch/ppc/pd_walk.c', 'arch/ppc/*.h',
-                     'kernel/irq/irq.h', 'kernel/irq/irq_math.h',
-                     'include/*.h', 'lib/kstring.h', 'lib/crc32.[ch]',
+             inputs=['sys/platform/powermac/lan_boot.h', 'sys/fs/serialfs/sfs_client.c',
+                     'sys/fs/serialfs/sfs_proto.c', 'fs/serialfs/*.h', 'fs/vfs*',
+                     'sys/fs/serialfs/serialfs.c', 'sys/fs/serialfs/serialfs_persistent.c', 'sys/include/boot_token.h',
+                     'kernel/console/*.h', 'sys/hal/block/dev.h', 'sys/net/host_mailbox.h',
+                     'sys/kern/kstring_c.c',
+                     'sys/arch/ppc/pd_walk.c', 'arch/ppc/*.h',
+                     'sys/kern/irq/irq.h', 'sys/kern/irq/irq_math.h',
+                     'include/*.h', 'sys/kern/kstring.h', 'lib/crc32.[ch]',
                      'lib/crc32_core.inc', 'lib/le_internal.h', 'lib/divdi3.c',
-                     'platform/powermac/platform_irq_limits.h',
+                     'sys/platform/powermac/platform_irq_limits.h',
                      'sdk/include/os32/*.h'])
 SOURCE = ROOT / COVERS[0]
 
@@ -28,7 +28,7 @@ SOURCE = ROOT / COVERS[0]
 def exercise(source, directory, expected=0, marker=None, peer=None):
     path = pathlib.Path(directory)
     (path / 'io.c').write_text(source)
-    (path / 'peer.c').write_text(peer or (ROOT / 'platform/powermac/hostfs_peer.c').read_text())
+    (path / 'peer.c').write_text(peer or (ROOT / 'sys/platform/powermac/hostfs_peer.c').read_text())
     binary = path / 'host'
     flags = ['gcc', '-m32', '-ffreestanding', '-fno-pie', '-no-pie',
              '-nostdlib', '-static', '-std=gnu11', '-O2', '-Wall', '-Wextra',
@@ -39,12 +39,12 @@ def exercise(source, directory, expected=0, marker=None, peer=None):
                 ROOT / 'sdk/include/os32', ROOT / 'fs', ROOT / 'kernel/console',
                 ROOT / 'kernel/dev']
     sources = [path / 'io.c', ROOT / 'tools/tests/ppc_hostfs_io.c',
-               ROOT / 'fs/serialfs/sfs_client.c', ROOT / 'fs/serialfs/sfs_proto.c',
-               ROOT / 'arch/ppc/kernel_trap.c', ROOT / 'arch/ppc/pd_walk.c',
+               ROOT / 'sys/fs/serialfs/sfs_client.c', ROOT / 'sys/fs/serialfs/sfs_proto.c',
+               ROOT / 'sys/arch/ppc/kernel_trap.c', ROOT / 'sys/arch/ppc/pd_walk.c',
                ROOT / 'lib/crc32.c', ROOT / 'lib/divdi3.c', path / 'peer.c',
-               ROOT / 'platform/powermac/hostfs_boot.c', ROOT / 'fs/serialfs/serialfs.c',
-               ROOT / 'fs/serialfs/serialfs_persistent.c', ROOT / 'fs/vfs.c',
-               ROOT / 'fs/vfs_fd.c', ROOT / 'lib/kstring_c.c']
+               ROOT / 'sys/platform/powermac/hostfs_boot.c', ROOT / 'sys/fs/serialfs/serialfs.c',
+               ROOT / 'sys/fs/serialfs/serialfs_persistent.c', ROOT / 'sys/fs/vfs.c',
+               ROOT / 'sys/fs/vfs_fd.c', ROOT / 'sys/kern/kstring_c.c']
     subprocess.run(flags + ['-I' + str(p) for p in includes] +
                    [str(p) for p in sources] + ['-o', str(binary)], check=True)
     result = subprocess.run(['qemu-i386', str(binary)], capture_output=True, timeout=10)
@@ -76,7 +76,7 @@ def main():
                 path.mkdir()
                 exercise(source.replace(old, new), path, rc, marker)
                 print(name + ': runtime RED with reach marker')
-            peer = (ROOT / 'platform/powermac/hostfs_peer.c').read_text()
+            peer = (ROOT / 'sys/platform/powermac/hostfs_peer.c').read_text()
             anchor = 'observe(h, src); /* Responses can be the first host observation. */'
             assert peer.count(anchor) == 1
             path = pathlib.Path(directory) / 'peer'

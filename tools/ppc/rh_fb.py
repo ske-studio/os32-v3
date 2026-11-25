@@ -104,7 +104,7 @@ def main():
     if not args.build_only:
         guest(control, elf, False)
     if args.mutate:
-        mutation = ('rh-stage-write', 'platform/powermac/rh_observe.c',
+        mutation = ('rh-stage-write', 'sys/platform/powermac/rh_observe.c',
                     '    if (!pixels) return;\n    u32 cell', '    return;\n    u32 cell')
         work = out/'no-stage'; work.mkdir(exist_ok=True)
         elf = boot.build(work, mutation=mutation)

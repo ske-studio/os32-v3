@@ -13,14 +13,14 @@ sys.dont_write_bytecode = True
 from run import ROOT, ROM, QMP, command, require
 
 CHECK = dict(name='ppc-kboot-entry', tier=2, budget=600,
-             covers=['arch/ppc/kernel_entry.S', 'arch/ppc/kernel_entry.h',
-                     'arch/ppc/kernel.ld', 'platform/powermac/platform_kboot_layout.h',
+             covers=['sys/arch/ppc/kernel_entry.S', 'sys/arch/ppc/kernel_entry.h',
+                     'sys/arch/ppc/kernel.ld', 'sys/platform/powermac/platform_kboot_layout.h',
                      'tools/ppc/kboot_entry.py', 'tools/ppc/run.py',
-                     'platform/powermac/ofw.c', 'platform/powermac/ofw.h',
-                     'platform/powermac/escc.c', 'platform/powermac/escc_tree.c',
-                     'platform/powermac/platform_of_layout.h', 'arch/ppc/ppc_boot.h',
-                     'lib/kstring_c.c', 'lib/kstring.h', 'include/types.h',
-                     'include/memmap.h', 'tools/gen_memmap.py', 'build/arch/ppc.mk'])
+                     'sys/platform/powermac/ofw.c', 'sys/platform/powermac/ofw.h',
+                     'sys/platform/powermac/escc.c', 'sys/platform/powermac/escc_tree.c',
+                     'sys/platform/powermac/platform_of_layout.h', 'sys/arch/ppc/ppc_boot.h',
+                     'sys/kern/kstring_c.c', 'sys/kern/kstring.h', 'sys/include/types.h',
+                     'sys/include/memmap.h', 'tools/gen_memmap.py', 'build/arch/ppc.mk'])
 PREFIX = str(Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-')
 FLAGS = ['-mcpu=7450', '-m32', '-mbig-endian', '-msoft-float', '-mno-altivec',
          '-msdata=none', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
@@ -29,7 +29,7 @@ FLAGS = ['-mcpu=7450', '-m32', '-mbig-endian', '-msoft-float', '-mno-altivec',
 CANARY = r'''
 #include "kernel_entry.h"
 #include "ofw.h"
-#include "platform/powermac/platform_kboot_layout.h"
+#include "sys/platform/powermac/platform_kboot_layout.h"
 volatile unsigned captured[3] = {1,1,1};
 volatile unsigned char bss_canary[37];
 void entry_canary_fail(void);
@@ -82,7 +82,7 @@ ppc_store8:
  stb 4,0(3)
  eieio
  blr
-# platform/powermac/ofw.c masks EE before its detached stop (same body as arch/ppc/entry.S).
+# sys/platform/powermac/ofw.c masks EE before its detached stop (same body as sys/arch/ppc/entry.S).
 .globl ppc_disable
 ppc_disable:
  mfmsr 3
@@ -103,15 +103,15 @@ def build(work, source, static=False):
     cc=PREFIX+'gcc'
     command(['python3', '-B', 'tools/gen_memmap.py', '--layout-header', work/'memmap_layout.h'])
     command([cc, '-E', '-P', '-x', 'c', '-I'+str(work), '-I.',
-             'arch/ppc/kernel.ld', '-o', work/'kernel.ld'])
+             'sys/arch/ppc/kernel.ld', '-o', work/'kernel.ld'])
     (work/'entry.S').write_text(source)
     (work/'observe.c').write_text(CANARY)
     (work/'observe.S').write_text(OBSERVER)
     objects=[]
     for i, src in enumerate([work/'entry.S', work/'observe.c', work/'observe.S',
-                            ROOT/'platform/powermac/ofw.c',
-                            ROOT/'platform/powermac/escc.c',
-                            ROOT/'platform/powermac/escc_tree.c', ROOT/'lib/kstring_c.c']):
+                            ROOT/'sys/platform/powermac/ofw.c',
+                            ROOT/'sys/platform/powermac/escc.c',
+                            ROOT/'sys/platform/powermac/escc_tree.c', ROOT/'sys/kern/kstring_c.c']):
         obj=work/f'{i}.o'
         command([cc, *FLAGS, '-I'+str(work), '-Iarch/ppc', '-c', src, '-o', obj])
         objects.append(obj)
@@ -201,7 +201,7 @@ def main():
     parser=argparse.ArgumentParser(); parser.add_argument('--mutate',action='store_true')
     args=parser.parse_args(); started=time.monotonic()
     out=Path(os.environ['TMPDIR'])/'kboot-entry'; out.mkdir(exist_ok=True)
-    source=(ROOT/'arch/ppc/kernel_entry.S').read_text()
+    source=(ROOT/'sys/arch/ppc/kernel_entry.S').read_text()
     control=out/'control'; control.mkdir(exist_ok=True)
     guest(control,build(control,source,True)); print('GREEN product entry',flush=True)
     if args.mutate:

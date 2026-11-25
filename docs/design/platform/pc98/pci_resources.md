@@ -1,6 +1,6 @@
-# platform/pc98/pci_resources.c — 設計
+# sys/platform/pc98/pci_resources.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_D3_DESIGN (D1 で移した)
-ソース: `platform/pc98/pci_resources.c`
+ソース: `sys/platform/pc98/pci_resources.c`
 
 ```c
 u32 ledger_resource_import_pci(void) {

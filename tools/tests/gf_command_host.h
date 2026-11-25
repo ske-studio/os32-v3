@@ -8,7 +8,7 @@
 #ifndef TOOLS_TESTS_GF_COMMAND_HOST_H
 #define TOOLS_TESTS_GF_COMMAND_HOST_H
 #include "gf_command_runtime_host.h"
-#include "../../hwdev/gf/command.h"
+#include "../../sys/dev/video/geforce/command.h"
 
 #if (defined(GF2_HOST_B0) + defined(GF2_HOST_B1) + defined(GF2_HOST_B2) + \
      defined(GF2_HOST_B3) + defined(GF2_HOST_B4) + defined(GF2_HOST_B5) + \
@@ -607,7 +607,7 @@ static const struct gf2_dma_ops dma_ops = {alloc_stub, free_stub, leak_stub};
 #endif
 
 #if defined(GF2_HOST_B9)
-#include "../../mm/dma_pool.h"
+#include "../../sys/kern/mm/dma_pool.h"
 static int alloc_rc, free_rc, leak_calls;
 static u32 requested_bytes, requested_align, requested_mask;
 static struct dma_buf seen;

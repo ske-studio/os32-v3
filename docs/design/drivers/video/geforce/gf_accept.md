@@ -1,4 +1,4 @@
-# drivers/video/geforce/gf_accept.c — 受入専用の計測
+# sys/dev/video/geforce/gf_accept.c — 受入専用の計測
 
 > 状態: **現行 (2026-11-01)**
 

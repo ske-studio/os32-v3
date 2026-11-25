@@ -26,7 +26,7 @@ def run(folder, source):
 
 
 def main():
-    source = ROOT/'kdebug/kdebug_main.c'
+    source = ROOT/'sys/platform/pc98/kdebug/kdebug_main.c'
     with tempfile.TemporaryDirectory(prefix='hwdev-dispatch-') as td:
         folder = Path(td)
         assert run(folder, source) == 0

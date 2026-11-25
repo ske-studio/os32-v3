@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Host notification wire, timing, queue, and mutation tests."""
 CHECK = dict(name='host-notify', tier=1, needs=[],
-             covers=['tools/host_notify.py', 'net/link.h'], budget=2.8,
+             covers=['tools/host_notify.py', 'sys/net/link.h'], budget=2.8,
     basis=['docs/design/tools/host_notify.md 送りの規則'],
 )
 import argparse
@@ -30,7 +30,7 @@ class Registry:
 
 def test(module):
     m = load(module)
-    header = (ROOT / 'net/link.h').read_text()
+    header = (ROOT / 'sys/net/link.h').read_text()
     def value(name):
         return int(re.search(r'^#define\s+' + name + r'\s+(\d+)', header, re.M).group(1))
     assert m.OP_NOTIFY == value('LINK_OP_NOTIFY')

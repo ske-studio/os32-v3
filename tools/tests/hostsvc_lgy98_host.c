@@ -1,7 +1,7 @@
 #include "hostsvc_fixture.h"
-#include "drivers/net/ne2000/ne2000.h"
-#include "drivers/net/ne2000/ne2000_regs.h"
-#include "net/link.h"
+#include "sys/dev/net/ne2000/ne2000.h"
+#include "sys/dev/net/ne2000/ne2000_regs.h"
+#include "sys/net/link.h"
 #include "os32/os32_kapi_shared.h"
 
 static int state, send_rc, recv_rc, calls;

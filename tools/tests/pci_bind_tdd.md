@@ -1,7 +1,7 @@
 # pci_bind — RED → GREEN の記録
 
 票: [`docs/tasks/v3/TASK_HAL_WIRING.md`](../../docs/tasks/v3/TASK_HAL_WIRING.md) §1-4
-対象: `drivers/pci/pci_bind_match.c` (一致規則と遷移) / `drivers/pci/pci_bind.c` (実行と記録)
+対象: `sys/dev/pci/pci_bind_match.c` (一致規則と遷移) / `sys/dev/pci/pci_bind.c` (実行と記録)
 試験: `tools/tests/test_pci_bind.py` + `tools/tests/pci_bind_host.c`
 実行: `make check-pci-bind-host` (`check-par` の列)
 
@@ -28,7 +28,7 @@ probe が失敗したときに「装置に触っていない」のか「未知�
 
 ```
 $ python3 -B tools/tests/test_pci_bind.py
-tools/tests/pci_bind_host.c: fatal error: ../../drivers/pci/pci_bind_match.c: No such file or directory
+tools/tests/pci_bind_host.c: fatal error: ../../sys/dev/pci/pci_bind_match.c: No such file or directory
 ```
 
 ### RED 2 — QUARANTINE で打ち切らない (変異 1 / 2)
@@ -52,7 +52,7 @@ tools/tests/pci_bind_host.c: fatal error: ../../drivers/pci/pci_bind_match.c: No
 
 ```
 $ python3 -B tools/tests/test_pci_bind.py --target --mutate
-HOST GNU89 -Werror compile PASS (real drivers/pci/pci_bind_match.c)
+HOST GNU89 -Werror compile PASS (real sys/dev/pci/pci_bind_match.c)
 TARGET i386-elf GNU89 -Werror PASS
 EXIT match_rules=0
 EXIT next_order=0
@@ -95,7 +95,7 @@ MUTATION 10 RED (1 件): 理由を書かなかった DECLINE を「問題なし�
   3 行のアダプタを PM が合流時に差す。既定は NULL = `PCI_LINE_OK`。
 - ~~**`pci_bind_info` を CPL=3 へ出す KAPI (v60) は PM が末尾追記する。**~~
   → **2026-09-23 に追加済み** (slot 223 = 0x384、worktree `wt/hal-c`)。
-  wrapper は `kapi/kapi_sys.c` の `kapi_pci_bind_info` で、出力ポインタは
+  wrapper は `sys/kapi/kapi_sys.c` の `kapi_pci_bind_info` で、出力ポインタは
   実装 A の `ring3_user_ranges_writable` で **8 バイトぶん**確かめてから書く
   (読み取り専用の USER ページなら `ring3_fault_kill`)。`lspci` が
   `bound (ok) irq=N` / `declined (<reason>)` / `quarantined (<reason>)` と

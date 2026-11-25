@@ -2,7 +2,7 @@
 """KAPI target selection and isolated output roots."""
 CHECK = dict(name='kapi-target-host', tier=1, needs=[], budget=5,
              covers=['sdk/gen_kapi.py', 'sdk/target_profile.py', 'sdk/kapi.json',
-                     'kapi/kapi_generated.c', 'sdk/link/generations.ld',
+                     'sys/kapi/kapi_generated.c', 'sdk/link/generations.ld',
                      'sdk/os32_generations.py', 'sdk/rust/os32api/src/generations.rs',
                      'tools/tests/test_kapi_target.py'],
     basis=['PPC_SEP5_DESIGN §2.3', '[ABI]'],
@@ -15,9 +15,9 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-OUTPUTS = ('include/kapi_call_generated.h', 'sdk/include/os32/os32_kapi_generated.h',
-           'sdk/include/os32/os32_kapi_slots.h', 'kapi/kapi_generated.c',
-           'exec/exec_kapi_init.inc', 'sdk/include/os32/os32_generations.h',
+OUTPUTS = ('sys/include/kapi_call_generated.h', 'sdk/include/os32/os32_kapi_generated.h',
+           'sdk/include/os32/os32_kapi_slots.h', 'sys/kapi/kapi_generated.c',
+           'sys/kern/exec/exec_kapi_init.inc', 'sdk/include/os32/os32_generations.h',
            'sdk/os32_generations.py', 'sdk/rust/os32api/src/generations.rs',
            'sdk/include/os32/os32_unit_stamp.h', 'sdk/crt/generations.inc',
            'sdk/link/generations.ld')

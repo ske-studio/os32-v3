@@ -5,8 +5,8 @@
 # — 区間の中は make check-kapi-* が照合する。生成は sdk/kapi.json を直して make で。
 GENERATED='sdk/include/os32/os32_kapi_generated.h
 sdk/include/os32/os32_kapi_slots.h
-kapi/kapi_generated.c
-exec/exec_kapi_init.inc
+sys/kapi/kapi_generated.c
+sys/kern/exec/exec_kapi_init.inc
 sdk/include/os32/os32_generations.h
 sdk/os32_generations.py
 sdk/rust/os32api/src/generations.rs

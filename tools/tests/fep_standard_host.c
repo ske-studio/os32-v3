@@ -23,7 +23,7 @@ char *kstrncpy(char *d, const char *s, u32 n)
     d[i] = 0;
     return d;
 }
-#define kstrlcpy kstrncpy   /* lib/kstring.h と同じ別名 */
+#define kstrlcpy kstrncpy   /* sys/kern/kstring.h と同じ別名 */
 char *kstrncat(char *d, const char *s, u32 n)
 {
     u32 used = kstrlen(d);
@@ -108,21 +108,21 @@ int platform_disk_geometry_get(int drive, struct platform_disk_geometry *info)
     info->phys_sector_size = 512; info->total_sectors = DISK_SECTORS;
     return IDE_OK;
 }
-#include "../../fs/ext2/ext2_super.c"
-#include "../../fs/ext2/ext2_time.c"
-#include "../../fs/ext2/ext2_inode.c"
-#include "../../fs/ext2/ext2_dir.c"
-#include "../../fs/ext2/ext2_file.c"
-#include "../../fs/ext2/ext2_medium_ide.c"
-#include "../../fs/ext2/ext2_fmt.c"
-#include "../../fs/ext2/ext2_vfs.c"
+#include "../../sys/fs/ext2/ext2_super.c"
+#include "../../sys/fs/ext2/ext2_time.c"
+#include "../../sys/fs/ext2/ext2_inode.c"
+#include "../../sys/fs/ext2/ext2_dir.c"
+#include "../../sys/fs/ext2/ext2_file.c"
+#include "../../sys/platform/pc98/storage/ext2_medium_ide.c"
+#include "../../sys/fs/ext2/ext2_fmt.c"
+#include "../../sys/fs/ext2/ext2_vfs.c"
 #include "../platform/pc98/boot_names.c"
-#include "../../fs/vfs.c"
-#include "../../fs/vfs_fd.c"
+#include "../../sys/fs/vfs.c"
+#include "../../sys/fs/vfs_fd.c"
 #include "../../lib/sqlite3/sqlite3.h"
 #include "../../lib/sqlite3/os32_sqlite_vfs.c"
 #define OS32_SQLITE_DIRECT_TEST 1
-#include "../../kernel/ime/ime_dict.c"
+#include "../../sys/kern/ime/ime_dict.c"
 #include "fep_store_host.h"
 
 static void close_db(Os32SqliteGroup *g, sqlite3 *db)

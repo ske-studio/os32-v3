@@ -17,7 +17,7 @@ def check(source, expected):
                         '-I' + str(ROOT / 'arch/ppc'), '-I' + str(ROOT / 'include'),
                         '-I' + str(ROOT), '-I' + str(ROOT / 'platform/powermac'),
                         str(path / 'trap.c'),
-                        str(ROOT / 'arch/ppc/pd_walk.c'),
+                        str(ROOT / 'sys/arch/ppc/pd_walk.c'),
                         str(ROOT / 'tools/ppc/test_user_trap_host.c'),
                         '-o', str(path / 'host')], check=True)
         result = subprocess.run(['qemu-i386', str(path / 'host')], capture_output=True, check=False)
@@ -29,7 +29,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'arch/ppc/kernel_trap.c').read_text()
+    source = (ROOT / 'sys/arch/ppc/kernel_trap.c').read_text()
     check(source, 0)
     if args.mutate:
         old = '''        if (f->vector == 0xc00) {

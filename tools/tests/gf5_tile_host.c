@@ -11,7 +11,7 @@
 #include "gf_guard_fake.h"
 /* Exercise the exact GR transfer used by start/recover; unrelated GR entry
  * points are discarded by section GC, without replacement definitions. */
-#include "../../hwdev/gf/gr.c"
+#include "../../sys/dev/video/geforce/gr.c"
 #define ALIGN 65536U
 #define SPACE (16U*ALIGN)
 #define CAP 512U

@@ -1,8 +1,8 @@
 """Exercise the RAM root device with the production device registry."""
 CHECK = dict(name='ram-ro-host', tier=1,
-    covers=['platform/powermac/platform_install_management.h', 'include/install_access.h', 'include/install_medium.h', 'build/core.yaml', 'userland/deploy.yaml', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml', 'kernel/dev/ram_ro.c', 'kernel/dev/ram_ro.h',
-            'tools/tests/ram_ro_host.c','drivers/base/dev.c', 'kernel/dev/dev.h', 'include/boot_root.h',
-            'tools/tests/ram_iso_host.c', 'tools/mkroot_image.py', 'fs/isofs/**', 'fs/vfs.c', 'fs/vfs.h', 'fs/vfs_device.h', 'lib/kstring_c.c', 'include/types.h', 'lib/kstring.h', 'sdk/include/os32/os32_kapi_shared.h'],
+    covers=['sys/platform/powermac/platform_install_management.h', 'sys/include/install_access.h', 'sys/include/install_medium.h', 'build/core.yaml', 'userland/deploy.yaml', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/mkfat12.py', 'build/packages.yaml', 'sys/kern/dev/ram_ro.c', 'sys/kern/dev/ram_ro.h',
+            'tools/tests/ram_ro_host.c','sys/dev/base/dev.c', 'sys/hal/block/dev.h', 'sys/include/boot_root.h',
+            'tools/tests/ram_iso_host.c', 'tools/mkroot_image.py', 'fs/isofs/**', 'sys/fs/vfs.c', 'sys/fs/vfs.h', 'sys/fs/vfs_device.h', 'sys/kern/kstring_c.c', 'sys/include/types.h', 'sys/kern/kstring.h', 'sdk/include/os32/os32_kapi_shared.h'],
     needs=['make:all'], budget=5,
     basis=['PPC_RAM_ROOT_W6_PLAN §2', 'PPC_RAM_ROOT_W6_PLAN §5', 'PPC_SHELL_DESIGN §8'],
 )
@@ -13,7 +13,7 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'kernel/dev/ram_ro.c'
+SOURCE = ROOT / 'sys/kern/dev/ram_ro.c'
 ANCHOR = 'ram->base + lba * RAM_RO_SECTOR_SIZE'
 
 
@@ -22,7 +22,7 @@ def compile_and_test(source, directory):
     cmd = ['gcc-13', '-O1', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
            '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
            '-D__cdecl=', '-I.', '-Iinclude', '-Iplatform/powermac', '-Isdk/include/os32',
-           str(source), 'drivers/base/dev.c', 'tools/tests/ram_ro_host.c', '-o', str(exe)]
+           str(source), 'sys/dev/base/dev.c', 'tools/tests/ram_ro_host.c', '-o', str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return subprocess.run([str(exe)], cwd=ROOT, check=False).returncode
 
@@ -32,7 +32,7 @@ def iso_test(directory, mutate):
     (d / 'motd').write_bytes(b'RAM root!\n!')
     subprocess.run([sys.executable, '-B', 'tools/mkroot_image.py', '--motd', str(d / 'motd'),
                     '--out', str(d / 'root.iso')], cwd=ROOT, check=True)
-    original = (ROOT / 'fs/isofs/iso9660.c').read_text()
+    original = (ROOT / 'sys/fs/isofs/iso9660.c').read_text()
     anchor = "devname[0] = type == VFS_DEV_RAM ? 'r' : 'c';"
     for variant in range(1 + int(mutate)):
         if original.count(anchor) != 1:
@@ -42,8 +42,8 @@ def iso_test(directory, mutate):
         cmd = ['gcc-13', '-O1', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffunction-sections',
                '-fdata-sections', '-Wl,--gc-sections', '-D__cdecl=', '-I.', '-Iinclude', '-Iplatform/powermac',
                '-Isdk/include/os32', '-Ifs', '-Ifs/isofs', '-Ikernel/dev', '-Idrivers/ata', '-Imm', '-Ilib',
-               str(source), 'fs/isofs/iso9660_media.c', 'fs/vfs.c', 'drivers/base/dev.c',
-               'kernel/dev/ram_ro.c', 'lib/kstring_c.c', 'tools/tests/ram_iso_host.c', '-o', str(d / 'iso-test')]
+               str(source), 'sys/fs/isofs/iso9660_media.c', 'sys/fs/vfs.c', 'sys/dev/base/dev.c',
+               'sys/kern/dev/ram_ro.c', 'sys/kern/kstring_c.c', 'tools/tests/ram_iso_host.c', '-o', str(d / 'iso-test')]
         subprocess.run(cmd, cwd=ROOT, check=True)
         rc = subprocess.run([str(d / 'iso-test'), str(d / 'root.iso')], cwd=ROOT).returncode
         if rc != (3 if variant else 0):
@@ -63,7 +63,7 @@ def main():
             mutant = pathlib.Path(tmp) / 'ram_ro.c'
             mutant.write_text(code.replace(ANCHOR, 'ram->base + (lba + 1) * RAM_RO_SECTOR_SIZE'))
             # The product header stays beside the original source.
-            mutant.write_text(mutant.read_text().replace('#include "ram_ro.h"', '#include "kernel/dev/ram_ro.h"'))
+            mutant.write_text(mutant.read_text().replace('#include "ram_ro.h"', '#include "sys/kern/dev/ram_ro.h"'))
             rc = compile_and_test(mutant, tmp)
             if rc != 3:
                 raise SystemExit(f'mutation failed to produce expected RED: {rc}')

@@ -34,8 +34,8 @@
 #define GF5_HOST_REAL_CLOCK
 #include "gf5_fake.h"
 /* Keep U1 self-contained until U7 owns the shared source registration. */
-#include "../../hwdev/gf/clock.c"
-#include "../../kdebug/gfinit_pll.c"
+#include "../../sys/dev/video/geforce/clock.c"
+#include "../../sys/dev/video/geforce/diag/gfinit_pll.c"
 
 /* Register/command golden values: ramnv40.c:78-175. */
 #define STRIDE 0x2000U /* ramnv40.c:80 */

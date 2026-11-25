@@ -1,5 +1,5 @@
 /* Link geforce_dma.c only; A2 supplies DMA pool dependencies. */
-#include "../../hwdev/gf/command.h"
+#include "../../sys/dev/video/geforce/command.h"
 
 #define GF2_HOST_B9
 #include "gf_command_host.h"

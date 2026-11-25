@@ -1,63 +1,63 @@
 {
   "schema": 1,
   "contracts": [
-    "drivers/video/cirrus/cirrus_module.h",
-    "include/gfx_hal.h",
-    "include/gfx_mode.h",
-    "drivers/video/cirrus/wab_glue.h"
+    "sys/dev/video/cirrus/cirrus_module.h",
+    "sys/include/gfx_hal.h",
+    "sys/include/gfx_mode.h",
+    "sys/dev/video/cirrus/wab_glue.h"
   ],
   "imports": [
     {
       "symbol": "cirrus_identify",
-      "source": "include/gfx_hal.h",
+      "source": "sys/include/gfx_hal.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfx_get_backend_pref",
-      "source": "include/gfx_hal.h",
+      "source": "sys/include/gfx_hal.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "ledger_surface_find",
-      "source": "mm/pgalloc.h",
+      "source": "sys/kern/mm/pgalloc.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "np2_detect",
-      "source": "drivers/char/np2sysp.h",
+      "source": "sys/dev/char/np2sysp.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kmemset",
-      "source": "lib/kstring.h",
+      "source": "sys/kern/kstring.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kmemcpy",
-      "source": "lib/kstring.h",
+      "source": "sys/kern/kstring.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kprintf",
-      "source": "include/kprintf.h",
+      "source": "sys/include/kprintf.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "palette_get_all",
-      "source": "gfx/palette.h",
+      "source": "sys/hal/gfx/palette.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "palette_shadow_set",
-      "source": "gfx/palette.h",
+      "source": "sys/hal/gfx/palette.h",
       "context": "normal",
       "irq": false
     }

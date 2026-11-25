@@ -1,6 +1,6 @@
-# drivers/video/cirrus/wab_glue_xe10.c — 設計
+# sys/platform/pc98/video/cirrus/wab_glue_xe10.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DESIGN (D1 で移した)
-ソース: `drivers/video/cirrus/wab_glue_xe10.c`
+ソース: `sys/platform/pc98/video/cirrus/wab_glue_xe10.c`
 
 - 内蔵 GD5428/5430 の VGA レジスタは 0904h、0CA0h〜0CAFh、0DA4h/0DA5h/0DAAh、FF82h に
   写像される。

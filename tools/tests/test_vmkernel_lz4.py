@@ -22,7 +22,7 @@ tools/tests/vmkernel_lz4_host.c は libc なしの 32bit 静的 ELF で、ASM �
   python3 -B tools/tests/test_vmkernel_lz4.py --mutate   # 否定側 (写しの上で変異 → RED)
 """
 CHECK = dict(name='vmkernel-lz4-host', tier=1,
-    covers=['boot/boot_defs.h', 'include/memmap.h', 'sdk/link/app_sys.ld', 'tools/tests/host32.py', 'boot/loader_fat_new.asm', 'boot/lz4_mini.c', 'lib/lz4.c', 'lib/lz4_decode_core.inc', 'tools/mkvmkernel.py', 'tools/gen_memmap.py', 'tools/tests/vmkernel_lz4_host.c', 'tools/check_artifacts.py', 'build/os32.ld', 'fs/fd_redirect.c', 'fs/pipe_buffer.c', 'arch/x86/kernel/kentry.asm', 'mm/shm.c', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link/shlib.ld', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/mkshlib.py', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'boot/vk32_defs.inc', 'boot/crc32_defs.inc', 'boot/fat12_defs.inc', 'boot/pc98_defs.inc', 'tools/tests/kernel_includes.py'],
+    covers=['boot/boot_defs.h', 'sys/include/memmap.h', 'sdk/link/app_sys.ld', 'tools/tests/host32.py', 'boot/loader_fat_new.asm', 'boot/lz4_mini.c', 'lib/lz4.c', 'lib/lz4_decode_core.inc', 'tools/mkvmkernel.py', 'tools/gen_memmap.py', 'tools/tests/vmkernel_lz4_host.c', 'tools/check_artifacts.py', 'build/os32.ld', 'sys/fs/fd_redirect.c', 'sys/fs/pipe_buffer.c', 'sys/arch/x86/kernel/kentry.asm', 'sys/kern/mm/shm.c', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link/shlib.ld', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/mkshlib.py', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'boot/vk32_defs.inc', 'boot/crc32_defs.inc', 'boot/fat12_defs.inc', 'boot/pc98_defs.inc', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=5.1,
     kind='characterization',
 )
@@ -241,7 +241,7 @@ def parse_vk32(img):
 
 def max_image_size():
     expr = subprocess.check_output(
-        ["cpp", "-E", "-P", "-imacros", str(ROOT / "include/memmap.h"),
+        ["cpp", "-E", "-P", "-imacros", str(ROOT / "sys/include/memmap.h"),
          "-imacros", str(LIMIT_HEADER), "-"],
         input="MAX_IMAGE_SIZE\n", text=True).strip()
     expr = re.sub(r"(?<=[0-9a-fA-F])[uUlL]+", "", expr)

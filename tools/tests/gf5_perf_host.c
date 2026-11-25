@@ -1,4 +1,4 @@
-/* Link hwdev/gf/perf.c, UNIT 0, freestanding (-nostdlib).
+/* Link sys/dev/video/geforce/perf.c, UNIT 0, freestanding (-nostdlib).
  * Golden ROM fields are independently transcribed from MIT nouveau c03c1a1
  * nvkm/subdev/bios/perf.c:30-145; the signed NV4a example is 325-25 MHz,
  * memory 200 MHz * 2000 = 400000 kHz. No installed refs are read at runtime.
@@ -157,7 +157,7 @@ static void fresh(void)
     h.ctx.deadline=OUTER_DL; h.ctx.image=&image;
     h.ctx.rom=(struct gf5_rom_view){.bytes=rom,.size=sizeof(rom)};
     gf2_host_memset(rom,0,sizeof(rom));
-    /* Shared BIT directory format, hwdev/gf/rom.inc; one BIT P v2 entry. */
+    /* Shared BIT directory format, sys/dev/video/geforce/rom.inc; one BIT P v2 entry. */
     static const u8 bit[]={0xff,0xb8,'B','I','T',0,0};
     gf2_host_memcpy(rom+BIT_AT,bit,sizeof(bit));
     rom[BIT_AT+8]=BIT_HEAD; rom[BIT_AT+9]=BIT_STRIDE; rom[BIT_AT+10]=1;

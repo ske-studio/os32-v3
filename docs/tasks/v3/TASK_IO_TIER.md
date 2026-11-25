@@ -20,8 +20,8 @@
 ## 2. 段の状態
 | 段 | 状態 |
 |---|---|
-| A0・A1 (契約の行・`kernel/io_work.h`) | 済 (2026-11-15) |
-| A3 (`kernel/io_work.c`)・A4 (`kernel/io_policy.c`) | 済 (2026-11-16、独立レビューの直し 1 回)。ビルドへの登録は A5。共有の口 `kernel/io_clock.h`・`kernel/io_policy.h` と PM の決定 P1〜P4 は設計の末尾 |
+| A0・A1 (契約の行・`sys/kern/io_work.h`) | 済 (2026-11-15) |
+| A3 (`sys/kern/io_work.c`)・A4 (`sys/kern/io_policy.c`) | 済 (2026-11-16、独立レビューの直し 1 回)。ビルドへの登録は A5。共有の口 `sys/kern/io_clock.h`・`sys/kern/io_policy.h` と PM の決定 P1〜P4 は設計の末尾 |
 | A5・T1・T2・D1〜D5・C1・C2・L1 | 済 (2026-11-16〜17、main の git log。この行は 2026-11-19 に本線 PM が実物に合わせて直した — 前は「未着手」のままだった) |
 | E1・E2 | 済 (2026-11-21)。host 試験の不足を補い、io_dispatch の互換枠での時計の読み出しを 2 回にした。NP21/W の受入 PASS。LAN 一括転送に依る項目は TASK_LAN_BULK 着手時に確認する |
 | P1 | 不要。PowerPC は io_work・io_policy を既にリンクしている |

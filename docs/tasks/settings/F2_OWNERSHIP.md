@@ -33,15 +33,15 @@ F1 は受入済みという依頼条件を前提とする。
 
 | 場所 | 現状と F2 に必要な差分 |
 |---|---|
-| `kapi/kapi_db.c` | DbSlot は owner／isolated を保持。finalize→必要なら ROLLBACK→sqlite3_close、close 失敗時は slot のみ隔離。FD の情報はない。owner/all cleanup は isolated を再試行しない |
+| `sys/kapi/kapi_db.c` | DbSlot は owner／isolated を保持。finalize→必要なら ROLLBACK→sqlite3_close、close 失敗時は slot のみ隔離。FD の情報はない。owner/all cleanup は isolated を再試行しない |
 | `tools/tests/kapi_db_owned_tdd.md` | F1 の既存 host 証跡は実 DB slot＋SQLite mock。実 VFS／FD／exec／FEP 生存の証拠ではない |
 | `lib/sqlite3/os32_sqlite_vfs.c` | Os32File は fd だけ。xOpen は現在 owner の `vfs_open`。xClose は void の `vfs_close` を呼ぶ。`os32_sqlite_db_fd` は main しか返さない |
-| `fs/vfs_fd.c` | FD 表は in_use／protect／owner。vfs_open は res_owner_get で付与。vfs_close は protect を無視して表を空ける。vfs_close_owned だけが protect を除外する。backend close callback は現在ない |
-| `fs/fd_redirect.c` | owner は再利用される nest 整数。redirect reset は直接 vfs_close を呼ぶため、「protect したから全 close 経路で安全」ではない |
-| `exec/exec.c` | heap reset 後、redirect→FD→pipe→SHM→sound→**db_cleanup_all**→GUI→nest 減算。親 DB の破壊と SQLite より先の FD 解放が残る |
-| `exec/exec.c` | nest 更新後の起動失敗は exec_launch_abort。現在は子コード未実行・owner 資源なしを前提に owner cleanup を省略 |
-| `exec/exec.c` | CTRL+STOP→ring3_fault_kill→exec_fault_recover→exec_exit。通常 sys_exit と CPL0 entry return も exec_exit。STOP は SQLite/KAPI の途中ではなく静かな境界へ持ち越す |
-| `kernel/ime/ime_dict.c` | FEP は直接 SQLite。open 完了後に main のみ protect、close 前に解除し close の結果を捨てる。検索・学習・列挙・削除・export・clear がある。export 出力 FD は SQLite FD ではない |
+| `sys/fs/vfs_fd.c` | FD 表は in_use／protect／owner。vfs_open は res_owner_get で付与。vfs_close は protect を無視して表を空ける。vfs_close_owned だけが protect を除外する。backend close callback は現在ない |
+| `sys/fs/fd_redirect.c` | owner は再利用される nest 整数。redirect reset は直接 vfs_close を呼ぶため、「protect したから全 close 経路で安全」ではない |
+| `sys/kern/exec/exec.c` | heap reset 後、redirect→FD→pipe→SHM→sound→**db_cleanup_all**→GUI→nest 減算。親 DB の破壊と SQLite より先の FD 解放が残る |
+| `sys/kern/exec/exec.c` | nest 更新後の起動失敗は exec_launch_abort。現在は子コード未実行・owner 資源なしを前提に owner cleanup を省略 |
+| `sys/kern/exec/exec.c` | CTRL+STOP→ring3_fault_kill→exec_fault_recover→exec_exit。通常 sys_exit と CPL0 entry return も exec_exit。STOP は SQLite/KAPI の途中ではなく静かな境界へ持ち越す |
+| `sys/kern/ime/ime_dict.c` | FEP は直接 SQLite。open 完了後に main のみ protect、close 前に解除し close の結果を捨てる。検索・学習・列挙・削除・export・clear がある。export 出力 FD は SQLite FD ではない |
 
 **接続から xOpen へ所有情報を運ぶ既存経路**:
 `lib/sqlite3/sqlite3.c` は指定 VFS を `db->pVfs` に保存して main を開く。
@@ -120,12 +120,12 @@ B の owner は一度も変更しない。FEP が B 実行中に初めて学習�
 
 ### 3.2 OS32 FD 表の内部 lease
 
-`fs/vfs_fd.c` の VfsFile に `lifetime = GENERIC / SQLITE`、cookie、FD generation、
+`sys/fs/vfs_fd.c` の VfsFile に `lifetime = GENERIC / SQLITE`、cookie、FD generation、
 quarantined、SQLite open flags（診断用）を加える。既存 protect と混用しない。
 **この FD 表を所属集合の正典**とし、解放される Os32File の intrusive list を隔離後に辿らない。
 Os32File は fd に加えて cookie と FD generation の lease を持つ。
 
-提案内部 API（`fs/vfs.h`、SDK へ公開しない）:
+提案内部 API（`sys/fs/vfs.h`、SDK へ公開しない）:
 
 ```c
 int vfs_open_sqlite(const char *path, int mode, int owner,
@@ -163,7 +163,7 @@ int vfs_count_sqlite(const VfsSqliteCookie *cookie);
 
 ### 3.3 F2a HOST 限定の確定契約（F2b–d の承認・完了とは別）
 
-F2a の編集対象は `fs/vfs_fd.c`、`fs/vfs.h`、`tools/tests/` の専用 harness／TDD 記録、
+F2a の編集対象は `sys/fs/vfs_fd.c`、`sys/fs/vfs.h`、`tools/tests/` の専用 harness／TDD 記録、
 および本節の契約明確化のみ。初稿 §1 の文書限定作業と区別する。exec／SQLite／FEP は未接続。
 
 - `VfsSqliteCookie = {int group_index, u32 generation}`、
@@ -232,7 +232,7 @@ F2 全体の R0/R1、実 SQLite、exec 終了、FEP、target link／guest の受
 
 ## 5. FEP direct SQLite の移行（exec 統合の前提）
 
-`kernel/ime/ime_dict.c` と必要なら内部 `kernel/ime/ime.h` に group 参照・隔離状態・保存診断を持たせる。
+`sys/kern/ime/ime_dict.c` と必要なら内部 `sys/kern/ime/ime.h` に group 参照・隔離状態・保存診断を持たせる。
 KAPI DbSlot へ入れず、RESIDENT group を open **前**に取得する。全 SQL 操作は既に db->pVfs を継承するので、
 検索/学習/列挙/削除/clear ごとの current owner 書換えは不要。ただし隔離中は全入口で操作を拒否する。
 
@@ -250,7 +250,7 @@ KAPI DbSlot へ入れず、RESIDENT group を open **前**に取得する。全 
 
 ## 6. exec 統合点と終了経路
 
-上の仕組みの host 検証と独立レビューが通るまで `exec/exec.c` を変更しない。
+上の仕組みの host 検証と独立レビューが通るまで `sys/kern/exec/exec.c` を変更しない。
 端末/GUI 担当から排他移管後、内部 helper `exec_cleanup_owned_resources(int owner)` を置き、
 **DB → redirect → generic FD → pipe** の四つをこの順にまとめる。
 DB は `db_cleanup_owned(owner)` であり current owner 再取得や db_cleanup_all ではない。
@@ -287,10 +287,10 @@ SQLite エンジン内部を fault で中断したケースに通常 close を�
 | 段階 | 許可を得た後の変更候補 | 提出物／次段への条件 |
 |---|---|---|
 | R0 設計凍結 | 本票の独立読取りレビュー | 専用 VFS の全 xOpen 経路、lease 寿命、close 失敗／同 nest、FEP、fault 前提を照合。未解決の重大指摘ゼロ、PM 承認後のみコード開始 |
-| F2a FD lease | `fs/vfs_fd.c`, `fs/vfs.h`、専用 host 試験 | GENERIC 回帰、明示 owner、managed close 拒否、lease 再利用防止、隔離と容量上限。exec はまだ触らない |
+| F2a FD lease | `sys/fs/vfs_fd.c`, `sys/fs/vfs.h`、専用 host 試験 | GENERIC 回帰、明示 owner、managed close 拒否、lease 再利用防止、隔離と容量上限。exec はまだ触らない |
 | F2b 接続 VFS＋F1 接続 | `lib/sqlite3/os32_sqlite_vfs.c/.h`, `kapi/kapi_db.c/.h`、専用 host 試験 | main/遅延 journal/temp 分類・失敗 open・close 順序・隔離。F1 既存試験も再実行 |
-| F2c FEP | `kernel/ime/ime_dict.c`, 必要時 `kernel/ime/ime.h`、専用 host 試験 | 常駐 group、全エラー分岐と reopen 拒否、export GENERIC を確認。default file open の未移行利用者ゼロ |
-| F2d 終了統合 | 排他移管された `exec/exec.c`、終了経路 host 試験 | 共通 helper と実 callsite の到達・順序。正常/fault/STOP/起動失敗、親資源を検証 |
+| F2c FEP | `sys/kern/ime/ime_dict.c`, 必要時 `sys/kern/ime/ime.h`、専用 host 試験 | 常駐 group、全エラー分岐と reopen 拒否、export GENERIC を確認。default file open の未移行利用者ゼロ |
+| F2d 終了統合 | 排他移管された `sys/kern/exec/exec.c`、終了経路 host 試験 | 共通 helper と実 callsite の到達・順序。正常/fault/STOP/起動失敗、親資源を検証 |
 | R1／実機ゲート | 独立 reviewer、後日承認された専任検証者 | host 実行証拠→target compile/link→ゲスト終了理由別測定。今回の作業では実施しない |
 
 順序は a→b→c→d。b/c 途中で default 未所属 file open の拒否を有効にして FEP を壊す配備をしない。

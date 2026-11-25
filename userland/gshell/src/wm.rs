@@ -50,7 +50,7 @@ pub const DAMAGE_SNAP: i32 = 32;
 /* WM が予約する SHM 内オフセット。**自前で定義しない** — 2026-09-17 まで
  * ここに 0x30000 の 3 つめの写しがあり、C と Rust proto を突き合わせる
  * make check-gui-proto の網から外れていた (決裁 D1 で +0x28000 へ動いた)。
- * 正典は include/memmap.h の MEM_SHM_GUI_OFFSET。 */
+ * 正典は sys/include/memmap.h の MEM_SHM_GUI_OFFSET。 */
 pub use os32api::gui::proto::GUI_SHM_OFFSET;
 
 /* ================================================================ */

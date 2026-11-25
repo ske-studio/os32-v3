@@ -1,7 +1,7 @@
 /* Compare the shipped guest reference with the software renderer, freestanding. */
 #include "gfx2_sw.h"
 #define main guest_main
-#include "../../userland/tests/gfx2_rh.c"
+#include "../../userland/diag/gfx2_rh.c"
 #undef main
 static u8 dst[64*16*2], src[64*16*2];
 int gfxsync_read_rows(GfxSyncCtx *s, u32 x, u32 y, u32 w, u32 h, u8 *p, u32 pitch)

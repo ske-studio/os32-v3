@@ -3,7 +3,7 @@
  * A frame retains the EDs it fetched, including their original successors.
  * The small core below supplies only the frozen 1A API used by this HCD test.
  */
-#include "drivers/usb/ohci_priv.h"
+#include "sys/dev/usb/ohci_priv.h"
 #define PAGE 4096u
 #define NPAGES 8u
 #define MAX_HELD 96u

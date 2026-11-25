@@ -26,10 +26,10 @@ $(C_KERNEL_OBJ) $(ASM_KERNEL_OBJ) $(BUILD_ID_OBJ) $(R1_OBJECTS) \
     $(SHELL_OBJ) $(SH_OBJ) $(PCI_DECODE_USER_OBJ) $(PC98PT_USER_OBJ) \
     $(SH_PCI_DECODE_OBJ) $(SH_PC98PT_OBJ) $(INST_OBJ) $(BENCH_OBJ) \
     $(BENCH_S2X_OBJ) $(FAULTPROBE_OBJ) $(SQLITE_SA_OBJ) \
-    $(patsubst %.c,%.o,$(wildcard userland/cmds/*.c userland/tests/*.c userland/system/*.c)) \
+    $(patsubst %.c,%.o,$(wildcard userland/cmds/*.c) userland/diag/allocator_bench.c userland/diag/asset_demo.c userland/diag/asset_test.c userland/diag/audit_test.c userland/diag/av_test.c userland/diag/blit_test.c userland/diag/blit_test2.c userland/diag/cfg_bench.c userland/diag/crash.c userland/diag/crtexit.c userland/diag/d0a_test.c userland/diag/db_test.c userland/diag/db_v50_test.c userland/diag/dbq.c userland/diag/demo_tile.c userland/diag/disk_auth_test.c userland/diag/e2seek.c userland/diag/e2test.c userland/diag/ecs_test.c userland/diag/exec_heap_test.c userland/diag/faulttest.c userland/diag/fep_meta_test.c userland/diag/font_lease_test.c userland/diag/font_load_test.c userland/diag/fp_stop.c userland/diag/gfx200_test.c userland/diag/gfx2_i1.c userland/diag/gfx2_i2.c userland/diag/gfx2_i3.c userland/diag/gfx2_rh.c userland/diag/gfx_demo200.c userland/diag/gui_busy.c userland/diag/gui_call_test.c userland/diag/h2_stack.c userland/diag/h3a.c userland/diag/h3b.c userland/diag/h5_shape_i.c userland/diag/h5_shape_ii.c userland/diag/h5_shape_iii.c userland/diag/hal_test.c userland/diag/heap_test.c userland/diag/hello.c userland/diag/host_test.c userland/diag/hwscroll_probe.c userland/diag/input_test.c userland/diag/kapi_cost.c userland/diag/kbd_echo.c userland/diag/kcallback_test.c userland/diag/kdebug_probe.c userland/diag/klibc_test.c userland/diag/kout_test.c userland/diag/kprint_boundary.c userland/diag/kstr_bench.c userland/diag/kstr_boundary.c userland/diag/kstr_v86.c userland/diag/layout_cycle_test.c userland/diag/loopfmt_test.c userland/diag/malloc_arena_test.c userland/diag/math_test.c userland/diag/mem_map_test.c userland/diag/mem_stat_compat_test.c userland/diag/mem_stat_test.c userland/diag/mgx_test.c userland/diag/mouse_test.c userland/diag/nop.c userland/diag/pcm_play.c userland/diag/pcm_test.c userland/diag/pegcchk.c userland/diag/pipe_owner_test.c userland/diag/raw_wait_test.c userland/diag/restest.c userland/diag/ring3_fault.c userland/diag/ring3_guard.c userland/diag/ring3_hello.c userland/diag/rotate_test.c userland/diag/save_test.c userland/diag/sbrk_grow_test.c userland/diag/shm_reuse_child.c userland/diag/shm_reuse_test.c userland/diag/shutdown_probe.c userland/diag/snd2_test.c userland/diag/sndl_test.c userland/diag/stat_t.c userland/diag/stop_loop.c userland/diag/t_exit.c userland/diag/test2.c userland/diag/text_ro_test.c userland/diag/tile_bench.c userland/diag/time_test.c userland/diag/trim_back.c userland/diag/trim_front.c $(wildcard userland/system/*.c)) \
     lib/utf8_prog.o lib/lz4_prog.o lib/microtar/microtar_prog.o userland/lib/rt/pkg.o \
     userland/lib/gfx/ui.o $(MODULE_PROVIDER_OBJS) \
-    userland/tests/kstr_asm_a.o userland/tests/kstr_c_c.o \
+    userland/diag/kstr_asm_a.o userland/diag/kstr_c_c.o \
     $(RUST_LZ4_LIB) $(RUST_KAPI_RS) $(SDK_KAPI_HDR) sdk: | $(KAPI_GENERATED)
 
 $(GSHELL_LIB) sdk: | $(RUST_KAPI_RS)
@@ -51,7 +51,7 @@ $(KERNEL_PAIRED_MODULES) $(R1_PAIRED_MODULES): sdk/target_profile.py
 # これにより構造体定義などヘッダを変更したとき、依存する .o が必ず再ビルドされる。
 # Rust の target/ 以下にも .d があるため除外する。
 # Ignore legacy core .d files beside sources, including lib/: those describe
-# the old objects. User-side lib/*_prog.d stays in scope until the 6b task.
+# the old objects. User-side sys/kern/*_prog.d stays in scope until the 6b task.
 DEPFILES := $(C_KERNEL_OBJ:.o=.d) $(BUILD_ID_OBJ:.o=.d) \
             $(shell find $(BUILD_OUT) boot programs userland sdk \
               -name '*.d' -not -path '*/target/*' 2>/dev/null) \

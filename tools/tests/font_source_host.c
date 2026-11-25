@@ -1,4 +1,4 @@
-/* T7b-b1: font の read lease (fs/vfs_fd.c と kernel/console/font_source.c を実物で組む)。
+/* T7b-b1: font の read lease (sys/fs/vfs_fd.c と sys/kern/console/font_source.c を実物で組む)。
  * 設計 ~/os32-tmp/run/t7bb12/DESIGN.final.md §2 / §5 の b1①〜⑦ と b2②④ の
  * lease 表側。S1 = VFS 部、S2 = lease 表・app の門 (public KAPI の実体)・
  * shell 側の段 C/D。S3b = exec.c の回収 hook (exec_reclaim_resources を
@@ -14,7 +14,7 @@
 #include "types.h"
 #define __KSTRING_H
 u32 kstrlen(const char *s) { return (u32)strlen(s); }
-/* Match lib/kstring_c.c / kstring_asm.asm: capacity includes NUL, no padding. */
+/* Match sys/kern/kstring_c.c / kstring_asm.asm: capacity includes NUL, no padding. */
 char *kstrlcpy(char *dst, const char *src, u32 size)
 {
     u32 i;
@@ -23,17 +23,17 @@ char *kstrlcpy(char *dst, const char *src, u32 size)
     dst[i] = '\0';
     return dst;
 }
-#include "../../fs/vfs_fd.c"
+#include "../../sys/fs/vfs_fd.c"
 #ifdef FONT_SOURCE_HOST_APP_TOTAL
 #undef VFS_FONT_FD_MAX_APP_TOTAL
 #define VFS_FONT_FD_MAX_APP_TOTAL FONT_SOURCE_HOST_APP_TOTAL
 #endif
-/* kernel/gui.h は ILP32 の構造体の大きさを STATIC_ASSERT するので 64 ビットの
+/* sys/kern/gui.h は ILP32 の構造体の大きさを STATIC_ASSERT するので 64 ビットの
  * ホストでは読めない。font_source.c が使うのは GUI_SHELL_OWNER だけなので、
- * 試験 py が kernel/gui.h から読んだ値を -DHOST_GUI_SHELL_OWNER で渡す */
+ * 試験 py が sys/kern/gui.h から読んだ値を -DHOST_GUI_SHELL_OWNER で渡す */
 #define __GUI_H
 #define GUI_SHELL_OWNER HOST_GUI_SHELL_OWNER
-#include "../../kernel/console/font_source.c"
+#include "../../sys/kern/console/font_source.c"
 #include "exec_font_lease.h"
 
 #define CHECK(x) do { if (!(x)) { \
@@ -387,7 +387,7 @@ static void budget(void)
         open_font_ok(APP_OWNER, VFS_FONT_OPEN_PIN, &l);
 }
 
-/* ==== S2: lease 表と app の門 (kernel/console/font_source.c) ==================== */
+/* ==== S2: lease 表と app の門 (sys/kern/console/font_source.c) ==================== */
 
 /* exec / redir_access の境界の贋物。caller は試験が演じる */
 static int from_user = 1, caller_ok = 1, copy_fail, kill_calls;
@@ -686,7 +686,7 @@ static void lease_owned(void)
     for (i = 0; i < FONT_LEASE_SLOTS; i++) CHECK(g_font_leases[i].kind == FONT_LEASE_FREE);
 }
 
-/* S3b b1⑤: exec/exec.c の exec_reclaim_resources (切り出した実物) が app の
+/* S3b b1⑤: sys/kern/exec/exec.c の exec_reclaim_resources (切り出した実物) が app の
  * lease 表の枠と VFS の FD を両方返す。他の回収の段は贋物で、前後の段から
  * lease の状態を見る (font_lease_close_owned は fd_redirect の後・pipe の前)。 */
 static int reclaim_target = -1, reclaim_mid_ok, reclaim_steps;

@@ -29,30 +29,30 @@
 - 公開ラスタ表は最大200件、各行1件、行間隔2以上、既定予算は4行1件。
 - IF=0・同期失敗・予算違反は静止提示。戻り値が void なので失敗理由は得られない。
 - 以上の契約は `sdk/include/os32/os32_kapi_shared.h`。v2 の6384件表とは別物。
-- wrapper は USER 入力表の全域を検査して既存描画へ渡す。`kapi/kapi_generated.c`。
+- wrapper は USER 入力表の全域を検査して既存描画へ渡す。`sys/kapi/kapi_generated.c`。
 - 既存利用例: `userland/lib/gfx/draw/gfx_raster.c` が表構築と KAPI 呼出を提供。
-- `userland/tests/gfx_demo200.c` の `build_assets()` は surface→sprite、初期化、dirty 転送の例。
+- `userland/diag/gfx_demo200.c` の `build_assets()` は surface→sprite、初期化、dirty 転送の例。
 - `userland/` の OSRI 検索ではデコーダー利用例は見つからず、画像用の実装を流用できるとはしない。
 
 ### OSRI と再生器の現在地
 
 | 部品 | 実装と到達性 |
 |---|---|
-| ファイル形式 | 64Bヘッダ、32B RGB444初期色、128000Bの4面、8Bイベント。`gfx/gfx_osri.h` の `OSRI_HEADER_BYTES`。 |
-| 読込 | `osri_load(path, gfx_kernel_fb *, OsriImage *)`、VFSからBBへ読込。カーネル内部のみ。`gfx/gfx_osri.c`。 |
-| 検証 | 寸法・予約欄・正確な長さ・band・RGB444・順序・CRC・末尾余剰を検査。`gfx/gfx_osri.c`。 |
-| 現行通常 | v1≤200、v2≤1197・行3番号。行内番号昇順、同値拒否。`gfx/gfx_osri.h` の `OSRI_V1_MAX_EVENTS`、`gfx/gfx_osri.c` の `osri_load()`。 |
-| 現行OBS | v2≤6384・行16番号、行内任意順・同値可、番号重複拒否。`gfx/gfx_osri.c`。 |
-| 旧通常核 | `pl_prepare/pl_frame`、最大6 OUTの型・認定方式。`drivers/video/pc98/splash_raster_image.h` の `PL_MAX_OUTS`。 |
-| OBS準備 | `pl_obs_prepare`、band1/v2専用、差分成分をG/R/B順に列化。`drivers/video/pc98/splash_raster_image.c`。 |
-| OBS制限 | 現物の上限47 OUT、格納64、plan52008B。`drivers/video/pc98/splash_raster_image.h`。 |
-| HBLANK核 | activeで先頭番号を選び、H立上りで列を実行、VSYNCならDROP。`drivers/video/pc98/splash_raster_image.c`（pl_obs_frame、919はobs_edge）。 |
-| IF区間 | VBLANK待ちはIF開放、その後CLI、初期色・可視行走査、全出口で復元。`drivers/video/pc98/splash_raster_image.c`。 |
-| 既存公開ラスタ | dirty転送/flip後 `pc98_splash_raster_table` へ。`drivers/video/pc98/gfx_vram.c`。OSRI核ではない。 |
+| ファイル形式 | 64Bヘッダ、32B RGB444初期色、128000Bの4面、8Bイベント。`sys/kern/gfx/osri/gfx_osri.h` の `OSRI_HEADER_BYTES`。 |
+| 読込 | `osri_load(path, gfx_kernel_fb *, OsriImage *)`、VFSからBBへ読込。カーネル内部のみ。`sys/kern/gfx/osri/gfx_osri.c`。 |
+| 検証 | 寸法・予約欄・正確な長さ・band・RGB444・順序・CRC・末尾余剰を検査。`sys/kern/gfx/osri/gfx_osri.c`。 |
+| 現行通常 | v1≤200、v2≤1197・行3番号。行内番号昇順、同値拒否。`sys/kern/gfx/osri/gfx_osri.h` の `OSRI_V1_MAX_EVENTS`、`sys/kern/gfx/osri/gfx_osri.c` の `osri_load()`。 |
+| 現行OBS | v2≤6384・行16番号、行内任意順・同値可、番号重複拒否。`sys/kern/gfx/osri/gfx_osri.c`。 |
+| 旧通常核 | `pl_prepare/pl_frame`、最大6 OUTの型・認定方式。`sys/platform/pc98/video/splash_raster_image.h` の `PL_MAX_OUTS`。 |
+| OBS準備 | `pl_obs_prepare`、band1/v2専用、差分成分をG/R/B順に列化。`sys/platform/pc98/video/splash_raster_image.c`。 |
+| OBS制限 | 現物の上限47 OUT、格納64、plan52008B。`sys/platform/pc98/video/splash_raster_image.h`。 |
+| HBLANK核 | activeで先頭番号を選び、H立上りで列を実行、VSYNCならDROP。`sys/platform/pc98/video/splash_raster_image.c`（pl_obs_frame、919はobs_edge）。 |
+| IF区間 | VBLANK待ちはIF開放、その後CLI、初期色・可視行走査、全出口で復元。`sys/platform/pc98/video/splash_raster_image.c`。 |
+| 既存公開ラスタ | dirty転送/flip後 `pc98_splash_raster_table` へ。`sys/platform/pc98/video/gfx_vram.c`。OSRI核ではない。 |
 
-- `drivers/video/pc98/gfx_vram.c` は目標行直前〜HBLANKの4 OUTだけ保護し、保護間にIF開放を置く方式。
+- `sys/platform/pc98/video/gfx_vram.c` は目標行直前〜HBLANKの4 OUTだけ保護し、保護間にIF開放を置く方式。
 - `RASTER_LINE_US` は実装から削除済みで、`tools/tests/cpu_calibrate_host.c` のコメントだけに残る。古い120µs待ちを現在の根拠にしない。
-- 読込失敗でもBBには部分画素が入り得る（`gfx/gfx_osri.c` の `osri_load()`）。検査完了前の転送は禁止する。
+- 読込失敗でもBBには部分画素が入り得る（`sys/kern/gfx/osri/gfx_osri.c` の `osri_load()`）。検査完了前の転送は禁止する。
 - B31は「HBLANK内に全OUTが収まる」保証ではない。enc2は可視域への色変更のはみ出しも評価する。
 - 根拠: `docs/design/tools/osri_enc2.md` の「時刻のモデル (はみ出しの見た目)」。生成時の探索はホスト専用（同じ文書の「役割の分担」）。
 
@@ -115,7 +115,7 @@ int gfx_osri_show(const char *path, u32 duration_ms);
 - 専用の負値は追加しない。loaderの0/-1だけでは分類できないため、内部に理由を返す補助口を足し、既存boot呼出の契約は維持する。
 - USER不正アドレスは既存B1のfault/kill契約。pathはNULまで上限付きコピーし、保持するUSERポインタは0本。
 - G1確認: `sdk/gen_kapi.py` のinは範囲検査、target:trueはtargetへ委譲し、引数はそのまま渡す。文字列コピーは生成しない。
-- `kapi/kapi_strings.c` のコピー表も手登録。今回は登録せず手書きkapi_osri.cをtargetにし、in=[{arg:"path",target:true}]・out:"none"を指定する。
+- `sys/kapi/kapi_strings.c` のコピー表も手登録。今回は登録せず手書きkapi_osri.cをtargetにし、in=[{arg:"path",target:true}]・out:"none"を指定する。
 - 入口でcallerを捕捉しVFS_MAX_PATH内をcopy_caller_bytesでNULまでコピー。不正範囲/桁溢れはB1、正常範囲の非終端/空はINVAL、確保失敗はNOSPC。全域一括の先読みはしない。
 - 現在末尾 `sys_ver_info` の後へ1枠追加、他変更が先行しなければv80。`sdk/kapi.json`。
 - v79基準の追加slotは255。実装時に最新末尾・容量を再確認し、版衝突時は次の版を採る。
@@ -135,7 +135,7 @@ int gfx_osri_show(const char *path, u32 duration_ms);
 - 引数なしはusageを出す。ファイル一覧・次画像・拡縮・回転・PNG/JPEG対応は初版に加えない。
 - GUI中も--gfx宣言で既存の全画面取得を許す。gfx_init→gfx_kapi_claim→appslot_gfx_claimの門を通り、GUIウィンドウ内には表示しない。
 - showはgfx開始済みを必須とし、con_sink_is_enabled()のときだけ呼出元==appslot_gfx_owner()も検査する。不成立はBUSY。CUIでは所有者がWMのままでも許可する。
-- gfx_shutdownと同じGUI限定の所有照合を使う（gfx/gfx_core.c）。static gfx_startedには内部読み口を1つ足す。showはgfx_init/shutdownを呼ばず、所有者・開始状態を変更しない。
+- gfx_shutdownと同じGUI限定の所有照合を使う（sys/hal/gfx/gfx_core.c）。static gfx_startedには内部読み口を1つ足す。showはgfx_init/shutdownを呼ばず、所有者・開始状態を変更しない。
 - HALに現在の表示経路のOSRI hookを1つ置く。pc98 GDC 640×400 planar4の31k/24kに対応し、GeForce/PEGC480/200ラインはNOSYS。gfx/からpl_v2_*を直接呼ばない。
 - HAL hookの署名案は `int (*osri_show)(const struct OsriImage *, const struct PlV2Plan *, run_ctl *)`。固定画像のplanはNULL、run_ctlは時間・取消状態を持つ内部型。hook欠如はNOSYS。
 - パレットは全16色を使うため、GUIの部分leaseで済ませない。TVRAM文字重畳も表示中は隠し、終了時に復元する。
@@ -174,13 +174,13 @@ int gfx_osri_show(const char *path, u32 duration_ms);
 | ファイル（新規は+、宣言は対応.h） | 1ファイルの責務 |
 |---|---|
 | +`userland/osriview/main.c` | 引数、KAPI呼出、結果表示のみ。 |
-| +`gfx/gfx_osri_view.c` / +`.h` | 同期サービスの所有・読込・復帰、USER入口から渡されたkernel pathを使う。 |
-| `gfx/gfx_core.c` / 対応.h | static gfx_startedの内部読み口を追加。GUI限定の所有照合をサービスで使用する。 |
-| +`kapi/kapi_osri.c` | 手書きtarget。USER文字列の検証/コピーと理由分類、呼出元を保持してサービスへ渡す。 |
+| +`sys/kern/gfx/osri/gfx_osri_view.c` / +`.h` | 同期サービスの所有・読込・復帰、USER入口から渡されたkernel pathを使う。 |
+| `sys/hal/gfx/gfx_core.c` / 対応.h | static gfx_startedの内部読み口を追加。GUI限定の所有照合をサービスで使用する。 |
+| +`sys/kapi/kapi_osri.c` | 手書きtarget。USER文字列の検証/コピーと理由分類、呼出元を保持してサービスへ渡す。 |
 | HALの現表示経路interface/pc98実装（GeForce後に配置確定） | OSRI hook・能力判定と共通runへの結線。非対応経路はNOSYS。 |
-| +`drivers/video/pc98/splash_raster_run.c` / +`.h` | 有限時間制御と取消境界。S5bの同種計算をここへ移し二重実装しない。 |
-| `platform/pc98/splash_image.c` | S5bの呼出を共通runへ結線、bootの演出/復帰責務は維持。 |
-| `gfx/gfx_osri.c`、S5のplan/play | 核を再利用しloaderに内部エラー理由を追加。公開KAPIのためにOBSマクロ分岐を復活させない。 |
+| +`sys/platform/pc98/video/splash_raster_run.c` / +`.h` | 有限時間制御と取消境界。S5bの同種計算をここへ移し二重実装しない。 |
+| `sys/platform/pc98/splash_image.c` | S5bの呼出を共通runへ結線、bootの演出/復帰責務は維持。 |
+| `sys/kern/gfx/osri/gfx_osri.c`、S5のplan/play | 核を再利用しloaderに内部エラー理由を追加。公開KAPIのためにOBSマクロ分岐を復活させない。 |
 | `sdk/kapi.json`、`sdk/include/os32/os32_kapi_shared.h` | 末尾1枠、既存戻り値を使用、版。生成物は生成器のみ。 |
 | `build/app.conf`、`build/kernel.mk`、`userland/deploy.yaml` | 最低API版、--gfx、ソース登録、アプリ配置。登録変更は直列。 |
 | +`tools/tests/test_osri_view.py` / +`osri_view_host.c` | 契約・所有・終了のhost試験と変異、CHECK入力登録。 |

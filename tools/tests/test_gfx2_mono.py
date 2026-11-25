@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """S5 monochrome expansion and transparent clipping."""
 CHECK = dict(name='gfx2-mono-host', tier=1, needs=[], budget=5,
-    covers=['gfx/v2/sw_mono.c', 'gfx/v2/gfx2_sw.h', 'gfx/v2/gfx2_int.h',
-            'include/gfx_sync.h', 'tools/tests/gfx2_mono_host.c',
+    covers=['sys/hal/gfx/v2/sw_mono.c', 'sys/hal/gfx/v2/gfx2_sw.h', 'sys/hal/gfx/v2/gfx2_int.h',
+            'sys/include/gfx_sync.h', 'tools/tests/gfx2_mono_host.c',
             'tools/tests/test_gfx2_mono.py', 'tools/tests/host32.py'],
     basis=['HAL_V2_DESIGN §3-3', 'HAL_V2_DESIGN §5-2'],
 )
@@ -27,7 +27,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/v2/sw_mono.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/v2/sw_mono.c').read_text()
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         assert observe(work, source) == 0

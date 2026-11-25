@@ -3,8 +3,8 @@
 #include "ppc_trap.h"
 #include "kernel_tick.h"
 #include "arch_io.h"
-#include "kernel/irq/tick.h"
-#include "kernel/irq/irq.h"
+#include "sys/kern/irq/tick.h"
+#include "sys/kern/irq/irq.h"
 volatile u32 kctx_irq_depth;
 static int dec, writes, enabled, reject_config;
 int __real_tick_clock_config(u32 num, u32 den);

@@ -4,12 +4,12 @@
 
 - 単一利用者・単一タスク・協調切替、整数演算。カーネル→具体ドライバだけを外す。逆方向、既存検査、エラー、待ち、復旧を保つ。権限機構は追加しない。
 
-- 確定境界: D2 §2–4 の入力・出力・時計の表と未登録値、D3 §3 の boot_step と IF/順序を維持。`platform/pc98/boot.c` の `pc98_boot_bind()` の bind に新フェーズを足さない。
+- 確定境界: D2 §2–4 の入力・出力・時計の表と未登録値、D3 §3 の boot_step と IF/順序を維持。`sys/platform/pc98/boot.c` の `pc98_boot_bind()` の bind に新フェーズを足さない。
 - B §2 のリンク時固定口・§試験の基点列固定を踏襲。C §3 の固定名ヘッダ/static const は必要な機種記述だけに使い、状態表を増やさない。
 
 ## 2. 共通の契約と生成経路
 
-- 新規 `include/platform_device.h` は内部宣言だけ。実装は `platform/pc98/device_*.c`。登録関数0、操作表0、動的確保0。状態は従来の所有者に置く。
+- 新規 `sys/include/platform_device.h` は内部宣言だけ。実装は `platform/pc98/device_*.c`。登録関数0、操作表0、動的確保0。状態は従来の所有者に置く。
 - 名前は原関数に `platform_` を付け、引数/返値/副作用を一対一で転送。公開KAPIの番号・版・署名・cdecl・out/in記述は不変（F5(a)、公開変更ではない）。
 
 > [要確認: 計画の時制?]
@@ -24,9 +24,9 @@
 - PC-9821、単一利用者・単一タスク・協調切替。目的は固まらない・壊さない・戻せること。整数演算、既存 I/O と待ちを維持。
 - KAPI 番号・署名・呼出規約、部品 ABI、配置世代を変更しない。CLAUDE.md [C1]–[D4] を適用。新規ハード制御方式は導入しない。
 
-- D1 §2: `tick_register`、6枠、IRQ0/IF=0、SND→PCM→NE2K→E82557→LINK→LGY98 を維持。`arch/x86/kernel/isr_handlers.c` の dispatch は変更しない。
+- D1 §2: `tick_register`、6枠、IRQ0/IF=0、SND→PCM→NE2K→E82557→LINK→LGY98 を維持。`sys/arch/x86/kernel/isr_handlers.c` の dispatch は変更しない。
 - D3 §3: `boot_platform_register(const struct boot_platform *)` と `step[BOOT_POINT_COUNT]` は既存のまま。
-  `platform/pc98/kernel.c` の bind、`kernel_main()` PIC→`kernel_main()` sysclk→BOOT_DMA→`kernel_main()` PIT の呼出位置、IF、ログを固定する。
+  `sys/platform/pc98/kernel.c` の bind、`kernel_main()` PIC→`kernel_main()` sysclk→BOOT_DMA→`kernel_main()` PIT の呼出位置、IF、ログを固定する。
 
 ## 2. 共通境界 — リンク時固定の小さい口
 
@@ -73,7 +73,7 @@ CPUのPTEビット生成・CR3・TLB操作はkernel所有。
 ### device_ide
 
 ```c
-/* kernel/dev/device_ide.c: 状態なし、KAPIの検査は呼出側に残す */
+/* sys/dev/ide/device_ide.c: 状態なし、KAPIの検査は呼出側に残す */
 void platform_ide_init(void) { (void)ide_init(); }
 int platform_ide_read_sector(int d, u32 l, void *b)
 { return ide_read_sector(d, l, b); }
@@ -85,14 +85,14 @@ int platform_ide_read_sector(int d, u32 l, void *b)
 
 ### lan_match
 
-- `platform/pc98/lan_match.c` に現 e82557_driver をそのまま移す。外部名も残し既存利用者を壊さない。lan_probe は `lan_module_probe` として内部公開。
+- `sys/platform/pc98/lan_match.c` に現 e82557_driver をそのまま移す。外部名も残し既存利用者を壊さない。lan_probe は `lan_module_probe` として内部公開。
 
 > [要確認: 計画の時制?]
 
 - 機種口は表を返すだけ。bindの時期・pci_boundの更新・失敗時のunbindを常駐facadeに残す。起動で先行bindしない。
 
 ```c
-/* platform/pc98/lan_match.c: 静的・常駐、callbackも常駐 */
+/* sys/platform/pc98/lan_match.c: 静的・常駐、callbackも常駐 */
 const struct pci_driver e82557_driver = {
     sizeof(struct pci_driver), E82557_VENDOR, E82557_DEVICE,
     PCI_CLASS_NETWORK, PCI_SUB_NET_ETHERNET, "e82557", lan_module_probe
@@ -114,13 +114,13 @@ const struct pci_driver *platform_lan_driver(void) { return &e82557_driver; }
 
 ### device_pci
 
-2026-11-19 の PCI の共通化 段 M3 で、転送 4 本と kapi_pci_bind_info は共通の kernel/dev/device_pci.c に移った (この機種の置き場には残っていない)。
+2026-11-19 の PCI の共通化 段 M3 で、転送 4 本と kapi_pci_bind_info は共通の sys/dev/pci/device_pci.c に移った (この機種の置き場には残っていない)。
 
 ### device_host
 
 device_host.cにnp2_detect/get_version/get_cpu/get_clock/check_hostdrv（元の宣言と同型）と上記6転送。
 
-> [要確認] 「上記6転送」は元文書の host_readfile/writefile/listdir/delete/mkdir/getconfig。platform/pc98/device_host.c の同名 platform_host_* に対応する。
+> [要確認] 「上記6転送」は元文書の host_readfile/writefile/listdir/delete/mkdir/getconfig。sys/platform/pc98/device_host.c の同名 platform_host_* に対応する。
 
 ### device_kcg
 
@@ -135,7 +135,7 @@ int platform_kcg_load_font(const char *p) { return kcg_load_font(p); } /* NOSYS 
 ### system
 
 ```c
-/* platform/pc98/system.c */
+/* sys/platform/pc98/system.c */
 void platform_reset(void) {
     outp(SYSPORT_C_BSR, BSR_SHUT0_SET);
     outp(SYSPORT_C_BSR, BSR_SHUT1_SET);
@@ -147,7 +147,7 @@ void platform_reset(void) {
 
 ### clock
 
-|platform/pc98/clock.c、起動前景|`v86_bios_real_lowmem()[BIOS_WORK_SYSCLK]` を1回読む。bit7=1:1996800Hz/8MHz系、0:2457600Hz。既存低位メモリ変換経路を維持|
+|sys/platform/pc98/clock.c、起動前景|`v86_bios_real_lowmem()[BIOS_WORK_SYSCLK]` を1回読む。bit7=1:1996800Hz/8MHz系、0:2457600Hz。既存低位メモリ変換経路を維持|
 
 ### memory
 
@@ -159,7 +159,7 @@ void platform_reset(void) {
 ### tick_order
 
 ```c
-/* platform/pc98/tick_order.h: 配線の順序。kernel/irq/tick.c は読まない。 */
+/* sys/platform/pc98/tick_order.h: 配線の順序。sys/kern/irq/tick.c は読まない。 */
 enum { PC98_TICK_SND, PC98_TICK_PCM, PC98_TICK_NE2K,
        PC98_TICK_E82557, PC98_TICK_LINK, PC98_TICK_LGY98 };
 ```
@@ -183,7 +183,7 @@ platform 側で `STATIC_ASSERT(IDE_MAX_DRIVES == …)` を置く
 ### boot_disk
 
 ```c
-/* platform/pc98/boot_disk.c の static const 表を pc98_boot_bind で登録。 */
+/* sys/platform/pc98/boot_disk.c の static const 表を pc98_boot_bind で登録。 */
 ```
 IDE 固有型/定数/addr_mode 判定を boot_disk.c に移し、IDE の状態は IDE が所有。照会は起動前景または KAPI の協調文脈、IRQ 内では呼ばない。
 
@@ -219,7 +219,7 @@ fill_ata は元の get_geom 成功かつ present の場合だけ既存 ATA 欄/a
 |PC98 emergency backend|文字/属性面へのアクセスだけ。可変大域状態なし|paging前の起動、例外、DF専用スタック、V86 teardown（IRQ/例外内を含む）|
 
 ```c
-/* platform/pc98/emergency.c: 通常console/sink/kprintfに依存しない */
+/* sys/platform/pc98/emergency.c: 通常console/sink/kprintfに依存しない */
 void platform_fault_cell(u32 pos, u16 code, u8 attr) {
     ((volatile u16 *)P2V_IO(TVRAM_BASE))[pos] = code;
     ((volatile u16 *)P2V_IO(TVRAM_ATTR))[pos] = (u16)attr;
@@ -235,7 +235,7 @@ void platform_fault_cell(u32 pos, u16 code, u8 attr) {
 |PC98 splash backend|既存struct gfx_kernel_fbの記述子1個（借用ポインタ）|起動前景のみ、IRQから呼ばない。バッファ自体はgfx所有|
 
 ```c
-/* platform/pc98/splash.c: 旧記述子を移動、バッファを複製しない */
+/* sys/platform/pc98/splash.c: 旧記述子を移動、バッファを複製しない */
 static struct gfx_kernel_fb splash_fb;
 /* begin: pref保存→PC98指定→gfx_init→pref復元→framebuffer/format/4面確認 */
 /* 失敗: gfx_shutdown→非0。kernel側がtvram_clearしてreturn。 */
@@ -255,7 +255,7 @@ static struct gfx_kernel_fb splash_fb;
 
 ### console_attr
 
-- 色ビット判定・visible補完・旧来の青緑赤変換・黒→白を`platform/pc98/console_attr.c`へ全移動。単独hostリンクできる純粋関数に分離。
+- 色ビット判定・visible補完・旧来の青緑赤変換・黒→白を`sys/platform/pc98/console_attr.c`へ全移動。単独hostリンクできる純粋関数に分離。
 
 > [要確認: 計画の時制?]
 
@@ -292,23 +292,23 @@ static struct gfx_kernel_fb splash_fb;
 
 - [platform/pc98/timer](timer.md)
 
-- [platform/pc98/splash_image.c](splash_image.c.md)
+- [sys/platform/pc98/splash_image.c](splash_image.c.md)
 
-- [platform/pc98/splash_probe.c](splash_probe.c.md)
+- [sys/platform/pc98/splash_probe.c](splash_probe.c.md)
 
-- [platform/pc98/kernel.c](kernel.md)
+- [sys/platform/pc98/kernel.c](kernel.md)
 
-- [platform/pc98/kernel_gfx_config.inc](kernel_gfx_config.md)
+- [sys/platform/pc98/kernel_gfx_config.inc](kernel_gfx_config.md)
 
-- [platform/pc98/boot_platform.c](boot_platform.md)
+- [sys/platform/pc98/boot_platform.c](boot_platform.md)
 
-- [platform/pc98/sysclk.c](sysclk.md)
+- [sys/platform/pc98/sysclk.c](sysclk.md)
 
-- [platform/pc98/boot_splash.c](boot_splash.c.md)
+- [sys/platform/pc98/boot_splash.c](boot_splash.c.md)
 
-- [platform/pc98/splash.c](splash.c.md)
+- [sys/platform/pc98/splash.c](splash.c.md)
 
-- [platform/pc98/splash_obs.c](splash_obs.c.md)
+- [sys/platform/pc98/splash_obs.c](splash_obs.c.md)
 - [bootinfo_check](bootinfo_check.md)
 - [console](console.md)
 - [display](display.md)

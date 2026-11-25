@@ -1,0 +1,23 @@
+#include "gfinit_resources.h"
+#include "kprintf.h"
+#include "../../../pci/pci.h"
+#include "../../../pci/pci_barsize.h"
+#ifdef GF_PRODUCTION
+#include "../production.h"
+#endif
+#if !defined(GFINIT_RESOURCES_HOST) && !defined(GF_PRODUCTION)
+#ifdef HWDEV_MODULE
+#include "sys/dev/hwdev/generated/hwdev_import_macros.h"
+#else
+#include "../../../../platform/pc98/kdebug/generated/kdebug_import_macros.h"
+#endif
+#endif
+/* Lengths are measured once by boot PCI enumeration. */
+
+#include "../gfinit_resources/bounds.inc"
+
+#include "../gfinit_resources/bars.inc"
+
+#include "../gfinit_resources/windows.inc"
+
+#include "../gfinit_resources/scan.inc"

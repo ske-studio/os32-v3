@@ -42,14 +42,14 @@ class Port:
 
 def reports(runner):
     files = {
-        'ver_format_source.c': pc98_format_source() + (ROOT / 'kernel/ver_format.c').read_text(),
-        'ver_state_source.c': function((ROOT / 'kdebug/kdebug_module.c').read_text(),
+        'ver_format_source.c': pc98_format_source() + (ROOT / 'sys/kern/ver_format.c').read_text(),
+        'ver_state_source.c': function((ROOT / 'sys/kern/kdebug/kdebug_module.c').read_text(),
                                       'const char *kdebug_state_name('),
         'ver_shell_source.c': function((ROOT / 'userland/shell/cmd_base.c').read_text(),
                                       'static int cmd_ver('),
     }
     result = execute((ROOT / 'tools/tests/ver_about_host.c').read_text(), runner,
-                     files, assembly='lib/kstring_asm.asm')
+                     files, assembly='sys/kern/kstring_asm.asm')
     assert result.returncode == 0, result.stderr
     cases = []
     for case in result.stdout.split('REPORT\n')[1:]:

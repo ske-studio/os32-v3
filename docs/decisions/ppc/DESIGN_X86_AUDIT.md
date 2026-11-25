@@ -11,7 +11,7 @@
 
 | 文書 | 状態 | 判定 | 段・根拠 | 直し案 |
 |---|---|---|---|---|
-| `origin/wip/kfill-designs:docs/decisions/ppc/PPC_KAPI_GUI_SWITCH_DESIGN.md` | 未着手 | 止めるべき | 5d §2-2・§5 M1〜M3/P1〜P4・確定追記 A6〜A8。SESSION_SHELL_CALLER と swprobe の初回置換が ID 1 の仮親と USER sh を契約にする。x86 は platform/pc98/kernel.c の起動ループ、PPC は platform/powermac/exec_boot.c の仮親。 | owner 1 の shell 枠と共通の切替ループを先に揃え、sys_switch_shell だけ通常のシェルで受け入れる。 |
+| `origin/wip/kfill-designs:docs/decisions/ppc/PPC_KAPI_GUI_SWITCH_DESIGN.md` | 未着手 | 止めるべき | 5d §2-2・§5 M1〜M3/P1〜P4・確定追記 A6〜A8。SESSION_SHELL_CALLER と swprobe の初回置換が ID 1 の仮親と USER sh を契約にする。x86 は sys/platform/pc98/kernel.c の起動ループ、PPC は sys/platform/powermac/exec_boot.c の仮親。 | owner 1 の shell 枠と共通の切替ループを先に揃え、sys_switch_shell だけ通常のシェルで受け入れる。 |
 | `origin/wip/kfill-designs:docs/decisions/ppc/PPC_KAPI_FEP_INPUT_DESIGN.md` | 途中 | 止めるべき | 7a §2-1〜6・§4-1 M1/M4/M5/S1〜S3。P1〜P4b は main 1c9ed35c5。新規 fep_static、OS32_FEP_STATIC、/db・/dbu の RAM 複製と学習先の別規則を残段が固定する。 | x86 の fep.mod の起動・回収と辞書/学習パスを基準に設計し、USB/表示/媒体の物理差だけを後端に置く。 |
 | `origin/wip/kfill-designs:docs/decisions/ppc/PPC_KAPI_GFX_REST_DESIGN.md` | 未着手 | 止めるべき | 5c §2-3・§4 A2/B1。機種マクロで公開の門を分け、部分転送の dirty 消去まで PowerMac 専用にする。OF FB の固定モード・pitch・画素形式には物理理由がある。 | 所有・世代・転送済み範囲を共通 HAL で判断させ、OF の能力を既存の後端から返す。 |
 | `docs/decisions/ppc/PPC_KAPI_FILL_DESIGN.md` | 途中 | 直しが要る | 段 5c/5d・7a/7b (§段表、187–200 行)。表示・シェル・FEP/DB の提供者の前提が各確定設計と新方針にずれている。段 S の CPU 別スタック入口は正当。 | shell 枠・共通表示所有・module/DB 媒体の順を依存表に反映し、共通 provider と既存差の解消を発注単位にする。 |

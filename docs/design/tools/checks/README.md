@@ -12,7 +12,7 @@
 ```python
 # shebang・符号化・docstring・必要な __future__ の直後、通常 import より前
 CHECK = dict(name="dma-pool-host", tier=1,
-    covers=["mm/dma_pool.c", "mm/dma_pool_math.c"],  # 型の例。実際の全入力ではない
+    covers=["sys/kern/mm/dma_pool.c", "sys/kern/mm/dma_pool_math.c"],  # 型の例。実際の全入力ではない
     needs=[], budget=60)  # mutate_tier は省略可
 
 def run(ctx: "Context") -> int: ...
@@ -104,7 +104,7 @@ R1/R2 は `tools/tests/test_*.py` に宣言を足し、集約入口・道具ラ�
 
 ### recover-tables-host
 
-`kdebug/generated/recover_gf_tables.inc` の再現は `gen_recover_tables.py --check` を check-recover-tables-host から呼んで検査する (生成物を手で直さない)。
+`sys/dev/video/geforce/diag/generated/recover_gf_tables.inc` の再現は `gen_recover_tables.py --check` を check-recover-tables-host から呼んで検査する (生成物を手で直さない)。
 
 > [要確認] check-recover-tables-host の現行入口は tools/checks/recover-tables-host.py。
 

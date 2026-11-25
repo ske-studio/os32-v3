@@ -10,13 +10,13 @@ tools/tests/hsync_h3_host.c が userland/system/hsync.c を 1 行も写さず
 sys_set_mtime の成功 / NOSYS / I/O 失敗を注入できる。sys_read の呼び出し
 回数も数えるので「サイズも日時も同じなら 1 バイトも読まない」を直に見られる。
 
-drivers/hostdrv/hostdrv_stat_rules.inc の FILETIME 変換 (hdrv_filetime_to_unix /
+sys/dev/hostdrv/hostdrv_stat_rules.inc の FILETIME 変換 (hdrv_filetime_to_unix /
 hdrv_stat_mtime) も同じ翻訳単位で直接叩く (A16)。
 
   python3 -B tools/tests/test_hsync_h3.py [--target] [--mutate]
 
 --target を付けると、実機と同じ i386-elf クロスコンパイラでも
-hsync.c / drivers/hostdrv/hostdrvfs.c / fs/ext2/ext2_vfs.c / kapi/kapi_sysinfo.c が -Werror で
+hsync.c / sys/dev/hostdrv/hostdrvfs.c / sys/fs/ext2/ext2_vfs.c / sys/kapi/kapi_sysinfo.c が -Werror で
 通ることを確かめる ([C1] GNU11)。
 
 --mutate は**否定側**。この票の中心規則は
@@ -60,7 +60,7 @@ TARGET_USER = TARGET_COMMON + [
     "-Isdk/include/os32", "-Iuserland/lib",
     "-I" + str(CROSS_DIR / "i386-elf/include")]
 TARGET_KERNEL = TARGET_COMMON + [
-    # arch/x86 + platform/pc98: include/io.h は契約だけで、実装は固定名
+    # arch/x86 + platform/pc98: sys/include/io.h は契約だけで、実装は固定名
     # arch_io.h / platform_io.h を引く (順序 3)。
     "-D__KERNEL_BUILD__",
        *include_flags(ROOT)]
@@ -76,7 +76,7 @@ TARGET_KERNEL = TARGET_COMMON + [
 #  **KAPI が 1 本増えるたびに必ず落ちる**。実際 2026-09-16 に kbd_peekkey (v54)
 #  の末尾追記で `make check` が落ちた。
 #
-#  `kapi/kapi_db.c` の `db_slot_layout_ok` が同じ形 (`KAPI_SLOT_COUNT ==
+#  `sys/kapi/kapi_db.c` の `db_slot_layout_ok` が同じ形 (`KAPI_SLOT_COUNT ==
 #  KAPI_SLOT_HOST_CLOSE + 1` の等号) を踏んで**下限比較**に直した前例がある
 #  (同ファイルの見出しコメント)。ここも同じ考え方で **位置**だけを見る:
 #
@@ -171,7 +171,7 @@ def check_kapi_slot():
     # **「最新の KAPI と同じ版」ではない** (票 H2 §1 の 7 / §2-3 末尾で変更)。
     # 票 H2 の hsync は v53 の O_EXCL を使うが、カーネルを入れ替える途中で
     # **v52 のカーネルの上で動かす場面が現に起こる**。要求版を 53 にすると
-    # exec/exec.c の `min_api_ver > KAPI_VERSION` が「invalid OS32X binary」と
+    # sys/kern/exec/exec.c の `min_api_ver > KAPI_VERSION` が「invalid OS32X binary」と
     # して起動そのものを拒否し、hsync 自身の kernel_too_old も
     # --unsafe-overwrite も届かない。版の判定は hsync が api->version で行う。
     # 上限 (kapi.json の version 以下) は据え置き — 存在しない版を要求しない。
@@ -209,20 +209,20 @@ def build_vfs(tmp, name, extra=()):
            "-D__cdecl=", *inc, *extra,
            str(ROOT / "tools/tests/vfs_set_mtime_host.c"), "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
-    print("HOST GNU11 -Werror COMPILE PASS (real fs/vfs.c)", flush=True)
+    print("HOST GNU11 -Werror COMPILE PASS (real sys/fs/vfs.c)", flush=True)
     return exe
 
 
 def target_compile(tmp):
     jobs = [
         (TARGET_USER, "userland/system/hsync.c", []),
-        (TARGET_KERNEL, "drivers/hostdrv/hostdrvfs.c", ["-Wno-address-of-packed-member"]),
-        (TARGET_KERNEL, "fs/ext2/ext2_vfs.c", []),
-        (TARGET_KERNEL, "fs/fat/fatfs_vfs.c", []),
-        (TARGET_KERNEL, "fs/isofs/iso9660.c", []),
-        (TARGET_KERNEL, "fs/vfs.c", ["-Wno-sign-compare",
+        (TARGET_KERNEL, "sys/dev/hostdrv/hostdrvfs.c", ["-Wno-address-of-packed-member"]),
+        (TARGET_KERNEL, "sys/fs/ext2/ext2_vfs.c", []),
+        (TARGET_KERNEL, "sys/fs/fat/fatfs_vfs.c", []),
+        (TARGET_KERNEL, "sys/fs/isofs/iso9660.c", []),
+        (TARGET_KERNEL, "sys/fs/vfs.c", ["-Wno-sign-compare",
                                      "-Wno-unused-parameter"]),
-        (TARGET_KERNEL, "kapi/kapi_sysinfo.c", []),
+        (TARGET_KERNEL, "sys/kapi/kapi_sysinfo.c", []),
     ]
     for flags, src, extra in jobs:
         out = tmp / (pathlib.Path(src).stem + ".o")
@@ -274,8 +274,8 @@ MUT_TARGETS = {
     "mtime_unknown_is_same": "userland/system/hsync.c",
     "copy_on_mtime_diff": "userland/system/hsync.c",
     "no_set_mtime": "userland/system/hsync.c",
-    "filetime_no_epoch_shift": "drivers/hostdrv/hostdrv_stat_rules.inc",
-    "filetime_wrap": "drivers/hostdrv/hostdrv_stat_rules.inc",
+    "filetime_no_epoch_shift": "sys/dev/hostdrv/hostdrv_stat_rules.inc",
+    "filetime_wrap": "sys/dev/hostdrv/hostdrv_stat_rules.inc",
     "verify_ignored": "userland/system/hsync.c",
     "swallow_set_failure": "userland/system/hsync.c",
 }

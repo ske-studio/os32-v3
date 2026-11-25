@@ -5,7 +5,7 @@ CHECK = dict(name='hwdev-target-layout', tier=1, needs=['make:all'], budget=15,
             'tools/hwdev_layout.json', 'tools/gen_kdebug_imports.py',
             'tools/module_schema.py', 'tools/build_profile.py', 'build/arch/*.mk',
             'build/kdebug.mk', 'docs/design/hwdev/hwdev_imports.md',
-            'kernel/module/kdebug_imports.def', 'sdk/kapi.json', 'tools/mkmod.py', 'hwdev/**', 'kdebug/*.h', 'include/*.h'],
+            'sys/kern/module/kdebug_imports.def', 'sdk/kapi.json', 'tools/mkmod.py', 'hwdev/**', 'kdebug/*.h', 'include/*.h'],
     basis=['[ABI]'],
 )
 import argparse

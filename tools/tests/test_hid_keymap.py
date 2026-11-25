@@ -20,9 +20,9 @@ ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='hid-keymap', tier=1, budget=20,
     covers=['tools/tests/test_hid_keymap.py', 'tools/hid_keymap_import.py',
             'tools/keymap/netbsd_wscons_sources.json',
-            'tools/keymap/fetch_netbsd_wscons.sh', 'input/keymaps/hid_jp.c',
-            'input/hal/keymap.h', 'include/types.h', 'include/callconv.h',
-            'drivers/usb/hid_kbd_map.c'],
+            'tools/keymap/fetch_netbsd_wscons.sh', 'sys/input/keymaps/hid_jp.c',
+            'sys/hal/input/keymap.h', 'sys/include/types.h', 'sys/include/callconv.h',
+            'sys/dev/usb/hid_kbd_map.c'],
     basis=['INPUT_KEYMAP_DESIGN §3・§7 S1h/S1ht', 'NetBSD hidkbdmap 8a12c4d9'])
 COMMIT = '8a12c4d95f032e12f64013d7269443256fd26341'
 VERSION = 1
@@ -127,7 +127,7 @@ def validate(text):
     assert '2, 256, hid_jp_entries, hid_jp_compat_sc, hid_jp_norepeat,' in text
     assert '&hid_jp_extensions' in text
     assert 'hid_jp_order, hid_jp_actions, 2, hid_jp_no_keydata' in text
-    header = (ROOT/'input/hal/keymap.h').read_text()
+    header = (ROOT/'sys/hal/input/keymap.h').read_text()
     assert 'return sym >= 0xf220 && sym <= 0xf27f;' in header
 
 
@@ -166,7 +166,7 @@ def main():
     args = parser.parse_args()
     manifest = json.loads((ROOT/'tools/keymap/netbsd_wscons_sources.json').read_text())
     assert manifest == dict(commit=COMMIT, files=PINS)
-    path = ROOT/'input/keymaps/hid_jp.c'
+    path = ROOT/'sys/input/keymaps/hid_jp.c'
     text = path.read_text()
     validate(text)
     if args.mutate:

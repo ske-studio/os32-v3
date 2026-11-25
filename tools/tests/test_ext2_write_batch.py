@@ -12,13 +12,13 @@ from ext2_oracle_cache import OracleCache, check_cache
 from kernel_includes import include_flags
 
 CHECK = dict(name='ext2-write-batch-host', tier=1, budget=171.2,
-             covers=['include/ext2_medium_contract.h', 'fs/ext2/ext2_medium_ide.c', 'fs/ext2/**', 'tools/tests/ext2_write_batch_host.c',
+             covers=['sys/include/ext2_medium_contract.h', 'sys/platform/pc98/storage/ext2_medium_ide.c', 'fs/ext2/**', 'tools/tests/ext2_write_batch_host.c',
                      'tools/tests/test_ext2_write_batch.py', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'tools/tests/hdd_pt_fake.h',
                      'tools/tests/b8_e2fsck.py', 'tools/tests/ext2_oracle_cache.py',
-                     'fs/pc98pt.c',
-                     'fs/pc98pt.h', 'include/platform_device.h',
-                     'include/ide_contract.h'], needs=[],
+                     'sys/fs/pc98pt.c',
+                     'sys/fs/pc98pt.h', 'sys/include/platform_device.h',
+                     'sys/include/ide_contract.h'], needs=[],
     kind='characterization',
     env_limit='sector fault画像とe2fsckで整合性を確認するが、実drive cacheと電断時の書込み順序は再現しない。',
 )

@@ -1,11 +1,11 @@
 """Execute tri_burst6 grouped pacing, comparison, cleanup and log budget."""
 CHECK = dict(name='tri-burst6', tier=1, needs=[], budget=49.5, covers=[
     'tools/tests/test_tri_burst6.py', 'tools/tests/tri_burst6_host.c',
-    'userland/tests/hw/tri_burst6.hwb', 'tools/tests/hwb_fake.h',
+    'userland/diag/hw/tri_burst6.hwb', 'tools/tests/hwb_fake.h',
     'tools/tests/hwb_host.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
     'tools/tests/mutpar.py', 'userland/shell/hwb.h', 'userland/shell/hwb_probe.c',
     'userland/shell/hwb_parse.c', 'userland/shell/hwb_exec.c', 'userland/shell/hwb_log.c',
-    'kdebug/probe_wire.h', 'kdebug/hwb_wire.h', 'include/types.h',
+    'sys/kern/kdebug/probe_wire.h', 'sys/kern/kdebug/hwb_wire.h', 'sys/include/types.h',
     'sdk/include/os32/os32_kapi_shared.h'],
     kind='characterization',
     env_limit='fake busのgrouped pacingと読戻しを確認するが、実busの時序とburst故障への効果は保証しない。',
@@ -18,7 +18,7 @@ import hwb_host
 
 
 def trial(mutation=None):
-    script = (hwb_host.ROOT / 'userland/tests/hw/tri_burst6.hwb').read_text(encoding='ascii')
+    script = (hwb_host.ROOT / 'userland/diag/hw/tri_burst6.hwb').read_text(encoding='ascii')
     if mutation:
         name, before, after = mutation
         assert script.count(before) == 1, name

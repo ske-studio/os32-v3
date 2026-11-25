@@ -4,26 +4,26 @@
 
 # === ベースプログラム (単体ソースファイル → 自動ビルド) ===
 C_CMDS = $(wildcard userland/cmds/*.c)
-C_TESTS = $(filter-out userland/tests/gfx2_i2.c userland/tests/hwscroll_probe.c userland/tests/gfx200_test.c userland/tests/gfx_demo200.c userland/tests/blit_test.c userland/tests/blit_test2.c userland/tests/demo_tile.c userland/tests/tile_bench.c userland/tests/rotate_test.c userland/tests/db_test.c userland/tests/dbq.c userland/tests/e2test.c userland/tests/math_test.c userland/tests/input_test.c userland/tests/asset_test.c userland/tests/asset_demo.c userland/tests/ecs_test.c userland/tests/save_test.c userland/tests/mgx_test.c userland/tests/kbd_echo.c userland/tests/ring3_hello.c userland/tests/ring3_fault.c userland/tests/ring3_guard.c userland/tests/kstr_bench.c, $(wildcard userland/tests/*.c))
+C_TESTS = $(filter-out userland/diag/tickprobe.c userland/diag/ata_deny.c userland/diag/learn_probe.c userland/diag/gfx2_i2.c userland/diag/hwscroll_probe.c userland/diag/gfx200_test.c userland/diag/gfx_demo200.c userland/diag/blit_test.c userland/diag/blit_test2.c userland/diag/demo_tile.c userland/diag/tile_bench.c userland/diag/rotate_test.c userland/diag/db_test.c userland/diag/dbq.c userland/diag/e2test.c userland/diag/math_test.c userland/diag/input_test.c userland/diag/asset_test.c userland/diag/asset_demo.c userland/diag/ecs_test.c userland/diag/save_test.c userland/diag/mgx_test.c userland/diag/kbd_echo.c userland/diag/ring3_hello.c userland/diag/ring3_fault.c userland/diag/ring3_guard.c userland/diag/kstr_bench.c, $(wildcard userland/diag/*.c))
 C_SYSTEM = $(filter-out userland/system/lz4.c userland/system/cdinst.c $(INST_SHARED_SRC), $(wildcard userland/system/*.c))
 # cdinst / install が共有する hd0 の検査と書き込み (票 TASK_HDD_INSTALL 段 2)。
 # main を持たないので単体のプログラムにはしない (下の INST_OBJ でリンクする)
 INST_SHARED_SRC = userland/system/inst_disk.c userland/system/inst_hdd.c
 
 C_BASE_PROGRAMS = $(C_CMDS) $(C_TESTS) $(C_SYSTEM)
-BASE_PROGRAMS_BIN = $(C_BASE_PROGRAMS:.c=.bin) userland/shell.bin userland/tests/h2_stack512.bin
+BASE_PROGRAMS_BIN = $(C_BASE_PROGRAMS:.c=.bin) userland/shell.bin userland/diag/h2_stack512.bin
 
 # Pattern-rule intermediates must survive so the next build can reuse them.
 .SECONDARY: $(BASE_PROGRAMS_BIN:.bin=.elf) $(BASE_PROGRAMS_BIN:.bin=.raw)
 
 # T2g in-tree fixtures use the private SDK allocator inspection/serve seam.
-userland/tests/trim_back.elf userland/tests/trim_front.elf: PROGRAM_FLAGS += -Isdk/allocator
-userland/tests/trim_back.elf userland/tests/trim_front.elf: sdk/allocator/nano_adapter.h
+userland/diag/trim_back.elf userland/diag/trim_front.elf: PROGRAM_FLAGS += -Isdk/allocator
+userland/diag/trim_back.elf userland/diag/trim_front.elf: sdk/allocator/nano_adapter.h
 
-userland/tests/pcm_play.elf: userland/tests/pcm_wav.h
+userland/diag/pcm_play.elf: userland/diag/pcm_wav.h
 
 # nano libc keeps %f optional; the compatibility test exercises it explicitly.
-userland/tests/klibc_test.elf: PROGRAM_LDFLAGS += -u _printf_float
+userland/diag/klibc_test.elf: PROGRAM_LDFLAGS += -u _printf_float
 
 # === CRT0 ビルドルール ===
 sdk/crt/crt0.o: sdk/crt/crt0.asm
@@ -75,39 +75,39 @@ endif
 
 # === Shell Module ===
 SHELL_SRC = $(wildcard userland/shell/*.c)
-INST_HDRS = platform/$(PLATFORM)/platform_install_layout.h include/platform_install_boot.h userland/system/inst_hdd.h userland/system/inst_disk.h \
-            userland/shell/hdprep_plan.h fs/pc98pt.h fs/ext2/ext2_layout.h $(SDK_KAPI_HDR)
+INST_HDRS = sys/platform/$(PLATFORM)/platform_install_layout.h sys/include/platform_install_boot.h userland/system/inst_hdd.h userland/system/inst_disk.h \
+            userland/shell/hdprep_plan.h sys/fs/pc98pt.h sys/fs/ext2/ext2_layout.h $(SDK_KAPI_HDR)
 SHELL_INSTALL_OBJ = install_plan.o install_hdprep.o
 SHELL_OBJ = $(SHELL_SRC:.c=.o) $(addprefix userland/shell/,$(SHELL_INSTALL_OBJ))
 
-$(addprefix userland/shell/,$(SHELL_INSTALL_OBJ)): userland/shell/%.o: platform/$(PLATFORM)/%.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
+$(addprefix userland/shell/,$(SHELL_INSTALL_OBJ)): userland/shell/%.o: sys/platform/$(PLATFORM)/%.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 # ヘッダと .inc の明示依存 (B7)。生成済み .d は Makefile の DEPFILES でも読む。
 # 初回ビルドでも常駐側・外部プログラム側に同じ依存を与える。
-# include/memmap.h: cmd_sys.c の `mem` が常駐帯の定数を印字する (FONTPERF F3b で
+# sys/include/memmap.h: cmd_sys.c の `mem` が常駐帯の定数を印字する (FONTPERF F3b で
 # 帯を再割りしたとき、これが無いと旧い番地を印字する shell.bin が出来た)。
 # lib/crc32_core.inc: cmd_peek.c の CRC32 (hsync・ローダと同じ核)。
-SHELL_DEPS = kdebug/probe_wire.h kdebug/hwb_wire.h userland/shell/hwb.h kdebug/gf_command_wire.h kdebug/gf_foundation_wire.h kdebug/gfinit_wire.h kdebug/recover_wire.h sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h fs/pc98pt.h include/memmap.h lib/crc32_core.inc $(wildcard userland/shell/*.inc)
+SHELL_DEPS = sys/kern/kdebug/probe_wire.h sys/kern/kdebug/hwb_wire.h userland/shell/hwb.h sys/dev/video/geforce/diag/gf_command_wire.h sys/dev/video/geforce/diag/gf_foundation_wire.h sys/dev/video/geforce/diag/gfinit_wire.h sys/kern/kdebug/recover_wire.h sdk/include/os32/ls.h userland/shell/shell.h userland/shell/hdprep_plan.h sys/fs/pc98pt.h sys/include/memmap.h lib/crc32_core.inc $(wildcard userland/shell/*.inc)
 
 userland/shell/%.o: userland/shell/%.c $(SHELL_DEPS) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Iuserland/shell $(INC_libos32filer) -c $< -o $@
 
-# PCI の純粋な復号 (drivers/pci/pci_decode.c) を `lspci` / `pcidump` からも使う。
+# PCI の純粋な復号 (sys/dev/pci/pci_decode.c) を `lspci` / `pcidump` からも使う。
 # **写さない** — BAR の種別と番地、クラス名、Header Type の切り出しは
 # カーネルと 1 文字も違ってはいけない。ホスト試験 (check-pci-decode-host) が
 # 見張っているのはこの 1 本だけなので、CPL=3 側でも同じソースをもう一度
 # コンパイルして繋ぐ。I/O も静的配列も触らないのでそのまま通る。
 PCI_DECODE_USER_OBJ = userland/shell/pci_decode_user.o
-$(PCI_DECODE_USER_OBJ): drivers/pci/pci_decode.c drivers/pci/pci_decode.h | $(ABI_CONTRACT_ORDER)
-	$(CC) $(PROGRAM_FLAGS) -Idrivers -c drivers/pci/pci_decode.c -o $@
+$(PCI_DECODE_USER_OBJ): sys/dev/pci/pci_decode.c sys/dev/pci/pci_decode.h | $(ABI_CONTRACT_ORDER)
+	$(CC) $(PROGRAM_FLAGS) -Idrivers -c sys/dev/pci/pci_decode.c -o $@
 
-# 区画表の共有部 (fs/pc98pt.c) も同じ扱い — `hdprep` が書く区画表は
+# 区画表の共有部 (sys/fs/pc98pt.c) も同じ扱い — `hdprep` が書く区画表は
 # カーネル・ローダ・nhd_deploy.py と 1 バイトも違ってはいけない
 # (票 TASK_HDD_INSTALL 段 1-4)。
 PC98PT_USER_OBJ = userland/shell/pc98pt_user.o
-$(PC98PT_USER_OBJ): fs/pc98pt.c fs/pc98pt.h | $(ABI_CONTRACT_ORDER)
-	$(CC) $(PROGRAM_FLAGS) -Idrivers -c fs/pc98pt.c -o $@
+$(PC98PT_USER_OBJ): sys/fs/pc98pt.c sys/fs/pc98pt.h | $(ABI_CONTRACT_ORDER)
+	$(CC) $(PROGRAM_FLAGS) -Idrivers -c sys/fs/pc98pt.c -o $@
 
 $(BUILD_OUT)/app_sys.ld: sdk/link/app_sys.ld $(LAYOUT_HEADER)
 	$(CC) -E -P -x c -I$(BUILD_OUT) $< -o $@
@@ -127,25 +127,25 @@ $(RESIDENT_OUT)/shell.elf: $(BUILD_OUT)/app_sys.ld $(CRT0_RESIDENT_OBJ) $(SHELL_
 SH_OBJDIR = userland/shell/sh_obj
 SH_OBJ = $(addprefix $(SH_OBJDIR)/,$(SHELL_INSTALL_OBJ)) $(patsubst userland/shell/%.c,$(SH_OBJDIR)/%.o,$(SHELL_SRC))
 
-$(addprefix $(SH_OBJDIR)/,$(SHELL_INSTALL_OBJ)): $(SH_OBJDIR)/%.o: platform/$(PLATFORM)/%.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
+$(addprefix $(SH_OBJDIR)/,$(SHELL_INSTALL_OBJ)): $(SH_OBJDIR)/%.o: sys/platform/$(PLATFORM)/%.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
 	@mkdir -p $(@D)
 	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -c $< -o $@
 
-userland/shell/cmd_hw.o $(SH_OBJDIR)/cmd_hw.o userland/shell/hwb_exec.o $(SH_OBJDIR)/hwb_exec.o: private PROGRAM_FLAGS += -Iplatform/$(PLATFORM)
+userland/shell/cmd_hw.o $(SH_OBJDIR)/cmd_hw.o userland/shell/hwb_exec.o $(SH_OBJDIR)/hwb_exec.o: private PROGRAM_FLAGS += -Isys/platform/$(PLATFORM)
 $(SH_OBJDIR)/%.o: userland/shell/%.c $(SHELL_DEPS) | $(ABI_CONTRACT_ORDER)
 	@mkdir -p $(SH_OBJDIR)
 	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Iuserland/shell $(INC_libos32filer) -c $< -o $@
 
-# 常駐側と同じ drivers/pci/pci_decode.c を、sh.bin 用の出力先へ。
+# 常駐側と同じ sys/dev/pci/pci_decode.c を、sh.bin 用の出力先へ。
 SH_PCI_DECODE_OBJ = $(SH_OBJDIR)/pci_decode_user.o
-$(SH_PCI_DECODE_OBJ): drivers/pci/pci_decode.c drivers/pci/pci_decode.h | $(ABI_CONTRACT_ORDER)
+$(SH_PCI_DECODE_OBJ): sys/dev/pci/pci_decode.c sys/dev/pci/pci_decode.h | $(ABI_CONTRACT_ORDER)
 	@mkdir -p $(SH_OBJDIR)
-	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Idrivers -c drivers/pci/pci_decode.c -o $@
+	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Idrivers -c sys/dev/pci/pci_decode.c -o $@
 
 SH_PC98PT_OBJ = $(SH_OBJDIR)/pc98pt_user.o
-$(SH_PC98PT_OBJ): fs/pc98pt.c fs/pc98pt.h | $(ABI_CONTRACT_ORDER)
+$(SH_PC98PT_OBJ): sys/fs/pc98pt.c sys/fs/pc98pt.h | $(ABI_CONTRACT_ORDER)
 	@mkdir -p $(SH_OBJDIR)
-	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Idrivers -c fs/pc98pt.c -o $@
+	$(CC) $(PROGRAM_FLAGS) -DSHELL_AS_APP -Idrivers -c sys/fs/pc98pt.c -o $@
 
 # main.c だけが #include する .inc の明示依存 (レシピ無し = 上のパターン規則に
 # 前提だけを足す)。$(SHELL_DEPS) の wildcard でも拾えるが、wildcard は
@@ -210,19 +210,19 @@ clean-gshell:
 
 # === 共有 C ソースのユーザー空間ビルド ===
 # lib/ のいくつかはカーネルと外部プログラムの双方から使う。カーネル側の
-# lib/%.o は KERNEL_CFLAGS でビルドされる (build/kernel.mk) ため、
+# sys/kern/%.o は KERNEL_CFLAGS でビルドされる (build/kernel.mk) ため、
 # そのオブジェクトを外部プログラムにリンクすると 1 つの .o が 2 つの
 # リンクドメインに跨ることになる。ユーザー空間用は _prog.o として
 # PROGRAM_FLAGS で別途ビルドする。
 lib/utf8_prog.o: lib/utf8.c lib/utf8.h $(SDK_KAPI_HDR) | $(ABI_CONTRACT_ORDER)
-	$(CC) $(PROGRAM_FLAGS) -Ilib -c $< -o $@
+	$(CC) $(PROGRAM_FLAGS) -Ilib -Isys/kern -c $< -o $@
 
 # === LZ4 Command ===
 lib/lz4_prog.o: lib/lz4.c lib/lz4.h lib/lz4_decode_core.inc | $(ABI_CONTRACT_ORDER)
-	$(CC) $(PROGRAM_FLAGS) -Ilib -c $< -o $@
+	$(CC) $(PROGRAM_FLAGS) -Ilib -Isys/kern -c $< -o $@
 
 userland/system/lz4.o: userland/system/lz4.c | $(ABI_CONTRACT_ORDER)
-	$(CC) $(PROGRAM_FLAGS) -Ilib -c $< -o $@
+	$(CC) $(PROGRAM_FLAGS) -Ilib -Isys/kern -c $< -o $@
 
 userland/system/lz4.elf: sdk/link/app.ld $(CRT0_OBJ) userland/system/lz4.o lib/lz4_prog.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/system/lz4.o lib/lz4_prog.o -lc -lgcc
@@ -237,35 +237,35 @@ userland/system/cdinst.o: userland/system/cdinst.c userland/lib/rt/pkg.h userlan
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 # hd0 の規則は install と共有 (userland/system/inst_hdd.c / inst_disk.c)。区画表
-# (fs/pc98pt.c)、幾何と計画 (userland/shell/hdprep_plan.c)、ext2 の配置
-# (fs/ext2/ext2_layout.c) はカーネル・hdprep と同じソースを組む — **写さない**
+# (sys/fs/pc98pt.c)、幾何と計画 (userland/shell/hdprep_plan.c)、ext2 の配置
+# (sys/fs/ext2/ext2_layout.c) はカーネル・hdprep と同じソースを組む — **写さない**
 # (票 TASK_HDD_INSTALL 段 2-9)。
 userland/system/inst_disk.o: userland/system/inst_disk.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 userland/system/inst_hdd.o: userland/system/inst_hdd.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
-userland/system/ext2_layout_user.o: fs/ext2/ext2_layout.c fs/ext2/ext2_layout.h | $(ABI_CONTRACT_ORDER)
+userland/system/ext2_layout_user.o: sys/fs/ext2/ext2_layout.c sys/fs/ext2/ext2_layout.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
-userland/system/hdprep_plan_inst.o: userland/shell/hdprep_plan.c userland/shell/hdprep_plan.h fs/pc98pt.h | $(ABI_CONTRACT_ORDER)
+userland/system/hdprep_plan_inst.o: userland/shell/hdprep_plan.c userland/shell/hdprep_plan.h sys/fs/pc98pt.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
-userland/system/pc98pt_inst.o: fs/pc98pt.c fs/pc98pt.h | $(ABI_CONTRACT_ORDER)
+userland/system/pc98pt_inst.o: sys/fs/pc98pt.c sys/fs/pc98pt.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Idrivers -c $< -o $@
-userland/system/install_disk.o: platform/$(PLATFORM)/install_disk.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
+userland/system/install_disk.o: sys/platform/$(PLATFORM)/install_disk.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
-userland/system/install_target.o: platform/$(PLATFORM)/install_target.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
+userland/system/install_target.o: sys/platform/$(PLATFORM)/install_target.c $(INST_HDRS) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
 INST_OBJ = userland/system/install_target.o userland/system/install_disk.o userland/shell/install_plan.o userland/system/inst_hdd.o userland/system/inst_disk.o \
            userland/system/hdprep_plan_inst.o userland/system/pc98pt_inst.o \
            userland/system/ext2_layout_user.o
 
-userland/system/install_target.o: include/ide_contract.h include/types.h
-userland/system/install_target.o userland/shell/install_hdprep.o $(SH_OBJDIR)/install_hdprep.o: platform/$(PLATFORM)/install_geometry.h
+userland/system/install_target.o: sys/include/ide_contract.h sys/include/types.h
+userland/system/install_target.o userland/shell/install_hdprep.o $(SH_OBJDIR)/install_hdprep.o: sys/platform/$(PLATFORM)/install_geometry.h
 userland/system/cdinst.o: $(INST_HDRS)
 $(INST_OBJ) userland/system/install.elf userland/system/cdinst.o \
 userland/shell/cmd_hdprep.o userland/shell/hdprep_plan.o userland/shell/install_hdprep.o \
-$(addprefix $(SH_OBJDIR)/,cmd_hdprep.o hdprep_plan.o $(SHELL_INSTALL_OBJ)): private PROGRAM_FLAGS += -Iplatform/$(PLATFORM)
+$(addprefix $(SH_OBJDIR)/,cmd_hdprep.o hdprep_plan.o $(SHELL_INSTALL_OBJ)): private PROGRAM_FLAGS += -Isys/platform/$(PLATFORM)
 userland/shell/cmd_hdprep.o userland/shell/hdprep_plan.o \
 $(addprefix $(SH_OBJDIR)/,cmd_hdprep.o hdprep_plan.o): $(INST_HDRS)
 userland/system/cdinst.elf: sdk/link/app.ld $(CRT0_OBJ) userland/system/cdinst.o userland/lib/rt/pkg.o $(DBG_OBJ) $(INST_OBJ)
@@ -274,45 +274,45 @@ userland/system/cdinst.elf: sdk/link/app.ld $(CRT0_OBJ) userland/system/cdinst.o
 cdinst: $(CRT0_OBJ) userland/system/cdinst.bin
 
 # === Bench Module ===
-BENCH_SRC = $(wildcard userland/tests/bench/*.c)
+BENCH_SRC = userland/diag/bench/main.c
 BENCH_OBJ = $(BENCH_SRC:.c=.o)
 
-userland/tests/bench/%.o: userland/tests/bench/%.c | $(ABI_CONTRACT_ORDER)
+userland/diag/bench/%.o: userland/diag/bench/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32gfx) -c $< -o $@
 
-userland/tests/bench.elf: sdk/link/app.ld $(CRT0_OBJ) $(BENCH_OBJ) $(GFX_OBJ)
+userland/diag/bench.elf: sdk/link/app.ld $(CRT0_OBJ) $(BENCH_OBJ) $(GFX_OBJ)
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) $(BENCH_OBJ) $(LGRP_BEG) $(GFX_OBJ) $(LGRP_END) -lc -lgcc
 
-bench: $(CRT0_OBJ) userland/tests/bench.bin
+bench: $(CRT0_OBJ) userland/diag/bench.bin
 
 # === Bench Scale2x Module ===
-BENCH_S2X_SRC = userland/tests/bench_scale2x/main.c
+BENCH_S2X_SRC = userland/diag/bench_scale2x/main.c
 BENCH_S2X_OBJ = $(BENCH_S2X_SRC:.c=.o)
 
-userland/tests/bench_scale2x/%.o: userland/tests/bench_scale2x/%.c | $(ABI_CONTRACT_ORDER)
+userland/diag/bench_scale2x/%.o: userland/diag/bench_scale2x/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32gfx) -c $< -o $@
 
-userland/tests/bench_scale2x.elf: sdk/link/app.ld $(CRT0_OBJ) $(BENCH_S2X_OBJ) $(GFX_OBJ)
+userland/diag/bench_scale2x.elf: sdk/link/app.ld $(CRT0_OBJ) $(BENCH_S2X_OBJ) $(GFX_OBJ)
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) $(BENCH_S2X_OBJ) $(LGRP_BEG) $(GFX_OBJ) $(LGRP_END) -lc -lgcc
 
-bench_scale2x: $(CRT0_OBJ) userland/tests/bench_scale2x.bin
+bench_scale2x: $(CRT0_OBJ) userland/diag/bench_scale2x.bin
 
 # --- faultprobe (リング3 フォールト注入テスト, M3) ---
-FAULTPROBE_SRC = userland/tests/faultprobe/main.c
+FAULTPROBE_SRC = userland/diag/faultprobe/main.c
 FAULTPROBE_OBJ = $(FAULTPROBE_SRC:.c=.o)
 
-userland/tests/faultprobe/%.o: userland/tests/faultprobe/%.c | $(ABI_CONTRACT_ORDER)
+userland/diag/faultprobe/%.o: userland/diag/faultprobe/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
-userland/tests/faultprobe.elf: sdk/link/app.ld $(CRT0_OBJ) $(FAULTPROBE_OBJ)
+userland/diag/faultprobe.elf: sdk/link/app.ld $(CRT0_OBJ) $(FAULTPROBE_OBJ)
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) $(FAULTPROBE_OBJ) $(LGRP_BEG) $(LGRP_END) -lc -lgcc
 
-faultprobe: $(CRT0_OBJ) userland/tests/faultprobe.bin
+faultprobe: $(CRT0_OBJ) userland/diag/faultprobe.bin
 
 # --- ring3_hello / ring3_fault / ring3_guard (CPL=3 検証用) ---
 # マーカーは自分で確保した SHM。GUI fault 隔離の観測にも使うので
 # --cui-only は立てない。公開 KAPI の追加・意味変更なし。
-userland/tests/nop.o userland/tests/ring3_hello.o userland/tests/ring3_fault.o userland/tests/ring3_guard.o: userland/tests/ring3_marker.h
+userland/diag/nop.o userland/diag/ring3_hello.o userland/diag/ring3_fault.o userland/diag/ring3_guard.o: userland/diag/ring3_marker.h
 # --- ring3_hello (CPL=3 検証用最小プログラム, v2 M1) ---
 # crt0 を link しない自己完結バイナリ (独自 _start)。標準 crt0 は
 # kapi->sys_exit() 等カーネル関数ポインタを呼ぶが、M2 トランポリン前は CPL=3
@@ -325,62 +325,62 @@ userland/tests/nop.o userland/tests/ring3_hello.o userland/tests/ring3_fault.o u
 # 断る)。--api 39 は mkos32x が v3 の最低版 63 へ引き上げる (旧カーネルでは
 # 走らない = v3 の照合を持たないカーネルに載せない)。hello_r3 は
 # crt0 をリンクした ELF の流用なので crt0 の刻印をそのまま持つ。
-userland/tests/ring3_hello.o: userland/tests/ring3_hello.c | $(ABI_CONTRACT_ORDER)
+userland/diag/ring3_hello.o: userland/diag/ring3_hello.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
-userland/tests/ring3_hello.elf: userland/tests/ring3_hello.o sdk/link/app.ld
-	$(LD) -m elf_i386 -T sdk/link/app.ld -nostdlib --nmagic --gc-sections -o $@ userland/tests/ring3_hello.o
+userland/diag/ring3_hello.elf: userland/diag/ring3_hello.o sdk/link/app.ld
+	$(LD) -m elf_i386 -T sdk/link/app.ld -nostdlib --nmagic --gc-sections -o $@ userland/diag/ring3_hello.o
 
-userland/tests/ring3_hello.bin: userland/tests/ring3_hello.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
-	$(OBJCOPY) -O binary $< userland/tests/ring3_hello.raw
-	python3 sdk/mkos32x.py userland/tests/ring3_hello.raw $@ --elf $< --api 39 --ring3
-	@rm -f userland/tests/ring3_hello.raw
+userland/diag/ring3_hello.bin: userland/diag/ring3_hello.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
+	$(OBJCOPY) -O binary $< userland/diag/ring3_hello.raw
+	python3 sdk/mkos32x.py userland/diag/ring3_hello.raw $@ --elf $< --api 39 --ring3
+	@rm -f userland/diag/ring3_hello.raw
 
-ring3_hello: userland/tests/ring3_hello.bin
+ring3_hello: userland/diag/ring3_hello.bin
 .PHONY: ring3_hello
 
 # --- ring3_fault (CPL=3 フォールト kill 検証, v2 M1e) ---
 # ring3_hello と同形の crt0 非依存・--ring3 バイナリ。わざとカーネル帯域へ
 # 書き込み #PF させ、M1e の kill + fault_kill_count を検証する。
-userland/tests/ring3_fault.o: userland/tests/ring3_fault.c | $(ABI_CONTRACT_ORDER)
+userland/diag/ring3_fault.o: userland/diag/ring3_fault.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
-userland/tests/ring3_fault.elf: userland/tests/ring3_fault.o sdk/link/app.ld
-	$(LD) -m elf_i386 -T sdk/link/app.ld -nostdlib --nmagic --gc-sections -o $@ userland/tests/ring3_fault.o
+userland/diag/ring3_fault.elf: userland/diag/ring3_fault.o sdk/link/app.ld
+	$(LD) -m elf_i386 -T sdk/link/app.ld -nostdlib --nmagic --gc-sections -o $@ userland/diag/ring3_fault.o
 
-userland/tests/ring3_fault.bin: userland/tests/ring3_fault.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
-	$(OBJCOPY) -O binary $< userland/tests/ring3_fault.raw
-	python3 sdk/mkos32x.py userland/tests/ring3_fault.raw $@ --elf $< --api 39 --ring3
-	@rm -f userland/tests/ring3_fault.raw
+userland/diag/ring3_fault.bin: userland/diag/ring3_fault.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
+	$(OBJCOPY) -O binary $< userland/diag/ring3_fault.raw
+	python3 sdk/mkos32x.py userland/diag/ring3_fault.raw $@ --elf $< --api 39 --ring3
+	@rm -f userland/diag/ring3_fault.raw
 
-ring3_fault: userland/tests/ring3_fault.bin
+ring3_fault: userland/diag/ring3_fault.bin
 .PHONY: ring3_fault
 
 # --- ring3_guard (M3 ハードニング: heap/stack ガードページ検証) ---
-userland/tests/ring3_guard.o: userland/tests/ring3_guard.c | $(ABI_CONTRACT_ORDER)
+userland/diag/ring3_guard.o: userland/diag/ring3_guard.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
-userland/tests/ring3_guard.elf: userland/tests/ring3_guard.o sdk/link/app.ld
-	$(LD) -m elf_i386 -T sdk/link/app.ld -nostdlib --nmagic --gc-sections -o $@ userland/tests/ring3_guard.o
+userland/diag/ring3_guard.elf: userland/diag/ring3_guard.o sdk/link/app.ld
+	$(LD) -m elf_i386 -T sdk/link/app.ld -nostdlib --nmagic --gc-sections -o $@ userland/diag/ring3_guard.o
 
-userland/tests/ring3_guard.bin: userland/tests/ring3_guard.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
-	$(OBJCOPY) -O binary $< userland/tests/ring3_guard.raw
-	python3 sdk/mkos32x.py userland/tests/ring3_guard.raw $@ --elf $< --api 39
-	@rm -f userland/tests/ring3_guard.raw
+userland/diag/ring3_guard.bin: userland/diag/ring3_guard.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
+	$(OBJCOPY) -O binary $< userland/diag/ring3_guard.raw
+	python3 sdk/mkos32x.py userland/diag/ring3_guard.raw $@ --elf $< --api 39
+	@rm -f userland/diag/ring3_guard.raw
 
-ring3_guard: userland/tests/ring3_guard.bin
+ring3_guard: userland/diag/ring3_guard.bin
 .PHONY: ring3_guard
 
 # --- hello_r3 (M2 KAPI トランポリン検証: 既存 hello.c をソース無変更で CPL=3) ---
 # hello.elf (crt0 リンク済み, 通常ビルド) をそのまま使い、--ring3 を付けた
 # 別名 .bin にする。api->kprintf(%d/%s) / api->magic / api->version /
 # crt0 の sys_exit 往復を CPL=3 で網羅する (T1-T5)。ソースは一切変えない。
-userland/tests/hello_r3.bin: userland/tests/hello.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
-	$(OBJCOPY) -O binary $< userland/tests/hello_r3.raw
-	python3 sdk/mkos32x.py userland/tests/hello_r3.raw $@ --elf $< --api 39 --ring3
-	@rm -f userland/tests/hello_r3.raw
+userland/diag/hello_r3.bin: userland/diag/hello.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
+	$(OBJCOPY) -O binary $< userland/diag/hello_r3.raw
+	python3 sdk/mkos32x.py userland/diag/hello_r3.raw $@ --elf $< --api 39 --ring3
+	@rm -f userland/diag/hello_r3.raw
 
-hello_r3: userland/tests/hello_r3.bin
+hello_r3: userland/diag/hello_r3.bin
 .PHONY: hello_r3
 
 
@@ -405,32 +405,32 @@ endef
 
 # --- テストプログラム登録 ---
 
-$(eval $(call DEFINE_TEST,sndl_test,$$(LIBDIR)/libos32sndl.a,,userland/tests))
+$(eval $(call DEFINE_TEST,sndl_test,$$(LIBDIR)/libos32sndl.a,,userland/diag))
 $(eval $(call DEFINE_TEST,mmtimetest,$$(LIBMMTIME_OBJ),$$(INC_libmmtime),userland/diag))
 
-$(eval $(call DEFINE_TEST,gfx2_i2,$$(GFX_OBJ),$$(INC_libos32gfx),userland/tests))
+$(eval $(call DEFINE_TEST,gfx2_i2,$$(GFX_OBJ),$$(INC_libos32gfx),userland/diag))
 
-$(eval $(call DEFINE_TEST,hwscroll_probe,$$(GFX_OBJ),$$(INC_libos32gfx),userland/tests))
+$(eval $(call DEFINE_TEST,hwscroll_probe,$$(GFX_OBJ),$$(INC_libos32gfx),userland/diag))
 
-$(eval $(call DEFINE_TEST,gfx200_test,$$(GFX_OBJ),$$(INC_libos32gfx),userland/tests))
-$(eval $(call DEFINE_TEST,gfx_demo200,$$(GFX_OBJ),$$(INC_libos32gfx),userland/tests))
-$(eval $(call DEFINE_TEST,blit_test,$$(GFX_OBJ),$$(INC_libos32gfx),userland/tests))
-$(eval $(call DEFINE_TEST,blit_test2,$$(GFX_OBJ),$$(INC_libos32gfx),userland/tests))
-$(eval $(call DEFINE_TEST,rotate_test,$$(GFX_OBJ),$$(INC_libos32gfx),userland/tests))
-$(eval $(call DEFINE_TEST,demo_tile,$$(TILEMAP_OBJ) $$(GFX_OBJ) $$(LIBASSET_OBJ),$$(INC_libos32tilemap),userland/tests))
-$(eval $(call DEFINE_TEST,tile_bench,$$(TILEMAP_OBJ) $$(GFX_OBJ) $$(LIBASSET_OBJ),$$(INC_libos32tilemap),userland/tests))
-$(eval $(call DEFINE_TEST,db_test,$$(LIBOS32DB_OBJ),$$(INC_libos32db),userland/tests))
-$(eval $(call DEFINE_TEST,dbq,$$(LIBOS32DB_OBJ),$$(INC_libos32db),userland/tests))
-$(eval $(call DEFINE_TEST,e2test,,,userland/tests))
-$(eval $(call DEFINE_TEST,math_test,$$(LIBMATH_OBJ),$$(INC_libos32math),userland/tests))
-$(eval $(call DEFINE_TEST,input_test,$$(LIBINPUT_OBJ) $$(LIBMATH_OBJ),$$(INC_libos32input),userland/tests))
-$(eval $(call DEFINE_TEST,asset_test,$$(LIBASSET_OBJ),$$(INC_libos32asset),userland/tests))
-$(eval $(call DEFINE_TEST,asset_demo,$$(LIBASSET_OBJ),$$(INC_libos32asset),userland/tests))
-$(eval $(call DEFINE_TEST,ecs_test,$$(LIBECS_OBJ) $$(LIBMATH_OBJ),$$(INC_libos32ecs),userland/tests))
-$(eval $(call DEFINE_TEST,save_test,$$(LIBSAVE_OBJ),$$(INC_libos32save),userland/tests))
-$(eval $(call DEFINE_TEST,mgx_test,$$(LIBMGX_OBJ),$$(INC_libos32mgx),userland/tests))
+$(eval $(call DEFINE_TEST,gfx200_test,$$(GFX_OBJ),$$(INC_libos32gfx),userland/diag))
+$(eval $(call DEFINE_TEST,gfx_demo200,$$(GFX_OBJ),$$(INC_libos32gfx),userland/diag))
+$(eval $(call DEFINE_TEST,blit_test,$$(GFX_OBJ),$$(INC_libos32gfx),userland/diag))
+$(eval $(call DEFINE_TEST,blit_test2,$$(GFX_OBJ),$$(INC_libos32gfx),userland/diag))
+$(eval $(call DEFINE_TEST,rotate_test,$$(GFX_OBJ),$$(INC_libos32gfx),userland/diag))
+$(eval $(call DEFINE_TEST,demo_tile,$$(TILEMAP_OBJ) $$(GFX_OBJ) $$(LIBASSET_OBJ),$$(INC_libos32tilemap),userland/diag))
+$(eval $(call DEFINE_TEST,tile_bench,$$(TILEMAP_OBJ) $$(GFX_OBJ) $$(LIBASSET_OBJ),$$(INC_libos32tilemap),userland/diag))
+$(eval $(call DEFINE_TEST,db_test,$$(LIBOS32DB_OBJ),$$(INC_libos32db),userland/diag))
+$(eval $(call DEFINE_TEST,dbq,$$(LIBOS32DB_OBJ),$$(INC_libos32db),userland/diag))
+$(eval $(call DEFINE_TEST,e2test,,,userland/diag))
+$(eval $(call DEFINE_TEST,math_test,$$(LIBMATH_OBJ),$$(INC_libos32math),userland/diag))
+$(eval $(call DEFINE_TEST,input_test,$$(LIBINPUT_OBJ) $$(LIBMATH_OBJ),$$(INC_libos32input),userland/diag))
+$(eval $(call DEFINE_TEST,asset_test,$$(LIBASSET_OBJ),$$(INC_libos32asset),userland/diag))
+$(eval $(call DEFINE_TEST,asset_demo,$$(LIBASSET_OBJ),$$(INC_libos32asset),userland/diag))
+$(eval $(call DEFINE_TEST,ecs_test,$$(LIBECS_OBJ) $$(LIBMATH_OBJ),$$(INC_libos32ecs),userland/diag))
+$(eval $(call DEFINE_TEST,save_test,$$(LIBSAVE_OBJ),$$(INC_libos32save),userland/diag))
+$(eval $(call DEFINE_TEST,mgx_test,$$(LIBMGX_OBJ),$$(INC_libos32mgx),userland/diag))
 # kbd_echo — KAPI だけで動く CUI キー入力エコー (票 K7 の I1/I2/I3 観測手段)
-$(eval $(call DEFINE_TEST,kbd_echo,,,userland/tests))
+$(eval $(call DEFINE_TEST,kbd_echo,,,userland/diag))
 
 # === 標準アプリ ===
 # アプリは apps/Makefile が SDK 経由でビルドする。ここでは定義を持たない。
@@ -441,8 +441,8 @@ userland/lib/gfx/ui.o: userland/lib/gfx/ui.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32gfx) -c $< -o $@
 
 # === SQLite Standalone Test ===
-SQLITE_SA_DIR = userland/tests/sqlite_standalone
-SQLITE_SA_CFLAGS = $(C_STD_SQLITE) -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector -nostdlib -mno-red-zone -O1 -fcommon -Wno-long-long -w -I. -Iinclude $(SDK_INC) -Iuserland/lib -Ilib/sqlite3 -include lib/sqlite3/os32_sqlite_config.h -I$(CROSS_DIR)/i386-elf/include
+SQLITE_SA_DIR = userland/diag/sqlite_standalone
+SQLITE_SA_CFLAGS = $(C_STD_SQLITE) -m32 -march=i386 -ffreestanding -fno-pie -fno-stack-protector -nostdlib -mno-red-zone -O1 -fcommon -Wno-long-long -w -I. -Isys/include $(SDK_INC) -Iuserland/lib -Ilib/sqlite3 -include lib/sqlite3/os32_sqlite_config.h -I$(CROSS_DIR)/i386-elf/include
 SQLITE_SA_CFLAGS += -include sdk/include/os32/os32_unit_stamp.h
 
 $(SQLITE_SA_DIR)/sqlite3_user.o: lib/sqlite3/sqlite3.c lib/sqlite3/os32_sqlite_config.h | $(ABI_CONTRACT_ORDER)
@@ -481,49 +481,49 @@ userland/cmds/cfg.elf: sdk/link/app.ld $(CRT0_OBJ) userland/cmds/cfg.o $(LIBCFG_
 
 # cfg_bench — 設定レジストリの計測 (票 S5-C、libos32cfg を静的リンク)。明示規則は
 # 既定の tests/%.elf パターンに優先する。
-userland/tests/cfg_bench.o: userland/tests/cfg_bench.c userland/lib/cfg/libos32cfg.h | $(ABI_CONTRACT_ORDER)
+userland/diag/cfg_bench.o: userland/diag/cfg_bench.c userland/lib/cfg/libos32cfg.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32cfg) -c $< -o $@
 
-userland/tests/cfg_bench.elf: sdk/link/app.ld $(CRT0_OBJ) userland/tests/cfg_bench.o $(LIBCFG_OBJ)
-	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/tests/cfg_bench.o \
+userland/diag/cfg_bench.elf: sdk/link/app.ld $(CRT0_OBJ) userland/diag/cfg_bench.o $(LIBCFG_OBJ)
+	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/diag/cfg_bench.o \
 	      $(LGRP_BEG) $(LIBCFG_OBJ) $(LGRP_END) -lc -lgcc
 
 # kstr_bench — kstring のアセンブリ版と C 版を実機で測る
 # (票 docs/archive/portability/TASK_KSTRING_BENCH.md)。
 #
-# **出荷するソースそのもの**を測る。写しは作らない。lib/kstring_asm.asm と
-# lib/kstring_c.c は 13 本すべてが同名なので 1 つの実行ファイルに入らない。
+# **出荷するソースそのもの**を測る。写しは作らない。sys/kern/kstring_asm.asm と
+# sys/kern/kstring_c.c は 13 本すべてが同名なので 1 つの実行ファイルに入らない。
 # tools/tests/test_kstring_c.py と同じ手で objcopy --redefine-syms に
 # 接頭辞を付けさせ、アセンブリ版を a_*、C 版を c_* にして同居させる
 # (libc の memcpy / strlen 等とも衝突しなくなる副産物つき)。
 #
-# 名前の表はここが管理元。lib/kstring_asm.asm の global が増減したら
-# ここと userland/tests/kstr_bench.c の kb_build_table を直す
+# 名前の表はここが管理元。sys/kern/kstring_asm.asm の global が増減したら
+# ここと userland/diag/kstr_bench.c の kb_build_table を直す
 # ホストの計測枠試験は TT2 (2026-10-24) で削除。実機の計測器は保持。
 KSTR_BENCH_FUNCS = kmemcpy memcpy kmemset memset kstrlen strlen kstrcmp \
                    strcmp kstrncmp strncmp kstrcpy kstrncpy memcmp
 
-userland/tests/kstr_asm_a.o: lib/kstring_asm.asm
-	$(AS) -p sdk/crt/generations.inc -f elf32 $< -o userland/tests/kstr_asm_raw.o
-	@for f in $(KSTR_BENCH_FUNCS); do echo "$$f a_$$f"; done > userland/tests/kstr_ren_a.txt
-	$(OBJCOPY) --redefine-syms=userland/tests/kstr_ren_a.txt userland/tests/kstr_asm_raw.o $@
-	@rm -f userland/tests/kstr_asm_raw.o userland/tests/kstr_ren_a.txt
+userland/diag/kstr_asm_a.o: sys/kern/kstring_asm.asm
+	$(AS) -p sdk/crt/generations.inc -f elf32 $< -o userland/diag/kstr_asm_raw.o
+	@for f in $(KSTR_BENCH_FUNCS); do echo "$$f a_$$f"; done > userland/diag/kstr_ren_a.txt
+	$(OBJCOPY) --redefine-syms=userland/diag/kstr_ren_a.txt userland/diag/kstr_asm_raw.o $@
+	@rm -f userland/diag/kstr_asm_raw.o userland/diag/kstr_ren_a.txt
 
-userland/tests/kstr_c_c.o: lib/kstring_c.c lib/kstring.h include/types.h include/callconv.h | $(ABI_CONTRACT_ORDER)
-	$(CC) $(PROGRAM_FLAGS) -Ilib -c $< -o userland/tests/kstr_c_raw.o
-	@for f in $(KSTR_BENCH_FUNCS); do echo "$$f c_$$f"; done > userland/tests/kstr_ren_c.txt
-	$(OBJCOPY) --redefine-syms=userland/tests/kstr_ren_c.txt userland/tests/kstr_c_raw.o $@
-	@rm -f userland/tests/kstr_asm_raw.o userland/tests/kstr_c_raw.o userland/tests/kstr_c_raw.d userland/tests/kstr_ren_c.txt
+userland/diag/kstr_c_c.o: sys/kern/kstring_c.c sys/kern/kstring.h sys/include/types.h sys/include/callconv.h | $(ABI_CONTRACT_ORDER)
+	$(CC) $(PROGRAM_FLAGS) -Ilib -Isys/kern -c $< -o userland/diag/kstr_c_raw.o
+	@for f in $(KSTR_BENCH_FUNCS); do echo "$$f c_$$f"; done > userland/diag/kstr_ren_c.txt
+	$(OBJCOPY) --redefine-syms=userland/diag/kstr_ren_c.txt userland/diag/kstr_c_raw.o $@
+	@rm -f userland/diag/kstr_asm_raw.o userland/diag/kstr_c_raw.o userland/diag/kstr_c_raw.d userland/diag/kstr_ren_c.txt
 
-userland/tests/kstr_bench.o: userland/tests/kstr_bench.c | $(ABI_CONTRACT_ORDER)
+userland/diag/kstr_bench.o: userland/diag/kstr_bench.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -c $< -o $@
 
-userland/tests/kstr_bench.elf: sdk/link/app.ld $(CRT0_OBJ) userland/tests/kstr_bench.o \
-                               userland/tests/kstr_asm_a.o userland/tests/kstr_c_c.o
-	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/tests/kstr_bench.o \
-	      userland/tests/kstr_asm_a.o userland/tests/kstr_c_c.o -lc -lgcc
+userland/diag/kstr_bench.elf: sdk/link/app.ld $(CRT0_OBJ) userland/diag/kstr_bench.o \
+                               userland/diag/kstr_asm_a.o userland/diag/kstr_c_c.o
+	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/diag/kstr_bench.o \
+	      userland/diag/kstr_asm_a.o userland/diag/kstr_c_c.o -lc -lgcc
 
-kstr_bench: $(CRT0_OBJ) userland/tests/kstr_bench.bin
+kstr_bench: $(CRT0_OBJ) userland/diag/kstr_bench.bin
 
 # tar — ustar の作成 / 展開 / 一覧 (票 S6)。ustar の読み書きは vendor した
 # lib/microtar (rxi、MIT)。lib/lz4_prog.o と同じく、カーネル側とは別に
@@ -565,13 +565,13 @@ userland/cmds/hdate.elf: sdk/link/app.ld $(CRT0_OBJ) userland/cmds/hdate.o $(LIB
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/cmds/hdate.o \
 	      $(LGRP_BEG) $(LIBHOST_OBJ) $(LGRP_END) -lc -lgcc
 
-userland/tests/%.elf: userland/tests/%.c sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTRACT_ORDER)
-	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/tests/$*.o
-	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/tests/$*.o -lc -lgcc
+userland/diag/%.elf: userland/diag/%.c sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTRACT_ORDER)
+	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/diag/$*.o
+	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/diag/$*.o -lc -lgcc
 
-userland/tests/bench/%.elf: userland/tests/bench/%.c sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTRACT_ORDER)
-	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/tests/bench/$*.o
-	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/tests/bench/$*.o -lc -lgcc
+userland/diag/bench/%.elf: userland/diag/bench/%.c sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTRACT_ORDER)
+	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/diag/bench/$*.o
+	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/diag/bench/$*.o -lc -lgcc
 
 userland/system/%.elf: userland/system/%.c sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/system/$*.o
@@ -587,8 +587,8 @@ userland/system/install.elf: userland/system/install.c $(INST_HDRS) $(INST_OBJ) 
 	$(CC) $(PROGRAM_FLAGS) -c $< -o userland/system/install.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/system/install.o $(INST_OBJ) -lc -lgcc
 userland/system/hsync.elf: userland/system/hsync_protect.inc userland/system/hsync_fep.inc
-userland/system/hsync.elf: PROGRAM_FLAGS += -Iarch/$(ARCH)
-userland/system/hsync.elf: lib/crc32_core.inc exec/os32x_hdr.c exec/os32x_hdr.h include/endian_le.h arch/$(ARCH)/arch_exec_image.h
+userland/system/hsync.elf: PROGRAM_FLAGS += -Isys/arch/$(ARCH)
+userland/system/hsync.elf: lib/crc32_core.inc sys/kern/exec/os32x_hdr.c sys/kern/exec/os32x_hdr.h sys/include/endian_le.h sys/arch/$(ARCH)/arch_exec_image.h
 
 # === ELF → RAW → OS32X BIN 変換 ===
 # ユーザーランドぶん。ゲームは game/Makefile が自前で持つ。
@@ -616,7 +616,7 @@ userland/%.bin: userland/%.raw userland/%.elf sdk/mkos32x.py sdk/os32x_hdr.py sd
 	_heap=$${_heap:-0}; \
 	if [ "$*" = "shell" ] || [ "$*" = "gshell" ]; then _heap=0; fi; \
 	_opts=""; \
-	if [ "$*" = "tests/mem_stat_compat_test" ]; then _opts="$$_opts --compat-api"; fi; \
+	if [ "$*" = "diag/mem_stat_compat_test" ]; then _opts="$$_opts --compat-api"; fi; \
 	if [ "$$_heap" != "0" ]; then _opts="$$_opts --heap $$_heap"; fi; \
 	if [ "$$_decl" = "gfx" ]; then _opts="$$_opts --gfx"; fi; \
 	if [ "$$_decl" = "cui" ]; then _opts="$$_opts --cui-only"; fi; \
@@ -626,8 +626,8 @@ userland/%.bin: userland/%.raw userland/%.elf sdk/mkos32x.py sdk/os32x_hdr.py sd
 # === ヘルパーツール ===
 unicode_bin: $(BUILD_OUT)/unicode.bin
 
-tools/gen_unicode: tools/gen_unicode.c lib/unicode_jis_table.h kernel/console/unicode_file.h include/endian_le.h include/types.h include/callconv.h
-	gcc -std=gnu11 -O2 -I. -Iinclude $< -o $@
+tools/gen_unicode: tools/gen_unicode.c lib/unicode_jis_table.h sys/kern/console/unicode_file.h sys/include/endian_le.h sys/include/types.h sys/include/callconv.h
+	gcc -std=gnu11 -O2 -I. -Isys/include $< -o $@
 
 $(BUILD_OUT)/unicode.bin: tools/gen_unicode
 	@mkdir -p $(BUILD_OUT)
@@ -671,21 +671,21 @@ $(1)_rust: $$(CRT0_OBJ) $(2)/$(1).bin
 endef
 
 # --- Rustプログラム登録 ---
-$(eval $(call DEFINE_RUST_PROGRAM,hello_gfx,userland/tests,$$(GFX_OBJ)))
-$(eval $(call DEFINE_RUST_PROGRAM,alloc_demo,userland/tests,))
-$(eval $(call DEFINE_RUST_PROGRAM,trim_back_rs,userland/tests,))
+$(eval $(call DEFINE_RUST_PROGRAM,hello_gfx,userland/diag,$$(GFX_OBJ)))
+$(eval $(call DEFINE_RUST_PROGRAM,alloc_demo,userland/diag,))
+$(eval $(call DEFINE_RUST_PROGRAM,trim_back_rs,userland/diag,))
 programs: trim_back_rs_rust
-$(eval $(call DEFINE_RUST_PROGRAM,math_test_rs,userland/tests,))
-$(eval $(call DEFINE_RUST_PROGRAM,font_test,userland/tests,$$(GFX_OBJ)))
+$(eval $(call DEFINE_RUST_PROGRAM,math_test_rs,userland/diag,))
+$(eval $(call DEFINE_RUST_PROGRAM,font_test,userland/diag,$$(GFX_OBJ)))
 # gshell 配下の GUI アプリは libos32gui_stub をリンクし、描画とウィジェットの本体は
 # 共有ライブラリ /sys/lib/libos32gui.shlib (下) にある。libos32gfx もライブラリ側に
 # 入っているので $(GFX_OBJ) は要らない (C3)。gdi_test だけは libos32gfx_init を
 # 直接呼ぶ単独 GFX プログラムなので従来どおり。
-$(eval $(call DEFINE_RUST_PROGRAM,gui_demo,userland/tests,))
+$(eval $(call DEFINE_RUST_PROGRAM,gui_demo,userland/diag,))
 # v1.2 の client API 試験 (C4): MessageBox/File/Input の modal_result、session_launch、icon16。stub のみ
-$(eval $(call DEFINE_RUST_PROGRAM,v12_api_test,userland/tests,))
+$(eval $(call DEFINE_RUST_PROGRAM,v12_api_test,userland/diag,))
 # T5a: 静的 Unicode consumer も gfx の v76 KAPI stub を使う。
-$(eval $(call DEFINE_RUST_PROGRAM,t5a_display,userland/tests,$$(GFX_OBJ)))
+$(eval $(call DEFINE_RUST_PROGRAM,t5a_display,userland/diag,$$(GFX_OBJ)))
 programs: t5a_display_rust
 # v1.2 File Manager (C5): Win3.1 風 2 ペイン、SESSION_REQUEST で起動依頼。stub のみ
 $(eval $(call DEFINE_RUST_PROGRAM,filer,userland/system,))
@@ -694,9 +694,9 @@ $(eval $(call DEFINE_RUST_PROGRAM,filer,userland/system,))
 $(eval $(call DEFINE_RUST_PROGRAM,edit_gui,userland/system,))
 # ROADMAP v1.4 About dialog (/usr/bin/about.bin)。Start → Programs の about.bin から起動する。
 $(eval $(call DEFINE_RUST_PROGRAM,about,userland/system,))
-$(eval $(call DEFINE_RUST_PROGRAM,gdi_test,userland/tests,$$(GFX_OBJ)))
-$(eval $(call DEFINE_RUST_PROGRAM,lease_test,userland/tests,))
-$(eval $(call DEFINE_RUST_PROGRAM,gui_bench,userland/tests,))
+$(eval $(call DEFINE_RUST_PROGRAM,gdi_test,userland/diag,$$(GFX_OBJ)))
+$(eval $(call DEFINE_RUST_PROGRAM,lease_test,userland/diag,))
+$(eval $(call DEFINE_RUST_PROGRAM,gui_bench,userland/diag,))
 
 # === libos32gui.shlib — 共有ライブラリ (0x400000 常駐、票 C3 / K3) ===
 # 先頭 4KB がジャンプ表 (OS32ShlibHeader)。crt0 は付けない (入口は表であって
@@ -757,10 +757,10 @@ clean-programs: clean-rust clean-gshell
 	rm -f $(FAULTPROBE_OBJ)
 	rm -f userland/diag/mmtimetest.o userland/diag/mmtimetest.elf userland/diag/mmtimetest.raw userland/diag/mmtimetest.bin
 	rm -f userland/cmds/*.o userland/cmds/*.elf userland/cmds/*.raw userland/cmds/*.bin
-	rm -f userland/tests/*.o userland/tests/*.elf userland/tests/*.raw userland/tests/*.bin
-	rm -f userland/tests/kstr_ren_a.txt userland/tests/kstr_ren_c.txt userland/tests/kstr_c_raw.d
-	rm -f userland/tests/bench/*.o userland/tests/bench/*.elf userland/tests/bench/*.raw userland/tests/bench/*.bin
-	rm -f userland/tests/bench_scale2x/*.o userland/tests/bench_scale2x/*.elf userland/tests/bench_scale2x/*.raw userland/tests/bench_scale2x/*.bin
+	rm -f userland/diag/*.o userland/diag/*.elf userland/diag/*.raw userland/diag/*.bin
+	rm -f userland/diag/kstr_ren_a.txt userland/diag/kstr_ren_c.txt userland/diag/kstr_c_raw.d
+	rm -f userland/diag/bench/*.o userland/diag/bench/*.elf userland/diag/bench/*.raw userland/diag/bench/*.bin
+	rm -f userland/diag/bench_scale2x/*.o userland/diag/bench_scale2x/*.elf userland/diag/bench_scale2x/*.raw userland/diag/bench_scale2x/*.bin
 	rm -f userland/system/*.o userland/system/*.elf userland/system/*.raw userland/system/*.bin
 	rm -f sdk/crt/*.o sdk/crt/resident/*.o
 	rm -f userland/shell/*.o
@@ -768,7 +768,7 @@ clean-programs: clean-rust clean-gshell
 	rm -f userland/sh.elf userland/sh.raw userland/sh.bin
 
 	rm -f userland/lib/rt/*.o
-	rm -f userland/tests/sqlite_standalone/*.o userland/tests/sqlite_standalone/*.elf userland/tests/sqlite_standalone/*.raw userland/tests/sqlite_standalone/*.bin
+	rm -f userland/diag/sqlite_standalone/*.o userland/diag/sqlite_standalone/*.elf userland/diag/sqlite_standalone/*.raw userland/diag/sqlite_standalone/*.bin
 	rm -f lib/lz4_prog.o lib/utf8_prog.o
 	rm -f lib/zlib/*.o
 	rm -f lib/microtar/*.o
@@ -786,29 +786,29 @@ clean-programs: clean-rust clean-gshell
 .PHONY: clean-programs
 
 # T2h: 8MB code/stack/LARGE shapes, keyboard stdin stops, CUI-only headers.
-H5_SHAPE_BINS := $(addprefix userland/tests/,h5_shape_i.bin h5_shape_ii.bin h5_shape_iii.bin)
-userland/tests/h5_shape_i.elf userland/tests/h5_shape_ii.elf userland/tests/h5_shape_iii.elf: userland/tests/h5_shape.inc include/memmap.h
-userland/tests/h5_shape_i.bin userland/tests/h5_shape_iii.bin: userland/tests/%.bin: userland/tests/%.raw userland/tests/%.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
-	python3 sdk/mkos32x.py $< $@ --elf userland/tests/$*.elf --cui-only
-userland/tests/h5_shape_ii.bin: userland/tests/h5_shape_ii.raw userland/tests/h5_shape_ii.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
-	python3 sdk/mkos32x.py $< $@ --elf userland/tests/h5_shape_ii.elf --stack $(H2_STACK512_BYTES) --cui-only
+H5_SHAPE_BINS := $(addprefix userland/diag/,h5_shape_i.bin h5_shape_ii.bin h5_shape_iii.bin)
+userland/diag/h5_shape_i.elf userland/diag/h5_shape_ii.elf userland/diag/h5_shape_iii.elf: userland/diag/h5_shape.inc sys/include/memmap.h
+userland/diag/h5_shape_i.bin userland/diag/h5_shape_iii.bin: userland/diag/%.bin: userland/diag/%.raw userland/diag/%.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
+	python3 sdk/mkos32x.py $< $@ --elf userland/diag/$*.elf --cui-only
+userland/diag/h5_shape_ii.bin: userland/diag/h5_shape_ii.raw userland/diag/h5_shape_ii.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
+	python3 sdk/mkos32x.py $< $@ --elf userland/diag/h5_shape_ii.elf --stack $(H2_STACK512_BYTES) --cui-only
 .PHONY: h5-shapes
 h5-shapes: $(H5_SHAPE_BINS)
 
 # T2h h2: same guest, default 256KiB and explicit 512KiB; no public format change.
 H2_STACK512_BYTES := 524288
-userland/tests/h2_stack.elf: userland/tests/h2_stack_probe.h userland/tests/h2_stack_probe.inc include/memmap.h sdk/include/os32/os32_gui_shared.h
-userland/tests/h2_stack512.elf: userland/tests/h2_stack.c userland/tests/h2_stack_probe.h userland/tests/h2_stack_probe.inc include/memmap.h sdk/include/os32/os32_gui_shared.h sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTRACT_ORDER)
-	$(CC) $(PROGRAM_FLAGS) -DH2_STACK_BYTES=$(H2_STACK512_BYTES) -c $< -o userland/tests/h2_stack512.o
-	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/tests/h2_stack512.o -lc -lgcc
-userland/tests/h2_stack512.bin: userland/tests/h2_stack512.raw userland/tests/h2_stack512.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
-	python3 sdk/mkos32x.py $< $@ --elf userland/tests/h2_stack512.elf --stack $(H2_STACK512_BYTES)
+userland/diag/h2_stack.elf: userland/diag/h2_stack_probe.h userland/diag/h2_stack_probe.inc sys/include/memmap.h sdk/include/os32/os32_gui_shared.h
+userland/diag/h2_stack512.elf: userland/diag/h2_stack.c userland/diag/h2_stack_probe.h userland/diag/h2_stack_probe.inc sys/include/memmap.h sdk/include/os32/os32_gui_shared.h sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTRACT_ORDER)
+	$(CC) $(PROGRAM_FLAGS) -DH2_STACK_BYTES=$(H2_STACK512_BYTES) -c $< -o userland/diag/h2_stack512.o
+	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/diag/h2_stack512.o -lc -lgcc
+userland/diag/h2_stack512.bin: userland/diag/h2_stack512.raw userland/diag/h2_stack512.elf sdk/mkos32x.py sdk/os32x_hdr.py sdk/os32_generations.py
+	python3 sdk/mkos32x.py $< $@ --elf userland/diag/h2_stack512.elf --stack $(H2_STACK512_BYTES)
 
 # Explicit opt-in only. .fixture files never enter deploy manifests/packages.
 .PHONY: h2-fixtures
-h2-fixtures: userland/tests/h2_stack.bin userland/shell.bin userland/libos32gui.shlib userland/tests/gui_demo.bin
+h2-fixtures: userland/diag/h2_stack.bin userland/shell.bin userland/libos32gui.shlib userland/diag/gui_demo.bin
 	python3 tools/gen_h2_fixtures.py --out $(BUILD_OUT)/h2-isolated
 
 # T2h/h3 shared fixture code (the generic rule does not include userland .d).
-userland/tests/h3a.o: userland/tests/h3a.c userland/tests/h3/fixture.inc userland/tests/h3/state.inc userland/tests/h3/protocol.h
-userland/tests/h3b.o: userland/tests/h3b.c userland/tests/h3/fixture.inc userland/tests/h3/state.inc userland/tests/h3/protocol.h
+userland/diag/h3a.o: userland/diag/h3a.c userland/diag/h3/fixture.inc userland/diag/h3/state.inc userland/diag/h3/protocol.h
+userland/diag/h3b.o: userland/diag/h3b.c userland/diag/h3/fixture.inc userland/diag/h3/state.inc userland/diag/h3/protocol.h

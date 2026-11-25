@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Calibrated spacing, MMIO write ordering, live command updates and sweep."""
 CHECK = dict(name='trident-gap', tier=1, needs=[], budget=4.6,
-    covers=['include/copy_units.h', 'arch/*/arch_copy.h', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'drivers/video/trident/regs.c', 'drivers/video/trident/present.c',
-            'tools/tests/trident_sync_fake.c', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'drivers/video/trident/*.h',
-            'kdebug/trident_command_test.c', 'kdebug/trident_command_test.h',
-            'kdebug/tri_command_wire.h', 'kdebug/generated/**',
+    covers=['sys/include/copy_units.h', 'arch/*/arch_copy.h', 'sys/hal/gfx/sync/sync_int.h', 'sys/hal/gfx/v2/gfx2_int.h', 'sys/include/gfx_sync.h', 'sys/hal/gfx/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'sys/dev/video/trident/regs.c', 'sys/dev/video/trident/present.c',
+            'tools/tests/trident_sync_fake.c', 'sys/hal/gfx/sync/sync_int.h', 'sys/hal/gfx/v2/gfx2_int.h', 'drivers/video/trident/*.h',
+            'sys/dev/video/trident/diag/trident_command_test.c', 'sys/dev/video/trident/diag/trident_command_test.h',
+            'sys/dev/video/trident/diag/tri_command_wire.h', 'kdebug/generated/**',
             'tools/tests/trident_gap_host.c', 'tools/tests/test_trident_gap.py',
             'tools/tests/trident_gap_shell_host.c', 'userland/shell/cmd_tri.c',
             'userland/shell/shell.h',
             'tools/tests/host32.py', 'tools/tests/mutpar.py',
             'tools/tests/kernel_includes.py', 'include/*.h', 'gfx/*.h',
-            'kernel/module/*.h', 'lib/serial_diag.h', 'drivers/char/serial.h',
+            'kernel/module/*.h', 'lib/serial_diag.h', 'sys/dev/char/serial.h',
             'sdk/include/os32/*.h', 'build/config.mk'],
     basis=['HAL_V2_DESIGN §10', 'TRIDENT_FULL_DESIGN'],
 )
@@ -23,9 +23,9 @@ import host32
 from kernel_includes import include_flags
 from mutpar import build_in_tree
 ROOT = Path(__file__).resolve().parents[2]
-GAP = 'drivers/video/trident/present.c'
-REGS = 'drivers/video/trident/regs.c'
-CMD = 'kdebug/trident_command_test.c'
+GAP = 'sys/dev/video/trident/present.c'
+REGS = 'sys/dev/video/trident/regs.c'
+CMD = 'sys/dev/video/trident/diag/trident_command_test.c'
 MUTATIONS = [
     ('command-update', CMD, 'o->set_present(d, TRI_PRESENT_DWORD_GAP, q->arg)', 'o->set_present(d, TRI_PRESENT_DWORD_GAP, 0)'),
     ('sweep-pattern', CMD, '            gap_invert(d);', '            (void)d;'),

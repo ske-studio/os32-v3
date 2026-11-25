@@ -2,12 +2,12 @@
 """IO_TIER T1/P5/P7: actual PIT/TSC provider, freestanding ILP32."""
 CHECK = dict(name='pc98-io-clock-host', tier=3, budget=15, needs=[], covers=[
     'platform/pc98/clock_source.[ch]', 'platform/pc98/tsc_clock.[ch]',
-    'platform/pc98/tsc_math.c', 'platform/pc98/pit_time.[ch]',
-    'platform/pc98/pit.h', 'platform/pc98/pit_math.h', 'include/pc98.h',
-    'include/clock_source.h', 'include/platform_timer.h', 'include/kernel_tick.h',
-    'kernel/io_clock.h', 'kernel/time/ktime.h', 'kernel/time/tick_clock.h',
-    'kernel/irq/tick_budget.h', 'kernel/irq/irq.h', 'kernel/io_work.h', 'kernel/io_policy.h',
-    'include/types.h', 'include/callconv.h', 'lib/divdi3.c',
+    'sys/platform/pc98/tsc_math.c', 'platform/pc98/pit_time.[ch]',
+    'sys/platform/pc98/pit.h', 'sys/platform/pc98/pit_math.h', 'sys/platform/pc98/pc98.h',
+    'sys/hal/time/clock_source.h', 'sys/include/platform_timer.h', 'sys/include/kernel_tick.h',
+    'sys/kern/io_clock.h', 'sys/kern/time/ktime.h', 'sys/hal/time/tick_clock.h',
+    'sys/kern/irq/tick_budget.h', 'sys/kern/irq/irq.h', 'sys/kern/io_work.h', 'sys/kern/io_policy.h',
+    'sys/include/types.h', 'sys/include/callconv.h', 'lib/divdi3.c',
     'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_generations.h',
     'tools/tests/pc98_io_clock_host.c', 'tools/tests/test_pc98_io_clock.py',
     'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
@@ -21,23 +21,23 @@ import host32
 from kernel_includes import include_flags
 
 MUTANTS = [
-    ('mul rounds up', 'platform/pc98/clock_source.c',
+    ('mul rounds up', 'sys/platform/pc98/clock_source.c',
      'n / denominator; /* IO_MUL_FLOOR */',
      '(n + denominator - 1) / denominator; /* IO_MUL_FLOOR */'),
-    ('fixed shift', 'platform/pc98/clock_source.c',
+    ('fixed shift', 'sys/platform/pc98/clock_source.c',
      'io_mul = (u32)m;', 'io_mul = (u32)m; io_shift = 24;'),
-    ('ignores token generation', 'platform/pc98/clock_source.c',
+    ('ignores token generation', 'sys/platform/pc98/clock_source.c',
      'source != io_source || generation != io_generation', 'source != io_source || (generation & 0u)'),
-    ('no half-wrap guard', 'platform/pc98/clock_source.c',
+    ('no half-wrap guard', 'sys/platform/pc98/clock_source.c',
      'value >= 0x80000000ULL', '0'),
-    ('no source generation', 'platform/pc98/clock_source.c',
+    ('no source generation', 'sys/platform/pc98/clock_source.c',
      '++io_generation; /* IO_SOURCE_GENERATION */', '(void)io_generation; /* IO_SOURCE_GENERATION */'),
-    ('no calibration generation', 'platform/pc98/tsc_clock.c',
+    ('no calibration generation', 'sys/platform/pc98/tsc_clock.c',
      '++tsc_generation; /* IO_TSC_READY_GENERATION */', '(void)tsc_generation; /* IO_TSC_READY_GENERATION */'),
 ]
-PRODUCTS = ('platform/pc98/clock_source.c', 'platform/pc98/tsc_clock.c')
-HEADERS = ('platform/pc98/clock_source.h', 'platform/pc98/tsc_clock.h',
-           'include/clock_source.h', 'kernel/io_clock.h')
+PRODUCTS = ('sys/platform/pc98/clock_source.c', 'sys/platform/pc98/tsc_clock.c')
+HEADERS = ('sys/platform/pc98/clock_source.h', 'sys/platform/pc98/tsc_clock.h',
+           'sys/hal/time/clock_source.h', 'sys/kern/io_clock.h')
 
 
 def exercise(root, work, mutation=None):
@@ -66,7 +66,7 @@ def exercise(root, work, mutation=None):
         '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
         '-I' + str(work), *include_flags(root),
         str(root / 'tools/tests/pc98_io_clock_host.c'),
-        str(root / 'platform/pc98/tsc_math.c'), str(root / 'platform/pc98/pit_time.c'),
+        str(root / 'sys/platform/pc98/tsc_math.c'), str(root / 'sys/platform/pc98/pit_time.c'),
         str(root / 'lib/divdi3.c'), '-o', str(exe)], check=True)
     result = host32.run([str(exe)], capture_output=True)
     if result.returncode and result.stdout:

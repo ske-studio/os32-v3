@@ -9,13 +9,13 @@ static void prod_mismatch_at(const char *file, unsigned line, const char *expres
 #endif
 #define GF_S2_ENTRY unused_decoder_tests
 #include "gfinit_host.c"
-#include "hwdev/gf/production.h"
-#include "hwdev/gf/display/api.h"
-#include "mm/pgalloc.h"
-#include "mm/paging.h"
-#include "include/gf_production.h"
-#include "init/sysconfig.c"
-#include "init/gf_production_cfg.c"
+#include "sys/dev/video/geforce/production.h"
+#include "sys/dev/video/geforce/display/api.h"
+#include "sys/kern/mm/pgalloc.h"
+#include "sys/kern/mm/paging.h"
+#include "sys/include/gf_production.h"
+#include "sys/kern/init/sysconfig.c"
+#include "sys/kern/init/gf_production_cfg.c"
 #include "gfinit_resources_ra266.h"
 #include "gf_foundation_width_host.h"
 
@@ -177,7 +177,7 @@ int pci_cfg_write16(u32 b,u32 d,u32 f,u32 o,u16 v)
     prod_cfg[d][f][o/4]=(prod_cfg[d][f][o/4]&0xffff0000U)|(prod_mismatch?0x102:v);
     return 0;
 }
-#include "../../drivers/pci/pci_barsize.c"
+#include "../../sys/dev/pci/pci_barsize.c"
 void *kmemset(void *p,int value,u32 n)
 {u8 *b=p;while(n--)*b++=(u8)value;return p;}
 int kstrcmp(const char *a,const char *b)
@@ -735,7 +735,7 @@ static void prod_cases(void)
  * given as address 0 (unmapped), so any write or drain read faults the test. */
 #include "gfx_hal.h"
 GfxCounters gfx_counters;
-#include "../../drivers/video/geforce/gf_present.c"
+#include "../../sys/dev/video/geforce/gf_present.c"
 static u32 prod_points,prod_present_regs[GF_PRESENT_PFB_AMOUNT/4+1];
 static volatile u8 *volatile prod_unmapped;
 static int prod_present_point(void *v) { prod_points++;return gf_production_point(v); }

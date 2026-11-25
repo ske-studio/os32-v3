@@ -1,6 +1,6 @@
 /* Shared CUI/GUI terminal entry for Trident diagnostics. */
 #include "shell.h"
-#include "../../kdebug/tri_command_wire.h"
+#include "../../sys/dev/video/trident/diag/tri_command_wire.h"
 
 /* kdebug_call became available at this KAPI version (cmd_gf2.c). */
 #define TRI_KAPI_MIN 78U

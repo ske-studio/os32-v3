@@ -1,8 +1,8 @@
-# include/gfx_hal.h — 設計
+# sys/include/gfx_hal.h — 設計
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
-ソース: `include/gfx_hal.h`
+ソース: `sys/include/gfx_hal.h`
 
-GUI/グラフィックコンソール→RAM CLIENT→`gfx_present/dirty`→`backend_geforce`→video service→GF 部品。KAPI とアプリ側描画経路を変えない（[HW1]、`include/gfx_hal.h`）。
+GUI/グラフィックコンソール→RAM CLIENT→`gfx_present/dirty`→`backend_geforce`→video service→GF 部品。KAPI とアプリ側描画経路を変えない（[HW1]、`sys/include/gfx_hal.h`）。
 
 ## 内部設計と契約 (D1)
 
@@ -16,7 +16,7 @@ present は gshell (CPL=0) が窓へ直接、Cirrus は BLT 呼び出し。**v1 
 カーネルの最小限 = モード設定 / probe / enter / leave、窓の写像 (supervisor+PCD)、present / flip / VSYNC、能力表、HW エンジンの薄い口、**lease**。外へ出すもの = BB の所有 (gshell)、描画 (libos32gfx)、合成・カーソル・ドラッグ枠・FEP 窓 (gshell)。
 
 ```c
-/* include/gfx_hal.h / gfx/gfx_core.c: no probe, no mode switch */
+/* sys/include/gfx_hal.h / sys/hal/gfx/gfx_core.c: no probe, no mode switch */
 int gfx_ver_state(GFX_ScreenInfo *out, u32 *kind, u32 *active);
 ```
 
@@ -44,7 +44,7 @@ int gfx_ver_state(GFX_ScreenInfo *out, u32 *kind, u32 *active);
 **バックエンド関数表 + 描画プリミティブ段階の HAL** (2026-09-04 改訂)
 libos32gui は HAL の描画プリミティブ (塗り・矩形転送・文字・ビットマップ) と `present_rect` だけを呼ぶ。9801 / PEGC バックエンドはそれを主記憶のバックバッファ (9801 = 4 プレーン、PEGC = 8bpp) に描いて present し、Cirrus バックエンドは画面の実体をカードの VRAM に置いてエンジン (BitBLT / 塗り / 色展開) に流す。この違いは HAL の中に閉じ、GUI には見せない (Win3.1 の GDI とディスプレイドライバの分担と同じ)。present 時にチャンキー→プレーン変換する方式は 386 では重すぎるため不採用。
 
-> [要確認] 現行 include/gfx_hal.h の GfxBackend に文字・ビットマップの関数ポインタはなく、CPU 共通実装が担う。
+> [要確認] 現行 sys/include/gfx_hal.h の GfxBackend に文字・ビットマップの関数ポインタはなく、CPU 共通実装が担う。
 
 **能力ビット**
 テキスト面オーバーレイ可否 / HW 塗り / HW ブロック転送 / 画面サイズ (400・480・それ以上) / 色数を問い合わせ、GUI 側は決め打ちしない。

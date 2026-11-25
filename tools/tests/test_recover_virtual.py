@@ -1,6 +1,6 @@
 """T4b-8: real dispatcher and virtual normal/fault/trial-expire/poll-stop/txbusy-stop trials, fake HAL, ILP32."""
 CHECK = dict(name='recover-virtual', tier=1,
-    covers=['tools/tests/recover_gf_dev_stub.c', 'kdebug/recover.c', 'kdebug/probe_wire.h', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'kdebug/recover.h', 'kdebug/recover_profile.c', 'lib/pc98_cell.h', 'kdebug/recover_virtual.c', 'kdebug/recover_virtual.h', 'kdebug/recover_wire.h', 'kdebug/kdebug_main.c', 'kdebug/tri_command_wire.h', 'kdebug/trident_command_test.h', 'userland/shell/cmd_recover.c', 'tools/tests/recover_virtual_host.c', 'tools/tests/host32.py', 'tools/tests/recover_hostshim/io.h', 'tools/tests/mutpar.py', 'build/kdebug.mk', 'kdebug/recover_cleanup.h', 'kdebug/recover_diag.h', 'kernel/console/display_restore.h', 'kdebug/gf_stage_state.h', 'kdebug/gfinit_pll.h', 'kdebug/gfinit_wire.h', 'kdebug/gf_foundation_wire.h', 'kdebug/gf_command_wire.h', 'tools/tests/recover_virtual_fixture_host.inc'],
+    covers=['tools/tests/recover_gf_dev_stub.c', 'sys/platform/pc98/kdebug/recover.c', 'sys/kern/kdebug/probe_wire.h', 'kdebug/recover_common/*.inc', 'kdebug/recover_plan/*.inc', 'kdebug/recover_gf_stage/*.inc', 'sys/dev/video/geforce/diag/recover.h', 'sys/platform/pc98/kdebug/recover_profile.c', 'lib/pc98_cell.h', 'sys/kern/kdebug/recover_virtual.c', 'sys/kern/kdebug/recover_virtual.h', 'sys/kern/kdebug/recover_wire.h', 'sys/platform/pc98/kdebug/kdebug_main.c', 'sys/dev/video/trident/diag/tri_command_wire.h', 'sys/dev/video/trident/diag/trident_command_test.h', 'userland/shell/cmd_recover.c', 'tools/tests/recover_virtual_host.c', 'tools/tests/host32.py', 'tools/tests/recover_hostshim/io.h', 'tools/tests/mutpar.py', 'build/kdebug.mk', 'sys/platform/pc98/kdebug/recover_cleanup.h', 'sys/kern/kdebug/recover_diag.h', 'sys/kern/console/display_restore.h', 'sys/dev/video/geforce/diag/gf_stage_state.h', 'sys/dev/video/geforce/diag/gfinit_pll.h', 'sys/dev/video/geforce/diag/gfinit_wire.h', 'sys/dev/video/geforce/diag/gf_foundation_wire.h', 'sys/dev/video/geforce/diag/gf_command_wire.h', 'tools/tests/recover_virtual_fixture_host.inc'],
     needs=[], budget=5.5,
     basis=['REALHW_RECOVER_DESIGN §4', 'REALHW_RECOVER_DESIGN §5', 'DEVICE_STATES'],
 )
@@ -13,7 +13,7 @@ import host32
 import mutpar
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'kdebug/recover_virtual.c'
+SOURCE = 'sys/kern/kdebug/recover_virtual.c'
 MUTATIONS = [
     ('uart_poll_limit_removed', 'if (r->uart_polls >= max_polls) {',
      'if (r->uart_polls >= max_polls && 0) {'),
@@ -50,7 +50,7 @@ MUTATIONS = [
 
 
 def build_cmd(temp, dispatch=None, expire=0):
-    source = (dispatch if dispatch is not None else (ROOT / 'kdebug/kdebug_main.c').read_text()).split('static void selftest_run')[0]
+    source = (dispatch if dispatch is not None else (ROOT / 'sys/platform/pc98/kdebug/kdebug_main.c').read_text()).split('static void selftest_run')[0]
     source = '\n'.join(line for line in source.splitlines() if not line.startswith('#include'))
     (temp / 'virtual_dispatch.inc').write_text(source)
     return ['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
@@ -64,11 +64,11 @@ def build_cmd(temp, dispatch=None, expire=0):
 
 def one(item):
     name, before, after = item
-    path = {'paused_gate_removed': 'kdebug/kdebug_main.c',
-            'step_failure_ignored': 'kdebug/recover_common/session.inc',
-            'trial_deadline_removed': 'kdebug/recover_common/session.inc',
-            'step_poll_limit_removed': 'kdebug/recover_common/session.inc',
-            'uart_poll_limit_removed': 'kdebug/recover_common/clock.inc'}.get(name, SOURCE)
+    path = {'paused_gate_removed': 'sys/platform/pc98/kdebug/kdebug_main.c',
+            'step_failure_ignored': 'sys/dev/video/geforce/diag/recover_common/session.inc',
+            'trial_deadline_removed': 'sys/dev/video/geforce/diag/recover_common/session.inc',
+            'step_poll_limit_removed': 'sys/dev/video/geforce/diag/recover_common/session.inc',
+            'uart_poll_limit_removed': 'sys/kern/kdebug/recover_common/clock.inc'}.get(name, SOURCE)
     source = (ROOT / path).read_text()
     expected = 2 if name == 'synthetic_access_allowed' else 1
     if before and source.count(before) != expected:
@@ -79,7 +79,7 @@ def one(item):
         try:
             tree = mutpar.build_in_tree(ROOT, directory,
                 {path: changed},
-                [build_cmd(temp, changed if path == 'kdebug/kdebug_main.c' else None, expire)
+                [build_cmd(temp, changed if path == 'sys/platform/pc98/kdebug/kdebug_main.c' else None, expire)
                  for expire in (0, 1, 2, 3)], capture_output=True)
         except subprocess.CalledProcessError as exc:
             return name + ': COMPILE FAIL ' + str(exc.stderr), 1

@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """Run real FEP suspension and hsync main on freestanding ILP32 fixtures."""
 CHECK = dict(name='hsync-fep-host', tier=1,
-    covers=['exec/os32x_hdr.c', 'tools/tests/test_hsync_fep.py', 'tools/tests/hsync_fep_host.c',
+    covers=['sys/kern/exec/os32x_hdr.c', 'tools/tests/test_hsync_fep.py', 'tools/tests/hsync_fep_host.c',
             'tools/tests/ime_suspend_host.c', 'tools/tests/fep_suspend_owner_host.c', 'tools/tests/hsync_h2_host.c',
             'tools/tests/hsync_shell_fixture.h', 'tools/tests/fep_boundary_runtime.h',
             'tools/tests/host32.py', 'tools/gen_sqlite_imports.py',
             'tools/gen_kdebug_imports.py', 'tools/prototypes/fep_imports.def',
-            'include/**', 'fs/fd_redirect.h', 'fs/vfs.h', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h',
-            'kernel/module/**', 'exec/exec.h', 'drivers/input/kbd.h', 'drivers/char/serial.h',
-            'mm/kmalloc.h', 'mm/pgalloc.h', 'lib/kstring.h', 'lib/utf8.h',
+            'include/**', 'sys/fs/fd_redirect.h', 'sys/fs/vfs.h', 'sys/kern/sqlite_engine.h', 'sys/kern/sqlite_engine_body.h',
+            'kernel/module/**', 'sys/kern/exec/exec.h', 'sys/platform/pc98/input/kbd.h', 'sys/dev/char/serial.h',
+            'sys/kern/mm/kmalloc.h', 'sys/kern/mm/pgalloc.h', 'sys/kern/kstring.h', 'lib/utf8.h',
             'lib/sqlite3/os32_sqlite_outer.h', 'lib/sqlite3/os32_sqlite_vfs.c',
             'sdk/kapi.json', 'tools/mkmod.py', 'tools/module_schema.py',
-            'tools/prototypes/sqlite_imports.def', 'kernel/ime/ime_render.h', 'tools/tests/kernel_includes.py',
-            'kernel/ime/ime_suspend.c', 'kernel/ime/ime.h', 'include/ime_boot.h',
-            'kernel/ime/fep_module.h', 'kernel/ime/fep_module.c',
-            'kernel/ime/fep_body.c', 'build/fep-module.mk',
+            'tools/prototypes/sqlite_imports.def', 'sys/kern/ime/ime_render.h', 'tools/tests/kernel_includes.py',
+            'sys/kern/ime/ime_suspend.c', 'sys/kern/ime/ime.h', 'sys/include/ime_boot.h',
+            'sys/kern/ime/fep_module.h', 'sys/kern/ime/fep_module.c',
+            'sys/kern/ime/fep_body.c', 'build/fep-module.mk',
             'userland/system/hsync.c', 'userland/system/hsync_fep.inc',
             'userland/system/hsync_protect.inc', 'lib/crc32_core.inc',
-            'lib/kstring.c', 'lib/kstring_c.c', 'sdk/include/os32/**'],
+            'sys/kern/kstring.c', 'sys/kern/kstring_c.c', 'sdk/include/os32/**'],
     needs=['make:all'], budget=5.9,
     kind='characterization',
 )
@@ -47,11 +47,11 @@ MUTATIONS = [
      '            hsp_fep_all_db = 1;', '            hsp_fep_all_db = 1; return 1;',
      'settings failure warns protects continues'),
 
-    ('failed-reopen-retried-at-exit', 'kernel/ime/fep_module.c',
+    ('failed-reopen-retried-at-exit', 'sys/kern/ime/fep_module.c',
      '    if (!on) suspend_owner = 0;',
      '    if (!on && !rc) suspend_owner = 0;',
      'failed reopen stays disabled without cleanup retry'),
-    ('STOP-no-reopen', 'kernel/ime/fep_module.c',
+    ('STOP-no-reopen', 'sys/kern/ime/fep_module.c',
      '        (void)public_api()->dict_suspend(0);',
      '        if (0) (void)public_api()->dict_suspend(0);', 'STOP reopens through owner cleanup'),
     ('abort-no-reopen', 'userland/system/hsync.c',
@@ -63,15 +63,15 @@ MUTATIONS = [
     ('dry-run-closes', 'userland/system/hsync_fep.inc',
      '    if (!g_fep_off || g_dry_run) return 0;',
      '    if (!g_fep_off) return 0;', 'fep dry-run untouched'),
-    ('reopen-default-path', 'kernel/ime/ime_suspend.c',
+    ('reopen-default-path', 'sys/kern/ime/ime_suspend.c',
      'fep_store_open(&ime->store, saved_path, saved_user_path)', 'fep_store_open(&ime->store, IME_DICT_PATH, saved_user_path)',
      'dictionary path preserved'),
-    ('stale-suspend', 'kernel/ime/ime_suspend.c',
+    ('stale-suspend', 'sys/kern/ime/ime_suspend.c',
      '    if (suspended && ime->dict_loaded) suspended = 0;',
      '    if (0) suspended = 0;', 'external reopen can suspend again'),
-    ('mode-not-restored', 'kernel/ime/ime_suspend.c',
+    ('mode-not-restored', 'sys/kern/ime/ime_suspend.c',
      '    suspended = 0;\n    ime_set_mode(saved_mode);', '    suspended = 0;\n    ime_set_mode(IME_MODE_OFF);', 'restore mode'),
-    ('reopen-error-ignored', 'kernel/ime/ime_suspend.c',
+    ('reopen-error-ignored', 'sys/kern/ime/ime_suspend.c',
      '    if (rc) {\n        kprintf', '    if (rc && 0) {\n        kprintf', 'reopen failure disabled'),
 ]
 
@@ -80,7 +80,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--runner', choices=('qemu', 'native'), default='qemu')
     args = parser.parse_args()
-    paths = ['kernel/ime/fep_module.c', 'kernel/ime/ime_suspend.c', 'userland/system/hsync.c', 'userland/system/hsync_fep.inc']
+    paths = ['sys/kern/ime/fep_module.c', 'sys/kern/ime/ime_suspend.c', 'userland/system/hsync.c', 'userland/system/hsync_fep.inc']
     originals = {p: (ROOT / p).read_text() for p in paths}
     with tempfile.TemporaryDirectory(prefix='hsync-fep-') as td:
         work = Path(td)
@@ -109,7 +109,7 @@ def main():
                 current[path] = current[path].replace(old, new)
             for path, source in current.items():
                 dest = {'ime_suspend.c': 'ime_suspend_source.inc', 'fep_module.c': 'fep_module_source.inc'}.get(Path(path).name, Path(path).name)
-                (work / dest).write_text(source.replace('../../lib/', str(ROOT / 'lib') + '/').replace('../../fs/', str(ROOT / 'fs') + '/').replace('../../mm/', str(ROOT / 'mm') + '/').replace('../sqlite_engine.h', str(ROOT / 'kernel/sqlite_engine.h')))
+                (work / dest).write_text(source.replace('../../lib/', str(ROOT / 'lib') + '/').replace('../../fs/', str(ROOT / 'fs') + '/').replace('../../mm/', str(ROOT / 'mm') + '/').replace('../sqlite_engine.h', str(ROOT / 'sys/kern/sqlite_engine.h')))
             target = 'ime_suspend_host.c' if mutation and mutation[1].startswith('kernel/') else 'hsync_fep_host.c'
             if mutation and mutation[1].endswith('fep_module.c'):
                 target = 'fep_suspend_owner_host.c'
@@ -125,7 +125,7 @@ def main():
                     *include_flags(ROOT), '-I' + str(ROOT / 'userland/lib'),
                     '-I' + str(ROOT / 'userland/system'),
                     str(work / target),
-                    str(ROOT / 'lib/kstring.c'), str(ROOT / 'lib/kstring_c.c'),
+                    str(ROOT / 'sys/kern/kstring.c'), str(ROOT / 'sys/kern/kstring_c.c'),
                     '-o', str(exe)], check=True)
                 result = host32.run([str(exe)], runner=args.runner, capture_output=True, text=True, timeout=30)
                 print(result.stdout + result.stderr, end='', flush=True)

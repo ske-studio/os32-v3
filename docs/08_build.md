@@ -160,13 +160,13 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
 
 #### 起動時に読む部品の形式 (KMOD v1)
 
-`/boot` の部品 (`kdebug.bin`・`*.mod`) は全部同じ形式。値の正は `tools/module_schema.py` (生成 `kernel/module/module_schema.h`)、検査の実体は `kernel/module/module_image.c`、生成は `tools/mkmod.py`。
+`/boot` の部品 (`kdebug.bin`・`*.mod`) は全部同じ形式。値の正は `tools/module_schema.py` (生成 `sys/kern/module/module_schema.h`)、検査の実体は `sys/kern/module/module_image.c`、生成は `tools/mkmod.py`。
 
 - **並び**: `header (144 B、u32 LE × 36 語) → reloc 表 → import 表 → export 表 → 名前表 → (4096 B 整列) → payload (text / rodata / data) → bss (ファイルには無い)`。C の構造体を cast して読まず、語ごとに little-endian で decode する。
 - **ヘッダの語** (添字): 0 magic `'KMOD'`、1 format 1、2 header_size 144、3 image_size (= payload_offset + payload_size)、4 KAPI 機能版、5 memory_layout 世代、6 module_abi_gen (`.def` 全文の FNV-1a)、7 module_id、8 phase (2 = POST_ROOT)、9 flags (bit0 = 対の CRC あり)、10 mem_size、11 payload_offset、12 payload_size、13〜20 text/ro/data/bss の off・size、21〜26 reloc/import/export 表の offset・**件数**、27〜28 名前表の offset・**バイト長** (NUL を含む、`tools/mkmod.py`)、29 init、30 stop、31 pair_image_crc、32 image_crc、33 ops_version、34〜35 予約。
 - **基点**: 表の offset (21・23・25・27) は容器の先頭基点。節・init・stop・reloc の書込位置・import slot・export の入口は body 基点 (`body_base = container_base + payload_offset`、body は VA 0 でリンクした像)。`load_span = payload_offset + mem_size` を 1 回で確保する。
 - **表の 1 件**: reloc は `u32 off` (`R_386_32` の書込位置)。import は `{u32 name_hash; u16 type_ver; u16 kind; u32 slot_off}` 12 B、export は `{u32 name_hash; u16 slot; u16 ver; u32 entry_off}` 12 B。名前表は import の順、続いて export の順に NUL 区切りの名前を並べたもの。
-- **ローダーが拒否する条件** (`kernel/module/module_image.c`。本体は最初の 144 B だけで header の検査を済ませてから `load_span` を確保し、どれかが外れたら init を一度も呼ばずに断る):
+- **ローダーが拒否する条件** (`sys/kern/module/module_image.c`。本体は最初の 144 B だけで header の検査を済ませてから `load_span` を確保し、どれかが外れたら init を一度も呼ばずに断る):
   - header (`:60`): magic・format・header_size が違う / image_size がファイルの実長と違うか部品の image 上限を超える / module_id が呼び手の期待と違う / phase が違う / 必須の flags が無いか未知の flags がある / stop を許さない部品で stop ≠ 0 / 予約欄が 0 でない。
   - 大きさ (`:69`): payload_offset が 4096 未満・4096 の倍数でない・ファイル長を超える / payload_size ≠ image_size − payload_offset / mem_size が 4096 の倍数でない・mem 上限を超える・payload_size 未満 / load_span が overflow するか上限を超える。
   - 節 (`:79`): text/ro/data/bss が mem_size からはみ出す、text/ro/data が payload_size からはみ出す、bss が payload の中に始まる、節どうしが重なる / init が text の外 / stop ≠ 0 で text の外。
@@ -178,11 +178,11 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
   - reloc (`:197`): 書込位置の 4 B が payload の外、元の値 (VA 0 基点) が mem_size を超える (one-past は可)、reloc どうしの 4 B が重なる、import slot と重なる。再配置のときも base + mem_size の overflow を断る (`:228`)。
 - **KDEBUG (ID 1)**: POST_ROOT・対の CRC 必須・stop 無し・ops は版 4・20 口 (`KDEBUG_OPS_VERSION`、`tools/module_schema.py` の `KDEBUG_OPS_NAMES`)。他の部品は ops 1 口 (`initialize`)。大きさと表の件数の上限は次の表。
 - **KDEBUG の口と呼ぶ文脈** (slot は `KDEBUG_OPS_NAMES` の順で 1 から): 1〜4 `selftest_*`・5 `crt_diag_bootlog` は起動の通常文脈、6 `gcap_capture` と 19 `dbg_call` は KAPI (slot 239 `v86_gdc_capture`・253 `kdebug_call`) の通常文脈、7〜15 `gcap_*` は #GP・V86 入場・IRQ 停止中の例外文脈 (`.def` で印を付けた import だけを呼べる — `check-kdebug-ctx-host`)、16 `gcap_release` と 17〜18 `nic_*` は通常文脈だけ (IRQ・tick・irq_save の中は不可)、20 `hwdev_core_get` は HWDEV の核 (`docs/design/hwdev/hwdev_imports.md`)。部品が無い・口が空のときは本体が呼ばずに OFF の振る舞い (KAPI は `OS32_ERR_NOSYS`、他は 0 か何もしない) をする。部品の `init` は候補表を埋めて返すだけで、割当・登録・装置の操作・import の呼出しをしない (`check-kdebug-init-host`)。そのため init が失敗しても回収だけで元に戻る。
-- **KDEBUG=0 でも本体に残るもの**: lifecycle の監査 (`kernel/kaudit.c`、`audit_runs` の回数は ON と同じ) と自己試験の計数 (`kernel/kselftest_report.c`)。部品に移したのは kselftest の試験本体・`v86 -g` の記録器・crt_diag で、OFF ではファイルを開かず 0 B。
+- **KDEBUG=0 でも本体に残るもの**: lifecycle の監査 (`sys/kern/kaudit.c`、`audit_runs` の回数は ON と同じ) と自己試験の計数 (`sys/kern/kselftest_report.c`)。部品に移したのは kselftest の試験本体・`v86 -g` の記録器・crt_diag で、OFF ではファイルを開かず 0 B。
 
 #### 起動時に読む部品の大きさの上限と由来
 
-値の正は `tools/module_schema.py` の `COMPONENTS` (生成 `kernel/module/module_schema.h`)。ここは値・由来・今の余裕の参照で、変えるときは schema と一緒にこの表を直す。
+値の正は `tools/module_schema.py` の `COMPONENTS` (生成 `sys/kern/module/module_schema.h`)。ここは値・由来・今の余裕の参照で、変えるときは schema と一緒にこの表を直す。
 ユーザー決定 (2026-10-28): 「上限は物理の制約が無ければ広げてよい」。2026-10-22 の HWDEV の上限固定の決定を上書きし、物理の制約を確認して、制約が無ければ schema とこの表の上限を広げる。
 
 欄: image = ファイル (容器) の長さ、mem = body (BSS 込み)、load_span = `payload_offset + mem_size` (上の「起動時に読む部品の形式」)、表 = reloc / export の件数 (import の件数は上限を持たず、本体の契約と完全一致で照合する)。
@@ -201,8 +201,8 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
 | V86 (8) | 65,536 / 65,536 / 81,920 | 2,048 / 1 | **由来不明** (値だけ — T5c-3 884e20e、同上) | 11,606 (18%) / 16,384 (25%) / 20,480 (25%)、表 337 (16%) / 1 |
 | LAN (9) | 65,536 / 65,536 / 81,920 | 2,048 / 1 | **由来不明** (値だけ — T5c-4 8d9c5db、同上) | 16,640 (25%) / 16,384 (25%) / 20,480 (25%)、表 343 (17%) / 1 |
 | CIRRUS (10) | 65,536 / 65,536 / 81,920 | 2,048 / 1 | **由来不明** (値だけ — T5c-5b a77b893、同上) | 9,624 (15%) / 8,192 (12%) / 12,288 (15%)、表 106 (5%) / 1 |
-| HWDEV (11) | 262,144 / 262,144 / 327,680 | 16,384 / 2 | **決定** (2026-11-04、GF 層 4 で実測 200,704 B、物理の制約が無いので PM が広げた。メモリは `pgalloc` から取り固定の帯を持たない、`kernel/module/module_runtime.c` の `pgalloc_alloc_phys` 呼出し)。reloc は実測 1,523 件が現上限内 | 148,336 (57%) / 200,704 (77%) / 208,896 (64%)、text 78,363 B・rodata 61,608 B・data 172 B・BSS 57,716 B、表 1,523 (9%) / 1 |
-| GEFORCE (12) | 262,144 / 393,216 / 458,752 | 8,192 / 2 | **決定** (2026-11-11、HAL v2 I3 の統合で mem の終わりが 305,616 B になり 256 KiB を超えたため PM が mem を 384 KiB に拡大。load_span は従来の表の余裕 64 KiB を加えた 448 KiB。`kernel/module/module_runtime.c` が `pgalloc_alloc_phys` から取り、固定の帯は無い。image は 256 KiB を維持) | HAL v2 I3 の mem の終わり 305,616 B (78%)、頁切上げ 307,200 B。容器と表を含む値は I3 の RESULT.md の実測を参照 |
+| HWDEV (11) | 262,144 / 262,144 / 327,680 | 16,384 / 2 | **決定** (2026-11-04、GF 層 4 で実測 200,704 B、物理の制約が無いので PM が広げた。メモリは `pgalloc` から取り固定の帯を持たない、`sys/kern/module/module_runtime.c` の `pgalloc_alloc_phys` 呼出し)。reloc は実測 1,523 件が現上限内 | 148,336 (57%) / 200,704 (77%) / 208,896 (64%)、text 78,363 B・rodata 61,608 B・data 172 B・BSS 57,716 B、表 1,523 (9%) / 1 |
+| GEFORCE (12) | 262,144 / 393,216 / 458,752 | 8,192 / 2 | **決定** (2026-11-11、HAL v2 I3 の統合で mem の終わりが 305,616 B になり 256 KiB を超えたため PM が mem を 384 KiB に拡大。load_span は従来の表の余裕 64 KiB を加えた 448 KiB。`sys/kern/module/module_runtime.c` が `pgalloc_alloc_phys` から取り、固定の帯は無い。image は 256 KiB を維持) | HAL v2 I3 の mem の終わり 305,616 B (78%)、頁切上げ 307,200 B。容器と表を含む値は I3 の RESULT.md の実測を参照 |
 
 - export_max は各部品の ops 件数から **導出**。HWDEV・GEFORCE は `initialize` と `get_probe_decls` の 2、TRIDENT は `initialize`・`prepare`・`restore`・`get_probe_decls` の 4、他の独立部品は `initialize` の 1。KDEBUG の 64 は上の由来不明に含む。
 - load_span の上限が mem_max + 表最大の頁切上げより小さい部品がある (HWDEV: reloc を上限まで使うと prefix > 65,536 B)。load_span は別に検査するので読み込みは安全側に断る。
@@ -360,7 +360,7 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
 その写しだけで `__DATE__` / `__TIME__` を `SOURCE_DATE_EPOCH` で固定する。
 
 試験像だけにある BSS `r1_fixture_arm[7]` の各添字に
-`R1_FIXTURE_ARM` (`kernel/r1_fixture.h`) を `emu_write_mem` で書くと一度だけ発火する。
+`R1_FIXTURE_ARM` (`sys/kern/r1_fixture.h`) を `emu_write_mem` で書くと一度だけ発火する。
 1 は次の timer IRQ で割当て、2 は次の #UD で解放を要求し、`R1 context` で停止する。
 4 は USER syscall 中の開いた V86 session の終了で #UD を起こし、
 `exec teardown stopped` に至る。arm は停止前に消費し、未 arm / 不正値は無操作。
@@ -697,7 +697,7 @@ python3 tools/mkpkg.py --list packages/NORMAL.PKG                # 中身の一�
 
 cdinst の展開は依存の順 BOOT → MINIMAL → GUI → NORMAL → DEBUG。Minimal だけの HDD で
 `/etc/system.cfg` が `GUI=1` でも、gshell が無いのでカーネルは `gshell load failed -> CUI shell`
-を出して CUI で上がる (`platform/pc98/kernel.c` のシェル起動ループ。shlib が無いのは
+を出して CUI で上がる (`sys/platform/pc98/kernel.c` のシェル起動ループ。shlib が無いのは
 `[shlib] ... not found (GUI shlib disabled)` で、拒否理由は立たない)。
 
 **MINIMAL =「起動して、HDD に入れて、壊れたときに直して、残りを取ってこられる」
@@ -778,7 +778,7 @@ CD の MINIMAL とずれていた)。違いは `build/packages.yaml` の `fd:` �
 FD ルートの上に HDD の ext2 を載せても、残っている短い名前を黙って掴まない (ホスト試験:
 `test_packages.py` case 8、`test_sh_truncation.py` 25n〜25q)。旧フォントの 8.3 名
 `/sys/font/default.kcg` を読む旧フォントローダ (`kernel/boot_font.c`) は b37783b2 (T7a-1b) で撤去済み。
-今のフォントは KCG の部品 (`kcg.mod`、窓口は `drivers/video/kcg/kcg_module.c`) から取る。
+今のフォントは KCG の部品 (`kcg.mod`、窓口は `sys/dev/video/kcg/kcg_module.c`) から取る。
 FD に旧フォントを手で置いても読まない。**install.bin (FD → HDD) は
 この表を逆に当てて正規名で写し**、ブート領域へ書く物と FD だけの物は写さない
 (`userland/system/install.c` の `fd_renames` / `fd_only`。case 9 が packages.yaml と
@@ -874,7 +874,7 @@ TASK_CLANG_CHECKS (アーカイブ: `docs/archive/v3/TASK_CLANG_CHECKS.md`) §4�
   hlt/cli/sti を検査。arch/*/arch_*.h と ARCH-ASM-OK の例外を保持。
 - `make check-le-access`: ext2 / ISO9660 / KCG / utf8 の9ファイルの
   pointee alignment が上がる cast を canonical type で検査。
-  外部形式は `include/endian_le.h` の le16/le32 アクセサを通す。
+  外部形式は `sys/include/endian_le.h` の le16/le32 アクセサを通す。
 
 #### `tools/audit_cast_align.sh`
 

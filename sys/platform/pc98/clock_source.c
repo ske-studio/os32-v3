@@ -1,0 +1,205 @@
+#include "clock_source.h"
+#include "sys/kern/irq/tick_budget.h"
+#include "pit.h"
+#include "pit_time.h"
+#include "platform_timer.h"
+#include "os32_kapi_shared.h"
+#include "../../kern/time/ktime.h"
+#include "tick_clock.h"
+#include "tsc_clock.h"
+#include "sys/kern/io_clock.h"
+#include "io.h"
+
+STATIC_ASSERT(OS32_TICK_HZ == PIT_HZ, logical_tick_hz_match);
+
+static int clock_config_rc = OS32_ERR_NOSYS;
+void pc98_io_clock_install(void); /* IO_TIER P6; also in clock_source.h */
+enum { IO_PC98_PIT = 1, IO_PC98_TSC = 2 };
+static u32 io_source, io_generation, io_tsc_generation, io_mul, io_shift;
+
+/* P5/P7: numerator/denominator counts per us. Start at shift 31 so
+ * even the reciprocal of a TSC shift=32 fits u64; extend by one bit
+ * from the remainder, then reduce until mul fits u32. Preparation only. */
+static void io_rate_config(unsigned long long numerator, u32 denominator)
+{
+    unsigned long long n = numerator << 31;
+    unsigned long long m = n / denominator; /* IO_MUL_FLOOR */
+    io_shift = 31;
+    if (m < 0x80000000ULL) {
+        m = m * 2 + ((n % denominator) * 2) / denominator;
+        ++io_shift;
+    }
+    while (m > 0xffffffffULL) { m >>= 1; --io_shift; }
+    io_mul = (u32)m;
+}
+
+/* Caller holds IF=0. Only a source/calibration change rebuilds the rate. */
+static int io_clock_refresh(void)
+{
+    u32 mult, shift, generation;
+    const struct pit_setup *ps = pit_get_setup();
+    if (pc98_tsc_rate(&mult, &shift, &generation) == 0) {
+        if (io_source == IO_PC98_TSC && io_tsc_generation == generation) return 0;
+        io_rate_config(1ULL << shift, mult);
+        io_tsc_generation = generation;
+        io_source = IO_PC98_TSC;
+    } else {
+        if (clock_config_rc || !ps->valid || ps->mode != PIT_MODE_TIMER0 || !ps->reload)
+            return OS32_ERR_NOSYS;
+        if (io_source == IO_PC98_PIT) return 0;
+        io_rate_config(ps->clk_hz, 1000000u);
+        io_source = IO_PC98_PIT;
+    }
+    ++io_generation; /* IO_SOURCE_GENERATION */
+    return 0;
+}
+
+int platform_clock_init(u32 tick_hz)
+{
+    int rc = pit_init((unsigned int)tick_hz);
+    const struct pit_setup *ps = pit_get_setup();
+    clock_config_rc = OS32_ERR_NOSYS;
+    if (ps->valid) {
+        clock_config_rc = tick_clock_config(ps->reload, ps->clk_hz);
+        if (clock_config_rc == 0) {
+            io_rate_config(ps->clk_hz, 1000000u);
+            io_source = IO_PC98_PIT;
+            ++io_generation;
+        }
+        tick_budget_config();
+        if (clock_config_rc == 0) (void)pc98_tsc_init();
+    }
+    if (clock_config_rc == 0) pc98_io_clock_install(); /* IO_TIER P6 */
+    return rc;
+}
+void platform_clock_info(struct clock_info *out)
+{
+    const struct pit_setup *ps = pit_get_setup();
+    out->tick_hz = ps->hz;
+    out->counter_hz = ps->clk_hz;
+    out->ready = ps->valid && clock_config_rc == 0;
+}
+int pc98_pit_read_us(u32 *lo, u32 *hi)
+{
+    const struct pit_setup *ps = pit_get_setup();
+    struct time_snapshot snap;
+    unsigned int out_lo = 0, out_hi = 0;
+    int attempt, rc = OS32_ERR_AGAIN;
+    /* PIT を積んでいない / mode 2 でない機械では補間の意味が無い。 */
+    if (clock_config_rc != 0 || !ps->valid || ps->mode != (u8)PIT_MODE_TIMER0 || ps->reload == 0) {
+        return OS32_ERR_NOSYS;
+    }
+
+    for (attempt = 0; attempt < TIME_RETRY_MAX; attempt++) {
+        unsigned int count;
+        u32 raw_lo, raw_hi;
+        unsigned long long raw;
+        struct platform_timer_sample hw;
+        int p1, p2;
+
+        platform_timer_sample(&hw);
+        p1 = hw.p1;
+        count = hw.count;
+        p2 = hw.p2;
+
+        /* 4. 物理 IRQ 数 (IF=0 の中なので sample の間は不変) */
+        tick_clock_raw(&raw_lo, &raw_hi);
+        raw = ((unsigned long long)raw_hi << BITS_PER_U32) | raw_lo;
+
+        /* 5. 判定 */
+        if (time_decide(p1, p2, 0, count, &snap) == TIME_DECIDE_OK) {
+            /* t=0 の判定結果は pending の 0/1。下位語の周回も繰り上げる。 */
+            raw += snap.tick;
+            time_us_from64((unsigned int)raw, (unsigned int)(raw >> BITS_PER_U32),
+                           snap.count, ps->reload, (unsigned int)ps->clk_hz,
+                           &out_lo, &out_hi);
+            rc = 0;
+            break;
+        }
+    }
+    if (rc == 0) { *lo = out_lo; *hi = out_hi; }
+    return rc;
+}
+
+/* Public PIT fallback retains continuity after a permanent TSC failure.
+ * Like the original PIT reader this boundary is called with IF=0. */
+int platform_clock_read_us(u32 *lo, u32 *hi)
+{
+    static unsigned long long last, pit_origin, public_origin;
+    static int was_tsc, pit_rebased;
+    u32 l, h;
+    int ready = pc98_tsc_ready();
+    int rc = ready ? pc98_tsc_read_us(&l, &h) : pc98_pit_read_us(&l, &h);
+    if (rc) return rc;
+    unsigned long long us = ((unsigned long long)h << 32) | l;
+    if (!ready) {
+        if (was_tsc) {
+            pit_origin = us; public_origin = last; pit_rebased = 1;
+        }
+        if (pit_rebased) us = public_origin + (us - pit_origin);
+    }
+    if ((ready || pit_rebased) && us < last) us = last;
+    last = us; was_tsc = ready;
+    *lo = (u32)us; *hi = (u32)(us >> 32);
+    return 0;
+}
+
+/* Physical PIT periods plus the current phase, never a us round trip. */
+static int io_pit_count(u32 *out)
+{
+    const struct pit_setup *ps = pit_get_setup();
+    for (int tries = 0; tries < TIME_RETRY_MAX; ++tries) {
+        struct platform_timer_sample sample;
+        struct time_snapshot decision;
+        u32 low, high;
+        platform_timer_sample(&sample);
+        tick_clock_raw(&low, &high);
+        if (time_decide(sample.p1, sample.p2, 0, sample.count, &decision) == TIME_DECIDE_OK) {
+            *out = (low + decision.tick) * ps->reload +
+                   (decision.count <= ps->reload ? ps->reload - decision.count : 0);
+            return 0;
+        }
+    }
+    return OS32_ERR_AGAIN;
+}
+static int io_read(u32 *count, u32 *source, u32 *generation)
+{
+    unsigned int flags = irq_save();
+    u32 value, high;
+    int rc = io_clock_refresh();
+    if (!rc) {
+        if (io_source == IO_PC98_TSC)
+            __asm__ volatile("rdtsc" : "=a"(value), "=d"(high) : : "memory");
+        else rc = io_pit_count(&value);
+        if (!rc) { *count = value; *source = io_source; *generation = io_generation; }
+    }
+    irq_restore(flags);
+    return rc;
+}
+static int io_us_to_count(u32 us, u32 source, u32 generation, u32 *count)
+{
+    unsigned int flags = irq_save();
+    int rc = io_clock_refresh();
+    if (!rc && (source != io_source || generation != io_generation)) rc = OS32_ERR_AGAIN;
+    if (!rc) {
+        unsigned long long value = ((unsigned long long)us * io_mul) >> io_shift;
+        if (value >= 0x80000000ULL) rc = OS32_ERR_AGAIN;
+        else *count = (u32)value;
+    }
+    irq_restore(flags);
+    return rc;
+}
+static int io_read_us(u32 *lo, u32 *hi)
+{
+    unsigned int flags = irq_save();
+    int rc = platform_clock_read_us(lo, hi);
+    irq_restore(flags);
+    return rc;
+}
+const struct io_clock_ops pc98_io_clock_ops = {io_read, io_us_to_count, io_read_us};
+void pc98_io_clock_install(void)
+{
+    unsigned int flags = irq_save();
+    if (io_clock_refresh() == 0) io_clock_set_ops(&pc98_io_clock_ops);
+    irq_restore(flags);
+}

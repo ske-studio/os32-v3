@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """W[2..4]: compiled policy, actual registry/evaluator/held state, LE and BE."""
 CHECK = dict(name='input-w34', tier=1, budget=60, needs=[], kind='contract',
-    covers=['input/hal/input_policy.c', 'input/hal/input_policy.h',
-            'input/hal/keymap*.c', 'input/hal/keymap.h', 'input/hal/kbd_merge.c',
-            'input/hal/in2_dev.c', 'input/hal/in2_int.h', 'input/hal/legacy_keymap.c',
-            'input/keymaps/*.c', 'platform/pc98/input_keymap.c',
-            'include/types.h', 'include/callconv.h', 'include/kbd.h', 'include/legacy_guest.h', 'include/app_ids.h', 'include/io.h',
+    covers=['sys/input/input_policy.c', 'sys/input/input_policy.h',
+            'input/hal/keymap*.c', 'sys/hal/input/keymap.h', 'sys/hal/input/kbd_merge.c',
+            'sys/hal/input/in2_dev.c', 'sys/hal/input/in2_int.h', 'sys/hal/input/legacy_keymap.c',
+            'input/keymaps/*.c', 'sys/platform/pc98/input_keymap.c',
+            'sys/include/types.h', 'sys/include/callconv.h', 'sys/include/kbd.h', 'sys/include/legacy_guest.h', 'sys/include/app_ids.h', 'sys/include/io.h',
             'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/host32.py',
             'tools/tests/input_w34_host.c', 'tools/tests/test_input_w34.py'],
     basis=['docs/decisions/INPUT_KEYMAP_DESIGN.md §5・§8・W の小段の割り方・IKM1 v2 の列挙の数値'])
@@ -20,7 +20,7 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 PATHS = ['input/hal/'+n+'.c' for n in ('input_policy', 'keymap_registry', 'keymap_eval',
          'keymap_state', 'in2_dev', 'kbd_merge', 'legacy_keymap')]
-PATHS += ['input/keymaps/pc98_jp.c', 'input/keymaps/hid_jp.c', 'platform/pc98/input_keymap.c']
+PATHS += ['sys/input/keymaps/pc98_jp.c', 'sys/input/keymaps/hid_jp.c', 'sys/platform/pc98/input_keymap.c']
 MUTATIONS = [
     ('input_policy', 'if (found == key) return OS32_ERR_INVAL;', 'if (0) return OS32_ERR_INVAL;'),
     ('input_policy', 'if (contextual(active, &row, &value)) { /* W2_KEY_ACTION_FIRST */', 'if (0) { /* W2_KEY_ACTION_FIRST */'),
@@ -53,7 +53,7 @@ def run(ctx):
             files = []
             for name, code in texts.items():
                 path = tmp/(name+'.c')
-                path.write_text(code.replace('../../input/hal/keymap.h','keymap.h').replace('../../input/hal/in2_int.h','in2_int.h'))
+                path.write_text(code.replace('../../sys/hal/input/keymap.h','keymap.h').replace('../../sys/hal/input/in2_int.h','in2_int.h'))
                 files.append(str(path))
             cmd = ['gcc','-m32'] if arch == 'x86' else [str(cc),'-DPPC_TEST']
             cmd += ['-std=gnu11','-O2','-Wall','-Wextra','-Werror','-ffreestanding',

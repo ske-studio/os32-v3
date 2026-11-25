@@ -1,7 +1,7 @@
 # ext2_empty_name TDD 記録 — 長さ 0 の名前を ext2 に載せない
 
 契約: `docs/design/fs/ext2/ext2_dir.md` の「名前の検査 — 長さ 0 の名前を媒体に載せない」・`docs/design/fs/vfs.md` (マウント点そのものへの操作)。出所は票 TASK_EXT2_EMPTY_NAME
-試験: `tools/tests/ext2_empty_name_host.c` (実物の `fs/ext2/ext2_*.c` + `fs/vfs.c` + `fs/vfs_fd.c` + `userland/lib/rt/pkg.c` を `#include`)
+試験: `tools/tests/ext2_empty_name_host.c` (実物の `fs/ext2/ext2_*.c` + `sys/fs/vfs.c` + `sys/fs/vfs_fd.c` + `userland/lib/rt/pkg.c` を `#include`)
 実行: `python3 -B tools/tests/test_ext2_empty_name.py [--target] [--mutants] [case]` / `make check-ext2-empty-name-host`
 
 基点: `feat/gui` = `97c2eab`。
@@ -54,7 +54,7 @@ case cdinst  e2fsck -fn cdinst.img: clean
 case legacy  (仕込んだ 1 件だけ検出)
 case synth
 checks 200 failures 0
-TARGET i386-elf -Werror compile PASS (fs/ext2/ext2_dir.c, fs/ext2/ext2_file.c, fs/ext2/ext2_vfs.c, fs/vfs.c)
+TARGET i386-elf -Werror compile PASS (sys/fs/ext2/ext2_dir.c, sys/fs/ext2/ext2_file.c, sys/fs/ext2/ext2_vfs.c, sys/fs/vfs.c)
 ```
 
 ## 変異 (`--mutants`、fs/ の写しを変異させるので実物は書き換えない)

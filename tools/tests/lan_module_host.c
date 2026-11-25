@@ -8,12 +8,12 @@
 #define irq_save() 0U
 #define irq_restore(f) ((void)(f))
 #ifndef LAN_ADAPTER
-#define LAN_ADAPTER "../../drivers/net/e82557/lan_module.c"
+#define LAN_ADAPTER "../../sys/dev/net/e82557/lan_module.c"
 #endif
 #include "e82557_regs.h"
 #include "e82557.h"
 #include LAN_ADAPTER
-#include "../../kernel/irq/tick.c"
+#include "../../sys/kern/irq/tick.c"
 volatile u32 kctx_irq_depth;
 const u32 lan_kexports[] = {0};
 const struct module_symbol_contract lan_import_contracts[] = {{0}};
@@ -137,9 +137,9 @@ int pci_get(u32 idx, void *buf)
     return 0;
 }
 #define pci_bind_all real_pci_bind_all
-#include "../../drivers/pci/pci_bind.c"
+#include "../../sys/dev/pci/pci_bind.c"
 #undef pci_bind_all
-#include "../../drivers/pci/pci_bind_match.c"
+#include "../../sys/dev/pci/pci_bind_match.c"
 static u32 bind_calls, bind_reports;
 void __cdecl kprintf(u8 attr, const char *fmt, ...)
 {
@@ -299,7 +299,7 @@ void _start(void)
     finish(0);
 }
 
-#include "../../platform/pc98/module_pair.c"
+#include "../../sys/platform/pc98/module_pair.c"
 
 const struct boot_common *boot_common_get(void) {
     static struct boot_common info;

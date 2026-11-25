@@ -1,6 +1,6 @@
 """P0: fake devices + init contracts with the real instruction decoder."""
 CHECK = dict(name='video-service-host', tier=1,
-    covers=['tools/tests/video_service_host.c', 'tools/tests/gf_init_contract_host.c', 'tools/tests/host32.py', 'include/video_service.h', 'hwdev/gf/internal.h', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_decode.h', 'kdebug/gfinit_decode/*.inc', 'kdebug/gfinit_op/*.inc', 'kdebug/gfinit_pll.c', 'kdebug/gfinit_pll.h', 'kdebug/gfinit_exec.h', 'kdebug/gfinit_pll/*.inc', 'hwdev/gf/scripts.h'],
+    covers=['tools/tests/video_service_host.c', 'tools/tests/gf_init_contract_host.c', 'tools/tests/host32.py', 'sys/include/video_service.h', 'sys/dev/video/geforce/internal.h', 'sys/dev/video/geforce/diag/gfinit_decode.c', 'sys/dev/video/geforce/diag/gfinit_decode.h', 'kdebug/gfinit_decode/*.inc', 'kdebug/gfinit_op/*.inc', 'sys/dev/video/geforce/diag/gfinit_pll.c', 'sys/dev/video/geforce/diag/gfinit_pll.h', 'sys/dev/video/geforce/diag/gfinit_exec.h', 'kdebug/gfinit_pll/*.inc', 'sys/dev/video/geforce/scripts.h'],
     needs=[], budget=3.5,
     basis=['HWDEV_DESIGN §6', 'GF_STAGES_DESIGN §1'],
 )
@@ -28,7 +28,7 @@ def main():
             *[str(ROOT / f) for f in (
                 'tools/tests/video_service_host.c',
                 'tools/tests/gf_init_contract_host.c',
-                'kdebug/gfinit_decode.c', 'kdebug/gfinit_pll.c')],
+                'sys/dev/video/geforce/diag/gfinit_decode.c', 'sys/dev/video/geforce/diag/gfinit_pll.c')],
             '-o', str(exe)
         ], cwd=ROOT, check=True)
         for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():

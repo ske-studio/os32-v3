@@ -2,8 +2,8 @@
 """H2/H3: actual public records and LE codec; --ppc is manual/PM only."""
 CHECK = dict(name='record-layout', tier=1, needs=[], budget=15,
     covers=['tools/abi/record_layout_contract.c', 'tools/tests/test_record_layout.py',
-            'tools/tests/host32.py', 'include/types.h', 'include/callconv.h',
-            'drivers/pci/pci.c', 'include/pci_dev_contract.h',
+            'tools/tests/host32.py', 'sys/include/types.h', 'sys/include/callconv.h',
+            'sys/dev/pci/pci.c', 'sys/include/pci_dev_contract.h',
             'userland/shell/cmd_pci.c', 'sdk/include/os32/**', 'lib/le_internal.h'],
     basis=['[C1]', '[ABI]', 'KAPI_SPEC §3-1'],
 )
@@ -43,7 +43,7 @@ def prepare(directory):
     matches = re.findall(r'typedef struct \{[^{}]*\} PciDev;', text)
     assert len(matches) == 1, 'shell PciDev extraction must be unique'
     assertions = []
-    for owner, name in [('drivers/pci/pci.c', 'pci_dev_is_40'),
+    for owner, name in [('sys/dev/pci/pci.c', 'pci_dev_is_40'),
                         ('userland/shell/cmd_pci.c', 'shell_pci_dev_is_40')]:
         found = re.findall(r'STATIC_ASSERT\([^;]*, ' + name + r'\);',
                            (ROOT / owner).read_text())
@@ -54,7 +54,7 @@ def prepare(directory):
     # Keep the real relative include in le_internal.h; mutations use a mirror.
     (directory / 'lib').mkdir()
     (directory / 'include').mkdir()
-    (directory / 'include/types.h').write_text((ROOT / 'include/types.h').read_text())
+    (directory / 'sys/include/types.h').write_text((ROOT / 'sys/include/types.h').read_text())
     (directory / 'lib/le_internal.h').write_text((ROOT / 'lib/le_internal.h').read_text())
     return ['-I' + str(directory), '-I' + str(ROOT / 'include'),
             '-I' + str(ROOT / 'sdk/include/os32')]

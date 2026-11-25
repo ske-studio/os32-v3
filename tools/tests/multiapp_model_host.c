@@ -43,10 +43,10 @@ typedef unsigned int   u32;
 /* ------------------------------------------------------------------ */
 
 #define MA_MAX_APPS   4              /* 同時に生かせる非シェル ID の本数 */
-#define MA_SHELL_ID   1              /* = kernel/gui.h の GUI_SHELL_OWNER */
+#define MA_SHELL_ID   1              /* = sys/kern/gui.h の GUI_SHELL_OWNER */
 #define MA_ID_MIN     2
 #define MA_ID_MAX     (MA_ID_MIN + MA_MAX_APPS - 1)   /* 5 */
-#define MA_SLOT_MAX   4              /* = include/memmap.h の GUI_SLOT_MAX */
+#define MA_SLOT_MAX   4              /* = sys/include/memmap.h の GUI_SLOT_MAX */
 
 /* 資源の種類。実体は fd_redirect / vfs / pipe / gui 窓 / gui タイマ / shm。
  * 模型では「所有者タグ付きの数」だけを持つ (回収が ID 単位で閉じるかを見る)。 */
@@ -70,12 +70,12 @@ typedef unsigned int   u32;
 #define MA_FREE     0
 #define MA_RUNNING  1
 #define MA_PARKED   2
-/* 第 2 の park 点 = kbd 待ち (票 K7 D1)。exec/appslot.h の APP_STATE_WAIT_KEY
+/* 第 2 の park 点 = kbd 待ち (票 K7 D1)。sys/kern/exec/appslot.h の APP_STATE_WAIT_KEY
  * と同値で、exec_app_state もこの 3 を返す (既存の 0/1/2 の意味は動かない)。 */
 #define MA_WAIT_KEY 3
 /* 第 3 の park 点 = ポーリング型の協調 yield (票 T8 §7 D8)。GUI 中に
  * kbd_trygetchar / kbd_trygetkey / kbd_has_key を回す全画面 GFX プログラムを
- * 1 周だけ WM へ譲らせる印。exec/appslot.h の APP_STATE_WAIT_POLL と同値で、
+ * 1 周だけ WM へ譲らせる印。sys/kern/exec/appslot.h の APP_STATE_WAIT_POLL と同値で、
  * 足すのは別票 T8-3 K (既存の 0〜3 の意味は動かない)。 */
 #define MA_WAIT_POLL 4
 
@@ -550,7 +550,7 @@ static int ma_resume(MaState *st, int id)
     return MA_OK;
 }
 /* 資源の登録 (vfs_open / pipe_alloc / create_window / timer / shm_alloc 相当)。
- * 実物はどれも res_owner_get() でタグを打つ (fs/vfs_fd.c:139 ほか)。 */
+ * 実物はどれも res_owner_get() でタグを打つ (sys/fs/vfs_fd.c:139 ほか)。 */
 static int ma_res_add(MaState *st, int kind, int n) NOINST;
 static int ma_res_add(MaState *st, int kind, int n)
 {
@@ -646,7 +646,7 @@ static int ma_kill(MaState *st, int id)
     if (st->cur != MA_SHELL_ID) return MA_ERR_STATE;
     a = ma_app(st, id);
     if (!a) return MA_ERR_INVAL;
-    /* 指摘 D (D5): 鍵待ちのまま畳める (exec/appslot.c の resume/kill と同じ線)。 */
+    /* 指摘 D (D5): 鍵待ちのまま畳める (sys/kern/exec/appslot.c の resume/kill と同じ線)。 */
     if (a->state != MA_PARKED && a->state != MA_WAIT_KEY) return MA_ERR_STATE;
     ma_reclaim(st, id);
     return MA_OK;

@@ -1,7 +1,7 @@
 """S3-I: `install --recover-settings` / `--revert-settings` のホスト TDD。
 
 実 `userland/system/install_recover.inc` + 実 SQLite + 実 os32 SQLite VFS +
-実 FD 表 + 実 `kapi/kapi_db.c` を RAM のバックエンドに載せて回す。ホストの
+実 FD 表 + 実 `sys/kapi/kapi_db.c` を RAM のバックエンドに載せて回す。ホストの
 ファイルシステム・sudo・mount・配備・エミュレータには一切触らない。
 記録は tools/tests/s3_tdd.md 節 I。
 
@@ -9,7 +9,7 @@
 """
 import sqlite_cc
 CHECK = dict(name='install-recover-host', tier=1,
-    covers=['tools/tests/sqlite_bits_host.h', 'lib/softfloat/**', 'lib/softfloat_bits.c', 'lib/softfloat_bits.h', 'tools/tests/sqlite_cc.py', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'kapi/kapi_db.c', 'kapi/kapi_db.h', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/install_recover_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/system/install.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h'],
+    covers=['tools/tests/sqlite_bits_host.h', 'lib/softfloat/**', 'lib/softfloat_bits.c', 'lib/softfloat_bits.h', 'tools/tests/sqlite_cc.py', 'sys/fs/vfs_fd.c', 'sys/fs/vfs_fd_stdin.inc', 'sys/fs/vfs_stdin.h', 'sys/kern/exec/exec.h', 'sys/kapi/kapi_db.c', 'sys/kapi/kapi_db.h', 'sys/kern/sqlite_engine.h', 'sys/kern/sqlite_engine_body.h', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/sqlite3.c', 'tools/tests/install_recover_host.c', 'tools/tests/vfs_fd_sqlite_host.c', 'userland/system/install.c', 'tools/tests/input_fixture_host.h', 'sys/hal/input/input_service.c', 'sys/hal/input/pointer_service.h', 'sys/hal/input/input_service.h', 'sys/include/kbd.h'],
     needs=[], budget=8.2,
     kind='characterization',
 )
@@ -46,7 +46,7 @@ INC = ["-I" + str(ROOT / p) for p in
 CONFIG = str(ROOT / "lib/sqlite3/os32_sqlite_config.h")
 
 SHIMS = {
-    "exec/exec.h": "#include \"vfs_stdin.h\"\nVfsStdinRead *exec_stdin_state(void);\n",
+    "sys/kern/exec/exec.h": "#include \"vfs_stdin.h\"\nVfsStdinRead *exec_stdin_state(void);\n",
     "memmap.h": "extern unsigned char test_shm[];\n#define MEM_SHM_BASE test_shm\n#define MEM_SHM_DB_OFFSET 0UL\n#define MEM_SHM_DB_BASE (MEM_SHM_BASE + MEM_SHM_DB_OFFSET)\n",
     "exec.h": "int ring3_user_range_ok(u32 p, u32 len);\n",
 }
@@ -117,7 +117,7 @@ def mutations(tmp, sanitize):
         print("MUTATE " + label + " RED (compiled runtime): " +
               result.stderr.decode().splitlines()[0], flush=True)
 
-    source = (ROOT / "kapi/kapi_db.c").read_text()
+    source = (ROOT / "sys/kapi/kapi_db.c").read_text()
     old = "#define DB_MODULE_READY() services_public"
     assert source.count(old) == 1
     path = tmp / "kapi_db_mutant.c"

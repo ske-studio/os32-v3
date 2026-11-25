@@ -2,5 +2,5 @@
 #include "shim.h"
 
 #define main test2_main
-#include "../../../userland/tests/test2.c"
+#include "../../../userland/diag/test2.c"
 #undef main

@@ -1,4 +1,4 @@
-# drivers/block/fdc.c — フロッピーディスク制御
+# sys/dev/block/fdc.c — フロッピーディスク制御
 
 > 状態: **現行 (2026-10-31)**
 
@@ -7,10 +7,10 @@
 ## 落とし穴
 
 - **機械的な待ち時間と IRQ**: 短い時間上限では実機の SEEK や回転待ちが期限切れになる。
-  `drivers/block/fdc.h` は SEEK 1.5 秒、R/W 1 秒を取り、`drivers/block/fdc.c` の SENSE INTERRUPT で完了を回収する。
+  `sys/dev/block/fdc.h` は SEEK 1.5 秒、R/W 1 秒を取り、`sys/dev/block/fdc.c` の SENSE INTERRUPT で完了を回収する。
   再試行と時間切れを `make check-fdc-seek-host`、`make check-fdc-track-host` で検査する。
-- **Ready と DMA**: Ready 線のないドライブでは FRY がないと Not Ready になるため、動作時は FRY を立てる (`drivers/block/fdc.c` の `fdc_motor_on()`)。
-  1MB 超 DMA の許可は DMA 初期化が担当し、FDC は状態を読む (`drivers/block/fdc.c`)。DMA バッファの範囲も検査する (`drivers/block/fdc.c` の `fdc_buf_setup()`)。
+- **Ready と DMA**: Ready 線のないドライブでは FRY がないと Not Ready になるため、動作時は FRY を立てる (`sys/dev/block/fdc.c` の `fdc_motor_on()`)。
+  1MB 超 DMA の許可は DMA 初期化が担当し、FDC は状態を読む (`sys/dev/block/fdc.c`)。DMA バッファの範囲も検査する (`sys/dev/block/fdc.c` の `fdc_buf_setup()`)。
   エミュレータの成功だけでは機構の時間や DMA 制限を実証できない。
 
 ## 設計の補足
@@ -20,7 +20,7 @@
 
 ## 3. FDC IRQ の境界・起動・V86
 ```c
-/* drivers/block/fdc.c: 状態と入口をドライバ内へ閉じる。 */
+/* sys/dev/block/fdc.c: 状態と入口をドライバ内へ閉じる。 */
 static volatile u32 fdc_irq_fired;
 static int fdc_irq(unsigned int irq, void *arg) {
     (void)irq; (void)arg;

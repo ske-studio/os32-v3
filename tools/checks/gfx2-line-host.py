@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 CHECK = dict(name='gfx2-line-host', tier=1,
-    covers=['gfx/v2/sw_line.c', 'gfx/v2/gfx2_int.h', 'gfx/v2/gfx2_sw.h', 'include/**', 'mm/pgalloc.h',
-            'mm/paging.h', 'lib/kstring.h', 'arch/*/arch_copy.h',
+    covers=['sys/hal/gfx/v2/sw_line.c', 'sys/hal/gfx/v2/gfx2_int.h', 'sys/hal/gfx/v2/gfx2_sw.h', 'include/**', 'sys/kern/mm/pgalloc.h',
+            'sys/kern/mm/paging.h', 'sys/kern/kstring.h', 'arch/*/arch_copy.h',
             'tools/tests/gfx2_line_host.c', 'tools/tests/test_gfx2_line.py',
             'tools/tests/host32.py', 'tools/tests/mutpar.py'],
     needs=[], budget=3.0,

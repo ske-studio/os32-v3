@@ -6,14 +6,14 @@ import tempfile
 import host32
 
 CHECK = dict(name='input-export-host', tier=1, budget=5, needs=[], covers=[
-    'input/hal/in2_export.c', 'input/hal/in2_export.h', 'input/hal/in2_int.h',
-    'include/types.h', 'include/callconv.h', 'include/kbd.h', 'sdk/include/os32/os32_in2.h',
+    'sys/hal/input/in2_export.c', 'sys/hal/input/in2_export.h', 'sys/hal/input/in2_int.h',
+    'sys/include/types.h', 'sys/include/callconv.h', 'sys/include/kbd.h', 'sdk/include/os32/os32_in2.h',
     'tools/tests/input_export_host.c', 'tools/tests/test_input_export.py', 'tools/tests/host32.py'],
     basis=['INPUT_HAL_DESIGN §8 A0y', 'AV_HAL_DESIGN §5-2', 'AV0_V90_ADDENDUM §5'])
 
 
 def run(ctx):
-    source = (ctx.root / 'input/hal/in2_export.c').read_text()
+    source = (ctx.root / 'sys/hal/input/in2_export.c').read_text()
     with tempfile.TemporaryDirectory() as directory:
         unit = Path(directory) / 'in2_export.c'
         binary = Path(directory) / 'test'

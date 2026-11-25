@@ -50,7 +50,7 @@ r2→r3 の変更：PowerMac の FM/SSG を共通のソフト合成器から PCM
 1. 組数は25。sdk/kapi_target_ppc.py のキーを数え、ABSENT_PROVIDER_SLOTS の和集合を sdk/kapi.json の api 名と照合すると、重複なしの190本、全298本中の残り108本となる。残りには予約・特殊経路を含み得る。
 2. 空の wrap の戻り方は一様でない。sdk/gen_kapi.py と sdk/kapi_target_ppc.py により、void は無動作、ポインタは NULL、指定の10照会は 0、その他は戻り型へ変換した NOSYS。公開前からこれを利用するアプリがある前提で扱う。
 3. 44ソースの定義位置は build/sources/common.mk。build/select.mk が選択をまとめ、build/targets/ppc-powermac.mk が未選択分もコンパイルする。コンパイル合格だけでは提供の証明にならない。
-4. 指定の docs/decisions/ppc/PPC_SQLITE_STACK_DESIGN.md はこの基点の非アーカイブ木に無い。段 S は作業記録 ppc-sqlite-stack/DESIGN.final.md の旧スタック上の FP guard と別スタック呼出を参照。kapi/kapi_db.c のエンジン準備・所有者取得まで含めて別途受入する。
+4. 指定の docs/decisions/ppc/PPC_SQLITE_STACK_DESIGN.md はこの基点の非アーカイブ木に無い。段 S は作業記録 ppc-sqlite-stack/DESIGN.final.md の旧スタック上の FP guard と別スタック呼出を参照。sys/kapi/kapi_db.c のエンジン準備・所有者取得まで含めて別途受入する。
 
 #### 統合判断（POLICY_DEV §1）
 
@@ -67,98 +67,98 @@ A は共通本体を選択・初期化して通常 wrap に接続。B は既存�
 
 |組|本数|x86 の実体・所有者|道・必要な後端・先行段|重複防止の照合対象|
 |---|---:|---|---|---|
-|sys|3|共通 kernel/sys.c → 機種 platform_reset / platform_buzzer_*|reboot B は 確定設計 PPC_RESET_DESIGN.md の PMU/Cuda 受入後。buz 2本は暫定 E、Mac のシステムビープは AV HAL 後に再判定|sys_reboot の呼出元・本体|
-|surface（単独）|3|共通 exec/surface_query.c|A。OF FB の CLIENT を表示 ledger に登録し、surface_query・surface_lease・surface_unlease を公開|surface_api_query・surface_api_lease・surface_api_unlease|
-|surface（束）|1|共通 exec/surface_query.c|D。本線の #18 の確定設計を待って gfx_surface_lease を公開|surface_api_bundle|
-|gfx|22|装置 drivers/video/pc98/gfx_vram.c、共通 gfx/gfx_core.c と各 inc、gfx_hw_submit.c、kapi/kapi_osri.c|C は present 系と dirty の共通方針を先に移設。A は情報・所有者・共通描画。B は可視面・palette・raster・HW 能力。OF FB の実能力を検査。OSRI は VFS 後|gfx_core と OSRI デコーダ|
-|clock|1|共通 kernel/time/clock_service.c → 装置 drivers/char/rtc.c|B。drivers/macintosh/ の reset と同じ via_command を使う rtc_readを暦時計に登録、単調時計とは別|clock_read_legacy と VIA インスタンス|
+|sys|3|共通 sys/kern/sys.c → 機種 platform_reset / platform_buzzer_*|reboot B は 確定設計 PPC_RESET_DESIGN.md の PMU/Cuda 受入後。buz 2本は暫定 E、Mac のシステムビープは AV HAL 後に再判定|sys_reboot の呼出元・本体|
+|surface（単独）|3|共通 sys/kern/exec/surface_query.c|A。OF FB の CLIENT を表示 ledger に登録し、surface_query・surface_lease・surface_unlease を公開|surface_api_query・surface_api_lease・surface_api_unlease|
+|surface（束）|1|共通 sys/kern/exec/surface_query.c|D。本線の #18 の確定設計を待って gfx_surface_lease を公開|surface_api_bundle|
+|gfx|22|装置 sys/platform/pc98/video/gfx_vram.c、共通 sys/hal/gfx/gfx_core.c と各 inc、gfx_hw_submit.c、sys/kapi/kapi_osri.c|C は present 系と dirty の共通方針を先に移設。A は情報・所有者・共通描画。B は可視面・palette・raster・HW 能力。OF FB の実能力を検査。OSRI は VFS 後|gfx_core と OSRI デコーダ|
+|clock|1|共通 sys/hal/time/clock_service.c → 装置 sys/dev/char/rtc.c|B。drivers/macintosh/ の reset と同じ via_command を使う rtc_readを暦時計に登録、単調時計とは別|clock_read_legacy と VIA インスタンス|
 |console_font|9|共通 kernel/console/{console,font_source,unicode_file}.c|セル5本 A は既存 fbcon、字形 lease 3本と文字変換 A は KCG1・変換表の配備後|con_backend 経由・lease の所有者|
-|port|9|共通 kernel/port_service.c、kapi/kapi_sys.c|B。PortOps に ESCC の送受信・状態、diag は共通の出力検証。vfast は当該速度・方式を提供できる範囲のみ|port_register と ESCC の単一所有|
-|gui|3|共通 kernel/gui.c|A。GUI 実行主体・exec #4・表示所有権・shell 復帰を先行|gui_register/call と exec 終了フック|
+|port|9|共通 sys/kern/port_service.c、sys/kapi/kapi_sys.c|B。PortOps に ESCC の送受信・状態、diag は共通の出力検証。vfast は当該速度・方式を提供できる範囲のみ|port_register と ESCC の単一所有|
+|gui|3|共通 sys/kern/gui.c|A。GUI 実行主体・exec #4・表示所有権・shell 復帰を先行|gui_register/call と exec 終了フック|
 |sound|16|共通の廃止済み wrap 10 本、PC-98 の OPN 6 本|旧 MML・snd・起動音の 10 本は両機種で v90 の廃止時の動作を返す。PowerMac の旧 FM/SSG 6 口は無し（E）。PC-98 は OPN 単体を含め従来の HW。PowerPC アプリはすべて再ビルドし、sndl_chip_* を使う。追記 2 の SOFT 経路は両 arch 共通で、L6 → L2 合成器 → L1 ミキサ → L3 → PCM 後端で鳴らす。|本線が AV_HAL_DESIGN.md §8 の照らし直し → lib/os32_opna（整数 fmgen）の段 A〜D → userland/lib/snd/fmvoice.c（L2）を担当。IS・L1/L2 後に L3、C3・L3 後に L6、IL で統合。PPC 専用の合成器・adapter は作らない。 両 arch のビルド入力を正規化し、コアと fmvoice.c のソースパス集合の一致、リンクマップ上の各定義元が共通ライブラリに一つだけあること、機種別コピーが無いことを照合。|
-|platform|8|機種 platform/pc98/device_{host,loop}.c、装置 drivers/block/loop_dev.c|np2_* 5本 E。loop 3本は固定名転送の C→媒体契約 D→A、VFS と同じ仮想装置を選択、PC98 取次を共有口へ|loop_dev_attach とイメージ形式解析|
-|ide|8|機種 platform/pc98/{device_ide,bootinfo_geom}.c → 装置 drivers/ata/ide.c|生 ATA 7本は固定名窓口を共有する D→B、実 ATA 媒体・権限が条件。BIOS 由来の hdd_geom_info は E。RAM/ISO を ATA として報告しない|共通 sector 範囲・書込権限|
-|ext2|2|機種 kernel/dev/device_fs.c → 共通 fs/ext2/ext2_fmt.c|固定名転送の C→D→A。書込可能な block の契約から両 format を呼ぶ。loop 媒体を先行|ext2_fmt と ext2_layout|
+|platform|8|機種 platform/pc98/device_{host,loop}.c、装置 sys/dev/block/loop_dev.c|np2_* 5本 E。loop 3本は固定名転送の C→媒体契約 D→A、VFS と同じ仮想装置を選択、PC98 取次を共有口へ|loop_dev_attach とイメージ形式解析|
+|ide|8|機種 platform/pc98/{device_ide,bootinfo_geom}.c → 装置 sys/dev/ata/ide.c|生 ATA 7本は固定名窓口を共有する D→B、実 ATA 媒体・権限が条件。BIOS 由来の hdd_geom_info は E。RAM/ISO を ATA として報告しない|共通 sector 範囲・書込権限|
+|ext2|2|機種 sys/kern/dev/device_fs.c → 共通 sys/fs/ext2/ext2_fmt.c|固定名転送の C→D→A。書込可能な block の契約から両 format を呼ぶ。loop 媒体を先行|ext2_fmt と ext2_layout|
 |kcg|5|機種 platform/pc98/device_kcg.c、装置 drivers/video/kcg/{kcg,kcg_file}.c|C で固定名転送を共有し、A で kcg.c を両像に選ぶ。B は KCG1 の kcg_rom_read_ank・kcg_rom_read_kanji だけ。load は両像とも NOSYS|kcg_file_load と glyph 読取|
-|pci|4|機種 platform/pc98/device_pci.c、共通 kapi/kapi_sys.c → drivers/pci/pci_bind.c|C で drivers/pci/pci.c の走査・記録と bind 台帳・固定名窓口を共有し、B は config 読み書きだけ。OF と pci_config の BDF、実際の bind 台帳を対応付ける|config 取引と bind 台帳|
-|serialfs|2|機種 kernel/dev/device_fs.c → 共通 fs/serialfs/serialfs_session.c|固定名転送の C→A/B。既存 hostfs と同じ transport 所有・deadline 契約を満たしてから begin/end|serialfs_session と sfs_proto|
-|path|5|共通 lib/path.c、exec/exec_tramp_strings.inc|A。#6 から選択、起動 mount の validator と cwd を初期化|path_parse と tramp_copy|
-|db|17|共通 kapi/kapi_db.c と SQLite エンジン、CPU 別スタック入口|A+B。段 S → エンジン/VFS・共有結果・所有者回収 → 17本。SQL の PPC 再実装は不要|SQLite TU と同じ handle 表|
-|system_info|5|共通 kapi/kapi_sys.c、kernel/ver_collect.c、kernel/time/ktime.c|build・mtime は A、time は B（TB）、mem/ver は A+B（共通集計と実測可能な機種欄）|kapi_sys_* と mem_stat の構造体|
-|ime|17|共通 kernel/ime/、kernel/gui.c、機種描画部|入力・辞書は A、表示は B、ime_set_render は GUI 後。FEP のロード・辞書 VFS・共通入力を先行|同じ FEP facade、辞書形式|
+|pci|4|機種 platform/pc98/device_pci.c、共通 sys/kapi/kapi_sys.c → sys/dev/pci/pci_bind.c|C で sys/dev/pci/pci.c の走査・記録と bind 台帳・固定名窓口を共有し、B は config 読み書きだけ。OF と pci_config の BDF、実際の bind 台帳を対応付ける|config 取引と bind 台帳|
+|serialfs|2|機種 sys/kern/dev/device_fs.c → 共通 sys/fs/serialfs/serialfs_session.c|固定名転送の C→A/B。既存 hostfs と同じ transport 所有・deadline 契約を満たしてから begin/end|serialfs_session と sfs_proto|
+|path|5|共通 lib/path.c、sys/kern/exec/exec_tramp_strings.inc|A。#6 から選択、起動 mount の validator と cwd を初期化|path_parse と tramp_copy|
+|db|17|共通 sys/kapi/kapi_db.c と SQLite エンジン、CPU 別スタック入口|A+B。段 S → エンジン/VFS・共有結果・所有者回収 → 17本。SQL の PPC 再実装は不要|SQLite TU と同じ handle 表|
+|system_info|5|共通 sys/kapi/kapi_sys.c、sys/kern/ver_collect.c、sys/kern/time/ktime.c|build・mtime は A、time は B（TB）、mem/ver は A+B（共通集計と実測可能な機種欄）|kapi_sys_* と mem_stat の構造体|
+|ime|17|共通 kernel/ime/、sys/kern/gui.c、機種描画部|入力・辞書は A、表示は B、ime_set_render は GUI 後。FEP のロード・辞書 VFS・共通入力を先行|同じ FEP facade、辞書形式|
 |v86|5|機種 platform/pc98/legacy/{v86,v86_gcap}.c、arch/x86 の仮想86入口|E。VM86 と GDC の対象環境が無い|PPC 像に V86 定義を追加しない|
 |pcm|5|装置 drivers/sound/cs4231/{pcm_module,pcm_cs4231}.c|D→B。本線が常駐 dispatch と PC98 tick の条件を分離し、TICK 段 B → AV HAL 音声段 → IS でストリーム契約を確定。PowerPC 担当は PowerMac 音声装置の PCM 後端だけを実装し、共通ミキサの出力を形式と空き量に従って転送する。|両 arch のリンクマップで pcm_open・pcm_write・pcm_status・pcm_close・pcm_set_volume の各定義元が同じ常駐窓口 pcm_module.c に一致することを照合。|
-|boot_info|1|共通 init/bootinfo.c → 機種の boot capture|A+B。検証済み root の情報を共通 boot_common に発行後|boot_image_info の唯一の変換|
-|debug|1|共通 kernel/module/kdebug_call.c → 装置 kdebug/|A+B。module が使える像で実コマンドだけ公開し、CPU 固有採取は後端へ|同じ opcode dispatch|
+|boot_info|1|共通 sys/kern/init/bootinfo.c → 機種の boot capture|A+B。検証済み root の情報を共通 boot_common に発行後|boot_image_info の唯一の変換|
+|debug|1|共通 sys/kern/module/kdebug_call.c → 装置 kdebug/|A+B。module が使える像で実コマンドだけ公開し、CPU 固有採取は後端へ|同じ opcode dispatch|
 |gfx2|29|共通 gfx/v2/ の列挙・面・submit・fence・display|A は列挙と資源管理、B は of_fb_v2 ops。各機能は caps・check_op 後に使用|共通 gfx2_* と adapter 登録|
-|shm|3|共通 mm/shm.c|A。ppc_kernel.c の初期化とアプリの map/owner 回収を確認|shm_alloc/lock/free のリンク元|
-|pointer|6|共通 kernel/input_service.c、input/hal/pointer_state.c、機種の登録|C→B。PC-98 の mouse.c から cursor・poll・bounds を input/hal に移し、PC-98 は init・snapshot、PowerMac は USB イベント供給だけを担当|座標・ボタン・範囲の計算元|
+|shm|3|共通 sys/kern/mm/shm.c|A。ppc_kernel.c の初期化とアプリの map/owner 回収を確認|shm_alloc/lock/free のリンク元|
+|pointer|6|共通 sys/hal/input/input_service.c、sys/hal/input/pointer_state.c、機種の登録|C→B。PC-98 の mouse.c から cursor・poll・bounds を input/hal に移し、PC-98 は init・snapshot、PowerMac は USB イベント供給だけを担当|座標・ボタン・範囲の計算元|
 
 #### 関数別の追跡
 
 左は公開 slot（組名の接頭辞を省略しない）。矢印の右は x86 生成 wrap の実呼出。ファイルは上表と下記の定義元で特定する。
 各行は同じ組の連続した最大4本。生成器のガードと所有者検証は通常経路に残す。
 
-- sys ［buz_on → buz_on @ kernel/sys.c］ ［buz_off → buz_off @ kernel/sys.c］ ［sys_reboot → sys_reboot @ kernel/sys.c］
-- surface ［surface_query → surface_api_query @ exec/surface_query.c］ ［surface_lease → surface_api_lease @ exec/surface_query.c］ ［gfx_surface_lease → surface_api_bundle @ exec/surface_query.c］ ［surface_unlease → surface_api_unlease @ exec/surface_query.c］
-- gfx ［gfx_init → gfx_kapi_init @ gfx/gfx_core.c］ ［gfx_init_200 → gfx_kapi_init_200 @ gfx/gfx_core.c］ ［gfx_shutdown → gfx_shutdown @ gfx/gfx_core.c］ ［gfx_present → gfx_present @ drivers/video/pc98/gfx_vram.c］
-- gfx ［gfx_hardware_scroll → gfx_hardware_scroll @ gfx/gfx_scroll.c］ ［gfx_present_rect → gfx_present_rect @ drivers/video/pc98/gfx_vram.c］ ［gfx_set_palette → gfx_set_palette_hal @ gfx/gfx_core_api.inc］ ［gfx_get_palette → palette_get @ gfx/palette.c］
-- gfx ［gfx_get_framebuffer → gfx_get_framebuffer @ gfx/gfx_core_framebuffer.inc］ ［gfx_add_dirty_rect → gfx_add_dirty_rect @ drivers/video/pc98/gfx_vram.c］ ［gfx_present_dirty → gfx_present_dirty @ drivers/video/pc98/gfx_vram.c］ ［gfx_present_nosync → gfx_present_nosync @ drivers/video/pc98/gfx_vram.c］
-- gfx ［gfx_present_raster → gfx_present_raster @ drivers/video/pc98/gfx_vram.c］ ［gfx_screen_info → gfx_screen_info @ gfx/gfx_core_api.inc］ ［gfx_hw_fill_rect → gfx_hw_fill_rect @ gfx/gfx_core_api.inc］ ［gfx_hw_blit → gfx_hw_blit @ gfx/gfx_core_api.inc］
-- gfx ［gfx_stats → gfx_stats @ gfx/gfx_core_api.inc］ ［gfx_lease_palette → gfx_lease_palette @ gfx/gfx_core_api.inc］ ［gfx_screen_owner → gfx_screen_owner @ gfx/gfx_core.c］ ［gfx_osri_show → kapi_osri_show @ kapi/kapi_osri.c］
-- gfx ［gfx_hw_submit → gfx_hw_submit @ gfx/gfx_hw_submit.c］ ［gfx_hw_get → gfx_hw_get @ gfx/gfx_hw_submit.c］
-- clock ［rtc_read → clock_read_legacy @ kernel/time/clock_service.c］
-- console_font ［tvram_putchar_at → tvram_putchar_at @ kernel/console/console.c］ ［tvram_putkanji_at → tvram_putkanji_at @ kernel/console/console.c］ ［tvram_scroll → tvram_scroll @ kernel/console/console.c］ ［tvram_readchar_at → tvram_readchar_at @ kernel/console/console.c］
-- console_font ［tvram_reverse_cell → tvram_reverse_cell］ ［unicode_to_jis → unicode_file_lookup @ kernel/console/unicode_file.c］ ［font_source_open → font_lease_app_open @ kernel/console/font_source.c］ ［font_source_read_at → font_lease_app_read_at @ kernel/console/font_source.c］
-- console_font ［font_source_close → font_lease_app_close @ kernel/console/font_source.c］
-- port ［serial_init → port_init @ kernel/port_service.c］ ［serial_puts → port_puts_kapi @ kernel/port_service.c］ ［serial_getchar → port_getchar_kapi @ kernel/port_service.c］ ［serial_putchar → port_putchar_kapi @ kernel/port_service.c］
-- port ［serial_trygetchar → port_trygetchar @ kernel/port_service.c］ ［serial_is_initialized → port_is_initialized @ kernel/port_service.c］ ［serial_init_vfast → port_init_vfast @ kernel/port_service.c］ ［serial_get_status → port_get_status @ kernel/port_service.c］
-- port ［serial_diag → kapi_serial_diag @ kapi/kapi_port.c］
-- gui ［gui_call → gui_call @ kernel/gui.c］ ［gui_register → gui_register @ kernel/gui.c］ ［sys_switch_shell → sys_switch_shell @ kernel/gui.c］
+- sys ［buz_on → buz_on @ sys/kern/sys.c］ ［buz_off → buz_off @ sys/kern/sys.c］ ［sys_reboot → sys_reboot @ sys/kern/sys.c］
+- surface ［surface_query → surface_api_query @ sys/kern/exec/surface_query.c］ ［surface_lease → surface_api_lease @ sys/kern/exec/surface_query.c］ ［gfx_surface_lease → surface_api_bundle @ sys/kern/exec/surface_query.c］ ［surface_unlease → surface_api_unlease @ sys/kern/exec/surface_query.c］
+- gfx ［gfx_init → gfx_kapi_init @ sys/hal/gfx/gfx_core.c］ ［gfx_init_200 → gfx_kapi_init_200 @ sys/hal/gfx/gfx_core.c］ ［gfx_shutdown → gfx_shutdown @ sys/hal/gfx/gfx_core.c］ ［gfx_present → gfx_present @ sys/platform/pc98/video/gfx_vram.c］
+- gfx ［gfx_hardware_scroll → gfx_hardware_scroll @ sys/hal/gfx/gfx_scroll.c］ ［gfx_present_rect → gfx_present_rect @ sys/platform/pc98/video/gfx_vram.c］ ［gfx_set_palette → gfx_set_palette_hal @ sys/hal/gfx/gfx_core_api.inc］ ［gfx_get_palette → palette_get @ sys/hal/gfx/palette.c］
+- gfx ［gfx_get_framebuffer → gfx_get_framebuffer @ sys/hal/gfx/gfx_core_framebuffer.inc］ ［gfx_add_dirty_rect → gfx_add_dirty_rect @ sys/platform/pc98/video/gfx_vram.c］ ［gfx_present_dirty → gfx_present_dirty @ sys/platform/pc98/video/gfx_vram.c］ ［gfx_present_nosync → gfx_present_nosync @ sys/platform/pc98/video/gfx_vram.c］
+- gfx ［gfx_present_raster → gfx_present_raster @ sys/platform/pc98/video/gfx_vram.c］ ［gfx_screen_info → gfx_screen_info @ sys/hal/gfx/gfx_core_api.inc］ ［gfx_hw_fill_rect → gfx_hw_fill_rect @ sys/hal/gfx/gfx_core_api.inc］ ［gfx_hw_blit → gfx_hw_blit @ sys/hal/gfx/gfx_core_api.inc］
+- gfx ［gfx_stats → gfx_stats @ sys/hal/gfx/gfx_core_api.inc］ ［gfx_lease_palette → gfx_lease_palette @ sys/hal/gfx/gfx_core_api.inc］ ［gfx_screen_owner → gfx_screen_owner @ sys/hal/gfx/gfx_core.c］ ［gfx_osri_show → kapi_osri_show @ sys/kapi/kapi_osri.c］
+- gfx ［gfx_hw_submit → gfx_hw_submit @ sys/hal/gfx/gfx_hw_submit.c］ ［gfx_hw_get → gfx_hw_get @ sys/hal/gfx/gfx_hw_submit.c］
+- clock ［rtc_read → clock_read_legacy @ sys/hal/time/clock_service.c］
+- console_font ［tvram_putchar_at → tvram_putchar_at @ sys/kern/console/console.c］ ［tvram_putkanji_at → tvram_putkanji_at @ sys/kern/console/console.c］ ［tvram_scroll → tvram_scroll @ sys/kern/console/console.c］ ［tvram_readchar_at → tvram_readchar_at @ sys/kern/console/console.c］
+- console_font ［tvram_reverse_cell → tvram_reverse_cell］ ［unicode_to_jis → unicode_file_lookup @ sys/kern/console/unicode_file.c］ ［font_source_open → font_lease_app_open @ sys/kern/console/font_source.c］ ［font_source_read_at → font_lease_app_read_at @ sys/kern/console/font_source.c］
+- console_font ［font_source_close → font_lease_app_close @ sys/kern/console/font_source.c］
+- port ［serial_init → port_init @ sys/kern/port_service.c］ ［serial_puts → port_puts_kapi @ sys/kern/port_service.c］ ［serial_getchar → port_getchar_kapi @ sys/kern/port_service.c］ ［serial_putchar → port_putchar_kapi @ sys/kern/port_service.c］
+- port ［serial_trygetchar → port_trygetchar @ sys/kern/port_service.c］ ［serial_is_initialized → port_is_initialized @ sys/kern/port_service.c］ ［serial_init_vfast → port_init_vfast @ sys/kern/port_service.c］ ［serial_get_status → port_get_status @ sys/kern/port_service.c］
+- port ［serial_diag → kapi_serial_diag @ sys/kapi/kapi_port.c］
+- gui ［gui_call → gui_call @ sys/kern/gui.c］ ［gui_register → gui_register @ sys/kern/gui.c］ ［sys_switch_shell → sys_switch_shell @ sys/kern/gui.c］
 - sound ［fm_startup_sound → 無動作］ ［fm_play_mml → 無動作］ ［snd_bgm_play → 無動作］ ［snd_bgm_stop → 無動作］
 - sound ［snd_bgm_is_playing → 0］ ［snd_se_play → 無動作］ ［snd_se_play_raw → 無動作］ ［snd_set_master → 無動作］
-- sound ［snd_bgm_set_persist → 無動作］ ［fm_note_on → fm_note_on @ drivers/sound/fm/fm.c］ ［fm_note_off → fm_note_off @ drivers/sound/fm/fm.c］ ［fm_set_tone_num → fm_set_tone_num @ drivers/sound/fm/fm.c］
-- sound ［ssg_tone → ssg_tone @ drivers/sound/fm/fm.c］ ［ssg_volume → ssg_volume @ drivers/sound/fm/fm.c］ ［ssg_all_off → ssg_all_off @ drivers/sound/fm/fm.c］ ［snd_focus → OS32_ERR_NOSYS］
-- platform ［np2_detect → platform_np2_detect @ platform/pc98/device_host.c］ ［np2_get_version → platform_np2_get_version @ platform/pc98/device_host.c］ ［np2_get_cpu → platform_np2_get_cpu @ platform/pc98/device_host.c］ ［np2_get_clock → platform_np2_get_clock @ platform/pc98/device_host.c］
-- platform ［np2_check_hostdrv → platform_np2_check_hostdrv @ platform/pc98/device_host.c］ ［loop_attach → platform_loop_dev_attach @ platform/pc98/device_loop.c］ ［loop_detach → platform_loop_dev_detach @ platform/pc98/device_loop.c］ ［loop_status → platform_loop_dev_status @ platform/pc98/device_loop.c］
-- ide ［ide_init → platform_ide_init @ kernel/dev/device_ide.c］ ［ide_drive_present → platform_ide_drive_present @ kernel/dev/device_ide.c］ ［ide_identify → platform_ide_identify @ kernel/dev/device_ide.c］ ［ide_read_sector → platform_ide_read_sector @ kernel/dev/device_ide.c］
-- ide ［ide_write_sector → platform_ide_write_sector @ kernel/dev/device_ide.c］ ［ide_write_sectors → platform_ide_write_sectors @ kernel/dev/device_ide.c］ ［ide_get_info → platform_ide_get_info @ kernel/dev/device_ide.c］ ［hdd_geom_info → hdd_geom_info @ platform/pc98/bootinfo_geom.c］
-- ext2 ［ext2_format → platform_ext2_format @ kernel/dev/device_fs.c］ ［ext2_format_at → platform_ext2_format_at @ kernel/dev/device_fs.c］
-- kcg ［kcg_init → platform_kcg_init @ platform/pc98/device_kcg.c］ ［kcg_set_scale → platform_kcg_set_scale @ platform/pc98/device_kcg.c］ ［kcg_read_ank → kcg_read_ank @ drivers/video/kcg/kcg.c］ ［kcg_read_kanji → kcg_read_kanji @ drivers/video/kcg/kcg.c］
+- sound ［snd_bgm_set_persist → 無動作］ ［fm_note_on → fm_note_on @ sys/dev/sound/fm/fm.c］ ［fm_note_off → fm_note_off @ sys/dev/sound/fm/fm.c］ ［fm_set_tone_num → fm_set_tone_num @ sys/dev/sound/fm/fm.c］
+- sound ［ssg_tone → ssg_tone @ sys/dev/sound/fm/fm.c］ ［ssg_volume → ssg_volume @ sys/dev/sound/fm/fm.c］ ［ssg_all_off → ssg_all_off @ sys/dev/sound/fm/fm.c］ ［snd_focus → OS32_ERR_NOSYS］
+- platform ［np2_detect → platform_np2_detect @ sys/platform/pc98/device_host.c］ ［np2_get_version → platform_np2_get_version @ sys/platform/pc98/device_host.c］ ［np2_get_cpu → platform_np2_get_cpu @ sys/platform/pc98/device_host.c］ ［np2_get_clock → platform_np2_get_clock @ sys/platform/pc98/device_host.c］
+- platform ［np2_check_hostdrv → platform_np2_check_hostdrv @ sys/platform/pc98/device_host.c］ ［loop_attach → platform_loop_dev_attach @ platform/pc98/device_loop.c］ ［loop_detach → platform_loop_dev_detach @ platform/pc98/device_loop.c］ ［loop_status → platform_loop_dev_status @ platform/pc98/device_loop.c］
+- ide ［ide_init → platform_ide_init @ sys/dev/ide/device_ide.c］ ［ide_drive_present → platform_ide_drive_present @ sys/dev/ide/device_ide.c］ ［ide_identify → platform_ide_identify @ sys/dev/ide/device_ide.c］ ［ide_read_sector → platform_ide_read_sector @ sys/dev/ide/device_ide.c］
+- ide ［ide_write_sector → platform_ide_write_sector @ sys/dev/ide/device_ide.c］ ［ide_write_sectors → platform_ide_write_sectors @ sys/dev/ide/device_ide.c］ ［ide_get_info → platform_ide_get_info @ sys/dev/ide/device_ide.c］ ［hdd_geom_info → hdd_geom_info @ sys/platform/pc98/bootinfo_geom.c］
+- ext2 ［ext2_format → platform_ext2_format @ sys/kern/dev/device_fs.c］ ［ext2_format_at → platform_ext2_format_at @ sys/kern/dev/device_fs.c］
+- kcg ［kcg_init → platform_kcg_init @ platform/pc98/device_kcg.c］ ［kcg_set_scale → platform_kcg_set_scale @ platform/pc98/device_kcg.c］ ［kcg_read_ank → kcg_read_ank @ sys/dev/video/kcg/kcg.c］ ［kcg_read_kanji → kcg_read_kanji @ sys/dev/video/kcg/kcg.c］
 - kcg ［kcg_load_font → platform_kcg_load_font @ platform/pc98/device_kcg.c］
-- pci ［pci_count → platform_pci_count @ platform/pc98/device_pci.c］ ［pci_get → platform_pci_get @ platform/pc98/device_pci.c］ ［pci_cfg_read32 → platform_pci_cfg_read32 @ platform/pc98/device_pci.c］ ［pci_bind_info → kapi_pci_bind_info @ kapi/kapi_sys.c］
-- serialfs ［sfs_begin → platform_serialfs_session_begin @ kernel/dev/device_fs.c］ ［sfs_end → platform_serialfs_session_end @ kernel/dev/device_fs.c］
-- path ［path_get_drive → path_get_drive_user @ exec/exec_tramp_strings.inc］ ［path_get_cwd → path_get_cwd_user @ exec/exec_tramp_strings.inc］ ［path_set_drive → path_set_drive @ lib/path.c］ ［path_set_cwd → path_set_cwd @ lib/path.c］
+- pci ［pci_count → platform_pci_count @ platform/pc98/device_pci.c］ ［pci_get → platform_pci_get @ platform/pc98/device_pci.c］ ［pci_cfg_read32 → platform_pci_cfg_read32 @ platform/pc98/device_pci.c］ ［pci_bind_info → kapi_pci_bind_info @ sys/kapi/kapi_sys.c］
+- serialfs ［sfs_begin → platform_serialfs_session_begin @ sys/kern/dev/device_fs.c］ ［sfs_end → platform_serialfs_session_end @ sys/kern/dev/device_fs.c］
+- path ［path_get_drive → path_get_drive_user @ sys/kern/exec/exec_tramp_strings.inc］ ［path_get_cwd → path_get_cwd_user @ sys/kern/exec/exec_tramp_strings.inc］ ［path_set_drive → path_set_drive @ lib/path.c］ ［path_set_cwd → path_set_cwd @ lib/path.c］
 - path ［path_parse → path_parse @ lib/path.c］
-- db ［db_open → kapi_db_open @ kapi/kapi_db.c］ ［db_close → kapi_db_close @ kapi/kapi_db.c］ ［db_exec → kapi_db_exec @ kapi/kapi_db.c］ ［db_prepare → kapi_db_prepare @ kapi/kapi_db.c］
-- db ［db_step → kapi_db_step @ kapi/kapi_db.c］ ［db_column_int → kapi_db_column_int @ kapi/kapi_db.c］ ［db_column_text → kapi_db_column_text @ kapi/kapi_db.c］ ［db_finalize → kapi_db_finalize @ kapi/kapi_db.c］
-- db ［db_last_error → kapi_db_last_error @ kapi/kapi_db.c］ ［db_mem_used → kapi_db_mem_used @ kapi/kapi_db.c］ ［db_open_existing → kapi_db_open_existing @ kapi/kapi_db_v50.inc］ ［db_prepare_only → kapi_db_prepare_only @ kapi/kapi_db_v50.inc］
-- db ［db_bind_int → kapi_db_bind_int @ kapi/kapi_db_v50.inc］ ［db_bind_text → kapi_db_bind_text @ kapi/kapi_db_v50.inc］ ［db_bind_blob → kapi_db_bind_blob @ kapi/kapi_db_v50.inc］ ［db_bind_null → kapi_db_bind_null @ kapi/kapi_db_v50.inc］
-- db ［db_error_code → kapi_db_error_code @ kapi/kapi_db_v50.inc］
-- system_info ［sys_get_build_info → kapi_sys_get_build_info @ kapi/kapi_sys.c］ ［sys_set_mtime → kapi_sys_set_mtime @ kapi/kapi_sysinfo.c］ ［sys_time_now → kapi_sys_time_now @ kapi/kapi_sys.c］ ［mem_stat → kapi_mem_stat @ kapi/kapi_sysinfo.c］
-- system_info ［sys_ver_info → kapi_sys_ver_info @ kapi/kapi_sys.c］
-- ime ［ime_getchar → ime_getchar_kapi @ kernel/ime/fep_module.c］ ［ime_trygetchar → ime_trygetchar @ kernel/ime/fep_module.c］ ［ime_toggle → ime_toggle @ kernel/ime/fep_module.c］ ［ime_is_active → ime_is_active @ kernel/ime/fep_module.c］
-- ime ［ime_set_mode → ime_set_mode @ kernel/ime/fep_module.c］ ［ime_get_mode → ime_get_mode @ kernel/ime/fep_module.c］ ［ime_getkey → ime_getkey_kapi @ kernel/ime/fep_module.c］ ［ime_switch_dict → ime_switch_dict @ kernel/ime/fep_module.c］
-- ime ［ime_user_list → ime_user_list_facade @ kernel/ime/fep_module.c］ ［ime_user_delete → ime_user_delete_facade @ kernel/ime/fep_module.c］ ［ime_user_export → ime_user_export_facade @ kernel/ime/fep_module.c］ ［ime_user_clear → ime_user_clear_facade @ kernel/ime/fep_module.c］
-- ime ［ime_trygetkey → ime_trygetkey @ kernel/ime/fep_module.c］ ［ime_feed_key → ime_feed_key @ kernel/ime/fep_module.c］ ［ime_set_render → gui_ime_set_render @ kernel/gui.c］ ［ime_dict_info → ime_dict_info_facade @ kernel/ime/fep_module.c］
-- ime ［ime_dict_suspend → ime_dict_suspend @ kernel/ime/fep_module.c］
-- v86 ［v86_selftest → v86_smoke_test @ platform/pc98/legacy/v86.c］ ［v86_disktest → v86_disk_test @ platform/pc98/legacy/v86.c］ ［v86_boot → v86_boot @ platform/pc98/legacy/v86.c］ ［v86_boot2 → v86_boot2 @ platform/pc98/legacy/v86.c］
-- v86 ［v86_gdc_capture → v86_gdc_capture @ platform/pc98/legacy/v86_gcap.c］
-- pcm ［pcm_open → pcm_open @ drivers/sound/cs4231/pcm_module.c］ ［pcm_write → pcm_write @ drivers/sound/cs4231/pcm_module.c］ ［pcm_status → pcm_status @ drivers/sound/cs4231/pcm_module.c］ ［pcm_close → pcm_close @ drivers/sound/cs4231/pcm_module.c］
-- pcm ［pcm_set_volume → pcm_set_volume @ drivers/sound/cs4231/pcm_module.c］
-- boot_info ［boot_image_info → boot_image_info @ init/bootinfo.c］
-- debug ［kdebug_call → kdebug_call @ kernel/module/kdebug_call.c］
-- gfx2 ［gfx2_adapter_count → gfx2_adapter_count @ gfx/v2/enum.c］ ［gfx2_adapter_info → gfx2_adapter_info @ gfx/v2/enum.c］ ［gfx2_adapter_gen → gfx2_adapter_gen @ gfx/v2/backend_reg.c］ ［gfx2_caps → gfx2_caps @ gfx/v2/caps.c］
-- gfx2 ［gfx2_check_op → gfx2_check_op @ gfx/v2/check_op.c］ ［gfx2_surface_create → gfx2_surface_create @ gfx/v2/surface.c］ ［gfx2_surface_free → gfx2_surface_free @ gfx/v2/surface.c］ ［gfx2_surface_desc → gfx2_surface_desc @ gfx/v2/surface.c］
-- gfx2 ［gfx2_screen_surface → gfx2_screen_surface @ gfx/v2/surface.c］ ［gfx2_lock → gfx2_lock @ gfx/v2/lock.c］ ［gfx2_unlock → gfx2_unlock @ gfx/v2/lock.c］ ［gfx2_submit → gfx2_submit @ gfx/v2/submit.c］
-- gfx2 ［gfx2_fence_wait → gfx2_fence_wait @ gfx/v2/fence.c］ ［gfx2_fence_query → gfx2_fence_query @ gfx/v2/fence.c］ ［gfx2_head_info → gfx2_head_info @ gfx/v2/enum.c］ ［gfx2_connector_info → gfx2_connector_info @ gfx/v2/enum.c］
-- gfx2 ［gfx2_connector_edid → gfx2_connector_edid @ gfx/v2/enum.c］ ［gfx2_mode_count → gfx2_mode_count @ gfx/v2/enum.c］ ［gfx2_mode_get → gfx2_mode_get @ gfx/v2/enum.c］ ［gfx2_mode_set → gfx2_mode_set @ gfx/v2/modeset.c］
-- gfx2 ［gfx2_flip → gfx2_flip @ gfx/v2/display.c］ ［gfx2_vblank_wait → gfx2_vblank_wait @ gfx/v2/display.c］ ［gfx2_palette → gfx2_palette @ gfx/v2/display.c］ ［gfx2_gamma → gfx2_gamma @ gfx/v2/display.c］
-- gfx2 ［gfx2_cursor_image → gfx2_cursor_image @ gfx/v2/display.c］ ［gfx2_cursor_move → gfx2_cursor_move @ gfx/v2/display.c］ ［gfx2_cursor_show → gfx2_cursor_show @ gfx/v2/display.c］ ［gfx2_dpms → gfx2_dpms @ gfx/v2/display.c］
-- gfx2 ［gfx2_present → gfx2_present @ gfx/v2/display.c］
-- shm ［sys_shm_alloc → shm_alloc @ mm/shm.c］ ［sys_shm_lock → shm_lock @ mm/shm.c］ ［sys_shm_free → shm_free @ mm/shm.c］
-- pointer ［mouse_poll → pointer_poll @ kernel/input_service.c］ ［mouse_available → pointer_available @ kernel/input_service.c］ ［mouse_set_bounds → pointer_set_bounds @ kernel/input_service.c］ ［mouse_cursor_set_mode → pointer_cursor_set_mode @ kernel/input_service.c］
-- pointer ［mouse_cursor_show → pointer_cursor_show @ kernel/input_service.c］ ［mouse_cursor_hide → pointer_cursor_hide @ kernel/input_service.c］
+- db ［db_open → kapi_db_open @ sys/kapi/kapi_db.c］ ［db_close → kapi_db_close @ sys/kapi/kapi_db.c］ ［db_exec → kapi_db_exec @ sys/kapi/kapi_db.c］ ［db_prepare → kapi_db_prepare @ sys/kapi/kapi_db.c］
+- db ［db_step → kapi_db_step @ sys/kapi/kapi_db.c］ ［db_column_int → kapi_db_column_int @ sys/kapi/kapi_db.c］ ［db_column_text → kapi_db_column_text @ sys/kapi/kapi_db.c］ ［db_finalize → kapi_db_finalize @ sys/kapi/kapi_db.c］
+- db ［db_last_error → kapi_db_last_error @ sys/kapi/kapi_db.c］ ［db_mem_used → kapi_db_mem_used @ sys/kapi/kapi_db.c］ ［db_open_existing → kapi_db_open_existing @ sys/kapi/kapi_db_v50.inc］ ［db_prepare_only → kapi_db_prepare_only @ sys/kapi/kapi_db_v50.inc］
+- db ［db_bind_int → kapi_db_bind_int @ sys/kapi/kapi_db_v50.inc］ ［db_bind_text → kapi_db_bind_text @ sys/kapi/kapi_db_v50.inc］ ［db_bind_blob → kapi_db_bind_blob @ sys/kapi/kapi_db_v50.inc］ ［db_bind_null → kapi_db_bind_null @ sys/kapi/kapi_db_v50.inc］
+- db ［db_error_code → kapi_db_error_code @ sys/kapi/kapi_db_v50.inc］
+- system_info ［sys_get_build_info → kapi_sys_get_build_info @ sys/kapi/kapi_sys.c］ ［sys_set_mtime → kapi_sys_set_mtime @ sys/kapi/kapi_sysinfo.c］ ［sys_time_now → kapi_sys_time_now @ sys/kapi/kapi_sys.c］ ［mem_stat → kapi_mem_stat @ sys/kapi/kapi_sysinfo.c］
+- system_info ［sys_ver_info → kapi_sys_ver_info @ sys/kapi/kapi_sys.c］
+- ime ［ime_getchar → ime_getchar_kapi @ sys/kern/ime/fep_module.c］ ［ime_trygetchar → ime_trygetchar @ sys/kern/ime/fep_module.c］ ［ime_toggle → ime_toggle @ sys/kern/ime/fep_module.c］ ［ime_is_active → ime_is_active @ sys/kern/ime/fep_module.c］
+- ime ［ime_set_mode → ime_set_mode @ sys/kern/ime/fep_module.c］ ［ime_get_mode → ime_get_mode @ sys/kern/ime/fep_module.c］ ［ime_getkey → ime_getkey_kapi @ sys/kern/ime/fep_module.c］ ［ime_switch_dict → ime_switch_dict @ sys/kern/ime/fep_module.c］
+- ime ［ime_user_list → ime_user_list_facade @ sys/kern/ime/fep_module.c］ ［ime_user_delete → ime_user_delete_facade @ sys/kern/ime/fep_module.c］ ［ime_user_export → ime_user_export_facade @ sys/kern/ime/fep_module.c］ ［ime_user_clear → ime_user_clear_facade @ sys/kern/ime/fep_module.c］
+- ime ［ime_trygetkey → ime_trygetkey @ sys/kern/ime/fep_module.c］ ［ime_feed_key → ime_feed_key @ sys/kern/ime/fep_module.c］ ［ime_set_render → gui_ime_set_render @ sys/kern/gui.c］ ［ime_dict_info → ime_dict_info_facade @ sys/kern/ime/fep_module.c］
+- ime ［ime_dict_suspend → ime_dict_suspend @ sys/kern/ime/fep_module.c］
+- v86 ［v86_selftest → v86_smoke_test @ sys/platform/pc98/legacy/v86.c］ ［v86_disktest → v86_disk_test @ sys/platform/pc98/legacy/v86.c］ ［v86_boot → v86_boot @ sys/platform/pc98/legacy/v86.c］ ［v86_boot2 → v86_boot2 @ sys/platform/pc98/legacy/v86.c］
+- v86 ［v86_gdc_capture → v86_gdc_capture @ sys/platform/pc98/legacy/v86_gcap.c］
+- pcm ［pcm_open → pcm_open @ sys/dev/sound/cs4231/pcm_module.c］ ［pcm_write → pcm_write @ sys/dev/sound/cs4231/pcm_module.c］ ［pcm_status → pcm_status @ sys/dev/sound/cs4231/pcm_module.c］ ［pcm_close → pcm_close @ sys/dev/sound/cs4231/pcm_module.c］
+- pcm ［pcm_set_volume → pcm_set_volume @ sys/dev/sound/cs4231/pcm_module.c］
+- boot_info ［boot_image_info → boot_image_info @ sys/kern/init/bootinfo.c］
+- debug ［kdebug_call → kdebug_call @ sys/kern/module/kdebug_call.c］
+- gfx2 ［gfx2_adapter_count → gfx2_adapter_count @ sys/hal/gfx/v2/enum.c］ ［gfx2_adapter_info → gfx2_adapter_info @ sys/hal/gfx/v2/enum.c］ ［gfx2_adapter_gen → gfx2_adapter_gen @ sys/hal/gfx/v2/backend_reg.c］ ［gfx2_caps → gfx2_caps @ sys/hal/gfx/v2/caps.c］
+- gfx2 ［gfx2_check_op → gfx2_check_op @ sys/hal/gfx/v2/check_op.c］ ［gfx2_surface_create → gfx2_surface_create @ sys/hal/gfx/v2/surface.c］ ［gfx2_surface_free → gfx2_surface_free @ sys/hal/gfx/v2/surface.c］ ［gfx2_surface_desc → gfx2_surface_desc @ sys/hal/gfx/v2/surface.c］
+- gfx2 ［gfx2_screen_surface → gfx2_screen_surface @ sys/hal/gfx/v2/surface.c］ ［gfx2_lock → gfx2_lock @ sys/hal/gfx/v2/lock.c］ ［gfx2_unlock → gfx2_unlock @ sys/hal/gfx/v2/lock.c］ ［gfx2_submit → gfx2_submit @ sys/hal/gfx/v2/submit.c］
+- gfx2 ［gfx2_fence_wait → gfx2_fence_wait @ sys/hal/gfx/v2/fence.c］ ［gfx2_fence_query → gfx2_fence_query @ sys/hal/gfx/v2/fence.c］ ［gfx2_head_info → gfx2_head_info @ sys/hal/gfx/v2/enum.c］ ［gfx2_connector_info → gfx2_connector_info @ sys/hal/gfx/v2/enum.c］
+- gfx2 ［gfx2_connector_edid → gfx2_connector_edid @ sys/hal/gfx/v2/enum.c］ ［gfx2_mode_count → gfx2_mode_count @ sys/hal/gfx/v2/enum.c］ ［gfx2_mode_get → gfx2_mode_get @ sys/hal/gfx/v2/enum.c］ ［gfx2_mode_set → gfx2_mode_set @ sys/hal/gfx/v2/modeset.c］
+- gfx2 ［gfx2_flip → gfx2_flip @ sys/hal/gfx/v2/display.c］ ［gfx2_vblank_wait → gfx2_vblank_wait @ sys/hal/gfx/v2/display.c］ ［gfx2_palette → gfx2_palette @ sys/hal/gfx/v2/display.c］ ［gfx2_gamma → gfx2_gamma @ sys/hal/gfx/v2/display.c］
+- gfx2 ［gfx2_cursor_image → gfx2_cursor_image @ sys/hal/gfx/v2/display.c］ ［gfx2_cursor_move → gfx2_cursor_move @ sys/hal/gfx/v2/display.c］ ［gfx2_cursor_show → gfx2_cursor_show @ sys/hal/gfx/v2/display.c］ ［gfx2_dpms → gfx2_dpms @ sys/hal/gfx/v2/display.c］
+- gfx2 ［gfx2_present → gfx2_present @ sys/hal/gfx/v2/display.c］
+- shm ［sys_shm_alloc → shm_alloc @ sys/kern/mm/shm.c］ ［sys_shm_lock → shm_lock @ sys/kern/mm/shm.c］ ［sys_shm_free → shm_free @ sys/kern/mm/shm.c］
+- pointer ［mouse_poll → pointer_poll @ sys/hal/input/input_service.c］ ［mouse_available → pointer_available @ sys/hal/input/input_service.c］ ［mouse_set_bounds → pointer_set_bounds @ sys/hal/input/input_service.c］ ［mouse_cursor_set_mode → pointer_cursor_set_mode @ sys/hal/input/input_service.c］
+- pointer ［mouse_cursor_show → pointer_cursor_show @ sys/hal/input/input_service.c］ ［mouse_cursor_hide → pointer_cursor_hide @ sys/hal/input/input_service.c］
 - pointer の公開の順 (PowerPC の PM 決定 2026-11-19、Opus のレビューの指摘): 段 3c は mouse_set_bounds・mouse_cursor_set_mode・mouse_cursor_hide の 3 本を先に出す。mouse_available・mouse_poll・mouse_cursor_show は、本線の後端の ops (#27) と既定の範囲 (#28) の後に一緒に出す (available だけを先に出すと、poll が無いまま 1 を返し、アプリが初期化していない MouseInfo を読むため)。
 
 ### 3. 実施順と担当
@@ -171,38 +171,38 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 |順|担当・対象ファイル（提案の新規ファイルは「新設」）|出口と次段の条件|
 |---|---|---|
 |1a|本線 build/sources/common.mk|lib/path.c を EXEC の持ち物へ。PC98_PENDING と二重選択しない。validator と初期 drive を対象像で確認|
-|1b|PPC platform/powermac/root_boot.c|root の公開後に path の実在する device を選ぶ。USERSHELL 固有の hostfs は mount 後だけ利用|
+|1b|PPC sys/platform/powermac/root_boot.c|root の公開後に path の実在する device を選ぶ。USERSHELL 固有の hostfs は mount 後だけ利用|
 |1c|PPC sdk/kapi_target_ppc.py|path 5本を公開。get の返す文字列は既存のアプリ領域へコピー|
 |1d|PPC 同公開表|shm 3本。既存 map の書込・別所有者・終了回収が通れば path と並列可|
-|2a-i|本線 kapi/kapi_sys.c|build と mtime の依存を分離。像で不足する診断変数は常に0の extern で補わない|
+|2a-i|本線 sys/kapi/kapi_sys.c|build と mtime の依存を分離。像で不足する診断変数は常に0の extern で補わない|
 |2a-ii|本線 kapi/ の共通 TU|2a-i はその場の変更を NP21/W で受入。その後、分離済み関数だけを移動し x86 build_compare の関数差0|
-|2b|本線 kernel/time/ktime.c → kernel/ver_collect.c|前者は clock source の実値、後者は boot と機能欄の提供元を確認。各採用は #6 の1ファイル分だけ|
+|2b|本線 sys/kern/time/ktime.c → sys/kern/ver_collect.c|前者は clock source の実値、後者は boot と機能欄の提供元を確認。各採用は #6 の1ファイル分だけ|
 |2c|PPC 公開表|system_info は build、mtime、time、mem、ver の順。未準備なスナップショットの slot は後続へ|
-|3a|PPC platform/powermac/escc.c|既存送信の所有者・ログとの共存、受信と非待機読取を確認。PortOps 登録は別段|
-|3b-i|本線 drivers/input/mouse.c|d2_bind.c の PointerOps が使う poll・bounds のつなぎ、clamp、tvram_reverse_cell の set_mode/show/hide をその場で分離。init と snapshot を PC-98 に残し NP21/W で検証|
+|3a|PPC sys/platform/powermac/escc.c|既存送信の所有者・ログとの共存、受信と非待機読取を確認。PortOps 登録は別段|
+|3b-i|本線 sys/platform/pc98/input/mouse.c|d2_bind.c の PointerOps が使う poll・bounds のつなぎ、clamp、tvram_reverse_cell の set_mode/show/hide をその場で分離。init と snapshot を PC-98 に残し NP21/W で検証|
 |3b-ii|本線 input/hal/|分離済み cursor と poll・bounds を純移動し、PC-98 の登録で同じ動作を確認|
-|3c|PPC platform/powermac/usb_platform.c|移動後の共有入口 pointer_move とボタン入力へ配送。抜去時の解放とキーボード同時接続を確認して公開|
+|3c|PPC sys/platform/powermac/usb_platform.c|移動後の共有入口 pointer_move とボタン入力へ配送。抜去時の解放とキーボード同時接続を確認して公開|
 |4a|PPC 公開表だけ|セル5本を既存 console.c の con_backend_scroll・readchar・reverse 等と fbcon に結線。tvram_clear の生成分岐も照合|
 |4k-i|本線 build/select.mk|FEATURE_KCG の FEATURE_PC98_DEVICES 必須条件を解き、PC-98 の選択と無効像も確認|
-|4k-ii|本線 kernel/dev/device_kcg.c|device_kcg.c の固定名転送を純移動し両像で同じ TU と kcg.c を選ぶ|
-|4b|共通 kernel/console/font_source_kcg.c|PPC は既存 KCG1 から kcg_rom_read_ank・kanji を供給。load は両像で NOSYS。既存 KCG1 をフォント供給元に選ぶ。font lease の close と exec 終了の回収を先に受入|
-|5a-i|本線 drivers/video/pc98/gfx_vram.c（その場の変更、NP21/W で確認）|present、rect、dirty、nosync、raster のクリップ・変更矩形管理を抽出。PC98 VRAM 書込と同期は装置に保持|
-|5a-ii|本線 `gfx/gfx_dirty.c`|分離した dirty 列・矩形処理だけを純移動。flip・VSYNC 待ちは装置側。x86 関数差0 (変位と `gfx_add_dirty_rect` からの呼出前後のスタック整列、ret 後の実行されない整列命令のみ許容)|
-|5b|本線 gfx/gfx_core.c → PPC platform/powermac/display_provider.c|共通 present が後端へ渡す。INDEX8 の変換・pitch は既存 OF FB を使う。200行指定の実現可能範囲を照会|
+|4k-ii|本線 sys/dev/kcg/device_kcg.c|device_kcg.c の固定名転送を純移動し両像で同じ TU と kcg.c を選ぶ|
+|4b|共通 sys/kern/console/font_source_kcg.c|PPC は既存 KCG1 から kcg_rom_read_ank・kanji を供給。load は両像で NOSYS。既存 KCG1 をフォント供給元に選ぶ。font lease の close と exec 終了の回収を先に受入|
+|5a-i|本線 sys/platform/pc98/video/gfx_vram.c（その場の変更、NP21/W で確認）|present、rect、dirty、nosync、raster のクリップ・変更矩形管理を抽出。PC98 VRAM 書込と同期は装置に保持|
+|5a-ii|本線 `sys/hal/gfx/gfx_dirty.c`|分離した dirty 列・矩形処理だけを純移動。flip・VSYNC 待ちは装置側。x86 関数差0 (変位と `gfx_add_dirty_rect` からの呼出前後のスタック整列、ret 後の実行されない整列命令のみ許容)|
+|5b|本線 sys/hal/gfx/gfx_core.c → PPC sys/platform/powermac/display_provider.c|共通 present が後端へ渡す。INDEX8 の変換・pitch は既存 OF FB を使う。200行指定の実現可能範囲を照会|
 |5c|共通 HAL → OF FB 後端|所有・世代・転送範囲は共通 HAL、固定モード・pitch・画素形式は後端が返す。既存の表示の門は B02 で整理する。|
-|5d|PPC_SHELL_ALIGN_X86_DESIGN → kernel/gui.c|段 E で製品シェルを owner 1 の起動ループに接続する。段 F で通常の wrapper から共通の sys_switch_shell を通して shell → GUI → shell と回収を確認し、子からの切替要求が拒否されることを確かめて公開する。|
-|6a|PPC drivers/macintosh/ の VIA 装置 → platform/powermac/system.c|wt/ppc-reset の 955665762、docs/decisions/ppc/PPC_RESET_DESIGN.md の順。後続の rtc_read も同じ via_command を使用。再起動1本を先に公開、時計は同一装置を登録して別段で公開|
-|6f|転送先 TU は `kernel/dev/device_fs.c`・`kernel/dev/device_host.c` (2026-11-19 に移した)。loop (`kernel/dev/device_loop.c` の予定) は保留 — 転送先の loop_dev_* が装置のヘッダ drivers/block/loop_dev.h にしか無く、共通から呼ぶ契約 (include/ の宣言) ができるまで platform/pc98/device_loop.c に残す|serialfs・loop・ext2 の順に一組ずつ両像共通の TU に純移動。device_host.c の既存 PPC 転送も選択を切り替え、各固定名の定義を一つにする。PowerPC の EXEC 像は device_fs.o を選ぶが、中の転送先 (ext2_format*・serialfs_session_*) は PowerPC に無く、-ffunction-sections と --gc-sections で捨てられてリンクが通っている (6b・6c で転送先が入るまでの前提)|
-|6b|本線 fs/serialfs/serialfs_session.c → PPC hostfs_link_io.c|協調進行と session の所有を確定。既存のユーザー shell の transport を二重に初期化しない|
-|6c|本線 drivers/block/loop_dev.c → fs/ext2/ext2_fmt.c|仮想媒体の attach と書込権限を通してから formatter を選択。loop と ext2 は独立公開|
-|6d-i|本線 drivers/pci/pci.c|mech1 を config 後端に分離して NP21/W で照合。別の純移動段で pci_record・pci_scan_bus・count/get・bind 台帳と固定名転送を共有|
-|6d-ii|PPC platform/powermac/pci_config.c（pm_pci_read32 等の config 読み書きだけ）|BDF と項目順を確定。列挙から外れる装置を既存 GMAC への固定応答で代用しない|
-|6e|本線 init/bootinfo.c → PPC platform/powermac/root_image.c|捕捉した検証結果の発行順を決め、boot_info と ver の根拠を共有|
+|5d|PPC_SHELL_ALIGN_X86_DESIGN → sys/kern/gui.c|段 E で製品シェルを owner 1 の起動ループに接続する。段 F で通常の wrapper から共通の sys_switch_shell を通して shell → GUI → shell と回収を確認し、子からの切替要求が拒否されることを確かめて公開する。|
+|6a|PPC drivers/macintosh/ の VIA 装置 → sys/platform/powermac/system.c|wt/ppc-reset の 955665762、docs/decisions/ppc/PPC_RESET_DESIGN.md の順。後続の rtc_read も同じ via_command を使用。再起動1本を先に公開、時計は同一装置を登録して別段で公開|
+|6f|転送先 TU は `sys/kern/dev/device_fs.c`・`sys/kern/dev/device_host.c` (2026-11-19 に移した)。loop (`sys/dev/loop/device_loop.c` の予定) は保留 — 転送先の loop_dev_* が装置のヘッダ sys/dev/block/loop_dev.h にしか無く、共通から呼ぶ契約 (include/ の宣言) ができるまで platform/pc98/device_loop.c に残す|serialfs・loop・ext2 の順に一組ずつ両像共通の TU に純移動。device_host.c の既存 PPC 転送も選択を切り替え、各固定名の定義を一つにする。PowerPC の EXEC 像は device_fs.o を選ぶが、中の転送先 (ext2_format*・serialfs_session_*) は PowerPC に無く、-ffunction-sections と --gc-sections で捨てられてリンクが通っている (6b・6c で転送先が入るまでの前提)|
+|6b|本線 sys/fs/serialfs/serialfs_session.c → PPC hostfs_link_io.c|協調進行と session の所有を確定。既存のユーザー shell の transport を二重に初期化しない|
+|6c|本線 sys/dev/block/loop_dev.c → sys/fs/ext2/ext2_fmt.c|仮想媒体の attach と書込権限を通してから formatter を選択。loop と ext2 は独立公開|
+|6d-i|本線 sys/dev/pci/pci.c|mech1 を config 後端に分離して NP21/W で照合。別の純移動段で pci_record・pci_scan_bus・count/get・bind 台帳と固定名転送を共有|
+|6d-ii|PPC sys/platform/powermac/pci_config.c（pm_pci_read32 等の config 読み書きだけ）|BDF と項目順を確定。列挙から外れる装置を既存 GMAC への固定応答で代用しない|
+|6e|本線 sys/kern/init/bootinfo.c → PPC sys/platform/powermac/root_image.c|捕捉した検証結果の発行順を決め、boot_info と ver の根拠を共有|
 |7a-選択|本線 build/select.mk|FEATURE_FEP の FEATURE_PC98_DEVICES 依存を実際の前提機能に置換。両像の有効・無効構成を照合|
 |7a|module の読み込み L1 → L2 → FEP → KCG|fep.mod の起動と回収を x86 に揃える。辞書・学習は HDD の後、x86 と同じ VFS パスで公開する。|
 |7b-選択|本線 build/select.mk|実装済み (build/select.mk の FEATURE_SQLITE は FEATURE_EXEC を前提に置き換わっている)。残りは製品の道 (/sys/shell.bin の起動) での両像の有効・無効構成の受入だけ|
-|7b|静的 SQLite → kapi/kapi_db.c|公開済みの db 17 本を維持する。製品経路で VFS 上の DB、段 S のスタック・FP 保存復帰・guard、SHM と bind の寿命を確認する。SQLite の module 化は任意の B08。|
-|7c|本線 kernel/module/kdebug_call.c|module ローダの有効化後、許可された診断コマンドを選ぶ。CPU 固有の採取は独立段|
+|7b|静的 SQLite → sys/kapi/kapi_db.c|公開済みの db 17 本を維持する。製品経路で VFS 上の DB、段 S のスタック・FP 保存復帰・guard、SHM と bind の寿命を確認する。SQLite の module 化は任意の B08。|
+|7c|本線 sys/kern/module/kdebug_call.c|module ローダの有効化後、許可された診断コマンドを選ぶ。CPU 固有の採取は独立段|
 |8|本線 AV HAL の音声契約 → 装置後端、ATA の block 契約 → 装置後端|HAL 票の依存（音は A0・1kHz tick）を待つ。契約確定後に PowerPC 担当が各後端を接続する|
 |8-音|本線 AV HAL の合成器の照らし直し → os32_opna A〜D → L2、IS → L1、L1・L2 → L3、C3・L3 → L6|その後、PowerPC 担当が PowerMac の PCM 後端 drivers/sound/powermac/pcm_powermac.c（新設）を接続する。装置候補は Screamer（NetBSD awacs.c）や snapper（同 snapper.c）。G4 QuickSilver の実機搭載品は未確認。|
 

@@ -31,19 +31,19 @@ F2 の「SQLite 内部 fault は通常 cleanup で回復できない」という
 
 | 根拠 | 現状／必要な変更 |
 |---|---|
-| `kernel/ime/ime.c` | list/delete/export は caller pointer をそのまま dict 層へ渡す。clear は pointer なし |
-| `kernel/ime/ime_dict.c` | prefix を prepare 後に SQLITE_STATIC bind。ROW 中に out を直接書き、最後に finalize。途中の user fault は stmt を残して脱出し得る |
-| `kernel/ime/ime_dict.c` | NULL/空 kanji は同じ yomi の全候補削除。prepare 後に yomi/kanji を bind する。invalid→空文字変換は削除対象を拡大する |
-| `kernel/ime/ime_dict.c` | user path を VFS に直渡しし、O_TRUNC open が prepare より先。無効 path は file 操作より前に拒否する必要がある |
-| `kernel/ime/ime_dict.c` | open/close/reopen/search/learn/clear も直接 SQLite。search/learn の SQLITE_STATIC binding は reset だけでは解放されない。常駐 stmt の寿命も対象 |
-| `kernel/ime/ime.c` | 学習は kernel の候補配列、検索は kana_buf、switch は整数から選ぶ kernel literal path。user facade と trusted 内部呼出しを混同しない |
-| `kernel/ime/ime.h`、`sdk/include/os32/os32_kapi_shared.h` | 結果 yomi/kanji は各32 byte、入力 kana_buf は128 byte。**結果幅32を入力上限の根拠にできない** |
+| `sys/kern/ime/ime.c` | list/delete/export は caller pointer をそのまま dict 層へ渡す。clear は pointer なし |
+| `sys/kern/ime/ime_dict.c` | prefix を prepare 後に SQLITE_STATIC bind。ROW 中に out を直接書き、最後に finalize。途中の user fault は stmt を残して脱出し得る |
+| `sys/kern/ime/ime_dict.c` | NULL/空 kanji は同じ yomi の全候補削除。prepare 後に yomi/kanji を bind する。invalid→空文字変換は削除対象を拡大する |
+| `sys/kern/ime/ime_dict.c` | user path を VFS に直渡しし、O_TRUNC open が prepare より先。無効 path は file 操作より前に拒否する必要がある |
+| `sys/kern/ime/ime_dict.c` | open/close/reopen/search/learn/clear も直接 SQLite。search/learn の SQLITE_STATIC binding は reset だけでは解放されない。常駐 stmt の寿命も対象 |
+| `sys/kern/ime/ime.c` | 学習は kernel の候補配列、検索は kana_buf、switch は整数から選ぶ kernel literal path。user facade と trusted 内部呼出しを混同しない |
+| `sys/kern/ime/ime.h`、`sdk/include/os32/os32_kapi_shared.h` | 結果 yomi/kanji は各32 byte、入力 kana_buf は128 byte。**結果幅32を入力上限の根拠にできない** |
 | `userland/cmds/ime.c` | list は entries[64]/max=64。prefix/yomi/kanji/path は argv を直接渡し、32 byte 制限なし。省略 prefix と kanji は空文字、export 既定は `/tmp/userdict.csv` |
-| `mm/paging.c` | paging_is_present は master の page_tables を参照するだけ。現在 caller PD の PDE/PTE USER/RW 判定に流用できない |
-| `exec/exec.c` | ring3_ptr_ok は先頭番地の帯域判定。長さ、跨ぐページ、実効 USER/RW は検証しない。wrapper 中は caller CR3 のまま |
-| `arch/x86/kernel/isr_handlers.c`、`exec/exec.c` | ring3_in_syscall が真なら kernel 内 fault も app kill→AS破棄→exec_exit。現在 exec_exit は FD cleanup 後に db_cleanup_all。エンジン中断後の cleanup 再入は安全でない |
-| `arch/x86/kernel/ring3_entry.asm` | int80 本体は sti、出口は cli。49行の古い「cli不要」コメントでなく実命令と57行以降を正とする |
-| `kapi/kapi_db.c` | path 256/SQL 1024 のコピーはあるが checked copy でなく切捨て。exec/prepare は **旧 active_stmt finalize が SQL copy より先** |
+| `sys/kern/mm/paging.c` | paging_is_present は master の page_tables を参照するだけ。現在 caller PD の PDE/PTE USER/RW 判定に流用できない |
+| `sys/kern/exec/exec.c` | ring3_ptr_ok は先頭番地の帯域判定。長さ、跨ぐページ、実効 USER/RW は検証しない。wrapper 中は caller CR3 のまま |
+| `sys/arch/x86/kernel/isr_handlers.c`、`sys/kern/exec/exec.c` | ring3_in_syscall が真なら kernel 内 fault も app kill→AS破棄→exec_exit。現在 exec_exit は FD cleanup 後に db_cleanup_all。エンジン中断後の cleanup 再入は安全でない |
+| `sys/arch/x86/kernel/ring3_entry.asm` | int80 本体は sti、出口は cli。49行の古い「cli不要」コメントでなく実命令と57行以降を正とする |
+| `sys/kapi/kapi_db.c` | path 256/SQL 1024 のコピーはあるが checked copy でなく切捨て。exec/prepare は **旧 active_stmt finalize が SQL copy より先** |
 
 ## 3. 上限・返値・NULL の提案を先に凍結する
 
@@ -197,11 +197,11 @@ path も slot の予約・SQLite open・VFS 操作前に確定する。
 
 | 実在ファイル | カバーする入口／扱い |
 |---|---|
-| `kernel/ime/ime_dict.c` | open/partial-open cleanup、close/reopen、search/learn、list/delete/export/clear。file_control を呼ぶ dict_fd_protect も含む |
-| `kapi/kapi_db.c` | open/exec/prepare/step/column_int/column_text/finalize/close、last_error/mem_used、SHM row/error helper、all/owned cleanup。読み取り・診断 API も SQLite entry |
+| `sys/kern/ime/ime_dict.c` | open/partial-open cleanup、close/reopen、search/learn、list/delete/export/clear。file_control を呼ぶ dict_fd_protect も含む |
+| `sys/kapi/kapi_db.c` | open/exec/prepare/step/column_int/column_text/finalize/close、last_error/mem_used、SHM row/error helper、all/owned cleanup。読み取り・診断 API も SQLite entry |
 | `lib/sqlite3/os32_sqlite_vfs.c` | config/initialize の boot 外側、os32_sqlite_db_fd の file_control。sqlite3_os_init→vfs_register は初期化の内側として扱う |
 | `lib/sqlite3/os32_sqlite_test.c` | boot の :memory: open/PRAGMA/exec/close。file FD がなくても共有 kernel engine なので対象 |
-| `userland/tests/sqlite_standalone/sqlite_standalone.c`、`sqlite_user_vfs.c` | 独立 userland SQLite の試験。kernel pool の guard を持ち込まない。実 build/link で別 engine と確認する |
+| `userland/diag/sqlite_standalone/sqlite_standalone.c`、`sqlite_user_vfs.c` | 独立 userland SQLite の試験。kernel pool の guard を持ち込まない。実 build/link で別 engine と確認する |
 | `lib/sqlite3/sqlite3.c/.h`、config header | engine内部・宣言・マクロは outer callsite と区別。amalgamation を機械的 wrapper 化しない |
 
 実装 R0/R1 で tracked source と追加ソース、利用可能な apps/game を再検索し、
@@ -218,9 +218,9 @@ path も slot の予約・SQLite open・VFS 操作前に確定する。
 |---|---|---|
 | R0 | 本票の独立読取りレビューのみ | 上限、NULL、caller provenance、table walk、IF、guard 全caller一覧に重大未解決ゼロ。PM承認 |
 | B1 uaccess | `mm/paging.c/.h`＋専用 `tools/tests/` harness。出自 helper が必要な場合だけ別小差分 `exec/exec.c/.h` | synthetic caller/master PD、safe range/overflow/IF host 検証。既存 paging helper の意味を変えない |
-| B2 FEP | `kernel/ime/ime.c`、`kernel/ime/ime_dict.c`、`kernel/ime/ime.h`＋専用 host test | staged list、全入力copy、NULL、借用binding寿命、SQL/I/O失敗。SDK layout変更は別承認 |
+| B2 FEP | `sys/kern/ime/ime.c`、`sys/kern/ime/ime_dict.c`、`sys/kern/ime/ime.h`＋専用 host test | staged list、全入力copy、NULL、借用binding寿命、SQL/I/O失敗。SDK layout変更は別承認 |
 | B3 DB followup | 排他移管した `kapi/kapi_db.c/.h`＋既存 F1/専用 host test | copy-before-finalize、無効 SQL/path の engine entry=0、F1/F2回帰 |
-| B4a guard基礎 | 新規 kernel内部 guard `.c/.h`、必要な build source 登録、`arch/x86/kernel/isr_handlers.c`＋専用 host test | active fault→停止／非active→従来分類。ISR frame変更なし |
+| B4a guard基礎 | 新規 kernel内部 guard `.c/.h`、必要な build source 登録、`sys/arch/x86/kernel/isr_handlers.c`＋専用 host test | active fault→停止／非active→従来分類。ISR frame変更なし |
 | B4b 全caller移行 | DB側、FEP側、boot/VFS側を上表のファイル集合ごとに直列小差分 | 全 outer callを保護、callback二重enterなし、早期returnのleave漏れゼロ。未移行状態はhost限定 |
 | R1 target/guest | 独立 reviewer→承認された専任検証者 | 下記host/target/guest証跡を受領してから F2 統合へ引渡し |
 

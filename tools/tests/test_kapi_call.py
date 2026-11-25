@@ -1,10 +1,10 @@
 """D1: product x86 call/entry and common dispatcher, ILP32 without libc."""
 CHECK = dict(name='kapi-call-host', tier=1,
-    covers=['include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'kapi/kapi_generated.c', 'arch/x86/kernel/kapi_call.c', 'arch/x86/kernel/syscall_entry.c',
-            'arch/x86/kernel/ring3_entry.asm', 'arch/x86/kernel/exec_context.c',
-            'arch/x86/kernel/exec_entry.c', 'arch/x86/kernel/tss.h',
-            'exec/ring3_ls.h', 'include/kapi_call.h', 'include/kapi_call_generated.h', 'exec/redir_access.c', 'lib/kstring_asm.asm',
-            'include/exec_arch.h', 'include/redir_access.h', 'exec/exec_syscall.inc',
+    covers=['sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/kapi/kapi_generated.c', 'sys/arch/x86/kernel/kapi_call.c', 'sys/arch/x86/kernel/syscall_entry.c',
+            'sys/arch/x86/kernel/ring3_entry.asm', 'sys/arch/x86/kernel/exec_context.c',
+            'sys/arch/x86/kernel/exec_entry.c', 'sys/arch/x86/kernel/tss.h',
+            'sys/kern/exec/ring3_ls.h', 'sys/include/kapi_call.h', 'sys/include/kapi_call_generated.h', 'sys/kern/exec/redir_access.c', 'sys/kern/kstring_asm.asm',
+            'sys/include/exec_arch.h', 'sys/include/redir_access.h', 'sys/kern/exec/exec_syscall.inc',
             'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'sdk/kapi.json',
             'tools/tests/test_kapi_call.py', 'tools/tests/host_exec_context.h',
             'tools/tests/host_exec_entry.h', 'tools/tests/host_arch/*.h',
@@ -218,11 +218,11 @@ MUTATIONS = (
 
 def execute(folder, sources, host):
     (folder/'host.c').write_text(host.replace('/* PRODUCT */',
-        sources['call']+'\n'+sources['entry']+'\n'+sources['dispatch']).replace('/* CALLER_PRODUCT */', (ROOT/'exec/redir_access.c').read_text()))
-    asm=(ROOT/'arch/x86/kernel/ring3_entry.asm').read_text()
+        sources['call']+'\n'+sources['entry']+'\n'+sources['dispatch']).replace('/* CALLER_PRODUCT */', (ROOT/'sys/kern/exec/redir_access.c').read_text()))
+    asm=(ROOT/'sys/arch/x86/kernel/ring3_entry.asm').read_text()
     (folder/'invoke.asm').write_text('BITS 32\nsection .text\n'+asm[asm.index('global kapi_invoke'):])
     subprocess.run(['nasm','-f','elf32',str(folder/'invoke.asm'),'-o',str(folder/'invoke.o')],check=True)
-    subprocess.run(['nasm','-f','elf32',str(ROOT/'lib/kstring_asm.asm'),'-o',str(folder/'kstring.o')],check=True)
+    subprocess.run(['nasm','-f','elf32',str(ROOT/'sys/kern/kstring_asm.asm'),'-o',str(folder/'kstring.o')],check=True)
     subprocess.run(['gcc','-m32','-std=gnu11','-O2','-Wall','-Wextra','-Werror',
         '-ffreestanding','-fno-pie','-fno-stack-protector','-nostdlib','-static','-no-pie',
         '-ffunction-sections','-Wl,--gc-sections','-I'+str(ROOT/'tools/tests'),
@@ -242,7 +242,7 @@ def main():
         checks=''.join(f'CHECK((u32)a{k}==expected[{k}]);' for k in range(n))
         wrappers.append(f'static u32 f{n}({params}) {{ {checks} calls++; return 0x87654321; }}')
     wrappers.append('static void *wrappers[]={'+','.join(f'f{n}' for n in range(maximum+1))+'};')
-    generated=(ROOT/'kapi/kapi_generated.c').read_text()
+    generated=(ROOT/'sys/kapi/kapi_generated.c').read_text()
     tables=''
     for name in ('kapi_argsize','kapi_argptr'):
         start=generated.index('const u16 '+name)
@@ -259,8 +259,8 @@ def main():
     cases.append(f'reset(1); words[1]=1; words[2]=1; words[3]=1; table[KAPI_FN_TABLE_FIRST+{slot}]=(u32)wrappers[1]; dispatch({slot}); CHECK(kills==1 && !calls);')
     cases.append(f'reset(1); copy_ok=0; table[KAPI_FN_TABLE_FIRST+{slot}]=(u32)wrappers[1]; dispatch({slot}); CHECK(kills==1 && !calls && frame[7]==(u32)OS32_ERR_INVAL);')
     host=HOST.replace('/* TABLES */',tables).replace('/* WRAPPERS */','\n'.join(wrappers)).replace('/* DISPATCH_CASES */','\n'.join(cases))
-    dispatch=(ROOT/'exec/exec_syscall.inc').read_text(); start=dispatch.index('/* Keep the dispatcher')
-    sources=dict(call=(ROOT/'arch/x86/kernel/kapi_call.c').read_text(),entry=(ROOT/'arch/x86/kernel/syscall_entry.c').read_text(),dispatch=dispatch[start:])
+    dispatch=(ROOT/'sys/kern/exec/exec_syscall.inc').read_text(); start=dispatch.index('/* Keep the dispatcher')
+    sources=dict(call=(ROOT/'sys/arch/x86/kernel/kapi_call.c').read_text(),entry=(ROOT/'sys/arch/x86/kernel/syscall_entry.c').read_text(),dispatch=dispatch[start:])
     with tempfile.TemporaryDirectory(prefix='kapi-call-') as d:
         folder=Path(d)
         try:

@@ -21,7 +21,7 @@
 /*                                                                          */
 /*  I/O は持たない。書く手順は inst_hdd.c。                                  */
 /*  試験: tools/tests/test_hdd_stage2.py (記録 tools/tests/hdd_stage2_tdd.md) */
-/*  型は C の素の型だけ (os32api.h と include/types.h のどちらとも組める)。  */
+/*  型は C の素の型だけ (os32api.h と sys/include/types.h のどちらとも組める)。  */
 /* ======================================================================== */
 
 #ifndef INST_DISK_H
@@ -32,7 +32,7 @@
 /* ---- 媒体の上限 ---------------------------------------------------------- */
 /* 区画の大きさ (hdprep の上限と同じ 256MiB = ext2 32 グループ) */
 #define INST_PART_MB        HDPREP_MAX_MB
-/* fs/ext2/ext2_ctx.h EXT2_MAX_GROUPS。試験が突き合わせる */
+/* sys/fs/ext2/ext2_ctx.h EXT2_MAX_GROUPS。試験が突き合わせる */
 #define INST_EXT2_MAX_GROUPS 32UL
 /* 展開の後にも要る余白 (settings.db の更新・/tmp など、ブロック = 1KiB) */
 #define INST_SPACE_MARGIN_BLOCKS 256UL
@@ -43,7 +43,7 @@
 /* ext2 (1KiB ブロック) で OS32 が書ける 1 ファイルの上限: 直接 12 + 単一間接
  * 256 + 二重間接 256 × 256 ブロック = 67,383,296 B (三重間接は書かない) */
 #define INST_EXT2_MAX_FILE  ((12UL + 256UL + 256UL * 256UL) * 1024UL)
-/* fs/vfs.h VFS_MAX_PATH_DEPTH。展開先の前置 "/hd0" の 1 要素を足して収まること */
+/* sys/fs/vfs.h VFS_MAX_PATH_DEPTH。展開先の前置 "/hd0" の 1 要素を足して収まること */
 #define INST_VFS_MAX_DEPTH  32UL
 #define INST_PREFIX_DEPTH   1UL
 

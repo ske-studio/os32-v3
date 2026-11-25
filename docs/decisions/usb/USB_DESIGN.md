@@ -75,7 +75,7 @@ r5 は、失敗・取り外し・番地・再試行の扱いを**独自の状態
 | D3 | マウスは SET_PROTOCOL(1=report) で HID 記述子を解く (FB:input/ums.c:592-603) | boot (0) の固定 3B | 段 1 は報告の解析器を持たない |
 | D4 | 構成 0 に端点が無ければ次の構成を試す (FB:usb_device.c:2040-2046)、auto-install の構成選び (:2048-2081) | 構成 index 0 だけ (設定の失敗の扱いは FB と同じ: 再列挙 1 回の後は無視、:2013-2039) | HID・umass は構成 1 つで足りる |
 | D5 | 文字列記述子を読む | 読まない (表示は VID:PID) | 段 1 の範囲外 |
-| D6 | D0 でなければ D0 に移し BAR を書き戻す (FB:ohci_pci.c:98-114) | D0 でなければ断る | BAR に書かない規約 (`drivers/pci/pci.h`) |
+| D6 | D0 でなければ D0 に移し BAR を書き戻す (FB:ohci_pci.c:98-114) | D0 でなければ断る | BAR に書かない規約 (`sys/dev/pci/pci.h`) |
 | D7 | EHCI の BIOS 引き継ぎの期限切れでも続ける (FB:ehci_pci.c:579-590) | EHCI を使わない (CF を読み、0 なら OHCI は続ける) | OS32 は SMI との調停を持たない |
 | D8 | (無し) | 段 1 でも EHCI を静止し CF=0 を書いて読み戻す | BIOS 等が CF=1 で残すと全ポートが EHCI に行く (段 1 は EHCI を動かさない) |
 | D9 | HC の切り離しでは探索スレッドに detach を積み、進行中の探索の後に根から装置を順に free する (controller/usb_controller.c:194-224・427-448) | HC の故障は 1 本の入口 `usb_hc_dead`: 止める書き込みだけして DMA のメモリを全部隔離し、配下の装置は一括で「無い」にして上に 1 回知らせ、再起動まで使わない (§4-2-2) | PM 決定 (2026-11-09、簡素化): 故障した HC の DMA は止まった証拠が取れないことがあり、触ったメモリを二度と使わないのが要。装置ごとの順は要らない (DEVICE_STATES.md:16,31) |
@@ -160,47 +160,47 @@ r5 は、失敗・取り外し・番地・再試行の扱いを**独自の状態
 
 | 口 | 実物 |
 |---|---|
-| PCI | `drivers/pci/pci.h` (cfg 読み、`pci_cfg_write16` は Command 専用)、`include/pci_bind_contract.h`、`include/pci_dev_contract.h` |
-| DMA 池 | `mm/dma_pool.h` (`dma_alloc/dma_free/dma_mark_leaked`)、`include/memmap.h` の `MEM_DMA_POOL_BASE` (0x7F0000、64KB、1 回 32KB、span 16)、`include/dma_contract.h` |
-| MMIO | `mm/paging.h` `paging_device_map`、前提の検査 `mm/paging_map.inc` (台帳の準備・共有 PT の存在) |
-| 割込み・tick | `kernel/irq/irq.h`、`kernel/irq/tick.h` の `TICK_SLOT_COUNT`、`platform/pc98/tick_order.h` |
-| 部品 | `kernel/module/module_runtime.h`、手本 `drivers/net/e82557/lan_module.c` |
-| 入力 | `drivers/input/kbd.c` (IRQ から `kbd_deliver`)、修飾の状態 同ファイル内、`drivers/input/mouse.c` の `mouse_poll()` |
-| ブロック | `kernel/dev/dev.h` |
-| LE (バイト列) | `include/endian_le.h` の `le16_rd()` |
+| PCI | `sys/dev/pci/pci.h` (cfg 読み、`pci_cfg_write16` は Command 専用)、`sys/include/pci_bind_contract.h`、`sys/include/pci_dev_contract.h` |
+| DMA 池 | `sys/kern/mm/dma_pool.h` (`dma_alloc/dma_free/dma_mark_leaked`)、`sys/include/memmap.h` の `MEM_DMA_POOL_BASE` (0x7F0000、64KB、1 回 32KB、span 16)、`sys/include/dma_contract.h` |
+| MMIO | `sys/kern/mm/paging.h` `paging_device_map`、前提の検査 `sys/kern/mm/paging_map.inc` (台帳の準備・共有 PT の存在) |
+| 割込み・tick | `sys/kern/irq/irq.h`、`sys/kern/irq/tick.h` の `TICK_SLOT_COUNT`、`sys/platform/pc98/tick_order.h` |
+| 部品 | `sys/kern/module/module_runtime.h`、手本 `sys/dev/net/e82557/lan_module.c` |
+| 入力 | `sys/platform/pc98/input/kbd.c` (IRQ から `kbd_deliver`)、修飾の状態 同ファイル内、`sys/platform/pc98/input/mouse.c` の `mouse_poll()` |
+| ブロック | `sys/hal/block/dev.h` |
+| LE (バイト列) | `sys/include/endian_le.h` の `le16_rd()` |
 
 ### 1-2. 食い違い (9 件、r1 と同じ。#6・末尾を訂正)
 
 1. HWDEV_CORE_API.md は `docs/archive/` だけ → [D4] で使わない (DEVICE_STATES.md:16,28-31 を使う)。
 2. tick の slot が 7/7 で満杯 → `PC98_TICK_USB` を足し 8 に。
 3. DMA 池は既存の利用者と分け合う (§5-2)。
-4. 語単位の LE・MMIO の LE の口が無い → `include/endian_dma.h` (§6)。
+4. 語単位の LE・MMIO の LE の口が無い → `sys/include/endian_dma.h` (§6)。
 5. `pci_driver` に progif の照合が無い → vendor/device で結び probe で progif を見る。
 6. PCI 一般の MMIO 写像が無い。`paging_device_map` は台帳の準備と共有 PT を前提に断る (`paging_map.inc`) ので、写像の関数を足すだけでは動かない → §5-3 の 2 段。
 7. 鍵盤・マウスに外からの入口が無い → `kbd_merge.c`・`mouse_ext.c`。
 8. Ra266 の PCI スロット 2 本が使用中 (RA266.md:53-54) → ユーザー決定 (2026-11-09「その段で入れ替える」): USB の実機の受入の段に入るとき HighPoint を抜いて USB カードに入れ替える (物理操作はユーザー)。それまでは今の構成のまま (§11 の前提)。
 9. NP21/W: RA266.md:199 は「PCI を再現しない」、源には橋 2 つ (`~/np21w-src/src/io/pci/98graphbridge.c:39`・`cbusbridge.c:39`、実行時の設定は未確認)。USB はどちらでも無い。
 
-- (訂正) IRQ が使えない機能を断るのは `pci_bind` ではなく **probe の判断** (`drivers/pci/pci_bind_match.c` は probe の戻り値で打ち切り/次へを決めるだけ)。USB の probe は irq_line を理由に断らない (§7-3)。
-- `pci_cfg_write8` は無い → `drivers/pci/pci.c` に足す (§4-1)。
+- (訂正) IRQ が使えない機能を断るのは `pci_bind` ではなく **probe の判断** (`sys/dev/pci/pci_bind_match.c` は probe の戻り値で打ち切り/次へを決めるだけ)。USB の probe は irq_line を理由に断らない (§7-3)。
+- `pci_cfg_write8` は無い → `sys/dev/pci/pci.c` に足す (§4-1)。
 
 ## 2. 層の図と境目
 
 (図は r1 と同じ。以下を足す)
 
 - 置き場の 3 区分:
-  - **共通** (`drivers/usb/` の HCD・中核・class): `usb_platform.h`・`endian_dma.h`・`endian_le.h`・`lib/kstring.h`・`drivers/usb/*.h` だけを include。
-    S2h の `hid_kbd_map.c` だけは、共通の生成 HID backend を読むため `input/hal/keymap.h` も許す。
+  - **共通** (`drivers/usb/` の HCD・中核・class): `usb_platform.h`・`endian_dma.h`・`endian_le.h`・`sys/kern/kstring.h`・`drivers/usb/*.h` だけを include。
+    S2h の `hid_kbd_map.c` だけは、共通の生成 HID backend を読むため `sys/hal/input/keymap.h` も許す。
   - **常駐の踏み台** (vmkernel、pc98): `drivers/usb/usb_resident.c` — IRQ ×3・tick ×1 の踏み台、module 参照 (`MODULE_REF_IRQ/TICK/DMA`)、`lan_module.c` と同じ形で最大 3 登録・arg あり。
-  - **部品の殻** (`usb.mod`、pc98): `drivers/usb/usb_module.c` (PCI 表・lifecycle)・`platform/pc98/usb_platform.c` (usbp_* の実装、kernel の関数を import で呼ぶ)。
-- 番人 `tools/check_usb_portable.py`: 対象は共通の `drivers/usb/{usb_,ohci_,ehci_,hid_,umass_,scsi_}*.c` だけ (`usb_module.c`・`usb_resident.c` は除く)。`le32_t.raw` は `include/endian_dma.h`・`arch/*/arch_endian_dma.h` でだけ許す。
+  - **部品の殻** (`usb.mod`、pc98): `drivers/usb/usb_module.c` (PCI 表・lifecycle)・`sys/platform/pc98/usb_platform.c` (usbp_* の実装、kernel の関数を import で呼ぶ)。
+- 番人 `tools/check_usb_portable.py`: 対象は共通の `drivers/usb/{usb_,ohci_,ehci_,hid_,umass_,scsi_}*.c` だけ (`usb_module.c`・`usb_resident.c` は除く)。`le32_t.raw` は `sys/include/endian_dma.h`・`arch/*/arch_endian_dma.h` でだけ許す。
 - import 表 `drivers/usb/usb_imports.def`: `dma_alloc/dma_free/dma_mark_leaked`、`pci_cfg_read32/write8/write16`、`pci_bar_map/unmap`、`usb_resident_irq_attach/detach`・`usb_resident_tick_set`、`kbd_merge_event`・`kbd_merge_repeat`・`kbd_merge_release_src`、`mouse_ext_add`・`mouse_ext_release` (§3 の公開口と同じ名前、R3-11)、`kmalloc/kfree`、`cpu_delay_us`、`usb_ms_now`、(段 3) `dev_register/dev_unregister`。export は `initialize` の 1 口。
 - ロード順: PCI の結び・入力の初期化の後、シェルの前 (`build/packages.yaml` の boot 列、LAN の後)。
 
 ## 3. 構造体と部品の境目 (コード断片)
 
 ```c
-/* include/usb_platform.h — 契約。共通のコードは IF の状態を仮定しない */
+/* sys/include/usb_platform.h — 契約。共通のコードは IF の状態を仮定しない */
 struct usb_dma { u32 bus; void *va; u32 size; u32 cookie; };
 int  usbp_dma_alloc(u32 size, u32 align, struct usb_dma *out); /* 頁単位、[HW2]、失敗 <0 */
 int  usbp_dma_free(struct usb_dma *d);
@@ -228,7 +228,7 @@ void usbp_input_release(u8 src);              /* 抜去: その src の押下・
 ```
 
 ```c
-/* drivers/usb/usb_core.h — 中核と HCD の境目 (FB の usb_bus_methods / usb_pipe_methods に対応) */
+/* sys/dev/usb/usb_core.h — 中核と HCD の境目 (FB の usb_bus_methods / usb_pipe_methods に対応) */
 struct usb_hc_ops {
     int  (*start)(struct usb_hc *);                 /* 前景、§4-2 / §4-9 */
     void (*kill)(struct usb_hc *);                  /* 止める書き込みだけ (§4-2-2)。待たない・確かめない */
@@ -336,7 +336,7 @@ void mouse_ext_release(u8 src);
 | 5 | **EHCI の静止 (段 1 から)**: §4-9-1 の停止 → HCRESET → `CONFIGFLAG=0` を書いて読み戻す → `USBINTR=0` → BM を下げる | (手本なし、段 1 独自) | 段 1 は EHCI を動かさないが、BIOS 等が CF=1 で残すと全ポートが EHCI に行くため (R1-03) |
 | 6 | OHCI ×2 を §4-2 で起動 (5 の後) | — | — |
 
-- `pci_cfg_write8(bus,dev,fn,reg,v)`: `drivers/pci/pci.c` に +15 行。機構 #1 の `0xCFC + (reg&3)` へのバイト書きで、同じ DWORD の他バイト (W1C を含む) を読み書きしない。irq_save で囲む (`pci.h`)。
+- `pci_cfg_write8(bus,dev,fn,reg,v)`: `sys/dev/pci/pci.c` に +15 行。機構 #1 の `0xCFC + (reg&3)` へのバイト書きで、同じ DWORD の他バイト (W1C を含む) を読み書きしない。irq_save で囲む (`pci.h`)。
 
 ### 4-2. OHCI の起動 (`ohci_init.c`)
 
@@ -382,7 +382,7 @@ void usb_hc_dead(struct usb_hc *hc, u32 why)
 
 - `cls->gone(dev, iface)` の契約: xfer に触らない (DMA の塊は隔離済み)。入力は `usbp_input_release(src)`、ブロックは `Device` を「消えた」にする。**sc は返さない** (R7-01・R7-02)。`done()` は呼ばれない。1 回だけ。
 - 前景の `usb_xfer_sync` は待ちの各周で `hc->state == HC_DEAD` を見て `-USB_E_HC` で戻る。
-- ISR は `HC_DEAD` なら MMIO を読まず `IRQ_NONE`。線が鳴り続ければ kernel のストーム処理が止める (`kernel/irq/irq.h`)。IRQ の解除は部品の abort (前景) でだけ。
+- ISR は `HC_DEAD` なら MMIO を読まず `IRQ_NONE`。線が鳴り続ければ kernel のストーム処理が止める (`sys/kern/irq/irq.h`)。IRQ の解除は部品の abort (前景) でだけ。
 - その HC は再起動まで使わない (再初期化しない)。他の HC (もう 1 本の OHCI) は続ける。
 - 起動途中の失敗 (r4 の 4-2-2a を簡素化): BM を上げる前 (`hc->started` の旗 ST_DMA・ST_MMIO・ST_IRQ・ST_BM のうち ST_BM が無い) の失敗は DMA を返して写像を外し HC_OFF (HC は DMA していない。BIOS が BM+ で渡した HC も、起動の早い段の静止で BM を落としてある、末尾の追記)。上げた後の失敗は `usb_hc_dead`。
 - 部品の abort (`stop_dma`): HC_OFF の HC は何もしない。他は `usb_hc_dead(hc, ABORT)` を呼び、DMA は隔離のまま 0 を返す (部品は隔離される、DEVICE_STATES.md:31 の「止めたと証明できなければ隔離」)。EHCI の静止 (§4-9-1) は従来どおり。
@@ -618,9 +618,9 @@ int ehci_quiesce(struct usb_hc *hc, u32 *why) /* 前景。0 = 停止・リセッ
 
 | 利用者 | 大きさ | span | 根拠 |
 |---|---|---|---|
-| LAN (82557) | 14,032B → 16KB | 1 | `drivers/net/e82557/e82557.c`、`e82557_desc.c` |
-| PCM (CS4231) | 16KB | 1 | `drivers/sound/cs4231/pcm_cs4231.h`、`pcm_cs4231.c` |
-| GeForce | 要実測 | ? | `drivers/video/geforce/geforce_dma.c` の `geforce_dma_alloc()` (大きさは呼び手次第) |
+| LAN (82557) | 14,032B → 16KB | 1 | `sys/dev/net/e82557/e82557.c`、`e82557_desc.c` |
+| PCM (CS4231) | 16KB | 1 | `sys/dev/sound/cs4231/pcm_cs4231.h`、`pcm_cs4231.c` |
+| GeForce | 要実測 | ? | `sys/dev/video/geforce/geforce_dma.c` の `geforce_dma_alloc()` (大きさは呼び手次第) |
 | USB 段 1 | OHCI 2 頁 × 2 = 16KB | 4 | §3-1 |
 | USB 段 2 | + EHCI 3 頁 = 12KB | 3 | §4-9-2 |
 | USB 段 3 | + bulk 16KB | 1 | §4-10 |
@@ -634,15 +634,15 @@ int ehci_quiesce(struct usb_hc *hc, u32 *why) /* 前景。0 = 停止・リセッ
 
 | 段 | いつ | 何を | 置き場 |
 |---|---|---|---|
-| 予約 | 起動時、最初の AS より前 (`pc98_boot_pci_resources` から) | 1033:0035/00e0 の BAR0 について、長さの根拠表 (OHCI 4KB = OHCI 1.0a の register 空間を頁に、EHCI 256B (実測)。表は `kdebug/gfinit_resources.c` と 1 か所に) で範囲を決め、他の BAR・RAM・既存の窓と重ならないことを確かめ、owner (`ledger_owner_new`)・rid を台帳に登録し、PFN の範囲の共有 PT を用意する | `platform/pc98/pci_mmio.c` (新) の `pci_mmio_reserve(dev,bar)`、`platform/pc98/pci_resources.c` (+10) |
-| 写像 | 部品の start | `pci_bar_map(dev,bar,&va)` → `paging_device_map(owner,rid,first,end)` (`mm/paging.h`) | 同上 |
+| 予約 | 起動時、最初の AS より前 (`pc98_boot_pci_resources` から) | 1033:0035/00e0 の BAR0 について、長さの根拠表 (OHCI 4KB = OHCI 1.0a の register 空間を頁に、EHCI 256B (実測)。表は `sys/dev/video/geforce/diag/gfinit_resources.c` と 1 か所に) で範囲を決め、他の BAR・RAM・既存の窓と重ならないことを確かめ、owner (`ledger_owner_new`)・rid を台帳に登録し、PFN の範囲の共有 PT を用意する | `sys/platform/pc98/pci_mmio.c` (新) の `pci_mmio_reserve(dev,bar)`、`sys/platform/pc98/pci_resources.c` (+10) |
+| 写像 | 部品の start | `pci_bar_map(dev,bar,&va)` → `paging_device_map(owner,rid,first,end)` (`sys/kern/mm/paging.h`) | 同上 |
 | 戻し | stop の後 / start の失敗 | `paging_device_unmap`。予約は起動の寿命のまま (再写像は無い) | 同上 |
 
-- 予約が失敗した機能は probe で断る (理由を `pci_bind_set_reason` で残す)。台帳の関数の正確な使い方は `mm/pgalloc.h` に沿う (実装の段で確かめる)。
+- 予約が失敗した機能は probe で断る (理由を `pci_bind_set_reason` で残す)。台帳の関数の正確な使い方は `sys/kern/mm/pgalloc.h` に沿う (実装の段で確かめる)。
 
 ## 6. エンディアンと DMA の所有の移り (R1-19)
 
-- `include/endian_dma.h` / `arch/<arch>/arch_endian_dma.h` は r1 と同じ (`le32_t`、`dma_le32_get/put`、`mmio_rd32_le/wr32_le`)。
+- `sys/include/endian_dma.h` / `arch/<arch>/arch_endian_dma.h` は r1 と同じ (`le32_t`、`dma_le32_get/put`、`mmio_rd32_le/wr32_le`)。
 - `usbp_dma_sync(d,off,len,dir)` を初版から契約に置く。pc98 は障壁だけ (i386 の PCI は snoop)。PowerMac は「一貫していれば障壁、していなければ範囲の flush/invalidate」を platform の実装条件とし、一貫性の根拠 (資料) と受入は PowerPC の回で求める。
 - 所有の移る点 (呼ぶ所):
 
@@ -719,11 +719,11 @@ void usb_service(void)
 
 | 単位 | ファイル (新/変、行) | 受入 |
 |---|---|---|
-| 1A 型と契約 | `include/endian_dma.h` 60・`arch/x86/arch_endian_dma.h` 20・`arch/ppc/arch_endian_dma.h` 40、`include/usb_platform.h` 90、`drivers/usb/usb_core.h` 230・`usb_desc.h` 120・`ohci_regs.h` 120・`ohci_priv.h` (影の表・塊の型) 80、`tools/check_usb_portable.py` 80 | A1・A2 (コンパイルと番人だけ) |
+| 1A 型と契約 | `sys/include/endian_dma.h` 60・`sys/arch/x86/arch_endian_dma.h` 20・`sys/arch/ppc/arch_endian_dma.h` 40、`sys/include/usb_platform.h` 90、`sys/dev/usb/usb_core.h` 230・`usb_desc.h` 120・`ohci_regs.h` 120・`ohci_priv.h` (影の表・塊の型) 80、`tools/check_usb_portable.py` 80 | A1・A2 (コンパイルと番人だけ) |
 | 1B OHCI | `usb_dmamem.c` 150・`ohci_init.c` 260 (start・kill)・`usb_hc_dead.c` 80 (故障の入口)・`ohci_sched.c` 330 (作り・繋ぎ)・`ohci_done.c` 280 (check・short の継続)・`ohci_unlink.c` 150 (close・DMA 遅延)・`ohci_roothub.c` 160・`ehci_quiesce.c` 120、`tools/tests/usb_fake_ohci.c` 450・`usb_fake_ehci_min.c` 120 | A3・F2〜F6m・F9・F9u・F10・G1・G2 |
 | 1C 中核 | `usb_xfer.c` 280 (setup/start/stop/drained/unsetup・DMA 遅延・通知)・`usb_req.c` 150・`usb_enum.c` 320・`usb_explore.c` 260・`usb_cfgparse.c` 160・`usb_hub.c` 300・`usb_detach.c` 200 (usb_free_device の段)、`tools/tests/usb_fake_dev.c` 300 | A4・A6・F7〜F8c・F11a・F14 |
 | 1D HID と入力 | `hid_kbd.c` 240・`hid_kbd_map.c` 170・`hid_mouse.c` 110、`drivers/input/kbd_internal.h` 15 (新)・`kbd_merge.c` 100・`kbd.c` (同ファイル内 の static を外し `kbd_deliver_internal` に改名、`kbd_irq_handler()` を `kbd_merge_event` に、計 ±6 行)・`mouse_ext.c` 80・`mouse.c` (+8) | A5・F11・F11a・F12 |
-| 1E 殻と実機 | `drivers/usb/usb_resident.c` 160・`usb_module.c` 250・`usb_imports.def`・`platform/pc98/usb_platform.c` 200 (usbp_input_* を含む)・`drivers/usb/usb_early_quiesce.c` 120 (常駐側の起動の早い段の静止、末尾の追記)・`pci_mmio.c` 160・`pci_resources.c` (+10)・`drivers/pci/pci.c` (+15)、`include/memmap.h`/`kernel/irq/tick.h`/`tick_order.h`/`module_schema.h`/`tools/module_schema.py` (+20)、`build/*.mk`・`packages.yaml`、観測口 (下) | A7〜A11 |
+| 1E 殻と実機 | `drivers/usb/usb_resident.c` 160・`usb_module.c` 250・`usb_imports.def`・`sys/platform/pc98/usb_platform.c` 200 (usbp_input_* を含む)・`drivers/usb/usb_early_quiesce.c` 120 (常駐側の起動の早い段の静止、末尾の追記)・`pci_mmio.c` 160・`pci_resources.c` (+10)・`sys/dev/pci/pci.c` (+15)、`sys/include/memmap.h`/`sys/kern/irq/tick.h`/`tick_order.h`/`module_schema.h`/`tools/module_schema.py` (+20)、`build/*.mk`・`packages.yaml`、観測口 (下) | A7〜A11 |
 
 - 観測口 `usbstat`: 起動時と変化時に 1 行ずつ kernel のログ (シリアル) へ出す (段 1 はこれだけで受入できる)。シェルの `usbstat` は KAPI の末尾追加 1 口 (`usb_stat_get`) が要るので、1E で `os32-kapi-add` に従う (A11 で使う)。
 - 段 2: 2A `ehci_init.c` (起動) 220・2B `ehci_sched.c` 400・2C `ehci_done.c` 220・2D `ehci_roothub.c` 220 (A12)、2b は TT/split の別票。段 3: `umass_bbb.c` 320・`scsi_cmd.c` 200・`usb_blkdev.c` 160 (A13)。
@@ -742,7 +742,7 @@ void usb_service(void)
 | # | 受入 | 試験 | 変異 (一意、実行時に RED) |
 |---|---|---|---|
 | A1 | 記述子は口を通る | `-DUSB_TEST_SWAP` で A3〜A6 を再走 | `ed->headp.raw = x` を 1 か所 |
-| A2 | 共通は platform に直結しない | 番人 | `ohci_init.c` に `#include "mm/dma_pool.h"` |
+| A2 | 共通は platform に直結しない | 番人 | `ohci_init.c` に `#include "sys/kern/mm/dma_pool.h"` |
 | A3 | 起動の順 | OPERATIONAL の時点で HCCA と木が完成 | HCCA を埋める処理を OPERATIONAL の後へ |
 | A4 | 列挙・番地を重ねない | 偽装置 3 台 + ハブ | SET_ADDRESS 後の 10ms を消す |
 | A5 | HID の差分と合成 | 同じ USB 鍵盤で左右 Shift を押し、左だけ離す → SHIFT の break が出ない。本体と USB で同じキー | `prev/now` の数ではなく bit で差分する |
@@ -811,12 +811,12 @@ void usb_service(void)
 - なし (R6 の 8 件すべて反映。R6-01 は直し案ではなく PM 決定の簡素化で閉じた)。
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
-- **BIOS が BusMaster+・割込みを持ったまま渡す HC の静止 (起動の早い段、常駐側)**: 実機では BIOS が Command の BusMaster+ で HC を渡すので、§4-2-2 の「BM を上げる前は DMA しない」は usb.mod の probe の時点では成り立たない。さらに BIOS の HC の level の割込みは GeForce (`hwdev/gf/irq.c`、0x3C の線で SHARED)・CS4231 (`pcm_cs4231.c:548`)・82557 (`e82557.c:697`) と共有の線に乗り得て、usb.mod を読む前・入れない構成では誰も ack せず、共有の相手ごと storm でマスクされる (`kernel/irq/irq.h` `irq_storm_masked`)。そこで vmkernel の常駐側に `drivers/usb/usb_early_quiesce.c` を足し (1E)、`pc98_boot_pci_resources` の予約 (§5-3) の直後に、usb.mod の有無に関わらず 3 機能を静止する。順は手本 FreeBSD `sys/dev/pci/pci.c` の `ohci_early_takeover`・`ehci_early_takeover` (`hw.pci.usb_early_takeover` の early quirk) と `sys/dev/usb/controller/ohci_pci.c`・`ehci_pci.c` に倣う:
+- **BIOS が BusMaster+・割込みを持ったまま渡す HC の静止 (起動の早い段、常駐側)**: 実機では BIOS が Command の BusMaster+ で HC を渡すので、§4-2-2 の「BM を上げる前は DMA しない」は usb.mod の probe の時点では成り立たない。さらに BIOS の HC の level の割込みは GeForce (`sys/dev/video/geforce/irq.c`、0x3C の線で SHARED)・CS4231 (`pcm_cs4231.c:548`)・82557 (`e82557.c:697`) と共有の線に乗り得て、usb.mod を読む前・入れない構成では誰も ack せず、共有の相手ごと storm でマスクされる (`sys/kern/irq/irq.h` `irq_storm_masked`)。そこで vmkernel の常駐側に `drivers/usb/usb_early_quiesce.c` を足し (1E)、`pc98_boot_pci_resources` の予約 (§5-3) の直後に、usb.mod の有無に関わらず 3 機能を静止する。順は手本 FreeBSD `sys/dev/pci/pci.c` の `ohci_early_takeover`・`ehci_early_takeover` (`hw.pci.usb_early_takeover` の early quirk) と `sys/dev/usb/controller/ohci_pci.c`・`ehci_pci.c` に倣う:
   - OHCI: `HcControl.IR` が立っていれば `HcCommandStatus.OCR` → 1ms × 100 待ち、残れば `HCFS=RESET` (§4-2 #1 と同じ) → `HcInterruptDisable=ALL` (MIE を落とす) → `HCFS=RESET` で並びを止める → **最後に** Command の BM を落とす。BM を OCR の引き継ぎより前に落とすと BIOS の SMM と衝突し得るので、BM は必ず引き継ぎと割込みの禁止の後。
   - EHCI: §4-1 #4 の LEGSUP の引き継ぎ (OS 旗 → BIOS 旗を待つ) → `USBINTR=0` → `USBCMD.RS=0` で HCHalted を待つ → `CONFIGFLAG=0` → BM を落とす。期限切れは §4-1 #4 と同じく FAILED と記録し、`USBINTR=0` と BM を落とすことだけはする。
   - usb.mod の §4-1 #4・#5 は残す (引き継ぎ済みなら即座に通る)。これで probe の時点は BM=0 に戻り、§4-2-2 の `ST_BM` の旗と「上げる前の失敗は HC_OFF」は元の意味のまま成り立つ。
-  - os32powerpc の指摘: G4 でもキーボード・マウスは USB (KeyLargo の OHCI) なので、この段は pc98 の殻ではなく共通の `drivers/usb/` に置き (`tools/check_usb_portable.py` の対象)、レジスタは `include/endian_le.h`・`include/endian_dma.h` (`mmio_rd32_le/wr32_le`) を、DMA の口は `include/dma_contract.h` を必ず通す (直の番地・x86 の asm を書かない)。早い段は DMA の塊を取らない。G4 は platform の PCI の backend から同じ関数を呼ぶ。
-- **未割当の BAR と EHCI の 256B**: BIOS が番地を割り当てない機能の BAR は 0 ではなく大きさの測定値のまま (OHCI 0xFFFFF000・EHCI 0xFFFFFF00)。判定は起動時の BAR の測定 (`drivers/pci/pci_barsize.c` の `unassigned`) と同じ「0 または `~(len-1)`」にし、`pci_mmio_reserve`・`platform/pc98/pci_resources.c` (今は `ledger_resource_import_pci()` で番地 0 だけ飛ばし、0xFFFFF000 を RAW の資源として記録する) も同じ判定を使う。長さの表 (OHCI 4KB・EHCI 256B) は `kdebug/gfinit_resources.c` と 1 か所に寄せ、kdebug と pc98 の両方が読む。
+  - os32powerpc の指摘: G4 でもキーボード・マウスは USB (KeyLargo の OHCI) なので、この段は pc98 の殻ではなく共通の `drivers/usb/` に置き (`tools/check_usb_portable.py` の対象)、レジスタは `sys/include/endian_le.h`・`sys/include/endian_dma.h` (`mmio_rd32_le/wr32_le`) を、DMA の口は `sys/include/dma_contract.h` を必ず通す (直の番地・x86 の asm を書かない)。早い段は DMA の塊を取らない。G4 は platform の PCI の backend から同じ関数を呼ぶ。
+- **未割当の BAR と EHCI の 256B**: BIOS が番地を割り当てない機能の BAR は 0 ではなく大きさの測定値のまま (OHCI 0xFFFFF000・EHCI 0xFFFFFF00)。判定は起動時の BAR の測定 (`sys/dev/pci/pci_barsize.c` の `unassigned`) と同じ「0 または `~(len-1)`」にし、`pci_mmio_reserve`・`sys/platform/pc98/pci_resources.c` (今は `ledger_resource_import_pci()` で番地 0 だけ飛ばし、0xFFFFF000 を RAW の資源として記録する) も同じ判定を使う。長さの表 (OHCI 4KB・EHCI 256B) は `sys/dev/video/geforce/diag/gfinit_resources.c` と 1 か所に寄せ、kdebug と pc98 の両方が読む。
   - 未割当の機能は probe で断り (理由を `pci_bind_set_reason`)、他の機能は続ける。早い段の静止も未割当の機能は MMIO に触らず BM・MEM を落とすだけ。EHCI が未割当なら §4-1 #4・#5 (引き継ぎ・静止) を飛ばし、OHCI は続ける (BIOS は番地の無い EHCI を使えず、CONFIGFLAG はリセットの値 0 で全ポートが OHCI 側)。
   - EHCI の 256B は 4KB の頁を他の BAR と共有し得る。重なりの検査は頁ではなくバイトの範囲 `[base, base+len)` で行い、頁の共有は同じ PCI 装置 (同じ bus:dev の別の機能) とだけ許して写す。別の装置の BAR と頁を共有するときは EHCI を断る (理由を残す)。fixture は `tools/tests/gfinit_bus_host.c` (0xfffff000) に倣う。
 

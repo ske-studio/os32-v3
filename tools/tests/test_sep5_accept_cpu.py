@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """H5: acceptance CPU provider, real product gates and record trace."""
 CHECK = dict(name='sep5-accept-cpu-host', tier=1, needs=[], budget=5.0,
-    covers=['arch/x86/video/gf_accept_cpu.c', 'arch/ppc/video/gf_accept_cpu.c',
-            'include/video_wc.h', 'tools/tests/test_sep5_accept_cpu.py',
+    covers=['sys/arch/x86/video/gf_accept_cpu.c', 'sys/arch/ppc/video/gf_accept_cpu.c',
+            'sys/include/video_wc.h', 'tools/tests/test_sep5_accept_cpu.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'mm/paging.h', 'build/geforce-module.mk'],
+            'sys/kern/mm/paging.h', 'build/geforce-module.mk'],
     basis=['PPC_SEP5_DESIGN §2.2'],
 )
 import sys
@@ -54,7 +54,7 @@ void _start(void) {
 }
 '''
 def exercise(mutation=None):
-    source=(ROOT/'arch/x86/video/gf_accept_cpu.c').read_text()
+    source=(ROOT/'sys/arch/x86/video/gf_accept_cpu.c').read_text()
     if mutation:
         old,new=MUTATIONS[mutation]
         assert source.count(old)==1, (mutation,source.count(old))

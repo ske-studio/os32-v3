@@ -2,8 +2,8 @@
 
 票: S6-P (観測は TASK_S6 の受入記録、診断は TASK_S6P)
 契約: `docs/design/fs/ext2/ext2_super.md` 「小さな書き込みの I/O を減らす 2 つの仕掛け」、`docs/design/userland/cmds/tar.md` 「書き込みの形」
-実装 (段 B, ext2): `fs/ext2/ext2_ctx.h` / `fs/ext2/ext2_super.c` / `fs/ext2/ext2_inode.c` / `fs/ext2/ext2_dir.c` /
-      `fs/ext2/ext2_vfs.c` / `fs/ext2/ext2_priv.h` / `fs/ext2/ext2_fmt.c`
+実装 (段 B, ext2): `sys/fs/ext2/ext2_ctx.h` / `sys/fs/ext2/ext2_super.c` / `sys/fs/ext2/ext2_inode.c` / `sys/fs/ext2/ext2_dir.c` /
+      `sys/fs/ext2/ext2_vfs.c` / `sys/fs/ext2/ext2_priv.h` / `sys/fs/ext2/ext2_fmt.c`
 実装 (段 A, 呼び出し側): `lib/microtar/microtar.c` の `write_null_bytes()`
       (`lib/microtar/README.OS32` 改変点 4) / `userland/cmds/tar.c` ([C1] 修正)
 試験: `tools/tests/ext2_write_io_host.c` + `test_ext2_write_io.py`
@@ -14,7 +14,7 @@
 
 `con_sink_tdd.md` / `ext2_read_bound_host.c` と同じで、**模型ではなく実物**を見る:
 
-1. `ext2_write_io_host.c` が `fs/ext2/ext2_super.c` / `ext2_inode.c` / `ext2_dir.c` /
+1. `ext2_write_io_host.c` が `sys/fs/ext2/ext2_super.c` / `ext2_inode.c` / `ext2_dir.c` /
    `ext2_file.c` / `ext2_fmt.c` / `ext2_vfs.c` を 1 行も写さずに `#include` する。
 2. 差し替えるのは境界だけ — Device API (`dev_find` / `dev_blk_read_lba` /
    `dev_blk_write_lba`)、`ide_drive_present` / `ide_get_info`、kstring / kmalloc /
@@ -54,7 +54,7 @@
 
 `write_null_bytes()` (microtar.c) は `for (i = 0; i < n; i++) twrite(tar, &nul, 1);`
 — 1 バイトずつ書く。後方 `lseek` は create 経路には出ない (`mtar_seek(last_header)` は
-read 側)。`lseek` 自体は `fs/vfs_fd.c` の `vfs_seek` が `VfsFile.offset` を
+read 側)。`lseek` 自体は `sys/fs/vfs_fd.c` の `vfs_seek` が `VfsFile.offset` を
 書き換えるだけなので **0 セクタ** (ケース P4 で表明)。
 
 ## ケース
@@ -87,7 +87,7 @@ read 側)。`lseek` 自体は `fs/vfs_fd.c` の `vfs_seek` が `VfsFile.offset` 
 
 ### 26 セクタ (= 13 ブロック I/O) の内訳 — 1 回の `sys_write` あたり
 
-`fs/vfs_fd.c` の `vfs_write_fd` は **パス文字列**を渡すので、毎回ここから始まる:
+`sys/fs/vfs_fd.c` の `vfs_write_fd` は **パス文字列**を渡すので、毎回ここから始まる:
 
 | 何 | ブロック読 | ブロック書 |
 |---|---|---|
@@ -184,7 +184,7 @@ rmdir) は必ずそのどちらかを通る。
 ### (c) 付随: `ext2_format()` の一時コンテキストを static に
 
 `sizeof(Ext2Ctx)` は 732 → **1788 バイト** (記憶が 1056 バイト)。
-`fs/ext2/ext2_fmt.c` はこれをスタックに積んでいたので、そのままだと
+`sys/fs/ext2/ext2_fmt.c` はこれをスタックに積んでいたので、そのままだと
 `ext2_format()` のフレームが 824 → 1880 バイトに膨らむ (カーネルスタックは
 16KB)。`static` にして **88 バイト**にした — 変更前より小さい。
 シングルタスクなのでフォーマットが同時に 2 本走ることはない。

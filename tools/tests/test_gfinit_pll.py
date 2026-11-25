@@ -13,23 +13,23 @@ FLAGS = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-m32', '-march=i386',
 
 def command(exe):
     return ['gcc', *FLAGS, '-O2', '-nostdlib', '-static', '-no-pie',
-            '-I'+str(ROOT/'include'), '-I'+str(ROOT/'sdk/include/os32'), str(ROOT/'tools/tests/gfinit_pll_host.c'), *[str(ROOT / p) for p in ('hwdev/gf/runner.c','hwdev/gf/save.c','hwdev/gf/pll.c')], *map(str, sorted((ROOT/'hwdev/gf/op').glob('*.c'))), '-o', str(exe)]
+            '-I'+str(ROOT/'include'), '-I'+str(ROOT/'sdk/include/os32'), str(ROOT/'tools/tests/gfinit_pll_host.c'), *[str(ROOT / p) for p in ('sys/dev/video/geforce/runner.c','sys/dev/video/geforce/save.c','sys/dev/video/geforce/pll.c')], *map(str, sorted((ROOT/'hwdev/gf/op').glob('*.c'))), '-o', str(exe)]
 
 
 MUTATIONS = [
-    ('kdebug/gfinit_pll/sequence.inc', 'pll_write_limit', 'if (q->count < GF_PLL_WRITES_MAX)', 'if (q->count <= GF_PLL_WRITES_MAX)'),
-    ('kdebug/gfinit_pll/solve.inc', 'pll_low_clock', 'min = clk * GF_PLL_P_MAX', 'min = clk << GF_PLL_P_MAX'),
-    ('kdebug/gfinit_pll/solve.inc', 'pll_input_exit', 'if (GF_PLL_REF / m < a->min_input) return s->actual ? 0 : -1;', 'if (GF_PLL_REF / m < a->min_input) break;'),
-    ('kdebug/gfinit_pll/parse.inc', 'pll_version', 'r[table + GF_PLL_HDR_VERSION] != GF_PLL_TBL_VERSION', 'false'),
-    ('kdebug/gfinit_pll/limits.inc', 'pll_ref', 'l->ref == GF_PLL_REF', 'true'),
-    ('kdebug/gfinit_pll/solve.inc', 'pll_round', '(cp * m + GF_PLL_REF / 2) / GF_PLL_REF', '(cp * m) / GF_PLL_REF'),
-    ('kdebug/gfinit_pll/solve.inc', 'pll_output_round', '((n * GF_PLL_REF + div / 2) / div + m / 2) / m', '(n * GF_PLL_REF / div) / m'),
-    ('kdebug/gfinit_pll/solve.inc', 'pll_gain', 'n2 / m2 < 4 || n2 / m2 > 10', 'false'),
-    ('kdebug/gfinit_pll/sequence.inc', 'pll_mirror', 'GF_PLL_MEMORY_MIRROR, preg, keep, bits)', 'GF_PLL_MEMORY_MIRROR, preg, keep, bits ^ 1U)'),
-    ('kdebug/gfinit_pll/sequence.inc', 'pll_gate_restore_video', '~0U, 0); /* video gate restore */', '~0U, 1U); /* video gate restore */'),
-    ('kdebug/gfinit_pll/parse.inc', 'pll_fallback_not_first', 'u32 at = table + header, found = 0;', 'u32 at = table + header + len, found = 0;'),
-    ('kdebug/gfinit_pll/parse.inc', 'pll_match_ignored', '        at = table + header + i * len;\n', '        (void)i;\n'),
-    ('kdebug/gfinit_pll/sequence.inc', 'pll_gate_restore_clock', '~0U, 0); /* clock gate restore */', '~0U, 1U); /* clock gate restore */'),
+    ('sys/dev/video/geforce/gfinit_pll/sequence.inc', 'pll_write_limit', 'if (q->count < GF_PLL_WRITES_MAX)', 'if (q->count <= GF_PLL_WRITES_MAX)'),
+    ('sys/dev/video/geforce/gfinit_pll/solve.inc', 'pll_low_clock', 'min = clk * GF_PLL_P_MAX', 'min = clk << GF_PLL_P_MAX'),
+    ('sys/dev/video/geforce/gfinit_pll/solve.inc', 'pll_input_exit', 'if (GF_PLL_REF / m < a->min_input) return s->actual ? 0 : -1;', 'if (GF_PLL_REF / m < a->min_input) break;'),
+    ('sys/dev/video/geforce/gfinit_pll/parse.inc', 'pll_version', 'r[table + GF_PLL_HDR_VERSION] != GF_PLL_TBL_VERSION', 'false'),
+    ('sys/dev/video/geforce/gfinit_pll/limits.inc', 'pll_ref', 'l->ref == GF_PLL_REF', 'true'),
+    ('sys/dev/video/geforce/gfinit_pll/solve.inc', 'pll_round', '(cp * m + GF_PLL_REF / 2) / GF_PLL_REF', '(cp * m) / GF_PLL_REF'),
+    ('sys/dev/video/geforce/gfinit_pll/solve.inc', 'pll_output_round', '((n * GF_PLL_REF + div / 2) / div + m / 2) / m', '(n * GF_PLL_REF / div) / m'),
+    ('sys/dev/video/geforce/gfinit_pll/solve.inc', 'pll_gain', 'n2 / m2 < 4 || n2 / m2 > 10', 'false'),
+    ('sys/dev/video/geforce/gfinit_pll/sequence.inc', 'pll_mirror', 'GF_PLL_MEMORY_MIRROR, preg, keep, bits)', 'GF_PLL_MEMORY_MIRROR, preg, keep, bits ^ 1U)'),
+    ('sys/dev/video/geforce/gfinit_pll/sequence.inc', 'pll_gate_restore_video', '~0U, 0); /* video gate restore */', '~0U, 1U); /* video gate restore */'),
+    ('sys/dev/video/geforce/gfinit_pll/parse.inc', 'pll_fallback_not_first', 'u32 at = table + header, found = 0;', 'u32 at = table + header + len, found = 0;'),
+    ('sys/dev/video/geforce/gfinit_pll/parse.inc', 'pll_match_ignored', '        at = table + header + i * len;\n', '        (void)i;\n'),
+    ('sys/dev/video/geforce/gfinit_pll/sequence.inc', 'pll_gate_restore_clock', '~0U, 0); /* clock gate restore */', '~0U, 1U); /* clock gate restore */'),
 ]
 SHARED_MUTATIONS = []
 
@@ -55,7 +55,7 @@ def main():
         exe = pathlib.Path(td)/'host'
         obj = pathlib.Path(td)/'pll.o'
         subprocess.run(['gcc', *FLAGS, '-O2', '-I'+str(ROOT/'include'), '-I'+str(ROOT/'sdk/include/os32'), '-c',
-                        str(ROOT/'kdebug/gfinit_pll.c'), '-o', str(obj)], check=True)
+                        str(ROOT/'sys/dev/video/geforce/diag/gfinit_pll.c'), '-o', str(obj)], check=True)
         undefined = subprocess.check_output(['nm', '-u', str(obj)], text=True)
         if undefined.strip():
             raise RuntimeError('PLL unresolved symbols: '+undefined)
@@ -68,7 +68,7 @@ def main():
         return int(bool(mutpar.run_with_control(mutation,
             MUTATIONS +
             list(SHARED_MUTATIONS),
-            ('kdebug/gfinit_pll.c', 'control', '', ''))))
+            ('sys/dev/video/geforce/diag/gfinit_pll.c', 'control', '', ''))))
     return 0
 
 

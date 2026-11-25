@@ -3,7 +3,7 @@
 #include "kstring.h"
 #include "console.h"
 #include "text_screen.h"
-#include "platform/powermac/pm_console.h"
+#include "sys/platform/powermac/pm_console.h"
 #include "fbcon_source.inc"
 static void finish(int rc) __attribute__((noreturn));
 static void finish(int rc) {
@@ -42,7 +42,7 @@ static const u8 ascii[16]={0x80,0x42,0x24,0x18,0x81,0x7e};
 static const u8 kana[16]={0x20,0x40,0x80,0x02,0x01};
 static const u8 jis[32]={0x80,0x01,0x42,0x24,0x18,0x81};
 /* Load a complete synthetic KCG1 through the real resident provider. */
-#include "kernel/console/font_source_kcg.h"
+#include "sys/kern/console/font_source_kcg.h"
 static u8 fixture[295956];
 int font_guard_run(int (*call)(void *),void *arg) { return call(arg); }
 i32 font_lease_resident_open(const char *path,u32 *id,u32 *size) {
@@ -213,10 +213,10 @@ static void scroll_counts(void) {
     CHECK(c.cells[0].code==' ');
     fbcon_detach(&c);
 }
-#include "gfx/v2/gfx2_int.h"
-#include "platform/powermac/rh_observe.h"
-#include "platform/powermac/display_text.h"
-#include "platform/powermac/platform_display_fallback.h"
+#include "sys/hal/gfx/v2/gfx2_int.h"
+#include "sys/platform/powermac/rh_observe.h"
+#include "sys/platform/powermac/display_text.h"
+#include "sys/platform/powermac/platform_display_fallback.h"
 #include "display_restore.h"
 
 static struct gfx2_adapter adapter;

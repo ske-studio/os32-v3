@@ -19,7 +19,7 @@
 - P2 導入経路（§4–6）。本線が inst_hdd／inst_disk と hdprep の機種境界を整理し、PC-98 の空ディスク検査、確認、区画末尾の試し書きから表更新までの順を固定する。
 - P2 ext2（§3・§6）。本線が段2前に区画解決を分離し、短い区画と宣言容量超過の直接戻り値、診断、キャッシュ初期化順を回帰で固定する。
 
-照合基点は origin/main の 56d7be02d。7a に関する補足の私有 ops は kernel/ime/fep_module.h で現在は版 6（24 スロット）。B05 の受入は §2 のカーネルと部品の組で行う。
+照合基点は origin/main の 56d7be02d。7a に関する補足の私有 ops は sys/kern/ime/fep_module.h で現在は版 6（24 スロット）。B05 の受入は §2 のカーネルと部品の組で行う。
 
 ## 確定版 (11-21) → r4 の変更
 
@@ -39,28 +39,28 @@
 
 ## 1. x86 と起動順を揃える
 
-PC-98 は platform/pc98/boot.c の pc98_boot_bind で起動元から root_dev/root_fs を選び、kernel.c の platform_boot_machine が一度 mount する。FD は fd0/fat、HDD は hd0/ext2。HostDrv の自動 mount、時計、kernel_boot_memory の netcd・CD・KCG、kernel_mount_children、services の順を保つ。子の列挙本体だけを共通ヘッダに移し、同じ呼出位置で root・非 block・容量ゼロを飛ばす。CD は ISO、それ以外は ext2→ISO→FAT を試す。子単体の失敗は次の子へ進む。
+PC-98 は sys/platform/pc98/boot.c の pc98_boot_bind で起動元から root_dev/root_fs を選び、kernel.c の platform_boot_machine が一度 mount する。FD は fd0/fat、HDD は hd0/ext2。HostDrv の自動 mount、時計、kernel_boot_memory の netcd・CD・KCG、kernel_mount_children、services の順を保つ。子の列挙本体だけを共通ヘッダに移し、同じ呼出位置で root・非 block・容量ゼロを飛ばす。CD は ISO、それ以外は ext2→ISO→FAT を試す。子単体の失敗は次の子へ進む。
 
-PowerMac の platform/powermac/ppc_kernel.c は現在 root_frame_bytes がゼロの経路を持ち、pm_ide_boot は RAM root 処理後に呼ばれる。起動指定を媒体・HDD に分け、HDD の raw 探索を root より前に移す。旧診断像の frame 無しの契約はその像に残す。製品起動での不一致・不在・破損は装置と失敗段、rc を診断し停止する。
+PowerMac の sys/platform/powermac/ppc_kernel.c は現在 root_frame_bytes がゼロの経路を持ち、pm_ide_boot は RAM root 処理後に呼ばれる。起動指定を媒体・HDD に分け、HDD の raw 探索を root より前に移す。旧診断像の frame 無しの契約はその像に残す。製品起動での不一致・不在・破損は装置と失敗段、rc を診断し停止する。
 
 |起動元|root まで|root 成功後|
 |---|---|---|
 |導入媒体|現行の入口照合→圧縮枠予約→root_image.c の pm_root_image→root_boot.c の pm_root_boot→boot_root_start_registered。rd0/iso9660 を /、rd1/ramfs を /tmp に mount|登録後は後段失敗時も rd0 の裏頁を保持。pm_root_release に registered を渡し、圧縮枠・未登録の展開頁を所有権どおり回収|
 |HDD|引渡しを検査→ATA raw 同定→APM 照合→選んだ view を hd0 に登録→ext2 を / に一度 mount|/etc・/tmp・/db は ext2 のディレクトリ。RAM 像の予約・展開は不要|
 
-名前表には rd・既存の COM1 と hd を登録する。字句の登録と装置の実在を分け、root 成功後に path_init、path_set_device_validator(dev_name_present)、path_set_drive(vfs_devname("/")) を通す。path 失敗も shell 前で停止。MACHCFG は pm_machcfg_seed の値を基に kernel/machcfg_root.c の machcfg_load_root で実際の / の設定を反映する。ファイル欠落時は同関数の既定処理。追加装置登録後に子を列挙し、時計・poll 準備後に pm_hostfs_boot で persistent SerialFS を公開する。peer 不在でも常駐シェルへ進む。
+名前表には rd・既存の COM1 と hd を登録する。字句の登録と装置の実在を分け、root 成功後に path_init、path_set_device_validator(dev_name_present)、path_set_drive(vfs_devname("/")) を通す。path 失敗も shell 前で停止。MACHCFG は pm_machcfg_seed の値を基に sys/kern/machcfg_root.c の machcfg_load_root で実際の / の設定を反映する。ファイル欠落時は同関数の既定処理。追加装置登録後に子を列挙し、時計・poll 準備後に pm_hostfs_boot で persistent SerialFS を公開する。peer 不在でも常駐シェルへ進む。
 
 段 E の shell_loop_run(&pm_shell_loop_ops) と /sys/shell.bin のロード・復帰を使う。installer はこのシェルが起動する通常プログラム。USB 枝統合後も確認入力は通常の CUI を通し、専用 FIFO を追加しない。B10 の ESCC・LAN に失敗を送り、成功はシェルから / の装置・ファイルを読むことで観測する。B07 の旗なし IMAGE=powermac は build/out/ppc-powermac、シェルはその user/。旧名の検査では旧出力先を使う。
 
 ## 2. 共通 FEP と配備
 
-**そのまま使う所。** kernel/sqlite_engine.c の services_boot の辞書欠落時 SQLITE_ONLY、fep_meta_probe、reserve 検査、kernel/ime/fep_module.c の fep_module_load(sqlite_handle)、公開・失敗時の巻戻しを両機種で使う。kernel/ime/ime_store.h の既定辞書 /db/fep.db、大小の辞書、学習先 /etc/fep_user.db と設定による変更がパスの正典。部品の形式・辞書の生成・期待語は FEP 担当、B05 は配備と永続性を担当する。
+**そのまま使う所。** sys/kern/sqlite_engine.c の services_boot の辞書欠落時 SQLITE_ONLY、fep_meta_probe、reserve 検査、sys/kern/ime/fep_module.c の fep_module_load(sqlite_handle)、公開・失敗時の巻戻しを両機種で使う。sys/kern/ime/ime_store.h の既定辞書 /db/fep.db、大小の辞書、学習先 /etc/fep_user.db と設定による変更がパスの正典。部品の形式・辞書の生成・期待語は FEP 担当、B05 は配備と永続性を担当する。
 
 **直す所。** PPC の root_boot.c の OS32_HOOK_IME 用 /db・/dbu RAM mount は従来の診断像に限る。製品では SQLite・FEP の対応する部品、辞書と設定を同じ配備表から ISO と導入先に入れ、L2 が照合するカーネルと部品の組を保つ。媒体で辞書を読む場合は学習を無効、製品では /etc に学習して再起動後に候補を読む。C04 は診断用 KDEBUG=1 の構成で照合し、通常製品の起動条件にしない。共通 FEP 本体と x86 の配備表に変更予定はなく、x86 の kernel・部品・辞書はバイト一致見込み。
 
 ## 3. 共通 ext2 と区画の境目
 
-**そのまま使う所。** fs/ext2/ext2_vfs.c の ext2_vfs_mount が ext2_mount に渡す論理番号、fs/ext2/ext2_super.c の ext2_mountの superblock・容量・グループ検査、既存の file/dir/inode I/O を共用する。fs/ext2/ext2_fmt.c の ext2_format と ext2_format_at は登録済み ext2_medium_ops で範囲を確認して同じ整形本体を呼ぶ。PC-98 の ext2_medium_ide.c の ide_find_part は BIOS 幾何を要求し、min_lba は IPL を保護する。loop の別 ops も維持する。
+**そのまま使う所。** sys/fs/ext2/ext2_vfs.c の ext2_vfs_mount が ext2_mount に渡す論理番号、sys/fs/ext2/ext2_super.c の ext2_mountの superblock・容量・グループ検査、既存の file/dir/inode I/O を共用する。sys/fs/ext2/ext2_fmt.c の ext2_format と ext2_format_at は登録済み ext2_medium_ops で範囲を確認して同じ整形本体を呼ぶ。PC-98 の ext2_medium_ide.c の ide_find_part は BIOS 幾何を要求し、min_lba は IPL を保護する。loop の別 ops も維持する。
 
 **直す所。** mount が直接呼ぶ platform_ide_drive_present、ext2_dev_for、ext2_find_partition_ex を機種別の範囲解決へ移す。新設案の境目は次の形とする。
 
@@ -88,7 +88,7 @@ hdprep は owner が APP_ID_SHELL の常駐 CPL0 shell の組込みとして実�
 
 **直す所。** 起動資材の事前検査・対象計画・書込みの機種依存部分を platform_install_boot.h の境界へ出す。inst_hdd が両入口の導入手順を共有し、inst_disk の容量見積り・パス検査は共通に残す。inst_disk の PC-98 媒体判定・IPL 補正・区画表生成と hdprep の CHS 計画は機種側に置く。両入口で入力を検査し必要容量を見積もってから消去範囲を表示する。PPC は確認→排他→整形→APM 書込み検読→再認識→/hd0 mount→製品ファイル配置検読→HFS 起動像書込み検読→同期の順。ディレクトリとパッケージは各入口のコピー関数を使う。x86 install.bin・cdinst.bin は分離した関数と呼出位置でバイト差の可能性がある。媒体上の IPL・loader・kernel、導入結果と失敗順を比較する。
 
-hdprep は owner が APP_ID_SHELL の常駐 CPL0 shell の組込み。両 installer は前景 CUI の通常起動で、loader がロードした実パスを正規化して SYS_DISK_WRITE_PATHS と照合し、当該実行 slot に設定する disk_write_authorized を使う（exec/exec.c、exec/exec_launch.inc、include/config.h）。PPC の利用者呼出しも有効な利用者フレーム・slot・前景を検査する同じ契約に接続する。管理口、公開 raw 書込み、公開整形は exec_disk_write_allowed() を通し、予約 handle は認可済み owner の計画を指す。予約中の公開書込み・整形・管理口は呼出しの都度認可し、現在の owner と予約も照合する。owner 限定 mount のファイル操作も受付時に owner を照合する。受付後はカーネルだけが unit・予約世代・view 世代（該当時）・操作段・方向・許可範囲を保持し、要求と dirty buffer に引き継ぐ。実転送はこの情報と現在の予約状態を照合し、exec_disk_write_allowed() や実行中の利用者フレームには依存しない。段を進める前にその段の遅延書込みを同期・排出する。失効した要求や権限のない要求は転送前に拒否する。
+hdprep は owner が APP_ID_SHELL の常駐 CPL0 shell の組込み。両 installer は前景 CUI の通常起動で、loader がロードした実パスを正規化して SYS_DISK_WRITE_PATHS と照合し、当該実行 slot に設定する disk_write_authorized を使う（sys/kern/exec/exec.c、sys/kern/exec/exec_launch.inc、sys/include/config.h）。PPC の利用者呼出しも有効な利用者フレーム・slot・前景を検査する同じ契約に接続する。管理口、公開 raw 書込み、公開整形は exec_disk_write_allowed() を通し、予約 handle は認可済み owner の計画を指す。予約中の公開書込み・整形・管理口は呼出しの都度認可し、現在の owner と予約も照合する。owner 限定 mount のファイル操作も受付時に owner を照合する。受付後はカーネルだけが unit・予約世代・view 世代（該当時）・操作段・方向・許可範囲を保持し、要求と dirty buffer に引き継ぐ。実転送はこの情報と現在の予約状態を照合し、exec_disk_write_allowed() や実行中の利用者フレームには依存しない。段を進める前にその段の遅延書込みを同期・排出する。失効した要求や権限のない要求は転送前に拒否する。
 
 PPC の installer を通常の SDK/startup と IDE 構成でリンクし、導入 ISO の /sbin/install.bin と /sbin/cdinst.bin に収録する。P2 の公開済み raw 操作で IDENTIFY と表を読み、消去拒否時は全 sector を保持する。管理 ABI は本線 KAPI 担当が宣言・生成・dispatch、B05 が機種ハンドラと呼出元を所有する。公開口は int32_t begin(const InstallPlanV1 *plan, uint32_t *handle)、int32_t rescan(uint32_t handle)、int32_t end(uint32_t handle, uint32_t outcome)。begin は元表の識別情報と対象 unit・変更範囲を含む計画をカーネルにコピーして保持し、成功時だけ owner 専用 handle を返す。rescan/end は他 owner・失効済み handle を拒否する。ABI は固定幅の値とサイズ付き計画をコピーして検証し、成功は 0、権限・不正入力・利用中・I/O の各失敗は既存 OS32 エラーで返す。既存 slot の意味を変更せず sdk/kapi.json 末尾追加・版上げ・再生成・clean build を同段に含める。x86 にも公開表・SDK・ABI 依存バイナリの差が生じるため、この差を関数分離と別に記録する。
 

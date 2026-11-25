@@ -3,23 +3,23 @@
 import sqlite_cc
 CHECK = dict(name='fep-store-search', tier=1, needs=[], budget=6.5,
     covers=['tools/tests/sqlite_cc.py',
-        'kernel/ime/ime_dict.c',
-        'kernel/ime/ime_conn.c',
-        'kernel/ime/ime_user_store.c',
-        'kernel/ime/ime_store.h', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h',
-        'kernel/ime/ime.h',
-        'kernel/input_service.c',
-        'kernel/serial_diag.c',
+        'sys/kern/ime/ime_dict.c',
+        'sys/kern/ime/ime_conn.c',
+        'sys/kern/ime/ime_user_store.c',
+        'sys/kern/ime/ime_store.h', 'sys/kern/sqlite_engine.h', 'sys/kern/sqlite_engine_body.h',
+        'sys/kern/ime/ime.h',
+        'sys/hal/input/input_service.c',
+        'sys/kern/serial_diag.c',
         'lib/sqlite3/**',
-        'lib/kstring_c.c',
-        'lib/kstring.c',
+        'sys/kern/kstring_c.c',
+        'sys/kern/kstring.c',
         'lib/kmath.c',
         'lib/divdi3.c',
-        'lib/kstring.h',
-        'fs/vfs_fd.c',
-        'fs/vfs.h',
+        'sys/kern/kstring.h',
+        'sys/fs/vfs_fd.c',
+        'sys/fs/vfs.h',
         'sdk/include/os32/os32_kapi_shared.h',
-        'include/types.h',
+        'sys/include/types.h',
         'tools/tests/ime_dict_host.c',
         'tools/tests/vfs_fd_sqlite_host.c',
         'tools/tests/sqlite_groups_backend.h',
@@ -46,7 +46,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'kernel/ime/ime_dict.c'
+PRODUCT = 'sys/kern/ime/ime_dict.c'
 # Anchors include their surrounding branch so each mutation is unique.
 OLD = '''        if (store_ready(s, 0)) n = store_search_once(s, yomi, out, max, 0, &failed);'''
 NEW = '''        if (store_ready(s, 0)) n = 0;'''
@@ -66,14 +66,14 @@ def main():
                       str(ROOT / 'lib/sqlite3/sqlite3.c'), '-o', str(work / 'sqlite.o')], check=True)
         shim = work / 'ime_shim'
         shim.mkdir()
-        (shim / 'memmap.h').write_text('#include "' + str(ROOT / 'include/memmap.h') + '"\n'
+        (shim / 'memmap.h').write_text('#include "' + str(ROOT / 'sys/include/memmap.h') + '"\n'
             'extern unsigned char test_shm[];\n#undef MEM_SHM_BASE\n#define MEM_SHM_BASE test_shm\n')
         for header in ('stdio.h', 'stdlib.h', 'string.h'):
             (work / header).write_text('#include "fep_boundary_runtime.h"\n')
         harness = (ROOT / 'tools/tests/ime_dict_host.c').read_text()
         # This fixture supplies its fault-injectable probe and user product below.
         harness = harness.replace('#include "fep_store_host.h"', '')
-        harness = harness.replace('#include "../../kernel/ime/ime_dict.c"',
+        harness = harness.replace('#include "../../sys/kern/ime/ime_dict.c"',
             'static int stage_i_step(sqlite3_stmt *stmt);\n'
             'static int stage_i_bind_text(sqlite3_stmt *, int, const char *, int, sqlite3_destructor_type);\n'
             'static int stage_i_bind_null(sqlite3_stmt *, int);\n'
@@ -86,7 +86,7 @@ def main():
         (work / 'ime_dict_host.c').write_text(harness)
         (work / 'test.c').write_text((ROOT / 'tools/tests/fep_store_search_host.c').read_text())
         product = (ROOT / PRODUCT).read_text()
-        user_product = (ROOT / 'kernel/ime/ime_user_store.c').read_text()
+        user_product = (ROOT / 'sys/kern/ime/ime_user_store.c').read_text()
         cases = [('normal', product, user_product, '')]
         if args.mutate:
             old = 'int reset = sqlite3_reset(stmt);\n        int clear = sqlite3_bind_null(stmt, 1);'
@@ -142,7 +142,7 @@ def main():
                           '-I' + str(work), '-I' + str(shim), '-I' + str(ROOT),
                           '-I' + str(ROOT / 'tools/tests/host_arch'), '-I' + str(ROOT / 'tools/tests'),
                           *include_flags(ROOT), str(work / 'test.c'),
-                          *[str(ROOT / p) for p in ('lib/kstring_c.c', 'lib/kstring.c', 'lib/kmath.c', 'lib/divdi3.c')],
+                          *[str(ROOT / p) for p in ('sys/kern/kstring_c.c', 'sys/kern/kstring.c', 'lib/kmath.c', 'lib/divdi3.c')],
                           str(work / 'sqlite.o'), '-o', str(exe)], check=True)
             result = host32.run([str(exe)], capture_output=True, text=True, timeout=120)
             print(result.stdout + result.stderr, end='', flush=True)

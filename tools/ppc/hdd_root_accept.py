@@ -13,8 +13,8 @@ from kboot_accept import build_media, mutant_settings
 from run import ROOT, ROM
 
 START, LENGTH = 64, 8192
-VIEW = 'platform/powermac/partition_view.c'
-KERNEL = 'platform/powermac/ppc_kernel.c'
+VIEW = 'sys/platform/powermac/partition_view.c'
+KERNEL = 'sys/platform/powermac/ppc_kernel.c'
 
 
 def disk(work, name, populate=None):
@@ -54,8 +54,8 @@ def main():
         return 3
     work = Path(tempfile.mkdtemp(prefix='hdd-root-'))
     first, second = disk(work, 'first'), disk(work, 'selected')
-    tree = 'platform/powermac/ide_tree.c'
-    apm = 'platform/powermac/apm.c'
+    tree = 'sys/platform/powermac/ide_tree.c'
+    apm = 'sys/platform/powermac/apm.c'
     rootarg = 'os32-root=/pci@f2000000/mac-io@c/ata-3@20000/disk@1:3'
     no_ext2 = work / 'hfs.raw'
     data = bytearray(second.read_bytes())

@@ -16,32 +16,32 @@ r1→r2 の変更
 ## 1. 実物と目的
 | 現物 | 確認した契約・不足 |
 |---|---|
-| `hwdev/gf/display/service.c` | detect 直前に CR1F/44/11/3E/3F/36/37、PMC、ENGINE_CTRL とソフト状態を固定出力。項目追加には再ビルドが必要 |
+| `sys/dev/video/geforce/display/service.c` | detect 直前に CR1F/44/11/3E/3F/36/37、PMC、ENGINE_CTRL とソフト状態を固定出力。項目追加には再ビルドが必要 |
 | 同 `:402,410` | index を読み、選択して data を読み、index を復元する。「Read-only」コメントでも index 書込みは実在 |
-| `kdebug/gf_display_test.c` | シリアル gate を確認して EDID 等を出力。手順途中の任意レジスタ採取設定ではない |
-| `kdebug/hwb_wire.h` | HW_OP=18、version=1、32B 固定 wire。READ/WRITE/POINT、IO/PHYS/PCI |
-| `kdebug/hwb_access.c` の `hwb_phys()` | 幅・境界検証、MMIO 一時窓と cleanup、失敗読値0。複数項目・保存先・採取点はない |
+| `sys/dev/video/geforce/diag/gf_display_test.c` | シリアル gate を確認して EDID 等を出力。手順途中の任意レジスタ採取設定ではない |
+| `sys/kern/kdebug/hwb_wire.h` | HW_OP=18、version=1、32B 固定 wire。READ/WRITE/POINT、IO/PHYS/PCI |
+| `sys/kern/kdebug/hwb_access.c` の `hwb_phys()` | 幅・境界検証、MMIO 一時窓と cleanup、失敗読値0。複数項目・保存先・採取点はない |
 | `userland/shell/hwb_exec.c` | BAR 解決はシェル、各命令を begin/end 記録。ドライバ途中には入れない |
-| `kdebug/kdebug_main.c` | dbg_call で HW_OP を先に振分け。init は表の返却だけで登録も I/O もしない |
-| `kernel/module/kdebug_call.c` | 未ロード時の呼出しは NOSYS。公開 KAPI を増やさず新しい private op を運べる |
-| `kernel/module/kdebug_imports.def` 以降 | HWアクセス・資源照会等の kernel imports。末尾は index 320 |
-| `hwdev/hwdev_imports.def`、`docs/design/hwdev/hwdev_imports.md` | HWDEV の core と kernel import は別物。末尾追加、生成、監査が必要 |
-| `hwdev/hwdev_module.c` | hwdev は kdebug RUNNING が前提、公開後は登録参照で保持 |
-| `kernel/module/module.h`、`kdebug/kdebug_module.c` | kdebug ops v4、公開は検査後。ops を伸ばさず内部 import で橋渡しする |
-| `drivers/video/trident/lifecycle.c`、`trident_module.c` | Trident は独立部品で screen_init と detach を持つ。HWDEV imports だけでは届かない |
+| `sys/platform/pc98/kdebug/kdebug_main.c` | dbg_call で HW_OP を先に振分け。init は表の返却だけで登録も I/O もしない |
+| `sys/kern/module/kdebug_call.c` | 未ロード時の呼出しは NOSYS。公開 KAPI を増やさず新しい private op を運べる |
+| `sys/kern/module/kdebug_imports.def` 以降 | HWアクセス・資源照会等の kernel imports。末尾は index 320 |
+| `sys/dev/hwdev/hwdev_imports.def`、`docs/design/hwdev/hwdev_imports.md` | HWDEV の core と kernel import は別物。末尾追加、生成、監査が必要 |
+| `sys/dev/hwdev/hwdev_module.c` | hwdev は kdebug RUNNING が前提、公開後は登録参照で保持 |
+| `sys/kern/module/module.h`、`sys/kern/kdebug/kdebug_module.c` | kdebug ops v4、公開は検査後。ops を伸ばさず内部 import で橋渡しする |
+| `sys/dev/video/trident/lifecycle.c`、`trident_module.c` | Trident は独立部品で screen_init と detach を持つ。HWDEV imports だけでは届かない |
 - 一度採取点を配備した後は、項目・幅・番地・有効化を台本だけで変更する。新しい採取位置の追加はビルドが要る。
 - 既存の固定診断・HW_OP=18・EDID の結果は初版では維持する。ソフト状態の汎用採取は別機能。
 
 ## 2. 宣言・登録・境界
 ```c
-/* 新規 include/debug_probe.h。部品内の静的 RW slot と const 宣言表。 */
+/* 新規 sys/include/debug_probe.h。部品内の静的 RW slot と const 宣言表。 */
 typedef void (*probe_hit_fn)(u32 id);
 struct probe_slot { probe_hit_fn hit; u32 id; };
 struct probe_decl { const char *name; struct probe_slot *slot; };
 #define PROBE_HIT(s) do { if ((s).hit) (s).hit((s).id); } while (0)
 /* 各部品: static struct probe_slot detect_pre; */
 /* const table[] = {{"gf4.detect.pre", &detect_pre}, ...}; */
-/* kernel resident broker (新規 kernel/module/debug_probe.c): */
+/* kernel resident broker (新規 sys/kern/module/debug_probe.c): */
 i32 debug_probe_register(struct module_handle owner,
                          const struct probe_decl *table, u32 count);
 i32 debug_probe_control(u32 action, void *arg, u32 size);
@@ -57,8 +57,8 @@ typedef i32 (*probe_get_decls_fn)(const struct probe_decl **table, u32 *count);
 - 登録時に名前を kernel 表へコピーし、owner の世代付き handle と slot の所在を保持。採取 ID は表の添字 0..31。解除時に設定も無効化してから再利用し、世代付き採取 ID は設けない（module handle の世代検証は維持）。
 - 名前は ASCII `[a-z0-9_.]`、1..31字、全体で重複不可。宣言表の RO、文字列の終端、slot の RW 所属・整列を owner 範囲で検証。
 - 各部品の export に宣言表を返す関数を末尾追加し、loader が export 検査後・最初のドライバ操作前に登録する。該当部品 ops/version・export 契約を更新。
-- export 番号は0起点: hwdev は `hwdev_main.c` の末尾に `[2] get_probe_decls`、GF 本番は `drivers/video/geforce/geforce_body.c` に `[2]`、Trident は `drivers/video/trident/trident_body.c` に `[4]` を追加。全て上記型、関数 text 所属と表を検証する。
-- 登録位置: `hwdev/hwdev_module.c` の検査後・`hwdev_start()` の公開前、`drivers/video/geforce/geforce_module.c` の参照保持後・`geforce_start()` 前、`drivers/video/trident/trident_module.c` の参照保持後・同ファイル内 の prepare 前。start 中の登録は暫定とし、RUNNING 後に利用可、失敗時は解除する。
+- export 番号は0起点: hwdev は `hwdev_main.c` の末尾に `[2] get_probe_decls`、GF 本番は `sys/dev/video/geforce/geforce_body.c` に `[2]`、Trident は `sys/dev/video/trident/trident_body.c` に `[4]` を追加。全て上記型、関数 text 所属と表を検証する。
+- 登録位置: `sys/dev/hwdev/hwdev_module.c` の検査後・`hwdev_start()` の公開前、`sys/dev/video/geforce/geforce_module.c` の参照保持後・`geforce_start()` 前、`sys/dev/video/trident/trident_module.c` の参照保持後・同ファイル内 の prepare 前。start 中の登録は暫定とし、RUNNING 後に利用可、失敗時は解除する。
 - HWDEV と GF production 側で同じソースを別像に組む場合は、実行主体ごとに登録し、同名の同時公開を拒否する。採取対象は実際に選択された主体1つ。
 - Trident も専用 loader/export/import 生成経路を使う。kdebug の関数アドレスをドライバへリンクしない。
 - kdebug_init は変更しない。最初の ARM で kdebug が kernel broker に callback を渡す。broker が RUNNING・text 所属を検査し kdebug の登録参照を保持。
@@ -131,11 +131,11 @@ struct probe_wire { /* 全整数は32bit、offsetはbyte */
 | shell / 起動FD | shell text 3～6KiB。kdebugはPOST_ROOTでありFDローダ変更なし。FD収録対象と余白は生成成果物で検査 |
 | 段（各段で独立受入） | 変更ファイルと責務 |
 |---|---|
-| A1 契約・登録 | include/debug_probe.h（型/上限）、kernel/module/debug_probe.c（登録/寿命）、tools/tests/（ホスト偽部品試験） |
+| A1 契約・登録 | sys/include/debug_probe.h（型/上限）、sys/kern/module/debug_probe.c（登録/寿命）、tools/tests/（ホスト偽部品試験） |
 | A2 loader・export | module loader各ファイル（結線）、export/import def・生成器（末尾契約）。kdebug_importsにはcontrolを末尾追加 |
-| B 採取エンジン | kdebug/probe_wire.h（wire）、probe.c（設定/採取/リング）、probe_index.c（pairアクセス）、kdebug_main.c（op振分け）、ビルド目録 |
+| B 採取エンジン | sys/kern/kdebug/probe_wire.h（wire）、probe.c（設定/採取/リング）、probe_index.c（pairアクセス）、kdebug_main.c（op振分け）、ビルド目録 |
 | C 台本・出力 | userland/shell/hwb_probe.c（命令）、hwb_parse.c/hwb_exec.c（dispatch）、hwb_log.c（probe行）、HW_BASIC_DESIGN.md（利用契約） |
-| D 実点・受入 | hwdev/gf/display/service.c、drivers/video/trident/lifecycle.c（点）、各export宣言表、tools/accept/（台本）。最初の実点はA/Bのホスト偽部品受入後 |
+| D 実点・受入 | sys/dev/video/geforce/display/service.c、sys/dev/video/trident/lifecycle.c（点）、各export宣言表、tools/accept/（台本）。最初の実点はA/Bのホスト偽部品受入後 |
 
 段 D の PM 決定: GF の2点は geforce.mod の宣言表にだけ登録し、HWDEV の get_probe_decls は空のまま（display/service.c は HWDEV に組まれない）。
 - HWDEV core表を伸ばす必要はない。内部モジュールexport/import変更は生成契約・CRC・該当ABIを同期し、新旧不一致をloaderで拒否する。
@@ -166,7 +166,7 @@ struct probe_wire { /* 全整数は32bit、offsetはbyte */
 ### 1. kdebug の owner 取得
 既存 control に専用 op を足す。init、ATTACH の owner/text 検証・参照保持は維持する。
 ```c
-/* include/debug_probe.h: LIST=1, ATTACH=2, DETACH=3 は維持 */
+/* sys/include/debug_probe.h: LIST=1, ATTACH=2, DETACH=3 は維持 */
 #define PROBE_KDEBUG_OWNER 4U
 /* debug_probe_control(PROBE_KDEBUG_OWNER, &owner, sizeof(owner));
  * out: struct module_handle owner; 成功0、未RUNNING/サイズ不正はPROBE_ERR_ARG */
@@ -177,9 +177,9 @@ broker が module_records[0..MODULE_RECORD_CAP) の RUNNING かつ MODULE_ID_KDE
 ### 2. 停止中の unregister を検出
 登録集合の epoch を LIST に追加し、解除があれば全設定を失効させる（最小の一括失効）。
 ```c
-/* include/debug_probe.h: 既存欄の末尾に追加 */
+/* sys/include/debug_probe.h: 既存欄の末尾に追加 */
 struct probe_list { u32 count; struct probe_info points[PROBE_POINT_MAX]; u32 epoch; };
-/* kernel/module/debug_probe.c: 新規内部状態 */
+/* sys/kern/module/debug_probe.c: 新規内部状態 */
 static u32 registry_epoch = 1U;
 ```
 LIST は件数0でも現在の epoch を返す。実際に点を1つ以上消す unregister で、
@@ -192,9 +192,9 @@ B は最初の ADD で epoch を保存し、以後 ADD/ARM/STATUS/DRAIN の入�
 ARM の LIST 照合から ATTACH までは yield しない。wire と採取 ID は変更しない。
 これは §2 の「解除時に設定も無効化」を遅延照合で具体化する。点ごとの世代付き採取 ID は設けない。
 ### 3. 生成契約・固定値
-`kernel/module/kdebug_imports.def` は control の既存 index=321、schema=2、計322本を維持（追加 import 不要）。
+`sys/kern/module/kdebug_imports.def` は control の既存 index=321、schema=2、計322本を維持（追加 import 不要）。
 `tools/module_schema.py` の KDEBUG `ops_version=4` を `5` に上げ、旧像を loader で拒否する。
-`python3 tools/gen_module_schema.py` → `kernel/module/module_schema.h`、
+`python3 tools/gen_module_schema.py` → `sys/kern/module/module_schema.h`、
 `python3 tools/gen_kdebug_imports.py --stage S6 --out-dir kdebug/generated` を実行する。
 control の関数型は同じなので KDEBUG_ABI_GEN は変わらない。私有契約変更は ops_version で識別する。
 `make all` の build/kdebug.mk の正規レシピで hwdev/generated を再生成（debug_probe.h は contract CRC の入力）。
@@ -202,14 +202,14 @@ HWDEV_ABI=1、HWDEV_MODULE_OPS_VERSION=2、core 26 slots と provider export 番
 hwdev_contract_fixture.py の import/layout/inventory 固定値は当該入力不変なので維持し、CRC の kernel/core/body 一致を確認する。
 KDEBUG 版を固定する試験値のみ5へ追従し、旧4の拒否も試験。生成物の手編集は禁止。
 ### 4. 段と受入
-A3: include/debug_probe.h、kernel/module/debug_probe.c、tools/module_schema.py、上記生成物、tools/tests/debug_probe_host.c・test_debug_probe.py と KDEBUG版固定の既存試験。正典への本追記はPMが反映。
+A3: sys/include/debug_probe.h、sys/kern/module/debug_probe.c、tools/module_schema.py、上記生成物、tools/tests/debug_probe_host.c・test_debug_probe.py と KDEBUG版固定の既存試験。正典への本追記はPMが反映。
 B PACK追記:「A3後の基点を使い、ARM直前に PROBE_KDEBUG_OWNER で owner を取得する。ADD時epoch保存、操作入口の照合・全設定失効・再ADD要求を実装する。」
 試験: A3はowner取得の成功/未RUNNING/誤サイズ、停止中ADD相当のLIST→解除→同一再登録のepoch差、空解除不変、周回封鎖、既存detach/参照回帰をqemuで検査。Bで旧設定ARM拒否→再ADD成功を検査。実装時に対象ビルド・変更試験 --mutate・--lint、取込CIはPM。
 変異: owner取得のRUNNING条件削除、停止中unregisterのepoch更新削除、Bのepoch比較削除を各一意アンカーで実行時REDにする（A3とBそれぞれの担当試験）。
 
 ### 確定 (2026-11-07、Opus 第 1 回を PM が反映、本文より優先)
-- KDEBUG の ops_version は 4 のまま (確定設計 §3「kdebug ops v4 は不変」)。§3 の 5 への版上げ・module_schema.h と kdebug/generated の再生成・「旧 4 の拒否」の試験は削除。旧 kdebug.bin は FLAG_PAIR の pair CRC (kernel/module/module_image.c) で拒否される。
+- KDEBUG の ops_version は 4 のまま (確定設計 §3「kdebug ops v4 は不変」)。§3 の 5 への版上げ・module_schema.h と kdebug/generated の再生成・「旧 4 の拒否」の試験は削除。旧 kdebug.bin は FLAG_PAIR の pair CRC (sys/kern/module/module_image.c) で拒否される。
 - epoch は単に足すだけ。周回の扱い (0 で永久失効、0 のとき register・ATTACH を LIMIT で拒否、B の「0 なら破棄」、試験の「周回封鎖」) は削除 (シングルタスクで 4G 回の解除に届かない)。
-- hwdev/generated/{hwdev_contract.h, hwdev_core.c, hwdev_imports.json} は include/debug_probe.h が contract の入力なので CRC (HWDEV_CONTRACT_CRC・module_abi_gen) だけ変わる。再生成は make all (build/kdebug.mk) で行い、A3 の取り込みに含める。REVIEWED_* の 3 値は動かない。hwdev・GeForce・Trident の像は kernel と同時に配備する。
+- hwdev/generated/{hwdev_contract.h, hwdev_core.c, hwdev_imports.json} は sys/include/debug_probe.h が contract の入力なので CRC (HWDEV_CONTRACT_CRC・module_abi_gen) だけ変わる。再生成は make all (build/kdebug.mk) で行い、A3 の取り込みに含める。REVIEWED_* の 3 値は動かない。hwdev・GeForce・Trident の像は kernel と同時に配備する。
 - B: ADD で保存する epoch は、名前から ID を引いたのと同じ LIST の応答の値。ADD の入口で不一致なら全設定を破棄し、今の ADD を最初の ADD として続ける (失敗にするのは ARM だけ、状態の欄で失効を示す)。記録の名前は ADD のときに保存したものを使う。
 - 変異を 1 件足す: OWNER の検索から MODULE_ID_KDEBUG の条件を外す (kdebug より若い slot に RUNNING の別の module の記録を置く試験で RED)。

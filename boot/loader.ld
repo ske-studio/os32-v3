@@ -6,7 +6,7 @@
  * ASM側で __bss_start 〜 __bss_end をゼロクリアする。
  * ============================================================ */
 
-/* Canonical: include/memmap.h; checked by test_boot_named_constants.py. */
+/* Canonical: sys/include/memmap.h; checked by test_boot_named_constants.py. */
 MEM_LOADER_START = 0x8000;
 
 ENTRY(loader_entry)

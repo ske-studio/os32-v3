@@ -1,4 +1,4 @@
-# fs/ext2/ext2_file.c — ext2 ファイル I/O
+# sys/fs/ext2/ext2_file.c — ext2 ファイル I/O
 
 > 状態: **現行 (2026-10-31)**
 

@@ -7,11 +7,11 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 
 CHECK = dict(name='snd2-stream-host', tier=4, needs=[], budget=3,
-             covers=['sound/hal/snd2_refill_diag.h', 'kernel/time/tick_probe.h', 'kernel/time/tick_probe_ids.h', 'tools/tests/snd2_v1_host.c', 'include/pcm_contract.h', 'sound/hal/snd2_v1.c', 'kapi/kapi_snd2.c', 'exec/exec.h', 'include/user_read_contract.h', 'include/memmap.h', 'sound/hal/snd2.h', 'sound/hal/snd2_stream.c', 'sound/hal/snd2_caps.c',
-                     'sound/hal/snd2_reg.c', 'kernel/time/tick_clock.h', 'include/kernel_tick.h',
-                     'include/io.h', 'sound/hal/snd2_seg.c', 'sound/hal/snd2_stg.c',
-                     'sound/hal/snd2_int.h', 'sound/hal/snd2_ring_math.h',
-                     'include/av_contract.h', 'lib/kstring.h', 'mm/kmalloc.h', 'include/types.h',
+             covers=['sys/hal/sound/snd2_refill_diag.h', 'sys/kern/time/tick_probe.h', 'sys/kern/time/tick_probe_ids.h', 'tools/tests/snd2_v1_host.c', 'sys/include/pcm_contract.h', 'sys/hal/sound/snd2_v1.c', 'sys/kapi/kapi_snd2.c', 'sys/kern/exec/exec.h', 'sys/include/user_read_contract.h', 'sys/include/memmap.h', 'sys/hal/sound/snd2.h', 'sys/hal/sound/snd2_stream.c', 'sys/hal/sound/snd2_caps.c',
+                     'sys/hal/sound/snd2_reg.c', 'sys/hal/time/tick_clock.h', 'sys/include/kernel_tick.h',
+                     'sys/include/io.h', 'sys/hal/sound/snd2_seg.c', 'sys/hal/sound/snd2_stg.c',
+                     'sys/hal/sound/snd2_int.h', 'sys/hal/sound/snd2_ring_math.h',
+                     'sys/include/av_contract.h', 'sys/kern/kstring.h', 'sys/kern/mm/kmalloc.h', 'sys/include/types.h',
                      'sdk/include/os32/*.h', 'tools/tests/snd2_stream_host.c',
                      'tools/tests/test_snd2_stream.py', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'build/config.mk'],
@@ -64,7 +64,7 @@ def verify(work, mutation=None, diagnostic=False):
                     '-Werror', '-O2', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                     '-ffunction-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie', '-D__cdecl=',
                     *(['-DTICK_PROBE', '-DSND2_REFILL_DIAG'] if diagnostic else []), '-I' + str(work), '-I' + str(HAL),
-                    *include_flags(ROOT), *sources, ROOT / 'kapi/kapi_snd2.c', ROOT / 'tools/tests/snd2_stream_host.c',
+                    *include_flags(ROOT), *sources, ROOT / 'sys/kapi/kapi_snd2.c', ROOT / 'tools/tests/snd2_stream_host.c',
                     '-o', exe], check=True)
     return host_run([str(exe)], cwd=work, timeout=3).returncode
 

@@ -1,6 +1,6 @@
-# exec/appslot.c — 設計
+# sys/kern/exec/appslot.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: API_CONTRACTS (D1 で移した)
-ソース: `exec/appslot.c`
+ソース: `sys/kern/exec/appslot.c`
 
 ### T2a. 複数アプリ時のスロット割当と譲り合い — 確定 2026-09-04
 
@@ -44,10 +44,10 @@ OP_WAIT / kbd / poll / yield の共通更新と資格判定の順は
 ### 画面の所有者 (`appslot_gfx_claim`・`appslot_gfx_owner_exit`)
 
 - 所有者の初期値は WM (`GFX_OWNER_WM` = シェル帯)。アプリを立てただけでは移らない。
-- `gfx_init` (KAPI の門 `gfx/gfx_core.c`) が `appslot_gfx_claim(con_sink_is_enabled())` を呼ぶ。判定は純関数 `appslot_gfx_claim_check(gui_mode, caller, cpl3, hdr_flags)`:
+- `gfx_init` (KAPI の門 `sys/hal/gfx/gfx_core.c`) が `appslot_gfx_claim(con_sink_is_enabled())` を呼ぶ。判定は純関数 `appslot_gfx_claim_check(gui_mode, caller, cpl3, hdr_flags)`:
   - 呼び手がアプリの範囲外 (WM 自身の復帰の `gfx_init` など)、または CPL=0 → 素通し (所有者は動かない)。
   - GUI 中で `OS32X_FLAG_GFX` (`mkos32x --gfx`) の宣言が無い → `OS32_ERR_INVAL`。所有者は動かず `gfx_init_reject_count` が 1 増え、そのアプリに `abort_req` を立てる (syscall の出口で畳まれる)。何度拒否しても同じ。
   - それ以外 (GUI 中で宣言あり、または CUI 中) → 所有者は呼び手。CUI 中は宣言が無くても通し、拒否として数えない。同じアプリが二度呼んでも変わらない。
 - `appslot_gfx_owner_exit(id)`: 回収された ID が所有者なら WM へ戻す。他人の回収では戻らない。park しただけでは戻らない (WM は上書きしない)。正常終了でも `exec_kill` でも戻る。
 
-検査: `tools/tests/test_multiapp_impl.py` (`multiapp_impl_host.c`) と、ブート時の `appslot_gfx_owner_selftest` (`exec/appslot_selftest.inc`)。
+検査: `tools/tests/test_multiapp_impl.py` (`multiapp_impl_host.c`) と、ブート時の `appslot_gfx_owner_selftest` (`sys/kern/exec/appslot_selftest.inc`)。

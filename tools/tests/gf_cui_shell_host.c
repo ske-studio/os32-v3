@@ -1,12 +1,12 @@
 /* Real CUI parser; only the KAPI transport is replaced. */
 #define SHELL_H
-#include "../../include/types.h"
+#include "../../sys/include/types.h"
 #include "../../sdk/include/os32/os32_kapi_shared.h"
 #include "gf_command_runtime_host.h"
 static int equal(const char *a, const char *b)
 { while (*a && *a == *b) { ++a; ++b; } return *a == *b; }
 #define str_eq(a,b) equal(a,b)
-#include "../../kdebug/gf_command_wire.h"
+#include "../../sys/dev/video/geforce/diag/gf_command_wire.h"
 static u32 calls;
 static struct gf2_request captured;
 static i32 transport_rc, reply_rc;

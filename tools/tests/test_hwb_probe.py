@@ -2,9 +2,9 @@
 CHECK = dict(name='hwb-probe-host', tier=1, budget=9.4, needs=[], covers=[
     'userland/shell/hwb*.c', 'userland/shell/hwb.h', 'userland/shell/cmd_hw.c',
     'userland/shell/shell.h', 'sdk/include/os32/*.h', 'include/**',
-    'kdebug/**', 'kernel/module/module_runtime.h', 'kernel/module/module_image.h',
-    'drivers/char/serial*.h', 'drivers/pci/pci_hwb.h', 'exec/exec_hwb.h',
-    'mm/paging.h', 'lib/kstring.h', 'arch/x86/arch_io.h', 'platform/pc98/platform_io.h',
+    'kdebug/**', 'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.h',
+    'drivers/char/serial*.h', 'sys/dev/pci/pci_hwb.h', 'sys/kern/exec/exec_hwb.h',
+    'sys/kern/mm/paging.h', 'sys/kern/kstring.h', 'sys/arch/x86/arch_io.h', 'sys/platform/pc98/platform_io.h',
     'tools/tests/hwb_probe_host.c', 'tools/tests/hwb_probe_engine.c',
     'tools/tests/hwb_shell_host.c', 'tools/tests/probe_host.c',
     'tools/tests/hwb_fake.h', 'tools/tests/hwb_host.py', 'tools/tests/host32.py',
@@ -18,9 +18,9 @@ import hwb_host as host
 FIXTURE = 'tools/tests/hwb_probe_host.c'
 SOURCES = ('tools/tests/hwb_probe_engine.c',)
 MUTATIONS = [
-    ('consume', 'kdebug/probe.c', 'used--; drain_item = 0;',
+    ('consume', 'sys/dev/char/kdebug/probe.c', 'used--; drain_item = 0;',
      'used = 0; drain_item = 0;', 'probe-drain'),
-    ('serial', 'kdebug/probe.c', 'if (serial)\n            kprintf',
+    ('serial', 'sys/dev/char/kdebug/probe.c', 'if (serial)\n            kprintf',
      'if (false && serial)\n            kprintf', 'probe-serial'),
     ('wire-size', 'userland/shell/hwb_probe.c',
      'w->size != PROBE_WIRE_BYTES || w->version != PROBE_VERSION',

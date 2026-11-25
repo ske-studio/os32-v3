@@ -5,8 +5,8 @@ import tempfile
 from kernel_includes import include_flags
 
 CHECK = dict(name='gfx-present-host', tier=1, needs=[], budget=5,
-    covers=['gfx/gfx_present.c', 'gfx/gfx_dirty.c', 'gfx/gfx_dirty.h', 'gfx/gfx_internal.h',
-            'gfx/gfx.h', 'gfx/v2/gfx2_int.h', 'include/**', 'platform/*/platform_display_fallback.h',
+    covers=['sys/hal/gfx/gfx_present.c', 'sys/hal/gfx/gfx_dirty.c', 'sys/hal/gfx/gfx_dirty.h', 'sys/hal/gfx/gfx_internal.h',
+            'sys/hal/gfx/gfx.h', 'sys/hal/gfx/v2/gfx2_int.h', 'include/**', 'platform/*/platform_display_fallback.h',
             'tools/tests/gfx_present_host.c', 'tools/tests/gfx2_bridge_fake.h',
             'tools/tests/test_gfx_present.py', 'tools/tests/kernel_includes.py', 'build/config.mk'],
     basis=['docs/decisions/ARCH_COMPAT_CONTRACT.md AC-DISPLAY-2'])
@@ -21,7 +21,7 @@ MUTATIONS = [
 
 def run(ctx):
     root = Path(ctx.root)
-    original = (root / 'gfx/gfx_present.c').read_text()
+    original = (root / 'sys/hal/gfx/gfx_present.c').read_text()
     with tempfile.TemporaryDirectory() as folder:
         source = Path(folder) / 'gfx_present.c'
         exe = Path(folder) / 'present'
@@ -37,7 +37,7 @@ def run(ctx):
                 source.write_text(original.replace(anchor, replacement) if anchor else original)
                 subprocess.run(['gcc', '-std=gnu11', '-D__KERNEL_BUILD__', *flags,
                                 '-I' + folder, *include_flags(root),
-                                str(source), str(root / 'gfx/gfx_dirty.c'),
+                                str(source), str(root / 'sys/hal/gfx/gfx_dirty.c'),
                                 str(root / 'tools/tests/gfx_present_host.c'), '-o', str(exe)], check=True)
                 rc = subprocess.run([exe]).returncode
                 assert rc == expected, (machine, name, rc)

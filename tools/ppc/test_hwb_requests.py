@@ -14,14 +14,14 @@ def main():
     cases = [('normal', None, None, None, 0)]
     if args.mutate:
         cases += [
-            ('check-reads', 'kdebug/hwb_access.c', 'platform_hwb_phys_check(req->addr, width, bytes)',
+            ('check-reads', 'sys/kern/kdebug/hwb_access.c', 'platform_hwb_phys_check(req->addr, width, bytes)',
              'platform_hwb_phys(&(struct hw_req){.action=HW_READ, .width=width, .addr=req->addr})', 17),
-            ('port-ok', 'kdebug/hwb_access.c', 'platform_hwb_io(req)', 'HW_OK', 13),
+            ('port-ok', 'sys/kern/kdebug/hwb_access.c', 'platform_hwb_io(req)', 'HW_OK', 13),
             ('short-fill-request', 'userland/shell/hwb_exec.c', 'r->count * i->width)',
              'i->width)', 1),
-            ('short-fill-lookup', 'platform/powermac/hwb_resource.c', 'allows(lookup(addr, bytes)',
+            ('short-fill-lookup', 'sys/platform/powermac/hwb_resource.c', 'allows(lookup(addr, bytes)',
              'allows(lookup(addr, width)', 1),
-            ('unverified-gmac', 'platform/powermac/hwb_resource.c', 'gmac_verified && f->device',
+            ('unverified-gmac', 'sys/platform/powermac/hwb_resource.c', 'gmac_verified && f->device',
              'f->device', 29),
         ]
     for name, path, old, new, expected in cases:

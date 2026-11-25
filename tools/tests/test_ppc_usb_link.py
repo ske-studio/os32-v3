@@ -10,13 +10,13 @@ sys.path[:0] = [str(ROOT/'tools/ppc'), str(ROOT/'tools')]
 import usb_run
 
 CHECK = dict(name='ppc-usb-link-meter', tier=1, budget=10, needs=['make:ppc-ci-image'],
-    covers=['exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/tests/test_ppc_usb_link.py', 'tools/ppc/usb_run.py',
+    covers=['sys/kern/exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/tests/test_ppc_usb_link.py', 'tools/ppc/usb_run.py',
             'tools/ppc/kboot_accept.py', 'tools/ppc/kboot_run.py',
             'tools/ppc/run.py', 'tools/ppc/kboot_mutations.py',
-            'platform/powermac/**', 'arch/ppc/**', 'platform/powermac/ppc_kernel.c',
-            'tools/ppc/**', 'tools/*.py', 'fs/serialfs/serialfs_persistent.c',
-            'kernel/console/con_sink.c', 'kernel/console/console.c',
-            'mm/kmalloc.c', 'userland/shell/rshell_lan.c'],
+            'platform/powermac/**', 'arch/ppc/**', 'sys/platform/powermac/ppc_kernel.c',
+            'tools/ppc/**', 'tools/*.py', 'sys/fs/serialfs/serialfs_persistent.c',
+            'sys/kern/console/con_sink.c', 'sys/kern/console/console.c',
+            'sys/kern/mm/kmalloc.c', 'userland/shell/rshell_lan.c'],
     basis=['PPC_P5_REST_DESIGN §2・§5', 'PM U-c1 (2026-11-16)'])
 
 # Recorded serial marker shapes; no-service must leave the other services live.

@@ -4,7 +4,7 @@
       §2 (方式 B: カナ / CAPS は make で ON、break で OFF。起動時は 053Ah から)
 記録: tools/tests/kbd_dlog_tdd.md
 
-実物の drivers/input/kbd_dlog.c・drivers/input/kbd.c (IRQ1 ハンドラと kbd_diag_log)・
+実物の sys/dev/input/kbd_dlog.c・sys/platform/pc98/input/kbd.c (IRQ1 ハンドラと kbd_diag_log)・
 userland/shell/kbd_watch.c を 1 行も写さずに #include して回す。0043h / 0041h は
 tools/tests/kbd_hostshim/io.h で模型へ回す。
 
@@ -16,7 +16,7 @@ tools/tests/kbd_hostshim/io.h で模型へ回す。
   python3 -B tools/tests/test_kbd_dlog.py --mutate   # 否定側 (変異が RED になるか)
 """
 CHECK = dict(name='kbd-dlog-host', tier=1,
-    covers=['input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'drivers/input/kbd_hal.c', 'input/hal/in2_dev.c', 'input/hal/in2_state.c', 'input/hal/kbd_merge.c', 'tools/tests/kbd_capture_fixture_host.h', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'input/hal/keymap.h', 'kernel/idle_work.h', 'include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'include/kbd.h', 'drivers/input/kbd.h', 'platform/pc98/legacy/v86_kbd.h', 'drivers/input/kbd.c', 'input/hal/legacy_ring.c', 'input/hal/legacy_mode.c', 'kernel/input_legacy.c', 'kernel/input_wait.c', 'input/hal/in2_int.h', 'drivers/input/kbd_fgpoll.inc', 'drivers/video/geforce/geforce_module.h', 'drivers/input/kbd_dlog.c', 'drivers/input/kbd_status.c', 'tools/tests/kbd_dlog_host.c', 'userland/shell/kbd_watch.c', 'tools/tests/mutpar.py', 'drivers/input/mouse.c', 'input/hal/mouse_pointer.c', 'include/mouse_pointer_contract.h', 'include/kbd_contract.h', 'include/text_screen.h', 'tools/tests/serial_emergency_host.h', 'kernel/serial_diag.c', 'include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/hal/input/legacy_keymap.c', 'sys/input/keymaps/pc98_jp.c', 'sys/platform/pc98/input/kbd_hal.c', 'sys/hal/input/in2_dev.c', 'sys/hal/input/in2_state.c', 'sys/hal/input/kbd_merge.c', 'tools/tests/kbd_capture_fixture_host.h', 'sys/hal/input/keymap_registry.c', 'sys/hal/input/keymap_eval.c', 'sys/hal/input/keymap_state.c', 'sys/hal/input/keymap.h', 'sys/kern/idle_work.h', 'sys/include/legacy_guest.h', 'tools/tests/legacy_guest_fake.h', 'sys/include/kbd.h', 'sys/platform/pc98/input/kbd.h', 'sys/platform/pc98/legacy/v86_kbd.h', 'sys/platform/pc98/input/kbd.c', 'sys/hal/input/legacy_ring.c', 'sys/hal/input/legacy_mode.c', 'sys/kern/input_legacy.c', 'sys/kern/input_wait.c', 'sys/hal/input/in2_int.h', 'sys/platform/pc98/input/kbd_fgpoll.inc', 'sys/dev/video/geforce/geforce_module.h', 'sys/dev/input/kbd_dlog.c', 'sys/dev/input/kbd_status.c', 'tools/tests/kbd_dlog_host.c', 'userland/shell/kbd_watch.c', 'tools/tests/mutpar.py', 'sys/platform/pc98/input/mouse.c', 'sys/hal/input/mouse_pointer.c', 'sys/hal/input/mouse_pointer_contract.h', 'sys/include/kbd_contract.h', 'sys/include/text_screen.h', 'tools/tests/serial_emergency_host.h', 'sys/kern/serial_diag.c', 'sys/include/console_output.h', 'lib/serial_diag.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.4,
     kind='characterization',
 )
@@ -34,12 +34,12 @@ HARNESS = ROOT / "tools/tests/kbd_dlog_host.c"
 SHIM = ROOT / "tools/tests/kbd_hostshim"
 # 変異の対象。キーは MUTATIONS の 1 列目。
 SOURCES = {
-    "d": "drivers/input/kbd_dlog.c",
-    "k": "drivers/input/kbd.c",
-    "g": "input/hal/kbd_merge.c",
+    "d": "sys/dev/input/kbd_dlog.c",
+    "k": "sys/platform/pc98/input/kbd.c",
+    "g": "sys/hal/input/kbd_merge.c",
     "w": "userland/shell/kbd_watch.c",
-    "m": "drivers/input/mouse.c",
-    "p": "input/hal/mouse_pointer.c",
+    "m": "sys/platform/pc98/input/mouse.c",
+    "p": "sys/hal/input/mouse_pointer.c",
 }
 
 CASES = ["stop_timeout", "stop_mouse", "stop_burst", "ring_basic", "ring_wrap", "irq_skip", "irq_mods", "irq_flags_api",
@@ -132,7 +132,7 @@ def host_build(tmp, mutated=None):
     src_dir = pathlib.Path(tmp)
     exe = src_dir / "kbd-dlog-host"
     # Keep driver-local and explicit ../drivers/input/kbd.h includes in the fixture.
-    for rel in ("platform/pc98/legacy/v86_kbd.h", "drivers/input/kbd.h", "include/kbd.h"):
+    for rel in ("sys/platform/pc98/legacy/v86_kbd.h", "sys/platform/pc98/input/kbd.h", "sys/include/kbd.h"):
         dst = src_dir / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text((ROOT / rel).read_text(encoding="utf-8"), encoding="utf-8")
@@ -163,7 +163,7 @@ def run_cases(exe, cases):
 def build_target(tmp):
     """カーネルと同じ i386-elf で通す (ホストで外した STATIC_ASSERT もここで効く)。
     kbd_watch.c は常駐シェルの側だが、同じ GNU11 -Werror で通るかだけを見る。"""
-    for rel in ["drivers/input/kbd_dlog.c", "drivers/input/kbd.c", "userland/shell/kbd_watch.c"]:
+    for rel in ["sys/dev/input/kbd_dlog.c", "sys/platform/pc98/input/kbd.c", "userland/shell/kbd_watch.c"]:
         cmd = ["i386-elf-gcc", "-std=gnu11", "-m32", "-march=i386",
                "-ffreestanding", "-fno-pie", "-fno-stack-protector", "-nostdlib",
                "-mno-red-zone", "-fcommon", "-fsigned-char", "-fno-short-enums",
@@ -210,7 +210,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     with tempfile.TemporaryDirectory(prefix="os32-kbd-dlog-") as tmp:
         exe = host_build(tmp)
-        print("HOST GNU11 -Werror compile PASS (real drivers/input/kbd_dlog.c + drivers/input/kbd.c"
+        print("HOST GNU11 -Werror compile PASS (real sys/dev/input/kbd_dlog.c + sys/platform/pc98/input/kbd.c"
               " + userland/shell/kbd_watch.c)", flush=True)
         if "--target" in args:
             build_target(tmp)

@@ -3,7 +3,7 @@
 
 #include <string.h>
 #include "endian_le.h"
-#include "kernel/console/unicode_file.h"
+#include "sys/kern/console/unicode_file.h"
 
 /* Product file: headerless, strictly ordered LE pairs. */
 static int write_pairs(const char *path)

@@ -1,0 +1,512 @@
+/* ======================================================================== */
+/*  IME.C — OS32 カーネルFEP メインロジック                                  */
+/*                                                                          */
+/*  IME状態管理・キー処理・プリエディット表示・公開API                        */
+/*  ローマ字変換は ime_romkana.c、辞書検索は ime_dict.c に分離               */
+/* ======================================================================== */
+
+#define IME_DICT_LARGE      2
+#define IME_CAND_COLS       3
+#define IME_CAND_COL_WIDTH  26
+#define IME_CAND_LABEL_COLS 2
+#define IME_PAGE_COL        74
+/* "dd/dd)" after the opening parenthesis. */
+#define IME_COUNT_TEXT_COLS ((int)sizeof("00/00)") - 1)
+#include "memmap.h"
+#include "ime.h"
+#include "ime_display_private.h"
+#include <platform_ime_render.h>
+#include "../sqlite_engine.h"
+#include "kbd_contract.h"
+#include "text_screen.h"
+#include "console.h"
+#include "utf8.h"
+#include "kprintf.h"
+#include "kstring.h"
+#include "os32_kapi_shared.h"
+#include "../mm/kmalloc.h"
+#include "exec.h"
+#include "con_sink.h"
+#include "fd_redirect.h"
+#include "redir_access.h"
+#include "io.h"
+#include "sys/input/input_context.h"
+#include "sys/hal/input/in2_int.h"
+int fep_read_wait(int interruptible, int *key, u32 *start_tick, int resume);
+int fep_read_try(int *key);
+extern int ring3_call_from_user(void);
+extern void ring3_abort_check(void);
+
+#ifdef OS32_FEP_MODULE
+#include "fep_imports.h"
+#define services_public fep_services_public()
+#define services_boot_fault fep_services_boot_fault()
+#define kbd_shift_state fep_kbd_shift_state()
+#endif
+
+
+/* ======================================================================== */
+/*  グローバル IME 状態                                                      */
+/* ======================================================================== */
+
+static IME_State g_ime;
+
+IME_State *ime_suspend_state(void)
+{
+    return &g_ime;
+}
+
+FepStore *ime_current_store(void) { return &g_ime.store; }
+
+static int g_ime_reader_owner;
+static int g_ime_cui_redraw;
+static void ime_cancel_input(void);
+
+static void ime_publish_state(void)
+{
+    KbdPolicySnapshot current;
+    if (!services_public) return;
+    if (input_context_snapshot(&current)) {
+        kbd_policy_ime_state(0, 0, 0);
+        return;
+    }
+    int active = g_ime.mode != IME_MODE_OFF &&
+                 (g_ime.rk.preedit[0] || g_ime.kana_len || g_ime.converting);
+    kbd_policy_ime_state(active, current.owner, current.command_gen);
+}
+
+static int ime_take_cancel(void)
+{
+    KbdPolicySnapshot current;
+    if (!services_public || !_irq_enabled() || input_context_snapshot(&current) ||
+        input_ime_cancel_take(&current))
+        return 0;
+    ime_cancel_input();
+    return 1;
+}
+
+#include "ime_render.inc"
+
+#include "ime_commit_take.inc"
+#include "ime_convert.inc"
+#include "ime_delivery.inc"
+#include "ime_cui_process.inc"
+
+/* ======================================================================== */
+/*  公開API                                                                  */
+/* ======================================================================== */
+
+void ime_init(void)
+{
+    kmemset(&g_ime, 0, sizeof(IME_State));
+    ime_delivery_clear();
+    g_ime.mode = IME_MODE_OFF;
+    g_ime.dict_loaded = 0;
+    g_ime.state = IME_ST_INPUT;
+    g_ime.per_page = IME_CAND_COLS * IME_CANDLIST_SAVE_ROWS;
+    g_ime.render = IME_DEFAULT_RENDER;
+    ime_rk_init(&g_ime.rk);
+
+}
+
+/* Dynamic FEP resources remain private until the shared service gate opens. */
+u32 ime_boot_bytes(void)
+{
+    return ime_display_bytes();
+}
+
+int ime_dict_boot(void)
+{
+    if (g_ime.dict_loaded) return 0;
+    if (ime_display_boot(services_boot_fault)) return -1;
+    if (services_boot_fault == SERVICES_FAULT_FEP_CRC ||
+        services_boot_fault == SERVICES_FAULT_DICTIONARY) return -1;
+    char user_path[OS32_MAX_PATH];
+    int rc = fep_boot_config_get(&g_ime.store.meta, &g_ime.store.boot_reserve_kb);
+    if (rc) return rc;
+    rc = fep_boot_user_path_get(user_path, sizeof(user_path));
+    if (rc) {
+        user_path[0] = 0; /* Invalid path disables learning, never guess a file. */
+        kprintf(ATTR_RED, "IME: learning path unavailable (rc=%d)\r\n", rc);
+    }
+    rc = fep_store_open(&g_ime.store, IME_DICT_PATH, user_path);
+    if (rc) return rc;
+    g_ime.dict_loaded = 1;
+    return 0;
+}
+
+int ime_boot_abort(void)
+{
+    g_ime.mode = IME_MODE_OFF;
+    if (fep_store_close(&g_ime.store)) return -1;
+    g_ime.dict_loaded = 0;
+    ime_display_abort();
+    return 0;
+}
+
+void ime_toggle(void)
+{
+    if (!services_public) return;
+    if (g_ime.mode == IME_MODE_OFF) {
+        if (!g_ime.dict_loaded) {
+            if (ime_dict_boot() == 0) {
+                g_ime.dict_loaded = 1;
+            } else {
+                kprintf(ATTR_RED, "IME: Dict load failed, FEP disabled\r\n");
+                return;
+            }
+        }
+        g_ime.mode = IME_MODE_HIRAGANA;
+        g_ime.state = IME_ST_INPUT;
+        g_ime.kana_buf[0] = '\0';
+        g_ime.kana_len = 0;
+        g_ime.converting = 0;
+        ime_rk_init(&g_ime.rk);
+        tvram_set_scroll_reserve(1);   /* 25 行目を保護 */
+        preedit_draw();
+    } else {
+        /* かなバッファに残りがあれば確定 */
+        if (g_ime.kana_len > 0 || g_ime.rk.preedit[0] != '\0') {
+            commit_kana_direct();
+        }
+        g_ime.mode = IME_MODE_OFF;
+        g_ime.converting = 0;
+        g_ime.state = IME_ST_INPUT;
+        tvram_set_scroll_reserve(0);   /* 保護解除 */
+        candlist_clear();              /* 候補リスト領域を消去 */
+        preedit_clear();
+    }
+    ime_publish_state();
+}
+
+int ime_is_active(void)
+{
+    if (!services_public) return 0;
+    return g_ime.mode != IME_MODE_OFF;
+}
+
+int ime_apply_absolute(u32 action)
+{
+    if (!services_public || !_irq_enabled() ||
+        (action != INPUT_IME_ON && action != INPUT_IME_OFF)) return -1;
+    int target = action == INPUT_IME_ON;
+    if (ime_is_active() != target) ime_toggle();
+    return ime_is_active() == target ? 0 : -1;
+}
+
+void ime_set_mode(int mode)
+{
+    if (!services_public) return;
+    if (mode < IME_MODE_OFF || mode > IME_MODE_KATAKANA) return;
+
+    /* FEP ON 時は辞書を遅延オープンする (ime_toggle と同じ)。
+     * これを欠くと store.system.db が NULL のまま fep_store_search が常に
+     * 0 件を返し、変換がかな確定にフォールバックする。 */
+    if (mode != IME_MODE_OFF && !g_ime.dict_loaded) {
+        if (ime_dict_boot() == 0) {
+            g_ime.dict_loaded = 1;
+        } else {
+            kprintf(ATTR_RED, "IME: Dict load failed, FEP disabled\r\n");
+            return;
+        }
+    }
+    g_ime.mode = mode;
+    if (mode != IME_MODE_OFF) {
+        candlist_clear(); /* Restore the list before changing input mode. */
+        g_ime.state = IME_ST_INPUT;
+        g_ime.converting = 0;
+        tvram_set_scroll_reserve(1);
+        preedit_draw();
+    } else {
+        tvram_set_scroll_reserve(0);
+        candlist_clear();              /* 候補リスト領域を消去 */
+        preedit_clear();
+    }
+    ime_publish_state();
+}
+
+int ime_get_mode(void)
+{
+    if (!services_public) return IME_MODE_OFF;
+    return g_ime.mode;
+}
+
+/* Shell reload clears TVRAM after gui_owner_exit. Restore the shared mode
+ * when CUI starts waiting, before consuming its first key. */
+static void ime_prepare_cui_input(void)
+{
+    if (!g_ime_cui_redraw) return;
+    g_ime_cui_redraw = 0;
+    if (ime_is_active()) preedit_draw();
+}
+
+static int ime_getchar_wait(int interruptible, int *cancelled)
+{
+    u32 start_tick;
+    int resume = 0;
+    int keydata;
+    int result;
+
+    /* WM already passed GUI text through FEP before terminal injection. */
+    if (con_sink_is_enabled()) return kbd_getkey_wait(interruptible);
+    ime_prepare_cui_input();
+
+    for (;;) {
+        ime_take_cancel();
+        keydata = ime_delivery_take();
+        if (keydata >= 0) {
+            u8 a = (u8)(keydata & 0xFF);
+            if (a != 0) return (int)a;
+            continue;
+        }
+
+        int step = fep_read_wait(interruptible, &keydata, &start_tick, resume);
+        resume = step == IR_RECHECK;
+        if (resume) continue;
+        if (step != IR_KEY) keydata = -1;
+        int taken = ime_take_cancel();
+        if (keydata < 0) {
+            if (cancelled) *cancelled = taken;
+            return keydata;
+        }
+
+        result = ime_cui_process(keydata);
+        ime_publish_state();
+        if (result >= 0) {
+            u8 a = (u8)(result & 0xFF);
+            if (a != 0) return (int)a;
+        }
+    }
+}
+
+/* Only an actual CUI read takes custody of the shared composition. An empty
+ * child poll must not make its exit cancel its parent's preedit. */
+static void ime_note_cui_reader(void)
+{
+    if (ring3_call_from_user())
+        g_ime_reader_owner = res_owner_get(); /* nonblocking CUI input */
+}
+
+int ime_trygetchar(void)
+{
+    int keydata;
+    int result;
+
+    if (con_sink_is_enabled()) return kbd_trygetchar();
+retry:
+    ime_take_cancel();
+    ime_prepare_cui_input();
+
+    keydata = ime_delivery_take();
+    if (keydata >= 0) {
+        ime_note_cui_reader();
+        u8 a = (u8)(keydata & 0xFF);
+        return a != 0 ? (int)a : -1;
+    }
+
+    int step = fep_read_try(&keydata);
+    if (step == IR_RECHECK) goto retry;
+    if (step != IR_KEY) return -1;
+    ime_note_cui_reader();
+
+    result = ime_cui_process(keydata);
+    ime_publish_state();
+    if (result >= 0) {
+        u8 a = (u8)(result & 0xFF);
+        if (a != 0) return (int)a;
+    }
+    return -1;
+}
+
+/* ======================================================================== */
+/*  ime_feed_key — WM (gshell) が打鍵を 1 件 FEP に通す (GUI v1.1 W2、K 依頼 1)  */
+/*                                                                          */
+/*  GUI 中はカーネルが cooked キューに積まない (K2) ので、ime_trygetkey 系は  */
+/*  キーを引けない。WM が raw から作った keydata = (scancode << 8) | ascii を  */
+/*  ここへ渡す。keydata < 0 は「新しいキーは無い、確定文字列の続きだけ」。      */
+/*  戻り値:                                                                 */
+/*    < 0            FEP が消費した (WM はアプリへ Key を配送しない)          */
+/*    >= 0x100       素通り (keydata そのもの)                               */
+/*    == 0x1B        素通りの ESC (scancode 0 は ESC だけで ascii は 0x1B)     */
+/*    1..0xFF        確定文字列の 1 バイト (UTF-8)。続きは keydata < 0 で引く  */
+/*  分類が一意なのは、確定文字列 (UTF-8) に 0x1B が現れないため。            */
+/*  SHIFT+SPACE の on/off は WM が ime_toggle で行うので、ここでは見ない。      */
+/* ======================================================================== */
+int ime_feed_key(int keydata)
+{
+    if (!services_public) return keydata;
+    int result;
+
+    int cancelled = ime_take_cancel();
+    /* WM input-target lifetime boundary: STOP cancels even an unread tail.
+     * No dictionary access/learning, so this is also safe in X1. */
+    if (keydata >= 0 && ((keydata >> 8) & SCANCODE_KEY) == KEY_STOP) {
+        if (!cancelled) ime_cancel_input();
+        return -1;
+    }
+
+    /* 確定済みの続きがあれば先にそれを返す */
+    result = ime_commit_take();
+    if (result >= 0) return result;
+    if (keydata < 0) {
+        return -1;
+    }
+
+    /* FEP OFF: 素通り */
+    if (g_ime.mode == IME_MODE_OFF) {
+        return keydata;
+    }
+
+    result = ime_process_key(keydata);
+    ime_publish_state();
+    if (result == 1) return ime_commit_take();
+    if (result == -1) {
+        return keydata;      /* FEP が関与しないキー: 素通り */
+    }
+    return -1;               /* 消費 (未確定の更新など) */
+}
+
+/* ======================================================================== */
+/*  ime_set_render — 描画バックエンドの差し替え (GUI v1.1 W2、K 依頼 2)       */
+/*                                                                          */
+/*  WM (gshell、CPL=0) が GFX 版の IME_Render 関数表を渡す。NULL で TVRAM 版  */
+/*  に戻す。表の実体は呼び手が常駐している間だけ有効なので、gshell は終了時    */
+/*  (CUI へ戻る前) に NULL を渡すこと。                                      */
+/*  KAPI からは sys/kern/gui.c の gui_ime_set_render を経由する (owner 1 の     */
+/*  CPL=0 の直呼びだけを通す門、2026-09-26)。ここはカーネル内の直呼び用で、   */
+/*  呼び手を検査しない — gui_owner_exit(1) の NULL 戻しもここへ来る。         */
+/* ======================================================================== */
+void ime_set_render(void *table)
+{
+    const IME_Render *next = table ? (const IME_Render *)table : IME_DEFAULT_RENDER;
+    if (next != g_ime.render) {
+        ime_cancel_input(); /* GUI/CUI input lifetime ends with its renderer. */
+        g_ime_reader_owner = 0;
+        g_ime.render = next;
+    }
+    g_ime_cui_redraw = table == NULL;
+    /* Restore now and again at the first read after the shell reload clear. */
+    if (ime_is_active()) preedit_draw();
+}
+
+static int ime_getkey_wait(int interruptible, int *cancelled)
+{
+    if (!services_public) return kbd_getkey_wait(interruptible);
+    u32 start_tick;
+    int resume = 0;
+    int keydata;
+    int result;
+
+    if (con_sink_is_enabled()) return kbd_getkey_wait(interruptible);
+    ime_prepare_cui_input();
+
+    for (;;) {
+        ime_take_cancel();
+        keydata = ime_delivery_take();
+        if (keydata >= 0) {
+            return keydata;
+        }
+
+        int step = fep_read_wait(interruptible, &keydata, &start_tick, resume);
+        resume = step == IR_RECHECK;
+        if (resume) continue;
+        if (step != IR_KEY) keydata = -1;
+        int taken = ime_take_cancel();
+        if (keydata < 0) {
+            if (cancelled) *cancelled = taken;
+            return keydata;
+        } /* key wait interrupted */
+
+        result = ime_cui_process(keydata);
+        ime_publish_state();
+        if (result >= 0) {
+            return result;
+        }
+        /* No output: 未確定、次のキーを待つ */
+    }
+}
+
+int ime_trygetkey(void)
+{
+    if (!services_public) return kbd_trygetkey();
+    int keydata;
+
+    if (con_sink_is_enabled()) return kbd_trygetkey();
+retry:
+    ime_take_cancel();
+    ime_prepare_cui_input();
+
+    keydata = ime_delivery_take();
+    if (keydata >= 0) {
+        ime_note_cui_reader();
+        return keydata;
+    }
+
+    int step = fep_read_try(&keydata);
+    if (step == IR_RECHECK) goto retry;
+    if (step != IR_KEY) return -1;
+    ime_note_cui_reader();
+
+    int result = ime_cui_process(keydata);
+    ime_publish_state();
+    return result;
+}
+
+#include "ime_dict_api.inc"
+
+/* Cancel an input target's composition, without committing candidates.
+ * Dictionary/mode stay available for the next reader. */
+static void ime_cancel_input(void)
+{
+    candlist_clear();
+    g_ime.state = IME_ST_INPUT;
+    g_ime.kana_len = 0;
+    g_ime.kana_buf[0] = '\0';
+    g_ime.converting = 0;
+    g_ime.result_count = g_ime.candidate_idx = g_ime.page = 0;
+    g_ime.convert_len = 0;
+    g_ime.commit_len = g_ime.commit_pos = 0;
+    ime_delivery_clear();
+    ime_rk_init(&g_ime.rk);
+    tvram_set_scroll_reserve(g_ime.mode != IME_MODE_OFF ? 1 : 0);
+    /* OFF leaves the last console row to the app; ON keeps the mode visible. */
+    if (g_ime.mode != IME_MODE_OFF) preedit_draw();
+    ime_publish_state();
+}
+int ime_getchar(void) { return ime_getchar_wait(0, NULL); }
+int ime_getkey(void) { return ime_getkey_wait(0, NULL); }
+int ime_getchar_kapi(void)
+{
+    int c;
+    if (!con_sink_is_enabled() && ring3_call_from_user())
+        g_ime_reader_owner = res_owner_get();
+    int cancelled = 0;
+    c = ime_getchar_wait(1, &cancelled);
+    if (c < 0) {
+        if (!cancelled && !con_sink_is_enabled()) ime_cancel_input();
+        ring3_abort_check();
+    }
+    return c;
+}
+int ime_getkey_kapi(void)
+{
+    int c;
+    if (!con_sink_is_enabled() && ring3_call_from_user())
+        g_ime_reader_owner = res_owner_get();
+    int cancelled = 0;
+    c = ime_getkey_wait(1, &cancelled);
+    if (c < 0) {
+        if (!cancelled && !con_sink_is_enabled()) ime_cancel_input();
+        ring3_abort_check();
+    }
+    return c;
+}
+
+/* Also covers abort/fault at a syscall boundary after input became ready.
+ * A child that never read IME input must not cancel its parent's preedit. */
+void ime_owner_exit(int owner)
+{
+    if (owner <= 0 || owner != g_ime_reader_owner) return;
+    g_ime_reader_owner = 0;
+    if (!con_sink_is_enabled()) ime_cancel_input();
+}

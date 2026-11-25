@@ -4,12 +4,12 @@
 #include "types.h"
 #include "kstring.h"
 #include "os32_kapi_shared.h"
-#include "platform/powermac/hostfs.h"
+#include "sys/platform/powermac/hostfs.h"
 #include "platform_host.h"
-#include "fs/serialfs/serialfs.h"
-#include "fs/vfs_device.h"
-#include "net/host_mailbox.h"
-#include "net/link.h"
+#include "sys/fs/serialfs/serialfs.h"
+#include "sys/fs/vfs_device.h"
+#include "sys/net/host_mailbox.h"
+#include "sys/net/link.h"
 static int ee = 1;
 static u32 idles;
 int _irq_enabled(void) { return ee; }

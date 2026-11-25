@@ -1,6 +1,6 @@
-# include/gfx_format.h — 設計
+# sys/include/gfx_format.h — 設計
 > 状態: **現行 (2026-10-31)** — 出所: GFX_MODES_DESIGN (D1 で移した)
-ソース: `include/gfx_format.h`
+ソース: `sys/include/gfx_format.h`
 
 ## 2. 形式の層
 

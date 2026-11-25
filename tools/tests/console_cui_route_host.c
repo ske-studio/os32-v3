@@ -6,7 +6,7 @@
 #include "text_screen.h"
 #include "tvram_private.h"
 #include "console_dual.h"
-#include "gfx/v2/gfx2_int.h"
+#include "sys/hal/gfx/v2/gfx2_int.h"
 #include "pc98_route.h"
 #include "kstring.h"
 

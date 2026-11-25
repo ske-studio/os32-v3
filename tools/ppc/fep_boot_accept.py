@@ -97,7 +97,7 @@ def main():
         print('SKIP: PowerPC toolchain or HDD acceptance tools unavailable')
         return 3
     work = Path(tempfile.mkdtemp(prefix='ppc-fep-boot-'))
-    kernel = 'platform/powermac/ppc_kernel.c'
+    kernel = 'sys/platform/powermac/ppc_kernel.c'
     product = (ROOT / kernel).read_text()
     call = '        pm_exec_boot();'
     assert product.count(call) == 1
@@ -125,7 +125,7 @@ def main():
     template = work / 'template.json'
     template.write_text(json.dumps(manifest))
     # This diagnostic selects a fixture HDD to exercise dictionary loading.
-    tree = 'platform/powermac/ide_tree.c'
+    tree = 'sys/platform/powermac/ide_tree.c'
     diagnostic_tree = work / 'ide_tree.c'
     diagnostic_tree.write_text(f'#undef PM_INSTALL_MEDIA\n#include "{tree}"\n')
     shell = resident(work / 'user', False)

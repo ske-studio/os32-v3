@@ -16,7 +16,7 @@ int geforce_pc98_safe(void) { return safe; }
 int con_dual_cfg(void) { return 0; }
 void display_restore_98(void) { restored++; gfx_current_height=400; }
 void console_hw_cursor_enable(void) { redrawn++; }
-#include "../../drivers/video/pc98/pc98_route.c"
+#include "../../sys/platform/pc98/video/pc98_route.c"
 static int steps[8], n, fail_at;
 static u32 test_cell;
 static int access(void *opaque, u32 step, bool write, u32 *value)

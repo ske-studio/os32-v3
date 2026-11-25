@@ -1,6 +1,6 @@
-# include/pegc.h — 設計
+# sys/platform/pc98/pegc.h — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DESIGN (D1 で移した)
-ソース: `include/pegc.h`
+ソース: `sys/platform/pc98/pegc.h`
 
 ### 3.1 PEGC の資料上の仕様 (PC-9801 Bible §3-2、`C:\WATCOM\docs\PC9800Bible\3-2_グラフィック256色表示.md`)
 

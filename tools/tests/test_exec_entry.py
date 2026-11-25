@@ -1,8 +1,8 @@
 """Run the real x86 entry/context providers without 32-bit libc."""
 CHECK = dict(name='exec-entry-host', tier=1,
-    covers=['arch/x86/kernel/exec_entry.c', 'arch/x86/kernel/exec_context.c',
-            'arch/x86/kernel/tss.h', 'arch/x86/kernel/gdt.h', 'arch/x86/arch_exec_storage.h',
-            'include/exec_arch.h', 'include/abi.h', 'include/types.h', 'include/cpu.h',
+    covers=['sys/arch/x86/kernel/exec_entry.c', 'sys/arch/x86/kernel/exec_context.c',
+            'sys/arch/x86/kernel/tss.h', 'sys/arch/x86/kernel/gdt.h', 'sys/arch/x86/arch_exec_storage.h',
+            'sys/include/exec_arch.h', 'sys/include/abi.h', 'sys/include/types.h', 'sys/include/cpu.h',
             'tools/tests/host_arch/*.h', 'tools/tests/exec_entry_host.c',
             'tools/tests/test_exec_entry.py', 'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3,
@@ -28,8 +28,8 @@ MUTATIONS = (
 def execute(source=None):
     with tempfile.TemporaryDirectory(prefix='exec-entry-') as d:
         tmp=Path(d)
-        (tmp/'entry.c').write_text(source if source is not None else (ROOT/'arch/x86/kernel/exec_entry.c').read_text())
-        (tmp/'context.c').write_text((ROOT/'arch/x86/kernel/exec_context.c').read_text())
+        (tmp/'entry.c').write_text(source if source is not None else (ROOT/'sys/arch/x86/kernel/exec_entry.c').read_text())
+        (tmp/'context.c').write_text((ROOT/'sys/arch/x86/kernel/exec_context.c').read_text())
         exe=tmp/'test'
         p=subprocess.run(['gcc','-m32','-std=gnu11','-O2','-Wall','-Werror',
             '-Wno-unused-function','-Wno-unused-variable','-ffreestanding','-fno-pie',
@@ -44,7 +44,7 @@ if __name__=='__main__':
     status,log=execute();print(log,end='')
     if status!='pass': raise SystemExit(status)
     if '--mutate' in sys.argv:
-        original=(ROOT/'arch/x86/kernel/exec_entry.c').read_text()
+        original=(ROOT/'sys/arch/x86/kernel/exec_entry.c').read_text()
         for name,old,new in MUTATIONS:
             assert original.count(old)==1,(name,original.count(old))
             status,log=execute(original.replace(old,new))

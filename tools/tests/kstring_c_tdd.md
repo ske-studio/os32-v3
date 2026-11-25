@@ -1,16 +1,16 @@
 # 移植準備 順序 4-b — `kstring` の C 版とアセンブリ版の答え合わせ (試験の記録)
 
-- 票: 移植準備 順序 4-b (`lib/kstring_asm.asm` の C 版を用意する)。
+- 票: 移植準備 順序 4-b (`sys/kern/kstring_asm.asm` の C 版を用意する)。
   計測の正典は [`docs/tasks/portability/ARM_GAUGE.md`](../../docs/tasks/portability/ARM_GAUGE.md) §9 の
   「順序 4-b (kstring の C 版) 後」
 - 実行: `python3 -B tools/tests/test_kstring_c.py [--mutate]`
   (`make check-kstring-c-host` が `--mutate` 付きで回す)
-- 対象: `lib/kstring_asm.asm` (x86 の既定) / `lib/kstring_c.c` (C 版)
+- 対象: `sys/kern/kstring_asm.asm` (x86 の既定) / `sys/kern/kstring_c.c` (C 版)
 - ハーネス: `tools/tests/kstring_c_host.c`
 
 ## 0. 正直に書く ([V4])
 
-**試験は実装のあとに書いた。** `lib/kstring_c.c` を先に書き、そのあとで
+**試験は実装のあとに書いた。** `sys/kern/kstring_c.c` を先に書き、そのあとで
 `tools/tests/kstring_c_host.c` と `test_kstring_c.py` を書いた。だから
 「先に RED を見た」とは書けない。この記録自体はさらに後 (2026-09-15、
 文書整理 段階 E) に起こしたもので、根拠がそれまで `build/sdk.mk` の
@@ -27,9 +27,9 @@
 
 ## 2. 何を確かめる試験か
 
-1. 実物の `lib/kstring_asm.asm` を `nasm -f elf32` で組み、`objcopy` で 13 本の
+1. 実物の `sys/kern/kstring_asm.asm` を `nasm -f elf32` で組み、`objcopy` で 13 本の
    シンボルを `a_*` に改名する。
-2. 実物の `lib/kstring_c.c` をホスト ILP32 GNU89 (`-m32`) でコンパイルし、
+2. 実物の `sys/kern/kstring_c.c` をホスト ILP32 GNU89 (`-m32`) でコンパイルし、
    同じ 13 本を `c_*` に改名する。
 3. **両方を 1 つの実行ファイルにリンクし**、同じ入力で**戻り値とバッファの
    全内容 (前後の番兵を含む)** を突き合わせる。食い違ったら C 版が悪い
@@ -37,7 +37,7 @@
 
 13 本 = `kmemcpy` `memcpy` `kmemset` `memset` `kstrlen` `strlen` `kstrcmp`
 `strcmp` `kstrncmp` `strncmp` `kstrcpy` `kstrncpy` `memcmp`。
-`lib/kstring_asm.asm` の `global` 宣言と突き合わせるので、ここが増減したら
+`sys/kern/kstring_asm.asm` の `global` 宣言と突き合わせるので、ここが増減したら
 `check_symbol_set` が食い違いを検出する。
 
 比較そのものに試験対象を使わないよう、`h_*` の素朴な実装を別に持つ。
@@ -45,12 +45,12 @@ libc は使わない (`-nostdlib`、Linux の `int 0x80` で write/exit する�
 
 突き合わせる入力: 空 / 1 バイト / 4・8・16 の前後 / **0x80 以上のバイトを含む列
 (日本語の UTF-8)** / `n` が長さより長い・短い・0 / **重なりコピー (前方・後方)** /
-`kstrncpy` の埋め。`kdebug/kselftest.c` の `test_str` の既存ケースも両版で通す。
+`kstrncpy` の埋め。`sys/platform/pc98/kdebug/kselftest.c` の `test_str` の既存ケースも両版で通す。
 
 ### 重なりコピーまで一致させる理由
 
 アセンブリ版は 4 バイト単位のバルク転送 (`rep movsd` 相当) をするので、
-重なった領域の**壊れ方**が 1 バイトずつの版と違う。`lib/kstring.h` は重なりを
+重なった領域の**壊れ方**が 1 バイトずつの版と違う。`sys/kern/kstring.h` は重なりを
 保証しないと書いているが、C 版に差し替えた瞬間に壊れ方が変わると、
 **たまたま動いていた呼び出しが黙って壊れる**。だから壊れ方まで一致を要求する。
 
@@ -88,8 +88,8 @@ MUTATE alias_separate_body    RED (期待どおり落ちた)
 ## 4. この試験が言わないこと
 
 - **性能は測っていない。** C 版がアセンブリ版より遅いかどうかは対象外。
-- **x86 の既定ビルドを切り替えてはいない。** `lib/kstring_c.c` が
+- **x86 の既定ビルドを切り替えてはいない。** `sys/kern/kstring_c.c` が
   `C_KERNEL` に加わって ARM 計測の母数が 92 → 93 になったことは
   [`ARM_GAUGE.md`](../../docs/tasks/portability/ARM_GAUGE.md) §9 の側の記録。
-- 起動時自己試験 (`kdebug/kselftest.c` の `test_str`) の代替にはならない。
+- 起動時自己試験 (`sys/platform/pc98/kdebug/kselftest.c` の `test_str`) の代替にはならない。
   あちらは**実機で毎起動**、出荷するアセンブリ版を踏む。

@@ -1,6 +1,6 @@
-# kdebug/recover_wire.h — 設計
+# sys/kern/kdebug/recover_wire.h — 設計
 > 状態: **現行 (2026-10-31)** — 出所: REALHW_RECOVER_ADDENDUM.md・RECOVER_ROUTE_TEST.md・RECOVER_T4B_INJECT.md (D1 で移した)
-ソース: `kdebug/recover_wire.h`
+ソース: `sys/kern/kdebug/recover_wire.h`
 
 ## REALHW_RECOVER_ADDENDUM
 

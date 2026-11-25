@@ -22,7 +22,7 @@ typedef unsigned long  u32;
 #define EXT2_IND_BLOCK     12
 #define EXT2_DIND_BLOCK    13
 
-/* 1KiB 固定のローダ用 ext2 形式。fs/ext2/ext2.h と同名の定数は独立用の写し。 */
+/* 1KiB 固定のローダ用 ext2 形式。sys/fs/ext2/ext2.h と同名の定数は独立用の写し。 */
 #define EXT2_ADDR_PER_BLOCK          (EXT2_BLOCK_SIZE / 4)
 #define EXT2_SECTORS_PER_BLOCK       (EXT2_BLOCK_SIZE / BOOTINFO_SECLEN)
 #define EXT2_GDT_BLOCK               2
@@ -74,7 +74,7 @@ typedef unsigned long  u32;
 #define VK32_OFF_IMAGE_SIZE(n) (VK32_COMMON_SIZE + (u32)(n) * (VK32_ENTRY_SIZE + VK32_WORD_BYTES))
 #define VK32_OFF_IMAGE_CRC(n)  (VK32_OFF_IMAGE_SIZE(n) + VK32_WORD_BYTES)
 
-/* 展開先の帯 [MIN, END)。正典は include/memmap.h。
+/* 展開先の帯 [MIN, END)。正典は sys/include/memmap.h。
  * build/boot.mk が共通生成 memmap_layout.h を preinclude する。
  * 上端は固定 paging guard の手前 (MEM_LAYOUT_LOAD_END)。 */
 #define VK32_LOAD_MIN      LAYOUT_KERNEL_LOAD_ADDR
@@ -99,7 +99,7 @@ typedef unsigned long  u32;
 /* ヘッダ・エントリはバイト列を**オフセットで**読む (vk32_boot.c)。
  * 構造体は旧 v1 の説明用に残さない。 */
 
-/* ブート情報域 (0x7E00) のイメージ欄。**正典は platform/pc98/bootinfo_wire.h**。
+/* ブート情報域 (0x7E00) のイメージ欄。**正典は sys/platform/pc98/bootinfo_wire.h**。
  * ローダ (C) はカーネルのヘッダを読まないので写しを持つ。一致は
  * tools/tests/test_vk32_crc.py が名前ごとに照合する。 */
 #define BOOTINFO_BASE          0x7E00UL

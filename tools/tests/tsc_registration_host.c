@@ -1,7 +1,7 @@
 /* Check the actual TSC descriptor against the real dispatcher and policy. */
 #include "types.h"
 #include "pit.h"
-#include "kernel/io_work.h"
+#include "sys/kern/io_work.h"
 volatile u32 kctx_irq_depth;
 unsigned int irq_save(void) { return 0; }
 void irq_restore(unsigned int flags) { (void)flags; }
@@ -11,7 +11,7 @@ const struct pit_setup *pit_get_setup(void) { static const struct pit_setup p = 
 int pc98_pit_read_us(u32 *lo, u32 *hi) { *lo = *hi = 0; return 0; }
 unsigned int idle_work_compat_count(void) { return 0; }
 void idle_work_compat_run(void) {}
-#include "platform/pc98/tsc_clock.c"
+#include "sys/platform/pc98/tsc_clock.c"
 void _start(void)
 {
     int rc = io_register(&tsc_desc) == 0 ? 0 : 1;

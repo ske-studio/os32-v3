@@ -8,11 +8,11 @@ import tempfile
 import host32
 
 CHECK = dict(name='opn-chip-host', tier=1, needs=[], budget=2,
-    covers=['drivers/sound/fm/opn_chip.c', 'drivers/sound/fm/fm.h',
-            'drivers/sound/fm/opn_chip.h',
-            'drivers/sound/fm/opn_probe.h', 'tools/tests/opn_probe_hostshim/io.h',
-            'sound/hal/snd2_int.h', 'include/av_contract.h', 'sdk/include/os32/*.h',
-            'include/fm_contract.h', 'include/types.h', 'include/callconv.h',
+    covers=['sys/dev/sound/fm/opn_chip.c', 'sys/dev/sound/fm/fm.h',
+            'sys/dev/sound/fm/opn_chip.h',
+            'sys/dev/sound/fm/opn_probe.h', 'tools/tests/opn_probe_hostshim/io.h',
+            'sys/hal/sound/snd2_int.h', 'sys/include/av_contract.h', 'sdk/include/os32/*.h',
+            'sys/include/fm_contract.h', 'sys/include/types.h', 'sys/include/callconv.h',
             'tools/tests/test_opn_chip.py', 'tools/tests/opn_chip_host.c',
             'tools/tests/opn_chip_hostshim/io.h', 'tools/tests/host32.py'],
     basis=['docs/decisions/sound/AV_HAL_DESIGN.md §13',

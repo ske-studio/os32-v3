@@ -35,7 +35,7 @@
 #include "os32api.h"
 #include "inst_hdd.h"
 
-#include "include/platform_install_boot.h"
+#include "sys/include/platform_install_boot.h"
 #ifdef OS32_VERIFY_INSTALLED_FILES
 #include "inst_verify.h"
 #endif

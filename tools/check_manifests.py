@@ -476,7 +476,7 @@ def check_disk_write_paths(config=None, manifest=None):
     import re
     from pathlib import Path
     if config is None:
-        config = Path("include/config.h").read_text()
+        config = Path("sys/include/config.h").read_text()
     if manifest is None:
         manifest = yaml.safe_load(Path("userland/deploy.yaml").read_text())
     match = re.search(r'^#define\s+SYS_DISK_WRITE_PATHS\s+([^\n]+)', config, re.M)

@@ -2,9 +2,9 @@
 /*  HDD_STAGE1_HOST.C — 票 TASK_HDD_INSTALL 段 1 の純粋関数をそのまま回す    */
 /*                                                                          */
 /*  実物を 1 行も写さずに #include する:                                    */
-/*    fs/pc98pt.c          区画表の共有部 (標準配置)                   */
-/*    drivers/ata/ide_addr.c        ATA の指定の方式 (LBA28 / 現在 / 既定) と範囲 */
-/*    fs/ext2/ext2_layout.c          format の大きさの固定点 (N7)                 */
+/*    sys/fs/pc98pt.c          区画表の共有部 (標準配置)                   */
+/*    sys/dev/ata/ide_addr.c        ATA の指定の方式 (LBA28 / 現在 / 既定) と範囲 */
+/*    sys/fs/ext2/ext2_layout.c          format の大きさの固定点 (N7)                 */
 /*    userland/shell/hdprep_plan.c  hdprep の断る条件と計画                  */
 /*  記録: tools/tests/hdd_stage1_tdd.md                                     */
 /*  票  : docs/archive/realhw_v21/TASK_HDD_INSTALL.md 段 1 / §1-v3                */
@@ -18,11 +18,11 @@
 #include <string.h>
 #include <stddef.h>
 
-#include "../../fs/pc98pt.c"
-#include "../../drivers/ata/ide_addr.c"
-#include "../../fs/ext2/ext2_layout.c"
+#include "../../sys/fs/pc98pt.c"
+#include "../../sys/dev/ata/ide_addr.c"
+#include "../../sys/fs/ext2/ext2_layout.c"
 #include "../../userland/shell/hdprep_plan.c"
-#include "../../platform/pc98/install_plan.c"
+#include "../../sys/platform/pc98/install_plan.c"
 
 static int failed;
 #define CHECK(x) do { if (!(x)) { \

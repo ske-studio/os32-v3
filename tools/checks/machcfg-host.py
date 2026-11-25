@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Expected machine defaults: MACHCFG_DESIGN §3 and §7."""
 CHECK = dict(name='machcfg-host', tier=1, needs=[], budget=5,
-    covers=['include/machcfg_contract.h', 'include/types.h', 'include/callconv.h',
-            'platform/powermac/machcfg.c', 'platform/powermac/platform_machcfg.h',
-            'arch/ppc/ppc_oea.h', 'arch/ppc/ppc_boot.h', 'kernel/machcfg_root.c', 'include/config.h', 'lib/kstring.h',
-            'include/cpu.h', 'arch/x86/arch_cpu.h', 'init/sysconfig.c', 'init/sysconfig.h', 'fs/vfs.h', 'lib/kstring_c.c',
-            'tools/tests/kernel_includes.py', 'kernel/machcfg.c', 'platform/pc98/machcfg.c', 'tools/tests/machcfg_host.c',
-            'include/kprintf.h', 'include/console.h', 'sdk/include/os32/*.h',
-            'platform/pc98/kernel.c', 'platform/pc98/platform_console.h', 'lib/kprintf.c', 'lib/kprintf_format.inc',
+    covers=['sys/include/machcfg_contract.h', 'sys/include/types.h', 'sys/include/callconv.h',
+            'sys/platform/powermac/machcfg.c', 'sys/platform/powermac/platform_machcfg.h',
+            'sys/arch/ppc/ppc_oea.h', 'sys/arch/ppc/ppc_boot.h', 'sys/kern/machcfg_root.c', 'sys/include/config.h', 'sys/kern/kstring.h',
+            'sys/include/cpu.h', 'sys/arch/x86/arch_cpu.h', 'sys/kern/init/sysconfig.c', 'sys/kern/init/sysconfig.h', 'sys/fs/vfs.h', 'sys/kern/kstring_c.c',
+            'tools/tests/kernel_includes.py', 'sys/kern/machcfg.c', 'sys/platform/pc98/machcfg.c', 'tools/tests/machcfg_host.c',
+            'sys/include/kprintf.h', 'sys/include/console.h', 'sdk/include/os32/*.h',
+            'sys/platform/pc98/kernel.c', 'sys/platform/pc98/platform_console.h', 'sys/kern/kprintf.c', 'sys/kern/kprintf_format.inc',
             'tools/tests/host32.py', 'tools/tests/cc_cache.py'],
     basis=['docs/decisions/settings/MACHCFG_DESIGN.md §2, §3, §7'])
 
@@ -24,15 +24,15 @@ def run(ctx):
     import host32
     root = Path(ctx.root)
     match = re.search(r'^#define\s+SYSCONFIG_MAX\s+(\d+)\s*$',
-                      (root / 'init/sysconfig.c').read_text(), re.M)
+                      (root / 'sys/kern/init/sysconfig.c').read_text(), re.M)
     if not match:
         raise RuntimeError('SYSCONFIG_MAX definition missing')
-    source = (root / 'kernel/machcfg.c').read_text()
-    header = (root / 'include/machcfg_contract.h').read_text()
-    pc98 = (root / 'platform/pc98/machcfg.c').read_text()
-    powermac = (root / 'platform/powermac/machcfg.c').read_text()
-    loader = (root / 'kernel/machcfg_root.c').read_text()
-    boot = (root / 'platform/pc98/kernel.c').read_text()
+    source = (root / 'sys/kern/machcfg.c').read_text()
+    header = (root / 'sys/include/machcfg_contract.h').read_text()
+    pc98 = (root / 'sys/platform/pc98/machcfg.c').read_text()
+    powermac = (root / 'sys/platform/powermac/machcfg.c').read_text()
+    loader = (root / 'sys/kern/machcfg_root.c').read_text()
+    boot = (root / 'sys/platform/pc98/kernel.c').read_text()
     calls = ('kernel_boot_cpu(mem_kb, &boot);', 'machcfg_begin(platform_machcfg_seed());',
              'vfs_mount("/", boot.root_dev, boot.root_fs);', 'boot_platform_run(BOOT_AUTO_MOUNT, &boot);',
              'machcfg_load_root();', 'machcfg_report("pc98", 0, 0);', 'boot_platform_run(BOOT_CLOCK, &boot);')
@@ -64,11 +64,11 @@ def run(ctx):
     ]
     with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as tmp:
         tmp = Path(tmp)
-        formatter = (root / 'lib/kprintf.c').read_text().replace(
-            '#include "kprintf_format.inc"', (root / 'lib/kprintf_format.inc').read_text())
+        formatter = (root / 'sys/kern/kprintf.c').read_text().replace(
+            '#include "kprintf_format.inc"', (root / 'sys/kern/kprintf_format.inc').read_text())
         (tmp / 'format.c').write_text(formatter)
         gcc_headers = subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip()
-        parser = (root / 'init/sysconfig.c').read_text()
+        parser = (root / 'sys/kern/init/sysconfig.c').read_text()
         def check(src, hdr, cfg=parser, platform=pc98, root_src=loader, pm=False):
             (tmp / 'machcfg_root.c').write_text(root_src)
             (tmp / 'sysconfig.c').write_text(cfg)
@@ -85,7 +85,7 @@ def run(ctx):
                    str(tmp / 'machcfg_root.c'),
                    '-I' + str(root / 'platform/pc98'), str(tmp / 'format.c'),
                    *kernel_includes.include_flags(root), str(tmp / 'sysconfig.c'),
-                   str(root / 'lib/kstring_c.c'), str(root / 'tools/tests/machcfg_host.c'), '-o', str(exe)]
+                   str(root / 'sys/kern/kstring_c.c'), str(root / 'tools/tests/machcfg_host.c'), '-o', str(exe)]
             built = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if built.returncode:
                 return 'compile', built.stderr.decode()

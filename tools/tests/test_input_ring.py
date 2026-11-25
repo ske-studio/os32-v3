@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Internal input ring and clock contract."""
 CHECK = dict(name='input-ring-host', tier=1, budget=5, needs=[], covers=[
-    'input/hal/in2_int.h', 'input/hal/in2_ring.c', 'input/hal/in2_time.c',
-    'kernel/time/tick.c', 'kernel/time/tick_clock.h', 'include/kbd.h',
+    'sys/hal/input/in2_int.h', 'sys/hal/input/in2_ring.c', 'sys/hal/input/in2_time.c',
+    'sys/hal/time/tick.c', 'sys/hal/time/tick_clock.h', 'sys/include/kbd.h',
     'tools/tests/input_ring_host.c', 'tools/tests/test_input_ring.py', 'tools/tests/host32.py'],
     basis=['INPUT_HAL_DESIGN §3, §4, §8', 'AV_HAL_DESIGN §5-2'], kind='contract')
 import os
@@ -15,8 +15,8 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 
 def run(ctx):
-    ring = (ctx.root / 'input/hal/in2_ring.c').read_text()
-    clock = (ctx.root / 'input/hal/in2_time.c').read_text()
+    ring = (ctx.root / 'sys/hal/input/in2_ring.c').read_text()
+    clock = (ctx.root / 'sys/hal/input/in2_time.c').read_text()
     with tempfile.TemporaryDirectory(prefix='input-ring-') as td:
         tmp = Path(td)
         (tmp/'io.h').write_text('static inline unsigned irq_save(void) { return 0; }\nstatic inline void irq_restore(unsigned x) { (void)x; }\n')
@@ -24,7 +24,7 @@ def run(ctx):
             (tmp/'in2_ring.c').write_text(r)
             (tmp/'in2_time.c').write_text(t)
             cmd = ['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-I'+str(tmp), '-I'+str(ctx.root/'input/hal'), '-I'+str(ctx.root), '-I'+str(ctx.root/'include'), '-I'+str(ctx.root/'sdk/include/os32')]
-            subprocess.run(cmd + [str(tmp/'in2_ring.c'), str(tmp/'in2_time.c'), str(ctx.root/'kernel/time/tick.c'), str(ctx.root/'tools/tests/input_ring_host.c'), '-o', str(tmp/'test')], check=True)
+            subprocess.run(cmd + [str(tmp/'in2_ring.c'), str(tmp/'in2_time.c'), str(ctx.root/'sys/hal/time/tick.c'), str(ctx.root/'tools/tests/input_ring_host.c'), '-o', str(tmp/'test')], check=True)
             return host32.run([str(tmp/'test')], runner='qemu').returncode
         rc = build(ring, clock)
         assert rc == 0, rc

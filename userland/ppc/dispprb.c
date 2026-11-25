@@ -2,7 +2,7 @@
  * four-byte transfer accounting, including the reserved rows. Scroll follows
  * the circular scanout contract in docs/KAPI_SPEC.md (gfx_hardware_scroll). */
 #include "os32api.h"
-#include "../../include/app_ids.h"
+#include "../../sys/include/app_ids.h"
 #include <stdio.h>
 #include <string.h>
 

@@ -1,16 +1,16 @@
 """OBS real-C scan/ownership tests, runtime mutants and shared normal/OBS code."""
 CHECK = dict(name='splash-obs-host', tier=1,
-    covers=['drivers/video/pc98/splash_raster_image.c',
-            'drivers/video/pc98/splash_raster_plan.c', 'drivers/video/pc98/splash_raster_play.c',
-            'drivers/video/pc98/splash_raster_play.h', 'gfx/osri_profile.h',
-            'drivers/video/pc98/splash_raster.c',
-            'drivers/video/pc98/splash_raster_image.h', 'drivers/video/pc98/splash_raster.h',
-            'gfx/gfx_osri.c', 'gfx/gfx_osri.h', 'platform/pc98/splash_obs.c',
-            'platform/pc98/splash.c', 'platform/pc98/splash_image.c', 'platform/pc98/boot_splash.c',
-            'include/platform_splash.h', 'tools/tests/splash_obs_host.c',
+    covers=['sys/platform/pc98/video/splash_raster_image.c',
+            'sys/platform/pc98/video/splash_raster_plan.c', 'sys/platform/pc98/video/splash_raster_play.c',
+            'sys/platform/pc98/video/splash_raster_play.h', 'sys/kern/gfx/osri/osri_profile.h',
+            'sys/platform/pc98/video/splash_raster.c',
+            'sys/platform/pc98/video/splash_raster_image.h', 'sys/platform/pc98/video/splash_raster.h',
+            'sys/kern/gfx/osri/gfx_osri.c', 'sys/kern/gfx/osri/gfx_osri.h', 'sys/platform/pc98/splash_obs.c',
+            'sys/platform/pc98/splash.c', 'sys/platform/pc98/splash_image.c', 'sys/platform/pc98/boot_splash.c',
+            'sys/include/platform_splash.h', 'tools/tests/splash_obs_host.c',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
-            'lib/le_internal.h', 'lib/crc32_core.inc', 'lib/serial_diag.h', 'lib/kstring.h',
-            'drivers/char/serial.h', 'include/config.h', 'gfx/palette.h'],
+            'lib/le_internal.h', 'lib/crc32_core.inc', 'lib/serial_diag.h', 'sys/kern/kstring.h',
+            'sys/dev/char/serial.h', 'sys/include/config.h', 'sys/hal/gfx/palette.h'],
     needs=[], budget=9.2,
     basis=['docs/design/platform/pc98/splash_obs.c.md 流れ', 'docs/design/drivers/video/pc98/splash_raster_plan.c.md 列の作り方', 'docs/design/drivers/video/pc98/splash_raster_play.c.md 1 フレームの手順', 'docs/design/gfx/osri_profile.h.md 本数の数え方 (ゲストとホストで同じ)'],
 )
@@ -28,15 +28,15 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PLAYER = 'drivers/video/pc98/splash_raster_play.c'
-PLAN = 'drivers/video/pc98/splash_raster_plan.c'
-PREVIEW = 'drivers/video/pc98/splash_raster_image.c'
-OWNER = 'platform/pc98/splash_obs.c'
-HEADER = 'gfx/gfx_osri.h'
-SOURCES = [PLAYER, PLAN, PREVIEW, 'gfx/osri_profile.h',
-           'drivers/video/pc98/splash_raster_play.h', OWNER, HEADER, 'gfx/gfx_osri.c',
-           'drivers/video/pc98/splash_raster_image.h', 'include/platform_splash.h',
-           'platform/pc98/boot_splash.c', 'lib/le_internal.h', 'lib/crc32_core.inc',
+PLAYER = 'sys/platform/pc98/video/splash_raster_play.c'
+PLAN = 'sys/platform/pc98/video/splash_raster_plan.c'
+PREVIEW = 'sys/platform/pc98/video/splash_raster_image.c'
+OWNER = 'sys/platform/pc98/splash_obs.c'
+HEADER = 'sys/kern/gfx/osri/gfx_osri.h'
+SOURCES = [PLAYER, PLAN, PREVIEW, 'sys/kern/gfx/osri/osri_profile.h',
+           'sys/platform/pc98/video/splash_raster_play.h', OWNER, HEADER, 'sys/kern/gfx/osri/gfx_osri.c',
+           'sys/platform/pc98/video/splash_raster_image.h', 'sys/include/platform_splash.h',
+           'sys/platform/pc98/boot_splash.c', 'lib/le_internal.h', 'lib/crc32_core.inc',
            'tools/tests/splash_obs_host.c']
 MUTATIONS = (
     ('prepare capacity', PLAN, 'image->count > OSRI_IMAGE_EVENTS', 'image->count >= OSRI_IMAGE_EVENTS'),
@@ -51,8 +51,8 @@ MUTATIONS = (
     ('max stats', PLAN, 'plan->max_outs = r->count;', 'plan->max_outs = 0;'),
     ('total stats', PLAN, 'plan->total_outs += r->count;', 'plan->total_outs = r->count;'),
     ('early selection', PLAYER, 'if (r->count) outp(PAL_IDX_PORT, r->first);', '(void)r;'),
-    ('duplicate', 'gfx/gfx_osri.c', 'if (seen & (1u << ev->index)) goto done;', 'if (0 && (seen & (1u << ev->index))) goto done;'),
-    ('6384 bound', 'gfx/gfx_osri.c', 'OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS)', 'OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS - 1)'),
+    ('duplicate', 'sys/kern/gfx/osri/gfx_osri.c', 'if (seen & (1u << ev->index)) goto done;', 'if (0 && (seen & (1u << ev->index))) goto done;'),
+    ('6384 bound', 'sys/kern/gfx/osri/gfx_osri.c', 'OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS)', 'OSRI_V1_MAX_EVENTS : OSRI_V2_MAX_EVENTS - 1)'),
     ('next index', PLAN, 'r->value[r->count++] = e->index;', 'r->value[r->count++] = 0;'),
     ('low rearm', PLAYER, 'else if (armed) {\n            emit(r);', 'else {\n            emit(r);'),
     ('missing CLI', PLAYER, 'unsigned int flags = irq_save();', 'unsigned int flags = 1; (void)irq_save;'),

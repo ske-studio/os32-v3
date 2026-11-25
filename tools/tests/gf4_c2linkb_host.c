@@ -11,10 +11,10 @@
 #include "gf_startlog_host.h"
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
-#include "../../hwdev/gf/production.h"
-#include "../../drivers/video/geforce/geforce_module.h"
+#include "../../sys/dev/video/geforce/production.h"
+#include "../../sys/dev/video/geforce/geforce_module.h"
 #ifndef GF4_LINKS_SOURCE
-#define GF4_LINKS_SOURCE "../../hwdev/gf/display/links.c"
+#define GF4_LINKS_SOURCE "../../sys/dev/video/geforce/display/links.c"
 #endif
 #include GF4_LINKS_SOURCE
 

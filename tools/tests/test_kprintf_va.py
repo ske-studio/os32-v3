@@ -1,7 +1,7 @@
 """Real freestanding ILP32 renderer: word-vector and native variadic entries."""
 CHECK = dict(name='kprintf-va-host', tier=4,
-    covers=['lib/kprintf.c', 'lib/kprintf_format.inc', 'platform/pc98/platform_console.h', 'include/kprintf.h', 'include/console.h',
-            'include/types.h', 'sdk/include/os32/*.h', 'tools/tests/host32.py'],
+    covers=['sys/kern/kprintf.c', 'sys/kern/kprintf_format.inc', 'sys/platform/pc98/platform_console.h', 'sys/include/kprintf.h', 'sys/include/console.h',
+            'sys/include/types.h', 'sdk/include/os32/*.h', 'tools/tests/host32.py'],
     needs=[], budget=3.1,
     basis=['KAPI_SPEC'],
 )
@@ -95,11 +95,11 @@ def execute(source):
 
 
 def main(mutate=False):
-    # 書式の本体は雛形 lib/kprintf_format.inc。1 本のソースに展開して組む (変異は雛形の中)。
-    source = (ROOT / 'lib/kprintf.c').read_text()
+    # 書式の本体は雛形 sys/kern/kprintf_format.inc。1 本のソースに展開して組む (変異は雛形の中)。
+    source = (ROOT / 'sys/kern/kprintf.c').read_text()
     include = '#include "kprintf_format.inc"\n'
     assert source.count(include) == 1
-    source = source.replace(include, (ROOT / 'lib/kprintf_format.inc').read_text())
+    source = source.replace(include, (ROOT / 'sys/kern/kprintf_format.inc').read_text())
     assert execute(source) == 0
     print('PASS vector/native/expected output (qemu, freestanding ILP32)', flush=True)
     if mutate:

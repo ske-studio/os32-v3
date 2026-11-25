@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Trident RAM transfer policies and direct VRAM synchronization."""
 CHECK = dict(name='trident-present', tier=1, needs=[], budget=3.8,
-    covers=['include/copy_units.h', 'arch/*/arch_copy.h', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'include/gfx_sync.h', 'include/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'drivers/video/trident/present.c', 'drivers/video/trident/trident.h',
-            'tools/tests/trident_present_host.c', 'tools/tests/trident_sync_fake.c', 'include/gfx_sync.h', 'gfx/sync/sync_int.h', 'gfx/v2/gfx2_int.h', 'tools/tests/trident_device_fake.c',
+    covers=['sys/include/copy_units.h', 'arch/*/arch_copy.h', 'sys/hal/gfx/sync/sync_int.h', 'sys/hal/gfx/v2/gfx2_int.h', 'sys/include/gfx_sync.h', 'sys/hal/gfx/gfx_hal2.h', 'sdk/include/os32/os32_gfx2.h', 'sys/dev/video/trident/present.c', 'sys/dev/video/trident/trident.h',
+            'tools/tests/trident_present_host.c', 'tools/tests/trident_sync_fake.c', 'sys/include/gfx_sync.h', 'sys/hal/gfx/sync/sync_int.h', 'sys/hal/gfx/v2/gfx2_int.h', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_device_fake.h', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py', 'drivers/video/trident/regs.c',
-            'gfx/gfx_internal.h', 'gfx/gfx.h', 'include/gfx_hal.h', 'include/gfx_format.h',
-            'include/gfx_mode.h', 'mm/kmalloc.h', 'sdk/include/os32/os32_kapi_shared.h',
-            'sdk/include/os32/os32_generations.h', 'include/types.h', 'include/memmap.h',
-            'include/pegc.h', 'include/pc98.h', 'gfx/palette.h', 'build/config.mk'],
+            'tools/tests/kernel_includes.py', 'sys/dev/video/trident/regs.c',
+            'sys/hal/gfx/gfx_internal.h', 'sys/hal/gfx/gfx.h', 'sys/include/gfx_hal.h', 'sys/include/gfx_format.h',
+            'sys/include/gfx_mode.h', 'sys/kern/mm/kmalloc.h', 'sdk/include/os32/os32_kapi_shared.h',
+            'sdk/include/os32/os32_generations.h', 'sys/include/types.h', 'sys/include/memmap.h',
+            'sys/platform/pc98/pegc.h', 'sys/platform/pc98/pc98.h', 'sys/hal/gfx/palette.h', 'build/config.mk'],
     basis=['HAL_V2_DESIGN §10', 'TRIDENT_FULL_DESIGN'],
 )
 import argparse
@@ -20,7 +20,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'drivers/video/trident/present.c'
+SOURCE = ROOT / 'sys/dev/video/trident/present.c'
 MUTANTS = [
     ('skip-sync', 'int rc = tri_sync(d);', 'int rc = TRI_OK;'),
     ('drop-rc', 'if (rc) return rc;\n    if (!d->res', 'if (rc) return TRI_OK;\n    if (!d->res'),
@@ -50,7 +50,7 @@ def main():
                 '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie',
                 '-fno-stack-protector', '-nostdlib', '-static', '-no-pie',
                 '-I' + str(ROOT), '-I' + str(ROOT / 'drivers/video/trident'),
-                *include_flags(ROOT), str(path), str(ROOT / 'drivers/video/trident/regs.c'), str(ROOT / 'tools/tests/trident_device_fake.c'), str(ROOT / 'tools/tests/trident_sync_fake.c'),
+                *include_flags(ROOT), str(path), str(ROOT / 'sys/dev/video/trident/regs.c'), str(ROOT / 'tools/tests/trident_device_fake.c'), str(ROOT / 'tools/tests/trident_sync_fake.c'),
                 str(ROOT / 'tools/tests/trident_present_host.c'), '-o', str(exe)], check=True)
             for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
                 result = host32.run([str(exe)], runner=runner, capture_output=True)

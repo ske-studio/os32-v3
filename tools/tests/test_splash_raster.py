@@ -1,9 +1,9 @@
 """Shared palette player: rational scan model, IRQ windows and runtime mutants."""
 CHECK = dict(name='splash-raster-host', tier=1,
-    covers=['gfx/osri_profile.h', 'drivers/video/pc98/splash_raster.c', 'drivers/video/pc98/splash_raster.h',
+    covers=['sys/kern/gfx/osri/osri_profile.h', 'sys/platform/pc98/video/splash_raster.c', 'sys/platform/pc98/video/splash_raster.h',
             'tools/tests/splash_raster_host.c', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py', 'gfx/gfx_osri.h', 'gfx/gfx.h',
-            'include/types.h', 'include/pc98.h', 'include/pegc.h', 'include/sys.h', 'gfx/palette.h',
+            'tools/tests/kernel_includes.py', 'sys/kern/gfx/osri/gfx_osri.h', 'sys/hal/gfx/gfx.h',
+            'sys/include/types.h', 'sys/platform/pc98/pc98.h', 'sys/platform/pc98/pegc.h', 'sys/include/sys.h', 'sys/hal/gfx/palette.h',
             'sdk/include/os32/os32_kapi_shared.h'],
     needs=[], budget=4.7,
     basis=['docs/design/drivers/video/pc98/splash_raster.c.md begin の判定', 'docs/design/drivers/video/pc98/splash_raster.c.md 公開の表 (table) の再生', 'docs/design/drivers/video/pc98/splash_raster.h.md 周期の定数 (Subsystem 層)'],
@@ -19,7 +19,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'drivers/video/pc98/splash_raster.c'
+SOURCE = 'sys/platform/pc98/video/splash_raster.c'
 HARNESS = 'tools/tests/splash_raster_host.c'
 MUTATIONS = (
     ('D1 contaminates mode', 'inp(PEGC_HSYNC_PORT) & PEGC_HSYNC_READ_HF',

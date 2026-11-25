@@ -128,7 +128,7 @@ def generate(directory):
     lines += [' * DO NOT EDIT. Regenerate with the pinned reference sources.',
               ' * Each usage is listed; KS_voidSymbol rows have no mapped meaning.',
               ' * Metadata accessors belong to S2h, not this generated table.', ' */',
-              license_text, '#include "input/hal/keymap.h"', '',
+              license_text, '#include "sys/hal/input/keymap.h"', '',
               'const KmEntry hid_jp_entries[256] = {']
     for usage, row in enumerate(entries):
         lines.append('    {0x%04x, {0x%04x, 0x%04x}, {0x%04x, 0x%04x}}, /* 0x%02x %s */'
@@ -158,7 +158,7 @@ def generate(directory):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-dir', type=Path, default=DEFAULT_SOURCE)
-    parser.add_argument('--output', type=Path, default=ROOT/'input/keymaps/hid_jp.c')
+    parser.add_argument('--output', type=Path, default=ROOT/'sys/input/keymaps/hid_jp.c')
     args = parser.parse_args()
     try:
         output = generate(args.source_dir)

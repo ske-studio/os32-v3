@@ -67,7 +67,7 @@ u8 unicode_to_ank(u32 cp) { return cp < 0x80 ? (u8)cp : 0; }
 u16 unicode_to_jis(u32 cp) { return cp == 0x3042 ? 0x2422 : 0; }
 #include "console_source.inc"
 #ifndef BASELINE
-#include "platform/pc98/console.c"
+#include "sys/platform/pc98/console.c"
 #endif
 static void snapshot(u32 label)
 {

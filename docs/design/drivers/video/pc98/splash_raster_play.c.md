@@ -1,7 +1,7 @@
-# drivers/video/pc98/splash_raster_play.c — 画像の 1 フレームを H の辺を数えて再生する
+# sys/platform/pc98/video/splash_raster_play.c — 画像の 1 フレームを H の辺を数えて再生する
 
 > 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
-ソース: `drivers/video/pc98/splash_raster_play.c`・`drivers/video/pc98/splash_raster_play.h`
+ソース: `sys/platform/pc98/video/splash_raster_play.c`・`sys/platform/pc98/video/splash_raster_play.h`
 
 ## 口の契約
 
@@ -9,7 +9,7 @@
 - 戻り値は `PL_FRAME_OK` (0)、`PL_FRAME_DROP` (1、このフレームは途中で打ち切り、次のフレームで初期色から戻る)、`PL_FRAME_NO_SYNC` (-1、待ちの上限に達した)。
 - `pl_v2_frame_poll(..., poll, ctx)` は VBLANK を待った後に poll を呼び、非 0 なら `PL_FRAME_CANCEL` (2) を返す。ビューアーの中止に使う。
 - 前提は state の checked と dynamic_ok と、入口が IF=1 であること。違えば何もせず NO_SYNC。入口の IF はどの出口でも元に戻す。
-- 起動 (`platform/pc98/splash_image.c`)・観測の像 (`platform/pc98/splash_obs.c`)・ビューアー (`drivers/video/pc98/backend_pc98_osri.c`) が同じ関数を使う。
+- 起動 (`sys/platform/pc98/splash_image.c`)・観測の像 (`sys/platform/pc98/splash_obs.c`)・ビューアー (`sys/platform/pc98/video/backend_pc98_osri.c`) が同じ関数を使う。
 
 ## 1 フレームの手順
 

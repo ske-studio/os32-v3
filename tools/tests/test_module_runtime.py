@@ -2,7 +2,7 @@
 記録: tools/tests/module_runtime_tdd.md
 """
 CHECK = dict(name='module-runtime-host', tier=1,
-    covers=['arch/x86/arch_exec_cache.h', 'arch/ppc/arch_exec_cache.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'lib/le_internal.h', 'tools/tests/module_runtime_host.c', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/arch/x86/arch_exec_cache.h', 'sys/arch/ppc/arch_exec_cache.h', 'sys/kern/module/module_runtime.c', 'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.c', 'sys/kern/module/module_image.h', 'sys/kern/module/module_schema.h', 'sys/kern/mm/pgalloc.h', 'sys/include/types.h', 'sys/include/memmap.h', 'sys/fs/vfs.c', 'sys/fs/vfs.h', 'sys/dev/base/dev.c', 'sys/hal/block/dev.h', 'sys/dev/block/disk.h', 'sys/dev/ata/atapi.h', 'sys/dev/block/fdc.h', 'sys/include/console.h', 'sys/include/kbd.h', 'sys/platform/pc98/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'sys/kern/kstring.h', 'lib/le_internal.h', 'tools/tests/module_runtime_host.c', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'sys/fs/vfs_device.h', 'sys/platform/pc98/boot_names.h', 'sys/platform/pc98/boot_names.c', 'sys/dev/ata/ide.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=4.8,
     kind='characterization',
 )
@@ -22,7 +22,7 @@ FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werro
          '-ffunction-sections', '-fdata-sections']
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'kernel/module/module_runtime.c'
+SOURCE = ROOT / 'sys/kern/module/module_runtime.c'
 INCLUDES = include_flags(ROOT)
 
 
@@ -58,8 +58,8 @@ def main():
         (folder / 'arch_exec_cache.h').write_text(
             '#include "types.h"\nvoid arch_exec_publish(void *dst, u32 bytes);\n')
 
-        def build(source, vfs=ROOT / 'fs/vfs.c', dev=ROOT / 'drivers/base/dev.c',
-                  validator=ROOT / 'kernel/module/module_image.c'):
+        def build(source, vfs=ROOT / 'sys/fs/vfs.c', dev=ROOT / 'sys/dev/base/dev.c',
+                  validator=ROOT / 'sys/kern/module/module_image.c'):
             subprocess.run(['gcc', *FLAGS, '-Werror=vla', '-Wno-unused-parameter', '-DMODULE_CACHE_SPY', '-I' + str(folder), *INCLUDES,
                             '-nostdinc', '-isystem', subprocess.check_output(
                                 ['gcc', '-print-file-name=include'], text=True).strip(),
@@ -131,7 +131,7 @@ def main():
                 build(mutant)
                 run(cases, expected=1)
                 print(f'MUTATE {label} RED (runtime assertions)', flush=True)
-            validator = (ROOT / 'kernel/module/module_image.c').read_text()
+            validator = (ROOT / 'sys/kern/module/module_image.c').read_text()
             for label, condition, case in (
                     ('missing-pair-accepted', '!policy->img_valid', ('getter-failed', 13, 5)),
                     ('wrong-pair-accepted', 'h[MI_PAIR_CRC] != policy->pair_image_crc',
@@ -142,14 +142,14 @@ def main():
                 build(SOURCE, validator=mutant)
                 run([case], expected=1)
             for label, path, old, new, cases in (
-                ('fs-full-silent', ROOT / 'fs/vfs.c',
+                ('fs-full-silent', ROOT / 'sys/fs/vfs.c',
                  'if (num_fs == VFS_MAX_FS) return VFS_ERR_FULL;',
                  'if (num_fs == VFS_MAX_FS) return VFS_OK;', [('registry-full-unmount-reuse', 12, 0)]),
-                ('fs-mounted-remove', ROOT / 'fs/vfs.c',
+                ('fs-mounted-remove', ROOT / 'sys/fs/vfs.c',
                  'if (mounts[i].in_use && mounts[i].ops == ops) return VFS_ERR_BUSY;',
                  'if (0 && mounts[i].in_use && mounts[i].ops == ops) return VFS_ERR_BUSY;',
                  [('registry-full-unmount-reuse', 12, 0)]),
-                ('device-remove-missing', ROOT / 'drivers/base/dev.c',
+                ('device-remove-missing', ROOT / 'sys/dev/base/dev.c',
                  'while (++i < dev_num) dev_table[i - 1] = dev_table[i];',
                  'return 0;', [('registered-start-failure-0', 11, 0)]),
             ):

@@ -2,8 +2,8 @@
 
 契約の正典: `docs/design/kernel/kbd_inject.md` (注入リング) と `docs/design/exec/appslot_transition.md`
 (kbd 待ちの park と resume)。出所は票 TASK_K7_input の §1 D1〜D7 / §5 (R1 / R2 / B / C / D)。
-実装: `kernel/kbd_inject.c` + `include/kbd_inject.h` / `drivers/input/kbd.c` / `exec/appslot.c` + `exec/appslot.h` /
-`exec/exec.c` (`exec_park_kbd` / `exec_resume` の kbd 分岐。今の `exec_resume` は `exec/exec_schedule.inc`) / `kdebug/kselftest.c` / `sdk/kapi.json` (v47)
+実装: `sys/kern/kbd_inject.c` + `sys/include/kbd_inject.h` / `sys/platform/pc98/input/kbd.c` / `sys/kern/exec/appslot.c` + `sys/kern/exec/appslot.h` /
+`sys/kern/exec/exec.c` (`exec_park_kbd` / `exec_resume` の kbd 分岐。今の `exec_resume` は `sys/kern/exec/exec_schedule.inc`) / `sys/platform/pc98/kdebug/kselftest.c` / `sdk/kapi.json` (v47)
 試験: `tools/tests/kbd_inject_host.c` + `test_kbd_inject.py` (`make check-kbd-inject-host`) と
 `tools/tests/multiapp_impl_host.c` のケース 19 (`make check-multiapp-model-host`)
 
@@ -11,10 +11,10 @@
 
 `con_sink_tdd.md` / `k5b_kernel_tdd.md` と同じで、**模型ではなく実物**を見る:
 
-1. `kbd_inject_host.c` が `kernel/kbd_inject.c` を `#include` する (1 行も写さない)。
-   権限の照合相手も模型にしない — **`kernel/console/con_sink.c` を同じ翻訳単位に入れ**、
+1. `kbd_inject_host.c` が `sys/kern/kbd_inject.c` を `#include` する (1 行も写さない)。
+   権限の照合相手も模型にしない — **`sys/kern/console/con_sink.c` を同じ翻訳単位に入れ**、
    読み手の確立は本物の `con_sink_read()` で行う (注入の権限 = con_sink の読み手 1 本、票 §5 R2)。
-2. `multiapp_impl_host.c` は実物の `exec/appslot.c` と `kernel/kbd_inject.c` の両方を取り込み、
+2. `multiapp_impl_host.c` は実物の `sys/kern/exec/appslot.c` と `sys/kern/kbd_inject.c` の両方を取り込み、
    K5a の 84 検査に加えてケース 19 (第 2 の park 点) を回す。
 3. ホスト ILP32 GNU89 (`gcc -m32 -march=i386 -ffreestanding -Werror -nostdlib`) で走らせ、
    **同じソース**をカーネルと同じフラグの `i386-elf-gcc -Werror` でもコンパイルする ([C1])。
@@ -22,7 +22,7 @@
 con_sink の排他は include パスで IRQ 状態模型へ差し替える。
 注入リングは既存の `-DKBD_INJECT_NO_IRQ_LOCK` を使う (CPL=3 では特権命令を実行できない)。`make`・エミュレータ・配備は使わない。
 
-`exec/exec.c` はホストに持ち込めない (CR3 / setjmp / ページテーブル)。ケース 19 は
+`sys/kern/exec/exec.c` はホストに持ち込めない (CR3 / setjmp / ページテーブル)。ケース 19 は
 `exec_park_kbd` / `exec_resume` の **kbd 分岐 3 行だけ**をハーネスへ写す
 (`ma_park_kbd` / `ma_resume_kbd`) — K5a のケース 12〜16 が gshell の選択規則を写しているのと
 同じ扱いで、写した部分の正しさは言わない。
@@ -56,7 +56,7 @@ con_sink の排他は include パスで IRQ 状態模型へ差し替える。
 ## RED → GREEN
 
 実装を 1 か所ずつ「ありそうな間違い」に差し替えて、試験が**その間違いだけ**を捕まえることを見た。
-差し替えは全部戻してある (`kernel/kbd_inject.c` / `exec/appslot.c` は GREEN の形)。
+差し替えは全部戻してある (`sys/kern/kbd_inject.c` / `sys/kern/exec/appslot.c` は GREEN の形)。
 
 ### R1 — 注入の権限を見ない (誰でも注げる)
 
@@ -160,10 +160,10 @@ TARGET i386-elf GNU89 -Werror COMPILE PASS
 
 - **実機のことは何も言わない。** 受入 I1〜I5 (ゲスト) は 1 つも実施していない。
   `make` も配備もエミュレータ操作も行っていない ([V4])。
-- `exec/exec.c` の実物 (`exec_park_kbd` の longjmp / フレーム 13 語の保存 / CR3 の載せ替え /
+- `sys/kern/exec/exec.c` の実物 (`exec_park_kbd` の longjmp / フレーム 13 語の保存 / CR3 の載せ替え /
   `exec_resume` の `ring3_resume`) はホストに持ち込めないので通っていない。ケース 19 が
   見ているのは表 (`appslot.c`) とリング (`kbd_inject.c`) の噛み合わせだけ。
-- `drivers/input/kbd.c` の分岐 (GUI 中だけ注入リングを見る / `hlt` へ落ちる境界) は
+- `sys/platform/pc98/input/kbd.c` の分岐 (GUI 中だけ注入リングを見る / `hlt` へ落ちる境界) は
   クロスコンパイルが通ることしか見ていない。IRQ1・`hlt`・rshell のタイムアウトは
   ホストに無い。CUI 経路が本当に無変更かは回帰 (受入 I4) の担当。
 - KAPI 経由 (CPL=3 の `int 0x80`、ディスパッチャのポインタ検証) は通っていない。

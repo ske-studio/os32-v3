@@ -1,7 +1,7 @@
 /* Actual relocated SQLite body, full resident adapter and NASM stack switch. */
 #define OS32_SQLITE_OUTER_IMPL
-#include "input/hal/input_context.h"
-#include "input/hal/in2_int.h"
+#include "sys/input/input_context.h"
+#include "sys/hal/input/in2_int.h"
 void input_ime_action_flush(void) {}
 void input_context_focus_register(void (*flush)(void)) { (void)flush; }
 int input_context_snapshot(KbdPolicySnapshot *out) { (void)out; return -1; }
@@ -1299,7 +1299,7 @@ void _start(void)
     finish(0);
 }
 
-#include "../../platform/pc98/module_pair.c"
+#include "../../sys/platform/pc98/module_pair.c"
 
 const struct boot_common *boot_common_get(void) {
     static struct boot_common info;

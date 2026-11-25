@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """C1: the console takes its grid, default colour and route guard from the backend."""
 CHECK = dict(name='sep5-console-host', tier=1, needs=[], budget=10,
-    covers=['kernel/console/console.c', 'kernel/console/console_backend.h',
-            'platform/pc98/console.c', 'platform/pc98/tvram_private.h', 'include/text_screen.h',
-            'drivers/video/pc98/pc98_route.h', 'lib/utf8.c', 'lib/utf8.h',
+    covers=['sys/kern/console/console.c', 'sys/kern/console/console_backend.h',
+            'sys/platform/pc98/console.c', 'sys/platform/pc98/tvram_private.h', 'sys/include/text_screen.h',
+            'sys/platform/pc98/video/pc98_route.h', 'lib/utf8.c', 'lib/utf8.h',
             'tools/tests/sep5_console_host.c', 'tools/tests/sep5_console_pc98_host.c',
             'tools/tests/test_sep5_console.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'include/**',
@@ -17,8 +17,8 @@ import tempfile
 import host32
 from kernel_includes import include_flags
 ROOT = Path(__file__).resolve().parents[2]
-CONSOLE = 'kernel/console/console.c'
-BACKEND = 'platform/pc98/console.c'
+CONSOLE = 'sys/kern/console/console.c'
+BACKEND = 'sys/platform/pc98/console.c'
 # (name, unique anchor, replacement, exit code of the first expectation that must
 # fail). 98/99 = the console left the backend's grid. Codes end in the grid index
 # (0 = 80x25, 1 = 40x10): a stale 80/25 constant only shows on the second grid.
@@ -89,7 +89,7 @@ def boundary():
     console = (ROOT / CONSOLE).read_text()
     for word in ('pc98', 'TVRAM_COLS', 'TVRAM_ROWS', 'TATTR_', 'TVRAM_BASE', 'TVRAM_ATTR'):
         assert word not in console, word
-    header = (ROOT / 'include/text_screen.h').read_text()
+    header = (ROOT / 'sys/include/text_screen.h').read_text()
     assert '#include "pc98.h"' not in header and '#define' not in header.replace('#define OS32_TEXT_SCREEN_H', '')
 
 

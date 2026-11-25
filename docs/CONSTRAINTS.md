@@ -12,7 +12,7 @@
 
 ### [C2] カーネルの文字列操作
 
-**規則**: `lib/kstring.h` の `kstrncpy` / `kstrncat` / `kstrlen` / `kstrcmp` を使い、libc の同等品を呼ばない。
+**規則**: `sys/kern/kstring.h` の `kstrncpy` / `kstrncat` / `kstrlen` / `kstrcmp` を使い、libc の同等品を呼ばない。
 
 **理由**: カーネルは newlib とリンクされない。
 

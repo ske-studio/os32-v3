@@ -2,7 +2,7 @@
 """A1 declaration/layout evidence only; no dispatcher implementation or stub."""
 CHECK = dict(name='io-work-header-host', tier=1, budget=10, needs=[], covers=[
     'tools/tests/test_io_work_header.py', 'tools/tests/host32.py',
-    'kernel/io_work.h', 'include/types.h', 'include/callconv.h'],
+    'sys/kern/io_work.h', 'sys/include/types.h', 'sys/include/callconv.h'],
     basis=['IO_TIER_DESIGN §4'],
 )
 from pathlib import Path
@@ -49,7 +49,7 @@ def exercise(root, work, header):
 
 
 def run(ctx):
-    header = (ctx.root / 'kernel/io_work.h').read_text()
+    header = (ctx.root / 'sys/kern/io_work.h').read_text()
     with tempfile.TemporaryDirectory(prefix='io-work-header-') as td:
         work = Path(td)
         assert exercise(ctx.root, work, header) == 0

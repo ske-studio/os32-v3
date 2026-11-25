@@ -5,8 +5,8 @@
 
 票 docs/archive/v3/TASK_T1_LEDGER.md §4-4 (T1d、D33・X4)。旧 DEVICE_RESERVATION の
 核 (pgalloc_device_reserve / sys_device_reserve_core) を台帳の ledger_reserve_set
-に載せ直したので、その試験をここで流用・拡張する。mm/pgalloc.c と
-platform/pc98/pci_resources.c を丸ごと、drivers/pci/pci.c からは読み口 pci_get だけを
+に載せ直したので、その試験をここで流用・拡張する。sys/kern/mm/pgalloc.c と
+sys/platform/pc98/pci_resources.c を丸ごと、sys/dev/pci/pci.c からは読み口 pci_get だけを
 切り出して取り込む (特権命令の irq_save / irq_restore だけを贋物にし、
 irq_restore の度に L1 / L2 の不変条件を全ページ検査する — test_ledger.py と同じ
 足場)。見るもの:
@@ -50,10 +50,10 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import test_ledger as L  # noqa: E402
 
 ROOT = L.ROOT
-SOURCES = ('mm/pgalloc.c',
+SOURCES = ('sys/kern/mm/pgalloc.c',
            'tools/tests/pgalloc_host_fixture.h',
-           'platform/pc98/pci_resources.c', 'drivers/pci/pci.c', 'mm/paging.c', 'kernel/sys.c',
-           'platform/pc98/kernel.c')
+           'sys/platform/pc98/pci_resources.c', 'sys/dev/pci/pci.c', 'sys/kern/mm/paging.c', 'sys/kern/sys.c',
+           'sys/platform/pc98/kernel.c')
 
 
 def load(mutation=None):
@@ -67,7 +67,7 @@ def load(mutation=None):
 
 
 def pci_reader(pci_c):
-    """drivers/pci/pci.c から読み口 pci_get の本体だけを切り出す (I/O を触らない)。"""
+    """sys/dev/pci/pci.c から読み口 pci_get の本体だけを切り出す (I/O を触らない)。"""
     head = 'int pci_get(u32 idx, void *out)'
     body = pci_c.split(head, 1)[1]
     return head + body.split('\n}\n', 1)[0] + '\n}\n'
@@ -629,18 +629,18 @@ BODIES['cardbus'] = r"""
 
 def run_c(texts, body):
     """本体を組んで実行し、(成功, 出力) を返す。"""
-    extra = (EXTRA.replace('@PCI_READER@', pci_reader(texts['drivers/pci/pci.c']))
-             .replace('@LEDGER_PCI@', pci_source(texts['platform/pc98/pci_resources.c'])))
+    extra = (EXTRA.replace('@PCI_READER@', pci_reader(texts['sys/dev/pci/pci.c']))
+             .replace('@LEDGER_PCI@', pci_source(texts['sys/platform/pc98/pci_resources.c'])))
     post = L.POST.replace('static int test(void) {', extra + 'static int test(void) {', 1)
     with tempfile.TemporaryDirectory(prefix='os32-devres-') as tmp:
         tmp = pathlib.Path(tmp)
         (tmp / 'pgalloc_host_fixture.h').write_text(texts['tools/tests/pgalloc_host_fixture.h'])
-        src = texts['mm/pgalloc.c'].replace('#include "io.h"', '')
+        src = texts['sys/kern/mm/pgalloc.c'].replace('#include "io.h"', '')
         (tmp / 'test.c').write_text(L.PRE + src + post + body + L.END)
         cmd = ['gcc', *linker_flags()] + L.FLAGS + ['-I' + str(tmp)]
         cmd += include_flags(ROOT)
-        build = subprocess.run(cmd + [str(tmp / 'test.c'), str(ROOT / 'mm/physmem.c'),
-                                      str(ROOT / 'drivers/pci/pci_decode.c'),
+        build = subprocess.run(cmd + [str(tmp / 'test.c'), str(ROOT / 'sys/kern/mm/physmem.c'),
+                                      str(ROOT / 'sys/dev/pci/pci_decode.c'),
                                       '-o', str(tmp / 'test')], capture_output=True, text=True)
         if build.returncode:
             return False, 'compile\n' + build.stderr
@@ -657,14 +657,14 @@ def stage_run(texts):
             source = source.replace('irq_save()', 'host_irq_save()').replace('irq_restore(flags)', 'host_irq_restore(flags)')
             (tmp / f'{unit}_host_source.c').write_text(source)
         cmd = ['gcc', *linker_flags(), '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie', '-ffunction-sections', '-Wl,--gc-sections', '-DPHYSMEM_HOST_TEST=1']
-        # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約
+        # arch/x86 + platform/pc98: sys/include/io.h / sys/include/cpu.h は契約
         # だけで、実装は固定名 arch_io.h / arch_cpu.h / platform_io.h を
         # 引く (順序 3・5)。CR0 / CR3 を触る arch_cpu.h だけは、ホストでは
         # tools/tests/host_arch/ の実装が先に見つかるようにする。
         cmd += ['-I' + str(ROOT / 'tools/tests/host_arch')]
         cmd += include_flags(ROOT) + ['-I' + str(tmp)]
         build = subprocess.run(cmd + [str(ROOT / 'tools/tests/device_reservation_stage_host.c'),
-                                      str(ROOT / 'mm/physmem.c'), '-o', str(tmp / 'test')],
+                                      str(ROOT / 'sys/kern/mm/physmem.c'), '-o', str(tmp / 'test')],
                                capture_output=True, text=True)
         if build.returncode:
             return False, 'compile\n' + build.stderr
@@ -742,7 +742,7 @@ class DeviceReservation(unittest.TestCase):
     def test_old_broker_is_gone(self):
         # 旧 broker (pgalloc_device_reserve / sys_device_reserve_core) は T1d で
         # ledger_reserve_set に載せ直した。生の {first, end} を予約権限にする口を残さない。
-        for rel in ('mm/pgalloc.h', 'include/sys.h', 'mm/pgalloc.c', 'kernel/sys.c'):
+        for rel in ('sys/kern/mm/pgalloc.h', 'sys/include/sys.h', 'sys/kern/mm/pgalloc.c', 'sys/kern/sys.c'):
             text = (ROOT / rel).read_text()
             for name in ('pgalloc_device_reserve', 'sys_device_reserve_core',
                          'sys_device_span', 'device_claim'):
@@ -762,61 +762,61 @@ class DeviceReservation(unittest.TestCase):
 
 # 変異 (§4-4)。当て先は load() の写し (実物は書き換えない)。
 MUTATIONS = [
-    ('raw-grants-authority', 'mm/pgalloc.c',
+    ('raw-grants-authority', 'sys/kern/mm/pgalloc.c',
      'rr->width_basis > LEDGER_WB_GLUE_CONST', 'rr->width_basis > LEDGER_WB_PROBE_UNVERIFIED'),
-    ('decode-end-unchecked', 'mm/pgalloc.c',
+    ('decode-end-unchecked', 'sys/kern/mm/pgalloc.c',
      '            t.end > rr->decode_end ||\n', ''),
-    ('decode-first-unchecked', 'mm/pgalloc.c',
+    ('decode-first-unchecked', 'sys/kern/mm/pgalloc.c',
      't.first >= t.end || t.first < rr->decode_first ||', 't.first >= t.end ||'),
-    ('res-mask-not-merged', 'mm/pgalloc.c',
+    ('res-mask-not-merged', 'sys/kern/mm/pgalloc.c',
      '            s[k - 1].res |= s[i].res;\n', ''),
-    ('mixed-kind-overlap-merged', 'mm/pgalloc.c',
+    ('mixed-kind-overlap-merged', 'sys/kern/mm/pgalloc.c',
      '            if (k && s[i].first < s[k - 1].end) goto done;\n', ''),
-    ('background-refused', 'mm/pgalloc.c',
+    ('background-refused', 'sys/kern/mm/pgalloc.c',
      '        if (g->type == LEDGER_R_BACKGROUND) continue;\n', ''),
-    ('fixed-allowed', 'mm/pgalloc.c',
+    ('fixed-allowed', 'sys/kern/mm/pgalloc.c',
      '        if (g->type == LEDGER_R_BACKGROUND) continue;',
      '        if (g->type == LEDGER_R_BACKGROUND || g->type == LEDGER_R_FIXED) continue;'),
-    ('other-owner-device-allowed', 'mm/pgalloc.c',
+    ('other-owner-device-allowed', 'sys/kern/mm/pgalloc.c',
      '        if (g->type == LEDGER_R_BACKGROUND) continue;',
      '        if (g->type == LEDGER_R_BACKGROUND || g->type == LEDGER_R_DEVICE) continue;'),
-    ('partial-match-accepted', 'mm/pgalloc.c',
+    ('partial-match-accepted', 'sys/kern/mm/pgalloc.c',
      '        ok = hit == n && mine == n;', '        ok = hit == n;'),
-    ('res-mask-not-compared', 'mm/pgalloc.c',
+    ('res-mask-not-compared', 'sys/kern/mm/pgalloc.c',
      '                    g->res_mask == s[i].res && g->cache == s[i].kind) hit++;',
      '                    g->cache == s[i].kind) hit++;'),
-    ('live-or-permanent-unchecked', 'mm/pgalloc.c',
+    ('live-or-permanent-unchecked', 'sys/kern/mm/pgalloc.c',
      '            if (owner_map[p] ||\n', '            if (0 ||\n'),
-    ('ram-eligibility-unchecked', 'mm/pgalloc.c',
+    ('ram-eligibility-unchecked', 'sys/kern/mm/pgalloc.c',
      '(s[i].kind == LEDGER_CACHE_WB && !bit(eligible, p))) goto done;', '0) goto done;'),
-    ('eligibility-not-dropped', 'mm/pgalloc.c',
+    ('eligibility-not-dropped', 'sys/kern/mm/pgalloc.c',
      '                eligible[p / BITS_PER_U32] &= ~(1UL << (p % BITS_PER_U32));\n                total_pages--;\n',
      ''),
-    ('non-device-owner', 'mm/pgalloc.c',
+    ('non-device-owner', 'sys/kern/mm/pgalloc.c',
      '        ledger_owners[owner].kind != LEDGER_KIND_DEVICE || !spans || !n ||',
      '        !spans || !n ||'),
-    ('selfcheck-rejects-device-on-background', 'mm/pgalloc.c',
+    ('selfcheck-rejects-device-on-background', 'sys/kern/mm/pgalloc.c',
      '                !(r->type == LEDGER_R_DEVICE && g->type == LEDGER_R_BACKGROUND))\n',
      '                1)\n'),
-    ('overflow-not-counted', 'mm/pgalloc.c',
+    ('overflow-not-counted', 'sys/kern/mm/pgalloc.c',
      '        ledger_res_overflow++;\n', ''),
-    ('record-map-unchecked', 'mm/pgalloc.c',
+    ('record-map-unchecked', 'sys/kern/mm/pgalloc.c',
      '        rec->map_first > rec->map_end ||\n', ''),
-    ('import-usb-sizing-mask', 'platform/pc98/pci_resources.c',
+    ('import-usb-sizing-mask', 'sys/platform/pc98/pci_resources.c',
      'if (idx == 0 && pc98_usb_bar_width(&d)) continue;', ''),
-    ('import-width-verified', 'platform/pc98/pci_resources.c',
+    ('import-width-verified', 'sys/platform/pc98/pci_resources.c',
      '    r.width_basis = LEDGER_WB_RAW;', '    r.width_basis = LEDGER_WB_SIZING;'),
-    ('import-io-bars', 'platform/pc98/pci_resources.c',
+    ('import-io-bars', 'sys/platform/pc98/pci_resources.c',
      '            if (k < PCI_BAR_MEM32 || k > PCI_BAR_MEM64 ||',
      '            if (k < PCI_BAR_IO || k > PCI_BAR_MEM64 ||'),
-    ('import-mem64-high-kept', 'platform/pc98/pci_resources.c',
+    ('import-mem64-high-kept', 'sys/platform/pc98/pci_resources.c',
      '            if (k == PCI_BAR_MEM64 && (b + 1 >= nb || d.bar[++b])) continue;',
      '            if (k == PCI_BAR_MEM64 && (b + 1 >= nb || !d.bar[++b])) continue;'),
-    ('import-bridge-all-six', 'platform/pc98/pci_resources.c',
+    ('import-bridge-all-six', 'sys/platform/pc98/pci_resources.c',
      '    PCI_CFG_BAR_COUNT, 2, 1\n', '    PCI_CFG_BAR_COUNT, PCI_CFG_BAR_COUNT, 1\n'),
-    ('import-unknown-header-read', 'platform/pc98/pci_resources.c',
+    ('import-unknown-header-read', 'sys/platform/pc98/pci_resources.c',
      'ledger_pci_bars[layout] : 0;', 'ledger_pci_bars[layout] : 1;'),
-    ('print-overflow-before-import', 'platform/pc98/pci_resources.c',
+    ('print-overflow-before-import', 'sys/platform/pc98/pci_resources.c',
      '        pci_raw = ledger_resource_import_pci();\n'
      '        kprintf(TATTR_WHITE, "[ledger] pci raw=%u ovf=%u\\n",\n'
      '                pci_raw, ledger_res_overflow);\n',
@@ -824,7 +824,7 @@ MUTATIONS = [
      '        pci_raw = ledger_resource_import_pci();\n'
      '        kprintf(TATTR_WHITE, "[ledger] pci raw=%u ovf=%u\\n",\n'
      '                pci_raw, early);\n'),
-    ('import-overflow-counted-as-added', 'platform/pc98/pci_resources.c',
+    ('import-overflow-counted-as-added', 'sys/platform/pc98/pci_resources.c',
      '            if (ledger_resource_add(&r, &rid)) n++;',
      '            ledger_resource_add(&r, &rid); n++;'),
 ]

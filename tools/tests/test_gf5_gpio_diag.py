@@ -1,10 +1,10 @@
 """B03: real gf5 diagnostic dispatch with module boundary callbacks."""
 CHECK = dict(name='gf5-gpio-diag', tier=1, needs=[], budget=3.4,
-             covers=['tools/tests/recover_gf_dev_stub.c', 'kdebug/gf5_test.c', 'kdebug/gf5_test.h',
-                     'kdebug/gf_command_wire.h', 'hwdev/gf/**',
-                     'drivers/video/geforce/geforce_module.h',
-                     'kdebug/gfinit_decode.h', 'kdebug/gfinit_pll.h', 'lib/serial_diag.h', 'lib/crc32_core.inc',
-                     'include/types.h', 'tools/tests/gf5_gpio_diag_host.c',
+             covers=['tools/tests/recover_gf_dev_stub.c', 'sys/dev/video/geforce/diag/gf5_test.c', 'sys/dev/video/geforce/diag/gf5_test.h',
+                     'sys/dev/video/geforce/diag/gf_command_wire.h', 'hwdev/gf/**',
+                     'sys/dev/video/geforce/geforce_module.h',
+                     'sys/dev/video/geforce/diag/gfinit_decode.h', 'sys/dev/video/geforce/diag/gfinit_pll.h', 'lib/serial_diag.h', 'lib/crc32_core.inc',
+                     'sys/include/types.h', 'tools/tests/gf5_gpio_diag_host.c',
                      'tools/tests/serial_diag_host.h', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
                      'tools/tests/test_gf5_gpio_diag.py'],
@@ -20,7 +20,7 @@ import mutpar
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'kdebug/gf5_test.c'
+PRODUCT = 'sys/dev/video/geforce/diag/gf5_test.c'
 # Replace only resolved DCB logs; compilation must still succeed.
 ANCHOR = 'rc = o->gpio_find(owner, (u8)a[0], &line, log);'
 MUTANT = ANCHOR + '\n        log[0] = 0; log[1] = 1;'

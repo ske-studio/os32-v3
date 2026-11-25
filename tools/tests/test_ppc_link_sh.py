@@ -15,24 +15,24 @@ import host32
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-link-sh', env=['ppc-cross'], tier=1, needs=[], budget=60,
     covers=['tools/tests/test_ppc_link_sh.py', 'tools/tests/host32.py',
-            'build/targets/ppc-powermac.mk', 'build/ppc-user.mk', 'platform/powermac/ppc_kernel.c',
-            'platform/powermac/hostfs_boot.c', 'platform/powermac/hostfs_link_io.c',
-            'platform/powermac/hostfs_link_peer.c',
-            'net/host_mailbox.c', 'net/link.c', 'net/nic.c',
-            'kernel/dev/device_host.c', 'platform/powermac/usb_boot.c',
-            'platform/powermac/terminal_fifo.inc', 'kernel/cli/resident_cli.h',
-            'net/host_mailbox.h', 'net/link.h', 'net/nic.h',
-            'platform/powermac/link_platform.c', 'platform/powermac/link_platform.h',
-            'platform/powermac/input_boot.c', 'platform/powermac/console_stream.c',
-            'platform/powermac/log_printf.c', 'platform/powermac/shell_loop_ops.c',
+            'build/targets/ppc-powermac.mk', 'build/ppc-user.mk', 'sys/platform/powermac/ppc_kernel.c',
+            'sys/platform/powermac/hostfs_boot.c', 'sys/platform/powermac/hostfs_link_io.c',
+            'sys/platform/powermac/hostfs_link_peer.c',
+            'sys/net/host_mailbox.c', 'sys/net/link.c', 'sys/net/nic.c',
+            'sys/kern/dev/device_host.c', 'sys/platform/powermac/usb_boot.c',
+            'sys/platform/powermac/terminal_fifo.inc', 'sys/kern/cli/resident_cli.h',
+            'sys/net/host_mailbox.h', 'sys/net/link.h', 'sys/net/nic.h',
+            'sys/platform/powermac/link_platform.c', 'sys/platform/powermac/link_platform.h',
+            'sys/platform/powermac/input_boot.c', 'sys/platform/powermac/console_stream.c',
+            'sys/platform/powermac/log_printf.c', 'sys/platform/powermac/shell_loop_ops.c',
             'platform/powermac/*.h', 'include/*.h', 'kernel/console/*.h',
-            'init/shell_loop.c', 'lib/kstring_c.c', 'lib/kprintf.c', 'lib/kprintf_format.inc', 'input/hal/in2_int.h', 'exec/exec.h', 'kernel/idle_work.h',
-            'arch/ppc/*.h', 'sdk/include/os32/*.h', 'net/link_platform.h'],
+            'sys/kern/init/shell_loop.c', 'sys/kern/kstring_c.c', 'sys/kern/kprintf.c', 'sys/kern/kprintf_format.inc', 'sys/hal/input/in2_int.h', 'sys/kern/exec/exec.h', 'sys/kern/idle_work.h',
+            'arch/ppc/*.h', 'sdk/include/os32/*.h', 'sys/hal/net/link_platform.h'],
     basis=['LAN_OPERATOR_DESIGN §5/§8 P4c', 'PPC_P3_DESIGN v2 §2/§3; appendix A-1 E5/E6/E7, A-3/A-4'])
 
 PREFIX = r'''
 #include "types.h"
-#include "net/link_platform.h"
+#include "sys/hal/net/link_platform.h"
 #include "os32_kapi_shared.h"
 static void finish(int rc) { __asm__ volatile("int $0x80" : : "a"(1), "b"(rc)); for (;;) {} }
 #define CHECK(x) do { if (!(x)) finish(1); } while (0)
@@ -162,12 +162,12 @@ void _start(void) {
 def execute(tmp, source, harness):
     (tmp/'test.c').write_text(PREFIX+source+harness)
     builtin_headers = subprocess.check_output(['gcc', '-print-file-name=include'], text=True).strip()
-    formatter = ['lib/kprintf.c'] if harness == OUTPUT else []
+    formatter = ['sys/kern/kprintf.c'] if harness == OUTPUT else []
     subprocess.run(['gcc','-m32', '-nostdinc','-isystem',builtin_headers, '-std=gnu11','-D__cdecl=','-DKBOOT_SH=1','-DKBOOT_LINK=1',
         '-ffreestanding','-fno-builtin','-fno-pie','-no-pie','-nostdlib','-static',
         '-ffunction-sections','-fdata-sections','-Wl,--gc-sections',
         '-I.','-Iinclude','-Ikernel','-Ikernel/console','-Iplatform/powermac','-Iarch/ppc',
-        '-Isdk/include/os32','-Iexec','-Ilib',str(tmp/'test.c'),'lib/kstring_c.c',*formatter,'-o',str(tmp/'test')],cwd=ROOT,check=True)
+        '-Isdk/include/os32','-Iexec','-Ilib',str(tmp/'test.c'),'sys/kern/kstring_c.c',*formatter,'-o',str(tmp/'test')],cwd=ROOT,check=True)
     return host32.run([str(tmp/'test')],runner='qemu',timeout=10).returncode
 
 
@@ -189,8 +189,8 @@ def selection(tmp, mutate):
         assert not link[1].strip() and link[3] == 'build/out/ppc-user/link-sh/shell.bin'
         absent=['hostfs_io','hostfs_peer','lan_wire','lan_terminal','terminal_input']
         assert all('platform/powermac/'+name+'.c' not in link[2].split() for name in absent)
-        assert all(name in link[2].split() for name in ['net/link.c','net/host_mailbox.c','net/nic.c','kernel/dev/device_host.c','platform/powermac/usb_boot.c',
-            'platform/powermac/hostfs_link_io.c','platform/powermac/hostfs_link_peer.c','platform/powermac/hostfs_boot.c'])
+        assert all(name in link[2].split() for name in ['sys/net/link.c','sys/net/host_mailbox.c','sys/net/nic.c','sys/kern/dev/device_host.c','sys/platform/powermac/usb_boot.c',
+            'sys/platform/powermac/hostfs_link_io.c','sys/platform/powermac/hostfs_link_peer.c','sys/platform/powermac/hostfs_boot.c'])
         for flags,out in [(['KBOOT_SH=1','KBOOT_LINK=0'],'link-sh'),(['KBOOT_LINK=1'],'link'),(['KBOOT_SHELL=1','KBOOT_LINK=0'],'link-sh')]:
             assert manifest(path,flags,['KB_OUT'])[0]=='build/out/ppc-kboot/'+out
         rejected=subprocess.run(['make','-s','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SHELL=1','KBOOT_LINK=1','-n'],cwd=ROOT,capture_output=True)
@@ -200,7 +200,7 @@ def selection(tmp, mutate):
             assert subprocess.run(['make','-s','ARCH=ppc','PLATFORM=powermac','TARGET_MK='+str(path),'KBOOT_SH=1',override,'-n'],cwd=ROOT,capture_output=True).returncode!=0
     check(original)
     if mutate:
-        for old,new in [('KB_OUT ?= build/out/ppc-powermac','KB_OUT ?= build/out/ppc-kboot/link-sh'),('KB_SH_OUT ?= $(KB_OUT)/user','KB_SH_OUT ?= build/out/ppc-user/link-sh'),('KB_C := $(C_KERNEL)','KB_C := $(filter-out platform/powermac/hostfs_link_io.c,$(C_KERNEL)) platform/powermac/hostfs_io.c'),('KB_ROOT_SHELL = $(KB_SH_OUT)/shell.bin','KB_ROOT_SHELL = $(KB_SH_OUT)/sh.bin')]:
+        for old,new in [('KB_OUT ?= build/out/ppc-powermac','KB_OUT ?= build/out/ppc-kboot/link-sh'),('KB_SH_OUT ?= $(KB_OUT)/user','KB_SH_OUT ?= build/out/ppc-user/link-sh'),('KB_C := $(C_KERNEL)','KB_C := $(filter-out sys/platform/powermac/hostfs_link_io.c,$(C_KERNEL)) sys/platform/powermac/hostfs_io.c'),('KB_ROOT_SHELL = $(KB_SH_OUT)/shell.bin','KB_ROOT_SHELL = $(KB_SH_OUT)/sh.bin')]:
             assert original.count(old)==1
             try: check(original.replace(old,new))
             except AssertionError: print('RED selection',old)
@@ -214,14 +214,14 @@ def main():
         print(('FAIL' if required else 'SKIP')+' ppc-link-sh: PPC toolchain or host runner unavailable')
         return int(required)
     mutate='--mutate' in sys.argv
-    work=(ROOT/'platform/powermac/link_platform.c').read_text()
+    work=(ROOT/'sys/platform/powermac/link_platform.c').read_text()
     work=work[work.index('#if KBOOT_SH'):]
     start=work.index('    do {'); end=work.index('    pm_lan_poll',start)
     work=work[:start]+'    hi=1; lo=2; again=hi; (void)again;\n'+work[end:]
-    boot=(ROOT/'platform/powermac/ppc_kernel.c').read_text()
+    boot=(ROOT/'sys/platform/powermac/ppc_kernel.c').read_text()
     registration=boot[boot.index('#if KBOOT_LINK\n        int work_rc'):]
     registration=registration[:registration.index('        if (work_rc)')]
-    work += '\n#include "kernel/idle_work.h"\nint idle_work_register(void (*fn)(void)) { CHECK(fn==pm_link_service_once); return 0; }\nstatic void registration(void) {\n'+registration+'CHECK(work_rc==0); }\n'
+    work += '\n#include "sys/kern/idle_work.h"\nint idle_work_register(void (*fn)(void)) { CHECK(fn==pm_link_service_once); return 0; }\nstatic void registration(void) {\n'+registration+'CHECK(work_rc==0); }\n'
     cases=[('work','#define PM_LOAD_KDEBUG 1\n'+work,WORK.replace('void _start(void) {','void _start(void) { registration();'),[
         ('    if (running) return;','    (void)running;'),
         ('    pm_usb_poll();','    ;'),
@@ -230,14 +230,14 @@ def main():
         ('while (generation &&','while (0 && generation &&'),
         ('    pm_lan_poll(((u64)hi << 32) | lo);','    (void)lo;'),
         ('int work_rc = idle_work_register(pm_link_service_once);','int work_rc = -1;')]),
-        ('provider',(ROOT/'platform/powermac/input_boot.c').read_text(),PROVIDER,[
+        ('provider',(ROOT/'sys/platform/powermac/input_boot.c').read_text(),PROVIDER,[
             ('.try_key = pm_input_usb_take, .peek_key = pm_input_usb_peek,','.try_key = pm_input_usb_peek, .peek_key = pm_input_usb_take,')]),
-        ('boot',(ROOT/'platform/powermac/shell_loop_ops.c').read_text()+(ROOT/'init/shell_loop.c').read_text(),BOOT,[
+        ('boot',(ROOT/'sys/platform/powermac/shell_loop_ops.c').read_text()+(ROOT/'sys/kern/init/shell_loop.c').read_text(),BOOT,[
             ('    return gui ? 2 : 0;', '    return gui ? 2 : 1;'),
             ('    shell_print("Cannot load', '    if (0) shell_print("Cannot load'),
             ('rshell_active = 0;', 'rshell_active = 1;'),
             ('rc != EXEC_ERR_FAULT','rc == EXEC_ERR_FAULT')]),
-        ('output',(ROOT/'platform/powermac/console_stream.c').read_text()+(ROOT/'platform/powermac/log_printf.c').read_text(),OUTPUT,[
+        ('output',(ROOT/'sys/platform/powermac/console_stream.c').read_text()+(ROOT/'sys/platform/powermac/log_printf.c').read_text(),OUTPUT,[
             ('    pm_log_write(bytes, n);','    pm_log_write(bytes, n); console_write(bytes, n, color);'),
             ('    console_write(bytes, len, 1);','    console_write(bytes, len, 1); console_write(bytes, len, 1);')])]
     with tempfile.TemporaryDirectory(prefix='ppc-link-sh-') as d:

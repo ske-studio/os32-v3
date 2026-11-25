@@ -11,13 +11,13 @@ import test_ext2_write_batch as batch
 from kernel_includes import include_flags
 
 CHECK = dict(name='ext2-write-run-host', tier=1, budget=195.6,
-             covers=['include/ext2_medium_contract.h', 'fs/ext2/ext2_medium_ide.c', 'tools/tests/cc_cache.py', 'fs/ext2/**', 'tools/tests/ext2_write_batch_host.c',
+             covers=['sys/include/ext2_medium_contract.h', 'sys/platform/pc98/storage/ext2_medium_ide.c', 'tools/tests/cc_cache.py', 'fs/ext2/**', 'tools/tests/ext2_write_batch_host.c',
                      'tools/tests/test_ext2_write_batch.py', 'tools/tests/host32.py',
                      'tools/tests/kernel_includes.py', 'tools/tests/hdd_pt_fake.h',
                      'tools/tests/b8_e2fsck.py', 'tools/tests/ext2_oracle_cache.py',
-                     'fs/pc98pt.c',
-                     'fs/pc98pt.h', 'include/platform_device.h',
-                     'include/ide_contract.h', 'tools/tests/ext2_write_run_host.c',
+                     'sys/fs/pc98pt.c',
+                     'sys/fs/pc98pt.h', 'sys/include/platform_device.h',
+                     'sys/include/ide_contract.h', 'tools/tests/ext2_write_run_host.c',
                      'tools/tests/test_ext2_write_run.py'], needs=[],
     kind='characterization',
     env_limit='hostのI/O模型で連続書込みを確認するが、実drive cache・媒体障害・電断時の書込み順序は再現しない。',

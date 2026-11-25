@@ -1,5 +1,5 @@
 #include "gf_command_runtime_host.h"
-#include "../../kdebug/gf_prim_bench.c"
+#include "../../sys/dev/video/geforce/diag/gf_prim_bench.c"
 static struct gf_foundation f;
 static struct gf2_chan ch;
 static struct gf3_ctx ctx;

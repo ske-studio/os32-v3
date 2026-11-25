@@ -9,7 +9,7 @@
 
 ## `exec_start` の後に画を消さない
 
-`gfx_init` は VRAM の両ページをゼロクリアする (`gfx/gfx_core.c`)。WM はクライアント面を持たないので、消した画は本人に `Paint` を出して描き直させるしか戻らない。遮蔽は露出を生まない (`visible::recompute_and_expose` の dirty は新しく見えた分だけ) ので、消したままにすると park 中のアプリは導出群の ready にならず、誰にも起こされず黒のまま残る。
+`gfx_init` は VRAM の両ページをゼロクリアする (`sys/hal/gfx/gfx_core.c`)。WM はクライアント面を持たないので、消した画は本人に `Paint` を出して描き直させるしか戻らない。遮蔽は露出を生まない (`visible::recompute_and_expose` の dirty は新しく見えた分だけ) ので、消したままにすると park 中のアプリは導出群の ready にならず、誰にも起こされず黒のまま残る。
 
 | `exec_start` の戻り | 画面 |
 |---|---|

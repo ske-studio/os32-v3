@@ -1,4 +1,4 @@
-#include "../../hwdev/gf/foundation.h"
+#include "../../sys/dev/video/geforce/foundation.h"
 static struct gf_foundation stage_foundation;
 static struct gf_stage_state stage_fixture;
 static void stage_baseline(void)

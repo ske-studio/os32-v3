@@ -15,17 +15,17 @@ import zlib
 from kboot_accept import build_media, mutant_settings
 from run import ROOT, ROM
 
-BOOT = 'platform/powermac/ide_boot.c'
-BUS = 'platform/powermac/platform_ide_bus.h'
-TREE = 'platform/powermac/ide_tree.c'
-DRIVER = 'drivers/ata/ide.c'
+BOOT = 'sys/platform/powermac/ide_boot.c'
+BUS = 'sys/platform/powermac/platform_ide_bus.h'
+TREE = 'sys/platform/powermac/ide_tree.c'
+DRIVER = 'sys/dev/ata/ide.c'
 WRITE_MUTANTS = ('write-word', 'write-lba', 'write-count')
 WRITE_CASES = ('write', 'deny', *WRITE_MUTANTS)
 MUTANTS = ('word', 'bar', 'wait', 'lba')
 
 
 def make_write_image(out, case):
-    kernel = 'platform/powermac/ppc_kernel.c'
+    kernel = 'sys/platform/powermac/ppc_kernel.c'
     diag = (ROOT / 'tools/ppc/ata_write_diag.c').read_text()
     source = (ROOT / kernel).read_text()
     entry = 'void platform_boot_run(void)'
@@ -47,7 +47,7 @@ def make_write_image(out, case):
     settings = ['KB_MUT_EXTRA_SRC=' + kernel, 'KB_MUT_EXTRA_FILE=' + str(kernel_copy),
                 'KB_SH_OUT=' + str(user), 'PPC_RES_MUT_SRC=' + resident,
                 'PPC_RES_MUT_FILE=' + str(path)]
-    device = 'kernel/dev/device_ide.c'
+    device = 'sys/dev/ide/device_ide.c'
     provider = (ROOT / device).read_text()
     init = '    (void)ide_init();'
     assert provider.count(init) == 1
@@ -64,7 +64,7 @@ def make_write_image(out, case):
         assert header.count(word) == 1
         header = header.replace(word, '(ata_payload_phase ? ((u16)p[1] << 8) | p[0] : '+word+')')
     (out / 'platform_ide_bus.h').write_text(
-        '#include "drivers/ata/ide.h"\nextern unsigned ata_write_commands;\n'
+        '#include "sys/dev/ata/ide.h"\nextern unsigned ata_write_commands;\n'
         'extern int ata_payload_phase;\n' + header)
     if case == 'write-lba':
         anchor = 'ide_write_sector(drv, lba,'
@@ -154,7 +154,7 @@ void ata_check_wait(void)
 }
 """)
     if case == 'lba':
-        path = 'drivers/ata/ide_addr.c'
+        path = 'sys/dev/ata/ide_addr.c'
         before = 'out->sect_num = (u8)(lba & 0xFFUL);'
         settings += mutant_settings(out, case, path, before,
                                     'out->sect_num = (u8)((lba + 1) & 0xFFUL);')

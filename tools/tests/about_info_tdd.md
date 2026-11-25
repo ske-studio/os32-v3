@@ -18,7 +18,7 @@ Start → Programs (root メニューへの項目は足していない)。
 ## 土台 — 食い違いの検出
 
 `ver` はシェル (C)、About は Rust なので文字列の組み立てそのものは共有できない
-(版だけは `include/config.h` の `SYS_VERSION` を About がコンパイル時に切り出して共有)。
+(版だけは `sys/include/config.h` の `SYS_VERSION` を About がコンパイル時に切り出して共有)。
 代わりに**両方の実物を同じ入力で回して突き合わせる**:
 
 - ver 側: `ver_about_host.c` が実物の `cmd_base.c` を 1 行も写さず `#include` し、

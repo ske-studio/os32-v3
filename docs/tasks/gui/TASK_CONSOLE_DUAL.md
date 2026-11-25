@@ -12,10 +12,10 @@
 
 | 段 | ファイル | 前提 |
 |---|---|---|
-| H0 | gfx/v2/enum.c (gfx2_head_info が v1 の机の connector_mask を 0 で上書きする欠けの直し) | — |
-| D1 | kernel/console/console_dual.h・.c (新、出力先の表 N 個と判定) | — |
-| D2 | platform/pc98/display_dual.c (新、gfx2 の列挙で表を作る・GUI の状態に触らない文字画面の開始) | D1・H0 |
-| D3〜D5 | console.c の門 4 か所・pc98_route.c・platform/pc98/kernel.c (412・473) | D1 (D5 は D3 も) |
+| H0 | sys/hal/gfx/v2/enum.c (gfx2_head_info が v1 の机の connector_mask を 0 で上書きする欠けの直し) | — |
+| D1 | sys/kern/console/console_dual.h・.c (新、出力先の表 N 個と判定) | — |
+| D2 | sys/platform/pc98/display_dual.c (新、gfx2 の列挙で表を作る・GUI の状態に触らない文字画面の開始) | D1・H0 |
+| D3〜D5 | console.c の門 4 か所・pc98_route.c・sys/platform/pc98/kernel.c (412・473) | D1 (D5 は D3 も) |
 | D6 | tools/tests/console_dual_host.c と `make check-console-dual-host` | D1〜D4 |
 
 - 設定 `CONSOLE_DUAL` (system.cfg) の既定は 0。

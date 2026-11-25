@@ -8,7 +8,7 @@ from kernel_includes import include_flags
 from mutpar import build_in_tree
 
 CHECK = dict(name='gf-v2-readback-host', tier=1, needs=[], budget=15,
-    covers=['drivers/video/geforce/gf_v2_ops.c', 'drivers/video/geforce/gf_v2_life.c',
+    covers=['sys/dev/video/geforce/gf_v2_ops.c', 'sys/dev/video/geforce/gf_v2_life.c',
             'drivers/video/geforce/*.h', 'hwdev/gf/**', 'gfx/v2/*.h', 'include/*.h',
             'arch/*/arch_copy.h', 'sdk/include/os32/*.h',
             'tools/tests/gf_v2_readback_host.c', 'tools/tests/test_gf_v2_readback.py',
@@ -16,7 +16,7 @@ CHECK = dict(name='gf-v2-readback-host', tier=1, needs=[], budget=15,
     basis=['HAL_V2_DESIGN §7-5', 'HAL_V2_DESIGN §13-3'],
 )
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'drivers/video/geforce/gf_v2_ops.c'
+SOURCE = 'sys/dev/video/geforce/gf_v2_ops.c'
 MUTATIONS = (
     ('alias-identity', 's.reservation_id = v.reservation_id;', 's.reservation_id = 0;'),
     ('alias-generation', 's.generation = v.generation;', 's.generation = 0;'),
@@ -34,9 +34,9 @@ def observe(folder, mutation=None):
         source = (ROOT / SOURCE).read_text()
         assert source.count(old) == 1
         edits[SOURCE] = source.replace(old, new)
-    sources = ['tools/tests/gf_v2_readback_host.c', 'drivers/video/geforce/gf_v2_life.c',
-               'hwdev/gf/accel_surface.c', 'hwdev/gf/accel_transfer.c',
-               'hwdev/gf/accel_m2mf.c', 'hwdev/gf/vram_view.c']
+    sources = ['tools/tests/gf_v2_readback_host.c', 'sys/dev/video/geforce/gf_v2_life.c',
+               'sys/dev/video/geforce/accel_surface.c', 'sys/dev/video/geforce/accel_transfer.c',
+               'sys/dev/video/geforce/accel_m2mf.c', 'sys/dev/video/geforce/vram_view.c']
     exe = folder / 'readback'
     build_in_tree(ROOT, folder, edits, [['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra',
         '-Werror', '-O0', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static',

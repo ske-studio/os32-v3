@@ -16,10 +16,10 @@ import host32
 from kernel_layout import linker_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-TARGET_SRC = ['kdebug/kselftest.c', 'kdebug/kselftest/h4_backing.inc', 'mm/paging.c', 'mm/pgalloc.c',
-              'exec/access_walk.c', 'mm/physmem.c', 'mm/dma_pool.c',
-              'mm/dma_pool_math.c', 'lib/dma_contract.c',
-              'drivers/block/fdc.c', 'drivers/block/fdc_decide.c']
+TARGET_SRC = ['sys/platform/pc98/kdebug/kselftest.c', 'sys/arch/x86/kdebug/kselftest/h4_backing.inc', 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c',
+              'sys/kern/exec/access_walk.c', 'sys/kern/mm/physmem.c', 'sys/kern/mm/dma_pool.c',
+              'sys/kern/mm/dma_pool_math.c', 'lib/dma_contract.c',
+              'sys/dev/block/fdc.c', 'sys/dev/block/fdc_decide.c']
 MUTANTS = [
     ('VA-only high classification', 'pfns[i] > H4_PHYS_BOUNDARY / PAGE_SIZE',
      'va > H4_PHYS_BOUNDARY'),
@@ -46,10 +46,10 @@ MUTANTS = [
 
 
 def fixture_source():
-    source = (ROOT / 'kdebug/kselftest.c').read_text()
+    source = (ROOT / 'sys/platform/pc98/kdebug/kselftest.c').read_text()
     dispatch = source.split('int kselftest_run_post_exec(void)', 1)[1].split('\n}', 1)[0]
     assert dispatch.count('    test_h4_backing();') == 1
-    source = (ROOT / 'kdebug/kselftest/h4_backing.inc').read_text()
+    source = (ROOT / 'sys/arch/x86/kdebug/kselftest/h4_backing.inc').read_text()
     start = source.index('/* T3b2: H-4(a) backing fixture.')
     return source[start:source.index('/* T3b2 end */', start)]
 
@@ -58,12 +58,12 @@ def run(body, runner):
     with tempfile.TemporaryDirectory(prefix='h4-backing-') as directory:
         tmp = Path(directory)
         (tmp / 'h4_backing_source.c').write_text(body)
-        for name, path in (('paging', 'mm/paging.c'),
-                           ('pgalloc', 'mm/pgalloc.c'),
-                           ('dma_pool', 'mm/dma_pool.c'),
-                           ('access_walk', 'exec/access_walk.c')):
+        for name, path in (('paging', 'sys/kern/mm/paging.c'),
+                           ('pgalloc', 'sys/kern/mm/pgalloc.c'),
+                           ('dma_pool', 'sys/kern/mm/dma_pool.c'),
+                           ('access_walk', 'sys/kern/exec/access_walk.c')):
             (tmp / (name + '_host_source.c')).write_text(paging_source(ROOT / path))
-        fdc = (ROOT / 'drivers/block/fdc.c').read_text()
+        fdc = (ROOT / 'sys/dev/block/fdc.c').read_text()
         fdc = fdc[fdc.index('static u8 s_fdbuf['):fdc.index('static u8 *fdc_dma_buf(void)')]
         fdc = fdc.replace('static u8 s_fdbuf[FDC_BUF_BYTES];',
                           '#define s_fdbuf ((u8 *)P2V(host_fdc_base))')
@@ -85,9 +85,9 @@ def run(body, runner):
                    '-static', '-no-pie', '-Wl,--gc-sections', '-I' + str(tmp),
                    *['-I' + str(ROOT / 'tools/tests/host_arch'), *include_flags(ROOT)],
                    str(ROOT / 'tools/tests/h4_backing_host.c'),
-                   *[str(ROOT / path) for path in ('mm/physmem.c',
-                       'mm/dma_pool_math.c',
-                       'lib/dma_contract.c', 'drivers/block/fdc_decide.c')],
+                   *[str(ROOT / path) for path in ('sys/kern/mm/physmem.c',
+                       'sys/kern/mm/dma_pool_math.c',
+                       'lib/dma_contract.c', 'sys/dev/block/fdc_decide.c')],
                    '-o', str(exe)]
         host32.build(command, check=True, capture_output=True, text=True)
         return host32.run([str(exe)], runner=runner, capture_output=True,

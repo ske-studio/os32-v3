@@ -1,11 +1,11 @@
-# gfx/gfx_osri.c — `.osri` の読み込みと形式の検査
+# sys/kern/gfx/osri/gfx_osri.c — `.osri` の読み込みと形式の検査
 
 > 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
-ソース: `gfx/gfx_osri.c`
+ソース: `sys/kern/gfx/osri/gfx_osri.c`
 
 ## 口の契約
 
-- `osri_load_checked(path, dst, image)` は成功で 0、失敗で `OS32_ERR_*` を返す (NOTFOUND・NOSPC・INVAL・IO を分ける)。ビューアー (`gfx/gfx_osri_view.c`) が使う。
+- `osri_load_checked(path, dst, image)` は成功で 0、失敗で `OS32_ERR_*` を返す (NOTFOUND・NOSPC・INVAL・IO を分ける)。ビューアー (`sys/kern/gfx/osri/gfx_osri_view.c`) が使う。
 - `osri_load(path, dst, image)` は起動用。検査は同じで、成功 0・失敗 -1 を返す。
 - どの出口でも FD を閉じる。メモリの確保はしない。ポート I/O・表示・時間待ちもしない。
 - 失敗したとき、借りた BB は途中まで上書きされていることがある。描き直すのは呼び手 (起動は内蔵のロゴ、ビューアーは 0 で消す)。検査が全部通るまで、呼び手は提示しない。
@@ -22,7 +22,7 @@
 ## 境目
 
 - 1 行の OUT の本数と、再生できるかどうかは見ない。再生の準備器 `pl_v2_prepare` ([splash_raster_plan.c](../drivers/video/pc98/splash_raster_plan.c.md)) が全行を独立に検査し直す。
-- 呼び手は起動の `platform/pc98/splash_image.c`、観測の像の `platform/pc98/splash_obs.c`、ビューアーの `gfx/gfx_osri_view.c`。
+- 呼び手は起動の `sys/platform/pc98/splash_image.c`、観測の像の `sys/platform/pc98/splash_obs.c`、ビューアーの `sys/kern/gfx/osri/gfx_osri_view.c`。
 
 ## 検査
 

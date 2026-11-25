@@ -14,13 +14,13 @@ import host32
 from kernel_includes import include_flags
 
 CHECK = dict(name='link-notify', tier=1, needs=[], covers=[
-    'net/link_notify.c', 'net/link_notify.h', 'net/link.h', 'net/host_mailbox.c',
-    'net/host_mailbox.h', 'sdk/include/os32/os32_host_notice.h',
+    'sys/net/link_notify.c', 'sys/net/link_notify.h', 'sys/net/link.h', 'sys/net/host_mailbox.c',
+    'sys/net/host_mailbox.h', 'sdk/include/os32/os32_host_notice.h',
     'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/link_notify_host.c',
     'tools/tests/hostsvc_fixture.c', 'tools/tests/hostsvc_fixture.h',
     'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'build/config.mk',
-    'include/io.h', 'include/types.h', 'include/net_eth.h', 'lib/le_internal.h',
-    'lib/kstring.h', 'mm/kmalloc.h'], budget=3.1,
+    'sys/include/io.h', 'sys/include/types.h', 'sys/include/net_eth.h', 'lib/le_internal.h',
+    'sys/kern/kstring.h', 'sys/kern/mm/kmalloc.h'], budget=3.1,
     basis=['docs/design/net/link_notify.md 受け手の規則'],
 )
 ROOT = Path(__file__).resolve().parents[2]
@@ -84,7 +84,7 @@ def main():
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='link-notify-') as tmp:
         work = Path(tmp)
-        source = ROOT / 'net/link_notify.c'
+        source = ROOT / 'sys/net/link_notify.c'
         # Compile real privileged IO path with the kernel compiler as well.
         cross = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross')) / 'bin/i386-elf-gcc'
         subprocess.run([str(cross), '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror',

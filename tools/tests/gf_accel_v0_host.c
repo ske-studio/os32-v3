@@ -1,8 +1,8 @@
-/* Link hwdev/gf/vram_view.c only, no libc. V0 needs only map_ops stubs;
+/* Link sys/dev/video/geforce/vram_view.c only, no libc. V0 needs only map_ops stubs;
  * reuse A1's prescribed gf_command_runtime_host.h assertion/entry substrate.
  * No MMIO, push or clock dependency is needed for this component. */
 #include "gf_command_runtime_host.h"
-#include "../../hwdev/gf/accel.h"
+#include "../../sys/dev/video/geforce/accel.h"
 
 #define PAGE MEM_PAGE_SIZE
 #define SURFACE_OFF (GF2_PUSH_MIN_BASE + PAGE)

@@ -1,13 +1,13 @@
-# kernel/sys.c — 設計
+# sys/kern/sys.c — 設計
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
-ソース: `kernel/sys.c`
+ソース: `sys/kern/sys.c`
 
 本番 context/復帰 callback は起動中保持して module を pin し、正常終了後も予約は保持する。owner の核移設、共通装置 registry、N1 lease の再設計は行わない。
 
 ## 内部設計と契約 (D1)
 
 ```c
-/* kernel/sys.c: 既存公開名・halt の位置を維持 */
+/* sys/kern/sys.c: 既存公開名・halt の位置を維持 */
 void sys_reboot(void) {
     platform_reset();
     for (;;) { _halt(); }

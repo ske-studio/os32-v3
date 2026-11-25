@@ -5,7 +5,7 @@ flat oracle still comes from the original header. Product sources contain no
 static pair table. Runtime mutants are optional (--mutate, PM only).
 """
 CHECK = dict(name='unicode-lookup-host', tier=1,
-    covers=['lib/unicode_jis_table.h', 'lib/utf8.c', 'lib/utf8.h', 'include/types.h', 'include/endian_le.h', 'tools/gen_unicode.c', 'tools/tests/host32.py', 'kernel/console/unicode_file.c', 'kernel/console/unicode_file.h', 'mm/pgalloc.h', 'fs/vfs.h', 'include/config.h', 'include/memmap.h', 'include/kprintf.h', 'sdk/include/os32/os32_kapi_shared.h', 'build/kernel.mk', 'tools/tests/unicode_lookup_sdk.c', 'tools/tests/unicode_lookup_host.c', 'kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_generated.h', 'build/programs.mk', 'build/deploy.mk', 'tools/tests/kernel_includes.py'],
+    covers=['lib/unicode_jis_table.h', 'lib/utf8.c', 'lib/utf8.h', 'sys/include/types.h', 'sys/include/endian_le.h', 'tools/gen_unicode.c', 'tools/tests/host32.py', 'sys/kern/console/unicode_file.c', 'sys/kern/console/unicode_file.h', 'sys/kern/mm/pgalloc.h', 'sys/fs/vfs.h', 'sys/include/config.h', 'sys/include/memmap.h', 'sys/include/kprintf.h', 'sdk/include/os32/os32_kapi_shared.h', 'build/kernel.mk', 'tools/tests/unicode_lookup_sdk.c', 'tools/tests/unicode_lookup_host.c', 'sys/kapi/kapi_generated.c', 'sdk/include/os32/os32_kapi_generated.h', 'build/programs.mk', 'build/deploy.mk', 'tools/tests/kernel_includes.py'],
     needs=[], budget=6.1,
     basis=['KAPI_SPEC §4-13'],
 )
@@ -20,7 +20,7 @@ import tempfile
 import host32
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-PRODUCT = 'kernel/console/unicode_file.c'
+PRODUCT = 'sys/kern/console/unicode_file.c'
 TABLE = 'lib/unicode_jis_table.h'
 SDK = 'tools/tests/unicode_lookup_sdk.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-ffreestanding',
@@ -96,7 +96,7 @@ def product_build_rules():
         assert len(expected) == 28252, 'existing old product artifact must regenerate'
         make('-q')  # Up to date: do not recreate it on every build.
         for dependency in ('tools/gen_unicode.c', 'lib/unicode_jis_table.h',
-                           'kernel/console/unicode_file.h'):
+                           'sys/kern/console/unicode_file.h'):
             out.write_bytes(bytes(131072))
             result = make('-W', dependency)
             assert './tools/gen_unicode --pairs out/unicode.bin' in result.stdout
@@ -108,7 +108,7 @@ def product_build_rules():
 
 
 def run_case(runner, mutation=None):
-    paths = [PRODUCT, 'kernel/console/unicode_file.h', SDK,
+    paths = [PRODUCT, 'sys/kern/console/unicode_file.h', SDK,
              'lib/utf8.c', 'lib/utf8.h', 'tools/tests/unicode_lookup_host.c']
     texts = {p: (ROOT / p).read_text() for p in paths}
     pairs = entries((ROOT / TABLE).read_text())
@@ -154,7 +154,7 @@ def run_case(runner, mutation=None):
         kernel_utf8 = kernel_utf8.replace('#include "../kernel/console/unicode_file.h"',
                                           '#include "unicode_file.h"')
         (tmp / 'unicode_kernel.c').write_text('#define __KERNEL_BUILD__ 1\n' + kernel_utf8)
-        generated = (ROOT / 'kapi/kapi_generated.c').read_text()
+        generated = (ROOT / 'sys/kapi/kapi_generated.c').read_text()
         wrapper = re.search(r'u16 __cdecl wrap_unicode_to_jis\(u32 cp\)\n\{.*?\n\}',
                             generated, re.S).group(0)
         (tmp / 'unicode_kapi.c').write_text(

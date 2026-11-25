@@ -25,9 +25,9 @@ from kboot_mutations import KERNEL_NEGATIVES, KERNEL_MUTATIONS, AUDIT_MUTATIONS
 import re
 
 CHECK = dict(name='ppc-kboot-accept', tier=2, budget=900, covers=[
-    'platform/powermac/ppc_kernel.c', 'arch/ppc/**', 'platform/powermac/**', 'mm/**', 'kernel/sys.c',
-    'kernel/irq/tick.c', 'kernel/time/tick.c', 'fs/fd_redirect.c', 'lib/kprintf.c',
-    'lib/kstring_c.c', 'lib/divdi3.c', 'include/**', 'build/targets/ppc-powermac.mk',
+    'sys/platform/powermac/ppc_kernel.c', 'arch/ppc/**', 'platform/powermac/**', 'mm/**', 'sys/kern/sys.c',
+    'sys/kern/irq/tick.c', 'sys/hal/time/tick.c', 'sys/fs/fd_redirect.c', 'sys/kern/kprintf.c',
+    'sys/kern/kstring_c.c', 'lib/divdi3.c', 'include/**', 'build/targets/ppc-powermac.mk',
     'tools/ppc/kboot_accept.py', 'tools/ppc/kboot_run.py', 'tools/ppc/kboot_mutations.py',
     'tools/ppc/run.py', 'tools/gen_memmap.py'])
 

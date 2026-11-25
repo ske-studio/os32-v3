@@ -1,186 +1,186 @@
 {
   "schema": 1,
   "contracts": [
-    "drivers/video/geforce/geforce_module.h",
-    "include/gfx_hal.h",
-    "include/gfx_hal2.h",
-    "include/video_service.h",
-    "hwdev/gf/production.h",
-    "hwdev/gf/foundation.h",
-    "hwdev/gf/internal.h",
-    "drivers/video/geforce/geforce_tick.h",
-    "hwdev/gf/gf1_test.h",
-    "kdebug/gfinit_bus.h",
-    "include/debug_probe.h"
+    "sys/dev/video/geforce/geforce_module.h",
+    "sys/include/gfx_hal.h",
+    "sys/hal/gfx/gfx_hal2.h",
+    "sys/include/video_service.h",
+    "sys/dev/video/geforce/production.h",
+    "sys/dev/video/geforce/foundation.h",
+    "sys/dev/video/geforce/internal.h",
+    "sys/platform/pc98/video/geforce/geforce_tick.h",
+    "sys/dev/video/geforce/gf1_test.h",
+    "sys/dev/video/geforce/diag/gfinit_bus.h",
+    "sys/include/debug_probe.h"
   ],
   "imports": [
     {
       "symbol": "pc98_route_to_gf",
-      "source": "drivers/video/pc98/pc98_route.h",
+      "source": "sys/platform/pc98/video/pc98_route.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pc98_route_to_98",
-      "source": "drivers/video/pc98/pc98_route.h",
+      "source": "sys/platform/pc98/video/pc98_route.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pc98_route_cell_check",
-      "source": "drivers/video/pc98/pc98_route.h",
+      "source": "sys/platform/pc98/video/pc98_route.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "geforce_display_failed",
-      "source": "include/geforce_contract.h",
+      "source": "sys/include/geforce_contract.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "palette_get_all",
-      "source": "gfx/palette.h",
+      "source": "sys/hal/gfx/palette.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "palette_shadow_set",
-      "source": "gfx/palette.h",
+      "source": "sys/hal/gfx/palette.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pc98_route_select_98",
-      "source": "drivers/video/pc98/pc98_route.h",
+      "source": "sys/platform/pc98/video/pc98_route.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pc98_console_set_safe",
-      "source": "drivers/video/pc98/pc98_route.h",
+      "source": "sys/platform/pc98/video/pc98_route.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "geforce_range_reserved",
-      "source": "drivers/video/geforce/geforce_module.h",
+      "source": "sys/dev/video/geforce/geforce_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_cfg_read32",
-      "source": "include/pci_contract.h",
+      "source": "sys/include/pci_contract.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_cfg_read16",
-      "source": "drivers/pci/pci.h",
+      "source": "sys/dev/pci/pci.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_cfg_write16",
-      "source": "drivers/pci/pci.h",
+      "source": "sys/dev/pci/pci.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pgalloc_alloc_phys",
-      "source": "mm/pgalloc.h",
+      "source": "sys/kern/mm/pgalloc.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pgalloc_free_n_owner",
-      "source": "mm/pgalloc.h",
+      "source": "sys/kern/mm/pgalloc.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pgalloc_range_has_ram",
-      "source": "mm/pgalloc.h",
+      "source": "sys/kern/mm/pgalloc.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "paging_pte_raw",
-      "source": "mm/paging.h",
+      "source": "sys/kern/mm/paging.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "sys_time_now",
-      "source": "include/sys.h",
+      "source": "sys/include/sys.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kmemset",
-      "source": "lib/kstring.h",
+      "source": "sys/kern/kstring.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kmemcpy",
-      "source": "lib/kstring.h",
+      "source": "sys/kern/kstring.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "kprintf",
-      "source": "include/kprintf.h",
+      "source": "sys/include/kprintf.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_cfg_read8",
-      "source": "drivers/pci/pci.h",
+      "source": "sys/dev/pci/pci.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "irq_register",
-      "source": "kernel/irq/irq.h",
+      "source": "sys/kern/irq/irq.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "irq_unregister",
-      "source": "kernel/irq/irq.h",
+      "source": "sys/kern/irq/irq.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "irq_save",
-      "source": "include/io.h",
+      "source": "sys/include/io.h",
       "context": "normal",
       "irq": true,
       "declaration": "unsigned int irq_save(void);"
     },
     {
       "symbol": "irq_restore",
-      "source": "include/io.h",
+      "source": "sys/include/io.h",
       "context": "normal",
       "irq": true,
       "declaration": "void irq_restore(unsigned int flags);"
     },
     {
       "symbol": "geforce_tick_bind",
-      "source": "drivers/video/geforce/geforce_tick.h",
+      "source": "sys/platform/pc98/video/geforce/geforce_tick.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "paging_map_phys",
-      "source": "mm/paging.h",
+      "source": "sys/kern/mm/paging.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "paging_set_not_present",
-      "source": "mm/paging.h",
+      "source": "sys/kern/mm/paging.h",
       "context": "normal",
       "irq": false
     },
@@ -198,61 +198,61 @@
     },
     {
       "symbol": "tick_register",
-      "source": "kernel/irq/tick.h",
+      "source": "sys/kern/irq/tick.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "geforce_dma_ops",
-      "source": "hwdev/gf/command.h",
+      "source": "sys/dev/video/geforce/command.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "geforce_resource_lookup",
-      "source": "drivers/video/geforce/geforce_module.h",
+      "source": "sys/dev/video/geforce/geforce_module.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "paging_device_map",
-      "source": "mm/paging.h",
+      "source": "sys/kern/mm/paging.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "paging_device_unmap",
-      "source": "mm/paging.h",
+      "source": "sys/kern/mm/paging.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfx_policy_scan_changed",
-      "source": "gfx/gfx_policy.h",
+      "source": "sys/hal/gfx/gfx_policy.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfx_policy_gen_get",
-      "source": "gfx/gfx_policy.h",
+      "source": "sys/hal/gfx/gfx_policy.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfx_policy_reeval",
-      "source": "gfx/gfx_policy.h",
+      "source": "sys/hal/gfx/gfx_policy.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "gfx_is_started",
-      "source": "gfx/gfx_osri_view.h",
+      "source": "sys/kern/gfx/osri/gfx_osri_view.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pci_bar_get",
-      "source": "drivers/pci/pci.h",
+      "source": "sys/dev/pci/pci.h",
       "context": "normal",
       "irq": false
     }

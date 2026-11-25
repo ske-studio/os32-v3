@@ -75,7 +75,7 @@ void __os32_libc_exit(int rc) { exit(rc); }
 |tools/tests/newlib_errno_host.c|変更|5 行、errno 試験用スタブ|
 |tools/tests/test_crt_exit.py、tools/tests/crt_exit_host.c|新規|約 90 行と 80 行、host32 ビルド・変異と偽 KAPI|
 |tools/tests/test_ppc_newlib.py|変更|約 70 行、execute に実物の start.o・syscalls.o を渡す終了試験と start 単体の対照|
-|userland/tests/crtexit.c、userland/deploy.yaml|新規・変更|約 20 行と 1 項目、crtexit.bin を収録（build/programs.mk）|
+|userland/diag/crtexit.c、userland/deploy.yaml|新規・変更|約 20 行と 1 項目、crtexit.bin を収録（build/programs.mk）|
 |userland/ppc/nlprobe.c、tools/accept/ppc_newlib.py|変更|約 20 行と 12 行、引数 crt-return と親シェルの判定。既存の PPC_USER_APPS と KB_ROOT_BINS の nlprobe を使用|
 
 新設 test_crt_exit.py は CHECK 名 crt-exit（host32、tier 2）を宣言。PPC は既存 CHECK ppc-newlib（ppc-cross、tier 2、qemu-ppc）を拡張。各変異は作業用コピーに単独で入れ、同じ runner で原版の PASS、変異の指定箇所での RED を確認する。

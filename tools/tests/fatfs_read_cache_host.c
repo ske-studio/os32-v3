@@ -143,8 +143,8 @@ char *kstrncpy(char *dst, const char *src, u32 n)
 }
 char *kstrncat(char *dst, const char *src, u32 n)
 { u32 len = strlen(dst); if (len < n) kstrncpy(dst + len, src, n - len); return dst; }
-#include "../../fs/pc98pt.c"
-#include "../../fs/fat/fatfs_vfs.c"
+#include "../../sys/fs/pc98pt.c"
+#include "../../sys/fs/fat/fatfs_vfs.c"
 
 static void reset_counts(void)
 {

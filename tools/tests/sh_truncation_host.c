@@ -842,7 +842,7 @@ static void __cdecl h_console_set_cursor(int x, int y) { (void)x; (void)y; }
 static void __cdecl h_tvram_clear(void) {}
 
 /* ルートのデバイス名 (vfs_devname("/"))。既定は HDD。FD のルート名は
- * test_sh_truncation.py が platform/pc98/kernel.c から読んで -DFD_ROOT_DEV で渡す
+ * test_sh_truncation.py が sys/platform/pc98/kernel.c から読んで -DFD_ROOT_DEV で渡す
  * (試験の側で "fd0" を決め打ちしない) */
 #ifndef FD_ROOT_DEV
 #error "FD_ROOT_DEV (kernel.c の FD ルートのデバイス名) を -D で渡すこと"
@@ -1002,19 +1002,19 @@ int shell_cmd_hw(int argc, char **argv) { (void)argc; (void)argv; return 0; }
 int shell_cmd_gfinit(int argc, char **argv) { (void)argc; (void)argv; return 0; }
 /* cmd_pci.c (lspci / pcidump、票 TASK_LAN_82557 L-A)。main.c が
  * shell_cmd_pci_init() を呼ぶので**取り込まないとリンクが通らない**。
- * 復号の実体 drivers/pci/pci_decode.c は実ビルドでも同じ 1 本をリンクする
+ * 復号の実体 sys/dev/pci/pci_decode.c は実ビルドでも同じ 1 本をリンクする
  * (build/programs.mk の PCI_DECODE_USER_OBJ)。 */
 #include "../../userland/shell/cmd_pci.c"
-#include "../../drivers/pci/pci_decode.c"
+#include "../../sys/dev/pci/pci_decode.c"
 #include "../../userland/shell/pci_verbose.c"   /* lspci -v の行づくり */
 /* cmd_hdprep.c (hdprep、票 TASK_HDD_INSTALL 段 1) も同じ理由 — main.c が
  * shell_cmd_hdprep_init() を呼ぶ。判定の純粋部と区画表の共有部も実ビルドと同じ 1 本
  * (build/programs.mk の PC98PT_USER_OBJ)。 */
 #include "../../userland/shell/cmd_hdprep.c"
 #include "../../userland/shell/hdprep_plan.c"
-#include "../../platform/pc98/install_plan.c"
-#include "../../platform/pc98/install_hdprep.c"
-#include "../../fs/pc98pt.c"
+#include "../../sys/platform/pc98/install_plan.c"
+#include "../../sys/platform/pc98/install_hdprep.c"
+#include "../../sys/fs/pc98pt.c"
 #include "../../userland/shell/cmd_filer.c"
 void rsh_lan_reset(void) {}
 int rsh_lan_poll(void) { return OS32_ERR_AGAIN; }
@@ -3587,7 +3587,7 @@ static void case_script_esc_watch(void)
  *
  *  sh.bin は協調型 GUI の中の CPL=3 アプリなので、譲らないかぎり WM は
  *  1 度も回らない。2026-09-16 まで、この譲りは行ごとの ESC 監視の副作用で
- *  出ていた (kbd_trygetkey の空振り → drivers/input/kbd.c の exec_park_poll)。
+ *  出ていた (kbd_trygetkey の空振り → sys/platform/pc98/input/kbd.c の exec_park_poll)。
  *  監視を kbd_peekkey へ替えたときに副作用ごと消えたので、script_exec が
  *  KAPI v49 の sys_yield で明示的に譲り直す。
  *

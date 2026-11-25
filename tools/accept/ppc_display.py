@@ -60,31 +60,31 @@ def read_head(body, status, suffix):
 
 
 # Provider-side mutations keep the public probe and its pixel oracle identical.
-PROVIDER = 'platform/powermac/display_provider.c'
+PROVIDER = 'sys/platform/powermac/display_provider.c'
 WIDTH = 'return m ? (int)m->width : 0;'
 GATE = ('return present_owner && present_owner == appslot_present_owner() &&\n'
         '           a && a->kind == GFX2_KIND_OF_FB && a->state == GFX2_AD_OK &&\n'
         '           of_fb_ready() && present_generation == a->gen;')
 COPY_ENTRY = 'static int surface_copy(void *c, u32 head, const struct gfx2_surf *s)\n{'
 PRESENT_MUTATIONS = {
-    'scroll-off': ('platform/powermac/display.c', 'of_fb_scroll(y);', '(void)y;'),
-    'scroll-owner': ('gfx/gfx_scroll.c', 'if (!DISPLAY_SCROLL_OK()) return;', ''),
+    'scroll-off': ('sys/platform/powermac/display.c', 'of_fb_scroll(y);', '(void)y;'),
+    'scroll-owner': ('sys/hal/gfx/gfx_scroll.c', 'if (!DISPLAY_SCROLL_OK()) return;', ''),
     # Scope the misplaced gate to redraws by a running app. Boot and target
     # acquisition must succeed for the glyph comparison to exercise a flip.
-    'redraw-gated': ('drivers/video/of_fb/of_fb_v2.c', COPY_ENTRY,
-                     '#include "display_provider.h"\n#include "exec/appslot.h"\n' + COPY_ENTRY +
+    'redraw-gated': ('sys/dev/video/of_fb/of_fb_v2.c', COPY_ENTRY,
+                     '#include "display_provider.h"\n#include "sys/kern/exec/appslot.h"\n' + COPY_ENTRY +
                      '\n    if (appslot_cur() && s && !head && adapter_for(c)->head[0].scan_sid == s->sid'
                      ' && !DISPLAY_V1_PRESENT_OK()) return 0;'),
-    'count-commit': ('drivers/video/of_fb/backend_of_fb.c',
+    'count-commit': ('sys/dev/video/of_fb/backend_of_fb.c',
                      'if (!rc) gfx_counters.commits++;', '(void)rc;'),
-    'count-bytes': ('drivers/video/of_fb/backend_of_fb.c',
+    'count-bytes': ('sys/dev/video/of_fb/backend_of_fb.c',
                     'gfx_counters.present_bytes += (end - first);', '(void)end;'),
     'width-768': (PROVIDER, WIDTH, 'return m ? (int)m->width - 32 : 0;'),
     'width-640': (PROVIDER, WIDTH, 'return m ? 640 : 0;'),
     'gate-open': (PROVIDER, GATE, 'return a != 0;'),
     'owner-unchecked': (PROVIDER, 'present_owner == appslot_present_owner() &&', ''),
 }
-TARGET_FAILURE = ('platform/powermac/console_text.c', '\n    rc = open_target();',
+TARGET_FAILURE = ('sys/platform/powermac/console_text.c', '\n    rc = open_target();',
                   '\n    rc = -1;')
 PROBES = {'scroll-off': ('scroll',), 'scroll-owner': ('scroll',), 'redraw-gated': ('shutdown',), 'width-768': ('edge',), 'width-640': ('dirty', 'full'),
           'gate-open': ('shutdown',), 'target-failure': ('shutdown',),
@@ -400,7 +400,7 @@ def observe(media, cpu, evidence, case, modes=(), osri=False):
 
 
 def osri_fixture(path, fixed=False):
-    """OSRI v2 layout in gfx/gfx_osri.h, one palette update on row 1."""
+    """OSRI v2 layout in sys/kern/gfx/osri/gfx_osri.h, one palette update on row 1."""
     size = 128096 if fixed else 128096 + 8
     data = bytearray(size)
     struct.pack_into('<4s4H2BH6I4H', data, 0, b'OSRI', 2, 64, 640, 400,
@@ -483,18 +483,18 @@ def main():
             absent_bindings(folder, kernel / 'gen', case, ('gfx_get_framebuffer',))
         mutation = []
         if case == 'osri-slot-swap':
-            init = (ROOT / 'exec/exec_kapi_init.inc').read_text()
+            init = (ROOT / 'sys/kern/exec/exec_kapi_init.inc').read_text()
             for slot, other in [('gfx_osri_show', 'sys_set_mtime'), ('sys_set_mtime', 'gfx_osri_show')]:
                 assignment = f'kapi->{slot} = wrap_{slot};'
                 assert init.count(assignment) == 1
                 init = init.replace(assignment, f'kapi->{slot} = wrap_{other};')
             (folder / 'swapped_init.inc').write_text(init)
-            mutation = mutant_settings(folder, case, 'exec/exec.c',
+            mutation = mutant_settings(folder, case, 'sys/kern/exec/exec.c',
                                        '#include "exec_kapi_init.inc"', '#include "swapped_init.inc"')
         if case == 'osri-restore-skipped':
             # transfer() in this include copies the saved terminal rows back.
             include = '#include "of_fb_osri.inc"'
-            mutation = mutant_settings(folder, case, 'drivers/video/of_fb/backend_of_fb.c',
+            mutation = mutant_settings(folder, case, 'sys/dev/video/of_fb/backend_of_fb.c',
                                        include, '#define transfer(...) ((void)src)\n' + include +
                                        '\n#undef transfer')
         if case in PRESENT_MUTATIONS:
@@ -506,12 +506,12 @@ def main():
                 mutation.extend(arg.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for arg in extra)
         if case == 'lease-kept':
             # The display's surface code is an .inc; mutate the revoke itself.
-            mutation = mutant_settings(folder, case, 'exec/lease.c',
+            mutation = mutant_settings(folder, case, 'sys/kern/exec/lease.c',
                                        '        if (a && a->as && a->as->pd_phys) failed += lease_revoke_sid(a->as, sid);',
                                        '        (void)a; (void)sid;')
         if case == EXIT_MODE_CASE:
             anchor = '    int poison = 0;'
-            mutation = mutant_settings(folder, case, 'gfx/v2/owner_release.c', anchor,
+            mutation = mutant_settings(folder, case, 'sys/hal/gfx/v2/owner_release.c', anchor,
                 anchor + '\n    struct gfx2_adapter *active = gfx2_active();'
                          '\n    if (active) active->head[0].mode_id ^= 1u;')
         # Compare identical RAM-root bytes even when the ISO builder timestamps files.

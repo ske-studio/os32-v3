@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import host32
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'gfx/v2/enum.c'
+SOURCE = ROOT / 'sys/hal/gfx/v2/enum.c'
 
 def observe(work, source):
     src = work / 'enum.c'
@@ -13,7 +13,7 @@ def observe(work, source):
     exe = work / 'test'
     cmd = ['gcc', '-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-nostdlib', '-static', '-no-pie']
     cmd += ['-I' + str(ROOT / p) for p in ('gfx/v2', 'lib', 'include', 'sdk/include/os32', 'mm', 'arch/x86', 'platform/pc98')]
-    host32.build(cmd + [str(src), str(ROOT / 'tools/tests/gfx2_enum_host.c'), str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)], check=True)
+    host32.build(cmd + [str(src), str(ROOT / 'tools/tests/gfx2_enum_host.c'), str(ROOT / 'sys/kern/kstring_c.c'), '-o', str(exe)], check=True)
     return host32.run([str(exe)], timeout=30).returncode
 
 def main():

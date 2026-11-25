@@ -14,7 +14,7 @@ LAYOUT_FLAGS = [
                 '-Wl,--defsym=__ledger_fixed_end=0x180000']
 FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
-# arch/x86 + platform/pc98: include/io.h は契約だけで、実装は固定名
+# arch/x86 + platform/pc98: sys/include/io.h は契約だけで、実装は固定名
 # arch_io.h / platform_io.h を引く (順序 3)。build/config.mk の INC_COMMON と
 # 同じものをここでも渡す。
 INCLUDES = include_flags(ROOT)
@@ -29,7 +29,7 @@ if __name__ == "__main__":
         print("HOST ILP32 GNU11 COMPILE PASS", flush=True)
         host32.run([str(exe)], cwd=ROOT, check=True, timeout=60)
         subprocess.run(["i386-elf-gcc", *FLAGS, "-O2", *INCLUDES,
-                        "-c", str(ROOT / "mm/pgalloc.c"),
+                        "-c", str(ROOT / "sys/kern/mm/pgalloc.c"),
                         "-o", str(pathlib.Path(tmp) / "pgalloc.o")],
                        cwd=ROOT, check=True)
         print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)

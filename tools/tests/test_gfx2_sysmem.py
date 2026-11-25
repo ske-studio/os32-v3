@@ -7,7 +7,7 @@ import host32
 from mutpar import build_in_tree
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'gfx/v2/sysmem.c'
+SOURCE = 'sys/hal/gfx/v2/sysmem.c'
 OLD = 'kmemset(s->kva, 0, n * PAGE_SIZE);'
 NEW = 'kmemset(s->kva, 0, s->bytes);'
 

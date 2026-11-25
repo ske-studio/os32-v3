@@ -3,7 +3,7 @@
 --prepare compiles copied substitutions only; it does not execute mutants.
 """
 CHECK = dict(name='dep-dir-a-l02-host', tier=1,
-    covers=['platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'include/callconv.h', 'platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'drivers/char/serial.h', 'hwdev/hwdev_imports.def', 'include/gf_production.h', 'kdebug/kpeek.h', 'kdebug/recover.h', 'tools/tests/hwdev_contract_fixture.py', 'kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'drivers/net/e82557/lan_module.c', 'drivers/net/e82557/lan_module.h', 'drivers/net/e82557/lan_body.c', 'platform/pc98/kernel.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/lan_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/lan_module_host.c', 'tools/tests/test_lan_module.py', 'build/lan-module.ld', 'drivers/net/e82557/e82557.h', 'drivers/net/e82557/e82557_regs.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'drivers/pci/pci_bind.c', 'drivers/pci/pci_bind_match.c', 'drivers/pci/pci_bind.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'mm/dma_pool.h', 'kernel/module/module.h', 'include/sys.h', 'include/kprintf.h', 'kernel/module/kdebug_imports.def', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.h', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'tools/mkpkg.py', 'tools/deploy_manifests.py', 'build/core.yaml', 'build/packages.yaml', 'userland/deploy.yaml', 'sdk/kapi.json', 'build/out/lan/*', 'build/out/lan.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/lan_contract.h', 'include/dma_contract.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'platform/pc98/lan_match.c', 'tools/tests/dep_dir_a_l02_host.c', 'tools/tests/test_e82557_drv.py', 'tools/tests/e82557_drv_host.c', 'tools/hwdev_layout.json', 'hwdev/generated/hwdev_contract.h', 'build/lan-module.mk', 'tools/tests/fixtures/dep_dir_a/l02.json', 'drivers/net/e82557/e82557.c', 'drivers/net/e82557/e82557_desc.c', 'drivers/net/e82557/e82557_eeprom.c', 'drivers/pci/pci_decode.c', 'hwdev/generated/hwdev_imports.json', 'hwdev/generated/hwdev_layout.txt', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
+    covers=['sys/platform/pc98/module_pair.c', 'sys/include/platform_module_pair.h', 'sys/include/callconv.h', 'sys/platform/pc98/boot_capture.c', 'sys/platform/pc98/bootinfo_wire.h', 'sys/platform/pc98/bootinfo_native.h', 'sys/dev/char/serial.h', 'sys/dev/hwdev/hwdev_imports.def', 'sys/include/gf_production.h', 'sys/platform/pc98/kdebug/kpeek.h', 'sys/dev/video/geforce/diag/recover.h', 'tools/tests/hwdev_contract_fixture.py', 'sys/kern/irq/tick.c', 'sys/kern/irq/tick.h', 'sys/platform/pc98/tick_order.h', 'sys/kern/module/module_runtime.c', 'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.c', 'sys/kern/module/module_image.h', 'sys/kern/module/module_schema.h', 'sys/kern/mm/pgalloc.h', 'sys/include/types.h', 'sys/include/memmap.h', 'sys/fs/vfs.c', 'sys/fs/vfs.h', 'sys/dev/base/dev.c', 'sys/hal/block/dev.h', 'sys/dev/block/disk.h', 'sys/dev/ata/atapi.h', 'sys/dev/block/fdc.h', 'sys/include/console.h', 'sys/include/kbd.h', 'sys/platform/pc98/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'sys/kern/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'sys/dev/net/e82557/lan_module.c', 'sys/dev/net/e82557/lan_module.h', 'sys/dev/net/e82557/lan_body.c', 'sys/platform/pc98/kernel.c', 'sys/include/config.h', 'sdk/include/os32/os32_generations.h', 'sys/include/bootinfo.h', 'tools/prototypes/lan_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/lan_module_host.c', 'tools/tests/test_lan_module.py', 'build/lan-module.ld', 'sys/dev/net/e82557/e82557.h', 'sys/dev/net/e82557/e82557_regs.h', 'sys/dev/pci/pci.h', 'sys/dev/pci/pci_decode.h', 'sys/dev/pci/pci_bind.c', 'sys/dev/pci/pci_bind_match.c', 'sys/dev/pci/pci_bind.h', 'sys/kern/irq/irq.h', 'sys/kern/irq/irq_math.h', 'sys/kern/mm/dma_pool.h', 'sys/kern/module/module.h', 'sys/include/sys.h', 'sys/include/kprintf.h', 'sys/kern/module/kdebug_imports.def', 'sys/fs/serialfs/sfs_lan.h', 'sys/fs/serialfs/sfs_client.h', 'sys/fs/serialfs/sfs_proto.h', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'tools/mkpkg.py', 'tools/deploy_manifests.py', 'build/core.yaml', 'build/packages.yaml', 'userland/deploy.yaml', 'sdk/kapi.json', 'build/out/lan/*', 'build/out/lan.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'sys/fs/vfs_device.h', 'sys/platform/pc98/boot_names.h', 'sys/platform/pc98/boot_names.c', 'sys/dev/ata/ide.h', 'sys/include/lan_contract.h', 'sys/include/dma_contract.h', 'sys/include/pci_dev_contract.h', 'sys/include/pci_bind_contract.h', 'sys/platform/pc98/lan_match.c', 'tools/tests/dep_dir_a_l02_host.c', 'tools/tests/test_e82557_drv.py', 'tools/tests/e82557_drv_host.c', 'tools/hwdev_layout.json', 'sys/dev/hwdev/generated/hwdev_contract.h', 'build/lan-module.mk', 'tools/tests/fixtures/dep_dir_a/l02.json', 'sys/dev/net/e82557/e82557.c', 'sys/dev/net/e82557/e82557_desc.c', 'sys/dev/net/e82557/e82557_eeprom.c', 'sys/dev/pci/pci_decode.c', 'sys/dev/hwdev/generated/hwdev_imports.json', 'sys/dev/hwdev/generated/hwdev_layout.txt', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
     needs=['make:all'], budget=4.9,
     kind='characterization',
 )
@@ -20,10 +20,10 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 OLD = 'E82557_VENDOR, E82557_DEVICE,'
 NEW = 'E82557_VENDOR, E82557_DEVICE ^ 1,'
-COPIES = ['include/callconv.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h',
-          'include/types.h', 'drivers/pci/pci_decode.h', 'drivers/pci/pci.h',
-          'drivers/pci/pci_bind.h', 'drivers/pci/pci_bind_match.c', 'drivers/net/e82557/lan_module.h',
-          'platform/pc98/lan_match.c', 'tools/tests/dep_dir_a_l02_host.c']
+COPIES = ['sys/include/callconv.h', 'sys/include/pci_dev_contract.h', 'sys/include/pci_bind_contract.h',
+          'sys/include/types.h', 'sys/dev/pci/pci_decode.h', 'sys/dev/pci/pci.h',
+          'sys/dev/pci/pci_bind.h', 'sys/dev/pci/pci_bind_match.c', 'sys/dev/net/e82557/lan_module.h',
+          'sys/platform/pc98/lan_match.c', 'tools/tests/dep_dir_a_l02_host.c']
 
 
 def build(folder, body):
@@ -31,20 +31,20 @@ def build(folder, body):
         dest = folder / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, dest)
-    (folder / 'platform/pc98/lan_match.c').write_text(body)
+    (folder / 'sys/platform/pc98/lan_match.c').write_text(body)
     exe = folder / 'match'
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                     '-ffreestanding', '-nostdlib', '-static', '-fno-pie', '-no-pie',
                     *include_flags(folder),
                     *include_flags(ROOT),
                     str(folder / 'tools/tests/dep_dir_a_l02_host.c'),
-                    str(folder / 'platform/pc98/lan_match.c'),
-                    str(folder / 'drivers/pci/pci_bind_match.c'), '-o', str(exe)], check=True)
+                    str(folder / 'sys/platform/pc98/lan_match.c'),
+                    str(folder / 'sys/dev/pci/pci_bind_match.c'), '-o', str(exe)], check=True)
     return exe
 
 
 def contracts():
-    for header in ('include/pci_dev_contract.h', 'include/pci_bind_contract.h'):
+    for header in ('sys/include/pci_dev_contract.h', 'sys/include/pci_bind_contract.h'):
         result = subprocess.run(['make', '-n', '-j1', '-W', header,
                                  'build/out/lan/lan_imports.h'], cwd=ROOT,
                                 capture_output=True, text=True, check=True)
@@ -86,7 +86,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     parser.add_argument('--prepare', action='store_true')
     args = parser.parse_args()
-    body = (ROOT / 'platform/pc98/lan_match.c').read_text()
+    body = (ROOT / 'sys/platform/pc98/lan_match.c').read_text()
     assert body.count(OLD) == 1
     with tempfile.TemporaryDirectory(prefix='dep-dir-a-l02-') as directory:
         folder = Path(directory)

@@ -3,9 +3,9 @@
  * success. The real service lookup runs; binding/lifecycle uses the separate
  * gf_accel_c1/c2 hosts with real F1/F2/F3 products. Weak definitions allow a
  * fixture's explicit lower-layer model or real backend to take precedence. */
-#include "hwdev/gf/accel.h"
-#include "hwdev/gf/feature5.h"
-#include "hwdev/gf/production.h"
+#include "sys/dev/video/geforce/accel.h"
+#include "sys/dev/video/geforce/feature5.h"
+#include "sys/dev/video/geforce/production.h"
 /* Ownerless fixtures cannot prepare or measure a stopped production card. */
 __attribute__((weak)) int gf_production_identity(struct gf_production *p)
 { (void)p; __builtin_trap(); }
@@ -88,7 +88,7 @@ __attribute__((weak)) int gf_direct_ok(void) { __builtin_trap(); }
 __attribute__((weak)) const GfxDirectOps gf_direct_ops = {0};
 
 /* Legacy HAL fixtures do not exercise v2; its contract has a separate host. */
-#include "drivers/video/geforce/gf_v2.h"
+#include "sys/dev/video/geforce/gf_v2.h"
 __attribute__((weak)) const GfxBackendV2 gf_backend_v2 = {0};
 __attribute__((weak)) int gf_v2_start(struct gf_v2 *g, u32 dl) { (void)g; (void)dl; return 0; }
 __attribute__((weak)) struct gf_v2 gf_v2_inst;

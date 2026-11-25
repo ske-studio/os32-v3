@@ -1,8 +1,8 @@
-"""Cirrus の窓の可否は RAM の上端ではなく物理地図で決める (drivers/video/cirrus/backend_cirrus.c)。
+"""Cirrus の窓の可否は RAM の上端ではなく物理地図で決める (sys/dev/video/cirrus/backend_cirrus.c)。
 
 記録: tools/tests/cirrus_win_tdd.md / 教訓 docs/design/mm/pgalloc.md#落とし穴
 
-tools/tests/cirrus_win_host.c が実物の drivers/video/cirrus/backend_cirrus.c を 1 行も写さずに
+tools/tests/cirrus_win_host.c が実物の sys/dev/video/cirrus/backend_cirrus.c を 1 行も写さずに
 #include し、pgalloc_range_has_ram (贋の物理地図) と sys_get_mem_kb (上端) と
 ボードグルーだけを贋物にして ILP32 で回す (test_pgalloc_range.py と同じ形)。
 
@@ -15,7 +15,7 @@ tools/tests/cirrus_win_host.c が実物の drivers/video/cirrus/backend_cirrus.c
 make・エミュレータ・配備には触れない。
 """
 CHECK = dict(name='cirrus-win-host', tier=1,
-    covers=['gfx/palette.h', 'include/gfx_format.h', 'tools/tests/host32.py', 'drivers/video/cirrus/wab_glue_xe10.c', 'drivers/video/cirrus/backend_cirrus.c', 'drivers/video/cirrus/cirrus_identify.c', 'tools/tests/cirrus_win_host.c', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
+    covers=['sys/hal/gfx/palette.h', 'sys/include/gfx_format.h', 'tools/tests/host32.py', 'sys/platform/pc98/video/cirrus/wab_glue_xe10.c', 'sys/dev/video/cirrus/backend_cirrus.c', 'sys/platform/pc98/video/cirrus/cirrus_identify.c', 'tools/tests/cirrus_win_host.c', 'tools/tests/mutpar.py', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.1,
     basis=['AC-MEM-1', '[HW1]'],
 )
@@ -37,8 +37,8 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
 # build/config.mk の INC_GFX と同じ探索先 (INC_COMMON + gfx drivers fs lib kernel)。
 INCLUDES = include_flags(ROOT)
 SRC = ROOT / "tools/tests/cirrus_win_host.c"
-MUT_TARGET = "drivers/video/cirrus/backend_cirrus.c"
-IDENTIFY = "drivers/video/cirrus/cirrus_identify.c"
+MUT_TARGET = "sys/dev/video/cirrus/backend_cirrus.c"
+IDENTIFY = "sys/platform/pc98/video/cirrus/cirrus_identify.c"
 
 
 def host_cmd(exe):
@@ -99,7 +99,7 @@ MUTATIONS = [
      "    if (!cirrus_identify()) return 0;\n"),
     # 9 = リニア窓を 16MB 直上 (旧番地) へ戻す。高位 RAM の構成で probe が落ちる
     #     (帯の外なので STATIC_ASSERT でも止まる)。
-    ("old_linear_sel", "include/wab_xe10.h",
+    ("old_linear_sel", "sys/platform/pc98/wab_xe10.h",
      "#define WAB_XE10_LINEARWIN_SEL \\\n"
      "    ((u8)(MEM_DEVICE_APERTURE_BASE >> WAB_XE10_LINEARWIN_SHIFT))",
      "#define WAB_XE10_LINEARWIN_SEL 0x01"),
@@ -135,7 +135,7 @@ if __name__ == "__main__":
         tmp = pathlib.Path(tmp)
         exe = tmp / "cirrus-win"
         subprocess.run(host_cmd(exe), cwd=ROOT, check=True)
-        print("HOST ILP32 GNU11 COMPILE PASS (real drivers/video/cirrus/backend_cirrus.c)",
+        print("HOST ILP32 GNU11 COMPILE PASS (real sys/dev/video/cirrus/backend_cirrus.c)",
               flush=True)
         rc = host32.run([str(exe)], cwd=ROOT, timeout=60).returncode
         print("EXIT cirrus_win_host=%d" % rc, flush=True)
@@ -143,9 +143,9 @@ if __name__ == "__main__":
         subprocess.run(target_cmd(tmp / "backend_cirrus.o"), cwd=ROOT,
                        check=True)
         # ボードの層: リニア窓が v3 のデバイス窓の帯と静的 PT に収まることは
-        # drivers/video/cirrus/wab_glue_xe10.c の STATIC_ASSERT が見る。同じフラグで通す。
+        # sys/platform/pc98/video/cirrus/wab_glue_xe10.c の STATIC_ASSERT が見る。同じフラグで通す。
         subprocess.run(["i386-elf-gcc", *FLAGS, "-O2", *INCLUDES, "-c",
-                        str(ROOT / "drivers/video/cirrus/wab_glue_xe10.c"),
+                        str(ROOT / "sys/platform/pc98/video/cirrus/wab_glue_xe10.c"),
                         "-o", str(tmp / "wab_glue_xe10.o")], cwd=ROOT,
                        check=True)
         print("TARGET i386-elf GNU11 -Werror COMPILE PASS "

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """C2/L1: actual public boundary, policy and extracted exec finish/kill bodies."""
 CHECK = dict(name='io-kapi-host', tier=1, budget=30, needs=[], covers=[
-    'sdk/kapi.json', 'sdk/kapi_rust_gen.py', 'kernel/io_kapi.c', 'kernel/io_kapi.h', 'kernel/io_policy.c', 'kernel/io_policy.h',
-    'kernel/io_work.h', 'exec/exec_syscall.inc', 'exec/exec_finish.inc', 'exec/exec_schedule.inc', 'exec/exec_launch.inc',
-    'exec/appslot.h', 'exec/shell_service.h', 'include/app_ids.h',
+    'sdk/kapi.json', 'sdk/kapi_rust_gen.py', 'sys/kern/io_kapi.c', 'sys/kern/io_kapi.h', 'sys/kern/io_policy.c', 'sys/kern/io_policy.h',
+    'sys/kern/io_work.h', 'sys/kern/exec/exec_syscall.inc', 'sys/kern/exec/exec_finish.inc', 'sys/kern/exec/exec_schedule.inc', 'sys/kern/exec/exec_launch.inc',
+    'sys/kern/exec/appslot.h', 'sys/kern/exec/shell_service.h', 'sys/include/app_ids.h',
     'tools/tests/io_kapi_host.c', 'tools/tests/test_io_kapi.py', 'tools/tests/host32.py',
-    'include/types.h', 'include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h'],
+    'sys/include/types.h', 'sys/include/callconv.h', 'sdk/include/os32/os32_kapi_shared.h'],
     basis=['IO_TIER_DESIGN §4', '§8', 'N4', 'AC-IO-1', 'AC-IO-2'],
     env_limit='PPC BE runtime requires powerpc-elf-gcc and qemu-ppc user mode')
 import os

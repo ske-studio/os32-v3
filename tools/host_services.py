@@ -8,7 +8,7 @@ import re
 from typing import Callable
 
 
-MAX_SERVICE_ID = 65531  # REMOTE_SVC_REGISTRY_MAX in include/remote_control.h
+MAX_SERVICE_ID = 65531  # REMOTE_SVC_REGISTRY_MAX in sys/include/remote_control.h
 BUILTINS = ('os32.alive', 'os32.clip', 'os32.print', 'os32.http')
 SFS_SERVICES = ('os32.file', 'os32.iso9660')
 STUBS = ('os32.udf', 'os32.mail', 'os32.feed', 'os32.chat')

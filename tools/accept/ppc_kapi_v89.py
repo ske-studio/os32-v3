@@ -39,7 +39,7 @@ def fixture(folder, case, gate):
             source = (ROOT / path).read_text()
         sources[path] = replace(source, anchor, value)
 
-    boot = 'platform/powermac/ppc_kernel.c'
+    boot = 'sys/platform/powermac/ppc_kernel.c'
     stop = '    if (!shared_user) kboot_stop("KAPI trampoline");'
     base = '(u32)user_gate' if gate else 'exec_tramp_page_addr()'
     edit(boot, stop, stop + '''
@@ -68,20 +68,20 @@ def fixture(folder, case, gate):
         edit(boot, 'user_gate[PAGE_SIZE]', 'user_gate[2 * PAGE_SIZE]')
         edit(boot, '(u32)user_gate, 1)', '(u32)user_gate, 2)')
     if case in ('missing-page', 'map-failure'):
-        path = 'mm/paging_map.inc'
+        path = 'sys/kern/mm/paging_map.inc'
         if case == 'map-failure':
             anchor = 'prepare_tables(MEM_SHM_BASE >> PAGE_SHIFT, MEM_SHM_SIZE / PAGE_SIZE)'
             # The right operand of || runs only after trampoline preparation succeeds.
             edit(path, anchor, r'(kprintf(7, "V89 inject SHM prepare failure\r\n"), -1)')
-            edit('mm/paging.c', '#include "paging.h"', '#include "paging.h"\n#include "kprintf.h"')
+            edit('sys/kern/mm/paging.c', '#include "paging.h"', '#include "paging.h"\n#include "kprintf.h"')
         else:
             anchor = '        set_page_noflush(frame, frame, PAGE_RO | PTE_USER);'
             edit(path, anchor, '        if (i == 1) continue;\n' + anchor)
-        edit('mm/paging.c', '#include "paging_map.inc"', '#include "v89-map.inc"')
+        edit('sys/kern/mm/paging.c', '#include "paging_map.inc"', '#include "v89-map.inc"')
         (folder / 'v89-map.inc').write_text(sources.pop(path))
     if not gate:
         launch = '        arch_entry_enter(&ctx->entry, want_ring3 ? ctx->as->pd_phys : 0);'
-        edit('exec/exec_launch.inc', launch, r'''        kprintf(7, "V89 enter\r\n");
+        edit('sys/kern/exec/exec_launch.inc', launch, r'''        kprintf(7, "V89 enter\r\n");
         if (want_ring3) {
             u32 reads = 0, writes = 0, identity = 0;
             unsigned flags = irq_save();
@@ -104,13 +104,13 @@ def fixture(folder, case, gate):
             check = bound.replace('KAPI_FUNC_COUNT)', 'KAPI_FUNC_COUNT - 1)')
         elif case == 'accept-first':
             check = bound.replace('>=', '>')
-        edit('exec/exec_syscall.inc', '#define RING3_ARG_WINDOW',
+        edit('sys/kern/exec/exec_syscall.inc', '#define RING3_ARG_WINDOW',
              'static volatile u32 v89_boundary;\n#define RING3_ARG_WINDOW')
-        edit('exec/exec_syscall.inc', bound, check + '\n        v89_boundary = slot;')
+        edit('sys/kern/exec/exec_syscall.inc', bound, check + '\n        v89_boundary = slot;')
         # Keep reserved slots away from argument metadata even when the tested
         # comparison is relaxed. Only the product rejection emits the marker.
         anchor = '    wrapptr = exec_kapi_table()'
-        edit('exec/exec_syscall.inc', anchor, r"""    if (slot >= KAPI_FUNC_COUNT) {
+        edit('sys/kern/exec/exec_syscall.inc', anchor, r"""    if (slot >= KAPI_FUNC_COUNT) {
         v89_boundary = ~slot;
         result = OS32_ERR_INVAL;
         goto syscall_complete;
@@ -122,24 +122,24 @@ def fixture(folder, case, gate):
     }
 """ + anchor)
         done = '    arch_syscall_result(&call, result);'
-        edit('exec/exec_syscall.inc', done, done + '''
+        edit('sys/kern/exec/exec_syscall.inc', done, done + '''
     static int v89_follow;
     if (slot == 0 || v89_follow)
         kprintf(7, "V89 slot=%u result=%d heap=%u shm=%u\\r\\n",
                 slot, (int)result, kapi->sbrk_heap_limit, kapi->shm_base);
     v89_follow = slot == 0;''')
         if case == 'wrong-data':
-            edit('exec/exec_launch.inc', '[KAPI_DATA_IDX_SHM_BASE] = kapi->shm_base;',
+            edit('sys/kern/exec/exec_launch.inc', '[KAPI_DATA_IDX_SHM_BASE] = kapi->shm_base;',
                  '[KAPI_DATA_IDX_SHM_BASE] = is_shell ? kapi->shm_base : sbrk_end;')
         for path in tuple(sources):
             if path.endswith('.inc'):
                 name = Path(path).name
-                edit('exec/exec.c', f'#include "{name}"', f'#include "v89-{name}"')
+                edit('sys/kern/exec/exec.c', f'#include "{name}"', f'#include "v89-{name}"')
                 (folder / ('v89-' + name)).write_text(sources.pop(path))
     if case == 'wrong-stub':
-        edit('arch/ppc/syscall_code.c', '0x38000000u | i)', '0x38000000u | (i == 297 ? 7 : i))')
+        edit('sys/arch/ppc/syscall_code.c', '0x38000000u | i)', '0x38000000u | (i == 297 ? 7 : i))')
     if case == 'wrong-branch':
-        edit('arch/ppc/syscall_code.c', '(l.ls_off + 8u) -',
+        edit('sys/arch/ppc/syscall_code.c', '(l.ls_off + 8u) -',
              '(l.ls_off + (i == 297 ? 12u : 8u)) -')
     settings = []
     for key, (path, source) in zip(('KB_MUT', 'KB_MUT_EXTRA', 'KB_MUT_THIRD'), sources.items(), strict=False):

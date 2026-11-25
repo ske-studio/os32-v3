@@ -1,4 +1,4 @@
-#include "../../hwdev/gf/display/palette.c"
+#include "../../sys/dev/video/geforce/display/palette.c"
 
 struct event { u32 bar, off, width, value; };
 static struct event events[VIDEO_PALETTE_BYTES + 2];

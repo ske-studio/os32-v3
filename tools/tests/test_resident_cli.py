@@ -7,11 +7,11 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'kernel/cli/resident_cli.c'
+SOURCE = ROOT / 'sys/kern/cli/resident_cli.c'
 CHECK = dict(name='resident-cli', tier=1, budget=60, needs=[],
-             covers=['kernel/cli/resident_cli.c', 'kernel/cli/resident_cli.h',
-                     'include/types.h', 'tools/tests/test_resident_cli.py',
-                     'lib/kstring_c.c', 'lib/kstring.h'],
+             covers=['sys/kern/cli/resident_cli.c', 'sys/kern/cli/resident_cli.h',
+                     'sys/include/types.h', 'tools/tests/test_resident_cli.py',
+                     'sys/kern/kstring_c.c', 'sys/kern/kstring.h'],
     basis=['PPC_SHELL_DESIGN §3', 'PPC_SHELL_DESIGN §7', 'PPC_SHELL_SC_DESIGN §5'],
     env_limit='fake terminal/FSでCLIと行取消を確認するが、実ESCCの停止と入出力遅延は再現しない。',
 )
@@ -20,7 +20,7 @@ HARNESS = r'''
 #include <setjmp.h>
 #include <stdio.h>
 #include <string.h>
-#include "kernel/cli/resident_cli.h"
+#include "sys/kern/cli/resident_cli.h"
 static jmp_buf done;
 static const char *input;
 static char out[4096], path[256], data[256];
@@ -106,7 +106,7 @@ def main():
             subprocess.run([os.environ.get('CC', 'gcc'), '-std=gnu11', '-Wall', '-Wextra', '-Werror',
                             '-I', str(ROOT), '-I', str(ROOT / 'include'),
                             '-I', str(ROOT / 'kernel/cli'), str(d / 'resident_cli.c'),
-                            str(d / 'harness.c'), str(ROOT / 'lib/kstring_c.c'), '-o', str(d / 'test')], check=True)
+                            str(d / 'harness.c'), str(ROOT / 'sys/kern/kstring_c.c'), '-o', str(d / 'test')], check=True)
             result = subprocess.run([str(d / 'test')], timeout=10, check=False)
             if result.returncode != expected:
                 raise RuntimeError(f'{name}: expected {expected}, got {result.returncode}')

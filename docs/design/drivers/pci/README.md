@@ -1,6 +1,6 @@
 # drivers/pci — 設計
 > 状態: **現行 (2026-11-10)**
-ソース: `drivers/pci/pci.c`、`drivers/pci/pci_barsize.c`
+ソース: `sys/dev/pci/pci.c`、`sys/dev/pci/pci_barsize.c`
 
 BOOT_PCI_ENUM の列挙時に、各装置の BAR を一度測り、設定を戻してから記録する。
 公開 `pci_dev` は生値の写しを返す。長さ・種類・prefetch・未割当状態は別表に持ち、

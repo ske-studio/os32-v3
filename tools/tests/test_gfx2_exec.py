@@ -8,7 +8,7 @@ import tempfile
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'exec/exec_finish.inc'
+SOURCE = ROOT / 'sys/kern/exec/exec_finish.inc'
 ANCHOR = '    if (exec_gfx_owner_release(a->as))\n        paging_addrspace_poison(a->as);'
 
 def run_case(tmp, mutate, failure):

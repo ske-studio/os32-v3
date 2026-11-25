@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Compare the linked DAC image with the independently recorded hardware script."""
 CHECK = dict(name='trident-dac', tier=1, needs=[], budget=2.8,
-    covers=['drivers/video/trident/default_dac.c', 'drivers/video/trident/trident.h',
-            'userland/tests/hw/trident_mode.hwb', 'tools/tests/host32.py',
+    covers=['sys/dev/video/trident/default_dac.c', 'sys/dev/video/trident/trident.h',
+            'userland/diag/hw/trident_mode.hwb', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py'],
     basis=['TRIDENT_S3_DESIGN §1', 'TRIDENT_S3_DESIGN §3', 'TRIDENT_FULL_DESIGN §5'],
 )
@@ -18,8 +18,8 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = ROOT / 'drivers/video/trident/default_dac.c'
-SCRIPT = ROOT / 'userland/tests/hw/trident_mode.hwb'
+PRODUCT = ROOT / 'sys/dev/video/trident/default_dac.c'
+SCRIPT = ROOT / 'userland/diag/hw/trident_mode.hwb'
 DIGEST = '58d253e8f2d9b14a7dc486f5f4f04295d4c66ad04e00f3e16ce7580dfc50e6a4'
 MUTATIONS = (('first', '    0, 0, 0, 0, 0, 42, 0, 42, 0, 0, 42, 42,',
               '    1, 0, 0, 0, 0, 42, 0, 42, 0, 0, 42, 42,'),
@@ -37,7 +37,7 @@ def main():
     assert len(entries) == 768 and [i for i, _ in entries] == list(range(768))
     expected = bytes(v for _, v in entries)
     assert hashlib.sha256(expected).hexdigest() == DIGEST
-    source = '#include "drivers/video/trident/trident.h"\n'
+    source = '#include "sys/dev/video/trident/trident.h"\n'
     source += 'static const u8 expected[768] = {' + ','.join(map(str, expected)) + '};\n'
     source += '''void _start(void) {
         int rc = 0;

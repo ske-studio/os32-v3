@@ -14,8 +14,8 @@ void *kmemcpy(void *dst, const void *src, u32 n) { return memcpy(dst, src, n); }
 static unsigned int irq_enabled = 1, saves, restores;
 static unsigned int irq_save(void) { unsigned int f = irq_enabled; irq_enabled = 0; saves++; return f; }
 static void irq_restore(unsigned int f) { assert(!irq_enabled); irq_enabled = f; restores++; }
-#include "../../fs/fd_redirect.c"
-#include "../../exec/redir_access.c"
+#include "../../sys/fs/fd_redirect.c"
+#include "../../sys/kern/exec/redir_access.c"
 volatile int ring3_wm_depth;
 
 #define BYTES (PAGE_SIZE * 2)

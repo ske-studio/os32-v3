@@ -1,5 +1,5 @@
 #include "legacy_source.inc"
-/* Oracle: 2c03d5ed:drivers/input/kbd.c cooked ring, renamed only. */
+/* Oracle: 2c03d5ed:sys/platform/pc98/input/kbd.c cooked ring, renamed only. */
 static volatile u16 old_buf[KBD_BUF_SIZE];
 static volatile int old_head, old_tail, old_count;
 static volatile u32 old_dropped;
@@ -27,7 +27,7 @@ static int old_peek(void) {
     irq_restore(flags);
     return (int)entry;
 }
-/* Oracle: 7eb7efac:drivers/input/kbd.c raw enqueue/dequeue. */
+/* Oracle: 7eb7efac:sys/platform/pc98/input/kbd.c raw enqueue/dequeue. */
 static volatile u16 old_raw_buf[KBD_BUF_SIZE];
 static volatile int old_raw_head, old_raw_tail, old_raw_count;
 static volatile u32 old_raw_dropped;

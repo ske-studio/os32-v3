@@ -2,7 +2,7 @@
 """HW-BASIC log formatting and atomic delivery."""
 CHECK = dict(name='hwb-log-host', tier=1,
              covers=['userland/shell/hwb_log.c', 'userland/shell/hwb.h',
-                     'kdebug/hwb_wire.h', 'tools/tests/hwb_log_host.c',
+                     'sys/kern/kdebug/hwb_wire.h', 'tools/tests/hwb_log_host.c',
                      'tools/tests/hwb_fake.h', 'tools/tests/hwb_host.py',
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py',
                      'tools/tests/mutpar.py'], needs=[], budget=4.5,

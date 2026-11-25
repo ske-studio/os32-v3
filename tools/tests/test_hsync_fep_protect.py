@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """DICT_META F/O4: lexical rules, real entity scan, aliases and 24-slot boundary."""
 CHECK = dict(name='hsync-fep-protect', tier=1, needs=[], budget=3.4,
-    covers=['exec/os32x_hdr.c', 'userland/system/hsync_protect.inc', 'userland/system/hsync.c',
+    covers=['sys/kern/exec/os32x_hdr.c', 'userland/system/hsync_protect.inc', 'userland/system/hsync.c',
             'tools/tests/hsync_fep_protect_host.c', 'tools/tests/host32.py',
             'sdk/include/os32/os32_kapi_shared.h'],
     basis=['docs/design/userland/system/hsync_protect.md 登録', 'docs/design/userland/system/hsync_protect.md 実在の名前の収集と上限'],

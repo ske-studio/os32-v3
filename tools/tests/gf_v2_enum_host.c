@@ -1,5 +1,5 @@
-#include "drivers/video/geforce/gf_v2.h"
-#include "hwdev/gf/display/api.h"
+#include "sys/dev/video/geforce/gf_v2.h"
+#include "sys/dev/video/geforce/display/api.h"
 static struct gf4_state state;
 static struct gf4_route routes[3];
 static struct gf4_ctx c;

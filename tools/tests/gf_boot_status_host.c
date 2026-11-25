@@ -1,5 +1,5 @@
 /* Actual GF1 status observation, with a stale production loan. */
-#include "../../kdebug/gf_foundation_test.c"
+#include "../../sys/dev/video/geforce/diag/gf_foundation_test.c"
 static struct gf_production status_owner;
 static u32 pci_reads, io_reads;
 static u16 command = RECOVER_COMMAND_STOP;

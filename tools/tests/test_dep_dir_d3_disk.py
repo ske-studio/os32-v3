@@ -7,10 +7,10 @@ import sys
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCES = ('init/bootinfo.c', 'platform/pc98/bootinfo_check.c',
-           'platform/pc98/boot_disk.c', 'platform/pc98/bootinfo_capture.c',
-           'platform/pc98/bootinfo_geom.c', 'platform/pc98/bootinfo_report.c')
-HEADERS = ('platform/pc98/bootinfo_native.h', 'platform/pc98/bootinfo_wire.h', 'include/ide_contract.h', 'platform/pc98/boot_disk.h', 'init/boot_disk.h')
+SOURCES = ('sys/kern/init/bootinfo.c', 'sys/platform/pc98/bootinfo_check.c',
+           'sys/platform/pc98/boot_disk.c', 'sys/platform/pc98/bootinfo_capture.c',
+           'sys/platform/pc98/bootinfo_geom.c', 'sys/platform/pc98/bootinfo_report.c')
+HEADERS = ('sys/platform/pc98/bootinfo_native.h', 'sys/platform/pc98/bootinfo_wire.h', 'sys/include/ide_contract.h', 'sys/platform/pc98/boot_disk.h', 'sys/kern/init/boot_disk.h')
 
 
 def build(tmp, mutation=None):
@@ -38,9 +38,9 @@ def build(tmp, mutation=None):
 
 
 def main():
-    kernel = (ROOT / 'platform/pc98/kernel.c').read_text()
+    kernel = (ROOT / 'sys/platform/pc98/kernel.c').read_text()
     assert kernel.index('pc98_boot_bind(&boot, boot_drive);') < kernel.index('bootinfo_report();')
-    for rel in ('init/bootinfo.c', 'platform/pc98/kernel.c'):
+    for rel in ('sys/kern/init/bootinfo.c', 'sys/platform/pc98/kernel.c'):
         text = (ROOT / rel).read_text()
         assert '#include "ide.h"' not in text
         assert 'boot_devices.h' not in text
@@ -49,7 +49,7 @@ def main():
         result = host32.run([str(exe)], check=True)
         assert result.returncode == 0
     if '--mutate' in sys.argv:
-        mutation = ('platform/pc98/boot_disk.c',
+        mutation = ('sys/platform/pc98/boot_disk.c',
                     '    return 0;\n}\n\nstatic int pc98_disk_report_ata',
                     '    return BOOTINFO_DA_HDD0 + ide_drive;\n}\n\nstatic int pc98_disk_report_ata')
         with tempfile.TemporaryDirectory(prefix='dep-dir-d3-disk-mut-') as td:

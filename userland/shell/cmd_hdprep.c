@@ -19,11 +19,11 @@
 /*   データは無い。区画表を書く前の失敗ならディスクは空のまま扱える)。       */
 /*                                                                          */
 /*  判定と計画は hdprep_plan.c (純粋関数、ホスト試験の対象)。区画表の中身は */
-/*  fs/pc98pt.c (カーネル・ローダ・nhd_deploy.py と共有) で作る。      */
+/*  sys/fs/pc98pt.c (カーネル・ローダ・nhd_deploy.py と共有) で作る。      */
 /* ======================================================================== */
 
 #include "shell.h"
-#include "include/platform_install_boot.h"
+#include "sys/include/platform_install_boot.h"
 
 #define HDPREP_ANSWER_MAX    8
 #define HDPREP_CHECK_FILE    "/hd0/.hdprep"

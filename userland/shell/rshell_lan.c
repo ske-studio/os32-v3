@@ -1,7 +1,7 @@
 /* LAN_OPERATOR_DESIGN §§2–3, X10. Called by the foreground at a line boundary. */
 #include "shell.h"
-#include "../../include/remote_control.h"
-#include "../../include/con_sink.h"
+#include "../../sys/include/remote_control.h"
+#include "../../sys/include/con_sink.h"
 #include "../lib/host/libos32host.h"
 #include <stdio.h>
 

@@ -1,6 +1,6 @@
-# fs/vfs.c — 設計
+# sys/fs/vfs.c — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_EXT2_EMPTY_NAME の契約を今のソースと照らして要約
-ソース: `fs/vfs.c` (`vfs_rel_is_root`・`vfs_write`・`vfs_rm`・`vfs_rename`・`vfs_mkdir`・`vfs_rmdir`)・`fs/vfs_fd.c` (`vfs_open_internal`)
+ソース: `sys/fs/vfs.c` (`vfs_rel_is_root`・`vfs_write`・`vfs_rm`・`vfs_rename`・`vfs_mkdir`・`vfs_rmdir`)・`sys/fs/vfs_fd.c` (`vfs_open_internal`)
 
 VFS の API の一覧・パスの長さ・最終要素の `.` / `..`・FD の失効の正典は `docs/06_filesystem.md` §6-1。ここはマウント点そのものへの操作だけを書く。
 

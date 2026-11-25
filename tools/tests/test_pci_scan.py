@@ -1,10 +1,10 @@
 """Run the real boot PCI enumeration and resource collector over fake ports."""
 CHECK = dict(name='pci-scan-host', tier=4,
-    covers=['drivers/pci/pci.c', 'platform/pc98/pci_config.c', 'include/pci_config_contract.h', 'drivers/pci/pci_barsize.c', 'drivers/pci/pci_barsize.h',
-            'drivers/pci/pci.h', 'drivers/pci/pci_decode.c', 'drivers/pci/pci_decode.h',
+    covers=['sys/dev/pci/pci.c', 'sys/platform/pc98/pci_config.c', 'sys/include/pci_config_contract.h', 'sys/dev/pci/pci_barsize.c', 'sys/dev/pci/pci_barsize.h',
+            'sys/dev/pci/pci.h', 'sys/dev/pci/pci_decode.c', 'sys/dev/pci/pci_decode.h',
             'tools/tests/pci_scan_host.c', 'tools/tests/test_pci_scan.py',
-            'kdebug/gfinit_resources.c', 'kdebug/gfinit_resources.h', 'kdebug/gfinit_resources/*.inc',
-            'tools/tests/host32.py', 'tools/tests/mutpar.py', 'include/types.h', 'include/pci_dev_contract.h', 'include/pc98.h', 'include/kprintf.h', 'kdebug/recover.h',
+            'sys/dev/video/geforce/diag/gfinit_resources.c', 'sys/dev/video/geforce/diag/gfinit_resources.h', 'kdebug/gfinit_resources/*.inc',
+            'tools/tests/host32.py', 'tools/tests/mutpar.py', 'sys/include/types.h', 'sys/include/pci_dev_contract.h', 'sys/platform/pc98/pc98.h', 'sys/include/kprintf.h', 'sys/dev/video/geforce/diag/recover.h',
             'sdk/include/os32/os32_kapi_shared.h'], needs=[], budget=5,
     kind='characterization',
 )
@@ -21,19 +21,19 @@ COUNT = '    g_pci_seen++;\n    if (g_pci_count >= PCI_MAX_DEVS) return;'
 ROOT_SCAN = ('    for (u32 i = 0, bus; i < PCI_CONFIG_MAX_ROOTS && pci_config_root_bus(i, &bus) == 0; i++)\n'
              '        pci_scan_bus(bus, 0);')
 MUTATIONS = [
-    ('platform/pc98/pci_config.c', 'backend_name', 'return "mech#1";', 'return "mech1";'),
-    ('platform/pc98/pci_config.c', 'extra_root', 'if (idx != 0) return -1;', '(void)idx;'),
-    ('platform/pc98/pci_config.c', 'skip_measure', 'return 1;', 'return 0;'),
-    ('drivers/pci/pci.c', 'root_limit', 'i < PCI_CONFIG_MAX_ROOTS && ', ''),
-    ('drivers/pci/pci.c', 'fixed_root', ROOT_SCAN, '    (void)pci_config_root_bus; pci_scan_bus(0, 0);'),
-    ('drivers/pci/pci.c', 'record_missing', RECORD, ''),
-    ('drivers/pci/pci.c', 'reset_missing', '    pci_barsize_reset();', ''),
-    ('drivers/pci/pci.c', 'record_after_full', RECORD + '\n' + COUNT, COUNT + '\n' + RECORD),
-    ('drivers/pci/pci.c', 'scan_single', 'nfn = pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;', 'nfn = 1; (void)hdr0;'),
-    ('kdebug/gfinit_resources/bounds.inc', 'collect_single', 'return pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;', '(void)hdr0; return 1;'),
-    ('drivers/pci/pci_barsize.c', 'disabled_rom', 'd->rom_reg && (pci_cfg_read32(bus, dev, fn, d->rom_reg) & 1U)', 'd->rom_reg'),
-    ('drivers/pci/pci_barsize.c', 'ide_compat', 'if (ide && i < 4 && !(progif & (i < 2 ? 1U : 4U))) continue;', '(void)ide; (void)progif;'),
-    ('drivers/pci/pci_barsize.c', 'measure_atomic', 'unsigned int flags = irq_save();', 'unsigned int flags = irq_state;'),
+    ('sys/platform/pc98/pci_config.c', 'backend_name', 'return "mech#1";', 'return "mech1";'),
+    ('sys/platform/pc98/pci_config.c', 'extra_root', 'if (idx != 0) return -1;', '(void)idx;'),
+    ('sys/platform/pc98/pci_config.c', 'skip_measure', 'return 1;', 'return 0;'),
+    ('sys/dev/pci/pci.c', 'root_limit', 'i < PCI_CONFIG_MAX_ROOTS && ', ''),
+    ('sys/dev/pci/pci.c', 'fixed_root', ROOT_SCAN, '    (void)pci_config_root_bus; pci_scan_bus(0, 0);'),
+    ('sys/dev/pci/pci.c', 'record_missing', RECORD, ''),
+    ('sys/dev/pci/pci.c', 'reset_missing', '    pci_barsize_reset();', ''),
+    ('sys/dev/pci/pci.c', 'record_after_full', RECORD + '\n' + COUNT, COUNT + '\n' + RECORD),
+    ('sys/dev/pci/pci.c', 'scan_single', 'nfn = pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;', 'nfn = 1; (void)hdr0;'),
+    ('sys/dev/video/geforce/gfinit_resources/bounds.inc', 'collect_single', 'return pci_is_multifunction(hdr0) ? PCI_FN_COUNT : 1;', '(void)hdr0; return 1;'),
+    ('sys/dev/pci/pci_barsize.c', 'disabled_rom', 'd->rom_reg && (pci_cfg_read32(bus, dev, fn, d->rom_reg) & 1U)', 'd->rom_reg'),
+    ('sys/dev/pci/pci_barsize.c', 'ide_compat', 'if (ide && i < 4 && !(progif & (i < 2 ? 1U : 4U))) continue;', '(void)ide; (void)progif;'),
+    ('sys/dev/pci/pci_barsize.c', 'measure_atomic', 'unsigned int flags = irq_save();', 'unsigned int flags = irq_state;'),
 ]
 def command(exe):
     return ['gcc', '-std=gnu11', '-Wall', '-Wextra', '-Werror', '-D__cdecl=', '-m32', '-march=i386', '-ffreestanding', '-fno-pie',
@@ -58,7 +58,7 @@ def main():
         subprocess.run(command(exe),check=True)
         if host32.run([str(exe)]).returncode:return 1
     if '--mutate' in sys.argv:
-        return int(bool(mutpar.run_with_control(mutation,MUTATIONS,('drivers/pci/pci.c','control','',''))))
+        return int(bool(mutpar.run_with_control(mutation,MUTATIONS,('sys/dev/pci/pci.c','control','',''))))
     return 0
 if __name__=='__main__':sys.exit(main())
 def run(ctx):

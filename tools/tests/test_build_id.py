@@ -10,7 +10,7 @@
   - 中身が同じなら書き直さない (mtime が動かない = build_id.o を組み直さない)
   - 生成した C を gcc で組んで文字列を読むと同じ ID
   - clean / -dirty のシンボルサイズはどちらも BUILD_COMMIT_MAX (24)
-  - 長さが BUILD_COMMIT_MAX (include/build_id.h) 未満
+  - 長さが BUILD_COMMIT_MAX (sys/include/build_id.h) 未満
 
   python3 -B tools/tests/test_build_id.py            # 全ケース
   python3 -B tools/tests/test_build_id.py --mutate   # 否定側 (写しの上で変異 → RED)
@@ -32,7 +32,7 @@ import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 GEN = ROOT / "tools/gen_build_id.py"
-HDR = ROOT / "include/build_id.h"
+HDR = ROOT / "sys/include/build_id.h"
 
 
 class Fail(Exception):
@@ -62,7 +62,7 @@ def commit_max():
     m = re.search(r"^#define\s+BUILD_COMMIT_MAX\s+(\d+)", HDR.read_text(encoding="utf-8"),
                   re.MULTILINE)
     if not m:
-        raise Fail("include/build_id.h に BUILD_COMMIT_MAX が無い")
+        raise Fail("sys/include/build_id.h に BUILD_COMMIT_MAX が無い")
     return int(m.group(1))
 
 

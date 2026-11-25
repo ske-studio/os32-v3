@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 CHECK = dict(name='ver-gfx-host', tier=1,
-    covers=['platform/pc98/gfx_selector_lifecycle.inc', 'include/gfx_hal.h', 'include/gfx_mode.h', 'include/gfx_format.h', 'gfx/gfx_core.c', 'gfx/gfx_core_api.inc', 'tools/tests/test_ver_gfx.py', 'tools/tests/host32.py'],
+    covers=['sys/platform/pc98/gfx_selector_lifecycle.inc', 'sys/include/gfx_hal.h', 'sys/include/gfx_mode.h', 'sys/include/gfx_format.h', 'sys/hal/gfx/gfx_core.c', 'sys/hal/gfx/gfx_core_api.inc', 'tools/tests/test_ver_gfx.py', 'tools/tests/host32.py'],
     needs=[], budget=3.3,
     basis=['KAPI_SPEC'],
 )

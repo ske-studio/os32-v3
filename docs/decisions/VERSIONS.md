@@ -4,7 +4,7 @@
 
 ## 1. 版数の対応表
 
-製品版文字列の唯一の定義は `include/config.h` の `SYS_VERSION`。
+製品版文字列の唯一の定義は `sys/include/config.h` の `SYS_VERSION`。
 現行の開発版は `3.0-dev` (表示は `v3.0-dev`)、リリース時に `3.0` へ更新する。
 この文書は系列とリリース判断を説明するもので、製品版文字列の抽出元にはしない。
 Build・Commit・Image CRC と KernelAPI の版は、製品版とは別の識別子である。

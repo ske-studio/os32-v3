@@ -1,7 +1,7 @@
 #ifndef OS32_LE_INTERNAL_H
 #define OS32_LE_INTERNAL_H
 
-#include "../include/types.h"
+#include "../sys/include/types.h"
 
 static inline u32 le_read32(const u8 *p)
 {

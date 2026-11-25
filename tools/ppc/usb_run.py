@@ -21,25 +21,25 @@ from kboot_run import ROOT, ROM, QMP, command, require, serial, validate_root as
 USB_QEMU_CLOCK = ['-icount', 'shift=auto']
 
 CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:kernel'],
-             covers=['platform/powermac/console_stream.c', 'platform/powermac/log_printf.c',
-                     'platform/powermac/log.c', 'platform/powermac/kboot_log.h', 'platform/powermac/input_usb.c', 'platform/powermac/input_keymap_backend.c', 'platform/powermac/input_usb.h', 'tools/tests/host32.py', 'tools/ppc/usb_run.py', 'platform/powermac/usb*', 'build/targets/ppc-powermac.mk', 'platform/powermac/ppc_kernel.c',
-                     'platform/powermac/kboot_capture.c', 'drivers/usb/*.[ch]',
-                     'include/usb_platform.h', 'include/endian_dma.h',
-                     'arch/ppc/arch_endian_dma.h', 'tools/ppc/kboot_accept.py',
+             covers=['sys/platform/powermac/console_stream.c', 'sys/platform/powermac/log_printf.c',
+                     'sys/platform/powermac/log.c', 'sys/platform/powermac/kboot_log.h', 'sys/platform/powermac/input_usb.c', 'sys/platform/powermac/input_keymap_backend.c', 'sys/platform/powermac/input_usb.h', 'tools/tests/host32.py', 'tools/ppc/usb_run.py', 'platform/powermac/usb*', 'build/targets/ppc-powermac.mk', 'sys/platform/powermac/ppc_kernel.c',
+                     'sys/platform/powermac/kboot_capture.c', 'drivers/usb/*.[ch]',
+                     'sys/include/usb_platform.h', 'sys/include/endian_dma.h',
+                     'sys/arch/ppc/arch_endian_dma.h', 'tools/ppc/kboot_accept.py',
                      'tools/ppc/kboot_run.py', 'tools/ppc/run.py',
-                     'platform/powermac/shell_boot.c', 'platform/powermac/input_boot.c',
-                     'arch/ppc/entry.S',
-                     'arch/ppc/kernel_dec.c',
-                     'arch/ppc/kernel_mmu.S',
-                     'arch/ppc/kernel_probe.S',
-                     'arch/ppc/kernel_trap.c',
-                     'arch/ppc/ofw_note.S',
-                     'platform/powermac/boot.c',
-                     'platform/powermac/clock.c',
-                     'platform/powermac/escc.c',
-                     'platform/powermac/escc_tree.c',
-                     'platform/powermac/mpic.c',
-                     'platform/powermac/ofw.c',
+                     'sys/platform/powermac/shell_boot.c', 'sys/platform/powermac/input_boot.c',
+                     'sys/arch/ppc/entry.S',
+                     'sys/arch/ppc/kernel_dec.c',
+                     'sys/arch/ppc/kernel_mmu.S',
+                     'sys/arch/ppc/kernel_probe.S',
+                     'sys/arch/ppc/kernel_trap.c',
+                     'sys/arch/ppc/ofw_note.S',
+                     'sys/platform/powermac/boot.c',
+                     'sys/platform/powermac/clock.c',
+                     'sys/platform/powermac/escc.c',
+                     'sys/platform/powermac/escc_tree.c',
+                     'sys/platform/powermac/mpic.c',
+                     'sys/platform/powermac/ofw.c',
                      'tools/host_image.py',
                      'tools/lan_bridge.py',
                      'tools/lanfs_host.py',
@@ -47,7 +47,7 @@ CHECK = dict(name='ppc-usb', tier=2, budget=900, needs=['make:kernel'],
                      'tools/ppc_hostfs.py',
                      'tools/ppc_lan_host.py',
                      'tools/serialfs_host.py'],
-             inputs=['tools/ppc/sd_run.py', 'arch/ppc/kernel_boot.h',
+             inputs=['tools/ppc/sd_run.py', 'sys/arch/ppc/kernel_boot.h',
                      'tools/ppc/link_sh_run.py', 'tools/host_agent.py',
                      'tools/host_rshell.py', 'tools/host_operator_socket.py',
                      'tools/ppc_lan_host.py', 'tools/ppc/link_run.py'])
@@ -95,8 +95,8 @@ static int usb_probe_input(void)
 
 
 def mutation(work, mode):
-    src = ('arch/ppc/kernel_trap.c' if mode == 'syscall-ee' else
-           'platform/powermac/usb_boot.c' if mode == 'no-service' else 'platform/powermac/usb_key_report.c')
+    src = ('sys/arch/ppc/kernel_trap.c' if mode == 'syscall-ee' else
+           'sys/platform/powermac/usb_boot.c' if mode == 'no-service' else 'sys/platform/powermac/usb_key_report.c')
     content = (ROOT/src).read_text()
     before, after = {
         'syscall-ee': ('            ppc_enable();', '            /* mutation: no syscall enable */'),
@@ -112,12 +112,12 @@ def mutation(work, mode):
 def settings(work, mode):
     # As in sc_run's serial mode, substitute only the external LAN connection
     # and byte-input boundaries. USER sh and the USB product closure are real.
-    boot = (ROOT/'platform/powermac/shell_boot.c').read_text()
+    boot = (ROOT/'sys/platform/powermac/shell_boot.c').read_text()
     anchor = 'while (!pm_term_connected() && !pm_input_usb_has_key()) pm_terminal_poll();'
     require(boot.count(anchor) == 1, 'unique USB wait anchor')
     boot = boot.replace(anchor,
                         '/* Serial acceptance supplies the terminal connection. */')
-    inp = (ROOT/'platform/powermac/input_boot.c').read_text()
+    inp = (ROOT/'sys/platform/powermac/input_boot.c').read_text()
     inp = inp.replace('static PmInputDecoder', PROBE+'\nstatic PmInputDecoder')
     if mode != 'normal':
         inp = inp.replace('if (!stalled && (u32)(now - returned) >= 10000)',
@@ -125,8 +125,8 @@ def settings(work, mode):
     require(inp.count('pm_terminal_trygetkey()') == 1, 'unique USB input anchor')
     inp = inp.replace('pm_terminal_trygetkey()', 'usb_probe_input()')
     result = ['KBOOT_SH=1', 'KBOOT_LINK=0', 'KBOOT_USB_KEY_TRACE=1']
-    for slot, src, content in [('', 'platform/powermac/shell_boot.c', boot),
-                                ('EXTRA_', 'platform/powermac/input_boot.c', inp)]:
+    for slot, src, content in [('', 'sys/platform/powermac/shell_boot.c', boot),
+                                ('EXTRA_', 'sys/platform/powermac/input_boot.c', inp)]:
         dest = work/(mode+'-'+Path(src).name)
         dest.write_text(content)
         result += ['KB_MUT_'+slot+'SRC='+src, 'KB_MUT_'+slot+'FILE='+str(dest)]
@@ -279,7 +279,7 @@ def stream_payload(text):
 
 
 def product_settings(work, mode, late=False):
-    src = 'platform/powermac/console_stream.c'
+    src = 'sys/platform/powermac/console_stream.c'
     text = (ROOT/src).read_text()
     anchor = '(void)pm_escc_write(&serial, bytes, len);'
     require(text.count(anchor) == 1, 'unique stream observation anchor')
@@ -298,7 +298,7 @@ def product_settings(work, mode, late=False):
     file = work/(mode+'-stream.c'); file.write_text(text)
     opts = ['KBOOT_SH=1', 'KBOOT_LINK=0', 'KBOOT_USB_KEY_TRACE=1', 'KB_MUT_SRC='+src, 'KB_MUT_FILE='+str(file)]
     if mode in ('invert-key', 'no-forward'):
-        src = 'platform/powermac/usb_key_report.c'
+        src = 'sys/platform/powermac/usb_key_report.c'
         text = (ROOT/src).read_text()
         anchor = 'usb_input_usage(src, usage, down, 0);'
         require(text.count(anchor) == 1, 'unique whole callback anchor')
@@ -307,7 +307,7 @@ def product_settings(work, mode, late=False):
         file = work/(mode+'-platform.c'); file.write_text(text)
         opts += ['KB_MUT_EXTRA_SRC='+src, 'KB_MUT_EXTRA_FILE='+str(file)]
     if late:
-        src = 'platform/powermac/shell_boot.c'
+        src = 'sys/platform/powermac/shell_boot.c'
         text = (ROOT/src).read_text()
         anchor = 'while (!pm_term_connected() && !pm_input_usb_has_key()) pm_terminal_poll();'
         require(text.count(anchor) == 1, 'unique mouse-only startup wait anchor')
@@ -635,7 +635,7 @@ def before_shell_input(work):
     """Hold the acceptance kernel before shell_loop until the real USB FIFO has a key."""
     from kboot_accept import mutant_settings
     anchor = '        shell_loop_run(&pm_shell_loop_ops);'
-    settings = mutant_settings(work, 'preloaded-key', 'platform/powermac/ppc_kernel.c',
+    settings = mutant_settings(work, 'preloaded-key', 'sys/platform/powermac/ppc_kernel.c',
         anchor, '        extern int pm_input_usb_peek(void);\n'
         '        while (pm_input_usb_peek() < 0) idle_wait_step();\n' + anchor)
     return [item.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for item in settings]
@@ -785,7 +785,7 @@ def link_lan_accept(media, cpu, out, mode='normal'):
             window['end'] = s.word('tick_count')
         failed = rsh_command(s, 'cat /host/f', during=during)
         ticks = (window['end']-window['start']) & 0xffffffff
-        # An expired CALL ends as OS32_ERR_HOSTDOWN (fs/serialfs/sfs_client.c:237-253).
+        # An expired CALL ends as OS32_ERR_HOSTDOWN (sys/fs/serialfs/sfs_client.c:237-253).
         require(failed == b'cat: /host/f: Host is down\n' and
                 80 <= ticks <= 200, 'guest SFS deadline near 1000ms: '+repr((failed, ticks)))
         s.close_rshell()
@@ -1008,7 +1008,7 @@ def main():
         if mode == 'lost-first':
             from kboot_accept import mutant_settings
             anchor = 'static int try_local_char(void) { return input_legacy_try(IL_LOCAL_CHAR); }'
-            opts += mutant_settings(work, mode, 'platform/powermac/input_boot.c', anchor,
+            opts += mutant_settings(work, mode, 'sys/platform/powermac/input_boot.c', anchor,
                 'static int try_local_char(void) { static int lost; int ch = input_legacy_try(IL_LOCAL_CHAR); '
                 'if (ch >= 0 && !lost) { lost = 1; return -1; } return ch; }')
         media = build_media(work/mode, *opts)

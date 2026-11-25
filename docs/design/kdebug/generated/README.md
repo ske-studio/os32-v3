@@ -4,6 +4,6 @@
 
 ### recover_gf_tables.inc
 
-ソース: `kdebug/generated/recover_gf_tables.inc`
+ソース: `sys/dev/video/geforce/diag/generated/recover_gf_tables.inc`
 
 生成 include は 3 表と件数だけを持つ

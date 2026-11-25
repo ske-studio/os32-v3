@@ -1,6 +1,6 @@
 """S5C shared policy, CLI routing, and default one-file integration."""
 CHECK = dict(name='osri-profile', tier=1, needs=['make:osri-enc2-core'], budget=3.3,
-             covers=['gfx/osri_profile.h', 'gfx/gfx_osri.h', 'tools/osri_profile.py',
+             covers=['sys/kern/gfx/osri/osri_profile.h', 'sys/kern/gfx/osri/gfx_osri.h', 'tools/osri_profile.py',
                      'tools/img2osri.py', 'tools/osri_enc2_native.py',
                      'tools/osri_enc2_spec.py', 'tools/osri_enc2_decode.py',
                      'tools/osri_enc2_master.py', 'tools/osri_enc2_order.py',
@@ -103,10 +103,10 @@ def check():
         (tree/'gfx').mkdir(parents=True)
         (tree/'tools').mkdir()
         shutil.copy(profile.__file__, tree/'tools/osri_profile.py')
-        gfx = ROOT/'gfx/gfx_osri.h'
-        shutil.copy(gfx, tree/'gfx/gfx_osri.h')
-        policy = tree/'gfx/osri_profile.h'
-        original = (ROOT/'gfx/osri_profile.h').read_text()
+        gfx = ROOT/'sys/kern/gfx/osri/gfx_osri.h'
+        shutil.copy(gfx, tree/'sys/kern/gfx/osri/gfx_osri.h')
+        policy = tree/'sys/kern/gfx/osri/osri_profile.h'
+        original = (ROOT/'sys/kern/gfx/osri/osri_profile.h').read_text()
         for value in (31, 23):
             policy.write_text(original.replace('31u', f'{value}u'))
             result = subprocess.run([sys.executable, '-B', '-c',
@@ -158,7 +158,7 @@ def main():
             tree = Path(name)
             shutil.copytree(ROOT/'tools', tree/'tools', ignore=shutil.ignore_patterns('__pycache__', 'tests'))
             (tree/'gfx').mkdir()
-            shutil.copy(ROOT/'gfx/osri_profile.h', tree/'gfx/osri_profile.h')
+            shutil.copy(ROOT/'sys/kern/gfx/osri/osri_profile.h', tree/'sys/kern/gfx/osri/osri_profile.h')
             env = dict(os.environ, OSRI_PROFILE_TOOLS=str(tree/'tools'))
             for label, module, old, new in MUTATIONS:
                 path = tree/'tools'/module

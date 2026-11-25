@@ -1,12 +1,12 @@
 #include "pgalloc.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "platform/powermac/root_boot.h"
-#include "fs/vfs.h"
-#include "kernel/dev/ram_ro.h"
-#include "fs/isofs/iso9660.h"
-#include "fs/ramfs/ramfs.h"
-#include "lib/kstring.h"
+#include "sys/platform/powermac/root_boot.h"
+#include "sys/fs/vfs.h"
+#include "sys/kern/dev/ram_ro.h"
+#include "sys/fs/isofs/iso9660.h"
+#include "sys/fs/ramfs/ramfs.h"
+#include "sys/kern/kstring.h"
 
 volatile u32 tick_count;
 void *kmalloc(u32 n) { return malloc(n); }

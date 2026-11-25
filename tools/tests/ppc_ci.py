@@ -172,7 +172,7 @@ def guest_prerequisites():
 def scope_matrix(source):
     module = types.ModuleType('scope_subject')
     exec(compile(source, 'ppc_scope.py', 'exec'), module.__dict__)
-    for path in ('arch/ppc/entry.S', 'platform/powermac/ofw.c', 'build/targets/ppc-powermac.mk', 'build/images/ppc-flags.mk', 'build/select.mk',
+    for path in ('sys/arch/ppc/entry.S', 'sys/platform/powermac/ofw.c', 'build/targets/ppc-powermac.mk', 'sys/conf/images/ppc-flags.mk', 'build/select.mk',
                  'userland/ppc/a.c', 'tools/ppc/compile_ci.py',
                  'tools/ci/build_cross_ppc.sh', '.github/actions/ppc-setup/action.yml',
                  'tools/ci/ppc_scope.py', '.github/workflows/check.yml',

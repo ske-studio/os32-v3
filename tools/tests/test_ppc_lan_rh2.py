@@ -12,10 +12,10 @@ import host32
 
 CHECK = dict(name='ppc-lan-rh2', tier=2, budget=60, needs=[],
     covers=['tools/tests/test_ppc_lan_rh2.py',
-            'platform/powermac/gmac_tree.c', 'tools/ppc/pci_fake_lane.h', 'platform/powermac/pci_config.c',
-            'platform/powermac/gmac_clock.c', 'drivers/net/gem/gem_phy.c',
-            'platform/powermac/lan_boot.h',
-            'platform/powermac/ofw.h', 'arch/ppc/*.h', 'drivers/net/gem/gem.h',
+            'sys/platform/powermac/gmac_tree.c', 'tools/ppc/pci_fake_lane.h', 'sys/platform/powermac/pci_config.c',
+            'sys/platform/powermac/gmac_clock.c', 'sys/dev/net/gem/gem_phy.c',
+            'sys/platform/powermac/lan_boot.h',
+            'sys/platform/powermac/ofw.h', 'arch/ppc/*.h', 'sys/dev/net/gem/gem.h',
             'tools/ppc/lan_p3_fake.c',
             'tools/ppc/lan_p17_fake.c', 'lib/kstring*', 'include/*.h',
             'tools/tests/host32.py'],
@@ -30,8 +30,8 @@ FLAGS = ['gcc', '-m32', '-nostdinc', '-std=gnu11', '-O2', '-Wall', '-Wextra', '-
 
 
 def main():
-    tree = (ROOT / 'platform/powermac/gmac_tree.c').read_text()
-    phy = (ROOT / 'drivers/net/gem/gem_phy.c').read_text()
+    tree = (ROOT / 'sys/platform/powermac/gmac_tree.c').read_text()
+    phy = (ROOT / 'sys/dev/net/gem/gem_phy.c').read_text()
     with tempfile.TemporaryDirectory(prefix='rh2-') as td:
         d = Path(td)
         def tree_case(text, cases, red=False):
@@ -39,8 +39,8 @@ def main():
             exe = d / 'tree'
             subprocess.run(FLAGS + ['-DRH2_TREE', '-DPM_PCI_FAKE_MMIO', '-DPM_PCI_FAKE_LANE',
                 '-DPM_GMAC_CLOCK_FAKE', str(src),
-                *[str(ROOT / p) for p in ('platform/powermac/pci_config.c',
-                  'platform/powermac/gmac_clock.c', 'lib/kstring_c.c',
+                *[str(ROOT / p) for p in ('sys/platform/powermac/pci_config.c',
+                  'sys/platform/powermac/gmac_clock.c', 'sys/kern/kstring_c.c',
                   'tools/ppc/lan_p3_fake.c')], '-o', str(exe)], check=True)
             for case in cases:
                 r = host32.run([str(exe), str(case)], runner='qemu', capture_output=True, timeout=10)

@@ -1,41 +1,41 @@
 {
   "schema": 1,
   "contracts": [
-    "kernel/ime/fep_module.h",
-    "kernel/ime/ime_render.h",
+    "sys/kern/ime/fep_module.h",
+    "sys/kern/ime/ime_render.h",
     "sdk/include/os32/os32_kapi_shared.h",
-    "input/hal/input_context.h"
+    "sys/input/input_context.h"
   ],
   "imports": [
     {
       "symbol": "caller_access_get",
       "context": "normal",
       "irq": false,
-      "source": "include/redir_access.h"
+      "source": "sys/include/redir_access.h"
     },
     {
       "symbol": "check_caller_write_range",
       "context": "normal",
       "irq": false,
-      "source": "include/redir_access.h"
+      "source": "sys/include/redir_access.h"
     },
     {
       "symbol": "con_sink_is_enabled",
       "context": "normal",
       "irq": false,
-      "source": "include/con_sink.h"
+      "source": "sys/include/con_sink.h"
     },
     {
       "symbol": "copy_caller_cstr",
       "context": "normal",
       "irq": false,
-      "source": "include/redir_access.h"
+      "source": "sys/include/redir_access.h"
     },
     {
       "symbol": "copy_to_caller",
       "context": "normal",
       "irq": false,
-      "source": "include/redir_access.h"
+      "source": "sys/include/redir_access.h"
     },
     {
       "symbol": "fep_kbd_shift_state",
@@ -47,19 +47,19 @@
       "symbol": "fep_boot_config_get",
       "context": "normal",
       "irq": false,
-      "source": "kernel/ime/ime_store.h"
+      "source": "sys/kern/ime/ime_store.h"
     },
     {
       "symbol": "fep_boot_user_path_get",
       "context": "normal",
       "irq": false,
-      "source": "kernel/ime/ime_store.h"
+      "source": "sys/kern/ime/ime_store.h"
     },
     {
       "symbol": "fep_meta_probe",
       "context": "normal",
       "irq": false,
-      "source": "kernel/ime/ime_store.h"
+      "source": "sys/kern/ime/ime_store.h"
     },
     {
       "symbol": "fep_services_boot_fault",
@@ -83,91 +83,91 @@
       "symbol": "kbd_getkey_wait",
       "context": "normal",
       "irq": false,
-      "source": "include/kbd_contract.h"
+      "source": "sys/include/kbd_contract.h"
     },
     {
       "symbol": "kbd_trygetchar",
       "context": "normal",
       "irq": false,
-      "source": "include/kbd_contract.h"
+      "source": "sys/include/kbd_contract.h"
     },
     {
       "symbol": "kbd_trygetkey",
       "context": "normal",
       "irq": false,
-      "source": "include/kbd_contract.h"
+      "source": "sys/include/kbd_contract.h"
     },
     {
       "symbol": "kfree",
       "context": "normal",
       "irq": false,
-      "source": "mm/kmalloc.h"
+      "source": "sys/kern/mm/kmalloc.h"
     },
     {
       "symbol": "kmalloc",
       "context": "normal",
       "irq": false,
-      "source": "mm/kmalloc.h"
+      "source": "sys/kern/mm/kmalloc.h"
     },
     {
       "symbol": "kmalloc_block_size",
       "context": "normal",
       "irq": false,
-      "source": "mm/kmalloc.h"
+      "source": "sys/kern/mm/kmalloc.h"
     },
     {
       "symbol": "kmemcpy",
       "context": "normal",
       "irq": false,
-      "source": "lib/kstring.h"
+      "source": "sys/kern/kstring.h"
     },
     {
       "symbol": "kmemset",
       "context": "normal",
       "irq": false,
-      "source": "lib/kstring.h"
+      "source": "sys/kern/kstring.h"
     },
     {
       "symbol": "kprintf",
       "context": "normal",
       "irq": false,
-      "source": "include/kprintf.h"
+      "source": "sys/include/kprintf.h"
     },
     {
       "symbol": "kstrcmp",
       "context": "normal",
       "irq": false,
-      "source": "lib/kstring.h"
+      "source": "sys/kern/kstring.h"
     },
     {
       "symbol": "kstrcpy",
       "context": "normal",
       "irq": false,
-      "source": "lib/kstring.h"
+      "source": "sys/kern/kstring.h"
     },
     {
       "symbol": "kstrlen",
       "context": "normal",
       "irq": false,
-      "source": "lib/kstring.h"
+      "source": "sys/kern/kstring.h"
     },
     {
       "symbol": "kstrncat",
       "context": "normal",
       "irq": false,
-      "source": "lib/kstring.h"
+      "source": "sys/kern/kstring.h"
     },
     {
       "symbol": "kstrncmp",
       "context": "normal",
       "irq": false,
-      "source": "lib/kstring.h"
+      "source": "sys/kern/kstring.h"
     },
     {
       "symbol": "kstrncpy",
       "context": "normal",
       "irq": false,
-      "source": "lib/kstring.h"
+      "source": "sys/kern/kstring.h"
     },
     {
       "symbol": "ktime_ticks",
@@ -179,7 +179,7 @@
       "symbol": "kzalloc",
       "context": "normal",
       "irq": false,
-      "source": "mm/kmalloc.h"
+      "source": "sys/kern/mm/kmalloc.h"
     },
     {
       "symbol": "os32_sqlite_bind_int",
@@ -323,7 +323,7 @@
       "symbol": "res_owner_get",
       "context": "normal",
       "irq": false,
-      "source": "fs/fd_redirect.h"
+      "source": "sys/fs/fd_redirect.h"
     },
     {
       "symbol": "ring3_abort_check",
@@ -335,49 +335,49 @@
       "symbol": "ring3_call_from_user",
       "context": "normal",
       "irq": false,
-      "source": "exec/exec.h"
+      "source": "sys/kern/exec/exec.h"
     },
     {
       "symbol": "ring3_fault_kill",
       "context": "normal",
       "irq": false,
-      "source": "exec/exec.h"
+      "source": "sys/kern/exec/exec.h"
     },
     {
       "symbol": "serial_puts",
       "context": "normal",
       "irq": false,
-      "source": "include/serial_contract.h"
+      "source": "sys/include/serial_contract.h"
     },
     {
       "symbol": "sqlite_engine_available",
       "context": "normal",
       "irq": false,
-      "source": "kernel/sqlite_engine.h"
+      "source": "sys/kern/sqlite_engine.h"
     },
     {
       "symbol": "tvram_putchar_at",
       "context": "normal",
       "irq": false,
-      "source": "include/text_screen.h"
+      "source": "sys/include/text_screen.h"
     },
     {
       "symbol": "tvram_putkanji_at",
       "context": "normal",
       "irq": false,
-      "source": "include/text_screen.h"
+      "source": "sys/include/text_screen.h"
     },
     {
       "symbol": "tvram_readchar_at",
       "context": "normal",
       "irq": false,
-      "source": "include/text_screen.h"
+      "source": "sys/include/text_screen.h"
     },
     {
       "symbol": "tvram_set_scroll_reserve",
       "context": "normal",
       "irq": false,
-      "source": "include/text_screen.h"
+      "source": "sys/include/text_screen.h"
     },
     {
       "symbol": "unicode_to_ank",
@@ -413,49 +413,49 @@
       "symbol": "vfs_close",
       "context": "normal",
       "irq": false,
-      "source": "fs/vfs.h"
+      "source": "sys/fs/vfs.h"
     },
     {
       "symbol": "vfs_fd_is_stale",
       "context": "normal",
       "irq": false,
-      "source": "fs/vfs.h"
+      "source": "sys/fs/vfs.h"
     },
     {
       "symbol": "vfs_open",
       "context": "normal",
       "irq": false,
-      "source": "fs/vfs.h"
+      "source": "sys/fs/vfs.h"
     },
     {
       "symbol": "vfs_stat",
       "context": "normal",
       "irq": false,
-      "source": "fs/vfs.h"
+      "source": "sys/fs/vfs.h"
     },
     {
       "symbol": "vfs_write_fd",
       "context": "normal",
       "irq": false,
-      "source": "fs/vfs.h"
+      "source": "sys/fs/vfs.h"
     },
     {
       "symbol": "kbd_policy_ime_state",
       "context": "normal",
       "irq": false,
-      "source": "input/hal/input_context.h"
+      "source": "sys/input/input_context.h"
     },
     {
       "symbol": "input_context_snapshot",
       "context": "normal",
       "irq": false,
-      "source": "input/hal/input_context.h"
+      "source": "sys/input/input_context.h"
     },
     {
       "symbol": "input_ime_cancel_take",
       "context": "normal",
       "irq": false,
-      "source": "input/hal/input_context.h"
+      "source": "sys/input/input_context.h"
     },
     {
       "symbol": "fep_read_wait",

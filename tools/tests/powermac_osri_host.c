@@ -1,10 +1,10 @@
 /* DESIGN.final §3/§4. A load may yield, including rebind of the same CLIENT.
  * The private decoded surface is borrowed only during the synchronous hook. */
-#include "gfx/gfx_osri.h"
-#include "gfx/gfx_osri_view.h"
+#include "sys/kern/gfx/osri/gfx_osri.h"
+#include "sys/kern/gfx/osri/gfx_osri_view.h"
 #include "gfx_hal.h"
-#include "drivers/video/of_fb/backend_of_fb.h"
-#include "exec/appslot.h"
+#include "sys/dev/video/of_fb/backend_of_fb.h"
+#include "sys/kern/exec/appslot.h"
 #include "vfs.h"
 #include "kbd.h"
 #include "wire_data.h"

@@ -9,7 +9,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='remote-x0', tier=1, needs=[], budget=5,
-    covers=['include/remote_control.h', 'net/host_mailbox.h', 'net/link.h',
+    covers=['sys/include/remote_control.h', 'sys/net/host_mailbox.h', 'sys/net/link.h',
             'tools/host_services.py', 'tools/tests/test_remote_x0.py'],
     basis=['LAN_OPERATOR_DESIGN §2', '[C1]'],
 )
@@ -42,9 +42,9 @@ int main(void) {
 }
 '''
 MUTATIONS = (
-    ('reserved-number', 'include/remote_control.h', '#define REMOTE_SVC_RSHELL       65534u', '#define REMOTE_SVC_RSHELL       65533u'),
-    ('command-length', 'include/remote_control.h', '#define REMOTE_RSHELL_COMMAND_MAX 126', '#define REMOTE_RSHELL_COMMAND_MAX 127'),
-    ('notify-length', 'net/link.h', '#define LINK_NOTIFY_DATA_MAX        236', '#define LINK_NOTIFY_DATA_MAX        235'),
+    ('reserved-number', 'sys/include/remote_control.h', '#define REMOTE_SVC_RSHELL       65534u', '#define REMOTE_SVC_RSHELL       65533u'),
+    ('command-length', 'sys/include/remote_control.h', '#define REMOTE_RSHELL_COMMAND_MAX 126', '#define REMOTE_RSHELL_COMMAND_MAX 127'),
+    ('notify-length', 'sys/net/link.h', '#define LINK_NOTIFY_DATA_MAX        236', '#define LINK_NOTIFY_DATA_MAX        235'),
 )
 
 
@@ -54,7 +54,7 @@ def main():
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix='remote-x0-') as tmp:
         work = Path(tmp)
-        for name in ('include/remote_control.h', 'net/host_mailbox.h', 'net/link.h'):
+        for name in ('sys/include/remote_control.h', 'sys/net/host_mailbox.h', 'sys/net/link.h'):
             target = work / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / name, target)

@@ -8,7 +8,7 @@ import subprocess
 from urllib.request import urlopen
 
 image = Path("build/out/tick-probe")
-unit = image / "obj/platform/pc98/tsc_clock.o"
+unit = image / "obj/sys/platform/pc98/tsc_clock.o"
 text = (image / "kernel.map").read_text()
 match = re.search(r"^ \.bss\s+(0x[0-9a-f]+)\s+0x[0-9a-f]+\s+" + re.escape(str(unit)) + r"$", text, re.M)
 base = int(match[1], 16)

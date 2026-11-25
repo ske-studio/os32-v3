@@ -13,8 +13,8 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-fp-accept-host', env=['ppc-cross', 'qemu-ppc'], tier=1, budget=10, needs=[],
     covers=['tools/tests/test_ppc_fp_accept.py', 'tools/accept/ppc_fp.py',
-            'arch/ppc/exec_enter.S', 'arch/ppc/exec_resume.S', 'arch/ppc/kernel_vectors.S',
-            'arch/ppc/fp_context.S', 'arch/ppc/kernel_trap.c',
+            'sys/arch/ppc/exec_enter.S', 'sys/arch/ppc/exec_resume.S', 'sys/arch/ppc/kernel_vectors.S',
+            'sys/arch/ppc/fp_context.S', 'sys/arch/ppc/kernel_trap.c',
             'build/ppc-user.mk', 'build/targets/ppc-powermac.mk',
             'userland/ppc/fp_probe_main.c', 'userland/ppc/fp_probe.S',
             'tools/tests/ppc_fp_accept_host.c', 'sdk/include/os32/**'],
@@ -70,13 +70,13 @@ def settings(ns):
                 changed = Path(path).read_text()
                 assert changed != original
             if name.startswith('F4'):
-                assert pairs[0][0] == 'arch/ppc/exec_enter.S'
-                assert pairs[1][0] == 'arch/ppc/kernel_vectors.S'
+                assert pairs[0][0] == 'sys/arch/ppc/exec_enter.S'
+                assert pairs[1][0] == 'sys/arch/ppc/kernel_vectors.S'
                 assert '    ori 3,3,PPC_MSR_FP' not in Path(pairs[1][1]).read_text()
-            if name == 'F4-retry': assert pairs[2][0] == 'arch/ppc/kernel_trap.c'
+            if name == 'F4-retry': assert pairs[2][0] == 'sys/arch/ppc/kernel_trap.c'
             if name == 'F1-entry':
-                assert [src for src, _ in pairs] == ['arch/ppc/exec_enter.S',
-                    'arch/ppc/exec_resume.S', 'arch/ppc/kernel_vectors.S']
+                assert [src for src, _ in pairs] == ['sys/arch/ppc/exec_enter.S',
+                    'sys/arch/ppc/exec_resume.S', 'sys/arch/ppc/kernel_vectors.S']
 
 
 def user_driver():

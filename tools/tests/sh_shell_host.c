@@ -727,7 +727,7 @@ static void case_backspace_erases(void)
 /* ========================================================================
  *  5. パイプバッファは sh 自身の .bss から配る (往復 5 の blocker)
  *
- *  `sys_pipe_get_buf()` が返すのはカーネル帯 (fs/pipe_buffer.c の kmalloc)
+ *  `sys_pipe_get_buf()` が返すのはカーネル帯 (sys/fs/pipe_buffer.c の kmalloc)
  *  で、それを `sys_redirect_fd_buf()` へ渡すと `ring3_ptr_ok` に落ちて
  *  CPL=3 の sh が畳まれる (`sh> echo a | cat`)。返るポインタが sh の静的
  *  配列の中にあること、解放後に再確保できること、上限を超えたら失敗する

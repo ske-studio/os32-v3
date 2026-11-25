@@ -59,8 +59,8 @@
 
 | 所有 | ファイル |
 |---|---|
-| H 排他 | `gfx/**`、`include/gfx_hal.h` (新規)、`drivers/wab_*.{c,h}` (新規、H3) |
-| K 排他 | `kernel/**` `exec/**` `include/memmap.h` `sdk/kapi.json` と生成物 4 つ、`sdk/include/os32/os32_kapi_shared.h`、`sdk/include/os32/os32_gui_shared.h` (新規)、`sdk/link/app.ld`、`userland/shell/**` (K4 の `os32gui`) |
+| H 排他 | `gfx/**`、`sys/include/gfx_hal.h` (新規)、`drivers/wab_*.{c,h}` (新規、H3) |
+| K 排他 | `kernel/**` `exec/**` `sys/include/memmap.h` `sdk/kapi.json` と生成物 4 つ、`sdk/include/os32/os32_kapi_shared.h`、`sdk/include/os32/os32_gui_shared.h` (新規)、`sdk/link/app.ld`、`userland/shell/**` (K4 の `os32gui`) |
 | W 排他 | `userland/gshell/**` (新規) |
 | C 排他 | `userland/rust/libos32gui/**`、`userland/rust/gui_demo/**`、`sdk/rust/os32api/src/gui/**` (新規、共有定数の Rust 側) |
 | PM | `tools/check_gui_proto.py` (新規)、`docs/tasks/gui/**`、`docs/ROADMAP.md` |
@@ -79,7 +79,7 @@ C レーンが同じ値を写す。PM の `tools/check_gui_proto.py` が両者�
 | 項目 | 提案値 (K1 が確定させる) |
 |---|---|
 | `GUI_PROTO_VERSION` | 1 |
-| SHM | [契約 T2](../../design/include/memmap.md) と `include/memmap.h` / `os32_gui_shared.h` の定義を参照 |
+| SHM | [契約 T2](../../design/include/memmap.md) と `sys/include/memmap.h` / `os32_gui_shared.h` の定義を参照 |
 | op | 0 予約、1 `INIT`、2 `POLL`、3 `WAIT`、4 `COMMIT`、5 `INVALIDATE`、6 `STATS`、7 `LEASE_PALETTE`、16〜 ウィンドウ (`CREATE` `DESTROY` `MOVE` `RESIZE` `SHOW` `SET_TITLE` `CLIENT_RECT` `RAISE` `SET_FOCUS` `SET_TEXT_CURSOR`)、32〜 サーフェス (`CREATE` `DESTROY`)、48〜 タイマ (`SET` `KILL`)、64〜 モーダル (`OPEN`)、80〜 予備 |
 | イベント種別 | 契約 U2 の並び順どおり 1 から: `PAINT` `CONFIGURE` `CLOSE` `FOCUS` `KEY` `TEXT` `POINTER` `BUTTON` `TIMER` `WIDGET` `MODAL` `QUIT` `PALETTE` |
 | イベント配置 | **16B = 共通ヘッダ 8B (`kind` u8 @0, `sub` u8 @1, `serial` u16 @2, `window` u32 @4 = index:16 \| generation:16) + ペイロード 8B** (契約 U2 の表)。C / Rust とも大きさとオフセットを static assert |
@@ -87,7 +87,7 @@ C レーンが同じ値を写す。PM の `tools/check_gui_proto.py` が両者�
 | 色 | 契約 G6 の 16 色を `GUI_COLOR_*` の役割名で、RGB は `GUI_SYSTEM_PALETTE[16]` |
 | `Style.flags` | `TRANSPARENT_BG 0x01` `XOR 0x02` `DOTTED 0x04` `DITHER50 0x08` |
 | 上限 | ウィンドウ 16、サーフェス 16、ウィジェット 64、リスト項目 128、タイマ 8/アプリ、クリップ深さ 8、損傷 8/ウィンドウ、文字列 256B |
-| 追加 KAPI (v41) | `gui_call(u32 op, u32 arg) -> i32`、`gui_register(handler, pump) -> i32` (shell 帯からのみ)、`gfx_stats(void *out)`、`gfx_lease_palette(first, count, const u8 *rgb)`、`sys_switch_shell(const char *path) -> i32` (shell 帯からのみ、K4)、`kbd_dropped_count(void) -> u32` (カーネルのキー待ち行列が捨てた打鍵の累計。`drivers/input/kbd.c` の満杯分岐で加算) |
+| 追加 KAPI (v41) | `gui_call(u32 op, u32 arg) -> i32`、`gui_register(handler, pump) -> i32` (shell 帯からのみ)、`gfx_stats(void *out)`、`gfx_lease_palette(first, count, const u8 *rgb)`、`sys_switch_shell(const char *path) -> i32` (shell 帯からのみ、K4)、`kbd_dropped_count(void) -> u32` (カーネルのキー待ち行列が捨てた打鍵の累計。`sys/platform/pc98/input/kbd.c` の満杯分岐で加算) |
 
 > **版番号確定 (2026-09-06、同日改訂)**: GUI は **v42** (ime_feed_key / ime_set_render を含む 180 関数。開発中は v41 と呼んでいた)、ネットワークの Host Services (`../network/LINK_PLAN.md`) は **v43**。ユーザー承諾済み。版番号割り当ての正典は [KAPI_SPEC §3-2 の予約表](../../KAPI_SPEC.md)。
 

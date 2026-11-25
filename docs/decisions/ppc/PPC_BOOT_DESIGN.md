@@ -10,7 +10,7 @@
 - M4: root の address/size cells と chosen の memory/mmu を手本順に検査する。
 - M5: BSS を _edata〜_end の 4 回の stb と 4-byte 増分で消す。
 - M6: MMIO mode はビット定義から求めた名前付き定数とする。
-- C2: lib/kstring_c.c をそのまま組み、types.h・kstring.h を使う。
+- C2: sys/kern/kstring_c.c をそのまま組み、types.h・kstring.h を使う。
 - C4: 番地・サイズ・パスを 3 層の定数にまとめ、ld も同じヘッダから生成する。
 - C5: 番地とポインタの変換を専用の口に集約する。
 - P1: -nostdlib、既定の toolchain 1 組、カーネルの soft-float/no-altivec を固定する。
@@ -23,11 +23,11 @@
 - 対象は QuickSilver（7450/7455、BE32、OF 4.x）、先行機は QEMU 8.2.2 mac99 / OpenBIOS 1.1。シングルタスク・協調切替、整数のみ。共有コード・既存ビルドは変更しない。
 - OS32 読取元は `/home/hight/wt/os32-v3/ppc-env`、基点 `d524ab05`。N は `/home/hight/os32-tmp/ref/netbsd` @36eddebc、O は `/home/hight/os32-tmp/ref/openbsd` @b907757a。NB=N:sys/arch/macppc/stand/ofwboot/Locore.c、NL=N:sys/arch/macppc/stand/ofwboot/loadfile_machdep.c、NZ=N:sys/arch/macppc/dev/zs.c。
 - REVIEW.r1 の実測を採用：MSR=0x2030、real-mode?=false、load-base=0x4000000、available 下端=0x4000。macio BAR=0x80000000、ch-a offset=0x13020、先頭 size=1、RR0=0x44/45、RR1=7、open 成功。ELF の CD 起動は未観測。
-- 完成済み toolchain は `/home/hight/opt/cross-ppc/bin`。本改訂では §2 の旗で lib/kstring_c.c の PPC コンパイル成功を確認した（kstring.r3.o）。起動は実測せず実装段へ渡す。既定 1 組は hard-float・AltiVec なし、カーネルは soft-float/no-altivec、userland ABI は SysV PPC32 hard-float とする。
+- 完成済み toolchain は `/home/hight/opt/cross-ppc/bin`。本改訂では §2 の旗で sys/kern/kstring_c.c の PPC コンパイル成功を確認した（kstring.r3.o）。起動は実測せず実装段へ渡す。既定 1 組は hard-float・AltiVec なし、カーネルは soft-float/no-altivec、userland ABI は SysV PPC32 hard-float とする。
 | ID | 前提と実物の差 | 決定 |
 |---|---|---|
 | X1 | build/config.mk は x86 固定 | config を読まない独立 build/ppc.mk |
-| X2 | include/cpu.h は x86_flags.h・cdecl に依存 | 契約ヘッダ io.h・cpu.h は取り込まない |
+| X2 | sys/include/cpu.h は x86_flags.h・cdecl に依存 | 契約ヘッダ io.h・cpu.h は取り込まない |
 | X3 | arch/README.md の新 arch 手順は全原始命令を要求 | 今段は独立試作、共有契約の実装は次段 |
 | X5 | NZ:1048 は物理和、O:sys/arch/macppc/dev/zs.c:1040 は mapiodev | 本段は firmware に I/O 写像を依頼 |
 | X6 | O:sys/arch/macppc/stand/ofwboot/ld.script:21–24 は PT_LOAD のみ | NOTE bytes を明示する PT_NOTE を追加。根拠は PM F11 と OF 用 NOTE を持つ同 stand/ofwmagic.S:37–69 |
@@ -41,7 +41,7 @@
 | 3 | NZ:1024–1048 | 木の最初の ch-a と親 macio から物理番地、path を open |
 | 4 | N:sys/arch/macppc/stand/ofwboot/loadfile_machdep.c:176–199 | real-mode なら map を省略、それ以外は chosen/mmu へ map、直接送信前に EE 禁止・sync |
 | 5 | NZ:905–923,789–798 | RR0→data の直接送信、RR1 ALL_SENT 待ち |
-| 6 | include/io.h の _stop 契約 | sync、EE=0、ppc_stop_loop 自己分岐 |
+| 6 | sys/include/io.h の _stop 契約 | sync、EE=0、ppc_stop_loop 自己分岐 |
 - ELF32 BE / EM_PPC / ET_EXEC、entry=_start。PT_LOAD は 1 個 RWX、p_vaddr=p_paddr=PM_LINK_BASE (0x20000)、整列は `-N` に従う (O:sys/arch/macppc/stand/ofwboot/Makefile:43 と同じ。実測 offset 0x74・align 4)、text/rodata/data/BSS/stack を含む p_memsz <64 KiB を ASSERT。PT_NOTE は別に 1 個、同じ bytes を LOAD にも含める（X6）。
 - NOTE は owner=`PowerPC\0`、namesz=8、descsz=20、type=0x1275、descriptor={0,-1,-1,-1,-1}（virtual、他は既定）、O:sys/arch/macppc/stand/ofwmagic.S:37–69 の値を移す。
 - 0x20000 は OpenBSD のリンク番地。load-base はロード作業域、real-base は firmware の予約条件であり、どちらも空き RAM の保証ではない。環境変数を変更しない。OpenBIOS の ELF/CD 起動は §6、Apple OF4.x の受理と非衝突は §7 で確認する。
@@ -62,7 +62,7 @@
 
 ## 3. 部品の境目
 ```c
-/* arch/ppc/ppc_boot.h: unsigned int と pointer は 4 bytes */
+/* sys/arch/ppc/ppc_boot.h: unsigned int と pointer は 4 bytes */
 typedef unsigned int cell;
 typedef int (*ppc_ci)(void *);
 unsigned int ppc_load8(cell va);
@@ -71,7 +71,7 @@ void ppc_sync(void);
 void ppc_disable(void); /* MSR EE を落とし isync */
 void ppc_stop(void) __attribute__((noreturn)); /* ppc_stop_loop を公開 */
 void powermac_boot(ppc_ci ci);
-/* platform/powermac/ofw.h: 同期・単一呼出し、heap 不使用 */
+/* sys/platform/powermac/ofw.h: 同期・単一呼出し、heap 不使用 */
 void ofw_init(ppc_ci ci);
 struct ofw_env { int in, out, memory, mmu, real_mode; unsigned ac, sc; };
 int ofw_setup(struct ofw_env *e); /* 0 成功、-1 console 不可、-2 bad_environment */
@@ -100,7 +100,7 @@ int pm_escc_drain(const struct pm_escc *s); /* write/drain: 0 成功、-1 timeou
 ```
 - ld↔entry.S：`_start`、`_edata`/`_end`（BSS と stack を含む 4-byte 整列の半開区間）、`__stack_bottom`/`__stack_top`（8 KiB、top は16-byte 整列）、`__image_end`。この半開区間を消去し、C が戻れば ppc_stop。entry.S は入口と上記 CPU/MMIO 原始操作を持つ。
 - NOTE の入力 section は `.note.ofw`（alloc、4-byte 整列）。boot.ld は `KEEP(*(.note.ofw))` を LOAD と NOTE に割当てる。文字列は 8 bytes、descriptor は 5 cells。
-- OF 探索の固定 buffer は property 4 KiB、path 1 KiB。getprop の長さと buffer 上限を確認。lib/kstring_c.c は kstring.h→types.h のみを引き、u8/u32 と unsigned long を使う。PPC32 は long/pointer が 4 bytes。lib/kstring_c.c の memcpy/memset/strlen/strcmp/strncmp alias と memcmp を使い、そこで未定義の memmove は呼ばない。宣言は lib/kstring.h を引く。契約ヘッダ io.h・cpu.h は取り込まない。
+- OF 探索の固定 buffer は property 4 KiB、path 1 KiB。getprop の長さと buffer 上限を確認。sys/kern/kstring_c.c は kstring.h→types.h のみを引き、u8/u32 と unsigned long を使う。PPC32 は long/pointer が 4 bytes。sys/kern/kstring_c.c の memcpy/memset/strlen/strcmp/strncmp alias と memcmp を使い、そこで未定義の memmove は呼ばない。宣言は sys/kern/kstring.h を引く。契約ヘッダ io.h・cpu.h は取り込まない。
 - map の元配列は N:sys/arch/macppc/stand/ofwboot/loadfile_machdep.c:179–195、実 CI 配列は NB:654–693。環境は ofw_setup が所有する。ofw_call_method は NB:671–672 の ni>6 の拒否も保持する。
 ```c
 int ofw_map_io(int mmu, unsigned ac, cell pa) {
@@ -115,10 +115,10 @@ int ofw_map_io(int mmu, unsigned ac, cell pa) {
  * CI=-1 は -1、catch 非0 はその値を返す。成功時、method の結果を逆順で
  * 呼出元 cells[0..no) に戻す（NB:690–691）。map は no=0、catch だけを確認する。 */
 ```
-- C4 の 3 層は docs/POLICY_DEV.md §2 の Shared→Subsystem→Local。今段に公開 ABI 定数はなく Shared を増やさず、Subsystem の platform/powermac/platform_of_layout.h に PPC の番地・サイズ・OF path を集約する（PM_LINK_BASE=0x20000、PM_ESCC_WINDOW=0x20、PM_ESCC_STRIDE=0x10、PM_MAP_MODE_IO=0x2a、BAT 値・stack/整列・poll 上限・RR mask）。Local はそこからの導出・参照だけにし同じ値を再定義しない。実行時の BAR/offset は DT から取得する。
-- build/config.mk の LAYOUT_CPP と同じ `$(CC) -E -P -x c -imacros platform/powermac/platform_of_layout.h` で boot.ld を生成。C/asm/ld 共用の定数は suffix・型宣言なし、C 専用部はガードする。出力・ISO/ログのパスは build/ppc.mk の基点→派生パス→run.py 引数で一元化する。
+- C4 の 3 層は docs/POLICY_DEV.md §2 の Shared→Subsystem→Local。今段に公開 ABI 定数はなく Shared を増やさず、Subsystem の sys/platform/powermac/platform_of_layout.h に PPC の番地・サイズ・OF path を集約する（PM_LINK_BASE=0x20000、PM_ESCC_WINDOW=0x20、PM_ESCC_STRIDE=0x10、PM_MAP_MODE_IO=0x2a、BAT 値・stack/整列・poll 上限・RR mask）。Local はそこからの導出・参照だけにし同じ値を再定義しない。実行時の BAR/offset は DT から取得する。
+- build/config.mk の LAYOUT_CPP と同じ `$(CC) -E -P -x c -imacros sys/platform/powermac/platform_of_layout.h` で boot.ld を生成。C/asm/ld 共用の定数は suffix・型宣言なし、C 専用部はガードする。出力・ISO/ログのパスは build/ppc.mk の基点→派生パス→run.py 引数で一元化する。
 - C5: ppc_boot.h の `cell ppc_ptr_cell(const void *p)` / `void *ppc_cell_ptr(cell a)` に pointer/cell 変換を集約する（static inline）。MMIO は cell のまま外部 asm に渡し、CI の pointer 引数はこの口だけで cell 化する。
-- arch は OF/path/ESCC を知らず、platform は CPU 命令を書かない。共有 include/io.h・cpu.h の契約は次段でまとめて実装し、その時点から共有の I/O・CPU 契約を接続する。
+- arch は OF/path/ESCC を知らず、platform は CPU 命令を書かない。共有 sys/include/io.h・cpu.h の契約は次段でまとめて実装し、その時点から共有の I/O・CPU 契約を接続する。
 
 ## 4. 部品の大きさ（推定 KiB）
 | 部品 | file / RAM 増分 |
@@ -132,21 +132,21 @@ int ofw_map_io(int mmu, unsigned ac, cell pa) {
 ## 5. 新規ファイルと割当て
 | ファイル | 行数目安 | 段（1 実装者が表の順に進める） |
 |---|---:|---|
-| platform/powermac/platform_of_layout.h | 45 | A1 定数の 3 層、cpp 出力確認 |
-| arch/ppc/ppc_boot.h | 45 | A2 CPU/MMIO・変換口、宣言コンパイル |
-| platform/powermac/ofw.h | 65 | A3 OF/環境/ESCC 宣言、宣言コンパイル |
-| arch/ppc/entry.S | 105 | B1 BAT/MSR・BSS・CPU/MMIO、object ビルド |
-| arch/ppc/boot.ld | 40 | B2 cpp・リンク記号、script 生成 |
-| arch/ppc/ofw_note.S | 25 | B3 NOTE、object ビルド |
+| sys/platform/powermac/platform_of_layout.h | 45 | A1 定数の 3 層、cpp 出力確認 |
+| sys/arch/ppc/ppc_boot.h | 45 | A2 CPU/MMIO・変換口、宣言コンパイル |
+| sys/platform/powermac/ofw.h | 65 | A3 OF/環境/ESCC 宣言、宣言コンパイル |
+| sys/arch/ppc/entry.S | 105 | B1 BAT/MSR・BSS・CPU/MMIO、object ビルド |
+| sys/arch/ppc/boot.ld | 40 | B2 cpp・リンク記号、script 生成 |
+| sys/arch/ppc/ofw_note.S | 25 | B3 NOTE、object ビルド |
 | tools/ppc/flow_fixture.h | 70 | T1 手本の期待列、fixture コンパイル |
 | tools/ppc/flow_fake.c | 130 | T2 CI/MMIO fake・_start、object ビルド |
-| platform/powermac/ofw.c | 175 | C1 CI/setup、T2 で host TDD・PPC object |
-| platform/powermac/escc_tree.c | 140 | C2 木・open・条件付き map、T2・PPC object |
-| platform/powermac/escc.c | 55 | C3 送信/drain、T2 で host TDD・PPC object |
-| platform/powermac/boot.c | 45 | D1 結線・FAIL、T2 の全ケース・PPC object |
+| sys/platform/powermac/ofw.c | 175 | C1 CI/setup、T2 で host TDD・PPC object |
+| sys/platform/powermac/escc_tree.c | 140 | C2 木・open・条件付き map、T2・PPC object |
+| sys/platform/powermac/escc.c | 55 | C3 送信/drain、T2 で host TDD・PPC object |
+| sys/platform/powermac/boot.c | 45 | D1 結線・FAIL、T2 の全ケース・PPC object |
 | build/ppc.mk | 65 | D2 明示 source・host/ELF の全リンク |
 | tools/ppc/run.py | 180 | T3 host→静的→QEMU→変異 |
-- 新規 14 ファイル・約1185行、既存 lib/kstring_c.c を無変更で source に加える。1 実装者が段ごとにビルド、製品 C は実装と host TDD で進める。D2 完成前は同じ旗の直接コマンドで object/host を組み、host は完成済み製品部品のケースから順に有効にする。BSD から移す部分に著作権・許諾本文を残す。Linux/OpenBIOS/QEMU の GPL ソースは読まない・写さない。
+- 新規 14 ファイル・約1185行、既存 sys/kern/kstring_c.c を無変更で source に加える。1 実装者が段ごとにビルド、製品 C は実装と host TDD で進める。D2 完成前は同じ旗の直接コマンドで object/host を組み、host は完成済み製品部品のケースから順に有効にする。BSD から移す部分に著作権・許諾本文を残す。Linux/OpenBIOS/QEMU の GPL ソースは読まない・写さない。
 - 実装時の文書は docs/tasks/ppc/。この設計改訂は依頼どおり作業ディレクトリだけに置き、リポジトリへは書かない。
 - 独立 `make -f build/ppc.mk CROSS_DIR=/home/hight/opt/cross-ppc`、生成物は全て `build/out/ppc/`。既存 config/Makefile/.gitignore を変更しない。
 - PM 別枝の前提：tools/checks/run.py の NOTEST に `('arch/ppc/**', ())`、`('platform/powermac/**', ())`、`('tools/ppc/**', ())`、`('build/ppc.mk', ())`。実装者は触らず、PM が PC-98 側 PM に渡す（同 同ファイル内 の実物確認済み）。

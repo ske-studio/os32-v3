@@ -27,13 +27,13 @@
 
 |番号|実物の確認|設計への反映|
 |---|---|---|
-|X1|idle_workはIF/EE=1・IRQ深さ0限定、再入禁止、最大4本を1周。優先・期限・予算なし（kernel/idle_work.c (IDLE_WORK_LIMIT)）。sys_halt以外に入力待ち・syscall入口・協調切替から呼ぶ（kernel/sys.c、drivers/input/kbd.c、exec/exec_syscall.inc、exec/exec_schedule.inc、net/link.cのLINK_IDLE、net/nic.cのnet_tx末尾）|協調点はこれら全体。現登録者はNE2K・NIC RX・TSC校正の3種類|
-|X2|NE2Kの8件/120µsはFG1のdemux（net/rx_work.c (rx_work_begin())、net/nic.c）。ne2k_bh内で共有（drivers/net/ne2000/ne2000.c）。IRQは印付け（ne2000_irq.inc）|論点4の「IRQ内なのでTier外」は採らず、FG1予算をTierと合成|
-|X3|PCMはIRQ10から補充（drivers/sound/cs4231/pcm_cs4231.c）、IRQ0のpcm_tick救済も残る（`pcm_advance_run()`）|T3は全面的なIRQ10専用化ではない。当面は両経路をTier外の装置保証として保存|
-|X4|e82557にはidle不足2jiffyでIRQ0のdemux救済がある（net/nic.c）。同箇所に独立のpending判定は無い|「IRQでは要求記録のみ」は現状の例外を伴う。今回この救済を削らない|
-|X5|移行前の観測: PPC syscallはEE=0でidle_workが進まない（exec/exec_syscall.inc、arch/ppc/kernel_trap.c）。IRQ出口のTier処理も無い（同、arch/x86/kernel/isr_stub.asm）|AC-CTX適合後は共通FG1協調点で実行。IRQ出口は作らない|
+|X1|idle_workはIF/EE=1・IRQ深さ0限定、再入禁止、最大4本を1周。優先・期限・予算なし（sys/kern/idle_work.c (IDLE_WORK_LIMIT)）。sys_halt以外に入力待ち・syscall入口・協調切替から呼ぶ（sys/kern/sys.c、sys/platform/pc98/input/kbd.c、sys/kern/exec/exec_syscall.inc、sys/kern/exec/exec_schedule.inc、sys/net/link.cのLINK_IDLE、sys/net/nic.cのnet_tx末尾）|協調点はこれら全体。現登録者はNE2K・NIC RX・TSC校正の3種類|
+|X2|NE2Kの8件/120µsはFG1のdemux（sys/net/rx_work.c (rx_work_begin())、sys/net/nic.c）。ne2k_bh内で共有（sys/dev/net/ne2000/ne2000.c）。IRQは印付け（ne2000_irq.inc）|論点4の「IRQ内なのでTier外」は採らず、FG1予算をTierと合成|
+|X3|PCMはIRQ10から補充（sys/dev/sound/cs4231/pcm_cs4231.c）、IRQ0のpcm_tick救済も残る（`pcm_advance_run()`）|T3は全面的なIRQ10専用化ではない。当面は両経路をTier外の装置保証として保存|
+|X4|e82557にはidle不足2jiffyでIRQ0のdemux救済がある（sys/net/nic.c）。同箇所に独立のpending判定は無い|「IRQでは要求記録のみ」は現状の例外を伴う。今回この救済を削らない|
+|X5|移行前の観測: PPC syscallはEE=0でidle_workが進まない（sys/kern/exec/exec_syscall.inc、sys/arch/ppc/kernel_trap.c）。IRQ出口のTier処理も無い（同、sys/arch/x86/kernel/isr_stub.asm）|AC-CTX適合後は共通FG1協調点で実行。IRQ出口は作らない|
 
-- tick_dispatchは7slotを順に1周し既存tick_budgetを挟む（kernel/irq/tick.h、tick.c:25）。IRQ0の論理周に実行（arch/x86/kernel/isr_stub.asm、isr_handlers.c）。PPCもjiffyで実行（arch/ppc/kernel_dec.c）。
+- tick_dispatchは7slotを順に1周し既存tick_budgetを挟む（sys/kern/irq/tick.h、tick.c:25）。IRQ0の論理周に実行（sys/arch/x86/kernel/isr_stub.asm、isr_handlers.c）。PPCもjiffyで実行（sys/arch/ppc/kernel_dec.c）。
 - 設計のみ。preflight --fix-fonts・build・lint・変異・guestは未実施。依頼にbase指定はなく、作業木は読み取り専用。試験合格は主張しない。
 
 ## 2. 実行層と論点1（U1決定: 初版は案B）
@@ -57,8 +57,8 @@
 
 ## 3. 時計・設定・LANの境界（論点2〜5）
 - AC-TIME-4（新）: io_clock_usはIRQ/FG0/FG1から読める単調µs時計。成功時のみ出力有効、未準備NOSYS・一時失敗AGAIN。短いirq_save/restoreを内包し、源・分解能・停止中進行をAC-TIME-2と揃える。
-- x86はT1のTSC/PIT連続時計（platform/pc98/clock_source.c (platform_clock_read_us())）、PPCはupper/lower/upperのTB時計（platform/powermac/clock.c）。LANが必要とするµsの読み口はio_clock_usに統一。
-- 頻繁な予算判定は§5の生countで行う。arch_tick_budget_*は流用しない。x86のstatic budget_tscはIRQで上書きされ得る（platform/pc98/tick_budget.c）、PPC内部単位はTB count（platform/powermac/tick_budget.c (arch_tick_budget_base())）。Tierは巡回ローカルな時計tokenを持つ。
+- x86はT1のTSC/PIT連続時計（sys/platform/pc98/clock_source.c (platform_clock_read_us())）、PPCはupper/lower/upperのTB時計（sys/platform/powermac/clock.c）。LANが必要とするµsの読み口はio_clock_usに統一。
+- 頻繁な予算判定は§5の生countで行う。arch_tick_budget_*は流用しない。x86のstatic budget_tscはIRQで上書きされ得る（sys/platform/pc98/tick_budget.c）、PPC内部単位はTB count（sys/platform/powermac/tick_budget.c (arch_tick_budget_base())）。Tierは巡回ローカルな時計tokenを持つ。
 - 時計失敗時は追加単位を開始せずMOREを残し記録。TSC校正だけは時計未準備でも有限な起動例外として1周1回進める。一般の時間保証は準備後。
 - AC-IO-1（新）はFG1の協調進行・再入無動作・欠如NOSYS、AC-IO-2（新）は設定の検証・原子的置換・LE形式・owner終了時復元を定義。
 - T2の8件/120µsは既存NIC demuxの上限であり、LAN一括転送の初期値ではない。NICは残りTier予算・既存時間上限・既存件数上限の最小まで。ne2k_bh内の複数呼出でも予算を共有する。
@@ -161,8 +161,8 @@ int io_pump(unsigned int budget_us); /* callback数、負=失敗 */
 |現登録者／新サービス|既定|移行|
 |---|---|---|
 |ne2k_bh（ne2000_control.inc (ne2k_init())）|Tier2・FG|まず互換adapter、次にPIO/復旧/回収の単位と残予算|
-|net_rx_idle（net/nic.c）|Tier2・FG|NICと予算共有。IRQ救済は別経路のまま|
-|pc98_tsc_calibrate_work（platform/pc98/tsc_clock.c）|Tier3・FG|時計未準備の有限例外。通常は既存timerから要求|
+|net_rx_idle（sys/net/nic.c）|Tier2・FG|NICと予算共有。IRQ救済は別経路のまま|
+|pc98_tsc_calibrate_work（sys/platform/pc98/tsc_clock.c）|Tier3・FG|時計未準備の有限例外。通常は既存timerから要求|
 |LAN一括転送|Tier2・FG|Tier前は既存4枠の残り1枠で1周1回、LAN設計の自己予算。Tier後はLAN所有の同じstepを直接登録|
 |PCM|現IRQ経路|現状維持。案Aの利用者が決まった場合だけ別票|
 |入力/GUI、先読み/キャッシュ|将来Tier2、Tier3|現idle登録済みとは扱わず、小単位化後に追加|
@@ -170,29 +170,29 @@ int io_pump(unsigned int budget_us); /* callback数、負=失敗 */
 - idle_work_register/runの名前と最大4本の互換枠を保持。互換fnは常にpending扱いで1巡1回、io_request不要。予算非対応と明示し、A5後〜D3/D4前も回収を止めない。空の速い道は互換枠0本時だけ。既存登録者移行後に通常の単位契約を有効化。旧tick登録順は不変。
 - [推・未ビルド] 共通text 3〜5KiB、FG pump/時計adapter 0.5〜1.5KiB、RAM 3〜4KiB（16枠・表2面・owner別保存表・統計）、lz4増分2〜4KiB、設定最大272B。追加stackはmap/guest watermarkで確認。
 - MINIMALはkernel内増分のみ、診断はDEBUGへ。FD空き下限64KiB（docs/08_build.md）、同:767の443/655KiBは過去の測定で現余裕の証明ではない。
-- resident上限MEM_KERNEL_IMAGE_MAX（include/memmap.h）、圧縮像上限520,192B（TICK_1KHZ_NEXT_DESIGN §4-3）を再測定。kdebugへリンクしないので予定増分0。kdebug上限image/mem各256KiB・load_span512KiB（docs/08_build.md）を維持。実装時に両FD・MINIMAL・mapで合否判定。
+- resident上限MEM_KERNEL_IMAGE_MAX（sys/include/memmap.h）、圧縮像上限520,192B（TICK_1KHZ_NEXT_DESIGN §4-3）を再測定。kdebugへリンクしないので予定増分0。kdebug上限image/mem各256KiB・load_span512KiB（docs/08_build.md）を維持。実装時に両FD・MINIMAL・mapで合否判定。
 
 ## 7. ファイル・段・担当境界
 各行が1段=1ファイル=1実装者。同一ファイルは直列。B1〜B4・旧C3・D6・出口試験は削除。
 |段|新/変更ファイル|目安行|依存・並列|
 |---|---|---:|---|
 |A0|変更 docs/decisions/ARCH_COMPAT_CONTRACT.md|45|FG・時計・表を先に確定|
-|A1|新 kernel/io_work.h|90|A0、io_slice_beginを利用者向けの口に追加|
-|A3|新 kernel/io_work.c|260|A1、bit選択・予算・再入禁止・io_clock_us薄い共通口|
-|A4|新 kernel/io_policy.c|240|A1、A3と並列可。定数表・LE検証・owner保存復元|
-|A5|変更 kernel/idle_work.c|60|A3、互換adapter|
+|A1|新 sys/kern/io_work.h|90|A0、io_slice_beginを利用者向けの口に追加|
+|A3|新 sys/kern/io_work.c|260|A1、bit選択・予算・再入禁止・io_clock_us薄い共通口|
+|A4|新 sys/kern/io_policy.c|240|A1、A3と並列可。定数表・LE検証・owner保存復元|
+|A5|変更 sys/kern/idle_work.c|60|A3、互換adapter|
 |C1|変更 sdk/kapi.json|90|A1/A4、関数・公開型・版|
-|C2|新 kernel/io_kapi.c|80|C1、公開口の境界|
+|C2|新 sys/kern/io_kapi.c|80|C1、公開口の境界|
 |C4|arch/x86 ABI adapter（必要な場合のみ）|30|C2、共通FG1実行器への接続|
 |P1|arch/ppc ABI adapter（必要な場合のみ）|65|C2、共通FG1実行器への接続|
-|T1|変更 platform/pc98/clock_source.c|65|A1、生count/token/係数。PPC側と並列可|
-|T2|変更 platform/powermac/clock.c|45|A1、TB count/token/係数|
-|L1|変更 exec/exec.c|15|A4、owner共通資源回収へ復元口を結線|
-|D1|変更 net/rx_work.c|50|A3、残時間合成|
-|D2|変更 net/nic.c|80|D1、FG登録移行|
-|D3|変更 drivers/net/ne2000/ne2000.c|100|D2、bhの分割・予算|
-|D4|変更 drivers/net/ne2000/ne2000_control.inc|15|D3、登録切替|
-|D5|変更 platform/pc98/tsc_clock.c|25|A5、起動例外adapter|
+|T1|変更 sys/platform/pc98/clock_source.c|65|A1、生count/token/係数。PPC側と並列可|
+|T2|変更 sys/platform/powermac/clock.c|45|A1、TB count/token/係数|
+|L1|変更 sys/kern/exec/exec.c|15|A4、owner共通資源回収へ復元口を結線|
+|D1|変更 sys/net/rx_work.c|50|A3、残時間合成|
+|D2|変更 sys/net/nic.c|80|D1、FG登録移行|
+|D3|変更 sys/dev/net/ne2000/ne2000.c|100|D2、bhの分割・予算|
+|D4|変更 sys/dev/net/ne2000/ne2000_control.inc|15|D3、登録切替|
+|D5|変更 sys/platform/pc98/tsc_clock.c|25|A5、起動例外adapter|
 |E1|新 tools/tests/io_tier_host.c|350|A1、偽時計/要求/provider|
 |E2|新 tools/tests/test_io_tier.py|200|E1、CHECK inputs/covers・変異|
 - T1/T2はR8のcount境界、L1はR5の終了時復元に必要な結線。実装前に既存の共通回収位置を限定確認する。ビルド登録・PPC選択集合・生成KAPI結線も各ファイル単位で追従する。生成物は手編集しない。
@@ -241,8 +241,8 @@ int io_pump(unsigned int budget_us); /* callback数、負=失敗 */
 - P4 (試験の実行): host の試験は tools/tests/host32.py の runner (native と qemu-i386 の user 実行) で回してよい。依頼の「QEMU に触らない」は PowerPC の QEMU の system emulation の意味。preflight の build/out の像が無い NG は、この段では make all をしないので無視してよい。
 - P5 (換算の係数、T1・T2 共通、2026-11-16): 時計の準備のときに、その源の Hz から mul (u32) と shift (0..32) を 1 回だけ作る。shift は mul = floor((hz << shift) / 1000000) が 2^32 未満に収まる最大の値で、準備のときの 64bit 除算は可 (lib/divdi3.c)。換算は count = (u32)(((u64)us * mul) >> shift) の掛け算とシフトだけで、切り捨て。結果が 2^31 (半周) 以上になる us は AGAIN。mul・shift・source・generation は provider の static に 1 組で持ち、source か generation が違う us_to_count は AGAIN。x86 の PIT の源は周期込みの count の Hz、TSC は校正後の Hz で、校正が終わったら generation を進める。
 - P6 (像への登録と provider の結線、2026-11-16): io_work.c・io_policy.c を x86 と PowerPC の像に入れるのは A5 (idle_work.c は両方の像に入っているため)。T1・T2 は provider (ops) と install の関数を置き、platform の時計の初期化から install を呼ぶ 1 行は、A5 が main に入った後に入れる。
-- P7 (T1 の TSC の率の受け渡し、2026-11-16): platform/pc98/tsc_clock.c に、校正の世代 `tsc_generation` (static u32) を足す。state が TSC_READY に入るとき、および TSC_READY から出るとき (FAILED・OFF) にだけ 1 進める。読み取りの口 `int pc98_tsc_rate(u32 *mult, u32 *shift, u32 *generation)` を tsc_clock.h に足す。TSC_READY なら epoch の mult・shift (cycles→µs の係数) と世代を返して 0、それ以外は NOSYS。短い irq_save/restore で一貫した組を返す。T1 の provider は、read と us_to_count で pc98_tsc_rate の世代が手元の組と違うときにだけ、その mult・shift から P5 の us→count の mul・shift を作り直す (64bit 除算はこの作り直しのときだけ)。TSC が READY でなければ PIT の源を使う。source は TSC と PIT で固定の値、generation は provider が源の切り替えか tsc_generation の変化のたびに進める。tsc_clock.c の変更はこの世代と口だけに限る。
-- P8 (D1・D2 の予算の合成、2026-11-16): kernel/io_work.h・io_work.c に `int io_slice_limit(struct io_slice *s, u32 budget_us, u32 max_units)` を足す。slice の残り count と件数を、budget_us を同じ token で換算した count と max_units の小さい方へ狭めるだけ (広げない)。換算は P1 の表を使い、token が違えば AGAIN、成功で 0。NIC の provider は step の入口で io_slice_limit(s, NET_RX_WORK_LIMIT_US, NET_RX_SCAN_MAX) を呼び、以後の単位は io_slice_take で判定する。dispatcher の外の直接の呼び出し (IRQ0 の救済・net_tick) は、io_slice_begin(&s, NET_RX_WORK_LIMIT_US, NET_RX_SCAN_MAX) で作った slice を使う。io_work.c の変更はこの口と試験だけに限る。
+- P7 (T1 の TSC の率の受け渡し、2026-11-16): sys/platform/pc98/tsc_clock.c に、校正の世代 `tsc_generation` (static u32) を足す。state が TSC_READY に入るとき、および TSC_READY から出るとき (FAILED・OFF) にだけ 1 進める。読み取りの口 `int pc98_tsc_rate(u32 *mult, u32 *shift, u32 *generation)` を tsc_clock.h に足す。TSC_READY なら epoch の mult・shift (cycles→µs の係数) と世代を返して 0、それ以外は NOSYS。短い irq_save/restore で一貫した組を返す。T1 の provider は、read と us_to_count で pc98_tsc_rate の世代が手元の組と違うときにだけ、その mult・shift から P5 の us→count の mul・shift を作り直す (64bit 除算はこの作り直しのときだけ)。TSC が READY でなければ PIT の源を使う。source は TSC と PIT で固定の値、generation は provider が源の切り替えか tsc_generation の変化のたびに進める。tsc_clock.c の変更はこの世代と口だけに限る。
+- P8 (D1・D2 の予算の合成、2026-11-16): sys/kern/io_work.h・io_work.c に `int io_slice_limit(struct io_slice *s, u32 budget_us, u32 max_units)` を足す。slice の残り count と件数を、budget_us を同じ token で換算した count と max_units の小さい方へ狭めるだけ (広げない)。換算は P1 の表を使い、token が違えば AGAIN、成功で 0。NIC の provider は step の入口で io_slice_limit(s, NET_RX_WORK_LIMIT_US, NET_RX_SCAN_MAX) を呼び、以後の単位は io_slice_take で判定する。dispatcher の外の直接の呼び出し (IRQ0 の救済・net_tick) は、io_slice_begin(&s, NET_RX_WORK_LIMIT_US, NET_RX_SCAN_MAX) で作った slice を使う。io_work.c の変更はこの口と試験だけに限る。
 - P9 (D5 の要求の源と時計の失敗、2026-11-16): tick の 7 枠は全部使われているので、新しい枠は作らない。TSC の校正の provider は、CALIBRATING と READY (監視) の間は step の最後で IO_MORE を返して自分で再要求する (今の互換枠が毎巡呼ばれていたのと同じ頻度で、next_work_ms の間引きも今のまま)。OFF・FAILED になったら IO_DONE で止める。登録 (io_register) は pc98_tsc_init で行い、そのとき io_request を 1 回立てる。時計の失敗の巡では dispatcher が provider を呼ばないが、pending は残るので次の巡で続く。§3 の「時計未準備の有限例外」は、x86 では T1 の PIT の源が platform_clock_init で準備されるので、互換枠に残す道は取らない。timer からの要求に替えるのは、tick の枠を見直す段で行う。
 - P8 の補足 (D1・D2 の取り込み、2026-11-16): io_work.c の refresh_counts は、P1 の表と一緒に io_slice_limit 用の限度の count の表も、token・policy の generation の組が変わった巡の入口で埋める (毎巡の換算を増やさないため)。
 - P10 (D3・D4 の予算の共有、2026-11-16): ne2k_bh の provider は、step の入口で io_slice_limit(s, NET_RX_WORK_LIMIT_US, ~0u) として時間だけを狭め、件数は狭めない。PIO・復旧・回収の 1 手ごとに io_slice_take で時間 (と slice の件数) を判定する。ne2k_bh の中で net の demux を呼ぶときは、同じ slice の時間を共有しつつ、demux の 8 件 (NET_RX_SCAN_MAX) は rx_work_budget の側の局所の数で数える (rx_work に「時間は渡された slice、件数は自分の 8 件」で始める口を足す)。D2 の dispatcher 経由の net_rx_idle は今のまま (P8)。既存の試験の「1 回の BH で NIC から 9 枚回収し、demux は 8 件以下」の期待は保つ。仕事を立てる所のうち割り込み・tick から要求が立たない物 (rx_backlog・OVW_WAIT・need_tx など) がある間は、稼働中は IO_MORE で毎巡進める (D2 と同じ)。

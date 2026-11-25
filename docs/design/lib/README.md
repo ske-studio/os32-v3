@@ -19,7 +19,7 @@ int dma_range_ok(u32 pa, u32 size, u32 limit) {
 ### kprintf_attr
 
 ```c
-/* lib/kprintf_attr.c: 既存公開名を維持する互換wrapper */
+/* sys/kern/kprintf_attr.c: 既存公開名を維持する互換wrapper */
 u8 kprintf_attr_to_pc98(u8 attr) { return con_backend_printf_attr(attr); }
 ```
 
@@ -29,7 +29,7 @@ u8 kprintf_attr_to_pc98(u8 attr) { return con_backend_printf_attr(attr); }
 
 ## 索引
 
-- [lib/kprintf.c](kprintf.md)
+- [sys/kern/kprintf.c](kprintf.md)
 - [pc98_cell.md](pc98_cell.md)
 - [lib/sqlite3/](sqlite3/README.md)
 - [lib/utf8.c](utf8.md)

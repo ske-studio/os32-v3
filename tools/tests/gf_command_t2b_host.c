@@ -1,11 +1,11 @@
 /* Real T2 observer, with typed module/trial/clock/serial dependencies only.
  * No channel implementation is linked: acceptance must reject bad replies. */
 #include "gf_command_runtime_host.h"
-#include "../../include/io.h"
-#include "../../hwdev/gf/display/data.h"
+#include "../../sys/include/io.h"
+#include "../../sys/dev/video/geforce/display/data.h"
 #define _irq_enabled() 1
 #ifndef GF2_T2B_SOURCE
-#define GF2_T2B_SOURCE "../../kdebug/gf_command_test.c"
+#define GF2_T2B_SOURCE "../../sys/dev/video/geforce/diag/gf_command_test.c"
 #endif
 #include GF2_T2B_SOURCE
 
@@ -35,7 +35,7 @@ i32 gf_display_test(u32 session)
     return display_rc;
 }
 
-/* Layer 5 diagnostic dispatch target (kdebug/gf5_test.h); not exercised here. */
+/* Layer 5 diagnostic dispatch target (sys/dev/video/geforce/diag/gf5_test.h); not exercised here. */
 i32 gf5_test(u32 session)
 {
     (void)session;
@@ -283,7 +283,7 @@ static void t2b_fault_subchannel(void)
 }
 static void t2b_accel_dispatch(void)
 {
-    /* Case IDs follow the T0 entry contract: kdebug/gf_accel_test.c:24-26. */
+    /* Case IDs follow the T0 entry contract: sys/dev/video/geforce/diag/gf_accel_test.c:24-26. */
     enum { ACCEL_INIT = 0, ACCEL_FILL = 1 };
     const u32 cases[] = {ACCEL_INIT, ACCEL_FILL};
     const int results[] = {GF2_OK, GF2_EIO};
@@ -305,7 +305,7 @@ static void t2b_accel_dispatch(void)
 }
 static void t2b_display_dispatch(void)
 {
-    /* GF4_DISPLAY is routed like GF3_ACCEL (kdebug/gf_command_test.c). */
+    /* GF4_DISPLAY is routed like GF3_ACCEL (sys/dev/video/geforce/diag/gf_command_test.c). */
     const u32 sessions[] = {0, GF4_DISPLAY_SESSION_MAX};
     const int results[] = {GF2_OK, GF2_EIO};
     for (unsigned i = 0; i < sizeof(sessions) / sizeof(sessions[0]); i++) {

@@ -1,13 +1,13 @@
-# mm/paging.c — 設計
+# sys/kern/mm/paging.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_C_DESIGN・MEMMAP_V3 (D1 で移した)
-ソース: `mm/paging.c`
+ソース: `sys/kern/mm/paging.c`
 
 |状態・値|所有者|文脈|
 |---|---|---|
-|PD/PT・boot_identity_end・監査状態|mm/paging.c|initの既存irq_save/restore、監査は既存文脈|
+|PD/PT・boot_identity_end・監査状態|sys/kern/mm/paging.c|initの既存irq_save/restore、監査は既存文脈|
 
 ```c
-/* mm/paging.c: static helper、既存ループ内で使用 */
+/* sys/kern/mm/paging.c: static helper、既存ループ内で使用 */
 static int platform_span_has(const struct platform_memory_span *s, u32 a)
 { return a >= s->first && a < s->end; }
 static u32 native_cache_bits(u32 a)
@@ -48,11 +48,11 @@ static u32 native_cache_bits(u32 a)
 
 検査: `tools/tests/test_paging_bounds.py` (`paging_bounds_host.c`)。
 
-## アプリ帯の AS (`mm/paging_addrspace.inc`・`mm/paging_lease.inc`)
+## アプリ帯の AS (`sys/kern/mm/paging_addrspace.inc`・`sys/kern/mm/paging_lease.inc`)
 
 > 出所: APP_BAND_PDE の契約を今のソースと照らして要約 (2026-11-18)
 
-アプリ帯は `MEM_APP_BAND_BASE` (0x80000000、`APP_BAND_PDE`) から連続 `MEM_APP_BAND_MAX_PDES` (64) 枚の PDE で、上端 `MEM_APP_BAND_MAX_TOP` が `MEM_APP_STACK_TOP`。帯は lease 窓の PDE (`LEASE_PDE`) より下に収まる (`mm/paging.c` の STATIC_ASSERT)。
+アプリ帯は `MEM_APP_BAND_BASE` (0x80000000、`APP_BAND_PDE`) から連続 `MEM_APP_BAND_MAX_PDES` (64) 枚の PDE で、上端 `MEM_APP_BAND_MAX_TOP` が `MEM_APP_STACK_TOP`。帯は lease 窓の PDE (`LEASE_PDE`) より下に収まる (`sys/kern/mm/paging.c` の STATIC_ASSERT)。
 
 - `paging_addrspace_create_n(as, owner, pde_count)`: `pde_count` は 1〜`MEM_APP_BAND_MAX_PDES`、`as`・`owner` が 0 なら -1 で何も確保しない。確保するのは **PD 1 枚だけ**。master の PDE を写したうえで、`APP_BAND_PDE` から lease 窓の終わり (`MEM_LEASE_END`) までの PDE を 0 にする (高位の USER・装置の写像を継がない)。`app_pde_count` は引数によらず常に `MEM_APP_BAND_MAX_PDES`。`paging_addrspace_create` は `pde_count = 1` の呼び出し。
 - `paging_addrspace_create_lease` (起動用) は master の CR3 の上・IRQ/例外の外でだけ動き、加えて lease 窓の先頭 PT を 1 枚確保して `PT|RW|USER` で張る (PD + lease PT の 2 枚)。どちらの確保に失敗しても、確保済みを返して所有者のページ数 0 で -1。
@@ -61,13 +61,13 @@ static u32 native_cache_bits(u32 a)
 - `paging_addrspace_destroy` は lease が残っていれば何もしない。lease PT → アプリ PT → PD の順に所有者付きで返し、返却失敗なら AS を毒状態にして止める。active な PD は破棄しない。破棄後、所有者のページ数と池の空きは作成前に戻る。
 - 自己診断 `paging_app_band_selftest` (kselftest に載る) は 64 枚の AS を作り、PT 0 枚・master の帯 PDE が 0 であること、stack の最上ページへの写像と解放、破棄後に空きが元へ戻ることを見る。
 
-検査は `tools/tests/test_app_band_pde.py` (実 `mm/paging.c` をホストで動かす)。
+検査は `tools/tests/test_app_band_pde.py` (実 `sys/kern/mm/paging.c` をホストで動かす)。
 
 ## 地図の自己診断と、最悪配置の表明
 
 > 出所: TASK_KSTACK_USER (§4 の 2・3) の契約を今のソースと照らして要約 (2026-11-18)
 
-ソース: `mm/paging.c` (`paging_memmap_selftest`・`memmap_want_at`・`paging_set_not_present`・ファイル先頭の `STATIC_ASSERT` 群)・`mm/paging.h` (`paging_memmap_bad`・`paging_memmap_bad_count`・`MM_BAD_*`)・`build/os32.ld` の `ASSERT`。静的な地図の検査は `tools/gen_memmap.py` (`docs/design/tools/gen_memmap.md`)。
+ソース: `sys/kern/mm/paging.c` (`paging_memmap_selftest`・`memmap_want_at`・`paging_set_not_present`・ファイル先頭の `STATIC_ASSERT` 群)・`sys/kern/mm/paging.h` (`paging_memmap_bad`・`paging_memmap_bad_count`・`MM_BAD_*`)・`build/os32.ld` の `ASSERT`。静的な地図の検査は `tools/gen_memmap.py` (`docs/design/tools/gen_memmap.md`)。
 
 ### `paging_memmap_selftest(tramp_page)` — 実物のページ表と地図の照合
 
@@ -80,7 +80,7 @@ static u32 native_cache_bits(u32 a)
 
 `KHEAP_BASE` 以降は `__bss_end` から動く浮動番地なので定数式にならず、`STATIC_ASSERT` に混ぜると「variably modified at file scope」で落ちるか、黙って死ぬ。そこで上限をリンカに置く: `build/os32.ld` の `ASSERT` が常駐の鎖の終端 (`LAYOUT_MEM_SHM_RESV_START`) を固定ページ表の手前のガード (`LAYOUT_MEM_FIXED_PAGING_GUARD_BASE`) 以下に止める (カーネル本体の予算 `MEM_KERNEL_IMAGE_MAX` と同値)。上限が保証されるので、**予算いっぱいまで育った場合の配置** (`*_MAX` の定数) で重なりを表明できる。
 
-| 表明 (`mm/paging.c`) | 意味 |
+| 表明 (`sys/kern/mm/paging.c`) | 意味 |
 |---|---|
 | `shm_band_within_kernel_band` | 最悪配置でも SHM 帯 (前方ガード〜後方ガード) がカーネル帯に収まる |
 | `shm_resv_not_reversed` | 最悪配置でも SHM 後方の予約が逆転しない (空は許す) |
@@ -91,4 +91,4 @@ static u32 native_cache_bits(u32 a)
 
 **表明の条件に浮動番地を混ぜない。** 浮いた番地と固定番地を同じ帯で隣り合わせにしない (スタックはカーネル帯の外の固定番地に置く)。
 
-検査: `make check-memmap-host` の `tools/tests/test_memmap_boot.py` (本体 `tools/tests/memmap_boot_host.c`)。実物の `mm/paging.c` を `#include` し、起動順を再生してから自己診断を呼ぶ。`mm/shm.c` の `shm_init` は写しで再生し、写しが本物の本文とずれていないことを突き合わせる。`--mutate` の中心は `band-unbounded` (浮動番地の規則を帯の外へ広げる)。
+検査: `make check-memmap-host` の `tools/tests/test_memmap_boot.py` (本体 `tools/tests/memmap_boot_host.c`)。実物の `sys/kern/mm/paging.c` を `#include` し、起動順を再生してから自己診断を呼ぶ。`sys/kern/mm/shm.c` の `shm_init` は写しで再生し、写しが本物の本文とずれていないことを突き合わせる。`--mutate` の中心は `band-unbounded` (浮動番地の規則を帯の外へ広げる)。

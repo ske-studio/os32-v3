@@ -21,15 +21,15 @@
 
 |#|実物との食い違い／不足|根拠と処置|
 |---|---|---|
-|1|OS32X wire は LE、kernel は native 構造体を参照|`exec/os32x_hdr.c`。読込み時に decode|
+|1|OS32X wire は LE、kernel は native 構造体を参照|`sys/kern/exec/os32x_hdr.c`。読込み時に decode|
 |2|ELF と配置刻印の読取りも LE 固定|`sdk/os32x_hdr.py` の `__init__()`。EI_DATA に従う|
 |3|PPC profile の SDK 能力は無効|`sdk/target_profile.py`。USER C 能力だけ開く|
 |4|CRT は x86 stack 引数専用|`sdk/crt/crt0.asm`。PPC `_start` を別実装|
-|5|USER 例外・SC は停止経路|`arch/ppc/kernel_trap.c` の `ppc_trap_dispatch()`。既存 exec dispatch に接続|
-|6|保存域・FP 域が暫定|`arch/ppc/arch_exec_storage.h`。整数 ABI に確定|
+|5|USER 例外・SC は停止経路|`sys/arch/ppc/kernel_trap.c` の `ppc_trap_dispatch()`。既存 exec dispatch に接続|
+|6|保存域・FP 域が暫定|`sys/arch/ppc/arch_exec_storage.h`。整数 ABI に確定|
 |7|KAPI 引数サイズ生成は i386 cdecl 前提|`sdk/gen_kapi.py`。target 別 adapter|
-|8|文書の戻り値は status 表、非 GUI 実装は終了値|`exec/exec_launch.inc` の `exec_launch()`。受入では7を返す|
-|9|exec の主要2 TU は selected 成功一覧にない|`exec/exec.c`、`kapi/kapi_generated.c`。§9の facade 段で接続|
+|8|文書の戻り値は status 表、非 GUI 実装は終了値|`sys/kern/exec/exec_launch.inc` の `exec_launch()`。受入では7を返す|
+|9|exec の主要2 TU は selected 成功一覧にない|`sys/kern/exec/exec.c`、`sys/kapi/kapi_generated.c`。§9の facade 段で接続|
 
 - `exec/`・`kapi/` の直下 `.c` のうち、この設計の時点で PowerPC で組めなかったのは上記 2 TU。
 - `exec_syscall.inc` は独立 TU ではなく `exec.c` の閉包。成功一覧への不在は今回の再測定結果ではない。
@@ -53,7 +53,7 @@
 ```c
 /* resident_cli_ops への追加。既存コマンド以外の行を渡す。 */
 int (*run)(const char *line);
-/* platform/powermac/cli_boot.c */
+/* sys/platform/powermac/cli_boot.c */
 .run = exec_run; /* int exec_run(const char *cmdline); */
 ```
 
@@ -82,7 +82,7 @@ int (*run)(const char *line);
 - 通常 C 内の u64・構造体・可変引数はコンパイラ ABI、syscall の対応型は§4に限定。
 
 ```c
-/* arch/ppc/exec_entry.c の private 型。全欄 u32。 */
+/* sys/arch/ppc/exec_entry.c の private 型。全欄 u32。 */
 struct ppc_entry {
     u32 pc, sp;
     struct exec_entry_args args;
@@ -279,7 +279,7 @@ make ARCH=ppc PLATFORM=powermac hello
 
 |段|主ファイル／機能|依存・順序|印|
 |---|---|---|---|
-|B01|`exec/os32x_hdr.c`＋宣言：LE decode|先行|共★|
+|B01|`sys/kern/exec/os32x_hdr.c`＋宣言：LE decode|先行|共★|
 |B02|既存 header 読込元＋公開 SDK header：decode・PPC flag 拒否|B01|共★|
 |B03|`exec_arch.h`＋x86/PPC 口：target 識別|B02|共・不変|
 |B04|`sdk/os32x_hdr.py`：ELF endian・PPC flag|B02|共・不変|
@@ -304,7 +304,7 @@ make ARCH=ppc PLATFORM=powermac hello
 |F01|`exec.c`＋legacy 口＋PPC実体：legacy_guest 分離|閉包の先頭|共・不変|
 |F02|`exec.c`＋gfx 口＋PPC実体：gfx/gfx_hal include と参照|F01|共・不変|
 |F03|gfx 口＋`exec_finish.inc`＋PPC実体：emergency・owner 回収|F02、**HAL v2 の I1 が main に入った後の main を基点**|共・不変|
-|F04|`exec/lease.c`＋surface 口＋PPC実体：表示 lease 依存|F02、**HAL v2 の I1 が main に入った後の main を基点**、I2 (C14) と時期を合わせる|共・不変|
+|F04|`sys/kern/exec/lease.c`＋surface 口＋PPC実体：表示 lease 依存|F02、**HAL v2 の I1 が main に入った後の main を基点**、I2 (C14) と時期を合わせる|共・不変|
 |F05|`exec.c`＋gui 口＋PPC実体：gui 登録・owner 通知|独立|共・不変|
 |F06|`exec_abort.inc`＋pump 口＋PPC実体：ring3_gui_pump|F05|共・不変|
 |F07|`exec.c`＋snd 口＋PPC実体：snd_engine・終了通知|独立|共・不変|
@@ -313,12 +313,12 @@ make ARCH=ppc PLATFORM=powermac hello
 |F10|生成器＋IME 生成 helper：KAPI の IME binding|F09、③統合前|共・不変|
 |F11|`exec_syscall.inc`＋GeForce 口＋PPC実体：due/poll|独立|共・不変|
 |F12|`exec_schedule.inc`：同じ GeForce 口へ接続|F11|共・不変|
-|F13|`exec_syscall.inc`＋KAPI 表の口＋PPC実体：KAPI_ADDR 参照。PPC の KAPI_ADDR は platform/powermac の配置の header に置き、include/memmap.h には触らない (HAL v2 との約束)|B08、x86 は元の表参照へ inline 展開|共・不変|
+|F13|`exec_syscall.inc`＋KAPI 表の口＋PPC実体：KAPI_ADDR 参照。PPC の KAPI_ADDR は platform/powermac の配置の header に置き、sys/include/memmap.h には触らない (HAL v2 との約束)|B08、x86 は元の表参照へ inline 展開|共・不変|
 |F14|生成器＋PPC binding helper：不要 wrapper の実依存を除去|F02・F05・F07・F10、型付き未対応応答|共・不変|
 |F15|KAPI 初期化生成口＋PPC 表実体：全 slot と metadata の配置|F13・F14、既存初期化経路へ接続|共・不変|
 |F16|font guard の口＋PPC 実体 (fault は既存の停止)：`font_guard_fault` (定義は x86 の isr_handlers.c だけ、呼ぶ所は exec_finish.inc・exec_fault.inc)|**HAL v2 の I1 の後の main を基点** (exec_finish.inc)|共・不変|
 |F17|kselftest の口＋PPC 実体 (no-op)：`kselftest_run_audit` (exec_launch.inc)、`kselftest_probe.h` の include (exec.c)|独立|共・不変|
-|F18|r1 fixture の口＋PPC 実体 (no-op)：`r1_fixture_resume`・`r1_fixture_parent` (exec_schedule.inc・exec_finish.inc、kernel/r1_fixture.c は legacy_guest.h を include)|**HAL v2 の I1 の後の main を基点** (exec_finish.inc)|共・不変|
+|F18|r1 fixture の口＋PPC 実体 (no-op)：`r1_fixture_resume`・`r1_fixture_parent` (exec_schedule.inc・exec_finish.inc、sys/kern/r1_fixture.c は legacy_guest.h を include)|**HAL v2 の I1 の後の main を基点** (exec_finish.inc)|共・不変|
 |F19|pcm の回収の口＋PPC 実体 (no-op)：`pcm_reclaim` (exec_finish.inc)、host の回収 (exec_finish.inc)|**HAL v2 の I1 の後の main を基点** (exec_finish.inc)|共・不変|
 |F20|exec.c の残りの include の口：`serial_diag.h`・`kapi_db.h` (exec.c)|F01|共・不変|
 |B25|PPC `crt0.S`＋`start.c`：CRT|B07、arch と並列|不変|
@@ -341,7 +341,7 @@ make ARCH=ppc PLATFORM=powermac hello
 - selected 成功済み TU もリンク成功を意味しない。B31 の未解決参照を消すまで閉包完了とはしない。
 
 - 生成器 (sdk/gen_kapi.py と生成の口) に触る段 B07・B08・F10・F14・F15 は**直列** (同じファイルを同時に直さない)。kapi_generated.c は HAL v2 の A0 (gfx2_* 29 本、main 済み) の後を基点にする。
-- exec/exec_finish.inc と exec/lease.c に触る段 (F03・F04・F16・F18・F19) はすべて HAL v2 の I1 が main に入った後の main を基点にする。段の一覧は出す前に本線の PM に送る。
+- sys/kern/exec/exec_finish.inc と sys/kern/exec/lease.c に触る段 (F03・F04・F16・F18・F19) はすべて HAL v2 の I1 が main に入った後の main を基点にする。段の一覧は出す前に本線の PM に送る。
 
 **10. 受入・最小試験・容量・判断事項**
 
@@ -385,13 +385,13 @@ make ARCH=ppc PLATFORM=powermac hello
 
 S-B の受入は QEMU 7450・7455 で到達 (tools/ppc/sb_run.py、LAN 端末から `/bin/hello.bin ok` → `hello ok` → `exit=7` を 2 回、USER text への store → `exit=-2` → その後の hello も `exit=7`)。段の状態は票 TASK_PPC_SHELL が持つ。
 
-- **B21 はやめた**: USER の番地の copy は共通の exec/redir_access.c (ページ表で引いた PA を P2V で写す) をそのまま使う。PPC の copy の backend は作らない。
-- **B03**: target の判定の口は `arch/<arch>/arch_exec_image.h` の `arch_exec_image_accept(flags)` (`exec_arch.h` は既存の include/exec_arch.h と名前がぶつかるのでやめた)。x86 は関数形式の macro (static inline だと GCC の局所記号の名前が変わり os32x_hdr.o が変わる)。
+- **B21 はやめた**: USER の番地の copy は共通の sys/kern/exec/redir_access.c (ページ表で引いた PA を P2V で写す) をそのまま使う。PPC の copy の backend は作らない。
+- **B03**: target の判定の口は `arch/<arch>/arch_exec_image.h` の `arch_exec_image_accept(flags)` (`exec_arch.h` は既存の sys/include/exec_arch.h と名前がぶつかるのでやめた)。x86 は関数形式の macro (static inline だと GCC の局所記号の名前が変わり os32x_hdr.o が変わる)。
 - **B04**: ELF の識別 (CLASS=1・DATA=2・machine=20) の照合は `--target ppc-powermac` のときだけ。x86 は B04 前と同じ (CLASS=1・DATA=1、machine は不問)。
 - **B29**: PowerMac の tick_count は共通の単位 10ms (論理 100Hz)。KAPI の tick_count と exec の閉包がこの単位で書かれている。DEC は物理 1kHz で、論理 tick は共通の `tick_clock_step` が作る (2026-11-12 のユーザー決定、[TICK_ARCH_DESIGN](../time/TICK_ARCH_DESIGN.md) §4)。細かい時間は timebase。起動の時計の検査は論理 3 tick の間隔に、raw と TB の照合 (`dec_rate`) を加える。
-- **F14・B31 の KAPI の振り分け**: `sdk/kapi_target_ppc.py` の群で、PowerMac の像に無い provider の slot を型付きの不在 (取得 0・照会 0・操作 OS32_ERR_NOSYS・void は何もしない) にする。B31 の link で sys (buz_on/off・sys_reboot/halt) と surface (query/lease/unlease) の 8 slot を足した。kernel/sys.c・exec/surface_query.c は共通のソースのまま link し、--gc-sections で PC-98 の参照が落ちる。
-- **B31 の link**: 共通の部品 (input_service・kbd_inject・con_sink・pipe_buffer・fd_redirect・kapi_strings・kapi_print・kstring・paging_app・clock_service・os_time・sys) は facade を作らずそのまま link。シェル像だけ arch/ppc/kboot_unavailable.c を外す (exec の本物と重なる)。今の像 (KBOOT_SHELL なし) は sha256 不変。resident は 716KiB (§10 の暫定 +64〜192KiB の範囲)、予約の残り 1800KiB。
-- **B30**: PowerMac の exec の初期化 `pm_exec_boot` (platform/powermac/exec_boot.c) は fd_redirect → pipe_buffer → exec_init。シェル像の USER 共有ページは exec のトランポリン (x86 と同じ、memory_boot の直後)、sys_mem_kb は 16MB。**常駐 CLI が親 (ID 1) を占めるので exec_nest_level = 1** (B35 の実行で見つかった。0 のままだと子をシェルの番地に読み込もうとする)。
+- **F14・B31 の KAPI の振り分け**: `sdk/kapi_target_ppc.py` の群で、PowerMac の像に無い provider の slot を型付きの不在 (取得 0・照会 0・操作 OS32_ERR_NOSYS・void は何もしない) にする。B31 の link で sys (buz_on/off・sys_reboot/halt) と surface (query/lease/unlease) の 8 slot を足した。sys/kern/sys.c・sys/kern/exec/surface_query.c は共通のソースのまま link し、--gc-sections で PC-98 の参照が落ちる。
+- **B31 の link**: 共通の部品 (input_service・kbd_inject・con_sink・pipe_buffer・fd_redirect・kapi_strings・kapi_print・kstring・paging_app・clock_service・os_time・sys) は facade を作らずそのまま link。シェル像だけ sys/arch/ppc/kboot_unavailable.c を外す (exec の本物と重なる)。今の像 (KBOOT_SHELL なし) は sha256 不変。resident は 716KiB (§10 の暫定 +64〜192KiB の範囲)、予約の残り 1800KiB。
+- **B30**: PowerMac の exec の初期化 `pm_exec_boot` (sys/platform/powermac/exec_boot.c) は fd_redirect → pipe_buffer → exec_init。シェル像の USER 共有ページは exec のトランポリン (x86 と同じ、memory_boot の直後)、sys_mem_kb は 16MB。**常駐 CLI が親 (ID 1) を占めるので exec_nest_level = 1** (B35 の実行で見つかった。0 のままだと子をシェルの番地に読み込もうとする)。
 - **B32**: `resident_cli_ops.run`。組み込みでない行は分割前の写しを run へ、戻り値を `exit=<値>` で出す。run が NULL なら従来の `unknown command`。
 - **B33・B35**: 受入のアプリは userland/ppc/{hello,fault}.c (userland/tests/*.c は x86 の build が wildcard で拾う)。build は build/ppc-user.mk (`make ARCH=ppc PLATFORM=powermac hello`)。root の像には tools/mkroot_image.py の `--bin` で入れる。
 - **B27**: link_guard の PPC の検査は世代の刻印を ELF の endian で比べ、nano の検査は x86 の app.ld だけ。`-lc`・`-lm`・`-lgcc` を断る (別表記まで断る指摘は過剰防御として不採用)。

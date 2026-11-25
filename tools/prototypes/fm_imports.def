@@ -1,28 +1,28 @@
 {
   "schema": 1,
   "contracts": [
-    "include/fm_contract.h",
-    "drivers/sound/fm/fm_module.h",
-    "drivers/sound/fm/fm.h"
+    "sys/include/fm_contract.h",
+    "sys/dev/sound/fm/fm_module.h",
+    "sys/dev/sound/fm/fm.h"
   ],
   "imports": [
     {
       "symbol": "snd2_chip_register",
-      "source": "sound/hal/snd2_int.h",
+      "source": "sys/hal/sound/snd2_int.h",
       "context": "normal",
       "irq": false,
       "declaration": "int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i);"
     },
     {
       "symbol": "snd2_chip_unregister",
-      "source": "sound/hal/snd2_int.h",
+      "source": "sys/hal/sound/snd2_int.h",
       "context": "normal",
       "irq": false,
       "declaration": "int snd2_chip_unregister(u32 dev);"
     },
     {
       "symbol": "snd2_chip_implicit",
-      "source": "sound/hal/snd2_int.h",
+      "source": "sys/hal/sound/snd2_int.h",
       "context": "normal",
       "irq": false,
       "declaration": "int snd2_chip_implicit(int owner);"

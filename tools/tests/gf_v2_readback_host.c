@@ -1,6 +1,6 @@
 /* Real G1 -> layer 3 validation/transfer/M2MF -> fake GF2 DMA engine.
  * Alias descriptors deliberately carry no G9 reservation identity. */
-#include "../../drivers/video/geforce/gf_v2_ops.c"
+#include "../../sys/dev/video/geforce/gf_v2_ops.c"
 
 static struct gf_foundation foundation;
 static struct gf2_chan channel;

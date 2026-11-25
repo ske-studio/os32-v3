@@ -12,9 +12,9 @@
 
 - [gfx/gfx_core](gfx_core.md)
 
-- [gfx/gfx_osri.h](gfx_osri.h.md)
-- [gfx/gfx_osri.c](gfx_osri.c.md)
-- [gfx/osri_profile.h](osri_profile.h.md)
+- [sys/kern/gfx/osri/gfx_osri.h](gfx_osri.h.md)
+- [sys/kern/gfx/osri/gfx_osri.c](gfx_osri.c.md)
+- [sys/kern/gfx/osri/osri_profile.h](osri_profile.h.md)
 - [gfx_core_bridge](gfx_core_bridge.md)
 - [gfx_core_framebuffer](gfx_core_framebuffer.md)
 - [gfx_core_surface](gfx_core_surface.md)

@@ -1,9 +1,9 @@
 """Resident probe registry, owner lookup, epoch and slot publication (ILP32)."""
 CHECK = dict(name='debug-probe', tier=1, needs=[], budget=3.5,
-    covers=['include/debug_probe.h', 'kernel/module/debug_probe.c',
-            'kernel/module/module_runtime.h', 'kernel/module/module_image.h',
-            'kernel/module/module_schema.h', 'include/types.h', 'include/memmap.h',
-            'sdk/include/os32/os32_kapi_shared.h', 'lib/kstring.h', 'lib/kstring_c.c',
+    covers=['sys/include/debug_probe.h', 'sys/kern/module/debug_probe.c',
+            'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.h',
+            'sys/kern/module/module_schema.h', 'sys/include/types.h', 'sys/include/memmap.h',
+            'sdk/include/os32/os32_kapi_shared.h', 'sys/kern/kstring.h', 'sys/kern/kstring_c.c',
             'tools/tests/debug_probe_host.c', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk', 'build/kernel.mk'],
     basis=['KDBG_PROBE_DESIGN'],
@@ -17,7 +17,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'kernel/module/debug_probe.c'
+SOURCE = ROOT / 'sys/kern/module/debug_probe.c'
 MUTATIONS = [
     ('owner-running', 'if (r->state != MODULE_RUNNING) continue;', 'if (0) continue;'),
     ('owner-kdebug', 'if (r->module_id != MODULE_ID_KDEBUG) continue;', 'if (0) continue;'),
@@ -59,7 +59,7 @@ def main():
             exe = folder / label
             subprocess.run([*flags, '-nostdlib', '-static', '-no-pie',
                             '-Wl,--gc-sections', ROOT / 'tools/tests/debug_probe_host.c',
-                            unit, ROOT / 'lib/kstring_c.c', '-o', exe], check=True)
+                            unit, ROOT / 'sys/kern/kstring_c.c', '-o', exe], check=True)
             for runner in os.environ.get('HOST32_RUNNERS', 'native qemu').split():
                 result = host32.run([str(exe)], runner=runner, capture_output=True)
                 if label == 'normal':

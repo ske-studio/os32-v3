@@ -13,7 +13,7 @@ KernelAPI *kapi;
 OS32_KAPI_LAYOUT_STAMP();
 
 /* entry frame の 4 語目 (T7b-b2)。常駐 shell (gshell) には kernel の内部入口の
- * 表 (exec/shell_service.h の ShellService) の番地、app には 0 が渡る。
+ * 表 (sys/kern/exec/shell_service.h の ShellService) の番地、app には 0 が渡る。
  * KAPI ではない (表は KAPI / trampoline / import 表に載らない)。main の署名は
  * 変えない — 使うのは常駐 shell だけで、magic / version を確かめてから読む
  * (userland/gshell/src/ffi.rs)。 */

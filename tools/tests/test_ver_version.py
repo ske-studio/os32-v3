@@ -1,6 +1,6 @@
 """V1: real build dependency loading and the kernel formatter's product version."""
 CHECK = dict(name='ver-version-host', tier=1,
-    covers=['platform/pc98/ver_backend.c', 'platform/pc98/platform_ver.h', 'include/ver_backend_contract.h', 'include/config.h', 'docs/decisions/VERSIONS.md', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'kdebug/kdebug_module.c', 'tools/tests/mutpar.py', 'kernel/ver_format.c', 'kernel/ver_info.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/platform/pc98/ver_backend.c', 'sys/platform/pc98/platform_ver.h', 'sys/include/ver_backend_contract.h', 'sys/include/config.h', 'docs/decisions/VERSIONS.md', 'tools/tests/ver_test_utils.py', 'tools/tests/host32.py', 'sys/kern/kdebug/kdebug_module.c', 'tools/tests/mutpar.py', 'sys/kern/ver_format.c', 'sys/kern/ver_info.h', 'sdk/include/os32/os32_ver_info.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/kernel_includes.py'],
     needs=['make:all'], budget=12.2,
     kind='characterization',
 )
@@ -15,9 +15,9 @@ import time
 import mutpar
 from ver_test_utils import ROOT, arguments
 
-CONSUMER = 'platform/pc98/ver_backend.c'
+CONSUMER = 'sys/platform/pc98/ver_backend.c'
 VERSION_USE = '"PC-9821 OS32 v" SYS_VERSION'
-OBJECTS = ('build/out/obj/platform/pc98/ver_backend.o', 'build/out/obj/kernel/ver_format.o', 'build/out/obj/kdebug/kdebug_module.o')
+OBJECTS = ('build/out/obj/sys/platform/pc98/ver_backend.o', 'build/out/obj/sys/kern/ver_format.o', 'build/out/obj/sys/kern/kdebug/kdebug_module.o')
 # These directories contain all outputs/generators reachable from OBJECTS.
 # Copy tracked sources, excluding .o/.d/target caches; other inputs are read-only
 # links. Neither config edits nor make outputs touch the invoking worktree.
@@ -38,7 +38,7 @@ def heading(version):
 def rebuild(config, edits=None):
     with tempfile.TemporaryDirectory(prefix='ver-version-') as directory:
         tree = mutpar.mutant_tree(ROOT, pathlib.Path(directory)/'tree',
-                                  {'include/config.h': config, **(edits or {})},
+                                  {'sys/include/config.h': config, **(edits or {})},
                                   real=BUILD_REAL)
         env = dict(os.environ)
         env['PATH'] = str(pathlib.Path(env['CROSS_DIR'])/'bin') + os.pathsep + env['PATH']
@@ -55,7 +55,7 @@ def rebuild(config, edits=None):
         assert heading('3.0-dev') in objects[0].read_bytes()
         make()
         assert before == [path.stat().st_mtime_ns for path in objects], 'unchanged inputs rebuilt'
-        header = tree/'include/config.h'
+        header = tree/'sys/include/config.h'
         header.write_text(config.replace('"3.0-dev"', '"9.9-test"'))
         stamp = time.time_ns()
         assert stamp > max(before)
@@ -70,7 +70,7 @@ def rebuild(config, edits=None):
 
 def main():
     args = arguments()
-    config = (ROOT/'include/config.h').read_text()
+    config = (ROOT/'sys/include/config.h').read_text()
     check_version(config)
     rebuild(config)
     if args.mutate:

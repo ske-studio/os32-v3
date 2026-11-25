@@ -1,10 +1,10 @@
 /* T1: real WC owner, platform stop and HAL; explicit ownerless display fixture.
  * The complete F4 module composition is covered by gf4_c3_host.c. */
 #include "geforce_module.h"
-#include "hwdev/gf/production.h"
-#include "mm/pgalloc.h"
-#include "mm/paging.h"
-#include "arch/x86/kernel/mtrr_wc.h"
+#include "sys/dev/video/geforce/production.h"
+#include "sys/kern/mm/pgalloc.h"
+#include "sys/kern/mm/paging.h"
+#include "sys/arch/x86/kernel/mtrr_wc.h"
 #include "palette.h"
 #define geforce_backend_ops gfx_backend_geforce
 const unsigned int __os32_abi_1_mem_4_fmt_4 = 0;
@@ -101,10 +101,10 @@ int gf_production_quiesce(struct gf_production *p)
 { (void)p;CHECK(identity || !lease.active || restore_fail);quiesces++;started=0;return 0; }
 int gf_production_point(void *p) { (void)p;return identity ? 0 : -1; }
 int pc98_route_select_98(void) { return 0; }
-#include "../../hwdev/gf/accel.h"
+#include "../../sys/dev/video/geforce/accel.h"
 void gf_hook_scan_bind(bool active, const struct gf3_surface *scan)
 { CHECK(!active && !scan); }
-#include "../../drivers/video/geforce/geforce_body.c"
+#include "../../sys/dev/video/geforce/geforce_body.c"
 /* This ownerless WC fixture omits the F4 service and its resident slots. */
 i32 gf4_get_probe_decls(const struct probe_decl **table, u32 *count)
 { *table=0; *count=0; return 0; }
@@ -144,7 +144,7 @@ int pc98_route_to_98(void) { CHECK(identity || !lease.active || restore_fail);re
 #define video_stop fake_stop
 #define video_palette fake_palette
 #define gf_present_rect fake_present
-#include "../../drivers/video/geforce/backend_geforce.c"
+#include "../../sys/dev/video/geforce/backend_geforce.c"
 void geforce_display_failed(void) {}
 int gfx_current_height,gfx_flip_enabled,gfx_display_page;
 static GfxCounters counters;

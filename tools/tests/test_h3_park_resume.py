@@ -3,7 +3,7 @@
 Only successful compilation followed by runtime failure counts as mutation RED.
 """
 CHECK = dict(name='h3-park-resume-host', tier=1,
-    covers=['tools/np21w_mcp/symbols.py', 'exec/exec.c', 'arch/x86/kernel/isr_stub.asm', 'tools/h3_layout.c', 'tools/h3_park_resume.py', 'sdk/include/os32/os32api.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/h3_state_host.c', 'tools/tests/host32.py', 'userland/tests/h3/protocol.h', 'userland/tests/h3a.c', 'userland/tests/h3b.c', 'tools/np21w_mcp/gui.py', 'tools/np21w_mcp/gui_desc.py', 'userland/gshell/src/wm.rs', 'userland/gshell/src/startmenu.rs', 'userland/gshell/src/taskbar.rs', 'tools/np21w_mcp/np21w_client.py', 'arch/x86/kernel/cpu_flags.inc', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['tools/np21w_mcp/symbols.py', 'sys/kern/exec/exec.c', 'sys/arch/x86/kernel/isr_stub.asm', 'tools/h3_layout.c', 'tools/h3_park_resume.py', 'sdk/include/os32/os32api.h', 'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/h3_state_host.c', 'tools/tests/host32.py', 'userland/diag/h3/protocol.h', 'userland/diag/h3a.c', 'userland/diag/h3b.c', 'tools/np21w_mcp/gui.py', 'tools/np21w_mcp/gui_desc.py', 'userland/gshell/src/wm.rs', 'userland/gshell/src/startmenu.rs', 'userland/gshell/src/taskbar.rs', 'tools/np21w_mcp/np21w_client.py', 'sys/arch/x86/kernel/cpu_flags.inc', 'tools/tests/kernel_includes.py', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h'],
     needs=['make:all'], budget=4.1,
     kind='characterization',
 )
@@ -26,8 +26,8 @@ import unittest
 from host32 import run
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TARGET_SRC = ['tools/h3_park_resume.py', 'tools/h3_layout.c',
-              'userland/tests/h3/protocol.h', 'userland/tests/h3/state.inc',
-              'userland/tests/h3/fixture.inc', 'userland/tests/h3a.c', 'userland/tests/h3b.c']
+              'userland/diag/h3/protocol.h', 'userland/diag/h3/state.inc',
+              'userland/diag/h3/fixture.inc', 'userland/diag/h3a.c', 'userland/diag/h3b.c']
 
 
 def module(path):
@@ -443,7 +443,7 @@ class Tests(unittest.TestCase):
 
     def test_protocol_header(self):
         import re
-        source = (ROOT / 'userland/tests/h3/protocol.h').read_text()
+        source = (ROOT / 'userland/diag/h3/protocol.h').read_text()
         constants = {name: int(value, 0) for name, value in re.findall(
             r'#define H3_(\w+) (0x[0-9A-Fa-f]+|\d+)u', source)}
         self.assertEqual(h3.MAGIC, constants['MAGIC'])
@@ -1534,7 +1534,7 @@ class Tests(unittest.TestCase):
 
 def c_run(directory, mutation=None):
     directory = pathlib.Path(directory)
-    source = (ROOT / 'userland/tests/h3/state.inc').read_text()
+    source = (ROOT / 'userland/diag/h3/state.inc').read_text()
     if mutation:
         old, new = mutation
         assert source.count(old) == 1, (old, source.count(old))
@@ -1542,7 +1542,7 @@ def c_run(directory, mutation=None):
     target = directory / 'userland/tests/h3'
     target.mkdir(parents=True, exist_ok=True)
     (target / 'state.inc').write_text(source)
-    (target / 'protocol.h').write_bytes((ROOT / 'userland/tests/h3/protocol.h').read_bytes())
+    (target / 'protocol.h').write_bytes((ROOT / 'userland/diag/h3/protocol.h').read_bytes())
     exe = directory / 'state'
     subprocess.run(['gcc', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie',
                     '-fno-stack-protector', '-nostdlib', '-Wl,-e,_start', '-I' + str(directory),

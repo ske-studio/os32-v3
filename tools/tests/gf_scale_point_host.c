@@ -3,7 +3,7 @@
  * observed half-pixel tie: gf-accept4/e_all.txt, fmt=4 trial=1, (3,3).
  * This fixture tests the oracle, not SIFM hardware or conversion precision. */
 #include "gf_command_runtime_host.h"
-#include "../../kdebug/gf_accel_test.c"
+#include "../../sys/dev/video/geforce/diag/gf_accel_test.c"
 
 void _start(void)
 {

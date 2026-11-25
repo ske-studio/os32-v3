@@ -4,7 +4,7 @@ LB's real driver/PCI and SerialFS transport regressions remain separate checks.
 This suite establishes the owner lifetime across those callbacks, not NIC I/O.
 """
 CHECK = dict(name='lan-module-host', tier=1,
-    covers=['platform/pc98/module_pair.c', 'include/platform_module_pair.h', 'platform/pc98/boot_capture.c', 'platform/pc98/bootinfo_wire.h', 'platform/pc98/bootinfo_native.h', 'kernel/irq/tick.c', 'kernel/irq/tick.h', 'platform/pc98/tick_order.h', 'kernel/module/module_runtime.c', 'kernel/module/module_runtime.h', 'kernel/module/module_image.c', 'kernel/module/module_image.h', 'kernel/module/module_schema.h', 'mm/pgalloc.h', 'include/types.h', 'include/memmap.h', 'fs/vfs.c', 'fs/vfs.h', 'drivers/base/dev.c', 'kernel/dev/dev.h', 'drivers/block/disk.h', 'drivers/ata/atapi.h', 'drivers/block/fdc.h', 'include/console.h', 'include/kbd.h', 'drivers/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'lib/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'drivers/net/e82557/lan_module.c', 'drivers/net/e82557/lan_module.h', 'drivers/net/e82557/lan_body.c', 'drivers/block/netcd.h', 'platform/pc98/kernel_boot_memory.inc', 'init/sysconfig.h', 'platform/pc98/kernel.c', 'include/config.h', 'sdk/include/os32/os32_generations.h', 'include/bootinfo.h', 'tools/prototypes/lan_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/lan_module_host.c', 'build/lan-module.ld', 'drivers/net/e82557/e82557.h', 'drivers/net/e82557/e82557_regs.h', 'drivers/pci/pci.h', 'drivers/pci/pci_decode.h', 'drivers/pci/pci_bind.c', 'drivers/pci/pci_bind_match.c', 'drivers/pci/pci_bind.h', 'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'mm/dma_pool.h', 'kernel/module/module.h', 'include/sys.h', 'include/kprintf.h', 'kernel/module/kdebug_imports.def', 'fs/serialfs/sfs_lan.h', 'fs/serialfs/sfs_client.h', 'fs/serialfs/sfs_proto.h', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'tools/mkpkg.py', 'tools/deploy_manifests.py', 'build/core.yaml', 'build/packages.yaml', 'userland/deploy.yaml', 'sdk/kapi.json', 'build/out/lan/*', 'build/out/lan.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'fs/vfs_device.h', 'platform/pc98/boot_names.h', 'platform/pc98/boot_names.c', 'drivers/ata/ide.h', 'include/lan_contract.h', 'include/dma_contract.h', 'include/pci_dev_contract.h', 'include/pci_bind_contract.h', 'platform/pc98/lan_match.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
+    covers=['sys/platform/pc98/module_pair.c', 'sys/include/platform_module_pair.h', 'sys/platform/pc98/boot_capture.c', 'sys/platform/pc98/bootinfo_wire.h', 'sys/platform/pc98/bootinfo_native.h', 'sys/kern/irq/tick.c', 'sys/kern/irq/tick.h', 'sys/platform/pc98/tick_order.h', 'sys/kern/module/module_runtime.c', 'sys/kern/module/module_runtime.h', 'sys/kern/module/module_image.c', 'sys/kern/module/module_image.h', 'sys/kern/module/module_schema.h', 'sys/kern/mm/pgalloc.h', 'sys/include/types.h', 'sys/include/memmap.h', 'sys/fs/vfs.c', 'sys/fs/vfs.h', 'sys/dev/base/dev.c', 'sys/hal/block/dev.h', 'sys/dev/block/disk.h', 'sys/dev/ata/atapi.h', 'sys/dev/block/fdc.h', 'sys/include/console.h', 'sys/include/kbd.h', 'sys/platform/pc98/input/kbd.h', 'tools/module_schema.py', 'tools/gen_module_schema.py', 'sys/kern/kstring.h', 'tools/tests/module_runtime_host.c', 'tools/tests/test_module_runtime.py', 'tools/tests/module_runtime_tdd.md', 'tools/tests/test_module_image.py', 'tools/tests/module_image_host.c', 'tools/tests/host32.py', 'sys/dev/net/e82557/lan_module.c', 'sys/dev/net/e82557/lan_module.h', 'sys/dev/net/e82557/lan_body.c', 'sys/dev/block/netcd.h', 'sys/platform/pc98/kernel_boot_memory.inc', 'sys/kern/init/sysconfig.h', 'sys/platform/pc98/kernel.c', 'sys/include/config.h', 'sdk/include/os32/os32_generations.h', 'sys/include/bootinfo.h', 'tools/prototypes/lan_imports.def', 'tools/gen_sqlite_imports.py', 'tools/tests/lan_module_host.c', 'build/lan-module.ld', 'sys/dev/net/e82557/e82557.h', 'sys/dev/net/e82557/e82557_regs.h', 'sys/dev/pci/pci.h', 'sys/dev/pci/pci_decode.h', 'sys/dev/pci/pci_bind.c', 'sys/dev/pci/pci_bind_match.c', 'sys/dev/pci/pci_bind.h', 'sys/kern/irq/irq.h', 'sys/kern/irq/irq_math.h', 'sys/kern/mm/dma_pool.h', 'sys/kern/module/module.h', 'sys/include/sys.h', 'sys/include/kprintf.h', 'sys/kern/module/kdebug_imports.def', 'sys/fs/serialfs/sfs_lan.h', 'sys/fs/serialfs/sfs_client.h', 'sys/fs/serialfs/sfs_proto.h', 'tools/mkmod.py', 'tools/gen_kdebug_imports.py', 'tools/mkpkg.py', 'tools/deploy_manifests.py', 'build/core.yaml', 'build/packages.yaml', 'userland/deploy.yaml', 'sdk/kapi.json', 'build/out/lan/*', 'build/out/lan.mod', 'build/out/vmkernel.lz4', 'build/out/kernel.elf', 'sys/fs/vfs_device.h', 'sys/platform/pc98/boot_names.h', 'sys/platform/pc98/boot_names.c', 'sys/dev/ata/ide.h', 'sys/include/lan_contract.h', 'sys/include/dma_contract.h', 'sys/include/pci_dev_contract.h', 'sys/include/pci_bind_contract.h', 'sys/platform/pc98/lan_match.c', 'tools/tests/kernel_includes.py', 'tools/tests/kernel_boot_source.py', 'lib/sqlite3/os32_sqlite_vfs.c', 'tools/prototypes/sqlite_imports.def'],
     needs=['make:all'], budget=5.8,
     kind='characterization',
 )
@@ -24,7 +24,7 @@ from test_module_runtime import FLAGS, INCLUDES, image
 from test_module_image import build_validator, validate, fnv, crc, word
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'drivers/net/e82557/lan_module.c'
+SOURCE = ROOT / 'sys/dev/net/e82557/lan_module.c'
 CASES = ['normal-detach', 'decline-zero-refs', 'quarantine-no-rebind-free',
          'active-session-retained', 'prefix-failure', 'failure-after-bind',
          'decline-after-irq-dma-cleanup', 'missing-module-pci-info', 'init-failure-pci-info',
@@ -62,7 +62,7 @@ def product_image(folder):
                  'sfs_lan_reset', 'sfs_lan_set_peer'):
         assert name in core.symbols and name in body.symbols, name
     # h4 uses the resident VFS/PCI/DMA facades and keeps its existing contracts.
-    imports = (ROOT / 'kernel/module/kdebug_imports.def').read_text()
+    imports = (ROOT / 'sys/kern/module/kdebug_imports.def').read_text()
     for name in ('dma_alloc', 'dma_free', 'vfs_read'):
         assert name in core.symbols and '"symbol": "' + name + '"' in imports, name
     for name in ('pci_bind_all', 'pci_cfg_read32', 'irq_register', 'vfs_read'):
@@ -106,7 +106,7 @@ def boot_distribution():
     assert early.index('kernel_boot_lan(&boot);') < early.index('lan_module_netcd_register(netcd_alias)')
     assert re.search(r'if \(!netcd_boot\)\s*\{\s*kernel_boot_lan\(&boot\);\s*\}', boot)
     assert re.search(r'if \(memory_boot_dma_available\(\)\)\s*\{\s*lan_module_load\(\);\s*\}', helper)
-    assert 'services_boot_mode' not in boot and 'SYS_LAN_MOD' in (ROOT / 'include/config.h').read_text()
+    assert 'services_boot_mode' not in boot and 'SYS_LAN_MOD' in (ROOT / 'sys/include/config.h').read_text()
     plan = mkpkg.load_plan(ROOT / 'build/packages.yaml')
     for loader in ('boot/loader_fat_new.bin', 'boot/loader_fat144.bin'):
         entries, problems = mkpkg.fd_plan(plan, str(ROOT), loader)
@@ -125,9 +125,9 @@ def runtime_checks(folder, mutations=False):
                         '-DLAN_ADAPTER="' + str(source) + '"',
                         '-nostdlib', '-static', '-no-pie', '-Wl,--gc-sections',
                         ROOT / 'tools/tests/lan_module_host.c',
-                        ROOT / 'kernel/module/module_runtime.c', ROOT / 'kernel/module/module_image.c',
-                        ROOT / 'platform/pc98/lan_match.c',
-                        ROOT / 'fs/vfs.c', ROOT / 'drivers/base/dev.c', '-o', exe], check=True)
+                        ROOT / 'sys/kern/module/module_runtime.c', ROOT / 'sys/kern/module/module_image.c',
+                        ROOT / 'sys/platform/pc98/lan_match.c',
+                        ROOT / 'sys/fs/vfs.c', ROOT / 'sys/dev/base/dev.c', '-o', exe], check=True)
 
     def run(modes, expected=0):
         for mode in modes:

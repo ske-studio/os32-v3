@@ -47,7 +47,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'platform/powermac/lan_terminal.c').read_text()
+    original = (ROOT / 'sys/platform/powermac/lan_terminal.c').read_text()
     with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as tmp:
         d = Path(tmp)
         (d / 'harness.c').write_text(HARNESS)
@@ -58,7 +58,7 @@ def main():
                 if original.count(old) != 1:
                     raise RuntimeError('mutation anchor is not unique: ' + name)
             (d / 'terminal.c').write_text(source)
-            cmd = ['gcc-13', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-fno-builtin', '-Wall', '-Wextra', '-Werror', '-I.', '-Iinclude', '-Iplatform/powermac', str(d / 'harness.c'), str(d / 'terminal.c'), 'platform/powermac/lan_wire.c', 'lib/kstring_c.c', '-o', str(d / 'test')]
+            cmd = ['gcc-13', '-m32', '-std=gnu11', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static', '-fno-builtin', '-Wall', '-Wextra', '-Werror', '-I.', '-Iinclude', '-Iplatform/powermac', str(d / 'harness.c'), str(d / 'terminal.c'), 'sys/platform/powermac/lan_wire.c', 'sys/kern/kstring_c.c', '-o', str(d / 'test')]
             subprocess.run(cmd, cwd=ROOT, check=True, timeout=60)
             result = subprocess.run(['qemu-i386', str(d / 'test')], capture_output=True, text=True, timeout=60)
             if result.returncode != expected or diagnostic not in result.stderr or marker not in result.stderr:

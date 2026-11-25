@@ -1,8 +1,8 @@
 /* D6: real FD table and C1 generation; backend/path routing are fixtures.
  * C4/D5/I hook wiring and automatic path refresh remain integration tests. */
 #include "types.h"
-#include "lib/kstring.h"
-#include "fs/serialfs/serialfs_persistent.c"
+#include "sys/kern/kstring.h"
+#include "sys/fs/serialfs/serialfs_persistent.c"
 #include PRODUCT_SOURCE
 #define REQUIRE(x) do { if (!(x)) return __LINE__; } while (0)
 static int ctx, other_ctx, checks, calls, failure, notify, swap_probe;

@@ -34,10 +34,10 @@
 
 |責務|PC-98|PowerMac の現物|
 |---|---|---|
-|構成|build/select.mk → build/images/pc98.mk → 所有者別集合と legacy 順|同じ選択器が先に build/images/ppc-flags.mk を読み、最後の override IMAGE の結果で機能表と kboot 順を読む。無指定は link-sh。|
+|構成|build/select.mk → sys/conf/images/pc98.mk → 所有者別集合と legacy 順|同じ選択器が先に sys/conf/images/ppc-flags.mk を読み、最後の override IMAGE の結果で機能表と kboot 順を読む。無指定は link-sh。|
 |リンクと内側の root|build/targets/x86-pc98.mk の all と build/sources/order.mk|build/targets/ppc-powermac.mk の KB_LINK_COMMAND、build/ppc-root-pair.mk の grouped target。exec 像は root-input.iso から最終 PPCKERN.ELF と root.iso を組で発行。kboot_audit.py が最終 ELF と PPCKERN.map を検査。|
 |媒体と配布|build/image.mk の FDD_IMAGE_ARGS と fd144、build/deploy.mk の deploy-fd と deploy-nhd|kb-user がユーザー像を組み、ROOT_MANIFEST が /sys/shell.bin を配置。外側の CD は tools/ppc/link_sh_run.py の Session.start と tools/ppc/ata_accept.py の guest が個別生成。PPC の deploy は未対応。|
-|通常入力|製品 FD/HDD でシェルを起動|platform/powermac/shell_loop_ops.c の共通ループ用操作と fb_run.py:observe の USB キー・画面観測。link_sh_run.py:main の normal は settings(observe_flow=True) の計測用。|
+|通常入力|製品 FD/HDD でシェルを起動|sys/platform/powermac/shell_loop_ops.c の共通ループ用操作と fb_run.py:observe の USB キー・画面観測。link_sh_run.py:main の normal は settings(observe_flow=True) の計測用。|
 
 tools/ppc/compile_ci.py:run の現行呼出し（SH, LINK 順）は次の通り。最後に 1,1 で common-compile を呼ぶ。
 
@@ -80,9 +80,9 @@ KB_EXEC := $(filter 1,$(FEATURE_EXEC))
 KB_C_LEGACY := -DKBOOT_LINK=$(FEATURE_LINK) -DKBOOT_SH=$(FEATURE_USERSHELL) -DKBOOT_SHELL=$(FEATURE_CLI)
 KB_SH_OUT ?= $(KB_OUT)/user
 # kb-user の再帰 make に PPC_USER_OUT=$(KB_SH_OUT) を渡す
-KB_SELECT_MK += build/images/ppc-flags.mk build/targets/ppc-powermac.mk
+KB_SELECT_MK += sys/conf/images/ppc-flags.mk build/targets/ppc-powermac.mk
 ifneq ($(filter powermac kboot-link-sh,$(IMAGE)),)
-KB_SELECT_MK += build/images/powermac.mk
+KB_SELECT_MK += sys/conf/images/powermac.mk
 endif
 ```
 

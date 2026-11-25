@@ -17,7 +17,7 @@ def observe(work, source):
              ('.', 'include', 'sdk/include/os32', 'userland/lib/gfx/v2')]
     host32.build(['gcc', '-m32', '-std=gnu11', '-Wall', '-Wextra', '-Werror',
         '-O0', '-ffreestanding', '-fno-pie', '-no-pie', '-nostdlib', '-static',
-        *flags, str(path), str(ROOT / 'gfx/v2/format.c'),
+        *flags, str(path), str(ROOT / 'sys/hal/gfx/v2/format.c'),
         str(ROOT / 'tools/tests/gfx2_user_host.c'), '-o', str(exe)], check=True)
     return host32.run([str(exe)]).returncode
 

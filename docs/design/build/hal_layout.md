@@ -35,7 +35,7 @@ HAL の利用者も調査対象に含む。受信後のプロトコル選別は 
 | `mouse_pointer_contract.h` | `sys/hal/input/` | ポインタ状態を採取するバックエンドの登録 |
 | `snd_wake_contract.h` | `sys/hal/sound/` | 音源の通知をクロックに登録する契約 |
 
-この3本は P0-6 の対象外で、P1-1 に渡す。D-4 を含む P3 の HAL 移動は 116 本（分割不要 104、P8 対象 12）。P8 では ext2_medium_contract.h の媒体操作表と登録口を sys/hal/block/ に置き、ext2_medium_ide_ops と ext2_medium_loop_ops の宣言は platform/pc98/boot.c が参照する各アダプタの登録用ヘッダに分ける。残りの契約ヘッダは現行の利用者と提供者の境界を保って P1-1 で配置する。たとえば `av_contract.h` は V86 と KAPI 入口も宣言し、`pcm_contract.h` は CS4231 系の版と tick 配線も規定する。いずれもファイル丸ごとの HAL 移設から外す。
+この3本は P0-6 の対象外で、P1-1 に渡す。D-4 を含む P3 の HAL 移動は 116 本（分割不要 104、P8 対象 12）。P8 では ext2_medium_contract.h の媒体操作表と登録口を sys/hal/block/ に置き、ext2_medium_ide_ops と ext2_medium_loop_ops の宣言は sys/platform/pc98/boot.c が参照する各アダプタの登録用ヘッダに分ける。残りの契約ヘッダは現行の利用者と提供者の境界を保って P1-1 で配置する。たとえば `av_contract.h` は V86 と KAPI 入口も宣言し、`pcm_contract.h` は CS4231 系の版と tick 配線も規定する。いずれもファイル丸ごとの HAL 移設から外す。
 
 もう一案は、音・入力の共通処理と契約ヘッダを今の持ち主の側に置くこと。P3 の音・入力のパス変更と利用者の include 更新は減るが、利用者は分野別の実装ディレクトリと include/ を横断して契約を探すことになり、仕様 §4 の集約には後の移動が要る。推奨案では装置を差し替える利用者が sys/hal/ の契約だけを参照し、具体表の依存は登録側に閉じる。固有宣言の分割は P8 で行う。
 

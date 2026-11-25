@@ -1,8 +1,8 @@
 """Exercise the resident cooperative work registry with a host IF seam."""
 CHECK = dict(name='idle-work-host', tier=1,
     covers=['tools/tests/idle_io_sources.py', 'kernel/io_work.[ch]',
-            'kernel/io_clock.h', 'kernel/io_policy.[ch]', 'exec/appslot.h',
-            'kernel/idle_work.[ch]', 'net/nic.h', 'kernel/irq/irq.h', 'include/io.h',
+            'sys/kern/io_clock.h', 'kernel/io_policy.[ch]', 'sys/kern/exec/appslot.h',
+            'kernel/idle_work.[ch]', 'sys/net/nic.h', 'sys/kern/irq/irq.h', 'sys/include/io.h',
             'build/sources/common.mk', 'build/sources/order.mk',
             'tools/tests/idle_work_host.c', 'tools/tests/test_idle_work.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main():
-    original = (ROOT / 'kernel/idle_work.c').read_text()
+    original = (ROOT / 'sys/kern/idle_work.c').read_text()
     with tempfile.TemporaryDirectory(prefix='idle-work-') as td:
         exe = Path(td) / 'idle_work'
 
@@ -35,7 +35,7 @@ def main():
                             str(ROOT / 'tools/tests/idle_work_host.c'), *idle_io_sources(ROOT, td, product), '-o', str(exe)],
                            check=True)
 
-        build(ROOT / 'kernel/idle_work.c')
+        build(ROOT / 'sys/kern/idle_work.c')
         for runner in os.environ.get('HOST32_RUNNERS', 'qemu').split():
             assert host32.run([str(exe)], runner=runner).returncode == 0, runner
             print('PASS idle work (' + runner + ')', flush=True)
@@ -56,7 +56,7 @@ def main():
                 build(source)
                 assert host32.run([str(exe)], runner='qemu').returncode != 0, label
                 print('MUTATE RED ' + label, flush=True)
-            product = (ROOT / 'kernel/io_work.c').read_text()
+            product = (ROOT / 'sys/kern/io_work.c').read_text()
             for old, new, label in [
                 ('if (running) return 0;', 'if (0) return 0;', 'reentry'),
                 ('idle_work_compat_count() == 0 && !any_pending()', '!any_pending()', 'compat pending'),
@@ -65,7 +65,7 @@ def main():
                  'if (idle_work_compat_count() == 0 && !any_pending()) { u32 a,b,c; raw_read(&a,&b,&c); return 0; }', 'empty clock'),
             ]:
                 assert product.count(old) == 1, label
-                build(ROOT / 'kernel/idle_work.c', product.replace(old, new, 1))
+                build(ROOT / 'sys/kern/idle_work.c', product.replace(old, new, 1))
                 assert host32.run([str(exe)], runner='qemu').returncode != 0, label
                 print('MUTATE RED ' + label, flush=True)
 

@@ -11,12 +11,12 @@ script/contract change. Full production bind/lifecycle assembly belongs to
 3c/3d; this standalone 3b tree has declarations only for those components.
 """
 CHECK = dict(name='trident-restore', tier=1, needs=[], budget=4.6,
-    covers=['drivers/video/trident/state_restore.c',
-            'drivers/video/trident/trident.h', 'tools/tests/trident_restore_host.c',
+    covers=['sys/dev/video/trident/state_restore.c',
+            'sys/dev/video/trident/trident.h', 'tools/tests/trident_restore_host.c',
             'tools/tests/trident_device_fake.c', 'tools/tests/trident_device_fake.h',
-            'userland/tests/hw/trident_mode.hwb', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py', 'build/config.mk', 'include/types.h',
-            'include/memmap.h', 'gfx/palette.h', 'include/pegc.h'],
+            'userland/diag/hw/trident_mode.hwb', 'tools/tests/host32.py',
+            'tools/tests/kernel_includes.py', 'build/config.mk', 'sys/include/types.h',
+            'sys/include/memmap.h', 'sys/hal/gfx/palette.h', 'sys/platform/pc98/pegc.h'],
     basis=['TRIDENT_S3_DESIGN §1', 'TRIDENT_S3_DESIGN §2', 'TRIDENT_S3_DESIGN §3'],
 )
 import argparse
@@ -30,10 +30,10 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'drivers/video/trident/state_restore.c'
+PRODUCT = 'sys/dev/video/trident/state_restore.c'
 HOST = 'tools/tests/trident_restore_host.c'
 FAKE = 'tools/tests/trident_device_fake.c'
-SCRIPT = 'userland/tests/hw/trident_mode.hwb'
+SCRIPT = 'userland/diag/hw/trident_mode.hwb'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
          '-nostdlib', '-static', '-no-pie', '-Wl,-e,_start']

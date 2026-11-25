@@ -1,5 +1,5 @@
 /* Link fence.c only; A2 supplies the B1/B7 and timing/MMIO stubs. */
-#include "../../hwdev/gf/command.h"
+#include "../../sys/dev/video/geforce/command.h"
 
 #define GF2_HOST_B6
 #include "gf_command_host.h"

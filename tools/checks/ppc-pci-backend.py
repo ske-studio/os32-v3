@@ -4,17 +4,17 @@ import subprocess
 import tempfile
 
 CHECK = dict(name='ppc-pci-backend', tier=1, needs=[], budget=10,
-    covers=['platform/powermac/pci_backend.c', 'platform/powermac/pci_config.c',
-            'platform/powermac/lan_boot.h', 'tools/ppc/pci_backend_fake.c',
-            'platform/powermac/pci_boot_memory.inc', 'platform/powermac/kboot_info.h',
-            'platform/powermac/pci_capture.h', 'kdebug/hwb_wire.h',
-            'arch/ppc/kernel_trap.c', 'arch/ppc/ppc_trap.h', 'platform/powermac/hwb_instructions.h',
-            'arch/ppc/ppc_oea.h', 'arch/ppc/ppc_boot.h', 'arch/ppc/kernel_boot.h',
-            'include/types.h', 'include/callconv.h', 'include/memmap.h',
-            'include/pci_config_contract.h', 'include/pci_bind_contract.h',
-            'include/pci_dev_contract.h', 'drivers/pci/pci.h', 'drivers/pci/pci_bind.h',
-            'include/pci_contract.h', 'include/kprintf.h', 'drivers/pci/*.c', 'drivers/pci/*.h', 'drivers/net/gem/gem.h',
-            'sdk/include/os32/*.h', 'lib/kstring_c.c', 'lib/kstring.h'],
+    covers=['sys/platform/powermac/pci_backend.c', 'sys/platform/powermac/pci_config.c',
+            'sys/platform/powermac/lan_boot.h', 'tools/ppc/pci_backend_fake.c',
+            'sys/platform/powermac/pci_boot_memory.inc', 'sys/platform/powermac/kboot_info.h',
+            'sys/platform/powermac/pci_capture.h', 'sys/kern/kdebug/hwb_wire.h',
+            'sys/arch/ppc/kernel_trap.c', 'sys/arch/ppc/ppc_trap.h', 'sys/platform/powermac/hwb_instructions.h',
+            'sys/arch/ppc/ppc_oea.h', 'sys/arch/ppc/ppc_boot.h', 'sys/arch/ppc/kernel_boot.h',
+            'sys/include/types.h', 'sys/include/callconv.h', 'sys/include/memmap.h',
+            'sys/include/pci_config_contract.h', 'sys/include/pci_bind_contract.h',
+            'sys/include/pci_dev_contract.h', 'sys/dev/pci/pci.h', 'sys/dev/pci/pci_bind.h',
+            'sys/include/pci_contract.h', 'sys/include/kprintf.h', 'drivers/pci/*.c', 'drivers/pci/*.h', 'sys/dev/net/gem/gem.h',
+            'sdk/include/os32/*.h', 'sys/kern/kstring_c.c', 'sys/kern/kstring.h'],
     basis=['docs/decisions/realhw/HWOP_COMMON_DESIGN.md §3', 'docs/decisions/ppc/PCI_COMMON_DESIGN.md §3・§7'])
 
 
@@ -39,9 +39,9 @@ def run(ctx):
                              f'-DWIDTHS_ONLY={int(widths_only)}', '-Wl,--gc-sections', '-DPM_PCI_FAKE_MMIO', '-DPPC_TRAP_HOST_TEST',
                             '-I.', '-Iinclude', '-Ilib', '-Iplatform/powermac', '-Iarch/ppc',
                             '-Isdk/include/os32', 'tools/ppc/pci_backend_fake.c',
-                            'arch/ppc/kernel_trap.c', 'drivers/pci/pci.c', 'drivers/pci/pci_decode.c', 'drivers/pci/pci_barsize.c',
-                            'drivers/pci/pci_bind.c', 'drivers/pci/pci_bind_match.c',
-                            'lib/kstring_c.c', *(Path(tmp) / name for name in sources),
+                            'sys/arch/ppc/kernel_trap.c', 'sys/dev/pci/pci.c', 'sys/dev/pci/pci_decode.c', 'sys/dev/pci/pci_barsize.c',
+                            'sys/dev/pci/pci_bind.c', 'sys/dev/pci/pci_bind_match.c',
+                            'sys/kern/kstring_c.c', *(Path(tmp) / name for name in sources),
                             '-o', exe], cwd=ctx.root, check=True)
             rc = subprocess.run(['qemu-i386', exe], timeout=10).returncode
             if rc != expected:

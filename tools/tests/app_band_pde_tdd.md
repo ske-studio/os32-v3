@@ -8,7 +8,7 @@
 ## 何を検証するか
 
 アプリ帯 (`MEM_APP_BAND_BASE` から `MEM_APP_BAND_MAX_PDES` 枚の PDE) の AS を、
-実物の `mm/paging.c` (`paging_addrspace.inc`・`paging_lease.inc` を含む) をホストで
+実物の `sys/kern/mm/paging.c` (`paging_addrspace.inc`・`paging_lease.inc` を含む) をホストで
 動かして検査する。ゲスト (NP21/W) の検証ではない。
 
 当初の票は「PDE を 1 枚から要求量に応じて 2 枚へ増やす」(`paging_app_band_pdes()` が
@@ -17,11 +17,11 @@
 
 ## 作り
 
-- `mm/paging.c` を読み、特権命令 (`mov %cr3` / `mov %cr0`) だけを
+- `sys/kern/mm/paging.c` を読み、特権命令 (`mov %cr3` / `mov %cr0`) だけを
   ホスト変数への代入に置換して `paging_host_source.c` として書き出す。
   `pgalloc_alloc_phys` は失敗の位置を指定できる差し替え (`fail_at`) を通す
-- `mm/pgalloc.c` は `irq_save` / `irq_restore` を潰して同様に書き出す
-- `kdebug/kselftest/ledger.inc` の台帳の自己診断も同じ実行物へ取り込む
+- `sys/kern/mm/pgalloc.c` は `irq_save` / `irq_restore` を潰して同様に書き出す
+- `sys/arch/x86/kdebug/kselftest/ledger.inc` の台帳の自己診断も同じ実行物へ取り込む
 - `-m32 -march=i386 -std=gnu11 -ffreestanding` で ILP32 としてビルドし、
   libc に依存せず直接走らせる
 
@@ -71,5 +71,5 @@
 
 ## この試験が見ていないもの
 
-- `exec/exec.c` の起動時のレイアウト決定と、アプリ帯への初期写像
+- `sys/kern/exec/exec.c` の起動時のレイアウト決定と、アプリ帯への初期写像
 - ゲスト上の実挙動 (kselftest、`ring3_guard` の否定試験、8MB / 15MB 構成)。PM が NP21/W で行う

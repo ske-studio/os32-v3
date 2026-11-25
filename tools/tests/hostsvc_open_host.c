@@ -1,16 +1,16 @@
 /* Real VFS mount/FD state and LAN client; only wire and clock are fixtures. */
 #include "hostsvc_fixture.h"
-#include "fs/serialfs/serialfs.h"
-#include "fs/vfs_device.h"
-#include "net/host_mailbox.h"
+#include "sys/fs/serialfs/serialfs.h"
+#include "sys/fs/vfs_device.h"
+#include "sys/net/host_mailbox.h"
 #include "os32_kapi_shared.h"
 #define IO_H
 static unsigned int irq_save(void) { unsigned int f=hs_if(); hs_set_if(0); return f; }
 static void irq_restore(unsigned int f) { hs_set_if(f); }
 static u8 heap[16384];
 void *kmalloc(u32 n) { return n==sizeof(heap) ? heap : 0; }
-#include "net/host_mailbox.c"
-#include "fs/serialfs/serialfs_persistent.c"
+#include "sys/net/host_mailbox.c"
+#include "sys/fs/serialfs/serialfs_persistent.c"
 #include PRODUCT_SOURCE
 
 static u8 response[SFS_BUFFER_FRAME];

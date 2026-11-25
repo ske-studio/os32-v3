@@ -1,4 +1,4 @@
-"""WM の文脈では KAPI の出力検査を効かせない — 実物の exec/ring3_str.c と kernel/gui.c で。
+"""WM の文脈では KAPI の出力検査を効かせない — 実物の sys/kern/exec/ring3_str.c と sys/kern/gui.c で。
 
 票:   docs/archive/kernel_v21/TASK_KAPI_OUTPUT_GUARD.md (追補 2026-09-26)
 記録: tools/tests/ring3_guard_tdd.md
@@ -13,14 +13,14 @@ ring3_guard_active(in_syscall, wm_depth) に寄せること。
 見るもの:
   (1) 判定表 — in_syscall × wm_depth (負は安全側)
   (2) gui_call / gui_owner_exit の前後で深さが対になる (入れ子も)
-  (3) アプリが登録したバッファ (fs/fd_redirect.c) は WM の中でも表を歩く
+  (3) アプリが登録したバッファ (sys/fs/fd_redirect.c) は WM の中でも表を歩く
       — 門は呼び手の文脈ではなくポインタの由来で決める (代行レビュー P2)
-  (4) KAPI ime_set_render (kernel/gui.c の gui_ime_set_render) は常駐側
+  (4) KAPI ime_set_render (sys/kern/gui.c の gui_ime_set_render) は常駐側
       (owner 1、CPL=0 の直呼び) だけ、gshell の終了で NULL に戻る (同 P2)
   (5) gui_register も同じ門 (owner 1 かつ CPL=0 の直呼び)、gshell の
       top-level の登録は通る (代行レビュー P3、host §6)
-  (6) WM の中で落ちた観測点 (静的): exec/exec.c の ring3_kill_kind が深さを
-      0 に戻す**前**に ring3_wm_fault_count を数え、arch/x86/kernel/isr_handlers.c の
+  (6) WM の中で落ちた観測点 (静的): sys/kern/exec/exec.c の ring3_kill_kind が深さを
+      0 に戻す**前**に ring3_wm_fault_count を数え、sys/arch/x86/kernel/isr_handlers.c の
       2 つの kill の行が深さ 1 以上で " (in WM)" を足す (代行レビュー P3)
 
 test_ring3_str.py と同じ様式 — ホスト ILP32 GNU11 で走らせたあと、同じ
@@ -44,70 +44,70 @@ FLAGS = ["-std=gnu11", "-m32", "-march=i386", "-ffreestanding", "-fno-pie",
          "-fno-stack-protector", "-Wall", "-Wextra", "-Werror"]
 INC_DIRS = tuple(d for d in dict.fromkeys(include_dirs()) if d != '.')
 HOST_SRC = ROOT / "tools/tests/ring3_guard_host.c"
-KERNEL_SRCS = [ROOT / "exec/ring3_str.c", ROOT / "kernel/gui.c", ROOT / "fs/fd_redirect.c"]
+KERNEL_SRCS = [ROOT / "sys/kern/exec/ring3_str.c", ROOT / "sys/kern/gui.c", ROOT / "sys/fs/fd_redirect.c"]
 
 # 否定側: 実物の 1 行を壊すと RED になることを見る (写しの上で。ソースは触らない)。
 MUTATIONS = [
-    ("arch/x86/kernel/isr_handlers.c", '        sputs(" err="); sput_hex32(error_code);\n', '', "PF error code absent"),
-    ("kernel/gui.c", "    if (op == GUI_OP_OWNER_EXIT) return OS32_ERR_INVAL;", "",
+    ("sys/arch/x86/kernel/isr_handlers.c", '        sputs(" err="); sput_hex32(error_code);\n', '', "PF error code absent"),
+    ("sys/kern/gui.c", "    if (op == GUI_OP_OWNER_EXIT) return OS32_ERR_INVAL;", "",
      "OWNER_EXIT public forgery allowed"),
-    ("exec/ring3_str.c",
+    ("sys/kern/exec/ring3_str.c",
      "    if (wm_depth > 0) return 0;\n",
      "    (void)wm_depth;\n",
      "WM の文脈を見ない (= 直す前の判定)"),
-    ("kernel/gui.c",
+    ("sys/kern/gui.c",
      "    ring3_wm_enter();\n    r = g_gui_handler(op, arg, res_owner_get());\n",
      "    r = g_gui_handler(op, arg, res_owner_get());\n",
      "gui_call が印を立てない"),
-    ("kernel/gui.c",
+    ("sys/kern/gui.c",
      "    r = g_gui_handler(op, arg, res_owner_get());\n    ring3_wm_leave();\n",
      "    r = g_gui_handler(op, arg, res_owner_get());\n",
      "gui_call が印を下ろさない"),
-    ("kernel/gui.c",
+    ("sys/kern/gui.c",
      "        ring3_wm_enter();\n        g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);\n",
      "        g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);\n",
      "owner_exit が印を立てない"),
     # Registered-buffer mutations now live in test_fd_redirect_d0a.py.
     # 代行レビュー P2 (2026-09-26): ime_set_render は常駐側だけ。
-    ("kernel/gui.c",
+    ("sys/kern/gui.c",
      "    if (res_owner_get() != GUI_SHELL_OWNER || ring3_call_from_user()) {\n        gui_ime_render_rejected++;\n",
      "    if (0) {\n        gui_ime_render_rejected++;\n",
      "ime_set_render の門を外す (= 直す前)"),
-    ("kernel/gui.c",
+    ("sys/kern/gui.c",
      "    if (res_owner_get() != GUI_SHELL_OWNER || ring3_call_from_user()) {\n        gui_ime_render_rejected++;\n",
      "    if (res_owner_get() != GUI_SHELL_OWNER) {\n        gui_ime_render_rejected++;\n",
      "ime_set_render の門が由来 (ring3_call_from_user) を見ない"),
-    ("kernel/gui.c",
+    ("sys/kern/gui.c",
      "    if (res_owner_get() != GUI_SHELL_OWNER || ring3_call_from_user()) {\n        gui_ime_render_rejected++;\n",
      "    if (ring3_call_from_user()) {\n        gui_ime_render_rejected++;\n",
      "ime_set_render の門が owner を見ない"),
-    ("kernel/gui.c",
+    ("sys/kern/gui.c",
      "        ime_set_render((void *)0);\n",
      "",
      "gshell の終了で FEP の描画先を戻さない"),
     # 代行レビュー P3 (2026-09-26): gui_register も同じ門。
-    ("kernel/gui.c",
+    ("sys/kern/gui.c",
      "    if (res_owner_get() != GUI_SHELL_OWNER || ring3_call_from_user()) {\n        return OS32_ERR_INVAL;\n",
      "    if (res_owner_get() != GUI_SHELL_OWNER) {\n        return OS32_ERR_INVAL;\n",
      "gui_register の門が由来 (ring3_call_from_user) を見ない (= 直す前)"),
-    ("kernel/gui.c",
+    ("sys/kern/gui.c",
      "    if (res_owner_get() != GUI_SHELL_OWNER || ring3_call_from_user()) {\n        return OS32_ERR_INVAL;\n",
      "    if (res_owner_get() != GUI_SHELL_OWNER || !ring3_call_from_user()) {\n        return OS32_ERR_INVAL;\n",
      "gui_register の門が top-level の正当な登録を断る (過剰)"),
     # 代行レビュー P3 (2026-09-26): WM の中で落ちた観測点 (静的検査)。
-    ('exec/exec_fault.inc',
+    ('sys/kern/exec/exec_fault.inc',
      "    if (kind == EXEC_KIND_FAULT && ring3_wm_depth > 0) {\n        ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */\n    }",
      "    ring3_context_clear();\n    if (kind == EXEC_KIND_FAULT && ring3_wm_depth > 0) {\n        ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */\n    }",
      "ring3_wm_fault_count を深さを 0 に戻した後で数える (常に 0)"),
-    ('exec/exec_fault.inc',
+    ('sys/kern/exec/exec_fault.inc',
      "        ring3_wm_fault_count++;     /* 深さを 0 に戻す前に数える */\n",
      "",
      "ring3_wm_fault_count を数えない"),
-    ("arch/x86/kernel/isr_handlers.c",
+    ("sys/arch/x86/kernel/isr_handlers.c",
      "        sputs(\" EIP=\"); sput_hex32(fault_eip);\n        if (ring3_wm_depth > 0) sputs(\" (in WM)\");\n",
      "        sputs(\" EIP=\"); sput_hex32(fault_eip);\n",
      "例外の kill の行に (in WM) を付けない"),
-    ("arch/x86/kernel/isr_handlers.c",
+    ("sys/arch/x86/kernel/isr_handlers.c",
      "        }\n        if (ring3_wm_depth > 0) sputs(\" (in WM)\");\n        sputs(\" -> kill app\\n\");\n",
      "        }\n        sputs(\" -> kill app\\n\");\n",
      "#PF の kill の行に (in WM) を付けない"),
@@ -156,7 +156,7 @@ def static_checks(root, quiet=False):
         bad.append("ring3_kill_kind の数える条件が深さ 1 以上 / FAULT でない")
     if "volatile u32 ring3_wm_fault_count = 0;" not in exec_c:
         bad.append("ring3_wm_fault_count が大域 (カーネルシンボル) でない")
-    isr = (root / "arch/x86/kernel/isr_handlers.c").read_text(encoding="utf-8")
+    isr = (root / "sys/arch/x86/kernel/isr_handlers.c").read_text(encoding="utf-8")
     for head in ("void exception_handler(", "void page_fault_handler("):
         fb = _func_body(isr, head)
         k = fb.find("ring3_fault_kill();")
@@ -176,7 +176,7 @@ def includes(root):
 
 def run_host(root, tmp, quiet=False):
     exe = tmp / "ring3-guard"
-    isr = (root / "arch/x86/kernel/isr_handlers.c").read_text()
+    isr = (root / "sys/arch/x86/kernel/isr_handlers.c").read_text()
     a = isr.index('        sputs("\\n[ring3] #PF')
     b = isr.index('        ring3_fault_kill();', a)
     (tmp / "pf_diag.inc").write_text(isr[a:b])

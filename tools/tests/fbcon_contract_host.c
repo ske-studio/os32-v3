@@ -4,10 +4,10 @@
 #define _start surface_fixture_start
 #include "surface_fixture.inc"
 #undef _start
-#include "platform/powermac/pm_console.h"
-#include "drivers/video/of_fb/backend_of_fb.h"
-#include "platform/powermac/rh_observe.h"
-#include "gfx/palette.h"
+#include "sys/platform/powermac/pm_console.h"
+#include "sys/dev/video/of_fb/backend_of_fb.h"
+#include "sys/platform/powermac/rh_observe.h"
+#include "sys/hal/gfx/palette.h"
 
 /* This contract drives ordinary console flips with no borrowed OSRI image. */
 #include "gfx2_bridge_fake.h"

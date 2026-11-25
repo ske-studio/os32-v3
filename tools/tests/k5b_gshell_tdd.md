@@ -235,7 +235,7 @@ make check-kapi-version  → KAPI バージョン一致: v44 (4 箇所)
 | `a_running_app_yields_to_a_parked_app_that_has_a_deliverable_paint` | (1) A に配送できる `Paint` がある間は走っている B が `OP_WAIT` で譲る (`should_park(3)`)、(2) A を起こして `OP_POLL` させると `Paint` が配られ**配送できる dirty は残らない** (B に隠れた分だけが残る = 契約 G4)、(3) B の窓を閉じると A の露出部が dirty になり、また `pick == 2` |
 
 **モックを 1 つ実物に寄せた**: `host/mocks.rs` の `gfx_init` は「何もしない」だったが、
-ゲストの `gfx_init` (`gfx/gfx_core.c`) は **VRAM の両ページをゼロクリアする**。
+ゲストの `gfx_init` (`sys/hal/gfx/gfx_core.c`) は **VRAM の両ページをゼロクリアする**。
 そこまで模さないと「画が消えたのに描き直させない」不具合がホストで観測できず、
 検査が空振りする。呼ばれた回数 (`mocks::GFX_INITS`) も数える。
 

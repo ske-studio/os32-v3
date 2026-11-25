@@ -5,7 +5,7 @@
 #include "appmem.h"
 #include "memmap.h"
 #define main guest_main
-#include "../../userland/tests/allocator_bench.c"
+#include "../../userland/diag/allocator_bench.c"
 #undef main
 #include <stdarg.h>
 #include "appslot.h"

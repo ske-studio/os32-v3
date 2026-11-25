@@ -1,14 +1,14 @@
-"""K5b-K: the real AppSlot code (exec/appslot.c) under K5a's 84 checks.
+"""K5b-K: the real AppSlot code (sys/kern/exec/appslot.c) under K5a's 84 checks.
 
 Ticket: docs/archive/gui_v13/TASK_K5B_kernel.md (host tests, 3rd item)
 Log:    tools/tests/k5b_kernel_tdd.md
 
 K5a's tools/tests/multiapp_model_host.c hand-wrote the state machine as a
 model. This harness compiles the shipped kernel source instead
-(exec/appslot.c, included verbatim by multiapp_impl_host.c) and runs the same
+(sys/kern/exec/appslot.c, included verbatim by multiapp_impl_host.c) and runs the same
 numbered checks against it, plus case 17 for the OP_WAIT mark (C5/C6) and
 case 19 for K7's second park point (WAIT_KEY / parked_from_kbd), which also
-pulls in kernel/kbd_inject.c verbatim.  -DKBD_INJECT_NO_IRQ_LOCK swaps that
+pulls in sys/kern/kbd_inject.c verbatim.  -DKBD_INJECT_NO_IRQ_LOCK swaps that
 unit's cli/popfl for an empty lock: CPL=3 cannot execute them.
 
 Same shape as test_multiapp_model.py / test_pgalloc_range.py: build ILP32
@@ -64,7 +64,7 @@ if __name__ == "__main__":
             assert result.returncode != 0 and 'FAIL F1 hidden shell resume cannot take q' in result.stdout, result.stdout
             print('RED runtime: resume must pass the actual recipient')
         subprocess.run(["i386-elf-gcc", *FLAGS, "-O2", *includes, "-c",
-                        str(ROOT / "exec/appslot.c"),
+                        str(ROOT / "sys/kern/exec/appslot.c"),
                         "-o", str(tmp / "appslot.o")],
                        cwd=ROOT, check=True)
         print("TARGET i386-elf GNU11 -Werror COMPILE PASS", flush=True)

@@ -2,8 +2,8 @@
  * from the raw leaves. Count accesses before and after injected failures. */
 #include "hwb_window.h"
 #include "ppc_trap.h"
-#include "mm/paging.h"
-#include "kdebug/hwb_wire.h"
+#include "sys/kern/mm/paging.h"
+#include "sys/kern/kdebug/hwb_wire.h"
 
 static u32 leaves[2], effective[2], irq = PPC_MSR_EE;
 static int stale_restore, byte_model;

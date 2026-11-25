@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Learning DB open/schema/meta fault injection, freestanding ILP32."""
 CHECK = dict(name='fep-user-store', tier=1, needs=[], budget=4.3,
-    covers=['kernel/ime/ime_user_store.c', 'kernel/ime/ime_conn.c',
-            'kernel/ime/ime_store.h', 'kernel/sqlite_engine.h', 'kernel/sqlite_engine_body.h', 'lib/sqlite3/os32_sqlite_outer.h',
-            'lib/sqlite3/os32_sqlite_vfs.h', 'lib/kstring_c.c',
+    covers=['sys/kern/ime/ime_user_store.c', 'sys/kern/ime/ime_conn.c',
+            'sys/kern/ime/ime_store.h', 'sys/kern/sqlite_engine.h', 'sys/kern/sqlite_engine_body.h', 'lib/sqlite3/os32_sqlite_outer.h',
+            'lib/sqlite3/os32_sqlite_vfs.h', 'sys/kern/kstring_c.c',
             'tools/tests/fep_user_store_host.c', 'tools/tests/fep_store_fixture.c',
             'tools/tests/fep_store_fixture.h', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py', 'build/config.mk'],
@@ -20,7 +20,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-PRODUCT = 'kernel/ime/ime_user_store.c'
+PRODUCT = 'sys/kern/ime/ime_user_store.c'
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 MUTANTS = [
@@ -65,12 +65,12 @@ def main():
         product = (ROOT / PRODUCT).read_text()
         def build(code, mutant=False):
             unit = work / 'user.c'
-            unit.write_text(src.replace('#include "kernel/ime/ime_user_store.c"', code))
+            unit.write_text(src.replace('#include "sys/kern/ime/ime_user_store.c"', code))
             exe = work / 'user'
             subprocess.run(['gcc', *FLAGS, *(['-Wno-unused-function'] if mutant else []),
                             '-I' + str(ROOT / 'kernel/ime'), '-I' + str(ROOT),
                             *include_flags(ROOT), '-nostdlib', '-static', '-no-pie',
-                            str(unit), str(ROOT / 'lib/kstring_c.c'), '-o', str(exe)], check=True)
+                            str(unit), str(ROOT / 'sys/kern/kstring_c.c'), '-o', str(exe)], check=True)
             return host32.run([str(exe)], cwd=ROOT).returncode
         rc = build(product)
         if rc:

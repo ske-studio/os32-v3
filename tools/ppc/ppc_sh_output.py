@@ -13,8 +13,8 @@ from run import CriterionFailure
 CHECK = dict(name='ppc-sh-output', tier=2, budget=900, needs=[],
              covers=['tools/ppc/ppc_sh_output.py', 'userland/ppc/outprobe.c'],
              inputs=['build/targets/ppc-powermac.mk', 'build/ppc-user.mk',
-                     'platform/powermac/report_product.c', 'platform/powermac/kboot_console.c', 'platform/powermac/console_stream.c',
-                     'fs/vfs_fd.c', 'tools/ppc/kboot_accept.py', 'tools/ppc/kboot_run.py',
+                     'sys/platform/powermac/report_product.c', 'sys/platform/powermac/kboot_console.c', 'sys/platform/powermac/console_stream.c',
+                     'sys/fs/vfs_fd.c', 'tools/ppc/kboot_accept.py', 'tools/ppc/kboot_run.py',
                      'tools/ppc/sc_run.py', 'tools/ppc_lan_host.py',
                      'tools/ppc/link_sh_run.py', 'tools/ppc/link_run.py',
                      'tools/host_agent.py',
@@ -124,11 +124,11 @@ def main():
     for name in ('normal', 'fd1-log', 'ready-leak') if args.mutate else ('normal',):
         mutation = []
         if name == 'fd1-log':
-            mutation = mutant_settings(work, name, 'platform/powermac/console_stream.c',
+            mutation = mutant_settings(work, name, 'sys/platform/powermac/console_stream.c',
                                        '    console_write(buf, size, color);',
                                        '    (void)color; pm_log_write(buf, size);')
         if name == 'ready-leak':
-            mutation = mutant_settings(work, name, 'platform/powermac/ppc_kernel.c',
+            mutation = mutant_settings(work, name, 'sys/platform/powermac/ppc_kernel.c',
                                        '    pm_report_ready(start);',
                                        '    pm_report_ready(start);\n'
                                        '    kprintf(KBOOT_ATTR, "KBOOT READY stage=pre-user\\r\\n");')

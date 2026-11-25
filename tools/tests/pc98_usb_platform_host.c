@@ -1,6 +1,6 @@
 #include "usb_probe.h"
-#include "drivers/pci/pci.h"
-#include "drivers/pci/pci_barsize.h"
+#include "sys/dev/pci/pci.h"
+#include "sys/dev/pci/pci_barsize.h"
 
 static struct pci_dev dev = {.bus=1, .dev=13, .fn=1, .vendor=0x1033,
     .device=0x0035, .class=12, .subclass=3, .progif=16};

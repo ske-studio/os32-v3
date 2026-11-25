@@ -2,13 +2,13 @@
 
 契約: `docs/design/tools/gen_memmap.md` (静的な地図の検査)・`docs/design/mm/paging.md` の「地図の自己診断と、最悪配置の表明」(実物のページ表の照合と `STATIC_ASSERT`)。出所は票 TASK_KSTACK_USER の §4 の 1・2・3 と §4-bis。
 
-対象: `tools/gen_memmap.py` / `mm/paging.c` / `kdebug/kselftest.c` / `include/memmap.h`
+対象: `tools/gen_memmap.py` / `sys/kern/mm/paging.c` / `sys/platform/pc98/kdebug/kselftest.c` / `sys/include/memmap.h`
 試験: `tools/tests/test_memmap_gen.py` / `tools/tests/test_memmap_boot.py` + `memmap_boot_host.c`
 登録: `make check` → `check-memmap-host` / `check-memmap` (2026-09-17 決裁 D1/D2 の後に登録)
 
 ## 症状
 
-`userland/tests/crash.c` がカーネルスタックガード `0x1FB000` へ書いても落ちない。
+`userland/diag/crash.c` がカーネルスタックガード `0x1FB000` へ書いても落ちない。
 生きているゲストのページ表を読むと、設計と実装がこうずれていた。
 
 | 区間 | `memmap.h` の地図 | 実物 |
@@ -38,7 +38,7 @@
 
 ### 1. `tools/gen_memmap.py` (静的 — 設計が矛盾していないか)
 
-`include/memmap.h` の `#define` を解き、`build/out/kernel.map` の `__bss_end`
+`sys/include/memmap.h` の `#define` を解き、`build/out/kernel.map` の `__bss_end`
 から実値の地図を起こす。**実物の `memmap.h` を使い、`kernel.map` だけ差し替える**
 ので、番地を直しても試験は腐らない。
 
@@ -74,7 +74,7 @@ RED だったこと: どれも道具そのものが無かった。とくに NOMA
 
 0 から `MEM_DMA_POOL_END` までの全ページを `memmap.h` から導いた期待値と比べ、食い違った区間を
 `paging_memmap_bad[]` に積んで `kselftest_fail` に数える。
-`tools/tests/memmap_boot_host.c` が `mm/paging.c` を**そのまま** `#include` し、
+`tools/tests/memmap_boot_host.c` が `sys/kern/mm/paging.c` を**そのまま** `#include` し、
 `paging_init` → `paging_reclaim_conventional` → `shm_init` 相当 → KAPI 踏み台、
 というカーネルの起動順を再生してから呼ぶ。ゲストを起動せずに件数と区間が確定する。
 
@@ -113,11 +113,11 @@ SLACK が空 = `0x375000`。どちらも撥ねた逆転 0・食い違い 0 本)�
 ### 3. `shm_init()` の写しについて
 
 ホストの gcc 15 は `(u32)&__bss_end` を含む定数式を畳まなくなっており
-(クロスの gcc 13.2 も `-Werror` では同じ)、`mm/shm.c` の `STATIC_ASSERT` が
+(クロスの gcc 13.2 も `-Werror` では同じ)、`sys/kern/mm/shm.c` の `STATIC_ASSERT` が
 `variably modified at file scope` になるので `#include` できない。
 ページ表に対する 3 つの呼び出しだけをハーネスに写し、
 **写しが本物とずれていないことを `test_memmap_boot.py` が
-`mm/shm.c` の `shm_init()` 本文と突き合わせる** (`check_shm_replay`)。
+`sys/kern/mm/shm.c` の `shm_init()` 本文と突き合わせる** (`check_shm_replay`)。
 
 ## 決裁 D1 / D2 (2026-09-17) で何が変わったか
 
@@ -125,7 +125,7 @@ SLACK が空 = `0x375000`。どちらも撥ねた逆転 0・食い違い 0 本)�
 
 要点は「浮いた番地 (`KHEAP_BASE` 以降) と固定番地を同じ帯で隣り合わせにしない」。
 カーネル帯域は丸ごと浮動側に渡し、スタックは帯の外の固定番地に置く。GUI 予約は
-常に SHM の末尾のブロック (`MEM_SHM_GUI_OFFSET`)。今の番地と大きさは `include/memmap.h`。
+常に SHM の末尾のブロック (`MEM_SHM_GUI_OFFSET`)。今の番地と大きさは `sys/include/memmap.h`。
 
 ### D2 — 門をリンカに置く
 
@@ -142,14 +142,14 @@ SLACK が空 = `0x375000`。どちらも撥ねた逆転 0・食い違い 0 本)�
 
 | ファイル | 表明 | 何を見るか |
 |---|---|---|
-| `mm/shm.c` | `shm_gui_base_aligned` | GUI 予約の先頭がブロック境界に乗る |
-| `mm/shm.c` | `shm_gui_within_band` | GUI 予約が SHM 帯に収まる |
-| `mm/shm.c` | `shm_gui_is_last_blocks` | 予約が帯の **末尾** にある (新規) |
-| `mm/paging.c` | `shm_band_within_kernel_band` | 最悪配置でも SHM 帯がカーネル帯域に収まる |
-| `mm/paging.c` | `shm_resv_not_reversed` | 最悪配置でも後方予約が逆転しない (空は許す) |
-| `mm/paging.c` | `shm_band_below_kstack_guard` | 最悪配置でも SHM はスタックガードに届かない |
-| `mm/paging.c` | `kstack_outside_shm_band` | スタック 16KB 全部が SHM 帯の外 |
-| `mm/paging.c` | `kstack_outside_kernel_band` | スタックが浮動番地の帯の外に居る (D1 の要点) |
+| `sys/kern/mm/shm.c` | `shm_gui_base_aligned` | GUI 予約の先頭がブロック境界に乗る |
+| `sys/kern/mm/shm.c` | `shm_gui_within_band` | GUI 予約が SHM 帯に収まる |
+| `sys/kern/mm/shm.c` | `shm_gui_is_last_blocks` | 予約が帯の **末尾** にある (新規) |
+| `sys/kern/mm/paging.c` | `shm_band_within_kernel_band` | 最悪配置でも SHM 帯がカーネル帯域に収まる |
+| `sys/kern/mm/paging.c` | `shm_resv_not_reversed` | 最悪配置でも後方予約が逆転しない (空は許す) |
+| `sys/kern/mm/paging.c` | `shm_band_below_kstack_guard` | 最悪配置でも SHM はスタックガードに届かない |
+| `sys/kern/mm/paging.c` | `kstack_outside_shm_band` | スタック 16KB 全部が SHM 帯の外 |
+| `sys/kern/mm/paging.c` | `kstack_outside_kernel_band` | スタックが浮動番地の帯の外に居る (D1 の要点) |
 
 `shm.c` の 2 本は 2026-09-17 まで **黙って死んでいた**。条件に
 `(u32)&__bss_end` 由来の値が入っていたため、GCC が可変長配列として警告だけ
@@ -165,7 +165,7 @@ C のヘッダを読めない相手 (リンカスクリプト / NASM) と、SDK 
 | 場所 | 写している値 |
 |---|---|
 | `build/os32.ld` ほか | 今の一覧は `tools/gen_memmap.py` の `MIRRORS` |
-| `arch/x86/kernel/kentry.asm` | 値ではなく生成ヘッダの `LAYOUT_MEM_KSTACK_TOP` を引く (数値直書きに戻したら検出) |
+| `sys/arch/x86/kernel/kentry.asm` | 値ではなく生成ヘッダの `LAYOUT_MEM_KSTACK_TOP` を引く (数値直書きに戻したら検出) |
 | `sdk/include/os32/os32_gui_shared.h` | `GUI_SHM_OFFSET` = `MEM_SHM_GUI_OFFSET` |
 | `sdk/rust/os32api/src/gui/proto.rs` | 同上 (C ⇄ Rust は `make check-gui-proto` も見る) |
 

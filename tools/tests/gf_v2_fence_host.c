@@ -1,4 +1,4 @@
-#include "drivers/video/geforce/gf_v2.h"
+#include "sys/dev/video/geforce/gf_v2.h"
 static struct gf_v2 g;
 static struct gf2_chan ch;
 static int kick_count, wait_count, wait_rc, poll_rc, poll_done;

@@ -12,11 +12,11 @@ OS32 の移植点は **2 本の軸**に分かれている。
 
 | 契約 | 何の契約か | 引く固定名 |
 |---|---|---|
-| [`include/io.h`](../include/io.h) | ポート I/O、割り込み制御、CPU 停止、IDT のロード | `arch_io.h` / `platform_io.h` |
-| [`include/abi.h`](../include/abi.h) | 引数語の幅・整列とスタック整列 | `arch_abi.h` |
-| [`include/cpu.h`](../include/cpu.h) | アドレス変換表の根と TLB・変換の有効化、ユーザモードへの遷移、別スタックでの呼び出し | `arch_cpu.h` |
-| [`include/exec_arch.h`](../include/exec_arch.h) | syscall の借用 view、USER 保存域、親の特権 snapshot と復帰 | `arch_exec_storage.h` (容量・整列のみ) |
-| `include/exec_arch.h` の註 | 書いた命令を実行に公開する `arch_exec_publish(dst, bytes)` (関数かマクロ) | `arch_exec_cache.h` |
+| [`sys/include/io.h`](../sys/include/io.h) | ポート I/O、割り込み制御、CPU 停止、IDT のロード | `arch_io.h` / `platform_io.h` |
+| [`sys/include/abi.h`](../sys/include/abi.h) | 引数語の幅・整列とスタック整列 | `arch_abi.h` |
+| [`sys/include/cpu.h`](../sys/include/cpu.h) | アドレス変換表の根と TLB・変換の有効化、ユーザモードへの遷移、別スタックでの呼び出し | `arch_cpu.h` |
+| [`sys/include/exec_arch.h`](../sys/include/exec_arch.h) | syscall の借用 view、USER 保存域、親の特権 snapshot と復帰 | `arch_exec_storage.h` (容量・整列のみ) |
+| `sys/include/exec_arch.h` の註 | 書いた命令を実行に公開する `arch_exec_publish(dst, bytes)` (関数かマクロ) | `arch_exec_cache.h` |
 | `arch_exec_kapi.h` 自身の註 | 起動時に組む KAPI の関数表の番地 `exec_kapi_table()` | `arch_exec_kapi.h` |
 
     #include "arch_io.h"        /* arch/$(ARCH)/arch_io.h     */
@@ -35,15 +35,15 @@ OS32 の移植点は **2 本の軸**に分かれている。
 本文に増やさないのがこの構成の目的で、`#ifdef` で 1 ファイルの中を分ける形に
 戻してはいけない。
 
-なお `arch/x86/arch_io.h` と `platform/pc98/platform_io.h` の**ファイル名が
+なお `sys/arch/x86/arch_io.h` と `sys/platform/pc98/platform_io.h` の**ファイル名が
 契約側の `io.h` と違う**のは意図的。同名にすると `-I` の順で実装側が契約
 ヘッダ自身を引き込む (あるいはその逆) 事故が起きる (`cpu.h` / `arch_cpu.h`
 も同じ)。
 
 **契約の無い、その arch だけの小物**は `arch_` で始めない名前にする
-(いまは [`arch/x86/x86_desc.h`](x86/x86_desc.h) — GDT のロードと `ltr`)。
+(いまは [`sys/arch/x86/x86_desc.h`](x86/x86_desc.h) — GDT のロードと `ltr`)。
 x86 にしか意味の無い仕組みなので `include/` に契約を置かず、x86 専用の
-`arch/x86/kernel/gdt.c` / `arch/x86/kernel/tss.c` だけが直接引く。`ARCH` が別の値なら
+`sys/arch/x86/kernel/gdt.c` / `sys/arch/x86/kernel/tss.c` だけが直接引く。`ARCH` が別の値なら
 見つからずに止まり、それが「このソースは x86 専用」という印になる。
 `arch_` で始まる名前は**契約の実装**だけが使う (番人がこの区別を見る)。
 
@@ -51,13 +51,13 @@ x86 にしか意味の無い仕組みなので `include/` に契約を置かず�
 
 1. **ディレクトリを作る。** `arch/<arch>/` を掘り、`arch_io.h` と
    `arch_cpu.h` を置く。既存の `arch/x86/arch_*.h` はコピー元ではなく
-   **対照表**として使う — 写すのは命令列ではなく、`include/io.h` /
-   `include/cpu.h` の註に書かれた契約のほう。
+   **対照表**として使う — 写すのは命令列ではなく、`sys/include/io.h` /
+   `sys/include/cpu.h` の註に書かれた契約のほう。
 
-2. **契約を満たす。** `include/io.h` と `include/cpu.h` が挙げている原始命令を
+2. **契約を満たす。** `sys/include/io.h` と `sys/include/cpu.h` が挙げている原始命令を
    全部、同じシグネチャで実装する。`io.h` 側と `cpu.h` の MMU 4 種は宣言が
    あるので、型が食い違えばコンパイルが止まる。初回入口は
-   `include/exec_arch.h` の prepare/enter と storage provider の契約を満たす。
+   `sys/include/exec_arch.h` の prepare/enter と storage provider の契約を満たす。
    引数の論理値は共通側、配置と遷移は arch 側が所有する。とくに次は
    命令を並べるだけでは満たせない:
 
@@ -114,8 +114,8 @@ x86 にしか意味の無い仕組みなので `include/` に契約を置かず�
 
 `tools/check_arch_asm.py` (`make check` の `check-arch-asm`) が、カーネル側の
 C ソースに `hlt` / `cli` / `sti` の直書きが無いことを検査する。直書きしてよいのは
-`arch/<arch>/arch_*.h` (契約の実装側) だけで、**契約側の `include/io.h` /
-`include/cpu.h` も検査対象** — 契約に実装が混ざったらそこで止まる。
+`arch/<arch>/arch_*.h` (契約の実装側) だけで、**契約側の `sys/include/io.h` /
+`sys/include/cpu.h` も検査対象** — 契約に実装が混ざったらそこで止まる。
 `arch_` で始まらない arch 専用の小物 (`x86_desc.h`) は許可一覧に**入らない**
 — 直書きの散らばる先を増やさないため。
 
@@ -124,11 +124,11 @@ C ソースに `hlt` / `cli` / `sti` の直書きが無いことを検査する�
 
 ## 今あるもの
 
-    arch/x86/arch_io.h              i386 (唯一の実装): 割り込み・CPU 停止・lidt
-    arch/x86/arch_cpu.h             i386 (唯一の実装): CR3 / CR0.PG
-    arch/x86/kernel/exec_entry.c    初回配置、CPL0 の call と USER の不可分な iret 遷移
-    arch/x86/x86_desc.h             x86 専用の小物 (契約なし): lgdt とセグメント再設定、ltr
-    platform/pc98/platform_io.h     PC-9801/9821 (唯一の実装)
+    sys/arch/x86/arch_io.h              i386 (唯一の実装): 割り込み・CPU 停止・lidt
+    sys/arch/x86/arch_cpu.h             i386 (唯一の実装): CR3 / CR0.PG
+    sys/arch/x86/kernel/exec_entry.c    初回配置、CPL0 の call と USER の不可分な iret 遷移
+    sys/arch/x86/x86_desc.h             x86 専用の小物 (契約なし): lgdt とセグメント再設定、ltr
+    sys/platform/pc98/platform_io.h     PC-9801/9821 (唯一の実装)
 
 `arch/arm/` は**まだ無い**。この骨格は受け皿を先に用意するためのもので、
 ARM 実装は別票で行う。
@@ -150,7 +150,7 @@ PowerPC のコンパイラは通す (`make ppc-ci-image` の `common-compile`。
 しない)。共通のソースが機種・装置のヘッダを読む辺は
 `python3 -B tools/check_layers.py` が両方の像の `.d` から数え、基準
 (`tools/layers_baseline.json`、今は 0) より増えても減っても落ちる。直し方の表は
-docs/design/tools/check_layers.md §8。起動の順は共通の `init/kernel_start.c` が
+docs/design/tools/check_layers.md §8。起動の順は共通の `sys/kern/init/kernel_start.c` が
 持ち、局面の中身は `platform/<機種>/` が実装する。
 
 像は QEMU mac99 で OF から入り、案 D の paging・例外・MPIC・decrementer まで
@@ -158,5 +158,5 @@ docs/design/tools/check_layers.md §8。起動の順は共通の `init/kernel_st
 既存 bootstrap は `make ppc-boot` / `make ppc-boot-check` で独立して扱う。
 x86 の旧一覧を ARM に通す測定は別系列のまま維持する。
 
-内部呼出属性は [`callconv.h`](../include/callconv.h) に集約する。
+内部呼出属性は [`callconv.h`](../sys/include/callconv.h) に集約する。
 i386 は cdecl、他 target は通常 C ABI。

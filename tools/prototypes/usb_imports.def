@@ -1,141 +1,141 @@
 {
   "schema": 1,
   "contracts": [
-    "platform/pc98/usb_resident.h",
-    "kernel/module/module_runtime.h",
-    "input/hal/in2_int.h",
-    "drivers/usb/usb_core.h"
+    "sys/platform/pc98/usb_resident.h",
+    "sys/kern/module/module_runtime.h",
+    "sys/hal/input/in2_int.h",
+    "sys/dev/usb/usb_core.h"
   ],
   "imports": [
     {
       "symbol": "dma_alloc",
-      "source": "mm/dma_pool.h",
+      "source": "sys/kern/mm/dma_pool.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "dma_free",
-      "source": "mm/dma_pool.h",
+      "source": "sys/kern/mm/dma_pool.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "dma_mark_leaked",
-      "source": "mm/dma_pool.h",
+      "source": "sys/kern/mm/dma_pool.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "in2_time_ms",
-      "source": "input/hal/in2_int.h",
+      "source": "sys/hal/input/in2_int.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "kfree",
-      "source": "mm/kmalloc.h",
+      "source": "sys/kern/mm/kmalloc.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "kmalloc",
-      "source": "mm/kmalloc.h",
+      "source": "sys/kern/mm/kmalloc.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "kmemcpy",
-      "source": "lib/kstring.h",
+      "source": "sys/kern/kstring.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "kmemset",
-      "source": "lib/kstring.h",
+      "source": "sys/kern/kstring.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "kprintf",
-      "source": "include/kprintf.h",
+      "source": "sys/include/kprintf.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "kvprintf",
-      "source": "include/kprintf.h",
+      "source": "sys/include/kprintf.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "module_record_get",
-      "source": "kernel/module/module_runtime.h",
+      "source": "sys/kern/module/module_runtime.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "module_ref_acquire",
-      "source": "kernel/module/module_runtime.h",
+      "source": "sys/kern/module/module_runtime.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "module_ref_release",
-      "source": "kernel/module/module_runtime.h",
+      "source": "sys/kern/module/module_runtime.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "pc98_usb_resident_start",
-      "source": "platform/pc98/usb_resident.h",
+      "source": "sys/platform/pc98/usb_resident.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "usb_input_alloc",
-      "source": "input/hal/usb_input.h",
+      "source": "sys/hal/input/usb_input.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "usb_input_mouse",
-      "source": "input/hal/usb_input.h",
+      "source": "sys/hal/input/usb_input.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "usb_input_release",
-      "source": "input/hal/usb_input.h",
+      "source": "sys/hal/input/usb_input.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "usb_input_usage",
-      "source": "input/hal/usb_input.h",
+      "source": "sys/hal/input/usb_input.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "usbp_cfg_cmd",
-      "source": "include/usb_platform.h",
+      "source": "sys/include/usb_platform.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "usbp_mmio_unmap",
-      "source": "include/usb_platform.h",
+      "source": "sys/include/usb_platform.h",
       "context": "normal",
       "irq": true
     },
     {
       "symbol": "usbp_udelay",
-      "source": "include/usb_platform.h",
+      "source": "sys/include/usb_platform.h",
       "context": "normal",
       "irq": false
     },
     {
       "symbol": "pc98_usb_service_log",
-      "source": "platform/pc98/usb_resident.h",
+      "source": "sys/platform/pc98/usb_resident.h",
       "context": "normal",
       "irq": true
     }

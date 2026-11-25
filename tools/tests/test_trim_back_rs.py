@@ -16,13 +16,13 @@ import test_trim_kernel as kernel
 ROOT = Path(__file__).resolve().parents[2]
 CACHE = 'userland/rust/trim_back_rs/src/cache.rs'
 WM = 'userland/gshell/src/trim.rs'
-SLOT = 'exec/appslot.c'
+SLOT = 'sys/kern/exec/appslot.c'
 APP = 'userland/rust/libos32gui/src/app.rs'
 STUB = 'userland/rust/libos32gui_stub/src/lib.rs'
-TARGET_SRCS = ['exec/appslot.c', 'exec/exec.c', 'exec/exec_schedule.inc', 'kernel/gui.c', 'kdebug/kselftest/appmem.inc',
-         'kapi/kapi_sysinfo.c', 'exec/exec_heap.c', 'exec/appmem.c', 'exec/appmem_map.c',
-         'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/physmem.c',
-         CACHE, WM, APP, STUB, 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h']
+TARGET_SRCS = ['sys/kern/exec/appslot.c', 'sys/kern/exec/exec.c', 'sys/kern/exec/exec_schedule.inc', 'sys/kern/gui.c', 'sys/kern/kdebug/kselftest/appmem.inc',
+         'sys/kapi/kapi_sysinfo.c', 'sys/kern/exec/exec_heap.c', 'sys/kern/exec/appmem.c', 'sys/kern/exec/appmem_map.c',
+         'sys/kern/exec/appmem_unmap.c', 'sys/kern/mm/paging_app.c', 'sys/kern/mm/physmem.c',
+         CACHE, WM, APP, STUB, 'sys/include/exec_arch.h', 'sys/arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'sys/arch/x86/kernel/exec_context.c', 'sys/arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'sys/arch/x86/kernel/tss.h']
 MUTANTS = [
     ('stop-leaves-bit', SLOT, '    slot_zero(a);\n    appslot_reclaim_count++;',
      '    u32 pending = a->trim_pending, epoch = a->trim_epoch;\n'
@@ -129,13 +129,13 @@ def build(tmp, sources):
     s = p.read_text().replace('#include "public_wrap_source.c"', '#undef caller_access_get\n#include "public_wrap_source.c"')
     p.write_text(s)
     fn = kernel.base.function
-    (tmp / 'stop_source.c').write_text('\n'.join(fn(sources['exec/exec_schedule.inc'], sig) for sig in
+    (tmp / 'stop_source.c').write_text('\n'.join(fn(sources['sys/kern/exec/exec_schedule.inc'], sig) for sig in
         ('static void exec_kill_one(', 'i32 exec_kill(')))
     objects = []
-    for index, name in enumerate(('exec/appmem.c', 'exec/appmem_map.c', 'exec/appmem_unmap.c', 'mm/paging_app.c', 'mm/physmem.c')):
+    for index, name in enumerate(('sys/kern/exec/appmem.c', 'sys/kern/exec/appmem_map.c', 'sys/kern/exec/appmem_unmap.c', 'sys/kern/mm/paging_app.c', 'sys/kern/mm/physmem.c')):
         src, obj = tmp / f'part{index}.c', tmp / f'part{index}.o'
         src.write_text(sources[name])
-        extra = ['-Dpgalloc_alloc_phys=map_alloc', '-Dpgalloc_free_n_owner=map_free'] if name == 'mm/paging_app.c' else []
+        extra = ['-Dpgalloc_alloc_phys=map_alloc', '-Dpgalloc_free_n_owner=map_free'] if name == 'sys/kern/mm/paging_app.c' else []
         host32.build(cc + extra + ['-c', str(src), '-o', str(obj)], check=True, capture_output=True, text=True)
         objects.append(str(obj))
     return cc, objects, rust_library(tmp, sources)

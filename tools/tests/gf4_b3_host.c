@@ -1,4 +1,4 @@
-/* libc-free, link with hwdev/gf/display/ddc.c; A1 UNIT 3.
+/* libc-free, link with sys/dev/video/geforce/display/ddc.c; A1 UNIT 3.
  * Independent wire oracle: EDID messages are 50/W,offset,50/R,128 bytes;
  * E-DDC prefixes 30/W,segment. Values below come from GF_FEAT4_DESIGN §4,
  * MIT nouveau c03c1a1 nvkm/subdev/i2c/busnv04.c:41-70 (pins),

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """G8 GART bounds and surface DMA selection."""
 CHECK = dict(name='gf-g8-host', tier=1, needs=[], budget=5,
-    covers=['hwdev/gf/accel_surface.c', 'hwdev/gf/accel.h',
+    covers=['sys/dev/video/geforce/accel_surface.c', 'sys/dev/video/geforce/accel.h',
             'tools/tests/gf_g8_host.c', 'tools/tests/test_gf_g8.py',
             'tools/tests/gf_accel_host.h', 'tools/tests/gf_command_runtime_host.h',
             'tools/tests/recover_gf_dev_stub.c', 'tools/tests/kernel_includes.py',
@@ -33,7 +33,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'hwdev/gf/accel_surface.c').read_text()
+    source = (ROOT / 'sys/dev/video/geforce/accel_surface.c').read_text()
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         assert observe(work, source) == 0

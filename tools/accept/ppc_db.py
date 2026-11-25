@@ -14,20 +14,20 @@ from kboot_accept import build_media
 from ppc_shm import guest_available
 from run import require
 
-DB = 'kapi/kapi_db.c'
-V50 = 'kapi/kapi_db_v50.inc'
+DB = 'sys/kapi/kapi_db.c'
+V50 = 'sys/kapi/kapi_db_v50.inc'
 BIND = 'text_copy_buf, length,\n                                             SQLITE_TRANSIENT'
 MUTATIONS = {
-    'no-vfs': [('fs/ramfs/ramfs.c', None, '.sqlite = &ramfs_sqlite_ops', '.sqlite = 0 ? &ramfs_sqlite_ops : 0')],
+    'no-vfs': [('sys/fs/ramfs/ramfs.c', None, '.sqlite = &ramfs_sqlite_ops', '.sqlite = 0 ? &ramfs_sqlite_ops : 0')],
     'static-bind': [(DB, V50, BIND, BIND.replace('TRANSIENT', 'STATIC'))],
     'fp-owner': [(DB, V50, 'if (handle == -1) {',
                   'extern volatile u32 services_boot_fault; if (handle == -2) services_boot_fault = 99;\n    if (handle == -1) {'),
-                 ('kernel/sqlite_engine.c', None, 'arch_kernel_fp_end(&guard);',
+                 ('sys/kern/sqlite_engine.c', None, 'arch_kernel_fp_end(&guard);',
                   'if (services_boot_fault == 99) services_boot_fault = 0;\n'
                   '    else arch_kernel_fp_end(&guard);')],
     'empty-only': [(DB, V50, 'if (st.st_size == 0)', 'if (st.st_size != 0)')],
-    'lost-code': [(DB, 'kapi/kapi_db_helpers.inc', 'db_open_fail[owner] = code;', '(void)code;')],
-    'leak': [('exec/exec.c', 'exec/exec_finish.inc', 'exec_db_cleanup_owned(id);', ';')],
+    'lost-code': [(DB, 'sys/kapi/kapi_db_helpers.inc', 'db_open_fail[owner] = code;', '(void)code;')],
+    'leak': [('sys/kern/exec/exec.c', 'sys/kern/exec/exec_finish.inc', 'exec_db_cleanup_owned(id);', ';')],
 }
 FIRST = 'OPEN CREATE INSERT BIND-RC BIND-VAL STEP CONV-POS CONV-NEG CONV-MOD-POS CONV-MOD-NEG CONV-SUM FP-PRE FPSCR NEXT ERR-RC ERR-CODE NAME CLOSE USED PENDING'.split()
 SECOND = ['STAT', 'REOPEN', 'RECLAIM']

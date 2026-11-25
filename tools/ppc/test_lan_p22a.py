@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / 'arch/ppc/kernel_probe.h'
+HEADER = ROOT / 'sys/arch/ppc/kernel_probe.h'
 
 def check(header):
     with tempfile.TemporaryDirectory() as d:

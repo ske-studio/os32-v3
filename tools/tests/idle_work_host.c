@@ -6,7 +6,7 @@ static void _idle(void) { ++sleeps; }
 int net_rx_recent(u32 window_ms) { return recent_ms < window_ms; }
 static int _irq_enabled(void) { return host_if; }
 #ifndef IDLE_WORK_SOURCE
-#define IDLE_WORK_SOURCE "../../kernel/idle_work.c"
+#define IDLE_WORK_SOURCE "../../sys/kern/idle_work.c"
 #endif
 #include IDLE_WORK_SOURCE
 #include "io_clock.h"

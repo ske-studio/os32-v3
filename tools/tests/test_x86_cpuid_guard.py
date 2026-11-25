@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Model a CPU whose ID bit is immutable; run the real probe separately too."""
 CHECK = dict(name='x86-cpuid-guard-host', tier=1, needs=[], budget=5,
-    covers=['arch/x86/arch_cpu.h', 'arch/x86/x86_flags.h',
+    covers=['sys/arch/x86/arch_cpu.h', 'sys/arch/x86/x86_flags.h',
             'tools/tests/test_x86_cpuid_guard.py', 'tools/tests/host32.py'],
     kind='characterization',
 )
@@ -62,7 +62,7 @@ static struct { u32 cr3; } kernel_tss;
 
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument('--mutate',action='store_true');args=parser.parse_args()
-    header=(ROOT/'arch/x86/arch_cpu.h').read_text()
+    header=(ROOT/'sys/arch/x86/arch_cpu.h').read_text()
     with tempfile.TemporaryDirectory() as td:
         work=Path(td)
         assert observe(work,header,False)==0

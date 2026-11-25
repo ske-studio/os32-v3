@@ -5,7 +5,7 @@
  * Fixture addresses are synthetic ROM offsets, not device ROM contents. */
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
-#include "../../hwdev/gf/internal.h"
+#include "../../sys/dev/video/geforce/internal.h"
 
 enum {
     C2_ROM_BYTES=4096, C2_EVENTS=32768, C2_REGS=64,

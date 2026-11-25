@@ -9,18 +9,18 @@ ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='ppc-hostfs-link-io', tier=1, needs=[], budget=15,
     env=['ppc-cross'], basis=['LAN_OPERATOR_DESIGN §5', 'LAN_OPERATOR_DESIGN §8',
         'PACK ppc-sfs-deadline PM conditions B/C'],
-    covers=['platform/powermac/hostfs_link_io.c', 'tools/tests/ppc_hostfs_link_io.c',
-            'tools/tests/test_ppc_hostfs_link_io.py', 'platform/powermac/hostfs_link_peer.c',
-            'platform/powermac/hostfs_boot.c',
+    covers=['sys/platform/powermac/hostfs_link_io.c', 'tools/tests/ppc_hostfs_link_io.c',
+            'tools/tests/test_ppc_hostfs_link_io.py', 'sys/platform/powermac/hostfs_link_peer.c',
+            'sys/platform/powermac/hostfs_boot.c',
             'fs/vfs*.c', 'fs/*.h', 'fs/serialfs/serialfs*.c',
-            'fs/vfs_fd_stdin.inc', 'exec/*.h', 'kernel/*.h',
-            'kernel/console/*.h', 'kernel/dev/dev.h', 'mm/kmalloc.h',
-            'net/host_mailbox.c', 'lib/kstring_c.c', 'lib/kstring.h',
-            'platform/powermac/hostfs.h', 'platform/powermac/lan_boot.h',
+            'sys/fs/vfs_fd_stdin.inc', 'exec/*.h', 'kernel/*.h',
+            'kernel/console/*.h', 'sys/hal/block/dev.h', 'sys/kern/mm/kmalloc.h',
+            'sys/net/host_mailbox.c', 'sys/kern/kstring_c.c', 'sys/kern/kstring.h',
+            'sys/platform/powermac/hostfs.h', 'sys/platform/powermac/lan_boot.h',
             'drivers/net/gem/*.h',
-            'fs/serialfs/*.h', 'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c',
-            'fs/vfs.h', 'net/link*.h', 'net/host_mailbox.h', 'kernel/idle_work.h',
-            'kernel/irq/*.h', 'platform/powermac/platform_irq_limits.h',
+            'fs/serialfs/*.h', 'sys/fs/serialfs/sfs_client.c', 'sys/fs/serialfs/sfs_proto.c',
+            'sys/fs/vfs.h', 'net/link*.h', 'sys/net/host_mailbox.h', 'sys/kern/idle_work.h',
+            'kernel/irq/*.h', 'sys/platform/powermac/platform_irq_limits.h',
             'include/*.h', 'sdk/include/os32/*.h', 'lib/le_internal.h',
             'lib/crc32.[ch]', 'lib/crc32_core.inc', 'tools/tests/host32.py'])
 MUTATIONS = [
@@ -55,10 +55,10 @@ def exercise(folder, source, extra=None):
            '-DKBOOT_LINK=1', '-I' + str(folder)]
     cmd += ['-I' + str(ROOT / path) for path in includes]
     cmd += [str(ROOT / path) for path in ['tools/tests/ppc_hostfs_link_io.c',
-            'fs/serialfs/sfs_client.c', 'fs/serialfs/sfs_proto.c', 'lib/crc32.c',
-            'platform/powermac/hostfs_boot.c', 'platform/powermac/hostfs_link_peer.c',
-            'fs/serialfs/serialfs.c', 'fs/serialfs/serialfs_persistent.c',
-            'fs/vfs.c', 'fs/vfs_fd.c', 'lib/kstring_c.c', 'net/host_mailbox.c']]
+            'sys/fs/serialfs/sfs_client.c', 'sys/fs/serialfs/sfs_proto.c', 'lib/crc32.c',
+            'sys/platform/powermac/hostfs_boot.c', 'sys/platform/powermac/hostfs_link_peer.c',
+            'sys/fs/serialfs/serialfs.c', 'sys/fs/serialfs/serialfs_persistent.c',
+            'sys/fs/vfs.c', 'sys/fs/vfs_fd.c', 'sys/kern/kstring_c.c', 'sys/net/host_mailbox.c']]
     if extra:
         target, old, new = extra
         text = (ROOT / target).read_text()
@@ -72,7 +72,7 @@ def exercise(folder, source, extra=None):
     return result.returncode
 
 def main():
-    source = (ROOT / 'platform/powermac/hostfs_link_io.c').read_text()
+    source = (ROOT / 'sys/platform/powermac/hostfs_link_io.c').read_text()
     with tempfile.TemporaryDirectory(prefix='ppc-hostfs-link-') as td:
         work = Path(td)
         assert exercise(work / 'control', source) == 0
@@ -83,11 +83,11 @@ def main():
                 assert exercise(work / str(i), source.replace(old, new)) == 1, name
                 print('RED runtime:', name, flush=True)
             for i, extra in enumerate([
-                ('platform/powermac/hostfs_boot.c', 'if (!rc) rc = sfs_persistent_start(&cfg);', '(void)cfg;'),
-                ('platform/powermac/hostfs_link_peer.c', 'return fixed ? allowed : 0;', 'return 0;'),
-                ('fs/serialfs/serialfs_persistent.c', 'if (!host_valid) reconnect = 1;', 'reconnect = 1;'),
-                ('fs/serialfs/serialfs_persistent.c', 'if (host_valid && host_generation != generation)', 'if (0 && host_valid && host_generation != generation)'),
-                ('platform/powermac/hostfs_link_peer.c', '.peer_valid = peer != 0', '.peer_valid = 1'),
+                ('sys/platform/powermac/hostfs_boot.c', 'if (!rc) rc = sfs_persistent_start(&cfg);', '(void)cfg;'),
+                ('sys/platform/powermac/hostfs_link_peer.c', 'return fixed ? allowed : 0;', 'return 0;'),
+                ('sys/fs/serialfs/serialfs_persistent.c', 'if (!host_valid) reconnect = 1;', 'reconnect = 1;'),
+                ('sys/fs/serialfs/serialfs_persistent.c', 'if (host_valid && host_generation != generation)', 'if (0 && host_valid && host_generation != generation)'),
+                ('sys/platform/powermac/hostfs_link_peer.c', '.peer_valid = peer != 0', '.peer_valid = 1'),
             ]):
                 assert exercise(work / f'integration{i}', source, extra) == 1, extra[0]
                 print('RED runtime:', extra[0], flush=True)

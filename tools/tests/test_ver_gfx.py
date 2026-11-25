@@ -10,7 +10,7 @@ import tempfile
 import host32
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = 'gfx/gfx_core_api.inc'
+SOURCE = 'sys/hal/gfx/gfx_core_api.inc'
 MUTATIONS = [
     ('active-always', '*active = gfx_started != 0;', '*active = 1;', 'active == 0'),
     ('target-height', 'else if (mode) info.height = mode->height;',
@@ -114,7 +114,7 @@ def run(runner, mutation=None):
     start = text.index('int gfx_ver_state(')
     end = text.index('\n/* ======================================================================== */', start)
     getter = text[start:end]
-    provider = (ROOT / 'platform/pc98/gfx_selector_lifecycle.inc').read_text()
+    provider = (ROOT / 'sys/platform/pc98/gfx_selector_lifecycle.inc').read_text()
     provider = provider[provider.index('u32 display_provider_ver_kind('):provider.index('void display_provider_prepare_failed(')]
     if mutation:
         _, old, new, _ = mutation

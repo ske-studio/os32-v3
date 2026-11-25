@@ -14,11 +14,11 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 MIRRORS = {
-    # 起動の番地は機種のヘッダ、KIB・MEM_1MB・KERNEL_LOAD_ADDR はそれが読む include/memmap.h。
-    "memmap_defs.inc": "platform/pc98/platform_boot_layout.h",
-    "pc98_defs.inc": "include/pc98.h",
-    "gdt_defs.inc": "arch/x86/kernel/gdt.h",
-    "hex_defs.inc": "lib/kstring.h",
+    # 起動の番地は機種のヘッダ、KIB・MEM_1MB・KERNEL_LOAD_ADDR はそれが読む sys/include/memmap.h。
+    "memmap_defs.inc": "sys/platform/pc98/platform_boot_layout.h",
+    "pc98_defs.inc": "sys/platform/pc98/pc98.h",
+    "gdt_defs.inc": "sys/arch/x86/kernel/gdt.h",
+    "hex_defs.inc": "sys/kern/kstring.h",
 }
 
 
@@ -63,7 +63,7 @@ def main():
                             ld_text, re.M)
         assert address, "loader.ld must name its load address"
         assert re.search(r'\.\s*=\s*MEM_LOADER_START;', ld_text)
-        check_c("platform/pc98/platform_boot_layout.h", [("MEM_LOADER_START",
+        check_c("sys/platform/pc98/platform_boot_layout.h", [("MEM_LOADER_START",
                                          int(address[1], 16))])
         # Local wire-format/policy constants also get independent fixed values.
         local = {
@@ -101,7 +101,7 @@ def main():
         # The wire header/entry sizes already have C canonical definitions.
         names = ["VK32_COMMON_SIZE", "VK32_ENTRY_SIZE"]
         check_c("boot/boot_defs.h", zip(names, asm_values(tmp, "vk32_defs.inc", names)))
-        check_c("platform/pc98/bootinfo_wire.h", [("BOOTINFO_DA_HD1", 0x81)])
+        check_c("sys/platform/pc98/bootinfo_wire.h", [("BOOTINFO_DA_HD1", 0x81)])
         # Compile the CRC canonical definition with the types it requires.
         source = ('typedef unsigned char u8; typedef unsigned int u32;\n'
                   '#include "lib/crc32_core.inc"\n'

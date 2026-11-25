@@ -445,38 +445,38 @@ def run(overrides=None):
                               ('input','SC_STOP','KEY_STOP'), ('input','MOD_CTRL','SHIFT_CTRL')]:
         value=re.search(r'const '+rname+r': \w+ = (0x[0-9a-fA-F]+|[0-9]+);',read('userland/gshell/src/'+rust+'.rs'))[1]
         constants += '_Static_assert('+cname+' == '+value+', "'+rname+'");\n'
-    transition = read('exec/appslot_transition.inc').replace(
-        '#include "appslot_park.inc"', read('exec/appslot_park.inc'))
+    transition = read('sys/kern/exec/appslot_transition.inc').replace(
+        '#include "appslot_park.inc"', read('sys/kern/exec/appslot_park.inc'))
     hwb_flag = re.search(r'^static volatile u32 g_hwb_abort_pending = 0;', ex, re.M)[0]
     hwb_flag += '\nint input_display_restore_capture(u32 owner) { (void)owner; return 0; }\nint input_display_restore_drain(void) { return 0; }\n'
-    code = PRE + constants + hwb_flag + '\n' + read('exec/appslot.c').replace(
+    code = PRE + constants + hwb_flag + '\n' + read('sys/kern/exec/appslot.c').replace(
         '#include "appslot_transition.inc"', transition) + '\n' + syscall_providers(ROOT, read) + '\n'.join(function(ex,n) for n in (
         'exec_cui_display_abort','ring3_abort_request','ring3_abort_check','exec_park_transfer','exec_park_stop','exec_syscall_dispatch')) + '\n' + resume + '\n'
-    deliver = function(read('input/hal/legacy_keymap.c'), 'input_emit_keymap')
+    deliver = function(read('sys/hal/input/legacy_keymap.c'), 'input_emit_keymap')
     raw = deliver[deliver.index('    if (kbd_gui_mode) {'):deliver.index('    if (consumed')]
     raw = raw.replace('sc != 0xff && raw_due', '1').replace('sc != 0xff && ', '').replace('physical_mods', 'mods').replace('!down', 'is_break').replace('sc,', 'keycode,').replace('mods', 'kbd_shift_state')
     code += 'int in2_excl_drop_raw(u8 sc, int br) { (void)sc; (void)br; return 0; }\n'
-    code += function(read('input/hal/legacy_ring.c'), 'keep_raw') + '\n'
-    ring = read('input/hal/legacy_ring.c')
+    code += function(read('sys/hal/input/legacy_ring.c'), 'keep_raw') + '\n'
+    ring = read('sys/hal/input/legacy_ring.c')
     code += ring[ring.index('enum raw_priority'):ring.index('void kbd_raw_purge_keep')]
     code += function(ring, 'make_room') + '\n'
     code += function(ring, 'append_raw') + '\n'
     code += function(ring, 'has_ctrl_stop') + '\n'
     code += function(ring, 'legacy_raw_push') + '\n'
-    mode = read('input/hal/legacy_mode.c')
+    mode = read('sys/hal/input/legacy_mode.c')
     code += function(mode, 'legacy_stop_filter') + '\n'
     code += 'static void raw_enqueue(int keycode, int is_break, int kbd_shift_state) {\n' + raw + '}\n'
-    code += function(read('input/hal/legacy_ring.c'), 'legacy_raw_discard_stop') + '\n'
+    code += function(read('sys/hal/input/legacy_ring.c'), 'legacy_raw_discard_stop') + '\n'
     code += function(mode, 'kbd_discard_stop') + '\n'
-    code += function(read('kernel/gui.c'), 'gui_owner_exit') + '\n'
-    code += read('kernel/input_service.c') + '\nstatic InputOps kstop_input;\n'
+    code += function(read('sys/kern/gui.c'), 'gui_owner_exit') + '\n'
+    code += read('sys/hal/input/input_service.c') + '\nstatic InputOps kstop_input;\n'
     code += POST.replace('void _start(void) {', 'void _start(void) { kstop_input = empty_input; kstop_input.gui_mode = kbd_set_gui_mode; input_register(&kstop_input);')
     with tempfile.TemporaryDirectory(prefix='os32-kstop-') as d:
         d=pathlib.Path(d)
-        (d/'provider.c').write_text(read('arch/x86/kernel/exec_context.c'))
+        (d/'provider.c').write_text(read('sys/arch/x86/kernel/exec_context.c'))
         code = '#define HOST_EXEC_CONTEXT_SOURCE "' + str(d/'provider.c') + '"\n' + code
         (d/'t.c').write_text(code)
-        (d/'s.asm').write_text((ROOT/'arch/x86/kernel/setjmp.asm').read_text().replace('exec_longjmp','asm_longjmp'))
+        (d/'s.asm').write_text((ROOT/'sys/arch/x86/kernel/setjmp.asm').read_text().replace('exec_longjmp','asm_longjmp'))
         subprocess.run(['nasm','-f','elf32',str(d/'s.asm'),'-o',str(d/'s.o')],check=True,capture_output=True)
         inc=(['-I' + str(ROOT / p) for p in ('tools/tests', 'tools/tests/host_arch')] + include_flags(ROOT))
         r=subprocess.run(['gcc','-m32','-std=gnu11','-O0','-Wall','-Werror','-Wno-unused-function',
@@ -487,42 +487,42 @@ def run(overrides=None):
         return ('pass' if r.returncode==0 else 'runtime'),r.stdout+r.stderr
 
 MUTATIONS = [
- ('provider-syscall-result', 'arch/x86/kernel/exec_context.c',
+ ('provider-syscall-result', 'sys/arch/x86/kernel/exec_context.c',
   '    ((u32 *)call->native)[FRAME_EAX] = result;',
   '    ((u32 *)call->native)[FRAME_EAX] = result + 1;'),
- ('provider-save-frame', 'arch/x86/kernel/exec_context.c',
+ ('provider-save-frame', 'sys/arch/x86/kernel/exec_context.c',
   '    __builtin_memcpy(out->opaque, call->native, sizeof(out->opaque));',
   '    __builtin_memcpy(out->opaque, call->native, sizeof(out->opaque) - sizeof(u32));'),
- ('culprit-ignore-mark','exec/appslot_transition.inc',
+ ('culprit-ignore-mark','sys/kern/exec/appslot_transition.inc',
   'a && a->state == APP_STATE_WAIT_POLL && a->parked_from_stop)',
   'a && a->state == APP_STATE_WAIT_POLL)'),
- ('culprit-ignore-state','exec/appslot_transition.inc',
+ ('culprit-ignore-state','sys/kern/exec/appslot_transition.inc',
   'a && a->state == APP_STATE_WAIT_POLL && a->parked_from_stop)',
   'a && a->parked_from_stop)'),
- ('culprit-ignore-owner','exec/appslot_transition.inc',
+ ('culprit-ignore-owner','sys/kern/exec/appslot_transition.inc',
   'int appslot_stop_culprit(void)\n{\n    if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;',
   'int appslot_stop_culprit(void)\n{'),
- ('lost-shell-request','exec/appslot_transition.inc','        g_slot[APP_ID_SHELL].stop_wm_req = 1;','        g_slot[APP_ID_SHELL].stop_wm_req = 0;'),
- ('ignore-shell-request','exec/appslot_transition.inc','    return g_slot[APP_ID_SHELL].stop_wm_req || (a && a->stop_wm_req);','    return a && a->stop_wm_req;'),
- ('lost-notice-kind','kernel/gui.c','g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);','g_gui_handler(GUI_OP_OWNER_EXIT, 0, owner);'),
- ('no-request','exec/exec_abort.inc','        appslot_stop_request();','        /* missing request */'),
- ('no-safe-transfer','exec/exec_syscall.inc','    exec_park_stop(&call);','    /* missing transfer */'),
- ('before-completion','exec/exec_syscall.inc','    result = arch_kapi_invoke','    exec_park_stop(&call);\n    result = arch_kapi_invoke'),
- ('eax-clobber','exec/exec_schedule.inc','        /* STOP parked a completed syscall;', '        arch_user_result(&a->frame, (u32)wait_ret);\n        /* STOP parked a completed syscall;'),
- ('wrong-owner','exec/appslot_transition.inc','    a->parked_from_stop = 1;', '    g_slot[3].abort_req = 1;\n    a->parked_from_stop = 1;'),
- ('stale-request','exec/appslot_transition.inc','    a->stop_wm_req = 0;\n    g_slot[APP_ID_SHELL].stop_wm_req = 0;\n    ring3_stop_park_count++;\n    a->parked_from_stop = 1;', '    a->parked_from_stop = 1;'),
- ('no-mark','exec/appslot_transition.inc','    a->parked_from_stop = 1;', '    a->parked_from_stop = 0;'),
- ('raw-stop-retained','input/hal/legacy_ring.c','(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;', '(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) { /* retain */ }'),
+ ('lost-shell-request','sys/kern/exec/appslot_transition.inc','        g_slot[APP_ID_SHELL].stop_wm_req = 1;','        g_slot[APP_ID_SHELL].stop_wm_req = 0;'),
+ ('ignore-shell-request','sys/kern/exec/appslot_transition.inc','    return g_slot[APP_ID_SHELL].stop_wm_req || (a && a->stop_wm_req);','    return a && a->stop_wm_req;'),
+ ('lost-notice-kind','sys/kern/gui.c','g_gui_handler(GUI_OP_OWNER_EXIT, (u32)kind, owner);','g_gui_handler(GUI_OP_OWNER_EXIT, 0, owner);'),
+ ('no-request','sys/kern/exec/exec_abort.inc','        appslot_stop_request();','        /* missing request */'),
+ ('no-safe-transfer','sys/kern/exec/exec_syscall.inc','    exec_park_stop(&call);','    /* missing transfer */'),
+ ('before-completion','sys/kern/exec/exec_syscall.inc','    result = arch_kapi_invoke','    exec_park_stop(&call);\n    result = arch_kapi_invoke'),
+ ('eax-clobber','sys/kern/exec/exec_schedule.inc','        /* STOP parked a completed syscall;', '        arch_user_result(&a->frame, (u32)wait_ret);\n        /* STOP parked a completed syscall;'),
+ ('wrong-owner','sys/kern/exec/appslot_transition.inc','    a->parked_from_stop = 1;', '    g_slot[3].abort_req = 1;\n    a->parked_from_stop = 1;'),
+ ('stale-request','sys/kern/exec/appslot_transition.inc','    a->stop_wm_req = 0;\n    g_slot[APP_ID_SHELL].stop_wm_req = 0;\n    ring3_stop_park_count++;\n    a->parked_from_stop = 1;', '    a->parked_from_stop = 1;'),
+ ('no-mark','sys/kern/exec/appslot_transition.inc','    a->parked_from_stop = 1;', '    a->parked_from_stop = 0;'),
+ ('raw-stop-retained','sys/hal/input/legacy_ring.c','(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) continue;', '(raw & (SHIFT_CTRL << KBD_RAW_MOD_SHIFT))) { /* retain */ }'),
 ]
 # Function-scoped replacements, each with exactly one match.
 for guard in ('!a->cpl3 ||', 'a != g_cur_app ||', 'a->in_op_wait ||',
               'ring3_wm_depth ||', 'kctx_irq_depth ||', 'kctx_exc_depth'):
     src = function(exec_source(ROOT), 'exec_park_stop')
     assert src.count(guard)==1
-    MUTATIONS.append(('guard-'+guard, 'exec/exec_syscall.inc', src, src.replace(guard, '0' if guard=='kctx_exc_depth' else '')))
+    MUTATIONS.append(('guard-'+guard, 'sys/kern/exec/exec_syscall.inc', src, src.replace(guard, '0' if guard=='kctx_exc_depth' else '')))
 for name, origin in (('appslot_park_commit', 'wait'), ('appslot_park_kbd_commit', 'kbd'),
                      ('appslot_park_poll_commit', 'poll'), ('appslot_park_yield_commit', 'yield')):
-    path = 'exec/appslot_park.inc'
+    path = 'sys/kern/exec/appslot_park.inc'
     src = function((ROOT/path).read_text(), 'appslot_park_commit_origin')
     for line in src.splitlines():
         if 'stop_wm_req = 0;' in line:
@@ -531,19 +531,19 @@ for name, origin in (('appslot_park_commit', 'wait'), ('appslot_park_kbd_commit'
             conditional = f'    if (origin != &a->parked_from_{origin}) {line.strip()}'
             MUTATIONS.append((name+'-'+line.strip(), path, src, src.replace(line, conditional)))
 for name in ('appslot_abort_clear','appslot_start_commit','appslot_resume_commit'):
-    path = 'exec/appslot.c' if name in ('appslot_abort_clear', 'appslot_start_commit') else 'exec/appslot_transition.inc'
+    path = 'sys/kern/exec/appslot.c' if name in ('appslot_abort_clear', 'appslot_start_commit') else 'sys/kern/exec/appslot_transition.inc'
     src = function((ROOT/path).read_text(),name)
     for line in src.splitlines():
         if 'stop_wm_req = 0;' in line:
             assert src.count(line)==1
             MUTATIONS.append((name+'-'+line.strip(), path,src,src.replace(line,'')))
-src = (ROOT/'exec/appslot.c').read_text()
+src = (ROOT/'sys/kern/exec/appslot.c').read_text()
 a=src.index('u32 appslot_reclaim('); b=src.index('\n}',a)+2
 src=src[a:b]
-MUTATIONS.append(('reclaim-shell-request','exec/appslot.c',src,src.replace('    g_slot[APP_ID_SHELL].stop_wm_req = 0;','')))
-src=function((ROOT/'exec/appslot_transition.inc').read_text(),'appslot_stop_request')
-MUTATIONS.append(('request-non-gui','exec/appslot_transition.inc',src,src.replace('a->gui && ','')))
-MUTATIONS.append(('raw-full-loses-stop','input/hal/legacy_ring.c',
+MUTATIONS.append(('reclaim-shell-request','sys/kern/exec/appslot.c',src,src.replace('    g_slot[APP_ID_SHELL].stop_wm_req = 0;','')))
+src=function((ROOT/'sys/kern/exec/appslot_transition.inc').read_text(),'appslot_stop_request')
+MUTATIONS.append(('request-non-gui','sys/kern/exec/appslot_transition.inc',src,src.replace('a->gui && ','')))
+MUTATIONS.append(('raw-full-loses-stop','sys/hal/input/legacy_ring.c',
     'int stop = keycode == KEY_STOP && !is_break && (mods & SHIFT_CTRL);',
     'int stop = 0;'))
 
@@ -551,7 +551,7 @@ for name, guard in (('raw-full-replaces-break', '!is_break && '),
                     ('raw-full-replaces-without-ctrl', ' && (mods & SHIFT_CTRL)')):
     old = 'int stop = keycode == KEY_STOP && !is_break && (mods & SHIFT_CTRL);'
     assert old.count(guard) == 1
-    MUTATIONS.append((name, 'input/hal/legacy_ring.c', old, old.replace(guard, '')))
+    MUTATIONS.append((name, 'sys/hal/input/legacy_ring.c', old, old.replace(guard, '')))
 
 # Resume-mark cases must catch regressions without the boot selftest.
 for name, fn, old, new in (
@@ -565,9 +565,9 @@ for name, fn, old, new in (
     ('poll-throttle', 'appslot_park_poll_check', 'now_tick == g_poll_last_tick', '0'),
     ('poll-attempt-tick', 'appslot_park_poll_check', 'g_poll_last_tick = now_tick;', ';'),
 ):
-    src = function((ROOT/'exec/appslot_transition.inc').read_text(), fn)
+    src = function((ROOT/'sys/kern/exec/appslot_transition.inc').read_text(), fn)
     assert old in src
-    MUTATIONS.append((name, 'exec/appslot_transition.inc', src, src.replace(old, new)))
+    MUTATIONS.append((name, 'sys/kern/exec/appslot_transition.inc', src, src.replace(old, new)))
 
 for name, fn, old, new in (
     ('wait-op-gate', 'appslot_park_check', '!g_cur_op_is_wait ||', '0 ||'),
@@ -579,13 +579,13 @@ for name, fn, old, new in (
     ('poll-yield-count', 'appslot_park_poll_commit', 'ring3_poll_yield_count++;', ';'),
     ('yield-count', 'appslot_park_yield_commit', 'ring3_yield_count++;', ';'),
 ):
-    src = function((ROOT/'exec/appslot_transition.inc').read_text(), fn)
+    src = function((ROOT/'sys/kern/exec/appslot_transition.inc').read_text(), fn)
     assert old in src
-    MUTATIONS.append((name, 'exec/appslot_transition.inc', src, src.replace(old, new)))
+    MUTATIONS.append((name, 'sys/kern/exec/appslot_transition.inc', src, src.replace(old, new)))
 for origin in ('wait', 'kbd', 'poll', 'yield'):
     old = f'&a->parked_from_{origin},'
     new = '&a->parked_from_stop,'
-    MUTATIONS.append((origin+'-park-origin', 'exec/appslot_transition.inc', old, new))
+    MUTATIONS.append((origin+'-park-origin', 'sys/kern/exec/appslot_transition.inc', old, new))
 
 if __name__ == '__main__':
     status,log=run(); print('kstop control:',status,log,flush=True)

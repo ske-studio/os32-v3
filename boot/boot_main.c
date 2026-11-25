@@ -9,8 +9,8 @@
 /* ======================================================================== */
 
 #include "boot_defs.h"
-#include "../include/pc98.h"
-#include "pc98pt.h"   /* 区画表の共有部 (fs/pc98pt.c、票 TASK_HDD_INSTALL 段 1-4) */
+#include "../sys/platform/pc98/pc98.h"
+#include "pc98pt.h"   /* 区画表の共有部 (sys/fs/pc98pt.c、票 TASK_HDD_INSTALL 段 1-4) */
 
 #define BOOT_ERR_NOT_FOUND (-2)
 #define BOOT_ERR_TOO_BIG   (-6)
@@ -39,7 +39,7 @@ static int find_partition(u32 *out_lba)
 }
 
 /* ================================================================ */
-/*  ブート情報域のイメージ欄 (正典 platform/pc98/bootinfo_wire.h、写しは boot_defs.h) */
+/*  ブート情報域のイメージ欄 (正典 sys/platform/pc98/bootinfo_wire.h、写しは boot_defs.h) */
 /* ================================================================ */
 static void wr32_low(u32 addr, u32 v)
 {
@@ -112,7 +112,7 @@ int boot_main(void)
         return BOOT_ERR_IMAGE;
     }
 
-    /* 6. 起動したイメージの CRC をブート情報域へ (platform/pc98/bootinfo_wire.h の
+    /* 6. 起動したイメージの CRC をブート情報域へ (sys/platform/pc98/bootinfo_wire.h の
      *    イメージ欄)。主部は実モードで封じ済み — イメージ欄は自分の
      *    チェック語を**最後に**書く。 */
     bootinfo_set_image(img_crc, (u32)file_size);

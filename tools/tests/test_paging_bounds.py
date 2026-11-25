@@ -15,15 +15,15 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-Wall', '-Wextra', '-Werror']
 with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
     tmp = pathlib.Path(tmp)
-    source = paging_source(ROOT / 'mm/paging.c')
+    source = paging_source(ROOT / 'sys/kern/mm/paging.c')
     (tmp / 'paging_host_source.c').write_text(source)
-    allocator = (ROOT / 'mm/pgalloc.c').read_text()
+    allocator = (ROOT / 'sys/kern/mm/pgalloc.c').read_text()
     for part in ('owner', 'resource', 'surface'):
         allocator = allocator.replace(
             f'#include "pgalloc_{part}.inc"', (ROOT / f'mm/pgalloc_{part}.inc').read_text())
     allocator = allocator.replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags')
     (tmp / 'pgalloc_host_source.c').write_text(allocator)
-    # arch/x86 + platform/pc98: include/io.h / include/cpu.h は契約だけで、
+    # arch/x86 + platform/pc98: sys/include/io.h / sys/include/cpu.h は契約だけで、
     # 実装は固定名 arch_io.h / arch_cpu.h / platform_io.h を引く (順序 3・5)。
     # build/config.mk の INC_COMMON と同じものをここでも渡す。
     includes = include_flags(ROOT) + ['-I' + str(tmp)]
@@ -35,10 +35,10 @@ with tempfile.TemporaryDirectory(prefix='os32-paging-') as tmp:
     defines = ['-DPHYSMEM_HOST_TEST=1', ]
     if args.rebuild:
         defines.append('-DTEST_' + args.rebuild.upper())
-    build = ['gcc', *FLAGS, *defines, '-nostdlib', '-static', '-no-pie', *host_includes, str(ROOT / 'tools/tests' / harness), str(ROOT / 'mm/physmem.c'), '-o', str(exe)]
+    build = ['gcc', *FLAGS, *defines, '-nostdlib', '-static', '-no-pie', *host_includes, str(ROOT / 'tools/tests' / harness), str(ROOT / 'sys/kern/mm/physmem.c'), '-o', str(exe)]
     subprocess.run(build, check=True)
     host32.run([str(exe)], check=True, timeout=60)
-    subprocess.run(['i386-elf-gcc', *FLAGS, *defines, '-O2', *includes, '-c', str(ROOT / 'mm/paging.c'), '-o', str(tmp / 'paging.o')], check=True)
+    subprocess.run(['i386-elf-gcc', *FLAGS, *defines, '-O2', *includes, '-c', str(ROOT / 'sys/kern/mm/paging.c'), '-o', str(tmp / 'paging.o')], check=True)
     print('HOST ILP32 + TARGET GNU11 PASS')
 
     if args.mutate:

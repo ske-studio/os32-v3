@@ -7,7 +7,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'hwdev/gf/accel_rop3.c'
+SOURCE = ROOT / 'sys/dev/video/geforce/accel_rop3.c'
 
 def observe(work, source):
     path = work / 'accel_rop3.c'

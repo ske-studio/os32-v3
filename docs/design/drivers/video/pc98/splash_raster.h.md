@@ -1,7 +1,7 @@
-# drivers/video/pc98/splash_raster.h — 走査の判定の状態と内部の口
+# sys/platform/pc98/video/splash_raster.h — 走査の判定の状態と内部の口
 
 > 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
-ソース: `drivers/video/pc98/splash_raster.h`
+ソース: `sys/platform/pc98/video/splash_raster.h`
 
 ## 何をするか
 
@@ -9,7 +9,7 @@ PC-98 標準の 16 色の画面で、行ごとにパレットを書き換える�
 
 ## 周期の定数 (Subsystem 層)
 
-行の周期は µs の有理数 `SPLASH_RASTER_LINE_NUM_US / den` で表す (分子 100000)。値は `include/pegc.h` の 400 行の SYNC の表 (`PEGC_GDC_MSYNC_400`・`PEGC_GDC_MSYNC_400_31K`) から実行時に取り出す。
+行の周期は µs の有理数 `SPLASH_RASTER_LINE_NUM_US / den` で表す (分子 100000)。値は `sys/platform/pc98/pegc.h` の 400 行の SYNC の表 (`PEGC_GDC_MSYNC_400`・`PEGC_GDC_MSYNC_400_31K`) から実行時に取り出す。
 
 | 周波数 | den | 1 行 | 総行数 | VS | VBP | 1 フレーム |
 |---|---|---|---|---|---|---|
@@ -29,13 +29,13 @@ PC-98 標準の 16 色の画面で、行ごとにパレットを書き換える�
 ## 寿命と口の契約
 
 - 状態の実体は `splash_raster.c` の static 1 つ。`pc98_splash_raster_state()` は初回の利用で `begin` を呼び (遅延判定)、以後は同じ状態を貸す。
-- `pc98_splash_raster_reset()` は、gfx の初期化の入口 (`gfx/gfx_core_init.inc`) と `gfx_shutdown` (`gfx/gfx_core.c`) から `display_provider_raster_reset` (`platform/pc98/gfx_selector_lifecycle.inc`) 経由で呼ばれる。判定の結果を次の gfx_init へ持ち越さない。
+- `pc98_splash_raster_reset()` は、gfx の初期化の入口 (`sys/hal/gfx/gfx_core_init.inc`) と `gfx_shutdown` (`sys/hal/gfx/gfx_core.c`) から `display_provider_raster_reset` (`sys/platform/pc98/gfx_selector_lifecycle.inc`) 経由で呼ばれる。判定の結果を次の gfx_init へ持ち越さない。
 - `begin`・`frame`・`table` は `SPLASH_RASTER_OK` (0) か `SPLASH_RASTER_NO_SYNC` (-1) を返し、last_result にも残す。
 - 行ごとの画像の再生 (`pl_v2_*`) は別のファイル ([splash_raster_play.c](splash_raster_play.c.md)) で、この状態を借りるだけ。
 
 ## 診断だけの型
 
 - `SPLASH_RASTER_DIAG` の内側の型 (`SplashRasterProbeCost`・`ProbeEntry`・`EventDiag`・`Diag`) と `pc98_splash_raster_diag()` は診断の像だけにある。記録は次の frame/reset まで借りる。
-- `SplashRasterBudget`・`SplashRasterEntryBudget`・`SplashRasterImageBudget`・`enum SplashRasterWave`・`SPLASH_RASTER_IMAGE_OUTS` (5)・`IMAGE_DIAG_OUTS` (6) は、いまは診断の probe (`platform/pc98/splash_probe.c`) だけが使う。通常の再生は使わない。
+- `SplashRasterBudget`・`SplashRasterEntryBudget`・`SplashRasterImageBudget`・`enum SplashRasterWave`・`SPLASH_RASTER_IMAGE_OUTS` (5)・`IMAGE_DIAG_OUTS` (6) は、いまは診断の probe (`sys/platform/pc98/splash_probe.c`) だけが使う。通常の再生は使わない。
 - 予算の式の意味 (ヘッダのコメント): Q はサンプル間隔 (IN と比較と計数を含む)、D は成功した IN から列の開始まで、W は列全体、B は bit6 の高の幅、E は誤差。採否は `Q+D+W+E < B_min` と `Q < min(B_min, H_min−B_max)`。単位は 1/den µs の整数比。
 - `SPLASH_RASTER_PER_LINE` は使う所が無い。

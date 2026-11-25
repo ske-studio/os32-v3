@@ -1,0 +1,1195 @@
+/* ======================================================================== */
+/*  IME_DICT.C - FEP辞書検索エンジン (SQLite ベース)                         */
+/*                                                                          */
+/*  カーネルVFS上のSQLite DBファイルを辞書バックエンドとして使用する。        */
+/*  SQLite は resident outer facade 経由で typed module export を呼ぶ。               */
+/*                                                                          */
+/*  検索モード:                                                              */
+/*    - 2文字以下: 完全一致 (変換キー押下時のみ呼ばれる前提)                 */
+/*    - 3文字以上: 前方一致 (範囲検索でインデックス活用)                     */
+/* ======================================================================== */
+
+#define IME_NONSHORTENING_COST_PENALTY 300 /* 非負のコストで、候補のバイト長が読み以上のときに足す */
+/* 辞書の種類と操作ごとの失敗の値は ABI の値のまま。 */
+#define IME_DICT_ERR_EXACT_PREPARE (-2)
+#define IME_DICT_ERR_PREFIX_PREPARE (-3)
+#define IME_DICT_ERR_USER_LIST     (-4)
+#define IME_DICT_ERR_DELETE_PREPARE (-2)
+#define IME_DICT_ERR_DELETE_EXEC   (-3)
+#define IME_DICT_ERR_EXPORT_OPEN   (-2)
+#define IME_DICT_ERR_EXPORT_PREPARE (-3)
+#define IME_DICT_ERR_EXPORT_READ   (-4)
+#define IME_DICT_ERR_EXPORT_WRITE  (-5)
+#define IME_DICT_ERR_CLEAR         (-2)
+#include "ime.h"
+#include "../sqlite_engine.h"
+#include "sqlite3.h"
+#include "os32_sqlite_outer.h"
+#include "vfs.h"
+#include "utf8.h"
+#include "kprintf.h"
+#include "serial_contract.h"
+#include "kstring.h"
+#include "../mm/kmalloc.h"
+#include "os32_kapi_shared.h"
+#include "os32_sqlite_vfs.h"
+
+#ifdef OS32_FEP_MODULE
+#include "fep_imports.h"
+#define services_stage fep_services_stage()
+#define services_boot_fault fep_services_boot_fault()
+#endif
+
+
+/* Opt-in T4b-7 guest probe. No KAPI argument or normal-build behavior change.
+ * 100Hz ticks let keyboard IRQs arrive while internal logging is still active.
+ * Force this object to rebuild when toggling KERNEL_CFLAGS_EXTRA (see TDD). */
+#if defined(OS32_RAW_WAIT_LOG_TICKS) && OS32_RAW_WAIT_LOG_TICKS > 0
+#include "io.h"
+#ifdef OS32_FEP_MODULE
+#define tick_count ktime_ticks()
+#else
+extern volatile u32 tick_count;
+#endif
+extern int ring3_call_from_user(void);
+static void ime_dict_log_probe(void)
+{
+    if (!ring3_call_from_user()) return;
+    u32 start = tick_count;
+    serial_puts("raw_wait LOG BEGIN\r\n");
+    while ((u32)(tick_count - start) < OS32_RAW_WAIT_LOG_TICKS) {
+        u32 tick = tick_count;
+        serial_puts(".");
+        while (tick_count == tick) io_wait();
+    }
+    serial_puts("\r\nraw_wait LOG END\r\n");
+}
+#endif
+
+/* プリペアドステートメントのSQL */
+static const char SQL_EXACT[] =
+    "SELECT kanji, pos_id, cost FROM ("
+    "  SELECT kanji, 0 as pos_id, (-10000 - freq) as cost FROM dict_user WHERE yomi = ?1"
+    "  UNION ALL "
+    "  SELECT kanji, pos_id, cost FROM dict WHERE yomi = ?1"
+    ") ORDER BY cost LIMIT 32";
+
+static const char SQL_PREFIX[] =
+    "SELECT kanji, pos_id, cost FROM ("
+    "  SELECT kanji, 0 as pos_id, (-10000 - freq) as cost"
+    "    FROM dict_user WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
+    "  UNION ALL "
+    "  SELECT kanji, pos_id,"
+    "    CASE WHEN yomi = ?1 THEN cost - 500 ELSE cost END as cost"
+    "    FROM dict WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF'"
+    ") ORDER BY cost LIMIT 32";
+
+static const char SQL_LEARN[] =
+    "INSERT INTO dict_user (yomi, kanji, freq, last_ts) "
+    "SELECT ?1, ?2, 1, CASE WHEN MAX(last_ts)>=9223372036854775807 "
+    "THEN COUNT(*)+1 ELSE COALESCE(MAX(last_ts),0)+1 END FROM dict_user WHERE yomi=?1 "
+    /* At saturation, compact older ranks in the same atomic write. The
+     * number of earlier rows preserves ties and leaves the new rank highest. */
+    "UNION ALL SELECT ?1, u.kanji, 0, (SELECT COUNT(*) FROM dict_user AS older "
+    "WHERE older.yomi=?1 AND older.last_ts<u.last_ts) FROM dict_user AS u "
+    "WHERE (SELECT MAX(last_ts) FROM dict_user WHERE yomi=?1)>=9223372036854775807 "
+    "AND u.yomi=?1 AND u.kanji<>?2 "
+    "ON CONFLICT(yomi, kanji) DO UPDATE SET "
+    "freq = freq + excluded.freq, last_ts = excluded.last_ts";
+
+/* ======================================================================== */
+/*  公開API                                                                  */
+/* ======================================================================== */
+
+int ime_dict_open(IME_Dict *dict, const char *path)
+{
+    if (!SQLITE_OUTER_READY(1)) return -1;
+    sqlite3 *db = 0;
+    sqlite3_stmt *stmt;
+    int rc;
+
+    if (dict->isolated || dict->db) return -1;
+    kmemset(dict, 0, sizeof(IME_Dict));
+    if (os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 0, &dict->group)
+            != SQLITE_OK) return -1;
+    /* 開き直しに使う名前。収まらなければ覚えない (= 開き直さない)。
+     * 切り詰めた名前で別の DB を開き直さない */
+    if (path && kstrlen(path) < sizeof(dict->path))
+        kstrncpy(dict->path, path, sizeof(dict->path));
+
+    /* DBファイルを読み書き可能で開く (ユーザー辞書のため) */
+    rc = os32_sqlite_group_open(&dict->group, path, SQLITE_OPEN_READWRITE, &db);
+    dict->db = db;
+    if (rc != SQLITE_OK) {
+        kprintf(ATTR_RED, "IME: sqlite3_open failed: %s (rc=%d)\r\n",
+                path, rc);
+        (void)ime_dict_close(dict);
+        return -1;
+    }
+    dict->db = (void *)db;
+
+    /* 学習用テーブルの作成 (存在しない場合) */
+    rc = sqlite3_exec(db,
+        "CREATE TABLE IF NOT EXISTS dict_user ("
+        "  yomi TEXT NOT NULL,"
+        "  kanji TEXT NOT NULL,"
+        "  freq INTEGER DEFAULT 1,"
+        "  last_ts INTEGER DEFAULT 0,"
+        "  PRIMARY KEY (yomi, kanji)"
+        ");"
+        "CREATE INDEX IF NOT EXISTS idx_user_yomi ON dict_user(yomi);",
+        0, 0, 0);
+    if (rc != SQLITE_OK) {
+        kprintf(ATTR_RED, "IME: create user dict failed (rc=%d)\r\n", rc);
+        /* 学習はできないが検索は続行するためエラーにはしない */
+    }
+
+    /* 完全一致検索用プリペアドステートメント */
+    rc = sqlite3_prepare_v2(db, SQL_EXACT, -1, &stmt, (const char **)0);
+    if (rc != SQLITE_OK) {
+        kprintf(ATTR_RED, "IME: prepare exact failed (rc=%d)\r\n", rc);
+        (void)ime_dict_close(dict);
+        return IME_DICT_ERR_EXACT_PREPARE;
+    }
+    dict->exact_stmt = (void *)stmt;
+
+    /* 前方一致検索用プリペアドステートメント */
+    rc = sqlite3_prepare_v2(db, SQL_PREFIX, -1, &stmt, (const char **)0);
+    if (rc != SQLITE_OK) {
+        kprintf(ATTR_RED, "IME: prepare prefix failed (rc=%d)\r\n", rc);
+        (void)ime_dict_close(dict);
+        return IME_DICT_ERR_PREFIX_PREPARE;
+    }
+    dict->prefix_stmt = (void *)stmt;
+
+    /* 学習(UPSERT)用プリペアドステートメント */
+    rc = sqlite3_prepare_v2(db, SQL_LEARN, -1, &stmt, (const char **)0);
+    if (rc == SQLITE_OK) {
+        dict->learn_stmt = (void *)stmt;
+    } else {
+        kprintf(ATTR_RED, "IME: prepare learn failed (rc=%d)\r\n", rc);
+        dict->learn_stmt = (void *)0;
+    }
+
+    /* Main and late journals retain the RESIDENT group lease. */
+
+    /* 成功の知らせはシリアルだけに出す。GUI (gshell) 中に SHIFT+SPACE で
+     * 初めて辞書を開くと、この行が TVRAM に残って GFX 画面に透けるため
+     * (2026-09-06 G3 で実測)。失敗は今までどおり画面にも出す。 */
+    serial_puts("IME: Dict loaded (SQLite): ");
+    serial_puts(path);
+    serial_puts("\r\n");
+#if defined(OS32_RAW_WAIT_LOG_TICKS) && OS32_RAW_WAIT_LOG_TICKS > 0
+    ime_dict_log_probe();
+#endif
+    return 0;
+}
+
+/* ======================================================================== */
+/*  常駐接続の開き直し (票 TASK_VFS_FD_PATH 方針 v3 の 6 / ラリー 3)          */
+/*                                                                          */
+/*  辞書の実体が消える・作り直される (`rm` → 作り直し、別の実体への置き換え   */
+/*  rename、umount) と、VFS は開いていた FD に失効の印を付け、以後の読みは    */
+/*  OS32_ERR_STALE になる (SQLite には SQLITE_IOERR として届く)。そのときは   */
+/*  **SQLite 接続ごと**開き直す — ステートメント 3 本の finalize →          */
+/*  sqlite3_close → group_finish → acquire/open → prepare                       */
+/*  (ime_dict_close + ime_dict_open)。                                      */
+/*                                                                          */
+/*  hsync の差し替え (置き換え rename) は**ここへ来ない**: 辞書を開いている   */
+/*  間は /db/fep.db の置き換えを VFS が BUSY で断る (開いている SQLite DB の  */
+/*  rename は BUSY、票のユーザー決裁 ①)。hsync は「使用中で置き換えられ      */
+/*  なかった」と表示する。失効して開き直すのは rm と作り直しの経路だけ。      */
+/*                                                                          */
+/*  - **旧接続に SQL を流す前に**失効を確かめる (dict_ready、Codex 実装      */
+/*    レビュー ラリー 1 の B1)。失効した接続で sqlite3_step をすると、SQLite  */
+/*    は本体を読む前に hot journal を判定し、ジャーナルを再生・削除しうる。   */
+/*    失効していたら step をせずに閉じ、ジャーナルを stat してから開き直す。  */
+/*  - 失効 1 回につき 1 回。新しい FD はまた失効しうる (次の作り直し) ので、  */
+/*    印の付いた FD を見たら開き直す。失効を伴わない I/O エラーは 1 回だけ   */
+/*    (io_retried、成功した操作で戻す)。                                     */
+/*  - `<名前>-journal` が中身を持って残っていたら (hot journal) **開かない**。 */
+/*    辞書無しで動き、画面に出す。前の接続の途中の書き込みを、新しい実体に    */
+/*    巻き戻させない。                                                       */
+/*  - 検索・学習だけでなく、ユーザー辞書の一覧・削除・書き出し・全消去も同じ  */
+/*    経路を通る (Codex 実装レビュー ラリー 1 の B5)。                        */
+/*  戻り値: 1 = 開き直した (呼び手は 1 回だけやり直してよい) / 0 = しない     */
+/* ======================================================================== */
+static int dict_recover(IME_Dict *dict)
+{
+    /* `<名前>-journal` を組み、stat の後で末尾を落として名前に戻す
+     * (ime_dict_open は dict を消してから名前を写すので、別に持つ) */
+    static char name[OS32_MAX_PATH];
+    OS32_Stat st;
+    int fd, stale, rc;
+    u32 n;
+
+    if (!dict || !dict->db || dict->isolated || !dict->path[0]) return 0;
+    fd = os32_sqlite_db_fd(dict->db);
+    stale = (fd >= 0) ? vfs_fd_is_stale(fd) : 0;
+    if (!stale && dict->io_retried) return 0;
+
+    n = kstrlen(dict->path);
+    if (n + sizeof("-journal") > sizeof(name)) return 0;   /* "-journal" + NUL */
+    kstrncpy(name, dict->path, sizeof(name));
+    kstrncat(name, "-journal", sizeof(name));
+
+    if (ime_dict_close(dict) != 0) return 0;
+    rc = vfs_stat(name, &st);
+    if (rc != OS32_ERR_NOTFOUND && !(rc == 0 && st.st_size == 0)) {
+        /* hot journal (か、有無を判定できない)。開かない */
+        kprintf(ATTR_RED, "IME: %s remains (rc=%d), dictionary disabled\r\n",
+                name, rc);
+        return 0;
+    }
+    name[n] = '\0';
+    if (ime_dict_open(dict, name) != 0) {
+        kprintf(ATTR_RED, "IME: dictionary reopen failed, running without it\r\n");
+        return 0;
+    }
+    /* 失効による開き直しは印を持ち越さない。I/O エラーによる開き直しは 1 回 */
+    dict->io_retried = stale ? 0 : 1;
+    serial_puts("IME: dictionary reopened\r\n");
+    return 1;
+}
+
+/* 旧接続に SQL を流す**前**に呼ぶ (B1)。FD が失効していたら、その接続では
+ * 何も実行せずに閉じて開き直す (hot journal なら辞書無し)。
+ * 戻り値: 1 = 使える接続がある / 0 = 辞書無し */
+static int dict_ready(IME_Dict *dict)
+{
+    if (!SQLITE_OUTER_READY(1)) return 0;
+    int fd;
+    if (!dict || !dict->db || dict->isolated) return 0;
+    fd = os32_sqlite_db_fd(dict->db);
+    if (fd >= 0 && vfs_fd_is_stale(fd)) (void)dict_recover(dict);
+    return dict->db != (void *)0 && !dict->isolated;
+}
+
+static int is_ioerr(int rc) { return (rc & 0xFF) == SQLITE_IOERR; }
+
+static int ime_dict_search_once(IME_Dict *dict, const char *yomi,
+                                IME_Result *results, int max_results,
+                                int *io_error);
+
+int ime_dict_search(IME_Dict *dict, const char *yomi,
+                    IME_Result *results, int max_results)
+{
+    int io_error = 0;
+    int n;
+    if (!dict_ready(dict)) return 0;
+    n = ime_dict_search_once(dict, yomi, results, max_results, &io_error);
+    if (io_error && dict_recover(dict)) {
+        n = ime_dict_search_once(dict, yomi, results, max_results, &io_error);
+    }
+    if (n > 0 && dict) dict->io_retried = 0;
+    return n;
+}
+
+static int ime_dict_search_once(IME_Dict *dict, const char *yomi,
+                                IME_Result *results, int max_results,
+                                int *io_error)
+{
+    sqlite3_stmt *stmt;
+    int yomi_chars;
+    int count;
+    int yomi_len;
+    const char *kanji_text;
+    char *full_kanji[IME_MAX_RESULTS] = {0};
+    int copy_len;
+
+    *io_error = 0;
+    if (!dict || !dict->db || !yomi || !results || max_results <= 0)
+        return 0;
+    if (yomi[0] == '\0') return 0;
+
+    /* 最大取得数を制限 */
+    if (max_results > IME_MAX_RESULTS)
+        max_results = IME_MAX_RESULTS;
+
+    /* UTF-8 文字数に応じてクエリを切り替え */
+    yomi_chars = utf8_strlen((const u8 *)yomi);
+    yomi_len = (int)kstrlen(yomi);
+
+    if (yomi_chars <= 2) {
+        /* 2文字以下: 完全一致のみ */
+        stmt = (sqlite3_stmt *)dict->exact_stmt;
+    } else {
+        /* 3文字以上: 前方一致 */
+        stmt = (sqlite3_stmt *)dict->prefix_stmt;
+    }
+
+    sqlite3_reset(stmt);
+    int bind_rc = sqlite3_bind_text(stmt, 1, yomi, yomi_len, SQLITE_STATIC);
+
+    /* 結果取得ループ */
+    count = 0;
+    {
+        int step_rc = bind_rc;
+        while (bind_rc == SQLITE_OK && count < max_results &&
+               (step_rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        IME_Result *r = &results[count];
+
+        /* 漢字 (カラム0) */
+        kanji_text = (const char *)sqlite3_column_text(stmt, 0);
+        if (!kanji_text) continue;
+        /* Compare full SQL spellings before the public 31-byte truncation.
+         * Short words already fit in results; retain only longer originals.
+         * The cost-ordered SQL puts learned words first. Do not refill LIMIT. */
+        int i;
+        for (i = 0; i < count; i++) {
+            const char *seen = full_kanji[i] ? full_kanji[i] : results[i].kanji;
+            if (kstrcmp(seen, kanji_text) == 0) break;
+        }
+        if (i < count) continue;
+        copy_len = (int)kstrlen(kanji_text);
+        if (copy_len >= (int)sizeof(r->kanji)) {
+            full_kanji[count] = kzalloc(copy_len + 1);
+            if (!full_kanji[count]) {
+                step_rc = SQLITE_NOMEM;
+                break;
+            }
+            kmemcpy(full_kanji[count], kanji_text, copy_len + 1);
+        }
+        if (copy_len > (int)sizeof(r->kanji) - 1) copy_len = (int)sizeof(r->kanji) - 1;
+        kmemcpy(r->kanji, kanji_text, copy_len);
+        r->kanji[copy_len] = '\0';
+
+        /* 読みをコピー */
+        copy_len = yomi_len < (int)sizeof(r->yomi) - 1 ? yomi_len : (int)sizeof(r->yomi) - 1;
+        kmemcpy(r->yomi, yomi, copy_len);
+        r->yomi[copy_len] = '\0';
+
+        /* 品詞ID (カラム1) */
+        r->pos_id = (u16)sqlite3_column_int(stmt, 1);
+
+        /* コスト (カラム2) */
+        r->cost = sqlite3_column_int(stmt, 2);
+
+        /* ひらがな/カタカナそのまま表記に対する動的ペナルティ */
+        if (r->cost >= 0 && kstrlen(r->kanji) >= (u32)yomi_len) {
+            r->cost += IME_NONSHORTENING_COST_PENALTY;
+        }
+
+        count++;
+        }
+
+        /* 診断: step がエラーで終わった場合のみ表示 (SQLITE_DONE は正常) */
+        if (count == 0 && step_rc != SQLITE_DONE) {
+            /* 読めなかった (FD の失効を含む) — 呼び手が開き直しを判断する */
+            if ((step_rc & 0xFF) == SQLITE_IOERR) *io_error = 1;
+            kprintf(ATTR_RED,
+                    "IME: search 0hit len=%d chars=%d step=%d err=%d ext=%d %s\r\n",
+                    yomi_len, yomi_chars, step_rc,
+                    sqlite3_errcode((sqlite3 *)dict->db),
+                    sqlite3_extended_errcode((sqlite3 *)dict->db),
+                    sqlite3_errmsg((sqlite3 *)dict->db));
+        }
+    }
+
+    for (int i = 0; i < count; i++)
+        if (full_kanji[i]) kfree(full_kanji[i]);
+    /* End SQLITE_STATIC borrowing even on LIMIT, bind or step failure. */
+    int reset_rc = sqlite3_reset(stmt);
+    int clear_rc = sqlite3_bind_null(stmt, 1);
+    if (reset_rc != SQLITE_OK || clear_rc != SQLITE_OK) count = 0;
+    return count;
+}
+
+static int dict_learn_once(sqlite3_stmt *stmt, const char *yomi, const char *kanji)
+{
+    int rc;
+    sqlite3_reset(stmt);
+    rc = sqlite3_bind_text(stmt, 1, yomi, -1, SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_bind_text(stmt, 2, kanji, -1, SQLITE_STATIC);
+    if (rc == SQLITE_OK) rc = sqlite3_step(stmt);
+    int reset_rc = sqlite3_reset(stmt);
+    int y_rc = sqlite3_bind_null(stmt, 1);
+    int k_rc = sqlite3_bind_null(stmt, 2);
+    if (rc == SQLITE_DONE) {
+        if (reset_rc != SQLITE_OK) rc = reset_rc;
+        else if (y_rc != SQLITE_OK) rc = y_rc;
+        else if (k_rc != SQLITE_OK) rc = k_rc;
+    }
+    return rc;
+}
+
+void ime_dict_learn(IME_Dict *dict, const char *yomi, const char *kanji)
+{
+    int rc;
+    if (!dict || !yomi || !kanji) return;
+    if (!dict_ready(dict) || !dict->learn_stmt) return;
+    rc = dict_learn_once((sqlite3_stmt *)dict->learn_stmt, yomi, kanji);
+    if (rc != SQLITE_DONE && is_ioerr(rc) && dict_recover(dict) &&
+        dict->learn_stmt) {
+        rc = dict_learn_once((sqlite3_stmt *)dict->learn_stmt, yomi, kanji);
+    }
+    if (rc != SQLITE_DONE) {
+        kprintf(ATTR_RED, "IME: Learn failed (rc=%d)\r\n", rc);
+    } else {
+        dict->io_retried = 0;
+    }
+}
+
+/* Finalize always destroys the statement; its rc reports the last evaluation. */
+int ime_dict_close(IME_Dict *dict)
+{
+    int rc = SQLITE_OK, next;
+    if (!dict || dict->isolated) return -1;
+    if (!dict->group.generation) return 0;
+    if (os32_sqlite_group_begin_close(&dict->group) != SQLITE_OK) {
+        dict->isolated = 1;
+        return -1;
+    }
+    void **statements[] = { &dict->exact_stmt, &dict->prefix_stmt, &dict->learn_stmt };
+    for (unsigned int i = 0; i < sizeof(statements) / sizeof(statements[0]); i++) {
+        if (*statements[i]) {
+            next = sqlite3_finalize((sqlite3_stmt *)*statements[i]);
+            *statements[i] = 0;
+            if (next != SQLITE_OK)
+                kprintf(ATTR_RED, "IME: finalize evaluation rc=%d\r\n", next);
+        }
+    }
+    if (dict->db) rc = sqlite3_close((sqlite3 *)dict->db);
+    if (rc == SQLITE_OK) dict->db = 0;
+    next = os32_sqlite_group_finish(&dict->group, rc);
+    if (next != SQLITE_OK) { dict->isolated = 1; return -1; }
+    dict->group.generation = 0;
+    return 0;
+}
+
+/* 辞書再オープン */
+int ime_dict_reopen(IME_Dict *dict, const char *path)
+{
+    if (!SQLITE_OUTER_READY(1)) return -1;
+    if (ime_dict_close(dict) != 0) return -1;
+    return ime_dict_open(dict, path);
+}
+
+/* ======================================================================== */
+/*  ユーザー学習辞書の管理 (ime コマンドの user list / delete / export /      */
+/*  clear)。どれも検索・学習と同じ回復経路を通る (Codex 実装レビュー         */
+/*  ラリー 1 の B5): 旧接続に SQL を流す前に失効を確かめ (dict_ready)、       */
+/*  I/O エラーなら 1 回だけ開き直してやり直す (dict_recover)。                */
+/*  *_once の戻り値は各 API の戻り値そのもの、*io_error = 1 は「I/O エラーで  */
+/*  失敗した」(開き直して 1 回やり直す)。                                   */
+/* ======================================================================== */
+
+/* Public display fields stay 32 bytes; input keys are never truncated. */
+static void user_display_copy(char *out, const char *text, u32 cap)
+{
+    u32 n = text ? kstrlen(text) : 0;
+    if (n >= cap) {
+        n = cap - 1;
+        while (n && UTF8_IS_CONT((u8)text[n])) n--;
+    }
+    if (n) kmemcpy(out, text, n);
+    out[n] = '\0';
+}
+
+/* 一覧: 件数 / -4 = 読めなかった (部分的な一覧を成功にしない)。
+ * prepare の失敗も -4 — 以前は 0 を返したので、ime コマンドが「学習なし」と
+ * 区別できなかった (実装レビュー ラリー 2 の非 blocker) */
+static int user_list_once(sqlite3 *db, const char *yomi_prefix,
+                          IME_UserEntry *out, int max, int *io_error)
+{
+    sqlite3_stmt *stmt = NULL;
+    int rc;
+    int count = 0;
+    const char *sql;
+
+    *io_error = 0;
+    if (yomi_prefix && yomi_prefix[0] != '\0') {
+        sql = "SELECT yomi, kanji, freq FROM dict_user WHERE yomi >= ?1 AND yomi < ?1 || X'EFBFBF' ORDER BY freq DESC, yomi ASC LIMIT ?2";
+    } else {
+        sql = "SELECT yomi, kanji, freq FROM dict_user ORDER BY freq DESC, yomi ASC LIMIT ?2";
+    }
+
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) goto finish;
+    if (yomi_prefix && yomi_prefix[0] != '\0') {
+        rc = sqlite3_bind_text(stmt, 1, yomi_prefix, (int)kstrlen(yomi_prefix), SQLITE_STATIC);
+    }
+    if (rc == SQLITE_OK) rc = sqlite3_bind_int(stmt, 2, max);
+    if (rc != SQLITE_OK) goto finish;
+
+    while (count < max && (rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        IME_UserEntry *e = &out[count];
+        const char *y_text = (const char *)sqlite3_column_text(stmt, 0);
+        const char *k_text = (const char *)sqlite3_column_text(stmt, 1);
+        int freq = sqlite3_column_int(stmt, 2);
+        kmemset(e, 0, sizeof(*e)); /* Also clear tails after a recovered partial read. */
+        user_display_copy(e->yomi, y_text, sizeof(e->yomi));
+        user_display_copy(e->kanji, k_text, sizeof(e->kanji));
+        e->freq = freq;
+        count++;
+    }
+    if (count == max && rc == SQLITE_ROW) rc = SQLITE_DONE;
+finish:
+    if (stmt) {
+        int final_rc = sqlite3_finalize(stmt);
+        if (rc == SQLITE_DONE && final_rc != SQLITE_OK) rc = final_rc;
+    }
+    if (rc != SQLITE_DONE) {
+        *io_error = is_ioerr(rc);
+        kprintf(ATTR_RED, "IME: user_list prepare failed / bind/step/finalize failed (rc=%d)\r\n", rc);
+        return IME_DICT_ERR_USER_LIST;
+    }
+    return count;
+}
+
+/* ユーザー学習辞書列挙 */
+int ime_user_list(IME_Dict *dict, const char *yomi_prefix,
+                  IME_UserEntry *out, int max)
+{
+    int io_error = 0, n;
+
+    if (!dict || !out || max <= 0 || max > IME_USER_LIST_MAX) return -1;
+    if (!dict_ready(dict)) return -1;
+    n = user_list_once((sqlite3 *)dict->db, yomi_prefix, out, max, &io_error);
+    if (io_error && dict_recover(dict))
+        n = user_list_once((sqlite3 *)dict->db, yomi_prefix, out, max, &io_error);
+    if (n >= 0 && !io_error) dict->io_retried = 0;
+    return n;
+}
+
+static int user_delete_once(sqlite3 *db, const char *yomi,
+                            const char *kanji, int *io_error)
+{
+    sqlite3_stmt *stmt = NULL;
+    int rc;
+    const char *sql;
+
+    *io_error = 0;
+    if (kanji && kanji[0] != '\0') {
+        sql = "DELETE FROM dict_user WHERE yomi = ?1 AND kanji = ?2";
+    } else {
+        sql = "DELETE FROM dict_user WHERE yomi = ?1";
+    }
+
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        *io_error = is_ioerr(sqlite3_extended_errcode(db));
+        kprintf(ATTR_RED, "IME: user_delete prepare failed (rc=%d)\r\n", rc);
+        return IME_DICT_ERR_DELETE_PREPARE;
+    }
+
+    rc = sqlite3_bind_text(stmt, 1, yomi, (int)kstrlen(yomi), SQLITE_STATIC);
+    if (rc == SQLITE_OK && kanji && kanji[0] != '\0') {
+        rc = sqlite3_bind_text(stmt, 2, kanji, (int)kstrlen(kanji), SQLITE_STATIC);
+    }
+    if (rc == SQLITE_OK) rc = sqlite3_step(stmt);
+    int final_rc = sqlite3_finalize(stmt);
+    if (rc == SQLITE_DONE && final_rc != SQLITE_OK) rc = final_rc;
+
+    if (rc != SQLITE_DONE) {
+        *io_error = is_ioerr(rc);
+        kprintf(ATTR_RED, "IME: user_delete execute failed (rc=%d)\r\n", rc);
+        return IME_DICT_ERR_DELETE_EXEC;
+    }
+
+    return 0;
+}
+
+/* ユーザー学習辞書エントリ削除 */
+int ime_user_delete(IME_Dict *dict, const char *yomi, const char *kanji)
+{
+    int io_error = 0, rc;
+
+    if (!dict || !yomi || yomi[0] == '\0') return -1;
+    if (!dict_ready(dict)) return -1;
+    rc = user_delete_once((sqlite3 *)dict->db, yomi, kanji, &io_error);
+    if (io_error && dict_recover(dict))
+        rc = user_delete_once((sqlite3 *)dict->db, yomi, kanji, &io_error);
+    if (rc == 0) dict->io_retried = 0;
+    return rc;
+}
+
+/* 書き出し: 0 = 成功 / -2 = 書き出し先を開けない / -3 = prepare 失敗 /
+ * -4 = 途中で読めなかった (sqlite3_step の異常終了を EOF と区別する) /
+ * -5 = 書き出し先へ書けなかった */
+static int user_export_once(sqlite3 *db, const char *path, int *io_error)
+{
+    sqlite3_stmt *stmt = NULL;
+    int rc, step_rc, fd, result = 0;
+    u32 len;
+    const char *sql;
+    char line[128];
+
+    *io_error = 0;
+    fd = vfs_open(path, KAPI_O_WRONLY | KAPI_O_CREAT | KAPI_O_TRUNC);
+    if (fd < 0) {
+        kprintf(ATTR_RED, "IME: export open failed: %s (fd=%d)\r\n", path, fd);
+        return IME_DICT_ERR_EXPORT_OPEN;
+    }
+
+    sql = "SELECT yomi, kanji, freq FROM dict_user ORDER BY freq DESC, yomi ASC";
+    rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
+    if (rc != SQLITE_OK) {
+        *io_error = is_ioerr(sqlite3_extended_errcode(db));
+        kprintf(ATTR_RED, "IME: export prepare failed (rc=%d)\r\n", rc);
+        if (stmt) sqlite3_finalize(stmt);
+        (void)vfs_close(fd);
+        return IME_DICT_ERR_EXPORT_PREPARE;
+    }
+
+    while ((step_rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+        const char *y_text = (const char *)sqlite3_column_text(stmt, 0);
+        const char *k_text = (const char *)sqlite3_column_text(stmt, 1);
+        int freq = sqlite3_column_int(stmt, 2);
+
+        if (!y_text || !k_text) continue;
+
+        sqlite3_snprintf(sizeof(line), line, "%s,%s,%d\n", y_text, k_text, freq);
+        len = (u32)kstrlen(line);
+        if (vfs_write_fd(fd, line, len) != (int)len) {
+            kprintf(ATTR_RED, "IME: export write failed: %s\r\n", path);
+            result = IME_DICT_ERR_EXPORT_WRITE;
+            break;
+        }
+    }
+    if (result == 0 && step_rc != SQLITE_DONE) {
+        *io_error = is_ioerr(step_rc);
+        kprintf(ATTR_RED, "IME: export step failed (rc=%d)\r\n", step_rc);
+        result = IME_DICT_ERR_EXPORT_READ;
+    }
+
+    int final_rc = sqlite3_finalize(stmt);
+    if (!result && final_rc != SQLITE_OK) {
+        *io_error = is_ioerr(final_rc);
+        result = IME_DICT_ERR_EXPORT_READ;
+    }
+    vfs_close(fd); /* void API: no close status is exposed by VFS. */
+    return result;
+}
+
+/* ユーザー学習辞書CSVエクスポート */
+int ime_user_export(IME_Dict *dict, const char *path)
+{
+    int io_error = 0, rc;
+
+    if (!dict || !path || path[0] == '\0') return -1;
+    if (!dict_ready(dict)) return -1;
+    rc = user_export_once((sqlite3 *)dict->db, path, &io_error);
+    if (io_error && dict_recover(dict))
+        rc = user_export_once((sqlite3 *)dict->db, path, &io_error);   /* 書き出し先は O_TRUNC で作り直す */
+    if (rc == 0) dict->io_retried = 0;
+    return rc;
+}
+
+/* ユーザー学習辞書全消去 */
+int ime_user_clear(IME_Dict *dict)
+{
+    int rc;
+
+    if (!dict) return -1;
+    if (!dict_ready(dict)) return -1;
+    rc = sqlite3_exec((sqlite3 *)dict->db, "DELETE FROM dict_user;", NULL, NULL, NULL);
+    if (rc != SQLITE_OK &&
+        is_ioerr(sqlite3_extended_errcode((sqlite3 *)dict->db)) &&
+        dict_recover(dict)) {
+        rc = sqlite3_exec((sqlite3 *)dict->db, "DELETE FROM dict_user;",
+                          NULL, NULL, NULL);
+    }
+    if (rc != SQLITE_OK) {
+        kprintf(ATTR_RED, "IME: user_clear execute failed (rc=%d)\r\n", rc);
+        return IME_DICT_ERR_CLEAR;
+    }
+    dict->io_retried = 0;
+    return 0;
+}
+
+/* DICT_META stage I. The legacy entry points above remain until J/K bind
+ * their facades to FepStore; they do not share handles or layout casts. */
+/* Seek past the last row of a full page. LIMIT bounds SQLite's sort heap
+ * even when a reading matches thousands of duplicate spellings. */
+static const char STORE_EXACT[] =
+    "SELECT kanji,pos_id,cost,rowid FROM dict WHERE yomi=?1 AND kanji IS NOT NULL "
+    "AND (?2 IS NULL OR (COALESCE(cost,0),rowid) > "
+    "(SELECT COALESCE(cost,0),rowid FROM dict WHERE rowid=?2)) "
+    "ORDER BY COALESCE(cost,0),rowid LIMIT 32";
+/* Prefix cursors stream the indexed reading range. Return both halves of
+ * each integer sort key through the module's 32-bit column_int facade. */
+static const char STORE_PREFIX[] =
+    "SELECT kanji,pos_id,score,score>>32,score,id>>32,id FROM "
+    "(SELECT kanji,pos_id,CASE WHEN yomi=?1 THEN cost-500 ELSE cost END AS score,rowid AS id "
+    "FROM dict WHERE yomi>=?1 AND yomi<?1 || X'EFBFBF' AND kanji IS NOT NULL)";
+/* Complement turns descending integer timestamps into ascending seek keys. */
+static const char USER_EXACT[] =
+    "SELECT kanji,0,-10000-freq,rowid,COALESCE(~last_ts,9223372036854775807) AS rank "
+    "FROM dict_user WHERE yomi=?1 AND kanji IS NOT NULL "
+    "AND (?2 IS NULL OR (rank,-COALESCE(freq,0),kanji,rowid) > "
+    "(SELECT COALESCE(~last_ts,9223372036854775807),-COALESCE(freq,0),kanji,rowid "
+    "FROM dict_user WHERE rowid=?2)) "
+    "ORDER BY rank,-COALESCE(freq,0),kanji,rowid LIMIT 32";
+static const char USER_PREFIX[] =
+    "SELECT kanji,0,-10000-freq,rank>>32,rank,frequency_key>>32,frequency_key FROM "
+    "(SELECT kanji,freq,COALESCE(CASE WHEN yomi=?1 THEN ~last_ts END,"
+    "9223372036854775807) AS rank,-COALESCE(freq,0) AS frequency_key FROM dict_user "
+    "WHERE yomi>=?1 AND yomi<?1 || X'EFBFBF' AND kanji IS NOT NULL)";
+
+static int store_prepare(FepConn *c, int user)
+{
+    const char *sql[] = { user ? USER_EXACT : STORE_EXACT,
+                          user ? USER_PREFIX : STORE_PREFIX, SQL_LEARN };
+    void **slots[] = { &c->exact, &c->prefix, &c->learn };
+    for (int i = 0; i < (user ? 3 : 2); i++) {
+        if (*slots[i]) continue;
+        sqlite3_stmt *stmt = 0;
+        int rc = sqlite3_prepare_v2(c->db, sql[i], -1, &stmt, 0);
+        *slots[i] = stmt; /* Also retain partial prepare for close. */
+        if (rc != SQLITE_OK) return OS32_ERR_IO;
+    }
+    return 0;
+}
+
+static int store_system_open(FepStore *s, const char *path)
+{
+    FepConn *c = &s->system;
+    FepMeta meta;
+    sqlite3 *db = 0;
+    char pragma[OS32_MAX_PATH];
+    if (c->isolated || c->db || c->group.generation) return OS32_ERR_BUSY;
+    int rc = fep_meta_probe(path, &meta);
+    if (rc) return rc;
+    kstrncpy(c->path, path, sizeof(c->path));
+    rc = os32_sqlite_group_acquire(OS32_SQLITE_RESIDENT, 0, &c->group);
+    if (rc != SQLITE_OK) return OS32_ERR_IO;
+    rc = os32_sqlite_group_open(&c->group, path, SQLITE_OPEN_READONLY, &db);
+    c->db = db;
+    int result = rc == SQLITE_OK ? fep_conn_ready(c) : OS32_ERR_IO;
+    if (!result) {
+        sqlite3_snprintf(sizeof(pragma), pragma, "PRAGMA cache_size=%u", meta.cache_pages);
+        if (sqlite3_exec(db, pragma, 0, 0, 0) != SQLITE_OK) result = OS32_ERR_IO;
+    }
+    if (!result) result = store_prepare(c, 0);
+    if (result) {
+        int close_rc = fep_conn_close(c);
+        return close_rc ? close_rc : result;
+    }
+    s->meta = meta; /* Publish only after the new system is usable. */
+    c->io_retried = 0;
+    return 0;
+}
+
+static int store_user_open(FepStore *s)
+{
+    int rc = fep_user_open(s);
+    if (!rc) rc = store_prepare(&s->user, 1);
+    if (rc) {
+        s->user_enabled = 0;
+        int close_rc = fep_conn_close(&s->user);
+        kprintf(ATTR_RED, "IME: learning disabled (rc=%d, close=%d)\r\n", rc, close_rc);
+        if (close_rc) rc = close_rc;
+    }
+    return rc;
+}
+
+int fep_store_open(FepStore *s, const char *path, const char *user_path)
+{
+    if (!s || !path || !path[0] || !user_path ||
+        kstrlen(path) >= sizeof(s->system.path)) return OS32_ERR_INVAL;
+    if (s->system.group.generation || s->user.group.generation ||
+        s->system.db || s->user.db || s->system.isolated || s->user.isolated)
+        return OS32_ERR_BUSY;
+    if (!SQLITE_OUTER_READY(1)) return OS32_ERR_IO;
+    /* Never truncate an invalid learning path into another file name. */
+    if (kstrlen(user_path) >= sizeof(s->user.path)) {
+        s->user_enabled = 0;
+        s->user.path[0] = 0;
+        kprintf(ATTR_RED, "IME: learning disabled (path rc=%d)\r\n", OS32_ERR_INVAL);
+    } else {
+        /* Retain the configured learning path even if the system is missing. */
+        kstrncpy(s->user.path, user_path, sizeof(s->user.path));
+    }
+    FepMeta meta;
+    int rc = fep_meta_probe(path, &meta);
+    if (rc) return rc;
+    /* Settings may set the boot reservation below the dictionary request
+     * (DICT_META_DESIGN §6: settings → meta → 192 KiB). The dictionary
+     * accepted at boot (s->meta, kept across suspend) is not rejected again;
+     * only a larger replacement (hsync during suspend) needs a restart. */
+    u32 limit = s->boot_reserve_kb > s->meta.reserve_kb ?
+        s->boot_reserve_kb : s->meta.reserve_kb;
+    if (s->boot_reserve_kb && meta.reserve_kb > limit) {
+        kprintf(ATTR_RED, "IME: dictionary needs more memory; restart required\r\n");
+        return OS32_ERR_AGAIN;
+    }
+    rc = store_system_open(s, path);
+    if (rc) return rc;
+    /* D requires the complete system identity and user path before open. */
+    (void)store_user_open(s); /* Learning failure does not disable conversion. */
+    return 0;
+}
+
+/* K: probe and reservation checks precede any change to the live store. */
+int fep_store_switch(FepStore *s, const char *path)
+{
+    FepMeta target, old_meta;
+    char old_path[OS32_MAX_PATH], target_path[OS32_MAX_PATH];
+    if (!s || !path || !path[0] || kstrlen(path) >= sizeof(target_path))
+        return OS32_ERR_INVAL;
+    if (s->system.isolated || s->user.isolated) {
+        kprintf(ATTR_RED, "IME: isolated connection; restart required\r\n");
+        return OS32_ERR_BUSY;
+    }
+    if (!SQLITE_OUTER_READY(1)) return OS32_ERR_IO;
+    /* A live dictionary already owns this inode. Probing it through a new
+     * SQLite connection would fail the VFS same-inode exclusion. */
+    if (s->system.db && !kstrcmp(path, s->system.path))
+        return fep_conn_ready(&s->system);
+    kstrncpy(target_path, path, sizeof(target_path));
+    int rc = fep_meta_probe(target_path, &target);
+    if (rc) return rc;
+    if (target.reserve_kb > s->boot_reserve_kb) {
+        kprintf(ATTR_RED, "IME: dictionary needs more memory; restart required\r\n");
+        return OS32_ERR_AGAIN;
+    }
+    old_meta = s->meta;
+    kstrncpy(old_path, s->system.path, sizeof(old_path));
+    int had_system = s->system.db != 0;
+    rc = fep_conn_close(&s->system);
+    if (rc) {
+        kprintf(ATTR_RED, "IME: dictionary close failed; restart required\r\n");
+        return rc;
+    }
+    rc = store_system_open(s, target_path);
+    if (rc) {
+        if (!s->system.isolated && had_system && !store_system_open(s, old_path))
+            s->meta = old_meta;
+        else
+            kprintf(ATTR_RED, "IME: dictionary unavailable; restart required\r\n");
+        return rc;
+    }
+    if (kstrcmp(old_meta.dict_id, s->meta.dict_id) ||
+        old_meta.pos_version != s->meta.pos_version) {
+        s->user_enabled = 0;
+        rc = fep_conn_close(&s->user);
+        if (rc) {
+            kprintf(ATTR_RED, "IME: learning close failed; restart required\r\n");
+            return rc;
+        }
+        (void)store_user_open(s);
+    } else if (!had_system && !s->user.db && s->user.path[0]) {
+        (void)store_user_open(s);
+    }
+    return 0;
+}
+
+int fep_store_close(FepStore *s)
+{
+    if (!s) return OS32_ERR_INVAL;
+    s->user_enabled = 0;
+    int user_rc = fep_conn_close(&s->user);
+    int system_rc = fep_conn_close(&s->system);
+    return system_rc ? system_rc : user_rc;
+}
+
+u32 fep_store_live_connections(const FepStore *s)
+{
+    if (!s) return 0;
+    /* A failed close may keep a group even after sqlite3_close succeeded. */
+    return (s->system.group.generation != 0) + (s->user.group.generation != 0);
+}
+
+/* Reopen only the failed connection, never reuse a quarantined group. As in
+ * the legacy path, reject a hot/unknown journal before opening a new inode. */
+static int store_recover(FepStore *s, int user)
+{
+    FepConn *c = user ? &s->user : &s->system;
+    char path[OS32_MAX_PATH], journal[OS32_MAX_PATH];
+    OS32_Stat st;
+    if (!c->db || c->isolated || !c->path[0]) return 0;
+    int ready = fep_conn_ready(c);
+    int stale = ready == OS32_ERR_STALE;
+    if (ready && !stale) return 0;
+    if (!stale && c->io_retried) return 0;
+    if (kstrlen(c->path) + sizeof(FEP_USER_JOURNAL_SUFFIX) > sizeof(journal)) return 0;
+    kstrncpy(path, c->path, sizeof(path));
+    kstrncpy(journal, path, sizeof(journal));
+    kstrncat(journal, FEP_USER_JOURNAL_SUFFIX, sizeof(journal));
+    if (user) s->user_enabled = 0;
+    if (fep_conn_close(c)) return 0;
+    int rc = vfs_stat(journal, &st);
+    if (rc != OS32_ERR_NOTFOUND && !(rc == 0 && st.st_size == 0)) {
+        kprintf(ATTR_RED, "IME: %s remains (rc=%d), connection disabled\r\n", journal, rc);
+        return 0;
+    }
+    if (user) rc = store_user_open(s);
+    else {
+        FepMeta old_meta = s->meta;
+        rc = store_system_open(s, path);
+        /* A replaced system may have a different identity. Revalidate user. */
+        if (!rc && s->user_enabled &&
+            (old_meta.pos_version != s->meta.pos_version ||
+             kstrcmp(old_meta.dict_id, s->meta.dict_id))) {
+            s->user_enabled = 0;
+            if (!fep_conn_close(&s->user)) (void)store_user_open(s);
+        }
+    }
+    if (rc) return 0;
+    c->io_retried = stale ? 0 : 1;
+    return 1;
+}
+
+static int store_ready(FepStore *s, int user)
+{
+    if (user && !s->user_enabled) return 0;
+    FepConn *c = user ? &s->user : &s->system;
+    int rc = fep_conn_ready(c);
+    if (rc == OS32_ERR_STALE) return store_recover(s, user);
+    return rc == 0;
+}
+
+typedef struct {
+    long long major, minor;
+    char *text;
+    int cost, pos;
+} PrefixCandidate;
+
+static long long prefix_key(sqlite3_stmt *stmt, int high)
+{
+    return (long long)sqlite3_column_int(stmt, high) * 4294967296LL +
+           (u32)sqlite3_column_int(stmt, high + 1);
+}
+
+static int prefix_before(const PrefixCandidate *a, const PrefixCandidate *b)
+{
+    if (a->major != b->major) return a->major < b->major;
+    if (a->minor != b->minor) return a->minor < b->minor;
+    return kstrcmp(a->text, b->text) < 0;
+}
+
+/* Keep only the best distinct spellings seen so far. A better occurrence
+ * replaces the old spelling. Learned results occupy a fixed leading slice
+ * while the system cursor fills the remaining slots. */
+static int prefix_insert(PrefixCandidate *best, int first, int *count, int max,
+                         sqlite3_stmt *stmt)
+{
+    PrefixCandidate row = {
+        .major = prefix_key(stmt, 3), .minor = prefix_key(stmt, 5),
+        .text = (char *)sqlite3_column_text(stmt, 0),
+        .cost = sqlite3_column_int(stmt, 2), .pos = sqlite3_column_int(stmt, 1)
+    };
+    if (!row.text) return SQLITE_NOMEM;
+    if (*count == max && !prefix_before(&row, &best[max - 1])) return SQLITE_OK;
+    int slot = 0;
+    while (slot < *count && kstrcmp(row.text, best[slot].text)) slot++;
+    if (slot < *count) {
+        if (slot < first || !prefix_before(&row, &best[slot])) return SQLITE_OK;
+        row.text = best[slot].text;
+    } else {
+        u32 bytes = kstrlen(row.text) + 1;
+        char *copy = kzalloc(bytes);
+        if (!copy) return SQLITE_NOMEM;
+        kmemcpy(copy, row.text, bytes);
+        row.text = copy;
+        if (slot == max) kfree(best[--slot].text);
+        else (*count)++;
+    }
+    while (slot > first && prefix_before(&row, &best[slot - 1])) {
+        best[slot] = best[slot - 1];
+        slot--;
+    }
+    best[slot] = row;
+    return SQLITE_OK;
+}
+
+static int store_prefix_once(FepStore *s, const char *yomi, IME_Result *out,
+                             int max, int use_user, int *failed)
+{
+    PrefixCandidate best[IME_MAX_RESULTS];
+    int count = 0, len = (int)kstrlen(yomi);
+    *failed = 0;
+    for (int user = use_user; user >= 0 && count < max; user--) {
+        sqlite3_stmt *stmt = user ? s->user.prefix : s->system.prefix;
+        int first = count;
+        int rc = sqlite3_bind_text(stmt, 1, yomi, len, SQLITE_STATIC);
+        if (rc == SQLITE_OK) {
+            while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+                rc = prefix_insert(best, first, &count, max, stmt);
+                if (rc != SQLITE_OK) break;
+            }
+        }
+        int reset = sqlite3_reset(stmt);
+        int clear = sqlite3_bind_null(stmt, 1);
+        if (rc == SQLITE_DONE) rc = reset == SQLITE_OK ? clear : reset;
+        if (rc != SQLITE_OK) {
+            *failed = is_ioerr(rc) ? user + 1 : (user ? 4 : 5);
+            break;
+        }
+    }
+    for (int i = 0; i < count; i++) {
+        if (!*failed) {
+            kstrncpy(out[i].kanji, best[i].text, sizeof(out[i].kanji));
+            user_display_copy(out[i].yomi, yomi, sizeof(out[i].yomi));
+            out[i].pos_id = (u16)best[i].pos;
+            int cost = best[i].cost;
+            if (cost >= 0 && kstrlen(out[i].kanji) >= (u32)len)
+                cost += IME_NONSHORTENING_COST_PENALTY;
+            out[i].cost = (u16)cost;
+        }
+        kfree(best[i].text);
+    }
+    return *failed ? 0 : count;
+}
+
+/* Both cursors retain their current SQL row until selected. No pointer from
+ * one cursor is used after stepping/resetting that cursor. */
+static int store_search_once(FepStore *s, const char *yomi, IME_Result *out,
+                             int max, int use_user, int *failed)
+{
+    if (utf8_strlen((const u8 *)yomi) > 2)
+        return store_prefix_once(s, yomi, out, max, use_user, failed);
+    sqlite3_stmt *sys = s->system.exact;
+    sqlite3_stmt *usr = use_user ? s->user.exact : 0;
+    sqlite3_stmt *cursors[] = { sys, usr };
+    int state[] = { SQLITE_DONE, SQLITE_DONE };
+    int page_rows[2] = {0};
+    char *full[IME_MAX_RESULTS] = {0};
+    int count = 0, len = (int)kstrlen(yomi);
+    *failed = 0;
+    for (int i = 0; i < 2; i++) {
+        if (!cursors[i]) continue;
+        int rc = sqlite3_reset(cursors[i]);
+        if (rc == SQLITE_OK) rc = sqlite3_bind_text(cursors[i], 1, yomi, len, SQLITE_STATIC);
+        state[i] = rc == SQLITE_OK ? sqlite3_step(cursors[i]) : rc;
+    }
+    while (count < max) {
+        for (int i = 0; i < 2; i++)
+            if (state[i] != SQLITE_ROW && state[i] != SQLITE_DONE)
+                *failed = is_ioerr(state[i]) ? i + 1 : (i ? 4 : 5);
+        if (*failed || (state[0] == SQLITE_DONE && state[1] == SQLITE_DONE)) break;
+        int pick = state[1] == SQLITE_ROW;
+        sqlite3_stmt *stmt = cursors[pick];
+        const char *text = (const char *)sqlite3_column_text(stmt, 0);
+        if (text) {
+            int duplicate = 0;
+            for (int i = 0; i < count; i++)
+                if (!kstrcmp(full[i] ? full[i] : out[i].kanji, text)) duplicate = 1;
+            if (!duplicate) {
+                IME_Result *r = &out[count];
+                u32 n = kstrlen(text);
+                if (n >= sizeof(r->kanji)) {
+                    full[count] = kzalloc(n + 1);
+                    if (!full[count]) { *failed = 3; break; }
+                    kmemcpy(full[count], text, n + 1);
+                    n = sizeof(r->kanji) - 1;
+                }
+                kmemcpy(r->kanji, text, n); r->kanji[n] = 0;
+                user_display_copy(r->yomi, yomi, sizeof(r->yomi));
+                r->pos_id = (u16)sqlite3_column_int(stmt, 1);
+                int cost = sqlite3_column_int(stmt, 2);
+                if (cost >= 0 && kstrlen(r->kanji) >= (u32)len)
+                    cost += IME_NONSHORTENING_COST_PENALTY;
+                r->cost = (u16)cost;
+                count++;
+            }
+        }
+        if (count == max) break;
+        if (++page_rows[pick] == IME_MAX_RESULTS) {
+            /* Decimal text preserves the full SQLite rowid across reset. */
+            char last[21];
+            const char *id = (const char *)sqlite3_column_text(stmt, 3);
+            if (!id) { *failed = 3; break; }
+            kstrncpy(last, id, sizeof(last));
+            int rc = sqlite3_reset(stmt);
+            if (rc == SQLITE_OK) rc = sqlite3_bind_text(stmt, 2, last, -1, SQLITE_TRANSIENT);
+            if (rc != SQLITE_OK) { state[pick] = rc; continue; }
+            page_rows[pick] = 0;
+        }
+        state[pick] = sqlite3_step(stmt);
+    }
+    for (int i = 0; i < IME_MAX_RESULTS; i++) if (full[i]) kfree(full[i]);
+    for (int i = 0; i < 2; i++) {
+        if (!cursors[i]) continue;
+        int reset = sqlite3_reset(cursors[i]);
+        int clear = sqlite3_bind_null(cursors[i], 1);
+        if (clear == SQLITE_OK) clear = sqlite3_bind_null(cursors[i], 2);
+        if (reset != SQLITE_OK || clear != SQLITE_OK) {
+            int rc = reset != SQLITE_OK ? reset : clear;
+            *failed = is_ioerr(rc) ? i + 1 : (i ? 4 : 5);
+        }
+    }
+    return *failed ? 0 : count;
+}
+
+int fep_store_search(FepStore *s, const char *yomi, IME_Result *out, int max)
+{
+    if (!s || !yomi || !yomi[0] || !out || max <= 0) return 0;
+    if (max > IME_MAX_RESULTS) max = IME_MAX_RESULTS;
+    if (!store_ready(s, 0)) return 0;
+    int user = store_ready(s, 1), failed;
+    int n = store_search_once(s, yomi, out, max, user, &failed);
+    if (failed == 2 || failed == 4) {
+        /* Discard the entire partial merge, not just the last user row. */
+        if (failed == 2) (void)store_recover(s, 1);
+        user = 0;
+        if (store_ready(s, 0)) n = store_search_once(s, yomi, out, max, 0, &failed);
+    } else if (failed == 1 && store_recover(s, 0)) {
+        user = store_ready(s, 1);
+        n = store_search_once(s, yomi, out, max, user, &failed);
+        if ((failed == 2 || failed == 4) && store_ready(s, 0)) {
+            user = 0;
+            n = store_search_once(s, yomi, out, max, 0, &failed);
+        }
+    }
+    if (!failed) {
+        s->system.io_retried = 0;
+        if (user && s->user_enabled) s->user.io_retried = 0;
+    }
+    return n;
+}
+
+void fep_store_learn(FepStore *s, const char *yomi, const char *kanji)
+{
+    if (!s || !yomi || !kanji || !store_ready(s, 1) || !s->user.learn) return;
+    int rc = dict_learn_once(s->user.learn, yomi, kanji);
+    if (is_ioerr(rc) && store_recover(s, 1))
+        rc = dict_learn_once(s->user.learn, yomi, kanji);
+    if (rc == SQLITE_DONE) s->user.io_retried = 0;
+    else kprintf(ATTR_RED, "IME: Learn failed (rc=%d)\r\n", rc);
+}
+
+int fep_store_user_list(FepStore *s, const char *prefix, IME_UserEntry *out, int max)
+{
+    int io_error = 0;
+    if (!s || !out || max <= 0 || max > IME_USER_LIST_MAX || !store_ready(s, 1)) return -1;
+    int n = user_list_once(s->user.db, prefix, out, max, &io_error);
+    if (io_error && store_recover(s, 1))
+        n = user_list_once(s->user.db, prefix, out, max, &io_error);
+    if (n >= 0) s->user.io_retried = 0;
+    return n;
+}
+
+int fep_store_user_delete(FepStore *s, const char *yomi, const char *kanji)
+{
+    int io_error = 0;
+    if (!s || !yomi || !yomi[0] || !store_ready(s, 1)) return -1;
+    int rc = user_delete_once(s->user.db, yomi, kanji, &io_error);
+    if (io_error && store_recover(s, 1))
+        rc = user_delete_once(s->user.db, yomi, kanji, &io_error);
+    if (!rc) s->user.io_retried = 0;
+    return rc;
+}
+
+int fep_store_user_export(FepStore *s, const char *path)
+{
+    int io_error = 0;
+    if (!s || !path || !path[0] || !store_ready(s, 1)) return -1;
+    int rc = user_export_once(s->user.db, path, &io_error);
+    if (io_error && store_recover(s, 1))
+        rc = user_export_once(s->user.db, path, &io_error);
+    if (!rc) s->user.io_retried = 0;
+    return rc;
+}
+
+int fep_store_user_clear(FepStore *s)
+{
+    if (!s || !store_ready(s, 1)) return -1;
+    int rc = sqlite3_exec(s->user.db, "DELETE FROM dict_user;", 0, 0, 0);
+    if (is_ioerr(rc) && store_recover(s, 1))
+        rc = sqlite3_exec(s->user.db, "DELETE FROM dict_user;", 0, 0, 0);
+    if (rc != SQLITE_OK) return IME_DICT_ERR_CLEAR;
+    s->user.io_retried = 0;
+    return 0;
+}

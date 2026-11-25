@@ -5,7 +5,7 @@ fixture manifest for revisions, inputs, shim/source hashes and procedure.
 All positive and later mutation builds use the same copied directory tree.
 """
 CHECK = dict(name='dep-dir-c-memory-host', tier=1,
-    covers=['mm/paging_lowmap.h', 'mm/paging_lowmap.inc', 'tools/tests/paging_source.py', 'mm/memory_boot.c', 'platform/pc98/memory.c', 'include/platform_memory.h', 'platform/pc98/platform_memory_desc.h', 'mm/paging.c', 'mm/pgalloc.c', 'kernel/sys.c', 'mm/physmem.c', 'kernel/*.h', 'platform/pc98/*.h', 'include/*.h', 'arch/x86/*.h', 'lib/*.h', 'drivers/**/*.h', 'exec/*.h', 'sdk/include/os32/*.h', 'tools/tests/host_arch/*.h', 'tools/tests/host32.py', 'tools/tests/dep_dir_c_memory_host.c', 'tools/tests/fixtures/dep_dir_c/**', 'tools/tests/kernel_includes.py', 'mm/*.h', 'init/*.h', 'arch/x86/kernel/*.h', 'kernel/**/*.h', 'net/*.h', 'kapi/*.h', 'gfx/*.h', 'lib/sqlite3/*.h'],
+    covers=['sys/kern/mm/paging_lowmap.h', 'sys/kern/mm/paging_lowmap.inc', 'tools/tests/paging_source.py', 'sys/kern/mm/memory_boot.c', 'sys/platform/pc98/memory.c', 'sys/include/platform_memory.h', 'sys/platform/pc98/platform_memory_desc.h', 'sys/kern/mm/paging.c', 'sys/kern/mm/pgalloc.c', 'sys/kern/sys.c', 'sys/kern/mm/physmem.c', 'kernel/*.h', 'platform/pc98/*.h', 'include/*.h', 'arch/x86/*.h', 'lib/*.h', 'drivers/**/*.h', 'exec/*.h', 'sdk/include/os32/*.h', 'tools/tests/host_arch/*.h', 'tools/tests/host32.py', 'tools/tests/dep_dir_c_memory_host.c', 'tools/tests/fixtures/dep_dir_c/**', 'tools/tests/kernel_includes.py', 'mm/*.h', 'init/*.h', 'arch/x86/kernel/*.h', 'kernel/**/*.h', 'net/*.h', 'kapi/*.h', 'gfx/*.h', 'lib/sqlite3/*.h'],
     needs=[], budget=17.3,
     basis=['AC-MEM-1', '[C5]'],
 )
@@ -25,37 +25,37 @@ import host32
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / 'tools/tests/fixtures/dep_dir_c'
-SOURCES = ('kernel/sys.c',) + tuple('mm/' + name + '.c' for name in
+SOURCES = ('sys/kern/sys.c',) + tuple('mm/' + name + '.c' for name in
                 ('paging', 'pgalloc', 'memory_boot', 'physmem')) + (
-                    'platform/pc98/memory.c',)
+                    'sys/platform/pc98/memory.c',)
 HEADER_DIRS = tuple(dict.fromkeys(include_dirs()))
 HARNESS = 'tools/tests/dep_dir_c_memory_host.c'
 
 # name, source, literal target, replacement, fixed input
 MUTATIONS = (
-    ('bios-high-byte', 'platform/pc98/memory.c',
+    ('bios-high-byte', 'sys/platform/pc98/memory.c',
      'bios[BIOS_WORK_MEM_HIGH_MB + 1] << 8',
      'bios[BIOS_WORK_MEM_HIGH_MB + 1] << 0', 'bios-256'),
-    ('low-restore', 'platform/pc98/memory.c',
+    ('low-restore', 'sys/platform/pc98/memory.c',
      '*low = saved;', '*low = pattern;', 'wrap-later'),
-    ('second-pass', 'platform/pc98/memory.c',
+    ('second-pass', 'sys/platform/pc98/memory.c',
      'if (*(volatile u32 *)P2V_BOOT(addr) != (addr ^ MEMORY_BOOT_PROBE_XOR))',
      'if (*(volatile u32 *)P2V_BOOT(addr) == (addr ^ MEMORY_BOOT_PROBE_XOR))',
      'alias-middle'),
-    ('legacy-clamp', 'platform/pc98/platform_memory_desc.h',
+    ('legacy-clamp', 'sys/platform/pc98/platform_memory_desc.h',
      'MEM_SYSTEM_SPACE_BASE, MEM_SYSTEM_SPACE_BASE, MEM_SYSTEM_SPACE_END,',
      'MEM_HIGH_RAM_BASE, MEM_SYSTEM_SPACE_BASE, MEM_SYSTEM_SPACE_END,',
      'legacy-16384'),
-    ('background-end', 'mm/memory_boot.c',
+    ('background-end', 'sys/kern/mm/memory_boot.c',
      '                                  platform_memory_geometry.system_end / PAGE_SIZE,',
      '                                  platform_memory_geometry.system_end / PAGE_SIZE - 1,',
      'bios-5'),
-    ('native-uc-end', 'platform/pc98/platform_memory_desc.h',
+    ('native-uc-end', 'sys/platform/pc98/platform_memory_desc.h',
      '{TVRAM_CHAR_BASE, TVRAM_CG_WINDOW}',
      '{TVRAM_CHAR_BASE, TVRAM_CG_WINDOW + MEM_PAGE_SIZE}', 'bios-5'),
-    ('native-pwt', 'mm/paging.c',
+    ('native-pwt', 'sys/kern/mm/paging.c',
      '            return PTE_PCD;', '            return PTE_PWT;', 'bios-5'),
-    ('rom-end', 'platform/pc98/platform_memory_desc.h',
+    ('rom-end', 'sys/platform/pc98/platform_memory_desc.h',
      '{MEM_BIOS_ROM_START, MEM_BIOS_ROM_END + 1}',
      '{MEM_BIOS_ROM_START, MEM_BIOS_ROM_END + 1 - MEM_PAGE_SIZE}', 'bios-5'),
 )
@@ -104,8 +104,8 @@ def build(work, sample, source_root=ROOT, mutation=None, attributes=False):
     if mutation and mutation[1].endswith('.h'):
         path = work / mutation[1]
         path.write_text(replace_once(path.read_text(), mutation[2], mutation[3]))
-    # geforce_module.h (via kernel/sys.c) needs only the resident stop state.
-    for rel in ('hwdev/gf/stop_state.h',):
+    # geforce_module.h (via sys/kern/sys.c) needs only the resident stop state.
+    for rel in ('sys/dev/video/geforce/stop_state.h',):
         dest = work / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source_root / rel, dest)
@@ -121,7 +121,7 @@ def build(work, sample, source_root=ROOT, mutation=None, attributes=False):
         if unit in ('paging', 'pgalloc', 'sys'):
             text = text.replace('irq_save()', 'host_irq_save()')
             text = text.replace('irq_restore(flags)', 'host_irq_restore(flags)')
-        if rel == 'platform/pc98/memory.c':
+        if rel == 'sys/platform/pc98/memory.c':
             text = instrument_probe(text)
         dest = work / Path(rel).parent / (unit + '_host_source.c')
         dest.write_text(text)

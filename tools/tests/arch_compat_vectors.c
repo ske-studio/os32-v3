@@ -4,7 +4,7 @@
 /* PC98 table wiring uses a recording keyboard; PowerMac runs its real reader.
  * These seams do not establish device, IRQ, or scheduler conformance. */
 #include "input_service.h"
-#include "kernel/input_service.c"
+#include "sys/hal/input/input_service.c"
 static int queued = -1, polls, delay, cancelled, waited, raw_key = -1, down;
 static u32 mods;
 static int take(void)
@@ -70,8 +70,8 @@ u32 pm_input_usb_dropped(void) { return 0; }
 int pm_terminal_trygetkey(void) { return -1; }
 void pm_terminal_poll(void) {}
 int platform_clock_read_us(u32 *lo, u32 *hi) { *lo = fake_time; *hi = 0; return 0; }
-#include "kernel/input_legacy.c"
-#include "kernel/input_wait.c"
+#include "sys/kern/input_legacy.c"
+#include "sys/kern/input_wait.c"
 #endif
 #include INPUT_SOURCE
 static int hits, bgm_stop_calls, ide_init_calls;
@@ -158,7 +158,7 @@ void _start(void)
     __builtin_unreachable();
 }
 #else
-#include "kernel/irq/tick.h"
+#include "sys/kern/irq/tick.h"
 volatile u32 tick_count;
 static u32 irq_state = 1;
 u32 irq_save(void) { u32 old = irq_state; irq_state = 0; return old; }
@@ -195,8 +195,8 @@ static int time3(void)
     return 0;
 }
 #ifdef MPIC_SOURCE
-#include "platform/powermac/mpic.h"
-#include "arch/ppc/ppc_trap.h"
+#include "sys/platform/powermac/mpic.h"
+#include "sys/arch/ppc/ppc_trap.h"
 static u32 regs[PM_MPIC_WINDOW_MAX / 4];
 static unsigned eois, deliveries;
 u32 pm_mpic_bus_read(u32 address, int little)

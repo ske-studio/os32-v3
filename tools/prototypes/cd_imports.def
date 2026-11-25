@@ -1,58 +1,58 @@
 {
   "schema": 1,
   "contracts": [
-    "drivers/ata/cd_module.h",
-    "kernel/dev/dev.h",
-    "fs/vfs.h"
+    "sys/dev/ata/cd_module.h",
+    "sys/hal/block/dev.h",
+    "sys/fs/vfs.h"
   ],
   "imports": [
     {
       "symbol": "cpu_delay_us",
       "context": "normal",
       "irq": false,
-      "source": "kernel/time/cpu_calibrate.h"
+      "source": "sys/hal/time/cpu_calibrate.h"
     },
     {
       "symbol": "dev_find",
       "context": "normal",
       "irq": false,
-      "source": "kernel/dev/dev.h"
+      "source": "sys/hal/block/dev.h"
     },
     {
       "symbol": "dev_blk_read_lba",
       "context": "normal",
       "irq": false,
-      "source": "kernel/dev/dev.h"
+      "source": "sys/hal/block/dev.h"
     },
     {
       "symbol": "kfree",
       "context": "normal",
       "irq": false,
-      "source": "mm/kmalloc.h"
+      "source": "sys/kern/mm/kmalloc.h"
     },
     {
       "symbol": "kmalloc",
       "context": "normal",
       "irq": false,
-      "source": "mm/kmalloc.h"
+      "source": "sys/kern/mm/kmalloc.h"
     },
     {
       "symbol": "kzalloc",
       "context": "normal",
       "irq": false,
-      "source": "mm/kmalloc.h"
+      "source": "sys/kern/mm/kmalloc.h"
     },
     {
       "symbol": "kprintf",
       "context": "normal",
       "irq": false,
-      "source": "include/kprintf.h"
+      "source": "sys/include/kprintf.h"
     },
     {
       "symbol": "kstrncpy",
       "context": "normal",
       "irq": false,
-      "source": "lib/kstring.h"
+      "source": "sys/kern/kstring.h"
     },
     {
       "symbol": "ktime_ticks",
@@ -64,37 +64,37 @@
       "symbol": "kstrcmp",
       "context": "normal",
       "irq": false,
-      "source": "lib/kstring.h"
+      "source": "sys/kern/kstring.h"
     },
     {
       "symbol": "kstrlen",
       "context": "normal",
       "irq": false,
-      "source": "lib/kstring.h"
+      "source": "sys/kern/kstring.h"
     },
     {
       "symbol": "kmemcpy",
       "context": "normal",
       "irq": false,
-      "source": "lib/kstring.h"
+      "source": "sys/kern/kstring.h"
     },
     {
       "symbol": "ide_multiple_reset_bank",
       "context": "normal",
       "irq": false,
-      "source": "drivers/ata/ide.h"
+      "source": "sys/dev/ata/ide.h"
     },
     {
       "symbol": "dev_media_check",
       "context": "normal",
       "irq": false,
-      "source": "kernel/dev/dev.h"
+      "source": "sys/hal/block/dev.h"
     },
     {
       "symbol": "vfs_fd_stale_mount",
       "context": "normal",
       "irq": false,
-      "source": "fs/vfs.h"
+      "source": "sys/fs/vfs.h"
     }
   ]
 }

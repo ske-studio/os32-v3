@@ -8,7 +8,7 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'drivers/video/geforce/gf_v2_gart.c'
+SOURCE = ROOT / 'sys/dev/video/geforce/gf_v2_gart.c'
 
 
 def observe(work, source):

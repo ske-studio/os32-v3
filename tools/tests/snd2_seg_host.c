@@ -1,6 +1,6 @@
-#include "sound/hal/snd2.h"
+#include "sys/hal/sound/snd2.h"
 #include "kstring.h"
-#include "mm/kmalloc.h"
+#include "sys/kern/mm/kmalloc.h"
 
 #define REQUIRE(expr) do { if (!(expr)) return 1; } while (0)
 static u32 ring[4096], staging[SND2_STG_FRAMES], samples[SND2_STG_FRAMES];

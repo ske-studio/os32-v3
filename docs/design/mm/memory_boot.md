@@ -1,13 +1,13 @@
-# mm/memory_boot.c — 設計
+# sys/kern/mm/memory_boot.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: DEP_DIR_C_DESIGN (D1 で移した)
-ソース: `mm/memory_boot.c`
+ソース: `sys/kern/mm/memory_boot.c`
 
 |状態・値|所有者|文脈|
 |---|---|---|
-|boot_high_end / boot_ram_kb / boot_memory / meta境界|mm/memory_boot.c、従来のstaticを維持|detect/initの既存位置|
+|boot_high_end / boot_ram_kb / boot_memory / meta境界|sys/kern/mm/memory_boot.c、従来のstaticを維持|detect/initの既存位置|
 
 ```c
-/* mm/memory_boot.c: 公開名と戻り値契約を保存 */
+/* sys/kern/mm/memory_boot.c: 公開名と戻り値契約を保存 */
 u32 memory_boot_detect(u32 mem_kb)
 {
     u32 end = platform_memory_probe_high();
@@ -28,8 +28,8 @@ u32 memory_boot_detect(u32 mem_kb)
 
 > 出所: TASK_K6_ram_ceiling の契約を今のソースと照らして要約 (2026-11-18)
 
-- 起動の順は `memory_boot_detect` → `paging_init` → `memory_boot_init` (`platform/pc98/kernel_boot_memory.inc`)。検出が恒等写像の範囲と表の大きさを決めるので、この順を崩さない。`memory_boot_init` が失敗したら fail-stop で、`shm_init`・自己試験・`shlib_init` はその後。
-- 高位 RAM (`MEM_HIGH_RAM_BASE` = 16MB より上) の量は `memory_boot_detect` が確かめた量 (`boot_high_end`) だけ。ローダの申告 `mem_kb` はヒントで、それだけでは 1 ページも高位 RAM に上げない (`mem_kb = 0xFFFFFFFF` でも昇格しない)。`physmem_add_trusted` を呼ぶ製品のソースは `mm/memory_boot.c` の 1 か所 (`PHYSMEM_SOURCE_MACHINE`) だけ。
+- 起動の順は `memory_boot_detect` → `paging_init` → `memory_boot_init` (`sys/platform/pc98/kernel_boot_memory.inc`)。検出が恒等写像の範囲と表の大きさを決めるので、この順を崩さない。`memory_boot_init` が失敗したら fail-stop で、`shm_init`・自己試験・`shlib_init` はその後。
+- 高位 RAM (`MEM_HIGH_RAM_BASE` = 16MB より上) の量は `memory_boot_detect` が確かめた量 (`boot_high_end`) だけ。ローダの申告 `mem_kb` はヒントで、それだけでは 1 ページも高位 RAM に上げない (`mem_kb = 0xFFFFFFFF` でも昇格しない)。`physmem_add_trusted` を呼ぶ製品のソースは `sys/kern/mm/memory_boot.c` の 1 か所 (`PHYSMEM_SOURCE_MACHINE`) だけ。
 - 登録の上限は `MEM_PHYS_RAM_CEILING` (2GB) だけで、それ以外に RAM の量を切り詰める定数を置かない。引くのは名前の付いた予約だけ:
   - `[MEM_SYSTEM_SPACE_BASE, MEM_SYSTEM_SPACE_END)` (15〜16MB のシステム空間) → RESERVED。RAM として 1 ページも配らない。
   - `[MEM_PHYS_RAM_CEILING, 4GB)` → MMIO (デバイス窓の帯 `MEM_DEVICE_APERTURE_*` と最上位の ROM・PCI の帯 `[MEM_PHYS_MMIO_TOP, 4GB)` を含む)。

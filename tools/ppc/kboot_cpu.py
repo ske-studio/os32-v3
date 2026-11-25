@@ -14,16 +14,16 @@ from kboot_vectors import CROSS, FLAGS, symbols
 BASE_PRODUCT = list(vectors.PRODUCT)
 
 CHECK = dict(name='kboot-cpu', tier=2, budget=600, needs=[],
-             covers=['arch/ppc/kernel_cpu.c', 'arch/ppc/ppc_*.h',
+             covers=['sys/arch/ppc/kernel_cpu.c', 'arch/ppc/ppc_*.h',
                      'tools/ppc/kboot_cpu*', 'tools/ppc/kboot_vectors.py',
-                     'tools/ppc/run.py', 'arch/ppc/entry.S', 'arch/ppc/ofw_note.S',
-                     'arch/ppc/mmu.S', 'arch/ppc/cache_copy.S',
-                     'arch/ppc/kernel_vectors.S', 'arch/ppc/kernel_hpt.c',
-                     'arch/ppc/pd_walk.c', 'platform/powermac/ofw.c',
-                     'platform/powermac/ofw.h', 'platform/powermac/escc*.c',
-                     'platform/powermac/platform_of_layout.h', 'include/types.h',
-                     'include/callconv.h', 'include/memmap.h',
-                     'include/appmem_types.h', 'mm/paging.h',
+                     'tools/ppc/run.py', 'sys/arch/ppc/entry.S', 'sys/arch/ppc/ofw_note.S',
+                     'sys/arch/ppc/mmu.S', 'sys/arch/ppc/cache_copy.S',
+                     'sys/arch/ppc/kernel_vectors.S', 'sys/arch/ppc/kernel_hpt.c',
+                     'sys/arch/ppc/pd_walk.c', 'sys/platform/powermac/ofw.c',
+                     'sys/platform/powermac/ofw.h', 'platform/powermac/escc*.c',
+                     'sys/platform/powermac/platform_of_layout.h', 'sys/include/types.h',
+                     'sys/include/callconv.h', 'sys/include/memmap.h',
+                     'sys/include/appmem_types.h', 'sys/kern/mm/paging.h',
                      'lib/kstring*', 'build/arch/ppc.mk'])
 
 
@@ -49,7 +49,7 @@ def host(out, source, mutation=None):
            '-DPPC_HPT_HOST_TEST','-D__cdecl=','-Wall','-Wextra','-Werror']
     exe=out/'host'
     command(['gcc',*flags,*[x for x in FLAGS if x.startswith('-I')],source,
-             ROOT/'arch/ppc/kernel_hpt.c',ROOT/'tools/ppc/kboot_cpu_host.c','-o',exe])
+             ROOT/'sys/arch/ppc/kernel_hpt.c',ROOT/'tools/ppc/kboot_cpu_host.c','-o',exe])
     p=subprocess.run(['qemu-i386',str(exe)],timeout=10,capture_output=True)
     (out/'host-result.log').write_bytes(p.stdout)
     if mutation:
@@ -70,12 +70,12 @@ def host(out, source, mutation=None):
 def build(out, source):
     # C4's fixture owns ppc_trap_dispatch: keep D2's product trap out of this link.
     vectors.PRODUCT=[x for x in BASE_PRODUCT if 'kboot_vectors_fixture' not in x
-                     and x != 'arch/ppc/kernel_trap.c']
+                     and x != 'sys/arch/ppc/kernel_trap.c']
     vectors.PRODUCT += ['tools/ppc/kboot_cpu_fixture.S','tools/ppc/kboot_cpu_fixture.c',str(source)]
     # C2 is used directly; vectors.build normally renames its spill for the D1 wrapper.
     # Provide that alias without altering any product source.
     vectors.FLAGS = FLAGS + ['-Wl,--wrap=ppc_isync']
-    elf=vectors.build(out,ROOT/'arch/ppc/kernel_vectors.S')
+    elf=vectors.build(out,ROOT/'sys/arch/ppc/kernel_vectors.S')
     return elf
 
 
@@ -105,7 +105,7 @@ def static(out, source):
         require(re.search(r'li\s+r3,'+str(n)+r'\s*\n.*?ppc_hpt_vsid.*?oris\s+r3,r3,8192.*?mtsr\s+'+str(n)+r',r3',
                           segments,re.S), 'SR value Ks0/Kp1/fixed VSID '+str(n))
     hpt_obj=out/'hpt.o'
-    command([str(CROSS)+'gcc',*FLAGS,'-c',ROOT/'arch/ppc/kernel_hpt.c','-o',hpt_obj])
+    command([str(CROSS)+'gcc',*FLAGS,'-c',ROOT/'sys/arch/ppc/kernel_hpt.c','-o',hpt_obj])
     hpt_dis=command([str(CROSS)+'objdump','-d',hpt_obj])
     vsid=hpt_dis.split('<ppc_hpt_vsid>:',1)[1].split('blr',1)[0]
     require(re.search(r'ori\s+r3,r3,16',vsid),'C2 fixed VSID = 0x10 | segment')
@@ -186,7 +186,7 @@ def main():
     parser.add_argument('--host-only', action='store_true')
     a=parser.parse_args()
     out=ROOT/'build/out/ppc/kboot-cpu'
-    src=ROOT/'arch/ppc/kernel_cpu.c'
+    src=ROOT/'sys/arch/ppc/kernel_cpu.c'
     host(out/'normal',src)
     if not a.host_only:
         static(out/'normal',src)

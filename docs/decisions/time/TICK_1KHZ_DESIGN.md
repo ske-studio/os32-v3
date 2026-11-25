@@ -29,13 +29,13 @@
 | ID | 票・コメントからの前提 → 実物と設計への影響 |
 |---|---|
 | D1 | 8.125ms・23%速いのは過去の不具合。`kernel/time/pit.c:10`、`sysclk.h` に履歴、`pit.c` は既に実クロックから算出。再修正対象ではない。 |
-| D2 | `pit_math.c` は「100Hzだけ」と書くが判定は `hz == PIT_HZ`。`include/memmap.h` を変えるだけで通り、`pit_math.c` の切捨て divisor と `pit_compute()` の整数 µs が1kHzで不正確になる。 |
-| D3 | `kernel/time/ktime.c` は32bit周回非対応、`time_math.c` の pending 加算も32bit。物理1kHzなら約49.7日で周回し、clampだけでは時計が長期停止する。 |
-| D4 | `arch/x86/kernel/isr_stub.asm` は加算・callback・EOI・V86反射/期限を毎IRQで実施。`kernel/irq/tick.c` の `tick_dispatch()` に間引きは無い。既存周期を保つ結線が要る。 |
+| D2 | `pit_math.c` は「100Hzだけ」と書くが判定は `hz == PIT_HZ`。`sys/include/memmap.h` を変えるだけで通り、`pit_math.c` の切捨て divisor と `pit_compute()` の整数 µs が1kHzで不正確になる。 |
+| D3 | `sys/kern/time/ktime.c` は32bit周回非対応、`time_math.c` の pending 加算も32bit。物理1kHzなら約49.7日で周回し、clampだけでは時計が長期停止する。 |
+| D4 | `sys/arch/x86/kernel/isr_stub.asm` は加算・callback・EOI・V86反射/期限を毎IRQで実施。`sys/kern/irq/tick.c` の `tick_dispatch()` に間引きは無い。既存周期を保つ結線が要る。 |
 | D5 | `pcm_cs4231.h` の5/3tick・10ms、`snd_engine.c` の毎callback減衰・5/15/8tick、`v86.h:200` の300×100は追従しない。`kbd.c` に加え pcm_e4_guest・snd_engine・iso9660.h・platform_splash.h・gfinit・recover_* も PIT_HZ を参照する。固定値と率参照が混在するため、PIT_HZ は論理100Hzのまま保つ。 |
-| D6 | `kapi/kapi_generated.c` は get_tick を生の tick_count として返す。`userland/shell/cmd_base.c` の /100、`userland/lib/snd/libos32snd.c` の `snd_se_play_custom()` のms→tickなどがABIの実質的な100Hz契約。 |
-| D7 | `kdebug/recover_profile.c` はUARTフレーム<PIT周期・切捨てdivisorを要求。9600bpsの10bitは約1042µsで1kHzの周期を越す。復旧経路も移行の障害になる。 |
-| D8 | `drivers/video/pc98/splash_raster_play.c` の pl_v2_frame は active0+400行を IF=0 で走る（31k 約13ms、24k 約16ms）。`platform/pc98/splash_image.c` から起動時約3秒、wt/splash-time では最大8秒反復する。除外しなければA1 の800µsゲートを超え、B1 では1フレーム当たり約12回以上のIRQ0を失い、物理カウンタ・論理tick・sys_time_nowが遅れる。再生は作り直さない。スプラッシュの間は1kHzの契約の外で、tick・時計の遅れは許す（ユーザー決定 2026-11-05、§8 U2）。 |
+| D6 | `sys/kapi/kapi_generated.c` は get_tick を生の tick_count として返す。`userland/shell/cmd_base.c` の /100、`userland/lib/snd/libos32snd.c` の `snd_se_play_custom()` のms→tickなどがABIの実質的な100Hz契約。 |
+| D7 | `sys/platform/pc98/kdebug/recover_profile.c` はUARTフレーム<PIT周期・切捨てdivisorを要求。9600bpsの10bitは約1042µsで1kHzの周期を越す。復旧経路も移行の障害になる。 |
+| D8 | `sys/platform/pc98/video/splash_raster_play.c` の pl_v2_frame は active0+400行を IF=0 で走る（31k 約13ms、24k 約16ms）。`sys/platform/pc98/splash_image.c` から起動時約3秒、wt/splash-time では最大8秒反復する。除外しなければA1 の800µsゲートを超え、B1 では1フレーム当たり約12回以上のIRQ0を失い、物理カウンタ・論理tick・sys_time_nowが遅れる。再生は作り直さない。スプラッシュの間は1kHzの契約の外で、tick・時計の遅れは許す（ユーザー決定 2026-11-05、§8 U2）。 |
 
 ## 2. A: 周波数を変える前の実測
 専用票 `TASK_TICK_1KHZ.md` を後続PMが新設し、A0/A1/B0/B1の像・結果・判定を分けて記録する。現時点で合格とは扱わない。
@@ -50,8 +50,8 @@
 各版・各環境でウォームアップ30秒、各負荷60秒×5回、混合負荷30分。最悪値・p99・合計CPU占有・IRQ回数・観測漏れを保存。
 負荷: idle、FM BGM+SE/SSG減衰、PCM 44100/22050Hz連続再生とdrain/再同期、V86 BIOS/ROM/timeout/脱出、打鍵連打/CTRL+STOP、NIC+serial/host転送、FD/ISO、実行可能な混合。描画/splash はゲート対象から外して別ケースとする（通常描画の区間外測定はゲート対象）。
 PCM/V86で排他的な音源状態は別ケースにする。ゲストの協調処理は継続し、tickから新たな切替・待ち・確保を呼ばない。
-除外印は `platform/pc98/kernel.c` の boot_splash() 呼出し直前で立て、復帰直後に必ず解除する（早期return・診断分岐を含む）。_enable()・services_boot()・NIC legacy 初期化は区間外であり、除外を起動全体へ広げない。区間中もIRQ0のlink_rx_pumpとserial受信は生きる。入口/復帰と外部時刻を記録し、境界をまたぐサンプルは別集計に含め、区間外窓の開始時にpendingと診断カウンタの基準を取り直す。除外区間中の時計の遅れを区間外の時刻差へ持ち越さず、外部基準と時計の差分を区間外窓ごとに測る。wt/splash-time 等の単体診断を boot_splash 区間と偽装しない。
-CTRL+STOP の実物: `drivers/input/kbd.c` はIRQ1で ring3_abort_request() を呼び、cooked打鍵には配らない。`exec/exec_abort.inc` → `exec/appslot.c` の経路では、起動時のアプリ不在/CUIでは appslot_abort_request() が0を返し、abort_reqを立てず、スプラッシュも中断しない。これは100Hz像でも同じ効き目である。受信成功をkill数で代用せず、外部キー入力とIRQ1でのCTRL+STOP認識数を突合する。スプラッシュ中も取りこぼし0を受入とし、実測前に保証済みとは扱わない。
+除外印は `sys/platform/pc98/kernel.c` の boot_splash() 呼出し直前で立て、復帰直後に必ず解除する（早期return・診断分岐を含む）。_enable()・services_boot()・NIC legacy 初期化は区間外であり、除外を起動全体へ広げない。区間中もIRQ0のlink_rx_pumpとserial受信は生きる。入口/復帰と外部時刻を記録し、境界をまたぐサンプルは別集計に含め、区間外窓の開始時にpendingと診断カウンタの基準を取り直す。除外区間中の時計の遅れを区間外の時刻差へ持ち越さず、外部基準と時計の差分を区間外窓ごとに測る。wt/splash-time 等の単体診断を boot_splash 区間と偽装しない。
+CTRL+STOP の実物: `sys/platform/pc98/input/kbd.c` はIRQ1で ring3_abort_request() を呼び、cooked打鍵には配らない。`sys/kern/exec/exec_abort.inc` → `sys/kern/exec/appslot.c` の経路では、起動時のアプリ不在/CUIでは appslot_abort_request() が0を返し、abort_reqを立てず、スプラッシュも中断しない。これは100Hz像でも同じ効き目である。受信成功をkill数で代用せず、外部キー入力とIRQ1でのCTRL+STOP認識数を突合する。スプラッシュ中も取りこぼし0を受入とし、実測前に保証済みとは扱わない。
 NIC/serial は有限の既存バッファで受けられる分だけ受け、溜まる処理・要求は拒否し、溢れ・破棄を許す。無制限の保留やバッファ拡大で埋めない。8251は1バイトであり13〜16msのIF=0中の9600bps受信を無欠落とはしない。復帰後にNICのOVW回復・serialのOE後の受信再開と再送を確認し、正常な転送へ戻ることを合否とする。SerialDiag OE/受信リング溢れ増分0はスプラッシュ区間を除いた窓だけで判定する。
 短いIRQ経路は IRQ_ENTER〜EOI〜IRQ_LEAVE のうち timer_handler 全体を除いた区間と定義し、A1で入口/出口・EOIの区間和を別集計する。論理処理（反射/timeout等）は100Hz側へ分離計上し、timer_handlerのdispatch overheadも含む既存callback群と二重計上しない。B1の実際の短経路はB1で再測定する。
 測定点: IRQ_ENTER直前→復帰直前、C timer_handler、7slot各callback、EOI/反射/timeout、非IRQのIF=0最長区間、IRQ1/IRQ10の遅延、連続IRQ0の間隔。
@@ -72,20 +72,20 @@ B1でもスプラッシュ区間を除く窓で実測CPU占有5%以下、IRQ0最
 | 定数層 | 正典と役割 |
 |---|---|
 | Shared | `sdk/include/os32/os32_kapi_shared.h` に `OS32_TICK_HZ=100`（既存公開tickの意味を明文化）。公開ヘッダはC89、構造体/slot/引数単位を変更しない。 |
-| Subsystem | `include/memmap.h` の `PIT_HZ=100` と `TICK_MS=1000u/PIT_HZ` は論理値として維持。新設 `PIT_IRQ_HZ` だけを x86 の物理要求100→1000とする (PowerPC は `PM_DEC_HZ`)。`pit_setup.clk_hz/reload` が x86 の実周期の正典で、共通の tick_clock には num/den で渡す ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §2・§3)。 |
+| Subsystem | `sys/include/memmap.h` の `PIT_HZ=100` と `TICK_MS=1000u/PIT_HZ` は論理値として維持。新設 `PIT_IRQ_HZ` だけを x86 の物理要求100→1000とする (PowerPC は `PM_DEC_HZ`)。`pit_setup.clk_hz/reload` が x86 の実周期の正典で、共通の tick_clock には num/den で渡す ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §2・§3)。 |
 | Local | PCM/FDC/serial等の機構時間・回数・境界余裕は各所有ファイル。物理period_usを論理TICK_MSの代用にしない。同じ意味の新たな写しは増やさない。 |
-依存確認: SDK sharedヘッダ:192-195 の `__KERNEL_BUILD__` 分岐が memmap.h を読み、PowerPC の像も同じ分岐を通る。逆向きincludeは追加しない。SDK には `OS32_TICK_HZ` をリテラルの 100 で置くだけにし、`STATIC_ASSERT(OS32_TICK_HZ == PIT_HZ, logical_tick_hz_match)` は x86 だけの `platform/pc98/clock_source.c` に置く (PowerPC の PIT_HZ 監査を通すため、[TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) X4)。
+依存確認: SDK sharedヘッダ:192-195 の `__KERNEL_BUILD__` 分岐が memmap.h を読み、PowerPC の像も同じ分岐を通る。逆向きincludeは追加しない。SDK には `OS32_TICK_HZ` をリテラルの 100 で置くだけにし、`STATIC_ASSERT(OS32_TICK_HZ == PIT_HZ, logical_tick_hz_match)` は x86 だけの `sys/platform/pc98/clock_source.c` に置く (PowerPC の PIT_HZ 監査を通すため、[TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) X4)。
 物理要求の参照は pit_init・pit_mathの物理設定/検査・recover_profile・kselftest に限定し、物理計算自体は実clock/reloadを使う。論理消費者のPIT_HZ→OS32_TICK_HZ一括置換は不要。`tools/tests/gfinit_budget_host.c`、`pegc_mode_host.c`、`recover_t2_host.inc`、`dep_dir_b_timer_host.c` もPIT_HZ=100のままで10倍化を防ぐ。
 `pit_compute` は測定/比較の100と1000を扱う。未知clock/無効周波数を既存のPIT_ERR_CLOCK/HZで返すのは装置仕様の範囲でありソース許可リストではない。
 divisorは最近接整数 `reload=(clk_hz + hz/2)/hz`。1.9968MHz→1997（1000.100160µs、約−100ppm）、2.4576MHz→2458（1000.162760µs、約−163ppm）。
-100Hzは19968/24576で正確な10ms。切捨て1996/2457を採らず、周期ごとのreload変更も行わない。既存mode2プログラム順序は `platform/pc98/timer.c` を保持。
+100Hzは19968/24576で正確な10ms。切捨て1996/2457を採らず、周期ごとのreload変更も行わない。既存mode2プログラム順序は `sys/platform/pc98/timer.c` を保持。
 `pit_setup.period_us` は表示用floorと明記し、時刻累積や復旧判定に使用しない。`pit_init` は従来の負値+既定fallbackを保ち、試験起動では要求と実設定の不一致を失敗として表示。
 KAPIの意味/配置は維持するため版上げ不要。変更が必要になった場合はsdk/kapi.jsonを正として末尾追加・版上げ・再生成・clean buildを別段にし、生成ファイルを手編集しない。
 
 ## 4. 状態・関数・IRQ手順・周回
-`kernel/time/tick.c` (tick_count の定義の所) が両 arch 共通の tick_clock として物理カウント上位/下位と論理位相を所有し、tick_count を進めるのは `tick_clock_step` だけにする。口・検査・呼び手は [TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §2 が正 (`tick_clock_config(period_num, period_den)` で物理の周期を num/den 秒で受け、step は位相 `phase += num * OS32_TICK_HZ` が den を越えたら論理 tick)。
+`sys/hal/time/tick.c` (tick_count の定義の所) が両 arch 共通の tick_clock として物理カウント上位/下位と論理位相を所有し、tick_count を進めるのは `tick_clock_step` だけにする。口・検査・呼び手は [TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §2 が正 (`tick_clock_config(period_num, period_den)` で物理の周期を num/den 秒で受け、step は位相 `phase += num * OS32_TICK_HZ` が den を越えたら論理 tick)。
 1kHzでの論理tickは主に10IRQごと、位相補正時は9IRQ間隔となる。実時間との遅れは物理1周期未満。単純な10分周の−100/−163ppm累積を避ける。
-x86 のASMは既存 `inc tick_count` をstep呼出しへ置換、戻りを保存し、論理tick時のみtimer_handlerを呼ぶ。PowerPC は `arch/ppc/kernel_dec.c` の経過周期の loop で step を呼び、論理tick時のみ tick_dispatch を呼ぶ。EOIは全IRQで従来位置、V86_REFLECT 0とv86_tick_and_check_timeoutは論理tick時だけ。
+x86 のASMは既存 `inc tick_count` をstep呼出しへ置換、戻りを保存し、論理tick時のみtimer_handlerを呼ぶ。PowerPC は `sys/arch/ppc/kernel_dec.c` の経過周期の loop で step を呼び、論理tick時のみ tick_dispatch を呼ぶ。EOIは全IRQで従来位置、V86_REFLECT 0とv86_tick_and_check_timeoutは論理tick時だけ。
 これでV86のINT08h反射・#GP予算リセット・300×100の5分・GCAP300の3秒を保つ。例外脱出とIRQ深度の片付けは現在の順を保持し、分岐でEOIを飛ばさない。
 7slotの順・登録/解除・ownerは変えない。FM減衰、PCM停止state、NIC受信budget、GF共有IRQ救済pollは100Hzで継続。全slotの集中最大を測るので平均の間引きで重い1回を隠せない。
 `ktime.c` はIF保存後にp1/count/p2とraw_hi/loを採り、pendingなら**64bitで**raw+1、境界不確定なら既存3回retry。論理tick_countを補間に混ぜない。
@@ -111,19 +111,19 @@ CPU校正は論理tick5回≒50msを維持。`CPU_DELAY_SCALE=100` の2段割り
 | PCM `pcm_cs4231.h` / `pcm_cs4231_math.c` / `pcm_cs4231.c` | 5=50ms、3=30msは維持。closeの+3半分はDMA通過数、+3tickは停止期限、slack2は開始端数+証拠1回で、十倍しない。strict > の1回余裕も維持。 |
 | PCM `pcm_e4_guest.c` | 2秒は既存PIT_HZ=100で算出。frames/44100/22050、DMAサイズ、512frame marginはtickと無関係。 |
 | FM `fm.c` / `snd_engine.c` | ms/TICK_MSと最小1tick、MML期限を維持し率は既存PIT_HZ=100を維持。SE5/15/8/10は50/150/80/100ms、減衰3/2/1は100Hzごとの音量。raw APIも10ms単位。 |
-| V86 `v86.h:200` / `v86.c:433` / `kdebug/v86_gcap.c` の `GCAP_TICK_LIMIT` | 300×100=5分、GCAP300=3秒、GP上限=10ms窓を維持。物理IRQごとの予算リセットは禁止。 |
+| V86 `v86.h:200` / `v86.c:433` / `sys/platform/pc98/kdebug/v86_gcap.c` の `GCAP_TICK_LIMIT` | 300×100=5分、GCAP300=3秒、GP上限=10ms窓を維持。物理IRQごとの予算リセットは禁止。 |
 | kbd `kbd.c` / exec `appslot.h` | STOP抑止0.5秒を論理率で算出、APP_RUNAWAY200=2秒、park_poll/last_kernel_tickは同じ論理時計。IRQ1自体は間引かない。 |
 | FDC `fdc.h` / `fdc_seek_reset.inc` / `fdc_track.h` | 30/10/150/100/20/1/10=300/100/1500/1000/200/10/100ms。head settle3=ceil(15ms/10ms)+境界1、margin2は倍率、idle200=2秒。全て維持しFD実測。diskio.c:136の時計も同単位。 |
 | serial `serial_plan.h` / `serial_plan.c` | 10000µsは論理周期、最低3tick=30ms、edge1は量子化余裕。baudから2文字時間をceilして+1する契約を維持。IF=0側の有限poll回数はtickへ変えない。 |
 | NIC `e82557_regs.h` / `ne2000.c` の `NE2K_OVW_WAIT_TICKS` | PHY10=100ms、link300=3秒、TX50=500ms、OVW2=20ms、TX5=50msを維持。e82557.cの表示は論理TICK_MS。 |
-| link `net/link.h` / `link.c` / `link_selftest.inc` | RTO20=200ms、probe100=1秒を維持。`net/link_rx.inc` の LINK_RX_BUDGET16（link.h）は最大1.5KBのne2k_recv PIOを16件行い、`lgy98.c` のREFLECT_BUDGETも同形。10ms周期由来の件数上限は1ms時代の時間保証にならない。C-bus 1〜2MB/sの仮定では最大長1件だけで約0.75〜1.5ms、16件なら約12〜24ms＋処理費用となる。A1で両経路のcallback最大時間・件数・バイト数と他callback集中時の残予算を測る。IRQ0全体200µsから短経路・他callback等を引いた時間予算内となるよう、件数削減を測定後に決める。1件でも収まらなければ件数削減だけでは不十分で、PIO分割または既存協調処理への移管を別設計し再測定する。nonceのtickは数値種のまま。 |
+| link `sys/net/link.h` / `link.c` / `link_selftest.inc` | RTO20=200ms、probe100=1秒を維持。`sys/net/link_rx.inc` の LINK_RX_BUDGET16（link.h）は最大1.5KBのne2k_recv PIOを16件行い、`lgy98.c` のREFLECT_BUDGETも同形。10ms周期由来の件数上限は1ms時代の時間保証にならない。C-bus 1〜2MB/sの仮定では最大長1件だけで約0.75〜1.5ms、16件なら約12〜24ms＋処理費用となる。A1で両経路のcallback最大時間・件数・バイト数と他callback集中時の残予算を測る。IRQ0全体200µsから短経路・他callback等を引いた時間予算内となるよう、件数削減を測定後に決める。1件でも収まらなければ件数削減だけでは不十分で、PIO分割または既存協調処理への移管を別設計し再測定する。nonceのtickは数値種のまま。 |
 | FS `sfs_proto.c` の `sfs_ms_ticks()` / `serialfs_session.c` / `iso9660.h` | ceil(ms/TICK_MS)+1は端数対策。ISO idle2秒は論理率へ。SQLite `os32_sqlite_vfs.c` の/10000と最小1tickは現契約のまま（切捨て是正は別不具合票）。 |
 | 校正 `cpu_calibrate_math.h` / `cpu_calibrate.c` | 5tick観測、loops/tick下限1000・fallback10000を保持。実測でdelay_usの既存精度を確認。ATA/ATAPIの校正依存pollはtick数へ置換しない。 |
-| `kernel/irq/irq_math.c` の `irq_storm_step()` | storm上限は10ms窓のまま、閾値を十倍しない。IRQ配送負荷と隔離動作の回帰を行う。 |
+| `sys/kern/irq/irq_math.c` の `irq_storm_step()` | storm上限は10ms窓のまま、閾値を十倍しない。IRQ配送負荷と隔離動作の回帰を行う。 |
 | 起動 `kernel.c` / `platform_splash.h` / `splash_image.c` | reload10=100ms、splash3秒、画像のTICK_MS→µsを保持。ただしラスター再生のIF=0はD8のとおり別問題で、ユーザー決定（2026-11-05、§8 U2）により再生を作り直さず、スプラッシュ区間中のtick・時計の遅れを許す。platform splash/probe、bootlog_save、kernel/sqlite_engineの記録は論理tickと明記。 |
 | kdebug `gfinit.c` / `recover_cleanup.h` / `recover_gf.h` / `recover_common/session.inc:22` | 復旧/試験予算・秒表示は既存PIT_HZ=100を維持。recover_profile.cのPIT実設定検査だけは物理clock/reloadで判断し、二つの率を混同しない。 |
 | kdebug `kpeek.c` / `gf_foundation_test.c` の `observe()` / PEGC diag:108 | retry2=20msを維持。GF/PEGC測定秒は論理率へ。nic_traceは記録のみ、kselftestは実divisor/有理周期に期待値更新。 |
-| `kernel/ime/ime_dict.c` / `kernel/font_guard_fixture.c` の `font_fixture_body()` | 注入待ちOS32_RAW_WAIT_LOG_TICKSの単位維持、500=5秒。faulttest.cもPIT_HZ=100を維持。 |
+| `sys/kern/ime/ime_dict.c` / `sys/kern/font_guard_fixture.c` の `font_fixture_body()` | 注入待ちOS32_RAW_WAIT_LOG_TICKSの単位維持、500=5秒。faulttest.cもPIT_HZ=100を維持。 |
 | userland/SDKと生成import | get_tick利用のshell/rshell/sleep/watchdog/gshell/filer/bench/GUI/SDK exampleは100Hz契約を維持。ktime_ticks生成元tools/gen_sqlite_imports.pyと各module importは同単位。直接物理率を参照する注記を訂正。 |
 公開tickの `now < deadline` が残る例（sndtest.c、rshell.c、sdk/example/hello/main.c (main())）は周回で壊れる既存不具合として票に記録し、採用前の回帰範囲では差分比較へ修正する。
 実装時は同じ検索をtools/tests・生成物も含め再実行し、対応表で未分類0を確認する。ソースを許可リストで拒否する仕組みは作らない。
@@ -133,45 +133,45 @@ CPU校正は論理tick5回≒50msを維持。`CPU_DELAY_SCALE=100` の2段割り
 | ファイル | 新/変・概算差分行 | 役割・依存/並列 |
 |---|---|---|
 | docs/tasks/v3/TASK_TICK_1KHZ.md | 新100 | Aの票・証拠/判定、PM |
-| platform/pc98/kernel.c | 変4 | A/B診断像のみ、boot_splash呼出し前後の除外印・境界記録、再生は変更しない |
-| kernel/time/tick_probe.h | 新30 | 計測境界型、A先行 |
-| kernel/time/tick_probe.c | 新150 | 固定集計・スプラッシュ区間の別集計、A・診断像のみ |
-| kdebug/tick_probe.c | 新150 | 読出しと結果出力、計測型後に並列 |
-| arch/x86/kernel/isr_stub.asm | 変25 | A計測点、B raw step/EOI/論理分岐、逐次 |
-| kernel/irq/tick.c | 変15 | A callback計測点、配列順維持 |
+| sys/platform/pc98/kernel.c | 変4 | A/B診断像のみ、boot_splash呼出し前後の除外印・境界記録、再生は変更しない |
+| sys/kern/time/tick_probe.h | 新30 | 計測境界型、A先行 |
+| sys/kern/time/tick_probe.c | 新150 | 固定集計・スプラッシュ区間の別集計、A・診断像のみ |
+| sys/kern/kdebug/tick_probe.c | 新150 | 読出しと結果出力、計測型後に並列 |
+| sys/arch/x86/kernel/isr_stub.asm | 変25 | A計測点、B raw step/EOI/論理分岐、逐次 |
+| sys/kern/irq/tick.c | 変15 | A callback計測点、配列順維持 |
 | sdk/include/os32/os32_kapi_shared.h | 変5 | B論理率の意味とkernel分岐STATIC_ASSERT、先行 |
-| include/memmap.h | 変5 | PIT_HZ/TICK_MS維持、PIT_IRQ_HZ追加、C物理既定値切替は最後 |
+| sys/include/memmap.h | 変5 | PIT_HZ/TICK_MS維持、PIT_IRQ_HZ追加、C物理既定値切替は最後 |
 | kernel/time/pit_math.h | 変12 | 有理周期と表示値の契約 |
 | kernel/time/pit_math.c | 変15 | 100/1000と最近接divisor |
 | kernel/time/pit.c | 変10 | 初期化の要求にPIT_IRQ_HZ、設定値/注記 |
-| kernel/time/tick_clock.h・kernel/time/tick.c | 新45・変80 | 両 arch 共通の tick_clock、段 C1 ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §5) |
-| kernel/time/time_math.h | 変15 | 64bit snapshot引数 |
-| kernel/time/time_math.c | 変40 | 有理周期変換/pending carry、並列可 |
-| kernel/time/ktime.c | 変35 | raw snapshotとfallback時刻の接続、算数後 |
-| kernel/time/ktime.h | 変8 | epoch付き論理fallbackの内部宣言 |
-| drivers/sound/cs4231/pcm_cs4231.c | 変5 | fallback時計の呼出し、ktime後 |
+| sys/hal/time/tick_clock.h・sys/hal/time/tick.c | 新45・変80 | 両 arch 共通の tick_clock、段 C1 ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §5) |
+| sys/kern/time/time_math.h | 変15 | 64bit snapshot引数 |
+| sys/kern/time/time_math.c | 変40 | 有理周期変換/pending carry、並列可 |
+| sys/kern/time/ktime.c | 変35 | raw snapshotとfallback時刻の接続、算数後 |
+| sys/kern/time/ktime.h | 変8 | epoch付き論理fallbackの内部宣言 |
+| sys/dev/sound/cs4231/pcm_cs4231.c | 変5 | fallback時計の呼出し、ktime後 |
 | tools/prototypes/pcm_imports.def | 変8 | 内部fallback import追加、生成器で追従 |
-| drivers/sound/cs4231/pcm_e4_guest.c | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
+| sys/dev/sound/cs4231/pcm_e4_guest.c | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
 | drivers/sound/fm/snd_engine.c | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
-| drivers/input/kbd.c | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
-| fs/isofs/iso9660.h | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
-| include/platform_splash.h | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
-| drivers/video/pc98/backend_pegc_diag.inc | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
-| kdebug/gf_foundation_test.c | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
-| kdebug/gfinit.c | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
-| kdebug/kdebug_main.c | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
-| kdebug/recover_cleanup.h | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
-| kdebug/recover_gf.h | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
-| kdebug/recover_common/session.inc | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
-| kdebug/recover_profile.c | 変40 | UART待ち累積/実周期検査、呼出し文脈実測後 |
-| kdebug/kselftest/pit_setup.inc | 変15 | clock別divisor/有理周期の期待値 |
-| userland/tests/faulttest.c | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
+| sys/platform/pc98/input/kbd.c | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
+| sys/fs/isofs/iso9660.h | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
+| sys/include/platform_splash.h | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
+| sys/platform/pc98/video/backend_pegc_diag.inc | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
+| sys/dev/video/geforce/diag/gf_foundation_test.c | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
+| sys/dev/video/geforce/diag/gfinit.c | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
+| sys/platform/pc98/kdebug/kdebug_main.c | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
+| sys/platform/pc98/kdebug/recover_cleanup.h | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
+| sys/dev/video/geforce/diag/recover_gf.h | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
+| sys/dev/video/geforce/diag/recover_common/session.inc | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
+| sys/platform/pc98/kdebug/recover_profile.c | 変40 | UART待ち累積/実周期検査、呼出し文脈実測後 |
+| sys/platform/pc98/kdebug/kselftest/pit_setup.inc | 変15 | clock別divisor/有理周期の期待値 |
+| userland/diag/faulttest.c | 変更0 | 既存PIT_HZ=100を維持、率置換不要 |
 | userland/system/sndtest.c | 変2 | 周回差比較 |
 | userland/shell/rshell.c | 変8 | 周回差比較 |
 | sdk/example/hello/main.c | 変2 | 周回差比較 |
 | tools/tests/test_tick_1khz.py | 新180 | clock/phase/wrap/周期結線のhost・変異 |
 | tools/tests/tick_1khz_host.c | 新250 | 純関数の32bit/64bit比較fixture |
-A2はスプラッシュ区間を除く測定で発見したNIC等の阻害区間を先に解消する独立段。NICの削減値と変更量はA1実測後に確定し、`net/link.h`、`net/link_rx.inc`、`drivers/net/ne2000/lgy98.c` の実際の所有箇所ごとに段を分ける。
+A2はスプラッシュ区間を除く測定で発見したNIC等の阻害区間を先に解消する独立段。NICの削減値と変更量はA1実測後に確定し、`sys/net/link.h`、`sys/net/link_rx.inc`、`sys/dev/net/ne2000/lgy98.c` の実際の所有箇所ごとに段を分ける。
 ビルド登録は既存所有Makefileの該当リストへ数行、生成物は既存generatorで再生成。既存試験のアンカー/期待値も各所有ファイル単位で更新し並列競合を避ける。
 注記変更対象は§5の各所有ファイルに各1〜3行。大きい既存ファイルへ計測本体を足さず新ファイルに集約、time_math等は既存機能の置換だけとする。
 見積: 製品kernel text +2〜4KiB/BSS <128B（64bit算数helperの既リンク有無で変動）、PCM <0.5KiB、kdebug復旧修正 <1KiB。

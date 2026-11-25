@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  PCI_BIND_HOST.C — drivers/pci/pci_bind_match.c をそのままホストで回す       */
+/*  PCI_BIND_HOST.C — sys/dev/pci/pci_bind_match.c をそのままホストで回す       */
 /*                                                                          */
 /*  **NP21/W には PCI が無い**ので、この層はエミュレータでは 1 行も走らない */
 /*  (`pci_init()` が「mech#1 absent」で終わる)。実機の日に初めて通る経路に  */
@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../drivers/pci/pci_bind_match.c"
+#include "../../sys/dev/pci/pci_bind_match.c"
 
 #define CHECK(x) do { if (!(x)) { \
     fprintf(stderr, "FAIL %s:%d: %s\n", __func__, __LINE__, #x); failed++; \
@@ -306,11 +306,11 @@ static void line_state(void)
 /* ------------------------------------------------------------------ */
 /*  記録の取得口 (KAPI v60 `pci_bind_info` の裏側)                      */
 /*                                                                    */
-/*  `drivers/pci/pci_bind.c` は列挙表 (`pci_count` / `pci_get`) と kprintf */
+/*  `sys/dev/pci/pci_bind.c` は列挙表 (`pci_count` / `pci_get`) と kprintf */
 /*  しか外に頼らないので、その 3 本を偽物にすればホストでそのまま回る。*/
 /*  ここで固めるのは 2 つ: **8 バイトちょうど**しか書かないことと、    */
 /*  範囲外の idx で**出力に 1 バイトも書かない**こと。KAPI v60 の      */
-/*  wrapper (`kapi/kapi_sys.c`) は 8 バイトぶんだけ書き込み可を確かめて */
+/*  wrapper (`sys/kapi/kapi_sys.c`) は 8 バイトぶんだけ書き込み可を確かめて */
 /*  から呼ぶので、ここが増えると CPL=3 のバッファをはみ出す。          */
 /* ------------------------------------------------------------------ */
 #include "kprintf.h"
@@ -329,7 +329,7 @@ int pci_get(u32 idx, void *out)
 
 void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; }
 
-#include "../../drivers/pci/pci_bind.c"
+#include "../../sys/dev/pci/pci_bind.c"
 
 /* 8 バイトの記録 + その後ろの見張り。union なので型の別名の心配が無い。 */
 static union { struct pci_bind_info info; u8 raw[16]; } out_buf;

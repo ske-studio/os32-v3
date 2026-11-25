@@ -9,7 +9,7 @@ import owners
 
 def example(tables_for):
     entries = [('arch/x86/example.c', '100644'), ('docs/example.txt', '100644'),
-               ('include/pc98.h', '100644'), ('kernel/unused.c', '100644'), ('unused.rs', '100644'), ('module', '160000')]
+               ('sys/platform/pc98/pc98.h', '100644'), ('kernel/unused.c', '100644'), ('unused.rs', '100644'), ('module', '160000')]
     source = entries[0][0]
     tables = tables_for(entries, ({source: {'image'}}, {source: {'A', 'B'}},
                                   {source: {'usb', 'exec'}}))
@@ -41,9 +41,9 @@ def make_membership(inventory):
     images, groups, features = inventory()
     assert images['userland/rust/hello_gfx/src/lib.rs'] == {'pc98/userland/tests/hello_gfx.elf'}
     assert 'pc98/boot/boot_fat144.bin' in images['boot/boot_fat.asm']
-    assert 'pc98/build/out/kernel.elf' in images['exec/exec_abort.inc']
-    assert 'pc98/boot/boot_fat144.bin' not in images['exec/exec_abort.inc']
-    path = 'fs/ext2/ext2_dir.c'
+    assert 'pc98/build/out/kernel.elf' in images['sys/kern/exec/exec_abort.inc']
+    assert 'pc98/boot/boot_fat144.bin' not in images['sys/kern/exec/exec_abort.inc']
+    path = 'sys/fs/ext2/ext2_dir.c'
     assert 'build/sources/common.mk:C_COMMON_PC98_PENDING' in groups[path]
     assert features[path] == {'ide'}
     assert 'build/programs.mk:SHELL_SRC' in groups['userland/shell/main.c']

@@ -1,7 +1,7 @@
-# drivers/sound/cs4231/pcm_cs4231.c — CS4231 (MATE-X PCM) の PCM 再生ドライバ
+# sys/dev/sound/cs4231/pcm_cs4231.c — CS4231 (MATE-X PCM) の PCM 再生ドライバ
 
 > 状態: **現行 (2026-11-18)** — 出所: TASK_PCM_CS4231 (要約して移した)
-ソース: `drivers/sound/cs4231/pcm_cs4231.c` (I/O と状態機械)・`drivers/sound/cs4231/pcm_cs4231_math.c` (純粋部)・`drivers/sound/cs4231/pcm_cs4231.h` (数と列の型)・`drivers/sound/cs4231/pcm_refill.h` (tick の救済の閾値)・`include/pcm_contract.h` (状態・エラーの写し・KAPI の実体の宣言)
+ソース: `sys/dev/sound/cs4231/pcm_cs4231.c` (I/O と状態機械)・`sys/dev/sound/cs4231/pcm_cs4231_math.c` (純粋部)・`sys/dev/sound/cs4231/pcm_cs4231.h` (数と列の型)・`sys/dev/sound/cs4231/pcm_refill.h` (tick の救済の閾値)・`sys/include/pcm_contract.h` (状態・エラーの写し・KAPI の実体の宣言)
 
 16 ビット・ステレオ・44.1kHz / 22.05kHz の**再生だけ**を、ドライバ所有の DMA リングと KAPI v61 の 5 本で提供する。単位は
 frame (左右 1 組 = 4 バイト)。録音・PIO・8 ビット・モノラル・ミキサの入力側・86 型 PCM の FIFO の模倣・`0C2Bh/0C2Dh` の再配置・
@@ -62,7 +62,7 @@ DMA #0/#3・XTAL1 系のレート (48k など) は持たない。本体は部品
   (p.16/19) ので、DRS が落ちてから `dma_chan_mask` する。
 - FAULTED を一度踏むと再起動まで `pcm_open` は `OS32_ERR_IO` (`s_fault_sticky`)。
 
-## 口の契約 (KAPI v61、実体は `include/pcm_contract.h`)
+## 口の契約 (KAPI v61、実体は `sys/include/pcm_contract.h`)
 
 | 関数 | 契約 |
 |---|---|
@@ -142,10 +142,10 @@ MCE 付きで I9 = CAL 1 → MCE 付きで I16 = DACZ → R0 = 9 で MCE を落�
 
 ## 他の部品との境目
 
-- 土台: 割り込みの登録 (`kernel/irq`、`IRQ_F_SHARED`)、8237 (`drivers/dma/dma8237.h` の `dma_chan_setup` / `_remaining` / `_mask` / `_unmask` / `_ack_tc`)、
-  DMA プール (`mm/dma_pool.h`)、µs 時計 (`sys_time_now`)。部品の中では `irq_register` / `dma_alloc` などは façade の `pcm_module_*` に置き換わる ([pcm_module](pcm_module.md))。
+- 土台: 割り込みの登録 (`kernel/irq`、`IRQ_F_SHARED`)、8237 (`sys/dev/dma/dma8237.h` の `dma_chan_setup` / `_remaining` / `_mask` / `_unmask` / `_ack_tc`)、
+  DMA プール (`sys/kern/mm/dma_pool.h`)、µs 時計 (`sys_time_now`)。部品の中では `irq_register` / `dma_alloc` などは façade の `pcm_module_*` に置き換わる ([pcm_module](pcm_module.md))。
 - `PCM_IRQ` の値を知るのは pcm_cs4231 側だけ。既存 imports の `pcm_module_irq_register(irq,fn,arg,flags)` を使い、表や export スロットは追加しない。
-- 回収は `exec/exec_reclaim.h` の `exec_pcm_reclaim` → `pcm_reclaim`。起動時の検出は `pcm_init` (検出だけ、装置が無ければ `[pcm] none`)。
+- 回収は `sys/kern/exec/exec_reclaim.h` の `exec_pcm_reclaim` → `pcm_reclaim`。起動時の検出は `pcm_init` (検出だけ、装置が無ければ `[pcm] none`)。
 - 診断: `pcm_diag_fault_site` / `pcm_diag_evidence` / `pcm_diag_df_site` / `pcm_diag_stop_calls` などを kernel.map から読む (値の意味は `PCM_DIAG_*`)。
   `-DPCM_REFILL_DIAG` で観測と補充の時間 (`pcm_diag_observe` / `pcm_diag_refill`) を IRQ10 / tick 別に採れる。
 

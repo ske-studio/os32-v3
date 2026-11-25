@@ -19,21 +19,21 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT/'tools'), str(ROOT/'tools/ppc')]
 MUTATIONS = (
-    ('F1-entry', 'arch/ppc/exec_enter.S', 'PPC_MSR_ME|PPC_MSR_FP|PPC_MSR_IR', 'PPC_MSR_ME|PPC_MSR_IR'),
-    ('F2-fpr17', 'arch/ppc/fp_context.S', '    stfd 17,136(3)', '    nop'),
-    ('F2-fpscr', 'arch/ppc/fp_context.S', '    stfd 0,PPC_FP_FPSCR_OFFSET(3)', '    nop'),
-    ('F4-retry', 'arch/ppc/kernel_trap.c', '    if (!f || !translated) goto fatal;',
+    ('F1-entry', 'sys/arch/ppc/exec_enter.S', 'PPC_MSR_ME|PPC_MSR_FP|PPC_MSR_IR', 'PPC_MSR_ME|PPC_MSR_IR'),
+    ('F2-fpr17', 'sys/arch/ppc/fp_context.S', '    stfd 17,136(3)', '    nop'),
+    ('F2-fpscr', 'sys/arch/ppc/fp_context.S', '    stfd 0,PPC_FP_FPSCR_OFFSET(3)', '    nop'),
+    ('F4-retry', 'sys/arch/ppc/kernel_trap.c', '    if (!f || !translated) goto fatal;',
      '    if (!f || !translated) goto fatal;\n    if (f->vector == 0x800) return;'),
-    ('F5-init', 'arch/ppc/fp_context.S', '    b arch_fp_restore', '    blr'),
+    ('F5-init', 'sys/arch/ppc/fp_context.S', '    b arch_fp_restore', '    blr'),
 )
 
-STIMULUS = ('F4-resume', 'arch/ppc/kernel_vectors.S',
+STIMULUS = ('F4-resume', 'sys/arch/ppc/kernel_vectors.S',
             '    ori 3,3,PPC_MSR_FP', '    nop')
 # Every return to USER (IRQ/syscall via kernel_vectors.S, park via exec_resume.S)
 # sets MSR[FP] again, so an entry-only mutation is masked by the first DEC tick.
 # F1-entry therefore removes FP from all three USER entries; RED = 0x800 kill
 # before the F1 output (F4 instead fails after F4-before).
-RESUME = ('F1-resume', 'arch/ppc/exec_resume.S', '    ori 0,0,PPC_MSR_FP', '    nop')
+RESUME = ('F1-resume', 'sys/arch/ppc/exec_resume.S', '    ori 0,0,PPC_MSR_FP', '    nop')
 
 
 def settings(work, name):

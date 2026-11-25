@@ -1,7 +1,7 @@
 """T4b-4: real SQLite callbacks/FD table; runtime mutation failures only."""
 import sqlite_cc
 CHECK = dict(name='sqlite-vfs-identity-host', tier=1,
-    covers=['fs/ramfs/ramfs.h', 'tools/tests/sqlite_cc.py', 'tools/tests/sqlite_vfs_identity_host.c', 'tools/tests/sqlite_groups_host.c', 'tools/tests/sqlite_groups_backend.h', 'tools/tests/vfs_fd_sqlite_host.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/os32_sqlite_config.h', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'exec/exec.h', 'fs/vfs.c', 'fs/vfs.h', 'fs/ext2/ext2_vfs.c', 'tools/tests/input_fixture_host.h', 'kernel/input_service.c', 'include/pointer_service.h', 'include/input_service.h', 'include/kbd.h', 'tools/tests/kernel_includes.py'],
+    covers=['sys/fs/ramfs/ramfs.h', 'tools/tests/sqlite_cc.py', 'tools/tests/sqlite_vfs_identity_host.c', 'tools/tests/sqlite_groups_host.c', 'tools/tests/sqlite_groups_backend.h', 'tools/tests/vfs_fd_sqlite_host.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'lib/sqlite3/os32_sqlite_vfs.h', 'lib/sqlite3/sqlite3.c', 'lib/sqlite3/os32_sqlite_config.h', 'sys/fs/vfs_fd.c', 'sys/fs/vfs_fd_stdin.inc', 'sys/fs/vfs_stdin.h', 'sys/kern/exec/exec.h', 'sys/fs/vfs.c', 'sys/fs/vfs.h', 'sys/fs/ext2/ext2_vfs.c', 'tools/tests/input_fixture_host.h', 'sys/hal/input/input_service.c', 'sys/hal/input/pointer_service.h', 'sys/hal/input/input_service.h', 'sys/include/kbd.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=8.3,
     kind='characterization',
 )
@@ -17,13 +17,13 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 CASES = ['capacity', 'absolute', 'relative', 'alias', 'parent_child', 'same_owner', 'parked', 'quarantine',
          'close_gap', 'separate', 'errors', 'readonly', 'unsupported', 'fullpath']
-FILES = ['fs/vfs.h', 'fs/vfs_fd.c', 'fs/vfs_fd_stdin.inc', 'fs/vfs_stdin.h', 'lib/sqlite3/os32_sqlite_vfs.c',
+FILES = ['sys/fs/vfs.h', 'sys/fs/vfs_fd.c', 'sys/fs/vfs_fd_stdin.inc', 'sys/fs/vfs_stdin.h', 'lib/sqlite3/os32_sqlite_vfs.c',
          'lib/sqlite3/os32_sqlite_vfs.h', 'tools/tests/sqlite_vfs_identity_host.c',
          'tools/tests/sqlite_groups_host.c', 'tools/tests/sqlite_groups_backend.h',
          'tools/tests/vfs_fd_sqlite_host.c', 'tools/tests/input_fixture_host.h']
 INC = include_flags(ROOT)
 VFS = 'lib/sqlite3/os32_sqlite_vfs.c'
-FD = 'fs/vfs_fd.c'
+FD = 'sys/fs/vfs_fd.c'
 MUTANTS = [
     ('path_comparison', 'alias', [
         (VFS, 'other->main_identity.file_id == id.file_id', '0'),

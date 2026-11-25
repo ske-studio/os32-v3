@@ -1,4 +1,4 @@
-# drivers/ata/ide_request.inc — 要求検査と分割
+# sys/dev/ata/ide_request.inc — 要求検査と分割
 
 > 状態: **現行 (2026-10-31)**
 

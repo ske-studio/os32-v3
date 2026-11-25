@@ -1,6 +1,6 @@
-#include "drivers/video/geforce/gf_v2.h"
-#include "drivers/video/geforce/geforce_module.h"
-#include "hwdev/gf/display/api.h"
+#include "sys/dev/video/geforce/gf_v2.h"
+#include "sys/dev/video/geforce/geforce_module.h"
+#include "sys/dev/video/geforce/display/api.h"
 static struct gf_v2 g;
 static struct gf2_chan ch;
 static struct gf_foundation foundation;

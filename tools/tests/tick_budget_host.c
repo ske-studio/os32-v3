@@ -15,8 +15,8 @@ static int fake_ready;
 static u32 fake_us;
 int pc98_tsc_ready(void) { return fake_ready; }
 int pc98_tsc_read_us(u32 *lo, u32 *hi) { *lo = fake_us; *hi = 0; return 0; }
-#include "platform/pc98/tick_budget.c"
-#include "kernel/irq/tick_budget.c"
+#include "sys/platform/pc98/tick_budget.c"
+#include "sys/kern/irq/tick_budget.c"
 #define CHECK(x) do { if (!(x)) return __LINE__; } while (0)
 
 static int run(void)

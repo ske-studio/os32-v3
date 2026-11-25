@@ -33,14 +33,14 @@ def build(work, mode):
     cfg.write_text('KDEBUG=1\n')
     settings = []
     if mode == 'native-read':
-        settings = mutant_settings(work, mode, 'platform/powermac/hwb_resource.c',
+        settings = mutant_settings(work, mode, 'sys/platform/powermac/hwb_resource.c',
             'req->width, r->little, store, 1, 0,', 'req->width, 0, store, 1, 0,')
     if mode == 'port-ok':
-        settings = mutant_settings(work, mode, 'kdebug/hwb_access.c',
+        settings = mutant_settings(work, mode, 'sys/kern/kdebug/hwb_access.c',
             'req->status = platform_hwb_io(req);', 'req->status = HW_OK;')
     # Record the first two actual POINT returns starting at the enabled edge.
     # One additional reload after ABORT issues the next real POINT.
-    abort = (ROOT/'exec/exec_abort.inc').read_text()
+    abort = (ROOT/'sys/kern/exec/exec_abort.inc').read_text()
     mark = '    return !!pending;'
     assert abort.count(mark) == 1
     abort = 'volatile u32 hw_points[9];\n' + abort.replace(mark, '''
@@ -56,11 +56,11 @@ def build(work, mode):
         abort = abort.replace(anchor, 'u32 pending = g_hwb_abort_pending;')
     inc = work/(mode+'.inc')
     inc.write_text(abort)
-    observation = mutant_settings(work, 'observe-'+mode, 'exec/exec.c',
+    observation = mutant_settings(work, 'observe-'+mode, 'sys/kern/exec/exec.c',
                                  '#include "exec_abort.inc"', f'#include "{inc}"')
     settings.extend(arg.replace('KB_MUT_', 'KB_MUT_EXTRA_', 1) for arg in observation)
     signature = 'u32 pm_hwb_cfg_read(u32 bdf, u32 offset, u32 width, u32 *value)'
-    reads = mutant_settings(work, 'observe-pci-'+mode, 'platform/powermac/pci_backend.c',
+    reads = mutant_settings(work, 'observe-pci-'+mode, 'sys/platform/powermac/pci_backend.c',
         signature + '\n{ return pm_pci_access(&root, bdf << 8, offset, width, 0, value); }',
         'volatile u32 hw_pci_reads;\n' + signature + """
 {

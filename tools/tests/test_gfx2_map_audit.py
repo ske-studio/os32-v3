@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise C17 with real page tables and a runtime mutant."""
 CHECK = dict(name='gfx2-map-audit-host', tier=1, needs=[], budget=3,
-    covers=['gfx/v2/map_audit.c', 'gfx/v2/gfx2_int.h', 'mm/paging.h',
+    covers=['sys/hal/gfx/v2/map_audit.c', 'sys/hal/gfx/v2/gfx2_int.h', 'sys/kern/mm/paging.h',
             'tools/tests/gfx2_map_audit_host.c', 'tools/tests/test_gfx2_map_audit.py',
             'tools/tests/host32.py', 'tools/tests/kernel_includes.py'],
     basis=['HAL_V2_DESIGN §7-4', 'HAL_V2_DESIGN §13-2'],
@@ -29,7 +29,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    source = (ROOT / 'gfx/v2/map_audit.c').read_text()
+    source = (ROOT / 'sys/hal/gfx/v2/map_audit.c').read_text()
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
         assert observe(source, work) == 0

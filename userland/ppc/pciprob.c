@@ -1,5 +1,5 @@
 #include "os32api.h"
-#include "../../include/pci_bind_contract.h"
+#include "../../sys/include/pci_bind_contract.h"
 #include <stdio.h>
 #include <string.h>
 

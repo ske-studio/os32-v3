@@ -1,8 +1,8 @@
 ; Named constants; C mirrors are checked by test_boot_named_constants.py.
 %ifndef OS32_BOOT_MEMMAP_DEFS_INC
 %define OS32_BOOT_MEMMAP_DEFS_INC
-; Canonical: include/memmap.h (KIB, MEM_1MB, KERNEL_LOAD_ADDR) and
-; platform/pc98/platform_boot_layout.h (the loader and boot addresses).
+; Canonical: sys/include/memmap.h (KIB, MEM_1MB, KERNEL_LOAD_ADDR) and
+; sys/platform/pc98/platform_boot_layout.h (the loader and boot addresses).
 KIB EQU 1024
 MEM_1MB EQU 0x100000
 KERNEL_LOAD_ADDR EQU 0x100000

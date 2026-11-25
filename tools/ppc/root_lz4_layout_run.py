@@ -102,9 +102,9 @@ SECTIONS {{
                     '-D__cdecl=', '-fno-stack-protector', '-fno-builtin', '-ffunction-sections',
                     '-Wl,--gc-sections,-z,noexecstack,-z,max-page-size=4096', '-Wl,-T,'+str(linker),
                     *['-I'+str(ROOT/p) for p in ('include','lib','arch/ppc','platform/powermac')],
-                    asm, ROOT/'arch/ppc/entry.S', ROOT/'arch/ppc/kernel_entry.S',
-                    ROOT/'lib/kstring_c.c', ROOT/'arch/ppc/ofw_note.S', ROOT/'tools/ppc/root_lz4_probe.c',
-                    ROOT/'platform/powermac/ofw.c', '-o', elf], cwd=out, check=True)
+                    asm, ROOT/'sys/arch/ppc/entry.S', ROOT/'sys/arch/ppc/kernel_entry.S',
+                    ROOT/'sys/kern/kstring_c.c', ROOT/'sys/arch/ppc/ofw_note.S', ROOT/'tools/ppc/root_lz4_probe.c',
+                    ROOT/'sys/platform/powermac/ofw.c', '-o', elf], cwd=out, check=True)
     subprocess.run([cross/'powerpc-elf-readelf', '-lW', elf], check=True)
     data = bytearray(elf.read_bytes())
     ph = segments(data)

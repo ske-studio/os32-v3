@@ -1,7 +1,7 @@
-# platform/pc98/splash_image.c — 起動の画像の持ち主
+# sys/platform/pc98/splash_image.c — 起動の画像の持ち主
 
 > 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
-ソース: `platform/pc98/splash_image.c`
+ソース: `sys/platform/pc98/splash_image.c`
 
 ## 何をするか
 
@@ -10,7 +10,7 @@
 
 ## 画像の選び方と配布
 
-- パスは `include/config.h` の `SYS_SPLASH_IMAGE` (`/boot/splash.osri`)。`/boot/user.osri` (`SYS_SPLASH_USER_IMAGE`) があればそちらを先に使う (ユーザー決定 2026-11-04)。
+- パスは `sys/include/config.h` の `SYS_SPLASH_IMAGE` (`/boot/splash.osri`)。`/boot/user.osri` (`SYS_SPLASH_USER_IMAGE`) があればそちらを先に使う (ユーザー決定 2026-11-04)。
 - splash.osri は手元で作った画像を配備の集合で配る ([tools/raster_splash_asset](../../tools/raster_splash_asset.md))。user.osri は配備に入れないので、ユーザーが置いた画像は更新で消えない。
 - どちらも無ければ FALLBACK で、内蔵のロゴになる。
 

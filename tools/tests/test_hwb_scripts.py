@@ -1,16 +1,16 @@
 """Parse deployed HW-BASIC examples with the real parser, and check FAC order."""
 CHECK = dict(name='hwb-scripts-host', tier=1, budget=35.0, needs=[], covers=[
-    'userland/tests/hw/trident.hwb', 'userland/tests/hw/np21w_gdc.hwb',
-    'userland/tests/hw/np21w_tvram.hwb', 'userland/tests/hw/np21w_nopci.hwb',
-    'userland/tests/hw/np21w_loop.hwb', 'userland/tests/hw/np21w_poll.hwb',
-    'userland/tests/hw/np21w_wait.hwb', 'userland/shell/hwb_log.c', 'userland/shell/hwb_probe.c', 'userland/shell/hwb_parse.c',
-    'userland/shell/hwb.h', 'kdebug/probe_wire.h', 'kdebug/hwb_wire.h', 'include/types.h',
+    'userland/diag/hw/trident.hwb', 'userland/diag/hw/np21w_gdc.hwb',
+    'userland/diag/hw/np21w_tvram.hwb', 'userland/diag/hw/np21w_nopci.hwb',
+    'userland/diag/hw/np21w_loop.hwb', 'userland/diag/hw/np21w_poll.hwb',
+    'userland/diag/hw/np21w_wait.hwb', 'userland/shell/hwb_log.c', 'userland/shell/hwb_probe.c', 'userland/shell/hwb_parse.c',
+    'userland/shell/hwb.h', 'sys/kern/kdebug/probe_wire.h', 'sys/kern/kdebug/hwb_wire.h', 'sys/include/types.h',
     'sdk/include/os32/os32_kapi_shared.h', 'tools/tests/hwb_fake.h',
     'tools/tests/hwb_host.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
-    'userland/tests/hw/trident_mode.hwb', 'userland/shell/hwb_exec.c',
+    'userland/diag/hw/trident_mode.hwb', 'userland/shell/hwb_exec.c',
     'userland/shell/hwb_log.c', 'tools/tests/hwb_scripts_host.c',
-    'userland/tests/hw/gf_regs.hwb', 'userland/tests/hw/hpt370_probe.hwb', 'userland/tests/hw/gf_palette.hwb', 'userland/tests/hw/tri_w32.hwb', 'userland/tests/hw/tri_burst.hwb', 'userland/tests/hw/tri_burst2.hwb', 'userland/tests/hw/tri_burst3.hwb', 'userland/tests/hw/tri_burst4.hwb', 'userland/tests/hw/tri_burst5.hwb', 'userland/tests/hw/tri_burst6.hwb'],
+    'userland/diag/hw/gf_regs.hwb', 'userland/diag/hw/hpt370_probe.hwb', 'userland/diag/hw/gf_palette.hwb', 'userland/diag/hw/tri_w32.hwb', 'userland/diag/hw/tri_burst.hwb', 'userland/diag/hw/tri_burst2.hwb', 'userland/diag/hw/tri_burst3.hwb', 'userland/diag/hw/tri_burst4.hwb', 'userland/diag/hw/tri_burst5.hwb', 'userland/diag/hw/tri_burst6.hwb'],
     basis=['HW_BASIC_DESIGN §7'],
     env_limit='偽I/Oでparserと記録順を確認するが、実GDC/Tridentの復元とFAC writeの効果は保証しない。',
 )
@@ -24,11 +24,11 @@ import hwb_host
 
 ROOT = hwb_host.ROOT
 FILES = [
-    'userland/tests/hw/trident.hwb', 'userland/tests/hw/np21w_gdc.hwb',
-    'userland/tests/hw/np21w_tvram.hwb', 'userland/tests/hw/np21w_nopci.hwb',
-    'userland/tests/hw/np21w_loop.hwb', 'userland/tests/hw/np21w_poll.hwb',
-    'userland/tests/hw/np21w_wait.hwb', 'userland/tests/hw/trident_mode.hwb',
-    'userland/tests/hw/gf_regs.hwb', 'userland/tests/hw/hpt370_probe.hwb', 'userland/tests/hw/gf_palette.hwb', 'userland/tests/hw/tri_w32.hwb', 'userland/tests/hw/tri_burst.hwb', 'userland/tests/hw/tri_burst2.hwb', 'userland/tests/hw/tri_burst3.hwb', 'userland/tests/hw/tri_burst4.hwb', 'userland/tests/hw/tri_burst5.hwb', 'userland/tests/hw/tri_burst6.hwb']
+    'userland/diag/hw/trident.hwb', 'userland/diag/hw/np21w_gdc.hwb',
+    'userland/diag/hw/np21w_tvram.hwb', 'userland/diag/hw/np21w_nopci.hwb',
+    'userland/diag/hw/np21w_loop.hwb', 'userland/diag/hw/np21w_poll.hwb',
+    'userland/diag/hw/np21w_wait.hwb', 'userland/diag/hw/trident_mode.hwb',
+    'userland/diag/hw/gf_regs.hwb', 'userland/diag/hw/hpt370_probe.hwb', 'userland/diag/hw/gf_palette.hwb', 'userland/diag/hw/tri_w32.hwb', 'userland/diag/hw/tri_burst.hwb', 'userland/diag/hw/tri_burst2.hwb', 'userland/diag/hw/tri_burst3.hwb', 'userland/diag/hw/tri_burst4.hwb', 'userland/diag/hw/tri_burst5.hwb', 'userland/diag/hw/tri_burst6.hwb']
 MUTATIONS = [('enable-fac', FILES[0], 'iowrite8 port 0xFAC 2',
               'iowrite8 port 0xFAC 0', 'enable-fac'),
              ('gdc-restore', FILES[1], 'iowrite8 port 0x68 0x0F',
@@ -116,7 +116,7 @@ void _start(void) {
 
 
 
-MODE = 'userland/tests/hw/trident_mode.hwb'
+MODE = 'userland/diag/hw/trident_mode.hwb'
 EXEC = 'userland/shell/hwb_exec.c'
 EXEC_MUTATIONS = [
     ('state-save-order', MODE, ' call state_save\n # PC-98 PCI', ' # PC-98 PCI', 'state-save-restore'),

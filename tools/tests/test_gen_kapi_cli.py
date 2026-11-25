@@ -18,7 +18,7 @@ class KapiCli(unittest.TestCase):
         spec = json.loads((ROOT / 'sdk/kapi.json').read_text())
         subprocess.run([sys.executable, '-B', str(SCRIPT)], cwd=ROOT,
                        check=True, stdout=subprocess.DEVNULL)
-        internal = (ROOT / 'include/kapi_call_generated.h').read_text()
+        internal = (ROOT / 'sys/include/kapi_call_generated.h').read_text()
         fixed = [[a for a in api.get('args', []) if a != '...'] for api in spec['api']]
         self.assertIn('#define KAPI_FIXED_MAX %du' % max(map(len, fixed)), internal)
         counts = internal.split('kapi_fixed_count[] = {', 1)[1].split('};', 1)[0]
@@ -99,10 +99,10 @@ class KapiCli(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             legacy = state()
             for name, (data, _) in before.items():
-                if name not in ('sdk/kapi.json', 'kapi/kapi_generated.c'):
+                if name not in ('sdk/kapi.json', 'sys/kapi/kapi_generated.c'):
                     self.assertEqual(legacy[name][0], data, name)
-            self.assertNotEqual(legacy['kapi/kapi_generated.c'][0],
-                                before['kapi/kapi_generated.c'][0])
+            self.assertNotEqual(legacy['sys/kapi/kapi_generated.c'][0],
+                                before['sys/kapi/kapi_generated.c'][0])
             spec_path.write_bytes(original)
             self.assertEqual(run([]).returncode, 0)
             first = {name: data for name, (data, _) in state().items()}

@@ -7,13 +7,13 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / 'platform/powermac/cli_boot.c'
+SOURCE = ROOT / 'sys/platform/powermac/cli_boot.c'
 
 HARNESS = r'''
 #include <setjmp.h>
 #include <string.h>
-#include "platform/powermac/cli_boot.h"
-#include "fs/vfs.h"
+#include "sys/platform/powermac/cli_boot.h"
+#include "sys/fs/vfs.h"
 static jmp_buf done;
 static const char *input;
 static char output[4096], path[256], data[256];
@@ -73,7 +73,7 @@ def main():
                             '-I', str(ROOT), '-I', str(ROOT / 'include'),
                             '-I', str(ROOT / 'sdk/include'), '-I', str(ROOT / 'sdk/include/os32'),
                             '-I', str(ROOT / 'platform/powermac'), str(d / 'cli_boot.c'),
-                            str(ROOT / 'kernel/cli/resident_cli.c'), str(ROOT / 'lib/kstring_c.c'), str(d / 'harness.c'),
+                            str(ROOT / 'sys/kern/cli/resident_cli.c'), str(ROOT / 'sys/kern/kstring_c.c'), str(d / 'harness.c'),
                             '-o', str(d / 'test')], check=True)
             result = subprocess.run([str(d / 'test')], timeout=10, check=False)
             if result.returncode != expected:

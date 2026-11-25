@@ -2,7 +2,7 @@
  * 言えるかの回帰試験 (2026-09-13)。列挙のエラー伝播 (S3I2-K) と、一括
  * 書き込みの f_close の失敗 (起動ログ、2026-09-25) もここで見る。
  *
- * 実物の fs/fat/fatfs_vfs.c をそのまま取り込み、境界 (FatFs の f_*、Device /
+ * 実物の sys/fs/fat/fatfs_vfs.c をそのまま取り込み、境界 (FatFs の f_*、Device /
  * IDE、kmalloc、kprintf) だけを贋物に差し替える。実デバイス・実イメージ・
  * 実 FatFs には一切触れない。
  *
@@ -189,7 +189,7 @@ char *kstrncat(char *dst, const char *src, u32 n)
     return dst;
 }
 
-#include "../../fs/pc98pt.c"   /* fatfs_vfs.c の PC98PartEntry 読み (票 TASK_HDD_INSTALL 段 1-4) */
+#include "../../sys/fs/pc98pt.c"   /* fatfs_vfs.c の PC98PartEntry 読み (票 TASK_HDD_INSTALL 段 1-4) */
 /* 区画表の幾何 (fatfs_vfs.c が ext2 と同じ規則で引く、m4)。この試験は区画を
  * 探さないので、呼ばれたら IDENTIFY と同じ 8/17 を返すだけ */
 int bootinfo_part_geom(int ide_drive, u16 *heads, u16 *spt)
@@ -199,11 +199,11 @@ int bootinfo_part_geom(int ide_drive, u16 *heads, u16 *spt)
     if (spt) *spt = 17;
     return 2;
 }
-#include "../../fs/fat/fatfs_vfs.c"
+#include "../../sys/fs/fat/fatfs_vfs.c"
 
-/* 起動ログの手順 (init/bootlog.c) を実物の fatfs_vfs_write に結ぶ。
+/* 起動ログの手順 (sys/kern/init/bootlog.c) を実物の fatfs_vfs_write に結ぶ。
  * 錠はホストでは空 (回数は tools/tests/bootlog_host.c が見る)。 */
-#include "../../init/bootlog.c"
+#include "../../sys/kern/init/bootlog.c"
 unsigned int bootlog_lock(void) { return 0; }
 void bootlog_unlock(unsigned int f) { (void)f; }
 

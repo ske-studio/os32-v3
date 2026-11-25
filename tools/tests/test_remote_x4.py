@@ -16,7 +16,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 CHECK = dict(name='remote-x4', tier=1, needs=[], budget=3,
              covers=['tools/host_rshell.py', 'tools/host_notify.py',
-                     'tools/host_operator_socket.py', 'include/remote_control.h', 'tools/tests/test_remote_x4.py'],
+                     'tools/host_operator_socket.py', 'sys/include/remote_control.h', 'tools/tests/test_remote_x4.py'],
     basis=['LAN_OPERATOR_DESIGN §2', 'LAN_OPERATOR_DESIGN §7'],
 )
 BOOT = '0123456789abcdef0123456789abcdef'
@@ -26,7 +26,7 @@ def test(path):
     spec = importlib.util.spec_from_file_location('remote_x4', path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    header = (ROOT / 'include/remote_control.h').read_text()
+    header = (ROOT / 'sys/include/remote_control.h').read_text()
     for name, value in [('REMOTE_SVC_RSHELL', mod.RSHELL),
                         ('REMOTE_SVC_GSERIAL', mod.GSERIAL),
                         ('REMOTE_NOTIFY_EXECUTE', mod.EXECUTE),

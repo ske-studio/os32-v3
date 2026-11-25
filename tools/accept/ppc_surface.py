@@ -31,7 +31,7 @@ def fixture(folder):
 int surface_api_query(u32 role, struct surface_query_result *out)
 {
 """
-    settings = mutant_settings(folder, 'fixture', 'exec/surface_query.c', anchor, '#include "gfx_internal.h"\n' + anchor + """
+    settings = mutant_settings(folder, 'fixture', 'sys/kern/exec/surface_query.c', anchor, '#include "gfx_internal.h"\n' + anchor + """
     extern const void *probe_watch;
     extern int probe_copied;
     if (role == 0x102) { probe_watch = out; probe_copied = 0; return 0; }
@@ -57,7 +57,7 @@ int surface_api_query(u32 role, struct surface_query_result *out)
                       void *dst, u32 len)
 {
 """
-    spy = mutant_settings(folder, 'copy-watch', 'exec/redir_access.c', copy_entry,
+    spy = mutant_settings(folder, 'copy-watch', 'sys/kern/exec/redir_access.c', copy_entry,
                           'const void *probe_watch;\nint probe_copied;\n' + copy_entry +
                           '    if (src == probe_watch) probe_copied = 1;\n')
     return settings + [s.replace('KB_MUT_', 'KB_MUT_THIRD_', 1) for s in spy]
@@ -146,7 +146,7 @@ def main():
         if case == 'ignore-generation':
             # Feed the current generation to all three validation layers,
             # preserving sid checks and the production mapping path.
-            extra = mutant_settings(folder, case, 'exec/lease.c',
+            extra = mutant_settings(folder, case, 'sys/kern/exec/lease.c',
                                     '    if (!rc) rc = surface_query_refs(source, &ref, 1, access);',
                                     '    if (!rc) {\n'
                                     '        ref.generation = source->refs[0].generation;\n'
@@ -156,11 +156,11 @@ def main():
                             for setting in extra)
         elif case in ('bundle-disabled', 'ignore-count'):
             if case == 'bundle-disabled':
-                src = 'platform/powermac/display_bundle.c'
+                src = 'sys/platform/powermac/display_bundle.c'
                 before = 'return role == LEDGER_ROLE_CLIENT && backend == LEDGER_SF_OF_FB;'
                 after = '(void)role; (void)backend; return 0;'
             else:
-                src = 'exec/lease.c'
+                src = 'sys/kern/exec/lease.c'
                 before = ' || count != source->count)'
                 after = ')'
             extra = mutant_settings(folder, case, src, before, after)

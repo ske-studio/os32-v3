@@ -1,19 +1,19 @@
 # T5b-5: reuse T4 function imports, VA0 packing and paired distribution.
 CD_OUT := $(BUILD_OUT)/cd
 CD_GEN := $(addprefix $(CD_OUT)/,cd_imports.h cd_imports.json cd_import_slots.c cd_import_stubs.S cd_provider_types.c cd_kexports.c)
-CD_DEF_SOURCES := drivers/ata/ide.h drivers/ata/cd_module.h kernel/dev/dev.h fs/vfs.h kernel/time/cpu_calibrate.h mm/kmalloc.h lib/kstring.h include/kprintf.h
+CD_DEF_SOURCES := sys/dev/ata/ide.h sys/dev/ata/cd_module.h sys/hal/block/dev.h sys/fs/vfs.h sys/hal/time/cpu_calibrate.h sys/kern/mm/kmalloc.h sys/kern/kstring.h sys/include/kprintf.h
 $(CD_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prototypes/cd_imports.def $(CD_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module cd --out-dir $(CD_OUT)
 
 CD_OBJS := $(addprefix $(CD_OUT)/,cd_body.o atapi.o iso9660.o iso9660_media.o cd_import_slots.o cd_import_stubs.o)
 CD_INC := $(INC_KERNEL) -I. -I$(CD_OUT)
-$(CD_OUT)/cd_body.o: drivers/ata/cd_body.c $(CD_GEN) build/config.mk build/cd-module.mk
+$(CD_OUT)/cd_body.o: sys/dev/ata/cd_body.c $(CD_GEN) build/config.mk build/cd-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_CD_MODULE $(CD_INC) -c $< -o $@
-$(CD_OUT)/atapi.o: drivers/ata/atapi.c $(CD_GEN) build/config.mk build/cd-module.mk
+$(CD_OUT)/atapi.o: sys/dev/ata/atapi.c $(CD_GEN) build/config.mk build/cd-module.mk
 	$(CC) $(CFLAGS_BASE) -Os $(CD_INC) -c $< -o $@
-$(CD_OUT)/iso9660.o: fs/isofs/iso9660.c $(CD_GEN) build/config.mk build/cd-module.mk
+$(CD_OUT)/iso9660.o: sys/fs/isofs/iso9660.c $(CD_GEN) build/config.mk build/cd-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_CD_MODULE $(CD_INC) -c $< -o $@
-$(CD_OUT)/iso9660_media.o: fs/isofs/iso9660_media.c $(CD_GEN) build/config.mk build/cd-module.mk
+$(CD_OUT)/iso9660_media.o: sys/fs/isofs/iso9660_media.c $(CD_GEN) build/config.mk build/cd-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_CD_MODULE $(CD_INC) -c $< -o $@
 $(CD_OUT)/cd_import_slots.o $(CD_OUT)/cd_provider_types.o $(CD_OUT)/cd_kexports.o: $(CD_OUT)/%.o: $(CD_OUT)/%.c $(CD_GEN) build/config.mk build/cd-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -Werror $(CD_INC) -c $< -o $@
@@ -26,8 +26,8 @@ $(CD_OUT)/cd.elf: $(CD_OBJS) build/cd-module.ld sdk/link/generations.ld
 C_KERNEL_OBJ += $(CD_OUT)/cd_kexports.o
 R1_OBJECTS += $(CD_OUT)/cd_kexports.o
 $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf: $(CD_OUT)/cd_kexports.o
-$(KERNEL_OBJ_PREFIX)drivers/ata/cd_module.o $(R1_OBJ)/drivers/ata/cd_module.o: $(CD_GEN)
-$(KERNEL_OBJ_PREFIX)drivers/ata/cd_module.o $(R1_OBJ)/drivers/ata/cd_module.o: private CFLAGS_BASE += -I$(CD_OUT)
+$(KERNEL_OBJ_PREFIX)sys/dev/ata/cd_module.o $(R1_OBJ)/sys/dev/ata/cd_module.o: $(CD_GEN)
+$(KERNEL_OBJ_PREFIX)sys/dev/ata/cd_module.o $(R1_OBJ)/sys/dev/ata/cd_module.o: private CFLAGS_BASE += -I$(CD_OUT)
 
 define pack_cd
 	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --module-id 4 --elf $(CD_OUT)/cd.elf --metadata $(CD_OUT)/cd_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@

@@ -41,19 +41,19 @@ def main():
         for artifact in out.rglob('*'):
             if artifact.is_file():
                 assert artifact.read_bytes() == (again / artifact.relative_to(out)).read_bytes()
-        for name in ('exec/exec_kapi_init.inc', 'sdk/include/os32/os32_kapi_slots.h',
-                     'sdk/include/os32/os32_kapi_generated.h', 'include/kapi_call_generated.h',
+        for name in ('sys/kern/exec/exec_kapi_init.inc', 'sdk/include/os32/os32_kapi_slots.h',
+                     'sdk/include/os32/os32_kapi_generated.h', 'sys/include/kapi_call_generated.h',
                      'sdk/include/os32/os32_unit_stamp.h', 'sdk/include/os32/os32_generations.h'):
             assert (out / name).read_bytes() == (ROOT / name).read_bytes(), name
-        init = (out / 'exec/exec_kapi_init.inc').read_text()
+        init = (out / 'sys/kern/exec/exec_kapi_init.inc').read_text()
         assert verify_init(init, data)
         dirs = ['.', 'include', 'arch/ppc', 'platform/powermac', 'sdk/include', 'sdk/include/os32', 'kernel', 'init', 'kernel/console', 'kernel/irq', 'kernel/time', 'mm', 'lib', 'kapi', 'drivers', 'net', 'gfx', 'exec', 'fs', 'kernel/cli']
         dirs += [str(p.relative_to(ROOT)) for base in ('drivers', 'fs', 'kernel', 'gfx') for p in (ROOT / base).rglob('*') if p.is_dir()]
         cc = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-gcc'
         flags = ['-std=gnu11', '-ffreestanding', '-D__KERNEL_BUILD__', '-D__cdecl=', '-DOS32_HOOK_DEFAULT=0', '-I' + str(out / 'include'), '-I' + str(out / 'sdk/include/os32')] + ['-I' + str(ROOT / d) for d in dirs]
-        exec_source = out / 'exec/exec.c'
-        exec_source.write_bytes((ROOT / 'exec/exec.c').read_bytes())
-        for name, source in [('exec', exec_source), ('kapi', out / 'kapi/kapi_generated.c'), ('table', ROOT / 'arch/ppc/exec_kapi.c')]:
+        exec_source = out / 'sys/kern/exec/exec.c'
+        exec_source.write_bytes((ROOT / 'sys/kern/exec/exec.c').read_bytes())
+        for name, source in [('exec', exec_source), ('kapi', out / 'sys/kapi/kapi_generated.c'), ('table', ROOT / 'sys/arch/ppc/exec_kapi.c')]:
             subprocess.run([str(cc)] + flags + ['-c', str(source), '-o', str(tmp / (name + '.o'))], check=True)
         nm = cc.with_name('powerpc-elf-nm')
         undefined = set(re.findall(r'\b(wrap_\w+)$', subprocess.check_output([str(nm), '-u', str(tmp / 'exec.o')], text=True), re.M))
@@ -68,10 +68,10 @@ def main():
             assert not verify_init(swapped, data)
             print('same-signature OSRI/mtime slot swap: RED')
             print('missing assignment: RED')
-            source = (ROOT / 'arch/ppc/exec_kapi.c').read_text().replace('KernelAPI ppc_kapi_table __attribute__', 'const KernelAPI ppc_kapi_table __attribute__')
+            source = (ROOT / 'sys/arch/ppc/exec_kapi.c').read_text().replace('KernelAPI ppc_kapi_table __attribute__', 'const KernelAPI ppc_kapi_table __attribute__')
             mutant = tmp / 'mutant.c'
             mutant.write_text(source)
-            (tmp / 'kapi_table.h').write_text((ROOT / 'arch/ppc/kapi_table.h').read_text().replace('extern KernelAPI', 'extern const KernelAPI'))
+            (tmp / 'kapi_table.h').write_text((ROOT / 'sys/arch/ppc/kapi_table.h').read_text().replace('extern KernelAPI', 'extern const KernelAPI'))
             subprocess.run([str(cc)] + flags + ['-c', str(mutant), '-o', str(tmp / 'mutant.o')], check=True)
             assert not table_ok(nm, tmp / 'mutant.o', data['func_capacity'])
             print('const table: RED')

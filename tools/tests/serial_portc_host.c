@@ -1,5 +1,5 @@
 /* ======================================================================== */
-/*  SERIAL_PORTC_HOST.C — drivers/char/serial.c が 0035h を丸ごと書かないこと    */
+/*  SERIAL_PORTC_HOST.C — sys/dev/char/serial.c が 0035h を丸ごと書かないこと    */
 /*                                                                          */
 /*  実機 PC-9821Ra266 で rshell 中にビープが鳴り続けた件 (2026-09-24、      */
 /*  docs/POLICY_DEBUG.md#4-59-8255-ポート-c-の副作用)。0035h (8255 ポート C) は RS-232C の割り込み */
@@ -7,7 +7,7 @@
 /*  SHUT0 が同居する (docs/hw/undocumented/io_syste.md)。serial.c が 0x00 →  */
 /*  0x01 を全体に書くたびに BUZ = 0 になっていた。                           */
 /*                                                                          */
-/*  実物の drivers/char/serial.c を #include し、ポート I/O だけを偽物にする      */
+/*  実物の sys/dev/char/serial.c を #include し、ポート I/O だけを偽物にする      */
 /*  (test_serial_portc.py が arch_io.h / platform_io.h を差し替える)。偽物は */
 /*  8255 のポート C を模型として持ち、0037h の BSR (bit7 = 0) を 1 ビットの  */
 /*  セット/リセットとして適用する。0035h への書き込みと 0037h のモード設定   */
@@ -16,7 +16,7 @@
 /*  IRQ4 の線も模型にする: 線 = RXRE (bit0) かつ受信データあり。立ち上がり */
 /*  を数えて、ISR が汲み残したときに次の割り込みが作られるかを見る。       */
 /*  0136h は FIFO 搭載機の真似もできる (bit6 が読むたびに反転)。             */
-/*  platform/pc98/system.c のブザー実体を test_serial_portc.py が切り出す。 */
+/*  sys/platform/pc98/system.c のブザー実体を test_serial_portc.py が切り出す。 */
 /*  関数本体をそのまま写した sys_buz.inc で通す。                           */
 /*                                                                          */
 /*  NP21/W の sound/beepc.c も BUZ を bit3 = 0 で鳴らす (UNDOCUMENTED と同じ */
@@ -118,8 +118,8 @@ int ring3_wait_pending(void) { return 0; }
 #define SERIAL_TX_STUCK_HOST 1
 #include "serial.c"          /* 変異の写しを引けるよう -I で探させる */
 #include "serial_emergency_host.h"
-#include "../../drivers/char/serial_plan.c"
-#include "sys_buz.inc"       /* platform/pc98/system.c のブザー実体の写し */
+#include "../../sys/dev/char/serial_plan.c"
+#include "sys_buz.inc"       /* sys/platform/pc98/system.c のブザー実体の写し */
 
 void cpu_delay_us(u32 us) { (void)us; if (g_irq_enabled) tick_count++; }
 volatile u32 tick_count;
@@ -364,7 +364,7 @@ static void vfast_fifo_path(void)
     CHECK((g_portc & 0x07) == IEN_RX);
 }
 
-/* ---- platform/pc98/system.c の platform_buzzer_on / platform_buzzer_off が書く値 ---- */
+/* ---- sys/platform/pc98/system.c の platform_buzzer_on / platform_buzzer_off が書く値 ---- */
 static void sys_buz_values(void)
 {
     reset_model(PORTC_BOOT);

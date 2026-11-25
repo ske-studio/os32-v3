@@ -188,9 +188,9 @@ python3 -B tools/tests/test_install_recover.py happy chain # ケース指定
 | 実物 | 模型 (その形でしか作れないものだけ) |
 |---|---|
 | `userland/system/install_recover.inc` (install.c が `#include` するのと同じソース) | `exec` のポインタ検証 `ring3_user_range_ok` |
-| `kapi/kapi_db.c` (KAPI v50 の本物 — `db_open_existing` / `db_prepare_only` / `db_step` / `db_close` / `db_error_code`) | SHM の置き場 (`test_shm`) |
+| `sys/kapi/kapi_db.c` (KAPI v50 の本物 — `db_open_existing` / `db_prepare_only` / `db_step` / `db_close` / `db_error_code`) | SHM の置き場 (`test_shm`) |
 | `lib/sqlite3/sqlite3.c` + `lib/sqlite3/os32_sqlite_vfs.c` | `stat` の三値 / UNKNOWN / `st_ino` 共有 / `st_dev` |
-| `fs/vfs_fd.c` (`vfs_open` / `vfs_read_fd` / `vfs_write_fd` / `vfs_close`) + RAM backend | `rename` の 2 つの中途半端、`read` の負 / short write / 中身違い |
+| `sys/fs/vfs_fd.c` (`vfs_open` / `vfs_read_fd` / `vfs_write_fd` / `vfs_close`) + RAM backend | `rename` の 2 つの中途半端、`read` の負 / short write / 中身違い |
 | — | `unlink` / `sync` / `db_close` / `db_open_existing` の失敗 |
 
 ホストのファイルシステムには 1 バイトも触らない。マスタ (`/etc/settings.db`) も RAM fixture の
@@ -201,8 +201,8 @@ python3 -B tools/tests/test_install_recover.py happy chain # ケース指定
 `rop_*` (`api->sys_*` / `api->db_*`)、ホスト試験は同じ表を贋物で埋める。
 **本体は 1 行も分岐していない** (`#ifdef` も無い)。
 
-`st_dev` の復号は `fs/vfs.c` の `vfs_mount_dev_of` と同じ式 `(dev_type << 8 | unit) + 1`
-(種別は `fs/vfs.h` の `VFS_DEV_HD` = 0 / `VFS_DEV_FD` = 1)。外部プログラムからカーネルヘッダは
+`st_dev` の復号は `sys/fs/vfs.c` の `vfs_mount_dev_of` と同じ式 `(dev_type << 8 | unit) + 1`
+(種別は `sys/fs/vfs.h` の `VFS_DEV_HD` = 0 / `VFS_DEV_FD` = 1)。外部プログラムからカーネルヘッダは
 見えないので `.inc` 側に写しがあり、試験も同じ式で値を作って**両方が同じ規則で動くこと**を見る。
 
 ## I-1. ケース (14 本)
@@ -434,9 +434,9 @@ S3 の実機受入 (FDD ブート、root = FAT) で
 `db_open_existing("/etc/settings.db", 0)` が `SQLITE_IOERR` (10) で落ちた。
 
 KAPI v50 は open の手前で hot journal の有無を `vfs_stat("<path>-journal")` で見て、
-**NOTFOUND 以外は IOERR** と断じる (`kapi/kapi_db.c`)。「無い」と言い切れるのは NOTFOUND の
+**NOTFOUND 以外は IOERR** と断じる (`sys/kapi/kapi_db.c`)。「無い」と言い切れるのは NOTFOUND の
 ときだけ、という設計なので、この判断そのものは正しい。問題は FAT 側で、
-`fs/fat/fatfs/ffconf.h` は `FF_USE_LFN 0` なので `settings.db-journal` は 8.3 に収まらず、
+`sys/fs/fat/fatfs/ffconf.h` は `FF_USE_LFN 0` なので `settings.db-journal` は 8.3 に収まらず、
 `f_stat` が `FR_INVALID_NAME` を返す。これを `ff_to_vfs` が `VFS_ERR_INVAL` に写していた。
 
 実機で見えていた区別:
@@ -447,14 +447,14 @@ KAPI v50 は open の手前で hot journal の有無を `vfs_stat("<path>-journa
 | `/etc/nosuch` (収まるが無い) | `No such file` | `VFS_ERR_NOTFOUND` |
 
 **そのボリュームに存在しえない名前は、stat の意味では「存在しない」**。
-`fs/fat/fatfs_vfs.c` に `ff_stat_to_vfs()` を足し、`fatfs_vfs_stat` と `fatfs_vfs_get_size`
+`sys/fs/fat/fatfs_vfs.c` に `ff_stat_to_vfs()` を足し、`fatfs_vfs_stat` と `fatfs_vfs_get_size`
 (どちらも「在るか」を問う入口) だけがこれを通る。`FR_INVALID_NAME` → `VFS_ERR_NOTFOUND`、
 それ以外は `ff_to_vfs` へ委譲。**open / read / write / unlink / mkdir / rename / list は
 `ff_to_vfs` のまま** — 呼び手が不正な名前を渡したときの診断を潰さないため。
 
 ## K-1. 試験の範囲と遮断
 
-`tools/tests/fatfs_stat_host.c` が**実物の `fs/fat/fatfs_vfs.c` をそのまま `#include`** し、
+`tools/tests/fatfs_stat_host.c` が**実物の `sys/fs/fat/fatfs_vfs.c` をそのまま `#include`** し、
 境界だけを贋物に差し替える。
 
 | 差し替えたもの | 何を貰うか |
@@ -516,11 +516,11 @@ SUMMARY 7/7 PASS
 
 - **実機 (FDD ブート) では踏んでいない**。配備もエミュレータ操作もしていない。
   `db_open_existing("/etc/settings.db", 0)` が通るようになったかは未確認。
-- 実 FatFs (`fs/fat/fatfs/ff.c`) が 8.3 に収まらない名前で本当に `FR_INVALID_NAME` を返すことは
+- 実 FatFs (`sys/fs/fat/fatfs/ff.c`) が 8.3 に収まらない名前で本当に `FR_INVALID_NAME` を返すことは
   **贋物で仮定している**。根拠は実機の `ls -l /etc/settings.db-journal` = `Invalid argument`
   (受入時の観測) と `ffconf.h` の `FF_USE_LFN 0` であって、この試験の中では確かめていない。
-- HostDrv (`drivers/hostdrv/hostdrvfs.c`) と iso9660 の stat は見ていない。本件は FAT だけの写像。
-- `make all` / `make check` は未実行。`fs/fat/fatfs_vfs.c` の単体クロスコンパイル
+- HostDrv (`sys/dev/hostdrv/hostdrvfs.c`) と iso9660 の stat は見ていない。本件は FAT だけの写像。
+- `make all` / `make check` は未実行。`sys/fs/fat/fatfs_vfs.c` の単体クロスコンパイル
   (`i386-elf-gcc -Wall -Wextra -Werror`) だけ通した。
 
 ## C-5. Codex 実装レビュー 往復 1 (C レーン) — 2026-09-14
@@ -634,7 +634,7 @@ jr.val_b64` と `ran("import", "/b64.json", "--scope", "gshell", NULL) == 0`)。
 
 ### K-4.0 何を直したか、なぜ要るか
 
-`fs/fat/fatfs_vfs.c` の `fatfs_vfs_list()` は `f_readdir()` の戻りとファイル名の終端を
+`sys/fs/fat/fatfs_vfs.c` の `fatfs_vfs_list()` は `f_readdir()` の戻りとファイル名の終端を
 同じ `if` で見て `break` し、**その後は必ず `VFS_OK`** を返していた。
 
 ```c
@@ -668,11 +668,11 @@ FAT 側が負を返さない限り**欠けたファイルのまま `Installation
 `f_opendir` の失敗は元から `ff_to_vfs(fr)` の負を返しており**変更なし**。
 `f_closedir` は成功・打ち切りのどちらでも通る位置にあり、呼び忘れは無い
 (開けなかったときは `return` が先なので呼ばない = 正しい)。
-`vfs_ls` (`fs/vfs.c`) は `ops->list_dir()` の戻りをそのまま返すので**触っていない**。
+`vfs_ls` (`sys/fs/vfs.c`) は `ops->list_dir()` の戻りをそのまま返すので**触っていない**。
 
 ### K-4.1 試験の範囲と遮断
 
-K-1 と同じ作法 — `tools/tests/fatfs_stat_host.c` が実物の `fs/fat/fatfs_vfs.c` を `#include` し、
+K-1 と同じ作法 — `tools/tests/fatfs_stat_host.c` が実物の `sys/fs/fat/fatfs_vfs.c` を `#include` し、
 境界だけを贋物に差し替える。この票で足したのは列挙の 3 本:
 
 | 差し替えたもの | 何を貰うか |
@@ -684,7 +684,7 @@ K-1 と同じ作法 — `tools/tests/fatfs_stat_host.c` が実物の `fs/fat/fat
 実デバイス・実イメージ・実 FatFs には触らない。コンパイルは
 `gcc -std=gnu89 -Wall -Wextra -Werror -Wdeclaration-after-statement` ([C1])。
 実機カーネル側は `i386-elf-gcc -std=gnu89 -m32 -march=i386 -ffreestanding -O2 -Wall -Wextra -Werror`
-で `fs/fat/fatfs_vfs.c` を単体コンパイルして通した ([C1] / [C2] — 使う文字列関数は `kstrncpy` のみ)。
+で `sys/fs/fat/fatfs_vfs.c` を単体コンパイルして通した ([C1] / [C2] — 使う文字列関数は `kstrncpy` のみ)。
 
 ケース (既存 7 本 + 4 本 = 11 本):
 
@@ -745,8 +745,8 @@ SUMMARY 11/11 PASS
 
 - **実機では踏んでいない**。ビルド (`make all` / `make check`)・配備・エミュレータ操作は
   コーダーの役割外で、一切行っていない。カーネル全体のリンクも未確認
-  (`fs/fat/fatfs_vfs.c` の単体コンパイルまで)。
-- 実 FatFs (`fs/fat/fatfs/ff.c`) が実際に列挙途中で `FR_DISK_ERR` / `FR_NOT_READY` を返す条件は
+  (`sys/fs/fat/fatfs_vfs.c` の単体コンパイルまで)。
+- 実 FatFs (`sys/fs/fat/fatfs/ff.c`) が実際に列挙途中で `FR_DISK_ERR` / `FR_NOT_READY` を返す条件は
   **贋物で仮定している**。FDD の I/O 失敗をこの試験の中では起こしていない。
 - 呼び手側 (`sys_ls` → `install` の `copy_directory`) が負を失敗に数えるかは **S3I2-I の範囲**で、
   ここでは見ていない。`ls` / `cat` など他の `vfs_ls` 呼び手が負を受け取ったときの表示も未確認。

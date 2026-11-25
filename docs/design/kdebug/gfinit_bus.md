@@ -1,12 +1,12 @@
-# kdebug/gfinit_bus.c — 設計
+# sys/dev/video/geforce/diag/gfinit_bus.c — 設計
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
-ソース: `kdebug/gfinit_bus.c`
+ソース: `sys/dev/video/geforce/diag/gfinit_bus.c`
 
 baseline 値採取と局所復元だけ必要範囲を共有化。診断 recover 型の adapter を残す。
 
 ## GF6200_4A_DESIGN
 
-- `pci_get` は列挙時の写し（`drivers/pci/pci.c`）。書きの直前には生 config を読み BDF・BAR・Command を再検証する。
+- `pci_get` は列挙時の写し（`sys/dev/pci/pci.c`）。書きの直前には生 config を読み BDF・BAR・Command を再検証する。
 
 A2はPSTRAPSから組を導いて3を確認し、冷間のCR3C=0では止めない。main0の0xdfa9でCR3C←0、0xdfafのCOPYで(CR3C&0Fh) OR 30hを書いた直後にCR3C=3xhを確認する。
 

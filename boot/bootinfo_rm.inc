@@ -6,7 +6,7 @@
 ;; loader_fat_new.asm (FD、2HD / 1.44MB) と loader_hdd.asm (HDD) の
 ;; **両方がこの 1 つを %include する** (手続きを 2 か所に書かない)。
 ;; 呼ぶ側は `bits 16`、DS = 0、IF = 1 (INT 1Bh の HDD は割り込みを待つ)。
-;; 形式と書く順序は include/bootinfo.h の冒頭。
+;; 形式と書く順序は sys/include/bootinfo.h の冒頭。
 ;;
 ;;   bi_clear  AL = 取得元。域全体を 0 (= magic 0 = 無効) にし、
 ;;             version / source / ndrives を書く。**最初に必ず呼ぶ** (N2)。

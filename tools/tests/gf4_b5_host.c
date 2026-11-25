@@ -1,7 +1,7 @@
 /* MIT nouveau dispnv04/crtc.c:175-233, hw.c:85-124, hw.h:238-253. */
 #define GF4_HOST_UNIT 5
 #include "gf4_display_fake.h"
-#include "../../hwdev/gf/internal.h"
+#include "../../sys/dev/video/geforce/internal.h"
 #define REQUIRE(x) do { if (!(x)) return __LINE__; } while (0)
 /* crtc.c:198-233: indexed VGA controls and 10 ms settling interval. */
 #define T_OWNER 0x44U

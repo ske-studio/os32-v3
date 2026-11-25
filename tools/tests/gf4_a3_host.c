@@ -5,7 +5,7 @@
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
 #ifndef GF4_A3_SOURCE
-#define GF4_A3_SOURCE "../../kdebug/gf_display_test.c"
+#define GF4_A3_SOURCE "../../sys/dev/video/geforce/diag/gf_display_test.c"
 #endif
 #include GF4_A3_SOURCE
 
@@ -29,9 +29,9 @@ int geforce_heat_latch_clear(void) { heat_clear_calls++; return heat_clear_rc; }
 static int current_owner = 2;
 #ifdef INPUT_M6_3_REAL
 #include "io.h"
-#include "../../exec/appslot.c"
-#include "../../input/hal/input_context.c"
-#include "../../input/hal/input_interrupt.c"
+#include "../../sys/kern/exec/appslot.c"
+#include "../../sys/input/input_context.c"
+#include "../../sys/input/input_interrupt.c"
 volatile u32 kctx_irq_depth, kctx_exc_depth;
 static int stop_during_enter;
 void res_owner_set(int id) { current_owner = id; }
@@ -654,7 +654,7 @@ static void mode_steps(void)
     assert(image[IMAGE_WIDTH + 130] == 1 && image[IMAGE_WIDTH + 259] == 2);
     assert(image[IMAGE_WIDTH + 32] == 7 && image[130] == 7);
     assert(image[IMAGE_WIDTH + 33] == 0);
-    /* Independent spacing oracle: kdebug/gf_display_test.c:125-129 fixes
+    /* Independent spacing oracle: sys/dev/video/geforce/diag/gf_display_test.c:125-129 fixes
      * 32px lines/eight bars. Halfway to the first line is black at y=1;
      * changing only the product's spacing to 16 makes this pixel white. */
     enum { EXPECTED_GRID_PIXELS = 32, EXPECTED_BAR_COUNT = 8 };

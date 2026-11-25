@@ -9,12 +9,12 @@
 #undef irq_register
 #undef irq_unregister
 
-#include "../../kernel/irq/irq_math.c"
-#include "../../platform/pc98/irq_policy.c"
-#include "../../platform/pc98/irq_complete.c"
-#include "../../kernel/irq/irq.c"
-#include "../../kernel/irq/tick.c"
-#include "../../drivers/sound/cs4231/pcm_e4_diag.c"
+#include "../../sys/kern/irq/irq_math.c"
+#include "../../sys/platform/pc98/irq_policy.c"
+#include "../../sys/platform/pc98/irq_complete.c"
+#include "../../sys/kern/irq/irq.c"
+#include "../../sys/kern/irq/tick.c"
+#include "../../sys/dev/sound/cs4231/pcm_e4_diag.c"
 
 volatile u32 kctx_irq_depth;
 static unsigned int eois;

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """M1 pin transactions with the actual allocator and no libc."""
 CHECK = dict(name='pgalloc-pin', tier=1, needs=[], budget=30,
-    covers=['mm/pgalloc.c', 'mm/pgalloc_owner.inc', 'mm/pgalloc*.inc',
-            'mm/pgalloc.h', 'mm/physmem.c', 'mm/physmem.h',
+    covers=['sys/kern/mm/pgalloc.c', 'sys/kern/mm/pgalloc_owner.inc', 'mm/pgalloc*.inc',
+            'sys/kern/mm/pgalloc.h', 'sys/kern/mm/physmem.c', 'sys/kern/mm/physmem.h',
             'tools/tests/pgalloc_pin_host.c', 'tools/tests/pgalloc_host_fixture.h',
             'tools/tests/test_pgalloc_pin.py', 'tools/tests/host32.py',
             'tools/tests/kernel_includes.py'],
@@ -28,7 +28,7 @@ MUTATIONS = [
 def run_case(mutation=None):
     with tempfile.TemporaryDirectory(prefix='pin-') as tmp:
         tmp = pathlib.Path(tmp)
-        for path in [ROOT / 'mm/pgalloc.c', *(ROOT / 'mm').glob('pgalloc*.inc')]:
+        for path in [ROOT / 'sys/kern/mm/pgalloc.c', *(ROOT / 'mm').glob('pgalloc*.inc')]:
             data = path.read_text()
             if mutation and path.name == mutation[1]:
                 _, _, old, new = mutation
@@ -43,7 +43,7 @@ def run_case(mutation=None):
                '-Wl,--defsym=__ledger_fixed_start=0x17d000',
                '-Wl,--defsym=__ledger_fixed_end=0x180000', '-I' + str(tmp),
                '-I' + str(ROOT / 'tools/tests'), *include_flags(ROOT),
-               str(ROOT / 'tools/tests/pgalloc_pin_host.c'), str(ROOT / 'mm/physmem.c'),
+               str(ROOT / 'tools/tests/pgalloc_pin_host.c'), str(ROOT / 'sys/kern/mm/physmem.c'),
                '-o', str(tmp / 'test')]
         subprocess.run(cmd, check=True)
         return host32.run([str(tmp / 'test')], timeout=60).returncode

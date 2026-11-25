@@ -96,37 +96,37 @@ KERNEL_EXTRA_FLAGS = ["-O2", "-D__KERNEL_BUILD__"]
 # --- ファイル -> インクルード変数の対応 (build/kernel.mk のルールを写したもの) ---
 # build/kernel.mk の CORE_KERNEL_INCLUDES と描画バックエンドの個別ルール。
 CORE_INC_KERNEL = [
-    "drivers/ata/cd_body.c",
-    "drivers/ata/cd_module.c",
-    "drivers/net/e82557/lan_body.c",
-    "drivers/net/e82557/lan_module.c",
-    "drivers/sound/cs4231/pcm_body.c",
-    "drivers/sound/cs4231/pcm_module.c",
-    "drivers/sound/fm/fm_body.c",
-    "drivers/sound/fm/fm_module.c",
-    "drivers/video/cirrus/cirrus_body.c",
-    "drivers/video/cirrus/cirrus_module.c",
-    "drivers/video/geforce/geforce_body.c",
-    "drivers/video/geforce/geforce_module.c",
-    "drivers/video/geforce/geforce_platform.c",
-    "drivers/video/kcg/kcg_body.c",
-    "drivers/video/kcg/kcg_module.c",
-    "drivers/input/mouse.c",
-    "drivers/block/loop_dev.c",
-    "drivers/net/ne2000/ne2000.c",
-    "drivers/net/ne2000/lgy98.c",
-    "drivers/block/fdc.c",
-    "fs/serialfs/sfs_session_fg.c",
+    "sys/dev/ata/cd_body.c",
+    "sys/dev/ata/cd_module.c",
+    "sys/dev/net/e82557/lan_body.c",
+    "sys/dev/net/e82557/lan_module.c",
+    "sys/dev/sound/cs4231/pcm_body.c",
+    "sys/dev/sound/cs4231/pcm_module.c",
+    "sys/dev/sound/fm/fm_body.c",
+    "sys/dev/sound/fm/fm_module.c",
+    "sys/dev/video/cirrus/cirrus_body.c",
+    "sys/dev/video/cirrus/cirrus_module.c",
+    "sys/dev/video/geforce/geforce_body.c",
+    "sys/dev/video/geforce/geforce_module.c",
+    "sys/dev/video/geforce/geforce_platform.c",
+    "sys/dev/video/kcg/kcg_body.c",
+    "sys/dev/video/kcg/kcg_module.c",
+    "sys/platform/pc98/input/mouse.c",
+    "sys/dev/block/loop_dev.c",
+    "sys/dev/net/ne2000/ne2000.c",
+    "sys/dev/net/ne2000/lgy98.c",
+    "sys/dev/block/fdc.c",
+    "sys/fs/serialfs/sfs_session_fg.c",
     "lib/sqlite3/os32_sqlite_test.c",
 ]
 DRIVERS_INC_GFX = [
-    "drivers/video/cirrus/backend_cirrus.c",
-    "drivers/video/cirrus/cirrus_identify.c",
-    "drivers/video/geforce/backend_geforce.c",
-    "drivers/video/geforce/gf_present.c",
-    "drivers/video/pc98/backend_pc98.c",
-    "drivers/video/pc98/backend_pegc.c",
-    "drivers/video/pc98/pc98_route.c",
+    "sys/dev/video/cirrus/backend_cirrus.c",
+    "sys/platform/pc98/video/cirrus/cirrus_identify.c",
+    "sys/dev/video/geforce/backend_geforce.c",
+    "sys/dev/video/geforce/gf_present.c",
+    "sys/platform/pc98/video/backend_pc98.c",
+    "sys/platform/pc98/video/backend_pegc.c",
+    "sys/platform/pc98/video/pc98_route.c",
 ]
 
 # 先に一致したものを採る。fs/fat/fatfs/ は fs/ より先でなければならない。
@@ -150,7 +150,7 @@ INC_RULES = [
 # 採る**。io.h は asm エラーでもあるので、asm より先に見ないと全部 (a) に
 # 吸われて「io.h を分離すれば何本通るか」が見えなくなる。
 #
-# 順序 3 で io.h は契約 (include/io.h) と実装 (arch/<arch>/arch_io.h,
+# 順序 3 で io.h は契約 (sys/include/io.h) と実装 (arch/<arch>/arch_io.h,
 # platform/<platform>/platform_io.h) に分かれた。エラーが出るのは実装側の
 # 2 ファイルなので、両方をこの分類に含める。含めないと 33 本がまるごと
 # (a) へ移ってしまい、順序 1 の基準値と比べられなくなる。
@@ -233,7 +233,7 @@ def parse_c_kernel(config_root=None):
     """Legacy x86 measurement explicitly includes the C kstring alternative."""
     from build_profile import query
     return query(config_root or PROJ_DIR,
-                 ['ARCH=x86', 'PLATFORM=pc98', 'KSTRING_C_SRC=lib/kstring_c.c'],
+                 ['ARCH=x86', 'PLATFORM=pc98', 'KSTRING_C_SRC=sys/kern/kstring_c.c'],
                  config_only=True)['C_KERNEL']
 
 
@@ -321,7 +321,7 @@ def resolve_asm_origin(cc, flags, inc, path):
     """アセンブル段のエラーを元のソース行に戻す。
 
     `inb` のように**制約**が ARM に無いものはコンパイル段で落ちるので、
-    エラー行が `include/io.h:14` と出て分類できる。ところが `pushfl` /
+    エラー行が `sys/include/io.h:14` と出て分類できる。ところが `pushfl` /
     `sti` / `mov %cr3` のように制約 (`"=r"`) だけは ARM でも通るものは
     コンパイル段を素通りし、gcc の中間 `.s` を指した
     `/tmp/ccXXXXXX.s:96: Error: bad instruction 'pushfl'` になる。

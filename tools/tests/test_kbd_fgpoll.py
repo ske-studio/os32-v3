@@ -1,12 +1,12 @@
 """F2/F2i: real keyboard CUI foreground calls, ILP32 runtime mutants."""
 CHECK = dict(name='kbd-fgpoll-host', tier=1, needs=[], budget=3.4,
-             covers=['input/hal/legacy_keymap.c', 'input/keymaps/pc98_jp.c', 'drivers/input/kbd_hal.c', 'input/hal/in2_dev.c', 'input/hal/in2_state.c', 'input/hal/kbd_merge.c', 'tools/tests/kbd_capture_fixture_host.h', 'input/hal/keymap_registry.c', 'input/hal/keymap_eval.c', 'input/hal/keymap_state.c', 'input/hal/keymap.h', 'kernel/idle_work.h', 'tools/tests/test_kbd_fgpoll.py', 'tools/tests/kbd_fgpoll_host.c',
+             covers=['sys/hal/input/legacy_keymap.c', 'sys/input/keymaps/pc98_jp.c', 'sys/platform/pc98/input/kbd_hal.c', 'sys/hal/input/in2_dev.c', 'sys/hal/input/in2_state.c', 'sys/hal/input/kbd_merge.c', 'tools/tests/kbd_capture_fixture_host.h', 'sys/hal/input/keymap_registry.c', 'sys/hal/input/keymap_eval.c', 'sys/hal/input/keymap_state.c', 'sys/hal/input/keymap.h', 'sys/kern/idle_work.h', 'tools/tests/test_kbd_fgpoll.py', 'tools/tests/kbd_fgpoll_host.c',
                      'tools/tests/host32.py', 'tools/tests/kernel_includes.py', 'tools/tests/test_remote_x8a.py',
                      'tools/tests/host_arch/**', 'build/config.mk',
-                     'drivers/input/kbd.c', 'input/hal/legacy_ring.c', 'input/hal/legacy_mode.c', 'kernel/input_legacy.c', 'kernel/input_wait.c', 'input/hal/in2_int.h', 'drivers/input/kbd_fgpoll.inc',
-                     'drivers/input/*.h', 'drivers/char/serial.h',
-                     'drivers/video/geforce/geforce_module.h',
-                     'kernel/module/*.h', 'platform/pc98/legacy/v86_bios.h',
+                     'sys/platform/pc98/input/kbd.c', 'sys/hal/input/legacy_ring.c', 'sys/hal/input/legacy_mode.c', 'sys/kern/input_legacy.c', 'sys/kern/input_wait.c', 'sys/hal/input/in2_int.h', 'sys/platform/pc98/input/kbd_fgpoll.inc',
+                     'drivers/input/*.h', 'sys/dev/char/serial.h',
+                     'sys/dev/video/geforce/geforce_module.h',
+                     'kernel/module/*.h', 'sys/platform/pc98/legacy/v86_bios.h',
                      'include/**'],
     kind='characterization',
 )
@@ -23,9 +23,9 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-KBD = 'drivers/input/kbd.c'
-ADAPTER = 'drivers/input/kbd_fgpoll.inc'
-WAIT = 'kernel/input_wait.c'
+KBD = 'sys/platform/pc98/input/kbd.c'
+ADAPTER = 'sys/platform/pc98/input/kbd_fgpoll.inc'
+WAIT = 'sys/kern/input_wait.c'
 # Unique anchors; each mutant must compile, fail a runtime assertion and be
 # followed by an unmodified GREEN control. One mutant for each connection.
 MUTATIONS = [

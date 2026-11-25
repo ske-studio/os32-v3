@@ -4,12 +4,12 @@
   (= `fdc_init()` 失敗) と `MOUNT... root panic` が出るのに、**`kprintf` の
   診断行 (`[fdc] …` / `[ide] …`) が画面に 1 行も出ない**。
   「なぜ失敗したか」を書いてあるはずの行が全部消えていて、原因を追えなかった
-- 対象: [`lib/kprintf_attr.c`](../../lib/kprintf_attr.c) (新設) と、
-  その呼び出し元 [`lib/kprintf.c`](../../lib/kprintf.c)
+- 対象: [`sys/kern/kprintf_attr.c`](../../sys/kern/kprintf_attr.c) (新設) と、
+  その呼び出し元 [`sys/kern/kprintf.c`](../../sys/kern/kprintf.c)
 - 実行: `python3 -B tools/tests/test_kprintf_attr.py [--target] [--mutate] [case ...]`
   (`make check-kprintf-attr-host` が `--target --mutate` 付きで回す)
 - 試験: [`kprintf_attr_host.c`](kprintf_attr_host.c) — 実物の
-  `lib/kprintf_attr.c` を 1 行も写さずに `#include` する。変換は I/O も VRAM も
+  `sys/kern/kprintf_attr.c` を 1 行も写さずに `#include` する。変換は I/O も VRAM も
   触らない純粋関数なので **模型が 1 つも要らない**
 - KAPI は動かしていない。`kprintf` のシグネチャもそのまま
   (足したのは `kprintf_attr_to_pc98` の 1 本だけ)
@@ -22,7 +22,7 @@
 NP21/W の窓を目で見れば分かったはずだが、検証は `/api/tvram` で自動化して
 いたので誰も見ていなかった。
 
-| | PC-98 (`include/pc98.h` の `TATTR_*`) | PC/AT (CGA アトリビュート) |
+| | PC-98 (`sys/platform/pc98/pc98.h` の `TATTR_*`) | PC/AT (CGA アトリビュート) |
 |---|---|---|
 | bit0 | **表示** (0 = シークレット) | 前景 青 |
 | bit1 | ブリンク | 前景 緑 |
@@ -95,7 +95,7 @@ EXIT cga_bits=1
 ### GREEN
 
 ```
-HOST GNU89 -Werror compile PASS (real lib/kprintf_attr.c)
+HOST GNU89 -Werror compile PASS (real sys/kern/kprintf_attr.c)
 TARGET i386-elf GNU89 -Werror PASS
 EXIT real_callers=0
 EXIT pc98_passthrough=0
@@ -107,7 +107,7 @@ ENTRY kprintf applies conversion x1
 
 ### 否定側 (`--mutate`) — 6 本すべて RED
 
-実物の `lib/kprintf_attr.c` を 1 か所ずつ壊して、試験が気づくことを見る。
+実物の `sys/kern/kprintf_attr.c` を 1 か所ずつ壊して、試験が気づくことを見る。
 
 ```
 MUTATION 1 RED (3 件): 表示ビットを立てない (色だけ指定 = シークレットのまま消える)
@@ -127,12 +127,12 @@ MUTATION 6 RED (3 件): 素通し判定から青を落とす (0x21 が緑に化�
 | `invariants` | 256 通り全部で **必ず見える** (表示ビット + 色ビットが立つ)、冪等、PC/AT 入力に反転・点滅を足さない |
 | `cga_bits` | 輝度 (bit3) を捨てる / 青・緑・赤の対応 / PC-98 の色ビットがあれば CGA として読まない |
 
-加えて `check_entry()` が `lib/kprintf.c` の入口に変換の 1 行があることを
+加えて `check_entry()` が `sys/kern/kprintf.c` の入口に変換の 1 行があることを
 静的に見る — 変換が正しくても呼ばれていなければ画面は黒いままなので。
 
 ## 5. カーネル側 (kselftest)
 
-`kprintf` の原始命令に触ったので `kdebug/kselftest.c` に `test_kprintf_attr()`
+`kprintf` の原始命令に触ったので `sys/platform/pc98/kdebug/kselftest.c` に `test_kprintf_attr()`
 を足した (CLAUDE.md の規則)。上の 10 個の期待値をそのまま `check()` する。
 `kprintf` は KAPI 公開関数でもあるので、ここが壊れるとカーネルもアプリも
 同時に黙る — ブート時に毎回踏む。

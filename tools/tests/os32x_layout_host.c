@@ -7,7 +7,7 @@
 #undef OS32_SHLIB_PROTOCOL
 #define OS32_SHLIB_PROTOCOL 1UL
 #endif
-#include "../../exec/os32x_hdr.c"
+#include "../../sys/kern/exec/os32x_hdr.c"
 static int failures;
 #define CHECK(x) do { if (!(x)) { printf("FAIL: %s\n", #x); failures++; } } while (0)
 static OS32Header valid(void)

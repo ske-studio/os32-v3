@@ -1,7 +1,7 @@
 # cpu_calibrate — RED → GREEN の記録
 
 契約: `docs/design/kernel/time/cpu_calibrate.md` (止め方・計算・フォールバック、出所は TASK_SERIAL_VFAST 往復 3)
-対象: `kernel/time/cpu_calibrate_math.c` (止め方と計算) / `kernel/time/cpu_calibrate.c` (計測)
+対象: `sys/kern/time/cpu_calibrate_math.c` (止め方と計算) / `sys/platform/pc98/time/cpu_calibrate.c` (計測)
 試験: `tools/tests/test_cpu_calibrate.py` + `tools/tests/cpu_calibrate_host.c`
 実行: `make check-cpu-calibrate-host` (`check-par` の列)
 
@@ -57,7 +57,7 @@ s_loops_per_tick = CALIBRATE_LOOPS / elapsed;
 ## RED
 
 1. ハーネス (`cpu_calibrate_host.c`) と `test_cpu_calibrate.py` を先に書いた。
-   `kernel/time/cpu_calibrate_math.c` が無いのでコンパイルが通らない = RED。
+   `sys/kern/time/cpu_calibrate_math.c` が無いのでコンパイルが通らない = RED。
 
 2. 実装後の否定側 (`--mutate`)。**5 本とも実行時 RED** (写しの上で変異するので
    実物のソースは 1 バイトも動かない = `check-par` で並列に回せる)。
@@ -73,7 +73,7 @@ s_loops_per_tick = CALIBRATE_LOOPS / elapsed;
 ## GREEN
 
 ```
-HOST GNU89 -Werror compile PASS (real kernel/time/cpu_calibrate_math.c)
+HOST GNU89 -Werror compile PASS (real sys/kern/time/cpu_calibrate_math.c)
 TARGET i386-elf GNU89 -Werror PASS   (cpu_calibrate_math.c + cpu_calibrate.c)
 SUMMARY 4/4 PASS
 MUTATION 1..5 すべて RED
@@ -90,7 +90,7 @@ MUTATION 1..5 すべて RED
 
 ## 直し方
 
-`kernel/time/cpu_calibrate.c`:
+`sys/platform/pc98/time/cpu_calibrate.c`:
 
 ```c
 start = tick_count;
@@ -122,9 +122,9 @@ s_loops_per_tick = cpu_calibrate_compute(total, ticks);
 
 | 呼び手 | 用途 | 読み |
 |---|---|---|
-| `drivers/char/serial.c` | TxRDY のポーリング間隔 (`SER_TX_POLL_US` = 5µs) | **意図どおりになる**。ただし予算自体は tick 基準に変えたので、ここが多少ずれても結果は変わらない |
-| `drivers/net/ne2000/ne2000.c` | `NE2K_RDC_POLL_US` / `NE2K_RESET_POLL_US` / `NE2K_OVW_WAIT_US` のポーリング間隔 | いずれも**有限回ポーリングの間隔**で、待ちの上限は回数で決まる。間隔が伸びる = 上限までの実時間が伸びるので、**取りこぼしは減る方向**。逆に「回数を使い切るまでの時間」が 7〜13 倍になるので、切断された機器を待つ最悪時間は伸びる (実機で要観察) |
-| `drivers/video/pc98/gfx_vram.c` | `RASTER_LINE_US` (走査線 1 本ぶんの待ち) | **ここが一番効く**。短すぎた待ちが本来の長さになるので、ティアリング対策としては正しくなるが、**描画が遅くなったように見える可能性がある**。実機で GUI の体感を見ること |
+| `sys/dev/char/serial.c` | TxRDY のポーリング間隔 (`SER_TX_POLL_US` = 5µs) | **意図どおりになる**。ただし予算自体は tick 基準に変えたので、ここが多少ずれても結果は変わらない |
+| `sys/dev/net/ne2000/ne2000.c` | `NE2K_RDC_POLL_US` / `NE2K_RESET_POLL_US` / `NE2K_OVW_WAIT_US` のポーリング間隔 | いずれも**有限回ポーリングの間隔**で、待ちの上限は回数で決まる。間隔が伸びる = 上限までの実時間が伸びるので、**取りこぼしは減る方向**。逆に「回数を使い切るまでの時間」が 7〜13 倍になるので、切断された機器を待つ最悪時間は伸びる (実機で要観察) |
+| `sys/platform/pc98/video/gfx_vram.c` | `RASTER_LINE_US` (走査線 1 本ぶんの待ち) | **ここが一番効く**。短すぎた待ちが本来の長さになるので、ティアリング対策としては正しくなるが、**描画が遅くなったように見える可能性がある**。実機で GUI の体感を見ること |
 
 **まだ実機で確かめていない** ([V4])。NP21/W の実測は
 `cpu_calib_rounds = 16 / cpu_calib_ticks = 5` = 校正値 `16 × 200,000 / 5`

@@ -1,4 +1,4 @@
-#include "gfx/v2/gfx2_sw.h"
+#include "sys/hal/gfx/v2/gfx2_sw.h"
 u8 gfx2_sw_rowbuf[2][GFX2_SW_ROW_BYTES];
 int gfx2_fmt_info(u32 fmt, struct gfx2_fmt_info *o) { if (fmt != 1) return -1; o->cpp = 1; return 0; }
 u32 gfx2_px_read(const u8 *p, u32 fmt) { (void)fmt; return *p; }

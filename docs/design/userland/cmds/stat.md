@@ -10,7 +10,7 @@
 `<path>: <種別> size=<n> dev=<生値>(<復号>) ino=<n> mode=0<8 進> nlink=<n> uid=<n> gid=<n> atime=<n> mtime=<n> ctime=<n>`
 
 - 種別は `st_mode & OS_S_IFMT`: `FILE`・`DIR`・`DEV`・`FIFO`・それ以外は `UNKNOWN`。
-- `st_dev` は VFS が入れる `(dev_type << 8 | unit) + 1` を復号する (`STAT_DEV_TYPE`・`STAT_DEV_UNIT`。種別の値は `fs/vfs.h` の `VFS_DEV_*` の写し)。hd0 = 1、hd1 = 2、fd0 = 257。種別ごとの接頭辞は `hd`・`fd`・`ser`・`cd`・`host`。未知の種別は `type<t> unit<u>` と数字のまま。0 は `unknown` (FS が埋めず VFS もマウントを引けなかった)。
+- `st_dev` は VFS が入れる `(dev_type << 8 | unit) + 1` を復号する (`STAT_DEV_TYPE`・`STAT_DEV_UNIT`。種別の値は `sys/fs/vfs.h` の `VFS_DEV_*` の写し)。hd0 = 1、hd1 = 2、fd0 = 257。種別ごとの接頭辞は `hd`・`fd`・`ser`・`cd`・`host`。未知の種別は `type<t> unit<u>` と数字のまま。0 は `unknown` (FS が埋めず VFS もマウントを引けなかった)。
 - 32bit の値は `%lu` で出す (ホストの LP64 でも同じ書式)。1 行は 80 桁を超えうる。
 
 ## 失敗と終了コード

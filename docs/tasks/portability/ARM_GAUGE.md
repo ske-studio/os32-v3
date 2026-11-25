@@ -47,13 +47,13 @@
 ### `-fsyntax-only` ではなく `-c` を使う理由
 
 `-fsyntax-only` はインライン asm の**中身を見ない**。試したところ
-`arch/x86/kernel/gdt.c` (`__asm__` に `eax` を書いている) すら素通りし、
+`sys/arch/x86/kernel/gdt.c` (`__asm__` に `eax` を書いている) すら素通りし、
 「通った本数」が実態より大きく出る。コード生成まで走らせる `-c` を使う。
 
 ### アセンブル段のエラーを元のソース行へ戻している
 
 `inb` のように**制約**が ARM に無いものはコンパイル段で落ちるので、エラー行が
-`include/io.h` と出て分類できる。ところが `pushfl` / `sti` / `mov %cr3` のように
+`sys/include/io.h` と出て分類できる。ところが `pushfl` / `sti` / `mov %cr3` のように
 制約 (`"=r"`) だけは ARM でも通るものはコンパイル段を素通りし、gcc の中間 `.s` を
 指した `/tmp/ccXXXXXX.s:96: Error: bad instruction 'pushfl'` になる。これでは
 (1) どのヘッダ由来か分からず「io.h を分離したら何本通るか」が測れない、
@@ -61,8 +61,8 @@
 
 そこで `-g -S` で `.s` を出し直してアセンブルし、`.loc` / `.file` の表で元の
 ソース行に戻している。この処理のおかげで **7 本が「その他」から `io.h` 由来へ
-正しく移った** (`kernel/console/con_sink.c` `kernel/kbd_inject.c` `platform/pc98/kernel.c`
-`mm/pgalloc.c` `drivers/sound/fm/snd_engine.c` `platform/pc98/legacy/v86.c` `net/link.c`)。
+正しく移った** (`sys/kern/console/con_sink.c` `sys/kern/kbd_inject.c` `sys/platform/pc98/kernel.c`
+`sys/kern/mm/pgalloc.c` `drivers/sound/fm/snd_engine.c` `sys/platform/pc98/legacy/v86.c` `sys/net/link.c`)。
 `-g` はコード生成を変えないので、測っている対象は同じ。
 
 ### 対象から外しているもの (理由つき)
@@ -130,19 +130,19 @@
 
 | ファイル | 最初のエラー |
 |---|---|
-| `exec/exec.c` | `exec/exec.c: error: unknown register name 'eax' in 'asm'` |
-| `drivers/video/pc98/gfx_vram.c` | `gfx/gfx_internal.h (_memcpy_w()): error: impossible constraint in 'asm'` |
-| `arch/x86/kernel/gdt.c` | `arch/x86/kernel/gdt.c (gdt_set_gate()): error: unknown register name 'eax' in 'asm'` |
-| `mm/paging.c` | `mm/paging.c: Error: ARM register expected -- 'mov %cr3,r3'` |
-| `arch/x86/kernel/tss.c` | `arch/x86/kernel/tss.c (tss_init()): error: impossible constraint in 'asm'` |
+| `sys/kern/exec/exec.c` | `sys/kern/exec/exec.c: error: unknown register name 'eax' in 'asm'` |
+| `sys/platform/pc98/video/gfx_vram.c` | `sys/hal/gfx/gfx_internal.h (_memcpy_w()): error: impossible constraint in 'asm'` |
+| `sys/arch/x86/kernel/gdt.c` | `sys/arch/x86/kernel/gdt.c (gdt_set_gate()): error: unknown register name 'eax' in 'asm'` |
+| `sys/kern/mm/paging.c` | `sys/kern/mm/paging.c: Error: ARM register expected -- 'mov %cr3,r3'` |
+| `sys/arch/x86/kernel/tss.c` | `sys/arch/x86/kernel/tss.c (tss_init()): error: impossible constraint in 'asm'` |
 
 この 5 本は `io.h` を経由せず**その場に x86 asm を書いている**もの。`gdt` / `tss` /
 `cr3` は x86 の仕組みそのものなので、順序 3 で `arch/x86/` へ移す対象。
-`gfx/gfx_internal.h` の `_memcpy_w()` と `exec/exec.c` は移設先の判断が要る。
+`sys/hal/gfx/gfx_internal.h` の `_memcpy_w()` と `sys/kern/exec/exec.c` は移設先の判断が要る。
 
 ### (b) `io.h` 経由 — 33 本
 
-エラーの内訳 (`include/io.h` の行):
+エラーの内訳 (`sys/include/io.h` の行):
 
 | 行 | 中身 | 本数 |
 |---|---|---|
@@ -153,14 +153,14 @@
 
 ファイル:
 
-`drivers/ata/atapi.c` `drivers/block/fdc.c` `drivers/sound/fm/fm.c` `drivers/ata/ide.c` `drivers/input/kbd.c`
-`drivers/video/kcg/kcg.c` `drivers/net/ne2000/lgy98.c` `drivers/input/mouse.c` `drivers/input/mouse_bus.c`
-`drivers/input/mouse_seamless.c` `drivers/net/ne2000/ne2000.c` `drivers/char/np2sysp.c` `drivers/char/rtc.c`
-`drivers/char/serial.c` `drivers/video/cirrus/wab_glue_xe10.c` `drivers/hostdrv/hostdrvfs.c` `drivers/video/pc98/backend_pc98.c`
-`drivers/video/pc98/backend_pegc.c` `gfx/gfx_core.c` `gfx/gfx_scroll.c` `gfx/palette.c`
-`kernel/console/con_sink.c` `kernel/console/console.c` `arch/x86/kernel/idt.c` `arch/x86/kernel/isr_handlers.c`
-`kernel/kbd_inject.c` `platform/pc98/kernel.c` `mm/pgalloc.c` `drivers/sound/fm/snd_engine.c`
-`kernel/sys.c` `platform/pc98/legacy/v86.c` `platform/pc98/legacy/v86_io.c` `net/link.c`
+`sys/dev/ata/atapi.c` `sys/dev/block/fdc.c` `sys/dev/sound/fm/fm.c` `sys/dev/ata/ide.c` `sys/platform/pc98/input/kbd.c`
+`sys/dev/video/kcg/kcg.c` `sys/dev/net/ne2000/lgy98.c` `sys/platform/pc98/input/mouse.c` `sys/platform/pc98/input/mouse_bus.c`
+`sys/dev/input/mouse_seamless.c` `sys/dev/net/ne2000/ne2000.c` `sys/dev/char/np2sysp.c` `sys/dev/char/rtc.c`
+`sys/dev/char/serial.c` `sys/platform/pc98/video/cirrus/wab_glue_xe10.c` `sys/dev/hostdrv/hostdrvfs.c` `sys/platform/pc98/video/backend_pc98.c`
+`sys/platform/pc98/video/backend_pegc.c` `sys/hal/gfx/gfx_core.c` `sys/hal/gfx/gfx_scroll.c` `sys/hal/gfx/palette.c`
+`sys/kern/console/con_sink.c` `sys/kern/console/console.c` `sys/arch/x86/kernel/idt.c` `sys/arch/x86/kernel/isr_handlers.c`
+`sys/kern/kbd_inject.c` `sys/platform/pc98/kernel.c` `sys/kern/mm/pgalloc.c` `drivers/sound/fm/snd_engine.c`
+`sys/kern/sys.c` `sys/platform/pc98/legacy/v86.c` `sys/platform/pc98/legacy/v86_io.c` `sys/net/link.c`
 
 ---
 
@@ -186,7 +186,7 @@
 「呼び出し側を直す」より「`io.h` の中を arch 別にする」ほうが本体になる。
 呼び出し側に残っている直書きは別途 grep で洗うこと (本票では調べていない)。
 
-### `net/link.c` が 0/1
+### `sys/net/link.c` が 0/1
 
 `net/` はファイルが 1 本しかないので割合に意味は無い。`io.h` の `irq_save` 由来。
 
@@ -213,7 +213,7 @@ ARM で落ちた 38 本は本当に ARM 固有の理由で落ちている。
 
 | フラグ | 何から守るか |
 |---|---|
-| `-fsigned-char` | ARM EABI は `char` が **unsigned** が既定。**今のコードに符号依存は見つかっていない** (`lib/utf8.c` は `& 0x80`、`fs/isofs/iso9660.c` は `(unsigned char)` に明示キャスト) が、`kstrcmp` はまだ `lib/kstring_asm.asm` の x86 アセンブリで、これを C 版に起こす (順序 4) と `*a - *b` の符号で 0x80 以上のバイト = 日本語ファイル名の**並び順が変わる**。移植の最中に既定が裏返らないよう先に固定する |
+| `-fsigned-char` | ARM EABI は `char` が **unsigned** が既定。**今のコードに符号依存は見つかっていない** (`lib/utf8.c` は `& 0x80`、`sys/fs/isofs/iso9660.c` は `(unsigned char)` に明示キャスト) が、`kstrcmp` はまだ `sys/kern/kstring_asm.asm` の x86 アセンブリで、これを C 版に起こす (順序 4) と `*a - *b` の符号で 0x80 以上のバイト = 日本語ファイル名の**並び順が変わる**。移植の最中に既定が裏返らないよう先に固定する |
 | `-fno-short-enums` | ARM EABI は `-fshort-enums` が既定 (enum を収まる最小サイズに縮める)。`sdk/include/os32/os32_kapi_shared.h` の `exec_status_t` は `0 … -5` なので **1 バイトに縮む**。カーネルと外部プログラムで共有する ABI ヘッダなので、幅が食い違うと構造体のレイアウトごとずれる ([ABI]) |
 
 `CFLAGS_COMMON` はカーネル (`KERNEL_CFLAGS`) と
@@ -292,7 +292,7 @@ ABI の両側に同じ前提がかかる。
 | 順序 5 の直前 | `d191fd5` | **55 / 93** | 5 | 33 | 0 | 0 |
 | 順序 5 の直後 | 本作業 | **55 / 93** | **1** | **37** | 0 | 0 |
 
-母数が 92 → 93、通過が 54 → 55 に増えたのは順序 **4-b** (`lib/kstring_c.c` の
+母数が 92 → 93、通過が 54 → 55 に増えたのは順序 **4-b** (`sys/kern/kstring_c.c` の
 新設) の分で、順序 4-a は 1 本も動かしていない。ディレクトリ別は 4-a の前後で
 同じ (`kapi/` 4/4、`lib/` 9/9、`fs/` 14/15、`exec/` 4/5、`kernel/` 18/32、
 `drivers/` 5/20、`gfx/` 1/7、`net/` 0/1。順序 1〜3 との差は `lib/` の 8/8 → 9/9
@@ -308,8 +308,8 @@ ABI の両側に同じ前提がかかる。
 
 ### 順序 3 でも数字は動かない — それが確かめたかったこと
 
-順序 3 は `io.h` を**契約** (`include/io.h`) と**実装**
-(`arch/x86/arch_io.h` / `platform/pc98/platform_io.h`) に割っただけで、
+順序 3 は `io.h` を**契約** (`sys/include/io.h`) と**実装**
+(`sys/arch/x86/arch_io.h` / `sys/platform/pc98/platform_io.h`) に割っただけで、
 `ARCH=x86` のまま計測している以上、ARM コンパイラに渡る命令列は 1 つも
 変わらない。**54/92 のまま、分類の内訳も 5 / 33 / 0 / 0 のまま**であることが、
 「骨格を入れただけで中身は動かしていない」ことの裏づけになる。
@@ -318,13 +318,13 @@ ABI の両側に同じ前提がかかる。
 
 | 順序 2 まで | 順序 3 以後 | 本数 |
 |---|---|---|
-| `include/io.h` (`inp`) | `platform/pc98/platform_io.h` | 9 |
-| `include/io.h` (`outp`) | `platform/pc98/platform_io.h` | 17 |
-| `include/io.h` (`_enable`) | `arch/x86/arch_io.h` | 1 |
-| `include/io.h` (`irq_save`) | `arch/x86/arch_io.h` | 6 |
+| `sys/include/io.h` (`inp`) | `sys/platform/pc98/platform_io.h` | 9 |
+| `sys/include/io.h` (`outp`) | `sys/platform/pc98/platform_io.h` | 17 |
+| `sys/include/io.h` (`_enable`) | `sys/arch/x86/arch_io.h` | 1 |
+| `sys/include/io.h` (`irq_save`) | `sys/arch/x86/arch_io.h` | 6 |
 
-(a) の 5 本 (`exec/exec.c` `drivers/video/pc98/gfx_vram.c` `arch/x86/kernel/gdt.c` `mm/paging.c`
-`arch/x86/kernel/tss.c`) はエラー行もそのまま。順序 1 の §3 が「`gdt` / `tss` / `cr3` は
+(a) の 5 本 (`sys/kern/exec/exec.c` `sys/platform/pc98/video/gfx_vram.c` `sys/arch/x86/kernel/gdt.c` `sys/kern/mm/paging.c`
+`sys/arch/x86/kernel/tss.c`) はエラー行もそのまま。順序 1 の §3 が「`gdt` / `tss` / `cr3` は
 順序 3 で `arch/x86/` へ移す対象」と書いていたが、**この 5 本の移設は行って
 いない** — 順序 3 の承認範囲は `io.h` の分割と受け皿の導入までで、`gdt.c` /
 `tss.c` / `paging.c` の中身を `arch/` へ移すのは別の判断が要る (移すのは
@@ -333,8 +333,8 @@ ABI の両側に同じ前提がかかる。
 
 ### 順序 4-a でも数字は動かない — この計測器が測っていないものだから
 
-順序 4-a は `fs/ext2/ext2_*.c` / `drivers/video/kcg/kcg.c` / `lib/utf8.c` の
-`*(u32 *)&buf[off]` を `include/endian_le.h` の LE アクセサに置き換えた作業。
+順序 4-a は `fs/ext2/ext2_*.c` / `sys/dev/video/kcg/kcg.c` / `lib/utf8.c` の
+`*(u32 *)&buf[off]` を `sys/include/endian_le.h` の LE アクセサに置き換えた作業。
 **この計測器で数字が動かないのは正しく、しかも「効果が無い」という意味では
 ない。** 理由を分けて書いておく:
 
@@ -342,10 +342,10 @@ ABI の両側に同じ前提がかかる。
   `*(u32 *)&buf[off]` は ARM でも**普通にコンパイルできる** — 壊れるのは
   実行時 (`SCTLR.A=1` なら非アラインで abort、BE なら値が入れ替わる) なので、
   コンパイル計測には最初から現れない。
-* 実際、置き換えた 8 本のうち 7 本 (`fs/ext2/ext2_*.c` 5 本、`fs/isofs/iso9660.c`、
+* 実際、置き換えた 8 本のうち 7 本 (`fs/ext2/ext2_*.c` 5 本、`sys/fs/isofs/iso9660.c`、
   `lib/utf8.c`) は**順序 1 の時点から ARM を通っていた** (`fs/` 14/15、
-  `lib/` 8/8)。`drivers/video/kcg/kcg.c` だけは今も落ちるが、原因は
-  `platform/pc98/platform_io.h` の `outp()` のポート I/O で、エンディアンとは関係が無い。
+  `lib/` 8/8)。`sys/dev/video/kcg/kcg.c` だけは今も落ちるが、原因は
+  `sys/platform/pc98/platform_io.h` の `outp()` のポート I/O で、エンディアンとは関係が無い。
   基点 `ff4160c` の 55/93 は前後で 1 本も動かない (分類も 5 / 33 / 0 / 0 のまま)。
 
 つまり順序 4-a の効果は**この票の物差しでは測れない**。代わりの物差しとして、
@@ -353,13 +353,13 @@ ABI の両側に同じ前提がかかる。
 
 | 対象 | 順序 4-a の前 | 順序 4-a の後 |
 |---|---|---|
-| `fs/ext2/ext2_dir.c` | 29 | 0 |
-| `fs/ext2/ext2_fmt.c` | 54 | 0 |
-| `fs/ext2/ext2_inode.c` | 46 | 0 |
-| `fs/ext2/ext2_super.c` | 28 | 0 |
-| `drivers/video/kcg/kcg.c` | 3 | 0 |
+| `sys/fs/ext2/ext2_dir.c` | 29 | 0 |
+| `sys/fs/ext2/ext2_fmt.c` | 54 | 0 |
+| `sys/fs/ext2/ext2_inode.c` | 46 | 0 |
+| `sys/fs/ext2/ext2_super.c` | 28 | 0 |
+| `sys/dev/video/kcg/kcg.c` | 3 | 0 |
 | `lib/utf8.c` | 3 | 0 |
-| `fs/ext2/ext2_file.c` / `ext2_vfs.c` / `iso9660.c` | 0 | 0 |
+| `sys/fs/ext2/ext2_file.c` / `ext2_vfs.c` / `iso9660.c` | 0 | 0 |
 | **計** | **163** | **0** |
 
 `-Wcast-align` は既定では「非アラインを許す CPU」で黙るので、x86 のホストで
@@ -397,7 +397,7 @@ ABI の両側に同じ前提がかかる。
 | 対象 | 結果 |
 |---|---|
 | `C_KERNEL` 92 本のうち 91 本 | **91 / 91 が md5 一致**、相違 0、エラー 0 |
-| `kapi/kapi_sys.c` | `__DATE__` / `__TIME__` を埋めるので md5 比較の対象外。同じ分にコンパイルして**バイト一致**を確認 |
+| `sys/kapi/kapi_sys.c` | `__DATE__` / `__TIME__` を埋めるので md5 比較の対象外。同じ分にコンパイルして**バイト一致**を確認 |
 
 ### 順序 4-b (kstring の C 版) 後 — 2026-09-15
 
@@ -405,8 +405,8 @@ ABI の両側に同じ前提がかかる。
 |---|---|---|---|---|---|
 | 順序 4-b 後 | **55 / 93** | 5 | 33 | 0 | 0 |
 
-`lib/kstring_c.c` が `C_KERNEL` に加わって母数が 92 → 93 になり、そのまま ARM で通る側に入った。
-x86 の既定は `lib/kstring_asm.asm` のまま (`build/kernel.mk` の `ARCH` 分岐)。
+`sys/kern/kstring_c.c` が `C_KERNEL` に加わって母数が 92 → 93 になり、そのまま ARM で通る側に入った。
+x86 の既定は `sys/kern/kstring_asm.asm` のまま (`build/kernel.mk` の `ARCH` 分岐)。
 計測器は `kernel.mk` の `$(KSTRING_C_SRC)` をファイル名と誤解して (d) に数え DRIFT を出していたので、
 変数を `kernel.mk` 自身の代入から展開するようにした (`parse_kernel_vars`)。
 
@@ -419,11 +419,11 @@ x86 の既定は `lib/kstring_asm.asm` のまま (`build/kernel.mk` の `ARCH` �
 
 | 順序 4 まで | 順序 5 以後 | 本数 |
 |---|---|---|
-| `exec/exec.c` (リング降下) | `arch/x86/arch_cpu.h` | 1 |
-| `arch/x86/kernel/gdt.c` (lgdt + セグメント) | `arch/x86/x86_desc.h` | 1 |
-| `mm/paging.c` (`mov %cr3`) | `arch/x86/arch_cpu.h` | 1 |
-| `arch/x86/kernel/tss.c` (`ltr`) | `arch/x86/x86_desc.h` | 1 |
-| `drivers/video/pc98/gfx_vram.c` (`rep movsw` ほか) | 変わらず `gfx/gfx_internal.h` の `_memcpy_w()` | 1 |
+| `sys/kern/exec/exec.c` (リング降下) | `sys/arch/x86/arch_cpu.h` | 1 |
+| `sys/arch/x86/kernel/gdt.c` (lgdt + セグメント) | `sys/arch/x86/x86_desc.h` | 1 |
+| `sys/kern/mm/paging.c` (`mov %cr3`) | `sys/arch/x86/arch_cpu.h` | 1 |
+| `sys/arch/x86/kernel/tss.c` (`ltr`) | `sys/arch/x86/x86_desc.h` | 1 |
+| `sys/platform/pc98/video/gfx_vram.c` (`rep movsw` ほか) | 変わらず `sys/hal/gfx/gfx_internal.h` の `_memcpy_w()` | 1 |
 
 分類 (a) の意味は「差し替え先がまだ決まっていない、その場の x86 asm」なので、
 `arch/` や `platform/` の下に入ったものは (b) 側に数えるよう
@@ -435,13 +435,13 @@ x86 の既定は `lib/kstring_asm.asm` のまま (`build/kernel.mk` の `ARCH` �
 
 ついでに 2 つ:
 
-* `CR0_PE` / `CR0_PG` を `include/pc98.h` から `arch/x86/arch_cpu.h` へ移した
-  (CPU のビットであって機種の持ち物ではない)。使っていたのは `mm/paging.c`
+* `CR0_PE` / `CR0_PG` を `sys/platform/pc98/pc98.h` から `sys/arch/x86/arch_cpu.h` へ移した
+  (CPU のビットであって機種の持ち物ではない)。使っていたのは `sys/kern/mm/paging.c`
   だけで、そこは `arch_mmu_enable()` の内側になった。
-* その結果 `mm/paging.c` が `pc98.h` を引く理由が無くなったので外した
+* その結果 `sys/kern/mm/paging.c` が `pc98.h` を引く理由が無くなったので外した
   (`.o` は md5 一致のまま)。ページングのコードが機種ヘッダに依存しなくなる。
 
-残る (a) の 1 本は `drivers/video/pc98/gfx_vram.c` (`gfx/gfx_internal.h` の `rep movsw` /
+残る (a) の 1 本は `sys/platform/pc98/video/gfx_vram.c` (`sys/hal/gfx/gfx_internal.h` の `rep movsw` /
 `rep stosl`)。これはデバイス層 (VRAM への転送) の話で、順序 5 の範囲外
 (HANDOVER_2026-09-16 §5「やらないこと」)。
 
@@ -453,7 +453,7 @@ x86 の既定は `lib/kstring_asm.asm` のまま (`build/kernel.mk` の `ARCH` �
 | 対象 | 結果 |
 |---|---|
 | カーネルの `.o` 103 本のうち 102 本 | **102 / 102 が md5 一致**、相違 0 |
-| `kapi/kapi_sys.o` | `__DATE__` / `__TIME__` を埋めるので対象外。`objdump -s` で見た差は `.rodata` のビルド時刻文字列 1 か所だけ (命令は無差) |
+| `sys/kapi/kapi_sys.o` | `__DATE__` / `__TIME__` を埋めるので対象外。`objdump -s` で見た差は `.rodata` のビルド時刻文字列 1 か所だけ (命令は無差) |
 
 一致させるために、特権境界の 2 つ (`arch_enter_user` /
 `arch_call_on_stack`) は `static inline` 関数ではなく**マクロ**にした。
@@ -466,16 +466,16 @@ x86 の既定は `lib/kstring_asm.asm` のまま (`build/kernel.mk` の `ARCH` �
   (同 39 行の差)。
 
 どちらも動作は同じだが、「移設で命令列は変わっていない」を `.o` の md5 で
-示せなくなる。理由は `include/cpu.h` の §2 に書いた。
+示せなくなる。理由は `sys/include/cpu.h` の §2 に書いた。
 `kernel_tss.esp0` を引数のポインタで渡す案も、`struct tss_entry` が packed の
 ため `-Waddress-of-packed-member` が出るのでやめ、記録先は arch 実装の内側
 (x86 では `kernel_tss.esp0`) に閉じた。
 
 ### kstring の asm 版 / C 版の速度 (2026-09-17、基点 `63754b4`)
 
-順序 4-b で新設した `lib/kstring_c.c` を **x86 でも使うか**を実測した
+順序 4-b で新設した `sys/kern/kstring_c.c` を **x86 でも使うか**を実測した
 (票 `docs/archive/portability/TASK_KSTRING_BENCH.md`、計測プログラム
-`userland/tests/kstr_bench.c`、集計 `tools/kstr_bench_report.py`)。
+`userland/diag/kstr_bench.c`、集計 `tools/kstr_bench_report.py`)。
 NP21/W の既定設定 (約 16MHz) で 3 回、13 本 × 7 長 × 2 ずれ × 2 版 = 364 升。
 
 | 関数 | 比の中央値 (C / asm) | 比の最大 | 差の出どころ |
@@ -506,12 +506,12 @@ NP21/W の既定設定 (約 16MHz) で 3 回、13 本 × 7 長 × 2 ずれ × 2 
 `rep` を使わない 4 本が 1.08 に留まるのがその対照。[未] **実機での倍率は未測定**であり、
 13 倍を実機の値として引用しない ([V4])。
 
-[推] **差は C の実装方法でも縮む可能性がある。** `lib/kstring_c.c` は境界をまたぐ読み込みを避けるため
+[推] **差は C の実装方法でも縮む可能性がある。** `sys/kern/kstring_c.c` は境界をまたぐ読み込みを避けるため
 1 バイトずつ 4 回読んで語に組み直している。送り元と送り先の境界が揃う場合に
 `u32` のまま動かす分岐を足すことが改善候補になる。[未] 最適化後の差は未測定。
 
 **決定 (ユーザー、2026-09-17): x86 はアセンブリ版を維持。** `build/kernel.mk` の
-`ifeq ($(ARCH),x86)` はそのまま。`lib/kstring_c.c` は他アーキ向けに現状の設計で進める。
+`ifeq ($(ARCH),x86)` はそのまま。`sys/kern/kstring_c.c` は他アーキ向けに現状の設計で進める。
 
 高速側 (P100 相当) の条件は**測っていない** — `np21x64w.ini` の `clk_mult` 変更が要り、
 [D2] の承認対象かつスキル `os32-emu-config` の扱うキーに無いため見送った。
@@ -527,7 +527,7 @@ NP21/W の既定設定 (約 16MHz) で 3 回、13 本 × 7 長 × 2 ずれ × 2 
 
 | 前提 | 効く場所 |
 |---|---|
-| `sizeof(void *) == 4`、`u32` とポインタが同じ幅 | `lib/kstring_c.c` の語単位処理、`include/types.h`、KAPI の構造体レイアウト ([ABI]) |
+| `sizeof(void *) == 4`、`u32` とポインタが同じ幅 | `sys/kern/kstring_c.c` の語単位処理、`sys/include/types.h`、KAPI の構造体レイアウト ([ABI]) |
 | 語の単位は 4 バイト | `KSTR_WORD` とゼロ検出の定数 `0x01010101` / `0x80808080` |
 | `int` は 32 ビット | KAPI の戻り値、`OS32_ERR_*` |
 

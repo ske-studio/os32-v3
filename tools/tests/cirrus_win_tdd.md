@@ -2,7 +2,7 @@
 
 教訓: [pgalloc「落とし穴」](../../docs/design/mm/pgalloc.md#落とし穴) (デバイス窓は物理地図で判定、RAM の上端で判定しない)
 契約: `docs/design/drivers/video/cirrus/cirrus_identify.md`、`docs/design/drivers/video/cirrus/backend_cirrus.md` 「probe の段」 (観測は TASK_S5 の R2)
-実装: `drivers/video/cirrus/cirrus_identify.c` の `cirrus_win_usable()`
+実装: `sys/platform/pc98/video/cirrus/cirrus_identify.c` の `cirrus_win_usable()`
 試験: `tools/tests/cirrus_win_host.c` + `tools/tests/test_cirrus_win.py` (`make check-cirrus-win-host`)
 
 ## 欠陥
@@ -14,28 +14,28 @@ PEGC で直した §4-34 と同じ形。
 
 ## 様式
 
-`test_pgalloc_range.py` と同じ形: `cirrus_win_host.c` が実物の `drivers/video/cirrus/backend_cirrus.c` を `#include` し
+`test_pgalloc_range.py` と同じ形: `cirrus_win_host.c` が実物の `sys/dev/video/cirrus/backend_cirrus.c` を `#include` し
 (1 行も写さない)、周りだけを贋物にしてホスト ILP32 GNU89 (`gcc -m32 -nostdlib`、`int 0x80`) で走らせる。
 同じソースを `i386-elf-gcc -Werror` でもコンパイルする ([C1])。
 
 - `pgalloc_range_has_ram` = **贋の物理地図** (RAM の span 表)。実物と同じく範囲異常・未初期化は 1。
 - `sys_get_mem_kb` = 構成の上端 (旧判定を RED にするため)。
-- `wab_glue_xe10` = 贋グルー (実物の窓の番地 `include/wab_xe10.h` を入れ、`probe` の到達を数える)。
+- `wab_glue_xe10` = 贋グルー (実物の窓の番地 `sys/platform/pc98/wab_xe10.h` を入れ、`probe` の到達を数える)。
 
 ## 2 段目: リニア窓の移設と NP21/W の門 (A2、ユーザー決定 2026-09-29)
 
 1 段目 (上の修正) の後も、リニア窓 01000000h は 16MB 超の RAM と本当に重なるので probe は 0 のままだった。
 ユーザー決定: **Cirrus は NP21/W 互換のためだけ**。リニア窓を v3 のデバイス窓の帯 `[0xFE000000, 0xFF000000)`
-(`include/memmap.h` `MEM_DEVICE_APERTURE_*`) の先頭へ移す。
+(`sys/include/memmap.h` `MEM_DEVICE_APERTURE_*`) の先頭へ移す。
 
-- `include/memmap.h`: 帯と `MEM_PHYS_RAM_CEILING` を定義。`mm/memory_boot.c` は `[MEM_PHYS_RAM_CEILING, 4GB)` を MMIO にする。
-- `include/wab_xe10.h`: `WAB_XE10_LINEARWIN_SEL` = 帯の先頭 >> 24 = FEh (NP21/W は FFh を捨てる)。窓として出る 4MB を `WAB_XE10_LINEARWIN_DECODE` に。
-  帯と静的 PT に収まることは `drivers/video/cirrus/wab_glue_xe10.c` の STATIC_ASSERT。
-- `mm/paging.c`: 帯の先頭 4MB の PT を静的に 1 枚 (+4KB BSS)。PDE は paging_init で present。
-- `drivers/video/cirrus/backend_cirrus.c`: 窓の上限を旧 PAGING_MAP_SIZE (32MB) から 32bit 空間の末尾へ。
+- `sys/include/memmap.h`: 帯と `MEM_PHYS_RAM_CEILING` を定義。`sys/kern/mm/memory_boot.c` は `[MEM_PHYS_RAM_CEILING, 4GB)` を MMIO にする。
+- `sys/platform/pc98/wab_xe10.h`: `WAB_XE10_LINEARWIN_SEL` = 帯の先頭 >> 24 = FEh (NP21/W は FFh を捨てる)。窓として出る 4MB を `WAB_XE10_LINEARWIN_DECODE` に。
+  帯と静的 PT に収まることは `sys/platform/pc98/video/cirrus/wab_glue_xe10.c` の STATIC_ASSERT。
+- `sys/kern/mm/paging.c`: 帯の先頭 4MB の PT を静的に 1 枚 (+4KB BSS)。PDE は paging_init で present。
+- `sys/dev/video/cirrus/backend_cirrus.c`: 窓の上限を旧 PAGING_MAP_SIZE (32MB) から 32bit 空間の末尾へ。
   **段 2 の門**: auto では `np2_detect()` が真のときだけボードの ID を読む。`GFX=cirrus` の明示時は読む。
   auto の probe は 1 回ごとに np2_detect の検出通信 (07EFh へ `"NP2"` の OUT 3 回 + 応答の IN 最大 7 回) を 1 組**追加で**行う。
-  叩くポートはマウスの初期化 (`drivers/input/mouse.c`) が毎回の起動で既に使っている 07EFh だけで新しいポートは無いが、
+  叩くポートはマウスの初期化 (`sys/platform/pc98/input/mouse.c`) が毎回の起動で既に使っている 07EFh だけで新しいポートは無いが、
   実機でもこの回数ぶん I/O は増える (ボードの ID 0FAAh/0FABh を読まなくなる代わり)。
 
 ## 見ること
@@ -60,7 +60,7 @@ PEGC で直した §4-34 と同じ形。
 
 ## RED → GREEN
 
-- RED (修正前の `drivers/video/cirrus/backend_cirrus.c`、2026-09-29):
+- RED (修正前の `sys/dev/video/cirrus/backend_cirrus.c`、2026-09-29):
   `ASSERT FAIL: cirrus_win_usable(BANK, BANK_N)` / `EXIT cirrus_win_host=1` (1 の最初の確認で落ちる)。
 - GREEN (1 段目の修正後): 7 段とも PASS、`EXIT cirrus_win_host=0`、`TARGET i386-elf GNU89 -Werror COMPILE PASS`。
 
@@ -83,7 +83,7 @@ PEGC で直した §4-34 と同じ形。
 | `no_np2_gate` | auto でも NP21/W 判定をせずに ID を読む | 7 |
 | `gate_ignores_forced` | `GFX=cirrus` でも NP21/W でなければ試さない | 7 |
 | `np2_before_window` | 窓の判定より前に NP21/W 判定を読む | 7 (RAM に当たる構成で判定を読む) |
-| `old_linear_sel` (`include/wab_xe10.h`) | リニア窓を 01000000h へ戻す | 2 (番地)。カーネルでは glue の STATIC_ASSERT でも止まる |
+| `old_linear_sel` (`sys/platform/pc98/wab_xe10.h`) | リニア窓を 01000000h へ戻す | 2 (番地)。カーネルでは glue の STATIC_ASSERT でも止まる |
 
 ## 範囲の外 (未検証)
 

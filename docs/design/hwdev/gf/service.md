@@ -1,6 +1,6 @@
-# hwdev/gf/service.c — 設計
+# sys/dev/video/geforce/service.c — 設計
 > 状態: **現行 (2026-10-30)** — 出所: GF_DRIVER_DESIGN (2026-10-29 確定、D0 で移した)
-ソース: `hwdev/gf/service.c`
+ソース: `sys/dev/video/geforce/service.c`
 
 HAL に GF のレジスタ・ROM・recover token を出さない。
 成功 0、引数・範囲不正は既存 `OS32_ERR_INVAL`、未対応は `OS32_ERR_NOSYS`、装置処理失敗は既存下層と同じ -1。新しい失敗分類を作らず、最後の段・対象・既存 rc を保持する。

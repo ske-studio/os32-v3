@@ -8,15 +8,15 @@ import subprocess
 import tempfile
 
 CHECK = dict(name='ppc-cpu-nap', tier=2, budget=30, needs=[], env=['ppc-cross'],
-    covers=['tools/tests/test_ppc_cpu_nap.py', 'tools/ppc/cpu_nap*', 'arch/ppc/kernel_cpu.c',
-            'arch/ppc/kernel_dec.c', 'arch/ppc/kernel_trap.c',
-            'platform/powermac/kernel_boot.c', 'arch/ppc/mmu.S', 'arch/ppc/ppc_oea.h',
-            'arch/ppc/ppc_trap.h', 'arch/ppc/ppc_frame.h', 'arch/ppc/pd_walk.c',
-            'arch/ppc/ppc_pd.h', 'arch/ppc/ppc_boot.h', 'arch/ppc/arch_exec_storage.h',
-            'include/machcfg_contract.h', 'include/exec_arch.h', 'include/types.h', 'include/callconv.h',
-            'kernel/irq/irq.h', 'kernel/irq/irq_math.h', 'include/platform_irq.h',
-            'platform/powermac/platform_irq_limits.h', 'arch/ppc/ppc_hpt.h',
-            'platform/powermac/platform_of_layout.h'],
+    covers=['tools/tests/test_ppc_cpu_nap.py', 'tools/ppc/cpu_nap*', 'sys/arch/ppc/kernel_cpu.c',
+            'sys/arch/ppc/kernel_dec.c', 'sys/arch/ppc/kernel_trap.c',
+            'sys/platform/powermac/kernel_boot.c', 'sys/arch/ppc/mmu.S', 'sys/arch/ppc/ppc_oea.h',
+            'sys/arch/ppc/ppc_trap.h', 'sys/arch/ppc/ppc_frame.h', 'sys/arch/ppc/pd_walk.c',
+            'sys/arch/ppc/ppc_pd.h', 'sys/arch/ppc/ppc_boot.h', 'sys/arch/ppc/arch_exec_storage.h',
+            'sys/include/machcfg_contract.h', 'sys/include/exec_arch.h', 'sys/include/types.h', 'sys/include/callconv.h',
+            'sys/kern/irq/irq.h', 'sys/kern/irq/irq_math.h', 'sys/include/platform_irq.h',
+            'sys/platform/powermac/platform_irq_limits.h', 'sys/arch/ppc/ppc_hpt.h',
+            'sys/platform/powermac/platform_of_layout.h'],
     basis=['User decision 2026-11-16 and mainline assignment (PPC NAP)',
            'docs/decisions/settings/MACHCFG_DESIGN.md P-G, P-R2, P-R4'])
 ROOT = Path(__file__).resolve().parents[2]
@@ -41,11 +41,11 @@ def main(argv=None):
     if missing:
         print('SKIP ppc-cpu-nap: unavailable '+', '.join(missing), flush=True)
         return int(os.environ.get('OS32_REQUIRE_PPC')=='1')
-    cpu=(ROOT/'arch/ppc/kernel_cpu.c').read_text()
-    dec=(ROOT/'arch/ppc/kernel_dec.c').read_text()
+    cpu=(ROOT/'sys/arch/ppc/kernel_cpu.c').read_text()
+    dec=(ROOT/'sys/arch/ppc/kernel_dec.c').read_text()
     parts={'power': cpu[cpu.index('void ppc_cpu_power_init('):cpu.index('void ppc_cpu_load_segments(')],
            'idle': dec[dec.index('void arch_cpu_idle('):dec.index('void arch_cpu_halt(')],
-           'trap': (ROOT/'arch/ppc/kernel_trap.c').read_text()}
+           'trap': (ROOT/'sys/arch/ppc/kernel_trap.c').read_text()}
     with tempfile.TemporaryDirectory(prefix='cpu-nap-') as td:
         out=Path(td)
         for name, part, old, new, expected in [('normal', None, None, None, 0)]+(MUTATIONS if args.mutate else []):
@@ -60,7 +60,7 @@ def main(argv=None):
                  '-fno-stack-protector','-DPPC_TRAP_HOST_TEST',
                  *['-I'+str(p) for p in (out,ROOT/'arch/ppc',ROOT/'include',ROOT/'platform/powermac',ROOT)],
                  str(ROOT/'tools/ppc/cpu_nap_host.c'),str(out/'trap.c'),
-                 str(ROOT/'arch/ppc/pd_walk.c'),'-o',str(out/'host')]
+                 str(ROOT/'sys/arch/ppc/pd_walk.c'),'-o',str(out/'host')]
             subprocess.run(cmd,check=True)
             rc=subprocess.run(['qemu-i386',str(out/'host')],timeout=5).returncode
             assert rc==expected, (name,rc,expected)

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """82557 adapter with libc-free driver and module-reference fakes."""
 CHECK = dict(name='hostsvc-e82557', tier=1, needs=[], budget=3.4, covers=[
-    'drivers/net/e82557/nic_e82557.c', 'net/nic.h', 'include/lan_contract.h',
-    'drivers/net/e82557/lan_module.h', 'drivers/net/e82557/e82557_regs.h',
+    'sys/dev/net/e82557/nic_e82557.c', 'sys/net/nic.h', 'sys/include/lan_contract.h',
+    'sys/dev/net/e82557/lan_module.h', 'sys/dev/net/e82557/e82557_regs.h',
     'sdk/include/os32/os32_kapi_shared.h',
     'tools/tests/hostsvc_e82557_host.c', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'build/config.mk'],
@@ -42,7 +42,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
-    original = (ROOT / 'drivers/net/e82557/nic_e82557.c').read_text()
+    original = (ROOT / 'sys/dev/net/e82557/nic_e82557.c').read_text()
     with tempfile.TemporaryDirectory(prefix='hostsvc-e82557-') as tmp:
         work = Path(tmp)
         rc = build_run(work, original)

@@ -1,7 +1,7 @@
 extern int ring3_call_from_user(void);
 extern int ring3_user_ranges_writable_always(u32, u32, u32, u32);
 /* Exec boundary for unrelated redirect consumers. The d0b test includes the
- * real exec/redir_access.c; this shim preserves the older permission fixture. */
+ * real sys/kern/exec/redir_access.c; this shim preserves the older permission fixture. */
 int redir_access_capture(RedirAccess *a)
 {
     *a = (RedirAccess){0};

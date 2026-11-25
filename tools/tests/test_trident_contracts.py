@@ -6,17 +6,17 @@ expected values never come from product output. Complete Init trace oracles
 belong to 3b; this suite checks the gate, not the hardware Init sequence.
 """
 CHECK = dict(name='trident-contracts', tier=1, needs=[], budget=6.2,
-    covers=['drivers/video/trident/trident.h',
-            'drivers/video/trident/trident_module.h', 'gfx/gfx_emergency.h',
+    covers=['sys/dev/video/trident/trident.h',
+            'sys/dev/video/trident/trident_module.h', 'sys/hal/gfx/gfx_emergency.h',
             'tools/tests/trident_device_fake.h', 'tools/tests/trident_device_fake.c',
             'tools/tests/trident_contract_host.c', 'tools/tests/host32.py',
-            'tools/tests/kernel_includes.py', 'build/config.mk', 'include/types.h',
-            'include/memmap.h', 'include/pegc.h', 'gfx/palette.h',
-            'mm/pgalloc.h', 'mm/paging.h', 'exec/surface_query.c',
+            'tools/tests/kernel_includes.py', 'build/config.mk', 'sys/include/types.h',
+            'sys/include/memmap.h', 'sys/platform/pc98/pegc.h', 'sys/hal/gfx/palette.h',
+            'sys/kern/mm/pgalloc.h', 'sys/kern/mm/paging.h', 'sys/kern/exec/surface_query.c',
             'sdk/include/os32/os32_surface.h',
-            'mm/physmem.h', 'exec/surface_limits.h', 'include/sys.h',
-            'include/gfx_hal.h', 'include/gfx_mode.h', 'include/gfx_format.h',
-            'gfx/gfx.h', 'sdk/include/os32/os32_kapi_shared.h',
+            'sys/kern/mm/physmem.h', 'sys/kern/exec/surface_limits.h', 'sys/include/sys.h',
+            'sys/include/gfx_hal.h', 'sys/include/gfx_mode.h', 'sys/include/gfx_format.h',
+            'sys/hal/gfx/gfx.h', 'sdk/include/os32/os32_kapi_shared.h',
             'sdk/include/os32/os32_generations.h'],
     basis=['TRIDENT_FULL_DESIGN §9', 'TRIDENT_S3_DESIGN §2', 'TRIDENT_S3_DESIGN §3'],
 )
@@ -31,16 +31,16 @@ import host32
 from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = 'drivers/video/trident/trident.h'
-MODULE = 'drivers/video/trident/trident_module.h'
-EMERGENCY = 'gfx/gfx_emergency.h'
+HEADER = 'sys/dev/video/trident/trident.h'
+MODULE = 'sys/dev/video/trident/trident_module.h'
+EMERGENCY = 'sys/hal/gfx/gfx_emergency.h'
 FAKE_H = 'tools/tests/trident_device_fake.h'
 FAKE_C = 'tools/tests/trident_device_fake.c'
 HOST = 'tools/tests/trident_contract_host.c'
-MEMMAP = 'include/memmap.h'
-PGALLOC = 'mm/pgalloc.h'
+MEMMAP = 'sys/include/memmap.h'
+PGALLOC = 'sys/kern/mm/pgalloc.h'
 HEADERS = (HEADER, MODULE, EMERGENCY, FAKE_H, MEMMAP, PGALLOC,
-           'include/pegc.h', 'gfx/palette.h', 'sdk/include/os32/os32_surface.h')
+           'sys/platform/pc98/pegc.h', 'sys/hal/gfx/palette.h', 'sdk/include/os32/os32_surface.h')
 FLAGS = ['-m32', '-march=i386', '-std=gnu11', '-O2', '-Wall', '-Wextra',
          '-Werror', '-ffreestanding', '-fno-pie', '-fno-stack-protector']
 CONSTANTS = {
@@ -342,7 +342,7 @@ def surface_abi(work, compiler, surface_id=5, expected_failure=False, backend="T
                     '-fsyntax-only', str(public)], check=True)
     src = work / 'surface_abi.c'
     src.write_text(f'#include "{header}"\n'
-                   f'#include "{ROOT / "exec/surface_query.c"}"\n')
+                   f'#include "{ROOT / "sys/kern/exec/surface_query.c"}"\n')
     result = subprocess.run([compiler, *FLAGS, '-I' + str(ROOT),
                              *include_flags(ROOT), '-fsyntax-only', str(src)],
                             capture_output=True, text=True)
@@ -386,8 +386,8 @@ def main():
             print(f'PASS constant/layout contracts and fake selftest ({runner})', flush=True)
         if args.mutate:
             tree = work / 'tree'
-            for path in (*HEADERS, FAKE_C, HOST, 'exec/surface_limits.h',
-                         'mm/paging.h', 'mm/physmem.h'):
+            for path in (*HEADERS, FAKE_C, HOST, 'sys/kern/exec/surface_limits.h',
+                         'sys/kern/mm/paging.h', 'sys/kern/mm/physmem.h'):
                 dest = tree / path
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(ROOT / path, dest)

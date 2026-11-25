@@ -1,7 +1,7 @@
-# platform/pc98/splash_probe.c — 診断ビルドの計測
+# sys/platform/pc98/splash_probe.c — 診断ビルドの計測
 
 > 状態: **現行 (2026-11-18)** — 出所: RASTER_SPLASH_*_DESIGN・TASK_RASTER_SPLASH (要約して移した)
-ソース: `platform/pc98/splash_probe.c`
+ソース: `sys/platform/pc98/splash_probe.c`
 
 この部品は B=31 などの採用の根拠になった実機の数字を採る道具。通常の再生は、ここで測った予算の表を読まない (旧方式の認定表は撤去済み)。下の「段」(LC-A・PL・M1) は名前の由来で、作業の経過ではない。
 
@@ -63,4 +63,4 @@ VS型の16色は F 後の VBP で測る。初期色 IRQ 超過は負の余裕と
 ## 実機で得た数字 (Ra266・31kHz)
 
 - bit6 の周期 約 31.8µs、高の幅 約 5.9µs、IN 約 1.15µs、OUT 平均 約 0.65µs・観測上限 約 0.78µs。
-- 1 行 5 OUT の概算は 1.15+0.78×5=5.05µs で、5.9µs との差は約 0.85µs。6 OUT は約 5.83µs で差は約 0.07µs。ただし分岐の費用を含まない見積もりで、採用の根拠は観測の像の実写 ([splash_obs.c](splash_obs.c.md)・[gfx/osri_profile.h](../../gfx/osri_profile.h.md)) に移った。
+- 1 行 5 OUT の概算は 1.15+0.78×5=5.05µs で、5.9µs との差は約 0.85µs。6 OUT は約 5.83µs で差は約 0.07µs。ただし分岐の費用を含まない見積もりで、採用の根拠は観測の像の実写 ([splash_obs.c](splash_obs.c.md)・[sys/kern/gfx/osri/osri_profile.h](../../gfx/osri_profile.h.md)) に移った。

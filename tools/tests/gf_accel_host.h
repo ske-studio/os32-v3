@@ -5,7 +5,7 @@
 #ifndef TOOLS_TESTS_GF_ACCEL_HOST_H
 #define TOOLS_TESTS_GF_ACCEL_HOST_H
 #include "gf_command_runtime_host.h"
-#include "../../hwdev/gf/accel.h"
+#include "../../sys/dev/video/geforce/accel.h"
 #if !defined(GF3_HOST_UNIT) || GF3_HOST_UNIT < 0 || GF3_HOST_UNIT > 12
 #error "GF3_HOST_UNIT must select B0..B10, C0, or no stubs (0..12)"
 #endif

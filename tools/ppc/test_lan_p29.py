@@ -25,7 +25,7 @@ def cases(mod, elf):
              'response 3 OK base=0x0 size=0x800 base=0x100 size=0x100 base=0x1000 size=0x200 base=0x2000 size=0x300',
              'response 4 OK ' + (boot + bytes.fromhex('525400123456ffffffffffff')).hex(),
              'response 5 OK ' + data.hex()]
-    mapping = ' .bss.pool 0x2000 0x300 platform/powermac/gmac_dma.o\n'
+    mapping = ' .bss.pool 0x2000 0x300 sys/platform/powermac/gmac_dma.o\n'
     def judge(s=serial, c=serial, h=lines, m=mapping):
         return mod.lan_judge(s, c, h, elf, m, boot)
     assert judge() is None, judge()

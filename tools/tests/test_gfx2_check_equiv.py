@@ -7,17 +7,17 @@ from test_gfx2_i1 import ROOT, observe
 
 EXTRA = sorted(str(path.relative_to(ROOT)) for path in (ROOT / 'gfx/v2').glob('sw_*.c')
                if path.name != 'sw_table.c')
-EXTRA += ['gfx/v2/check_op.c', 'gfx/v2/submit.c', 'gfx/v2/format.c',
-          'gfx/sync/sync_bind.c', 'lib/divdi3.c']
-NATIVE = ['drivers/video/pc98/pegc_v2.c', 'drivers/video/of_fb/of_fb_v2.c',
-          'drivers/video/of_fb/backend_of_fb.c']
+EXTRA += ['sys/hal/gfx/v2/check_op.c', 'sys/hal/gfx/v2/submit.c', 'sys/hal/gfx/v2/format.c',
+          'sys/hal/gfx/sync/sync_bind.c', 'lib/divdi3.c']
+NATIVE = ['sys/platform/pc98/video/pegc_v2.c', 'sys/dev/video/of_fb/of_fb_v2.c',
+          'sys/dev/video/of_fb/backend_of_fb.c']
 MUTATIONS = [
-    ('alpha capability', 'gfx/v2/check_op.c',
+    ('alpha capability', 'sys/hal/gfx/v2/check_op.c',
      '(op->op == GFX2_OP_ALPHA && df == GFX2_FMT_INDEX8)', '0'),
-    ('shadow dispatch', 'gfx/v2/check_op.c',
+    ('shadow dispatch', 'sys/hal/gfx/v2/check_op.c',
      'shadow(a, ex->dst)) {\n        *how = GFX2_HOW_SW;',
      'shadow(a, ex->dst)) {\n        *how = GFX2_HOW_HW;'),
-    ('filter capability', 'gfx/v2/check_op.c',
+    ('filter capability', 'sys/hal/gfx/v2/check_op.c',
      '(op->op == GFX2_OP_STRETCH && (op->flags & GFX2_F_FILTER) && df == GFX2_FMT_INDEX8)', '0'),
 ]
 

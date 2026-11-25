@@ -2,9 +2,9 @@
  * nouveau c03c1a1 nvkm/subdev/gpio/base.c:80-109 resolves each get/set;
  * log[state] bit 1 is direction, bit 0 is output; get uses log[1] polarity.
  * These callbacks model only the module boundary, no hardware or ROM parser. */
-#include "../../hwdev/gf/feature5.h"
-#include "../../kdebug/gf5_test.h"
-#include "../../kdebug/gf_command_wire.h"
+#include "../../sys/dev/video/geforce/feature5.h"
+#include "../../sys/dev/video/geforce/diag/gf5_test.h"
+#include "../../sys/dev/video/geforce/diag/gf_command_wire.h"
 #include "serial_diag_host.h"
 
 static void __attribute__((noreturn)) quit(int rc)

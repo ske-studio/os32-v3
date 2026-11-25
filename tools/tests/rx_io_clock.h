@@ -1,7 +1,7 @@
 /* Fake raw clock for fixtures that execute the real Tier budget code. */
 #ifndef TEST_RX_IO_CLOCK_H
 #define TEST_RX_IO_CLOCK_H
-#include "kernel/io_clock.h"
+#include "sys/kern/io_clock.h"
 #include "clock_source.h"
 #ifndef TEST_RX_CLOCK_LOCK
 #define TEST_RX_CLOCK_LOCK() 0u

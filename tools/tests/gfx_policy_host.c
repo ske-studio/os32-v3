@@ -2,7 +2,7 @@
 #include "gfx_hal.h"
 #include "gfx_policy.h"
 #include "pgalloc.h"
-#include "../../exec/appslot.h"
+#include "../../sys/kern/exec/appslot.h"
 
 static void finish(int rc) __attribute__((noreturn));
 static void finish(int rc)

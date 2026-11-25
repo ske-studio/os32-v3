@@ -10,8 +10,8 @@
 #define _start unused_runtime_start
 #include "module_runtime_host.c"
 #undef _start
-#include "../../drivers/video/geforce/geforce_module.c"
-#include "../../drivers/video/geforce/geforce_body.c"
+#include "../../sys/dev/video/geforce/geforce_module.c"
+#include "../../sys/dev/video/geforce/geforce_body.c"
 #define GF4_HOST_UNIT 14
 #include "gf4_display_fake.h"
 /* Keep checks observable even when a getter/slot store is inlined. */
@@ -278,6 +278,6 @@ void _start(void)
 
 #define contains broker_contains
 #define entries broker_entries
-#include "kernel/module/debug_probe.c"
+#include "sys/kern/module/debug_probe.c"
 #undef entries
 #undef contains

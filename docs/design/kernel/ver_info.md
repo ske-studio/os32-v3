@@ -1,6 +1,6 @@
-# kernel/ver_info.h — 設計
+# sys/kern/ver_info.h — 設計
 > 状態: **現行 (2026-10-31)** — 出所: VER_INFO_DESIGN (D1 で移した)
-ソース: `kernel/ver_info.h`
+ソース: `sys/kern/ver_info.h`
 
 - 単一利用者・単一タスク・協調切替。取得のための再検出、待ち、装置操作、権限強化は加えない。
 
@@ -11,7 +11,7 @@
 - 部品境界（下の VerSnapshot はカーネル内部、公開 ABI ではない）:
 
 ```c
-/* kernel/ver_info.h: private snapshot + prototypes */
+/* sys/kern/ver_info.h: private snapshot + prototypes */
 typedef struct {
     u32 cpu_measured, pit_valid, pit_hz, pit_input;
     u32 ser_ready, ser_mode, ser_baud, ser_fifo, pcm_present;
@@ -19,9 +19,9 @@ typedef struct {
     u32 api_version; char build[32];
     int boot_ok, debug_ok; BootImageInfo boot; MemStat debug;
     u32 plat[8]; /* 機種固有の保存値 */
-    ServicesVerState services; /* kernel/sqlite_engine.h の内部型 */
+    ServicesVerState services; /* sys/kern/sqlite_engine.h の内部型 */
 } VerSnapshot;
-void ver_collect(VerSnapshot *s); /* kernel/ver_collect.c, bounded reads */
+void ver_collect(VerSnapshot *s); /* sys/kern/ver_collect.c, bounded reads */
 void ver_format(const VerSnapshot *s, OS32_VerInfo *out); /* cold, bounded */
 ```
 

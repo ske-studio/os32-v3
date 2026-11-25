@@ -3,7 +3,7 @@
 #include "gfx2_i1_host.c"
 #undef _start
 
-#include "../../drivers/video/of_fb/backend_of_fb.h"
+#include "../../sys/dev/video/of_fb/backend_of_fb.h"
 
 #include "of_fb_osri_fake.h"
 

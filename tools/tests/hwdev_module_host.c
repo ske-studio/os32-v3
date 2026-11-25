@@ -1,7 +1,7 @@
 #include "debug_probe_snapshot.h"
 #include "bootinfo_native.h"
 #ifndef HWDEV_REAL_IMAGE
-#include "../../platform/powermac/module_diag.c"
+#include "../../sys/platform/powermac/module_diag.c"
 /* This fixture exercises PROBE, including rejection of unsupported actions. */
 i32 hwb_access(void *buf, u32 size)
 {
@@ -10,13 +10,13 @@ i32 hwb_access(void *buf, u32 size)
 }
 #endif
 /* Actual facade + runtime + validator; synthetic M2 or built GF body. */
-#include "../../hwdev/hwdev_module.c"
+#include "../../sys/dev/hwdev/hwdev_module.c"
 #include "pgalloc.h"
 #include "memmap.h"
 #include "vfs.h"
 #ifdef HWDEV_REAL_IMAGE
 #include "hwdev_pair.h"
-#include "kdebug/gfinit.h"
+#include "sys/dev/video/geforce/diag/gfinit.h"
 #include "hwdev_owner_fixture.h"
 static struct recover image_owner;
 static u32 image_owner_calls, image_end_calls, image_free_calls, image_terminal;
@@ -325,7 +325,7 @@ void _start(void)
 
 #define contains broker_contains
 #define entries broker_entries
-#include "kernel/module/debug_probe.c"
+#include "sys/kern/module/debug_probe.c"
 #undef entries
 #undef contains
 
@@ -334,7 +334,7 @@ int kstrcmp(const char *a, const char *b)
 char *kstrncpy(char *d, const char *s, u32 n)
 { u32 i=0; if (!n) return d; while (i+1<n && s[i]) { d[i]=s[i]; i++; } d[i]=0; return d; }
 
-#include "../../platform/pc98/module_pair.c"
+#include "../../sys/platform/pc98/module_pair.c"
 
 const struct boot_common *boot_common_get(void) {
     static struct boot_common info;

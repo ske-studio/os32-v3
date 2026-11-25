@@ -105,7 +105,7 @@ def main():
     parser.add_argument('--map', help='link map must not contain libc/libgcc')
     parser.add_argument('--sqlite-group')
     parser.add_argument('--sqlite-inputs', nargs='+', default=[])
-    parser.add_argument('--fp-object', help='dedicated arch/ppc/fp_context.o only')
+    parser.add_argument('--fp-object', help='dedicated sys/arch/ppc/fp_context.o only')
     parser.add_argument('--sources', nargs='+', required=True)
     parser.add_argument('--mutant', nargs=2, action='append', metavar=('SOURCE', 'FILE'),
                         help='audit FILE in place of product SOURCE (mutation builds)')

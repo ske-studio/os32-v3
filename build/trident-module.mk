@@ -1,14 +1,16 @@
 # Trident S3: VA0 body, function imports, paired optional GUI distribution.
 TRIDENT_OUT := $(BUILD_OUT)/trident
 TRIDENT_GEN := $(addprefix $(TRIDENT_OUT)/,trident_imports.h trident_imports.json trident_import_slots.c trident_import_stubs.S trident_provider_types.c trident_kexports.c)
-TRIDENT_DEF_SOURCES := include/debug_probe.h drivers/video/trident/trident_module.h include/gfx_hal.h include/gfx_mode.h drivers/video/trident/trident.h gfx/palette.h lib/serial_diag.h mm/kmalloc.h drivers/char/serial.h include/serial_contract.h include/gfx_sync.h include/gfx_hal2.h gfx/v2/gfx2_int.h gfx/sync/sync_int.h
+TRIDENT_DEF_SOURCES := sys/include/debug_probe.h sys/dev/video/trident/trident_module.h sys/include/gfx_hal.h sys/include/gfx_mode.h sys/dev/video/trident/trident.h sys/hal/gfx/palette.h lib/serial_diag.h sys/kern/mm/kmalloc.h sys/dev/char/serial.h sys/include/serial_contract.h sys/include/gfx_sync.h sys/hal/gfx/gfx_hal2.h sys/hal/gfx/v2/gfx2_int.h sys/hal/gfx/sync/sync_int.h
 $(TRIDENT_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/module_schema.py tools/prototypes/trident_imports.def $(TRIDENT_DEF_SOURCES)
 	python3 tools/gen_sqlite_imports.py --module trident --out-dir $(TRIDENT_OUT)
 
 TRIDENT_PARTS := trident_body backend_trident probe regs default_dac state_save state_restore pc98_init vram mode_640 route_ra266 present palette screen video accel cursor ddc1 dpms lifecycle
 TRIDENT_OBJS := $(addprefix $(TRIDENT_OUT)/,$(addsuffix .o,$(TRIDENT_PARTS)) trident_import_slots.o trident_import_stubs.o)
 TRIDENT_INC := $(INC_KERNEL) -I. -I$(TRIDENT_OUT)
-$(addprefix $(TRIDENT_OUT)/,$(addsuffix .o,$(TRIDENT_PARTS))): $(TRIDENT_OUT)/%.o: drivers/video/trident/%.c $(TRIDENT_GEN) build/config.mk build/trident-module.mk
+$(addprefix $(TRIDENT_OUT)/,$(addsuffix .o,$(filter-out route_ra266,$(TRIDENT_PARTS)))): $(TRIDENT_OUT)/%.o: sys/dev/video/trident/%.c $(TRIDENT_GEN) build/config.mk build/trident-module.mk
+	$(CC) $(CFLAGS_BASE) -Os $(TRIDENT_INC) -c $< -o $@
+$(TRIDENT_OUT)/route_ra266.o: sys/platform/pc98/video/route_ra266.c $(TRIDENT_GEN) build/config.mk build/trident-module.mk
 	$(CC) $(CFLAGS_BASE) -Os $(TRIDENT_INC) -c $< -o $@
 $(TRIDENT_OUT)/trident_import_slots.o $(TRIDENT_OUT)/trident_provider_types.o $(TRIDENT_OUT)/trident_kexports.o: $(TRIDENT_OUT)/%.o: $(TRIDENT_OUT)/%.c $(TRIDENT_GEN) build/config.mk build/trident-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -Werror $(TRIDENT_INC) -c $< -o $@
@@ -21,8 +23,8 @@ $(TRIDENT_OUT)/trident.elf: $(TRIDENT_OBJS) build/trident-module.ld sdk/link/gen
 C_KERNEL_OBJ += $(TRIDENT_OUT)/trident_kexports.o
 R1_OBJECTS += $(TRIDENT_OUT)/trident_kexports.o
 $(BUILD_OUT)/kernel.elf $(R1_OUT)/kernel.elf: $(TRIDENT_OUT)/trident_kexports.o
-$(KERNEL_OBJ_PREFIX)drivers/video/trident/trident_module.o $(R1_OBJ)/drivers/video/trident/trident_module.o: $(TRIDENT_GEN)
-$(KERNEL_OBJ_PREFIX)drivers/video/trident/trident_module.o $(R1_OBJ)/drivers/video/trident/trident_module.o: private CFLAGS_BASE += -I$(TRIDENT_OUT)
+$(KERNEL_OBJ_PREFIX)sys/dev/video/trident/trident_module.o $(R1_OBJ)/sys/dev/video/trident/trident_module.o: $(TRIDENT_GEN)
+$(KERNEL_OBJ_PREFIX)sys/dev/video/trident/trident_module.o $(R1_OBJ)/sys/dev/video/trident/trident_module.o: private CFLAGS_BASE += -I$(TRIDENT_OUT)
 
 define pack_trident
 	python3 tools/mkmod.py --target $(ARCH)-$(PLATFORM) --module-id 13 --elf $(TRIDENT_OUT)/trident.elf --metadata $(TRIDENT_OUT)/trident_imports.json --vmkernel $(1) --kapi-abi-gen $(KDEBUG_KAPI_GEN) --layout-gen $(KDEBUG_LAYOUT_GEN) -o $@

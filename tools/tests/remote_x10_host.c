@@ -1,7 +1,7 @@
 /* Fake KAPI at the shell boundary. No product source is replaced in baseline. */
 #include "shell.h"
-#include "../../include/remote_control.h"
-#include "../../include/con_sink.h"
+#include "../../sys/include/remote_control.h"
+#include "../../sys/include/con_sink.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>

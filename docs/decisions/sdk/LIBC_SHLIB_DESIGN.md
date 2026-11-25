@@ -19,14 +19,14 @@
 ## 1. 実物の確認
 |実物・根拠|設計への意味／食い違い番号|
 |---|---|
-|`mm/shlib.c` は単一の大域状態と GUI の固定パス。`include/memmap.h` は1MiB、app=0x80100000|差1: 汎用複数枠は未実装。名前の変更だけでは libc を載せられない|
-|`mm/shlib.c` は全 AS に GUI を付け、data を複製。`exec/exec_image_map.inc` はその全枚数を予算化|差2: 非依存 CUI にも付く。依存集合ごとの attach と予算へ変更|
-|`mm/shlib.c` と `sdk/link/shlib.ld` は text 直後を data とする|差3: text 増加でデータ番地が変わる。公開データ固定番地 ABI には新配置が必要|
-|`exec/exec_image_map.inc` は常駐 shell の依存を拒否。`docs/09_exec.md` は低位 shell を supervisor 共有|差4: shell.bin はそのまま共有 libc を呼べない。P7 は静的を継続|
+|`sys/kern/mm/shlib.c` は単一の大域状態と GUI の固定パス。`sys/include/memmap.h` は1MiB、app=0x80100000|差1: 汎用複数枠は未実装。名前の変更だけでは libc を載せられない|
+|`sys/kern/mm/shlib.c` は全 AS に GUI を付け、data を複製。`sys/kern/exec/exec_image_map.inc` はその全枚数を予算化|差2: 非依存 CUI にも付く。依存集合ごとの attach と予算へ変更|
+|`sys/kern/mm/shlib.c` と `sdk/link/shlib.ld` は text 直後を data とする|差3: text 増加でデータ番地が変わる。公開データ固定番地 ABI には新配置が必要|
+|`sys/kern/exec/exec_image_map.inc` は常駐 shell の依存を拒否。`docs/09_exec.md` は低位 shell を supervisor 共有|差4: shell.bin はそのまま共有 libc を呼べない。P7 は静的を継続|
 |`build/config.mk`、`build/programs.mk` は CRT＋私有 nano allocator＋`-lc -lgcc`|差5: 「libc 全体が nano 版」とは確認できない。実物は private nano allocator と toolchain libc.a の組合せ|
 |`sdk/crt/syscalls.c`、mainの `docs/decisions/time/OS32_TIME_DESIGN.md`|差6訂正: 時刻設計は存在。sys_timeはローカル暦epoch、tv_usec=0を維持、UTC/µsは新KAPI time_get。時計ページは本票では口だけ予約|
-|`build/programs.mk` は「0x400000 常駐」、実定義は `include/memmap.h` の0x80000000|差7: 古いコメント。実装根拠は現定義とする|
-|`sdk/include/os32/os32_kapi_shared.h`、`exec/os32x_hdr.c`|OS32X v4=60B、4世代照合、SHLIB表32B＋絶対関数番地。GUI版と汎用protocolを区別する|
+|`build/programs.mk` は「0x400000 常駐」、実定義は `sys/include/memmap.h` の0x80000000|差7: 古いコメント。実装根拠は現定義とする|
+|`sdk/include/os32/os32_kapi_shared.h`、`sys/kern/exec/os32x_hdr.c`|OS32X v4=60B、4世代照合、SHLIB表32B＋絶対関数番地。GUI版と汎用protocolを区別する|
 |`userland/rust/libos32gui/src/shlib.rs`、`sdk/rust/os32api/src/gui/stub.rs`|GUI表は122関数、Rust stub と番号を照合。生成元を共通化して libc でも使う|
 |`build/packages.yaml`、`userland/deploy.yaml`|FD=BOOT＋MINIMAL−除外。外部救援7本は install/cdinst/hsync/less/grep/hexdump/cfg、shell は core|
 |`build/programs.mk`、`docs/design/userland/lib/host/host_call.md`|GUI は libos32host を内包、現規則は末尾に `-lc -lgcc`。host_call は SDK の待機関数で libc と別の責務|
@@ -52,7 +52,7 @@
 |2|0x80100000–0x80180000|libos32gui.1|
 |3|0x80180000–0x80200000|将来枠。末尾0x801FF000–0x80200000を時計ページとして別予約|
 - 各通常枠512KiB、先頭16KiBが表、+0x4000–0x8000は公開RO固定区画、+0x8000からtext/private rodata、上限+0x70000。data固定先頭は+0x70000、上限64KiB。RO内部の予約余白はpayloadに含め、RO末尾とdata間の穴・未使用枠は写像・複製しない。
-- APP_BAND は可変PDEの既存方式（`include/memmap.h`）を維持。image最大長、PT予算、最初のPDEの残量を新app先頭から再計算。heap=0x88000000、stack帯は維持。
+- APP_BAND は可変PDEの既存方式（`sys/include/memmap.h`）を維持。image最大長、PT予算、最初のPDEの残量を新app先頭から再計算。heap=0x88000000、stack帯は維持。
 - 定義元は memmap.h（帯）、公開shlib ABI（枠ID/offset）、config.h（配備パス）の3層。リンカ・Rust・Pythonへ生成し数値の二重管理をなくす。
 ```c
 /* 新protocol。全フィールド u32、LE、自然4B配置、64B。C89対応。 */
@@ -127,7 +127,7 @@ void __cdecl os32_libc_fini(void);              /* entry[1] */
 |host_call|SDK/libos32hostに残す。共有アプリ・GUIからのlibc参照は同一libcへ、静的救援は静的libcへ。host待機がlibc initやmallocから逆向きに呼ばれる依存を作らない|
 - `libc→KAPI`、`GUI→libc＋KAPI`。共有アプリとGUIのリンク行から `-lc` と `$(NANO_LIB)` を外しstubへ置換、CRTの静的syscalls/nanoも共有経路へ混ぜない。link_guardがmapのlibc.a/libos32nano.aメンバー不在を検査し、未提供関数は未定義参照で失敗させる。libc像と静的救援だけが実体をリンクする。新libc像に `-lgcc` を漫然と追加せず、必要helperは[L1]適合の既存実装へ解決する。
 - 時計の結び目: `{time_page,time_abi}` と上記VAを予約し、P7では0/0。将来のkernel所有RO+USER頁の実体・更新は別の時刻実装へ委譲する。libc `_gettimeofday` はページ提供有無によらず `sys_time` とtv_usec=0を維持し、UTC/µsは新KAPI time_getを使う。
-- `exec/exec_launch.inc` のapp用aux=0を、app stack上に複製した `{u32 bytes,time_page,time_abi;}` へのUSERポインタにする。shell用auxは既存ShellServiceのまま。shared_startがapp auxを読みLibcStartへ写す。時計未提供時は0/0で、この情報のためにkernelポインタを公開しない。
+- `sys/kern/exec/exec_launch.inc` のapp用aux=0を、app stack上に複製した `{u32 bytes,time_page,time_abi;}` へのUSERポインタにする。shell用auxは既存ShellServiceのまま。shared_startがapp auxを読みLibcStartへ写す。時計未提供時は0/0で、この情報のためにkernelポインタを公開しない。
 - 時刻の意味は `docs/decisions/time/OS32_TIME_DESIGN.md` に従う。ページpayload・整合読取は将来の別契約とし、未知版は利用しない。P7は置き場と引渡しだけで、newlibの時刻意味・精度を変更しない。
 
 ## 6. 起動と配備
@@ -169,17 +169,17 @@ void __cdecl os32_libc_fini(void);              /* entry[1] */
 |A2|`sdk/gen_shlib.py`（新）|stub/絶対RO・RW symbol/表/C・Rust定義、.o未定義参照とarchive定義から公開集合を生成|
 |A3|`sdk/include/os32/os32_kapi_shared.h`|OS32X v5、共通構造体、KAPI版同期|
 |A4|`sdk/kapi.json`|P7整理と4世代切替、既存生成器で再生成|
-|A5|`include/memmap.h`|2MiB帯、各枠、clock頁、app先頭|
-|A6|`include/config.h`|indexとlibc配備パス（実装時に既存config定義元へ合わせる）|
-|B1|`mm/shlib.c`|単一GUI状態を汎用枠レジストリ・原本管理へ|
+|A5|`sys/include/memmap.h`|2MiB帯、各枠、clock頁、app先頭|
+|A6|`sys/include/config.h`|indexとlibc配備パス（実装時に既存config定義元へ合わせる）|
+|B1|`sys/kern/mm/shlib.c`|単一GUI状態を汎用枠レジストリ・原本管理へ|
 |B2|`mm/shlib_attach.c`（新）|依存集合の写像・複製・解除・巻戻し|
-|B3|`mm/shlib.h`|枠ID/依存集合引数、枚数合計、read_page契約|
+|B3|`sys/kern/mm/shlib.h`|枠ID/依存集合引数、枚数合計、read_page契約|
 |B4|`exec/shlib_needs.c`（新）|依存閉包・版照合・診断、状態は起動計画に所有|
-|B5|`exec/os32x_hdr.c`|v5の128B・依存件数・世代を検査|
-|B6|`exec/exec_launch.inc`|入口前の依存計画、attachとCRT起動情報|
-|B7|`exec/exec_image_map.inc`|必要data/PT予算・app帯境界・欠損診断|
-|B8|`exec/exec_finish.inc`|ASの依存集合を使ってdetach|
-|B9|`platform/pc98/kernel_gui_shlib.inc`|GUI専用の失敗通知を枠別診断へ。kernel.cの既存shlib_init呼出し位置は維持|
+|B5|`sys/kern/exec/os32x_hdr.c`|v5の128B・依存件数・世代を検査|
+|B6|`sys/kern/exec/exec_launch.inc`|入口前の依存計画、attachとCRT起動情報|
+|B7|`sys/kern/exec/exec_image_map.inc`|必要data/PT予算・app帯境界・欠損診断|
+|B8|`sys/kern/exec/exec_finish.inc`|ASの依存集合を使ってdetach|
+|B9|`sys/platform/pc98/kernel_gui_shlib.inc`|GUI専用の失敗通知を枠別診断へ。kernel.cの既存shlib_init呼出し位置は維持|
 |C1|`sdk/libc/state.c`（新）|impure.o代替の固定公開data、reent/stdio初期化と終了|
 |C2|`sdk/crt/shared_start.c`（新）|LibcStartを組み、libc init前後の順を所有|
 |C3|`sdk/crt/crt0_c.c`|static/shared入口の結線、return/exit経路|

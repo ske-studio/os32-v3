@@ -6,7 +6,7 @@
  *  実行:   python3 -B tools/tests/test_net_link.py [ケース名 ...]
  *  記録:   tools/tests/n1_tdd.md
  *
- *  `net/link.c` と `kapi/kapi_host.c` を 1 行も写さずそのまま #include する
+ *  `sys/net/link.c` と `sys/kapi/kapi_host.c` を 1 行も写さずそのまま #include する
  *  (模型ではない)。贋物にするのは、ホストに持ち込めない 4 つだけ:
  *    - NIC   : RX キュー、**TX は 1 tick 1 フレームしか受けない**、tick
  *    - cli/sti: IF=0 中のタイマ延期と、復元直後の tick
@@ -51,7 +51,7 @@ typedef signed int     i32;
 #define __cdecl
 #endif
 
-#include "net/nic.h"
+#include "sys/net/nic.h"
 
 /* ---- 贋 os32_kapi_shared.h ([C4] 共有定数のうちこの票が使う分だけ) ------ */
 #define OS32_KAPI_SHARED_H
@@ -242,7 +242,7 @@ static void ticks(int n) { int i; for (i = 0; i < n; i++) host_tick(); }
 /*  実物                                                                    */
 /* ======================================================================== */
 #ifndef LINK_SOURCE
-#define LINK_SOURCE "../../net/link.c"
+#define LINK_SOURCE "../../sys/net/link.c"
 #endif
 #include LINK_SOURCE
 
@@ -289,12 +289,12 @@ int np2_get_version(char *b, int n) { (void)b; (void)n; return 0; }
 int np2_get_cpu(char *b, int n) { (void)b; (void)n; return 0; }
 int np2_get_clock(char *b, int n) { (void)b; (void)n; return 0; }
 int np2_check_hostdrv(char *b, int n) { (void)b; (void)n; return 0; }
-#include "../../kernel/dev/device_host.c"
-#include "../../kapi/kapi_host.c"
+#include "../../sys/kern/dev/device_host.c"
+#include "../../sys/kapi/kapi_host.c"
 #include "kapi_profile.h"
 #include "generated_host_open.inc"
 
-/* ディスパッチャの早期検査 (exec/exec.c の ring3_syscall_dispatch と同じ規則)。
+/* ディスパッチャの早期検査 (sys/kern/exec/exec.c の ring3_syscall_dispatch と同じ規則)。
  * 表に残る引数だけを早期検査する。長さ付きは生成wrapが全域検査する。 */
 static int dispatch_early(u16 ptrmask, const u32 *args, int nfixed)
 {
