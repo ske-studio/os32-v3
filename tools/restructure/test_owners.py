@@ -25,11 +25,20 @@ def example(tables_for):
 
 
 def make_membership(inventory):
-    _, groups, features = inventory()
+    images, groups, features = inventory()
     path = 'fs/ext2/ext2_dir.c'
     assert 'build/sources/common.mk:C_COMMON_PC98_PENDING' in groups[path]
     assert features[path] == {'ide'}
     assert 'build/programs.mk:SHELL_SRC' in groups['userland/shell/main.c']
+
+    for stem in ('cpu_setup', 'decrementer', 'exception', 'pmap'):
+        path = f'arch/ppc/{stem}.c'
+        assert 'build/ppc.mk:MMU_C' in groups[path], path
+        assert any(image.endswith('/PPCMMU.ELF') for image in images[path]), path
+    path = 'userland/lib/rt/pkg.c'
+    assert 'build/ppc-user.mk:PPC_INST_EXTRA' in groups[path]
+    assert any(image.startswith('powermac/') and image.endswith('/cdinst.elf')
+               for image in images[path])
 
 
 def run(mutate):
@@ -66,14 +75,16 @@ def run(mutate):
         for old, new in [('len(features) >= 2', 'len(features) > 2'),
                          ("elif path.split('/')[0] in KERNEL_ROOTS or image:", "elif True:"),
                          ("'CLI', 'EXEC', 'IDE'", "'PC98_PENDING', 'CLI', 'EXEC', 'IDE'"),
-                         ('INST_SHARED_SRC SHELL_SRC BENCH_SRC', 'INST_SHARED_SRC BENCH_SRC'),
+                         ("target.lower().endswith('.elf')", "target.endswith('.elf')"),
+                         ("name, value = assignment.groups()", "name, value = assignment.groups()\n                if name == 'PPC_INST_EXTRA': continue"),
+                         ("for v in names))", "for v in names if v != 'SHELL_SRC'))"),
                          ("owner(path)", "owner('common')"),
                          ('for path, mode in entries:', 'for path, mode in entries[:-1]:')]:
             assert original.count(old) == 1
             scope = {'__file__': str(path), '__name__': 'mutant'}
             exec(compile(original.replace(old, new), str(path), 'exec'), scope)
             try:
-                if old.startswith(("'CLI'", 'INST_SHARED_SRC')):
+                if old.startswith(("'CLI'", 'target.lower()', 'name, value', 'for v in names')):
                     make_membership(scope['inventory'])
                 else:
                     example(scope['tables_for'])

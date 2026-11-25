@@ -130,28 +130,90 @@ KERNEL_ROOTS = set('arch platform drivers hwdev kdebug init kernel mm exec fs gf
                    'kapi lib include sound'.split())
 
 
-def collect_programs(directory, groups):
-    query = directory / 'programs.mk'
-    query.write_text("""include build/config.mk
-include build/programs.mk
-p0_program_sets = C_CMDS C_TESTS C_SYSTEM INST_SHARED_SRC SHELL_SRC BENCH_SRC BENCH_S2X_SRC FAULTPROBE_SRC
-$(foreach v,$(p0_program_sets),$(info P0_PROGRAM $(v) $($(v))))
-p0-programs:
-\t@:
-""")
-    for line in make_output(['-f', str(query), 'ARCH=x86', 'PLATFORM=pc98',
-                             'IMAGE=pc98', 'p0-programs']).splitlines():
-        if line.startswith('P0_PROGRAM '):
-            _, variable, *sources = line.split()
-            for source in sources:
-                groups[source].add('build/programs.mk:' + variable)
+def read_graph(database):
+    """Read concrete rules and the origins of source/object list variables."""
+    definitions = database.split('# Variables\n', 1)[1].split('# Pattern-specific', 1)[0]
+    names = {}
+    origin = ''
+    for line in definitions.splitlines():
+        location = re.fullmatch(r"# makefile \(from '([^']+)', line \d+\)", line)
+        if line.startswith('#'):
+            origin = location[1] if location else ''
+        elif origin.startswith('build/') and origin.endswith('.mk'):
+            assignment = re.fullmatch(r'(\w+) [:?+]?= (.*)', line)
+            if assignment:
+                name, value = assignment.groups()
+                if (re.search(r'\.(?:c|cpp|S|s|asm|rs|o|a)(?:\s|$|\))', value)
+                        and not any(token in value for token in ('$(shell', '$@', '$<', '%', ' -'))):
+                    names[name] = origin
+            origin = ''
+    rules = {}
+    files = database.split('# Files\n', 1)[1]
+    for line in files.splitlines():
+        rule = re.fullmatch(r'([^\s:#=]+):(?: (.*))?', line)
+        if rule and '=' not in (rule[2] or ''):
+            rules[rule[1]] = (rule[2] or '').partition('|')[0].split()
+    return rules, names
+
+
+def collect_graph(directory, profile, args, goal, images, groups):
+    database = make_output(['-np', *args, goal])
+    rules, names = read_graph(database)
+    # Expand only list-like assignments. The file database supplies their defining
+    # makefile, including variables evaluated lazily with wildcard or patsubst.
+    query = directory / 'lists.mk'
+    query.write_text(''.join(f'$(info P0_LIST {v} $({v}))\n' for v in names))
+    values = defaultdict(set)
+    for line in make_output(['-n', *args, '-f', str(query), '--eval=p0-list: ; @:', 'p0-list']).splitlines():
+        if line.startswith('P0_LIST '):
+            _, name, *items = line.split()
+            for item in items:
+                values[item].add(f'{names[name]}:{name}')
+
+    for target in rules:
+        if not target.lower().endswith('.elf'):
+            continue
+        image = profile + '/' + target
+        pending = list(rules[target])
+        seen = set()
+        while pending:
+            item = pending.pop()
+            if item in seen:
+                continue
+            seen.add(item)
+            suffix = Path(item).suffix
+            if suffix.lower() in SUFFIXES:
+                images[item].add(image)
+                groups[item].update(values[item])
+            elif suffix == '.o':
+                inputs = [dep for dep in rules.get(item, ()) if Path(dep).suffix.lower() in SUFFIXES]
+                if inputs:
+                    source = inputs[0]
+                    groups[source].update(values[item])
+                    pending.append(source)
+            elif suffix == '.a':
+                pending.extend(rules.get(item, ()))
+    # Recognize source sets even when a translation unit has no ELF link rule.
+    for item, labels in values.items():
+        if Path(item).suffix.lower() in SUFFIXES:
+            groups[item].update(labels)
 
 
 def inventory():
     images, groups, features = (defaultdict(set) for _ in range(3))
     with tempfile.TemporaryDirectory() as temporary:
         directory = Path(temporary)
-        collect_programs(directory, groups)
+        graph = directory / 'graph.mk'
+        graph.write_text("""include build/config.mk
+ifeq ($(ARCH),x86)
+BUILD_ID_SRC = $(BUILD_OUT)/build_id.c
+include build/build-id.mk
+endif
+include build/targets/$(ARCH)-$(PLATFORM).mk
+include build/abi_contract.mk
+p0-graph: ; @:
+""")
+        collect_graph(directory, 'ppc-bootstrap', ['-f', 'build/ppc.mk'], 'all', images, groups)
         labels = {}
         for pattern in ('select.mk', 'sources/*.mk', 'platform/*.mk', 'arch/*.mk', 'features/*.mk'):
             for path in sorted((ROOT / 'build').glob(pattern)):
@@ -176,6 +238,9 @@ p0-extra:
             command = ['-f', str(query), 'p0-extra',
                        'ARCH=' + ('x86' if pc98 else 'ppc'), 'PLATFORM=' + ('pc98' if pc98 else 'powermac'),
                        f'IMAGE={path.stem}', f'BUILD_OUT={directory}/out', f'KB_OUT={directory}/kb']
+            graph_args = ['-f', str(graph), *command[3:6]]
+            collect_graph(directory, path.stem, graph_args, 'programs' if pc98 else 'p0-graph',
+                          images, groups)
             if pc98:
                 for (filename, variable, feature), key in labels.items():
                     if not variable.startswith('DIAGNOSTIC_'):
