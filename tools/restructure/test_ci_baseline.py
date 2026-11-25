@@ -26,18 +26,25 @@ def check(tool, path):
     artifact = path / 'times/1/check-times-shard'
     artifact.mkdir(parents=True)
     (artifact / 'check_times.tsv').write_text('check-good\t1\t0\ncheck-bad\t2\t2\n')
-    older[0].update(headBranch='wt/int-test', conclusion='success')
+    (path / 'jobs-5.json').write_text(json.dumps(dict(total_count=1, jobs=[dict(job, conclusion='skipped')])))
+    older[0].update(name='check', headBranch='wt/int-test', conclusion='success')
     (path / 'runs.json').write_text(json.dumps(runs))
     for shard, duration in enumerate([2, 5]):
         directory = path / f'times/5/check-times-sha-ppc-qemu-{shard}'
         directory.mkdir(parents=True)
         (directory / 'check_times.tsv').write_text(f'check-one\t{duration}\t0\n')
-    tool.inventory(path, path)
+    (path / 'jobs-2.tsv').write_text('101\tchecks (0)\n')
+    (path / '2-checks__0_.log').write_text('tZ SKIP reason\ntZ MUTATE runtime RED case\n'
+                                          'tZ ### 通過したが SKIP の行がある\ntZ - `check-one` (2 行)\n')
+    tool.inventory(path, path, path)
 
     def rows(name):
         with (path / (name + '.tsv')).open() as stream:
             return list(csv.DictReader(stream, delimiter='\t'))
 
+    observed = rows('log_jobs')[0]
+    assert (observed['skip_lines'], observed['red_outcome_lines']) == ('1', '1')
+    assert rows('log_checks')[0]['count'] == '2'
     assert len(rows('pushes')) == 20
     assert [r['result'] for r in rows('pushes')[:2]] == ['pending', 'failure']
     assert rows('shard_balance') == [dict(push='3', run_id='5', group='qemu-ppc', shards='2',
@@ -65,6 +72,7 @@ if __name__ == '__main__':
     if parser.parse_args().mutate:
         mutations = [('reverse=True', 'reverse=False'),
                      ('[:limit]', '[:]'),
+                     ("+ counts['failure']", "+ counts['failure'] + counts['skipped']"),
                      ('round(max(totals), 2)', 'round(min(totals), 2)'),
                      ("if 'failure' in results:", 'if False:'),
                      ('if int(rc):', 'if not int(rc):'),

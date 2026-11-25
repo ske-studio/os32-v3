@@ -4,6 +4,7 @@ from collections import Counter, defaultdict
 import csv
 from datetime import datetime
 import json
+import re
 from pathlib import Path
 import sys
 
@@ -45,7 +46,60 @@ def save(out, name, columns, rows):
         writer.writerows(rows)
 
 
-def inventory(ci, out):
+def measure_logs(directory, out):
+    jobs, attributed = [], []
+    sampled = set()
+    for manifest in sorted(directory.glob('jobs-*.tsv')):
+        rid = manifest.stem.split('-')[1]
+        sampled.add(rid)
+        for jid, name in csv.reader(manifest.read_text().splitlines(), delimiter='\t'):
+            slug = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
+            path = directory / f'{rid}-{slug}.log'
+            skips = red = ambiguous = named_skips = hidden = 0
+            section = ''
+            owner = ''
+            with path.open('rb') as stream:
+                if b'<Code>BlobNotFound</Code>' in stream.readline():
+                    jobs.append((rid, jid, name, 'BlobNotFound', None, None, None, None, None, None))
+                    continue
+                stream.seek(0)
+                for raw in stream:
+                    line = raw.partition(b'Z ')[2].rstrip(b'\r\n')
+                    if line.startswith(b'### '):
+                        section = 'skip' if line.startswith('### 通過したが SKIP'.encode()) else ''
+                    if section == 'skip':
+                        match = re.fullmatch(rb'- `([^`]+)` \((\d+) ' + '行'.encode() + rb'\)', line)
+                        if match:
+                            count = int(match[2])
+                            named_skips += count
+                            attributed.append((rid, jid, match[1].decode(), 'gate_skip_summary', count))
+                    if line.startswith(b'<details><summary>'):
+                        owner = line.removeprefix(b'<details><summary>').partition(' のログの末尾</summary>'.encode())[0].decode()
+                    if line == b'</details>':
+                        owner = ''
+                    if re.match(rb'SKIP\b', line):
+                        skips += 1
+                        if owner:
+                            attributed.append((rid, jid, owner, 'skip_line', 1))
+                    if re.search(rb'\bRED\b', line):
+                        # Exclude prose, totals and echoed commands from individual outcomes.
+                        if re.match(rb'(?:RED\b|(?:MUTAT(?:E|ION)|mutant|mutation|runtime|MUTANT)\b.*?\bRED\b)', line):
+                            red += 1
+                            if owner:
+                                attributed.append((rid, jid, owner, 'red_line', 1))
+                        else:
+                            ambiguous += 1
+                    summary = re.fullmatch(rb'\| (\d+) \| (\d+) \| \d+ \| \d+ \| \d+ \| \d+ ' + '秒 '.encode() + rb'\|', line)
+                    if summary:
+                        hidden += int(summary[2])
+            jobs.append((rid, jid, name, 'ok', path.stat().st_size, skips, named_skips, red, ambiguous, hidden))
+    save(out, 'log_jobs', 'run_id job_id job status bytes skip_lines gate_reported_skip_lines red_outcome_lines other_red_lines gate_passes_without_stdout', jobs)
+    save(out, 'log_checks', 'run_id job_id check evidence count', attributed)
+    return sampled
+
+
+def inventory(ci, out, logs=None):
+    sampled = measure_logs(logs, out) if logs else set()
     runs = json.loads((ci / 'runs.json').read_text())
     pushes, workflows, jobs, failures, requests = [], [], [], [], []
     balance = []
@@ -92,7 +146,8 @@ def inventory(ci, out):
                 by_job[(run['name'], name)].append((result, rid))
             workflows.append((number, rid, run['name'], run['createdAt'], run['conclusion'] or 'pending',
                               len(records) if jobfile.exists() else None, len(timers), ','.join(evidence)))
-            requests.append((rid, 'all job stdout + per-check logs (SKIP, mutation outcomes, byte count)',
+            coverage = ('代表ログあり' if str(rid) in sampled else '1 回分で代表') if sampled else 'job stdout'
+            requests.append((rid, coverage,
                              'final jobs JSON' if not records else '',
                              'failed step stdout' if run['conclusion'] == 'failure' else ''))
         elapsed = seconds(created, max(finishes)) if complete and finishes and state != 'pending' else None
@@ -119,5 +174,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('ci', type=Path)
     parser.add_argument('out', type=Path)
+    parser.add_argument('--logs', type=Path)
     args = parser.parse_args()
-    inventory(args.ci, args.out)
+    inventory(args.ci, args.out, args.logs)
