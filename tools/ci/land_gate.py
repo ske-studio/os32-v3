@@ -15,6 +15,9 @@ from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from checks.run import DOCS, matches
+
 
 def command(*args):
     return subprocess.check_output(args, timeout=30)
@@ -117,6 +120,58 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def medium_digest(base, run, artifacts, boot, artifact_id=None):
+    sha = run['head_sha']
+    if boot['machine'] == 'pc98':
+        name = f"os32-{run['head_branch'].replace('/', '-')}-{sha[:7]}"
+        filenames = {'os32_boot.d88', 'os32_boot.img', 'os32_boot144.img', 'os32_install.iso'}
+    elif boot['machine'] == 'powermac' and boot['image'] in ('core', 'link', 'sh', 'link-sh', 'shell', 'neg1'):
+        name = f"ppc-{boot['image']}-{sha}"
+        filenames = {'boot.iso'}
+    else:
+        raise ValueError('unrecognized boot machine or image')
+    matches = [row for row in artifacts if row['name'] == name and not row['expired']
+               and (artifact_id is None or row['id'] == artifact_id)]
+    if len(matches) != 1 or boot['filename'] not in filenames:
+        raise ValueError('boot medium does not identify a unique artifact')
+    artifact, = matches
+    archive = command('gh', 'api', f"{base}/artifacts/{artifact['id']}/zip")
+    if artifact['digest'] != 'sha256:' + hashlib.sha256(archive).hexdigest():
+        raise ValueError('downloaded artifact digest mismatch')
+    with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
+        with bundle.open(boot['filename']) as medium:
+            return hashlib.file_digest(medium, 'sha256').hexdigest()
+
+
+def verify_boot(base, repo, workflow, run, artifacts, boot):
+    sha = run['head_sha']
+    previous = boot['sha']
+    rid, attempt = number(boot['run_id']), number(boot['attempt'])
+    artifact_id = number(boot['artifact_id'])
+    if previous != sha:
+        if not re.fullmatch('[0-9a-f]{40}', previous):
+            raise ValueError('invalid previous SHA')
+        command('git', 'merge-base', '--is-ancestor', previous, 'origin/main')
+        command('git', 'merge-base', '--is-ancestor', previous, sha)
+        paths = command('git', 'diff', '--no-renames', '--name-only', '-z', previous, sha, '--')
+        if any(path and not matches(os.fsdecode(path), DOCS) for path in paths.split(b'\0')):
+            raise ValueError('previous boot record requires a documentation-only change')
+        prior = api(f'{base}/runs/{rid}/attempts/{attempt}')
+        if (not eligible(prior, repo, previous, workflow, 'wt/') or prior['id'] != rid
+                or prior['run_attempt'] != attempt):
+            raise ValueError('previous boot run or attempt does not match')
+        prior_artifacts = pages(f'{base}/runs/{rid}/artifacts', 'artifacts', {})
+        if medium_digest(base, prior, prior_artifacts, boot, artifact_id) != boot['sha256']:
+            raise ValueError('previous boot artifact digest mismatch')
+        artifact_id = None  # Locate the independently built candidate by name.
+    elif rid != run['id'] or attempt != run['run_attempt']:
+        raise ValueError('boot run or attempt does not match candidate')
+    if (medium_digest(base, run, artifacts, boot, artifact_id) != boot['sha256']
+            or boot['result'] != 'success' or not boot['reached']
+            or not Path(boot['log']).is_file() or digest(boot['media']) != boot['sha256']):
+        raise ValueError('invalid boot evidence')
+
+
 def verify(repo, sha, evidence):
     workflow = 'restructure-build.yml'
     base = f'repos/{repo}/actions'
@@ -142,30 +197,7 @@ def verify(repo, sha, evidence):
     machines = set()
     for boot in evidence['boots']:
         machine = boot['machine']
-        artifact = next((row for row in artifacts if row['id'] == number(boot['artifact_id'])), None)
-        if machine == 'pc98':
-            expected_name = f"os32-{run['head_branch'].replace('/', '-')}-{sha[:7]}"
-            filenames = {'os32_boot.d88', 'os32_boot.img', 'os32_boot144.img', 'os32_install.iso'}
-        elif machine == 'powermac' and boot['image'] in ('core', 'link', 'sh', 'link-sh', 'shell', 'neg1'):
-            expected_name = f"ppc-{boot['image']}-{sha}"
-            filenames = {'boot.iso'}
-        else:
-            raise ValueError('unrecognized boot machine or image')
-        if (not artifact or artifact['expired'] or artifact['name'] != expected_name
-                or boot['filename'] not in filenames):
-            raise ValueError('boot medium does not identify a candidate artifact')
-        archive = command('gh', 'api', f"{base}/artifacts/{artifact['id']}/zip")
-        if artifact['digest'] != 'sha256:' + hashlib.sha256(archive).hexdigest():
-            raise ValueError('downloaded artifact digest mismatch')
-        with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
-            with bundle.open(boot['filename']) as medium:
-                if hashlib.file_digest(medium, 'sha256').hexdigest() != boot['sha256']:
-                    raise ValueError('boot medium differs from CI output')
-        if (boot['sha'] != sha or number(boot['run_id']) != rid
-                or number(boot['attempt']) != attempt or boot['result'] != 'success'
-                or not boot['reached'] or not Path(boot['log']).is_file()
-                or digest(boot['media']) != boot['sha256']):
-            failures.append(f'invalid boot evidence: {machine}')
+        verify_boot(base, repo, ident, run, artifacts, boot)
         machines.add(machine)
     if machines != {'pc98', 'powermac'}:
         failures.append('both PC-98 and PowerMac boot records required')
