@@ -53,17 +53,56 @@ VARIABLE = re.compile(r'\$[({]([\w.-]+)(?=[:})])')
 LINK = re.compile(r'(?:^|\s)(?:\$\([\w.-]*(?:LD|LINK|LINK_COMMAND)\)|(?:[\w./-]+-)?ld)(?:\s|$)|-Wl,')
 
 
+def calls(value):
+    """Split literal GNU Make call arguments at un-nested commas."""
+    for match in re.finditer(r'\$([({])call\s+([\w.-]+),', value):
+        closing = ')' if match[1] == '(' else '}'
+        opening = match[1]
+        args = []
+        start = match.end()
+        depth = 0
+        for index in range(start, len(value)):
+            char = value[index]
+            if char == closing and depth == 0:
+                args.append(value[start:index])
+                yield match[2], args
+                break
+            if char == ',' and depth == 0:
+                args.append(value[start:index])
+                start = index + 1
+            elif char == opening:
+                depth += 1
+            elif char == closing:
+                depth -= 1
+
+
+def references(value, macro):
+    return {(macro, name) if name.isdecimal() else name for name in VARIABLE.findall(value)}
+
+
 def definitions(root):
     rows = list(raw_definitions(root))
     inputs = {}
     pending = []
-    for _, _, _, value in rows:
+    call_sites = {}
+    macro = None
+    for path, number, _, value in rows:
+        if value.startswith('define '):
+            macro = value.split()[1]
+        elif value == 'endef' or number == 0:
+            macro = None
+        for callee, args in calls(value):
+            for position, arg in enumerate(args, 1):
+                if arg.strip():
+                    slot = (callee, str(position))
+                    inputs.setdefault(slot, set()).update(references(arg, macro))
+                    call_sites.setdefault((path, number), set()).add(slot)
         assignment = ASSIGN.match(value)
         if assignment:
             name, rhs = assignment.groups()
-            inputs.setdefault(name, set()).update(VARIABLE.findall(rhs))
-        elif LINK.search(value):
-            pending.extend(VARIABLE.findall(value))
+            inputs.setdefault(name, set()).update(references(rhs, macro))
+        elif LINK.search(value.replace('$$', '$')):
+            pending.extend(references(value, macro))
 
     linked = set()
     while pending:
@@ -74,7 +113,9 @@ def definitions(root):
 
     for path, number, kind, value in rows:
         assignment = ASSIGN.match(value)
-        if assignment and assignment[1] in linked and 'link-order' not in kind:
+        from_assignment = assignment and assignment[1] in linked
+        from_call = linked.intersection(call_sites.get((path, number), ()))
+        if (from_assignment or from_call) and 'link-order' not in kind:
             kind = 'link-order' if kind == 'definition' else kind + ',link-order'
         yield path, number, kind, value
 

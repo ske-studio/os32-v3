@@ -33,11 +33,20 @@ def check():
         with (sdk / 'flags.mk').open('a') as stream:
             stream.write('TAIL = -lz -lc\nEXTRAS = $(TAIL)\n'
                          'ARCHIVE = $(shell cc -print-libgcc-file-name)\n')
+        with (root / 'Makefile').open('a') as stream:
+            stream.write('define PROGRAM\n$(1):\n\t$$(LD) $(2) -o $$@\nendef\n'
+                         'define COMPILE\n$(1):\n\t$$(CC) $(2) -c $$<\nendef\n'
+                         'LIBS = -lz -lc\n'
+                         '$(eval $(call PROGRAM,$(subst x,y,x),$$(LIBS) tail.a))\n'
+                         '$(eval $(call COMPILE,other,-g))\n')
         (root / 'outside.mk').touch()
         (root / 'src.c').touch()
         build_refs.ROOT = root
         assert build_refs.main(root)
         sources = {row['make_text'] for row in table(root, 'link_sources.tsv')}
+        assert '$(eval $(call PROGRAM,$(subst x,y,x),$$(LIBS) tail.a))' in sources
+        assert 'LIBS = -lz -lc' in sources
+        assert '$(eval $(call COMPILE,other,-g))' not in sources
         assert {'EXTRAS = $(TAIL)', 'TAIL = -lz -lc'} <= sources
         assert any(row['make_text'].startswith('ARCHIVE =') and 'path-expression' in row['kind']
                    for row in table(root, 'build_refs.tsv'))
@@ -56,6 +65,7 @@ if __name__ == '__main__':
         source = Path(build_refs.__file__).read_text()
         for old, new in [("('build/**/*.mk', 'sdk/**/*.mk')", "('build/**/*.mk',)"), ("p.endswith('.mk')", "False"),
                          ("assignment[1] in linked", "False"), ("|shell|", "|"),
+                         ("from_assignment or from_call", "from_assignment"),
                          ("return bool(missing)", "return False")]:
             assert source.count(old) == 1
             with tempfile.TemporaryDirectory() as tmp:
