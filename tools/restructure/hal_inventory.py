@@ -136,6 +136,13 @@ def inventory(files, symbols=None):
                 definitions[name].append((obj, 'nm'))
     device_names = {name for name, sites in definitions.items()
                     if any(p.startswith(('drivers/', 'platform/', 'hwdev/', 'kdebug/')) for p, _ in sites)}
+    for name in device_names.copy():
+        machines = {parts[1] for path, _ in definitions[name]
+                    if (parts := path.split('/'))[0] == 'platform' and len(parts) >= 3}
+        common_header = any(site.startswith('include/') and site.rsplit(':', 1)[0].endswith('.h')
+                            for site in decls.get(name, ()))
+        if common_header and len(machines) >= 2:
+            device_names.remove(name)
     for path, code in sorted(files.items()):
         found = set()
         individual = None
