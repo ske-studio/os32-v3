@@ -46,7 +46,16 @@ def save(out, name, columns, rows):
         writer.writerows(rows)
 
 
-def measure_logs(directory, out):
+RED_FORMATS = {
+    'RED': rb'RED\b',
+    'mutation_prefix': rb'(?:MUTAT(?:E|ION)|mutant|mutation|MUTANT)\b.*?\bRED\b',
+    'runtime_prefix': rb'runtime\b.*?\bRED\b',
+    'named_reach_marker': rb'[\w.-]+: runtime RED with reach marker$',
+}
+
+
+def measure_logs(directory, out, check_names):
+    formats = Counter()
     jobs, attributed = [], []
     sampled = set()
     for manifest in sorted(directory.glob('jobs-*.tsv')):
@@ -79,11 +88,17 @@ def measure_logs(directory, out):
                         owner = ''
                     if re.match(rb'SKIP\b', line):
                         skips += 1
-                        if owner:
-                            attributed.append((rid, jid, owner, 'skip_line', 1))
+                        named = re.match(rb'SKIP ([\w.-]+):', line)
+                        label = named[1].decode() if named else ''
+                        check = label if label in check_names else owner
+                        if check:
+                            attributed.append((rid, jid, check, 'skip_line', 1))
                     if re.search(rb'\bRED\b', line):
                         # Exclude prose, totals and echoed commands from individual outcomes.
-                        if re.match(rb'(?:RED\b|(?:MUTAT(?:E|ION)|mutant|mutation|runtime|MUTANT)\b.*?\bRED\b)', line):
+                        form = next((key for key, pattern in RED_FORMATS.items()
+                                     if re.match(pattern, line)), None)
+                        if form:
+                            formats[rid, jid, form] += 1
                             red += 1
                             if owner:
                                 attributed.append((rid, jid, owner, 'red_line', 1))
@@ -95,11 +110,13 @@ def measure_logs(directory, out):
             jobs.append((rid, jid, name, 'ok', path.stat().st_size, skips, named_skips, red, ambiguous, hidden))
     save(out, 'log_jobs', 'run_id job_id job status bytes skip_lines gate_reported_skip_lines red_outcome_lines other_red_lines gate_passes_without_stdout', jobs)
     save(out, 'log_checks', 'run_id job_id check evidence count', attributed)
+    save(out, 'red_formats', 'run_id job_id format count',
+         ((*key, count) for key, count in sorted(formats.items())))
     return sampled
 
 
-def inventory(ci, out, logs=None):
-    sampled = measure_logs(logs, out) if logs else set()
+def inventory(ci, out, logs=None, check_names=()):
+    sampled = measure_logs(logs, out, check_names) if logs else set()
     runs = json.loads((ci / 'runs.json').read_text())
     pushes, workflows, jobs, failures, requests = [], [], [], [], []
     balance = []
@@ -175,5 +192,7 @@ if __name__ == '__main__':
     parser.add_argument('ci', type=Path)
     parser.add_argument('out', type=Path)
     parser.add_argument('--logs', type=Path)
+    parser.add_argument('--registry', type=Path, help='saved run.py --list --json for the sampled revision')
     args = parser.parse_args()
-    inventory(args.ci, args.out, args.logs)
+    names = {r['name'] for r in json.loads(args.registry.read_text())} if args.registry else set()
+    inventory(args.ci, args.out, args.logs, names)

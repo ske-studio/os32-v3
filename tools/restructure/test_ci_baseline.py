@@ -35,16 +35,22 @@ def check(tool, path):
         (directory / 'check_times.tsv').write_text(f'check-one\t{duration}\t0\n')
     (path / 'jobs-2.tsv').write_text('101\tchecks (0)\n')
     (path / '2-checks__0_.log').write_text('tZ SKIP reason\ntZ MUTATE runtime RED case\n'
+                                          'tZ SKIP ppc-sc: unavailable\ntZ SKIP compile: unavailable\n'
+                                          'tZ upper: runtime RED with reach marker\ntZ prose about RED\n'
                                           'tZ ### 通過したが SKIP の行がある\ntZ - `check-one` (2 行)\n')
-    tool.inventory(path, path, path)
+    tool.inventory(path, path, path, {'ppc-sc'})
 
     def rows(name):
         with (path / (name + '.tsv')).open() as stream:
             return list(csv.DictReader(stream, delimiter='\t'))
 
     observed = rows('log_jobs')[0]
-    assert (observed['skip_lines'], observed['red_outcome_lines']) == ('1', '1')
-    assert rows('log_checks')[0]['count'] == '2'
+    assert (observed['skip_lines'], observed['red_outcome_lines']) == ('3', '2')
+    assert observed['other_red_lines'] == '1'
+    assert [(r['check'], r['evidence'], r['count']) for r in rows('log_checks')] == [
+        ('ppc-sc', 'skip_line', '1'), ('check-one', 'gate_skip_summary', '2')]
+    assert {r['format']: r['count'] for r in rows('red_formats')} == {
+        'mutation_prefix': '1', 'named_reach_marker': '1'}
     assert len(rows('pushes')) == 20
     assert [r['result'] for r in rows('pushes')[:2]] == ['pending', 'failure']
     assert rows('shard_balance') == [dict(push='3', run_id='5', group='qemu-ppc', shards='2',
@@ -72,6 +78,8 @@ if __name__ == '__main__':
     if parser.parse_args().mutate:
         mutations = [('reverse=True', 'reverse=False'),
                      ('[:limit]', '[:]'),
+                     ('label in check_names', 'False'),
+                     ('runtime RED with reach marker$', 'runtime GREEN with reach marker$'),
                      ("+ counts['failure']", "+ counts['failure'] + counts['skipped']"),
                      ('round(max(totals), 2)', 'round(min(totals), 2)'),
                      ("if 'failure' in results:", 'if False:'),
