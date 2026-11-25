@@ -1,4 +1,5 @@
 """P0-3 host fixtures and negative checks."""
+import ast
 from pathlib import Path
 import sys
 import tempfile
@@ -16,6 +17,21 @@ def verify(module):
     assert classify('tools/checks/example.py') == ('', '')
     assert module.red_lines('RED runtime: case A\nMUTATION 2 RED (3 hits)\nMUTATIONS 2/2 RED') == 2
     with tempfile.TemporaryDirectory() as temp:
+        checks = [dict(name='guest', path='guest.py', covers=[], env=['qemu-ppc'])]
+        assert module.candidates(checks[0]) == ('L4', 'tests/system/')
+        for name, rows in [('host-0', 'check-guest\t1\t0'),
+                           ('sha-ppc-qemu-3', 'check-guest\t625.49\t0'),
+                           ('sha-ppc-qemu-4', 'check-guest\t2\t1')]:
+            folder = Path(temp) / 'run' / name
+            folder.mkdir(parents=True)
+            (folder / 'check_times.tsv').write_text(rows)
+        assert module.measured_times([Path(temp)], checks) == {'guest': 625.49}
+        guard = 'if args.mutate:\n'
+        reports = "    print('RED first')\n    print('RED second')"
+        assert module.mutation_branch(ast.parse(guard + reports))[0] == 2
+        loop = "    for case in ['a', 'b']:\n    "
+        assert module.mutation_branch(ast.parse(guard + loop + reports.splitlines()[0]))[0] == 2
+        assert module.mutation_branch(ast.parse(guard + '    run_cases()'))[0] == ''
         path = Path(temp) / 'fixture.py'
         path.write_text('MUTANTS = [1, 2]\n')
         assert module.mutation_table(path) == 2
@@ -28,6 +44,9 @@ if __name__ == '__main__':
     if '--mutate' in sys.argv:
         source = Path(inventory.__file__).read_text()
         for anchor, replacement in [("owners.add('hal')", "owners.add('sound')"),
+                                    ("'qemu-ppc' in check['env']", 'False'),
+                                    ("c['name']: c['env']", "c['name']: []"),
+                                    ('total += size * inner', 'total += inner'),
                                     ('len(owners) > 1', 'len(owners) > 2'),
                                     ('return len(tables[0].elts)', 'return 0')]:
             assert source.count(anchor) == 1

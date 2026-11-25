@@ -64,24 +64,130 @@ def mutation_table(path):
     return None
 
 
+def literal_size(expr):
+    if isinstance(expr, (ast.List, ast.Tuple)) and not any(
+            isinstance(item, ast.Starred) for item in expr.elts):
+        return len(expr.elts)
+    return None
+
+
+def branch_count(body, sizes):
+    """Count individual RED reports in straight-line cases and fixed loops."""
+    total = 0
+    sizes = sizes.copy()
+    for stmt in body:
+        if isinstance(stmt, ast.For):
+            size = (sizes.get(stmt.iter.id) if isinstance(stmt.iter, ast.Name)
+                    else literal_size(stmt.iter))
+            inner = branch_count(stmt.body, sizes)
+            if size is None or not inner or stmt.orelse:
+                return None
+            total += size * inner
+        elif isinstance(stmt, ast.With):
+            inner = branch_count(stmt.body, sizes)
+            if inner is None:
+                return None
+            total += inner
+        elif isinstance(stmt, ast.Assign):
+            for target in stmt.targets:
+                if isinstance(target, ast.Name):
+                    sizes[target.id] = literal_size(stmt.value)
+        elif isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
+            call = stmt.value
+            if isinstance(call.func, ast.Name) and call.func.id == 'print' and call.args:
+                arg = call.args[0]
+                while isinstance(arg, ast.BinOp):
+                    arg = arg.left
+                if isinstance(arg, ast.JoinedStr) and arg.values:
+                    arg = arg.values[0]
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    if re.match(r'^(?:MUTATE )?RED\b', arg.value):
+                        total += 1
+            else:
+                return None  # A helper may execute additional mutants.
+        elif not isinstance(stmt, (ast.Assert, ast.Pass)):
+            return None
+    return total
+
+
+def mutation_branch(tree):
+    branches = [n for n in ast.walk(tree) if isinstance(n, ast.If) and (
+        isinstance(n.test, ast.Attribute) and n.test.attr == 'mutate' or
+        ast.unparse(n.test) == "'--mutate' in sys.argv")]
+    if any(isinstance(n, ast.If) and isinstance(n.test, ast.Name)
+           and n.test.id == 'mutate' for n in ast.walk(tree)):
+        return '', 'mutation-flag-in-helper'
+    branches = [branch for branch in branches if not (
+        len(branch.body) == 1 and isinstance(branch.body[0], ast.Expr)
+        and isinstance(branch.body[0].value, ast.Call)
+        and isinstance(branch.body[0].value.func, ast.Attribute)
+        and branch.body[0].value.func.attr == 'append'
+        and [ast.unparse(arg) for arg in branch.body[0].value.args] == ["'--mutate'"])]
+    if not branches:
+        return '', 'no-simple-mutate-branch'
+    if len(branches) != 1:
+        return '', 'multiple-mutate-branches'
+    branch = branches[0]
+    if any(branch in ast.walk(n) for n in ast.walk(tree)
+           if isinstance(n, (ast.For, ast.While))):
+        return '', 'dynamic-control-or-helper'
+    # A literal local case table can be counted even when each case has
+    # its own error handling. Require one dispatch over the unmodified table.
+    cases = [stmt for stmt in branch.body if isinstance(stmt, ast.Assign)
+             and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name)
+             and stmt.targets[0].id.lower() in ('mutations', 'mutants')
+             and literal_size(stmt.value) is not None]
+    if len(cases) == 1:
+        table = cases[0]
+        name = table.targets[0].id
+        loops = [stmt for stmt in branch.body if isinstance(stmt, ast.For)]
+        if len(loops) == 1:
+            loop = loops[0]
+            seq = loop.iter
+            if isinstance(seq, ast.Call) and isinstance(seq.func, ast.Name) and (
+                    seq.func.id == 'enumerate' and seq.args):
+                seq = seq.args[0]
+            if (isinstance(seq, ast.Name) and seq.id == name
+                    and branch.body.index(table) < branch.body.index(loop)
+                    and all(stmt is table or stmt is loop or isinstance(stmt, ast.Assert)
+                            or isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call)
+                            and isinstance(stmt.value.func, ast.Name) and stmt.value.func.id == 'print'
+                            for stmt in branch.body)
+                    and not any(isinstance(n, (ast.Break, ast.Continue))
+                                for n in ast.walk(loop))):
+                return literal_size(table.value), 'local-case-table'
+    count = branch_count(branch.body, {})
+    if count:
+        return count, 'mutate-branch'
+    return '', 'dynamic-control-or-helper'
+
+
+def measured_times(artifacts, checks):
+    paths = [p for d in artifacts for p in d.rglob('check_times.tsv')]
+    return time_inventory.medians(time_inventory.load(paths),
+                                  {c['name']: c['env'] for c in checks})
+
+
 def mutations(check):
     path = ROOT / check['path']
     if check['path'].startswith('tools/checks/'):
         run = next((n for n in ast.parse(path.read_text()).body
                     if isinstance(n, ast.FunctionDef) and n.name == 'run'), None)
         if run is None:
-            return '', ''
+            return '', '', 'no-run-entry'
         scripts = {n.value for n in ast.walk(run) if isinstance(n, ast.Constant)
                    and isinstance(n.value, str) and n.value.startswith('tools/')
                    and n.value.endswith('.py')}
         if len(scripts) != 1:
-            return '', ''
+            return '', '', 'multiple-scripts' if scripts else 'indirect-run-entry'
         path = ROOT / scripts.pop()
     if path.is_file():
         count = mutation_table(path)
         if count is not None:
-            return count, str(path.relative_to(ROOT))
-    return '', ''
+            return count, str(path.relative_to(ROOT)), 'declaration-table'
+        count, reason = mutation_branch(ast.parse(path.read_text()))
+        return count, str(path.relative_to(ROOT)), reason
+    return '', '', 'missing-script'
 
 
 def red_lines(log):
@@ -112,14 +218,12 @@ def main():
     args = parser.parse_args()
     observed = observations(args.prior_run)
     checks = json.loads(args.registry.read_text())
-    times = time_inventory.medians(time_inventory.load(
-        [p for d in args.artifacts for p in d.rglob('check_times.tsv')]),
-        {c['name']: c['env'] for c in checks})
+    times = measured_times(args.artifacts, checks)
     keys = ['name', 'path', 'tier', 'env', 'covers', 'basis', 'kind']
     with (args.out / 'checks.tsv').open('w', newline='') as full, (
             args.out / 'no_candidate.tsv').open('w', newline='') as missing:
         table, gaps = [csv.writer(f, delimiter='\t', lineterminator='\n') for f in (full, missing)]
-        table.writerow(keys + ['mutation_table_count', 'mutation_source', 'prior_individual_red_lines', 'ci_seconds', 'level', 'destination'])
+        table.writerow(keys + ['mutation_count', 'mutation_source', 'mutation_basis', 'prior_individual_red_lines', 'ci_seconds', 'level', 'destination'])
         gaps.writerow(['name', 'level', 'destination'])
         for check in sorted(checks, key=lambda c: c['name']):
             level, dest = candidates(check)
