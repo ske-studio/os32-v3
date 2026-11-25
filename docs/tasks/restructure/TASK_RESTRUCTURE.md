@@ -9,7 +9,7 @@
 | ファイル | 中身 | 読む人 |
 |---|---|---|
 | [RULES.md](RULES.md) | 全部の段に効く決まり 9 つ、承認の節目 A0〜A7、依頼の型 | 全員、最初に |
-| [DECISIONS.md](DECISIONS.md) | ユーザーの決定 U1〜U7、配置の未決 D-1〜D-8 | PM、P1・P5・P6 の書き手 |
+| [DECISIONS.md](DECISIONS.md) | ユーザーの決定 U1〜U8、配置の未決 D-1〜D-11 | PM、P1・P5・P6 の書き手 |
 | [NOW.md](NOW.md) | 今の置き場と本数、既にある道具、重なる既存の票 | P0・P1 の書き手 |
 | [SRC_QA_RESTRUCTURE_SPEC.md](SRC_QA_RESTRUCTURE_SPEC.md) | ユーザーの仕様の原文 (§1〜§19)。段の表が「仕様 §n」で指した節だけ読む | 指された時 |
 
