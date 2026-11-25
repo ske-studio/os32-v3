@@ -54,23 +54,45 @@ def sections(path):
         yield name, int(offset, 16), int(size, 16)
 
 
-def inventory(out):
+def inventory(out, built_after=None):
     sources = set(subprocess.check_output(['git', 'ls-files', '-z']).decode().strip('\0').split('\0'))
     build_logs = [out / 'build.log']
     if (out / 'build-ppc.log').is_file():
         build_logs.append(out / 'build-ppc.log')
     units = defaultdict(set)
     provenance = defaultdict(set)
+    # Make's command lines also name link inputs and archive targets.
+    products = defaultdict(set)
     for log in build_logs:
-        for product, inputs in compile_units(log.read_text()).items():
+        commands = log.read_text()
+        for word in commands.split():
+            if word.endswith(('.o', '.elf', '.a')) and not word.startswith(('-', '/')):
+                products[Path(word)].add(log.name)
+        for product, inputs in compile_units(commands).items():
             units[product].update(inputs)
             provenance[product].update(f'{log.name}: {source}' for source in inputs)
     sources.update(p for values in units.values() for p in values)
     deploy = json.loads(Path('build/out/deploy-set.json').read_text())
-    products = {Path(entry['host']) for entry in deploy['files'] if 'host' in entry}
-    for root in ('build/out', 'userland', 'boot', 'sdk', 'lib'):
-        products.update(p for p in Path(root).rglob('*') if p.suffix.lower() in
-                        ('.elf', '.o', '.bin', '.mod', '.osx', '.iso', '.img', '.lz4', '.a', '.rlib'))
+    for entry in deploy['files']:
+        if 'host' in entry:
+            products[Path(entry['host'])].add('deploy-set.json')
+    # Include dependency targets from incremental builds and other generated payloads.
+    ignored = subprocess.check_output(['git', 'ls-files', '--others', '--ignored',
+                                       '--exclude-standard', '-z']).decode().split('\0')
+    since = built_after.stat().st_mtime_ns if built_after else None
+    for name in ignored:
+        if name.startswith('docs/archive/'):
+            continue
+        path = Path(name)
+        if path.suffix == '.d':
+            target = path.read_text(errors='replace').partition(':')[0]
+            if target.endswith('.o') and '\n' not in target:
+                products[Path(target)].add(name)
+        elif path.suffix.lower() in ('.bin', '.mod', '.osx', '.iso', '.img', '.lz4', '.rlib'):
+            products[path].add('git ignored build payload')
+        elif (since is not None and path.suffix.lower() in ('.o', '.elf', '.a')
+              and path.is_file() and path.stat().st_mtime_ns > since):
+            products[path].add(f'newer than {built_after}')
     rows = []
     coverage = []
     for path in sorted(products):
@@ -133,12 +155,14 @@ def inventory(out):
             if kind.startswith('runtime string') and (lines := macro_lines(source)):
                 basis += '; __FILE__ token at ' + source + ':' + lines + '; expansion 未確定'
             rows.append((str(path), kind, value, source, tu, basis, origin))
-        coverage.append((str(path), 'ELF' if elf else 'ar' if archive else 'raw', ','.join(sorted(candidates)) or UNKNOWN, len(records), symbol_status, origin))
+        coverage.append((str(path), 'ELF' if elf else 'ar' if archive else 'raw', ','.join(sorted(candidates)) or UNKNOWN, len(records), symbol_status, origin, ' | '.join(sorted(products[path]))))
     table(out / 'artifact_paths.tsv', 'product kind spelling source compiling_TU evidence TU_evidence', rows)
-    table(out / 'products.tsv', 'product format compile_inputs records symbol_evidence TU_evidence', coverage)
+    table(out / 'products.tsv', 'product format compile_inputs records symbol_evidence TU_evidence product_evidence', coverage)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output', type=Path)
-    inventory(parser.parse_args().output)
+    parser.add_argument('--built-after', type=Path, help='file timestamp marking the beginning of the build')
+    args = parser.parse_args()
+    inventory(args.output, args.built_after)

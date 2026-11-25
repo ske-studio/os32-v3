@@ -111,7 +111,7 @@ def scan(args):
                               + r')(?![A-Za-z0-9_.+\-])')
 
     def holder(name):
-        if name.startswith(('docs/archive/', 'docs/hw/', 'docs/tasks/restructure/')) or not Path(name).is_file():
+        if name.startswith('docs/archive/') or not Path(name).is_file():
             return [], [], None
         raw = Path(name).read_bytes()
         if b'\0' in raw:
