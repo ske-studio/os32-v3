@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Verify the integration push evidence for a fast-forward to main."""
 import argparse
+import csv
+from fnmatch import fnmatchcase
 import hashlib
 import io
 import zipfile
@@ -16,7 +18,7 @@ from pathlib import Path
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from checks.run import DOCS, matches
+from deploy_manifests import CORE_MANIFEST_RELPATHS
 
 
 def command(*args):
@@ -143,6 +145,23 @@ def medium_digest(base, run, artifacts, boot, artifact_id=None):
             return hashlib.file_digest(medium, 'sha256').hexdigest()
 
 
+def documentation_only(sha, paths):
+    def read(path):
+        return command('git', 'show', f'{sha}:{path}').decode('utf-8')
+
+    ledger = read('docs/tasks/restructure/data/scope.tsv')
+    docs = {row['パス'] for row in csv.DictReader(io.StringIO(ledger), delimiter='\t')
+            if row['所属種類'] == '文書'}
+    if not paths <= docs:
+        return False
+    # P6-0: build/kdebug.mk feeds the HWDEV specification to the generator.
+    image_inputs = ['docs/design/hwdev/hwdev_imports.md']
+    for manifest in CORE_MANIFEST_RELPATHS:
+        entries = yaml.safe_load(read(manifest))['filesystem']['files']
+        image_inputs.extend(entry['host'] for entry in entries if not entry.get('host_only'))
+    return not any(fnmatchcase(path, pattern) for path in paths for pattern in image_inputs)
+
+
 def verify_boot(base, repo, workflow, run, artifacts, boot):
     sha = run['head_sha']
     previous = boot['sha']
@@ -154,7 +173,7 @@ def verify_boot(base, repo, workflow, run, artifacts, boot):
         command('git', 'merge-base', '--is-ancestor', previous, 'origin/main')
         command('git', 'merge-base', '--is-ancestor', previous, sha)
         paths = command('git', 'diff', '--no-renames', '--name-only', '-z', previous, sha, '--')
-        if any(path and not matches(os.fsdecode(path), DOCS) for path in paths.split(b'\0')):
+        if not documentation_only(sha, {os.fsdecode(path) for path in paths.split(b'\0') if path}):
             raise ValueError('previous boot record requires a documentation-only change')
         prior = api(f'{base}/runs/{rid}/attempts/{attempt}')
         if (not eligible(prior, repo, previous, workflow, 'wt/') or prior['id'] != rid

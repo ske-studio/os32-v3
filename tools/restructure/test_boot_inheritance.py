@@ -43,6 +43,10 @@ def exercise(source, root):
         candidate = artifact(new, 202, after)
 
         def command(*args):
+            if args[:2] == ('git', 'show'):
+                revision, path = args[2].split(':', 1)
+                assert revision == new['head_sha']
+                return (TOOL.parents[2] / path).read_bytes()
             if args[:2] == ('git', 'diff'):
                 assert args[2:] == ('--no-renames', '--name-only', '-z', old['head_sha'], new['head_sha'], '--')
                 return paths
@@ -59,7 +63,12 @@ def exercise(source, root):
             else:
                 assert allowed, label
 
-    case('same medium after docs edit', True, paths=b'docs/images/screen.png\0')
+    case('same medium after docs edit', True, paths=b'docs/images/demo_0532.png\0')
+    case('listed markdown', True, paths=b'docs/CONSTRAINTS.md\0')
+    case('test instructions', False, paths=b'docs/CONSTRAINTS.md\0tools/accept/gf_a4.md\0')
+    case('unlisted markdown', False, paths=b'docs/new-file.md\0')
+    case('packaged manual', False, paths=b'docs/manpages/hsync.1\0')
+    case('generator input', False, paths=b'docs/design/hwdev/hwdev_imports.md\0')
     case('code change', False, paths=b'README.md\0sys/boot.c\0')
     case('candidate medium changed', False, after=b'changed')
     case('prior artifact differs', False, before=b'changed')
@@ -79,7 +88,10 @@ if __name__ == '__main__':
         if args.mutate:
             for anchor, replacement in [
                     ('if previous != sha:', "if previous != sha: raise ValueError('fresh record required')\n    if previous != sha:"),
-                    ('not matches(os.fsdecode(path), DOCS)', 'False'),
+                    ("if row['所属種類'] == '文書'", 'if True'),
+                    ('if not paths <= docs:', 'if False:'),
+                    ('image_inputs.extend(', '[].extend('),
+                    ("['docs/design/hwdev/hwdev_imports.md']", '[]'),
                     ("medium_digest(base, prior, prior_artifacts, boot, artifact_id) != boot['sha256']", 'False'),
                     ("medium_digest(base, run, artifacts, boot, artifact_id) != boot['sha256']", 'False'),
                     ("prior['run_attempt'] != attempt", 'False')]:
