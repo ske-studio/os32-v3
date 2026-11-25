@@ -58,7 +58,7 @@ def mutation(item):
 
 def diagnostic_mutation(item):
     name, old, new = item
-    file = 'tools/tests/gfinit_romfile_host.c'
+    file = 'tools/gfinit_romfile_host.c'
     source = (ROOT / file).read_text()
     if old and source.count(old) != 1:
         return f'{name}: ambiguous anchor', 1
@@ -126,7 +126,7 @@ def main():
             return oracle_result.returncode
         oracle = dict(line.split('=', 1) for line in oracle_result.stdout.decode().splitlines())
         cmd = command(exe)
-        cmd[cmd.index(str(ROOT / 'tools/tests/gfinit_host.c'))] = str(ROOT / 'tools/tests/gfinit_romfile_host.c')
+        cmd[cmd.index(str(ROOT / 'tools/tests/gfinit_host.c'))] = str(ROOT / 'tools/gfinit_romfile_host.c')
         cmd.insert(1, '-DGF_ROM_HEADER="' + str(header) + '"')
         subprocess.run(cmd, cwd=ROOT, check=True)
         result = host32.run([str(exe)], cwd=ROOT, timeout=60, capture_output=True)

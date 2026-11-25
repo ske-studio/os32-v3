@@ -1,15 +1,32 @@
 /* Private-ROM diagnostic: report decoded structure and derived numbers only. */
-#define _start gf_profile_entry
-#include "recover_gf_host.c"
-#undef _start
-#include "../../kdebug/gfinit_pll.c"
-#include "../../kdebug/gfinit_decode.c"
-#include "../../kdebug/gfinit_mode.c"
-#include "gf_display_calc_host.inc"
+#include "../kdebug/recover.c"
+#include "../kdebug/recover_gf.c"
+#include "../kdebug/gfinit_pll.c"
+#include "../kdebug/gfinit_decode.c"
+#include "../kdebug/gfinit_mode.c"
+#include "../hwdev/gf/display/calc.c"
+#include "../hwdev/gf/display/timing.c"
+#include "../hwdev/gf/display/format.c"
+#include "../hwdev/gf/display/pitch.c"
+#include "../hwdev/gf/display/start.c"
+#include "../hwdev/gf/display/dac_format.c"
+#include "../hwdev/gf/display/output.c"
+#include "../hwdev/gf/display/cursor.c"
+#include "../hwdev/gf/display/fifo.c"
+#include "../hwdev/gf/display/extended.c"
+#include "../hwdev/gf/display/pll_program.c"
 #include GF_ROM_HEADER
 #define GF_MODE_ERROR_SCALE 10000U /* hundredths of one percent */
 #define GF_MODE_ERROR_DIVISOR 200U
 static struct gfinit_decode decoded;
+static struct gfinit_plan profile_buffer;
+static struct recover_profile profile;
+static void print(const char *s)
+{
+    unsigned n = 0; while (s[n]) n++;
+    u32 result;
+    __asm__ volatile("int $0x80" : "=a"(result) : "0"(4), "b"(1), "c"(s), "d"(n) : "memory");
+}
 static void number(u32 x)
 {
     char b[16]; u32 n = 0;
@@ -65,6 +82,7 @@ static int diagnostic(void)
 {
     const u8 *r = gf_private_rom; u32 size = sizeof(gf_private_rom), table = GF_INIT_PLL_TABLE;
     struct gfinit_pll_limits l, row = {0};
+    if (size <= table + GF_PLL_HDR_COUNT) return -1;
     if (gfinit_pll_parse(r, size, table, GF_PLL_VIDEO, &l)) return -1;
     u32 header=r[table+GF_PLL_HDR_HEADER_LEN], len=r[table+GF_PLL_HDR_ENTRY_LEN], count=r[table+GF_PLL_HDR_COUNT];
     field("pll.table", table); field("pll.version", r[table+GF_PLL_HDR_VERSION]);
@@ -109,8 +127,8 @@ static int diagnostic(void)
 }
 void _start(void)
 {
-    gf_fixture_init();
-    int rc=gfinit_decode_rom(gf_private_rom, sizeof(gf_private_rom), &gf_fixture_profile, &decoded);
+    int rc = recover_gf_profile_expand(&profile, &profile_buffer);
+    if (!rc) rc = gfinit_decode_rom(gf_private_rom, sizeof(gf_private_rom), &profile, &decoded);
     field("decode.rc", rc ? 1U : 0U); field("decode.size", sizeof(gf_private_rom));
     field("decode.insns", decoded.program.count);
     field("decode.nodes", decoded.plan.node_count); field("decode.error_pc", decoded.error_pc); field("decode.error", decoded.error);

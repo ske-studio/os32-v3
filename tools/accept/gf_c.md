@@ -129,6 +129,6 @@ reboot後の照合基準は50C=00000004、508=00051104、578=00000E02、PMC.ENAB
 FAIL終端を受信済みならabortを重ねない。final/EOT不着時はmonitor終了後、通信可能なら共通引数で `--command` を省略して `recover now c` を一度試す。Ctrl-Cをabortの代用にせず受信者を重ねない。出口へ戻れなければユーザーが電源再投入。復帰できたら証拠→reboot→baseline照合（M:196,203、docs/design/kdebug/recover_common/s0.md）。
 
 ## 当日前にノートで埋める未確認
-25.175MHzの**実ROM**での係数は未確認。ノートの既存段0の私有ROMを `GF_ROM_HEADER` の `gf_private_rom` に渡し、当日版 `tools/tests/gfinit_romfile_host.c` を同じhostコンパイル手順で実行する（同、コンパイルの組立例 tools/tests/test_gfinit.py）。本起草では実行・ビルドしない。
+25.175MHzの**実ROM**での係数は未確認。ノートの既存段0の私有ROMを `GF_ROM_HEADER` の `gf_private_rom` に渡し、当日版 `tools/gfinit_romfile_host.c` を同じhostコンパイル手順で実行する（同、コンパイルの組立例 tools/tests/test_gfinit.py）。本起草では実行・ビルドしない。
 保存するのはROM長/CRC、VIDEO limits/ref、`decode.rc=0`・`diagnostic.rc=0`、`mode.request_khz=25175`、single_stage、mode.n1/m1/n2/m2/p・actual/error・error_percent_hundredths・within_half_percent=1、mode.write0..4のreg/source/keep/value。単段判定を適用したmode欄を使い、旧36MHzのtwo/single欄と混ぜない。±0.5%以内を確認しmanifestに転載する。ROM生バイトは資料へ載せない（docs/design/hwdev/gf/display/pll_program.md、同host:104–112）。
 実ROMの解が揃ってもPLL lock/実周波数、POSTなしのstateの十分性、0FACh=01の実映像、C実機所要時間は未確認のまま。実機で上の証拠を採る(記録はアーカイブ)。本作業は本ファイルの起草のみ、実機・NP21/W・ビルド・試験は未実施。

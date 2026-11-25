@@ -32,6 +32,26 @@ def fixture(root):
     return subprocess.check_output(['git', 'write-tree'], cwd=root, text=True).strip()
 
 
+def rom_revisions(root):
+    subprocess.run(['git', 'init', '-q', str(root)], check=True)
+    revisions = []
+    for path in (verify.BASE_ROM_HOST, verify.ROM_HOST):
+        dest = root / path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(path)
+        subprocess.run(['git', 'add', path], cwd=root, check=True)
+        tree = subprocess.check_output(['git', 'write-tree'], cwd=root, text=True).strip()
+        revisions.append((tree, path))
+    return revisions
+
+
+def exercise_rom(module, root, revisions):
+    module.ROOT = root
+    for tree, expected in revisions:
+        sources, _ = module.review_inputs(tree, set(), {module.ROM_HOST})
+        assert sources[module.ROM_HOST] == expected
+
+
 def exercise(module, root, tree):
     module.ROOT = root
     table = root / 'scope.tsv'
@@ -193,6 +213,9 @@ def main():
     with tempfile.TemporaryDirectory() as folder:
         root = Path(folder)
         tree = fixture(root)
+        rom_root = root / 'rom-fixture'
+        revisions = rom_revisions(rom_root)
+        exercise_rom(verify, rom_root, revisions)
         hal_root = root / 'hal-fixture'
         hal_tree = hal_fixture(hal_root)
         exercise(verify, root, tree)
@@ -200,6 +223,7 @@ def main():
         exercise_layout(verify, root)
         if args.mutate:
             for anchor, replacement in (
+                ("hosts == [BASE_ROM_HOST]", "BASE_ROM_HOST in hosts"),
                 ("issues.append('理由のない割れ ' + detail)", 'pass'),
                 ("if path in layout.PPC_DIAGNOSTICS:", 'if False:'),
                 ("if kind != '製品':\n                    issues.append", "if False:\n                    issues.append"),
@@ -242,6 +266,7 @@ def main():
                 exec(compile(source.replace(anchor, replacement), verify.__file__, 'exec'),
                      mutant.__dict__)
                 try:
+                    exercise_rom(mutant, rom_root, revisions)
                     exercise(mutant, root, tree)
                     exercise_hal(mutant, hal_root, hal_tree)
                     exercise_layout(mutant, root)

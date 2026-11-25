@@ -15,7 +15,10 @@ import hal_inventory
 import layout
 
 ROOT = Path(__file__).resolve().parents[2]
-BASE = 'c6076a6f6'
+BASE = 'v3-pre-restructure'
+# Diagnostic host split out of the test tree after baseline capture.
+ROM_HOST = 'tools/gfinit_romfile_host.c'
+BASE_ROM_HOST = 'tools/tests/gfinit_romfile_host.c'
 LAYER_BLOB = '{revision}:tools/check_layers.py'
 SCOPE = ROOT / 'docs/tasks/restructure/data/scope.tsv'
 HEADER = ['パス', '担当', '種類', '根拠', '外の呼び出し元', '所属種類']
@@ -50,7 +53,13 @@ def review_inputs(base, paths, tools):
     callers = {p for p in paths if p.startswith(('tools/checks/', '.github/workflows/'))
                or p == 'Makefile' or (p.startswith('build/') and p.endswith('.mk'))}
     names = sorted(callers | tools)
-    request = ''.join(f'{base}:{p}\n' for p in names).encode()
+    aliases = {}
+    if ROM_HOST in names:
+        hosts = subprocess.check_output(['git', 'ls-tree', '--name-only', base, '--',
+                                         ROM_HOST, BASE_ROM_HOST], cwd=ROOT, text=True).splitlines()
+        if hosts == [BASE_ROM_HOST]:
+            aliases[ROM_HOST] = BASE_ROM_HOST
+    request = ''.join(f'{base}:{aliases.get(p, p)}\n' for p in names).encode()
     blobs = io.BytesIO(subprocess.check_output(['git', 'cat-file', '--batch'],
                                                cwd=ROOT, input=request))
     sources = {}
@@ -83,6 +92,9 @@ def inventory(base):
     paths = set(data.rstrip('\0').split('\0'))
     excluded = {p for p in paths if p.startswith('tools/restructure/')
                 or re.fullmatch(r'tools/checks/restructure_p0_\d+\.py', p)}
+    if BASE_ROM_HOST in paths and ROM_HOST not in paths:
+        paths.remove(BASE_ROM_HOST)
+        paths.add(ROM_HOST)
     return paths - excluded, excluded
 
 

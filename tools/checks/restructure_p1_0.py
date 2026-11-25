@@ -9,7 +9,9 @@ CHECK = dict(name='restructure-p1-0', tier=1, needs=[], budget=20,
                      'sdk/os32_generations.py', 'sdk/rust/os32api/src/generations.rs',
                      'tools/g16/scan_ui_chars.py', 'tools/gen_kcg_font.py', 'tools/gen_unicode.py',
                      'tools/np21w_restart.py', 'tools/pack_name_tables.txt', 'tools/pack_notes.txt',
-                     'tools/split_c_functions.py',
+                     'tools/split_c_functions.py', 'tools/gfinit_romfile_host.c',
+                     'hwdev/gf/display/*.c', 'kdebug/gfinit_decode.c', 'kdebug/gfinit_mode.c',
+                     'kdebug/gfinit_pll.c', 'kdebug/recover.c', 'kdebug/recover_gf.c',
                      'docs/tasks/restructure/data/scope.tsv'],
              basis=['docs/tasks/restructure/P1.md P1-0 担当の表', 'docs/design/build/hal_layout.md ファイル単位の判断'])
 

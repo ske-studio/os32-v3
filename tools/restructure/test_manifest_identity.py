@@ -61,6 +61,7 @@ def exercise(root, directory):
         shutil.copyfile(tree / path, base)
         lines.append(hashlib.sha256(base.read_bytes()).hexdigest() + '  ' + str(path))
     manifest.write_text('\n'.join(lines) + '\n')
+    (directory / 'PRESENCE').write_text(str(blob) + '\n')
     mapping = directory / 'map.json'
     mapping.write_text(json.dumps([{'from': str(old), 'to': str(new)},
                                    {'from': old_header, 'to': new_header}]))
@@ -105,6 +106,54 @@ def exercise(root, directory):
     (tree / new).write_text(source(new_header, '2'))
     path.unlink()
     check('changed initializer', 1, 'DIFF ' + str(new_obj), command=make(new_obj))
+    # Two moved names in a comment, including a repeated non-NUL occurrence.
+    text_artifact = Path('public.h')
+    def references(header, source):
+        return (f'/*{header}*/ [{header}] "{header}" {source}\0'
+                f'vendor/{old_header} {old_header}.bak')
+
+    before = references(old_header, old)
+    correct = references(new_header, new)
+    broad = correct.replace(f'vendor/{old_header}', f'vendor/{new_header}')
+    (directory / text_artifact).write_text(before)
+    with manifest.open('a') as out:
+        out.write(hashlib.sha256(before.encode()).hexdigest() + '  public.h\n')
+    (tree / text_artifact).write_text(correct)
+    asm = Path('lib/sample.asm')
+    moved_asm = Path('sys/kern/sample.asm')
+    asm_obj = Path('sample.o')
+    for name in (asm, moved_asm):
+        (tree / name).parent.mkdir(parents=True, exist_ok=True)
+    (tree / asm).write_text('section .text\nglobal sample\nsample: ret\n')
+    subprocess.run(['nasm', '-f', 'elf32', str(asm), '-o', str(asm_obj)], cwd=tree, check=True)
+    shutil.copyfile(tree / asm_obj, directory / asm_obj)
+    with manifest.open('a') as out:
+        out.write(hashlib.sha256((tree / asm_obj).read_bytes()).hexdigest() + '  sample.o\n')
+    (tree / asm).rename(tree / moved_asm)
+    mapping.write_text(json.dumps(json.loads(mapping.read_text()) +
+                                  [{'from': str(asm), 'to': str(moved_asm)}]))
+    with (tree / 'Makefile').open('a') as out:
+        out.write(f'AS = nasm\nsample.o: {moved_asm}\n\t$(AS) -f elf32 $< -o $@\n')
+    # Restore the earlier control object before checking independent declarations.
+    (tree / new).write_text(source(new_header))
+    path.unlink()
+    git('add', 'Makefile', str(moved_asm), str(new))
+    git('commit', '-qm', f'Sep-Changes: path-string public.h {old_header}\n'
+                         f'Sep-Changes: path-string public.h {old}\n'
+                         f'Sep-Changes: path-string {asm_obj} {asm} {moved_asm}')
+    (tree / asm_obj).unlink()
+    media = 'boot-media.iso'
+    with (directory / 'PRESENCE').open('a') as out:
+        out.write(media + '\n')
+    check('missing presence-only media', 3, 'MISSING ' + media, command=['make', str(new_obj), str(asm_obj)])
+    (tree / media).touch()
+    check('text and NASM', 0, '0 missing, 0 different', args=['--base', 'v3-pre-restructure'])
+    (tree / text_artifact).write_text(broad)
+    check('undeclared vendor path', 1, 'DIFF public.h', args=['--base', 'v3-pre-restructure'])
+    (tree / text_artifact).write_text(correct)
+    with (tree / text_artifact).open('a') as out:
+        out.write(' ')
+    check('unrelated text byte', 1, 'DIFF public.h', args=['--base', 'v3-pre-restructure'])
     git('commit', '--allow-empty', '-qm', 'Sep-Changes: x86')
     result = subprocess.run([sys.executable, '-B', root / TOOLS[0], '--manifest', manifest,
                              '--tree', tree, '--move-map', mapping, '--base', 'HEAD^'],
@@ -124,8 +173,15 @@ def main():
                     ('                    return moved', '                    return old'),
                     ("if result.returncode:\n            print('BUILD FAILED'", "if False:\n            print('BUILD FAILED'"),
                     ('missing += 1', 'missing += 0'),
-                    (' != expected:', ' == expected:'),
+                    ('for contents, expected in ((original, hashlib.sha256(data).hexdigest()),', 'for contents, expected in ((original, digest),'),
                     ('(normalized, digest)', '(original, digest)'),
+                    ("hashes.keys() | presence", "hashes.keys()"),
+                    ('pattern = PATH_START + b"(?:"', 'pattern = b"(?:"'),
+                    ('+ b")" + PATH_END', '+ b")"'),
+                    ('PATH_CHAR = rb"[A-Za-z0-9_./-]"', 'PATH_CHAR = rb"[A-Za-z0-9_./*-]"'),
+                    ('PATH_CHAR = rb"[A-Za-z0-9_./-]"', 'PATH_CHAR = rb"[A-Za-z0-9_./\\[-]"'),
+                    ("matches = re.sub(pattern,", "matches = re.sub(b'never-match',"),
+                    ("(source, digest)):", "(moved, digest)):"),
                     ('SOURCE_DATE_EPOCH=epoch', "SOURCE_DATE_EPOCH='0'"),
                     ('different += 1\n    if not seen', 'different += 0\n    if not seen')]):
                 mutant = work / str(i)
