@@ -14,8 +14,10 @@ CHECK = dict(name='snd2-guest-host', tier=4, needs=[], budget=3,
 def run(ctx):
     source = (ctx.root / 'userland/tests/snd2_test.c').read_text()
     mutants = [
+        ('.lead_periods = lead', '.lead_periods = 3'),
+        ('PERIOD <= lead', 'PERIOD < lead'),
         ('index += step;', 'index += step + 1;'),
-        ('written - FRAMES + (frames - sent)', 'written - FRAMES + PERIOD'),
+        ('written - capacity + (frames - sent)', 'written - capacity + PERIOD'),
         ('target = (target + PERIOD - 1) / PERIOD * PERIOD;', ''),
         ('if (full_waits > 1) target += PERIOD;', ''),
         ('++full_waits > PERIOD', '0'),
