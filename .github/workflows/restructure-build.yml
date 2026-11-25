@@ -129,10 +129,10 @@ jobs:
       - uses: ./.github/actions/ppc-setup
       - name: Build PowerPC media
         env:
-          IMAGE: ${{ matrix.image }}
+          PPC_SEL: ${{ matrix.image }}
           OS32_ACCEPT_IPA_LICENSE: "1"
         run: |
-          case "$IMAGE" in
+          case "$PPC_SEL" in
             core) flags=(KBOOT_LINK=0); dir=. ;;
             link) flags=(KBOOT_LINK=1); dir=link ;;
             sh) flags=(KBOOT_SH=1 KBOOT_LINK=0); dir=link-sh ;;
