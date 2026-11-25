@@ -29,11 +29,18 @@ def check():
         (root / 'Makefile').write_text(
             'include sdk/pkg/flags.mk\ninclude outside.mk\n'
             'all: fixture.elf\nfixture.elf: src.c\n'
-            '\tld $(FLAGS) second.o first.o -o $@\n')
+            '\tld $(FLAGS) second.o first.o $(EXTRAS) -o $@\n')
+        with (sdk / 'flags.mk').open('a') as stream:
+            stream.write('TAIL = -lz -lc\nEXTRAS = $(TAIL)\n'
+                         'ARCHIVE = $(shell cc -print-libgcc-file-name)\n')
         (root / 'outside.mk').touch()
         (root / 'src.c').touch()
         build_refs.ROOT = root
         assert build_refs.main(root)
+        sources = {row['make_text'] for row in table(root, 'link_sources.tsv')}
+        assert {'EXTRAS = $(TAIL)', 'TAIL = -lz -lc'} <= sources
+        assert any(row['make_text'].startswith('ARCHIVE =') and 'path-expression' in row['kind']
+                   for row in table(root, 'build_refs.tsv'))
         assert any(row['file'] == 'outside.mk' and row['covered'] == '0'
                    for row in table(root, 'read_mk.tsv'))
         assert any(row['directories_in_order'] == 'b a' and row['target'] == 'fixture.elf'
@@ -48,6 +55,7 @@ if __name__ == '__main__':
     if '--mutate' in sys.argv:
         source = Path(build_refs.__file__).read_text()
         for old, new in [("('build/**/*.mk', 'sdk/**/*.mk')", "('build/**/*.mk',)"), ("p.endswith('.mk')", "False"),
+                         ("assignment[1] in linked", "False"), ("|shell|", "|"),
                          ("return bool(missing)", "return False")]:
             assert source.count(old) == 1
             with tempfile.TemporaryDirectory() as tmp:

@@ -13,7 +13,7 @@ TAGS = {
     'include-order': r'-I|INCLUDE|INC_KERNEL',
     'output': r'(?:^|\s)-o\s|BUILD_OUT|\b\w*OUT\b|\$@',
     'link-order': r'\b\w*(?:ORDER|OBJS?|OBJECTS|LINK_COMMAND)\w*\b|\$\(\w*LD\)|-Wl,|-elf-ld\b|\$\^',
-    'path-expression': r'\$\((?:addprefix|addsuffix|patsubst|subst|wildcard|foreach|basename|dir|notdir)\s|\$\([^()]+:[^()]+=|\)/',
+    'path-expression': r'\$\((?:addprefix|addsuffix|patsubst|subst|shell|realpath|abspath|wildcard|foreach|basename|dir|notdir)\s|\$\([^()]+:[^()]+=|\)/',
 }
 
 
@@ -32,7 +32,7 @@ def statements(lines):
             yield start, value
 
 
-def definitions(root):
+def raw_definitions(root):
     files = [root / 'Makefile']
     for pattern in ('build/**/*.mk', 'sdk/**/*.mk'):
         files.extend(sorted(root.glob(pattern)))
@@ -44,6 +44,39 @@ def definitions(root):
             if re.match(r'^[^#=\s]+(?:\s+[^:=\s]+)*\s*:(?![=])', value):
                 tags.append('dependency')
             yield relative, number, ','.join(tags) or 'definition', value
+
+
+# Follow named inputs across included makefiles. Conditional and appended
+# definitions are all candidates because this table spans every image.
+ASSIGN = re.compile(r'^(?:export\s+)?([\w.-]+)\s*(?::=|\+=|\?=|=)\s*(.*)')
+VARIABLE = re.compile(r'\$[({]([\w.-]+)(?=[:})])')
+LINK = re.compile(r'(?:^|\s)(?:\$\([\w.-]*(?:LD|LINK|LINK_COMMAND)\)|(?:[\w./-]+-)?ld)(?:\s|$)|-Wl,')
+
+
+def definitions(root):
+    rows = list(raw_definitions(root))
+    inputs = {}
+    pending = []
+    for _, _, _, value in rows:
+        assignment = ASSIGN.match(value)
+        if assignment:
+            name, rhs = assignment.groups()
+            inputs.setdefault(name, set()).update(VARIABLE.findall(rhs))
+        elif LINK.search(value):
+            pending.extend(VARIABLE.findall(value))
+
+    linked = set()
+    while pending:
+        name = pending.pop()
+        if name not in linked:
+            linked.add(name)
+            pending.extend(inputs.get(name, ()))
+
+    for path, number, kind, value in rows:
+        assignment = ASSIGN.match(value)
+        if assignment and assignment[1] in linked and 'link-order' not in kind:
+            kind = 'link-order' if kind == 'definition' else kind + ',link-order'
+        yield path, number, kind, value
 
 
 def observed(log):
