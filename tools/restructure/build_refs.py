@@ -1,5 +1,6 @@
 """Inventory build definitions and verify their coverage with GNU Make dry runs."""
 import argparse
+import bisect
 import csv
 import os
 from pathlib import Path
@@ -46,78 +47,78 @@ def raw_definitions(root):
             yield relative, number, ','.join(tags) or 'definition', value
 
 
-# Follow named inputs across included makefiles. Conditional and appended
-# definitions are all candidates because this table spans every image.
-ASSIGN = re.compile(r'^(?:export\s+)?([\w.-]+)\s*(?::=|\+=|\?=|=)\s*(.*)')
+# GNU Make prints each recursive invocation's database separately. Keep its
+# variables, target-specific overrides, and rules in the same namespace.
+ORIGIN = re.compile(r"^# (?:makefile|override) \(from '(.+)', line (\d+)\)")
+RECIPE = re.compile(r"^#  recipe to execute \(from '(.+)', line (\d+)\):")
+ASSIGN = re.compile(r'^(?:(\S+):\s+)?([\w.-]+)\s*(?:::=|:=|\+=|\?=|=)\s*(.*)')
 VARIABLE = re.compile(r'\$[({]([\w.-]+)(?=[:})])')
-LINK = re.compile(r'(?:^|\s)(?:\$\([\w.-]*(?:LD|LINK|LINK_COMMAND)\)|(?:[\w./-]+-)?ld)(?:\s|$)|-Wl,')
+LINK = re.compile(r'(?:^|[\s/@])(?:\$\([\w.-]*(?:LD|LINK|LINK_COMMAND)\)|(?:[\w.-]+-)?ld)(?:\s|$)|-Wl,')
+SOURCE = re.compile(r'\S+\.(?:c|cc|cpp|s|S|asm|rs)$')
 
 
-def calls(value):
-    """Split literal GNU Make call arguments at un-nested commas."""
-    for match in re.finditer(r'\$([({])call\s+([\w.-]+),', value):
-        closing = ')' if match[1] == '(' else '}'
-        opening = match[1]
-        args = []
-        start = match.end()
-        depth = 0
-        for index in range(start, len(value)):
-            char = value[index]
-            if char == closing and depth == 0:
-                args.append(value[start:index])
-                yield match[2], args
-                break
-            if char == ',' and depth == 0:
-                args.append(value[start:index])
-                start = index + 1
-            elif char == opening:
-                depth += 1
-            elif char == closing:
-                depth -= 1
+def database_sources(block, expanded_targets):
+    variables = {}
+    prerequisites = {}
+    recipes = []
+    target = None
+    origin = recipe = None
+    for line in block.splitlines():
+        if origin:
+            match = ASSIGN.match(line)
+            if match:
+                scope, name, rhs = match.groups()
+                variables[scope, name] = origin, rhs
+            origin = None
+        if match := ORIGIN.match(line):
+            origin = match[1], int(match[2])
+        elif match := RECIPE.match(line):
+            recipe = match[1], int(match[2])
+        elif line.startswith('\t') and recipe and target:
+            recipes.append((target, recipe, line.strip()))
+        else:
+            recipe = None
+            if not line:
+                target = None
+            elif match := re.match(r'^([^#\s:=]+)::?\s*(.*)$', line):
+                target = match[1]
+                if not ASSIGN.match(line):
+                    prerequisites[target] = match[2].split('|')[0].split()
 
+    # Immediate assignments and computed variable names lose their expansion
+    # history in -p. Index literal inputs by word, then join them to the
+    # link rule's actual prerequisites (including the sources of its objects).
+    owners = {}
+    for (scope, name), (origin, rhs) in variables.items():
+        if scope is None:
+            for word in rhs.split():
+                if SOURCE.fullmatch(word) or word.endswith(('.a', '.o', '.ld')):
+                    owners.setdefault(word, set()).add((origin, name))
 
-def references(value, macro):
-    return {(macro, name) if name.isdecimal() else name for name in VARIABLE.findall(value)}
-
-
-def definitions(root):
-    rows = list(raw_definitions(root))
-    inputs = {}
-    pending = []
-    call_sites = {}
-    macro = None
-    for path, number, _, value in rows:
-        if value.startswith('define '):
-            macro = value.split()[1]
-        elif value == 'endef' or number == 0:
-            macro = None
-        for callee, args in calls(value):
-            for position, arg in enumerate(args, 1):
-                if arg.strip():
-                    slot = (callee, str(position))
-                    inputs.setdefault(slot, set()).update(references(arg, macro))
-                    call_sites.setdefault((path, number), set()).add(slot)
-        assignment = ASSIGN.match(value)
-        if assignment:
-            name, rhs = assignment.groups()
-            inputs.setdefault(name, set()).update(references(rhs, macro))
-        elif LINK.search(value.replace('$$', '$')):
-            pending.extend(references(value, macro))
-
-    linked = set()
-    while pending:
-        name = pending.pop()
-        if name not in linked:
-            linked.add(name)
-            pending.extend(inputs.get(name, ()))
-
-    for path, number, kind, value in rows:
-        assignment = ASSIGN.match(value)
-        from_assignment = assignment and assignment[1] in linked
-        from_call = linked.intersection(call_sites.get((path, number), ()))
-        if (from_assignment or from_call) and 'link-order' not in kind:
-            kind = 'link-order' if kind == 'definition' else kind + ',link-order'
-        yield path, number, kind, value
+    for target, recipe, command in recipes:
+        if (target, *recipe) not in expanded_targets and not LINK.search(command):
+            continue
+        yield recipe, target, 'recipe', command
+        pending = VARIABLE.findall(command)
+        visited = set()
+        while pending:
+            name = pending.pop()
+            if name in visited:
+                continue
+            visited.add(name)
+            for scope in (None, target):
+                entry = variables.get((scope, name))
+                if entry:
+                    origin, rhs = entry
+                    yield origin, target, 'variable', name
+                    pending.extend(VARIABLE.findall(rhs))
+        for position, word in enumerate(prerequisites.get(target, ()), 1):
+            inputs = [word]
+            if word.endswith('.o'):
+                inputs.extend(src for src in prerequisites.get(word, ()) if SOURCE.fullmatch(src))
+            for item in inputs:
+                for origin, name in owners.get(item, ()):
+                    yield origin, target, 'prerequisite-word', f'{position} {word} <- {name} {item}'
 
 
 def observed(log):
@@ -134,11 +135,10 @@ def write_table(path, columns, rows):
 
 
 def main(out):
-    refs = list(definitions(ROOT))
+    refs = list(raw_definitions(ROOT))
     indexed = {path for path, _, tag, _ in refs if tag == 'file'}
     columns = ('file', 'line', 'kind', 'make_text')
-    write_table(out / 'build_refs.tsv', columns, refs)
-    write_table(out / 'link_sources.tsv', columns, (r for r in refs if 'link-order' in r[2]))
+    evidence = set()
     coverage, includes, links = [], [], []
     for image in ('pc98', *IMAGES):
         args = ['all'] if image == 'pc98' else ['ARCH=ppc', 'PLATFORM=powermac', 'IMAGE=' + image]
@@ -175,6 +175,34 @@ def main(out):
                     includes.append((image, *location, ' '.join(flags)))
                 if re.search(r'(?:^|[/\s])(?:[\w-]+-)?ld(?:\s|$)|-Wl,', line):
                     links.append((image, *location, line))
+        targets = {(target, path, int(number)) for config, path, number, target, _ in links
+                   if config == image}
+        for block in re.findall(r'^# Make data base.*?^# Finished Make data base', log, re.M | re.S):
+            for (path, number), target, reason, detail in database_sources(block, targets):
+                if path in indexed:
+                    evidence.add((path, number, image, target, reason, detail))
+    # GNU Make reports the end line of some continued statements.
+    starts = {}
+    for path, number, _, _ in refs:
+        starts.setdefault(path, []).append(number)
+    linked = set()
+    for path, number, *_ in evidence:
+        lines = starts[path]
+        linked.add((path, lines[bisect.bisect_right(lines, number) - 1]))
+    differences = []
+    sources = []
+    for row in refs:
+        path, number, kind, value = row
+        db = (path, number) in linked
+        lexical = 'link-order' in kind
+        if db:
+            sources.append(row)
+        if lexical != db:
+            differences.append((*row, int(db)))
+    write_table(out / 'build_refs.tsv', columns, refs)
+    write_table(out / 'link_sources.tsv', columns, sources)
+    write_table(out / 'link_evidence.tsv', ('file', 'db_line', 'image', 'target', 'basis', 'word_or_recipe'), sorted(evidence))
+    write_table(out / 'link_differences.tsv', (*columns, 'database_match'), differences)
     write_table(out / 'read_mk.tsv', ('image', 'file', 'covered'), coverage)
     cmd_cols = ('image', 'recipe_file', 'line', 'target')
     write_table(out / 'include_order.tsv', (*cmd_cols, 'directories_in_order'), includes)
