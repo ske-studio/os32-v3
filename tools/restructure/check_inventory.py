@@ -199,6 +199,8 @@ def mutations(check):
 
 
 def is_report(line):
+    if line.startswith("MUTATE 総括:"):
+        return False
     return bool(re.search(r'\bRED\b', line)) and not re.search(
         r'^MUTATIONS\b|\d+\s*/\s*\d+\s+(?:(?:runtime|mutants?)\s+)?RED\b', line, re.I)
 
@@ -318,7 +320,12 @@ def ci_counts(directory, artifacts, refs):
                     count, marks = claims[name]
                     results[name] = (count, f'{log.name}:{marks[0]+1}', 'ci-red')
                 else:
-                    reason = 'ambiguous-or-incomplete-transcript' if name in refs else 'no-reference'
+                    if name not in refs:
+                        reason = 'no-reference'
+                    elif any(is_report(line) for line in refs[name]):
+                        reason = 'ambiguous-or-incomplete-transcript'
+                    else:
+                        reason = 'no-individual-red-in-reference'
                     results[name] = ('', log.name, reason)
     return results
 
