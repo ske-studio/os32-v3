@@ -1,5 +1,6 @@
 CHECK = dict(name='restructure-p0-4', tier=1, needs=[], budget=2,
-             covers=['tools/restructure/ci_baseline.py', 'tools/restructure/test_ci_baseline.py'],
+             covers=['tools/restructure/ci_baseline.py', 'tools/restructure/test_ci_baseline.py',
+                     'tools/ci/time_inventory.py', 'tools/checks/weights.json'],
              basis=['docs/tasks/restructure/P0.md P0-4', 'docs/POLICY_CI.md R1'])
 
 

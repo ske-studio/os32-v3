@@ -5,6 +5,10 @@ import csv
 from datetime import datetime
 import json
 from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ci"))
+import time_inventory
 
 
 def recent_pushes(runs, limit):
@@ -44,6 +48,7 @@ def save(out, name, columns, rows):
 def inventory(ci, out):
     runs = json.loads((ci / 'runs.json').read_text())
     pushes, workflows, jobs, failures, requests = [], [], [], [], []
+    balance = []
     by_job = defaultdict(list)
     for number, group in enumerate(recent_pushes(runs, 20), 1):
         finishes = []
@@ -54,6 +59,13 @@ def inventory(ci, out):
             rid = run['databaseId']
             jobfile = ci / f'jobs-{rid}.json'
             timers = sorted((ci / 'times' / str(rid)).glob('check-times-*/check_times.tsv'))
+            if state == 'success' and run['headBranch'].startswith('wt/int-'):
+                shards = time_inventory.shard_sums(time_inventory.load(timers))
+                for kind, rows in sorted(shards.items()):
+                    totals = [total for _, _, total in rows]
+                    ratio = time_inventory.imbalance(rows)
+                    balance.append((number, rid, kind, len(rows), round(min(totals), 2),
+                                    round(max(totals), 2), round(ratio, 2) if ratio else None))
             evidence = []
             for timer in timers:
                 for name, _, rc in csv.reader(timer.read_text().splitlines(), delimiter='\t'):
@@ -94,6 +106,7 @@ def inventory(ci, out):
                       counts['cancelled'], counts['skipped'],
                       round(100 * counts['success'] / decided, 2) if decided else None,
                       ','.join(str(i) for _, i in observations)))
+    save(out, 'shard_balance', 'push run_id group shards min_sum_s max_sum_s ratio', balance)
     save(out, 'pushes', 'push created_utc ref sha result elapsed_s run_ids', pushes)
     save(out, 'runs', 'push run_id workflow created_utc result jobs timers observed_failed_checks', workflows)
     save(out, 'jobs', 'push run_id job_id job result created_utc started_utc ended_utc queue_s duration_s failed_steps', jobs)
