@@ -1,5 +1,6 @@
 # OS32-v3 ソース管理構造・品質保証体制再設計仕様書
 
+> 上位: [TASK_RESTRUCTURE.md](TASK_RESTRUCTURE.md)
 > 状態: **草案 (2026-11-25、未承認)** — ユーザーが書いた仕様の原文 (下の本文は写しで、書き換えない)。段に切った実行の票は [TASK_RESTRUCTURE.md](TASK_RESTRUCTURE.md)。本文の章番号 (§1〜§19) を票が「仕様 §n」で指す。
 
 状態：設計草案・未承認  

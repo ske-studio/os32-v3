@@ -1,6 +1,6 @@
 # 作り直しの前の実物 (2026-11-25、main `92ad7c6e0`、タグ `v3-snd-hal-20261125`)
 
-入口: [TASK_RESTRUCTURE.md](TASK_RESTRUCTURE.md)。どの段も先に [RULES.md](RULES.md) を読む。
+> 上位: [TASK_RESTRUCTURE.md](TASK_RESTRUCTURE.md)・[RULES.md](RULES.md) (入口と、どの段も先に読む決まり)
 
 追跡ファイルは 6,473 本。数は `git ls-files <置き場> | wc -l`。
 
@@ -35,4 +35,4 @@
 | `tools/move_docs.py`・`tools/check_docs_links.py`・`check_docs_orphans.py` | 文書の移動とリンクの検査 | 各波で文書の中のパスを直す |
 
 関係する既存の票 (重なりは P6・P8 で畳む。それまでは各票が正典):
-[TASK_CI_REWORK](../v3/TASK_CI_REWORK.md) の S3〜S7 (入口・一覧・表・SKIP・重み) = 仕様 §8・§11・§14 の一部、[TASK_PPC_SEP](../ppc/TASK_PPC_SEP.md) の残件 = 仕様 Phase 8、[TASK_REDUNDANCY](../v3/TASK_REDUNDANCY.md) = 仕様 §15 の重複実装、[TASK_POLICY_LIGHT](../v3/TASK_POLICY_LIGHT.md) の試験の 4 段 = 仕様 §7 の分類、[DEFERRED_TESTS](../DEFERRED_TESTS.md) §2 の `CI-WAIT-PPC20`。
+`v3/TASK_CI_REWORK` の S3〜S7 (入口・一覧・表・SKIP・重み) = 仕様 §8・§11・§14 の一部、`ppc/TASK_PPC_SEP` の残件 = 仕様 Phase 8、`v3/TASK_REDUNDANCY` = 仕様 §15 の重複実装、`v3/TASK_POLICY_LIGHT` の試験の 4 段 = 仕様 §7 の分類、[DEFERRED_TESTS](../DEFERRED_TESTS.md) §2 の `CI-WAIT-PPC20`。

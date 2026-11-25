@@ -1,6 +1,7 @@
 # 全体の決まりと依頼の型 (どの段の依頼にも写す)
 
-入口: [TASK_RESTRUCTURE.md](TASK_RESTRUCTURE.md)。
+> 索引: 全部の段が上位として指す決まり (段のファイルは `> 上位:` でここを指す)
+> 上位: [TASK_RESTRUCTURE.md](TASK_RESTRUCTURE.md)
 
 ## 決まり
 
