@@ -35,7 +35,7 @@ def make_write_image(out, case):
     # Run the fixture at the resident shell entry, with its normal owner and slot.
     kernel_copy = out / 'boot.c'
     kernel_copy.write_text(source.replace(anchor, anchor + '\n'
-                           '        exec_run("/sys/shell.bin");\n'
+                           '        kprintf(7, "ATA-TEST shell=%d\\r\\n", exec_run("/sys/shell.bin"));\n'
                            '        kprintf(7, "ATA-TEST done\\r\\n");'))
     resident = 'userland/shell/main.c'
     entry = 'int main(int argc, char **argv, KernelAPI *api)\n{'
