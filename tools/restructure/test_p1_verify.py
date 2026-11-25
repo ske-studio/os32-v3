@@ -18,6 +18,8 @@ def fixture(root):
         dest = root / path
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.touch()
+    (root / 'tools/fixture_source.py').write_text("print('GREEN')\n")
+    (root / 'tools/checks/fixture_runner.py').write_text("# covers tools/fixture_source.py\n")
     subprocess.run(['git', 'add', '.'], cwd=root, check=True)
     return subprocess.check_output(['git', 'write-tree'], cwd=root, text=True).strip()
 
@@ -28,9 +30,14 @@ def exercise(module, root, tree):
     product = ['code.c', 'P1-1', '製品', '仮 D-3', '']
     runner = ['tools/checks/fixture_runner.py', 'P1-4', '実行の基盤', '登録を実行', '']
     rom = ['tools/gfinit_rom_check.py', 'P1-4', '検査の本体', '期待 CRC と照合', '']
-    source = ['tools/fixture_source.py', 'P1-1', '運用の道具', '入力の読込み', '']
+    source = ['tools/fixture_source.py', 'P1-1', '運用の道具', '候補印=合否語、登録・check 目標・workflow の参照。入力を生成する', '']
     footer = [verify.EXCLUDED, ['tools/checks/restructure_p0_987.py'],
               ['tools/restructure/inventory.py']]
+
+    for snippet, marker in [("print('FAIL')", '合否語'), ("print('RED')", '合否語'),
+                            ('return 3', '異常終了'), ('value != expected', '期待値・試験入力')]:
+        assert module.candidate_marks(snippet, 'probe.py', set()) == marker
+    assert not module.candidate_marks('print(value)', 'probe.py', {'other_probe.py'})
 
     def check(rows, expected_code, messages, rom_row=rom):
         with table.open('w', newline='', encoding='utf-8') as stream:
@@ -43,6 +50,10 @@ def exercise(module, root, tree):
             assert message in output.getvalue(), message
 
     check([product, runner, *footer], 0, ['A1\tcode.c', '差 0'])
+    reviewed = source[3]
+    source[3] = '用途未記録'
+    check([product, runner, *footer], 1, ['fixture_source.py: 候補印=合否語、登録・check 目標・workflow の参照'])
+    source[3] = reviewed
     check([product, runner, *footer], 1, ['gfinit_rom_check.py: 検査の本体として分類する'],
           [rom[0], 'P1-1', '運用の道具', *rom[3:]])
     check([['other.c', *product[1:]], runner, *footer], 1, ['不足: code.c', '余分: other.c'])
@@ -66,6 +77,9 @@ def main():
                 ('expected - counts.keys()', 'set()'),
                 ('counts.keys() - expected', 'set()'),
                 ("if path.removeprefix('tools/') in CHECK_BODIES and path.startswith('tools/') and kind != '検査の本体':", 'if False:'),
+                ('if Path(path).name in callers:', 'if False:'),
+                ('if re.search(pattern, source)', 'if False'),
+                ("if marks and REVIEW_MARK + marks + '。' not in reason:", 'if False:'),
                 ('if count > 1:', 'if False:'),
                 ('if any(not value.strip() for value in row[:4]):', 'if False:'),
                 ("compare('母数外', exclusions, omitted, issues)", 'pass'),

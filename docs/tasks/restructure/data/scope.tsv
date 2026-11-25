@@ -3236,7 +3236,7 @@ tools/archive_refs_baseline.json	P1-4	試験の支援	契約検査の解析・�
 tools/audit_cast_align.sh	P1-4	検査の本体	契約・受入条件を検査する入口	—
 tools/build_compare.py	P1-4	検査の本体	基点と対象を別々にビルドし、配布する生成物の差を終了値で報告	—
 tools/build_compare.sh	P1-4	実行の基盤	同じ場所の build_compare.py に引数を渡して生成物の一致検査を起動	—
-tools/build_profile.py	P1-1	運用の道具	開発・製造・配備用の build_profile.py	—
+tools/build_profile.py	P1-1	運用の道具	開発・製造・配備用の build_profile.py。make の展開結果とコンパイラ引数を JSON に取り出す。 候補印=登録・check 目標・workflow の参照。	—
 tools/check_arch_asm.py	P1-4	検査の本体	契約・受入条件を検査する入口	—
 tools/check_archive_refs.py	P1-4	検査の本体	契約・受入条件を検査する入口	—
 tools/check_arm_compile.py	P1-4	検査の本体	契約・受入条件を検査する入口	—
@@ -3583,16 +3583,16 @@ tools/checks/weights.json	P1-4	実行の基盤	登録の実行・環境選択・
 tools/checks/x11-shared-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—
 tools/checks/x87-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—
 tools/checks/x87-lifecycle-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—
-tools/ci/build_cross.sh	P1-1	運用の道具	クロスツールチェーンの構築	—
-tools/ci/build_cross_ppc.sh	P1-1	運用の道具	クロスツールチェーンの構築	—
+tools/ci/build_cross.sh	P1-1	運用の道具	クロスツールチェーンの構築。クロスコンパイラとライブラリを構築する。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/ci/build_cross_ppc.sh	P1-1	運用の道具	クロスツールチェーンの構築。クロスコンパイラとライブラリを構築する。 候補印=異常終了、登録・check 目標・workflow の参照。	—
 tools/ci/gate.py	P1-4	実行の基盤	CI の実行・比較・取り込み判定	—
 tools/ci/land_gate.py	P1-4	実行の基盤	CI の実行・比較・取り込み判定	—
 tools/ci/ppc_scope.py	P1-4	実行の基盤	CI の実行・比較・取り込み判定	—
 tools/ci/reuse_success.py	P1-4	実行の基盤	CI の実行・比較・取り込み判定	—
 tools/ci/runner_compare.py	P1-4	実行の基盤	CI の実行・比較・取り込み判定	—
-tools/ci/sep_identity.py	P1-4	実行の基盤	CI の実行・比較・取り込み判定	—
+tools/ci/sep_identity.py	P1-4	検査の本体	sep の生成物差分を集約して終了値を決める。 候補印=合否語、異常終了、登録・check 目標・workflow の参照。	—
 tools/ci/time_inventory.py	P1-4	実行の基盤	CI の実行・比較・取り込み判定	—
-tools/ci_fetch.sh	P1-1	運用の道具	開発・製造・配備用の ci_fetch.sh	実機ノートの採取・転送台本、pc98emu の操作・受入台本
+tools/ci_fetch.sh	P1-1	運用の道具	開発・製造・配備用の ci_fetch.sh。配布物を取得し、取得先に保存する。 候補印=異常終了、登録・check 目標・workflow の参照。	実機ノートの採取・転送台本、pc98emu の操作・受入台本
 tools/clang_ast/__init__.py	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
 tools/clang_ast/align.py	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
 tools/clang_ast/asm.py	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
@@ -3603,104 +3603,104 @@ tools/clang_ast/parallel_units.py	P1-4	試験の支援	契約検査の解析・�
 tools/clang_ast/result_cache.py	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
 tools/clang_ast/type_occurrences.cpp	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
 tools/clang_ast/type_occurrences.py	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
-tools/create_fat12_d88.sh	P1-1	運用の道具	開発・製造・配備用の create_fat12_d88.sh	—
-tools/deploy_manifests.py	P1-1	運用の道具	開発・製造・配備用の deploy_manifests.py	—
-tools/deploy_protect.py	P1-1	運用の道具	開発・製造・配備用の deploy_protect.py	—
-tools/deploy_source_check.py	P1-1	運用の道具	開発・製造・配備用の deploy_source_check.py	—
-tools/doc_delink_archive.py	P1-1	運用の道具	開発・製造・配備用の doc_delink_archive.py	—
+tools/create_fat12_d88.sh	P1-4	試験の支援	FAT12 の試験用 D88 フロッピー像を組み立てる。 候補印=登録・check 目標・workflow の参照。	—
+tools/deploy_manifests.py	P1-1	運用の道具	開発・製造・配備用の deploy_manifests.py。配備・配布するファイル集合と世代の記録を組み立てる。 候補印=登録・check 目標・workflow の参照。	—
+tools/deploy_protect.py	P1-1	運用の道具	開発・製造・配備用の deploy_protect.py。配備時の書き込み・削除を制御し、対象外のファイルを保護する。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/deploy_source_check.py	P1-4	検査の本体	配備元と期待集合を照合し、不整合で異常終了する。余剰の削除も担当する。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/doc_delink_archive.py	P1-1	運用の道具	開発・製造・配備用の doc_delink_archive.py。移設・編集の際にソースや文書の参照を書き換える。 候補印=異常終了、登録・check 目標・workflow の参照。	—
 tools/doc_graph.py	P1-4	検査の本体	check-docs-tree が文書間のリンクを走査し、基準値との差を判定	—
 tools/doc_line_refs_baseline.json	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
 tools/doc_tree_baseline.json	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
 tools/docs_status_exceptions.json	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
-tools/emu_agent/README.md	P1-1	運用の道具	agent.py の起動例と接続設定を実装と一緒に移す	—
-tools/emu_agent/agent.py	P1-1	運用の道具	開発・製造・配備用の emu_agent/agent.py	—
-tools/emu_agent/mcp_server.py	P1-1	運用の道具	開発・製造・配備用の emu_agent/mcp_server.py	—
-tools/emu_agent/playbook.py	P1-1	運用の道具	開発・製造・配備用の emu_agent/playbook.py	—
-tools/emu_agent/tasks/regress.txt	P1-1	運用の道具	開発・製造・配備用の emu_agent/tasks/regress.txt	—
-tools/emu_agent/tasks/v86_dos.txt	P1-1	運用の道具	開発・製造・配備用の emu_agent/tasks/v86_dos.txt	—
-tools/fd_netcd_config.py	P1-1	運用の道具	開発・製造・配備用の fd_netcd_config.py	—
-tools/fep_budget_capture.py	P1-1	運用の道具	開発・製造・配備用の fep_budget_capture.py	—
-tools/fep_compiler.py	P1-1	運用の道具	開発・製造・配備用の fep_compiler.py	—
-tools/fep_to_sqlite.py	P1-1	運用の道具	開発・製造・配備用の fep_to_sqlite.py	—
-tools/fetch_fonts.py	P1-1	運用の道具	開発・製造・配備用の fetch_fonts.py	—
-tools/g16/gen_preload16.py	P1-1	運用の道具	開発・製造・配備用の g16/gen_preload16.py	—
-tools/g16/scan_ui_chars.py	P1-1	運用の道具	開発・製造・配備用の g16/scan_ui_chars.py	—
+tools/emu_agent/README.md	P1-1	運用の道具	agent.py の起動例と接続設定を実装と一緒に移す 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/emu_agent/agent.py	P1-1	運用の道具	開発・製造・配備用の emu_agent/agent.py。エミュレータの操作と画面観測を行うための命令・実行手順。 候補印=合否語、異常終了、登録・check 目標・workflow の参照。	—
+tools/emu_agent/mcp_server.py	P1-1	運用の道具	開発・製造・配備用の emu_agent/mcp_server.py。エミュレータの操作と画面観測を行うための命令・実行手順。 候補印=登録・check 目標・workflow の参照。	—
+tools/emu_agent/playbook.py	P1-1	運用の道具	開発・製造・配備用の emu_agent/playbook.py。エミュレータの操作と画面観測を行うための命令・実行手順。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/emu_agent/tasks/regress.txt	P1-4	試験の支援	配備後の回帰試験で転記する観測値と操作を指定する。 候補印=合否語、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/emu_agent/tasks/v86_dos.txt	P1-1	運用の道具	開発・製造・配備用の emu_agent/tasks/v86_dos.txt。エミュレータの操作と画面観測を行うための命令・実行手順。 候補印=登録・check 目標・workflow の参照。	—
+tools/fd_netcd_config.py	P1-1	運用の道具	開発・製造・配備用の fd_netcd_config.py。配備する媒体・パッケージを生成または更新する。 候補印=異常終了、期待値・試験入力。	—
+tools/fep_budget_capture.py	P1-4	検査の本体	MEMSYS5 の PASS、F9 の成功、回収記録の網羅を判定する。 候補印=合否語、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/fep_compiler.py	P1-1	運用の道具	開発・製造・配備用の fep_compiler.py。入力辞書を FEP が読む形式へ変換する。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/fep_to_sqlite.py	P1-1	運用の道具	開発・製造・配備用の fep_to_sqlite.py。入力辞書を FEP が読む形式へ変換する。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/fetch_fonts.py	P1-1	運用の道具	開発・製造・配備用の fetch_fonts.py。配布物を取得し、取得先に保存する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/g16/gen_preload16.py	P1-1	運用の道具	開発・製造・配備用の g16/gen_preload16.py。GUI フォントの文字集合・グリフ・先読みデータを生成する。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/g16/scan_ui_chars.py	P1-1	運用の道具	開発・製造・配備用の g16/scan_ui_chars.py。GUI フォントの文字集合・グリフ・先読みデータを生成する。 候補印=異常終了。	—
 tools/g16/ui_chars.txt	P1-1	運用の道具	開発・製造・配備用の g16/ui_chars.txt	—
-tools/gen_build_id.py	P1-1	運用の道具	開発・製造・配備用の gen_build_id.py	—
-tools/gen_deploy_set.py	P1-1	運用の道具	開発・製造・配備用の gen_deploy_set.py	—
-tools/gen_font16.py	P1-1	運用の道具	開発・製造・配備用の gen_font16.py	—
-tools/gen_g16.py	P1-1	運用の道具	開発・製造・配備用の gen_g16.py	—
-tools/gen_generation_manifest.py	P1-1	運用の道具	開発・製造・配備用の gen_generation_manifest.py	—
+tools/gen_build_id.py	P1-1	運用の道具	開発・製造・配備用の gen_build_id.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/gen_deploy_set.py	P1-1	運用の道具	開発・製造・配備用の gen_deploy_set.py。配備・配布するファイル集合と世代の記録を組み立てる。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/gen_font16.py	P1-1	運用の道具	開発・製造・配備用の gen_font16.py。GUI フォントの文字集合・グリフ・先読みデータを生成する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/gen_g16.py	P1-1	運用の道具	開発・製造・配備用の gen_g16.py。GUI フォントの文字集合・グリフ・先読みデータを生成する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/gen_generation_manifest.py	P1-1	運用の道具	開発・製造・配備用の gen_generation_manifest.py。配備・配布するファイル集合と世代の記録を組み立てる。 候補印=登録・check 目標・workflow の参照。	—
 tools/gen_guest_acceptance.py	P1-4	実行の基盤	試験群の実行・登録または結果集計	—
 tools/gen_h2_fixtures.py	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
-tools/gen_hwdev_contract.py	P1-1	運用の道具	開発・製造・配備用の gen_hwdev_contract.py	—
-tools/gen_hwdev_pair.py	P1-1	運用の道具	開発・製造・配備用の gen_hwdev_pair.py	—
-tools/gen_kcg_font.py	P1-1	運用の道具	開発・製造・配備用の gen_kcg_font.py	—
-tools/gen_kdebug_imports.py	P1-1	運用の道具	開発・製造・配備用の gen_kdebug_imports.py	—
-tools/gen_memmap.py	P1-1	運用の道具	開発・製造・配備用の gen_memmap.py	pc98emu 経由 tools/ppc/root_lz4_layout_run.py
-tools/gen_module_schema.py	P1-1	運用の道具	開発・製造・配備用の gen_module_schema.py	—
+tools/gen_hwdev_contract.py	P1-1	運用の道具	開発・製造・配備用の gen_hwdev_contract.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。 候補印=合否語、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/gen_hwdev_pair.py	P1-1	運用の道具	開発・製造・配備用の gen_hwdev_pair.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。 候補印=登録・check 目標・workflow の参照。	—
+tools/gen_kcg_font.py	P1-1	運用の道具	開発・製造・配備用の gen_kcg_font.py。GUI フォントの文字集合・グリフ・先読みデータを生成する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/gen_kdebug_imports.py	P1-1	運用の道具	開発・製造・配備用の gen_kdebug_imports.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/gen_memmap.py	P1-1	運用の道具	開発・製造・配備用の gen_memmap.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	pc98emu 経由 tools/ppc/root_lz4_layout_run.py
+tools/gen_module_schema.py	P1-1	運用の道具	開発・製造・配備用の gen_module_schema.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
 tools/gen_opna_layout.py	P1-1	運用の道具	開発・製造・配備用の gen_opna_layout.py	—
-tools/gen_opna_tables.cpp	P1-1	運用の道具	開発・製造・配備用の gen_opna_tables.cpp	—
-tools/gen_opna_tables.py	P1-1	運用の道具	開発・製造・配備用の gen_opna_tables.py	—
-tools/gen_recover_tables.py	P1-1	運用の道具	開発・製造・配備用の gen_recover_tables.py	—
-tools/gen_sdk_manifest.py	P1-1	運用の道具	開発・製造・配備用の gen_sdk_manifest.py	—
-tools/gen_sqlite_imports.py	P1-1	運用の道具	開発・製造・配備用の gen_sqlite_imports.py	—
+tools/gen_opna_tables.cpp	P1-1	運用の道具	開発・製造・配備用の gen_opna_tables.cpp。fmgen の整数表を抽出し製品用の定数を生成する。 候補印=異常終了、期待値・試験入力。	—
+tools/gen_opna_tables.py	P1-1	運用の道具	開発・製造・配備用の gen_opna_tables.py。fmgen の整数表を抽出し製品用の定数を生成する。 候補印=合否語、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/gen_recover_tables.py	P1-1	運用の道具	開発・製造・配備用の gen_recover_tables.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。 候補印=合否語、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/gen_sdk_manifest.py	P1-1	運用の道具	開発・製造・配備用の gen_sdk_manifest.py。配備・配布するファイル集合と世代の記録を組み立てる。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/gen_sqlite_imports.py	P1-1	運用の道具	開発・製造・配備用の gen_sqlite_imports.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。 候補印=登録・check 目標・workflow の参照。	—
 tools/gen_tests_inventory.py	P1-4	実行の基盤	試験群の実行・登録または結果集計	—
-tools/gen_unicode.c	P1-1	運用の道具	開発・製造・配備用の gen_unicode.c	—
-tools/gen_unicode.py	P1-1	運用の道具	開発・製造・配備用の gen_unicode.py	—
-tools/gen_v86_int80.py	P1-1	運用の道具	開発・製造・配備用の gen_v86_int80.py	—
-tools/gfinit_mode_tables.py	P1-1	運用の道具	開発・製造・配備用の gfinit_mode_tables.py	—
+tools/gen_unicode.c	P1-1	運用の道具	開発・製造・配備用の gen_unicode.c。ビルドで使う文字・キーの変換表を生成する。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/gen_unicode.py	P1-1	運用の道具	開発・製造・配備用の gen_unicode.py。ビルドで使う文字・キーの変換表を生成する。 候補印=登録・check 目標・workflow の参照。	—
+tools/gen_v86_int80.py	P1-4	試験の支援	V86 の FLAGS 観測専用の試験像と期待値を生成する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/gfinit_mode_tables.py	P1-1	運用の道具	開発・製造・配備用の gfinit_mode_tables.py。GPU 初期化の記録・ROM を読み、設定や記録を展開する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
 tools/gfinit_rom_check.py	P1-4	検査の本体	test_gfinit_fixture.py が使う ROM 初期化領域の長さ・CRC32 の期待値照合	—
-tools/gfinit_rom_decode.py	P1-1	運用の道具	開発・製造・配備用の gfinit_rom_decode.py	—
-tools/gfinit_source.py	P1-1	運用の道具	開発・製造・配備用の gfinit_source.py	—
-tools/gserial.py	P1-1	運用の道具	開発・製造・配備用の gserial.py	実機ノートの採取・転送台本
+tools/gfinit_rom_decode.py	P1-1	運用の道具	開発・製造・配備用の gfinit_rom_decode.py。GPU 初期化の記録・ROM を読み、設定や記録を展開する。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/gfinit_source.py	P1-1	運用の道具	開発・製造・配備用の gfinit_source.py。GPU 初期化の記録・ROM を読み、設定や記録を展開する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/gserial.py	P1-1	運用の道具	開発・製造・配備用の gserial.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	実機ノートの採取・転送台本
 tools/guest_tests.py	P1-4	実行の基盤	試験群の実行・登録または結果集計	—
 tools/gui_gate.py	P1-4	検査の本体	契約・受入条件を検査する入口	pc98emu の操作・受入台本
 tools/h3_layout.c	P1-4	試験の支援	ゲスト試験の観測値を取り出す補助	—
 tools/h3_park_resume.py	P1-4	検査の本体	ゲストでの park/resume の観測・検証	—
-tools/hid_keymap_import.py	P1-1	運用の道具	開発・製造・配備用の hid_keymap_import.py	—
-tools/host_agent.py	P1-1	運用の道具	開発・製造・配備用の host_agent.py	実機ノート /opt/os32 の常駐サービスと運用台本、pc98emu の操作・受入台本
-tools/host_agent_config.py	P1-1	運用の道具	開発・製造・配備用の host_agent_config.py	実機ノート /opt/os32 の常駐サービスと運用台本
-tools/host_agent_service.py	P1-1	運用の道具	開発・製造・配備用の host_agent_service.py	実機ノート /opt/os32 の常駐サービスと運用台本、G4 os32-g4-agent
-tools/host_image.py	P1-1	運用の道具	開発・製造・配備用の host_image.py	—
-tools/host_linux.py	P1-1	運用の道具	開発・製造・配備用の host_linux.py	実機ノート /opt/os32 の常駐サービスと運用台本
-tools/host_notify.py	P1-1	運用の道具	開発・製造・配備用の host_notify.py	実機ノート /opt/os32 の常駐サービスと運用台本
-tools/host_operator_socket.py	P1-1	運用の道具	開発・製造・配備用の host_operator_socket.py	実機ノート /opt/os32 の常駐サービスと運用台本
-tools/host_rshell.py	P1-1	運用の道具	開発・製造・配備用の host_rshell.py	実機ノート /opt/os32 の常駐サービスと運用台本
-tools/host_services.py	P1-1	運用の道具	開発・製造・配備用の host_services.py	実機ノート /opt/os32 の常駐サービスと運用台本
-tools/host_sfs_link.py	P1-1	運用の道具	開発・製造・配備用の host_sfs_link.py	—
-tools/host_tree_manifest.py	P1-1	運用の道具	開発・製造・配備用の host_tree_manifest.py	—
-tools/hostdrv_deploy.py	P1-1	運用の道具	開発・製造・配備用の hostdrv_deploy.py	—
+tools/hid_keymap_import.py	P1-1	運用の道具	開発・製造・配備用の hid_keymap_import.py。ビルドで使う文字・キーの変換表を生成する。 候補印=異常終了、期待値・試験入力。	—
+tools/host_agent.py	P1-1	運用の道具	開発・製造・配備用の host_agent.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	実機ノート /opt/os32 の常駐サービスと運用台本、pc98emu の操作・受入台本
+tools/host_agent_config.py	P1-1	運用の道具	開発・製造・配備用の host_agent_config.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=登録・check 目標・workflow の参照。	実機ノート /opt/os32 の常駐サービスと運用台本
+tools/host_agent_service.py	P1-1	運用の道具	開発・製造・配備用の host_agent_service.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=異常終了。	実機ノート /opt/os32 の常駐サービスと運用台本、G4 os32-g4-agent
+tools/host_image.py	P1-1	運用の道具	開発・製造・配備用の host_image.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=登録・check 目標・workflow の参照。	—
+tools/host_linux.py	P1-1	運用の道具	開発・製造・配備用の host_linux.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=登録・check 目標・workflow の参照。	実機ノート /opt/os32 の常駐サービスと運用台本
+tools/host_notify.py	P1-1	運用の道具	開発・製造・配備用の host_notify.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=登録・check 目標・workflow の参照。	実機ノート /opt/os32 の常駐サービスと運用台本
+tools/host_operator_socket.py	P1-1	運用の道具	開発・製造・配備用の host_operator_socket.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=登録・check 目標・workflow の参照。	実機ノート /opt/os32 の常駐サービスと運用台本
+tools/host_rshell.py	P1-1	運用の道具	開発・製造・配備用の host_rshell.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=登録・check 目標・workflow の参照。	実機ノート /opt/os32 の常駐サービスと運用台本
+tools/host_services.py	P1-1	運用の道具	開発・製造・配備用の host_services.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=異常終了、登録・check 目標・workflow の参照。	実機ノート /opt/os32 の常駐サービスと運用台本
+tools/host_sfs_link.py	P1-1	運用の道具	開発・製造・配備用の host_sfs_link.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/host_tree_manifest.py	P1-1	運用の道具	開発・製造・配備用の host_tree_manifest.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=登録・check 目標・workflow の参照。	—
+tools/hostdrv_deploy.py	P1-1	運用の道具	開発・製造・配備用の hostdrv_deploy.py。配備時の書き込み・削除を制御し、対象外のファイルを保護する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
 tools/hostsvc_contracts.pyi	P1-1	運用の道具	開発・製造・配備用の hostsvc_contracts.pyi	—
 tools/hwdev_audit.py	P1-4	検査の本体	契約・受入条件を検査する入口	—
-tools/hwdev_layout.json	P1-1	運用の道具	開発・製造・配備用の hwdev_layout.json	—
-tools/img2mgx.py	P1-1	運用の道具	開発・製造・配備用の img2mgx.py	—
-tools/img2osri.py	P1-1	運用の道具	開発・製造・配備用の img2osri.py	—
-tools/img2vbz.py	P1-1	運用の道具	開発・製造・配備用の img2vbz.py	—
+tools/hwdev_layout.json	P1-1	運用の道具	開発・製造・配備用の hwdev_layout.json。HWDEV のレイアウト生成に使う型定義。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/img2mgx.py	P1-1	運用の道具	開発・製造・配備用の img2mgx.py。画像や資産をゲスト用の形式に変換する工程で使う。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/img2osri.py	P1-1	運用の道具	開発・製造・配備用の img2osri.py。画像や資産をゲスト用の形式に変換する工程で使う。 候補印=期待値・試験入力。	—
+tools/img2vbz.py	P1-1	運用の道具	開発・製造・配備用の img2vbz.py。画像や資産をゲスト用の形式に変換する工程で使う。 候補印=異常終了、登録・check 目標・workflow の参照。	—
 tools/include_resolve.py	P1-1	運用の道具	開発・製造・配備用の include_resolve.py	—
-tools/jobs.sh	P1-1	運用の道具	開発・製造・配備用の jobs.sh	—
-tools/kbd_import.py	P1-1	運用の道具	開発・製造・配備用の kbd_import.py	—
-tools/keymap/fetch_netbsd_wscons.sh	P1-1	運用の道具	開発・製造・配備用の keymap/fetch_netbsd_wscons.sh	—
+tools/jobs.sh	P1-1	運用の道具	開発・製造・配備用の jobs.sh。開発作業のジョブやレビューを起動し、結果を呼び出し元へ渡す。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/kbd_import.py	P1-1	運用の道具	開発・製造・配備用の kbd_import.py。ビルドで使う文字・キーの変換表を生成する。 候補印=期待値・試験入力。	—
+tools/keymap/fetch_netbsd_wscons.sh	P1-1	運用の道具	開発・製造・配備用の keymap/fetch_netbsd_wscons.sh。配布物を取得し、取得先に保存する。 候補印=期待値・試験入力。	—
 tools/keymap/netbsd_wscons_sources.json	P1-1	運用の道具	開発・製造・配備用の keymap/netbsd_wscons_sources.json	—
 tools/keymap/pc98_s1p.c	P1-1	運用の道具	開発・製造・配備用の keymap/pc98_s1p.c	—
 tools/keymap/pc98_s1p_sources.json	P1-1	運用の道具	開発・製造・配備用の keymap/pc98_s1p_sources.json	—
 tools/kstr_bench_report.py	P1-4	試験の支援	ゲスト試験の観測値を取り出す補助	—
-tools/lan_bridge.py	P1-1	運用の道具	開発・製造・配備用の lan_bridge.py	実機ノート /opt/os32 の常駐サービスと運用台本
-tools/lanfs_host.py	P1-1	運用の道具	開発・製造・配備用の lanfs_host.py	実機ノート /opt/os32 の常駐サービスと運用台本
+tools/lan_bridge.py	P1-1	運用の道具	開発・製造・配備用の lan_bridge.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=異常終了、登録・check 目標・workflow の参照。	実機ノート /opt/os32 の常駐サービスと運用台本
+tools/lanfs_host.py	P1-1	運用の道具	開発・製造・配備用の lanfs_host.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	実機ノート /opt/os32 の常駐サービスと運用台本
 tools/layers_baseline.json	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
-tools/lz4_compress.py	P1-1	運用の道具	開発・製造・配備用の lz4_compress.py	—
+tools/lz4_compress.py	P1-1	運用の道具	開発・製造・配備用の lz4_compress.py。画像や資産をゲスト用の形式に変換する工程で使う。 候補印=異常終了、登録・check 目標・workflow の参照。	—
 tools/memmap_audit_live.py	P1-4	検査の本体	実機から採取したページ表を memmap.h と比較し、不一致を終了値で報告	—
-tools/mk_blank_nhd.py	P1-1	運用の道具	開発・製造・配備用の mk_blank_nhd.py	pc98emu の操作・受入台本
-tools/mk_settings_db.py	P1-1	運用の道具	開発・製造・配備用の mk_settings_db.py	—
-tools/mkd88.py	P1-1	運用の道具	開発・製造・配備用の mkd88.py	—
-tools/mkfat12.py	P1-1	運用の道具	開発・製造・配備用の mkfat12.py	—
-tools/mkmod.py	P1-1	運用の道具	開発・製造・配備用の mkmod.py	実機ノートの採取・転送台本
-tools/mkpkg.py	P1-1	運用の道具	開発・製造・配備用の mkpkg.py	—
-tools/mkroot_image.py	P1-1	運用の道具	開発・製造・配備用の mkroot_image.py	—
-tools/mkshlib.py	P1-1	運用の道具	開発・製造・配備用の mkshlib.py	—
-tools/mkvmkernel.py	P1-1	運用の道具	開発・製造・配備用の mkvmkernel.py	—
-tools/module_schema.py	P1-1	運用の道具	開発・製造・配備用の module_schema.py	—
-tools/move_docs.py	P1-1	運用の道具	開発・製造・配備用の move_docs.py	—
+tools/mk_blank_nhd.py	P1-1	運用の道具	開発・製造・配備用の mk_blank_nhd.py。配備する媒体・パッケージを生成または更新する。 候補印=異常終了、登録・check 目標・workflow の参照。	pc98emu の操作・受入台本
+tools/mk_settings_db.py	P1-1	運用の道具	開発・製造・配備用の mk_settings_db.py。データやリンク結果を製品のビルドが必要とする形式に整える。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/mkd88.py	P1-1	運用の道具	開発・製造・配備用の mkd88.py。配備する媒体・パッケージを生成または更新する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/mkfat12.py	P1-1	運用の道具	開発・製造・配備用の mkfat12.py。配備する媒体・パッケージを生成または更新する。 候補印=登録・check 目標・workflow の参照。	—
+tools/mkmod.py	P1-1	運用の道具	開発・製造・配備用の mkmod.py。データやリンク結果を製品のビルドが必要とする形式に整える。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	実機ノートの採取・転送台本
+tools/mkpkg.py	P1-1	運用の道具	開発・製造・配備用の mkpkg.py。配備する媒体・パッケージを生成または更新する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/mkroot_image.py	P1-1	運用の道具	開発・製造・配備用の mkroot_image.py。配備する媒体・パッケージを生成または更新する。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/mkshlib.py	P1-1	運用の道具	開発・製造・配備用の mkshlib.py。データやリンク結果を製品のビルドが必要とする形式に整える。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/mkvmkernel.py	P1-1	運用の道具	開発・製造・配備用の mkvmkernel.py。配備する媒体・パッケージを生成または更新する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/module_schema.py	P1-1	運用の道具	開発・製造・配備用の module_schema.py。データやリンク結果を製品のビルドが必要とする形式に整える。 候補印=登録・check 目標・workflow の参照。	—
+tools/move_docs.py	P1-1	運用の道具	開発・製造・配備用の move_docs.py。移設・編集の際にソースや文書の参照を書き換える。 候補印=異常終了、登録・check 目標・workflow の参照。	—
 tools/move_files.py	P1-1	運用の道具	開発・製造・配備用の move_files.py	—
 tools/net_l0_test.py	P1-4	検査の本体	契約・受入条件を検査する入口	—
 tools/net_l1_test.py	P1-4	検査の本体	契約・受入条件を検査する入口	—
@@ -3708,27 +3708,27 @@ tools/net_l2_test.py	P1-4	検査の本体	契約・受入条件を検査する�
 tools/net_l3_test.py	P1-4	検査の本体	契約・受入条件を検査する入口	—
 tools/net_m2_test.py	P1-4	検査の本体	契約・受入条件を検査する入口	—
 tools/net_m4_test.py	P1-4	検査の本体	契約・受入条件を検査する入口	—
-tools/nhd_deploy.py	P1-1	運用の道具	開発・製造・配備用の nhd_deploy.py	—
-tools/nhd_profile.py	P1-1	運用の道具	開発・製造・配備用の nhd_profile.py	—
-tools/np21w_ctl.py	P1-1	運用の道具	開発・製造・配備用の np21w_ctl.py	pc98emu の操作・受入台本
-tools/np21w_ini.py	P1-1	運用の道具	開発・製造・配備用の np21w_ini.py	—
-tools/np21w_ini_live.py	P1-1	運用の道具	開発・製造・配備用の np21w_ini_live.py	—
-tools/np21w_mcp/gui.py	P1-1	運用の道具	開発・製造・配備用の np21w_mcp/gui.py	—
-tools/np21w_mcp/gui_desc.py	P1-1	運用の道具	開発・製造・配備用の np21w_mcp/gui_desc.py	—
-tools/np21w_mcp/np21w_client.py	P1-1	運用の道具	開発・製造・配備用の np21w_mcp/np21w_client.py	pc98emu の操作・受入台本
-tools/np21w_mcp/server.py	P1-1	運用の道具	開発・製造・配備用の np21w_mcp/server.py	—
-tools/np21w_mcp/symbols.py	P1-1	運用の道具	開発・製造・配備用の np21w_mcp/symbols.py	—
-tools/np21w_restart.py	P1-1	運用の道具	開発・製造・配備用の np21w_restart.py	—
-tools/np21w_trial.py	P1-1	運用の道具	開発・製造・配備用の np21w_trial.py	—
+tools/nhd_deploy.py	P1-1	運用の道具	開発・製造・配備用の nhd_deploy.py。配備時の書き込み・削除を制御し、対象外のファイルを保護する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/nhd_profile.py	P1-1	運用の道具	開発・製造・配備用の nhd_profile.py。NP21/W の起動・設定・操作・観測を提供する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/np21w_ctl.py	P1-1	運用の道具	開発・製造・配備用の np21w_ctl.py。NP21/W の起動・設定・操作・観測を提供する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	pc98emu の操作・受入台本
+tools/np21w_ini.py	P1-1	運用の道具	開発・製造・配備用の np21w_ini.py。NP21/W の起動・設定・操作・観測を提供する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/np21w_ini_live.py	P1-1	運用の道具	開発・製造・配備用の np21w_ini_live.py。NP21/W の起動・設定・操作・観測を提供する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/np21w_mcp/gui.py	P1-1	運用の道具	開発・製造・配備用の np21w_mcp/gui.py。NP21/W の起動・設定・操作・観測を提供する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/np21w_mcp/gui_desc.py	P1-1	運用の道具	開発・製造・配備用の np21w_mcp/gui_desc.py。NP21/W の起動・設定・操作・観測を提供する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/np21w_mcp/np21w_client.py	P1-1	運用の道具	開発・製造・配備用の np21w_mcp/np21w_client.py。NP21/W の起動・設定・操作・観測を提供する。 候補印=登録・check 目標・workflow の参照。	pc98emu の操作・受入台本
+tools/np21w_mcp/server.py	P1-1	運用の道具	開発・製造・配備用の np21w_mcp/server.py。NP21/W の起動・設定・操作・観測を提供する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/np21w_mcp/symbols.py	P1-1	運用の道具	開発・製造・配備用の np21w_mcp/symbols.py。NP21/W の起動・設定・操作・観測を提供する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/np21w_restart.py	P1-1	運用の道具	開発・製造・配備用の np21w_restart.py。NP21/W の起動・設定・操作・観測を提供する。 候補印=登録・check 目標・workflow の参照。	—
+tools/np21w_trial.py	P1-1	運用の道具	開発・製造・配備用の np21w_trial.py。NP21/W の起動・設定・操作・観測を提供する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
 tools/opna_rustc.py	P1-1	運用の道具	開発・製造・配備用の opna_rustc.py	—
-tools/os32_server.py	P1-1	運用の道具	開発・製造・配備用の os32_server.py	—
-tools/osri_enc2_compare.py	P1-1	運用の道具	開発・製造・配備用の osri_enc2_compare.py	—
-tools/osri_enc2_core.c	P1-1	運用の道具	開発・製造・配備用の osri_enc2_core.c	—
+tools/os32_server.py	P1-1	運用の道具	開発・製造・配備用の os32_server.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/osri_enc2_compare.py	P1-1	運用の道具	開発・製造・配備用の osri_enc2_compare.py。符号化条件ごとの時間、画質と CRC を CSV・比較画像に書き出す実験用の道具。 候補印=期待値・試験入力。	—
+tools/osri_enc2_core.c	P1-1	運用の道具	開発・製造・配備用の osri_enc2_core.c。画像や資産をゲスト用の形式に変換する工程で使う。 候補印=異常終了、期待値・試験入力。	—
 tools/osri_enc2_decode.py	P1-1	運用の道具	開発・製造・配備用の osri_enc2_decode.py	—
 tools/osri_enc2_dither.py	P1-1	運用の道具	開発・製造・配備用の osri_enc2_dither.py	—
 tools/osri_enc2_master.py	P1-1	運用の道具	開発・製造・配備用の osri_enc2_master.py	—
 tools/osri_enc2_metrics.py	P1-1	運用の道具	開発・製造・配備用の osri_enc2_metrics.py	—
-tools/osri_enc2_native.py	P1-1	運用の道具	開発・製造・配備用の osri_enc2_native.py	—
+tools/osri_enc2_native.py	P1-1	運用の道具	開発・製造・配備用の osri_enc2_native.py。画像や資産をゲスト用の形式に変換する工程で使う。 候補印=期待値・試験入力。	—
 tools/osri_enc2_order.py	P1-1	運用の道具	開発・製造・配備用の osri_enc2_order.py	—
 tools/osri_enc2_pack.py	P1-1	運用の道具	開発・製造・配備用の osri_enc2_pack.py	—
 tools/osri_enc2_plan.py	P1-1	運用の道具	開発・製造・配備用の osri_enc2_plan.py	—
@@ -3736,17 +3736,17 @@ tools/osri_enc2_row.py	P1-1	運用の道具	開発・製造・配備用の osri_
 tools/osri_enc2_spec.py	P1-1	運用の道具	開発・製造・配備用の osri_enc2_spec.py	—
 tools/osri_enc2_timing.py	P1-1	運用の道具	開発・製造・配備用の osri_enc2_timing.py	—
 tools/osri_enc2_tree.py	P1-1	運用の道具	開発・製造・配備用の osri_enc2_tree.py	—
-tools/osri_profile.py	P1-1	運用の道具	開発・製造・配備用の osri_profile.py	—
-tools/pack_name_tables.txt	P1-1	運用の道具	開発・製造・配備用の pack_name_tables.txt	—
-tools/pack_notes.txt	P1-1	運用の道具	開発・製造・配備用の pack_notes.txt	—
-tools/pc98pt.py	P1-1	運用の道具	開発・製造・配備用の pc98pt.py	—
-tools/ppc/README.md	P1-1	運用の道具	PowerPC の像の作成・実行手順が参照する PPC 用の運用道具と一緒に移す	—
+tools/osri_profile.py	P1-1	運用の道具	開発・製造・配備用の osri_profile.py。画像や資産をゲスト用の形式に変換する工程で使う。 候補印=期待値・試験入力。	—
+tools/pack_name_tables.txt	P1-1	運用の道具	開発・製造・配備用の pack_name_tables.txt。依頼パックに収録するパスと作業上の注意を供給する。 候補印=登録・check 目標・workflow の参照。	—
+tools/pack_notes.txt	P1-1	運用の道具	開発・製造・配備用の pack_notes.txt。依頼パックに収録するパスと作業上の注意を供給する。 候補印=登録・check 目標・workflow の参照。	—
+tools/pc98pt.py	P1-1	運用の道具	開発・製造・配備用の pc98pt.py。PC-98 区画表を読み書きする。 候補印=登録・check 目標・workflow の参照。	—
+tools/ppc/README.md	P1-1	運用の道具	PowerPC の像の作成・実行手順が参照する PPC 用の運用道具と一緒に移す 候補印=登録・check 目標・workflow の参照。	—
 tools/ppc/ata_accept.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/ata_accept_diag.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
 tools/ppc/ata_deny.c	P1-4	試験の支援	build/ppc-user.mk の PPC_USER_APPS で atadeny.bin をビルドし、ata_accept.py が受入像の KB_ROOT_BINS に追加	—
 tools/ppc/ata_write_diag.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
-tools/ppc/boot_media.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力	—
-tools/ppc/build_cross.sh	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力	—
+tools/ppc/boot_media.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。 候補印=登録・check 目標・workflow の参照。	—
+tools/ppc/build_cross.sh	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力。クロスコンパイラとライブラリを構築する。 候補印=登録・check 目標・workflow の参照。	—
 tools/ppc/check_layout.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/children_accept.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/compile_ci.py	P1-4	実行の基盤	PowerPC の検査環境・一括実行を管理	—
@@ -3768,7 +3768,7 @@ tools/ppc/hwb_window_accept.py	P1-4	検査の本体	対象を起動または解�
 tools/ppc/hwb_window_guest.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
 tools/ppc/hwb_window_host.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
 tools/ppc/install_accept.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
-tools/ppc/install_packages.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力	—
+tools/ppc/install_packages.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。 候補印=期待値・試験入力。	—
 tools/ppc/kboot_accept.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/kboot_all.py	P1-4	実行の基盤	PowerPC の検査環境・一括実行を管理	—
 tools/ppc/kboot_audit.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
@@ -3841,7 +3841,7 @@ tools/ppc/mmu_fake.c	P1-4	試験の支援	検査が使う手順・入力・代�
 tools/ppc/mmu_fixture.h	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—
 tools/ppc/mmu_flow_fake.c	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—
 tools/ppc/mmu_run.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
-tools/ppc/module_rela.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力	—
+tools/ppc/module_rela.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力。データやリンク結果を製品のビルドが必要とする形式に整える。 候補印=異常終了、登録・check 目標・workflow の参照。	—
 tools/ppc/of_hdd_accept.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/of_hdd_probe.inc	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—
 tools/ppc/pair_fixture/bytes.S	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
@@ -3853,24 +3853,24 @@ tools/ppc/pci_hosts_fake.c	P1-4	試験の支援	検査が使う手順・入力�
 tools/ppc/ppc_resource_owner.py	P1-4	試験の支援	受入試験の入力・観測を準備	—
 tools/ppc/ppc_sh_output.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/product_accept.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
-tools/ppc/product_media.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力	—
+tools/ppc/product_media.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
 tools/ppc/product_media_host.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/realhw_image.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/realhw_run.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/rh_fb.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/rh_observe_host.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
 tools/ppc/root_lz4_inventory.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	pc98emu の操作・受入台本
-tools/ppc/root_lz4_layout.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力	pc98emu 経由 tools/ppc/root_lz4_layout_run.py
+tools/ppc/root_lz4_layout.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力。データやリンク結果を製品のビルドが必要とする形式に整える。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	pc98emu 経由 tools/ppc/root_lz4_layout_run.py
 tools/ppc/root_lz4_layout_host.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/root_lz4_layout_run.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	pc98emu の操作・受入台本
 tools/ppc/root_lz4_probe.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	pc98emu 経由 tools/ppc/root_lz4_layout_run.py
-tools/ppc/root_pair.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力	—
+tools/ppc/root_pair.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
 tools/ppc/run.py	P1-4	実行の基盤	PowerPC の検査環境・一括実行を管理	—
 tools/ppc/sb_run.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/sc_run.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/sd_run.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/shell_run.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
-tools/ppc/sqlite_attributes.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力	—
+tools/ppc/sqlite_attributes.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力。データやリンク結果を製品のビルドが必要とする形式に整える。 候補印=期待値・試験入力。	—
 tools/ppc/test_app_link.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/test_cli_boot.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/test_exec_cache.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
@@ -3928,45 +3928,45 @@ tools/ppc/test_user_trap_host.c	P1-4	試験の支援	登録試験から組み込
 tools/ppc/test_user_vectors.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/usb_run.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/usb_via_overlap_host.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
-tools/ppc_hostfs.py	P1-1	運用の道具	開発・製造・配備用の ppc_hostfs.py	—
-tools/ppc_lan_host.py	P1-1	運用の道具	開発・製造・配備用の ppc_lan_host.py	—
-tools/ppc_link_transport.py	P1-1	運用の道具	開発・製造・配備用の ppc_link_transport.py	—
-tools/preflight.sh	P1-1	運用の道具	開発・製造・配備用の preflight.sh	—
-tools/prototypes/cd_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/cd_imports.def	—
-tools/prototypes/cirrus_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/cirrus_imports.def	—
-tools/prototypes/fep_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/fep_imports.def	—
+tools/ppc_hostfs.py	P1-1	運用の道具	開発・製造・配備用の ppc_hostfs.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=登録・check 目標・workflow の参照。	—
+tools/ppc_lan_host.py	P1-1	運用の道具	開発・製造・配備用の ppc_lan_host.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/ppc_link_transport.py	P1-1	運用の道具	開発・製造・配備用の ppc_link_transport.py。受入と常用の ppc_lan_host が共用する診断・シェル通信クライアント。 候補印=登録・check 目標・workflow の参照。	—
+tools/preflight.sh	P1-1	運用の道具	開発・製造・配備用の preflight.sh。作業木の準備状況を診断し、指定時には不足フォントを用意する。 候補印=異常終了、期待値・試験入力。	—
+tools/prototypes/cd_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/cd_imports.def。製品用インポート表の生成入力。 候補印=登録・check 目標・workflow の参照。	—
+tools/prototypes/cirrus_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/cirrus_imports.def。製品用インポート表の生成入力。 候補印=登録・check 目標・workflow の参照。	—
+tools/prototypes/fep_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/fep_imports.def。製品用インポート表の生成入力。 候補印=登録・check 目標・workflow の参照。	—
 tools/prototypes/fm_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/fm_imports.def	—
-tools/prototypes/geforce_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/geforce_imports.def	—
+tools/prototypes/geforce_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/geforce_imports.def。製品用インポート表の生成入力。 候補印=登録・check 目標・workflow の参照。	—
 tools/prototypes/kcg_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/kcg_imports.def	—
-tools/prototypes/lan_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/lan_imports.def	—
-tools/prototypes/pcm_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/pcm_imports.def	—
-tools/prototypes/sqlite_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/sqlite_imports.def	—
-tools/prototypes/trident_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/trident_imports.def	—
-tools/prototypes/usb_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/usb_imports.def	—
-tools/prototypes/v86_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/v86_imports.def	—
-tools/prune_stale.py	P1-1	運用の道具	開発・製造・配備用の prune_stale.py	—
-tools/r1_manifest.py	P1-1	運用の道具	開発・製造・配備用の r1_manifest.py	—
-tools/raster_obs_assets.py	P1-1	運用の道具	開発・製造・配備用の raster_obs_assets.py	—
-tools/raster_splash_asset.py	P1-1	運用の道具	開発・製造・配備用の raster_splash_asset.py	—
-tools/remote_transport.py	P1-1	運用の道具	開発・製造・配備用の remote_transport.py	実機ノート /opt/os32 の常駐サービスと運用台本
-tools/review_local.py	P1-1	運用の道具	開発・製造・配備用の review_local.py	—
-tools/rshell.py	P1-1	運用の道具	開発・製造・配備用の rshell.py	実機ノート /opt/os32 の常駐サービスと運用台本、pc98emu の操作・受入台本
-tools/rshell_hwb.py	P1-1	運用の道具	開発・製造・配備用の rshell_hwb.py	—
-tools/rshell_peek.py	P1-1	運用の道具	開発・製造・配備用の rshell_peek.py	—
-tools/rshell_recover.py	P1-1	運用の道具	開発・製造・配備用の rshell_recover.py	—
-tools/rshell_serial.py	P1-1	運用の道具	開発・製造・配備用の rshell_serial.py	実機ノートの採取・転送台本
+tools/prototypes/lan_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/lan_imports.def。製品用インポート表の生成入力。 候補印=登録・check 目標・workflow の参照。	—
+tools/prototypes/pcm_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/pcm_imports.def。製品用インポート表の生成入力。 候補印=登録・check 目標・workflow の参照。	—
+tools/prototypes/sqlite_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/sqlite_imports.def。製品用インポート表の生成入力。 候補印=登録・check 目標・workflow の参照。	—
+tools/prototypes/trident_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/trident_imports.def。製品用インポート表の生成入力。 候補印=登録・check 目標・workflow の参照。	—
+tools/prototypes/usb_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/usb_imports.def。製品用インポート表の生成入力。 候補印=登録・check 目標・workflow の参照。	—
+tools/prototypes/v86_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/v86_imports.def。製品用インポート表の生成入力。 候補印=登録・check 目標・workflow の参照。	—
+tools/prune_stale.py	P1-1	運用の道具	開発・製造・配備用の prune_stale.py。配備時の書き込み・削除を制御し、対象外のファイルを保護する。 候補印=合否語、異常終了、登録・check 目標・workflow の参照。	—
+tools/r1_manifest.py	P1-4	試験の支援	障害注入用の像だけのマニフェストを生成する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/raster_obs_assets.py	P1-4	試験の支援	N01〜N16 の観測用資産と配備マニフェストを生成する。 候補印=期待値・試験入力。	—
+tools/raster_splash_asset.py	P1-1	運用の道具	開発・製造・配備用の raster_splash_asset.py。画像や資産をゲスト用の形式に変換する工程で使う。 候補印=異常終了。	—
+tools/remote_transport.py	P1-1	運用の道具	開発・製造・配備用の remote_transport.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=登録・check 目標・workflow の参照。	実機ノート /opt/os32 の常駐サービスと運用台本
+tools/review_local.py	P1-1	運用の道具	開発・製造・配備用の review_local.py。開発作業のジョブやレビューを起動し、結果を呼び出し元へ渡す。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/rshell.py	P1-1	運用の道具	開発・製造・配備用の rshell.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。 候補印=異常終了、期待値・試験入力。	実機ノート /opt/os32 の常駐サービスと運用台本、pc98emu の操作・受入台本
+tools/rshell_hwb.py	P1-1	運用の道具	開発・製造・配備用の rshell_hwb.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/rshell_peek.py	P1-1	運用の道具	開発・製造・配備用の rshell_peek.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/rshell_recover.py	P1-1	運用の道具	開発・製造・配備用の rshell_recover.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。 候補印=合否語、異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—
+tools/rshell_serial.py	P1-1	運用の道具	開発・製造・配備用の rshell_serial.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	実機ノートの採取・転送台本
 tools/run_host_group.py	P1-4	実行の基盤	試験群の実行・登録または結果集計	—
-tools/screenshot.py	P1-1	運用の道具	開発・製造・配備用の screenshot.py	—
-tools/serialfs_host.py	P1-1	運用の道具	開発・製造・配備用の serialfs_host.py	実機ノート /opt/os32 の常駐サービスと運用台本
-tools/source_roots.py	P1-1	運用の道具	開発・製造・配備用の source_roots.py	—
-tools/split_c_functions.py	P1-1	運用の道具	開発・製造・配備用の split_c_functions.py	—
+tools/screenshot.py	P1-1	運用の道具	開発・製造・配備用の screenshot.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/serialfs_host.py	P1-1	運用の道具	開発・製造・配備用の serialfs_host.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=異常終了、登録・check 目標・workflow の参照。	実機ノート /opt/os32 の常駐サービスと運用台本
+tools/source_roots.py	P1-4	試験の支援	静的検査ごとの走査範囲を供給する。 候補印=登録・check 目標・workflow の参照。	—
+tools/split_c_functions.py	P1-1	運用の道具	開発・製造・配備用の split_c_functions.py。移設・編集の際にソースや文書の参照を書き換える。 候補印=登録・check 目標・workflow の参照。	—
 tools/sqlite_module_proto.py	P1-1	運用の道具	開発・製造・配備用の sqlite_module_proto.py	—
-tools/sync_docs_to_win.sh	P1-1	運用の道具	開発・製造・配備用の sync_docs_to_win.sh	—
-tools/sync_hwdocs.sh	P1-1	運用の道具	開発・製造・配備用の sync_hwdocs.sh	—
-tools/systemd/README.md	P1-1	運用の道具	常駐サービスのユニットと対応する導入手順を一緒に移す	—
+tools/sync_docs_to_win.sh	P1-1	運用の道具	開発・製造・配備用の sync_docs_to_win.sh。運用先に文書・資料やサービスを同期する。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/sync_hwdocs.sh	P1-1	運用の道具	開発・製造・配備用の sync_hwdocs.sh。運用先に文書・資料やサービスを同期する。 候補印=異常終了、登録・check 目標・workflow の参照。	—
+tools/systemd/README.md	P1-1	運用の道具	常駐サービスのユニットと対応する導入手順を一緒に移す 候補印=登録・check 目標・workflow の参照。	—
 tools/systemd/host-agent.example.json	P1-1	運用の道具	開発・製造・配備用の systemd/host-agent.example.json	—
 tools/systemd/os32-host-agent@.service	P1-1	運用の道具	開発・製造・配備用の systemd/os32-host-agent@.service	—
-tools/systemd/update_host_agent.sh	P1-1	運用の道具	開発・製造・配備用の systemd/update_host_agent.sh	実機ノート /opt/os32 の常駐サービスと運用台本
+tools/systemd/update_host_agent.sh	P1-1	運用の道具	開発・製造・配備用の systemd/update_host_agent.sh。運用先に文書・資料やサービスを同期する。 候補印=異常終了。	実機ノート /opt/os32 の常駐サービスと運用台本
 tools/test_changes.py	P1-4	実行の基盤	試験群の実行・登録または結果集計	—
 tools/tests/about_info_tdd.md	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—
 tools/tests/access_walk_host.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
@@ -5808,7 +5808,7 @@ tools/tests/x11_shared_host_l45.inc	P1-4	試験の支援	検査が使う手順�
 tools/tests/x87_emu_core_host.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
 tools/tests/x87_host.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
 tools/tests/x87_lifecycle_host.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
-tools/tvdump_recv.py	P1-1	運用の道具	開発・製造・配備用の tvdump_recv.py	—
+tools/tvdump_recv.py	P1-1	運用の道具	開発・製造・配備用の tvdump_recv.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。 候補印=異常終了、登録・check 目標・workflow の参照。	—
 userland/cmds/cal.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/cmds/cal.elf	—
 userland/cmds/cfg.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/cmds/cfg.elf	—
 userland/cmds/diff.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/cmds/diff.elf	—
