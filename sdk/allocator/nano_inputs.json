@@ -119,7 +119,7 @@
     "sources": {
       "sdk/allocator/nano_adapter.c": "5d0396d953112443a3cba7b9a0f02352a029701933ae520a384ccebaea3a9fc3",
       "sdk/allocator/nano_adapter.h": "fe7d202c48a0056c656629b06810f46568efbaa53778eaab3ada14f52e2258e3",
-      "sdk/allocator/build_nano.py": "5ee17bf0d3d550c01f5abb083f3202ab580c158ceb41f7c85266ec0b980d3dde",
+      "sdk/allocator/build_nano.py": "e0161bb82e13d2a7862d48f050d93ec7c3a93904a31aba76f40165cbb9341e68",
       "sdk/allocator/check_link.py": "12a6826d36eb95912e1d2739b3ee36d17d3bf5de2edd8457289761e5ef541302"
     },
     "patches": [],
@@ -285,7 +285,7 @@
         "sources": {
           "sdk/allocator/nano_adapter.c": "5d0396d953112443a3cba7b9a0f02352a029701933ae520a384ccebaea3a9fc3",
           "sdk/allocator/nano_adapter.h": "fe7d202c48a0056c656629b06810f46568efbaa53778eaab3ada14f52e2258e3",
-          "sdk/allocator/build_nano.py": "5ee17bf0d3d550c01f5abb083f3202ab580c158ceb41f7c85266ec0b980d3dde",
+          "sdk/allocator/build_nano.py": "e0161bb82e13d2a7862d48f050d93ec7c3a93904a31aba76f40165cbb9341e68",
           "sdk/allocator/check_link.py": "12a6826d36eb95912e1d2739b3ee36d17d3bf5de2edd8457289761e5ef541302",
           "sdk/allocator/build_nano_target.py": "2c0a36a1618d6331d91a17c426acb760da665ff1a3705b64f16e9242fdad51e9",
           "sdk/allocator/check_link_target.py": "93775e38e59d4884ac5fc0206078b605d108fe5a9a066013b016018592aa4ed7"

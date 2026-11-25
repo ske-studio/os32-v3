@@ -43,7 +43,7 @@ def build(prefix, output, adapter=None, reuse=None, crt=None):
     objects.append(obj)
     archive = output / ('libos32nano.a' if crt else 'libos32nano_fixture.a')
     archive.unlink(missing_ok=True)
-    inputs.command(prefix, 'ar', 'rcs', archive, *objects)
+    inputs.command(prefix, 'ar', 'rcsD', archive, *objects)
     digest = lambda data: hashlib.sha256(data).hexdigest()
     receipt = {'adapter': digest(obj.read_bytes()),
                'nano': {member: digest((output / member).read_bytes()) for member in spec['members']},

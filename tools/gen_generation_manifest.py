@@ -2,10 +2,27 @@
 """D35 build set: IDs, canonical generations and hashes; no deployment."""
 import hashlib
 import json
+import re
 from pathlib import Path
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
+
+def link_input(path):
+    record = json.loads(path.read_text())
+    for field in ('selected', 'vendor'):
+        names = []
+        for name in record[field]:
+            name = name.removeprefix(str(ROOT) + '/')
+            # The original link receipt retains Cargo's checkout-specific cache
+            # suffix. Report the archive, crate and codegen unit in the build set.
+            if '/target/' in name:
+                name = re.sub(r'(\.a\(\w+)-[0-9a-f]{16}(?=\.[^()]+\.rcgu\.o\)$)', r'\1', name)
+            names.append(name)
+        record[field] = sorted(names)
+    record['path'] = str(path.relative_to(ROOT))
+    return record
+
 
 def main():
     canon = json.loads((ROOT / 'sdk/kapi.json').read_text())
@@ -28,7 +45,7 @@ def main():
                 'external': {p: 'not built (empty submodule)' if not (ROOT / p / 'Makefile').exists() else 'not included; rebuild with clean-external'
                              for p in ('apps', 'game')},
                 'files': files,
-                'link_inputs': [json.loads(p.read_text()) | {'path': str(p.relative_to(ROOT))}
+                'link_inputs': [link_input(p)
                                 for p in sorted(list((ROOT / 'userland').rglob('*.inputs.json')) + list((ROOT / 'build/out').glob('*.inputs.json')))]}
     out = ROOT / 'build/out/generations-manifest.json'
     out.write_text(json.dumps(manifest, indent=2) + '\n')
