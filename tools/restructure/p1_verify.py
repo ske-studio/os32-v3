@@ -18,6 +18,13 @@ KINDS = {
 }
 
 
+# Direct tools whose primary output is a verdict (P1-0 scope review).
+CHECK_BODIES = {
+    'build_compare.py', 'doc_graph.py',
+    'gfinit_rom_check.py', 'memmap_audit_live.py',
+}
+
+
 def inventory(base):
     data = subprocess.check_output(['git', 'ls-tree', '-rz', '--name-only', base],
                                    cwd=ROOT).decode()
@@ -67,6 +74,8 @@ def verify_scope(table, base):
                 issues.append(f'{path}: 担当・種類が不正 ({owner}, {kind})')
             if path.startswith('tools/') and kind not in KINDS['P1-4'] | {'運用の道具'}:
                 issues.append(f'{path}: tools の種類が不正')
+            if path.removeprefix('tools/') in CHECK_BODIES and path.startswith('tools/') and kind != '検査の本体':
+                issues.append(f'{path}: 検査の本体として分類する')
             if any(tag in reason for tag in ('仮', '保留', '未確定')):
                 pending.append((path, reason))
     if not footer:

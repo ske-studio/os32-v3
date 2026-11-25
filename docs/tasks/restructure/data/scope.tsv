@@ -2547,7 +2547,7 @@ lib/lz4.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—
 lib/lz4.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—
 lib/lz4_decode_core.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—
 lib/microtar/LICENSE	P1-1	第三者の物	取り込んだ上流ライブラリまたはその付属物	—
-lib/microtar/README.OS32	P1-1	第三者の物	取り込んだ上流ライブラリまたはその付属物	—
+lib/microtar/README.OS32	P1-1	第三者の物	同梱した microtar の取得版とライセンスを特定するためソースと一緒に移す	—
 lib/microtar/microtar.c	P1-1	第三者の物	取り込んだ上流ライブラリまたはその付属物	—
 lib/microtar/microtar.h	P1-1	第三者の物	取り込んだ上流ライブラリまたはその付属物	—
 lib/os32_opna/Cargo.lock	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—
@@ -2692,7 +2692,7 @@ lib/sqlite3/sqlite_stack.asm	P1-1	製品	P0-1 で像の入力を確認：pc98	�
 lib/unicode_jis_table.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/unicode.bin	—
 lib/utf8.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/gshell.elf	—
 lib/utf8.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—
-lib/zlib/README.OS32	P1-1	第三者の物	取り込んだ上流ライブラリまたはその付属物	—
+lib/zlib/README.OS32	P1-1	第三者の物	同梱した inflate の出所・採用ファイル・ライセンスを特定するためソースと一緒に移す	—
 lib/zlib/adler32.c	P1-1	第三者の物	取り込んだ上流ライブラリまたはその付属物	—
 lib/zlib/inffast.c	P1-1	第三者の物	取り込んだ上流ライブラリまたはその付属物	—
 lib/zlib/inffast.h	P1-1	第三者の物	取り込んだ上流ライブラリまたはその付属物	—
@@ -3234,8 +3234,8 @@ tools/accept/t4a4.md	P1-4	試験の支援	検査が使う手順・入力・代�
 tools/accept/t7a2c.md	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—
 tools/archive_refs_baseline.json	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
 tools/audit_cast_align.sh	P1-4	検査の本体	契約・受入条件を検査する入口	—
-tools/build_compare.py	P1-1	運用の道具	開発・製造・配備用の build_compare.py	—
-tools/build_compare.sh	P1-1	運用の道具	開発・製造・配備用の build_compare.sh	—
+tools/build_compare.py	P1-4	検査の本体	基点と対象を別々にビルドし、配布する生成物の差を終了値で報告	—
+tools/build_compare.sh	P1-4	実行の基盤	同じ場所の build_compare.py に引数を渡して生成物の一致検査を起動	—
 tools/build_profile.py	P1-1	運用の道具	開発・製造・配備用の build_profile.py	—
 tools/check_arch_asm.py	P1-4	検査の本体	契約・受入条件を検査する入口	—
 tools/check_archive_refs.py	P1-4	検査の本体	契約・受入条件を検査する入口	—
@@ -3608,11 +3608,11 @@ tools/deploy_manifests.py	P1-1	運用の道具	開発・製造・配備用の de
 tools/deploy_protect.py	P1-1	運用の道具	開発・製造・配備用の deploy_protect.py	—
 tools/deploy_source_check.py	P1-1	運用の道具	開発・製造・配備用の deploy_source_check.py	—
 tools/doc_delink_archive.py	P1-1	運用の道具	開発・製造・配備用の doc_delink_archive.py	—
-tools/doc_graph.py	P1-1	運用の道具	開発・製造・配備用の doc_graph.py	—
+tools/doc_graph.py	P1-4	検査の本体	check-docs-tree が文書間のリンクを走査し、基準値との差を判定	—
 tools/doc_line_refs_baseline.json	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
 tools/doc_tree_baseline.json	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
 tools/docs_status_exceptions.json	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
-tools/emu_agent/README.md	P1-1	運用の道具	開発・製造・配備用の emu_agent/README.md	—
+tools/emu_agent/README.md	P1-1	運用の道具	agent.py の起動例と接続設定を実装と一緒に移す	—
 tools/emu_agent/agent.py	P1-1	運用の道具	開発・製造・配備用の emu_agent/agent.py	—
 tools/emu_agent/mcp_server.py	P1-1	運用の道具	開発・製造・配備用の emu_agent/mcp_server.py	—
 tools/emu_agent/playbook.py	P1-1	運用の道具	開発・製造・配備用の emu_agent/playbook.py	—
@@ -3650,7 +3650,7 @@ tools/gen_unicode.c	P1-1	運用の道具	開発・製造・配備用の gen_unic
 tools/gen_unicode.py	P1-1	運用の道具	開発・製造・配備用の gen_unicode.py	—
 tools/gen_v86_int80.py	P1-1	運用の道具	開発・製造・配備用の gen_v86_int80.py	—
 tools/gfinit_mode_tables.py	P1-1	運用の道具	開発・製造・配備用の gfinit_mode_tables.py	—
-tools/gfinit_rom_check.py	P1-1	運用の道具	開発・製造・配備用の gfinit_rom_check.py	—
+tools/gfinit_rom_check.py	P1-4	検査の本体	test_gfinit_fixture.py が使う ROM 初期化領域の長さ・CRC32 の期待値照合	—
 tools/gfinit_rom_decode.py	P1-1	運用の道具	開発・製造・配備用の gfinit_rom_decode.py	—
 tools/gfinit_source.py	P1-1	運用の道具	開発・製造・配備用の gfinit_source.py	—
 tools/gserial.py	P1-1	運用の道具	開発・製造・配備用の gserial.py	実機ノートの採取・転送台本
@@ -3689,7 +3689,7 @@ tools/lan_bridge.py	P1-1	運用の道具	開発・製造・配備用の lan_brid
 tools/lanfs_host.py	P1-1	運用の道具	開発・製造・配備用の lanfs_host.py	実機ノート /opt/os32 の常駐サービスと運用台本
 tools/layers_baseline.json	P1-4	試験の支援	契約検査の解析・照合入力を供給	—
 tools/lz4_compress.py	P1-1	運用の道具	開発・製造・配備用の lz4_compress.py	—
-tools/memmap_audit_live.py	P1-1	運用の道具	開発・製造・配備用の memmap_audit_live.py	—
+tools/memmap_audit_live.py	P1-4	検査の本体	実機から採取したページ表を memmap.h と比較し、不一致を終了値で報告	—
 tools/mk_blank_nhd.py	P1-1	運用の道具	開発・製造・配備用の mk_blank_nhd.py	pc98emu の操作・受入台本
 tools/mk_settings_db.py	P1-1	運用の道具	開発・製造・配備用の mk_settings_db.py	—
 tools/mkd88.py	P1-1	運用の道具	開発・製造・配備用の mkd88.py	—
@@ -3740,10 +3740,10 @@ tools/osri_profile.py	P1-1	運用の道具	開発・製造・配備用の osri_p
 tools/pack_name_tables.txt	P1-1	運用の道具	開発・製造・配備用の pack_name_tables.txt	—
 tools/pack_notes.txt	P1-1	運用の道具	開発・製造・配備用の pack_notes.txt	—
 tools/pc98pt.py	P1-1	運用の道具	開発・製造・配備用の pc98pt.py	—
-tools/ppc/README.md	P1-1	運用の道具	PowerPC 用道具の運用手順	—
+tools/ppc/README.md	P1-1	運用の道具	PowerPC の像の作成・実行手順が参照する PPC 用の運用道具と一緒に移す	—
 tools/ppc/ata_accept.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/ata_accept_diag.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
-tools/ppc/ata_deny.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
+tools/ppc/ata_deny.c	P1-4	試験の支援	build/ppc-user.mk の PPC_USER_APPS で atadeny.bin をビルドし、ata_accept.py が受入像の KB_ROOT_BINS に追加	—
 tools/ppc/ata_write_diag.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
 tools/ppc/boot_media.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力	—
 tools/ppc/build_cross.sh	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力	—
@@ -3832,7 +3832,7 @@ tools/ppc/lan_p24_fake.c	P1-4	試験の支援	検査が使う手順・入力・�
 tools/ppc/lan_p24d_test.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
 tools/ppc/lan_p3_fake.c	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—
 tools/ppc/lan_probe.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
-tools/ppc/learn_probe.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—
+tools/ppc/learn_probe.c	P1-4	試験の支援	build/ppc-user.mk の PPC_USER_APPS で learnprb.bin をビルドし、of_hdd_accept.py が受入像の KB_ROOT_BINS に追加	—
 tools/ppc/link_diag_run.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/link_run.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—
 tools/ppc/link_sh_run.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	pc98emu の操作・受入台本
@@ -3963,7 +3963,7 @@ tools/split_c_functions.py	P1-1	運用の道具	開発・製造・配備用の s
 tools/sqlite_module_proto.py	P1-1	運用の道具	開発・製造・配備用の sqlite_module_proto.py	—
 tools/sync_docs_to_win.sh	P1-1	運用の道具	開発・製造・配備用の sync_docs_to_win.sh	—
 tools/sync_hwdocs.sh	P1-1	運用の道具	開発・製造・配備用の sync_hwdocs.sh	—
-tools/systemd/README.md	P1-1	運用の道具	開発・製造・配備用の systemd/README.md	—
+tools/systemd/README.md	P1-1	運用の道具	常駐サービスのユニットと対応する導入手順を一緒に移す	—
 tools/systemd/host-agent.example.json	P1-1	運用の道具	開発・製造・配備用の systemd/host-agent.example.json	—
 tools/systemd/os32-host-agent@.service	P1-1	運用の道具	開発・製造・配備用の systemd/os32-host-agent@.service	—
 tools/systemd/update_host_agent.sh	P1-1	運用の道具	開発・製造・配備用の systemd/update_host_agent.sh	実機ノート /opt/os32 の常駐サービスと運用台本
