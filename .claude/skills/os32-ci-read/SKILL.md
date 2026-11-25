@@ -5,6 +5,9 @@ description: GitHub の CI (check・build・sep) の結果を読む・落ちた�
 
 # os32-ci-read — CI の結果を読む
 
+> **作り直しの票の間 (2026-11-26〜P6 の切り替え) の一時の形**: 古い workflow (check・build・sep・selfhost-probe) は止めてあり、CI は `restructure-build` だけ。main に入れる判定は `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` — JSON は候補の SHA・その run と attempt (全部のジョブの success)・PM の機械の基点 (`v3-pre-restructure`) との比べの記録 (`comparison`)・PC-98 と PowerMac の起動の記録 (`boots`、媒体の名前・sha256・run・attempt・artifact id・ログ)。形の例は P3 の `~/os32-tmp/run/restructure/p3-gate/evidence.json`、定めは [ci_v2 §0](../../../docs/design/tools/ci/ci_v2.md)。文書だけの取り込みも起動の記録を取る (DECISIONS の U21)。下の check・build の手順は切り替えの後に書き直す。
+
+
 決まりは [POLICY_CI](../../../docs/POLICY_CI.md)。workflow の形は [08_build](../../../docs/08_build.md) §8-6。
 
 ## 1. 起動を確かめる (push の直後に 1 回)

@@ -8,6 +8,8 @@ description: レビューを通った段 (作業木のブランチ) を push し
 規則の正典は [ROLES §0](../../../docs/tasks/agents/ROLES.md) (検査の段、全体検査は節目、検査中も main を編集してよい)。
 ここはその手順を 1 本にしたもの。
 
+> **作り直しの票の間 (2026-11-26〜P6 の切り替え) の一時の形**: 古い workflow (check・build・sep・selfhost-probe) は止めてあり、CI は `restructure-build` だけ。main に入れる判定は `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` — JSON は候補の SHA・その run と attempt (全部のジョブの success)・PM の機械の基点 (`v3-pre-restructure`) との比べの記録 (`comparison`)・PC-98 と PowerMac の起動の記録 (`boots`、媒体の名前・sha256・run・attempt・artifact id・ログ)。形の例は P3 の `~/os32-tmp/run/restructure/p3-gate/evidence.json`、定めは [ci_v2 §0](../../../docs/design/tools/ci/ci_v2.md)。文書だけの取り込みも起動の記録を取る (DECISIONS の U21)。下の check・build の手順は切り替えの後に書き直す。
+
 ## 1. 取り込む前
 
 - レビューが「取り込み可」か。要修正なら直してから (軽い指摘は PM が直すか、次の段の依頼に書いて設計票の末尾に「送り項目」として残す)。
