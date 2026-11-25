@@ -1,0 +1,25 @@
+移動元	行き先ディレクトリ	分ける理由
+drivers/block	sys/dev/block sys/platform/pc98	WD33C93 の PC-98 固定ポート定義を機種側が持つ。
+drivers/input	sys/dev/input sys/platform/pc98/input	PC-98 のポート・IRQ・入力源の登録と、受信診断・状態判定・シームレスマウスの装置処理を分ける。
+drivers/video/cirrus	sys/dev/video/cirrus sys/platform/pc98/video/cirrus	PC-98 ボードの識別と WAB の接続を Cirrus の描画実装から分ける。
+drivers/video/geforce	sys/dev/video/geforce sys/platform/pc98/video/geforce	PC-98 の tick 接続は機種側が持つ。
+drivers/video/trident	sys/dev/video/trident sys/platform/pc98/video	Ra266 の表示経路を選ぶ処理は機種側が持つ。
+fs/ext2	sys/dev/block sys/fs/ext2 sys/platform/pc98/storage	ext2 本体、PC-98 IDE 媒体、ループ装置の媒体アダプタを各所有者に置く。
+gfx	sys/hal/gfx sys/kern/console sys/kern/gfx/osri	描画 HAL、コンソール出力、OSRI 画像処理を分ける。
+hwdev	sys/dev/hwdev sys/dev/video/geforce	GeForce のモードと読込状態は装置側、モジュールの入口と生成入力は hwdev が持つ。
+hwdev/generated	sys/dev/hwdev/generated sys/dev/video/geforce	GeForce のモード表と hwdev モジュールの生成インターフェースを分ける。
+hwdev/gf	sys/dev/video/geforce sys/platform/pc98/geforce	Ra266 の固定 PCI 位置と BAR の照合は機種側が持つ。
+include	sys/arch/x86 sys/hal/gfx sys/hal/input sys/hal/sound sys/hal/time sys/include sys/platform/pc98	共有ヘッダ、分野別 HAL 契約、PC-98・x86 固有ヘッダを宣言の所有者に置く（D-4）。
+input/hal	sys/hal/input sys/input	入力先・IME・割込み先の方針と HAL の入力源・イベント処理を分ける。
+kdebug	sys/arch/x86/kdebug sys/dev/char/kdebug sys/dev/video/geforce/diag sys/dev/video/trident/diag sys/kern/kdebug sys/platform/pc98/kdebug	共通診断、機種、CPU、GeForce・Trident・シリアルの診断を依存先別に置く（D-3）。
+kdebug/generated	sys/arch/x86/kdebug/generated sys/dev/video/geforce/diag/generated sys/platform/pc98/kdebug/generated	PC-98 のモジュール契約、x86 スタブ、GeForce 復旧表を分ける（D-3）。
+kdebug/kselftest	sys/arch/x86/kdebug/kselftest sys/dev/dma/kdebug/kselftest sys/kern/kdebug/kselftest sys/platform/pc98/kdebug/kselftest	共通・CPU・PC-98・8237 の診断片を検査対象の所有者に置く（D-3）。
+kdebug/recover_common	sys/dev/video/geforce/diag/recover_common sys/kern/kdebug/recover_common	共通の時計処理と GeForce 固有の記録・停止処理を分ける（D-3）。
+kdebug/recover_plan	sys/dev/video/geforce/diag/recover_plan sys/kern/kdebug/recover_plan sys/platform/pc98/kdebug/recover_plan	共通の状態照合、GeForce レジスタ操作、機種プロファイルを分ける（D-3）。
+kernel	sys/hal/input sys/kern	入力サービスの振り分けは入力 HAL が持つ。
+kernel/dev	sys/dev/ide sys/dev/kcg sys/dev/loop sys/dev/pci sys/hal/block sys/kern/dev	共通の媒体管理、ブロック契約、IDE・KCG・loop・PCI の装置操作を分ける。
+kernel/time	sys/hal/time sys/kern/time sys/platform/pc98/time	時計 HAL の入口、PC-98 の校正、共通の時刻処理を分ける。
+lib	lib sys/kern	kstring と kprintf はカーネルが持ち、共有ライブラリは現位置に置く（D-5）。
+net	sys/hal/net sys/net	機種別リンクの契約をネットワーク本体から分ける。
+sound/hal	sys/hal/sound sys/kern/v86	V86 サービス未提供時の弱定義は V86 側が持つ。
+tools/ppc	tools/ppc userland/diag	ゲストに組む診断をホストの運用道具から分ける（D-8）。

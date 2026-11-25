@@ -4,6 +4,7 @@ import csv
 from collections import defaultdict
 from pathlib import Path
 
+import layout
 from p1_verify import boundary_symbol
 
 
@@ -228,6 +229,32 @@ def fixed(path, tables):
     return role, 'P8' if path in SPLIT else '移すだけ', dest, reason
 
 
+def p8_destination(path):
+    # U17 moves the whole file now. Keep the proposed internal separation in the reason.
+    parent = Path(path).parent.as_posix()
+    special = {'drivers/input': 'sys/platform/pc98/input', 'gfx': 'sys/hal/gfx',
+               'gfx/v2': 'sys/hal/gfx/v2', 'hwdev/gf': 'sys/dev/video/geforce',
+               'input/hal': 'sys/hal/input'}
+    if path == 'input/hal/input_policy.c':
+        return 'sys/input/input_policy.c'
+    if parent in special:
+        return special[parent] + '/' + Path(path).name
+    return layout.placement(path, {}, {})[0]
+
+
+def sibling_destination(path, dest):
+    source = Path(path)
+    if source.parent == Path('gfx/v2'):
+        return 'sys/hal/gfx/v2/' + source.name
+    if source.parent == Path('kdebug') and Path(dest).parent == Path('sys/dev/video/geforce'):
+        return 'sys/dev/video/geforce/diag/' + source.name
+    if source.parent == Path('kdebug/kselftest') and '/kselftest/' in dest and '/kdebug/' not in dest:
+        return dest.replace('/kselftest/', '/kdebug/kselftest/')
+    if path in ('kernel/console/console.c', 'kernel/dev/install_management.c'):
+        return 'sys/kern/' + path.removeprefix('kernel/')
+    return dest
+
+
 def merge(p0, reviews):
     tables = {}
     for name in ('hal', 'geforce', 'p8'):
@@ -286,7 +313,10 @@ def merge(p0, reviews):
             symbol = boundary_symbol(source)
             if symbol:
                 reason += f' 境界照合 {symbol}。' + retained_reason(path, dest)
-        yield [path, role, move, dest, reason]
+        if move == 'P8':
+            reason += '。P8 の再配置候補：' + dest
+            dest = p8_destination(path)
+        yield [path, role, move, sibling_destination(path, dest), reason]
 
 
 def main():
