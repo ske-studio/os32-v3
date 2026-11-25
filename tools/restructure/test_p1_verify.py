@@ -27,12 +27,12 @@ def fixture(root):
 def exercise(module, root, tree):
     module.ROOT = root
     table = root / 'scope.tsv'
-    product = ['code.c', 'P1-1', '製品', '仮 D-3', '']
-    runner = ['tools/checks/fixture_runner.py', 'P1-4', '実行の基盤', '登録を実行', '']
-    rom = ['tools/gfinit_rom_check.py', 'P1-4', '検査の本体', '期待 CRC と照合', '']
-    source = ['tools/fixture_source.py', 'P1-1', '運用の道具', '候補印=合否語、登録・check 目標・workflow の参照。入力を生成する', '']
-    footer = [verify.EXCLUDED, ['tools/checks/restructure_p0_987.py'],
-              ['tools/restructure/inventory.py']]
+    product = ['code.c', 'P1-1', '製品', '仮 D-3', '', '共通実装']
+    runner = ['tools/checks/fixture_runner.py', 'P1-4', '実行の基盤', '登録を実行', '', '開発・検査用実装']
+    rom = ['tools/gfinit_rom_check.py', 'P1-4', '検査の本体', '期待 CRC と照合', '', '開発・検査用実装']
+    source = ['tools/fixture_source.py', 'P1-1', '運用の道具', '候補印=合否語、登録・check 目標・workflow の参照。入力を生成する', '', '開発・検査用実装']
+    footer = [verify.EXCLUDED, ['tools/checks/restructure_p0_987.py', '開発・検査用実装'],
+              ['tools/restructure/inventory.py', '開発・検査用実装']]
 
     for snippet, marker in [("print('FAIL')", '合否語'), ("print('RED')", '合否語'),
                             ('return 3', '異常終了'), ('value != expected', '期待値・試験入力')]:
@@ -50,6 +50,9 @@ def exercise(module, root, tree):
             assert message in output.getvalue(), message
 
     check([product, runner, *footer], 0, ['A1\tcode.c', '差 0'])
+    for invalid in ('', '範囲外'):
+        check([[*product[:-1], invalid], runner, *footer], 1, ['code.c: 所属種類が空または不正'])
+    check([product, runner, *footer[:-1], [footer[-1][0], '']], 1, ['母数外の所属種類が不正'])
     reviewed = source[3]
     source[3] = '用途未記録'
     check([product, runner, *footer], 1, ['fixture_source.py: 候補印=合否語、登録・check 目標・workflow の参照'])
@@ -74,6 +77,8 @@ def main():
         exercise(verify, root, tree)
         if args.mutate:
             for anchor, replacement in (
+                ('if ownership not in OWNERSHIP_KINDS:', 'if False:'),
+                ("if row[1] != '開発・検査用実装':", 'if False:'),
                 ('expected - counts.keys()', 'set()'),
                 ('counts.keys() - expected', 'set()'),
                 ("if path.removeprefix('tools/') in CHECK_BODIES and path.startswith('tools/') and kind != '検査の本体':", 'if False:'),

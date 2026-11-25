@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 BASE = 'c6076a6f6'
 SCOPE = ROOT / 'docs/tasks/restructure/data/scope.tsv'
-HEADER = ['パス', '担当', '種類', '根拠', '外の呼び出し元']
+HEADER = ['パス', '担当', '種類', '根拠', '外の呼び出し元', '所属種類']
 EXCLUDED = ['# 基点の棚卸し用ファイル（母数外）']
 KINDS = {
     'P1-1': {'製品', 'ビルドの定義', '公開物', '資産', '運用の道具', '第三者の物'},
@@ -89,6 +89,12 @@ def compare(label, actual, expected, issues):
             issues.append(f'{label} 重複: {path} ({count})')
 
 
+OWNERSHIP_KINDS = {
+    '共通実装', 'CPU固有実装', '機種固有実装', 'デバイス固有実装', '公開インターフェース',
+    '開発・検査用実装', '文書', 'ビルドの定義', '資産', '第三者の物',
+}
+
+
 def verify_scope(table, base, list_candidates=False):
     expected, omitted = inventory(base)
     issues = []
@@ -105,13 +111,17 @@ def verify_scope(table, base, list_candidates=False):
             if row == EXCLUDED and not footer:
                 footer = True
                 continue
-            if footer and len(row) == 1:
+            if footer and len(row) == 2:
+                if row[1] != '開発・検査用実装':
+                    issues.append(f'{row[0]}: 母数外の所属種類が不正')
                 exclusions.append(row[0])
                 continue
             if footer or len(row) != len(HEADER):
                 issues.append(f'{rows.line_num} 行目: 列数または節が不正')
                 continue
-            path, owner, kind, reason, caller = row
+            path, owner, kind, reason, caller, ownership = row
+            if ownership not in OWNERSHIP_KINDS:
+                issues.append(f'{path}: 所属種類が空または不正 ({ownership})')
             paths.append(path)
             if any(not value.strip() for value in row[:4]):
                 issues.append(f'{path}: 必須欄が空')
