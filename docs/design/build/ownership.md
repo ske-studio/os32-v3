@@ -81,6 +81,8 @@ tools/ の走査根の定数、glob・rglob・os.walk、git ls-files の利用�
 | `tools/check_usb_portable.py` | 2 | tools/checks/usb-portable.py |
 | `tools/check_manifests.py` | 4 | tools/checks/manifests.py |
 | `tools/g16/scan_ui_chars.py` | 0 | 該当なし |
+
+呼び出し元の件数には文書のコマンド例も入るので、現役の呼び出し元の数としては読まない。調べる道具が拾わない形: `python -m` での起動、`sys.path` を経た同じ階層や `tools/` の直下以外への裸の import、変数でパスを組み立てる `$(shell …)` (sol のレビュー 2026-11-25)。
 | `tools/gen_kdebug_imports.py` | 25 | build/cd-module.mk |
 | `tools/gen_hwdev_contract.py` | 5 | build/kdebug.mk |
 | `tools/check_privileged.py` | 5 | build/os32snd.mk |
