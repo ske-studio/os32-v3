@@ -331,6 +331,7 @@ def verify_layout(scope, table, mapping, root):
     issues = []
     paths = []
     moves = []
+    sibling_dirs = {}
     destinations = set()
     pending = []
     with table.open(newline='') as stream:
@@ -345,6 +346,10 @@ def verify_layout(scope, table, mapping, root):
             paths.append(path)
             if dest == '保留':
                 pending.append((path, reason))
+            if dest != '保留':
+                parent = str(Path(path).parent)
+                target_dir = str(Path(path if dest == '=' else dest).parent)
+                sibling_dirs.setdefault(parent, set()).add(target_dir)
             if dest in ('=', '保留'):
                 continue
             target = Path(dest)
@@ -357,6 +362,19 @@ def verify_layout(scope, table, mapping, root):
                 issues.append(f'{path}: 移動元がない')
             destinations.add(dest)
             moves.append({'from': path, 'to': dest})
+    decisions = {r['移動元']: r for r in layout.read_rows(SCOPE.with_name('layout_splits.tsv'))}
+    split_count = 0
+    for parent, targets in sorted(sibling_dirs.items()):
+        if len(targets) < 2:
+            continue
+        split_count += 1
+        decision = decisions.get(parent)
+        detail = parent + ' → ' + '、'.join(sorted(targets))
+        if (not decision or not decision['分ける理由'].strip()
+                or set(decision['行き先ディレクトリ'].split()) != targets):
+            issues.append('理由のない割れ ' + detail)
+        else:
+            print('配置の割れ', detail, decision['分ける理由'])
     compare('配置表', paths, expected, issues)
     if json.loads(mapping.read_text()) != moves:
         issues.append('移動表が配置表の確定行と一致しない')
@@ -381,7 +399,7 @@ def verify_layout(scope, table, mapping, root):
     if issues:
         print(*issues, sep='\n')
         return 1
-    print(f'OK: 配置 {len(paths)}、移動 {len(moves)}、保留 {len(pending)}、集合差・衝突 0')
+    print(f'OK: 配置 {len(paths)}、移動 {len(moves)}、保留 {len(pending)}、割れ {split_count}、理由のない割れ・集合差・衝突 0')
     return 0
 
 

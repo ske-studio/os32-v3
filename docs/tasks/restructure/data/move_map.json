@@ -2501,51 +2501,51 @@
   },
   {
     "from": "gfx/v2/sw_hostdata.c",
-    "to": "sys/hal/gfx/sw_hostdata.c"
+    "to": "sys/hal/gfx/v2/sw_hostdata.c"
   },
   {
     "from": "gfx/v2/sw_line.c",
-    "to": "sys/hal/gfx/sw_line.c"
+    "to": "sys/hal/gfx/v2/sw_line.c"
   },
   {
     "from": "gfx/v2/sw_mono.c",
-    "to": "sys/hal/gfx/sw_mono.c"
+    "to": "sys/hal/gfx/v2/sw_mono.c"
   },
   {
     "from": "gfx/v2/sw_readback.c",
-    "to": "sys/hal/gfx/sw_readback.c"
+    "to": "sys/hal/gfx/v2/sw_readback.c"
   },
   {
     "from": "gfx/v2/sw_rop.c",
-    "to": "sys/hal/gfx/sw_rop.c"
+    "to": "sys/hal/gfx/v2/sw_rop.c"
   },
   {
     "from": "gfx/v2/sw_rop4.c",
-    "to": "sys/hal/gfx/sw_rop4.c"
+    "to": "sys/hal/gfx/v2/sw_rop4.c"
   },
   {
     "from": "gfx/v2/sw_stretch.c",
-    "to": "sys/hal/gfx/sw_stretch.c"
+    "to": "sys/hal/gfx/v2/sw_stretch.c"
   },
   {
     "from": "gfx/v2/sw_table.c",
-    "to": "sys/hal/gfx/sw_table.c"
+    "to": "sys/hal/gfx/v2/sw_table.c"
   },
   {
     "from": "gfx/v2/sysmem.c",
-    "to": "sys/hal/gfx/sysmem.c"
+    "to": "sys/hal/gfx/v2/sysmem.c"
   },
   {
     "from": "gfx/v2/v1_bridge.c",
-    "to": "sys/hal/gfx/v1_bridge.c"
+    "to": "sys/hal/gfx/v2/v1_bridge.c"
   },
   {
     "from": "gfx/v2/v1_shim.c",
-    "to": "sys/hal/gfx/v1_shim.c"
+    "to": "sys/hal/gfx/v2/v1_shim.c"
   },
   {
     "from": "gfx/v2/vram_heap.c",
-    "to": "sys/hal/gfx/vram_heap.c"
+    "to": "sys/hal/gfx/v2/vram_heap.c"
   },
   {
     "from": "hwdev/generated/gf_mode_rows.inc",
@@ -3977,7 +3977,7 @@
   },
   {
     "from": "kdebug/gf_command_test.c",
-    "to": "sys/dev/video/geforce/gf_command_test.c"
+    "to": "sys/dev/video/geforce/diag/gf_command_test.c"
   },
   {
     "from": "kdebug/gf_command_test.h",
@@ -3997,39 +3997,39 @@
   },
   {
     "from": "kdebug/gf_foundation_test.c",
-    "to": "sys/dev/video/geforce/gf_foundation_test.c"
+    "to": "sys/dev/video/geforce/diag/gf_foundation_test.c"
   },
   {
     "from": "kdebug/gf_foundation_test.h",
-    "to": "sys/dev/video/geforce/gf_foundation_test.h"
+    "to": "sys/dev/video/geforce/diag/gf_foundation_test.h"
   },
   {
     "from": "kdebug/gf_foundation_wire.h",
-    "to": "sys/dev/video/geforce/gf_foundation_wire.h"
+    "to": "sys/dev/video/geforce/diag/gf_foundation_wire.h"
   },
   {
     "from": "kdebug/gf_prim_bench.c",
-    "to": "sys/dev/video/geforce/gf_prim_bench.c"
+    "to": "sys/dev/video/geforce/diag/gf_prim_bench.c"
   },
   {
     "from": "kdebug/gf_prim_bench.h",
-    "to": "sys/dev/video/geforce/gf_prim_bench.h"
+    "to": "sys/dev/video/geforce/diag/gf_prim_bench.h"
   },
   {
     "from": "kdebug/gf_stage_state.c",
-    "to": "sys/dev/video/geforce/gf_stage_state.c"
+    "to": "sys/dev/video/geforce/diag/gf_stage_state.c"
   },
   {
     "from": "kdebug/gf_stage_state.h",
-    "to": "sys/dev/video/geforce/gf_stage_state.h"
+    "to": "sys/dev/video/geforce/diag/gf_stage_state.h"
   },
   {
     "from": "kdebug/gfinit.c",
-    "to": "sys/dev/video/geforce/gfinit.c"
+    "to": "sys/dev/video/geforce/diag/gfinit.c"
   },
   {
     "from": "kdebug/gfinit.h",
-    "to": "sys/dev/video/geforce/gfinit.h"
+    "to": "sys/dev/video/geforce/diag/gfinit.h"
   },
   {
     "from": "kdebug/gfinit/rom.inc",
@@ -4037,23 +4037,23 @@
   },
   {
     "from": "kdebug/gfinit_budget.inc",
-    "to": "sys/dev/video/geforce/gfinit_budget.inc"
+    "to": "sys/dev/video/geforce/diag/gfinit_budget.inc"
   },
   {
     "from": "kdebug/gfinit_bus.c",
-    "to": "sys/dev/video/geforce/gfinit_bus.c"
+    "to": "sys/dev/video/geforce/diag/gfinit_bus.c"
   },
   {
     "from": "kdebug/gfinit_bus.h",
-    "to": "sys/dev/video/geforce/gfinit_bus.h"
+    "to": "sys/dev/video/geforce/diag/gfinit_bus.h"
   },
   {
     "from": "kdebug/gfinit_decode.c",
-    "to": "sys/dev/video/geforce/gfinit_decode.c"
+    "to": "sys/dev/video/geforce/diag/gfinit_decode.c"
   },
   {
     "from": "kdebug/gfinit_decode.h",
-    "to": "sys/dev/video/geforce/gfinit_decode.h"
+    "to": "sys/dev/video/geforce/diag/gfinit_decode.h"
   },
   {
     "from": "kdebug/gfinit_decode/bytes.inc",
@@ -4065,15 +4065,15 @@
   },
   {
     "from": "kdebug/gfinit_exec.c",
-    "to": "sys/dev/video/geforce/gfinit_exec.c"
+    "to": "sys/dev/video/geforce/diag/gfinit_exec.c"
   },
   {
     "from": "kdebug/gfinit_exec.h",
-    "to": "sys/dev/video/geforce/gfinit_exec.h"
+    "to": "sys/dev/video/geforce/diag/gfinit_exec.h"
   },
   {
     "from": "kdebug/gfinit_mode.c",
-    "to": "sys/dev/video/geforce/gfinit_mode.c"
+    "to": "sys/dev/video/geforce/diag/gfinit_mode.c"
   },
   {
     "from": "kdebug/gfinit_op/condition_decode.inc",
@@ -4125,19 +4125,19 @@
   },
   {
     "from": "kdebug/gfinit_plan.c",
-    "to": "sys/dev/video/geforce/gfinit_plan.c"
+    "to": "sys/dev/video/geforce/diag/gfinit_plan.c"
   },
   {
     "from": "kdebug/gfinit_plan.h",
-    "to": "sys/dev/video/geforce/gfinit_plan.h"
+    "to": "sys/dev/video/geforce/diag/gfinit_plan.h"
   },
   {
     "from": "kdebug/gfinit_plan_c.c",
-    "to": "sys/dev/video/geforce/gfinit_plan_c.c"
+    "to": "sys/dev/video/geforce/diag/gfinit_plan_c.c"
   },
   {
     "from": "kdebug/gfinit_plan_c.h",
-    "to": "sys/dev/video/geforce/gfinit_plan_c.h"
+    "to": "sys/dev/video/geforce/diag/gfinit_plan_c.h"
   },
   {
     "from": "kdebug/gfinit_plan_c/baseline.inc",
@@ -4149,11 +4149,11 @@
   },
   {
     "from": "kdebug/gfinit_pll.c",
-    "to": "sys/dev/video/geforce/gfinit_pll.c"
+    "to": "sys/dev/video/geforce/diag/gfinit_pll.c"
   },
   {
     "from": "kdebug/gfinit_pll.h",
-    "to": "sys/dev/video/geforce/gfinit_pll.h"
+    "to": "sys/dev/video/geforce/diag/gfinit_pll.h"
   },
   {
     "from": "kdebug/gfinit_pll/limits.inc",
@@ -4173,11 +4173,11 @@
   },
   {
     "from": "kdebug/gfinit_resources.c",
-    "to": "sys/dev/video/geforce/gfinit_resources.c"
+    "to": "sys/dev/video/geforce/diag/gfinit_resources.c"
   },
   {
     "from": "kdebug/gfinit_resources.h",
-    "to": "sys/dev/video/geforce/gfinit_resources.h"
+    "to": "sys/dev/video/geforce/diag/gfinit_resources.h"
   },
   {
     "from": "kdebug/gfinit_resources/bars.inc",
@@ -4197,11 +4197,11 @@
   },
   {
     "from": "kdebug/gfinit_verify.inc",
-    "to": "sys/dev/video/geforce/gfinit_verify.inc"
+    "to": "sys/dev/video/geforce/diag/gfinit_verify.inc"
   },
   {
     "from": "kdebug/gfinit_wire.h",
-    "to": "sys/dev/video/geforce/gfinit_wire.h"
+    "to": "sys/dev/video/geforce/diag/gfinit_wire.h"
   },
   {
     "from": "kdebug/hwb_access.c",
@@ -4285,11 +4285,11 @@
   },
   {
     "from": "kdebug/kselftest/gfx_ledger.inc",
-    "to": "sys/platform/pc98/kselftest/gfx_ledger.inc"
+    "to": "sys/platform/pc98/kdebug/kselftest/gfx_ledger.inc"
   },
   {
     "from": "kdebug/kselftest/gfx_owner.inc",
-    "to": "sys/kern/kselftest/gfx_owner.inc"
+    "to": "sys/kern/kdebug/kselftest/gfx_owner.inc"
   },
   {
     "from": "kdebug/kselftest/h4_backing.inc",
@@ -4449,23 +4449,23 @@
   },
   {
     "from": "kdebug/recover_gf.c",
-    "to": "sys/dev/video/geforce/recover_gf.c"
+    "to": "sys/dev/video/geforce/diag/recover_gf.c"
   },
   {
     "from": "kdebug/recover_gf.h",
-    "to": "sys/dev/video/geforce/recover_gf.h"
+    "to": "sys/dev/video/geforce/diag/recover_gf.h"
   },
   {
     "from": "kdebug/recover_gf_c.h",
-    "to": "sys/dev/video/geforce/recover_gf_c.h"
+    "to": "sys/dev/video/geforce/diag/recover_gf_c.h"
   },
   {
     "from": "kdebug/recover_gf_expand.h",
-    "to": "sys/dev/video/geforce/recover_gf_expand.h"
+    "to": "sys/dev/video/geforce/diag/recover_gf_expand.h"
   },
   {
     "from": "kdebug/recover_gf_locate.c",
-    "to": "sys/dev/video/geforce/recover_gf_locate.c"
+    "to": "sys/dev/video/geforce/diag/recover_gf_locate.c"
   },
   {
     "from": "kdebug/recover_gf_stage/c.inc",
@@ -4585,7 +4585,7 @@
   },
   {
     "from": "kernel/console/console.c",
-    "to": "sys/kern/console.c"
+    "to": "sys/kern/console/console.c"
   },
   {
     "from": "kernel/console/console_backend.h",
@@ -4685,7 +4685,7 @@
   },
   {
     "from": "kernel/dev/install_management.c",
-    "to": "sys/kern/install_management.c"
+    "to": "sys/kern/dev/install_management.c"
   },
   {
     "from": "kernel/dev/ram_ro.c",

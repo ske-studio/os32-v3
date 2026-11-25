@@ -176,6 +176,11 @@ def exercise_layout(module, root):
                           ('tests/a.c', '配置先不正'), ('sys/b.c', '配置先不正')]:
         check([first, [held[0], dest, 'test']], canonical + [{'from': held[0], 'to': dest}],
               1, message)
+    (root / 'first/b.c').touch()
+    with scope.open('a') as stream:
+        stream.write('first/b.c\tP1-1\n')
+    check([first, held, ['first/b.c', '=', 'keep']], canonical, 1, '理由のない割れ first')
+    scope.write_text(scope.read_text().removesuffix('first/b.c\tP1-1\n'))
     check([first, held], [], 1, '移動表が配置表')
     check([first, [held[0], '=', '']], canonical, 1, '必須欄不正')
 
@@ -195,6 +200,7 @@ def main():
         exercise_layout(verify, root)
         if args.mutate:
             for anchor, replacement in (
+                ("issues.append('理由のない割れ ' + detail)", 'pass'),
                 ("if path in layout.PPC_DIAGNOSTICS:", 'if False:'),
                 ("if kind != '製品':\n                    issues.append", "if False:\n                    issues.append"),
                 ("compare('配置表', paths, expected, issues)", 'pass'),

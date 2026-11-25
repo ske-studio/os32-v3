@@ -277,18 +277,18 @@ gfx/v2/sw_alpha.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_alpha.c	gfx/v2/sw_
 gfx/v2/sw_ckey.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_ckey.c	gfx/v2/sw_ckey.c:4 gfx2_sw_ckey — 色キーとクリップ範囲を使い CPU で画素を選んで転送する。
 gfx/v2/sw_copy.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_copy.c	gfx/v2/sw_copy.c:4 gfx2_sw_copy — 重なりとピッチを考慮して矩形を行単位でコピーする。
 gfx/v2/sw_fill.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_fill.c	gfx/v2/sw_fill.c:4 gfx2_sw_fill — ピクセル形式に応じた色でクリップ矩形を塗りつぶす。
-gfx/v2/sw_hostdata.c	共通処理	移すだけ	sys/hal/gfx/sw_hostdata.c	gfx/v2/sw_hostdata.c:3 gfx2_sw_hostdata — CPU側の画素をクリップ範囲で読み同期面またはメモリ面へ書く。
-gfx/v2/sw_line.c	共通処理	移すだけ	sys/hal/gfx/sw_line.c	gfx/v2/sw_line.c:4 gfx2_sw_line — 線分をクリップし画素へ展開する。
-gfx/v2/sw_mono.c	共通処理	移すだけ	sys/hal/gfx/sw_mono.c	gfx/v2/sw_mono.c:4 gfx2_sw_mono — 単色ビット列を前景色・背景色へ展開する。
-gfx/v2/sw_readback.c	共通処理	移すだけ	sys/hal/gfx/sw_readback.c	gfx/v2/sw_readback.c:4 gfx2_sw_readback — 同期面またはメモリ面を行単位で読み戻す。
-gfx/v2/sw_rop.c	共通処理	移すだけ	sys/hal/gfx/sw_rop.c	gfx/v2/sw_rop.c:14 gfx2_sw_rop — ROP3の演算結果を画素に反映する。
-gfx/v2/sw_rop4.c	共通処理	移すだけ	sys/hal/gfx/sw_rop4.c	gfx/v2/sw_rop4.c:36 gfx2_sw_rop4 — マスクのビットで前景・背景のROP3を選ぶ。
-gfx/v2/sw_stretch.c	共通処理	移すだけ	sys/hal/gfx/sw_stretch.c	gfx/v2/sw_stretch.c:48 gfx2_sw_stretch — 転送先の位置に対応する転送元画素を求める。
-gfx/v2/sw_table.c	振り分け	移すだけ	sys/hal/gfx/sw_table.c	gfx/v2/sw_table.c:3 gfx2_sw_table — 操作番号とソフトウェア描画関数を対応付ける表。
-gfx/v2/sysmem.c	共通処理	移すだけ	sys/hal/gfx/sysmem.c	gfx/v2/sysmem.c:6 gfx2_sysmem_alloc — 所有者付きページを確保し面に対応付けてゼロクリアする。
-gfx/v2/v1_bridge.c	共通処理	移すだけ	sys/hal/gfx/v1_bridge.c	gfx/v2/v1_bridge.c:38 v1_bridge_rebind — 台帳の面をv2の別名に結び再設定前に使用中の面を静止させる。
-gfx/v2/v1_shim.c	振り分け	移すだけ	sys/hal/gfx/v1_shim.c	gfx/v2/v1_shim.c:234 gfx2_v1_shim — v2操作表にshim_flip等のv1変換関数を登録する。
-gfx/v2/vram_heap.c	共通処理	移すだけ	sys/hal/gfx/vram_heap.c	gfx/v2/vram_heap.c:18 gfx2_heap_alloc — 管理中の空き領域からVRAMオフセットを割り当てる。
+gfx/v2/sw_hostdata.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_hostdata.c	gfx/v2/sw_hostdata.c:3 gfx2_sw_hostdata — CPU側の画素をクリップ範囲で読み同期面またはメモリ面へ書く。
+gfx/v2/sw_line.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_line.c	gfx/v2/sw_line.c:4 gfx2_sw_line — 線分をクリップし画素へ展開する。
+gfx/v2/sw_mono.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_mono.c	gfx/v2/sw_mono.c:4 gfx2_sw_mono — 単色ビット列を前景色・背景色へ展開する。
+gfx/v2/sw_readback.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_readback.c	gfx/v2/sw_readback.c:4 gfx2_sw_readback — 同期面またはメモリ面を行単位で読み戻す。
+gfx/v2/sw_rop.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_rop.c	gfx/v2/sw_rop.c:14 gfx2_sw_rop — ROP3の演算結果を画素に反映する。
+gfx/v2/sw_rop4.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_rop4.c	gfx/v2/sw_rop4.c:36 gfx2_sw_rop4 — マスクのビットで前景・背景のROP3を選ぶ。
+gfx/v2/sw_stretch.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_stretch.c	gfx/v2/sw_stretch.c:48 gfx2_sw_stretch — 転送先の位置に対応する転送元画素を求める。
+gfx/v2/sw_table.c	振り分け	移すだけ	sys/hal/gfx/v2/sw_table.c	gfx/v2/sw_table.c:3 gfx2_sw_table — 操作番号とソフトウェア描画関数を対応付ける表。
+gfx/v2/sysmem.c	共通処理	移すだけ	sys/hal/gfx/v2/sysmem.c	gfx/v2/sysmem.c:6 gfx2_sysmem_alloc — 所有者付きページを確保し面に対応付けてゼロクリアする。
+gfx/v2/v1_bridge.c	共通処理	移すだけ	sys/hal/gfx/v2/v1_bridge.c	gfx/v2/v1_bridge.c:38 v1_bridge_rebind — 台帳の面をv2の別名に結び再設定前に使用中の面を静止させる。
+gfx/v2/v1_shim.c	振り分け	移すだけ	sys/hal/gfx/v2/v1_shim.c	gfx/v2/v1_shim.c:234 gfx2_v1_shim — v2操作表にshim_flip等のv1変換関数を登録する。
+gfx/v2/vram_heap.c	共通処理	移すだけ	sys/hal/gfx/v2/vram_heap.c	gfx/v2/vram_heap.c:18 gfx2_heap_alloc — 管理中の空き領域からVRAMオフセットを割り当てる。
 hwdev/generated/gf_mode_rows.inc	その他	移すだけ	sys/dev/video/geforce/gf_mode_rows.inc	gf_mode_rows.inc の gf_mode_rows：gf_load_row が序数で引くレジスタ設定の生成表。 境界照合 gf_mode_row。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 hwdev/gf/accel.h	契約	移すだけ	sys/dev/video/geforce/accel.h	hwdev/gf/accel.h:240 int gf3_copy_emit(。2D コピー命令生成を装置側に置く。 境界照合 gf3_rc。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 hwdev/gf/accel_copy.c	バックエンド	移すだけ	sys/dev/video/geforce/accel_copy.c	hwdev/gf/accel_copy.c:22 int gf3_copy_emit(。2D コピー命令生成を装置側に置く。 境界照合 GF3_BLIT_POINT_IN。上記の実装と固有宣言は候補先の所有者の内部で使用する。
@@ -482,31 +482,31 @@ kdebug/gf5_test.c	振り分け	移すだけ	sys/dev/video/geforce/diag/gf5_test.
 kdebug/gf5_test.h	契約	移すだけ	sys/dev/video/geforce/diag/gf5_test.h	kdebug/gf5_test.h:5 gf5_test — GF5の同期診断入口をsession引数で宣言する。
 kdebug/gf_accel_test.c	その他	移すだけ	sys/dev/video/geforce/diag/gf_accel_test.c	kdebug/gf_accel_test.c:756 gf_accel_test — GF3加速診断をケース別に実行し、結果と差分を集計する。 境界照合 gf3_case。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gf_accel_test.h	契約	移すだけ	sys/dev/video/geforce/diag/gf_accel_test.h	kdebug/gf_accel_test.h:4 gf_accel_test — GF加速診断をケース番号で起動する入口を宣言する。 境界照合 gf_accel_test。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gf_command_test.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_command_test.c	kdebug/gf_command_test.c:49 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF2_REFERENCE_COUNT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_command_test.c	バックエンド	移すだけ	sys/dev/video/geforce/diag/gf_command_test.c	kdebug/gf_command_test.c:49 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF2_REFERENCE_COUNT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gf_command_test.h	契約	移すだけ	sys/dev/video/geforce/diag/gf_command_test.h	kdebug/gf_command_test.h:7 gf_command_test — GF基盤と行読取コールバックを受ける同期コマンド診断の契約。 境界照合 gf_command_test。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gf_command_wire.h	契約	移すだけ	sys/dev/video/geforce/diag/gf_command_wire.h	kdebug/gf_command_wire.h:48 gf2_request — GF診断要求のC89形式と操作番号を規定し、userland/shell/cmd_gf2.cと共有する。 境界照合 GF_OP_COMMAND。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gf_display_test.c	振り分け	移すだけ	sys/dev/video/geforce/diag/gf_display_test.c	kdebug/gf_display_test.c:1076 gf_display_test — GFの表示診断要求を復号し、CUIの出入りや表示試験へ振り分ける。 境界照合 gf4_test_ops。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gf_display_test.h	契約	移すだけ	sys/dev/video/geforce/diag/gf_display_test.h	kdebug/gf_display_test.h:5 gf_display_test — GF表示診断の実行と所有者終了時の解放入口を宣言する。 境界照合 gf_display_owner_exit。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gf_foundation_test.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_foundation_test.c	kdebug/gf_foundation_test.c:131 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 gf_irq_stats。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gf_foundation_test.h	契約	移すだけ	sys/dev/video/geforce/gf_foundation_test.h	kdebug/gf_foundation_test.h:10 BAR1 の行読み取りと表示コールバックを受ける GF1 診断入口を宣言する。 境界照合 gf_foundation_test。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gf_foundation_wire.h	型	移すだけ	sys/dev/video/geforce/gf_foundation_wire.h	kdebug/gf_foundation_wire.h:8 cmd_gf1.c と診断側が共有する要求のサイズ・試験番号・セッション・結果を定義する。 境界照合 GF_OP_FOUNDATION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gf_prim_bench.c	その他	移すだけ	sys/dev/video/geforce/gf_prim_bench.c	kdebug/gf_prim_bench.c:127 geforce_accel_ops から得る描画操作を使い、指定項目の性能を測る。 境界照合 gf3_test_ops。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gf_prim_bench.h	契約	移すだけ	sys/dev/video/geforce/gf_prim_bench.h	kdebug/gf_prim_bench.h:4 GeForce プリミティブのベンチマークに項目番号を渡す入口を宣言する。 境界照合 gf_prim_bench。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gf_stage_state.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_stage_state.c	kdebug/gf_stage_state.c:28 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 gf_stage_capture。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gf_stage_state.h	型	移すだけ	sys/dev/video/geforce/gf_stage_state.h	kdebug/gf_stage_state.h:32 gf_stage_state に ROM・BAR・PLL の状態を保持し、捕捉済みの状態から再入可否を調べる。 境界照合 GF_STAGE_FIELDS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit.c	kdebug/gfinit.c:353 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_US_PER_TICK。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit.h	契約	移すだけ	sys/dev/video/geforce/gfinit.h	kdebug/gfinit.h:8 GF 初期化の要求と recover_ops を受ける診断入口を宣言し、要求サイズを検査する。
+kdebug/gf_foundation_test.c	バックエンド	移すだけ	sys/dev/video/geforce/diag/gf_foundation_test.c	kdebug/gf_foundation_test.c:131 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 gf_irq_stats。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_foundation_test.h	契約	移すだけ	sys/dev/video/geforce/diag/gf_foundation_test.h	kdebug/gf_foundation_test.h:10 BAR1 の行読み取りと表示コールバックを受ける GF1 診断入口を宣言する。 境界照合 gf_foundation_test。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_foundation_wire.h	型	移すだけ	sys/dev/video/geforce/diag/gf_foundation_wire.h	kdebug/gf_foundation_wire.h:8 cmd_gf1.c と診断側が共有する要求のサイズ・試験番号・セッション・結果を定義する。 境界照合 GF_OP_FOUNDATION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_prim_bench.c	その他	移すだけ	sys/dev/video/geforce/diag/gf_prim_bench.c	kdebug/gf_prim_bench.c:127 geforce_accel_ops から得る描画操作を使い、指定項目の性能を測る。 境界照合 gf3_test_ops。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_prim_bench.h	契約	移すだけ	sys/dev/video/geforce/diag/gf_prim_bench.h	kdebug/gf_prim_bench.h:4 GeForce プリミティブのベンチマークに項目番号を渡す入口を宣言する。 境界照合 gf_prim_bench。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_stage_state.c	バックエンド	移すだけ	sys/dev/video/geforce/diag/gf_stage_state.c	kdebug/gf_stage_state.c:28 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 gf_stage_capture。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_stage_state.h	型	移すだけ	sys/dev/video/geforce/diag/gf_stage_state.h	kdebug/gf_stage_state.h:32 gf_stage_state に ROM・BAR・PLL の状態を保持し、捕捉済みの状態から再入可否を調べる。 境界照合 GF_STAGE_FIELDS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit.c	バックエンド	移すだけ	sys/dev/video/geforce/diag/gfinit.c	kdebug/gfinit.c:353 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_US_PER_TICK。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit.h	契約	移すだけ	sys/dev/video/geforce/diag/gfinit.h	kdebug/gfinit.h:8 GF 初期化の要求と recover_ops を受ける診断入口を宣言し、要求サイズを検査する。
 kdebug/gfinit/rom.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit/rom.inc	kdebug/gfinit/rom.inc:11 bus の PCI command と BAR を調べて ROM を読み、検査に使う長さ・CRC・chip を返す。 境界照合 gf_inspect_line。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_budget.inc	その他	移すだけ	sys/dev/video/geforce/gfinit_budget.inc	kdebug/gfinit_budget.inc:9 復旧計画のノード数と引数数から GF 診断ログの必要行数を求める。 境界照合 GF_REC_FIXED_ROWS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_bus.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_bus.c	kdebug/gfinit_bus.c:255 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_LEGACY_LO。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_bus.h	契約	移すだけ	sys/dev/video/geforce/gfinit_bus.h	kdebug/gfinit_bus.h:26 GF 初期化で使う PCI 設定アクセスの操作表と probe・identity の入口を宣言する。 境界照合 gf_foundation。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_decode.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_decode.c	kdebug/gfinit_decode.c:45 case GF_INIT_IO_RESTRICT_PROG。初期化命令のデコードを装置側に置く。 境界照合 GF_ARRAY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_decode.h	型	移すだけ	sys/dev/video/geforce/gfinit_decode.h	kdebug/gfinit_decode.h:118 GF ROM 命令と復号結果の格納形式を定義し、ROM からその形式を作る入口を宣言する。 境界照合 GF_INIT_IO_RESTRICT_PROG。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_budget.inc	その他	移すだけ	sys/dev/video/geforce/diag/gfinit_budget.inc	kdebug/gfinit_budget.inc:9 復旧計画のノード数と引数数から GF 診断ログの必要行数を求める。 境界照合 GF_REC_FIXED_ROWS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_bus.c	バックエンド	移すだけ	sys/dev/video/geforce/diag/gfinit_bus.c	kdebug/gfinit_bus.c:255 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_LEGACY_LO。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_bus.h	契約	移すだけ	sys/dev/video/geforce/diag/gfinit_bus.h	kdebug/gfinit_bus.h:26 GF 初期化で使う PCI 設定アクセスの操作表と probe・identity の入口を宣言する。 境界照合 gf_foundation。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_decode.c	バックエンド	移すだけ	sys/dev/video/geforce/diag/gfinit_decode.c	kdebug/gfinit_decode.c:45 case GF_INIT_IO_RESTRICT_PROG。初期化命令のデコードを装置側に置く。 境界照合 GF_ARRAY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_decode.h	型	移すだけ	sys/dev/video/geforce/diag/gfinit_decode.h	kdebug/gfinit_decode.h:118 GF ROM 命令と復号結果の格納形式を定義し、ROM からその形式を作る入口を宣言する。 境界照合 GF_INIT_IO_RESTRICT_PROG。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_decode/bytes.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_decode/bytes.inc	kdebug/gfinit_decode/bytes.inc:9 ROM 命令のシフト量を GF_SHIFT_WRAP 等で検査し、同じ断片の span と le が境界検査と値の読取りを担う。 境界照合 GF_SHIFT_LEFT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_decode/tables.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_decode/tables.inc	kdebug/gfinit_decode/tables.inc:2 gfinit_decode.c が参照する ROM スクリプトごとの開始位置・長さ・CRC を保持する。 境界照合 gf_script_span。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_exec.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_exec.c	kdebug/gfinit_exec.c:7 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_INIT_EXEC_US。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_exec.h	契約	移すだけ	sys/dev/video/geforce/gfinit_exec.h	kdebug/gfinit_exec.h:16 recover に渡す GF 初期化の実行・準備コールバックと復元入口を宣言する。 境界照合 gf_init_program。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_mode.c	その他	移すだけ	sys/dev/video/geforce/gfinit_mode.c	kdebug/gfinit_mode.c:42 GF モード試験用に色帯・市松模様・外枠から表示確認用の画素列を生成する。 境界照合 GF_MODE_RGB。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_exec.c	バックエンド	移すだけ	sys/dev/video/geforce/diag/gfinit_exec.c	kdebug/gfinit_exec.c:7 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_INIT_EXEC_US。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_exec.h	契約	移すだけ	sys/dev/video/geforce/diag/gfinit_exec.h	kdebug/gfinit_exec.h:16 recover に渡す GF 初期化の実行・準備コールバックと復元入口を宣言する。 境界照合 gf_init_program。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_mode.c	その他	移すだけ	sys/dev/video/geforce/diag/gfinit_mode.c	kdebug/gfinit_mode.c:42 GF モード試験用に色帯・市松模様・外枠から表示確認用の画素列を生成する。 境界照合 GF_MODE_RGB。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_op/condition_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/condition_decode.inc	kdebug/gfinit_op/condition_decode.inc:24 case GF_INIT_IO_FLAG_CONDITION。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_IO_FLAG_CONDITION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_op/copy_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/copy_decode.inc	kdebug/gfinit_op/copy_decode.inc:1 case GF_INIT_COPY。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_COPY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_op/cr_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/cr_decode.inc	kdebug/gfinit_op/cr_decode.inc:1 case GF_INIT_CR。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_CR。上記の実装と固有宣言は候補先の所有者の内部で使用する。
@@ -519,35 +519,35 @@ kdebug/gfinit_op/reset_nv_reg_decode.inc	バックエンド	移すだけ	sys/dev
 kdebug/gfinit_op/sub_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/sub_decode.inc	kdebug/gfinit_op/sub_decode.inc:24 case GF_INIT_SUB。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_SUB。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_op/tmds_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/tmds_decode.inc	kdebug/gfinit_op/tmds_decode.inc:25 case GF_INIT_TMDS_REG。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_TMDS_REG。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_op/zm_reg_sequence_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/zm_reg_sequence_decode.inc	kdebug/gfinit_op/zm_reg_sequence_decode.inc:1 case GF_INIT_ZM_REG_SEQUENCE。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_ZM_REG_SEQUENCE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_plan.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_plan.c	kdebug/gfinit_plan.c:245 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_PLAN_ARRAY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_plan.h	型	移すだけ	sys/dev/video/geforce/gfinit_plan.h	kdebug/gfinit_plan.h:55 復号後の初期化計画に GF 用の対象・規則・退避 VRAM を保持し、構築入口に渡す。 境界照合 GF_PLAN_OPCODE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_plan_c.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_plan_c.c	kdebug/gfinit_plan_c.c:353 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_VPLL_PROBE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_plan_c.h	契約	移すだけ	sys/dev/video/geforce/gfinit_plan_c.h	kdebug/gfinit_plan_c.h:21 GF の段 C の計画構築・再構築、基準状態と VRAM 処理の入口を宣言する。 境界照合 GF_C_OPCODE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_plan.c	バックエンド	移すだけ	sys/dev/video/geforce/diag/gfinit_plan.c	kdebug/gfinit_plan.c:245 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_PLAN_ARRAY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_plan.h	型	移すだけ	sys/dev/video/geforce/diag/gfinit_plan.h	kdebug/gfinit_plan.h:55 復号後の初期化計画に GF 用の対象・規則・退避 VRAM を保持し、構築入口に渡す。 境界照合 GF_PLAN_OPCODE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_plan_c.c	バックエンド	移すだけ	sys/dev/video/geforce/diag/gfinit_plan_c.c	kdebug/gfinit_plan_c.c:353 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_VPLL_PROBE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_plan_c.h	契約	移すだけ	sys/dev/video/geforce/diag/gfinit_plan_c.h	kdebug/gfinit_plan_c.h:21 GF の段 C の計画構築・再構築、基準状態と VRAM 処理の入口を宣言する。 境界照合 GF_C_OPCODE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_plan_c/baseline.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_plan_c/baseline.inc	kdebug/gfinit_plan_c/baseline.inc:2 対象キーを GF の PLL ゲートや CR・MMIO フィールドに照合し、計画の基準値を引く。 境界照合 GF_STAGE_FIELDS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_plan_c/checks.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_plan_c/checks.inc	kdebug/gfinit_plan_c/checks.inc:4 段 C の検査ノードを組み、保存値を参照する場合は capture と期待値引数を設定する。 境界照合 GF_C_CHECK_SAVED。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_pll.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_pll.c	kdebug/gfinit_pll.c:58 gfinit_pll_solve を含む制約・ROM 解析・係数探索・書込列生成の各断片を同じ翻訳単位に組む。 境界照合 GF_PLL_REF。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_pll.h	型	移すだけ	sys/dev/video/geforce/gfinit_pll.h	kdebug/gfinit_pll.h:85 GF PLL の VCO 制約、分周係数の解とレジスタ書込列の形式を定義する。 境界照合 GF_PLL_TBL_VERSION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_pll.c	バックエンド	移すだけ	sys/dev/video/geforce/diag/gfinit_pll.c	kdebug/gfinit_pll.c:58 gfinit_pll_solve を含む制約・ROM 解析・係数探索・書込列生成の各断片を同じ翻訳単位に組む。 境界照合 GF_PLL_REF。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_pll.h	型	移すだけ	sys/dev/video/geforce/diag/gfinit_pll.h	kdebug/gfinit_pll.h:85 GF PLL の VCO 制約、分周係数の解とレジスタ書込列の形式を定義する。 境界照合 GF_PLL_TBL_VERSION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_pll/limits.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_pll/limits.inc	kdebug/gfinit_pll/limits.inc:18 第1 VCO と、有効な場合の第2 VCO の制約を vco_ok で検査する。 境界照合 GF_PLL_NM_MAX。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_pll/parse.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_pll/parse.inc	kdebug/gfinit_pll/parse.inc:24 ROM 表の範囲を検査し、対象 PLL レジスタに合うエントリから制約を読む。 境界照合 GF_PLL_TBL_HDR_MIN。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_pll/sequence.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_pll/sequence.inc	kdebug/gfinit_pll/sequence.inc:30 対象 PLL と係数解に応じてレジスタ書込列を作る。 境界照合 GF_PLL_WRITES_MAX。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_pll/solve.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_pll/solve.inc	kdebug/gfinit_pll/solve.inc:8 VCO の制約内で目標クロックに近い分周係数を探索する。 境界照合 GF_PLL_P_MAX。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_resources.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_resources.c	kdebug/gfinit_resources.c:23 gfinit_resources の PCI 走査と BAR・窓の検査を組む。build/geforce-module.mk でも同じソースを使用する。 境界照合 GF_PRODUCTION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_resources.h	契約	移すだけ	sys/dev/video/geforce/gfinit_resources.h	kdebug/gfinit_resources.h:9 GF の資源検査で除外範囲と件数を返す入口、拒否理由を取得する入口を宣言する。 境界照合 GF_RES_GPU_DEV。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_resources.c	バックエンド	移すだけ	sys/dev/video/geforce/diag/gfinit_resources.c	kdebug/gfinit_resources.c:23 gfinit_resources の PCI 走査と BAR・窓の検査を組む。build/geforce-module.mk でも同じソースを使用する。 境界照合 GF_PRODUCTION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_resources.h	契約	移すだけ	sys/dev/video/geforce/diag/gfinit_resources.h	kdebug/gfinit_resources.h:9 GF の資源検査で除外範囲と件数を返す入口、拒否理由を取得する入口を宣言する。 境界照合 GF_RES_GPU_DEV。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_resources/bars.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_resources/bars.inc	kdebug/gfinit_resources/bars.inc:1 PCI BAR の現在値と起動時キャッシュを照合し、未割当や長さ不明を区別する。
 kdebug/gfinit_resources/bounds.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_resources/bounds.inc	kdebug/gfinit_resources/bounds.inc:8 GF 資源検査の拒否理由と PCI 位置を本番用に記録し、診断構成では表示する。 境界照合 GF_PRODUCTION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_resources/scan.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_resources/scan.inc	kdebug/gfinit_resources/scan.inc:1 bus 0 の各機能を走査し、対象 GPU の ID を確認して他装置の BAR・ブリッジ窓を除外範囲にする。 境界照合 GF_PRODUCTION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/gfinit_resources/windows.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_resources/windows.inc	kdebug/gfinit_resources/windows.inc:1 PCI ブリッジ窓の基底・上限・種別を設定空間から読み、除外範囲を算出する。
-kdebug/gfinit_verify.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_verify.inc	kdebug/gfinit_verify.inc:8 段 C の書込規則を終了時の検査ノードおよび検証除外レジスタに照合する。 境界照合 GF_NO_VERIFY_MAX。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/gfinit_wire.h	型	移すだけ	sys/dev/video/geforce/gfinit_wire.h	kdebug/gfinit_wire.h:23 cmd_gfinit.c と共有する操作番号・要求形式と PREPARE 用の検証除外リストを定義する。 境界照合 GF_INIT_MAINS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/kselftest/gfx_ledger.inc	その他	移すだけ	sys/platform/pc98/kselftest/gfx_ledger.inc	kdebug/kselftest/gfx_ledger.inc:27 PC-98 の GVRAM 各面・PEGC・Cirrus の台帳と x86 ページ表のキャッシュ属性を検査する。 境界照合 LEDGER_SF_PC98。PC-98 の VRAM の x86 キャッシュ属性そのものを検査する機種専用試験。
-kdebug/kselftest/gfx_owner.inc	その他	移すだけ	sys/kern/kselftest/gfx_owner.inc	kdebug/kselftest/gfx_owner.inc:8 appslot_gfx_owner_selftest の結果から、画面所有の移譲・返却とアプリ属性による拒否を検査する。
-kdebug/recover_gf.c	バックエンド	移すだけ	sys/dev/video/geforce/recover_gf.c	kdebug/recover_gf.c:267 GF 固有の復旧規則・対象の表を所有者の計画バッファへ展開する。 境界照合 GF_QUIESCE_REC。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/recover_gf.h	契約	移すだけ	sys/dev/video/geforce/recover_gf.h	kdebug/recover_gf.h:77 GF の復旧プロファイルと BAR サイズ測定・準備計画を外部参照用に宣言する。
-kdebug/recover_gf_c.h	バックエンド	移すだけ	sys/dev/video/geforce/recover_gf_c.h	kdebug/recover_gf_c.h:10 GF の段 C で PLL 係数の読み戻しを照合するためのレジスタ別マスクを定義する。 境界照合 GF_LOAD_FP_ON。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kdebug/recover_gf_expand.h	契約	移すだけ	sys/dev/video/geforce/recover_gf_expand.h	kdebug/recover_gf_expand.h:7 GF の復旧プロファイルを gfinit_plan のバッファへ展開する入口を宣言する。
-kdebug/recover_gf_locate.c	バックエンド	移すだけ	sys/dev/video/geforce/recover_gf_locate.c	kdebug/recover_gf_locate.c:5 pci_locate_fn0 で対象 GF を探して結果を保持し、未検出時のデバイス番号も決める。 境界照合 gf_loc。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_verify.inc	バックエンド	移すだけ	sys/dev/video/geforce/diag/gfinit_verify.inc	kdebug/gfinit_verify.inc:8 段 C の書込規則を終了時の検査ノードおよび検証除外レジスタに照合する。 境界照合 GF_NO_VERIFY_MAX。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_wire.h	型	移すだけ	sys/dev/video/geforce/diag/gfinit_wire.h	kdebug/gfinit_wire.h:23 cmd_gfinit.c と共有する操作番号・要求形式と PREPARE 用の検証除外リストを定義する。 境界照合 GF_INIT_MAINS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/kselftest/gfx_ledger.inc	その他	移すだけ	sys/platform/pc98/kdebug/kselftest/gfx_ledger.inc	kdebug/kselftest/gfx_ledger.inc:27 PC-98 の GVRAM 各面・PEGC・Cirrus の台帳と x86 ページ表のキャッシュ属性を検査する。 境界照合 LEDGER_SF_PC98。PC-98 の VRAM の x86 キャッシュ属性そのものを検査する機種専用試験。
+kdebug/kselftest/gfx_owner.inc	その他	移すだけ	sys/kern/kdebug/kselftest/gfx_owner.inc	kdebug/kselftest/gfx_owner.inc:8 appslot_gfx_owner_selftest の結果から、画面所有の移譲・返却とアプリ属性による拒否を検査する。
+kdebug/recover_gf.c	バックエンド	移すだけ	sys/dev/video/geforce/diag/recover_gf.c	kdebug/recover_gf.c:267 GF 固有の復旧規則・対象の表を所有者の計画バッファへ展開する。 境界照合 GF_QUIESCE_REC。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/recover_gf.h	契約	移すだけ	sys/dev/video/geforce/diag/recover_gf.h	kdebug/recover_gf.h:77 GF の復旧プロファイルと BAR サイズ測定・準備計画を外部参照用に宣言する。
+kdebug/recover_gf_c.h	バックエンド	移すだけ	sys/dev/video/geforce/diag/recover_gf_c.h	kdebug/recover_gf_c.h:10 GF の段 C で PLL 係数の読み戻しを照合するためのレジスタ別マスクを定義する。 境界照合 GF_LOAD_FP_ON。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/recover_gf_expand.h	契約	移すだけ	sys/dev/video/geforce/diag/recover_gf_expand.h	kdebug/recover_gf_expand.h:7 GF の復旧プロファイルを gfinit_plan のバッファへ展開する入口を宣言する。
+kdebug/recover_gf_locate.c	バックエンド	移すだけ	sys/dev/video/geforce/diag/recover_gf_locate.c	kdebug/recover_gf_locate.c:5 pci_locate_fn0 で対象 GF を探して結果を保持し、未検出時のデバイス番号も決める。 境界照合 gf_loc。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/recover_gf_stage/c.inc	バックエンド	移すだけ	sys/dev/video/geforce/recover_gf_stage/c.inc	kdebug/recover_gf_stage/c.inc:11 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_MODE_VRAM_BAR。上記の実装と固有宣言は候補先の所有者の内部で使用する。
-kernel/console/console.c	共通処理	移すだけ	sys/kern/console.c	kernel/console/console.c:231 shell_print_dec → shell_print。同じ翻訳単位の shell_print を呼ぶ。数値を文字列に変換した後の出力。 定義 kernel/console/console.c:210, platform/powermac/kboot_console.c:33。 境界照合 kbd_inject_discard。kbd_inject_discard は kernel/kbd_inject.c の注入キューを破棄する。
+kernel/console/console.c	共通処理	移すだけ	sys/kern/console/console.c	kernel/console/console.c:231 shell_print_dec → shell_print。同じ翻訳単位の shell_print を呼ぶ。数値を文字列に変換した後の出力。 定義 kernel/console/console.c:210, platform/powermac/kboot_console.c:33。 境界照合 kbd_inject_discard。kbd_inject_discard は kernel/kbd_inject.c の注入キューを破棄する。
 kernel/console/console_dual.c	共通処理	移すだけ	sys/kern/console/console_dual.c	kernel/console/console_dual.c:25 display_dual_key — 二重出力の可否は display_dual_outputs で表示提供側に問い合わせる。
 kernel/dev/dev.c	共通処理	移すだけ	sys/kern/dev/dev.c	kernel/dev/dev.c:6 dev_find — dev_name_present は登録済みの Device の名前を照合する。
 kernel/dev/dev.h	契約	移すだけ	sys/hal/block/dev.h	kernel/dev/dev.h:46 (*blk_read)。ブロックの契約を定義する。
@@ -555,7 +555,7 @@ kernel/dev/device_ide.c	バックエンド	移すだけ	sys/dev/ide/device_ide.c
 kernel/dev/device_kcg.c	バックエンド	移すだけ	sys/dev/kcg/device_kcg.c	kernel/dev/device_kcg.c:6 kcg_init — platform_kcg_load_font は KCG の提供するフォント読込口のアダプタ。 境界照合 kcg_init。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kernel/dev/device_loop.c	バックエンド	移すだけ	sys/dev/loop/device_loop.c	kernel/dev/device_loop.c:7 loop_dev_get_geometry — platform_loop_dev_read_lba は loop デバイスの読み取り口に委譲する。
 kernel/dev/device_pci.c	バックエンド	移すだけ	sys/dev/pci/device_pci.c	kernel/dev/device_pci.c:9 pci_count — platform_pci_cfg_read32 は PCI アダプタで構成空間の参照を受ける。
-kernel/dev/install_management.c	共通処理	移すだけ	sys/kern/install_management.c	kernel/dev/install_management.c:97 install_begin → platform_install_medium。固定名 platform_install_management.h が PC-98 と IDE 無効の PowerMac では空ポインタ、IDE 有効時は platform/powermac/install_backend.c の媒体操作表を返す。呼ぶ側はこの既存の取得口を使用。 定義 platform/powermac/install_backend.c:249。 境界照合 serial_crc。serial_crc は媒体識別値の比較欄。
+kernel/dev/install_management.c	共通処理	移すだけ	sys/kern/dev/install_management.c	kernel/dev/install_management.c:97 install_begin → platform_install_medium。固定名 platform_install_management.h が PC-98 と IDE 無効の PowerMac では空ポインタ、IDE 有効時は platform/powermac/install_backend.c の媒体操作表を返す。呼ぶ側はこの既存の取得口を使用。 定義 platform/powermac/install_backend.c:249。 境界照合 serial_crc。serial_crc は媒体識別値の比較欄。
 kernel/dev/ram_ro.c	共通処理	移すだけ	sys/kern/dev/ram_ro.c	kernel/dev/ram_ro.c:40 dev_register — ram_ro_register は読み取り専用の Device を既存の登録口に渡す。
 kernel/idle_work.c	共通処理	移すだけ	sys/kern/idle_work.c	kernel/idle_work.c:40 idle_work_run → platform_install_medium。固定名 platform_install_management.h が PC-98 と IDE 無効の PowerMac では空ポインタ、IDE 有効時は platform/powermac/install_backend.c の媒体操作表を返す。呼ぶ側はこの既存の取得口を使用。 定義 platform/powermac/install_backend.c:249。
 kernel/ime/ime.c	共通処理	P8	sys/kern/ime/ime.c	kernel/ime/ime.c — ime_getchar_wait と非同期入力が kbd_getkey_wait・kbd_trygetchar・kbd_trygetkey を直に呼ぶ。入力 HAL に待機・取得を委譲する。。P8 の再配置候補：sys/kern/ime/ + sys/hal/input/
