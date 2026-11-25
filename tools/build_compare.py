@@ -61,10 +61,10 @@ def snapshot(root, revision, destination):
 
 
 def archive_members(data):
-    """Compare payload members, including duplicate names, in stored order."""
+    """Compare all stored member bytes except the timestamp in each header."""
     if not data.startswith(b'!<arch>\n'):
         raise ValueError('invalid ar archive')
-    result, strings, offset = [], b'', 8
+    result, offset = [], 8
     while offset < len(data):
         header = data[offset:offset + 60]
         if len(header) != 60 or header[58:] != b'`\n':
@@ -73,25 +73,11 @@ def archive_members(data):
         payload = data[offset + 60:offset + 60 + size]
         if len(payload) != size:
             raise ValueError('truncated ar member')
-        name = header[:16].decode().strip()
-        offset += 60 + size + (size & 1)
-        if name == '//':
-            strings = payload
-            continue
-        if name in ('/', '/SYM64/'):
-            continue
-        if name.startswith('#1/'):
-            length = int(name[3:])
-            name, payload = payload[:length].decode(), payload[length:]
-        elif name.startswith('/') and name[1:].isdigit():
-            start = int(name[1:])
-            end = strings.find(b'/\n', start)
-            if end < 0:
-                raise ValueError('invalid ar string offset')
-            name = strings[start:end].decode()
-        else:
-            name = name.rstrip('/')
-        result.append((name, payload))
+        end = offset + 60 + size + (size & 1)
+        if size < 0 or end > len(data):
+            raise ValueError('invalid ar member size or padding')
+        result.append((header[:16] + header[28:], data[offset + 60:end]))
+        offset = end
     return result
 
 

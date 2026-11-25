@@ -77,7 +77,8 @@ def exercise(root, directory):
     check('unchanged', 0, '0 missing, 0 different')
     library = Path('build/out/lib/libsample.a')
     member = tree / 'sample.o'
-    member.write_bytes(b'abc')
+    subprocess.run(['cc', '-x', 'c', '-c', '-o', member, '-'],
+                   input=b'const char sample[] = "abc";', check=True)
     (tree / library).parent.mkdir(parents=True)
     subprocess.run(['ar', 'rcD', tree / library, member], check=True)
     baseline = directory / library
@@ -89,6 +90,12 @@ def exercise(root, directory):
     changed_time = original[:24] + b'123'.ljust(12) + original[36:]
     (tree / library).write_bytes(changed_time)
     check('ar member time', 0, 'MATCH ar')
+    # GNU ar stores its symbol index as the first member named "/".
+    assert original[8:24].rstrip() == b'/'
+    index_end = 68 + int(original[56:66])
+    position = original.index(b'sample\0', 68, index_end)
+    (tree / library).write_bytes(original[:position] + b'x' + original[position + 1:])
+    check('ar symbol index', 1, 'DIFF ' + str(library))
     (tree / library).write_bytes(changed_time.replace(b'abc', b'abd'))
     check('ar member payload', 1, 'DIFF ' + str(library))
     draft = directory / 'declarations'
@@ -202,7 +209,8 @@ def main():
             for i, (before, after) in enumerate([
                     ('                    return moved', '                    return old'),
                     ("if result.returncode:\n            print('BUILD FAILED'", "if False:\n            print('BUILD FAILED'"),
-                    ('result.append((name, payload))', 'result.append((name, len(payload)))'),
+                    ('data[offset + 60:end]', 'len(payload)'),
+                    ('        result.append((header[:16]', "        if header[:16].rstrip() == b'/':\n            offset = end\n            continue\n        result.append((header[:16]"),
                     ('missing += 1', 'missing += 0'),
                     ('for contents, expected in ((original, hashlib.sha256(data).hexdigest()),', 'for contents, expected in ((original, digest),'),
                     ('(normalized, digest)', '(original, digest)'),
