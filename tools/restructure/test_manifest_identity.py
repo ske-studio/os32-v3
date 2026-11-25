@@ -108,12 +108,16 @@ def exercise(root, directory):
     check('changed initializer', 1, 'DIFF ' + str(new_obj), command=make(new_obj))
     # Two moved names in a comment, including a repeated non-NUL occurrence.
     text_artifact = Path('public.h')
-    before = f'/* {old_header} references {old} and {old_header}; vendor/{old_header} */\n'
+    def references(header, source):
+        return (f'/*{header}*/ [{header}] "{header}" {source}\0'
+                f'vendor/{old_header} {old_header}.bak')
+
+    before = references(old_header, old)
+    correct = references(new_header, new)
+    broad = correct.replace(f'vendor/{old_header}', f'vendor/{new_header}')
     (directory / text_artifact).write_text(before)
     with manifest.open('a') as out:
         out.write(hashlib.sha256(before.encode()).hexdigest() + '  public.h\n')
-    broad = before.replace(old_header, new_header).replace(str(old), str(new))
-    correct = broad.replace(f'vendor/{new_header}', f'vendor/{old_header}')
     (tree / text_artifact).write_text(correct)
     asm = Path('lib/sample.asm')
     moved_asm = Path('sys/kern/sample.asm')
@@ -173,6 +177,9 @@ def main():
                     ('(normalized, digest)', '(original, digest)'),
                     ("hashes.keys() | presence", "hashes.keys()"),
                     ('pattern = PATH_START + b"(?:"', 'pattern = b"(?:"'),
+                    ('+ b")" + PATH_END', '+ b")"'),
+                    ('PATH_CHAR = rb"[A-Za-z0-9_./-]"', 'PATH_CHAR = rb"[A-Za-z0-9_./*-]"'),
+                    ('PATH_CHAR = rb"[A-Za-z0-9_./-]"', 'PATH_CHAR = rb"[A-Za-z0-9_./\\[-]"'),
                     ("matches = re.sub(pattern,", "matches = re.sub(b'never-match',"),
                     ("(source, digest)):", "(moved, digest)):"),
                     ('SOURCE_DATE_EPOCH=epoch', "SOURCE_DATE_EPOCH='0'"),

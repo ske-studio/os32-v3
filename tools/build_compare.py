@@ -346,8 +346,9 @@ def replay_asm(tree, target, source, moved, data, digest, env):
 
 
 # A declared move names a complete repository-relative path.
-PATH_START = rb"""(?<![^\s\x00"'(<`])"""
-PATH_END = rb"""(?=$|[\s\x00"'>),;`])"""
+PATH_CHAR = rb"[A-Za-z0-9_./-]"
+PATH_START = rb"(?<!" + PATH_CHAR + rb")"
+PATH_END = rb"(?!" + PATH_CHAR + rb")"
 
 
 def replay_literal(tree, target, literal_input, source, moved, data, digest, env):
@@ -468,10 +469,8 @@ def compare_saved(manifest, tree, move_map, messages, env):
                 replacements = {str(src).encode(): str(moves[src]).encode() for src in declared}
                 # A text comment has no terminator. Retain the stricter binary
                 # literal contract, including ELF layout, for other artifacts.
-                if b'\0' in before:
-                    replacements = {src + b'\0': dst + b'\0' for src, dst in replacements.items()}
                 pattern = b'|'.join(map(re.escape, sorted(replacements, key=len, reverse=True)))
-                pattern = PATH_START + b"(?:" + pattern + b")" + (b"" if b"\0" in before else PATH_END)
+                pattern = PATH_START + b"(?:" + pattern + b")" + PATH_END
                 matches = re.sub(pattern, lambda m: replacements[m[0]], before) == data
                 if before.startswith(b'\x7fELF') and any(len(k) != len(v) for k, v in replacements.items()):
                     matches = False
