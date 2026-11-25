@@ -18,7 +18,7 @@ CLASSIFIER_PATH = verify.LAYER_BLOB.split(':', 1)[1]
 def fixture(root):
     subprocess.run(['git', 'init', '-q', str(root)], check=True)
     for path in ('tools/gfinit_rom_check.py', 'tools/fixture_source.py', 'code.c', 'tools/checks/fixture_runner.py', 'tools/restructure/inventory.py',
-                 'tools/checks/restructure_p0_987.py', 'include/pc98.h', 'build/arch/example.mk'):
+                 'tools/checks/restructure_p0_987.py', 'include/pc98.h', 'platform/pc98/platform_console.h', 'build/arch/example.mk'):
         dest = root / path
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.touch()
@@ -40,6 +40,7 @@ def exercise(module, root, tree):
     source = ['tools/fixture_source.py', 'P1-1', '運用の道具', '候補印=合否語、登録・check 目標・workflow の参照。入力を生成する', '', '開発・検査用実装']
     classifier = [CLASSIFIER_PATH, 'P1-4', '検査の本体', '層の分類', '', '開発・検査用実装']
     header = ['include/pc98.h', 'P1-1', '製品', '名前つきヘッダ', '', '機種固有実装']
+    fixed = ['platform/pc98/platform_console.h', 'P1-1', '製品', '固定名の契約', '', '機種固有実装']
     manifest = ['build/arch/example.mk', 'P1-1', 'ビルドの定義', '像の定義', '', 'ビルドの定義']
     footer = [verify.EXCLUDED, ['tools/checks/restructure_p0_987.py', '開発・検査用実装'],
               ['tools/restructure/inventory.py', '開発・検査用実装']]
@@ -51,7 +52,7 @@ def exercise(module, root, tree):
 
     def check(rows, expected_code, messages, rom_row=rom):
         with table.open('w', newline='', encoding='utf-8') as stream:
-            csv.writer(stream, delimiter='\t').writerows([verify.HEADER, classifier, header, manifest, rom_row, source, *rows])
+            csv.writer(stream, delimiter='\t').writerows([verify.HEADER, classifier, header, fixed, manifest, rom_row, source, *rows])
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             code = module.verify_scope(table, tree)
@@ -63,6 +64,12 @@ def exercise(module, root, tree):
     header[-1] = '共通実装'
     check([product, runner, *footer], 1, ['include/pc98.h: 所属照合 機種固有実装 → 共通実装 の理由がない'])
     header[-1] = '機種固有実装'
+    for row in (header, fixed):
+        original = row.copy()
+        row[3] += '。所属判断=共通実装：共通の処理'
+        row[-1] = '共通実装'
+        check([product, runner, *footer], 1, [row[0] + ': ヘッダの所属は 機種固有実装 に固定'])
+        row[:] = original
     check([[*product[:3], '像の入力', *product[4:]], runner, *footer], 1, ['code.c: 所属照合'])
     for invalid in ('', '範囲外'):
         check([[*product[:-1], invalid], runner, *footer], 1, ['code.c: 所属種類が空または不正'])
@@ -160,6 +167,7 @@ def main():
                 ('for path, reason in sorted(pending):', 'for path, reason in []:'),
                 ("elif 'sys/hal/' in dest and role not in HAL_ROLES:", 'elif False:'),
                 ('if move not in (', 'if False and move not in ('),
+                ('if header_kind and ownership != header_kind:', 'if False:'),
                 ('if evidence - {ownership}:', 'if False:'),
                 ('evidence.update(members.get(path, ()))', 'pass'),
                 ('if ownership not in OWNERSHIP_KINDS:', 'if False:'),

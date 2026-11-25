@@ -23,7 +23,7 @@ P1-0 の個別の用途判断を先に適用し、製品にだけ P0-1 の層を
 
 像の対象は、その構成が何をコンパイル・リンクするかで決める。所属は、実装が提供する機能と、その実装に必要な命令・機種仕様・装置で決める。例えば userland/ppc/hello.c は PPC 像に入るが SDK の呼出しだけなので共通実装。同じ場所の dbprob.c は FPSCR を操作するため CPU 固有。lib/kprintf.c は C_COMMON_CORE で書式処理を提供し、固定名 platform_kprintf.h を通じて機種に出力を委ねるため共通実装。
 
-P1 の照合は check_layers.owner の名前つきヘッダと配置、担当表の用途、基点の Make 所属集合に直接記されたソースを使う。すべての所属候補と記入値を照合し、食い違いをパスごとに表示する。採用した種類と理由を「所属判断=種類：理由」と根拠欄に記す。例えば drivers/pci/pci.c は C_COMMON_EXEC に入るが、PCI 装置の処理を提供する。条件式・wildcard を含む像の依存全体の展開は P2 の問い合わせが扱う。
+P1 の照合は check_layers.owner の名前つきヘッダと配置、担当表の用途、基点の Make 所属集合に直接記されたソースを使う。すべての所属候補と記入値を照合し、食い違いをパスごとに表示する。NAMED のヘッダと固定名の契約ヘッダは、その宣言・配置が定める所属と異なれば根拠欄の記述にかかわらず失敗する。その他の食い違いでは採用した種類と理由を「所属判断=種類：理由」と根拠欄に記す。例えば drivers/pci/pci.c は C_COMMON_EXEC に入るが、PCI 装置の処理を提供する。条件式・wildcard を含む像の依存全体の展開は P2 の問い合わせが扱う。
 
 ## P2 の正本と問い合わせ
 
@@ -53,6 +53,7 @@ sdk/include の 19 ヘッダでは public が true のまま images に依存先
 | tools/check_c_dialect.py | VENDOR_DIRS、SDK_HDR_DIR、公開ヘッダ・見本の glob | 第三者の所属、SDK 配布宣言の public、見本のビルド入力から対象を得る。C 方言の規則は検査に残す |
 | tools/check_av_portable.py | sound/hal・input/hal の C とヘッダ | 所属宣言に HAL の役割とサブシステムを付けて選ぶ |
 | tools/check_usb_portable.py | drivers/usb の走査とファイル名の接頭辞 | USB の所属宣言と実装の役割から対象を選ぶ。許される include は検査の契約 |
+| tools/check_manifests.py、tools/gen_kdebug_imports.py、tools/gen_hwdev_contract.py | プログラムの入力、後二者は GF のソース・ヘッダ | 各対象を共通の所属・依存の宣言から列挙する |
 | tools/check_privileged.py | SCAN_DIRS の userland 以下の object | 像のユーザーランド入力から対応する object を取得する |
 | tools/restructure/owners.py | KERNEL_ROOTS と調査対象の規則 | P2 の全件照合後 P7 で撤去 |
 | tools/restructure/hal_inventory.py | COMMON・OWNERS・SCOPES | 役割の判断を HAL の表に渡し P7 で撤去 |
@@ -61,6 +62,33 @@ sdk/include の 19 ヘッダでは public が true のまま images に依存先
 tools/ の走査根の定数、glob・rglob・os.walk、git ls-files の利用箇所を照合した。check_arch_asm・check_p2v・check_kprintf_window の走査根は source_roots の行に含む。配布済み SDK を再帰してハッシュを記録する gen_sdk_manifest は生成後の媒体を読む。
 
 全件を列挙する入口は同じ Make 宣言を展開する。個々の検査の入力・試験 fixture・像のリンク順は、それぞれの契約として残す。移動後の照合では宣言から出した全件と Git の追跡パスの差、所属が一意に決まらないパスをそれぞれ報告する。
+
+## A1 の不要の候補
+
+16 本のうち、使用を確認できた道具は 15 本。残る tools/g16/scan_ui_chars.py は GUI ソースから文字を集める。Makefile、build 以下の .mk、tools/checks の登録、workflow、スキル、他の道具の呼出し・import、現行 docs の手順で呼出元は各 0 件。生成した ui_chars.txt には手動更新の注記があり、gen_preload16.py はその文字表を使う。手元での更新頻度は未確認。A1 で不要の候補として提示し、入口への移行対象から外す。削除の判断は D-11 と同じく別票で行う。
+
+再調査は `python3 -B tools/restructure/tool_callers.py PATH...`。出力は対象パス、該当ファイル数、各ファイル名と最初の該当行の TSV。追跡中の手順・コマンド・Make の明示前提・Python import を静的に探す。自己参照、一覧の記載、アーカイブとハードウェア資料は集計から除く。動的に組み立てたコマンドや木の外での手動実行は未確認。
+
+| 対象 | 呼出元ファイル数 | 所在の例 |
+|---|---:|---|
+| `tools/check_layers.py` | 6 | tools/checks/layers-ppc.py |
+| `tools/ci/ppc_scope.py` | 2 | .github/workflows/check.yml |
+| `tools/source_roots.py` | 4 | tools/check_arch_asm.py |
+| `tools/checks/run.py` | 44 | .github/workflows/build.yml |
+| `tools/check_arm_compile.py` | 2 | build/sdk.mk |
+| `tools/check_c_dialect.py` | 3 | tools/checks/c-dialect.py |
+| `tools/check_av_portable.py` | 1 | tools/tests/test_av_abi.py |
+| `tools/check_usb_portable.py` | 2 | tools/checks/usb-portable.py |
+| `tools/check_manifests.py` | 4 | tools/checks/manifests.py |
+| `tools/g16/scan_ui_chars.py` | 0 | 該当なし |
+
+呼び出し元の件数には文書のコマンド例も入るので、現役の呼び出し元の数としては読まない。調べる道具が拾わない形: `python -m` での起動、`sys.path` を経た同じ階層や `tools/` の直下以外への裸の import、変数でパスを組み立てる `$(shell …)` (sol のレビュー 2026-11-25)。
+| `tools/gen_kdebug_imports.py` | 25 | build/cd-module.mk |
+| `tools/gen_hwdev_contract.py` | 5 | build/kdebug.mk |
+| `tools/check_privileged.py` | 5 | build/os32snd.mk |
+| `tools/restructure/owners.py` | 1 | tools/restructure/test_owners.py |
+| `tools/restructure/hal_inventory.py` | 1 | tools/restructure/test_hal_inventory.py |
+| `tools/restructure/path_refs.py` | 2 | tools/restructure/artifact_paths.py |
 
 ## 構造の関門（仕様 §15）
 
