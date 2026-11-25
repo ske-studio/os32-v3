@@ -47,7 +47,7 @@ def instrument(path, directory, labels):
             feature = next((guard for guard in reversed(guards) if guard), '')
         else:
             group = re.fullmatch(r'(?:C_COMMON|C_PLATFORM|C_ARCH|GAS_ARCH)_(\w+)', variable)
-            if group and group[1] not in {'CORE', 'COMPILE_ONLY_PPC', 'HOOKS_ABSENT'}:
+            if group and group[1] in {'CLI', 'EXEC', 'IDE', 'LINK', 'LOOP', 'USB', 'USERSHELL'}:
                 feature = group[1].lower()
         label = (path.relative_to(ROOT).as_posix(), variable, feature)
         key = labels.setdefault(label, f'P0_SET_{len(labels)}')
@@ -125,10 +125,33 @@ p0-links: $(if $(filter x86,$(ARCH)),$(BUILD_OUT)/kernel.elf) $(p0_pairs)
                 features[source].add(Path(image).stem)
 
 
+# Negative results are meaningful only for the kernel tree searched by select.mk.
+KERNEL_ROOTS = set('arch platform drivers hwdev kdebug init kernel mm exec fs gfx net input '
+                   'kapi lib include sound'.split())
+
+
+def collect_programs(directory, groups):
+    query = directory / 'programs.mk'
+    query.write_text("""include build/config.mk
+include build/programs.mk
+p0_program_sets = C_CMDS C_TESTS C_SYSTEM INST_SHARED_SRC SHELL_SRC BENCH_SRC BENCH_S2X_SRC FAULTPROBE_SRC
+$(foreach v,$(p0_program_sets),$(info P0_PROGRAM $(v) $($(v))))
+p0-programs:
+\t@:
+""")
+    for line in make_output(['-f', str(query), 'ARCH=x86', 'PLATFORM=pc98',
+                             'IMAGE=pc98', 'p0-programs']).splitlines():
+        if line.startswith('P0_PROGRAM '):
+            _, variable, *sources = line.split()
+            for source in sources:
+                groups[source].add('build/programs.mk:' + variable)
+
+
 def inventory():
     images, groups, features = (defaultdict(set) for _ in range(3))
     with tempfile.TemporaryDirectory() as temporary:
         directory = Path(temporary)
+        collect_programs(directory, groups)
         labels = {}
         for pattern in ('select.mk', 'sources/*.mk', 'platform/*.mk', 'arch/*.mk', 'features/*.mk'):
             for path in sorted((ROOT / 'build').glob(pattern)):
@@ -192,19 +215,28 @@ def rows(entries, images, groups, features):
         kind = ('gitlink' if mode == '160000' else 'symlink' if mode == '120000'
                 else 'source' if suffix in SUFFIXES else suffix.lstrip('.') or 'file')
         layer = '/'.join(filter(None, owner(path)))
-        row = (path, kind, layer, ','.join(sorted(images.get(path, ()))),
-               ','.join(sorted(groups.get(path, ()))))
-        yield row, sorted(features.get(path, ()))
+        image = ','.join(sorted(images.get(path, ())))
+        group = ','.join(sorted(groups.get(path, ())))
+        evidence = layer if layer != 'common' else group or image
+        status = ''
+        if kind == 'source':
+            if group:
+                status = 'member'
+            elif path.split('/')[0] in KERNEL_ROOTS or image:
+                status = 'no-set'
+            else:
+                status = 'out-of-scope'
+        yield (path, kind, evidence, image, group, layer, status), sorted(features.get(path, ()))
 
 
 def tables_for(entries, membership):
-    tables = {name: [] for name in ('owners', 'owner-empty', 'no-set', 'multi-feature')}
+    tables = {name: [] for name in ('owners', 'owner-empty', 'no-set', 'out-of-scope', 'multi-feature')}
     for row, features in rows(entries, *membership):
         tables['owners'].append(row)
         if not row[2]:
             tables['owner-empty'].append(row)
-        if row[1] == 'source' and not row[4]:
-            tables['no-set'].append(row)
+        if row[6] in ('no-set', 'out-of-scope'):
+            tables[row[6]].append(row)
         if len(features) >= 2:
             tables['multi-feature'].append((*row, ','.join(features)))
     return tables

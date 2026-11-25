@@ -9,36 +9,46 @@ import owners
 
 def example(tables_for):
     entries = [('arch/x86/example.c', '100644'), ('docs/example.md', '100644'),
-               ('include/pc98.h', '100644'), ('unused.rs', '100644'), ('module', '160000')]
+               ('include/pc98.h', '100644'), ('kernel/unused.c', '100644'), ('unused.rs', '100644'), ('module', '160000')]
     source = entries[0][0]
     tables = tables_for(entries, ({source: {'image'}}, {source: {'A', 'B'}},
                                   {source: {'usb', 'exec'}}))
     rows = tables['owners']
     assert [row[0] for row in rows] == [path for path, _ in entries]
-    assert rows[0] == (source, 'source', 'arch/x86', 'image', 'A,B')
+    assert rows[0] == (source, 'source', 'arch/x86', 'image', 'A,B', 'arch/x86', 'member')
     assert rows[2][2] == 'named/platform/pc98'
     assert rows[-1][1] == 'gitlink'
     assert tables['no-set'] == [rows[3]]
-    assert tables['owner-empty'] == []
+    assert tables['out-of-scope'] == [rows[4]]
+    assert tables['owner-empty'] == [rows[i] for i in (1, 3, 4, 5)]
     assert tables['multi-feature'] == [(*rows[0], 'exec,usb')]
+
+
+def make_membership(inventory):
+    _, groups, features = inventory()
+    path = 'fs/ext2/ext2_dir.c'
+    assert 'build/sources/common.mk:C_COMMON_PC98_PENDING' in groups[path]
+    assert features[path] == {'ide'}
+    assert 'build/programs.mk:SHELL_SRC' in groups['userland/shell/main.c']
 
 
 def run(mutate):
     example(owners.tables_for)
+    make_membership(owners.inventory)
     with tempfile.TemporaryDirectory() as tmp:
         subprocess.run([sys.executable, '-B', owners.__file__, tmp], check=True)
         paths = subprocess.check_output(['git', 'ls-files', '-z'], cwd=owners.ROOT)
         rows = [line.split('\t') for line in (Path(tmp) / 'owners.tsv').read_text().splitlines()]
         assert [row[0] for row in rows] == paths.decode().split('\0')[:-1]
-        assert all(len(row) == 5 for row in rows)
+        assert all(len(row) == 7 for row in rows)
         # The class, link image and Make owner come from independent parts of the build.
         assert any(owner == 'device' and 'pc98/' in images and groups
-                   for _, _, owner, images, groups in rows)
+                   for _, _, owner, images, groups, _, _ in rows)
         assert any('powermac' in images and 'pc98' in images and 'C_COMMON_CORE' in groups
-                   for _, _, _, images, groups in rows)
+                   for _, _, _, images, groups, _, _ in rows)
         # Compare unambiguous source stems with actual linker inputs, including NASM.
         by_stem = {}
-        for path, kind, _, images, _ in rows:
+        for path, kind, _, images, _, _, _ in rows:
             if kind == 'source':
                 by_stem.setdefault(str(Path(path).with_suffix('.o')), []).append((path, images))
         mapped = []
@@ -54,14 +64,19 @@ def run(mutate):
         path = Path(owners.__file__)
         original = path.read_text()
         for old, new in [('len(features) >= 2', 'len(features) > 2'),
-                         ("not row[4]", "bool(row[4])"),
+                         ("elif path.split('/')[0] in KERNEL_ROOTS or image:", "elif True:"),
+                         ("'CLI', 'EXEC', 'IDE'", "'PC98_PENDING', 'CLI', 'EXEC', 'IDE'"),
+                         ('INST_SHARED_SRC SHELL_SRC BENCH_SRC', 'INST_SHARED_SRC BENCH_SRC'),
                          ("owner(path)", "owner('common')"),
                          ('for path, mode in entries:', 'for path, mode in entries[:-1]:')]:
             assert original.count(old) == 1
             scope = {'__file__': str(path), '__name__': 'mutant'}
             exec(compile(original.replace(old, new), str(path), 'exec'), scope)
             try:
-                example(scope['tables_for'])
+                if old.startswith(("'CLI'", 'INST_SHARED_SRC')):
+                    make_membership(scope['inventory'])
+                else:
+                    example(scope['tables_for'])
             except AssertionError:
                 print('RED', old)
             else:
