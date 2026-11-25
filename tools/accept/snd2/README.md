@@ -33,6 +33,14 @@ done
 
 各 JSON の ok・rate・frames を確認し、pcm を base64 復号して s16le ステレオとして読む。各窓は frames_total を終端にして重複を除く。採取自体に空白があれば再測定する。wave の右の印の欠け・重複が 0、左の周期が 44.1 frame。発音遅延は下記の latency 専用試行で測る。
 
+## Ra266 実機（§13-4）
+
+1. 製品像で CS4231 を確認し、シリアルを記録しながら `snd2_test wave lead=3 secs=60` を一度実行する。44.1 kHz・period 256 の連続した 60 秒で `written=2646000`、`underruns=0`、drain 後に `snd2_test PASS rc=0` が合格条件。30 秒試行を足し合わせない。
+2. IF=0 は下記の kernel-tick-probe 診断像と対のモジュールを実機に配備し、KDEBUG=1 で採る。`tickprobe stop` で起動時の採取を閉じる。ホストの同じビルドの `nm -an build/out/tick-probe/kernel.elf` から tsc_clock.o の state・tsc_generation・epoch の番地を求める（同名なら kernel.map の当該 .bss と照合）。ゲストの `peek -k -w4 番地 4` で state と世代を、epoch の番地 + 0x10 から長さ 8 で mult・shift を読む。値はリトルエンディアンで、state=2、mult > 0、shift は 1〜32。世代と係数を十進整数で `{"generation":G,"mult":M,"shift":S}` の形で rate-before.json に保存する。
+3. 生シリアルを別ファイル if0.serial に取り、`tickprobe start` → `snd2_test`（pause を含む）→ `snd2_test wave lead=3 secs=60` → `snd2_test exit` → `tickprobe stop`。同じ時計の値を再読し、state・世代・係数が前後で一致することを確認する。60 秒の集計と各試験の PASS を保存する。
+4. ホストで `python3 tools/accept/snd2/verify_if0.py rate-before.json if0.serial` を実行する。両 bank の start・pause・resync・advance・teardown・other と、それを囲む if0-resident・irq0・irq10 の各 worst と全体最大を記録する。全経路の count が各々合計 1 以上、observation_lost=0、最長が **1450 µs 以下**で合格。自然に resync が起きず count=0 なら、その経路は未測定で実機の IF=0 判定を保留する。期限超過は未合格として実測値を報告する。
+5. L3 の sndl pump 最大間隔は IL で測る。sndl 実装後、同条件で最大間隔を cap − period と比較する。IS の max_writer_us は書込みループの記録として扱う。
+
 ## v1 の回帰
 
 ホストで `python3 tools/tests/make_pcm_wav.py test.wav` を実行し、WAV を HostDrv へ置く。ゲストで `pcm_play /host/test.wav` を実行する。再生中に採った JSON を使い `python3 tools/tests/pcm_play_guest.py test.wav capture/<取得時刻>.json --min-frames 22050` が終了コード 0。既存の `pcm_test`、`pcm_test short`、装置なし構成の `pcm_test nodev`、E4 専用像の `pcm_test e4`（serial に `[pcm-e4] 5/5 PASS`）と TASK_PCM_CS4231 の E 系の判定を適用する。

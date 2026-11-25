@@ -3,12 +3,48 @@ import base64
 import json
 import math
 import struct
+from io import BytesIO
+from unittest.mock import patch
+import sys
 import tempfile
 from pathlib import Path
 
 CHECK = dict(name='snd2-accept-host', tier=1, needs=[], budget=1,
              covers=['tools/accept/snd2/*.py'],
              basis=['docs/decisions/sound/AV_HAL_DESIGN.md §13-3'])
+
+
+def latency_capture(script, directory, mutate):
+    def reply(start, right):
+        raw = b''.join(struct.pack('<hh', 0, r) for r in right)
+        return BytesIO(json.dumps(dict(ok=True, rate=44100, frames=len(right),
+                        frames_total=start+len(right), pcm=base64.b64encode(raw).decode())).encode())
+
+    source = script.read_text()
+    for mutant in range(1 + int(mutate)):
+        code = source
+        if mutant:
+            anchor = 'prior = (prior + fresh)[-256:]'
+            assert code.count(anchor) == 1
+            code = code.replace(anchor, 'prior = fresh[-256:]')
+        output = directory / f'latency-{mutant}'
+        # The reference is exactly one period back. An overlapping window
+        # without a hit intervenes, then the hit arrives in an adjacent window.
+        replies = [reply(990, [10007] + [0]*127), BytesIO(b'{"ok":true}'),
+                   reply(1100, [0]*146), reply(1246, [-23456])]
+        with patch('urllib.request.urlopen', side_effect=replies), \
+             patch('time.monotonic_ns', side_effect=[0, 1, 2, 3, 4, 5]), \
+             patch.object(sys, 'argv', [str(script), str(output)]):
+            try:
+                exec(compile(code, str(script), 'exec'), {'__name__': '__main__'})
+            except ValueError:
+                assert mutant
+                print('RED runtime lost previous window')
+            except SystemExit as done:
+                assert not mutant and done.code == 0
+                result = json.loads((output / 'timing.json').read_text())
+                assert result['capture_frame'] == 1246 and result['frame'] == 8*256
+                print('GREEN latency across windows')
 
 
 def run(ctx):
@@ -20,6 +56,7 @@ def run(ctx):
     changes = [('end-start', '0'), ('(left,right)==expected', 'right == expected[1]')]
     with tempfile.TemporaryDirectory() as td:
         directory = Path(td)
+        latency_capture(scripts / 'latency.py', directory, ctx.mutate)
         def window(name, rate, start, samples):
             pcm = b''.join(struct.pack('<hh', *sample) for sample in samples)
             (directory / name).write_text(json.dumps(dict(

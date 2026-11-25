@@ -8,7 +8,7 @@
 #define PERIOD 256
 static short samples[2 * PERIOD];
 
-static int playback(KernelAPI *api, u32 dev, const char *mode, u32 lead)
+static int playback(KernelAPI *api, u32 dev, const char *mode, u32 lead, u32 seconds)
 {
     SND2_Caps caps;
     SND2_Pos pos;
@@ -31,7 +31,7 @@ static int playback(KernelAPI *api, u32 dev, const char *mode, u32 lead)
     int latency = !strcmp(mode, "latency");
     int epoch_test = !strcmp(mode, "epoch");
     int long_run = latency || !strcmp(mode, "wave") || !strcmp(mode, "stall") || epoch_test;
-    u32 total = long_run ? 30 * desc.fmt.rate : capacity;
+    u32 total = long_run ? seconds * desc.fmt.rate : capacity;
     const u32 step = 32000 / desc.fmt.rate, remainder = 32000 % desc.fmt.rate;
     u32 written = 0, index = 0, fraction = 0, frames = 0, sent = 0;
     int diag = (!strcmp(mode, "wave") || !strcmp(mode, "stall")) &&
@@ -207,9 +207,22 @@ int main(int argc, char **argv, KernelAPI *api)
     int measured = !strcmp(mode, "wave") || !strcmp(mode, "stall") ||
                    !strcmp(mode, "latency") || !strcmp(mode, "epoch");
     u32 lead = 3;
-    if (argc > 3 || (argc == 3 && (!measured || !parse_lead(argv[2], &lead))) ||
-        (!measured && *mode && strcmp(mode, "exit") && strcmp(mode, "nodev"))) {
-        api->kprintf(7, "usage: snd2_test [exit|nodev] or snd2_test wave|stall|latency|epoch [lead=N]\n");
+    u32 seconds = 30;
+    int have_lead = 0, have_secs = 0;
+    int valid = measured || !*mode || !strcmp(mode, "exit") || !strcmp(mode, "nodev");
+    for (int i = 2; valid && i < argc; ++i) {
+        if (measured && !have_lead && parse_lead(argv[i], &lead)) {
+            have_lead = 1;
+        } else if (!strcmp(mode, "wave") && !have_secs &&
+                   (!strcmp(argv[i], "secs=30") || !strcmp(argv[i], "secs=60"))) {
+            seconds = !strcmp(argv[i], "secs=60") ? 60 : 30;
+            have_secs = 1;
+        } else {
+            valid = 0;
+        }
+    }
+    if (!valid) {
+        api->kprintf(7, "usage: snd2_test [exit|nodev] or wave|stall|latency|epoch [lead=N] (wave: [secs=30|secs=60])\n");
         return 1;
     }
     int leave_open = !strcmp(mode, "exit");
@@ -221,7 +234,7 @@ int main(int argc, char **argv, KernelAPI *api)
         rc = api->snd2_dev_info(i, &info);
         if (rc) break;
         api->kprintf(7, "dev=%u kind=%u %s\n", info.dev, info.kind, info.name);
-        if (info.kind == SND2_KIND_PCM_OUT) rc = playback(api, info.dev, mode, lead);
+        if (info.kind == SND2_KIND_PCM_OUT) rc = playback(api, info.dev, mode, lead, seconds);
         else if (info.kind == SND2_KIND_FM || info.kind == SND2_KIND_PSG)
             rc = chip(api, info.dev, leave_open);
         else rc = 12;
