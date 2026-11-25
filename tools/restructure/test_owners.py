@@ -8,7 +8,7 @@ import owners
 
 
 def example(tables_for):
-    entries = [('arch/x86/example.c', '100644'), ('docs/example.md', '100644'),
+    entries = [('arch/x86/example.c', '100644'), ('docs/example.txt', '100644'),
                ('include/pc98.h', '100644'), ('kernel/unused.c', '100644'), ('unused.rs', '100644'), ('module', '160000')]
     source = entries[0][0]
     tables = tables_for(entries, ({source: {'image'}}, {source: {'A', 'B'}},
@@ -16,11 +16,19 @@ def example(tables_for):
     rows = tables['owners']
     assert [row[0] for row in rows] == [path for path, _ in entries]
     assert rows[0] == (source, 'source', 'arch/x86', 'image', 'A,B', 'arch/x86', 'member')
+    assert rows[1][1:3] == ('document', 'document: docs/')
+    examples = {'tools/x.py': 'development-test', 'a/tests/x.c': 'development-test',
+                '.github/workflows/x.yml': 'development-test', 'a/README': 'document',
+                'tools/x.md': 'document', 'sdk/include/x.h': 'public-interface',
+                'sdk/kapi.json': 'public-interface'}
+    cases = [(path, '100644') for path in examples]
+    extra = tables_for(cases, ({}, {}, {}))['owners']
+    assert all(row[1] == examples[row[0]] and row[2].startswith(row[1] + ': ') for row in extra)
     assert rows[2][2] == 'named/platform/pc98'
     assert rows[-1][1] == 'gitlink'
     assert tables['no-set'] == [rows[3]]
     assert tables['out-of-scope'] == [rows[4]]
-    assert tables['owner-empty'] == [rows[i] for i in (1, 3, 4, 5)]
+    assert tables['owner-empty'] == [rows[i] for i in (3, 4, 5)]
     assert sum(int(row[-1]) for row in tables['owner-empty-reasons']) == len(tables['owner-empty'])
     assert tables['multi-feature'] == [(*rows[0], 'exec,usb')]
 
@@ -77,7 +85,10 @@ def run(mutate):
     if mutate:
         path = Path(owners.__file__)
         original = path.read_text()
-        for old, new in [('len(features) >= 2', 'len(features) > 2'),
+        for old, new in [("path == 'sdk/kapi.json'", "False"),
+                         ("parts[0] == 'docs' or", "False or"),
+                         ("path.startswith('.github/workflows/')", "False"),
+                         ('len(features) >= 2', 'len(features) > 2'),
                          ("elif path.split('/')[0] in KERNEL_ROOTS or image:", "elif True:"),
                          ("'CLI', 'EXEC', 'IDE'", "'PC98_PENDING', 'CLI', 'EXEC', 'IDE'"),
                          ("target.lower().endswith", "target.endswith"),
