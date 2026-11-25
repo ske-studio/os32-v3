@@ -8,10 +8,17 @@ typedef struct {
     SND2_DevInfo info;
     SND2_Caps caps;
     Snd2Stream stream;
+#ifdef TICK_PROBE
+    u32 gap_start_ms;
+    u8 gap_active;
+#endif
     u8 writing; /* A foreground copy still holds the staging allocation. */
 } Snd2Device;
 
 Snd2Device *snd2_device(u32 dev);
+#ifdef TICK_PROBE
+int snd2_arm_observation_gap(Snd2Device *d);
+#endif
 #ifdef SND2_REFILL_DIAG
 int snd2_refill_caps(Snd2Device *d, SND2_Caps *out);
 #endif

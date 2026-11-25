@@ -75,6 +75,10 @@ def run(ctx):
         assert verify(work) == 0
         assert verify(work, diagnostic=True) == 0
         if ctx.mutate:
+            for old, new in [('d->gap_start_ms < 150U', 'd->gap_start_ms < 149U'),
+                             ('!d->gap_active &&', '')]:
+                assert verify(work, ('stream', old, new), diagnostic=True) == 1
+                print('RED runtime', old)
             old = 'stream_lock(TP_SND_ADVANCE)'
             assert verify(work, ('stream', old, 'stream_lock(TP_SND_OTHER)'), diagnostic=True) == 1
             print('RED runtime missing sound advance metric')

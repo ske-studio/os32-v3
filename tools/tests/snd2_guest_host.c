@@ -8,7 +8,11 @@
 
 enum scenario { NORMAL, NO_CHANGE, DOUBLE_CHANGE, NO_CONTINUATION, NO_AFTER, NO_KEY };
 static enum scenario scene;
+static u32 latency_us = 29409;
 static int latency_run, wave_run, diagnostic, inject_delay;
+#ifdef SND2_WRITER_DIAG
+static unsigned gap_requests;
+#endif
 static u32 retired, elapsed_us, reported_us, gaps, waits, time_reads;
 
 static u32 cursor, tick, marker, requests;
@@ -27,6 +31,9 @@ static void consume_period(void)
 static int caps(u32 dev, SND2_Caps *out, u32 size)
 {
     (void)size;
+#ifdef SND2_WRITER_DIAG
+    if (dev == SND2_CAPS_OBSERVATION_GAP) ++gap_requests;
+#endif
     if ((dev & SND2_CAPS_REFILL) && !diagnostic) return -1;
     *out = (SND2_Caps){.dev = dev, .ring_frames = 4096, .fmt_count = 1};
     out->fmt[0].rate = 44100;
@@ -79,6 +86,10 @@ static int position(u32 h, SND2_Pos *p)
         /* Recovery at the final sample leaves no proof of continuation. */
         if (scene == NO_CONTINUATION && cursor < 44100 * 30) p->epoch = 7;
     }
+    if (latency_run) {
+        p->epoch = 0;
+        if (marker && cursor == queue_capacity + 1) p->played = queue_capacity;
+    }
     p->time_ms = tick;
     p->underruns = gaps;
     return 0;
@@ -130,7 +141,16 @@ static int key(void)
     if (scene == NO_CONTINUATION && cursor < 44100 * 30) return -1;
     return 'a';
 }
-static int clock_us(u32 *lo, u32 *hi) { ++time_reads; *lo = wave_run ? elapsed_us : tick; *hi = 0; return 0; }
+static int clock_us(u32 *lo, u32 *hi)
+{
+    ++time_reads;
+    unsigned long long now = 0xfffffff0ULL;
+    if (!requests) now -= 100;
+    if (marker && cursor > queue_capacity + 1) now += latency_us;
+    *lo = wave_run ? elapsed_us : (u32)now;
+    *hi = wave_run ? 0 : (u32)(now >> 32);
+    return 0;
+}
 static i32 yield_cpu(void) { if (wave_run) consume_period(); return 0; }
 static void report(u8 color, const char *fmt, ...) {
     (void)color;
@@ -173,10 +193,16 @@ int main(void)
         cursor = 0;
         if ((playback(&api, 0, "epoch", 3, 30) == 0) != (scene == NORMAL)) return 1;
     }
+#ifdef SND2_WRITER_DIAG
+    if (gap_requests != NO_AFTER + 1) return 1;
+#endif
     latency_run = 1;
     scene = NORMAL;
     cursor = 0;
     if (playback(&api, 0, "latency", 3, 30) || marker != 1 || requests != 2) return 1;
+    cursor = requests = marker = 0;
+    latency_us = 29410;
+    if (!playback(&api, 0, "latency", 3, 30)) return 1;
     scene = NO_KEY;
     cursor = 0;
     if (!playback(&api, 0, "latency", 3, 30)) return 1;

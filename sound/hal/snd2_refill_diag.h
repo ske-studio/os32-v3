@@ -3,6 +3,7 @@
 
 /* Query snd2_caps(dev | SND2_CAPS_REFILL, ...) for a running stream.
  * The diagnostic snapshot occupies reserved[] only on this query. */
+#define SND2_CAPS_OBSERVATION_GAP 0x40000000UL
 #define SND2_CAPS_REFILL 0x80000000UL
 enum {
     SND2_DIAG_PI, SND2_DIAG_TICK, SND2_DIAG_MAX_US,

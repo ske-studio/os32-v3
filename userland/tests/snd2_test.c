@@ -40,6 +40,8 @@ static int playback(KernelAPI *api, u32 dev, const char *mode, u32 lead, u32 sec
     int have_time = 0;
     int stalled = 0, mark_pending = 0, marked = 0;
     u32 mark_frame = 0, write_lo = 0, write_hi = 0;
+    unsigned long long upper_us = 0;
+    int observed = 0;
     SND2_Pos previous = {0}, recovered = {0};
     int armed = 0, changed = 0;
     unsigned full_waits = 0;
@@ -50,6 +52,16 @@ static int playback(KernelAPI *api, u32 dev, const char *mode, u32 lead, u32 sec
             if (have_time && now - prev_us > max_writer_us) max_writer_us = now - prev_us;
             prev_us = now;
             have_time = 1;
+        }
+        if (marked && !observed) {
+            if (api->snd2_stream_pos(h, &pos) || pos.epoch) return 13;
+            if (pos.played > mark_frame) {
+                u32 lo, hi;
+                if (api->sys_time_now(&lo, &hi)) return 13;
+                upper_us = (((unsigned long long)hi << 32) | lo) -
+                           (((unsigned long long)write_hi << 32) | write_lo);
+                observed = 1;
+            }
         }
         if (sent == frames) {
             sent = 0;
@@ -101,13 +113,26 @@ static int playback(KernelAPI *api, u32 dev, const char *mode, u32 lead, u32 sec
         if (epoch_test && !changed && written >= desc.fmt.rate) {
             int key = api->kbd_trygetchar();
             if ((!armed && key == 'b') || (armed && key == 'a')) {
-                if (api->snd2_stream_pos(h, &pos)) return 6;
+                int rc = api->snd2_stream_pos(h, &pos);
+                if (rc) {
+                    api->kprintf(7, "epoch key=%c pos_rc=%d\n", key, rc);
+                    return 6;
+                }
                 if (!armed) {
+#ifdef SND2_WRITER_DIAG
+                    rc = api->snd2_caps(dev | SND2_CAPS_OBSERVATION_GAP, &caps, sizeof(caps));
+                    if (rc) {
+                        api->kprintf(7, "epoch gap arm_rc=%d\n", rc);
+                        return 6;
+                    }
+#endif
                     previous = pos;
                     armed = 1;
                     api->kprintf(7, "epoch armed epoch=%u played=%u ms=%u\n",
                                  pos.epoch, pos.played, pos.time_ms);
                 } else {
+                    api->kprintf(7, "epoch key=a before=%u after=%u played=%u ms=%u\n",
+                                 previous.epoch, pos.epoch, pos.played, pos.time_ms);
                     if (pos.epoch != previous.epoch + 1U) return 6;
                     recovered = pos;
                     changed = 1;
@@ -122,8 +147,13 @@ static int playback(KernelAPI *api, u32 dev, const char *mode, u32 lead, u32 sec
         }
     }
     if (api->snd2_stream_wait(h, total - PERIOD, 1000)) return 5;
-    if (api->snd2_stream_pos(h, &pos) || pos.written != total ||
-        pos.played < total - PERIOD || pos.played > pos.written) return 6;
+    int pos_rc = api->snd2_stream_pos(h, &pos);
+    if (pos_rc || pos.written != total ||
+        pos.played < total - PERIOD || pos.played > pos.written) {
+        if (epoch_test)
+            api->kprintf(7, "epoch final pos_rc=%d armed=%u changed=%u\n", pos_rc, armed, changed);
+        return 6;
+    }
     api->kprintf(7, "written=%u played=%u underruns=%u epoch=%u\n",
                  pos.written, pos.played, pos.underruns, pos.epoch);
     if (diag &&
@@ -162,9 +192,18 @@ static int playback(KernelAPI *api, u32 dev, const char *mode, u32 lead, u32 sec
     if (epoch_test && (!changed || pos.epoch != recovered.epoch ||
                        pos.played <= recovered.played)) return 6;
     if (latency) {
-        if (!marked || pos.underruns) return 13;
+        if (!observed || pos.underruns || pos.epoch) return 13;
         api->kprintf(7, "latency frame=%u write_us_hi=%u write_us_lo=%u\n",
                      mark_frame, write_hi, write_lo);
+        api->kprintf(7, "dma_upper_us_hi=%u dma_upper_us_lo=%u\n",
+                     (u32)(upper_us >> 32), (u32)upper_us);
+        /* Crystal CS4231A DS139PP2, FIFOs (pp. 14-15) and Digital Filter
+           Characteristics (p. 6): 16 FIFO samples + 10 periods for PCM. */
+        u32 codec_us = ((16U + 10U) * 1000000U + desc.fmt.rate - 1) / desc.fmt.rate;
+        unsigned long long output_upper_us = upper_us + codec_us;
+        api->kprintf(7, "output_upper_us_hi=%u output_upper_us_lo=%u\n",
+                     (u32)(output_upper_us >> 32), (u32)output_upper_us);
+        if (output_upper_us >= 30000) return 13;
     }
     if (long_run) return api->snd2_stream_close(h, SND2_CLOSE_DRAIN);
     if (!strcmp(mode, "exit")) return 0;

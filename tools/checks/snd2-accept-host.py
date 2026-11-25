@@ -3,7 +3,8 @@ import base64
 import json
 import math
 import struct
-from io import BytesIO
+from contextlib import redirect_stdout
+from io import BytesIO, StringIO
 from unittest.mock import patch
 import sys
 import tempfile
@@ -33,7 +34,7 @@ def latency_capture(script, directory, mutate):
         replies = [reply(990, [10007] + [0]*127), BytesIO(b'{"ok":true}'),
                    reply(1100, [0]*146), reply(1246, [-23456])]
         with patch('urllib.request.urlopen', side_effect=replies), \
-             patch('time.monotonic_ns', side_effect=[0, 1, 2, 3, 4, 5]), \
+             patch('time.monotonic_ns', side_effect=[0, 1, 2, 3, 4, 350000001]), \
              patch.object(sys, 'argv', [str(script), str(output)]):
             try:
                 exec(compile(code, str(script), 'exec'), {'__name__': '__main__'})
@@ -43,17 +44,44 @@ def latency_capture(script, directory, mutate):
             except SystemExit as done:
                 assert not mutant and done.code == 0
                 result = json.loads((output / 'timing.json').read_text())
+                assert result['upper_ns'] == 350000000
                 assert result['capture_frame'] == 1246 and result['frame'] == 8*256
                 print('GREEN latency across windows')
+
+
+def if0_capture(script, mutate):
+    source = script.read_text()
+    for mutant in range(1 + int(mutate)):
+        anchor = 'not any(int(n) for n, _ in rows)'
+        assert source.count(anchor) == 1
+        code = source.replace(anchor, 'False') if mutant else source
+        ns = {'__name__': 'if0_under_test'}
+        exec(compile(code, str(script), 'exec'), ns)
+        rows = ['TSC=raw cycles observation_lost=0']
+        for path in ns['PATHS']:
+            rows += [f'{path} count={count} worst=0x5aa' for count in (0, 1)]
+        log = '\n'.join(rows)
+        rate = dict(mult=2, shift=1)
+        with redirect_stdout(StringIO()):
+            assert ns['verify'](rate, log)
+            assert not ns['verify'](rate, log.replace('0x5aa', '0x5ab'))
+        output = StringIO()
+        with redirect_stdout(output):
+            passed = ns['verify'](rate, log.replace('snd-resync count=1', 'snd-resync count=0'))
+        detected = not passed and '未測定: snd-resync' in output.getvalue()
+        assert detected != bool(mutant)
+        print('RED runtime unobserved resync' if mutant else 'GREEN IF=0 coverage')
 
 
 def run(ctx):
     scripts = ctx.root / 'tools/accept/snd2'
     for path in scripts.glob('*.py'):
         compile(path.read_text(), str(path), 'exec')
+    if0_capture(scripts / 'verify_if0.py', ctx.mutate)
     verifier = scripts / 'verify_wave.py'
     source = verifier.read_text()
-    changes = [('end-start', '0'), ('(left,right)==expected', 'right == expected[1]')]
+    changes = [('start if saw_boot_rate else stop', 'start'), ('end-start', '0'), ('(left,right)==expected', 'right == expected[1]')]
+    changes.append(('if 10000 <= right <=', 'if False and 10000 <= right <='))
     with tempfile.TemporaryDirectory() as td:
         directory = Path(td)
         latency_capture(scripts / 'latency.py', directory, ctx.mutate)
@@ -81,6 +109,21 @@ def run(ctx):
             window('1.json', 44100, 10, samples[:300])
             window('2.json', 44100, 266, samples[256:])
             good = matches()
+            # With DMA stopped, the old marker remains in every idle window.
+            (directory / '0.json').unlink()
+            window('00.json', 44100, 0, samples[:10])
+            window('01.json', 44100, 0, samples[:10])
+            window('1.json', 44100, 0, samples[:10] + samples[:300])
+            good = good and matches()
+            (directory / '00.json').unlink()
+            (directory / '01.json').unlink()
+            window('0.json', 8000, 0, [(0, 0)])
+            window('1.json', 44100, 10, samples[:300])
+            window('2.json', 44100, 266, samples[256:] + [(0, 0)] * 8)
+            good = good and matches()
+            for replay in (samples[-1:], samples[256:], samples):
+                window('2.json', 44100, 266, samples[256:] + [(0, 0)] + replay)
+                good = good and not matches()
             damaged = samples[256:]
             damaged[-1] = (1, damaged[-1][1])
             window('2.json', 44100, 266, damaged)

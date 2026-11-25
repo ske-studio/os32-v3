@@ -113,6 +113,9 @@ int snd2_open_mode(const SND2_StreamDesc *desc, u32 *id, int v1)
     u32 gen = s->gen;
     kmemset(s, 0, sizeof(*s));
     s->gen = gen;
+#ifdef TICK_PROBE
+    d->gap_active = 0;
+#endif
     s->fmt = desc->fmt;
 #ifdef SND2_REFILL_DIAG
     s->min_stg = ~0U;
@@ -192,6 +195,9 @@ int snd2_write_checked(u32 id, const void *buf, u32 bytes,
                     snd2_stg_publish(s, n);
                     u32 hw;
                     if (s->state == SND2_ST_RUN && !s->restart_pending &&
+#ifdef TICK_PROBE
+                        !d->gap_active &&
+#endif
                         s->epoch == epoch && d->be->hw_pos(d->ctx, &hw) >= 0)
                         snd2_seg_after_publish(s, hw, tick_clock_ms());
                     rc = n * stride;
@@ -273,6 +279,23 @@ int snd2_refill_caps(Snd2Device *d, SND2_Caps *out)
 }
 #endif
 
+#ifdef TICK_PROBE
+int snd2_arm_observation_gap(Snd2Device *d)
+{
+    unsigned flags = irq_save();
+    Snd2Stream *s = &d->stream;
+    int rc = OS32_ERR_BUSY;
+    if (s->owner && s->owner == res_owner_get() && !s->closing &&
+        s->state == SND2_ST_RUN && !s->restart_pending && !d->gap_active) {
+        d->gap_start_ms = tick_clock_ms();
+        d->gap_active = 1;
+        rc = 0;
+    }
+    irq_restore(flags);
+    return rc;
+}
+#endif
+
 void snd2_advance(u32 dev)
 {
     Snd2Device *d = snd2_device(dev);
@@ -282,6 +305,15 @@ void snd2_advance(u32 dev)
         if (s->state == SND2_ST_RUN || s->state == SND2_ST_PAUSE ||
             s->state == SND2_ST_DRAIN) {
             u32 hw = 0, now = tick_clock_ms();
+#ifdef TICK_PROBE
+            if (d->gap_active) {
+                if (now - d->gap_start_ms < 150U) {
+                    stream_unlock(flags);
+                    return;
+                }
+                d->gap_active = 0;
+            }
+#endif
             if (s->restart_pending) {
                 stream_metric(TP_SND_RESYNC);
                 snd2_seg_reset(s, now);

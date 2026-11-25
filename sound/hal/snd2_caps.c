@@ -4,6 +4,15 @@
 
 int snd2_caps(u32 dev, SND2_Caps *out, u32 size)
 {
+#ifdef TICK_PROBE
+    if (dev & SND2_CAPS_OBSERVATION_GAP) {
+        Snd2Device *active = snd2_device(dev & ~SND2_CAPS_OBSERVATION_GAP);
+        if (!active || !out || size != sizeof(*out)) return OS32_ERR_INVAL;
+        int rc = snd2_arm_observation_gap(active);
+        if (!rc) *out = active->caps;
+        return rc;
+    }
+#endif
 #ifdef SND2_REFILL_DIAG
     if (dev & SND2_CAPS_REFILL) {
         Snd2Device *active = snd2_device(dev & ~SND2_CAPS_REFILL);
