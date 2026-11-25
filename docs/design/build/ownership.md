@@ -71,7 +71,7 @@ tools/ の走査根の定数、glob・rglob・os.walk、git ls-files の利用�
 | include 依存方向 | layers-x86・layers-ppc | 共通ソースから機種専用ヘッダを読む |
 | リンク依存関係 | P2-7 | PowerMac のリンク前提に x86 専用 object を加える |
 | 機種独立性 | ppc-compile の common-compile | 共通 C に x86 専用の命令を入れる |
-| HAL 契約 | P1-3 が書く | |
+| HAL 契約 | d2-services-host（入力・ポインタ・時計の操作表） | PC-98 の初期化から input_register を外し、入力が登録先に届かなくなる変異で落ちる |
 | ソース登録漏れ | P2-2 | 製品 C のコンパイル登録を外し、追跡と所属だけ残す |
 | 検査登録漏れ | P2-4 | 配置表の検査本体から登録だけを取り除く |
 | 生成物の再現性 | P2-7 | 同じ版・構成の二つの清浄ビルドに作業パスを埋め、バイト差を検出する |

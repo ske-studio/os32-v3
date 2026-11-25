@@ -8,6 +8,8 @@ import subprocess
 from collections import Counter
 from pathlib import Path
 
+import hal_inventory
+
 ROOT = Path(__file__).resolve().parents[2]
 BASE = 'c6076a6f6'
 LAYER_BLOB = '{revision}:tools/check_layers.py'
@@ -224,14 +226,84 @@ def verify_scope(table, base, list_candidates=False):
     return 0
 
 
+HAL_MAP = SCOPE.with_name('hal_map.tsv')
+HAL_HEADER = ['パス', '役割', '移設', '行き先の候補', '根拠']
+HAL_ROLES = {'契約', '型', '共通処理', '振り分け'}
+
+
+def hal_targets(base):
+    tracked, _ = inventory(base)
+    inputs = {p for p in tracked if p.split('/')[0] in hal_inventory.OWNERS
+              and p.endswith(('.c', '.inc', '.h'))}
+    sources, _ = review_inputs(base, set(), inputs)
+    hal, calls, geforce = hal_inventory.inventory(
+        {p: hal_inventory.mask(body) for p, body in sources.items()})
+    return {r[1] for r in hal} | {r[0] for r in calls} | {r[0] for r in geforce}
+
+
+def hal_table_targets(directory):
+    expected = set()
+    for name in ('hal.tsv', 'geforce.tsv', 'p8.tsv'):
+        with (directory / name).open(encoding='utf-8', newline='') as stream:
+            expected.update(row['file'] for row in csv.DictReader(stream, delimiter='\t'))
+    return expected
+
+
+def verify_hal(table, expected):
+    issues = []
+    paths = []
+    destinations = {}
+    moves = Counter()
+    pending = []
+    with table.open(encoding='utf-8', newline='') as stream:
+        rows = csv.reader(stream, delimiter='\t', strict=True)
+        if next(rows, None) != HAL_HEADER:
+            issues.append('HAL 表の見出し不一致')
+        for row in rows:
+            if len(row) != len(HAL_HEADER):
+                issues.append(f'HAL {rows.line_num} 行目: 列数不正')
+                continue
+            path, role, move, dest, reason = row
+            paths.append(path)
+            moves[move] += 1
+            if move == '移すだけ':
+                if dest in destinations:
+                    issues.append(f'{path}: 行き先が {destinations[dest]} と衝突 ({dest})')
+                destinations[dest] = path
+            if any(not cell.strip() for cell in row):
+                issues.append(f'{path}: HAL 必須欄が空')
+            if move not in ('移すだけ', 'P8', '未確定', '保留'):
+                issues.append(f'{path}: 移設判断が不正')
+            if role not in HAL_ROLES | {'バックエンド', 'その他', '未確定', '保留'}:
+                issues.append(f'{path}: HAL 役割が不正')
+            if any(tag in cell for cell in (role, move, dest) for tag in ('未確定', '保留')):
+                pending.append((path, reason))
+            elif 'sys/hal/' in dest and role not in HAL_ROLES:
+                issues.append(f'{path}: HAL に装置固有の実装を配置')
+    compare('HAL', paths, expected, issues)
+    for path, reason in sorted(pending):
+        print(f'A1 HAL\t{path}\t{reason}')
+    for issue in issues:
+        print(issue)
+    if issues:
+        return 1
+    print(f'OK: HAL {len(paths)}、移すだけ {moves["移すだけ"]}、P8 {moves["P8"]}、'
+          f'差 0、重複 0、必須欄の空 0、未確定 {len(pending)}')
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base', default=BASE)
     parser.add_argument('table', nargs='?', type=Path, default=SCOPE)
     parser.add_argument('--list-candidates', action='store_true',
                         help='list every operational tool with review markers')
+    parser.add_argument('--hal-map', type=Path, default=HAL_MAP)
+    parser.add_argument('--p0-dir', type=Path, help='P0-6 の元の3表と直接照合する')
     args = parser.parse_args()
-    return verify_scope(args.table, args.base, args.list_candidates)
+    scope_status = verify_scope(args.table, args.base, args.list_candidates)
+    expected = hal_table_targets(args.p0_dir) if args.p0_dir else hal_targets(args.base)
+    return verify_hal(args.hal_map, expected) or scope_status
 
 
 if __name__ == '__main__':
