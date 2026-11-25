@@ -2,43 +2,47 @@
 
 > 上位: [TASK_RESTRUCTURE.md](TASK_RESTRUCTURE.md)・[RULES.md](RULES.md) (入口と、どの段も先に読む決まり)
 
-**判定 (票を書いたセッションのレビュー 2026-11-25)**: P0-2・P0-4 は使える。P0-1・P0-6・P0-7 は足りない (持ち主空 4,207・HAL の役割の未確定 295・模型とコンパイルだけの未確定 814/812 — 読んで埋める仕事は P0-1 の分類の追加と P1-3・P5-2 へ)。P0-3 は一部 (L3 の 585 本は covers から機械で付けた候補、P1-4 で読んで決める。変異の数は 261 本だけ)。P0-5 は表は使える (結論は下の P0-5 の節)。P0-8 は一部 (未確定 100、ノートと pc98emu への質問 40 行 remote.tsv は未送付)。**数は段ごとに基点が違う** — 道具を main に入れた後の 1 つの SHA で取り直す (P0.md)。
+**判定 (票を書いたセッションのレビュー 2026-11-25)**: P0-2・P0-4 は使える。P0-1・P0-6・P0-7 は足りない (持ち主空 366・HAL の役割の未確定 295・模型とコンパイルだけの未確定 813/811 — 読んで埋める仕事は P0-1 の残りと P1-3・P5-2 へ)。P0-3 は一部 (L3 の 585 本は covers から機械で付けた候補、P1-4 で読んで決める。変異の数は 261 本だけ)。P0-5 は表は使える (結論は下の P0-5 の節)。P0-8 は一部 (未確定 100、ノートと pc98emu への質問 40 行 remote.tsv は未送付)。
 
-基点 `2b9d7316d` (一部の段は `d942afeb0`)。書き手も読み手も astra (DECISIONS の U8)、各段は読み手の所見 (P1) が 0 になるまで直した。残る P2 は各節の「残る漏れ」。
-生の表は PM の機械の `~/os32-tmp/run/restructure/p0-<n>/` (リポジトリの外)、棚卸しの道具は枝 `wip/rs-p0-<n>` の `tools/restructure/` (ユーザー指示 2026-11-25「P0までで止まってください」で push せず作業木に残す)。CI の実測の生データは `~/os32-tmp/run/restructure/p0-4/ci/`・`ci-logs/`。
+基点は全段とも `4146cf146`。P0-3・P0-4 の CI 実測は `3b1cecee3` の保存ログと P0-4 の push 履歴を使った。書き手も読み手も astra (DECISIONS の U8)。前回の読み手の所見と残る漏れは各節に記す。
+
+- 追跡 6,513 件から道具・試験 17 ファイルと検査登録ファイル 8 件を除いた母数は 6,488 件。
+- 検査登録 822 本から同じ 8 登録を除いた母数は 814 本。除外パス一覧は生表の親の `excluded`。
+- 生表は `/home/hight/os32-tmp/run/restructure/p0-rerun/rerun-4146cf146/p0-<n>/`。CI の入力は `~/os32-tmp/run/restructure/p0-4/ci/` と `~/os32-tmp/run/restructure/ci-logs/`。
 
 ## P0-1
 
-- 作業基点 `40d72ae93`。追跡 6,490 件と `owners.tsv` の 6,490 行はパス・順序とも一致。ヘッダなし。列はパス、種類、所属の根拠、入る像、Make 変数、check_layers 分類、集合調査結果。
-- 明示分類・集合・像の根拠が空の行は `owner-empty.tsv` に 4,207 件。既定の common は分類列に残した。
-- `owner-empty-reasons.tsv` は置き場・拡張子・理由・件数の 100 行。内訳は調査対象外のソース 915 件、調査済みで集合も像もないソース 7 件、像への依存を確認できなかったヘッダ・inc 175 件、その他の明示分類・ビルド根拠なし 3,110 件。
-- ソース 2,282 件。Make 集合あり 1,148 件、集合を確認できなかった `no-set.tsv` は 219 件（像だけ判明したものを含む）、調査対象外の `out-of-scope.tsv` は 915 件。`multi-feature.tsv` は 80 件。
+- 除外後の追跡 6,488 件と `owners.tsv` の 6,488 行はパス・順序とも一致。ヘッダなし。列はパス、種類、所属の根拠、入る像、Make 変数、check_layers 分類、集合調査結果。
+- 明示分類・集合・像の根拠が空の行は `owner-empty.tsv` に 366 件。像に入らない開発・検査用 2,555 件、文書 1,274 件、公開インターフェース 1 件に分類規則を付けた。既定の common は分類列に残した。
+- 像に入らない公開インターフェースは `sdk/kapi.json` の 1 件。基点で追跡する `sdk/include/` の 19 ヘッダはすべて像の入力でもあり、仕様 §5 の所有の表では公開の所属と依存先の像を併記する。
+- `owner-empty-reasons.tsv` は置き場・拡張子・理由・件数の 51 行。内訳は調査対象外のソース 102 件、調査済みで集合も像もないソース 7 件、像への依存を確認できなかったヘッダ・inc 29 件、その他の明示分類・ビルド根拠なし 228 件。
+- ソース 2,282 件。Make 集合あり 1,151 件、集合を確認できなかった `no-set.tsv` は 216 件（像だけ判明したものを含む）、調査対象外の `out-of-scope.tsv` は 915 件。`multi-feature.tsv` は 80 件。
 - PC-98、PowerMac 各構成、独立 PowerPC bootstrap の Make 規則から採取。MMU_C の 4 ソースは PPCMMU.ELF、pkg.c は PPC_INST_EXTRA と cdinst.elf に所属。ext2_dir.c の機能は IDE のみ。
 - Cargo metadata（offline）の crate 根と生成済み Cargo 依存表から .rs を照合。hello_gfx/src/lib.rs → hello_gfx.elf、直接生成規則で boot_fat.asm → boot_fat144.bin、コンパイラ依存で exec_abort.inc → PC-98 kernel.elf を確認。
-- 生表は `/home/hight/os32-tmp/run/restructure/p0-1/`。像はビルド入力としての所属。最終媒体への収録、依存ファイルがない構成の条件付き include は未確認。
+- 生表は `/home/hight/os32-tmp/run/restructure/p0-rerun/rerun-4146cf146/p0-1/`。像はビルド入力としての所属。最終媒体への収録、依存ファイルがない構成の条件付き include は未確認。
 - 残る漏れ (読み手 2026-11-25): リンカスクリプトの像への所属 (boot/loader.ld は通常・デバッグの両 ELF のリンク入力だが像の欄が空) と、ELF から変換する BIN へのソースの所属 (boot/boot_main.c → loader_hdd.bin、build/boot.mk) は表に反映されない。
 
 ## P0-2
 
 - 生表のデータ行数（見出し除く） build_refs.tsv 3431、include_order.tsv 3132、link_differences.tsv 680、link_evidence.tsv 36577、link_order.tsv 196、link_sources.tsv 403、read_mk.tsv 200。
 - 構成ごとの .mk 読込 pc98 56、powermac 27、kboot-core 18、kboot-link 18、kboot-shell 27、kboot-sh 27、kboot-link-sh 27。異なる 71 本、未収録 0 件。
-- geforce.elf の GEFORCE_OBJS 由来の前提は初期定義（8 行）16 件、追記（26 行）123 件。先頭 geforce_body.o の候補はこの変数では 8 行だけ。
+- geforce.elf の GEFORCE_OBJS 由来の前提は初期定義16 件、追記123 件。先頭 geforce_body.o の候補はこの変数では初期定義だけ。
 - common.mk、programs.mk、ppc-user.mk のリンク出所と ppc-user.mk のパス組み立て分類を確認。
 - 文面のリンク分類だけにある行 453、データベースからだけ拾った行 227。
 - 残る漏れ：同一ファイル内の追記を最終値の末尾と照合する。複雑な関数を含む追記や別ファイルにまたがる定義は元の行を確定できない。同じ語を持つ別変数も候補に含まれる。
-- 生表・ログの所在 /home/hight/os32-tmp/run/restructure/p0-2/。
+- 生表の所在 /home/hight/os32-tmp/run/restructure/p0-rerun/rerun-4146cf146/p0-2/。
 - 残る漏れ (読み手 2026-11-25): 条件分岐で実行されなかった再代入が追記の前にあると、初期値の出所をその再代入の行として記録する場合がある (tools/restructure/build_refs.py)。
 
 ## P0-3
 
-- 基点 `2b9d7316d` の登録 814 本 = `checks.tsv` 814 行。名前の過不足・重複 0。
+- 除外後の登録 814 本 = `checks.tsv` 814 行。名前の過不足・重複 0。
 - covers 由来の分類・行き先がそろうのは 807 行。欠ける 7 行は `no_candidate.tsv`。分類別は {'L0': 15, 'L1': 2, 'L2': 143, 'L3': 585, 'L4': 61, 'M': 4, '空欄': 4}、L5 は 0。
 - env から L4 を示唆する 58 行は別列に掲載。covers でも L4 が 43 行、env のみが L4 を示すのは 15 行。
 - CI 所要は保存済み p0-4/ci/times の成功行から環境を合わせた中央値で 814 行、空欄 0。
 - 変異は `3b1cecee3` の check 45568507923・build 45568508091 が対象。同じ run/shard の成功記録で対象を絞り、過去の個別ログの検査固有の出力と照合して、今回の CI の個別 RED 行を数えた。表にジョブログ名と行番号を記録。
 - 変異数が取れたのは 261 行。未確定 553 行の内訳は、過去の個別ログに個別 RED が見つからないもの 51、個別 RED はあるが今回のログで帰属・完全性を確認できないもの 401、対応する過去の個別ログなし 43、gate が成功ログ本文を省略したもの 58。
 - e82557-eeprom-host は 21、gshell-host は 185（183 + 2）、allocator-bench-host は 5、abi-boundary は 2、edit-doc-host は総括を除いて 11。ソース推計との不一致 19 行を `source_disagreements.tsv` に掲載。回数の単位は RED 報告行で、同じ変異を別 runner で報告する場合も各行を数える。
-- 生表・基点の登録 JSON・検証ログは `/home/hight/os32-tmp/run/restructure/p0-3/`。
+- 生表・基点の登録 JSONは `/home/hight/os32-tmp/run/restructure/p0-rerun/rerun-4146cf146/p0-3/`。
 
 ## P0-4
 
@@ -57,26 +61,27 @@
 - 変異の結果を示す書式に合う RED の行は 9,042 行 (行頭 RED 4,967、変異を示す接頭辞 3,771、行頭 runtime 298、名前付き runtime RED with reach marker 6)。**これは変異の件数の下限ではない** — 同じ変異の個別の結果と集計の行 (例 `RED ISO rd name (exit 3)` と `RED 1/1`、ci-logs/45568508091-checks__0_.log) が両方入り、二重に数える行がある。検査名に帰属できた結果行は 0。ほかに判定できない RED の行が 1,334 行あり、static-check が個別の結果を `RED (落ちた)` で終える 8 行を含む (ci-logs/45568507923-static-check.log) — 読み手 (2026-11-25) の所見を PM が書き換え。変異の総数はログからは確定できない (次の行)。
 - CI のログに検査ごとの構造化された結果（検査名・SKIP・変異の数）が無いので、総数はログからは確定できない。P6 で gate の結果に持たせる候補。
 - ジョブ別は log_jobs.tsv、検査名付きの行は log_checks.tsv、ジョブ・書式別の内訳は red_formats.tsv。残りの run は「1 回分で代表」。別件の未取得は 45579912559 の失敗段 stdout と 45580917618 の完了時 jobs JSON。
-- 生表の所在は `~/os32-tmp/run/restructure/p0-4/`。
+- 生表の所在は `/home/hight/os32-tmp/run/restructure/p0-rerun/rerun-4146cf146/p0-4/`。
 
 ## P0-5
 
-- **表から読める結論** (票を書いたセッションのレビュー 2026-11-25): (A) `include/` を移すと kdebug の生成物が変わる — kdebug.elf と kselftest.o に文字列 `include/memmap.h` が入る (artifact_paths.tsv の runtime string の行)。カーネル側の置き場のパスが出荷物に入るのは抜き取った範囲でこの 1 件。P3 の W9 はバイト一致にならず `Sep-Changes:` の宣言つきの波になる。(B) `userland/libos32gui.elf` に作業木の絶対パス (`…/rs-p0-5/userland/lib/font/src/raster.rs`) と rustup の置き場が入る — 置き場の移動と関係なく作業木が違えば生成物が変わる (POLICY_CI G11)。(C) `move_files.py` が置換できない所は unresolved.tsv 7,514 行。手で直すと確定しているのは split_paths 10 と unresolved_paths 312 (部品の .mk の .o のパスなど)。directory literal 2,918 と constructed expression 1,450 は使われ方が未確定で、P2-6 の予行で分かる。
-- 作業基点 88def8978。生表は /home/hight/os32-tmp/run/restructure/p0-5/。行数は見出しを除く。
-- 仮表 map.json は 1,802 ファイル。dry-run.jsonl は 4,649 実行、置換差分あり 2,732。dry-run-full.json は tools/tests/host_arch/arch_abi.h の全対応表による照合。
-- refs.tsv は 82,370 観測、うち根拠が未確定 22,897。path_refs.tsv は種類×根拠 23 行。現行票 P3.md の24行目 init/kernel_start.c は refs と dry-run の両方で確認。
-- 種類別の出現数：__FILE__ source 24、allow 76、baseline 185、constructed path 3,243、covers 21,355、document 15,965、mutation context 221、mutation operand 9,249、skill 97、source/build 10,101、tools 21,810、workflow 44。
-- effective_covers.tsv は登録済み 814 検査・21,114 行。
-- unresolved.tsv は 7,514 行。constructed expression unchanged; evaluation 未確定 1,450、directory literal; use 未確定 2,918、excluded holder 463、glob outside literal map 1,840、include directory not supplemented by dry-run 521、split_paths 10、unresolved_paths 312。
-- products.tsv は 2,192 成果物。make のログ・.d・配布表・無視対象の生成物を走査。build-start は PC-98 の build.log 作成時刻で、以後に更新された .o・.elf・.a も対象。各行の product_evidence に選定根拠を記録。
-- artifact_paths.tsv は 22,646 行。DWARF line CU 3,410、DWARF line file 2,698、DW_AT_comp_dir 160、DW_AT_name 3,410、STT_FILE 8,354、path bytes 4,582、runtime string .rodata 31、runtime string .rodata.str1.4 1。gfx/v2/format.o の STT_FILE format.c は build.log と gfx/v2/format.d から gfx/v2/format.c に帰属。
-- 生成物にスラッシュ付き表記が入る TU は 136、うち表記先も照合できた TU は 135。basename 等を含めると 1,134 TU。生成元が未確定の観測は 5,749 行。PC-98 と PowerMac の同一ソースは1回数えた。
+- **表から読める結論** (票を書いたセッションのレビュー 2026-11-25): (A) `include/` を移すと kdebug の生成物が変わる — kdebug.elf と kselftest.o に文字列 `include/memmap.h` が入る (artifact_paths.tsv の runtime string の行)。カーネル側の置き場のパスが出荷物に入るのは抜き取った範囲でこの 1 件。P3 の W9 はバイト一致にならず `Sep-Changes:` の宣言つきの波になる。(B) `userland/libos32gui.elf` に作業木の絶対パス (`…/rs-p0-rerun/userland/lib/font/src/raster.rs`) と rustup の置き場が入る — 置き場の移動と関係なく作業木が違えば生成物が変わる (POLICY_CI G11)。(C) `move_files.py` が置換できない所は unresolved.tsv 7,517 行。手で直すと確定しているのは split_paths 10 と unresolved_paths 312 (部品の .mk の .o のパスなど)。directory literal 2,923 と constructed expression 1,450 は使われ方が未確定で、P2-6 の予行で分かる。
+- 生表は /home/hight/os32-tmp/run/restructure/p0-rerun/rerun-4146cf146/p0-5/。行数は見出しを除く。
+- 仮表 map.json は 1,802 ファイル。dry-run.jsonl は 4,648 実行、置換差分あり 2,731。dry-run-full.json は tools/tests/host_arch/arch_abi.h の全対応表による照合。
+- refs.tsv は 82,351 観測、うち根拠が未確定 22,883。path_refs.tsv は種類×根拠 23 行。現行票 P3.md の init/kernel_start.c は refs と dry-run の両方で確認。
+- 種類別の出現数：__FILE__ source 21、allow 76、baseline 185、constructed path 3,243、covers 21,343、document 15,998、mutation context 221、mutation operand 9,248、skill 97、source/build 10,101、tools 21,774、workflow 44。
+- effective_covers.tsv は814 登録のうち covers が空の build-no-deploy を除く 813 検査・21,102 行。
+- unresolved.tsv は 7,517 行。constructed expression unchanged; evaluation 未確定 1,450、directory literal; use 未確定 2,923、excluded holder 463、glob outside literal map 1,838、include directory not supplemented by dry-run 521、split_paths 10、unresolved_paths 312。
+- products.tsv は 2,838 成果物。make のログ・.d・配布表・無視対象の生成物を走査。build-start は PC-98 の build.log 作成時刻で、以後に更新された .o・.elf・.a も対象。各行の product_evidence に選定根拠を記録。
+- 前回の PowerMac 像に加え、今回は ppc-ci-image の生成物も走査したため、成果物とシンボルの観測が増えた。
+- artifact_paths.tsv は 24,623 行。DWARF line CU 3,572、DWARF line file 2,856、DW_AT_comp_dir 171、DW_AT_name 3,572、STT_FILE 9,662、path bytes 4,758、runtime string .rodata 31、runtime string .rodata.str1.4 1。gfx/v2/format.o の STT_FILE format.c は build.log と gfx/v2/format.d から gfx/v2/format.c に帰属。
+- 生成物にスラッシュ付き表記が入る TU は 136、うち表記先も照合できた TU は 135。basename 等を含めると 1,148 TU。生成元が未確定の観測は 7,139 行。PC-98 と PowerMac の同一ソースは1回数えた。
 - 未確認：動的な式・変異の実行時の参照先、__FILE__ の展開由来、LLVM bitcode を含む書庫 12 件の非 ELF メンバー、圧縮内容の展開後だけに見える表記。全 CI・ゲスト受入は未実行。
 - 残る漏れ (読み手 2026-11-25): D88 の形の生成物は探索の対象から漏れる — images/os32_boot.d88 (build/image.mk) に fpdummy.c のパスが残るが products.tsv・artifact_paths.tsv に無く、集計の外。
 
 ## P0-6
 
-- 基点 d942afeb0、修正元 c688e6a69。表の行数は見出しを除く。全 1062 行に file・判定・根拠あり。
+- 表の行数は見出しを除く。全 1062 行に file・判定・根拠あり。
 - hal.tsv は 366 行、360 ファイル。役割の判定は 未確定 295、実コード 71。
 - 各分野の内訳は 契約／共通処理／振り分け／バックエンド／未確定（行）。
 - 音　1／4／3／2／29
@@ -94,33 +99,33 @@
 - HAL の移設判断・P8 の変更判断は候補。間接呼出し、マクロ展開、全構成のリンク先、移設後の生成物一致は未確認。
 - include/ の共通ヘッダで宣言され、複数機種に定義がある契約の呼出しを63件除外。platform_clock_read_us は0件、geforce_foreground_poll は候補2件。
 - 残る漏れ：platform_irq_topology は include/platform_irq.h に宣言があるが、定義を確認できたのは platform/pc98/irq_policy.c の1機種のみ。4呼出しが候補に残る。
-- 表と検査ログは /home/hight/os32-tmp/run/restructure/p0-6/。
+- 表は /home/hight/os32-tmp/run/restructure/p0-rerun/rerun-4146cf146/p0-6/。
 - 残る漏れ (読み手 2026-11-25): 共通の契約 platform_host_owner_exit は kernel/dev/device_host.c と platform/powermac/host_unavailable.c に定義があり、片方が platform/ の外にあるため p8.tsv に未確定として残る。
 
 ## P0-7
 
-前回実装コミット 65fabd050 の登録 815 本 × 5 条件 = 4075 行。条件は表頭に 5 件。
+登録 814 本 × 5 条件 = 4070 行。条件は表頭に 5 件。
 
 | 条件 | 候補（登録） | 条件外 | 未確定 |
 |---|---:|---:|---:|
-| 段名 | 59 | 756 | 0 |
-| 模型 | 1 | 0 | 814 |
-| コンパイルのみ | 3 | 0 | 812 |
-| 同一宣言 | 7 | 639 | 169 |
-| 変異50超 | 8 | 255 | 552 |
+| 段名 | 58 | 756 | 0 |
+| 模型 | 1 | 0 | 813 |
+| コンパイルのみ | 3 | 0 | 811 |
+| 同一宣言 | 7 | 638 | 169 |
+| 変異50超 | 8 | 255 | 551 |
 
 同一宣言は 5 組。空の宣言は未確定。
 R1 型は multiapp-model-host の模型部分。同行の実物試験とは別に模型を単独リンクして実行する。
 コンパイルのみは直接追跡できた全試験のプロセス呼出しで判定。abi-boundary は生成物の終了値を調べるため候補から除外。
 変異は CI run 45568507923・45568508091 の個別 RED 行で 261 登録を計測。50 超は 6 登録（gshell-host 185）。ほかに静的な表からの候補が 2 登録あり、実行数は未確定。
 動的な委譲・間接的なソース入力は静的解析の範囲外。候補の採否は未確認。
-生表: /home/hight/os32-tmp/run/restructure/p0-7/quality_candidates.tsv
+生表: /home/hight/os32-tmp/run/restructure/p0-rerun/rerun-4146cf146/p0-7/quality_candidates.tsv
 - 残る漏れ (読み手 2026-11-25): 段名の条件は L＋番号を拾わず、dep-dir-a-l01-host など同じ系列の 9 登録が条件外になる (tools/restructure/quality_candidates.py)。
-- 母数 (読み手 2026-11-25): P0-3 の基点は 814 登録。作業木で足した restructure-p0-7 を含めて 815 登録を集計した。
+- 前回の 815 登録には restructure-p0-7 自身が入っていた。今回は P0-3 と同じ登録を調査した。
 
 ## P0-8
 
-前回実装 87c95d675（親 d942afeb0）。相手・パス・用途別に 638 件。
+相手・パス・用途別に 638 件。
 
 | 相手 | 変わる | 変わらない | 未確定 |
 | --- | ---: | ---: | ---: |

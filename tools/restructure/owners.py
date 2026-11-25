@@ -349,6 +349,20 @@ p0-extra:
     return images, groups, features
 
 
+def non_image_role(path):
+    parts = Path(path).parts
+    if path.startswith('sdk/include/') or path == 'sdk/kapi.json':
+        return 'public-interface', 'sdk/include/' if path.startswith('sdk/include/') else path
+    if parts[0] == 'docs' or Path(path).suffix.lower() == '.md' or parts[-1].split('.')[0].upper() == 'README':
+        return 'document', 'docs/' if parts[0] == 'docs' else parts[-1]
+    if path.startswith('.github/actions/'):
+        return 'development-test', '.github/actions/'
+    if parts[0] == 'tools' or 'tests' in parts[:-1] or path.startswith('.github/workflows/'):
+        rule = 'tools/' if parts[0] == 'tools' else 'tests/' if 'tests' in parts[:-1] else '.github/workflows/'
+        return 'development-test', rule
+    return None
+
+
 def rows(entries, images, groups, features):
     for path, mode in entries:
         suffix = Path(path).suffix.lower()
@@ -366,6 +380,10 @@ def rows(entries, images, groups, features):
                 status = 'no-set'
             else:
                 status = 'out-of-scope'
+        role = non_image_role(path) if not image else None
+        if role:
+            kind, rule = role
+            evidence = f'{kind}: {rule}'
         yield (path, kind, evidence, image, group, layer, status), sorted(features.get(path, ()))
 
 
