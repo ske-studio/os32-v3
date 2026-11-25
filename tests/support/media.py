@@ -5,6 +5,7 @@ import stat
 import subprocess
 import sys
 import tarfile
+import zlib
 
 PPC = {
     "core": (["KBOOT_LINK=0"], "."),
@@ -64,6 +65,23 @@ def x86_build(config):
         archive.add(hostdrv, arcname="hostdrv")
 
 
+def verify_archive(archive_path, manifest):
+    name = "hostdrv/.deploy/manifest.txt"
+    try:
+        with tarfile.open(archive_path, "r:gz") as archive:
+            try:
+                member = archive.getmember(name)
+            except KeyError:
+                raise Failure(f"missing {name}") from None
+            if not member.isfile():
+                raise Failure(f"invalid {name}")
+            with archive.extractfile(member) as packed:
+                if packed.read() != manifest.read_bytes():
+                    raise Failure("HostDrv archive manifest mismatch")
+    except (tarfile.TarError, EOFError, OSError, zlib.error) as exc:
+        raise OSError(f"cannot read {archive_path}: {exc}") from exc
+
+
 def x86_verify(config):
     sys.path.insert(0, str(Path("tools").resolve()))
     from fd_reader import d88_to_raw, fat12_files
@@ -77,10 +95,7 @@ def x86_verify(config):
     require(manifest)
     archive_path = host.parent / "hostdrv.tar.gz"
     require(archive_path)
-    with tarfile.open(archive_path, "r:gz") as archive:
-        packed = archive.extractfile("hostdrv/.deploy/manifest.txt")
-        if packed is None or packed.read() != manifest.read_bytes():
-            raise Failure("HostDrv archive manifest mismatch")
+    verify_archive(archive_path, manifest)
     packages, problems = expand_plan(load_plan("build/packages.yaml"), ".")
     if problems or not packages:
         raise Failure(f"invalid package plan: {problems}")
