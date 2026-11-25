@@ -25,6 +25,7 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 | 機能ごとのブランチで並列に実装する (触るファイルの一覧・共有の登録ファイルの持ち主・上限の予算・結線は直列) | [tasks/agents/PARALLEL_BRANCHES.md](tasks/agents/PARALLEL_BRANCHES.md) | ROLES §0 (案内のみ) |
 | 手本がある移植の進め方 (コンパイルを全部の実装の後に・設計の段の点検・依頼に必ず書くこと・踏んだこと) | [tasks/agents/PORT_FLOW.md](tasks/agents/PORT_FLOW.md) | ROLES §0 (1 行)、スキル `os32-delegate` (案内のみ) |
 | 票・設計をアーカイブへ移す時の決まり (何をいつ移すか・移す前に要約する物・要約の書き方・移す順) | [POLICY_ARCHIVE.md](POLICY_ARCHIVE.md) | 規則は [CONSTRAINTS.md](CONSTRAINTS.md) の [D4]、籠の一覧は `docs/archive/README.md`、手順はスキル `.claude/skills/os32-archive` |
+| 新しい検査を書く・登録する | [検査の書き方](design/tools/checks/tests_v2.md) | [登録の 13 項と結果](design/tools/checks/registry_v2.md) |
 | CI を作る時・改修する時の決まり (関門・全部回す・表とログ・登録から引く・用意は 1 か所・同じ入口・改修の順) | [POLICY_CI.md](POLICY_CI.md) | 新 CI の結果と取り込みの設計は [ci_v2.md](design/tools/ci/ci_v2.md)、欠点の実測と手本の形は [design/tools/ci/gate.md](design/tools/ci/gate.md)、既存の check・build を直す票は [tasks/v3/TASK_CI_REWORK.md](tasks/v3/TASK_CI_REWORK.md)、08_build §8-6 (案内のみ) |
 | PCI 装置の扱い (手本・不在・待ち・初期化・番地・PC-98・試験) | [POLICY_PCIDEV.md](POLICY_PCIDEV.md) | PORT_FLOW §4、WORK_GUIDE、POLICY_DEBUG §4、05_drivers (案内のみ) |
 | 実行形式 (`os32x_format`) が変わる版の実機への入れ方 | [REALHW_FORMAT_UPDATE.md](REALHW_FORMAT_UPDATE.md) | スキル os32-realhw-update の世代の表 (案内のみ) |

@@ -1,0 +1,63 @@
+# 新しい検査の登録と結果
+
+> 状態: P1-5 起草済み (sol のレビュー待ち)。
+
+候補 SHA の `tests/registry.toml` を正本とする。TOML は標準の tomllib でコードを実行せずに表と配列を読める。1 契約が 1 個の `[[check]]` に対応し、本体のパスは所属と ID から決まる。[検査の書き方](tests_v2.md)
+
+## 仕様 §8 の 13 項
+
+| 項 | 欄 | 書く値・読み方 |
+|---|---|---|
+| 1 検査 ID | id | 全登録で一意の英小文字・数字・アンダースコア |
+| 2 仕様 ID と期待の出所 | spec | 現行文書のパスと節見出しの組。節が仕様 ID を兼ねる |
+| 3 所属 | subsystem | tests 下の担当ディレクトリ名 |
+| 4 分類 | level | L0 静的、L1 ビルド・成果物、L2 実関数、L3 結合、L4 システム、L5 実機、M 検査品質。実行順とは独立 |
+| 5 対象ソース | sources | 製品パス又は Make ターゲットとその入力。make: の後は Make の目標名。依存不明時は全件へ広げる |
+| 6 実行環境 | environment | 実行器が用意するツール・バックエンドの組の名前 |
+| 7 対応 arch | arch | 対象 CPU と、その CPU で実行する構成名の配列。各要素が計画の 1 行 |
+| 8 前提生成物 | needs | 入力に必要な生成物名の配列。空配列は前提なし |
+| 9 合否条件 | expect | 観測する結果と合格条件 |
+| 10 限界 | limits | この観測で保証できない範囲 |
+| 11 必須の関門 | gates | push・main のうち要求する関門。指定内は常時対象を既定とし、条件付きならここに適用条件も宣言 |
+| 12 所要 | seconds | 実行器が各結果に書く実測秒。登録の手書きは 12 項で、所要の予想値は不要 |
+| 13 変異 | mutations | 1 個以上の宣言。ID は全登録で一意。適用構成・操作対象・操作の時点と内容・検出すべき失敗を指定 |
+
+## P4 順 1 の登録
+
+```toml
+[[check]]
+id = "ppc_media_build"
+spec = { path = "docs/design/tools/ci/ci_v2.md", section = "§0 最小 workflow と仮の関門" }
+subsystem = "infra"
+level = "L1"
+sources = ["make:all", "make:iso"]
+environment = "linux-ppc-cross"
+arch = { ppc = ["core", "link", "sh", "link-sh", "shell", "neg1"] }
+needs = []
+expect = "ビルド成功、PPCKERN.ELF と boot.iso が非空"
+limits = "起動到達と再生成時の一致は別の検査"
+gates = ["push", "main"]
+mutations = [{ id = "ppc_core_missing_iso", config = "core", when = "after_build", remove = "build/out/ppc-kboot/boot.iso", fail = "missing boot.iso" }]
+```
+
+実行器は本体を起動する前に environment の前提を検査する。linux-ppc-cross では make・Python・媒体生成ツールと PowerPC クロスコンパイラ・binutils が実行でき、対象の newlib のヘッダと libc.a が読めることを確認する。不足なら実行器が対象の行に不足名と ERROR（終了値 2）を記録する。前提が揃って製品のコンパイル・リンクに失敗した場合や必須出力が欠けた場合は、本体が FAIL（終了値 1）を返す。make の依存は各構成の ARCH・PLATFORM・機能指定で展開する。所属・像の選択は候補版の[所有の入口](../../build/ownership.md)に従う。lint は表の必須欄・型、ID、構成と変異の参照、本体の所在、出所の実ファイルと節を確認する。例えば needs を省くと失敗し、spec.path が現行の棚に無い文書を指しても失敗する。空配列と欠落は区別する。
+
+## 計画から集計まで
+
+P6-1 が登録を読み、P6-2 の手元・CI 共通入口が環境・分類・arch で束を作る。workflow に名前とパスを列挙しない。候補 SHA・run ID・attempt の計画に ID・構成・必須の変異 ID を残し、collect は登録の全件と結果を照合する。通常の行は ID・構成・状態・理由・seconds・ログの所在を持つ。[CI 設計 §1〜§4](../ci/ci_v2.md)
+
+| 状態 | 記録と関門 |
+|---|---|
+| PASS | 実行して期待どおり |
+| FAIL | 実行して期待に違反。必須なら赤 |
+| ERROR | ツール不足・基盤異常・別 SHA の行など。赤、終了値 2 |
+| NOT_RUN | 必要なのに結果が欠けた ID・構成を集計側で補い、赤 |
+| NOT_APPLICABLE | 登録の対象条件から外れた理由を記録 |
+| DEFERRED | 承認済み延期台帳 ID と今回の取り込み条件を記録し、条件を満たす場合だけ許す |
+| REUSED | 対象コミット・検査条件・環境・必要生成物・元の実行結果（直接の PASS）の一致を確認できる場合だけ。当面は使用せず、適用対象は毎回実行する（U11）。再利用の採否は A6 |
+
+SKIP は出さない。変異は通常の PASS を確かめた後、登録から M として別に計画する。操作が指定対象に一意に作用し、狙った FAIL と診断が得られた時だけ検出に数える。例の欠落時には本体が missing boot.iso を出す。正常対照の失敗、操作不能、環境 ERROR は検出に数えない。検査ごとに宣言数・実行数・検出数・変異秒を別集計し、必須変異の欠け・未検出は赤。通常のみと変異込みの回の所要を区別する。main 候補は全件・変異込み、途中の push も当初は全件。再生成比較は main 候補だけとし、選択や変異の再評価を絞る判断は A6 に残す。
+
+## 成果物を取得するとき
+
+成果物状態は登録欄に足さず、取得時に manifest（候補 SHA・構成・配布 run/attempt・artifact ID・sha256）、同じ SHA の全件集計、受入記録から導く。BUILT は生成済みで調査に取得可。VERIFIED は候補の指定 run の最新 attempt とその全件集計が成功し、取り込みに使える。ACCEPTED は対象 SHA・媒体 sha256 に結び付いた必要なゲスト・実機受入が完了したもの。受入だけで必須 CI を通過した扱いにはしない。文書変更も U21 の間は候補ごとに起動する。[CI 設計 §5・§8](../ci/ci_v2.md)
