@@ -107,12 +107,13 @@ def exercise_hal(module, root, tree):
     row = ['gfx.c', '振り分け', '移すだけ', 'sys/hal/gfx/', 'gfx.c の flip が委譲する']
     pending = ['gpu.c', 'バックエンド', '未確定', 'sys/dev/', 'gpu.c の probe を A1 で確認']
 
+    sources = {'gfx.c': '/* cpuid */ void flip(void) {}'}
     def check(rows, status, *messages):
         with table.open('w', newline='', encoding='utf-8') as stream:
             csv.writer(stream, delimiter='\t').writerows([header, *rows])
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
-            result = module.verify_hal(table, {'gfx.c', 'gpu.c'})
+            result = module.verify_hal(table, {'gfx.c', 'gpu.c'}, sources)
         assert result == status, output.getvalue()
         for message in messages:
             assert message in output.getvalue(), message
@@ -124,6 +125,14 @@ def exercise_hal(module, root, tree):
     check([row, ['gpu.c', '契約', '移すだけ', row[3], '入口を宣言']], 1, '衝突')
     check([row[:-1] + [' '], pending], 1, 'HAL 必須欄が空')
     check([row[:2] + ['候補'] + row[3:], pending], 1, '移設判断が不正')
+
+    for code in ('int flags = PTE_PCD;', 'kbd_trygetkey();', 'id == NET_NIC_E82557',
+                 'extern struct ops ext2_medium_loop_ops;', '__asm__("nop");'):
+        sources['gfx.c'] = code
+        check([row, pending], 1, '移すだけの境界根拠がない')
+        check([row[:2] + ['P8'] + row[3:], pending], 0, 'P8 1')
+    sources['gfx.c'] = 'pte_write();'
+    check([row[:-1] + ['境界照合 pte_write。GPU の GART 表を更新する。'], pending], 0)
 
 
 def main():
@@ -144,6 +153,7 @@ def main():
                 ('{r[0] for r in calls}', 'set()'),
                 ('{r[0] for r in geforce}', 'set()'),
                 ("('hal.tsv', 'geforce.tsv', 'p8.tsv')", "('hal.tsv', 'geforce.tsv')"),
+                ("if symbol and f'境界照合 {symbol}。' not in reason:", 'if False:'),
                 ('if dest in destinations:', 'if False:'),
                 ("compare('HAL', paths, expected, issues)", 'pass'),
                 ('if any(not cell.strip() for cell in row):', 'if False:'),

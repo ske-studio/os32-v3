@@ -4,6 +4,8 @@ import csv
 from collections import defaultdict
 from pathlib import Path
 
+from p1_verify import boundary_symbol
+
 
 DOMAINS = {'音': 'sound', '入力': 'input', '描画': 'gfx', '時刻': 'time',
            'ブロック': 'block', 'LAN': 'net'}
@@ -62,6 +64,135 @@ RESOLVED = {
     'net/nic_rx.c': '受信後の選別とキュー管理はネットワーク層の共通処理。',
     'sound/hal/snd2_v1.c': '旧 PCM API の変換は音声共通層にまとめる。',
 }
+
+
+BOUNDARY_SPLITS = {
+    'drivers/net/e82557/lan_module.c': (
+        'sys/dev/net/e82557/ + sys/platform/pc98/',
+        'e82557_tick の登録が PC98_TICK_E82557 を固定する。スロットを機種配線で決める。'),
+    'drivers/net/ne2000/lgy98.c': (
+        'sys/dev/net/ne2000/ + sys/platform/pc98/',
+        'lgy98_tick の登録が PC98_TICK_LGY98 を選ぶ。割付を機種側に渡す。'),
+    'drivers/net/ne2000/ne2000.c': (
+        'sys/dev/net/ne2000/ + sys/platform/pc98/',
+        'rd の装置操作と同じ翻訳単位で PC98_TICK_COUNT を検査する。取り込む ne2000_control.inc と共に機種別スロット割付を分ける。'),
+    'drivers/net/ne2000/ne2000_control.inc': (
+        'sys/dev/net/ne2000/ + sys/platform/pc98/',
+        'ne2k_timer_tick の登録で PC98_TICK_NE2K を決め打ちする。機種からスロットを渡す。'),
+    'drivers/video/geforce/backend_geforce.c': (
+        'sys/dev/video/geforce/ + sys/platform/pc98/',
+        'pc98_route_to_gf と pc98_console_set_safe による表示経路変更を機種側に分ける。'),
+    'drivers/video/geforce/geforce_module.c': (
+        'sys/dev/video/geforce/ + sys/platform/pc98/',
+        'pc98_route_safe と pc98_route_to_98 を直接使うモジュール停止経路に機種側の委譲口が要る。'),
+    'drivers/video/trident/present.c': (
+        'sys/dev/video/trident/ + sys/platform/pc98/',
+        'trident_port8 に PC98_IO_WAIT_PORT を指定する待ち操作を機種側に渡す。'),
+    'gfx/v2/lock.c': (
+        'sys/hal/gfx/ + sys/arch/x86/',
+        'gfx2_lock の写像が PTE_PCD・PTE_PWT と CR3 を読む。キャッシュ属性の継承とアドレス空間の照合を CPU 側に渡す。'),
+    'kernel/ime/ime.c': (
+        'sys/kern/ime/ + sys/hal/input/',
+        'ime_getchar_wait と非同期入力が kbd_getkey_wait・kbd_trygetchar・kbd_trygetkey を直に呼ぶ。入力 HAL に待機・取得を委譲する。'),
+    'net/nic.c': (
+        'sys/hal/net/ + sys/dev/net/',
+        'IRQ 時の受信を NET_NIC_E82557 と LINK_PLATFORM_TICK_RX_LGY98_SLOT で決める。選択順と受信能力を登録側から渡す。'),
+    'net/nic.h': (
+        'sys/hal/net/ + sys/dev/net/',
+        'NetNicOps と net_lgy98_adapter・net_e82557_adapter の extern を分け、具体表を登録側に公開する。'),
+    'include/ext2_medium_contract.h': (
+        'sys/hal/block/ + sys/platform/pc98/ + sys/dev/block/',
+        'ext2_medium_ops と登録口を HAL に残し、ext2_medium_ide_ops・ext2_medium_loop_ops の宣言を platform/pc98/boot.c が使う登録側へ分ける。'),
+    'gfx/gfx_core_surface.inc': (
+        'sys/hal/gfx/ + sys/arch/x86/',
+        'gfx_reinit_surface_roles 周辺で paging_load_cr3 が描画中のページ表を切り替える。写像の切替と復帰を CPU 側で対にする。'),
+    'kernel/kaudit.c': (
+        'sys/kern/ + sys/arch/x86/',
+        'kselftest_run_audit が PTE_USER・PTE_PCD を解釈する。ページ属性の照合を CPU 側に分ける。'),
+    'mm/memory_boot.c': (
+        'sys/kern/mm/ + sys/arch/x86/ + sys/dev/video/',
+        'memory_boot_init のページ予算が PTE_COUNT と GF_PRODUCTION_PT_PAGES に依存する。ページ表と装置予約の必要量を各提供側から受ける。'),
+    'exec/exec_launch.inc': (
+        'sys/kern/exec/ + sys/arch/x86/',
+        'paging_current_cr3 と paging_load_cr3 による起動前後の空間切替を CPU 側へ分ける。'),
+    'exec/exec_syscall.inc': (
+        'sys/kern/exec/ + sys/arch/x86/',
+        'paging_load_cr3 にカーネルの PD を渡す終了経路をアドレス空間切替の口に移す。'),
+    'include/gfx_hal.h': (
+        'sys/hal/gfx/ + sys/dev/video/ + sys/platform/pc98/',
+        'GfxBackend と各機種・装置の具体表、pegc_restore_text_sync・trident_boot_reserve の宣言を分ける。'),
+    'input/hal/in2_int.h': (
+        'sys/hal/input/ + sys/dev/input/',
+        'kbd_hal_init と kbd_hal_capture は drivers/input/kbd_hal.c の装置入口。共通リングの内部宣言から分ける。'),
+    'input/hal/keymap_eval.c': (
+        'sys/hal/input/ + sys/platform/pc98/',
+        'KM_MAP_PC98 でバンクと拡張表の解釈が変わる。マップの提供側に評価を渡す。'),
+    'input/hal/keymap_registry.c': (
+        'sys/hal/input/ + sys/platform/pc98/',
+        'valid_map が KM_MAP_PC98 の件数とバンク構造を解釈する。マップ固有の検証を登録側に渡す。'),
+    'input/hal/input_policy.c': (
+        'sys/input/ + sys/platform/',
+        'ikm_policy_init と既定キー選択が機種番号でプロファイルと制御文字を選ぶ。既定値を機種から渡す。'),
+    'kernel/ime/ime_dict.c': (
+        'sys/kern/ime/',
+        '辞書の読込と再開が装置実装の serial_puts を直接呼ぶ。診断出力を kprintf に渡す。'),
+    'drivers/video/geforce/geforce_platform.c': (
+        'sys/dev/video/geforce/ + sys/arch/x86/',
+        'reserve の BAR 写像が PTE_PCD を指定する。MMIO 用の属性設定を CPU 側へ渡す。'),
+    'drivers/video/trident/resources.c': (
+        'sys/dev/video/trident/ + sys/arch/x86/',
+        'trident_resources_rollback が CR3 を保存・交換する。装置資源の解放と空間切替を分ける。'),
+    'hwdev/gf/native.c': (
+        'sys/dev/video/geforce/ + sys/arch/x86/',
+        'geforce_range_reserved の写像照合で PTE_PRESENT・PTE_RW・PTE_PCD を解釈する。CPU 側から照合結果を受ける。'),
+    'platform/pc98/clock_source.c': (
+        'sys/platform/pc98/ + sys/arch/x86/',
+        'PIT の配線と rdtsc の読み出しを分け、CPU 側からカウンタを受ける。'),
+    'platform/powermac/clock.c': (
+        'sys/platform/powermac/ + sys/arch/ppc/',
+        'platform_clock_read_us の周波数換算から mftb・mftbu の読出しを分ける。'),
+    'platform/powermac/system.c': (
+        'sys/platform/powermac/ + sys/arch/ppc/',
+        'RTC 配線と mftb・mftbu による Time Base 読出し、eieio バリアを分ける。'),
+    'kapi/kapi_generated.c': (
+        'sys/kapi/ + sys/dev/',
+        'wrap_kcg_read_ank などが具体装置に直接委譲する。生成の入力で委譲先を変更し公開 ABI を保つ。'),
+}
+
+
+RETAINED = {
+    'drivers/char/rtc.c': 'pc98_clock は PC-98 内蔵カレンダ時計の操作表であり、この提供側で完結する。',
+    'drivers/video/geforce/geforce_module.h': 'pc98_safe は常駐モジュールの操作表の欄で、経路切替の実装は含まない。',
+    'drivers/video/trident/lifecycle.c': 'trident_pc98_init は同じ装置の FIFO・MCLK の設定段を呼ぶ。',
+    'drivers/video/trident/trident.h': 'TRI_STEP_PC98_INIT は装置内部の初期化段を記録する列挙値。',
+
+    'fs/ext2/ext2_fmt.c': 'ide_drive は媒体操作表に渡す引数。',
+    'fs/ext2/ext2_super.c': 'ide_drive は platform_ext2_resolve に渡す識別値。',
+    'fs/fat/fatfs/ff.c': 'PTE はディスク区画表の欄を示す。',
+    'gfx/gfx_osri_view_internal.h': 'serial_gate_active は登録済みの非常時出力への問い合わせ。',
+    'gfx/sync/sync_write.c': '空の asm はコンパイラバリアで CPU 命令を発行しない。',
+    'gfx/v2/a0_weak.c': 'NOSYS の既定実装は pte_flags の値を使用しない。',
+    'gfx/v2/gfx2_int.h': '台帳と共有する識別値の一致を静的に検査し、装置操作は行わない。',
+    'input/hal/input_policy.h': '入力設定形式の識別値と初期化の宣言。機種別の既定値は実装で分離する。',
+    'kernel/console/console.c': 'kbd_inject_discard は kernel/kbd_inject.c の注入キューを破棄する。',
+    'kernel/dev/install_management.c': 'serial_crc は媒体識別値の比較欄。',
+    'lib/kprintf_format.inc': '属性は機種が実装する変換口へ渡す。',
+    'net/host_mailbox.c': 'serial_now は通知の通し番号。',
+    'sound/hal/a0_weak.c': 'V86 未提供時の弱いサービス入口をまとめてサービス所有者へ移す。',
+    'drivers/video/geforce/gf_v2_gart.c': 'pte_write の対象は GPU の GART 表。',
+    'kdebug/kselftest/gfx_ledger.inc': 'PC-98 の VRAM の x86 キャッシュ属性そのものを検査する機種専用試験。',
+    'kernel/time/cpu_calibrate.c': 'NOP ループは PC-98 の tick に対して計測する対象そのもの。',
+}
+
+
+def retained_reason(path, dest):
+    if path in RETAINED:
+        return RETAINED[path]
+    if path.startswith('input/hal/'):
+        return '入力の共通状態・リング・方針の参照で、装置側の読取りを呼ばない。'
+    if dest.startswith(('sys/dev/', 'sys/platform/', 'sys/arch/')):
+        return '上記の実装と固有宣言は候補先の所有者の内部で使用する。'
+    raise ValueError(f'{path}: 境界の判断が必要')
 
 
 def read(path):
@@ -144,6 +275,17 @@ def merge(p0, reviews):
                         name = path.removeprefix(prefix)
                         break
             dest += name
+        if path == 'sound/hal/a0_weak.c':
+            dest = 'sys/kern/v86/a0_weak.c'
+        if path in BOUNDARY_SPLITS:
+            dest, detail = BOUNDARY_SPLITS[path]
+            move = 'P8'
+            reason = f'{path} — {detail}'
+        elif move == '移すだけ':
+            source = (Path(__file__).resolve().parents[2] / path).read_text()
+            symbol = boundary_symbol(source)
+            if symbol:
+                reason += f' 境界照合 {symbol}。' + retained_reason(path, dest)
         yield [path, role, move, dest, reason]
 
 

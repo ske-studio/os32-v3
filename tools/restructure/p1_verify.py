@@ -231,6 +231,19 @@ HAL_HEADER = ['パス', '役割', '移設', '行き先の候補', '根拠']
 HAL_ROLES = {'契約', '型', '共通処理', '振り分け'}
 
 
+# Inspect identifiers in executable text, including declarations and macro bodies.
+BOUNDARY = re.compile(
+    r'\b(?:PTE_\w+|(?:\w+_)?cr[034]|cpuid|__asm__|__asm|asm|rdtsc|invlpg|wbinvd|'
+    r'(?:in|out)[bwl]|(?:\w+_)?(?:pc98|powermac|lgy98|e82557|pegc|cirrus|trident|'
+    r'geforce|cs4231|pcm86)(?:_\w+)?|(?:kbd|gf[234]?|fdc|ide|atapi|kcg|v86s?|'
+    r'egc|gdc|serial|ext2_medium_(?:ide|loop))_\w+)\b', re.I)
+
+
+def boundary_symbol(source):
+    match = BOUNDARY.search(hal_inventory.mask(source))
+    return match.group() if match else ''
+
+
 def hal_targets(base):
     tracked, _ = inventory(base)
     inputs = {p for p in tracked if p.split('/')[0] in hal_inventory.OWNERS
@@ -249,7 +262,7 @@ def hal_table_targets(directory):
     return expected
 
 
-def verify_hal(table, expected):
+def verify_hal(table, expected, sources):
     issues = []
     paths = []
     destinations = {}
@@ -267,6 +280,9 @@ def verify_hal(table, expected):
             paths.append(path)
             moves[move] += 1
             if move == '移すだけ':
+                symbol = boundary_symbol(sources.get(path, ''))
+                if symbol and f'境界照合 {symbol}。' not in reason:
+                    issues.append(f'{path}: 移すだけの境界根拠がない ({symbol})')
                 if dest in destinations:
                     issues.append(f'{path}: 行き先が {destinations[dest]} と衝突 ({dest})')
                 destinations[dest] = path
@@ -303,7 +319,8 @@ def main():
     args = parser.parse_args()
     scope_status = verify_scope(args.table, args.base, args.list_candidates)
     expected = hal_table_targets(args.p0_dir) if args.p0_dir else hal_targets(args.base)
-    return verify_hal(args.hal_map, expected) or scope_status
+    sources, _ = review_inputs(args.base, set(), expected)
+    return verify_hal(args.hal_map, expected, sources) or scope_status
 
 
 if __name__ == '__main__':
