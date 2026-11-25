@@ -4,6 +4,7 @@
 #include "config.h"
 #include "kstring.h"
 #include "sysconfig.h"
+#include "os32_snd2.h"
 #include "vfs.h"
 
 #ifdef TEST_POWERMAC
@@ -71,12 +72,12 @@ static int reports(void)
         struct machcfg values;
         const char *body;
     } cases[] = {
-        {MACHCFG_FILE_OK, 3, {2, 1}, "ok perf=2/file nap="},
-        {MACHCFG_FILE_NOFS, 0, {0, 0}, "nofs perf=0/def nap="},
-        {MACHCFG_FILE_NONE, 0, {0, 0}, "none perf=0/def nap="},
-        {MACHCFG_FILE_BIG, 0, {0, 0}, "big perf=0/def nap="},
-        {MACHCFG_FILE_OK, MACHCFG_KEY_PERF, {0, 0}, "ok perf=0/file nap="},
-        {MACHCFG_FILE_OK, MACHCFG_KEY_NAP, {0, 1}, "ok perf=0/def nap="}
+        {MACHCFG_FILE_OK, 3, {2, 1, 0}, "ok perf=2/file nap="},
+        {MACHCFG_FILE_NOFS, 0, {0, 0, 0}, "nofs perf=0/def nap="},
+        {MACHCFG_FILE_NONE, 0, {0, 0, 0}, "none perf=0/def nap="},
+        {MACHCFG_FILE_BIG, 0, {0, 0, 0}, "big perf=0/def nap="},
+        {MACHCFG_FILE_OK, MACHCFG_KEY_PERF, {0, 0, 0}, "ok perf=0/file nap="},
+        {MACHCFG_FILE_OK, MACHCFG_KEY_NAP, {0, 1, 0}, "ok perf=0/def nap="}
     };
     for (unsigned m = 0; m < sizeof(machines)/sizeof(machines[0]); ++m) {
         const typeof(*machines) *mch = &machines[m];
@@ -85,7 +86,7 @@ static int reports(void)
         host_pvr = mch->cpu;
         struct machcfg_seed seed = platform_machcfg_seed();
 #else
-        struct machcfg_seed seed = mch->cpu ? (struct machcfg_seed){{0, 0}, mch->accepts}
+        struct machcfg_seed seed = mch->cpu ? (struct machcfg_seed){{0, 0, 0}, mch->accepts}
                                             : platform_machcfg_seed();
 #endif
         for (unsigned i = 0; i < sizeof(cases)/sizeof(cases[0]); ++i) {
@@ -191,7 +192,7 @@ static int root_loads(void)
         host_pvr = machine->cpu;
         struct machcfg_seed seed = platform_machcfg_seed();
 #else
-        struct machcfg_seed seed = machine->cpu ? (struct machcfg_seed){{0, 0}, machine->accepts}
+        struct machcfg_seed seed = machine->cpu ? (struct machcfg_seed){{0, 0, 0}, machine->accepts}
                                             : platform_machcfg_seed();
 #endif
         for (unsigned i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
@@ -224,17 +225,35 @@ static int root_loads(void)
     return 1;
 }
 
+static int sound_modes(void)
+{
+    static const struct { const char *text; u8 mode; } cases[] = {
+        {"snd.fm=hw", SND2_DEV_FM_HW}, {"snd.fm=soft", SND2_DEV_FM_SOFT},
+        {"snd.fm=none", SND2_DEV_FM_NONE}, {"snd.fm=auto", 0}
+    };
+    struct machcfg_seed seed = platform_machcfg_seed();
+    for (unsigned i = 0; i < sizeof(cases)/sizeof(cases[0]); ++i) {
+        config_size = kstrlen(cases[i].text);
+        kmemcpy(config, cases[i].text, config_size);
+        machcfg_begin(seed);
+        if (machcfg_load_root() != MACHCFG_FILE_OK ||
+            machcfg_get()->snd_flags != (seed.defaults.snd_flags | cases[i].mode)) return 0;
+    }
+    return 1;
+}
+
 static int run(void)
 {
 #ifdef TEST_POWERMAC
     if (!check_powermac_seeds()) return 22;
 #endif
+    if (!sound_modes()) return 23;
     if (!root_loads()) return 21;
     if (!line_endings()) return 20;
     const struct machcfg_seed seeds[] = {
-        {{0, 0}, 1}, {{0, 0}, 0}, platform_machcfg_seed()
+        {{0, 0, 0}, 1}, {{0, 0, 0}, 0}, platform_machcfg_seed()
     };
-    struct machcfg values = {2, 1};
+    struct machcfg values = {2, 1, 0};
     unsigned int i;
     for (i = 0; i < sizeof(seeds) / sizeof(seeds[0]); ++i) {
         machcfg_begin(seeds[i]);
@@ -255,8 +274,8 @@ static int run(void)
             return 4;
     }
     {
-        const struct machcfg_seed seed = {{1, 1}, 0};
-        const struct machcfg candidate = {2, 0};
+        const struct machcfg_seed seed = {{1, 1, 0}, 0};
+        const struct machcfg candidate = {2, 0, 0};
         machcfg_begin(seed);
         if (machcfg_get()->perf_request != 1 || machcfg_get()->nap7450 != 1)
             return 5;

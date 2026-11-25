@@ -4,7 +4,7 @@
 #include "os32_kapi_shared.h"
 #include "kernel/io_work.h"
 #include "kernel/io_policy.h"
-static u32 fake_flags, mutable_id, max_leaf, features, cpuid_calls;
+static u32 fake_flags, mutable_id, max_leaf, fake_features, cpuid_calls;
 static u32 fake_ms, rdtsc_calls, endpoint_cycles = 100;
 static unsigned long long counter, pit_us;
 static int pit_rc, slots_rc, registrations;
@@ -51,7 +51,7 @@ static void dispatch(void)
 
 static void reset(void)
 {
-    fake_flags = 0x202; mutable_id = 1; max_leaf = 1; features = 1u << 4;
+    fake_flags = 0x202; mutable_id = 1; max_leaf = 1; fake_features = 1u << 4;
     enabled = 1; kctx_irq_depth = 0; counter = 1000; pit_us = 10;
     fake_ms = 0; pit_rc = 0; endpoint_cycles = 100;
     registered = 0; slots_rc = 0; registrations = 0; requested = 0; provider = 0;
@@ -101,9 +101,9 @@ static void tests(void)
     CHECK(pc98_tsc_init() == OS32_ERR_NOSYS && !cpuid_calls && !rdtsc_calls);
     mutable_id = 1; max_leaf = 0; cpuid_calls = 0;
     CHECK(pc98_tsc_init() == OS32_ERR_NOSYS && cpuid_calls == 1 && !rdtsc_calls);
-    max_leaf = 1; features = 0;
+    max_leaf = 1; fake_features = 0;
     CHECK(pc98_tsc_init() == OS32_ERR_NOSYS && !rdtsc_calls);
-    features = 1u << 4; slots_rc = -1; registered = 0;
+    fake_features = 1u << 4; slots_rc = -1; registered = 0;
     CHECK(pc98_tsc_init() == OS32_ERR_FULL && state == TSC_OFF);
     reset(); CHECK(registrations == 1); CHECK(pc98_tsc_init() == 0 && registrations == 1);
     u32 l = 123, h = 456;

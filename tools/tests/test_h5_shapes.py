@@ -2,7 +2,7 @@
 Compile/link failures and signals are errors, never mutation RED.
 """
 CHECK = dict(name='h5-shapes-host', tier=1,
-    covers=['userland/tests/h5_shape*.c', 'userland/deploy.yaml', 'tools/tests/h5_shapes_host.c', 'tools/tests/host32.py', 'sdk/os32x_hdr.py', 'sdk/mkos32x.py', 'sdk/link/app.ld', 'sdk/crt/crt0.asm', 'sdk/crt/crt0_c.c', 'sdk/crt/syscalls.c', 'sdk/include/os32/**', 'include/memmap.h', 'include/types.h', 'exec/exec.c', 'exec/exec.h', 'exec/appslot.c', 'exec/appslot.h', 'tools/tests/kernel_includes.py', 'userland/lib/rt/ls.c', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
+    covers=['userland/tests/h5_shape*.c', 'userland/deploy.yaml', 'tools/tests/h5_shapes_host.c', 'tools/tests/host32.py', 'exec/os32x_hdr.h', 'sdk/os32x_hdr.py', 'sdk/mkos32x.py', 'sdk/link/app.ld', 'sdk/crt/crt0.asm', 'sdk/crt/crt0_c.c', 'sdk/crt/syscalls.c', 'sdk/include/os32/**', 'include/memmap.h', 'include/types.h', 'exec/exec.c', 'exec/exec.h', 'exec/appslot.c', 'exec/appslot.h', 'tools/tests/kernel_includes.py', 'userland/lib/rt/ls.c', 'exec/exec_*.inc', 'tools/tests/exec_source.py', 'sdk/gen_kapi.py', 'sdk/kapi_abi_x86.py', 'sdk/target_profile.py', 'include/exec_arch.h', 'arch/x86/arch_exec_storage.h', 'tools/tests/host_arch/arch_exec_storage.h', 'tools/tests/host_exec_context.h', 'arch/x86/kernel/exec_context.c', 'arch/x86/kernel/exec_entry.c', 'tools/tests/host_exec_entry.h', 'arch/x86/kernel/tss.h'],
     needs=[], budget=7.2,
     basis=['MEMMAP_V3'],
 )
@@ -166,16 +166,19 @@ def preentry(tmp, headers, runner):
     gate = gate[:gate.index(end)]
     funcs = ''.join(extract(source, s) for s in
                     ('static u32 exec_ring3_extra_pages(', 'static u32 exec_ring3_pages('))
-    funcs += extract((ROOT / 'exec/appslot.c').read_text(), 'int appslot_start_admit(')
     shapes = ','.join('{%d,%d,%d}' % (h['text_size'], h['bss_size'], h['stack_size'])
                       for h in headers)
     code = '''#include "os32api.h"
+#include "os32x_hdr.h"
+#include "config.h"
 #include "memmap.h"
 #include "paging.h"
 #define APP_ID_SHELL 1
-static int g_cur=APP_ID_SHELL, entered, errors, restored;
+static int entered, errors, restored;
 static u32 available;
-static int appslot_alloc_id(void) { return 2; }
+static int ring3_wait_pending(void) { return 0; }
+static int exec_sound_acquire(int (*cancelled)(void)) { (void)cancelled; return -1; }
+static u32 exec_sound_data_pages(void) { return 0; }
 static u32 exec_shlib_data_pages(void) { return 10; }
 static u32 pgalloc_free_pages(void) { return available; }
 static void shell_print(const char *s, u8 attr) { (void)s; (void)attr; errors++; }
@@ -187,7 +190,8 @@ static int launch(u32 image, u32 stack) {
     u32 load_base=MEM_EXEC_LOAD_ADDR, sbrk_end=PAGE_ALIGN_UP(load_base+image)+PAGE_SIZE;
     u32 exec_heap_size=MEM_EXEC_HEAP_MIN, stack_size=stack ? stack : MEM_EXEC_STACK_SIZE;
     u32 need_pages;
-    int want_ring3=1, gui=0;
+    int want_ring3=1;
+    OS32Header header={0}, *hdr=&header;
 '''+gate+'''
     entered++; /* host entry boundary, reached only after admission */
     return 0;

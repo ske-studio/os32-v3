@@ -5,6 +5,10 @@
 
 #include "os32_kapi_shared.h"
 
+/* OS32X executable dependencies, encoded by sdk/os32x_hdr.py. */
+#define OS32X_FLAG_SND 0x0080
+#define OS32X_FLAG_WITH_GUI 0x0100
+
 #define OS32X_LAYOUT_OK        0   /* complete matching header */
 #define OS32X_LAYOUT_SHORT     1   /* fewer than a complete header */
 #define OS32X_LAYOUT_OLD       2   /* unknown format/header size/flags */

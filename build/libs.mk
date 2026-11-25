@@ -87,6 +87,8 @@ ALL_LIB_OBJ :=
 $(eval $(call DEFINE_LIB,libmmtime,userland/lib/mmtime,,))
 LIBMMTIME_OBJ = $(LIBDIR)/libmmtime.a
 
+$(eval $(call DEFINE_LIB,libos32sndl,sdk/sndl,-ffunction-sections,))
+
 # libos32math — 整数数学ライブラリ (最も基底)
 $(eval $(call DEFINE_LIB,libos32math,userland/lib/math,,))
 LIBMATH_OBJ = $(LIBDIR)/libos32math.a
@@ -261,7 +263,7 @@ $(LIBDIR)/libos32filer.a: $(FILER_ARCHIVE_OBJ)
 # === ライブラリ全ビルドターゲット ===
 # 全ライブラリのアーカイブを作る。SDK 切り出し時はこの LIBDIR がそのまま
 # sysroot の lib/ になる。
-ALL_LIB_ARCHIVES = $(LIBDIR)/libmmtime.a $(LIBDIR)/libos32math.a \
+ALL_LIB_ARCHIVES = $(LIBDIR)/libos32sndl.a $(LIBDIR)/libmmtime.a $(LIBDIR)/libos32math.a \
                    $(LIBDIR)/libos32gfx.a \
                    $(LIBDIR)/libos32db.a \
                    $(LIBDIR)/libos32asset.a \

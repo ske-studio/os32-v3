@@ -3,8 +3,8 @@
 #include "access_walk_host.c"
 #include "surface_query.h"
 static struct surface_query_source source;
-static int gui;
-int con_sink_is_enabled(void) { return gui; }
+static int host_gui_enabled;
+int con_sink_is_enabled(void) { return host_gui_enabled; }
 int appslot_gfx_owner(void) { return 2; }
 u32 gfx_sf_backend(void) { return LEDGER_SF_PC98; }
 int gfx_surface_source(u32 role, struct surface_query_source *out)

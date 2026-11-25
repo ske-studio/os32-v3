@@ -37,11 +37,12 @@ CD インストール (userland/system/cdinst.c) の .PKG は、配備の正典
 """
 
 CHECK = dict(name='packages-host', tier=0,
-    covers=['platform/pc98/platform_install_layout.h', 'include/platform_install_boot.h', 'platform/pc98/install_geometry.h', 'include/ide_contract.h', 'apps', 'game', 'userland/deploy.yaml', 'docs/manpages/**', 'assets/**', 'build/core.yaml', 'build/deploy.mk', 'build/image.mk', 'build/packages.yaml', 'fs/pc98pt.c', 'fs/ext2/ext2_layout.c', 'fs/fat/fatfs_vfs.c', 'platform/pc98/kernel.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/install_fresh_host.c', 'userland/shell/cmd_filer.c', 'userland/shell/hdprep_plan.c', 'platform/pc98/install_plan.c', 'userland/system/cdinst.c', 'userland/system/inst_disk.c', 'platform/pc98/install_disk.c', 'userland/system/inst_hdd.c', 'platform/pc98/install_target.c', 'userland/system/install.c', 'tools/check_artifacts.py'],
+    covers=['lib/os32_opna/fmgen_readme*.txt', 'lib/os32_opna/README.OS32', 'platform/pc98/platform_install_layout.h', 'include/platform_install_boot.h', 'platform/pc98/install_geometry.h', 'include/ide_contract.h', 'apps', 'game', 'userland/deploy.yaml', 'docs/manpages/**', 'assets/**', 'build/core.yaml', 'build/deploy.mk', 'build/image.mk', 'build/packages.yaml', 'fs/pc98pt.c', 'fs/ext2/ext2_layout.c', 'fs/fat/fatfs_vfs.c', 'platform/pc98/kernel.c', 'tools/deploy_manifests.py', 'tools/mkpkg.py', 'tools/tests/install_fresh_host.c', 'userland/shell/cmd_filer.c', 'userland/shell/hdprep_plan.c', 'platform/pc98/install_plan.c', 'userland/system/cdinst.c', 'userland/system/inst_disk.c', 'platform/pc98/install_disk.c', 'userland/system/inst_hdd.c', 'platform/pc98/install_target.c', 'userland/system/install.c', 'tools/check_artifacts.py'],
     needs=['make:all'], budget=6.7,
     basis=['[C4]'],
 )
 
+import hashlib
 import os
 import random
 import pathlib
@@ -304,6 +305,7 @@ def expected_files(plan):
 def verify_media(pkg_paths, want, label):
     """PKG 群を読み戻し、want とちょうど一致するか"""
     got = {}
+    license_hashes = {}
     dup = []
     bad_bytes = []
     ok = True
@@ -320,6 +322,8 @@ def verify_media(pkg_paths, want, label):
         for g, t, data in entries:
             if t != mkpkg.PKG_TYPE_FILE:
                 continue
+            if label == "ISO" and g.startswith('/sys/licenses/fmgen/'):
+                license_hashes[g] = hashlib.sha256(data).hexdigest()
             if g in got:
                 dup.append(g)
             got[g] = os.path.basename(path)
@@ -328,6 +332,19 @@ def verify_media(pkg_paths, want, label):
                 with open(h, 'rb') as f:
                     if f.read() != data:
                         bad_bytes.append(g)
+    if label == "ISO":
+        # Upstream bytes recorded in lib/os32_opna/PORT.md, independent of the manifest.
+        originals = {
+            'fmgen_readme.txt': '45022797065ff63aa856d224758231eae0d10fa332896590355b5dba722f7be7',
+            'fmgen_readme_kai.txt': '50f16ce53c3e5e0928716efccfceab250d06add45c6a7f387ce90fdcd1130801',
+            'fmgen_readme_np2.txt': 'd3b7a9cb3dce47cee20a2380820d9a590b52c7ad41230a86d5df8ed734ea3d53',
+            'fmgen_readme_np21w.txt': '7cbec22e348a309a3178233844a1511dbf922a7ab19910ccfae720014671147c',
+        }
+        ok &= check(all(
+            license_hashes.get('/sys/licenses/fmgen/' + name) == digest
+            for name, digest in originals.items()), "ISO: fmgen 原文 4 本の SHA-256")
+        ok &= check('/sys/licenses/fmgen/README.OS32' in license_hashes,
+                    "ISO: fmgen の改変記録")
     missing = sorted(set(want) - set(got))
     extra = sorted(set(got) - set(want))
     for g in missing[:20]:

@@ -15,6 +15,9 @@ int main(void) {
     h.memory_layout_generation = OS32_MEMORY_LAYOUT_GENERATION;
     h.flags = OS32X_FLAG_PPC32;
     if (os32x_layout_check(&h, OS32X_HDR_SIZE, KAPI_DATA_FIELDS_OFF) != OS32X_LAYOUT_OK) return 1;
+    h.flags |= OS32X_FLAG_SND | OS32X_FLAG_RING3;
+    h.shlib_protocol = OS32_SHLIB_PROTOCOL;
+    if (os32x_layout_check(&h, OS32X_HDR_SIZE, KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_OK) return 3;
     h.flags = 0;
     if (os32x_layout_check(&h, OS32X_HDR_SIZE, KAPI_DATA_FIELDS_OFF) != OS32X_LAYOUT_OLD) return 2;
     return 0;

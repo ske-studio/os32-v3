@@ -3,7 +3,7 @@ static void lease_root_check(unsigned long root);
 #define HOST_MMU_LOAD_CHECK(root) lease_root_check(root)
 #include "access_walk_host.c"
 #include "surface_query.h"
-static int armed, reject_copy, break_rollback, abort_copy, gui, gfx_owner = 2;
+static int armed, reject_copy, break_rollback, abort_copy, host_gui_enabled, gfx_owner = 2;
 static u32 copyin_calls;
 int host_lease_copyin(const struct caller_access *c, const void *src, void *dst, u32 n)
 {
@@ -20,7 +20,7 @@ static void lease_root_check(unsigned long root)
 {
     if (armed) CHECK(root == space.pd_phys); /* Includes transient master hops. */
 }
-int con_sink_is_enabled(void) { return gui; }
+int con_sink_is_enabled(void) { return host_gui_enabled; }
 int appslot_gfx_owner(void) { return gfx_owner; }
 static u32 selected_backend = LEDGER_SF_PC98;
 u32 gfx_sf_backend(void) { return selected_backend; }
@@ -157,7 +157,7 @@ static void caller_copy_tests(void)
     GET(OS32_ERR_INVAL); /* DISPLAY also requires the selected backend. */
     selected_backend = LEDGER_SF_PEGC;
     tokens[0] = GET(0); CHECK(!lease_release(&space, tokens[0]));
-    gui = 1; gfx_owner = 1; GET(OS32_ERR_INVAL); gfx_owner = 2; gui = 0;
+    host_gui_enabled = 1; gfx_owner = 1; GET(OS32_ERR_INVAL); gfx_owner = 2; host_gui_enabled = 0;
     source.role = LEDGER_ROLE_UNICODE; source.backend = 0;
     ledger_surfaces[sid].role = LEDGER_ROLE_UNICODE; ledger_surfaces[sid].backend = 0;
     ledger_surfaces[sid].perm_max = LEDGER_PERM_RO;
@@ -166,7 +166,7 @@ static void caller_copy_tests(void)
     requested_access = LEDGER_PERM_RO;
     source.role = LEDGER_ROLE_TVRAM; ledger_surfaces[sid].role = LEDGER_ROLE_TVRAM;
     tokens[0] = GET(0); CHECK(!lease_release(&space, tokens[0]));
-    gui = 1; GET(OS32_ERR_INVAL); gui = 0;
+    host_gui_enabled = 1; GET(OS32_ERR_INVAL); host_gui_enabled = 0;
     get_lease(OS32_ERR_INVAL, 0, (void *)output_va);
     get_lease(OS32_ERR_INVAL, (void *)0xfffffffcU, (void *)output_va);
     get_lease(OS32_ERR_INVAL, (void *)MEM_EXEC_LOAD_ADDR, 0);

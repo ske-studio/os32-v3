@@ -61,7 +61,7 @@ def allowed(mnemonic):
     return False
 
 
-def scan(objdump, path):
+def scan(objdump, path, integer_only=False):
     """{finding: (count, first 'addr <func>')}."""
     out = subprocess.run([objdump, "-d", "-w", path], capture_output=True, text=True,
                          errors="replace", timeout=120)
@@ -84,7 +84,7 @@ def scan(objdump, path):
         bad = []
         if mnem in PREFIXES:
             pass  # bare prefix byte (e.g. data16 before a 386 instruction)
-        elif not allowed(mnem):
+        elif not allowed(mnem) or (integer_only and (mnem.startswith("f") or mnem == "wait")):
             bad.append(mnem)
         elif mnem.startswith("nop") and ops.strip():
             bad.append(mnem + " <operand> (0F 1F multi-byte NOP)")
@@ -99,6 +99,7 @@ def scan(objdump, path):
 
 
 def main(argv):
+    integer_only = "--integer-only" in argv
     paths = [a for a in argv if not a.startswith("-")]
     if not paths:
         print(__doc__.strip().splitlines()[-1], file=sys.stderr)
@@ -112,9 +113,10 @@ def main(argv):
         if not os.path.isfile(path):
             print(f"[ISA386] {path}: 無い (先にビルド)", file=sys.stderr)
             return 2
-        findings, lines = scan(objdump, path)
+        findings, lines = scan(objdump, path, integer_only)
         if not findings:
-            print(f"[ISA386] OK {path}: {lines} instructions, 386/387 only")
+            isa = "386 integer" if integer_only else "386/387"
+            print(f"[ISA386] OK {path}: {lines} instructions, {isa} only")
             continue
         bad += 1
         for name, (count, first) in sorted(findings.items()):

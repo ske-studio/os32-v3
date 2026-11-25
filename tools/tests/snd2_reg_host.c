@@ -1,3 +1,6 @@
+#include "machcfg_contract.h"
+static struct machcfg cfg;
+const struct machcfg *machcfg_get(void) { return &cfg; }
 #include "snd2.h"
 int snd2_refill_caps(Snd2Device *d, SND2_Caps *out) { (void)d; (void)out; return -1; }
 

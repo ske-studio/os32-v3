@@ -8,23 +8,28 @@ import tempfile
 from . import ParseError, resource_dir
 
 
-@functools.lru_cache(maxsize=1)
-def visitor_binary():
-    source = pathlib.Path(__file__).with_suffix('.cpp')
+@functools.lru_cache(maxsize=2)
+def visitor_binary(filename='type_occurrences.cpp'):
+    """Build the TypeLoc executable or the in-process libclang cursor visitor."""
+    source = pathlib.Path(__file__).with_name(filename)
     llvm = pathlib.Path(resource_dir()).parents[2]
-    key = hashlib.sha256(source.read_bytes() + str(llvm).encode()).hexdigest()
-    directory = pathlib.Path(tempfile.gettempdir()) / ('os32-type-visitors-' + str(os.getuid()))
-    directory.mkdir(mode=0o700, exist_ok=True)
-    binary = directory / key
-    if binary.is_file():
-        return binary
     try:
-        cpp = next((llvm / 'lib').glob('libclang-cpp.so*'))
-        shared = next((llvm / 'lib').glob('libLLVM.so*'))
+        key = hashlib.sha256(source.read_bytes() + str(llvm).encode()).hexdigest()
+        directory = pathlib.Path(tempfile.gettempdir()) / ('os32-type-visitors-' + str(os.getuid()))
+        directory.mkdir(mode=0o700, exist_ok=True)
+        binary = directory / key
+        if binary.is_file():
+            return binary
+        if source.suffix == '.c':
+            compiler = ['clang', '-std=gnu11', '-shared', '-fPIC', '-O2']
+            libraries = [str(llvm / 'lib/libclang.so')]
+        else:
+            compiler = ['clang++', '-std=c++17', '-O0']
+            libraries = [str(next((llvm / 'lib').glob(name)))
+                         for name in ('libclang-cpp.so*', 'libLLVM.so*')]
         with tempfile.TemporaryDirectory(dir=directory) as staging:
             output = pathlib.Path(staging) / 'visitor'
-            result = subprocess.run(['clang++', '-std=c++17', '-O0',
-                '-I' + str(llvm / 'include'), str(source), str(cpp), str(shared),
+            result = subprocess.run([*compiler, '-I' + str(llvm / 'include'), str(source), *libraries,
                 '-Wl,-rpath,' + str(llvm / 'lib'), '-o', str(output)],
                 capture_output=True, text=True, stdin=subprocess.DEVNULL)
             if result.returncode:

@@ -31,7 +31,9 @@ static void die(void)
 enum { OK, OPEN_FAIL, SEEK_FAIL, SHORT_FIRST, SHORT_LAST, MAP_FIRST, MAP_LAST, READ_ERROR, PROTECT_FAIL };
 static int failure, is_user, opened, closed, aborted, reads, maps, jump_ready;
 static int last_slot_id;
-static u32 required_api, required_protocol;
+static u32 required_api, required_protocol, image_flags;
+static u32 free_pages = 100, after_load = 100;
+static int gui_loaded, sound_acquires, sound_attaches, reservations, as_creates;
 static int x87_calls, x87_entry_depth, x87_init_after_save;
 static struct arch_fp_context *x87_saved;
 void arch_fp_save(struct arch_fp_context *p) { x87_saved = p; x87_calls++; }
@@ -41,14 +43,27 @@ static u32 image_size, bss_size, copied;
 static int protected, image_mapped;
 static char events[32];
 static u32 event_count;
-static u8 backing[3][PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
+/* Bank 0 is the ordinary fixture. The two crossed launches retain separate
+ * image, stack, AS and return context while both slot records are live. */
+static unsigned overlap;
+static struct {
+    struct addrspace as;
+    u8 image[3][PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
+    u8 stack[3][PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
+    void *landing[5];
+    int id;
+} banks[3];
+#define backing (banks[overlap].image)
+#define space (banks[overlap].as)
+#define escape (banks[overlap].landing)
+#define argv_backing (banks[overlap].stack)
+static void cross_header_read(void);
+static const char *const image_paths[] = {0, "/first", "/second"};
 static AppSlot slots[APP_SLOT_COUNT];
-static struct addrspace space, launcher_space;
+static struct addrspace launcher_space;
 static KernelAPI api;
-static void *escape[5];
 /* E01b lets the real loader continue through argv and the entry frame. */
 static int argv_mode, read_fail_at, store_fail_at, stores, argv_tables;
-static u8 argv_backing[3][PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
 static u8 command_backing[3 * PAGE_SIZE];
 static u32 tramp[KAPI_DATA_IDX_SHM_BASE + 1];
 static u32 expected_argv, expected_frame;
@@ -105,14 +120,21 @@ int vfs_read(const char *path, void *buf, u32 n)
     hdr->load_addr = is_user ? MEM_EXEC_LOAD_ADDR : MEM_SHELL_LOAD_ADDR;
     hdr->text_size = image_size;
     hdr->min_api_ver = required_api;
+    hdr->flags = image_flags;
     hdr->shlib_protocol = required_protocol;
     hdr->code_size = PAGE_SIZE;
     hdr->bss_size = bss_size;
+    if (overlap) {
+        CHECK(!kstrcmp(path, image_paths[overlap]));
+        hdr->entry_offset = overlap * 16;
+        if (overlap == 1) cross_header_read();
+    }
     return n;
 }
 int vfs_open(const char *path, int mode)
 {
     CHECK(decode_calls > 0);
+    if (overlap) CHECK(!kstrcmp(path, image_paths[overlap]));
     CHECK(jump_ready && !opened && (argv_mode || !kstrcmp(path, "/fixture")) && mode == 0);
     event('O');
     if (failure == OPEN_FAIL) return -1;
@@ -201,10 +223,11 @@ void paging_load_cr3(u32 pd)
 void shell_print(const char *s, u8 a)
 {
     (void)a;
+    if (!free_pages || !kstrcmp(s, "Error: required shared library is not loaded\n")) return;
     CHECK(required_protocol && (!kstrcmp(s, "shared library protocol mismatch") ||
                                 !kstrcmp(s, "; rebuild required\n")));
 }
-void shell_print_dec(u32 n, u8 a) { (void)n; (void)a; CHECK(0); }
+void shell_print_dec(u32 n, u8 a) { (void)n; (void)a; CHECK(!free_pages); }
 void __cdecl kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; CHECK(0); }
 void __cdecl console_printf(u8 attr, const char *fmt, ...)
 {
@@ -217,13 +240,13 @@ int appslot_cur(void) { return argv_mode && is_user ? 3 : 1; }
 AppSlot *appslot_at(int id) { CHECK(id >= 0 && id < APP_SLOT_COUNT); last_slot_id = id; return &slots[id]; }
 int appslot_start_admit(int gui, u32 pages, u32 free_pages) { (void)gui; (void)pages; (void)free_pages; return 2; }
 int appslot_cui_only_admit(int gui, u32 flags) { (void)gui; (void)flags; return 0; }
-u32 pgalloc_free_pages(void) { return 100; }
+u32 pgalloc_free_pages(void) { return free_pages; }
 void exec_heap_save_state(u32 *used) { *used = 0; }
 int ledger_owner_new(u32 kind, u32 id, const char *name, u32 *out) { (void)kind; (void)id; (void)name; *out = 9; return 1; }
 int ledger_owner_retire(u32 owner) { CHECK(owner == 9); return 1; }
 void *kmalloc(u32 n) { CHECK(n == sizeof(space)); return &space; }
 void kfree(void *p) { CHECK(p == &space); }
-int paging_addrspace_create_lease(struct addrspace *as, u32 owner) { CHECK(as == &space && owner == 9); as->pd_phys = 23; as->owner = owner; return 0; }
+int paging_addrspace_create_lease(struct addrspace *as, u32 owner) { CHECK(as == &space && owner == 9); as_creates++; as->pd_phys = 23; as->owner = owner; return 0; }
 void appmem_init(struct addrspace *as, u32 b, u32 e, u32 h, u32 g) { (void)as; (void)b; (void)e; (void)h; (void)g; }
 int shlib_addrspace_attach(struct addrspace *as) { CHECK(as == &space); return 0; }
 int exec_setjmp(k_jmpbuf buf) { (void)buf; CHECK(!jump_ready); jump_ready = 1; event('J'); return 0; }
@@ -237,6 +260,13 @@ void av_focus_exec_enter(int id) { (void)id; }
 void appslot_start_commit(int id, int gui, u32 pages) {
     (void)id; (void)gui; (void)pages;
     CHECK(x87_entry_depth && x87_calls == 2 && x87_init_after_save && x87_saved == &fp_parent[x87_entry_depth]);
+    if (overlap) {
+        CHECK(id == banks[overlap].id && slots[id].as == &space);
+        u32 ip;
+        kmemcpy(&ip, slots[id].entry.opaque + sizeof(u32), sizeof(ip));
+        CHECK(ip == MEM_EXEC_LOAD_ADDR + overlap * 16);
+        slots[id].state = APP_STATE_RUNNING;
+    }
     argv_done();
 }
 void appslot_mark_scheduled(int id, u32 tick) { (void)id; (void)tick; CHECK(0); }
@@ -245,7 +275,21 @@ ShellService g_shell_service;
 int vfs_resolve_path(const char *path, char *out, int size) { kstrncpy(out, path, size); return VFS_OK; }
 volatile u32 font_guard_active, tick_count, ring3_wm_shell_gen;
 u32 shlib_data_pages(void) { return 0; }
-int shlib_loaded(void) { return 0; }
+int appslot_start_reserve(int gui)
+{
+    reservations++;
+    if (overlap) {
+        CHECK(sound_acquires && !banks[overlap].id);
+        banks[overlap].id = slots[2].state ? 4 : 2;
+        return banks[overlap].id;
+    }
+    return appslot_start_admit(gui, 0, 0);
+}
+void appslot_start_release(int id) { (void)id; }
+int shlib_sound_acquire(int (*cancelled)(void)) { (void)cancelled; sound_acquires++; free_pages = after_load; return 0; }
+int shlib_sound_attach(struct addrspace *as) { CHECK(as == &space); sound_attaches++; return 0; }
+u32 shlib_sound_data_pages(void) { return 0; }
+int shlib_loaded(void) { return gui_loaded; }
 int as_va_to_pa_read(u32 pd, u32 va, u32 *pa)
 {
     CHECK(argv_mode && pd == 17 && va >= MEM_EXEC_LOAD_ADDR);
@@ -389,12 +433,12 @@ static u32 stack_word(int user, u32 va)
 static void argv_case(int user, const char *command, const char *bytes,
                       u32 byte_count, int argc, int read_fault, int store_fault)
 {
-    argv_mode = 1; is_user = user; failure = OK; image_size = PAGE_SIZE; bss_size = 33;
+    argv_mode = 1; is_user = user; failure = OK; image_size = PAGE_SIZE + overlap; bss_size = 33;
     opened = closed = aborted = reads = maps = jump_ready = 0;
     protected = image_mapped = 0;
     copied = event_count = x87_calls = 0; stores = argv_tables = 0;
     read_fail_at = read_fault; store_fail_at = store_fault;
-    kmemset(slots, 0, sizeof(slots));
+    if (!overlap) kmemset(slots, 0, sizeof(slots));
     kmemset(argv_backing, 0xA5, sizeof(argv_backing));
     kmemset((void *)(MEM_SHELL_STACK_TOP - sizeof(argv_backing)), 0xA5, sizeof(argv_backing));
     launcher_space.pd_phys = 17;
@@ -408,7 +452,7 @@ static void argv_case(int user, const char *command, const char *bytes,
     expected_argv = str - 4 * OS32_MAX_ARGS;
     expected_frame = (expected_argv - 16) & ~15u;
     const char *input = command;
-    if (user) {
+    if (user && !overlap) {
         /* Raw path parsing sees the same bytes, while launch_read_byte must
          * use the launcher PD and the separate physical backing. */
         kstrncpy((char *)MEM_EXEC_LOAD_ADDR, command, sizeof(command_backing));
@@ -426,7 +470,7 @@ static void argv_case(int user, const char *command, const char *bytes,
         return;
     }
     CHECK(read_fault < 0 && store_fault < 0);
-    CHECK(slots[user ? 2 : 1].stack_top == top);
+    CHECK(slots[overlap ? banks[overlap].id : user ? 2 : 1].stack_top == top);
     u32 offset = 0;
     for (int i = 0; i < argc; i++) {
         CHECK(stack_word(user, expected_argv + 4 * i) == str + offset);
@@ -446,6 +490,40 @@ static void argv_case(int user, const char *command, const char *bytes,
     CHECK(stack_word(user, expected_frame + 8) == (user ? (u32)tramp : (u32)kapi));
     CHECK(stack_word(user, expected_frame + 12) == (user ? 0 : (u32)&g_shell_service));
     if (user) CHECK(stack_word(user, expected_frame - 4) == 0);
+}
+/* Cross VFS header reads before the first caller decodes its bytes. The
+ * second program stays live while the first continues to body I/O and argv. */
+static void cross_header_read(void)
+{
+    u32 outer_argv = expected_argv, outer_frame = expected_frame;
+    AppSlot *outer_app = g_cur_app;
+    overlap = 2;
+    argv_case(1, "/second right", "/second\0right", sizeof("/second\0right"), 2, -1, -1);
+    CHECK(slots[banks[2].id].state == APP_STATE_RUNNING);
+    overlap = 1;
+    g_cur_app = outer_app;
+    expected_argv = outer_argv; expected_frame = outer_frame;
+    image_size = PAGE_SIZE + overlap;
+    opened = closed = aborted = reads = maps = jump_ready = 0;
+    protected = image_mapped = 0;
+    copied = event_count = x87_calls = stores = argv_tables = 0;
+}
+
+static void crossed_launches(void)
+{
+    kmemset(slots, 0, sizeof(slots));
+    overlap = 1; x87_entry_depth = 1;
+    required_protocol = OS32_SHLIB_PROTOCOL;
+    image_flags = OS32X_FLAG_SND | OS32X_FLAG_RING3;
+    argv_case(1, "/first left", "/first\0left", sizeof("/first\0left"), 2, -1, -1);
+    CHECK(banks[1].id != banks[2].id && slots[banks[2].id].as == &banks[2].as);
+    exec_teardown_app(&slots[banks[1].id]);
+    CHECK(slots[banks[2].id].as->pd_phys && slots[banks[2].id].state == APP_STATE_RUNNING);
+    overlap = 2;
+    exec_teardown_app(&slots[banks[2].id]);
+    overlap = 0; x87_entry_depth = 0;
+    image_flags = required_protocol = 0;
+    say("PASS crossed exec: different paths, headers, entry frames, argv and AS lifetimes\n");
 }
 static void argv_cases(void)
 {
@@ -512,8 +590,46 @@ static void image_range_tests(void)
     CHECK(os32x_layout_check(&h, 64, KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_OLD);
     h.version = OS32X_HDR_VERSION; h.flags = OS32X_FLAG_PPC32;
     CHECK(os32x_layout_check(&h, 64, KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_OLD);
+    h.flags = OS32X_FLAG_WITH_GUI;
+    CHECK(os32x_layout_check(&h, 64, KAPI_DATA_FIELDS_OFF) != OS32X_LAYOUT_OK);
+    h.flags = OS32X_FLAG_SND | OS32X_FLAG_RING3;
+    CHECK(os32x_layout_check(&h, 64, KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_PROTOCOL);
+    h.shlib_protocol = OS32_SHLIB_PROTOCOL;
+    CHECK(!os32x_layout_check(&h, 64, KAPI_DATA_FIELDS_OFF));
+    CHECK(exec_image_reject_reason(&h, 1, MEM_EXEC_LOAD_ADDR, 3 * PAGE_SIZE));
+    h.flags &= ~OS32X_FLAG_RING3;
+    CHECK(os32x_layout_check(&h, 64, KAPI_DATA_FIELDS_OFF) != OS32X_LAYOUT_OK);
+    h.flags |= OS32X_FLAG_SHLIB | OS32X_FLAG_RING3;
+    CHECK(os32x_layout_check(&h, 64, KAPI_DATA_FIELDS_OFF) != OS32X_LAYOUT_OK);
     h.flags = 0; h.version = 4; h.header_size = 60;
     CHECK(os32x_layout_check(&h, 64, KAPI_DATA_FIELDS_OFF) == OS32X_LAYOUT_OLD);
+}
+static void dependency_cases(void)
+{
+    required_protocol = OS32_SHLIB_PROTOCOL;
+    image_size = PAGE_SIZE; is_user = exec_nest_level = 1;
+    image_flags = OS32X_FLAG_RING3;
+    CHECK(exec_launch("/fixture", 0) == EXEC_ERR_INVALID);
+    gui_loaded = 1;
+    check_case(1, OK, PAGE_SIZE);
+    CHECK(!sound_acquires && !sound_attaches);
+    gui_loaded = 0;
+    image_flags |= OS32X_FLAG_SND | OS32X_FLAG_WITH_GUI;
+    CHECK(exec_launch("/fixture", 0) == EXEC_ERR_INVALID);
+    CHECK(!sound_acquires);
+    gui_loaded = 1;
+    check_case(1, OK, PAGE_SIZE);
+    CHECK(sound_acquires == 1 && sound_attaches == 1);
+    gui_loaded = 0;
+    image_flags &= ~OS32X_FLAG_WITH_GUI;
+    check_case(1, OK, PAGE_SIZE);
+    CHECK(sound_acquires == 2 && sound_attaches == 2);
+    int old_as = as_creates, old_reservations = reservations;
+    after_load = 0;
+    CHECK(exec_launch("/fixture", 0) == EXEC_ERR_NOMEM);
+    CHECK(sound_acquires == 3 && as_creates == old_as && reservations == old_reservations);
+    after_load = free_pages = 100;
+    image_flags = required_protocol = 0;
 }
 void _start(void)
 {
@@ -528,6 +644,7 @@ void _start(void)
     u32 result, args[6] = {MEM_SHELL_LOAD_ADDR, 3 * PAGE_SIZE, 3, 0x32, 0xffffffffu, 0};
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == MEM_SHELL_LOAD_ADDR);
+    dependency_cases();
     args[0] = MEM_SHELL_STACK_TOP - sizeof(argv_backing); args[1] = sizeof(argv_backing);
     __asm__ volatile("int $0x80" : "=a"(result) : "a"(90), "b"(args) : "memory");
     CHECK(result == args[0]);
@@ -545,6 +662,7 @@ void _start(void)
     }
     say("PASS exec image: 21 cases (19 launches, 2 empty-payload controls), bytes, page boundaries, BSS and close-before-abort\n");
     argv_cases();
+    crossed_launches();
     __asm__ volatile("int $0x80" : : "a"(1), "b"(0));
     for (;;) {}
 }

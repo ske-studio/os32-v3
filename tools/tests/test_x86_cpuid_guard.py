@@ -19,7 +19,7 @@ def observe(work, header, model):
 static struct { u32 cr3; } kernel_tss;
 '''
     if model:
-        prefix += 'static u32 flags, original, mutable_id, cpuid_calls;\n'
+        prefix += 'static u32 flags, original, mutable_id, cpuid_calls, family;\n'
         prefix += '''static void probe_flags(u32 probe, u32 *changed, u32 old) {
  flags = mutable_id ? probe : flags;
  *changed = flags; flags = old;
@@ -31,7 +31,7 @@ static struct { u32 cr3; } kernel_tss;
                            'probe_flags(probe, &changed, old);', header, flags=re.S)
         assert n == 1
         header, n = re.subn(r'__asm__ volatile\("cpuid".*?;',
-                           'cpuid_calls++; d = (1UL << 23); a = 1; b = c = 0;', header)
+                           'cpuid_calls++; d = (1UL << 23); a = a ? family<<8 : 1; b = c = 0;', header)
         assert n == 3
         test = '''for (unsigned id=0; id<2; id++) {
  original=flags=0x202 | (id<<21); mutable_id=0; cpuid_calls=0;
@@ -40,6 +40,8 @@ static struct { u32 cr3; } kernel_tss;
  mutable_id=1;
  if (!arch_cpu_has_mmx() || cpuid_calls!=2 || flags!=original) return 3;
  arch_cpu_serialize(); if (cpuid_calls!=3 || flags!=original) return 4;
+ family=4; if (arch_cpu_pentium_or_later()) return 7;
+ family=5; if (!arch_cpu_pentium_or_later()) return 8;
 }'''
     else:
         test = '''u32 before, after;
@@ -66,6 +68,10 @@ def main():
         assert observe(work,header,False)==0
         assert observe(work,header,True)==0
         if args.mutate:
+            family = '((signature >> 8) & 15) >= 5'
+            assert header.count(family) == 1
+            assert observe(work,header.replace(family, family.replace('>= 5', '>= 4')),True)==7
+            print('RED runtime 486 accepted for software FM')
             for anchor in ('if (!arch_cpu_has_cpuid()) return;', 'if (!arch_cpu_has_cpuid()) return 0;'):
                 assert header.count(anchor)==1
                 rc=observe(work,header.replace(anchor,''),True)

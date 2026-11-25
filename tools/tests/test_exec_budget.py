@@ -40,7 +40,7 @@ def extract(source):
     shell = source[source.index('    /* 常駐 CRT と USER の sbrk 上限を公開する。 */'):source.index('    {\n        u32 argv_addr;')]
     parts.append('''
 #define kmalloc budget_kmalloc
-#define appslot_start_admit budget_admit
+#define appslot_start_reserve budget_reserve
 static int budget_launch(int is_shell, u32 image, u32 heap_sz, u32 requested_stack) {
     u32 load_base, max_size, stack_top, guard_a, guard_b, sbrk_end;
     u32 exec_heap_base, exec_heap_size, stack_size = MEM_EXEC_STACK_SIZE, need_pages;
@@ -55,7 +55,7 @@ static int budget_launch(int is_shell, u32 image, u32 heap_sz, u32 requested_sta
     return id;
 }
 #undef kmalloc
-#undef appslot_start_admit
+#undef appslot_start_reserve
 ''')
     return '\n'.join(parts)
 
@@ -70,7 +70,11 @@ def run(source):
         (tmp / 'exec_bb_overlap.inc').write_text(bb.extract(source))
         (tmp / 'budget_launch.inc').write_text(extract(source))
         shlib = (ROOT / 'mm/shlib.c').read_text()
-        (tmp / 'budget_shlib.inc').write_text('\n'.join(bb.slice_out(shlib, sig) for sig in ('int shlib_addrspace_attach(', 'void shlib_addrspace_detach(')))
+        descriptor = shlib[shlib.index('struct shlib_image {'):shlib.index('static int load_image')]
+        (tmp / 'budget_shlib.inc').write_text(descriptor + '\n'.join(bb.slice_out(shlib, sig) for sig in (
+            'static int attach_image(', 'static void detach_image(', 'int shlib_addrspace_attach(',
+            'void shlib_addrspace_detach(', 'int shlib_sound_attach(',
+            'u32 shlib_sound_data_pages(')))
         (tmp / 'budget_admit.inc').write_text(bb.slice_out((ROOT / 'exec/appslot.c').read_text(), 'int appslot_start_admit('))
         (tmp / 'paging_host_source.c').write_text(paging_source(ROOT / 'mm/paging.c'))
         (tmp / 'pgalloc_host_source.c').write_text(paging_source(ROOT / 'mm/pgalloc.c').replace('irq_save()', '0').replace('irq_restore(flags)', '(void)flags'))
@@ -151,8 +155,8 @@ def main():
                 b = '        if (sbrk_end + PAGE_SIZE > exec_heap_base || exec_heap_size > guard_b - exec_heap_base)\n            return EXEC_ERR_NOMEM;'
                 assert source.count(a) == source.count(b) == 1
                 changed = source.replace(a, '').replace(b, '')
-                marker = '        if (appslot_start_admit(gui, need_pages, pgalloc_free_pages()) < 0) {'
-                changed = changed.replace(marker, '        (void)appslot_start_admit(gui, need_pages, pgalloc_free_pages());\n'+a.replace('            if', '        if')+'\n'+b+'\n'+marker)
+                marker = '        if (need_pages > pgalloc_free_pages()) {'
+                changed = changed.replace(marker, '        (void)appslot_start_reserve(gui);\n'+a.replace('            if', '        if')+'\n'+b+'\n'+marker)
             else:
                 assert source.count(old) == 1, (name, source.count(old))
                 changed = source.replace(old, new)

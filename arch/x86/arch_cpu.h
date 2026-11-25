@@ -78,7 +78,7 @@ static inline void arch_cpu_serialize(void)
     u32 a = 0, b, c, d;
     __asm__ volatile("cpuid" : "+a"(a), "=b"(b), "=c"(c), "=d"(d) : : "memory");
 }
-static inline int arch_cpu_has_feature(u32 bit)
+static inline int arch_cpu_signature(u32 *signature, u32 *features)
 {
     if (!arch_cpu_has_cpuid()) return 0;
     u32 a = 0, b, c, d;
@@ -86,7 +86,21 @@ static inline int arch_cpu_has_feature(u32 bit)
     if (a < 1) return 0;
     a = 1;
     __asm__ volatile("cpuid" : "+a"(a), "=b"(b), "=c"(c), "=d"(d));
-    return (d & bit) != 0;
+    *signature = a;
+    *features = d;
+    return 1;
+}
+
+static inline int arch_cpu_has_feature(u32 bit)
+{
+    u32 signature, features;
+    return arch_cpu_signature(&signature, &features) && (features & bit);
+}
+
+static inline int arch_cpu_pentium_or_later(void)
+{
+    u32 signature, features;
+    return arch_cpu_signature(&signature, &features) && ((signature >> 8) & 15) >= 5;
 }
 
 static inline int arch_cpu_has_mmx(void)

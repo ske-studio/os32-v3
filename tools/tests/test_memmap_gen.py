@@ -83,7 +83,7 @@ def _unused_mirrors(root, m):"""),
 
 
 # memmap.h の値を写している場所 (gen_memmap.py の MIRRORS / ASM_SYMBOLIC と同じ顔ぶれ)
-MIRROR_FILES = ("build/os32.ld", "arch/x86/kernel/kentry.asm",
+MIRROR_FILES = ("sdk/include/os32/os32_sndl_table.h", "build/os32.ld", "arch/x86/kernel/kentry.asm",
                 "sdk/include/os32/os32_gui_shared.h",
                 "sdk/rust/os32api/src/gui/proto.rs",
                 # ホスト試験が mm/shm.c を組むための偽 memmap.h を持つ。

@@ -113,14 +113,14 @@ def check_generated(work):
     r1 = targets[1].read_text().replace(str(out / 'r1/obj') + '/', '')
     assert normal == r1
     for path in [out / 'memmap_layout.h', targets[0], targets[1], targets[-1]]:
-        assert not retired_names(path.read_text()), path
+        assert not retired_names(path.read_bytes()), path
     print('normal/R1 ld, kernel ASM, loader ASM/C, resident ld generated PASS')
 
 
 def retired_names(source):
     # Build the retired selector spelling here so this test is not its own exception.
-    return any(name in source for name in ('MEM_LAYOUT_' + 'V5',
-                                          'MEM_KERNEL_RESV_START', 'MEM_KERNEL_RESV_END'))
+    return any(name in source for name in (b'MEM_LAYOUT_' + b'V5',
+                                          b'MEM_KERNEL_RESV_START', b'MEM_KERNEL_RESV_END'))
 
 
 def check_retired():
@@ -128,9 +128,9 @@ def check_retired():
     for name in paths:
         path = ROOT / name
         if path.suffix in ('.c', '.h', '.asm', '.S', '.ld', '.mk') and path.is_file():
-            assert not retired_names(path.read_text()), name
+            assert not retired_names(path.read_bytes()), name
     for name in ('tools/gen_memmap.py', 'tools/mkvmkernel.py'):
-        assert not retired_names((ROOT / name).read_text()), name
+        assert not retired_names((ROOT / name).read_bytes()), name
     print('retired product selector/reservation names absent PASS')
 
 

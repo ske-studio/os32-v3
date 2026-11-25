@@ -59,6 +59,7 @@
 #define SYS_BOOTLOG_FS_EXT2   "ext2"     /* 書き出す FS (vfs_fstype の名前) */
 #define SYS_BOOTLOG_FS_FAT    "fat"
 #define SYS_BOOTLOG_TEXT_MAX  0x4000UL   /* 本文の容量 16KB (静的配列) */
+#define SYS_SHLIB_SND         "/sys/lib/libos32snd.shlib"
 #define SYS_SHLIB_GUI         "/sys/lib/libos32gui.shlib"
                                                    /* GUI 共有ライブラリ (K3/C3)。
                                                     * MEM_SHLIB_BASE 常駐。無ければ

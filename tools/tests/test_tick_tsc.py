@@ -68,7 +68,7 @@ def verify(work, mutation=None):
                     'changed = mutable_id ? probe : old;', cpu, flags=re.S)
     assert n == 1
     cpu, n = re.subn(r'__asm__ volatile\("cpuid".*?;',
-                    '++cpuid_calls; d = a ? features : 0; a = a ? 0 : max_leaf; b = c = 0; (void)b; (void)c; (void)d;', cpu)
+                    '++cpuid_calls; d = a ? fake_features : 0; a = a ? 0 : max_leaf; b = c = 0; (void)b; (void)c; (void)d;', cpu)
     assert n == 3
     (work / 'cpu.h').write_text(cpu)
     (work / 'io.h').write_text('unsigned int irq_save(void);\nvoid irq_restore(unsigned int);\nint _irq_enabled(void);\n')
