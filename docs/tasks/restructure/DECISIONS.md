@@ -15,6 +15,19 @@
 
 「push ごとに全部を変異込み」と書いていた所 (2026-11-25 に直した。P7-3 で但し書きを消す): `docs/POLICY_CI.md` G1・R4、`docs/tasks/agents/ROLES.md` §0「検査」、`docs/tasks/agents/PARALLEL_BRANCHES.md` §3、`docs/tasks/agents/PORT_FLOW.md` の段 8、`docs/tasks/agents/HANDOVER_2026-10-25.md` §1 の 2 行、`docs/08_build.md` (§8-1 の CI の段落・木の図・`make check` の表・§8-6)、`docs/POLICY_DEV.md` §6 の 1 行、`docs/design/tools/ci/gate.md` (F1・§2)・`sep_identity.md` §4、`CLAUDE.md` の Build Commands、スキル `os32-ci-read`・`os32-delegate`・`os32-test-basis`・`os32-arch-sep`。
 
-P0 で出た追加の未決 (2026-11-25、P0 の取り直しのレビュー): **D-9** 第三者の物の置き場 (`lib/os32_opna/upstream`・`lib/softfloat`・`userland/lib/font/vendor`)、**D-10** `sdk/` の include 以外の公開物 (リンカスクリプト・`mkos32x.py`・Rust のターゲットの定義)、**D-11** 残骸の削除 (どの像の入力でもないヘッダ — 移動と別の種類の変更なので RULES の 1 により別の段)。
+P0 で出た追加の未決 (2026-11-25、P0 の取り直しのレビュー): **D-9** 第三者の物の置き場 (`lib/os32_opna/upstream`・`lib/softfloat`・`userland/lib/font/vendor`)、**D-10** `sdk/` の include 以外の公開物 (リンカスクリプト・`mkos32x.py`・Rust のターゲットの定義)、**D-11** 残骸の削除 (どの像の入力でもないヘッダ — 移動と別の種類の変更なので RULES の 1 により、P1-1 は候補の一覧を出すだけ。A1 では候補を確かめ、消す仕事は PM が別の票に切る)。
 
-配置の未決 (P1-1 が案を出し、P1 の承認で決まる): **D-1** `sys/kern/` の下位 (`mm`・`exec`・`init` を残すか平たくするか)、**D-2** GeForce (`drivers/video/geforce` 29・`hwdev/gf` 143・`kdebug/gfinit_*`) を `sys/dev/` の 1 か所に寄せる範囲、**D-3** `kdebug/` の行き先 (起動時自己試験 `kselftest` は検査か製品か)、**D-4** `sound/hal`・`input/hal`・`include/*_contract.h` のうち `sys/hal/` に移す物 (仕様 §4: 契約と共通処理だけ)、**D-5** `lib/` のうちカーネルにだけ入る物 (`kstring` など) の置き場、**D-6** `sys/conf/` に置く物 (`build/images/`・`build/features/` の像と機能の定義か)、**D-7** `sample/`・`packages/`・`images/`・`game/` の扱い、**D-8** `userland/tests/` (配備する試験のプログラム) を `tests/` に移すか。
+配置の未決 (案を出す段: D-3・D-8 の仮の分類は P1-0、D-4 は P1-3、D-8 の行き先は P1-4、残りは P1-1。P1 の承認 A1 で決まる): **D-1** `sys/kern/` の下位 (`mm`・`exec`・`init` を残すか平たくするか)、**D-2** GeForce (`drivers/video/geforce` 29・`hwdev/gf` 143・`kdebug/gfinit_*`) を `sys/dev/` の 1 か所に寄せる範囲、**D-3** `kdebug/` の行き先 (起動時自己試験 `kselftest` は検査か製品か)、**D-4** `sound/hal`・`input/hal`・`include/*_contract.h` のうち `sys/hal/` に移す物 (仕様 §4: 契約と共通処理だけ)、**D-5** `lib/` のうちカーネルにだけ入る物 (`kstring` など) の置き場、**D-6** `sys/conf/` に置く物 (`build/images/`・`build/features/` の像と機能の定義か)、**D-7** `sample/`・`packages/`・`images/`・`game/` の扱い、**D-8** `userland/tests/` (配備する試験のプログラム) を `tests/` に移すか。
+
+仕様 §19 の未決 8 項の決め先 (U7):
+
+| 仕様 §19 の項 | 案を出す段 | 承認 |
+|---|---|---|
+| 個別ソースの最終配置 | P1-1・P1-3 | A1 |
+| 個別検査の統廃合 | P5-1〜P5-4 | A5 |
+| PC-98 システム検査の自動化方式 | P5-5 | A5 |
+| ミューテーションテストの必須実行条件 | P6-7 | A6 |
+| CI の変更影響別実行条件 | P6-6 | A6 |
+| セルフホスト Runner の利用範囲 | P1-7a | A6 |
+| CI の目標実行時間 | P1-7a (P0-4 の実測が前の数字) | A6 |
+| GitHub 上の取り込み制御方式 | P1-7a (検査した SHA と取り込む SHA が同じ事の保証)。実物での確かめは P7-1 | A6、実証は A7 の後 |

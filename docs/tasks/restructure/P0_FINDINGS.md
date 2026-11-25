@@ -2,7 +2,7 @@
 
 > 上位: [TASK_RESTRUCTURE.md](TASK_RESTRUCTURE.md)・[RULES.md](RULES.md) (入口と、どの段も先に読む決まり)
 
-**判定 (票を書いたセッションのレビュー 2026-11-25)**: P0-2・P0-4 は使える。P0-1・P0-6・P0-7 は足りない (持ち主空 366・HAL の役割の未確定 295・模型とコンパイルだけの未確定 813/811 — 読んで埋める仕事は P0-1 の残りと P1-3・P5-2 へ)。P0-3 は一部 (L3 の 585 本は covers から機械で付けた候補、P1-4 で読んで決める。変異の数は 261 本だけ)。P0-5 は表は使える (結論は下の P0-5 の節)。P0-8 は一部 (未確定 100、ノートと pc98emu への質問 40 行 remote.tsv は未送付)。
+**判定 (票を書いたセッションのレビュー 2026-11-25)**: P0-2・P0-4 は使える。P0-1・P0-6・P0-7 は足りない (持ち主空 366・HAL の役割の未確定 295・模型とコンパイルだけの未確定 813/811 — 読んで埋める仕事は P0-1 の残りと P1-3・P5-2 へ)。P0-3 は一部 (L3 の 585 本は covers から機械で付けた候補、P1-4 で読んで決める。変異の数は 261 本だけ)。P0-5 は表は使える (結論は下の P0-5 の節)。P0-8 は一部 (未確定 100、ノートと pc98emu への質問 40 行 remote.tsv は 2026-11-25 に送付・回答済み、要約は末尾の「P1 への入力」)。
 
 基点は全段とも `4146cf146`。P0-3・P0-4 の CI 実測は `3b1cecee3` の保存ログと P0-4 の push 履歴を使った。書き手も読み手も astra (DECISIONS の U8)。前回の読み手の所見と残る漏れは各節に記す。
 
@@ -151,10 +151,10 @@ remote.tsv（40行）は実機ノート・pc98emu への質問。実機とリモ
 ## P1 への入力 (P0 の取り直しのレビュー、票を書いたセッション 2026-11-25)
 
 - P0 の取り直し (基点 4146cf146) は受け取り可。P0 の回し直しは要らない。
-- 持ち主が空 366 のうち約 100 は規則の漏れ: ホストの試験の .rs 32 本 (userland/gshell/host の *_tests.rs、userland/rust の host/、host_tests/ — 規則が「tests」という名前のディレクトリしか拾わない)、userland/lib/font/vendor/ttf-parser の 64 本 (Cargo.toml の dev-dependencies、製品に入らない)。
+- 持ち主が空 366 のうち約 100 は規則の漏れ: 持ち主が空の .rs は 93 本 — userland/lib/font/vendor/ttf-parser の 64 本 (Cargo.toml の dev-dependencies、製品に入らない。ほかに同じ vendor の .rs でない 5 本)、ホストの試験の置き場 host/・host_tests/ の 26 本 (規則が「tests」という名前のディレクトリしか拾わない。同じ置き場に .rs でない 6 本、試験の本体と支援 mocks.rs の類が混ざる)、残り 3 本 (userland/gshell/src の fixture.rs・typical_ops.rs、libos32term_render の rework_tests.rs)。前の版の「32 本 + 64 本」は数え違い (sol の指摘 2026-11-25)。
 - 「公開インターフェースは 1 件」は狭い: 規則が sdk/include/ と sdk/kapi.json だけで、sdk/ の 29 本が未分類 (sdk/link の .ld 6、mkos32x.py など .py 15、Rust のターゲットの定義 3 ほか)。
 - 仕様 §5 の 6 種類に当たらない物: build/ の .mk 74 とリンカスクリプト 16、assets/ 22、sample/ 10、文書 1,274。
 - 残骸の候補: kernel/v86 の .h 5 本、include/ の diag_stack.h・snd_writer_probe.h・type_contract.h・vk32.h はどの像の入力でもない。
-- P0-6・P0-7 の未確定は前と同じ (295・813・811)。P0-8 の remote.tsv 40 行 (ノートと pc98emu への質問) は未送付 — P1-6 の「知らせる相手」の前に送る。
+- P0-6・P0-7 の未確定は前と同じ (295・813・811)。HAL の表で役割または移設の判断が未確定の行は和で 326 (役割 295・移設 317)。
 - **外の利用者への質問の回答** (P0-8 の remote.tsv の 40 問、ユーザー承認 2026-11-25 で送付、同日に回答): 実機ノートは /opt/os32 (os32-v3 全体の git の作業木) の tools/ を常駐のサービスが使い、作業木の外に tools/ の写しが 37 個 (~/os32-tmp/tools-<8 桁>/、版の記録なし) と G4 の常駐 (~/os32-tmp/ppc-rh/wt-rd で tools/host_agent_service.py を相対パスで起こす) がある — tools/ を動かす・分ける時は知らせる。pc98emu は tools/ (np21w_ctl・np21w_mcp/np21w_client・gui_gate・ci_fetch・accept/snd2・ppc の 3 本) を sys.path と git archive で使い、ソースを実行時に読む道具が 4 本 (tools/ppc/root_lz4_layout が include/memmap.h、root_lz4_layout_run が tools/gen_memmap.py・lib/kstring_c.c・arch/ppc/ofw_note.S、link_sh_run が userland/shell と kernel/console/con_sink.c、accept/snd2/verify_soft が lib/os32_opna/upstream) — これらは木の中の道具なので P3 の波で一緒に直す。tests/ へ移る時に pc98emu の側で直すのは tools/tests/make_pcm_wav.py と pcm_play_guest.py の呼び出し 2 か所。回答の全文は PM の機械の ~/os32-tmp/run/restructure/remote-answers-*.md。
 
