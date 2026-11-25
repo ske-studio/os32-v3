@@ -28,15 +28,16 @@ static int caps(u32 dev, SND2_Caps *out, u32 size)
 {
     (void)size;
     if ((dev & SND2_CAPS_REFILL) && !diagnostic) return -1;
-    *out = (SND2_Caps){.dev = dev, .fmt_count = 1};
+    *out = (SND2_Caps){.dev = dev, .ring_frames = 4096, .fmt_count = 1};
     out->fmt[0].rate = 44100;
     out->fmt[0].enc = SND2_ENC_S16LE;
     out->fmt[0].channels = 2;
     return 0;
 }
+static u32 queue_capacity, expected_seconds = 30;
 static int open_stream(const SND2_StreamDesc *desc, u32 *h)
 {
-    (void)desc;
+    queue_capacity = (desc->lead_periods + 1) * PERIOD;
     *h = 1;
     return 0;
 }
@@ -45,7 +46,7 @@ static int write_stream(u32 h, const void *buf, u32 bytes)
     (void)h;
     if (wave_run) {
         pending_frames = bytes / 4;
-        u32 free = FRAMES - (cursor - retired);
+        u32 free = queue_capacity - (cursor - retired);
         if (bytes > free * 4) bytes = free * 4;
         if (bytes > 128 * 4) bytes = 128 * 4; /* Exercise scratch suffixes. */
         const short *pcm = buf;
@@ -85,7 +86,7 @@ static int position(u32 h, SND2_Pos *p)
 static int wait_stream(u32 h, u32 f, u32 ms)
 {
     (void)h; (void)ms;
-    if (wave_run && f != 44100 * 30 - PERIOD) {
+    if (wave_run && f != 44100 * expected_seconds - PERIOD) {
         u32 needed = retired + pending_frames;
         /* At the final short write DMA can reach the unrounded target
          * before retirement. An already satisfied wait advances no time. */
@@ -141,6 +142,9 @@ static void report(u8 color, const char *fmt, ...) {
     }
 }
 
+static int device_count(void) { cursor = retired = gaps = 0; return 1; }
+static int device_info(u32 i, SND2_DevInfo *info) { (void)i; *info = (SND2_DevInfo){.kind = SND2_KIND_PCM_OUT}; return 0; }
+
 int main(void)
 {
     KernelAPI api = {.snd2_caps = caps, .snd2_stream_open = open_stream,
@@ -149,17 +153,33 @@ int main(void)
         .snd2_stream_close = close_stream, .get_tick = clock_tick,
         .kbd_trygetchar = key, .sys_time_now = clock_us, .sys_yield = yield_cpu,
         .kprintf = report};
+    char *args[] = {"snd2_test", "wave", "lead=4", "secs=60"};
+    api.snd2_dev_count = device_count;
+    api.snd2_dev_info = device_info;
+    wave_run = 1;
+    if (snd2_guest_main(3, args, &api) || queue_capacity != 5 * PERIOD) return 1;
+    expected_seconds = 60;
+    if (snd2_guest_main(4, args, &api) || cursor != 44100 * 60 || queue_capacity != 5 * PERIOD) return 1;
+    expected_seconds = 30;
+    args[2] = "lead=0";
+    if (snd2_guest_main(3, args, &api) || queue_capacity != 2 * PERIOD) return 1;
+    const char *bad[] = {"lead=16", "lead=4294967297", "lead=", "4", "lead=-1", "lead=4x", "secs=0", "secs=61"};
+    for (unsigned i = 0; i < sizeof(bad)/sizeof(bad[0]); ++i) {
+        args[2] = (char *)bad[i];
+        if (!snd2_guest_main(3, args, &api)) return 1;
+    }
+    wave_run = 0;
     for (scene = NORMAL; scene <= NO_AFTER; scene++) {
         cursor = 0;
-        if ((playback(&api, 0, "epoch") == 0) != (scene == NORMAL)) return 1;
+        if ((playback(&api, 0, "epoch", 3, 30) == 0) != (scene == NORMAL)) return 1;
     }
     latency_run = 1;
     scene = NORMAL;
     cursor = 0;
-    if (playback(&api, 0, "latency") || marker != 1 || requests != 2) return 1;
+    if (playback(&api, 0, "latency", 3, 30) || marker != 1 || requests != 2) return 1;
     scene = NO_KEY;
     cursor = 0;
-    if (!playback(&api, 0, "latency")) return 1;
+    if (!playback(&api, 0, "latency", 3, 30)) return 1;
     wave_run = 1;
     for (int run = 0; run < 3; ++run) {
         mid_period = 0;
@@ -167,7 +187,7 @@ int main(void)
         inject_delay = run == 2;
         elapsed_us = 0xfffff000U;
         cursor = retired = gaps = waits = reported_us = time_reads = 0;
-        int rc = playback(&api, 0, "wave");
+        int rc = playback(&api, 0, "wave", 3, 30);
         if (rc != (inject_delay ? 6 : 0) || gaps != (u32)inject_delay || !waits)
             return 1;
         if (!inject_delay && !mid_period) return 1;
@@ -178,7 +198,7 @@ int main(void)
     diagnostic = inject_delay = 0;
     for (stuck = 0; stuck <= 1; ++stuck) {
         cursor = retired = gaps = waits = immediate = public_played = 0;
-        int rc = playback(&api, 0, "wave");
+        int rc = playback(&api, 0, "wave", 3, 30);
         if (rc != (stuck ? 3 : 0) || !immediate || immediate > PERIOD) return 1;
     }
     return 0;
