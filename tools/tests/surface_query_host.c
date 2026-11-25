@@ -1,8 +1,8 @@
 #define HOST_CALLER_COPY_TEST
 #include "access_walk_host.c"
 #include "surface_query_host_source.c"
-static int gui, gfx_owner = 1;
-int con_sink_is_enabled(void) { return gui; }
+static int host_gui_enabled, gfx_owner = 1;
+int con_sink_is_enabled(void) { return host_gui_enabled; }
 int appslot_gfx_owner(void) { return gfx_owner; }
 static struct surface_query_source source;
 static struct surface_query_result *value;
@@ -46,7 +46,7 @@ static void caller_copy_tests(void)
     for (u32 if_on = 0; if_on < 2; if_on++) {
         host_arch_if = if_on ? 0x202 : 2;
         for (u32 mode = 0; mode < 2; mode++) {
-            gui = (int)mode;
+            host_gui_enabled = (int)mode;
             for (u32 g = 0; g < 2; g++) {
                 slot.hdr_flags = g ? OS32X_FLAG_GFX : 0;
                 for (u32 f = 0; f < 2; f++) {
@@ -69,7 +69,7 @@ static void caller_copy_tests(void)
             }
         }
     }
-    gui = 0; slot.hdr_flags = 0;
+    host_gui_enabled = 0; slot.hdr_flags = 0;
     source.role = LEDGER_ROLE_CLIENT; source.backend = LEDGER_SF_PC98;
     ledger_surfaces[sid[0]].role = LEDGER_ROLE_CLIENT;
     ledger_surfaces[sid[0]].backend = LEDGER_SF_PC98;

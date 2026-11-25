@@ -3,6 +3,7 @@
  * exec's actual launch mapping block must never expose low Unicode or BB.
  * Run through test_app_bb_overlap.py, GNU11 ILP32. */
 #include "types.h"
+#include "os32x_hdr.h"
 static u32 host_cr3;
 #include "ring3_str.h"
 #include "redir_access.h"

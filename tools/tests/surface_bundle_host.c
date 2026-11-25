@@ -27,7 +27,7 @@ void *kmemset(void *dst, int value, u32 size)
     for (u32 i = 0; i < size; i++) ((u8 *)dst)[i] = (u8)value;
     return dst;
 }
-static int armed, gui, gfx_owner = 2, reject_copy, break_rollback;
+static int armed, host_gui_enabled, gfx_owner = 2, reject_copy, break_rollback;
 static u32 copyins, publications, release_calls, fail_release;
 static u32 requested_access = LEDGER_PERM_RW;
 int host_bundle_unmap(struct addrspace *as, u32 base, u32 npages)
@@ -45,7 +45,7 @@ static void bundle_root_check(unsigned long root)
 {
     if (armed) CHECK(root == space.pd_phys);
 }
-int con_sink_is_enabled(void) { return gui; }
+int con_sink_is_enabled(void) { return host_gui_enabled; }
 int appslot_gfx_owner(void) { return gfx_owner; }
 static u32 selected_backend = LEDGER_SF_PC98;
 u32 gfx_sf_backend(void) { return selected_backend; }
@@ -389,8 +389,8 @@ static void caller_copy_tests(void)
     selected_backend = LEDGER_SF_PC98; GET(0); release_bundle();
     source.count = 3; GET(OS32_ERR_INVAL); source.count = 4;
     source.ready = 0; GET(OS32_ERR_INVAL); source.ready = 1;
-    gui = 1; gfx_owner = 1; GET(OS32_ERR_INVAL);
-    gfx_owner = 2; GET(0); release_bundle(); gui = 0;
+    host_gui_enabled = 1; gfx_owner = 1; GET(OS32_ERR_INVAL);
+    gfx_owner = 2; GET(0); release_bundle(); host_gui_enabled = 0;
     slot.hdr_flags = 0; GET(OS32_ERR_INVAL); slot.hdr_flags = OS32X_FLAG_GFX;
     for (u32 i = 0; i < 2; i++) {
         u32 before = copyins;

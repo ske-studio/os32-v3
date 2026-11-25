@@ -39,29 +39,6 @@ def type_features(typ, seen=None):
     return result
 
 
-def runtime_sizeof(c):
-    # In valid C sizeof(type) is nonconstant only for a variably sized type.
-    if c.kind != K.CXX_UNARY_EXPR:
-        return False
-    evaluate = cx.conf.lib.clang_Cursor_Evaluate
-    evaluate.argtypes, evaluate.restype = [cx.Cursor], ctypes.c_void_p
-    def nonconstant(cursor):
-        result = evaluate(cursor)
-        if not result:
-            return True
-        dispose = cx.conf.lib.clang_EvalResult_dispose
-        dispose.argtypes = [ctypes.c_void_p]
-        dispose(result)
-        return False
-    if nonconstant(c):
-        return True
-    # sizeof(pointer-to-VLA) and _Alignof(VLA) are themselves constant.
-    # Type operands expose their array dimensions as direct expression children;
-    # ordinary sizeof(expr) instead has a PAREN_EXPR child.
-    return any(x.kind.is_expression() and x.kind != K.PAREN_EXPR and nonconstant(x)
-               for x in c.get_children())
-
-
 def findings(tu, root, words, headers, public=False):
     from .type_occurrences import findings as type_occurrences
     hits = {hit for hit in type_occurrences(tu, root) if hit[2] in words}
@@ -83,8 +60,6 @@ def findings(tu, root, words, headers, public=False):
         if not rel:
             continue
         features = type_features(c.type)
-        if runtime_sizeof(c):
-            features.add('VLA')
         if c.kind == K.FUNCTION_DECL:
             features |= type_features(c.type.get_result())
         if c.kind == K.VAR_DECL and c.tls_kind.value:

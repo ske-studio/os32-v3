@@ -31,6 +31,9 @@ public:
             if (array->getIndexTypeQualifiers().hasRestrict())
                 report("restrict");
         }
+        // sizeof and _Alignof can hide a VLA inside a written type operand.
+        if (type->isVariableArrayType())
+            report("VLA");
         if (type->isAtomicType())
             report("_Atomic");
         return clang::RecursiveASTVisitor<TypeVisitor>::TraverseTypeLoc(loc);

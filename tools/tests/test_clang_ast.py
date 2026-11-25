@@ -446,6 +446,12 @@ if __name__ == '__main__':
         self.assertEqual(dialect(self.tu('int f(void) { return sizeof(int *); }'),
                                  ROOT,{'restrict','_Atomic'},set()),[])
 
+    def test_sizeof_fixed_expression(self):
+        # LD3 queries fixed buffer and pointee sizes without parentheses.
+        body = ('int f(int *p) { char buf[16]; '
+                'return sizeof buf + sizeof *p + sizeof p[1]; }')
+        self.assertEqual(dialect(self.tu(body), ROOT, {'VLA'}, set()), [])
+
     def test_array_parameter_restrict(self):
         contexts = [
             'int f(int a[{qual}]);',
