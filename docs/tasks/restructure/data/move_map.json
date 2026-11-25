@@ -3761,11 +3761,11 @@
   },
   {
     "from": "kdebug/crt_diag.c",
-    "to": "sys/kern/kdebug/crt_diag.c"
+    "to": "sys/platform/pc98/kdebug/crt_diag.c"
   },
   {
     "from": "kdebug/crt_diag.h",
-    "to": "sys/kern/kdebug/crt_diag.h"
+    "to": "sys/platform/pc98/kdebug/crt_diag.h"
   },
   {
     "from": "kdebug/generated/kdebug_import_macros.h",
@@ -4049,7 +4049,7 @@
   },
   {
     "from": "kdebug/kdebug_main.c",
-    "to": "sys/kern/kdebug/kdebug_main.c"
+    "to": "sys/platform/pc98/kdebug/kdebug_main.c"
   },
   {
     "from": "kdebug/kdebug_module.c",
@@ -4065,15 +4065,15 @@
   },
   {
     "from": "kdebug/kpeek.c",
-    "to": "sys/kern/kdebug/kpeek.c"
+    "to": "sys/platform/pc98/kdebug/kpeek.c"
   },
   {
     "from": "kdebug/kpeek.h",
-    "to": "sys/kern/kdebug/kpeek.h"
+    "to": "sys/platform/pc98/kdebug/kpeek.h"
   },
   {
     "from": "kdebug/kselftest.c",
-    "to": "sys/kern/kdebug/kselftest.c"
+    "to": "sys/platform/pc98/kdebug/kselftest.c"
   },
   {
     "from": "kdebug/kselftest/abort_admit.inc",
@@ -4089,7 +4089,7 @@
   },
   {
     "from": "kdebug/kselftest/bootinfo.inc",
-    "to": "sys/kern/kdebug/kselftest/bootinfo.inc"
+    "to": "sys/platform/pc98/kdebug/kselftest/bootinfo.inc"
   },
   {
     "from": "kdebug/kselftest/bootlog.inc",
@@ -4165,7 +4165,7 @@
   },
   {
     "from": "kdebug/kselftest/kprintf_attr.inc",
-    "to": "sys/kern/kdebug/kselftest/kprintf_attr.inc"
+    "to": "sys/platform/pc98/kdebug/kselftest/kprintf_attr.inc"
   },
   {
     "from": "kdebug/kselftest/ledger.inc",
@@ -4193,7 +4193,7 @@
   },
   {
     "from": "kdebug/kselftest/pit_setup.inc",
-    "to": "sys/kern/kdebug/kselftest/pit_setup.inc"
+    "to": "sys/platform/pc98/kdebug/kselftest/pit_setup.inc"
   },
   {
     "from": "kdebug/kselftest/pool_model.inc",
@@ -4229,11 +4229,11 @@
   },
   {
     "from": "kdebug/nic_trace.c",
-    "to": "sys/kern/kdebug/nic_trace.c"
+    "to": "sys/platform/pc98/kdebug/nic_trace.c"
   },
   {
     "from": "kdebug/nic_trace.h",
-    "to": "sys/kern/kdebug/nic_trace.h"
+    "to": "sys/platform/pc98/kdebug/nic_trace.h"
   },
   {
     "from": "kdebug/probe.c",
@@ -4253,7 +4253,7 @@
   },
   {
     "from": "kdebug/recover.c",
-    "to": "sys/kern/kdebug/recover.c"
+    "to": "sys/platform/pc98/kdebug/recover.c"
   },
   {
     "from": "kdebug/recover.h",
@@ -4261,7 +4261,7 @@
   },
   {
     "from": "kdebug/recover_cleanup.h",
-    "to": "sys/kern/kdebug/recover_cleanup.h"
+    "to": "sys/platform/pc98/kdebug/recover_cleanup.h"
   },
   {
     "from": "kdebug/recover_common/clock.inc",
@@ -4325,7 +4325,7 @@
   },
   {
     "from": "kdebug/recover_plan/profile.inc",
-    "to": "sys/kern/kdebug/recover_plan/profile.inc"
+    "to": "sys/platform/pc98/kdebug/recover_plan/profile.inc"
   },
   {
     "from": "kdebug/recover_plan/step.inc",
@@ -4333,7 +4333,7 @@
   },
   {
     "from": "kdebug/recover_profile.c",
-    "to": "sys/kern/kdebug/recover_profile.c"
+    "to": "sys/platform/pc98/kdebug/recover_profile.c"
   },
   {
     "from": "kdebug/recover_virtual.c",
@@ -4369,35 +4369,35 @@
   },
   {
     "from": "kdebug/tri_command_wire.h",
-    "to": "sys/kern/kdebug/tri_command_wire.h"
+    "to": "sys/dev/video/trident/diag/tri_command_wire.h"
   },
   {
     "from": "kdebug/trident_command_test.c",
-    "to": "sys/kern/kdebug/trident_command_test.c"
+    "to": "sys/dev/video/trident/diag/trident_command_test.c"
   },
   {
     "from": "kdebug/trident_command_test.h",
-    "to": "sys/kern/kdebug/trident_command_test.h"
+    "to": "sys/dev/video/trident/diag/trident_command_test.h"
   },
   {
     "from": "kdebug/v86_gcap.c",
-    "to": "sys/kern/kdebug/v86_gcap.c"
+    "to": "sys/platform/pc98/kdebug/v86_gcap.c"
   },
   {
     "from": "kdebug/v86_gcap_defs.h",
-    "to": "sys/kern/kdebug/v86_gcap_defs.h"
+    "to": "sys/platform/pc98/kdebug/v86_gcap_defs.h"
   },
   {
     "from": "kdebug/v86_gcap_diag.h",
-    "to": "sys/kern/kdebug/v86_gcap_diag.h"
+    "to": "sys/platform/pc98/kdebug/v86_gcap_diag.h"
   },
   {
     "from": "kdebug/v86_gcap_math.c",
-    "to": "sys/kern/kdebug/v86_gcap_math.c"
+    "to": "sys/platform/pc98/kdebug/v86_gcap_math.c"
   },
   {
     "from": "kdebug/v86_test16_gcap.asm",
-    "to": "sys/kern/kdebug/v86_test16_gcap.asm"
+    "to": "sys/platform/pc98/kdebug/v86_test16_gcap.asm"
   },
   {
     "from": "kernel/av_focus.c",
@@ -6394,6 +6394,14 @@
   {
     "from": "sound/hal/snd2_v1.c",
     "to": "sys/hal/sound/snd2_v1.c"
+  },
+  {
+    "from": "tools/ppc/ata_deny.c",
+    "to": "userland/diag/ata_deny.c"
+  },
+  {
+    "from": "tools/ppc/learn_probe.c",
+    "to": "userland/diag/learn_probe.c"
   },
   {
     "from": "userland/tests/allocator_bench.c",

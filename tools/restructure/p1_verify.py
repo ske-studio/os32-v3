@@ -211,7 +211,10 @@ def verify_scope(table, base, list_candidates=False):
                 issues.append(f'{path}: 必須欄が空')
             if kind not in KINDS.get(owner, set()):
                 issues.append(f'{path}: 担当・種類が不正 ({owner}, {kind})')
-            if path.startswith('tools/') and kind not in KINDS['P1-4'] | {'運用の道具', 'ビルドの定義'}:
+            if path in layout.PPC_DIAGNOSTICS:
+                if kind != '製品':
+                    issues.append(f'{path}: PPC_USER_APPS の製品入力')
+            elif path.startswith('tools/') and kind not in KINDS['P1-4'] | {'運用の道具', 'ビルドの定義'}:
                 issues.append(f'{path}: tools の種類が不正')
             if path.removeprefix('tools/') in CHECK_BODIES and path.startswith('tools/') and kind != '検査の本体':
                 issues.append(f'{path}: 検査の本体として分類する')

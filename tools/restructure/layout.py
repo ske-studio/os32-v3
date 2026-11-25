@@ -10,6 +10,11 @@ DATA = ROOT / 'docs/tasks/restructure/data'
 HEADER = ['パス', '行き先', '根拠']
 CONTRACTS = {'gfx_present_contract.h': 'gfx', 'mouse_pointer_contract.h': 'input',
              'snd_wake_contract.h': 'sound'}
+PPC_DIAGNOSTICS = {'tools/ppc/ata_deny.c', 'tools/ppc/learn_probe.c'}
+BUILD_FOLLOWUP = {
+    'build/sdk.mk': 'P2-3：CHECK_REGISTRATION が Make の解析時に旧 tools/checks/run.py --make を起動する',
+    'build/programs.mk': 'P3：C_TESTS の wildcard userland/tests/*.c と除外・個別規則を userland/diag/ に合わせる',
+}
 UNUSED = {
     'tools/g16/scan_ui_chars.py': '文字表の手動更新用。ownership.md の再調査でも呼出元なし',
     'tools/gen_kcg_font.py': 'gen_font16.py 冒頭が置き換えを明記。旧形式生成器の起動なし',
@@ -28,7 +33,7 @@ def read_rows(path):
         return list(csv.DictReader(stream, delimiter='\t'))
 
 
-def placement(path, hal):
+def placement(path, hal, scope):
     top, _, rest = path.partition('/')
     if path in hal:
         h = hal[path]
@@ -50,6 +55,12 @@ def placement(path, hal):
         return 'sys/dev/' + rest, '装置クラスごとのドライバ'
     if top == 'hwdev':
         return 'sys/dev/' + path, 'hwdev モジュール固有の実装と生成入力'
+    if path in PPC_DIAGNOSTICS:
+        return 'userland/diag/' + Path(path).name, 'D-8：' + scope['根拠']
+    if top == 'kdebug' and scope['所属種類'] == '機種固有実装':
+        return 'sys/platform/pc98/' + path, 'D-3：' + scope['根拠'].split('所属判断=')[-1]
+    if top == 'kdebug' and rest.startswith(('trident_command_', 'tri_command_')):
+        return 'sys/dev/video/trident/diag/' + rest, 'D-3：Trident のコマンド診断とその通信形式'
     if top == 'kdebug':
         return 'sys/kern/' + path, 'D-3：build/kdebug.mk で組む診断モジュール'
     if top in {'arch', 'platform', 'include', 'gfx', 'sound', 'input', 'fs', 'net', 'kapi'}:
@@ -86,9 +97,11 @@ def main():
         writer.writerow(HEADER)
         for row in scope:
             path = row['パス']
-            dest, reason = placement(path, hal)
+            dest, reason = placement(path, hal, row)
             if dest == '=':
                 reason += '：' + row['根拠'].partition(' 候補印=')[0]
+            if path in BUILD_FOLLOWUP:
+                reason += '。' + BUILD_FOLLOWUP[path]
             if path in empty:
                 reason += '。持ち主：' + row['所属種類']
             if row['根拠'].startswith('担当の直し'):
@@ -101,14 +114,14 @@ def main():
             if row['外の呼び出し元'] != '—':
                 reason += '。外部利用を継続：' + row['外の呼び出し元']
             if path in REMNANTS or path.startswith('kernel/v86/') and path.endswith('.h'):
-                reason += '。D-11 残骸の候補：P0-1 で像の入力なし'
+                reason += '。D-11 残骸の候補：P0-1 で像の入力なし。ただし build/kdebug.mk の HWDEV_HEADERS が拾う HWDEV_GENERATED の前提。削除前に生成依存を確認'
             writer.writerow([path, dest, reason])
     for row in read_rows(DATA / 'scope.tsv'):
         caller = row.get('外の呼び出し元')
         if caller and caller != '—':
             action = 'P7 で終了。P3 前に相手に通知'
             if row['担当'] == 'P1-1':
-                dest, _ = placement(row['パス'], hal)
+                dest, _ = placement(row['パス'], hal, row)
                 action = '現行入口を維持' if dest == '=' else 'P3 前に参照先の変更を通知：' + dest
             review.append(['外部利用', row['パス'], caller + '。' + action])
     with (DATA / 'layout_review.tsv').open('w') as stream:

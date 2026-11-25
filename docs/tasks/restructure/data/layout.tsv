@@ -265,10 +265,10 @@ build/ppc-ram-root.json	=	現在の配置を維持：像・パッケージ・依
 build/ppc-root-pair.mk	=	現在の配置を維持：像・パッケージ・依存またはツールチェーンの構成。持ち主：ビルドの定義
 build/ppc-user.mk	=	現在の配置を維持：像・パッケージ・依存またはツールチェーンの構成。持ち主：ビルドの定義
 build/ppc.mk	=	現在の配置を維持：像・パッケージ・依存またはツールチェーンの構成。持ち主：ビルドの定義
-build/programs.mk	=	現在の配置を維持：像・パッケージ・依存またはツールチェーンの構成。持ち主：ビルドの定義
+build/programs.mk	=	現在の配置を維持：像・パッケージ・依存またはツールチェーンの構成。P3：C_TESTS の wildcard userland/tests/*.c と除外・個別規則を userland/diag/ に合わせる。持ち主：ビルドの定義
 build/ram-root.mk	=	現在の配置を維持：像・パッケージ・依存またはツールチェーンの構成。持ち主：ビルドの定義
 build/sdk-target.mk	=	現在の配置を維持：像・パッケージ・依存またはツールチェーンの構成。持ち主：ビルドの定義
-build/sdk.mk	=	現在の配置を維持：像・パッケージ・依存またはツールチェーンの構成。持ち主：ビルドの定義
+build/sdk.mk	=	現在の配置を維持：像・パッケージ・依存またはツールチェーンの構成。P2-3：CHECK_REGISTRATION が Make の解析時に旧 tools/checks/run.py --make を起動する。持ち主：ビルドの定義
 build/select.mk	=	現在の配置を維持：像・パッケージ・依存またはツールチェーンの構成。持ち主：ビルドの定義
 build/softfloat.mk	=	現在の配置を維持：像・パッケージ・依存またはツールチェーンの構成。持ち主：ビルドの定義
 build/sources/common.mk	=	現在の配置を維持：像・パッケージ・依存またはツールチェーンの構成。持ち主：ビルドの定義
@@ -1042,7 +1042,7 @@ include/v86_contract.h	sys/include/v86_contract.h	仕様 §3.2：include の責�
 include/ver_backend_contract.h	sys/include/ver_backend_contract.h	仕様 §3.2：include の責任を引き継ぐ
 include/video_service.h	sys/include/video_service.h	仕様 §3.2：include の責任を引き継ぐ
 include/video_wc.h	sys/include/video_wc.h	仕様 §3.2：include の責任を引き継ぐ
-include/vk32.h	sys/include/vk32.h	仕様 §3.2：include の責任を引き継ぐ。持ち主：共通実装。D-11 残骸の候補：P0-1 で像の入力なし
+include/vk32.h	sys/include/vk32.h	仕様 §3.2：include の責任を引き継ぐ。持ち主：共通実装。D-11 残骸の候補：P0-1 で像の入力なし。ただし build/kdebug.mk の HWDEV_HEADERS が拾う HWDEV_GENERATED の前提。削除前に生成依存を確認
 include/wab_xe10.h	sys/platform/pc98/wab_xe10.h	check_layers.NAMED の PC-98 所有ヘッダ
 init/boot_disk.h	sys/kern/init/boot_disk.h	D-1：初期化・メモリ・実行の責任を下位に残す
 init/boot_root.c	sys/kern/init/boot_root.c	D-1：初期化・メモリ・実行の責任を下位に残す
@@ -1108,8 +1108,8 @@ kapi/kapi_sys.c	sys/kapi/kapi_sys.c	仕様 §3.2：kapi の責任を引き継ぐ
 kapi/kapi_sysinfo.c	sys/kapi/kapi_sysinfo.c	仕様 §3.2：kapi の責任を引き継ぐ
 kapi/kapi_sysinfo.h	sys/kapi/kapi_sysinfo.h	仕様 §3.2：kapi の責任を引き継ぐ
 kapi/range_internal.h	sys/kapi/range_internal.h	仕様 §3.2：kapi の責任を引き継ぐ
-kdebug/crt_diag.c	sys/kern/kdebug/crt_diag.c	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/crt_diag.h	sys/kern/kdebug/crt_diag.h	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/crt_diag.c	sys/platform/pc98/kdebug/crt_diag.c	D-3：機種固有実装：PEGC のポート・BIOS ワークを扱う CRT 診断
+kdebug/crt_diag.h	sys/platform/pc98/kdebug/crt_diag.h	D-3：機種固有実装：PEGC のポート・BIOS ワークを扱う CRT 診断
 kdebug/generated/kdebug_import_macros.h	sys/kern/kdebug/generated/kdebug_import_macros.h	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/generated/kdebug_import_slots.c	sys/kern/kdebug/generated/kdebug_import_slots.c	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/generated/kdebug_import_stubs.S	sys/kern/kdebug/generated/kdebug_import_stubs.S	D-3：build/kdebug.mk で組む診断モジュール
@@ -1180,17 +1180,17 @@ kdebug/gfinit_verify.inc	sys/dev/video/geforce/gfinit_verify.inc	移すだけ：
 kdebug/gfinit_wire.h	sys/dev/video/geforce/gfinit_wire.h	移すだけ：kdebug/gfinit_wire.h:23 cmd_gfinit.c と共有する操作番号・要求形式と PREPARE 用の検証除外リストを定義する。 境界照合 GF_INIT_MAINS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
 kdebug/hwb_access.c	sys/kern/kdebug/hwb_access.c	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/hwb_wire.h	sys/kern/kdebug/hwb_wire.h	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kdebug_main.c	sys/kern/kdebug/kdebug_main.c	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kdebug_main.c	sys/platform/pc98/kdebug/kdebug_main.c	D-3：機種固有実装：PC-98 の V86・画面診断を組み込む入口
 kdebug/kdebug_module.c	sys/kern/kdebug/kdebug_module.c	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kdebug_window.c	sys/kern/kdebug/kdebug_window.c	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kdebug_window.h	sys/kern/kdebug/kdebug_window.h	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kpeek.c	sys/kern/kdebug/kpeek.c	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kpeek.h	sys/kern/kdebug/kpeek.h	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest.c	sys/kern/kdebug/kselftest.c	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kpeek.c	sys/platform/pc98/kdebug/kpeek.c	D-3：機種固有実装：PC-98 の VRAM・装置予約域を除外するメモリ診断
+kdebug/kpeek.h	sys/platform/pc98/kdebug/kpeek.h	D-3：機種固有実装：PC-98 の VRAM・装置予約域を除外するメモリ診断
+kdebug/kselftest.c	sys/platform/pc98/kdebug/kselftest.c	D-3：機種固有実装：PC-98 の V86・画面診断を組み込む入口
 kdebug/kselftest/abort_admit.inc	sys/kern/kdebug/kselftest/abort_admit.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/app_band_pde.inc	sys/kern/kdebug/kselftest/app_band_pde.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/appmem.inc	sys/kern/kdebug/kselftest/appmem.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/bootinfo.inc	sys/kern/kdebug/kselftest/bootinfo.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kselftest/bootinfo.inc	sys/platform/pc98/kdebug/kselftest/bootinfo.inc	D-3：機種固有実装：PC-98 のシステムクロックに対する PIT の設定を照合
 kdebug/kselftest/bootlog.inc	sys/kern/kdebug/kselftest/bootlog.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/caller_boot.inc	sys/kern/kdebug/kselftest/caller_boot.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/con_sink_render_gate.inc	sys/kern/kdebug/kselftest/con_sink_render_gate.inc	D-3：build/kdebug.mk で組む診断モジュール
@@ -1209,14 +1209,14 @@ kdebug/kselftest/kbd_cmd.inc	sys/kern/kdebug/kselftest/kbd_cmd.inc	D-3：build/k
 kdebug/kselftest/kbd_inject.inc	sys/kern/kdebug/kselftest/kbd_inject.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/kcg_display_return.inc	sys/kern/kdebug/kselftest/kcg_display_return.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/kprintf.inc	sys/kern/kdebug/kselftest/kprintf.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/kprintf_attr.inc	sys/kern/kdebug/kselftest/kprintf_attr.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kselftest/kprintf_attr.inc	sys/platform/pc98/kdebug/kselftest/kprintf_attr.inc	D-3：機種固有実装：PC-98 テキスト VRAM の色属性を照合
 kdebug/kselftest/ledger.inc	sys/kern/kdebug/kselftest/ledger.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/map_user_keep.inc	sys/kern/kdebug/kselftest/map_user_keep.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/mem.inc	sys/kern/kdebug/kselftest/mem.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/memmap.inc	sys/kern/kdebug/kselftest/memmap.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/memmap_pool_user.inc	sys/kern/kdebug/kselftest/memmap_pool_user.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/pcm.inc	sys/kern/kdebug/kselftest/pcm.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/kselftest/pit_setup.inc	sys/kern/kdebug/kselftest/pit_setup.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/kselftest/pit_setup.inc	sys/platform/pc98/kdebug/kselftest/pit_setup.inc	D-3：機種固有実装：PC-98 のシステムクロックに対する PIT の設定を照合
 kdebug/kselftest/pool_model.inc	sys/kern/kdebug/kselftest/pool_model.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/ring3_pd.inc	sys/kern/kdebug/kselftest/ring3_pd.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/ring3_wm_guard.inc	sys/kern/kdebug/kselftest/ring3_wm_guard.inc	D-3：build/kdebug.mk で組む診断モジュール
@@ -1225,15 +1225,15 @@ kdebug/kselftest/str.inc	sys/kern/kdebug/kselftest/str.inc	D-3：build/kdebug.mk
 kdebug/kselftest/time_now.inc	sys/kern/kdebug/kselftest/time_now.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/tramp_user_str.inc	sys/kern/kdebug/kselftest/tramp_user_str.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/kselftest/utoa.inc	sys/kern/kdebug/kselftest/utoa.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/nic_trace.c	sys/kern/kdebug/nic_trace.c	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/nic_trace.h	sys/kern/kdebug/nic_trace.h	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/nic_trace.c	sys/platform/pc98/kdebug/nic_trace.c	D-3：機種固有実装：PC-98 の bootinfo_native を使う NIC 診断
+kdebug/nic_trace.h	sys/platform/pc98/kdebug/nic_trace.h	D-3：機種固有実装：PC-98 の bootinfo_native を使う NIC 診断
 kdebug/probe.c	sys/kern/kdebug/probe.c	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/probe_index.c	sys/kern/kdebug/probe_index.c	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/probe_validate.h	sys/kern/kdebug/probe_validate.h	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/probe_wire.h	sys/kern/kdebug/probe_wire.h	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/recover.c	sys/kern/kdebug/recover.c	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/recover.c	sys/platform/pc98/kdebug/recover.c	D-3：機種固有実装：PC-98 の I/O と画面・タイマ復旧の処理
 kdebug/recover.h	sys/kern/kdebug/recover.h	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/recover_cleanup.h	sys/kern/kdebug/recover_cleanup.h	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/recover_cleanup.h	sys/platform/pc98/kdebug/recover_cleanup.h	D-3：機種固有実装：PC-98 の I/O と画面・タイマ復旧の処理
 kdebug/recover_common/clock.inc	sys/kern/kdebug/recover_common/clock.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/recover_common/log.inc	sys/kern/kdebug/recover_common/log.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/recover_common/s0.inc	sys/kern/kdebug/recover_common/s0.inc	D-3：build/kdebug.mk で組む診断モジュール
@@ -1249,9 +1249,9 @@ kdebug/recover_plan/access.inc	sys/kern/kdebug/recover_plan/access.inc	D-3：bui
 kdebug/recover_plan/access_idle_read.inc	sys/kern/kdebug/recover_plan/access_idle_read.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/recover_plan/access_saved_matches.inc	sys/kern/kdebug/recover_plan/access_saved_matches.inc	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/recover_plan/bind.inc	sys/kern/kdebug/recover_plan/bind.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/recover_plan/profile.inc	sys/kern/kdebug/recover_plan/profile.inc	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/recover_plan/profile.inc	sys/platform/pc98/kdebug/recover_plan/profile.inc	D-3：機種固有実装：PC-98 の I/O と画面・タイマ復旧の処理
 kdebug/recover_plan/step.inc	sys/kern/kdebug/recover_plan/step.inc	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/recover_profile.c	sys/kern/kdebug/recover_profile.c	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/recover_profile.c	sys/platform/pc98/kdebug/recover_profile.c	D-3：機種固有実装：PC-98 の I/O と画面・タイマ復旧の処理
 kdebug/recover_virtual.c	sys/kern/kdebug/recover_virtual.c	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/recover_virtual.h	sys/kern/kdebug/recover_virtual.h	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/recover_wire.h	sys/kern/kdebug/recover_wire.h	D-3：build/kdebug.mk で組む診断モジュール
@@ -1260,14 +1260,14 @@ kdebug/selftest_internal.h	sys/kern/kdebug/selftest_internal.h	D-3：build/kdebu
 kdebug/selftest_kbd_inject.c	sys/kern/kdebug/selftest_kbd_inject.c	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/selftest_lease.c	sys/kern/kdebug/selftest_lease.c	D-3：build/kdebug.mk で組む診断モジュール
 kdebug/tick_probe.c	sys/kern/kdebug/tick_probe.c	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/tri_command_wire.h	sys/kern/kdebug/tri_command_wire.h	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/trident_command_test.c	sys/kern/kdebug/trident_command_test.c	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/trident_command_test.h	sys/kern/kdebug/trident_command_test.h	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/v86_gcap.c	sys/kern/kdebug/v86_gcap.c	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/v86_gcap_defs.h	sys/kern/kdebug/v86_gcap_defs.h	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/v86_gcap_diag.h	sys/kern/kdebug/v86_gcap_diag.h	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/v86_gcap_math.c	sys/kern/kdebug/v86_gcap_math.c	D-3：build/kdebug.mk で組む診断モジュール
-kdebug/v86_test16_gcap.asm	sys/kern/kdebug/v86_test16_gcap.asm	D-3：build/kdebug.mk で組む診断モジュール
+kdebug/tri_command_wire.h	sys/dev/video/trident/diag/tri_command_wire.h	D-3：Trident のコマンド診断とその通信形式
+kdebug/trident_command_test.c	sys/dev/video/trident/diag/trident_command_test.c	D-3：Trident のコマンド診断とその通信形式
+kdebug/trident_command_test.h	sys/dev/video/trident/diag/trident_command_test.h	D-3：Trident のコマンド診断とその通信形式
+kdebug/v86_gcap.c	sys/platform/pc98/kdebug/v86_gcap.c	D-3：機種固有実装：PC-98 ROM の INT 18h 画面モードと I/O 列の採取
+kdebug/v86_gcap_defs.h	sys/platform/pc98/kdebug/v86_gcap_defs.h	D-3：機種固有実装：PC-98 ROM の INT 18h 画面モードと I/O 列の採取
+kdebug/v86_gcap_diag.h	sys/platform/pc98/kdebug/v86_gcap_diag.h	D-3：機種固有実装：PC-98 ROM の INT 18h 画面モードと I/O 列の採取
+kdebug/v86_gcap_math.c	sys/platform/pc98/kdebug/v86_gcap_math.c	D-3：機種固有実装：PC-98 ROM の INT 18h 画面モードと I/O 列の採取
+kdebug/v86_test16_gcap.asm	sys/platform/pc98/kdebug/v86_test16_gcap.asm	D-3：機種固有実装：PC-98 ROM の INT 18h 画面モードと I/O 列の採取
 kernel/av_focus.c	sys/kern/av_focus.c	D-1：カーネル共通処理
 kernel/boot_token.c	sys/kern/boot_token.c	D-1：カーネル共通処理
 kernel/cli/resident_cli.c	sys/kern/cli/resident_cli.c	D-1：カーネル共通処理
@@ -1389,11 +1389,11 @@ kernel/time/tick_probe.h	sys/kern/time/tick_probe.h	移すだけ：kernel/time/t
 kernel/time/tick_probe_ids.h	sys/kern/time/tick_probe_ids.h	移すだけ：kernel/time/tick_probe_ids.h:4 TP_IRQ0 — 計測側とtick_probe_begin等で共有するIRQ計測点の識別値。
 kernel/time/time_math.c	sys/kern/time/time_math.c	移すだけ：kernel/time/time_math.c:3 time_clamp — 今回の時刻が前回を下回ったとき補正する。
 kernel/time/time_math.h	sys/kern/time/time_math.h	移すだけ：kernel/time/time_math.h:19 time_clamp — 単調性を保つ補正関数の入出力を定める。
-kernel/v86/v86.h	sys/kern/v86/v86.h	D-1：カーネル共通処理。持ち主：共通実装。D-11 残骸の候補：P0-1 で像の入力なし
-kernel/v86/v86_gcap.h	sys/kern/v86/v86_gcap.h	D-1：カーネル共通処理。持ち主：共通実装。D-11 残骸の候補：P0-1 で像の入力なし
-kernel/v86/v86_gcap_math.h	sys/kern/v86/v86_gcap_math.h	D-1：カーネル共通処理。持ち主：共通実装。D-11 残骸の候補：P0-1 で像の入力なし
-kernel/v86/v86_mem.h	sys/kern/v86/v86_mem.h	D-1：カーネル共通処理。持ち主：共通実装。D-11 残骸の候補：P0-1 で像の入力なし
-kernel/v86/v86_module.h	sys/kern/v86/v86_module.h	D-1：カーネル共通処理。持ち主：共通実装。D-11 残骸の候補：P0-1 で像の入力なし
+kernel/v86/v86.h	sys/kern/v86/v86.h	D-1：カーネル共通処理。持ち主：共通実装。D-11 残骸の候補：P0-1 で像の入力なし。ただし build/kdebug.mk の HWDEV_HEADERS が拾う HWDEV_GENERATED の前提。削除前に生成依存を確認
+kernel/v86/v86_gcap.h	sys/kern/v86/v86_gcap.h	D-1：カーネル共通処理。持ち主：共通実装。D-11 残骸の候補：P0-1 で像の入力なし。ただし build/kdebug.mk の HWDEV_HEADERS が拾う HWDEV_GENERATED の前提。削除前に生成依存を確認
+kernel/v86/v86_gcap_math.h	sys/kern/v86/v86_gcap_math.h	D-1：カーネル共通処理。持ち主：共通実装。D-11 残骸の候補：P0-1 で像の入力なし。ただし build/kdebug.mk の HWDEV_HEADERS が拾う HWDEV_GENERATED の前提。削除前に生成依存を確認
+kernel/v86/v86_mem.h	sys/kern/v86/v86_mem.h	D-1：カーネル共通処理。持ち主：共通実装。D-11 残骸の候補：P0-1 で像の入力なし。ただし build/kdebug.mk の HWDEV_HEADERS が拾う HWDEV_GENERATED の前提。削除前に生成依存を確認
+kernel/v86/v86_module.h	sys/kern/v86/v86_module.h	D-1：カーネル共通処理。持ち主：共通実装。D-11 残骸の候補：P0-1 で像の入力なし。ただし build/kdebug.mk の HWDEV_HEADERS が拾う HWDEV_GENERATED の前提。削除前に生成依存を確認
 kernel/ver_collect.c	sys/kern/ver_collect.c	D-1：カーネル共通処理
 kernel/ver_format.c	sys/kern/ver_format.c	D-1：カーネル共通処理
 kernel/ver_info.h	sys/kern/ver_info.h	D-1：カーネル共通処理
@@ -2156,9 +2156,11 @@ tools/pack_name_tables.txt	保留	不要の候補：冒頭で旧 check_select.py
 tools/pack_notes.txt	保留	不要の候補：旧 pack の助言表。現行登録の covers にだけ残り、表を読む入口なし。運用の静的呼出元 0 件
 tools/pc98pt.py	=	現在の配置を維持：開発・製造・配備用の pc98pt.py。PC-98 区画表を読み書きする。。運用の静的呼出元 2 件
 tools/ppc/README.md	=	現在の配置を維持：PowerPC の像の作成・実行手順が参照する PPC 用の運用道具と一緒に移す。運用の静的呼出元 0 件
+tools/ppc/ata_deny.c	userland/diag/ata_deny.c	D-8：担当の直し（P1-4 → P1-1）：build/ppc-user.mk の PPC_USER_APPS で atadeny.bin をビルドし、ata_accept.py が受入像の KB_ROOT_BINS に追加。SDK の呼出しだけを使うゲスト診断
 tools/ppc/boot_media.py	=	現在の配置を維持：PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。。運用の静的呼出元 3 件
 tools/ppc/build_cross.sh	=	現在の配置を維持：PowerMac 像の生成・リンク・媒体作成の入力。クロスコンパイラとライブラリを構築する。。運用の静的呼出元 0 件
 tools/ppc/install_packages.py	=	現在の配置を維持：PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。。運用の静的呼出元 1 件
+tools/ppc/learn_probe.c	userland/diag/learn_probe.c	D-8：担当の直し（P1-4 → P1-1）：build/ppc-user.mk の PPC_USER_APPS で learnprb.bin をビルドし、of_hdd_accept.py が受入像の KB_ROOT_BINS に追加。SDK の呼出しだけを使うゲスト診断
 tools/ppc/module_rela.py	=	現在の配置を維持：PowerMac 像の生成・リンク・媒体作成の入力。データやリンク結果を製品のビルドが必要とする形式に整える。。運用の静的呼出元 2 件
 tools/ppc/product_media.py	=	現在の配置を維持：PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。。運用の静的呼出元 3 件
 tools/ppc/root_lz4_layout.py	=	現在の配置を維持：PowerMac 像の生成・リンク・媒体作成の入力。データやリンク結果を製品のビルドが必要とする形式に整える。。運用の静的呼出元 8 件。外部利用を継続：pc98emu 経由 tools/ppc/root_lz4_layout_run.py

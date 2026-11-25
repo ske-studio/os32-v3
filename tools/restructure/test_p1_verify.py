@@ -18,7 +18,7 @@ CLASSIFIER_PATH = verify.LAYER_BLOB.split(':', 1)[1]
 
 def fixture(root):
     subprocess.run(['git', 'init', '-q', str(root)], check=True)
-    for path in ('tools/gfinit_rom_check.py', 'tools/fixture_source.py', 'code.c', 'tools/checks/fixture_runner.py', 'tools/restructure/inventory.py',
+    for path in ('tools/ppc/ata_deny.c', 'tools/gfinit_rom_check.py', 'tools/fixture_source.py', 'code.c', 'tools/checks/fixture_runner.py', 'tools/restructure/inventory.py',
                  'tools/checks/restructure_p0_987.py', 'include/pc98.h', 'platform/pc98/platform_console.h', 'build/arch/example.mk'):
         dest = root / path
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -42,6 +42,7 @@ def exercise(module, root, tree):
     classifier = [CLASSIFIER_PATH, 'P1-4', '検査の本体', '層の分類', '', '開発・検査用実装']
     header = ['include/pc98.h', 'P1-1', '製品', '名前つきヘッダ', '', '機種固有実装']
     fixed = ['platform/pc98/platform_console.h', 'P1-1', '製品', '固定名の契約', '', '機種固有実装']
+    guest = ['tools/ppc/ata_deny.c', 'P1-1', '製品', 'PPC_USER_APPS の入力', '', '共通実装']
     manifest = ['build/arch/example.mk', 'P1-1', 'ビルドの定義', '像の定義', '', 'ビルドの定義']
     footer = [verify.EXCLUDED, ['tools/checks/restructure_p0_987.py', '開発・検査用実装'],
               ['tools/restructure/inventory.py', '開発・検査用実装']]
@@ -53,7 +54,7 @@ def exercise(module, root, tree):
 
     def check(rows, expected_code, messages, rom_row=rom):
         with table.open('w', newline='', encoding='utf-8') as stream:
-            csv.writer(stream, delimiter='\t').writerows([verify.HEADER, classifier, header, fixed, manifest, rom_row, source, *rows])
+            csv.writer(stream, delimiter='\t').writerows([verify.HEADER, classifier, header, fixed, manifest, guest, rom_row, source, *rows])
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             code = module.verify_scope(table, tree)
@@ -62,6 +63,9 @@ def exercise(module, root, tree):
             assert message in output.getvalue(), message
 
     check([product, runner, *footer], 0, ['A1\tcode.c', '差 0'])
+    guest[1:3], guest[-1] = ['P1-4', '試験の支援'], '開発・検査用実装'
+    check([product, runner, *footer], 1, ['PPC_USER_APPS の製品入力'])
+    guest[1:3], guest[-1] = ['P1-1', '製品'], '共通実装'
     header[-1] = '共通実装'
     check([product, runner, *footer], 1, ['include/pc98.h: 所属照合 機種固有実装 → 共通実装 の理由がない'])
     header[-1] = '機種固有実装'
@@ -191,6 +195,8 @@ def main():
         exercise_layout(verify, root)
         if args.mutate:
             for anchor, replacement in (
+                ("if path in layout.PPC_DIAGNOSTICS:", 'if False:'),
+                ("if kind != '製品':\n                    issues.append", "if False:\n                    issues.append"),
                 ("compare('配置表', paths, expected, issues)", 'pass'),
                 ('if dest in destinations or (root / dest).exists()', 'if (root / dest).exists()'),
                 ('or (root / dest).exists() or', 'or False or'),

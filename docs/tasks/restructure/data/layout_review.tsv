@@ -131,9 +131,11 @@
 運用の道具	tools/pack_notes.txt	旧 pack の助言表。現行登録の covers にだけ残り、表を読む入口なし。呼出元：静的参照なし
 運用の道具	tools/pc98pt.py	開発・製造・配備用の pc98pt.py。PC-98 区画表を読み書きする。。呼出元：tools/nhd_deploy.py:48、tools/tests/test_hdd_stage1.py:10
 運用の道具	tools/ppc/README.md	PowerPC の像の作成・実行手順が参照する PPC 用の運用道具と一緒に移す。呼出元：静的参照なし
+担当の直し	tools/ppc/ata_deny.c	担当の直し（P1-4 → P1-1）：build/ppc-user.mk の PPC_USER_APPS で atadeny.bin をビルドし、ata_accept.py が受入像の KB_ROOT_BINS に追加。SDK の呼出しだけを使うゲスト診断
 運用の道具	tools/ppc/boot_media.py	PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。。呼出元：build/targets/ppc-powermac.mk:196、tools/ppc/kboot_accept.py:21、tools/ppc/root_lz4_inventory.py:161
 運用の道具	tools/ppc/build_cross.sh	PowerMac 像の生成・リンク・媒体作成の入力。クロスコンパイラとライブラリを構築する。。呼出元：静的参照なし
 運用の道具	tools/ppc/install_packages.py	PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。。呼出元：build/ppc-install-boot.mk:41
+担当の直し	tools/ppc/learn_probe.c	担当の直し（P1-4 → P1-1）：build/ppc-user.mk の PPC_USER_APPS で learnprb.bin をビルドし、of_hdd_accept.py が受入像の KB_ROOT_BINS に追加。SDK の呼出しだけを使うゲスト診断
 運用の道具	tools/ppc/module_rela.py	PowerMac 像の生成・リンク・媒体作成の入力。データやリンク結果を製品のビルドが必要とする形式に整える。。呼出元：build/ppc-fep-module.mk:30、build/targets/ppc-powermac.mk:356
 運用の道具	tools/ppc/product_media.py	PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。。呼出元：build/ppc-install-boot.mk:18、tools/ppc/product_accept.py:13、tools/ppc/product_media_host.py:8
 運用の道具	tools/ppc/root_lz4_layout.py	PowerMac 像の生成・リンク・媒体作成の入力。データやリンク結果を製品のビルドが必要とする形式に整える。。呼出元：build/ppc-root-pair.mk:6、tools/ppc/deploy_accept.py:13、tools/ppc/product_media.py:9、tools/ppc/root_lz4_inventory.py:19、tools/ppc/root_lz4_layout_host.py:15、tools/ppc/root_lz4_layout_run.py:33、tools/ppc/root_pair.py:14、tools/ppc/test_root_pair.py:12

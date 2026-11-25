@@ -2238,8 +2238,8 @@ kapi/kapi_sys.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	共通実�
 kapi/kapi_sysinfo.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kapi/kapi_sysinfo.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 kapi/range_internal.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
-kdebug/crt_diag.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/crt_diag.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
+kdebug/crt_diag.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PEGC のポート・BIOS ワークを扱う CRT 診断	—	機種固有実装
+kdebug/crt_diag.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PEGC のポート・BIOS ワークを扱う CRT 診断	—	機種固有実装
 kdebug/generated/kdebug_import_macros.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/generated/kdebug_import_slots.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/generated/kdebug_import_stubs.S	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
@@ -2310,17 +2310,17 @@ kdebug/gfinit_verify.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/build/
 kdebug/gfinit_wire.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/geforce.mod	—	デバイス固有実装
 kdebug/hwb_access.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/kdebug.elf	—	デバイス固有実装
 kdebug/hwb_wire.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	デバイス固有実装
-kdebug/kdebug_main.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
+kdebug/kdebug_main.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の V86・画面診断を組み込む入口	—	機種固有実装
 kdebug/kdebug_module.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
 kdebug/kdebug_window.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/kdebug_window.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/geforce/geforce.elf	—	デバイス固有実装
-kdebug/kpeek.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/kpeek.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/hwdev/hwdev.elf	—	デバイス固有実装
-kdebug/kselftest.c	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kpeek.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の VRAM・装置予約域を除外するメモリ診断	—	機種固有実装
+kdebug/kpeek.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/hwdev/hwdev.elf。所属判断=機種固有実装：PC-98 の VRAM・装置予約域を除外するメモリ診断	—	機種固有実装
+kdebug/kselftest.c	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=機種固有実装：PC-98 の V86・画面診断を組み込む入口	—	機種固有実装
 kdebug/kselftest/abort_admit.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/app_band_pde.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/appmem.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/bootinfo.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/bootinfo.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=機種固有実装：PC-98 のシステムクロックに対する PIT の設定を照合	—	機種固有実装
 kdebug/kselftest/bootlog.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/caller_boot.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/con_sink_render_gate.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
@@ -2339,14 +2339,14 @@ kdebug/kselftest/kbd_cmd.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）�
 kdebug/kselftest/kbd_inject.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/kcg_display_return.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/kprintf.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/kprintf_attr.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/kprintf_attr.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=機種固有実装：PC-98 テキスト VRAM の色属性を照合	—	機種固有実装
 kdebug/kselftest/ledger.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/map_user_keep.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/mem.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/memmap.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/memmap_pool_user.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/pcm.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/pit_setup.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/pit_setup.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース。所属判断=機種固有実装：PC-98 のシステムクロックに対する PIT の設定を照合	—	機種固有実装
 kdebug/kselftest/pool_model.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/ring3_pd.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/ring3_wm_guard.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
@@ -2355,15 +2355,15 @@ kdebug/kselftest/str.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カ
 kdebug/kselftest/time_now.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/tramp_user_str.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/kselftest/utoa.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/nic_trace.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/nic_trace.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
+kdebug/nic_trace.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の bootinfo_native を使う NIC 診断	—	機種固有実装
+kdebug/nic_trace.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の bootinfo_native を使う NIC 診断	—	機種固有実装
 kdebug/probe.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/probe_index.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/probe_validate.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/kdebug.elf	—	デバイス固有実装
 kdebug/probe_wire.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/kdebug.elf	—	デバイス固有実装
-kdebug/recover.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
+kdebug/recover.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の I/O と画面・タイマ復旧の処理	—	機種固有実装
 kdebug/recover.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/geforce.mod	—	デバイス固有実装
-kdebug/recover_cleanup.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
+kdebug/recover_cleanup.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の I/O と画面・タイマ復旧の処理	—	機種固有実装
 kdebug/recover_common/clock.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/recover_common/log.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/recover_common/s0.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
@@ -2379,9 +2379,9 @@ kdebug/recover_plan/access.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/
 kdebug/recover_plan/access_idle_read.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/recover_plan/access_saved_matches.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/recover_plan/bind.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/recover_plan/profile.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
+kdebug/recover_plan/profile.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の I/O と画面・タイマ復旧の処理	—	機種固有実装
 kdebug/recover_plan/step.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/recover_profile.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
+kdebug/recover_profile.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 の I/O と画面・タイマ復旧の処理	—	機種固有実装
 kdebug/recover_virtual.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/recover_virtual.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/recover_wire.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
@@ -2393,11 +2393,11 @@ kdebug/tick_probe.c	P1-1	製品	製品実装・同梱ファイル：kdebug	—	�
 kdebug/tri_command_wire.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/trident_command_test.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/trident_command_test.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/v86_gcap.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/v86_gcap_defs.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/v86_gcap_diag.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/v86_gcap_math.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
-kdebug/v86_test16_gcap.asm	P1-1	製品	製品実装・同梱ファイル：kdebug	—	デバイス固有実装
+kdebug/v86_gcap.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 ROM の INT 18h 画面モードと I/O 列の採取	—	機種固有実装
+kdebug/v86_gcap_defs.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 ROM の INT 18h 画面モードと I/O 列の採取	—	機種固有実装
+kdebug/v86_gcap_diag.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 ROM の INT 18h 画面モードと I/O 列の採取	—	機種固有実装
+kdebug/v86_gcap_math.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf。所属判断=機種固有実装：PC-98 ROM の INT 18h 画面モードと I/O 列の採取	—	機種固有実装
+kdebug/v86_test16_gcap.asm	P1-1	製品	製品実装・同梱ファイル：kdebug。所属判断=機種固有実装：PC-98 ROM の INT 18h 画面モードと I/O 列の採取	—	機種固有実装
 kernel/av_focus.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kernel/boot_token.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	共通実装
 kernel/cli/resident_cli.c	P1-1	製品	Make の入力集合：build/sources/common.mk:C_COMMON_CLI	—	共通実装
@@ -3743,7 +3743,7 @@ tools/pc98pt.py	P1-1	運用の道具	開発・製造・配備用の pc98pt.py。
 tools/ppc/README.md	P1-1	運用の道具	PowerPC の像の作成・実行手順が参照する PPC 用の運用道具と一緒に移す 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/ppc/ata_accept.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—	開発・検査用実装
 tools/ppc/ata_accept_diag.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—	開発・検査用実装
-tools/ppc/ata_deny.c	P1-4	試験の支援	build/ppc-user.mk の PPC_USER_APPS で atadeny.bin をビルドし、ata_accept.py が受入像の KB_ROOT_BINS に追加	—	開発・検査用実装
+tools/ppc/ata_deny.c	P1-1	製品	担当の直し（P1-4 → P1-1）：build/ppc-user.mk の PPC_USER_APPS で atadeny.bin をビルドし、ata_accept.py が受入像の KB_ROOT_BINS に追加。SDK の呼出しだけを使うゲスト診断	—	共通実装
 tools/ppc/ata_write_diag.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—	開発・検査用実装
 tools/ppc/boot_media.py	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/ppc/build_cross.sh	P1-1	運用の道具	PowerMac 像の生成・リンク・媒体作成の入力。クロスコンパイラとライブラリを構築する。 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
@@ -3832,7 +3832,7 @@ tools/ppc/lan_p24_fake.c	P1-4	試験の支援	検査が使う手順・入力・�
 tools/ppc/lan_p24d_test.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—	開発・検査用実装
 tools/ppc/lan_p3_fake.c	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/ppc/lan_probe.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—	開発・検査用実装
-tools/ppc/learn_probe.c	P1-4	試験の支援	build/ppc-user.mk の PPC_USER_APPS で learnprb.bin をビルドし、of_hdd_accept.py が受入像の KB_ROOT_BINS に追加	—	開発・検査用実装
+tools/ppc/learn_probe.c	P1-1	製品	担当の直し（P1-4 → P1-1）：build/ppc-user.mk の PPC_USER_APPS で learnprb.bin をビルドし、of_hdd_accept.py が受入像の KB_ROOT_BINS に追加。SDK の呼出しだけを使うゲスト診断	—	共通実装
 tools/ppc/link_diag_run.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—	開発・検査用実装
 tools/ppc/link_run.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—	開発・検査用実装
 tools/ppc/link_sh_run.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	pc98emu の操作・受入台本	開発・検査用実装
