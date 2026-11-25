@@ -8,8 +8,8 @@ int pm_machcfg_seed(u32 pvr, struct machcfg_seed *out)
         u32 version;
         struct machcfg_seed seed;
     } rows[] = {
-        {PPC_PVR_7450, {{0, 0}, 1}},
-        {PPC_PVR_7455, {{0, 0}, 0}}
+        {PPC_PVR_7450, {{0, 0, 0}, 1}},
+        {PPC_PVR_7455, {{0, 0, 0}, 0}}
     };
     for (unsigned i = 0; i < sizeof(rows) / sizeof(rows[0]); ++i) {
         if (rows[i].version == (pvr >> 16)) {
@@ -17,7 +17,7 @@ int pm_machcfg_seed(u32 pvr, struct machcfg_seed *out)
             return 1;
         }
     }
-    *out = (struct machcfg_seed){{0, 0}, 0};
+    *out = (struct machcfg_seed){{0, 0, 0}, 0};
     return 0;
 }
 

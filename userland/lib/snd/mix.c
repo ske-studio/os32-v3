@@ -16,6 +16,7 @@ typedef struct {
     uint32_t id, hz, left, right, frame, phase;
     SND2_Fmt fmt;
     int playing;
+    uint32_t reset_generation;
     Buffer *head, *tail;
 } Voice;
 
@@ -208,6 +209,7 @@ int sndl_voice_reset(unsigned long id)
         v->head = b->next;
         complete(b, SNDL_RESET);
     }
+    ++v->reset_generation;
     v->tail = 0;
     v->playing = 0;
     v->frame = v->phase = 0;
@@ -312,4 +314,40 @@ void sndl_mix_finish(const int32_t *stereo, int16_t *out, uint32_t frames)
             *out++ = s > 32767 ? 32767 : s < -32768 ? -32768 : s;
         }
     }
+}
+
+uint32_t sndl_mix_generation(uint32_t id)
+{
+    Voice *v = lookup(id);
+    return v ? v->reset_generation : 0;
+}
+
+int sndl_mix_queued(void)
+{
+    for (unsigned i = 0; i < SNDL_VOICE_MAX; ++i)
+        if (voices[i].head) return 1;
+    return 0;
+}
+
+int sndl_mix_can_drain(void)
+{
+    for (unsigned i = 0; i < SNDL_VOICE_MAX; ++i) {
+        Voice *v = &voices[i];
+        if (v->head && (!v->playing || (v->tail->flags & SNDL_LOOP))) return 0;
+    }
+    return 1;
+}
+
+int sndl_mix_pending(void)
+{
+    for (unsigned i = 0; i < BUF_MAX; i++)
+        if (buffers[i].state == QUEUED || buffers[i].state == GENERATED)
+            return 1;
+    return 0;
+}
+
+void sndl_mix_abort(void)
+{
+    for (unsigned i = 0; i < SNDL_VOICE_MAX; i++)
+        if (voices[i].id) sndl_voice_reset(voices[i].id);
 }

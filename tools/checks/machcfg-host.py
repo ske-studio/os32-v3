@@ -4,7 +4,7 @@ CHECK = dict(name='machcfg-host', tier=1, needs=[], budget=5,
     covers=['include/machcfg_contract.h', 'include/types.h', 'include/callconv.h',
             'platform/powermac/machcfg.c', 'platform/powermac/platform_machcfg.h',
             'arch/ppc/ppc_oea.h', 'arch/ppc/ppc_boot.h', 'kernel/machcfg_root.c', 'include/config.h', 'lib/kstring.h',
-            'init/sysconfig.c', 'init/sysconfig.h', 'fs/vfs.h', 'lib/kstring_c.c',
+            'include/cpu.h', 'arch/x86/arch_cpu.h', 'init/sysconfig.c', 'init/sysconfig.h', 'fs/vfs.h', 'lib/kstring_c.c',
             'tools/tests/kernel_includes.py', 'kernel/machcfg.c', 'platform/pc98/machcfg.c', 'tools/tests/machcfg_host.c',
             'include/kprintf.h', 'include/console.h', 'sdk/include/os32/*.h',
             'platform/pc98/kernel.c', 'platform/pc98/platform_console.h', 'lib/kprintf.c', 'lib/kprintf_format.inc',
@@ -59,7 +59,7 @@ def run(ctx):
         ('report-before-finish', '!finished || reported', 'reported'),
         ('report-n-a', 'if (machine_seed.accepts_nap7450 == 0)', 'if (0)'),
         ('freeze', 'if (finished)', 'if (0)'),
-        ('begin-defaults', 'current = seed.defaults;', 'current = (struct machcfg){0, 0};'),
+        ('begin-defaults', 'current = seed.defaults;', 'current = (struct machcfg){0};'),
         ('capability-default', 'next.nap7450 = machine_seed.defaults.nap7450;', 'next.nap7450 = 0;'),
     ]
     with tempfile.TemporaryDirectory(dir=os.environ.get('TMPDIR')) as tmp:
@@ -117,6 +117,10 @@ def run(ctx):
                     print(name, phase, result)
                     return 1
                 print(name, 'runtime RED')
+            old = 'values.snd_flags |= SND2_DEV_FM_HW'
+            assert loader.count(old) == 1
+            assert check(source, header, root_src=loader.replace(old, 'values.snd_flags |= 0')) == ('run', 23)
+            print('machine FM policy runtime RED')
             for name, old, new in [
                 ('bare-cr-length', 'end < n && length', 'length'),
                 ('bare-cr-integer', r"end - s >= 2 && *s == '\r' && s[1] == '\n'",

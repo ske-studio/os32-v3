@@ -14,7 +14,7 @@ $(OPNA_ARCHIVE): $(wildcard lib/os32_opna/src/*.rs) lib/os32_opna/Cargo.toml lib
 	    --manifest-path lib/os32_opna/Cargo.toml --target "$(OPNA_TARGET)"
 
 SND_DIR := userland/lib/snd
-SND_OBJ := $(SND_DIR)/mix.o $(SND_DIR)/panic.o $(SND_DIR)/render.o
+SND_OBJ := $(SND_DIR)/mix.o $(SND_DIR)/panic.o $(SND_DIR)/render.o $(SND_DIR)/pump.o $(SND_DIR)/chip.o $(SND_DIR)/fmvoice.o
 ALL_LIB_OBJ += $(SND_OBJ)
 # L2/L3 call these private interfaces inside the shared library.
 SND_INTERNAL := opna_init opna_reset opna_write opna_read opna_status opna_rhythm \

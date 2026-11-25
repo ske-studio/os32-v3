@@ -8,3 +8,11 @@ SND_ENTRY sndl_voice_delete
 SND_ENTRY sndl_voice_done
 SND_ENTRY sndl_init
 SND_ENTRY sndl_render
+SND_ENTRY sndl_open
+SND_ENTRY sndl_pump
+SND_ENTRY sndl_close
+SND_ENTRY sndl_voice_pos
+SND_ENTRY sndl_chip_open
+SND_ENTRY sndl_chip_write
+SND_ENTRY sndl_chip_read
+SND_ENTRY sndl_chip_close

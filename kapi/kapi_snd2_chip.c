@@ -1,3 +1,4 @@
+#include "machcfg_contract.h"
 #include "../sound/hal/snd2_int.h"
 
 /* Public indices are dense across both registries. Each registry returns
@@ -14,7 +15,7 @@ int kapi_snd2_dev_count(void)
 int kapi_snd2_dev_info(u32 index, SND2_DevInfo *out)
 {
     u32 pcm = snd2_dev_count();
-    if (index < pcm)
-        return snd2_dev_info(index, out);
-    return snd2_chip_dev_info(index - pcm, out);
+    int rc = index < pcm ? snd2_dev_info(index, out) : snd2_chip_dev_info(index - pcm, out);
+    if (!rc) out->flags |= machcfg_get()->snd_flags;
+    return rc;
 }

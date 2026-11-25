@@ -1,7 +1,7 @@
 #include "os32api.h"
 #include "mix.h"
 
-static KernelAPI *sound_api;
+KernelAPI *sound_api;
 
 int sndl_init(KernelAPI *api)
 {

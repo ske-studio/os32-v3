@@ -6,6 +6,12 @@
 #define SND2_DEV_DEFAULT 0x02
 #define SND2_DEV_READY 0x04
 #define SND2_DEV_FAULTED 0x08
+/* Machine policy bits on enumerated sound devices. */
+#define SND2_DEV_SOFT_CPU 0x10
+#define SND2_DEV_FM_HW    0x20
+#define SND2_DEV_FM_SOFT  0x40
+#define SND2_DEV_FM_NONE  0x60
+#define SND2_DEV_FM_MASK  0x60
 #define SND2_ENC_S16LE 1
 #define SND2_ENC_U8 2
 #define SND2_MAX_FMT 16

@@ -88,3 +88,59 @@ int sndl_render(short *pcm, unsigned long frames, unsigned long rate)
     if (!table) return -1;
     return ((int (*)(short *pcm, unsigned long frames, unsigned long rate))table[SNDL_E_RENDER])(pcm, frames, rate);
 }
+
+int sndl_open(const SND2_Fmt *fmt, u32 period, u32 lead)
+{
+    const u32 *table = sndl_table(kapi);
+    if (!table) return -1;
+    return ((int (*)(const SND2_Fmt *fmt, u32 period, u32 lead))table[SNDL_E_OPEN])(fmt, period, lead);
+}
+
+int sndl_pump(void)
+{
+    const u32 *table = sndl_table(kapi);
+    if (!table) return -1;
+    return ((int (*)(void))table[SNDL_E_PUMP])();
+}
+
+int sndl_close(u32 how)
+{
+    const u32 *table = sndl_table(kapi);
+    if (!table) return -1;
+    return ((int (*)(u32 how))table[SNDL_E_CLOSE])(how);
+}
+
+int sndl_voice_pos(u32 voice, u32 *buffer, u32 *play, u32 *gen)
+{
+    const u32 *table = sndl_table(kapi);
+    if (!table) return -1;
+    return ((int (*)(u32 voice, u32 *buffer, u32 *play, u32 *gen))table[SNDL_E_VOICE_POS])(voice, buffer, play, gen);
+}
+
+int sndl_chip_open(const SNDL_ChipReq *rq, u32 *handle, SNDL_ChipGot *got)
+{
+    const u32 *table = sndl_table(kapi);
+    if (!table) return -1;
+    return ((int (*)(const SNDL_ChipReq *rq, u32 *handle, SNDL_ChipGot *got))table[SNDL_E_CHIP_OPEN])(rq, handle, got);
+}
+
+int sndl_chip_write(u32 handle, const SND2_RegW *w, u32 n, u32 at_us)
+{
+    const u32 *table = sndl_table(kapi);
+    if (!table) return -1;
+    return ((int (*)(u32 handle, const SND2_RegW *w, u32 n, u32 at_us))table[SNDL_E_CHIP_WRITE])(handle, w, n, at_us);
+}
+
+int sndl_chip_read(u32 handle, u32 bank, u32 what, u32 reg)
+{
+    const u32 *table = sndl_table(kapi);
+    if (!table) return -1;
+    return ((int (*)(u32 handle, u32 bank, u32 what, u32 reg))table[SNDL_E_CHIP_READ])(handle, bank, what, reg);
+}
+
+int sndl_chip_close(u32 handle)
+{
+    const u32 *table = sndl_table(kapi);
+    if (!table) return -1;
+    return ((int (*)(u32 handle))table[SNDL_E_CHIP_CLOSE])(handle);
+}

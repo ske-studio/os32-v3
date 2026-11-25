@@ -128,3 +128,10 @@ python3 tools/accept/snd2/verify_if0.py "$D/rate-before.json" "$D/if0.serial"
 ```
 
 if0.serial は行頭にホスト時刻等を挿入しない生シリアルで、今回の start/stop 1 組だけにする。合格は全経路観測済みかつ最長が period の 1/4 以内（設計の 5.8 ms / 4 = 1450 µs 以下、実周期 256 / 44100 秒にも収まる）。生の最大値と換算値を残す。校正失敗、時計の世代変更、イベント欠測、未実行の経路は未測定。閾値超過は未合格として値を報告する。
+
+### IL の SOFT OPNA
+
+録音を先に開始し、ゲストで `sndl_test soft` を実行する。44100 Hz の取得 JSON を
+`python3 tools/accept/snd2/verify_soft.py <録音ディレクトリ>` で照合する。
+右の 256 frame ごとの 12345 が同期印。左の FM 音と右の印を含む最初の 1 秒を
+上流 fmgen の同じ音色・音程から得た PCM と比較する。

@@ -14,7 +14,7 @@ struct FmVoice {
     unsigned char *wave[6];
     FmvMemory mem;
     Event *pending, *audio, *tail;
-    uint32_t tm_us, previous;
+    uint32_t tm_us, previous, window_start;
     int external, started;
 };
 
@@ -252,26 +252,37 @@ static void render_to(FmVoice *v, unsigned char **out, unsigned count)
     }
 }
 
-int fmv_render(FmVoice *v, uint32_t now, unsigned char *out, uint32_t frames)
+int fmv_render_part(FmVoice *v, uint32_t now, unsigned char *out, uint32_t frames,
+                    uint32_t offset, uint32_t count)
 {
-    if (!v || (frames && !out) || frames > UINT32_MAX/4) return INVAL;
+    if (!v || (count && !out) || count > UINT32_MAX/4 ||
+        offset > frames || count > frames-offset) return INVAL;
     int rc = sync_timer(v,now);
-    if (rc || !frames) return rc;
-    uint32_t start = v->started ? v->previous : now;
-    uint32_t span = now-start, cursor = 0;
+    if (rc || !count) return rc;
+    if (!offset) {
+        v->window_start = v->started ? v->previous : now;
+        v->previous = now;
+        v->started = 1;
+    }
+    uint32_t start = v->window_start;
+    uint32_t span = now-start, cursor = offset;
     while (v->audio && !before(now,v->audio->at)) {
         uint32_t at = v->audio->at, frame = 0;
         if (before(start,at) && span)
             frame = (uint64_t)(at-start)*frames/span;
         if (frame >= frames) frame = frames-1;
+        if (frame >= offset+count) break;
         if (frame > cursor) {
             render_to(v,&out,frame-cursor);
             cursor = frame;
         }
         consume(v);
     }
-    render_to(v,&out,frames-cursor);
-    v->previous = now;
-    v->started = 1;
+    render_to(v,&out,offset+count-cursor);
     return 0;
+}
+
+int fmv_render(FmVoice *v, uint32_t now, unsigned char *out, uint32_t frames)
+{
+    return fmv_render_part(v, now, out, frames, 0, frames);
 }

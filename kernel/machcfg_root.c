@@ -1,5 +1,7 @@
 #include "machcfg_contract.h"
 #include "config.h"
+#include "os32_snd2.h"
+#include "kstring.h"
 #include "sysconfig.h"
 
 int machcfg_load_root(void)
@@ -25,6 +27,12 @@ int machcfg_load_root(void)
     if (x >= 0 && x <= 1) {
         values.nap7450 = (u8)x;
         keys |= MACHCFG_KEY_NAP;
+    }
+    char mode[16];
+    if (sysconfig_get_str(SYS_MACHINE_CFG, "snd.fm", mode, sizeof mode) > 0) {
+        if (!kstrcmp(mode, "hw")) values.snd_flags |= SND2_DEV_FM_HW;
+        if (!kstrcmp(mode, "soft")) values.snd_flags |= SND2_DEV_FM_SOFT;
+        if (!kstrcmp(mode, "none")) values.snd_flags |= SND2_DEV_FM_NONE;
     }
     sysconfig_temp_end();
     machcfg_note_file(MACHCFG_FILE_OK, keys);
