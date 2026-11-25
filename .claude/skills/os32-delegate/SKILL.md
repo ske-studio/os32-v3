@@ -31,7 +31,7 @@ git worktree add -q -b wt/<名> ~/wt/os32-v3/<名> <基点の SHA>
 返答本文に報告 (25〜35 行以内: 変更ファイル、試験と変異の結果ログの所在、設計からの逸脱、未決)。
 ```
 
-- **完了条件はメインストリームもサブストリームも同じ** ([PARALLEL_BRANCHES](../../../docs/tasks/agents/PARALLEL_BRANCHES.md) §3、ユーザー決定 2026-11-05): 依頼には「make all と触った・足した試験の直接の実行と --mutate・lint だけ」と書く (全体は CI が変異込みで回す)。PM が `wt/<名前>` を push して GitHub の CI (check・build) の緑で取り込む。
+- **完了条件はメインストリームもサブストリームも同じ** ([PARALLEL_BRANCHES](../../../docs/tasks/agents/PARALLEL_BRANCHES.md) §3、ユーザー決定 2026-11-05): 依頼には「make all と触った・足した試験の直接の実行と --mutate・lint だけ」と書く (全体の変異込みは main に入れる SHA の関門で CI が回す — POLICY_CI G1)。PM が `wt/<名前>` を push して GitHub の CI (check・build) の緑で取り込む。
 - **名前の置き換え・式の書き換えを含む段** (2026-10-25、票 TASK_MAGIC_NUM で取り込みの検査に 6 本落ちた): 変異の置換の目印 (試験の中の元の式の文字列) が壊れても MUTATE=0 では見つからない。完了条件に「最後に `python3 ~/os32-tmp/bin/stale_anchor.py <基点>` を作業木で回し (試験の文字列のうち、基点では変えたファイルにあり今は無いものを挙げる)、目印なら直して、その試験を MUTATE=1 で 1 回回し RED の数が基点と同じこと」を足す。機械語を変えない段は、変える前後の ELF の `objdump -d` を比べる (`~/os32-tmp/run/magic/objcompare.py` が雛形)。
 - 足した・触った試験の変異の実行条件は [ROLES §0「検査」](../../../docs/tasks/agents/ROLES.md) に従う。
 - **検査を足す段は、シャードの重み (tools/checks/weights.json) の追従も完了条件に入れる** (2026-11-19、PowerPC の受入 15 本に重みが無く、1 本のシャードに重い検査が寄って 30 分の上限で落ちた)。手順はスキル os32-ci-inventory の --merge (足した検査の分だけ、検査の集合は変えない)。

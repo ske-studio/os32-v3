@@ -5,7 +5,7 @@ description: 試験の期待の出所 (basis) を設計に結び、ソースの�
 
 # os32-test-basis — 試験の出所と、固定の外し方
 
-決まりの正典: 試験の期待は設計から ([POLICY_DEV](../../../docs/POLICY_DEV.md) §6)、検査の宣言の形は `tools/checks/run.py` の docstring、試験の一覧の読み方は [TESTS](../../../docs/TESTS.md)。関門は全部の検査を変異込みで回す ([POLICY_CI](../../../docs/POLICY_CI.md) G1)。
+決まりの正典: 試験の期待は設計から ([POLICY_DEV](../../../docs/POLICY_DEV.md) §6)、検査の宣言の形は `tools/checks/run.py` の docstring、試験の一覧の読み方は [TESTS](../../../docs/TESTS.md)。main に入れる SHA の関門は全部の検査を変異込みで回す (途中の push ごとではない、[POLICY_CI](../../../docs/POLICY_CI.md) G1)。
 
 ## 1. 検査の宣言 (`tools/checks/<名>.py`)
 

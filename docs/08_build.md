@@ -42,7 +42,7 @@ SHA-256 を照合。第三者ミラーは使わない。プロキシは `https_p
 
 ### §8-2 ビルドパイプライン
 
-CI は配布物の `artifacts` と検査の `checks` (全部の検査を変異込みで、6 シャード) を並列に実行する。PowerPC の QEMU の検査は check の `ppc-qemu` を 20 組に割る (ユーザー決定 2026-11-24「20組に」、上限は組ごとに 30 分のまま。重みは `os32-ci-inventory` で作り直す)。`gfinit-host`・`gf5-host`・`geforce-host` は CI から外した (ユーザー決定 2026-11-22、台帳 DEFERRED_TESTS の CI-DROP-* の行)。取り方と合格条件の正典は
+CI は配布物の `artifacts` と検査の `checks` (全部の検査を変異込みで、6 シャード) を並列に実行する。全件の検査 (変異込み) は main に入れる SHA の関門 (ユーザー決定 2026-11-25、[POLICY_CI](POLICY_CI.md) G1)。今の workflow は新しい CI に切り替わるまで途中の push でも全件を回すが、それは決まりではない。PowerPC の QEMU の検査は check の `ppc-qemu` を 20 組に割る (ユーザー決定 2026-11-24「20組に」、上限は組ごとに 30 分のまま。重みは `os32-ci-inventory` で作り直す)。`gfinit-host`・`gf5-host`・`geforce-host` は CI から外した (ユーザー決定 2026-11-22、台帳 DEFERRED_TESTS の CI-DROP-* の行)。取り方と合格条件の正典は
 [§8-6](#8-6-github-actions-での本体ビルド)。
 
 ```
@@ -256,7 +256,7 @@ os32-v3/
 ├── hwdev/          装置の核 HWDEV の部品 (hwdev.mod) の中身
 ├── lib/            汎用ライブラリ (utf8, path, sqlite3, zlib, microtar 等。vendor したものは各ディレクトリの README.OS32 が出所とライセンスの正典)
 ├── userland/       ユーザー空間 (shell/, gshell/ (GUI シェル, Rust), cmds/, system/, tests/, rust/ (libos32gui 等), lib/)
-├── .github/        GitHub Actions (workflows/check.yml: 静的ゲート、workflows/build.yml: 本体ビルド + 全部の検査を変異込みで)
+├── .github/        GitHub Actions (workflows/check.yml: 静的ゲート、workflows/build.yml: 本体ビルド + 全部の検査を変異込みで。全件は main に入れる SHA の関門)
 ├── apps/           git submodule (ske-studio/os32-apps) — 標準アプリ。make external / make apps
 ├── game/           git submodule (ske-studio/os32-game) — 対戦スゴロク RPG。make external / make game
 ├── docs/hw/        PC-98 資料のローカルミラー (git 管理外、tools/sync_hwdocs.sh)
@@ -450,7 +450,7 @@ python3 tools/gen_memmap.py --manifest --check
 |---|---|---|---|
 | `make check-fast` | 全検査を変異なし | 手元で全体をざっと見たい時 (関門ではない) | 304.24秒 (2026-10-04、-j4/qemu、build変更によるmake変種9回込み) |
 | `make check-changed` | 段と当たりから選んだ列を実行。当たりだけ変異込み。docs だけなら文書系のみ | 手元で、変えた所に関係する検査をまとめて見たい時 (関門ではない。30 分を超えるなら止めて push する) | 選択集合に依存 |
-| `make check` | 全検査を変異込み | GitHub の CI の build の `checks` (6 シャード、取り込みの関門)。手元では回さない | 967.50秒 (16分7.5秒、2026-10-04、-j4/qemu、レビュー修正後)。改修前の当日ログは12〜48分で条件差あり |
+| `make check` | 全検査を変異込み | GitHub の CI の build の `checks` (6 シャード、main に入れる SHA の関門)。手元では回さない | 967.50秒 (16分7.5秒、2026-10-04、-j4/qemu、レビュー修正後)。改修前の当日ログは12〜48分で条件差あり |
 
 上の所要時間を測った条件と RED/GREEN の記録はアーカイブ `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`。
 `MUTATE=1` / `0` / `sel` と `MUTATE_TARGETS` で変異を切り替える。
@@ -460,7 +460,7 @@ python3 tools/gen_memmap.py --manifest --check
 
 **誰がいつ回すか**: 実装者・PM の担当、`MUTATE=0`・lint の条件、取り込みの検査の 3 段は、正典 [ROLES §0「検査」](tasks/agents/ROLES.md) に従う。
 
-段の取り込みは GitHub の CI で検査する。CI は全部の検査を変異込みで回す ([ROLES §0「検査」](tasks/agents/ROLES.md)、`docs/POLICY_CI.md` G1)。夜だけ・手動だけの全体検査は無い。
+段の取り込みは GitHub の CI で検査する。main に入れる SHA に、全部の検査を変異込みで回す ([ROLES §0「検査」](tasks/agents/ROLES.md)、`docs/POLICY_CI.md` G1。途中の push ごとに全件を回すのは決まりではなく、今の workflow の作り — ユーザー決定 2026-11-25)。夜だけ・手動だけの全体検査は無い。
 機種依存の分離の枝 (`wt/sep-*`) には workflow `sep` があり、push ごとに変異込みの全検査 (6 シャード) と「生成物が基点と同じ」を回す。既存の CI の欠点を直した手本として組んであり、手元でも同じ入口 (`python3 -B tools/ci/gate.py run --shard 0/6 --out <置き場>`) で回せる ([design/tools/ci/gate.md](design/tools/ci/gate.md)、[sep_identity.md](design/tools/ci/sep_identity.md))。
 変更は基点からHEADまでと、未コミット (staged/unstaged)・未追跡の和。
 基点は `tools/checks/run.py` の `BASE_REFS` (main、origin/main、feat/gui、origin/feat/gui の順) に見つかる merge-base。
@@ -1113,7 +1113,7 @@ GitHub Actionsでの新規構築はf1a作業中は未実施、PMがCI runで確�
 `.github/workflows/build.yml` (workflow 名 `build`) は、配布物の `artifacts` と
 検査6シャード (`checks (0)`〜`checks (5)`) を依存関係なしで並列に動かす。
 共通の composite action で準備し、`artifacts` は core の完全ビルド・配布物の upload を行う。
-各検査シャードは `make -k check CHECK_SHARD=i/6` (全部の検査を変異込み) を回し、そのシャードの CHECK needs
+各検査シャードは `make -k check CHECK_SHARD=i/6` (全部の検査を変異込み。決まりは main に入れる SHA の関門) を回し、そのシャードの CHECK needs
 (推移的な check 前提を含む) に必要な make 前提だけを `check-prepare` で組む。
 main へ入れる判定は配布物・検査6本と静的ゲートの `check.yml` がすべて合格すること
 (変異込みの `make check` は回さない)。arch-asm と le-access は build の全範囲検査に集約し、

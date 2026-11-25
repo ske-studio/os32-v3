@@ -105,7 +105,7 @@ C の基準は [C1](CONSTRAINTS.md)、検査は `make check-c-dialect`。既存�
 
 ホスト模型・QEMU・NP21/W 等の環境で出せない故障の型を `env_limit` に書き、
 その試験の合格で保証できる範囲と、実機・別環境での受入を分ける。
-CI は全部の検査を変異込みで回す。`full_only` で `make check-fast` と静的 CI から外すかは、試験の目的と環境の限界から決める。
+main に入れる SHA には、CI で全部の検査を変異込みで回す ([POLICY_CI](POLICY_CI.md) G1。途中の push ごとではない)。`full_only` で `make check-fast` と静的 CI から外すかは、試験の目的と環境の限界から決める。
 欄の型と配置指定は `docs/TESTS.md` の「CHECK の宣言」を参照。
 
 ## §7. リリースとバージョン管理

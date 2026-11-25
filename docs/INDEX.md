@@ -343,6 +343,13 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [tasks/shell/INHERITED_BUGS.md](tasks/shell/INHERITED_BUGS.md) | 継承バグ台帳 (T9 で起こした、常駐シェルと sh.bin の共通) |
 | `docs/archive/hotdeploy/DESIGN.md` | ホットデプロイ (再起動なしの配備) の設計 |
 
+### ソースの置き場と検査の体制の作り直し (2026-11-25、計画・未着手)
+
+| ドキュメント | 内容 |
+|---|---|
+| [tasks/restructure/TASK_RESTRUCTURE.md](tasks/restructure/TASK_RESTRUCTURE.md) | **入口 — 計画 (2026-11-25)**。`sys/` と `tests/` への移行・検査の棚卸し・CI の作り直し。段ごとのファイル (`P0.md`〜`P8.md`)・決まり (`RULES.md`)・ユーザーの決定 (`DECISIONS.md`)・今の実物 (`NOW.md`) の索引 |
+| [tasks/restructure/SRC_QA_RESTRUCTURE_SPEC.md](tasks/restructure/SRC_QA_RESTRUCTURE_SPEC.md) | ユーザーの仕様の原文 (草案・未承認、§1〜§19) |
+
 ### 試験と道具
 
 | ドキュメント | 内容 |

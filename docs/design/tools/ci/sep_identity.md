@@ -42,7 +42,7 @@
 
 ## 4. 変異込みの検査
 
-同じ workflow の `checks` のジョブが、全部の検査を変異込みで 6 シャードに分けて回す。形と決まりは `gate.md`。
+同じ workflow の `checks` のジョブが、全部の検査を変異込みで 6 シャードに分けて回す。形と決まりは `gate.md` (全件は main に入れる SHA の関門、`docs/POLICY_CI.md` G1)。
 
 ## 5. 範囲の外
 
