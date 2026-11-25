@@ -9,6 +9,14 @@ void *kmemset(void *p, int c, unsigned int n)
     while (n--) *q++ = (unsigned char)c;
     return p;
 }
+static unsigned int irq_save(void) { return 0; }
+static void irq_restore(unsigned int flags) { (void)flags; }
+static unsigned int delay;
+static void (*notify)(void);
+static int snd_wake_register(void (*fn)(void)) { notify = fn; return 0; }
+static int snd_wake_arm(unsigned int us) { delay = us; return 0; }
+static void (*fast)(unsigned int);
+static int tick_fast_set(void (*fn)(unsigned int)) { fast = fn; notify = 0; return 0; }
 #include TP_SOURCE
 static void fail(void)
 {
@@ -62,7 +70,28 @@ static void slot_work(void) { tp_host_clock += 10; }
 #include TP_TICK
 void _start(void)
 {
-    tick_probe_boot(); stop(); start();
+    tick_probe_boot(); stop();
+    for (unsigned int mode = TP_S1_IDLE; mode <= TP_S1_FIXTURE; mode++) {
+        struct tp_control c = {mode, 0};
+        CHECK(tick_probe_control(&c) == 0);
+        CHECK(!!notify == (mode == TP_S1_WAIT || mode == TP_S1_DUE));
+        if (mode == TP_S1_WAIT) CHECK(delay == 300000000u);
+        if (mode == TP_S1_DUE) {
+            CHECK(delay == 1000);
+            delay = 0;
+            notify();
+            CHECK(delay == 1000);
+        }
+        CHECK(!!fast == (mode == TP_S1_FIXTURE));
+        if (mode == TP_S1_FIXTURE) {
+            CHECK(!delay);
+            fast(1);
+            CHECK(delay == 1000);
+        }
+        CHECK(stop()->s1_notifications == (mode >= TP_S1_DUE));
+        CHECK(!delay && !notify && !fast);
+    }
+    start();
     for (unsigned int i = 0; i < 99; i++) sample(TP_SLOT0, 32);
     sample(TP_SLOT0, 60000);
     sample(TP_SLOT1, 0x100000001ULL);
@@ -143,6 +172,16 @@ void _start(void)
     CHECK(s->device[0][TP_DMA][TP_IRQ0_CTX].bytes == 60);
     CHECK(s->device[0][TP_TX][TP_IRQ5_CTX].full.worst == 19);
     CHECK(s->device[0][TP_TX][TP_IRQ5_CTX].bytes == 42 && s->lost == 0);
+    start();
+    tick_probe_irq_enter(10); tp_host_clock += 3;
+    tick_probe_sound_begin(TP_SND_ADVANCE); tp_host_clock += 13;
+    tick_probe_sound_begin(TP_SND_OTHER); tp_host_clock += 17;
+    tick_probe_sound_metric(TP_SND_RESYNC);
+    tick_probe_sound_end(); tp_host_clock += 19; tick_probe_sound_end();
+    tp_host_clock += 5; tick_probe_irq_leave(10);
+    s = stop();
+    CHECK(s->extra[0][TP_PCM_IRQ10].worst == 57);
+    CHECK(s->extra[0][TP_SND_RESYNC].count == 1 && s->extra[0][TP_SND_RESYNC].worst == 49);
     start();
     slots[2].fn = slot_work; slots[3].fn = slot_work; slots[4].fn = slot_work; slots[7].fn = slot_work;
     tick_dispatch(); s = stop();

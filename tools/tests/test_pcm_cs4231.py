@@ -21,10 +21,10 @@
   python3 -B tools/tests/test_pcm_cs4231.py --mutate   # 否定側 (変異が RED か)
 """
 CHECK = dict(name='pcm-cs4231-host', tier=1,
-    covers=['include/time_units.h', 'kernel/time/tick_clock.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_refill.h', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/mutpar.py', 'include/pcm_contract.h', 'tools/tests/kernel_includes.py'],
+    covers=['sound/hal/snd2_seg.c', 'sound/hal/snd2_int.h', 'sound/hal/snd2_stg.c', 'include/av_contract.h', 'sdk/include/os32/*.h', 'drivers/sound/cs4231/pcm_hw.h', 'sound/hal/snd2_ring_math.h', 'include/time_units.h', 'kernel/time/tick_clock.h', 'drivers/sound/cs4231/pcm_cs4231.c', 'drivers/sound/cs4231/pcm_refill.h', 'drivers/sound/cs4231/pcm_cs4231_math.c', 'tools/tests/pcm_cs4231_host.c', 'tools/tests/mutpar.py', 'include/pcm_contract.h', 'tools/tests/kernel_includes.py'],
     needs=[], budget=3.5,
-    kind='characterization',
-    pins=['AV_HAL_DESIGN'],
+    basis=['docs/decisions/sound/AV_HAL_DESIGN.md §3-4・§12・§13-2',
+           'docs/design/drivers/sound/cs4231/pcm_cs4231.md §2'],
 )
 
 from kernel_includes import include_flags
@@ -39,6 +39,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HARNESS = ROOT / "tools/tests/pcm_cs4231_host.c"
 SRC = ROOT / "drivers/sound/cs4231/pcm_cs4231_math.c"
+SEG_SOURCES = [ROOT / 'sound/hal/snd2_seg.c', ROOT / 'sound/hal/snd2_stg.c']
 TARGET_SRCS = ["drivers/sound/cs4231/pcm_cs4231_math.c", "drivers/sound/cs4231/pcm_cs4231.c"]
 
 CASES = ["cont", "refill", "drain", "drain_short", "start", "rate",
@@ -81,66 +82,22 @@ MUTATIONS = [
      "    OP(PCM_OP_DEADLINE, 0, PCM_STOP_TICKS),\n",
      "期限を毎 tick 入れ直す (待ちがいつまでも切れない)"),
     # --- 連続性と補充 ---
-    (r"    if \(p1 >= p0\) return PCM_CONT_SAME;\n"
-     r"    return PCM_CONT_LOST;",
-     "    (void)p0; (void)p1; return PCM_CONT_SAME;",
-     "同じ半分で戻った観測 (1 周 = 2 境界) を「境界なし」と読む"),
-    (r"    if \(h0 != h1\) return PCM_CONT_SWITCH;",
-     "    if (h0 != h1) return (p1 >= p0) ? PCM_CONT_SWITCH : PCM_CONT_LOST;",
-     "1 → 0 の折り返し (p が戻って見える) を喪失と読む"),
+    (r"if \(snd2_backtracked\(h0, p0, h1, p1\)\)", "if (0 && snd2_backtracked(h0, p0, h1, p1))",
+     "同じ半分で戻った観測を見逃す"),
+    (r"return h0 == h1 \? PCM_CONT_SAME : PCM_CONT_SWITCH;",
+     "return h0 == h1 ? PCM_CONT_SAME : (p1 >= p0 ? PCM_CONT_SWITCH : PCM_CONT_LOST);",
+     "1 → 0 の折り返しを喪失と読む"),
     (r"    return \(end - p1\) >= PCM_REFILL_MARGIN;",
      "    (void)end; return 1;",
      "補充の余裕を見ない (書いている最中に装置が追い越して古い音が出る)"),
-    # --- 切り替え・underrun・drain ---
-    (r"        changed = \(h1 != \(u32\)c->half\);\n"
-     r"        old = c->half;\n"
-     r"        progressed = \(changed \|\| p1 != c->pos\);\n"
-     r"        c->half = \(u8\)h1;\n"
-     r"        c->pos = p1;",
-     "        c->half = (u8)h1;\n"
-     "        c->pos = p1;\n"
-     "        changed = (h1 != (u32)c->half);\n"
-     "        old = c->half;\n"
-     "        progressed = (changed || p1 != c->pos);",
-     "changed / old / progressed を更新**後**の位置で決める (境界を取り逃がす)"),
-    (r"            if \(c->state == PCM_ST_RUNNING &&\n"
-     r"                c->filled\[h1\] < PCM_HALF_FRAMES\) \{\n"
-     r"                c->underruns\+\+;\n"
-     r"            \}\n", "",
-     "underrun を数えない (無音が出ているのに status が 0 のまま)"),
-    (r"            if \(act->frames > 0U\) \{\n"
-     r"                c->last_data_half = \(u8\)old;\n"
-     r"                c->drain = PCM_DRAIN_WAIT;\n"
-     r"            \}",
-     "            c->last_data_half = (u8)old;\n"
-     "            c->drain = PCM_DRAIN_WAIT;",
-     "0 frame の補充でも last_data_half を動かす (drain が終わらない)"),
-    # `staged == 0` の条件は `frames > 0` の段階戻し (上の 11) と重なって
-    # いて単独では観測できない (残りがあれば必ず補充され、段階が WAIT に
-    # 戻る)。観測できるのは「完了は DRAINING のときだけ」のほう。
-    (r"            if \(c->state == PCM_ST_DRAINING &&\n"
-     r"                c->drain == PCM_DRAIN_OUT && c->stg.staged == 0U\) \{",
-     "            if (c->drain == PCM_DRAIN_OUT && c->stg.staged == 0U) {",
-     "RUNNING でも drain の完了で STOP_REQ へ落ちる (再生の途中で止まる)"),
-    (r"    if \(stage == PCM_DRAIN_IN\)\n"
-     r"        return \(h1 != last_data_half\) \? PCM_DRAIN_SIL : PCM_DRAIN_IN;",
-     "    if (stage == PCM_DRAIN_IN) return PCM_DRAIN_SIL;",
-     "「読んでいる」から無条件に進む (データの半分を通り切る前に止める)"),
-    # --- 番犬 ---
-    (r"    if \(\(u32\)\(now - c->last_progress\) > pcm_watchdog_us\(c->rate\)\) \{\n"
-     r"        pcm_fail\(c, act\);\n    \}", "",
-     "番犬を持たない (IRQ も tick も来なくなった装置に気付かない)"),
-    (r"        if \(progressed\) c->last_progress = now;",
-     "        (void)progressed; c->last_progress = now;",
-     "位置が進まなくても番犬の基準を進める (止まった装置を見逃す)"),
     # --- ステージング ---
     (r"u32 pcm_stg_free\(const struct pcm_stg \*s\)\n\{\n"
-     r"    return PCM_STG_FRAMES - s->staged;\n\}",
+     r"    return snd2_room\(PCM_STG_FRAMES, s->staged\);\n\}",
      "u32 pcm_stg_free(const struct pcm_stg *s)\n{\n"
      "    return (s->w >= s->r) ? (PCM_STG_FRAMES - (s->w - s->r))\n"
      "                          : (s->r - s->w);\n}",
      "空きを w/r の差で出す (4096 消費した直後の空きが 0 に見える)"),
-    (r"    head = PCM_STG_FRAMES - off;\n    if \(n < head\) head = n;",
+    (r"    head = snd2_prefix\(PCM_STG_FRAMES, off, n\);",
      "    (void)off; head = n;",
      "物理末尾を跨ぐ写しを 2 分割しない (先頭へ回り込むぶんを踏み外す)"),
     # --- pcm_start の配り方 ---
@@ -225,7 +182,7 @@ def host_build(tmp, source_text=None, driver_text=None):
     exe = src_dir / "pcm-host"
     inc = INCLUDES
     if source_text is None and driver_text is None:
-        cmd = ["gcc", *FLAGS, *inc, str(HARNESS), "-o", str(exe)]
+        cmd = ["gcc", *FLAGS, "-DPCM_SEGMENT_TEST", *inc, str(HARNESS), *SEG_SOURCES, "-o", str(exe)]
     else:
         mut = src_dir / "drivers/sound/cs4231"
         mut.mkdir(parents=True, exist_ok=True)
@@ -238,8 +195,8 @@ def host_build(tmp, source_text=None, driver_text=None):
         (mut / "pcm_cs4231.h").write_text(
             (ROOT / "drivers/sound/cs4231/pcm_cs4231.h").read_text(encoding="utf-8"),
             encoding="utf-8")
-        (mut / "pcm_refill.h").write_text(
-            (ROOT / "drivers/sound/cs4231/pcm_refill.h").read_text(), encoding="utf-8")
+        for name in ("pcm_refill.h", "pcm_hw.h"):
+            (mut / name).write_text((ROOT / DRIVER).with_name(name).read_text(), encoding="utf-8")
         shim = src_dir / "harness.c"
         shim.write_text(
             HARNESS.read_text(encoding="utf-8")
@@ -247,8 +204,8 @@ def host_build(tmp, source_text=None, driver_text=None):
                      '"drivers/sound/cs4231/pcm_cs4231_math.c"')
             .replace('"../../drivers/sound/cs4231/pcm_cs4231.c"', '"drivers/sound/cs4231/pcm_cs4231.c"'),
             encoding="utf-8")
-        cmd = ["gcc", *FLAGS, "-I" + str(src_dir), "-I" + str(mut), *inc,
-               str(shim), "-o", str(exe)]
+        cmd = ["gcc", *FLAGS, "-DPCM_SEGMENT_TEST", "-I" + str(src_dir), "-I" + str(mut), *inc,
+               str(shim), *SEG_SOURCES, "-o", str(exe)]
     subprocess.run(cmd, cwd=ROOT, check=True)
     return exe
 
@@ -331,6 +288,18 @@ def mutate(tmp):
         status = f"RED ({hit})" if hit else "**GREEN (見逃し)**"
         print(f"MUTATION {i} {status}: {why}", flush=True)
         bad += not hit
+    segment = SEG_SOURCES[0].read_text()
+    anchor = 'if (!n) return;'
+    assert segment.count(anchor) == 1
+    mutated = pathlib.Path(tmp) / 'snd2_seg.c'
+    mutated.write_text(segment.replace(anchor, 'if (!n || used) return;'))
+    exe = pathlib.Path(tmp) / 'pcm-segment-mutant'
+    subprocess.run(['gcc', *FLAGS, '-DPCM_SEGMENT_TEST', *INCLUDES, '-I' + str(SEG_SOURCES[0].parent),
+                    str(HARNESS), str(mutated), str(SEG_SOURCES[1]), '-o', str(exe)], check=True)
+    if run_cases(exe, ['obs'], quiet=True):
+        print('RED runtime: skip partially filled segment')
+    else:
+        bad += 1
     return bad
 
 

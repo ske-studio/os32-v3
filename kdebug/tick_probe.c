@@ -30,10 +30,12 @@ int tick_probe_call(void *buf, unsigned int size)
     struct tp_control c = {((struct tp_request *)buf)->action, 0};
     int rc = debug_probe_control(TP_CONTROL, &c, sizeof(c));
     if (rc) { kprintf(7, "tickprobe: stop before start/show\n"); return rc; }
-    if (!c.snapshot) { kprintf(7, "tickprobe: started (100Hz)\n"); return 0; }
+    if (!c.snapshot) { kprintf(7, "tickprobe: started\n"); return 0; }
     const struct tp_snapshot *s = c.snapshot;
     kprintf(7, "tickprobe: stopped TSC=%s observation_lost=%u\n",
             s->available ? "raw cycles" : "unmeasured", s->lost);
+    if (s->s1_mode)
+        kprintf(7, "s1-mode=%u notifications=%u\n", s->s1_mode, s->s1_notifications);
     if (!s->available) return 0;
     cycles("empty-cost", s->empty_cost);
     cycles("splash-enter", s->splash_enter);
@@ -54,7 +56,8 @@ int tick_probe_call(void *buf, unsigned int size)
         kprintf(7, "interval-over-2^22=%u (bins start at 2^8)\n", s->bank[bank][TP_INTERVAL].hist[15]);
         for (unsigned int id = 0; id < TP_EXTRA_COUNT; id++) {
             const struct tp_stat *v = &s->extra[bank][id];
-            kprintf(7, "%s count=%u ", (const char *const[]){"mtrr-wc", "irq3", "irq5", "slot-budget", "pit-read"}[id], v->count);
+            kprintf(7, "%s count=%u ", (const char *const[]){"mtrr-wc", "irq3", "irq5", "slot-budget", "pit-read",
+                "snd-other", "snd-start", "snd-pause", "snd-advance", "snd-resync", "snd-teardown", "irq10"}[id], v->count);
             cycles("worst", v->worst); cycles("total", v->total);
             if (id == TP_PIT && v->count) cycles("average", average(v->total, v->count));
             kprintf(7, "\n");

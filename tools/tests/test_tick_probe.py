@@ -1,6 +1,6 @@
 """A1 real aggregation and boot call boundary, ILP32/qemu, runtime mutants."""
 CHECK = dict(name='tick-probe-host', tier=4, needs=[], budget=5,
-    covers=['kernel/time/tick_probe.c', 'kernel/time/tick_probe.h', 'kernel/time/tick_probe_ids.h',
+    covers=['include/snd_wake_contract.h', 'kernel/time/tick_probe.c', 'kernel/time/tick_probe.h', 'kernel/time/tick_probe_ids.h',
             'net/link_platform.h', 'platform/pc98/platform_link_inline.h', 'platform/pc98/link_platform.c', 'net/link.c', 'net/nic.c', 'drivers/net/ne2000/ne2000.c',
             'drivers/net/ne2000/ne2000_data.inc',
             'platform/pc98/kernel.c', 'tools/tests/tick_probe_host.c',
@@ -12,7 +12,7 @@ CHECK = dict(name='tick-probe-host', tier=4, needs=[], budget=5,
             'platform/pc98/pit.c', 'arch/x86/kernel/mtrr_wc.c',
             'drivers/net/e82557/e82557.c',
             'tools/tests/host32.py'],
-    basis=['TICK_1KHZ_DESIGN'],
+    basis=['TICK_1KHZ_DESIGN', 'docs/decisions/sound/AV_HAL_DESIGN.md §13-3'],
 )
 import os
 from pathlib import Path
@@ -61,6 +61,10 @@ def main():
             assert run(original.replace(hist_shift, '0'), boundary) == 1
             print('RED runtime exit=1 interval histogram upper bound', flush=True)
             mutants = [
+                ('PCM IRQ10 enclosure', 'if (irq == 10) tick_probe_extra_end(TP_PCM_IRQ10);', '', False),
+                ('sound outer span', 'if (sound_depth) sound_metric = metric;', '(void)metric;', False),
+                ('fixture callback', '    s1_notify();', '    (void)now_ms;', False),
+                ('rearm', '    snd_wake_arm(1000);', '    snd_wake_arm(0);', False),
                 ('worst', 'if (d > s->worst) s->worst = d;', 's->worst = d;', False),
                 ('histogram', 's->hist[bin]++;', 's->hist[0]++;', False),
                 ('p99', 's->count - s->count / 100', 's->count', False),

@@ -3046,7 +3046,7 @@ int __cdecl wrap_io_pump(unsigned int budget_us)
 int __cdecl wrap_snd2_dev_count(void)
 {
     KAPI_HIT(298);
-    return snd2_dev_count();
+    return kapi_snd2_dev_count();
 }
 
 int __cdecl wrap_snd2_dev_info(u32 dev, SND2_DevInfo *o)
@@ -3057,7 +3057,7 @@ int __cdecl wrap_snd2_dev_info(u32 dev, SND2_DevInfo *o)
                                     (u32)0, 0u)) {
         ring3_fault_kill();   /* 戻らない */
     }
-    return snd2_dev_info(dev, o);
+    return kapi_snd2_dev_info(dev, o);
 }
 
 int __cdecl wrap_snd2_caps(u32 dev, SND2_Caps *o, u32 size)
@@ -3113,7 +3113,7 @@ int __cdecl wrap_snd2_dsp_process(u32 dev, u32 unit, const i32 *params, u32 n, c
     if (!kapi_in_range((u32)params, kapi_out_mul(KAPI_OUT_LEN(params, n), 4u))) {
         ring3_fault_kill();
     }
-    return snd2_dsp_process(dev, unit, params, n, in, out, frames, fmt_index);
+    return kapi_snd2_dsp_process(dev, unit, params, n, in, out, frames, fmt_index);
 }
 
 int __cdecl wrap_snd2_stream_open(const SND2_StreamDesc *d, u32 *stream)
@@ -3134,7 +3134,7 @@ int __cdecl wrap_snd2_stream_open(const SND2_StreamDesc *d, u32 *stream)
 int __cdecl wrap_snd2_stream_write(u32 stream, const void *buf, u32 bytes)
 {
     KAPI_HIT(306);
-    return snd2_stream_write(stream, buf, bytes);
+    return kapi_snd2_stream_write(stream, buf, bytes);
 }
 
 int __cdecl wrap_snd2_stream_start(u32 stream)

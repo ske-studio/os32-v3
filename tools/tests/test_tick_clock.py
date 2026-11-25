@@ -1,6 +1,6 @@
 """Exercise the common physical-to-logical clock without libc."""
 CHECK = dict(name='tick-clock-host', tier=4,
-    covers=['drivers/sound/snd_wake_tick.c', 'drivers/sound/snd_wake_tick.h',
+    covers=['include/snd_wake_contract.h', 'drivers/sound/snd_wake_tick.c', 'drivers/sound/snd_wake_tick.h',
             'kernel/time/tick.c', 'kernel/time/tick_clock.h',
             'include/kernel_tick.h', 'sdk/include/os32/os32_kapi_shared.h',
             'tools/tests/tick_clock_host.c', 'tools/tests/test_tick_clock.py',
@@ -17,6 +17,7 @@ from kernel_includes import include_flags
 
 ROOT = Path(__file__).resolve().parents[2]
 MUTATIONS = (
+    ('if (!result && pcm_fn) pcm_fn();', '(void)pcm_fn;'),
     ('(i32)(now - due_ms) >= 0', 'now >= due_ms'),
     ('(i32)(now - due_ms) >= 0', '(i32)(now - due_ms) > 0'),
     ('armed = 0;\n        wake_notify', 'wake_notify'),

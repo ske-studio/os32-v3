@@ -6,26 +6,13 @@
 #include "v2/gfx2_int.h"
 #include "kmalloc.h"
 #include "kstring.h"
-#include "con_sink.h"
-#include "pcm_contract.h"
-#include "serial_diag.h"
-#include "../fs/serialfs/serialfs.h"
-#include "../exec/appslot.h"
+#include "gfx_osri_view_internal.h"
 
 extern volatile u32 tick_count;
-static int osri_active;
-
-int gfx_osri_poll_abort(int caller)
-{
-    AppSlot *slot = appslot_get(caller);
-    return (slot && slot->abort_req) || appslot_stop_pending();
-}
 
 int gfx_osri_view(const char *path, u32 duration_ms, int caller)
 {
-    if (!gfx_is_started() || osri_active ||
-        (con_sink_is_enabled() && caller != appslot_gfx_owner()) ||
-        serial_gate_active() || serialfs_is_mounted() || pcm_state() != PCM_ST_CLOSED)
+    if (OSRI_VIEW_BUSY(caller))
         return OS32_ERR_BUSY;
     if (!g_backend || !g_backend->osri_show) return OS32_ERR_NOSYS;
     struct gfx_kernel_fb fb;

@@ -272,7 +272,7 @@ ifeq ($(TICK_PROBE_BUILD),1)
 ifneq ($(ARCH)-$(PLATFORM)-$(FEATURE_KDEBUG),x86-pc98-1)
 $(error tick probe requires x86-pc98 kdebug)
 endif
-DIAGNOSTIC_TICK_PROBE_BUILD = kernel/time/tick_probe.c
+DIAGNOSTIC_TICK_PROBE_BUILD = kernel/time/tick_probe.c platform/pc98/snd_writer_probe.c
 endif
 # KNOWN_FEATURE_VARIABLES は今の 15 個のまま (build/targets/x86-pc98.mk の「0 があれば止める」が読む)。
 KNOWN_FEATURE_VARIABLES = $(addprefix FEATURE_,$(shell echo $(FEATURES) | tr 'a-z-' 'A-Z_'))

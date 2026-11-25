@@ -225,10 +225,11 @@ int snd2_dsp_process(u32 dev, u32 unit, const i32 *params, u32 n,
 ```
 - 書いてよい区間: 再生中の区間 `p = hw / period` は書かない。`p+1` は `hw % period < period − margin` の時だけ (margin = min(512, period/2)、今の REFILL_MARGIN と同じ考え)。`p+1 .. p+lead` の範囲。
 - 写す規則: 実データは区間の順に詰める。「最初の満ちていない区間」にだけ追補し (末尾の 0 を上書き)、満ちたら次へ。1 回の advance で写すのは最大 `lead × period` frame (CS4231 の低遅延で 768 frame = 3KB、v1 で 2048 frame = 8KB、今の半面の写しと同じ上限)。ステージングの折り返しは `pcm_split` で 2 回に分ける。
-- 区間が過ぎた時 (advance が p の変化を見た時、過ぎた区間ごとに): `played += seg_n[s]`、RUN かつ未 pause かつ `seg_n[s] < period` かつ後ろにまだ実データが無かった → `underruns++`。その区間を 0 埋めして `seg_n=0`。
+- 区間が過ぎた時 (advance が p の変化を見た時、過ぎた区間ごとに): `played += seg_n[s]`、RUN かつ未 pause かつ `seg_n[s] < period` かつ実データを一度でも再生した (この区間を含む) → `underruns++`。その区間を 0 埋めして `seg_n=0`。
 - 途中の位置: `played_now = played + min(hw % period, seg_n[p])` (pos の問い合わせだけ。無音は数えない → **played ≤ written を常に保つ**)。
 - 連続性を失った時 (今の `pcm_cont` の偽・watchdog・観測の間隔がリング 1 周を超えた、R3-P1-1): 今の RS_STOP → RS_RESTART の 2 段のまま、順を次に固定する。(1) **止める**: `hw_stop` (IF=0、上限つき)。(2) **止まった証拠**が無ければリングにもカーソルにも触らず `snd2_teardown` (DMA の隔離・FAULTED)。(3) 証拠があれば: `epoch++`、リング全体を 0 埋め・全区間 `seg_n=0`、**`copied = played`** に巻き戻し (ステージングは played まで捨てないので失わない)。(4) **元の状態を保って**再始動 (R4-P1-1): RUN・DRAIN は §3-4-1 と同じ充填で `hw_start`。PAUSE はリングを無音のまま (実データを写さず `copied = played`) `hw_start` し、状態は PAUSE のまま。実データは明示の start (再開) の後の advance から写す。IDLE では DMA が止まっているので起きない。played は失った区間の分を数えない (鳴ったか分からない物は「鳴っていない」)。DMA が走っている間にリングを書かない。
-- 補充の担い手: PI (区間ごと) と論理 tick の両方から `snd2_advance(dev)`。段 B の後は物理 1kHz からも。**段 B の前は period ≥ 1024 だけを開く** (S4 の前提、§12)。
+- 前景も staging の publish 直後に RUN・同じ epoch・再始動待ちでない場合に DMA を 1 回読む。連続性が保たれていれば、同じ保護範囲で最初の未充填区間だけに追補する。未退役区間の再利用・退役・再同期は advance が担う。追加の IF=0 は DMA 読み 1 回と最大 1 区間の写しで、診断像では snd-other に含む。
+- 補充の担い手: PI (区間ごと) と論理 tick の両方から `snd2_advance(dev)`。段 B の物理 1kHz では、CS4231 の再生中、論理 tick の間の IRQ0 でも同じ補充を呼ぶ。新しい staging がなく、前回の DMA 位置から次の境界までの距離が CS4231 の最大レートでもまだ進めない距離なら、物理 tick は DMA を読まずに戻る。省略の期限は DMA の移動を確認した読みの直前の較正済み TSC から求める。TSC が使えない時は毎回 DMA を確認する。論理 tick の回は従来の PCM slot が担当する。**段 B の前は period ≥ 1024 だけを開く** (S4 の前提、§12)。
 - 遅延: `cap = (lead+1) × period` (v2)。低遅延 period 256・lead 3 → cap 1024 frame = 23.2ms @44.1k。既定 period 2048・lead 1 → 4096 frame (92.9ms)。
 
 | 設定 | period | lead | cap (最悪の遅延 @44.1k) | IRQ の間隔 |
@@ -267,16 +268,17 @@ typedef struct Snd2Stream {          /* sound/hal/snd2_int.h。書くのは soun
     u32 gen; u8 state, paused, v1, closing; int owner;   /* 前景の文脈が書く */
     SND2_Fmt fmt; u32 period, nseg, lead, cap, margin;   /* open で決め、閉じるまで不変 */
     u32 written;                     /* 前景が IF=0 の短い区間で publish */
-    u32 played, copied, epoch, underruns;                /* advance (IF=0) だけが書く */
-    u32 seg_first[16]; u16 seg_n[16];                    /* advance だけ */
+    u32 played, epoch, underruns;    /* advance (IF=0) だけが書く */
+    u32 copied;                      /* advance と publish の直後の補充 (どちらも IF=0) が書く — §3-4 */
+    u32 seg_first[16]; u16 seg_n[16];                    /* advance と publish の直後の補充 (IF=0) */
     u8 *stg; u32 stg_frames;         /* ステージング 8192 frame = 32KB (kmalloc、DMA しない) */
     u8 *ring; u32 last_hw, last_obs_ms;                  /* ring は backend が渡す DMA の面 */
 } Snd2Stream;
 ```
-- write の検査の順: 番号 (STALE) → 持ち主 (INVAL) → 状態 (§3-3) → buf の NULL (INVAL) → `bytes / frame_bytes` (0 なら 0)。受ける量 = `min(frames, cap − (written − played), stg の空き)`。ステージングへの写しは IF=1、`written += n` だけ IF=0。部分受理は正の byte 数、満杯は 0。
+- write の検査の順: 番号 (STALE) → 持ち主 (INVAL) → 状態 (§3-3) → buf の NULL (INVAL) → `bytes / frame_bytes` (0 なら 0)。受ける量 = `min(frames, cap − (written − played), stg の空き)`。ステージングへの写しは IF=1、`written += n` と §3-4 の publish の直後の補充 (DMA の位置の読み 1 回と最大 1 区間の ring への写し) が IF=0。部分受理は正の byte 数、満杯は 0。
 - open の検査の順 (R2-P2-2): desc の size → dev (範囲・PRESENT・FAULTED なら IO) → fmt が caps の表にある → period (0 は既定、2 の冪で `period_min ≤ period ≤ period_max`、段 B の前は ≥ 1024) → lead (0 は 1、`1 ≤ lead ≤ ring_frames/period − 1`) → `cap = (lead+1) × period` (≤ ring_frames ≤ 4096 なので溢れない) → 持ち主 (BUSY)。v1 だけは cap = 8192 (ステージングの大きさ) の例外。
 - **公開の位置は 1 つ** (R2-P2-1): IF=0 で `played_now = played + min(hw % period, seg_n[p])` と `epoch` を組で写し取る (snapshot)。pos はこの played_now を `played` として返し、wait も同じ関数で比べる (pos で届いた frame の wait が TIMEOUT にならない)。`done(f) = (i32)(played_now − f) >= 0`。距離: `written − played ≤ cap ≤ 8192` なので比べは常に < 2^31。
-- wait (同じ snapshot で比べる): `(i32)(frame − written) > 0` は INVAL (まだ書いていない frame を待つとシングルタスクでは終わらない)。結果: 0 = 届いた / TIMEOUT / STALE (待ちの間に閉じた・回収) / IO (FAULTED)。待ちは sys_yield を回して played を見るだけ (起こす旗は持たない)。
+- wait (同じ snapshot で比べる): `(i32)(frame − written) > 0` は INVAL (まだ書いていない frame を待つとシングルタスクでは終わらない)。結果: 0 = 届いた / TIMEOUT / STALE (待ちの間に閉じた・回収) / IO (FAULTED)。未到達で PAUSE または中断要求 (abort・GUI STOP) があれば直ちに TIMEOUT で syscall の出口へ戻る。GUI のアプリは WAIT_POLL へ park し、WM が resume したら元の開始時刻で同じ wait を再実行する。CUI の wait は割り込み禁止で snapshot を確認し、未到達ならそのまま不可分の割り込み許可・休止に入る。PI または物理 tick の退役はその IRQ から戻った直後に再確認する。他の IRQ でも条件と期限を再確認する。
 - epoch が変わったら互換層は位置の対応を取り直す (WAVEHDR の完了は played で判定するので、失った区間の分は遅れて完了する)。
 
 ### 3-6. v1 (pcm_*) の統合 (P1-4)
@@ -996,7 +998,7 @@ int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i)
 ### 7. 段・試験・変異
 | 段 | ファイル | 呼ぶ | 書く共有の状態 | 行 | I | 前提 |
 |---|---|---|---|---|---|---|
-| C0 | drivers/sound/fm/opn_probe.c (SYNTH §6 の probe、0188h だけ。fm.h に bank1・A460h・クロック。29h・分周は資料で確かめ本書に追記) | inp/outp | 検出の結果 | 180 | IS | R0b |
+| C0 | drivers/sound/fm/opn_probe.c・opn_probe.h (SYNTH §6 の probe、0188h だけ。fm.h に bank1・A460h・クロック。29h・分周は資料で確かめ本書に追記) | inp/outp | 検出の結果 | 180 | IS | R0b |
 | C1 | drivers/sound/fm/opn_chip.c (SndChipBackend: 扱いの表・bank1・read・open/close・静止の列。opn_write_checked を bank つきに) | C0 | 装置の内部 | 240 | IS | C0 |
 | C2 | sound/hal/snd2_chip.c (登録・owner・gen・implicit・FAULTED・reclaim の FM の行、CPU 非依存) | be->* | `snd2_chips[]` | 170 | IS | S1 |
 | C3 | kapi/kapi_snd2_chip.c | C2 | — | 120 | IS | C2・AV0 |
@@ -1028,6 +1030,7 @@ int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i)
 | 書きの適用の時点: t=100 の reset と t=50 の load が保留の時、t=80 の read は load だけ反映し flag の時刻は load の時点から、t=100 以降は reset が効く・同じ at_us の 2 件は積んだ順 | sndl_fmtime_host | 適用の前に模型を進めない / at_us > r も反映 / 同時刻を後ろから |
 | write の n=257・4n の溢れ | kapi_audit_host | 上限を外す |
 - NP21/W: SNDboard を 26K・86・無しの 3 構成 (ini は --live-apply + restore) で probe・caps、/api/sound で HW の書きが鳴る、V86 の HW で FM のゲーム 1 本、86 + `--fm=soft` で SOFT。実機 Ra266: 不在の記録、fm_note_on 100 回の時間 (10ms × 回でない)、sndl_chip が SOFT。シリアルで判定。
+- C0 で資料を確かめた結果 (2026-11-24、Bible 2-13_FM音源・UNDOCUMENTED io_sound・Yamaha YM2608 Application Manual・BSD-3 の ymfm、GPL は見ない): OPNA の 29h は D7 が SCH (6ch の許可)、D1 が Timer B、D0 が Timer A の IRQ の出力の許可。HAL は OPNA の open 時に前の所有者の 29h 書込みシャドウから D1:D0 を落とし、D7 を含む残りを保つ。以後の 29h 書込みにも同じマスクをかける。BSD-3 ymfm の [src/ymfm_opn.cpp](https://github.com/aaronsgiles/ymfm/blob/main/src/ymfm_opn.cpp) では、`ym2608::write_data` が 29h の IRQ マスクを設定し、`ym2608::clock_fm_and_adpcm` が D7 で FM のチャンネル数を選び、`ym2608::read_status` が Timer A/B の flag を返す。27h の flag の許可と stop/reset は別の機能なので、IRQ を抑えてもタイマの flag は polling できる。既定のプリスケーラでは 26K の 3,993,600 / 72 と 86 の 7,987,200 / 144 がともに 55,466⅔ Hz で、同じ BLOCK と F-number が同じ音程を与える (72・144 は FM 全体の実効の分周、2Dh の選択値そのものではない)。SSG は別の計算で、既定の実効の入力クロックが等しい。probe の宣言は `drivers/sound/fm/opn_probe.h` (fm.h に置くと FM の部品の ABI の識別値が変わるため)。Timer B を始めた後は BUSY の固着でも停止と 29h の戻しを試み、戻せなければ UNKNOWN・contained=0 を返して呼び手が IRQ の mask を保つ。
 - 足す行 約 1,350 (§11 の計に足す)。1,000 行を超えるファイルは無い。
 
 ### 8. 決定 (PM 決定、推奨の (a))

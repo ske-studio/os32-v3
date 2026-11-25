@@ -17,7 +17,9 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 # g1's trim fields and restartable stdin's buf/size/done/active follow the prefix.
-SLOT_BYTES = 204 + 108 + 10 * struct.calcsize('<I')  # C2 entry context adds 16B
+# C2 adds four entry-context words. S6 retains a retry flag and the original
+# tick across GUI yield so resuming the syscall preserves its timeout.
+SLOT_BYTES = 204 + 108 + (6 + 4 + 2) * struct.calcsize('<I')
 sys.path.insert(0, str(ROOT / 'tools'))
 import gen_guest_acceptance as ga
 import tvdump_recv as tv

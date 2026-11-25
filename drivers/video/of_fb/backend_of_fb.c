@@ -7,6 +7,17 @@
 static struct of_fb_desc fb;
 static GfxMode mode;
 static int live;
+static unsigned long long generation;
+static int osri_visible;
+/* Full V2 flips may scan a surface independent of the v1 CLIENT. saved then
+ * retains that committed image, including subsequent partial presents. */
+static int external_scanout;
+
+unsigned long long of_fb_osri_generation(void)
+{
+    return live && fb.clut && fb.width >= 640 &&
+        fb.height - fb.protected_rows >= 400 ? generation : 0;
+}
 static u8 scan_index[256];
 static int remapped;
 /* Private logical INDEX8 image. Keep this full frame outside the kernel heap
@@ -24,6 +35,7 @@ static void reset_origin(void)
 
 void of_fb_reset_frame(void)
 {
+    external_scanout = 0;
     reset_origin();
     kmemset(saved, 0, fb.width * fb.height);
     transfer(0, 0, 0, 0, fb.width, fb.height);
@@ -40,6 +52,7 @@ int of_fb_ready(void) { return live; }
 void of_fb_unbind(void)
 {
     live = 0;
+    osri_visible = 0;
     if (saved) pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, V2P(saved) / PAGE_SIZE, saved_pages);
     saved = 0;
     fb = (struct of_fb_desc){0};
@@ -75,6 +88,8 @@ int of_fb_bind(const struct of_fb_desc *d)
     gfx_backend_of_fb.bb_size = d->shadow_bytes;
     gfx_backend_of_fb.mode_count = 1;
     of_fb_reset_frame();
+    if (generation != ~(unsigned long long)0) ++generation;
+    else { of_fb_unbind(); return OS32_ERR_NOSPC; }
     live = 1;
     return 0;
 }
@@ -96,13 +111,18 @@ static void transfer(const u8 *src, u32 pitch, int x, int y, int w, int h)
     if (y < 0) y = 0;
     if (right > fb.width) right = fb.width;
     if (bottom > fb.height) bottom = fb.height;
-    u32 first = (u32)x & ~3u, end = ((u32)right + 3) & ~3u;
     for (u32 row = y; row < (u32)bottom; row++) {
+        u32 first = (u32)x & ~3u, end = ((u32)right + 3) & ~3u;
         u8 *indices = saved + row * fb.width + first;
         if (src) kmemcpy(indices, src + row * pitch + first, end - first);
         int dest_row = (int)row - origin;
         if (dest_row < 0) dest_row += fb.height;
         if ((u32)dest_row < fb.protected_rows) continue;
+        if (osri_visible && (u32)dest_row - fb.protected_rows < 400 && first < 640) {
+            if (end <= 640) continue;
+            indices += 640 - first;
+            first = 640;
+        }
         const u8 *source = indices;
         volatile u32 *dest = (volatile u32 *)(fb.display + dest_row * fb.pitch + first);
         u32 words = (end - first) / sizeof(u32);
@@ -146,6 +166,7 @@ int of_fb_replace(const u8 *src, u32 pitch, u32 bytes)
     int rc = validate_source(src, pitch, bytes);
     if (rc) return rc;
     reset_origin();
+    external_scanout = src != fb.shadow;
     transfer(src, pitch, 0, 0, fb.width, fb.height);
     return 0;
 }
@@ -175,6 +196,17 @@ static void present(int x, int y, int w, int h)
 }
 static int set_mode(u32 id) { return !live ? OS32_ERR_STALE : id == 1 ? 0 : OS32_ERR_NOSYS; }
 static void noop(void) { }
+static int nearest_clut(int red, int green, int blue)
+{
+    int best = 0, distance = 3 * 255 * 255 + 1;
+    for (int j = 0; j < 256; ++j) {
+        int r = red - fb.clut[j][0], g = green - fb.clut[j][1], b = blue - fb.clut[j][2];
+        int d = r*r + g*g + b*b;
+        if (d < distance) { best = j; distance = d; }
+    }
+    return best;
+}
+
 int of_fb_palette(int first, int count, const u8 *rgb)
 {
     if (!live) return OS32_ERR_STALE;
@@ -186,14 +218,7 @@ int of_fb_palette(int first, int count, const u8 *rgb)
     if (!fb.palette_allowed || !fb.palette_allowed()) return OS32_ERR_BUSY;
     int changed = 0;
     for (int i = first; i < first + count; i++, rgb += 3) {
-        int best = 0, distance = 3 * 255 * 255 + 1;
-        for (int j = 0; j < 256; j++) {
-            int r = (rgb[0] & 15) * 17 - fb.clut[j][0];
-            int g = (rgb[1] & 15) * 17 - fb.clut[j][1];
-            int b = (rgb[2] & 15) * 17 - fb.clut[j][2];
-            int d = r*r + g*g + b*b;
-            if (d < distance) { best = j; distance = d; }
-        }
+        int best = nearest_clut((rgb[0] & 15) * 17, (rgb[1] & 15) * 17, (rgb[2] & 15) * 17);
         palette_shadow_set(i, rgb[0], rgb[1], rgb[2]);
         if (scan_index[i] == best) continue;
         remapped += (best != i) - (scan_index[i] != i);
@@ -210,7 +235,10 @@ static void palette(int first, int count, const u8 *rgb)
 {
     (void)of_fb_palette(first, count, rgb);
 }
+#include "of_fb_osri.inc"
+
 GfxBackend gfx_backend_of_fb = {
+    .osri_show = of_osri_show,
     .name = "of_fb", .probe = of_fb_ready, .prepare = noop, .init = noop,
     .query = query, .shutdown = of_fb_unbind, .enter = noop, .leave = noop,
     .present_rect = present, .set_palette = palette, .set_mode = set_mode,

@@ -28,19 +28,13 @@ int strcmp(const char *a, const char *b)
     return (u8)*a - (u8)*b;
 }
 #define fprintf(stream, fmt, ...) report("FAIL " #__VA_ARGS__ "\n")
+#define PCM_HOST_HEAP_BYTES (8192U * PCM_FRAME_BYTES)
 #define main fixture_main
 #include "fixture.c"
 #undef main
-#include "pcm_module.h"
-static int loaded;
-static struct module_handle pcm_handle;
-static PcmModuleApi candidate;
-const u32 *module_exports(struct module_handle h)
-{
-    (void)h;
-    return loaded ? (const u32 *)&candidate : 0;
-}
-#include "proxy.c"
+#include "pcm_hw.h"
+void pcm_module_refill_tick(int active) { (void)active; }
+u32 tick_clock_ms(void) { return (u32)sim_now_us / 1000; }
 #define KAPI_HIT(slot) ((void)(slot))
 #define KAPI_OUT_LEN(p, n) ((p) ? (n) : 0)
 static u32 range_calls;
@@ -65,6 +59,7 @@ static void playback_wait(void)
     if (pcm_pos_frames(sim_left) / PCM_HALF_FRAMES != half) run_isr(device_irq);
     run_isr(pcm_tick);
 }
+i32 exec_sys_yield(void) { playback_wait(); return 0; }
 void _start(void)
 {
     static u8 data[16388];
@@ -79,32 +74,28 @@ void _start(void)
     CHECK(freeb == 123 && counters == 456);
     CHECK(wrap_pcm_close() == OS32_ERR_INVAL);
     CHECK(wrap_pcm_set_volume(50) == OS32_ERR_INVAL);
-    CHECK(proxy_pcm_state() == PCM_ST_CLOSED && !proxy_pcm_present());
-    candidate = (PcmModuleApi){.open=pcm_open, .write_check=pcm_write_check,
-        .write=pcm_write, .status=pcm_status, .close=pcm_close,
-        .set_volume=pcm_set_volume, .state=pcm_state, .present=pcm_present,
-        .reclaim=pcm_reclaim};
-    loaded = 1;
+    CHECK(pcm_state() == PCM_ST_CLOSED);
+    CHECK(pcm_hw_register() == 0);
     reset_all(); dev_present = 0;
     CHECK(wrap_pcm_open(44100) == OS32_ERR_NOSYS);
-    CHECK(proxy_pcm_state() == PCM_ST_CLOSED);
+    CHECK(pcm_state() == PCM_ST_CLOSED);
     for (u32 rate = 22050; rate <= 44100; rate *= 2) {
         reset_all();
         CHECK(wrap_pcm_open(rate) == 0);
         CHECK(wrap_pcm_open(rate) == PCM_ERR_BUSY);
-        CHECK(wrap_pcm_status(&freeb, &counters) == 0 && freeb == 16384 && counters == 0);
+        CHECK(wrap_pcm_status(&freeb, &counters) == 0 && freeb == 8192U * PCM_FRAME_BYTES && counters == 0);
         CHECK(wrap_pcm_write(0, 0) == OS32_ERR_INVAL);
         CHECK(wrap_pcm_write(data, 3) == 0);
         CHECK(wrap_pcm_write(data, 16380) == 16380);
-        CHECK(proxy_pcm_state() == PCM_ST_OPEN && sim_masked);
+        CHECK(pcm_state() == PCM_ST_OPEN && sim_masked);
         CHECK(wrap_pcm_write(data, 7) == 4); /* truncate to one whole frame */
-        CHECK(proxy_pcm_state() == PCM_ST_RUNNING && !sim_masked);
+        CHECK(pcm_state() == PCM_ST_RUNNING && !sim_masked);
         CHECK(wrap_pcm_write(data, 16388) == 16384); /* partial acceptance */
         CHECK(wrap_pcm_write(data, 4) == 0); /* full, caller must retry */
         dev_play = 1;
         wait_probe = playback_wait; /* half-boundary IRQ plus periodic tick */
         CHECK(wrap_pcm_close() == 0);
-        CHECK(proxy_pcm_state() == PCM_ST_CLOSED && !sim_irq_registered);
+        CHECK(pcm_state() == PCM_ST_CLOSED && !sim_irq_registered);
         CHECK(!pool_used[0] && !heap_used);
         CHECK(wrap_pcm_close() == OS32_ERR_INVAL);
         CHECK(wrap_pcm_write(data, 0) == OS32_ERR_INVAL);
@@ -112,8 +103,8 @@ void _start(void)
         CHECK(wrap_pcm_open(rate) == 0);
         sim_set_pos(0); /* model the reprogrammed DMA counter on reopen */
         CHECK(wrap_pcm_write(data, 4) == 4); /* short stream starts on close */
-        CHECK(proxy_pcm_state() == PCM_ST_OPEN);
-        CHECK(wrap_pcm_close() == 0 && proxy_pcm_state() == PCM_ST_CLOSED);
+        CHECK(pcm_state() == PCM_ST_OPEN);
+        CHECK(wrap_pcm_close() == 0 && pcm_state() == PCM_ST_CLOSED);
         CHECK(wrap_pcm_open(rate) == 0 && wrap_pcm_close() == 0); /* empty */
     }
     /* PPC absent providers intentionally differ from the x86 unloaded proxy. */

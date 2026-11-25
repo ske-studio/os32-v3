@@ -1,3 +1,6 @@
+#ifdef SND2_WRITER_DIAG
+#include "snd_writer_probe.h"
+#endif
 /* Fixed storage only; no I/O in IRQ context. CPU reference: Intel SDM,
  * Vol.2 CPUID/RDTSC (CPUID.1:EDX.TSC[4], EFLAGS.ID availability test).
  * https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developers-manual.pdf
@@ -9,6 +12,8 @@
 #include "irq.h"
 #include "lan_contract.h"
 #include "kstring.h"
+#include "tick_clock.h"
+#include "snd_wake_contract.h"
 #else
 extern void *kmemset(void *, int, unsigned int);
 extern unsigned long long tp_host_clock;
@@ -78,6 +83,30 @@ unsigned long long tick_probe_p99(const struct tp_stat *s)
 {
     return p99_shift(s, 0);
 }
+/* Stream locks can nest (close starts an idle stream). Keep the outer span
+ * when its work changes from advance to resync or teardown. */
+static unsigned int sound_depth, sound_metric;
+static struct tp_mark sound_mark;
+void tick_probe_sound_begin(unsigned int metric)
+{
+    if (!data.running) return;
+    if (sound_depth++ == 0) {
+        sound_metric = metric;
+        sound_mark = mark();
+    }
+}
+void tick_probe_sound_metric(unsigned int metric)
+{
+    if (sound_depth) sound_metric = metric;
+}
+void tick_probe_sound_end(void)
+{
+    if (!sound_depth || --sound_depth) return;
+    unsigned long long end = now();
+    unsigned int bank = sound_mark.splash || splash || sound_mark.epoch != epoch;
+    if (end < sound_mark.t) data.lost++;
+    else add_stat(&data.extra[bank][sound_metric], end - sound_mark.t);
+}
 void tick_probe_extra_begin(unsigned int id)
 {
     if (!data.running) return;
@@ -119,7 +148,11 @@ void tick_probe_end(unsigned int id)
 }
 void tick_probe_irq_enter(unsigned int irq)
 {
+#ifdef SND2_WRITER_DIAG
+    sw_irq(irq);
+#endif
     if (!data.running) return;
+    if (irq == 10) tick_probe_extra_begin(TP_PCM_IRQ10);
     if (irq == 5) irq5_active = 1;
     if (irq == 3 || irq == 5) tick_probe_extra_begin(irq == 3 ? TP_IRQ3 : TP_IRQ5);
     if (irq == 0) {
@@ -136,6 +169,7 @@ void tick_probe_irq_enter(unsigned int irq)
 }
 void tick_probe_irq_leave(unsigned int irq)
 {
+    if (irq == 10) tick_probe_extra_end(TP_PCM_IRQ10);
     if (irq == 3 || irq == 5) {
         tick_probe_extra_end(irq == 3 ? TP_IRQ3 : TP_IRQ5);
         if (irq == 5) irq5_active = 0;
@@ -287,10 +321,24 @@ void tick_probe_boot(void)
         data.running = 1; /* capture boot splash before shell exists */
     }
 }
+static void s1_notify(void)
+{
+    data.s1_notifications++;
+    snd_wake_arm(1000); /* One expiry per millisecond, including rearm cost. */
+}
+
+/* Control for the callback work alone, once per raw tick. */
+static void s1_fixture(unsigned int now_ms)
+{
+    (void)now_ms;
+    s1_notify();
+}
+
 int tick_probe_control(struct tp_control *c)
 {
     /* Caller is cooperative, IF=1. Freeze with a tiny raw CLI section. */
-    if (c->action == 1) {
+    int s1 = c->action >= TP_S1_IDLE && c->action <= TP_S1_FIXTURE;
+    if (c->action == 1 || s1) {
         if (data.running) return -1;
         unsigned int available = data.available;
         unsigned long long cost = data.empty_cost;
@@ -302,7 +350,23 @@ int tick_probe_control(struct tp_control *c)
         kmemset(pio_cycles, 0, sizeof(pio_cycles));
         irq5_active = 0;
         data.available = available; data.empty_cost = cost;
-        if (available) { window = now(); data.running = 1; }
+        if (s1) {
+            if (!available) return -1;
+            unsigned int flags = irq_save();
+            int rc = c->action == TP_S1_FIXTURE ? tick_fast_set(s1_fixture) :
+                     snd_wake_register(s1_notify);
+            if (!rc) {
+                data.s1_mode = c->action;
+                if (c->action == TP_S1_IDLE)
+                    tick_fast_set(0);
+                else if (c->action != TP_S1_FIXTURE)
+                    snd_wake_arm(c->action == TP_S1_WAIT ? 300000000u : 1000u);
+                window = now();
+                data.running = 1;
+            }
+            irq_restore(flags);
+            if (rc) return rc;
+        } else if (available) { window = now(); data.running = 1; }
         c->snapshot = 0;
         return 0;
     } else if (c->action == 2) {
@@ -317,6 +381,10 @@ int tick_probe_control(struct tp_control *c)
                 if (extra_pending[i].valid) data.lost++;
             if (if0.valid) data.lost++;
             if (net_start.valid || pio_mark.valid) data.lost++;
+        }
+        if (data.running && data.s1_mode >= TP_S1_WAIT) {
+            snd_wake_arm(0);
+            tick_fast_set(0);
         }
         data.running = 0;
 #ifndef TICK_PROBE_HOST

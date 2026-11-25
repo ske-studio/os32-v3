@@ -3,7 +3,7 @@ import argparse
 import hashlib
 import re
 from pathlib import Path
-import tempfile
+import keep_tmp
 
 from kboot_accept import build_media, mutant_settings
 from link_sh_run import ROOT, Session
@@ -125,7 +125,7 @@ def main():
     parser.add_argument('--mutate', action='store_true')
     args = parser.parse_args()
     hashes = set()
-    with tempfile.TemporaryDirectory(prefix='ppc-install-') as work:
+    with keep_tmp.temporary_directory(prefix='ppc-install-') as work:
         for case in ['normal'] + (list(CASES) if args.mutate else []):
             out = Path(work)/case
             media = build(out, case)

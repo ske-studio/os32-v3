@@ -15,6 +15,7 @@
 #include "kernel_tick.h"   /* tick_count */
 #include "pcm_cs4231.h"
 #include "pcm_refill.h"
+#include "pcm_hw.h"
 #include "../../dma/dma8237.h"
 #include "dma_pool.h"
 #include "kmalloc.h"     /* ステージングは DMA しないので KHEAP から */
@@ -59,7 +60,14 @@ static u32  s_ring_phys;           /* s_ring_buf.pa (装置へ渡す物理) */
 static struct dma_buf s_ring_buf;  /* dma_alloc の組 (返すときに渡す) */
 static u8  *s_stg;                 /* ステージング 16KB (KHEAP。DMA しない) */
 static int  s_owner;
+/* HAL2 owns the same physical codec until release. Its core owns staging. */
+static u32 s_hal_period;
+static void (*s_hal_advance)(void);
 static int  s_irq_reg;
+/* advance runs from IRQ10 or the timer IRQ. Only foreground may detach. */
+static volatile int s_in_advance;
+static volatile int s_release_pending;
+static int s_release_leak;
 static int  s_present;             /* 起動時の検出 */
 static u8   s_version;             /* I25 の V2-0 (シフト前) */
 static volatile int s_mce_busy;    /* MCE の列の途中 */
@@ -243,7 +251,12 @@ static int pcm_run(const struct pcm_op *ops, int n, int at, int blocking)
         switch (o->kind) {
         case PCM_OP_REG:
             if (o->a & PCM_R0_MCE) s_mce_busy = 1;
-            cs_write(o->a, o->b);
+            if (s_hal_advance && o->a == PCM_I_BASE_LO)
+                cs_write(o->a, (u8)(s_hal_period - 1));
+            else if (s_hal_advance && o->a == PCM_I_BASE_HI)
+                cs_write(o->a, (u8)((s_hal_period - 1) >> 8));
+            else
+                cs_write(o->a, o->b);
             break;
         case PCM_OP_PORT:      outp(PCM_PORT_ROUTE + o->a, o->b); break;
         case PCM_OP_WAIT_INIT:
@@ -268,12 +281,13 @@ static int pcm_run(const struct pcm_op *ops, int n, int at, int blocking)
                 return OS32_ERR_IO;
             break;
         case PCM_OP_RING_CLEAR:
+            if (s_hal_advance) break;
             kmemset(s_ring, 0, PCM_RING_BYTES);
             g_pcm.filled[0] = 0;
             g_pcm.filled[1] = 0;
             break;
-        case PCM_OP_RING_FILL:  pcm_ring_fill(); break;
-        case PCM_OP_TIMEBASE:   pcm_timebase(); break;
+        case PCM_OP_RING_FILL:  if (!s_hal_advance) pcm_ring_fill(); break;
+        case PCM_OP_TIMEBASE:   if (!s_hal_advance) pcm_timebase(); break;
         case PCM_OP_DEADLINE:   s_deadline = tick_count + o->b; break;
         case PCM_OP_ACK_TC:     dma_chan_ack_tc(PCM_DMA_CHAN); break;
         default: break;
@@ -459,10 +473,7 @@ static int pcm_advance(enum pcm_advance_origin origin)
     }
 
     /* 共通の PI の ack。**受理の判定にだけ**使い、連続性には使わない。 */
-    if ((cs_read(PCM_I_ALTSTAT) & PCM_ALT_PI) != 0) {
-        cs_write(PCM_I_ALTSTAT, 0);
-        handled = 1;
-    }
+    handled = pcm_codec_ack();
 
     switch (g_pcm.state) {
     case PCM_ST_RUNNING:
@@ -475,14 +486,55 @@ static int pcm_advance(enum pcm_advance_origin origin)
     return handled ? IRQ_HANDLED : IRQ_NONE;
 }
 
+#ifdef SND2_REFILL_DIAG
+static u32 hal_pi, hal_ticks, hal_max_us, hal_last_us;
+
+void pcm_codec_counters(u32 *pi, u32 *ticks, u32 *max_us)
+{
+    *pi = hal_pi;
+    *ticks = hal_ticks;
+    *max_us = hal_max_us;
+}
+#endif
+
+static void pcm_hal_advance(enum pcm_advance_origin origin)
+{
+    ++s_in_advance;
+#ifdef SND2_REFILL_DIAG
+    if (g_pcm.state == PCM_ST_RUNNING) {
+        u32 now = pcm_now();
+        if ((hal_ticks || hal_pi) && now - hal_last_us > hal_max_us)
+            hal_max_us = now - hal_last_us;
+        hal_last_us = now;
+        if (origin == PCM_FROM_TICK) ++hal_ticks;
+        else ++hal_pi;
+    }
+#else
+    (void)origin;
+#endif
+    s_hal_advance();
+    --s_in_advance;
+}
+
 static int pcm_irq(unsigned int irq, void *arg)
 {
     (void)irq; (void)arg;
+    if (s_hal_advance) {
+        if (s_claimed || s_mce_busy || g_pcm.state != PCM_ST_RUNNING)
+            return IRQ_NONE;
+        if (!pcm_codec_ack()) return IRQ_NONE;
+        pcm_hal_advance(PCM_FROM_IRQ10);
+        return IRQ_HANDLED;
+    }
     return pcm_advance(PCM_FROM_IRQ10);
 }
 
 void pcm_tick(void)
 {
+    if (s_hal_advance) {
+        if (!s_claimed && !s_mce_busy) pcm_hal_advance(PCM_FROM_TICK);
+        return;
+    }
     (void)pcm_advance(PCM_FROM_TICK);
 }
 
@@ -531,13 +583,18 @@ int pcm_present(void) { return s_present; }
 static void pcm_release(int leak)
 {
     if (g_pcm.finalized) return;
-    g_pcm.finalized = 1;
     s_claimed = 1;              /* 以後 advance は装置にもリングにも触らない */
 
     if (s_irq_reg) {
-        irq_unregister(PCM_IRQ, pcm_irq, 0);
+        if (irq_unregister(PCM_IRQ, pcm_irq, 0) != 0) {
+            s_release_leak = leak;
+            s_release_pending = 1;
+            return;
+        }
         s_irq_reg = 0;
     }
+    g_pcm.finalized = 1;
+    s_release_pending = 0;
     /* **ステージングは必ず kfree してよい** — 装置が触らないメモリなので、
      * リングが「止まった証拠」を取れなかった (leak) かどうかと独立。 */
     if (s_stg) kfree(s_stg);
@@ -553,7 +610,13 @@ static void pcm_release(int leak)
     s_ring_phys = 0;
     kmemset(&s_ring_buf, 0, sizeof(s_ring_buf));
     s_owner = 0;
+    s_hal_advance = 0;
     s_mce_busy = 0;
+}
+
+void pcm_codec_finish_release(void)
+{
+    if (s_release_pending) pcm_release(s_release_leak);
 }
 
 static int pcm_owner_ok(void)
@@ -572,19 +635,26 @@ static int pcm_open_fail(int rc)
     return rc;
 }
 
-int pcm_open(u32 rate)
+static int pcm_open_device(u32 rate, u32 period, void (*advance)(void))
 {
     struct pcm_op ops[PCM_SEQ_MAX];
     const struct pcm_op *tbl;
     u8 fmt = 0;
     int rc;
 
+    pcm_codec_finish_release();
+    if (s_release_pending) return PCM_ERR_BUSY;
     if (s_fault_sticky) return OS32_ERR_IO;
     if (g_pcm.state != PCM_ST_CLOSED) return PCM_ERR_BUSY;
     if (pcm_fmt_for_rate(rate, &fmt) != 0) return OS32_ERR_INVAL;
     if (pcm_refill_threshold(rate) >= PCM_HALF_FRAMES) return OS32_ERR_INVAL;
 
     /* 巻き戻しも pcm_release を通るので、**1 度だけ**の錠を先に外す。 */
+    s_hal_period = period;
+#ifdef SND2_REFILL_DIAG
+    hal_pi = hal_ticks = hal_max_us = 0;
+#endif
+    s_hal_advance = advance;
     g_pcm.finalized = 0;
     g_pcm.state = PCM_ST_OPENING;
     s_claimed = 0;
@@ -601,10 +671,10 @@ int pcm_open(u32 rate)
         s_ring = (u8 *)s_ring_buf.va;
         s_ring_phys = s_ring_buf.pa;
     }
-    s_stg = (u8 *)kmalloc(PCM_STG_BYTES);
-    if (!s_ring || !s_stg) return pcm_open_fail(PCM_ERR_NOMEM);
+    if (!advance) s_stg = (u8 *)kmalloc(PCM_STG_BYTES);
+    if (!s_ring || (!advance && !s_stg)) return pcm_open_fail(PCM_ERR_NOMEM);
     kmemset(s_ring, 0, PCM_RING_BYTES);
-    kmemset(s_stg, 0, PCM_STG_BYTES);
+    if (s_stg) kmemset(s_stg, 0, PCM_STG_BYTES);
 
     if (irq_register(PCM_IRQ, pcm_irq, 0, IRQ_F_SHARED) != 0)
         return pcm_open_fail(PCM_ERR_BUSY);
@@ -617,11 +687,16 @@ int pcm_open(u32 rate)
     kmemset(&g_pcm, 0, sizeof(g_pcm));
     g_pcm.rate = rate;
     g_pcm.state = PCM_ST_OPEN;
-    s_owner = res_owner_get();
+    s_owner = advance ? 0 : res_owner_get();
     s_deadline = 0;
     s_seq_at = 0;
     pcm_clock_rebase();         /* 長い空白の後でも時計の基準は今 */
     return 0;
+}
+
+int pcm_open(u32 rate)
+{
+    return pcm_open_device(rate, PCM_HALF_FRAMES, 0);
 }
 
 /* OPEN → RUNNING。装置は停止中で、リングを書く例外の 1 つ (IF=0)。 */
@@ -804,11 +879,20 @@ int pcm_close(void)
 /* ======================================================================== */
 /*  8. 回収 — 待たない abort。fault/STOP も着地後 IF=1 の通常文脈 (R1)。   */
 /* ======================================================================== */
-void pcm_reclaim(int owner)
+/* IF=0. Mask the DMA channel and verify the codec has accepted PEN=0. */
+static int pcm_abort_proven(void)
 {
     const struct pcm_op *ops;
+    int n = pcm_seq_abort(&ops);
+    pcm_run(ops, n, 0, 0);
+    return (inp(PCM_PORT_R0) & PCM_R0_INIT) == 0 &&
+           (cs_read(PCM_I_IFACE) & PCM_IFACE_PEN) == 0;
+}
+
+void pcm_reclaim(int owner)
+{
     unsigned int f;
-    int st, evid, n;
+    int st, evid;
 
     if (owner <= 0 || owner != s_owner) return;
 
@@ -828,10 +912,7 @@ void pcm_reclaim(int owner)
         evid = 0;
     } else if (st != PCM_ST_OPEN && st != PCM_ST_STOP_DONE) {
         /* RUNNING / DRAINING / RS_* / STOP_REQ: 境界は問わずに止める。 */
-        n = pcm_seq_abort(&ops);
-        pcm_run(ops, n, 0, 0);
-        evid = ((inp(PCM_PORT_R0) & PCM_R0_INIT) == 0 &&
-                (cs_read(PCM_I_IFACE) & PCM_IFACE_PEN) == 0);
+        evid = pcm_abort_proven();
     }
     if (evid) g_pcm.state = PCM_ST_STOP_DONE;
     else pcm_enter_faulted(PCM_DIAG_FAULT_RECLAIM);
@@ -845,4 +926,70 @@ int pcm_module_quiet(void)
 {
     pcm_reclaim(s_owner);
     return !s_fault_sticky && g_pcm.state == PCM_ST_CLOSED;
+}
+
+int pcm_codec_open(u32 rate, u32 period, void (*advance)(void), u8 **ring)
+{
+    int rc = pcm_open_device(rate, period, advance);
+    if (!rc) *ring = s_ring;
+    return rc == PCM_ERR_BUSY ? OS32_ERR_BUSY : rc;
+}
+
+int pcm_codec_start(void)
+{
+    /* After stop the 8237 must restart at frame zero. The core has primed
+     * the ring, so neither the legacy RING_FILL nor TIMEBASE runs here. */
+    const struct pcm_op *ops;
+    int n = pcm_seq_restart(&ops);
+    if (pcm_run(ops, n, 0, 0) < 0) return 1; /* setup failed before unmask */
+    g_pcm.state = PCM_ST_RUNNING;
+    return 0;
+}
+
+int pcm_codec_pos(u32 *frame)
+{
+    u32 left;
+    int tc;
+    if (dma_chan_remaining(PCM_DMA_CHAN, &left, &tc) != 0) return OS32_ERR_IO;
+    if (tc) dma_chan_ack_tc(PCM_DMA_CHAN);
+    *frame = pcm_pos_frames(left);
+    return 0;
+}
+
+int pcm_codec_ack(void)
+{
+    if (!(cs_read(PCM_I_ALTSTAT) & PCM_ALT_PI)) return 0;
+    cs_write(PCM_I_ALTSTAT, 0);
+    return 1;
+}
+
+int pcm_codec_stop(void)
+{
+    if (s_release_pending) return s_release_leak ? OS32_ERR_IO : 0;
+    if (!s_hal_advance || g_pcm.state == PCM_ST_OPEN) return 0;
+    if (!pcm_abort_proven()) {
+        /* teardown restores IF before release. Block the shared IRQ now. */
+        s_claimed = 1;
+        return OS32_ERR_IO;
+    }
+    g_pcm.state = PCM_ST_OPEN;
+    return 0;
+}
+
+void pcm_codec_release(int leak)
+{
+    if (!s_hal_advance || s_release_pending) return;
+    if (s_in_advance) {
+        s_claimed = 1;
+        s_release_leak = leak;
+        s_release_pending = 1;
+        return;
+    }
+    pcm_release(leak);
+}
+
+void pcm_codec_volume(u8 left, u8 right)
+{
+    cs_write_locked(PCM_I_LDA, left);
+    cs_write_locked(PCM_I_RDA, right);
 }

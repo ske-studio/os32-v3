@@ -56,6 +56,10 @@ $(PPC_GUIPROB).o: userland/ppc/guiprob.c userland/ppc/guiprob_exclusive.h build/
 	@mkdir -p $(@D)
 	$(CC) $(PPC_USER_FLAGS) $(if $(filter 1,$(PPC_C_GUI)),-DC_GUI_ACCEPT) -c $< -o $@
 
+# ISO 9660 level 1 uses the eight-character guest name snd2test.
+$(PPC_USER_OUT)/snd2test.o: userland/tests/snd2_test.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
+	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
+
 $(PPC_USER_OUT)/memstat.o: userland/tests/mem_stat_test.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
@@ -65,7 +69,7 @@ $(PPC_USER_OUT)/atadeny.o: tools/ppc/ata_deny.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT
 $(PPC_USER_OUT)/learnprb.o: tools/ppc/learn_probe.c $(SDK_KAPI_HDR) | $(PPC_USER_OUT)
 	$(CC) $(PPC_USER_FLAGS) -c $< -o $@
 
-PPC_USER_APPS += $(PPC_GUIPROB) $(PPC_USER_OUT)/memstat $(PPC_USER_OUT)/atadeny $(PPC_USER_OUT)/learnprb
+PPC_USER_APPS += $(PPC_USER_OUT)/snd2test $(PPC_GUIPROB) $(PPC_USER_OUT)/memstat $(PPC_USER_OUT)/atadeny $(PPC_USER_OUT)/learnprb
 $(addsuffix .elf,$(PPC_USER_APPS)): $(PPC_USER_OUT)/%.elf: $(PPC_USER_CRT) $(PPC_USER_OUT)/%.o $(SDK_TARGET_APP_LINK) sdk/link_guard.py sdk/allocator/check_link_target.py $(PPC_USER_NANO) $(PPC_USER_NANO:.a=.json)
 	$(PPC_USER_LINK) -o $@ $(filter %.o,$^) $(PPC_USER_LIBS)
 

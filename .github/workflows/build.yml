@@ -23,6 +23,11 @@ on:
       - "**.md"
       - ".claude/**"
   workflow_dispatch:
+    inputs:
+      tick_s1:
+        description: Build the Ra266 S1 diagnostic HostDrv
+        type: boolean
+        default: false
 
 concurrency:
   group: build-${{ github.ref }}
@@ -170,6 +175,30 @@ jobs:
         with:
           name: ${{ steps.name.outputs.artifact }}
           path: out/
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Build S1 diagnostic HostDrv
+        if: inputs.tick_s1
+        run: |
+          export PATH="$CROSS_DIR/bin:$PATH"
+          export HOSTDRV_DIR="$RUNNER_TEMP/s1-hostdrv"
+          mv build/out "$RUNNER_TEMP/product-out"
+          mkdir -p "$HOSTDRV_DIR"
+          make -j"$(nproc)" TICK_PROBE_BUILD=1 all build/out/tickprobe.bin build/out/snd2_test_diag.bin
+          python3 tools/hostdrv_deploy.py sync
+          mkdir -p "$HOSTDRV_DIR/tick"
+          cp build/out/tickprobe.bin "$HOSTDRV_DIR/tick/"
+          cp build/out/snd2_test_diag.bin "$HOSTDRV_DIR/tick/"
+          (cd "$HOSTDRV_DIR" && find . -type f -print0 | sort -z | xargs -0 sha256sum) > "$RUNNER_TEMP/s1-sums"
+          cp "$RUNNER_TEMP/s1-sums" "$HOSTDRV_DIR/SHA256SUMS"
+          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/tick-s1-hostdrv.tar.gz" s1-hostdrv
+
+      - uses: actions/upload-artifact@v4
+        if: inputs.tick_s1
+        with:
+          name: tick-s1-${{ github.sha }}
+          path: ${{ runner.temp }}/tick-s1-hostdrv.tar.gz
           retention-days: 30
           if-no-files-found: error
 

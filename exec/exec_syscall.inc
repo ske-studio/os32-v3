@@ -1,3 +1,6 @@
+#ifdef SND2_WRITER_DIAG
+#include "snd_writer_probe.h"
+#endif
 #include "exec_gfx_poll.h"
 #include "io_kapi.h"
 /* Ring3 syscall dispatch and completed-syscall STOP parking. Included by exec.c. */
@@ -59,6 +62,10 @@ void exec_syscall_dispatch(struct arch_syscall *view)
     io_syscall_begin(io_owner);
     u32 result;
     u32 slot = arch_syscall_slot(&call);
+#ifdef SND2_WRITER_DIAG
+    if (slot == KAPI_SLOT_SND2_STREAM_WRITE) sw_write();
+    else sw_point(SW_OTHER);
+#endif
     u32 wrapptr;
     struct kapi_arg_source src;
     struct kapi_values values;
@@ -90,13 +97,22 @@ void exec_syscall_dispatch(struct arch_syscall *view)
 
     /* --- GUI 入力ポンプ (票 K2-1、契約 T6 / T8 の X4) ---
      * フォールトガード (ring3_in_syscall) を立てる **前** に回す。 */
+#ifdef SND2_WRITER_DIAG
+    sw_point(SW_OTHER);
+#endif
     ring3_gui_pump();
+#ifdef SND2_WRITER_DIAG
+    sw_point(SW_GUI);
+#endif
     /* AC-CTX-1: arch の入口はフレーム・stack・翻訳を準備してから
      * 割込みを許可し、通常 syscall 本体を FG1 で渡す。
      * IRQ は保存状態を復元し、深さを 0 に戻して本体へ復帰する。
      * idle_work_run 自身も許可状態・深さ・再入を検査する。
      * 短い排他区間の所有者は、終了時に元の許可状態を復元する。 */
     if (slot != KAPI_SLOT_IO_PUMP) idle_work_run(); /* IO_PUMP_ONCE */
+#ifdef SND2_WRITER_DIAG
+    sw_point(SW_IDLE);
+#endif
 
     arch_kapi_source(&src, &call);
 
@@ -168,15 +184,34 @@ syscall_complete:
     caller_access_leave(&prev_caller);
     ring3_in_syscall = prev_in_syscall;
     g_cur_frame = prev_frame;
+#ifdef SND2_WRITER_DIAG
+    sw_point(SW_OTHER);
+#endif
 
     exec_cui_display_abort();
 
+#ifdef SND2_WRITER_DIAG
+    sw_point(SW_DISPLAY);
+#endif
     /* Resident deadline/pending check only; F5 work runs at a due foreground
      * point after caller restoration and before the resulting abort check. */
     if (exec_gfx_poll_due(tick_count)) exec_gfx_poll();
+#ifdef SND2_WRITER_DIAG
+    sw_point(SW_GFX);
+#endif
 
     /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */
     ring3_abort_check();
+#ifdef SND2_WRITER_DIAG
+    sw_point(SW_ABORT);
+#endif
     exec_park_stop(&call);
+#ifdef SND2_WRITER_DIAG
+    sw_point(SW_PARK);
+#endif
     io_syscall_end(io_owner); /* IO_SYSCALL_RETURN */
+#ifdef SND2_WRITER_DIAG
+    sw_point(SW_IO_END);
+    if (slot == KAPI_SLOT_SND2_STREAM_WAIT && !result) sw_exit();
+#endif
 }

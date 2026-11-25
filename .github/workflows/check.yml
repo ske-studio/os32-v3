@@ -243,7 +243,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -272,7 +272,7 @@ jobs:
           OS32_ACCEPT_IPA_LICENSE: "1"
           TMPDIR: ${{ runner.temp }}
         run: |
-          python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/10 --out "$RUNNER_TEMP/gate"
+          python3 -B tools/ci/gate.py run --env qemu-ppc --shard ${{ matrix.shard }}/20 --out "$RUNNER_TEMP/gate"
       - name: Upload check times
         if: always() && steps.prior.outputs.reuse != 'true' && steps.scope.outputs.scope == 'ppc'
         uses: actions/upload-artifact@v4
@@ -289,6 +289,7 @@ jobs:
             ${{ runner.temp }}/gate/results.json
             ${{ runner.temp }}/gate/failed-logs/
           if-no-files-found: warn
+          retention-days: 7
       - name: PPC QEMU diagnostics
         if: failure()
         run: |

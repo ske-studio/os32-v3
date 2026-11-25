@@ -25,6 +25,11 @@ ROOT = Path(__file__).resolve().parents[2]
 TAIL_LINES = 40
 SLOWEST = 10
 FAILED_LOG_BYTES = 4 << 20
+# 落ちた検査がログに書いた証拠の置き場 (evidence=<dir>) から小さな文字の証拠だけを写す (11-24、本線 PM 了承)。
+# ゲストのシリアル・UART のトレース・画面・QEMU の stderr。1 ファイルは末尾だけ、1 検査の合計にも上限。
+EVIDENCE_NAMES = re.compile(r'(?:serial(?:-[ab])?\.log|qemu\.log|uart\.trace|screen[\w.-]*\.txt|qemu\.stderr|events\.json|frames\.log)$')
+EVIDENCE_FILE_BYTES = 512 << 10
+EVIDENCE_CHECK_BYTES = 4 << 20
 # この検査の束が要る道具。足りない物は全部まとめて挙げ、検査を始める前に止める
 # (検査の途中で「コマンドが無い」で落ちて、原因が環境か変更かを読み分けさせない)。
 TOOLS = (
@@ -174,6 +179,36 @@ def keep_failed_log(kept, source, rc, limit=FAILED_LOG_BYTES):
             (kept / source.name).write_bytes(handle.read())
 
 
+def keep_evidence(kept, log, limit=EVIDENCE_CHECK_BYTES, per_file=EVIDENCE_FILE_BYTES, scratch=None):
+    """落ちた検査のログの最後の evidence=<dir> から、小さな証拠を kept/<検査>/ に写す。写した合計のバイト数を返す。
+
+    evidence= を出さない道具は、検査ごとの一時の置き場 scratch (TMPDIR) から拾う。新しい物から写す
+    (落ちたゲストは最後に動いた物なので、先に済んだ場合の記録で上限を使い切らない)。"""
+    paths = re.findall(r'evidence=(\S+)', log.read_text(errors='replace')) if log.is_file() else []
+    base = Path(paths[-1]) if paths else None
+    if base is None or not base.is_dir():
+        base = scratch
+    if base is None or not base.is_dir():
+        return 0
+    target = kept / log.stem
+    total = 0
+    for source in sorted(base.rglob('*'), key=lambda path: (-path.stat().st_mtime_ns, str(path))):
+        if total >= limit:
+            break
+        if not source.is_file() or not EVIDENCE_NAMES.search(source.name):
+            continue
+        with source.open('rb') as handle:
+            size = handle.seek(0, os.SEEK_END)
+            take = min(size, per_file, limit - total)
+            handle.seek(size - take)
+            data = handle.read()
+        place = target / source.relative_to(base)
+        place.parent.mkdir(parents=True, exist_ok=True)
+        place.write_bytes(data)
+        total += len(data)
+    return total
+
+
 def run_each(expected, timed):
     """--env の束: 検査を 1 本ずつ順に回す。1 本落ちても残りを回し、落ちた本数を返す。
 
@@ -221,9 +256,25 @@ def run(args):
         os.environ.update(env, MUTATE=mutate)
 
         def timed(name):
-            rc = check_time.run(times, name, [sys.executable, '-B', 'tools/checks/run.py',
-                                              '--run', name] + selection)
+            # 検査ごとに一時の置き場を分け、evidence= を出さない道具の証拠も落ちた時に拾えるようにする。
+            scratch = Path(os.environ.get('RUNNER_TEMP') or '/tmp') / 'os32-ck' / name
+            shutil.rmtree(scratch, ignore_errors=True)
+            scratch.mkdir(parents=True)
+            saved = os.environ.get('TMPDIR')
+            os.environ['TMPDIR'] = str(scratch)
+            os.environ['OS32_KEEP_TMP'] = '1'
+            try:
+                rc = check_time.run(times, name, [sys.executable, '-B', 'tools/checks/run.py',
+                                                  '--run', name] + selection)
+            finally:
+                os.environ.pop('OS32_KEEP_TMP', None)
+                if saved is None:
+                    del os.environ['TMPDIR']
+                else:
+                    os.environ['TMPDIR'] = saved
             keep_failed_log(kept, logs_dir / (name + '.log'), rc)
+            if rc:
+                keep_evidence(kept / 'evidence', logs_dir / (name + '.log'), scratch=scratch)
             return rc
         previous = os.getcwd()
         os.chdir(ROOT)

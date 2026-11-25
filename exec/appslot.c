@@ -322,6 +322,7 @@ void appslot_start_commit(int id, int gui, u32 pages)
     a->parked_from_wait = 0;
     a->parked_from_kbd = 0;
     a->parked_from_poll = 0;
+    a->wait_restart = 0;
     a->parked_from_yield = 0;
     a->parked_from_stop = 0;
     a->stop_wm_req = 0;
@@ -352,6 +353,7 @@ void appslot_shell_commit(void)
     a->parked_from_wait = 0;
     a->parked_from_kbd = 0;
     a->parked_from_poll = 0;
+    a->wait_restart = 0;
     a->parked_from_yield = 0;
     a->parked_from_stop = 0;
     a->stop_wm_req = 0;

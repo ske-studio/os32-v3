@@ -14,11 +14,14 @@ enum { TP_RX, TP_TX, TP_DMA, TP_DEVICE_COUNT };
 enum { TP_FOREGROUND, TP_IRQ0_CTX, TP_IRQ5_CTX, TP_CONTEXTS };
 struct tp_net_worst { unsigned long long total, part[TP_NET_COUNT]; };
 struct tp_device { struct tp_stat full, pio; unsigned long long bytes; };
-enum { TP_WC, TP_IRQ3, TP_IRQ5, TP_BUDGET, TP_PIT, TP_EXTRA_COUNT };
+enum { TP_WC, TP_IRQ3, TP_IRQ5, TP_BUDGET, TP_PIT,
+       TP_SND_OTHER, TP_SND_START, TP_SND_PAUSE, TP_SND_ADVANCE, TP_SND_RESYNC,
+       TP_SND_TEARDOWN, TP_PCM_IRQ10, TP_EXTRA_COUNT };
 struct tp_snapshot {
     struct tp_stat bank[2][TP_METRICS]; /* normal, splash/crossing */
     unsigned long long elapsed[2], splash_enter, splash_leave, empty_cost;
     unsigned long long arrival[2]; /* IRQ1 / IRQ10; external trace correlation */
+    unsigned int s1_mode, s1_notifications;
     unsigned int available, running, lost, arrivals[2];
     struct tp_net_worst net[2];
     struct tp_device device[2][TP_DEVICE_COUNT][TP_CONTEXTS];
@@ -30,6 +33,9 @@ struct tp_snapshot {
 };
 struct tp_mark { unsigned long long t; unsigned int epoch, splash, valid; };
 struct tp_device_mark { struct tp_mark start; unsigned long long pio; unsigned int context; };
+void tick_probe_sound_begin(unsigned int metric);
+void tick_probe_sound_metric(unsigned int metric);
+void tick_probe_sound_end(void);
 void tick_probe_extra_begin(unsigned int id);
 void tick_probe_extra_end(unsigned int id);
 void tick_probe_wc_begin(unsigned long caller);
@@ -42,6 +48,7 @@ struct tp_device_mark tick_probe_device_start(void);
 void tick_probe_device_end(unsigned int id, struct tp_device_mark m, unsigned int bytes);
 void tick_probe_pio_begin(void);
 void tick_probe_pio_end(void);
+enum { TP_S1_IDLE = 4, TP_S1_WAIT, TP_S1_DUE, TP_S1_FIXTURE };
 struct tp_request { unsigned int action; }; /* 1=start, 2=stop, 3=show */
 struct tp_control { unsigned int action; const struct tp_snapshot *snapshot; };
 void tick_probe_boot(void);

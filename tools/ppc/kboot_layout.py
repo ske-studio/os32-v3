@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Link the product kernel layout; independent of make check and firmware."""
 import argparse
+import json
 import os
 from pathlib import Path
 import re
 import struct
 import subprocess
 import sys
-import tempfile
+import keep_tmp
 import time
 
 from kboot_accept import fixed_layout, linked_image
@@ -106,7 +107,13 @@ def report_product(path):
     assert '/SYS/SHELL.BIN;1' in names
     assert all('/BIN/'+name+'.BIN;1' not in names for name in ('SH', 'HELLO', 'FAULT'))
     shell_bytes = subprocess.check_output(['isoinfo', '-i', iso, '-x', '/SYS/SHELL.BIN;1'])
-    assert shell_bytes == (ROOT/'build/out/ppc-user/link-sh/shell.bin').read_bytes()
+    # Compare with the shell.bin make staged into this image's root: an image with its own KB_OUT
+    # writes root-manifest.json naming KB_OUT/user/shell.bin; otherwise the shared default manifest.
+    manifest = path.parent/'root-manifest.json'
+    if not manifest.exists():
+        manifest = ROOT/'build/ppc-ram-root.json'
+    staged = Path(json.loads(manifest.read_text())['/sys/shell.bin'])
+    assert shell_bytes == (staged if staged.is_absolute() else ROOT/staged).read_bytes(), staged
 
     bss = symbols['__bss_end'] - symbols['__bss_start']
     print(f'PT_LOAD raw={raw} memory={memory} BSS={bss} root={root} '
@@ -194,7 +201,7 @@ def main():
         return
     prefix = str(Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')) / 'bin/powerpc-elf-')
     started = time.monotonic()
-    with tempfile.TemporaryDirectory(prefix='kboot-layout-', dir=os.environ.get('TMPDIR')) as tmp:
+    with keep_tmp.temporary_directory(prefix='kboot-layout-', dir=os.environ.get('TMPDIR')) as tmp:
         work = Path(tmp)
         command(['python3', '-B', 'tools/gen_memmap.py', '--layout-header', work/'memmap_layout.h'])
         script = (ROOT/'arch/ppc/kernel.ld').read_text()

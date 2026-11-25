@@ -173,16 +173,17 @@ static int run_stream(KernelAPI *api, u32 total_frames, int report)
         want = total_frames - done;
         if (want > (u32)PCM_CHUNK) want = (u32)PCM_CHUNK;
         fill_chunk(done, want);
-        rc = api->pcm_write(chunk, want * PCM_FRAME_BYTES);
-        if (rc < 0) {
-            api->kprintf(0x41, "pcm_write -> %d (at frame %u)\n", rc, done);
-            return rc;
+        u32 sent = 0;
+        while (sent < want) {
+            rc = api->pcm_write(chunk + sent, (want - sent) * PCM_FRAME_BYTES);
+            if (rc < 0) {
+                api->kprintf(0x41, "pcm_write -> %d (at frame %u)\n", rc, done + sent);
+                return rc;
+            }
+            if (!rc) api->sys_yield();
+            sent += (u32)rc / PCM_FRAME_BYTES;
         }
-        if (rc == 0) {
-            api->sys_yield();          /* 満杯。ステージングが空くまで譲る */
-            continue;
-        }
-        done += (u32)rc / PCM_FRAME_BYTES;
+        done += sent;
         if (report && done >= next_report) {
             sec++;
             next_report += (u32)PCM_RATE;

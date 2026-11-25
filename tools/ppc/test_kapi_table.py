@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify the PowerMac KAPI table and its generated initializer."""
+"""Expected from KAPI_SPEC §4-16 and the shared slot ABI: normal OSRI wrapper and ordered initializer."""
 import json
 import os
 import re
@@ -35,6 +35,16 @@ def main():
     with tempfile.TemporaryDirectory(prefix='ppc-table-') as directory:
         tmp = Path(directory)
         out = generate(tmp)
+        repeat = tmp / 'repeat'
+        repeat.mkdir()
+        again = generate(repeat)
+        for artifact in out.rglob('*'):
+            if artifact.is_file():
+                assert artifact.read_bytes() == (again / artifact.relative_to(out)).read_bytes()
+        for name in ('exec/exec_kapi_init.inc', 'sdk/include/os32/os32_kapi_slots.h',
+                     'sdk/include/os32/os32_kapi_generated.h', 'include/kapi_call_generated.h',
+                     'sdk/include/os32/os32_unit_stamp.h', 'sdk/include/os32/os32_generations.h'):
+            assert (out / name).read_bytes() == (ROOT / name).read_bytes(), name
         init = (out / 'exec/exec_kapi_init.inc').read_text()
         assert verify_init(init, data)
         dirs = ['.', 'include', 'arch/ppc', 'platform/powermac', 'sdk/include', 'sdk/include/os32', 'kernel', 'init', 'kernel/console', 'kernel/irq', 'kernel/time', 'mm', 'lib', 'kapi', 'drivers', 'net', 'gfx', 'exec', 'fs', 'kernel/cli']
@@ -53,6 +63,10 @@ def main():
         print('slots:', len(data['api']), 'wrappers resolved:', len(undefined))
         if '--mutate' in sys.argv:
             assert not verify_init(init.replace('    kapi->' + data['api'][0]['name'] + ' = wrap_' + data['api'][0]['name'] + ';\n', '', 1), data)
+            swapped = init.replace('wrap_gfx_osri_show;', 'wrap_sys_set_mtime;').replace(
+                'kapi->sys_set_mtime = wrap_sys_set_mtime;', 'kapi->sys_set_mtime = wrap_gfx_osri_show;')
+            assert not verify_init(swapped, data)
+            print('same-signature OSRI/mtime slot swap: RED')
             print('missing assignment: RED')
             source = (ROOT / 'arch/ppc/exec_kapi.c').read_text().replace('KernelAPI ppc_kapi_table __attribute__', 'const KernelAPI ppc_kapi_table __attribute__')
             mutant = tmp / 'mutant.c'

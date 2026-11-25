@@ -19,7 +19,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 def function(s, name):
     import re
-    m = re.search(r'^(?:static )?(?:void|int|i32) (?:__cdecl )?' + name + r'\([^;{}]*\)\n\{', s, re.M)
+    m = re.search(r'^(?:static )?(?:void|int|unsigned int|i32) (?:__cdecl )?' + name + r'\([^;{}]*\)\n\{', s, re.M)
     if not m:
         raise ValueError(name)
     return s[m.start():s.index('\n}', m.end()) + 2]
@@ -155,7 +155,7 @@ static void exec_restore_context(int id) {
     CHECK(exec_heap_used() == resident_used);
 }
 static void exec_teardown_app(AppSlot *a) {
-    CHECK(a == &slots[2] && cleanup == 7 && cr3 == 1 && host_if);
+    CHECK(a == &slots[2] && cleanup == 8 && cr3 == 1 && host_if);
     CHECK(!kctx_irq_depth && !kctx_exc_depth);
     CHECK(g_pending_id == 0 && g_longjmp_reason == EXEC_LJ_EXIT);
     teardown++;
@@ -179,8 +179,9 @@ static void vfs_close_owned(int id) { resource(id, 2); }
 static void install_reclaim_owner(int id) { (void)id; }
 static void pipe_free_owned(int id) { resource(id, 3); }
 static void shm_free_owned(int id) { resource(id, 4); }
-static void exec_pcm_reclaim(int id) { resource(id, 5); }
-static void in2_reclaim(int id) { resource(id, 6); }
+static void snd2_reclaim(int id) { resource(id, 5); }
+static void snd2_chip_reclaim(int id) { resource(id, 6); }
+static void in2_reclaim(int id) { resource(id, 7); }
 #include "input/hal/in2_int.h"
 #include "kbd_contract.h"
 /* One unread FEP action in the resident provider at child return. */
@@ -194,12 +195,12 @@ const struct InputLegacyProvider *input_legacy_provider(void)
 static int stop_discards;
 static void input_discard_stop(void) { stop_discards++; kbd_discard_stop(); }
 static int ime_clean;
-void exec_ime_owner_exit(int id) { CHECK(id == 2 && cleanup == 7 && teardown == 1); ime_clean = 1; }
+void exec_ime_owner_exit(int id) { CHECK(id == 2 && cleanup == 8 && teardown == 1); ime_clean = 1; }
 static void av_focus_exec_leave(int id, int parent) { CHECK(id == 2 && parent == cur); }
 static void exec_gui_owner_exit(int id, int kind) {
     CHECK(ime_clean); ime_clean = 0;
     CHECK(kind == (host_wm_kill ? EXEC_KIND_ABORTED : phase == 3 ? EXEC_KIND_EXITED : scheduled_kind));
-    CHECK(id == 2 && cleanup == 7 && teardown == 1);
+    CHECK(id == 2 && cleanup == 8 && teardown == 1);
     CHECK(stop_discards == (kind == EXEC_KIND_ABORTED));
     if (!host_gui) {
         CHECK(pending_fep_action == (kind == EXEC_KIND_ABORTED ? 0 : 'z'));
@@ -411,7 +412,7 @@ static int test(void) {
     CHECK(__builtin_offsetof(AppSlot, trim_pending) == 204);
     CHECK(__builtin_offsetof(AppSlot, trim_epoch) == 204 + sizeof(int));
     CHECK(sizeof(VfsStdinRead) == 16);
-    CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32) + sizeof(VfsStdinRead) + sizeof(struct arch_fp_context) + sizeof(struct arch_entry_context));
+    CHECK(sizeof(AppSlot) == 204 + sizeof(int) + sizeof(u32) + sizeof(VfsStdinRead) + sizeof(struct arch_fp_context) + sizeof(struct arch_entry_context) + sizeof(slots[0].wait_restart) + sizeof(slots[0].wait_begin));
     CHECK(sizeof(RedirAccess) == 24 && sizeof(CallerAccessFrame) == 28);
     CHECK(sizeof(FdRedirect) == 52 && sizeof(FdRedirectState) == 156);
     CHECK(sizeof(Ring3CallContext) == 48);   /* T7b-b2 S3b: wm_shell_gen を足した */
@@ -435,7 +436,7 @@ static int test(void) {
         phase = 1;
         CHECK((resumed ? resume_landing() : launch_landing()) ==
               (resumed || gui ? 0 : EXEC_ERR_FAULT));
-        CHECK(cleanup == 7 && teardown == 1 && notices == 1 && transfers == 1);
+        CHECK(cleanup == 8 && teardown == 1 && notices == 1 && transfers == 1);
         CHECK(!g_pending_id && !kctx_irq_depth && !kctx_exc_depth && host_if);
         CHECK(!ring3_in_syscall && !ring3_wm_depth && fault_kill_count == 1);
         CHECK(ring3_wm_fault_count == (kind == EXEC_KIND_FAULT));
@@ -445,7 +446,7 @@ static int test(void) {
             CHECK(exec_last_result(&k, &c) == 0 && k == EXEC_KIND_EXITED && c == 314);
         }
         exec_pending_finish(); /* 一度消費した pending を二重回収しない */
-        CHECK(cleanup == 7 && teardown == 1 && notices == 1);
+        CHECK(cleanup == 8 && teardown == 1 && notices == 1);
     }
     for (resumed = 0; resumed < 2; resumed++) {
         setup(1, EXEC_KIND_ABORTED); phase = 8;
@@ -459,14 +460,14 @@ static int test(void) {
     }
     setup(0, EXEC_KIND_EXITED); phase = 3;
     CHECK(launch_landing() == 17);
-    CHECK(cleanup == 7 && teardown == 1 && notices == 1 && !transfers);
+    CHECK(cleanup == 8 && teardown == 1 && notices == 1 && !transfers);
     CHECK(!ring3_in_syscall && !ring3_wm_depth);
     setup(0, EXEC_KIND_ABORTED); phase = 4;
     CHECK(launch_landing() == EXEC_ERR_FAULT);
-    CHECK(cleanup == 7 && notices == 1 && !transfers);
+    CHECK(cleanup == 8 && notices == 1 && !transfers);
     setup(0, EXEC_KIND_FAULT); phase = 2;
     CHECK(launch_landing() == EXEC_ERR_FAULT);
-    CHECK(cleanup == 7 && notices == 1 && transfers == 1);
+    CHECK(cleanup == 8 && notices == 1 && transfers == 1);
     /* Both real landing blocks restore a surviving parent's exact values. */
     for (resumed = 0; resumed <= 1; resumed++)
     for (int action = 0; action <= 8; action++)
@@ -513,7 +514,7 @@ static int test(void) {
         x87_saves = x87_restores = 0; x87_last = 0;
         CHECK(exec_kill(2) == 0);
         CHECK(x87_saves == 0 && x87_restores == 0 && x87_last == 0);
-        CHECK(cleanup == 7 && teardown == 1 && notices == 1 && !transfers);
+        CHECK(cleanup == 8 && teardown == 1 && notices == 1 && !transfers);
         CHECK(slots[2].state == APP_STATE_FREE && slots[3].state == APP_STATE_RUNNING);
         CHECK(cur == 1 && owner == 1 && cr3 == 1 && ring3_transition_count == 1);
     }
@@ -553,6 +554,12 @@ void ring3_resume(const u32 *frame, u32 pd, void *tss) {
     for (int i = 0; i < APP_FRAME_WORDS; i++) child_frame[i] = frame[i];
     child_frame[8] = 0x1002; child_frame[7] = KAPI_SLOT_SYS_READ;
     g_cur_frame = &child_view; ring3_in_syscall = 1;
+    if (expected_eax == KAPI_SLOT_SND2_STREAM_WAIT) {
+        child_frame[7] = expected_eax;
+        CHECK(exec_wait_begin(91) == 15 && !slots[2].wait_restart);
+        CHECK(exec_wait_can_park());
+        exec_wait_park(15);
+    }
     exec_park_kbd(); CHECK(0);
 }
 '''
@@ -605,6 +612,15 @@ static void test_stdin_resume(void) {
     }
     resume_src = APP_RESUME_SRC_POLL; key_count = expected_keys = 0; expected_eax = (u32)-1;
     CHECK(exec_resume(2, 999) == 2);
+    resume_src = APP_RESUME_SRC_YIELD;
+    expected_eax = HOST_FRAME(a->frame)[7] = KAPI_SLOT_SND2_STREAM_WAIT;
+    expected_eip = 0x1000;
+    a->wait_restart = 1;
+    a->wait_begin = 15;
+    for (int i = 0; i < 2; ++i) {
+        CHECK(exec_resume(2, 999) == 2);
+        CHECK(a->wait_restart && a->wait_begin == 15);
+    }
     stdin_resume_test = 0;
 }
 '''
@@ -619,7 +635,7 @@ def run(source=None, irq=None, provider=None, ring=None):
     names = ('exec_reclaim_resources', 'exec_notify_owned', 'exec_reclaim_owned',
              'ring3_context_save', 'ring3_context_clear', 'ring3_context_restore',
              'ring3_wm_enter', 'ring3_wm_leave', 'exec_syscall_dispatch',
-             'exec_park_transfer', 'exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield', 'exec_park_stop',
+             'exec_park_transfer', 'exec_wait_begin', 'exec_wait_can_park', 'exec_wait_park', 'exec_park', 'exec_park_kbd', 'exec_park_poll', 'exec_sys_yield', 'exec_park_stop',
              'exec_finish', 'exec_exit', 'kapi_sys_exit', 'exec_last_result', 'exec_pending_transfer', 'exec_pending_finish',
              'exec_kill_one', 'exec_kill', 'exec_fault_recover', 'ring3_kill_kind', 'ring3_fault_kill', 'ring3_abort_kill')
     context = source[source.index('typedef struct {\n    CallerAccessFrame caller;'):source.index('} Ring3CallContext;') + len('} Ring3CallContext;')]
@@ -709,6 +725,8 @@ class ExecR1(unittest.TestCase):
 
 
 MUTATIONS = (
+    ('PCM reclaim omitted', '    snd2_reclaim(id);', '    (void)id;'),
+    ('chip reclaim omitted', '    snd2_chip_reclaim(id);', '    (void)id;'),
     ('input reclaim omitted', '    in2_reclaim(id);', '    (void)id;'),
     ('x87-kill-restore', '    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);',
      '    arch_fp_restore(&a->fp_state);\n    exec_reclaim_resources(id);\n    exec_teardown_app(a);\n    appslot_reclaim(id);\n    exec_notify_owned(id, EXEC_KIND_ABORTED);'),
@@ -718,6 +736,8 @@ MUTATIONS = (
      '        exec_pending_finish();\n        (void)fp_depth;\n        ring3_context_restore(&caller_context);\n        _enable();\n        if (g_longjmp_reason'),
     ('stdin-wrong-call', '        arch_syscall_slot(g_cur_frame) != KAPI_SLOT_SYS_READ ||', ''),
     ('stdin-WM-state', '!ring3_in_syscall || ring3_wm_depth || !g_cur_frame ||', '!ring3_in_syscall || !g_cur_frame ||'),
+    ('wait-no-rewind', '        arch_user_restart(&a->frame);', '        (void)a;'),
+    ('wait-deadline-reset', 'return a->wait_begin;', 'return now;'),
     ('stdin-no-rewind', '    if (restart_stdin) arch_user_restart(&a->frame);', ''),
     ('stdin-consume', '            if (!kbd_inject_peek_for((int)app_id, &ch)) return OS32_ERR_AGAIN;',
      '            if (!kbd_inject_take_for((int)app_id, &ch)) return OS32_ERR_AGAIN;'),

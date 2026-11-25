@@ -21,8 +21,10 @@ SOURCES = [BACKEND, V2, 'platform/powermac/display_provider.c',
            'platform/powermac/display_dual.c', 'platform/powermac/display.c', 'gfx/gfx_scroll.c']
 CHECK = dict(env=['ppc-cross'], name='of-fb-host', tier=1, needs=[], budget=30, covers=[
     'drivers/video/of_fb/backend_of_fb.c', 'drivers/video/of_fb/of_fb_v2.c',
+    'drivers/video/of_fb/of_fb_osri.inc', 'gfx/gfx_osri.h', 'gfx/gfx_osri_view.h',
+    'gfx/osri_profile.h', 'kernel/idle_work.h', 'include/kernel_tick.h', 'mm/kmalloc.h',
     'platform/powermac/display_provider.c', 'platform/powermac/display_dual.c',
-    'gfx/gfx_scroll.c', 'platform/powermac/display.c', 'drivers/video/of_fb/backend_of_fb.h',
+    'include/redir_access.h', 'gfx/v2/display.c', 'gfx/gfx_scroll.c', 'platform/powermac/display.c', 'drivers/video/of_fb/backend_of_fb.h',
     'platform/powermac/platform_display_fallback.h', 'tools/tests/of_fb_host.c',
     'tools/tests/test_of_fb.py', 'tools/tests/host32.py',
     'tools/tests/kernel_includes.py', 'tools/tests/mutpar.py',
@@ -33,7 +35,17 @@ CHECK = dict(env=['ppc-cross'], name='of-fb-host', tier=1, needs=[], budget=30, 
     'arch/ppc/kernel_boot.h', 'kernel/console/console_dual.h'],
     basis=['PPC_FBCON_DESIGN §2', 'AC-DISPLAY-2', 'PPC_KAPI_GFX_REST_DESIGN 5c §2-5 A3 A8'],
 )
+OSRI = 'drivers/video/of_fb/of_fb_osri.inc'
 MUTATIONS = (
+    ('extension-disabled', OSRI, 'if (deadline < extension) deadline = extension;',
+     'if (deadline < extension) deadline = elapsed;'),
+    ('physical-index-remapped', OSRI, 'dst[x] = *pixels++;',
+     '{ u32 word = *pixels++; u8 *bytes = (u8 *)&word; for (int j = 0; j < 4; j++) bytes[j] = scan_index[bytes[j]]; dst[x] = word; }'),
+    ('plane-bit', OSRI, '128u >> (x % 8)', '1u << (x % 8)'),
+    ('late-event', OSRI, 'event[event].line == y', 'event[event].line + 1u == y'),
+    ('generation-lost', OSRI, 'if (of_fb_osri_generation() != bound)', 'if (!of_fb_osri_generation() && bound)'),
+    ('fixed-deadline', OSRI, 'if (image->count && elapsed >= deadline) return GFX_OSRI_SHOW_DONE;',
+     'if (elapsed >= deadline) return GFX_OSRI_SHOW_DONE;'),
     ('public-color-rejected', 'gfx/gfx_core_api.inc',
      'if (DISPLAY_SET_PALETTE(g_backend, idx, 1, rgb)) return;',
      '(void)DISPLAY_SET_PALETTE(g_backend, idx, 1, rgb);'),
@@ -96,7 +108,7 @@ def observe(folder, mutation=None):
                '-nostdlib', '-nostdinc', '-static', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections',
                '-I' + str(ROOT / 'platform/powermac'), '-I' + str(ROOT), *include_flags(ROOT),
                '-I' + str(ROOT / 'arch/ppc'),
-               str(ROOT / 'tools/tests/of_fb_host.c'),
+               str(ROOT / 'tools/tests/of_fb_host.c'), str(ROOT / 'gfx/v2/display.c'),
                *(str(ROOT / path) for path in SOURCES),
                str(ROOT / 'gfx/palette.c'), str(ROOT / 'gfx/v2/palette_state.c'), str(ROOT / 'gfx/v2/backend_reg.c'), str(ROOT / 'gfx/v2/caps.c'), str(ROOT / 'gfx/v2/enum.c'), '-o', str(exe)]
     build_in_tree(ROOT, folder, edits, [command])

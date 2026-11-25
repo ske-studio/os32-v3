@@ -51,7 +51,7 @@ static-setup の最後の `gate.py preflight --env static` はホストの道具
 2. このシャードの検査の名前を `tools/checks/run.py --list --shard` から取る (G4)。
 3. `make -k -jN check CHECK_SHARD=… MUTATE=1` (`--no-mutate` なら `check-fast`、`MUTATE=0`) を、`CHECK_LOG_DIR=<置き場>/logs`・`CHECK_TIMES=<置き場>/check_times.tsv`・`OS32_REQUIRE_PPC=1` で回す。前提の準備・並列・順序は make の今の仕組みのまま (検査の走らせ方をもう 1 つ作らない)。
 4. `check_times.tsv` (検査・秒・終了コード) と検査ごとのログから表を作る: 通過・失敗・回っていない・SKIP の行がある。
-5. `<置き場>/results.json`、`<置き場>/failed-logs/` (落ちた検査のログの末尾 4 MiB)、画面と `$GITHUB_STEP_SUMMARY` に表。失敗か、回っていない検査が 1 本でもあれば終了コード 1。検査は全部通ったのに make が落ちた時 (前提の準備、木が変わっていないことの照合) も 1。
+5. `<置き場>/results.json`、`<置き場>/failed-logs/` (落ちた検査のログの末尾 4 MiB)、`--env` の回では落ちた検査のゲストの証拠 `failed-logs/evidence/<検査>/` (シリアル・qemu.log・画面など、1 ファイル 512 KiB・1 検査 4 MiB まで、新しい物から。ログの最後の `evidence=<dir>` から、無ければ検査ごとの一時の置き場 `$RUNNER_TEMP/os32-ck/<検査>` (検査の TMPDIR) から。同じ回では OS32_KEEP_TMP=1 を立て、QEMU の受入の道具は一時の置き場を `tools/ppc/keep_tmp.py` の `temporary_directory` で作って消さない)、画面と `$GITHUB_STEP_SUMMARY` に表。失敗か、回っていない検査が 1 本でもあれば終了コード 1。検査は全部通ったのに make が落ちた時 (前提の準備、木が変わっていないことの照合) も 1。
 
 `--env <環境>` を付けた時は、その環境を要る検査 (`run.py --list --env`) だけをシャードに割り、手順 3 の make の代わりに、検査を 1 本ずつ順に `tools/checks/run.py --run <検査> --env <環境>` で回す (`run_each`)。1 本落ちても残りを回し、所要は同じ `check_times.tsv` に足す。QEMU で機械を丸ごと模擬する検査は、並べて回すと期限に間に合わなくなるので、シャードの中は直列にする。check.yml の `ppc-qemu` がこの入口を使う。
 
@@ -83,7 +83,7 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 |---|---|---|
 | check.yml `static-check` | `make check-<名>` を手で並べる | クロスコンパイラ無しで回る検査に CHECK の `env` で印を付け、`gate.py run` に環境の絞り込みを足して一覧を登録から取る (G4)。static の事前確認は §3-1 |
 | check.yml `ppc-compile` | `run.py --run all`、`ppc_scope.py` のパスの一覧 | `gate.py run --env ppc-cross` に替える (G2・G3)。PowerPC を回すかどうかの判定は、パスの一覧ではなく所有者集合 (`build/select.mk`) から引く |
-| check.yml `ppc-qemu` | 2026-11-18 に `gate.py run --env qemu-ppc --shard i/4` の 4 分割にし、`needs` の鎖を外した (G2・G3・G10)。2026-11-21 のユーザー決定で 5 分割から i/6 の 6 分割に変更 (各段 20〜27 分、30 分での時間切れが 3 回)。2026-11-22 に 8 分割を経て 10 分割 (i/10) に変更。検査ごとの所要を成果物 `check-times-<SHA>-ppc-qemu-<i>` に出す | 残りは `ppc_scope.py` のパスの一覧と、用意の行の重複 |
+| check.yml `ppc-qemu` | 2026-11-18 に `gate.py run --env qemu-ppc --shard i/4` の 4 分割にし、`needs` の鎖を外した (G2・G3・G10)。2026-11-21 のユーザー決定で 5 分割から i/6 の 6 分割に変更 (各段 20〜27 分、30 分での時間切れが 3 回)。2026-11-22 に 8 分割を経て 10 分割 (i/10) に変更。2026-11-24 のユーザー決定「20組に」で 20 分割 (i/20)、上限は 30 分のまま (§5-10)。検査ごとの所要を成果物 `check-times-<SHA>-ppc-qemu-<i>` に出す | 残りは `ppc_scope.py` のパスの一覧と、用意の行の重複 |
 | build.yml `checks` (6 シャード) | `make -k check CHECK_SHARD=…` (全部の検査を変異込み、2026-11-18 から) | `gate.py run --shard …` に替えると、表・検査ごとのログ・回っていない検査の検出が付く (G2・G3)。`gate-setup` にすると PowerPC の検査が SKIP にならない (G5・G6) |
 | 用意 | apt の行が 4 か所 | `gate-setup` に寄せる (G5) |
 
@@ -243,3 +243,18 @@ static-check の Check map は 5 分、Host tests は 6 分（検査本体の実
 | 7/10 | `ppc-boot-info-guest`、`ppc-mouse-guest`、`ppc-ver-guest`、`ppc-rtc-guest`、`ppc-root-lz4-layout-host` | 859.9 |
 | 8/10 | `ppc-db-guest`、`ppc-kapi-v89-guest`、`ppc-usb`、`ppc-path-guest`、`ppc-loop-guest` | 878.7 |
 | 9/10 | `ppc-ata-guest`、`ppc-sfs-guest`、`ppc-sd-link`、`ppc-sc`、`ppc-sqlite-static-guest` | 882.7 |
+
+## 5-10. PowerPC の QEMU の組の重みの作り直し (2026-11-24、本線 PM の決定 (c))
+
+上限は組ごとに 30 分のまま (用意 約 3 分を含む)。合格の線は各組 28 分以内 (本線 PM)。標本は `calibrate_weights.py --merge` に、int-ppc-1123h・1123a・1123i の check の 6 回分の `check-times` の中央値。
+
+| 回 | 重み | 組の実時間 (用意込み) | 結果 |
+|---|---|---|---|
+| 1123h 8232174fa (前) | 11-22 の重み | 最長 29 分 15 秒 (組 2) | 上限の際 |
+| 1123i 79a554797 | 作り直し 1 回目 (見込み 22.1〜22.3 分) | 18〜29 分 (組 5・8 が 29 分) | 線を越えた |
+| 1123i b5b03dc79 | 同上 | 16〜26 分、組 3 は 30 分で打ち切り (`ppc-deploy-guest` 840 秒・`ppc-kapi-v89-guest` 444 秒・`ppc-gfx2-guest` 295 秒、重みは 624・250・193) | 打ち切り |
+| 1123i 7cbf23c48 | 作り直し 2 回目 (見込み 21.9〜22.4 分) | 19〜27 分 | 通過 |
+
+同じ検査が回ごとに 4〜8 割伸びる (`ppc-deploy-guest` の標本は 562〜840 秒)。見込み 22 分 + 用意 3 分では、上限までの余裕は 5 分ほど。再び 28 分を越えたら、組の数か上限の見直しを本線 PM からユーザーに上げる。
+
+20 組 (2026-11-24 のユーザー決定「20組に」、上限 30 分のまま) の最初の回 (76ec252b8、check 45349078850): ppc-qemu の各組 10〜18 分 (用意込み、組 0 の `ppc-display-guest` 単独が 18 分)、全部 success。runner の空き待ちで組の開始が 07:35〜08:06 にずれ、push から最後のジョブまでは 44 分 (10 組の時は 30〜36 分)。組 0 が通った回の実測で 25 分を越えたら、`ppc-display-guest` の中を割る案 (変異・待ちの見直し、または 2 本に分ける) を出す (本線 PM、11-24)。

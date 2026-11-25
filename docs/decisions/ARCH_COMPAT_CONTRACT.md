@@ -1,5 +1,7 @@
 # ARCH_COMPAT_CONTRACT — アーキテクチャ間の互換契約
 
+> 起動の骨格を共通の層へ (機種依存の分離のやり直しの ①、ユーザー決定 2026-11-24、設計まで): [ARCH_BOOT_SKELETON_DESIGN.md](ARCH_BOOT_SKELETON_DESIGN.md)。KAPI の表と配置を機種ごとに分ける (②、設計まで): [ARCH_KAPI_SPLIT_DESIGN.md](ARCH_KAPI_SPLIT_DESIGN.md)。
+
 > 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](ppc/DESIGN_X86_AUDIT.md))。
 
 > 状態: **確定 (2026-11-14)** — アーキ間の互換契約の正典 (ユーザーの提案「最大公約数と最小公倍数の互換層」、astra 起草・Opus 5.5 の独立レビュー 2 回・PowerPC PM の見直し)。契約の確定と実装の適合は分け、適合は §4 の各項目と W3 で更新する。
@@ -122,7 +124,7 @@ N4 に従い I/O 専用 adapter は追加しない。上表は arch 入口全体
 
 |ID|保証 / 能力 / 不在、文脈|正にする記号・所在|x86 の満たし方|PowerPC の満たし方|両アーキの試験 ID / 担当設計|
 |---|---|---|---|---|---|
-|AC-KAPI-1|G: slot 順・公開 ABI を保持。C: 機能群の利用可否。A: pointer=NULL、指定 query=0、その他の値=NOSYS、void は無動作と事前照会を対にする。文脈は元 API を継承し、不在 stub で拡張しない|`ABSENT_PROVIDER_SLOTS`・`ZERO_SLOTS`・`absent_result` (`sdk/kapi_target_ppc.py`)、生成分岐 (`sdk/gen_kapi.py`)|通常 provider と予約 slot。欠けた provider の型別試験も行う|不在群を生成。IME 等の既存例外を一律 query=0 に書き換えない。void と組にする照会の欠落は F8 で分類|`AC-KAPI-1/absent-types-capability`（T1 で作る） / ABI|
+|AC-KAPI-1|G: 名前・意味・振る舞いを保持 (ソースの互換)。slot の番号・並びは機種ごとに決める (ユーザー 2026-11-24「絞る」、POLICY_DEV §10 の「x86 に揃える」。表を機種ごとに分ける段は設計まで)。C: 機能群の利用可否。A: pointer=NULL、指定 query=0、その他の値=NOSYS、void は無動作と事前照会を対にする。文脈は元 API を継承し、不在 stub で拡張しない|`ABSENT_PROVIDER_SLOTS`・`ZERO_SLOTS`・`absent_result` (`sdk/kapi_target_ppc.py`)、生成分岐 (`sdk/gen_kapi.py`)|通常 provider と予約 slot。欠けた provider の型別試験も行う|不在群を生成。IME 等の既存例外を一律 query=0 に書き換えない。void と組にする照会の欠落は F8 で分類|`AC-KAPI-1/absent-types-capability`（T1 で作る） / ABI|
 |AC-INPUT-1|G: 共通のキー符号・非待機 try、空=-1。C: pressed/raw/modifier/interruptible を独立照会。A: 能力なしを「未押下」と同一視しない。待機は前景で進行可能な場合だけ。IRQ 利用を新たに保証しない|`InputOps` (`include/input_service.h`)、`input_getkey_wait` 。能力表現は F6 で追加|`platform/pc98/d2_bind.c` が既存入力へ委譲|`platform/powermac/input_boot.c` は共通 HAL の pressed・raw・modifiers を公開。USB の Ctrl+Pause で割込み可能待機を中断|`arch-compat-host`（両機種の InputOps）、`ppc-input-usb-host`（USB・切断・待機） / 本書・PPC 立上げ順|
 |AC-MEM-1|G: 地図は byte の半開区間、probe は確認済み end PFN、予約域を除外。C: 採用範囲・属性。A: probe=0 は高 RAM 未確認であり物理 RAM 不在の断定ではない。probe は起動 FG0|`platform_memory_geometry/span`・`platform_memory_probe_high` (`include/platform_memory.h`)、`MEM_PAGE_SIZE` (`include/memmap.h`)|`platform/pc98/memory.c` と platform_memory_desc|`platform/powermac/memory.c` と platform_memory_desc。実機搭載量から未採用 RAM を使わず、compat BIOS 帯を実在 BIOS と解釈しない|`AC-MEM-1/ranges-reserved-unconfirmed`（T1 で作る） / MEM・PPC|
 |AC-BOOT-1|G: 検証済み image だけ valid。C: 起動元・CRC 検証。A: 未検証は image_valid=0、既存 NONE を保持。捕捉は起動 FG0、読出は公開後|`boot_common`・`BOOTINFO_SRC_NONE` (`include/bootinfo.h`)|`platform/pc98/boot_capture.c`|`platform/powermac/boot_capture.c`。OF 起動を FD/HDD に偽装しない|`AC-BOOT-1/unverified-image`（T1 で作る） / PPC 立上げ順|
@@ -206,6 +208,7 @@ POLICY_DEV §10「x86 に揃える」(ユーザー決定 2026-11-20、動作実�
 | KCG の字形の読み出し | CG ROM/CG RAM を `drivers/video/kcg/kcg_module.c` (kcg.mod の提供者の口) が読む | 常駐の KCG1 ファイル (`platform/powermac/kcg.c`) | ANK・漢字の読み出しの転送は共有した (`drivers/video/kcg/kcg_read_provider.inc`、B14 2026-11-20)。字形の出所の違いは残す (物理) | 部品のロードは B08 (module の読み込み) の段で揃える |
 | ATA Data のバイト順 (D8) | LE の 16 bit ポート | BE の窓。IDENTIFY の語はバイト交換し、セクタは媒体の並びを保つ | 残す (物理) | CPU のバイト順が違う。語の値とセクタのバイト列を別の窓口で渡す |
 | BIOS 由来のディスク幾何 (D9) | BIOS の幾何を区画表の位置の決定に使う | BIOS 由来の幾何が無く、`hdd_geom_info` は不在 | 残す (物理) | ファームウェアが違う。PowerMac の ATA はこの幾何による区画探索を行わない |
+| 旧 FM・SSG の 6 欄 | PC-98 の OPN で FM・SSG を操作する | PowerMac では不在 | 残す (物理) | [AV0・v90 の決定](sound/AV0_V90_ADDENDUM.md) は旧 6 欄を ABI に維持する。PowerMac でその機能を提供しないことは本節の機種別方針。両機種共通の FM・SSG 合成は新しい音声 API で提供する予定。 |
 | KAPI の不在 | 全部ある | 型ごとの不在 (`sdk/kapi_target_ppc.py`) | 埋めている途中 | PPC KAPI の埋め (PPC_KAPI_FILL_DESIGN) |
 
 ## 確定 (2026-11-14、Opus 5.5 第 2 回は「確定してよい」、P3 の 4 件を PM が反映)

@@ -1,5 +1,8 @@
 #include "../../../kernel/irq/tick.h"
 #include "tick_order.h"
+#include "tick_clock.h"
+#include "platform/pc98/tsc_clock.h"
+#include "sound/hal/snd2.h"
 _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* Resident facade and IRQ/tick/DMA references, using the T5c-0 record. */
 #include "pcm_module.h"
@@ -24,6 +27,41 @@ static void (*tick_target)(void);
 static irq_handler_fn irq_target;
 static unsigned int irq_line;
 
+static const Snd2Stream *refill_stream;
+
+/* Earliest possible boundary from a verified DMA movement. A PIT IRQ
+ * count cannot bound elapsed time while interrupts were masked. */
+static unsigned long long refill_due_us;
+
+static void pcm_between_jiffies(void)
+{
+    const Snd2Stream *s = refill_stream;
+    u32 lo, hi, previous = s->last_hw;
+    int timed = pc98_tsc_read_us(&lo, &hi) == 0;
+    unsigned long long now = timed ? ((unsigned long long)hi << 32) | lo : 0;
+    if (s->written == s->copied && timed && now < refill_due_us)
+        return;
+
+    refill_due_us = 0;
+    tick_target();
+    if (timed && refill_stream == s && s->last_hw != previous) {
+        u32 remaining = s->period - (s->last_hw & (s->period - 1));
+        /* Start the interval before sampling DMA. Even 44.1 kHz takes
+         * over 22 us per frame; allow one frame already in progress. */
+        refill_due_us = now + (remaining - 1) * 22U;
+    }
+}
+
+/* The module tick reference pins tick_target. The registry retains the
+ * stream until stop; detach also removes the hook before dropping the ref. */
+void pcm_module_refill_tick(int dev)
+{
+    Snd2Device *d = dev >= 0 ? snd2_device((u32)dev) : 0;
+    refill_due_us = 0;
+    refill_stream = d ? &d->stream : 0;
+    tick_pcm_set(refill_stream && tick_target ? pcm_between_jiffies : 0);
+}
+
 void pcm_tick(void)
 {
     if (tick_target) tick_target();
@@ -32,37 +70,6 @@ void pcm_tick(void)
 #endif
 }
 
-int pcm_open(u32 rate)
-{
-    if (module_exports(pcm_handle)) return candidate.open(rate);
-    if (rate != PCM_RATE_44100 && rate != PCM_RATE_22050) return OS32_ERR_INVAL;
-    return OS32_ERR_NOSYS;
-}
-int pcm_write_check(void)
-{
-    if (module_exports(pcm_handle)) return candidate.write_check();
-    return OS32_ERR_INVAL;
-}
-int pcm_write(const void *buf, u32 bytes)
-{
-    if (module_exports(pcm_handle)) return candidate.write(buf, bytes);
-    return OS32_ERR_INVAL;
-}
-int pcm_status(u32 *free_bytes, u32 *counters)
-{
-    if (module_exports(pcm_handle)) return candidate.status(free_bytes, counters);
-    return OS32_ERR_INVAL;
-}
-int pcm_close(void)
-{
-    if (module_exports(pcm_handle)) return candidate.close();
-    return OS32_ERR_INVAL;
-}
-int pcm_set_volume(u32 percent)
-{
-    if (module_exports(pcm_handle)) return candidate.set_volume(percent);
-    return OS32_ERR_INVAL;
-}
 int pcm_state(void)
 {
     if (module_exports(pcm_handle)) return candidate.state();
@@ -72,10 +79,6 @@ int pcm_present(void)
 {
     if (module_exports(pcm_handle)) return candidate.present();
     return 0;
-}
-void pcm_reclaim(int owner)
-{
-    if (module_exports(pcm_handle)) candidate.reclaim(owner);
 }
 
 int pcm_module_irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsigned int flags)
@@ -168,6 +171,7 @@ static int pcm_detach(struct module_record *r)
     (void)r;
     unsigned int flags = irq_save();
     if (tick_target) {
+        pcm_module_refill_tick(-1);
         tick_target = 0;
         module_ref_release(pcm_handle, MODULE_REF_TICK);
     }
