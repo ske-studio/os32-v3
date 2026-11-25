@@ -13,9 +13,9 @@
 
 ## 2. ファイル地図 (どのファイルが何で、仕様はどこか)
 
-### 起動 `init/` (共通の骨格) と `platform/pc98/` (PC-98 の入口)
+### 起動 `sys/kern/init/` (共通の骨格) と `sys/platform/pc98/` (PC-98 の入口)
 
-ファイルの列で `platform/pc98/` と書いていない物は `init/` の下。
+ファイルの列でファイル名だけの物は `sys/kern/init/` の下。
 
 | ファイル | 役割 | 仕様 |
 |---|---|---|
@@ -25,7 +25,7 @@
 | `bootinfo.c`、`sys/platform/pc98/bootinfo_check.c` | ローダから受け取る起動情報 (起動元、イメージの CRC `VK32` → `ver` の `Image CRC`) — v2.1 | archive/realhw_v21/TASK_HDD_INSTALL (アーカイブ: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md`) 段 0 |
 | `bootlog.c` `bootlog_save.c` | 起動ログ `/var/log/boot.log` (前回分は `.1`) — v2.1 | [RELEASE_v2.1 §1](RELEASE_v2.1.md) |
 
-### メモリ `mm/`
+### メモリ `sys/kern/mm/`
 
 | ファイル | 役割 | 仕様 |
 |---|---|---|
@@ -35,9 +35,9 @@
 | `shm.c` | 共有メモリの割当と DB / GUI の予約。帯とブロック数は `sys/include/memmap.h`、配置の説明は [02 §2-1](02_memory.md) | [02](02_memory.md)、設計 `docs/design/mm/README.md#shm`・`docs/design/include/memmap.md` |
 | `dma_pool.c` `dma_pool_math.c` | DMA プール (0x7F0000 の 64KB 整列の固定区間。64KB 境界をまたがない配り方、[HW2]) — v2.1 | 票 TASK_HAL_WIRING §1-3、[02 §2-1](02_memory.md) |
 
-### カーネル `kernel/` (常駐サービス) とその下
+### カーネル `sys/kern/` (常駐サービス) とその下
 
-ファイルの列の `irq/` などは `kernel/` の下のディレクトリ。
+ファイルの列の `irq/` などは `sys/kern/` の下のディレクトリ。
 
 | ファイル | 役割 | 仕様 |
 |---|---|---|
@@ -46,22 +46,22 @@
 | `kselftest_report.c` (項目の本体は `sys/platform/pc98/kdebug/kselftest.c`) | ブート時セルフテスト (kstring / kmalloc / kprintf)。プリミティブを触ったら項目を足す | [POLICY_DEBUG §2](POLICY_DEBUG.md) |
 | `irq/irq.c` `irq/irq_math.c` | 割り込みの動的登録 (`irq_register`、共有 IRQ、storm の検出) — v2.1 | 票 TASK_HAL_WIRING §1-1 |
 | `time/ktime.c` `time/time_math.c` | µs 時計 (`ktime_*`、2.4576MHz 系のクランプ) — v2.1 | 票 TASK_HAL_WIRING §1-5 |
-| `sys/platform/pc98/sysclk.c` `sys/platform/pc98/pit_math.c`、`time/cpu_calibrate.c` `time/cpu_calibrate_math.c` | システムクロックの判定 (1.9968 / 2.4576MHz、`0000:0501h` bit7) → PIT の分周、CPU の校正 — v2.1 | [POLICY_DEBUG §4-54](POLICY_DEBUG.md#4-54-pit-の実時間) |
+| `sys/platform/pc98/sysclk.c` `sys/platform/pc98/pit_math.c`、`sys/platform/pc98/time/cpu_calibrate.c` `time/cpu_calibrate_math.c` | システムクロックの判定 (1.9968 / 2.4576MHz、`0000:0501h` bit7) → PIT の分周、CPU の校正 — v2.1 | [POLICY_DEBUG §4-54](POLICY_DEBUG.md#4-54-pit-の実時間) |
 | `module/module_image.c` / `module/module_runtime.c`、`sys/kern/kdebug/kdebug_module.c` | 部品の検証・固定 record・load/start/abort と隔離の核。`/boot/kdebug.bin` の接続 (KDEBUG=1 のときだけ、root マウント後) は部品の側の `sys/kern/kdebug/kdebug_module.c`。部品ごとの読み込みは各装置の `*_module.c` (HWDEV は `sys/dev/hwdev/hwdev_module.c`) | 票 TASK_T4_T6_MODULES §2-2、[08_build §8-2](08_build.md#起動時に読む部品の形式-kmod-v1) (形式・kdebug の口) |
 | `console/console.c` | TVRAM 出力、スクロール予約 (`tvram_set_scroll_reserve`)、GDC カーソル | [05 §5-9](05_drivers.md) 周辺、[console「落とし穴」](design/kernel/console/console.md#落とし穴) |
 | `console/con_sink.c` | console シンク — GUI モード中のカーネル出力を 8KB のリングに溜め、端末アプリが `con_sink_read` (KAPI v46) で吸う | [KAPI_SPEC v46 節](KAPI_SPEC.md)、`docs/archive/gui_v13/TASK_K6C_console.md` |
 | `ime/ime.c` `ime/ime_romkana.c` `ime/ime_dict.c` `ime/ime_render*.c` | FEP。描画は関数表 (`ime_render.h`) 越し。GUI は `ime_feed_key` / `ime_set_render` (KAPI v42) で WM が FEP を持つ | 票 `tasks/fep/00_INDEX.md`、archive/gui_v11/TASK_W2 (アーカイブ: `docs/archive/gui_v11/TASK_W2_fep_lease_modal.md`) |
-| `platform/pc98/legacy/v86*.c` (`kernel/v86/` は転送ヘッダだけ) | V86 モニタ、仮想 PIC、キー所有権、脱出キー | archive/v21/v86v2/ (アーカイブ: `docs/archive/v21/v86v2/README.md`) |
-| `sys/platform/pc98/legacy/v86_gcap.c`、`kdebug/` の `v86_gcap.c` `v86_gcap_math.c` `v86_test16_gcap.asm` | `v86 -g`: 実機の ROM が INT 18h AH=30h/31h で流す I/O (OUT 列) を記録 — v2.1 | 票 TASK_PEGC480_REALHW §3 段 1、[POLICY_DEBUG §4-62](POLICY_DEBUG.md#4-62-pegc-の実機モード) |
+| `sys/platform/pc98/legacy/v86*.c` (`sys/kern/v86/` は転送ヘッダだけ) | V86 モニタ、仮想 PIC、キー所有権、脱出キー | archive/v21/v86v2/ (アーカイブ: `docs/archive/v21/v86v2/README.md`) |
+| `sys/platform/pc98/legacy/v86_gcap.c`、`sys/platform/pc98/kdebug/` の `v86_gcap.c` `v86_gcap_math.c` `v86_test16_gcap.asm` | `v86 -g`: 実機の ROM が INT 18h AH=30h/31h で流す I/O (OUT 列) を記録 — v2.1 | 票 TASK_PEGC480_REALHW §3 段 1、[POLICY_DEBUG §4-62](POLICY_DEBUG.md#4-62-pegc-の実機モード) |
 
-### CPU 依存 `arch/x86/kernel/`
+### CPU 依存 `sys/arch/x86/kernel/`
 
 | ファイル | 役割 | 仕様 |
 |---|---|---|
 | `idt.c` `isr_handlers.c` `isr_stub.asm` | 割り込み、`int 0x80` KAPI トランポリン着地点 | [04](04_interrupts.md)、archive/kernel_v2/M2 (アーカイブ: `docs/archive/kernel_v2/M2_KAPI_TRAMPOLINE.md`) |
 | `ring3_entry.asm` | `int 0x80` の入口 (`int80_stub`: セグメント復元後 `sti`、出口 `cli`)、`kapi_invoke` | [09](09_exec.md)、[ring3_entry「落とし穴」](design/arch/x86/kernel/ring3_entry.md#落とし穴) |
 
-### 実行と KernelAPI `exec/` `kapi/` `sdk/`
+### 実行と KernelAPI `sys/kern/exec/` `sys/kapi/` `sdk/`
 
 | ファイル | 役割 | 仕様 |
 |---|---|---|
@@ -75,9 +75,9 @@
 | `sdk/link/app.ld` `app_sys.ld` `shlib.ld` `sdk/crt/crt0.asm` | アプリ (私有 VA 0x80100000) / シェル帯 (0x400000、gshell) / 共有ライブラリ (私有 VA 0x80000000) のリンク | [09](09_exec.md)、[02 §2-1](02_memory.md) |
 | `sdk/gen_kapi.py` `kapi_rust_gen.py` `mkos32x.py` `tools/mkshlib.py` | KAPI 生成、OS32X ヘッダ付与、`.shlib` 生成と番号表照合 (`make check-shlib`) | [08 §8-4](08_build.md) |
 
-### ドライバ `drivers/` (装置の種類ごと)
+### ドライバ `sys/dev/` (装置の種類ごと)
 
-ファイルの列の `block/` などは `drivers/` の下のディレクトリ。部品 (.mod) の窓口 `*_module.c` と本体 `*_body.c` は装置の隣にある。
+ファイルの列の `block/` などは `sys/dev/` の下のディレクトリ。部品 (.mod) の窓口 `*_module.c` と本体 `*_body.c` は装置の隣にある。
 
 | ファイル | 役割 | 仕様 |
 |---|---|---|
@@ -88,21 +88,21 @@
 | `ata/ide.c` `ata/atapi.c` | IDE HDD、ATAPI CD-ROM | [06 §6-3](06_filesystem.md)、[05 §5-6](05_drivers.md) |
 | `dma/dma8237.c` `dma/dma8237_math.c` | 8237 DMA の共通部 (`dma_chan_setup`、auto-init) — v2.1 | 票 TASK_HAL_WIRING §1-2 |
 | `pci/pci.c` `pci/pci_decode.c` `pci/pci_bind.c` `pci/pci_bind_match.c` | PCI の列挙 (メカニズム #1)・構成空間のデコード・結線表 (ドライバとの結び付け)、`lspci -v` — v2.1 | 票 TASK_LAN_82557 (L-A)、票 TASK_HAL_WIRING §1-4 |
-| `input/kbd.c` | PC-98 キーボード、修飾キー、V86 への注入。GUI 中は cooked に積まず raw リング (`kbd_trygetrawkey`、`keycode\|down<<8\|mods<<9`)、CTRL+STOP → `ring3_abort_request` | [05 §5-1](05_drivers.md) |
+| `sys/platform/pc98/input/kbd.c` | PC-98 キーボード、修飾キー、V86 への注入。GUI 中は cooked に積まず raw リング (`kbd_trygetrawkey`、`keycode\|down<<8\|mods<<9`)、CTRL+STOP → `ring3_abort_request` | [05 §5-1](05_drivers.md) |
 | `input/kbd_status.c` `input/kbd_dlog.c` | キーボード 8251 の状態 (`kbdstat`) と make/break の記録 (`kbdstat -w`) — v2.1 | [POLICY_DEBUG §4-57](POLICY_DEBUG.md#4-57-キーボード-8251-の信号線) |
-| `input/mouse*.c` | バスマウス + NP21/W シームレスマウス (座標は移動範囲へ比例配分、480 ライン可) | [05 §5-7](05_drivers.md) |
+| `sys/platform/pc98/input/mouse*.c`、`input/mouse_seamless.c` | バスマウス + NP21/W シームレスマウス (座標は移動範囲へ比例配分、480 ライン可) | [05 §5-7](05_drivers.md) |
 | `char/serial.c` | RS-232C (rshell / ai-debug の経路) | [05 §5-4](05_drivers.md) |
 | `char/serial_plan.c` | シリアルの整数分周の計画 (115200 まで、クロック判定つき) — v2.1 | archive/realhw_v21/TASK_SERIAL_VFAST (アーカイブ: `docs/archive/realhw_v21/TASK_SERIAL_VFAST.md`)、[POLICY_DEBUG §4-49](POLICY_DEBUG.md#4-49-シリアルの実効速度) |
 | `char/np2sysp.c` | NP21/W ハイパーコール | [05 §5-10](05_drivers.md) |
 | `net/ne2000/lgy98.c` `ne2000.c` `ne2000_ring.c` `ne2000_io.asm` `ne2000_regs.h` | LGY-98 (NE2000 互換 C バス LAN)。カード固有 / 8390 本体 / リング計算 (ホスト試験可) / 16bit PIO / レジスタ定数の正典。既定は有効 (カード未装着時は起動継続)。無効化は `make kernel-nolgy98` (`build/config.mk`) | 票 `tasks/network/PLAN.md` |
 | `sound/fm/fm.c` | OPN/OPM | [05 §5-3](05_drivers.md) |
-| `sound/fm/snd_engine.c` | FM/SSG シーケンサ (タイマ IRQ 駆動) | [05 §5-3](05_drivers.md) |
+| `sound/fm/opn_chip.c` | FM/SSG の OPN チップへのアクセス | [05 §5-3](05_drivers.md) |
 | `sound/cs4231/pcm_cs4231.c` `pcm_cs4231_math.c` | CS4231 (MATE-X PCM) の PCM 再生 (リングは DMA プール、IRQ は動的登録) — v2.1 | [設計書](design/drivers/sound/cs4231/pcm_cs4231.md) |
 | `video/kcg/kcg.c` | 旧 `.kcgfont` の読込 / KCG facadeへの橋 | [05 §5-9](05_drivers.md) |
 | `video/kcg/kcg_body.c` `video/kcg/kcg_module.c` | KCG ROM/cache部品 / typed facade | [05 §5-9](05_drivers.md) |
-| `video/cirrus/wab_glue.h` `wab_glue_xe10.c` `wab_cirrus.c` | ウィンドウアクセラレータ: ボードグルー契約 / Xe10 内蔵 (ID 5Bh、0FAAh/0FABh) / CL-GD5430 チップ (BLT は I/O 経由、8bpp、DAC)。定数は `sys/platform/pc98/wab_xe10.h` | 設計 `docs/design/drivers/video/cirrus/wab_cirrus.md`・`docs/design/include/gfx_hal.md`、archive/gui_v11/TASK_H3 (アーカイブ: `docs/archive/gui_v11/TASK_H3_cirrus.md`) |
+| `video/cirrus/wab_glue.h` `sys/platform/pc98/video/cirrus/wab_glue_xe10.c` `wab_cirrus.c` | ウィンドウアクセラレータ: ボードグルー契約 / Xe10 内蔵 (ID 5Bh、0FAAh/0FABh) / CL-GD5430 チップ (BLT は I/O 経由、8bpp、DAC)。定数は `sys/platform/pc98/wab_xe10.h` | 設計 `docs/design/drivers/video/cirrus/wab_cirrus.md`・`docs/design/include/gfx_hal.md`、archive/gui_v11/TASK_H3 (アーカイブ: `docs/archive/gui_v11/TASK_H3_cirrus.md`) |
 
-### ファイルシステム `fs/` (共通層) と FS ごとの下
+### ファイルシステム `sys/fs/` (共通層) と FS ごとの下
 
 | ファイル | 役割 | 仕様 |
 |---|---|---|
@@ -114,7 +114,7 @@
 | `isofs/iso9660.c` | CD-ROM | [06 §6-6](06_filesystem.md) |
 | `serialfs/serialfs.c` `serialfs_session.c` `sfs_client.c` `sfs_proto.c` | SerialFS — シリアル越しの `/host` (ホスト側は `tools/serialfs_host.py`)。`hsync --root` と組んで実機の HDD を更新する — v2.1 | archive/realhw_v21/TASK_SERIAL_HOSTFS (アーカイブ: `docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md`) |
 
-### 描画 HAL の共通層 `gfx/` (バックエンドは `drivers/video/` の装置の隣)、SQLite `lib/sqlite3/`、ブート `boot/`
+### 描画 HAL の共通層 `sys/hal/gfx/` (バックエンドは `sys/dev/video/` の装置の隣)、SQLite `lib/sqlite3/`、ブート `boot/`
 
 | ファイル | 役割 | 仕様 |
 |---|---|---|

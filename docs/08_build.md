@@ -212,51 +212,21 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
 ```
 os32-v3/
 ├── boot/           ブートローダー (16bit/32bit ASM + C)
-├── init/           入口の骨格 (kernel_start.c — 起動の 3 つの局面の順。中身は platform/)、起動情報・起動ログ、/etc/system.cfg
-├── kernel/         常駐サービス・診断・ver・GUI の背骨 (gui.c)・SQLite の常駐側・試験専用の器
-│   ├── irq/        割り込みの動的登録・IRQ0 コールバック
-│   ├── time/       µs 時計・tick の時計・CPU の校正
-│   ├── module/     部品 (KMOD) の検証と load/start/abort の核 (部品ごとの読み込みは各装置の *_module.c、kdebug/・hwdev/ の側)
-│   ├── dev/        装置の登録簿の口 (dev.h) と RAM の読み取り専用のブロック装置 (ram_ro)
-│   ├── console/    TVRAM コンソール・console シンク・フォントの lease・Unicode 表
-│   ├── ime/        FEP (fep.mod の本体と窓口)
-│   └── v86/        x86 専用の旧パス互換転送ヘッダのみ
-├── mm/             ページング・物理ページ台帳・カーネルヒープ・DMA プール・SHM・shlib
-├── arch/           CPU 依存の実装。`ARCH ?= x86` で選ぶ。足し方は arch/README.md
-│   └── x86/        原始命令の実装 (arch_io.h — 割り込み制御・CPU 停止・IDT ロード、arch_cpu.h — CR3/CR0・リング降下、x86_desc.h — GDT/TSS ロード)
-│       └── kernel/ GDT/IDT/TSS・#DF・例外の受け口・入口 asm (kentry.asm)・リング 3 降下 (ring3_entry.asm)
-│   (arch/ppc/ は PowerPC: 入口 asm・例外・HPT・decrementer・exec の arch の口)
-├── platform/       機種依存の実装。`PLATFORM ?= pc98` で選ぶ。固定名 platform_*.h は機種ごとに差し替える契約の実装
-│   ├── pc98/       入口の 3 つの局面 (kernel.c)・起動の段・スプラッシュ・PIT とシステムクロック・表示の provider
-│   │   └── legacy/ V86 モニタ・低位メモリ・v86.mod の結線と、BIOS・PIC・KBD・I/O の模擬
-│   └── powermac/   入口の 3 つの局面 (ppc_kernel.c)・起動 (kernel_boot.c)・OF・MPIC・GMAC・コンソール
-├── include/        カーネル内の共通ヘッダ (memmap.h, gfx_hal.h 等)。io.h / cpu.h は原始命令の**契約**だけ、platform_*.h は機種境界の契約、*_contract.h は共通と装置の間の口 (共通は装置のヘッダを読まない — design/tools/check_layers.md §8)
-├── drivers/        ハードウェアドライバ (装置の種類ごと。部品の窓口 *_module.c と本体 *_body.c、表示のバックエンドは装置の隣)
-│   ├── base/       デバイス登録簿の実装 (dev.c。口 dev.h は kernel/dev/)
-│   ├── ata/        IDE・ATAPI と cd.mod
-│   ├── block/      FDC・論理ディスク・ループバック・FatFs の装置層 (fat_diskio.c)・SCSI 定数
-│   ├── hostdrv/    NP21/W の HostDrv (/host) の FS (エミュレータの I/O ポートの口)
-│   ├── char/       シリアル・RTC・NP21/W ハイパーコール
-│   ├── dma/        8237 DMA
-│   ├── input/      キーボード・マウス
-│   ├── pci/        PCI の列挙・構成空間の復号・結線表
-│   ├── net/        LAN カード (ne2000/ — DP8390 系と LGY-98、e82557/ — Intel 8255x と lan.mod)
-│   ├── sound/      音源 (fm/ — OPN・サウンドエンジンと fm.mod、cs4231/ — CS4231 PCM と pcm.mod)
-│   └── video/      表示装置 (kcg/ — 漢字 ROM と kcg.mod、cirrus/ — Cirrus・Xe10 グルー・HAL バックエンドと cirrus.mod、geforce/ — GeForce の HAL バックエンドと geforce.mod、pc98/ — 内蔵表示 (GDC planar・PEGC) のバックエンド)
-├── gfx/            描画 HAL の共通層だけ (gfx_core・スクロール・パレット。PC-98 の VRAM への提示とバックエンドは drivers/video/)
-├── fs/             VFS・fd・リダイレクト・パイプ (共通層)、PC-98 の区画表 pc98pt.[ch] (ローダ・ユーザーランドと共有)
-│   ├── ext2/       ext2 (NHD の主 FS)
-│   ├── fat/        FatFs の VFS 結線 (fatfs/ — vendor の FatFs、中身は不変)
-│   ├── isofs/      ISO9660 (CD-ROM)
-│   └── serialfs/   SerialFS (シリアル・LAN 越しの /host)
-├── net/            リンク層 (link.c)
-├── exec/           OS32X(外部プログラム) のロードと環境設定
-├── kapi/           外部プログラム向け KernelAPI リダイレクタ
-├── kdebug/         診断の部品 (/boot/kdebug.bin) の中身 (セルフテスト・v86 -g・GeForce 初期化の段など)
-├── hwdev/          装置の核 HWDEV の部品 (hwdev.mod) の中身
+├── sys/            カーネルのソースと構成
+│   ├── arch/       CPU 依存の入口・例外・仮想記憶 (x86、ppc)
+│   ├── conf/       機能とイメージの構成 (features/、images/)
+│   ├── dev/        装置ドライバ、表示バックエンド、HWDEV
+│   ├── fs/         VFS、ext2、FAT、ISO9660、SerialFS
+│   ├── hal/        描画・入力・音声・時計などの HAL
+│   ├── include/    共通ヘッダと機種・装置との契約
+│   ├── input/      入力方針・コンテキスト・キーマップ
+│   ├── kapi/       KernelAPI の実装
+│   ├── kern/       起動 (init/)、メモリ (mm/)、実行 (exec/)、割り込み、コンソール、FEP
+│   ├── net/        ネットワークの共通層
+│   └── platform/   機種依存の実装 (pc98/、powermac/)。PC-98 の V86 モニタは pc98/legacy/
 ├── lib/            汎用ライブラリ (utf8, path, sqlite3, zlib, microtar 等。vendor したものは各ディレクトリの README.OS32 が出所とライセンスの正典)
 ├── userland/       ユーザー空間 (shell/, gshell/ (GUI シェル, Rust), cmds/, system/, tests/, rust/ (libos32gui 等), lib/)
-├── .github/        GitHub Actions (workflows/check.yml: 静的ゲート、workflows/build.yml: 本体ビルド + 全部の検査を変異込みで。全件は main に入れる SHA の関門)
+├── .github/        作り直し期間の CI は workflows/restructure-build.yml。旧 4 本は .disabled
 ├── apps/           git submodule (ske-studio/os32-apps) — 標準アプリ。make external / make apps
 ├── game/           git submodule (ske-studio/os32-game) — 対戦スゴロク RPG。make external / make game
 ├── docs/hw/        PC-98 資料のローカルミラー (git 管理外、tools/sync_hwdocs.sh)
@@ -272,7 +242,7 @@ os32-v3/
 └── docs/           仕様書ドキュメント群
 ```
 
-ファイルごとの役割は DEVELOPMENT.md §2 (ファイル地図)。この配置にした理由と旧い配置からの対応表は票 TASK_SRC_LAYOUT §2・§3 (記録)。
+ファイルごとの役割は DEVELOPMENT.md §2 (ファイル地図)。P3 の移動前後のパスは `docs/tasks/restructure/data/move_map.json` で引ける。
 
 #### 新しい CPU・機種に着手する前に
 
@@ -972,7 +942,7 @@ Ubuntu (WSL2 では Ubuntu 側のシェル) で OS32 のリポジトリのルー
 | 本体ビルドとホスト試験 | [build-setup](../.github/actions/build-setup/action.yml)。NASM、ISO 作成の genisoimage、ext2 の作成・検査の e2fsprogs、32 ビット試験の qemu-user を含む。 |
 | PowerPC クロスの構築 | [ppc-setup](../.github/actions/ppc-setup/action.yml) の構築依存を入れる。 |
 | 全検査 | [gate-setup](../.github/actions/gate-setup/action.yml) は上の二つに gcc-13 と PowerPC ゲスト用の qemu-system-ppc、ファームウェアの qemu-system-data、VGA ROM の seabios を加える。全機種を取得するメタパッケージ qemu-system は導入時間が長いため、この構成では個別に入れる。 |
-| 静的検査 | [static-setup](../.github/actions/static-setup/action.yml)。C の AST 検査に使う clang・libclang・python3-clang の動作確認は [§8-4 の C ソース検査](#c-ソース検査-clang) を参照。文書リンク用の lychee は [check.yml の Install lychee](../.github/workflows/check.yml) と同じ版を PATH に置き、`lychee --version` を確認する。 |
+| 静的検査 | [static-setup](../.github/actions/static-setup/action.yml)。C の AST 検査に使う clang・libclang・python3-clang の動作確認は [§8-4 の C ソース検査](#c-ソース検査-clang) を参照。文書リンク用の lychee は [停止中の check.yml.disabled の Install lychee](../.github/workflows/check.yml.disabled) と同じ版を PATH に置き、`lychee --version` を確認する。 |
 
 Python の依存は [requirements.txt](../requirements.txt) から入れる。Ubuntu の `python3-venv` を用意し、apt の clang バインディングも読める仮想環境を使う。次回のビルド時も同じ環境を有効にする。
 
@@ -1109,6 +1079,10 @@ GitHub Actionsでの新規構築はf1a作業中は未実施、PMがCI runで確�
 システムの `libc.a` の手編集・allocator公開切替は行わない。
 
 ### §8-6 GitHub Actions での本体ビルド
+
+作り直し期間は [restructure-build.yml](../.github/workflows/restructure-build.yml) が PC-98 と PowerPC の像を組む。取り込み条件は [ci_v2 §0](design/tools/ci/ci_v2.md)。P6-2〜P6-4 で同文書 §4 の全件集計に切り替える。
+
+#### 移動前の CI（作り直し期間は停止）
 
 `.github/workflows/build.yml` (workflow 名 `build`) は、配布物の `artifacts` と
 検査6シャード (`checks (0)`〜`checks (5)`) を依存関係なしで並列に動かす。
