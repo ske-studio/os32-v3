@@ -1,0 +1,69 @@
+[[check]]
+id = "ppc_media_build"
+spec = { path = "docs/design/tools/ci/ci_v2.md", section = "§0 最小 workflow と仮の関門" }
+subsystem = "infra"
+level = "L1"
+sources = ["make:all", "make:iso"]
+environment = "linux-ppc-cross"
+arch = { ppc = ["core", "link", "sh", "link-sh", "shell", "neg1"] }
+needs = []
+expect = "ビルド成功、PPCKERN.ELF と boot.iso が非空"
+limits = "起動到達と再生成時の一致は別の検査"
+gates = ["push", "main"]
+mutations = [{ id = "ppc_core_missing_iso", config = "core", when = "after_build", remove = "build/out/ppc-kboot/boot.iso", fail = "missing boot.iso" }]
+
+[[check]]
+id = "x86_media_build"
+spec = { path = "docs/design/tools/checks/tests_v2.md", section = "配布物と再生成の合否" }
+subsystem = "infra"
+level = "L1"
+sources = ["make:all", "make:kernel-r1", "make:deploy-u3", "make:iso"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "PC-98 配布物が揃い FD と HostDrv が同じカーネルを持つ"
+limits = "起動は別の検査"
+gates = ["push", "main"]
+mutations = [{ id = "x86_missing_iso", config = "pc98", remove = "images/os32_install.iso", fail = "missing os32_install.iso", when = "after_build" }]
+
+[[check]]
+id = "ppc_common_compile"
+spec = { path = "docs/design/tools/checks/tests_v2.md", section = "配布物と再生成の合否" }
+subsystem = "infra"
+level = "L1"
+sources = ["make:common-compile"]
+environment = "linux-ppc-cross"
+arch = { ppc = ["link-sh"] }
+needs = []
+expect = "共通の各入力が PowerPC の再配置可能 ELF を生成する"
+limits = "リンクと起動は保証しない"
+gates = ["push", "main"]
+mutations = [{ id = "common_missing_object", config = "link-sh", remove = "build/out/ppc-kboot/link-sh/sys/kern/mm/dma_pool.o", fail = "missing dma_pool.o", when = "after_build" }]
+
+[[check]]
+id = "build_identity"
+spec = { path = "docs/design/tools/checks/tests_v2.md", section = "配布物と再生成の合否" }
+subsystem = "infra"
+level = "L1"
+sources = ["make:all", "make:kernel-r1", "make:deploy-u3", "make:iso"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"], ppc = ["core", "link", "sh", "link-sh", "shell", "neg1"] }
+needs = []
+expect = "同じ入力から再生成した生成物の集合とバイトが一致する"
+limits = "時刻を含む PowerPC 媒体と root_image_blob.o は存在だけを確認"
+gates = ["main"]
+mutations = [{ id = "ppc_changed_elf", config = "core", append = "build/out/ppc-kboot/PPCKERN.ELF", fail = "different artifacts: build/out/ppc-kboot/PPCKERN.ELF", when = "after_build" }]
+
+[[check]]
+id = "registry_fields"
+spec = { path = "docs/design/tools/checks/registry_v2.md", section = "P4 順 1 の登録" }
+subsystem = "infra"
+level = "M"
+sources = ["tests/registry.toml", "tests/support/registry.py"]
+environment = "python"
+arch = { host = ["local"] }
+needs = []
+expect = "登録が通り、必須の欄を欠く登録を lint が拒否する"
+limits = "製品の実行結果は調べない"
+gates = ["push", "main"]
+mutations = [{ id = "lint_accepts_missing", config = "local", replace = "tests/support/registry.py", old = "missing = FIELDS", new = "row.setdefault('needs', [])\n        missing = FIELDS", fail = "missing field not rejected: needs", when = "after_build" }]
