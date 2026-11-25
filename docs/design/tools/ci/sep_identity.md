@@ -47,3 +47,18 @@
 ## 5. 範囲の外
 
 NP21/W・実機の受入はしない。分離の作り直しが終わったら、この workflow と道具は削除する。
+
+## 6. 作り直しの枝で保存した一覧と比べる (P2-1)
+
+P2-0 が採った全像の一覧を `sha256sum` の形式 (小文字の SHA-256、空白 2 個、基点の木からの相対パス) で 1 ファイルにまとめる。基点の生成物は一覧の隣に同じ相対パスで保存する。候補の木は古い生成物が残らない所で組む。
+
+    python3 -B tools/build_compare.py --baseline-build --tree BASE_TREE --base v3-pre-restructure -- make all kernel-r1
+    python3 -B tools/ci/sep_identity.py --manifest BASE/SHA256SUMS --move-map docs/tasks/restructure/data/move_map.json --tree TREE --base v3-pre-restructure -- make all kernel-r1
+
+1 行目はタグをチェックアウトした空のビルド木での採取、2 行目は候補の比較。両方とも基点 SHA の先頭 12 桁を OS32_BUILD_COMMIT、基点のコミット時刻（Unix 秒）を SOURCE_DATE_EPOCH に設定し、TZ=UTC・LC_ALL=C で GCC の __DATE__・__TIME__ を固定する。末尾のコマンドは木を組む工程 (例は x86 部分のみ)。全件の関門では配布物と PowerPC の 6 像まで作る工程を渡す。組み済みの木を比べ直す入口は `tools/build_compare.py` で、同じオプションから末尾のビルドコマンドを除く。どちらも基点を組み直さない。像のディレクトリを保って移動元のソースに対応するオブジェクトを探す。PowerPC の各像直下の `root_image_blob.o` は G11 により存在だけを見る。
+
+一致は終了 0、バイト差・余分な生成物は 1、ビルド失敗・入力の誤りは 2、一覧の生成物の欠けは 3。欠けと差が混在すれば両方を印字して 3 で終わる。
+ビルド時は `--base`（既定は `v3-pre-restructure`）、組み済みの木では明示した `--base` から HEAD までのコミット本文を読む。差を許す宣言は 1 行に生成物 1 本とパス 1 本を記す。
+
+- `Sep-Changes: path-string ARTIFACT OLD_PATH` は、保存した基点のハッシュを照合し、末尾 NUL を含む旧パスを対応表で置換した全バイトと候補を比べる。長さが変わる ELF には次の再コンパイルを使う。
+- ELF の配置まで動く C の診断文字列には、候補でそのリテラルを書く入力も指定する。例は `Sep-Changes: path-string build/out/kdebug/kselftest.o include/memmap.h kdebug/kselftest/memmap.inc`（末尾は移動後の置き場に合わせる）。候補のソース・フォントを一時ディレクトリに写し、同じ固定環境で `make 対象` を回す。候補の全バイトを再現でき、指定の入力の文字列末尾だけを旧パスに戻して組むと保存済み SHA-256 に戻る場合に一致とする。これにより節の配置・シンボル・再配置を含めて検証する。対象は単独で make できる生成物と、ソースに直接書かれた通常の C 文字列。ビルドの失敗は終了 2、再現できない差は終了 1。

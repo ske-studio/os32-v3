@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 
@@ -27,19 +28,23 @@ def git(root, *args):
                           capture_output=True).stdout
 
 
+def copy_candidate(root, destination):
+    # Copy the effective worktree directly. Starting from an archive would
+    # retain the old name of a staged git mv (absent from ls-files).
+    names = git(root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard').decode().split('\0')
+    for name in names:
+        if not name or name == '.env' or name.startswith(('docs/archive/', 'docs/hw/')):
+            continue
+        source, target = root / name, destination / name
+        if source.is_file():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+
+
 def snapshot(root, revision, destination):
     destination.mkdir()
     if revision == 'HEAD':
-        # Copy the effective worktree directly. Starting from an archive would
-        # retain the old name of a staged git mv (absent from ls-files).
-        names = git(root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard').decode().split('\0')
-        for name in names:
-            if not name or name == '.env' or name.startswith(('docs/archive/', 'docs/hw/')):
-                continue
-            source, target = root / name, destination / name
-            if source.is_file():
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source, target)
+        copy_candidate(root, destination)
     else:
         data = git(root, 'archive', '--format=tar', revision)
         with tarfile.open(fileobj=io.BytesIO(data)) as archive:
@@ -278,7 +283,197 @@ def function_diff(left, right, objdump):
     return ''.join(lines) or 'No function changes; inspect data sections and image metadata.\n'
 
 
+def relative(name):
+    path = Path(name)
+    if not name or path.is_absolute() or '..' in path.parts or str(path) != name:
+        raise ValueError(f'invalid relative path: {name!r}')
+    return path
+
+
+def candidate_path(tree, old, moves, objects):
+    """Keep the image prefix and apply only moves present in this candidate."""
+    if old.suffix == '.o':
+        for index in range(len(old.parts)):
+            suffix = Path(*old.parts[index:])
+            if suffix in objects:
+                src, dst = objects[suffix]
+                moved = Path(*old.parts[:index]) / dst.with_suffix('.o')
+                if (tree / moved).is_file() or ((tree / dst).is_file() and not (tree / src).is_file()):
+                    return moved
+                break
+    target = moves.get(old, old)
+    if target != old and (tree / old).is_file() and not (tree / target).is_file():
+        return old
+    return target
+
+
+def fixed_build_env(tree, base):
+    commit, epoch = git(tree, 'show', '-s', '--format=%H %ct', base + '^{commit}').decode().split()
+    return dict(os.environ, SOURCE_DATE_EPOCH=epoch, OS32_BUILD_COMMIT=commit[:12],
+                TZ='UTC', LC_ALL='C')
+
+
+def replay_literal(tree, target, literal_input, source, moved, data, digest, env):
+    """Rebuild the candidate target with each spelling. Compare entire artifacts."""
+    if str(moved).encode() + b'\0' not in data:
+        return False
+    with tempfile.TemporaryDirectory() as directory:
+        work = Path(directory)
+        copy_candidate(tree, work)
+        if (tree / 'assets/fonts').is_dir():
+            shutil.copytree(tree / 'assets/fonts', work / 'assets/fonts', dirs_exist_ok=True)
+        path = work / literal_input
+        original = path.read_bytes()
+        # Only rewrite an ordinary diagnostic string ending in the mapped path.
+        # Skip comments, character literals and preprocessor directives (includes).
+        tokens = rb'''(?m)^[ \t]*\#[^\n]*(?:\n|$)|//[^\n]*|/\*[\s\S]*?\*/|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"'''
+        suffix = str(moved).encode() + b'"'
+
+        def replace(match):
+            token = match[0]
+            if token.startswith(b'"') and token.endswith(suffix):
+                return token[:-len(suffix)] + str(source).encode() + b'"'
+            return token
+
+        normalized = re.sub(tokens, replace, original)
+        if normalized == original:
+            return False
+        for contents, expected in ((original, hashlib.sha256(data).hexdigest()),
+                                   (normalized, digest)):
+            path.write_bytes(contents)
+            output = work / target
+            output.unlink(missing_ok=True)
+            try:
+                subprocess.run(['make', str(target)], cwd=work, env=env, check=True)
+            except (OSError, subprocess.CalledProcessError) as error:
+                raise ValueError(f'BUILD FAILED {target}: {error}') from error
+            if hashlib.sha256(output.read_bytes()).hexdigest() != expected:
+                return False
+    return True
+
+
+def compare_saved(manifest, tree, move_map, messages, env):
+    moves = {relative(row['from']): relative(row['to'])
+             for row in json.loads(move_map.read_text())}
+    rules = {}
+    for line in messages.splitlines():
+        if line.startswith('Sep-Changes:'):
+            fields = line.split()
+            if len(fields) not in (4, 5) or fields[1] != 'path-string':
+                raise ValueError('expected Sep-Changes: path-string ARTIFACT OLD_PATH')
+            artifact, old = map(relative, fields[2:4])
+            if old not in moves or artifact in rules:
+                raise ValueError(f'invalid path-string declaration: {line}')
+            literal_input = relative(fields[4]) if len(fields) == 5 else None
+            if literal_input and literal_input.suffix not in ('.c', '.h', '.inc'):
+                raise ValueError(f'expected C literal input: {literal_input}')
+            rules[artifact] = old, literal_input
+
+    objects = {src.with_suffix('.o'): (src, dst) for src, dst in moves.items()
+               if src.suffix in ('.c', '.S', '.s', '.asm')}
+    volatile = {Path('build/out/ppc-kboot') / image / 'root_image_blob.o'
+                for image in ('', 'link', 'link-sh', 'sh', 'shell', 'neg1')}
+    missing = different = 0
+    seen = set()
+    targets = set()
+    for line in manifest.read_text().splitlines():
+        match = re.fullmatch(r'([0-9a-f]{64}) [ *](.+)', line)
+        if not match:
+            raise ValueError(f'invalid sha256sum line: {line}')
+        digest, name = match.groups()
+        old = relative(name)
+        target = candidate_path(tree, old, moves, objects)
+        if old in seen:
+            raise ValueError(f'duplicate manifest entry: {old}')
+        if target in targets:
+            raise ValueError(f'multiple manifest entries map to {target}')
+        seen.add(old)
+        targets.add(target)
+        path = tree / target
+        if not path.is_file():
+            print('MISSING', target)
+            missing += 1
+            continue
+        if old in volatile:
+            continue
+        data = path.read_bytes()
+        if hashlib.sha256(data).hexdigest() == digest:
+            continue
+        if old in rules:
+            source, literal_input = rules[old]
+            before = (manifest.parent / old).read_bytes()
+            if hashlib.sha256(before).hexdigest() != digest:
+                raise ValueError(f'corrupt baseline: {old}')
+            if literal_input:
+                matches = replay_literal(tree, target, literal_input, source, moves[source],
+                                         data, digest, env)
+            elif before.startswith(b'\x7fELF') and len(str(source).encode()) != len(str(moves[source]).encode()):
+                matches = False
+            else:
+                matches = before.replace(str(source).encode() + b'\0',
+                                         str(moves[source]).encode() + b'\0') == data
+            if matches:
+                print('MATCH path-string', old, source)
+                continue
+        print('DIFF', target)
+        different += 1
+    if not seen or rules.keys() - seen:
+        raise ValueError('empty manifest or declaration outside manifest')
+    products = artifacts(tree, all_products=True)
+    products.update(p.relative_to(tree) for p in (tree / 'packages').rglob('*'))
+    products.update(p.relative_to(tree) for p in (tree / 'build/out/ppc-kboot').rglob('PPCKERN.ELF'))
+    for extra in sorted(products - targets):
+        if (tree / extra).is_file():
+            print('DIFF unexpected', extra)
+            different += 1
+    print(f'{len(seen)} artifacts, {missing} missing, {different} different')
+    return 3 if missing else int(bool(different))
+
+
+def manifest_main(argv):
+    build = '--' in argv
+    parser = argparse.ArgumentParser(description="Compare a candidate with a saved sha256sum manifest.")
+    parser.add_argument('--manifest', type=Path)
+    parser.add_argument('--baseline-build', action='store_true')
+    parser.add_argument('--move-map', type=Path)
+    parser.add_argument('--tree', type=Path, default=Path.cwd())
+    parser.add_argument('--base', help='read Sep-Changes from BASE..HEAD')
+    if build:
+        parser.add_argument('command', nargs=argparse.REMAINDER)
+    args = parser.parse_args(argv)
+    if args.baseline_build and (not build or args.manifest):
+        parser.error('--baseline-build requires a command and no manifest')
+    if not args.baseline_build and (not args.manifest or not args.move_map):
+        parser.error('comparison requires --manifest and --move-map')
+    base = args.base or 'v3-pre-restructure'
+    try:
+        env = fixed_build_env(args.tree, base) if build or args.base else None
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        parser.error(str(error))
+    if build:
+        if len(args.command) < 2 or args.command[0] != '--':
+            parser.error('supply the candidate build command after --')
+        try:
+            result = subprocess.run(args.command[1:], cwd=args.tree, env=env)
+        except OSError as error:
+            print('BUILD FAILED', error)
+            return 2
+        if result.returncode:
+            print('BUILD FAILED', result.returncode)
+            return 2
+    if args.baseline_build:
+        return 0
+    try:
+        messages = subprocess.check_output(['git', 'log', '--format=%B', base + '..HEAD'],
+                                           cwd=args.tree, text=True) if env else ''
+        return compare_saved(args.manifest, args.tree, args.move_map, messages, env)
+    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+        parser.error(str(error))
+
+
 def main():
+    if '--baseline-build' in sys.argv or any(arg.split('=')[0] == '--manifest' for arg in sys.argv[1:]):
+        return manifest_main(sys.argv[1:])
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('base')
     ap.add_argument('target')
@@ -319,7 +514,7 @@ def main():
                                     stdout=stream, stderr=subprocess.STDOUT)
         if result.returncode:
             print(f'{label}: build failed, rc={result.returncode}: {log}', flush=True)
-            return result.returncode
+            return 2
         tree = output / label
         workspace.rename(tree)
         trees.append(tree)

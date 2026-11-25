@@ -145,6 +145,12 @@ def verdict(name, identical, changes, detail):
 
 
 def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if any(arg.split('=')[0] == '--manifest' for arg in argv):
+        if '--' not in argv:
+            parser = argparse.ArgumentParser()
+            parser.error('supply the candidate build command after --')
+        return subprocess.call([sys.executable, '-B', ROOT / 'tools/build_compare.py', *argv])
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base', help='基点 (既定は origin/main との merge-base)')
     parser.add_argument('--work', type=Path, required=True, help='作業用の空の置き場')
@@ -166,7 +172,8 @@ def main(argv=None):
         lines = [line for line in (result.stdout + result.stderr).splitlines() if not line.startswith('MATCH ')]
         if result.returncode not in (0, 1):
             print('\n'.join(lines[-40:]))
-            raise RuntimeError('tools/build_compare.py failed to run')
+            print('BUILD FAILED x86')
+            return 2
         different = [line.split(None, 1)[1].strip() for line in lines if line.startswith('DIFF')]
         moved = renames(git(ROOT, 'diff', '--name-status', '-M90', base, head))
         pairs, different = moved_object_pairs(different, moved)
