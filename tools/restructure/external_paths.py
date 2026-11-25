@@ -249,9 +249,12 @@ def report(data, output):
                 [(*key, " | ".join(sorted(paths))) for key, paths in sorted(notices.items())])
     # The stage ticket gives the W range, but assigns no individual file to a wave.
     ticket = (ROOT / "docs/tasks/restructure/TASK_RESTRUCTURE.md").read_text()
-    first, last = map(int, re.search(r"波 W(\d+)〜W(\d+)", ticket).groups())
+    # U10 (2026-11-25) から移動は 1 本の枝で 1 回 — 波の範囲が票に無ければ 1 つの移動として扱う。
+    found = re.search(r"波 W(\d+)〜W(\d+)", ticket)
+    names = ([f"W{i}" for i in range(int(found[1]), int(found[2]) + 1)] + ["T1〜Tn（各波）"]
+             if found else ["W1（U10 の 1 回の移動）"])
     waves = []
-    for wave in [f"W{i}" for i in range(first, last + 1)] + ["T1〜Tn（各波）"]:
+    for wave in names:
         for who in sorted(counts):
             candidates = sorted({key[1] for key in data if key[0] == who and
                                  (key[3] == UNKNOWN or (wave.startswith("W") and key[3] == MOVE))})
