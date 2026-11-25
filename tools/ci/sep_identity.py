@@ -17,7 +17,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGETS = ('x86', 'ppc')
-# PowerPC の像 (build/images/ppc-flags.mk の旗) — CI の 4 像と、常駐 CLI・NEGATIVE の像。
+# PowerPC の像 (sys/conf/images/ppc-flags.mk の旗) — CI の 4 像と、常駐 CLI・NEGATIVE の像。
 PPC_IMAGES = (['KBOOT_LINK=0'], [], ['KBOOT_SH=1', 'KBOOT_LINK=0'], ['KBOOT_SH=1'],
               ['KBOOT_SHELL=1', 'KBOOT_LINK=0'], ['NEGATIVE=1', 'KBOOT_LINK=0'])
 # RAM root の ISO は同じ入力でも作るたびに変わる (時刻)。カーネルのコードではない。

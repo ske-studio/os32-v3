@@ -10,7 +10,7 @@
 - 製品が変わっていないことは**成果物のバイト比較**で示す。試験は実装者は回さず、取り込みの検査で 1 回だけ回る (ユーザー了承 2026-10-30)。
 - 実装者は terra でよい (中身を書かない作業。「1,000 行超のファイルは terra に出さない」は編集の決まりで、置き場の移動には当たらない)。道具そのものを変える段は sol。
 
-ATA M1 では `platform/pc98/device_ide.c` を `kernel/dev/device_ide.c` に移し、PC-98 のリンク順を維持した。
+ATA M1 では `platform/pc98/device_ide.c` を `sys/dev/ide/device_ide.c` に移し、PC-98 のリンク順を維持した。
 
 ## 2. 道具 (どれも L0 = 5e346e2d で入った)
 
@@ -24,14 +24,14 @@ ATA M1 では `platform/pc98/device_ide.c` を `kernel/dev/device_ide.c` に移�
 
 ## 3. 手順 (1 段)
 
-kernel/ver_collect.c と kernel/ver_format.c は C_COMMON_EXEC で両機種の exec 像に入る。PC-98 のリンク順は build/sources/order.mk に従う。
+sys/kern/ver_collect.c と sys/kern/ver_format.c は C_COMMON_EXEC で両機種の exec 像に入る。PC-98 のリンク順は build/sources/order.mk に従う。
 
 1. **前提**: `build/config.mk` の新しいディレクトリの一覧が 1 つの変数 (`KERNEL_SRC_DIRS`) にあり、各 `INC_*` はそれを引く形になっていること (L1 では行ごとに書き足したので、L2 の最初にまとめる — 並びを変えずに、成果物のバイト一致で確かめる)。
-2. 対応表 JSON を書く (`[{"from": "kernel/paging.c", "to": "mm/paging.c"}, …]`)。名前は変えない。
+2. 対応表 JSON を書く (`[{"from": "kernel/paging.c", "to": "sys/kern/mm/paging.c"}, …]`)。名前は変えない。
 3. `python3 tools/move_files.py <表> --dry-run` → 置換の件数と「置換しきれない一覧」を見る → 適用。
 4. 一覧に出た所を手で直す (ビルドの `*-module.mk`・`kdebug.mk`・`os32.ld` のパスで選ぶ規則、試験の分割パスなど)。直したファイルと行を報告に書く。
 5. 新しいディレクトリを `KERNEL_SRC_DIRS` (→ INC_KERNEL ほか) と、最上位なら `tools/source_roots.py` に足す。
-6. 生成物は入力 (`kernel/module/kdebug_imports.def`・`hwdev/hwdev_imports.def`・`tools/prototypes/*_imports.def`) の置換と .mk の修正の後、適用時の JSON の `regenerate` にあるターゲットを `make` に渡して作り直す。古い `.d` が消えたファイルを指して make が止まったら `build/out/obj` の `.d` を消して組み直す。
+6. 生成物は入力 (`sys/kern/module/kdebug_imports.def`・`sys/dev/hwdev/hwdev_imports.def`・`tools/prototypes/*_imports.def`) の置換と .mk の修正の後、適用時の JSON の `regenerate` にあるターゲットを `make` に渡して作り直す。古い `.d` が消えたファイルを指して make が止まったら `build/out/obj` の `.d` を消して組み直す。
 7. 完了条件 (下) を満たして報告。
 
 ### 完了条件 (実装者 — 試験は回さない)

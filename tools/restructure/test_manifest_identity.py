@@ -75,6 +75,36 @@ def exercise(root, directory):
         print(label, message)
 
     check('unchanged', 0, '0 missing, 0 different')
+    library = Path('build/out/lib/libsample.a')
+    member = tree / 'sample.o'
+    member.write_bytes(b'abc')
+    (tree / library).parent.mkdir(parents=True)
+    subprocess.run(['ar', 'rcD', tree / library, member], check=True)
+    baseline = directory / library
+    baseline.parent.mkdir(parents=True)
+    shutil.copyfile(tree / library, baseline)
+    original = baseline.read_bytes()
+    with manifest.open('a') as output:
+        output.write(hashlib.sha256(original).hexdigest() + '  ' + str(library) + '\n')
+    changed_time = original[:24] + b'123'.ljust(12) + original[36:]
+    (tree / library).write_bytes(changed_time)
+    check('ar member time', 0, 'MATCH ar')
+    (tree / library).write_bytes(changed_time.replace(b'abc', b'abd'))
+    check('ar member payload', 1, 'DIFF ' + str(library))
+    draft = directory / 'declarations'
+    digest = hashlib.sha256((tree / library).read_bytes()).hexdigest()
+    draft.write_text(f'Sep-Changes: reviewed-replay {library} {digest} combined\n')
+    replay = directory / 'replay' / library
+    replay.parent.mkdir(parents=True)
+    replay.write_bytes(original)
+    args = ['--declarations', str(draft), '--replay-tree', str(directory / 'replay')]
+    check('reviewed candidate and replay', 0, 'MATCH reviewed-replay', args=args)
+    replay.write_bytes(changed_time)
+    check('wrong replay bytes', 1, 'DIFF ' + str(library), args=args)
+    replay.write_bytes(original)
+    (tree / library).write_bytes(changed_time.replace(b'abc', b'abe'))
+    check('unreviewed candidate bytes', 1, 'DIFF ' + str(library), args=args)
+    (tree / library).write_bytes(original)
     (tree / new).parent.mkdir(parents=True)
     (tree / old).rename(tree / new)
     (tree / old_obj).unlink()
@@ -172,6 +202,7 @@ def main():
             for i, (before, after) in enumerate([
                     ('                    return moved', '                    return old'),
                     ("if result.returncode:\n            print('BUILD FAILED'", "if False:\n            print('BUILD FAILED'"),
+                    ('result.append((name, payload))', 'result.append((name, len(payload)))'),
                     ('missing += 1', 'missing += 0'),
                     ('for contents, expected in ((original, hashlib.sha256(data).hexdigest()),', 'for contents, expected in ((original, digest),'),
                     ('(normalized, digest)', '(original, digest)'),

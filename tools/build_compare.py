@@ -178,8 +178,8 @@ H2_OBJECT_MOVES = {
 
 # E1 preserves the shim's position in both normal and R1 links.
 H2_OBJECT_MOVES['exec/ring3_ls_shim.o'] = 'arch/x86/kernel/ring3_ls_shim.o'
-H2_OBJECT_MOVES['platform/pc98/device_kcg.o'] = 'kernel/dev/device_kcg.o'
-H2_OBJECT_MOVES['platform/pc98/device_loop.o'] = 'kernel/dev/device_loop.o'
+H2_OBJECT_MOVES['platform/pc98/device_kcg.o'] = 'sys/dev/kcg/device_kcg.o'
+H2_OBJECT_MOVES['platform/pc98/device_loop.o'] = 'sys/dev/loop/device_loop.o'
 
 
 def h2_object_path(rel, root):
@@ -255,9 +255,9 @@ def object_paths(root):
             if key.startswith('build/out/obj/'):
                 key = key[len('build/out/obj/'):]
             # E: compare the moved adapter against its original translation unit.
-            key = key.replace("platform/pc98/legacy/v86_call.o", "exec/v86_call.o")
-            key = key.replace("platform/pc98/bootinfo_check.o", "init/bootinfo_check.o")
-            key = key.replace("platform/pc98/bios_snapshot.o", "kernel/v86/v86_snapshot.o")
+            key = key.replace("sys/platform/pc98/legacy/v86_call.o", "exec/v86_call.o")
+            key = key.replace("sys/platform/pc98/bootinfo_check.o", "init/bootinfo_check.o")
+            key = key.replace("sys/platform/pc98/bios_snapshot.o", "kernel/v86/v86_snapshot.o")
             for old, new in H2_OBJECT_MOVES.items():
                 if key.endswith(new):
                     key = key[:-len(new)] + old
@@ -292,6 +292,26 @@ def relative(name):
 
 def candidate_path(tree, old, moves, objects):
     """Keep the image prefix and apply only moves present in this candidate."""
+    # A module's private object directory may resemble an old source path.
+    if (tree / old).is_file():
+        return old
+    diagnostics = Path('userland/tests')
+    if old.is_relative_to(diagnostics) and any(src.is_relative_to(diagnostics)
+            and dst.is_relative_to('userland/diag') for src, dst in moves.items()):
+        return Path('userland/diag') / old.relative_to(diagnostics)
+    cache = Path('build/out/ppc-kboot/sqlite-cache')
+    if old.is_relative_to(cache):
+        key, *parts = old.relative_to(cache).parts
+        if re.fullmatch(r'[0-9a-f]{64}', key):
+            tail = Path(*parts)
+            relocated = objects.get(tail)
+            if relocated:
+                tail = relocated[1].with_suffix('.o')
+            candidates = [path / tail for path in (tree / cache).glob('*')
+                          if re.fullmatch(r'[0-9a-f]{64}', path.name)
+                          and (path / tail).is_file()]
+            if len(candidates) == 1:
+                return candidates[0].relative_to(tree)
     if old.suffix == '.o':
         for index in range(len(old.parts)):
             suffix = Path(*old.parts[index:])
@@ -391,13 +411,23 @@ def replay_literal(tree, target, literal_input, source, moved, data, digest, env
     return True
 
 
-def compare_saved(manifest, tree, move_map, messages, env):
+def compare_saved(manifest, tree, move_map, messages, env, replay_tree=None):
     moves = {relative(row['from']): relative(row['to'])
              for row in json.loads(move_map.read_text())}
+    reviewed = {}
     rules = {}
     for line in messages.splitlines():
         if line.startswith('Sep-Changes:'):
             fields = line.split()
+            if fields[1:2] == ['reviewed-replay']:
+                if (len(fields) != 5 or not re.fullmatch(r'[0-9a-f]{64}', fields[3])
+                        or fields[4] not in ('path', 'hwdev', 'module-abi', 'combined')):
+                    raise ValueError(f'invalid reviewed-replay declaration: {line}')
+                artifact = relative(fields[2])
+                if artifact in reviewed or replay_tree is None:
+                    raise ValueError(f'duplicate declaration or missing replay tree: {line}')
+                reviewed[artifact] = fields[3], fields[4]
+                continue
             if len(fields) not in (4, 5) or fields[1] != 'path-string':
                 raise ValueError('expected Sep-Changes: path-string ARTIFACT OLD_PATH')
             artifact, old = map(relative, fields[2:4])
@@ -430,7 +460,7 @@ def compare_saved(manifest, tree, move_map, messages, env):
         if old in hashes:
             raise ValueError(f'duplicate manifest entry: {old}')
         hashes[old] = digest
-    if rules.keys() & presence:
+    if (rules.keys() | reviewed.keys()) & presence or rules.keys() & reviewed.keys():
         raise ValueError('path-string declaration for presence-only artifact')
     for old in sorted(hashes.keys() | presence):
         digest = hashes.get(old)
@@ -449,6 +479,20 @@ def compare_saved(manifest, tree, move_map, messages, env):
         data = path.read_bytes()
         if hashlib.sha256(data).hexdigest() == digest:
             continue
+        if old.suffix == '.a':
+            before = (manifest.parent / old).read_bytes()
+            if hashlib.sha256(before).hexdigest() != digest:
+                raise ValueError(f'corrupt baseline: {old}')
+            if archive_members(before) == archive_members(data):
+                print('MATCH ar', old)
+                continue
+        if old in reviewed:
+            expected, reason = reviewed[old]
+            replayed = replay_tree / target
+            if (hashlib.sha256(data).hexdigest() == expected and replayed.is_file()
+                    and hashlib.sha256(replayed.read_bytes()).hexdigest() == digest):
+                print('MATCH reviewed-replay', old, reason)
+                continue
         if old in rules:
             declared = rules[old]
             before = (manifest.parent / old).read_bytes()
@@ -479,7 +523,7 @@ def compare_saved(manifest, tree, move_map, messages, env):
                 continue
         print('DIFF', target)
         different += 1
-    if not seen or rules.keys() - seen:
+    if not seen or (rules.keys() | reviewed.keys()) - seen:
         raise ValueError('empty manifest or declaration outside manifest')
     products = artifacts(tree, all_products=True)
     products.update(p.relative_to(tree) for p in (tree / 'packages').rglob('*'))
@@ -500,6 +544,8 @@ def manifest_main(argv):
     parser.add_argument('--move-map', type=Path)
     parser.add_argument('--tree', type=Path, default=Path.cwd())
     parser.add_argument('--base', help='read Sep-Changes from BASE..HEAD')
+    parser.add_argument('--replay-tree', type=Path, help='candidate rebuilt with reviewed inputs restored')
+    parser.add_argument('--declarations', type=Path, help='additional Sep-Changes lines before commit')
     if build:
         parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
@@ -528,7 +574,9 @@ def manifest_main(argv):
     try:
         messages = subprocess.check_output(['git', 'log', '--format=%B', base + '..HEAD'],
                                            cwd=args.tree, text=True) if env else ''
-        return compare_saved(args.manifest, args.tree, args.move_map, messages, env)
+        if args.declarations:
+            messages += '\n' + args.declarations.read_text()
+        return compare_saved(args.manifest, args.tree, args.move_map, messages, env, args.replay_tree)
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         parser.error(str(error))
 

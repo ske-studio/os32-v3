@@ -12,11 +12,11 @@ from pathlib import Path
 import re
 import subprocess
 
-EXCLUDED = ('docs/archive/', 'docs/hw/', 'third_party/', 'lib/sqlite3/sqlite3.',
-            'lib/zlib/', 'lib/microtar/', 'fs/fat/fatfs/ff.', 'fs/fat/fatfs/diskio.h',
+EXCLUDED = ('docs/tasks/restructure/data/', 'docs/archive/', 'docs/hw/', 'third_party/', 'lib/sqlite3/sqlite3.',
+            'lib/zlib/', 'lib/microtar/', 'fs/fat/fatfs/ff.', 'sys/fs/fat/fatfs/diskio.h',
             'userland/lib/ui/microui.', 'userland/lib/font/vendor/',
             'kdebug/generated/', 'hwdev/generated/', 'lib/sqlite3/generated/',
-            'kapi/kapi_generated.c', 'exec/exec_kapi_init.inc',
+            'sys/kapi/kapi_generated.c', 'sys/kern/exec/exec_kapi_init.inc',
             'sdk/include/os32/os32_kapi_shared.h', 'sdk/include/os32/os32_kapi_generated.h',
             'sdk/include/os32/os32_kapi_slots.h', 'sdk/include/os32/os32_generations.h',
             'sdk/include/os32/os32_unit_stamp.h', 'sdk/os32_generations.py',
@@ -66,7 +66,7 @@ def reference_replacements(text, filename, moves):
     replacements = path_replacements(moves)
     old_parent = Path(filename).parent
     new_parent = Path(moves.get(filename, filename)).parent
-    # Paths relative to the old file (e.g. ../mm/paging.h) need a new base.
+    # Paths relative to the old file (e.g. ../sys/kern/mm/paging.h) need a new base.
     relative = {}
     for old, new in replacements.items():
         rel = os.path.relpath(old, old_parent).replace(os.sep, '/')
@@ -149,9 +149,43 @@ def plan(root, moves):
             for match in remaining_pattern.finditer(content):
                 unresolved_paths.append({'file': name, 'line': line, 'path': match[0],
                                          'text': original.strip()})
-    targets = [p for p in ('kapi/kapi_generated.c', 'kdebug/generated/kdebug_imports.h',
-                           'hwdev/generated/hwdev_contract.h') if (root / p).is_file()]
+    targets = [p for p in ('sys/kapi/kapi_generated.c', 'sys/platform/pc98/kdebug/generated/kdebug_imports.h',
+                           'sys/dev/hwdev/generated/hwdev_contract.h') if (root / p).is_file()]
     return edits, split_paths, unresolved_paths, targets
+
+
+def apply_plan(root, moves):
+    """Limit replacement candidates by basename when diagnostics are not needed."""
+    by_leaf = {}
+    for old in moves:
+        for alias in path_replacements({old: moves[old]}):
+            by_leaf.setdefault(Path(alias).name, set()).add(old)
+    edits = []
+    for name in git(root, 'ls-files', '-z').decode().split('\0'):
+        if not name or name.startswith(EXCLUDED) or not (root / name).is_file():
+            continue
+        data = (root / name).read_bytes()
+        if b'\0' in data:
+            continue
+        try:
+            before = data.decode('utf-8')
+        except UnicodeDecodeError:
+            continue
+        candidates = set()
+        for word in re.findall(r'[A-Za-z0-9_.+\-]+', before):
+            candidates.update(by_leaf.get(word, ()))
+        if name in moves:
+            candidates.add(name)
+        if '-I' in before and (name == 'build/config.mk' or
+                name.startswith(('build/sources/', 'build/features/', 'build/platform/', 'build/arch/'))):
+            candidates.update(moves)
+        if candidates:
+            selected = {old: moves[old] for old in sorted(candidates)}
+            after = rewrite(before, name, selected, root)
+            if after != before:
+                edits.append(dict(file=name, destination=moves.get(name, name),
+                                  before=before, after=after))
+    return edits, [], [], []
 
 
 def main():
@@ -159,10 +193,11 @@ def main():
     ap.add_argument('map', type=Path)
     ap.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--apply-only', action='store_true', help='skip unresolved-reference diagnostics')
     args = ap.parse_args()
     root = args.root.resolve()
     moves = load_map(root, args.map)
-    edits, split_paths, unresolved_paths, targets = plan(root, moves)
+    edits, split_paths, unresolved_paths, targets = (apply_plan if args.apply_only else plan)(root, moves)
     report = {'moves': moves, 'replacements': [dict(file=e['file'], destination=e['destination'],
                diff=list(difflib.unified_diff(e['before'].splitlines(), e['after'].splitlines(),
                                              e['file'], e['destination'], lineterm=''))) for e in edits],
