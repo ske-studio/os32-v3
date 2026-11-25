@@ -52,15 +52,11 @@ packages: programs boot $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES) unico
           assets-deployed assets/fep.db
 	python3 tools/mkpkg.py --plan build/packages.yaml --output packages/ --base .
 
-# In reproducible builds the volume and every directory record use the same epoch.
-ifdef SOURCE_DATE_EPOCH
-INSTALL_MKISOFS = xorriso -as mkisofs --set_all_file_dates "=$(SOURCE_DATE_EPOCH)"
-else
-INSTALL_MKISOFS = genisoimage
-endif
+# Use the build comparison epoch when the caller supplies none.
+INSTALL_ISO_EPOCH = $(or $(SOURCE_DATE_EPOCH),946684800)
 iso: packages
 	@mkdir -p images
-	$(INSTALL_MKISOFS) -o images/os32_install.iso -V "OS32_INSTALL" -input-charset utf-8 -R packages/
+	SOURCE_DATE_EPOCH=$(INSTALL_ISO_EPOCH) xorriso -as mkisofs --set_all_file_dates "=$(INSTALL_ISO_EPOCH)" -o images/os32_install.iso -V "OS32_INSTALL" -input-charset utf-8 -R packages/
 
 # イメージクリーン
 clean-images:
