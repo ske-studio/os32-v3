@@ -33,6 +33,17 @@
 | SYNTH-L4 | midi_host の MIDI 出力と close・切断時の reset | L4 が残る | [AV_HAL_DESIGN](../decisions/sound/AV_HAL_DESIGN.md) の L4・IL |
 | SYNTH-L7 | midi_fm の GM → OPN 変換と L6 経由の発音 | L7 が残る | [AV_HAL_DESIGN](../decisions/sound/AV_HAL_DESIGN.md) の L7・IL |
 | SYNTH-IL | V 段を通して DOS の FM ゲーム 1 本を NP21/W で鳴らす | 手元では通常アプリの SOFT OPNA の発音まで確認済み | TASK_SYNTH_OPNA の統合の枝で CI・NP21/W 受入 |
+| SND-IRQ10-RA266 | 実機 Ra266 で HAL の後の像だけ CS4231 の PI の割り込み (IRQ10) が来ない回帰の直し — 旧い pcm_advance と同じく tick でも I24.PI を消す (枝 `wip/snd-irq10-hwb` 071d43f64、統合の枝 `wt/int-1125d` 491a87b87、sol 承認、**main に入れていない**)。実機で IRQ10 と pi が戻るかを診断像の tickprobe で確かめる | 2026-11-25 ユーザー指示「実装を止めて」で止めた。CI と実機の確かめの前 | 再開時: int-1125d に main を取り込み CI → 診断像 → 実機ノート (ユーザー承認 2026-11-25「CI の後に実機で確かめる」済み) |
+| SND-IRQ0-RA266 | 実機 Ra266 で音を流している間の IRQ0 の最悪 211 µs が TICK 段 B のゲート (≤200 µs) を越えた (main 574a09a の診断像、~/os32-tmp/run/snd-accept3/RA266.md) | PI が来ないので 1 kHz の補充が全部 IRQ0 で走る疑い — SND-IRQ10-RA266 で下がるか | SND-IRQ10-RA266 の後に同じ測りで ≤200 µs |
+| SND-S9-SIDE | HAL の S9 で CS4231 の旧い副作用を移し忘れた残り: 旧い pcm_advance は OPEN・STOP_DONE・停止/再始動の間も PI を ack、旧い STOP の DRS の待ちと PI=0 の読み戻しが HAL の abort に無い、host の試験が RUNNING の条件・I24 の読み書きの回数と順序・R2 を書かないことを直に見ていない (sol のレビュー 2026-11-25) | POLICY_DEBUG §1 の決まり (移す段は旧い副作用の一覧) の後に見つかった | SND-IRQ10-RA266 の実機の結果の後に一覧を作って直す |
+| SND-HAL-RA266-IF0 | サウンドの HAL の §13-4 の実機の IF=0 の受入で irq10 が未測定 (他の 8 経路は最大 211 µs で観測済み、60 秒の wave は合格) | SND-IRQ10-RA266 と同じ根 | SND-IRQ10-RA266 の後に verify_if0 が rc=0 |
+| ARCH-BOOT-SKEL | 起動の骨格を共通の層へ (① [ARCH_BOOT_SKELETON_DESIGN](../decisions/ARCH_BOOT_SKELETON_DESIGN.md)) の実装 | ユーザー決定 2026-11-24「実装はしないでね」— 設計まで | ユーザーの指示で着手 |
+| ARCH-KAPI-SPLIT | KAPI の表と配置を機種ごとに (② [ARCH_KAPI_SPLIT_DESIGN](../decisions/ARCH_KAPI_SPLIT_DESIGN.md)) の実装 | 同上 | 同上 |
+| ES1370-PCM | QEMU の PCM の試験の装置 ES1370 ([ES1370_DESIGN](../decisions/sound/ES1370_DESIGN.md)) の実装 | 同上 | 同上 |
+| PCAT-1 | x86 の PC/AT への対応 (見積り 2026-11-24: CUI 5 段 1,370〜2,540 行、GUI 6 段 1,570〜2,940 行) | 着手はユーザーの判断待ち | ユーザーの指示で着手 |
+| USB-STAT-1 | USB の段 1E の (h) usb_stat_get | 1E の受入 (2026-11-24) の範囲外 | TASK_USB の次の段 |
+| NP21W-KEYEDGE-MERGE | NP21/W のフォークの aidebug-key-edge (b49b96a83、/api/key の scan と down) をフォークの main に取り込むか | ユーザーの判断待ち (今は非公開の pre-release の exe で pc98emu が使用) | ユーザーの判断 |
+| CI-WAIT-PPC20 | GitHub Actions の push から最後のジョブまで約 28〜32 分。PowerPC の check の 20 組が同時の runner の上限を越え開始が最大 12 分待つ | 組の数は 2026-11-24 のユーザー決定「20組に」 — 変えるならユーザーに諮る | c-dialect の高速化 (main 3b1cecee3) の後の実測を見て案 |
 | USB-TICK-BUDGET-1 | Ra266 で OHCI 完了・HID 入力・挿抜と共有 IRQ 負荷時の USB slot と IRQ0 の最大時間を測る。idle 繰り越し導入（2026-11-23）後は、完了の集中・挿抜・共有 IRQ 負荷で前景の usb_service の連続 IF=0 の最大時間と HID 入力の遅れも測る | 予約 90 µs は 3 HC × 30 µs の仮定 | 実測最大に余裕を加えて予約を再設定し、1 kHz で IRQ0 最大 200 µs 以内と入力継続を確認して閉じる |
 | USB-IDLE-LATENCY-1 | CPU を使い切る処理が協調点に戻らない間の HID 配送の遅れと IRQ の無い HC の見回り（sol レビュー 2026-11-23） | tick の予算拒否が続くと次の協調点まで配送が待たされ、遅れの上限がない。IRQ の無い HC の見回りも止まる | Ra266 で測定後、予算付きの実行点を設けるか、許容する遅れと条件を設計で決める |
 | INPUT-REPEAT | 押し続けたキーのリピート配送 | NP21/W の hold はメイクを繰り返さない | TASK_INPUT_HAL。メイクを反復する鍵盤で確認 |
