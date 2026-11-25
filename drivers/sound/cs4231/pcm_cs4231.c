@@ -532,7 +532,10 @@ static int pcm_irq(unsigned int irq, void *arg)
 void pcm_tick(void)
 {
     if (s_hal_advance) {
-        if (!s_claimed && !s_mce_busy) pcm_hal_advance(PCM_FROM_TICK);
+        if (s_claimed || s_mce_busy) return;
+        /* Release a latched PI even when its IRQ10 edge was missed. */
+        if (g_pcm.state == PCM_ST_RUNNING) (void)pcm_codec_ack();
+        pcm_hal_advance(PCM_FROM_TICK);
         return;
     }
     (void)pcm_advance(PCM_FROM_TICK);
