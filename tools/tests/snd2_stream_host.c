@@ -79,7 +79,8 @@ static int hw_open(void *ctx, const SND2_Fmt *fmt, u32 p, u8 **out)
     return open_error;
 }
 static int start(void *ctx) { (void)ctx; if (!locked) error = 1; ++start_calls; return starts; }
-static int pos(void *ctx, u32 *p) { (void)ctx; *p = hw; return pos_error; }
+static unsigned pos_reads;
+static int pos(void *ctx, u32 *p) { ++pos_reads; (void)ctx; *p = hw; return pos_error; }
 static int ack(void *ctx) { (void)ctx; return 1; }
 static int stop(void *ctx)
 {
@@ -178,6 +179,36 @@ static int publish_replay(void)
     return snd2_stream_close(id, SND2_CLOSE_ABORT);
 }
 
+#ifdef TICK_PROBE
+#include "snd2_refill_diag.h"
+static int observation_gap(void)
+{
+    SND2_Caps caps;
+    now = ~0U - 100;
+    CHECK(!snd2_stream_open(&desc, &id));
+    CHECK(snd2_stream_write(id, samples, 4) == 4);
+    CHECK(!snd2_stream_start(id));
+    u32 request = desc.dev | SND2_CAPS_OBSERVATION_GAP;
+    ++owner;
+    CHECK(snd2_caps(request, &caps, sizeof(caps)) < 0);
+    --owner;
+    CHECK(!snd2_caps(request, &caps, sizeof(caps)));
+    unsigned reads = pos_reads, resyncs = measured[TP_SND_RESYNC];
+    now += 149;
+    hw = 2475;
+    snd2_advance(desc.dev);
+    CHECK(snd2_stream_write(id, samples, 4) == 4);
+    CHECK(pos_reads == reads && measured[TP_SND_RESYNC] == resyncs);
+    ++now;
+    hw += 44;
+    snd2_advance(desc.dev);
+    CHECK(pos_reads > reads && measured[TP_SND_RESYNC] == resyncs + 1);
+    CHECK(snd2_device(desc.dev)->stream.epoch == 1);
+    hw = 0;
+    return snd2_stream_close(id, SND2_CLOSE_ABORT);
+}
+#endif
+
 static int probe(void)
 {
     CHECK(!v1_contract());
@@ -186,6 +217,9 @@ static int probe(void)
                              .period_frames=256, .lead_periods=3};
     SND2_DevInfo info = {.kind=SND2_KIND_PCM_OUT};
     CHECK(!snd2_register(&backend, 0, &info));
+#ifdef TICK_PROBE
+    CHECK(!observation_gap());
+#endif
     CHECK(!publish_replay());
     CHECK(!matrix());
     Snd2Stream *stream = &snd2_device(0)->stream;

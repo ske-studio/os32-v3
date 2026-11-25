@@ -14,12 +14,11 @@ snd2_test exit
 snd2_test
 snd2_test wave lead=4
 snd2_test stall lead=4
-snd2_test epoch lead=4
 ```
 
 最初の 3 回とも装置一覧に CS4231 (kind=1) と FM (kind=2) があり、各回の末尾が `snd2_test PASS rc=0`。exit は動作中の stream と chip を開いたまま終了する。直後の通常実行で両方を再取得し close できることが終了回収の合格条件。装置が欠けた構成の PASS は両装置の検証に数えない。
 
-wave は 44.1 kHz、period 256、上記の lead で 30 秒。左は 32 段の 1 kHz 正弦、右は 256 frame ごとの 1 frame の印（値 10000 + 区間番号 modulo 16000）。written=1323000、underruns=0。stall は 1 秒のところで供給を 200 ms 停止する。underruns が増え、played ≤ written を保ち、再供給後も印が順番どおりなら合格。epoch の実行には下記の b・150 ms 停止・a の操作が必要。
+wave は 44.1 kHz、period 256、上記の lead で 30 秒。左は 32 段の 1 kHz 正弦、右は 256 frame ごとの 1 frame の印（値 10000 + 区間番号 modulo 16000）。written=1323000、underruns=0。stall は 1 秒のところで供給を 200 ms 停止する。underruns が増え、played ≤ written を保ち、再供給後も印が順番どおりなら合格。epoch は下記の診断像で別に実行する。
 
 ホスト側は再生前から採取する。例は別端末で実行し、再生終了後に Ctrl-C で止める。
 
@@ -37,8 +36,8 @@ done
 
 1. 製品像で CS4231 を確認し、シリアルを記録しながら `snd2_test wave lead=3 secs=60` を一度実行する。44.1 kHz・period 256 の連続した 60 秒で `written=2646000`、`underruns=0`、drain 後に `snd2_test PASS rc=0` が合格条件。30 秒試行を足し合わせない。
 2. IF=0 は下記の kernel-tick-probe 診断像と対のモジュールを実機に配備し、KDEBUG=1 で採る。`tickprobe stop` で起動時の採取を閉じる。ホストの同じビルドの `nm -an build/out/tick-probe/kernel.elf` から tsc_clock.o の state・tsc_generation・epoch の番地を求める（同名なら kernel.map の当該 .bss と照合）。ゲストの `peek -k -w4 番地 4` で state と世代を、epoch の番地 + 0x10 から長さ 8 で mult・shift を読む。値はリトルエンディアンで、state=2、mult > 0、shift は 1〜32。世代と係数を十進整数で `{"generation":G,"mult":M,"shift":S}` の形で rate-before.json に保存する。
-3. 生シリアルを別ファイル if0.serial に取り、`tickprobe start` → `snd2_test`（pause を含む）→ `snd2_test wave lead=3 secs=60` → `snd2_test exit` → `tickprobe stop`。同じ時計の値を再読し、state・世代・係数が前後で一致することを確認する。60 秒の集計と各試験の PASS を保存する。
-4. ホストで `python3 tools/accept/snd2/verify_if0.py rate-before.json if0.serial` を実行する。両 bank の start・pause・resync・advance・teardown・other と、それを囲む if0-resident・irq0・irq10 の各 worst と全体最大を記録する。全経路の count が各々合計 1 以上、observation_lost=0、最長が **1450 µs 以下**で合格。自然に resync が起きず count=0 なら、その経路は未測定で実機の IF=0 判定を保留する。期限超過は未合格として実測値を報告する。
+3. 生シリアルを別ファイル if0.serial に取り、`tickprobe start` → `snd2_test`（pause を含む）→ `snd2_test wave lead=3 secs=60` → `snd2_test_diag epoch lead=3`（下記の b・a 操作）→ `snd2_test exit` → `tickprobe stop`。同じ時計の値を再読し、state・世代・係数が前後で一致することを確認する。60 秒の集計と各試験の PASS を保存する。
+4. ホストで `python3 tools/accept/snd2/verify_if0.py rate-before.json if0.serial` を実行する。両 bank の start・pause・resync・advance・teardown・other と、それを囲む if0-resident・irq0・irq10 の各 worst と全体最大を記録する。全経路の count が各々合計 1 以上、observation_lost=0、最長が **1450 µs 以下**で合格。診断試行後も count=0 なら、その経路は未測定で実機の IF=0 判定を保留する。期限超過は未合格として実測値を報告する。
 5. L3 の sndl pump 最大間隔は IL で測る。sndl 実装後、同条件で最大間隔を cap − period と比較する。IS の max_writer_us は書込みループの記録として扱う。
 
 ## v1 の回帰
@@ -81,26 +80,13 @@ export NP21W_AIDEBUG_URL=${NP21W_AIDEBUG_URL:-http://127.0.0.1:8025}
 
 ## P1（§13-3）150 ms 停止の前後と再生継続
 
-製品像で `snd2_test epoch lead=4`。開始 2 秒後にホストで次の 1 行目を実行し、ゲストの `epoch armed epoch=E played=P ms=T` を待つ。すぐに残りを実行する。停止はこの 1 回だけ。ホストは API の成功応答と時刻を保存する。
+NP21/W と実機で kernel-tick-probe 診断像と対のモジュール・snd2_test_diag.bin を使う。`snd2_test_diag epoch lead=4`（実機は lead=3）を開始し、2 秒後に b を入力する。診断 HAL は IRQ と DMA を動かしたまま、advance と書込み時の DMA 位置の観測をゲスト時計で 150 ms 抑止する。次の advance が通常の欠測判定、停止確認、epoch 更新、再始動を行う。シリアルの `epoch armed` を確認し、ゲストが等速で 0.5 秒以上走った後、再生中に a を入力する。NP21/W での入力例を示す。
 
 ```sh
 curl -fsS -d text=b "$NP21W_AIDEBUG_URL/api/key"
-python3 - <<'PY'
-import json, os, time
-from urllib.request import urlopen
-base = os.environ['NP21W_AIDEBUG_URL']
-def post(path, body=b''):
-    with urlopen(base+path, data=body, timeout=3) as r:
-        assert json.load(r)['ok']
-    print(path, time.monotonic_ns())
-post('/api/pause')
-try:
-    time.sleep(.150)
-finally:
-    post('/api/resume')
-time.sleep(.050)  # allow advance/restart and another DMA period
-post('/api/key', b'text=a')
-PY
+# epoch armed が表示された後
+sleep 0.5
+curl -fsS -d text=a "$NP21W_AIDEBUG_URL/api/key"
 ```
 
 a を送った直後、同じホストで再開後の PCM を 2 回採る。最初の窓を基準に、増えた frame の印を調べる。途中の窓も取得した場合は時刻順に引数に渡す。全窓が同じ frames_total なら再生継続の証拠がなく不合格。
@@ -112,14 +98,14 @@ curl -fsS "$NP21W_AIDEBUG_URL/api/sound?pcm=1" > "$D/epoch-continued.json"
 python3 tools/accept/snd2/verify_epoch.py "$D/epoch-a.json" "$D/epoch-continued.json"
 ```
 
-シリアルの `epoch before=E played=P ms=T after=A played=Q ms=U` の前半が armed の値に一致し、A = (E+1) mod 2³²。最後の位置集計行は epoch=A、played > Q、played ≤ written=1323000、drain 後の末尾は PASS。上で出した実音の application frame も Q を超えること。a の後に位置と実際の PCM の両方が進んだことを確かめる。停止中にエミュレータが PIT と DMA の両方を凍結し位置欠測が生じない場合は epoch が変わらず FAIL になる。req52 の armed 以後、書込みループ内で rc=6 になれるのは a の処理時（位置取得失敗または epoch 不一致）。この場合は resume 後である。ただし最終位置の取得・整合検査も集計の表示前に rc=6 を返すため、当時のログだけでは前後を断定できない。次回は epoch key=a の位置または取得エラー、あるいは epoch final のエラー行で区別する。PIT と DMA が共に凍結する構成ではこの試行を未測定とし、実機で DMA が走る間に位置観測だけが 150 ms 以上途切れる条件で評価することを推奨する。単なる供給停止は stall の検査になる。診断像で観測だけを抑止する方法もあるが、製品像での実証は別途必要。
+シリアルの `epoch before=E played=P ms=T after=A played=Q ms=U` の前半が armed の値に一致し、A = (E+1) mod 2³²。最後の位置集計行は epoch=A、played > Q、played ≤ written=1323000、drain 後の末尾は PASS。上で出した実音の application frame も Q を超えること。a の後に位置と実際の PCM の両方が進んだことを確かめる。実機ではシリアルの epoch と played の継続を記録する。旧 req52 のホスト pause は PIT と DMA の両方を凍結し得る。当時は a 処理と最終位置検査のいずれも集計表示前に rc=6 を返したため、armed と FAIL の 2 行から失敗の前後は特定できない。
 
 ## P1（§13-3）IF=0 の最長区間
 
-`make kernel-tick-probe` の build/out/tick-probe/vmkernel.lz4 と同じ出力ディレクトリの paired modules（kdebug.bin、pcm.mod、fm.mod 等）を診断機に配備する。CPUID の TSC を持つ CPU を選び、等速・KDEBUG=1 で起動する。tickprobe.bin と今回の snd2_test.bin を実行可能にする。シリアル採取を開始し、診断機と手元の kernel.map のビルドが一致することを確認する。
+`make kernel-tick-probe` の build/out/tick-probe/vmkernel.lz4 と同じ出力ディレクトリの paired modules（kdebug.bin、pcm.mod、fm.mod 等）を診断機に配備する。CPUID の TSC を持つ CPU を選び、等速・KDEBUG=1 で起動する。tickprobe.bin、snd2_test_diag.bin と通常の snd2_test.bin を実行可能にする。シリアル採取を開始し、診断機と手元の kernel.map のビルドが一致することを確認する。
 
 1. ゲストで最初に `tickprobe stop` を実行し、起動時に自動で始まった採取を閉じる。この出力は if0.serial の外に置く。ホストで `python3 tools/accept/snd2/sound_rate.py > "$D/rate-before.json"`。診断像の map と .o から PC-98 の PIT 校正済み TSC 係数と世代を読む。
-2. ゲストで順に `tickprobe start`、`snd2_test`、`snd2_test wave lead=4`、`snd2_test epoch lead=4`（上記の b → 停止 → a）、`snd2_test exit`、`tickprobe stop`。各試験の PASS と、最初の started、最後の `TSC=raw cycles observation_lost=0` を確認する。波形や遅延の製品像試行とは別に採る。
+2. ゲストで順に `tickprobe start`、`snd2_test`、`snd2_test wave lead=4`、`snd2_test_diag epoch lead=4`（上記の b → 位置欠測 → a）、`snd2_test exit`、`tickprobe stop`。各試験の PASS と、最初の started、最後の `TSC=raw cycles observation_lost=0` を確認する。波形や遅延の製品像試行とは別に採る。
 3. 両方の bank の snd-start（16 KB 消去・prime・hw_start）、snd-pause（消去）、snd-resync（停止・再構築・再始動）、snd-advance（通常のコピー）、snd-teardown（停止・回収）、snd-other（書込みの publish 等）について count と worst の hex 値を保存する。各種類で両 bank の合計 count > 0 を要求する。foreground / IRQ のどちらでも stream の最外側のロック区間を計時し、途中で resync / teardown に移った場合も最初からの時間を計上する。停止後の集計表示を採取する。foreground の if0-resident と、advance を呼ぶ PIT の irq0・CS4231 の irq10 も両 bank で採る。これらは HAL を囲む時間（他の処理を含み得る）の保守的な上限。区間の一部だけが短くても合格にしない。
 4. ホストで `python3 tools/accept/snd2/sound_rate.py > "$D/rate-after.json" && cmp "$D/rate-before.json" "$D/rate-after.json"`。同じ世代・係数であること。下のコマンドでシリアルログから全種類の最大を µs に切り上げる。
 

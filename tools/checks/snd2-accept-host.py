@@ -3,7 +3,8 @@ import base64
 import json
 import math
 import struct
-from io import BytesIO
+from contextlib import redirect_stdout
+from io import BytesIO, StringIO
 from unittest.mock import patch
 import sys
 import tempfile
@@ -48,10 +49,35 @@ def latency_capture(script, directory, mutate):
                 print('GREEN latency across windows')
 
 
+def if0_capture(script, mutate):
+    source = script.read_text()
+    for mutant in range(1 + int(mutate)):
+        anchor = 'not any(int(n) for n, _ in rows)'
+        assert source.count(anchor) == 1
+        code = source.replace(anchor, 'False') if mutant else source
+        ns = {'__name__': 'if0_under_test'}
+        exec(compile(code, str(script), 'exec'), ns)
+        rows = ['TSC=raw cycles observation_lost=0']
+        for path in ns['PATHS']:
+            rows += [f'{path} count={count} worst=0x5aa' for count in (0, 1)]
+        log = '\n'.join(rows)
+        rate = dict(mult=2, shift=1)
+        with redirect_stdout(StringIO()):
+            assert ns['verify'](rate, log)
+            assert not ns['verify'](rate, log.replace('0x5aa', '0x5ab'))
+        output = StringIO()
+        with redirect_stdout(output):
+            passed = ns['verify'](rate, log.replace('snd-resync count=1', 'snd-resync count=0'))
+        detected = not passed and '未測定: snd-resync' in output.getvalue()
+        assert detected != bool(mutant)
+        print('RED runtime unobserved resync' if mutant else 'GREEN IF=0 coverage')
+
+
 def run(ctx):
     scripts = ctx.root / 'tools/accept/snd2'
     for path in scripts.glob('*.py'):
         compile(path.read_text(), str(path), 'exec')
+    if0_capture(scripts / 'verify_if0.py', ctx.mutate)
     verifier = scripts / 'verify_wave.py'
     source = verifier.read_text()
     changes = [('start if saw_boot_rate else stop', 'start'), ('end-start', '0'), ('(left,right)==expected', 'right == expected[1]')]

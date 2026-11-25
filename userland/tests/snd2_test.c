@@ -119,6 +119,13 @@ static int playback(KernelAPI *api, u32 dev, const char *mode, u32 lead, u32 sec
                     return 6;
                 }
                 if (!armed) {
+#ifdef SND2_WRITER_DIAG
+                    rc = api->snd2_caps(dev | SND2_CAPS_OBSERVATION_GAP, &caps, sizeof(caps));
+                    if (rc) {
+                        api->kprintf(7, "epoch gap arm_rc=%d\n", rc);
+                        return 6;
+                    }
+#endif
                     previous = pos;
                     armed = 1;
                     api->kprintf(7, "epoch armed epoch=%u played=%u ms=%u\n",

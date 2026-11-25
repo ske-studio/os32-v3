@@ -10,6 +10,9 @@ enum scenario { NORMAL, NO_CHANGE, DOUBLE_CHANGE, NO_CONTINUATION, NO_AFTER, NO_
 static enum scenario scene;
 static u32 latency_us = 29999;
 static int latency_run, wave_run, diagnostic, inject_delay;
+#ifdef SND2_WRITER_DIAG
+static unsigned gap_requests;
+#endif
 static u32 retired, elapsed_us, reported_us, gaps, waits, time_reads;
 
 static u32 cursor, tick, marker, requests;
@@ -28,6 +31,9 @@ static void consume_period(void)
 static int caps(u32 dev, SND2_Caps *out, u32 size)
 {
     (void)size;
+#ifdef SND2_WRITER_DIAG
+    if (dev == SND2_CAPS_OBSERVATION_GAP) ++gap_requests;
+#endif
     if ((dev & SND2_CAPS_REFILL) && !diagnostic) return -1;
     *out = (SND2_Caps){.dev = dev, .ring_frames = 4096, .fmt_count = 1};
     out->fmt[0].rate = 44100;
@@ -187,6 +193,9 @@ int main(void)
         cursor = 0;
         if ((playback(&api, 0, "epoch", 3, 30) == 0) != (scene == NORMAL)) return 1;
     }
+#ifdef SND2_WRITER_DIAG
+    if (gap_requests != NO_AFTER + 1) return 1;
+#endif
     latency_run = 1;
     scene = NORMAL;
     cursor = 0;
