@@ -1,5 +1,6 @@
 """Inventory the P0-8 consumers. Run after gen_deploy_set.py on the built tree."""
 import argparse
+import ast
 import csv
 import json
 import posixpath
@@ -24,9 +25,9 @@ def judgment(path, kind):
         return KEEP, "W/T 各波", RULES + " §1–3（ソース・検査の配置のみ）"
     if kind == "SDK入力" and (path == "../build/sdk" or path.startswith("../build/sdk/")):
         return KEEP, "W/T 各波", "docs/08_build.md §8（staged SDK は build/sdk/）"
-    if path.startswith(("arch/", "kernel/", "platform/", "exec/")):
+    if path.startswith(("arch/", "kernel/", "platform/", "exec/", "include/")):
         return MOVE, "W 該当波", NOW + " 対応する sys/ 配下への移動予定"
-    if path.startswith(("assets/", "userland/", "build/out/")):
+    if path.startswith(("assets/", "sdk/", "userland/", "build/out/")):
         return KEEP, "W/T 各波", NOW + " 現置き場維持・ビルド出力"
     return UNKNOWN, "P1 対応表で該当波を決定", NOW + " 個別パスの行き先未確定"
 
@@ -81,6 +82,62 @@ def external(rows, tree, who, ref):
                 rows(who, path, "SDK入力" if file == "Makefile" and path == sdk_root else "木外参照", src)
 
 
+def procedure_tools(file, emulator):
+    section = ""
+    for n, line in enumerate((ROOT / file).read_text().splitlines(), 1):
+        if line.startswith("## "):
+            section = line
+        if not section:
+            continue
+        if emulator:
+            who = "PM" if "PM" in section else "pc98emu"
+        elif "NP21/W の予行" in line:
+            who = "NP21/W 予行"
+        elif "PM" in section:
+            who = "PM"
+        elif "ノート" in section or "シリアルで hsync" in line:
+            who = "実機ノート"
+        else:
+            who = "実行機未確定"
+        for path in re.findall(r"(?<![\w./-])(?:[\w./-]+\.(?:py|sh)|\.mcp\.json)(?![\w./-])", line):
+            yield who, path, f"{file}:{n}"
+
+
+def runtime_inputs(add, entries, tracked):
+    """Follow local Python imports from documented host-tool entry points."""
+    pending = list(entries)
+    seen = set()
+    while pending:
+        who, file = pending.pop()
+        if (who, file) in seen:
+            continue
+        seen.add((who, file))
+        module = ast.parse((ROOT / file).read_text(), filename=file)
+        for node in ast.walk(module):
+            names = []
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                names = [node.module] if node.module else [alias.name for alias in node.names]
+            for name in names:
+                for directory in (Path(file).parent, Path("tools"), Path(".")):
+                    imported = (directory / (name.replace(".", "/") + ".py")).as_posix()
+                    if imported in tracked:
+                        pending.append((who, imported))
+                        break
+            literal = None
+            if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
+                if isinstance(node.left, ast.Name) and node.left.id == "ROOT":
+                    literal = node.right
+            elif isinstance(node, ast.Call) and node.args:
+                if isinstance(node.func, ast.Name) and node.func.id in ("Path", "open"):
+                    literal = node.args[0]
+            if isinstance(literal, ast.Constant) and isinstance(literal.value, str):
+                path = literal.value
+                if "/" in path and path in tracked:
+                    add(who, path, "道具の実行時入力", f"{file}:{node.lineno}")
+
+
 def inventory(deploy_set, consumers):
     data = defaultdict(set)
 
@@ -105,12 +162,38 @@ def inventory(deploy_set, consumers):
         extract("実機ノート", file, r'(/opt/os32/tools/[\w./@-]+)', "常駐・更新")
     extract("実機ノート", "tools/host_agent_service.py", r"TOOLS / '([^']+)'", "常駐・子プロセス",
             prefix="/opt/os32/tools/")
-    for file in (real, "docs/decisions/realhw/RA266.md"):
-        extract("実機ノート", file, r'((?:tools/)?(?:ci_fetch\.sh|lanfs_host\.py|rshell_serial\.py)|tools/hostdrv_deploy\.py)', "操作手順")
-        extract("実機ノート", file, r'(hostdrv\.tar\.gz|\.deploy/manifest\.txt)', "配布名")
+    extract("実機ノート", "docs/decisions/realhw/RA266.md", r'(hostdrv\.tar\.gz)', "配布名")
+    extract("NP21/W 予行", real, r'(/mnt/c/[^ ]*?\.deploy/manifest\.txt)', "相手機")
     extract("pc98emu", emu, r'`(C:\\[^`]+|~/os32pm-request-<N>\.md|~/os32-v3|np21x64w(?:-iN)?\.ini)`', "相手機")
     extract("pc98emu", emu, r'(hostdrv\.tar\.gz|os32-<枝>-<SHA7>)', "配布名")
-    extract("pc98emu", emu, r'((?:tools/)?(?:driver|np21w_ctl|np21w_client)\.py|\.mcp\.json)', "操作手順")
+    tracked = set(git(ROOT, "ls-files").splitlines())
+    scripts = defaultdict(list)
+    for file in tracked:
+        if file.endswith((".py", ".sh")):
+            scripts[Path(file).name].append(file)
+    entries = set()
+    for file in (real, emu):
+        for who, path, source in procedure_tools(file, file == emu):
+            matches = [path] if path in tracked else scripts[path]
+            resolved = matches[0] if len(matches) == 1 else path
+            add(who, resolved, "操作手順", source)
+            if resolved in tracked and resolved.endswith(".py"):
+                entries.add((who, resolved))
+    config = json.loads((ROOT / ".mcp.json").read_text())
+    emu_lines = (ROOT / emu).read_text().splitlines()
+    for name, server in config["mcpServers"].items():
+        mentions = [n for n, line in enumerate(emu_lines, 1) if ".mcp.json" in line
+                    and re.search(r"MCP の " + re.escape(name) + r"\b", line)]
+        if mentions:
+            for arg in server.get("args", []):
+                if arg in tracked and arg.startswith("tools/") and arg.endswith(".py"):
+                    entries.add(("pc98emu", arg))
+                    add("pc98emu", arg, "MCP 起動", f".mcp.json#/mcpServers/{name}/args | {emu}:{mentions[0]}")
+    for who, path, *_ in data:
+        local = path.removeprefix("/opt/os32/")
+        if path.startswith("/opt/os32/") and local in tracked and local.endswith(".py"):
+            entries.add((who, local))
+    runtime_inputs(add, entries, tracked)
     extract("pc98emu", emu, r"(C:\\[A-Za-z0-9_\\.%-]+)", "相手機")
     extract("pc98emu", emu, r"`(/mnt/c/os32|np21w_aidebug_<port>\.token)`", "相手機")
     fetch = "tools/ci_fetch.sh"
@@ -151,14 +234,18 @@ def main():
     args = parser.parse_args()
     consumers = [("np21w-src", args.np21w), ("apps", args.modules / "apps"), ("game", args.modules / "game")]
     data = inventory(args.deploy_set, consumers)
+    report(data, args.output)
+
+
+def report(data, output):
     counts = defaultdict(Counter)
     notices = defaultdict(set)
     for who, path, kind, result, wave, reason, status in data:
         counts[who][result] += 1
         notices[wave, who, result].add(path)
-    write_table(args.output / "paths.tsv", ["相手", "パス", "種類", "判定", "波", "判定根拠", "実物", "参照元"],
+    write_table(output / "paths.tsv", ["相手", "パス", "種類", "判定", "波", "判定根拠", "実物", "参照元"],
                 [(*key, " | ".join(sorted(sources))) for key, sources in sorted(data.items())])
-    write_table(args.output / "notify.tsv", ["照合時期", "知らせる相手", "判定", "照合するパス"],
+    write_table(output / "notify.tsv", ["照合時期", "知らせる相手", "判定", "照合するパス"],
                 [(*key, " | ".join(sorted(paths))) for key, paths in sorted(notices.items())])
     # The stage ticket gives the W range, but assigns no individual file to a wave.
     ticket = (ROOT / "docs/tasks/restructure/TASK_RESTRUCTURE.md").read_text()
@@ -170,11 +257,11 @@ def main():
                                  (key[3] == UNKNOWN or (wave.startswith("W") and key[3] == MOVE))})
             action = "旧パスが当該波の移動表と一致したら事前通知" if candidates else "移動による通知対象なし"
             waves.append((wave, who, action, " | ".join(candidates)))
-    write_table(args.output / "waves.tsv", ["波", "相手", "通知条件", "照合候補"], waves)
-    write_table(args.output / "remote.tsv", ["相手", "未確認のパス", "相手に聞く項目", "文書の所在"],
+    write_table(output / "waves.tsv", ["波", "相手", "通知条件", "照合候補"], waves)
+    write_table(output / "remote.tsv", ["相手", "未確認のパス", "相手に聞く項目", "文書の所在"],
                 [(key[0], key[1], "現在の版・枠でこのパスを使うか。別の配置なら実際のパスは何か。",
                   " | ".join(sorted(sources))) for key, sources in sorted(data.items()) if key[-1] == REMOTE])
-    write_table(args.output / "counts.tsv", ["相手", MOVE, KEEP, UNKNOWN],
+    write_table(output / "counts.tsv", ["相手", MOVE, KEEP, UNKNOWN],
                 [(who, c[MOVE], c[KEEP], c[UNKNOWN]) for who, c in sorted(counts.items())])
 
 

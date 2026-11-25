@@ -3,6 +3,7 @@ import sys
 
 CHECK = dict(name="restructure-p0-8", tier=1, needs=["make:all"], budget=2,
              covers=["tools/restructure/external_paths.py", "tools/restructure/test_external_paths.py",
+                     ".mcp.json", "tools/**/*.py", ".claude/skills/run-os32/driver.py",
                      ".github/workflows/build.yml", "build/core.yaml", "userland/deploy.yaml",
                      "docs/08_build.md", "docs/decisions/realhw/RA266.md",
                      "docs/tasks/restructure/NOW.md", "docs/tasks/restructure/RULES.md",
