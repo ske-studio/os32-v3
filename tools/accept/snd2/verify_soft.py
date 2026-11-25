@@ -1,25 +1,36 @@
 """Check the first second of sndl_test soft against the original fmgen PCM."""
-import hashlib
+from pathlib import Path
+import subprocess
+import tempfile
 import itertools
 import struct
 import sys
 from verify_wave import capture
 
-# FM::OPNA reset at 7987200 Hz / 44100 Hz, channel 0, algorithm 7,
-# carrier 1, MUL=1, TL=12, AR=31, left pan, block=4, F-number=0x269.
-EXPECTED = "a20a9e0f2ec0a61068a2b6e867c54c7162aac76664bfabe21e295689789be1fc"
+def reference():
+    here = Path(__file__).resolve().parent
+    upstream = here.parents[2] / 'lib/os32_opna/upstream'
+    with tempfile.TemporaryDirectory() as tmp:
+        work = Path(tmp)
+        (work / 'compiler.h').touch()
+        exe = work / 'tone'
+        subprocess.run(['g++', '-std=c++17', '-O2', '-fwrapv', '-ffunction-sections',
+                        '-fdata-sections', '-DSUPPORT_FMGEN', '-DMAX_PATH=260',
+                        '-I', work, '-I', upstream, '-Wl,--gc-sections', here / 'soft_tone.cpp',
+                        *(upstream / f'fmgen_{part}.cpp' for part in
+                          ('fmgen', 'opna', 'fmtimer', 'psg')), '-o', exe], check=True)
+        return subprocess.check_output([exe])
 
 
 def verify(frames):
     aligned = itertools.dropwhile(lambda frame: frame[1] != 12345, frames)
-    digest = hashlib.sha256()
-    for i in range(44100):
-        frame = next(aligned, None)
-        if frame is None or frame[1] != (12345 if i % 256 == 0 else 0):
-            raise ValueError(f"missing or displaced PCM at frame {i}")
-        digest.update(struct.pack("<hh", *frame))
-    if digest.hexdigest() != EXPECTED:
-        raise ValueError(f"software OPNA waveform differs: {digest.hexdigest()}")
+    pcm = reference()
+    if len(pcm) != 44100 * 4:
+        raise ValueError("incomplete fmgen reference")
+    for i, expected in enumerate(struct.iter_unpack('<hh', pcm)):
+        actual = next(aligned, None)
+        if actual != expected:
+            raise ValueError(f"frame {i}: expected {expected}, got {actual}")
     print("PASS 44100 consecutive software OPNA stereo frames")
 
 

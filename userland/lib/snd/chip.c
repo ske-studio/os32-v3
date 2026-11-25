@@ -198,7 +198,7 @@ int sndl_chip_prepare(struct SndlWindow *window)
             window->now = now;
             have_clock = 1;
         }
-        int rc = fmv_render(slots[i].fm, now, 0, 0);
+        int rc = fmv_render_part(slots[i].fm, now, 0, window->frames, window->offset, 0);
         if (rc) return rc;
     }
     return 0;

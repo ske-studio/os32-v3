@@ -10,6 +10,7 @@ CHECK = dict(name='sndl-live-host', tier=1, needs=['make:all'], budget=8,
              basis=['docs/decisions/sound/AV_HAL_DESIGN.md §7-1, §7-3, 追記 §3'])
 
 CASES = [
+    ('pump', 'generations[i] != sndl_mix_generation(voice)', '0'),
     ('pump', 'scratch + 2*sent', 'scratch'),
     ('pump', 'pos.state == SND2_ST_IDLE && pos.cap', 'pos.state == SND2_ST_RUN && pos.cap'),
     ('pump', 'played - s->offset - s->count', 'played + 1 - s->offset - s->count'),

@@ -119,6 +119,22 @@ static int pump(void)
     CHECK(!sndl_voice_done(v,&done,&how) && how == SNDL_RESET);
     faulted = 0;
     CHECK(!sndl_open(&fmt,256,3) && !sndl_close(SND2_CLOSE_ABORT) && !sndl_voice_delete(v));
+    CHECK(!sndl_open(&fmt,256,3) && !sndl_voice_new(&fmt,&v));
+    CHECK(!sndl_voice_submit(v,data,4,0,&b) && !sndl_voice_play(v));
+    limit = 4;
+    CHECK(!sndl_pump()); /* one sample, then three silent frames */
+    u32 next;
+    CHECK(!sndl_voice_submit(v,data,4,0,&next));
+    pos.played = 1;
+    limit = 1;
+    CHECK(!sndl_pump() && !sndl_voice_reset(v));
+    pos.played = 2;
+    CHECK(!sndl_voice_pos(v,&done,&play,&gen) && done == b && play == 1 && gen == 0);
+    pos.played = 4;
+    CHECK(!sndl_voice_pos(v,&done,&play,&gen) && done == next && play == 0);
+    pos.played = 5;
+    CHECK(!sndl_voice_pos(v,&done,&play,&gen) && done == 0 && play == 0);
+    CHECK(!sndl_close(SND2_CLOSE_ABORT) && !sndl_voice_delete(v));
     return 0;
 }
 

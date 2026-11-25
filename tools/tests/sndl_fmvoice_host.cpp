@@ -54,6 +54,11 @@ static void timing(uint32_t base) {
     assert((positions == std::vector<unsigned>{0,0,2,2,3}));
     assert(!fmv_render(v,t(201),pcm,1));
     assert(positions.back()==4 && positions.size()==6);
+    assert(!fmv_write(v,t(290),8,3));
+    assert(!fmv_render(v,t(300),nullptr,0));
+    assert(positions.size()==6);
+    assert(!fmv_render(v,t(400),pcm,8));
+    assert(positions.back()==5 && positions.size()==7);
     fmv_reset(v,t(0));
     positions.clear();
     events.clear();

@@ -258,12 +258,14 @@ int fmv_render_part(FmVoice *v, uint32_t now, unsigned char *out, uint32_t frame
     if (!v || (count && !out) || count > UINT32_MAX/4 ||
         offset > frames || count > frames-offset) return INVAL;
     int rc = sync_timer(v,now);
-    if (rc || !count) return rc;
+    if (rc) return rc;
+    if (!count && frames) return 0; /* Timer preparation for a nonempty window. */
     if (!offset) {
         v->window_start = v->started ? v->previous : now;
         v->previous = now;
         v->started = 1;
     }
+    if (!count) return 0; /* Empty pump advances the clock and retains audio events. */
     uint32_t start = v->window_start;
     uint32_t span = now-start, cursor = offset;
     while (v->audio && !before(now,v->audio->at)) {

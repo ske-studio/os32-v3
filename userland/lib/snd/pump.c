@@ -107,11 +107,16 @@ int sndl_voice_pos(u32 voice, u32 *buffer, u32 *play, u32 *gen)
     for (unsigned i = 0; i < count; ++i) {
         SndlMixSpan *s = &records[i];
         u32 distance = p.played - s->offset;
-        if (s->voice == voice && distance < s->count) {
+        if (s->voice != voice) continue;
+        if (distance < s->count) {
             *buffer = s->buf_id;
             *play = frame_at(s, distance);
-            break;
+        } else if (cursor[k].voice == voice && generations[i] != sndl_mix_generation(voice)) {
+            /* A pre-reset span still lies beyond this silent gap. */
+            *buffer = cursor[k].buffer;
+            *play = cursor[k].frame;
         }
+        break;
     }
     return 0;
 }

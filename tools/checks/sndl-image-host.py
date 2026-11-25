@@ -9,6 +9,7 @@ CHECK = dict(name='sndl-image-host', tier=1, needs=['make:all'], budget=3,
                      'userland/tests/sndl_test.c', 'sdk/sndl/stub.c', 'sdk/include/os32/*.h',
                      'userland/lib/snd/**', 'sdk/mkos32x.py', 'sdk/link/shlib.ld',
                      'tools/accept/snd2/verify_soft.py', 'tools/accept/snd2/verify_wave.py',
+                     'tools/accept/snd2/soft_tone.cpp', 'lib/os32_opna/upstream/**',
                      'build/os32snd.mk', 'sdk/os32x_hdr.py'],
              basis=['docs/decisions/sound/AV_HAL_DESIGN.md §7 x86 アプリからの読み込み'])
 

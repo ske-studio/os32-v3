@@ -32,6 +32,7 @@ def run(ctx):
         subprocess.run(['rustc', '--edition=2021', '--crate-type=staticlib', '-O', '-Cpanic=abort',
                         core / 'src/lib.rs', '-o', archive], check=True)
         mutants = [('frame clamp', 'frame = frames-1', 'frame = 0'),
+                   ('empty pump clock', 'if (!count && frames)', 'if (!count)'),
                    ('CSM applied', 'opna_apply_csm(v->state)', '(void)0'),
                    ('RIFF form', '!tag(h+8,"WAVE")', '0'),
                    ('chunk padding', 'n + (n & 1)', 'n'),

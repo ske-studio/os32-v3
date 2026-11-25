@@ -26,7 +26,7 @@ int fmv_csm(FmVoice *v, uint32_t at);
 int fmv_read(FmVoice *v, uint32_t now, unsigned reg, unsigned *value);
 int fmv_status(FmVoice *v, uint32_t now, unsigned bank, unsigned *value);
 /* L3 calls once per generated interval. Output is overwritten stereo PCM16 LE.
- * A zero-frame call advances the timer only. Retry on allocation failure. */
+ * An empty interval advances the pump clock and timer, retaining audio events. Retry on allocation failure. */
 int fmv_render(FmVoice *v, uint32_t now, unsigned char *out, uint32_t frames);
 int fmv_render_part(FmVoice *v, uint32_t now, unsigned char *out, uint32_t frames,
                     uint32_t offset, uint32_t count);
