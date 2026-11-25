@@ -1,3 +1,7 @@
+#ifdef SND2_WRITER_DIAG
+#include "snd_writer_probe.h"
+#endif
+#include "snd2_refill_diag.h"
 #include "snd2.h"
 #include "io.h"
 #include "kernel/time/tick_clock.h"
@@ -110,6 +114,12 @@ int snd2_open_mode(const SND2_StreamDesc *desc, u32 *id, int v1)
     kmemset(s, 0, sizeof(*s));
     s->gen = gen;
     s->fmt = desc->fmt;
+#ifdef SND2_REFILL_DIAG
+    s->min_stg = ~0U;
+#ifdef SND2_WRITER_DIAG
+    sw_reset();
+#endif
+#endif
     s->period = period;
     s->margin = period / 2 < 512 ? period / 2 : 512;
     s->nseg = d->caps.ring_frames / period;
@@ -153,6 +163,7 @@ int snd2_write_checked(u32 id, const void *buf, u32 bytes,
         Snd2Stream *s = &d->stream;
         if (s->state == SND2_ST_DRAIN || !buf) rc = OS32_ERR_INVAL;
         else {
+            u32 epoch = s->epoch;
             u32 off, stride = snd2_frame_bytes(s);
             u32 n = snd2_stg_reserve(s, bytes / stride, &off);
             if (n) {
@@ -179,6 +190,10 @@ int snd2_write_checked(u32 id, const void *buf, u32 bytes,
                     rc = OS32_ERR_STALE;
                 } else {
                     snd2_stg_publish(s, n);
+                    u32 hw;
+                    if (s->state == SND2_ST_RUN && !s->restart_pending &&
+                        s->epoch == epoch && d->be->hw_pos(d->ctx, &hw) >= 0)
+                        snd2_seg_after_publish(s, hw, tick_clock_ms());
                     rc = n * stride;
                 }
             }
@@ -221,13 +236,42 @@ int snd2_stream_start(u32 id)
         }
         if (s->state == SND2_ST_DRAIN) rc = OS32_ERR_INVAL;
         else {
-            s->paused = 0;
+            snd2_seg_resume(s);
             s->state = SND2_ST_RUN;
         }
     }
     stream_unlock(flags);
     return rc;
 }
+
+#ifdef SND2_REFILL_DIAG
+int snd2_refill_caps(Snd2Device *d, SND2_Caps *out)
+{
+    unsigned flags = irq_save();
+    Snd2Stream *s = &d->stream;
+    SND2_Caps snapshot = {0};
+    int rc = s->owner && s->owner == res_owner_get() && !s->closing
+           ? d->be->caps(d->ctx, &snapshot) : OS32_ERR_STALE;
+    if (!rc) {
+#ifdef SND2_WRITER_DIAG
+        sw_snapshot(snapshot.reserved);
+#endif
+        snapshot.reserved[SND2_DIAG_MIN_STG] = s->min_stg;
+        snapshot.reserved[SND2_DIAG_FRAME] = s->underruns ? s->gap_frame : ~0U;
+        snapshot.reserved[SND2_DIAG_SEG_N] = s->underruns ? s->gap_n : ~0U;
+        snapshot.reserved[SND2_DIAG_NEXT_FIRST] = s->underruns ? s->gap_next : ~0U;
+        snapshot.reserved[SND2_DIAG_EVENT_STG] = s->gap_stg;
+        snapshot.reserved[SND2_DIAG_REFILL_TRIED] = s->gap_tried;
+        snapshot.reserved[SND2_DIAG_DMA_STEP] = s->max_dma_step;
+    }
+    irq_restore(flags);
+    if (!rc) {
+        *out = d->caps;
+        kmemcpy(out->reserved, snapshot.reserved, sizeof(out->reserved));
+    }
+    return rc;
+}
+#endif
 
 void snd2_advance(u32 dev)
 {

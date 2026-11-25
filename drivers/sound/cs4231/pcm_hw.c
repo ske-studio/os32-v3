@@ -1,3 +1,4 @@
+#include "sound/hal/snd2_refill_diag.h"
 #include "pcm_hw.h"
 #include "pcm_module.h"
 #include "pcm_cs4231.h"
@@ -20,6 +21,13 @@ static int caps(void *ctx, SND2_Caps *out)
         .period_min = 256, .period_max = PCM_HALF_FRAMES,
         .ring_frames = PCM_RING_FRAMES, .volume_steps = PCM_DA_ATT_MAX + 1
     };
+#ifdef SND2_REFILL_DIAG
+    u32 pi, ticks, max_us;
+    pcm_codec_counters(&pi, &ticks, &max_us);
+    out->reserved[SND2_DIAG_PI] = pi;
+    out->reserved[SND2_DIAG_TICK] = ticks;
+    out->reserved[SND2_DIAG_MAX_US] = max_us;
+#endif
     return 0;
 }
 
@@ -32,7 +40,9 @@ static int hw_open(void *ctx, const SND2_Fmt *fmt, u32 period, u8 **ring)
 static int hw_start(void *ctx)
 {
     (void)ctx;
-    return pcm_codec_start();
+    int rc = pcm_codec_start();
+    if (!rc) pcm_module_refill_tick(dev);
+    return rc;
 }
 
 static int hw_pos(void *ctx, u32 *frame)
@@ -50,6 +60,7 @@ static int hw_ack(void *ctx)
 static int hw_stop(void *ctx)
 {
     (void)ctx;
+    pcm_module_refill_tick(-1);
     return pcm_codec_stop();
 }
 

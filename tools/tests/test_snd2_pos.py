@@ -7,7 +7,7 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 
 CHECK = dict(name='snd2-pos-host', tier=4, needs=[], budget=3,
-             covers=['sound/hal/snd2.h', 'sound/hal/snd2_stream.c', 'sound/hal/snd2_pos.c',
+             covers=['include/exec_wait_contract.h', 'sound/hal/snd2_refill_diag.h', 'sound/hal/snd2.h', 'sound/hal/snd2_stream.c', 'sound/hal/snd2_pos.c',
                      'kernel/time/tick_clock.h', 'include/kernel_tick.h',
                      'include/io.h', 'sound/hal/snd2_seg.c', 'sound/hal/snd2_stg.c',
                      'sound/hal/snd2_int.h', 'sound/hal/snd2_ring_math.h',
@@ -20,19 +20,23 @@ CHECK = dict(name='snd2-pos-host', tier=4, needs=[], budget=3,
 ROOT = Path(__file__).resolve().parents[2]
 HAL = ROOT / 'sound/hal'
 MUTATIONS = [
+    ('pos', 'ring3_wait_pending() ||', ''),
+    ('pos', 'pos.state == SND2_ST_PAUSE ||', ''),
+    ('pos', 'else if (park)', 'else if (park && 0)'),
+    ('pos', '                    _idle();', '                    irq_restore(saved); _idle();'),
     ('pos', '(frame - pos.written) > 0', '(frame - pos.written) < 0'),
     ('pos', 'pos.played - frame', 'snd2_device(id & 15U)->stream.played - frame'),
     ('pos', 'pos.time_ms - begin >=', 'pos.time_ms - begin >'),
     ('pos', '.epoch = s->epoch', '.epoch = 0'),
     ('pos', '    irq_restore(flags);', '',
-     'int rc = snd2_owned_device(id, &d);',
-     'int rc = snd2_owned_device(id, &d);\n    irq_restore(flags);'),
+     'int rc = snapshot_locked(id, out);',
+     'irq_restore(flags);\n    int rc = snapshot_locked(id, out);'),
 ]
 
 
 def verify(work, mutation=None):
     sources = []
-    (work / 'io.h').write_text('unsigned irq_save(void); void irq_restore(unsigned);\n')
+    (work / 'io.h').write_text('unsigned irq_save(void); void irq_restore(unsigned); void _idle(void);\n')
     for unit in ('pos', 'stream', 'seg', 'stg'):
         path = work / f'snd2_{unit}.c'
         source = (HAL / path.name).read_text()

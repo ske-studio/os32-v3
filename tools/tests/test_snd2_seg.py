@@ -7,7 +7,8 @@ from host32 import run as host_run
 from kernel_includes import include_flags
 
 CHECK = dict(name='snd2-seg-host', tier=4, needs=[], budget=3,
-             covers=['sound/hal/snd2_seg.c', 'sound/hal/snd2_stg.c',
+             covers=['include/exec_wait_contract.h', 'sound/hal/snd2.h', 'sound/hal/snd2_pos.c', 'include/io.h',
+                     'kernel/time/tick_clock.h', 'include/kernel_tick.h', 'sound/hal/snd2_seg.c', 'sound/hal/snd2_stg.c',
                      'sound/hal/snd2_int.h', 'sound/hal/snd2_ring_math.h',
                      'include/av_contract.h', 'lib/kstring.h', 'mm/kmalloc.h', 'include/types.h',
                      'sdk/include/os32/*.h', 'tools/tests/snd2_seg_host.c',
@@ -18,10 +19,14 @@ CHECK = dict(name='snd2-seg-host', tier=4, needs=[], budget=3,
 ROOT = Path(__file__).resolve().parents[2]
 HAL = ROOT / 'sound/hal'
 MUTATIONS = [
+    ('seg', '!(s->resume_silence & (1U << prev)) && ', ''),
+    ('seg', 's->gap_next = s->seg_n[next] ? s->seg_first[next] : ~0U;',
+     's->gap_next = next;'),
     ('seg', 'last_obs_ms >= revolution_ms', 'last_obs_ms > revolution_ms'),
     ('seg', 'last_progress_ms >= revolution_ms', 'last_progress_ms > revolution_ms'),
     ('seg', 'if (!n) return;', 'if (!n || used) return;'),
     ('seg', 's->played += n;', 's->played += s->period;'),
+    ('seg', 'n < s->period)', 'n < s->period && s->played == s->copied)'),
     ('seg', 's->copied = s->played;\n    s->last_hw', 's->last_hw'),
     ('seg', 's->period - s->margin', 's->period'),
     ('seg', 'i <= s->lead; ++i)\n', 'i < s->lead; ++i)\n'),
@@ -33,9 +38,10 @@ MUTATIONS = [
 ]
 
 
-def verify(work, mutation=None):
+def verify(work, mutation=None, diagnostic=True):
     sources = []
-    for unit in ('seg', 'stg'):
+    (work / 'io.h').write_text('unsigned irq_save(void); void irq_restore(unsigned); void _idle(void);\n')
+    for unit in ('seg', 'stg', 'pos'):
         path = work / f'snd2_{unit}.c'
         source = (HAL / path.name).read_text()
         if mutation and mutation[0] == unit:
@@ -45,7 +51,7 @@ def verify(work, mutation=None):
         path.write_text(source)
         sources.append(path)
     exe = work / 'test'
-    subprocess.run(['gcc', '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra',
+    subprocess.run(['gcc', *(['-DSND2_REFILL_DIAG'] if diagnostic else []), '-I' + str(work), '-m32', '-march=i386', '-std=gnu11', '-Wall', '-Wextra',
                     '-Werror', '-O2', '-ffreestanding', '-fno-pie', '-fno-stack-protector',
                     '-nostdlib', '-static', '-no-pie', '-D__cdecl=', '-I' + str(HAL),
                     *include_flags(ROOT), *sources, ROOT / 'tools/tests/snd2_seg_host.c',
@@ -57,6 +63,7 @@ def run(ctx):
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
         assert verify(work) == 0
+        assert verify(work, diagnostic=False) == 0
         if ctx.mutate:
             for mutation in MUTATIONS:
                 assert verify(work, mutation) == 1, mutation

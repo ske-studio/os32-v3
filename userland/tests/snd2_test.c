@@ -1,3 +1,7 @@
+#ifdef SND2_WRITER_DIAG
+#include "snd_writer_probe.h"
+#endif
+#include "../../sound/hal/snd2_refill_diag.h"
 #include "os32api.h"
 #include <string.h>
 
@@ -11,7 +15,7 @@ static int playback(KernelAPI *api, u32 dev, const char *mode)
     SND2_Pos pos;
     u32 h;
     if (api->snd2_caps(dev, &caps, sizeof(caps)) || caps.dev != dev ||
-        !caps.fmt_count || caps.fmt[0].enc != SND2_ENC_S16LE ||
+        !caps.fmt_count || !caps.fmt[0].rate || caps.fmt[0].enc != SND2_ENC_S16LE ||
         caps.fmt[0].channels != 2) return 1;
     SND2_StreamDesc desc = {.size = sizeof(desc), .dev = dev, .fmt = caps.fmt[0],
                             .period_frames = PERIOD, .lead_periods = 3};
@@ -27,41 +31,69 @@ static int playback(KernelAPI *api, u32 dev, const char *mode)
     int epoch_test = !strcmp(mode, "epoch");
     int long_run = latency || !strcmp(mode, "wave") || !strcmp(mode, "stall") || epoch_test;
     u32 total = long_run ? 30 * desc.fmt.rate : FRAMES;
-    u32 written = 0, phase = 0, last_progress = api->get_tick();
+    const u32 step = 32000 / desc.fmt.rate, remainder = 32000 % desc.fmt.rate;
+    u32 written = 0, index = 0, fraction = 0, frames = 0, sent = 0;
+    int diag = (!strcmp(mode, "wave") || !strcmp(mode, "stall")) &&
+               !api->snd2_caps(dev | SND2_CAPS_REFILL, &caps, sizeof(caps));
+    u32 prev_us = 0, max_writer_us = 0;
+    int have_time = 0;
     int stalled = 0, mark_pending = 0, marked = 0;
     u32 mark_frame = 0, write_lo = 0, write_hi = 0;
     SND2_Pos previous = {0}, recovered = {0};
     int armed = 0, changed = 0;
+    unsigned full_waits = 0;
     while (written < total) {
-        u32 frames = total - written;
-        if (frames > PERIOD) frames = PERIOD;
-        u32 next = phase;
-        for (u32 i = 0; i < frames; ++i) {
-            samples[2*i] = sine[next * 32 / desc.fmt.rate];
-            samples[2*i+1] = ((written+i) % PERIOD) ? 0 : 10000 + ((written+i)/PERIOD) % 16000;
-            next = (next + 1000) % desc.fmt.rate;
+        if (diag && written >= FRAMES) {
+            u32 now, hi;
+            if (api->sys_time_now(&now, &hi)) return 13;
+            if (have_time && now - prev_us > max_writer_us) max_writer_us = now - prev_us;
+            prev_us = now;
+            have_time = 1;
+        }
+        if (sent == frames) {
+            sent = 0;
+            frames = total - written;
+            if (frames > PERIOD) frames = PERIOD;
+            for (u32 i = 0; i < frames; ++i) {
+                samples[2*i] = sine[index];
+                samples[2*i+1] = ((written+i) % PERIOD) ? 0 : 10000 + ((written+i)/PERIOD) % 16000;
+                index += step;
+                if (fraction >= desc.fmt.rate - remainder) {
+                    fraction -= desc.fmt.rate - remainder;
+                    ++index;
+                } else {
+                    fraction += remainder;
+                }
+                index &= 31;
+            }
         }
         if (latency && written >= FRAMES && !marked) {
             if (!mark_pending) mark_pending = api->kbd_trygetchar() == 'x';
             if (mark_pending) {
-                samples[1] = -23456;
+                samples[2*sent+1] = -23456;
                 if (api->sys_time_now(&write_lo, &write_hi)) return 13;
             }
         }
-        int n = api->snd2_stream_write(h, samples, frames * 4);
-        if (n < 0 || (n & 3) || (u32)n > frames * 4) return 3;
+        int n = api->snd2_stream_write(h, samples + 2*sent, (frames - sent) * 4);
+        if (n < 0 || (n & 3) || (u32)n > (frames - sent) * 4) return 3;
         if (!n) {
-            if (api->get_tick() - last_progress > 100) return 3;
-            api->sys_yield();
+            /* played can advance inside a period before retirement frees space. */
+            if (written < FRAMES || ++full_waits > PERIOD) return 3;
+            u32 target = written - FRAMES + (frames - sent);
+            target = (target + PERIOD - 1) / PERIOD * PERIOD;
+            /* A short retirement can put even an aligned played target
+             * inside the next segment. Block on its successor on retry. */
+            if (full_waits > 1) target += PERIOD;
+            if (api->snd2_stream_wait(h, target, 1000)) return 3;
             continue;
         }
+        full_waits = 0;
         if (mark_pending) {
             mark_frame = written;
             marked = 1;
             mark_pending = 0;
         }
-        last_progress = api->get_tick();
-        phase = (phase + (u32)n / 4 * 1000) % desc.fmt.rate;
+        sent += (u32)n / 4;
         u32 before = written;
         written += (u32)n / 4;
         if (before < FRAMES && written >= FRAMES && api->snd2_stream_start(h)) return 4;
@@ -93,6 +125,34 @@ static int playback(KernelAPI *api, u32 dev, const char *mode)
         pos.played < total - PERIOD || pos.played > pos.written) return 6;
     api->kprintf(7, "written=%u played=%u underruns=%u epoch=%u\n",
                  pos.written, pos.played, pos.underruns, pos.epoch);
+    if (diag &&
+        !api->snd2_caps(dev | SND2_CAPS_REFILL, &caps, sizeof(caps))) {
+        const unsigned long *v = caps.reserved;
+#ifdef SND2_WRITER_DIAG
+        static const char *const work[] = {
+            "other/user", "display_restore", "gfx_poll", "abort_check",
+            "park_stop", "io_end", "gui_pump", "idle_work"
+        };
+        unsigned which = v[SW_WORK] & SW_WORK_BYTE;
+        unsigned exit_work = (v[SW_WORK] >> SW_WAIT_SHIFT) & SW_WORK_BYTE;
+        unsigned write_work = (v[SW_WORK] >> SW_WRITE_SHIFT) & SW_WORK_BYTE;
+        api->kprintf(7, "wait_exit_us=%u exit_write_us=%u ready_write_us=%u pairs=%u exit_work=%s write_work=%s\n",
+                     v[SW_WAIT_EXIT], v[SW_EXIT_WRITE], v[SW_TOTAL], v[SW_PAIRS],
+                     exit_work < sizeof(work)/sizeof(work[0]) ? work[exit_work] : "unknown",
+                     write_work < sizeof(work)/sizeof(work[0]) ? work[write_work] : "unknown");
+        api->kprintf(7, "worst_work=%s work_us=%u tsc_gaps_10ms=%u wake_irq=%u wake_ready_us=%u\n",
+                     which < sizeof(work)/sizeof(work[0]) ? work[which] : "unknown",
+                     v[SW_WORK_US], v[SW_JUMPS], v[SW_WAKE_IRQ], v[SW_WAKE_US]);
+#endif
+        api->kprintf(7, "max_writer_us=%u\n", max_writer_us);
+        api->kprintf(7, "pi=%u tick=%u max_advance_us=%u max_dma_frames=%u min_stg=%u\n",
+                     v[SND2_DIAG_PI], v[SND2_DIAG_TICK], v[SND2_DIAG_MAX_US],
+                     v[SND2_DIAG_DMA_STEP], v[SND2_DIAG_MIN_STG]);
+        if (pos.underruns)
+            api->kprintf(7, "gap_frame=%u seg_n=%u next_first=%u event_stg=%u refill_tried=%u\n",
+                         v[SND2_DIAG_FRAME], v[SND2_DIAG_SEG_N],
+                         v[SND2_DIAG_NEXT_FIRST], v[SND2_DIAG_EVENT_STG], v[SND2_DIAG_REFILL_TRIED]);
+    }
     if (!strcmp(mode, "wave") && pos.underruns) return 6;
     if (epoch_test && changed)
         api->kprintf(7, "epoch before=%u played=%u ms=%u after=%u played=%u ms=%u\n",

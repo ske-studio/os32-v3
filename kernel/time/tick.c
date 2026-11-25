@@ -9,12 +9,20 @@ static u32 jif_phase, ms_phase, ms_now, step_jif, step_ms, clk;
 static unsigned char fast_enabled;
 static void (*fast_fn)(u32);
 
+static void (*pcm_fn)(void);
+
+void tick_pcm_set(void (*fn)(void))
+{
+    pcm_fn = fn;
+    fast_enabled = fast_fn || pcm_fn;
+}
+
 int tick_fast_set(void (*fn)(u32))
 {
     if (fn && fast_fn && fn != fast_fn)
         return OS32_ERR_BUSY;
     fast_fn = fn;
-    fast_enabled = fn != 0;
+    fast_enabled = fast_fn || pcm_fn;
     return 0;
 }
 
@@ -37,6 +45,7 @@ static __attribute__((noinline)) u32 notify_step(u32 result)
 {
     if (fast_fn)
         fast_fn(ms_now);
+    if (!result && pcm_fn) pcm_fn();
     return result;
 }
 

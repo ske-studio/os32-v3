@@ -1,3 +1,4 @@
+#include "sound/hal/snd2_refill_diag.h"
 /* Exercise the paired body and resident stream core through their normal entries. */
 #define PCM_HOST_HEAP_BYTES (8192U * PCM_FRAME_BYTES)
 #define main original_pcm_main
@@ -5,6 +6,9 @@
 #undef main
 #include "sound/hal/snd2.h"
 #include "pcm_module.h"
+
+static int physical_tick_active;
+void pcm_module_refill_tick(int dev) { physical_tick_active = dev >= 0; }
 
 int pcm_module_init(PcmModuleApi *out);
 u32 tick_clock_ms(void) { return (u32)(sim_now_us / 1000); }
@@ -62,16 +66,21 @@ int main(int argc, char **argv)
     CHECK(!snd2_device(info.dev)->stream.copied);
     sim_setup_fail = 0;
     CHECK(!snd2_stream_start(id) && !sim_masked && (dev_reg[PCM_I_IFACE] & PCM_IFACE_PEN));
-    CHECK(!memcmp(pool_mem[0], data, sizeof(data)));
+    CHECK(physical_tick_active && !memcmp(pool_mem[0], data, sizeof(data)));
     sim_set_pos(40);
     CHECK(pcm_irq(PCM_IRQ, 0) == IRQ_NONE);
     CHECK(snd2_device(info.dev)->stream.last_hw == 0);
     dev_reg[PCM_I_ALTSTAT] = PCM_ALT_PI;
     CHECK(pcm_irq(PCM_IRQ, 0) == IRQ_HANDLED && !dev_reg[PCM_I_ALTSTAT]);
     CHECK(snd2_device(info.dev)->stream.last_hw == 40);
+    sim_now_us += 1999;
     sim_set_pos(80);
     api.tick();
     CHECK(snd2_device(info.dev)->stream.last_hw == 80);
+    CHECK(!snd2_caps(info.dev | SND2_CAPS_REFILL, &caps, sizeof(caps)));
+    CHECK(caps.reserved[SND2_DIAG_PI] == 1 && caps.reserved[SND2_DIAG_TICK] == 1);
+    CHECK(caps.reserved[SND2_DIAG_MAX_US] == 1999 && caps.reserved[SND2_DIAG_DMA_STEP] == 40);
+    CHECK(!caps.reserved[SND2_DIAG_MIN_STG] && caps.reserved[SND2_DIAG_FRAME] == ~0U);
     sim_set_pos(10);  /* Backward within the period: stop, prove and re-prime. */
     sim_setup_fail = 1;
     api.tick();
@@ -82,7 +91,7 @@ int main(int argc, char **argv)
     CHECK(dev_reg[PCM_I_BASE_LO] == 255 && dev_reg[PCM_I_BASE_HI] == 1);
     CHECK(!memcmp(pool_mem[0], data, sizeof(data)));
     CHECK(!snd2_stream_close(id, SND2_CLOSE_DRAIN));
-    CHECK(sim_masked && sim_irq_registered && pool_used[0]);
+    CHECK(!physical_tick_active && sim_masked && sim_irq_registered && pool_used[0]);
     sim_unregister_fail = 1;
     CHECK(snd2_stream_open(&desc, &id) == OS32_ERR_BUSY);
     CHECK(sim_irq_registered && pool_used[0]);

@@ -128,6 +128,8 @@ typedef struct {
     VfsStdinRead stdin_read;  /* sys_read progress across KBD park */
     struct arch_fp_context fp_state;
     struct arch_entry_context entry; /* owned initial entry and saved caller SP */
+    int wait_restart;          /* Yield park must retry the timed syscall. */
+    u32 wait_begin;
 } AppSlot;
 
 extern u32 appslot_trim_epoch;

@@ -1,3 +1,6 @@
+#ifdef SND2_WRITER_DIAG
+#include "snd_writer_probe.h"
+#endif
 /* Fixed storage only; no I/O in IRQ context. CPU reference: Intel SDM,
  * Vol.2 CPUID/RDTSC (CPUID.1:EDX.TSC[4], EFLAGS.ID availability test).
  * https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developers-manual.pdf
@@ -145,6 +148,9 @@ void tick_probe_end(unsigned int id)
 }
 void tick_probe_irq_enter(unsigned int irq)
 {
+#ifdef SND2_WRITER_DIAG
+    sw_irq(irq);
+#endif
     if (!data.running) return;
     if (irq == 10) tick_probe_extra_begin(TP_PCM_IRQ10);
     if (irq == 5) irq5_active = 1;

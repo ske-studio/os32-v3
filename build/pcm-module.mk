@@ -6,13 +6,16 @@ $(PCM_GEN) &: tools/gen_sqlite_imports.py tools/gen_kdebug_imports.py tools/prot
 	python3 tools/gen_sqlite_imports.py --module pcm --out-dir $(PCM_OUT)
 
 PCM_OBJS := $(addprefix $(PCM_OUT)/,pcm_body.o pcm_hw.o pcm_cs4231.o pcm_cs4231_math.o pcm_import_slots.o pcm_import_stubs.o)
+ifeq ($(TICK_PROBE_BUILD),1)
+$(PCM_OUT)/pcm_hw.o $(PCM_OUT)/pcm_cs4231.o: private PCM_DIAG_FLAG := -DSND2_REFILL_DIAG
+endif
 PCM_INC := $(INC_KERNEL) -I. -I$(PCM_OUT)
 $(PCM_OUT)/pcm_body.o: drivers/sound/cs4231/pcm_body.c $(PCM_GEN) build/config.mk build/pcm-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_PCM_MODULE $(PCM_INC) -c $< -o $@
 $(PCM_OUT)/pcm_hw.o: drivers/sound/cs4231/pcm_hw.c $(PCM_GEN) build/config.mk build/pcm-module.mk
-	$(CC) $(CFLAGS_BASE) -Os -DOS32_PCM_MODULE $(PCM_INC) -c $< -o $@
+	$(CC) $(PCM_DIAG_FLAG) $(CFLAGS_BASE) -Os -DOS32_PCM_MODULE $(PCM_INC) -c $< -o $@
 $(PCM_OUT)/pcm_cs4231.o: drivers/sound/cs4231/pcm_cs4231.c $(PCM_GEN) build/config.mk build/pcm-module.mk
-	$(CC) $(CFLAGS_BASE) -Os -DOS32_PCM_MODULE $(PCM_INC) -c $< -o $@
+	$(CC) $(PCM_DIAG_FLAG) $(CFLAGS_BASE) -Os -DOS32_PCM_MODULE $(PCM_INC) -c $< -o $@
 $(PCM_OUT)/pcm_cs4231_math.o: drivers/sound/cs4231/pcm_cs4231_math.c $(PCM_GEN) build/config.mk build/pcm-module.mk
 	$(CC) $(CFLAGS_BASE) -Os -DOS32_PCM_MODULE $(PCM_INC) -c $< -o $@
 $(PCM_OUT)/pcm_import_slots.o $(PCM_OUT)/pcm_provider_types.o $(PCM_OUT)/pcm_kexports.o: $(PCM_OUT)/%.o: $(PCM_OUT)/%.c $(PCM_GEN) build/config.mk build/pcm-module.mk

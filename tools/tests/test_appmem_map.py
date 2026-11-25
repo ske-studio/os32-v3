@@ -155,8 +155,8 @@ MUTANTS = [
      '    exec_addrspace_abort(as);', 'poison counted once'),
     ('resume-no-abort', 5, '    g_cur_app = a;\n    ring3_abort_check();',
      '    g_cur_app = a;', 'poison resume killed before CR3'),
-    ('syscall-exit-no-abort', 5, '    ring3_abort_check();\n    exec_park_stop(&call);',
-     '    exec_park_stop(&call);', 'poison syscall exit killed'),
+    ('syscall-exit-no-abort', 5, '    /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */\n    ring3_abort_check();',
+     '    /* --- 出口でも CTRL+STOP を見る (契約 T6、v1.2 G2 で実測した隙間) --- */', 'poison syscall exit killed'),
     ('WM-clears-poison-abort', 6, 'if (!g_slot[i].as || !g_slot[i].as->appmem_poisoned)',
      'if (1)', 'poison WM clear preserves abort'),
 

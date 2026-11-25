@@ -45,6 +45,10 @@ int snd2_register(const SndBackend *be, void *ctx, const SND2_DevInfo *info)
     caps.dev = dev;
     caps.size = sizeof(caps);
     caps.kind = info->kind;
+#ifdef SND2_REFILL_DIAG
+    for (u32 i = 0; i < sizeof(caps.reserved) / sizeof(caps.reserved[0]); ++i)
+        caps.reserved[i] = 0;
+#endif
     d->caps = caps;
     d->ctx = ctx;
     d->be = be;
