@@ -12,6 +12,10 @@ sys.path.insert(0, str(ROOT / 'tools/ci'))
 import time_inventory
 
 
+def environment_level(check):
+    return 'L4' if 'qemu-ppc' in check['env'] else ''
+
+
 def candidates(check):
     owners = set()
     methods = set()
@@ -40,7 +44,7 @@ def candidates(check):
         elif path.startswith('build/') or path == 'Makefile':
             methods.add('L1')
 
-    if 'qemu-ppc' in check['env'] or 'L4' in methods:
+    if 'L4' in methods:
         return 'L4', 'tests/system/'
     if owners:
         if len(owners) > 1:
@@ -176,8 +180,12 @@ def mutations(check):
         if run is None:
             return '', '', 'no-run-entry'
         scripts = {n.value for n in ast.walk(run) if isinstance(n, ast.Constant)
-                   and isinstance(n.value, str) and n.value.startswith('tools/')
+                   and isinstance(n.value, str) and '/' in n.value
                    and n.value.endswith('.py')}
+        if len(scripts) > 1 and all((ROOT / name).is_file() for name in scripts):
+            counts = [mutation_table(ROOT / name) for name in scripts]
+            if all(count is not None for count in counts):
+                return sum(counts), ','.join(sorted(scripts)), 'declaration-tables'
         if len(scripts) != 1:
             return '', '', 'multiple-scripts' if scripts else 'indirect-run-entry'
         path = ROOT / scripts.pop()
@@ -190,22 +198,129 @@ def mutations(check):
     return '', '', 'missing-script'
 
 
-def red_lines(log):
-    """Count individual RED reports, excluding totals, in a successful prior run."""
-    return sum(bool(re.search(r'\bRED\b', line)) for line in log.splitlines()
-               if not re.search(r'\d+\s*/\s*\d+|^MUTATIONS\b', line)
-               and re.match(r'^\s*(?:RED\b|(?:MUTATION|MUTANT)\s+\S+\s+RED\b)', line, re.I))
+def is_report(line):
+    return bool(re.search(r'\bRED\b', line)) and not re.search(
+        r'^MUTATIONS\b|\d+\s*/\s*\d+\s+(?:(?:runtime|mutants?)\s+)?RED\b', line, re.I)
 
 
-def observations(runs):
+def references(runs):
     result = {}
     for times, logs in runs:
         for _, successes in time_inventory.load([Path(times)]):
             for name in successes:
                 path = Path(logs) / ('check-%s.log' % name)
                 if path.is_file():
-                    result[name] = red_lines(path.read_text(errors='replace'))
+                    result[name] = path.read_text(errors='replace').splitlines()
     return result
+
+
+def kbd_blocks(lines):
+    """Buffered integration.py reports end with a checked killed/total marker."""
+    blocks = []
+    reports = []
+    for pos, line in enumerate(lines):
+        if line.startswith('RED  ') and ' -> FAIL: ' in line:
+            reports.append(line)
+            continue
+        end = re.fullmatch(r'kbdnav mutations: (\d+)/(\d+) killed', line)
+        if end and len(reports) == int(end[1]) == int(end[2]):
+            blocks.append((pos, set(reports), len(reports)))
+        reports = []
+    return blocks
+
+
+def attributable(reference, lines, positions, blocks):
+    # Match complete child runs even when a wrapper launches multiple scripts.
+    prior = kbd_blocks(reference)
+    red = [line for line in reference if is_report(line)]
+    if prior and sum(n for _, _, n in prior) == len(red):
+        hits = []
+        for _, labels, _ in prior:
+            matches = [(pos, n) for pos, actual, n in blocks if labels <= actual]
+            if len(matches) != 1:
+                return None
+            hits.extend(matches)
+        if len({pos for pos, _ in hits}) == len(hits):
+            return sum(n for _, n in hits), [pos for pos, _ in hits]
+        return None
+
+    if not red:
+        return None
+    # Numbered reports may interleave. Require each exact label, its ordinal,
+    # and the matching terminator, in order in the same job.
+    if reference[-1] == f'MUTATIONS {len(red)}/{len(red)} RED' and all(
+            line.startswith(f'MUTATION {i} RED ') for i, line in enumerate(red, 1)):
+        hits = [positions.get(line, []) for line in red]
+        if all(len(hit) == 1 for hit in hits):
+            indices = [hit[0] for hit in hits]
+            if indices == sorted(indices) and lines[indices[-1]+1:indices[-1]+2] == reference[-1:]:
+                return len(indices), indices
+
+    # A complete named transcript, or its RED section between stable control
+    # and completion messages. Ambiguous / changed transcripts stay unknown.
+    first = reference.index(red[0])
+    section = reference[max(0, first-1):]
+    if not section or not section[0].strip():
+        section = reference
+    starts = [pos for pos in positions.get(section[0], [])
+              if lines[pos:pos+len(section)] == section
+              ]
+    if len(starts) == 1:
+        start = starts[0]
+        return sum(is_report(line) for line in lines[start:start+len(section)]), [start]
+    return None
+
+
+def ci_counts(directory, artifacts, refs):
+    from collections import defaultdict
+    results = {}
+    for jobs in sorted(directory.glob('jobs-*.tsv')):
+        run = jobs.stem.split('-')[1]
+        for row in jobs.read_text().splitlines():
+            job_id, job = row.split('\t')
+            shard = re.fullmatch(r'(checks|ppc-qemu) \((\d+)\)', job)
+            if not shard:
+                continue
+            group, index = shard.groups()
+            suffix = ('-ppc-qemu-' if group == 'ppc-qemu' else '-') + index
+            paths = [p for root in artifacts for p in (root/run).glob('*' + suffix + '/check_times.tsv')]
+            if len(paths) != 1:
+                raise ValueError(f'{job}: expected one timing artifact, got {paths}')
+            _, names = time_inventory.load(paths)[0]
+            log = directory / f'{run}-{group}__{index}_.log'
+            if group == 'ppc-qemu':
+                # gate.render only publishes tails of failed checks.
+                text = log.read_text(errors='replace')
+                if '## 検査 シャード ' not in text or '(変異あり)' not in text:
+                    raise ValueError(f'{log}: missing mutation gate report')
+                for name in names:
+                    results[name] = ('', log.name, 'gate-success-without-transcript')
+                continue
+            with log.open(errors='replace') as f:
+                lines = [line.rstrip('\n').partition('Z ')[2] for line in f]
+            relevant = {line for name in names for line in refs.get(name, [])}
+            positions = defaultdict(list)
+            for pos, line in enumerate(lines):
+                if line in relevant:
+                    positions[line].append(pos)
+            blocks = kbd_blocks(lines)
+            claims = {}
+            owners = defaultdict(set)
+            for name in names:
+                ref = refs.get(name)
+                hit = attributable(ref, lines, positions, blocks) if ref else None
+                if hit:
+                    claims[name] = hit
+                    for pos in hit[1]:
+                        owners[pos].add(name)
+            for name in names:
+                if name in claims and all(len(owners[p]) == 1 for p in claims[name][1]):
+                    count, marks = claims[name]
+                    results[name] = (count, f'{log.name}:{marks[0]+1}', 'ci-red')
+                else:
+                    reason = 'ambiguous-or-incomplete-transcript' if name in refs else 'no-reference'
+                    results[name] = ('', log.name, reason)
+    return results
 
 
 def main():
@@ -215,21 +330,32 @@ def main():
     parser.add_argument('artifacts', nargs='*', type=Path)
     parser.add_argument('--prior-run', action='append', nargs=2, default=[],
                         metavar=('TIMES_TSV', 'LOG_DIR'))
+    parser.add_argument('--ci-logs', required=True, type=Path)
     args = parser.parse_args()
-    observed = observations(args.prior_run)
+    observed = ci_counts(args.ci_logs, args.artifacts, references(args.prior_run))
     checks = json.loads(args.registry.read_text())
     times = measured_times(args.artifacts, checks)
     keys = ['name', 'path', 'tier', 'env', 'covers', 'basis', 'kind']
-    with (args.out / 'checks.tsv').open('w', newline='') as full, (
+    with (args.out / 'source_disagreements.tsv').open('w', newline='') as diff, (
+            args.out / 'checks.tsv').open('w', newline='') as full, (
             args.out / 'no_candidate.tsv').open('w', newline='') as missing:
         table, gaps = [csv.writer(f, delimiter='\t', lineterminator='\n') for f in (full, missing)]
-        table.writerow(keys + ['mutation_count', 'mutation_source', 'mutation_basis', 'prior_individual_red_lines', 'ci_seconds', 'level', 'destination'])
+        table.writerow(keys + ['mutation_count', 'mutation_source', 'mutation_basis', 'source_estimate', 'source_path', 'source_basis', 'disagreement', 'env_level', 'ci_seconds', 'level', 'destination'])
+        differences = csv.writer(diff, delimiter='\t', lineterminator='\n')
+        differences.writerow(['name', 'mutation_count', 'mutation_source', 'source_estimate', 'source_path'])
         gaps.writerow(['name', 'level', 'destination'])
         for check in sorted(checks, key=lambda c: c['name']):
             level, dest = candidates(check)
             values = [json.dumps(check[k], ensure_ascii=False) if isinstance(check[k], list)
                       else check[k] for k in keys]
-            table.writerow(values + [*mutations(check), observed.get(check['name'], ''), times.get(check['name'], ''), level, dest])
+            count, log, reason = observed.get(check['name'], ('', '', 'no-success-row'))
+            estimate, path, basis = mutations(check)
+            mismatch = int(count != estimate) if count != '' and estimate != '' else ''
+            if mismatch == 1:
+                differences.writerow([check['name'], count, log, estimate, path])
+            env_level = environment_level(check)
+            table.writerow(values + [count, log, reason, estimate, path, basis, mismatch,
+                                     env_level, times.get(check['name'], ''), level, dest])
             if not level or not dest:
                 gaps.writerow([check['name'], level, dest])
 
