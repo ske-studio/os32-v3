@@ -33,7 +33,7 @@ def latency_capture(script, directory, mutate):
         replies = [reply(990, [10007] + [0]*127), BytesIO(b'{"ok":true}'),
                    reply(1100, [0]*146), reply(1246, [-23456])]
         with patch('urllib.request.urlopen', side_effect=replies), \
-             patch('time.monotonic_ns', side_effect=[0, 1, 2, 3, 4, 5]), \
+             patch('time.monotonic_ns', side_effect=[0, 1, 2, 3, 4, 350000001]), \
              patch.object(sys, 'argv', [str(script), str(output)]):
             try:
                 exec(compile(code, str(script), 'exec'), {'__name__': '__main__'})
@@ -43,6 +43,7 @@ def latency_capture(script, directory, mutate):
             except SystemExit as done:
                 assert not mutant and done.code == 0
                 result = json.loads((output / 'timing.json').read_text())
+                assert result['upper_ns'] == 350000000
                 assert result['capture_frame'] == 1246 and result['frame'] == 8*256
                 print('GREEN latency across windows')
 
@@ -53,7 +54,7 @@ def run(ctx):
         compile(path.read_text(), str(path), 'exec')
     verifier = scripts / 'verify_wave.py'
     source = verifier.read_text()
-    changes = [('end-start', '0'), ('(left,right)==expected', 'right == expected[1]')]
+    changes = [('start if saw_boot_rate else stop', 'start'), ('end-start', '0'), ('(left,right)==expected', 'right == expected[1]')]
     with tempfile.TemporaryDirectory() as td:
         directory = Path(td)
         latency_capture(scripts / 'latency.py', directory, ctx.mutate)
@@ -81,6 +82,16 @@ def run(ctx):
             window('1.json', 44100, 10, samples[:300])
             window('2.json', 44100, 266, samples[256:])
             good = matches()
+            # With DMA stopped, the old marker remains in every idle window.
+            (directory / '0.json').unlink()
+            window('00.json', 44100, 0, samples[:10])
+            window('01.json', 44100, 0, samples[:10])
+            window('1.json', 44100, 0, samples[:10] + samples[:300])
+            good = good and matches()
+            (directory / '00.json').unlink()
+            (directory / '01.json').unlink()
+            window('0.json', 8000, 0, [(0, 0)])
+            window('1.json', 44100, 10, samples[:300])
             damaged = samples[256:]
             damaged[-1] = (1, damaged[-1][1])
             window('2.json', 44100, 266, damaged)

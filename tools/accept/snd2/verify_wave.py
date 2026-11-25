@@ -5,11 +5,13 @@ sine = (0,2341,4592,6667,8485,9978,11087,11769,12000,11769,11087,9978,
         -11769,-12000,-11769,-11087,-9978,-8485,-6667,-4592,-2341)
 
 
-def capture(directory):
+def capture_paths(paths):
     frames, end = bytearray(), None
-    for path in sorted(Path(directory).glob('*.json')):
+    saw_boot_rate = False
+    for path in paths:
         r = json.loads(path.read_text())
         if end is None and r['ok'] and r['rate'] == 8000:
+            saw_boot_rate = True
             continue
         assert r['ok'] and r['rate'] == 44100, path
         raw = base64.b64decode(r['pcm'], validate=True)
@@ -17,11 +19,15 @@ def capture(directory):
         stop = r['frames_total']
         start = stop - r['frames']
         if end is None:
-            end = start
+            end = start if saw_boot_rate else stop
         assert start <= end <= stop, f'capture gap or reset: {path}'
         frames.extend(raw[4*(end-start):])
         end = stop
     return struct.iter_unpack('<hh', frames)
+
+
+def capture(directory):
+    return capture_paths(sorted(Path(directory).glob('*.json')))
 
 
 def verify(data, total=44100*30):

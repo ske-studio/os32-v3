@@ -56,7 +56,7 @@ make ARCH=ppc PLATFORM=powermac IMAGE=powermac KB_ROOT_BINS=build/out/ppc-powerm
 
 ### wave の生 frame 照合
 
-wave 専用の空ディレクトリに取得する。直前の試験の生 frame が窓から消えるまで 1 秒以上空け、開始前から終了まで採る。次をホストで実行する。
+wave 専用の空ディレクトリに取得する。再生開始前に少なくとも 1 窓の取得完了を確認し、終了まで採る。停止中は何秒待っても frames_total は進まず、前の試験の印が残る。最初の 44100 Hz 窓の終端を基準に、その後増えた frame だけを照合する。起動時の 8000 Hz 窓から切り替わる場合は、新レートの先頭から照合する。次をホストで実行する。
 
 ```sh
 python3 tools/accept/snd2/verify_wave.py capture
@@ -77,7 +77,7 @@ export NP21W_AIDEBUG_URL=${NP21W_AIDEBUG_URL:-http://127.0.0.1:8025}
 
 ゲストで `snd2_test latency lead=4`、約 2 秒後にホストで `python3 tools/accept/snd2/latency.py "$D/latency-01"`（未使用の出力先）。再生中にホスト側が x を 1 回送り、ゲストは次に受理される書込みの右先頭だけを −23456 にする。ゲストは終了時に `latency frame=F write_us_hi=H write_us_lo=L` を出す。時刻は受理された write の直前（ゲスト起動から 2³²H + L µs）。
 
-ホストの timing.json にある frame が F と一致し、ゲストが underruns=0・PASS、ホストが終了 0 かつ upper_ns < 30000000 なら合格。upper_ns はキー要求の送信直前から、印を含む最初の sound 応答の受信完了までの単調時計の差。書込みは送信より後、採取側の発音は受信完了以前なので、入力配送・ポーリング・転送も含む上限になる。ゲスト位置カウンタに依存しない。開始前から x が入力されていた場合や採取窓の欠けは無効。時刻と before.json・hit.json を保存する。30 ms 以上なら上限を報告し受入保留。異なる開始時点で繰り返した場合は各回の値と最大を残す。
+ゲストの単調 µs 時計で、書込み直前から HAL の DMA 由来の played が F を超えたことを観測した直後までを測る。再試行では受理された write の時刻を使う。書込みを続けながら観測するので、割込み・観測の遅れも上限に含む。dma_upper_us_hi=0、dma_upper_us_lo < 30000、underruns=0、epoch=0、PASS を要求する。これは DMA 通過までの上限で、アナログ出力段の遅れは含まない。ホストは補助照合に使い、timing.json の frame が F と一致することを確かめる。upper_ns はキー要求の送信直前から、印を含む最初の sound 応答の受信完了までの単調時計の差。書込みは送信より後、採取側の発音は受信完了以前なので、入力配送・ポーリング・転送も含む上限になる。ゲスト位置カウンタに依存しない。開始前から x が入力されていた場合や採取窓の欠けは無効。時刻と before.json・hit.json を保存する。req52 の upper_ns は 337〜365 ms で、API 1 回に約 105〜128 ms かかった。この値は記録のみとし、ホストの終了 0 は印の照合成功を示す。異なる開始時点で繰り返した場合は各回の値と最大を残す。
 
 ## P1（§13-3）150 ms 停止の前後と再生継続
 
@@ -103,7 +103,7 @@ post('/api/key', b'text=a')
 PY
 ```
 
-a を送った直後、同じホストで再開後の PCM を 2 回採る。最初の窓と重なる frame を除いて鳴った印を調べる。
+a を送った直後、同じホストで再開後の PCM を 2 回採る。最初の窓を基準に、増えた frame の印を調べる。途中の窓も取得した場合は時刻順に引数に渡す。全窓が同じ frames_total なら再生継続の証拠がなく不合格。
 
 ```sh
 curl -fsS "$NP21W_AIDEBUG_URL/api/sound?pcm=1" > "$D/epoch-a.json"
@@ -112,7 +112,7 @@ curl -fsS "$NP21W_AIDEBUG_URL/api/sound?pcm=1" > "$D/epoch-continued.json"
 python3 tools/accept/snd2/verify_epoch.py "$D/epoch-a.json" "$D/epoch-continued.json"
 ```
 
-シリアルの `epoch before=E played=P ms=T after=A played=Q ms=U` の前半が armed の値に一致し、A = (E+1) mod 2³²。最後の位置集計行は epoch=A、played > Q、played ≤ written=1323000、drain 後の末尾は PASS。上で出した実音の application frame も Q を超えること。a の後に位置と実際の PCM の両方が進んだことを確かめる。停止中にエミュレータが PIT と DMA の両方を凍結し位置欠測が生じない場合は epoch が変わらず FAIL になる。その結果と構成を記録する。
+シリアルの `epoch before=E played=P ms=T after=A played=Q ms=U` の前半が armed の値に一致し、A = (E+1) mod 2³²。最後の位置集計行は epoch=A、played > Q、played ≤ written=1323000、drain 後の末尾は PASS。上で出した実音の application frame も Q を超えること。a の後に位置と実際の PCM の両方が進んだことを確かめる。停止中にエミュレータが PIT と DMA の両方を凍結し位置欠測が生じない場合は epoch が変わらず FAIL になる。req52 の armed 以後、書込みループ内で rc=6 になれるのは a の処理時（位置取得失敗または epoch 不一致）。この場合は resume 後である。ただし最終位置の取得・整合検査も集計の表示前に rc=6 を返すため、当時のログだけでは前後を断定できない。次回は epoch key=a の位置または取得エラー、あるいは epoch final のエラー行で区別する。PIT と DMA が共に凍結する構成ではこの試行を未測定とし、実機で DMA が走る間に位置観測だけが 150 ms 以上途切れる条件で評価することを推奨する。単なる供給停止は stall の検査になる。診断像で観測だけを抑止する方法もあるが、製品像での実証は別途必要。
 
 ## P1（§13-3）IF=0 の最長区間
 

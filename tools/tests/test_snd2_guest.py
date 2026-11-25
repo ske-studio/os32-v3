@@ -27,7 +27,9 @@ def run(ctx):
         ('pos.played <= recovered.played', 'pos.played < recovered.played'),
         ('!changed || pos.epoch', '0 || pos.epoch'),
         ('samples[2*sent+1] = -23456;', 'samples[2*sent+1] = 0;'),
-        ('if (!marked || pos.underruns)', 'if (pos.underruns)'),
+        ('pos.played > mark_frame', 'pos.played >= mark_frame'),
+        ('upper_us >= 30000', 'upper_us > 30000'),
+        ('!observed || pos.underruns', 'pos.underruns'),
     ]
     with tempfile.TemporaryDirectory() as td:
         work = Path(td)
