@@ -1,5 +1,6 @@
 """Verify P1 ledgers against the design baseline (P1.md, 母数)."""
 import argparse
+import ast
 import csv
 import io
 import re
@@ -9,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = 'c6076a6f6'
+LAYER_BLOB = '{revision}:tools/check_layers.py'
 SCOPE = ROOT / 'docs/tasks/restructure/data/scope.tsv'
 HEADER = ['パス', '担当', '種類', '根拠', '外の呼び出し元', '所属種類']
 EXCLUDED = ['# 基点の棚卸し用ファイル（母数外）']
@@ -95,8 +97,62 @@ OWNERSHIP_KINDS = {
 }
 
 
+LAYER_KIND = {'common': '共通実装', 'arch': 'CPU固有実装',
+              'platform': '機種固有実装', 'device': 'デバイス固有実装'}
+
+
+def layer_declarations(source):
+    # Read the reviewed revision's literal ownership declarations without
+    # importing its scanner (which reads build artifacts when run).
+    values = {}
+    for node in ast.parse(source).body:
+        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
+            name = node.targets[0].id
+            if name in ('NAMED', 'DEVICE_ROOTS'):
+                values[name] = ast.literal_eval(node.value)
+    return values['NAMED'], values['DEVICE_ROOTS']
+
+
+def placement_kind(path, kind, named, devices):
+    if kind != '製品':
+        return {'公開物': '公開インターフェース', '運用の道具': '開発・検査用実装',
+                **dict.fromkeys(KINDS['P1-4'], '開発・検査用実装')}.get(kind, kind)
+    if path in ('apps', 'game'):
+        return '第三者の物'
+    if path.startswith('boot/'):
+        return '機種固有実装'
+    parts = path.split('/')
+    if len(parts) == 2 and parts[0] == 'include' and parts[1] in named:
+        return LAYER_KIND[named[parts[1]][0]]
+    if len(parts) > 2 and parts[0] in ('arch', 'platform'):
+        return LAYER_KIND[parts[0]]
+    if parts[0] in devices:
+        return LAYER_KIND['device']
+    return LAYER_KIND['common']
+
+
+def build_kinds(definitions):
+    """Literal members of ownership sets. Feature selection alone is not ownership."""
+    result = {}
+    for body in definitions.values():
+        for line in body.replace('\\\n', ' ').splitlines():
+            match = re.match(r'(?:C|ASM|GAS)_(COMMON|ARCH|PLATFORM)\w*\s*[:+]?=\s*(.*)', line)
+            if match:
+                for member in match[2].split('#')[0].split():
+                    if re.fullmatch(r'[\w./-]+\.(?:c|S|asm)', member):
+                        result.setdefault(member, set()).add(LAYER_KIND[match[1].lower()])
+    return result
+
+
 def verify_scope(table, base, list_candidates=False):
     expected, omitted = inventory(base)
+    manifests = {p for p in expected if p.startswith(('build/arch/', 'build/platform/', 'build/sources/'))
+                 and p.endswith('.mk')}
+    definitions, _ = review_inputs(base, set(), manifests)
+    classifier = subprocess.check_output(['git', 'show', LAYER_BLOB.format(revision=base)],
+                                         cwd=ROOT, text=True)
+    named, devices = layer_declarations(classifier)
+    members = build_kinds(definitions)
     issues = []
     pending = []
     paths = []
@@ -122,6 +178,17 @@ def verify_scope(table, base, list_candidates=False):
             path, owner, kind, reason, caller, ownership = row
             if ownership not in OWNERSHIP_KINDS:
                 issues.append(f'{path}: 所属種類が空または不正 ({ownership})')
+            evidence = {placement_kind(path, kind, named, devices)}
+            if kind == '製品':
+                evidence.update(members.get(path, ()))
+            decision = re.search(r'所属判断=([^：]+)：(\S.*)', reason)
+            if decision and decision[1] != ownership:
+                issues.append(f'{path}: 所属判断と所属種類が不一致')
+            if evidence - {ownership}:
+                detail = f'{path}: 所属照合 {"/".join(sorted(evidence))} → {ownership}'
+                print(detail)
+                if not decision or decision[1] != ownership:
+                    issues.append(detail + ' の理由がない')
             paths.append(path)
             if any(not value.strip() for value in row[:4]):
                 issues.append(f'{path}: 必須欄が空')

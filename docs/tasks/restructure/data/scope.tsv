@@ -1415,21 +1415,21 @@ docs/tasks/v3/V3_PLAN.md	文書	文書	文書ツリーの本文・添付・管�
 docs/tasks/v4/README.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/tasks/vision/AUXILIARY_CORE_SERVICE.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/tasks/vision/LEGACY_LIVING_PRESERVATION.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
-drivers/ata/atapi.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
+drivers/ata/atapi.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=デバイス固有実装：装置層の ata 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/ata/atapi.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
 drivers/ata/atapi_pio.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
-drivers/ata/cd_body.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
+drivers/ata/cd_body.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=デバイス固有実装：装置層の ata 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/ata/cd_body.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
 drivers/ata/cd_module.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
 drivers/ata/cd_module.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
-drivers/ata/ide.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
+drivers/ata/ide.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=デバイス固有実装：装置層の ata 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/ata/ide.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
-drivers/ata/ide_addr.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
+drivers/ata/ide_addr.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=デバイス固有実装：装置層の ata 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/ata/ide_addr.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
 drivers/ata/ide_multiple.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
 drivers/ata/ide_pio.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
 drivers/ata/ide_request.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
-drivers/base/dev.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
+drivers/base/dev.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=デバイス固有実装：装置層の base 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/block/disk.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
 drivers/block/fat_diskio.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
 drivers/block/fdc.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
@@ -1443,7 +1443,7 @@ drivers/block/fdc_seek_reset.inc	P1-1	製品	P0-1 で像の入力を確認：pc9
 drivers/block/fdc_track.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
 drivers/block/fdc_track.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	デバイス固有実装
 drivers/block/fdc_transfer.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	デバイス固有実装
-drivers/block/loop_dev.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
+drivers/block/loop_dev.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=デバイス固有実装：装置層の block 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/block/loop_dev.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
 drivers/block/loop_dev_block_io.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
 drivers/block/loop_dev_chs_io.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
@@ -1481,7 +1481,7 @@ drivers/input/mouse.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out
 drivers/input/mouse_bus.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
 drivers/input/mouse_hal.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
 drivers/input/mouse_seamless.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
-drivers/macintosh/via.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	デバイス固有実装
+drivers/macintosh/via.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core。所属判断=デバイス固有実装：装置層の macintosh 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/macintosh/via.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	デバイス固有実装
 drivers/net/e82557/e82557.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/lan/lan.elf	—	デバイス固有実装
 drivers/net/e82557/e82557.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
@@ -1497,12 +1497,12 @@ drivers/net/e82557/lan_module.c	P1-1	製品	P0-1 で像の入力を確認：pc98
 drivers/net/e82557/lan_module.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	デバイス固有実装
 drivers/net/e82557/nic_e82557.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/lan/lan.elf	—	デバイス固有実装
 drivers/net/gem/gem.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	デバイス固有実装
-drivers/net/gem/gem_mac.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	デバイス固有実装
-drivers/net/gem/gem_phy.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	デバイス固有実装
-drivers/net/gem/gem_reset.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	デバイス固有実装
-drivers/net/gem/gem_ring.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	デバイス固有実装
-drivers/net/gem/gem_rx.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	デバイス固有実装
-drivers/net/gem/gem_tx.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	デバイス固有実装
+drivers/net/gem/gem_mac.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core。所属判断=デバイス固有実装：装置層の net 実装を像の機能集合から選択	—	デバイス固有実装
+drivers/net/gem/gem_phy.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core。所属判断=デバイス固有実装：装置層の net 実装を像の機能集合から選択	—	デバイス固有実装
+drivers/net/gem/gem_reset.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core。所属判断=デバイス固有実装：装置層の net 実装を像の機能集合から選択	—	デバイス固有実装
+drivers/net/gem/gem_ring.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core。所属判断=デバイス固有実装：装置層の net 実装を像の機能集合から選択	—	デバイス固有実装
+drivers/net/gem/gem_rx.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core。所属判断=デバイス固有実装：装置層の net 実装を像の機能集合から選択	—	デバイス固有実装
+drivers/net/gem/gem_tx.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core。所属判断=デバイス固有実装：装置層の net 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/net/ne2000/lgy98.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
 drivers/net/ne2000/lgy98.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	デバイス固有実装
 drivers/net/ne2000/ne2000.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
@@ -1515,14 +1515,14 @@ drivers/net/ne2000/ne2000_regs.h	P1-1	製品	P0-1 で像の入力を確認：pc9
 drivers/net/ne2000/ne2000_ring.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
 drivers/net/ne2000/ne2000_ring.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	デバイス固有実装
 drivers/net/ne2000/nic_lgy98.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
-drivers/pci/pci.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
+drivers/pci/pci.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=デバイス固有実装：装置層の pci 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/pci/pci.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
-drivers/pci/pci_barsize.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
+drivers/pci/pci_barsize.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=デバイス固有実装：装置層の pci 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/pci/pci_barsize.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
-drivers/pci/pci_bind.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
+drivers/pci/pci_bind.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=デバイス固有実装：装置層の pci 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/pci/pci_bind.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
-drivers/pci/pci_bind_match.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
-drivers/pci/pci_decode.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/shell.elf	—	デバイス固有実装
+drivers/pci/pci_bind_match.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=デバイス固有実装：装置層の pci 実装を像の機能集合から選択	—	デバイス固有実装
+drivers/pci/pci_decode.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/shell.elf。所属判断=デバイス固有実装：装置層の pci 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/pci/pci_decode.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
 drivers/pci/pci_hwb.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/kdebug.elf	—	デバイス固有実装
 drivers/pci/pci_hwb.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/kdebug.elf	—	デバイス固有実装
@@ -1552,8 +1552,8 @@ drivers/sound/fm/opn_probe.c	P1-1	製品	P0-1 で像の入力を確認：pc98/bu
 drivers/sound/fm/opn_probe.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/fm/fm.elf	—	デバイス固有実装
 drivers/sound/snd_wake_tick.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
 drivers/sound/snd_wake_tick.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	デバイス固有実装
-drivers/usb/ehci_handoff.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
-drivers/usb/ehci_quiesce.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
+drivers/usb/ehci_handoff.c	P1-1	製品	P0-1 で像の入力を確認：pc98。所属判断=デバイス固有実装：装置層の usb 実装を像の機能集合から選択	—	デバイス固有実装
+drivers/usb/ehci_quiesce.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=デバイス固有実装：装置層の usb 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/usb/hid_boot.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
 drivers/usb/hid_kbd.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
 drivers/usb/hid_kbd_map.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
@@ -1626,10 +1626,10 @@ drivers/video/kcg/kcg_body.c	P1-1	製品	P0-1 で像の入力を確認：pc98/bu
 drivers/video/kcg/kcg_module.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
 drivers/video/kcg/kcg_module.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
 drivers/video/kcg/kcg_read_provider.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
-drivers/video/of_fb/backend_of_fb.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
+drivers/video/of_fb/backend_of_fb.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=デバイス固有実装：装置層の video 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/video/of_fb/backend_of_fb.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
 drivers/video/of_fb/of_fb_osri.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	デバイス固有実装
-drivers/video/of_fb/of_fb_v2.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	デバイス固有実装
+drivers/video/of_fb/of_fb_v2.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=デバイス固有実装：装置層の video 実装を像の機能集合から選択	—	デバイス固有実装
 drivers/video/pc98/backend_pc98.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
 drivers/video/pc98/backend_pc98_osri.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
 drivers/video/pc98/backend_pegc.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	デバイス固有実装
@@ -1750,10 +1750,10 @@ exec/system_surface.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	
 exec/system_surface.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/ext2/ext2.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/ext2/ext2_ctx.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
-fs/ext2/ext2_dir.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+fs/ext2/ext2_dir.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から fs/ext2 の共通処理をリンク	—	共通実装
 fs/ext2/ext2_dir_directory.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/ext2/ext2_dir_rename.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
-fs/ext2/ext2_file.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+fs/ext2/ext2_file.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から fs/ext2 の共通処理をリンク	—	共通実装
 fs/ext2/ext2_file_read_cache.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/ext2/ext2_file_read_run.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/ext2/ext2_file_write_batch.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -1762,7 +1762,7 @@ fs/ext2/ext2_fmt.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—
 fs/ext2/ext2_fmt_init_groups.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/ext2/ext2_fmt_write_backups.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/ext2/ext2_fmt_write_groups.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
-fs/ext2/ext2_inode.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+fs/ext2/ext2_inode.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から fs/ext2 の共通処理をリンク	—	共通実装
 fs/ext2/ext2_inode_cache.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/ext2/ext2_inode_indirect_cache.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/ext2/ext2_inode_write_bitmap.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -1770,13 +1770,13 @@ fs/ext2/ext2_inode_write_bmap.inc	P1-1	製品	P0-1 で像の入力を確認：kb
 fs/ext2/ext2_inode_write_cache.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/ext2/ext2_layout.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/cdinst.elf	—	共通実装
 fs/ext2/ext2_layout.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
-fs/ext2/ext2_medium_ide.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	共通実装
+fs/ext2/ext2_medium_ide.c	P1-1	製品	P0-1 で像の入力を確認：pc98。所属判断=機種固有実装：pc98pt.h の区画表を処理する	—	機種固有実装
 fs/ext2/ext2_medium_loop.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	共通実装
 fs/ext2/ext2_priv.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
-fs/ext2/ext2_super.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+fs/ext2/ext2_super.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から fs/ext2 の共通処理をリンク	—	共通実装
 fs/ext2/ext2_super_block_io.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/ext2/ext2_time.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
-fs/ext2/ext2_vfs.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+fs/ext2/ext2_vfs.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から fs/ext2 の共通処理をリンク	—	共通実装
 fs/ext2/ext2_vfs_remove_path.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/fat/fatfs/diskio.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	共通実装
 fs/fat/fatfs/diskio_os32.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	共通実装
@@ -1789,17 +1789,17 @@ fs/fat/fatfs_vfs_read_cache.inc	P1-1	製品	P0-1 で像の入力を確認：pc98
 fs/fd_redirect.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	共通実装
 fs/fd_redirect.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	共通実装
 fs/ide_limits.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	共通実装
-fs/isofs/iso9660.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+fs/isofs/iso9660.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から fs/isofs の共通処理をリンク	—	共通実装
 fs/isofs/iso9660.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/isofs/iso9660_dir_read.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/isofs/iso9660_dir_record.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
-fs/isofs/iso9660_media.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+fs/isofs/iso9660_media.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から fs/isofs の共通処理をリンク	—	共通実装
 fs/isofs/iso9660_media.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/pc98pt.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/shell.elf	—	共通実装
 fs/pc98pt.h	P1-1	製品	P0-1 で像の入力を確認：pc98/boot/loader_hdd.elf	—	共通実装
 fs/pipe_buffer.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 fs/pipe_buffer.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
-fs/ramfs/ramfs.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+fs/ramfs/ramfs.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から fs/ramfs の共通処理をリンク	—	共通実装
 fs/ramfs/ramfs.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 fs/serialfs/serialfs.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 fs/serialfs/serialfs.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -1823,7 +1823,7 @@ fs/vfs_name_rules.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out
 fs/vfs_stdin.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 game	P1-1	製品	外部アプリケーションの gitlink	—	第三者の物
 gfx/gfx.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
-gfx/gfx_console.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+gfx/gfx_console.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から gfx の共通処理をリンク	—	共通実装
 gfx/gfx_console.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 gfx/gfx_core.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 gfx/gfx_core_api.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -1839,7 +1839,7 @@ gfx/gfx_hw_mono_cpu.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	
 gfx/gfx_hw_mono_cpu.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 gfx/gfx_hw_submit.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 gfx/gfx_internal.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
-gfx/gfx_osri.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+gfx/gfx_osri.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から gfx の共通処理をリンク	—	共通実装
 gfx/gfx_osri.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 gfx/gfx_osri_view.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	共通実装
 gfx/gfx_osri_view.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -2175,7 +2175,7 @@ include/video_wc.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/ke
 include/vk32.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
 include/wab_xe10.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/cirrus/cirrus.elf	—	機種固有実装
 init/boot_disk.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	共通実装
-init/boot_root.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+init/boot_root.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から init の共通処理をリンク	—	共通実装
 init/bootinfo.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 init/bootlog.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 init/bootlog_save.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	共通実装
@@ -2212,10 +2212,10 @@ input/hal/legacy_ring.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-s
 input/hal/mouse_ext.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 input/hal/mouse_pointer.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 input/hal/pointer_state.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
-input/hal/usb_input.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+input/hal/usb_input.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から input/hal の共通処理をリンク	—	共通実装
 input/hal/usb_input.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
-input/keymaps/hid_jp.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
-input/keymaps/pc98_jp.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	共通実装
+input/keymaps/hid_jp.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から input/keymaps の共通処理をリンク	—	共通実装
+input/keymaps/pc98_jp.c	P1-1	製品	P0-1 で像の入力を確認：pc98。所属判断=機種固有実装：jp.pc98.kbd の走査コード表	—	機種固有実装
 kapi/kapi_db.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kapi/kapi_db.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 kapi/kapi_db_helpers.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -2227,7 +2227,7 @@ kapi/kapi_host.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build
 kapi/kapi_host_notice.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kapi/kapi_host_notice.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 kapi/kapi_in2.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
-kapi/kapi_osri.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+kapi/kapi_osri.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から kapi の共通処理をリンク	—	共通実装
 kapi/kapi_port.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kapi/kapi_print.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kapi/kapi_profile.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -2409,7 +2409,7 @@ kernel/console/console_dual.c	P1-1	製品	P0-1 で像の入力を確認：kboot-
 kernel/console/console_dual.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 kernel/console/console_stream.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 kernel/console/display_restore.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
-kernel/console/fbcon.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+kernel/console/fbcon.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から kernel/console の共通処理をリンク	—	共通実装
 kernel/console/fbcon.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 kernel/console/font_guard.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kernel/console/font_guard.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -2425,11 +2425,11 @@ kernel/dev/dev_name.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/
 kernel/dev/device_fs.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kernel/dev/device_host.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link	—	共通実装
 kernel/dev/device_ide.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
-kernel/dev/device_kcg.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+kernel/dev/device_kcg.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から kernel/dev の共通処理をリンク	—	共通実装
 kernel/dev/device_loop.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kernel/dev/device_pci.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kernel/dev/install_management.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
-kernel/dev/ram_ro.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+kernel/dev/ram_ro.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から kernel/dev の共通処理をリンク	—	共通実装
 kernel/dev/ram_ro.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 kernel/fep_boot.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kernel/fep_boot.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	共通実装
@@ -2481,12 +2481,12 @@ kernel/kaudit.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	共通実�
 kernel/kbd_inject.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kernel/kselftest.h	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	共通実装
 kernel/kselftest_report.c	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	共通実装
-kernel/kstack_hw.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	共通実装
+kernel/kstack_hw.c	P1-1	製品	P0-1 で像の入力を確認：pc98。所属判断=共通実装：像の集合から kernel の共通処理をリンク	—	共通実装
 kernel/kstack_hw.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	共通実装
 kernel/machcfg.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	共通実装
 kernel/machcfg_root.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kernel/module/debug_probe.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
-kernel/module/kdebug_call.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+kernel/module/kdebug_call.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から kernel/module の共通処理をリンク	—	共通実装
 kernel/module/kdebug_imports.def	P1-1	製品	製品実装・同梱ファイル：kernel/module	—	共通実装
 kernel/module/module.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 kernel/module/module_fixup_ppc.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -2506,7 +2506,7 @@ kernel/sqlite_outer.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	
 kernel/sqlite_static.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kernel/sys.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	共通実装
 kernel/time/clock_service.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
-kernel/time/cpu_calibrate.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
+kernel/time/cpu_calibrate.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から kernel/time の共通処理をリンク	—	共通実装
 kernel/time/cpu_calibrate.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 kernel/time/cpu_calibrate_math.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kernel/time/cpu_calibrate_math.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -2533,12 +2533,12 @@ lib/crc32_core.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/bui
 lib/divdi3.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	共通実装
 lib/dma_contract.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	共通実装
 lib/kmath.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
-lib/kprintf.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	共通実装
+lib/kprintf.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core。C_COMMON_CORE の書式処理が固定名 platform_kprintf.h を呼ぶ	—	共通実装
 lib/kprintf_attr.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 lib/kprintf_format.inc	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	共通実装
 lib/kstring.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 lib/kstring.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	共通実装
-lib/kstring_asm.asm	P1-1	製品	P0-1 で像の入力を確認：pc98	—	共通実装
+lib/kstring_asm.asm	P1-1	製品	P0-1 で像の入力を確認：pc98。所属判断=CPU固有実装：x86 レジスタと呼出規約を使うアセンブラ	—	CPU固有実装
 lib/kstring_c.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	pc98emu 経由 tools/ppc/root_lz4_layout_run.py	共通実装
 lib/kutf16.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	共通実装
 lib/kutf16.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	共通実装
@@ -2688,7 +2688,7 @@ lib/sqlite3/os32_sqlite_vfs.c	P1-1	製品	P0-1 で像の入力を確認：kboot-
 lib/sqlite3/os32_sqlite_vfs.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 lib/sqlite3/sqlite3.c	P1-1	第三者の物	取り込んだ上流ライブラリまたはその付属物	—	第三者の物
 lib/sqlite3/sqlite3.h	P1-1	第三者の物	取り込んだ上流ライブラリまたはその付属物	—	第三者の物
-lib/sqlite3/sqlite_stack.asm	P1-1	製品	P0-1 で像の入力を確認：pc98	—	共通実装
+lib/sqlite3/sqlite_stack.asm	P1-1	製品	P0-1 で像の入力を確認：pc98。所属判断=CPU固有実装：x86 レジスタと呼出規約を使うアセンブラ	—	CPU固有実装
 lib/unicode_jis_table.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/unicode.bin	—	共通実装
 lib/utf8.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/gshell.elf	—	共通実装
 lib/utf8.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -2887,7 +2887,7 @@ platform/pc98/splash.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	機�
 platform/pc98/splash_image.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	機種固有実装
 platform/pc98/splash_obs.c	P1-1	製品	P0-1 で像の入力を確認：pc98+SPLASH_OBS_BUILD	—	機種固有実装
 platform/pc98/splash_probe.c	P1-1	製品	P0-1 で像の入力を確認：pc98+SPLASH_DIAG_BUILD	—	機種固有実装
-platform/pc98/sysclk.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	機種固有実装
+platform/pc98/sysclk.c	P1-1	製品	P0-1 で像の入力を確認：pc98。所属判断=機種固有実装：pc98 の起動・クロック実装を CPU 集合経由で選択	—	機種固有実装
 platform/pc98/sysclk.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	機種固有実装
 platform/pc98/system.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	機種固有実装
 platform/pc98/tick_budget.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	機種固有実装
@@ -2968,7 +2968,7 @@ platform/powermac/kboot_reserve.c	P1-1	製品	P0-1 で像の入力を確認：kb
 platform/powermac/kcg.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	機種固有実装
 platform/powermac/kdebug_imports.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	機種固有実装
 platform/powermac/kdebug_imports.json	P1-1	製品	製品実装・同梱ファイル：platform/powermac	—	機種固有実装
-platform/powermac/kernel_boot.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	機種固有実装
+platform/powermac/kernel_boot.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core。所属判断=機種固有実装：powermac の起動・クロック実装を CPU 集合経由で選択	—	機種固有実装
 platform/powermac/lan_boot.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	機種固有実装
 platform/powermac/lan_diag.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	機種固有実装
 platform/powermac/lan_gem_io.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	機種固有実装
@@ -6015,9 +6015,9 @@ userland/lib/font/vendor/ttf-parser-0.21.1/src/tables/trak.rs	P1-4	試験の支�
 userland/lib/font/vendor/ttf-parser-0.21.1/src/tables/vhea.rs	P1-4	試験の支援	font/Cargo.toml の dev-dependency。outline 試験が使う ttf-parser 一式	—	開発・検査用実装
 userland/lib/font/vendor/ttf-parser-0.21.1/src/tables/vorg.rs	P1-4	試験の支援	font/Cargo.toml の dev-dependency。outline 試験が使う ttf-parser 一式	—	開発・検査用実装
 userland/lib/font/vendor/ttf-parser-0.21.1/src/var_store.rs	P1-4	試験の支援	font/Cargo.toml の dev-dependency。outline 試験が使う ttf-parser 一式	—	開発・検査用実装
-userland/lib/gfx/asm/asm_blit.asm	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/gshell.elf	—	共通実装
-userland/lib/gfx/asm/asm_draw.asm	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/gshell.elf	—	共通実装
-userland/lib/gfx/asm/asm_sprite.asm	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/gshell.elf	—	共通実装
+userland/lib/gfx/asm/asm_blit.asm	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/gshell.elf。所属判断=CPU固有実装：x86 レジスタと呼出規約を使うアセンブラ	—	CPU固有実装
+userland/lib/gfx/asm/asm_draw.asm	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/gshell.elf。所属判断=CPU固有実装：x86 レジスタと呼出規約を使うアセンブラ	—	CPU固有実装
+userland/lib/gfx/asm/asm_sprite.asm	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/gshell.elf。所属判断=CPU固有実装：x86 レジスタと呼出規約を使うアセンブラ	—	CPU固有実装
 userland/lib/gfx/asm/gfx_const.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/gshell.elf	—	共通実装
 userland/lib/gfx/draw/gfx_blt.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/gshell.elf	—	共通実装
 userland/lib/gfx/draw/gfx_cmd.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/gshell.elf	—	共通実装
@@ -6039,7 +6039,7 @@ userland/lib/gfx/libgfx_attach_internal.h	P1-1	製品	P0-1 で像の入力を確
 userland/lib/gfx/libgfx_internal.h	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/gshell.elf	—	共通実装
 userland/lib/gfx/libos32gfx.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/gshell.elf	—	共通実装
 userland/lib/gfx/libos32gfx.h	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/gshell.elf	—	共通実装
-userland/lib/gfx/libos32gfx_core.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/gshell.elf	—	共通実装
+userland/lib/gfx/libos32gfx_core.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/gshell.elf。所属判断=CPU固有実装：mov で x86 の CS を読む	—	CPU固有実装
 userland/lib/gfx/text/gfx_font.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/gshell.elf	—	共通実装
 userland/lib/gfx/text/gfx_kcg.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/gshell.elf	—	共通実装
 userland/lib/gfx/text/lconsole.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/gshell.elf	—	共通実装
@@ -6095,7 +6095,7 @@ userland/lib/snd/mix.h	P1-1	製品	P0-1 で像の入力を確認：pc98/userland
 userland/lib/snd/panic.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/libos32snd.elf	—	共通実装
 userland/lib/snd/pump.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/libos32snd.elf	—	共通実装
 userland/lib/snd/render.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/libos32snd.elf	—	共通実装
-userland/lib/tilemap/asm_tilemap.asm	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/demo_tile.elf	—	共通実装
+userland/lib/tilemap/asm_tilemap.asm	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/demo_tile.elf。所属判断=CPU固有実装：x86 レジスタと呼出規約を使うアセンブラ	—	CPU固有実装
 userland/lib/tilemap/libos32tilemap.h	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/demo_tile.elf	—	共通実装
 userland/lib/tilemap/tilemap_bg.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/demo_tile.elf	—	共通実装
 userland/lib/tilemap/tilemap_compose.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/demo_tile.elf	—	共通実装
@@ -6131,46 +6131,46 @@ userland/libos32term_render/src/lib.rs	P1-1	製品	P0-1 で像の入力を確認
 userland/libos32term_render/src/rework_tests.rs	P1-4	検査の本体	ライブラリまたは GUI の動作を確かめる試験	—	開発・検査用実装
 userland/libos32term_render/tests/render.rs	P1-4	検査の本体	ライブラリまたは GUI の動作を確かめる試験	—	開発・検査用実装
 userland/libos32term_render/tests/rework.rs	P1-4	検査の本体	ライブラリまたは GUI の動作を確かめる試験	—	開発・検査用実装
-userland/ppc/bootprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/bootprob.elf	—	CPU固有実装
-userland/ppc/celltest.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/celltest.elf	—	CPU固有実装
-userland/ppc/dbprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/dbprob.elf	—	CPU固有実装
-userland/ppc/dispprb.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/dispprb.elf	—	CPU固有実装
-userland/ppc/fault.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/fault.elf	—	CPU固有実装
-userland/ppc/fontprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/fontprob.elf	—	CPU固有実装
-userland/ppc/fp_probe.S	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/fp_probe.elf	—	CPU固有実装
-userland/ppc/fp_probe_main.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/fp_probe.elf	—	CPU固有実装
-userland/ppc/gfx2prob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/gfx2prob.elf	—	CPU固有実装
-userland/ppc/guiprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/guiprob.elf	—	CPU固有実装
-userland/ppc/guiprob_exclusive.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/guiprob.elf	—	CPU固有実装
-userland/ppc/hello.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/hello.elf	—	CPU固有実装
-userland/ppc/in2prob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/in2prob.elf	—	CPU固有実装
-userland/ppc/infoprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/infoprob.elf	—	CPU固有実装
-userland/ppc/kcgprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/kcgprob.elf	—	CPU固有実装
-userland/ppc/loopprb.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/loopprb.elf	—	CPU固有実装
-userland/ppc/mousprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/mousprob.elf	—	CPU固有実装
-userland/ppc/nest.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/nest.elf	—	CPU固有実装
-userland/ppc/nlprobe.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/nlprobe.elf	—	CPU固有実装
-userland/ppc/outprobe.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/outprobe.elf	—	CPU固有実装
-userland/ppc/pathprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/pathprob.elf	—	CPU固有実装
-userland/ppc/pciprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/pciprob.elf	—	CPU固有実装
-userland/ppc/portprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/portprob.elf	—	CPU固有実装
-userland/ppc/rtcprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/rtcprob.elf	—	CPU固有実装
-userland/ppc/sfsprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/sfsprob.elf	—	CPU固有実装
-userland/ppc/sh/format.c	P1-1	製品	製品実装・同梱ファイル：userland/ppc/sh	—	CPU固有実装
-userland/ppc/sh/include/stdio.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	CPU固有実装
-userland/ppc/sh/include/string.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	CPU固有実装
-userland/ppc/sh/link_profile.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	CPU固有実装
-userland/ppc/sh/newlib_runtime.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/sh.elf	—	CPU固有実装
-userland/ppc/sh/profile.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/sh.elf	—	CPU固有実装
-userland/ppc/sh/runtime.c	P1-1	製品	製品実装・同梱ファイル：userland/ppc/sh	—	CPU固有実装
-userland/ppc/sh/runtime.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	CPU固有実装
-userland/ppc/sh/stdio.c	P1-1	製品	製品実装・同梱ファイル：userland/ppc/sh	—	CPU固有実装
-userland/ppc/sh/string.c	P1-1	製品	製品実装・同梱ファイル：userland/ppc/sh	—	CPU固有実装
-userland/ppc/shmprobe.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/shmprobe.elf	—	CPU固有実装
-userland/ppc/surfprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/surfprob.elf	—	CPU固有実装
-userland/ppc/sysiprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/sysiprob.elf	—	CPU固有実装
-userland/ppc/v89probe.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/v89probe.elf	—	CPU固有実装
-userland/ppc/verprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/verprob.elf	—	CPU固有実装
+userland/ppc/bootprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/bootprob.elf	—	共通実装
+userland/ppc/celltest.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/celltest.elf	—	共通実装
+userland/ppc/dbprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/dbprob.elf。所属判断=CPU固有実装：mffs と mtfsf で FPSCR を操作	—	CPU固有実装
+userland/ppc/dispprb.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/dispprb.elf。所属判断=CPU固有実装：trap 命令を発行	—	CPU固有実装
+userland/ppc/fault.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/fault.elf	—	共通実装
+userland/ppc/fontprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/fontprob.elf	—	共通実装
+userland/ppc/fp_probe.S	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/fp_probe.elf。所属判断=CPU固有実装：PowerPC の浮動小数点レジスタを操作	—	CPU固有実装
+userland/ppc/fp_probe_main.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/fp_probe.elf。所属判断=CPU固有実装：ppc_fp_load 等の専用 ABI を呼ぶ	—	CPU固有実装
+userland/ppc/gfx2prob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/gfx2prob.elf	—	共通実装
+userland/ppc/guiprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/guiprob.elf	—	共通実装
+userland/ppc/guiprob_exclusive.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/guiprob.elf	—	共通実装
+userland/ppc/hello.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/hello.elf	—	共通実装
+userland/ppc/in2prob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/in2prob.elf	—	共通実装
+userland/ppc/infoprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/infoprob.elf	—	共通実装
+userland/ppc/kcgprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/kcgprob.elf	—	共通実装
+userland/ppc/loopprb.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/loopprb.elf	—	共通実装
+userland/ppc/mousprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/mousprob.elf	—	共通実装
+userland/ppc/nest.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/nest.elf	—	共通実装
+userland/ppc/nlprobe.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/nlprobe.elf。所属判断=CPU固有実装：trap 命令を発行	—	CPU固有実装
+userland/ppc/outprobe.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/outprobe.elf	—	共通実装
+userland/ppc/pathprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/pathprob.elf	—	共通実装
+userland/ppc/pciprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/pciprob.elf	—	共通実装
+userland/ppc/portprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/portprob.elf	—	共通実装
+userland/ppc/rtcprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/rtcprob.elf	—	共通実装
+userland/ppc/sfsprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/sfsprob.elf	—	共通実装
+userland/ppc/sh/format.c	P1-1	製品	製品実装・同梱ファイル：userland/ppc/sh	—	共通実装
+userland/ppc/sh/include/stdio.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+userland/ppc/sh/include/string.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+userland/ppc/sh/link_profile.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+userland/ppc/sh/newlib_runtime.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/sh.elf	—	共通実装
+userland/ppc/sh/profile.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/sh.elf	—	共通実装
+userland/ppc/sh/runtime.c	P1-1	製品	製品実装・同梱ファイル：userland/ppc/sh	—	共通実装
+userland/ppc/sh/runtime.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+userland/ppc/sh/stdio.c	P1-1	製品	製品実装・同梱ファイル：userland/ppc/sh	—	共通実装
+userland/ppc/sh/string.c	P1-1	製品	製品実装・同梱ファイル：userland/ppc/sh	—	共通実装
+userland/ppc/shmprobe.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/shmprobe.elf	—	共通実装
+userland/ppc/surfprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/surfprob.elf	—	共通実装
+userland/ppc/sysiprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/sysiprob.elf	—	共通実装
+userland/ppc/v89probe.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/v89probe.elf	—	共通実装
+userland/ppc/verprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/verprob.elf	—	共通実装
 userland/rust/.cargo/config.toml	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
 userland/rust/Cargo.lock	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
 userland/rust/Cargo.toml	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
