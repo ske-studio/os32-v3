@@ -57,7 +57,38 @@ LINK = re.compile(r'(?:^|[\s/@])(?:\$\([\w.-]*(?:LD|LINK|LINK_COMMAND)\)|(?:[\w.
 SOURCE = re.compile(r'\S+\.(?:c|cc|cpp|s|S|asm|rs)$')
 
 
-def database_sources(block, expanded_targets):
+def assignment_history(refs):
+    history = {}
+    for path, line, _, value in refs:
+        match = re.fullmatch(r'([\w.-]+)\s*(:=|=|\+=)\s*(.*)', value)
+        if match:
+            name, operator, rhs = match.groups()
+            history.setdefault((path, name), []).append((line, operator, rhs))
+    return history
+
+
+def input_origins(origin, name, rhs, variables, history):
+    words = rhs.split()
+    path, end = origin
+    # Work backwards from Make's reported assignment. A literal or simple
+    # variable append must match the suffix of the recorded value exactly.
+    entries = [entry for entry in history.get((path, name), ()) if entry[0] <= end]
+    if entries and entries[-1][1] == '+=':
+        for line, operator, value in reversed(entries):
+            if operator != '+=':
+                origin = (path, line)
+                break
+            expanded = re.sub(r'\$\(([\w.-]+)\)', lambda m: variables.get(
+                (None, m[1]), (None, m[0]))[1], value)
+            suffix = expanded.split()
+            if not suffix or words[-len(suffix):] != suffix:
+                break
+            yield from ((word, (path, line)) for word in suffix)
+            del words[-len(suffix):]
+    yield from ((word, origin) for word in words)
+
+
+def database_sources(block, expanded_targets, history):
     variables = {}
     prerequisites = {}
     recipes = []
@@ -91,9 +122,9 @@ def database_sources(block, expanded_targets):
     owners = {}
     for (scope, name), (origin, rhs) in variables.items():
         if scope is None:
-            for word in rhs.split():
+            for word, supplier in input_origins(origin, name, rhs, variables, history):
                 if SOURCE.fullmatch(word) or word.endswith(('.a', '.o', '.ld')):
-                    owners.setdefault(word, set()).add((origin, name))
+                    owners.setdefault(word, set()).add((supplier, name))
 
     for target, recipe, command in recipes:
         if (target, *recipe) not in expanded_targets and not LINK.search(command):
@@ -136,6 +167,7 @@ def write_table(path, columns, rows):
 
 def main(out):
     refs = list(raw_definitions(ROOT))
+    history = assignment_history(refs)
     indexed = {path for path, _, tag, _ in refs if tag == 'file'}
     columns = ('file', 'line', 'kind', 'make_text')
     evidence = set()
@@ -178,7 +210,7 @@ def main(out):
         targets = {(target, path, int(number)) for config, path, number, target, _ in links
                    if config == image}
         for block in re.findall(r'^# Make data base.*?^# Finished Make data base', log, re.M | re.S):
-            for (path, number), target, reason, detail in database_sources(block, targets):
+            for (path, number), target, reason, detail in database_sources(block, targets, history):
                 if path in indexed:
                     evidence.add((path, number, image, target, reason, detail))
     # GNU Make reports the end line of some continued statements.

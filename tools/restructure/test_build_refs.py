@@ -41,12 +41,22 @@ def check():
                          'LIBS = -lz -lc\n'
                          '$(eval $(call PROGRAM,$(subst x,y,x),$$(LIBS) tail.a))\n'
                          '$(eval $(call COMPILE,other,-g))\n')
+        with (sdk / 'flags.mk').open('a') as stream:
+            stream.write('PARTS := $(addprefix obj/,body.o)\nSERVICE := obj/service.o\n'
+                         'PARTS += $(SERVICE)\nmodule: $(PARTS)\n\tld $(PARTS) -o $@\n')
         (root / 'outside.mk').touch()
         (root / 'src.c').touch()
         build_refs.ROOT = root
         assert build_refs.main(root)
         sources = {row['make_text'] for row in table(root, 'link_sources.tsv')}
         assert '$(eval $(call PROGRAM,$(subst x,y,x),$$(LIBS) tail.a))' in sources
+        evidence = table(root, 'link_evidence.tsv')
+        flags = (sdk / 'flags.mk').read_text().splitlines()
+        suppliers = {(row['word_or_recipe'], flags[int(row['db_line']) - 1])
+                     for row in evidence if row['target'] == 'module'
+                     and row['basis'] == 'prerequisite-word' and ' <- PARTS ' in row['word_or_recipe']}
+        assert suppliers == {('1 obj/body.o <- PARTS obj/body.o', 'PARTS := $(addprefix obj/,body.o)'),
+                             ('2 obj/service.o <- PARTS obj/service.o', 'PARTS += $(SERVICE)')}
         assert 'LIBS = -lz -lc' in sources
         assert 'INPUT_CORE = src.c' in sources
         assert 'fixture.elf: TARGET_FLAGS += -u float_symbol' in sources
@@ -72,7 +82,7 @@ if __name__ == '__main__':
                          ("pending.extend(VARIABLE.findall(rhs))", "pass"), ("|shell|", "|"),
                          ("yield recipe, target", "if False: yield recipe, target"),
                          ("owners.get(item, ())", "()"), ("(None, target)", "(None,)"),
-                         ("return bool(missing)", "return False")]:
+                         ("origin = (path, line)", "pass"), ("return bool(missing)", "return False")]:
             assert source.count(old) == 1
             with tempfile.TemporaryDirectory() as tmp:
                 path = Path(tmp)
