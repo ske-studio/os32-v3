@@ -37,7 +37,8 @@ int main(int argc, char **argv, KernelAPI *api)
     unsigned long voice, buffer, done, how;
     if (argc == 2 && !strcmp(argv[1], "soft")) {
         int rc = soft_tone(api);
-        api->kprintf(7, rc ? "sndl_test soft FAIL rc=%d\n" : "sndl_test soft PASS rc=%d\n", rc);
+        if (rc) api->kprintf(7, "sndl_test soft FAIL rc=%d\n", rc);
+        else api->kprintf(7, "sndl_test soft PASS rc=0\n");
         return rc;
     }
     if (sndl_init(api) || sndl_voice_new(&fmt, &voice) ||
