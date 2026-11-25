@@ -1,6 +1,6 @@
-# tools/tests/recover_tables_oracle.c — 設計
+# tools/recover_tables/recover_tables_oracle.c — 設計
 > 状態: **現行 (2026-10-31)** — 出所: GF6200_4A_DESIGN・GF6200_VPLL_PROBE・SLIM_HWDEV_DESIGN (D1 で移した)
-ソース: `tools/tests/recover_tables_oracle.c`
+ソース: `tools/recover_tables/recover_tables_oracle.c`
 
 **SUB7 (MEM、12020h〜1202Eh) と SUB6 (CORE、12000h〜12005h) の書込み 21 本の verify mask をすべて 0 にする**。nouveau (MIT、nv04.c の setPLL_double_lowregs) はこれらを書いた後に読み戻さず、rnndb にも読み戻せるビットの定義が無い。
 書込みの列・値・順・保存値の復元は変えない。
@@ -28,4 +28,4 @@ HWDEV行は不要。
 
 - oracleは圧縮生成器から生成し直さない。旧型の別translation unitとしてリンクし、製品には入れない。
 
-- oracle は旧 recover_gf.c のヘッダ・定数・参照配列・式関数を含む前処理済み C translation unit として固定し、元コミット・元ソースと fixture の SHA256・抽出コマンドを tools/tests/recover_tables_oracle.json に記録する（圧縮生成器から再生成しない）。
+- oracle は旧 recover_gf.c のヘッダ・定数・参照配列・式関数を含む前処理済み C translation unit として固定し、元コミット・元ソースと fixture の SHA256・抽出コマンドを tools/recover_tables/recover_tables_oracle.json に記録する（圧縮生成器から再生成しない）。

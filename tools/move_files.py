@@ -166,7 +166,7 @@ def main():
     report = {'moves': moves, 'replacements': [dict(file=e['file'], destination=e['destination'],
                diff=list(difflib.unified_diff(e['before'].splitlines(), e['after'].splitlines(),
                                              e['file'], e['destination'], lineterm=''))) for e in edits],
-              'split_paths': split_paths, 'unresolved_paths': unresolved_paths, 'regenerate': targets}
+              'split_paths': split_paths, 'unresolved_paths': unresolved_paths, 'regenerate': [moves.get(p, p) for p in targets]}
     print(json.dumps(report, indent=2), flush=True)
     if args.dry_run:
         return 0
@@ -175,8 +175,6 @@ def main():
         git(root, 'mv', '--', old, new)
     for edit in edits:
         (root / edit['destination']).write_text(edit['after'])
-    if targets:
-        subprocess.run(['make', *targets], cwd=root, check=True)
     return 0
 
 

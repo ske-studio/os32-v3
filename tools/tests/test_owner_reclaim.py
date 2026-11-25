@@ -14,6 +14,7 @@ one host binary, no Make / emulator / VFS.
 from kernel_includes import include_flags
 import os
 import pathlib
+import re
 import subprocess
 import tempfile
 import unittest
@@ -21,7 +22,16 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
+def shm_size(header):
+    match, = re.findall(r"^#define\s+MEM_SHM_SIZE\s+(0x[0-9a-fA-F]+|[0-9]+)[uUlL]*\b",
+                        header, re.MULTILINE)
+    return int(match, 0)
+
+
 class OwnerReclaimTests(unittest.TestCase):
+    def assert_shm_size_matches(self, shim, product):
+        self.assertEqual(shm_size(shim), shm_size(product), "MEM_SHM_SIZE mismatch")
+
     def test_host_cases(self):
         with tempfile.TemporaryDirectory(prefix="os32-owner-reclaim-") as tmp:
             tmp = pathlib.Path(tmp)
@@ -40,7 +50,6 @@ class OwnerReclaimTests(unittest.TestCase):
                 "#define OS32_TEST_MEMMAP_H\n"
                 "#define MEM_SHM_BASE       0x00180000U\n"
                 # 2026-09-17 決裁 D1 で 16 → 14 ブロック、GUI 予約は末尾 4 個。
-                # 値の写しなので tools/gen_memmap.py --check が実物と照合する。
                 "#define MEM_SHM_SIZE       0x038000U\n"   # 224KB = 16KB x 14
                 "#define MEM_SHM_GUI_SIZE   0x10000U\n"
                 "#define MEM_SHM_GUI_OFFSET (MEM_SHM_SIZE - MEM_SHM_GUI_SIZE)\n"
@@ -53,6 +62,17 @@ class OwnerReclaimTests(unittest.TestCase):
                 # so the real header always wins) needs this one constant.
                 "#define MEM_APP_BAND_MAX_PDES 2UL\n"
                 + db_defines + lease_defines + "#endif\n")
+            shim = (tmp / "memmap.h").read_text()
+            product = (ROOT / "include/memmap.h").read_text()
+            self.assert_shm_size_matches(shim, product)
+            if os.environ.get("MUTATE") == "1":
+                anchor = "#define MEM_SHM_SIZE       0x038000U"
+                self.assertEqual(shim.count(anchor), 1)
+                stale = shim.replace(anchor, "#define MEM_SHM_SIZE       0x040000U")
+                with self.assertRaisesRegex(AssertionError, "MEM_SHM_SIZE mismatch"):
+                    self.assert_shm_size_matches(stale, product)
+                print("RED owner reclaim shim: stale 16-block MEM_SHM_SIZE")
+
             (tmp / "kstring.h").write_text(
                 "#include <string.h>\n"
                 "void test_shm_memset(void *d, int c, unsigned long n);\n"

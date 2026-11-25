@@ -476,7 +476,7 @@ merge-base が HEAD と同じ作業枝では **HEAD** を使い、直前の取�
    宣言の契約は [README](design/tools/checks/README.md)。名前は `make check-<name>` に対応する。
 2. `covers` に直接読む入力を書き、組立前提は `make:`、検査前提は `check:` で `needs` に書く。
    自己ファイルは自動入力。依存から復元できるヘッダは自動抽出し、直接読むヘッダは残す。
-3. `make tests-inventory` で `build/out/` の試験表と runner 一覧を確認する (コミット不要)。
+3. メモリ地図は `make all` の後に `make docs-gen` で生成する。`make tests-inventory` で `build/out/` の試験表と runner 一覧を確認する (コミット不要)。
 4. `python3 -B tools/checks/run.py --lint` と関連ホスト試験で確認する。
    lint は宣言・全ファイルの対象宣言漏れ・入力・既存の成果物読取監査を行い、一覧生成器は CHECK の列と実行スクリプトを読む。
 

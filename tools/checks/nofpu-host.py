@@ -1,5 +1,5 @@
 CHECK = dict(name='nofpu-host', tier=1, budget=12,
-    covers=['platform/pc98/platform_install_layout.h', 'include/platform_install_boot.h', 'include/ide_contract.h', 'platform/pc98/install_disk.c', 'platform/pc98/install_geometry.h', 'platform/pc98/install_plan.c', 'platform/pc98/install_target.c', 'tools/tests/test_nofpu.py', 'tools/tests/test_packages.py',
+    covers=['tools/fd_reader.py', 'platform/pc98/platform_install_layout.h', 'include/platform_install_boot.h', 'include/ide_contract.h', 'platform/pc98/install_disk.c', 'platform/pc98/install_geometry.h', 'platform/pc98/install_plan.c', 'platform/pc98/install_target.c', 'tools/tests/test_nofpu.py', 'tools/tests/test_packages.py',
             'assets/filetypes', 'fs/pc98pt.c', 'fs/ext2/ext2_layout.c',
             'tools/check_artifacts.py', 'tools/tests/install_fresh_host.c',
             'userland/shell/hdprep_plan.c', 'userland/system/cdinst.c',

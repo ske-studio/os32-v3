@@ -2033,6 +2033,8 @@ sound/hal/snd2_stg.c	sys/hal/sound/snd2_stg.c	移すだけ：snd2_stg.c の snd2
 sound/hal/snd2_stream.c	sys/hal/sound/snd2_stream.c	移すだけ：sound/hal/snd2_stream.c:123 sw_reset — snd2_stream_open は共通の寿命管理を行い、ハードウェア停止は操作表に渡す。
 sound/hal/snd2_v1.c	sys/hal/sound/snd2_v1.c	移すだけ：snd2_v1.c の pcm_open は既定装置を選び旧 PCM 呼出しを snd2_open_mode に変換する。pcm_status の割り込み保護も include/io.h の irq_save と irq_restore の契約を使う。 旧 PCM API の変換は音声共通層にまとめる。
 tools/abi/type_contract.c	=	現在の配置を維持：担当の直し（P1-4 → P1-1）：build/abi_contract.mk が毎ビルドでコンパイル
+tools/accept/in2_gui_mutations.py	=	PC-98 受入媒体の生成に使用。P2-3 で tools/in2_gui_mutations.py に移設済み。
+tools/accept/pc98_in2_image.py	=	PC-98 受入媒体の生成に使用。P2-3 で tools/pc98_in2_image.py に移設済み。
 tools/build_profile.py	=	現在の配置を維持：開発・製造・配備用の build_profile.py。make の展開結果とコンパイラ引数を JSON に取り出す。。運用の静的呼出元 14 件
 tools/check_artifacts.py	=	現在の配置を維持：担当の直し（P1-4 → P1-1）：gen_memmap.py の manifest 用 require_fresh
 tools/check_isa386.py	=	現在の配置を維持：担当の直し（P1-4 → P1-1）：build/os32snd.mk が shlib 包装時に実行
@@ -2202,6 +2204,10 @@ tools/systemd/README.md	=	現在の配置を維持：常駐サービスのユニ
 tools/systemd/host-agent.example.json	=	現在の配置を維持：開発・製造・配備用の systemd/host-agent.example.json。運用の静的呼出元 0 件
 tools/systemd/os32-host-agent@.service	=	現在の配置を維持：開発・製造・配備用の systemd/os32-host-agent@.service。運用の静的呼出元 0 件
 tools/systemd/update_host_agent.sh	=	現在の配置を維持：開発・製造・配備用の systemd/update_host_agent.sh。運用先に文書・資料やサービスを同期する。。運用の静的呼出元 1 件。外部利用を継続：実機ノート /opt/os32 の常駐サービスと運用台本
+tools/tests/recover_tables_host.c	=	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_host.c に移設済み。
+tools/tests/recover_tables_host.h	=	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_host.h に移設済み。
+tools/tests/recover_tables_oracle.c	=	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_oracle.c に移設済み。
+tools/tests/recover_tables_oracle.json	=	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_oracle.json に移設済み。
 tools/tvdump_recv.py	=	現在の配置を維持：開発・製造・配備用の tvdump_recv.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。。運用の静的呼出元 3 件
 userland/cmds/cal.c	=	現在の配置を維持：P0-1 で像の入力を確認：pc98/userland/cmds/cal.elf
 userland/cmds/cfg.c	=	現在の配置を維持：P0-1 で像の入力を確認：pc98/userland/cmds/cfg.elf

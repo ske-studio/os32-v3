@@ -2,18 +2,16 @@
 """Generate GF storage tables from compiler-evaluated, frozen oracle records.
 
 No C initializer parsing and no oracle rewriting. Without --input, the frozen
-oracle translation unit is evaluated by test_recover_tables.extract_oracle().
+oracle translation unit is evaluated by recover_oracle.extract_oracle().
 Auxiliary arrays and expression functions stay in recover_gf.c; references
 retain their names.
 """
 import argparse
 import json
 import pathlib
-import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'tools/tests'))
-from test_recover_tables import extract_oracle  # noqa: E402
+from recover_oracle import extract_oracle
 
 OUTPUT = ROOT / 'kdebug/generated/recover_gf_tables.inc'
 NONE = 0xffffffff

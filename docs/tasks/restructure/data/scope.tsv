@@ -3180,12 +3180,12 @@ tools/accept/gf_accel.py	P1-4	検査の本体	対象を起動または解析し�
 tools/accept/gf_c.md	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/accept/gf_main.md	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/accept/gf_s8.md	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
-tools/accept/in2_gui_mutations.py	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
+tools/accept/in2_gui_mutations.py	P1-1	運用の道具	PC-98 受入媒体の生成に使用。P2-3 で tools/in2_gui_mutations.py に移設済み。候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/accept/in2_gui_trial.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—	開発・検査用実装
 tools/accept/kdbg_probes.md	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/accept/np21w_key_edge.patch	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/accept/pc98_in2_gui.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	pc98emu の操作・受入台本	開発・検査用実装
-tools/accept/pc98_in2_image.py	P1-4	試験の支援	受入試験の入力・観測を準備	—	開発・検査用実装
+tools/accept/pc98_in2_image.py	P1-1	運用の道具	PC-98 受入媒体の生成に使用。P2-3 で tools/pc98_in2_image.py に移設済み。候補印=期待値・試験入力。	—	開発・検査用実装
 tools/accept/ppc_boot_info.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—	開発・検査用実装
 tools/accept/ppc_console_cells.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—	開発・検査用実装
 tools/accept/ppc_db.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—	開発・検査用実装
@@ -4841,10 +4841,10 @@ tools/tests/recover_hostshim/io.h	P1-4	試験の支援	検査が使う手順・�
 tools/tests/recover_t2_host.inc	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/tests/recover_t3_host.inc	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/tests/recover_tables_bounds.h	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
-tools/tests/recover_tables_host.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—	開発・検査用実装
-tools/tests/recover_tables_host.h	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
-tools/tests/recover_tables_oracle.c	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
-tools/tests/recover_tables_oracle.json	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
+tools/tests/recover_tables_host.c	P1-1	運用の道具	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_host.c に移設済み。候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
+tools/tests/recover_tables_host.h	P1-1	運用の道具	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_host.h に移設済み。候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
+tools/tests/recover_tables_oracle.c	P1-1	運用の道具	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_oracle.c に移設済み。候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
+tools/tests/recover_tables_oracle.json	P1-1	運用の道具	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_oracle.json に移設済み。候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/tests/recover_virtual_cases_host.inc	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/tests/recover_virtual_fixture_host.inc	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/tests/recover_virtual_host.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—	開発・検査用実装

@@ -120,14 +120,14 @@ jobs:
             cp build/out/generations-manifest.json out/
           fi
           cp packages/*.PKG out/packages/
-          # 既存の媒体試験の FAT12 / D88 reader で、配布する像の中身を読む。
+          # 配布用の FAT12 / D88 reader で、配布する像の中身を読む。
           python3 - "$RUNNER_TEMP/hostdrv" > "$RUNNER_TEMP/deploy-check.txt" <<'PY'
           import hashlib
           from pathlib import Path
           import sys
 
-          sys.path.insert(0, "tools/tests")
-          from test_packages import d88_to_raw, fat12_files
+          sys.path.insert(0, "tools")
+          from fd_reader import d88_to_raw, fat12_files
 
           host_sha = hashlib.sha256((Path(sys.argv[1]) / "boot/vmkernel.lz4").read_bytes()).hexdigest()
           print(f"hostdrv boot/vmkernel.lz4 sha256: {host_sha}")

@@ -10,7 +10,7 @@ SRC="$(cd "$(dirname "$0")/.." && pwd)"
 DST="${OS32_DOCS_WIN:-/mnt/c/WATCOM/docs/os32}"
 [ -d "$(dirname "$DST")" ] || { echo "ERROR: $(dirname "$DST") が無い (Windows 側の資料ディレクトリ)"; exit 1; }
 # 直接実行でも、生成に失敗したら同期前に止める。
-make -C "$SRC" docs-gen
+make -C "$SRC" docs-gen tests-inventory
 mkdir -p "$DST/build/out"
 rsync -a --delete --exclude='hw/' --exclude='__pycache__/' "$SRC/docs/" "$DST/docs/"
 cp "$SRC/build/out/TESTS.md" "$SRC/build/out/HOST32.md" "$SRC/build/out/MEMMAP.md" "$DST/build/out/"

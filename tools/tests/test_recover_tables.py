@@ -6,7 +6,6 @@ producer. This command never rewrites the oracle. Each record is
 values use slots 1..count (guard fields use their element ordinal).
 """
 import argparse
-import hashlib
 import json
 import pathlib
 import re
@@ -18,48 +17,14 @@ import host32
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TESTS = ROOT / 'tools/tests'
-ORACLE = TESTS / 'recover_tables_oracle.c'
-FLAGS = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-m32', '-march=i386',
-         '-ffreestanding', '-fno-pie', '-fno-stack-protector', '-O0',
-         '-ffunction-sections', '-fdata-sections', '-I' + str(ROOT / 'include')]
+sys.path.insert(0, str(ROOT / 'tools'))
+from recover_oracle import DATA, FLAGS, ORACLE, load_provenance, records, wrapper
+
 COUNTS = {'rule_count': 578, 'target_count': 154, 'layout_count': 1039, 'expr_count': 8}
 
 
 def preprocess(source):
     return subprocess.check_output(['gcc', *FLAGS, '-E', '-P', str(source)], text=True)
-
-
-def wrapper(source, text, name):
-    """Discover declarations only; C, not Python, evaluates initializers."""
-    arrays = re.findall(r'^static const (?:u32|struct recover_guard) (\w+)\[\]', text, re.M)
-    evaluators = re.findall(r'^static int (\w+)\(const u32 \*\w+, u32 \w+, u32 \*\w+\)', text, re.M)
-    exports = re.findall(r'^const (?:struct \w+|u32) (recover_gf_\w+)', text, re.M)
-    prefix = ''.join(f'#define {symbol} oracle_{symbol}\n' for symbol in exports) if name == 'oracle' else ''
-    result = prefix + f'#include "{source}"\n'
-    result += 'static const char *rt_symbol(const void *p)\n{\n    if (!p) return "NULL";\n'
-    result += ''.join(f'    if (p == {symbol}) return "{symbol}";\n' for symbol in arrays)
-    result += '    return "UNKNOWN";\n}\n'
-    result += 'static const char *rt_eval_symbol(int (*p)(const u32 *, u32, u32 *))\n{\n    if (!p) return "NULL";\n'
-    result += ''.join(f'    if (p == {symbol}) return "{symbol}";\n' for symbol in evaluators)
-    result += '    return "UNKNOWN";\n}\n'
-    if name == 'product':
-        result += '#define RT_EXPAND_PRODUCT 1\n'
-        result += f'#include "{TESTS / "recover_tables_bounds.h"}"\n'
-    result += f'#define RT_DUMP recover_tables_dump_{name}\n#include "{TESTS / "recover_tables_host.h"}"\n'
-    return result
-
-
-def records(stream):
-    result = []
-    keys = set()
-    for line in stream.splitlines():
-        table, row, field, slot, value = line.split('\t')
-        key = (table, int(row), field, int(slot))
-        if key in keys or value == 'UNKNOWN':
-            raise ValueError(f'duplicate field or unregistered reference: {line}')
-        keys.add(key)
-        result.append([*key, int(value) if value.isdecimal() else value])
-    return result
 
 
 def compare(old, new):
@@ -76,34 +41,6 @@ def expression_bodies(text):
     # These functions are retained unchanged by S2. Compare preprocessed bodies
     # as well as symbolic eval bindings, never function addresses across TUs.
     return dict(re.findall(r'^static int (\w+)(\([^\n]+\)\n\{.*?^\})', text, re.M | re.S))
-
-
-def load_provenance():
-    provenance = json.loads((TESTS / 'recover_tables_oracle.json').read_text())
-    if hashlib.sha256(ORACLE.read_bytes()).hexdigest() != provenance['oracle_sha256']:
-        raise ValueError('frozen oracle SHA256 mismatch')
-    return provenance
-
-
-def extract_oracle():
-    """Evaluate the frozen TU alone, also before a generated product exists."""
-    provenance = load_provenance()
-    with tempfile.TemporaryDirectory(prefix='recover-oracle-') as tmp:
-        temp = pathlib.Path(tmp)
-        unit = temp / 'oracle.c'
-        unit.write_text(wrapper(ORACLE, ORACLE.read_text(), 'oracle'))
-        main = temp / 'main.c'
-        main.write_text((TESTS / 'recover_tables_host.c').read_text().replace(
-            '    recover_tables_dump_product();', ''))
-        exe = temp / 'extract'
-        subprocess.run(['gcc', *FLAGS, '-nostdlib', '-static', '-no-pie',
-                        '-Wl,--gc-sections', str(unit), str(ROOT / 'kdebug/recover.c'),
-                        str(main), '-o', str(exe)], check=True)
-        run = host32.run([str(exe)], cwd=ROOT, timeout=60, capture_output=True)
-        if run.returncode or not run.stdout.endswith(b'END\n'):
-            raise RuntimeError(f'oracle extraction failed: {run.stderr!r}')
-        return {'schema': 1, 'provenance': provenance,
-                'records': records(run.stdout.decode()[:-4])}
 
 
 def check_generator_bounds():
@@ -139,12 +76,12 @@ def main():
         units = []
         for name, file, text in [('oracle', ORACLE, old_text), ('product', source, new_text)]:
             unit = temp / (name + '.c')
-            unit.write_text(wrapper(file, text, name))
+            unit.write_text(wrapper(file, text, name, TESTS / 'recover_tables_bounds.h' if name == 'product' else None))
             units.append(str(unit))
         exe = temp / 'host'
         subprocess.run(['gcc', *FLAGS, '-nostdlib', '-static', '-no-pie',
                         '-Wl,--gc-sections', *units, str(ROOT / 'kdebug/recover.c'),
-                        str(TESTS / 'recover_tables_host.c'), '-o', str(exe)], check=True)
+                        str(DATA / 'recover_tables_host.c'), '-o', str(exe)], check=True)
         run = host32.run([str(exe)], cwd=ROOT, timeout=60, capture_output=True)
         if run.returncode:
             raise RuntimeError(f'host extraction failed rc={run.returncode}: {run.stderr!r}')
