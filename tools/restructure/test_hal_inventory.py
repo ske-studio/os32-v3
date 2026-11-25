@@ -10,7 +10,7 @@ import hal_inventory as inv
 def check():
     source = {'include/fdc_contract.h': 'int fdc_status(void);',
               'drivers/block/unit.c': 'int fdc_status(void) { return 1; }',
-              'fs/use.inc': '/* fdc_status(); */\nreturn fdc_status();',
+              'fs/use.inc': 'int use(void) { /* fdc_status(); */\nreturn fdc_status(); }',
               'gfx/opaque.c': 'const char *s = "struct GfxBackend {";',
               'include/input_service.h': 'struct InputOps { int (*get)(void); };',
               'platform/test.c': 'const InputOps io = { .get = fetch };',
@@ -25,6 +25,25 @@ def check():
     _, ambiguous, _ = inv.inventory({p: inv.mask(s) for p, s in mixed.items()})
     assert ambiguous[0][5] == '未確定'
     assert gf[0][:3] == ('hwdev/gf/unit.c', 'GPU エンジン・表示制御・サービス', '推測')
+    fixture = {
+        'drivers/unit.c': 'void set_size(int n) {}',
+        'fs/use.c': 'void update(void) { set_size(1); }',
+        'fs/medium.c': 'const struct ext2_medium_ops ops = { .read = read };',
+        'drivers/ata/test.c': 'int atapi_read_sectors(void) { return atapi_read10(); }',
+        'drivers/video/geforce/test.c': 'int gf4_edid_modes(void) { return checksum(); }',
+        'drivers/video/geforce/empty.c': 'int gf4_edid_modes(void) { return 0; }',
+    }
+    hal, calls, gf = inv.inventory(fixture)
+    assert [(r[0], r[2], r[4]) for r in calls] == [('fs/use.c', 'set_size', 'drivers/unit.c:1')]
+    assert any(r[0:4] == ('ブロック', 'fs/medium.c', 1, 'バックエンド') for r in hal)
+    assert any(r[1] == 'drivers/ata/test.c' and 'atapi_read10' in r[5] for r in hal)
+    assert [(r[3], r[4]) for r in gf] == [('未確定', '未確定'), ('EDID 表示モードの解析', '実コード')]
+    _, nm_calls, _ = inv.inventory({'fs/use.c': 'void use(void) { entry(); }'},
+                                   {'entry': ['platform/unit.o']})
+    assert nm_calls[0][4] == 'platform/unit.o:nm'
+    fixture['include/alternate.h'] = '#define set_size(n) (0)'
+    assert inv.inventory(fixture)[1][0][5] == '未確定'
+
 
 
 if __name__ == '__main__':
@@ -34,7 +53,11 @@ if __name__ == '__main__':
         for old, new in [('return LITERALS.sub', 'return source or LITERALS.sub'),
                          ("and not any(d == domain for d, _ in found)", "and False"),
                          ("or 'gf' in path.lower()", "or False"),
-                         ("if targets and all(p.split('/')[0] not in COMMON for p, _ in targets)",
+                         ("if individual:", "if False:"),
+                         ("if spec:", "if False:"),
+                         ("if name not in device_names", "if name not in decls or name not in device_names"),
+                         ("m = re.search(expr, code)", "m = None if path.startswith('fs/') else re.search(expr, code)"),
+                         ("if name not in alternate and all(p.split('/')[0] not in COMMON for p, _ in targets)",
                           "if targets")]:
             assert tool.count(old) == 1
             with tempfile.TemporaryDirectory() as tmp:
