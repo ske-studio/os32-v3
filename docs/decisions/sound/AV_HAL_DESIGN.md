@@ -617,6 +617,10 @@ int sndl_midi_long(u32 h, const void *p, u32 n);  int sndl_midi_reset(u32 h);  i
 | §3 C ABI | synth_open/write/read/pump/wake_irq/finish/abort | サービスの口は削除。adapter が `fmv_new/fmv_write/fmv_read/fmv_status/fmv_render/fmv_reset/fmv_csm` を持ち、コアの FFI を呼ぶ | L2 |
 | §5 の private の timer/CSM の ABI (`opna_timer_write`・`opna_timer_count`・`opna_apply_csm`) | コアの FFI | **コアに残す** (宣言は lib/os32_opna/opna.h、段 A)。カーネルの模型 (V1) は C で別に持つので timer_write/count は使わない。CSM_KEYON は L2 が `opna_apply_csm` で反映 (R3-P2-2) | A・L2 |
 | §4 表・ビルド・障害 | 最終の synth.elf・再配置・カーネルの panic の終端 | ユーザーの共有ライブラリとして結ぶ (再配置は SDK の共有ライブラリの規則)。Rust の panic はアプリの異常終了 (カーネルの panic にしない) | L5 |
+| [LD1](SNDL_LOAD_DESIGN.md) | SDK の音枠・依存印・リンク/pack・旧世代互換と表の検算 | L5 | 枠契約 | 100〜160 | IL | メモリ契約の決定 |
+| [LD2](SNDL_LOAD_DESIGN.md) | mm/shlib.c の枠別原本、初回読込、attach/detach と RO 判定 | LD1 | 原本・AS の付着集合 | 120〜200 | IL | LD1 |
+| [LD3](SNDL_LOAD_DESIGN.md) | exec の要求検証・初回取得・公開後の予算検査（空き 0 を含む）・待機後の ID 予約と巻戻し | LD2 | 起動計画 | 70〜120 | IL | LD2 |
+| [LD4](SNDL_LOAD_DESIGN.md) | SDK の sndl stub、音表と init、ゲスト sndl_test・対象 host 試験 | LD1〜3・L2/L3/L6 | アプリの bind 状態 | 160〜270 | IL | ソフト音源と PCM の接続 |
 | §5 DMA 時計・PCM の接続・所有者 (サービスの部分) | D・Ptarget=D+6144・owned submit・PCM と排他 | 削除 (上の private の ABI は残す)。量は §7-1 の空き、時刻は §7-4、所有は PCM の流れ | L2・L3 |
 | §5 timer の IRQ と CS4231 の次期限 (R3) | カーネルの IRQ で timer を進める | V86 の timer の模型へ (§9-4)、**起床源の順は 11-05 の決定のまま**。ネイティブの MIDI・MML では timer は要らない | V1 |
 | §6 snd・装置の選択 | snd の SOFT が synth.mod を使う | MML ごと廃止 (§7-6)。FM の検出 (HW/SOFT/NONE) は V86 のセッションの FM_SOFT の既定を決めるのに残す | V2 |
@@ -779,7 +783,7 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | IA | F1・N1〜N7・D1・D2・K2・G1・E1・R0a〜R0c | in2_test (新) のシリアルの出力・gshell の配送の記録 | 13-2 の入力の行が全部・av_no_weak.sh IA が 0・WM の既存の試験 (KBD_NAV・STOP) が退行しない |
 | IS | S1〜S9・K1・E1 | snd2_test・pcm_play (v1)・/api/sound の取得 | 13-2 の音の行が全部・既存の PCM の試験 (TASK_PCM_CS4231 の E 系) が v1 のまま通る |
 | IP | P0〜P5 | in2_test・実機の USB の回 | 3 種 × 状態・振動 |
-| IL | L1〜L5・Q1・V1〜V6 | sndl_test・DOS の FM のゲーム 1 本 | 13-2 の IL の行 |
+| IL | L1〜L7・Q1・V1〜V6・IS・[LD1〜LD4](SNDL_LOAD_DESIGN.md) | sndl_test・DOS の FM のゲーム 1 本 | 13-2 の IL の行 |
 
 ### 13-2. host (libc 無し) と変異 (製品の行を 1 つ変えて RED)
 | 反例・確かめる事 | 試験 | 変異 |

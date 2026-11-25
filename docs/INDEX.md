@@ -231,6 +231,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | [decisions/realhw/HWDEV_DESIGN.md](decisions/realhw/HWDEV_DESIGN.md) | HWDEV の採用方式・境界と安全条件の維持。 |
 | [decisions/realhw/RA266.md](decisions/realhw/RA266.md) | Ra266 の機体構成・基準構成と実機の方針。 |
 | [decisions/realhw/REALHW_RECOVER_DESIGN.md](decisions/realhw/REALHW_RECOVER_DESIGN.md) | 復帰の保証範囲、配線・電源操作・書込み承認の方針。 |
+| [decisions/sound/SNDL_LOAD_DESIGN.md](decisions/sound/SNDL_LOAD_DESIGN.md) | アプリの音要求、共有像の初回読み込みと世代互換。 |
 | [decisions/sound/SYNTH_OPNA_DESIGN.md](decisions/sound/SYNTH_OPNA_DESIGN.md) | PCM の合成器 (ソフト OPNA、fmgen の移植) の確定設計。 |
 | [PowerMac の HW_OP 後端](decisions/ppc/PPC_HWOP_BACKEND_DESIGN.md) | PCI 構成取引、物理窓、実行中止と段別の受入。 |
 | [decisions/ppc/ARCH_BRINGUP_ORDER.md](decisions/ppc/ARCH_BRINGUP_ORDER.md) | 新アーキテクチャの起動から USER sh までの順と開発用 CLI の扱い。 |
