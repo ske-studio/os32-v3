@@ -258,3 +258,5 @@ static-check の Check map は 5 分、Host tests は 6 分（検査本体の実
 同じ検査が回ごとに 4〜8 割伸びる (`ppc-deploy-guest` の標本は 562〜840 秒)。見込み 22 分 + 用意 3 分では、上限までの余裕は 5 分ほど。再び 28 分を越えたら、組の数か上限の見直しを本線 PM からユーザーに上げる。
 
 20 組 (2026-11-24 のユーザー決定「20組に」、上限 30 分のまま) の最初の回 (76ec252b8、check 45349078850): ppc-qemu の各組 10〜18 分 (用意込み、組 0 の `ppc-display-guest` 単独が 18 分)、全部 success。runner の空き待ちで組の開始が 07:35〜08:06 にずれ、push から最後のジョブまでは 44 分 (10 組の時は 30〜36 分)。組 0 が通った回の実測で 25 分を越えたら、`ppc-display-guest` の中を割る案 (変異・待ちの見直し、または 2 本に分ける) を出す (本線 PM、11-24)。
+
+2026-11-25: int-ppc-1124d の回 (e62bca29f、check 45427776109) で組 0 の `ppc-display-guest` 単独が 1785 秒 (ステップの上限 30 分まで 15 秒、18 分の回もあり回ごとの振れが大きい)。本線 PM と決めて 2 本に分けた: `tools/accept/ppc_display.py --part i/2` が normal と変異の場合 18 の 1 つおき (9 ずつ) を回し、`ppc-display-guest` (0/2) と `ppc-display-guest-b` (1/2)。変異の集合・covers・basis は同じ (関門を弱めない)。normal のビルドと起動は 2 本とも要る。重みは仮に 950 秒ずつ、次の回の check-times で `calibrate_weights.py --merge` して作り直す。

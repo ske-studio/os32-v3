@@ -421,6 +421,7 @@ def main():
     group.add_argument('--osri', action='store_true', help='exercise slot 257 and OF scanout')
     group.add_argument('--present', action='store_true', help='exercise public drawing and display recovery')
     parser.add_argument('--case', action='append', help='build selected mutation and its normal control')
+    parser.add_argument('--part', help='i/n: normal plus every n-th mutation case from i (CI splits the run)')
     args = parser.parse_args()
     cross = Path(os.environ.get('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc'))
     if any(not os.access(cross / 'bin' / ('powerpc-elf-' + tool), os.X_OK)
@@ -460,6 +461,14 @@ def main():
         if unknown:
             parser.error('unavailable cases: ' + ', '.join(sorted(unknown)))
         cases = tuple(case for case in cases if case == 'normal' or case in args.case)
+    if args.part:
+        index, count = map(int, args.part.split('/'))
+        if not 0 <= index < count:
+            parser.error('--part must be i/n with 0 <= i < n')
+        if index and len(cases) == 1:
+            print(f'part {args.part}: normal runs in part 0/{count}; no mutation case without --mutate', flush=True)
+            return 0
+        cases = ('normal',) + cases[1:][index::count]
     for case in cases:
         folder = work / case
         folder.mkdir()

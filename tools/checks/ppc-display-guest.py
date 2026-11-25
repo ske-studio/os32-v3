@@ -1,3 +1,5 @@
+# The mutation cases are split over two checks (one 30-minute CI step each); -b runs the other half.
+PART = '0/2'
 CHECK = dict(name='ppc-display-guest', tier=2, needs=[], budget=1200,
     env=['ppc-cross', 'qemu-ppc', 'socket'], full_only=True,
     covers=['tools/checks/ppc-display-guest.py', 'tools/accept/ppc_display.py', 'tools/accept/ppc_shm.py',
@@ -18,7 +20,7 @@ def run(ctx):
     for key in ('BUILD_OUT', 'KERNEL_CFLAGS', 'INC_KERNEL', 'C_STD',
                 'SQLITE_PROTO_OUT', 'MAKEFLAGS', 'MFLAGS', 'MAKELEVEL'):
         env.pop(key, None)
-    rc = subprocess.call(['python3', '-B', 'tools/accept/ppc_display.py', '--present'] +
+    rc = subprocess.call(['python3', '-B', 'tools/accept/ppc_display.py', '--present', '--part', PART] +
                          (['--mutate'] if ctx.mutate else []), cwd=ctx.root, env=env)
     # rc 3 = toolchain/QEMU/socket absent; only a failure when the PPC environment is required.
     return 0 if rc == 3 and os.environ.get('OS32_REQUIRE_PPC') != '1' else rc
