@@ -1,0 +1,9 @@
+#!/usr/bin/python3
+import os,sys,shutil,pathlib
+paths={'build/out/asm/sys/arch/x86/kernel/kentry.asm': 'build/out/asm/arch/x86/kernel/kentry.asm', 'build/out/asm/sys/arch/x86/kernel/isr_stub.asm': 'build/out/asm/arch/x86/kernel/isr_stub.asm', 'build/out/asm/sys/kernel/v86/v86_entry.asm': 'build/out/asm/kernel/v86/v86_entry.asm', 'build/out/asm/sys/arch/x86/kernel/ring3_entry.asm': 'build/out/asm/arch/x86/kernel/ring3_entry.asm', 'build/out/asm/sys/arch/x86/kernel/setjmp.asm': 'build/out/asm/arch/x86/kernel/setjmp.asm', 'build/out/asm/sys/kern/kstring_asm.asm': 'build/out/asm/lib/kstring_asm.asm', 'build/out/asm/sys/dev/net/ne2000/ne2000_io.asm': 'build/out/asm/drivers/net/ne2000/ne2000_io.asm', 'build/out/r1/obj/sys/arch/x86/kernel/kentry.o.asm': 'build/out/r1/obj/arch/x86/kernel/kentry.o.asm', 'build/out/r1/obj/sys/arch/x86/kernel/isr_stub.o.asm': 'build/out/r1/obj/arch/x86/kernel/isr_stub.o.asm', 'build/out/r1/obj/sys/arch/x86/kernel/ring3_entry.o.asm': 'build/out/r1/obj/arch/x86/kernel/ring3_entry.o.asm', 'build/out/r1/obj/sys/arch/x86/kernel/setjmp.o.asm': 'build/out/r1/obj/arch/x86/kernel/setjmp.o.asm', 'build/out/r1/obj/sys/kernel/v86/v86_entry.o.asm': 'build/out/r1/obj/kernel/v86/v86_entry.o.asm', 'build/out/r1/obj/sys/kern/kstring_asm.o.asm': 'build/out/r1/obj/lib/kstring_asm.o.asm', 'build/out/r1/obj/sys/dev/net/ne2000/ne2000_io.o.asm': 'build/out/r1/obj/drivers/net/ne2000/ne2000_io.o.asm'}
+paths["sys/kern/kstring_asm.asm"]="lib/kstring_asm.asm"
+args=sys.argv[1:]
+for i,a in enumerate(args):
+ if a in paths:
+  path=pathlib.Path(paths[a]);path.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(a,path);args[i]=str(path)
+os.execvp("nasm",["nasm",*args])

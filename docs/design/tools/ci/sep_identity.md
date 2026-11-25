@@ -65,3 +65,11 @@ P2-0 が採った全像の一覧を `sha256sum` の形式 (小文字の SHA-256�
 - ELF の配置まで動く C の診断文字列には、候補でそのリテラルを書く入力も指定する。例は `Sep-Changes: path-string build/out/kdebug/kselftest.o sys/include/memmap.h sys/platform/pc98/kdebug/kselftest/memmap.inc`（末尾は移動後の置き場に合わせる）。候補のソース・フォントを一時ディレクトリに写し、同じ固定環境で `make 対象` を回す。候補の全バイトを再現でき、指定の入力の文字列末尾だけを旧パスに戻して組むと保存済み SHA-256 に戻る場合に一致とする。これにより節の配置・シンボル・再配置を含めて検証する。対象は単独で make できる生成物と、ソースに直接書かれた通常の C 文字列。ビルドの失敗は終了 2、再現できない差は終了 1。
 
 - NASM の入力名が ELF に残る場合は `Sep-Changes: path-string userland/tests/kstr_asm_a.o sys/kern/kstring_asm.asm sys/kern/kstring_asm.asm` の形で宣言する。同じソースの写しを旧名でも用意し、候補のレシピのアセンブラ入力名だけを替えて組む。両方の全バイトを照合する。
+
+## 7. 理由つきの差を旧い入力で再現する (`reviewed-replay`、P3)
+
+`Sep-Changes: reviewed-replay ARTIFACT CANDIDATE_SHA256 REPLAY_SHA256` は、移動で中身が変わった生成物を、旧い入力に戻した木で組み直すと基点と同じバイトになることを宣言する。道具 (`tools/build_compare.py`) が照らすのは候補の sha256 と、再現の木の sha256 が基点と一致することの 2 つだけなので、正しさの中身は「再現の木をどう作ったか」にある。P3 (2026-11-26) の 93 件の作り方はリポジトリに残す (DECISIONS の U20):
+
+- 再現の木: `tools/restructure/replay/replay-normalize.py` が候補の木に 3 つだけを戻す — (1) 生成済みの契約の値 11 個を旧い値に (`contract-replay.py`)、(2) kselftest の文字列 1 行を旧いパスに、(3) NASM の入力の名前 14 個を旧い名前に (`nasm-replay`)。
+- 照合: `audit-comparison.py` が 93 件の宣言・候補・基点・再現の sha256 を突き合わせる。差の一覧は [reviewed-differences.tsv](../../../tasks/restructure/data/reviewed-differences.tsv) (内訳: パス 24・HWDEV の CRC 7・部品の ABI の世代 20・それらの波及 42)。
+- 台本は PM の機械の置き場 (`~/os32-tmp/run/restructure/`) の絶対パスを前提にした記録で、そのまま回す道具ではない。差の種類は DECISIONS の U19。
