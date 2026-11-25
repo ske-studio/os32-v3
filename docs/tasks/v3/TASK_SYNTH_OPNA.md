@@ -1,6 +1,6 @@
 # TASK_SYNTH_OPNA — PCM の合成器 (ソフト OPNA、fmgen の移植)
 
-> 状態: **実装中 (2026-11-24)** — コア (lib/os32_opna の段 A〜D、元の fmgen と全サンプル一致)・libos32snd の L1・L2・L5・アプリからの読み込み (LD1〜LD3) は手元の枝 (wip/synth-ld ほか、push していない)。x86 は NP21/W で sndl_test が通り、PowerPC は QEMU のゲスト試験が通った。鳴らす段 (L3・L6) は AV_HAL の S 段の後。
+> 状態: **受入待ち (2026-11-25)** — 統合の枝で CI と NP21/W の受入を行う。
 
 ## 0. ユーザー決定 (原文)
 
@@ -9,23 +9,17 @@
 - 設計の未決 3 件 (2026-11-05、原文):「7 件とも推奨どおり (推奨)」。中身: (a) リズム 6 音の素材は同梱しない (b) FM 音源が OPN だけの機械の既定はハードの OPN (c) V86 のタイマの割り込みは PCM のタイマで次の期限に起こす (実装前に資料で確かめ、だめなら PIT の one-shot、どちらも駄目なら 100Hz の上限を改めて諮る)。
 - 着手と進め方 (2026-11-24):「着手」「完成までプッシュせず自前で通るところまで実装してください」「並列実装は？」。PM の解釈: 合成器の枝は完成 (鳴らす段まで) まで push せず手元でビルド・試験・レビューを通し、完成した時にまとめて報告してから push する。段 C は 3 本を並べて作る。
 - 効果音 (FM 音源で鳴らす、PCM だけの機械では fmgen 由来の PCM をユーザーが任意で実行したときに作る) は 2026-11-04 のユーザー決定 (V3_PLAN の該当行)。起動時には作らない。
+- 統合の枝の受入 (2026-11-25):「push して CI と pc98emu で受入 (推奨)」。手元で実装・検証する段を終え、統合の枝を受入に回す。
+
+手元ではコア A〜D が元の fmgen と全サンプル一致し、L1・L2・L3・L5・L6 とアプリからの読み込み (LD) は各段で sol が承認した。2026-11-24 に NP21/W で `sndl_test` (LD) が通り、PowerPC では QEMU のゲスト試験が通った。配布像の SOFT OPNA が出力した 1 秒の PCM は、元の fmgen と全フレーム一致した。
 
 ## 1. 詳細設計 (確定) の要約
 
-全文: [SYNTH_OPNA_DESIGN](../../decisions/sound/SYNTH_OPNA_DESIGN.md) (確定の節が本文より優先)。
+| 段 | 統合の枝での状態 |
+|---|---|
+| A〜D | Rust の OPNA コア、表生成、内部 C ABI を実装済み。[合成器の設計](../../decisions/sound/SYNTH_OPNA_DESIGN.md) §2〜4 |
+| L1・L2・L3・L5・L6 | ミキサー、FM voice、PCM pump、共有像、chip 選択を実装済み。 |
+| LD1〜LD3 | 音枠と依存印、共有像の初回読み込み、exec からの取得を実装済み。[読み込みの設計](../../decisions/sound/SNDL_LOAD_DESIGN.md) §3〜4 |
+| L4・L7・IL | MIDI の両経路と V 段を含む DOS の FM ゲームの受入が残る。[持越し台帳](../DEFERRED_TESTS.md) |
 
-| 段 | 中身 | 状態 |
-|---|---|---|
-| A | `lib/os32_opna/` の ABI ヘッダ・PORT.md・fmgen の 4 原文と README.OS32・THIRD_PARTY.md | 未着手 |
-| B | 元 C++ の表の生成 (`gen_opna_tables`)・状態 (state.rs) | 未着手 |
-| C | operator・channel・psg・adpcm・rhythm・timer (Rust、整数演算) | 未着手 |
-| D | registers・lib.rs (FFI・混合)・Cargo・target・`synth-module.mk` | 未着手 |
-| E | `drivers/sound/synth/` (供給・通常文脈の pump・WAV 読込み・常駐 facade) と `pcm_source.inc` (内部の口 attach・push・finish・abort・status・detach) | 未着手。P8 の段 A を先に取り込む |
-| F | `drivers/sound/fm/` の backend (probe・auto/hw/soft/none)・`snd_engine.c` の接続 | 未着手 |
-| G | `kernel/v86/v86_opna.c` ほか (A460h の仮想化・タイマ)・`synth_timer.c` | 未着手。タイマの起床源は実装前に資料で確かめる |
-| H | host の oracle (元 C++ との差分)・変異・`check_opna`・ゲスト試験 | 未着手 |
-
-- 入口: 段 A から。段 E は P8 GUI 層 (票 TASK_P8_GUI_LAYER) の段 A の後 (PM 決定)。
-- PM 決定 (確定の節): 世代付き handle と STALE は使わない (token と owner)、タイマの FIFO 積みは通常文脈の trampoline へ。
-- 浮動小数点は使わない (Rust の float_arithmetic を deny、全対象の台帳は PORT.md)。fmgen の条件 (出所・フリー配布・改変の明示・原文添付) は A 段で満たす。
-- 受入 (host / NP21/W / 実機) は全文の §9。実機 Ra266 の OPNA 判定は実機受入に回す。
+受入条件は [AV_HAL_DESIGN](../../decisions/sound/AV_HAL_DESIGN.md) §13。Ra266 の OPNA 判定は実機受入で確認する。

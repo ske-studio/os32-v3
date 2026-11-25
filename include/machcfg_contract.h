@@ -6,7 +6,7 @@
 #define MACHCFG_FILE_MAX (1024 - 1)
 #define MACHCFG_LINE_MAX 95
 
-struct machcfg { u8 perf_request, nap7450; };
+struct machcfg { u8 perf_request, nap7450, snd_flags; };
 struct machcfg_seed { struct machcfg defaults; u8 accepts_nap7450; };
 
 struct machcfg_seed platform_machcfg_seed(void);

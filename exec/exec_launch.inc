@@ -47,11 +47,11 @@ static int exec_launch(const char *cmdline, int gui_arg)
     char path[VFS_MAX_PATH];
     /* 解決済みのパス。ヘッダを先に 1 ページ読むので、本体の読み込みでは
      * 同じ探索をやり直さずこちらを使う (探索でヒットした綴りを保つ)。 */
-    static char resolved[VFS_MAX_PATH];
+    char resolved[VFS_MAX_PATH];
     /* ヘッダだけを先に読むカーネル側バッファ。本体を読む先の物理は、
      * ヘッダの text_size / bss_size / heap_size を見るまで決まらない
      * (D1 の「起動時の順序」手順 2)。 */
-    static u8 hdrbuf[OS32X_HDR_SIZE];
+    u8 hdrbuf[OS32X_HDR_SIZE];
     u32 launcher_pd = paging_current_cr3();
     int launch_cmd_len = 0, launch_read_failed = 0;
     while (launch_read_byte(launcher_pd, cmdline + launch_cmd_len, &launch_read_failed)) {
@@ -69,17 +69,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
     is_shell = (exec_nest_level == 0);
     if (is_shell) g_layout_reject = 0;   /* 0 段の起動ごとに消す (子では触らない) */
 
-    /* ---- ID の池 (D3)。物理の勘定はヘッダを読んでから ---- */
-    if (is_shell) {
-        id = APP_ID_SHELL;
-    } else {
-        id = appslot_start_admit(gui, 0, 0);
-        if (id < 0) {
-            if (id == OS32_ERR_FULL)
-                shell_print("Error: too many programs running\n", ATTR_RED);
-            return id;
-        }
-    }
+    id = APP_ID_SHELL;
 
     /* コマンドラインからパスを抽出。**切り詰めない** (票 TASK_VFS_FD_PATH
      * v3 の追記): 以前は 255 バイトで切って、切った名前の別のプログラムを
@@ -232,8 +222,20 @@ static int exec_launch(const char *cmdline, int gui_arg)
     /* ======== 物理の勘定 (D5)。入らなければ拒否、切り詰めない ======== */
     need_pages = 0;
     if (want_ring3) {
+        if (hdr->flags & OS32X_FLAG_SND) {
+            int rc = exec_sound_acquire(ring3_wait_pending);
+            if (rc == OS32_ERR_BUSY) {
+                shell_print("Error: loaded GUI overlaps sound library\n", ATTR_RED);
+                return EXEC_ERR_INVALID;
+            }
+            if (rc < 0) {
+                shell_print("Error loading " SYS_SHLIB_SND "\n", ATTR_RED);
+                return rc;
+            }
+        }
         need_pages = exec_ring3_pages(load_base, sbrk_end, exec_heap_size, stack_size);
-        if (appslot_start_admit(gui, need_pages, pgalloc_free_pages()) < 0) {
+        if (hdr->flags & OS32X_FLAG_SND) need_pages += exec_sound_data_pages();
+        if (need_pages > pgalloc_free_pages()) {
             shell_print("[DBG] NOMEM: need pages=", ATTR_WHITE);
             shell_print_dec(need_pages, ATTR_WHITE);
             shell_print(" free=", ATTR_WHITE);
@@ -248,6 +250,8 @@ static int exec_launch(const char *cmdline, int gui_arg)
      * **失敗しうる操作より前に**控えておく。後ろに置くと、巻き戻しが
      * 古い exec_heap_used で起動元のヒープ管理変数を上書きする。 */
     if (!is_shell) {
+        id = appslot_start_reserve(gui);
+        if (id < 0) return id;
         exec_heap_save_state(&appslot_at(launcher_id)->exec_heap_used);
     }
 
@@ -280,6 +284,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
          * (TASK_T1_LEDGER §4-8)。返却は exec_teardown_app。 */
         if (!ledger_owner_new(LEDGER_KIND_AS, (u32)id, "app", &as_owner)) {
             shell_print("Error: ring3 addrspace create failed\n", ATTR_RED);
+            appslot_start_release(id);
             return EXEC_ERR_NOMEM;
         }
         paging_load_cr3(paging_kernel_pd_phys());
@@ -288,6 +293,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
             if (ctx->as) kfree(ctx->as);
             ctx->as = 0;
             (void)ledger_owner_retire(as_owner);
+            appslot_start_release(id);
             exec_restore_context(launcher_id);
             return EXEC_ERR_NOMEM;
         }
@@ -310,7 +316,8 @@ static int exec_launch(const char *cmdline, int gui_arg)
          * 専用の物理ページ (原本から複製)。**master CR3 のまま**行う —
          * 原本 g_data_master は共有ライブラリ帯の末尾 = アプリ固有 PDE の
          * 中にあり、アプリ CR3 の下では別物を指す (I11)。 */
-        if (exec_shlib_addrspace_attach(ctx->as) < 0) {
+        if (exec_shlib_addrspace_attach(ctx->as) < 0 ||
+            ((hdr->flags & OS32X_FLAG_SND) && exec_sound_attach(ctx->as) < 0)) {
             shell_print("Error: shlib data attach failed (out of memory)\n", ATTR_RED);
             return exec_launch_abort(launcher_id, id, EXEC_ERR_NOMEM);
         }

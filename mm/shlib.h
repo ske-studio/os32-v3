@@ -11,6 +11,9 @@
  * 戻り値: 0=ロード成功, -1=未ロード (ファイルが無い / 形式不正)。
  * -1 でも起動は続行してよい (GUI を使わないプログラムには影響しない)。 */
 int shlib_init(void);
+int shlib_sound_acquire(int (*cancelled)(void));
+u32 shlib_sound_data_pages(void);
+int shlib_sound_attach(struct addrspace *as);
 
 /* ライブラリが常駐しているか (1=常駐)。 */
 int shlib_loaded(void);

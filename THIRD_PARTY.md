@@ -24,6 +24,7 @@ OS32 本体は MIT ([LICENSE](LICENSE))。ここに挙げるのはリポジト�
 | Inconsolata Regular | 3.000 | SIL OFL 1.1 | リポジトリには含めない。`tools/fetch_fonts.py --family inconsolata` で公式 release から取得。製品配布への追加は T7b-b3 | 無改変、zip・TTF・OFL の SHA-256 を固定 | 取得物と同じ `assets/fonts/Inconsolata-OFL.txt`、取得元・条件は `assets/fonts/README.OS32` |
 | JF ドット東雲ゴシック16 (東雲フォント 0.9.11 由来) | jfdotfont-20150527 | 東雲フォントライセンス (Public Domain 宣言、JF は原版の条件を継承) | **リポジトリには含めない** — `JF-Dot-Shinonome16.ttf` は `tools/fetch_fonts.py --family jfdot-shinonome16` が配布 zip から取得 (zip・TTF の SHA-256 を固定)。GUI の標準和文 (ゲストの `/usr/share/fonts/`)。派生物 `JF-Dot-Shinonome16.g16` (描き済みの 16px 字形の束、TTF の EBDT 16px strike からホストで生成、`tools/gen_g16.py`、TASK_FONTPERF) も同じ場所に配る | TTF は**無改変**。束は EBDT の原ドットを 16×16 の枠に並べ直したもの | 取得物と同じ `assets/fonts/JF-Dot-Shinonome16-LICENSE.txt` (同梱)、取得元は `assets/fonts/README.OS32` |
 | 常用漢字表 | 2010 年内閣告示 (2,136 字) | 事実の一覧 (告示) | `assets/joyo_kanji.txt` (`tools/fep_to_sqlite.py` が辞書の絞り込みに使う) | 漢字だけを 1 行に並べたもの | — |
+| fmgen (cisc) | 008、NP21/W b49b96a8305b | 作者独自のフリーソフト配布条件。商用組込みは事前合意 | [移植台帳](lib/os32_opna/PORT.md)、段 A は参照ソースのみ | 採録版から無改変 | [条件と改変記録](lib/os32_opna/README.OS32)、配布像への組込み時は `/sys/licenses/fmgen/` |
 | Python パッケージ (ホストの道具) | [requirements.txt](requirements.txt) | 各パッケージ (Pillow = HPND/MIT-CMU、PyYAML = MIT、lz4 = BSD-3、numpy = BSD-3、fontTools = MIT、zopfli = Apache-2.0、pyserial = BSD-3、pywin32 = PSF、pyautogui = BSD-3、pandas = BSD-3) | `tools/` の実行時に import。**配布物には入らない** | — | 各パッケージの配布物 |
 
 ゲスト側 (ディスクイメージ) に**含まれるもの**は SQLite・zlib inflate・microtar・microui・FatFs・

@@ -30,6 +30,9 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
+| SYNTH-L4 | midi_host の MIDI 出力と close・切断時の reset | L4 が残る | [AV_HAL_DESIGN](../decisions/sound/AV_HAL_DESIGN.md) の L4・IL |
+| SYNTH-L7 | midi_fm の GM → OPN 変換と L6 経由の発音 | L7 が残る | [AV_HAL_DESIGN](../decisions/sound/AV_HAL_DESIGN.md) の L7・IL |
+| SYNTH-IL | V 段を通して DOS の FM ゲーム 1 本を NP21/W で鳴らす | 手元では通常アプリの SOFT OPNA の発音まで確認済み | TASK_SYNTH_OPNA の統合の枝で CI・NP21/W 受入 |
 | USB-TICK-BUDGET-1 | Ra266 で OHCI 完了・HID 入力・挿抜と共有 IRQ 負荷時の USB slot と IRQ0 の最大時間を測る。idle 繰り越し導入（2026-11-23）後は、完了の集中・挿抜・共有 IRQ 負荷で前景の usb_service の連続 IF=0 の最大時間と HID 入力の遅れも測る | 予約 90 µs は 3 HC × 30 µs の仮定 | 実測最大に余裕を加えて予約を再設定し、1 kHz で IRQ0 最大 200 µs 以内と入力継続を確認して閉じる |
 | USB-IDLE-LATENCY-1 | CPU を使い切る処理が協調点に戻らない間の HID 配送の遅れと IRQ の無い HC の見回り（sol レビュー 2026-11-23） | tick の予算拒否が続くと次の協調点まで配送が待たされ、遅れの上限がない。IRQ の無い HC の見回りも止まる | Ra266 で測定後、予算付きの実行点を設けるか、許容する遅れと条件を設計で決める |
 | INPUT-REPEAT | 押し続けたキーのリピート配送 | NP21/W の hold はメイクを繰り返さない | TASK_INPUT_HAL。メイクを反復する鍵盤で確認 |

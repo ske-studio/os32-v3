@@ -176,6 +176,24 @@ static int addrspace_map_user_page(struct addrspace *as, u32 virt, u32 phys,
     return 0;
 }
 
+/* Drop an unused private table with its AS inactive. Other regions may
+ * share this PDE, so inspect the entire table before releasing it. */
+void paging_addrspace_drop_empty_pt(struct addrspace *as, u32 va)
+{
+    u32 pde = PDE_INDEX(va);
+    if (!as || !as->pd_phys || as->appmem_poisoned ||
+        paging_current_cr3() != paging_kernel_pd_phys() ||
+        pde < as->app_pde || pde - as->app_pde >= as->app_pde_count) return;
+    u32 *frame = &as->app_pt_phys[pde - as->app_pde];
+    if (!*frame) return;
+    u32 *table = P2V(*frame);
+    for (u32 i = 0; i < PTE_COUNT; i++)
+        if (table[i]) return;
+    ((u32 *)P2V(as->pd_phys))[pde] = 0;
+    if (pgalloc_free_n_owner(as->owner, *frame / PAGE_SIZE, 1)) *frame = 0;
+    else paging_addrspace_poison(as);
+}
+
 int paging_addrspace_map_user(struct addrspace *as, u32 virt, u32 phys,
                               u32 flags)
 {

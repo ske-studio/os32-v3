@@ -4,6 +4,8 @@
 #include "paging.h"
 
 extern u32 paging_irq_ops;
+void paging_addrspace_drop_empty_pt(struct addrspace *as, u32 va);
+
 
 /* Stack-local, never embedded in AS/AppSlot. PFNs of staged data live in NP PTEs. */
 struct paging_app_stage {

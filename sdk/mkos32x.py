@@ -218,6 +218,13 @@ def main():
             raise H.HeaderError("invalid heap/stack size")
         code_size = check_image_layout(elf, text_addr, text_size, entry_offset)
         shlib_dependency = '__os32_shlib_dependency' in elf.symbols
+        if '__os32_snd_dependency' in elf.symbols:
+            if flags & (OS32X_FLAG_SHLIB | H.OS32X_FLAG_PPC32):
+                raise H.HeaderError("sound dependency requires a ring 3 x86 application")
+            flags |= H.OS32X_FLAG_SND | OS32X_FLAG_RING3
+            if shlib_dependency:
+                flags |= H.OS32X_FLAG_WITH_GUI
+            shlib_dependency = True
         if shlib_dependency and load_addr != H.OS32X_APP_LOAD_ADDR:
             raise H.HeaderError("resident shell must be statically linked")
         if compat_api and (shlib_dependency or flags & OS32X_FLAG_SHLIB):

@@ -166,16 +166,18 @@ def preentry(tmp, headers, runner):
     gate = gate[:gate.index(end)]
     funcs = ''.join(extract(source, s) for s in
                     ('static u32 exec_ring3_extra_pages(', 'static u32 exec_ring3_pages('))
-    funcs += extract((ROOT / 'exec/appslot.c').read_text(), 'int appslot_start_admit(')
     shapes = ','.join('{%d,%d,%d}' % (h['text_size'], h['bss_size'], h['stack_size'])
                       for h in headers)
     code = '''#include "os32api.h"
+#include "config.h"
 #include "memmap.h"
 #include "paging.h"
 #define APP_ID_SHELL 1
-static int g_cur=APP_ID_SHELL, entered, errors, restored;
+static int entered, errors, restored;
 static u32 available;
-static int appslot_alloc_id(void) { return 2; }
+static int ring3_wait_pending(void) { return 0; }
+static int exec_sound_acquire(int (*cancelled)(void)) { (void)cancelled; return -1; }
+static u32 exec_sound_data_pages(void) { return 0; }
 static u32 exec_shlib_data_pages(void) { return 10; }
 static u32 pgalloc_free_pages(void) { return available; }
 static void shell_print(const char *s, u8 attr) { (void)s; (void)attr; errors++; }
@@ -187,7 +189,8 @@ static int launch(u32 image, u32 stack) {
     u32 load_base=MEM_EXEC_LOAD_ADDR, sbrk_end=PAGE_ALIGN_UP(load_base+image)+PAGE_SIZE;
     u32 exec_heap_size=MEM_EXEC_HEAP_MIN, stack_size=stack ? stack : MEM_EXEC_STACK_SIZE;
     u32 need_pages;
-    int want_ring3=1, gui=0;
+    int want_ring3=1;
+    OS32Header header={0}, *hdr=&header;
 '''+gate+'''
     entered++; /* host entry boundary, reached only after admission */
     return 0;

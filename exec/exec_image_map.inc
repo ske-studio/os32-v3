@@ -78,7 +78,8 @@ static const char *exec_image_reject_reason(const OS32Header *hdr, int is_shell,
         reason = "Error: invalid image code range\n";
     else if (is_shell && hdr->shlib_protocol)
         reason = "Error: resident shell must have shlib_protocol=0\n";
-    else if (hdr->shlib_protocol && !exec_shlib_loaded())
+    else if (hdr->shlib_protocol && (!(hdr->flags & OS32X_FLAG_SND) ||
+             (hdr->flags & OS32X_FLAG_WITH_GUI)) && !exec_shlib_loaded())
         reason = "Error: required shared library is not loaded\n";
     return reason;
 }

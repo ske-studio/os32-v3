@@ -33,7 +33,7 @@ MUTANTS = [
     ('access_walk', 'sf->npages != l->npages', '0', 'lease page count'),
     ('access_walk', 'sf->perm_max == LEDGER_PERM_NONE', '0', 'lease NONE input'),
     ('shlib', 'pgalloc_page_owned(frame / PAGE_SIZE, LEDGER_OWNER_SHLIB)', '1', 'shlib ledger owner'),
-    ('shlib', 'page < g_text_pages', 'page < MEM_SHLIB_SIZE / PAGE_SIZE', 'shlib text bound'),
+    ('shlib', 'page < image->text_pages', 'page < MEM_SHLIB_SIZE / PAGE_SIZE', 'shlib text bound'),
     ('access_walk', '!(expected & PTE_PRESENT)', '0', 'master present'),
     ('access_walk', '(expected & PTE_PS)', '0', 'master PS'),
     ('access_walk', '(as->pd_phys & ~mask)', '0', 'PD alignment'),
@@ -60,7 +60,7 @@ MUTANTS = [
     ('access_walk', 'sf->gen != l->generation', '0', 'surface generation'),
     ('access_walk', '!(l->flags & PTE_RW)', '0', 'RO lease authority'),
     ('access_walk', 'frame != (sf->first + (va - l->base) / PAGE_SIZE) * PAGE_SIZE', '0', 'lease PFN'),
-    ('shlib', 'g_pages[page] == frame', '1', 'shlib exact backing'),
+    ('shlib', 'image->pages[page] == frame', '1', 'shlib exact backing'),
     ('access_walk', '!write && exec_shlib_read_page(va, frame)', 'exec_shlib_read_page(va, frame)', 'shlib output'),
     ('redir_access', 'if (write) kmemcpy(P2V(pa), bytes, n);', 'if (write) { }', 'boot copyout moves bytes'),
 ]

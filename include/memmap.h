@@ -375,6 +375,7 @@ extern u32 __ledger_fixed_start, __ledger_fixed_end;
 /* ====================================================================== */
 #define MEM_SHLIB_BASE        MEM_APP_BAND_BASE   /* 0x80000000 */
 #define MEM_SHLIB_SIZE        0x100000UL          /* 1MB */
+#define MEM_SHLIB_SND_BASE    0x80080000u
 #define MEM_SHLIB_END         (MEM_SHLIB_BASE + MEM_SHLIB_SIZE)
 
 /* 外部アプリ image/sbrk は高位、heap と可変 stack は別予約。 */

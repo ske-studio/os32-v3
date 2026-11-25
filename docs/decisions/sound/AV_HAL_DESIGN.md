@@ -458,6 +458,21 @@ XInput は in2_pad_* をそのまま / DI8 のキーボードは in2_key_state�
 
 状態はすべてアプリの中。カーネルの口は os32_snd2.h (と §9 の V86 の口) だけを使う。シングルタスクなので、ライブラリの中に排他は置かない (呼ぶのはアプリの 1 本の流れだけ)。
 
+### x86 アプリからの読み込み（LD1〜LD4）
+
+SDK の `<os32/sndl.h>` を読み、`-los32sndl` をリンクする。スタブを参照した ELF に `__os32_snd_dependency` が残り、pack が OS32X v5 の依存印を刻む。最初の呼出しでスタブが SLIB の magic、共通 protocol、音表の版と長さを確認し、そのアプリの KernelAPI を init へ渡す。
+
+| 必須の共有像 | 新規 flags | shlib_protocol |
+|---|---|---:|
+| なし | 0 | 0 |
+| GUI | 0 | 2 |
+| 音 | SND（0x0080） | 2 |
+| GUI と音 | SND と WITH_GUI（0x0100） | 2 |
+
+音の最初の要求で exec は `/sys/lib/libos32snd.shlib` を読む。音枠は `0x80080000` から `0x80100000` の直前まで。ロード済み GUI が 128 頁を超える場合は音のファイルを開く前に拒否する。GUI 単独では従来どおり 256 頁まで使用できる。音の RO 原本は常駐し、data/BSS は利用する AS ごとに複製する。exec は原本公開後の空き頁を確認してから起動 ID を予約する。PowerPC は音依存を入口前に拒否する。
+
+音表 v1 の番号 0〜7 は voice の new、submit、set、play、stop、reset、delete、done、8 は init、9 は render。`sndl_render(pcm, frames, rate)` は 1〜1024 frame を指定レートのステレオ s16le として呼び手のバッファへ書く。この経路の完了はメモリへの描画完了を表す。`sndl_test` はモノラルの正負 2 サンプルから左右 4 サンプルを照合する。装置への転送と実再生位置は §7-1・§7-3 の対象。
+
 ### 7-1. 開始と pump (R2-P1-3)
 ```c
 /* userland/lib/snd/libos32snd.h (C89) */
@@ -602,6 +617,10 @@ int sndl_midi_long(u32 h, const void *p, u32 n);  int sndl_midi_reset(u32 h);  i
 | §3 C ABI | synth_open/write/read/pump/wake_irq/finish/abort | サービスの口は削除。adapter が `fmv_new/fmv_write/fmv_read/fmv_status/fmv_render/fmv_reset/fmv_csm` を持ち、コアの FFI を呼ぶ | L2 |
 | §5 の private の timer/CSM の ABI (`opna_timer_write`・`opna_timer_count`・`opna_apply_csm`) | コアの FFI | **コアに残す** (宣言は lib/os32_opna/opna.h、段 A)。カーネルの模型 (V1) は C で別に持つので timer_write/count は使わない。CSM_KEYON は L2 が `opna_apply_csm` で反映 (R3-P2-2) | A・L2 |
 | §4 表・ビルド・障害 | 最終の synth.elf・再配置・カーネルの panic の終端 | ユーザーの共有ライブラリとして結ぶ (再配置は SDK の共有ライブラリの規則)。Rust の panic はアプリの異常終了 (カーネルの panic にしない) | L5 |
+| [LD1](SNDL_LOAD_DESIGN.md) | SDK の音枠・依存印・リンク/pack・旧世代互換と表の検算 | L5 | 枠契約 | 100〜160 | IL | メモリ契約の決定 |
+| [LD2](SNDL_LOAD_DESIGN.md) | mm/shlib.c の枠別原本、初回読込、attach/detach と RO 判定 | LD1 | 原本・AS の付着集合 | 120〜200 | IL | LD1 |
+| [LD3](SNDL_LOAD_DESIGN.md) | exec の要求検証・初回取得・公開後の予算検査（空き 0 を含む）・待機後の ID 予約と巻戻し | LD2 | 起動計画 | 70〜120 | IL | LD2 |
+| [LD4](SNDL_LOAD_DESIGN.md) | SDK の sndl stub、音表と init、ゲスト sndl_test・対象 host 試験 | LD1〜3・L2/L3/L6 | アプリの bind 状態 | 160〜270 | IL | ソフト音源と PCM の接続 |
 | §5 DMA 時計・PCM の接続・所有者 (サービスの部分) | D・Ptarget=D+6144・owned submit・PCM と排他 | 削除 (上の private の ABI は残す)。量は §7-1 の空き、時刻は §7-4、所有は PCM の流れ | L2・L3 |
 | §5 timer の IRQ と CS4231 の次期限 (R3) | カーネルの IRQ で timer を進める | V86 の timer の模型へ (§9-4)、**起床源の順は 11-05 の決定のまま**。ネイティブの MIDI・MML では timer は要らない | V1 |
 | §6 snd・装置の選択 | snd の SOFT が synth.mod を使う | MML ごと廃止 (§7-6)。FM の検出 (HW/SOFT/NONE) は V86 のセッションの FM_SOFT の既定を決めるのに残す | V2 |
@@ -764,7 +783,7 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | IA | F1・N1〜N7・D1・D2・K2・G1・E1・R0a〜R0c | in2_test (新) のシリアルの出力・gshell の配送の記録 | 13-2 の入力の行が全部・av_no_weak.sh IA が 0・WM の既存の試験 (KBD_NAV・STOP) が退行しない |
 | IS | S1〜S9・K1・E1 | snd2_test・pcm_play (v1)・/api/sound の取得 | 13-2 の音の行が全部・既存の PCM の試験 (TASK_PCM_CS4231 の E 系) が v1 のまま通る |
 | IP | P0〜P5 | in2_test・実機の USB の回 | 3 種 × 状態・振動 |
-| IL | L1〜L5・Q1・V1〜V6 | sndl_test・DOS の FM のゲーム 1 本 | 13-2 の IL の行 |
+| IL | L1〜L7・Q1・V1〜V6・IS・[LD1〜LD4](SNDL_LOAD_DESIGN.md) | sndl_test・DOS の FM のゲーム 1 本 | 13-2 の IL の行 |
 
 ### 13-2. host (libc 無し) と変異 (製品の行を 1 つ変えて RED)
 | 反例・確かめる事 | 試験 | 変異 |
