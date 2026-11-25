@@ -148,3 +148,12 @@ notify.tsv（17行）・waves.tsv（120行）で W1〜W11 と T 各波の旧パ�
 remote.tsv（40行）は実機ノート・pc98emu への質問。実機とリモート枠の現物、GitHub の配布物、動的に組む参照は未確認。H-7 の外部ビルドは未実行。
 - 残る漏れ (読み手 2026-11-25): 分割して組み立てる固定のパスと import 先のファイル自体に未収録の例がある (NP21/W の予行の SDK ヘッダ sdk/include/os32/os32_kapi_shared.h — tools/nhd_deploy.py、実機ノートの /opt/os32/tools/host_linux.py — tools/host_agent.py)。
 
+## P1 への入力 (P0 の取り直しのレビュー、票を書いたセッション 2026-11-25)
+
+- P0 の取り直し (基点 4146cf146) は受け取り可。P0 の回し直しは要らない。
+- 持ち主が空 366 のうち約 100 は規則の漏れ: ホストの試験の .rs 32 本 (userland/gshell/host の *_tests.rs、userland/rust の host/、host_tests/ — 規則が「tests」という名前のディレクトリしか拾わない)、userland/lib/font/vendor/ttf-parser の 64 本 (Cargo.toml の dev-dependencies、製品に入らない)。
+- 「公開インターフェースは 1 件」は狭い: 規則が sdk/include/ と sdk/kapi.json だけで、sdk/ の 29 本が未分類 (sdk/link の .ld 6、mkos32x.py など .py 15、Rust のターゲットの定義 3 ほか)。
+- 仕様 §5 の 6 種類に当たらない物: build/ の .mk 74 とリンカスクリプト 16、assets/ 22、sample/ 10、文書 1,274。
+- 残骸の候補: kernel/v86 の .h 5 本、include/ の diag_stack.h・snd_writer_probe.h・type_contract.h・vk32.h はどの像の入力でもない。
+- P0-6・P0-7 の未確定は前と同じ (295・813・811)。P0-8 の remote.tsv 40 行 (ノートと pc98emu への質問) は未送付 — P1-6 の「知らせる相手」の前に送る。
+
