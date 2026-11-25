@@ -1,6 +1,6 @@
 # 新しい検査を 1 本書く
 
-> 状態: P1-4 起草済み (sol のレビュー待ち)。
+> 状態: P1-4 確定 (2026-11-26、sol 確定可)。
 
 検査名は保証する契約から付ける。期待する値・失敗条件を現行の設計書の節、KAPI 定義、装置資料に求め、登録に出所を記す。根拠が足りなければ先に設計を補う。足す順はビルドと一致、起動、木の形、デバッグで触る契約とする。旧登録の変換や網羅表の作成は行わない。（P4「新しい検査が満たす事」）
 
@@ -42,4 +42,12 @@ PowerPC は QEMU で決めた到達点を採る。PC-98 は U11・U13 により�
 
 D-8 はゲストに配備する診断と入力・実機台本を userland/diag/ にまとめる。atadeny.bin と learnprb.bin のソースも含む。同じ配備物を作る Rust クレートは現行 Cargo 入力位置に保ち、ホストの QA は tests/ に書く。（P1_LAYOUT の D-8）
 
-D-12 は配置表が「A3 で P1-4 が扱う」とした項。P4 順 3 の前に PM に諮る。推奨は、現行設計の期待を満たす層・文書・KAPI 互換の静的解析器を新しい登録から呼び、検査本体と道具の試験は現行契約から書く案。旧パスを自前で持つ層判定は所有の入口に合わせてから載せる。もう一案は解析器も含めて書き直すこと。現行の設計で使える解析処理まで作り直す工数が増える。[所有の入口](../../build/ownership.md)
+D-12 は決定済み (DECISIONS の U22、ユーザー 2026-11-26「現行の内容を精査し新規でつくる」): P4 の順 3 で、今の層・所有・文書・KAPI の互換の検査と道具が何を保証しているかを読み、要る契約を設計書に書いてから、検査本体も解析の道具も新しく書く。今の道具をそのまま新しい登録に載せ直さない。
+
+## 配布物と再生成の合否
+
+PC-98 は all・kernel-r1 と deploy-u3・iso を組み、kernel.elf・kernel.map・vmkernel.lz4、D88・生 2HD・1440 KiB FD・インストール ISO、PKG、deploy-set.json、hostdrv.tar.gz と格納した HostDrv の manifest を要求する。両 FD と HostDrv と配布カーネル、D88 と生 2HD、deploy-set と配備元を照合する。
+
+main の再生成比較は各構成を同じコミット ID・時刻で清浄な木から 2 回組む。x86 は P2-0 の build_compare.artifacts(all_products=True) と packages の配布物、PowerPC は各指定の ELF とオブジェクトを比較し、パス集合の差も落とす。P2-0 と同じく PowerPC の boot.iso は媒体の時刻が入るため存在だけを要求する。link-sh/root_image_blob.o を生成する構成でもこのファイルは存在だけを比較する（現行の ROOT_BLOB は空）。
+
+PowerPC の common-compile は ppc-ci-image と同じ KBOOT_SH=1・KBOOT_LINK=1 で C_COMMON_PC98_PENDING と C_COMMON_COMPILE_ONLY_PPC の C 入力ごとに PowerPC ELF の再配置可能オブジェクトを生成する。リンクと起動は対象外。
