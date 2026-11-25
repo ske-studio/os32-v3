@@ -151,9 +151,9 @@ class RunnerTest(unittest.TestCase):
         # check-fast の再帰 make にも配置指定を渡し、前提の準備から除外する。
         actual = Path(R.__file__).parents[2]
         self.write('tools/checks/run.py', Path(R.__file__).read_text())
-        sdk = (actual / 'build/sdk.mk').read_text()
-        section = sdk[sdk.index('ifeq ($(CHECK_TIME_CHILD),1)'):sdk.index('CHECK_TIMES ?=')]
-        fast = sdk[sdk.index('check-fast:'):sdk.index('# FILES=')]
+        rules = (actual / 'build/check.mk').read_text()
+        section = rules[rules.index('ifeq ($(CHECK_TIME_CHILD),1)'):rules.index('CHECK_TIMES ?=')]
+        fast = rules[rules.index('check-fast:'):rules.index('# FILES=')]
         self.write('Makefile', section + '\n' + fast +
                    '\nalpha beta:\n\t@echo $@ >> prepared\ncheck-par:\n\t@echo $(CHECK_PAR_TARGETS) > selected\n')
         self.write('tools/check_tree_unchanged.py', 'pass\n')
@@ -220,8 +220,8 @@ class RunnerTest(unittest.TestCase):
         self.check('a', budget=10, needs=['make:alpha'])
         self.check('b', budget=9, needs=['make:beta'])
         self.check('c', budget=1, needs=['check:b'])
-        sdk = (actual / 'build/sdk.mk').read_text()
-        section = sdk[sdk.index('ifeq ($(CHECK_TIME_CHILD),1)'):sdk.index('CHECK_TIMES ?=')]
+        rules = (actual / 'build/check.mk').read_text()
+        section = rules[rules.index('ifeq ($(CHECK_TIME_CHILD),1)'):rules.index('CHECK_TIMES ?=')]
         self.write('Makefile', section + '\nalpha beta:\n\t@echo $@ >> prepared\n')
         for i, expected in enumerate(('alpha', 'beta')):
             result = subprocess.run(['make', '--no-print-directory', 'check-prepare', f'CHECK_SHARD={i}/2'],

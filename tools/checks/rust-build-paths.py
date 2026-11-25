@@ -23,7 +23,7 @@ def run(ctx):
         host = subprocess.check_output(['rustc', '--print', 'host-tuple'], cwd=ctx.root, text=True).strip()
         cases = ['first', 'second']
         if ctx.mutate:
-            cases.extend(['path-mutant', 'symbol-mutant'])
+            cases.extend(['untrimmed', 'unstamped-root'])
         for name in cases:
             root = Path(tmp) / name
             app = root / 'app'
@@ -31,11 +31,11 @@ def run(ctx):
             (root / '.cargo').mkdir(parents=True)
             shutil.copyfile(ctx.root / 'rust-toolchain.toml', root / 'rust-toolchain.toml')
             setting = config
-            if name == 'path-mutant':
+            if name == 'untrimmed':
                 anchor = 'trim-paths = "all"'
                 assert config.count(anchor) == 1
                 setting = config.replace(anchor, 'trim-paths = "none"')
-            elif name == 'symbol-mutant':
+            elif name == 'unstamped-root':
                 assert config.count('OS32_SOURCE_ROOT =') == 1
                 setting = config.replace('OS32_SOURCE_ROOT =', 'UNUSED_ROOT =')
             (root / '.cargo/config.toml').write_text(setting)
@@ -53,7 +53,7 @@ def run(ctx):
                            cwd=app, env=env, check=True)
             binary = app / 'target' / host / 'release/app'
             location = subprocess.check_output([binary]).strip()
-            if name == 'path-mutant':
+            if name == 'untrimmed':
                 assert bytes(dep) in location
                 print('RED: disabling trim-paths exposed the dependency checkout')
             else:

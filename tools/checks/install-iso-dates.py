@@ -19,17 +19,17 @@ def run(ctx):
         packages.mkdir()
         pkg = packages / 'SAMPLE.PKG'
         pkg.write_bytes(b'OS32')
-        for mutant in ([False, True] if ctx.mutate else [False]):
+        for preserve_mtime in ([False, True] if ctx.mutate else [False]):
             option = '--set_all_file_dates "=$(INSTALL_ISO_EPOCH)"'
             assert recipe.count(option) == 1
-            (root / 'Makefile').write_text(recipe.replace(option, '') if mutant else recipe)
+            (root / 'Makefile').write_text(recipe.replace(option, '') if preserve_mtime else recipe)
             images = []
             for stamp in (946684900, 946685000):
                 os.utime(pkg, (stamp, stamp))
                 subprocess.run(['make', '-o', 'packages', 'iso'], cwd=root, env=env, check=True)
                 image, = (root / 'images').glob('*.iso')
                 images.append(image.read_bytes())
-            if mutant:
+            if preserve_mtime:
                 assert images[0] != images[1]
                 print('RED: preserving input mtime changed the installation ISO')
             else:

@@ -162,10 +162,14 @@ def cases(prefix, work, mutate):
     receipt.write_text(json.dumps(trusted))
     builder.build(prefix, work / 'reuse', reuse=archive, receipt=receipt)
     assert sentinel(prefix, work, ROOT / 'sdk/link/ppc/app.ld') == 0
-    # Execute the unchanged x86 builder twice at exactly the same absolute path.
+    # Execute the x86 builder twice at exactly the same absolute path.
     xprefix = Path(os.environ.get('CROSS_DIR', '/home/hight/opt/cross'))
     old = json.loads(subprocess.check_output(['git', 'show', 'a0429c94:sdk/allocator/nano_inputs.json'], cwd=ROOT))
     current = json.loads(inputs.LEDGER.read_text())
+    # P2-2 changed the SDK builder. Verify its recorded digest against the
+    # actual source while retaining the historical baseline for every other input.
+    old['sdk_build']['sources']['sdk/allocator/build_nano.py'] = inputs.digest(
+        (ROOT / 'sdk/allocator/build_nano.py').read_bytes())
     assert {k: current[k] for k in ('toolchain', 'sdk_build')} == {k: old[k] for k in ('toolchain', 'sdk_build')}
     assert x86.cache_key(current) == x86.cache_key(old)
     xcrt = work / 'x86-syscalls.o'

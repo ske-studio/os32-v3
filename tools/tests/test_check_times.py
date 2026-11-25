@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Timing regressions with two fake checks; mutations never touch the live tree."""
 CHECK = dict(name='check-times-host', tier=1,
-    covers=['tools/checks/run.py', 'tools/check_time.py', 'build/sdk.mk', 'sdk/kapi.json'],
+    covers=['tools/checks/run.py', 'tools/check_time.py', 'build/check.mk', 'sdk/kapi.json'],
     needs=[], budget=24.5,
     kind='characterization',
 )
@@ -18,7 +18,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 TIMER = (ROOT / 'tools/check_time.py').read_text()
-SDK = (ROOT / 'build/sdk.mk').read_text()
+CHECK_RULES = (ROOT / 'build/check.mk').read_text()
 RUNNER = (ROOT / 'tools/checks/run.py').read_text()
 
 
@@ -30,13 +30,13 @@ class CheckTimesTest(unittest.TestCase):
         for directory in ('tools/checks', 'sdk', 'build'):
             (self.root / directory).mkdir(parents=True, exist_ok=True)
         self.write('tools/check_time.py', TIMER)
-        self.write('build/sdk.mk', SDK)
+        self.write('build/check.mk', CHECK_RULES)
         self.write('tools/checks/run.py', RUNNER)
         self.write('drivers/video/a.c', 'int a;\n')
         subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
         self.write('sdk/kapi.json', '{"version": 1}')
         self.write('Makefile', 'BUILD_OUT = build/out\n'
-                   'FAIL ?= 0\nPREP_FAIL ?= 0\nexport FAIL PREP_FAIL EMPTY\ninclude build/sdk.mk\n'
+                   'FAIL ?= 0\nPREP_FAIL ?= 0\nexport FAIL PREP_FAIL EMPTY\ninclude build/check.mk\n'
                    '.PHONY: shared\nshared:\n\t@echo prepared >> prepared\n\t@exit $(PREP_FAIL)\n')
         for name in ('a', 'b'):
             self.write(f'tools/checks/{name}.py',
@@ -183,8 +183,8 @@ class CheckTimesTest(unittest.TestCase):
 
 
 def main():
-    global TIMER, SDK
-    originals = TIMER, SDK
+    global TIMER, CHECK_RULES
+    originals = TIMER, CHECK_RULES
     def run():
         return unittest.TextTestRunner().run(
             unittest.defaultTestLoader.loadTestsFromTestCase(CheckTimesTest)).wasSuccessful()
@@ -198,19 +198,19 @@ def main():
             ('timer', 'elapsed = time.monotonic() - start', 'elapsed = 0'),
             ('timer', "log = Path(log_dir) / (name + '.log')", "log = Path(log_dir) / 'all.log'"),
             ('timer', 'stdout=out, stderr=subprocess.STDOUT)', 'stdout=out)'),
-            ('sdk', '--reset "$(CHECK_TIMES)"', '--reset "$(CHECK_TIMES).unused"'),
-            ('sdk', 'check-par CHECK_PAR_TARGETS="$$CC_STAGE1"', '$$CC_STAGE1'),
-            ('sdk', '$(foreach edge,$(CHECK_EDGES),$(eval $(subst :, : ,$(edge))))', ''),
-            ('sdk', 'CHECK_PAR_TARGETS ?= $(CHECK_SHARD_TARGETS)', 'CHECK_PAR_TARGETS ?= $(CHECK_NAMES)'),
+            ('rules', '--reset "$(CHECK_TIMES)"', '--reset "$(CHECK_TIMES).unused"'),
+            ('rules', 'check-par CHECK_PAR_TARGETS="$$CC_STAGE1"', '$$CC_STAGE1'),
+            ('rules', '$(foreach edge,$(CHECK_EDGES),$(eval $(subst :, : ,$(edge))))', ''),
+            ('rules', 'CHECK_PAR_TARGETS ?= $(CHECK_SHARD_TARGETS)', 'CHECK_PAR_TARGETS ?= $(CHECK_NAMES)'),
         )
         for index, (kind, old, new) in enumerate(mutations, 1):
-            TIMER, SDK = originals
-            source = TIMER if kind == 'timer' else SDK
+            TIMER, CHECK_RULES = originals
+            source = TIMER if kind == 'timer' else CHECK_RULES
             assert source.count(old) == 1, old
             if kind == 'timer':
                 TIMER = source.replace(old, new)
             else:
-                SDK = source.replace(old, new)
+                CHECK_RULES = source.replace(old, new)
             with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
                 killed = not run()
             print(f'MUTATION {index} {"RED" if killed else "GREEN"}')

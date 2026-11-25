@@ -4,7 +4,7 @@ CHECK = dict(name='ci-split-host', tier=0,
              covers=['.github/workflows/check.yml', '.github/workflows/build.yml',
                      '.github/actions/build-setup/action.yml', '.github/actions/static-setup/action.yml', 'tools/ci/build_cross.sh', 'tools/fetch_fonts.py',
                      'tools/ci/gate.py', 'tools/check_time.py', 'tools/ci/ppc_scope.py', 'docs/design/hwdev/hwdev_imports.md', 'tools/ci/build_cross_ppc.sh', '.github/actions/ppc-setup/action.yml', 'tools/ci_fetch.sh', 'tools/ci/reuse_success.py', 'tools/checks/weights.json',
-                     'tools/checks/run.py', 'build/sdk.mk', 'tools/tests/test_ci_split.py',
+                     'tools/checks/run.py', 'build/sdk.mk', 'build/check.mk', 'tools/tests/test_ci_split.py',
                      'CLAUDE.md', 'README.md', 'docs/INDEX.md'],
              needs=[], budget=5.3,
     kind='characterization',
@@ -458,7 +458,7 @@ def routing_cases(build_source, check_source):
     build_job = yaml.safe_load(build_source)['jobs']['checks']
     flags = re.findall(r'CHECK_EXCLUDE_ENV=([^ ]+)', command(build_job, 'make -k check'))
     build = selected('make', '-s', '--no-print-directory',
-                     '--eval=show-routing: ; @echo $(CHECK_SHARD_TARGETS)', 'show-routing',
+                     '--eval=check-show-routing: ; @echo $(CHECK_SHARD_TARGETS)', 'check-show-routing',
                      *['CHECK_EXCLUDE_ENV=' + value for value in flags])
     compile_checks = ppc_selection('ppc-compile', 'tools/checks/run.py --run')
     guest = set()
