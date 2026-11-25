@@ -22,7 +22,7 @@
 依頼パックは [os32-delegate](../../../.claude/skills/os32-delegate/SKILL.md) の型に、次を足す:
 
 - 最初に読む物: この [RULES.md](RULES.md) と自分の段のファイル (`P<n>.md`) の該当の行、仕様の該当の § (段の表の「仕様 §n」)、段が指す正典。
-- 基点の SHA、段の名前、書き手のモデルと理由 1 行、触ってよい置き場 (P0 は `tools/restructure/` と `docs/tasks/restructure/` だけ、P3・P4 は対応表の行と [P3.md](P3.md) の手順の 3〜5 に挙げた物だけ)。
+- 基点の SHA、段の名前、書き手のモデルと理由 1 行 (今は書き手も読み手も astra — DECISIONS の U8)、触ってよい置き場 (P0 は `tools/restructure/` と `docs/tasks/restructure/` だけ、P3・P4 は対応表の行と [P3.md](P3.md) の手順の 3〜5 に挙げた物だけ)。
 - 終わりの確かめを、表の列のまま写す (数で言う)。回す検査の名前 (`run.py --select --files <触るファイル>` の候補から)。
 - 止まる所 (上の 7) と、止まった時に持ち帰る物。
 - 読み手への依頼には書き手の報告を渡さず、差分・対応表・ログの場所だけを渡す (ROLES §0)。
