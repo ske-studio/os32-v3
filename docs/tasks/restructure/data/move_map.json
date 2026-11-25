@@ -1,0 +1,6950 @@
+[
+  {
+    "from": "arch/ppc/arch_abi.h",
+    "to": "sys/arch/ppc/arch_abi.h"
+  },
+  {
+    "from": "arch/ppc/arch_copy.h",
+    "to": "sys/arch/ppc/arch_copy.h"
+  },
+  {
+    "from": "arch/ppc/arch_cpu.h",
+    "to": "sys/arch/ppc/arch_cpu.h"
+  },
+  {
+    "from": "arch/ppc/arch_diag_stack.h",
+    "to": "sys/arch/ppc/arch_diag_stack.h"
+  },
+  {
+    "from": "arch/ppc/arch_endian_dma.h",
+    "to": "sys/arch/ppc/arch_endian_dma.h"
+  },
+  {
+    "from": "arch/ppc/arch_exec_cache.h",
+    "to": "sys/arch/ppc/arch_exec_cache.h"
+  },
+  {
+    "from": "arch/ppc/arch_exec_image.h",
+    "to": "sys/arch/ppc/arch_exec_image.h"
+  },
+  {
+    "from": "arch/ppc/arch_exec_kapi.h",
+    "to": "sys/arch/ppc/arch_exec_kapi.h"
+  },
+  {
+    "from": "arch/ppc/arch_exec_selftest.h",
+    "to": "sys/arch/ppc/arch_exec_selftest.h"
+  },
+  {
+    "from": "arch/ppc/arch_exec_storage.h",
+    "to": "sys/arch/ppc/arch_exec_storage.h"
+  },
+  {
+    "from": "arch/ppc/arch_io.h",
+    "to": "sys/arch/ppc/arch_io.h"
+  },
+  {
+    "from": "arch/ppc/arch_jmp_storage.h",
+    "to": "sys/arch/ppc/arch_jmp_storage.h"
+  },
+  {
+    "from": "arch/ppc/arch_kernel_fp.h",
+    "to": "sys/arch/ppc/arch_kernel_fp.h"
+  },
+  {
+    "from": "arch/ppc/arch_tick_budget.h",
+    "to": "sys/arch/ppc/arch_tick_budget.h"
+  },
+  {
+    "from": "arch/ppc/arch_type_contract.h",
+    "to": "sys/arch/ppc/arch_type_contract.h"
+  },
+  {
+    "from": "arch/ppc/boot.ld",
+    "to": "sys/arch/ppc/boot.ld"
+  },
+  {
+    "from": "arch/ppc/cache_copy.S",
+    "to": "sys/arch/ppc/cache_copy.S"
+  },
+  {
+    "from": "arch/ppc/cpu_setup.c",
+    "to": "sys/arch/ppc/cpu_setup.c"
+  },
+  {
+    "from": "arch/ppc/decrementer.c",
+    "to": "sys/arch/ppc/decrementer.c"
+  },
+  {
+    "from": "arch/ppc/dma_cache.c",
+    "to": "sys/arch/ppc/dma_cache.c"
+  },
+  {
+    "from": "arch/ppc/entry.S",
+    "to": "sys/arch/ppc/entry.S"
+  },
+  {
+    "from": "arch/ppc/exception.c",
+    "to": "sys/arch/ppc/exception.c"
+  },
+  {
+    "from": "arch/ppc/exec_cache.c",
+    "to": "sys/arch/ppc/exec_cache.c"
+  },
+  {
+    "from": "arch/ppc/exec_context.c",
+    "to": "sys/arch/ppc/exec_context.c"
+  },
+  {
+    "from": "arch/ppc/exec_enter.S",
+    "to": "sys/arch/ppc/exec_enter.S"
+  },
+  {
+    "from": "arch/ppc/exec_entry.c",
+    "to": "sys/arch/ppc/exec_entry.c"
+  },
+  {
+    "from": "arch/ppc/exec_kapi.c",
+    "to": "sys/arch/ppc/exec_kapi.c"
+  },
+  {
+    "from": "arch/ppc/exec_resume.S",
+    "to": "sys/arch/ppc/exec_resume.S"
+  },
+  {
+    "from": "arch/ppc/exec_selftest.c",
+    "to": "sys/arch/ppc/exec_selftest.c"
+  },
+  {
+    "from": "arch/ppc/fp_context.S",
+    "to": "sys/arch/ppc/fp_context.S"
+  },
+  {
+    "from": "arch/ppc/hwb_transfer.S",
+    "to": "sys/arch/ppc/hwb_transfer.S"
+  },
+  {
+    "from": "arch/ppc/kapi_call.c",
+    "to": "sys/arch/ppc/kapi_call.c"
+  },
+  {
+    "from": "arch/ppc/kapi_table.h",
+    "to": "sys/arch/ppc/kapi_table.h"
+  },
+  {
+    "from": "arch/ppc/kboot_unavailable.c",
+    "to": "sys/arch/ppc/kboot_unavailable.c"
+  },
+  {
+    "from": "arch/ppc/kernel.ld",
+    "to": "sys/arch/ppc/kernel.ld"
+  },
+  {
+    "from": "arch/ppc/kernel_boot.h",
+    "to": "sys/arch/ppc/kernel_boot.h"
+  },
+  {
+    "from": "arch/ppc/kernel_cpu.c",
+    "to": "sys/arch/ppc/kernel_cpu.c"
+  },
+  {
+    "from": "arch/ppc/kernel_dec.c",
+    "to": "sys/arch/ppc/kernel_dec.c"
+  },
+  {
+    "from": "arch/ppc/kernel_entry.S",
+    "to": "sys/arch/ppc/kernel_entry.S"
+  },
+  {
+    "from": "arch/ppc/kernel_entry.h",
+    "to": "sys/arch/ppc/kernel_entry.h"
+  },
+  {
+    "from": "arch/ppc/kernel_fp.c",
+    "to": "sys/arch/ppc/kernel_fp.c"
+  },
+  {
+    "from": "arch/ppc/kernel_fp.h",
+    "to": "sys/arch/ppc/kernel_fp.h"
+  },
+  {
+    "from": "arch/ppc/kernel_hpt.c",
+    "to": "sys/arch/ppc/kernel_hpt.c"
+  },
+  {
+    "from": "arch/ppc/kernel_mmu.S",
+    "to": "sys/arch/ppc/kernel_mmu.S"
+  },
+  {
+    "from": "arch/ppc/kernel_probe.S",
+    "to": "sys/arch/ppc/kernel_probe.S"
+  },
+  {
+    "from": "arch/ppc/kernel_probe.h",
+    "to": "sys/arch/ppc/kernel_probe.h"
+  },
+  {
+    "from": "arch/ppc/kernel_takeover.S",
+    "to": "sys/arch/ppc/kernel_takeover.S"
+  },
+  {
+    "from": "arch/ppc/kernel_trap.c",
+    "to": "sys/arch/ppc/kernel_trap.c"
+  },
+  {
+    "from": "arch/ppc/kernel_vectors.S",
+    "to": "sys/arch/ppc/kernel_vectors.S"
+  },
+  {
+    "from": "arch/ppc/mmu.S",
+    "to": "sys/arch/ppc/mmu.S"
+  },
+  {
+    "from": "arch/ppc/mmu.ld",
+    "to": "sys/arch/ppc/mmu.ld"
+  },
+  {
+    "from": "arch/ppc/mmu_probe.S",
+    "to": "sys/arch/ppc/mmu_probe.S"
+  },
+  {
+    "from": "arch/ppc/ofw_note.S",
+    "to": "sys/arch/ppc/ofw_note.S"
+  },
+  {
+    "from": "arch/ppc/pd_walk.c",
+    "to": "sys/arch/ppc/pd_walk.c"
+  },
+  {
+    "from": "arch/ppc/pmap.c",
+    "to": "sys/arch/ppc/pmap.c"
+  },
+  {
+    "from": "arch/ppc/ppc_boot.h",
+    "to": "sys/arch/ppc/ppc_boot.h"
+  },
+  {
+    "from": "arch/ppc/ppc_frame.h",
+    "to": "sys/arch/ppc/ppc_frame.h"
+  },
+  {
+    "from": "arch/ppc/ppc_hpt.h",
+    "to": "sys/arch/ppc/ppc_hpt.h"
+  },
+  {
+    "from": "arch/ppc/ppc_mmio16.h",
+    "to": "sys/arch/ppc/ppc_mmio16.h"
+  },
+  {
+    "from": "arch/ppc/ppc_oea.h",
+    "to": "sys/arch/ppc/ppc_oea.h"
+  },
+  {
+    "from": "arch/ppc/ppc_pd.h",
+    "to": "sys/arch/ppc/ppc_pd.h"
+  },
+  {
+    "from": "arch/ppc/ppc_pmap.h",
+    "to": "sys/arch/ppc/ppc_pmap.h"
+  },
+  {
+    "from": "arch/ppc/ppc_trap.h",
+    "to": "sys/arch/ppc/ppc_trap.h"
+  },
+  {
+    "from": "arch/ppc/setjmp.S",
+    "to": "sys/arch/ppc/setjmp.S"
+  },
+  {
+    "from": "arch/ppc/sqlite_restore.S",
+    "to": "sys/arch/ppc/sqlite_restore.S"
+  },
+  {
+    "from": "arch/ppc/sqlite_stack_ppc.S",
+    "to": "sys/arch/ppc/sqlite_stack_ppc.S"
+  },
+  {
+    "from": "arch/ppc/syscall_code.c",
+    "to": "sys/arch/ppc/syscall_code.c"
+  },
+  {
+    "from": "arch/ppc/takeover.S",
+    "to": "sys/arch/ppc/takeover.S"
+  },
+  {
+    "from": "arch/ppc/user_fault.c",
+    "to": "sys/arch/ppc/user_fault.c"
+  },
+  {
+    "from": "arch/ppc/vectors.S",
+    "to": "sys/arch/ppc/vectors.S"
+  },
+  {
+    "from": "arch/ppc/video/gf_accept_cpu.c",
+    "to": "sys/arch/ppc/video/gf_accept_cpu.c"
+  },
+  {
+    "from": "arch/ppc/video_wc.c",
+    "to": "sys/arch/ppc/video_wc.c"
+  },
+  {
+    "from": "arch/x86/arch_abi.h",
+    "to": "sys/arch/x86/arch_abi.h"
+  },
+  {
+    "from": "arch/x86/arch_copy.h",
+    "to": "sys/arch/x86/arch_copy.h"
+  },
+  {
+    "from": "arch/x86/arch_cpu.h",
+    "to": "sys/arch/x86/arch_cpu.h"
+  },
+  {
+    "from": "arch/x86/arch_ctx_probe.c",
+    "to": "sys/arch/x86/arch_ctx_probe.c"
+  },
+  {
+    "from": "arch/x86/arch_diag_stack.h",
+    "to": "sys/arch/x86/arch_diag_stack.h"
+  },
+  {
+    "from": "arch/x86/arch_endian_dma.h",
+    "to": "sys/arch/x86/arch_endian_dma.h"
+  },
+  {
+    "from": "arch/x86/arch_exec_cache.h",
+    "to": "sys/arch/x86/arch_exec_cache.h"
+  },
+  {
+    "from": "arch/x86/arch_exec_image.h",
+    "to": "sys/arch/x86/arch_exec_image.h"
+  },
+  {
+    "from": "arch/x86/arch_exec_kapi.h",
+    "to": "sys/arch/x86/arch_exec_kapi.h"
+  },
+  {
+    "from": "arch/x86/arch_exec_selftest.h",
+    "to": "sys/arch/x86/arch_exec_selftest.h"
+  },
+  {
+    "from": "arch/x86/arch_exec_storage.h",
+    "to": "sys/arch/x86/arch_exec_storage.h"
+  },
+  {
+    "from": "arch/x86/arch_io.h",
+    "to": "sys/arch/x86/arch_io.h"
+  },
+  {
+    "from": "arch/x86/arch_jmp_storage.h",
+    "to": "sys/arch/x86/arch_jmp_storage.h"
+  },
+  {
+    "from": "arch/x86/arch_kernel_fp.h",
+    "to": "sys/arch/x86/arch_kernel_fp.h"
+  },
+  {
+    "from": "arch/x86/arch_tick_budget.h",
+    "to": "sys/arch/x86/arch_tick_budget.h"
+  },
+  {
+    "from": "arch/x86/arch_type_contract.h",
+    "to": "sys/arch/x86/arch_type_contract.h"
+  },
+  {
+    "from": "arch/x86/kernel/boot_after_paging.c",
+    "to": "sys/arch/x86/kernel/boot_after_paging.c"
+  },
+  {
+    "from": "arch/x86/kernel/boot_cpu.c",
+    "to": "sys/arch/x86/kernel/boot_cpu.c"
+  },
+  {
+    "from": "arch/x86/kernel/cpu_flags.inc",
+    "to": "sys/arch/x86/kernel/cpu_flags.inc"
+  },
+  {
+    "from": "arch/x86/kernel/double_fault.c",
+    "to": "sys/arch/x86/kernel/double_fault.c"
+  },
+  {
+    "from": "arch/x86/kernel/double_fault.h",
+    "to": "sys/arch/x86/kernel/double_fault.h"
+  },
+  {
+    "from": "arch/x86/kernel/entry_layout.inc",
+    "to": "sys/arch/x86/kernel/entry_layout.inc"
+  },
+  {
+    "from": "arch/x86/kernel/exec_context.c",
+    "to": "sys/arch/x86/kernel/exec_context.c"
+  },
+  {
+    "from": "arch/x86/kernel/exec_entry.c",
+    "to": "sys/arch/x86/kernel/exec_entry.c"
+  },
+  {
+    "from": "arch/x86/kernel/fault_fixture.c",
+    "to": "sys/arch/x86/kernel/fault_fixture.c"
+  },
+  {
+    "from": "arch/x86/kernel/gdt.c",
+    "to": "sys/arch/x86/kernel/gdt.c"
+  },
+  {
+    "from": "arch/x86/kernel/gdt.h",
+    "to": "sys/arch/x86/kernel/gdt.h"
+  },
+  {
+    "from": "arch/x86/kernel/idt.c",
+    "to": "sys/arch/x86/kernel/idt.c"
+  },
+  {
+    "from": "arch/x86/kernel/idt.h",
+    "to": "sys/arch/x86/kernel/idt.h"
+  },
+  {
+    "from": "arch/x86/kernel/iret_user.inc",
+    "to": "sys/arch/x86/kernel/iret_user.inc"
+  },
+  {
+    "from": "arch/x86/kernel/isr_handlers.c",
+    "to": "sys/arch/x86/kernel/isr_handlers.c"
+  },
+  {
+    "from": "arch/x86/kernel/isr_stub.asm",
+    "to": "sys/arch/x86/kernel/isr_stub.asm"
+  },
+  {
+    "from": "arch/x86/kernel/kapi_call.c",
+    "to": "sys/arch/x86/kernel/kapi_call.c"
+  },
+  {
+    "from": "arch/x86/kernel/kentry.asm",
+    "to": "sys/arch/x86/kernel/kentry.asm"
+  },
+  {
+    "from": "arch/x86/kernel/mtrr_wc.c",
+    "to": "sys/arch/x86/kernel/mtrr_wc.c"
+  },
+  {
+    "from": "arch/x86/kernel/mtrr_wc.h",
+    "to": "sys/arch/x86/kernel/mtrr_wc.h"
+  },
+  {
+    "from": "arch/x86/kernel/ring3_entry.asm",
+    "to": "sys/arch/x86/kernel/ring3_entry.asm"
+  },
+  {
+    "from": "arch/x86/kernel/ring3_ls.S",
+    "to": "sys/arch/x86/kernel/ring3_ls.S"
+  },
+  {
+    "from": "arch/x86/kernel/setjmp.asm",
+    "to": "sys/arch/x86/kernel/setjmp.asm"
+  },
+  {
+    "from": "arch/x86/kernel/syscall_code.c",
+    "to": "sys/arch/x86/kernel/syscall_code.c"
+  },
+  {
+    "from": "arch/x86/kernel/syscall_entry.c",
+    "to": "sys/arch/x86/kernel/syscall_entry.c"
+  },
+  {
+    "from": "arch/x86/kernel/tss.c",
+    "to": "sys/arch/x86/kernel/tss.c"
+  },
+  {
+    "from": "arch/x86/kernel/tss.h",
+    "to": "sys/arch/x86/kernel/tss.h"
+  },
+  {
+    "from": "arch/x86/kernel/video_wc.c",
+    "to": "sys/arch/x86/kernel/video_wc.c"
+  },
+  {
+    "from": "arch/x86/kernel/x87.c",
+    "to": "sys/arch/x86/kernel/x87.c"
+  },
+  {
+    "from": "arch/x86/kernel/x87.h",
+    "to": "sys/arch/x86/kernel/x87.h"
+  },
+  {
+    "from": "arch/x86/kernel/x87_emu.h",
+    "to": "sys/arch/x86/kernel/x87_emu.h"
+  },
+  {
+    "from": "arch/x86/kernel/x87_emu_decode.c",
+    "to": "sys/arch/x86/kernel/x87_emu_decode.c"
+  },
+  {
+    "from": "arch/x86/kernel/x87_emu_dispatch.c",
+    "to": "sys/arch/x86/kernel/x87_emu_dispatch.c"
+  },
+  {
+    "from": "arch/x86/kernel/x87_emu_esc03.c",
+    "to": "sys/arch/x86/kernel/x87_emu_esc03.c"
+  },
+  {
+    "from": "arch/x86/kernel/x87_emu_esc47.c",
+    "to": "sys/arch/x86/kernel/x87_emu_esc47.c"
+  },
+  {
+    "from": "arch/x86/kernel/x87_emu_exception.c",
+    "to": "sys/arch/x86/kernel/x87_emu_exception.c"
+  },
+  {
+    "from": "arch/x86/kernel/x87_emu_internal.h",
+    "to": "sys/arch/x86/kernel/x87_emu_internal.h"
+  },
+  {
+    "from": "arch/x86/kernel/x87_emu_memory.c",
+    "to": "sys/arch/x86/kernel/x87_emu_memory.c"
+  },
+  {
+    "from": "arch/x86/kernel/x87_emu_ops.c",
+    "to": "sys/arch/x86/kernel/x87_emu_ops.c"
+  },
+  {
+    "from": "arch/x86/kernel/x87_emu_state.c",
+    "to": "sys/arch/x86/kernel/x87_emu_state.c"
+  },
+  {
+    "from": "arch/x86/kernel/x87_emu_vendor/LICENSE-I386C-FPU.TXT",
+    "to": "sys/arch/x86/kernel/x87_emu_vendor/LICENSE-I386C-FPU.TXT"
+  },
+  {
+    "from": "arch/x86/kernel/x87_emu_vendor/UPSTREAM.json",
+    "to": "sys/arch/x86/kernel/x87_emu_vendor/UPSTREAM.json"
+  },
+  {
+    "from": "arch/x86/kernel/x87_emu_vendor/fpemul_softfloat3.NOTICE",
+    "to": "sys/arch/x86/kernel/x87_emu_vendor/fpemul_softfloat3.NOTICE"
+  },
+  {
+    "from": "arch/x86/kernel/x87_nm.h",
+    "to": "sys/arch/x86/kernel/x87_nm.h"
+  },
+  {
+    "from": "arch/x86/video/gf_accept_cpu.c",
+    "to": "sys/arch/x86/video/gf_accept_cpu.c"
+  },
+  {
+    "from": "arch/x86/x86_desc.h",
+    "to": "sys/arch/x86/x86_desc.h"
+  },
+  {
+    "from": "arch/x86/x86_flags.h",
+    "to": "sys/arch/x86/x86_flags.h"
+  },
+  {
+    "from": "build/features/cd.mk",
+    "to": "sys/conf/features/cd.mk"
+  },
+  {
+    "from": "build/features/cirrus.mk",
+    "to": "sys/conf/features/cirrus.mk"
+  },
+  {
+    "from": "build/features/fep.mk",
+    "to": "sys/conf/features/fep.mk"
+  },
+  {
+    "from": "build/features/fm.mk",
+    "to": "sys/conf/features/fm.mk"
+  },
+  {
+    "from": "build/features/geforce.mk",
+    "to": "sys/conf/features/geforce.mk"
+  },
+  {
+    "from": "build/features/hwdev.mk",
+    "to": "sys/conf/features/hwdev.mk"
+  },
+  {
+    "from": "build/features/kcg.mk",
+    "to": "sys/conf/features/kcg.mk"
+  },
+  {
+    "from": "build/features/kdebug.mk",
+    "to": "sys/conf/features/kdebug.mk"
+  },
+  {
+    "from": "build/features/lan.mk",
+    "to": "sys/conf/features/lan.mk"
+  },
+  {
+    "from": "build/features/pc98-devices.mk",
+    "to": "sys/conf/features/pc98-devices.mk"
+  },
+  {
+    "from": "build/features/pcm.mk",
+    "to": "sys/conf/features/pcm.mk"
+  },
+  {
+    "from": "build/features/sqlite-static.mk",
+    "to": "sys/conf/features/sqlite-static.mk"
+  },
+  {
+    "from": "build/features/sqlite.mk",
+    "to": "sys/conf/features/sqlite.mk"
+  },
+  {
+    "from": "build/features/trident.mk",
+    "to": "sys/conf/features/trident.mk"
+  },
+  {
+    "from": "build/features/v86.mk",
+    "to": "sys/conf/features/v86.mk"
+  },
+  {
+    "from": "build/features/x87.mk",
+    "to": "sys/conf/features/x87.mk"
+  },
+  {
+    "from": "build/images/kboot-core.mk",
+    "to": "sys/conf/images/kboot-core.mk"
+  },
+  {
+    "from": "build/images/kboot-link-sh.mk",
+    "to": "sys/conf/images/kboot-link-sh.mk"
+  },
+  {
+    "from": "build/images/kboot-link.mk",
+    "to": "sys/conf/images/kboot-link.mk"
+  },
+  {
+    "from": "build/images/kboot-sh.mk",
+    "to": "sys/conf/images/kboot-sh.mk"
+  },
+  {
+    "from": "build/images/kboot-shell.mk",
+    "to": "sys/conf/images/kboot-shell.mk"
+  },
+  {
+    "from": "build/images/pc98.mk",
+    "to": "sys/conf/images/pc98.mk"
+  },
+  {
+    "from": "build/images/powermac.mk",
+    "to": "sys/conf/images/powermac.mk"
+  },
+  {
+    "from": "build/images/ppc-flags.mk",
+    "to": "sys/conf/images/ppc-flags.mk"
+  },
+  {
+    "from": "drivers/ata/atapi.c",
+    "to": "sys/dev/ata/atapi.c"
+  },
+  {
+    "from": "drivers/ata/atapi.h",
+    "to": "sys/dev/ata/atapi.h"
+  },
+  {
+    "from": "drivers/ata/atapi_pio.inc",
+    "to": "sys/dev/ata/atapi_pio.inc"
+  },
+  {
+    "from": "drivers/ata/cd_body.c",
+    "to": "sys/dev/ata/cd_body.c"
+  },
+  {
+    "from": "drivers/ata/cd_body.h",
+    "to": "sys/dev/ata/cd_body.h"
+  },
+  {
+    "from": "drivers/ata/cd_module.c",
+    "to": "sys/dev/ata/cd_module.c"
+  },
+  {
+    "from": "drivers/ata/cd_module.h",
+    "to": "sys/dev/ata/cd_module.h"
+  },
+  {
+    "from": "drivers/ata/ide.c",
+    "to": "sys/dev/ata/ide.c"
+  },
+  {
+    "from": "drivers/ata/ide.h",
+    "to": "sys/dev/ata/ide.h"
+  },
+  {
+    "from": "drivers/ata/ide_addr.c",
+    "to": "sys/dev/ata/ide_addr.c"
+  },
+  {
+    "from": "drivers/ata/ide_addr.h",
+    "to": "sys/dev/ata/ide_addr.h"
+  },
+  {
+    "from": "drivers/ata/ide_multiple.inc",
+    "to": "sys/dev/ata/ide_multiple.inc"
+  },
+  {
+    "from": "drivers/ata/ide_pio.inc",
+    "to": "sys/dev/ata/ide_pio.inc"
+  },
+  {
+    "from": "drivers/ata/ide_request.inc",
+    "to": "sys/dev/ata/ide_request.inc"
+  },
+  {
+    "from": "drivers/block/disk.h",
+    "to": "sys/dev/block/disk.h"
+  },
+  {
+    "from": "drivers/block/fdc.c",
+    "to": "sys/dev/block/fdc.c"
+  },
+  {
+    "from": "drivers/block/fdc.h",
+    "to": "sys/dev/block/fdc.h"
+  },
+  {
+    "from": "drivers/block/fdc_command.inc",
+    "to": "sys/dev/block/fdc_command.inc"
+  },
+  {
+    "from": "drivers/block/fdc_decide.c",
+    "to": "sys/dev/block/fdc_decide.c"
+  },
+  {
+    "from": "drivers/block/fdc_decide.h",
+    "to": "sys/dev/block/fdc_decide.h"
+  },
+  {
+    "from": "drivers/block/fdc_io.inc",
+    "to": "sys/dev/block/fdc_io.inc"
+  },
+  {
+    "from": "drivers/block/fdc_sector_transfer.inc",
+    "to": "sys/dev/block/fdc_sector_transfer.inc"
+  },
+  {
+    "from": "drivers/block/fdc_seek_reset.inc",
+    "to": "sys/dev/block/fdc_seek_reset.inc"
+  },
+  {
+    "from": "drivers/block/fdc_track.c",
+    "to": "sys/dev/block/fdc_track.c"
+  },
+  {
+    "from": "drivers/block/fdc_track.h",
+    "to": "sys/dev/block/fdc_track.h"
+  },
+  {
+    "from": "drivers/block/fdc_transfer.inc",
+    "to": "sys/dev/block/fdc_transfer.inc"
+  },
+  {
+    "from": "drivers/block/loop_dev.c",
+    "to": "sys/dev/block/loop_dev.c"
+  },
+  {
+    "from": "drivers/block/loop_dev.h",
+    "to": "sys/dev/block/loop_dev.h"
+  },
+  {
+    "from": "drivers/block/loop_dev_block_io.inc",
+    "to": "sys/dev/block/loop_dev_block_io.inc"
+  },
+  {
+    "from": "drivers/block/loop_dev_chs_io.inc",
+    "to": "sys/dev/block/loop_dev_chs_io.inc"
+  },
+  {
+    "from": "drivers/block/loop_dev_format.inc",
+    "to": "sys/dev/block/loop_dev_format.inc"
+  },
+  {
+    "from": "drivers/block/netcd.c",
+    "to": "sys/dev/block/netcd.c"
+  },
+  {
+    "from": "drivers/block/netcd.h",
+    "to": "sys/dev/block/netcd.h"
+  },
+  {
+    "from": "drivers/block/scsi.h",
+    "to": "sys/platform/pc98/scsi.h"
+  },
+  {
+    "from": "drivers/char/np2sysp.c",
+    "to": "sys/dev/char/np2sysp.c"
+  },
+  {
+    "from": "drivers/char/np2sysp.h",
+    "to": "sys/dev/char/np2sysp.h"
+  },
+  {
+    "from": "drivers/char/rtc.c",
+    "to": "sys/dev/char/rtc.c"
+  },
+  {
+    "from": "drivers/char/rtc.h",
+    "to": "sys/dev/char/rtc.h"
+  },
+  {
+    "from": "drivers/char/serial.c",
+    "to": "sys/dev/char/serial.c"
+  },
+  {
+    "from": "drivers/char/serial.h",
+    "to": "sys/dev/char/serial.h"
+  },
+  {
+    "from": "drivers/char/serial_kapi.h",
+    "to": "sys/dev/char/serial_kapi.h"
+  },
+  {
+    "from": "drivers/char/serial_plan.c",
+    "to": "sys/dev/char/serial_plan.c"
+  },
+  {
+    "from": "drivers/char/serial_plan.h",
+    "to": "sys/dev/char/serial_plan.h"
+  },
+  {
+    "from": "drivers/dma/dma8237.c",
+    "to": "sys/dev/dma/dma8237.c"
+  },
+  {
+    "from": "drivers/dma/dma8237.h",
+    "to": "sys/dev/dma/dma8237.h"
+  },
+  {
+    "from": "drivers/dma/dma8237_math.c",
+    "to": "sys/dev/dma/dma8237_math.c"
+  },
+  {
+    "from": "drivers/hostdrv/hostdrv_list_rules.inc",
+    "to": "sys/dev/hostdrv/hostdrv_list_rules.inc"
+  },
+  {
+    "from": "drivers/hostdrv/hostdrv_stat_rules.inc",
+    "to": "sys/dev/hostdrv/hostdrv_stat_rules.inc"
+  },
+  {
+    "from": "drivers/hostdrv/hostdrvfs.c",
+    "to": "sys/dev/hostdrv/hostdrvfs.c"
+  },
+  {
+    "from": "drivers/hostdrv/hostdrvfs.h",
+    "to": "sys/dev/hostdrv/hostdrvfs.h"
+  },
+  {
+    "from": "drivers/hostdrv/hostdrvfs_proto.h",
+    "to": "sys/dev/hostdrv/hostdrvfs_proto.h"
+  },
+  {
+    "from": "drivers/input/kbd.h",
+    "to": "sys/platform/pc98/input/kbd.h"
+  },
+  {
+    "from": "drivers/input/kbd_dlog.c",
+    "to": "sys/dev/input/kbd_dlog.c"
+  },
+  {
+    "from": "drivers/input/kbd_dlog.h",
+    "to": "sys/dev/input/kbd_dlog.h"
+  },
+  {
+    "from": "drivers/input/kbd_hal.c",
+    "to": "sys/platform/pc98/input/kbd_hal.c"
+  },
+  {
+    "from": "drivers/input/kbd_status.c",
+    "to": "sys/dev/input/kbd_status.c"
+  },
+  {
+    "from": "drivers/input/kbd_status.h",
+    "to": "sys/dev/input/kbd_status.h"
+  },
+  {
+    "from": "drivers/input/mouse.c",
+    "to": "sys/platform/pc98/input/mouse.c"
+  },
+  {
+    "from": "drivers/input/mouse.h",
+    "to": "sys/platform/pc98/input/mouse.h"
+  },
+  {
+    "from": "drivers/input/mouse_bus.c",
+    "to": "sys/platform/pc98/input/mouse_bus.c"
+  },
+  {
+    "from": "drivers/input/mouse_hal.c",
+    "to": "sys/platform/pc98/input/mouse_hal.c"
+  },
+  {
+    "from": "drivers/input/mouse_seamless.c",
+    "to": "sys/dev/input/mouse_seamless.c"
+  },
+  {
+    "from": "drivers/macintosh/via.c",
+    "to": "sys/dev/macintosh/via.c"
+  },
+  {
+    "from": "drivers/macintosh/via.h",
+    "to": "sys/dev/macintosh/via.h"
+  },
+  {
+    "from": "drivers/net/e82557/e82557.c",
+    "to": "sys/dev/net/e82557/e82557.c"
+  },
+  {
+    "from": "drivers/net/e82557/e82557.h",
+    "to": "sys/dev/net/e82557/e82557.h"
+  },
+  {
+    "from": "drivers/net/e82557/e82557_desc.c",
+    "to": "sys/dev/net/e82557/e82557_desc.c"
+  },
+  {
+    "from": "drivers/net/e82557/e82557_desc.h",
+    "to": "sys/dev/net/e82557/e82557_desc.h"
+  },
+  {
+    "from": "drivers/net/e82557/e82557_eeprom.c",
+    "to": "sys/dev/net/e82557/e82557_eeprom.c"
+  },
+  {
+    "from": "drivers/net/e82557/e82557_eeprom.h",
+    "to": "sys/dev/net/e82557/e82557_eeprom.h"
+  },
+  {
+    "from": "drivers/net/e82557/e82557_probe_loopback.inc",
+    "to": "sys/dev/net/e82557/e82557_probe_loopback.inc"
+  },
+  {
+    "from": "drivers/net/e82557/e82557_probe_reset_base.inc",
+    "to": "sys/dev/net/e82557/e82557_probe_reset_base.inc"
+  },
+  {
+    "from": "drivers/net/e82557/e82557_regs.h",
+    "to": "sys/dev/net/e82557/e82557_regs.h"
+  },
+  {
+    "from": "drivers/net/e82557/lan_body.c",
+    "to": "sys/dev/net/e82557/lan_body.c"
+  },
+  {
+    "from": "drivers/net/e82557/lan_module.h",
+    "to": "sys/dev/net/e82557/lan_module.h"
+  },
+  {
+    "from": "drivers/net/e82557/nic_e82557.c",
+    "to": "sys/dev/net/e82557/nic_e82557.c"
+  },
+  {
+    "from": "drivers/net/gem/gem.h",
+    "to": "sys/dev/net/gem/gem.h"
+  },
+  {
+    "from": "drivers/net/gem/gem_mac.c",
+    "to": "sys/dev/net/gem/gem_mac.c"
+  },
+  {
+    "from": "drivers/net/gem/gem_phy.c",
+    "to": "sys/dev/net/gem/gem_phy.c"
+  },
+  {
+    "from": "drivers/net/gem/gem_reset.c",
+    "to": "sys/dev/net/gem/gem_reset.c"
+  },
+  {
+    "from": "drivers/net/gem/gem_ring.c",
+    "to": "sys/dev/net/gem/gem_ring.c"
+  },
+  {
+    "from": "drivers/net/gem/gem_rx.c",
+    "to": "sys/dev/net/gem/gem_rx.c"
+  },
+  {
+    "from": "drivers/net/gem/gem_tx.c",
+    "to": "sys/dev/net/gem/gem_tx.c"
+  },
+  {
+    "from": "drivers/net/ne2000/lgy98.h",
+    "to": "sys/dev/net/ne2000/lgy98.h"
+  },
+  {
+    "from": "drivers/net/ne2000/ne2000.h",
+    "to": "sys/dev/net/ne2000/ne2000.h"
+  },
+  {
+    "from": "drivers/net/ne2000/ne2000_data.inc",
+    "to": "sys/dev/net/ne2000/ne2000_data.inc"
+  },
+  {
+    "from": "drivers/net/ne2000/ne2000_io.asm",
+    "to": "sys/dev/net/ne2000/ne2000_io.asm"
+  },
+  {
+    "from": "drivers/net/ne2000/ne2000_irq.inc",
+    "to": "sys/dev/net/ne2000/ne2000_irq.inc"
+  },
+  {
+    "from": "drivers/net/ne2000/ne2000_regs.h",
+    "to": "sys/dev/net/ne2000/ne2000_regs.h"
+  },
+  {
+    "from": "drivers/net/ne2000/ne2000_ring.c",
+    "to": "sys/dev/net/ne2000/ne2000_ring.c"
+  },
+  {
+    "from": "drivers/net/ne2000/ne2000_ring.h",
+    "to": "sys/dev/net/ne2000/ne2000_ring.h"
+  },
+  {
+    "from": "drivers/net/ne2000/nic_lgy98.c",
+    "to": "sys/dev/net/ne2000/nic_lgy98.c"
+  },
+  {
+    "from": "drivers/pci/pci.c",
+    "to": "sys/dev/pci/pci.c"
+  },
+  {
+    "from": "drivers/pci/pci.h",
+    "to": "sys/dev/pci/pci.h"
+  },
+  {
+    "from": "drivers/pci/pci_barsize.c",
+    "to": "sys/dev/pci/pci_barsize.c"
+  },
+  {
+    "from": "drivers/pci/pci_barsize.h",
+    "to": "sys/dev/pci/pci_barsize.h"
+  },
+  {
+    "from": "drivers/pci/pci_bind.c",
+    "to": "sys/dev/pci/pci_bind.c"
+  },
+  {
+    "from": "drivers/pci/pci_bind.h",
+    "to": "sys/dev/pci/pci_bind.h"
+  },
+  {
+    "from": "drivers/pci/pci_bind_match.c",
+    "to": "sys/dev/pci/pci_bind_match.c"
+  },
+  {
+    "from": "drivers/pci/pci_decode.c",
+    "to": "sys/dev/pci/pci_decode.c"
+  },
+  {
+    "from": "drivers/pci/pci_decode.h",
+    "to": "sys/dev/pci/pci_decode.h"
+  },
+  {
+    "from": "drivers/pci/pci_hwb.c",
+    "to": "sys/dev/pci/pci_hwb.c"
+  },
+  {
+    "from": "drivers/pci/pci_hwb.h",
+    "to": "sys/dev/pci/pci_hwb.h"
+  },
+  {
+    "from": "drivers/pci/pci_locate.c",
+    "to": "sys/dev/pci/pci_locate.c"
+  },
+  {
+    "from": "drivers/pci/pci_locate.h",
+    "to": "sys/dev/pci/pci_locate.h"
+  },
+  {
+    "from": "drivers/sound/cs4231/pcm_body.c",
+    "to": "sys/dev/sound/cs4231/pcm_body.c"
+  },
+  {
+    "from": "drivers/sound/cs4231/pcm_cs4231.c",
+    "to": "sys/dev/sound/cs4231/pcm_cs4231.c"
+  },
+  {
+    "from": "drivers/sound/cs4231/pcm_cs4231.h",
+    "to": "sys/dev/sound/cs4231/pcm_cs4231.h"
+  },
+  {
+    "from": "drivers/sound/cs4231/pcm_cs4231_math.c",
+    "to": "sys/dev/sound/cs4231/pcm_cs4231_math.c"
+  },
+  {
+    "from": "drivers/sound/cs4231/pcm_e4_diag.c",
+    "to": "sys/dev/sound/cs4231/pcm_e4_diag.c"
+  },
+  {
+    "from": "drivers/sound/cs4231/pcm_e4_diag.h",
+    "to": "sys/dev/sound/cs4231/pcm_e4_diag.h"
+  },
+  {
+    "from": "drivers/sound/cs4231/pcm_e4_guest.c",
+    "to": "sys/dev/sound/cs4231/pcm_e4_guest.c"
+  },
+  {
+    "from": "drivers/sound/cs4231/pcm_e4_wire.h",
+    "to": "sys/dev/sound/cs4231/pcm_e4_wire.h"
+  },
+  {
+    "from": "drivers/sound/cs4231/pcm_hw.c",
+    "to": "sys/dev/sound/cs4231/pcm_hw.c"
+  },
+  {
+    "from": "drivers/sound/cs4231/pcm_hw.h",
+    "to": "sys/dev/sound/cs4231/pcm_hw.h"
+  },
+  {
+    "from": "drivers/sound/cs4231/pcm_module.h",
+    "to": "sys/dev/sound/cs4231/pcm_module.h"
+  },
+  {
+    "from": "drivers/sound/cs4231/pcm_refill.h",
+    "to": "sys/dev/sound/cs4231/pcm_refill.h"
+  },
+  {
+    "from": "drivers/sound/fm/fm.c",
+    "to": "sys/dev/sound/fm/fm.c"
+  },
+  {
+    "from": "drivers/sound/fm/fm.h",
+    "to": "sys/dev/sound/fm/fm.h"
+  },
+  {
+    "from": "drivers/sound/fm/fm_body.c",
+    "to": "sys/dev/sound/fm/fm_body.c"
+  },
+  {
+    "from": "drivers/sound/fm/fm_module.c",
+    "to": "sys/dev/sound/fm/fm_module.c"
+  },
+  {
+    "from": "drivers/sound/fm/fm_module.h",
+    "to": "sys/dev/sound/fm/fm_module.h"
+  },
+  {
+    "from": "drivers/sound/fm/opn_chip.c",
+    "to": "sys/dev/sound/fm/opn_chip.c"
+  },
+  {
+    "from": "drivers/sound/fm/opn_chip.h",
+    "to": "sys/dev/sound/fm/opn_chip.h"
+  },
+  {
+    "from": "drivers/sound/fm/opn_probe.c",
+    "to": "sys/dev/sound/fm/opn_probe.c"
+  },
+  {
+    "from": "drivers/sound/fm/opn_probe.h",
+    "to": "sys/dev/sound/fm/opn_probe.h"
+  },
+  {
+    "from": "drivers/sound/snd_wake_tick.c",
+    "to": "sys/hal/sound/snd_wake_tick.c"
+  },
+  {
+    "from": "drivers/sound/snd_wake_tick.h",
+    "to": "sys/hal/sound/snd_wake_tick.h"
+  },
+  {
+    "from": "drivers/usb/ehci_handoff.c",
+    "to": "sys/dev/usb/ehci_handoff.c"
+  },
+  {
+    "from": "drivers/usb/ehci_quiesce.c",
+    "to": "sys/dev/usb/ehci_quiesce.c"
+  },
+  {
+    "from": "drivers/usb/hid_boot.h",
+    "to": "sys/dev/usb/hid_boot.h"
+  },
+  {
+    "from": "drivers/usb/hid_kbd.c",
+    "to": "sys/dev/usb/hid_kbd.c"
+  },
+  {
+    "from": "drivers/usb/hid_kbd_map.c",
+    "to": "sys/dev/usb/hid_kbd_map.c"
+  },
+  {
+    "from": "drivers/usb/hid_mouse.c",
+    "to": "sys/dev/usb/hid_mouse.c"
+  },
+  {
+    "from": "drivers/usb/ohci_done.c",
+    "to": "sys/dev/usb/ohci_done.c"
+  },
+  {
+    "from": "drivers/usb/ohci_init.c",
+    "to": "sys/dev/usb/ohci_init.c"
+  },
+  {
+    "from": "drivers/usb/ohci_internal.h",
+    "to": "sys/dev/usb/ohci_internal.h"
+  },
+  {
+    "from": "drivers/usb/ohci_priv.h",
+    "to": "sys/dev/usb/ohci_priv.h"
+  },
+  {
+    "from": "drivers/usb/ohci_regs.h",
+    "to": "sys/dev/usb/ohci_regs.h"
+  },
+  {
+    "from": "drivers/usb/ohci_roothub.c",
+    "to": "sys/dev/usb/ohci_roothub.c"
+  },
+  {
+    "from": "drivers/usb/ohci_sched.c",
+    "to": "sys/dev/usb/ohci_sched.c"
+  },
+  {
+    "from": "drivers/usb/ohci_unlink.c",
+    "to": "sys/dev/usb/ohci_unlink.c"
+  },
+  {
+    "from": "drivers/usb/usb_cfgparse.c",
+    "to": "sys/dev/usb/usb_cfgparse.c"
+  },
+  {
+    "from": "drivers/usb/usb_classes.c",
+    "to": "sys/dev/usb/usb_classes.c"
+  },
+  {
+    "from": "drivers/usb/usb_core.h",
+    "to": "sys/dev/usb/usb_core.h"
+  },
+  {
+    "from": "drivers/usb/usb_desc.h",
+    "to": "sys/dev/usb/usb_desc.h"
+  },
+  {
+    "from": "drivers/usb/usb_detach.c",
+    "to": "sys/dev/usb/usb_detach.c"
+  },
+  {
+    "from": "drivers/usb/usb_dmamem.c",
+    "to": "sys/dev/usb/usb_dmamem.c"
+  },
+  {
+    "from": "drivers/usb/usb_enum.c",
+    "to": "sys/dev/usb/usb_enum.c"
+  },
+  {
+    "from": "drivers/usb/usb_explore.c",
+    "to": "sys/dev/usb/usb_explore.c"
+  },
+  {
+    "from": "drivers/usb/usb_hc_dead.c",
+    "to": "sys/dev/usb/usb_hc_dead.c"
+  },
+  {
+    "from": "drivers/usb/usb_hub.c",
+    "to": "sys/dev/usb/usb_hub.c"
+  },
+  {
+    "from": "drivers/usb/usb_internal.h",
+    "to": "sys/dev/usb/usb_internal.h"
+  },
+  {
+    "from": "drivers/usb/usb_req.c",
+    "to": "sys/dev/usb/usb_req.c"
+  },
+  {
+    "from": "drivers/usb/usb_service.c",
+    "to": "sys/dev/usb/usb_service.c"
+  },
+  {
+    "from": "drivers/usb/usb_walk.h",
+    "to": "sys/dev/usb/usb_walk.h"
+  },
+  {
+    "from": "drivers/usb/usb_xfer.c",
+    "to": "sys/dev/usb/usb_xfer.c"
+  },
+  {
+    "from": "drivers/video/cirrus/backend_cirrus.c",
+    "to": "sys/dev/video/cirrus/backend_cirrus.c"
+  },
+  {
+    "from": "drivers/video/cirrus/cirrus_body.c",
+    "to": "sys/dev/video/cirrus/cirrus_body.c"
+  },
+  {
+    "from": "drivers/video/cirrus/cirrus_identify.c",
+    "to": "sys/platform/pc98/video/cirrus/cirrus_identify.c"
+  },
+  {
+    "from": "drivers/video/cirrus/cirrus_module.c",
+    "to": "sys/dev/video/cirrus/cirrus_module.c"
+  },
+  {
+    "from": "drivers/video/cirrus/cirrus_module.h",
+    "to": "sys/dev/video/cirrus/cirrus_module.h"
+  },
+  {
+    "from": "drivers/video/cirrus/wab_cirrus.c",
+    "to": "sys/dev/video/cirrus/wab_cirrus.c"
+  },
+  {
+    "from": "drivers/video/cirrus/wab_cirrus.h",
+    "to": "sys/dev/video/cirrus/wab_cirrus.h"
+  },
+  {
+    "from": "drivers/video/cirrus/wab_glue.h",
+    "to": "sys/dev/video/cirrus/wab_glue.h"
+  },
+  {
+    "from": "drivers/video/cirrus/wab_glue_xe10.c",
+    "to": "sys/platform/pc98/video/cirrus/wab_glue_xe10.c"
+  },
+  {
+    "from": "drivers/video/cirrus/wab_glue_xe10.h",
+    "to": "sys/platform/pc98/video/cirrus/wab_glue_xe10.h"
+  },
+  {
+    "from": "drivers/video/geforce/edid.c",
+    "to": "sys/dev/video/geforce/edid.c"
+  },
+  {
+    "from": "drivers/video/geforce/geforce_dma.c",
+    "to": "sys/dev/video/geforce/geforce_dma.c"
+  },
+  {
+    "from": "drivers/video/geforce/geforce_module.h",
+    "to": "sys/dev/video/geforce/geforce_module.h"
+  },
+  {
+    "from": "drivers/video/geforce/geforce_tick.c",
+    "to": "sys/platform/pc98/video/geforce/geforce_tick.c"
+  },
+  {
+    "from": "drivers/video/geforce/geforce_tick.h",
+    "to": "sys/platform/pc98/video/geforce/geforce_tick.h"
+  },
+  {
+    "from": "drivers/video/geforce/gf_accept.c",
+    "to": "sys/dev/video/geforce/gf_accept.c"
+  },
+  {
+    "from": "drivers/video/geforce/gf_direct.c",
+    "to": "sys/dev/video/geforce/gf_direct.c"
+  },
+  {
+    "from": "drivers/video/geforce/gf_display_data.c",
+    "to": "sys/dev/video/geforce/gf_display_data.c"
+  },
+  {
+    "from": "drivers/video/geforce/gf_hook.c",
+    "to": "sys/dev/video/geforce/gf_hook.c"
+  },
+  {
+    "from": "drivers/video/geforce/gf_present.c",
+    "to": "sys/dev/video/geforce/gf_present.c"
+  },
+  {
+    "from": "drivers/video/geforce/gf_present_m2mf.c",
+    "to": "sys/dev/video/geforce/gf_present_m2mf.c"
+  },
+  {
+    "from": "drivers/video/geforce/gf_v2.h",
+    "to": "sys/dev/video/geforce/gf_v2.h"
+  },
+  {
+    "from": "drivers/video/geforce/gf_v2.h.orig",
+    "to": "sys/dev/video/geforce/gf_v2.h.orig"
+  },
+  {
+    "from": "drivers/video/geforce/gf_v2_alloc.c",
+    "to": "sys/dev/video/geforce/gf_v2_alloc.c"
+  },
+  {
+    "from": "drivers/video/geforce/gf_v2_display.c",
+    "to": "sys/dev/video/geforce/gf_v2_display.c"
+  },
+  {
+    "from": "drivers/video/geforce/gf_v2_enum.c",
+    "to": "sys/dev/video/geforce/gf_v2_enum.c"
+  },
+  {
+    "from": "drivers/video/geforce/gf_v2_fence.c",
+    "to": "sys/dev/video/geforce/gf_v2_fence.c"
+  },
+  {
+    "from": "drivers/video/geforce/gf_v2_gart.c",
+    "to": "sys/dev/video/geforce/gf_v2_gart.c"
+  },
+  {
+    "from": "drivers/video/geforce/gf_v2_life.c",
+    "to": "sys/dev/video/geforce/gf_v2_life.c"
+  },
+  {
+    "from": "drivers/video/geforce/gf_v2_ops.c",
+    "to": "sys/dev/video/geforce/gf_v2_ops.c"
+  },
+  {
+    "from": "drivers/video/geforce/gf_v2_weak.c",
+    "to": "sys/dev/video/geforce/gf_v2_weak.c"
+  },
+  {
+    "from": "drivers/video/geforce/gf_v2_weak.c.orig",
+    "to": "sys/dev/video/geforce/gf_v2_weak.c.orig"
+  },
+  {
+    "from": "drivers/video/geforce/gf_wc.c",
+    "to": "sys/dev/video/geforce/gf_wc.c"
+  },
+  {
+    "from": "drivers/video/geforce/leave_log.h",
+    "to": "sys/dev/video/geforce/leave_log.h"
+  },
+  {
+    "from": "drivers/video/geforce/tv_data.c",
+    "to": "sys/dev/video/geforce/tv_data.c"
+  },
+  {
+    "from": "drivers/video/kcg/kcg.c",
+    "to": "sys/dev/video/kcg/kcg.c"
+  },
+  {
+    "from": "drivers/video/kcg/kcg.h",
+    "to": "sys/dev/video/kcg/kcg.h"
+  },
+  {
+    "from": "drivers/video/kcg/kcg_body.c",
+    "to": "sys/dev/video/kcg/kcg_body.c"
+  },
+  {
+    "from": "drivers/video/kcg/kcg_module.c",
+    "to": "sys/dev/video/kcg/kcg_module.c"
+  },
+  {
+    "from": "drivers/video/kcg/kcg_module.h",
+    "to": "sys/dev/video/kcg/kcg_module.h"
+  },
+  {
+    "from": "drivers/video/kcg/kcg_read_provider.inc",
+    "to": "sys/dev/video/kcg/kcg_read_provider.inc"
+  },
+  {
+    "from": "drivers/video/of_fb/backend_of_fb.c",
+    "to": "sys/dev/video/of_fb/backend_of_fb.c"
+  },
+  {
+    "from": "drivers/video/of_fb/of_fb_v2.c",
+    "to": "sys/dev/video/of_fb/of_fb_v2.c"
+  },
+  {
+    "from": "drivers/video/pc98/backend_pc98.c",
+    "to": "sys/platform/pc98/video/backend_pc98.c"
+  },
+  {
+    "from": "drivers/video/pc98/backend_pc98_osri.c",
+    "to": "sys/platform/pc98/video/backend_pc98_osri.c"
+  },
+  {
+    "from": "drivers/video/pc98/backend_pegc.c",
+    "to": "sys/platform/pc98/video/backend_pegc.c"
+  },
+  {
+    "from": "drivers/video/pc98/backend_pegc_diag.inc",
+    "to": "sys/platform/pc98/video/backend_pegc_diag.inc"
+  },
+  {
+    "from": "drivers/video/pc98/backend_pegc_present.inc",
+    "to": "sys/platform/pc98/video/backend_pegc_present.inc"
+  },
+  {
+    "from": "drivers/video/pc98/backend_pegc_restore.inc",
+    "to": "sys/platform/pc98/video/backend_pegc_restore.inc"
+  },
+  {
+    "from": "drivers/video/pc98/backend_pegc_timing.inc",
+    "to": "sys/platform/pc98/video/backend_pegc_timing.inc"
+  },
+  {
+    "from": "drivers/video/pc98/gfx_vram.c",
+    "to": "sys/platform/pc98/video/gfx_vram.c"
+  },
+  {
+    "from": "drivers/video/pc98/pc98_route.c",
+    "to": "sys/platform/pc98/video/pc98_route.c"
+  },
+  {
+    "from": "drivers/video/pc98/pc98_route.h",
+    "to": "sys/platform/pc98/video/pc98_route.h"
+  },
+  {
+    "from": "drivers/video/pc98/pegc_v2.c",
+    "to": "sys/platform/pc98/video/pegc_v2.c"
+  },
+  {
+    "from": "drivers/video/pc98/splash_raster.c",
+    "to": "sys/platform/pc98/video/splash_raster.c"
+  },
+  {
+    "from": "drivers/video/pc98/splash_raster.h",
+    "to": "sys/platform/pc98/video/splash_raster.h"
+  },
+  {
+    "from": "drivers/video/pc98/splash_raster_image.c",
+    "to": "sys/platform/pc98/video/splash_raster_image.c"
+  },
+  {
+    "from": "drivers/video/pc98/splash_raster_image.h",
+    "to": "sys/platform/pc98/video/splash_raster_image.h"
+  },
+  {
+    "from": "drivers/video/pc98/splash_raster_plan.c",
+    "to": "sys/platform/pc98/video/splash_raster_plan.c"
+  },
+  {
+    "from": "drivers/video/pc98/splash_raster_play.c",
+    "to": "sys/platform/pc98/video/splash_raster_play.c"
+  },
+  {
+    "from": "drivers/video/pc98/splash_raster_play.h",
+    "to": "sys/platform/pc98/video/splash_raster_play.h"
+  },
+  {
+    "from": "drivers/video/pc98/splash_raster_run.c",
+    "to": "sys/platform/pc98/video/splash_raster_run.c"
+  },
+  {
+    "from": "drivers/video/pc98/splash_raster_run.h",
+    "to": "sys/platform/pc98/video/splash_raster_run.h"
+  },
+  {
+    "from": "drivers/video/trident/accel.c",
+    "to": "sys/dev/video/trident/accel.c"
+  },
+  {
+    "from": "drivers/video/trident/backend_trident.c",
+    "to": "sys/dev/video/trident/backend_trident.c"
+  },
+  {
+    "from": "drivers/video/trident/cursor.c",
+    "to": "sys/dev/video/trident/cursor.c"
+  },
+  {
+    "from": "drivers/video/trident/ddc1.c",
+    "to": "sys/dev/video/trident/ddc1.c"
+  },
+  {
+    "from": "drivers/video/trident/default_dac.c",
+    "to": "sys/dev/video/trident/default_dac.c"
+  },
+  {
+    "from": "drivers/video/trident/dpms.c",
+    "to": "sys/dev/video/trident/dpms.c"
+  },
+  {
+    "from": "drivers/video/trident/lifecycle.c",
+    "to": "sys/dev/video/trident/lifecycle.c"
+  },
+  {
+    "from": "drivers/video/trident/mode_640.c",
+    "to": "sys/dev/video/trident/mode_640.c"
+  },
+  {
+    "from": "drivers/video/trident/palette.c",
+    "to": "sys/dev/video/trident/palette.c"
+  },
+  {
+    "from": "drivers/video/trident/pc98_init.c",
+    "to": "sys/dev/video/trident/pc98_init.c"
+  },
+  {
+    "from": "drivers/video/trident/probe.c",
+    "to": "sys/dev/video/trident/probe.c"
+  },
+  {
+    "from": "drivers/video/trident/probes.h",
+    "to": "sys/dev/video/trident/probes.h"
+  },
+  {
+    "from": "drivers/video/trident/regs.c",
+    "to": "sys/dev/video/trident/regs.c"
+  },
+  {
+    "from": "drivers/video/trident/route_ra266.c",
+    "to": "sys/platform/pc98/video/route_ra266.c"
+  },
+  {
+    "from": "drivers/video/trident/screen.c",
+    "to": "sys/dev/video/trident/screen.c"
+  },
+  {
+    "from": "drivers/video/trident/state_restore.c",
+    "to": "sys/dev/video/trident/state_restore.c"
+  },
+  {
+    "from": "drivers/video/trident/state_save.c",
+    "to": "sys/dev/video/trident/state_save.c"
+  },
+  {
+    "from": "drivers/video/trident/trident.h",
+    "to": "sys/dev/video/trident/trident.h"
+  },
+  {
+    "from": "drivers/video/trident/trident_body.c",
+    "to": "sys/dev/video/trident/trident_body.c"
+  },
+  {
+    "from": "drivers/video/trident/trident_module.c",
+    "to": "sys/dev/video/trident/trident_module.c"
+  },
+  {
+    "from": "drivers/video/trident/trident_module.h",
+    "to": "sys/dev/video/trident/trident_module.h"
+  },
+  {
+    "from": "drivers/video/trident/video.c",
+    "to": "sys/dev/video/trident/video.c"
+  },
+  {
+    "from": "drivers/video/trident/vram.c",
+    "to": "sys/dev/video/trident/vram.c"
+  },
+  {
+    "from": "exec/absent/exec_font_guard.c",
+    "to": "sys/kern/exec/absent/exec_font_guard.c"
+  },
+  {
+    "from": "exec/absent/exec_font_lease.c",
+    "to": "sys/kern/exec/absent/exec_font_lease.c"
+  },
+  {
+    "from": "exec/absent/exec_gfx.c",
+    "to": "sys/kern/exec/absent/exec_gfx.c"
+  },
+  {
+    "from": "exec/absent/exec_gfx_poll.c",
+    "to": "sys/kern/exec/absent/exec_gfx_poll.c"
+  },
+  {
+    "from": "exec/absent/exec_gui.c",
+    "to": "sys/kern/exec/absent/exec_gui.c"
+  },
+  {
+    "from": "exec/absent/exec_ime.c",
+    "to": "sys/kern/exec/absent/exec_ime.c"
+  },
+  {
+    "from": "exec/absent/exec_kapi_db.c",
+    "to": "sys/kern/exec/absent/exec_kapi_db.c"
+  },
+  {
+    "from": "exec/absent/exec_legacy.c",
+    "to": "sys/kern/exec/absent/exec_legacy.c"
+  },
+  {
+    "from": "exec/absent/exec_r1.c",
+    "to": "sys/kern/exec/absent/exec_r1.c"
+  },
+  {
+    "from": "exec/absent/exec_reclaim.c",
+    "to": "sys/kern/exec/absent/exec_reclaim.c"
+  },
+  {
+    "from": "exec/absent/exec_serial_diag.c",
+    "to": "sys/kern/exec/absent/exec_serial_diag.c"
+  },
+  {
+    "from": "exec/absent/exec_shlib.c",
+    "to": "sys/kern/exec/absent/exec_shlib.c"
+  },
+  {
+    "from": "exec/absent/exec_surface.c",
+    "to": "sys/kern/exec/absent/exec_surface.c"
+  },
+  {
+    "from": "exec/access_walk.c",
+    "to": "sys/kern/exec/access_walk.c"
+  },
+  {
+    "from": "exec/appmem.c",
+    "to": "sys/kern/exec/appmem.c"
+  },
+  {
+    "from": "exec/appmem.h",
+    "to": "sys/kern/exec/appmem.h"
+  },
+  {
+    "from": "exec/appmem_map.c",
+    "to": "sys/kern/exec/appmem_map.c"
+  },
+  {
+    "from": "exec/appmem_unmap.c",
+    "to": "sys/kern/exec/appmem_unmap.c"
+  },
+  {
+    "from": "exec/appslot.h",
+    "to": "sys/kern/exec/appslot.h"
+  },
+  {
+    "from": "exec/appslot_park.inc",
+    "to": "sys/kern/exec/appslot_park.inc"
+  },
+  {
+    "from": "exec/appslot_selftest.inc",
+    "to": "sys/kern/exec/appslot_selftest.inc"
+  },
+  {
+    "from": "exec/appslot_transition.inc",
+    "to": "sys/kern/exec/appslot_transition.inc"
+  },
+  {
+    "from": "exec/exec.c",
+    "to": "sys/kern/exec/exec.c"
+  },
+  {
+    "from": "exec/exec.h",
+    "to": "sys/kern/exec/exec.h"
+  },
+  {
+    "from": "exec/exec_abort.inc",
+    "to": "sys/kern/exec/exec_abort.inc"
+  },
+  {
+    "from": "exec/exec_argv.inc",
+    "to": "sys/kern/exec/exec_argv.inc"
+  },
+  {
+    "from": "exec/exec_fault.inc",
+    "to": "sys/kern/exec/exec_fault.inc"
+  },
+  {
+    "from": "exec/exec_finish.inc",
+    "to": "sys/kern/exec/exec_finish.inc"
+  },
+  {
+    "from": "exec/exec_font_guard.h",
+    "to": "sys/kern/exec/exec_font_guard.h"
+  },
+  {
+    "from": "exec/exec_font_lease.h",
+    "to": "sys/kern/exec/exec_font_lease.h"
+  },
+  {
+    "from": "exec/exec_gfx.h",
+    "to": "sys/kern/exec/exec_gfx.h"
+  },
+  {
+    "from": "exec/exec_gui.h",
+    "to": "sys/kern/exec/exec_gui.h"
+  },
+  {
+    "from": "exec/exec_heap.c",
+    "to": "sys/kern/exec/exec_heap.c"
+  },
+  {
+    "from": "exec/exec_heap.h",
+    "to": "sys/kern/exec/exec_heap.h"
+  },
+  {
+    "from": "exec/exec_hooks.h",
+    "to": "sys/kern/exec/exec_hooks.h"
+  },
+  {
+    "from": "exec/exec_hwb.h",
+    "to": "sys/kern/exec/exec_hwb.h"
+  },
+  {
+    "from": "exec/exec_image.inc",
+    "to": "sys/kern/exec/exec_image.inc"
+  },
+  {
+    "from": "exec/exec_image_map.inc",
+    "to": "sys/kern/exec/exec_image_map.inc"
+  },
+  {
+    "from": "exec/exec_ime.h",
+    "to": "sys/kern/exec/exec_ime.h"
+  },
+  {
+    "from": "exec/exec_kapi_db.h",
+    "to": "sys/kern/exec/exec_kapi_db.h"
+  },
+  {
+    "from": "exec/exec_kapi_init.inc",
+    "to": "sys/kern/exec/exec_kapi_init.inc"
+  },
+  {
+    "from": "exec/exec_legacy.h",
+    "to": "sys/kern/exec/exec_legacy.h"
+  },
+  {
+    "from": "exec/exec_r1.h",
+    "to": "sys/kern/exec/exec_r1.h"
+  },
+  {
+    "from": "exec/exec_reclaim.h",
+    "to": "sys/kern/exec/exec_reclaim.h"
+  },
+  {
+    "from": "exec/exec_schedule.inc",
+    "to": "sys/kern/exec/exec_schedule.inc"
+  },
+  {
+    "from": "exec/exec_serial_diag.h",
+    "to": "sys/kern/exec/exec_serial_diag.h"
+  },
+  {
+    "from": "exec/exec_shlib.h",
+    "to": "sys/kern/exec/exec_shlib.h"
+  },
+  {
+    "from": "exec/exec_stdin.inc",
+    "to": "sys/kern/exec/exec_stdin.inc"
+  },
+  {
+    "from": "exec/exec_surface.h",
+    "to": "sys/kern/exec/exec_surface.h"
+  },
+  {
+    "from": "exec/exec_tramp_init.inc",
+    "to": "sys/kern/exec/exec_tramp_init.inc"
+  },
+  {
+    "from": "exec/exec_tramp_strings.inc",
+    "to": "sys/kern/exec/exec_tramp_strings.inc"
+  },
+  {
+    "from": "exec/launch.c",
+    "to": "sys/kern/exec/launch.c"
+  },
+  {
+    "from": "exec/lease.c",
+    "to": "sys/kern/exec/lease.c"
+  },
+  {
+    "from": "exec/lease.h",
+    "to": "sys/kern/exec/lease.h"
+  },
+  {
+    "from": "exec/os32x_hdr.c",
+    "to": "sys/kern/exec/os32x_hdr.c"
+  },
+  {
+    "from": "exec/os32x_hdr.h",
+    "to": "sys/kern/exec/os32x_hdr.h"
+  },
+  {
+    "from": "exec/owner_diag.h",
+    "to": "sys/kern/exec/owner_diag.h"
+  },
+  {
+    "from": "exec/redir_access.c",
+    "to": "sys/kern/exec/redir_access.c"
+  },
+  {
+    "from": "exec/ring3_ls.c",
+    "to": "sys/kern/exec/ring3_ls.c"
+  },
+  {
+    "from": "exec/ring3_ls.h",
+    "to": "sys/kern/exec/ring3_ls.h"
+  },
+  {
+    "from": "exec/ring3_str.c",
+    "to": "sys/kern/exec/ring3_str.c"
+  },
+  {
+    "from": "exec/ring3_str.h",
+    "to": "sys/kern/exec/ring3_str.h"
+  },
+  {
+    "from": "exec/shell_service.c",
+    "to": "sys/kern/exec/shell_service.c"
+  },
+  {
+    "from": "exec/shell_service.h",
+    "to": "sys/kern/exec/shell_service.h"
+  },
+  {
+    "from": "exec/surface_limits.h",
+    "to": "sys/kern/exec/surface_limits.h"
+  },
+  {
+    "from": "exec/surface_query.c",
+    "to": "sys/kern/exec/surface_query.c"
+  },
+  {
+    "from": "exec/surface_query.h",
+    "to": "sys/kern/exec/surface_query.h"
+  },
+  {
+    "from": "exec/system_surface.c",
+    "to": "sys/kern/exec/system_surface.c"
+  },
+  {
+    "from": "exec/system_surface.h",
+    "to": "sys/kern/exec/system_surface.h"
+  },
+  {
+    "from": "fs/ext2/ext2.h",
+    "to": "sys/fs/ext2/ext2.h"
+  },
+  {
+    "from": "fs/ext2/ext2_ctx.h",
+    "to": "sys/fs/ext2/ext2_ctx.h"
+  },
+  {
+    "from": "fs/ext2/ext2_dir.c",
+    "to": "sys/fs/ext2/ext2_dir.c"
+  },
+  {
+    "from": "fs/ext2/ext2_dir_directory.inc",
+    "to": "sys/fs/ext2/ext2_dir_directory.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_dir_rename.inc",
+    "to": "sys/fs/ext2/ext2_dir_rename.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_file.c",
+    "to": "sys/fs/ext2/ext2_file.c"
+  },
+  {
+    "from": "fs/ext2/ext2_file_read_cache.inc",
+    "to": "sys/fs/ext2/ext2_file_read_cache.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_file_read_run.inc",
+    "to": "sys/fs/ext2/ext2_file_read_run.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_file_write_batch.inc",
+    "to": "sys/fs/ext2/ext2_file_write_batch.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_file_write_run.inc",
+    "to": "sys/fs/ext2/ext2_file_write_run.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_fmt.c",
+    "to": "sys/fs/ext2/ext2_fmt.c"
+  },
+  {
+    "from": "fs/ext2/ext2_fmt_init_groups.inc",
+    "to": "sys/fs/ext2/ext2_fmt_init_groups.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_fmt_write_backups.inc",
+    "to": "sys/fs/ext2/ext2_fmt_write_backups.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_fmt_write_groups.inc",
+    "to": "sys/fs/ext2/ext2_fmt_write_groups.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_inode.c",
+    "to": "sys/fs/ext2/ext2_inode.c"
+  },
+  {
+    "from": "fs/ext2/ext2_inode_cache.inc",
+    "to": "sys/fs/ext2/ext2_inode_cache.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_inode_indirect_cache.inc",
+    "to": "sys/fs/ext2/ext2_inode_indirect_cache.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_inode_write_bitmap.inc",
+    "to": "sys/fs/ext2/ext2_inode_write_bitmap.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_inode_write_bmap.inc",
+    "to": "sys/fs/ext2/ext2_inode_write_bmap.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_inode_write_cache.inc",
+    "to": "sys/fs/ext2/ext2_inode_write_cache.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_layout.c",
+    "to": "sys/fs/ext2/ext2_layout.c"
+  },
+  {
+    "from": "fs/ext2/ext2_layout.h",
+    "to": "sys/fs/ext2/ext2_layout.h"
+  },
+  {
+    "from": "fs/ext2/ext2_medium_ide.c",
+    "to": "sys/platform/pc98/storage/ext2_medium_ide.c"
+  },
+  {
+    "from": "fs/ext2/ext2_medium_loop.c",
+    "to": "sys/dev/block/ext2_medium_loop.c"
+  },
+  {
+    "from": "fs/ext2/ext2_priv.h",
+    "to": "sys/fs/ext2/ext2_priv.h"
+  },
+  {
+    "from": "fs/ext2/ext2_super.c",
+    "to": "sys/fs/ext2/ext2_super.c"
+  },
+  {
+    "from": "fs/ext2/ext2_super_block_io.inc",
+    "to": "sys/fs/ext2/ext2_super_block_io.inc"
+  },
+  {
+    "from": "fs/ext2/ext2_time.c",
+    "to": "sys/fs/ext2/ext2_time.c"
+  },
+  {
+    "from": "fs/ext2/ext2_vfs.c",
+    "to": "sys/fs/ext2/ext2_vfs.c"
+  },
+  {
+    "from": "fs/ext2/ext2_vfs_remove_path.inc",
+    "to": "sys/fs/ext2/ext2_vfs_remove_path.inc"
+  },
+  {
+    "from": "fs/fat/fatfs/diskio.h",
+    "to": "sys/fs/fat/fatfs/diskio.h"
+  },
+  {
+    "from": "fs/fat/fatfs/diskio_os32.h",
+    "to": "sys/fs/fat/fatfs/diskio_os32.h"
+  },
+  {
+    "from": "fs/fat/fatfs/ff.c",
+    "to": "sys/fs/fat/fatfs/ff.c"
+  },
+  {
+    "from": "fs/fat/fatfs/ff.h",
+    "to": "sys/fs/fat/fatfs/ff.h"
+  },
+  {
+    "from": "fs/fat/fatfs/ffconf.h",
+    "to": "sys/fs/fat/fatfs/ffconf.h"
+  },
+  {
+    "from": "fs/fat/fatfs/string.h",
+    "to": "sys/fs/fat/fatfs/string.h"
+  },
+  {
+    "from": "fs/fd_redirect.c",
+    "to": "sys/fs/fd_redirect.c"
+  },
+  {
+    "from": "fs/fd_redirect.h",
+    "to": "sys/fs/fd_redirect.h"
+  },
+  {
+    "from": "fs/ide_limits.h",
+    "to": "sys/fs/ide_limits.h"
+  },
+  {
+    "from": "fs/isofs/iso9660.c",
+    "to": "sys/fs/isofs/iso9660.c"
+  },
+  {
+    "from": "fs/isofs/iso9660.h",
+    "to": "sys/fs/isofs/iso9660.h"
+  },
+  {
+    "from": "fs/isofs/iso9660_dir_read.inc",
+    "to": "sys/fs/isofs/iso9660_dir_read.inc"
+  },
+  {
+    "from": "fs/isofs/iso9660_dir_record.inc",
+    "to": "sys/fs/isofs/iso9660_dir_record.inc"
+  },
+  {
+    "from": "fs/isofs/iso9660_media.c",
+    "to": "sys/fs/isofs/iso9660_media.c"
+  },
+  {
+    "from": "fs/isofs/iso9660_media.h",
+    "to": "sys/fs/isofs/iso9660_media.h"
+  },
+  {
+    "from": "fs/pc98pt.c",
+    "to": "sys/fs/pc98pt.c"
+  },
+  {
+    "from": "fs/pc98pt.h",
+    "to": "sys/fs/pc98pt.h"
+  },
+  {
+    "from": "fs/pipe_buffer.c",
+    "to": "sys/fs/pipe_buffer.c"
+  },
+  {
+    "from": "fs/pipe_buffer.h",
+    "to": "sys/fs/pipe_buffer.h"
+  },
+  {
+    "from": "fs/ramfs/ramfs.c",
+    "to": "sys/fs/ramfs/ramfs.c"
+  },
+  {
+    "from": "fs/ramfs/ramfs.h",
+    "to": "sys/fs/ramfs/ramfs.h"
+  },
+  {
+    "from": "fs/serialfs/serialfs.c",
+    "to": "sys/fs/serialfs/serialfs.c"
+  },
+  {
+    "from": "fs/serialfs/serialfs.h",
+    "to": "sys/fs/serialfs/serialfs.h"
+  },
+  {
+    "from": "fs/serialfs/serialfs_persistent.c",
+    "to": "sys/fs/serialfs/serialfs_persistent.c"
+  },
+  {
+    "from": "fs/serialfs/serialfs_session.c",
+    "to": "sys/fs/serialfs/serialfs_session.c"
+  },
+  {
+    "from": "fs/serialfs/sfs_block.c",
+    "to": "sys/fs/serialfs/sfs_block.c"
+  },
+  {
+    "from": "fs/serialfs/sfs_block.h",
+    "to": "sys/fs/serialfs/sfs_block.h"
+  },
+  {
+    "from": "fs/serialfs/sfs_client.c",
+    "to": "sys/fs/serialfs/sfs_client.c"
+  },
+  {
+    "from": "fs/serialfs/sfs_client.h",
+    "to": "sys/fs/serialfs/sfs_client.h"
+  },
+  {
+    "from": "fs/serialfs/sfs_lan.c",
+    "to": "sys/fs/serialfs/sfs_lan.c"
+  },
+  {
+    "from": "fs/serialfs/sfs_lan.h",
+    "to": "sys/fs/serialfs/sfs_lan.h"
+  },
+  {
+    "from": "fs/serialfs/sfs_proto.c",
+    "to": "sys/fs/serialfs/sfs_proto.c"
+  },
+  {
+    "from": "fs/serialfs/sfs_proto.h",
+    "to": "sys/fs/serialfs/sfs_proto.h"
+  },
+  {
+    "from": "fs/vfs.c",
+    "to": "sys/fs/vfs.c"
+  },
+  {
+    "from": "fs/vfs.h",
+    "to": "sys/fs/vfs.h"
+  },
+  {
+    "from": "fs/vfs_device.h",
+    "to": "sys/fs/vfs_device.h"
+  },
+  {
+    "from": "fs/vfs_fd.c",
+    "to": "sys/fs/vfs_fd.c"
+  },
+  {
+    "from": "fs/vfs_fd_stdin.inc",
+    "to": "sys/fs/vfs_fd_stdin.inc"
+  },
+  {
+    "from": "fs/vfs_name_rules.inc",
+    "to": "sys/fs/vfs_name_rules.inc"
+  },
+  {
+    "from": "fs/vfs_stdin.h",
+    "to": "sys/fs/vfs_stdin.h"
+  },
+  {
+    "from": "gfx/gfx.h",
+    "to": "sys/hal/gfx/gfx.h"
+  },
+  {
+    "from": "gfx/gfx_console.c",
+    "to": "sys/kern/console/gfx_console.c"
+  },
+  {
+    "from": "gfx/gfx_console.h",
+    "to": "sys/kern/console/gfx_console.h"
+  },
+  {
+    "from": "gfx/gfx_core_api.inc",
+    "to": "sys/hal/gfx/gfx_core_api.inc"
+  },
+  {
+    "from": "gfx/gfx_core_bridge.inc",
+    "to": "sys/hal/gfx/gfx_core_bridge.inc"
+  },
+  {
+    "from": "gfx/gfx_core_framebuffer.inc",
+    "to": "sys/hal/gfx/gfx_core_framebuffer.inc"
+  },
+  {
+    "from": "gfx/gfx_dirty.c",
+    "to": "sys/hal/gfx/gfx_dirty.c"
+  },
+  {
+    "from": "gfx/gfx_dirty.h",
+    "to": "sys/hal/gfx/gfx_dirty.h"
+  },
+  {
+    "from": "gfx/gfx_emergency.c",
+    "to": "sys/hal/gfx/gfx_emergency.c"
+  },
+  {
+    "from": "gfx/gfx_emergency.h",
+    "to": "sys/hal/gfx/gfx_emergency.h"
+  },
+  {
+    "from": "gfx/gfx_hw_mono_cpu.c",
+    "to": "sys/hal/gfx/gfx_hw_mono_cpu.c"
+  },
+  {
+    "from": "gfx/gfx_hw_mono_cpu.h",
+    "to": "sys/hal/gfx/gfx_hw_mono_cpu.h"
+  },
+  {
+    "from": "gfx/gfx_hw_submit.c",
+    "to": "sys/hal/gfx/gfx_hw_submit.c"
+  },
+  {
+    "from": "gfx/gfx_osri.c",
+    "to": "sys/kern/gfx/osri/gfx_osri.c"
+  },
+  {
+    "from": "gfx/gfx_osri.h",
+    "to": "sys/kern/gfx/osri/gfx_osri.h"
+  },
+  {
+    "from": "gfx/gfx_osri_view.c",
+    "to": "sys/kern/gfx/osri/gfx_osri_view.c"
+  },
+  {
+    "from": "gfx/gfx_osri_view.h",
+    "to": "sys/kern/gfx/osri/gfx_osri_view.h"
+  },
+  {
+    "from": "gfx/gfx_osri_view_internal.h",
+    "to": "sys/kern/gfx/osri/gfx_osri_view_internal.h"
+  },
+  {
+    "from": "gfx/gfx_policy.c",
+    "to": "sys/hal/gfx/gfx_policy.c"
+  },
+  {
+    "from": "gfx/gfx_policy.h",
+    "to": "sys/hal/gfx/gfx_policy.h"
+  },
+  {
+    "from": "gfx/gfx_present.c",
+    "to": "sys/hal/gfx/gfx_present.c"
+  },
+  {
+    "from": "gfx/gfx_scroll.c",
+    "to": "sys/hal/gfx/gfx_scroll.c"
+  },
+  {
+    "from": "gfx/osri_profile.h",
+    "to": "sys/kern/gfx/osri/osri_profile.h"
+  },
+  {
+    "from": "gfx/palette.c",
+    "to": "sys/hal/gfx/palette.c"
+  },
+  {
+    "from": "gfx/palette.h",
+    "to": "sys/hal/gfx/palette.h"
+  },
+  {
+    "from": "gfx/sync/a0_weak.c",
+    "to": "sys/hal/gfx/sync/a0_weak.c"
+  },
+  {
+    "from": "gfx/sync/sync_bind.c",
+    "to": "sys/hal/gfx/sync/sync_bind.c"
+  },
+  {
+    "from": "gfx/sync/sync_cfg.c",
+    "to": "sys/hal/gfx/sync/sync_cfg.c"
+  },
+  {
+    "from": "gfx/sync/sync_gap.c",
+    "to": "sys/hal/gfx/sync/sync_gap.c"
+  },
+  {
+    "from": "gfx/sync/sync_int.h",
+    "to": "sys/hal/gfx/sync/sync_int.h"
+  },
+  {
+    "from": "gfx/sync/sync_storage.c",
+    "to": "sys/hal/gfx/sync/sync_storage.c"
+  },
+  {
+    "from": "gfx/sync/sync_write.c",
+    "to": "sys/hal/gfx/sync/sync_write.c"
+  },
+  {
+    "from": "gfx/v2/a0_weak.c",
+    "to": "sys/hal/gfx/v2/a0_weak.c"
+  },
+  {
+    "from": "gfx/v2/backend_reg.c",
+    "to": "sys/hal/gfx/v2/backend_reg.c"
+  },
+  {
+    "from": "gfx/v2/check_op.c",
+    "to": "sys/hal/gfx/v2/check_op.c"
+  },
+  {
+    "from": "gfx/v2/display.c",
+    "to": "sys/hal/gfx/v2/display.c"
+  },
+  {
+    "from": "gfx/v2/fence.c",
+    "to": "sys/hal/gfx/v2/fence.c"
+  },
+  {
+    "from": "gfx/v2/format.c",
+    "to": "sys/hal/gfx/v2/format.c"
+  },
+  {
+    "from": "gfx/v2/gart.c",
+    "to": "sys/hal/gfx/v2/gart.c"
+  },
+  {
+    "from": "gfx/v2/gfx2_exec.h",
+    "to": "sys/hal/gfx/v2/gfx2_exec.h"
+  },
+  {
+    "from": "gfx/v2/gfx2_fmt.h",
+    "to": "sys/hal/gfx/v2/gfx2_fmt.h"
+  },
+  {
+    "from": "gfx/v2/gfx2_int.h",
+    "to": "sys/hal/gfx/v2/gfx2_int.h"
+  },
+  {
+    "from": "gfx/v2/gfx2_sw.h",
+    "to": "sys/hal/gfx/v2/gfx2_sw.h"
+  },
+  {
+    "from": "gfx/v2/modeset.c",
+    "to": "sys/hal/gfx/v2/modeset.c"
+  },
+  {
+    "from": "gfx/v2/owner_release.c",
+    "to": "sys/hal/gfx/v2/owner_release.c"
+  },
+  {
+    "from": "gfx/v2/palette_state.c",
+    "to": "sys/hal/gfx/v2/palette_state.c"
+  },
+  {
+    "from": "gfx/v2/submit.c",
+    "to": "sys/hal/gfx/v2/submit.c"
+  },
+  {
+    "from": "gfx/v2/surface.c",
+    "to": "sys/hal/gfx/v2/surface.c"
+  },
+  {
+    "from": "gfx/v2/sw_alpha.c",
+    "to": "sys/hal/gfx/v2/sw_alpha.c"
+  },
+  {
+    "from": "gfx/v2/sw_ckey.c",
+    "to": "sys/hal/gfx/v2/sw_ckey.c"
+  },
+  {
+    "from": "gfx/v2/sw_copy.c",
+    "to": "sys/hal/gfx/v2/sw_copy.c"
+  },
+  {
+    "from": "gfx/v2/sw_fill.c",
+    "to": "sys/hal/gfx/v2/sw_fill.c"
+  },
+  {
+    "from": "gfx/v2/sw_hostdata.c",
+    "to": "sys/hal/gfx/sw_hostdata.c"
+  },
+  {
+    "from": "gfx/v2/sw_line.c",
+    "to": "sys/hal/gfx/sw_line.c"
+  },
+  {
+    "from": "gfx/v2/sw_mono.c",
+    "to": "sys/hal/gfx/sw_mono.c"
+  },
+  {
+    "from": "gfx/v2/sw_readback.c",
+    "to": "sys/hal/gfx/sw_readback.c"
+  },
+  {
+    "from": "gfx/v2/sw_rop.c",
+    "to": "sys/hal/gfx/sw_rop.c"
+  },
+  {
+    "from": "gfx/v2/sw_rop4.c",
+    "to": "sys/hal/gfx/sw_rop4.c"
+  },
+  {
+    "from": "gfx/v2/sw_stretch.c",
+    "to": "sys/hal/gfx/sw_stretch.c"
+  },
+  {
+    "from": "gfx/v2/sw_table.c",
+    "to": "sys/hal/gfx/sw_table.c"
+  },
+  {
+    "from": "gfx/v2/sysmem.c",
+    "to": "sys/hal/gfx/sysmem.c"
+  },
+  {
+    "from": "gfx/v2/v1_bridge.c",
+    "to": "sys/hal/gfx/v1_bridge.c"
+  },
+  {
+    "from": "gfx/v2/v1_shim.c",
+    "to": "sys/hal/gfx/v1_shim.c"
+  },
+  {
+    "from": "gfx/v2/vram_heap.c",
+    "to": "sys/hal/gfx/vram_heap.c"
+  },
+  {
+    "from": "hwdev/generated/gf_mode_rows.inc",
+    "to": "sys/dev/video/geforce/gf_mode_rows.inc"
+  },
+  {
+    "from": "hwdev/generated/hwdev_contract.h",
+    "to": "sys/dev/hwdev/generated/hwdev_contract.h"
+  },
+  {
+    "from": "hwdev/generated/hwdev_core.c",
+    "to": "sys/dev/hwdev/generated/hwdev_core.c"
+  },
+  {
+    "from": "hwdev/generated/hwdev_import_macros.h",
+    "to": "sys/dev/hwdev/generated/hwdev_import_macros.h"
+  },
+  {
+    "from": "hwdev/generated/hwdev_import_slots.c",
+    "to": "sys/dev/hwdev/generated/hwdev_import_slots.c"
+  },
+  {
+    "from": "hwdev/generated/hwdev_import_stubs.S",
+    "to": "sys/dev/hwdev/generated/hwdev_import_stubs.S"
+  },
+  {
+    "from": "hwdev/generated/hwdev_imports.h",
+    "to": "sys/dev/hwdev/generated/hwdev_imports.h"
+  },
+  {
+    "from": "hwdev/generated/hwdev_imports.json",
+    "to": "sys/dev/hwdev/generated/hwdev_imports.json"
+  },
+  {
+    "from": "hwdev/generated/hwdev_layout.txt",
+    "to": "sys/dev/hwdev/generated/hwdev_layout.txt"
+  },
+  {
+    "from": "hwdev/gf/accel.h",
+    "to": "sys/dev/video/geforce/accel.h"
+  },
+  {
+    "from": "hwdev/gf/accel_copy.c",
+    "to": "sys/dev/video/geforce/accel_copy.c"
+  },
+  {
+    "from": "hwdev/gf/accel_fill.c",
+    "to": "sys/dev/video/geforce/accel_fill.c"
+  },
+  {
+    "from": "hwdev/gf/accel_ifc.c",
+    "to": "sys/dev/video/geforce/accel_ifc.c"
+  },
+  {
+    "from": "hwdev/gf/accel_m2mf.c",
+    "to": "sys/dev/video/geforce/accel_m2mf.c"
+  },
+  {
+    "from": "hwdev/gf/accel_mono.c",
+    "to": "sys/dev/video/geforce/accel_mono.c"
+  },
+  {
+    "from": "hwdev/gf/accel_objects.c",
+    "to": "sys/dev/video/geforce/accel_objects.c"
+  },
+  {
+    "from": "hwdev/gf/accel_rop.c",
+    "to": "sys/dev/video/geforce/accel_rop.c"
+  },
+  {
+    "from": "hwdev/gf/accel_rop3.c",
+    "to": "sys/dev/video/geforce/accel_rop3.c"
+  },
+  {
+    "from": "hwdev/gf/accel_scale.c",
+    "to": "sys/dev/video/geforce/accel_scale.c"
+  },
+  {
+    "from": "hwdev/gf/accel_service.h",
+    "to": "sys/dev/video/geforce/accel_service.h"
+  },
+  {
+    "from": "hwdev/gf/accel_surface.c",
+    "to": "sys/dev/video/geforce/accel_surface.c"
+  },
+  {
+    "from": "hwdev/gf/accel_transfer.c",
+    "to": "sys/dev/video/geforce/accel_transfer.c"
+  },
+  {
+    "from": "hwdev/gf/bus.c",
+    "to": "sys/dev/video/geforce/bus.c"
+  },
+  {
+    "from": "hwdev/gf/clock.c",
+    "to": "sys/dev/video/geforce/clock.c"
+  },
+  {
+    "from": "hwdev/gf/command.c",
+    "to": "sys/dev/video/geforce/command.c"
+  },
+  {
+    "from": "hwdev/gf/command.h",
+    "to": "sys/dev/video/geforce/command.h"
+  },
+  {
+    "from": "hwdev/gf/command_platform.c",
+    "to": "sys/dev/video/geforce/command_platform.c"
+  },
+  {
+    "from": "hwdev/gf/command_test.c",
+    "to": "sys/dev/video/geforce/command_test.c"
+  },
+  {
+    "from": "hwdev/gf/devinit.c",
+    "to": "sys/dev/video/geforce/devinit.c"
+  },
+  {
+    "from": "hwdev/gf/display/access.h",
+    "to": "sys/dev/video/geforce/display/access.h"
+  },
+  {
+    "from": "hwdev/gf/display/api.h",
+    "to": "sys/dev/video/geforce/display/api.h"
+  },
+  {
+    "from": "hwdev/gf/display/baseline.c",
+    "to": "sys/dev/video/geforce/display/baseline.c"
+  },
+  {
+    "from": "hwdev/gf/display/blank.c",
+    "to": "sys/dev/video/geforce/display/blank.c"
+  },
+  {
+    "from": "hwdev/gf/display/calc.c",
+    "to": "sys/dev/video/geforce/display/calc.c"
+  },
+  {
+    "from": "hwdev/gf/display/calc.h",
+    "to": "sys/dev/video/geforce/display/calc.h"
+  },
+  {
+    "from": "hwdev/gf/display/checks.c",
+    "to": "sys/dev/video/geforce/display/checks.c"
+  },
+  {
+    "from": "hwdev/gf/display/checks.inc",
+    "to": "sys/dev/video/geforce/display/checks.inc"
+  },
+  {
+    "from": "hwdev/gf/display/cursor.c",
+    "to": "sys/dev/video/geforce/display/cursor.c"
+  },
+  {
+    "from": "hwdev/gf/display/dac_format.c",
+    "to": "sys/dev/video/geforce/display/dac_format.c"
+  },
+  {
+    "from": "hwdev/gf/display/data.h",
+    "to": "sys/dev/video/geforce/display/data.h"
+  },
+  {
+    "from": "hwdev/gf/display/dcb.c",
+    "to": "sys/dev/video/geforce/display/dcb.c"
+  },
+  {
+    "from": "hwdev/gf/display/ddc.c",
+    "to": "sys/dev/video/geforce/display/ddc.c"
+  },
+  {
+    "from": "hwdev/gf/display/dpms.c",
+    "to": "sys/dev/video/geforce/display/dpms.c"
+  },
+  {
+    "from": "hwdev/gf/display/enc_state.c",
+    "to": "sys/dev/video/geforce/display/enc_state.c"
+  },
+  {
+    "from": "hwdev/gf/display/extended.c",
+    "to": "sys/dev/video/geforce/display/extended.c"
+  },
+  {
+    "from": "hwdev/gf/display/fifo.c",
+    "to": "sys/dev/video/geforce/display/fifo.c"
+  },
+  {
+    "from": "hwdev/gf/display/flip.c",
+    "to": "sys/dev/video/geforce/display/flip.c"
+  },
+  {
+    "from": "hwdev/gf/display/format.c",
+    "to": "sys/dev/video/geforce/display/format.c"
+  },
+  {
+    "from": "hwdev/gf/display/gamma.c",
+    "to": "sys/dev/video/geforce/display/gamma.c"
+  },
+  {
+    "from": "hwdev/gf/display/heads.c",
+    "to": "sys/dev/video/geforce/display/heads.c"
+  },
+  {
+    "from": "hwdev/gf/display/hw_fonts.c",
+    "to": "sys/dev/video/geforce/display/hw_fonts.c"
+  },
+  {
+    "from": "hwdev/gf/display/hw_load.c",
+    "to": "sys/dev/video/geforce/display/hw_load.c"
+  },
+  {
+    "from": "hwdev/gf/display/hw_pll.c",
+    "to": "sys/dev/video/geforce/display/hw_pll.c"
+  },
+  {
+    "from": "hwdev/gf/display/hw_state.c",
+    "to": "sys/dev/video/geforce/display/hw_state.c"
+  },
+  {
+    "from": "hwdev/gf/display/hw_state.h",
+    "to": "sys/dev/video/geforce/display/hw_state.h"
+  },
+  {
+    "from": "hwdev/gf/display/hw_state_crtc.c",
+    "to": "sys/dev/video/geforce/display/hw_state_crtc.c"
+  },
+  {
+    "from": "hwdev/gf/display/links.c",
+    "to": "sys/dev/video/geforce/display/links.c"
+  },
+  {
+    "from": "hwdev/gf/display/load_row.c",
+    "to": "sys/dev/video/geforce/display/load_row.c"
+  },
+  {
+    "from": "hwdev/gf/display/modes.c",
+    "to": "sys/dev/video/geforce/display/modes.c"
+  },
+  {
+    "from": "hwdev/gf/display/modeset.c",
+    "to": "sys/dev/video/geforce/display/modeset.c"
+  },
+  {
+    "from": "hwdev/gf/display/output.c",
+    "to": "sys/dev/video/geforce/display/output.c"
+  },
+  {
+    "from": "hwdev/gf/display/palette.c",
+    "to": "sys/dev/video/geforce/display/palette.c"
+  },
+  {
+    "from": "hwdev/gf/display/pitch.c",
+    "to": "sys/dev/video/geforce/display/pitch.c"
+  },
+  {
+    "from": "hwdev/gf/display/pll_program.c",
+    "to": "sys/dev/video/geforce/display/pll_program.c"
+  },
+  {
+    "from": "hwdev/gf/display/probes.h",
+    "to": "sys/dev/video/geforce/display/probes.h"
+  },
+  {
+    "from": "hwdev/gf/display/quiesce.c",
+    "to": "sys/dev/video/geforce/display/quiesce.c"
+  },
+  {
+    "from": "hwdev/gf/display/recover.c",
+    "to": "sys/dev/video/geforce/display/recover.c"
+  },
+  {
+    "from": "hwdev/gf/display/save.c",
+    "to": "sys/dev/video/geforce/display/save.c"
+  },
+  {
+    "from": "hwdev/gf/display/scan.c",
+    "to": "sys/dev/video/geforce/display/scan.c"
+  },
+  {
+    "from": "hwdev/gf/display/service.c",
+    "to": "sys/dev/video/geforce/display/service.c"
+  },
+  {
+    "from": "hwdev/gf/display/stage.h",
+    "to": "sys/dev/video/geforce/display/stage.h"
+  },
+  {
+    "from": "hwdev/gf/display/start.c",
+    "to": "sys/dev/video/geforce/display/start.c"
+  },
+  {
+    "from": "hwdev/gf/display/state.h",
+    "to": "sys/dev/video/geforce/display/state.h"
+  },
+  {
+    "from": "hwdev/gf/display/timeout.h",
+    "to": "sys/dev/video/geforce/display/timeout.h"
+  },
+  {
+    "from": "hwdev/gf/display/timing.c",
+    "to": "sys/dev/video/geforce/display/timing.c"
+  },
+  {
+    "from": "hwdev/gf/display/tmds.c",
+    "to": "sys/dev/video/geforce/display/tmds.c"
+  },
+  {
+    "from": "hwdev/gf/display/transaction.c",
+    "to": "sys/dev/video/geforce/display/transaction.c"
+  },
+  {
+    "from": "hwdev/gf/display/tv.c",
+    "to": "sys/dev/video/geforce/display/tv.c"
+  },
+  {
+    "from": "hwdev/gf/dmaobj.c",
+    "to": "sys/dev/video/geforce/dmaobj.c"
+  },
+  {
+    "from": "hwdev/gf/engine_stop.c",
+    "to": "sys/dev/video/geforce/engine_stop.c"
+  },
+  {
+    "from": "hwdev/gf/fault.c",
+    "to": "sys/dev/video/geforce/fault.c"
+  },
+  {
+    "from": "hwdev/gf/feature5.h",
+    "to": "sys/dev/video/geforce/feature5.h"
+  },
+  {
+    "from": "hwdev/gf/feature5_links.c",
+    "to": "sys/dev/video/geforce/feature5_links.c"
+  },
+  {
+    "from": "hwdev/gf/feature5_rom.c",
+    "to": "sys/dev/video/geforce/feature5_rom.c"
+  },
+  {
+    "from": "hwdev/gf/feature5_service.c",
+    "to": "sys/dev/video/geforce/feature5_service.c"
+  },
+  {
+    "from": "hwdev/gf/fence.c",
+    "to": "sys/dev/video/geforce/fence.c"
+  },
+  {
+    "from": "hwdev/gf/fifo.c",
+    "to": "sys/dev/video/geforce/fifo.c"
+  },
+  {
+    "from": "hwdev/gf/foundation.c",
+    "to": "sys/dev/video/geforce/foundation.c"
+  },
+  {
+    "from": "hwdev/gf/foundation.h",
+    "to": "sys/dev/video/geforce/foundation.h"
+  },
+  {
+    "from": "hwdev/gf/foundation_test.c",
+    "to": "sys/dev/video/geforce/foundation_test.c"
+  },
+  {
+    "from": "hwdev/gf/gf1_test.h",
+    "to": "sys/dev/video/geforce/gf1_test.h"
+  },
+  {
+    "from": "hwdev/gf/gf2_test.h",
+    "to": "sys/dev/video/geforce/gf2_test.h"
+  },
+  {
+    "from": "hwdev/gf/gr.c",
+    "to": "sys/dev/video/geforce/gr.c"
+  },
+  {
+    "from": "hwdev/gf/grctx.c",
+    "to": "sys/dev/video/geforce/grctx.c"
+  },
+  {
+    "from": "hwdev/gf/instmem.c",
+    "to": "sys/dev/video/geforce/instmem.c"
+  },
+  {
+    "from": "hwdev/gf/instmem_map.c",
+    "to": "sys/dev/video/geforce/instmem_map.c"
+  },
+  {
+    "from": "hwdev/gf/internal.h",
+    "to": "sys/dev/video/geforce/internal.h"
+  },
+  {
+    "from": "hwdev/gf/irq.c",
+    "to": "sys/dev/video/geforce/irq.c"
+  },
+  {
+    "from": "hwdev/gf/master.c",
+    "to": "sys/dev/video/geforce/master.c"
+  },
+  {
+    "from": "hwdev/gf/mc.c",
+    "to": "sys/dev/video/geforce/mc.c"
+  },
+  {
+    "from": "hwdev/gf/op/compute_mem.c",
+    "to": "sys/dev/video/geforce/op/op/compute_mem.c"
+  },
+  {
+    "from": "hwdev/gf/op/condition.c",
+    "to": "sys/dev/video/geforce/op/op/condition.c"
+  },
+  {
+    "from": "hwdev/gf/op/copy.c",
+    "to": "sys/dev/video/geforce/op/op/copy.c"
+  },
+  {
+    "from": "hwdev/gf/op/copy_nv_reg.c",
+    "to": "sys/dev/video/geforce/op/op/copy_nv_reg.c"
+  },
+  {
+    "from": "hwdev/gf/op/cr.c",
+    "to": "sys/dev/video/geforce/op/op/cr.c"
+  },
+  {
+    "from": "hwdev/gf/op/cr_index_address_latched.c",
+    "to": "sys/dev/video/geforce/op/op/cr_index_address_latched.c"
+  },
+  {
+    "from": "hwdev/gf/op/done.c",
+    "to": "sys/dev/video/geforce/op/op/done.c"
+  },
+  {
+    "from": "hwdev/gf/op/end_repeat.c",
+    "to": "sys/dev/video/geforce/op/op/end_repeat.c"
+  },
+  {
+    "from": "hwdev/gf/op/index_io.c",
+    "to": "sys/dev/video/geforce/op/op/index_io.c"
+  },
+  {
+    "from": "hwdev/gf/op/io_flag_condition.c",
+    "to": "sys/dev/video/geforce/op/op/io_flag_condition.c"
+  },
+  {
+    "from": "hwdev/gf/op/io_restrict_pll2.c",
+    "to": "sys/dev/video/geforce/op/op/io_restrict_pll2.c"
+  },
+  {
+    "from": "hwdev/gf/op/io_restrict_prog.c",
+    "to": "sys/dev/video/geforce/op/op/io_restrict_prog.c"
+  },
+  {
+    "from": "hwdev/gf/op/macro.c",
+    "to": "sys/dev/video/geforce/op/op/macro.c"
+  },
+  {
+    "from": "hwdev/gf/op/not.c",
+    "to": "sys/dev/video/geforce/op/op/not.c"
+  },
+  {
+    "from": "hwdev/gf/op/nv_reg.c",
+    "to": "sys/dev/video/geforce/op/op/nv_reg.c"
+  },
+  {
+    "from": "hwdev/gf/op/pll2.c",
+    "to": "sys/dev/video/geforce/op/op/pll2.c"
+  },
+  {
+    "from": "hwdev/gf/op/repeat.c",
+    "to": "sys/dev/video/geforce/op/op/repeat.c"
+  },
+  {
+    "from": "hwdev/gf/op/reset.c",
+    "to": "sys/dev/video/geforce/op/op/reset.c"
+  },
+  {
+    "from": "hwdev/gf/op/resume.c",
+    "to": "sys/dev/video/geforce/op/op/resume.c"
+  },
+  {
+    "from": "hwdev/gf/op/sub.c",
+    "to": "sys/dev/video/geforce/op/op/sub.c"
+  },
+  {
+    "from": "hwdev/gf/op/sub_direct.c",
+    "to": "sys/dev/video/geforce/op/op/sub_direct.c"
+  },
+  {
+    "from": "hwdev/gf/op/time.c",
+    "to": "sys/dev/video/geforce/op/op/time.c"
+  },
+  {
+    "from": "hwdev/gf/op/tmds_reg.c",
+    "to": "sys/dev/video/geforce/op/op/tmds_reg.c"
+  },
+  {
+    "from": "hwdev/gf/op/zm_cr.c",
+    "to": "sys/dev/video/geforce/op/op/zm_cr.c"
+  },
+  {
+    "from": "hwdev/gf/op/zm_cr_group.c",
+    "to": "sys/dev/video/geforce/op/op/zm_cr_group.c"
+  },
+  {
+    "from": "hwdev/gf/op/zm_index_io.c",
+    "to": "sys/dev/video/geforce/op/op/zm_index_io.c"
+  },
+  {
+    "from": "hwdev/gf/op/zm_reg.c",
+    "to": "sys/dev/video/geforce/op/op/zm_reg.c"
+  },
+  {
+    "from": "hwdev/gf/op/zm_reg_sequence.c",
+    "to": "sys/dev/video/geforce/op/op/zm_reg_sequence.c"
+  },
+  {
+    "from": "hwdev/gf/op/zm_tmds_group.c",
+    "to": "sys/dev/video/geforce/op/op/zm_tmds_group.c"
+  },
+  {
+    "from": "hwdev/gf/perf.c",
+    "to": "sys/dev/video/geforce/perf.c"
+  },
+  {
+    "from": "hwdev/gf/pll.c",
+    "to": "sys/dev/video/geforce/pll.c"
+  },
+  {
+    "from": "hwdev/gf/production.h",
+    "to": "sys/dev/video/geforce/production.h"
+  },
+  {
+    "from": "hwdev/gf/push.c",
+    "to": "sys/dev/video/geforce/push.c"
+  },
+  {
+    "from": "hwdev/gf/quiesce_rows.h",
+    "to": "sys/dev/video/geforce/quiesce_rows.h"
+  },
+  {
+    "from": "hwdev/gf/ramclock.c",
+    "to": "sys/dev/video/geforce/ramclock.c"
+  },
+  {
+    "from": "hwdev/gf/ramht.c",
+    "to": "sys/dev/video/geforce/ramht.c"
+  },
+  {
+    "from": "hwdev/gf/resources.c",
+    "to": "sys/platform/pc98/geforce/resources.c"
+  },
+  {
+    "from": "hwdev/gf/rom.inc",
+    "to": "sys/dev/video/geforce/rom.inc"
+  },
+  {
+    "from": "hwdev/gf/runner.c",
+    "to": "sys/dev/video/geforce/runner.c"
+  },
+  {
+    "from": "hwdev/gf/save.c",
+    "to": "sys/dev/video/geforce/save.c"
+  },
+  {
+    "from": "hwdev/gf/scripts.h",
+    "to": "sys/dev/video/geforce/scripts.h"
+  },
+  {
+    "from": "hwdev/gf/service.c",
+    "to": "sys/dev/video/geforce/service.c"
+  },
+  {
+    "from": "hwdev/gf/state.c",
+    "to": "sys/dev/video/geforce/state.c"
+  },
+  {
+    "from": "hwdev/gf/stop_state.h",
+    "to": "sys/dev/video/geforce/stop_state.h"
+  },
+  {
+    "from": "hwdev/gf/therm.c",
+    "to": "sys/dev/video/geforce/therm.c"
+  },
+  {
+    "from": "hwdev/gf/tile.c",
+    "to": "sys/dev/video/geforce/tile.c"
+  },
+  {
+    "from": "hwdev/gf/volt.c",
+    "to": "sys/dev/video/geforce/volt.c"
+  },
+  {
+    "from": "hwdev/gf/vram_layout.h",
+    "to": "sys/dev/video/geforce/vram_layout.h"
+  },
+  {
+    "from": "hwdev/gf/vram_view.c",
+    "to": "sys/dev/video/geforce/vram_view.c"
+  },
+  {
+    "from": "hwdev/gf/vram_view.h",
+    "to": "sys/dev/video/geforce/vram_view.h"
+  },
+  {
+    "from": "hwdev/gf/wait_diag.h",
+    "to": "sys/dev/video/geforce/wait_diag.h"
+  },
+  {
+    "from": "hwdev/gf_load_state.c",
+    "to": "sys/dev/video/geforce/gf_load_state.c"
+  },
+  {
+    "from": "hwdev/gf_load_state.h",
+    "to": "sys/dev/video/geforce/gf_load_state.h"
+  },
+  {
+    "from": "hwdev/gfinit_mode.h",
+    "to": "sys/dev/video/geforce/gfinit_mode.h"
+  },
+  {
+    "from": "hwdev/hwdev_imports.def",
+    "to": "sys/dev/hwdev/hwdev_imports.def"
+  },
+  {
+    "from": "hwdev/hwdev_main.c",
+    "to": "sys/dev/hwdev/hwdev_main.c"
+  },
+  {
+    "from": "hwdev/hwdev_module.c",
+    "to": "sys/dev/hwdev/hwdev_module.c"
+  },
+  {
+    "from": "hwdev/hwdev_module.h",
+    "to": "sys/dev/hwdev/hwdev_module.h"
+  },
+  {
+    "from": "hwdev/hwdev_private.h",
+    "to": "sys/dev/hwdev/hwdev_private.h"
+  },
+  {
+    "from": "hwdev/owner.h",
+    "to": "sys/dev/hwdev/owner.h"
+  },
+  {
+    "from": "include/abi.h",
+    "to": "sys/include/abi.h"
+  },
+  {
+    "from": "include/app_ids.h",
+    "to": "sys/include/app_ids.h"
+  },
+  {
+    "from": "include/appmem_types.h",
+    "to": "sys/include/appmem_types.h"
+  },
+  {
+    "from": "include/atapi_contract.h",
+    "to": "sys/include/atapi_contract.h"
+  },
+  {
+    "from": "include/av_contract.h",
+    "to": "sys/include/av_contract.h"
+  },
+  {
+    "from": "include/boot_cpu.h",
+    "to": "sys/include/boot_cpu.h"
+  },
+  {
+    "from": "include/boot_diag.h",
+    "to": "sys/include/boot_diag.h"
+  },
+  {
+    "from": "include/boot_root.h",
+    "to": "sys/include/boot_root.h"
+  },
+  {
+    "from": "include/boot_token.h",
+    "to": "sys/include/boot_token.h"
+  },
+  {
+    "from": "include/bootinfo.h",
+    "to": "sys/include/bootinfo.h"
+  },
+  {
+    "from": "include/bootlog.h",
+    "to": "sys/include/bootlog.h"
+  },
+  {
+    "from": "include/build_id.h",
+    "to": "sys/include/build_id.h"
+  },
+  {
+    "from": "include/callconv.h",
+    "to": "sys/include/callconv.h"
+  },
+  {
+    "from": "include/clock_service.h",
+    "to": "sys/hal/time/clock_service.h"
+  },
+  {
+    "from": "include/clock_source.h",
+    "to": "sys/hal/time/clock_source.h"
+  },
+  {
+    "from": "include/con_sink.h",
+    "to": "sys/include/con_sink.h"
+  },
+  {
+    "from": "include/config.h",
+    "to": "sys/include/config.h"
+  },
+  {
+    "from": "include/console.h",
+    "to": "sys/include/console.h"
+  },
+  {
+    "from": "include/console_attr.h",
+    "to": "sys/include/console_attr.h"
+  },
+  {
+    "from": "include/console_output.h",
+    "to": "sys/include/console_output.h"
+  },
+  {
+    "from": "include/copy_units.h",
+    "to": "sys/include/copy_units.h"
+  },
+  {
+    "from": "include/cpu.h",
+    "to": "sys/include/cpu.h"
+  },
+  {
+    "from": "include/debug_probe.h",
+    "to": "sys/include/debug_probe.h"
+  },
+  {
+    "from": "include/debug_probe_snapshot.h",
+    "to": "sys/include/debug_probe_snapshot.h"
+  },
+  {
+    "from": "include/diag_stack.h",
+    "to": "sys/include/diag_stack.h"
+  },
+  {
+    "from": "include/display_provider.h",
+    "to": "sys/include/display_provider.h"
+  },
+  {
+    "from": "include/dma_contract.h",
+    "to": "sys/include/dma_contract.h"
+  },
+  {
+    "from": "include/endian_dma.h",
+    "to": "sys/include/endian_dma.h"
+  },
+  {
+    "from": "include/endian_le.h",
+    "to": "sys/include/endian_le.h"
+  },
+  {
+    "from": "include/exec_arch.h",
+    "to": "sys/include/exec_arch.h"
+  },
+  {
+    "from": "include/exec_selftest.h",
+    "to": "sys/include/exec_selftest.h"
+  },
+  {
+    "from": "include/exec_wait_contract.h",
+    "to": "sys/include/exec_wait_contract.h"
+  },
+  {
+    "from": "include/fault_fixture.h",
+    "to": "sys/include/fault_fixture.h"
+  },
+  {
+    "from": "include/fdc_contract.h",
+    "to": "sys/include/fdc_contract.h"
+  },
+  {
+    "from": "include/fm_contract.h",
+    "to": "sys/include/fm_contract.h"
+  },
+  {
+    "from": "include/geforce_contract.h",
+    "to": "sys/include/geforce_contract.h"
+  },
+  {
+    "from": "include/gf_production.h",
+    "to": "sys/include/gf_production.h"
+  },
+  {
+    "from": "include/gfx_format.h",
+    "to": "sys/include/gfx_format.h"
+  },
+  {
+    "from": "include/gfx_hal2.h",
+    "to": "sys/hal/gfx/gfx_hal2.h"
+  },
+  {
+    "from": "include/gfx_mode.h",
+    "to": "sys/include/gfx_mode.h"
+  },
+  {
+    "from": "include/gfx_present_contract.h",
+    "to": "sys/hal/gfx/gfx_present_contract.h"
+  },
+  {
+    "from": "include/gfx_sync.h",
+    "to": "sys/include/gfx_sync.h"
+  },
+  {
+    "from": "include/ide_bus.h",
+    "to": "sys/include/ide_bus.h"
+  },
+  {
+    "from": "include/ide_contract.h",
+    "to": "sys/include/ide_contract.h"
+  },
+  {
+    "from": "include/ime_boot.h",
+    "to": "sys/include/ime_boot.h"
+  },
+  {
+    "from": "include/ime_control.h",
+    "to": "sys/include/ime_control.h"
+  },
+  {
+    "from": "include/input_service.h",
+    "to": "sys/hal/input/input_service.h"
+  },
+  {
+    "from": "include/install_access.h",
+    "to": "sys/include/install_access.h"
+  },
+  {
+    "from": "include/install_management.h",
+    "to": "sys/include/install_management.h"
+  },
+  {
+    "from": "include/install_medium.h",
+    "to": "sys/include/install_medium.h"
+  },
+  {
+    "from": "include/io.h",
+    "to": "sys/include/io.h"
+  },
+  {
+    "from": "include/irq_line.h",
+    "to": "sys/include/irq_line.h"
+  },
+  {
+    "from": "include/kapi_call.h",
+    "to": "sys/include/kapi_call.h"
+  },
+  {
+    "from": "include/kapi_call_generated.h",
+    "to": "sys/include/kapi_call_generated.h"
+  },
+  {
+    "from": "include/kapi_print.h",
+    "to": "sys/include/kapi_print.h"
+  },
+  {
+    "from": "include/kapi_strings.h",
+    "to": "sys/include/kapi_strings.h"
+  },
+  {
+    "from": "include/kbd.h",
+    "to": "sys/include/kbd.h"
+  },
+  {
+    "from": "include/kbd_contract.h",
+    "to": "sys/include/kbd_contract.h"
+  },
+  {
+    "from": "include/kbd_inject.h",
+    "to": "sys/include/kbd_inject.h"
+  },
+  {
+    "from": "include/kcg_contract.h",
+    "to": "sys/include/kcg_contract.h"
+  },
+  {
+    "from": "include/kernel_mount_children.h",
+    "to": "sys/include/kernel_mount_children.h"
+  },
+  {
+    "from": "include/kernel_tick.h",
+    "to": "sys/include/kernel_tick.h"
+  },
+  {
+    "from": "include/kprintf.h",
+    "to": "sys/include/kprintf.h"
+  },
+  {
+    "from": "include/kselftest_probe.h",
+    "to": "sys/include/kselftest_probe.h"
+  },
+  {
+    "from": "include/ksetjmp.h",
+    "to": "sys/include/ksetjmp.h"
+  },
+  {
+    "from": "include/lan_contract.h",
+    "to": "sys/include/lan_contract.h"
+  },
+  {
+    "from": "include/launch.h",
+    "to": "sys/include/launch.h"
+  },
+  {
+    "from": "include/legacy_guest.h",
+    "to": "sys/include/legacy_guest.h"
+  },
+  {
+    "from": "include/loop_contract.h",
+    "to": "sys/include/loop_contract.h"
+  },
+  {
+    "from": "include/machcfg_contract.h",
+    "to": "sys/include/machcfg_contract.h"
+  },
+  {
+    "from": "include/memmap.h",
+    "to": "sys/include/memmap.h"
+  },
+  {
+    "from": "include/mouse_pointer_contract.h",
+    "to": "sys/hal/input/mouse_pointer_contract.h"
+  },
+  {
+    "from": "include/net_eth.h",
+    "to": "sys/include/net_eth.h"
+  },
+  {
+    "from": "include/os_time.h",
+    "to": "sys/include/os_time.h"
+  },
+  {
+    "from": "include/pc98.h",
+    "to": "sys/platform/pc98/pc98.h"
+  },
+  {
+    "from": "include/pci_bind_contract.h",
+    "to": "sys/include/pci_bind_contract.h"
+  },
+  {
+    "from": "include/pci_config_contract.h",
+    "to": "sys/include/pci_config_contract.h"
+  },
+  {
+    "from": "include/pci_contract.h",
+    "to": "sys/include/pci_contract.h"
+  },
+  {
+    "from": "include/pci_dev_contract.h",
+    "to": "sys/include/pci_dev_contract.h"
+  },
+  {
+    "from": "include/pci_hwb_contract.h",
+    "to": "sys/include/pci_hwb_contract.h"
+  },
+  {
+    "from": "include/pcm_contract.h",
+    "to": "sys/include/pcm_contract.h"
+  },
+  {
+    "from": "include/pegc.h",
+    "to": "sys/platform/pc98/pegc.h"
+  },
+  {
+    "from": "include/platform_boot.h",
+    "to": "sys/include/platform_boot.h"
+  },
+  {
+    "from": "include/platform_device.h",
+    "to": "sys/include/platform_device.h"
+  },
+  {
+    "from": "include/platform_display.h",
+    "to": "sys/include/platform_display.h"
+  },
+  {
+    "from": "include/platform_emergency.h",
+    "to": "sys/include/platform_emergency.h"
+  },
+  {
+    "from": "include/platform_host.h",
+    "to": "sys/include/platform_host.h"
+  },
+  {
+    "from": "include/platform_install_boot.h",
+    "to": "sys/include/platform_install_boot.h"
+  },
+  {
+    "from": "include/platform_irq.h",
+    "to": "sys/include/platform_irq.h"
+  },
+  {
+    "from": "include/platform_memory.h",
+    "to": "sys/include/platform_memory.h"
+  },
+  {
+    "from": "include/platform_module_pair.h",
+    "to": "sys/include/platform_module_pair.h"
+  },
+  {
+    "from": "include/platform_splash.h",
+    "to": "sys/include/platform_splash.h"
+  },
+  {
+    "from": "include/platform_sys.h",
+    "to": "sys/include/platform_sys.h"
+  },
+  {
+    "from": "include/platform_timer.h",
+    "to": "sys/include/platform_timer.h"
+  },
+  {
+    "from": "include/pointer_service.h",
+    "to": "sys/hal/input/pointer_service.h"
+  },
+  {
+    "from": "include/port_service.h",
+    "to": "sys/include/port_service.h"
+  },
+  {
+    "from": "include/redir_access.h",
+    "to": "sys/include/redir_access.h"
+  },
+  {
+    "from": "include/remote_control.h",
+    "to": "sys/include/remote_control.h"
+  },
+  {
+    "from": "include/serial_contract.h",
+    "to": "sys/include/serial_contract.h"
+  },
+  {
+    "from": "include/shell_loop.h",
+    "to": "sys/include/shell_loop.h"
+  },
+  {
+    "from": "include/snd_wake_contract.h",
+    "to": "sys/hal/sound/snd_wake_contract.h"
+  },
+  {
+    "from": "include/snd_writer_probe.h",
+    "to": "sys/include/snd_writer_probe.h"
+  },
+  {
+    "from": "include/sys.h",
+    "to": "sys/include/sys.h"
+  },
+  {
+    "from": "include/syscall_code.h",
+    "to": "sys/include/syscall_code.h"
+  },
+  {
+    "from": "include/text_screen.h",
+    "to": "sys/include/text_screen.h"
+  },
+  {
+    "from": "include/time_units.h",
+    "to": "sys/include/time_units.h"
+  },
+  {
+    "from": "include/type_contract.h",
+    "to": "sys/include/type_contract.h"
+  },
+  {
+    "from": "include/types.h",
+    "to": "sys/include/types.h"
+  },
+  {
+    "from": "include/usb_platform.h",
+    "to": "sys/include/usb_platform.h"
+  },
+  {
+    "from": "include/user_read_contract.h",
+    "to": "sys/include/user_read_contract.h"
+  },
+  {
+    "from": "include/v86_call.h",
+    "to": "sys/arch/x86/v86_call.h"
+  },
+  {
+    "from": "include/v86_contract.h",
+    "to": "sys/include/v86_contract.h"
+  },
+  {
+    "from": "include/ver_backend_contract.h",
+    "to": "sys/include/ver_backend_contract.h"
+  },
+  {
+    "from": "include/video_service.h",
+    "to": "sys/include/video_service.h"
+  },
+  {
+    "from": "include/video_wc.h",
+    "to": "sys/include/video_wc.h"
+  },
+  {
+    "from": "include/vk32.h",
+    "to": "sys/include/vk32.h"
+  },
+  {
+    "from": "include/wab_xe10.h",
+    "to": "sys/platform/pc98/wab_xe10.h"
+  },
+  {
+    "from": "init/boot_disk.h",
+    "to": "sys/kern/init/boot_disk.h"
+  },
+  {
+    "from": "init/boot_root.c",
+    "to": "sys/kern/init/boot_root.c"
+  },
+  {
+    "from": "init/bootinfo.c",
+    "to": "sys/kern/init/bootinfo.c"
+  },
+  {
+    "from": "init/bootlog.c",
+    "to": "sys/kern/init/bootlog.c"
+  },
+  {
+    "from": "init/bootlog_save.c",
+    "to": "sys/kern/init/bootlog_save.c"
+  },
+  {
+    "from": "init/gf_production_cfg.c",
+    "to": "sys/kern/init/gf_production_cfg.c"
+  },
+  {
+    "from": "init/kaudit_boot.c",
+    "to": "sys/kern/init/kaudit_boot.c"
+  },
+  {
+    "from": "init/kernel_start.c",
+    "to": "sys/kern/init/kernel_start.c"
+  },
+  {
+    "from": "init/kernel_start.h",
+    "to": "sys/kern/init/kernel_start.h"
+  },
+  {
+    "from": "init/shell_loop.c",
+    "to": "sys/kern/init/shell_loop.c"
+  },
+  {
+    "from": "init/sysconfig.c",
+    "to": "sys/kern/init/sysconfig.c"
+  },
+  {
+    "from": "init/sysconfig.h",
+    "to": "sys/kern/init/sysconfig.h"
+  },
+  {
+    "from": "input/hal/in2_dev.c",
+    "to": "sys/hal/input/in2_dev.c"
+  },
+  {
+    "from": "input/hal/in2_excl.c",
+    "to": "sys/hal/input/in2_excl.c"
+  },
+  {
+    "from": "input/hal/in2_export.c",
+    "to": "sys/hal/input/in2_export.c"
+  },
+  {
+    "from": "input/hal/in2_export.h",
+    "to": "sys/hal/input/in2_export.h"
+  },
+  {
+    "from": "input/hal/in2_reclaim.c",
+    "to": "sys/hal/input/in2_reclaim.c"
+  },
+  {
+    "from": "input/hal/in2_ring.c",
+    "to": "sys/hal/input/in2_ring.c"
+  },
+  {
+    "from": "input/hal/in2_state.c",
+    "to": "sys/hal/input/in2_state.c"
+  },
+  {
+    "from": "input/hal/in2_time.c",
+    "to": "sys/hal/input/in2_time.c"
+  },
+  {
+    "from": "input/hal/input_context.c",
+    "to": "sys/input/input_context.c"
+  },
+  {
+    "from": "input/hal/input_context.h",
+    "to": "sys/input/input_context.h"
+  },
+  {
+    "from": "input/hal/input_ime_gate.c",
+    "to": "sys/input/input_ime_gate.c"
+  },
+  {
+    "from": "input/hal/input_interrupt.c",
+    "to": "sys/input/input_interrupt.c"
+  },
+  {
+    "from": "input/hal/input_policy.h",
+    "to": "sys/input/input_policy.h"
+  },
+  {
+    "from": "input/hal/kbd_merge.c",
+    "to": "sys/hal/input/kbd_merge.c"
+  },
+  {
+    "from": "input/hal/keymap_state.c",
+    "to": "sys/hal/input/keymap_state.c"
+  },
+  {
+    "from": "input/hal/legacy_keymap.c",
+    "to": "sys/hal/input/legacy_keymap.c"
+  },
+  {
+    "from": "input/hal/legacy_mode.c",
+    "to": "sys/hal/input/legacy_mode.c"
+  },
+  {
+    "from": "input/hal/legacy_ring.c",
+    "to": "sys/hal/input/legacy_ring.c"
+  },
+  {
+    "from": "input/hal/mouse_ext.c",
+    "to": "sys/hal/input/mouse_ext.c"
+  },
+  {
+    "from": "input/hal/mouse_pointer.c",
+    "to": "sys/hal/input/mouse_pointer.c"
+  },
+  {
+    "from": "input/hal/pointer_state.c",
+    "to": "sys/hal/input/pointer_state.c"
+  },
+  {
+    "from": "input/hal/usb_input.c",
+    "to": "sys/hal/input/usb_input.c"
+  },
+  {
+    "from": "input/hal/usb_input.h",
+    "to": "sys/hal/input/usb_input.h"
+  },
+  {
+    "from": "input/keymaps/hid_jp.c",
+    "to": "sys/input/keymaps/hid_jp.c"
+  },
+  {
+    "from": "input/keymaps/pc98_jp.c",
+    "to": "sys/input/keymaps/pc98_jp.c"
+  },
+  {
+    "from": "kapi/kapi_db.c",
+    "to": "sys/kapi/kapi_db.c"
+  },
+  {
+    "from": "kapi/kapi_db.h",
+    "to": "sys/kapi/kapi_db.h"
+  },
+  {
+    "from": "kapi/kapi_db_helpers.inc",
+    "to": "sys/kapi/kapi_db_helpers.inc"
+  },
+  {
+    "from": "kapi/kapi_db_selftest.inc",
+    "to": "sys/kapi/kapi_db_selftest.inc"
+  },
+  {
+    "from": "kapi/kapi_db_v50.inc",
+    "to": "sys/kapi/kapi_db_v50.inc"
+  },
+  {
+    "from": "kapi/kapi_host.c",
+    "to": "sys/kapi/kapi_host.c"
+  },
+  {
+    "from": "kapi/kapi_host.h",
+    "to": "sys/kapi/kapi_host.h"
+  },
+  {
+    "from": "kapi/kapi_host_notice.c",
+    "to": "sys/kapi/kapi_host_notice.c"
+  },
+  {
+    "from": "kapi/kapi_host_notice.h",
+    "to": "sys/kapi/kapi_host_notice.h"
+  },
+  {
+    "from": "kapi/kapi_in2.c",
+    "to": "sys/kapi/kapi_in2.c"
+  },
+  {
+    "from": "kapi/kapi_osri.c",
+    "to": "sys/kapi/kapi_osri.c"
+  },
+  {
+    "from": "kapi/kapi_port.c",
+    "to": "sys/kapi/kapi_port.c"
+  },
+  {
+    "from": "kapi/kapi_print.c",
+    "to": "sys/kapi/kapi_print.c"
+  },
+  {
+    "from": "kapi/kapi_profile.h",
+    "to": "sys/kapi/kapi_profile.h"
+  },
+  {
+    "from": "kapi/kapi_snd2.c",
+    "to": "sys/kapi/kapi_snd2.c"
+  },
+  {
+    "from": "kapi/kapi_snd2_chip.c",
+    "to": "sys/kapi/kapi_snd2_chip.c"
+  },
+  {
+    "from": "kapi/kapi_strings.c",
+    "to": "sys/kapi/kapi_strings.c"
+  },
+  {
+    "from": "kapi/kapi_sys.c",
+    "to": "sys/kapi/kapi_sys.c"
+  },
+  {
+    "from": "kapi/kapi_sysinfo.c",
+    "to": "sys/kapi/kapi_sysinfo.c"
+  },
+  {
+    "from": "kapi/kapi_sysinfo.h",
+    "to": "sys/kapi/kapi_sysinfo.h"
+  },
+  {
+    "from": "kapi/range_internal.h",
+    "to": "sys/kapi/range_internal.h"
+  },
+  {
+    "from": "kdebug/crt_diag.c",
+    "to": "sys/platform/pc98/kdebug/crt_diag.c"
+  },
+  {
+    "from": "kdebug/crt_diag.h",
+    "to": "sys/platform/pc98/kdebug/crt_diag.h"
+  },
+  {
+    "from": "kdebug/generated/kdebug_import_macros.h",
+    "to": "sys/platform/pc98/kdebug/generated/kdebug_import_macros.h"
+  },
+  {
+    "from": "kdebug/generated/kdebug_import_slots.c",
+    "to": "sys/platform/pc98/kdebug/generated/kdebug_import_slots.c"
+  },
+  {
+    "from": "kdebug/generated/kdebug_import_stubs.S",
+    "to": "sys/arch/x86/kdebug/generated/kdebug_import_stubs.S"
+  },
+  {
+    "from": "kdebug/generated/kdebug_imports.h",
+    "to": "sys/platform/pc98/kdebug/generated/kdebug_imports.h"
+  },
+  {
+    "from": "kdebug/generated/kdebug_imports.json",
+    "to": "sys/platform/pc98/kdebug/generated/kdebug_imports.json"
+  },
+  {
+    "from": "kdebug/generated/kdebug_kexports.c",
+    "to": "sys/platform/pc98/kdebug/generated/kdebug_kexports.c"
+  },
+  {
+    "from": "kdebug/generated/recover_gf_tables.inc",
+    "to": "sys/dev/video/geforce/diag/generated/recover_gf_tables.inc"
+  },
+  {
+    "from": "kdebug/gf5_test.c",
+    "to": "sys/dev/video/geforce/diag/gf5_test.c"
+  },
+  {
+    "from": "kdebug/gf5_test.h",
+    "to": "sys/dev/video/geforce/diag/gf5_test.h"
+  },
+  {
+    "from": "kdebug/gf_accel_test.c",
+    "to": "sys/dev/video/geforce/diag/gf_accel_test.c"
+  },
+  {
+    "from": "kdebug/gf_accel_test.h",
+    "to": "sys/dev/video/geforce/diag/gf_accel_test.h"
+  },
+  {
+    "from": "kdebug/gf_command_test.c",
+    "to": "sys/dev/video/geforce/gf_command_test.c"
+  },
+  {
+    "from": "kdebug/gf_command_test.h",
+    "to": "sys/dev/video/geforce/diag/gf_command_test.h"
+  },
+  {
+    "from": "kdebug/gf_command_wire.h",
+    "to": "sys/dev/video/geforce/diag/gf_command_wire.h"
+  },
+  {
+    "from": "kdebug/gf_display_test.c",
+    "to": "sys/dev/video/geforce/diag/gf_display_test.c"
+  },
+  {
+    "from": "kdebug/gf_display_test.h",
+    "to": "sys/dev/video/geforce/diag/gf_display_test.h"
+  },
+  {
+    "from": "kdebug/gf_foundation_test.c",
+    "to": "sys/dev/video/geforce/gf_foundation_test.c"
+  },
+  {
+    "from": "kdebug/gf_foundation_test.h",
+    "to": "sys/dev/video/geforce/gf_foundation_test.h"
+  },
+  {
+    "from": "kdebug/gf_foundation_wire.h",
+    "to": "sys/dev/video/geforce/gf_foundation_wire.h"
+  },
+  {
+    "from": "kdebug/gf_prim_bench.c",
+    "to": "sys/dev/video/geforce/gf_prim_bench.c"
+  },
+  {
+    "from": "kdebug/gf_prim_bench.h",
+    "to": "sys/dev/video/geforce/gf_prim_bench.h"
+  },
+  {
+    "from": "kdebug/gf_stage_state.c",
+    "to": "sys/dev/video/geforce/gf_stage_state.c"
+  },
+  {
+    "from": "kdebug/gf_stage_state.h",
+    "to": "sys/dev/video/geforce/gf_stage_state.h"
+  },
+  {
+    "from": "kdebug/gfinit.c",
+    "to": "sys/dev/video/geforce/gfinit.c"
+  },
+  {
+    "from": "kdebug/gfinit.h",
+    "to": "sys/dev/video/geforce/gfinit.h"
+  },
+  {
+    "from": "kdebug/gfinit/rom.inc",
+    "to": "sys/dev/video/geforce/gfinit/rom.inc"
+  },
+  {
+    "from": "kdebug/gfinit_budget.inc",
+    "to": "sys/dev/video/geforce/gfinit_budget.inc"
+  },
+  {
+    "from": "kdebug/gfinit_bus.c",
+    "to": "sys/dev/video/geforce/gfinit_bus.c"
+  },
+  {
+    "from": "kdebug/gfinit_bus.h",
+    "to": "sys/dev/video/geforce/gfinit_bus.h"
+  },
+  {
+    "from": "kdebug/gfinit_decode.c",
+    "to": "sys/dev/video/geforce/gfinit_decode.c"
+  },
+  {
+    "from": "kdebug/gfinit_decode.h",
+    "to": "sys/dev/video/geforce/gfinit_decode.h"
+  },
+  {
+    "from": "kdebug/gfinit_decode/bytes.inc",
+    "to": "sys/dev/video/geforce/gfinit_decode/bytes.inc"
+  },
+  {
+    "from": "kdebug/gfinit_decode/tables.inc",
+    "to": "sys/dev/video/geforce/gfinit_decode/tables.inc"
+  },
+  {
+    "from": "kdebug/gfinit_exec.c",
+    "to": "sys/dev/video/geforce/gfinit_exec.c"
+  },
+  {
+    "from": "kdebug/gfinit_exec.h",
+    "to": "sys/dev/video/geforce/gfinit_exec.h"
+  },
+  {
+    "from": "kdebug/gfinit_mode.c",
+    "to": "sys/dev/video/geforce/gfinit_mode.c"
+  },
+  {
+    "from": "kdebug/gfinit_op/condition_decode.inc",
+    "to": "sys/dev/video/geforce/gfinit_op/condition_decode.inc"
+  },
+  {
+    "from": "kdebug/gfinit_op/copy_decode.inc",
+    "to": "sys/dev/video/geforce/gfinit_op/copy_decode.inc"
+  },
+  {
+    "from": "kdebug/gfinit_op/cr_decode.inc",
+    "to": "sys/dev/video/geforce/gfinit_op/cr_decode.inc"
+  },
+  {
+    "from": "kdebug/gfinit_op/cr_index_address_latched_decode.inc",
+    "to": "sys/dev/video/geforce/gfinit_op/cr_index_address_latched_decode.inc"
+  },
+  {
+    "from": "kdebug/gfinit_op/index_io_decode.inc",
+    "to": "sys/dev/video/geforce/gfinit_op/index_io_decode.inc"
+  },
+  {
+    "from": "kdebug/gfinit_op/io_restrict_decode.inc",
+    "to": "sys/dev/video/geforce/gfinit_op/io_restrict_decode.inc"
+  },
+  {
+    "from": "kdebug/gfinit_op/pll2_zm_reg_decode.inc",
+    "to": "sys/dev/video/geforce/gfinit_op/pll2_zm_reg_decode.inc"
+  },
+  {
+    "from": "kdebug/gfinit_op/repeat_decode.inc",
+    "to": "sys/dev/video/geforce/gfinit_op/repeat_decode.inc"
+  },
+  {
+    "from": "kdebug/gfinit_op/reset_nv_reg_decode.inc",
+    "to": "sys/dev/video/geforce/gfinit_op/reset_nv_reg_decode.inc"
+  },
+  {
+    "from": "kdebug/gfinit_op/sub_decode.inc",
+    "to": "sys/dev/video/geforce/gfinit_op/sub_decode.inc"
+  },
+  {
+    "from": "kdebug/gfinit_op/tmds_decode.inc",
+    "to": "sys/dev/video/geforce/gfinit_op/tmds_decode.inc"
+  },
+  {
+    "from": "kdebug/gfinit_op/zm_reg_sequence_decode.inc",
+    "to": "sys/dev/video/geforce/gfinit_op/zm_reg_sequence_decode.inc"
+  },
+  {
+    "from": "kdebug/gfinit_plan.c",
+    "to": "sys/dev/video/geforce/gfinit_plan.c"
+  },
+  {
+    "from": "kdebug/gfinit_plan.h",
+    "to": "sys/dev/video/geforce/gfinit_plan.h"
+  },
+  {
+    "from": "kdebug/gfinit_plan_c.c",
+    "to": "sys/dev/video/geforce/gfinit_plan_c.c"
+  },
+  {
+    "from": "kdebug/gfinit_plan_c.h",
+    "to": "sys/dev/video/geforce/gfinit_plan_c.h"
+  },
+  {
+    "from": "kdebug/gfinit_plan_c/baseline.inc",
+    "to": "sys/dev/video/geforce/gfinit_plan_c/baseline.inc"
+  },
+  {
+    "from": "kdebug/gfinit_plan_c/checks.inc",
+    "to": "sys/dev/video/geforce/gfinit_plan_c/checks.inc"
+  },
+  {
+    "from": "kdebug/gfinit_pll.c",
+    "to": "sys/dev/video/geforce/gfinit_pll.c"
+  },
+  {
+    "from": "kdebug/gfinit_pll.h",
+    "to": "sys/dev/video/geforce/gfinit_pll.h"
+  },
+  {
+    "from": "kdebug/gfinit_pll/limits.inc",
+    "to": "sys/dev/video/geforce/gfinit_pll/limits.inc"
+  },
+  {
+    "from": "kdebug/gfinit_pll/parse.inc",
+    "to": "sys/dev/video/geforce/gfinit_pll/parse.inc"
+  },
+  {
+    "from": "kdebug/gfinit_pll/sequence.inc",
+    "to": "sys/dev/video/geforce/gfinit_pll/sequence.inc"
+  },
+  {
+    "from": "kdebug/gfinit_pll/solve.inc",
+    "to": "sys/dev/video/geforce/gfinit_pll/solve.inc"
+  },
+  {
+    "from": "kdebug/gfinit_resources.c",
+    "to": "sys/dev/video/geforce/gfinit_resources.c"
+  },
+  {
+    "from": "kdebug/gfinit_resources.h",
+    "to": "sys/dev/video/geforce/gfinit_resources.h"
+  },
+  {
+    "from": "kdebug/gfinit_resources/bars.inc",
+    "to": "sys/dev/video/geforce/gfinit_resources/bars.inc"
+  },
+  {
+    "from": "kdebug/gfinit_resources/bounds.inc",
+    "to": "sys/dev/video/geforce/gfinit_resources/bounds.inc"
+  },
+  {
+    "from": "kdebug/gfinit_resources/scan.inc",
+    "to": "sys/dev/video/geforce/gfinit_resources/scan.inc"
+  },
+  {
+    "from": "kdebug/gfinit_resources/windows.inc",
+    "to": "sys/dev/video/geforce/gfinit_resources/windows.inc"
+  },
+  {
+    "from": "kdebug/gfinit_verify.inc",
+    "to": "sys/dev/video/geforce/gfinit_verify.inc"
+  },
+  {
+    "from": "kdebug/gfinit_wire.h",
+    "to": "sys/dev/video/geforce/gfinit_wire.h"
+  },
+  {
+    "from": "kdebug/hwb_access.c",
+    "to": "sys/kern/kdebug/hwb_access.c"
+  },
+  {
+    "from": "kdebug/hwb_wire.h",
+    "to": "sys/kern/kdebug/hwb_wire.h"
+  },
+  {
+    "from": "kdebug/kdebug_main.c",
+    "to": "sys/platform/pc98/kdebug/kdebug_main.c"
+  },
+  {
+    "from": "kdebug/kdebug_module.c",
+    "to": "sys/kern/kdebug/kdebug_module.c"
+  },
+  {
+    "from": "kdebug/kdebug_window.c",
+    "to": "sys/arch/x86/kdebug/kdebug_window.c"
+  },
+  {
+    "from": "kdebug/kdebug_window.h",
+    "to": "sys/arch/x86/kdebug/kdebug_window.h"
+  },
+  {
+    "from": "kdebug/kpeek.c",
+    "to": "sys/platform/pc98/kdebug/kpeek.c"
+  },
+  {
+    "from": "kdebug/kpeek.h",
+    "to": "sys/platform/pc98/kdebug/kpeek.h"
+  },
+  {
+    "from": "kdebug/kselftest.c",
+    "to": "sys/platform/pc98/kdebug/kselftest.c"
+  },
+  {
+    "from": "kdebug/kselftest/abort_admit.inc",
+    "to": "sys/kern/kdebug/kselftest/abort_admit.inc"
+  },
+  {
+    "from": "kdebug/kselftest/app_band_pde.inc",
+    "to": "sys/arch/x86/kdebug/kselftest/app_band_pde.inc"
+  },
+  {
+    "from": "kdebug/kselftest/appmem.inc",
+    "to": "sys/kern/kdebug/kselftest/appmem.inc"
+  },
+  {
+    "from": "kdebug/kselftest/bootinfo.inc",
+    "to": "sys/platform/pc98/kdebug/kselftest/bootinfo.inc"
+  },
+  {
+    "from": "kdebug/kselftest/bootlog.inc",
+    "to": "sys/kern/kdebug/kselftest/bootlog.inc"
+  },
+  {
+    "from": "kdebug/kselftest/caller_boot.inc",
+    "to": "sys/arch/x86/kdebug/kselftest/caller_boot.inc"
+  },
+  {
+    "from": "kdebug/kselftest/con_sink_render_gate.inc",
+    "to": "sys/kern/kdebug/kselftest/con_sink_render_gate.inc"
+  },
+  {
+    "from": "kdebug/kselftest/cpu_calibrate.inc",
+    "to": "sys/kern/kdebug/kselftest/cpu_calibrate.inc"
+  },
+  {
+    "from": "kdebug/kselftest/dma8237.inc",
+    "to": "sys/dev/dma/kdebug/kselftest/dma8237.inc"
+  },
+  {
+    "from": "kdebug/kselftest/dma_pool.inc",
+    "to": "sys/kern/kdebug/kselftest/dma_pool.inc"
+  },
+  {
+    "from": "kdebug/kselftest/fd_redirect_access_guard.inc",
+    "to": "sys/kern/kdebug/kselftest/fd_redirect_access_guard.inc"
+  },
+  {
+    "from": "kdebug/kselftest/gfx_ledger.inc",
+    "to": "sys/platform/pc98/kselftest/gfx_ledger.inc"
+  },
+  {
+    "from": "kdebug/kselftest/gfx_owner.inc",
+    "to": "sys/kern/kselftest/gfx_owner.inc"
+  },
+  {
+    "from": "kdebug/kselftest/h4_backing.inc",
+    "to": "sys/arch/x86/kdebug/kselftest/h4_backing.inc"
+  },
+  {
+    "from": "kdebug/kselftest/heap.inc",
+    "to": "sys/kern/kdebug/kselftest/heap.inc"
+  },
+  {
+    "from": "kdebug/kselftest/ime_render_gate.inc",
+    "to": "sys/kern/kdebug/kselftest/ime_render_gate.inc"
+  },
+  {
+    "from": "kdebug/kselftest/irq_dynamic.inc",
+    "to": "sys/platform/pc98/kdebug/kselftest/irq_dynamic.inc"
+  },
+  {
+    "from": "kdebug/kselftest/kapi_layout.inc",
+    "to": "sys/arch/x86/kdebug/kselftest/kapi_layout.inc"
+  },
+  {
+    "from": "kdebug/kselftest/kbd_cmd.inc",
+    "to": "sys/platform/pc98/kdebug/kselftest/kbd_cmd.inc"
+  },
+  {
+    "from": "kdebug/kselftest/kbd_inject.inc",
+    "to": "sys/kern/kdebug/kselftest/kbd_inject.inc"
+  },
+  {
+    "from": "kdebug/kselftest/kcg_display_return.inc",
+    "to": "sys/platform/pc98/kdebug/kselftest/kcg_display_return.inc"
+  },
+  {
+    "from": "kdebug/kselftest/kprintf.inc",
+    "to": "sys/kern/kdebug/kselftest/kprintf.inc"
+  },
+  {
+    "from": "kdebug/kselftest/kprintf_attr.inc",
+    "to": "sys/platform/pc98/kdebug/kselftest/kprintf_attr.inc"
+  },
+  {
+    "from": "kdebug/kselftest/ledger.inc",
+    "to": "sys/arch/x86/kdebug/kselftest/ledger.inc"
+  },
+  {
+    "from": "kdebug/kselftest/map_user_keep.inc",
+    "to": "sys/arch/x86/kdebug/kselftest/map_user_keep.inc"
+  },
+  {
+    "from": "kdebug/kselftest/mem.inc",
+    "to": "sys/kern/kdebug/kselftest/mem.inc"
+  },
+  {
+    "from": "kdebug/kselftest/memmap.inc",
+    "to": "sys/platform/pc98/kdebug/kselftest/memmap.inc"
+  },
+  {
+    "from": "kdebug/kselftest/memmap_pool_user.inc",
+    "to": "sys/arch/x86/kdebug/kselftest/memmap_pool_user.inc"
+  },
+  {
+    "from": "kdebug/kselftest/pcm.inc",
+    "to": "sys/kern/kdebug/kselftest/pcm.inc"
+  },
+  {
+    "from": "kdebug/kselftest/pit_setup.inc",
+    "to": "sys/platform/pc98/kdebug/kselftest/pit_setup.inc"
+  },
+  {
+    "from": "kdebug/kselftest/pool_model.inc",
+    "to": "sys/kern/kdebug/kselftest/pool_model.inc"
+  },
+  {
+    "from": "kdebug/kselftest/ring3_pd.inc",
+    "to": "sys/arch/x86/kdebug/kselftest/ring3_pd.inc"
+  },
+  {
+    "from": "kdebug/kselftest/ring3_wm_guard.inc",
+    "to": "sys/kern/kdebug/kselftest/ring3_wm_guard.inc"
+  },
+  {
+    "from": "kdebug/kselftest/slack_cycle.inc",
+    "to": "sys/kern/kdebug/kselftest/slack_cycle.inc"
+  },
+  {
+    "from": "kdebug/kselftest/str.inc",
+    "to": "sys/kern/kdebug/kselftest/str.inc"
+  },
+  {
+    "from": "kdebug/kselftest/time_now.inc",
+    "to": "sys/kern/kdebug/kselftest/time_now.inc"
+  },
+  {
+    "from": "kdebug/kselftest/tramp_user_str.inc",
+    "to": "sys/arch/x86/kdebug/kselftest/tramp_user_str.inc"
+  },
+  {
+    "from": "kdebug/kselftest/utoa.inc",
+    "to": "sys/kern/kdebug/kselftest/utoa.inc"
+  },
+  {
+    "from": "kdebug/nic_trace.c",
+    "to": "sys/platform/pc98/kdebug/nic_trace.c"
+  },
+  {
+    "from": "kdebug/nic_trace.h",
+    "to": "sys/platform/pc98/kdebug/nic_trace.h"
+  },
+  {
+    "from": "kdebug/probe.c",
+    "to": "sys/dev/char/kdebug/probe.c"
+  },
+  {
+    "from": "kdebug/probe_index.c",
+    "to": "sys/kern/kdebug/probe_index.c"
+  },
+  {
+    "from": "kdebug/probe_validate.h",
+    "to": "sys/kern/kdebug/probe_validate.h"
+  },
+  {
+    "from": "kdebug/probe_wire.h",
+    "to": "sys/kern/kdebug/probe_wire.h"
+  },
+  {
+    "from": "kdebug/recover.c",
+    "to": "sys/platform/pc98/kdebug/recover.c"
+  },
+  {
+    "from": "kdebug/recover.h",
+    "to": "sys/dev/video/geforce/diag/recover.h"
+  },
+  {
+    "from": "kdebug/recover_cleanup.h",
+    "to": "sys/platform/pc98/kdebug/recover_cleanup.h"
+  },
+  {
+    "from": "kdebug/recover_common/clock.inc",
+    "to": "sys/kern/kdebug/recover_common/clock.inc"
+  },
+  {
+    "from": "kdebug/recover_common/log.inc",
+    "to": "sys/dev/video/geforce/diag/recover_common/log.inc"
+  },
+  {
+    "from": "kdebug/recover_common/s0.inc",
+    "to": "sys/dev/video/geforce/diag/recover_common/s0.inc"
+  },
+  {
+    "from": "kdebug/recover_common/session.inc",
+    "to": "sys/dev/video/geforce/diag/recover_common/session.inc"
+  },
+  {
+    "from": "kdebug/recover_diag.h",
+    "to": "sys/kern/kdebug/recover_diag.h"
+  },
+  {
+    "from": "kdebug/recover_gf.c",
+    "to": "sys/dev/video/geforce/recover_gf.c"
+  },
+  {
+    "from": "kdebug/recover_gf.h",
+    "to": "sys/dev/video/geforce/recover_gf.h"
+  },
+  {
+    "from": "kdebug/recover_gf_c.h",
+    "to": "sys/dev/video/geforce/recover_gf_c.h"
+  },
+  {
+    "from": "kdebug/recover_gf_expand.h",
+    "to": "sys/dev/video/geforce/recover_gf_expand.h"
+  },
+  {
+    "from": "kdebug/recover_gf_locate.c",
+    "to": "sys/dev/video/geforce/recover_gf_locate.c"
+  },
+  {
+    "from": "kdebug/recover_gf_stage/c.inc",
+    "to": "sys/dev/video/geforce/recover_gf_stage/c.inc"
+  },
+  {
+    "from": "kdebug/recover_plan/access.inc",
+    "to": "sys/dev/video/geforce/diag/recover_plan/access.inc"
+  },
+  {
+    "from": "kdebug/recover_plan/access_idle_read.inc",
+    "to": "sys/kern/kdebug/recover_plan/access_idle_read.inc"
+  },
+  {
+    "from": "kdebug/recover_plan/access_saved_matches.inc",
+    "to": "sys/kern/kdebug/recover_plan/access_saved_matches.inc"
+  },
+  {
+    "from": "kdebug/recover_plan/bind.inc",
+    "to": "sys/dev/video/geforce/diag/recover_plan/bind.inc"
+  },
+  {
+    "from": "kdebug/recover_plan/profile.inc",
+    "to": "sys/platform/pc98/kdebug/recover_plan/profile.inc"
+  },
+  {
+    "from": "kdebug/recover_plan/step.inc",
+    "to": "sys/dev/video/geforce/diag/recover_plan/step.inc"
+  },
+  {
+    "from": "kdebug/recover_profile.c",
+    "to": "sys/platform/pc98/kdebug/recover_profile.c"
+  },
+  {
+    "from": "kdebug/recover_virtual.c",
+    "to": "sys/kern/kdebug/recover_virtual.c"
+  },
+  {
+    "from": "kdebug/recover_virtual.h",
+    "to": "sys/kern/kdebug/recover_virtual.h"
+  },
+  {
+    "from": "kdebug/recover_wire.h",
+    "to": "sys/kern/kdebug/recover_wire.h"
+  },
+  {
+    "from": "kdebug/selftest_exec.c",
+    "to": "sys/arch/x86/kdebug/selftest_exec.c"
+  },
+  {
+    "from": "kdebug/selftest_internal.h",
+    "to": "sys/kern/kdebug/selftest_internal.h"
+  },
+  {
+    "from": "kdebug/selftest_kbd_inject.c",
+    "to": "sys/kern/kdebug/selftest_kbd_inject.c"
+  },
+  {
+    "from": "kdebug/selftest_lease.c",
+    "to": "sys/arch/x86/kdebug/selftest_lease.c"
+  },
+  {
+    "from": "kdebug/tick_probe.c",
+    "to": "sys/kern/kdebug/tick_probe.c"
+  },
+  {
+    "from": "kdebug/tri_command_wire.h",
+    "to": "sys/dev/video/trident/diag/tri_command_wire.h"
+  },
+  {
+    "from": "kdebug/trident_command_test.c",
+    "to": "sys/dev/video/trident/diag/trident_command_test.c"
+  },
+  {
+    "from": "kdebug/trident_command_test.h",
+    "to": "sys/dev/video/trident/diag/trident_command_test.h"
+  },
+  {
+    "from": "kdebug/v86_gcap.c",
+    "to": "sys/platform/pc98/kdebug/v86_gcap.c"
+  },
+  {
+    "from": "kdebug/v86_gcap_defs.h",
+    "to": "sys/platform/pc98/kdebug/v86_gcap_defs.h"
+  },
+  {
+    "from": "kdebug/v86_gcap_diag.h",
+    "to": "sys/platform/pc98/kdebug/v86_gcap_diag.h"
+  },
+  {
+    "from": "kdebug/v86_gcap_math.c",
+    "to": "sys/platform/pc98/kdebug/v86_gcap_math.c"
+  },
+  {
+    "from": "kdebug/v86_test16_gcap.asm",
+    "to": "sys/platform/pc98/kdebug/v86_test16_gcap.asm"
+  },
+  {
+    "from": "kernel/av_focus.c",
+    "to": "sys/kern/av_focus.c"
+  },
+  {
+    "from": "kernel/boot_token.c",
+    "to": "sys/kern/boot_token.c"
+  },
+  {
+    "from": "kernel/cli/resident_cli.c",
+    "to": "sys/kern/cli/resident_cli.c"
+  },
+  {
+    "from": "kernel/cli/resident_cli.h",
+    "to": "sys/kern/cli/resident_cli.h"
+  },
+  {
+    "from": "kernel/console/con_sink.c",
+    "to": "sys/kern/console/con_sink.c"
+  },
+  {
+    "from": "kernel/console/console.c",
+    "to": "sys/kern/console.c"
+  },
+  {
+    "from": "kernel/console/console_backend.h",
+    "to": "sys/kern/console/console_backend.h"
+  },
+  {
+    "from": "kernel/console/console_dual.c",
+    "to": "sys/kern/console/console_dual.c"
+  },
+  {
+    "from": "kernel/console/console_dual.h",
+    "to": "sys/kern/console/console_dual.h"
+  },
+  {
+    "from": "kernel/console/console_stream.h",
+    "to": "sys/kern/console/console_stream.h"
+  },
+  {
+    "from": "kernel/console/display_restore.h",
+    "to": "sys/kern/console/display_restore.h"
+  },
+  {
+    "from": "kernel/console/fbcon.c",
+    "to": "sys/kern/console/fbcon.c"
+  },
+  {
+    "from": "kernel/console/fbcon.h",
+    "to": "sys/kern/console/fbcon.h"
+  },
+  {
+    "from": "kernel/console/font_guard.c",
+    "to": "sys/kern/console/font_guard.c"
+  },
+  {
+    "from": "kernel/console/font_guard.h",
+    "to": "sys/kern/console/font_guard.h"
+  },
+  {
+    "from": "kernel/console/font_source.c",
+    "to": "sys/kern/console/font_source.c"
+  },
+  {
+    "from": "kernel/console/font_source.h",
+    "to": "sys/kern/console/font_source.h"
+  },
+  {
+    "from": "kernel/console/font_source_kcg.c",
+    "to": "sys/kern/console/font_source_kcg.c"
+  },
+  {
+    "from": "kernel/console/font_source_kcg.h",
+    "to": "sys/kern/console/font_source_kcg.h"
+  },
+  {
+    "from": "kernel/console/unicode_file.c",
+    "to": "sys/kern/console/unicode_file.c"
+  },
+  {
+    "from": "kernel/console/unicode_file.h",
+    "to": "sys/kern/console/unicode_file.h"
+  },
+  {
+    "from": "kernel/dev/dev.c",
+    "to": "sys/kern/dev/dev.c"
+  },
+  {
+    "from": "kernel/dev/dev.h",
+    "to": "sys/hal/block/dev.h"
+  },
+  {
+    "from": "kernel/dev/dev_name.h",
+    "to": "sys/kern/dev/dev_name.h"
+  },
+  {
+    "from": "kernel/dev/device_fs.c",
+    "to": "sys/kern/dev/device_fs.c"
+  },
+  {
+    "from": "kernel/dev/device_host.c",
+    "to": "sys/kern/dev/device_host.c"
+  },
+  {
+    "from": "kernel/dev/device_ide.c",
+    "to": "sys/dev/ide/device_ide.c"
+  },
+  {
+    "from": "kernel/dev/device_kcg.c",
+    "to": "sys/dev/kcg/device_kcg.c"
+  },
+  {
+    "from": "kernel/dev/device_loop.c",
+    "to": "sys/dev/loop/device_loop.c"
+  },
+  {
+    "from": "kernel/dev/device_pci.c",
+    "to": "sys/dev/pci/device_pci.c"
+  },
+  {
+    "from": "kernel/dev/install_management.c",
+    "to": "sys/kern/install_management.c"
+  },
+  {
+    "from": "kernel/dev/ram_ro.c",
+    "to": "sys/kern/dev/ram_ro.c"
+  },
+  {
+    "from": "kernel/dev/ram_ro.h",
+    "to": "sys/kern/dev/ram_ro.h"
+  },
+  {
+    "from": "kernel/fep_boot.c",
+    "to": "sys/kern/fep_boot.c"
+  },
+  {
+    "from": "kernel/fep_boot.h",
+    "to": "sys/kern/fep_boot.h"
+  },
+  {
+    "from": "kernel/font_guard_fixture.c",
+    "to": "sys/kern/font_guard_fixture.c"
+  },
+  {
+    "from": "kernel/gui.c",
+    "to": "sys/kern/gui.c"
+  },
+  {
+    "from": "kernel/gui.h",
+    "to": "sys/kern/gui.h"
+  },
+  {
+    "from": "kernel/idle_work.c",
+    "to": "sys/kern/idle_work.c"
+  },
+  {
+    "from": "kernel/idle_work.h",
+    "to": "sys/kern/idle_work.h"
+  },
+  {
+    "from": "kernel/ime/fep_body.c",
+    "to": "sys/kern/ime/fep_body.c"
+  },
+  {
+    "from": "kernel/ime/fep_module.c",
+    "to": "sys/kern/ime/fep_module.c"
+  },
+  {
+    "from": "kernel/ime/fep_module.h",
+    "to": "sys/kern/ime/fep_module.h"
+  },
+  {
+    "from": "kernel/ime/ime.h",
+    "to": "sys/kern/ime/ime.h"
+  },
+  {
+    "from": "kernel/ime/ime_candidate_commit.inc",
+    "to": "sys/kern/ime/ime_candidate_commit.inc"
+  },
+  {
+    "from": "kernel/ime/ime_commit_take.inc",
+    "to": "sys/kern/ime/ime_commit_take.inc"
+  },
+  {
+    "from": "kernel/ime/ime_conn.c",
+    "to": "sys/kern/ime/ime_conn.c"
+  },
+  {
+    "from": "kernel/ime/ime_convert.inc",
+    "to": "sys/kern/ime/ime_convert.inc"
+  },
+  {
+    "from": "kernel/ime/ime_cui_process.inc",
+    "to": "sys/kern/ime/ime_cui_process.inc"
+  },
+  {
+    "from": "kernel/ime/ime_delivery.inc",
+    "to": "sys/kern/ime/ime_delivery.inc"
+  },
+  {
+    "from": "kernel/ime/ime_dict_api.inc",
+    "to": "sys/kern/ime/ime_dict_api.inc"
+  },
+  {
+    "from": "kernel/ime/ime_dict_info.c",
+    "to": "sys/kern/ime/ime_dict_info.c"
+  },
+  {
+    "from": "kernel/ime/ime_display_private.h",
+    "to": "sys/kern/ime/ime_display_private.h"
+  },
+  {
+    "from": "kernel/ime/ime_render.h",
+    "to": "sys/kern/ime/ime_render.h"
+  },
+  {
+    "from": "kernel/ime/ime_render.inc",
+    "to": "sys/kern/ime/ime_render.inc"
+  },
+  {
+    "from": "kernel/ime/ime_romkana.c",
+    "to": "sys/kern/ime/ime_romkana.c"
+  },
+  {
+    "from": "kernel/ime/ime_store.h",
+    "to": "sys/kern/ime/ime_store.h"
+  },
+  {
+    "from": "kernel/ime/ime_suspend.c",
+    "to": "sys/kern/ime/ime_suspend.c"
+  },
+  {
+    "from": "kernel/ime/ime_user_store.c",
+    "to": "sys/kern/ime/ime_user_store.c"
+  },
+  {
+    "from": "kernel/input_legacy.c",
+    "to": "sys/kern/input_legacy.c"
+  },
+  {
+    "from": "kernel/input_service.c",
+    "to": "sys/hal/input/input_service.c"
+  },
+  {
+    "from": "kernel/input_wait.c",
+    "to": "sys/kern/input_wait.c"
+  },
+  {
+    "from": "kernel/io_clock.h",
+    "to": "sys/kern/io_clock.h"
+  },
+  {
+    "from": "kernel/io_kapi.c",
+    "to": "sys/kern/io_kapi.c"
+  },
+  {
+    "from": "kernel/io_kapi.h",
+    "to": "sys/kern/io_kapi.h"
+  },
+  {
+    "from": "kernel/io_policy.c",
+    "to": "sys/kern/io_policy.c"
+  },
+  {
+    "from": "kernel/io_policy.h",
+    "to": "sys/kern/io_policy.h"
+  },
+  {
+    "from": "kernel/io_work.c",
+    "to": "sys/kern/io_work.c"
+  },
+  {
+    "from": "kernel/io_work.h",
+    "to": "sys/kern/io_work.h"
+  },
+  {
+    "from": "kernel/irq/irq.h",
+    "to": "sys/kern/irq/irq.h"
+  },
+  {
+    "from": "kernel/irq/irq_math.c",
+    "to": "sys/kern/irq/irq_math.c"
+  },
+  {
+    "from": "kernel/irq/irq_math.h",
+    "to": "sys/kern/irq/irq_math.h"
+  },
+  {
+    "from": "kernel/irq/tick.c",
+    "to": "sys/kern/irq/tick.c"
+  },
+  {
+    "from": "kernel/irq/tick.h",
+    "to": "sys/kern/irq/tick.h"
+  },
+  {
+    "from": "kernel/irq/tick_budget.c",
+    "to": "sys/kern/irq/tick_budget.c"
+  },
+  {
+    "from": "kernel/irq/tick_budget.h",
+    "to": "sys/kern/irq/tick_budget.h"
+  },
+  {
+    "from": "kernel/kbd_inject.c",
+    "to": "sys/kern/kbd_inject.c"
+  },
+  {
+    "from": "kernel/kselftest.h",
+    "to": "sys/kern/kselftest.h"
+  },
+  {
+    "from": "kernel/kselftest_report.c",
+    "to": "sys/kern/kselftest_report.c"
+  },
+  {
+    "from": "kernel/kstack_hw.c",
+    "to": "sys/kern/kstack_hw.c"
+  },
+  {
+    "from": "kernel/kstack_hw.h",
+    "to": "sys/kern/kstack_hw.h"
+  },
+  {
+    "from": "kernel/machcfg.c",
+    "to": "sys/kern/machcfg.c"
+  },
+  {
+    "from": "kernel/machcfg_root.c",
+    "to": "sys/kern/machcfg_root.c"
+  },
+  {
+    "from": "kernel/module/debug_probe.c",
+    "to": "sys/kern/module/debug_probe.c"
+  },
+  {
+    "from": "kernel/module/kdebug_imports.def",
+    "to": "sys/kern/module/kdebug_imports.def"
+  },
+  {
+    "from": "kernel/module/module.h",
+    "to": "sys/kern/module/module.h"
+  },
+  {
+    "from": "kernel/module/module_fixup_ppc.inc",
+    "to": "sys/kern/module/module_fixup_ppc.inc"
+  },
+  {
+    "from": "kernel/module/module_image.c",
+    "to": "sys/kern/module/module_image.c"
+  },
+  {
+    "from": "kernel/module/module_image.h",
+    "to": "sys/kern/module/module_image.h"
+  },
+  {
+    "from": "kernel/module/module_runtime.c",
+    "to": "sys/kern/module/module_runtime.c"
+  },
+  {
+    "from": "kernel/module/module_runtime.h",
+    "to": "sys/kern/module/module_runtime.h"
+  },
+  {
+    "from": "kernel/module/module_schema.h",
+    "to": "sys/kern/module/module_schema.h"
+  },
+  {
+    "from": "kernel/port_service.c",
+    "to": "sys/kern/port_service.c"
+  },
+  {
+    "from": "kernel/r1_fixture.c",
+    "to": "sys/kern/r1_fixture.c"
+  },
+  {
+    "from": "kernel/r1_fixture.h",
+    "to": "sys/kern/r1_fixture.h"
+  },
+  {
+    "from": "kernel/serial_diag.c",
+    "to": "sys/kern/serial_diag.c"
+  },
+  {
+    "from": "kernel/sqlite_engine.c",
+    "to": "sys/kern/sqlite_engine.c"
+  },
+  {
+    "from": "kernel/sqlite_engine.h",
+    "to": "sys/kern/sqlite_engine.h"
+  },
+  {
+    "from": "kernel/sqlite_engine_body.h",
+    "to": "sys/kern/sqlite_engine_body.h"
+  },
+  {
+    "from": "kernel/sqlite_outer.c",
+    "to": "sys/kern/sqlite_outer.c"
+  },
+  {
+    "from": "kernel/sqlite_static.c",
+    "to": "sys/kern/sqlite_static.c"
+  },
+  {
+    "from": "kernel/time/clock_service.c",
+    "to": "sys/hal/time/clock_service.c"
+  },
+  {
+    "from": "kernel/time/cpu_calibrate.c",
+    "to": "sys/platform/pc98/time/cpu_calibrate.c"
+  },
+  {
+    "from": "kernel/time/cpu_calibrate.h",
+    "to": "sys/hal/time/cpu_calibrate.h"
+  },
+  {
+    "from": "kernel/time/cpu_calibrate_math.c",
+    "to": "sys/kern/time/cpu_calibrate_math.c"
+  },
+  {
+    "from": "kernel/time/cpu_calibrate_math.h",
+    "to": "sys/kern/time/cpu_calibrate_math.h"
+  },
+  {
+    "from": "kernel/time/ktime.c",
+    "to": "sys/kern/time/ktime.c"
+  },
+  {
+    "from": "kernel/time/ktime.h",
+    "to": "sys/kern/time/ktime.h"
+  },
+  {
+    "from": "kernel/time/tick.c",
+    "to": "sys/hal/time/tick.c"
+  },
+  {
+    "from": "kernel/time/tick_clock.h",
+    "to": "sys/hal/time/tick_clock.h"
+  },
+  {
+    "from": "kernel/time/tick_probe.h",
+    "to": "sys/kern/time/tick_probe.h"
+  },
+  {
+    "from": "kernel/time/tick_probe_ids.h",
+    "to": "sys/kern/time/tick_probe_ids.h"
+  },
+  {
+    "from": "kernel/time/time_math.c",
+    "to": "sys/kern/time/time_math.c"
+  },
+  {
+    "from": "kernel/time/time_math.h",
+    "to": "sys/kern/time/time_math.h"
+  },
+  {
+    "from": "kernel/v86/v86.h",
+    "to": "sys/kern/v86/v86.h"
+  },
+  {
+    "from": "kernel/v86/v86_gcap.h",
+    "to": "sys/kern/v86/v86_gcap.h"
+  },
+  {
+    "from": "kernel/v86/v86_gcap_math.h",
+    "to": "sys/kern/v86/v86_gcap_math.h"
+  },
+  {
+    "from": "kernel/v86/v86_mem.h",
+    "to": "sys/kern/v86/v86_mem.h"
+  },
+  {
+    "from": "kernel/v86/v86_module.h",
+    "to": "sys/kern/v86/v86_module.h"
+  },
+  {
+    "from": "kernel/ver_collect.c",
+    "to": "sys/kern/ver_collect.c"
+  },
+  {
+    "from": "kernel/ver_format.c",
+    "to": "sys/kern/ver_format.c"
+  },
+  {
+    "from": "kernel/ver_info.h",
+    "to": "sys/kern/ver_info.h"
+  },
+  {
+    "from": "lib/kprintf.c",
+    "to": "sys/kern/kprintf.c"
+  },
+  {
+    "from": "lib/kprintf_attr.c",
+    "to": "sys/kern/kprintf_attr.c"
+  },
+  {
+    "from": "lib/kprintf_format.inc",
+    "to": "sys/kern/kprintf_format.inc"
+  },
+  {
+    "from": "lib/kstring.c",
+    "to": "sys/kern/kstring.c"
+  },
+  {
+    "from": "lib/kstring.h",
+    "to": "sys/kern/kstring.h"
+  },
+  {
+    "from": "lib/kstring_asm.asm",
+    "to": "sys/kern/kstring_asm.asm"
+  },
+  {
+    "from": "lib/kstring_c.c",
+    "to": "sys/kern/kstring_c.c"
+  },
+  {
+    "from": "mm/dma_pool.c",
+    "to": "sys/kern/mm/dma_pool.c"
+  },
+  {
+    "from": "mm/dma_pool.h",
+    "to": "sys/kern/mm/dma_pool.h"
+  },
+  {
+    "from": "mm/dma_pool_math.c",
+    "to": "sys/kern/mm/dma_pool_math.c"
+  },
+  {
+    "from": "mm/kmalloc.c",
+    "to": "sys/kern/mm/kmalloc.c"
+  },
+  {
+    "from": "mm/kmalloc.h",
+    "to": "sys/kern/mm/kmalloc.h"
+  },
+  {
+    "from": "mm/memory_boot.h",
+    "to": "sys/kern/mm/memory_boot.h"
+  },
+  {
+    "from": "mm/paging.c",
+    "to": "sys/kern/mm/paging.c"
+  },
+  {
+    "from": "mm/paging.h",
+    "to": "sys/kern/mm/paging.h"
+  },
+  {
+    "from": "mm/paging_addrspace.inc",
+    "to": "sys/kern/mm/paging_addrspace.inc"
+  },
+  {
+    "from": "mm/paging_app.c",
+    "to": "sys/kern/mm/paging_app.c"
+  },
+  {
+    "from": "mm/paging_app.h",
+    "to": "sys/kern/mm/paging_app.h"
+  },
+  {
+    "from": "mm/paging_boot.inc",
+    "to": "sys/kern/mm/paging_boot.inc"
+  },
+  {
+    "from": "mm/paging_gfx2.inc",
+    "to": "sys/kern/mm/paging_gfx2.inc"
+  },
+  {
+    "from": "mm/paging_gfx2_selftest.inc",
+    "to": "sys/kern/mm/paging_gfx2_selftest.inc"
+  },
+  {
+    "from": "mm/paging_lease.inc",
+    "to": "sys/kern/mm/paging_lease.inc"
+  },
+  {
+    "from": "mm/paging_lowmap.h",
+    "to": "sys/kern/mm/paging_lowmap.h"
+  },
+  {
+    "from": "mm/paging_lowmap.inc",
+    "to": "sys/kern/mm/paging_lowmap.inc"
+  },
+  {
+    "from": "mm/paging_map.inc",
+    "to": "sys/kern/mm/paging_map.inc"
+  },
+  {
+    "from": "mm/pgalloc.c",
+    "to": "sys/kern/mm/pgalloc.c"
+  },
+  {
+    "from": "mm/pgalloc.h",
+    "to": "sys/kern/mm/pgalloc.h"
+  },
+  {
+    "from": "mm/pgalloc_owner.inc",
+    "to": "sys/kern/mm/pgalloc_owner.inc"
+  },
+  {
+    "from": "mm/pgalloc_resource.inc",
+    "to": "sys/kern/mm/pgalloc_resource.inc"
+  },
+  {
+    "from": "mm/pgalloc_surface.inc",
+    "to": "sys/kern/mm/pgalloc_surface.inc"
+  },
+  {
+    "from": "mm/physmem.c",
+    "to": "sys/kern/mm/physmem.c"
+  },
+  {
+    "from": "mm/physmem.h",
+    "to": "sys/kern/mm/physmem.h"
+  },
+  {
+    "from": "mm/shlib.c",
+    "to": "sys/kern/mm/shlib.c"
+  },
+  {
+    "from": "mm/shlib.h",
+    "to": "sys/kern/mm/shlib.h"
+  },
+  {
+    "from": "mm/shm.c",
+    "to": "sys/kern/mm/shm.c"
+  },
+  {
+    "from": "mm/shm.h",
+    "to": "sys/kern/mm/shm.h"
+  },
+  {
+    "from": "net/host_mailbox.c",
+    "to": "sys/net/host_mailbox.c"
+  },
+  {
+    "from": "net/host_mailbox.h",
+    "to": "sys/net/host_mailbox.h"
+  },
+  {
+    "from": "net/link.c",
+    "to": "sys/net/link.c"
+  },
+  {
+    "from": "net/link.h",
+    "to": "sys/net/link.h"
+  },
+  {
+    "from": "net/link_host_api.inc",
+    "to": "sys/net/link_host_api.inc"
+  },
+  {
+    "from": "net/link_notify.c",
+    "to": "sys/net/link_notify.c"
+  },
+  {
+    "from": "net/link_notify.h",
+    "to": "sys/net/link_notify.h"
+  },
+  {
+    "from": "net/link_platform.h",
+    "to": "sys/hal/net/link_platform.h"
+  },
+  {
+    "from": "net/link_rx.inc",
+    "to": "sys/net/link_rx.inc"
+  },
+  {
+    "from": "net/link_selftest.inc",
+    "to": "sys/net/link_selftest.inc"
+  },
+  {
+    "from": "net/nic_rx.c",
+    "to": "sys/net/nic_rx.c"
+  },
+  {
+    "from": "net/nic_rx.h",
+    "to": "sys/net/nic_rx.h"
+  },
+  {
+    "from": "net/rx_work.c",
+    "to": "sys/net/rx_work.c"
+  },
+  {
+    "from": "net/rx_work.h",
+    "to": "sys/net/rx_work.h"
+  },
+  {
+    "from": "platform/none/legacy_guest.c",
+    "to": "sys/platform/none/legacy_guest.c"
+  },
+  {
+    "from": "platform/pc98/bios_snapshot.c",
+    "to": "sys/platform/pc98/bios_snapshot.c"
+  },
+  {
+    "from": "platform/pc98/bios_snapshot.h",
+    "to": "sys/platform/pc98/bios_snapshot.h"
+  },
+  {
+    "from": "platform/pc98/boot.c",
+    "to": "sys/platform/pc98/boot.c"
+  },
+  {
+    "from": "platform/pc98/boot.h",
+    "to": "sys/platform/pc98/boot.h"
+  },
+  {
+    "from": "platform/pc98/boot_capture.c",
+    "to": "sys/platform/pc98/boot_capture.c"
+  },
+  {
+    "from": "platform/pc98/boot_diag.c",
+    "to": "sys/platform/pc98/boot_diag.c"
+  },
+  {
+    "from": "platform/pc98/boot_disk.c",
+    "to": "sys/platform/pc98/boot_disk.c"
+  },
+  {
+    "from": "platform/pc98/boot_disk.h",
+    "to": "sys/platform/pc98/boot_disk.h"
+  },
+  {
+    "from": "platform/pc98/boot_display.c",
+    "to": "sys/platform/pc98/boot_display.c"
+  },
+  {
+    "from": "platform/pc98/boot_display.h",
+    "to": "sys/platform/pc98/boot_display.h"
+  },
+  {
+    "from": "platform/pc98/boot_irq.c",
+    "to": "sys/platform/pc98/boot_irq.c"
+  },
+  {
+    "from": "platform/pc98/boot_names.c",
+    "to": "sys/platform/pc98/boot_names.c"
+  },
+  {
+    "from": "platform/pc98/boot_names.h",
+    "to": "sys/platform/pc98/boot_names.h"
+  },
+  {
+    "from": "platform/pc98/boot_platform.c",
+    "to": "sys/platform/pc98/boot_platform.c"
+  },
+  {
+    "from": "platform/pc98/boot_platform.h",
+    "to": "sys/platform/pc98/boot_platform.h"
+  },
+  {
+    "from": "platform/pc98/boot_serial.inc",
+    "to": "sys/platform/pc98/boot_serial.inc"
+  },
+  {
+    "from": "platform/pc98/boot_splash.c",
+    "to": "sys/platform/pc98/boot_splash.c"
+  },
+  {
+    "from": "platform/pc98/boot_splash.h",
+    "to": "sys/platform/pc98/boot_splash.h"
+  },
+  {
+    "from": "platform/pc98/boot_token_pc98.c",
+    "to": "sys/platform/pc98/boot_token_pc98.c"
+  },
+  {
+    "from": "platform/pc98/bootinfo_capture.c",
+    "to": "sys/platform/pc98/bootinfo_capture.c"
+  },
+  {
+    "from": "platform/pc98/bootinfo_check.c",
+    "to": "sys/platform/pc98/bootinfo_check.c"
+  },
+  {
+    "from": "platform/pc98/bootinfo_geom.c",
+    "to": "sys/platform/pc98/bootinfo_geom.c"
+  },
+  {
+    "from": "platform/pc98/bootinfo_native.h",
+    "to": "sys/platform/pc98/bootinfo_native.h"
+  },
+  {
+    "from": "platform/pc98/bootinfo_report.c",
+    "to": "sys/platform/pc98/bootinfo_report.c"
+  },
+  {
+    "from": "platform/pc98/bootinfo_wire.h",
+    "to": "sys/platform/pc98/bootinfo_wire.h"
+  },
+  {
+    "from": "platform/pc98/clock.c",
+    "to": "sys/platform/pc98/clock.c"
+  },
+  {
+    "from": "platform/pc98/clock_source.h",
+    "to": "sys/platform/pc98/clock_source.h"
+  },
+  {
+    "from": "platform/pc98/console.c",
+    "to": "sys/platform/pc98/console.c"
+  },
+  {
+    "from": "platform/pc98/console_attr.c",
+    "to": "sys/platform/pc98/console_attr.c"
+  },
+  {
+    "from": "platform/pc98/d2_bind.c",
+    "to": "sys/platform/pc98/d2_bind.c"
+  },
+  {
+    "from": "platform/pc98/device_host.c",
+    "to": "sys/platform/pc98/device_host.c"
+  },
+  {
+    "from": "platform/pc98/display.c",
+    "to": "sys/platform/pc98/display.c"
+  },
+  {
+    "from": "platform/pc98/display_bundle.c",
+    "to": "sys/platform/pc98/display_bundle.c"
+  },
+  {
+    "from": "platform/pc98/display_dual.c",
+    "to": "sys/platform/pc98/display_dual.c"
+  },
+  {
+    "from": "platform/pc98/display_private.h",
+    "to": "sys/platform/pc98/display_private.h"
+  },
+  {
+    "from": "platform/pc98/emergency.c",
+    "to": "sys/platform/pc98/emergency.c"
+  },
+  {
+    "from": "platform/pc98/gfx_init.c",
+    "to": "sys/platform/pc98/gfx_init.c"
+  },
+  {
+    "from": "platform/pc98/gfx_scroll.c",
+    "to": "sys/platform/pc98/gfx_scroll.c"
+  },
+  {
+    "from": "platform/pc98/gfx_selector.c",
+    "to": "sys/platform/pc98/gfx_selector.c"
+  },
+  {
+    "from": "platform/pc98/gfx_selector_lifecycle.inc",
+    "to": "sys/platform/pc98/gfx_selector_lifecycle.inc"
+  },
+  {
+    "from": "platform/pc98/gfx_surfaces.c",
+    "to": "sys/platform/pc98/gfx_surfaces.c"
+  },
+  {
+    "from": "platform/pc98/ime_display.c",
+    "to": "sys/platform/pc98/ime_display.c"
+  },
+  {
+    "from": "platform/pc98/ime_render_tvram.c",
+    "to": "sys/platform/pc98/ime_render_tvram.c"
+  },
+  {
+    "from": "platform/pc98/input_keymap.c",
+    "to": "sys/platform/pc98/input_keymap.c"
+  },
+  {
+    "from": "platform/pc98/install_disk.c",
+    "to": "sys/platform/pc98/install_disk.c"
+  },
+  {
+    "from": "platform/pc98/install_geometry.h",
+    "to": "sys/platform/pc98/install_geometry.h"
+  },
+  {
+    "from": "platform/pc98/install_hdprep.c",
+    "to": "sys/platform/pc98/install_hdprep.c"
+  },
+  {
+    "from": "platform/pc98/install_plan.c",
+    "to": "sys/platform/pc98/install_plan.c"
+  },
+  {
+    "from": "platform/pc98/install_target.c",
+    "to": "sys/platform/pc98/install_target.c"
+  },
+  {
+    "from": "platform/pc98/irq_complete.c",
+    "to": "sys/platform/pc98/irq_complete.c"
+  },
+  {
+    "from": "platform/pc98/irq_policy.c",
+    "to": "sys/platform/pc98/irq_policy.c"
+  },
+  {
+    "from": "platform/pc98/kernel.c",
+    "to": "sys/platform/pc98/kernel.c"
+  },
+  {
+    "from": "platform/pc98/kernel_boot_cpu.inc",
+    "to": "sys/platform/pc98/kernel_boot_cpu.inc"
+  },
+  {
+    "from": "platform/pc98/kernel_boot_memory.inc",
+    "to": "sys/platform/pc98/kernel_boot_memory.inc"
+  },
+  {
+    "from": "platform/pc98/kernel_gfx_config.inc",
+    "to": "sys/platform/pc98/kernel_gfx_config.inc"
+  },
+  {
+    "from": "platform/pc98/kernel_gui_shlib.inc",
+    "to": "sys/platform/pc98/kernel_gui_shlib.inc"
+  },
+  {
+    "from": "platform/pc98/kernel_shell_fdd.inc",
+    "to": "sys/platform/pc98/kernel_shell_fdd.inc"
+  },
+  {
+    "from": "platform/pc98/lan_match.c",
+    "to": "sys/platform/pc98/lan_match.c"
+  },
+  {
+    "from": "platform/pc98/legacy/guest.c",
+    "to": "sys/platform/pc98/legacy/guest.c"
+  },
+  {
+    "from": "platform/pc98/legacy/lowmap.c",
+    "to": "sys/platform/pc98/legacy/lowmap.c"
+  },
+  {
+    "from": "platform/pc98/legacy/v86.c",
+    "to": "sys/platform/pc98/legacy/v86.c"
+  },
+  {
+    "from": "platform/pc98/legacy/v86.h",
+    "to": "sys/platform/pc98/legacy/v86.h"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_bios.c",
+    "to": "sys/platform/pc98/legacy/v86_bios.c"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_bios.h",
+    "to": "sys/platform/pc98/legacy/v86_bios.h"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_bios_fdd_command.inc",
+    "to": "sys/platform/pc98/legacy/v86_bios_fdd_command.inc"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_bios_fdd_read.inc",
+    "to": "sys/platform/pc98/legacy/v86_bios_fdd_read.inc"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_bios_sasi.inc",
+    "to": "sys/platform/pc98/legacy/v86_bios_sasi.inc"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_body.c",
+    "to": "sys/platform/pc98/legacy/v86_body.c"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_call.c",
+    "to": "sys/platform/pc98/legacy/v86_call.c"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_entry.asm",
+    "to": "sys/platform/pc98/legacy/v86_entry.asm"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_gcap.c",
+    "to": "sys/platform/pc98/legacy/v86_gcap.c"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_gcap.h",
+    "to": "sys/platform/pc98/legacy/v86_gcap.h"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_gcap_math.h",
+    "to": "sys/platform/pc98/legacy/v86_gcap_math.h"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_gp_emulate.inc",
+    "to": "sys/platform/pc98/legacy/v86_gp_emulate.inc"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_io.c",
+    "to": "sys/platform/pc98/legacy/v86_io.c"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_io.h",
+    "to": "sys/platform/pc98/legacy/v86_io.h"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_kbd.c",
+    "to": "sys/platform/pc98/legacy/v86_kbd.c"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_kbd.h",
+    "to": "sys/platform/pc98/legacy/v86_kbd.h"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_mem.c",
+    "to": "sys/platform/pc98/legacy/v86_mem.c"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_mem.h",
+    "to": "sys/platform/pc98/legacy/v86_mem.h"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_module.c",
+    "to": "sys/platform/pc98/legacy/v86_module.c"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_module.h",
+    "to": "sys/platform/pc98/legacy/v86_module.h"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_pic.c",
+    "to": "sys/platform/pc98/legacy/v86_pic.c"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_pic.h",
+    "to": "sys/platform/pc98/legacy/v86_pic.h"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_test16.asm",
+    "to": "sys/platform/pc98/legacy/v86_test16.asm"
+  },
+  {
+    "from": "platform/pc98/legacy/v86_test16_disk.asm",
+    "to": "sys/platform/pc98/legacy/v86_test16_disk.asm"
+  },
+  {
+    "from": "platform/pc98/link_platform.c",
+    "to": "sys/platform/pc98/link_platform.c"
+  },
+  {
+    "from": "platform/pc98/machcfg.c",
+    "to": "sys/platform/pc98/machcfg.c"
+  },
+  {
+    "from": "platform/pc98/memory.c",
+    "to": "sys/platform/pc98/memory.c"
+  },
+  {
+    "from": "platform/pc98/module_pair.c",
+    "to": "sys/platform/pc98/module_pair.c"
+  },
+  {
+    "from": "platform/pc98/pci_config.c",
+    "to": "sys/platform/pc98/pci_config.c"
+  },
+  {
+    "from": "platform/pc98/pci_mmio.c",
+    "to": "sys/platform/pc98/pci_mmio.c"
+  },
+  {
+    "from": "platform/pc98/pci_resources.c",
+    "to": "sys/platform/pc98/pci_resources.c"
+  },
+  {
+    "from": "platform/pc98/pci_resources.h",
+    "to": "sys/platform/pc98/pci_resources.h"
+  },
+  {
+    "from": "platform/pc98/pic.c",
+    "to": "sys/platform/pc98/pic.c"
+  },
+  {
+    "from": "platform/pc98/pit.c",
+    "to": "sys/platform/pc98/pit.c"
+  },
+  {
+    "from": "platform/pc98/pit.h",
+    "to": "sys/platform/pc98/pit.h"
+  },
+  {
+    "from": "platform/pc98/pit_math.c",
+    "to": "sys/platform/pc98/pit_math.c"
+  },
+  {
+    "from": "platform/pc98/pit_math.h",
+    "to": "sys/platform/pc98/pit_math.h"
+  },
+  {
+    "from": "platform/pc98/pit_time.c",
+    "to": "sys/platform/pc98/pit_time.c"
+  },
+  {
+    "from": "platform/pc98/pit_time.h",
+    "to": "sys/platform/pc98/pit_time.h"
+  },
+  {
+    "from": "platform/pc98/platform_atapi_bus.h",
+    "to": "sys/platform/pc98/platform_atapi_bus.h"
+  },
+  {
+    "from": "platform/pc98/platform_boot_layout.h",
+    "to": "sys/platform/pc98/platform_boot_layout.h"
+  },
+  {
+    "from": "platform/pc98/platform_build_info.h",
+    "to": "sys/platform/pc98/platform_build_info.h"
+  },
+  {
+    "from": "platform/pc98/platform_console.h",
+    "to": "sys/platform/pc98/platform_console.h"
+  },
+  {
+    "from": "platform/pc98/platform_display_fallback.h",
+    "to": "sys/platform/pc98/platform_display_fallback.h"
+  },
+  {
+    "from": "platform/pc98/platform_ext2.h",
+    "to": "sys/platform/pc98/platform_ext2.h"
+  },
+  {
+    "from": "platform/pc98/platform_hwb.h",
+    "to": "sys/platform/pc98/platform_hwb.h"
+  },
+  {
+    "from": "platform/pc98/platform_hwb_addr.h",
+    "to": "sys/platform/pc98/platform_hwb_addr.h"
+  },
+  {
+    "from": "platform/pc98/platform_hwb_pci.h",
+    "to": "sys/platform/pc98/platform_hwb_pci.h"
+  },
+  {
+    "from": "platform/pc98/platform_hwb_session.h",
+    "to": "sys/platform/pc98/platform_hwb_session.h"
+  },
+  {
+    "from": "platform/pc98/platform_ide_bus.h",
+    "to": "sys/platform/pc98/platform_ide_bus.h"
+  },
+  {
+    "from": "platform/pc98/platform_ide_ports.h",
+    "to": "sys/platform/pc98/platform_ide_ports.h"
+  },
+  {
+    "from": "platform/pc98/platform_ime_render.h",
+    "to": "sys/platform/pc98/platform_ime_render.h"
+  },
+  {
+    "from": "platform/pc98/platform_input_caps.h",
+    "to": "sys/platform/pc98/platform_input_caps.h"
+  },
+  {
+    "from": "platform/pc98/platform_install_layout.h",
+    "to": "sys/platform/pc98/platform_install_layout.h"
+  },
+  {
+    "from": "platform/pc98/platform_install_management.h",
+    "to": "sys/platform/pc98/platform_install_management.h"
+  },
+  {
+    "from": "platform/pc98/platform_io.h",
+    "to": "sys/platform/pc98/platform_io.h"
+  },
+  {
+    "from": "platform/pc98/platform_irq_limits.h",
+    "to": "sys/platform/pc98/platform_irq_limits.h"
+  },
+  {
+    "from": "platform/pc98/platform_kprintf.h",
+    "to": "sys/platform/pc98/platform_kprintf.h"
+  },
+  {
+    "from": "platform/pc98/platform_link_inline.h",
+    "to": "sys/platform/pc98/platform_link_inline.h"
+  },
+  {
+    "from": "platform/pc98/platform_mem_stat.h",
+    "to": "sys/platform/pc98/platform_mem_stat.h"
+  },
+  {
+    "from": "platform/pc98/platform_memory_desc.h",
+    "to": "sys/platform/pc98/platform_memory_desc.h"
+  },
+  {
+    "from": "platform/pc98/platform_osri.h",
+    "to": "sys/platform/pc98/platform_osri.h"
+  },
+  {
+    "from": "platform/pc98/platform_paging_window.h",
+    "to": "sys/platform/pc98/platform_paging_window.h"
+  },
+  {
+    "from": "platform/pc98/platform_pic.h",
+    "to": "sys/platform/pc98/platform_pic.h"
+  },
+  {
+    "from": "platform/pc98/platform_usb_identity.h",
+    "to": "sys/platform/pc98/platform_usb_identity.h"
+  },
+  {
+    "from": "platform/pc98/platform_ver.h",
+    "to": "sys/platform/pc98/platform_ver.h"
+  },
+  {
+    "from": "platform/pc98/snd_writer_probe.c",
+    "to": "sys/platform/pc98/snd_writer_probe.c"
+  },
+  {
+    "from": "platform/pc98/splash.c",
+    "to": "sys/platform/pc98/splash.c"
+  },
+  {
+    "from": "platform/pc98/splash_image.c",
+    "to": "sys/platform/pc98/splash_image.c"
+  },
+  {
+    "from": "platform/pc98/splash_obs.c",
+    "to": "sys/platform/pc98/splash_obs.c"
+  },
+  {
+    "from": "platform/pc98/splash_probe.c",
+    "to": "sys/platform/pc98/splash_probe.c"
+  },
+  {
+    "from": "platform/pc98/sysclk.c",
+    "to": "sys/platform/pc98/sysclk.c"
+  },
+  {
+    "from": "platform/pc98/sysclk.h",
+    "to": "sys/platform/pc98/sysclk.h"
+  },
+  {
+    "from": "platform/pc98/system.c",
+    "to": "sys/platform/pc98/system.c"
+  },
+  {
+    "from": "platform/pc98/tick_budget.c",
+    "to": "sys/platform/pc98/tick_budget.c"
+  },
+  {
+    "from": "platform/pc98/tick_order.h",
+    "to": "sys/platform/pc98/tick_order.h"
+  },
+  {
+    "from": "platform/pc98/timer.c",
+    "to": "sys/platform/pc98/timer.c"
+  },
+  {
+    "from": "platform/pc98/tsc_clock.c",
+    "to": "sys/platform/pc98/tsc_clock.c"
+  },
+  {
+    "from": "platform/pc98/tsc_clock.h",
+    "to": "sys/platform/pc98/tsc_clock.h"
+  },
+  {
+    "from": "platform/pc98/tsc_math.c",
+    "to": "sys/platform/pc98/tsc_math.c"
+  },
+  {
+    "from": "platform/pc98/tvram_private.h",
+    "to": "sys/platform/pc98/tvram_private.h"
+  },
+  {
+    "from": "platform/pc98/usb_config.c",
+    "to": "sys/platform/pc98/usb_config.c"
+  },
+  {
+    "from": "platform/pc98/usb_load.c",
+    "to": "sys/platform/pc98/usb_load.c"
+  },
+  {
+    "from": "platform/pc98/usb_module.c",
+    "to": "sys/platform/pc98/usb_module.c"
+  },
+  {
+    "from": "platform/pc98/usb_module_runtime.c",
+    "to": "sys/platform/pc98/usb_module_runtime.c"
+  },
+  {
+    "from": "platform/pc98/usb_platform.c",
+    "to": "sys/platform/pc98/usb_platform.c"
+  },
+  {
+    "from": "platform/pc98/usb_probe.h",
+    "to": "sys/platform/pc98/usb_probe.h"
+  },
+  {
+    "from": "platform/pc98/usb_resident.c",
+    "to": "sys/platform/pc98/usb_resident.c"
+  },
+  {
+    "from": "platform/pc98/usb_resident.h",
+    "to": "sys/platform/pc98/usb_resident.h"
+  },
+  {
+    "from": "platform/pc98/ver_backend.c",
+    "to": "sys/platform/pc98/ver_backend.c"
+  },
+  {
+    "from": "platform/powermac/apm.c",
+    "to": "sys/platform/powermac/apm.c"
+  },
+  {
+    "from": "platform/powermac/apm.h",
+    "to": "sys/platform/powermac/apm.h"
+  },
+  {
+    "from": "platform/powermac/boot.c",
+    "to": "sys/platform/powermac/boot.c"
+  },
+  {
+    "from": "platform/powermac/boot_capture.c",
+    "to": "sys/platform/powermac/boot_capture.c"
+  },
+  {
+    "from": "platform/powermac/boot_token_powermac.c",
+    "to": "sys/platform/powermac/boot_token_powermac.c"
+  },
+  {
+    "from": "platform/powermac/cli_boot.c",
+    "to": "sys/platform/powermac/cli_boot.c"
+  },
+  {
+    "from": "platform/powermac/cli_boot.h",
+    "to": "sys/platform/powermac/cli_boot.h"
+  },
+  {
+    "from": "platform/powermac/console.c",
+    "to": "sys/platform/powermac/console.c"
+  },
+  {
+    "from": "platform/powermac/console_stream.c",
+    "to": "sys/platform/powermac/console_stream.c"
+  },
+  {
+    "from": "platform/powermac/console_text.c",
+    "to": "sys/platform/powermac/console_text.c"
+  },
+  {
+    "from": "platform/powermac/diag_slots.h",
+    "to": "sys/platform/powermac/diag_slots.h"
+  },
+  {
+    "from": "platform/powermac/display.c",
+    "to": "sys/platform/powermac/display.c"
+  },
+  {
+    "from": "platform/powermac/display_bundle.c",
+    "to": "sys/platform/powermac/display_bundle.c"
+  },
+  {
+    "from": "platform/powermac/display_dual.c",
+    "to": "sys/platform/powermac/display_dual.c"
+  },
+  {
+    "from": "platform/powermac/display_provider.c",
+    "to": "sys/platform/powermac/display_provider.c"
+  },
+  {
+    "from": "platform/powermac/display_text.h",
+    "to": "sys/platform/powermac/display_text.h"
+  },
+  {
+    "from": "platform/powermac/dump.c",
+    "to": "sys/platform/powermac/dump.c"
+  },
+  {
+    "from": "platform/powermac/escc.c",
+    "to": "sys/platform/powermac/escc.c"
+  },
+  {
+    "from": "platform/powermac/escc_tree.c",
+    "to": "sys/platform/powermac/escc_tree.c"
+  },
+  {
+    "from": "platform/powermac/exec_boot.c",
+    "to": "sys/platform/powermac/exec_boot.c"
+  },
+  {
+    "from": "platform/powermac/exec_boot.h",
+    "to": "sys/platform/powermac/exec_boot.h"
+  },
+  {
+    "from": "platform/powermac/fep_imports.c",
+    "to": "sys/platform/powermac/fep_imports.c"
+  },
+  {
+    "from": "platform/powermac/gmac_clock.c",
+    "to": "sys/platform/powermac/gmac_clock.c"
+  },
+  {
+    "from": "platform/powermac/gmac_dma.c",
+    "to": "sys/platform/powermac/gmac_dma.c"
+  },
+  {
+    "from": "platform/powermac/gmac_tree.c",
+    "to": "sys/platform/powermac/gmac_tree.c"
+  },
+  {
+    "from": "platform/powermac/host_unavailable.c",
+    "to": "sys/platform/powermac/host_unavailable.c"
+  },
+  {
+    "from": "platform/powermac/hostfs.h",
+    "to": "sys/platform/powermac/hostfs.h"
+  },
+  {
+    "from": "platform/powermac/hostfs_boot.c",
+    "to": "sys/platform/powermac/hostfs_boot.c"
+  },
+  {
+    "from": "platform/powermac/hostfs_io.c",
+    "to": "sys/platform/powermac/hostfs_io.c"
+  },
+  {
+    "from": "platform/powermac/hostfs_link_io.c",
+    "to": "sys/platform/powermac/hostfs_link_io.c"
+  },
+  {
+    "from": "platform/powermac/hostfs_link_peer.c",
+    "to": "sys/platform/powermac/hostfs_link_peer.c"
+  },
+  {
+    "from": "platform/powermac/hostfs_peer.c",
+    "to": "sys/platform/powermac/hostfs_peer.c"
+  },
+  {
+    "from": "platform/powermac/hwb_instructions.h",
+    "to": "sys/platform/powermac/hwb_instructions.h"
+  },
+  {
+    "from": "platform/powermac/hwb_resource.c",
+    "to": "sys/platform/powermac/hwb_resource.c"
+  },
+  {
+    "from": "platform/powermac/hwb_resource.h",
+    "to": "sys/platform/powermac/hwb_resource.h"
+  },
+  {
+    "from": "platform/powermac/hwb_window.c",
+    "to": "sys/platform/powermac/hwb_window.c"
+  },
+  {
+    "from": "platform/powermac/hwb_window.h",
+    "to": "sys/platform/powermac/hwb_window.h"
+  },
+  {
+    "from": "platform/powermac/ide_boot.c",
+    "to": "sys/platform/powermac/ide_boot.c"
+  },
+  {
+    "from": "platform/powermac/ide_boot.h",
+    "to": "sys/platform/powermac/ide_boot.h"
+  },
+  {
+    "from": "platform/powermac/ide_compatible.h",
+    "to": "sys/platform/powermac/ide_compatible.h"
+  },
+  {
+    "from": "platform/powermac/ide_tree.c",
+    "to": "sys/platform/powermac/ide_tree.c"
+  },
+  {
+    "from": "platform/powermac/ime_display.c",
+    "to": "sys/platform/powermac/ime_display.c"
+  },
+  {
+    "from": "platform/powermac/input_boot.c",
+    "to": "sys/platform/powermac/input_boot.c"
+  },
+  {
+    "from": "platform/powermac/input_boot.h",
+    "to": "sys/platform/powermac/input_boot.h"
+  },
+  {
+    "from": "platform/powermac/input_decode.c",
+    "to": "sys/platform/powermac/input_decode.c"
+  },
+  {
+    "from": "platform/powermac/input_keymap_backend.c",
+    "to": "sys/platform/powermac/input_keymap_backend.c"
+  },
+  {
+    "from": "platform/powermac/input_usb.c",
+    "to": "sys/platform/powermac/input_usb.c"
+  },
+  {
+    "from": "platform/powermac/input_usb.h",
+    "to": "sys/platform/powermac/input_usb.h"
+  },
+  {
+    "from": "platform/powermac/install_apm.h",
+    "to": "sys/platform/powermac/install_apm.h"
+  },
+  {
+    "from": "platform/powermac/install_backend.c",
+    "to": "sys/platform/powermac/install_backend.c"
+  },
+  {
+    "from": "platform/powermac/install_backend.h",
+    "to": "sys/platform/powermac/install_backend.h"
+  },
+  {
+    "from": "platform/powermac/install_target.c",
+    "to": "sys/platform/powermac/install_target.c"
+  },
+  {
+    "from": "platform/powermac/kboot_capture.c",
+    "to": "sys/platform/powermac/kboot_capture.c"
+  },
+  {
+    "from": "platform/powermac/kboot_console.c",
+    "to": "sys/platform/powermac/kboot_console.c"
+  },
+  {
+    "from": "platform/powermac/kboot_info.h",
+    "to": "sys/platform/powermac/kboot_info.h"
+  },
+  {
+    "from": "platform/powermac/kboot_log.h",
+    "to": "sys/platform/powermac/kboot_log.h"
+  },
+  {
+    "from": "platform/powermac/kboot_report.h",
+    "to": "sys/platform/powermac/kboot_report.h"
+  },
+  {
+    "from": "platform/powermac/kboot_reserve.c",
+    "to": "sys/platform/powermac/kboot_reserve.c"
+  },
+  {
+    "from": "platform/powermac/kcg.c",
+    "to": "sys/platform/powermac/kcg.c"
+  },
+  {
+    "from": "platform/powermac/kdebug_imports.h",
+    "to": "sys/platform/powermac/kdebug_imports.h"
+  },
+  {
+    "from": "platform/powermac/kdebug_imports.json",
+    "to": "sys/platform/powermac/kdebug_imports.json"
+  },
+  {
+    "from": "platform/powermac/kernel_boot.c",
+    "to": "sys/platform/powermac/kernel_boot.c"
+  },
+  {
+    "from": "platform/powermac/lan_boot.h",
+    "to": "sys/platform/powermac/lan_boot.h"
+  },
+  {
+    "from": "platform/powermac/lan_diag.c",
+    "to": "sys/platform/powermac/lan_diag.c"
+  },
+  {
+    "from": "platform/powermac/lan_gem_io.c",
+    "to": "sys/platform/powermac/lan_gem_io.c"
+  },
+  {
+    "from": "platform/powermac/lan_log.c",
+    "to": "sys/platform/powermac/lan_log.c"
+  },
+  {
+    "from": "platform/powermac/lan_monitor.c",
+    "to": "sys/platform/powermac/lan_monitor.c"
+  },
+  {
+    "from": "platform/powermac/lan_service.c",
+    "to": "sys/platform/powermac/lan_service.c"
+  },
+  {
+    "from": "platform/powermac/lan_terminal.c",
+    "to": "sys/platform/powermac/lan_terminal.c"
+  },
+  {
+    "from": "platform/powermac/lan_wire.c",
+    "to": "sys/platform/powermac/lan_wire.c"
+  },
+  {
+    "from": "platform/powermac/link_diag.c",
+    "to": "sys/platform/powermac/link_diag.c"
+  },
+  {
+    "from": "platform/powermac/link_log.c",
+    "to": "sys/platform/powermac/link_log.c"
+  },
+  {
+    "from": "platform/powermac/link_platform.c",
+    "to": "sys/platform/powermac/link_platform.c"
+  },
+  {
+    "from": "platform/powermac/link_platform.h",
+    "to": "sys/platform/powermac/link_platform.h"
+  },
+  {
+    "from": "platform/powermac/log.c",
+    "to": "sys/platform/powermac/log.c"
+  },
+  {
+    "from": "platform/powermac/log_printf.c",
+    "to": "sys/platform/powermac/log_printf.c"
+  },
+  {
+    "from": "platform/powermac/loop_boot.c",
+    "to": "sys/platform/powermac/loop_boot.c"
+  },
+  {
+    "from": "platform/powermac/loop_boot.h",
+    "to": "sys/platform/powermac/loop_boot.h"
+  },
+  {
+    "from": "platform/powermac/machcfg.c",
+    "to": "sys/platform/powermac/machcfg.c"
+  },
+  {
+    "from": "platform/powermac/memory.c",
+    "to": "sys/platform/powermac/memory.c"
+  },
+  {
+    "from": "platform/powermac/memory.h",
+    "to": "sys/platform/powermac/memory.h"
+  },
+  {
+    "from": "platform/powermac/mmu_boot.c",
+    "to": "sys/platform/powermac/mmu_boot.c"
+  },
+  {
+    "from": "platform/powermac/mmu_start.c",
+    "to": "sys/platform/powermac/mmu_start.c"
+  },
+  {
+    "from": "platform/powermac/module_diag.c",
+    "to": "sys/platform/powermac/module_diag.c"
+  },
+  {
+    "from": "platform/powermac/module_pair.c",
+    "to": "sys/platform/powermac/module_pair.c"
+  },
+  {
+    "from": "platform/powermac/mpic.c",
+    "to": "sys/platform/powermac/mpic.c"
+  },
+  {
+    "from": "platform/powermac/mpic.h",
+    "to": "sys/platform/powermac/mpic.h"
+  },
+  {
+    "from": "platform/powermac/mpic_tree.c",
+    "to": "sys/platform/powermac/mpic_tree.c"
+  },
+  {
+    "from": "platform/powermac/mpic_tree.h",
+    "to": "sys/platform/powermac/mpic_tree.h"
+  },
+  {
+    "from": "platform/powermac/nic_gem.c",
+    "to": "sys/platform/powermac/nic_gem.c"
+  },
+  {
+    "from": "platform/powermac/nic_gem.h",
+    "to": "sys/platform/powermac/nic_gem.h"
+  },
+  {
+    "from": "platform/powermac/of_loader.c",
+    "to": "sys/platform/powermac/of_loader.c"
+  },
+  {
+    "from": "platform/powermac/of_loader_entry.S",
+    "to": "sys/platform/powermac/of_loader_entry.S"
+  },
+  {
+    "from": "platform/powermac/ofw.c",
+    "to": "sys/platform/powermac/ofw.c"
+  },
+  {
+    "from": "platform/powermac/ofw.h",
+    "to": "sys/platform/powermac/ofw.h"
+  },
+  {
+    "from": "platform/powermac/osri_view.c",
+    "to": "sys/platform/powermac/osri_view.c"
+  },
+  {
+    "from": "platform/powermac/partition_view.c",
+    "to": "sys/platform/powermac/partition_view.c"
+  },
+  {
+    "from": "platform/powermac/pci_backend.c",
+    "to": "sys/platform/powermac/pci_backend.c"
+  },
+  {
+    "from": "platform/powermac/pci_boot_memory.inc",
+    "to": "sys/platform/powermac/pci_boot_memory.inc"
+  },
+  {
+    "from": "platform/powermac/pci_capture.h",
+    "to": "sys/platform/powermac/pci_capture.h"
+  },
+  {
+    "from": "platform/powermac/pci_capture.inc",
+    "to": "sys/platform/powermac/pci_capture.inc"
+  },
+  {
+    "from": "platform/powermac/pci_config.c",
+    "to": "sys/platform/powermac/pci_config.c"
+  },
+  {
+    "from": "platform/powermac/pci_hosts.inc",
+    "to": "sys/platform/powermac/pci_hosts.inc"
+  },
+  {
+    "from": "platform/powermac/pci_unavailable.c",
+    "to": "sys/platform/powermac/pci_unavailable.c"
+  },
+  {
+    "from": "platform/powermac/platform_atapi_bus.h",
+    "to": "sys/platform/powermac/platform_atapi_bus.h"
+  },
+  {
+    "from": "platform/powermac/platform_build_info.h",
+    "to": "sys/platform/powermac/platform_build_info.h"
+  },
+  {
+    "from": "platform/powermac/platform_console.h",
+    "to": "sys/platform/powermac/platform_console.h"
+  },
+  {
+    "from": "platform/powermac/platform_display_fallback.h",
+    "to": "sys/platform/powermac/platform_display_fallback.h"
+  },
+  {
+    "from": "platform/powermac/platform_ext2.h",
+    "to": "sys/platform/powermac/platform_ext2.h"
+  },
+  {
+    "from": "platform/powermac/platform_handoff_layout.h",
+    "to": "sys/platform/powermac/platform_handoff_layout.h"
+  },
+  {
+    "from": "platform/powermac/platform_hwb.h",
+    "to": "sys/platform/powermac/platform_hwb.h"
+  },
+  {
+    "from": "platform/powermac/platform_hwb_addr.h",
+    "to": "sys/platform/powermac/platform_hwb_addr.h"
+  },
+  {
+    "from": "platform/powermac/platform_hwb_pci.h",
+    "to": "sys/platform/powermac/platform_hwb_pci.h"
+  },
+  {
+    "from": "platform/powermac/platform_hwb_session.h",
+    "to": "sys/platform/powermac/platform_hwb_session.h"
+  },
+  {
+    "from": "platform/powermac/platform_ide_bus.h",
+    "to": "sys/platform/powermac/platform_ide_bus.h"
+  },
+  {
+    "from": "platform/powermac/platform_ime_render.h",
+    "to": "sys/platform/powermac/platform_ime_render.h"
+  },
+  {
+    "from": "platform/powermac/platform_input_caps.h",
+    "to": "sys/platform/powermac/platform_input_caps.h"
+  },
+  {
+    "from": "platform/powermac/platform_install_layout.h",
+    "to": "sys/platform/powermac/platform_install_layout.h"
+  },
+  {
+    "from": "platform/powermac/platform_install_management.h",
+    "to": "sys/platform/powermac/platform_install_management.h"
+  },
+  {
+    "from": "platform/powermac/platform_io.h",
+    "to": "sys/platform/powermac/platform_io.h"
+  },
+  {
+    "from": "platform/powermac/platform_irq_limits.h",
+    "to": "sys/platform/powermac/platform_irq_limits.h"
+  },
+  {
+    "from": "platform/powermac/platform_kboot_layout.h",
+    "to": "sys/platform/powermac/platform_kboot_layout.h"
+  },
+  {
+    "from": "platform/powermac/platform_kprintf.h",
+    "to": "sys/platform/powermac/platform_kprintf.h"
+  },
+  {
+    "from": "platform/powermac/platform_link_inline.h",
+    "to": "sys/platform/powermac/platform_link_inline.h"
+  },
+  {
+    "from": "platform/powermac/platform_machcfg.h",
+    "to": "sys/platform/powermac/platform_machcfg.h"
+  },
+  {
+    "from": "platform/powermac/platform_mem_stat.h",
+    "to": "sys/platform/powermac/platform_mem_stat.h"
+  },
+  {
+    "from": "platform/powermac/platform_memory_desc.h",
+    "to": "sys/platform/powermac/platform_memory_desc.h"
+  },
+  {
+    "from": "platform/powermac/platform_of_layout.h",
+    "to": "sys/platform/powermac/platform_of_layout.h"
+  },
+  {
+    "from": "platform/powermac/platform_osri.h",
+    "to": "sys/platform/powermac/platform_osri.h"
+  },
+  {
+    "from": "platform/powermac/platform_paging_window.h",
+    "to": "sys/platform/powermac/platform_paging_window.h"
+  },
+  {
+    "from": "platform/powermac/platform_usb_identity.h",
+    "to": "sys/platform/powermac/platform_usb_identity.h"
+  },
+  {
+    "from": "platform/powermac/platform_ver.h",
+    "to": "sys/platform/powermac/platform_ver.h"
+  },
+  {
+    "from": "platform/powermac/pm_console.h",
+    "to": "sys/platform/powermac/pm_console.h"
+  },
+  {
+    "from": "platform/powermac/ppc_kernel.c",
+    "to": "sys/platform/powermac/ppc_kernel.c"
+  },
+  {
+    "from": "platform/powermac/ppc_memmap.h",
+    "to": "sys/platform/powermac/ppc_memmap.h"
+  },
+  {
+    "from": "platform/powermac/product_boot.c",
+    "to": "sys/platform/powermac/product_boot.c"
+  },
+  {
+    "from": "platform/powermac/product_boot.h",
+    "to": "sys/platform/powermac/product_boot.h"
+  },
+  {
+    "from": "platform/powermac/report_diag.c",
+    "to": "sys/platform/powermac/report_diag.c"
+  },
+  {
+    "from": "platform/powermac/report_product.c",
+    "to": "sys/platform/powermac/report_product.c"
+  },
+  {
+    "from": "platform/powermac/rh_observe.c",
+    "to": "sys/platform/powermac/rh_observe.c"
+  },
+  {
+    "from": "platform/powermac/rh_observe.h",
+    "to": "sys/platform/powermac/rh_observe.h"
+  },
+  {
+    "from": "platform/powermac/root_boot.c",
+    "to": "sys/platform/powermac/root_boot.c"
+  },
+  {
+    "from": "platform/powermac/root_boot.h",
+    "to": "sys/platform/powermac/root_boot.h"
+  },
+  {
+    "from": "platform/powermac/root_image.c",
+    "to": "sys/platform/powermac/root_image.c"
+  },
+  {
+    "from": "platform/powermac/shell_boot.c",
+    "to": "sys/platform/powermac/shell_boot.c"
+  },
+  {
+    "from": "platform/powermac/shell_boot.h",
+    "to": "sys/platform/powermac/shell_boot.h"
+  },
+  {
+    "from": "platform/powermac/shell_loop_ops.c",
+    "to": "sys/platform/powermac/shell_loop_ops.c"
+  },
+  {
+    "from": "platform/powermac/shell_loop_ops.h",
+    "to": "sys/platform/powermac/shell_loop_ops.h"
+  },
+  {
+    "from": "platform/powermac/shell_putchar.c",
+    "to": "sys/platform/powermac/shell_putchar.c"
+  },
+  {
+    "from": "platform/powermac/terminal_fifo.inc",
+    "to": "sys/platform/powermac/terminal_fifo.inc"
+  },
+  {
+    "from": "platform/powermac/terminal_input.c",
+    "to": "sys/platform/powermac/terminal_input.c"
+  },
+  {
+    "from": "platform/powermac/tick_budget.c",
+    "to": "sys/platform/powermac/tick_budget.c"
+  },
+  {
+    "from": "platform/powermac/usb_boot.c",
+    "to": "sys/platform/powermac/usb_boot.c"
+  },
+  {
+    "from": "platform/powermac/usb_boot.h",
+    "to": "sys/platform/powermac/usb_boot.h"
+  },
+  {
+    "from": "platform/powermac/usb_key_report.c",
+    "to": "sys/platform/powermac/usb_key_report.c"
+  },
+  {
+    "from": "platform/powermac/usb_platform.c",
+    "to": "sys/platform/powermac/usb_platform.c"
+  },
+  {
+    "from": "platform/powermac/usb_tree.c",
+    "to": "sys/platform/powermac/usb_tree.c"
+  },
+  {
+    "from": "platform/powermac/ver_backend.c",
+    "to": "sys/platform/powermac/ver_backend.c"
+  },
+  {
+    "from": "platform/powermac/via_tree.c",
+    "to": "sys/platform/powermac/via_tree.c"
+  },
+  {
+    "from": "platform/powermac/via_window.h",
+    "to": "sys/platform/powermac/via_window.h"
+  },
+  {
+    "from": "sound/hal/a0_weak.c",
+    "to": "sys/kern/v86/a0_weak.c"
+  },
+  {
+    "from": "sound/hal/snd2.h",
+    "to": "sys/hal/sound/snd2.h"
+  },
+  {
+    "from": "sound/hal/snd2_caps.c",
+    "to": "sys/hal/sound/snd2_caps.c"
+  },
+  {
+    "from": "sound/hal/snd2_chip.c",
+    "to": "sys/hal/sound/snd2_chip.c"
+  },
+  {
+    "from": "sound/hal/snd2_dsp.c",
+    "to": "sys/hal/sound/snd2_dsp.c"
+  },
+  {
+    "from": "sound/hal/snd2_int.h",
+    "to": "sys/hal/sound/snd2_int.h"
+  },
+  {
+    "from": "sound/hal/snd2_pos.c",
+    "to": "sys/hal/sound/snd2_pos.c"
+  },
+  {
+    "from": "sound/hal/snd2_refill_diag.h",
+    "to": "sys/hal/sound/snd2_refill_diag.h"
+  },
+  {
+    "from": "sound/hal/snd2_reg.c",
+    "to": "sys/hal/sound/snd2_reg.c"
+  },
+  {
+    "from": "sound/hal/snd2_ring_math.h",
+    "to": "sys/hal/sound/snd2_ring_math.h"
+  },
+  {
+    "from": "sound/hal/snd2_seg.c",
+    "to": "sys/hal/sound/snd2_seg.c"
+  },
+  {
+    "from": "sound/hal/snd2_stg.c",
+    "to": "sys/hal/sound/snd2_stg.c"
+  },
+  {
+    "from": "sound/hal/snd2_stream.c",
+    "to": "sys/hal/sound/snd2_stream.c"
+  },
+  {
+    "from": "sound/hal/snd2_v1.c",
+    "to": "sys/hal/sound/snd2_v1.c"
+  },
+  {
+    "from": "tools/ppc/ata_deny.c",
+    "to": "userland/diag/ata_deny.c"
+  },
+  {
+    "from": "tools/ppc/learn_probe.c",
+    "to": "userland/diag/learn_probe.c"
+  },
+  {
+    "from": "userland/tests/allocator_bench.c",
+    "to": "userland/diag/allocator_bench.c"
+  },
+  {
+    "from": "userland/tests/asset_demo.c",
+    "to": "userland/diag/asset_demo.c"
+  },
+  {
+    "from": "userland/tests/asset_test.c",
+    "to": "userland/diag/asset_test.c"
+  },
+  {
+    "from": "userland/tests/audit_test.c",
+    "to": "userland/diag/audit_test.c"
+  },
+  {
+    "from": "userland/tests/av_test.c",
+    "to": "userland/diag/av_test.c"
+  },
+  {
+    "from": "userland/tests/bench/main.c",
+    "to": "userland/diag/bench/main.c"
+  },
+  {
+    "from": "userland/tests/bench_scale2x/main.c",
+    "to": "userland/diag/bench_scale2x/main.c"
+  },
+  {
+    "from": "userland/tests/blit_test.c",
+    "to": "userland/diag/blit_test.c"
+  },
+  {
+    "from": "userland/tests/blit_test2.c",
+    "to": "userland/diag/blit_test2.c"
+  },
+  {
+    "from": "userland/tests/cfg_bench.c",
+    "to": "userland/diag/cfg_bench.c"
+  },
+  {
+    "from": "userland/tests/crash.c",
+    "to": "userland/diag/crash.c"
+  },
+  {
+    "from": "userland/tests/crtexit.c",
+    "to": "userland/diag/crtexit.c"
+  },
+  {
+    "from": "userland/tests/d0a_test.c",
+    "to": "userland/diag/d0a_test.c"
+  },
+  {
+    "from": "userland/tests/data/hello.sh",
+    "to": "userland/diag/data/hello.sh"
+  },
+  {
+    "from": "userland/tests/data/test.txt",
+    "to": "userland/diag/data/test.txt"
+  },
+  {
+    "from": "userland/tests/data/test_pager.txt",
+    "to": "userland/diag/data/test_pager.txt"
+  },
+  {
+    "from": "userland/tests/data/test_script.bat",
+    "to": "userland/diag/data/test_script.bat"
+  },
+  {
+    "from": "userland/tests/data/test_table.md",
+    "to": "userland/diag/data/test_table.md"
+  },
+  {
+    "from": "userland/tests/data/test_utf8.txt",
+    "to": "userland/diag/data/test_utf8.txt"
+  },
+  {
+    "from": "userland/tests/db_test.c",
+    "to": "userland/diag/db_test.c"
+  },
+  {
+    "from": "userland/tests/db_v50_test.c",
+    "to": "userland/diag/db_v50_test.c"
+  },
+  {
+    "from": "userland/tests/dbq.c",
+    "to": "userland/diag/dbq.c"
+  },
+  {
+    "from": "userland/tests/demo_tile.c",
+    "to": "userland/diag/demo_tile.c"
+  },
+  {
+    "from": "userland/tests/disk_auth_test.c",
+    "to": "userland/diag/disk_auth_test.c"
+  },
+  {
+    "from": "userland/tests/e2seek.c",
+    "to": "userland/diag/e2seek.c"
+  },
+  {
+    "from": "userland/tests/e2test.c",
+    "to": "userland/diag/e2test.c"
+  },
+  {
+    "from": "userland/tests/ecs_test.c",
+    "to": "userland/diag/ecs_test.c"
+  },
+  {
+    "from": "userland/tests/exec_heap_test.c",
+    "to": "userland/diag/exec_heap_test.c"
+  },
+  {
+    "from": "userland/tests/faultprobe/main.c",
+    "to": "userland/diag/faultprobe/main.c"
+  },
+  {
+    "from": "userland/tests/faulttest.c",
+    "to": "userland/diag/faulttest.c"
+  },
+  {
+    "from": "userland/tests/fep_meta_test.c",
+    "to": "userland/diag/fep_meta_test.c"
+  },
+  {
+    "from": "userland/tests/font_lease_test.c",
+    "to": "userland/diag/font_lease_test.c"
+  },
+  {
+    "from": "userland/tests/font_load_test.c",
+    "to": "userland/diag/font_load_test.c"
+  },
+  {
+    "from": "userland/tests/fp_stop.c",
+    "to": "userland/diag/fp_stop.c"
+  },
+  {
+    "from": "userland/tests/gfx200_test.c",
+    "to": "userland/diag/gfx200_test.c"
+  },
+  {
+    "from": "userland/tests/gfx2_i1.c",
+    "to": "userland/diag/gfx2_i1.c"
+  },
+  {
+    "from": "userland/tests/gfx2_i2.c",
+    "to": "userland/diag/gfx2_i2.c"
+  },
+  {
+    "from": "userland/tests/gfx2_i3.c",
+    "to": "userland/diag/gfx2_i3.c"
+  },
+  {
+    "from": "userland/tests/gfx2_rh.c",
+    "to": "userland/diag/gfx2_rh.c"
+  },
+  {
+    "from": "userland/tests/gfx_demo200.c",
+    "to": "userland/diag/gfx_demo200.c"
+  },
+  {
+    "from": "userland/tests/gui_busy.c",
+    "to": "userland/diag/gui_busy.c"
+  },
+  {
+    "from": "userland/tests/gui_call_test.c",
+    "to": "userland/diag/gui_call_test.c"
+  },
+  {
+    "from": "userland/tests/h2_stack.c",
+    "to": "userland/diag/h2_stack.c"
+  },
+  {
+    "from": "userland/tests/h2_stack_probe.h",
+    "to": "userland/diag/h2_stack_probe.h"
+  },
+  {
+    "from": "userland/tests/h2_stack_probe.inc",
+    "to": "userland/diag/h2_stack_probe.inc"
+  },
+  {
+    "from": "userland/tests/h3/fixture.inc",
+    "to": "userland/diag/h3/fixture.inc"
+  },
+  {
+    "from": "userland/tests/h3/protocol.h",
+    "to": "userland/diag/h3/protocol.h"
+  },
+  {
+    "from": "userland/tests/h3/state.inc",
+    "to": "userland/diag/h3/state.inc"
+  },
+  {
+    "from": "userland/tests/h3a.c",
+    "to": "userland/diag/h3a.c"
+  },
+  {
+    "from": "userland/tests/h3b.c",
+    "to": "userland/diag/h3b.c"
+  },
+  {
+    "from": "userland/tests/h5_shape.inc",
+    "to": "userland/diag/h5_shape.inc"
+  },
+  {
+    "from": "userland/tests/h5_shape_i.c",
+    "to": "userland/diag/h5_shape_i.c"
+  },
+  {
+    "from": "userland/tests/h5_shape_ii.c",
+    "to": "userland/diag/h5_shape_ii.c"
+  },
+  {
+    "from": "userland/tests/h5_shape_iii.c",
+    "to": "userland/diag/h5_shape_iii.c"
+  },
+  {
+    "from": "userland/tests/hal_test.c",
+    "to": "userland/diag/hal_test.c"
+  },
+  {
+    "from": "userland/tests/heap_test.c",
+    "to": "userland/diag/heap_test.c"
+  },
+  {
+    "from": "userland/tests/hello.c",
+    "to": "userland/diag/hello.c"
+  },
+  {
+    "from": "userland/tests/host_test.c",
+    "to": "userland/diag/host_test.c"
+  },
+  {
+    "from": "userland/tests/hw/g4/gmac.hwb",
+    "to": "userland/diag/hw/g4/gmac.hwb"
+  },
+  {
+    "from": "userland/tests/hw/gf_palette.hwb",
+    "to": "userland/diag/hw/gf_palette.hwb"
+  },
+  {
+    "from": "userland/tests/hw/gf_regs.hwb",
+    "to": "userland/diag/hw/gf_regs.hwb"
+  },
+  {
+    "from": "userland/tests/hw/hpt370_probe.hwb",
+    "to": "userland/diag/hw/hpt370_probe.hwb"
+  },
+  {
+    "from": "userland/tests/hw/mac99/ohci.hwb",
+    "to": "userland/diag/hw/mac99/ohci.hwb"
+  },
+  {
+    "from": "userland/tests/hw/mac99/port_read16.hwb",
+    "to": "userland/diag/hw/mac99/port_read16.hwb"
+  },
+  {
+    "from": "userland/tests/hw/mac99/port_read32.hwb",
+    "to": "userland/diag/hw/mac99/port_read32.hwb"
+  },
+  {
+    "from": "userland/tests/hw/mac99/port_read8.hwb",
+    "to": "userland/diag/hw/mac99/port_read8.hwb"
+  },
+  {
+    "from": "userland/tests/hw/mac99/port_write16.hwb",
+    "to": "userland/diag/hw/mac99/port_write16.hwb"
+  },
+  {
+    "from": "userland/tests/hw/mac99/port_write32.hwb",
+    "to": "userland/diag/hw/mac99/port_write32.hwb"
+  },
+  {
+    "from": "userland/tests/hw/mac99/port_write8.hwb",
+    "to": "userland/diag/hw/mac99/port_write8.hwb"
+  },
+  {
+    "from": "userland/tests/hw/np21w_gdc.hwb",
+    "to": "userland/diag/hw/np21w_gdc.hwb"
+  },
+  {
+    "from": "userland/tests/hw/np21w_loop.hwb",
+    "to": "userland/diag/hw/np21w_loop.hwb"
+  },
+  {
+    "from": "userland/tests/hw/np21w_nopci.hwb",
+    "to": "userland/diag/hw/np21w_nopci.hwb"
+  },
+  {
+    "from": "userland/tests/hw/np21w_poll.hwb",
+    "to": "userland/diag/hw/np21w_poll.hwb"
+  },
+  {
+    "from": "userland/tests/hw/np21w_tvram.hwb",
+    "to": "userland/diag/hw/np21w_tvram.hwb"
+  },
+  {
+    "from": "userland/tests/hw/np21w_wait.hwb",
+    "to": "userland/diag/hw/np21w_wait.hwb"
+  },
+  {
+    "from": "userland/tests/hw/tri_burst.hwb",
+    "to": "userland/diag/hw/tri_burst.hwb"
+  },
+  {
+    "from": "userland/tests/hw/tri_burst2.hwb",
+    "to": "userland/diag/hw/tri_burst2.hwb"
+  },
+  {
+    "from": "userland/tests/hw/tri_burst3.hwb",
+    "to": "userland/diag/hw/tri_burst3.hwb"
+  },
+  {
+    "from": "userland/tests/hw/tri_burst4.hwb",
+    "to": "userland/diag/hw/tri_burst4.hwb"
+  },
+  {
+    "from": "userland/tests/hw/tri_burst5.hwb",
+    "to": "userland/diag/hw/tri_burst5.hwb"
+  },
+  {
+    "from": "userland/tests/hw/tri_burst6.hwb",
+    "to": "userland/diag/hw/tri_burst6.hwb"
+  },
+  {
+    "from": "userland/tests/hw/tri_w32.hwb",
+    "to": "userland/diag/hw/tri_w32.hwb"
+  },
+  {
+    "from": "userland/tests/hw/trident.hwb",
+    "to": "userland/diag/hw/trident.hwb"
+  },
+  {
+    "from": "userland/tests/hw/trident_mode.hwb",
+    "to": "userland/diag/hw/trident_mode.hwb"
+  },
+  {
+    "from": "userland/tests/hwscroll_probe.c",
+    "to": "userland/diag/hwscroll_probe.c"
+  },
+  {
+    "from": "userland/tests/input_test.c",
+    "to": "userland/diag/input_test.c"
+  },
+  {
+    "from": "userland/tests/kapi_cost.c",
+    "to": "userland/diag/kapi_cost.c"
+  },
+  {
+    "from": "userland/tests/kbd_echo.c",
+    "to": "userland/diag/kbd_echo.c"
+  },
+  {
+    "from": "userland/tests/kcallback_test.c",
+    "to": "userland/diag/kcallback_test.c"
+  },
+  {
+    "from": "userland/tests/kdebug_probe.c",
+    "to": "userland/diag/kdebug_probe.c"
+  },
+  {
+    "from": "userland/tests/klibc_test.c",
+    "to": "userland/diag/klibc_test.c"
+  },
+  {
+    "from": "userland/tests/kout_test.c",
+    "to": "userland/diag/kout_test.c"
+  },
+  {
+    "from": "userland/tests/kprint_boundary.c",
+    "to": "userland/diag/kprint_boundary.c"
+  },
+  {
+    "from": "userland/tests/kstr_bench.c",
+    "to": "userland/diag/kstr_bench.c"
+  },
+  {
+    "from": "userland/tests/kstr_boundary.c",
+    "to": "userland/diag/kstr_boundary.c"
+  },
+  {
+    "from": "userland/tests/kstr_v86.c",
+    "to": "userland/diag/kstr_v86.c"
+  },
+  {
+    "from": "userland/tests/layout_cycle_test.c",
+    "to": "userland/diag/layout_cycle_test.c"
+  },
+  {
+    "from": "userland/tests/loopfmt_test.c",
+    "to": "userland/diag/loopfmt_test.c"
+  },
+  {
+    "from": "userland/tests/malloc_arena_test.c",
+    "to": "userland/diag/malloc_arena_test.c"
+  },
+  {
+    "from": "userland/tests/math_test.c",
+    "to": "userland/diag/math_test.c"
+  },
+  {
+    "from": "userland/tests/mem_map_test.c",
+    "to": "userland/diag/mem_map_test.c"
+  },
+  {
+    "from": "userland/tests/mem_stat_compat_test.c",
+    "to": "userland/diag/mem_stat_compat_test.c"
+  },
+  {
+    "from": "userland/tests/mem_stat_test.c",
+    "to": "userland/diag/mem_stat_test.c"
+  },
+  {
+    "from": "userland/tests/mgx_test.c",
+    "to": "userland/diag/mgx_test.c"
+  },
+  {
+    "from": "userland/tests/mouse_test.c",
+    "to": "userland/diag/mouse_test.c"
+  },
+  {
+    "from": "userland/tests/nop.c",
+    "to": "userland/diag/nop.c"
+  },
+  {
+    "from": "userland/tests/pcm_play.c",
+    "to": "userland/diag/pcm_play.c"
+  },
+  {
+    "from": "userland/tests/pcm_test.c",
+    "to": "userland/diag/pcm_test.c"
+  },
+  {
+    "from": "userland/tests/pcm_wav.h",
+    "to": "userland/diag/pcm_wav.h"
+  },
+  {
+    "from": "userland/tests/pegcchk.c",
+    "to": "userland/diag/pegcchk.c"
+  },
+  {
+    "from": "userland/tests/pipe_owner_test.c",
+    "to": "userland/diag/pipe_owner_test.c"
+  },
+  {
+    "from": "userland/tests/raw_wait_test.c",
+    "to": "userland/diag/raw_wait_test.c"
+  },
+  {
+    "from": "userland/tests/restest.c",
+    "to": "userland/diag/restest.c"
+  },
+  {
+    "from": "userland/tests/ring3_fault.c",
+    "to": "userland/diag/ring3_fault.c"
+  },
+  {
+    "from": "userland/tests/ring3_guard.c",
+    "to": "userland/diag/ring3_guard.c"
+  },
+  {
+    "from": "userland/tests/ring3_hello.c",
+    "to": "userland/diag/ring3_hello.c"
+  },
+  {
+    "from": "userland/tests/ring3_marker.h",
+    "to": "userland/diag/ring3_marker.h"
+  },
+  {
+    "from": "userland/tests/rotate_test.c",
+    "to": "userland/diag/rotate_test.c"
+  },
+  {
+    "from": "userland/tests/save_test.c",
+    "to": "userland/diag/save_test.c"
+  },
+  {
+    "from": "userland/tests/sbrk_grow_test.c",
+    "to": "userland/diag/sbrk_grow_test.c"
+  },
+  {
+    "from": "userland/tests/shm_reuse_child.c",
+    "to": "userland/diag/shm_reuse_child.c"
+  },
+  {
+    "from": "userland/tests/shm_reuse_test.c",
+    "to": "userland/diag/shm_reuse_test.c"
+  },
+  {
+    "from": "userland/tests/shutdown_probe.c",
+    "to": "userland/diag/shutdown_probe.c"
+  },
+  {
+    "from": "userland/tests/snd2_test.c",
+    "to": "userland/diag/snd2_test.c"
+  },
+  {
+    "from": "userland/tests/sndl_test.c",
+    "to": "userland/diag/sndl_test.c"
+  },
+  {
+    "from": "userland/tests/sqlite_standalone/sqlite_standalone.c",
+    "to": "userland/diag/sqlite_standalone/sqlite_standalone.c"
+  },
+  {
+    "from": "userland/tests/sqlite_standalone/sqlite_user_vfs.c",
+    "to": "userland/diag/sqlite_standalone/sqlite_user_vfs.c"
+  },
+  {
+    "from": "userland/tests/stat_t.c",
+    "to": "userland/diag/stat_t.c"
+  },
+  {
+    "from": "userland/tests/stop_loop.c",
+    "to": "userland/diag/stop_loop.c"
+  },
+  {
+    "from": "userland/tests/t_exit.c",
+    "to": "userland/diag/t_exit.c"
+  },
+  {
+    "from": "userland/tests/test2.c",
+    "to": "userland/diag/test2.c"
+  },
+  {
+    "from": "userland/tests/text_ro_test.c",
+    "to": "userland/diag/text_ro_test.c"
+  },
+  {
+    "from": "userland/tests/tile_bench.c",
+    "to": "userland/diag/tile_bench.c"
+  },
+  {
+    "from": "userland/tests/time_test.c",
+    "to": "userland/diag/time_test.c"
+  },
+  {
+    "from": "userland/tests/trim_back.c",
+    "to": "userland/diag/trim_back.c"
+  },
+  {
+    "from": "userland/tests/trim_front.c",
+    "to": "userland/diag/trim_front.c"
+  }
+]

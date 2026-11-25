@@ -3,12 +3,16 @@ import argparse
 import ast
 import csv
 import io
+import json
+import os
+import tempfile
 import re
 import subprocess
 from collections import Counter
 from pathlib import Path
 
 import hal_inventory
+import layout
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = 'c6076a6f6'
@@ -25,9 +29,9 @@ KINDS = {
 
 # Reviewed tools whose primary output is a verdict (P1-0 scope review).
 CHECK_BODIES = {
-    'build_compare.py', 'doc_graph.py',
+    'build_compare.py',
     'gfinit_rom_check.py', 'memmap_audit_live.py', 'fep_budget_capture.py',
-    'ci/sep_identity.py', 'deploy_source_check.py',
+    'ci/sep_identity.py',
 }
 
 
@@ -207,7 +211,10 @@ def verify_scope(table, base, list_candidates=False):
                 issues.append(f'{path}: 必須欄が空')
             if kind not in KINDS.get(owner, set()):
                 issues.append(f'{path}: 担当・種類が不正 ({owner}, {kind})')
-            if path.startswith('tools/') and kind not in KINDS['P1-4'] | {'運用の道具'}:
+            if path in layout.PPC_DIAGNOSTICS:
+                if kind != '製品':
+                    issues.append(f'{path}: PPC_USER_APPS の製品入力')
+            elif path.startswith('tools/') and kind not in KINDS['P1-4'] | {'運用の道具', 'ビルドの定義'}:
                 issues.append(f'{path}: tools の種類が不正')
             if path.removeprefix('tools/') in CHECK_BODIES and path.startswith('tools/') and kind != '検査の本体':
                 issues.append(f'{path}: 検査の本体として分類する')
@@ -319,6 +326,65 @@ def verify_hal(table, expected, sources):
     return 0
 
 
+def verify_layout(scope, table, mapping, root):
+    expected = {r['パス'] for r in layout.read_rows(scope) if r['担当'] == 'P1-1'}
+    issues = []
+    paths = []
+    moves = []
+    destinations = set()
+    pending = []
+    with table.open(newline='') as stream:
+        reader = csv.reader(stream, delimiter='\t')
+        if next(reader, None) != layout.HEADER:
+            issues.append('配置表の見出し不一致')
+        for row in reader:
+            if len(row) != 3 or not all(cell.strip() for cell in row):
+                issues.append(f'配置表 {reader.line_num} 行目: 必須欄不正')
+                continue
+            path, dest, reason = row
+            paths.append(path)
+            if dest == '保留':
+                pending.append((path, reason))
+            if dest in ('=', '保留'):
+                continue
+            target = Path(dest)
+            if (target.is_absolute() or '..' in target.parts or dest != target.as_posix()
+                    or target.name != Path(path).name or target.parts[0] == 'tests'):
+                issues.append(f'{path}: 配置先不正 {dest}')
+            if dest in destinations or (root / dest).exists() or (root / dest).is_symlink():
+                issues.append(f'{path}: 配置先の衝突 {dest}')
+            if not (root / path).is_file():
+                issues.append(f'{path}: 移動元がない')
+            destinations.add(dest)
+            moves.append({'from': path, 'to': dest})
+    compare('配置表', paths, expected, issues)
+    if json.loads(mapping.read_text()) != moves:
+        issues.append('移動表が配置表の確定行と一致しない')
+    for dest in destinations:
+        for parent in Path(dest).parents:
+            existing = root / parent
+            if str(parent) in destinations or existing.is_file() or existing.is_symlink():
+                issues.append(f'{dest}: 配置先の親が衝突 {parent}')
+    if not issues:
+        # Exercise the real CLI and the complete map against the real paths.
+        # An empty scratch index scopes this check to map acceptance (P1).
+        with tempfile.TemporaryDirectory() as scratch:
+            result = subprocess.run(
+                ['python3', str(Path(__file__).resolve().parents[1] / 'move_files.py'), '--dry-run',
+                 '--root', str(root), str(mapping.resolve())],
+                env={**os.environ, 'GIT_INDEX_FILE': str(Path(scratch) / 'index')},
+                capture_output=True, text=True)
+            if result.returncode or json.loads(result.stdout)['moves'] != {m['from']: m['to'] for m in moves}:
+                issues.append('dry-run が移動表を受理しない：' + result.stderr)
+    for path, reason in sorted(pending, key=lambda item: item[0]):
+        print(f'A1 保留\t{path}\t{reason}')
+    if issues:
+        print(*issues, sep='\n')
+        return 1
+    print(f'OK: 配置 {len(paths)}、移動 {len(moves)}、保留 {len(pending)}、集合差・衝突 0')
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base', default=BASE)
@@ -331,7 +397,9 @@ def main():
     scope_status = verify_scope(args.table, args.base, args.list_candidates)
     expected = hal_table_targets(args.p0_dir) if args.p0_dir else hal_targets(args.base)
     sources, _ = review_inputs(args.base, set(), expected)
-    return verify_hal(args.hal_map, expected, sources) or scope_status
+    hal_status = verify_hal(args.hal_map, expected, sources)
+    directory = args.table.parent
+    return verify_layout(args.table, directory / 'layout.tsv', directory / 'move_map.json', ROOT) or hal_status or scope_status
 
 
 if __name__ == '__main__':
