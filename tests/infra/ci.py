@@ -17,18 +17,25 @@ from build_compare import copy_candidate
 import fetch_fonts
 
 
-def prerequisites(environment, cpu):
+def prerequisites(environment, cpu, config, sources):
     if environment == "python":
         return
     ppc = environment == "linux-ppc-cross" or environment == "linux-cross" and cpu == "ppc"
     directory = Path(os.environ.get("PPC_CROSS_DIR" if ppc else "CROSS_DIR",
                                     Path.home() / "opt" / ("cross-ppc" if ppc else "cross")))
     prefix = "powerpc-elf" if ppc else "i386-elf"
-    tools = ["make", "python3", "gcc", "cargo", "rustc", "xorriso"]
-    for module in ("lz4", "yaml", "PIL", "fontTools"):
+    tools = ["make", "python3"]
+    modules = []
+    if not ppc:
+        tools += ["gcc", "cargo", "rustc", "xorriso", "nasm"]
+        modules = ["lz4", "yaml", "PIL", "fontTools"]
+    elif "make:iso" in sources:
+        tools += ["genisoimage", "isoinfo"]
+        if config in ("sh", "link-sh", "shell"):
+            modules = ["lz4", "PIL", "fontTools"]
+    for module in modules:
         if importlib.util.find_spec(module) is None:
             raise OSError(f"missing Python module {module}")
-    tools += ["genisoimage", "isoinfo"] if ppc else ["nasm"]
     tools += [directory / "bin" / f"{prefix}-{tool}" for tool in
               ("gcc", "as", "ar", "ld", "objcopy", "objdump", "nm", "readelf")]
     for tool in tools:
@@ -69,7 +76,7 @@ def snapshot(destination):
 
 
 def execute(candidate, row, cpu, config, mutations, env):
-    prerequisites(row["environment"], cpu)
+    prerequisites(row["environment"], cpu, config, row["sources"])
     with tempfile.TemporaryDirectory() as tmp:
         tree = Path(tmp)
         shutil.copytree(candidate, tree, dirs_exist_ok=True)
