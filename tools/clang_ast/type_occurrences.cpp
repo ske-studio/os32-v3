@@ -18,10 +18,10 @@ public:
         auto position = sources.getExpansionLoc(loc.getBeginLoc());
         if (position.isInvalid())
             return true;
-        auto file = sources.getFilename(position);
-        auto line = sources.getLineNumber(sources.getFileID(position),
-                                          sources.getFileOffset(position));
         auto report = [&](const char *feature) {
+            auto file = sources.getFilename(position);
+            auto line = sources.getLineNumber(sources.getFileID(position),
+                                              sources.getFileOffset(position));
             llvm::outs() << file << '\t' << line << '\t' << feature << '\n';
         };
         if (type.isRestrictQualified())

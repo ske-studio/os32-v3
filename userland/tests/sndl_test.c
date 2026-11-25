@@ -35,7 +35,11 @@ int main(int argc, char **argv, KernelAPI *api)
     SND2_Fmt fmt = {22050, 16, 1, SND2_ENC_S16LE, 0};
     short tone[] = {4096, -4096}, out[4] = {0};
     unsigned long voice, buffer, done, how;
-    if (argc == 2 && !strcmp(argv[1], "soft")) return soft_tone(api);
+    if (argc == 2 && !strcmp(argv[1], "soft")) {
+        int rc = soft_tone(api);
+        api->kprintf(7, rc ? "sndl_test soft FAIL rc=%d\n" : "sndl_test soft PASS rc=%d\n", rc);
+        return rc;
+    }
     if (sndl_init(api) || sndl_voice_new(&fmt, &voice) ||
         sndl_voice_submit(voice, tone, sizeof(tone), 0, &buffer) ||
         sndl_voice_set(voice, fmt.rate, 0, 0) || sndl_voice_play(voice) || sndl_render(out, 2, fmt.rate) ||

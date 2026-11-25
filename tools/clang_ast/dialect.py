@@ -1,48 +1,48 @@
 """Language rules on clang's physical cursors, types and preprocessing records."""
 import ctypes
 import functools
-from . import cx, K, T, walk, relpath
+from . import cx, K, ParseError, relpath
+from .type_occurrences import visitor_binary
+
+
+# Match the feature bits in dialect_candidates.c.
+_RESTRICT, _ATOMIC, _VLA, _ANONYMOUS, _TLS, _OLD_STYLE = (1, 2, 4, 8, 16, 32)
+_TYPE_WORDS = ((_RESTRICT, 'restrict'), (_ATOMIC, '_Atomic'), (_VLA, 'VLA'))
+
+
+# CXCursor contains pointers into its translation unit. Keep the unit alive
+# exactly as clang.cindex.Cursor.get_children does.
+_Report = ctypes.CFUNCTYPE(None, cx.Cursor, ctypes.c_uint)
 
 
 @functools.lru_cache(maxsize=1)
-def anonymous_api():
-    # LLVM 18 exposes the C API but not the Python convenience method.
-    lib = ctypes.CDLL(cx.conf.get_filename())
-    fn = lib.clang_Cursor_isAnonymousRecordDecl
-    fn.argtypes, fn.restype = [cx.Cursor], ctypes.c_bool
-    return fn
+def candidate_visitor():
+    try:
+        library = ctypes.CDLL(str(visitor_binary('dialect_candidates.c')))
+        visit = library.dialect_candidates
+    except (OSError, AttributeError) as error:
+        raise ParseError('Clang cursor visitor unavailable: ' + str(error)) from error
+    visit.argtypes = [cx.TranslationUnit, ctypes.c_int, _Report]
+    visit.restype = None
+    return visit
 
 
-def type_features(typ, seen=None):
-    seen = set() if seen is None else seen
-    typ = typ.get_canonical()
-    key = typ.spelling
-    if key in seen:
-        return set()
-    seen.add(key)
-    result = set()
-    if typ.is_restrict_qualified():
-        result.add('restrict')
-    if typ.kind == T.ATOMIC:
-        result.add('_Atomic')
-    if typ.kind == T.VARIABLEARRAY:
-        result.add('VLA')
-    if typ.kind == T.POINTER:
-        result |= type_features(typ.get_pointee(),seen)
-    if typ.kind in (T.CONSTANTARRAY,T.INCOMPLETEARRAY,T.VARIABLEARRAY):
-        result |= type_features(typ.element_type,seen)
-    if typ.kind in (T.FUNCTIONPROTO,T.FUNCTIONNOPROTO):
-        result |= type_features(typ.get_result(),seen)
-        if typ.kind == T.FUNCTIONPROTO:
-            for arg in typ.argument_types():
-                result |= type_features(arg,seen)
-    return result
+def candidates(tu, public):
+    nodes = []
+
+    @_Report
+    def collect(cursor, mask):
+        cursor._tu = tu
+        nodes.append((cursor, mask))
+
+    candidate_visitor()(tu, public, collect)
+    return nodes
 
 
 def findings(tu, root, words, headers, public=False):
     from .type_occurrences import findings as type_occurrences
     hits = {hit for hit in type_occurrences(tu, root) if hit[2] in words}
-    nodes = list(walk(tu.cursor))
+    nodes = candidates(tu, public)
     for d in tu.diagnostics:
         folding_assert = d.option == '-Wgnu-folding-constant' and any(
             c.kind == K.STATIC_ASSERT and str(c.location.file) == str(d.location.file) and
@@ -55,14 +55,12 @@ def findings(tu, root, words, headers, public=False):
                 hits.add((rel,d.location.line,'nonconstant static assert' if folding_assert else 'old-style definition'))
             except ValueError:
                 pass
-    for c,_ in nodes:
+    for c, mask in nodes:
         rel = relpath(c,root)
         if not rel:
             continue
-        features = type_features(c.type)
-        if c.kind == K.FUNCTION_DECL:
-            features |= type_features(c.type.get_result())
-        if c.kind == K.VAR_DECL and c.tls_kind.value:
+        features = {word for bit, word in _TYPE_WORDS if mask & bit}
+        if mask & _TLS:
             # Use tokens only to distinguish the two spellings in diagnostics.
             features.add('__thread' if any(t.spelling == '__thread' for t in c.get_tokens())
                          else '_Thread_local')
@@ -77,7 +75,7 @@ def findings(tu, root, words, headers, public=False):
                     hits.add((rel,c.location.line,t.spelling))
         if public:
             features &= words
-        if c.kind in (K.STRUCT_DECL,K.UNION_DECL) and anonymous_api()(c) and c.semantic_parent and \
+        if mask & _ANONYMOUS and c.semantic_parent and \
                 c.semantic_parent.kind in (K.STRUCT_DECL,K.UNION_DECL):
             fields = tuple(x.spelling for x in c.get_children() if x.kind == K.FIELD_DECL)
             # Pre-existing HostDrv wire-layout members: preserve ABI, reject new shapes.
@@ -85,7 +83,7 @@ def findings(tu, root, words, headers, public=False):
                 ('ReplaceIfExists','AdvanceOnly'), ('ClusterCount','DeleteHandle'))
             if not inherited:
                 features.add('anonymous record')
-        if c.kind == K.FUNCTION_DECL and c.is_definition() and c.type.kind == T.FUNCTIONNOPROTO:
+        if mask & _OLD_STYLE:
             features.add('old-style definition')
         for feature in features:
             if feature in words or feature in ('VLA','anonymous record','old-style definition'):
