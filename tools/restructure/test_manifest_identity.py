@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOLS = ['tools/build_compare.py', 'tools/ci/sep_identity.py']
@@ -25,12 +26,33 @@ def exercise(root, directory):
     new_header = 'sys/include/memmap.h'
     for name in (old, blob, old_obj):
         (tree / name).parent.mkdir(parents=True, exist_ok=True)
-    (tree / old).write_text('const char path[] = "' + old_header + '";\n')
+    (tree / old_header).parent.mkdir()
+    (tree / old_header).write_text('#define VALUE 17\n')
+    def source(header, value='1'):
+        return (f'#include "{header}"\nconst char path[] = "map: {header}";\n'
+                f'int value = VALUE + {value};\n'
+                'const char stamp[] = __DATE__ " " __TIME__ " " COMMIT;\n')
+    (tree / old).write_text(source(old_header))
     (tree / blob).write_bytes(b'ISO')
-    (tree / 'Makefile').write_text('all:\n\tmkdir -p $(dir $(OBJ))\n\t$(CC) -c $(SRC) -o $(OBJ)\n')
-    def make(source, output):
-        return ['make', 'SRC=' + str(source), 'OBJ=' + str(output)]
-    subprocess.run(make(old, old_obj), cwd=tree, check=True, stdout=subprocess.DEVNULL)
+    (tree / 'Makefile').write_text(
+        'all: $(OBJ)\nbuild/out/obj/%.o: %.c\n\tmkdir -p $(@D)\n'
+        '\t$(CC) -I. -DCOMMIT=\\"$(OS32_BUILD_COMMIT)\\" -c $< -o $@\n')
+    def make(output):
+        return ['make', 'OBJ=' + str(output)]
+    def git(*args):
+        subprocess.run(['git', '-c', 'user.name=test', '-c', 'user.email=test@localhost',
+                        *args], cwd=tree, check=True, capture_output=True)
+    git('init', '-q')
+    git('add', 'Makefile', str(old), old_header)
+    git('commit', '-qm', 'baseline')
+    git('tag', '-a', 'v3-pre-restructure', '-m', 'capture baseline')
+    subprocess.run([sys.executable, '-B', root / TOOLS[0], '--baseline-build', '--tree', tree,
+                    '--', *make(old_obj)], check=True, stdout=subprocess.DEVNULL)
+    sha, epoch = subprocess.check_output(['git', 'show', '-s', '--format=%H %ct'],
+                                         cwd=tree, text=True).split()
+    assert sha[:12].encode() in (tree / old_obj).read_bytes()
+    stamp = time.strftime('%b %e %Y %H:%M:%S', time.gmtime(int(epoch))).encode()
+    assert stamp in (tree / old_obj).read_bytes()
     manifest = directory / 'sha256sums'
     lines = []
     for path in (old_obj, blob):
@@ -56,29 +78,33 @@ def exercise(root, directory):
     (tree / old).rename(tree / new)
     (tree / old_obj).unlink()
     (tree / blob).write_bytes(b'other ISO')
-    check('moved', 0, '0 missing, 0 different', command=make(new, new_obj))
+    check('moved', 0, '0 missing, 0 different', command=make(new_obj))
     # Change exactly one byte of the rebuilt object.
     path = tree / new_obj
     data = path.read_bytes()
     path.write_bytes(data[:-1] + bytes([data[-1] ^ 1]))
     check('one byte', 1, 'DIFF ' + str(new_obj))
     check('missing tool', 2, 'BUILD FAILED', command=['./no-such-tool'])
+    (tree / new_obj).unlink()
     (tree / new).write_text('#error broken\n')
-    check('broken make', 2, 'BUILD FAILED', command=make(new, new_obj))
+    check('broken make', 2, 'BUILD FAILED', command=make(new_obj))
     path.write_bytes(data)
     (tree / blob).unlink()
     check('missing ISO object', 3, 'MISSING ' + str(blob))
     (tree / blob).write_bytes(b'ISO')
-    def git(*args):
-        subprocess.run(['git', '-c', 'user.name=test', '-c', 'user.email=test@localhost',
-                        *args], cwd=tree, check=True, capture_output=True)
-    git('init', '-q')
-    git('commit', '--allow-empty', '-qm', 'baseline')
-    git('commit', '--allow-empty', '-qm', f'Sep-Changes: path-string {old_obj} {old_header}')
-    path.write_bytes(data.replace(old_header.encode(), new_header.encode()))
-    check('declared string', 0, 'MATCH path-string', args=['--base', 'HEAD^'])
+    (tree / new_header).parent.mkdir(parents=True)
+    (tree / old_header).rename(tree / new_header)
+    (tree / new).write_text(source(new_header))
+    git('add', '-u')
+    git('add', str(new), new_header)
+    git('commit', '-qm', f'Sep-Changes: path-string {old_obj} {old_header} {new}')
+    path.unlink()
+    check('recompiled header move', 0, 'MATCH path-string', command=make(new_obj))
     path.write_bytes(path.read_bytes() + b'x')
     check('extra byte after normalization', 1, 'DIFF ' + str(new_obj), args=['--base', 'HEAD^'])
+    (tree / new).write_text(source(new_header, '2'))
+    path.unlink()
+    check('changed initializer', 1, 'DIFF ' + str(new_obj), command=make(new_obj))
     git('commit', '--allow-empty', '-qm', 'Sep-Changes: x86')
     result = subprocess.run([sys.executable, '-B', root / TOOLS[0], '--manifest', manifest,
                              '--tree', tree, '--move-map', mapping, '--base', 'HEAD^'],
@@ -98,7 +124,9 @@ def main():
                     ('                    return moved', '                    return old'),
                     ("if result.returncode:\n            print('BUILD FAILED'", "if False:\n            print('BUILD FAILED'"),
                     ('missing += 1', 'missing += 0'),
-                    (' == data:', ' != data:'),
+                    (' != expected:', ' == expected:'),
+                    ('(normalized, digest)', '(original, digest)'),
+                    ('SOURCE_DATE_EPOCH=epoch', "SOURCE_DATE_EPOCH='0'"),
                     ('different += 1\n    if not seen', 'different += 0\n    if not seen')]):
                 mutant = work / str(i)
                 for file in TOOLS:
