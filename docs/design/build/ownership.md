@@ -23,7 +23,7 @@ P1-0 の個別の用途判断を先に適用し、製品にだけ P0-1 の層を
 
 像の対象は、その構成が何をコンパイル・リンクするかで決める。所属は、実装が提供する機能と、その実装に必要な命令・機種仕様・装置で決める。例えば userland/ppc/hello.c は PPC 像に入るが SDK の呼出しだけなので共通実装。同じ場所の dbprob.c は FPSCR を操作するため CPU 固有。lib/kprintf.c は C_COMMON_CORE で書式処理を提供し、固定名 platform_kprintf.h を通じて機種に出力を委ねるため共通実装。
 
-P1 の照合は check_layers.owner の名前つきヘッダと配置、担当表の用途、基点の Make 所属集合に直接記されたソースを使う。すべての所属候補と記入値を照合し、食い違いをパスごとに表示する。採用した種類と理由を「所属判断=種類：理由」と根拠欄に記す。例えば drivers/pci/pci.c は C_COMMON_EXEC に入るが、PCI 装置の処理を提供する。条件式・wildcard を含む像の依存全体の展開は P2 の問い合わせが扱う。
+P1 の照合は check_layers.owner の名前つきヘッダと配置、担当表の用途、基点の Make 所属集合に直接記されたソースを使う。すべての所属候補と記入値を照合し、食い違いをパスごとに表示する。NAMED のヘッダと固定名の契約ヘッダは、その宣言・配置が定める所属と異なれば根拠欄の記述にかかわらず失敗する。その他の食い違いでは採用した種類と理由を「所属判断=種類：理由」と根拠欄に記す。例えば drivers/pci/pci.c は C_COMMON_EXEC に入るが、PCI 装置の処理を提供する。条件式・wildcard を含む像の依存全体の展開は P2 の問い合わせが扱う。
 
 ## P2 の正本と問い合わせ
 
@@ -53,6 +53,7 @@ sdk/include の 19 ヘッダでは public が true のまま images に依存先
 | tools/check_c_dialect.py | VENDOR_DIRS、SDK_HDR_DIR、公開ヘッダ・見本の glob | 第三者の所属、SDK 配布宣言の public、見本のビルド入力から対象を得る。C 方言の規則は検査に残す |
 | tools/check_av_portable.py | sound/hal・input/hal の C とヘッダ | 所属宣言に HAL の役割とサブシステムを付けて選ぶ |
 | tools/check_usb_portable.py | drivers/usb の走査とファイル名の接頭辞 | USB の所属宣言と実装の役割から対象を選ぶ。許される include は検査の契約 |
+| tools/check_manifests.py、tools/g16/scan_ui_chars.py、tools/gen_kdebug_imports.py、tools/gen_hwdev_contract.py | 順にプログラムの入力、GUI のソース、後二者は GF のソース・ヘッダ | 各対象を共通の所属・依存の宣言から列挙する |
 | tools/check_privileged.py | SCAN_DIRS の userland 以下の object | 像のユーザーランド入力から対応する object を取得する |
 | tools/restructure/owners.py | KERNEL_ROOTS と調査対象の規則 | P2 の全件照合後 P7 で撤去 |
 | tools/restructure/hal_inventory.py | COMMON・OWNERS・SCOPES | 役割の判断を HAL の表に渡し P7 で撤去 |

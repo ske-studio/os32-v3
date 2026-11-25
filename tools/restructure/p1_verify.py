@@ -113,7 +113,17 @@ def layer_declarations(source):
     return values['NAMED'], values['DEVICE_ROOTS']
 
 
-def placement_kind(path, kind, named, devices):
+def declared_header_kind(path, named):
+    parts = path.split('/')
+    if len(parts) == 2 and parts[0] == 'include' and parts[1] in named:
+        return LAYER_KIND[named[parts[1]][0]]
+    if (len(parts) == 3 and parts[0] in ('arch', 'platform')
+            and parts[2].startswith(parts[0] + '_') and parts[2].endswith('.h')):
+        return LAYER_KIND[parts[0]]
+    return None
+
+
+def placement_kind(path, kind, devices):
     if kind != '製品':
         return {'公開物': '公開インターフェース', '運用の道具': '開発・検査用実装',
                 **dict.fromkeys(KINDS['P1-4'], '開発・検査用実装')}.get(kind, kind)
@@ -122,8 +132,6 @@ def placement_kind(path, kind, named, devices):
     if path.startswith('boot/'):
         return '機種固有実装'
     parts = path.split('/')
-    if len(parts) == 2 and parts[0] == 'include' and parts[1] in named:
-        return LAYER_KIND[named[parts[1]][0]]
     if len(parts) > 2 and parts[0] in ('arch', 'platform'):
         return LAYER_KIND[parts[0]]
     if parts[0] in devices:
@@ -178,7 +186,10 @@ def verify_scope(table, base, list_candidates=False):
             path, owner, kind, reason, caller, ownership = row
             if ownership not in OWNERSHIP_KINDS:
                 issues.append(f'{path}: 所属種類が空または不正 ({ownership})')
-            evidence = {placement_kind(path, kind, named, devices)}
+            header_kind = declared_header_kind(path, named)
+            if header_kind and ownership != header_kind:
+                issues.append(f'{path}: ヘッダの所属は {header_kind} に固定')
+            evidence = {header_kind or placement_kind(path, kind, devices)}
             if kind == '製品':
                 evidence.update(members.get(path, ()))
             decision = re.search(r'所属判断=([^：]+)：(\S.*)', reason)
