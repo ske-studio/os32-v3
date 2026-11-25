@@ -250,7 +250,7 @@ def main():
                     assert 'ATA-TEST child=73 provider_calls=0' in lines, lines[-10:]
                 else:
                     metadata = actual[:2048] + actual[root_start*512:]
-                    assert f'ATA-TEST metadata={zlib.crc32(metadata):08x}' in lines
+                    assert f'ATA-TEST metadata={zlib.crc32(metadata):08x}' in lines, (case, cpu, lines[-10:])
                     expected[:2048] = actual[:2048]
                     expected[root_start*512:] = actual[root_start*512:]
                     assert 'ATA-TEST end=0' in lines
