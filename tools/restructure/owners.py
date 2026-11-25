@@ -355,6 +355,8 @@ def non_image_role(path):
         return 'public-interface', 'sdk/include/' if path.startswith('sdk/include/') else path
     if parts[0] == 'docs' or Path(path).suffix.lower() == '.md' or parts[-1].split('.')[0].upper() == 'README':
         return 'document', 'docs/' if parts[0] == 'docs' else parts[-1]
+    if path.startswith('.github/actions/'):
+        return 'development-test', '.github/actions/'
     if parts[0] == 'tools' or 'tests' in parts[:-1] or path.startswith('.github/workflows/'):
         rule = 'tools/' if parts[0] == 'tools' else 'tests/' if 'tests' in parts[:-1] else '.github/workflows/'
         return 'development-test', rule

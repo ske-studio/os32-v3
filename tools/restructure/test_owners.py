@@ -24,6 +24,10 @@ def example(tables_for):
     cases = [(path, '100644') for path in examples]
     extra = tables_for(cases, ({}, {}, {}))['owners']
     assert all(row[1] == examples[row[0]] and row[2].startswith(row[1] + ': ') for row in extra)
+    action = '.github/actions/custom/action.yml'
+    action_tables = tables_for([(action, '100644')], ({}, {}, {}))
+    assert action_tables['owners'][0][1:3] == ('development-test', 'development-test: .github/actions/')
+    assert not action_tables['owner-empty']
     assert rows[2][2] == 'named/platform/pc98'
     assert rows[-1][1] == 'gitlink'
     assert tables['no-set'] == [rows[3]]
@@ -87,6 +91,7 @@ def run(mutate):
         original = path.read_text()
         for old, new in [("path == 'sdk/kapi.json'", "False"),
                          ("parts[0] == 'docs' or", "False or"),
+                         ("path.startswith('.github/actions/')", "False"),
                          ("path.startswith('.github/workflows/')", "False"),
                          ('len(features) >= 2', 'len(features) > 2'),
                          ("elif path.split('/')[0] in KERNEL_ROOTS or image:", "elif True:"),
