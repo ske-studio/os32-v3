@@ -108,11 +108,13 @@ def exercise(root, directory):
     check('changed initializer', 1, 'DIFF ' + str(new_obj), command=make(new_obj))
     # Two moved names in a comment, including a repeated non-NUL occurrence.
     text_artifact = Path('public.h')
-    before = f'/* {old_header} references {old} and {old_header} */\n'
+    before = f'/* {old_header} references {old} and {old_header}; vendor/{old_header} */\n'
     (directory / text_artifact).write_text(before)
     with manifest.open('a') as out:
         out.write(hashlib.sha256(before.encode()).hexdigest() + '  public.h\n')
-    (tree / text_artifact).write_text(before.replace(old_header, new_header).replace(str(old), str(new)))
+    broad = before.replace(old_header, new_header).replace(str(old), str(new))
+    correct = broad.replace(f'vendor/{new_header}', f'vendor/{old_header}')
+    (tree / text_artifact).write_text(correct)
     asm = Path('lib/sample.asm')
     moved_asm = Path('sys/kern/sample.asm')
     asm_obj = Path('sample.o')
@@ -142,6 +144,9 @@ def exercise(root, directory):
     check('missing presence-only media', 3, 'MISSING ' + media, command=['make', str(new_obj), str(asm_obj)])
     (tree / media).touch()
     check('text and NASM', 0, '0 missing, 0 different', args=['--base', 'v3-pre-restructure'])
+    (tree / text_artifact).write_text(broad)
+    check('undeclared vendor path', 1, 'DIFF public.h', args=['--base', 'v3-pre-restructure'])
+    (tree / text_artifact).write_text(correct)
     with (tree / text_artifact).open('a') as out:
         out.write(' ')
     check('unrelated text byte', 1, 'DIFF public.h', args=['--base', 'v3-pre-restructure'])
@@ -167,6 +172,7 @@ def main():
                     ('for contents, expected in ((original, hashlib.sha256(data).hexdigest()),', 'for contents, expected in ((original, digest),'),
                     ('(normalized, digest)', '(original, digest)'),
                     ("hashes.keys() | presence", "hashes.keys()"),
+                    ('pattern = PATH_START + b"(?:"', 'pattern = b"(?:"'),
                     ("matches = re.sub(pattern,", "matches = re.sub(b'never-match',"),
                     ("(source, digest)):", "(moved, digest)):"),
                     ('SOURCE_DATE_EPOCH=epoch', "SOURCE_DATE_EPOCH='0'"),

@@ -345,6 +345,11 @@ def replay_asm(tree, target, source, moved, data, digest, env):
     return True
 
 
+# A declared move names a complete repository-relative path.
+PATH_START = rb"""(?<![^\s\x00"'(<`])"""
+PATH_END = rb"""(?=$|[\s\x00"'>),;`])"""
+
+
 def replay_literal(tree, target, literal_input, source, moved, data, digest, env):
     """Rebuild the candidate target with each spelling. Compare entire artifacts."""
     if str(moved).encode() + b'\0' not in data:
@@ -363,7 +368,7 @@ def replay_literal(tree, target, literal_input, source, moved, data, digest, env
 
         def replace(match):
             token = match[0]
-            if token.startswith(b'"') and token.endswith(suffix):
+            if token.startswith(b'"') and re.search(PATH_START + re.escape(suffix) + rb'\Z', token):
                 return token[:-len(suffix)] + str(source).encode() + b'"'
             return token
 
@@ -466,6 +471,7 @@ def compare_saved(manifest, tree, move_map, messages, env):
                 if b'\0' in before:
                     replacements = {src + b'\0': dst + b'\0' for src, dst in replacements.items()}
                 pattern = b'|'.join(map(re.escape, sorted(replacements, key=len, reverse=True)))
+                pattern = PATH_START + b"(?:" + pattern + b")" + (b"" if b"\0" in before else PATH_END)
                 matches = re.sub(pattern, lambda m: replacements[m[0]], before) == data
                 if before.startswith(b'\x7fELF') and any(len(k) != len(v) for k, v in replacements.items()):
                     matches = False
