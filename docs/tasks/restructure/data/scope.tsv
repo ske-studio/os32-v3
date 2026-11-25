@@ -1,4 +1,5 @@
 パス	担当	種類	根拠	外の呼び出し元	所属種類
+.cargo/config.toml	P1-1	ビルドの定義	Rust のビルド設定	—	ビルドの定義
 .claude/agents/reviewer.md	文書	文書	説明・仕様・ライセンスを記す文書	—	文書
 .claude/hooks/after_compact.sh	P1-1	運用の道具	開発環境の設定・運用	—	開発・検査用実装
 .claude/hooks/protect_generated.sh	P1-1	運用の道具	開発環境の設定・運用	—	開発・検査用実装
@@ -235,6 +236,7 @@ build/boot.mk	P1-1	ビルドの定義	像・パッケージ・依存またはツ
 build/build-id.mk	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
 build/cd-module.ld	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
 build/cd-module.mk	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
+build/check.mk	P1-4	実行の基盤	検査の登録・起動	—	開発・検査用実装
 build/cirrus-module.ld	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
 build/cirrus-module.mk	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
 build/config.mk	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
@@ -746,6 +748,8 @@ docs/design/boot/loader_fat_new.md	文書	文書	文書ツリーの本文・添�
 docs/design/boot/lz4_mini.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/design/boot/vk32_boot.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/design/build/README.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
+docs/design/build/hal_layout.md	文書	文書	作り直しの設計・台帳	—	文書
+docs/design/build/ownership.md	文書	文書	作り直しの設計・台帳	—	文書
 docs/design/build/select.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/design/drivers/README.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/design/drivers/ata/README.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
@@ -1105,6 +1109,7 @@ docs/design/tools/check_nano_inputs.md	文書	文書	文書ツリーの本文・
 docs/design/tools/checks/README.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/design/tools/checks/convert.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/design/tools/checks/run.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
+docs/design/tools/ci/ci_v2.md	文書	文書	作り直しの設計・台帳	—	文書
 docs/design/tools/ci/gate.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/design/tools/ci/sep_identity.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/design/tools/ci/time_inventory.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
@@ -1379,6 +1384,7 @@ docs/tasks/restructure/NOW.md	文書	文書	文書ツリーの本文・添付・
 docs/tasks/restructure/P0.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/tasks/restructure/P0_FINDINGS.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/tasks/restructure/P1.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
+docs/tasks/restructure/P1_LAYOUT.md	文書	文書	作り直しの設計・台帳	—	文書
 docs/tasks/restructure/P2.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/tasks/restructure/P3.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/tasks/restructure/P4.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
@@ -1389,6 +1395,12 @@ docs/tasks/restructure/P8.md	文書	文書	文書ツリーの本文・添付・�
 docs/tasks/restructure/RULES.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/tasks/restructure/SRC_QA_RESTRUCTURE_SPEC.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/tasks/restructure/TASK_RESTRUCTURE.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
+docs/tasks/restructure/data/hal_map.tsv	文書	文書	作り直しの設計・台帳	—	文書
+docs/tasks/restructure/data/layout.tsv	文書	文書	作り直しの設計・台帳	—	文書
+docs/tasks/restructure/data/layout_review.tsv	文書	文書	作り直しの設計・台帳	—	文書
+docs/tasks/restructure/data/layout_splits.tsv	文書	文書	作り直しの設計・台帳	—	文書
+docs/tasks/restructure/data/move_map.json	文書	文書	作り直しの設計・台帳	—	文書
+docs/tasks/restructure/data/scope.tsv	文書	文書	作り直しの設計・台帳	—	文書
 docs/tasks/settings/DESIGN.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/tasks/settings/DEVICE_RESERVATION.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
 docs/tasks/settings/F2_OWNERSHIP.md	文書	文書	文書ツリーの本文・添付・管理データ	—	文書
@@ -3180,12 +3192,10 @@ tools/accept/gf_accel.py	P1-4	検査の本体	対象を起動または解析し�
 tools/accept/gf_c.md	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/accept/gf_main.md	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/accept/gf_s8.md	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
-tools/accept/in2_gui_mutations.py	P1-1	運用の道具	PC-98 受入媒体の生成に使用。P2-3 で tools/in2_gui_mutations.py に移設済み。候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/accept/in2_gui_trial.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—	開発・検査用実装
 tools/accept/kdbg_probes.md	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/accept/np21w_key_edge.patch	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/accept/pc98_in2_gui.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	pc98emu の操作・受入台本	開発・検査用実装
-tools/accept/pc98_in2_image.py	P1-1	運用の道具	PC-98 受入媒体の生成に使用。P2-3 で tools/pc98_in2_image.py に移設済み。候補印=期待値・試験入力。	—	開発・検査用実装
 tools/accept/ppc_boot_info.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—	開発・検査用実装
 tools/accept/ppc_console_cells.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—	開発・検査用実装
 tools/accept/ppc_db.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—	開発・検査用実装
@@ -3363,6 +3373,7 @@ tools/checks/hdd-stage2-host.py	P1-4	検査の本体	検査登録または登録
 tools/checks/hsync-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
 tools/checks/hwdev-audit-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
 tools/checks/hwdev-module-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
+tools/checks/install-iso-dates.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
 tools/checks/jobs-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
 tools/checks/kapi-abi-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
 tools/checks/kapi-abi.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
@@ -3535,9 +3546,13 @@ tools/checks/privileged.py	P1-4	検査の本体	検査登録または登録が�
 tools/checks/r1-fixture-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
 tools/checks/ramfs-sqlite-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
 tools/checks/recover-tables-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
+tools/checks/restructure_p1_0.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
+tools/checks/restructure_p2_1.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
+tools/checks/restructure_tool_callers.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
 tools/checks/ring3-guard-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
 tools/checks/rshell-serial-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
 tools/checks/run.py	P1-4	実行の基盤	登録の実行・環境選択・シャードの所要時間を管理	—	開発・検査用実装
+tools/checks/rust-build-paths.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
 tools/checks/sbrk-crt-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
 tools/checks/sep5-boot-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
 tools/checks/sep5-trace-host.py	P1-4	検査の本体	検査登録または登録が実行する判定	—	開発・検査用実装
@@ -3619,12 +3634,13 @@ tools/emu_agent/playbook.py	P1-1	運用の道具	開発・製造・配備用の 
 tools/emu_agent/tasks/regress.txt	P1-4	試験の支援	配備後の回帰試験で転記する観測値と操作を指定する。 候補印=合否語、期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/emu_agent/tasks/v86_dos.txt	P1-1	運用の道具	開発・製造・配備用の emu_agent/tasks/v86_dos.txt。エミュレータの操作と画面観測を行うための命令・実行手順。 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/fd_netcd_config.py	P1-1	運用の道具	開発・製造・配備用の fd_netcd_config.py。配備する媒体・パッケージを生成または更新する。 候補印=異常終了、期待値・試験入力。	—	開発・検査用実装
+tools/fd_reader.py	P1-1	運用の道具	配布媒体の FAT12・D88 を読む 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/fep_budget_capture.py	P1-4	検査の本体	MEMSYS5 の PASS、F9 の成功、回収記録の網羅を判定する。 候補印=合否語、期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/fep_compiler.py	P1-1	運用の道具	開発・製造・配備用の fep_compiler.py。入力辞書を FEP が読む形式へ変換する。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/fep_to_sqlite.py	P1-1	運用の道具	開発・製造・配備用の fep_to_sqlite.py。入力辞書を FEP が読む形式へ変換する。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/fetch_fonts.py	P1-1	運用の道具	開発・製造・配備用の fetch_fonts.py。配布物を取得し、取得先に保存する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/g16/gen_preload16.py	P1-1	運用の道具	開発・製造・配備用の g16/gen_preload16.py。GUI フォントの文字集合・グリフ・先読みデータを生成する。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
-tools/g16/scan_ui_chars.py	P1-1	運用の道具	開発・製造・配備用の g16/scan_ui_chars.py。GUI フォントの文字集合・グリフ・先読みデータを生成する。 候補印=異常終了。	—	開発・検査用実装
+tools/g16/scan_ui_chars.py	P1-1	運用の道具	開発・製造・配備用の g16/scan_ui_chars.py。GUI フォントの文字集合・グリフ・先読みデータを生成する。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/g16/ui_chars.txt	P1-1	運用の道具	開発・製造・配備用の g16/ui_chars.txt	—	開発・検査用実装
 tools/gen_build_id.py	P1-1	運用の道具	開発・製造・配備用の gen_build_id.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/gen_deploy_set.py	P1-1	運用の道具	開発・製造・配備用の gen_deploy_set.py。配備・配布するファイル集合と世代の記録を組み立てる。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
@@ -3652,6 +3668,7 @@ tools/gen_v86_int80.py	P1-1	ビルドの定義	担当の直し（P1-4 → P1-1�
 tools/gfinit_mode_tables.py	P1-1	運用の道具	開発・製造・配備用の gfinit_mode_tables.py。GPU 初期化の記録・ROM を読み、設定や記録を展開する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/gfinit_rom_check.py	P1-4	検査の本体	test_gfinit_fixture.py が使う ROM 初期化領域の長さ・CRC32 の期待値照合	—	開発・検査用実装
 tools/gfinit_rom_decode.py	P1-1	運用の道具	開発・製造・配備用の gfinit_rom_decode.py。GPU 初期化の記録・ROM を読み、設定や記録を展開する。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
+tools/gfinit_romfile_host.c	P1-1	運用の道具	ROM 診断器が組むホストプログラム 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/gfinit_source.py	P1-1	運用の道具	開発・製造・配備用の gfinit_source.py。GPU 初期化の記録・ROM を読み、設定や記録を展開する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/gserial.py	P1-1	運用の道具	開発・製造・配備用の gserial.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	実機ノートの採取・転送台本	開発・検査用実装
 tools/guest_tests.py	P1-4	実行の基盤	試験群の実行・登録または結果集計	—	開発・検査用実装
@@ -3677,6 +3694,7 @@ tools/hwdev_layout.json	P1-1	運用の道具	開発・製造・配備用の hwde
 tools/img2mgx.py	P1-1	運用の道具	開発・製造・配備用の img2mgx.py。画像や資産をゲスト用の形式に変換する工程で使う。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/img2osri.py	P1-1	運用の道具	開発・製造・配備用の img2osri.py。画像や資産をゲスト用の形式に変換する工程で使う。 候補印=期待値・試験入力。	—	開発・検査用実装
 tools/img2vbz.py	P1-1	運用の道具	開発・製造・配備用の img2vbz.py。画像や資産をゲスト用の形式に変換する工程で使う。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
+tools/in2_gui_mutations.py	P1-1	運用の道具	PC-98 受入媒体の生成に使用。P2-3 で tools/in2_gui_mutations.py に移設済み。 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/include_resolve.py	P1-1	運用の道具	開発・製造・配備用の include_resolve.py	—	開発・検査用実装
 tools/jobs.sh	P1-1	運用の道具	開発・製造・配備用の jobs.sh。開発作業のジョブやレビューを起動し、結果を呼び出し元へ渡す。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/kbd_import.py	P1-1	運用の道具	開発・製造・配備用の kbd_import.py。ビルドで使う文字・キーの変換表を生成する。 候補印=期待値・試験入力。	—	開発・検査用実装
@@ -3701,7 +3719,7 @@ tools/mkshlib.py	P1-1	運用の道具	開発・製造・配備用の mkshlib.py�
 tools/mkvmkernel.py	P1-1	運用の道具	開発・製造・配備用の mkvmkernel.py。配備する媒体・パッケージを生成または更新する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/module_schema.py	P1-1	運用の道具	開発・製造・配備用の module_schema.py。データやリンク結果を製品のビルドが必要とする形式に整える。 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/move_docs.py	P1-1	運用の道具	開発・製造・配備用の move_docs.py。移設・編集の際にソースや文書の参照を書き換える。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
-tools/move_files.py	P1-1	運用の道具	開発・製造・配備用の move_files.py	—	開発・検査用実装
+tools/move_files.py	P1-1	運用の道具	開発・製造・配備用の move_files.py 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/net_l0_test.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
 tools/net_l1_test.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
 tools/net_l2_test.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
@@ -3739,6 +3757,7 @@ tools/osri_enc2_tree.py	P1-1	運用の道具	開発・製造・配備用の osri
 tools/osri_profile.py	P1-1	運用の道具	開発・製造・配備用の osri_profile.py。画像や資産をゲスト用の形式に変換する工程で使う。 候補印=期待値・試験入力。	—	開発・検査用実装
 tools/pack_name_tables.txt	P1-1	運用の道具	開発・製造・配備用の pack_name_tables.txt。依頼パックに収録するパスと作業上の注意を供給する。 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/pack_notes.txt	P1-1	運用の道具	開発・製造・配備用の pack_notes.txt。依頼パックに収録するパスと作業上の注意を供給する。 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
+tools/pc98_in2_image.py	P1-1	運用の道具	PC-98 受入媒体の生成に使用。P2-3 で tools/pc98_in2_image.py に移設済み。 候補印=期待値・試験入力。	—	開発・検査用実装
 tools/pc98pt.py	P1-1	運用の道具	開発・製造・配備用の pc98pt.py。PC-98 区画表を読み書きする。 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/ppc/README.md	P1-1	運用の道具	PowerPC の像の作成・実行手順が参照する PPC 用の運用道具と一緒に移す 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/ppc/ata_accept.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—	開発・検査用実装
@@ -3948,6 +3967,11 @@ tools/prune_stale.py	P1-1	運用の道具	開発・製造・配備用の prune_s
 tools/r1_manifest.py	P1-1	ビルドの定義	担当の直し（P1-4 → P1-1）：kernel-r1 が manifest を生成	—	ビルドの定義
 tools/raster_obs_assets.py	P1-4	試験の支援	N01〜N16 の観測用資産と配備マニフェストを生成する。 候補印=期待値・試験入力。	—	開発・検査用実装
 tools/raster_splash_asset.py	P1-1	運用の道具	開発・製造・配備用の raster_splash_asset.py。画像や資産をゲスト用の形式に変換する工程で使う。 候補印=異常終了。	—	開発・検査用実装
+tools/recover_oracle.py	P1-1	運用の道具	GF の生成器で固定表を評価する 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
+tools/recover_tables/recover_tables_host.c	P1-1	運用の道具	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_host.c に移設済み。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
+tools/recover_tables/recover_tables_host.h	P1-1	運用の道具	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_host.h に移設済み。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
+tools/recover_tables/recover_tables_oracle.c	P1-1	運用の道具	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_oracle.c に移設済み。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
+tools/recover_tables/recover_tables_oracle.json	P1-1	運用の道具	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_oracle.json に移設済み。 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/remote_transport.py	P1-1	運用の道具	開発・製造・配備用の remote_transport.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=登録・check 目標・workflow の参照。	実機ノート /opt/os32 の常駐サービスと運用台本	開発・検査用実装
 tools/review_local.py	P1-1	運用の道具	開発・製造・配備用の review_local.py。開発作業のジョブやレビューを起動し、結果を呼び出し元へ渡す。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/rshell.py	P1-1	運用の道具	開発・製造・配備用の rshell.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。 候補印=異常終了、期待値・試験入力。	実機ノート /opt/os32 の常駐サービスと運用台本、pc98emu の操作・受入台本	開発・検査用実装
@@ -4379,7 +4403,6 @@ tools/tests/gfinit_plan_c_host.c	P1-4	試験の支援	登録試験から組み�
 tools/tests/gfinit_plan_host.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—	開発・検査用実装
 tools/tests/gfinit_pll_host.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—	開発・検査用実装
 tools/tests/gfinit_resources_ra266.h	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
-tools/tests/gfinit_romfile_host.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—	開発・検査用実装
 tools/tests/gfinit_s0_cases_host.inc	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/tests/gfinit_s0_host.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—	開発・検査用実装
 tools/tests/gfinit_sequence_host.inc	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
@@ -4841,10 +4864,6 @@ tools/tests/recover_hostshim/io.h	P1-4	試験の支援	検査が使う手順・�
 tools/tests/recover_t2_host.inc	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/tests/recover_t3_host.inc	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/tests/recover_tables_bounds.h	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
-tools/tests/recover_tables_host.c	P1-1	運用の道具	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_host.c に移設済み。候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
-tools/tests/recover_tables_host.h	P1-1	運用の道具	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_host.h に移設済み。候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
-tools/tests/recover_tables_oracle.c	P1-1	運用の道具	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_oracle.c に移設済み。候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
-tools/tests/recover_tables_oracle.json	P1-1	運用の道具	GF の生成器が固定表を評価する入力。P2-3 で tools/recover_tables/recover_tables_oracle.json に移設済み。候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/tests/recover_virtual_cases_host.inc	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/tests/recover_virtual_fixture_host.inc	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/tests/recover_virtual_host.c	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—	開発・検査用実装
@@ -6502,7 +6521,10 @@ tools/restructure/check_inventory.py	開発・検査用実装
 tools/restructure/ci_baseline.py	開発・検査用実装
 tools/restructure/external_paths.py	開発・検査用実装
 tools/restructure/hal_inventory.py	開発・検査用実装
+tools/restructure/layout.py	開発・検査用実装
+tools/restructure/merge_hal.py	開発・検査用実装
 tools/restructure/owners.py	開発・検査用実装
+tools/restructure/p1_verify.py	開発・検査用実装
 tools/restructure/path_refs.py	開発・検査用実装
 tools/restructure/quality_candidates.py	開発・検査用実装
 tools/restructure/test_build_refs.py	開発・検査用実装
@@ -6510,6 +6532,10 @@ tools/restructure/test_ci_baseline.py	開発・検査用実装
 tools/restructure/test_external_paths.py	開発・検査用実装
 tools/restructure/test_hal_inventory.py	開発・検査用実装
 tools/restructure/test_inventory.py	開発・検査用実装
+tools/restructure/test_manifest_identity.py	開発・検査用実装
 tools/restructure/test_owners.py	開発・検査用実装
+tools/restructure/test_p1_verify.py	開発・検査用実装
 tools/restructure/test_path_refs.py	開発・検査用実装
 tools/restructure/test_quality_candidates.py	開発・検査用実装
+tools/restructure/test_tool_callers.py	開発・検査用実装
+tools/restructure/tool_callers.py	開発・検査用実装

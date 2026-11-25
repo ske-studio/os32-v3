@@ -313,6 +313,38 @@ def fixed_build_env(tree, base):
                 TZ='UTC', LC_ALL='C')
 
 
+def replay_asm(tree, target, source, moved, data, digest, env):
+    """Replay NASM's implicit ELF file symbol with the old input filename."""
+    with tempfile.TemporaryDirectory() as directory:
+        work = Path(directory)
+        copy_candidate(tree, work)
+        old = work / source
+        if old.exists():
+            return False
+        old.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(work / moved, old)
+        for spelling, expected in ((moved, hashlib.sha256(data).hexdigest()), (source, digest)):
+            # Keep the candidate recipe, assembler, flags and objcopy. Only
+            # replace the exact source argument passed to the assembler.
+            wrapper = work / 'replay-asm.py'
+            wrapper.write_text(
+                'import os, sys\n'
+                f'args = [{str(spelling)!r} if a == {str(moved)!r} else a for a in sys.argv[1:]]\n'
+                'os.execvp(args[0], args)\n')
+            (work / 'replay.mk').write_text('override AS := python3 replay-asm.py $(AS)\n')
+            output = work / target
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.unlink(missing_ok=True)
+            try:
+                subprocess.run(['make', '-f', 'Makefile', '-f', 'replay.mk', str(target)],
+                               cwd=work, env=env, check=True)
+            except (OSError, subprocess.CalledProcessError) as error:
+                raise ValueError(f'BUILD FAILED {target}: {error}') from error
+            if hashlib.sha256(output.read_bytes()).hexdigest() != expected:
+                return False
+    return True
+
+
 def replay_literal(tree, target, literal_input, source, moved, data, digest, env):
     """Rebuild the candidate target with each spelling. Compare entire artifacts."""
     if str(moved).encode() + b'\0' not in data:
@@ -342,6 +374,7 @@ def replay_literal(tree, target, literal_input, source, moved, data, digest, env
                                    (normalized, digest)):
             path.write_bytes(contents)
             output = work / target
+            output.parent.mkdir(parents=True, exist_ok=True)
             output.unlink(missing_ok=True)
             try:
                 subprocess.run(['make', str(target)], cwd=work, env=env, check=True)
@@ -362,29 +395,40 @@ def compare_saved(manifest, tree, move_map, messages, env):
             if len(fields) not in (4, 5) or fields[1] != 'path-string':
                 raise ValueError('expected Sep-Changes: path-string ARTIFACT OLD_PATH')
             artifact, old = map(relative, fields[2:4])
-            if old not in moves or artifact in rules:
+            if old not in moves or old in rules.get(artifact, {}):
                 raise ValueError(f'invalid path-string declaration: {line}')
             literal_input = relative(fields[4]) if len(fields) == 5 else None
-            if literal_input and literal_input.suffix not in ('.c', '.h', '.inc'):
-                raise ValueError(f'expected C literal input: {literal_input}')
-            rules[artifact] = old, literal_input
+            if literal_input and literal_input.suffix not in ('.c', '.h', '.inc', '.asm'):
+                raise ValueError(f'expected literal or assembler input: {literal_input}')
+            rules.setdefault(artifact, {})[old] = literal_input
 
     objects = {src.with_suffix('.o'): (src, dst) for src, dst in moves.items()
                if src.suffix in ('.c', '.S', '.s', '.asm')}
-    volatile = {Path('build/out/ppc-kboot') / image / 'root_image_blob.o'
-                for image in ('', 'link', 'link-sh', 'sh', 'shell', 'neg1')}
+    presence_path = manifest.with_name('PRESENCE')
+    presence = set()
+    for name in presence_path.read_text().splitlines():
+        path = relative(name)
+        if path in presence:
+            raise ValueError(f'duplicate PRESENCE entry: {path}')
+        presence.add(path)
     missing = different = 0
     seen = set()
     targets = set()
+    hashes = {}
     for line in manifest.read_text().splitlines():
         match = re.fullmatch(r'([0-9a-f]{64}) [ *](.+)', line)
         if not match:
             raise ValueError(f'invalid sha256sum line: {line}')
         digest, name = match.groups()
         old = relative(name)
-        target = candidate_path(tree, old, moves, objects)
-        if old in seen:
+        if old in hashes:
             raise ValueError(f'duplicate manifest entry: {old}')
+        hashes[old] = digest
+    if rules.keys() & presence:
+        raise ValueError('path-string declaration for presence-only artifact')
+    for old in sorted(hashes.keys() | presence):
+        digest = hashes.get(old)
+        target = candidate_path(tree, old, moves, objects)
         if target in targets:
             raise ValueError(f'multiple manifest entries map to {target}')
         seen.add(old)
@@ -394,26 +438,39 @@ def compare_saved(manifest, tree, move_map, messages, env):
             print('MISSING', target)
             missing += 1
             continue
-        if old in volatile:
+        if old in presence:
             continue
         data = path.read_bytes()
         if hashlib.sha256(data).hexdigest() == digest:
             continue
         if old in rules:
-            source, literal_input = rules[old]
+            declared = rules[old]
             before = (manifest.parent / old).read_bytes()
             if hashlib.sha256(before).hexdigest() != digest:
                 raise ValueError(f'corrupt baseline: {old}')
-            if literal_input:
-                matches = replay_literal(tree, target, literal_input, source, moves[source],
-                                         data, digest, env)
-            elif before.startswith(b'\x7fELF') and len(str(source).encode()) != len(str(moves[source]).encode()):
-                matches = False
+            if any(declared.values()):
+                if len(declared) != 1:
+                    raise ValueError(f'replay requires a single literal input: {old}')
+                source, literal_input = next(iter(declared.items()))
+                if literal_input.suffix == '.asm':
+                    if literal_input != moves[source]:
+                        raise ValueError(f'expected mapped assembler input: {literal_input}')
+                    matches = replay_asm(tree, target, source, literal_input, data, digest, env)
+                else:
+                    matches = replay_literal(tree, target, literal_input, source, moves[source],
+                                             data, digest, env)
             else:
-                matches = before.replace(str(source).encode() + b'\0',
-                                         str(moves[source]).encode() + b'\0') == data
+                replacements = {str(src).encode(): str(moves[src]).encode() for src in declared}
+                # A text comment has no terminator. Retain the stricter binary
+                # literal contract, including ELF layout, for other artifacts.
+                if b'\0' in before:
+                    replacements = {src + b'\0': dst + b'\0' for src, dst in replacements.items()}
+                pattern = b'|'.join(map(re.escape, sorted(replacements, key=len, reverse=True)))
+                matches = re.sub(pattern, lambda m: replacements[m[0]], before) == data
+                if before.startswith(b'\x7fELF') and any(len(k) != len(v) for k, v in replacements.items()):
+                    matches = False
             if matches:
-                print('MATCH path-string', old, source)
+                print('MATCH path-string', old, *declared)
                 continue
         print('DIFF', target)
         different += 1

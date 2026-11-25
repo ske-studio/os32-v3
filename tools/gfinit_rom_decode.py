@@ -5,14 +5,13 @@ ROM copy and prints the decode counters and failing pc. The ROM is turned into a
 array only inside a temporary directory; no ROM bytes are printed or written into
 the repository. Does not disassemble anything.
 """
+import os
 import pathlib
 import subprocess
 import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / 'tools/tests'))
-import host32  # noqa: E402
 
 FLAGS = ['-std=gnu11', '-Wall', '-Wextra', '-Werror', '-m32', '-march=i386',
          '-ffreestanding', '-fno-pie', '-fno-stack-protector']
@@ -28,10 +27,12 @@ def main(argv):
         body = ','.join(str(b) for b in rom)
         header.write_text('static const u8 gf_private_rom[%d] = {%s};\n' % (len(rom), body))
         exe = pathlib.Path(td) / 'decode'
-        subprocess.run(['gcc', *FLAGS, '-O2', '-nostdlib', '-static', '-no-pie',
-                        '-I' + str(ROOT / 'include'), '-DGF_ROM_HEADER="%s"' % header,
-                        str(ROOT / 'tools/tests/gfinit_romfile_host.c'), '-o', str(exe)], check=True)
-        return host32.run([str(exe)], timeout=60).returncode
+        subprocess.run(['gcc', *FLAGS, '-O2', '-ffunction-sections', '-fdata-sections', '-Wl,--gc-sections', '-nostdlib', '-static', '-no-pie',
+                        '-I' + str(ROOT / 'include'), '-I' + str(ROOT / 'sdk/include/os32'), '-DGF_ROM_HEADER="%s"' % header,
+                        str(ROOT / 'tools/gfinit_romfile_host.c'), '-o', str(exe)], check=True)
+        runner = os.environ.get('HOST32_RUNNERS', 'native qemu').split()[0]
+        launch = {'native': ['setarch', os.uname().machine, '-R'], 'qemu': ['qemu-i386']}
+        return subprocess.run([*launch[runner], str(exe)], timeout=60).returncode
 
 
 if __name__ == '__main__':
