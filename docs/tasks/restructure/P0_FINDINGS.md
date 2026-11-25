@@ -2,6 +2,8 @@
 
 > 上位: [TASK_RESTRUCTURE.md](TASK_RESTRUCTURE.md)・[RULES.md](RULES.md) (入口と、どの段も先に読む決まり)
 
+**判定 (票を書いたセッションのレビュー 2026-11-25)**: P0-2・P0-4 は使える。P0-1・P0-6・P0-7 は足りない (持ち主空 4,207・HAL の役割の未確定 295・模型とコンパイルだけの未確定 814/812 — 読んで埋める仕事は P0-1 の分類の追加と P1-3・P5-2 へ)。P0-3 は一部 (L3 の 585 本は covers から機械で付けた候補、P1-4 で読んで決める。変異の数は 261 本だけ)。P0-5 は表は使える (結論は下の P0-5 の節)。P0-8 は一部 (未確定 100、ノートと pc98emu への質問 40 行 remote.tsv は未送付)。**数は段ごとに基点が違う** — 道具を main に入れた後の 1 つの SHA で取り直す (P0.md)。
+
 基点 `2b9d7316d` (一部の段は `d942afeb0`)。書き手も読み手も astra (DECISIONS の U8)、各段は読み手の所見 (P1) が 0 になるまで直した。残る P2 は各節の「残る漏れ」。
 生の表は PM の機械の `~/os32-tmp/run/restructure/p0-<n>/` (リポジトリの外)、棚卸しの道具は枝 `wip/rs-p0-<n>` の `tools/restructure/` (ユーザー指示 2026-11-25「P0までで止まってください」で push せず作業木に残す)。CI の実測の生データは `~/os32-tmp/run/restructure/p0-4/ci/`・`ci-logs/`。
 
@@ -59,6 +61,7 @@
 
 ## P0-5
 
+- **表から読める結論** (票を書いたセッションのレビュー 2026-11-25): (A) `include/` を移すと kdebug の生成物が変わる — kdebug.elf と kselftest.o に文字列 `include/memmap.h` が入る (artifact_paths.tsv の runtime string の行)。カーネル側の置き場のパスが出荷物に入るのは抜き取った範囲でこの 1 件。P3 の W9 はバイト一致にならず `Sep-Changes:` の宣言つきの波になる。(B) `userland/libos32gui.elf` に作業木の絶対パス (`…/rs-p0-5/userland/lib/font/src/raster.rs`) と rustup の置き場が入る — 置き場の移動と関係なく作業木が違えば生成物が変わる (POLICY_CI G11)。(C) `move_files.py` が置換できない所は unresolved.tsv 7,514 行。手で直すと確定しているのは split_paths 10 と unresolved_paths 312 (部品の .mk の .o のパスなど)。directory literal 2,918 と constructed expression 1,450 は使われ方が未確定で、P2-6 の予行で分かる。
 - 作業基点 88def8978。生表は /home/hight/os32-tmp/run/restructure/p0-5/。行数は見出しを除く。
 - 仮表 map.json は 1,802 ファイル。dry-run.jsonl は 4,649 実行、置換差分あり 2,732。dry-run-full.json は tools/tests/host_arch/arch_abi.h の全対応表による照合。
 - refs.tsv は 82,370 観測、うち根拠が未確定 22,897。path_refs.tsv は種類×根拠 23 行。現行票 P3.md の24行目 init/kernel_start.c は refs と dry-run の両方で確認。
