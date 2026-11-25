@@ -47,3 +47,14 @@
 ## 5. 範囲の外
 
 NP21/W・実機の受入はしない。分離の作り直しが終わったら、この workflow と道具は削除する。
+
+## 6. 作り直しの枝で保存した一覧と比べる (P2-1)
+
+P2-0 が採った全像の一覧を `sha256sum` の形式 (小文字の SHA-256、空白 2 個、基点の木からの相対パス) で 1 ファイルにまとめる。基点の生成物は一覧の隣に同じ相対パスで保存する。候補の木は古い生成物が残らない所で組む。
+
+    python3 -B tools/ci/sep_identity.py --manifest BASE/SHA256SUMS --move-map docs/tasks/restructure/data/move_map.json --tree TREE --base v3-pre-restructure -- make all kernel-r1
+
+最後のコマンドは候補を組む工程 (例は x86 部分のみ)。全件の関門では配布物と PowerPC の 6 像まで作る工程を渡す。組み済みの木を比べ直す入口は `tools/build_compare.py` で、同じオプションから末尾のビルドコマンドを除く。どちらも基点を組み直さない。像のディレクトリを保って移動元のソースに対応するオブジェクトを探す。PowerPC の各像直下の `root_image_blob.o` は G11 により存在だけを見る。
+
+一致は終了 0、バイト差・余分な生成物は 1、ビルド失敗・入力の誤りは 2、一覧の生成物の欠けは 3。欠けと差が混在すれば両方を印字して 3 で終わる。
+`--base` を渡すと、そのリビジョンから HEAD までのコミット本文を読む。許す宣言は 1 行に 1 組、例えば `Sep-Changes: path-string build/out/kselftest.o include/memmap.h`。一覧のハッシュで確認した基点のバイト列の中で、指定のパスとその末尾の NUL だけを対応表どおりに置き換え、候補の全バイトと比べる。リンクの配置や長さの欄にも差が残れば差とする。

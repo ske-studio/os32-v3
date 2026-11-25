@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 
@@ -278,7 +279,130 @@ def function_diff(left, right, objdump):
     return ''.join(lines) or 'No function changes; inspect data sections and image metadata.\n'
 
 
+def relative(name):
+    path = Path(name)
+    if not name or path.is_absolute() or '..' in path.parts or str(path) != name:
+        raise ValueError(f'invalid relative path: {name!r}')
+    return path
+
+
+def candidate_path(tree, old, moves, objects):
+    """Keep the image prefix and apply only moves present in this candidate."""
+    if old.suffix == '.o':
+        for index in range(len(old.parts)):
+            suffix = Path(*old.parts[index:])
+            if suffix in objects:
+                src, dst = objects[suffix]
+                moved = Path(*old.parts[:index]) / dst.with_suffix('.o')
+                if (tree / moved).is_file() or ((tree / dst).is_file() and not (tree / src).is_file()):
+                    return moved
+                break
+    target = moves.get(old, old)
+    if target != old and (tree / old).is_file() and not (tree / target).is_file():
+        return old
+    return target
+
+
+def compare_saved(manifest, tree, move_map, messages):
+    moves = {relative(row['from']): relative(row['to'])
+             for row in json.loads(move_map.read_text())}
+    rules = {}
+    for line in messages.splitlines():
+        if line.startswith('Sep-Changes:'):
+            fields = line.split()
+            if len(fields) != 4 or fields[1] != 'path-string':
+                raise ValueError('expected Sep-Changes: path-string ARTIFACT OLD_PATH')
+            artifact, old = map(relative, fields[2:])
+            if old not in moves or artifact in rules:
+                raise ValueError(f'invalid path-string declaration: {line}')
+            rules[artifact] = old
+
+    objects = {src.with_suffix('.o'): (src, dst) for src, dst in moves.items()
+               if src.suffix in ('.c', '.S', '.s', '.asm')}
+    volatile = {Path('build/out/ppc-kboot') / image / 'root_image_blob.o'
+                for image in ('', 'link', 'link-sh', 'sh', 'shell', 'neg1')}
+    missing = different = 0
+    seen = set()
+    targets = set()
+    for line in manifest.read_text().splitlines():
+        match = re.fullmatch(r'([0-9a-f]{64}) [ *](.+)', line)
+        if not match:
+            raise ValueError(f'invalid sha256sum line: {line}')
+        digest, name = match.groups()
+        old = relative(name)
+        target = candidate_path(tree, old, moves, objects)
+        if old in seen:
+            raise ValueError(f'duplicate manifest entry: {old}')
+        if target in targets:
+            raise ValueError(f'multiple manifest entries map to {target}')
+        seen.add(old)
+        targets.add(target)
+        path = tree / target
+        if not path.is_file():
+            print('MISSING', target)
+            missing += 1
+            continue
+        if old in volatile:
+            continue
+        data = path.read_bytes()
+        if hashlib.sha256(data).hexdigest() == digest:
+            continue
+        if old in rules:
+            source = rules[old]
+            before = (manifest.parent / old).read_bytes()
+            if hashlib.sha256(before).hexdigest() != digest:
+                raise ValueError(f'corrupt baseline: {old}')
+            if before.replace(str(source).encode() + b'\0',
+                              str(moves[source]).encode() + b'\0') == data:
+                print('MATCH path-string', old, source)
+                continue
+        print('DIFF', target)
+        different += 1
+    if not seen or rules.keys() - seen:
+        raise ValueError('empty manifest or declaration outside manifest')
+    products = artifacts(tree, all_products=True)
+    products.update(p.relative_to(tree) for p in (tree / 'packages').rglob('*'))
+    products.update(p.relative_to(tree) for p in (tree / 'build/out/ppc-kboot').rglob('PPCKERN.ELF'))
+    for extra in sorted(products - targets):
+        if (tree / extra).is_file():
+            print('DIFF unexpected', extra)
+            different += 1
+    print(f'{len(seen)} artifacts, {missing} missing, {different} different')
+    return 3 if missing else int(bool(different))
+
+
+def manifest_main(argv):
+    build = '--' in argv
+    parser = argparse.ArgumentParser(description="Compare a candidate with a saved sha256sum manifest.")
+    parser.add_argument('--manifest', type=Path, required=True)
+    parser.add_argument('--move-map', type=Path, required=True)
+    parser.add_argument('--tree', type=Path, default=Path.cwd())
+    parser.add_argument('--base', help='read Sep-Changes from BASE..HEAD')
+    if build:
+        parser.add_argument('command', nargs=argparse.REMAINDER)
+    args = parser.parse_args(argv)
+    if build:
+        if len(args.command) < 2 or args.command[0] != '--':
+            parser.error('supply the candidate build command after --')
+        try:
+            result = subprocess.run(args.command[1:], cwd=args.tree)
+        except OSError as error:
+            print('BUILD FAILED', error)
+            return 2
+        if result.returncode:
+            print('BUILD FAILED', result.returncode)
+            return 2
+    try:
+        messages = subprocess.check_output(['git', 'log', '--format=%B', args.base + '..HEAD'],
+                                           cwd=args.tree, text=True) if args.base else ''
+        return compare_saved(args.manifest, args.tree, args.move_map, messages)
+    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+        parser.error(str(error))
+
+
 def main():
+    if any(arg.split('=')[0] == '--manifest' for arg in sys.argv[1:]):
+        return manifest_main(sys.argv[1:])
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('base')
     ap.add_argument('target')
@@ -319,7 +443,7 @@ def main():
                                     stdout=stream, stderr=subprocess.STDOUT)
         if result.returncode:
             print(f'{label}: build failed, rc={result.returncode}: {log}', flush=True)
-            return result.returncode
+            return 2
         tree = output / label
         workspace.rename(tree)
         trees.append(tree)

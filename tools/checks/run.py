@@ -388,6 +388,11 @@ def compiler_headers(root, sources, inc_dirs):
     return frozenset(found)
 
 PATH_AUDIT_ALLOW = {
+    ("check-restructure-p2-1", "tools/build_compare.py"):
+        "manifest mode reads only the private candidate and saved baseline",
+    ("check-restructure-p2-1", "tools/ci/sep_identity.py"):
+        "candidate build runs in the temporary test tree",
+    "tools/restructure/test_manifest_identity.py": "all products are built in TemporaryDirectory",
     ("check-ppc-fep-import", "tools/gen_kdebug_imports.py"):
         "module observation helper imports the generator; the PC-98 check_nm path is unused",
     ("check-ppc-module-guest", "tools/gen_kdebug_imports.py"):
