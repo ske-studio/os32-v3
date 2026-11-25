@@ -2079,7 +2079,7 @@ include/copy_units.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/b
 include/cpu.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	共通実装
 include/debug_probe.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 include/debug_probe_snapshot.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
-include/diag_stack.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+include/diag_stack.h	P1-1	製品	SQLite の OS32_SQLITE_TRACE 条件で sqlite3.c が参照	—	共通実装
 include/display_provider.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 include/dma_contract.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 include/endian_dma.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -2120,7 +2120,7 @@ include/kcg_contract.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh
 include/kernel_mount_children.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 include/kernel_tick.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	共通実装
 include/kprintf.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	共通実装
-include/kselftest_probe.h	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	共通実装
+include/kselftest_probe.h	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	共通実装
 include/ksetjmp.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 include/lan_contract.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	共通実装
 include/launch.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -2158,12 +2158,12 @@ include/remote_control.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-
 include/serial_contract.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 include/shell_loop.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 include/snd_wake_contract.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	共通実装
-include/snd_writer_probe.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+include/snd_writer_probe.h	P1-1	製品	snd2_stream.c と PC-98 の診断カウンタ宣言	—	共通実装
 include/sys.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	共通実装
 include/syscall_code.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 include/text_screen.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 include/time_units.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	共通実装
-include/type_contract.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+include/type_contract.h	P1-1	製品	build/abi_contract.mk が tools/abi/type_contract.c 経由で読む	—	共通実装
 include/types.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	共通実装
 include/usb_platform.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 include/user_read_contract.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -2172,7 +2172,7 @@ include/v86_contract.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh
 include/ver_backend_contract.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 include/video_service.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/geforce.mod	—	共通実装
 include/video_wc.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	共通実装
-include/vk32.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+include/vk32.h	P1-1	製品	VK32 形式の宣言。P0-1 の像に入力なし。D-11 候補	—	共通実装
 include/wab_xe10.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/cirrus/cirrus.elf	—	機種固有実装
 init/boot_disk.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	共通実装
 init/boot_root.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh。所属判断=共通実装：像の集合から init の共通処理をリンク	—	共通実装
@@ -2200,7 +2200,7 @@ input/hal/input_context.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link
 input/hal/input_ime_gate.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 input/hal/input_interrupt.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 input/hal/input_policy.c	P1-1	製品	Make の入力集合：build/sources/common.mk:C_COMMON_COMPILE_ONLY_PPC	—	共通実装
-input/hal/input_policy.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+input/hal/input_policy.h	P1-1	製品	input_policy.c が読む入力方針の型	—	共通実装
 input/hal/kbd_merge.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 input/hal/keymap.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
 input/hal/keymap_eval.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
@@ -2316,45 +2316,45 @@ kdebug/kdebug_window.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/ou
 kdebug/kdebug_window.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/geforce/geforce.elf	—	デバイス固有実装
 kdebug/kpeek.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/kpeek.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/hwdev/hwdev.elf	—	デバイス固有実装
-kdebug/kselftest.c	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/abort_admit.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/app_band_pde.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/appmem.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/bootinfo.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/bootlog.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/caller_boot.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/con_sink_render_gate.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/cpu_calibrate.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/dma8237.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/dma_pool.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/fd_redirect_access_guard.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/gfx_ledger.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/gfx_owner.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/h4_backing.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/heap.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/ime_render_gate.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/irq_dynamic.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/kapi_layout.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/kbd_cmd.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/kbd_inject.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/kcg_display_return.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/kprintf.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/kprintf_attr.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/ledger.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/map_user_keep.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/mem.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/memmap.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/memmap_pool_user.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/pcm.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/pit_setup.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/pool_model.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/ring3_pd.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/ring3_wm_guard.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/slack_cycle.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/str.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/time_now.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/tramp_user_str.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
-kdebug/kselftest/utoa.inc	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest.c	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/abort_admit.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/app_band_pde.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/appmem.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/bootinfo.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/bootlog.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/caller_boot.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/con_sink_render_gate.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/cpu_calibrate.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/dma8237.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/dma_pool.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/fd_redirect_access_guard.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/gfx_ledger.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/gfx_owner.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/h4_backing.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/heap.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/ime_render_gate.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/irq_dynamic.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/kapi_layout.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/kbd_cmd.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/kbd_inject.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/kcg_display_return.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/kprintf.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/kprintf_attr.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/ledger.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/map_user_keep.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/mem.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/memmap.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/memmap_pool_user.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/pcm.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/pit_setup.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/pool_model.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/ring3_pd.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/ring3_wm_guard.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/slack_cycle.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/str.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/time_now.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/tramp_user_str.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
+kdebug/kselftest/utoa.inc	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	デバイス固有実装
 kdebug/nic_trace.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/nic_trace.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
 kdebug/probe.c	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	デバイス固有実装
@@ -2479,8 +2479,8 @@ kernel/irq/tick_budget.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	
 kernel/irq/tick_budget.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-kboot/PPCKERN.ELF	—	共通実装
 kernel/kaudit.c	P1-1	製品	P0-1 で像の入力を確認：pc98	—	共通実装
 kernel/kbd_inject.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
-kernel/kselftest.h	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	共通実装
-kernel/kselftest_report.c	P1-1	製品	仮 D-3：カーネル起動時の自己試験とその組込みインターフェース	—	共通実装
+kernel/kselftest.h	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	共通実装
+kernel/kselftest_report.c	P1-1	製品	D-3（build/kdebug.mk の組込み）：カーネル起動時の自己試験とその組込みインターフェース	—	共通実装
 kernel/kstack_hw.c	P1-1	製品	P0-1 で像の入力を確認：pc98。所属判断=共通実装：像の集合から kernel の共通処理をリンク	—	共通実装
 kernel/kstack_hw.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kdebug/kdebug.elf	—	共通実装
 kernel/machcfg.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core	—	共通実装
@@ -2519,11 +2519,11 @@ kernel/time/tick_probe.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/
 kernel/time/tick_probe_ids.h	P1-1	製品	P0-1 で像の入力を確認：pc98/build/out/kernel.elf	—	共通実装
 kernel/time/time_math.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kernel/time/time_math.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
-kernel/v86/v86.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
-kernel/v86/v86_gcap.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
-kernel/v86/v86_gcap_math.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
-kernel/v86/v86_mem.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
-kernel/v86/v86_module.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+kernel/v86/v86.h	P1-1	製品	PC-98 V86 への旧互換ヘッダ。D-11 候補	—	共通実装
+kernel/v86/v86_gcap.h	P1-1	製品	PC-98 V86 への旧互換ヘッダ。D-11 候補	—	共通実装
+kernel/v86/v86_gcap_math.h	P1-1	製品	PC-98 V86 への旧互換ヘッダ。D-11 候補	—	共通実装
+kernel/v86/v86_mem.h	P1-1	製品	PC-98 V86 への旧互換ヘッダ。D-11 候補	—	共通実装
+kernel/v86/v86_module.h	P1-1	製品	PC-98 V86 への旧互換ヘッダ。D-11 候補	—	共通実装
 kernel/ver_collect.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kernel/ver_format.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 kernel/ver_info.h	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh/build/out/ppc-kboot/link-sh/PPCKERN.ELF	—	共通実装
@@ -3168,7 +3168,7 @@ sound/hal/snd2_stg.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	�
 sound/hal/snd2_stream.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 sound/hal/snd2_v1.c	P1-1	製品	P0-1 で像の入力を確認：kboot-link-sh	—	共通実装
 tools/abi/record_layout_contract.c	P1-4	試験の支援	契約検査の解析・照合入力を供給	—	開発・検査用実装
-tools/abi/type_contract.c	P1-4	試験の支援	契約検査の解析・照合入力を供給	—	開発・検査用実装
+tools/abi/type_contract.c	P1-1	ビルドの定義	担当の直し（P1-4 → P1-1）：build/abi_contract.mk が毎ビルドでコンパイル	—	ビルドの定義
 tools/accept/arch_ctx.py	P1-4	検査の本体	対象を起動または解析して受入条件を判定	—	開発・検査用実装
 tools/accept/arch_ctx_observer.h	P1-4	試験の支援	検査が使う手順・入力・代替実装または実行補助	—	開発・検査用実装
 tools/accept/arch_ctx_parent.S	P1-4	試験の支援	登録試験から組み込む観測・補助コード	—	開発・検査用実装
@@ -3240,7 +3240,7 @@ tools/build_profile.py	P1-1	運用の道具	開発・製造・配備用の build
 tools/check_arch_asm.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
 tools/check_archive_refs.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
 tools/check_arm_compile.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
-tools/check_artifacts.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
+tools/check_artifacts.py	P1-1	ビルドの定義	担当の直し（P1-4 → P1-1）：gen_memmap.py の manifest 用 require_fresh	—	ビルドの定義
 tools/check_av_portable.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
 tools/check_c_dialect.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
 tools/check_constraints.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
@@ -3249,7 +3249,7 @@ tools/check_docs_links.py	P1-4	検査の本体	契約・受入条件を検査す
 tools/check_docs_orphans.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
 tools/check_docs_status.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
 tools/check_gui_proto.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
-tools/check_isa386.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
+tools/check_isa386.py	P1-1	ビルドの定義	担当の直し（P1-4 → P1-1）：build/os32snd.mk が shlib 包装時に実行	—	ビルドの定義
 tools/check_kapi_abi.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
 tools/check_kapi_version.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
 tools/check_kprintf_window.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
@@ -3257,11 +3257,11 @@ tools/check_kprintf_window_allow.txt	P1-4	試験の支援	契約検査の解析�
 tools/check_layers.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
 tools/check_le_access.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
 tools/check_manifests.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
-tools/check_nano_inputs.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
-tools/check_nano_inputs_target.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
+tools/check_nano_inputs.py	P1-1	ビルドの定義	担当の直し（P1-4 → P1-1）：sdk/allocator/build_nano.py が import	—	ビルドの定義
+tools/check_nano_inputs_target.py	P1-1	ビルドの定義	担当の直し（P1-4 → P1-1）：sdk/allocator/build_nano_target.py が import	—	ビルドの定義
 tools/check_p2v.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
 tools/check_p2v_allow.txt	P1-4	試験の支援	契約検査の解析・照合入力を供給	—	開発・検査用実装
-tools/check_privileged.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
+tools/check_privileged.py	P1-1	ビルドの定義	担当の直し（P1-4 → P1-1）：check_isa386.py が objdump_bin を import	—	ビルドの定義
 tools/check_privileged_allow.txt	P1-4	試験の支援	契約検査の解析・照合入力を供給	—	開発・検査用実装
 tools/check_time.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
 tools/check_tree_unchanged.py	P1-4	検査の本体	契約・受入条件を検査する入口	—	開発・検査用実装
@@ -3606,9 +3606,9 @@ tools/clang_ast/type_occurrences.py	P1-4	試験の支援	契約検査の解析�
 tools/create_fat12_d88.sh	P1-4	試験の支援	FAT12 の試験用 D88 フロッピー像を組み立てる。 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/deploy_manifests.py	P1-1	運用の道具	開発・製造・配備用の deploy_manifests.py。配備・配布するファイル集合と世代の記録を組み立てる。 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/deploy_protect.py	P1-1	運用の道具	開発・製造・配備用の deploy_protect.py。配備時の書き込み・削除を制御し、対象外のファイルを保護する。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
-tools/deploy_source_check.py	P1-4	検査の本体	配備元と期待集合を照合し、不整合で異常終了する。余剰の削除も担当する。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
+tools/deploy_source_check.py	P1-1	ビルドの定義	担当の直し（P1-4 → P1-1）：build/deploy.mk の配布先整理の入口	—	ビルドの定義
 tools/doc_delink_archive.py	P1-1	運用の道具	開発・製造・配備用の doc_delink_archive.py。移設・編集の際にソースや文書の参照を書き換える。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
-tools/doc_graph.py	P1-4	検査の本体	check-docs-tree が文書間のリンクを走査し、基準値との差を判定	—	開発・検査用実装
+tools/doc_graph.py	P1-1	ビルドの定義	担当の直し（P1-4 → P1-1）：運用の doc_delink_archive.py が import	—	ビルドの定義
 tools/doc_line_refs_baseline.json	P1-4	試験の支援	契約検査の解析・照合入力を供給	—	開発・検査用実装
 tools/doc_tree_baseline.json	P1-4	試験の支援	契約検査の解析・照合入力を供給	—	開発・検査用実装
 tools/docs_status_exceptions.json	P1-4	試験の支援	契約検査の解析・照合入力を供給	—	開発・検査用実装
@@ -3648,7 +3648,7 @@ tools/gen_sqlite_imports.py	P1-1	運用の道具	開発・製造・配備用の 
 tools/gen_tests_inventory.py	P1-4	実行の基盤	試験群の実行・登録または結果集計	—	開発・検査用実装
 tools/gen_unicode.c	P1-1	運用の道具	開発・製造・配備用の gen_unicode.c。ビルドで使う文字・キーの変換表を生成する。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/gen_unicode.py	P1-1	運用の道具	開発・製造・配備用の gen_unicode.py。ビルドで使う文字・キーの変換表を生成する。 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
-tools/gen_v86_int80.py	P1-4	試験の支援	V86 の FLAGS 観測専用の試験像と期待値を生成する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
+tools/gen_v86_int80.py	P1-1	ビルドの定義	担当の直し（P1-4 → P1-1）：programs_base の int80.img を生成	—	ビルドの定義
 tools/gfinit_mode_tables.py	P1-1	運用の道具	開発・製造・配備用の gfinit_mode_tables.py。GPU 初期化の記録・ROM を読み、設定や記録を展開する。 候補印=異常終了、期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/gfinit_rom_check.py	P1-4	検査の本体	test_gfinit_fixture.py が使う ROM 初期化領域の長さ・CRC32 の期待値照合	—	開発・検査用実装
 tools/gfinit_rom_decode.py	P1-1	運用の道具	開発・製造・配備用の gfinit_rom_decode.py。GPU 初期化の記録・ROM を読み、設定や記録を展開する。 候補印=異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
@@ -3945,7 +3945,7 @@ tools/prototypes/trident_imports.def	P1-1	運用の道具	開発・製造・配�
 tools/prototypes/usb_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/usb_imports.def。製品用インポート表の生成入力。 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/prototypes/v86_imports.def	P1-1	運用の道具	開発・製造・配備用の prototypes/v86_imports.def。製品用インポート表の生成入力。 候補印=登録・check 目標・workflow の参照。	—	開発・検査用実装
 tools/prune_stale.py	P1-1	運用の道具	開発・製造・配備用の prune_stale.py。配備時の書き込み・削除を制御し、対象外のファイルを保護する。 候補印=合否語、異常終了、登録・check 目標・workflow の参照。	—	開発・検査用実装
-tools/r1_manifest.py	P1-4	試験の支援	障害注入用の像だけのマニフェストを生成する。 候補印=期待値・試験入力、登録・check 目標・workflow の参照。	—	開発・検査用実装
+tools/r1_manifest.py	P1-1	ビルドの定義	担当の直し（P1-4 → P1-1）：kernel-r1 が manifest を生成	—	ビルドの定義
 tools/raster_obs_assets.py	P1-4	試験の支援	N01〜N16 の観測用資産と配備マニフェストを生成する。 候補印=期待値・試験入力。	—	開発・検査用実装
 tools/raster_splash_asset.py	P1-1	運用の道具	開発・製造・配備用の raster_splash_asset.py。画像や資産をゲスト用の形式に変換する工程で使う。 候補印=異常終了。	—	開発・検査用実装
 tools/remote_transport.py	P1-1	運用の道具	開発・製造・配備用の remote_transport.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。 候補印=登録・check 目標・workflow の参照。	実機ノート /opt/os32 の常駐サービスと運用台本	開発・検査用実装
@@ -5916,7 +5916,7 @@ userland/lib/cfg/libos32cfg.c	P1-1	製品	P0-1 で像の入力を確認：kboot-
 userland/lib/cfg/libos32cfg.h	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/cmds/cfg.elf	—	共通実装
 userland/lib/db/libos32db.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/db_test.elf	—	共通実装
 userland/lib/db/libos32db.h	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/db_test.elf	—	共通実装
-userland/lib/db/libos32db_util.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+userland/lib/db/libos32db_util.h	P1-1	製品	DB 系ユーザーライブラリに供給するマクロと SQL 補助	—	共通実装
 userland/lib/ecs/ecs_component.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/ecs_test.elf	—	共通実装
 userland/lib/ecs/ecs_core.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/ecs_test.elf	—	共通実装
 userland/lib/ecs/ecs_query.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/ecs_test.elf	—	共通実装
@@ -6064,10 +6064,10 @@ userland/lib/math/recip.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userl
 userland/lib/math/sqrt.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/gshell.elf	—	共通実装
 userland/lib/math/trig.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/gshell.elf	—	共通実装
 userland/lib/math/vec2.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/gshell.elf	—	共通実装
-userland/lib/md/libos32md.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+userland/lib/md/libos32md.h	P1-1	製品	ユーザーランドの描画またはシェル実装が使う内部宣言：userland/lib/md/libos32md.h	—	共通実装
 userland/lib/md/md_parse.c	P1-1	製品	製品実装・同梱ファイル：userland/lib/md	—	共通実装
 userland/lib/md/md_render.c	P1-1	製品	製品実装・同梱ファイル：userland/lib/md	—	共通実装
-userland/lib/md/md_render.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+userland/lib/md/md_render.h	P1-1	製品	ユーザーランドの描画またはシェル実装が使う内部宣言：userland/lib/md/md_render.h	—	共通実装
 userland/lib/mgx/libos32mgx.h	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/mgx_test.elf	—	共通実装
 userland/lib/mgx/mgx_blit.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/mgx_test.elf	—	共通実装
 userland/lib/mgx/mgx_decode.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/mgx_test.elf	—	共通実装
@@ -6101,10 +6101,10 @@ userland/lib/tilemap/tilemap_bg.c	P1-1	製品	P0-1 で像の入力を確認：pc
 userland/lib/tilemap/tilemap_compose.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/demo_tile.elf	—	共通実装
 userland/lib/tilemap/tilemap_core.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/demo_tile.elf	—	共通実装
 userland/lib/tilemap/tilemap_internal.h	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/demo_tile.elf	—	共通実装
-userland/lib/ui/libos32ui.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+userland/lib/ui/libos32ui.h	P1-1	製品	ユーザーランドの描画またはシェル実装が使う内部宣言：userland/lib/ui/libos32ui.h	—	共通実装
 userland/lib/ui/libos32ui_core.c	P1-1	製品	Make の入力集合：build/libs.mk:libos32ui_SRC	—	共通実装
 userland/lib/ui/microui.c	P1-1	製品	Make の入力集合：build/libs.mk:libos32ui_SRC	—	共通実装
-userland/lib/ui/microui.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+userland/lib/ui/microui.h	P1-1	製品	ユーザーランドの描画またはシェル実装が使う内部宣言：userland/lib/ui/microui.h	—	共通実装
 userland/libos32term/.gitignore	P1-1	運用の道具	Git で追跡する開発用ファイルの選択	—	開発・検査用実装
 userland/libos32term/Cargo.lock	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
 userland/libos32term/Cargo.toml	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
@@ -6157,13 +6157,13 @@ userland/ppc/portprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/b
 userland/ppc/rtcprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/rtcprob.elf	—	共通実装
 userland/ppc/sfsprob.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/sfsprob.elf	—	共通実装
 userland/ppc/sh/format.c	P1-1	製品	製品実装・同梱ファイル：userland/ppc/sh	—	共通実装
-userland/ppc/sh/include/stdio.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
-userland/ppc/sh/include/string.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
-userland/ppc/sh/link_profile.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+userland/ppc/sh/include/stdio.h	P1-1	製品	ユーザーランドの描画またはシェル実装が使う内部宣言：userland/ppc/sh/include/stdio.h	—	共通実装
+userland/ppc/sh/include/string.h	P1-1	製品	ユーザーランドの描画またはシェル実装が使う内部宣言：userland/ppc/sh/include/string.h	—	共通実装
+userland/ppc/sh/link_profile.h	P1-1	製品	ユーザーランドの描画またはシェル実装が使う内部宣言：userland/ppc/sh/link_profile.h	—	共通実装
 userland/ppc/sh/newlib_runtime.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/sh.elf	—	共通実装
 userland/ppc/sh/profile.h	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/sh.elf	—	共通実装
 userland/ppc/sh/runtime.c	P1-1	製品	製品実装・同梱ファイル：userland/ppc/sh	—	共通実装
-userland/ppc/sh/runtime.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+userland/ppc/sh/runtime.h	P1-1	製品	ユーザーランドの描画またはシェル実装が使う内部宣言：userland/ppc/sh/runtime.h	—	共通実装
 userland/ppc/sh/stdio.c	P1-1	製品	製品実装・同梱ファイル：userland/ppc/sh	—	共通実装
 userland/ppc/sh/string.c	P1-1	製品	製品実装・同梱ファイル：userland/ppc/sh	—	共通実装
 userland/ppc/shmprobe.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/shmprobe.elf	—	共通実装
@@ -6177,8 +6177,8 @@ userland/rust/Cargo.toml	P1-1	ビルドの定義	像・パッケージ・依存�
 userland/rust/about/Cargo.toml	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
 userland/rust/about/src/info.rs	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/system/about.elf	—	共通実装
 userland/rust/about/src/lib.rs	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/system/about.elf	—	共通実装
-userland/rust/alloc_demo/Cargo.toml	P1-4	試験の支援	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/alloc_demo/src/lib.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
+userland/rust/alloc_demo/Cargo.toml	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/alloc_demo/src/lib.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
 userland/rust/edit_gui/Cargo.toml	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
 userland/rust/edit_gui/host/doc_tests.rs	P1-4	検査の本体	ホスト用ハーネスで実行する試験	—	開発・検査用実装
 userland/rust/edit_gui/src/doc.rs	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/system/edit_gui.elf	—	共通実装
@@ -6190,20 +6190,20 @@ userland/rust/filer/src/fmt.rs	P1-1	製品	P0-1 で像の入力を確認：pc98/
 userland/rust/filer/src/icons.rs	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/system/filer.elf	—	共通実装
 userland/rust/filer/src/lib.rs	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/system/filer.elf	—	共通実装
 userland/rust/filer/src/model.rs	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/system/filer.elf	—	共通実装
-userland/rust/font_test/Cargo.toml	P1-4	試験の支援	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/font_test/src/lib.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/gdi_test/Cargo.toml	P1-4	試験の支援	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/gdi_test/src/corpus.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/gdi_test/src/fontbench.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/gdi_test/src/lib.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/gui_bench/Cargo.toml	P1-4	試験の支援	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/gui_bench/src/lib.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/gui_demo/Cargo.toml	P1-4	試験の支援	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/gui_demo/src/lib.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/hello_gfx/Cargo.toml	P1-4	試験の支援	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/hello_gfx/src/lib.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/lease_test/Cargo.toml	P1-4	試験の支援	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/lease_test/src/lib.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
+userland/rust/font_test/Cargo.toml	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/font_test/src/lib.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/gdi_test/Cargo.toml	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/gdi_test/src/corpus.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/gdi_test/src/fontbench.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/gdi_test/src/lib.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/gui_bench/Cargo.toml	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/gui_bench/src/lib.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/gui_demo/Cargo.toml	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/gui_demo/src/lib.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/hello_gfx/Cargo.toml	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/hello_gfx/src/lib.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/lease_test/Cargo.toml	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/lease_test/src/lib.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
 userland/rust/libos32gui/Cargo.toml	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
 userland/rust/libos32gui/host/textcore_tests.rs	P1-4	検査の本体	ホスト用ハーネスで実行する試験	—	開発・検査用実装
 userland/rust/libos32gui/host_tests/Cargo.lock	P1-4	試験の支援	ホスト試験用 crate の入力・模擬実装	—	開発・検査用実装
@@ -6254,8 +6254,8 @@ userland/rust/libos32gui_stub/src/surface.rs	P1-1	製品	P0-1 で像の入力を
 userland/rust/libos32gui_stub/src/timer.rs	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/system/about.elf	—	共通実装
 userland/rust/libos32gui_stub/src/widget.rs	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/system/about.elf	—	共通実装
 userland/rust/libos32gui_stub/src/window.rs	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/system/about.elf	—	共通実装
-userland/rust/math_test_rs/Cargo.toml	P1-4	試験の支援	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/math_test_rs/src/lib.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
+userland/rust/math_test_rs/Cargo.toml	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/math_test_rs/src/lib.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
 userland/rust/os32_math/Cargo.toml	P1-1	ビルドの定義	像・パッケージ・依存またはツールチェーンの構成	—	ビルドの定義
 userland/rust/os32_math/src/atan2.rs	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/math_test_rs.elf	—	共通実装
 userland/rust/os32_math/src/fix16.rs	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/math_test_rs.elf	—	共通実装
@@ -6267,33 +6267,33 @@ userland/rust/os32_math/src/sqrt.rs	P1-1	製品	P0-1 で像の入力を確認：
 userland/rust/os32_math/src/trig.rs	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/math_test_rs.elf	—	共通実装
 userland/rust/os32_math/src/vec2.rs	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/tests/math_test_rs.elf	—	共通実装
 userland/rust/t5a_display/.gitignore	P1-1	運用の道具	Git で追跡する開発用ファイルの選択	—	開発・検査用実装
-userland/rust/t5a_display/Cargo.toml	P1-4	試験の支援	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
+userland/rust/t5a_display/Cargo.toml	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
 userland/rust/t5a_display/README.md	文書	文書	説明・仕様・ライセンスを記す文書	—	文書
 userland/rust/t5a_display/TDD_LOG.md	文書	文書	説明・仕様・ライセンスを記す文書	—	文書
 userland/rust/t5a_display/host_tests/Cargo.lock	P1-4	試験の支援	ホスト試験用 crate の入力・模擬実装	—	開発・検査用実装
 userland/rust/t5a_display/host_tests/Cargo.toml	P1-4	試験の支援	ホスト試験用 crate の入力・模擬実装	—	開発・検査用実装
 userland/rust/t5a_display/host_tests/src/lib.rs	P1-4	試験の支援	ゲスト実装をホスト試験 crate に組み込むモジュール宣言	—	開発・検査用実装
 userland/rust/t5a_display/record.py	P1-4	試験の支援	ホスト試験の実行結果を TDD_LOG に記録	—	開発・検査用実装
-userland/rust/t5a_display/src/boundary.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/t5a_display/src/clipboard.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/t5a_display/src/guest.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/t5a_display/src/inject.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/t5a_display/src/input.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/t5a_display/src/launch.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/t5a_display/src/lib.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/t5a_display/src/paint.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/t5a_display/src/prompt.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/t5a_display/src/session.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/t5a_display/src/sink.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/t5a_display/src/state.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/t5a_display/src/status.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/t5a_display/src/storage.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/t5a_display/src/view.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/trim_back_rs/Cargo.toml	P1-4	試験の支援	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/trim_back_rs/src/cache.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/trim_back_rs/src/lib.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/v12_api_test/Cargo.toml	P1-4	試験の支援	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
-userland/rust/v12_api_test/src/lib.rs	P1-4	検査の本体	仮 D-8：build/programs.mk が userland/tests に配備する Rust プログラムの入力	—	開発・検査用実装
+userland/rust/t5a_display/src/boundary.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/t5a_display/src/clipboard.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/t5a_display/src/guest.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/t5a_display/src/inject.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/t5a_display/src/input.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/t5a_display/src/launch.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/t5a_display/src/lib.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/t5a_display/src/paint.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/t5a_display/src/prompt.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/t5a_display/src/session.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/t5a_display/src/sink.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/t5a_display/src/state.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/t5a_display/src/status.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/t5a_display/src/storage.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/t5a_display/src/view.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/trim_back_rs/Cargo.toml	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/trim_back_rs/src/cache.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/trim_back_rs/src/lib.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/v12_api_test/Cargo.toml	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
+userland/rust/v12_api_test/src/lib.rs	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力	—	共通実装
 userland/shell/cmd_base.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/shell.elf	—	共通実装
 userland/shell/cmd_dir.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/shell.elf	—	共通実装
 userland/shell/cmd_env.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/shell.elf	—	共通実装
@@ -6347,146 +6347,146 @@ userland/system/inst_disk.c	P1-1	製品	P0-1 で像の入力を確認：kboot-co
 userland/system/inst_disk.h	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/sh.elf	—	共通実装
 userland/system/inst_hdd.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/cdinst.elf	—	共通実装
 userland/system/inst_hdd.h	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/sh.elf	—	共通実装
-userland/system/inst_verify.h	P1-1	製品	仮：像への依存は未確認。製品ツリーのヘッダ・残存物として P1-1 で確認（D-11）	—	共通実装
+userland/system/inst_verify.h	P1-1	製品	install.c と pkg.c の検証宣言	—	共通実装
 userland/system/install.c	P1-1	製品	P0-1 で像の入力を確認：kboot-core/build/out/ppc-user/install.elf	—	共通実装
 userland/system/install_recover.inc	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/system/install.elf	—	共通実装
 userland/system/lz4.c	P1-1	製品	P0-1 で像の入力を確認：pc98/userland/system/lz4.elf	—	共通実装
-userland/tests/allocator_bench.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/asset_demo.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/asset_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/audit_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/av_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/bench/main.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/bench_scale2x/main.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/blit_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/blit_test2.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/cfg_bench.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/crash.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/crtexit.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/d0a_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/data/hello.sh	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/data/test.txt	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/data/test_pager.txt	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/data/test_script.bat	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/data/test_table.md	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/data/test_utf8.txt	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/db_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/db_v50_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/dbq.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/demo_tile.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/disk_auth_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/e2seek.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/e2test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/ecs_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/exec_heap_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/faultprobe/main.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/faulttest.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/fep_meta_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/font_lease_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/font_load_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/fp_stop.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/gfx200_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/gfx2_i1.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/gfx2_i2.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/gfx2_i3.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/gfx2_rh.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/gfx_demo200.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/gui_busy.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/gui_call_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/h2_stack.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/h2_stack_probe.h	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/h2_stack_probe.inc	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/h3/fixture.inc	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/h3/protocol.h	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/h3/state.inc	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/h3a.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/h3b.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/h5_shape.inc	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/h5_shape_i.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/h5_shape_ii.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/h5_shape_iii.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hal_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/heap_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hello.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/host_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/g4/gmac.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/gf_palette.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/gf_regs.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/hpt370_probe.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/mac99/ohci.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/mac99/port_read16.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/mac99/port_read32.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/mac99/port_read8.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/mac99/port_write16.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/mac99/port_write32.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/mac99/port_write8.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/np21w_gdc.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/np21w_loop.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/np21w_nopci.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/np21w_poll.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/np21w_tvram.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/np21w_wait.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/tri_burst.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/tri_burst2.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/tri_burst3.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/tri_burst4.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/tri_burst5.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/tri_burst6.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/tri_w32.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/trident.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hw/trident_mode.hwb	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/hwscroll_probe.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/input_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/kapi_cost.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/kbd_echo.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/kcallback_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/kdebug_probe.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/klibc_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/kout_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/kprint_boundary.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/kstr_bench.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/kstr_boundary.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/kstr_v86.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/layout_cycle_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/loopfmt_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/malloc_arena_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/math_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/mem_map_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/mem_stat_compat_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/mem_stat_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/mgx_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/mouse_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/nop.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/pcm_play.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/pcm_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/pcm_wav.h	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/pegcchk.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/pipe_owner_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/raw_wait_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/restest.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/ring3_fault.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/ring3_guard.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/ring3_hello.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/ring3_marker.h	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/rotate_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/save_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/sbrk_grow_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/shm_reuse_child.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/shm_reuse_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/shutdown_probe.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/snd2_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/sndl_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/sqlite_standalone/sqlite_standalone.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/sqlite_standalone/sqlite_user_vfs.c	P1-4	試験の支援	仮 D-8：配備するゲスト試験の入力・補助実装	—	開発・検査用実装
-userland/tests/stat_t.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/stop_loop.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/t_exit.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/test2.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/text_ro_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/tile_bench.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/time_test.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/trim_back.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
-userland/tests/trim_front.c	P1-4	検査の本体	仮 D-8：ゲスト用にビルド・配備する試験プログラム	—	開発・検査用実装
+userland/tests/allocator_bench.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/asset_demo.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/asset_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/audit_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/av_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/bench/main.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/bench_scale2x/main.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/blit_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/blit_test2.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/cfg_bench.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/crash.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/crtexit.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/d0a_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/data/hello.sh	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/data/test.txt	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/data/test_pager.txt	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/data/test_script.bat	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/data/test_table.md	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/data/test_utf8.txt	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/db_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/db_v50_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/dbq.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/demo_tile.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/disk_auth_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/e2seek.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/e2test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/ecs_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/exec_heap_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/faultprobe/main.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/faulttest.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/fep_meta_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/font_lease_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/font_load_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/fp_stop.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/gfx200_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/gfx2_i1.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/gfx2_i2.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/gfx2_i3.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/gfx2_rh.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/gfx_demo200.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/gui_busy.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/gui_call_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/h2_stack.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/h2_stack_probe.h	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/h2_stack_probe.inc	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/h3/fixture.inc	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/h3/protocol.h	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/h3/state.inc	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/h3a.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/h3b.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/h5_shape.inc	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/h5_shape_i.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/h5_shape_ii.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/h5_shape_iii.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hal_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/heap_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hello.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/host_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/g4/gmac.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/gf_palette.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/gf_regs.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/hpt370_probe.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/mac99/ohci.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/mac99/port_read16.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/mac99/port_read32.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/mac99/port_read8.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/mac99/port_write16.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/mac99/port_write32.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/mac99/port_write8.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/np21w_gdc.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/np21w_loop.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/np21w_nopci.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/np21w_poll.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/np21w_tvram.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/np21w_wait.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/tri_burst.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/tri_burst2.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/tri_burst3.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/tri_burst4.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/tri_burst5.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/tri_burst6.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/tri_w32.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/trident.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hw/trident_mode.hwb	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/hwscroll_probe.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/input_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/kapi_cost.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/kbd_echo.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/kcallback_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/kdebug_probe.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/klibc_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/kout_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/kprint_boundary.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/kstr_bench.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/kstr_boundary.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/kstr_v86.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/layout_cycle_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/loopfmt_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/malloc_arena_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/math_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/mem_map_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/mem_stat_compat_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/mem_stat_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/mgx_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/mouse_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/nop.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/pcm_play.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/pcm_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/pcm_wav.h	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/pegcchk.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/pipe_owner_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/raw_wait_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/restest.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/ring3_fault.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/ring3_guard.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/ring3_hello.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/ring3_marker.h	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/rotate_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/save_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/sbrk_grow_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/shm_reuse_child.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/shm_reuse_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/shutdown_probe.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/snd2_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/sndl_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/sqlite_standalone/sqlite_standalone.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/sqlite_standalone/sqlite_user_vfs.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/stat_t.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/stop_loop.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/t_exit.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/test2.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/text_ro_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/tile_bench.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/time_test.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/trim_back.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
+userland/tests/trim_front.c	P1-1	製品	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力	—	開発・検査用実装
 # 基点の棚卸し用ファイル（母数外）
 tools/checks/restructure_p0_1.py	開発・検査用実装
 tools/checks/restructure_p0_2.py	開発・検査用実装

@@ -1,0 +1,419 @@
+区分	パス	判断・証拠
+運用の道具	.claude/hooks/after_compact.sh	開発環境の設定・運用。呼出元：静的参照なし
+運用の道具	.claude/hooks/protect_generated.sh	開発環境の設定・運用。呼出元：静的参照なし
+運用の道具	.claude/settings.json	開発環境の設定・運用。呼出元：静的参照なし
+運用の道具	.claude/skills/run-os32/driver.py	開発環境の設定・運用。呼出元：.claude/skills/run-os32/SKILL.md:14
+運用の道具	.gitattributes	開発環境の設定・運用。呼出元：静的参照なし
+運用の道具	.gitignore	Git で追跡する開発用ファイルの選択。呼出元：静的参照なし
+運用の道具	.ignore	開発環境の設定・運用。呼出元：静的参照なし
+運用の道具	.mcp.json	開発環境の設定・運用。呼出元：tools/emu_agent/mcp_server.py:9
+担当の直し	tools/abi/type_contract.c	担当の直し（P1-4 → P1-1）：build/abi_contract.mk が毎ビルドでコンパイル
+運用の道具	tools/build_profile.py	開発・製造・配備用の build_profile.py。make の展開結果とコンパイラ引数を JSON に取り出す。。呼出元：tools/check_arm_compile.py:234、tools/ppc/check_layout.py:18、tools/tests/test_build_profile.py:8、tools/tests/test_build_selection.py:13、tools/tests/test_dep_dir_d_console.py:22、tools/tests/test_dep_dir_d_display.py:22、tools/tests/test_dep_dir_d_emergency.py:25、tools/tests/test_dep_dir_d_splash.py:22、tools/tests/test_hwdev_target_layout.py:20、tools/tests/test_memory_boot.py:30、tools/tests/test_module_policy.py:25、tools/tests/test_shell_service.py:49、tools/tests/test_target_toolchain.py:10、tools/tests/test_tick.py:18
+担当の直し	tools/check_artifacts.py	担当の直し（P1-4 → P1-1）：gen_memmap.py の manifest 用 require_fresh
+担当の直し	tools/check_isa386.py	担当の直し（P1-4 → P1-1）：build/os32snd.mk が shlib 包装時に実行
+担当の直し	tools/check_nano_inputs.py	担当の直し（P1-4 → P1-1）：sdk/allocator/build_nano.py が import
+担当の直し	tools/check_nano_inputs_target.py	担当の直し（P1-4 → P1-1）：sdk/allocator/build_nano_target.py が import
+担当の直し	tools/check_privileged.py	担当の直し（P1-4 → P1-1）：check_isa386.py が objdump_bin を import
+運用の道具	tools/ci/build_cross.sh	クロスツールチェーンの構築。クロスコンパイラとライブラリを構築する。。呼出元：docs/08_build.md:992、tools/tests/test_nano_targets.py:30
+運用の道具	tools/ci/build_cross_ppc.sh	クロスツールチェーンの構築。クロスコンパイラとライブラリを構築する。。呼出元：docs/08_build.md:993、tools/checks/ppc-compile.py:15、tools/tests/ppc_ci.py:51
+運用の道具	tools/ci_fetch.sh	開発・製造・配備用の ci_fetch.sh。配布物を取得し、取得先に保存する。。呼出元：docs/08_build.md:1190
+運用の道具	tools/deploy_manifests.py	開発・製造・配備用の deploy_manifests.py。配備・配布するファイル集合と世代の記録を組み立てる。。呼出元：tools/check_manifests.py:38、tools/checks/restructure_p0_8.py:12、tools/gen_deploy_set.py:10、tools/hostdrv_deploy.py:52、tools/mkpkg.py:412、tools/nhd_deploy.py:82、tools/prune_stale.py:35、tools/tests/test_deploy_set.py:30、tools/tests/test_h3b_fixtures.py:27、tools/tests/test_packages.py:58、tools/tests/test_raster_splash_asset.py:30
+運用の道具	tools/deploy_protect.py	開発・製造・配備用の deploy_protect.py。配備時の書き込み・削除を制御し、対象外のファイルを保護する。。呼出元：tools/deploy_source_check.py:13、tools/hostdrv_deploy.py:42、tools/nhd_deploy.py:46、tools/prune_stale.py:37、tools/tests/test_deploy_protect.py:38、tools/tests/test_hostdrv_manifest.py:32
+担当の直し	tools/deploy_source_check.py	担当の直し（P1-4 → P1-1）：build/deploy.mk の配布先整理の入口
+運用の道具	tools/doc_delink_archive.py	開発・製造・配備用の doc_delink_archive.py。移設・編集の際にソースや文書の参照を書き換える。。呼出元：.claude/skills/os32-archive/SKILL.md:53、docs/POLICY_ARCHIVE.md:49
+担当の直し	tools/doc_graph.py	担当の直し（P1-4 → P1-1）：運用の doc_delink_archive.py が import
+運用の道具	tools/emu_agent/README.md	agent.py の起動例と接続設定を実装と一緒に移す。呼出元：静的参照なし
+運用の道具	tools/emu_agent/agent.py	開発・製造・配備用の emu_agent/agent.py。エミュレータの操作と画面観測を行うための命令・実行手順。。呼出元：tools/emu_agent/README.md:7
+運用の道具	tools/emu_agent/mcp_server.py	開発・製造・配備用の emu_agent/mcp_server.py。エミュレータの操作と画面観測を行うための命令・実行手順。。呼出元：静的参照なし
+運用の道具	tools/emu_agent/playbook.py	開発・製造・配備用の emu_agent/playbook.py。エミュレータの操作と画面観測を行うための命令・実行手順。。呼出元：tools/emu_agent/README.md:88
+運用の道具	tools/emu_agent/tasks/v86_dos.txt	開発・製造・配備用の emu_agent/tasks/v86_dos.txt。エミュレータの操作と画面観測を行うための命令・実行手順。。呼出元：静的参照なし
+運用の道具	tools/fd_netcd_config.py	開発・製造・配備用の fd_netcd_config.py。配備する媒体・パッケージを生成または更新する。。呼出元：静的参照なし
+運用の道具	tools/fep_compiler.py	開発・製造・配備用の fep_compiler.py。入力辞書を FEP が読む形式へ変換する。。呼出元：build/assets.mk:69
+運用の道具	tools/fep_to_sqlite.py	開発・製造・配備用の fep_to_sqlite.py。入力辞書を FEP が読む形式へ変換する。。呼出元：build/assets.mk:59、build/ppc-install-boot.mk:35、build/programs.mk:637、tools/ppc/fep_boot_accept.py:22
+運用の道具	tools/fetch_fonts.py	開発・製造・配備用の fetch_fonts.py。配布物を取得し、取得先に保存する。。呼出元：build/font-fetch.mk:21、docs/08_build.md:35、tools/tests/test_ci_split.py:5、tools/tests/test_preflight.py:4
+運用の道具	tools/g16/gen_preload16.py	開発・製造・配備用の g16/gen_preload16.py。GUI フォントの文字集合・グリフ・先読みデータを生成する。。呼出元：build/assets.mk:33
+運用の道具	tools/g16/scan_ui_chars.py	文字表の手動更新用。ownership.md の再調査でも呼出元なし。呼出元：静的参照なし
+運用の道具	tools/g16/ui_chars.txt	開発・製造・配備用の g16/ui_chars.txt。呼出元：build/assets.mk:34
+運用の道具	tools/gen_build_id.py	開発・製造・配備用の gen_build_id.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。。呼出元：build/build-id.mk:6、build/kernel-objects.mk:71、docs/design/tools/README.md:40、tools/checks/build-compare-host.py:3、tools/gen_generation_manifest.py:26、tools/hostdrv_deploy.py:152、tools/tests/test_hostdrv_manifest.py:339
+運用の道具	tools/gen_deploy_set.py	開発・製造・配備用の gen_deploy_set.py。配備・配布するファイル集合と世代の記録を組み立てる。。呼出元：.github/workflows/build.yml:108、build/deploy.mk:8、build/targets/x86-pc98.mk:78、tools/deploy_source_check.py:14、tools/tests/test_deploy_set.py:211
+運用の道具	tools/gen_font16.py	開発・製造・配備用の gen_font16.py。GUI フォントの文字集合・グリフ・先読みデータを生成する。。呼出元：build/assets.mk:53、build/font-fetch.mk:42、docs/decisions/ppc/PPC_NOTES.md:10、tools/accept/ppc_font.py:48、tools/tests/test_kcg_ebdt.py:29、tools/tests/test_kcg_lz4.py:17
+運用の道具	tools/gen_g16.py	開発・製造・配備用の gen_g16.py。GUI フォントの文字集合・グリフ・先読みデータを生成する。。呼出元：build/assets.mk:33、build/font-fetch.mk:42、tools/g16/gen_preload16.py:26、tools/gen_font16.py:311、tools/tests/test_kcg_ebdt.py:81
+運用の道具	tools/gen_generation_manifest.py	開発・製造・配備用の gen_generation_manifest.py。配備・配布するファイル集合と世代の記録を組み立てる。。呼出元：.github/workflows/build.yml:107、build/kernel.mk:33、build/targets/x86-pc98.mk:76
+運用の道具	tools/gen_hwdev_contract.py	開発・製造・配備用の gen_hwdev_contract.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。。呼出元：build/kdebug.mk:88、tools/checks/hwdev-module-host.py:15、tools/ppc/check_layout.py:19、tools/tests/test_hwdev_module.py:18、tools/tests/test_hwdev_target_layout.py:19
+運用の道具	tools/gen_hwdev_pair.py	開発・製造・配備用の gen_hwdev_pair.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。。呼出元：build/hwdev.mk:17
+運用の道具	tools/gen_kcg_font.py	gen_font16.py 冒頭が置き換えを明記。旧形式生成器の起動なし。呼出元：静的参照なし
+運用の道具	tools/gen_kdebug_imports.py	開発・製造・配備用の gen_kdebug_imports.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。。呼出元：build/cd-module.mk:5、build/cirrus-module.mk:5、build/fm-module.mk:5、build/geforce-module.mk:5、build/kcg-module.mk:5、build/kdebug.mk:33、build/lan-module.mk:5、build/pcm-module.mk:5、build/sqlite-gen.mk:4、build/sqlite-proto.mk:5、build/trident-module.mk:5、build/usb-module.mk:5、build/v86-module.mk:5、docs/decisions/realhw/KDBG_PROBE_DESIGN.md:198、tools/gen_hwdev_contract.py:12、tools/gen_sqlite_imports.py:11、tools/hwdev_audit.py:15、tools/tests/hwdev_contract_fixture.py:55、tools/tests/test_exec_selftest.py:23、tools/tests/test_gf_guard_imports.py:33、tools/tests/test_hwdev_image.py:24、tools/tests/test_kdebug_ctx.py:30、tools/tests/test_kdebug_imports.py:20、tools/tests/test_kdebug_init.py:27、tools/tests/test_mkmod.py:17
+運用の道具	tools/gen_memmap.py	開発・製造・配備用の gen_memmap.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。。呼出元：Makefile:73、build/kernel.mk:27、build/ppc-user.mk:132、build/targets/ppc-powermac.mk:225、build/targets/x86-pc98.mk:77、docs/08_build.md:419、docs/design/platform/pc98/platform_boot_layout.md:34、tools/checks/memmap.py:15、tools/clang_ast/build.py:186、tools/memmap_audit_live.py:17、tools/mkvmkernel.py:136、tools/ppc/kboot_entry.py:104、tools/ppc/kboot_layout.py:206、tools/ppc/kboot_root_image.py:69、tools/tests/test_ci_stab.py:1228、tools/tests/test_hdd_stage1.py:42、tools/tests/test_hdd_stage2.py:44、tools/tests/test_layout_defs.py:18、tools/tests/test_memmap_gen.py:327、tools/tests/test_stack_entry.py:9、tools/tests/test_t3c2.py:18、tools/tests/test_v86_low.py:127、tools/tests/test_vk32_crc.py:53、tools/tests/test_vmkernel_layout.py:22
+運用の道具	tools/gen_module_schema.py	開発・製造・配備用の gen_module_schema.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。。呼出元：build/kdebug.mk:9、docs/decisions/realhw/KDBG_PROBE_DESIGN.md:197、tools/module_schema.py:3、tools/tests/test_mkmod.py:19、tools/tests/test_module_policy.py:30
+運用の道具	tools/gen_opna_layout.py	開発・製造・配備用の gen_opna_layout.py。呼出元：build/os32snd.mk:8
+運用の道具	tools/gen_opna_tables.cpp	開発・製造・配備用の gen_opna_tables.cpp。fmgen の整数表を抽出し製品用の定数を生成する。。呼出元：静的参照なし
+運用の道具	tools/gen_opna_tables.py	開発・製造・配備用の gen_opna_tables.py。fmgen の整数表を抽出し製品用の定数を生成する。。呼出元：tools/checks/opna-tables.py:9
+運用の道具	tools/gen_recover_tables.py	開発・製造・配備用の gen_recover_tables.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。。呼出元：tools/checks/recover-tables-host.py:25、tools/tests/test_recover_tables.py:111
+運用の道具	tools/gen_sdk_manifest.py	開発・製造・配備用の gen_sdk_manifest.py。配備・配布するファイル集合と世代の記録を組み立てる。。呼出元：build/sdk.mk:88
+運用の道具	tools/gen_sqlite_imports.py	開発・製造・配備用の gen_sqlite_imports.py。ビルドが使う定義・表を生成する。入力や生成物の検算はその生成工程に属する。。呼出元：build/cd-module.mk:5、build/cirrus-module.mk:5、build/fep-common.mk:20、build/fm-module.mk:5、build/geforce-module.mk:5、build/kcg-module.mk:5、build/lan-module.mk:5、build/pcm-module.mk:5、build/sqlite-gen.mk:4、build/sqlite-proto.mk:5、build/targets/ppc-powermac.mk:161、build/trident-module.mk:5、build/usb-module.mk:5、build/v86-module.mk:5、tools/accept/ppc_module.py:20、tools/tests/ppc_ci.py:201、tools/tests/test_ime_display_boundary.py:41、tools/tests/test_sqlite_module_proto.py:23
+運用の道具	tools/gen_unicode.c	開発・製造・配備用の gen_unicode.c。ビルドで使う文字・キーの変換表を生成する。。呼出元：build/programs.mk:629、build/targets/ppc-powermac.mk:65、tools/ci/ppc_scope.py:18
+運用の道具	tools/gen_unicode.py	unicode.bin は build の C 版 gen_unicode が生成。旧 Python 版の起動なし。呼出元：静的参照なし
+担当の直し	tools/gen_v86_int80.py	担当の直し（P1-4 → P1-1）：programs_base の int80.img を生成
+運用の道具	tools/gfinit_mode_tables.py	開発・製造・配備用の gfinit_mode_tables.py。GPU 初期化の記録・ROM を読み、設定や記録を展開する。。呼出元：tools/gen_recover_tables.py:99
+運用の道具	tools/gfinit_rom_decode.py	開発・製造・配備用の gfinit_rom_decode.py。GPU 初期化の記録・ROM を読み、設定や記録を展開する。。呼出元：静的参照なし
+運用の道具	tools/gfinit_source.py	開発・製造・配備用の gfinit_source.py。GPU 初期化の記録・ROM を読み、設定や記録を展開する。。呼出元：tools/checks/test_run.py:531、tools/tests/test_gfinit_fixture.py:21
+運用の道具	tools/gserial.py	開発・製造・配備用の gserial.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。。呼出元：tools/tests/test_remote_x13.py:138
+運用の道具	tools/hid_keymap_import.py	開発・製造・配備用の hid_keymap_import.py。ビルドで使う文字・キーの変換表を生成する。。呼出元：静的参照なし
+運用の道具	tools/host_agent.py	開発・製造・配備用の host_agent.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：docs/tasks/realhw/TASK_LAN_82557.md:78、tools/lan_bridge.py:28、tools/ppc/link_run.py:27、tools/ppc/link_sh_run.py:31、tools/ppc/sd_run.py:284、tools/ppc/usb_run.py:646、tools/tests/sfs_restart_fixture.py:18、tools/tests/test_host_agent.py:32、tools/tests/test_hsync_inventory_flow.py:39、tools/tests/test_lan_bridge.py:260、tools/tests/test_ppc_link_log.py:19、tools/tests/test_remote_x11.py:113
+運用の道具	tools/host_agent_config.py	開発・製造・配備用の host_agent_config.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：tools/host_agent.py:1611、tools/host_agent_service.py:12、tools/remote_transport.py:15
+運用の道具	tools/host_agent_service.py	開発・製造・配備用の host_agent_service.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：tools/systemd/README.md:92、tools/tests/test_remote_u5b.py:112
+運用の道具	tools/host_image.py	開発・製造・配備用の host_image.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：tools/host_sfs_link.py:20、tools/lanfs_host.py:190
+運用の道具	tools/host_linux.py	開発・製造・配備用の host_linux.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：tools/host_agent.py:41
+運用の道具	tools/host_notify.py	開発・製造・配備用の host_notify.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：tools/host_agent.py:44、tools/tests/test_remote_x6.py:74
+運用の道具	tools/host_operator_socket.py	開発・製造・配備用の host_operator_socket.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：tools/host_agent.py:47、tools/ppc/link_run.py:28、tools/ppc/link_sh_run.py:33、tools/tests/test_remote_u5d.py:20、tools/tests/test_remote_x13.py:22、tools/tests/test_remote_x4.py:157
+運用の道具	tools/host_rshell.py	開発・製造・配備用の host_rshell.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：tools/host_agent.py:46、tools/host_operator_socket.py:10、tools/ppc/hwb_commands_accept.py:140、tools/ppc/link_sh_run.py:34、tools/tests/test_remote_x11.py:114、tools/tests/test_remote_x13.py:253、tools/tests/test_remote_x5.py:19
+運用の道具	tools/host_services.py	開発・製造・配備用の host_services.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：tools/host_agent.py:45、tools/tests/test_remote_x0.py:82
+運用の道具	tools/host_sfs_link.py	開発・製造・配備用の host_sfs_link.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：tools/host_agent.py:42、tools/tests/test_host_sfs_link.py:20
+運用の道具	tools/host_tree_manifest.py	開発・製造・配備用の host_tree_manifest.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：tools/serialfs_host.py:44、tools/tests/test_hsync_inventory_flow.py:36
+運用の道具	tools/hostdrv_deploy.py	開発・製造・配備用の hostdrv_deploy.py。配備時の書き込み・削除を制御し、対象外のファイルを保護する。。呼出元：.github/workflows/build.yml:189、build/config.mk:230、tools/guest_tests.py:628、tools/tests/test_deploy_protect.py:40、tools/tests/test_h3b_fixtures.py:194、tools/tests/test_h4_manifest.py:142、tools/tests/test_hostdrv_manifest.py:31、tools/tests/test_raster_splash_asset.py:129
+運用の道具	tools/hostsvc_contracts.pyi	開発・製造・配備用の hostsvc_contracts.pyi。呼出元：静的参照なし
+運用の道具	tools/hwdev_layout.json	開発・製造・配備用の hwdev_layout.json。HWDEV のレイアウト生成に使う型定義。。呼出元：build/kdebug.mk:88
+運用の道具	tools/img2mgx.py	開発・製造・配備用の img2mgx.py。画像や資産をゲスト用の形式に変換する工程で使う。。呼出元：docs/MGX_FORMAT.md:269
+運用の道具	tools/img2osri.py	開発・製造・配備用の img2osri.py。画像や資産をゲスト用の形式に変換する工程で使う。。呼出元：docs/design/tools/img2osri.md:8、tools/osri_enc2_compare.py:21、tools/osri_enc2_native.py:111、tools/raster_obs_assets.py:14、tools/tests/test_osri_profile.py:26
+運用の道具	tools/img2vbz.py	開発・製造・配備用の img2vbz.py。画像や資産をゲスト用の形式に変換する工程で使う。。呼出元：静的参照なし
+運用の道具	tools/include_resolve.py	開発・製造・配備用の include_resolve.py。呼出元：静的参照なし
+運用の道具	tools/jobs.sh	開発・製造・配備用の jobs.sh。開発作業のジョブやレビューを起動し、結果を呼び出し元へ渡す。。呼出元：静的参照なし
+運用の道具	tools/kbd_import.py	開発・製造・配備用の kbd_import.py。ビルドで使う文字・キーの変換表を生成する。。呼出元：静的参照なし
+運用の道具	tools/keymap/fetch_netbsd_wscons.sh	開発・製造・配備用の keymap/fetch_netbsd_wscons.sh。配布物を取得し、取得先に保存する。。呼出元：静的参照なし
+運用の道具	tools/keymap/netbsd_wscons_sources.json	開発・製造・配備用の keymap/netbsd_wscons_sources.json。呼出元：静的参照なし
+運用の道具	tools/keymap/pc98_s1p.c	開発・製造・配備用の keymap/pc98_s1p.c。呼出元：静的参照なし
+運用の道具	tools/keymap/pc98_s1p_sources.json	開発・製造・配備用の keymap/pc98_s1p_sources.json。呼出元：静的参照なし
+運用の道具	tools/lan_bridge.py	開発・製造・配備用の lan_bridge.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：docs/tasks/realhw/TASK_LAN_82557.md:67、tools/lanfs_host.py:19
+運用の道具	tools/lanfs_host.py	開発・製造・配備用の lanfs_host.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：tools/host_agent.py:43、tools/host_sfs_link.py:19、tools/ppc_hostfs.py:10、tools/rshell_peek.py:242、tools/tests/sfs_restart_fixture.py:2、tools/tests/test_hsync_inventory_flow.py:37
+運用の道具	tools/lz4_compress.py	開発・製造・配備用の lz4_compress.py。画像や資産をゲスト用の形式に変換する工程で使う。。呼出元：静的参照なし
+運用の道具	tools/mk_blank_nhd.py	開発・製造・配備用の mk_blank_nhd.py。配備する媒体・パッケージを生成または更新する。。呼出元：tools/accept/pc98_in2_image.py:14、tools/tests/s3i2_tdd.md:223
+運用の道具	tools/mk_settings_db.py	開発・製造・配備用の mk_settings_db.py。データやリンク結果を製品のビルドが必要とする形式に整える。。呼出元：build/assets.mk:81
+運用の道具	tools/mkd88.py	開発・製造・配備用の mkd88.py。配備する媒体・パッケージを生成または更新する。。呼出元：静的参照なし
+運用の道具	tools/mkfat12.py	開発・製造・配備用の mkfat12.py。配備する媒体・パッケージを生成または更新する。。呼出元：build/image.mk:23、tools/fd_netcd_config.py:13、tools/mkroot_image.py:13、tools/tests/test_fd_netcd_config.py:22
+運用の道具	tools/mkmod.py	開発・製造・配備用の mkmod.py。データやリンク結果を製品のビルドが必要とする形式に整える。。呼出元：build/cd-module.mk:33、build/cirrus-module.mk:31、build/fep-module.mk:29、build/fm-module.mk:29、build/geforce-module.mk:43、build/hwdev.mk:17、build/kcg-module.mk:27、build/kdebug.mk:33、build/lan-module.mk:41、build/pcm-module.mk:36、build/ppc-fep-module.mk:30、build/ppc-install-boot.mk:41、build/ppc-root-pair.mk:6、build/sqlite-proto.mk:36、build/targets/ppc-powermac.mk:356、build/trident-module.mk:28、build/usb-module.mk:25、build/v86-module.mk:27、docs/decisions/ppc/PPC_MODULE_ALIGN_X86_DESIGN.md:50、tools/accept/ppc_module.py:17、tools/gen_hwdev_pair.py:7、tools/gen_kdebug_imports.py:312、tools/hwdev_audit.py:16、tools/ppc/install_packages.py:14、tools/ppc/root_pair.py:12、tools/sqlite_module_proto.py:9、tools/tests/test_cd_module.py:40、tools/tests/test_cirrus_module.py:37、tools/tests/test_dep_dir_a_l01.py:99、tools/tests/test_dep_dir_a_l02.py:61、tools/tests/test_double_fault.py:14、tools/tests/test_fm_module.py:34、tools/tests/test_geforce.py:292、tools/tests/test_hwdev_audit.py:14、tools/tests/test_hwdev_module.py:19、tools/tests/test_kcg_module.py:163、tools/tests/test_kdebug_ctx.py:31、tools/tests/test_kdebug_imports.py:21、tools/tests/test_kdebug_init.py:28、tools/tests/test_lan_module.py:42、tools/tests/test_mkmod.py:18、tools/tests/test_pcm_module.py:36、tools/tests/test_sqlite_module_proto.py:22、tools/tests/test_trident_module.py:104、tools/tests/test_v86_module.py:43
+運用の道具	tools/mkpkg.py	開発・製造・配備用の mkpkg.py。配備する媒体・パッケージを生成または更新する。。呼出元：build/image.mk:16、build/ppc-install-boot.mk:41、docs/08_build.md:679、tools/mkroot_image.py:12、tools/ppc/deploy_accept.py:11、tools/ppc/install_packages.py:15、tools/tests/test_ext2_empty_name.py:15、tools/tests/test_lan_module.py:95、tools/tests/test_lzss_pkg.py:26、tools/tests/test_mk_settings_db.py:517、tools/tests/test_packages.py:59、tools/tests/test_raster_splash_asset.py:31、tools/tests/test_vfs_fd_path.py:74
+運用の道具	tools/mkroot_image.py	開発・製造・配備用の mkroot_image.py。配備する媒体・パッケージを生成または更新する。。呼出元：build/ram-root.mk:7、tools/tests/test_boot_root.py:27、tools/tests/test_ram_ro.py:33
+運用の道具	tools/mkshlib.py	開発・製造・配備用の mkshlib.py。データやリンク結果を製品のビルドが必要とする形式に整える。。呼出元：build/os32snd.mk:38、build/programs.mk:726、tools/checks/h2-fixtures-host.py:3、tools/checks/shlib.py:15、tools/tests/s2_tdd.md:466、tools/tests/test_kapi_layout.py:545
+運用の道具	tools/mkvmkernel.py	開発・製造・配備用の mkvmkernel.py。配備する媒体・パッケージを生成または更新する。。呼出元：build/kernel.mk:27、tools/rshell_peek.py:141、tools/tests/test_vk32_crc.py:6、tools/tests/test_vmkernel_lz4.py:7
+運用の道具	tools/module_schema.py	開発・製造・配備用の module_schema.py。データやリンク結果を製品のビルドが必要とする形式に整える。。呼出元：build/cd-module.mk:35、build/cirrus-module.mk:33、build/fep-module.mk:31、build/fm-module.mk:31、build/geforce-module.mk:5、build/hwdev.mk:17、build/kcg-module.mk:29、build/kdebug.mk:9、build/lan-module.mk:43、build/pcm-module.mk:38、build/ppc-fep-module.mk:30、build/ppc-install-boot.mk:41、build/ppc-root-pair.mk:6、build/sqlite-proto.mk:36、build/targets/ppc-powermac.mk:356、build/trident-module.mk:5、build/usb-module.mk:5、build/v86-module.mk:29、tools/checks/ppc-diag-import-host.py:21、tools/gen_hwdev_contract.py:13、tools/gen_hwdev_pair.py:8、tools/gen_kdebug_imports.py:17、tools/gen_module_schema.py:6、tools/gen_sqlite_imports.py:12、tools/hwdev_audit.py:17、tools/mkmod.py:21、tools/ppc/root_pair.py:13、tools/sqlite_module_proto.py:10、tools/tests/test_geforce.py:293、tools/tests/test_kdebug_imports.py:22、tools/tests/test_lan_module.py:43、tools/tests/test_module_policy.py:29、tools/tests/test_np21w_gui.py:26
+運用の道具	tools/move_docs.py	開発・製造・配備用の move_docs.py。移設・編集の際にソースや文書の参照を書き換える。。呼出元：.claude/skills/os32-archive/SKILL.md:51、docs/08_build.md:929、docs/POLICY_ARCHIVE.md:48
+運用の道具	tools/move_files.py	開発・製造・配備用の move_files.py。呼出元：.claude/skills/os32-arch-sep/SKILL.md:46、docs/SRC_MOVE.md:31、tools/restructure/path_refs.py:86、tools/restructure/test_path_refs.py:42
+運用の道具	tools/nhd_deploy.py	開発・製造・配備用の nhd_deploy.py。配備時の書き込み・削除を制御し、対象外のファイルを保護する。。呼出元：build/config.mk:229、docs/08_build.md:303、tools/accept/pc98_in2_image.py:15、tools/accept/recover_t4b.md:54、tools/prune_stale.py:198、tools/tests/test_deploy_protect.py:39、tools/tests/test_deploy_set.py:33、tools/tests/test_h3b_fixtures.py:197、tools/tests/test_hdd_stage1.py:370、tools/tests/test_nhd_deploy_failure.py:261、tools/tests/test_nhd_deploy_profile.py:21、tools/tests/test_raster_splash_asset.py:130
+運用の道具	tools/nhd_profile.py	開発・製造・配備用の nhd_profile.py。NP21/W の起動・設定・操作・観測を提供する。。呼出元：tools/nhd_deploy.py:40、tools/np21w_ctl.py:905、tools/tests/test_nhd_deploy_profile.py:22
+運用の道具	tools/np21w_ctl.py	開発・製造・配備用の np21w_ctl.py。NP21/W の起動・設定・操作・観測を提供する。。呼出元：.claude/skills/run-os32/SKILL.md:37、tools/accept/pc98_in2_gui.py:16、tools/accept/recover_t4b.md:52、tools/nhd_deploy.py:373、tools/tests/test_nhd_deploy_failure.py:160、tools/tests/test_np21w_ctl.py:37
+運用の道具	tools/np21w_ini.py	開発・製造・配備用の np21w_ini.py。NP21/W の起動・設定・操作・観測を提供する。。呼出元：tools/accept/pc98_in2_gui.py:18、tools/np21w_ini_live.py:16、tools/np21w_trial.py:19、tools/tests/np21w_ini_tdd.md:28、tools/tests/test_np21w_trial.py:15
+運用の道具	tools/np21w_ini_live.py	開発・製造・配備用の np21w_ini_live.py。NP21/W の起動・設定・操作・観測を提供する。。呼出元：tools/np21w_trial.py:18、tools/tests/np21w_ini_live_tdd.md:116、tools/tests/test_np21w_ini_live.py:22、tools/tests/test_np21w_transport.py:14、tools/tests/test_np21w_trial.py:17
+運用の道具	tools/np21w_mcp/gui.py	開発・製造・配備用の np21w_mcp/gui.py。NP21/W の起動・設定・操作・観測を提供する。。呼出元：tools/h3_park_resume.py:405、tools/np21w_mcp/server.py:653
+運用の道具	tools/np21w_mcp/gui_desc.py	開発・製造・配備用の np21w_mcp/gui_desc.py。NP21/W の起動・設定・操作・観測を提供する。。呼出元：tools/h3_park_resume.py:430
+運用の道具	tools/np21w_mcp/np21w_client.py	開発・製造・配備用の np21w_mcp/np21w_client.py。NP21/W の起動・設定・操作・観測を提供する。。呼出元：tools/emu_agent/agent.py:12、tools/np21w_mcp/gui.py:21、tools/np21w_mcp/server.py:25
+運用の道具	tools/np21w_mcp/server.py	開発・製造・配備用の np21w_mcp/server.py。NP21/W の起動・設定・操作・観測を提供する。。呼出元：静的参照なし
+運用の道具	tools/np21w_mcp/symbols.py	開発・製造・配備用の np21w_mcp/symbols.py。NP21/W の起動・設定・操作・観測を提供する。。呼出元：tools/np21w_mcp/gui.py:263、tools/np21w_mcp/server.py:26
+運用の道具	tools/np21w_restart.py	冒頭で非推奨。停止・再起動は np21w_ctl.py に移行済み。呼出元：静的参照なし
+運用の道具	tools/np21w_trial.py	開発・製造・配備用の np21w_trial.py。NP21/W の起動・設定・操作・観測を提供する。。呼出元：tools/tests/np21w_trial_tdd.md:111、tools/tests/s3i2_tdd.md:225、tools/tests/test_np21w_transport.py:15、tools/tests/test_np21w_trial.py:14
+運用の道具	tools/opna_rustc.py	開発・製造・配備用の opna_rustc.py。呼出元：build/os32snd.mk:10
+運用の道具	tools/os32_server.py	開発・製造・配備用の os32_server.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：静的参照なし
+運用の道具	tools/osri_enc2_compare.py	開発・製造・配備用の osri_enc2_compare.py。符号化条件ごとの時間、画質と CRC を CSV・比較画像に書き出す実験用の道具。。呼出元：tools/tests/test_osri_enc2.py:42
+運用の道具	tools/osri_enc2_core.c	開発・製造・配備用の osri_enc2_core.c。画像や資産をゲスト用の形式に変換する工程で使う。。呼出元：build/assets.mk:123
+運用の道具	tools/osri_enc2_decode.py	開発・製造・配備用の osri_enc2_decode.py。呼出元：tools/osri_enc2_compare.py:28、tools/raster_splash_asset.py:15、tools/tests/test_osri_enc2.py:40
+運用の道具	tools/osri_enc2_dither.py	開発・製造・配備用の osri_enc2_dither.py。呼出元：tools/tests/test_osri_enc2.py:38、tools/tests/test_osri_enc2_core.py:28
+運用の道具	tools/osri_enc2_master.py	開発・製造・配備用の osri_enc2_master.py。呼出元：tools/osri_enc2_plan.py:5、tools/tests/test_osri_enc2.py:32
+運用の道具	tools/osri_enc2_metrics.py	開発・製造・配備用の osri_enc2_metrics.py。呼出元：tools/osri_enc2_compare.py:26、tools/tests/test_osri_enc2.py:41
+運用の道具	tools/osri_enc2_native.py	開発・製造・配備用の osri_enc2_native.py。画像や資産をゲスト用の形式に変換する工程で使う。。呼出元：tools/img2osri.py:282、tools/osri_enc2_compare.py:24、tools/tests/test_osri_enc2_core.py:30、tools/tests/test_osri_profile.py:27
+運用の道具	tools/osri_enc2_order.py	開発・製造・配備用の osri_enc2_order.py。呼出元：tools/osri_enc2_compare.py:25、tools/osri_enc2_plan.py:8、tools/osri_enc2_row.py:5、tools/tests/test_osri_enc2.py:35
+運用の道具	tools/osri_enc2_pack.py	開発・製造・配備用の osri_enc2_pack.py。呼出元：tools/osri_enc2_compare.py:27、tools/osri_enc2_native.py:112、tools/tests/test_osri_enc2.py:39、tools/tests/test_osri_enc2_core.py:29
+運用の道具	tools/osri_enc2_plan.py	開発・製造・配備用の osri_enc2_plan.py。呼出元：tools/osri_enc2_compare.py:23、tools/osri_enc2_native.py:16、tools/tests/test_osri_enc2.py:37、tools/tests/test_osri_enc2_core.py:27
+運用の道具	tools/osri_enc2_row.py	開発・製造・配備用の osri_enc2_row.py。呼出元：tools/osri_enc2_plan.py:7、tools/tests/test_osri_enc2.py:36、tools/tests/test_osri_enc2_core.py:26
+運用の道具	tools/osri_enc2_spec.py	開発・製造・配備用の osri_enc2_spec.py。呼出元：tools/img2osri.py:8、tools/osri_enc2_compare.py:22、tools/osri_enc2_dither.py:3、tools/osri_enc2_master.py:3、tools/osri_enc2_metrics.py:4、tools/osri_enc2_native.py:15、tools/osri_enc2_order.py:3、tools/osri_enc2_pack.py:5、tools/osri_enc2_plan.py:4、tools/osri_enc2_row.py:3、tools/osri_enc2_timing.py:3、tools/osri_enc2_tree.py:4、tools/tests/test_osri_enc2.py:30、tools/tests/test_osri_enc2_core.py:25
+運用の道具	tools/osri_enc2_timing.py	開発・製造・配備用の osri_enc2_timing.py。呼出元：tools/osri_enc2_dither.py:4、tools/osri_enc2_metrics.py:5、tools/osri_enc2_pack.py:6、tools/tests/test_osri_enc2.py:34
+運用の道具	tools/osri_enc2_tree.py	開発・製造・配備用の osri_enc2_tree.py。呼出元：tools/osri_enc2_native.py:17、tools/osri_enc2_plan.py:6、tools/tests/test_osri_enc2.py:33
+運用の道具	tools/osri_profile.py	開発・製造・配備用の osri_profile.py。画像や資産をゲスト用の形式に変換する工程で使う。。呼出元：tools/img2osri.py:7、tools/osri_enc2_decode.py:2、tools/osri_enc2_native.py:14、tools/osri_enc2_spec.py:6、tools/raster_splash_asset.py:16、tools/tests/test_osri_profile.py:28
+運用の道具	tools/pack_name_tables.txt	冒頭で旧 check_select.py --pack 用と宣言。現行の実行入口からの読込なし。呼出元：静的参照なし
+運用の道具	tools/pack_notes.txt	旧 pack の助言表。現行登録の covers にだけ残り、表を読む入口なし。呼出元：静的参照なし
+運用の道具	tools/pc98pt.py	開発・製造・配備用の pc98pt.py。PC-98 区画表を読み書きする。。呼出元：tools/nhd_deploy.py:48、tools/tests/test_hdd_stage1.py:10
+運用の道具	tools/ppc/README.md	PowerPC の像の作成・実行手順が参照する PPC 用の運用道具と一緒に移す。呼出元：静的参照なし
+運用の道具	tools/ppc/boot_media.py	PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。。呼出元：build/targets/ppc-powermac.mk:196、tools/ppc/kboot_accept.py:21、tools/ppc/root_lz4_inventory.py:161
+運用の道具	tools/ppc/build_cross.sh	PowerMac 像の生成・リンク・媒体作成の入力。クロスコンパイラとライブラリを構築する。。呼出元：静的参照なし
+運用の道具	tools/ppc/install_packages.py	PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。。呼出元：build/ppc-install-boot.mk:41
+運用の道具	tools/ppc/module_rela.py	PowerMac 像の生成・リンク・媒体作成の入力。データやリンク結果を製品のビルドが必要とする形式に整える。。呼出元：build/ppc-fep-module.mk:30、build/targets/ppc-powermac.mk:356
+運用の道具	tools/ppc/product_media.py	PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。。呼出元：build/ppc-install-boot.mk:18、tools/ppc/product_accept.py:13、tools/ppc/product_media_host.py:8
+運用の道具	tools/ppc/root_lz4_layout.py	PowerMac 像の生成・リンク・媒体作成の入力。データやリンク結果を製品のビルドが必要とする形式に整える。。呼出元：build/ppc-root-pair.mk:6、tools/ppc/deploy_accept.py:13、tools/ppc/product_media.py:9、tools/ppc/root_lz4_inventory.py:19、tools/ppc/root_lz4_layout_host.py:15、tools/ppc/root_lz4_layout_run.py:33、tools/ppc/root_pair.py:14、tools/ppc/test_root_pair.py:12
+運用の道具	tools/ppc/root_pair.py	PowerMac 像の生成・リンク・媒体作成の入力。配備する媒体・パッケージを生成または更新する。。呼出元：tools/ci/ppc_scope.py:19、tools/ppc/fep_boot_accept.py:19、tools/ppc/product_media.py:87、tools/ppc/test_root_pair.py:13
+運用の道具	tools/ppc/sqlite_attributes.py	PowerMac 像の生成・リンク・媒体作成の入力。データやリンク結果を製品のビルドが必要とする形式に整える。。呼出元：build/targets/ppc-powermac.mk:168
+運用の道具	tools/ppc_hostfs.py	開発・製造・配備用の ppc_hostfs.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：tools/ppc_lan_host.py:129
+運用の道具	tools/ppc_lan_host.py	開発・製造・配備用の ppc_lan_host.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：docs/decisions/ppc/PPC_REALHW_G4_DESIGN.md:107、tools/ppc/kboot_run.py:27、tools/ppc/link_run.py:26、tools/ppc/link_sh_run.py:30、tools/ppc/realhw_run.py:22、tools/tests/ppc_hostfs_server.py:15、tools/tests/ppc_hostfs_wire.py:11、tools/tests/test_remote_p5.py:15
+運用の道具	tools/ppc_link_transport.py	開発・製造・配備用の ppc_link_transport.py。受入と常用の ppc_lan_host が共用する診断・シェル通信クライアント。。呼出元：tools/ppc/realhw_run.py:25、tools/ppc_lan_host.py:400、tools/tests/test_remote_p2h.py:51
+運用の道具	tools/preflight.sh	開発・製造・配備用の preflight.sh。作業木の準備状況を診断し、指定時には不足フォントを用意する。。呼出元：tools/tests/test_preflight.py:71
+運用の道具	tools/prototypes/cd_imports.def	開発・製造・配備用の prototypes/cd_imports.def。製品用インポート表の生成入力。。呼出元：build/cd-module.mk:5
+運用の道具	tools/prototypes/cirrus_imports.def	開発・製造・配備用の prototypes/cirrus_imports.def。製品用インポート表の生成入力。。呼出元：build/cirrus-module.mk:5、docs/design/tools/prototypes/README.md:7
+運用の道具	tools/prototypes/fep_imports.def	開発・製造・配備用の prototypes/fep_imports.def。製品用インポート表の生成入力。。呼出元：静的参照なし
+運用の道具	tools/prototypes/fm_imports.def	開発・製造・配備用の prototypes/fm_imports.def。呼出元：build/fm-module.mk:5
+運用の道具	tools/prototypes/geforce_imports.def	開発・製造・配備用の prototypes/geforce_imports.def。製品用インポート表の生成入力。。呼出元：build/geforce-module.mk:5
+運用の道具	tools/prototypes/kcg_imports.def	開発・製造・配備用の prototypes/kcg_imports.def。呼出元：build/kcg-module.mk:5
+運用の道具	tools/prototypes/lan_imports.def	開発・製造・配備用の prototypes/lan_imports.def。製品用インポート表の生成入力。。呼出元：build/lan-module.mk:5
+運用の道具	tools/prototypes/pcm_imports.def	開発・製造・配備用の prototypes/pcm_imports.def。製品用インポート表の生成入力。。呼出元：build/pcm-module.mk:5
+運用の道具	tools/prototypes/sqlite_imports.def	開発・製造・配備用の prototypes/sqlite_imports.def。製品用インポート表の生成入力。。呼出元：build/sqlite-gen.mk:4、build/sqlite-proto.mk:5
+運用の道具	tools/prototypes/trident_imports.def	開発・製造・配備用の prototypes/trident_imports.def。製品用インポート表の生成入力。。呼出元：build/trident-module.mk:5
+運用の道具	tools/prototypes/usb_imports.def	開発・製造・配備用の prototypes/usb_imports.def。製品用インポート表の生成入力。。呼出元：build/usb-module.mk:5
+運用の道具	tools/prototypes/v86_imports.def	開発・製造・配備用の prototypes/v86_imports.def。製品用インポート表の生成入力。。呼出元：build/v86-module.mk:5
+運用の道具	tools/prune_stale.py	開発・製造・配備用の prune_stale.py。配備時の書き込み・削除を制御し、対象外のファイルを保護する。。呼出元：build/deploy.mk:55、tools/tests/test_deploy_protect.py:41
+担当の直し	tools/r1_manifest.py	担当の直し（P1-4 → P1-1）：kernel-r1 が manifest を生成
+運用の道具	tools/raster_splash_asset.py	開発・製造・配備用の raster_splash_asset.py。画像や資産をゲスト用の形式に変換する工程で使う。。呼出元：docs/design/tools/raster_splash_asset.md:13
+運用の道具	tools/remote_transport.py	開発・製造・配備用の remote_transport.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：tools/gserial.py:17、tools/ppc_link_transport.py:9、tools/rshell.py:11
+運用の道具	tools/review_local.py	開発・製造・配備用の review_local.py。開発作業のジョブやレビューを起動し、結果を呼び出し元へ渡す。。呼出元：静的参照なし
+運用の道具	tools/rshell.py	開発・製造・配備用の rshell.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。。呼出元：tools/tests/test_remote_x13.py:137
+運用の道具	tools/rshell_hwb.py	開発・製造・配備用の rshell_hwb.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。。呼出元：tools/rshell_serial.py:98、tools/tests/test_hwb_shell.py:22
+運用の道具	tools/rshell_peek.py	開発・製造・配備用の rshell_peek.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。。呼出元：tools/rshell_serial.py:93、tools/tests/test_ver_accept.py:17
+運用の道具	tools/rshell_recover.py	開発・製造・配備用の rshell_recover.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。。呼出元：tools/accept/gf_a4.md:97、tools/accept/gf_c.md:86、tools/accept/recover_t4b.md:28、tools/accept/recover_t4b_host.py:16、tools/tests/test_recover_t3.py:12、tools/tests/test_ver_accept.py:18
+運用の道具	tools/rshell_serial.py	開発・製造・配備用の rshell_serial.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。。呼出元：docs/decisions/realhw/RA266.md:19、tools/accept/gf_c.md:108、tools/gserial.py:16、tools/rshell_peek.py:6、tools/rshell_recover.py:489、tools/tests/test_guest_acceptance.py:191、tools/tests/test_hsync_inventory_flow.py:38、tools/tests/test_rshell_hwb.py:20、tools/tvdump_recv.py:40
+運用の道具	tools/screenshot.py	開発・製造・配備用の screenshot.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。。呼出元：静的参照なし
+運用の道具	tools/serialfs_host.py	開発・製造・配備用の serialfs_host.py。実機とホスト間の接続、サービス設定、要求や応答の処理を担う。。呼出元：tools/host_sfs_link.py:21、tools/lanfs_host.py:20、tools/ppc/sd_run.py:276、tools/ppc_hostfs.py:11、tools/rshell_peek.py:243、tools/rshell_serial.py:87、tools/tests/ppc_hostfs_server.py:16、tools/tests/sfs_restart_fixture.py:16、tools/tests/test_host_sfs_link.py:21、tools/tests/test_hsync_inventory_flow.py:35、tools/tests/test_lanfs.py:35、tools/tests/test_ppc_sd_run.py:56、tools/tests/test_remote_p4b.py:15、tools/tests/test_rshell_peek.py:36
+運用の道具	tools/split_c_functions.py	分割時の一回用。現行の工程・手順に呼出元なし。呼出元：静的参照なし
+運用の道具	tools/sqlite_module_proto.py	開発・製造・配備用の sqlite_module_proto.py。呼出元：build/sqlite-proto.mk:36
+運用の道具	tools/sync_docs_to_win.sh	開発・製造・配備用の sync_docs_to_win.sh。運用先に文書・資料やサービスを同期する。。呼出元：Makefile:76
+運用の道具	tools/sync_hwdocs.sh	開発・製造・配備用の sync_hwdocs.sh。運用先に文書・資料やサービスを同期する。。呼出元：静的参照なし
+運用の道具	tools/systemd/README.md	常駐サービスのユニットと対応する導入手順を一緒に移す。呼出元：静的参照なし
+運用の道具	tools/systemd/host-agent.example.json	開発・製造・配備用の systemd/host-agent.example.json。呼出元：静的参照なし
+運用の道具	tools/systemd/os32-host-agent@.service	開発・製造・配備用の systemd/os32-host-agent@.service。呼出元：静的参照なし
+運用の道具	tools/systemd/update_host_agent.sh	開発・製造・配備用の systemd/update_host_agent.sh。運用先に文書・資料やサービスを同期する。。呼出元：tools/systemd/README.md:55
+運用の道具	tools/tvdump_recv.py	開発・製造・配備用の tvdump_recv.py。ゲストを操作し応答・観測データを回収する。終了値は通信や操作の成否を示す。。呼出元：tools/tests/guest_acceptance.yaml:241、tools/tests/test_e9_observation.py:47、tools/tests/test_guest_acceptance.py:25
+運用の道具	userland/libos32term/.gitignore	Git で追跡する開発用ファイルの選択。呼出元：静的参照なし
+運用の道具	userland/libos32term_render/.gitignore	Git で追跡する開発用ファイルの選択。呼出元：静的参照なし
+担当の直し	userland/rust/alloc_demo/Cargo.toml	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/alloc_demo/src/lib.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/font_test/Cargo.toml	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/font_test/src/lib.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/gdi_test/Cargo.toml	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/gdi_test/src/corpus.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/gdi_test/src/fontbench.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/gdi_test/src/lib.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/gui_bench/Cargo.toml	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/gui_bench/src/lib.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/gui_demo/Cargo.toml	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/gui_demo/src/lib.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/hello_gfx/Cargo.toml	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/hello_gfx/src/lib.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/lease_test/Cargo.toml	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/lease_test/src/lib.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/math_test_rs/Cargo.toml	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/math_test_rs/src/lib.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+運用の道具	userland/rust/t5a_display/.gitignore	Git で追跡する開発用ファイルの選択。呼出元：静的参照なし
+担当の直し	userland/rust/t5a_display/Cargo.toml	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/boundary.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/clipboard.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/guest.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/inject.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/input.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/launch.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/lib.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/paint.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/prompt.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/session.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/sink.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/state.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/status.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/storage.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/t5a_display/src/view.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/trim_back_rs/Cargo.toml	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/trim_back_rs/src/cache.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/trim_back_rs/src/lib.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/v12_api_test/Cargo.toml	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/rust/v12_api_test/src/lib.rs	担当の直し（P1-4 → P1-1）：D-8：build/programs.mk の配備診断クレートの入力
+担当の直し	userland/tests/allocator_bench.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/asset_demo.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/asset_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/audit_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/av_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/bench/main.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/bench_scale2x/main.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/blit_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/blit_test2.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/cfg_bench.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/crash.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/crtexit.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/d0a_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/data/hello.sh	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/data/test.txt	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/data/test_pager.txt	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/data/test_script.bat	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/data/test_table.md	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/data/test_utf8.txt	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/db_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/db_v50_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/dbq.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/demo_tile.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/disk_auth_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/e2seek.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/e2test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/ecs_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/exec_heap_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/faultprobe/main.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/faulttest.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/fep_meta_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/font_lease_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/font_load_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/fp_stop.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/gfx200_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/gfx2_i1.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/gfx2_i2.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/gfx2_i3.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/gfx2_rh.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/gfx_demo200.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/gui_busy.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/gui_call_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/h2_stack.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/h2_stack_probe.h	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/h2_stack_probe.inc	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/h3/fixture.inc	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/h3/protocol.h	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/h3/state.inc	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/h3a.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/h3b.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/h5_shape.inc	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/h5_shape_i.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/h5_shape_ii.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/h5_shape_iii.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hal_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/heap_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hello.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/host_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/g4/gmac.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/gf_palette.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/gf_regs.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/hpt370_probe.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/mac99/ohci.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/mac99/port_read16.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/mac99/port_read32.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/mac99/port_read8.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/mac99/port_write16.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/mac99/port_write32.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/mac99/port_write8.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/np21w_gdc.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/np21w_loop.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/np21w_nopci.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/np21w_poll.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/np21w_tvram.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/np21w_wait.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/tri_burst.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/tri_burst2.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/tri_burst3.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/tri_burst4.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/tri_burst5.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/tri_burst6.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/tri_w32.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/trident.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hw/trident_mode.hwb	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/hwscroll_probe.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/input_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/kapi_cost.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/kbd_echo.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/kcallback_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/kdebug_probe.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/klibc_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/kout_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/kprint_boundary.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/kstr_bench.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/kstr_boundary.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/kstr_v86.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/layout_cycle_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/loopfmt_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/malloc_arena_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/math_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/mem_map_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/mem_stat_compat_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/mem_stat_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/mgx_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/mouse_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/nop.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/pcm_play.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/pcm_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/pcm_wav.h	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/pegcchk.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/pipe_owner_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/raw_wait_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/restest.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/ring3_fault.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/ring3_guard.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/ring3_hello.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/ring3_marker.h	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/rotate_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/save_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/sbrk_grow_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/shm_reuse_child.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/shm_reuse_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/shutdown_probe.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/snd2_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/sndl_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/sqlite_standalone/sqlite_standalone.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/sqlite_standalone/sqlite_user_vfs.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/stat_t.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/stop_loop.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/t_exit.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/test2.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/text_ro_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/tile_bench.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/time_test.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/trim_back.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+担当の直し	userland/tests/trim_front.c	担当の直し（P1-4 → P1-1）：D-8：ゲスト診断のプログラム・配備データ（build/programs.mk・userland/deploy.yaml）。所属判断=開発・検査用実装：ゲストで診断するための入力
+外部利用	.claude/skills/run-os32/driver.py	pc98emu のゲスト操作。現行入口を維持
+外部利用	Makefile	実機ノートのビルド。現行入口を維持
+外部利用	arch/ppc/ofw_note.S	pc98emu 経由 tools/ppc/root_lz4_layout_run.py。P3 前に参照先の変更を通知：sys/arch/ppc/ofw_note.S
+外部利用	include/memmap.h	pc98emu 経由 tools/ppc/root_lz4_layout.py。P3 前に参照先の変更を通知：sys/include/memmap.h
+外部利用	kernel/console/con_sink.c	pc98emu 経由 tools/ppc/link_sh_run.py。P3 前に参照先の変更を通知：sys/kern/console/con_sink.c
+外部利用	lib/kstring_c.c	pc98emu 経由 tools/ppc/root_lz4_layout_run.py。P3 前に参照先の変更を通知：sys/kern/kstring_c.c
+外部利用	lib/os32_opna/upstream/fmgen_file.h	pc98emu 経由 tools/accept/snd2/verify_soft.py。現行入口を維持
+外部利用	lib/os32_opna/upstream/fmgen_fmgen.cpp	pc98emu 経由 tools/accept/snd2/verify_soft.py。現行入口を維持
+外部利用	lib/os32_opna/upstream/fmgen_fmgen.h	pc98emu 経由 tools/accept/snd2/verify_soft.py。現行入口を維持
+外部利用	lib/os32_opna/upstream/fmgen_fmgeninl.h	pc98emu 経由 tools/accept/snd2/verify_soft.py。現行入口を維持
+外部利用	lib/os32_opna/upstream/fmgen_fmtimer.cpp	pc98emu 経由 tools/accept/snd2/verify_soft.py。現行入口を維持
+外部利用	lib/os32_opna/upstream/fmgen_fmtimer.h	pc98emu 経由 tools/accept/snd2/verify_soft.py。現行入口を維持
+外部利用	lib/os32_opna/upstream/fmgen_headers.h	pc98emu 経由 tools/accept/snd2/verify_soft.py。現行入口を維持
+外部利用	lib/os32_opna/upstream/fmgen_misc.h	pc98emu 経由 tools/accept/snd2/verify_soft.py。現行入口を維持
+外部利用	lib/os32_opna/upstream/fmgen_opna.cpp	pc98emu 経由 tools/accept/snd2/verify_soft.py。現行入口を維持
+外部利用	lib/os32_opna/upstream/fmgen_opna.h	pc98emu 経由 tools/accept/snd2/verify_soft.py。現行入口を維持
+外部利用	lib/os32_opna/upstream/fmgen_psg.cpp	pc98emu 経由 tools/accept/snd2/verify_soft.py。現行入口を維持
+外部利用	lib/os32_opna/upstream/fmgen_psg.h	pc98emu 経由 tools/accept/snd2/verify_soft.py。現行入口を維持
+外部利用	lib/os32_opna/upstream/fmgen_types.h	pc98emu 経由 tools/accept/snd2/verify_soft.py。現行入口を維持
+外部利用	requirements.txt	実機ノートのビルド。現行入口を維持
+外部利用	rust-toolchain.toml	実機ノートのビルド。現行入口を維持
+外部利用	tools/accept/pc98_in2_gui.py	pc98emu の操作・受入台本。P7 で終了。P3 前に相手に通知
+外部利用	tools/accept/snd2/README.md	pc98emu の git archive による snd2 受入。P7 で終了。P3 前に相手に通知
+外部利用	tools/accept/snd2/diag_insert.py	pc98emu の git archive による snd2 受入。P7 で終了。P3 前に相手に通知
+外部利用	tools/accept/snd2/latency.py	pc98emu の git archive による snd2 受入。P7 で終了。P3 前に相手に通知
+外部利用	tools/accept/snd2/soft_tone.cpp	pc98emu の git archive による snd2 受入。P7 で終了。P3 前に相手に通知
+外部利用	tools/accept/snd2/sound_rate.py	pc98emu の git archive による snd2 受入。P7 で終了。P3 前に相手に通知
+外部利用	tools/accept/snd2/verify_epoch.py	pc98emu の git archive による snd2 受入。P7 で終了。P3 前に相手に通知
+外部利用	tools/accept/snd2/verify_if0.py	pc98emu の git archive による snd2 受入。P7 で終了。P3 前に相手に通知
+外部利用	tools/accept/snd2/verify_soft.py	pc98emu の git archive による snd2 受入。P7 で終了。P3 前に相手に通知
+外部利用	tools/accept/snd2/verify_wave.py	pc98emu の git archive による snd2 受入。P7 で終了。P3 前に相手に通知
+外部利用	tools/ci_fetch.sh	実機ノートの採取・転送台本、pc98emu の操作・受入台本。現行入口を維持
+外部利用	tools/gen_memmap.py	pc98emu 経由 tools/ppc/root_lz4_layout_run.py。現行入口を維持
+外部利用	tools/gserial.py	実機ノートの採取・転送台本。現行入口を維持
+外部利用	tools/gui_gate.py	pc98emu の操作・受入台本。P7 で終了。P3 前に相手に通知
+外部利用	tools/host_agent.py	実機ノート /opt/os32 の常駐サービスと運用台本、pc98emu の操作・受入台本。現行入口を維持
+外部利用	tools/host_agent_config.py	実機ノート /opt/os32 の常駐サービスと運用台本。現行入口を維持
+外部利用	tools/host_agent_service.py	実機ノート /opt/os32 の常駐サービスと運用台本、G4 os32-g4-agent。現行入口を維持
+外部利用	tools/host_linux.py	実機ノート /opt/os32 の常駐サービスと運用台本。現行入口を維持
+外部利用	tools/host_notify.py	実機ノート /opt/os32 の常駐サービスと運用台本。現行入口を維持
+外部利用	tools/host_operator_socket.py	実機ノート /opt/os32 の常駐サービスと運用台本。現行入口を維持
+外部利用	tools/host_rshell.py	実機ノート /opt/os32 の常駐サービスと運用台本。現行入口を維持
+外部利用	tools/host_services.py	実機ノート /opt/os32 の常駐サービスと運用台本。現行入口を維持
+外部利用	tools/lan_bridge.py	実機ノート /opt/os32 の常駐サービスと運用台本。現行入口を維持
+外部利用	tools/lanfs_host.py	実機ノート /opt/os32 の常駐サービスと運用台本。現行入口を維持
+外部利用	tools/mk_blank_nhd.py	pc98emu の操作・受入台本。現行入口を維持
+外部利用	tools/mkmod.py	実機ノートの採取・転送台本。現行入口を維持
+外部利用	tools/np21w_ctl.py	pc98emu の操作・受入台本。現行入口を維持
+外部利用	tools/np21w_mcp/np21w_client.py	pc98emu の操作・受入台本。現行入口を維持
+外部利用	tools/ppc/link_sh_run.py	pc98emu の操作・受入台本。P7 で終了。P3 前に相手に通知
+外部利用	tools/ppc/root_lz4_inventory.py	pc98emu の操作・受入台本。P7 で終了。P3 前に相手に通知
+外部利用	tools/ppc/root_lz4_layout.py	pc98emu 経由 tools/ppc/root_lz4_layout_run.py。現行入口を維持
+外部利用	tools/ppc/root_lz4_layout_run.py	pc98emu の操作・受入台本。P7 で終了。P3 前に相手に通知
+外部利用	tools/ppc/root_lz4_probe.c	pc98emu 経由 tools/ppc/root_lz4_layout_run.py。P7 で終了。P3 前に相手に通知
+外部利用	tools/remote_transport.py	実機ノート /opt/os32 の常駐サービスと運用台本。現行入口を維持
+外部利用	tools/rshell.py	実機ノート /opt/os32 の常駐サービスと運用台本、pc98emu の操作・受入台本。現行入口を維持
+外部利用	tools/rshell_serial.py	実機ノートの採取・転送台本。現行入口を維持
+外部利用	tools/serialfs_host.py	実機ノート /opt/os32 の常駐サービスと運用台本。現行入口を維持
+外部利用	tools/systemd/update_host_agent.sh	実機ノート /opt/os32 の常駐サービスと運用台本。現行入口を維持
+外部利用	tools/tests/make_pcm_wav.py	pc98emu の操作・受入台本。P7 で終了。P3 前に相手に通知
+外部利用	tools/tests/pcm_play_guest.py	pc98emu の操作・受入台本。P7 で終了。P3 前に相手に通知
+外部利用	userland/shell/main.c	pc98emu 経由 tools/ppc/link_sh_run.py。現行入口を維持
+外部利用	userland/shell/rshell_lan.c	pc98emu 経由 tools/ppc/link_sh_run.py。現行入口を維持
