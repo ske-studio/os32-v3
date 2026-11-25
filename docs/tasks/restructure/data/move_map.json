@@ -692,8 +692,16 @@
     "to": "sys/dev/ata/ide_request.inc"
   },
   {
+    "from": "drivers/base/dev.c",
+    "to": "sys/dev/base/dev.c"
+  },
+  {
     "from": "drivers/block/disk.h",
     "to": "sys/dev/block/disk.h"
+  },
+  {
+    "from": "drivers/block/fat_diskio.c",
+    "to": "sys/dev/block/fat_diskio.c"
   },
   {
     "from": "drivers/block/fdc.c",
@@ -840,6 +848,10 @@
     "to": "sys/dev/hostdrv/hostdrvfs_proto.h"
   },
   {
+    "from": "drivers/input/kbd.c",
+    "to": "sys/platform/pc98/input/kbd.c"
+  },
+  {
     "from": "drivers/input/kbd.h",
     "to": "sys/platform/pc98/input/kbd.h"
   },
@@ -850,6 +862,10 @@
   {
     "from": "drivers/input/kbd_dlog.h",
     "to": "sys/dev/input/kbd_dlog.h"
+  },
+  {
+    "from": "drivers/input/kbd_fgpoll.inc",
+    "to": "sys/platform/pc98/input/kbd_fgpoll.inc"
   },
   {
     "from": "drivers/input/kbd_hal.c",
@@ -932,6 +948,10 @@
     "to": "sys/dev/net/e82557/lan_body.c"
   },
   {
+    "from": "drivers/net/e82557/lan_module.c",
+    "to": "sys/dev/net/e82557/lan_module.c"
+  },
+  {
     "from": "drivers/net/e82557/lan_module.h",
     "to": "sys/dev/net/e82557/lan_module.h"
   },
@@ -968,12 +988,24 @@
     "to": "sys/dev/net/gem/gem_tx.c"
   },
   {
+    "from": "drivers/net/ne2000/lgy98.c",
+    "to": "sys/dev/net/ne2000/lgy98.c"
+  },
+  {
     "from": "drivers/net/ne2000/lgy98.h",
     "to": "sys/dev/net/ne2000/lgy98.h"
   },
   {
+    "from": "drivers/net/ne2000/ne2000.c",
+    "to": "sys/dev/net/ne2000/ne2000.c"
+  },
+  {
     "from": "drivers/net/ne2000/ne2000.h",
     "to": "sys/dev/net/ne2000/ne2000.h"
+  },
+  {
+    "from": "drivers/net/ne2000/ne2000_control.inc",
+    "to": "sys/dev/net/ne2000/ne2000_control.inc"
   },
   {
     "from": "drivers/net/ne2000/ne2000_data.inc",
@@ -1094,6 +1126,10 @@
   {
     "from": "drivers/sound/cs4231/pcm_hw.h",
     "to": "sys/dev/sound/cs4231/pcm_hw.h"
+  },
+  {
+    "from": "drivers/sound/cs4231/pcm_module.c",
+    "to": "sys/dev/sound/cs4231/pcm_module.c"
   },
   {
     "from": "drivers/sound/cs4231/pcm_module.h",
@@ -1304,16 +1340,32 @@
     "to": "sys/platform/pc98/video/cirrus/wab_glue_xe10.h"
   },
   {
+    "from": "drivers/video/geforce/backend_geforce.c",
+    "to": "sys/dev/video/geforce/backend_geforce.c"
+  },
+  {
     "from": "drivers/video/geforce/edid.c",
     "to": "sys/dev/video/geforce/edid.c"
+  },
+  {
+    "from": "drivers/video/geforce/geforce_body.c",
+    "to": "sys/dev/video/geforce/geforce_body.c"
   },
   {
     "from": "drivers/video/geforce/geforce_dma.c",
     "to": "sys/dev/video/geforce/geforce_dma.c"
   },
   {
+    "from": "drivers/video/geforce/geforce_module.c",
+    "to": "sys/dev/video/geforce/geforce_module.c"
+  },
+  {
     "from": "drivers/video/geforce/geforce_module.h",
     "to": "sys/dev/video/geforce/geforce_module.h"
+  },
+  {
+    "from": "drivers/video/geforce/geforce_platform.c",
+    "to": "sys/dev/video/geforce/geforce_platform.c"
   },
   {
     "from": "drivers/video/geforce/geforce_tick.c",
@@ -1430,6 +1482,14 @@
   {
     "from": "drivers/video/of_fb/backend_of_fb.c",
     "to": "sys/dev/video/of_fb/backend_of_fb.c"
+  },
+  {
+    "from": "drivers/video/of_fb/backend_of_fb.h",
+    "to": "sys/dev/video/of_fb/backend_of_fb.h"
+  },
+  {
+    "from": "drivers/video/of_fb/of_fb_osri.inc",
+    "to": "sys/dev/video/of_fb/of_fb_osri.inc"
   },
   {
     "from": "drivers/video/of_fb/of_fb_v2.c",
@@ -1556,6 +1616,10 @@
     "to": "sys/dev/video/trident/pc98_init.c"
   },
   {
+    "from": "drivers/video/trident/present.c",
+    "to": "sys/dev/video/trident/present.c"
+  },
+  {
     "from": "drivers/video/trident/probe.c",
     "to": "sys/dev/video/trident/probe.c"
   },
@@ -1566,6 +1630,10 @@
   {
     "from": "drivers/video/trident/regs.c",
     "to": "sys/dev/video/trident/regs.c"
+  },
+  {
+    "from": "drivers/video/trident/resources.c",
+    "to": "sys/dev/video/trident/resources.c"
   },
   {
     "from": "drivers/video/trident/route_ra266.c",
@@ -1680,6 +1748,10 @@
     "to": "sys/kern/exec/appmem_unmap.c"
   },
   {
+    "from": "exec/appslot.c",
+    "to": "sys/kern/exec/appslot.c"
+  },
+  {
     "from": "exec/appslot.h",
     "to": "sys/kern/exec/appslot.h"
   },
@@ -1732,6 +1804,10 @@
     "to": "sys/kern/exec/exec_gfx.h"
   },
   {
+    "from": "exec/exec_gfx_poll.h",
+    "to": "sys/kern/exec/exec_gfx_poll.h"
+  },
+  {
     "from": "exec/exec_gui.h",
     "to": "sys/kern/exec/exec_gui.h"
   },
@@ -1772,6 +1848,10 @@
     "to": "sys/kern/exec/exec_kapi_init.inc"
   },
   {
+    "from": "exec/exec_launch.inc",
+    "to": "sys/kern/exec/exec_launch.inc"
+  },
+  {
     "from": "exec/exec_legacy.h",
     "to": "sys/kern/exec/exec_legacy.h"
   },
@@ -1802,6 +1882,10 @@
   {
     "from": "exec/exec_surface.h",
     "to": "sys/kern/exec/exec_surface.h"
+  },
+  {
+    "from": "exec/exec_syscall.inc",
+    "to": "sys/kern/exec/exec_syscall.inc"
   },
   {
     "from": "exec/exec_tramp_init.inc",
@@ -2028,6 +2112,14 @@
     "to": "sys/fs/fat/fatfs/string.h"
   },
   {
+    "from": "fs/fat/fatfs_vfs.c",
+    "to": "sys/fs/fat/fatfs_vfs.c"
+  },
+  {
+    "from": "fs/fat/fatfs_vfs_read_cache.inc",
+    "to": "sys/fs/fat/fatfs_vfs_read_cache.inc"
+  },
+  {
     "from": "fs/fd_redirect.c",
     "to": "sys/fs/fd_redirect.c"
   },
@@ -2136,6 +2228,10 @@
     "to": "sys/fs/serialfs/sfs_proto.h"
   },
   {
+    "from": "fs/serialfs/sfs_session_fg.c",
+    "to": "sys/fs/serialfs/sfs_session_fg.c"
+  },
+  {
     "from": "fs/vfs.c",
     "to": "sys/fs/vfs.c"
   },
@@ -2176,6 +2272,10 @@
     "to": "sys/kern/console/gfx_console.h"
   },
   {
+    "from": "gfx/gfx_core.c",
+    "to": "sys/hal/gfx/gfx_core.c"
+  },
+  {
     "from": "gfx/gfx_core_api.inc",
     "to": "sys/hal/gfx/gfx_core_api.inc"
   },
@@ -2186,6 +2286,14 @@
   {
     "from": "gfx/gfx_core_framebuffer.inc",
     "to": "sys/hal/gfx/gfx_core_framebuffer.inc"
+  },
+  {
+    "from": "gfx/gfx_core_init.inc",
+    "to": "sys/hal/gfx/gfx_core_init.inc"
+  },
+  {
+    "from": "gfx/gfx_core_surface.inc",
+    "to": "sys/hal/gfx/gfx_core_surface.inc"
   },
   {
     "from": "gfx/gfx_dirty.c",
@@ -2214,6 +2322,10 @@
   {
     "from": "gfx/gfx_hw_submit.c",
     "to": "sys/hal/gfx/gfx_hw_submit.c"
+  },
+  {
+    "from": "gfx/gfx_internal.h",
+    "to": "sys/hal/gfx/gfx_internal.h"
   },
   {
     "from": "gfx/gfx_osri.c",
@@ -2300,12 +2412,20 @@
     "to": "sys/hal/gfx/v2/backend_reg.c"
   },
   {
+    "from": "gfx/v2/caps.c",
+    "to": "sys/hal/gfx/v2/caps.c"
+  },
+  {
     "from": "gfx/v2/check_op.c",
     "to": "sys/hal/gfx/v2/check_op.c"
   },
   {
     "from": "gfx/v2/display.c",
     "to": "sys/hal/gfx/v2/display.c"
+  },
+  {
+    "from": "gfx/v2/enum.c",
+    "to": "sys/hal/gfx/v2/enum.c"
   },
   {
     "from": "gfx/v2/fence.c",
@@ -2334,6 +2454,14 @@
   {
     "from": "gfx/v2/gfx2_sw.h",
     "to": "sys/hal/gfx/v2/gfx2_sw.h"
+  },
+  {
+    "from": "gfx/v2/lock.c",
+    "to": "sys/hal/gfx/v2/lock.c"
+  },
+  {
+    "from": "gfx/v2/map_audit.c",
+    "to": "sys/hal/gfx/v2/map_audit.c"
   },
   {
     "from": "gfx/v2/modeset.c",
@@ -2820,6 +2948,10 @@
     "to": "sys/dev/video/geforce/mc.c"
   },
   {
+    "from": "hwdev/gf/native.c",
+    "to": "sys/dev/video/geforce/native.c"
+  },
+  {
     "from": "hwdev/gf/op/compute_mem.c",
     "to": "sys/dev/video/geforce/op/op/compute_mem.c"
   },
@@ -3188,6 +3320,10 @@
     "to": "sys/include/exec_wait_contract.h"
   },
   {
+    "from": "include/ext2_medium_contract.h",
+    "to": "sys/include/ext2_medium_contract.h"
+  },
+  {
     "from": "include/fault_fixture.h",
     "to": "sys/include/fault_fixture.h"
   },
@@ -3210,6 +3346,10 @@
   {
     "from": "include/gfx_format.h",
     "to": "sys/include/gfx_format.h"
+  },
+  {
+    "from": "include/gfx_hal.h",
+    "to": "sys/include/gfx_hal.h"
   },
   {
     "from": "include/gfx_hal2.h",
@@ -3592,6 +3732,10 @@
     "to": "sys/hal/input/in2_export.h"
   },
   {
+    "from": "input/hal/in2_int.h",
+    "to": "sys/hal/input/in2_int.h"
+  },
+  {
     "from": "input/hal/in2_reclaim.c",
     "to": "sys/hal/input/in2_reclaim.c"
   },
@@ -3624,12 +3768,28 @@
     "to": "sys/input/input_interrupt.c"
   },
   {
+    "from": "input/hal/input_policy.c",
+    "to": "sys/input/input_policy.c"
+  },
+  {
     "from": "input/hal/input_policy.h",
     "to": "sys/input/input_policy.h"
   },
   {
     "from": "input/hal/kbd_merge.c",
     "to": "sys/hal/input/kbd_merge.c"
+  },
+  {
+    "from": "input/hal/keymap.h",
+    "to": "sys/hal/input/keymap.h"
+  },
+  {
+    "from": "input/hal/keymap_eval.c",
+    "to": "sys/hal/input/keymap_eval.c"
+  },
+  {
+    "from": "input/hal/keymap_registry.c",
+    "to": "sys/hal/input/keymap_registry.c"
   },
   {
     "from": "input/hal/keymap_state.c",
@@ -3694,6 +3854,10 @@
   {
     "from": "kapi/kapi_db_v50.inc",
     "to": "sys/kapi/kapi_db_v50.inc"
+  },
+  {
+    "from": "kapi/kapi_generated.c",
+    "to": "sys/kapi/kapi_generated.c"
   },
   {
     "from": "kapi/kapi_host.c",
@@ -4572,6 +4736,10 @@
     "to": "sys/kern/ime/fep_module.h"
   },
   {
+    "from": "kernel/ime/ime.c",
+    "to": "sys/kern/ime/ime.c"
+  },
+  {
     "from": "kernel/ime/ime.h",
     "to": "sys/kern/ime/ime.h"
   },
@@ -4598,6 +4766,10 @@
   {
     "from": "kernel/ime/ime_delivery.inc",
     "to": "sys/kern/ime/ime_delivery.inc"
+  },
+  {
+    "from": "kernel/ime/ime_dict.c",
+    "to": "sys/kern/ime/ime_dict.c"
   },
   {
     "from": "kernel/ime/ime_dict_api.inc",
@@ -4676,6 +4848,10 @@
     "to": "sys/kern/io_work.h"
   },
   {
+    "from": "kernel/irq/irq.c",
+    "to": "sys/kern/irq/irq.c"
+  },
+  {
     "from": "kernel/irq/irq.h",
     "to": "sys/kern/irq/irq.h"
   },
@@ -4702,6 +4878,10 @@
   {
     "from": "kernel/irq/tick_budget.h",
     "to": "sys/kern/irq/tick_budget.h"
+  },
+  {
+    "from": "kernel/kaudit.c",
+    "to": "sys/kern/kaudit.c"
   },
   {
     "from": "kernel/kbd_inject.c",
@@ -4734,6 +4914,10 @@
   {
     "from": "kernel/module/debug_probe.c",
     "to": "sys/kern/module/debug_probe.c"
+  },
+  {
+    "from": "kernel/module/kdebug_call.c",
+    "to": "sys/kern/module/kdebug_call.c"
   },
   {
     "from": "kernel/module/kdebug_imports.def",
@@ -4804,6 +4988,10 @@
     "to": "sys/kern/sqlite_static.c"
   },
   {
+    "from": "kernel/sys.c",
+    "to": "sys/kern/sys.c"
+  },
+  {
     "from": "kernel/time/clock_service.c",
     "to": "sys/hal/time/clock_service.c"
   },
@@ -4838,6 +5026,10 @@
   {
     "from": "kernel/time/tick_clock.h",
     "to": "sys/hal/time/tick_clock.h"
+  },
+  {
+    "from": "kernel/time/tick_probe.c",
+    "to": "sys/kern/time/tick_probe.c"
   },
   {
     "from": "kernel/time/tick_probe.h",
@@ -4934,6 +5126,10 @@
   {
     "from": "mm/kmalloc.h",
     "to": "sys/kern/mm/kmalloc.h"
+  },
+  {
+    "from": "mm/memory_boot.c",
+    "to": "sys/kern/mm/memory_boot.c"
   },
   {
     "from": "mm/memory_boot.h",
@@ -5072,6 +5268,14 @@
     "to": "sys/net/link_selftest.inc"
   },
   {
+    "from": "net/nic.c",
+    "to": "sys/net/nic.c"
+  },
+  {
+    "from": "net/nic.h",
+    "to": "sys/net/nic.h"
+  },
+  {
     "from": "net/nic_rx.c",
     "to": "sys/net/nic_rx.c"
   },
@@ -5194,6 +5398,10 @@
   {
     "from": "platform/pc98/clock.c",
     "to": "sys/platform/pc98/clock.c"
+  },
+  {
+    "from": "platform/pc98/clock_source.c",
+    "to": "sys/platform/pc98/clock_source.c"
   },
   {
     "from": "platform/pc98/clock_source.h",
@@ -5726,6 +5934,10 @@
   {
     "from": "platform/powermac/cli_boot.h",
     "to": "sys/platform/powermac/cli_boot.h"
+  },
+  {
+    "from": "platform/powermac/clock.c",
+    "to": "sys/platform/powermac/clock.c"
   },
   {
     "from": "platform/powermac/console.c",
@@ -6294,6 +6506,10 @@
   {
     "from": "platform/powermac/shell_putchar.c",
     "to": "sys/platform/powermac/shell_putchar.c"
+  },
+  {
+    "from": "platform/powermac/system.c",
+    "to": "sys/platform/powermac/system.c"
   },
   {
     "from": "platform/powermac/terminal_fifo.inc",

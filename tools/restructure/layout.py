@@ -46,7 +46,7 @@ def placement(path, hal, scope):
     top, _, rest = path.partition('/')
     if path in hal:
         h = hal[path]
-        return (h['行き先の候補'] if h['移設'] == '移すだけ' else '保留',
+        return (h['行き先の候補'] if h['移設'] in ('移すだけ', 'P8') else '保留',
                 h['移設'] + '：' + h['根拠'])
     if path in {'include/pc98.h', 'include/pegc.h', 'include/wab_xe10.h'}:
         return 'sys/platform/pc98/' + rest, 'check_layers.NAMED の PC-98 所有ヘッダ'
