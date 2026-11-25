@@ -1,6 +1,7 @@
 CHECK = dict(name='restructure-p0-1', tier=1, needs=['make:build/out/kernel.elf'], budget=60,
              covers=['tools/restructure/*.py', 'tools/check_layers.py', 'tools/layers_baseline.json',
-                     'arch/ppc/*.c', 'userland/lib/rt/pkg.c', 'fs/ext2/ext2_dir.c', 'userland/shell/main.c', 'kapi/kapi_generated.c', 'build/out/kernel.map', 'build/**/*.mk',
+                     '**/Cargo.toml', '**/Cargo.lock', '**/*.rs', 'build/out/**/*.d',
+                     'exec/exec_abort.inc', 'boot/boot_fat.asm', 'arch/ppc/*.c', 'userland/lib/rt/pkg.c', 'fs/ext2/ext2_dir.c', 'userland/shell/main.c', 'kapi/kapi_generated.c', 'build/out/kernel.map', 'build/**/*.mk',
                      'build/*.mk', 'sdk/target_profile*.py', 'kernel/module/kdebug_imports.def'],
              basis=['docs/tasks/restructure/P0.md P0-1'])
 

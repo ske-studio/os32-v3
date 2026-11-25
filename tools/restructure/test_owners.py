@@ -21,11 +21,16 @@ def example(tables_for):
     assert tables['no-set'] == [rows[3]]
     assert tables['out-of-scope'] == [rows[4]]
     assert tables['owner-empty'] == [rows[i] for i in (1, 3, 4, 5)]
+    assert sum(int(row[-1]) for row in tables['owner-empty-reasons']) == len(tables['owner-empty'])
     assert tables['multi-feature'] == [(*rows[0], 'exec,usb')]
 
 
 def make_membership(inventory):
     images, groups, features = inventory()
+    assert images['userland/rust/hello_gfx/src/lib.rs'] == {'pc98/userland/tests/hello_gfx.elf'}
+    assert 'pc98/boot/boot_fat144.bin' in images['boot/boot_fat.asm']
+    assert 'pc98/build/out/kernel.elf' in images['exec/exec_abort.inc']
+    assert 'pc98/boot/boot_fat144.bin' not in images['exec/exec_abort.inc']
     path = 'fs/ext2/ext2_dir.c'
     assert 'build/sources/common.mk:C_COMMON_PC98_PENDING' in groups[path]
     assert features[path] == {'ide'}
@@ -75,7 +80,10 @@ def run(mutate):
         for old, new in [('len(features) >= 2', 'len(features) > 2'),
                          ("elif path.split('/')[0] in KERNEL_ROOTS or image:", "elif True:"),
                          ("'CLI', 'EXEC', 'IDE'", "'PC98_PENDING', 'CLI', 'EXEC', 'IDE'"),
-                         ("target.lower().endswith('.elf')", "target.endswith('.elf')"),
+                         ("target.lower().endswith", "target.endswith"),
+                         ("'.elf', '.bin', '.mod'", "'.elf', '.mod'"),
+                         ("if item in manifests:", "if False:"),
+                         ("images[os.path.normpath(item)].add(image)", "pass"),
                          ("name, value = assignment.groups()", "name, value = assignment.groups()\n                if name == 'PPC_INST_EXTRA': continue"),
                          ("for v in names))", "for v in names if v != 'SHELL_SRC'))"),
                          ("owner(path)", "owner('common')"),
@@ -84,7 +92,8 @@ def run(mutate):
             scope = {'__file__': str(path), '__name__': 'mutant'}
             exec(compile(original.replace(old, new), str(path), 'exec'), scope)
             try:
-                if old.startswith(("'CLI'", 'target.lower()', 'name, value', 'for v in names')):
+                if old.startswith(("'CLI'", 'target.lower()', 'name, value', 'for v in names',
+                                   "'.elf'", 'if item in manifests', 'images[os.path.normpath')):
                     make_membership(scope['inventory'])
                 else:
                     example(scope['tables_for'])

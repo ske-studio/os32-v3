@@ -1,5 +1,8 @@
 """P0-1: tracked paths, check_layers owners and expanded kernel source sets."""
 import argparse
+from collections import Counter
+from functools import lru_cache
+import json
 import os
 from collections import defaultdict
 from pathlib import Path
@@ -156,8 +159,70 @@ def read_graph(database):
     return rules, names
 
 
+@lru_cache(maxsize=None)
+def dep_inputs(depfile):
+    if not depfile.is_file():
+        return ()
+    for line in depfile.read_text().replace('\\\n', ' ').splitlines():
+        target, separator, deps = line.partition(': ')
+        if separator and deps:
+            return deps.split()
+    return ()
+
+
+@lru_cache(maxsize=None)
+def crate_roots(manifest):
+    metadata = json.loads(subprocess.check_output(
+        ['cargo', 'metadata', '--offline', '--locked', '--no-deps', '--format-version', '1',
+         '--manifest-path', str(manifest)], cwd=manifest.parent))
+    return {target['name']: Path(target['src_path'])
+            for package in metadata['packages'] for target in package['targets']
+            if 'staticlib' in target['crate_types']}
+
+
+def rust_inputs(archive, manifest):
+    name = archive.stem.removeprefix('lib')
+    root = crate_roots(manifest).get(name)
+    if root is None:
+        return
+    yield root
+    # Cargo's archive depfile includes the resolved dependencies of linked crates.
+    yield from map(Path, dep_inputs(archive.with_suffix('.d')))
+    # Match the hashed compiler invocation to this archive, including its features.
+    for hashed in (archive.parent / 'deps').glob(archive.stem + '-*.a'):
+        if archive.exists() and hashed.samefile(archive):
+            depfile = hashed.with_name(hashed.stem.removeprefix('lib') + '.d')
+            for source in dep_inputs(depfile):
+                yield manifest.parent / source
+
+
+def cargo_manifests(database, directory, args):
+    # Make retains unexpanded recipe text in the file database. Resolve its cd
+    # directory in this profile, including builds with a separate --target-dir.
+    origins = {}
+    for block in database.split('# Files\n', 1)[1].split('\n\n'):
+        target = re.search(r'^([^\s:#=]+\.a):.*$', block, re.M)
+        if not target or 'cargo build' not in block:
+            continue
+        cd = re.search(r'cd (\S+) &&', block)
+        explicit = re.search(r'--manifest-path (\S+/Cargo.toml)', block)
+        if explicit or cd:
+            origins[target[1]] = explicit[1] if explicit else cd[1] + '/Cargo.toml'
+    if not origins:
+        return {}
+    query = directory / 'cargo.mk'
+    query.write_text(''.join(f'$(info P0_CARGO {a} {m})\n' for a, m in origins.items()))
+    result = {}
+    for line in make_output(['-n', *args, '-f', str(query), '--eval=p0-cargo: ; @:', 'p0-cargo']).splitlines():
+        if line.startswith('P0_CARGO '):
+            _, archive, manifest = line.split()
+            result[archive] = ROOT / manifest
+    return result
+
+
 def collect_graph(directory, profile, args, goal, images, groups):
-    database = make_output(['-np', *args, goal])
+    database = make_output(['-np', *args, *goal.split()])
+    manifests = cargo_manifests(database, directory, args)
     rules, names = read_graph(database)
     # Expand only list-like assignments. The file database supplies their defining
     # makefile, including variables evaluated lazily with wildcard or patsubst.
@@ -171,7 +236,7 @@ def collect_graph(directory, profile, args, goal, images, groups):
                 values[item].add(f'{names[name]}:{name}')
 
     for target in rules:
-        if not target.lower().endswith('.elf'):
+        if not target.lower().endswith(('.elf', '.bin', '.mod', '.shlib')):
             continue
         image = profile + '/' + target
         pending = list(rules[target])
@@ -185,7 +250,12 @@ def collect_graph(directory, profile, args, goal, images, groups):
             if suffix.lower() in SUFFIXES:
                 images[item].add(image)
                 groups[item].update(values[item])
+            elif suffix.lower() in {'.h', '.inc'}:
+                images[os.path.normpath(item)].add(image)
             elif suffix == '.o':
+                deps = dep_inputs((ROOT / item).with_suffix('.d'))
+                pending.extend(dep for dep in (*rules.get(item, ()), *deps)
+                               if Path(dep).suffix.lower() in {'.h', '.inc'})
                 inputs = [dep for dep in rules.get(item, ()) if Path(dep).suffix.lower() in SUFFIXES]
                 if inputs:
                     source = inputs[0]
@@ -193,6 +263,11 @@ def collect_graph(directory, profile, args, goal, images, groups):
                     pending.append(source)
             elif suffix == '.a':
                 pending.extend(rules.get(item, ()))
+                if item in manifests:
+                    for source in rust_inputs(ROOT / item, manifests[item]):
+                        path = Path(os.path.normpath(ROOT / source))
+                        if path.is_relative_to(ROOT) and path.suffix == '.rs':
+                            images[str(path.relative_to(ROOT))].add(image)
     # Recognize source sets even when a translation unit has no ELF link rule.
     for item, labels in values.items():
         if Path(item).suffix.lower() in SUFFIXES:
@@ -239,7 +314,7 @@ p0-extra:
                        'ARCH=' + ('x86' if pc98 else 'ppc'), 'PLATFORM=' + ('pc98' if pc98 else 'powermac'),
                        f'IMAGE={path.stem}', f'BUILD_OUT={directory}/out', f'KB_OUT={directory}/kb']
             graph_args = ['-f', str(graph), *command[3:6]]
-            collect_graph(directory, path.stem, graph_args, 'programs' if pc98 else 'p0-graph',
+            collect_graph(directory, path.stem, graph_args, 'programs boot build/out/kernel.elf' if pc98 else 'p0-graph',
                           images, groups)
             if pc98:
                 for (filename, variable, feature), key in labels.items():
@@ -304,6 +379,13 @@ def tables_for(entries, membership):
             tables[row[6]].append(row)
         if len(features) >= 2:
             tables['multi-feature'].append((*row, ','.join(features)))
+    reasons = Counter()
+    for path, kind, _, _, _, _, status in tables['owner-empty']:
+        location, sep, _ = path.partition('/')
+        reasons[(location if sep else '.', Path(path).suffix.lower() or '(none)',
+                 status or ('include-without-image' if kind in {'h', 'inc'}
+                            else 'no-explicit-layer-or-build-evidence'))] += 1
+    tables['owner-empty-reasons'] = [(*key, str(count)) for key, count in sorted(reasons.items())]
     return tables
 
 
