@@ -44,3 +44,5 @@ imports を同じ像へリンク。kexports は kernel 側
 ## 索引
 
 - [build/select](select.md) — ソースの持ち主の一覧・像の構成の軸・順の式
+- [追跡ファイルの所属と像への依存](ownership.md) — P2 の問い合わせと構造の関門
+- [HAL の契約と実装の配置](hal_layout.md) — W10 と P8 の境界、D-4 の推奨案

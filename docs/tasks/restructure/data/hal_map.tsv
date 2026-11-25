@@ -1,0 +1,625 @@
+パス	役割	移設	行き先の候補	根拠
+drivers/ata/atapi.c	バックエンド	移すだけ	sys/dev/ata/atapi.c	drivers/ata/atapi.c:762 atapi_read_sectors — READ(10) を atapi_read10 に渡す。 境界照合 ATAPI_DRIVE_COUNT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/ata/atapi.h	契約	移すだけ	sys/dev/ata/atapi.h	drivers/ata/atapi.h:179 atapi_read_capacity — ATAPI の媒体容量取得とパケット転送の定数を宣言する。 境界照合 ATAPI_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/ata/atapi_pio.inc	バックエンド	移すだけ	sys/dev/ata/atapi_pio.inc	drivers/ata/atapi_pio.inc:3 atapi_pio_read — ATAPI のデータ相を PIO で読む。 境界照合 atapi_pio_read。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/ata/cd_body.c	バックエンド	移すだけ	sys/dev/ata/cd_body.c	drivers/ata/cd_body.c:7 cd_read — CD の Device 読み取りを atapi_read_sectors に接続する。 境界照合 atapi_read_sectors。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/ata/cd_body.h	契約	移すだけ	sys/dev/ata/cd_body.h	drivers/ata/cd_body.h:6 cd_module_init — CD 本体の操作表を取得する入口を宣言する。
+drivers/ata/cd_module.c	バックエンド	移すだけ	sys/dev/ata/cd_module.c	drivers/ata/cd_module.c:72 cd_module_load — CD モジュールのロードと切り離しを管理する。
+drivers/ata/cd_module.h	契約	移すだけ	sys/dev/ata/cd_module.h	drivers/ata/cd_module.h:14 cd_module_load — CD 専用の操作表とロード入口を定義する。
+drivers/ata/ide.c	バックエンド	移すだけ	sys/dev/ata/ide.c	drivers/ata/ide.c:41 ide_select_bank — IDE バスの対象バンクを選択する。 境界照合 IDE_SASI_SPT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/ata/ide.h	契約	移すだけ	sys/dev/ata/ide.h	drivers/ata/ide.h:98 ide_read_sector_chs — IDE 専用の CHS 読み出しと PIO 定数を公開する。 境界照合 IDE_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/ata/ide_addr.c	バックエンド	移すだけ	sys/dev/ata/ide_addr.c	drivers/ata/ide_addr.c:61 ide_addr_make — ATA のアドレス方式に応じて要求用の値を組み立てる。 境界照合 ide_addr_mode。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/ata/ide_addr.h	契約	移すだけ	sys/dev/ata/ide_addr.h	drivers/ata/ide_addr.h:86 ide_addr_make — IDE のアドレス方式と変換の引数を定義する。 境界照合 IDE_ADDR_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/ata/ide_multiple.inc	バックエンド	移すだけ	sys/dev/ata/ide_multiple.inc	drivers/ata/ide_multiple.inc:50 ide_multiple_prepare — ドライブの複数セクタ転送の状態を準備する。 境界照合 ide_multiple_state。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/ata/ide_pio.inc	バックエンド	移すだけ	sys/dev/ata/ide_pio.inc	drivers/ata/ide_pio.inc:37 ide_pio_command — IDE の PIO コマンドを発行し転送相を処理する。 境界照合 ide_pio_settle。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/ata/ide_request.inc	バックエンド	移すだけ	sys/dev/ata/ide_request.inc	drivers/ata/ide_request.inc:84 ide_read_sector — 単一セクタ要求を IDE 転送経路に渡す。 境界照合 ide_request。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/base/dev.c	共通処理	P8	sys/hal/block/・sys/dev/block/・sys/dev/ata/	drivers/base/dev.c:251 dev_managed_transfer — install_medium で範囲を解決する一方、同じファイルの hd_read が ide_read_sectors を直呼びするため IDE・FDD アダプタを分離する。 登録・転送の共通処理と具体的な FDD/IDE アダプタが同居する。
+drivers/block/disk.h	その他	移すだけ	sys/dev/block/disk.h	drivers/block/disk.h:18 DISK_SECT_SZ — FDC_SECTOR_SIZE 等をフロッピー用の別名で公開する。 境界照合 FDC_CYLINDERS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/block/fat_diskio.c	振り分け	P8	sys/fs/fat/・sys/dev/block/	drivers/block/fat_diskio.c:212 disk_read — FatFs のドライブ選択と媒体変換が fdd_ops_read_multi の fdc_read_sectors 直呼びと同居するため、FS 側と装置操作を分離する。
+drivers/block/fdc.c	バックエンド	移すだけ	sys/dev/block/fdc.c	drivers/block/fdc.c:246 fdc_read_sector — FDC のジオメトリに従いセクタを読み取る。 境界照合 FDC_DTL_UNUSED。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/block/fdc.h	契約	移すだけ	sys/dev/block/fdc.h	drivers/block/fdc.h:355 fdc_set_3mode — FDC の媒体モード選択と機器状態の取得を宣言する。 境界照合 FDC_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/block/fdc_command.inc	バックエンド	移すだけ	sys/dev/block/fdc_command.inc	drivers/block/fdc_command.inc:2 fdc_send_sector_command — FDC のセクタコマンドをバイト単位で送る。 境界照合 fdc_send_sector_command。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/block/fdc_decide.c	バックエンド	移すだけ	sys/dev/block/fdc_decide.c	drivers/block/fdc_decide.c:35 fdc_classify_seek_end — FDC の割込み結果からシーク完了を判定する。 境界照合 fdc_sis_result_bytes。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/block/fdc_decide.h	契約	移すだけ	sys/dev/block/fdc_decide.h	drivers/block/fdc_decide.h:85 fdc_classify_seek_end — ST0 のマスクとシーク結果判定の入口を定義する。 境界照合 FDC_DECIDE_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/block/fdc_io.inc	バックエンド	移すだけ	sys/dev/block/fdc_io.inc	drivers/block/fdc_io.inc:19 fdc_send_byte — FDC の状態を待ってコマンドバイトを書く。 境界照合 fdc_delay。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/block/fdc_sector_transfer.inc	バックエンド	移すだけ	sys/dev/block/fdc_sector_transfer.inc	drivers/block/fdc_sector_transfer.inc:2 fdc_transfer_sector_geom — 指定ジオメトリで FDC の単一セクタ転送を実行する。 境界照合 fdc_transfer_sector_geom。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/block/fdc_seek_reset.inc	バックエンド	移すだけ	sys/dev/block/fdc_seek_reset.inc	drivers/block/fdc_seek_reset.inc:101 fdc_reset — コントローラをリセットし割込み結果を処理する。 境界照合 fdc_sis_is_foreign。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/block/fdc_track.c	バックエンド	移すだけ	sys/dev/block/fdc_track.c	drivers/block/fdc_track.c:13 fdc_track_split — FDC 読み出しをトラック境界で分割する。 境界照合 fdc_track_split。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/block/fdc_track.h	契約	移すだけ	sys/dev/block/fdc_track.h	drivers/block/fdc_track.h:148 fdc_track_init — FDC トラックキャッシュの状態と操作を定義する。 境界照合 FDC_TRACK_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/block/fdc_transfer.inc	バックエンド	移すだけ	sys/dev/block/fdc_transfer.inc	drivers/block/fdc_transfer.inc:42 fdc_read_sector_geom — FDC 読み取りを fdc_transfer_sector_geom に渡す。 境界照合 fdc_report_fail。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/block/loop_dev.c	バックエンド	移すだけ	sys/dev/block/loop_dev.c	drivers/block/loop_dev.c:202 loop_dev_attach_fd — ファイルを仮想ブロック装置のスロットに結び付ける。
+drivers/block/loop_dev.h	契約	移すだけ	sys/dev/block/loop_dev.h	drivers/block/loop_dev.h:63 loop_dev_seek_d88 — D88 形式を含むループ装置固有の操作を宣言する。
+drivers/block/loop_dev_block_io.inc	バックエンド	移すだけ	sys/dev/block/loop_dev_block_io.inc	drivers/block/loop_dev_block_io.inc:19 raw_blk_read — 仮想 LBA をファイル位置に変換して VFS から読む。
+drivers/block/loop_dev_chs_io.inc	バックエンド	移すだけ	sys/dev/block/loop_dev_chs_io.inc	drivers/block/loop_dev_chs_io.inc:155 loop_dev_read_chs — 仮想媒体の CHS を使って画像内のセクタを読む。
+drivers/block/loop_dev_format.inc	バックエンド	移すだけ	sys/dev/block/loop_dev_format.inc	drivers/block/loop_dev_format.inc:6 attach_d88 — D88 のヘッダを解釈してスロットを設定する。
+drivers/block/netcd.c	バックエンド	移すだけ	sys/dev/block/netcd.c	drivers/block/netcd.c:111 netcd_read — ネットワーク越しの CD をブロック装置として読む。
+drivers/block/netcd.h	契約	移すだけ	sys/dev/block/netcd.h	drivers/block/netcd.h:8 netcd_register — 遠隔媒体情報から仮想 CD を登録する入口を宣言する。
+drivers/block/scsi.h	その他	移すだけ	sys/platform/pc98/scsi.h	drivers/block/scsi.h:18 SCSI_IO_ADDR — PC-98 の WD33C93 ポート番地と BIOS 用定数を予約する。
+drivers/char/rtc.c	バックエンド	移すだけ	sys/dev/char/rtc.c	drivers/char/rtc.c:168 ClockOps pc98_clock = {。時刻のバックエンドを定義する。 境界照合 pc98_read_date。pc98_clock は PC-98 内蔵カレンダ時計の操作表であり、この提供側で完結する。
+drivers/input/kbd.c	バックエンド	P8	sys/platform/pc98/input/・sys/kern/input/	drivers/input/kbd.c:162 kbd_irq_handler — PC-98 の受信割込みと共通キー取得処理が同居し、kbd_trygetchar は GPU ポーリングにも入るため受信と前景処理を分ける。
+drivers/input/kbd.h	その他	移すだけ	sys/platform/pc98/input/kbd.h	drivers/input/kbd.h:21 KBD_DATA — PC-98 キーボードのポートと 8251A の制御語を定義する。 境界照合 OS32_PC98_KBD_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/input/kbd_dlog.c	バックエンド	移すだけ	sys/dev/input/kbd_dlog.c	drivers/input/kbd_dlog.c:31 kbd_dlog_push — 生スキャンコードと修飾状態を受信診断リングに記録する。 境界照合 kbd_dlog_reset。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/input/kbd_dlog.h	契約	移すだけ	sys/dev/input/kbd_dlog.h	drivers/input/kbd_dlog.h:31 kbd_dlog_copy — キーボード受信診断リングの状態と読み出し口を定義する。 境界照合 KBD_DLOG_CAP。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/input/kbd_fgpoll.inc	その他	P8	sys/kern/	drivers/input/kbd_fgpoll.inc:8 kbd_foreground_poll — キー取得中に geforce_foreground_poll を直接呼ぶため、前景処理の呼び出しをキーボードから切り離す。
+drivers/input/kbd_hal.c	バックエンド	移すだけ	sys/platform/pc98/input/kbd_hal.c	drivers/input/kbd_hal.c:11 kbd_hal_init — pc98_jp_backend を選びネイティブ入力源を登録する。 境界照合 kbd_native_src。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/input/kbd_status.c	バックエンド	移すだけ	sys/dev/input/kbd_status.c	drivers/input/kbd_status.c:19 kbd_status_classify — 8251A の受信状態ビットを分類する。 境界照合 kbd_status_classify。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/input/kbd_status.h	契約	移すだけ	sys/dev/input/kbd_status.h	drivers/input/kbd_status.h:31 kbd_status_classify — 8251A のエラービットと受信判定の入口を定義する。 境界照合 KBD_STAT_RXRDY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/input/mouse.c	振り分け	移すだけ	sys/platform/pc98/input/mouse.c	drivers/input/mouse.c:23 mouse_init — NP2 検出と PC-98 の IRQ 設定から使用するマウスを選ぶ。 境界照合 PC98_IRQ_MOUSE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/input/mouse.h	契約	移すだけ	sys/platform/pc98/input/mouse.h	drivers/input/mouse.h:51 bus_mouse_init — PC-98 バスマウスとシームレスマウスの内部入口を宣言する。 境界照合 pc98_mouse_backend。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/input/mouse_bus.c	バックエンド	移すだけ	sys/platform/pc98/input/mouse_bus.c	drivers/input/mouse_bus.c:43 mouse_read_buttons — PC-98 バスマウスのポートからボタンを読む。
+drivers/input/mouse_hal.c	バックエンド	移すだけ	sys/platform/pc98/input/mouse_hal.c	drivers/input/mouse_hal.c:16 mouse_hal_capture — バスマウスの負論理ボタンを InputEvent に変換する。
+drivers/input/mouse_seamless.c	バックエンド	移すだけ	sys/dev/input/mouse_seamless.c	drivers/input/mouse_seamless.c:71 seamless_mouse_poll — NP2 のシームレスマウスから絶対座標を取得する。
+drivers/net/e82557/e82557.c	バックエンド	移すだけ	sys/dev/net/e82557/e82557.c	drivers/net/e82557/e82557.c:202 scb_issue — 82557 の SCB に CU/RU コマンドを発行する。 境界照合 E82557_HOST_TEST。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/net/e82557/e82557.h	その他	移すだけ	sys/dev/net/e82557/e82557.h	drivers/net/e82557/e82557.h:5 e82557_driver — PCI に登録する 82557 専用ドライバの外部宣言。 境界照合 E82557_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/net/e82557/e82557_desc.c	バックエンド	移すだけ	sys/dev/net/e82557/e82557_desc.c	drivers/net/e82557/e82557_desc.c:15 e82557_scb_cmd — CU/RU の命令を SCB コマンドに符号化する。 境界照合 E82557_CB_OFF。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/net/e82557/e82557_desc.h	契約	移すだけ	sys/dev/net/e82557/e82557_desc.h	drivers/net/e82557/e82557_desc.h:18 e82557_scb_decode — 82557 の SCB と記述子アクセスの操作を宣言する。 境界照合 E82557_DESC_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/net/e82557/e82557_eeprom.c	バックエンド	移すだけ	sys/dev/net/e82557/e82557_eeprom.c	drivers/net/e82557/e82557_eeprom.c:45 e82557_ee_read_word — シリアル EEPROM のワード読出しを実装する。 境界照合 e82557_io_window。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/net/e82557/e82557_eeprom.h	契約	移すだけ	sys/dev/net/e82557/e82557_eeprom.h	drivers/net/e82557/e82557_eeprom.h:21 e82557_ee_frame — 82557 の EEPROM 命令フレームの生成口を宣言する。 境界照合 E82557_EEPROM_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/net/e82557/e82557_probe_loopback.inc	バックエンド	移すだけ	sys/dev/net/e82557/e82557_probe_loopback.inc	drivers/net/e82557/e82557_probe_loopback.inc:1 probe_loopback — NIC の受信リングと送信記述子で自己ループ試験を行う。 境界照合 E82557_CFG_LEN。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/net/e82557/e82557_probe_reset_base.inc	バックエンド	移すだけ	sys/dev/net/e82557/e82557_probe_reset_base.inc	drivers/net/e82557/e82557_probe_reset_base.inc:1 probe_reset_base — 82557 の PORT リセット後に CU/RU のベースを設定する。 境界照合 E82557_TRACE_RST。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/net/e82557/e82557_regs.h	その他	移すだけ	sys/dev/net/e82557/e82557_regs.h	drivers/net/e82557/e82557_regs.h:8 E82557_VENDOR — PCI 識別値と 82557 レジスタ群を定義する。 境界照合 E82557_REGS_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/net/e82557/lan_body.c	バックエンド	移すだけ	sys/dev/net/e82557/lan_body.c	drivers/net/e82557/lan_body.c:5 lan_module_init — e82557_driver.probe と 82557 の送受信関数を操作表に束ねる。 境界照合 e82557_driver。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/net/e82557/lan_module.c	バックエンド	P8	sys/dev/net/e82557/ + sys/platform/pc98/	drivers/net/e82557/lan_module.c — e82557_tick の登録が PC98_TICK_E82557 を固定する。スロットを機種配線で決める。
+drivers/net/e82557/lan_module.h	契約	移すだけ	sys/dev/net/e82557/lan_module.h	drivers/net/e82557/lan_module.h:33 lan_module_probe — LAN モジュール固有の操作表と PCI プローブ入口を宣言する。
+drivers/net/e82557/nic_e82557.c	バックエンド	移すだけ	sys/dev/net/e82557/nic_e82557.c	drivers/net/e82557/nic_e82557.c:30 NetNicOps nic_ops = {。LANのバックエンドを定義する。 境界照合 e82557_send。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/net/gem/gem.h	型	移すだけ	sys/dev/net/gem/gem.h	drivers/net/gem/gem.h:225 gem_reset_step — GEM のレジスタと段階的リセットの入口を定義する。
+drivers/net/gem/gem_mac.c	バックエンド	移すだけ	sys/dev/net/gem/gem_mac.c	drivers/net/gem/gem_mac.c:6 gem_mac_init — GEM の MAC レジスタを初期化する。
+drivers/net/gem/gem_phy.c	バックエンド	移すだけ	sys/dev/net/gem/gem_phy.c	drivers/net/gem/gem_phy.c:114 gem_phy_sample — GEM の MIF を介して PHY 状態を取得する。
+drivers/net/gem/gem_reset.c	バックエンド	移すだけ	sys/dev/net/gem/gem_reset.c	drivers/net/gem/gem_reset.c:51 gem_reset_step — GEM のリセット状態をレジスタに応じて進める。
+drivers/net/gem/gem_ring.c	バックエンド	移すだけ	sys/dev/net/gem/gem_ring.c	drivers/net/gem/gem_ring.c:54 gem_ring_publish — GEM の DMA リングを装置側へ公開する。
+drivers/net/gem/gem_rx.c	バックエンド	移すだけ	sys/dev/net/gem/gem_rx.c	drivers/net/gem/gem_rx.c:15 gem_rx_some — GEM 受信記述子からフレームを取り出す。
+drivers/net/gem/gem_tx.c	バックエンド	移すだけ	sys/dev/net/gem/gem_tx.c	drivers/net/gem/gem_tx.c:8 gem_tx — GEM 送信リングへフレームを投入する。
+drivers/net/ne2000/lgy98.c	バックエンド	P8	sys/dev/net/ne2000/ + sys/platform/pc98/	drivers/net/ne2000/lgy98.c — lgy98_tick の登録が PC98_TICK_LGY98 を選ぶ。割付を機種側に渡す。
+drivers/net/ne2000/lgy98.h	契約	移すだけ	sys/dev/net/ne2000/lgy98.h	drivers/net/ne2000/lgy98.h:51 lgy98_validate_base — LGY-98 固有のポート配置と検証入口を定義する。 境界照合 LGY98_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/net/ne2000/ne2000.c	バックエンド	P8	sys/dev/net/ne2000/ + sys/platform/pc98/	drivers/net/ne2000/ne2000.c — rd の装置操作と同じ翻訳単位で PC98_TICK_COUNT を検査する。取り込む ne2000_control.inc と共に機種別スロット割付を分ける。
+drivers/net/ne2000/ne2000.h	契約	移すだけ	sys/dev/net/ne2000/ne2000.h	drivers/net/ne2000/ne2000.h:89 ne2k_init — NE2000 互換装置の初期化・送受信を宣言する。
+drivers/net/ne2000/ne2000_control.inc	バックエンド	P8	sys/dev/net/ne2000/ + sys/platform/pc98/	drivers/net/ne2000/ne2000_control.inc — ne2k_timer_tick の登録で PC98_TICK_NE2K を決め打ちする。機種からスロットを渡す。
+drivers/net/ne2000/ne2000_data.inc	バックエンド	移すだけ	sys/dev/net/ne2000/ne2000_data.inc	drivers/net/ne2000/ne2000_data.inc:35 rx_one — NE2000 のリングから受信パケットを取り出す。
+drivers/net/ne2000/ne2000_irq.inc	バックエンド	移すだけ	sys/dev/net/ne2000/ne2000_irq.inc	drivers/net/ne2000/ne2000_irq.inc:33 ne2k_irq_shared — NE2000 の共有割込みを処理する。
+drivers/net/ne2000/ne2000_regs.h	その他	移すだけ	sys/dev/net/ne2000/ne2000_regs.h	drivers/net/ne2000/ne2000_regs.h:17 NE2K_RAM_PAGES_16K — NE2000 のページ単位の RAM 配置とレジスタ群を定義する。
+drivers/net/ne2000/ne2000_ring.c	バックエンド	移すだけ	sys/dev/net/ne2000/ne2000_ring.c	drivers/net/ne2000/ne2000_ring.c:15 ne2k_ring_decode_hdr — NE2000 のリング上の受信ヘッダを解釈する。
+drivers/net/ne2000/ne2000_ring.h	契約	移すだけ	sys/dev/net/ne2000/ne2000_ring.h	drivers/net/ne2000/ne2000_ring.h:40 ne2k_ring_check — NE2000 のリング検査と結果コードを定義する。
+drivers/net/ne2000/nic_lgy98.c	バックエンド	移すだけ	sys/dev/net/ne2000/nic_lgy98.c	drivers/net/ne2000/nic_lgy98.c:45 NetNicOps lgy_ops = {。LANのバックエンドを定義する。 境界照合 net_lgy98_adapter。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/sound/cs4231/pcm_body.c	バックエンド	移すだけ	sys/dev/sound/cs4231/pcm_body.c	drivers/sound/cs4231/pcm_body.c:4 pcm_module_init — CS4231 の PCM 関数を操作表に設定し、装置を初期化・登録する。
+drivers/sound/cs4231/pcm_cs4231.c	バックエンド	移すだけ	sys/dev/sound/cs4231/pcm_cs4231.c	drivers/sound/cs4231/pcm_cs4231.c:94 cs_read — CS4231の間接レジスタを選んで読み出す。 境界照合 PCM_VER_CS4231。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/sound/cs4231/pcm_cs4231.h	その他	移すだけ	sys/dev/sound/cs4231/pcm_cs4231.h	drivers/sound/cs4231/pcm_cs4231.h:31 PCM_PORT_R1 — CS4231のデータポートと割込み経路の定数を定義する。 境界照合 PCM_CS4231_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/sound/cs4231/pcm_cs4231_math.c	バックエンド	移すだけ	sys/dev/sound/cs4231/pcm_cs4231_math.c	drivers/sound/cs4231/pcm_cs4231_math.c:23 pcm_fmt_for_rate — 対応サンプルレートをコーデックの形式値に変換する。
+drivers/sound/cs4231/pcm_e4_diag.c	その他	移すだけ	sys/dev/sound/cs4231/pcm_e4_diag.c	drivers/sound/cs4231/pcm_e4_diag.c:12 pcm_e4_arm — PCM割込み診断の観測値を初期化し、試験条件を設定する。
+drivers/sound/cs4231/pcm_e4_diag.h	型	移すだけ	sys/dev/sound/cs4231/pcm_e4_diag.h	drivers/sound/cs4231/pcm_e4_diag.h:13 pcm_e4_sample — PCM診断のハンドラ実行順と結果を記録する型を定義する。
+drivers/sound/cs4231/pcm_e4_guest.c	その他	移すだけ	sys/dev/sound/cs4231/pcm_e4_guest.c	drivers/sound/cs4231/pcm_e4_guest.c:37 run_case — PCM_IRQに模擬ハンドラを登録し、実PCMと共有する場合を検査する。 境界照合 serial_puts。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/sound/cs4231/pcm_e4_wire.h	契約	移すだけ	sys/dev/sound/cs4231/pcm_e4_wire.h	drivers/sound/cs4231/pcm_e4_wire.h:5 PCM_E4_OP_RUN — 診断像のkdebug_callで使うPCM試験のコマンド番号を定義する。
+drivers/sound/cs4231/pcm_hw.c	バックエンド	移すだけ	sys/dev/sound/cs4231/pcm_hw.c	drivers/sound/cs4231/pcm_hw.c:85 SndBackend backend = {。音のバックエンドを定義する。
+drivers/sound/cs4231/pcm_hw.h	契約	移すだけ	sys/dev/sound/cs4231/pcm_hw.h	drivers/sound/cs4231/pcm_hw.h:5 pcm_codec_open — コーデックを開いてリングを受け取る装置内部の口を宣言する。
+drivers/sound/cs4231/pcm_module.c	バックエンド	P8	sys/dev/sound/cs4231/pcm_module.c + sys/platform/pc98/sound/	drivers/sound/cs4231/pcm_module.c:36 pcm_between_jiffiesがpc98_tsc_read_usを直に呼び、登録側もPC98_TICK_PCMを選ぶ。機種の計時・配線をPCMモジュール管理から分ける。
+drivers/sound/cs4231/pcm_module.h	型	移すだけ	sys/dev/sound/cs4231/pcm_module.h	drivers/sound/cs4231/pcm_module.h:21 PcmModuleApi — PCMモジュールが公開する関数表と版を定める。
+drivers/sound/cs4231/pcm_refill.h	バックエンド	移すだけ	sys/dev/sound/cs4231/pcm_refill.h	drivers/sound/cs4231/pcm_refill.h:31 pcm_tick_rescue_due — PCM半バッファの境界までの距離で救済補充の要否を決める。
+drivers/sound/fm/fm.c	バックエンド	移すだけ	sys/dev/sound/fm/fm.c	drivers/sound/fm/fm.c:59 opn_write_checked — OPNの準備完了を待ってレジスタへ書く。
+drivers/sound/fm/fm.h	その他	移すだけ	sys/dev/sound/fm/fm.h	drivers/sound/fm/fm.h:13 OPN_ADDR — OPNのアドレス・データポートと音源レジスタ番号を定義する。
+drivers/sound/fm/fm_body.c	バックエンド	移すだけ	sys/dev/sound/fm/fm_body.c	drivers/sound/fm/fm_body.c:26 attach — OPNの検出結果を確認してopn_chip_backendを音源として登録する。
+drivers/sound/fm/fm_module.c	振り分け	移すだけ	sys/dev/sound/fm/fm_module.c	drivers/sound/fm/fm_module.c:25 opn_write — FMの旧入口からmodule_exportsでロード状態を確認してモジュールの操作へ渡す。
+drivers/sound/fm/fm_module.h	型	移すだけ	sys/dev/sound/fm/fm_module.h	drivers/sound/fm/fm_module.h:23 FmModuleApi — FMモジュールが返す音色・発音などの操作表を定義する。
+drivers/sound/fm/opn_chip.c	バックエンド	移すだけ	sys/dev/sound/fm/opn_chip.c	drivers/sound/fm/opn_chip.c:162 SndChipBackend opn_chip_backend = {。音のバックエンドを定義する。
+drivers/sound/fm/opn_chip.h	型	移すだけ	sys/dev/sound/fm/opn_chip.h	drivers/sound/fm/opn_chip.h:8 opn_chip — 検出したOPNの機種、共有IRQ、レジスタの書込み控えを保持する。
+drivers/sound/fm/opn_probe.c	バックエンド	移すだけ	sys/dev/sound/fm/opn_probe.c	drivers/sound/fm/opn_probe.c:12 ready_status — OPNのステータスをポーリングしてプローブの可否を調べる。
+drivers/sound/fm/opn_probe.h	契約	移すだけ	sys/dev/sound/fm/opn_probe.h	drivers/sound/fm/opn_probe.h:10 opn_probe — OPN・OPNAを識別するためのポート定数、判別結果と入口を定める。
+drivers/sound/snd_wake_tick.c	共通処理	移すだけ	sys/hal/sound/snd_wake_tick.c	drivers/sound/snd_wake_tick.c:28 snd_wake_arm — tick_clock_msで通知期限を計算し、wake_fastが登録済み関数を呼ぶ。装置レジスタへの依存はない。
+drivers/sound/snd_wake_tick.h	契約	移すだけ	sys/hal/sound/snd_wake_tick.h	drivers/sound/snd_wake_tick.h:3 snd_wake_contract.h — 音源共通の通知契約を再公開するだけで、装置固有の宣言を持たない。
+drivers/video/cirrus/backend_cirrus.c	バックエンド	移すだけ	sys/dev/video/cirrus/backend_cirrus.c	drivers/video/cirrus/backend_cirrus.c:583 GfxBackend CIRRUS_BACKEND_TABLE = {。描画のバックエンドを定義する。 境界照合 OS32_CIRRUS_MODULE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/cirrus/cirrus_body.c	バックエンド	移すだけ	sys/dev/video/cirrus/cirrus_body.c	drivers/video/cirrus/cirrus_body.c:3 cirrus_module_init — cirrus_backend_opsをGfxBackendの出力先に設定する。 境界照合 cirrus_context。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/cirrus/cirrus_identify.c	バックエンド	移すだけ	sys/platform/pc98/video/cirrus/cirrus_identify.c	drivers/video/cirrus/cirrus_identify.c:35 cirrus_identify — Xe10内蔵ボードのバンク窓とリニア窓を物理地図と照合する。 境界照合 CIRRUS_PATTERN_BYTES。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/cirrus/cirrus_module.c	バックエンド	移すだけ	sys/dev/video/cirrus/cirrus_module.c	drivers/video/cirrus/cirrus_module.c:16 GfxBackend gfx_backend_cirrus = {。描画のバックエンドを定義する。 境界照合 cirrus_kexports。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/cirrus/cirrus_module.h	契約	移すだけ	sys/dev/video/cirrus/cirrus_module.h	drivers/video/cirrus/cirrus_module.h:14 cirrus_module_load — Cirrus専用のモジュール初期化・ロードの境界を定める。 境界照合 CIRRUS_MODULE_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/cirrus/wab_cirrus.c	バックエンド	移すだけ	sys/dev/video/cirrus/wab_cirrus.c	drivers/video/cirrus/wab_cirrus.c:291 wab_cirrus_set_bank — WabGlue経由でCirrusのVRAMバンクを切り替える。 境界照合 CIRRUS_PATTERN_ALIGN。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/cirrus/wab_cirrus.h	契約	移すだけ	sys/dev/video/cirrus/wab_cirrus.h	drivers/video/cirrus/wab_cirrus.h:33 wab_cirrus_probe — WabGlueを取るCirrus固有の検出・描画操作を宣言する。 境界照合 __WAB_CIRRUS_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/cirrus/wab_glue.h	型	移すだけ	sys/dev/video/cirrus/wab_glue.h	drivers/video/cirrus/wab_glue.h:50 WabGlue — Cirrusが基板別のVGA入出力・リレー操作を呼ぶための型を定義する。
+drivers/video/cirrus/wab_glue_xe10.c	バックエンド	移すだけ	sys/platform/pc98/video/cirrus/wab_glue_xe10.c	drivers/video/cirrus/wab_glue_xe10.c:156 xe10_map — VGAレジスタをXe10内蔵アクセラレータのポートに対応付ける。 境界照合 PC98_IO_OPEN_BUS8。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/cirrus/wab_glue_xe10.h	契約	移すだけ	sys/platform/pc98/video/cirrus/wab_glue_xe10.h	drivers/video/cirrus/wab_glue_xe10.h:14 wab_glue_xe10 — Xe10内蔵ボード専用のWabGlueインスタンスを宣言する。
+drivers/video/geforce/backend_geforce.c	バックエンド	P8	sys/dev/video/geforce/ + sys/platform/pc98/	drivers/video/geforce/backend_geforce.c — pc98_route_to_gf と pc98_console_set_safe による表示経路変更を機種側に分ける。
+drivers/video/geforce/edid.c	バックエンド	移すだけ	sys/dev/video/geforce/edid.c	drivers/video/geforce/edid.c:549 gf4_edid_modes — EDIDのchecksumを検査し、GF4表示用のモード状態を組み立てる。 境界照合 gf4_timing。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/geforce_body.c	バックエンド	P8	sys/dev/video/geforce/geforce_body.c + sys/platform/pc98/video/	drivers/video/geforce/geforce_body.c:12 geforce_module_initが装置の初期化にroute98を渡し、route98はpc98_route_select_98を直に呼ぶ。表示経路の選択をPC-98側から渡す。 GPU 初期化を装置に残し、route98 の機種配線を分ける。
+drivers/video/geforce/geforce_dma.c	バックエンド	移すだけ	sys/dev/video/geforce/geforce_dma.c	drivers/video/geforce/geforce_dma.c:5 geforce_dma_alloc — DMAプールの割当てをgf2_dma_bufへ変換する。 境界照合 geforce_dma_alloc。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/geforce_module.c	バックエンド	P8	sys/dev/video/geforce/ + sys/platform/pc98/	drivers/video/geforce/geforce_module.c — pc98_route_safe と pc98_route_to_98 を直接使うモジュール停止経路に機種側の委譲口が要る。
+drivers/video/geforce/geforce_module.h	契約	移すだけ	sys/dev/video/geforce/geforce_module.h	drivers/video/geforce/geforce_module.h:90 GeforceModuleContext — GeForceモジュールへ渡すプラットフォーム情報と操作の型を定める。 操作表の型と公開・借用の手順を一緒に宣言するモジュール契約。 境界照合 GEFORCE_MODULE_H。pc98_safe は常駐モジュールの操作表の欄で、経路切替の実装は含まない。
+drivers/video/geforce/geforce_platform.c	バックエンド	P8	sys/dev/video/geforce/ + sys/arch/x86/	drivers/video/geforce/geforce_platform.c — reserve の BAR 写像が PTE_PCD を指定する。MMIO 用の属性設定を CPU 側へ渡す。
+drivers/video/geforce/geforce_tick.c	バックエンド	移すだけ	sys/platform/pc98/video/geforce/geforce_tick.c	drivers/video/geforce/geforce_tick.c:18 geforce_tick_bind — PC98_TICK_GFにコールバックを配線する。poll本体は引数で受け取る。 PC98_TICK_GF の配線は PC-98 側が所有する。 境界照合 PC98_TICK_COUNT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/geforce_tick.h	契約	移すだけ	sys/platform/pc98/video/geforce/geforce_tick.h	drivers/video/geforce/geforce_tick.h:8 geforce_tick_bind — PC-98のtickにGeForceのpollを接続する入口を宣言する。 PC-98 の tick 配線の宣言を同じ機種側に置く。 境界照合 GEFORCE_TICK_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_accept.c	その他	移すだけ	sys/dev/video/geforce/gf_accept.c	drivers/video/geforce/gf_accept.c:138 gf_accept_transfer — GeForce上の表示転送の受入測定を行う。 境界照合 GF_MODE_VRAM_BYTES。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_direct.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_direct.c	drivers/video/geforce/gf_direct.c:53 gf_direct_put — バックエンドの表示面情報を検証してINDEX8画素を直接書く。 境界照合 GF_DIRECT_PFB_AMOUNT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_display_data.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_display_data.c	drivers/video/geforce/gf_display_data.c:24 gf4_data_bind — GF4用の表示データ操作表と状態を渡す。 GF 専用の状態と操作表を常駐側から貸し出す装置実装。 境界照合 gf4_data_ops。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_hook.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_hook.c	drivers/video/geforce/gf_hook.c:82 geforce_fill_rop — 描画要求をGeForceのアクセラレーションコンテキストに渡す。 境界照合 OS32_GEFORCE_MODULE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_present.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_present.c	drivers/video/geforce/gf_present.c:18 gf_present_rect — クライアントの画素をGeForce表示窓へ転送する。 境界照合 OS32_GEFORCE_MODULE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_present_m2mf.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_present_m2mf.c	drivers/video/geforce/gf_present_m2mf.c:4 gf3_present_m2mf — gf3_uploadを使ってGF3サーフェスへ転送する。 境界照合 gf3_present_m2mf。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_v2.h	型	移すだけ	sys/dev/video/geforce/gf_v2.h	drivers/video/geforce/gf_v2.h:7 gf_v2_ring_e — GFX2の番号とGF2フェンスを対にして装置側で追跡する。 境界照合 DRIVERS_VIDEO_GEFORCE_GF_V2_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_v2_alloc.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_v2_alloc.c	drivers/video/geforce/gf_v2_alloc.c:4 gf_v2_alloc — gf_vram_reserveでGFX2サーフェス用VRAMを確保する。 境界照合 gf_v2_alloc。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_v2_display.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_v2_display.c	drivers/video/geforce/gf_v2_display.c:40 gf_v2_mode_set — GF4表示操作表のset_modeで表示モードを設定する。 境界照合 gf4_test_ops。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_v2_enum.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_v2_enum.c	drivers/video/geforce/gf_v2_enum.c:20 gf_v2_enum_head — GF4のヘッド情報からGFX2の列挙結果を作る。 境界照合 gf_v2_route_index。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_v2_fence.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_v2_fence.c	drivers/video/geforce/gf_v2_fence.c:27 gf_v2_fence_emit — gf2_fence_emitで実フェンスを発行しGFX2側の番号に対応付ける。 境界照合 gf_v2_fail。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_v2_gart.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_v2_gart.c	drivers/video/geforce/gf_v2_gart.c:82 gf_v2_gart_bind — pte_writeでGFのGARTにページを登録する。 境界照合 gf_v2。pte_write の対象は GPU の GART 表。
+drivers/video/geforce/gf_v2_life.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_v2_life.c	drivers/video/geforce/gf_v2_life.c:35 gf_v2_start — GF3コンテキストにGART範囲照会を設定する。 境界照合 gf4_test_ops。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_v2_ops.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_v2_ops.c	drivers/video/geforce/gf_v2_ops.c:276 GfxBackendV2 gf_backend_v2 = {。HAL 描画操作表を装置側に置く。 境界照合 gf_v2。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_v2_weak.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_v2_weak.c	drivers/video/geforce/gf_v2_weak.c:5 gf_v2_fence_idle — 強い定義をリンクしない構成向けにNOSYSを返すGeForce専用の弱い定義を持つ。 境界照合 gf_v2。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/gf_wc.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_wc.c	drivers/video/geforce/gf_wc.c:52 geforce_wc_start — GeForce表示領域を選び、CPU側のWC設定をarch_video_wc_startに委ねる。 境界照合 geforce_platform。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/leave_log.h	バックエンド	移すだけ	sys/dev/video/geforce/leave_log.h	drivers/video/geforce/leave_log.h:9 geforce_leave_log — GFのレジスタを読んでPC-98表示への復帰状態を記録する。 診断も geforce_leave_log が GPU のレジスタを選択・復元する装置操作。 境界照合 GEFORCE_LEAVE_LOG_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/geforce/tv_data.c	バックエンド	移すだけ	sys/dev/video/geforce/tv_data.c	drivers/video/geforce/tv_data.c:363 gf4_tv_state_calc — GF4用テレビ出力のタイミングとエンコーダ状態を算出する。 境界照合 gf4_timing。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/kcg/kcg.c	振り分け	移すだけ	sys/dev/video/kcg/kcg.c	drivers/video/kcg/kcg.c:45 kcg_read_ank — KCG専用のROM読出し入口にANK文字を渡す。 境界照合 KCG_SCALE_MAX。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/kcg/kcg.h	その他	移すだけ	sys/dev/video/kcg/kcg.h	drivers/video/kcg/kcg.h:19 KCG_LINE_SEL — 漢字CGの読出しライン選択・データポートを定める。 境界照合 KCG_CODE_LO。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/kcg/kcg_body.c	バックエンド	移すだけ	sys/dev/video/kcg/kcg_body.c	drivers/video/kcg/kcg_body.c:43 rom_kanji — 漢字CGのポートから字形を読み出す。 境界照合 KCG_KANJI_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/kcg/kcg_module.c	振り分け	移すだけ	sys/dev/video/kcg/kcg_module.c	drivers/video/kcg/kcg_module.c:19 stub_ank — KCGモジュール未接続時の代替読出しとロード済みAPIを扱う。 境界照合 kcg_kexports。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/kcg/kcg_module.h	契約	移すだけ	sys/dev/video/kcg/kcg_module.h	drivers/video/kcg/kcg_module.h:11 kcg_module_load — KCG専用のロード入口とROMキャッシュ容量を定める。 境界照合 KCG_MODULE_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/kcg/kcg_read_provider.inc	振り分け	移すだけ	sys/dev/video/kcg/kcg_read_provider.inc	drivers/video/kcg/kcg_read_provider.inc:2 kcg_rom_read_ank — public_apiのread_ankを呼んでKCG実装へ渡す。 境界照合 kcg_rom_read_ank。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/of_fb/backend_of_fb.c	バックエンド	移すだけ	sys/dev/video/of_fb/backend_of_fb.c	drivers/video/of_fb/backend_of_fb.c:240 GfxBackend gfx_backend_of_fb = {。描画のバックエンドを定義する。
+drivers/video/of_fb/backend_of_fb.h	契約	P8	sys/dev/video/of_fb/backend_of_fb.h + sys/platform/powermac/video/	drivers/video/of_fb/backend_of_fb.h:19 of_fb_bind — OFフレームバッファの記述子と束縛APIに、PowerMac側のpm_osri_key・pm_osri_decoded宣言が同居する。機種入力の境界を分ける必要がある。
+drivers/video/of_fb/of_fb_osri.inc	バックエンド	P8	sys/dev/video/of_fb/of_fb_osri.inc + sys/platform/powermac/video/	drivers/video/of_fb/of_fb_osri.inc:99 of_osri_show — OF表示面への転送とPowerMacのpm_osri_decoded・pm_osri_key直接呼出しが同居する。機種側から画像と入力の口を渡す必要がある。
+drivers/video/of_fb/of_fb_v2.c	バックエンド	移すだけ	sys/dev/video/of_fb/of_fb_v2.c	drivers/video/of_fb/of_fb_v2.c:239 GfxBackendV2 of_fb_v2 = {。描画のバックエンドを定義する。
+drivers/video/pc98/backend_pc98.c	バックエンド	移すだけ	sys/platform/pc98/video/backend_pc98.c	drivers/video/pc98/backend_pc98.c:138 GfxBackend gfx_backend_pc98 = {。描画のバックエンドを定義する。 境界照合 pc98_probe。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/backend_pc98_osri.c	バックエンド	移すだけ	sys/platform/pc98/video/backend_pc98_osri.c	drivers/video/pc98/backend_pc98_osri.c:53 pc98_osri_show — PC-98の画面とテキスト状態を扱い、OSRI画像を機種固有のラスター再生へ渡す。 境界照合 pc98_osri_show。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/backend_pegc.c	バックエンド	移すだけ	sys/platform/pc98/video/backend_pegc.c	drivers/video/pc98/backend_pegc.c:554 GfxBackend gfx_backend_pegc = {。描画のバックエンドを定義する。 境界照合 pegc_backend_v2。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/backend_pegc_diag.inc	その他	移すだけ	sys/platform/pc98/video/backend_pegc_diag.inc	drivers/video/pc98/backend_pegc_diag.inc:19 pegc_diag_take — PEGCステータスポートを選択して診断値を採取する。 境界照合 pegc_diag_take。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/backend_pegc_present.inc	バックエンド	移すだけ	sys/platform/pc98/video/backend_pegc_present.inc	drivers/video/pc98/backend_pegc_present.inc:46 pegc_present_rect — PEGC表示面へ更新矩形を転送する。 境界照合 pegc_query。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/backend_pegc_restore.inc	バックエンド	移すだけ	sys/platform/pc98/video/backend_pegc_restore.inc	drivers/video/pc98/backend_pegc_restore.inc:28 pegc_text_sync_400 — GDCの同期タイミングを戻しテキスト側の表示を再開する。 境界照合 pegc_text_sync_400。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/backend_pegc_timing.inc	バックエンド	移すだけ	sys/platform/pc98/video/backend_pegc_timing.inc	drivers/video/pc98/backend_pegc_timing.inc:26 gdc_wait_status — GDCのステータスポートを期限付きでポーリングする。 境界照合 GDC_TEXT_CMD。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/gfx_vram.c	バックエンド	移すだけ	sys/platform/pc98/video/gfx_vram.c	drivers/video/pc98/gfx_vram.c:43 _flush_dirty_queue — PC-98の4プレーンに更新矩形を転送し、同じファイルで表示ページとラスターを制御する。 境界照合 gfx_backend_pegc。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/pc98_route.c	バックエンド	移すだけ	sys/platform/pc98/video/pc98_route.c	drivers/video/pc98/pc98_route.c:17 route_set — PC-98の表示経路を切り替える。 境界照合 pc98_console_set_safe。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/pc98_route.h	その他	移すだけ	sys/platform/pc98/video/pc98_route.h	drivers/video/pc98/pc98_route.h:4 PC98_ROUTE_PORT — PC-98とGeForceの表示を選ぶ経路ポートと値を定める。 境界照合 PC98_ROUTE_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/pegc_v2.c	バックエンド	移すだけ	sys/platform/pc98/video/pegc_v2.c	drivers/video/pc98/pegc_v2.c:246 GfxBackendV2 pegc_backend_v2 = {。描画のバックエンドを定義する。 境界照合 GFX2_KIND_PEGC。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/splash_raster.c	バックエンド	移すだけ	sys/platform/pc98/video/splash_raster.c	drivers/video/pc98/splash_raster.c:260 pc98_splash_raster_table — PC-98の走査タイミングに合わせてパレット表を適用する。 境界照合 PEGC_GDC_MSYNC_400。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/splash_raster.h	型	移すだけ	sys/platform/pc98/video/splash_raster.h	drivers/video/pc98/splash_raster.h:44 SplashRaster — PC-98の24/31kHzラスター再生用の状態と入口を定める。 境界照合 PC98_SPLASH_RASTER_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/splash_raster_image.c	バックエンド	移すだけ	sys/platform/pc98/video/splash_raster_image.c	drivers/video/pc98/splash_raster_image.c:19 preview_vsync — PC-98の垂直同期を待ち、パレット初期状態でのプレビュー時間を確保する。 境界照合 GDC_GFX_STAT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/splash_raster_image.h	契約	移すだけ	sys/platform/pc98/video/splash_raster_image.h	drivers/video/pc98/splash_raster_image.h:12 pl_preview — PC-98のVBLANK単位のプレビュー入口とポート出力列の型を定める。 境界照合 PC98_SPLASH_RASTER_IMAGE_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/splash_raster_plan.c	バックエンド	移すだけ	sys/platform/pc98/video/splash_raster_plan.c	drivers/video/pc98/splash_raster_plan.c:6 pl_v2_prepare — 画像の行イベントを検証し、PC-98のパレットポート番号と出力値に展開する。
+drivers/video/pc98/splash_raster_play.c	バックエンド	移すだけ	sys/platform/pc98/video/splash_raster_play.c	drivers/video/pc98/splash_raster_play.c:87 pl_v2_frame_poll — 行別の出力列を使いPC-98のポートにパレット変更を書き出す。 境界照合 GDC_GFX_STAT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/splash_raster_play.h	型	移すだけ	sys/platform/pc98/video/splash_raster_play.h	drivers/video/pc98/splash_raster_play.h:7 PlV2Row — 各走査線に必要なPC-98のポート番号・値を保持する。 境界照合 PC98_SPLASH_RASTER_PLAY_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/splash_raster_run.c	バックエンド	移すだけ	sys/platform/pc98/video/splash_raster_run.c	drivers/video/pc98/splash_raster_run.c:7 pl_run_timing — PEGCのGDC同期設定から総走査線数を求め、再生状態と照合する。 境界照合 PEGC_GDC_MSYNC_400。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/pc98/splash_raster_run.h	型	移すだけ	sys/platform/pc98/video/splash_raster_run.h	drivers/video/pc98/splash_raster_run.h:11 PlRun — PC-98ラスター再生期限の分母・周期・消費時間を保持する。 境界照合 PC98_SPLASH_RASTER_RUN_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/accel.c	バックエンド	移すだけ	sys/dev/video/trident/accel.c	drivers/video/trident/accel.c:240 tri_fill — Tridentの描画エンジンで矩形塗りつぶしを発行する。 境界照合 trident_device。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/backend_trident.c	バックエンド	移すだけ	sys/dev/video/trident/backend_trident.c	drivers/video/trident/backend_trident.c:598 GfxBackend trident_backend_ops = {。描画のバックエンドを定義する。 境界照合 trident_device。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/cursor.c	バックエンド	移すだけ	sys/dev/video/trident/cursor.c	drivers/video/trident/cursor.c:201 tri_cursor_move — Tridentハードウェアカーソルの座標を設定する。 境界照合 trident_device。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/ddc1.c	バックエンド	移すだけ	sys/dev/video/trident/ddc1.c	drivers/video/trident/ddc1.c:43 tri_ddc1_read — indexed I/O で DDC1 のビット列を読む。 境界照合 trident_device。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/default_dac.c	バックエンド	移すだけ	sys/dev/video/trident/default_dac.c	drivers/video/trident/default_dac.c:32 trident_default_dac — state_save.c の save_palette が退避値の代替に使う DAC 表を定義する（関数なし）。 境界照合 trident_default_dac。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/dpms.c	バックエンド	移すだけ	sys/dev/video/trident/dpms.c	drivers/video/trident/dpms.c:52 trident_dpms_set — VGA のレジスタを更新して省電力状態を設定する。 境界照合 trident_dpms_set。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/lifecycle.c	バックエンド	移すだけ	sys/dev/video/trident/lifecycle.c	drivers/video/trident/lifecycle.c:98 trident_screen_init — チップの識別と容量判定を行い、画面を初期化する。 境界照合 trident_get_probe_decls。trident_pc98_init は同じ装置の FIFO・MCLK の設定段を呼ぶ。
+drivers/video/trident/mode_640.c	バックエンド	移すだけ	sys/dev/video/trident/mode_640.c	drivers/video/trident/mode_640.c:292 tri_mode_set — 計算したタイミングを VGA・Trident のレジスタに書く。 境界照合 trident_device。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/palette.c	バックエンド	移すだけ	sys/dev/video/trident/palette.c	drivers/video/trident/palette.c:213 trident_palette — 色成分を DAC 用に変換して書く。 境界照合 trident_device。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/pc98_init.c	バックエンド	移すだけ	sys/dev/video/trident/pc98_init.c	drivers/video/trident/pc98_init.c:66 trident_pc98_init — PC-98 搭載品の FIFO と MCLK を Trident のレジスタ経由で設定する。 境界照合 trident_pc98_init。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/present.c	バックエンド	P8	sys/dev/video/trident/ + sys/platform/pc98/	drivers/video/trident/present.c — trident_port8 に PC98_IO_WAIT_PORT を指定する待ち操作を機種側に渡す。
+drivers/video/trident/probe.c	バックエンド	移すだけ	sys/dev/video/trident/probe.c	drivers/video/trident/probe.c:17 trident_identify — PCI と indexed register の値でチップを識別する。 境界照合 trident_pci_validate。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/probes.h	契約	移すだけ	sys/dev/video/trident/probes.h	drivers/video/trident/probes.h:5 trident_get_probe_decls — Trident モジュールが返す診断プローブ表の宣言。 境界照合 TRIDENT_PROBES_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/regs.c	バックエンド	移すだけ	sys/dev/video/trident/regs.c	drivers/video/trident/regs.c:157 trident_indexed_write — インデックスと値を装置のレジスタ空間へ書く。 境界照合 trident_resources。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/resources.c	バックエンド	P8	sys/dev/video/trident/ + sys/arch/x86/	drivers/video/trident/resources.c — trident_resources_rollback が CR3 を保存・交換する。装置資源の解放と空間切替を分ける。
+drivers/video/trident/route_ra266.c	バックエンド	移すだけ	sys/platform/pc98/video/route_ra266.c	drivers/video/trident/route_ra266.c:74 trident_route_enable — RA266 の画面配線を PC-98 のフリップフロップと Trident の DAC の決まった順序で切り替える。 境界照合 trident_device。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/screen.c	バックエンド	移すだけ	sys/dev/video/trident/screen.c	drivers/video/trident/screen.c:70 trident_adjust_frame — CRTC の表示開始位置を設定する。 境界照合 trident_device。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/state_restore.c	バックエンド	移すだけ	sys/dev/video/trident/state_restore.c	drivers/video/trident/state_restore.c:76 trident_state_restore — 保存済み VGA・Trident レジスタを装置に書き戻す。 境界照合 trident_device。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/state_save.c	バックエンド	移すだけ	sys/dev/video/trident/state_save.c	drivers/video/trident/state_save.c:164 trident_state_save — VGA・拡張レジスタ・パレットを装置から退避する。 境界照合 trident_device。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/trident.h	型	移すだけ	sys/dev/video/trident/trident.h	drivers/video/trident/trident.h:417 tri_vram_init — Trident の装置状態・VRAM 管理型と内部操作を宣言する。 境界照合 TRIDENT_H。TRI_STEP_PC98_INIT は装置内部の初期化段を記録する列挙値。
+drivers/video/trident/trident_body.c	バックエンド	移すだけ	sys/dev/video/trident/trident_body.c	drivers/video/trident/trident_body.c:6 trident_module_init — モジュールの context を保持し trident_backend_ops を返す。 境界照合 trident_context。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/trident_module.c	バックエンド	移すだけ	sys/dev/video/trident/trident_module.c	drivers/video/trident/trident_module.c:31 GfxBackend gfx_backend_trident = {。描画のバックエンドを定義する。 境界照合 trident_kexports。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/trident_module.h	契約	移すだけ	sys/dev/video/trident/trident_module.h	drivers/video/trident/trident_module.h:111 trident_module_load — Trident 固有のモジュール操作表とロードの入口を宣言する。 境界照合 TRIDENT_MODULE_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/video.c	バックエンド	移すだけ	sys/dev/video/trident/video.c	drivers/video/trident/video.c:332 tri_video_put — オーバーレイの領域・座標を設定して映像を表示する。 境界照合 trident_device。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+drivers/video/trident/vram.c	バックエンド	移すだけ	sys/dev/video/trident/vram.c	drivers/video/trident/vram.c:336 trident_capacity_plan — チップのレジスタから容量を判定し VRAM の配置を決める。 境界照合 trident_device。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+exec/absent/exec_reclaim.c	振り分け	移すだけ	sys/kern/exec/absent/exec_reclaim.c	exec/absent/exec_reclaim.c の exec_host_owner_exit — include/platform_host.h の終了通知に owner を渡す。kernel/dev/device_host.c はリンク側へ委譲し、platform/powermac/host_unavailable.c は空実装を持つ。
+exec/appslot.c	共通処理	P8	sys/kern/exec/appslot.c	exec/appslot.c:662 gf_display_owner_exit — 終了時に弱い gf_display_owner_exit を直接選ぶ。表示所有者の終了通知を登録口に渡す。
+exec/exec_gfx.h	振り分け	移すだけ	sys/kern/exec/exec_gfx.h	exec/exec_gfx.h の exec_gfx_owner_exit — include/display_provider.h が固定名 platform_display_fallback.h を選ぶ。終了通知は PC-98 では空、PowerMac では console_text.c が必要時に gfx_shutdown を行う。
+exec/exec_gfx_poll.h	共通処理	P8	sys/kern/exec/exec_gfx_poll.h	exec/exec_gfx_poll.h:6 geforce_fg_due — exec_gfx_poll が GeForce の期限と前景処理を直に選ぶ。表示サービスに期限と実行を問い合わせる口が要る。
+exec/exec_launch.inc	共通処理	P8	sys/kern/exec/ + sys/arch/x86/	exec/exec_launch.inc — paging_current_cr3 と paging_load_cr3 による起動前後の空間切替を CPU 側へ分ける。
+exec/exec_syscall.inc	共通処理	P8	sys/kern/exec/ + sys/arch/x86/	exec/exec_syscall.inc — paging_load_cr3 にカーネルの PD を渡す終了経路をアドレス空間切替の口に移す。
+fs/ext2/ext2_fmt.c	共通処理	移すだけ	sys/fs/ext2/ext2_fmt.c	fs/ext2/ext2_fmt.c の fmt_wr — 固定名 platform_install_management.h の媒体取得口で管理媒体の有無を判定する。PC-98 は NULL、PowerMac は IDE 有効時に install_backend.c の操作表を返す。 境界照合 ide_drive。ide_drive は媒体操作表に渡す引数。
+fs/ext2/ext2_medium_ide.c	バックエンド	移すだけ	sys/platform/pc98/storage/ext2_medium_ide.c	fs/ext2/ext2_medium_ide.c:25 dev_find — IDE 用の ext2_medium_ide_ops が媒体・区画の解決を一手に受け持つ。 境界照合 ide_drive。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+fs/ext2/ext2_medium_loop.c	バックエンド	移すだけ	sys/dev/block/ext2_medium_loop.c	fs/ext2/ext2_medium_loop.c:8 loop_dev_status — ext2_medium_loop_ops は loop_contract.h の読み書きに委譲する独立アダプタ。 境界照合 ext2_medium_loop_ops。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+fs/ext2/ext2_super.c	共通処理	移すだけ	sys/fs/ext2/ext2_super.c	fs/ext2/ext2_super.c の ext2_meta_touch — 固定名 platform_install_management.h の媒体取得口で管理媒体の有無を判定する。PC-98 は NULL、PowerMac は IDE 有効時に install_backend.c の操作表を返す。 境界照合 ide_drive。ide_drive は platform_ext2_resolve に渡す識別値。
+fs/ext2/ext2_super_block_io.inc	共通処理	移すだけ	sys/fs/ext2/ext2_super_block_io.inc	fs/ext2/ext2_super_block_io.inc の ext2_device_transfer — 固定名 platform_install_management.h の媒体取得口で管理媒体の有無を判定する。PC-98 は NULL、PowerMac は IDE 有効時に install_backend.c の操作表を返す。
+fs/ext2/ext2_vfs.c	共通処理	移すだけ	sys/fs/ext2/ext2_vfs.c	fs/ext2/ext2_vfs.c:426 platform_ext2_vfs_mount — マウント先の選択は既存の platform_ext2_vfs_mount に委譲する。
+fs/fat/fatfs/ff.c	共通処理	移すだけ	sys/fs/fat/fatfs/ff.c	fs/fat/fatfs/ff.c の sync_window — fs/fat/fatfs/diskio.h の disk_write にドライブ番号とセクタ範囲を渡す。FDD/HDD の選択と装置操作は drivers/block/fat_diskio.c の同名関数が受け持つ。 境界照合 PTE_Boot。PTE はディスク区画表の欄を示す。
+fs/fat/fatfs_vfs.c	共通処理	P8	sys/fs/fat/fatfs_vfs.c	fs/fat/fatfs_vfs.c:512 bootinfo_part_geom — マウントが FDD と HDD を選び IDE 物理セクタ長と区画を直接設定する。媒体アダプタに設定を渡す必要がある。
+fs/fat/fatfs_vfs_read_cache.inc	共通処理	P8	sys/fs/fat/fatfs_vfs_read_cache.inc	fs/fat/fatfs_vfs_read_cache.inc:78 fdc_media_gen — キャッシュの無効化が FDC の世代に直結する。媒体共通の世代取得を介す必要がある。
+fs/isofs/iso9660.c	共通処理	移すだけ	sys/fs/isofs/iso9660.c	fs/isofs/iso9660.c:42 dev_blk_read_lba — iso_read_device は Device に対するブロック読み取りだけを要求する。
+fs/isofs/iso9660_media.c	共通処理	移すだけ	sys/fs/isofs/iso9660_media.c	fs/isofs/iso9660_media.c:38 dev_find — iso9660_resource_check は Device の媒体世代でキャッシュの寿命を判定する。
+fs/serialfs/serialfs_persistent.c	共通処理	移すだけ	sys/fs/serialfs/serialfs_persistent.c	fs/serialfs/serialfs_persistent.c の sfs_persistent_start — net/host_mailbox.h の HostAlive を取得する。net/host_mailbox.c は割り込みを保護して状態を写し、platform/powermac/hostfs_peer.c は観測済みの状態を写す。
+fs/serialfs/sfs_session_fg.c	共通処理	P8	sys/fs/serialfs/sfs_session_fg.c	fs/serialfs/sfs_session_fg.c の sfs_finish — 契約の口を足す。sfs_lan_reset 自体は sfs_lan.h の操作だが、同ファイルの sfs_fg_begin は e82557_state と e82557 固定の g_nic を使う。前景側には機種非依存の LAN セッション準備・状態取得口が要る。
+fs/vfs.c	共通処理	移すだけ	sys/fs/vfs.c	fs/vfs.c:325 vfs_find_mount → platform_install_medium。固定名 platform_install_management.h が PC-98 と IDE 無効の PowerMac では空ポインタ、IDE 有効時は platform/powermac/install_backend.c の媒体操作表を返す。呼ぶ側はこの既存の取得口を使用。 定義 platform/powermac/install_backend.c:249。
+fs/vfs_fd.c	共通処理	移すだけ	sys/fs/vfs_fd.c	fs/vfs_fd.c:92 fd_resource_check → platform_install_medium。固定名 platform_install_management.h が PC-98 と IDE 無効の PowerMac では空ポインタ、IDE 有効時は platform/powermac/install_backend.c の媒体操作表を返す。呼ぶ側はこの既存の取得口を使用。 定義 platform/powermac/install_backend.c:249。
+gfx/gfx.h	契約	移すだけ	sys/hal/gfx/gfx.h	gfx/gfx.h:41 gfx_kernel_framebuffer — カーネル向け framebuffer 取得と描画 API を宣言する。
+gfx/gfx_console.c	その他	移すだけ	sys/kern/console/gfx_console.c	gfx/gfx_console.c:24 gfx_console_open — fbconsole 所有の RAM 面を確保してコンソールの表示先にする。
+gfx/gfx_console.h	契約	移すだけ	sys/kern/console/gfx_console.h	gfx/gfx_console.h:12 gfx_console_lock — コンソールが所有する描画先の型とロック操作を宣言する。
+gfx/gfx_core.c	振り分け	P8	sys/hal/gfx/ + sys/platform/pc98/video/	gfx/gfx_core.c:128 gfx_mode_fits — 共通のモード選択が LEDGER_SF_PC98 だけ DISPLAY 面を省略可能にするため、この条件を provider に渡す必要がある。 shell_print は既存の契約を使えるが、gfx_mode_fits の機種例外が同じファイルに残る。
+gfx/gfx_core_api.inc	振り分け	移すだけ	sys/hal/gfx/gfx_core_api.inc	gfx/gfx_core_api.inc:63 gfx_hw_fill_rect — 選択中の backend の fill_rect に矩形を渡す。
+gfx/gfx_core_bridge.inc	共通処理	移すだけ	sys/hal/gfx/gfx_core_bridge.inc	gfx/gfx_core_bridge.inc:10 gfx_framebuffer_bridge — 呼出元を検査し USER に渡す面の lease を取得または再利用する。
+gfx/gfx_core_framebuffer.inc	共通処理	移すだけ	sys/hal/gfx/gfx_core_framebuffer.inc	gfx/gfx_core_framebuffer.inc:10 gfx_client_framebuffer — 選択面の台帳とモードから pitch・各 plane のアドレスを組み立てる。
+gfx/gfx_core_init.inc	振り分け	P8	sys/hal/gfx/gfx_core_init.inc	gfx/gfx_core_init.inc:41 display_planar_start — gfx_init_mode が planar のページ順と 200 行時の例外を所有する。初期化順を対応 provider に渡す。
+gfx/gfx_core_surface.inc	共通処理	P8	sys/hal/gfx/ + sys/arch/x86/	gfx/gfx_core_surface.inc — gfx_reinit_surface_roles 周辺で paging_load_cr3 が描画中のページ表を切り替える。写像の切替と復帰を CPU 側で対にする。
+gfx/gfx_dirty.c	共通処理	移すだけ	sys/hal/gfx/gfx_dirty.c	gfx/gfx_dirty.c:6 gfx_dirty_add — 更新矩形をクリップ・整列して既存の矩形に併合する。
+gfx/gfx_dirty.h	共通処理	移すだけ	sys/hal/gfx/gfx_dirty.h	gfx/gfx_dirty.h:7 gfx_dirty_at — キュー内の矩形へのポインタを返すインライン実装。
+gfx/gfx_emergency.c	振り分け	移すだけ	sys/hal/gfx/gfx_emergency.c	gfx/gfx_emergency.c:23 gfx_return_emergency — 所有者と再入を検査し、登録済みの復帰 callback を呼ぶ。
+gfx/gfx_emergency.h	契約	移すだけ	sys/hal/gfx/gfx_emergency.h	gfx/gfx_emergency.h:13 gfx_arm_emergency — 復帰 callback を登録する入口と復帰要求を宣言する。
+gfx/gfx_hw_mono_cpu.c	共通処理	移すだけ	sys/hal/gfx/gfx_hw_mono_cpu.c	gfx/gfx_hw_mono_cpu.c:7 gfx_hw_mono_cpu — 単色ビット列をタイルに展開して backend の put に渡す。
+gfx/gfx_hw_mono_cpu.h	契約	移すだけ	sys/hal/gfx/gfx_hw_mono_cpu.h	gfx/gfx_hw_mono_cpu.h:10 gfx_hw_mono_cpu — CPU 展開に必要なビット列・色・クリップ範囲を宣言する。
+gfx/gfx_hw_submit.c	振り分け	移すだけ	sys/hal/gfx/gfx_hw_submit.c	gfx/gfx_hw_submit.c:21 submit_one — コマンドに応じて blit・fill_rop・put・mono を呼び分ける。
+gfx/gfx_internal.h	契約	P8	sys/hal/gfx/ + sys/dev/video/pegc/	gfx/gfx_internal.h:49 pegc_select_window — 共通のクリップ処理・更新矩形型と PEGC 専用の窓選択宣言が同居し、装置側へ宣言を分ける必要がある。
+gfx/gfx_osri.c	その他	移すだけ	sys/kern/gfx/osri/gfx_osri.c	gfx/gfx_osri.c:23 osri_load_checked — 画像ファイルを読み、OSRI の形式を検査して表示用データを作る。
+gfx/gfx_osri.h	型	移すだけ	sys/kern/gfx/osri/gfx_osri.h	gfx/gfx_osri.h:57 osri_load_checked — OSRI のファイル形式、イベントの上限、読み込み結果の型を定義する。
+gfx/gfx_osri_view.c	その他	移すだけ	sys/kern/gfx/osri/gfx_osri_view.c	gfx/gfx_osri_view.c:13 gfx_osri_view — 呼出元を検査し、画像を読み込んで backend の osri_show に渡す。
+gfx/gfx_osri_view.h	契約	移すだけ	sys/kern/gfx/osri/gfx_osri_view.h	gfx/gfx_osri_view.h:7 gfx_osri_view — 画像表示の呼出元・表示期間と中断照会の入口を宣言する。
+gfx/gfx_osri_view_internal.h	その他	移すだけ	sys/kern/gfx/osri/gfx_osri_view_internal.h	gfx/gfx_osri_view_internal.h:12 gfx_osri_poll_abort — AppSlot の中断要求を調べ、表示の可否は platform_osri の契約を使って判定する。 境界照合 serial_gate_active。serial_gate_active は登録済みの非常時出力への問い合わせ。
+gfx/gfx_policy.c	共通処理	移すだけ	sys/hal/gfx/gfx_policy.c	gfx/gfx_policy.c:31 gfx_policy_reeval — 所有状態に応じて direct と shadow の描画操作表を切り替える。
+gfx/gfx_policy.h	契約	移すだけ	sys/hal/gfx/gfx_policy.h	gfx/gfx_policy.h:17 gfx_policy_blocks_map — 描画方針の再評価・世代・マッピング可否の問い合わせを宣言する。
+gfx/gfx_present.c	振り分け	移すだけ	sys/hal/gfx/gfx_present.c	gfx/gfx_present.c:57 present_dirty — packed の処理を先に試し、planar は gfx_present_contract.h の gfx_planar_present_dirty に渡す。
+gfx/gfx_scroll.c	共通処理	移すだけ	sys/hal/gfx/gfx_scroll.c	gfx/gfx_scroll.c:16 gfx_hardware_scroll — スクロール位置を高さで正規化し display_restore.h の display_scroll に渡す。
+gfx/osri_profile.h	契約	移すだけ	sys/kern/gfx/osri/osri_profile.h	gfx/osri_profile.h:5 OSRI_DEFAULT_OUT_BUDGET — ホストのエンコーダと画像準備処理で共有する出力予算を定義する（関数なし）。
+gfx/palette.c	共通処理	移すだけ	sys/hal/gfx/palette.c	gfx/palette.c:49 palette_set — パレット値を管理し、書き込みは display_restore.h の display_palette4_write に渡す。
+gfx/palette.h	契約	移すだけ	sys/hal/gfx/palette.h	gfx/palette.h:51 palette_set — パレットの設定・影コピー・読み出しを宣言する。
+gfx/sync/a0_weak.c	共通処理	移すだけ	sys/hal/gfx/sync/a0_weak.c	gfx/sync/a0_weak.c:3 gfxsync_bind — 実装を組み込まない構成の weak 定義が NOSYS を返す。
+gfx/sync/sync_bind.c	共通処理	移すだけ	sys/hal/gfx/sync/sync_bind.c	gfx/sync/sync_bind.c:30 gfxsync_bind — 対象と設定を検証してプールの同期 context を割り当てる。
+gfx/sync/sync_cfg.c	共通処理	移すだけ	sys/hal/gfx/sync/sync_cfg.c	gfx/sync/sync_cfg.c:71 gfxsync_cfg_lookup — キーで設定を検索し同期方式とパラメータを読み出す。
+gfx/sync/sync_gap.c	共通処理	移すだけ	sys/hal/gfx/sync/sync_gap.c	gfx/sync/sync_gap.c:6 gfxsync_gap_loops — 校正値とナノ秒から待機ループ数を飽和演算で求める。
+gfx/sync/sync_int.h	型	移すだけ	sys/hal/gfx/sync/sync_int.h	gfx/sync/sync_int.h:13 gfxsync_cfg_lookup — 同期 context と設定の型、検索・転送用の内部宣言をまとめる。
+gfx/sync/sync_storage.c	共通処理	移すだけ	sys/hal/gfx/sync/sync_storage.c	gfx/sync/sync_storage.c:3 gfxsync_ctx_pool — sync_bind.c の gfxsync_bind が割り当てる共用 context 配列を定義する（関数なし）。
+gfx/sync/sync_write.c	共通処理	移すだけ	sys/hal/gfx/sync/sync_write.c	gfx/sync/sync_write.c:16 gfxsync_row_write — 対象の幅・境界に合わせて書き込み、装置別同期は渡された関数を呼ぶ。 境界照合 __asm__。空の asm はコンパイラバリアで CPU 命令を発行しない。
+gfx/v2/a0_weak.c	共通処理	移すだけ	sys/hal/gfx/v2/a0_weak.c	gfx/v2/a0_weak.c:4 gfx2_adapter_count — 強い定義がない構成で NOSYS を返す weak 実装。 境界照合 pte_flags。NOSYS の既定実装は pte_flags の値を使用しない。
+gfx/v2/backend_reg.c	共通処理	移すだけ	sys/hal/gfx/v2/backend_reg.c	gfx/v2/backend_reg.c:99 gfx2_adapter_register — backend の操作表を検査してアダプタを登録する。
+gfx/v2/caps.c	共通処理	P8	sys/hal/gfx/v2/ + sys/dev/video/trident/	gfx/v2/caps.c:5 gfx2_caps_from_v1 — 共通の能力合成に Trident 固有の scanout 形式表があり、対応形式を backend の申告に切り出す必要がある。
+gfx/v2/check_op.c	共通処理	移すだけ	sys/hal/gfx/v2/check_op.c	gfx/v2/check_op.c:57 gfx2_check_op — 操作・形式・メモリプールを検査し実行可否を判定する。
+gfx/v2/display.c	振り分け	移すだけ	sys/hal/gfx/v2/display.c	gfx/v2/display.c:53 gfx2_flip — head と面を解決して表示切替を backend に依頼する。
+gfx/v2/enum.c	振り分け	P8	sys/hal/gfx/v2/ + sys/platform/pc98/video/・sys/dev/video/	gfx/v2/enum.c:107 gfx2_v1_enum_conn — 共通の列挙処理が PC98・PEGC かどうかで物理コネクタ種別を決めており、種別の供給を backend に移す必要がある。
+gfx/v2/fence.c	共通処理	移すだけ	sys/hal/gfx/v2/fence.c	gfx/v2/fence.c:128 gfx2_fence_wait_k — アダプタの進捗とフェンスの状態を確認して完了を待つ。
+gfx/v2/format.c	共通処理	移すだけ	sys/hal/gfx/v2/format.c	gfx/v2/format.c:55 gfx2_to_argb — ピクセル形式に応じて各色成分を展開し ARGB に変換する。
+gfx/v2/gart.c	共通処理	移すだけ	sys/hal/gfx/v2/gart.c	gfx/v2/gart.c:11 gfx2_gart_alloc — ページを確保・固定し、装置への結合は backend の gart_bind に渡す。
+gfx/v2/gfx2_exec.h	契約	移すだけ	sys/hal/gfx/v2/gfx2_exec.h	gfx/v2/gfx2_exec.h:6 gfx2_owner_release — 所有者終了時の描画資源解放を exec 側へ公開する。
+gfx/v2/gfx2_fmt.h	型	移すだけ	sys/hal/gfx/v2/gfx2_fmt.h	gfx/v2/gfx2_fmt.h:7 gfx2_fmt_info — ピクセル構成の型と変換関数の宣言を共有する。
+gfx/v2/gfx2_int.h	型	移すだけ	sys/hal/gfx/v2/gfx2_int.h	gfx/v2/gfx2_int.h:88 gfx2_adapter_register — アダプタ・面などの v2 内部状態と登録操作を定義・宣言する。 境界照合 GFX2_KIND_PC98。台帳と共有する識別値の一致を静的に検査し、装置操作は行わない。
+gfx/v2/gfx2_sw.h	契約	移すだけ	sys/hal/gfx/v2/gfx2_sw.h	gfx/v2/gfx2_sw.h:20 gfx2_sw_fill — ソフトウェア描画器が受け取る実行引数と操作別の入口を宣言する。
+gfx/v2/lock.c	共通処理	P8	sys/hal/gfx/ + sys/arch/x86/	gfx/v2/lock.c — gfx2_lock の写像が PTE_PCD・PTE_PWT と CR3 を読む。キャッシュ属性の継承とアドレス空間の照合を CPU 側に渡す。
+gfx/v2/map_audit.c	共通処理	P8	sys/hal/gfx/v2/ + sys/arch/（ページ表走査）	gfx/v2/map_audit.c:24 gfx2_map_audit — 描画面の写像を監査する途中で lease_pt_phys から PTE を直接読み、監査とページ表走査を分離する必要がある。
+gfx/v2/modeset.c	振り分け	移すだけ	sys/hal/gfx/v2/modeset.c	gfx/v2/modeset.c:32 gfx2_mode_set — コネクタとモードを検証して backend に画面設定を依頼する。
+gfx/v2/owner_release.c	共通処理	移すだけ	sys/hal/gfx/v2/owner_release.c	gfx/v2/owner_release.c:29 gfx2_owner_release — 終了した所有者の面・表示参照を解放し、解放を待つ面を隔離する。
+gfx/v2/palette_state.c	共通処理	移すだけ	sys/hal/gfx/v2/palette_state.c	gfx/v2/palette_state.c:16 gfx2_pal_set — v2 アダプタのパレット状態を更新する。
+gfx/v2/submit.c	振り分け	移すだけ	sys/hal/gfx/v2/submit.c	gfx/v2/submit.c:248 gfx2_submit — コマンドの引数・面を検証して実行方式に振り分ける。
+gfx/v2/surface.c	共通処理	移すだけ	sys/hal/gfx/v2/surface.c	gfx/v2/surface.c:61 gfx2_surf_new — 面の属性・裏付け領域・世代を管理する。
+gfx/v2/sw_alpha.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_alpha.c	gfx/v2/sw_alpha.c:19 gfx2_sw_alpha — ピクセル形式を確認し CPU で source-over 合成する。
+gfx/v2/sw_ckey.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_ckey.c	gfx/v2/sw_ckey.c:4 gfx2_sw_ckey — 色キーとクリップ範囲を使い CPU で画素を選んで転送する。
+gfx/v2/sw_copy.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_copy.c	gfx/v2/sw_copy.c:4 gfx2_sw_copy — 重なりとピッチを考慮して矩形を行単位でコピーする。
+gfx/v2/sw_fill.c	共通処理	移すだけ	sys/hal/gfx/v2/sw_fill.c	gfx/v2/sw_fill.c:4 gfx2_sw_fill — ピクセル形式に応じた色でクリップ矩形を塗りつぶす。
+gfx/v2/sw_hostdata.c	共通処理	移すだけ	sys/hal/gfx/sw_hostdata.c	gfx/v2/sw_hostdata.c:3 gfx2_sw_hostdata — CPU側の画素をクリップ範囲で読み同期面またはメモリ面へ書く。
+gfx/v2/sw_line.c	共通処理	移すだけ	sys/hal/gfx/sw_line.c	gfx/v2/sw_line.c:4 gfx2_sw_line — 線分をクリップし画素へ展開する。
+gfx/v2/sw_mono.c	共通処理	移すだけ	sys/hal/gfx/sw_mono.c	gfx/v2/sw_mono.c:4 gfx2_sw_mono — 単色ビット列を前景色・背景色へ展開する。
+gfx/v2/sw_readback.c	共通処理	移すだけ	sys/hal/gfx/sw_readback.c	gfx/v2/sw_readback.c:4 gfx2_sw_readback — 同期面またはメモリ面を行単位で読み戻す。
+gfx/v2/sw_rop.c	共通処理	移すだけ	sys/hal/gfx/sw_rop.c	gfx/v2/sw_rop.c:14 gfx2_sw_rop — ROP3の演算結果を画素に反映する。
+gfx/v2/sw_rop4.c	共通処理	移すだけ	sys/hal/gfx/sw_rop4.c	gfx/v2/sw_rop4.c:36 gfx2_sw_rop4 — マスクのビットで前景・背景のROP3を選ぶ。
+gfx/v2/sw_stretch.c	共通処理	移すだけ	sys/hal/gfx/sw_stretch.c	gfx/v2/sw_stretch.c:48 gfx2_sw_stretch — 転送先の位置に対応する転送元画素を求める。
+gfx/v2/sw_table.c	振り分け	移すだけ	sys/hal/gfx/sw_table.c	gfx/v2/sw_table.c:3 gfx2_sw_table — 操作番号とソフトウェア描画関数を対応付ける表。
+gfx/v2/sysmem.c	共通処理	移すだけ	sys/hal/gfx/sysmem.c	gfx/v2/sysmem.c:6 gfx2_sysmem_alloc — 所有者付きページを確保し面に対応付けてゼロクリアする。
+gfx/v2/v1_bridge.c	共通処理	移すだけ	sys/hal/gfx/v1_bridge.c	gfx/v2/v1_bridge.c:38 v1_bridge_rebind — 台帳の面をv2の別名に結び再設定前に使用中の面を静止させる。
+gfx/v2/v1_shim.c	振り分け	移すだけ	sys/hal/gfx/v1_shim.c	gfx/v2/v1_shim.c:234 gfx2_v1_shim — v2操作表にshim_flip等のv1変換関数を登録する。
+gfx/v2/vram_heap.c	共通処理	移すだけ	sys/hal/gfx/vram_heap.c	gfx/v2/vram_heap.c:18 gfx2_heap_alloc — 管理中の空き領域からVRAMオフセットを割り当てる。
+hwdev/generated/gf_mode_rows.inc	その他	移すだけ	sys/dev/video/geforce/gf_mode_rows.inc	gf_mode_rows.inc の gf_mode_rows：gf_load_row が序数で引くレジスタ設定の生成表。 境界照合 gf_mode_row。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/accel.h	契約	移すだけ	sys/dev/video/geforce/accel.h	hwdev/gf/accel.h:240 int gf3_copy_emit(。2D コピー命令生成を装置側に置く。 境界照合 gf3_rc。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/accel_copy.c	バックエンド	移すだけ	sys/dev/video/geforce/accel_copy.c	hwdev/gf/accel_copy.c:22 int gf3_copy_emit(。2D コピー命令生成を装置側に置く。 境界照合 GF3_BLIT_POINT_IN。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/accel_fill.c	バックエンド	移すだけ	sys/dev/video/geforce/accel_fill.c	accel_fill.c の gf3_fill_emit：GDI の色と矩形を描画コマンドに組む。 境界照合 GF3_GDI_COLOR_FORMAT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/accel_ifc.c	バックエンド	移すだけ	sys/dev/video/geforce/accel_ifc.c	accel_ifc.c の gf3_ifc：IFC オブジェクトに矩形と画素データを送る。 境界照合 gf3_ifc。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/accel_m2mf.c	バックエンド	移すだけ	sys/dev/video/geforce/accel_m2mf.c	accel_m2mf.c の gf3_m2mf：M2MF に入出力 DMA と転送範囲を設定する。 境界照合 gf3_ctx。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/accel_mono.c	バックエンド	移すだけ	sys/dev/video/geforce/accel_mono.c	accel_mono.c の gf3_mono：モノクロ描画の設定とビット列を送る。 境界照合 gf3_mono。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/accel_objects.c	バックエンド	移すだけ	sys/dev/video/geforce/accel_objects.c	accel_objects.c の gf3_init：GF3 の描画オブジェクトをクラス表に従って初期化する。 境界照合 GF3_OBJECT_COUNT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/accel_rop.c	バックエンド	移すだけ	sys/dev/video/geforce/accel_rop.c	accel_rop.c の gf3_rop_set：論理演算を rop_table から装置用の値に変換する。 境界照合 GF3_MTHD_OBJECT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/accel_rop3.c	バックエンド	移すだけ	sys/dev/video/geforce/accel_rop3.c	accel_rop3.c の gf3_rop3_set：パターンと ROP3 演算をサブチャネルに設定する。 境界照合 gf3_rop3_set。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/accel_scale.c	バックエンド	移すだけ	sys/dev/video/geforce/accel_scale.c	accel_scale.c の gf3_scale_emit：SIFM 用に拡大縮小の比と矩形を設定する。 境界照合 GF3_ERANGE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/accel_service.h	契約	移すだけ	sys/dev/video/geforce/accel_service.h	accel_service.h の gf3_service_owner_bind：GF3 サービスに所有者の起動・停止操作を登録する宣言。 境界照合 gf_production。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/accel_surface.c	バックエンド	移すだけ	sys/dev/video/geforce/accel_surface.c	accel_surface.c の gf3_surface_set：SF2D 用の面の書式とピッチを設定する。 境界照合 GF3_SF2D_FORMAT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/accel_transfer.c	振り分け	移すだけ	sys/dev/video/geforce/accel_transfer.c	accel_transfer.c の transfer：GF3 の形式と転送条件に応じて IFC または M2MF を使う。 境界照合 gf3_ctx。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/bus.c	バックエンド	移すだけ	sys/dev/video/geforce/bus.c	bus.c の gf_production_identity：PCI 構成空間を読み対象 GPU の識別情報を照合する。 境界照合 gf_production_identity。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/clock.c	バックエンド	移すだけ	sys/dev/video/geforce/clock.c	clock.c の gf5_clock_read：クロック源と PLL 設定を読み出す。 境界照合 gf_io。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/command.c	バックエンド	移すだけ	sys/dev/video/geforce/command.c	command.c の gf2_start：GF2 のコマンドチャネルと FIFO を起動する。 境界照合 gf2_chan。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/command.h	型	移すだけ	sys/dev/video/geforce/command.h	command.h の gf2_chan：FIFO・DMA・フェンスを扱う装置チャネルの状態を定義する。 境界照合 gf2_rc。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/command_platform.c	バックエンド	移すだけ	sys/dev/video/geforce/command_platform.c	command_platform.c の gf2_map_vram：チャネルのマップ操作表を通して VRAM の範囲を対応付ける。 境界照合 gf2_map_vram。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/command_test.c	その他	移すだけ	sys/dev/video/geforce/command_test.c	command_test.c の bad_command：不正な GPU コマンドに対する装置の応答を診断する。 境界照合 GF2_USER_BASE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/devinit.c	バックエンド	移すだけ	sys/dev/video/geforce/devinit.c	devinit.c の gf_production_prepare：GeForce の起動資源で本番用コンテキストを準備する。 境界照合 gf_production。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/access.h	バックエンド	移すだけ	sys/dev/video/geforce/display/access.h	access.h の gf_display_read：GF_MODE_REGISTER_BAR を指定し表示レジスタを読む。 境界照合 GF_DISPLAY_ACCESS_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/api.h	契約	移すだけ	sys/dev/video/geforce/display/api.h	api.h の gf4_set_mode：GF4 のヘッドと経路を扱う表示サービスの入口を宣言する。 境界照合 GF4_HEADS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/baseline.c	バックエンド	移すだけ	sys/dev/video/geforce/display/baseline.c	baseline.c の gf_display_baseline：表示初期化で基準となる装置状態を取得する。 境界照合 gf_display_context。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/blank.c	バックエンド	移すだけ	sys/dev/video/geforce/display/blank.c	blank.c の gf_display_blank：シーケンサのレジスタを操作して表示を消す。 境界照合 GF_SEQ_INDEX_PORT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/calc.c	バックエンド	移すだけ	sys/dev/video/geforce/display/calc.c	calc.c の gfinit_mode_calc：保存した GF レジスタと PLL 制約からモード設定を算出する。 境界照合 GF_MODE_DCB_OR。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/calc.h	契約	移すだけ	sys/dev/video/geforce/display/calc.h	hwdev/gf/display/calc.h:7 void gf_mode_timing(。表示モードの設定値計算を装置側に置く。 境界照合 GF_DISPLAY_CALC_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/checks.c	バックエンド	移すだけ	sys/dev/video/geforce/display/checks.c	checks.c の display_check：表示レジスタの実測値をマスクして期待値と比較する。 境界照合 gf_display_context。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/checks.inc	バックエンド	移すだけ	sys/dev/video/geforce/display/checks.inc	checks.inc の CHECK_MMIO：gf_display_checks に展開する PLL などの照合条件を列挙する。 境界照合 GF_MODE_PLLSEL_VPLL_A。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/cursor.c	バックエンド	移すだけ	sys/dev/video/geforce/display/cursor.c	hwdev/gf/display/cursor.c:28 void gf_mode_cursor(。表示モードの設定値計算を装置側に置く。 境界照合 gf_mode_cursor。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/dac_format.c	バックエンド	移すだけ	sys/dev/video/geforce/display/dac_format.c	hwdev/gf/display/dac_format.c:28 void gf_mode_dac_format(。表示モードの設定値計算を装置側に置く。 境界照合 gf_mode_dac_format。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/data.h	型	移すだけ	sys/dev/video/geforce/display/data.h	data.h の gf4_data_ops：EDID・DCB・TV 用のデータ処理を GF4 内部で受け渡す型。 境界照合 GF4_TIMINGS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/dcb.c	バックエンド	移すだけ	sys/dev/video/geforce/display/dcb.c	dcb.c の gf4_dcb_parse：GPU ROM の DCB から表示経路を取り出す。 境界照合 GF4_EDDC。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/ddc.c	バックエンド	移すだけ	sys/dev/video/geforce/display/ddc.c	ddc.c の ddc_lines：GF の DDC レジスタで SCL と SDA を制御する。 境界照合 gf_io。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/dpms.c	バックエンド	移すだけ	sys/dev/video/geforce/display/dpms.c	dpms.c の gf4_dpms_set：ヘッドの表示電力状態を CRTC に反映する。 境界照合 gf_io。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/enc_state.c	バックエンド	移すだけ	sys/dev/video/geforce/display/enc_state.c	enc_state.c の gf4_hw_enc_save：出力エンコーダの状態を退避する。 境界照合 gf_io。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/extended.c	バックエンド	移すだけ	sys/dev/video/geforce/display/extended.c	hwdev/gf/display/extended.c:28 void gf_mode_extended(。表示モードの設定値計算を装置側に置く。 境界照合 gf_mode_extended。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/fifo.c	バックエンド	移すだけ	sys/dev/video/geforce/display/fifo.c	hwdev/gf/display/fifo.c:29 void gf_mode_fifo(。表示モードの設定値計算を装置側に置く。 境界照合 gf_mode_fifo。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/flip.c	バックエンド	移すだけ	sys/dev/video/geforce/display/flip.c	flip.c の gf4_flip：表示面の切替をヘッドの走査状態に合わせる。 境界照合 serial_puts_polled。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/format.c	バックエンド	移すだけ	sys/dev/video/geforce/display/format.c	hwdev/gf/display/format.c:41 void gf_mode_format(。表示モードの設定値計算を装置側に置く。 境界照合 gf_mode_format。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/gamma.c	バックエンド	移すだけ	sys/dev/video/geforce/display/gamma.c	gamma.c の gf4_lut_load：ヘッドの LUT に色テーブルをロードする。 境界照合 gf4_ctx。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/heads.c	バックエンド	移すだけ	sys/dev/video/geforce/display/heads.c	heads.c の gf4_heads_apply：gf_irq_enable にヘッドの割り込み設定を渡す。 境界照合 gf4_heads_apply。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/hw_fonts.c	バックエンド	移すだけ	sys/dev/video/geforce/display/hw_fonts.c	hw_fonts.c の gf4_hw_fonts_save：VGA フォントを装置状態の復元用に退避する。 境界照合 gf_io。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/hw_load.c	バックエンド	移すだけ	sys/dev/video/geforce/display/hw_load.c	hw_load.c の gf4_hw_crtc_restore：保存した CRTC と RAMDAC の状態を装置に書き戻す。 境界照合 gf_io。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/hw_pll.c	バックエンド	移すだけ	sys/dev/video/geforce/display/hw_pll.c	hw_pll.c の gf4_hw_pll_restore：ヘッドごとの PLL レジスタを書き戻す。 境界照合 gf_io。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/hw_state.c	バックエンド	移すだけ	sys/dev/video/geforce/display/hw_state.c	hw_state.c の gf4_hw_save：GeForce のハードウェア状態の退避を取りまとめる。 境界照合 gf4_hw_saved。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/hw_state.h	型	移すだけ	sys/dev/video/geforce/display/hw_state.h	hw_state.h の gf4_hw_crtc_reg：CRTC・シーケンサ・DAC の保存形式を定義する。 境界照合 gf_io。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/hw_state_crtc.c	バックエンド	移すだけ	sys/dev/video/geforce/display/hw_state_crtc.c	hw_state_crtc.c の gf4_hw_crtc_save：VGA と拡張表示レジスタをヘッド別に退避する。 境界照合 GF_MODE_REGISTER_BAR。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/links.c	バックエンド	移すだけ	sys/dev/video/geforce/display/links.c	links.c の gf4_tmds_script_select：GPU ROM の表から TMDS 用のスクリプトを選ぶ。 境界照合 GF_ROM_BIT_ONLY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/load_row.c	バックエンド	移すだけ	sys/dev/video/geforce/display/load_row.c	load_row.c の gf_load_row：gf_mode_rows のレジスタ指定とビット値をモードに適用する。 境界照合 gf_load_row。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/modes.c	バックエンド	移すだけ	sys/dev/video/geforce/display/modes.c	modes.c の gf_display_mode_info：GF 表示コンテキストに対応するモード情報を返す。 境界照合 GF_DISPLAY_MODE_ID。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/modeset.c	バックエンド	移すだけ	sys/dev/video/geforce/display/modeset.c	modeset.c の gf_display_modeset：表示モードの設定列を GF の行ロード処理に渡す。 境界照合 gf_display_context。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/output.c	バックエンド	移すだけ	sys/dev/video/geforce/display/output.c	hwdev/gf/display/output.c:28 void gf_mode_output(。表示モードの設定値計算を装置側に置く。 境界照合 gf_mode_output。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/palette.c	バックエンド	移すだけ	sys/dev/video/geforce/display/palette.c	palette.c の gf_display_palette：GF 表示コンテキストのパレットに RGB 値を設定する。 境界照合 gf_display_palette。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/pitch.c	バックエンド	移すだけ	sys/dev/video/geforce/display/pitch.c	hwdev/gf/display/pitch.c:28 void gf_mode_pitch(。表示モードの設定値計算を装置側に置く。 境界照合 gf_mode_pitch。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/pll_program.c	バックエンド	移すだけ	sys/dev/video/geforce/display/pll_program.c	pll_program.c の gf_mode_pll_program：GF の保存クロック値と PLL 制約から設定列を組む。 境界照合 gf_mode_pll_program。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/probes.h	契約	移すだけ	sys/dev/video/geforce/display/probes.h	probes.h の gf4_get_probe_decls：GF4 の診断プローブ表を取得する入口を宣言する。 境界照合 GF4_PROBES_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/quiesce.c	バックエンド	移すだけ	sys/dev/video/geforce/display/quiesce.c	quiesce.c の gf_display_quiesce：GF の表示とエンジンを停止状態にする。 境界照合 GF_PRODUCTION_MODULE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/recover.c	バックエンド	移すだけ	sys/dev/video/geforce/display/recover.c	recover.c の gf4_service_restart：退避した GF4 表示サービスを再開する。 境界照合 gf4_ctx。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/save.c	バックエンド	移すだけ	sys/dev/video/geforce/display/save.c	save.c の gf4_display_save：GF4 の表示状態を退避する。 境界照合 gf4_ctx。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/scan.c	バックエンド	移すだけ	sys/dev/video/geforce/display/scan.c	scan.c の gf4_scan_prepare：スキャンアウト用の面と VRAM 配置を準備する。 境界照合 GF_PRODUCTION_MODULE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/service.c	バックエンド	移すだけ	sys/dev/video/geforce/display/service.c	service.c の gf4_service_init：GF4 表示サービスのコンテキストを初期化する。 境界照合 GF_ROM_BIT_ONLY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/stage.h	バックエンド	移すだけ	sys/dev/video/geforce/display/stage.h	stage.h の gf4_stage_deadline：GF foundation の時計から表示処理の期限を算出する。 境界照合 gf4_stage_deadline。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/start.c	バックエンド	移すだけ	sys/dev/video/geforce/display/start.c	hwdev/gf/display/start.c:28 void gf_mode_start(。表示モードの設定値計算を装置側に置く。 境界照合 gf_mode_start。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/state.h	その他	移すだけ	sys/dev/video/geforce/display/state.h	state.h の c_fields：GF の保存フィールドを CRTC や MMIO のレジスタに対応付ける。 境界照合 GF_DISPLAY_STATE_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/timeout.h	バックエンド	移すだけ	sys/dev/video/geforce/display/timeout.h	timeout.h の gf4_timeout：GF4 のヘッド・期限・レジスタ値をタイムアウト診断に記録する。 境界照合 GF4_TIMEOUT_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/timing.c	バックエンド	移すだけ	sys/dev/video/geforce/display/timing.c	hwdev/gf/display/timing.c:31 void gf_mode_timing(。表示モードの設定値計算を装置側に置く。 境界照合 gf_mode_timing。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/tmds.c	バックエンド	移すだけ	sys/dev/video/geforce/display/tmds.c	tmds.c の gf4_tmds_load：TMDS 用の出力状態をヘッドに設定する。 境界照合 gf_io。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/transaction.c	バックエンド	移すだけ	sys/dev/video/geforce/display/transaction.c	transaction.c の gf4_change_begin：表示設定変更に備えて GF4 の受付と表示状態を管理する。 境界照合 GF_PRODUCTION_MODULE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/display/tv.c	バックエンド	移すだけ	sys/dev/video/geforce/display/tv.c	tv.c の gf4_tv_sense：TV 出力の接続状態を検出する。 境界照合 gf_io。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/dmaobj.c	バックエンド	移すだけ	sys/dev/video/geforce/dmaobj.c	dmaobj.c の gf2_dma_new：VRAM または PCI メモリ用の GF2 DMA オブジェクトを作る。 境界照合 gf2_dma_new。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/engine_stop.c	バックエンド	移すだけ	sys/dev/video/geforce/engine_stop.c	engine_stop.c の gf_engine_stop：FIFO・GR・MPEG の各エンジンを止める。 境界照合 gf_engine_stop。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/fault.c	バックエンド	移すだけ	sys/dev/video/geforce/fault.c	fault.c の gf2_fault_check：FIFO などの異常状態を検出して記録する。 境界照合 gf_foundation。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/feature5.h	契約	移すだけ	sys/dev/video/geforce/feature5.h	feature5.h の gf5_clock_prog：GF5 のクロック・メモリ制御の操作を宣言する。 境界照合 gf_init_program。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/feature5_links.c	バックエンド	移すだけ	sys/dev/video/geforce/feature5_links.c	feature5_links.c の gf5_link_drain_pause：GF5 の操作に先立って GPU の処理を排出・一時停止する。 境界照合 GF2_EINVAL。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/feature5_rom.c	バックエンド	移すだけ	sys/dev/video/geforce/feature5_rom.c	feature5_rom.c の gf5_rom_acquire：GF5 が使う GPU ROM データを取得する。 境界照合 GF_ROM_BIT_ONLY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/feature5_service.c	バックエンド	移すだけ	sys/dev/video/geforce/feature5_service.c	hwdev/gf/feature5_service.c:190 gf5_service_poll — 温度監視の稼働状態を確認し、GF5サービスの時計でファン制御を進める。 境界照合 GF_PRODUCTION_MODULE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/fence.c	バックエンド	移すだけ	sys/dev/video/geforce/fence.c	hwdev/gf/fence.c:22 gf2_fence_emit — GF2チャネルのシーケンス番号を進めてフェンスを発行する。 境界照合 GF2_FENCE_BAR。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/fifo.c	バックエンド	移すだけ	sys/dev/video/geforce/fifo.c	hwdev/gf/fifo.c:106 gf2_fifo_init — RAMFCを初期化してpush DMAの位置を書き込む。 境界照合 gf2_chan。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/foundation.c	バックエンド	移すだけ	sys/dev/video/geforce/foundation.c	hwdev/gf/foundation.c:99 gf_foundation_start — バスマスタ、MC、インスタンスメモリ、割込みを順に有効化する。 境界照合 gf_foundation。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/foundation.h	契約	移すだけ	sys/dev/video/geforce/foundation.h	hwdev/gf/foundation.h:65 gf_mc_init — GFの基盤状態を渡すMC・インスタンスメモリ等の内部操作を宣言する。 境界照合 gf_inst。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/foundation_test.c	振り分け	移すだけ	sys/dev/video/geforce/foundation_test.c	hwdev/gf/foundation_test.c:65 call — GF1診断要求のサイズ・操作・ヘッドを検査し、基盤操作へ振り分ける。 境界照合 gf_foundation。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/gf1_test.h	契約	移すだけ	sys/dev/video/geforce/gf1_test.h	hwdev/gf/gf1_test.h:14 gf1_test_ops — prepareとcallで診断元とGF1モジュールを接続する内部契約。 境界照合 gf_irq_stats。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/gf2_test.h	型	移すだけ	sys/dev/video/geforce/gf2_test.h	hwdev/gf/gf2_test.h:6 gf2_test_request — GF2コマンド試験で渡す操作と期限を規定する。 境界照合 gf2_test_op。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/gr.c	バックエンド	移すだけ	sys/dev/video/geforce/gr.c	hwdev/gf/gr.c:97 gf2_gr_init — NV4A用のレジスタ列で描画エンジンを初期化する。 境界照合 gf_foundation。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/grctx.c	バックエンド	移すだけ	sys/dev/video/geforce/grctx.c	hwdev/gf/grctx.c:436 gf2_grctx_program — GF2の描画コンテキスト用プログラムを生成する。 境界照合 gf2_grctx。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/instmem.c	バックエンド	移すだけ	sys/dev/video/geforce/instmem.c	hwdev/gf/instmem.c:37 gf_inst_alloc — GFのインスタンスメモリから領域を確保する。 境界照合 gf_foundation。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/instmem_map.c	バックエンド	移すだけ	sys/dev/video/geforce/instmem_map.c	hwdev/gf/instmem_map.c:39 gf_instmem_map — BAR2の長さと整列を検査してマップし、アパーチャを記録する。 境界照合 geforce_resource_lookup。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/internal.h	契約	移すだけ	sys/dev/video/geforce/internal.h	hwdev/gf/internal.h:117 gf_init_run — GeForce初期化コンテキストを使う実行・保存・復旧の内部入口を宣言する。 境界照合 gf_init_context。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/irq.c	バックエンド	移すだけ	sys/dev/video/geforce/irq.c	hwdev/gf/irq.c:116 gf_irq_enable — GFの割込み源と表示ヘッドを指定して有効化する。 境界照合 GF_IRQ_ALL。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/master.c	バックエンド	移すだけ	sys/dev/video/geforce/master.c	hwdev/gf/master.c:12 gf_master_enable — GF基盤のPCIバスマスタを有効化する。 境界照合 GF_LATENCY_MIN。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/mc.c	バックエンド	移すだけ	sys/dev/video/geforce/mc.c	hwdev/gf/mc.c:14 gf_mc_init — BAR0でPFB容量を読み、PMC_ENABLEとMCの上限を設定する。 境界照合 GF_MC_BAR。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/native.c	バックエンド	P8	sys/dev/video/geforce/ + sys/arch/x86/	hwdev/gf/native.c — geforce_range_reserved の写像照合で PTE_PRESENT・PTE_RW・PTE_PCD を解釈する。CPU 側から照合結果を受ける。
+hwdev/gf/op/compute_mem.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/compute_mem.c	hwdev/gf/op/compute_mem.c:6 gf_op_compute_mem_run — NV44Aで実処理のないCOMPUTE_MEMを成功として終了する。 境界照合 gf_op_compute_mem_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/condition.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/condition.c	hwdev/gf/op/condition.c:7 gf_op_condition_run — BARを読み、マスク後の値が一致しなければ後続命令をスキップする。 境界照合 GF_CONDITION_BAR。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/copy.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/copy.c	hwdev/gf/op/copy.c:4 gf_op_copy_run — ROM命令指定のシフトとマスクでレジスタ値を索引ポートへ転記する。 境界照合 gf_op_copy_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/copy_nv_reg.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/copy_nv_reg.c	hwdev/gf/op/copy_nv_reg.c:10 gf_op_copy_nv_reg_run — ROM指定のシフト・XOR・マスクでNVレジスタ間を転記する。 境界照合 gf_op_copy_nv_reg_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/cr.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/cr.c	hwdev/gf/op/cr.c:5 gf_op_cr_run — CRTC索引レジスタを更新し、CR44の場合は対象ヘッドを記録する。 境界照合 gf_op_cr_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/cr_index_address_latched.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/cr_index_address_latched.c	hwdev/gf/op/cr_index_address_latched.c:4 gf_op_cr_index_address_latched_run — ROMのバイト列をラッチ経由で転送し、旧ラッチと索引を復元する。 境界照合 gf_op_cr_index_address_latched_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/done.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/done.c	hwdev/gf/op/done.c:5 gf_op_done_run — 反復深度を検査し、呼出し元のPCに戻るかスクリプトを終了する。 境界照合 gf_op_done_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/end_repeat.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/end_repeat.c	hwdev/gf/op/end_repeat.c:5 gf_op_end_repeat_run — 対応する反復フレームの回数を減らし、残り回数でPCを戻す。 境界照合 gf_op_end_repeat_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/index_io.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/index_io.c	hwdev/gf/op/index_io.c:5 gf_op_index_io_run — PRMCIO/PRMVIOの索引ポートを読み書きし、CR44ならヘッドを更新する。 境界照合 gf_op_index_io_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/io_flag_condition.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/io_flag_condition.c	hwdev/gf/op/io_flag_condition.c:5 gf_op_io_flag_condition_run — 索引ポートの値でROM表を引き、条件不成立ならskipを立てる。 境界照合 gf_op_io_flag_condition_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/io_restrict_pll2.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/io_restrict_pll2.c	hwdev/gf/op/io_restrict_pll2.c:4 gf_op_io_restrict_pll2_run — 索引ポートから選んだROMの周波数をGFのPLLへ渡す。 境界照合 gf_op_io_restrict_pll2_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/io_restrict_prog.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/io_restrict_prog.c	hwdev/gf/op/io_restrict_prog.c:23 gf_op_io_restrict_prog_run — 索引ポートの値でROMから32ビット値を選び、指定レジスタに書く。 境界照合 gf_op_io_restrict_prog_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/macro.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/macro.c	hwdev/gf/op/macro.c:8 gf_op_macro_run — デコード済みMACROの値を指定BARオフセットに書く。 境界照合 GF_MACRO_BAR。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/not.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/not.c	hwdev/gf/op/not.c:4 gf_op_not_run — GF初期化スクリプトのskip状態を反転する。 境界照合 gf_op_not_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/nv_reg.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/nv_reg.c	hwdev/gf/op/nv_reg.c:7 gf_op_nv_reg_run — NVレジスタの旧値を読み、マスクとORを適用して書き戻す。 境界照合 GF_NV_REG_WIDTH。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/pll2.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/pll2.c	hwdev/gf/op/pll2.c:5 gf_op_pll2_run — 命令の宛先と周波数をgf_init_pllに渡す。 境界照合 gf_op_pll2_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/repeat.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/repeat.c	hwdev/gf/op/repeat.c:4 gf_op_repeat_run — 次のPC、終端、反復回数をGF初期化用スタックに積む。 境界照合 gf_op_repeat_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/reset.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/reset.c	hwdev/gf/op/reset.c:5 gf_op_reset_run — PBUSレジスタを退避し、待ちを挟んでリセット列を書き込む。 境界照合 gf_op_reset_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/resume.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/resume.c	hwdev/gf/op/resume.c:4 gf_op_resume_run — GF初期化スクリプトのskip状態を解除する。 境界照合 gf_op_resume_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/sub.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/sub.c	hwdev/gf/op/sub.c:27 gf_op_sub_run — 表示スクリプトの空参照を扱い、戻り先を積んでサブルーチンへ移る。 境界照合 gf_op_sub_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/sub_direct.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/sub_direct.c	hwdev/gf/op/sub_direct.c:4 gf_op_sub_direct_run — 戻り先と反復深度を保存し、直接指定のスクリプト位置へ移る。 境界照合 gf_op_sub_direct_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/time.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/time.c	hwdev/gf/op/time.c:4 gf_op_time_run — スキップ中以外は命令の待ち時間をgf_init_waitに渡す。 境界照合 gf_op_time_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/tmds_reg.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/tmds_reg.c	hwdev/gf/op/tmds_reg.c:48 gf_op_tmds_reg_run — ヘッドに対応するTMDSレジスタを読み、マスクした値を書き戻す。 境界照合 GF_TMDS_BASE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/zm_cr.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/zm_cr.c	hwdev/gf/op/zm_cr.c:4 gf_op_zm_cr_run — CRTCに索引と即値を書き、CR44指定時のヘッドを追跡する。 境界照合 gf_op_zm_cr_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/zm_cr_group.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/zm_cr_group.c	hwdev/gf/op/zm_cr_group.c:10 gf_op_zm_cr_group_run — ROMの索引・値の組を順にCRTCへ適用し、CR44を追跡する。 境界照合 GF_ZM_CR_GROUP_PAIRS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/zm_index_io.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/zm_index_io.c	hwdev/gf/op/zm_index_io.c:4 gf_op_zm_index_io_run — ヘッドとポート種別で別名アドレスを求め、索引と値を書き込む。 境界照合 gf_op_zm_index_io_run。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/zm_reg.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/zm_reg.c	hwdev/gf/op/zm_reg.c:8 gf_op_zm_reg_run — ZM_REGの宛先へ32ビット即値を書き込む。 境界照合 GF_ZM_REG_BAR。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/zm_reg_sequence.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/zm_reg_sequence.c	hwdev/gf/op/zm_reg_sequence.c:8 gf_op_zm_reg_sequence_run — ROMからリトルエンディアンのワードを組み立て、連続レジスタに書く。 境界照合 GF_SEQUENCE_WORD_BYTES。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/op/zm_tmds_group.c	バックエンド	移すだけ	sys/dev/video/geforce/op/op/zm_tmds_group.c	hwdev/gf/op/zm_tmds_group.c:28 gf_op_zm_tmds_group_run — ROMの組ごとにTMDSデータと対象レジスタ番号を書き込む。 境界照合 GF_TMDS_DATA。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/perf.c	バックエンド	移すだけ	sys/dev/video/geforce/perf.c	hwdev/gf/perf.c:177 gf5_perf_get — GFのROM性能表から指定したエントリを取得する。 境界照合 GF_ROM_BIT_ONLY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/pll.c	バックエンド	移すだけ	sys/dev/video/geforce/pll.c	hwdev/gf/pll.c:6 gf_init_pll — ROMの制約からPLL設定列を作り、旧値を保存してMMIOへ適用する。 境界照合 gf_init_pll。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/production.h	契約	移すだけ	sys/dev/video/geforce/production.h	hwdev/gf/production.h:64 gf_production_identify — 固定BAR長・サブシステムIDとGF本番バックエンドの入口をまとめる。 境界照合 GF_ROM_MAX。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/push.c	バックエンド	移すだけ	sys/dev/video/geforce/push.c	hwdev/gf/push.c:160 gf2_emit — GF2チャネルのpush bufferへメソッドを発行する。 境界照合 GF2_USER_BASE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/quiesce_rows.h	バックエンド	移すだけ	sys/dev/video/geforce/quiesce_rows.h	hwdev/gf/quiesce_rows.h:5 GF_QUIESCE_ROWS — PC-98共存用のPBUSとPMCの停止列を定義し、診断と表示ドライバが展開する。 境界照合 GF_QUIESCE_ROWS_H。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/ramclock.c	バックエンド	移すだけ	sys/dev/video/geforce/ramclock.c	hwdev/gf/ramclock.c:119 gf5_ram_prog — 表示ヘッドの状態を扱いながらGF5のメモリクロック設定を適用する。 境界照合 gf_io。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/ramht.c	バックエンド	移すだけ	sys/dev/video/geforce/ramht.c	hwdev/gf/ramht.c:20 gf2_ramht_add — GFインスタンスメモリのRAMHTを探索し、ハンドルとエンジンを登録する。 境界照合 GF2_CHID。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/resources.c	バックエンド	移すだけ	sys/platform/pc98/geforce/resources.c	hwdev/gf/resources.c:8 gf_production_identify — Ra266固定のPCI位置でID・BAR属性・除外域を照合し、この構成のGF資源を確定する。 境界照合 gf_production_identify。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/rom.inc	バックエンド	移すだけ	sys/dev/video/geforce/rom.inc	hwdev/gf/rom.inc:71 gf_rom_validate — GF用ROMを検証する。gf_rom_chipが対象チップを照合する。 境界照合 GF_VERSION_CHIP。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/runner.c	振り分け	移すだけ	sys/dev/video/geforce/runner.c	hwdev/gf/runner.c:161 gf_init_run_one — GF初期化スクリプトのPC・ヘッド・スタックを設定し、実行器に渡す。 境界照合 GF_ROM_BIT_ONLY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/save.c	バックエンド	移すだけ	sys/dev/video/geforce/save.c	hwdev/gf/save.c:27 gf_init_restore — GF初期化時に保存したレジスタを復元する。 境界照合 gf_init_save。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/scripts.h	契約	移すだけ	sys/dev/video/geforce/scripts.h	hwdev/gf/scripts.h:6 gfinit_script_spans — GFのデコーダと実行器が共有する不変のスクリプト区間表を宣言する。 境界照合 gf_script_span。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/service.c	バックエンド	移すだけ	sys/dev/video/geforce/service.c	hwdev/gf/service.c:108 gf3_service_surfaces — GF3加速器の所有状態を調べ、表示面と試験面をサービスに結び付ける。 境界照合 gf3_service。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/state.c	バックエンド	移すだけ	sys/dev/video/geforce/state.c	hwdev/gf/state.c:82 gf5_state_save — GF5の実行段階や温度停止状態を検査し、装置状態を保存する。 境界照合 GF2_TIMEOUT_US。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/stop_state.h	型	移すだけ	sys/dev/video/geforce/stop_state.h	hwdev/gf/stop_state.h:8 gf5_stop_state — GF5の温度保護で使う停止段階・理由・温度を保持する型。
+hwdev/gf/therm.c	バックエンド	移すだけ	sys/dev/video/geforce/therm.c	hwdev/gf/therm.c:719 gf5_fan_tick — GF5温度監視とファン制御を進める。 境界照合 GF_ROM_BIT_ONLY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/tile.c	バックエンド	移すだけ	sys/dev/video/geforce/tile.c	hwdev/gf/tile.c:89 tile_fb_program — スロットからレジスタ位置を算出し、FBタイルのアドレス・上限・ピッチを設定する。 境界照合 GF3_EBUSY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/volt.c	バックエンド	移すだけ	sys/dev/video/geforce/volt.c	hwdev/gf/volt.c:179 gf5_gpio_find — GFのROM表から電圧制御等で使うGPIOを検索する。 境界照合 gf_io。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/vram_layout.h	バックエンド	移すだけ	sys/dev/video/geforce/vram_layout.h	hwdev/gf/vram_layout.h:24 gf_instmem_reserved — NV40のコンテキスト寸法でインスタンスメモリの予約量を算出する。 境界照合 GF_VRAM_SIZE_REG。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/vram_view.c	バックエンド	移すだけ	sys/dev/video/geforce/vram_view.c	hwdev/gf/vram_view.c:89 gf_vram_reserve — GFのVRAM台帳に範囲を予約し、借用と解放を管理する。 境界照合 gf_vram_registry。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/vram_view.h	契約	移すだけ	sys/dev/video/geforce/vram_view.h	hwdev/gf/vram_view.h:68 gf_vram_view_map — GFのVRAM予約・借用・マッピングの型と操作を宣言する。 境界照合 gf_vram_reservation。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf/wait_diag.h	バックエンド	移すだけ	sys/dev/video/geforce/wait_diag.h	hwdev/gf/wait_diag.h:7 gf_wait_timeout — GFの待ち時間超過時に対象レジスタを読み、値と期限をシリアルに記録する。 境界照合 gf_wait_timeout。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf_load_state.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_load_state.c	hwdev/gf_load_state.c:11 gf_load_state — NV44Aのモード設定行を所定の順序で適用し、FPとDPMSの位置で待つ。 境界照合 gf_load_boundary。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gf_load_state.h	契約	移すだけ	sys/dev/video/geforce/gf_load_state.h	hwdev/gf_load_state.h:41 gf_load_state — GFモード設定の行適用・区間切替・待機を渡す内部インタフェース。 境界照合 GF_LOAD_FP_WAIT_MS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+hwdev/gfinit_mode.h	契約	移すだけ	sys/dev/video/geforce/gfinit_mode.h	hwdev/gfinit_mode.h:145 gfinit_mode_calc — 固定640×480モードのタイミングとGF用モード計算の入口を定める。 境界照合 GF_MODE_WIDTH。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+include/clock_service.h	契約	移すだけ	sys/hal/time/clock_service.h	include/clock_service.h:17 struct ClockOps {。時刻の契約を定義する。
+include/clock_source.h	契約	移すだけ	sys/hal/time/clock_source.h	include/clock_source.h:8 platform_clock_read_us(u32 *lo, u32 *hi);。時刻の契約を定義する。
+include/ext2_medium_contract.h	契約	P8	sys/hal/block/ + sys/platform/pc98/ + sys/dev/block/	include/ext2_medium_contract.h — ext2_medium_ops と登録口を HAL に残し、ext2_medium_ide_ops・ext2_medium_loop_ops の宣言を platform/pc98/boot.c が使う登録側へ分ける。
+include/gfx_hal.h	契約	P8	sys/hal/gfx/ + sys/dev/video/ + sys/platform/pc98/	include/gfx_hal.h — GfxBackend と各機種・装置の具体表、pegc_restore_text_sync・trident_boot_reserve の宣言を分ける。
+include/gfx_hal2.h	契約	移すだけ	sys/hal/gfx/gfx_hal2.h	include/gfx_hal2.h:8 struct GfxBackendV2 {。描画の契約を定義する。
+include/input_service.h	契約	移すだけ	sys/hal/input/input_service.h	include/input_service.h:10 struct InputOps {。入力の契約を定義する。
+include/kernel_mount_children.h	共通処理	移すだけ	sys/include/kernel_mount_children.h	include/kernel_mount_children.h:14 dev_get_names — 子の列挙はデバイス登録表の名前と検索口を使う。
+include/pointer_service.h	契約	移すだけ	sys/hal/input/pointer_service.h	include/pointer_service.h:36 struct PointerOps {。入力の契約を定義する。
+init/kernel_start.c	共通処理	移すだけ	sys/kern/init/kernel_start.c	init/kernel_start.c:7 platform_boot_machine — 初期化の骨格が共通名の platform_boot_machine に機種の起動を委譲する。
+input/hal/in2_dev.c	共通処理	移すだけ	sys/hal/input/in2_dev.c	input/hal/in2_dev.c:11 input_src_register — 種別・由来と世代を入力源スロットに登録する。
+input/hal/in2_excl.c	共通処理	移すだけ	sys/hal/input/in2_excl.c	input/hal/in2_excl.c:42 in2_excl_acquire — 前景所有者を照合して入力の排他状態を更新する。 境界照合 kbd_raw_purge_keep。入力の共通状態・リング・方針の参照で、装置側の読取りを呼ばない。
+input/hal/in2_export.c	共通処理	移すだけ	sys/hal/input/in2_export.c	input/hal/in2_export.c:3 in2_export — 内部イベントの種別ごとに公開IN2_Eventの共用体を埋める。
+input/hal/in2_export.h	契約	移すだけ	sys/hal/input/in2_export.h	input/hal/in2_export.h:8 in2_export — 内部イベントと通番を公開イベントへ変換する口を宣言する。
+input/hal/in2_int.h	型	P8	sys/hal/input/ + sys/dev/input/	input/hal/in2_int.h — kbd_hal_init と kbd_hal_capture は drivers/input/kbd_hal.c の装置入口。共通リングの内部宣言から分ける。
+input/hal/in2_reclaim.c	共通処理	移すだけ	sys/hal/input/in2_reclaim.c	input/hal/in2_reclaim.c:13 in2_reclaim — 前景所有者のリングと相対移動量を消去し排他権を解放する。
+input/hal/in2_ring.c	共通処理	移すだけ	sys/hal/input/in2_ring.c	input/hal/in2_ring.c:32 in2_ring_push — イベントを必要に応じて合流させ入力リングへ積む。
+input/hal/in2_state.c	振り分け	移すだけ	sys/hal/input/in2_state.c	input/hal/in2_state.c:6 input_capture — 入力源を確認しイベント種別に応じて状態更新と配送を行う。
+input/hal/in2_time.c	共通処理	移すだけ	sys/hal/input/in2_time.c	input/hal/in2_time.c:4 in2_time_ms — tick_clock_msを入力時刻として返す。
+input/hal/input_context.c	共通処理	移すだけ	sys/input/input_context.c	input/hal/input_context.c:34 input_context_command_begin — コマンド実行に合わせて入力先コンテキストの世代を更新する。
+input/hal/input_context.h	契約	移すだけ	sys/input/input_context.h	input/hal/input_context.h:39 input_context_snapshot — 入力先の所有者と世代のスナップショットを取得する口。 境界照合 kbd_policy_ime_state。入力の共通状態・リング・方針の参照で、装置側の読取りを呼ばない。
+input/hal/input_ime_gate.c	共通処理	移すだけ	sys/input/input_ime_gate.c	input/hal/input_ime_gate.c:6 kbd_policy_ime_state — 所有者と世代を照合してIMEの捕捉先を記録する。 境界照合 kbd_policy_ime_state。入力の共通状態・リング・方針の参照で、装置側の読取りを呼ばない。
+input/hal/input_interrupt.c	共通処理	移すだけ	sys/input/input_interrupt.c	input/hal/input_interrupt.c:40 input_interrupt_capture — 割り込み要求の宛先・世代・理由を保存する。
+input/hal/input_policy.c	共通処理	P8	sys/input/ + sys/platform/	input/hal/input_policy.c — ikm_policy_init と既定キー選択が機種番号でプロファイルと制御文字を選ぶ。既定値を機種から渡す。
+input/hal/input_policy.h	契約	移すだけ	sys/input/input_policy.h	input/hal/input_policy.h:20 ikm_policy_set — 入力方針の設定・リセットの口と設定行の型を宣言する。 境界照合 IKM_PLATFORM_PC98。入力設定形式の識別値と初期化の宣言。機種別の既定値は実装で分離する。
+input/hal/kbd_merge.c	共通処理	移すだけ	sys/hal/input/kbd_merge.c	input/hal/kbd_merge.c:164 input_capture_key — 入力源別の押下状態を統合しキーマップの評価結果を配送する。 境界照合 kbd_shift_state。入力の共通状態・リング・方針の参照で、装置側の読取りを呼ばない。
+input/hal/keymap.h	型	P8	sys/hal/input/	input/hal/keymap.h:124 pc98_input_keymap_register — 共通のKmBackend型とPC-98固有の登録口・具体表の宣言が同居する。共通契約を置くには固有宣言を機種側へ分ける必要がある。
+input/hal/keymap_eval.c	共通処理	P8	sys/hal/input/ + sys/platform/pc98/	input/hal/keymap_eval.c — KM_MAP_PC98 でバンクと拡張表の解釈が変わる。マップの提供側に評価を渡す。
+input/hal/keymap_registry.c	共通処理	P8	sys/hal/input/ + sys/platform/pc98/	input/hal/keymap_registry.c — valid_map が KM_MAP_PC98 の件数とバンク構造を解釈する。マップ固有の検証を登録側に渡す。
+input/hal/keymap_state.c	共通処理	移すだけ	sys/hal/input/keymap_state.c	input/hal/keymap_state.c:49 km_state_apply — キー効果を修飾・ロック状態に反映する。
+input/hal/legacy_keymap.c	共通処理	移すだけ	sys/hal/input/legacy_keymap.c	input/hal/legacy_keymap.c:39 input_emit_keymap — 評価結果を互換スキャンコードまたは文字として配送する。 境界照合 kbd_gui_mode。入力の共通状態・リング・方針の参照で、装置側の読取りを呼ばない。
+input/hal/legacy_mode.c	共通処理	移すだけ	sys/hal/input/legacy_mode.c	input/hal/legacy_mode.c:39 kbd_set_gui_mode — GUI入力への切替に応じて互換入力状態を更新する。 境界照合 KBD_STOP_SUPPRESS_TICKS。入力の共通状態・リング・方針の参照で、装置側の読取りを呼ばない。
+input/hal/legacy_ring.c	共通処理	移すだけ	sys/hal/input/legacy_ring.c	input/hal/legacy_ring.c:13 legacy_cooked_push — 変換済みキーを互換入力リングに積む。 境界照合 kbd_buf。入力の共通状態・リング・方針の参照で、装置側の読取りを呼ばない。
+input/hal/mouse_ext.c	共通処理	移すだけ	sys/hal/input/mouse_ext.c	input/hal/mouse_ext.c:37 mouse_ext_move — 相対移動量を蓄積して拡張入力の読み出しに供する。
+input/hal/mouse_pointer.c	振り分け	移すだけ	sys/hal/input/mouse_pointer.c	input/hal/mouse_pointer.c:30 mouse_poll — 登録先のsnapshotから位置とボタンを取得し共通MouseStateへ写す。 境界照合 kbd_stop_mouse_sample。入力の共通状態・リング・方針の参照で、装置側の読取りを呼ばない。
+input/hal/pointer_state.c	共通処理	移すだけ	sys/hal/input/pointer_state.c	input/hal/pointer_state.c:37 pointer_source_buttons — 入力源別のボタン状態を扱う。
+input/hal/usb_input.c	共通処理	移すだけ	sys/hal/input/usb_input.c	input/hal/usb_input.c:39 usb_input_usage — USBの使用コードとハンドルをKmKeyへ変換して共通入力に渡す。 境界照合 kbd_gui_mode。入力の共通状態・リング・方針の参照で、装置側の読取りを呼ばない。
+input/hal/usb_input.h	契約	移すだけ	sys/hal/input/usb_input.h	input/hal/usb_input.h:6 usb_input_usage — USBの使用コードと押下状態を共通入力へ渡す口。
+kapi/kapi_generated.c	振り分け	P8	sys/kapi/ + sys/dev/	kapi/kapi_generated.c — wrap_kcg_read_ank などが具体装置に直接委譲する。生成の入力で委譲先を変更し公開 ABI を保つ。
+kapi/kapi_host.c	共通処理	移すだけ	sys/kapi/kapi_host.c	kapi/kapi_host.c:35 kapi_host_open → platform_host_open。include/platform_host.h の所有者付き操作。kernel/dev/device_host.c は link_host 系へ渡し、PowerMac の非対応実装も同じ宣言を使う。 定義 kernel/dev/device_host.c:4, platform/powermac/host_unavailable.c:6。
+kapi/kapi_host_notice.c	共通処理	移すだけ	sys/kapi/kapi_host_notice.c	kapi/kapi_host_notice.c:21 kapi_host_notice_read → host_mailbox_stage。net/host_mailbox.h の通知操作を使う。コピー前に通知を仮取得する。 定義 net/host_mailbox.c:111, platform/powermac/host_unavailable.c:53。
+kapi/kapi_osri.c	共通処理	移すだけ	sys/kapi/kapi_osri.c	kapi/kapi_osri.c:25 kapi_osri_show → gfx_osri_view。利用者のパスを複製後、gfx/gfx_osri_view.h の同期表示口に渡す。表示バックエンドの選択は呼出先にある。 定義 gfx/gfx_osri_view.c:13, platform/powermac/osri_view.c:19。
+kdebug/generated/recover_gf_tables.inc	その他	移すだけ	sys/dev/video/geforce/diag/generated/recover_gf_tables.inc	kdebug/generated/recover_gf_tables.inc:6 rules_small — kdebug/recover_gf.cが取り込むGF復旧規則の生成表。
+kdebug/gf5_test.c	振り分け	移すだけ	sys/dev/video/geforce/diag/gf5_test.c	kdebug/gf5_test.c:558 gf5_test — sessionからGF5診断操作と引数を復号し実行する。 境界照合 GF_ROM_BIT_ONLY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf5_test.h	契約	移すだけ	sys/dev/video/geforce/diag/gf5_test.h	kdebug/gf5_test.h:5 gf5_test — GF5の同期診断入口をsession引数で宣言する。
+kdebug/gf_accel_test.c	その他	移すだけ	sys/dev/video/geforce/diag/gf_accel_test.c	kdebug/gf_accel_test.c:756 gf_accel_test — GF3加速診断をケース別に実行し、結果と差分を集計する。 境界照合 gf3_case。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_accel_test.h	契約	移すだけ	sys/dev/video/geforce/diag/gf_accel_test.h	kdebug/gf_accel_test.h:4 gf_accel_test — GF加速診断をケース番号で起動する入口を宣言する。 境界照合 gf_accel_test。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_command_test.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_command_test.c	kdebug/gf_command_test.c:49 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF2_REFERENCE_COUNT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_command_test.h	契約	移すだけ	sys/dev/video/geforce/diag/gf_command_test.h	kdebug/gf_command_test.h:7 gf_command_test — GF基盤と行読取コールバックを受ける同期コマンド診断の契約。 境界照合 gf_command_test。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_command_wire.h	契約	移すだけ	sys/dev/video/geforce/diag/gf_command_wire.h	kdebug/gf_command_wire.h:48 gf2_request — GF診断要求のC89形式と操作番号を規定し、userland/shell/cmd_gf2.cと共有する。 境界照合 GF_OP_COMMAND。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_display_test.c	振り分け	移すだけ	sys/dev/video/geforce/diag/gf_display_test.c	kdebug/gf_display_test.c:1076 gf_display_test — GFの表示診断要求を復号し、CUIの出入りや表示試験へ振り分ける。 境界照合 gf4_test_ops。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_display_test.h	契約	移すだけ	sys/dev/video/geforce/diag/gf_display_test.h	kdebug/gf_display_test.h:5 gf_display_test — GF表示診断の実行と所有者終了時の解放入口を宣言する。 境界照合 gf_display_owner_exit。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_foundation_test.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_foundation_test.c	kdebug/gf_foundation_test.c:131 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 gf_irq_stats。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_foundation_test.h	契約	移すだけ	sys/dev/video/geforce/gf_foundation_test.h	kdebug/gf_foundation_test.h:10 BAR1 の行読み取りと表示コールバックを受ける GF1 診断入口を宣言する。 境界照合 gf_foundation_test。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_foundation_wire.h	型	移すだけ	sys/dev/video/geforce/gf_foundation_wire.h	kdebug/gf_foundation_wire.h:8 cmd_gf1.c と診断側が共有する要求のサイズ・試験番号・セッション・結果を定義する。 境界照合 GF_OP_FOUNDATION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_prim_bench.c	その他	移すだけ	sys/dev/video/geforce/gf_prim_bench.c	kdebug/gf_prim_bench.c:127 geforce_accel_ops から得る描画操作を使い、指定項目の性能を測る。 境界照合 gf3_test_ops。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_prim_bench.h	契約	移すだけ	sys/dev/video/geforce/gf_prim_bench.h	kdebug/gf_prim_bench.h:4 GeForce プリミティブのベンチマークに項目番号を渡す入口を宣言する。 境界照合 gf_prim_bench。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_stage_state.c	バックエンド	移すだけ	sys/dev/video/geforce/gf_stage_state.c	kdebug/gf_stage_state.c:28 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 gf_stage_capture。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gf_stage_state.h	型	移すだけ	sys/dev/video/geforce/gf_stage_state.h	kdebug/gf_stage_state.h:32 gf_stage_state に ROM・BAR・PLL の状態を保持し、捕捉済みの状態から再入可否を調べる。 境界照合 GF_STAGE_FIELDS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit.c	kdebug/gfinit.c:353 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_US_PER_TICK。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit.h	契約	移すだけ	sys/dev/video/geforce/gfinit.h	kdebug/gfinit.h:8 GF 初期化の要求と recover_ops を受ける診断入口を宣言し、要求サイズを検査する。
+kdebug/gfinit/rom.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit/rom.inc	kdebug/gfinit/rom.inc:11 bus の PCI command と BAR を調べて ROM を読み、検査に使う長さ・CRC・chip を返す。 境界照合 gf_inspect_line。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_budget.inc	その他	移すだけ	sys/dev/video/geforce/gfinit_budget.inc	kdebug/gfinit_budget.inc:9 復旧計画のノード数と引数数から GF 診断ログの必要行数を求める。 境界照合 GF_REC_FIXED_ROWS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_bus.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_bus.c	kdebug/gfinit_bus.c:255 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_LEGACY_LO。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_bus.h	契約	移すだけ	sys/dev/video/geforce/gfinit_bus.h	kdebug/gfinit_bus.h:26 GF 初期化で使う PCI 設定アクセスの操作表と probe・identity の入口を宣言する。 境界照合 gf_foundation。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_decode.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_decode.c	kdebug/gfinit_decode.c:45 case GF_INIT_IO_RESTRICT_PROG。初期化命令のデコードを装置側に置く。 境界照合 GF_ARRAY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_decode.h	型	移すだけ	sys/dev/video/geforce/gfinit_decode.h	kdebug/gfinit_decode.h:118 GF ROM 命令と復号結果の格納形式を定義し、ROM からその形式を作る入口を宣言する。 境界照合 GF_INIT_IO_RESTRICT_PROG。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_decode/bytes.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_decode/bytes.inc	kdebug/gfinit_decode/bytes.inc:9 ROM 命令のシフト量を GF_SHIFT_WRAP 等で検査し、同じ断片の span と le が境界検査と値の読取りを担う。 境界照合 GF_SHIFT_LEFT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_decode/tables.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_decode/tables.inc	kdebug/gfinit_decode/tables.inc:2 gfinit_decode.c が参照する ROM スクリプトごとの開始位置・長さ・CRC を保持する。 境界照合 gf_script_span。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_exec.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_exec.c	kdebug/gfinit_exec.c:7 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_INIT_EXEC_US。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_exec.h	契約	移すだけ	sys/dev/video/geforce/gfinit_exec.h	kdebug/gfinit_exec.h:16 recover に渡す GF 初期化の実行・準備コールバックと復元入口を宣言する。 境界照合 gf_init_program。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_mode.c	その他	移すだけ	sys/dev/video/geforce/gfinit_mode.c	kdebug/gfinit_mode.c:42 GF モード試験用に色帯・市松模様・外枠から表示確認用の画素列を生成する。 境界照合 GF_MODE_RGB。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_op/condition_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/condition_decode.inc	kdebug/gfinit_op/condition_decode.inc:24 case GF_INIT_IO_FLAG_CONDITION。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_IO_FLAG_CONDITION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_op/copy_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/copy_decode.inc	kdebug/gfinit_op/copy_decode.inc:1 case GF_INIT_COPY。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_COPY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_op/cr_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/cr_decode.inc	kdebug/gfinit_op/cr_decode.inc:1 case GF_INIT_CR。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_CR。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_op/cr_index_address_latched_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/cr_index_address_latched_decode.inc	kdebug/gfinit_op/cr_index_address_latched_decode.inc:1 case GF_INIT_CR_INDEX_ADDRESS_LATCHED。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_CR_INDEX_ADDRESS_LATCHED。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_op/index_io_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/index_io_decode.inc	kdebug/gfinit_op/index_io_decode.inc:1 case GF_INIT_ZM_INDEX_IO。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_ZM_INDEX_IO。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_op/io_restrict_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/io_restrict_decode.inc	kdebug/gfinit_op/io_restrict_decode.inc:1 case GF_INIT_IO_RESTRICT_PROG。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_IO_RESTRICT_PROG。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_op/pll2_zm_reg_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/pll2_zm_reg_decode.inc	kdebug/gfinit_op/pll2_zm_reg_decode.inc:1 case GF_INIT_PLL2。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_PLL2。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_op/repeat_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/repeat_decode.inc	kdebug/gfinit_op/repeat_decode.inc:1 case GF_INIT_REPEAT。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_REPEAT。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_op/reset_nv_reg_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/reset_nv_reg_decode.inc	kdebug/gfinit_op/reset_nv_reg_decode.inc:1 case GF_INIT_RESET。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_RESET。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_op/sub_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/sub_decode.inc	kdebug/gfinit_op/sub_decode.inc:24 case GF_INIT_SUB。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_SUB。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_op/tmds_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/tmds_decode.inc	kdebug/gfinit_op/tmds_decode.inc:25 case GF_INIT_TMDS_REG。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_TMDS_REG。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_op/zm_reg_sequence_decode.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_op/zm_reg_sequence_decode.inc	kdebug/gfinit_op/zm_reg_sequence_decode.inc:1 case GF_INIT_ZM_REG_SEQUENCE。初期化命令のデコードを装置側に置く。 境界照合 GF_INIT_ZM_REG_SEQUENCE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_plan.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_plan.c	kdebug/gfinit_plan.c:245 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_PLAN_ARRAY。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_plan.h	型	移すだけ	sys/dev/video/geforce/gfinit_plan.h	kdebug/gfinit_plan.h:55 復号後の初期化計画に GF 用の対象・規則・退避 VRAM を保持し、構築入口に渡す。 境界照合 GF_PLAN_OPCODE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_plan_c.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_plan_c.c	kdebug/gfinit_plan_c.c:353 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_VPLL_PROBE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_plan_c.h	契約	移すだけ	sys/dev/video/geforce/gfinit_plan_c.h	kdebug/gfinit_plan_c.h:21 GF の段 C の計画構築・再構築、基準状態と VRAM 処理の入口を宣言する。 境界照合 GF_C_OPCODE。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_plan_c/baseline.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_plan_c/baseline.inc	kdebug/gfinit_plan_c/baseline.inc:2 対象キーを GF の PLL ゲートや CR・MMIO フィールドに照合し、計画の基準値を引く。 境界照合 GF_STAGE_FIELDS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_plan_c/checks.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_plan_c/checks.inc	kdebug/gfinit_plan_c/checks.inc:4 段 C の検査ノードを組み、保存値を参照する場合は capture と期待値引数を設定する。 境界照合 GF_C_CHECK_SAVED。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_pll.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_pll.c	kdebug/gfinit_pll.c:58 gfinit_pll_solve を含む制約・ROM 解析・係数探索・書込列生成の各断片を同じ翻訳単位に組む。 境界照合 GF_PLL_REF。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_pll.h	型	移すだけ	sys/dev/video/geforce/gfinit_pll.h	kdebug/gfinit_pll.h:85 GF PLL の VCO 制約、分周係数の解とレジスタ書込列の形式を定義する。 境界照合 GF_PLL_TBL_VERSION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_pll/limits.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_pll/limits.inc	kdebug/gfinit_pll/limits.inc:18 第1 VCO と、有効な場合の第2 VCO の制約を vco_ok で検査する。 境界照合 GF_PLL_NM_MAX。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_pll/parse.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_pll/parse.inc	kdebug/gfinit_pll/parse.inc:24 ROM 表の範囲を検査し、対象 PLL レジスタに合うエントリから制約を読む。 境界照合 GF_PLL_TBL_HDR_MIN。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_pll/sequence.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_pll/sequence.inc	kdebug/gfinit_pll/sequence.inc:30 対象 PLL と係数解に応じてレジスタ書込列を作る。 境界照合 GF_PLL_WRITES_MAX。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_pll/solve.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_pll/solve.inc	kdebug/gfinit_pll/solve.inc:8 VCO の制約内で目標クロックに近い分周係数を探索する。 境界照合 GF_PLL_P_MAX。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_resources.c	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_resources.c	kdebug/gfinit_resources.c:23 gfinit_resources の PCI 走査と BAR・窓の検査を組む。build/geforce-module.mk でも同じソースを使用する。 境界照合 GF_PRODUCTION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_resources.h	契約	移すだけ	sys/dev/video/geforce/gfinit_resources.h	kdebug/gfinit_resources.h:9 GF の資源検査で除外範囲と件数を返す入口、拒否理由を取得する入口を宣言する。 境界照合 GF_RES_GPU_DEV。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_resources/bars.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_resources/bars.inc	kdebug/gfinit_resources/bars.inc:1 PCI BAR の現在値と起動時キャッシュを照合し、未割当や長さ不明を区別する。
+kdebug/gfinit_resources/bounds.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_resources/bounds.inc	kdebug/gfinit_resources/bounds.inc:8 GF 資源検査の拒否理由と PCI 位置を本番用に記録し、診断構成では表示する。 境界照合 GF_PRODUCTION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_resources/scan.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_resources/scan.inc	kdebug/gfinit_resources/scan.inc:1 bus 0 の各機能を走査し、対象 GPU の ID を確認して他装置の BAR・ブリッジ窓を除外範囲にする。 境界照合 GF_PRODUCTION。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_resources/windows.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_resources/windows.inc	kdebug/gfinit_resources/windows.inc:1 PCI ブリッジ窓の基底・上限・種別を設定空間から読み、除外範囲を算出する。
+kdebug/gfinit_verify.inc	バックエンド	移すだけ	sys/dev/video/geforce/gfinit_verify.inc	kdebug/gfinit_verify.inc:8 段 C の書込規則を終了時の検査ノードおよび検証除外レジスタに照合する。 境界照合 GF_NO_VERIFY_MAX。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/gfinit_wire.h	型	移すだけ	sys/dev/video/geforce/gfinit_wire.h	kdebug/gfinit_wire.h:23 cmd_gfinit.c と共有する操作番号・要求形式と PREPARE 用の検証除外リストを定義する。 境界照合 GF_INIT_MAINS。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/kselftest/gfx_ledger.inc	その他	移すだけ	sys/platform/pc98/kselftest/gfx_ledger.inc	kdebug/kselftest/gfx_ledger.inc:27 PC-98 の GVRAM 各面・PEGC・Cirrus の台帳と x86 ページ表のキャッシュ属性を検査する。 境界照合 LEDGER_SF_PC98。PC-98 の VRAM の x86 キャッシュ属性そのものを検査する機種専用試験。
+kdebug/kselftest/gfx_owner.inc	その他	移すだけ	sys/kern/kselftest/gfx_owner.inc	kdebug/kselftest/gfx_owner.inc:8 appslot_gfx_owner_selftest の結果から、画面所有の移譲・返却とアプリ属性による拒否を検査する。
+kdebug/recover_gf.c	バックエンド	移すだけ	sys/dev/video/geforce/recover_gf.c	kdebug/recover_gf.c:267 GF 固有の復旧規則・対象の表を所有者の計画バッファへ展開する。 境界照合 GF_QUIESCE_REC。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/recover_gf.h	契約	移すだけ	sys/dev/video/geforce/recover_gf.h	kdebug/recover_gf.h:77 GF の復旧プロファイルと BAR サイズ測定・準備計画を外部参照用に宣言する。
+kdebug/recover_gf_c.h	バックエンド	移すだけ	sys/dev/video/geforce/recover_gf_c.h	kdebug/recover_gf_c.h:10 GF の段 C で PLL 係数の読み戻しを照合するためのレジスタ別マスクを定義する。 境界照合 GF_LOAD_FP_ON。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/recover_gf_expand.h	契約	移すだけ	sys/dev/video/geforce/recover_gf_expand.h	kdebug/recover_gf_expand.h:7 GF の復旧プロファイルを gfinit_plan のバッファへ展開する入口を宣言する。
+kdebug/recover_gf_locate.c	バックエンド	移すだけ	sys/dev/video/geforce/recover_gf_locate.c	kdebug/recover_gf_locate.c:5 pci_locate_fn0 で対象 GF を探して結果を保持し、未検出時のデバイス番号も決める。 境界照合 gf_loc。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kdebug/recover_gf_stage/c.inc	バックエンド	移すだけ	sys/dev/video/geforce/recover_gf_stage/c.inc	kdebug/recover_gf_stage/c.inc:11 recover_safe_point(。復旧セッションの中断確認を装置側に置く。 境界照合 GF_MODE_VRAM_BAR。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kernel/console/console.c	共通処理	移すだけ	sys/kern/console.c	kernel/console/console.c:231 shell_print_dec → shell_print。同じ翻訳単位の shell_print を呼ぶ。数値を文字列に変換した後の出力。 定義 kernel/console/console.c:210, platform/powermac/kboot_console.c:33。 境界照合 kbd_inject_discard。kbd_inject_discard は kernel/kbd_inject.c の注入キューを破棄する。
+kernel/console/console_dual.c	共通処理	移すだけ	sys/kern/console/console_dual.c	kernel/console/console_dual.c:25 display_dual_key — 二重出力の可否は display_dual_outputs で表示提供側に問い合わせる。
+kernel/dev/dev.c	共通処理	移すだけ	sys/kern/dev/dev.c	kernel/dev/dev.c:6 dev_find — dev_name_present は登録済みの Device の名前を照合する。
+kernel/dev/dev.h	契約	移すだけ	sys/hal/block/dev.h	kernel/dev/dev.h:46 (*blk_read)。ブロックの契約を定義する。
+kernel/dev/device_ide.c	バックエンド	移すだけ	sys/dev/ide/device_ide.c	kernel/dev/device_ide.c:6 ide_init — platform_ide_read_sector は IDE を選んだ像用の委譲実装である。 境界照合 ide_init。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kernel/dev/device_kcg.c	バックエンド	移すだけ	sys/dev/kcg/device_kcg.c	kernel/dev/device_kcg.c:6 kcg_init — platform_kcg_load_font は KCG の提供するフォント読込口のアダプタ。 境界照合 kcg_init。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+kernel/dev/device_loop.c	バックエンド	移すだけ	sys/dev/loop/device_loop.c	kernel/dev/device_loop.c:7 loop_dev_get_geometry — platform_loop_dev_read_lba は loop デバイスの読み取り口に委譲する。
+kernel/dev/device_pci.c	バックエンド	移すだけ	sys/dev/pci/device_pci.c	kernel/dev/device_pci.c:9 pci_count — platform_pci_cfg_read32 は PCI アダプタで構成空間の参照を受ける。
+kernel/dev/install_management.c	共通処理	移すだけ	sys/kern/install_management.c	kernel/dev/install_management.c:97 install_begin → platform_install_medium。固定名 platform_install_management.h が PC-98 と IDE 無効の PowerMac では空ポインタ、IDE 有効時は platform/powermac/install_backend.c の媒体操作表を返す。呼ぶ側はこの既存の取得口を使用。 定義 platform/powermac/install_backend.c:249。 境界照合 serial_crc。serial_crc は媒体識別値の比較欄。
+kernel/dev/ram_ro.c	共通処理	移すだけ	sys/kern/dev/ram_ro.c	kernel/dev/ram_ro.c:40 dev_register — ram_ro_register は読み取り専用の Device を既存の登録口に渡す。
+kernel/idle_work.c	共通処理	移すだけ	sys/kern/idle_work.c	kernel/idle_work.c:40 idle_work_run → platform_install_medium。固定名 platform_install_management.h が PC-98 と IDE 無効の PowerMac では空ポインタ、IDE 有効時は platform/powermac/install_backend.c の媒体操作表を返す。呼ぶ側はこの既存の取得口を使用。 定義 platform/powermac/install_backend.c:249。
+kernel/ime/ime.c	共通処理	P8	sys/kern/ime/ + sys/hal/input/	kernel/ime/ime.c — ime_getchar_wait と非同期入力が kbd_getkey_wait・kbd_trygetchar・kbd_trygetkey を直に呼ぶ。入力 HAL に待機・取得を委譲する。
+kernel/ime/ime_dict.c	共通処理	P8	sys/kern/ime/	kernel/ime/ime_dict.c — 辞書の読込と再開が装置実装の serial_puts を直接呼ぶ。診断出力を kprintf に渡す。
+kernel/ime/ime_render.inc	共通処理	移すだけ	sys/kern/ime/ime_render.inc	kernel/ime/ime_render.inc:17 ime_display_cols — 描画は ime_display_save 等の表示サービスを介して行う。
+kernel/input_service.c	振り分け	移すだけ	sys/hal/input/input_service.c	kernel/input_service.c:25 empty_input — 入力提供元の登録前に使う空の操作表。 空の実装も登録できるが、ファイルの公開入口は InputOps への振り分け。
+kernel/irq/irq.c	共通処理	P8	sys/kern/irq/irq.c	kernel/irq/irq.c:39 platform_irq_topology — 共通の割込配送が PCM 専用診断を前後に差し込む。装置別の計測を登録する口が要る。
+kernel/irq/irq_math.c	共通処理	移すだけ	sys/kern/irq/irq_math.c	kernel/irq/irq_math.c:26 platform_irq_topology — irq_dyn_index は機種の既存の topology 取得口を使用する。
+kernel/irq/tick_budget.c	共通処理	移すだけ	sys/kern/irq/tick_budget.c	kernel/irq/tick_budget.c:10 arch_tick_budget_cnt — tick_budget_cnt はクロックの換算を既存の arch_tick_budget_cnt に委譲する。
+kernel/kaudit.c	共通処理	P8	sys/kern/ + sys/arch/x86/	kernel/kaudit.c — kselftest_run_audit が PTE_USER・PTE_PCD を解釈する。ページ属性の照合を CPU 側に分ける。
+kernel/kselftest_report.c	共通処理	移すだけ	sys/kern/kselftest_report.c	kernel/kselftest_report.c:27 kdebug_state_name — kselftest_skipped は部品の公開する状態名を表示する。
+kernel/module/kdebug_call.c	共通処理	P8	sys/kern/module/kdebug_call.c	kernel/module/kdebug_call.c:21 pcm_e4_run — kdebug_call が PCM 専用 opcode を識別して pcm_e4_run を起動する。診断要求の受付を部品へ渡す。
+kernel/sys.c	共通処理	P8	sys/kern/sys.c	kernel/sys.c:41 geforce_foreground_poll — sys_halt が GeForce を直接 poll する。待機時の前景処理を登録する口に変更する。
+kernel/time/clock_service.c	振り分け	移すだけ	sys/hal/time/clock_service.c	kernel/time/clock_service.c:12 clock_empty — 時計の登録前に使う日付・互換読出しの空実装を束ねる。 既定値の提供も含め、公開入口は登録した ClockOps への振り分け。
+kernel/time/cpu_calibrate.c	バックエンド	移すだけ	sys/platform/pc98/time/cpu_calibrate.c	kernel/time/cpu_calibrate.c:77 cpu_calibrate — PC-98起動時にtick_countでNOPループを校正しcpu_delay_usは100Hz前提で換算する。 境界照合 __asm__。NOP ループは PC-98 の tick に対して計測する対象そのもの。
+kernel/time/cpu_calibrate.h	契約	移すだけ	sys/hal/time/cpu_calibrate.h	kernel/time/cpu_calibrate.h:40 cpu_delay_us — 呼出し側と共有する遅延上限と校正値の取得口を定める。
+kernel/time/cpu_calibrate_math.c	共通処理	移すだけ	sys/kern/time/cpu_calibrate_math.c	kernel/time/cpu_calibrate_math.c:31 cpu_calibrate_compute — 総ループ数をtick数で割り、未計測・下限割れ時は既定値を返す。
+kernel/time/cpu_calibrate_math.h	契約	移すだけ	sys/kern/time/cpu_calibrate_math.h	kernel/time/cpu_calibrate_math.h:62 cpu_calibrate_compute — 校正の打切り条件と換算関数の口を定める。
+kernel/time/ktime.c	共通処理	移すだけ	sys/kern/time/ktime.c	kernel/time/ktime.c:38 sys_time_now — 時計契約から得た時刻を排他内で単調化し成功時に出力する。
+kernel/time/ktime.h	契約	移すだけ	sys/kern/time/ktime.h	kernel/time/ktime.h:27 time_test_feed_clear — 互換試験入力とその消去口、クランプ回数を宣言する。
+kernel/time/tick.c	共通処理	移すだけ	sys/hal/time/tick.c	kernel/time/tick.c:52 tick_clock_step — 物理tickの位相を進め論理jiffyとミリ秒を生成する。
+kernel/time/tick_clock.h	契約	移すだけ	sys/hal/time/tick_clock.h	kernel/time/tick_clock.h:13 tick_clock_config — tickの周波数比設定と論理時計の読出し口を定める。
+kernel/time/tick_probe.c	共通処理	P8	sys/kern/time/	kernel/time/tick_probe.c:337 tick_probe_control — 結果集計がe82557_statを直接呼び、時刻取得nowもRDTSCを使う。集計を移すには装置統計とCPU時計をそれぞれの所有者から受け取る口が要る。
+kernel/time/tick_probe.h	契約	移すだけ	sys/kern/time/tick_probe.h	kernel/time/tick_probe.h:62 tick_probe_control — 計測の開始・停止・スナップショット取得を定める。
+kernel/time/tick_probe_ids.h	型	移すだけ	sys/kern/time/tick_probe_ids.h	kernel/time/tick_probe_ids.h:4 TP_IRQ0 — 計測側とtick_probe_begin等で共有するIRQ計測点の識別値。
+kernel/time/time_math.c	共通処理	移すだけ	sys/kern/time/time_math.c	kernel/time/time_math.c:3 time_clamp — 今回の時刻が前回を下回ったとき補正する。
+kernel/time/time_math.h	契約	移すだけ	sys/kern/time/time_math.h	kernel/time/time_math.h:19 time_clamp — 単調性を保つ補正関数の入出力を定める。
+lib/kprintf_format.inc	共通処理	移すだけ	sys/kern/kprintf_format.inc	lib/kprintf_format.inc:69 print_format → kprintf_attr_to_pc98。include/kprintf.h の既存の属性変換口。lib/kprintf_attr.c は con_backend_printf_attr に委譲し、PowerMac の kboot_console.c は入力属性を返す。 定義 lib/kprintf_attr.c:5, platform/powermac/kboot_console.c:25。 境界照合 kprintf_attr_to_pc98。属性は機種が実装する変換口へ渡す。
+mm/memory_boot.c	共通処理	P8	sys/kern/mm/ + sys/arch/x86/ + sys/dev/video/	mm/memory_boot.c — memory_boot_init のページ予算が PTE_COUNT と GF_PRODUCTION_PT_PAGES に依存する。ページ表と装置予約の必要量を各提供側から受ける。
+net/host_mailbox.c	共通処理	移すだけ	sys/net/host_mailbox.c	net/host_mailbox.c:37 host_mailbox_put — ホスト通知を格納し満杯時の処理を行う。 境界照合 serial_now。serial_now は通知の通し番号。
+net/host_mailbox.h	契約	移すだけ	sys/net/host_mailbox.h	net/host_mailbox.h:9 host_mailbox_put — ホスト通知の格納・取得の口を定める。
+net/link.c	共通処理	移すだけ	sys/net/link.c	net/link.c:320 since — 再送等の経過時間をlink_platform_nowで求める。機種実装は固定名ヘッダで選ぶ。
+net/link.h	契約	移すだけ	sys/net/link.h	net/link.h:200 link_selftest — リンク操作と自己試験の呼出し口を定める。
+net/link_host_api.inc	共通処理	移すだけ	sys/net/link_host_api.inc	net/link_host_api.inc:31 link_host_deadlines — link_platform_nowを通じてホスト側ストリームの無応答期限を判定する。
+net/link_notify.c	共通処理	移すだけ	sys/net/link_notify.c	net/link_notify.c:48 link_notify_rx — 通知フレームの世代・長さを検証してメールボックスに配送する。
+net/link_notify.h	契約	移すだけ	sys/net/link_notify.h	net/link_notify.h:8 link_notify_rx — 受信通知・セッション・tickの処理入口を宣言する。
+net/link_platform.h	契約	移すだけ	sys/hal/net/link_platform.h	net/link_platform.h:10 link_platform_now — 各機種が提供する時刻・排他・待機・tick登録の口を定める。
+net/link_rx.inc	共通処理	移すだけ	sys/net/link_rx.inc	net/link_rx.inc:43 link_on_hello — HELLOの世代を固定名ヘッダのlink_platform_sessionに渡す。PC-98は空実装、PowerMacは構成別の実装を選ぶ。
+net/link_selftest.inc	その他	移すだけ	sys/net/link_selftest.inc	net/link_selftest.inc:20 link_wait_up — 時刻・待機の機種契約を使ってリンク確立を期限付きで待つ。link.cに組み込む自己試験。
+net/nic.c	振り分け	P8	sys/hal/net/ + sys/dev/net/	net/nic.c — IRQ 時の受信を NET_NIC_E82557 と LINK_PLATFORM_TICK_RX_LGY98_SLOT で決める。選択順と受信能力を登録側から渡す。
+net/nic.h	契約	P8	sys/hal/net/ + sys/dev/net/	net/nic.h — NetNicOps と net_lgy98_adapter・net_e82557_adapter の extern を分け、具体表を登録側に公開する。
+net/nic_rx.c	共通処理	移すだけ	sys/net/nic_rx.c	net/nic_rx.c:36 net_rx_demux_budget — 受信予算と宛先を確認しフレームをSFS・リンクのキューに分ける。 受信後の選別とキュー管理はネットワーク層の共通処理。
+net/nic_rx.h	契約	移すだけ	sys/net/nic_rx.h	net/nic_rx.h:16 net_rx_demux — NIC操作表とアドレスを受け取る共通受信処理を宣言する。
+net/rx_work.c	共通処理	移すだけ	sys/net/rx_work.c	net/rx_work.c:28 rx_work_take — 次の受信作業単位を開始できるか残予算で判定する。
+net/rx_work.h	契約	移すだけ	sys/net/rx_work.h	net/rx_work.h:13 rx_work_take — 受信予算の型と作業単位の消費口を定める。
+platform/pc98/clock_source.c	バックエンド	P8	sys/platform/pc98/ + sys/arch/x86/	platform/pc98/clock_source.c — PIT の配線と rdtsc の読み出しを分け、CPU 側からカウンタを受ける。
+platform/pc98/d2_bind.c	バックエンド	移すだけ	sys/platform/pc98/d2_bind.c	platform/pc98/d2_bind.c:14 InputOps pc98_input = {。入力のバックエンドを定義する。 境界照合 pc98_shift_state。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+platform/powermac/clock.c	バックエンド	P8	sys/platform/powermac/ + sys/arch/ppc/	platform/powermac/clock.c — platform_clock_read_us の周波数換算から mftb・mftbu の読出しを分ける。
+platform/powermac/display_provider.c	バックエンド	移すだけ	sys/platform/powermac/display_provider.c	platform/powermac/display_provider.c:15 GfxBackend gfx_backend_unsupported = {。描画のバックエンドを定義する。 境界照合 gfx_cirrus_probed。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+platform/powermac/input_boot.c	バックエンド	移すだけ	sys/platform/powermac/input_boot.c	platform/powermac/input_boot.c:127 InputOps ops = {。入力のバックエンドを定義する。 境界照合 kbd_gui_mode。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+platform/powermac/install_backend.c	バックエンド	移すだけ	sys/platform/powermac/install_backend.c	platform/powermac/install_backend.c:242 ext2_medium_ops ops = {。ブロックのバックエンドを定義する。 境界照合 IDE_MAX_DRIVES。上記の実装と固有宣言は候補先の所有者の内部で使用する。
+platform/powermac/nic_gem.c	バックエンド	移すだけ	sys/platform/powermac/nic_gem.c	platform/powermac/nic_gem.c:110 NetNicOps ops = {。LANのバックエンドを定義する。
+platform/powermac/system.c	バックエンド	P8	sys/platform/powermac/ + sys/arch/ppc/	platform/powermac/system.c — RTC 配線と mftb・mftbu による Time Base 読出し、eieio バリアを分ける。
+sound/hal/a0_weak.c	共通処理	移すだけ	sys/kern/v86/a0_weak.c	sound/hal/a0_weak.c:3 v86s_begin — V86サービス未提供時にNOSYSを返す弱定義。run・fm_drain・endも同じ既定動作。 境界照合 v86s_begin。V86 未提供時の弱いサービス入口をまとめてサービス所有者へ移す。
+sound/hal/snd2.h	型	移すだけ	sys/hal/sound/snd2.h	sound/hal/snd2.h:16 Snd2Device — バックエンド操作表・コンテキスト・能力・ストリームを保持する内部型。
+sound/hal/snd2_caps.c	共通処理	移すだけ	sys/hal/sound/snd2_caps.c	sound/hal/snd2_caps.c:5 snd2_caps — 登録済み装置の能力を出力サイズの検証後にコピーする。
+sound/hal/snd2_chip.c	振り分け	移すだけ	sys/hal/sound/snd2_chip.c	sound/hal/snd2_chip.c:37 snd2_chip_register — FM・PSGの操作表を検証しcapsを呼んで能力を登録する。
+sound/hal/snd2_dsp.c	振り分け	移すだけ	sys/hal/sound/snd2_dsp.c	sound/hal/snd2_dsp.c:44 snd2_dsp_insert — ユニットの能力と引数を検証して登録先のdsp_insertに委譲する。
+sound/hal/snd2_int.h	契約	移すだけ	sys/hal/sound/snd2_int.h	sound/hal/snd2_int.h:46 struct SndBackend {。音の契約を定義する。
+sound/hal/snd2_pos.c	共通処理	移すだけ	sys/hal/sound/snd2_pos.c	sound/hal/snd2_pos.c:42 sw_cancel — snd2_stream_wait は共通の待機状態と snd_writer_probe.h の計測口を使用する。
+sound/hal/snd2_refill_diag.h	契約	移すだけ	sys/hal/sound/snd2_refill_diag.h	snd2_refill_diag.h は snd2_caps の診断照会ビットと reserved[] の添字を定義する。snd2_caps.c の snd2_caps がこのビットで照会を識別する。
+sound/hal/snd2_reg.c	振り分け	移すだけ	sys/hal/sound/snd2_reg.c	snd2_reg.c の snd2_register は渡された SndBackend の操作表を検証し、be->caps(ctx, &caps) で能力を取得して操作表と ctx を装置スロットに保存する。
+sound/hal/snd2_ring_math.h	共通処理	移すだけ	sys/hal/sound/snd2_ring_math.h	snd2_ring_math.h の snd2_window はカーソルからリング内の開始位置と処理可能なフレーム数を求め、snd2_prefix は折り返し前の長さを計算する。
+sound/hal/snd2_seg.c	共通処理	移すだけ	sys/hal/sound/snd2_seg.c	snd2_seg.c の snd2_seg_reset は各セグメントを消去し、再生済み位置と時刻から管理状態を初期化する。snd2_seg_observe は引数の再生位置を使いセグメントを退役・補充する。
+sound/hal/snd2_stg.c	共通処理	移すだけ	sys/hal/sound/snd2_stg.c	snd2_stg.c の snd2_stg_alloc はフレーム幅に応じて kmalloc で一時バッファを確保し、snd2_stg_read と snd2_stg_write は折り返しを考慮してフレームをコピーする。
+sound/hal/snd2_stream.c	振り分け	移すだけ	sys/hal/sound/snd2_stream.c	sound/hal/snd2_stream.c:123 sw_reset — snd2_stream_open は共通の寿命管理を行い、ハードウェア停止は操作表に渡す。
+sound/hal/snd2_v1.c	共通処理	移すだけ	sys/hal/sound/snd2_v1.c	snd2_v1.c の pcm_open は既定装置を選び旧 PCM 呼出しを snd2_open_mode に変換する。pcm_status の割り込み保護も include/io.h の irq_save と irq_restore の契約を使う。 旧 PCM API の変換は音声共通層にまとめる。
