@@ -25,6 +25,14 @@ i32 exec_sys_yield(void)
     return 0;
 }
 
+/* A playback period raises an edge only if the previous PI was cleared. */
+static int playback_period_edge(void)
+{
+    int edge = !(dev_reg[PCM_I_ALTSTAT] & PCM_ALT_PI);
+    dev_reg[PCM_I_ALTSTAT] |= PCM_ALT_PI;
+    return edge;
+}
+
 static void irq_after_failed_stop(void)
 {
     u32 before = IO_ACCESSES;
@@ -70,12 +78,15 @@ int main(int argc, char **argv)
     sim_set_pos(40);
     CHECK(pcm_irq(PCM_IRQ, 0) == IRQ_NONE);
     CHECK(snd2_device(info.dev)->stream.last_hw == 0);
-    dev_reg[PCM_I_ALTSTAT] = PCM_ALT_PI;
-    CHECK(pcm_irq(PCM_IRQ, 0) == IRQ_HANDLED && !dev_reg[PCM_I_ALTSTAT]);
+    CHECK(playback_period_edge());  /* First IRQ10 is missed. */
+    CHECK(!playback_period_edge());
+    api.tick();
+    CHECK(pcm_irq(PCM_IRQ, 0) == IRQ_NONE);  /* Late IRQ after tick ack. */
     CHECK(snd2_device(info.dev)->stream.last_hw == 40);
     sim_now_us += 1999;
     sim_set_pos(80);
-    api.tick();
+    CHECK(playback_period_edge() && pcm_irq(PCM_IRQ, 0) == IRQ_HANDLED);
+    CHECK(!(dev_reg[PCM_I_ALTSTAT] & PCM_ALT_PI));
     CHECK(snd2_device(info.dev)->stream.last_hw == 80);
     CHECK(!snd2_caps(info.dev | SND2_CAPS_REFILL, &caps, sizeof(caps)));
     CHECK(caps.reserved[SND2_DIAG_PI] == 1 && caps.reserved[SND2_DIAG_TICK] == 1);
