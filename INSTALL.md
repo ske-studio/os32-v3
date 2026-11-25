@@ -45,7 +45,7 @@ WSL (Ubuntu) または Linux 環境で以下のツールが必要です。
 
 ```bash
 sudo apt install build-essential nasm make python3 python3-lz4 python3-yaml \
-  genisoimage libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex
+  genisoimage xorriso libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex
 ```
 
 Rust プログラムのビルドには rustup も必要です (`rust-toolchain.toml` が nightly を自動解決)。

@@ -1,0 +1,9 @@
+# Keep build locations out of shipped Rust panic messages and object files.
+[unstable]
+trim-paths = true
+
+[profile.release]
+trim-paths = "all"
+
+[env]
+OS32_SOURCE_ROOT = { value = ".", relative = true }

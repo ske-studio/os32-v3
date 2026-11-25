@@ -7,7 +7,7 @@ OPNA_ARCHIVE := $(OPNA_CARGO_DIR)/i386-os32-snd/release/libos32_opna.a
 opna-staticlib: $(OPNA_ARCHIVE)
 	python3 -B tools/gen_opna_layout.py "$(dir $(OPNA_ARCHIVE))deps"
 
-$(OPNA_ARCHIVE): $(wildcard lib/os32_opna/src/*.rs) lib/os32_opna/Cargo.toml lib/os32_opna/Cargo.lock $(OPNA_TARGET) tools/opna_rustc.py sdk/rustc_stamp.py sdk/target_profile.py sdk/os32_generations.py build/os32snd.mk
+$(OPNA_ARCHIVE): $(wildcard lib/os32_opna/src/*.rs) lib/os32_opna/Cargo.toml lib/os32_opna/Cargo.lock $(OPNA_TARGET) tools/opna_rustc.py sdk/rustc_stamp.py sdk/target_profile.py sdk/os32_generations.py .cargo/config.toml build/os32snd.mk
 	OS32_SDK_TARGET=x86-pc98-snd RUSTC_WRAPPER=$(CURDIR)/tools/opna_rustc.py \
 	    CARGO_TARGET_DIR="$(OPNA_CARGO_DIR)" cargo build --locked --release \
 	    -Zjson-target-spec -Zbuild-std=core,compiler_builtins -Zbuild-std-features=compiler-builtins-mem \

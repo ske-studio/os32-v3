@@ -73,7 +73,7 @@ $(2)/$(d)/%.o: $(2)/$(d)/%.c | $$(ABI_CONTRACT_ORDER)
 
 $(LIBDIR)/$(1).a: $$($(1)_OBJ)
 	@rm -f $$@
-	$$(AR) rcs $$@ $$^
+	$$(AR) rcsD $$@ $$^
 
 lib-$(1): $(LIBDIR)/$(1).a
 
@@ -110,7 +110,7 @@ ALL_LIB_OBJ += $(GFX_SRC:.c=.o) $(ASM_GFX_OBJ)
 
 $(LIBDIR)/libos32gfx.a: $(GFX_ARCHIVE_OBJ)
 	@rm -f $@
-	$(AR) rcs $@ $^
+	$(AR) rcsD $@ $^
 
 userland/lib/gfx/%.o: userland/lib/gfx/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32gfx) -Ilib -c $< -o $@
@@ -142,7 +142,7 @@ ALL_LIB_OBJ += $(LIBOS32DB_ARCHIVE_OBJ)
 
 $(LIBDIR)/libos32db.a: $(LIBOS32DB_ARCHIVE_OBJ)
 	@rm -f $@
-	$(AR) rcs $@ $^
+	$(AR) rcsD $@ $^
 
 userland/lib/db/%.o: userland/lib/db/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32db) -c $< -o $@
@@ -189,7 +189,7 @@ ALL_LIB_OBJ += $(TILEMAP_ARCHIVE_OBJ)
 
 $(LIBDIR)/libos32tilemap.a: $(TILEMAP_ARCHIVE_OBJ)
 	@rm -f $@
-	$(AR) rcs $@ $^
+	$(AR) rcsD $@ $^
 
 userland/lib/tilemap/%.o: userland/lib/tilemap/%.c | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) $(INC_libos32tilemap) -c $< -o $@
@@ -220,7 +220,7 @@ ALL_LIB_OBJ += $(ZLIB_INFLATE_OBJ)
 # (出所とライセンスの見通しのため。lib/zlib/README.OS32 を参照)
 $(LIBDIR)/libzinflate.a: $(ZLIB_INFLATE_OBJ)
 	@rm -f $@
-	$(AR) rcs $@ $^
+	$(AR) rcsD $@ $^
 
 # libos32mgx — MGX (漫画専用グレースケール画像形式) デコーダ
 $(eval $(call DEFINE_LIB,libos32mgx,userland/lib/mgx,,))
@@ -239,7 +239,7 @@ ALL_LIB_OBJ += $(MDLIB_ARCHIVE_OBJ)
 
 $(LIBDIR)/libos32md.a: $(MDLIB_ARCHIVE_OBJ)
 	@rm -f $@
-	$(AR) rcs $@ $^
+	$(AR) rcsD $@ $^
 
 # libos32filer — GFXファイラーライブラリ + TVRAM描画
 userland/lib/filer/filer_core.o: userland/lib/filer/filer_core.c userland/lib/filer/libos32filer.h sdk/include/os32/ls.h | $(ABI_CONTRACT_ORDER)
@@ -258,7 +258,7 @@ ALL_LIB_OBJ += $(FILER_ARCHIVE_OBJ)
 
 $(LIBDIR)/libos32filer.a: $(FILER_ARCHIVE_OBJ)
 	@rm -f $@
-	$(AR) rcs $@ $^
+	$(AR) rcsD $@ $^
 
 # === ライブラリ全ビルドターゲット ===
 # 全ライブラリのアーカイブを作る。SDK 切り出し時はこの LIBDIR がそのまま

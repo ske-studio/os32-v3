@@ -70,6 +70,17 @@ def main():
                 data = json.loads(record.read_text())
                 if data['generations'] != GEN or data['sha256'] != digest(dep):
                     raise SystemExit(f'rustc_stamp: stale crate before LTO: {dep}')
+    # Cargo hashes absolute paths for dependencies outside a workspace. Keep its
+    # cache filenames, but give in-tree target crates a relocatable symbol identity.
+    root = os.environ.get('OS32_SOURCE_ROOT')
+    manifest = pathlib.Path(os.environ.get('CARGO_MANIFEST_DIR', '.'))
+    if root and manifest.is_relative_to(root) and '--target' in args:
+        identity = [os.environ['CARGO_PKG_NAME'], os.environ['CARGO_PKG_VERSION'],
+                    pathlib.Path(args[args.index('--target') + 1]).name]
+        identity.extend(args[i + 1] for i, arg in enumerate(args) if arg == '--cfg')
+        for i, arg in enumerate(args):
+            if arg.startswith('metadata=') and args[i - 1] == '-C':
+                args[i] = 'metadata=' + json.dumps(identity)
     result = subprocess.run([compiler, *args], text=True, capture_output=True)
     if result.returncode:
         sys.stdout.write(result.stdout)
