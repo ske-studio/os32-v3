@@ -66,7 +66,7 @@ clean-images:
 # Private trial disk and resident shell, isolated from the normal x86 artifacts.
 .PHONY: pc98-in2-gui-image
 pc98-in2-gui-image:
-	python3 -B tools/accept/pc98_in2_image.py --out $(abspath $(BUILD_OUT)/pc98-in2-gui) $(if $(MUTANT),--mutant "$(MUTANT)")
+	python3 -B tools/pc98_in2_image.py --out $(abspath $(BUILD_OUT)/pc98-in2-gui) $(if $(MUTANT),--mutant "$(MUTANT)")
 
 userland/ppc/guiprob.elf: userland/ppc/guiprob.c userland/ppc/guiprob_exclusive.h sdk/link/app.ld $(CRT0_OBJ)
 	$(CC) $(PROGRAM_FLAGS) -DC_GUI_ACCEPT -c $< -o userland/ppc/guiprob.o

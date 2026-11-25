@@ -4,11 +4,9 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 import tempfile
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / 'tools'))
+ROOT = Path(__file__).resolve().parents[1]
 from in2_gui_mutations import PC98_MUTATIONS
 from build_compare import snapshot
 from mk_blank_nhd import create

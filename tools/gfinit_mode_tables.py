@@ -9,8 +9,7 @@ import struct
 import subprocess
 import tempfile
 
-from test_recover_tables import FLAGS
-import host32
+from recover_oracle import FLAGS, run_extractor
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 FULL = '0xffffffffU'
@@ -182,7 +181,7 @@ def generate():
         unit.write_text(source)
         subprocess.run(['gcc', *FLAGS, '-I'+str(ROOT), '-nostdlib', '-static',
                         '-no-pie', str(unit), '-o', str(exe)], check=True)
-        result = host32.run([str(exe)], cwd=ROOT, timeout=60, capture_output=True)
+        result = run_extractor(exe)
         if result.returncode or len(result.stdout) != len(rows)*11*4:
             raise RuntimeError('C allow-row extraction failed')
     numeric = list(struct.iter_unpack('<11I', result.stdout))
