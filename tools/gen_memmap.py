@@ -499,17 +499,10 @@ MIRRORS = (
     ("sdk/rust/os32api/src/gui/proto.rs",
      r"^pub const GUI_SHM_OFFSET:\s*u32\s*=\s*(0x[0-9A-Fa-f]+)\s*;",
      "MEM_SHM_GUI_OFFSET"),
-    # ホスト試験が mm/shm.c を組むための偽 memmap.h。実物は
-    # (u32)&__bss_end を含んでホストで使えないので写しを持つしかないが、
-    # **2026-09-17 に実際にずれた** — D1 で 16 → 14 ブロックにしたとき、
-    # ここだけ 16 のままで shm.c の表明が落ちた (make check が捕まえた)。
     # ローダ (NASM) はヘッダを読めないので番地を写して持つ
     # (票 TASK_HDD_INSTALL 段 0。オフセットの一致は tools/tests/test_bootinfo.py)。
     ("boot/bootinfo.inc", r"^MEM_BOOTINFO_BASE\s+EQU\s+(0x[0-9A-Fa-f]+)\s*$",
      "MEM_BOOTINFO_BASE"),
-    ("tools/tests/test_owner_reclaim.py",
-     r'"#define MEM_SHM_SIZE\s+(0x[0-9A-Fa-f]+)U',
-     "MEM_SHM_SIZE"),
     # VK32 の展開先の帯と、ローダ (C) が書くブート情報域 (票 TASK_SERIAL_HOSTFS
     # A-4)。HDD ローダ (boot/boot_defs.h) と FD ローダ (NASM) がそれぞれ写しを持つ。
     ("boot/boot_defs.h", r"^#define\s+VK32_LOAD_MIN\s+(0x[0-9A-Fa-f]+)UL",

@@ -69,7 +69,7 @@ ppc-ci-image:
 tests-inventory:
 	python3 tools/gen_tests_inventory.py --write
 
-docs-gen: tests-inventory
+docs-gen:
 	python3 tools/gen_memmap.py --write
 
 docs-win:

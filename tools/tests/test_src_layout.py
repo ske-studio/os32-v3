@@ -187,6 +187,8 @@ class LayoutTools(unittest.TestCase):
         self.assertEqual((self.root / 'third_party/vendor.c').read_text(), '/* kernel/main.c */\n')
         self.assertEqual((self.root / 'fs/fat/fatfs/ff.c').read_text(), '/* kernel/main.c */\n')
         self.assertIn('-Ikernel -Imm', (self.root / 'build/config.mk').read_text())
+        self.assertIn('../../kernel/local.h', (self.root / 'kdebug/generated/kdebug_imports.h').read_text())
+        command('make', *plan['regenerate'], cwd=self.root)
         after = self.include_rows()
         mapping = {m['from']: m['to'] for m in moves}
         identity = lambda rows: {(mapping.get(r['file'], r['file']), r['line'],
