@@ -56,7 +56,6 @@ def validate(checks, root):
         demand(relative(path) and path.startswith("docs/") and not path.startswith(("docs/archive/", "docs/hw/")), "invalid spec path")
         document = root / path
         demand(document.is_file() and string(spec["section"]), "missing spec")
-        demand(spec["section"] in re.findall(r"^#{1,6} (.+)$", document.read_text(), re.M), "missing spec section")
         arch = row["arch"]
         demand(isinstance(arch, dict) and arch and arch.keys() <= {"x86", "ppc", "host"}, "invalid arch")
         configs = set()
@@ -71,7 +70,9 @@ def validate(checks, root):
             demand(string(ledger_id) and re.fullmatch(r"[A-Za-z0-9_-]+", ledger_id), "invalid ledger ID")
             ledger = (root / "docs/tasks/DEFERRED_TESTS.md").read_text()
             demand(re.search(r"^\| " + re.escape(ledger_id) + r" \|", ledger, re.M), "unknown ledger ID")
-            demand(deferral["config"] in configs and strings(deferral["gates"])
+            conditions = deferral["config"]
+            conditions = [conditions] if isinstance(conditions, str) else conditions
+            demand(strings(conditions) and set(conditions) <= set(configs) and strings(deferral["gates"])
                    and set(deferral["gates"]) <= set(row["gates"]), "invalid deferral condition")
         demand(isinstance(row["mutations"], list) and row["mutations"], "missing mutations")
         for mutation in row["mutations"]:
@@ -93,4 +94,46 @@ def load(root):
     with (root / "tests/registry.toml").open("rb") as stream:
         data = tomllib.load(stream)
     demand(data.keys() == {"check"}, "expected check table")
+    check_inventory(data["check"], root)
     return validate(data["check"], root)
+
+
+# Entrypoint and its isolated runner tests, which are not check bodies.
+INFRASTRUCTURE = {"tests/infra/ci.py", "tests/infra/test_hostdrv_archive.py",
+                  "tests/infra/test_prerequisites.py"}
+
+
+def check_inventory(rows, root):
+    from tests.support.tracked import paths
+
+    tracked = paths(root)
+    bodies = {p for p in tracked if len(Path(p).parts) == 3 and
+              Path(p).parts[:1] == ("tests",) and Path(p).parts[1] in OWNERS and
+              p.endswith(".py") and Path(p).name != "__init__.py"} - INFRASTRUCTURE
+    registered = set()
+    ids = set()
+    errors = []
+    sections = {}
+    for row in rows:
+        name, owner = row["id"], row["subsystem"]
+        path = f"tests/{owner}/{name}.py"
+        if name in ids:
+            errors.append(f"duplicate id {name} at {path}")
+        if path in registered:
+            errors.append(f"duplicate registration {path}")
+        ids.add(name)
+        registered.add(path)
+        if path not in bodies or not (root / path).is_file():
+            errors.append(f"missing body {path}")
+        spec = row["spec"]
+        doc = spec["path"]
+        if doc not in tracked or not doc.startswith("docs/") or doc.startswith(("docs/archive/", "docs/hw/")):
+            errors.append(f"{path}: invalid specification {doc}")
+            continue
+        from tests.support.documents import headings_in
+        if doc not in sections:
+            sections[doc] = headings_in(root / doc)
+        if sections[doc].count(spec["section"]) != 1:
+            errors.append(f"{path}: missing or duplicate section {doc} {spec['section']}")
+    errors.extend(f"unregistered body {p}" for p in bodies - registered)
+    demand(not errors, "\n".join(sorted(errors)))

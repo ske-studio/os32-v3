@@ -3,6 +3,10 @@ on:
   push:
     branches: [main, "wt/**"]
   workflow_dispatch:
+    inputs:
+      kapi_base:
+        description: Previous main SHA for a manual main candidate
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -157,8 +161,27 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       bundles: ${{ steps.plan.outputs.bundles }}
+      kapi_base: ${{ steps.comparison.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select KAPI comparison commit
+        id: comparison
+        env:
+          BEFORE: ${{ github.event.before || inputs.kapi_base }}
+        run: |
+          if [[ "$GITHUB_REF_NAME" == main ]]; then
+            base="$BEFORE"
+          elif [[ "$GITHUB_REF_NAME" == wt/int-* ]]; then
+            base=$(git rev-parse origin/main)
+          else
+            base=$(git merge-base origin/main "$GITHUB_SHA")
+          fi
+          git cat-file -e "$base^{commit}"
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
+          echo "OS32_KAPI_BASE=$base" >> "$GITHUB_ENV"
+      - run: python3 -m pip install markdown-it-py
       - id: plan
         run: |
           bundles=$(python3 -B -m tests.infra.ci plan --gate "$GATE" --mutate --output "$RUNNER_TEMP/planned")
@@ -179,10 +202,14 @@ jobs:
         bundle: ${{ fromJSON(needs.plan.outputs.bundles) }}
     env:
       BUNDLE: ${{ matrix.bundle }}
+      OS32_KAPI_BASE: ${{ needs.plan.outputs.kapi_base }}
       GATE: ${{ (startsWith(github.ref_name, 'wt/int-') || github.ref_name == 'main') && 'main' || 'push' }}
       OS32_ACCEPT_IPA_LICENSE: "1"
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: python3 -m pip install markdown-it-py
       - uses: actions/download-artifact@v4
         with:
           name: plan-${{ github.run_attempt }}
@@ -212,9 +239,11 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     env:
+      OS32_KAPI_BASE: ${{ needs.plan.outputs.kapi_base }}
       GATE: ${{ (startsWith(github.ref_name, 'wt/int-') || github.ref_name == 'main') && 'main' || 'push' }}
     steps:
       - uses: actions/checkout@v4
+      - run: python3 -m pip install markdown-it-py
       - uses: actions/download-artifact@v4
         with:
           name: plan-${{ github.run_attempt }}

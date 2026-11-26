@@ -1,7 +1,6 @@
 """Plan, run and collect registry checks in local or hosted builds."""
 import argparse
 from collections import Counter, defaultdict
-import csv
 import importlib.util
 import json
 import math
@@ -13,7 +12,9 @@ import sys
 import tempfile
 import time
 
+from tests.support.tracked import paths
 from tests.support.registry import load
+from tools.ownership import Inventory
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -74,6 +75,7 @@ def mutate(tree, mutation):
 
 def snapshot(destination):
     copy_candidate(ROOT, destination)
+    (destination / ".check-index.json").write_text(json.dumps(sorted(paths(ROOT))))
     fonts = fetch_fonts.MEMBERS | fetch_fonts.INCONSOLATA_MEMBERS | fetch_fonts.JFDOT_MEMBERS
     names = [name for name, _ in fonts.values()]
     names.extend((fetch_fonts.OFL_NAME, fetch_fonts.JFDOT_LICENSE_NAME))
@@ -102,16 +104,17 @@ def exemption(row, config, gate):
     if gate not in row["gates"]:
         return "NOT_APPLICABLE", f"gate {gate} outside registration"
     approval = row.get("deferred")
-    if approval and config == approval["config"] and gate in approval["gates"]:
+    if approval and gate in approval["gates"]:
+        configs = approval["config"]
+        if config not in ([configs] if isinstance(configs, str) else configs):
+            return None
         return "DEFERRED", f'{approval["ledger"]}: {config} at {gate}'
     return None
 
 
 def manifest(plan, identity):
-    # P1-2 provides scope.tsv until P4-3 lands the ownership query. Make
-    # expands its own input sets. Unknown ownership keeps a check in the plan.
-    with (ROOT / "docs/tasks/restructure/data/scope.tsv").open() as stream:
-        ownership = {r["パス"]: r["所属種類"] for r in csv.DictReader(stream, delimiter="\t")}
+    inventory = Inventory(ROOT)
+    ownership = {path: inventory.lookup(path)["kind"] for path in inventory.paths}
     entries = []
     for row, cpu, config in plan:
         inputs = {path: ownership.get(path) for path in row["sources"]}
@@ -334,7 +337,7 @@ def main():
         return 0
     args.output.mkdir(parents=True, exist_ok=True)
     commit, epoch = subprocess.check_output(["git", "log", "-1", "--format=%H %ct"], cwd=ROOT, text=True).split()
-    identity = dict(sha=commit, run=os.getenv("GITHUB_RUN_ID", "local"),
+    identity = dict(sha=commit, kapi_base=os.getenv("OS32_KAPI_BASE"), run=os.getenv("GITHUB_RUN_ID", "local"),
                     attempt=os.getenv("GITHUB_RUN_ATTEMPT", "1"), mutate=args.mutate, gate=args.gate)
     all_args = argparse.Namespace(check=None, config=None, bundle=None)
     expected = manifest(selection(rows, all_args), identity)
@@ -360,7 +363,7 @@ def main():
     env["PATH"] = str(cross_bin) + os.pathsep + env.get("PATH", os.defpath)
     for key in ("MAKEFLAGS", "MFLAGS", "GNUMAKEFLAGS", "MAKEOVERRIDES"):
         env.pop(key, None)
-    env.update(OS32_BUILD_COMMIT=commit[:12], SOURCE_DATE_EPOCH=epoch, TZ="UTC", LC_ALL="C",
+    env.update(OS32_CHECK_REPOSITORY=str(ROOT), OS32_BUILD_COMMIT=commit[:12], SOURCE_DATE_EPOCH=epoch, TZ="UTC", LC_ALL="C",
                PYTHONDONTWRITEBYTECODE="1")
     with tempfile.TemporaryDirectory() as tmp:
         candidate = Path(tmp)
@@ -372,6 +375,6 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except (OSError, ValueError, KeyError, TypeError) as exc:
+    except (OSError, ImportError, ValueError, KeyError, TypeError) as exc:
         print(exc, file=sys.stderr)
         sys.exit(2)

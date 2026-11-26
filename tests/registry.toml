@@ -112,3 +112,181 @@ mutations = [
     { id = "accept_stale_attempt", config = "local", replace = "tools/ci/land_gate.py", old = "or number(run['run_attempt']) != attempt", new = "or False", fail = "invalid run_attempt accepted", when = "after_build" },
     { id = "accept_partial_boot", config = "local", replace = "tools/ci/land_gate.py", old = "if machines != {'pc98', 'powermac'}:", new = "if not machines:", fail = "missing PowerMac boot accepted", when = "after_build" },
 ]
+
+[[check]]
+id = "src_owner"
+spec = { path = "docs/design/build/ownership.md", section = "追跡パスの所有と配置" }
+subsystem = "infra"
+level = "L0"
+sources = ["build/sources/ownership.mk", "tools/ownership.py"]
+environment = "python"
+arch = { host = ["local"] }
+needs = []
+expect = "追跡パスが一意に所属し、許された棚にある"
+limits = "候補の Git 索引"
+gates = ["push", "main"]
+mutations = [{ id = "owner_conflict", config = "local", when = "after_build", replace = "build/sources/ownership.mk", old = "OWN_FILE += Makefile|ビルドの定義|-", new = "OWN_FILE += Makefile|ビルドの定義|-\nOWN_FILE += Makefile|文書|-", fail = "conflicting OWN_FILE Makefile" },
+    { id = "misplaced_cpu_header", config = "local", when = "after_build", replace = "build/sources/ownership.mk", old = "OWN_PLACEMENT += sys/include|共通実装", new = "OWN_PLACEMENT += sys/include|共通実装\nOWN_FILE += sys/include/boot_token.h|CPU固有実装|x86", fail = "misplaced sys/include/boot_token.h" }]
+
+[[check]]
+id = "build_sources"
+spec = { path = "docs/design/build/ownership.md", section = "構成別のコンパイル登録" }
+subsystem = "infra"
+level = "L0"
+sources = ["build/sources/ownership.mk", "make:all", "make:iso", "tests/support/product.py"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"], ppc = ["core", "link", "sh", "link-sh", "shell", "neg1"] }
+needs = []
+expect = "構成が指定した翻訳単位を製品のコンパイルが採用する"
+limits = "カーネルと部品"
+gates = ["push", "main"]
+mutations = [{ id = "missing_translation", config = "core", when = "after_build", replace = "build/select.mk", old = "C_KERNEL = $(C_SELECTED)", new = "C_KERNEL = $(filter-out sys/kern/machcfg.c,$(C_SELECTED))", fail = "sys/kern/machcfg.c missing from compilation" },
+    { id = "nonexistent_translation", config = "core", when = "after_build", replace = "build/sources/ownership.mk", old = "OWN_COMPILE_SET += C_SELECTED|pc98|core|link|sh|link-sh|shell|neg1", new = "OWN_COMPILE_SET += C_SELECTED|pc98|core|link|sh|link-sh|shell|neg1\nOWN_COMPILE += sys/kern/missing_input.c|core", fail = "sys/kern/missing_input.c missing input" }]
+
+[[check]]
+id = "include_layers"
+deferred = { ledger = "P43-INCLUDE", config = ["pc98"], gates = ["push", "main"] }
+spec = { path = "docs/design/tools/check_layers.md", section = "9. 構成ごとの include 直辺" }
+subsystem = "infra"
+level = "L0"
+sources = ["build/sources/ownership.mk", "make:kernel"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"], ppc = ["core"] }
+needs = []
+expect = "有効な include 直辺が所有の方向を守る"
+limits = "PC-98 と PowerMac core の C と前処理アセンブリ"
+gates = ["push", "main"]
+mutations = [{ id = "named_machine_header", config = "core", when = "after_build", replace = "sys/kern/machcfg.c", old = "#include \"kprintf.h\"", new = "#include \"kprintf.h\"\n#include \"sys/platform/pc98/pc98.h\"", fail = "R6 sys/kern/machcfg.c -> sys/platform/pc98/pc98.h" }]
+
+[[check]]
+id = "link_layers"
+deferred = { ledger = "P43-LINK", config = ["pc98", "core"], gates = ["push", "main"] }
+spec = { path = "docs/design/tools/check_layers.md", section = "10. 最終リンクの採用とシンボル解決" }
+subsystem = "infra"
+level = "L0"
+sources = ["build/sources/ownership.mk", "make:kernel"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"], ppc = ["core"] }
+needs = []
+expect = "最終リンクが対象構成の入力を採用する"
+limits = "書庫・部分リンクの内部は対象外"
+gates = ["push", "main"]
+mutations = [{ id = "wrong_cpu_object", config = "core", when = "after_build", replace = "build/targets/ppc-powermac.mk", old = "KB_C := $(C_KERNEL)", new = "KB_C := $(C_KERNEL) sys/arch/x86/kernel/double_fault.c", fail = "incompatible link input sys/arch/x86/kernel/double_fault.c" },
+ { id = "provider_type", config = "core", when = "after_build", replace = "sys/arch/ppc/arch_cpu.h", old = "u32 ppc_root_current(void);", new = "#if __INCLUDE_LEVEL__ > 1\nunsigned short ppc_root_current(void);\n#else\nu32 ppc_root_current(void);\n#endif", fail = "paging.c -> ppc_root_current -> sys/arch/ppc/kernel_mmu.S" },
+ { id = "provider_owner", config = "core", when = "after_build", replace = "build/sources/ownership.mk", old = "OWN_ASM_CONTRACT += sys/arch/ppc/kernel_mmu.S|sys/arch/ppc/arch_cpu.h", new = "OWN_ASM_CONTRACT += sys/arch/ppc/mmu.S|sys/arch/ppc/arch_cpu.h", fail = "paging.c -> ppc_root_current -> sys/arch/ppc/kernel_mmu.S" }]
+
+[[check]]
+id = "hal_contracts"
+spec = { path = "docs/design/include/input_service.md", section = "入力・ポインタ・時計の登録と到達" }
+subsystem = "infra"
+level = "L2"
+sources = ["sys/platform/pc98/d2_bind.c", "sys/hal/input/input_service.c", "sys/hal/time/clock_service.c"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"], ppc = ["sh", "link-sh", "shell"] }
+needs = []
+expect = "製品初期化後にキー・ポインタ・日付を転送する"
+limits = "装置境界はホストで供給する"
+gates = ["push", "main"]
+mutations = [{ id = "unregistered_input", config = "pc98", when = "after_build", replace = "sys/platform/pc98/d2_bind.c", old = "input_register(&pc98_input);", new = "(void)pc98_input;", fail = "HAL event did not reach" }]
+
+[[check]]
+id = "test_registration"
+spec = { path = "docs/design/tools/checks/registry_v2.md", section = "本体と登録の双方向照合" }
+subsystem = "infra"
+level = "M"
+sources = ["tests/registry.toml", "tests/support/registry.py"]
+environment = "python"
+arch = { host = ["local"] }
+needs = []
+expect = "各本体と登録が一対一で仕様の節が存在する"
+limits = "候補の追跡パス"
+gates = ["push", "main"]
+mutations = [
+    { id = "unregistered_test", config = "local", when = "after_build", replace = "tests/registry.toml", old = "[[check]]\nid = \"ppc_media_build\"\nspec = { path = \"docs/design/tools/ci/ci_v2.md\", section = \"§0 最小 workflow と仮の関門\" }\nsubsystem = \"infra\"\nlevel = \"L1\"\nsources = [\"make:all\", \"make:iso\"]\nenvironment = \"linux-ppc-cross\"\narch = { ppc = [\"core\", \"link\", \"sh\", \"link-sh\", \"shell\", \"neg1\"] }\nneeds = []\nexpect = \"ビルド成功、PPCKERN.ELF と boot.iso が非空\"\nlimits = \"起動到達と再生成時の一致は別の検査\"\ngates = [\"push\", \"main\"]\nmutations = [{ id = \"ppc_core_missing_iso\", config = \"core\", when = \"after_build\", remove = \"build/out/ppc-kboot/boot.iso\", fail = \"missing boot.iso\" }]", new = "# Removed the media check registration", fail = "unregistered body tests/infra/ppc_media_build.py" },
+    { id = "registered_body_missing", config = "local", when = "after_build", remove = "tests/infra/ppc_media_build.py", fail = "missing body tests/infra/ppc_media_build.py" },
+    { id = "registered_section_missing", config = "local", when = "after_build", replace = "docs/design/tools/checks/tests_v2.md", old = "## 配布物と再生成の合否", new = "## 配布の合否", fail = "missing or duplicate section" },
+]
+
+[[check]]
+id = "docs_links"
+spec = { path = "docs/POLICY_DEV.md", section = "§9-1 現行文書の内部リンク" }
+subsystem = "tools"
+level = "L0"
+sources = ["docs/POLICY_DEV.md", "docs/INDEX.md"]
+environment = "python"
+arch = { host = ["local"] }
+needs = []
+expect = "内部リンクのパスと断片が有効"
+limits = "履歴と外部の資料を除く"
+gates = ["push", "main"]
+mutations = [{ id = "docs_links_invalid", config = "local", when = "after_build", replace = "docs/08_build.md", old = "#### 起動時に読む部品の形式 (KMOD v1)", new = "#### 起動時に読む部品の形式 (KMOD v1) の例", fail = "missing anchor docs/08_build.md#起動時に読む部品の形式-kmod-v1" }]
+
+[[check]]
+id = "docs_navigation"
+spec = { path = "docs/POLICY_DEV.md", section = "§9-2 索引からの到達と根拠の向き" }
+subsystem = "tools"
+level = "L0"
+sources = ["docs/POLICY_DEV.md", "docs/INDEX.md"]
+environment = "python"
+arch = { host = ["local"] }
+needs = []
+expect = "現行索引から到達し根拠の方向が正しい"
+limits = "履歴と外部の資料を除く"
+gates = ["push", "main"]
+mutations = [{ id = "docs_navigation_invalid", config = "local", when = "after_build", replace = "docs/INDEX.md", old = "# OS32 ドキュメント索引", new = "# OS32 ドキュメント索引\n\n[過去](archive/README.md)", fail = "forbidden reference docs/archive/README.md" }]
+
+[[check]]
+id = "docs_source_refs"
+spec = { path = "docs/POLICY_DEV.md", section = "§9-4 ソースの位置参照" }
+subsystem = "tools"
+level = "L0"
+sources = ["docs/POLICY_DEV.md", "docs/INDEX.md"]
+environment = "python"
+arch = { host = ["local"] }
+needs = []
+expect = "ソース参照に安定した名前を使う"
+limits = "履歴と外部の資料を除く"
+gates = ["push", "main"]
+mutations = [{ id = "docs_source_refs_invalid", config = "local", when = "after_build", replace = "docs/INDEX.md", old = "# OS32 ドキュメント索引", new = "# OS32 ドキュメント索引\n\n参照 sys/kern/machcfg.c:333", fail = "sys/kern/machcfg.c:333" }]
+
+[[check]]
+id = "docs_status"
+spec = { path = "docs/POLICY_DEV.md", section = "§9-3 票の状態と完了条件" }
+subsystem = "tools"
+level = "L0"
+sources = ["docs/POLICY_DEV.md", "tools/docs_status_exceptions.json"]
+environment = "python"
+arch = { host = ["local"] }
+needs = []
+expect = "状態語と完了条件が正典に従う"
+limits = "現行の対象票"
+gates = ["push", "main"]
+mutations = [{ id = "unknown_status", config = "local", when = "after_build", replace = "docs/tasks/restructure/TASK_RESTRUCTURE.md", old = "> 状態: **実装中 (2026-11-25)** — P0 完了、P1 を開始 (ユーザー指示 2026-11-25「開始してください」)。機能の実装は停止のまま、この票が先 (ユーザー決定 2026-11-25、[DECISIONS.md](DECISIONS.md))。", new = "> 状態: **未定義 (2026-11-26)**", fail = "未定義" }]
+
+[[check]]
+id = "kapi_abi"
+spec = { path = "docs/KAPI_SPEC.md", section = "§3-4 公開 ABI の比較基点と破断" }
+subsystem = "tools"
+level = "L0"
+sources = ["sdk/kapi.json", "sdk/include/os32", "tests/support/kapi_layout.py"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"], ppc = ["core"] }
+needs = []
+expect = "公開スロットと欄が明示基点と互換"
+limits = "公開定義の比較"
+gates = ["push", "main"]
+mutations = [{ id = "changed_slot", config = "pc98", when = "after_build", replace = "sdk/kapi.json", old = "\"name\": \"gfx_init\",", new = "\"name\": \"renamed_gfx_init\",", fail = "incompatible slot 0" }]
+
+[[check]]
+id = "kapi_sync"
+spec = { path = "docs/KAPI_SPEC.md", section = "§3-5 公開定義と生成物の同期" }
+subsystem = "tools"
+level = "L0"
+sources = ["sdk/kapi.json", "sdk/gen_kapi.py", "sdk/kapi_rust_gen.py", "sdk/include/os32", "sdk/rust/os32api", "docs/KAPI_SPEC.md"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"], ppc = ["link-sh"] }
+needs = []
+expect = "公開定義と配布物・仕様の表が一致する"
+limits = "生成した C・Rust と仕様の公開表"
+gates = ["push", "main"]
+mutations = [{ id = "changed_data_offset", config = "pc98", when = "after_build", replace = "sdk/include/os32/os32_kapi_slots.h", old = "#define KAPI_DATA_FIELDS_OFF 0x608", new = "#define KAPI_DATA_FIELDS_OFF 0x60c", fail = "generated definition differs: sdk/include/os32/os32_kapi_slots.h" }]
