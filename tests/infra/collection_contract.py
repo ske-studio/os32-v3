@@ -43,6 +43,11 @@ def verify_selection():
           and not result["userland"] and not result["sdk"], "kernel products")
     check({("link_layers", "pc98"), ("kapi_abi", "core"), ("ppc_boot", "sh")} <= entries
           and ("ring3_instructions", "pc98") not in entries, "kernel checks")
+    for path in ("lib/lz4.c", "lib/utf8.c"):
+        result, entries = plan(path)
+        check(not result["full"] and result["userland"] and result["powerpc"] == list(PPC)
+              and {("ring3_instructions", "pc98"), ("c_dialect", "pc98"),
+                   ("link_layers", "pc98")} <= entries, f"shared program inputs: {path}")
     result, entries = plan("sys/platform/powermac/apm.c")
     check(result["pc98"] == "none" and result["powerpc"] == list(PPC)
           and ("ppc_boot", "core") in entries and all(c != "pc98" for _, c in entries), "PowerPC scope")
@@ -66,7 +71,7 @@ def verify_selection():
     check(job_errors(jobs, result, [{"bundle": "host"}]), "missing required boot medium accepted")
     for path in ("sdk/kapi.json", "sys/include/ide_contract.h", "sys/kern/exec/os32x_hdr.h",
                  "build/image.mk", ".github/workflows/restructure-build.yml", "tests/registry.toml",
-                 "unknown/path"):
+                 "unknown/path", "sys/kern/kstring.h"):
         result, entries = plan(path)
         check(result["full"] and result["sdk"] and result["userland"] and not result["skipped"]
               and len(entries) == sum(len(c) for r in rows for c in r["arch"].values()), "full scope")

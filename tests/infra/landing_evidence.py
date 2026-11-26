@@ -18,24 +18,31 @@ from tools.ci import land_gate as gate
 
 def selection_artifact(run):
     previous = "b" * 40
-    rows = '[[check]]\nid = "example"'
+    rows = '[[check]]\nid = "example"\ngates = ["main"]\nmutations = []'
     expected = dict(pc98="none", powerpc=["core"], entries=[["example", "core"]],
                     skipped={"other/local": "outside changed ownership and registered inputs"})
     plan = dict(base=previous, selection=expected.copy(), entries=[dict(id="example", config="core")],
                 identity=dict(sha=run["head_sha"], kapi_base=previous, run="19", attempt="2",
                               gate="main", mutate=True))
 
+    summary = dict(rc=0, errors=[], selection=expected, identity=plan["identity"],
+                   rows=[dict(id="example", config="core", status="PASS", reason="", mutations={})])
+
     def read_plan():
-        contents = io.BytesIO()
-        with zipfile.ZipFile(contents, "w") as archive:
-            archive.writestr("plan.json", json.dumps(plan))
-        data = contents.getvalue()
-        artifacts = [dict(name="plan-2", expired=False, id=42,
-                          digest="sha256:" + hashlib.sha256(data).hexdigest())]
-        commands = {("gh", "api", "/artifacts/42/zip"): data,
-                    ("git", "rev-parse", "origin/main"): previous.encode(),
+        commands = {("git", "rev-parse", "origin/main"): previous.encode(),
                     ("git", "merge-base", "--is-ancestor", previous, run["head_sha"]): b"",
                     ("git", "show", run["head_sha"] + ":tests/registry.toml"): rows.encode()}
+        artifacts = []
+        for ident, name, filename, payload in (
+                (42, "plan-2", "plan.json", plan),
+                (43, f"verified-{run['head_sha']}-a2", "summary.json", summary)):
+            contents = io.BytesIO()
+            with zipfile.ZipFile(contents, "w") as archive:
+                archive.writestr(filename, json.dumps(payload))
+            data = contents.getvalue()
+            artifacts.append(dict(name=name, expired=False, id=ident,
+                                  digest="sha256:" + hashlib.sha256(data).hexdigest()))
+            commands["gh", "api", f"/artifacts/{ident}/zip"] = data
         with patch.object(gate, "command", side_effect=lambda *args: commands[args]), \
              patch.object(gate, "comparison", return_value=expected):
             return gate.planned_boots("", run, artifacts)
@@ -51,6 +58,17 @@ def selection_artifact(run):
             except ValueError:
                 continue
             raise Failure(f"invalid selection {field} accepted")
+    for field, changed in (("rc", 1), ("rows", []), ("selection", {}),
+                           ("rows", [dict(summary["rows"][0], status="FAIL")]),
+                           ("rows", [dict(summary["rows"][0], mutations={"extra": {"result": "RED"}})]),
+                           ("identity", dict(summary["identity"], run="18")),
+                           ("identity", dict(summary["identity"], attempt="1"))):
+        with patch.dict(summary, {field: changed}):
+            try:
+                read_plan()
+            except ValueError:
+                continue
+            raise Failure(f"invalid summary {field} accepted")
 
 
 def verify(config):

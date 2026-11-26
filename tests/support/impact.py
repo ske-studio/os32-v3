@@ -1,6 +1,7 @@
 """Select registered configurations and their distribution media for one Git diff."""
 from fnmatch import fnmatchcase
 from pathlib import Path
+from subprocess import CalledProcessError
 from tools.ownership import Inventory, OwnershipError, git
 
 PPC = ("core", "link", "sh", "link-sh", "shell", "neg1")
@@ -82,7 +83,27 @@ def impact(rows, paths, inventory, force=False):
             if scopes[path] in ("ppc", "ppc-userland"):
                 bundles.discard("x86")
             direct_pairs.update((name, bundle) for bundle in bundles)
+    product_scopes = {"x86", "ppc", "kernel", "userland", "shared-userland", "ppc-userland"}
+    shared_programs = set()
+    if not force and "full" not in scopes.values() and product_scopes.intersection(scopes.values()):
+        from tools.ownership_images import image_dependencies
+        if not hasattr(inventory, "declared_images"):
+            try:
+                inventory.declared_images = image_dependencies(inventory, declared_only=True)
+            except (OSError, CalledProcessError):
+                inventory.declared_images = {}  # Unknown product inputs require the full plan.
+        for path, kind in scopes.items():
+            if kind not in product_scopes:
+                continue
+            outputs = inventory.declared_images.get(path, ())
+            if not outputs or Path(path).suffix not in (".c", ".asm", ".s", ".S"):
+                scopes[path] = "full"
+            elif any(config == "pc98" and output.startswith("userland/") and output.endswith((".elf", ".bin"))
+                     for config, output in outputs):
+                shared_programs.add(path)
     kinds = set(scopes.values())
+    if shared_programs:
+        kinds.add("userland")
     ppc_user_images = set()
     for path, kind in scopes.items():
         if kind in ("ppc-userland", "shared-userland"):
