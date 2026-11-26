@@ -21,10 +21,10 @@ description: OS32 の KernelAPI (KAPI) を追加・変更するときに使う�
 ## 落ちやすいところ
 
 - **版数は 2 か所**: `sdk/kapi.json` の `"version"` と
-  `sdk/include/os32/os32_kapi_shared.h` の `KAPI_VERSION`。一致していないと `make check` が落ちる。
+  `sdk/include/os32/os32_kapi_shared.h` の `KAPI_VERSION`。一致していないと検査 `kapi_sync` が落ちる (`python3 -B -m tests.infra.ci run --check kapi_sync`、KAPI_SPEC §3-5)。
 - **再生成のあとに `git diff --stat` を見る。** 意図した追加以外の行が動いていたら、
   生成物を手で触ったか、kapi.json の既存部分を動かしている。
-- **前の口は変えない。** 検査 `kapi-abi` が基点 (origin/main) の口の並びと比べる。定義のハッシュを固定する試験は無い (足すだけなら直す値は無い)。壊すのが正しい時はコミットの本文に `KAPI-Break: <理由>`。
+- **前の口は変えない。** 検査 `kapi_abi` (KAPI_SPEC §3-4) が CI の明示した基点の口の並びと比べる。定義のハッシュを固定する試験は無い (足すだけなら直す値は無い)。壊すのが正しい時 (ユーザーが決めた破断だけ — CONSTRAINTS [ABI]) は、KAPI の版上げ・ABI の世代・コミットの本文の `KAPI-Break: <対象の口・理由>` の行の 3 つを同じ差分に揃える (§3-4)。
 - **レビュー済みの指紋を追従させる。** KAPI を変えると、試験が固定で持つ指紋 (HWDEV・FEP) が変わる。一覧は [ROLES §4-3](../../../docs/tasks/agents/ROLES.md) の表。
 - **差分ビルドは無言で壊れる** ([ABI])。構造体が変わるので `make clean` → `make all`。
   古い `syscalls.o` が残ると `malloc` が全部 ENOMEM になる類の症状が出る ([CONSTRAINTS](../../../docs/CONSTRAINTS.md#abi-kernelapi))。
