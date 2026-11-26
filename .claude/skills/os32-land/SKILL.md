@@ -85,7 +85,7 @@ GitHub の CI (ユーザー決定 2026-11-05、メインストリームを含む
 
 ## 3-1. ゲストの受入と実機は CI の成果物から
 
-同じ run の最新 attempt の成果物を使い、機種ごとに媒体・sha256・artifact_id・到達点・ログを記録する。
+`tools/ci_fetch.sh --sha <SHA> --wait` で同じ run の最新 attempt の VERIFIED 媒体を使い、機種ごとに媒体・sha256・artifact_id・到達点・ログを記録する。
 
 ## 4. 落ちたとき
 
@@ -116,7 +116,7 @@ git push -q origin main
 
 - 取り消された attempt は成功に数えない。
 - main の restructure-build が赤なら最優先で直す。
-- 実機に入れる SHA は artifacts のジョブが成功したものを選ぶ (os32-realhw-update)。
+- 実機に入れる SHA は VERIFIED 以上のものを選ぶ (os32-realhw-update)。
 
 ## 6. 記録
 

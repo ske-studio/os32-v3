@@ -14,6 +14,8 @@ concurrency:
   cancel-in-progress: true
 jobs:
   artifacts:
+    outputs:
+      name: ${{ steps.name.outputs.artifact }}
     runs-on: ubuntu-latest
     timeout-minutes: 150
     steps:
@@ -21,6 +23,12 @@ jobs:
         with:
           ref: ${{ github.sha }}
       - uses: ./.github/actions/build-setup
+      - name: Set product build identity
+        run: |
+          echo "OS32_BUILD_COMMIT=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+          echo "TZ=UTC" >> "$GITHUB_ENV"
+          echo "LC_ALL=C" >> "$GITHUB_ENV"
       - name: Build core (make all)
         env:
           OS32_ACCEPT_IPA_LICENSE: "1"
@@ -33,7 +41,7 @@ jobs:
       #    BUILD_INFO.txt と SHA256SUMS は tools/ci_fetch.sh が読む。
       - name: Artifact name
         id: name
-        run: echo "artifact=os32-${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+        run: echo "artifact=os32-${GITHUB_REF_NAME//\//-}-${GITHUB_SHA::7}-a${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
 
       # kapi_sys.o は make ごとに再コンパイルされる。FD / ISO / HostDrv を 1 呼出しで作る。
       # deploy-u3 は FD を作ってから HostDrv を同期する (hsync の名札も含む)。
@@ -116,7 +124,6 @@ jobs:
         with:
           name: ${{ steps.name.outputs.artifact }}
           path: out/
-          overwrite: true
           retention-days: 30
           if-no-files-found: error
   powerpc:
@@ -132,6 +139,12 @@ jobs:
           ref: ${{ github.sha }}
       - uses: ./.github/actions/build-setup
       - uses: ./.github/actions/ppc-setup
+      - name: Set product build identity
+        run: |
+          echo "OS32_BUILD_COMMIT=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+          echo "TZ=UTC" >> "$GITHUB_ENV"
+          echo "LC_ALL=C" >> "$GITHUB_ENV"
       - name: Build PowerPC media
         env:
           PPC_SEL: ${{ matrix.image }}
@@ -151,9 +164,8 @@ jobs:
           (cd out && sha256sum PPCKERN.ELF boot.iso > SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
-          name: ppc-${{ matrix.image }}-${{ github.sha }}
+          name: ppc-${{ matrix.image }}-${{ github.sha }}-a${{ github.run_attempt }}
           path: out/
-          overwrite: true
           if-no-files-found: error
   plan:
     env:
@@ -193,7 +205,8 @@ jobs:
           if-no-files-found: error
       - run: python3 -B -m tests.infra.ci lint
   checks:
-    needs: plan
+    needs: [plan, artifacts, powerpc]
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 150
     strategy:
@@ -214,6 +227,16 @@ jobs:
         with:
           name: plan-${{ github.run_attempt }}
           path: ${{ runner.temp }}/planned
+      - uses: actions/download-artifact@v4
+        if: matrix.bundle == 'x86'
+        with:
+          name: ${{ needs.artifacts.outputs.name }}
+          path: ${{ runner.temp }}/products/pc98
+      - uses: actions/download-artifact@v4
+        if: matrix.bundle == 'ppc'
+        with:
+          pattern: ppc-*-${{ github.sha }}-a${{ github.run_attempt }}
+          path: ${{ runner.temp }}/products
       - if: matrix.bundle == 'host'
         run: python3 -m pip install PyYAML
       - uses: ./.github/actions/build-setup
@@ -236,6 +259,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends qemu-system-ppc seabios || { sudo apt-get update && sudo apt-get install -y --no-install-recommends --fix-missing qemu-system-ppc seabios; }
       - env:
+          OS32_PRODUCT_DIR: ${{ runner.temp }}/products
           OS32_KAPI_CACHE: ${{ runner.temp }}/kapi-targets
         run: python3 -B -m tests.infra.ci run --bundle "$BUNDLE" --mutate --gate "$GATE" --output "$RUNNER_TEMP/results" --plan-file "$RUNNER_TEMP/planned/plan.json"
       - uses: actions/upload-artifact@v4
@@ -247,7 +271,7 @@ jobs:
             ${{ runner.temp }}/results/*.log
           if-no-files-found: error
   collect:
-    needs: [plan, checks]
+    needs: [plan, artifacts, powerpc, checks]
     if: always()
     runs-on: ubuntu-latest
     env:
@@ -272,5 +296,11 @@ jobs:
         if: always()
         with:
           name: summary-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/results/summary.json
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: success() && needs.plan.result == 'success' && needs.checks.result == 'success' && needs.artifacts.result == 'success' && needs.powerpc.result == 'success'
+        with:
+          name: verified-${{ github.sha }}-a${{ github.run_attempt }}
           path: ${{ runner.temp }}/results/summary.json
           if-no-files-found: error

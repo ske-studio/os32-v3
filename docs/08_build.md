@@ -1073,7 +1073,7 @@ budget は重みの2倍で、超過は警告だけ。未計測の検査は CHECK
 - 変数は数の JSON 配列 (`[]` か `[4]` のような形) だけにする。壊れた JSON は、信頼された push の checks の 6 本を全部赤にする。配列でない値 (`14` など) は文字列の部分一致になり、意図しないシャードが自前に乗る。
 - 自前の runner が止まっていると、そのシャードは GitHub の側で queued のまま待ち、自動では標準に戻らない (待ちは timeout-minutes に数えない)。queued が 10 分を越えたら、変数を `[]` に戻して取り消し・回し直す (スキル os32-ci-read)。
 
-**成果物** (artifact 名 `os32-<ブランチ名の / を - に>-<sha7>`、保持 30 日):
+**成果物** (artifact 名 `os32-<ブランチ名の / を - に>-<sha7>-a<attempt>`、保持 30 日):
 
 | ファイル | 中身 |
 |---|---|
@@ -1096,14 +1096,13 @@ public repo でも artifact の API ダウンロードには認証が要る):
 tools/ci_fetch.sh                       # main の最新 run (既定 --repo ske-studio/os32-v3)
 tools/ci_fetch.sh --branch wt/ci
 tools/ci_fetch.sh --sha 0a5247f         # そのコミットの run (短縮 SHA 可)
-tools/ci_fetch.sh --sha 0a5247f --wait  # artifacts が未完了なら待つ
+tools/ci_fetch.sh --sha 0a5247f --wait  # VERIFIED を待つ
 tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表示するだけ
 ```
 
-指定 SHA (短縮可) / ブランチの最新の `build.yml` run を、run 全体の status で絞らず選ぶ。
-その run の `artifacts` ジョブが成功していれば、検査の完了を待たず取得する。`checks` が失敗・実行中なら
-その旨を 1 行表示する (調べの版も取得できる)。`artifacts` が未完了なら待機中と表示して終了 1、
-`--wait` なら 10 秒ごとに待つ。`artifacts` が失敗・取消等なら取得せず終了 1。
+指定 SHA またはブランチの最新 restructure-build run と最新 attempt を選び、既定は VERIFIED から取得する。
+実機調査用は `--allow-built` で BUILT から取得できる。両機種の受入を照合する場合は `--evidence JSON` で ACCEPTED を表示する。
+指定状態に届かなければ終了 1。`--wait` は run の完了まで 10 秒ごとに照会する。
 
 保存先は `./os32-ci/<artifact 名>/` (`--dir` で変更)。取得後に `BUILD_INFO.txt` を表示し、
 `SHA256SUMS` で全ファイルを照合する (不一致は終了 1、`gh` が無い / 未認証は終了 2)。

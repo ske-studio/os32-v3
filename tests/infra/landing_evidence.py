@@ -1,6 +1,9 @@
 """Exercise the integration verdict with synthetic API replies."""
 from pathlib import Path
+import os
+import subprocess
 import sys
+import tempfile
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,14 +36,41 @@ def verify(config):
                 raise
             raise Failure("invalid PC-98 selftest count accepted")
 
+    with tempfile.TemporaryDirectory() as tmp:
+        fake = Path(tmp) / "gh"
+        fake.write_text("""#!/bin/bash
+case "$1 $2" in
+    'auth status') exit 0 ;;
+    'run list') echo '[{"databaseId":19,"headSha":"%s","headBranch":"wt/int-example","createdAt":"now"}]' ;;
+    'api --paginate') echo "$NAMES" ;;
+    'api repos/'*) echo '{"run_attempt":2,"status":"completed"}' ;;
+    *) exit 2 ;;
+esac
+""" % sha)
+        fake.chmod(0o755)
+        product = f"os32-wt-int-example-{sha[:7]}-a2"
+        for names, options, rc, state in (
+            ([product], [], 1, "BUILT"),
+            ([product], ["--allow-built"], 0, "BUILT"),
+            ([product, f"verified-{sha}-a1"], [], 1, "BUILT"),
+            ([product, f"verified-{sha}-a2"], [], 0, "VERIFIED"),
+        ):
+            result = subprocess.run(["bash", ROOT / "tools/ci_fetch.sh", "--dry-run", *options],
+                env=dict(os.environ, PATH=tmp + os.pathsep + os.environ["PATH"], NAMES="\n".join(names)),
+                capture_output=True, text=True)
+            if result.returncode != rc or state not in result.stdout + result.stderr:
+                raise Failure(f"incorrect fetch policy for {state}: {result.stdout}{result.stderr}")
+
     def api(url):
         return {f"repos/{repo}/actions/workflows/restructure-build.yml": {"id": 3},
                 f"repos/{repo}/actions/runs/19": run}[url]
 
+    artifacts = [dict(name=f"verified-{sha}-a2", expired=False)]
+
     def pages(url, field, query):
         if (url, field, query) != (f"repos/{repo}/actions/runs/19/artifacts", "artifacts", {}):
             raise Failure("unexpected evidence query")
-        return []
+        return artifacts
 
     with patch.object(gate, "api", side_effect=api), patch.object(gate, "pages", side_effect=pages), \
          patch.object(gate, "verify_boot") as verify_boot:
@@ -56,6 +86,15 @@ def verify(config):
                 except ValueError:
                     continue
                 raise Failure(f"invalid {field} accepted")
+        marker = artifacts.pop()
+        try:
+            gate.verify(repo, sha, evidence)
+        except ValueError as exc:
+            if "VERIFIED required" not in str(exc):
+                raise
+        else:
+            raise Failure("BUILT accepted for landing")
+        artifacts.append(marker)
         evidence["boots"].pop()
         if not gate.verify(repo, sha, evidence):
             raise Failure("missing PowerMac boot accepted")

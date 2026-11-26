@@ -2,6 +2,7 @@ from contextlib import chdir
 from pathlib import Path
 import hashlib
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -40,6 +41,7 @@ def inventory(config):
 
 
 def build(config):
+    os.environ.pop("OS32_PRODUCT_DIR", None)  # Two independent clean builds.
     build_media, verify_media = (x86_build, x86_verify) if config == "pc98" else (ppc_build, ppc_verify)
     # The caller supplies an isolated candidate with no previous build products.
     with tempfile.TemporaryDirectory() as tmp:

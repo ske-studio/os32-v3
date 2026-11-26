@@ -101,7 +101,7 @@ id = "landing_evidence"
 spec = { path = "docs/design/tools/ci/ci_v2.md", section = "§8 取り込み SHA の固定" }
 subsystem = "infra"
 level = "M"
-sources = ["tools/ci/land_gate.py"]
+sources = ["tools/ci/land_gate.py", "tools/ci_fetch.sh"]
 environment = "python-yaml"
 arch = { host = ["local"] }
 needs = []
@@ -109,6 +109,7 @@ expect = "候補 SHA の指定 run の最新 attempt の成功と両機種の今
 limits = "API 応答を与えた関門の判定。媒体自体の起動は別の検査"
 gates = ["push", "main"]
 mutations = [
+    { id = "accept_built", config = "local", replace = "tools/ci/land_gate.py", old = 'if sum(row["name"] == marker and not row["expired"] for row in artifacts) != 1:', new = "if False:", fail = "BUILT accepted for landing", when = "after_build" },
     { id = "accept_stale_attempt", config = "local", replace = "tools/ci/land_gate.py", old = "or number(run['run_attempt']) != attempt", new = "or False", fail = "invalid run_attempt accepted", when = "after_build" },
     { id = "accept_failed_selftest", config = "local", replace = "tools/ci/land_gate.py", old = "if type(count) is not int or count != 0:", new = "if False:", fail = "invalid PC-98 selftest count accepted", when = "after_build" },
     { id = "accept_partial_boot", config = "local", replace = "tools/ci/land_gate.py", old = "if machines != {'pc98', 'powermac'}:", new = "if not machines:", fail = "missing PowerMac boot accepted", when = "after_build" },

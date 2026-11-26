@@ -79,6 +79,7 @@ def medium_digest(base, run, artifacts, boot, artifact_id=None):
         filenames = {'boot.iso'}
     else:
         raise ValueError('unrecognized boot machine or image')
+    name += f"-a{run['run_attempt']}"
     matches = [row for row in artifacts if row['name'] == name and not row['expired']
                and (artifact_id is None or row['id'] == artifact_id)]
     if len(matches) != 1 or boot['filename'] not in filenames:
@@ -156,6 +157,9 @@ def verify(repo, sha, evidence):
             or evidence['sha'] != sha):
         raise ValueError('candidate SHA or successful latest run attempt does not match')
     artifacts = pages(f'{base}/runs/{rid}/artifacts', 'artifacts', {})
+    marker = f"verified-{sha}-a{attempt}"
+    if sum(row["name"] == marker and not row["expired"] for row in artifacts) != 1:
+        raise ValueError("candidate artifact is BUILT, VERIFIED required")
     machines = set()
     for boot in evidence['boots']:
         machine = boot['machine']
@@ -184,6 +188,8 @@ def main():
         failures = [str(exc)]
     for error in failures:
         print(error, file=sys.stderr)
+    if not failures:
+        print(f"ACCEPTED {args.sha} run={evidence['run_id']} attempt={evidence['attempt']}")
     return int(bool(failures))
 
 
