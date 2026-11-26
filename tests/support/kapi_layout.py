@@ -1,4 +1,5 @@
 """Measure the public C definitions with the target ABI and verify Rust's view."""
+import hashlib
 import json
 import os
 import struct
@@ -92,9 +93,22 @@ def rust_layout(cpu, measured):
             '[lib]\npath="measure.rs"\n[dependencies]\nos32api={path=' + json.dumps(str(crate)) + '}\n')
         (folder / "measure.rs").write_text("#![no_std]\nuse core::mem::{align_of,offset_of,size_of};\n" +
                                            "\n".join(expected))
+        spec = root / f"sdk/rust/{target}-os32-none.json"
+        version = subprocess.check_output(["rustc", "-vV"])
+        key = hashlib.sha256(version + b"\0" + spec.read_bytes()).hexdigest()
+        cache = Path(os.environ.get("OS32_KAPI_CACHE", Path(tempfile.gettempdir()) / "kapi-targets"))
         cmd = ["cargo", "check", "--manifest-path", folder / "Cargo.toml", "-Zjson-target-spec",
-               "-Zbuild-std=core,alloc,compiler_builtins", "--target", root / f"sdk/rust/{target}-os32-none.json"]
-        proc = subprocess.run(cmd, capture_output=True, text=True)
+               "-Zbuild-std=core,alloc,compiler_builtins", "--target", spec]
+        env = dict(os.environ, CARGO_TARGET_DIR=str(cache / spec.stem / key))
+        proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        if proc.returncode:
+            env["CARGO_TARGET_DIR"] = str(folder / "target")
+            proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        if proc.returncode and not any(msg in proc.stderr for msg in
+                                       ("evaluation of constant value failed", "evaluation panicked")):
+            # Retry independently of restored build products and crate downloads.
+            env.update(CARGO_TARGET_DIR=str(folder / "retry-target"), CARGO_HOME=str(folder / "cargo-home"))
+            proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
         if proc.returncode:
             if "evaluation of constant value failed" in proc.stderr or "evaluation panicked" in proc.stderr:
                 raise Failure(f"{cpu} Rust layout mismatch: {proc.stderr}")

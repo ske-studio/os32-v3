@@ -19,6 +19,8 @@
 
 KAPI・FS・HAL の共通契約では、入力と期待値と比較関数を本体に一度書く。例えば同じファイルを読み、PC-98 と PowerPC の実行側が返したバイト列と長さを同じ関数に渡す。起動・呼出規約・ログ採取を機種側に閉じ、結果は構成ごとに残す。割り込みや MMU 固有の契約は各所属で検査し、物理デバイスのタイミングは L5 として限界を記す。
 
+kapi_sync は target 名・rustc の版・target JSON の内容で検査専用の Cargo 出力先を分け、同じ target の core は Cargo のロックの下で共有する。CI は runner OS・束・toolchain・Cargo.lock・target JSON をキーに取得物とこの出力先を保存し、キャッシュに起因し得るコンパイルエラーでは空の置き場で再試行する。
+
 ## 最初の登録例 — PowerPC の配布像を組めること
 
 P4 順 1 のうち `ppc_media_build` は `tests/infra/ppc_media_build.py` に置く。期待の出所は [CI 設計 §0](../ci/ci_v2.md) の PowerPC 6 像と必須ファイル欠落時の赤。対象は製品の Make 規則とそこから組む入力。各構成を清浄な候補 SHA の木で `make ARCH=ppc PLATFORM=powermac <下記の指定> all iso` で組む。既存のビルドジョブをこの呼出しに載せ、出力を配布にも使う。
