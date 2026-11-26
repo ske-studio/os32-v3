@@ -14,7 +14,8 @@ import time
 
 from tests.support.tracked import paths
 from tests.support.registry import load
-from tools.ownership import Inventory
+from tests.support.impact import comparison
+from tools.ownership import Inventory, OwnershipError
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -117,8 +118,16 @@ def scoped_deferral(exempt):
 
 
 def manifest(plan, identity):
-    inventory = Inventory(ROOT)
-    ownership = {path: inventory.lookup(path)["kind"] for path in inventory.paths}
+    try:
+        inventory = Inventory(ROOT)
+    except OwnershipError:
+        inventory = None
+    ownership = {}
+    for path in inventory.paths if inventory is not None else ():
+        try:
+            ownership[path] = inventory.lookup(path)["kind"]
+        except OwnershipError:
+            ownership[path] = None  # src_owner reports invalid placement on the full run.
     entries = []
     for row, cpu, config in plan:
         inputs = {path: ownership.get(path) for path in row["sources"]}
@@ -327,8 +336,22 @@ def collect(plan, args, identity, plan_errors=()):
     print("mode", "with mutations" if args.mutate else "normal", "bundle seconds", durations)
     print(f"{len(table)} rows rc={rc}")
     (args.output / "summary.json").write_text(json.dumps(dict(identity=identity, rows=table,
-        mutations=totals, durations=durations, errors=errors, rc=rc), indent=2))
+        selection=getattr(args, "impact", None), mutations=totals, durations=durations, errors=errors, rc=rc), indent=2))
     return rc
+
+
+def job_errors(jobs, selected, entries):
+    bundles = {entry["bundle"] for entry in entries}
+    required = dict(plan=True, artifacts=selected["pc98"] != "none", powerpc=bool(selected["powerpc"]))
+    required.update({f"checks-{cpu}": cpu in bundles for cpu in ("host", "x86", "ppc")})
+    errors = []
+    for job, active in required.items():
+        wanted = "success" if active else "skipped"
+        observed = jobs.get(job, {}).get("result", "missing")
+        print(f"{job}: {observed} (expected {wanted})")
+        if observed != wanted:
+            errors.append(f"{job}: expected {wanted}, got {observed}")
+    return errors
 
 
 def main():
@@ -340,6 +363,8 @@ def main():
     parser.add_argument("--bundle")
     parser.add_argument("--gate", choices=["push", "main"], default="main")
     parser.add_argument("--output", type=Path, default=Path("build/out/check-results"))
+    parser.add_argument("--base", default=os.getenv("OS32_CI_BASE"))
+    parser.add_argument("--full", action="store_true", default=os.getenv("GITHUB_EVENT_NAME") in ("schedule", "workflow_dispatch"))
     parser.add_argument("--plan-file", type=Path)
     args = parser.parse_args()
     rows = load(ROOT)
@@ -356,6 +381,19 @@ def main():
     all_args = argparse.Namespace(check=None, config=None, bundle=None)
     expected = manifest(selection(rows, all_args), identity)
     plan_errors = []
+    if args.base:
+        selected = comparison(ROOT, rows, args.base, commit, args.full)
+        args.impact = selected
+        expected.update(base=args.base, selection=selected)
+        keys = {tuple(key) for key in selected["entries"]}
+        expected["entries"] = [entry for entry in expected["entries"] if (entry["id"], entry["config"]) in keys]
+        plan = [entry for entry in plan if (entry[0]["id"], entry[2]) in keys]
+        if args.command == "collect":
+            for key, reason in (selected["skipped"] | selected["omitted_products"]).items():
+                print(f"Skipped {key}: {reason}")
+            jobs = json.loads(os.environ["OS32_JOB_RESULTS"]) if "OS32_JOB_RESULTS" in os.environ else None
+            if jobs is not None:
+                plan_errors.extend(job_errors(jobs, selected, expected["entries"]))
     if args.plan_file:
         try:
             if json.loads(args.plan_file.read_text()) != expected:

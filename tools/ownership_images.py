@@ -121,22 +121,30 @@ def recipe_edges(root, text, graph, cargo):
                 graph[target].add(image)
 
 
-def observe(root, tracked):
+def observe(root, tracked, declared_only=False):
     result = defaultdict(set)
     cache, cargo = {}, {}
     for config in ("pc98", *PPC):
         flags = [] if config == "pc98" else [*PPC_MAKE, *PPC[config][0]]
+        if declared_only and config == "pc98":
+            # The planner only traverses tracked prerequisites. An installed
+            # cross libc is an external leaf of the Make graph.
+            cross = root / ".external-toolchain"
+            flags += [f"CROSS_DIR={cross}", "-o", str(cross / "i386-elf/lib/libc.a")]
         goals = ["all", "iso"] + (["kernel-r1"] if config == "pc98" else [])
         sqlite_directory(config, root)
         proc = subprocess.run(["make", "-j1", "--trace", "-kBnp", *flags, *goals],
                               cwd=root, capture_output=True, text=True, errors="replace")
+        if declared_only and proc.returncode:
+            raise OSError(f"{config}: incomplete Make dependency graph: {proc.stderr}")
         graph = defaultdict(set)
         output = proc.stdout.replace("\\\n", " ")
-        dependencies, unknown = compile_edges(root, output.partition("# GNU Make")[0].splitlines(), cache)
-        graph.update(dependencies)
-        if proc.returncode or unknown:
-            print(f"{config}: incomplete dependencies; Make rc={proc.returncode}, "
-                  f"unknown objects={','.join(unknown)}", file=sys.stderr)
+        if not declared_only:
+            dependencies, unknown = compile_edges(root, output.partition("# GNU Make")[0].splitlines(), cache)
+            graph.update(dependencies)
+            if proc.returncode or unknown:
+                print(f"{config}: incomplete dependencies; Make rc={proc.returncode}, "
+                      f"unknown objects={','.join(unknown)}", file=sys.stderr)
         in_files = False
         for line in output.splitlines():
             if line == "# Files":
@@ -149,7 +157,8 @@ def observe(root, tracked):
             if rule and rule[2] and "=" not in rule[2]:
                 graph[relative(root, rule[1])].update(relative(root, p) for p in
                                                       rule[2].split("|", 1)[0].split())
-        recipe_edges(root, output.partition("# GNU Make")[0], graph, cargo)
+        if not declared_only:
+            recipe_edges(root, output.partition("# GNU Make")[0], graph, cargo)
         if not graph:
             raise OSError(f"{config}: no Make dependency graph: {proc.stderr}")
         def closure(starts):
@@ -169,7 +178,7 @@ def observe(root, tracked):
     return result
 
 
-def image_dependencies(inventory):
+def image_dependencies(inventory, declared_only=False):
     # Both modes observe clean product rules. Stale objects or depfiles in a
     # developer's worktree cannot introduce edges from a different revision.
     with tempfile.TemporaryDirectory() as tmp:
@@ -184,4 +193,4 @@ def image_dependencies(inventory):
                     files.extractall(root, filter="data")
         else:
             copy_inputs(inventory.root, root, inventory.paths)
-        return observe(root, inventory.paths)
+        return observe(root, inventory.paths, declared_only)

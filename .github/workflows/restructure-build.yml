@@ -2,6 +2,8 @@ name: restructure-build
 on:
   push:
     branches: [main, "wt/**"]
+  schedule:
+    - cron: "17 19 * * 0"
   workflow_dispatch:
     inputs:
       kapi_base:
@@ -10,10 +12,12 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: restructure-build-${{ github.ref }}
+  group: restructure-build-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   artifacts:
+    needs: plan
+    if: needs.plan.outputs.pc98 != 'none'
     outputs:
       name: ${{ steps.name.outputs.artifact }}
     runs-on: ubuntu-latest
@@ -29,13 +33,29 @@ jobs:
           echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
           echo "TZ=UTC" >> "$GITHUB_ENV"
           echo "LC_ALL=C" >> "$GITHUB_ENV"
-      - name: Build core (make all)
+      - name: Build candidate boot FD
+        if: needs.plan.outputs.pc98 == 'fd'
+        env:
+          OS32_ACCEPT_IPA_LICENSE: "1"
+        run: |
+          export PATH="$CROSS_DIR/bin:$PATH"
+          inputs=$(python3 tools/mkpkg.py --plan build/packages.yaml --fd-inputs --fd-loader boot/loader_fat_new.bin)
+          make -j"$(nproc)" images/os32_boot.d88 "FDD_IMAGE_DEPS=boot/boot_fat.bin $inputs"
+          mkdir -p out
+          cp images/os32_boot.d88 out/
+          echo "commit: $GITHUB_SHA (boot FD)" > out/BUILD_INFO.txt
+          (cd out && sha256sum os32_boot.d88 > SHA256SUMS)
+      - name: Build distribution prerequisites
+        if: needs.plan.outputs.pc98 == 'distribution'
         env:
           OS32_ACCEPT_IPA_LICENSE: "1"
         run: |
           export PATH="$CROSS_DIR/bin:$PATH"
           i386-elf-gcc --version | head -1
-          make -j"$(nproc)" all kernel-r1 CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
+          targets=(kernel-r1 build/out/kdebug.bin build/out/hwdev.mod iso)
+          if [[ "${{ needs.plan.outputs.userland }}" == true ]]; then targets+=(programs); fi
+          if [[ "${{ needs.plan.outputs.sdk }}" == true ]]; then targets+=(all); fi
+          make -j"$(nproc)" "${targets[@]}" CROSS_DIR="$CROSS_DIR" NP21W_DIR="$RUNNER_TEMP/np21w"
 
       # ⑤ 成果物: カーネル・起動 FD・インストール ISO・パッケージ・実機更新用の配備元 (hostdrv.tar.gz)。
       #    BUILD_INFO.txt と SHA256SUMS は tools/ci_fetch.sh が読む。
@@ -47,6 +67,7 @@ jobs:
       # deploy-u3 は FD を作ってから HostDrv を同期する (hsync の名札も含む)。
       # 生 2HD は D88 の副生成物、ISO は phony の iso で必ず作り直す。
       - name: Deploy set (same-build FD, ISO and HostDrv)
+        if: needs.plan.outputs.pc98 == 'distribution'
         run: |
           export PATH="$CROSS_DIR/bin:$PATH"
           mkdir -p "$RUNNER_TEMP/hostdrv" "$RUNNER_TEMP/np21w"
@@ -58,6 +79,7 @@ jobs:
           test -f "$RUNNER_TEMP/hostdrv/.deploy/manifest.txt"
 
       - name: Collect outputs
+        if: needs.plan.outputs.pc98 == 'distribution'
         run: |
           set -euo pipefail
           rm -rf out && mkdir -p out/packages
@@ -127,12 +149,14 @@ jobs:
           retention-days: 30
           if-no-files-found: error
   powerpc:
+    needs: plan
+    if: needs.plan.outputs.powerpc != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 150
     strategy:
       fail-fast: false
       matrix:
-        image: [core, link, sh, link-sh, shell, neg1]
+        image: ${{ fromJSON(needs.plan.outputs.powerpc) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -169,9 +193,13 @@ jobs:
           if-no-files-found: error
   plan:
     env:
-      GATE: ${{ (startsWith(github.ref_name, 'wt/int-') || github.ref_name == 'main') && 'main' || 'push' }}
+      GATE: ${{ (github.event_name != 'push' || startsWith(github.ref_name, 'wt/int-') || github.ref_name == 'main') && 'main' || 'push' }}
     runs-on: ubuntu-latest
     outputs:
+      pc98: ${{ steps.plan.outputs.pc98 }}
+      powerpc: ${{ steps.plan.outputs.powerpc }}
+      sdk: ${{ steps.plan.outputs.sdk }}
+      userland: ${{ steps.plan.outputs.userland }}
       bundles: ${{ steps.plan.outputs.bundles }}
       kapi_base: ${{ steps.comparison.outputs.sha }}
     steps:
@@ -184,19 +212,19 @@ jobs:
           BEFORE: ${{ github.event.before || inputs.kapi_base }}
         run: |
           if [[ "$GITHUB_REF_NAME" == main ]]; then
-            base="$BEFORE"
-          elif [[ "$GITHUB_REF_NAME" == wt/int-* ]]; then
-            base=$(git rev-parse origin/main)
+            base="${BEFORE:-$(git rev-parse HEAD^)}"
           else
             base=$(git merge-base origin/main "$GITHUB_SHA")
           fi
           git cat-file -e "$base^{commit}"
           echo "sha=$base" >> "$GITHUB_OUTPUT"
+          echo "OS32_CI_BASE=$base" >> "$GITHUB_ENV"
           echo "OS32_KAPI_BASE=$base" >> "$GITHUB_ENV"
-      - run: python3 -m pip install markdown-it-py
+      - run: python3 -m pip install markdown-it-py PyYAML
       - id: plan
         run: |
           bundles=$(python3 -B -m tests.infra.ci plan --gate "$GATE" --mutate --output "$RUNNER_TEMP/planned")
+          jq -r '.selection | "pc98=\(.pc98)", "userland=\(.userland)", "sdk=\(.sdk)", "powerpc=\(.powerpc|tojson)"' "$RUNNER_TEMP/planned/plan.json" >> "$GITHUB_OUTPUT"
           echo "bundles=$bundles" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
@@ -213,7 +241,10 @@ jobs:
       kapi_base: ${{ needs.plan.outputs.kapi_base }}
   checks-x86:
     needs: [plan, artifacts]
-    if: contains(fromJSON(needs.plan.outputs.bundles), 'x86')
+    if: >-
+      !cancelled() && needs.plan.result == 'success' &&
+      (needs.artifacts.result == 'success' || needs.artifacts.result == 'skipped') &&
+      contains(fromJSON(needs.plan.outputs.bundles), 'x86')
     uses: ./.github/workflows/restructure-check-bundle.yml
     with:
       bundle: x86
@@ -221,21 +252,29 @@ jobs:
       pc98_artifact: ${{ needs.artifacts.outputs.name }}
   checks-ppc:
     needs: [plan, powerpc]
-    if: contains(fromJSON(needs.plan.outputs.bundles), 'ppc')
+    if: >-
+      !cancelled() && needs.plan.result == 'success' &&
+      (needs.powerpc.result == 'success' || needs.powerpc.result == 'skipped') &&
+      contains(fromJSON(needs.plan.outputs.bundles), 'ppc')
     uses: ./.github/workflows/restructure-check-bundle.yml
     with:
       bundle: ppc
+      ppc_media: ${{ needs.plan.outputs.powerpc != '[]' }}
       kapi_base: ${{ needs.plan.outputs.kapi_base }}
   collect:
     needs: [plan, artifacts, powerpc, checks-host, checks-x86, checks-ppc]
     if: always()
     runs-on: ubuntu-latest
     env:
+      OS32_JOB_RESULTS: ${{ toJSON(needs) }}
+      OS32_CI_BASE: ${{ needs.plan.outputs.kapi_base }}
       OS32_KAPI_BASE: ${{ needs.plan.outputs.kapi_base }}
-      GATE: ${{ (startsWith(github.ref_name, 'wt/int-') || github.ref_name == 'main') && 'main' || 'push' }}
+      GATE: ${{ (github.event_name != 'push' || startsWith(github.ref_name, 'wt/int-') || github.ref_name == 'main') && 'main' || 'push' }}
     steps:
       - uses: actions/checkout@v4
-      - run: python3 -m pip install markdown-it-py
+        with:
+          fetch-depth: 0
+      - run: python3 -m pip install markdown-it-py PyYAML
       - uses: actions/download-artifact@v4
         with:
           name: plan-${{ github.run_attempt }}
@@ -255,7 +294,7 @@ jobs:
           path: ${{ runner.temp }}/results/summary.json
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
-        if: success() && needs.plan.result == 'success' && needs.checks-host.result == 'success' && needs.checks-x86.result == 'success' && needs.checks-ppc.result == 'success' && needs.artifacts.result == 'success' && needs.powerpc.result == 'success'
+        if: success()
         with:
           name: verified-${{ github.sha }}-a${{ github.run_attempt }}
           path: ${{ runner.temp }}/results/summary.json

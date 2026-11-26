@@ -8,7 +8,7 @@ import tempfile
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from tests.infra.ci import collect, run_bundle
+from tests.infra.ci import collect, job_errors, run_bundle
 from tests.support.media import Failure, main
 
 
@@ -17,7 +17,68 @@ def check(value, why):
         raise Failure(why)
 
 
+def verify_selection():
+    import tomllib
+    from tests.support.impact import impact, PPC
+    from tools.ownership import Inventory
+    root = Path.cwd()
+    inventory = Inventory(root)
+    rows = tomllib.loads((root / "tests/registry.toml").read_text())["check"]
+
+    def plan(path):
+        result = impact(rows, [path], inventory)
+        return result, {tuple(entry) for entry in result["entries"]}
+
+    result, entries = plan("userland/cmds/cal.c")
+    check(result["pc98"] == "distribution" and result["powerpc"] == [] and result["userland"]
+          and not result["sdk"], "userland products")
+    check(entries == {(name, "pc98") for name in ("ring3_instructions", "c_dialect",
+                                                  "x86_media_build", "build_identity")}, "userland checks")
+    result, entries = plan("userland/shell/cmd_dir.c")
+    check(result["pc98"] == "distribution" and set(result["powerpc"]) == {"sh", "link-sh", "shell"}
+          and ("ppc_boot", "shell") in entries and ("ppc_boot", "core") not in entries,
+          "shared userland media")
+    result, entries = plan("sys/kern/av_focus.c")
+    check(result["pc98"] == "distribution" and result["powerpc"] == list(PPC)
+          and not result["userland"] and not result["sdk"], "kernel products")
+    check({("link_layers", "pc98"), ("kapi_abi", "core"), ("ppc_boot", "sh")} <= entries
+          and ("ring3_instructions", "pc98") not in entries, "kernel checks")
+    for path in ("lib/lz4.c", "lib/utf8.c"):
+        result, entries = plan(path)
+        check(not result["full"] and result["userland"] and result["powerpc"] == list(PPC)
+              and {("ring3_instructions", "pc98"), ("c_dialect", "pc98"),
+                   ("link_layers", "pc98")} <= entries, f"shared program inputs: {path}")
+    result, entries = plan("sys/platform/powermac/apm.c")
+    check(result["pc98"] == "none" and result["powerpc"] == list(PPC)
+          and ("ppc_boot", "core") in entries and all(c != "pc98" for _, c in entries), "PowerPC scope")
+    result, entries = plan("sys/arch/x86/kernel/gdt.c")
+    check(result["pc98"] == "distribution" and result["powerpc"] == []
+          and ("include_layers", "pc98") in entries and ("ring3_instructions", "pc98") not in entries,
+          "x86 scope")
+    result, entries = plan("tools/ci/land_gate.py")
+    check(result["pc98"] == "none" and result["powerpc"] == []
+          and {("landing_evidence", "local"), ("collection_contract", "local")} <= entries, "gate scope")
+    result, entries = plan("tests/infra/p2v.py")
+    check(result["pc98"] == "none" and result["powerpc"] == []
+          and {("p2v", "pc98"), ("p2v", "link-sh")} <= entries, "independent cross checks")
+    result, entries = plan("docs/INDEX.md")
+    check(result["pc98"] == "fd" and result["powerpc"] == ["core"]
+          and entries == {(r["id"], "local") for r in rows if r["id"].startswith("docs_")}, "docs scope")
+    jobs = {job: {"result": "success"} for job in ("plan", "artifacts", "powerpc", "checks-host")}
+    jobs.update({job: {"result": "skipped"} for job in ("checks-x86", "checks-ppc")})
+    check(not job_errors(jobs, result, [{"bundle": "host"}]), "planned skip rejected")
+    jobs["powerpc"]["result"] = "skipped"
+    check(job_errors(jobs, result, [{"bundle": "host"}]), "missing required boot medium accepted")
+    for path in ("sdk/kapi.json", "sys/include/ide_contract.h", "sys/kern/exec/os32x_hdr.h",
+                 "build/image.mk", ".github/workflows/restructure-build.yml", "tests/registry.toml",
+                 "unknown/path", "sys/kern/kstring.h"):
+        result, entries = plan(path)
+        check(result["full"] and result["sdk"] and result["userland"] and not result["skipped"]
+              and len(entries) == sum(len(c) for r in rows for c in r["arch"].values()), "full scope")
+
+
 def verify(config):
+    verify_selection()
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         source = root / "source"

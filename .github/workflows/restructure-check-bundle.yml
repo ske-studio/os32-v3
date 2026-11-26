@@ -8,6 +8,9 @@ on:
       kapi_base:
         required: true
         type: string
+      ppc_media:
+        type: boolean
+        default: false
       pc98_artifact:
         type: string
 jobs:
@@ -16,30 +19,29 @@ jobs:
     timeout-minutes: 150
     env:
       BUNDLE: ${{ inputs.bundle }}
+      OS32_CI_BASE: ${{ inputs.kapi_base }}
       OS32_KAPI_BASE: ${{ inputs.kapi_base }}
-      GATE: ${{ (startsWith(github.ref_name, 'wt/int-') || github.ref_name == 'main') && 'main' || 'push' }}
+      GATE: ${{ (github.event_name != 'push' || startsWith(github.ref_name, 'wt/int-') || github.ref_name == 'main') && 'main' || 'push' }}
       OS32_ACCEPT_IPA_LICENSE: "1"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - run: python3 -m pip install markdown-it-py
+      - run: python3 -m pip install markdown-it-py PyYAML
       - uses: actions/download-artifact@v4
         with:
           name: plan-${{ github.run_attempt }}
           path: ${{ runner.temp }}/planned
       - uses: actions/download-artifact@v4
-        if: inputs.bundle == 'x86'
+        if: inputs.pc98_artifact != ''
         with:
           name: ${{ inputs.pc98_artifact }}
           path: ${{ runner.temp }}/products/pc98
       - uses: actions/download-artifact@v4
-        if: inputs.bundle == 'ppc'
+        if: inputs.ppc_media
         with:
           pattern: ppc-*-${{ github.sha }}-a${{ github.run_attempt }}
           path: ${{ runner.temp }}/products
-      - if: inputs.bundle == 'host'
-        run: python3 -m pip install PyYAML
       - uses: ./.github/actions/build-setup
         if: inputs.bundle != 'host'
       - name: Cache KAPI layout check dependencies

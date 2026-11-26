@@ -1,15 +1,74 @@
 """Exercise the integration verdict with synthetic API replies."""
+import hashlib
+import io
+import json
 from pathlib import Path
 import os
 import subprocess
 import sys
 import tempfile
+import zipfile
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from tests.support.media import Failure, main
 from tools.ci import land_gate as gate
+
+
+def selection_artifact(run):
+    previous = "b" * 40
+    rows = '[[check]]\nid = "example"\ngates = ["main"]\nmutations = []'
+    expected = dict(pc98="none", powerpc=["core"], entries=[["example", "core"]],
+                    skipped={"other/local": "outside changed ownership and registered inputs"})
+    plan = dict(base=previous, selection=expected.copy(), entries=[dict(id="example", config="core")],
+                identity=dict(sha=run["head_sha"], kapi_base=previous, run="19", attempt="2",
+                              gate="main", mutate=True))
+
+    summary = dict(rc=0, errors=[], selection=expected, identity=plan["identity"],
+                   rows=[dict(id="example", config="core", status="PASS", reason="", mutations={})])
+
+    def read_plan():
+        commands = {("git", "rev-parse", "origin/main"): previous.encode(),
+                    ("git", "merge-base", "--is-ancestor", previous, run["head_sha"]): b"",
+                    ("git", "show", run["head_sha"] + ":tests/registry.toml"): rows.encode()}
+        artifacts = []
+        for ident, name, filename, payload in (
+                (42, "plan-2", "plan.json", plan),
+                (43, f"verified-{run['head_sha']}-a2", "summary.json", summary)):
+            contents = io.BytesIO()
+            with zipfile.ZipFile(contents, "w") as archive:
+                archive.writestr(filename, json.dumps(payload))
+            data = contents.getvalue()
+            artifacts.append(dict(name=name, expired=False, id=ident,
+                                  digest="sha256:" + hashlib.sha256(data).hexdigest()))
+            commands["gh", "api", f"/artifacts/{ident}/zip"] = data
+        with patch.object(gate, "command", side_effect=lambda *args: commands[args]), \
+             patch.object(gate, "comparison", return_value=expected):
+            return gate.planned_boots("", run, artifacts)
+
+    if read_plan() != {"powermac"}:
+        raise Failure("wrong boot evidence for a PowerMac-only plan")
+    for field, changed in (("base", run["head_sha"]), ("entries", []),
+                           ("selection", dict(expected, skipped={})),
+                           ("identity", dict(plan["identity"], attempt="1"))):
+        with patch.dict(plan, {field: changed}):
+            try:
+                read_plan()
+            except ValueError:
+                continue
+            raise Failure(f"invalid selection {field} accepted")
+    for field, changed in (("rc", 1), ("rows", []), ("selection", {}),
+                           ("rows", [dict(summary["rows"][0], status="FAIL")]),
+                           ("rows", [dict(summary["rows"][0], mutations={"extra": {"result": "RED"}})]),
+                           ("identity", dict(summary["identity"], run="18")),
+                           ("identity", dict(summary["identity"], attempt="1"))):
+        with patch.dict(summary, {field: changed}):
+            try:
+                read_plan()
+            except ValueError:
+                continue
+            raise Failure(f"invalid summary {field} accepted")
 
 
 def verify(config):
@@ -19,6 +78,7 @@ def verify(config):
                head_branch="wt/int-example", head_repository={"full_name": repo},
                status="completed", conclusion="success")
 
+    selection_artifact(run)
     evidence = dict(sha=sha, run_id=19, attempt=2,
                     boots=[dict(machine=m, sha=sha) for m in ("pc98", "powermac")])
 
@@ -74,30 +134,42 @@ esac
 
     with patch.object(gate, "api", side_effect=api), patch.object(gate, "pages", side_effect=pages), \
          patch.object(gate, "verify_boot") as verify_boot:
-        if gate.verify(repo, sha, evidence):
-            raise Failure("complete integration evidence rejected")
-        if [call.args[-1] for call in verify_boot.call_args_list] != evidence["boots"]:
-            raise Failure("boot evidence unchecked")
-        for field, value in (("run_attempt", 3), ("id", 20), ("head_sha", "b" * 40),
-                             ("status", "in_progress"), ("conclusion", "failure")):
-            with patch.dict(run, {field: value}):
-                try:
-                    gate.verify(repo, sha, evidence)
-                except ValueError:
-                    continue
-                raise Failure(f"invalid {field} accepted")
-        marker = artifacts.pop()
         try:
             gate.verify(repo, sha, evidence)
         except ValueError as exc:
-            if "VERIFIED required" not in str(exc):
+            if "selection plan" not in str(exc):
                 raise
         else:
-            raise Failure("BUILT accepted for landing")
-        artifacts.append(marker)
-        evidence["boots"].pop()
-        if not gate.verify(repo, sha, evidence):
-            raise Failure("missing PowerMac boot accepted")
+            raise Failure("missing selection plan accepted")
+        with patch.object(gate, "planned_boots", return_value={"pc98", "powermac"}):
+            verify_verdict(gate, repo, sha, evidence, run, artifacts, verify_boot)
+
+
+def verify_verdict(gate, repo, sha, evidence, run, artifacts, verify_boot):
+    if gate.verify(repo, sha, evidence):
+        raise Failure("complete integration evidence rejected")
+    if [call.args[-1] for call in verify_boot.call_args_list] != evidence["boots"]:
+        raise Failure("boot evidence unchecked")
+    for field, value in (("run_attempt", 3), ("id", 20), ("head_sha", "b" * 40),
+                         ("status", "in_progress"), ("conclusion", "failure")):
+        with patch.dict(run, {field: value}):
+            try:
+                gate.verify(repo, sha, evidence)
+            except ValueError:
+                continue
+            raise Failure(f"invalid {field} accepted")
+    marker = artifacts.pop()
+    try:
+        gate.verify(repo, sha, evidence)
+    except ValueError as exc:
+        if "VERIFIED required" not in str(exc):
+            raise
+    else:
+        raise Failure("BUILT accepted for landing")
+    artifacts.append(marker)
+    evidence["boots"].pop()
+    if not gate.verify(repo, sha, evidence):
+        raise Failure("missing PowerMac boot accepted")
 
 
 if __name__ == "__main__":

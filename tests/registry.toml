@@ -87,21 +87,23 @@ id = "collection_contract"
 spec = { path = "docs/design/tools/ci/ci_v2.md", section = "§2 共通入口" }
 subsystem = "infra"
 level = "M"
-sources = ["tests/infra/ci.py"]
-environment = "python"
+sources = ["tests/infra/ci.py", "tests/support/impact.py", "tools/ownership_images.py"]
+environment = "python-yaml"
 arch = { host = ["local"] }
 needs = []
 expect = "独立した失敗の後も全件を集計し、欠落と禁じた再利用を拒む"
 limits = "ローカルの実行器・集計器まで"
 gates = ["push", "main"]
-mutations = [{ id = "allow_reuse", config = "local", replace = "tests/infra/ci.py", old = 'allowed = ("PASS", "FAIL",', new = 'allowed = ("REUSED", "PASS", "FAIL",', fail = "REUSED must be rejected", when = "after_build" }]
+mutations = [{ id = "drop_userland_check", config = "local", replace = "tests/support/impact.py", old = '{"ring3_instructions", "c_dialect",', new = '{"c_dialect",', fail = "userland checks", when = "after_build" },
+             { id = "drop_shared_program", config = "local", replace = "tests/support/impact.py", old = "if shared_programs:", new = "if False:", fail = "shared program inputs", when = "after_build" },
+             { id = "allow_reuse", config = "local", replace = "tests/infra/ci.py", old = 'allowed = ("PASS", "FAIL",', new = 'allowed = ("REUSED", "PASS", "FAIL",', fail = "REUSED must be rejected", when = "after_build" }]
 
 [[check]]
 id = "landing_evidence"
 spec = { path = "docs/design/tools/ci/ci_v2.md", section = "§8 取り込み SHA の固定" }
 subsystem = "infra"
 level = "M"
-sources = ["tools/ci/land_gate.py", "tools/ci_fetch.sh"]
+sources = ["tools/ci/land_gate.py", "tools/ci_fetch.sh", "tests/support/impact.py"]
 environment = "python-yaml"
 arch = { host = ["local"] }
 needs = []
@@ -109,10 +111,11 @@ expect = "候補 SHA の指定 run の最新 attempt の成功と両機種の今
 limits = "API 応答を与えた関門の判定。媒体自体の起動は別の検査"
 gates = ["push", "main"]
 mutations = [
+    { id = "accept_failed_summary", config = "local", replace = "tools/ci/land_gate.py", old = 'or summary["rc"] != 0', new = 'or False', fail = "invalid summary rc accepted", when = "after_build" },
     { id = "accept_built", config = "local", replace = "tools/ci/land_gate.py", old = 'if sum(row["name"] == marker and not row["expired"] for row in artifacts) != 1:', new = "if False:", fail = "BUILT accepted for landing", when = "after_build" },
     { id = "accept_stale_attempt", config = "local", replace = "tools/ci/land_gate.py", old = "or number(run['run_attempt']) != attempt", new = "or False", fail = "invalid run_attempt accepted", when = "after_build" },
     { id = "accept_failed_selftest", config = "local", replace = "tools/ci/land_gate.py", old = "if type(count) is not int or count != 0:", new = "if False:", fail = "invalid PC-98 selftest count accepted", when = "after_build" },
-    { id = "accept_partial_boot", config = "local", replace = "tools/ci/land_gate.py", old = "if machines != {'pc98', 'powermac'}:", new = "if not machines:", fail = "missing PowerMac boot accepted", when = "after_build" },
+    { id = "accept_partial_boot", config = "local", replace = "tools/ci/land_gate.py", old = "if machines != required:", new = "if not machines:", fail = "missing PowerMac boot accepted", when = "after_build" },
 ]
 
 [[check]]
