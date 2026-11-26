@@ -269,7 +269,7 @@ needs = []
 expect = "状態語と完了条件が正典に従う"
 limits = "現行の対象票"
 gates = ["push", "main"]
-mutations = [{ id = "unknown_status", config = "local", when = "after_build", replace = "docs/tasks/restructure/TASK_RESTRUCTURE.md", old = "> 状態: **実装中 (2026-11-25)** — P0 完了、P1 を開始 (ユーザー指示 2026-11-25「開始してください」)。機能の実装は停止のまま、この票が先 (ユーザー決定 2026-11-25、[DECISIONS.md](DECISIONS.md))。", new = "> 状態: **未定義 (2026-11-26)**", fail = "未定義" }]
+mutations = [{ id = "unknown_status", config = "local", when = "after_build", replace = "docs/tasks/restructure/TASK_RESTRUCTURE.md", old = "> 状態: **実装中", new = "> 状態: **未定義", fail = "未定義" }]
 
 [[check]]
 id = "kapi_abi"
