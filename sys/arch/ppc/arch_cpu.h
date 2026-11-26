@@ -1,6 +1,7 @@
 #ifndef OS32_PPC_ARCH_CPU_H
 #define OS32_PPC_ARCH_CPU_H
 #include "ppc_oea.h"
+void ppc_enable_translation(void);
 u32 ppc_root_current(void);
 void ppc_root_load(u32 root);
 void ppc_boot_load_root(u32 root);

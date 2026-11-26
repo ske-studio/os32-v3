@@ -1,4 +1,5 @@
 /* PPC_FP_NEWLIB_DESIGN §2; explicit, single-CPU FP interval. */
+#include "arch_io.h"
 #include "arch_kernel_fp.h"
 #include "ppc_oea.h"
 #include "sys/kern/irq/irq.h"

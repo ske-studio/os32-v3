@@ -174,7 +174,7 @@ limits = "書庫・部分リンクの内部は対象外"
 gates = ["push", "main"]
 mutations = [{ id = "wrong_cpu_object", config = "core", when = "after_build", replace = "build/targets/ppc-powermac.mk", old = "KB_C := $(C_KERNEL)", new = "KB_C := $(C_KERNEL) sys/arch/x86/kernel/double_fault.c", fail = "incompatible link input sys/arch/x86/kernel/double_fault.c" },
  { id = "provider_type", config = "core", when = "after_build", replace = "sys/arch/ppc/arch_cpu.h", old = "u32 ppc_root_current(void);", new = "#if __INCLUDE_LEVEL__ > 1\nunsigned short ppc_root_current(void);\n#else\nu32 ppc_root_current(void);\n#endif", fail = "paging.c -> ppc_root_current -> sys/arch/ppc/kernel_mmu.S" },
- { id = "provider_owner", config = "core", when = "after_build", replace = "build/sources/ownership.mk", old = "OWN_ASM_CONTRACT += sys/arch/ppc/kernel_mmu.S|sys/arch/ppc/arch_cpu.h", new = "OWN_ASM_CONTRACT += sys/arch/ppc/mmu.S|sys/arch/ppc/arch_cpu.h", fail = "paging.c -> ppc_root_current -> sys/arch/ppc/kernel_mmu.S" }]
+ { id = "provider_owner", config = "core", when = "after_build", replace = "build/sources/ownership.mk", old = "OWN_ASM_CONTRACT += sys/arch/ppc/kernel_mmu.S|sys/arch/ppc/arch_cpu.h", new = "OWN_ASM_CONTRACT += sys/arch/ppc/kernel_mmu.S|sys/arch/ppc/arch_io.h", fail = "paging.c -> ppc_root_current -> sys/arch/ppc/kernel_mmu.S" }]
 
 [[check]]
 id = "hal_contracts"

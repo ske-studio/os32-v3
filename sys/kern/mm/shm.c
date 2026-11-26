@@ -15,6 +15,7 @@
 /* ======================================================================== */
 
 #include "shm.h"
+#include "exec_caller_contract.h"
 #include "paging.h"
 #include "kstring.h"
 #include "os32_kapi_shared.h"
@@ -69,7 +70,6 @@ static int shm_block_owner[SHM_BLOCK_COUNT];
 /* res_owner_get() は sys/fs/fd_redirect.c。kernel/ は -Ifs を持たないので
  * sys/kern/gui.c と同じ流儀で extern 宣言する。 */
 extern int res_owner_get(void);
-extern int ring3_call_from_user(void);
 
 /* ブロックインデックス → 物理/仮想アドレス変換 */
 static u32 block_to_addr(int idx)

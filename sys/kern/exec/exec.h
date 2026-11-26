@@ -22,6 +22,7 @@
 #define EXEC_ENTRY_ARGS 4
 
 #include "os32_kapi_shared.h"
+#include "exec_caller_contract.h"
 #include "memmap.h"
 #include "user_read_contract.h"
 
@@ -166,10 +167,6 @@ int ring3_user_ranges_writable(u32 va, u32 la, u32 vb, u32 lb);
  * この関数は「いま渡されたポインタ」の既存出力ガード用。 */
 int ring3_user_ranges_writable_always(u32 va, u32 la, u32 vb, u32 lb);
 
-/* いまの呼び出しが CPL=3 のアプリ由来か (= ring3_guard_active(ring3_in_syscall,
- * ring3_wm_depth))。ポインタを**あとで使うために控える** KAPI が、控える時点で
- * 由来を記録するのに使う (redir_access_capture の RedirAccess)。 */
-int ring3_call_from_user(void);
 
 /* Internal raw-disk KAPI authorization; no public ABI field. */
 int exec_disk_write_allowed(void);

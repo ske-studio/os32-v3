@@ -10,6 +10,8 @@
  * | ring3_call_from_user   | sys/kern/exec/exec.c | no user context exists: always 0   |
  */
 
+#include "exec_caller_contract.h"
+
 /* Callers (sys/kern/mm/shm.c ownership gates) ask "is the current caller a CPL=3 app?".
  * Milestone 2 never enters user mode: a trap with MSR[PR] set is fatal in
  * sys/arch/ppc/kernel_trap.c (PPC_TRAP_USER). So the answer is always "no".

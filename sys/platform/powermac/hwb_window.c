@@ -1,5 +1,6 @@
 /* PowerMac HW_OP design §5, stages 5c/6a. This private entry takes a
  * resource-validated PA. Caller supplies a kernel-local value. */
+#include "arch_io.h"
 #include "hwb_window.h"
 #include "ppc_trap.h"
 #include "ppc_hpt.h"

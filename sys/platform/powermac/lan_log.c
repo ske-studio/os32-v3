@@ -1,4 +1,5 @@
 /* Bounded byte FIFO for the PowerMac boot log; producer is CPU0. */
+#include "arch_io.h"
 #include "lan_boot.h"
 #include "kboot_log.h"
 #include "ppc_oea.h"

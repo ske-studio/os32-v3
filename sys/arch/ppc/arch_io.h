@@ -1,6 +1,10 @@
 #ifndef OS32_PPC_ARCH_IO_H
 #define OS32_PPC_ARCH_IO_H
 #include "ppc_frame.h"
+void ppc_enable(void);
+u32 ppc_irq_save(void);
+void ppc_irq_restore(u32 saved_msr);
+int ppc_irq_enabled(void);
 static inline void _enable(void) { ppc_enable(); }
 static inline void _disable(void) { ppc_disable(); }
 static inline unsigned int irq_save(void) { return ppc_irq_save(); }
