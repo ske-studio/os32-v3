@@ -1,6 +1,9 @@
 from pathlib import Path
 import sys
 import json
+import os
+import re
+import subprocess
 from functools import lru_cache
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -60,6 +63,49 @@ def verify(config):
         args = [str(probe) if arg == source else arg for arg in cmd]
         return declarations(args, stage / "provider.aux")
 
+    @lru_cache(None)
+    def reader_externs(obj):
+        source, cmd = objects[obj]
+        if not cmd or not source.endswith((".asm", ".S")):
+            return {}
+        args = cmd.copy()
+        out = args.index("-o")
+        del args[out:out + 2]
+        args = [arg for arg in args if arg not in ("-P", "-MMD", "-MP", "-c")]
+        expanded = subprocess.check_output([*args, "-E"], text=True)
+        relocations = subprocess.check_output(["readelf", "-Wr", obj], text=True)
+        referenced = {fields[4] for line in relocations.splitlines()
+                      if len(fields := line.split()) >= 5 and fields[2].startswith("R_")}
+        header = None
+        result = {}
+        for line in expanded.splitlines():
+            marker = re.match(r'^# \d+ "([^"]+)"', line)
+            if marker:
+                header = os.path.normpath(marker[1])
+                continue
+            extern = re.fullmatch(r"\s*\.?extern\s+(\w+)\s*", line)
+            if (extern and extern[1] in referenced and header in inventory.paths and contract(header)
+                    and not target_wrong(config, inventory.lookup(header))):
+                result[extern[1]] = header
+        return result
+
+    @lru_cache(None)
+    def contract_types(obj, header):
+        source, cmd = objects[obj]
+        if "-traditional-cpp" in cmd:
+            # The NASM preprocessing recipe has layout flags but no C dialect.
+            out = cmd.index("-o")
+            asm_flags = [a for a in cmd[1:out] if a not in
+                         (source, "-traditional-cpp", "-DOS32_NASM", "-P", "-E", "-x", "c")]
+            source, cmd = next((src, flags) for src, flags in objects.values()
+                               if src.startswith("sys/kern/") and src.endswith(".c"))
+            cmd = [*cmd, *asm_flags]
+        probe = stage / "contract.c"
+        probe.write_text(f'#include "{Path(header).resolve()}"\n')
+        args = [str(probe) if a == source else a for a in cmd]
+        return {(name, ty) for origin, name, ty, _ in data_declarations(args, config)
+                if Path(origin).resolve() == Path(header).resolve()}
+
     symbol_table = lru_cache(None)(symbols)
 
     def contract(header):
@@ -110,6 +156,21 @@ def verify(config):
                                 for _, name, ty, defined in data_types(provider)):
             continue
         edge = f"{config} {output}: {r} -> {symbol} -> {p} ({violation})"
+        header = reader_externs(reader).get(symbol)
+        if header:
+            declared = contract_types(reader, header)
+            if any(name == symbol and defined and (name, ty) in declared
+                   for _, name, ty, defined in data_types(provider)):
+                continue
+            if p.endswith((".asm", ".S")):
+                provider_headers = inventory.tables["OWN_ASM_CONTRACT"].get(p, ())
+                kind = ("FunctionDecl" if definition.upper() == "T" else
+                        "VarDecl" if definition.upper() in "BDGRS" else None)
+                if any(name == symbol and ty[0] == kind and (name, ty) in declared
+                       for h in provider_headers if contract(h)
+                       and not target_wrong(config, inventory.lookup(h))
+                       for name, ty in contract_types(provider, h)):
+                    continue
         if p.endswith((".S", ".s", ".asm")):
             headers = inventory.tables["OWN_ASM_CONTRACT"].get(p, ())
             if any(contract(header) and origin == header and name == symbol and role == "C"

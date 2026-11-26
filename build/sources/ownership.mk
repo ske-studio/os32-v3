@@ -1309,3 +1309,11 @@ OWN_GENERATED += build/out/fep/fep_resident.h|共通実装|-|ordinary
 OWN_GENERATED += build/out/ppc-kboot/link-sh/fep/fep_resident.h|共通実装|-|ordinary
 OWN_GENERATED += build/out/fep/fep_providers.h|共通実装|-|ordinary
 OWN_GENERATED += build/out/ppc-kboot/link-sh/fep/fep_providers.h|共通実装|-|ordinary
+
+# P43 組 5: 起動と V86 のアセンブリ境界。
+OWN_HEADER += sys/platform/powermac/platform_kernel_entry.h|fixed_contract
+OWN_HEADER += sys/platform/powermac/platform_kernel_takeover.h|fixed_contract
+OWN_HEADER += sys/platform/powermac/platform_trap_sink.h|fixed_contract
+OWN_HEADER += sys/platform/pc98/platform_kernel_entry.h|fixed_contract
+OWN_HEADER += sys/platform/pc98/platform_v86_isr.h|fixed_contract
+OWN_ASM_CONTRACT += sys/platform/pc98/legacy/v86_entry.asm|sys/platform/pc98/platform_v86_isr.h

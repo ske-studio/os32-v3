@@ -35,6 +35,5 @@ const struct pm_kboot_info *ppc_boot_info(void);
 int ppc_boot_alias_plan(u32 pa, u32 bytes, u32 va,
                         struct ppc_boot_alias *out);
 void ppc_boot_load_root(u32 root);
-void ppc_kernel_real_start(const struct pm_kboot_info *info)
-    __attribute__((noreturn));
+
 #endif

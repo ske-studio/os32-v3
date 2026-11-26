@@ -1,3 +1,4 @@
+#include "platform_trap_sink.h"
 #include "arch_io.h"
 #include "platform_machcfg.h"
 #include "ide_boot.h"

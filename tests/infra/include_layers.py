@@ -101,6 +101,7 @@ def finish_layers(check, config, errors):
     ledger = {"include_layers": "P43-INCLUDE", "link_layers": "P43-LINK"}[check]
     if os.getenv("OS32_LAYER_DEFERRAL") == ledger:
         known = set()
+        outstanding = set()
         with Path("docs/tasks/restructure/data/p43_violations.tsv").open() as stream:
             for row in csv.DictReader(stream, delimiter="\t"):
                 if (row["検査"], row["構成"]) != (check, config):
@@ -108,15 +109,18 @@ def finish_layers(check, config, errors):
                 edge, rule = row["位置・辺"], row["契約"].split()[-1]
                 if check == "link_layers":
                     output, edge = edge.split(" ", 1)
-                    known.add(f"{config} {output}: {edge} ({rule})")
+                    key = f"{config} {output}: {edge} ({rule})"
                 else:
-                    known.add(f"{config} {rule} {edge}")
+                    key = f"{config} {rule} {edge}"
+                known.add(key)
+                if not row["根拠"].endswith("で解消。"):
+                    outstanding.add(key)
         for edge in sorted(known - errors):
             print("resolved", edge)
-        if errors and errors <= known:
+        if errors and errors <= outstanding:
             print(f"{ledger} {len(errors)} outstanding")
             sys.exit(3)
-        errors = errors - known
+        errors = errors - outstanding
     if errors:
         raise Failure("\n".join(sorted(errors)))
 

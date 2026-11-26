@@ -55,6 +55,14 @@ $(R1_OBJ)/%.o: %.c | $(ABI_CONTRACT_ORDER)
 # Preserve NASM's STT_FILE identity across H2's source move, including R1.
 legacy_asm_input = $(subst /platform/pc98/legacy/v86_entry,/kernel/v86/v86_entry,$(1))
 
+# Both NASM inputs use the product preprocessor for their platform externs.
+define pc98_asm_header
+$(R1_OBJ)/sys/arch/x86/kernel/$(1).o $(KERNEL_OBJ_PREFIX)sys/arch/x86/kernel/$(1).o: sys/platform/pc98/$(2).h
+$(R1_OBJ)/sys/arch/x86/kernel/$(1).o $(KERNEL_OBJ_PREFIX)sys/arch/x86/kernel/$(1).o: private LAYOUT_CPP += -DOS32_NASM -Isys/platform/pc98
+endef
+$(eval $(call pc98_asm_header,kentry,platform_kernel_entry))
+$(eval $(call pc98_asm_header,isr_stub,platform_v86_isr))
+
 $(R1_OBJ)/sys/arch/x86/kernel/isr_stub.o $(KERNEL_OBJ_PREFIX)sys/arch/x86/kernel/isr_stub.o: sys/kern/time/tick_probe_ids.h
 
 $(R1_OBJ)/%.o: %.asm sdk/crt/generations.inc sys/arch/x86/kernel/cpu_flags.inc sys/arch/x86/kernel/entry_layout.inc sys/arch/x86/kernel/iret_user.inc

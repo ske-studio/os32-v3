@@ -387,7 +387,6 @@ void v86_int80(u32 *frame)
     if (!v86_do_int(frame, RING3_SYSCALL_VECTOR,
                     V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS,
                     (kdebug.ops.gcap_keep_if ? kdebug.ops.gcap_keep_if() : 0))) {
-        extern void v86_exit_to_kernel(void);
         v86_exit_reason = V86_EXIT_FAULT;
         v86_exit_to_kernel();
     }

@@ -32,9 +32,7 @@ void arch_cpu_stop(void) __attribute__((noreturn));
 void ppc_trap_set_reader(ppc_pd_read_fn reader, void *context);
 /* Enable only after root and the sink's I/G MMIO alias are ready. */
 void ppc_trap_set_fatal_ready(int ready);
-/* Explicit H2/platform provider; never called in real mode or before ready.
- * Dump the complete frame and reason, using only the prepared I/G alias. */
-void ppc_trap_fatal_sink(const struct ppc_frame *frame, u32 reason);
+
 /* Returns 0 if occupied, unaligned, or not a supported negative probe kind. */
 int ppc_trap_onfault(u32 pc, u32 va, u32 reason, u32 resume);
 /* Diagnostic DSI recovery; returns 0 when occupied or unaligned. */

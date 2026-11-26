@@ -6,7 +6,7 @@
 cpu 386
 bits 32
 
-extern kernel_main
+#include "platform_kernel_entry.h"
 extern __bss_start
 extern __bss_end
 ;; LAYOUT_* は $(BUILD_OUT)/memmap_layout.h (LAYOUT_CPP で展開) から。

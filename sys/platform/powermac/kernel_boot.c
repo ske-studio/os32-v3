@@ -1,3 +1,4 @@
+#include "platform_kernel_takeover.h"
 #include "machcfg_contract.h"
 #include "ide_boot.h"
 /* OF-PPC 4.2.4/8.2; OpenBSD macppc/locore0.S:87; FreeBSD
