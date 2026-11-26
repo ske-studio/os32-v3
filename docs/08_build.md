@@ -42,8 +42,7 @@ SHA-256 を照合。第三者ミラーは使わない。プロキシは `https_p
 
 ### §8-2 ビルドパイプライン
 
-CI は配布物の `artifacts` と検査の `checks` (全部の検査を変異込みで、6 シャード) を並列に実行する。全件の検査 (変異込み) は main に入れる SHA の関門 (ユーザー決定 2026-11-25、`POLICY_CI` G1)。今の workflow は新しい CI に切り替わるまで途中の push でも全件を回すが、それは決まりではない。PowerPC の QEMU の検査は check の `ppc-qemu` を 20 組に割る (ユーザー決定 2026-11-24「20組に」、上限は組ごとに 30 分のまま。重みは `os32-ci-inventory` で作り直す)。`gfinit-host`・`gf5-host`・`geforce-host` は CI から外した (ユーザー決定 2026-11-22、台帳 DEFERRED_TESTS の CI-DROP-* の行)。取り方と合格条件の正典は
-[§8-6](#8-6-github-actions-での本体ビルド)。
+候補 SHA を `wt/int-*` に push し、`restructure-build` の同じ run の最新 attempt が全件集計まで成功したことを確かめる。文書だけの変更も、その候補の PC-98 と PowerMac の起動記録を揃えて `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` を回す。 [CI 設計](design/tools/ci/ci_v2.md)
 
 ```
 === カーネルビルド ===
@@ -122,20 +121,10 @@ userland/rust/libos32gui       → ld -T sdk/link/shlib.ld     → userland/libo
 GUI アプリ      → libos32gui_stub (ジャンプ表への薄いスタブ) を静的リンク、libos32gfx は入れない
 ```
 
-日常のターゲット (`make all` に含まれる): `kernel` `programs` `libs` `gshell` `shlib`。検査: `make check-fast` / `make check-changed` / `make check` の 3 通り
-([§8-4 検査の 3 段](#検査の3段))。`emu_agent` (ローカル AI) の `make` は
+日常のターゲット (`make all` に含まれる): `kernel` `programs` `libs` `gshell` `shlib`。検査は登録 ID で回す
+([§8-4 登録検査](#検査の3段))。`emu_agent` (ローカル AI) の `make` は
 許可リスト (`tools/emu_agent/agent.py` の `MAKE_TARGETS`) に載ったターゲットしか実行しない。
 `make all` の最後、および各配備 (`deploy` / `deploy-kernel` / `deploy-nhd` / `nhd_deploy.py sync`) の書込み前に、使う成果物から `build/out/deploy-set.json` を生成する。生成に失敗した場合は配備先へ書き込まない。配備時の期待表は最後に HostDrv/NHD へ配ったものの表で、FD の中身は含まない。`deploy-fd` と部分同期 `sync --tag` は期待表を再生成しない。期待集合・allow-list・名札照合と外部対象外の扱いは 票 T2H_EXTERNAL_GATE。
-
-**GitHub Actions** (`.github/workflows/check.yml`、os32-v3 で 2026-09-30 に作り直し): push / PR で、
-クロスツールチェーンも rustc も無しで回せる検査だけを自動ゲートにする — KAPI 版番号の一致、
-`sdk/kapi.json` からの生成物がコミット済みと一致すること ([ABI])、`check-kapi-out`、CONSTRAINTS ⇄ CLAUDE.md、
-`mkshlib --check`、GUI プロトコルの C ⇄ Rust 照合 (`check_gui_proto.py`)、
-対応表 (`check-map` / `check-check-select-host`)、文書 (lychee のリンク・孤児・状態行・試験一覧)、
-ne2000 リングと gcc + python3 だけで回るホスト試験。どの検査が CI に載っているかは
-`build/out/TESTS.md` ([生成手順](INDEX.md#生成文書の見方)) の CI 列 (`check.yml` の個別実行と `build.yml` の全検査の和集合から生成)。
-残り (末尾で `i386-elf-gcc` を使うホスト試験、rustc が要るもの、`check-manifests` / `check-packages-host` /
-`check-memmap` のように `make all` の成果物を読むもの) は `build.yml` の `make check` が回す (§8-6)。
 
 **コンパイラとフラグ** (実体は `build/config.mk`。ここは読むための写しで、値は config.mk が正しい):
 
@@ -394,68 +383,9 @@ python3 tools/gen_memmap.py --manifest --check
 ```
 
 <a id="検査の3段"></a>
-#### 検査の 3 段 (`check-fast` / `check-changed` / `check`、2026-09-26)
+#### 登録検査の回し方
 
-検査候補は `python3 -B tools/checks/run.py --select --files <触るファイル…>` で確認する。着地前に `python3 tools/test_changes.py --base <SHA> --pack <依頼パック.md>` で試験変更を確認する。
-票の段の記録は `check-docs-status` が 10 行超・台帳 ID のない未実施/延期/未確認を警告する (`--strict` で失敗)。
-`make check-docs-tree` は文書の層・宣言によるリンク違反を種類ごとの基準値 (`tools/doc_tree_baseline.json`) と比べ、増加で失敗、減少で更新可能と表示する (`python3 tools/doc_graph.py --update-baseline` で明示更新)。
-
-`HOST32_RUNNERS` は既定 `native qemu`。対象試験の一覧は `make tests-inventory` で
-`build/out/HOST32.md` に生成する ([生成文書の見方](INDEX.md#生成文書の見方))。
-正常対照は指定した全 runner、変異は先頭の runner で実行する。native への自動 fallback はしない。
-
-検査は `tools/checks/` または `tools/tests/test_*.py` の `CHECK` と `run(ctx)` に置く。
-`build/sdk.mk` は make の読み込みごとに `tools/checks/run.py --make` を 1 回だけ起動し、全検査名・通常列 (実測重みの降順)・シャード列・依存辺・make 前提を登録する。
-宣言の索引 `build/out/check-index.json` を `--list`・`--make`・`--run` が共有し、宣言のファイル・run.py・`weights.json` が変わると作り直す (消してよい)。
-選択列の `make:` 前提を親 make で一度準備してから検査を回す。
-`check-par` / `check-changed` は毎回 `build/out/check_times.tsv` を作り直し、検査名・経過秒・検査を実行した make の rc を TSV で追記する。
-保存先は `make check-changed CHECK_TIMES=/path/to/times.tsv` で変更できる (並列実行にも対応)。
-
-同じ対象の host 試験は `check-gfx-host`、`check-font-host`、`check-access-host` にまとめている。`tools/run_host_group.py` が元の試験を別々の make job
-として実行し、親の jobserver と正常対照・変異の runner 規則を共用する。
-`covers` は各群の和集合で、群の一部に当たればその群を選ぶ。
-`check-gfinit-fixture-host` は引き続きローカル専用。
-
-| ターゲット | 回すもの | いつ | 所要時間 |
-|---|---|---|---|
-| `make check-fast` | 全検査を変異なし | 手元で全体をざっと見たい時 (関門ではない) | 304.24秒 (2026-10-04、-j4/qemu、build変更によるmake変種9回込み) |
-| `make check-changed` | 段と当たりから選んだ列を実行。当たりだけ変異込み。docs だけなら文書系のみ | 手元で、変えた所に関係する検査をまとめて見たい時 (関門ではない。30 分を超えるなら止めて push する) | 選択集合に依存 |
-| `make check` | 全検査を変異込み | GitHub の CI の build の `checks` (6 シャード、main に入れる SHA の関門)。手元では回さない | 967.50秒 (16分7.5秒、2026-10-04、-j4/qemu、レビュー修正後)。改修前の当日ログは12〜48分で条件差あり |
-
-上の所要時間を測った条件と RED/GREEN の記録はアーカイブ `docs/archive/v3/TASK_T2D_T2H_RECORDS.md`。
-`MUTATE=1` / `0` / `sel` と `MUTATE_TARGETS` で変異を切り替える。
-`run(ctx)` は `ctx.mutate` と `ctx.runners` に従う。`MUTATE=0` は差分実行でも変異なし。
-`check-c-dialect-host` のmake変種9回は、変異ありの場合、または Makefile・build の規則・
-言語検査器が変わった場合だけ回す。実物の lint は各本体検査に集約し、ホスト試験はfixtureを使う。
-
-**誰がいつ回すか**: 実装者・PM の担当、`MUTATE=0`・lint の条件、取り込みの検査の 3 段は、正典 [ROLES §0「検査」](tasks/agents/ROLES.md) に従う。
-
-段の取り込みは GitHub の CI で検査する。main に入れる SHA に、全部の検査を変異込みで回す ([ROLES §0「検査」](tasks/agents/ROLES.md)、`docs/POLICY_CI.md` G1。途中の push ごとに全件を回すのは決まりではなく、今の workflow の作り — ユーザー決定 2026-11-25)。夜だけ・手動だけの全体検査は無い。
-機種依存の分離の枝 (`wt/sep-*`) には workflow `sep` があり、push ごとに変異込みの全検査 (6 シャード) と「生成物が基点と同じ」を回す。既存の CI の欠点を直した手本として組んであり、手元でも同じ入口 (`python3 -B tools/ci/gate.py run --shard 0/6 --out <置き場>`) で回せる ([design/tools/ci/gate.md](design/tools/ci/gate.md)、[sep_identity.md](design/tools/ci/sep_identity.md))。
-変更は基点からHEADまでと、未コミット (staged/unstaged)・未追跡の和。
-基点は `tools/checks/run.py` の `BASE_REFS` (main、origin/main、feat/gui、origin/feat/gui の順) に見つかる merge-base。
-merge-base が HEAD と同じ作業枝では **HEAD** を使い、直前の取り込みを変更に数えない。
-基準枝自身 (main を含む。origin/ 接頭辞を除いた枝名) の上では HEAD~1 を使い、直前のコミットを検査する。
-`BASE=<ref>` で明示、`FILES="a b"` で選択を試せる 。
-
-選択の詳細は [run.md「選択」](design/tools/checks/run.md) が正典。文書だけなら段 0、機能・共有層への変更は当たりと前提を選び、ビルド規則など全体に届く変更は段 4 になる。`build/*.mk` の既存ソース・オブジェクト一覧へのリテラル追加・削除だけなら全体にせず、対応するソースから選ぶ (適用条件は正典を参照)。
-
-**新しい試験の足し方**:
-
-1. 検査ファイルへ `CHECK = dict(name=..., covers=[...], needs=[...], budget=...)` と `run(ctx)` を置く。
-   宣言の契約は [README](design/tools/checks/README.md)。名前は `make check-<name>` に対応する。
-2. `covers` に直接読む入力を書き、組立前提は `make:`、検査前提は `check:` で `needs` に書く。
-   自己ファイルは自動入力。依存から復元できるヘッダは自動抽出し、直接読むヘッダは残す。
-3. メモリ地図は `make all` の後に `make docs-gen` で生成する。`make tests-inventory` で `build/out/` の試験表と runner 一覧を確認する (コミット不要)。
-4. `python3 -B tools/checks/run.py --lint` と関連ホスト試験で確認する。
-   lint は宣言・全ファイルの対象宣言漏れ・入力・既存の成果物読取監査を行い、一覧生成器は CHECK の列と実行スクリプトを読む。
-
-- `tools/check_tree_unchanged.py` の番人 は 3 通りとも段の前後で回る。
-- **変異試験は実物のソースを書き換えない** (2026-09-26〜)。変異は `tools/tests/mutpar.py` の
-  `mutant_tree` / `build_in_tree` / `run_script_in_tree` で一時ディレクトリの写しの木 (変異を当てるファイルと
-  gcc -MM の依存は実体、残りは symlink) に当て、変異なしの写しが GREEN であること (`CONTROL`) を
-  先に確かめる。新しい変異試験もこの作りにする — 実物を書き換える試験は列に足さない
-  (票 TASK_CHECK_MUT_PARALLEL (アーカイブ: `docs/archive/tools/TASK_CHECK_MUT_PARALLEL.md`) §5)。
+対象の契約を [登録仕様](design/tools/checks/registry_v2.md) と `tests/registry.toml` で確認し、`python3 -B -m tests.infra.ci run --check <id>` を回す。追加・変更した検査は `--mutate` 付きで回し、登録は `python3 -B -m tests.infra.ci lint` で照合する。担当ごとの完了条件は [ROLES §0](tasks/agents/ROLES.md)。古い検査は関門ではない (P7 で消す)。参考に読むだけ。
 
 #### 検査のキャッシュ (作業木の外、2026-11-04)
 
@@ -1080,9 +1010,11 @@ GitHub Actionsでの新規構築はf1a作業中は未実施、PMがCI runで確�
 
 ### §8-6 GitHub Actions での本体ビルド
 
-作り直し期間は [restructure-build.yml](../.github/workflows/restructure-build.yml) が PC-98 と PowerPC の像を組む。取り込み条件は [ci_v2 §0](design/tools/ci/ci_v2.md)。P6-2〜P6-4 で同文書 §4 の全件集計に切り替える。
+作り直し期間は [restructure-build.yml](../.github/workflows/restructure-build.yml) が PC-98 と PowerPC の像を組む。取り込み条件は [ci_v2 §0](design/tools/ci/ci_v2.md)。全件集計は同文書 §4 に従う。
 
 #### 移動前の CI（作り直し期間は停止）
+
+古い検査は関門ではない (P7 で消す)。参考に読むだけ。
 
 `.github/workflows/build.yml` (workflow 名 `build`) は、配布物の `artifacts` と
 検査6シャード (`checks (0)`〜`checks (5)`) を依存関係なしで並列に動かす。

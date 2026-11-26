@@ -10,6 +10,45 @@ description: レビューを通った段 (作業木のブランチ) を push し
 
 > **作り直し票の取り込み**は `wt/int-*` の候補 SHA を push し、`restructure-build` の同じ run の最新 attempt の全ジョブと全件集計（変異込み）の成功を待つ。`python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` に候補の sha・run_id・attempt・boots を渡す。boots は今回の PC-98 と PowerMac の媒体・sha256・artifact_id・到達点・ログ。文書だけでも両方を取り直す。再生成の一致は登録の build_identity が確かめる。古い検査は関門ではない (P7 で消す)。参考に読むだけ。[CI 設計 §4・§8](../../../docs/design/tools/ci/ci_v2.md)
 
+次は P4 の実測例。毎回、候補の実測値と読めるログ・媒体のパスに置き換える。PC-98 の reached には selftest の成功数と失敗数 0 を記録する (U27 の自動判定は別段)。
+
+```json
+{
+  "sha": "e720b21893c7fa36ad880b0b089e8cf6b2fb87fc",
+  "run_id": 45763181756,
+  "attempt": 1,
+  "boots": [
+    {
+      "machine": "pc98",
+      "filename": "os32_boot.d88",
+      "sha256": "dde7f849697e04e92fdbf4e5cf6dc1526dc95a911efb17276be671ef002459a5",
+      "run_id": 45763181756,
+      "attempt": 1,
+      "artifact_id": 15090358736,
+      "sha": "e720b21893c7fa36ad880b0b089e8cf6b2fb87fc",
+      "log": "/home/hight/os32-tmp/run/restructure/p4-3-boot-pc98/req61-report.txt",
+      "media": "/home/hight/os32-tmp/run/restructure/p4-3-boot-pc98/art/os32_boot.d88",
+      "result": "success",
+      "reached": "SERVICES_READY public=1, selftest 1143/0 (pc98emu req61)"
+    },
+    {
+      "machine": "powermac",
+      "image": "core",
+      "filename": "boot.iso",
+      "sha256": "0d2181bd4d7ef0cf779aa7e3f74333688e4777b3c886122ad6e6df7139950017",
+      "run_id": 45763181756,
+      "attempt": 1,
+      "artifact_id": 15091051344,
+      "sha": "e720b21893c7fa36ad880b0b089e8cf6b2fb87fc",
+      "log": "/home/hight/os32-tmp/run/restructure/p4-3-boot-ppc/core-ci.log",
+      "media": "/home/hight/os32-tmp/run/restructure/p4-3-boot-ppc/art/boot.iso",
+      "result": "success",
+      "reached": "KBOOT READY stage=pre-user"
+    }
+  ]
+}
+```
+
 ## 1. 取り込む前
 
 - レビューが「取り込み可」か。要修正なら直してから (軽い指摘は PM が直すか、次の段の依頼に書いて設計票の末尾に「送り項目」として残す)。
@@ -57,7 +96,7 @@ GitHub の CI (ユーザー決定 2026-11-05、メインストリームを含む
 今までに踏んだもの:
 - 状態行が語彙の外 (`docs/POLICY_DEV.md` §8 の表: 計画 / 設計中 / 実装中 / 受入待ち / 受入完了・実機確認待ち / 受入完了 / 撤回 / 完了記録 / 草案 / 現行。「計画中」「実装完了」は語彙の外)。
 - gshell を rustc で直に組む fixture が、build.rs の作る OUT_DIR のファイルを知らない (`test_gui_desc.py` の build_fixture に足す)。
-- `CHECK` の `covers` と依存抽出に入力が無く、変更しても試験が選ばれない。
+- `tests/registry.toml` の `sources`に入力が無く、変更しても試験が選ばれない。
 - 作業木の `assets/fonts` に IPAex が無い (同意済みの main から写す、gitignore)。
 - CI だけ落ちる: CI は 32bit の試験を native で走らせる (手元は qemu)。`HOST32_RUNNERS="native qemu"` で再現する。
 - 自分が書いていない変更がコミットに紛れる: 作業木はほかのエージェントも書ける。`git add -A` の前に `git status --short` を読み、覚えの無いファイルは外して出所を確かめる (2026-11-17、`userland/diag/hw/tri_burst.hwb` の 18 行が紛れて検査が落ちた)。
@@ -75,7 +114,7 @@ git push -q origin main
 ```
 
 - 取り消された attempt は成功に数えない。
-- main の CI の build が赤なら最優先で直す。
+- main の restructure-build が赤なら最優先で直す。
 - 実機に入れる SHA は artifacts のジョブが成功したものを選ぶ (os32-realhw-update)。
 
 ## 6. 記録

@@ -11,7 +11,7 @@ description: 受入完了した票・役目を終えた設計を、今も効い�
 
 ```bash
 T=TASK_X                      # 票の名前 (拡張子なし)
-git grep -n "$T" -- tools/checks                          # 検査の宣言の basis
+git grep -n "$T" -- tests/registry.toml                          # 検査の登録の spec
 git grep -ln "$T" -- 'tools/tests/*_tdd.md'               # 試験の覚え
 git grep -n "$T" -- docs .claude ':!docs/archive'          # 仕様・索引・ほかの票・スキル
 git grep -n "$T" -- docs/tasks/DEFERRED_TESTS.md          # 持越しの台帳
@@ -28,7 +28,7 @@ git grep -n "$T" -- docs/tasks/DEFERRED_TESTS.md          # 持越しの台帳
 作業木 <パス> だけで作業。git の commit・push はしない (`git add -N <新しいファイル>` だけ可)。重いビルドはしない。
 目的: 試験が確かめている契約を、今のソースと照らして docs/design/ に要約し、覚えの引き先を設計書に替える。
 読んでよいアーカイブの文書: <担当の票の一覧> だけ (ユーザーの指示で読む)。アーカイブは編集しない。
-手順: (1) 覚えと試験 (test_<名>.py・<名>_host.c・tools/checks/<名>*.py) から契約を特定 (2) ソースで今成り立つか確かめる。
+手順: (1) 覚えと試験 (test_<名>.py・<名>_host.c・tests/<所属>/<id>.py) から契約を特定 (2) ソースで今成り立つか確かめる。
   票・覚えと今のコードが違えば、今のコードと試験を正とし、違いを報告 (3) docs/design/<ソースと同じパス>.md に書く
   (既に在れば節を足す。仕様に同じ契約が在ればその節を引き先に) (4) 覚えの「票:」「契約の正典は」を設計書のパスと節に替える。
 書き方: 行番号でソースを指さない。設計書にアーカイブのパスを書かない。設計書どうしの相互リンクを作らない。
@@ -43,7 +43,7 @@ git grep -n "$T" -- docs/tasks/DEFERRED_TESTS.md          # 持越しの台帳
 
 - 「不具合の疑い」と「覚えを頼りに書いた」と申告された所を、ソースで確かめる。直しはコードの変更なので別のコミットにする。
 - 新しい設計書を索引に足す: 置き場に `README.md` があればそこへ `- [<名>](<名>.md)`、無ければ `docs/design/README.md` の「その他の設計書」へ。
-- 検査の宣言の basis を設計書に替える (`tools/checks/<名>*.py`)。
+- 検査の登録の spec を設計書の節に替える (`tests/registry.toml`)。
 
 ## 3. 移す
 
@@ -62,9 +62,10 @@ python3 -B tools/doc_delink_archive.py               # 文字に戻す
 ```bash
 git add -A -N .
 python3 -B tools/check_archive_refs.py --write-baseline     # 来歴の註・覚えの件数が変わった時
-CHECK_NO_NEEDS=1 make check-docs-links check-docs-orphans check-docs-status check-docs-tree \
-    check-docs-line-refs check-archive-refs check-tests-inventory MUTATE=0
-python3 -B tools/checks/run.py --lint
+for id in docs_links docs_navigation docs_source_refs docs_status; do
+    python3 -B -m tests.infra.ci run --check "$id" || exit 1
+done
+python3 -B -m tests.infra.ci lint
 ```
 
 落ち方と直し方:
@@ -74,7 +75,7 @@ python3 -B tools/checks/run.py --lint
 | `docs-orphans` | 新しい設計書が索引に無い | §2 の索引の行 |
 | `docs-tree` の相互リンク・決定 → 票 | 設計書どうしが互いにリンクした | 片方を文字の参照 (バッククォートのパス) に。基準値は増やさない |
 | `docs-tree` の現行 → アーカイブ | 移した票へのリンクが残った | `doc_delink_archive.py` |
-| `run.py --lint` の basis | basis が移した票の名前のまま | 設計書のパスに替える |
+| 登録の spec | spec が移した票の名前のまま | 設計書のパスに替える |
 | `docs-status` | 完了した票が現行の棚に残った・進行中の票に完了の基準が無い | 移すか、`tools/docs_status_exceptions.json` に理由 |
 
 取り込みはスキル os32-land (文書だけの変更でも、`tools/` の基準を触ったら build が要る)。

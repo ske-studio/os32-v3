@@ -52,7 +52,7 @@ Use focused Conventional Commits, matching history: `fix(exec): ...`, `feat(depl
 The step-by-step playbooks live under `.claude/skills/<name>/SKILL.md`. They are plain Markdown; read the one that matches the task before starting.
 
 - `os32-arch-sep`: adding or moving code across the common / CPU / machine / device boundary (layer check, contract headers, `platform_<name>.h`, `Sep-Changes:`).
-- `os32-test-basis`: legacy check conventions, for reference until P7.
+- `os32-test-basis`: register checks and verify their mutations.
 - `os32-kapi-add`: adding or changing a KernelAPI entry.
 - `os32-ci-read`: reading CI failures and re-running (PM).
 - `os32-ci-inventory`: legacy shard measurements, for reference until P7.
