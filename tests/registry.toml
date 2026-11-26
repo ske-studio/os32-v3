@@ -149,14 +149,15 @@ deferred = { ledger = "P43-INCLUDE", config = ["pc98"], gates = ["push", "main"]
 spec = { path = "docs/design/tools/check_layers.md", section = "9. 構成ごとの include 直辺" }
 subsystem = "infra"
 level = "L0"
-sources = ["build/sources/ownership.mk", "make:kernel"]
+sources = ["docs/tasks/restructure/data/p43_violations.tsv", "build/sources/ownership.mk", "make:kernel"]
 environment = "linux-cross"
 arch = { x86 = ["pc98"], ppc = ["core"] }
 needs = []
 expect = "有効な include 直辺が所有の方向を守る"
 limits = "PC-98 と PowerMac core の C と前処理アセンブリ"
 gates = ["push", "main"]
-mutations = [{ id = "named_machine_header", config = "core", when = "after_build", replace = "sys/kern/machcfg.c", old = "#include \"kprintf.h\"", new = "#include \"kprintf.h\"\n#include \"sys/platform/pc98/pc98.h\"", fail = "R6 sys/kern/machcfg.c -> sys/platform/pc98/pc98.h" }]
+mutations = [{ id = "new_nasm_device_edge", config = "pc98", when = "after_build", replace = "sys/dev/net/ne2000/ne2000_io.asm", old = "section .text", new = "section .text\n%include \"sys/arch/x86/kernel/cpu_flags.inc\"", fail = "R5 sys/dev/net/ne2000/ne2000_io.asm -> sys/arch/x86/kernel/cpu_flags.inc" },
+ { id = "named_machine_header", config = "core", when = "after_build", replace = "sys/kern/machcfg.c", old = "#include \"kprintf.h\"", new = "#include \"kprintf.h\"\n#include \"sys/platform/pc98/pc98.h\"", fail = "R6 sys/kern/machcfg.c -> sys/platform/pc98/pc98.h" }]
 
 [[check]]
 id = "link_layers"
@@ -164,7 +165,7 @@ deferred = { ledger = "P43-LINK", config = ["pc98", "core"], gates = ["push", "m
 spec = { path = "docs/design/tools/check_layers.md", section = "10. 最終リンクの採用とシンボル解決" }
 subsystem = "infra"
 level = "L0"
-sources = ["build/sources/ownership.mk", "make:kernel"]
+sources = ["docs/tasks/restructure/data/p43_violations.tsv", "build/sources/ownership.mk", "make:kernel"]
 environment = "linux-cross"
 arch = { x86 = ["pc98"], ppc = ["core"] }
 needs = []

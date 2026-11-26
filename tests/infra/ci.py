@@ -112,6 +112,10 @@ def exemption(row, config, gate):
     return None
 
 
+def scoped_deferral(exempt):
+    return exempt and exempt[0] == "DEFERRED" and exempt[1].split(":")[0] in ("P43-INCLUDE", "P43-LINK")
+
+
 def manifest(plan, identity):
     inventory = Inventory(ROOT)
     ownership = {path: inventory.lookup(path)["kind"] for path in inventory.paths}
@@ -124,7 +128,7 @@ def manifest(plan, identity):
                 inputs[path] = ownership.get(path)
 
         mids = [m["id"] for m in row["mutations"] if m["config"] == config
-                and identity["mutate"] and not exemption(row, config, identity["gate"])]
+                and identity["mutate"] and (not (exempt := exemption(row, config, identity["gate"])) or scoped_deferral(exempt))]
         entries.append(dict(id=row["id"], config=config, bundle=cpu, owner=row["subsystem"],
                             level=row["level"], environment=row["environment"], inputs=inputs,
                             mutations=mids))
@@ -135,16 +139,24 @@ def state(rc):
     return {0: "PASS", 1: "FAIL"}.get(rc, "ERROR")
 
 
-def execute(candidate, row, cpu, config, mutations, env, log, outcomes):
+def execute(candidate, row, cpu, config, mutations, env, log, outcomes, deferred=None):
     prerequisites(row["environment"], cpu, config, row["sources"])
     with tempfile.TemporaryDirectory() as tmp:
         tree = Path(tmp)
         shutil.copytree(candidate, tree, dirs_exist_ok=True)
         cmd = [sys.executable, "-B", f'tests/{row["subsystem"]}/{row["id"]}.py', config]
+        if deferred:
+            env = dict(env, OS32_LAYER_DEFERRAL=deferred[1].split(":")[0])
+        else:
+            env = env.copy()
+            env.pop("OS32_LAYER_DEFERRAL", None)
+        status = ("PASS", "build and verify passed")
         for phase in ("build", "verify"):
             rc = subprocess.run(cmd + [phase], cwd=tree, env=env, stdout=log,
                                 stderr=subprocess.STDOUT).returncode
-            if rc:
+            if phase == "verify" and rc == 3 and deferred:
+                status = deferred
+            elif rc:
                 return state(rc), f"{phase} exited {rc}"
         for m in mutations:
             start = time.monotonic()
@@ -169,7 +181,7 @@ def execute(candidate, row, cpu, config, mutations, env, log, outcomes):
                         shutil.copy2(saved, target)
                 outcomes[m["id"]] = dict(result=result, seconds=time.monotonic()-start)
                 print(m["id"], result, file=log)
-    return "PASS", "build and verify passed"
+    return status
 
 
 def run_bundle(candidate, plan, args, env, identity):
@@ -185,12 +197,12 @@ def run_bundle(candidate, plan, args, env, identity):
         outcomes = {}
         with (args.output / logfile).open("w") as log:
             exempt = exemption(row, config, args.gate)
-            if exempt:
+            if exempt and not scoped_deferral(exempt):
                 status, reason = exempt
             else:
                 mutations = [m for m in row["mutations"] if args.mutate and m["config"] == config]
                 try:
-                    status, reason = execute(candidate, row, cpu, config, mutations, env, log, outcomes)
+                    status, reason = execute(candidate, row, cpu, config, mutations, env, log, outcomes, exempt)
                 except (OSError, ValueError) as exc:
                     status, reason = "ERROR", str(exc)
                 print(reason, file=log)
@@ -261,8 +273,10 @@ def collect(plan, args, identity, plan_errors=()):
                         seconds=0, log="", mutations={})
         status = item["status"]
         exempt = exemption(row, config, args.gate)
-        applicable = exempt is None
+        applicable = exempt is None or scoped_deferral(exempt)
         allowed = ("PASS", "FAIL", "ERROR", "NOT_RUN") if applicable else (exempt[0], "NOT_RUN")
+        if scoped_deferral(exempt):
+            allowed += ("DEFERRED",)
         if status not in allowed or (exempt and status == exempt[0] and item["reason"] != exempt[1]):
             item.update(status="ERROR", reason=f"unjustified status {status}")
         status = item["status"]
