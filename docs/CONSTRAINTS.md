@@ -8,6 +8,8 @@
 
 **規則**: 本体・ブート・ユーザーランド・SDK 実装は GNU11、公開 SDK ヘッダは C89/GNU89 互換、SQLite は GNU89。暗黙の宣言・暗黙 int・VLA・自作コードの旧式関数定義を禁止し、vendor の例外は明記する。匿名構造体・共用体、`restrict`、atomic、TLS、スレッド API は新規導入しない。公開型・構造体配置・呼出し規約を維持する。
 
+外部配布の amalgamation `lib/sqlite3/sqlite3.c` だけは診断抑止を許す。自作の SQLite VFS と診断プログラムには GNU89 と通常の必須診断を適用する。
+
 **理由**: 実装の言語仕様を揃え、公開 ABI と既存コードの互換性を保つ。詳細は `docs/POLICY_DEV.md` §2。
 
 ### [C2] カーネルの文字列操作
@@ -25,6 +27,8 @@
 ### [C5] 物理番地とポインタの変換
 
 **規則**: 恒等 supervisor 領域の物理番地からポインタへは `P2V` / `P2V_IO`、定数式には `P2V_CONST` / `P2V_IO_CONST`、ページング前は `P2V_BOOT` を使う。装置・PTE・CR3 に渡すポインタは `V2P`、アプリ帯・lease 窓は AS / SURFACE から物理を求める。例外は `tools/check_p2v_allow.txt` に関数と理由を記録する。
+
+新登録では機種固有の変換本体を機種の固定名 `platform_*.h` に置き、共通コードからは P2V/V2P を使う。PC-98 のページング前の `boot_main` の LOAD_BUF・VK32_LOAD_MIN と `wr32_low` の bootinfo 書込みは物理番地を直接参照するため、この位置に限って許す。
 
 **理由**: 物理と仮想の意味を明示し、検査できるようにする。
 

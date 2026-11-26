@@ -112,6 +112,10 @@ def documentation_only(sha, paths):
 
 
 def verify_boot(base, repo, workflow, run, artifacts, boot):
+    if boot['machine'] == 'pc98':
+        count = boot.get('selftest_fail')
+        if type(count) is not int or count != 0:
+            raise ValueError('PC-98 requires selftest_fail=0')
     sha = run['head_sha']
     previous = boot['sha']
     rid, attempt = number(boot['run_id']), number(boot['attempt'])

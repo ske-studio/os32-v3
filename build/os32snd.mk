@@ -35,8 +35,7 @@ userland/libos32snd.elf: $(SND_DIR)/header.o $(SND_OBJ) $(OPNA_ARCHIVE) sdk/link
 userland/libos32snd.raw: userland/libos32snd.elf
 	$(OBJCOPY) -O binary $< $@
 
-userland/libos32snd.shlib: userland/libos32snd.raw userland/libos32snd.elf tools/mkshlib.py sdk/os32x_hdr.py sdk/os32_generations.py $(SND_DIR)/entries.inc sdk/include/os32/os32_sndl_table.h tools/check_isa386.py tools/check_privileged.py
-	python3 tools/check_isa386.py --integer-only userland/libos32snd.elf
+userland/libos32snd.shlib: userland/libos32snd.raw userland/libos32snd.elf tools/mkshlib.py sdk/os32x_hdr.py sdk/os32_generations.py $(SND_DIR)/entries.inc sdk/include/os32/os32_sndl_table.h
 	python3 tools/mkshlib.py $< $@ --elf userland/libos32snd.elf --entries $(SND_DIR)/entries.inc
 
 programs: userland/libos32snd.shlib

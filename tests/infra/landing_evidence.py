@@ -19,6 +19,20 @@ def verify(config):
     evidence = dict(sha=sha, run_id=19, attempt=2,
                     boots=[dict(machine=m, sha=sha) for m in ("pc98", "powermac")])
 
+    boot = dict(machine="pc98", sha=sha, run_id=19, attempt=2, artifact_id=1,
+                sha256="digest", result="success", reached="shell", log=__file__, media=__file__)
+    with patch.object(gate, "medium_digest", return_value="digest"), patch.object(gate, "digest", return_value="digest"):
+        gate.verify_boot("", repo, 3, run, [], dict(boot, selftest_fail=0))
+        gate.verify_boot("", repo, 3, run, [], dict(boot, machine="powermac"))
+        for extra in ({}, {"selftest_fail": 1}, {"selftest_fail": False}, {"selftest_fail": "0"}):
+            try:
+                gate.verify_boot("", repo, 3, run, [], dict(boot, **extra))
+            except ValueError as exc:
+                if "selftest_fail" in str(exc):
+                    continue
+                raise
+            raise Failure("invalid PC-98 selftest count accepted")
+
     def api(url):
         return {f"repos/{repo}/actions/workflows/restructure-build.yml": {"id": 3},
                 f"repos/{repo}/actions/runs/19": run}[url]

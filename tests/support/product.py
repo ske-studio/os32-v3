@@ -29,13 +29,17 @@ def sqlite_directory(config, root):
     return cache, output
 
 
-def commands(config, goals=("kernel",)):
+def recipe_lines(config, goals=("kernel",)):
     sqlite_directory(config, Path.cwd())
     proc = subprocess.run(["make", "-j1", "-Bn", *flags(config), *goals], capture_output=True, text=True)
     if proc.returncode:
         raise OSError(f"{config} Make expansion: {proc.stderr}")
-    for line in proc.stdout.replace("\\\n", " ").splitlines():
-        if " -o " not in line:
+    return proc.stdout.replace("\\\n", " ").splitlines()
+
+
+def commands(config, goals=("kernel",)):
+    for line in recipe_lines(config, goals):
+        if "-o " not in line:
             continue
         args = shlex.split(line)
         if "-o" not in args:

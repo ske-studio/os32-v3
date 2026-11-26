@@ -157,7 +157,8 @@ $(KB_HARD): $(SQLITE_GENERATED)
 $(KB_HARD) $(KB_GROUP).raw.o: sys/conf/features/sqlite-static.mk build/softfloat.mk
 $(KB_HARD): private KB_TU_FLAGS += -mhard-float -Os -Ilib/sqlite3 -Ilib/softfloat -Ifs -Isys/fs
 $(KB_OUT)/lib/softfloat/s_roundPackToF64.o: private KB_TU_FLAGS += -Wno-unused-label
-$(KB_VFS).o $(KB_OUT)/lib/sqlite3/sqlite3.o: private KB_TU_FLAGS += -std=gnu89 -DNDEBUG -Wno-long-long -w -include lib/sqlite3/os32_sqlite_config.h
+$(KB_VFS).o $(KB_OUT)/lib/sqlite3/sqlite3.o: private KB_TU_FLAGS += -std=gnu89 -DNDEBUG -Wno-long-long -include lib/sqlite3/os32_sqlite_config.h
+$(KB_OUT)/lib/sqlite3/sqlite3.o: private KB_TU_FLAGS += -w
 $(KB_VFS).c: tools/gen_sqlite_imports.py lib/sqlite3/os32_sqlite_vfs.c
 	@mkdir -p $(@D)
 	python3 -B $< --static-vfs $@
