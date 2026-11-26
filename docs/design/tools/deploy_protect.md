@@ -66,4 +66,4 @@ HostDrv → NHD の再帰コピーも同じ名前の表で守る。字句の判�
 
 ## 検査
 
-`settings-protect-host` の前半 (`tools/tests/test_deploy_protect.py`)。temp dir と mock だけで走り、`subprocess.run` を差し替えて `mount`・`umount`・`losetup`・`mkfs.ext2`・`e2fsck`・`taskkill.exe` が呼ばれたら落ち、cp・rm・mkdir の宛先が temp の外でも落ちる。import の前に `NP21W_DIR`・`HOSTDRV_DIR`・`OS32_NHD_LOCAL` を temp へ向ける (`.env` を読ませない)。
+`settings-protect-host` の前半 (`test_deploy_protect.py (旧版 b9df2c141356)`)。temp dir と mock だけで走り、`subprocess.run` を差し替えて `mount`・`umount`・`losetup`・`mkfs.ext2`・`e2fsck`・`taskkill.exe` が呼ばれたら落ち、cp・rm・mkdir の宛先が temp の外でも落ちる。import の前に `NP21W_DIR`・`HOSTDRV_DIR`・`OS32_NHD_LOCAL` を temp へ向ける (`.env` を読ませない)。

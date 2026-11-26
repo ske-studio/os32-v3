@@ -21,4 +21,4 @@
 
 ## 検査
 
-`tools-host` の中の `tools/tests/test_np21w_trial.py`。贋の transport と一時ディレクトリで組み、PowerShell の部分は生成されるコードの文字列だけを見る (Windows の上での動きは実走でしか分からない)。
+`tools-host` の中の `test_np21w_trial.py (旧版 47e2416fa344)`。贋の transport と一時ディレクトリで組み、PowerShell の部分は生成されるコードの文字列だけを見る (Windows の上での動きは実走でしか分からない)。

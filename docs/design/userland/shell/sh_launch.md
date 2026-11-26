@@ -35,4 +35,4 @@ GUI 端末の中の `sh.bin` は入れ子の `exec_run` を使えない。外部
 
 ## 検査
 
-`make check-sh-exec-host` の `tools/tests/test_sh_launch.py` (`sh_launch_host.c`)。`sh_launch.inc` をそのまま取り込み、`launch_req`・`launch_poll`・`sys_yield`・`kprintf` だけを差し替え、kbd・ime の呼び出しに印を付けて 1 度も呼ばれないことを見る。
+`make check-sh-exec-host` の `test_sh_launch.py (旧版 8dfa828f5c97)` (`sh_launch_host.c`)。`sh_launch.inc` をそのまま取り込み、`launch_req`・`launch_poll`・`sys_yield`・`kprintf` だけを差し替え、kbd・ime の呼び出しに印を付けて 1 度も呼ばれないことを見る。

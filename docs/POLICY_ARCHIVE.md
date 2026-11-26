@@ -20,8 +20,7 @@
 
 | 引いている所 | 探し方 | 要約の後の形 |
 |---|---|---|
-| 検査の宣言の出所 (`tools/checks/*.py` の `basis`) | `git grep -n "<票の名前>" -- tools/checks` | basis を設計書のパスに替える (アーカイブを指す basis は `python3 tools/checks/run.py --lint` が止める) |
-| 試験の覚え (`tools/tests/*_tdd.md`) の `票:`・`契約の正典は` | `git grep -ln "<票のパス>" -- 'tools/tests/*_tdd.md'` | 設計書のパスと節の名前に替える |
+| 検査の出所 | `git grep -n "<票の名前>" -- tests/registry.toml` | spec に現行設計のパスと節を書く。登録と節を lint で確かめる |
 | 仕様・索引・ほかの票・スキル (`docs/`・`.claude/skills/`) | `git grep -n "<票の名前>" -- docs .claude ':!docs/archive'` | 仕様として引いている所は設計書か仕様の節へ。所在だけの言及は文字で `(アーカイブ: \`docs/archive/…\`)` |
 | 持越しの台帳の行 | `git grep -n "<票の名前>" -- docs/tasks/DEFERRED_TESTS.md` | 行が票を開かずに読める形か確かめる。読めなければ、その節を先に仕様へ移す |
 | ソースの註・道具の docstring | `git grep -n "<票のパス>" -- '*.c' '*.h' '*.inc' '*.asm' '*.py'` | 来歴の記録として残してよい (新しく足さない)。契約のヘッダは註も含めて ABI の世代のハッシュに入るので触らない |
@@ -49,7 +48,7 @@
 5. `python3 tools/doc_delink_archive.py --dry-run` で現行 → アーカイブのリンクを見て、文字に戻す。
 6. `docs/archive/README.md` の籠の表と、`docs/INDEX.md` の行 (所在を文字で) を直す。
 7. `python3 tools/ops/check_archive_refs.py --write-baseline` (来歴の註が増減した時)。
-8. 検査: `CHECK_NO_NEEDS=1 make check-docs-links check-docs-orphans check-docs-status check-docs-tree check-docs-line-refs check-archive-refs check-tests-inventory MUTATE=0` と `python3 tools/checks/run.py --lint`。新しい文書は先に `git add -N` (追跡されていない文書は検査に入らない)。
+8. 検査: 登録検査 docs_links・docs_navigation・docs_status・docs_source_refs と `python3 -B -m tests.infra.ci lint`。新しい文書は先に `git add -N` (追跡されていない文書は検査に入らない)。
 
 ## §5. 検査が見る事
 

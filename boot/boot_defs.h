@@ -55,7 +55,7 @@ typedef unsigned long  u32;
  * 生成は tools/mkvmkernel.py、検査は boot/vk32_boot.c (HDD) と
  * boot/loader_fat_new.asm の pm_vk32_boot (FD)。両者は同じ VK32_ERR_* を返す。
  * **NASM 側の写し** (loader_fat_new.asm の VK32_* / MAX_IMAGE_SIZE の EQU) との
- * 一致は tools/tests/test_vk32_crc.py が名前ごとに照合する。 */
+ * 一致は test_vk32_crc.py (旧版 787690e6f03c) が名前ごとに照合する。 */
 #define VK32_MAGIC         0x32334B56UL
 #define VK32_VERSION       2UL
 #define VK32_MAX_ENTRIES   4
@@ -101,7 +101,7 @@ typedef unsigned long  u32;
 
 /* ブート情報域 (0x7E00) のイメージ欄。**正典は sys/platform/pc98/bootinfo_wire.h**。
  * ローダ (C) はカーネルのヘッダを読まないので写しを持つ。一致は
- * tools/tests/test_vk32_crc.py が名前ごとに照合する。 */
+ * test_vk32_crc.py (旧版 787690e6f03c) が名前ごとに照合する。 */
 #define BOOTINFO_BASE          0x7E00UL
 #define BI_OFF_IMG_CRC         0x30
 #define BI_OFF_IMG_SIZE        0x34

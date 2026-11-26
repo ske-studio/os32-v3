@@ -19,7 +19,7 @@ inactive なら引数を保存し done=0 で開始する。active の再発行�
 
 ## 試験と境界
 
-`tools/tests/test_vfs_fd_path.py` の stdin ケースは製品 `vfs_read_fd` に対して、
+`test_vfs_fd_path.py (旧版 3062ccc08e29)` の stdin ケースは製品 `vfs_read_fd` に対して、
 途中の longjmp、done=1,2 からの再開、2状態の交互読取、CR/LF、NUL、UTF-8 の分割、
 余剰入力、0長、負値、引数不一致と完了時の消去を確認する。
 exec の復帰は `exec_stdin` の別試験で確認し、

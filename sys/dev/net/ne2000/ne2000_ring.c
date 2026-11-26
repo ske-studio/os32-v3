@@ -2,7 +2,7 @@
 /*  NE2000_RING.C — DP8390 受信リングの純粋な計算 (I/O 無し)                 */
 /*                                                                          */
 /*  ne2000.c の受信回収と OVW 復旧が使う。ホスト試験:                        */
-/*  tools/tests/ne2000_ring_test.c (make check → check-ne2000-ring)。        */
+/*  ne2000_ring_test.c (旧版 5003eacfe3d5) (make check → check-ne2000-ring)。        */
 /* ======================================================================== */
 
 #include "ne2000_ring.h"

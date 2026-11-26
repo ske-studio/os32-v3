@@ -44,4 +44,4 @@ u32 kapi_host_notice_serial(void);                                       /* KAPI
 
 ## 確かめ
 
-- `tools/tests/test_host_mailbox.py` (65 通で最古を捨て drop=1、サービス別、同世代の ALIVE の繰り返しで押し出さない、全部の取り出しの絞り込み)・`test_host_notice.py` (KAPI、copyout 中の IRQ の投入で新しい serial を消さない、不正な out で不消費)・`test_hostsvc_contracts.py` (256B と各 offset)。
+- `test_host_mailbox.py (旧版 811ce48ef1d8)` (65 通で最古を捨て drop=1、サービス別、同世代の ALIVE の繰り返しで押し出さない、全部の取り出しの絞り込み)・`test_host_notice.py` (KAPI、copyout 中の IRQ の投入で新しい serial を消さない、不正な out で不消費)・`test_hostsvc_contracts.py` (256B と各 offset)。

@@ -17,7 +17,7 @@ unmount の sync 後かつ ctx 解放前に呼ぶ。sync の失敗でも失効�
 - **メタデータ I/O の失敗**: 読めなかったものを不存在や空きと扱うと、不正な上書きや交差リンクにつながる。
   エラーを伝播し、メタデータ障害後は `ext2_check_writable` で書込みを拒否する。
   `ext2_fs_error` のエラー記録用バッファは操作中の共有 scratch と分ける。
-  実際の open を通す失敗経路と媒体整合の回帰は `tools/tests/test_b8_open.py`。
+  実際の open を通す失敗経路と媒体整合の回帰は `test_b8_open.py (旧版 6455da9bbf55)`。
 
 ## 区画の探索とマウントの範囲
 
@@ -34,7 +34,7 @@ unmount の sync 後かつ ctx 解放前に呼ぶ。sync の失敗でも失効�
 - 区画が短すぎる・FS のブロック数が区画より大きい (`fs (N blocks) exceeds partition`) ならマウントしない。
 - `part_len` を文脈に持ち、ブロック I/O (`ext2_super_block_io.inc`) は区画の外 (×2 の桁あふれを含む) をデバイスに出さない。
 - 試験: `make check-hdd-stage1-host` のケース `find_bios`・`find_fail`・`mount_bounds`。RAM ディスクの ext2 試験は
-  LBA 1 に本物の区画表を置く足場 `tools/tests/hdd_pt_fake.h` に乗る。
+  LBA 1 に本物の区画表を置く足場 `hdd_pt_fake.h (旧版 28f26153b2da)` に乗る。
 
 ## 小さな書き込みの I/O を減らす 2 つの仕掛け
 
@@ -56,6 +56,6 @@ unmount の sync 後かつ ctx 解放前に呼ぶ。sync の失敗でも失効�
 
 ### 検査
 
-`tools/tests/test_ext2_write_io.py` (本体 `tools/tests/ext2_write_io_host.c`。実物の ext2 と microtar を組み、512 byte セクタの I/O 回数を数える)。
+`test_ext2_write_io.py (旧版 dd0b1062633f)` (本体 `ext2_write_io_host.c (旧版 a5c1ea237934)`。実物の ext2 と microtar を組み、512 byte セクタの I/O 回数を数える)。
 数で表明するのは「確保を伴う書き込みは伴わない書き込みより I/O が多い (sync が出る)」・後方 lseek が 0 セクタ・`tar c` の `sys_write` 回数で、各書き込みのセクタ数は表示だけ。
 ほかに、マウントし直した別インスタンスで中身・サイズ・空き数が一致すること (write-through)、記憶が unlink → 再作成・rename・rmdir → 同名ファイル・2 インスタンス同時に追従すること、毎操作のあとメタデータ (空き数・`used_dirs`・GD) がディスクと一致することを見る。

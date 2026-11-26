@@ -12,4 +12,4 @@ PC-98 標準 planar 表示の GDC 操作と、両ページの消去。
 
 ## 検査
 
-`tools/tests/test_display_cleanup.py` (スプラッシュの 4 つの希望値と失敗後の再試行、両ページの全面を汚してからの 400/200 行の初期化) と `tools/tests/test_boot_splash_native.py`。どの面・どのページの消去を省いても、その面・ページの残像として実行時に検出する。
+`test_display_cleanup.py (旧版 fb6078199f08)` (スプラッシュの 4 つの希望値と失敗後の再試行、両ページの全面を汚してからの 400/200 行の初期化) と `test_boot_splash_native.py (旧版 729852acc8b2)`。どの面・どのページの消去を省いても、その面・ページの残像として実行時に検出する。

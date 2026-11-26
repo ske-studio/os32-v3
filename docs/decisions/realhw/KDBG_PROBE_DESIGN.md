@@ -131,11 +131,11 @@ struct probe_wire { /* 全整数は32bit、offsetはbyte */
 | shell / 起動FD | shell text 3～6KiB。kdebugはPOST_ROOTでありFDローダ変更なし。FD収録対象と余白は生成成果物で検査 |
 | 段（各段で独立受入） | 変更ファイルと責務 |
 |---|---|
-| A1 契約・登録 | sys/include/debug_probe.h（型/上限）、sys/kern/module/debug_probe.c（登録/寿命）、tools/tests/（ホスト偽部品試験） |
+| A1 契約・登録 | sys/include/debug_probe.h（型/上限）、sys/kern/module/debug_probe.c（登録/寿命）、tests/dev/（ホスト偽部品試験） |
 | A2 loader・export | module loader各ファイル（結線）、export/import def・生成器（末尾契約）。kdebug_importsにはcontrolを末尾追加 |
 | B 採取エンジン | sys/kern/kdebug/probe_wire.h（wire）、probe.c（設定/採取/リング）、probe_index.c（pairアクセス）、kdebug_main.c（op振分け）、ビルド目録 |
 | C 台本・出力 | userland/shell/hwb_probe.c（命令）、hwb_parse.c/hwb_exec.c（dispatch）、hwb_log.c（probe行）、HW_BASIC_DESIGN.md（利用契約） |
-| D 実点・受入 | sys/dev/video/geforce/display/service.c、sys/dev/video/trident/lifecycle.c（点）、各export宣言表、tools/accept/（台本）。最初の実点はA/Bのホスト偽部品受入後 |
+| D 実点・受入 | sys/dev/video/geforce/display/service.c、sys/dev/video/trident/lifecycle.c（点）、各export宣言表、tools/ops/（台本）。最初の実点はA/Bのホスト偽部品受入後 |
 
 段 D の PM 決定: GF の2点は geforce.mod の宣言表にだけ登録し、HWDEV の get_probe_decls は空のまま（display/service.c は HWDEV に組まれない）。
 - HWDEV core表を伸ばす必要はない。内部モジュールexport/import変更は生成契約・CRC・該当ABIを同期し、新旧不一致をloaderで拒否する。
@@ -150,7 +150,7 @@ struct probe_wire { /* 全整数は32bit、offsetはbyte */
 | C | 256B行内の命令、31字名、停止後の全件出力と消去・出力失敗log_rc、serialの採取直後出力と通常文脈制限、既存HW_OPと -o/step/abort の回帰。変異: ring消費・serial呼出し・wireサイズ検査を外しRED |
 | D | NP21/Wで未ARMの表示/enter既存結果不変、ARM→操作→STOP→-oの実ログ照合。実機GF/TridentはPMがノートへ依頼し値を既存診断と比較 |
 - 実機では同一バイナリのまま台本の項目を変え、2回の採取内容が変わることを必須にする。点未到達もcaptured=0として識別する。
-- 新規 tools/tests はCHECK入力宣言、変異アンカー一意・実行時RED。担当像ビルド＋触った試験 --mutate＋--lint、取り込みはGitHub check/build。未実施を合格扱いしない。
+- 新規 tests/dev/ はCHECK入力宣言、変異アンカー一意・実行時RED。担当像ビルド＋触った試験 --mutate＋--lint、取り込みはGitHub check/build。未実施を合格扱いしない。
 ## 7. ユーザー判断が要る未決（0件）
 - F1〜F7 は全て PM 決定を採用。
 反論: 0件。
@@ -202,7 +202,7 @@ HWDEV_ABI=1、HWDEV_MODULE_OPS_VERSION=2、core 26 slots と provider export 番
 hwdev_contract_fixture.py の import/layout/inventory 固定値は当該入力不変なので維持し、CRC の kernel/core/body 一致を確認する。
 KDEBUG 版を固定する試験値のみ5へ追従し、旧4の拒否も試験。生成物の手編集は禁止。
 ### 4. 段と受入
-A3: sys/include/debug_probe.h、sys/kern/module/debug_probe.c、tools/module_schema.py、上記生成物、tools/tests/debug_probe_host.c・test_debug_probe.py と KDEBUG版固定の既存試験。正典への本追記はPMが反映。
+A3: sys/include/debug_probe.h、sys/kern/module/debug_probe.c、tools/module_schema.py、上記生成物、debug_probe_host.c (旧版 b41a9139e82e)・test_debug_probe.py と KDEBUG版固定の既存試験。正典への本追記はPMが反映。
 B PACK追記:「A3後の基点を使い、ARM直前に PROBE_KDEBUG_OWNER で owner を取得する。ADD時epoch保存、操作入口の照合・全設定失効・再ADD要求を実装する。」
 試験: A3はowner取得の成功/未RUNNING/誤サイズ、停止中ADD相当のLIST→解除→同一再登録のepoch差、空解除不変、周回封鎖、既存detach/参照回帰をqemuで検査。Bで旧設定ARM拒否→再ADD成功を検査。実装時に対象ビルド・変更試験 --mutate・--lint、取込CIはPM。
 変異: owner取得のRUNNING条件削除、停止中unregisterのepoch更新削除、Bのepoch比較削除を各一意アンカーで実行時REDにする（A3とBそれぞれの担当試験）。

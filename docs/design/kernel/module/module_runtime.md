@@ -33,4 +33,4 @@ R7 (owner 単位の回収、装置状態は init が戻す) はそのまま。
 2. `module_start`: 記録の表の写しを候補表として部品の開始関数 (KDEBUG なら `init`) に渡す。戻りが 0 でない、または候補表が記録の表と違えば `module_abort` して INIT_FAILED。成功したら表の手前 (prefix) のページを返し、残るのは body のページだけ。状態を RUNNING にする。
 3. `module_abort` (どの段の失敗でも): まず状態を ROLLING_BACK にして未公開にする → 依存する部品が残る・停止を確認できない・IRQ / tick / callback / DMA などの参照が残るなら QUARANTINED (資源を返さない) → そうでなければ owner のページを全部回収し、owner を retire して ABSENT。init を一度も呼ばない失敗では公開表は空のまま、FD は閉じ、ページは全部戻る。
 
-検査: `make check-kdebug-init-host` (`tools/tests/test_kdebug_init.py` のローダの段)。
+検査: `make check-kdebug-init-host` (`test_kdebug_init.py (旧版 f63933516995)` のローダの段)。

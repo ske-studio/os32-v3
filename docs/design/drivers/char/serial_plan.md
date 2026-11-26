@@ -44,6 +44,6 @@ FIFO モードではコマンドの書き込みも 0132h。選択子 (`serial_da
 
 ## 確かめ
 
-`make check-serial-vfast-host` (`tools/tests/test_serial_vfast.py`、`tools/tests/serial_vfast_host.c`)。分周表・モード判定 (FIFO の有無 ×
+`make check-serial-vfast-host` (`test_serial_vfast.py (旧版 850eef82c906)`、`serial_vfast_host.c (旧版 abdb25442030)`)。分周表・モード判定 (FIFO の有無 ×
 速度)・0132h と 0032h のビット違い・予算・番犬 (`docs/design/userland/shell/serial_watchdog.md`)。I/O の順番と IRQ の汲み出し、
 実効速度は実機でしか見られない。

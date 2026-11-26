@@ -17,7 +17,7 @@
 /*        と VSYNC の待ちの打ち切り数。backend_pegc.c pegc_diag_take)         */
 /*    4. 戻った後の INT 18h AH=31h は続けて `v86 -g` を走らせて R 31h の行で */
 /*       見る (v86_* を呼ぶと app.conf の宣言が `cui` になり、gfx_init を呼ぶ  */
-/*       このプログラムの `gfx` と両立しない — tools/check_manifests.py)。     */
+/*       このプログラムの `gfx` と両立しない — check_manifests.py (旧版 7862924cb7de))。     */
 /*    5. 最後に "pegcchk done" — ここまで出れば応答は続いている。             */
 /* ======================================================================== */
 #include "os32api.h"

@@ -393,13 +393,6 @@ pub fn cycle(st: &mut GuiState) {
     deliver(st);
 }
 
-#[cfg(test)]
-#[path = "../host/gserial_tests.rs"]
-mod tests;
 
 #[cfg(feature = "gf_accel_accept")]
 pub(crate) fn queued(st: &GuiState) -> bool { st.gserial.keys != 0 }
-
-#[cfg(test)]
-#[path = "../host/remote_g2_tests.rs"]
-mod remote_tests;

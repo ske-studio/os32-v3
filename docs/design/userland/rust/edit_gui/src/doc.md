@@ -58,4 +58,4 @@ GUI 版エディタの本文。GUI にも描画の KAPI にも依存しない状
 
 ## 検査
 
-`tools/tests/test_edit_doc.py` (`make check-edit-doc-host`、`--mutate` 付き)。実物を `#[path]` で取り込み (`userland/rust/edit_gui/host/doc_tests.rs`)、`sys_*` を贋物に替えて保存の失敗を踏む。行の短い write と改行の短い write は別の贋物で確かめる (1 つの贋物で両方を壊すと片方の判定が他方を隠す)。描画・WM 経由の入力の配線・Host Services・設定レジストリはゲストの受入の範囲。
+`test_edit_doc.py (旧版 985925016e7d)` (`make check-edit-doc-host`、`--mutate` 付き)。実物を `#[path]` で取り込み (`doc_tests.rs (旧版 c465b86e9b9b)`)、`sys_*` を贋物に替えて保存の失敗を踏む。行の短い write と改行の短い write は別の贋物で確かめる (1 つの贋物で両方を壊すと片方の判定が他方を隠す)。描画・WM 経由の入力の配線・Host Services・設定レジストリはゲストの受入の範囲。

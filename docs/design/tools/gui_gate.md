@@ -35,5 +35,5 @@ Start → `CUI mode` (`ROW_CUI`) → 確認ダイアログ Yes が唯一の経�
 
 ## 検査
 
-`tools/tests/test_gui_gate.py [--mutate]` (`make check-gui-gate-host`)。偽のゲスト (`FakeGuest`、`cirrus=True` で WAB 中継) と偽の時計で、NP21/W・HTTP・実時間に触らない。
+`test_gui_gate.py (旧版 b42c1a65670c) [--mutate]` (`make check-gui-gate-host`)。偽のゲスト (`FakeGuest`、`cirrus=True` で WAB 中継) と偽の時計で、NP21/W・HTTP・実時間に触らない。
 実ゲストでの ESC の効き、`/api/status` の値、高さ違いのときの座標が当たるか、CUI での `wab_height` の値はここでは分からず、NP21/W で台本を回して確かめる。

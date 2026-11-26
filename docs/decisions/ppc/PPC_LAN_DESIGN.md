@@ -29,7 +29,7 @@
 - PM決定3: QEMU/試験はUDP、実機はAF_PACKET、codec共通を確定。
 - P0観測: QEMU 8.2.2の既定sungem・106b:0021・2MiB BAR・UDP設定成功を採用。OF後tree/BAR・PHY・DMAは未確認のまま。
 ## 1. 実物の確認・適用範囲
-- 基点 `b98087e8`（HEAD照合）。SURVEY.md を土台に、指定された製品・BSD の該当行を照合。r1の「食い違い0件」を撤回：callback粒度、RANDOM_SEED式、RX補充の引用元をF1/F16/F17で訂正。SURVEYの提案は既実装とは数えない。 `sys/platform/powermac/log.c` は同期sink登録/直呼び、`sys/platform/powermac/ppc_kernel.c` は最初のKBOOT出力→2秒観測→idle。ここにenqueueとforeground pollを接続する。 `tools/lanfs_host.py` はLOGを破棄、`sys/fs/serialfs/sfs_proto.h` は片道seq=0/10ms時計、`tools/ppc/kboot_run.py` はKBOOT行数を固定している。この3点を回避する接続を以下で確定する。 PPCKERN.ELFのみ。②の共通mm/MPIC/1kHzを維持、mount/module/exec/USERなし。GMAC coreはQEMU/QuickSilver共用、NIC IRQなし、再送なし。x86 LANの動作・公開ABIを変えない。 本作業は設計ファイル1本の作成だけ。preflight（修正を含む）・ビルド・試験・ゲスト起動は依頼に従い未実施。以下の受入は将来の実装条件。 引用略号：`O/`=/home/hight/os32-tmp/ref/openbsd/sys/dev/ic/、`OP/`=同openbsd/sys/dev/pci/、`N/`=同netbsd/sys/arch/macppc/pci/、`NG/`=同netbsd/sys/dev/ic/、`F/`=同freebsd/sys/dev/gem/。GPL・archiveは参照しない。 **[M1]** GEMレジスタ仕様、**[M2]** QuickSilver/UniNorthのclock・PCI/DMA仕様、**[M3]** 採取したPHYの仕様が未入手。印の付く値はBSDに沿う設計候補。**QEMUで確かめる段はBSDの値のまま実装して進めてよい**が、実機（QuickSilver）に載せる前に、印の付く書込みをメーカー資料と実機のtreeの採取で照合する（照合できない書込みは実機のprofileで無効のままにする。R1）。
+- 基点 `b98087e8`（HEAD照合）。SURVEY.md を土台に、指定された製品・BSD の該当行を照合。r1の「食い違い0件」を撤回：callback粒度、RANDOM_SEED式、RX補充の引用元をF1/F16/F17で訂正。SURVEYの提案は既実装とは数えない。 `sys/platform/powermac/log.c` は同期sink登録/直呼び、`sys/platform/powermac/ppc_kernel.c` は最初のKBOOT出力→2秒観測→idle。ここにenqueueとforeground pollを接続する。 `tools/lanfs_host.py` はLOGを破棄、`sys/fs/serialfs/sfs_proto.h` は片道seq=0/10ms時計、`kboot_run.py (旧版 3c4a2c5ec78d)` はKBOOT行数を固定している。この3点を回避する接続を以下で確定する。 PPCKERN.ELFのみ。②の共通mm/MPIC/1kHzを維持、mount/module/exec/USERなし。GMAC coreはQEMU/QuickSilver共用、NIC IRQなし、再送なし。x86 LANの動作・公開ABIを変えない。 本作業は設計ファイル1本の作成だけ。preflight（修正を含む）・ビルド・試験・ゲスト起動は依頼に従い未実施。以下の受入は将来の実装条件。 引用略号：`O/`=/home/hight/os32-tmp/ref/openbsd/sys/dev/ic/、`OP/`=同openbsd/sys/dev/pci/、`N/`=同netbsd/sys/arch/macppc/pci/、`NG/`=同netbsd/sys/dev/ic/、`F/`=同freebsd/sys/dev/gem/。GPL・archiveは参照しない。 **[M1]** GEMレジスタ仕様、**[M2]** QuickSilver/UniNorthのclock・PCI/DMA仕様、**[M3]** 採取したPHYの仕様が未入手。印の付く値はBSDに沿う設計候補。**QEMUで確かめる段はBSDの値のまま実装して進めてよい**が、実機（QuickSilver）に載せる前に、印の付く書込みをメーカー資料と実機のtreeの採取で照合する（照合できない書込みは実機のprofileで無効のままにする。R1）。
 ## 2. 層・所有・像
 |層|唯一の所有者/ファイル（新規名は本設計）|寿命・接続|
 |---|---|---|
@@ -158,70 +158,70 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 |段|ファイル・行数目安|前提|Q観測 / H / R|
 |---|---|---|---|
 |P0|＋tools/ppc/lan_probe.py 100|なし|採取/UDP経路 / A0 / tree・資料|
-|H0|＋tools/ppc/test_lan_p0.py 60–160|P0|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H0|＋test_lan_p0.py (旧版 1de315997ae3) 60–160|P0|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P1|＋sys/platform/powermac/lan_boot.h 140|P0|P3 TREE / A1,A9,A10 / cells|
 |H1|＋tools/ppc/test_lan_p1.py 60–160|P1|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P2|＋sys/dev/net/gem/gem.h 140|P0|P15 RING / A5 / descriptor|
-|H2|＋tools/ppc/test_lan_p2.py 60–160|P2|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H2|＋test_lan_p2.py (旧版 67abc7ee499a) 60–160|P2|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P3|＋sys/platform/powermac/gmac_tree.c 250|P1|TREE bdf/bar/mac / A1 / root|
-|H3|＋tools/ppc/test_lan_p3.py 60–160|P3|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H3|＋test_lan_p3.py (旧版 9cd6cb936a43) 60–160|P3|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P4|Δsys/platform/powermac/kboot_info.h 8|P1|P5 CAPTURE / A1 / snapshot|
 |H4|＋tools/ppc/test_lan_p4.py 60–160|P4|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P5|Δsys/platform/powermac/kboot_capture.c 40|P3,P4|CAPTURE/OF増分0 / A1 / OF版|
 |H5|＋tools/ppc/test_lan_p5.py 60–160|P5|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P8|＋sys/platform/powermac/pci_config.c 150|P1|PCI id/master=0 / A2 / UniNorth停止|
-|H8|＋tools/ppc/test_lan_p8.py 60–160|P8|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H8|＋test_lan_p8.py (旧版 49e443f51ec1) 60–160|P8|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P10|Δsys/arch/ppc/kernel_boot.h 25|P1|P9 ALIAS / A3 / 非重複|
 |H10|＋tools/ppc/test_lan_p10.py 60–160|P10|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P9|Δsys/platform/powermac/kernel_boot.c 110|P5,P8,P10|ALIAS span=65536 / A2,A3 / clock窓|
 |H9|＋tools/ppc/test_lan_p9.py 60–160|P9|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P11|＋sys/arch/ppc/dma_cache.c 100|P0|P12 DMA / A4 / cache命令|
-|H11|＋tools/ppc/test_lan_p11.py 60–160|P11|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H11|＋test_lan_p11.py (旧版 1052d105bf2a) 60–160|P11|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P12|＋sys/platform/powermac/gmac_dma.c 160|P1,P11|DMA/I-G walk / A4 / bus到達性|
-|H12|＋tools/ppc/test_lan_p12.py 60–160|P12|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H12|＋test_lan_p12.py (旧版 0d4e8443c3d1) 60–160|P12|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P13|＋sys/platform/powermac/gmac_clock.c 55|P0,P8|CLOCK readback / A2 / clock gate|
-|H13|＋tools/ppc/test_lan_p13.py 60–160|P13|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H13|＋test_lan_p13.py (旧版 32611fdadc01) 60–160|P13|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P14|＋sys/dev/net/gem/gem_reset.c 150|P2,P13|RESET done / A5 / reset時間|
-|H14|＋tools/ppc/test_lan_p14.py 60–160|P14|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H14|＋test_lan_p14.py (旧版 b74ddef09aa3) 60–160|P14|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P15|＋sys/dev/net/gem/gem_ring.c 180|P2,P12,P14|RING tx=32 rx=124 / A5 / alignment|
-|H15|＋tools/ppc/test_lan_p15.py 60–160|P15|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H15|＋test_lan_p15.py (旧版 af08d3361632) 60–160|P15|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P16|＋sys/dev/net/gem/gem_mac.c 170|P2,P14|MAC/filter/enable / A5 / revision|
-|H16|＋tools/ppc/test_lan_p16.py 60–160|P16|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H16|＋test_lan_p16.py (旧版 c4d835a4aa6d) 60–160|P16|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P17|＋sys/dev/net/gem/gem_phy.c 230|P0,P2,P14|PHY id/100/full / A6 / PHY固有処置|
-|H17|＋tools/ppc/test_lan_p17.py 60–160|P17|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H17|＋test_lan_p17.py (旧版 86e293377ca0) 60–160|P17|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P18|＋sys/dev/net/gem/gem_tx.c 110|P15|TX complete / A7 / wire TX|
-|H18|＋tools/ppc/test_lan_p18.py 60–160|P18|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H18|＋test_lan_p18.py (旧版 724428ef5f3a) 60–160|P18|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P19|＋sys/dev/net/gem/gem_rx.c 170|P15|RX wrap/progress / A7 / RX/cache|
-|H19|＋tools/ppc/test_lan_p19.py 60–160|P19|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H19|＋test_lan_p19.py (旧版 d5cc788730a2) 60–160|P19|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P20|＋sys/platform/powermac/lan_log.c 170|P1|P24 LOG / A8 / 初期量|
-|H20|＋tools/ppc/test_lan_p20.py 60–160|P20|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H20|＋test_lan_p20.py (旧版 f6fb32d88421) 60–160|P20|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P21|＋sys/platform/powermac/lan_wire.c 150|P1|P24 WIRE / A9 / MTU|
-|H21|＋tools/ppc/test_lan_p21.py 60–160|P21|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H21|＋test_lan_p21.py (旧版 a2cbcb87ce15) 60–160|P21|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P22a|Δsys/arch/ppc/kernel_probe.h 5|P1|P22 PEEK / A10 / load値|
-|H22a|＋tools/ppc/test_lan_p22a.py 60–160|P22a|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H22a|＋test_lan_p22a.py (旧版 9688fadf9d83) 60–160|P22a|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P22b|Δsys/arch/ppc/kernel_probe.S 20|P22a|P22 PEEK / A10 / byte load|
-|H22b|＋tools/ppc/test_lan_p22b.py 60–160|P22b|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H22b|＋test_lan_p22b.py (旧版 4b1e276e4508) 60–160|P22b|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P22c|Δsys/arch/ppc/ppc_trap.h 5|P22a|P22 PEEK / A10 / DSI mask|
-|H22c|＋tools/ppc/test_lan_p22c.py 60–160|P22c|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H22c|＋test_lan_p22c.py (旧版 dd7b9a6c3914) 60–160|P22c|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P22d|Δsys/arch/ppc/kernel_trap.c 20|P22c|P22 FAULT応答 / A10 / 同期DSI|
-|H22d|＋tools/ppc/test_lan_p22d.py 60–160|P22d|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H22d|＋test_lan_p22d.py (旧版 7956be69299f) 60–160|P22d|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P22|＋sys/platform/powermac/lan_monitor.c 210|P21,P22b,P22d|MONITOR 5 / A10 / RAM snapshot|
-|H22|＋tools/ppc/test_lan_p22.py 60–160|P22|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H22|＋test_lan_p22.py (旧版 494c31ecea27) 60–160|P22|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P23|＋tools/ppc_lan_host.py 320|P21|HOST saved/gaps/reply / A9,A10 / host NIC|
-|H23|＋tools/ppc/test_lan_p23.py 60–160|P23|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H23|＋test_lan_p23.py (旧版 91a3a46fdbc4) 60–160|P23|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P24|＋sys/platform/powermac/lan_service.c 240|P8,P12–P23|L2往復/LOG/LOSS / A8–A11 / 再接続|
-|H24|＋tools/ppc/test_lan_p24.py 60–160|P24|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|H24|＋test_lan_p24.py (旧版 59802a1d5d8e) 60–160|P24|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P25|Δsys/platform/powermac/ppc_kernel.c 30|P24|ALIVE/LAN BUDGET / A11 / tick継続|
 |H25|＋tools/ppc/test_lan_p25.py 60–160|P25|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P26|Δbuild/targets/ppc-powermac.mk 30|P10,P25|IMAGE symbols/size / A12 / 配置|
 |H26|＋tools/ppc/test_lan_p26.py 60–160|P26|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
-|P29|Δtools/ppc/kboot_run.py 140|P23,P26|LAN印＋既存9印 / A11,A12 / ―|
-|H29|＋tools/ppc/test_lan_p29.py 60–160|P29|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
-|P30|Δtools/ppc/kboot_mutations.py 110|P29|期待診断/到達印 / A1–A12 / ―|
+|P29|Δkboot_run.py（旧版 3c4a2c5ec78d） 140|P23,P26|LAN印＋既存9印 / A11,A12 / ―|
+|H29|＋test_lan_p29.py (旧版 f0af390e6cb6) 60–160|P29|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
+|P30|Δkboot_mutations.py（旧版 b67d6b0c95b7） 110|P29|期待診断/到達印 / A1–A12 / ―|
 |H30|＋tools/ppc/test_lan_p30.py 60–160|P30|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P31|Δtools/ppc/kboot_accept.py 60|P30|7450/7455＋保存一致 / A12 / ―|
 |H31|＋tools/ppc/test_lan_p31.py 60–160|P31|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
-|P32|Δtools/ppc/kboot_all.py 12|P31|既存段とLAN統合 / A12 / ―|
+|P32|Δkboot_all.py（旧版 85377355faf2） 12|P31|既存段とLAN統合 / A12 / ―|
 |H32|＋tools/ppc/test_lan_p32.py 60–160|P32|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
 |P33|Δdocs/decisions/ppc/PPC_KBOOT_DESIGN.md 15|P9,P12|alias表/早期Master解除/後段I-G / A3,A4 / ―|
 |H33|＋tools/ppc/test_lan_p33.py 60–160|P33|直前段のH項目を製品本体で試験、CHECK/変異を同ファイルに所有|
@@ -248,7 +248,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - guest変異もP30で「直前LAN到達印＋期待のLAN ERROR code（例RESET_TIMEOUT）＋KBOOT ALIVE継続」を固定する。peekのPC/VA不一致など既存fatal対象は専用停止PCも照合。NIC失敗をOS停止の成功条件にしない。
 - QEMU起動形：既存ISO/QMP/7450・7455/128M/-smp 1を保ち、`-nic none -device sungem,netdev=n0,mac=52:54:00:12:34:56 -netdev socket,id=n0,udp=127.0.0.1:18026,localaddr=127.0.0.1:18027`。hostは--udpで18026にbindし18027へ送る。user netは使わない。
 - P0_QEMU.mdの確定事実は8.2.2・-S monitorのみ：既定sungem、0:15.0=106b:0021、BAR0 2MiB/未割当、bridge 106b:001f(dev11)/001e(dev14)/0022(dev12)、明示UDP設定受理。guestは未実行、OF後tree/BAR番地・PHY・DMAは未確認。P0の残りは既存OF採取経路と必要なMIF読出しで記録（不能項目は理由付き保留）、host socket経路確認と資料取得。OF NIC open/read/writeを合格条件にしない。実L2往復はP24/A7で証明する。
-- LAN無効時は遷移につき`LAN OFF code=<数値>`1本だけ、通常LAN印にもFAIL/FATAL/UNSUPPORTEDを含めない。tools/ppc/kboot_run.pyの既存禁止語/9印検査は維持。既定sungem付き②/無効LANでも合格する負経路をH29/A12で固定する。
+- LAN無効時は遷移につき`LAN OFF code=<数値>`1本だけ、通常LAN印にもFAIL/FATAL/UNSUPPORTEDを含めない。kboot_run.py（旧版 3c4a2c5ec78d）の既存禁止語/9印検査は維持。既定sungem付き②/無効LANでも合格する負経路をH29/A12で固定する。
 - 実装者は該当像build＋対象試験--mutate＋lint/必要な選択検査。統合後はPPC_IMPL_RULESのkboot_all回帰。make check-changed/全体変異は回さず、landingはCI、full-checkはユーザー判断。今回これらは全て未実施。
 ## 8. 実機の危険・資料・未決
 |順序|QuickSilverで初めて確かめること/観測|
@@ -286,7 +286,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - UniNorth の親が `/` でない階層は、この段では祖先の ranges を順に変換せず LAN_EUNSUPPORTED で拒否する。
 - 宣言の段の変異 (P1・P2) は、製品の `_Static_assert` で compile が落ちるものを RED と数える (compile の終了値・期待の assert の文字列・変異を当てた後の到達の印を照合)。加えて host の runtime の照合だけで落ちる変異を 1 本ずつ持つ。
 - 実装者の sandbox は AF_INET の socket を作れない。UDP の netdev を付けた QEMU と UDP の loop の試験は PM が sandbox の外で回し、sandbox の中では rc=3 と別の行で知らせる形にした。
-- tools/ppc/kboot_boot.py は x86 の build の生成物 build/out/memmap_layout.h を要する (新しい作業木では x86 の make を先に済ませる)。
+- kboot_boot.py (旧版 a987deb59b4e) は x86 の build の生成物 build/out/memmap_layout.h を要する (新しい作業木では x86 の make を先に済ませる)。
 
 ## 実装で決めたこと (2026-11-11、段 P4・P5・P12・P20・P21 の取り込みで PM が決定)
 - boot_id は capture (kboot_capture.c、host で試験する) では作らない。TB と PVR を読んで `pm_gmac_boot_id` を呼ぶのは LAN の service を始める直前の段 P25 (sys/platform/powermac/ppc_kernel.c)。
@@ -309,7 +309,7 @@ int ppc_probe_copy8(u32 va, u8 *out); /* kernel_probe.S: load成功0/onfault復�
 - PEEK の 1 byte の読みの PPC の実体 `pm_lan_copy8` は lan_monitor.c に置く (IRQ 保存 → `ppc_trap_onfault_data` → `ppc_probe_copy8` → clear → 復元)。PPC の managed RAM は恒等写像なので、PA も同じ peek_ok の区間で照らす。
 - `ppc_trap_onfault_data` は DSI の MISS・PROTECT・IO の集合だけを一回限り拾う。既存の exact reason の口 `ppc_trap_onfault` はそのまま (arm で data の印を落とす)。有効な PTE が MMIO の PA を指していても DSI_IO にはならないので、MMIO の拒否は monitor の I/G の検査と許可範囲で行う。
 - 単純化 (段 P22e、P22 の 3 回の往復の後に PM が決定し同じ取り込みに入れた): `peek_ig_ok`・`peek_deny`・I/G の判定・d の NULL と件数の検査はシングルタスク前提では要らない。PEEK は VA と PA を RAM の許可表 1 種で照らすだけで I/G MMIO を拒否できる (MMIO の PA は RAM の表に無く、DMA の descriptor の区画は像の予約の中)。N4 は service が許可の区間を RX buffer の前後に割って渡す。d は呼び手が保証するので monitor は検査しない。
-- ホストの道具 tools/ppc_lan_host.py: `--udp` では自分の MAC を `--mac` で与え (REQ の送信元と宛先の検査に使う)、LOG・BEACON は自分宛か broadcast、RSP は自分宛だけを採る。保存の世代は BEACON の next_seq と LOG の seq+1 の最大で追跡し、巻戻りで切り替える (§3(a))。lint が tools/ 直下の .py に受け持つ検査を求めるので CI の検査 tools/checks/ppc-lan-p23.py (tier 1) を登録した。
+- ホストの道具 tools/ppc_lan_host.py: `--udp` では自分の MAC を `--mac` で与え (REQ の送信元と宛先の検査に使う)、LOG・BEACON は自分宛か broadcast、RSP は自分宛だけを採る。保存の世代は BEACON の next_seq と LOG の seq+1 の最大で追跡し、巻戻りで切り替える (§3(a))。lint が tools/ 直下の .py に受け持つ検査を求めるので CI の検査 ppc-lan-p23.py (旧版 e23d87b215ed) (tier 1) を登録した。
 
 ## 実装で決めたこと (2026-11-11、段 P24a〜P24d・P24 と QEMU の先行スモーク S1 の直し P5b・P14b・P17c・P12b の取り込みで PM が決定)
 - service (段 P24) と起動への結線 (段 P25・P26) の境目は [PPC_LAN_SERVICE_DESIGN](PPC_LAN_SERVICE_DESIGN.md)、serial の LAN の印と受入の自動化 (段 P29〜P32) は [PPC_LAN_MARKS_DESIGN](PPC_LAN_MARKS_DESIGN.md) に分けた。

@@ -40,7 +40,7 @@
 
 - 表の略記 `geforce_platform.c` は `sys/dev/video/geforce/geforce_platform.c`、`gfx_core_surface.inc` は `gfx/` 配下。
 - `sys/dev/pci/pci.c` は BAR を読むだけ。`sys/platform/pc98/pci_resources.c` の RAW は幅未確定で権限ではない。
-- `tools/tests/test_device_reservation.py` に第二 span、exact retry、部分一致、永久保持等の試験が既存。合格を今回確認した意味ではない。
+- `test_device_reservation.py (旧版 6c8990917e0d)` に第二 span、exact retry、部分一致、永久保持等の試験が既存。合格を今回確認した意味ではない。
 - 指定 `docs/decisions/realhw/HWDEV_CORE_API.md` は存在せず、同名ファイルも検索で見つからなかった。
 - 現行 `docs/decisions/MEMMAP_V3.md` に D33 本文・§6 T1 はない。アーカイブは未参照。U6/X4 は票冒頭のみを根拠とする。
 - HWDEV の現行制約は `DEVICE_STATES.md:14,29-32`：表示所有中・未分類は claim 拒否、GF の BM 禁止は維持。
@@ -209,13 +209,13 @@ int gfx_device_activate(devres_handle h);
 | D4 | 変更 `sys/dev/video/geforce/native.c` | `reserved()` owner helperのみ 15 | C1後、G4と取込、claim結線なし | 0.25 |
 | D5 | 変更 `sys/platform/pc98/kdebug/kselftest/gfx_ledger.inc` | `gfx_dev_covers()` rid/helper 20 | C1後 | 0.25 |
 | E1 | 変更 `sys/platform/pc98/kernel.c` | 起動・gate 35 | 部品完成後、直列 | 0.5 |
-| F1 | 変更 `tools/tests/test_device_reservation.py` | 原子性・容量・変異 180 | A3と一括 | 0 |
-| F2 | 新 `tools/tests/test_device_activation.py` | C1/C3/D2のtrace・変異 260 | 同一担当が依存段ごと追記 | 0 |
-| G1 | 変更 `tools/tests/gfx_boot_host.c` | `host_reserve()` owner/選択BB 35 | C2と一括 | 0 |
-| G2 | 変更 `tools/tests/gf_wc_host.c` | `setup()` BDF別owner・他owner拒否の変異 25 | D3と一括 | 0 |
-| G3 | 変更 `tools/tests/lease_host.c` | `_start()` owner fixture 15 | A3と一括 | 0 |
-| G4 | 変更 `tools/tests/gf_production_host.c` | `prod_reset()` owner fixture/native経路・誤rid拒否 30 | D1/D4と一括 | 0 |
-| G5 | 変更 `tools/tests/access_walk_host.c` | `host_start()` owner fixture 20 | A3と一括 | 0 |
+| F1 | 変更 `test_device_reservation.py (旧版 6c8990917e0d)` | 原子性・容量・変異 180 | A3と一括 | 0 |
+| F2 | 新 `tests/hal/device_activation.py` | C1/C3/D2のtrace・変異 260 | 同一担当が依存段ごと追記 | 0 |
+| G1 | 変更 `gfx_boot_host.c (旧版 0247e48edfdd)` | `host_reserve()` owner/選択BB 35 | C2と一括 | 0 |
+| G2 | 変更 `gf_wc_host.c (旧版 951dc9c6bd20)` | `setup()` BDF別owner・他owner拒否の変異 25 | D3と一括 | 0 |
+| G3 | 変更 `lease_host.c (旧版 1c6d561f328a)` | `_start()` owner fixture 15 | A3と一括 | 0 |
+| G4 | 変更 `gf_production_host.c (旧版 9030065fac80)` | `prod_reset()` owner fixture/native経路・誤rid拒否 30 | D1/D4と一括 | 0 |
+| G5 | 変更 `access_walk_host.c (旧版 bae3a0bb2923)` | `host_start()` owner fixture 20 | A3と一括 | 0 |
 | P1/PM | 変更 `docs/tasks/DEFERRED_TESTS.md` | Ra266受入行 5 | E1統合時 | 0 |
 
 - 上限合計15.5KiB（kernel+部品+kdebugの合計で保守的に計上）、§6の8〜16KiB内。共有登録の増分もこの枠内、圧縮像・常駐RAMは統合時実測。
@@ -239,7 +239,7 @@ int gfx_device_activate(devres_handle h);
 | 実機資源 | host: BARLEN条件・上限とwidth_basis、RAW別slotの18資源構成、GF選択でPEGC BB無し | width_basisをRAWへ変更 |
 | 実機表示 | **PM 決定（ID10）**: Ra266+液晶でPEGC/Cirrus/GF各選択のCUI cold boot・GUI往復。カメラで同期/桁ズレ、シリアルでprobe順を確認 | hostでPEGC probeを起動へ戻す |
 
-- 実装各段: 対象像ビルド→`make -k check-changed BASE=<基点> MUTATE=0`→変更試験`--mutate`→`tools/checks/run.py --lint`。A1/A2は利用側hostコンパイルで契約を確認。
+- 実装各段: 対象像ビルド→`make -k check-changed BASE=<基点> MUTATE=0`→変更試験`--mutate`→旧手順（b6e510adf475 の記録）。A1/A2は利用側hostコンパイルで契約を確認。
 - A/B契約確定後に並列段、C/D完了後Eを直列結線。A3+F1、C1+F2初版、C3/D2+F2追記は一括取り込み、各段で対応host試験と --mutate が通るまで取り込まない。PM統合時に全体検査・ABI再ビルド・像予算確認、ゲスト/実機は直列。
 - 実機実施は後日。P1で DEFERRED_TESTS に「Ra266+液晶／PEGC・Cirrus・GF選択別／CUI起動・GUI往復／カメラ+シリアル証跡／未実施」を一行登録する。今回リポジトリには書かない。
 - 今回は設計書のみ作成し、上記検査は一切実行していない。未実施の実機受入とmissing文書は合格扱いしない。
@@ -253,8 +253,8 @@ int gfx_device_activate(devres_handle h);
 反論: 0件。
 
 ## 確定 (2026-11-04、claude-opus-5-5 の第 2 回、PM が反映)
-- N1: §7 の表の C2 の組に `tools/tests/test_gfx_boot.py` の変異の目印 (`ledger_reserve_set(LEDGER_OWNER_GFX, sp, n)` の行を core.index で探す) の追従を足す。C2 がその行を書き換えるなら、同じ段で目印を新しい行に直す。
-- N2: PM 決定 — 固定表示 group (PEGC/Xe10) の owner は今の `LEDGER_OWNER_GFX` (固定 7 番、sys/kern/mm/pgalloc.c) のまま。`ledger_device_commit` は新しい owner を作らない。`tools/tests/test_ledger.py` と `device_reservation_stage_host.c` は変えない。BDF ごとの DEVICE owner は GF など PCI の増設装置だけ。
+- N1: §7 の表の C2 の組に `test_gfx_boot.py (旧版 4cd97ce216a6)` の変異の目印 (`ledger_reserve_set(LEDGER_OWNER_GFX, sp, n)` の行を core.index で探す) の追従を足す。C2 がその行を書き換えるなら、同じ段で目印を新しい行に直す。
+- N2: PM 決定 — 固定表示 group (PEGC/Xe10) の owner は今の `LEDGER_OWNER_GFX` (固定 7 番、sys/kern/mm/pgalloc.c) のまま。`ledger_device_commit` は新しい owner を作らない。`test_ledger.py (旧版 46df7ecfc53d)` と `device_reservation_stage_host.c` は変えない。BDF ごとの DEVICE owner は GF など PCI の増設装置だけ。
 - N3: PM 決定 — Trident の上限の計算 (`sys/dev/video/geforce/gfinit_resources/bounds.inc`、隣の BAR の番地から実行時に縮める) は B3 の中で共有のファイル (`drivers/pci/pci_barlen.c`/`.h`、製品のカーネルに入る) へ移し、kdebug はそれを引く。計算の正典は 1 つ。B3 の触るファイルに bounds.inc と kdebug のビルドの入力を足す。
 - N4: `devres_request.width_basis[]` は置かない。`struct ledger_resource` の既存の width_basis の欄を使い、enum に `LEDGER_WB_BARLEN_UPPER` を足して `pgalloc_resource.inc` の照合で受け入れる (A2/A3)。
 - N5: CUI 単独アプリが表示 gate を acquire した後の release は、`to_cui` に加えて exec の後始末 (正常終了・abort・longjmp の共通の出口) に 1 行置く。同じ h なら冪等。

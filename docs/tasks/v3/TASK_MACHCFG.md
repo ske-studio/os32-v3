@@ -14,7 +14,7 @@
 
 - 形: 既定は機種ごとのビルド時の表 (PowerMac は PVR → platform 既定、PC-98 は platform 既定の 1 行)。root が読めた後に `/etc/machine.cfg` (パスの正典は `sys/include/config.h` の `SYS_MACHINE_CFG`) で上書きして 1 回だけ確定する。ファイルが無い・壊れた・FS の無い像では既定で確定し、起動は止めない。
 - 読みは既存の `sys/kern/init/sysconfig.c` を使う (新しいパーサは作らない、PM 決定)。sysconfig.c から gf_production の 2 関数を `sys/kern/init/gf_production_cfg.c` に出して、sysconfig.c を共通 (`C_COMMON_EXEC`) に移す。machine.cfg の厳しい検査は一時読取の間だけ効き、system.cfg の解釈は変えない。
-- 最初の利用者: PowerPC 7450 の NAP (既定 0。早くに下ろし、確定後に 1 の時だけ立てる。`tools/ppc/cpu_nap_host.c` の期待を対で直す)。性能の段の要求値 `perf.profile` (暫定の既定 0 = 互換、PM 決定。自動の扱いは票 PERF_PROFILE_PLAN の判断)。
+- 最初の利用者: PowerPC 7450 の NAP (既定 0。早くに下ろし、確定後に 1 の時だけ立てる。`cpu_nap_host.c (旧版 ea8e22515fed)` の期待を対で直す)。性能の段の要求値 `perf.profile` (暫定の既定 0 = 互換、PM 決定。自動の扱いは票 PERF_PROFILE_PLAN の判断)。
 - 契約: 内部契約 AC-BOOT-3 を第一候補 ([ARCH_COMPAT_CONTRACT](../../decisions/ARCH_COMPAT_CONTRACT.md))。公開 KAPI と hwdev の ABI は変えない。
 
 ## 2. 段

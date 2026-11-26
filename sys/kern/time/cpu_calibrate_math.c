@@ -7,8 +7,8 @@
 /*  0.31 tick)。**旧コードの生の elapsed はそこでも 0** で、補正 (0 → 1) が  */
 /*  200,000 を入れていた — 真値 640,000 の約 1/3.2。実機 266MHz は 1 周が    */
 /*  0.1 tick 未満でもっと深く 0 に落ち、1/7〜1/13 の桁になる。               */
-/*    試験: tools/tests/test_cpu_calibrate.py                               */
-/*    記録: tools/tests/cpu_calibrate_tdd.md                                */
+/*    試験: test_cpu_calibrate.py (旧版 fe32cedfe0f1)                               */
+/*    記録: cpu_calibrate_tdd.md (旧版 70f306468285)                                */
 /* ======================================================================== */
 
 #include "cpu_calibrate_math.h"

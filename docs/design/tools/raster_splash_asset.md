@@ -35,4 +35,4 @@
 
 ## 検査
 
-`tools/tests/test_raster_splash_asset.py` (raster-splash-asset-host): 手元の資産の生成、画像があるとき・無いときの HDD/hsync/パッケージの集合、FD への混入なし、上書きの禁止。
+`test_raster_splash_asset.py (旧版 8bdf65861153)` (raster-splash-asset-host): 手元の資産の生成、画像があるとき・無いときの HDD/hsync/パッケージの集合、FD への混入なし、上書きの禁止。

@@ -46,6 +46,6 @@ VRAM・FS には触らない。VRAM の転送は `gfx_vram.c`、画像の行ご�
 
 ## 検査
 
-- `tools/tests/test_splash_raster.py` (splash-raster-host): 有理数の走査の模型で、両周波数・両方の型・周期の不一致・IRQ の窓・遅れ・有限の待ちを確かめる。省略の変異は実行時 RED。
-- `tools/tests/test_boot_splash_native.py` (boot-splash-host): 実際の gfx の核・VRAM・この再生器を組み、flip の有無・初回と継続・同期失敗・IF=0・予算違反・再初期化での判定のやり直しを確かめる。120µs の相対待ちの復活も RED。
-- `tools/tests/test_splash_raster_diag.py`: 診断の記録が動くこと、通常の像の `.text` が変わらないこと。
+- `test_splash_raster.py (旧版 a5703c681da0)` (splash-raster-host): 有理数の走査の模型で、両周波数・両方の型・周期の不一致・IRQ の窓・遅れ・有限の待ちを確かめる。省略の変異は実行時 RED。
+- `test_boot_splash_native.py (旧版 729852acc8b2)` (boot-splash-host): 実際の gfx の核・VRAM・この再生器を組み、flip の有無・初回と継続・同期失敗・IF=0・予算違反・再初期化での判定のやり直しを確かめる。120µs の相対待ちの復活も RED。
+- `test_splash_raster_diag.py (旧版 c907f6a84336)`: 診断の記録が動くこと、通常の像の `.text` が変わらないこと。

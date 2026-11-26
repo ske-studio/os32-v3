@@ -23,10 +23,10 @@ T5b 撤去 (2026-09-10、`1c98613`) で消えた被覆: 「上位 UI (メニュ�
 `upper_ui_press_release_then_app_press(kind)` → `taskbar` / `menu` / `modal` / `fep`
 の 4 本、モーダル中の捕捉済み離しは `captured_release_{,right_}is_delivered_while_modal_is_open` /
 `captured_release_survives_the_pump_while_modal_is_open` / 負例
-`new_press_during_modal_is_not_forwarded_to_the_app` (記録 `tools/tests/gui_review4_20260910_tdd.md`)。
+`new_press_during_modal_is_not_forwarded_to_the_app` (記録 `gui_review4_20260910_tdd.md (旧版 07e2a173cf27)`)。
 残っていた裏側 (**アプリが受けた押下の対になる離しを上位 UI の上で行う** + その直後の押下)
 は `app_release_over_{taskbar,menu,modal,fep}_reaches_the_app_and_the_next_press_lands` の 4 本で
-メニュー / FEP まで広げた (記録 `tools/tests/gshell_buttonup_tdd.md`、`check-gshell-host` 100 本)。
+メニュー / FEP まで広げた (記録 `gshell_buttonup_tdd.md (旧版 dba6e0b26da1)`、`check-gshell-host` 100 本)。
 製品コードの修正は無し (`release_capture()` 経路は 4 経路とも正しかった)。
 
 **CI の範囲 (独立レビュー 2026-09-10 の指摘)**: `.github/workflows/check.yml` は静的整合性

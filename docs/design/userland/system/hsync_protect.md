@@ -38,9 +38,9 @@ hsync は HostDrv の中身を NHD へ写す。HostDrv に古い学習 DB が残
 
 ## 検査
 
-- `hsync-fep-protect` (`tools/tests/test_hsync_fep_protect.py`、本体 `tools/tests/hsync_fep_protect_host.c`): 字句の規則 (大文字小文字・正規化・祖先・カスタム名・ジャーナル)、実在の別名、24 枠の境目 (libc なし)。
-- `hsync-fep-host` (`tools/tests/test_hsync_fep.py`): `--fep-off` での停止と再開を hsync の main から。
-- 設定が読めないときに `/etc` の DB を全部守る場合は `tools/tests/fdrecov_cases.inc` にもある。
+- `hsync-fep-protect` (`test_hsync_fep_protect.py (旧版 0f08d6dd8fc4)`、本体 `hsync_fep_protect_host.c (旧版 fbec9ddb9437)`): 字句の規則 (大文字小文字・正規化・祖先・カスタム名・ジャーナル)、実在の別名、24 枠の境目 (libc なし)。
+- `hsync-fep-host` (`test_hsync_fep.py (旧版 358108dc9614)`): `--fep-off` での停止と再開を hsync の main から。
+- 設定が読めないときに `/etc` の DB を全部守る場合は `fdrecov_cases.inc (旧版 9cb089d5dff4)` にもある。
 
 ## settings.db の保護
 
@@ -57,4 +57,4 @@ hsync は HostDrv の中身を NHD へ写す。HostDrv に古い学習 DB が残
 
 ### 検査
 
-`settings-protect-host` の後半 (`tools/tests/test_hsync_protect.py`、本体 `tools/tests/hsync_protect_host.c`): 実物の `hsync_protect.inc` をホストで `-Werror` で組み、正規化・名前の規則・通してよい物・`-f` の連結・長いパス・名前の長さ・最終行のラベルを確かめる。同じソースが i386-elf-gcc と PROGRAM_FLAGS でも通ることと、hsync.c の inode の比較が在ることも見る。列挙・打ち切り・I/O 失敗の分岐はホストでは走らせていない。
+`settings-protect-host` の後半 (`test_hsync_protect.py (旧版 120342cd6a70)`、本体 `hsync_protect_host.c (旧版 165e8ae6633e)`): 実物の `hsync_protect.inc` をホストで `-Werror` で組み、正規化・名前の規則・通してよい物・`-f` の連結・長いパス・名前の長さ・最終行のラベルを確かめる。同じソースが i386-elf-gcc と PROGRAM_FLAGS でも通ることと、hsync.c の inode の比較が在ることも見る。列挙・打ち切り・I/O 失敗の分岐はホストでは走らせていない。

@@ -36,7 +36,7 @@ GeForce の資源の収集 (`sys/dev/video/geforce/gfinit_resources/scan.inc`) �
 
 ## 確かめ
 
-`make check-pci-locate-host` (`tools/tests/test_pci_locate.py` + `tools/tests/pci_locate_host.c`) が本物の
+`make check-pci-locate-host` (`test_pci_locate.py (旧版 fc3107e3e862)` + `pci_locate_host.c (旧版 61612495e760)`) が本物の
 `pci_locate.c` と `sys/dev/video/geforce/diag/recover_gf_locate.c` を偽の config 空間 (bus × dev × fn) で組んで回す。
 
 | fixture | 期待 |

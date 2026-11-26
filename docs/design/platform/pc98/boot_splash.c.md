@@ -33,6 +33,6 @@
 
 ## 検査
 
-- `tools/tests/test_boot_splash_native.py` (boot-splash-host): 実際の gfx の核・VRAM・再生器で、ロゴの初回と継続・flip の有無・静止の fallback・片付けの順。
-- `tools/tests/test_dep_dir_d_splash.py`: 描いたプレーンのバイト列と起動の寿命の対照。
-- `tools/tests/test_splash_wire.py`: 画像の有無・壊れた画像・期限で、画像の経路とロゴの分岐を通す。
+- `test_boot_splash_native.py (旧版 729852acc8b2)` (boot-splash-host): 実際の gfx の核・VRAM・再生器で、ロゴの初回と継続・flip の有無・静止の fallback・片付けの順。
+- `test_dep_dir_d_splash.py (旧版 9fe3db1d1739)`: 描いたプレーンのバイト列と起動の寿命の対照。
+- `test_splash_wire.py (旧版 1a5727f53cbf)`: 画像の有無・壊れた画像・期限で、画像の経路とロゴの分岐を通す。

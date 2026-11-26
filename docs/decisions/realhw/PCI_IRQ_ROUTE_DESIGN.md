@@ -100,7 +100,7 @@
 | backend PC-98 | `platform/pc98/pci_irq_pc98.c` | 起動時に 0:6.0 の 0x60〜0x63・各機能の 0x3D/0x3C・機種表を読んで表を作る。振り直しの書き込み・読み戻し・戻し。操作の口は既存の 8259 (`sys/platform/pc98/pic.c`・`irq_complete.c`) |
 | backend G4 | `platform/powermac/pci_irq_ofw.c` (os32powerpc) | 早い段の OF の読み取りで表を作る (読むだけ)。操作の口は MPIC (`sys/include/platform_irq.h` の mask・unmask・claim=IACK・complete=EOI、加えて優先度と宛先) |
 
-番人: `tools/check_pci_irq_portable.py` (`tools/check_usb_portable.py` と同じ型)。対象は共通の `drivers/pci/pci_irq*.c`。`pc98.h`・`platform_io.h`・`ofw.h`・`arch_*.h` の include、`inp`/`outp`、config の書き込みを禁じる。`#ifdef` で層を分けることも禁じる (`arch/README.md`)。
+番人: `tools/check_pci_irq_portable.py` (`check_usb_portable.py (旧版 9abc67fa5e56)` と同じ型)。対象は共通の `drivers/pci/pci_irq*.c`。`pc98.h`・`platform_io.h`・`ofw.h`・`arch_*.h` の include、`inp`/`outp`、config の書き込みを禁じる。`#ifdef` で層を分けることも禁じる (`arch/README.md`)。
 
 ### 3-1. 契約 (`include/pci_irq_platform.h`)
 ```c
@@ -209,12 +209,12 @@ int platform_pci_irq_route(u8 group, u16 line); /* 1 group ずつ。can_reroute=
 | 1 | `include/pci_irq_platform.h` | §3-1 の契約 | sol |
 | 2 | `drivers/pci/pci_irq_plan.c` (+`.h`) | §3-2 の純粋な関数 | terra |
 | 2b | `drivers/pci/pci_irq_kinds.c` | 対応表 (重み・静止の時機、§3-1) | terra |
-| 3 | `tools/tests/pci_irq_plan_host.c` | libc なし、モック backend 2 種 (振り直せる / 読むだけ。疎な source 20・25 の group を含む)、`make check-pci-irq-plan`、変異 | terra |
+| 3 | `tests/support/fixtures/pci_irq_plan_host.c` | libc なし、モック backend 2 種 (振り直せる / 読むだけ。疎な source 20・25 の group を含む)、`make check-pci-irq-plan`、変異 | terra |
 | 4 | `drivers/pci/pci_irq.c` | つなぎ・`pci_irq_settle`・`pci_irq_attach`・結び直し・ログ・成功後だけの `pci_dev.irq_line` の書き換え | sol |
 | 5 | `tools/check_pci_irq_portable.py` | 番人 (§3-0) | terra |
 | 6 | `platform/pc98/pci_irq_pc98.c` | PC-98 の backend (機種表・機能の分類・自己照合・group ごとの書き込み・戻し) | sol |
-| 6b | `tools/tests/pci_irq_pc98_host.c` | 段 6 を偽の config I/O で動かす。書き込みの位置ごとの失敗 (0x6x・各 0x3C・戻し)、0x3C が全部戻ること、列挙表との整合、固定の group が変わらないこと。`make check-pci-irq-pc98`、変異 | terra |
-| 7 | `userland/shell/pci_verbose.c` | lspci の共有の表示。`struct pci_dev` に欄を足すなら `userland/shell/cmd_pci.c` の `PciDev`・`tools/abi/record_layout_contract.c`・`test_record_layout.py` を同じ段で直す | terra |
+| 6b | `tests/support/fixtures/pci_irq_pc98_host.c` | 段 6 を偽の config I/O で動かす。書き込みの位置ごとの失敗 (0x6x・各 0x3C・戻し)、0x3C が全部戻ること、列挙表との整合、固定の group が変わらないこと。`make check-pci-irq-pc98`、変異 | terra |
+| 7 | `userland/shell/pci_verbose.c` | lspci の共有の表示。`struct pci_dev` に欄を足すなら `userland/shell/cmd_pci.c` の `PciDev`・`record_layout_contract.c (旧版 c2a9087b141c)`・`test_record_layout.py` を同じ段で直す | terra |
 | 8 | `sys/dev/net/e82557/e82557.c` | `irq_register` を `pci_irq_settle` + `pci_irq_attach` に替え、開始時に要因を 1 回回収する。ISR から呼ばれた (irq ≠ 0) ときの SWI を、tick の回収 (irq = 0) とは別に数える (`E82557_ST_SWI_ISR`) | terra |
 | 8b | `sys/dev/net/e82557/lan_module.c` | 包みを `lan_module_pci_irq_attach/detach` に替える (R2-03)。参照の勘定・記録する線・`lan_detach` の解除先を機器単位の口に揃える | terra |
 | 9 | `sys/dev/video/geforce/irq.c` | GeForce を機器単位の口 (`pci_irq_settle`・`pci_irq_attach`・`pci_irq_detach`) に移す (R2-02)。起点は `irq.c:93-101`・`:290-300`。`:95` の「0 または `IRQ_LINE_MAX` (16) 以上は GF1_EIRQ」の検査は外し、線の判定は共通の層に任せる | terra |
@@ -287,7 +287,7 @@ int platform_pci_irq_route(u8 group, u16 line); /* 1 group ずつ。can_reroute=
 - P3: §3-6 (b) MPIC の操作に — CPU ごとの current task priority を 0 に下げないと割込みが来ない / 宛先は CPU0 だけ (OS32 は 1 CPU) / spurious vector と IACK・EOI の順は FreeBSD の openpic_dispatch・openpic_eoi の手本どおり。sense は PCI の行だけ (level-low) で表の型で足りる、macio の子 (edge がある) は表の外で G4 の backend が MPIC に設定。UniNorth の config 空間は little-endian で G4 の pci_cfg_read32 の backend が byte を入れ替える (uninorth.c:144)、共通の層は値で受けるので影響なし。
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
-- **`pci_dev.irq` は `irq_line`**: `struct pci_dev` に `irq` の欄は無く、書き換えるのは `irq_line` (`sys/include/pci_dev_contract.h`、offset 36、全体 40B)。第 4 段 C-layout (3c742321) が `tools/abi/record_layout_contract.c` で `struct pci_dev` とシェルの `PciDev` (`userland/shell/cmd_pci.c`) の大きさ・全欄の offset の一致を STATIC_ASSERT で縛っている。§3-1・§3-4・段 4 の「`pci_dev.irq`」は `irq_line` の書き換えに直した。欄を足す (irq・追記 1 P2-2 の domain) なら、`cmd_pci.c` の `PciDev`・`record_layout_contract.c`・`test_record_layout.py` (と段 7 の `pci_verbose.c`) を同じ段で直す。
+- **`pci_dev.irq` は `irq_line`**: `struct pci_dev` に `irq` の欄は無く、書き換えるのは `irq_line` (`sys/include/pci_dev_contract.h`、offset 36、全体 40B)。第 4 段 C-layout (3c742321) が `record_layout_contract.c (旧版 c2a9087b141c)` で `struct pci_dev` とシェルの `PciDev` (`userland/shell/cmd_pci.c`) の大きさ・全欄の offset の一致を STATIC_ASSERT で縛っている。§3-1・§3-4・段 4 の「`pci_dev.irq`」は `irq_line` の書き換えに直した。欄を足す (irq・追記 1 P2-2 の domain) なら、`cmd_pci.c` の `PciDev`・`record_layout_contract.c`・`test_record_layout.py` (と段 7 の `pci_verbose.c`) を同じ段で直す。
 - **GeForce の前提は着地済み**: `GF_IRQ_LINE 6U` は消え (b690586c・afe45f35)、`sys/dev/video/geforce/irq.c` で 0x3C の線を読んで `IRQ_F_SHARED` で登録、解除は `gf_irq_detach()`。BDF は `recover_gf_dev()` (`sys/dev/video/geforce/diag/recover.h`)。§2 の判定を「耐える」に、§5 の前提の行を着地済みに書き換えた。
 - **段 9**: 起点は `irq.c:93-101`・`:290-300`。`irq.c:95` の `!irq_line || irq_line >= IRQ_LINE_MAX` (16) を GF1_EIRQ で断る検査は、追記 1 P2-1 (G4 は 32 以上の線) とぶつかるので、段 9 で外して共通の層の判定に任せる。
 - **§6 の受入のログ**: 今の形は `[gf1] PCI IRQ=5 register=0` (線の数字は括弧に入らない、不正な線は ` invalid=`。`sys/dev/video/geforce/irq.c` の `gf_irq_attach()`)。受入の文字列を直した。

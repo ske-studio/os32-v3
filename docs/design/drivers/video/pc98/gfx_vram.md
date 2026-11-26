@@ -35,4 +35,4 @@ NP21/W、実機の位相と I/O 予算は PM の受入で確認する。
 - `gfx_add_dirty_rect` は登録の前に `gfx_clip_screen` で画面 (幅 640・現在の高さ) へ切り、画面の外なら登録しない。巨大な矩形も画面の中に収まる。
 - `gfx_present_raster` は表の `count` が 0 以下または `GFX_RASTER_MAX_ENTRIES` を超えれば転送も表の再生もせず、初回提示の診断だけ通って戻る (負の count で表の外を読まない)。
 
-検査は `tools/tests/test_kapi_bounds.py`。
+検査は `test_kapi_bounds.py (旧版 9543608bb83e)`。

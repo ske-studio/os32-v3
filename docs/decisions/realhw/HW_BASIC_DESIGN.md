@@ -169,11 +169,11 @@ HW run=3 op=end rc=OK lines=10 writes=1
 | S build/kernel.mk | Eをカーネルへ追加（Fは既存exec.cにinclude済み） | E後 |
 | T tools/rshell_hwb.py | HWログ採取/完了検査 | A/G後並列可 |
 | U tools/rshell_serial.py | hwbサブコマンド接続 | T後 |
-| V tools/tests/hwb_test.py | 下表のhost/変異とCHECK登録 | A後並列可 |
-| W tools/tests/kpeek_test.py（既存試験の実名は参照検索で確定） | allow撤去に当たる試験・変異アンカー更新 | N後 |
+| V tests/dev/hwb_test.py | 下表のhost/変異とCHECK登録 | A後並列可 |
+| W tests/dev/kpeek_test.py（既存試験の実名は参照検索で確定） | allow撤去に当たる試験・変異アンカー更新 | N後 |
 | X test/hw/trident.hwb | §8のデータ（ゲスト/test/hwへ配備） | 文法固定後独立 |
 | Y sys/dev/video/geforce/diag/gfinit.c | kpeek_allow.h の include を外すだけ (KPEEK_NV_PROM_LEN は sys/dev/video/geforce/diag/recover.h、GF_ROM_MAX は sys/dev/video/geforce/production.h のまま通る) | N/O/Pと同時 |
-| AB tools/checks/run.py の CHECK の covers・tools/tests/test_kdebug_init.py | kpeek_allow.{c,h} を外す: covers に残る 6 本 (test_kdebug_init・test_geforce・test_gf_display・test_gf_command・gf-runner-host・gfinit-host) と、test_kdebug_init.py のコンパイルの一覧 | O/P と同時 (残すと run.py が missing input、`main()` はファイルが無くて止まる) |
+| AB run.py (旧版 bdcca5c408c4) の CHECK の covers・test_kdebug_init.py (旧版 f63933516995) | kpeek_allow.{c,h} を外す: covers に残る 6 本 (test_kdebug_init・test_geforce・test_gf_display・test_gf_command・gf-runner-host・gfinit-host) と、test_kdebug_init.py のコンパイルの一覧 | O/P と同時 (残すと run.py が missing input、`main()` はファイルが無くて止まる) |
 | Z docs/tasks/realhw/TASK_TRIDENT_DRIVER.md | §0-1の「許可表で照合」「許可リストで縛る」を削除し、任意番地と引数検査のみの方針に書換え（注記で残さない） | N後独立 |
 | AA TASK_KPEEK（実装時に所在確定） | §2-5の許可表前提を削除し、peek -mの任意番地・窓・引数検査へ本文を書換え | N後独立 |
 
@@ -292,8 +292,8 @@ HW run=3 op=end rc=OK lines=10 writes=1
 - N4 (P3、実装の段で直す): F の段で sys/kern/exec/exec_abort.inc (ring3_abort_request())・appslot.c の「CUI 中は 1 バイトも変えない (K2)」のコメントを新しい印に合わせて書き換え、CUI で印以外は変わらないことを host 試験で確かめる。
 
 ## PM 決定 (2026-11-05、HW-BASIC の機能 PM、実装の前)
-- P1 (段の分け方): §6 の 1 ファイル = 1 段を、実装者の単位で次の 10 段にまとめる。a0 = A・I と段をまたぐ宣言 (sys/dev/pci/pci_hwb.h・sys/kern/exec/exec_hwb.h) と host 試験の土台 (tools/tests/hwb_fake.h・tools/tests/hwb_host.py)。parse = B、exec = C、log = G、rshell = T・U、kd = D・L、pci = E、abort = F、allow = N・O・P・Y・AB・W・Z・AA と build/kdebug.mk の kpeek_allow.o の撤去、trident = X、wire = H・J・K・R・M・Q (hwb_access.o の追加)・S と追従の試験・本番の組み立ての試験。
-- P2 (試験の置き方): §6 の V (tools/tests/hwb_test.py 1 本) は、段ごとの `tools/tests/test_hwb_<部品>.py` (各自の CHECK と MUTATIONS) に分ける。共有の登録の衝突を避けるため (run.py の lint は 0 件に当たる covers の glob を missing input にする)。共通の組み立て・実行・変異は a0 の tools/tests/hwb_host.py。
+- P1 (段の分け方): §6 の 1 ファイル = 1 段を、実装者の単位で次の 10 段にまとめる。a0 = A・I と段をまたぐ宣言 (sys/dev/pci/pci_hwb.h・sys/kern/exec/exec_hwb.h) と host 試験の土台 (hwb_fake.h (旧版 3601662ea318)・hwb_host.py (旧版 ac97d8a595e6))。parse = B、exec = C、log = G、rshell = T・U、kd = D・L、pci = E、abort = F、allow = N・O・P・Y・AB・W・Z・AA と build/kdebug.mk の kpeek_allow.o の撤去、trident = X、wire = H・J・K・R・M・Q (hwb_access.o の追加)・S と追従の試験・本番の組み立ての試験。
+- P2 (試験の置き方): §6 の V (tests/dev/hwb_test.py 1 本) は、段ごとの `旧ホスト試験 test_hwb_<部品>.py` (各自の CHECK と MUTATIONS) に分ける。共有の登録の衝突を避けるため (run.py の lint は 0 件に当たる covers の glob を missing input にする)。共通の組み立て・実行・変異は a0 の hwb_host.py (旧版 ac97d8a595e6)。
 - P3 (N4 の appslot.c): 書き換えない。新しい印は exec_abort.inc の中だけにあり、appslot の状態は CUI で今までどおり 1 バイトも変わらないので、あのコメントは正しいまま。exec_abort.inc のコメントだけを書き換え、CUI で印以外が変わらないことは abort の host 試験で確かめる (wt/p6-close の exec/appslot との重なりも避ける)。
 - P4 (スクリプトの置き場): リポジトリの `userland/tests/hw/*.hwb` に置き、配備マニフェスト (userland/deploy.yaml、tags: [test]) でゲストの `/test/hw/` へ。§7 の NP21/W の試験のスクリプトも同じ所に置く。
 - P5 (vgaHWProtect の展開): 出典は X.Org xserver hw/xfree86/vgahw/vgaHW.c の vgaHWProtect (MIT、xorg-server-21.1.13、PM の手元 ~/os32-tmp/refs/xorg-vgahw/vgaHW.c:574)。trident の段で script 内の call に展開する。

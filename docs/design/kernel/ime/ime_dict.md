@@ -78,9 +78,9 @@
 
 ## 検査
 
-- `fep-store-search` (`tools/tests/test_fep_store_search.py`): 合成の順・同点・打ち切り・学習の失敗で system だけに戻ること・学習の有無で接続数が 1/2。
-- `fep-boundary-host` (`tools/tests/test_fep_boundary.py`): 製品の入口が store を使うこと、切替・起動の失敗の扱い。
-- `fep-meta` (`tools/tests/test_fep_meta.py`): 実物の SQLite で probe・切替・旧形式・未来版。
-- `fep-budget-host`・`fep-worst-load-host`・`fep-standard-host` (`tools/checks/`): 2 接続と probe の最大の使用量が予約に収まること。
-- `hsync-fep-host` (`tools/tests/test_hsync_fep.py`): 停止と再開を hsync から。
+- `fep-store-search` (`test_fep_store_search.py (旧版 bfa4904873f8)`): 合成の順・同点・打ち切り・学習の失敗で system だけに戻ること・学習の有無で接続数が 1/2。
+- `fep-boundary-host` (`test_fep_boundary.py (旧版 d3104d219a4c)`): 製品の入口が store を使うこと、切替・起動の失敗の扱い。
+- `fep-meta` (`test_fep_meta.py (旧版 2eca3ea1b8a5)`): 実物の SQLite で probe・切替・旧形式・未来版。
+- `fep-budget-host`・`fep-worst-load-host`・`fep-standard-host` (`旧検査登録`): 2 接続と probe の最大の使用量が予約に収まること。
+- `hsync-fep-host` (`test_hsync_fep.py (旧版 358108dc9614)`): 停止と再開を hsync から。
 - ゲスト: `userland/diag/fep_meta_test.c` (S→L→S で学習の頻度が残る、予約を超える切替で今の辞書が残る、ID・品詞の不一致で学習が止まり変換は続く)。

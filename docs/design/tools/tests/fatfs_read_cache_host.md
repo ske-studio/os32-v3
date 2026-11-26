@@ -1,4 +1,4 @@
-# tools/tests/fatfs_read_cache_host.c — FatFs 読み取り保持の試験
+# fatfs_read_cache_host.c (旧版 e538ecee5e2c) — FatFs 読み取り保持の試験
 
 > 状態: **現行 (2026-10-31)**
 

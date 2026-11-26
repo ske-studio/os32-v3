@@ -111,9 +111,9 @@ C_COMMON_HOOKS_ABSENT = $(foreach h,$(EXEC_HOOKS),$(if $(filter 0,$(HOOK_$(h))),
 | PowerPC の 6 像 | 移した 14 本と残り全部の `.o` の sha256 が、置き場の名前を読み替えて前と一致。核・link・neg1 は `PPCKERN.ELF` も一致 (exec の像は RAM root の ISO が作るたびに変わるので `.o` で見る) |
 | 層の検査 | 両方の像で R1 が 20 件ずつ減る見込み (`exec/` から arch へ向く辺は 0 になる)。x86 では `sys/kern/exec/exec_gfx_poll.h → sys/dev/video/geforce/geforce_module.h`・`exec/exec_snd.h → drivers/sound/fm/snd_engine.h` が R3 に現れる (今は arch のヘッダの陰で数えていなかった辺)。`--write-baseline` で基準を下げ、差分を報告に書く |
 | 選択の試験 | `test_build_selection.py` の fixture (x86 は不変、PowerPC は 14 本の置き場の名前だけ) |
-| 追従 (covers) | `arch/x86/exec_*.h`・`arch/ppc/exec_*.[ch]` を `covers` に持つ検査 (`tools/checks/exec-image-host.py`・`ppc-exec-*.py`・`ppc-kapi-table.py`・`ppc-syscall-code.py` など)。`run.py --lint` の missing input で洗う |
-| 追従 (PowerPC 側を単体で組む試験) | `tools/ppc/test_kapi_table.py` (`exec.c` の写しを cross で組む) に `-DOS32_HOOK_DEFAULT=0` を渡す。`tools/tests/test_ppc_rshell_link.py` (移した `exec_reclaim.c` を組む) は .c 自身が 0 を定義するのでパスの追従だけ。`tools/tests/test_ppc_terminal_work.py` はフックのヘッダを読まないので、include の名前 (`arch_exec_kapi.h`) とパスの追従だけ |
-| 追従 (arch のヘッダ・.c をパスで読む試験) | `tools/tests/test_geforce.py`・`test_gfx2_i3.py`・`test_gfx_policy_triggers.py`・`test_gf_cui.py`・`test_build_selection.py`・`r1_fixture_host.c`・`font_guard_host.c`・`exec_source.py`。本文から切り出す箇所と変異の目印は lint では捕まらないので、フックのヘッダの名前で `git grep` して洗い、`--mutate` で回す |
+| 追従 (covers) | `arch/x86/exec_*.h`・`arch/ppc/exec_*.[ch]` を `covers` に持つ検査 (`exec-image-host.py (旧版 b1b8e35928eb)`・`ppc-exec-*.py`・`ppc-kapi-table.py`・`ppc-syscall-code.py` など)。`run.py --lint` の missing input で洗う |
+| 追従 (PowerPC 側を単体で組む試験) | `test_kapi_table.py (旧版 8784926fcc62)` (`exec.c` の写しを cross で組む) に `-DOS32_HOOK_DEFAULT=0` を渡す。`test_ppc_rshell_link.py (旧版 5b9735510b1e)` (移した `exec_reclaim.c` を組む) は .c 自身が 0 を定義するのでパスの追従だけ。`test_ppc_terminal_work.py (旧版 4f017e5a3f7c)` はフックのヘッダを読まないので、include の名前 (`arch_exec_kapi.h`) とパスの追従だけ |
+| 追従 (arch のヘッダ・.c をパスで読む試験) | `test_geforce.py (旧版 4b690286e6b4)`・`test_gfx2_i3.py`・`test_gfx_policy_triggers.py`・`test_gf_cui.py`・`test_build_selection.py`・`r1_fixture_host.c`・`font_guard_host.c`・`exec_source.py`。本文から切り出す箇所と変異の目印は lint では捕まらないので、フックのヘッダの名前で `git grep` して洗い、`--mutate` で回す |
 
 ## 5. ファイル
 
@@ -123,7 +123,7 @@ C_COMMON_HOOKS_ABSENT = $(foreach h,$(EXEC_HOOKS),$(if $(filter 0,$(HOOK_$(h))),
 | 移動 | `arch/ppc/exec_<名>.c` 14 本 → `exec/absent/exec_<名>.c` |
 | 改名 | `arch/{x86,ppc}/exec_cache.h` → `arch_exec_cache.h`、`arch/{x86,ppc}/exec_kapi.h` → `arch_exec_kapi.h` |
 | 削除 | `arch/x86/exec_<名>.h` 14 本、`arch/ppc/exec_<名>.h` 14 本 |
-| 変更 | `build/select.mk`・`build/sources/order.mk`・`build/arch/ppc-sources.mk`・`build/targets/ppc-powermac.mk`、`sys/kern/exec/exec.c` (include 2 行)、`sys/arch/ppc/syscall_code.c`・`exec_cache.c`・`exec_kapi.c` (include)、`sys/include/exec_arch.h`、`tools/layers_baseline.json`、`tools/tests/fixtures/build_profile_ppc.json`、検査の `covers`、`arch/README.md`、`docs/design/build/select.md` (段 2 の行) |
+| 変更 | `build/select.mk`・`build/sources/order.mk`・`build/arch/ppc-sources.mk`・`build/targets/ppc-powermac.mk`、`sys/kern/exec/exec.c` (include 2 行)、`sys/arch/ppc/syscall_code.c`・`exec_cache.c`・`exec_kapi.c` (include)、`sys/include/exec_arch.h`、`tools/layers_baseline.json`、`build_profile_ppc.json (旧版 80da850b3508)`、検査の `covers`、`arch/README.md`、`docs/design/build/select.md` (段 2 の行) |
 
 ## 6. 未決
 
@@ -134,4 +134,4 @@ C_COMMON_HOOKS_ABSENT = $(foreach h,$(EXEC_HOOKS),$(if $(filter 0,$(HOOK_$(h))),
 - x86: `tools/build_compare.py` で 1227 個の生成物が全部一致。選択の fixture で変わったのは `CFLAGS_BASE` の欄だけ (`-DOS32_HOOK_<名>=1` が 14 個増えた)。
 - PowerPC: 6 像の 952 本の `.o` が、移した 14 本の置き場の名前を読み替えて前と一致 (RAM root の ISO の 3 本を除く)。
 - 層の検査: 共通 → arch の専用ヘッダ (R1) は両方の像で 25 件から 5 件に減った。x86 では `sys/kern/exec/exec_gfx_poll.h → sys/dev/video/geforce/geforce_module.h`・`exec/exec_snd.h → drivers/sound/fm/snd_engine.h` の 2 件が R3 に現れた (arch のヘッダの陰で数えていなかった辺)。辺の合計は x86-pc98 が 118 → 100、ppc-powermac が 74 → 54。
-- `KERNEL_CFLAGS_EXTRA` をコマンドラインで与える組み方 (`tools/tests/test_nofpu.py`) では `HOOK_DEFS` が落ち、ヘッダの既定 (在る) になる。x86 のフックを 0 にする段が来たら `HOOK_DEFS` は `KERNEL_CFLAGS` に直に足す。
+- `KERNEL_CFLAGS_EXTRA` をコマンドラインで与える組み方 (`test_nofpu.py (旧版 a12cc4f9bd0f)`) では `HOOK_DEFS` が落ち、ヘッダの既定 (在る) になる。x86 のフックを 0 にする段が来たら `HOOK_DEFS` は `KERNEL_CFLAGS` に直に足す。

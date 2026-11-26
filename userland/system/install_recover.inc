@@ -4,7 +4,7 @@
 /*                                                                          */
 /*  install.c から #include される本体。KAPI を直接呼ばず、すべての口を        */
 /*  `RecoverOps` (関数ポインタ表) 経由にしてあるので、ホスト TDD              */
-/*  (tools/tests/install_recover_host.c) が同じソースを取り込んで            */
+/*  (install_recover_host.c (旧版 e491db921901)) が同じソースを取り込んで            */
 /*  RAM バックエンドと障害注入の上で回せる。                                  */
 /*                                                                          */
 /*  設計原則 (票 §1): 元の対 (settings.db + -journal) は最後の切替まで        */

@@ -170,7 +170,7 @@ WM の共通経路 (`wm::set_focus` とその同類) に入れるので、**マ�
 
 準備 (**実装済み 2026-09-26、wt/kbd-diaglog、KAPI v67、NP21/W の確認範囲は §3-1、実機は未確認**。
 使い方は [POLICY_DEBUG §4-57](../../POLICY_DEBUG.md#4-57-キーボード-8251-の信号線) の `kbdstat -w`、試験は `make check-kbd-dlog-host`
-([記録](../../../tools/tests/kbd_dlog_tdd.md))): **受信のたびに記録する診断リング**をドライバに足す (`sys/platform/pc98/input/kbd.c` の IRQ1 で、受け取った 1 バイトごとに
+(旧版の記録 `31b7588f3708`)): **受信のたびに記録する診断リング**をドライバに足す (`sys/platform/pc98/input/kbd.c` の IRQ1 で、受け取った 1 バイトごとに
 `seq / code / make・break / 更新後の修飾` を 32 件の循環リングへ)。読むのは KAPI `kbd_diag_log` (追記、診断専用) と
 `kbdstat -w` (リングを読んで新しい分を 1 行ずつ出す。ESC か 30 秒で終わる)。**seq が飛んだら「取りこぼし — この区間は判定不能」と出す**。
 今の `kbdstat` では足りない: `last_code` は最後の 1 件だけ、`irq_count` は EMPTY / ERROR の判定より前に増えるので受信件数ではない、
@@ -217,7 +217,7 @@ Alt+TAB の窓一覧の表示 (v2、v1 はタスクバーのボタンで代用)�
 
 新しいモジュール `userland/gshell/src/kbdnav.rs` (ショートカット・切り替え・窓メニューの実行・キーボードの移動/サイズ・マウスキー)。
 入口は `input.rs` の `capture_keyboard` の 2 か所 (`kbdnav::pre` = 修飾キーを捨てる前、`kbdnav::on_key` = SHIFT+SPACE の後・モーダルより前) と、X4 の退避判定 `kbdnav::is_wm_raw`。
-マウスのエッジと移動は `input::edge_x3` / `input::move_x3` に切り出し、実マウスとマウスキーが同じ関数を通る。試験は `userland/gshell/host/kbdnav_tests.rs` (K1 ①〜⑧ + 窓メニュー等 + 代行レビューの探り、36 本)、変異は `host/integration.py` の `MUTATIONS` (32 本、`make check-gshell-host` が `--mutate` で毎回回す)。
+マウスのエッジと移動は `input::edge_x3` / `input::move_x3` に切り出し、実マウスとマウスキーが同じ関数を通る。試験は `kbdnav_tests.rs (旧版 9401a4d99aaf)` (K1 ①〜⑧ + 窓メニュー等 + 代行レビューの探り、36 本)、変異は `host/integration.py` の `MUTATIONS` (32 本、`make check-gshell-host` が `--mutate` で毎回回す)。
 
 §0 と今のコードの差: 行番号は 2026-09-25 時点でほぼ合っていた (input.rs のモーダル分岐は 377 がコメントの頭で本体は 383、全画面の判定は 470)。**最小化・最大化・元のサイズは WM に無かった** (票 §1-2 の窓メニューと GRPH+TAB の「最小化した窓」が前提にしていた) ので下のとおり足した。
 

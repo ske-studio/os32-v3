@@ -33,7 +33,7 @@ sys/include/diag_stack.h は SQLite のトレース構成、sys/include/snd_writ
 
 | 段 | 規則 | 修正と確認 |
 |---|---|---|
-| P2-3 | build/sdk.mk の CHECK_REGISTRATION | Make の解析時に旧 tools/checks/run.py --make が走る。製品ビルドをこの登録から切り離し、旧ランナーを外した状態で Make が解析できることを確かめる。 |
+| P2-3 | build/sdk.mk の CHECK_REGISTRATION | Make の解析時に旧 run.py (旧版 bdcca5c408c4) --make が走る。製品ビルドをこの登録から切り離し、旧ランナーを外した状態で Make が解析できることを確かめる。 |
 | P3 | build/programs.mk の C_TESTS | wildcard userland/tests/*.c と filter-out、個別規則を userland/diag/ に合わせ、移動前後の ELF・BIN の集合を照合する。 |
 | P3 | build/ppc-user.mk の atadeny.o・learnprb.o | 明示したソースを userland/diag/ に変更し、両方の BIN が生成されることを確かめる。 |
 

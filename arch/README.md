@@ -110,17 +110,10 @@ x86 にしか意味の無い仕組みなので `include/` に契約を置かず�
    この計測器は `ARCH=x86` の木を ARM コンパイラに通すもので、`arch/arm/` が
    出来ていなくても動く (だから受け皿だけ先に作れる)。
 
-## 番人
+## 命令の所有
 
-`tools/check_arch_asm.py` (`make check` の `check-arch-asm`) が、カーネル側の
-C ソースに `hlt` / `cli` / `sti` の直書きが無いことを検査する。直書きしてよいのは
-`arch/<arch>/arch_*.h` (契約の実装側) だけで、**契約側の `sys/include/io.h` /
-`sys/include/cpu.h` も検査対象** — 契約に実装が混ざったらそこで止まる。
-`arch_` で始まらない arch 専用の小物 (`x86_desc.h`) は許可一覧に**入らない**
-— 直書きの散らばる先を増やさないため。
-
-命令列の一部としてしか意味を持たず切り出せない箇所は、その `asm` の直前の
-コメントに `ARCH-ASM-OK` と**切り出せない理由**を書く。
+カーネルの `hlt`・`cli`・`sti` は CPU 側の実装に置く。ユーザー空間の実行命令は登録検査
+`ring3_instructions`、共通コードの include と最終リンクは `include_layers` と `link_layers` が検査する。
 
 ## 今あるもの
 

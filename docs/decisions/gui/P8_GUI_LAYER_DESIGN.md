@@ -152,8 +152,8 @@ Button down受理後だけcaptureを保持。upは元owner/窓/世代へ。owner
 | `userland/gshell/src/wm.rs` | 共有状態・回収接続、差分30行 | 共有束の例外 |
 | `userland/rust/libos32gui/src/app.rs` と既存widget入力状態 | OVERFLOW時の入力取消、差分40–80行 | 既存on_overflowを使用 |
 | +`userland/gshell/host/input_queue_tests.rs` | drop/focus/WMマウスキー試験、300–450行 | 入力契約後 |
-| +`tools/tests/pcm_stream_host.c` | PCM口・割込み点試験、350–450行 | PCM契約後 |
-| +`tools/tests/test_pcm_stream.py` | host実行/変異登録、150–250行 | host fixture後 |
+| +`tests/support/fixtures/pcm_stream_host.c` | PCM口・割込み点試験、350–450行 | PCM契約後 |
+| +`tests/sound/pcm_stream.py` | host実行/変異登録、150–250行 | host fixture後 |
 `kbdnav.rs` は既存のWMマウスキー配送と全画面除外を維持し、変更対象から外す。`handler.rs` も既存OP_POLLのdropped/OVERFLOW通知・消込を再利用するため変更不要。
 公開宣言、`sdk/kapi.json`、生成C/Rust binding、syscall wrapper、execのowner回収、build登録も追従する。
 その正確な登録先は指定読取範囲外なので実装開始時に正典から特定する。生成物を手編集しない。

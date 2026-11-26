@@ -1,6 +1,6 @@
-# tools/check_c_dialect.py — 設計
+# check_c_dialect.py (旧版 d768037598ba) — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_C11_MIGRATION (§6 段 4・段 5、受入 A1・A2・A5・A6)・TASK_CLANG_CHECKS の契約を今のソースと照らして要約
-ソース: `tools/check_c_dialect.py` (`expected_std`・`effective_std`・`probe_rejects`・`check_build_flags`・`check_sdk_headers`・`check_sdk_lib_headers`・`check_sdk_sample`・`check_internal_units`)・`tools/clang_ast/build.py` (`dry_run`・`strip_jobserver`・`parse_compile_lines`)・`tools/clang_ast/dialect.py`
+ソース: `check_c_dialect.py (旧版 d768037598ba)` (`expected_std`・`effective_std`・`probe_rejects`・`check_build_flags`・`check_sdk_headers`・`check_sdk_lib_headers`・`check_sdk_sample`・`check_internal_units`)・`tools/clang_ast/build.py` (`dry_run`・`strip_jobserver`・`parse_compile_lines`)・`dialect.py (旧版 dd5c871a87e7)`
 
 規則 [C1] (`docs/CONSTRAINTS.md`: 内部は GNU11、公開 SDK ヘッダは C89/GNU89、SQLite は GNU89、暗黙の宣言・int・VLA 等の禁止) を、旗の **文字列ではなくコンパイル結果** で確かめる (`make check-c-dialect`)。
 位置づけは「誤って持ち込むことを防ぐ guard」で、わざと作った入力への耐性は目標にしない。
@@ -27,4 +27,4 @@ gnu11 の旗の組ごとに小さな本文をコンパイルし、**期待する
 1 の翻訳単位のうち vendor (`lib/sqlite3`・`lib/zlib`・`lib/microtar`・`lib/fatfs`・`lib/os32_lz4`・`fs/fat/fatfs`・`userland/rust`) を除いたものを、**その単位の実際の引数で** clang に解析させ (`#if`・マクロ・行継続・`#include` の解釈は本物に任せる)、木の中のファイルに次が出たら落とす: `_Atomic`・`_Thread_local`・`__thread`・`restrict` (`__restrict` も型として)・`<stdatomic.h>`・`<threads.h>`・VLA・匿名の構造体 / 共用体・旧式 (K&R) の関数定義。システムヘッダと vendor のファイルは数えない。報告の行は物理行。
 **解析に失敗したら違反として落とす** (fail closed)。`#if` で外れた部分と、どの単位からも取り込まれないヘッダは見ない。
 
-検査: `tools/tests/test_c_dialect.py` (否定側は `--mutate`) と `tools/tests/test_clang_ast.py`。過去の反例 (コメント入りの `#include`、行継続で割った語、VT / FF、`make -e`・変数指定のエスケープ、保存済みの `lgy98.flags` の `#if` の中、SDK の展開されないマクロ) を試験に持つ。
+検査: `test_c_dialect.py (旧版 13ee5f94f9db)` (否定側は `--mutate`) と `test_clang_ast.py (旧版 5317fe59a07d)`。過去の反例 (コメント入りの `#include`、行継続で割った語、VT / FF、`make -e`・変数指定のエスケープ、保存済みの `lgy98.flags` の `#if` の中、SDK の展開されないマクロ) を試験に持つ。

@@ -500,7 +500,7 @@ MIRRORS = (
      r"^pub const GUI_SHM_OFFSET:\s*u32\s*=\s*(0x[0-9A-Fa-f]+)\s*;",
      "MEM_SHM_GUI_OFFSET"),
     # ローダ (NASM) はヘッダを読めないので番地を写して持つ
-    # (票 TASK_HDD_INSTALL 段 0。オフセットの一致は tools/tests/test_bootinfo.py)。
+    # (票 TASK_HDD_INSTALL 段 0)。
     ("boot/bootinfo.inc", r"^MEM_BOOTINFO_BASE\s+EQU\s+(0x[0-9A-Fa-f]+)\s*$",
      "MEM_BOOTINFO_BASE"),
     # VK32 の展開先の帯と、ローダ (C) が書くブート情報域 (票 TASK_SERIAL_HOSTFS

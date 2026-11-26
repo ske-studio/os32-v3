@@ -21,4 +21,4 @@
 
 ## 検査
 
-`tools-host` の中の `tools/tests/test_stat_cmd.py` (本体 `tools/tests/stat_cmd_host.c`)。実物の `stat.c` を `#define main stat_main` で取り込み、`sys_stat` だけを表に差し替えて `printf` の出力を突き合わせる。ケースは `dev`・`fields`・`notfound`・`multi`・`usage`。`--target` は i386-elf で単体コンパイルする。実 VFS が何を埋めるか (FAT・hostdrv は `st_ino` を埋めない等) はゲストでしか分からない。
+`tools-host` の中の `test_stat_cmd.py (旧版 913e781b1c6d)` (本体 `stat_cmd_host.c (旧版 ffe7d40092e8)`)。実物の `stat.c` を `#define main stat_main` で取り込み、`sys_stat` だけを表に差し替えて `printf` の出力を突き合わせる。ケースは `dev`・`fields`・`notfound`・`multi`・`usage`。`--target` は i386-elf で単体コンパイルする。実 VFS が何を埋めるか (FAT・hostdrv は `st_ino` を埋めない等) はゲストでしか分からない。

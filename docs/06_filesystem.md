@@ -299,7 +299,7 @@ PIO は同期呼出しのため IRQ・tick・DMA の停止口は追加しない�
 | `iso9660_get_file_size(ctx, path, size)` | ファイルサイズ取得 |
 | `iso9660_stat(ctx, path, st)` | ファイル情報取得 |
 
-**読みのキャッシュ** (実機の cdinst が 20KB/s を切った件、`tools/tests/cd_read_tdd.md`):
+**読みのキャッシュ** (実機の cdinst が 20KB/s を切った件、`cd_read_tdd.md (旧版 90e42b81cae2)`):
 
 - **直前に解決したパス 1 本** (LBA・サイズ・フラグ) を覚える。VFS は読みのたびにパスを渡すので、以前は区切り
   (4KB) ごとに根からディレクトリを読み直し、データと離れたディレクトリのセクタへ毎回シークしていた

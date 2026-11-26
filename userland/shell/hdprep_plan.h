@@ -8,7 +8,7 @@
 /*  1 バイトも書かない。                                                     */
 /*                                                                          */
 /*  I/O は持たない (cmd_hdprep.c が KAPI で集めた値を渡す)。ホスト試験:      */
-/*  tools/tests/test_hdd_stage1.py (記録 tools/tests/hdd_stage1_tdd.md)。    */
+/*  test_hdd_stage1.py (旧版 6201b26bccf0) (記録 hdd_stage1_tdd.md (旧版 b895f780947c))。    */
 /* ======================================================================== */
 
 #ifndef HDPREP_PLAN_H

@@ -30,7 +30,7 @@
 - R6: kai/np2 の原文、THIRD_PARTY.md、README.OS32、配布像での置き場を追加する。
 - R7: snd の BGM/SE 開始・終端に source を取得・解放し、通常文脈 producer と保持 owner を P8 に揃える。
 - R8: Count の各 delta を next_event と 32767µs 以下に分割する。
-- R9: usefmgen を PCM 比較の前提から除外し、入力列を鳴らすゲスト試験と tools/checks の CHECK 宣言を指定する。
+- R9: usefmgen を PCM 比較の前提から除外し、入力列を鳴らすゲスト試験と tests/registry.toml の CHECK 宣言を指定する。
 - R10: 起動時の最悪発音ベンチマークと遅い CPU の NOSYS 判定を削除する。
 - R11: ホスト oracle の SUPPORT_FMGEN と最小 compiler.h shim を追加する。
 
@@ -168,7 +168,7 @@ FM_SOFT の間は 0188h–018Fh と A460h を捕捉し、幅 2/4 を連続 byte 
 - ネイティブ chip では timer A の CSM 期限と同時刻に clear/停止を書き、後続に ADPCM RAM 書きと未来の WRITE を置く。PCM 満杯で timer status を二度読み、tm_us より古い WRITE を追加して再読し、空きを戻して pump を二度呼ぶ。timer の load/clear は各一度、期限の CSM は同時刻の停止より先に一度だけ音声へ届く。遅着で tm_us は戻らず、未来の WRITE は期限前に現れない。音声側の RAM 書込み・アドレス増分も一度だけであることをイベント列と RAM 内容で照合する。途中で音声依存 read を挟んでも、そこで消費した接頭部を pump が再適用しないことを確認する。
 - L2 に奇数長の未知 chunk と pad を持つ自作 WAV 6 本を渡し、全音の PCM を比較する。1 本欠損では rhythm のみ無音。RIFF 外へ伸びる chunk、pad 欠落、WAVE 以外の form、非 mono/16bit は INVAL、読取り途中の短い read は IO とし、失敗後に半端な波形が参照されないことを検査する。
 - host oracle は固定した元の fmgen 翻訳単位を `-DSUPPORT_FMGEN -Itools/tests/opna_host` でビルドする。compiler.h shim は標準の stdint/stdio/string、必要な型・呼出規約・MAX_PATH に限り、fmgen_types.h の型を二重定義しない。必要な識別子を PORT.md に記録し、host の ulong 幅を static assert と比較で確認する。FileIO の未解決参照に必要な場合だけ元の fmgen_file.cpp を host にリンクする。
-- tools/checks/check_opna.py の CHECK に Rust/C・ABI ヘッダ・表生成元と生成物・oracle/shim・guest runner と manifest・関連試験と変異を宣言し、runner の lint と入力変更時の選択を確認する。
+- tests/registry.toml の CHECK に Rust/C・ABI ヘッダ・表生成元と生成物・oracle/shim・guest runner と manifest・関連試験と変異を宣言し、runner の lint と入力変更時の選択を確認する。
 - 配布像から /sys/licenses/fmgen/ の 4 原文を読み戻し、それぞれ段 A の移植元 SHA-256 と一致すること、README.OS32 も収録されることを検査する。manifest の登録漏れ、原文の改行変換は不合格とする。
 
 ## 10. 決定（ユーザー判断 3 件）

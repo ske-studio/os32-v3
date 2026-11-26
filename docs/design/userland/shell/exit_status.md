@@ -4,7 +4,7 @@
 
 利用者に見える形 (`exit` の引数・`source` の値・`set -e` の表示) は `docs/manpages/exit.1`・`docs/manpages/source.1`、
 カーネル側の記録 (`exec_last_result` の種別・記録なしの扱い・GUI の子は書かない) は `docs/KAPI_SPEC.md` の
-`exec_last_result` の項が正典。ここはシェルの中の配線を書く。試験は `tools/tests/sh_status_host.c`。
+`exec_last_result` の項が正典。ここはシェルの中の配線を書く。試験は `sh_status_host.c (旧版 cd26a2e50c02)`。
 
 ## 1. 値の空間
 

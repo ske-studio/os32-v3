@@ -202,7 +202,7 @@ int gf2_gr_init(struct gf2_chan *); /* grctx allocationも所有、失敗時逆�
 |---|---|
 | A0 sys/dev/video/geforce/command.h 新 | 上記全stateと型付き境界を凍結、「確定」節の fifo/fb のプロトタイプを含む / 層 1 の A0 (foundation.h) の取り込み後 / 240 |
 | A1 sys/dev/video/geforce/production.h 変 | gf2所有state / A0 / 8 |
-| A2 tools/tests/gf_command_host.h 新 | 偽MMIO/PRAMIN/時計/IRQ骨格と部品stub、B群に依存しない / A0 / 140 |
+| A2 gf_command_host.h (旧版 55b31488eba2) 新 | 偽MMIO/PRAMIN/時計/IRQ骨格と部品stub、B群に依存しない / A0 / 140 |
 | B0 sys/dev/video/geforce/fifo.c 新 | PFIFO/RAMFC開始停止 / A0,F1 / 200 |
 | B1 sys/dev/video/geforce/push.c 新 | reserve/emit/wrap/kick / A0 / 180 |
 | B2 sys/dev/video/geforce/dmaobj.c 新 | DMA descriptor生成 / A0,F1 / 85 |
@@ -220,9 +220,9 @@ int gf2_gr_init(struct gf2_chan *); /* grctx allocationも所有、失敗時逆�
 | C4 tools/prototypes/geforce_imports.def 変 | typed DMA ops取得を1 import / B9 / 15 |
 | C5 build/geforce-module.mk 変 | 部品配置、サイズ検査 / B群,C4 / 20 |
 | D0 docs/02_memory.md 変 | push用UC map 64KiB/16頁、仮想配置に応じ追加PT最大2頁を予算化し実測、予約/解除寿命 / B8 / 15 |
-| A3 tools/tests/test_gf_command.py 新 (旧 T1) | CHECK登録、部品別host駆動、変異実行。A 段に置き、B 段の登録は PM が直列に取り込む (ROLES §3-3) / A2 / 100 |
+| A3 test_gf_command.py (旧版 c46a29959fd1) 新 (旧 T1) | CHECK登録、部品別host駆動、変異実行。A 段に置き、B 段の登録は PM が直列に取り込む (ROLES §3-3) / A2 / 100 |
 | T2 sys/dev/video/geforce/diag/gf_command_test.c 新 | 非GUI serial受入入口 / C群 / 170 |
-- 各B段はtools/tests/gf_command_b<N>_host.cを同じ担当の成果物として追加 (各約40行、合計約400行)。依存部品はA2 stubで置換、対象部品は実コードをlinkし、当該Bだけで正常/変異を実行可能。
+- 各B段はtests/support/fixtures/gf_command_b<N>_host.cを同じ担当の成果物として追加 (各約40行、合計約400行)。依存部品はA2 stubで置換、対象部品は実コードをlinkし、当該Bだけで正常/変異を実行可能。
 - 定数は既存3層規則の正典→共通定義→部品aliasへ配置。新しい一般メモリ予約をmemmap.hに重複固定しない。Aで型を凍結、Bは部品別、Cは結合、Tで受入。各段は単独host検査可能にする。
 
 ## 9. 受入 → 試験・変異と段の分け方
@@ -236,7 +236,7 @@ int gf2_gr_init(struct gf2_chan *); /* grctx allocationも所有、失敗時逆�
 | B8 map | BAR1長不足/加算overflow/部分extentのbaseとlength/解除失敗時保持 | 64KiB mapのPT増分と予約解除を記録 / offset無視を殺す |
 | 最終 | KDEBUG=0本番link、image<=128KiB、全段rollback | 起動→投入→停止→再開、IRQ6共有/VBLANK増加、表示維持、0:13.0/0221一致 |
 - host試験はレジスタ副作用のモデルでありDMA到達性の証明ではない。実機試験を実装前の着手条件にしない。PCI転送の結合試験だけ層3M2MFに依存し、referenceまでの層2受入を先行する。
-- T1は`CHECK=dict(name='gf-command-host',tier=1,needs=[],budget=90.0,covers=['hwdev/gf/**','sys/dev/video/geforce/geforce_dma.c','tools/tests/gf_command*','tools/tests/test_gf_command.py'])`を宣言。未着手Bは登録せず、追加済みBの試験欠落は失敗。A時点で骨格の正常/変異を実行する。
+- T1は`CHECK=dict(name='gf-command-host',tier=1,needs=[],budget=90.0,covers=['hwdev/gf/**','sys/dev/video/geforce/geforce_dma.c','旧ホスト試験 gf_command*','test_gf_command.py (旧版 c46a29959fd1)'])`を宣言。未着手Bは登録せず、追加済みBの試験欠落は失敗。A時点で骨格の正常/変異を実行する。
 - 各変異は無変更対照がGREEN→一意の目印で1箇所を変更→同じ対象試験が実行時RED→復元してGREENを要求。コンパイル失敗を検出成功に数えない。B担当が自身のfixture/変異をT1へ登録。
 - D1段: `docs/tasks/DEFERRED_TESTS.md`へ `GF-L2-Ra266 | 未実施 | Ra266 0:13.0/0221 | 10万reference・wrap・fault→recover・VBLANK・PCI往復(層3結合) | 実施担当/日付/serialログを実施時記入` の行を追加。host合格で実機済みにしない。
 - 各段の成果物: C1/GNU規則とMIT出所確認→局所host検査→前段と結合。実機配備/物理操作は本書の実行範囲外、D1/D2に従う。本書作成時はビルド/配備/リポジトリ編集を行っていない。

@@ -53,4 +53,4 @@ int os32_host_notice_read(const char *name, HostNotice *out); /* LIST で名前�
 
 ## 確かめ
 
-- `tools/tests/test_hostsvc_sdk.py` (yield・全体の期限の TIMEOUT・HOSTDOWN・古いハンドルの STALE・LIST の引き直し)・`test_host_lib.py`・`test_host_sdk_rs.py` (Rust の契約)。
+- `test_hostsvc_sdk.py (旧版 8fee15c02535)` (yield・全体の期限の TIMEOUT・HOSTDOWN・古いハンドルの STALE・LIST の引き直し)・`test_host_lib.py`・`test_host_sdk_rs.py` (Rust の契約)。

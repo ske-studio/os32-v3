@@ -88,7 +88,7 @@ WAIT_KEY との共有承認は v3 で改めた (GUIRUNKEY-1、ユーザー決定
 | syscall と KAPI | 関数表の slot → 8B stub → 共通 `sc` → 既存 exec syscall 経路。r0=slot、r3〜r10=引数、r3=戻り値、エラーは既存の負値。PowerMac に provider がない slot は型付きの不在を返す (取得 0・照会 0・操作 `OS32_ERR_NOSYS`・void は何もしない。`sdk/kapi_target_ppc.py`) |
 | 配置 | text は 0x80100000 から、4KiB 境界の後に data・bss、stack 上端は 0x90000000。KAPI 表・stub は USER RO の共有ページ (exec のトランポリン)。命令の書込み後、`arch_exec_publish` が `dcbst` → `sync` → `icbi` → `sync` → `isync` で公開する |
 | 終了値 | main の戻り値 = `sys_exit` の値 = `exec_run` の戻り値。開発用の常駐 CLI (`KBOOT_SHELL=1`) は `exit=<値>` を出す。USER fault は既存の負の exec エラー (受入では `exit=-2`) |
-| 受入 | `tools/ppc/sb_run.py` は LAN の端末から `/bin/hello.bin ok` → `hello ok` → `exit=7` を確認し、fault の後も hello が通ることを確認する |
+| 受入 | `sb_run.py (旧版 3c5018178a68)` は LAN の端末から `/bin/hello.bin ok` → `hello ok` → `exit=7` を確認し、fault の後も hello が通ることを確認する |
 
 設計の全文は [PPC_SHELL_EXEC_DESIGN](decisions/ppc/PPC_SHELL_EXEC_DESIGN.md) を参照。
 

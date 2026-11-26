@@ -31,4 +31,4 @@ KDEBUG=1 のみロード、PAIR は kernel 像 CRC。
 
 `kdebug_init(candidate)` は **候補表に自分の `kdebug_ops` を写して 0 を返すだけ**。import を 1 つも呼ばず、割当・登録・装置の操作をしない。だから init が失敗しても、ローダの回収 (owner 単位) だけで元に戻る。ローダは init の戻りが 0 で、候補表が像の export 表と一致したときだけ公開する。
 
-検査: `make check-kdebug-init-host` (`tools/tests/test_kdebug_init.py`)。実物の `kdebug_main.c` の init を ILP32 で呼んで候補表と import 呼び出し 0 を見る。実物の `kdebug_module.c`・`module_runtime.c`・`module_image.c` と実際に組んだ部品で、OFF・他の設定値・RUNNING・open / stat / ヘッダ読み / owner / 確保 / 本体読みの失敗・`image_valid` 0・ヘッダ / 対 / ABI / CRC / reloc / import / export の拒否・init の失敗を通す (import はすべて数える罠に結ぶ)。拒否と OFF の像は init の先頭を UD2 にして、init が呼ばれないことを見る。
+検査: `make check-kdebug-init-host` (`test_kdebug_init.py (旧版 f63933516995)`)。実物の `kdebug_main.c` の init を ILP32 で呼んで候補表と import 呼び出し 0 を見る。実物の `kdebug_module.c`・`module_runtime.c`・`module_image.c` と実際に組んだ部品で、OFF・他の設定値・RUNNING・open / stat / ヘッダ読み / owner / 確保 / 本体読みの失敗・`image_valid` 0・ヘッダ / 対 / ABI / CRC / reloc / import / export の拒否・init の失敗を通す (import はすべて数える罠に結ぶ)。拒否と OFF の像は init の先頭を UD2 にして、init が呼ばれないことを見る。

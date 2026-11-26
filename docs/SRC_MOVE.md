@@ -20,7 +20,7 @@ ATA M1 では `platform/pc98/device_ide.c` を `sys/dev/ide/device_ide.c` に移
 | `tools/include_resolve.py` | 全 `#include "x"` の解決先を JSON に出す。前後で比べ、パスの付け替え以外の変化が無いこと |
 | `tools/build_compare.sh <基点> <対象>` | 2 つの木を固定の build_id・`SOURCE_DATE_EPOCH` で組み、kernel・各 .mod・kdebug と r1 の同じもの (計 28 本) をバイト比較。ずれたら objdump で関数ごとの差を出す |
 | `tools/source_roots.py` | 走査型の検査 (check_p2v・check_arm_compile・check_arch_asm・check_kprintf_window) の走査の根の一覧。新しい最上位のディレクトリはここに足す |
-| `tools/tests/kernel_includes.py` | ホスト試験がカーネルのソースを組むときの -I。`build/config.mk` の `INC_KERNEL` を make で展開するので、**INC_KERNEL に足せば試験は追従する** |
+| `tools/ops/kernel_includes.py` | ゲスト観測用の配置を組むときの -I。`build/config.mk` の `INC_KERNEL` を make で展開するので、**INC_KERNEL に足せば試験は追従する** |
 
 ## 3. 手順 (1 段)
 
@@ -40,10 +40,10 @@ sys/kern/ver_collect.c と sys/kern/ver_format.c は C_COMMON_EXEC で両機種�
 - `tools/build_compare.sh <基点> HEAD` で 28 本がバイト一致。**例外**: 部品の取り決めの検算値 (`*_MODULE_ABI_GEN`・HWDEV の contract CRC) は契約ヘッダの**本文**から計算するので、道具が註のパスを置換すると値が変わる。このときは「成果物の大きさが前後で同じ」かつ「関数ごとの差が検算値の定数の入れ替えだけ (`movl`・`cmpl` などの即値 4 バイト。HWDEV の CRC は照合の `cmpl` にも出る、L2)」で一致とみなす。成果物ごとの差のバイト数は 8〜40 程度 (L1・L2 の実績)。宣言の置き場 (`source`) は 39ce3607 で `abi_hash` から外したので、置き場だけでは値は変わらない
 - `tools/include_resolve.py` の解決先が前後で一致 (パスの付け替えを除いて)。同名ヘッダの解決先も確かめ、比べ方は**単位 (コンパイル単位・ファイル) ごとの解決先の集合**で — 生成ヘッダは include をパスの順に並べるので行番号では比べない (L2)。製品の単位で変化 0 件。試験の fixture で、前は解決しなかった include が同じディレクトリに来て解決するようになるのは差に数えない
 - 走査型の検査の走査ファイル数が前後で一致
-- `tools/tests`・`build/`・`tools/checks` で旧いパスと文字列のディレクトリ名を grep して 0 件 (道具の一覧の取りこぼしの確かめ)
+- `tests/`・`build/`・`tools/` で旧いパスと文字列のディレクトリ名を grep して 0 件 (道具の一覧の取りこぼしの確かめ)
 - `make check-docs-links MUTATE=0` rc=0 (見出しのパスが変わってリンクの断片が切れるのを拾う、L2)
 - 変異のコピーの階層と -I の順・分割パス・生成物の隣接の前提を確認し、config.mk を読む道具は make 展開を使う
-- `python3 -B tools/checks/run.py --lint` rc=0
+- `python3 -B -m tests.infra.ci lint` rc=0
 
 ### PM の取り込み
 

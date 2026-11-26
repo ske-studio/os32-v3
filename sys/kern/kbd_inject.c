@@ -13,7 +13,7 @@
 /*     ループの中で回るので、con_sink と同じく IF 退避 (irq_save/restore)    */
 /*     で守る。単一プロデューサを仮定しない。                                */
 /*                                                                          */
-/*  ホスト試験 (tools/tests/kbd_inject_host.c) はこの .c をそのまま          */
+/*  ホスト試験 (kbd_inject_host.c (旧版 4c4e8e01e6df)) はこの .c をそのまま          */
 /*  #include して回す。                                                      */
 /* ======================================================================== */
 
@@ -45,7 +45,7 @@ extern int res_owner_get(void);
 /* ------------------------------------------------------------------------ */
 /*  状態                                                                     */
 /*                                                                          */
-/*  名前に inj_ を付けてあるのは、ホスト試験 (tools/tests/kbd_inject_host.c) */
+/*  名前に inj_ を付けてあるのは、ホスト試験 (kbd_inject_host.c (旧版 4c4e8e01e6df)) */
 /*  が sys/kern/console/con_sink.c と**同じ翻訳単位**へ両方を #include して、権限の    */
 /*  経路 (「注げるのは con_sink の読み手だけ」) を模型で置き換えずに通す     */
 /*  ため。con_sink.c 側の g_ring / g_head / ring_reset とぶつからない。      */

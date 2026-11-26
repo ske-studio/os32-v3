@@ -36,4 +36,4 @@ generation <u32>
 
 ## 確かめ
 
-- `tools/tests/test_hostsvc_services.py` (番号の割り当て・後勝ち・警告・sfs の静的な行・stub の 501・作らない名前が無い)・`test_hostsvc_sdk.py` (SDK の名前の解決と引き直し)。
+- `test_hostsvc_services.py (旧版 0a23c60eb444)` (番号の割り当て・後勝ち・警告・sfs の静的な行・stub の 501・作らない名前が無い)・`test_hostsvc_sdk.py` (SDK の名前の解決と引き直し)。

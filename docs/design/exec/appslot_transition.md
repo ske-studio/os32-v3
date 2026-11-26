@@ -55,4 +55,4 @@
 
 ## 検査
 
-`tools/tests/test_multiapp_impl.py` (`multiapp_impl_host.c`)。実物の `sys/kern/exec/appslot.c` と `sys/kern/kbd_inject.c` を取り込む。`exec_resume` の kbd 分岐はホストに持ち込めないので、ハーネスの `ma_resume_kbd` に写してある (写した部分の正しさは言わない)。
+`test_multiapp_impl.py (旧版 b46dfc292d27)` (`multiapp_impl_host.c`)。実物の `sys/kern/exec/appslot.c` と `sys/kern/kbd_inject.c` を取り込む。`exec_resume` の kbd 分岐はホストに持ち込めないので、ハーネスの `ma_resume_kbd` に写してある (写した部分の正しさは言わない)。

@@ -36,4 +36,4 @@
 
 ## 確かめ
 
-- `tools/tests/test_hostsvc_netcd.py`・`test_hostsvc_media.py` (像の差し替え・同じ像は世代を保つ・ATAPI の回帰・netcd=cd0 と並ぶ ATAPI=cd1)・`test_hostsvc_boot.py` (起動の順)・`test_hostsvc_fd.py`・`test_fd_netcd_config.py` (FD の設定の書き込みと読み戻し)・`test_packages.py` (`/etc/netcd.cfg` を HDD に写さない)。
+- `test_hostsvc_netcd.py (旧版 c2b0e620ea28)`・`test_hostsvc_media.py` (像の差し替え・同じ像は世代を保つ・ATAPI の回帰・netcd=cd0 と並ぶ ATAPI=cd1)・`test_hostsvc_boot.py` (起動の順)・`test_hostsvc_fd.py`・`test_fd_netcd_config.py` (FD の設定の書き込みと読み戻し)・`test_packages.py` (`/etc/netcd.cfg` を HDD に写さない)。

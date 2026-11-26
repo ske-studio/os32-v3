@@ -12,7 +12,7 @@
  *
  *   font_test -c   画面を使わない照合: 各フォントの決まった符号位置の集合を全部
  *                  ラスタして FONTCHK 行 (字数・黒画素数・FNV-1a) を出す。値は
- *                  tools/tests/test_font_raster.py の EXPECT 行と比べる。
+ *                  test_font_raster.py (旧版 110899e908ab) の EXPECT 行と比べる。
  *   font_test      見本の描画 (16px と 32px)。キーで戻る。
  *   font_test -p   T7b-a6 計測: 3 書体の open、東雲で 1000 字 (seq、-s は scatter) の
  *                  cold/warm と内訳 (lookup だけ / 輪郭まで / raster まで) の tick・

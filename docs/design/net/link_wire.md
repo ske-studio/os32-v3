@@ -5,7 +5,7 @@
 Host Services の link (EtherType 0x88B5) のフレームの形、HELLO、再同期、ハンドルの状態機械 (OS32 側)。
 KAPI の口 (`host_open`〜`host_close` の戻り値・期限) は `docs/design/net/link_host_api.md`、
 ホスト側の rid 台帳とセッション採番は `docs/design/tools/host_agent.md`。
-試験は `tools/tests/net_link_host.c` (実 `sys/net/link.c` + 実 `sys/kapi/kapi_host.c`、対向は実 Agent か台本) と `tools/tests/test_host_agent.py`。
+試験は `net_link_host.c (旧版 7dcebfe3f75f)` (実 `sys/net/link.c` + 実 `sys/kapi/kapi_host.c`、対向は実 Agent か台本) と `test_host_agent.py (旧版 0f4169a78dfd)`。
 
 ## 1. ヘッダ (20B、LE で明示的に直列化)
 

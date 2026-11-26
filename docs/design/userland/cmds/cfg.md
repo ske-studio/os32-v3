@@ -50,4 +50,4 @@ cfg import ...
 
 ## 検査
 
-`tools/tests/test_cfg.py` の `args` (引数解釈と整形の純関数 `cfg_cmd_parse`・`fmt_int`・`parse_int`・`fmt_hex`・`parse_hex`・`fmt_b64`・`fmt_json_str`・`status_name`・`type_name`)、`cmd` (`status`・`init`・`list`・`set`・`get`・`del`・`export` の通し)、`list_big` (255 byte の text 100 件を重複なく出し、`sys_yield` が呼ばれる)、`s5_pool` (`pool` の表示と `fmt_u32`)。`cfg.c` は `main` を `cfg_main` に差し替えて丸ごと組む。
+`test_cfg.py (旧版 f84b12760091)` の `args` (引数解釈と整形の純関数 `cfg_cmd_parse`・`fmt_int`・`parse_int`・`fmt_hex`・`parse_hex`・`fmt_b64`・`fmt_json_str`・`status_name`・`type_name`)、`cmd` (`status`・`init`・`list`・`set`・`get`・`del`・`export` の通し)、`list_big` (255 byte の text 100 件を重複なく出し、`sys_yield` が呼ばれる)、`s5_pool` (`pool` の表示と `fmt_u32`)。`cfg.c` は `main` を `cfg_main` に差し替えて丸ごと組む。

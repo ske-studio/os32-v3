@@ -40,7 +40,7 @@ SerialFS (シリアル越しの `/host`) の要求 / 応答。この文書は UA
 
 ## 確かめ
 
-`make check-serialfs-host` (`tools/tests/test_serialfs.py`): C の段 (`tools/tests/serialfs_host.c` が実物の `sfs_proto.c`・`sfs_client.c`・
+`make check-serialfs-host` (`test_serialfs.py (旧版 3080b693e474)`): C の段 (`serialfs_host.c (旧版 6b97a1216784)` が実物の `sfs_proto.c`・`sfs_client.c`・
 `serialfs.c` を偽の線と偽のホストで回す)、PY の段 (実物の `serialfs_host.py`・`rshell_serial.py` を偽のポートで)、XC の段 (C と
 Python が互いの列を読む、定数の照合、実時間のパイプで結合)。障害の注入: 応答の喪失 (1〜3 回は通る / 4 回で IO / 3 要求続けて死ぬ)、
 遅延・CRC 破損・番号違い・セッション違い・ホストの停止・ごみの連続・ERR・契約違反の応答、再送で副作用が二重にならない。

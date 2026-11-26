@@ -68,7 +68,7 @@ import time
 
 # pyserial はポートを開くときにしか要らない。**import 時に落とさない**のは、
 # 応答の識別 (check_echo / probe_ok / switch_reply_ok) を pyserial 無しの
-# ホストで試験できるようにするため (tools/tests/test_rshell_serial.py)。
+# ホストで試験できるようにするため。
 try:
     import serial  # pyserial
 except ImportError:  # pragma: no cover

@@ -41,7 +41,7 @@
 | I (統合) | kapi.json と生成物・誤り番号 (HOSTDOWN・TIMEOUT)・起動の登録・fd_netcd_config.py (起動前の FD の /etc/netcd.cfg)・packages.yaml・install.c の fd_only | — |
 | S (SDK) | host_call.c・libos32host.c・os32api の host.rs (os32_host_*、LIST で名前から番号) | SDK |
 
-順序: 契約 (A1・B1・D1) → adapter と H 群を並列 → C・D の結線 → I ([ABI] の clean・all) → NP21/W → 82557 実機。試験は `tools/tests/test_hostsvc_<項目>.py` (nic・deadline・persistent・write・image・isocache・mailbox・gui・linux・bootcd・seq・alive・race・handles・list・sdk・abi)。
+順序: 契約 (A1・B1・D1) → adapter と H 群を並列 → C・D の結線 → I ([ABI] の clean・all) → NP21/W → 82557 実機。試験は `旧ホスト試験 test_hostsvc_<項目>.py` (nic・deadline・persistent・write・image・isocache・mailbox・gui・linux・bootcd・seq・alive・race・handles・list・sdk・abi)。
 
 os32.time の PM 決定 (確定設計の REVIEW から): `sys_time`・`clock_read_date` は今までどおりローカル時刻 (ホストの標準時に従う壁時計) を epoch として返す (C の time()・SQLite・FAT の源)。UTC とずれは os32.time の中だけ。NP21/W は I/O の RTC の書き込みを捨てるので書き込みの受入は実機 — NP21/W のフォークに TIME SET を足す段は別。RTC の読みは今のパラレルのまま、Ra266 で年を確かめてから。
 

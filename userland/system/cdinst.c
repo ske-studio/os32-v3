@@ -762,7 +762,7 @@ static int install_packages(int choice, const InstTarget *target, const BootImg 
     /* 必須のファイルが /hd0 に事前検査のとおりの大きさで在る (最終の状態、
      * Codex 往復 2 P1-2 の二重の守り) */
     /* g_final_kernel = 0 は事前検査 (measure_packages) を通っていない呼び出し
-     * (tools/tests/vfs_fd_path_host.c が install_packages だけを回す) */
+     * (vfs_fd_path_host.c (旧版 de1397e10b99) が install_packages だけを回す) */
     if (g_final_kernel != 0 && !required_on_hd0()) {
         println(COL_RED, "Installation aborted. The HDD is incomplete.");
         return PKG_ERR_CORRUPT;

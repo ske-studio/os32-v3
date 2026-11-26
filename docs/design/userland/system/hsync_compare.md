@@ -86,7 +86,7 @@ settings.db などの保護は `hsync_protect.md` にある。HostDrv が返す 
   `/host` とその下は同期元そのもの (自己コピー) なので断る。
 - 要素数は `/host` を前置した**後**で見る。`HS_MAX_PATH_DEPTH` (32) を超えたら `path_too_deep` で errors。
   `sys/fs/vfs.c` は上限を超えた要素を黙って捨てるので、超えたパスは別のパスとして成立してしまう。
-  32 は `sys/fs/vfs.h` の `VFS_MAX_PATH_DEPTH` の写しで、`tools/tests/test_hsync_h1.py` が一致を検査する。
+  32 は `sys/fs/vfs.h` の `VFS_MAX_PATH_DEPTH` の写しで、`test_hsync_h1.py (旧版 5528cf72894a)` が一致を検査する。
 - `/sys` の既定除外は**全体同期のルート直下だけ** (`default_sys_exclusion`、-v で表示)。`hsync usr` の `usr/sys` は除外しない。`-f` でも解除しない。
 - 保護の判定で正規化できないもの (判定できないもの) は `path_rejected` の errors にし、`PROTECTED` と呼ばない。
 - 列挙 (`ls_cb`) は名前と種別だけを私有の `FileList` へ写し、コールバックの中で FS に触らない。

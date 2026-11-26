@@ -16,7 +16,7 @@
 |sys/platform/pc98/pit.c・pit_math.c/.h|PIT 設定と純粋整数演算。100Hz: reload 19968/24576、period_us=10000|
 
 退役した time_test_feed の保存域と clear は共通側で保持するが、時計の読取りには使わない。
-実呼出元・provider の試験は `tools/tests/test_clock_caller.py`。保護した出力頁で IF 復元前の書込みも検出する。
+実呼出元・provider の試験は `test_clock_caller.py (旧版 3affd3901cf4)`。保護した出力頁で IF 復元前の書込みも検出する。
 
 ### clock_service
 

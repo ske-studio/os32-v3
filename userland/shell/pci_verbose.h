@@ -11,7 +11,7 @@
 /*  (sys/kern/exec/exec.c の RING3_ARG_WINDOW)。1 行を `"%s\n"` 1 引数で出せば窓を    */
 /*  気にしなくてよく、しかも**ホストで出力そのものを突き合わせられる**。     */
 /*                                                                          */
-/*  試験: tools/tests/pci_decode_host.c の verbose_* (test_pci_decode.py)   */
+/*  試験: pci_decode_host.c (旧版 d13fc7147959) の verbose_* (test_pci_decode.py)   */
 /* ======================================================================== */
 
 #ifndef PCI_VERBOSE_H

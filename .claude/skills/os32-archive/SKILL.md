@@ -12,7 +12,6 @@ description: 受入完了した票・役目を終えた設計を、今も効い�
 ```bash
 T=TASK_X                      # 票の名前 (拡張子なし)
 git grep -n "$T" -- tests/registry.toml                          # 検査の登録の spec
-git grep -ln "$T" -- 'tools/tests/*_tdd.md'               # 試験の覚え
 git grep -n "$T" -- docs .claude ':!docs/archive'          # 仕様・索引・ほかの票・スキル
 git grep -n "$T" -- docs/tasks/DEFERRED_TESTS.md          # 持越しの台帳
 ```

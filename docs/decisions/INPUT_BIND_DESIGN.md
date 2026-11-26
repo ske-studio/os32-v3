@@ -231,7 +231,7 @@
 
 |ID|担当ファイル (新規は案) / 差分上限|前提と出口|
 |---|---|---|
-|M0[n]|tools/tests/input_pc98_compat_host.c、固定期待fixture、CHECK実行器 /380|台帳全128行×8列×Caps/Num/Kana。旧表版を固定した独立literal期待と照合し、製品表から期待を生成しない。意図差は台帳のB欄とB1のbyte利用側の動作を固定fixtureに載せる (Ctrl+3のESC取消、Ctrl+4/5/6/7のfiler右/左/上/下、Ctrl+8・/の7F等)。114はcooked entryなし、その他の非修飾nopはentryありも期待に含める|
+|M0[n]|input_pc98_compat_host.c (旧版 a15640c46b8b)、固定期待fixture、CHECK実行器 /380|台帳全128行×8列×Caps/Num/Kana。旧表版を固定した独立literal期待と照合し、製品表から期待を生成しない。意図差は台帳のB欄とB1のbyte利用側の動作を固定fixtureに載せる (Ctrl+3のESC取消、Ctrl+4/5/6/7のfiler右/左/上/下、Ctrl+8・/の7F等)。114はcooked entryなし、その他の非修飾nopはentryありも期待に含める|
 |M1[n]|tools/kbd_import.py、出典/差分台帳1個、T_import /380|実物→.kbd変換、合流/DROP/全usage照合、基底表は1表ずつ別小段|
 |M2[n]|sys/hal/input/legacy_keymap.c、内部kbd_policy.h、T_keymap /380|M0/M1、BSD8列/AltGr/特殊値、由来種別と台帳の出口。親3b評価器部分を置換|
 |M3[n]|sys/hal/input/keymap_state.c、kbd_merge.c、T_mods /380|M2/親2b、修飾/lock派生、物理緊急判定のkbd.c接続は別M3小段|
@@ -260,10 +260,10 @@
 |3c[n]|mode/STOP/flush抽出を3a後に先行し、旧変換で受入可能にする。M2/X-cookedへの逆依存を置かず、X-cookedは3c全段後|
 |4b|従来「4a/3b後」を「4a/M2/M3後」へ変更、PPC旧policyは維持。4b-mapでX-cookedを含む全結線条件を満たして有効化|
 
-- B完了条件 (ROLES §4-3): 新ソースは `build/sources/order.mk` (順)、`build/sources/common.mk`またはarch/platform一覧 (選択)、`tools/tests/fixtures/build_profile_x86.json`のC_KERNEL、PPC像に入る場合 `build/targets/ppc-powermac.mk`一覧へ追従。`check-build-selection-host`・`make all`で確認。
-- A0z完了条件 (同§4-3): 版2か所 (kapi.json・生成os32_kapi_shared.h)、README/INDEX/KAPI_SPEC、レビュー済指紋 `tools/tests/fixtures/dep_dir_a/l01.json` kapi_sha256・l04.json api_sha256・l05a.json public_sha256、`tools/tests/hwdev_contract_fixture.py`のHWDEV layout CRC/inventory、`tools/tests/test_ime_display_boundary.py`のFEP_MODULE_ABI_GENを追従。`check-dep-dir-a-l01`〜`l06`・`check-hwdev-image-host`・`check-ime-display-boundary-host`・KAPI audit/ranges/version、`make clean && make all`。
+- B完了条件 (ROLES §4-3): 新ソースは `build/sources/order.mk` (順)、`build/sources/common.mk`またはarch/platform一覧 (選択)、`build_profile_x86.json (旧版 060af0634e08)`のC_KERNEL、PPC像に入る場合 `build/targets/ppc-powermac.mk`一覧へ追従。`check-build-selection-host`・`make all`で確認。
+- A0z完了条件 (同§4-3): 版2か所 (kapi.json・生成os32_kapi_shared.h)、README/INDEX/KAPI_SPEC、レビュー済指紋 `l01.json (旧版 8f0af0167c2f)` kapi_sha256・l04.json api_sha256・l05a.json public_sha256、`hwdev_contract_fixture.py (旧版 54003f375ca6)`のHWDEV layout CRC/inventory、`test_ime_display_boundary.py (旧版 24ad6274535d)`のFEP_MODULE_ABI_GENを追従。`check-dep-dir-a-l01`〜`l06`・`check-hwdev-image-host`・`check-ime-display-boundary-host`・KAPI audit/ranges/version、`make clean && make all`。
 - 共通箇所の完了条件 (同§4-3): PPC像リンク、手元確認は `PATH=/home/hight/opt/cross-ppc/bin:$PATH make ARCH=ppc PLATFORM=powermac KBOOT_SH=1`。新しい製品関数呼出しは兄弟stubを持つ全試験土台 (#include型/python切出し型) をrgで確認して追従。
-- 試験の完了条件 (同§4-3): PPC toolchain/QEMU/socket不在は理由付きSKIP・rc=0、OS32_REQUIRE_PPC=1では失敗、`PPC_CROSS_DIR=/nonexistent make check-<名前>`で確認。CHECK covers/basisまたはkind/env_limit/pinsと変異anchorを追従、`tools/checks/run.py --lint`と `python3 ~/os32-tmp/bin/stale_anchor.py <基点>`。一覧/指紋/生成値は手計算せず生成器/試験出力を基点と比較し、意図した変更だけか確認。
+- 試験の完了条件 (同§4-3): PPC toolchain/QEMU/socket不在は理由付きSKIP・rc=0、OS32_REQUIRE_PPC=1では失敗、`PPC_CROSS_DIR=/nonexistent make check-<名前>`で確認。CHECK covers/basisまたはkind/env_limit/pinsと変異anchorを追従、旧手順（84ffadfb93b4 の記録）と `python3 ~/os32-tmp/bin/stale_anchor.py <基点>`。一覧/指紋/生成値は手計算せず生成器/試験出力を基点と比較し、意図した変更だけか確認。
 - F10: 4b-mapは親4b・M0〜M8・X-cooked・A0z・U1・U2・E-x・E-p・U3g・Lと対応B完了後。CHECK pinsは `[input-hal/4b-map,input-bind/U3-03,input-bind/F3,input-bind/F4,input-bind/N2-B]`、basisは本票§2/§2a/§3/§5の確定版。旧単独`U3`を残さず、N2のユーザー決定とF3/F4のPM推奨 (ユーザーに提示済み、反論なし) を反映して着手する。
 - host/変異: 列の順/spcl逆向き/lock OR→XOR/AltGr欠落、Caps→Ctrlのcooked/raw整合と物理救済、左右合流/usage差分欠落、UTF-8部分投入、peek副作用を各固有anchorでruntime RED。同じ入力の正常対照は最後の製品変更後に必ずPASS、変異だけREDでも受入しない。
 - F1/F2/F3/N1/N3/N4/N11試験: 両arch初期shellのLINE_EDIT宣言前とpoll待ちCtrl+Cでshell生存、GUI前景editorで裏BがRUNNING中もCtrl+Cはコピーのみ・B非中断、RLDNの03は中断せず真のCtrl+Cは中断、ls中断→終了→hwb開始で保留ゼロ、描画中組込STOP→command_endで表示owner解放・テキスト復帰・二度cleanup冪等、同owner新command_gen/owner再利用/IRQ境界/二度take、IME中STOP/ETX取消のみ→次の打鍵は中断、満杯pending/押しっぱなしを検証。世代照合/開始時clear/IME優先を外す変異はRED。
@@ -359,22 +359,22 @@ exec 終了 hook は `sys/kern/exec/exec_abort.inc` に内部 adapter として�
 
 ### 既存利用者の調査と実装時の追従
 
-`rg -n 'g_gfx_owner|appslot_gfx_(claim|owner|owner_exit)|gfx_screen_owner|gfx_fullscreen_owner'` を製品・SDK・userland・tools/tests に対して実施した。既存の生成物の署名は変更しない (診断用内部 import の追加は下記)。
+`rg -n 'g_gfx_owner|appslot_gfx_(claim|owner|owner_exit)|gfx_screen_owner|gfx_fullscreen_owner'` を製品・SDK・userland・旧ホスト試験 に対して実施した。既存の生成物の署名は変更しない (診断用内部 import の追加は下記)。
 
 |既存口/利用者|扱い|
 |---|---|
-|claim: `sys/hal/gfx/gfx_core.c` の `gfx_kapi_claim`、`sys/kern/exec/appslot_selftest.inc`、`tools/tests/multiapp_impl_host.c`|署名・許可・戻り値を維持。claim 前の drain と取得ごとの世代を試験。selftest が `g_gfx_owner` を直接保存/復元する箇所は新しい組とカウンタも保存/復元する|
+|claim: `sys/hal/gfx/gfx_core.c` の `gfx_kapi_claim`、`sys/kern/exec/appslot_selftest.inc`、`multiapp_impl_host.c (旧版 a096aa946524)`|署名・許可・戻り値を維持。claim 前の drain と取得ごとの世代を試験。selftest が `g_gfx_owner` を直接保存/復元する箇所は新しい組とカウンタも保存/復元する|
 |owner_exit: `sys/kern/exec/exec_finish.inc`、`sys/kern/exec/exec_abort.inc`、`sys/kern/exec/appslot_selftest.inc`|終了は無条件口のまま、表示 pending の回収だけ世代付き口へ。終了と遅延回収の順序を両方試験|
 |owner 読取: `sys/hal/gfx/gfx_core.c`、`sys/hal/gfx/gfx_policy.c`、`sys/hal/gfx/gfx_emergency.c`、`sys/kern/gfx/osri/gfx_osri_view.c`、`sys/kern/exec/surface_query.c`、`sys/kern/kbd_inject.c`、`sys/dev/video/trident/trident_module.c`、`sys/kern/kdebug/selftest_kbd_inject.c`|ID の意味を保持し呼出し変更なし。shell 資源の世代を持っても GUI の fullscreen 判定を変えない|
 |公開読取: `sys/hal/gfx/v2/display.c`・`modeset.c`・`surface.c`、`userland/gshell/src/{fullscreen,lib,multiapp,input}.rs`、`userland/diag/shutdown_probe.c`|`gfx_screen_owner()` の ABI と返す ID は不変。SDK/KAPI の再生成なし。既存 import の署名は維持。host mocks の既存 ID 契約も不変|
 
-製品の追従ファイルは `sys/kern/exec/appslot.c`・`sys/kern/exec/appslot.h` (世代と条件付き回収)、`sys/hal/gfx/gfx_core.c`・`sys/hal/gfx/gfx_core_init.inc` (取得前安全点/CUI shell 発行)、`sys/input/input_interrupt.c`・`sys/input/input_context.h` (印と内部宣言)、`sys/kern/exec/exec_abort.inc`・`sys/kern/exec/exec_finish.inc` (境界)、後続の `sys/kern/exec/exec_launch.inc` (登録/開始順) とする。`sys/kern/exec/appslot_selftest.inc` も保存対象追加が必要。診断 enter の前処理は `sys/dev/video/geforce/diag/gf_display_test.c` を追従し、モジュールから drain を呼ぶための内部 import は `sys/kern/module/kdebug_imports.def` とその生成器の出力を追従する (公開 KAPI への追加ではない。生成物は手編集しない)。1 小段の製品ファイル制限を守って直列に分け、B の像登録は別段とする。新呼出しを足す各段で tools/tests の #include 型・Python 切出し型を再検索し、appslot/gfx/exec の兄弟 stub と変異 anchor を追従する (特に `multiapp_impl_host.c`、`gfx_kernel_fb_host.c`、`gfx2_i2_core_host.h`、`exec_hwb_abort_host.c`、`test_exec_hwb_abort.py`、`test_exec_r1.py`)。
+製品の追従ファイルは `sys/kern/exec/appslot.c`・`sys/kern/exec/appslot.h` (世代と条件付き回収)、`sys/hal/gfx/gfx_core.c`・`sys/hal/gfx/gfx_core_init.inc` (取得前安全点/CUI shell 発行)、`sys/input/input_interrupt.c`・`sys/input/input_context.h` (印と内部宣言)、`sys/kern/exec/exec_abort.inc`・`sys/kern/exec/exec_finish.inc` (境界)、後続の `sys/kern/exec/exec_launch.inc` (登録/開始順) とする。`sys/kern/exec/appslot_selftest.inc` も保存対象追加が必要。診断 enter の前処理は `sys/dev/video/geforce/diag/gf_display_test.c` を追従し、モジュールから drain を呼ぶための内部 import は `sys/kern/module/kdebug_imports.def` とその生成器の出力を追従する (公開 KAPI への追加ではない。生成物は手編集しない)。1 小段の製品ファイル制限を守って直列に分け、B の像登録は別段とする。新呼出しを足す各段で 旧ホスト試験 の #include 型・Python 切出し型を再検索し、appslot/gfx/exec の兄弟 stub と変異 anchor を追従する (特に `multiapp_impl_host.c`、`gfx_kernel_fb_host.c`、`gfx2_i2_core_host.h`、`exec_hwb_abort_host.c`、`test_exec_hwb_abort.py`、`test_exec_r1.py`)。
 
 受入は (1) 同 owner 再取得で旧世代は回収不可、(2) 別 owner/同 ID 再利用も不可、(3) 0 と周回、(4) exit/kill が先・drain が先の両順と二度 drain、(5) snapshot/予約境界への IRQ 挿入、(6) shell の診断 leave→enter と描画組込 STOP→end の復帰、(7) command_active のまま exec 終了→次の hwb で中断印ゼロ、(8) 他 owner の終了で印を消さない、(9) GUI WM の所有 ID と claim 拒否の既存対照を固定する。比較を owner だけにする・発行を止める・exit の印消去を外す変異は runtime RED を求める。本追補だけの段ではコード・ビルド・変異/実機試験を実行せず、文書検査を完了条件とする。
 
 ### M6[3] の表示の資源の世代のレビューで足したこと (2026-11-17、Opus レビュー、PM)
 
-- 追従の表に `tools/tests/test_gf_cui.py` の `run_case` を足す。`appslot_gfx_owner_exit` の本体を文字列で切り出して組む試験なので、回収の予約と組の静的変数を使う形になったら、切り出す範囲を広げるか stub を足す。
+- 追従の表に `test_gf_cui.py (旧版 61fe734d42bc)` の `run_case` を足す。`appslot_gfx_owner_exit` の本体を文字列で切り出して組む試験なので、回収の予約と組の静的変数を使う形になったら、切り出す範囲を広げるか stub を足す。
 - 段の順: sys/input/input_context.c・input_interrupt.c を build/sources/common.mk の C_COMMON_EXEC に登録する段 (B) を、exec_finish.inc・gfx_core_init.inc に新しい呼び出しを足す段より先にする (exec.c と gfx_core.c は PPC の像にも入るので、登録が無いと両方の arch でリンクが落ちる)。受入に PPC の像 2 つのリンクを入れる。
 - `exec_reclaim_resources` の入口で exec_gen が得られない (CPL=0 の子で a->as が無い) ときは、中断の印を消さず、表示の印にも触れない (NULL を読まない)。
 - 診断の enter の途中 (入口の drain の後、gfx_init の acquire の前) の STOP は、特別に扱わない。gfx_init の中の drain で入りかけの診断が畳まれて ESTATE で戻る今の振る舞いのままとする (PM 決定 2026-11-17、識別のための印や口は足さない)。受入 (6) に、この区間への IRQ の挿入を 1 件足し、ESTATE で戻り印が残らないことを確かめる。

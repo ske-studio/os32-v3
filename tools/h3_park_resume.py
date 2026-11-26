@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Also support direct execution from tools/.
 import sys
 sys.path.insert(0, str(ROOT))
-from tools.tests.kernel_includes import include_flags
+from tools.ops.kernel_includes import include_flags
 MODES = {'pf': 1, 'gp': 2, 'de': 3, 'ud': 4, 'USER-loop': 5, 'KAPI-loop': 6}
 FIELDS = 'magic owner generation phase mode arm version fixture resumes consumed window gui_slot'.split()
 MAGIC = 0x48335031

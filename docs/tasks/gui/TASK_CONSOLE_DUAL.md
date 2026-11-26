@@ -16,7 +16,7 @@
 | D1 | sys/kern/console/console_dual.h・.c (新、出力先の表 N 個と判定) | — |
 | D2 | sys/platform/pc98/display_dual.c (新、gfx2 の列挙で表を作る・GUI の状態に触らない文字画面の開始) | D1・H0 |
 | D3〜D5 | console.c の門 4 か所・pc98_route.c・sys/platform/pc98/kernel.c (412・473) | D1 (D5 は D3 も) |
-| D6 | tools/tests/console_dual_host.c と `make check-console-dual-host` | D1〜D4 |
+| D6 | console_dual_host.c (旧版 4b121d4f002b) と `make check-console-dual-host` | D1〜D4 |
 
 - 設定 `CONSOLE_DUAL` (system.cfg) の既定は 0。
 - 一覧は能力として GF の全 head を常に返し (98 と合わせて 3 行)、停止中の head は running=0。接続の判定は保存した EDID の検出 (base_valid) まで、抜き差しのライブ検出はしない。

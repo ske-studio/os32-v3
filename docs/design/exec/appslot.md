@@ -50,4 +50,4 @@ OP_WAIT / kbd / poll / yield の共通更新と資格判定の順は
   - それ以外 (GUI 中で宣言あり、または CUI 中) → 所有者は呼び手。CUI 中は宣言が無くても通し、拒否として数えない。同じアプリが二度呼んでも変わらない。
 - `appslot_gfx_owner_exit(id)`: 回収された ID が所有者なら WM へ戻す。他人の回収では戻らない。park しただけでは戻らない (WM は上書きしない)。正常終了でも `exec_kill` でも戻る。
 
-検査: `tools/tests/test_multiapp_impl.py` (`multiapp_impl_host.c`) と、ブート時の `appslot_gfx_owner_selftest` (`sys/kern/exec/appslot_selftest.inc`)。
+検査: `test_multiapp_impl.py (旧版 b46dfc292d27)` (`multiapp_impl_host.c`) と、ブート時の `appslot_gfx_owner_selftest` (`sys/kern/exec/appslot_selftest.inc`)。

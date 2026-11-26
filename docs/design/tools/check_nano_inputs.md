@@ -31,4 +31,4 @@ upstream・configure・gcc・target・cflags・patches・構築スクリプト�
 
 ## 検査
 
-`tools/tests/test_nano_inputs.py` が実 toolchain の台帳を正常対照にし、入力を 1 つずつ変えたケースの拒否と、拒否を外す変異の実行時 RED を確かめる。
+`test_nano_inputs.py (旧版 027d3b5ba486)` が実 toolchain の台帳を正常対照にし、入力を 1 つずつ変えたケースの拒否と、拒否を外す変異の実行時 RED を確かめる。

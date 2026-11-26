@@ -5,7 +5,7 @@
 
 ## 1. 実物 (origin/main `75c7c6f69`)
 
-- x86-pc98: `C_SELECTED = C_COMMON C_ARCH C_PLATFORM C_FEATURES`、`C_KERNEL = filter(C_SELECTED, C_ORDER_LEGACY C_ARCH_NEW C_PLATFORM_NEW) C_PLATFORM_NEW C_DIAGNOSTICS` (`build/select.mk`)。そのあと `build/kernel-objects.mk` が `sys/platform/pc98/tsc_math.c`・`tsc_clock.c`・`sys/net/rx_work.c` を後ろに足す。`build_profile.py` の `C_KERNEL` は 376 本で、`tools/tests/fixtures/build_profile_x86.json` が並びを固定している。共通の場所の物は 164 本。
+- x86-pc98: `C_SELECTED = C_COMMON C_ARCH C_PLATFORM C_FEATURES`、`C_KERNEL = filter(C_SELECTED, C_ORDER_LEGACY C_ARCH_NEW C_PLATFORM_NEW) C_PLATFORM_NEW C_DIAGNOSTICS` (`build/select.mk`)。そのあと `build/kernel-objects.mk` が `sys/platform/pc98/tsc_math.c`・`tsc_clock.c`・`sys/net/rx_work.c` を後ろに足す。`build_profile.py` の `C_KERNEL` は 376 本で、`build_profile_x86.json (旧版 060af0634e08)` が並びを固定している。共通の場所の物は 164 本。
 - PowerPC の製品の像は、この時点では独立の Makefile の手書きの一覧 (段 5 で `build/targets/ppc-powermac.mk` に畳んだ)。`KBOOT_LINK ?= 1` なので旗が無い時の像は link。
 
   | 像 | 旗 | 出力 (`build/out/` の下) | .S | .c |
@@ -62,7 +62,7 @@ FEATURE_PC98_PENDING = 0
 - 像の機能は `IMAGE_FEATURES = LINK EXEC USERSHELL USB CLI LOOP PC98_PENDING` として、今の 15 個 (`FEATURES`) と別の一覧に持つ。値の検査 (0 か 1)・未知の `FEATURE_*` の検査は両方を見る。`build/targets/x86-pc98.mk` の「0 があれば止める」は今の 15 個だけを見る (下の `KNOWN_FEATURE_VARIABLES` の項)。
 - 依存: `USERSHELL`・`CLI` は `EXEC` が要る。`USERSHELL` と `CLI` は同時に 1 にできない。`select.mk` の今の依存の検査と同じ書き方で足す。
 - `IMAGE` の既定は `select.mk` の冒頭で決める: `IMAGE ?= $(if $(filter powermac,$(PLATFORM)),kboot-link,pc98)`。`build/images/$(IMAGE).mk` が無ければ `$(error unknown IMAGE ...)`。
-- `KNOWN_FEATURE_VARIABLES` は今の 15 個のまま変えない (`build/targets/x86-pc98.mk` の「0 があれば止める」が読む。このファイルは `tools/tests/test_sep5_boot.py` が基点 `3ebbd208` とバイト単位で固定しているので触らない)。像の機能は `IMAGE_FEATURE_VARIABLES` に持ち、未知の `FEATURE_*` の検査は両方を見る。`kernel-objects.mk` の SELECTION_STAMP には `IMAGE=<名>` を足す。
+- `KNOWN_FEATURE_VARIABLES` は今の 15 個のまま変えない (`build/targets/x86-pc98.mk` の「0 があれば止める」が読む。このファイルは `test_sep5_boot.py (旧版 31277df0731b)` が基点 `3ebbd208` とバイト単位で固定しているので触らない)。像の機能は `IMAGE_FEATURE_VARIABLES` に持ち、未知の `FEATURE_*` の検査は両方を見る。`kernel-objects.mk` の SELECTION_STAMP には `IMAGE=<名>` を足す。
 
 ### 3-2. 持ち主
 
@@ -154,10 +154,10 @@ legacy の式は今の `select.mk` に末尾の一覧を足しただけ (x86 の
   `KB_INC_EXTRA` の条件 (`-Inet` は LINK の時、exec の `-I` の群は EXEC の時)・`KB_EXTRA`・TU ごとの旗・KAPI の生成・`memmap_layout.h`・RAM root (`RAM_ROOT_C` は `build/ram-root.mk` が持つので、その分は `C_PLATFORM_EXEC` に `$(RAM_ROOT_C)` として載せる)・`kboot_audit`・`KB_MUT_*`・`kb-user` は今の規則のまま残す (条件は `KB_EXEC`・`KBOOT_*` のままでよい)。
 - 確かめ:
   - x86: `build_profile_x86.json` が不変 (`build-selection-host`)。手元で `tools/build_compare.py` で kernel.bin と部品が一致。
-  - PowerPC: 6 像の `KB_ASM`・`KB_C` の並びを `tools/tests/fixtures/build_profile_ppc.json` に固定し、`test_build_selection.py` が `make ARCH=ppc PLATFORM=powermac` から引いて比べる (段の前の木で取った値を fixture にする)。手元で 6 像の `PPCKERN.ELF` の sha256 が前後で同じ。今の `test_build_selection.py` がそのまま通る)。
-  - `tools/tests/test_remote_x9.py` (`build/targets/ppc-powermac.mk` の本文に `sys/kern/console/con_sink.c` があること) は、`select.mk` から引いた `kboot-link-sh` の `C_KERNEL` に在ることに書き換える。
+  - PowerPC: 6 像の `KB_ASM`・`KB_C` の並びを `build_profile_ppc.json (旧版 80da850b3508)` に固定し、`test_build_selection.py` が `make ARCH=ppc PLATFORM=powermac` から引いて比べる (段の前の木で取った値を fixture にする)。手元で 6 像の `PPCKERN.ELF` の sha256 が前後で同じ。今の `test_build_selection.py` がそのまま通る)。
+  - `test_remote_x9.py (旧版 4838ab51f6b8)` (`build/targets/ppc-powermac.mk` の本文に `sys/kern/console/con_sink.c` があること) は、`select.mk` から引いた `kboot-link-sh` の `C_KERNEL` に在ることに書き換える。
   - CI: check (ppc-compile・ppc-qemu)・build。
-- 触るファイル: `build/images/*.mk` (7)、`build/sources/common.mk`・`order.mk`、`build/select.mk`、`sys/conf/features/pc98-devices.mk`、`build/platform/pc98.mk`・`powermac.mk`、`build/arch/ppc-sources.mk`、`build/kernel-objects.mk`、`build/targets/ppc-powermac.mk`、`tools/tests/test_build_selection.py`・`test_remote_x9.py`・`fixtures/build_profile_ppc.json`、`tools/ops/check_arm_compile.py` は触らない (`KSTRING_C_SRC` の前提は同じ。`config.mk` だけの問い合わせの対象集合には、`kernel-objects.mk` が後から足していた `tsc_math.c`・`tsc_clock.c`・`rx_work.c` の 3 本が増え、実際の `C_KERNEL` と同じになる)。`build/targets/ppc-powermac.mk` の .o と `PPCKERN.ELF` は、一覧と順を持つ .mk (`KB_SELECT_MK`) を前提に持つ (一覧を変えたら組み直される)。
+- 触るファイル: `build/images/*.mk` (7)、`build/sources/common.mk`・`order.mk`、`build/select.mk`、`sys/conf/features/pc98-devices.mk`、`build/platform/pc98.mk`・`powermac.mk`、`build/arch/ppc-sources.mk`、`build/kernel-objects.mk`、`build/targets/ppc-powermac.mk`、`test_build_selection.py (旧版 4c986200fe5f)`・`test_remote_x9.py`・`fixtures/build_profile_ppc.json`、`tools/ops/check_arm_compile.py` は触らない (`KSTRING_C_SRC` の前提は同じ。`config.mk` だけの問い合わせの対象集合には、`kernel-objects.mk` が後から足していた `tsc_math.c`・`tsc_clock.c`・`rx_work.c` の 3 本が増え、実際の `C_KERNEL` と同じになる)。`build/targets/ppc-powermac.mk` の .o と `PPCKERN.ELF` は、一覧と順を持つ .mk (`KB_SELECT_MK`) を前提に持つ (一覧を変えたら組み直される)。
 
 ### 段 1b — compile だけの計測を消し、`make ARCH=ppc` を製品の入口にする
 

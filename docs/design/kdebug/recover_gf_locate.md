@@ -58,13 +58,13 @@ u32 recover_gf_second(void);                 /* U32_MAX = 2 枚目なし */
 | 検査 | 見ているもの |
 |---|---|
 | `make check-pci-locate-host` | a〜g の fixture (`docs/design/drivers/pci/pci_locate.md`)。変異 M1 常に FALLBACK → a・d、M3 毎回探す → e、M4 見つからない時も覚える → c |
-| `tools/tests/test_gf_production.py` (`make check-gf-production-host`) | 本物の探索 + identify + `sys/dev/video/geforce/master.c` の実体を 3 構成で: GPU = 13、GPU = 12 + USB = 13 (identify・BAR の読み・Command 04h と cache line / latency 0Ch・0Dh の宛先がすべて 0:12.0)、GPU 無し (`pci_cfg_write16`/`write32` が 0 回)。変異「master の宛先を 13 の直値」は dev = 12 で落ちる。`nm` の検査は ` recover_` のうち `recover_gf_dev`・`recover_gf_second` だけを許し、` kpeek_`・` trial_` の混入を禁じる |
-| `tools/tests/test_gfinit_bus.py` (`gfinit_bus_host.c`) | 偽 PCI が `GF_T_DEV` (= `recover_gf_test_dev`) だけを受ける。実測の Ra266 fixture (GPU = 13・別カード = 12) と、USB の OHCI/EHCI を 13 の fn0〜2 に置いて `GF_T_DEV = 12` に切り替えた資源の門 |
-| `tools/tests/test_gfinit_owner.py` | claim の後の `gf_device.bdf` が `recover_gf_test_dev << 3` (変異 `bdf_claim`) |
-| `tools/tests/test_gf5.py` | `target=0:` が dev に追従する (変異 `bdf-display`) |
+| `test_gf_production.py (旧版 2dbef53dc1b3)` (`make check-gf-production-host`) | 本物の探索 + identify + `sys/dev/video/geforce/master.c` の実体を 3 構成で: GPU = 13、GPU = 12 + USB = 13 (identify・BAR の読み・Command 04h と cache line / latency 0Ch・0Dh の宛先がすべて 0:12.0)、GPU 無し (`pci_cfg_write16`/`write32` が 0 回)。変異「master の宛先を 13 の直値」は dev = 12 で落ちる。`nm` の検査は ` recover_` のうち `recover_gf_dev`・`recover_gf_second` だけを許し、` kpeek_`・` trial_` の混入を禁じる |
+| `test_gfinit_bus.py (旧版 eff4ca908c50)` (`gfinit_bus_host.c`) | 偽 PCI が `GF_T_DEV` (= `recover_gf_test_dev`) だけを受ける。実測の Ra266 fixture (GPU = 13・別カード = 12) と、USB の OHCI/EHCI を 13 の fn0〜2 に置いて `GF_T_DEV = 12` に切り替えた資源の門 |
+| `test_gfinit_owner.py (旧版 e9e4a225c2c9)` | claim の後の `gf_device.bdf` が `recover_gf_test_dev << 3` (変異 `bdf_claim`) |
+| `test_gf5.py (旧版 e11bfb5c2301)` | `target=0:` が dev に追従する (変異 `bdf-display`) |
 
 偽 PCI が `dev == RECOVER_GF_DEV` を assert する host 試験は、本物を組むと探索が偽 PCI を読んで再帰するので
-`tools/tests/recover_gf_dev_stub.c` (`recover_gf_test_dev` を返すだけ) を組む。
+`recover_gf_dev_stub.c (旧版 1db0aad791f0)` (`recover_gf_test_dev` を返すだけ) を組む。
 
 NP21/W (PCI 無し): `[pci] mech#1 absent`、`[geforce] boot_reserve fail stage=` が位置の解決を入れる前と同じ段、`[geforce] pci` の行は出ない、kdebug の gfinit は拒む。
 

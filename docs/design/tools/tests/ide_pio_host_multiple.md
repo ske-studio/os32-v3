@@ -1,4 +1,4 @@
-# tools/tests/ide_pio_host_multiple.inc — MULTIPLE の受入模型
+# ide_pio_host_multiple.inc (旧版 d0ffa77f0eac) — MULTIPLE の受入模型
 
 > 状態: **現行 (2026-10-31)**
 

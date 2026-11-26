@@ -2,7 +2,7 @@
  *  hsync_protect.inc — hsync が /etc/settings.db* を壊さないための字句判定
  *
  *  票: docs/archive/settings/TASK_S0.md §2 (S0-D)、契約は S0_FOUNDATION.md §5 (D0)
- *  ホスト試験: tools/tests/hsync_protect_host.c / tools/tests/test_hsync_protect.py
+ *  ホスト試験: hsync_protect_host.c (旧版 165e8ae6633e) / test_hsync_protect.py (旧版 120342cd6a70)
  *
  *  hsync は HostDrv (/host = C:\os32) の中身を NHD の / へ O_CREAT|O_TRUNC で
  *  写す。HostDrv に古い etc/settings.db が 1 つ残っているだけで、ゲストが書いた
@@ -326,4 +326,4 @@ static int hsp_path_classify(const char *path)
  * (判定できないものは**保護側**に倒す fail-closed)。以前あった
  * `hsp_path_protected()` の包みは、hsync 本体が 3 値を使うようになって
  * 誰も呼ばなくなったのでここから外した (Codex 実装レビュー B2)。
- * 試験側の読みやすさのための包みは tools/tests/hsync_protect_host.c にある。 */
+ * 試験側の読みやすさのための包みは hsync_protect_host.c (旧版 165e8ae6633e) にある。 */

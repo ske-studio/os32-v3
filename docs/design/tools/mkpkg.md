@@ -14,7 +14,7 @@
 
 ## 検査
 
-`tools/tests/test_mk_settings_db.py` の `MkpkgMissingFile` (欠損の 3 種と「何も書かない」) と `RealPackageDefs` (`build/packages.yaml` の構成に問題が無い)。
+`test_mk_settings_db.py (旧版 ce23c0c1865f)` の `MkpkgMissingFile` (欠損の 3 種と「何も書かない」) と `RealPackageDefs` (`build/packages.yaml` の構成に問題が無い)。
 
 ## 消費側の上限を作る側で守る
 
@@ -26,4 +26,4 @@
 - 項目数 (ファイルとディレクトリの合計) は `PKG_MAX_ENTRIES` (128) まで。超えたら `ERROR: too many entries …` で終了コード 1。
 - 定数は消費側の `userland/lib/rt/pkg.h` の値の写し。
 
-検査: `make check-vfs-fd-path-host` (`tools/tests/test_vfs_fd_path.py` の段 `mkpkg`、実物の `tools/mkpkg.py` で 123 / 124 バイト、UTF-8 の 123 / 126 バイト、300 バイト、128 / 129 項目)。
+検査: `make check-vfs-fd-path-host` (`test_vfs_fd_path.py (旧版 3062ccc08e29)` の段 `mkpkg`、実物の `tools/mkpkg.py` で 123 / 124 バイト、UTF-8 の 123 / 126 バイト、300 バイト、128 / 129 項目)。

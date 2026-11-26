@@ -1,7 +1,7 @@
 # tools/ops/check_archive_refs.py — アーカイブを指す参照の戻り止め
 
 > 状態: **現行 (2026-11-18)** — ユーザー指示 2026-11-18 (増加だけ止める・[D4] を実態に合わせて書き分ける)。決まりの本文は [CONSTRAINTS](../../CONSTRAINTS.md) の [D4]。
-ソース: `tools/ops/check_archive_refs.py`・`tools/ops/archive_refs_baseline.json`・`tools/tests/test_archive_refs.py`
+ソース: `tools/ops/check_archive_refs.py`・`tools/ops/archive_refs_baseline.json`・`test_archive_refs.py (旧版 721184603678)`
 
 ## 目的
 
@@ -19,10 +19,10 @@
 
 | 項目 | 決まり |
 |---|---|
-| 対象のファイル | 追跡されているファイルのうち 3 つの群: 試験の覚え `tools/tests/*_tdd.md`、ソース (`.c` `.h` `.inc` `.asm` `.S`)、`tools/` の下の `.py` |
+| 対象のファイル | 追跡されているファイルのうち 2 つの群: ソース (`.c` `.h` `.inc` `.asm` `.S`)、`tools/` の下の `.py` |
 | 数える参照 | `docs/archive/<…>/<名>.<拡張子>` で、このリポジトリに追跡されているファイルと一致する物 |
 | 数えない物 | `docs/archive/README.md` (アーカイブの運用、現行の文書)、実在しないパス (試験の作り物)、置き場だけの言及 (`docs/archive/` で終わる物) |
-| 対象の外 | 現行の文書 (`docs/`) からアーカイブへのリンクは `check-docs-tree` が 0 件を見る。検査の宣言の basis は `tools/checks/run.py --lint` が止める |
+| 対象の外 | 現行の文書 (`docs/`) からアーカイブへのリンクは `docs_navigation` が 0 件を見る。登録の spec は `tests.infra.ci lint` が検査する |
 
 ## 基準
 

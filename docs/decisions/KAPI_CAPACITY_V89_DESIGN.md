@@ -135,9 +135,9 @@ hostdrv は絞り込み後の全転送候補を列挙し、各 OS32X 本体の�
 |tools/hwdev_layout.json|本線 A|予約を含むメンバー一覧を更新し DWARF から layout・CRC を再生成|
 |sys/dev/hwdev/generated/hwdev_contract.h|本線 A|予約を含むメンバー一覧を更新し DWARF から layout・CRC を再生成|
 |sys/dev/hwdev/generated/hwdev_layout.txt|本線 A|予約を含むメンバー一覧を更新し DWARF から layout・CRC を再生成|
-|tools/tests/hwdev_contract_fixture.py|本線 A|生成差分をレビューして HWDEV・FEP の変化した指紋を更新|
-|tools/tests/test_ime_display_boundary.py|本線 A|生成差分をレビューして HWDEV・FEP の変化した指紋を更新|
-|tools/tests/test_kapi_layout.py|本線 A/B|現行期待は JSON と配置式から導出。300・0x4b8・旧 CRT 実名は v88 拒否 fixture に限り、関連する変異の目印を更新|
+|hwdev_contract_fixture.py (旧版 54003f375ca6)|本線 A|生成差分をレビューして HWDEV・FEP の変化した指紋を更新|
+|test_ime_display_boundary.py (旧版 24ad6274535d)|本線 A|生成差分をレビューして HWDEV・FEP の変化した指紋を更新|
+|test_kapi_layout.py (旧版 ff44d589cebf)|本線 A/B|現行期待は JSON と配置式から導出。300・0x4b8・旧 CRT 実名は v88 拒否 fixture に限り、関連する変異の目印を更新|
 
 |docs/KAPI_SPEC.md|本線 A|版表記・予約・関数表を同期し旧データ位置を現行仕様から除く|
 |docs/INDEX.md|本線 A|版表記・予約・関数表を同期し旧データ位置を現行仕様から除く|
@@ -183,7 +183,7 @@ ROLES §6 に従い、本計画の承認後、実装前に PM がその時点の
 - **P1 初期化の順**: 早い構築が kapi を読むが、実の表の取得と初期化は両機種とも後の exec_init() にある (sys/kern/exec/exec.c、sys/kern/exec/exec_tramp_init.inc、sys/platform/powermac/exec_boot.c)。実の表の初期化を exec_init() から分け、「実の表の初期化 → トランポリンの構築と公開 → 写像」の順を両機種で固定する。
 - **P1 hsync・HostDrv の事前の照合**: 期待する変位と世代の取得元を経路ごとに決める — 名札 (manifest) がある時はそれ、名札が無い時 (HostDrv の絞り込みの配備で名札を消す時・hsync の名札なしの経路) は配る物の os32x のヘッダの世代と変位を読んで照らし、合えば通す。受入は正常の転送と、不適合の時の書き込み 0 の両方を試す。
 - **P2 部品の組の CRC**: 今の照合は MODULE_FLAG_PAIR が立つ時だけ。kdebug・FEP・HWDEV の 3 つの包装ではこの旗を必須にし、CRC の不一致の試験は旗つきの入力で行う。
-- **P2 境界の検査**: tools/tests/test_kapi_layout.py の旧い 1 頁の式 `12R + 272 <= 4096` は R=384 で落ちるので、§1 の表と文字列の頁・スタブと shim の頁のそれぞれの境界の検査に置き換える。
+- **P2 境界の検査**: test_kapi_layout.py (旧版 ff44d589cebf) の旧い 1 頁の式 `12R + 272 <= 4096` は R=384 で落ちるので、§1 の表と文字列の頁・スタブと shim の頁のそれぞれの境界の検査に置き換える。
 - **着手**: ROLES §6 の大きな書き換え — ユーザーの承認の後、今の main に注釈付きのタグを打って push してから始める。
 - **ユーザー決定 (2026-11-21、着手の承認)**: 「HAL とこの KAPI 群が整理されるまで、動かしたいもの以外動かせなくて良いです。つまり、後方互換性は考えなくて良いと言うことです。ビルドし直してイメージの入れ替えはそんなに気にしない」— 案 2 で着手する。
 - **PM 決定 (同日、上のユーザー決定を受けた簡素化)**: 旧いバイナリの拒否は、今ある exec の早い照合 (exec_launch・shlib_init の配置と世代の照合) で起動の前に止めるだけにする。**HostDrv・hsync の転送の前の全件の照合 (tools/hostdrv_deploy.py・userland/system/hsync.c の変更) は作らない** — 像は全部を作り直して入れ替える運用なので要らない (この 2 行は担当の表から外す)。

@@ -38,5 +38,5 @@ image と plan は呼び手が heap に確保し、この関数は借りるだ�
 
 ## 検査
 
-- `tools/tests/test_splash_obs.py` (splash-obs-host): 実 C で全 400 行の first/count/port/value を独立の復号と照合する。16 番号 1 成分 = 31 本の許可、もう 1 成分で 32 本の拒否、47/48 本の拒否、同値 16 件 = 0 本、空の行・持ち越しを確かめる。
-- `tools/tests/test_splash_v2.py`・`test_splash_wire.py`: 起動の持ち主から実際の準備器を呼ぶ。
+- `test_splash_obs.py (旧版 8ab116a7a93e)` (splash-obs-host): 実 C で全 400 行の first/count/port/value を独立の復号と照合する。16 番号 1 成分 = 31 本の許可、もう 1 成分で 32 本の拒否、47/48 本の拒否、同値 16 件 = 0 本、空の行・持ち越しを確かめる。
+- `test_splash_v2.py (旧版 2443845d59b2)`・`test_splash_wire.py`: 起動の持ち主から実際の準備器を呼ぶ。

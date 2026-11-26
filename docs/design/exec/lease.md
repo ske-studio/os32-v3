@@ -64,4 +64,4 @@ lease_selftest_result
 
 ### native の VRAM の属性
 
-PC-98 の native VRAM (TVRAM・B/R/G/I の各面) の master alias は、`paging_init` の最初の表の構築で UC にする (`sys/kern/mm/paging.c` の `native_cache_bits`)。後から WB を UC に書き換えない。CG・ROM・RAM は WB のまま。V86 の setup/teardown もこの属性を保ち、exec・V86・再 exec の各時点で低位 1MB の PCD/PWT が変わらないこと、lease の alias と台帳が一致することを `tools/tests/test_surface_bundle.py` が確かめる。
+PC-98 の native VRAM (TVRAM・B/R/G/I の各面) の master alias は、`paging_init` の最初の表の構築で UC にする (`sys/kern/mm/paging.c` の `native_cache_bits`)。後から WB を UC に書き換えない。CG・ROM・RAM は WB のまま。V86 の setup/teardown もこの属性を保ち、exec・V86・再 exec の各時点で低位 1MB の PCD/PWT が変わらないこと、lease の alias と台帳が一致することを `test_surface_bundle.py (旧版 03714882501b)` が確かめる。

@@ -6,7 +6,7 @@
 #  載らない媒体だけの物 (ブートセクタ、settings.db) だけ。ファイルの一覧を
 #  ここに写さないこと — 2026-09-24 まで手書きの二重管理で、配備 179 本の
 #  うち 27 本 (gshell / libos32gui.shlib / 既定フォント …) が CD に入って
-#  いなかった。生成は tools/mkpkg.py --plan、検査は make check-packages-host。
+#  いなかった。生成は tools/mkpkg.py --plan。
 #
 #  振り分け (deploy マニフェストの各行の tags:):
 #    core      → MINIMAL  起動に要るもの (カーネル、unicode、shell、filetypes、
@@ -40,8 +40,7 @@
 #  **起動 FD (build/image.mk) の中身は BOOT + MINIMAL から fd.exclude を除いた集合** (下の fd:)。
 #  FD の除外・FD だけに要る物・FAT の 8.3 に合わせた置き場所の違いを fd: に書く。
 #  core / base に足した物は fd.exclude 以外 FD にも入るので、FD の空き (docs/08_build.md) を見ること。
-#  **2HD の空きが FD_MIN_FREE_KB (tools/tests/test_packages.py) を切ると
-#  make check-packages-host が落ちる** — 2026-09-25 にカーネルの 4KB 増で 2HD が
+#  2HD の容量に注意。2026-09-25 にカーネルの 4KB 増で 2HD が
 #  前触れなく作れなくなった (既定フォント 184KB と一般コマンドを NORMAL へ移して空けた)。
 #
 #  項目数 (ファイル + ディレクトリ) が消費側の上限 128 (userland/lib/rt/pkg.h

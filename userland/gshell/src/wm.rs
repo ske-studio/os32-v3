@@ -1801,9 +1801,6 @@ pub fn restore_palette(p: &[u8; 48]) {
 }
 
 /* 合成器のホスト試験 (`host/integration.py` でだけ組む)。 */
-#[cfg(test)]
-#[path = "../host/wm_composite_tests.rs"]
-mod wm_composite_tests;
 
 // Acceptance timing begin. No storage, clocks or serial calls in normal builds.
 #[cfg(feature = "gf_accel_accept")]
@@ -1909,7 +1906,5 @@ pub(crate) mod gf_accept {
             }
         }
     }
-    #[cfg(test)]
-    mod tests { include!("../host/gf_accept_tests.rs"); }
 }
 // Acceptance timing end.

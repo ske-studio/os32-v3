@@ -32,5 +32,5 @@ SB と GDT の写しを持つ。
 
 ## 確かめ
 
-`make check-hdd-stage1-host` (`tools/tests/test_hdd_stage1.py`) のケース `layout` (32/33 グループの境界・sparse の境目を
+`make check-hdd-stage1-host` (`test_hdd_stage1.py (旧版 6201b26bccf0)`) のケース `layout` (32/33 グループの境界・sparse の境目を
 1 ブロックずつ掃く・128〜524,288 セクタの全長) と、作った像の `e2fsck -fn` (16,652 / 20,160 / 36,000 / 62,496 セクタ)。

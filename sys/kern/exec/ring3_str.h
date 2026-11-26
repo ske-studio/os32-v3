@@ -54,7 +54,7 @@
  * 戻り値: CPL=3 由来なら scratch、そうでなければ src (CPL=0 の常駐シェルは
  * カーネル帯をそのまま読めるので、写す意味も余地もない)。
  * **純関数に近い** (書くのは scratch だけ) のでホストでそのまま試験できる
- * — tools/tests/ring3_str_host.c。 */
+ * — ring3_str_host.c (旧版 c52140156689)。 */
 const char *ring3_user_str(int in_syscall, char *scratch, u32 cap,
                            const char *src);
 
@@ -128,7 +128,7 @@ int ring3_range_overlaps(u32 p, u32 len, u32 base, u32 end);
 /*                                                                          */
 /*  `ring3_in_syscall` の意味 (#PF/#GP の帰属) は**変えない** — WM の中で     */
 /*  落ちたときの扱いは従来どおり。純関数なのでホストで表を固定する            */
-/*  (tools/tests/ring3_guard_host.c)。                                       */
+/*  (ring3_guard_host.c (旧版 e64d934e092e))。                                       */
 /*  戻り値: 1 = ガードを効かせる (CPL=3 由来) / 0 = 常駐側の直呼び扱い。       */
 /* ======================================================================== */
 int ring3_guard_active(int in_syscall, int wm_depth);

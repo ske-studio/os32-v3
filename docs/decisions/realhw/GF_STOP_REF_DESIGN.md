@@ -215,8 +215,8 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
   - 関数 `sys/platform/pc98/display_dual.c`
   - 宣言 `sys/kern/console/console_dual.h`
   - 呼び出し `sys/hal/gfx/gfx_core.c` (停止の前の dpms(3)) と `sys/hal/gfx/gfx_core_init.inc` の `gfx_init_mode()` (開始の後の dpms(0))
-  - 試験の弱いシンボル `tools/tests/gfx2_backend_reg_host.c` の `gfx_scroll_init()`・`tools/tests/test_gfx_policy_triggers.py`・`tools/tests/sep5_gfx_init_host.c`
-  - `tools/tests/console_dual_host.c` (A3 DPMS)、`tools/tests/test_console_dual.py` (変異 'DPMS call')
+  - 試験の弱いシンボル `gfx2_backend_reg_host.c (旧版 3539b089baa6)` の `gfx_scroll_init()`・`test_gfx_policy_triggers.py (旧版 729757ba7bc5)`・`sep5_gfx_init_host.c (旧版 907e635ad342)`
+  - `console_dual_host.c (旧版 4b121d4f002b)` (A3 DPMS)、`test_console_dual.py (旧版 8437bf6f0d22)` (変異 'DPMS call')
 - 開始の後の dpms(0) が要らない理由: GUI への再入は毎回 `svc_initial` が `dpms=GF4_ON` の image (D/service.c:372) で modeset し、commit で DPMS ON にする。
 - 外すのは S4 (restore が入る段) の実機の受入 R5 の後。S4 より前に外しても、svc_dpms_on のせいで右に机が止まって映る今の状態と同じなので害は無いが、受入の意味が無くなる。
 
@@ -226,17 +226,17 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
 
 | 試験 | 直し |
 |---|---|
-| tools/tests/gf4_c2rec_host.c | suspend の前後で SR01・CR17・CR1A・DACCLK への書き込みが 0 回、settle が無いことに替える |
-| tools/tests/test_gf_display.py (変異 `c2rec`/`saved-blank`) | 削除して §5-2 の変異に替える |
-| tools/tests/gf4_c2svc_host.c | 停止は常に settle が無く、最初の時計は F3 fini。saved_closed=false の場合も同じ結果になる行を足す |
-| tools/tests/gf4_c2svc_host.c の注記 | "suspend does not write DPMS" に替える |
-| tools/tests/gf4_c2log_host.c (S0 で足した detect state の欄) | 2 回目の開始の期待値を「1 回目と同じ。ただし SR01 bit5・CR11 bit7・CR21 を除く」にする (fixture は停止の restore を通す) |
-| tools/tests/console_dual_host.c・test_console_dual.py ほか 3 本 | S5 で §4 の行を削除する |
+| gf4_c2rec_host.c (旧版 39b340a7967d) | suspend の前後で SR01・CR17・CR1A・DACCLK への書き込みが 0 回、settle が無いことに替える |
+| test_gf_display.py (旧版 983602fcd992) (変異 `c2rec`/`saved-blank`) | 削除して §5-2 の変異に替える |
+| gf4_c2svc_host.c (旧版 13d5dbaeb386) | 停止は常に settle が無く、最初の時計は F3 fini。saved_closed=false の場合も同じ結果になる行を足す |
+| gf4_c2svc_host.c (旧版 13d5dbaeb386) の注記 | "suspend does not write DPMS" に替える |
+| gf4_c2log_host.c (旧版 fcad5fad62b9) (S0 で足した detect state の欄) | 2 回目の開始の期待値を「1 回目と同じ。ただし SR01 bit5・CR11 bit7・CR21 を除く」にする (fixture は停止の restore を通す) |
+| console_dual_host.c (旧版 4b121d4f002b)・test_console_dual.py ほか 3 本 | S5 で §4 の行を削除する |
 | gf4_c2stop_host.c・gf5_display_lifetime 系 | 書き込みの数や順を見る行が落ちたら、fixture の CR/SR/RAMDAC の初期値を S0 の 1 回目の値にして直す |
 
 ### 5-2. 足す試験と変異
 
-**新しい `tools/tests/gf4_hwstate_host.c`** (test_gf_display.py に段 `hwstate` を足す)。偽のレジスタ表の初期値は S0 の 1 回目の値にする。
+**新しい `gf4_hwstate_host.c (旧版 03be096d2895)`** (test_gf_display.py に段 `hwstate` を足す)。偽のレジスタ表の初期値は S0 の 1 回目の値にする。
 - 保存:
   - フォント → crtc 0・1 → エンコーダーの順。owner を head ごとに CR44 で選ぶ。
   - AR10 bit0=1 ならフォントを読まず、ページも取らない。
@@ -290,14 +290,14 @@ S0 7eee4b40 で、owner を CR44 で切り替えて読んだ値。証拠はノ�
 
 | 段 | ファイル | 前提 | 見込み | 実装者 |
 |---|---|---|---|---|
-| S0 観測 (済、7eee4b40) | D/service.c の detect state の欄と owner の切り替え、tools/tests/gf4_c2log_host.c、test_gf_display.py | — | 実装済み | main に入れる段として統合の枝に載せる |
+| S0 観測 (済、7eee4b40) | D/service.c の detect state の欄と owner の切り替え、gf4_c2log_host.c (旧版 fcad5fad62b9)、test_gf_display.py | — | 実装済み | main に入れる段として統合の枝に載せる |
 | S1 保存 | D/hw_state.h (新、宣言)、D/hw_state.c (新、static の置き場・`gf4_hw_save`・`gf4_hw_state_reset`・save_state の ramdac/vga/palette/ext・get_pllvals/decode_pll) | — | 300 | terra |
 | S1b フォント | D/hw_fonts.c (新、V/hw.c:289-371 の save/restore、ページの取得と返却) | S1 の宣言 | 120 | terra |
 | S2 復元 | D/hw_load.c (新、§3-5 の 1〜6 と `nv_crtc_restore`) | S1 の宣言 | 300 | terra |
 | S2b PLL | D/hw_pll.c (新、setPLL_double_highregs・new_ramdac580・powerctrl_1_shift の写し) | S1 の宣言 | 120 | terra |
 | S3 エンコーダー | D/enc_state.c (新、DAC/TMDS/TV の save/restore。bound head は V/dfp.c:55-、TV の state の save/load は V/tvmodesnv17.c:379-430)、D/tv.c (tv_state_load を公開する 1 行) | S1 の宣言 | 220 | terra |
-| S4a 停止と開始の結線 | D/service.c (svc_dpms_on の削除・svc_rom の保存・停止の #4〜#9)、D/quiesce.c (時計の失敗の枝、§3-3)、tools/tests/gf4_c2svc_host.c・gf4_c2stop_host.c・新 gf4_hwstate_host.c | S1〜S3 | -90/+110、試験 +250 | sol |
-| S4b suspend・restart の結線 | D/recover.c (rec_dpms_on の削除)、tools/tests/gf4_c2rec_host.c、tools/tests/test_gf_display.py (変異の差し替え) | S1〜S3 | -50/+10、試験 +60 | terra |
+| S4a 停止と開始の結線 | D/service.c (svc_dpms_on の削除・svc_rom の保存・停止の #4〜#9)、D/quiesce.c (時計の失敗の枝、§3-3)、gf4_c2svc_host.c (旧版 13d5dbaeb386)・gf4_c2stop_host.c・新 gf4_hwstate_host.c | S1〜S3 | -90/+110、試験 +250 | sol |
+| S4b suspend・restart の結線 | D/recover.c (rec_dpms_on の削除)、gf4_c2rec_host.c (旧版 39b340a7967d)、test_gf_display.py (旧版 983602fcd992) (変異の差し替え) | S1〜S3 | -50/+10、試験 +60 | terra |
 | S5 CONSOLE_DUAL | `display_dual_dpms` を外す (§4 の 9 か所) | S4a・S4b の実機の受入 R5 | -50 | terra |
 | S6 文書 | §8 の 2 文書。docs/design/hwdev/gf/display/ に hw_state.md・hw_load.md・hw_pll.md・hw_fonts.md・enc_state.md | S4a・S4b | — | PM |
 

@@ -58,7 +58,7 @@ POLICY_DEV §1 の統合判断（同）:
 |c ビルド時の既定表＋root のファイル（推奨）|単一の像で安全に起動し、root 開通後に上書き可能|初期値と確定値の二段階。読み直し時点を一か所に限定する。|
 
 - ゲストの /etc/machine.cfg を選ぶ。PC-98 は起動 root（FD を含む）、PowerMac は RAM root の像を作る際に任意で収録。/host やネットワークの成立を待たない。
-- [C4] パスの仕様は本節、文字列の正典は sys/include/config.h の SYS_MACHINE_CFG、読取側はその名前を参照。バイト数は sysconfig の SYSCONFIG_MAX (1024、sys/kern/init/sysconfig.c。シェルの CFG_READ_MAX と等しいことを tools/tests/test_mem_stat.py が [C4] として見ているので値を変えない) に従い、契約ヘッダの MACHCFG_FILE_MAX は `SYSCONFIG_MAX - 1` (1023) から導く。MACHCFG_LINE_MAX (改行を除き 95) は契約ヘッダ。物理番地の追加なし。
+- [C4] パスの仕様は本節、文字列の正典は sys/include/config.h の SYS_MACHINE_CFG、読取側はその名前を参照。バイト数は sysconfig の SYSCONFIG_MAX (1024、sys/kern/init/sysconfig.c。シェルの CFG_READ_MAX と等しいことを test_mem_stat.py (旧版 213f1e2d3820) が [C4] として見ているので値を変えない) に従い、契約ヘッダの MACHCFG_FILE_MAX は `SYSCONFIG_MAX - 1` (1023) から導く。MACHCFG_LINE_MAX (改行を除き 95) は契約ヘッダ。物理番地の追加なし。
 - PowerMac は ROOT_MANIFEST を build/ram-root.mk の mkroot_image.py --manifest に渡し、root_image.c 経由で RAM root を ELF に埋め込む。収録内容を替えるには ELF を再生成する。
 - ファイルは当該 root を使う機体への差分。共用媒体でも効く範囲をキーで限定する。例えば次の 2 行。
 
@@ -114,7 +114,7 @@ const struct machcfg *machcfg_get(void);
 |B|新規 sys/include/machcfg_contract.h|30、型・定数・関数|A|
 |B1|変更 sys/include/config.h|1、SYS_MACHINE_CFG|A|
 |B2|新規 sys/kern/init/gf_production_cfg.c|15、gf_production_configure・gf_production_selected と静的状態を移す|A|
-|B2t|変更 tools/tests/gf_production_host.c・tools/tests/test_gf_production.py|5、gf_production_host.c の `#include "sys/kern/init/sysconfig.c"` に sys/kern/init/gf_production_cfg.c の include を足す (sysconfig.c の include は残す。試験が初期化に戻す static 変数 gf_configured の初期化が新しいファイルの側で見える形)。covers に新しいファイルを足す|B2|
+|B2t|変更 gf_production_host.c (旧版 9030065fac80)・test_gf_production.py (旧版 2dbef53dc1b3)|5、gf_production_host.c の `#include "sys/kern/init/sysconfig.c"` に sys/kern/init/gf_production_cfg.c の include を足す (sysconfig.c の include は残す。試験が初期化に戻す static 変数 gf_configured の初期化が新しいファイルの側で見える形)。covers に新しいファイルを足す|B2|
 |B3|変更 sys/kern/init/sysconfig.h|5、一時読取の開始・終了の宣言|B|
 |B4|変更 sys/kern/init/sysconfig.c|45、gf_production.h 依存を除去。SYSCONFIG_MAX の行は変えず、配列だけ `sc_buf[SYSCONFIG_MAX + 1]` にする。§2–3 のサイズ・整数検査 (一時読取の間だけ) と一時読取を実装|B1,B2,B3|
 |C|新規 sys/kern/machcfg.c|100、状態・既定・確定|B|
@@ -123,13 +123,13 @@ const struct machcfg *machcfg_get(void);
 |F|新規 sys/platform/powermac/machcfg.c|35、識別と既定表|B|
 |G|変更 sys/arch/ppc/kernel_cpu.c|20、早期と確定後の HID0 適用 (G-a と G-b に分ける、追記 P-G)|B|
 |H|変更 sys/platform/pc98/kernel.c|8、早期 begin と root 後の load|C,D,E|
-|G1|変更 tools/ppc/cpu_nap_host.c・tools/tests/test_ppc_cpu_nap.py|30、CHECK 20・22 の 7450 早期期待値を NAP 解除に変更し、確定後の 0/1 と 7455 を検証。試験の目印の付け直し・明示クリアを削る変異・covers (追記 P-R2)|G|
+|G1|変更 cpu_nap_host.c (旧版 ea8e22515fed)・test_ppc_cpu_nap.py (旧版 0a6dbf7254ef)|30、CHECK 20・22 の 7450 早期期待値を NAP 解除に変更し、確定後の 0/1 と 7455 を検証。試験の目印の付け直し・明示クリアを削る変異・covers (追記 P-R2)|G|
 |I|変更 sys/platform/powermac/ppc_kernel.c|12、platform_boot_services で成功・失敗を確定後に ppc_cpu_power_apply()|C,D,F,G|
 |J|変更 build/sources/common.mk|6、sysconfig.c を C_COMMON_PC98_PENDING から C_COMMON_EXEC に移し (vfs_read を呼ぶので、sys/fs/vfs.c の無い像に入れない。CORE に入れると PowerMac の KBOOT_LINK でリンクが落ちる)、gf_production_cfg.c は旧区分。sys/kern/machcfg.c は C_COMMON_CORE、machcfg_root.c は C_COMMON_EXEC|B2,B4,C,D|
 |K|変更 build/platform/pc98.mk|1、E の選択|E|
 |L|変更 build/platform/powermac.mk|1、F の選択|F|
-|M|新規 tools/tests/machcfg_host.c|100、表駆動入力・凍結・誤り|C,D,E,F|
-|M1|新規 tools/checks/machcfg-host.py|25、両表の host 試験をビルド・実行|M|
+|M|新規 machcfg_host.c (旧版 dc8f05c16cda)|100、表駆動入力・凍結・誤り|C,D,E,F|
+|M1|新規 machcfg-host.py (旧版 5a8c9a8f2988)|25、両表の host 試験をビルド・実行|M|
 |N|変更 tools/gen_deploy_set.py|5、machine.cfg は optional とし指定時のみ etc/machine.cfg を配布|B1|
 |N1|変更 build/targets/ppc-powermac.mk|5、`ROOT_MANIFEST`・`ROOT_DEPS` に、選んだ設定を書くスタンプ (中身が変わった時だけ更新) を足して ROOT_ISO の依存にする (追記 P-R5)|N|
 
@@ -180,8 +180,8 @@ G4 の設定切替を埋め込み RAM root と ELF の再生成で運用して�
 
 | ID | 決めたこと |
 |---|---|
-| P-R1 | idle は変えない。`sys/arch/ppc/kernel_dec.c` の `ppc_cpu_nap` が立てる MSR[POW] はそのまま (AC-SYNC-2 の試験 `tools/tests/test_arch_compat.py` の anchor_nap と、`test_ppc_cpu_nap` の CHECK 10 を変えない)。POW も外すのは下の P-R4 の順の 2 手目で、その時は `kernel_dec.c` と試験 2 本の段を足す |
-| P-R2 | 段 G1 に `tools/tests/test_ppc_cpu_nap.py` を含める: G の式の変更に合わせた目印の付け直し (count==1 の assert)、§7 の変異「7450 の明示クリアを削る」を MUTATIONS に、covers に `sys/include/machcfg_contract.h` |
+| P-R1 | idle は変えない。`sys/arch/ppc/kernel_dec.c` の `ppc_cpu_nap` が立てる MSR[POW] はそのまま (AC-SYNC-2 の試験 `test_arch_compat.py (旧版 feb27053b188)` の anchor_nap と、`test_ppc_cpu_nap` の CHECK 10 を変えない)。POW も外すのは下の P-R4 の順の 2 手目で、その時は `kernel_dec.c` と試験 2 本の段を足す |
+| P-R2 | 段 G1 に `test_ppc_cpu_nap.py (旧版 0a6dbf7254ef)` を含める: G の式の変更に合わせた目印の付け直し (count==1 の assert)、§7 の変異「7450 の明示クリアを削る」を MUTATIONS に、covers に `sys/include/machcfg_contract.h` |
 | P-R3 | 口は `void ppc_cpu_power_apply(u32 pvr, u8 nap7450)`。`sys/arch/ppc/kernel_cpu.c` で `ppc_cpu_power_init` の直後に置き (試験が `ppc_cpu_power_init(` 〜 `ppc_cpu_load_segments(` で切り出すため)、中で `machcfg_get` を呼ばない (値は呼び手の platform が渡す) |
 | P-R4 | 手本 NetBSD (`sys/arch/powerpc/oea/cpu_subr.c` の 7450 の分岐、「XXX my quicksilver hangs if nap is enabled」) は 7450 で NAP も DPM も立てず、powersave も 0 (POW も立てない)。見分けの像 4c0f7ef4 (NAP だけ外した) は未確認で、11-18 の G4 の観測では `LAN STATE state=5 link=1`・`LINK HEAP used=383408` でプロンプトが出ずに止まっていた (/host より前。NAP だけでは説明できない恐れ)。§7 の実機の行の順: (1) NAP=0 の像で /host が通るか、(2) 通らなければ DPM と POW も外す (NetBSD と同じ形)、(3) それでも止まれば NAP 以外の原因として調べ直す |
 | P-R5 | 段 N1 の置き場は `build/targets/ppc-powermac.mk` の `ROOT_MANIFEST ?=` と `ROOT_DEPS`。`build/ram-root.mk` は mtime で依存を見るので、設定入りから無しに戻すと ISO が作り直されず `/etc/machine.cfg` が残る。選んだ設定のスタンプ (中身が変わった時だけ更新) を ROOT_ISO の依存にする |
@@ -195,8 +195,8 @@ G4 の設定切替を埋め込み RAM root と ELF の再生成で運用して�
 
 ### 1. machine.cfg のファイル長（段 B・M1）
 段 B の sys/include/machcfg_contract.h に公開上限を置く。式は `#define MACHCFG_FILE_MAX (1024 - 1)` とし、読取幅 1024 の正典は sys/kern/init/sysconfig.c の `#define SYSCONFIG_MAX  1024` とする。
-段 M1 の tools/checks/machcfg-host.py はその数値定義を読み、host コンパイルに -DTEST_SYSCONFIG_MAX=<読んだ数値> を渡す。段 M の tools/tests/machcfg_host.c で `_Static_assert(MACHCFG_FILE_MAX == TEST_SYSCONFIG_MAX - 1, "machine.cfg limit");` を課す。
-段 B3 で定数を移す必要はない。[C4] は tools/tests/test_mem_stat.py (CFG_READ_MAX と SYSCONFIG_MAX の照合) が userland/shell/cmd_sys.c の CFG_READ_MAX と sys/kern/init/sysconfig.c の SYSCONFIG_MAX を直接読むため、試験の追従も不要。
+段 M1 の machcfg-host.py (旧版 5a8c9a8f2988) はその数値定義を読み、host コンパイルに -DTEST_SYSCONFIG_MAX=<読んだ数値> を渡す。段 M の machcfg_host.c (旧版 dc8f05c16cda) で `_Static_assert(MACHCFG_FILE_MAX == TEST_SYSCONFIG_MAX - 1, "machine.cfg limit");` を課す。
+段 B3 で定数を移す必要はない。[C4] は test_mem_stat.py (旧版 213f1e2d3820) (CFG_READ_MAX と SYSCONFIG_MAX の照合) が userland/shell/cmd_sys.c の CFG_READ_MAX と sys/kern/init/sysconfig.c の SYSCONFIG_MAX を直接読むため、試験の追従も不要。
 §7 受入・変異：上限の等式が成立し、1023 B は解析、1024 B は全体を破棄する。契約式の減数を 2 に変えると host ビルドが失敗する。
 
 ### 2. ppc7450.nap の採否（段 C・D・E・F）
@@ -243,7 +243,7 @@ r1→r2 の変更 (REVIEW-D.r1 と PM 決定):
 | 状態 `machine_seed`・`current`・`finished` | `sys/kern/machcfg.c` の `machine_seed・current・finished` (static、外から読む口なし) | 済 |
 | `machcfg_begin` / `machcfg_finish` (対象外の NAP を既定に戻す) / `machcfg_get` | `sys/kern/machcfg.c` の `machcfg_begin` / `machcfg_finish` / `machcfg_get` | 済。ビルドの一覧には未登録 (段 J) |
 | パス `SYS_MACHINE_CFG` | `sys/include/config.h` の `SYS_MACHINE_CFG` | 済 |
-| host 試験 | `tools/tests/machcfg_host.c`・`tools/checks/machcfg-host.py` (machcfg.c だけを組む。変異は文字列一致 `begin-defaults`) | 済 |
+| host 試験 | `machcfg_host.c (旧版 dc8f05c16cda)`・`machcfg-host.py (旧版 5a8c9a8f2988)` (machcfg.c だけを組む。変異は文字列一致 `begin-defaults`) | 済 |
 | sysconfig の読取 | `sys/kern/init/sysconfig.c` の `SYSCONFIG_MAX` (1024)・`sc_buf[SYSCONFIG_MAX]`・`sc_load` (1023 B だけ読む)・`sysconfig_get_int` | **一時読取口は無い** (B3・B4 未着手)。今は 1023 B 超を見分けられない |
 | 機種の表 | `sys/platform/pc98/machcfg.c`・`sys/platform/powermac/machcfg.c` | **無い** (E・F 未着手) |
 | PC-98 の差し込み点 | `sys/platform/pc98/kernel.c` の `kernel_boot_cpu`・`BOOT_AUTO_MOUNT`・`kernel_boot_serial`・`kernel_gfx_config` | 呼び出しは無い (H 未着手) |
@@ -353,7 +353,7 @@ MACHCFG powermac cpu=0x80000201 seed=cpu file=nofs perf=0/def nap=0/def
 ```
 
 - x86 と PowerPC で**同じ書式・同じ関数**。違うのは機種が渡す 3 つの引数だけ。採用値の並びは契約の構造体の順 (perf、nap) で固定。キーを足す時は行の末尾に足す。
-- 出すのは 1 回。`machcfg_report` は static の印で 2 回目以降を黙って戻る。印は `machcfg_begin` が戻す (host 試験は 1 プロセスで seed ごとに begin を呼ぶ、`tools/tests/machcfg_host.c` の `run`)。確定前 (finish の前) に呼ばれた時も出さずに戻る (印は立てない)。
+- 出すのは 1 回。`machcfg_report` は static の印で 2 回目以降を黙って戻る。印は `machcfg_begin` が戻す (host 試験は 1 プロセスで seed ごとに begin を呼ぶ、`machcfg_host.c (旧版 dc8f05c16cda)` の `run`)。確定前 (finish の前) に呼ばれた時も出さずに戻る (印は立てない)。
 - PowerMac の seed の出所は段 F の `int pm_machcfg_seed(u32 pvr, struct machcfg_seed *out)` (`sys/platform/powermac/machcfg.c`、戻り値 1 = PVR が一致、0 = 機種の既定)。begin の所と I の report の所でそれぞれ `ppc_read_pvr()` を読み直して引く (PVR は `sys/platform/powermac/kernel_boot.c` の `ppc_kernel_real_start` のローカルで残らない)。
 - 呼ぶ所: PC-98 は load の直後 (H)。PowerMac は確定 → `ppc_cpu_power_apply` → `machcfg_report` → HID0 の行、の順 (I)。FS の無い像でも出す (既定の確認に使う)。
 - PC-98 の report は **load の直後 (`sys/platform/pc98/kernel.c` の `BOOT_AUTO_MOUNT` の直後) で確定**。kprintf は console_printf の別名 (`sys/kern/kprintf.c` の `kprintf`)、console_write は毎回 bootlog_push (`sys/kern/console/console.c` の `console_write`)、bootlog は BSS から溜める (`sys/kern/init/bootlog.c` の `g_bl_stopped`)。 BOOT_AUTO_MOUNT より前の `bootinfo_report` も kprintf で出している。
@@ -391,10 +391,10 @@ MACHCFG HID0 pvr=0x80000201 hid0=0x8040c0a4 nap=0
 |---|---|---|---|
 | D-ii | `sys/include/machcfg_contract.h` | 定数 6 個と `machcfg_note_file`・`machcfg_report` の宣言 | C |
 | D-ii | `sys/kern/machcfg.c` | static 3 つ、begin での戻し 3 行、note・report (約 38 行)。既存の行は動かさない (変異の目印 `current = seed.defaults;` を保つ) | C |
-| D-ii | `tools/tests/machcfg_host.c`・`tools/checks/machcfg-host.py` | kprintf の代役は、先例 `tools/tests/test_kprintf_va.py` と同じく `sys/kern/kprintf.c` を展開して組み (kprintf_spec・kutoa_dec・kutoa_hex を含める)、`sys/kern/kprintf_format.inc` の `KPRINTF_WRITE` をバッファへ書く関数にする (host は `-m32 -ffreestanding -nostdlib` で vsnprintf が無い)。行の照合、変異、covers に `sys/kern/kprintf.c` と `sys/kern/kprintf_format.inc` | C |
+| D-ii | `machcfg_host.c (旧版 dc8f05c16cda)`・`machcfg-host.py (旧版 5a8c9a8f2988)` | kprintf の代役は、先例 `test_kprintf_va.py (旧版 2d2f6c72ec59)` と同じく `sys/kern/kprintf.c` を展開して組み (kprintf_spec・kutoa_dec・kutoa_hex を含める)、`sys/kern/kprintf_format.inc` の `KPRINTF_WRITE` をバッファへ書く関数にする (host は `-m32 -ffreestanding -nostdlib` で vsnprintf が無い)。行の照合、変異、covers に `sys/kern/kprintf.c` と `sys/kern/kprintf_format.inc` | C |
 | D-i | `sys/include/machcfg_contract.h` | `machcfg_load_root` の宣言 | D-ii |
 | D-i | `sys/kern/machcfg_root.c` (新規) | §2 の断片 (約 30 行) | B2・B2t・B3・B4・D-ii (B4 は B1・B2・B3 に依存、設計 §6) |
-| D-i | `tools/tests/machcfg_host.c`・`machcfg-host.py` | vfs_read の代役 (回数を数える)、sysconfig.c と組む、covers に machcfg_root.c | B4 |
+| D-i | `machcfg_host.c (旧版 dc8f05c16cda)`・`machcfg-host.py` | vfs_read の代役 (回数を数える)、sysconfig.c と組む、covers に machcfg_root.c | B4 |
 | F | `sys/platform/powermac/machcfg.c` | 設計の表に `pm_machcfg_seed` を足す | B |
 | H | `sys/platform/pc98/kernel.c` | begin、load、report の 3 つの呼び出し | D-i・E |
 | I | `sys/platform/powermac/ppc_kernel.c` | load か finish(0)、apply、report、HID0 の行 | D-i・F・G-b |

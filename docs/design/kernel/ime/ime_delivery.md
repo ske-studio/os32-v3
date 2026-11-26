@@ -45,8 +45,8 @@ GUI は元キーを WM の現在の打鍵が保持する。`ime_feed_key(-1)` �
 配送先・既存 flush の契約は [fep](../../userland/gshell/src/fep.md) を参照。
 KAPI/ABI v79 と公開状態構造体は変更しない。
 
-`tools/tests/x11_shared_host_imetab.inc` が6入口×2候補状態、Tab/F1/制御コード、
+`x11_shared_host_imetab.inc (旧版 7b1fcd4ac368)` が6入口×2候補状態、Tab/F1/制御コード、
 混用、次の `a → Enter`、学習1回、取消、GUI KAPI 境界を検証する。
 `x11_park_host.c` は製品 `exec_park/exec_resume` を通す。
 GUI の回収・Text→Key・次打鍵・入力ダイアログの順序は
-`userland/gshell/host/kbdnav_tests_imetab.rs` が製品 `fep.rs/input.rs` で検証する。
+`kbdnav_tests_imetab.rs (旧版 5ce71699e421)` が製品 `fep.rs/input.rs` で検証する。

@@ -1,4 +1,4 @@
-# tools/tests/b8_open_host.c — 読取回帰試験
+# b8_open_host.c (旧版 2cd6db9b20ad) — 読取回帰試験
 
 > 状態: **現行 (2026-10-31)**
 

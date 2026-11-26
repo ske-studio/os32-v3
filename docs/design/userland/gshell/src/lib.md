@@ -22,4 +22,4 @@
 
 ## 検査
 
-`make check-gshell-host` (`userland/gshell/host/wm_tests.rs` の `a_parked_app_is_not_left_black_when_another_app_is_launched`・`a_running_app_yields_to_a_parked_app_that_has_a_deliverable_paint`)。ホストの `gfx_init` の贋物は VRAM を消したことと回数 (`mocks::GFX_INITS`) を記録する。
+`make check-gshell-host` (`wm_tests.rs (旧版 bb1fab993dc8)` の `a_parked_app_is_not_left_black_when_another_app_is_launched`・`a_running_app_yields_to_a_parked_app_that_has_a_deliverable_paint`)。ホストの `gfx_init` の贋物は VRAM を消したことと回数 (`mocks::GFX_INITS`) を記録する。

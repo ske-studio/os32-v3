@@ -75,7 +75,7 @@ B1でもスプラッシュ区間を除く窓で実測CPU占有5%以下、IRQ0最
 | Subsystem | `sys/include/memmap.h` の `PIT_HZ=100` と `TICK_MS=1000u/PIT_HZ` は論理値として維持。新設 `PIT_IRQ_HZ` だけを x86 の物理要求100→1000とする (PowerPC は `PM_DEC_HZ`)。`pit_setup.clk_hz/reload` が x86 の実周期の正典で、共通の tick_clock には num/den で渡す ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §2・§3)。 |
 | Local | PCM/FDC/serial等の機構時間・回数・境界余裕は各所有ファイル。物理period_usを論理TICK_MSの代用にしない。同じ意味の新たな写しは増やさない。 |
 依存確認: SDK sharedヘッダ:192-195 の `__KERNEL_BUILD__` 分岐が memmap.h を読み、PowerPC の像も同じ分岐を通る。逆向きincludeは追加しない。SDK には `OS32_TICK_HZ` をリテラルの 100 で置くだけにし、`STATIC_ASSERT(OS32_TICK_HZ == PIT_HZ, logical_tick_hz_match)` は x86 だけの `sys/platform/pc98/clock_source.c` に置く (PowerPC の PIT_HZ 監査を通すため、[TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) X4)。
-物理要求の参照は pit_init・pit_mathの物理設定/検査・recover_profile・kselftest に限定し、物理計算自体は実clock/reloadを使う。論理消費者のPIT_HZ→OS32_TICK_HZ一括置換は不要。`tools/tests/gfinit_budget_host.c`、`pegc_mode_host.c`、`recover_t2_host.inc`、`dep_dir_b_timer_host.c` もPIT_HZ=100のままで10倍化を防ぐ。
+物理要求の参照は pit_init・pit_mathの物理設定/検査・recover_profile・kselftest に限定し、物理計算自体は実clock/reloadを使う。論理消費者のPIT_HZ→OS32_TICK_HZ一括置換は不要。`gfinit_budget_host.c (旧版 edfe25f1cbb9)`、`pegc_mode_host.c`、`recover_t2_host.inc`、`dep_dir_b_timer_host.c` もPIT_HZ=100のままで10倍化を防ぐ。
 `pit_compute` は測定/比較の100と1000を扱う。未知clock/無効周波数を既存のPIT_ERR_CLOCK/HZで返すのは装置仕様の範囲でありソース許可リストではない。
 divisorは最近接整数 `reload=(clk_hz + hz/2)/hz`。1.9968MHz→1997（1000.100160µs、約−100ppm）、2.4576MHz→2458（1000.162760µs、約−163ppm）。
 100Hzは19968/24576で正確な10ms。切捨て1996/2457を採らず、周期ごとのreload変更も行わない。既存mode2プログラム順序は `sys/platform/pc98/timer.c` を保持。
@@ -126,7 +126,7 @@ CPU校正は論理tick5回≒50msを維持。`CPU_DELAY_SCALE=100` の2段割り
 | `sys/kern/ime/ime_dict.c` / `sys/kern/font_guard_fixture.c` の `font_fixture_body()` | 注入待ちOS32_RAW_WAIT_LOG_TICKSの単位維持、500=5秒。faulttest.cもPIT_HZ=100を維持。 |
 | userland/SDKと生成import | get_tick利用のshell/rshell/sleep/watchdog/gshell/filer/bench/GUI/SDK exampleは100Hz契約を維持。ktime_ticks生成元tools/gen_sqlite_imports.pyと各module importは同単位。直接物理率を参照する注記を訂正。 |
 公開tickの `now < deadline` が残る例（sndtest.c、rshell.c、sdk/example/hello/main.c (main())）は周回で壊れる既存不具合として票に記録し、採用前の回帰範囲では差分比較へ修正する。
-実装時は同じ検索をtools/tests・生成物も含め再実行し、対応表で未分類0を確認する。ソースを許可リストで拒否する仕組みは作らない。
+実装時は同じ検索をtests/hal/・生成物も含め再実行し、対応表で未分類0を確認する。ソースを許可リストで拒否する仕組みは作らない。
 
 ## 6. ファイルごとの変更段と大きさ
 各行が1ファイル=1段。宣言ヘッダと本体は順に渡す。A（測定）→A2（スプラッシュ区間を除くNIC等の時間超過対処）→A再測定/ゲート→B（100Hz統合）→C（1kHz試験）を固定し、各段は半日〜1日以内を目安。
@@ -169,8 +169,8 @@ CPU校正は論理tick5回≒50msを維持。`CPU_DELAY_SCALE=100` の2段割り
 | userland/system/sndtest.c | 変2 | 周回差比較 |
 | userland/shell/rshell.c | 変8 | 周回差比較 |
 | sdk/example/hello/main.c | 変2 | 周回差比較 |
-| tools/tests/test_tick_1khz.py | 新180 | clock/phase/wrap/周期結線のhost・変異 |
-| tools/tests/tick_1khz_host.c | 新250 | 純関数の32bit/64bit比較fixture |
+| tests/hal/tick_1khz.py | 新180 | clock/phase/wrap/周期結線のhost・変異 |
+| tests/support/fixtures/tick_1khz_host.c | 新250 | 純関数の32bit/64bit比較fixture |
 A2はスプラッシュ区間を除く測定で発見したNIC等の阻害区間を先に解消する独立段。NICの削減値と変更量はA1実測後に確定し、`sys/net/link.h`、`sys/net/link_rx.inc`、`sys/dev/net/ne2000/lgy98.c` の実際の所有箇所ごとに段を分ける。
 ビルド登録は既存所有Makefileの該当リストへ数行、生成物は既存generatorで再生成。既存試験のアンカー/期待値も各所有ファイル単位で更新し並列競合を避ける。
 注記変更対象は§5の各所有ファイルに各1〜3行。大きい既存ファイルへ計測本体を足さず新ファイルに集約、time_math等は既存機能の置換だけとする。

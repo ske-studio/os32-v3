@@ -46,4 +46,4 @@
 
 ## 確かめ
 
-- `tools/tests/test_hostsvc_persistent.py` (sfs run の外の読み書き、コマンド終了後も mount、ホストの再起動で古い FD が STALE・新しい open は成功)・`test_hostsvc_sfs_deadline.py` (入口から 1000ms + 1 tick で HOSTDOWN、次の要求で再送信)・`test_hostsvc_serialfs.py`・`test_hostsvc_sfs_lan.py`・`test_hostsvc_open.py`・`test_hostsvc_init.py` (起動の結線と設定の鍵)・`test_serialfs.py` (UART の既存の動作)。
+- `test_hostsvc_persistent.py (旧版 030af773a023)` (sfs run の外の読み書き、コマンド終了後も mount、ホストの再起動で古い FD が STALE・新しい open は成功)・`test_hostsvc_sfs_deadline.py` (入口から 1000ms + 1 tick で HOSTDOWN、次の要求で再送信)・`test_hostsvc_serialfs.py`・`test_hostsvc_sfs_lan.py`・`test_hostsvc_open.py`・`test_hostsvc_init.py` (起動の結線と設定の鍵)・`test_serialfs.py` (UART の既存の動作)。

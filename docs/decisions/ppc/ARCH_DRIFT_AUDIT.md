@@ -76,13 +76,13 @@
 
 | 対象 | x86 の観測 | PPC の観測 | 共通に照合する契約 |
 |---|---|---|---|
-| シェル | `tools/tests/test_kernel_shell.py` の GUI 選択・復帰 | `tools/tests/ppc_sh_boot.py` と `tools/ppc/link_sh_run.py` の起動・link シェル | 終了／fault／ロード失敗の区別と再起動。初回接続待ちは像の条件にする |
-| ver・メモリ | `tools/tests/test_ver_accept.py`、`userland/diag/mem_stat_test.c` | `tools/accept/ppc_ver.py`、同一 memstat の `userland/diag/mem_stat_test.c` | 版・build とメモリ指標。装置、CPU、採取可能なメモリ指標を別に期待 |
-| rshell・link | `tools/tests/test_rshell_serial.py`、`tools/tests/test_link_platform.py` | `tools/tests/test_ppc_rshell_link.py`、`tools/tests/test_ppc_link_platform.py` | command/status と link の進行。Serial ACK・LAN epoch の観測経路は個別 |
-| SFS | `tools/tests/test_serialfs.py` と `userland/shell/rshell.c` | `tools/accept/ppc_sfs.py` | cwd 復帰、子の exit、回収と再接続。PPC は RSH OUT と行境界を追加で観測 |
-| SQLite | `tools/tests/test_sqlite_product_sql.py` | `tools/accept/ppc_sqlite_static.py`、`tools/accept/ppc_sqlite_stack.py` | DB と VFS の契約、PPC 固有の FP/stack 境界、x86 のモジュール供給 |
-| 表示 | `tools/tests/test_ver_gfx.py` と `tools/tests/test_recover_gf.py` | `tools/accept/ppc_display.py`、`tools/accept/ppc_gfx2.py` | 表示 lease・初期化／終了・選択中 mode、装置ごとの recover と出力 |
-| 時計・起動 | `tools/tests/test_tick_clock.py`、`tools/tests/test_tick_irq.py`、`tools/tests/test_bootlog.py` | `tools/ppc/kboot_accept.py`、`tools/accept/ppc_rtc.py` | logical tick・µs の進行と起動段、PIT/TSC・DEC/TB の誤差は別 |
+| シェル | `test_kernel_shell.py (旧版 db36e5710ca6)` の GUI 選択・復帰 | `ppc_sh_boot.py (旧版 5a9698ae3a9a)` と `tools/ppc/link_sh_run.py` の起動・link シェル | 終了／fault／ロード失敗の区別と再起動。初回接続待ちは像の条件にする |
+| ver・メモリ | `test_ver_accept.py (旧版 6dd98f39305a)`、`userland/diag/mem_stat_test.c` | `ppc_ver.py (旧版 e05e54116bb4)`、同一 memstat の `userland/diag/mem_stat_test.c` | 版・build とメモリ指標。装置、CPU、採取可能なメモリ指標を別に期待 |
+| rshell・link | `test_rshell_serial.py (旧版 1be347749f8c)`、`test_link_platform.py (旧版 c4bc40be8d05)` | `test_ppc_rshell_link.py (旧版 5b9735510b1e)`、`test_ppc_link_platform.py (旧版 2c7f25e65f91)` | command/status と link の進行。Serial ACK・LAN epoch の観測経路は個別 |
+| SFS | `test_serialfs.py (旧版 3080b693e474)` と `userland/shell/rshell.c` | `ppc_sfs.py (旧版 55711a435e84)` | cwd 復帰、子の exit、回収と再接続。PPC は RSH OUT と行境界を追加で観測 |
+| SQLite | `test_sqlite_product_sql.py (旧版 482e526b6bca)` | `ppc_sqlite_static.py (旧版 d3cb5d6c21d4)`、`ppc_sqlite_stack.py (旧版 4a3f34b0d4f3)` | DB と VFS の契約、PPC 固有の FP/stack 境界、x86 のモジュール供給 |
+| 表示 | `test_ver_gfx.py (旧版 8466cfa4566e)` と `test_recover_gf.py (旧版 c5df5707d529)` | `ppc_display.py (旧版 5e1f27510eb6)`、`ppc_gfx2.py (旧版 6c6043dc49f7)` | 表示 lease・初期化／終了・選択中 mode、装置ごとの recover と出力 |
+| 時計・起動 | `test_tick_clock.py (旧版 b4100266a43a)`、`test_tick_irq.py (旧版 fd39b74a69a4)`、`test_bootlog.py (旧版 389fac4a955a)` | `tools/ppc/kboot_accept.py`、`ppc_rtc.py (旧版 a2c0d7ba791b)` | logical tick・µs の進行と起動段、PIT/TSC・DEC/TB の誤差は別 |
 | USER probe | `userland/tests/` の製品テスト | `build/ppc-user.mk` の hello/fault/nest（起動・子）、outprobe/nlprobe/celltest/fontprob/kcgprob（文字）、shmprobe/surfprob/gfx2prob/dispprb/mousprob（資源・表示・入力）、infoprob/sysiprob/verprob/pciprob/bootprob/portprob/rtcprob（情報・装置）、pathprob/loopprb/dbprob/sfsprob（パス・媒体・DB・SFS）。FP は受入専用の `build/ppc-user.mk` | 個別 probe の同名ファイルを探すより、検証する KAPI と観測値を共有。memstat は既に同じソース |
 
 ## ソース選択の照合台帳

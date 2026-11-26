@@ -1,7 +1,7 @@
 # tools/ops/check_doc_line_refs.py — 文書の行番号つきの参照の戻り止め
 
 > 状態: **現行 (2026-11-17)** — ユーザー決定 2026-11-17 (行番号つきの参照を禁止する)。決まりの本文は [POLICY_DEV §9](../../POLICY_DEV.md)。
-ソース: `tools/ops/check_doc_line_refs.py`・`tools/ops/doc_line_refs_baseline.json`・`tools/tests/test_doc_line_refs.py`
+ソース: `tools/ops/check_doc_line_refs.py`・`tools/ops/doc_line_refs_baseline.json`・`test_doc_line_refs.py (旧版 a864f26c857a)`
 
 ## 目的
 

@@ -8,8 +8,8 @@
 /*  走らせて確かめられるのが実機 PC-9821Ra266 だけだから。机上の判断のまま   */
 /*  実機へ持って行くと、1 回の実機セッションを復号の間違いで潰す。           */
 /*                                                                          */
-/*  試験: tools/tests/pci_decode_host.c + tools/tests/test_pci_decode.py    */
-/*  記録: tools/tests/pci_decode_tdd.md                                    */
+/*  試験: pci_decode_host.c (旧版 d13fc7147959) + test_pci_decode.py (旧版 a5ba7472a1c6)    */
+/*  記録: pci_decode_tdd.md (旧版 c1e937d1c664)                                    */
 /*  票  : docs/tasks/realhw/TASK_LAN_82557.md §2 L-A                       */
 /*                                                                          */
 /*  出典:                                                                   */

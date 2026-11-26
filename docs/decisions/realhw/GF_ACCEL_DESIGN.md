@@ -203,8 +203,8 @@ WC不成立は理由付きSKIPで、比較の合格と数えない。レコー�
 | S14 +drivers/video/geforce/gf_accept.c | 3方式・矩形・readback・計時、100–160、S2/S10後 |
 | S15 build/geforce-module.mk | 受入構成/転送方式選択、+10–20、S14後 |
 | S16 userland/gshell/src/wm.rs | 受入時だけイベント/合成/presentの計時、+20–40、S14後 |
-| T0 +tools/tests/test_mtrr_wc.py | fake CPUID/MSR/CR・PTE不変とCHECK/変異、160–230、S0後に並列 |
-| T1 tools/tests/test_geforce.py | 転送store trace・端・WC寿命と既存写像維持、+60–100、S2/S7/S10後 |
+| T0 +test_mtrr_wc.py (旧版 aff66a818303) | fake CPUID/MSR/CR・PTE不変とCHECK/変異、160–230、S0後に並列 |
+| T1 test_geforce.py (旧版 4b690286e6b4) | 転送store trace・端・WC寿命と既存写像維持、+60–100、S2/S7/S10後 |
 | T3 +tools/ops/gf_accel.py | シリアル記録の統計/版照合、80–130、S14後 |
 - r2 の S3–S6（mm の型/分割/同期）、S9（native 状態別検査）、T2（台帳変更試験）の6段を削除。21段→15段、追跡のため残る段の ID は維持する。
 - Cファイル名のみの行は drivers/video/geforce/（hwdev/arch/mm/build は表記どおり）。各段は半日以内〜1日、共有ヘッダを先に確定。既存fixtureが別ファイルならその1本を追加子段として指名する。

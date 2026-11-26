@@ -13,8 +13,7 @@ SerialFS のセッションを開く。ホストは `tools/rshell_serial.py --se
   3. 要求フレームには `<dir>` を根にした応答を返す。LOG フレームは溜めた
      出力として表示し、EXIT フレームで終了コードを受け取る
 
-形式の正典は sys/fs/serialfs/sfs_proto.h (C)。ここはその写しで、tools/tests/test_serialfs.py が
-C の組み立てた列をここで読み、その逆も確かめる。
+形式の正典は sys/fs/serialfs/sfs_proto.h (C)。ここは同じフレームを読み書きする。
 
 規則 (票 §1-v2 B-7' / §1-v3):
   - **`sfs run` の行の外ではフレームを解釈しない** (セッション外の `cat` の本文で

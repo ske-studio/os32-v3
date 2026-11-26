@@ -44,4 +44,4 @@ NP21/W の ini (`[NekoProject21]` の節) の書き換えの約束。固定値�
 
 ## 検査
 
-`tools-host` の中の `tools/tests/test_np21w_ini.py` (`PathFields` ほか)。贋の `wslpath` と一時ディレクトリだけを使い、実 ini・実プロセスには触らない。
+`tools-host` の中の `test_np21w_ini.py (旧版 109f0b0d5cee)` (`PathFields` ほか)。贋の `wslpath` と一時ディレクトリだけを使い、実 ini・実プロセスには触らない。

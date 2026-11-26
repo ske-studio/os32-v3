@@ -209,26 +209,9 @@ DB接続は保存/ロード時だけ。追加像は64KiB以内を目標として
 | build/programs.mk | cpanel登録、cfg/bootcfgの必要リンク | crate後 |
 | userland/rust/Cargo.toml | workspace登録 | buildと直列 |
 | userland/deploy.yaml | cpanel.binを/usr/binへ登録 | build後 |
-| ＋tools/tests/cpanel_model.rs | 編集・保存結果・RELOAD要求失敗のhost試験 | modelと並列可 |
-| ＋tools/tests/cpanel_store_host.c | 実cfg/rules、故障注入・変異（bootcfg内部は前置き別段で試験） | storeと並列可 |
-| ＋tools/tests/test_cpanel.py | 上記harness実行、正常対照後に変異 | 最終統合 |
-| ＋userland/gshell/host/cfg_reload_tests.rs | 実handlerの予約・重複要求・park・top-level消費・Noticeを検証 | reload後 |
-| userland/gshell/host/integration.py | 上記試験を既存host harnessへ登録、変異と正常対照 | host試験後 |
-| ＋tools/checks/cpanel-host.py | CHECK宣言とtest_cpanel.py呼出し、終了値伝播 | 最終統合 |
-
-`tools/checks/cpanel-host.py` の宣言案（budgetは秒、初回実測で調整）:
-
-```python
-CHECK = dict(name='cpanel-host', tier=1,
-    covers=['userland/rust/cpanel/**', 'userland/lib/cfg/**',
-            'userland/cmds/cfg.c', 'sdk/include/os32/os32_gui_shared.h',
-            'sdk/rust/os32api/src/gui/proto.rs',
-            'tools/tests/cpanel_model.rs', 'tools/tests/cpanel_store_host.c',
-            'tools/tests/test_cpanel.py', 'tools/checks/cpanel-host.py'],
-    needs=[], budget=30.0)
-```
-
-run(ctx)はctx.rootをcwdとし、HOST32_RUNNERSにctx.runnersを渡してtest_cpanel.pyを実行、ctx.mutateなら--mutateを渡し、子の終了値を返す。gshell側は既存tools/checks/gshell-host.pyのcoversとintegration.pyを使う。
+| tests/support/fixtures/cpanel/ | 編集・保存・RELOAD 失敗の Rust 模型、実 cfg/rules に対する故障注入用 C ハーネス | model・store と並行可 |
+| tests/integration/cpanel.py | 正常対照と変異、gshell の予約・重複要求・park・top-level 消費・Notice を観測 | reload 後 |
+| tests/registry.toml | cpanel の出所・入力・対象構成・期待・変異を登録する | 最終統合 |
 
 ## 9. 受入 → 試験と変異
 

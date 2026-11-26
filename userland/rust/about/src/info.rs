@@ -1,6 +1,6 @@
 //! Value-only reader of the kernel's ver/About lines. No device formatting here.
 //! Constants and repr(C) layout mirror sdk/include/os32/os32_ver_info.h;
-//! tools/tests/test_about_info.py checks both against the real C ABI.
+//! test_about_info.py (旧版 85ada75c1e56) checks both against the real C ABI.
 pub const OS32_VER_LINES: usize = 20;
 pub const OS32_VER_TEXT: usize = 64;
 pub const OS32_VER_COLS: usize = 52;

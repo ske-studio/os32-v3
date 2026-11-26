@@ -32,4 +32,4 @@
 
 ## 検査
 
-`cfg-host` (`tools/tests/test_cfg.py`、本体 `tools/tests/cfg_host.c`) の `s3_json` (reader 単体の受理と拒否、最長行、エスケープ、base64、int32 の境界) と `s3_scope` (対象外の行の非正準 base64・4096 byte 超の blob は通り、先頭ゼロは落ちる)。
+`cfg-host` (`test_cfg.py (旧版 f84b12760091)`、本体 `cfg_host.c (旧版 947ea5937a47)`) の `s3_json` (reader 単体の受理と拒否、最長行、エスケープ、base64、int32 の境界) と `s3_scope` (対象外の行の非正準 base64・4096 byte 超の blob は通り、先頭ゼロは落ちる)。

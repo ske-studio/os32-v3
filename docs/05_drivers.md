@@ -180,7 +180,7 @@ SCROLL の IM もそのクロックとの組で選ぶ (両方 5MHz なら PITCH 
 (実機の読みは 81h だが bit7〜2 は「常に 0」、PLL を持つ機種がある)。ホスト試験は `make check-pegc-mode-host`。
 
 - **順序と中身**: 入る (`pegc_enter_480_ports`) と戻る (`pegc_text_sync_400`) は同じ `pegc_apply_timing` を値だけ替えて通り、実機 Ra266 の ROM (INT 18h AH=30h) の列の順に書く — 6Ah 拡張モード (07h・21h・06h) と 41h → 表示停止 (68h 0Eh) → 09A8h (今の D0 が目標と違うときだけ、bit1,0 だけ) → GDC クロック → 両 GDC の RESET・MASTER/SLAVE と SYNC → テキスト CSRFORM・グラフィック CSRFORM (L/R = 0) → STOP2 → 両 GDC の PITCH・ZOOM・SCROLL (グラフィック LEN 3FFh) → 68h 08h・6Ah 69h (800 ライン構成)・6Eh (拡張アトリビュート、各書き込みの後に 5Fh の待ち)・テキスト CRTC (70h〜7Ah) → 68h 0Fh → START (ROM は両 GDC を止めたまま返すので、OS32 が呼び手として 480 では両 GDC、戻りではテキストだけ 6Bh)。ROM の待ちに合わせて 7 か所で VSYNC を待ち、1 回 50ms で打ち切って `pegc_vsync_timeouts` を数える。CUI へ戻るときは ROM の CSRFORM がカーソル非表示なので `console_hw_cursor_enable()` で戻す。
-- **ROM の記録が期待値**: 実機 ROM の 480 / 戻りの OUT 列 (各 94 行) は `tools/tests/pegc_mode_host.c` の `ROM_S480` / `ROM_BACK` に数値のまま置き、`check-pegc-mode-host` の `rom_s480` / `rom_back` が実物の列と 1 行ずつ比べる。比べるのは `pegc_enter_480_ports()` と `pegc_text_sync_400()` の頭から終わりまで (MMIO・VRAM クリア・パレット・起動時の記録・診断の 09A0h の読みは外す)。違えてよい行は同じ試験の除外表 (`EDIT_COMMON` / `EDIT_BACK` / `ADD_*`) に理由付きで置く: 09A0h 03h の読み、PC-98GS 用の A46Eh・A660h と ROM バンク 063Ch (記録器が実機へ通していない)、描画コマンド A2h 20h・78h ([HW1])、戻りの 68h 09h (OS32 のグラフィックは 400 ライン)。**6Ah 07h・A0h DFh・A2h 28h・6Ah 06h の組は意味が資料に無い未解明の差分で、送っていない** — 実機で表示が崩れたら最初に疑う。
+- **ROM の記録が期待値**: 実機 ROM の 480 / 戻りの OUT 列 (各 94 行) は `pegc_mode_host.c (旧版 74eab42d0979)` の `ROM_S480` / `ROM_BACK` に数値のまま置き、`check-pegc-mode-host` の `rom_s480` / `rom_back` が実物の列と 1 行ずつ比べる。比べるのは `pegc_enter_480_ports()` と `pegc_text_sync_400()` の頭から終わりまで (MMIO・VRAM クリア・パレット・起動時の記録・診断の 09A0h の読みは外す)。違えてよい行は同じ試験の除外表 (`EDIT_COMMON` / `EDIT_BACK` / `ADD_*`) に理由付きで置く: 09A0h 03h の読み、PC-98GS 用の A46Eh・A660h と ROM バンク 063Ch (記録器が実機へ通していない)、描画コマンド A2h 20h・78h ([HW1])、戻りの 68h 09h (OS32 のグラフィックは 400 ライン)。**6Ah 07h・A0h DFh・A2h 28h・6Ah 06h の組は意味が資料に無い未解明の差分で、送っていない** — 実機で表示が崩れたら最初に疑う。
 - **画面を見ずに確かめる道具 `pegcchk [秒数]`** (`/usr/bin/pegcchk.bin`、rshell から): PEGC で 640x480 へ入り、テスト画 (枠・縦線 x=0/1/320/638/639・16 ラインごとの横線・対角線) を描いて待ち、CUI へ戻って `[pegc] enter …` / `[pegc] exit …` (入った直後と戻った後の 09A8h・09A0h の読み、FIFO / VSYNC の打ち切り数 `fifo_to` / `vs_to`)、`R mode` / `R back`、`pegcchk done` を出す。Ra266 では 09a8 が 81 のまま、clk が 3 → 0、`fifo_to` / `vs_to` が 0 になるのが正常。戻った後の AH=31h は続けて `v86 -g` の `R 31h` 行で見る (Ra266 は `AX=310d BX=0100`)。期待の全行は [RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1。
 - 480 ラインのときの液晶の OSD (水平・垂直周波数) は未採取 (TASK_TRIDENT_DRIVER の段 0 の残件)。
 
@@ -325,7 +325,7 @@ IDEセカンダリバンクに接続されたATAPI CD-ROMデバイスをPIOモ�
 - **ドライブとの相性で困ったら `ATAPI_READ_MAX_SECTORS` を 1 にする** (`sys/dev/ata/atapi.h` の 1 か所、旧来の 1 セクタずつに戻る)
 - **NP21/W は READ(10) で UNIT ATTENTION を返さない** (媒体の交換は TEST UNIT READY だけが報告する)。
   世代の経路は実機でしか踏まない。NP21/W の DRQ は 2048 バイトずつ
-- 試験: CD の読みの host 試験 `cd-read-host` は CI から外した (ユーザー決定 2026-11-20、持越し台帳 CI-DROP-CDREAD-1。組の C の `tools/tests/cd_read_host.c`・`cd_pkg_host.c` と記録 `tools/tests/cd_read_tdd.md` は戻す時のために残す)
+- 試験: CD の読みの host 試験 `cd-read-host` は CI から外した (ユーザー決定 2026-11-20、持越し台帳 CI-DROP-CDREAD-1。組の C の `cd_read_host.c (旧版 9268775a530e)`・`cd_pkg_host.c` と記録 `cd_read_tdd.md (旧版 90e42b81cae2)` は戻す時のために残す)
 
 ### §5-7 マウス (mouse.c / mouse.h / mouse_bus.c / mouse_seamless.c)
 

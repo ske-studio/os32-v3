@@ -16,7 +16,7 @@
 /*  ここにはハードウェア (CR3 / setjmp / pgalloc / ページテーブル) を         */
 /*  1 つも置かない。実体は sys/kern/exec/exec.c が持ち、この表は「誰が居て、どの状態で、*/
 /*  次に何をしてよいか」だけを決める。だからホストでそのまま試験できる       */
-/*  (tools/tests/multiapp_impl_host.c が K5a の模型と同じ 84 検査を回す)。   */
+/*  (multiapp_impl_host.c (旧版 a096aa946524) が K5a の模型と同じ 84 検査を回す)。   */
 /* ======================================================================== */
 
 #ifndef __APPSLOT_H
@@ -258,7 +258,7 @@ void appslot_park_kbd_commit(void);
  *
  *   now_tick : 呼び手 (sys/platform/pc98/input/kbd.c) が渡す PIT の tick (100Hz)。
  *              **引数で受ける**のは (a) この表がハードウェアを知らない規約と
- *              (b) ホスト試験 (tools/tests/multiapp_impl_host.c ケース 22) で
+ *              (b) ホスト試験 (multiapp_impl_host.c (旧版 a096aa946524) ケース 22) で
  *              tick を差し替えられるようにするため。
  *
  * 戻り値: 0 = 譲ってよい / OS32_ERR_AGAIN = 前回の試みから tick が進んで

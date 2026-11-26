@@ -1,4 +1,4 @@
-# tools/tests/fep_standard_host.c — IME・SQLite・ext2 の統合回帰
+# fep_standard_host.c (旧版 f28f1a0668c3) — IME・SQLite・ext2 の統合回帰
 
 > 状態: **現行 (2026-10-31)**
 

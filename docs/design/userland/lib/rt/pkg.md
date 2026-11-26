@@ -26,4 +26,4 @@
 
 - 種別がファイルの項目だけを書く。置き場を `O_WRONLY | O_CREAT | O_TRUNC` で開けない (置き場がディレクトリなど) ・書き切れないときは `PKG_ERR_IO` で止める。失敗を飲み込んで `PKG_OK` を返さない。無圧縮・LZSS のどちらの経路も同じ。
 
-検査: `make check-vfs-fd-path-host` (`tools/tests/test_vfs_fd_path.py` の段 `pkg`、実物の `pkg.c` を ext2 の像の上で)。像は `e2fsck -fn` に当てる。
+検査: `make check-vfs-fd-path-host` (`test_vfs_fd_path.py (旧版 3062ccc08e29)` の段 `pkg`、実物の `pkg.c` を ext2 の像の上で)。像は `e2fsck -fn` に当てる。

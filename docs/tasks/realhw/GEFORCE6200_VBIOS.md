@@ -18,7 +18,7 @@
 **扱いの約束** ([HW3]、票 §0 と段 2b のユーザー決定 2026-10-21):
 
 - VBIOS の **x86 コードは逆アセンブルしていない** し、その内容はどこにも無い。分かっているのは ROM の**データの表** (BIT・init script・条件表・PLL の表・DCB など) だけ。x86 コードの解析は最終手段で、要るときはユーザーが判断する。
-- ROM の実物とバイト列はリポジトリに置かない (ノートの証拠ディレクトリだけ)。この文書もバイト列は載せず、命令は「どの script が何をするか」の水準で書く。命令の全件は [`tools/tests/gfinit_fixture.h`](../../../tools/tests/gfinit_fixture.h) にある。
+- ROM の実物とバイト列はリポジトリに置かない (ノートの証拠ディレクトリだけ)。この文書もバイト列は載せず、命令は「どの script が何をするか」の水準で書く。命令の全件は `gfinit_fixture.h` (旧版の Git blob `9f2651fbd119`) にある。
 
 ---
 
@@ -339,9 +339,9 @@ fixture は 193 命令が起こしうる操作を 1 件ずつ並べ (索引レ�
 ### 8-2. ROM と fixture の一致
 
 - 写し: `~/os32-tmp/run/gf6200_4a/nvbios/init_scripts.txt` (WSL 側、211 行) — nvbios の出力の init script の部分。一部の行は圧縮表記なので fixture のバイト列は写しから復元した値。VBIOS 由来なので公開リポジトリには置かない (PM 判断 2026-10-21)。
-- fixture: [`tools/tests/gfinit_fixture.h`](../../../tools/tests/gfinit_fixture.h) — 9 本の開始・長さ・CRC32 (`gf_scripts`)、193 命令 (`gf_instructions`)、619 の書込み候補 (`gf_effects`)、表の位置と大きさ (`gf_table_spans`)、main の順。ROM のバイトは init script のデータの範囲だけで、x86 コードは含まない。
+- fixture: `gfinit_fixture.h` (旧版の Git blob `9f2651fbd119`) — 9 本の開始・長さ・CRC32 (`gf_scripts`)、193 命令 (`gf_instructions`)、619 の書込み候補 (`gf_effects`)、表の位置と大きさ (`gf_table_spans`)、main の順。ROM のバイトは init script のデータの範囲だけで、x86 コードは含まない。
 - 照合: [`tools/gfinit_rom_check.py`](../../../tools/gfinit_rom_check.py) をノートで ROM の実物に当て、**9 本の範囲の CRC32 がすべて一致** (rc=0、605ae6a、2026-10-21)。ROM を出力・保存せず、9 つの範囲だけを比べる。`--list` で期待値 (開始・長さ・CRC) を ROM 無しで表示できる。
-- 写しと fixture の一致を見る試験は `make check-gfinit-fixture-host` ([`tools/tests/test_gfinit_fixture.py`](../../../tools/tests/test_gfinit_fixture.py))。これは CI で回らない PM のローカル検査 ([DEFERRED_TESTS](../DEFERRED_TESTS.md) の GF4A-S1-FIXTURE)。CI では `check-recover-gf` が fixture と許可表の照合だけを見る。
+- 写しと fixture の一致を見る試験は `make check-gfinit-fixture-host` (`test_gfinit_fixture.py` (旧版の Git blob `5168e3b077ab`))。これは CI で回らない PM のローカル検査 ([DEFERRED_TESTS](../DEFERRED_TESTS.md) の GF4A-S1-FIXTURE)。CI では `check-recover-gf` が fixture と許可表の照合だけを見る。
 
 ### 8-3. 使った資料
 

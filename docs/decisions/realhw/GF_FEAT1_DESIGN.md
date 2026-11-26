@@ -173,7 +173,7 @@ import現状は`build/out/geforce/geforce_imports.h:34`の20。irq_register/unre
 
 | 段 | ファイル（O/相対、新/変） | 単一の役目 | 行数 / 依存 |
 |---|---|---|---|
-| A0 | sys/dev/video/geforce/foundation.h 新、sys/dev/video/geforce/production.h・sys/dev/video/geforce/internal.h・sys/dev/video/geforce/diag/recover.h・sys/kern/irq/tick.h・sys/platform/pc98/tick_order.h 変、sys/platform/pc98/video/geforce/geforce_tick.h 新、tools/tests/tick_host.c・tools/tests/test_tick.py 変 | 内部ABI・所有state・hook・RUN/STOP・tick枠6→7の宣言。tick の試験も 7 枠に (tick_host.c の callbacks[] を 7 個に、test_tick.py の OWNERS と 同ファイル内 の covers に geforce_tick.c) | 計170 / 最初 |
+| A0 | sys/dev/video/geforce/foundation.h 新、sys/dev/video/geforce/production.h・sys/dev/video/geforce/internal.h・sys/dev/video/geforce/diag/recover.h・sys/kern/irq/tick.h・sys/platform/pc98/tick_order.h 変、sys/platform/pc98/video/geforce/geforce_tick.h 新、tick_host.c (旧版 afe9a15cbc76)・test_tick.py (旧版 cf2c0ab9932a) 変 | 内部ABI・所有state・hook・RUN/STOP・tick枠6→7の宣言。tick の試験も 7 枠に (tick_host.c の callbacks[] を 7 個に、test_tick.py の OWNERS と 同ファイル内 の covers に geforce_tick.c) | 計170 / 最初 |
 | B0 | sys/dev/video/geforce/master.c 新 | PCI BM/latency | 80 / A0 |
 | B1 | sys/dev/video/geforce/instmem.c 新 | instance確保/free/access | 180 / A0 |
 | B2 | sys/dev/video/geforce/irq.c 新 | 登録/dispatch/ACK/counter | 240 / A0 |
@@ -230,7 +230,7 @@ import現状は`build/out/geforce/geforce_imports.h:34`の20。irq_register/unre
 - P3: PMC を閉じているあいだの VBLANK の数の意味を §5 に 1 行。
 
 ## B 段の出し方で PM が決めたこと (2026-11-02)
-- 層 2 の Opus レビュー F4 と同じ理由で、T0 (1 ファイルの host 試験) を B 段ごとに分ける: 各 B 段は自分の部品の host 試験 `tools/tests/gf1_<部品>_host.c` と `tools/tests/test_gf1_<部品>.py` (CHECK 宣言・変異) を成果物に含める。T0 は C 段の後の結合の試験 (開始・停止の順) に絞る。
+- 層 2 の Opus レビュー F4 と同じ理由で、T0 (1 ファイルの host 試験) を B 段ごとに分ける: 各 B 段は自分の部品の host 試験 `旧ホスト試験 gf1_<部品>_host.c` と `旧ホスト試験 test_gf1_<部品>.py` (CHECK 宣言・変異) を成果物に含める。T0 は C 段の後の結合の試験 (開始・停止の順) に絞る。
 - B 段の .c はモジュールへの結線 (C11 の build/geforce-module.mk・C10 の import) の前なので、B 段ではホストの試験で組んで確かめる。像への組み込みは C10・C11。
 - 実装者: B2 (irq.c、判定の論理) は sol、ほかの B 段は terra。
 
@@ -251,7 +251,7 @@ GEFORCE_SOURCES := $(filter-out $(GEFORCE_LAYER1_PENDING),$(GEFORCE_SOURCES))
 ```
 配置は既存 GEFORCE_SOURCES 定義の直後、GEFORCE_SERVICE_OBJS 算出より前。B6 の常駐 tick も C11 まで kernel に追加しない。
 理由: 未完成の import/provider に依存せず、末尾の「B は host 単独検証、像への組込みは C10/C11」を維持できる。
-各 B の host 試験は当該 .c を直接組む。tools/checks/map.py の needs=['make:all'] は残し、check-changed の準備も通す。
+各 B の host 試験は当該 .c を直接組む。map.py (旧版 3813371e3a96) の needs=['make:all'] は残し、check-changed の準備も通す。
 C10 の import 契約と B6 provider を揃え、C11 で除外を撤去し常駐 tick を配置する；層1を参照する C の接続変更はこの結線と一緒に検査する。
 C10 は下記 production map adapter の paging_map_phys・paging_set_not_present も import に含め、既存 paging_pte_raw を再利用し、生成契約との完全一致を検査する。
 
@@ -427,7 +427,7 @@ PM は宣言追補→C0/C1/C2/C4/C5→診断 owner 接続・C8→module dispatch
 ### CK の取り込みで CW へ送る項目 (2026-11-02、Opus レビュー、PM)
 - P2-1: C7 は recover_gf_profile に載ったが本番の呼び手は無い (本番の gfinit の回復表 recover_gf_template、sys/dev/video/geforce/diag/recover_gf.c の quiesce は PBUS1850/1854/PMC_IRQ の 3 行)。§3:113 のとおりで、本番で engine を止めるのは §2:369 の「cleanup/S0 の前の stop フック」= CW の結線だけ。CW はこのフックを必ず結ぶ。
 - P2-2: gf_foundation_stop (sys/dev/video/geforce/foundation.c) に、失効のときに先に戻る分岐 (追記 同ファイル内) と P2-a の B5 unmap がまだ無い → **CW で足す** (失効なら MMIO を書かずに unmap して GF1_EPCI)。
-- P3-1: revoke の試験 (tools/tests/gf1_foundation_host.c) は saves==restores しか見ない → 呼ぶ前の saves を控えて +1 を CHECK し、「CLI を外す」変異を足す (CW)。
+- P3-1: revoke の試験 (gf1_foundation_host.c (旧版 27dadb884b9c)) は saves==restores しか見ない → 呼ぶ前の saves を控えて +1 を CHECK し、「CLI を外す」変異を足す (CW)。
 - P3-2: engine の bit (0x100/0x1000/0x2) が sys/dev/video/geforce/diag/recover_common/s0.inc と sys/dev/video/geforce/engine_stop.c に別々にある → recover.h の RECOVER_PMC_ENABLE の隣に共通の定義を置く (CW)。
 - P3-3: CK から CW の取り込みまでのあいだ stage.foundation の設定が無く gf_stage_entry は -1 → そのあいだ C 段の診断を実機で回さない。
 

@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""試験の覚え・ソースの註・道具の Python が、アーカイブの文書を指す件数を数え、基準と照らす。
+"""ソースの註・道具の Python が、アーカイブの文書を指す件数を数え、基準と照らす。
 
 決まり ([D4]、docs/CONSTRAINTS.md): `docs/archive/` の文書は過去の記録で、作業・試験の根拠に
-しない。試験の覚え (`tools/tests/*_tdd.md`) やソースの註に残っている票のパスは、票を移した時に
+しない。ソースの註に残っている票のパスは、票を移した時に
 道具が追従させた来歴の記録で、新しく足さない。契約の出所は現行の文書 (`docs/design/`・仕様) を指す。
 
-数える物: 下の 3 つの群のファイルの中の `docs/archive/<…>/<名>.<拡張子>` で、このリポジトリに
+数える物: 下の 2 つの群のファイルの中の `docs/archive/<…>/<名>.<拡張子>` で、このリポジトリに
 追跡されているファイルと一致する物。`docs/archive/README.md` (アーカイブの運用、現行の文書) と、
 実在しないパス (試験の作り物) は数えない。
 
-  test-notes  tools/tests/*_tdd.md
   source      .c .h .inc .asm .S
   python      tools/ の下の .py
 
@@ -38,8 +37,6 @@ def tracked(root):
 
 def group(name):
     """数える群の名前。対象の外は None。"""
-    if name.startswith('tools/tests/') and name.endswith('_tdd.md'):
-        return 'test-notes'
     if name.endswith(SOURCE_EXTS):
         return 'source'
     if name.startswith('tools/') and name.endswith('.py'):
@@ -84,7 +81,7 @@ def compare(observed, baseline):
 
 
 def totals(observed):
-    out = {'test-notes': 0, 'source': 0, 'python': 0}
+    out = {'source': 0, 'python': 0}
     for name, found in observed.items():
         out[group(name)] += found
     return out
@@ -107,8 +104,8 @@ def main(argv=None):
     for line in problems:
         print(line)
     sums = totals(observed)
-    print('archive-refs: %d ファイル、%d 件 (試験の覚え %d・ソースの註 %d・道具の Python %d、基準 %d 件)' % (
-        len(observed), sum(observed.values()), sums['test-notes'], sums['source'], sums['python'],
+    print('archive-refs: %d ファイル、%d 件 (ソースの註 %d・道具の Python %d、基準 %d 件)' % (
+        len(observed), sum(observed.values()), sums['source'], sums['python'],
         sum(baseline.values())))
     return 1 if problems else 0
 

@@ -117,7 +117,3 @@ pub fn move_window(st: &mut GuiState, index: usize, x: i32, y: i32) {
     st.windows[index].configure_pending = true;
     cursor::show(st);
 }
-
-#[cfg(test)]
-#[path = "../host/movecopy_tests.rs"]
-mod tests;

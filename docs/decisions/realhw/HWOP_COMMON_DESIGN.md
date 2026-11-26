@@ -103,7 +103,7 @@ block はループ前に一度、実ストアの PC とマップ済み VA 区間
 ## 3. 段と受入条件
 
 1. **本線、x86 の分離。** 現行翻訳単位とリンク順を維持し、宣言を契約に出し、固定名ヘッダのインラインで従来の式・命令列を保つ。新 action の配送と新 import はこの段に含めない。基点と候補を同じ条件で build_compare（tools/ci/sep_identity.py）に通し、x86 生成物の差 0 を条件にする。差が出たらオブジェクト・逆アセンブルで最初の差を調べ、分割位置を直す。
-2. **本線の回帰。** make all、層・ソース選択の検査、PPC common-compile。tools/tests の test_hwb_{wire,access,parse,exec,shell,log,probe,scripts}、test_pci_hwb、test_exec_hwb_abort、test_rshell_hwb に対応する check を変異込みで通す。既存の期待値・実アクセス列・ログを保持し、移動した変異アンカーは同じ故障で実行時 RED を確認する。最後に checks/run.py --lint。全変異は CI。
+2. **本線の回帰。** make all、層・ソース選択の検査、PPC common-compile。tests/dev/ の test_hwb_{wire,access,parse,exec,shell,log,probe,scripts}、test_pci_hwb、test_exec_hwb_abort、test_rshell_hwb に対応する check を変異込みで通す。既存の期待値・実アクセス列・ログを保持し、移動した変異アンカーは同じ故障で実行時 RED を確認する。最後に checks/run.py --lint。全変異は CI。
 3. **PowerPC 担当。** diag_call に共通 HW_OP を接続し、必要な型付き import をロード時に解決。既定 PCI ドメインの橋・窓を GEM の起動条件から独立して取得する。PowerMac のみで使う変換 action は固定名ヘッダで配送し、PC-98 の配送は既存コードへ畳み込む。build/select.mk の所有者集合で選ぶ。x86 比較を再実施し、生成物変更の申告は PPC のみ。PROBE_OP の LIST と部品無しの動作も確認する。
 4. **QEMU mac99。** FEATURE_KDEBUG を有効にした像の常駐シェルで、列挙された OHCI を選ぶ。hpt370_probe.hwb の CFG_OFFSET/CFG_VALUE 反復を用い、ID、class と BAR0 を pciread で記録する。window を BAR0 に結び mmioread32 で +0 の HcRevision を読む。終了 0、ID は列挙結果、ログの addr は OF から独立に算出した物理番地、値の下位 8 ビットは既存 OHCI 初期化の revision と照合する。HPT370 の ATA 書込み・ポート番号は転用しない。
 5. **失敗と停止。** 別台本で有効な port に ioread / iowrite を幅別に各一件実行し、各ログの NOSYS と終了 3 を確認。wire 試験で call=0/status=2 と READ 値 0 を確認し、モジュール無しと区別する。wait/poll 中に停止入力を入れ ABORT、次回のロードは正常。窓の二ページ目のマップ失敗と復元失敗は後端試験で注入し、先行ストア 0 と復元結果を検査する。

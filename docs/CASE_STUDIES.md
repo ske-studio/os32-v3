@@ -87,7 +87,7 @@ v3 のメモリマップは、PM が 1 人で案を書いて Codex に見せる�
 (語を足すときは表だけ直す)。「書いてあるのに辿れない」は無いのと同じなので、孤児検査を回す。**運用規約はインシデントごとに 1 行足す構造にしない** — 14KB に膨れたオーケストレーションのプロンプトが慎重さの過剰と中断癖を強化していた。
 規約は 3 行に固定し、増える分は既存行の書き換えで吸収する。
 
-出典: `docs/INDEX.md` 冒頭の正典表、`docs/POLICY_DEV.md` §8 (状態行の語彙)、`tools/check_docs_status.py` / `check_docs_orphans.py` / `check_docs_links.py` の docstring、`docs/archive/agents/RETROSPECTIVE_2026-09-09.md` §4、`docs/archive/README.md`。
+出典: `docs/INDEX.md` 冒頭の正典表、`docs/POLICY_DEV.md` §8 (状態行の語彙)、`check_docs_status.py (旧版 98c944bf8a79)` / `check_docs_orphans.py` / `check_docs_links.py` の docstring、`docs/archive/agents/RETROSPECTIVE_2026-09-09.md` §4、`docs/archive/README.md`。
 
 ## 7. 変異試験 — 実物を書き換えない写しの木、変えた所だけ変異
 

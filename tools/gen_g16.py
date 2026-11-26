@@ -6,7 +6,7 @@
 
 The glyphs are the TTF's own 16ppem EBDT strike (the original dots, with the
 smallGlyphMetrics bearings), placed in the 16x16 cell. T7b-a5 proved the
-product raster == EBDT for every glyph (tools/tests/test_font_raster.py), and
+product raster == EBDT for every glyph, and
 check_g16 there re-proves bundle == EBDT == raster for every record.
 
 Cell: 16 rows x pitch 2, MSB = left, row 0 = cell top = baseline - ASCENT (14,

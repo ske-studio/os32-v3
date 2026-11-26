@@ -14,11 +14,11 @@ rename の更新順序も管理する。
 
 - **ディレクトリ rename の順序**: 失敗途中で二つの名前が同じディレクトリを指すと、片方の削除で残りが解放済み inode を指しうる。
   ディレクトリは旧名を先に外し、新名を付ける (`sys/fs/ext2/ext2_dir.c`)。
-  I/O 失敗を不存在に読み替えない。失敗経路の回帰は `tools/tests/test_b8_open.py`。
+  I/O 失敗を不存在に読み替えない。失敗経路の回帰は `test_b8_open.py (旧版 6455da9bbf55)`。
 
 - **不正な名前**: 空名は列挙時に読み飛ばされるため、OS32 で読めても媒体が正しいとは限らない (`sys/fs/ext2/ext2_dir.c`)。
   空・`.`・`..`・長すぎる名前・`/` を含む名前は書込み前に拒否する (`sys/fs/ext2/ext2_dir.c` の `ext2_name_check()`)。
-  `make check-ext2-empty-name-host` と `tools/tests/test_b8_open.py` はホスト像を検査する。
+  `make check-ext2-empty-name-host` と `test_b8_open.py (旧版 6455da9bbf55)` はホスト像を検査する。
   実インストール像も別途 `e2fsck -fn` で検査する。
 
 ## 名前の検査 — 長さ 0 の名前を媒体に載せない
@@ -33,4 +33,4 @@ rename の更新順序も管理する。
 - `ext2_vfs_mkdir` はパスが FS のルートそのもの (`""`・`"/"`・`"//"` …、`ext2_path_is_root`) なら `VFS_ERR_EXIST` (POSIX の `mkdir("/")` と同じ)。親 `/` + 名前 `""` に分けて名前の無いディレクトリを作らない。
 - 列挙 (`ext2_list_dir`) は `name_len` 0 の項目を読み飛ばすので、OS32 から一覧しても名前の無い項目は見えない。媒体の正しさは `e2fsck -fn` で確かめる。
 
-検査: `make check-ext2-empty-name-host` (`tools/tests/test_ext2_empty_name.py`、本体 `tools/tests/ext2_empty_name_host.c`、実物の `fs/ext2/*.c`・`sys/fs/vfs.c`・`sys/fs/vfs_fd.c`・`userland/lib/rt/pkg.c`)。段の終わりに全ディレクトリの生の項目を歩き、像を本物の `e2fsck -fn` に当てる (終了コード 0 以外は失敗)。
+検査: `make check-ext2-empty-name-host` (`test_ext2_empty_name.py (旧版 1972f33be05e)`、本体 `ext2_empty_name_host.c (旧版 4034cebef360)`、実物の `fs/ext2/*.c`・`sys/fs/vfs.c`・`sys/fs/vfs_fd.c`・`userland/lib/rt/pkg.c`)。段の終わりに全ディレクトリの生の項目を歩き、像を本物の `e2fsck -fn` に当てる (終了コード 0 以外は失敗)。

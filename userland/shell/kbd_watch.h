@@ -3,7 +3,7 @@
 /*                                                                          */
 /*  KAPI も I/O も呼ばない。cmd_sys.c の kbdstat -w が kbd_diag_log         */
 /*  (KAPI v67) で受け取ったエントリをここで 1 行にし、kprintf で出す。       */
-/*  ホスト試験 (tools/tests/test_kbd_dlog.py) が実物を #include して         */
+/*  ホスト試験 (test_kbd_dlog.py (旧版 2a446906e839)) が実物を #include して         */
 /*  書式を固定する。票 docs/tasks/gui/TASK_KBD_NAV.md §3。                   */
 /* ======================================================================== */
 

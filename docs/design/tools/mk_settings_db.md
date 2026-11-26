@@ -41,4 +41,4 @@
 
 ## 検査
 
-`tools-host` の中の `tools/tests/test_mk_settings_db.py` (ホストだけ): 決定性 (`Determinism`)・schema と PRAGMA (`Schema`)・規則違反の拒否と境界値の受理 (`Rejects`)・mkpkg の欠損 (`MkpkgMissingFile`)・リポジトリのパッケージ構成 (`RealPackageDefs`)・実物の tsv (`RealDefaults`)・ビルドの結線 (`BuildWiring`)。
+`tools-host` の中の `test_mk_settings_db.py (旧版 ce23c0c1865f)` (ホストだけ): 決定性 (`Determinism`)・schema と PRAGMA (`Schema`)・規則違反の拒否と境界値の受理 (`Rejects`)・mkpkg の欠損 (`MkpkgMissingFile`)・リポジトリのパッケージ構成 (`RealPackageDefs`)・実物の tsv (`RealDefaults`)・ビルドの結線 (`BuildWiring`)。

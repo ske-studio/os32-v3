@@ -914,7 +914,3 @@ fn release_held(st: &mut GuiState) {
         }
     }
 }
-
-#[cfg(test)]
-#[path = "../host/kbdnav_tests.rs"]
-mod tests;

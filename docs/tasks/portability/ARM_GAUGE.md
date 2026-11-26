@@ -264,7 +264,7 @@ ABI の両側に同じ前提がかかる。
 
 > 共有 ABI ヘッダ (`sdk/include/os32/`) の型は `char` の符号・`enum` の幅の既定に依存しない。`CFLAGS_COMMON` の `-fsigned-char` / `-fno-short-enums` を外さない。
 
-歯を付けるなら `tools/check_constraints.py` ではなく専用の検査
+歯を付けるなら `check_constraints.py (旧版 e35cb6b16531)` ではなく専用の検査
 (`build/config.mk` の `CFLAGS_COMMON` に 2 つのフラグが在ることを確かめる数行) を
 `make check` に足すのが筋。ID だけ足しても検査にはならない。
 
@@ -349,7 +349,7 @@ ABI の両側に同じ前提がかかる。
   基点 `ff4160c` の 55/93 は前後で 1 本も動かない (分類も 5 / 33 / 0 / 0 のまま)。
 
 つまり順序 4-a の効果は**この票の物差しでは測れない**。代わりの物差しとして、
-`-Wcast-align=strict` の警告数を置く (`tools/check_le_access.py`、`make check`):
+`-Wcast-align=strict` の警告数を置く (`check_le_access.py (旧版 18506c2136e0)`、`make check`):
 
 | 対象 | 順序 4-a の前 | 順序 4-a の後 |
 |---|---|---|
@@ -366,7 +366,7 @@ ABI の両側に同じ前提がかかる。
 見張るには **`=strict` が要る**。等価性 (x86 で振る舞いが変わらないこと) は
 `.o` の突き合わせではなく **B8 の試験と実物の `e2fsck`** で見た — アクセサが
 インライン展開されると命令列は変わりうるので `.o` 比較は成立しない。
-`tools/tests/test_b8_open.py` が 1461 件 0 失敗、`e2fsck` 654 像で
+`test_b8_open.py (旧版 6455da9bbf55)` が 1461 件 0 失敗、`e2fsck` 654 像で
 自前の媒体検査との食い違い 0。
 
 ### 計測器に 2 つ手を入れた

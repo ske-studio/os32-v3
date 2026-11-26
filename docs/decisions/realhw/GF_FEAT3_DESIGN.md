@@ -215,8 +215,8 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
 | 段 / ファイル | 機能 / 依存 / 行目安 |
 |---|---|
 | A0 sys/dev/video/geforce/accel.h 新、sys/dev/video/geforce/vram_view.h 新 (宣言のみ) | 上記型/API/handle/subc/定数alias・窓/面台帳の型と列挙契約 / F2 command.h / 180 |
-| A1 tools/tests/gf_accel_host.h 新 | 偽MMIO・push記録・clock・staging・CPU参照画像の試験骨格 / A0 / 160 |
-| A2 tools/tests/test_gf_accel.py 新 | 各Bのhost実行/変異登録、登録は直列統合 / A1 / 100 |
+| A1 gf_accel_host.h (旧版 05f46b787efe) 新 | 偽MMIO・push記録・clock・staging・CPU参照画像の試験骨格 / A0 / 160 |
+| A2 test_gf_accel.py (旧版 af1ae2c15513) 新 | 各Bのhost実行/変異登録、登録は直列統合 / A1 / 100 |
 | A3 sys/dev/video/geforce/production.h 変 | gf3_ctx所有 / A0 / 4 |
 | V0 sys/dev/video/geforce/vram_view.c 新 | 独立VRAM窓/面台帳実装・対応host試験 / A0の凍結済み宣言 / 行数は実装時報告 |
 | B0 sys/dev/video/geforce/accel_objects.c 新 | object開始/終了・bind・ready/epoch / A0,F2 / 180 |
@@ -232,7 +232,7 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
 | B10 sys/dev/video/geforce/gf_present_m2mf.c 新 | 試験用present adapter / B8 / 25 |
 | C0 sys/dev/video/geforce/gf_hook.c 新 | module専用adapter・ctx/scan借用口 / B3,B4 / 90 |
 | C0a sys/dev/video/geforce/backend_geforce.c 変 | module条件内の登録・scan/active通知、非moduleはgf3参照なし / C0 / 25 |
-| C0b tools/tests/backend_geforce_host.c 変 | 非module/GFAの未解決参照なし、module版はhook stubでG5境界値照合 / C0a / 35 |
+| C0b backend_geforce_host.c (旧版 533b4fb52dfe) 変 | 非module/GFAの未解決参照なし、module版はhook stubでG5境界値照合 / C0a / 35 |
 | C1 sys/dev/video/geforce/service.c 変 | F2 start後gf3_init、recover後再生成 / B0 / 20 |
 | C2 sys/dev/video/geforce/display/quiesce.c 変 | gf3受付停止→fini→既存F2停止、失敗時所有保持 / B0 / 15 |
 | C3 build/geforce-module.mk 変 | 新部品をmoduleだけにlink・GFA別compile確認・image検査 / B群 / 20 |
@@ -241,7 +241,7 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
 | T0 sys/dev/video/geforce/diag/gf_accel_test.c 新 | serial case、予約試験面、比較/復元 / C群 / 220 |
 | T1 sys/dev/video/geforce/diag/gf_command_test.c 変 (F2予定) | 既存GF試験入口からT0をdispatch / T0 / 15 |
 | D1 docs/tasks/DEFERRED_TESTS.md 変 | GF-L3-Ra266の未実施行追加、実施後に証跡 / T0 / 1 |
-- 各B担当は同時にtools/tests/gf_accel_b<N>_host.cを作る (各40〜80行)。実装1ファイルを実linkし依存はA1 stub、試験登録はA2へ直列。共有Cを複数担当に渡さない。定数の正典/共通定義/alias配置はA0で既存3層に沿って確定。
+- 各B担当は同時にtests/support/fixtures/gf_accel_b<N>_host.cを作る (各40〜80行)。実装1ファイルを実linkし依存はA1 stub、試験登録はA2へ直列。共有Cを複数担当に渡さない。定数の正典/共通定義/alias配置はA0で既存3層に沿って確定。
 
 ## 13. 受入 → 試験・変異・段分け
 | 受入条件 | host (実部品+偽MMIO/push照合) / 変異 | Ra266 serial / カメラ |
@@ -255,7 +255,7 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
 | SIFM | 1:1/2倍/1/2/非整数、clip、RGB/YUV順序・pitch・固定小数。変異:20→16bit/filter逆/offset誤り | 565/32bit offscreen readback、色変換・bilinearは既知単色/端/許容丸めを記録、8bit表示試験と混同しない |
 | hook/present/障害 | gf2失敗全段注入、HAL rc、fill(639,479,INT_MAX,INT_MAX)・blit負座標/巨大寸法・!active、無GUI経路、image予算。変異:GET=PUTを完了扱い/旧epoch受付 | serialにseq/ref/rc、未完了を成功にしない、CPU presentの従来表示を撮影 |
 - A骨格→各B単独host/変異→C結合 (F1/F2実コード+偽MMIO)→T実機。各段で試験コードを完成させ、実行は全実装後にPMがまとめる。該当変異を実行時REDにして合格とし、実機未試験を機能削除の根拠にしない。カメラだけでDMA正しさを判定せずserialのbyte比較と組にする。
-- A2は `CHECK=dict(name="gf-accel-host",tier=1,needs=[],budget=90.0,covers=["hwdev/gf/accel*","drivers/video/geforce/*","tools/tests/gf_accel*","tools/tests/test_gf_accel.py"])`。未着手Bは未登録、登録済みBの欠落は失敗。各変異は無変更GREEN→1箇所変更で実行時RED→復元GREEN、コンパイル失敗は検出に数えない。
+- A2は `CHECK=dict(name="gf-accel-host",tier=1,needs=[],budget=90.0,covers=["hwdev/gf/accel*","drivers/video/geforce/*","旧ホスト試験 gf_accel*","test_gf_accel.py (旧版 af1ae2c15513)"])`。未着手Bは未登録、登録済みBの欠落は失敗。各変異は無変更GREEN→1箇所変更で実行時RED→復元GREEN、コンパイル失敗は検出に数えない。
 - D1の台帳行: `GF-L3-Ra266 | 未実施 | Ra266 0:13.0/0221 | 2D全case・PCI双方向・M2MF notifier・recover・CPU present維持 | 実施担当/日付/serialログ/カメラを実施時記入`。host合格で実機済みにしない。
 - 試験面は表示予約末尾の次の64B境界からB未満に台帳で所有予約し、pitchは64B整列。notifierは末尾instmem所有なので試験面起点から除く。容量不足はGF2_ENOSPC、表示面・pushを流用しない。CPU期待像とVRAM readbackはreference完了後の独立VRAM窓で比較し、M2MF同士の往復だけに依存しない。
 
@@ -317,7 +317,7 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
 | backend_geforce.c・sys/include/gfx_hal.h・kernelソース列 | F3 C0a、F4 C1/C4、F5前景結線 | F3 C0a→F4 C1/C4→F5前景段。HAL宣言だけ先に独立凍結、各backendの追随も単一担当。 |
 | build/hwdev.mk・sys/dev/hwdev/hwdev_imports.def・docs/design/hwdev/hwdev_imports.md | 各層共有計算/診断変更 | 各層登録担当の直列列。import変更は表/件数も同時、他段は必要性と取得元ヘッダーを報告。 |
 | tools/gen_hwdev_contract.py・tools/hwdev_layout.json・契約/schema/import生成物（sys/kern/module/module_schema.hを含む） | 全層の配置/契約変更 | PMの登録段だけ。生成器の件数/台帳を追随し、生成は全部品統合後に1回。sys/kern/module/module_schema.hはtools/gen_module_schema.pyの生成物で、点検時:259–260にgeforceの上限131072がある。F4 C3がtools/module_schema.pyを変更したらPM登録段で再生成する。B担当による生成/生成物手編集なし。 |
-| tools/tests/test_gf_command.py・test_gf_accel.py・test_gf_display.py・test_gf5.py | F2追随、各層B群 | 前者はPM登録段、残りはF3 A2/F4 A2/F5 A3が各1人で所有。BはCHECK/case/変異tupleを報告。 |
+| test_gf_command.py (旧版 c46a29959fd1)・test_gf_accel.py・test_gf_display.py・test_gf5.py | F2追随、各層B群 | 前者はPM登録段、残りはF3 A2/F4 A2/F5 A3が各1人で所有。BはCHECK/case/変異tupleを報告。 |
 | hwdev_contract_fixture.py・test_dep_dir_a_l02.py・sh_{status,shell,truncation}_host.c・recover_virtual_fixture_host.inc・hwdev_audit.py（tools/tests等） | 契約/ソース追加の波及 | PM登録段が該当分を追随。各実装者は当たる一覧を報告、件数/CRCは可能なら元から導出。 |
 | kdebug/gfinit_*・sys/dev/video/geforce/gfinit_mode.h・sys/dev/video/geforce/diag/gf_command_test.c・DEFERRED_TESTS.md | F4 A0、F5 C0/C1、F3 T1、全層台帳 | F4 A0を先行。F5 C0はB1と同一所有者で直列、C1 tables.incはF4 A0後。診断dispatch/台帳はPM登録段へ追加行報告。 |
 
@@ -478,7 +478,7 @@ int gf3_m2mf(struct gf3_ctx *c, u32 in_handle, u32 out_handle, u32 in_off, u32 o
 - 対応: E:394–410 の BO refn/validation を呼出側の予約確認に、:412–430 を B7 に分離。N/nouveau_bo.c:594–599,618–629 の固定配置寿命に相当。BO を受け取らない既存 raw ABI に推測認可を追加せず、協調前景の同一所有期間で保証する。手本の非同期 BO 待ちは §7 の同期 API に合わせる。
 
 ### G1 — A1 が所有する host API の全一覧
-`tools/tests/gf_accel_host.h` は試験 TU だけに include。`GF3_HOST_UNIT` は B0〜B10 を 0〜10、C0 を 11、依存 stub 無しを 12 とする必須選択（範囲外/未定義は #error）。旧 GF3_HOST_COMMAND_STUBS と個別自作 stub は廃止。既存 B0 試験（tools/tests/gf_accel_b0_host.c）は A1 確定後に B0 担当が GF3_HOST_B0 を GF3_HOST_UNIT=0 に移行し、自作 stub 12 個を削除する。各呼出しの前提（pause 中・!ready・dl・align=16・zero=false）は該当 event の observe で照合する。製品 TU は1本、選択された製品の定義は絶対に stub しない。C1/C2/C4 の結合は 12 と F1/F2/各B実物を使う。
+`gf_accel_host.h (旧版 05f46b787efe)` は試験 TU だけに include。`GF3_HOST_UNIT` は B0〜B10 を 0〜10、C0 を 11、依存 stub 無しを 12 とする必須選択（範囲外/未定義は #error）。旧 GF3_HOST_COMMAND_STUBS と個別自作 stub は廃止。既存 B0 試験（gf_accel_b0_host.c (旧版 e5a06ed4cfd5)）は A1 確定後に B0 担当が GF3_HOST_B0 を GF3_HOST_UNIT=0 に移行し、自作 stub 12 個を削除する。各呼出しの前提（pause 中・!ready・dl・align=16・zero=false）は該当 event の observe で照合する。製品 TU は1本、選択された製品の定義は絶対に stub しない。C1/C2/C4 の結合は 12 と F1/F2/各B実物を使う。
 以下が新しい完全定義・宣言。helper はヘッダー内 static inline、依存 stub だけ外部定義。大きな記憶域は試験の static 領域、画像/記録バッファは呼出側借用、heap/VLA/libc は使わない。
 ```c
 enum gf3_host_op { H_EMIT, H_FENCE, H_WAIT, H_FAULT, H_PAUSE, H_RESUME, H_STOP, H_ALLOC, H_FREE, H_DMA_NEW, H_GR_NEW, H_DEL, H_MATCH, H_FORMAT, H_SPAN, H_SURFACE_CHECK, H_RAM_CHECK, H_SURFACE_SET, H_ROP, H_IFC, H_M2MF, H_UPLOAD, H_FILL, H_COPY, H_READ, H_WRITE, H_CLOCK, H_SLEEP, H_OP_COUNT };

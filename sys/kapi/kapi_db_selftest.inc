@@ -13,7 +13,7 @@
 /*                                                                          */
 /*  だから長さは **下限だけ** 見る。slot_count を引数で受けるのは、          */
 /*  「KAPI をもう 1 本足したら」をホスト試験から直に試せるようにするため      */
-/*  (tools/tests/kapi_db_v50_host.c の slot_layout_append)。                 */
+/*  (kapi_db_v50_host.c (旧版 efcd32cfb5e9) の slot_layout_append)。                 */
 /*                                                                          */
 /*  数値の直書きはしない ([C4]) — 位置は全部 os32_kapi_slots.h の定数から     */
 /*  導く。合っていなければ外部プログラムは「別の関数を呼ぶ」という最も静かな  */

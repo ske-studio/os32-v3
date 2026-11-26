@@ -3,8 +3,8 @@
 /*                                                                          */
 /*  I/O を持たない。sys/platform/pc98/input/kbd.c の IRQ1 ハンドラが 0043h を読んだ値を     */
 /*  渡し、0041h を読むか・使うかをここで決める。ホスト試験                  */
-/*  (tools/tests/test_kbd_status.py) が実物をそのまま #include して回す。    */
-/*  記録: tools/tests/kbd_status_tdd.md、経緯: docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線   */
+/*  (test_kbd_status.py (旧版 9bab77d48885)) が実物をそのまま #include して回す。    */
+/*  記録: kbd_status_tdd.md (旧版 9e793e12bab1)、経緯: docs/POLICY_DEBUG.md#4-57-キーボード-8251-の信号線   */
 /* ======================================================================== */
 
 #ifndef __KBD_STATUS_H

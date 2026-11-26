@@ -1,6 +1,6 @@
-# tools/tests/ — 設計
+# 旧ホスト試験の設計記録
 > 状態: **現行 (2026-10-31)** — 出所: BARLEN_DESIGN・CRT31K_DESIGN・GF6200_VPLL_PROBE・SLIM_HWDEV_DESIGN (D1 で移した)
-ソース: `tools/tests/`
+撤去時点の試験は基点 `dafe81642` で参照できる。
 
 - 6本の既存host試験は寿命を持つgfinit_planバッファへ1回展開し、以後そのprofileを使う。部分コピーするlayouts/targetsもその配列を借りる。
 
@@ -64,16 +64,16 @@
 
 - [GeForce 再 init・shell fault の停止経路](gf_wc_recovery_host.inc.md)
 
-- [tools/tests/test_osri](test_osri.md)
+- [旧ホスト試験 test_osri](test_osri.md)
 - [受入計測の模型](test_gf_accel.md)
 
-- [tools/tests/splash_wire_host.c](splash_wire_host.c.md)
+- [splash_wire_host.c (旧版 e3173aeb461c)](splash_wire_host.c.md)
 
-- [tools/tests/test_splash_wire.py](test_splash_wire.py.md)
+- [test_splash_wire.py (旧版 1a5727f53cbf)](test_splash_wire.py.md)
 
-- [tools/tests/splash_raster_diag_host.c](splash_raster_diag_host.c.md)
+- [splash_raster_diag_host.c (旧版 5c7e7156d35c)](splash_raster_diag_host.c.md)
 
-- [tools/tests/test_splash_raster_diag.py](test_splash_raster_diag.py.md)
+- [test_splash_raster_diag.py (旧版 c907f6a84336)](test_splash_raster_diag.py.md)
 
-- [tools/tests/splash_probe_host.c](splash_probe_host.c.md)
+- [splash_probe_host.c (旧版 42465234e77d)](splash_probe_host.c.md)
 

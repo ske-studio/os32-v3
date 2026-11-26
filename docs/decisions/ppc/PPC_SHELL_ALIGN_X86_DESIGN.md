@@ -230,25 +230,25 @@ void shell_loop_run(const struct shell_loop_ops *ops); /* 新設 */
 
 |段|既存の固定（パス・行）|移す期待／保つ変異|
 |---|---|---|
-|A|tools/ppc/kboot_reserve.py の exercise、tools/ppc/kboot_root_image.py の verify、kboot_layout.py|小さい root の配置に加え、製品 PT_LOAD と固定帯、OF の穴を観測|
-|B|tools/ppc/test_exec_entry.py の HARNESS・main|既存 USER の整列・store 失敗に常駐の通常 return、実表、親 SP を加える|
-|B|tools/ppc/test_exec_publish.py、tools/ppc/test_kapi_binding.py の verify|子のコード可視化と out ポインタ検査を維持。常駐ロード後に異なる命令列を同番地から実行|
-|B|tools/accept/arch_ctx.py の image と tools/accept/arch_ctx_probe.c の ctx_irq とシェル起動時の文脈検査|旧 shell_boot 置換と仮親直下の子起動を、実常駐親からの計測に移す。割込み・park/resume・終了・FP の文脈を比較|
-|C|tools/ppc/test_sh_build.py の exercise・main|旧 USER VA 0x80100000 の固定を shell VA に変更。ELF entry、PPC 印、未解決 0、リンク入力の証跡を維持|
-|C|tools/ppc/sc_run.py の outputs|環境既定を sys/include/config.h の SYS_DEFAULT_PATH・SYS_DEFAULT_SHELL に合わせる。SHELL の期待は /shell、実行ファイルの格納先は /sys/shell.bin|
-|C|tools/accept/ppc_newlib.py の capacity・main|試験用 root への sh.bin 直入れを更新。子 fault 後の FD 空き回復・139 を維持|
-|D|tools/ppc/shell_run.py の accept、tools/ppc/sb_run.py の main、tools/ppc/sc_run.py の LINK_NEST_EXPECTED・start|旧 CLI の os32>、exit=-2、exit=7 は製品の表示と status に移す。子の nest kind/code と parent=12345 はそのまま（親 ID の値ではない）|
-|D|tools/accept/ppc_loop.py の observe・main|旧 resident_cli_ops の getkey 差替えと診断像の固定を製品の入力・子の結果へ|
+|A|kboot_reserve.py (旧版 9d3ff30745c5) の exercise、kboot_root_image.py (旧版 8ebbb0dff5d2) の verify、kboot_layout.py|小さい root の配置に加え、製品 PT_LOAD と固定帯、OF の穴を観測|
+|B|test_exec_entry.py (旧版 378b1983781e) の HARNESS・main|既存 USER の整列・store 失敗に常駐の通常 return、実表、親 SP を加える|
+|B|test_exec_publish.py (旧版 c4067fcb19e4)、test_kapi_binding.py (旧版 3baaeeee4857) の verify|子のコード可視化と out ポインタ検査を維持。常駐ロード後に異なる命令列を同番地から実行|
+|B|arch_ctx.py (旧版 73f25956448a) の image と arch_ctx_probe.c (旧版 714e47ed6ec6) の ctx_irq とシェル起動時の文脈検査|旧 shell_boot 置換と仮親直下の子起動を、実常駐親からの計測に移す。割込み・park/resume・終了・FP の文脈を比較|
+|C|test_sh_build.py (旧版 0a6921b395fe) の exercise・main|旧 USER VA 0x80100000 の固定を shell VA に変更。ELF entry、PPC 印、未解決 0、リンク入力の証跡を維持|
+|C|sc_run.py (旧版 a0164610a69c) の outputs|環境既定を sys/include/config.h の SYS_DEFAULT_PATH・SYS_DEFAULT_SHELL に合わせる。SHELL の期待は /shell、実行ファイルの格納先は /sys/shell.bin|
+|C|ppc_newlib.py (旧版 e9a625727f26) の capacity・main|試験用 root への sh.bin 直入れを更新。子 fault 後の FD 空き回復・139 を維持|
+|D|shell_run.py (旧版 2bc137a055de) の accept、sb_run.py (旧版 3c5018178a68) の main、sc_run.py (旧版 a0164610a69c) の LINK_NEST_EXPECTED・start|旧 CLI の os32>、exit=-2、exit=7 は製品の表示と status に移す。子の nest kind/code と parent=12345 はそのまま（親 ID の値ではない）|
+|D|ppc_loop.py (旧版 912733a0f34c) の observe・main|旧 resident_cli_ops の getkey 差替えと診断像の固定を製品の入力・子の結果へ|
 |E|tools/ppc/link_sh_run.py の MUTATIONS・outputs・accept・app_started|g_cur_app 非ゼロ待ちを実枠の commit に変更。RSH 中の active、捕捉後の reader 解除、終了時の非 active を時点ごとに確認|
 |E|同試験の trap 回復の観測|シェル内 trap は PR=0 の回復を通る。ログの旧 USER 文言を外し、同じ枠の世代更新、捕捉回収、次コマンドで判定|
-|E|tools/ppc/usb_run.py の settings・product_settings・execute・usb_keys、tools/ppc/fb_run.py の MUTATIONS|初回キー消費の変異を「一文字目が入力へ渡る」に反転。USB 脱着、FB の表示、LAN RPC 後の読み手を再確認|
-|E|tools/ppc/sd_run.py の start・keep_fs、tools/ppc/realhw_run.py の link_script・main|旧 USER 起動文言を常駐の実行観測に置換。二度目の起動と実機 nest/shell/exact の終了コードを保持|
-|E|tools/accept/ppc_sfs.py の observe|一行の開始回数、終了 7、CWD 復元。未マウント時は共通常駐の拒否文言、begin 後の失敗とは別ケース|
-|E|tools/accept/ppc_display_lifecycle.py の image・output_drawn、tools/accept/ppc_display.py の GATE、tools/accept/ppc_shm.py の試験設定、tools/accept/ppc_db.py の MUTATIONS|表示・SHM・DB の owner は実行中の子の ID と照合。子の終了で親所有の資源が残ることを維持|
-|E|tools/accept/ppc_fp.py の verdict・observe、ppc_sqlite_stack.py、ppc_sqlite_static.py|USER 子の FP・stack・終了後の追加改行を、実常駐親の RSH で確認|
-|E|tools/accept/ppc_{boot_info,console_cells,font,gfx2,kcg,mouse,path,pci,port,rtc,surface,sysinfo,ver}.py|共用の RSH セッション／製品像組立の呼出し側。旧 sh の到達待ちを共用側で更新して各コマンドの期待を照合|
-|F|tools/ppc/test_kapi_binding.py の不在 slot の期待表|生成器の既定・LAN のみ・製品を比較。各構成の従来 absent 期待から製品だけ切替一枠を除く。製品 wrapper の実体への参照、他構成の同枠の NOSYS、全構成の gui_call/gui_register の NOSYS を確認|
-|F|tools/tests/test_ring3_guard.py、test_shell_service.py、test_trim_kernel.py、test_trim_flow.py|本線の owner、戻り番地、世代、consume を維持。P2 の「子で通る」host 模型を統合しない|
+|E|usb_run.py (旧版 402a96233090) の settings・product_settings・execute・usb_keys、fb_run.py (旧版 3a8c0801b6b7) の MUTATIONS|初回キー消費の変異を「一文字目が入力へ渡る」に反転。USB 脱着、FB の表示、LAN RPC 後の読み手を再確認|
+|E|sd_run.py (旧版 edc6604c1432) の start・keep_fs、realhw_run.py (旧版 cf3acc15e747) の link_script・main|旧 USER 起動文言を常駐の実行観測に置換。二度目の起動と実機 nest/shell/exact の終了コードを保持|
+|E|ppc_sfs.py (旧版 55711a435e84) の observe|一行の開始回数、終了 7、CWD 復元。未マウント時は共通常駐の拒否文言、begin 後の失敗とは別ケース|
+|E|ppc_display_lifecycle.py (旧版 384654ef3c13) の image・output_drawn、ppc_display.py (旧版 5e1f27510eb6) の GATE、ppc_shm.py (旧版 957b354b3091) の試験設定、ppc_db.py (旧版 79ea3ae69222) の MUTATIONS|表示・SHM・DB の owner は実行中の子の ID と照合。子の終了で親所有の資源が残ることを維持|
+|E|ppc_fp.py (旧版 b4213d5446e3) の verdict・observe、ppc_sqlite_stack.py、ppc_sqlite_static.py|USER 子の FP・stack・終了後の追加改行を、実常駐親の RSH で確認|
+|E|旧受入 ppc_{boot_info,console_cells,font,gfx2,kcg,mouse,path,pci,port,rtc,surface,sysinfo,ver}.py|共用の RSH セッション／製品像組立の呼出し側。旧 sh の到達待ちを共用側で更新して各コマンドの期待を照合|
+|F|test_kapi_binding.py (旧版 3baaeeee4857) の不在 slot の期待表|生成器の既定・LAN のみ・製品を比較。各構成の従来 absent 期待から製品だけ切替一枠を除く。製品 wrapper の実体への参照、他構成の同枠の NOSYS、全構成の gui_call/gui_register の NOSYS を確認|
+|F|test_ring3_guard.py (旧版 8e0bfe6189d3)、test_shell_service.py、test_trim_kernel.py、test_trim_flow.py|本線の owner、戻り番地、世代、consume を維持。P2 の「子で通る」host 模型を統合しない|
 
 ### 台本で照合する時点
 
@@ -260,16 +260,16 @@ void shell_loop_run(const struct shell_loop_ops *ops); /* 新設 */
 |親 fault 後、回収してループへ|なし|0|0|0|NULL|
 |次の親入口|1（新世代）|0|1|1|NULL|
 
-根拠は static AppSlot *g_cur_app（sys/kern/exec/exec.c の g_cur_app）、commit と深さ更新（sys/kern/exec/exec_launch.inc の exec_launch）、親文脈復元・最上位終了（sys/kern/exec/exec_finish.inc の exec_restore_context・exec_finish）。入力台本は初回キーと再接続後の入力を個別に照合し、USB の再接続後は READY を待ってから要求する（tools/ppc/usb_run.py の launch）。root 台本は製品 root の実パスと試験 root の第2像をそれぞれ開いて検証する。
+根拠は static AppSlot *g_cur_app（sys/kern/exec/exec.c の g_cur_app）、commit と深さ更新（sys/kern/exec/exec_launch.inc の exec_launch）、親文脈復元・最上位終了（sys/kern/exec/exec_finish.inc の exec_restore_context・exec_finish）。入力台本は初回キーと再接続後の入力を個別に照合し、USB の再接続後は READY を待ってから要求する（usb_run.py (旧版 402a96233090) の launch）。root 台本は製品 root の実パスと試験 root の第2像をそれぞれ開いて検証する。
 
 ### 検査宣言と試験の土台
 
-- tools/tests/ppc_sh_boot.py、ppc_sh_runtime.py、ppc_sh_launch.py、ppc_sh_input.py、ppc_sh_string.py、test_ppc_sh_stdio.py は、旧 profile と shim を製品の代わりに組む入力を外す。常駐 CRT の実リンク・出力・子起動へ移す。
-- tools/tests/test_resident_cli.py の CLI 専用 parser・疑似 FS と tools/checks/ppc-cli-boot.py は、同じ役目の製品受入が緑になってから廃止する。
-- tools/tests/test_ppc_link_sh*.py、test_ppc_sd_run.py、test_ppc_newlib.py、test_ppc_terminal_work.py の起動元と変異アンカーを同期。UTF-8 の RED は旧 runtime の差替えから実際の端末出力に移す。
-- tools/checks/ppc-{sh-boot,sh-runtime,sh-string,sh-launch-host,sh-output,sc,sd,rh-fb,usb,terminal-input,exec-entry,fp-guest}.py の covers と inputs を各段で更新。
-- tools/guest_acceptance.yaml と tools/checks/guest-acceptance-host.py は新製品の台本を参照。tools/tests/fixtures/build_profile_ppc.json は五つの構成の kboot-query 結果から更新する。
-- tools/tests/test_build_selection.py は完全な製品と診断の閉包を比較。x86 fixture は x86 の実際の共通ファイル移動だけ反映。追加・削除した検査名は tools/checks/weights.json と突き合わせる。
+- ppc_sh_boot.py (旧版 5a9698ae3a9a)、ppc_sh_runtime.py、ppc_sh_launch.py、ppc_sh_input.py、ppc_sh_string.py、test_ppc_sh_stdio.py は、旧 profile と shim を製品の代わりに組む入力を外す。常駐 CRT の実リンク・出力・子起動へ移す。
+- test_resident_cli.py (旧版 4b96fbfe3777) の CLI 専用 parser・疑似 FS と ppc-cli-boot.py (旧版 7a647d1fd8c6) は、同じ役目の製品受入が緑になってから廃止する。
+- 旧ホスト試験 test_ppc_link_sh*.py、test_ppc_sd_run.py、test_ppc_newlib.py、test_ppc_terminal_work.py の起動元と変異アンカーを同期。UTF-8 の RED は旧 runtime の差替えから実際の端末出力に移す。
+- 旧登録 ppc-{sh-boot,sh-runtime,sh-string,sh-launch-host,sh-output,sc,sd,rh-fb,usb,terminal-input,exec-entry,fp-guest}.py の covers と inputs を各段で更新。
+- tools/guest_acceptance.yaml と guest-acceptance-host.py (旧版 924c39b74b07) は新製品の台本を参照。build_profile_ppc.json (旧版 80da850b3508) は五つの構成の kboot-query 結果から更新する。
+- test_build_selection.py (旧版 4c986200fe5f) は完全な製品と診断の閉包を比較。x86 fixture は x86 の実際の共通ファイル移動だけ反映。追加・削除した検査名は weights.json (旧版 a34c927e1b5d) と突き合わせる。
 - 既存の層検査は baseline 0。新設 init の依存を共通契約だけに収め、追加の例外は不要。共通ソースの PPC コンパイルも通す。
 - 実装段の受入ログは両 CPU と NP21/W の像・版・入出力を区別する。実機確認は同じ製品像の既存 realhw_run 台本に引き渡す。本稿の数値は静的照合とサイズ見積もりで、ゲスト実測は実装後に記録する。
 
@@ -284,7 +284,7 @@ void shell_loop_run(const struct shell_loop_ops *ops); /* 新設 */
 - **P2 (§5・§9) busy の語の型**: sys/arch/ppc/ppc_frame.h で、フレームの先頭から 164 B の busy の語を `u32 *busy` として取れる型付きの道を共有し (struct ppc_frame の 160 B の vector の後ろ)、アセンブリの定数 KFRAME_BUSY とのオフセットの一致を静的に検査する。PR=0 の回復の分岐だけで読み、その jump context に渡す。
 - **P2 (§7・§9) 旧い旗の正規化の負例**: 製品の像へ正規化される入力は、旧名・旧旗を含めて NEGATIVE=0 の時だけに限る。旧旗の組 LINK/SH/SHELL=0/0/1 と NEGATIVE が非 0 の組み合わせを拒否する試験を足す (sys/conf/images/ppc-flags.mk の旗の検査の順に依らない)。
 - **段の入れ替え (2026-11-20 夜、PowerPC の PM の決定を本線の PM が受けた)**: C2 (build/ppc-ram-root.json に /sys/shell.bin) を段 E に移し、起動を切り替える取り込みで旧い /bin/sh.bin・hello・fault を外すのと同時に入れる — 両方を置くと常駐の終端 0x396000・chain 0x401000 で上限を 135,168 B 超えるため (sol の C の P1)。段 C は「/sys/shell.bin を成果物として組める」まで (製品の像の中身は main と同じ)。段 E の受入に、新しい shell.bin (raw 218,544 B、旧 165,440 B より +53 KB) を入れた後の像の予算 (常駐の終端・chain・ISO の丸め) の照合を足す。
-- **段の入れ替え (2026-11-20 夜、その 2)**: C5 (sys/conf/images/ppc-flags.mk の旧名・旧旗の正規化) と C4 (build/select.mk の既定の製品) も段 E に移す — 正規化は旧い名前の像 (kboot-shell の常駐 CLI の os32>・outprobe の自動実行ほか) を製品の像に変えるので、起動を切り替える前に入れると旧い受入 (tools/ppc/ppc_sh_output.py・check-ppc-sh-output ほか) が壊れる (sol の C の第 2 回の P1)。段 C は /sys/shell.bin を成果物として組める (make ARCH=ppc PLATFORM=powermac shell、sdk/link/ppc/app_sys.ld と世代の再生成) だけ。確定の「旧い旗の正規化の負例」の試験も段 E で。
+- **段の入れ替え (2026-11-20 夜、その 2)**: C5 (sys/conf/images/ppc-flags.mk の旧名・旧旗の正規化) と C4 (build/select.mk の既定の製品) も段 E に移す — 正規化は旧い名前の像 (kboot-shell の常駐 CLI の os32>・outprobe の自動実行ほか) を製品の像に変えるので、起動を切り替える前に入れると旧い受入 (ppc_sh_output.py (旧版 9a88dc8cb23b)・check-ppc-sh-output ほか) が壊れる (sol の C の第 2 回の P1)。段 C は /sys/shell.bin を成果物として組める (make ARCH=ppc PLATFORM=powermac shell、sdk/link/ppc/app_sys.ld と世代の再生成) だけ。確定の「旧い旗の正規化の負例」の試験も段 E で。
 - **E5a・E5 の LAN の提供の判定 (PM 決定 2026-11-20 夜、astra の止まりを受けて)**: 起動の案内の前に通知を消費せずに LAN の提供を判定する新しい口 (KAPI) は作らない — x86 の今の作り (rshell の中で `g_api->host_notice_read` があれば `rsh_lan_poll()` で通知を読む) に寄せる。入口の条件は「UART が使える (`serial_get_status()` で判定)、又は `host_notice_read` の slot がある」。実行中に `host_notice_read` が `NOSYS` を返したら「LAN の提供なし」として以後の LAN の poll をやめる (誤りとして扱わない、通知の消費の問題は起きない — 届いた通知は今と同じ処理)。
 - **E5 の READY の `host_open` の NOSYS (PM 決定 2026-11-20 夜)**: READY の `host_open` が `NOSYS` の間は今の x86 と同じく再試行を続ける (共通の `link_host_open` はリンクの初期化の前にも NOSYS を返すので、そこで止めると LAN が遅れて上がる x86 の構成を壊す)。「LAN の提供なし」として poll をやめる条件は `host_notice_read` の NOSYS だけ。UART も無い時は active のまま rshell でローカルの入力を処理する (それでよい)。
-- **E5・E6 の SFS の受入の台本 (PM 決定 2026-11-20 夜、sol の E5 のレビューを受けて)**: tools/accept/ppc_sfs.py の kboot-link-sh の台本を `/sys/shell.bin` の起動に切り替えるのは、`/sys/shell.bin` が像に入る PowerPC の段 E で (7450・7455 の両方で確かめる)。E6 で APP 専用の SFS の分岐を消したので、段 E と同じ統合の枝で入れるまで、この台本の正常系は単独では通らない。
+- **E5・E6 の SFS の受入の台本 (PM 決定 2026-11-20 夜、sol の E5 のレビューを受けて)**: ppc_sfs.py (旧版 55711a435e84) の kboot-link-sh の台本を `/sys/shell.bin` の起動に切り替えるのは、`/sys/shell.bin` が像に入る PowerPC の段 E で (7450・7455 の両方で確かめる)。E6 で APP 専用の SFS の分岐を消したので、段 E と同じ統合の枝で入れるまで、この台本の正常系は単独では通らない。

@@ -1,8 +1,0 @@
-{
-  "base": "b400acb6",
-  "v86_functions": {
-    "v86_disk_test": "89de7da75c882ac36ff9e3c92dccd4e249eeda5ee06e6b28f5d08258c9f27c4c",
-    "v86_boot2": "b3bf579fce6d3393be6a4f1931cf1e16271913243020d607d6276458d79df8a8"
-  },
-  "v86_detach_sha256": "38d0f72795d2b8e37afc7331b88f39cd1dd4701139730a1d2d81931a818409df"
-}

@@ -75,7 +75,7 @@ word 53 bit0 が立っていれば `(valid)`、無ければ `(n/a)`。
 
 ## 確かめ
 
-- `make check-bootinfo-host` (`tools/tests/test_bootinfo.py`)。ケース `good`・`magic`・`check_word`・`version`・`sum`・
+- `make check-bootinfo-host` (`test_bootinfo.py (旧版 307f0c73339c)`)。ケース `good`・`magic`・`check_word`・`version`・`sum`・
   `rules`・`format`・`image`・`inc_mirror`。`--target` で `sys/kern/init/bootinfo.c` と `sys/dev/ata/ide.c` を i386-elf で組む。
 - ローダの実モードの手続き (域へ書くこと、書く順序、HDD ローダの幾何の食い違いでの停止) はホストでは見られない。
   起動時は kselftest の `test_bootinfo()` が写したこと・magic を消したことを見る。

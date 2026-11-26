@@ -19,4 +19,4 @@ VA 0 で `--emit-relocs` 付きでリンクした i386 ELF から、`/boot` の�
 - export: ops の表の大きさが部品の口数 + 1 語でない、表が payload の外、先頭の版が部品の ops の版と違う (古い版の ELF)、口のポインタに `R_386_32` が無いのに非 0、入口が `.text` の外、名前の重複・hash の衝突。
 - init が `.text` の外。
 
-検査: `make check-mkmod-host` (`tools/tests/test_mkmod.py`)。実物の i386 ELF (生成した import slot とスタブ、非整列の絶対再配置、内部の PC32 呼び出し、export 2 本) から容器を作って C の検査器に通し、埋めた対の CRC と容器の CRC、CLI の出力と API の結果の一致を見る。壊れた ELF・対応しない / 未解決の再配置・不正な import・壊れた VK32 は失敗すること。`--mutate` は絶対再配置の取りこぼし・PC32 を残す・対の CRC が 0・export の slot の誤りを写しに入れる。import の集合と `.def` の一致は `tools/tests/test_kdebug_imports.py`。
+検査: `make check-mkmod-host` (`test_mkmod.py (旧版 28350c91f2f2)`)。実物の i386 ELF (生成した import slot とスタブ、非整列の絶対再配置、内部の PC32 呼び出し、export 2 本) から容器を作って C の検査器に通し、埋めた対の CRC と容器の CRC、CLI の出力と API の結果の一致を見る。壊れた ELF・対応しない / 未解決の再配置・不正な import・壊れた VK32 は失敗すること。`--mutate` は絶対再配置の取りこぼし・PC32 を残す・対の CRC が 0・export の slot の誤りを写しに入れる。import の集合と `.def` の一致は `test_kdebug_imports.py (旧版 ec2d8a4c41b3)`。

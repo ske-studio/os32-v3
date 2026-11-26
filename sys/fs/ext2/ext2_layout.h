@@ -17,7 +17,7 @@
 /*      ルートだけ。lost+found は作らない — e2fsck -n は「無い」を報告する)   */
 /*  上限は EXT2_MAX_GROUPS (32 グループ = 256MiB)。                          */
 /*                                                                          */
-/*  試験: tools/tests/test_hdd_stage1.py (記録 tools/tests/hdd_stage1_tdd.md) */
+/*  試験: test_hdd_stage1.py (旧版 6201b26bccf0) (記録 hdd_stage1_tdd.md (旧版 b895f780947c)) */
 /* ======================================================================== */
 
 #ifndef EXT2_LAYOUT_H

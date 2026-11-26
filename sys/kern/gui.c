@@ -99,7 +99,7 @@ i32 gui_call(u32 op, u32 arg)
 /*  owner 1 は常駐シェルだけなので owner だけでも今は穴ではないが、門を     */
 /*  1 つの形に揃えて「owner の意味が変わったら開く」を塞ぐ。正当な呼び手は   */
 /*  gshell の top-level (ディスパッチの外、ring3_in_syscall = 0) で、これは  */
-/*  通る (tools/tests/ring3_guard_host.c §6)。                               */
+/*  通る (ring3_guard_host.c (旧版 e64d934e092e) §6)。                               */
 /* ======================================================================== */
 static void __attribute__((cold)) gui_diag_register(void)
 {

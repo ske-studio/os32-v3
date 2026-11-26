@@ -3,8 +3,8 @@
 /*                                                                          */
 /*  ここには副作用のある行を 1 つも置かない (KAPI も呼ばない)。切り出して   */
 /*  あるのは、**実機でしか起きない失敗**をホストで試験するため。            */
-/*    試験: tools/tests/test_serial_vfast.py (ケース watchdog)              */
-/*    記録: tools/tests/serial_vfast_tdd.md                                 */
+/*    試験: test_serial_vfast.py (旧版 850eef82c906) (ケース watchdog)              */
+/*    記録: serial_vfast_tdd.md (旧版 a6de03cdab60)                                 */
 /* ======================================================================== */
 
 #include "serial_watchdog.h"

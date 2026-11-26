@@ -1,4 +1,4 @@
-# tools/tests/test_ext2_read_bound.py — 読取回帰試験
+# test_ext2_read_bound.py (旧版 a8bf3ff30d51) — 読取回帰試験
 
 > 状態: **現行 (2026-10-31)**
 

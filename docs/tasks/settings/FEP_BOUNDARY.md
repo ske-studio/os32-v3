@@ -83,7 +83,7 @@ NULL prefix、NULL/正常な空 kanji、delete/export の既存 SQL/I/O 分類�
 list は BSS 64件をゼロ化・busy 予約し、エラーと late copyout 拒否でも解放する。回復再試行時も行全体をゼロ化。
 検索/学習の常駐 stmt は reset と借用 text 引数への bind_null で借用を終了する（既存 typed export のみ）。
 VFS の `vfs_close` は void なので close の rc は観測できない。全正常エラーで一度だけ閉じる。
-実ソース＋製品設定 SQLite/VFS の試験は `tools/tests/test_fep_boundary.py`。
+実ソース＋製品設定 SQLite/VFS の試験は `test_fep_boundary.py (旧版 d3104d219a4c)`。
 この host 試験の copy/outer/IF は差し替え境界であり、実 PD/IRQ/NP21/W の証明にはしない。
 page 0 NP (T7)、fep.mod 分離 (T5a-2) はこの接続では閉じない。
 
@@ -217,7 +217,7 @@ path も slot の予約・SQLite open・VFS 操作前に確定する。
 | 段階 | 後日承認する小さいファイル集合 | 完了条件 |
 |---|---|---|
 | R0 | 本票の独立読取りレビューのみ | 上限、NULL、caller provenance、table walk、IF、guard 全caller一覧に重大未解決ゼロ。PM承認 |
-| B1 uaccess | `mm/paging.c/.h`＋専用 `tools/tests/` harness。出自 helper が必要な場合だけ別小差分 `exec/exec.c/.h` | synthetic caller/master PD、safe range/overflow/IF host 検証。既存 paging helper の意味を変えない |
+| B1 uaccess | `mm/paging.c/.h`＋専用 `tests/integration/` harness。出自 helper が必要な場合だけ別小差分 `exec/exec.c/.h` | synthetic caller/master PD、safe range/overflow/IF host 検証。既存 paging helper の意味を変えない |
 | B2 FEP | `sys/kern/ime/ime.c`、`sys/kern/ime/ime_dict.c`、`sys/kern/ime/ime.h`＋専用 host test | staged list、全入力copy、NULL、借用binding寿命、SQL/I/O失敗。SDK layout変更は別承認 |
 | B3 DB followup | 排他移管した `kapi/kapi_db.c/.h`＋既存 F1/専用 host test | copy-before-finalize、無効 SQL/path の engine entry=0、F1/F2回帰 |
 | B4a guard基礎 | 新規 kernel内部 guard `.c/.h`、必要な build source 登録、`sys/arch/x86/kernel/isr_handlers.c`＋専用 host test | active fault→停止／非active→従来分類。ISR frame変更なし |

@@ -2,9 +2,9 @@
 /*  APPSLOT.C — アプリ ID の表と状態遷移 (K5b-K)                             */
 /*                                                                          */
 /*  票 docs/archive/gui_v13/TASK_K5_multiapp.md の §設計 D0〜D4 をそのまま      */
-/*  写したもの。K5a のホスト模型 (tools/tests/multiapp_model_host.c) の       */
+/*  写したもの。K5a のホスト模型 (multiapp_model_host.c (旧版 193acea8d871)) の       */
 /*  遷移表が仕様で、この .c がその実装。同じ検査を                            */
-/*  tools/tests/multiapp_impl_host.c が **この .c を直接コンパイルして** 回す。*/
+/*  multiapp_impl_host.c (旧版 a096aa946524) が **この .c を直接コンパイルして** 回す。*/
 /*                                                                          */
 /*  ここに置かないもの (置くと模型がホストで動かなくなる):                    */
 /*    - CR3 / setjmp / pgalloc / ページテーブル → sys/kern/exec/exec.c                */
@@ -577,7 +577,7 @@ int appslot_state(int id)
 /*                                                                          */
 /*  判定を純関数に切り出してあるのは、材料 (GUI 中か / 呼び手の ID / CPL /   */
 /*  ヘッダの宣言ビット) が全部この表にあり、ホストでそのまま試験できるため   */
-/*  (tools/tests/multiapp_impl_host.c ケース 20)。                           */
+/*  (multiapp_impl_host.c (旧版 a096aa946524) ケース 20)。                           */
 /* ======================================================================== */
 int appslot_gfx_claim_check(int gui_mode, int caller, int cpl3, u32 hdr_flags)
 {

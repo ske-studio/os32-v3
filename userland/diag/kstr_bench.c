@@ -9,7 +9,7 @@
 /*  ■ 両版の同居のしかた                                                     */
 /*    出荷するソースそのもの (sys/kern/kstring_asm.asm と sys/kern/kstring_c.c) を      */
 /*    このプログラムにもリンクする。13 本の名前が丸ごと衝突するので、        */
-/*    tools/tests/test_kstring_c.py と同じ手で objcopy --redefine-syms に     */
+/*    test_kstring_c.py (旧版 afb6691a6e87) と同じ手で objcopy --redefine-syms に     */
 /*    接頭辞を付けさせ、アセンブリ版を a_*、C 版を c_* にして 1 つの実行      */
 /*    ファイルに入れる (build/programs.mk の kstr_bench 規則)。**写しは       */
 /*    作らない** — 測る対象は出荷する実物でなければ意味が無い。              */
@@ -222,7 +222,7 @@ static void kb_add(const char *name, int kind, KbFnPtr fa, KbFnPtr fc)
 }
 
 /* sys/kern/kstring_asm.asm の global と 1 対 1。増減したらここも直す
- * (tools/tests/test_kstr_bench.py が .asm の global と突き合わせる)。 */
+ * (旧ホスト試験 test_kstr_bench.py が .asm の global と突き合わせる)。 */
 static void kb_build_table(void)
 {
     kb_nfn = 0;

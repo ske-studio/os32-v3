@@ -8,7 +8,7 @@
 /*  ここも番地の正典 ([C4])。地図 (build/out/MEMMAP.md) と重なりの検査、       */
 /*  生成ヘッダ memmap_layout.h の LAYOUT_ の名前は tools/gen_memmap.py が      */
 /*  sys/include/memmap.h と合わせて読む。NASM の写しは boot/memmap_defs.inc         */
-/*  (一致は tools/tests/test_boot_named_constants.py)。                        */
+/*  (一致は test_boot_named_constants.py (旧版 ec2b81bf9d3b))。                        */
 /* ======================================================================== */
 
 #ifndef PC98_PLATFORM_BOOT_LAYOUT_H

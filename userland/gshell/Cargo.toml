@@ -33,7 +33,7 @@ gf_accel_accept = []
 # global_allocator を単一実体で供給する。
 os32api = { path = "../../sdk/rust/os32api" }
 # T7b-b3 S3: 製品の字形 engine (reader / raster / glyph cache)。no_std・heap 無し、
-# in-repo (F5 から製品の依存は無し、ttf-parser は crate の試験の oracle だけ)。open/raster は kernel の
+# in-repo (F5 から製品の依存は無し)。open/raster は kernel の
 # font_guard_run (service 表 v2) の callback の中でだけ呼ぶ (src/font.rs)。
 os32-font = { path = "../lib/font" }
 

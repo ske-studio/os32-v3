@@ -22,4 +22,4 @@
 
 ## 確かめ
 
-- `tools/tests/test_host_notify.py` (窓・再送・沈黙と解除)・`test_hostsvc_services.py`・`test_remote_g2.py`・`test_remote_x3.py` (操作口の予約番号での送り)。
+- `test_host_notify.py (旧版 f4c33bc46412)` (窓・再送・沈黙と解除)・`test_hostsvc_services.py`・`test_remote_g2.py`・`test_remote_x3.py` (操作口の予約番号での送り)。

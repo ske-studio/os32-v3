@@ -13,7 +13,7 @@
 | 第 3 段 C1・C2・D1・D2・D3 | 文脈・起動引数・syscall | main |
 | 第 3 段 E2・E3 | syscall の番号と callback | main (一括受入、2259debc) |
 | 第 3 段 F・第 4 段 F | 全段の後の実測と記録 (製品コードは触らない) | 済 (2026-11-10、下の「実測」) |
-| 第 4 段 A・B・C・D・E | 型の幅・配置・モジュール、PPC の型・配置の検査の入口 (tools/ppc/check_layout.py) | main |
+| 第 4 段 A・B・C・D・E | 型の幅・配置・モジュール、PPC の型・配置の検査の入口 (check_layout.py (旧版 36f76cb85c39)) | main |
 | 第 5 段 A・D1・D2・E・F | コピーの原始操作、WC と GeForce の受入の CPU 部、SQLite の診断、boot の拒否 | main |
 | 第 5 段 B1・C2・B2 | palette・IME の TVRAM・scroll を PC98 の表示 backend へ | main (一括受入、2259debc)。B2 の hardware scroll の +1 行の観測は未確認 (観測用アプリ hwscroll_probe が NP21/W で期待どおりに映らない、main でも同じ画面) |
 | 第 5 段 B3・C3 | planar の初期化を PC98 の表示 provider へ、boot の IME の facade (sys/include/ime_boot.h) | main (92cb185e、NP21/W の最小受入と B3 の 6 画面の比較は合格) |
@@ -52,7 +52,7 @@
 
 x86 の受入で未確認のまま残る物: B2 の hardware scroll の +1 行 (上の表)、flip を使わない同期の present (B6)、Cirrus・GeForce・Trident の選択と予約の経路 (NP21/W の標準構成では通らない。host の試験が見ている)、v86 の往復での console (C1)。
 
-PPC の型・配置は `python3 -B tools/ppc/check_layout.py` で確かめる (第 4 段 E)。本体の link と起動は票 TASK_PPC_KBOOT。
+PPC の型・配置は 旧手順（493a279c4288 の記録） で確かめる (第 4 段 E)。本体の link と起動は票 TASK_PPC_KBOOT。
 
 **本体接続は案 D とし、案 B には着手しない。分離は実際に甘く、MMU 外の33件も直す。**
 今の ppc-mmu は案 C を続け、`sys/include/cpu.h` は変えず、context 操作は `sys/arch/ppc/ppc_pmap.h` の `ppc_*` に閉じる。

@@ -43,4 +43,4 @@
 
 ## 検査
 
-`tools/tests/test_edit_doc.py` (`make check-edit-doc-host`、`--mutate` 付き)。実物を `#[path]` で取り込み (`userland/rust/libos32gui/host/textcore_tests.rs`)、`static_checks()` が上の textbox の配線と番号を静的に見る。`draw.rs` の `decode_glyph` は完全な多バイト列の幅を `cols_at` で決める (末尾で切れた列は幅 0 で描画を止める)。
+`test_edit_doc.py (旧版 985925016e7d)` (`make check-edit-doc-host`、`--mutate` 付き)。実物を `#[path]` で取り込み (`textcore_tests.rs (旧版 35e6290159cb)`)、`static_checks()` が上の textbox の配線と番号を静的に見る。`draw.rs` の `decode_glyph` は完全な多バイト列の幅を `cols_at` で決める (末尾で切れた列は幅 0 で描画を止める)。

@@ -215,7 +215,7 @@ const char *shell_get_path(void)
 /*  コマンドの起動経路 (has_ext / has_slash / try_exec /                     */
 /*  try_exec_from_path / sh_is_cui_only / run_cmd_internal) の実体。         */
 /*  ホスト試験がそのまま #include できるように別ファイルにしてある            */
-/*  (tools/tests/sh_truncation_host.c)。並びは切り出す前と同一。             */
+/*  (sh_truncation_host.c (旧版 e16688ff4188))。並びは切り出す前と同一。             */
 /* ======================================================================== */
 #include "sh_exec.inc"
 

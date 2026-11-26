@@ -493,7 +493,7 @@ userland/diag/cfg_bench.elf: sdk/link/app.ld $(CRT0_OBJ) userland/diag/cfg_bench
 #
 # **出荷するソースそのもの**を測る。写しは作らない。sys/kern/kstring_asm.asm と
 # sys/kern/kstring_c.c は 13 本すべてが同名なので 1 つの実行ファイルに入らない。
-# tools/tests/test_kstring_c.py と同じ手で objcopy --redefine-syms に
+# objcopy --redefine-syms に
 # 接頭辞を付けさせ、アセンブリ版を a_*、C 版を c_* にして同居させる
 # (libc の memcpy / strlen 等とも衝突しなくなる副産物つき)。
 #

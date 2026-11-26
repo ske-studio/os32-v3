@@ -22,4 +22,4 @@
 
 ## 検査
 
-`tools/tests/test_shm_user.py`。
+`test_shm_user.py (旧版 90c5181c7d63)`。

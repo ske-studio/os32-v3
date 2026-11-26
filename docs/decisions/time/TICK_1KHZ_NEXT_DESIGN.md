@@ -218,7 +218,7 @@ typedef struct { u32 id, delay_us, next_lo, next_hi; MMT_CB cb; u32 user, missed
 | A2-c6 | sys/kern/sys.c・sys/kern/exec/exec_schedule.inc・sys/platform/pc98/input/kbd.c (呼ぶ所、各 1 段) | 変 | +1・+1・+3 | c2 |
 | A2-c7 | sys/net/link.c (`LINK_IDLE`) | 変 | +2 | c2 |
 | A2-c8 | sys/net/nic.c (`net_tx` の後の idle_work_run) | 変 | +2 | c2 |
-| A2-t1〜t2 | tools/tests/tick_budget_host.c・ne2k_bh_host.c (故障注入) | 新 | 130・150 | b2・c4 |
+| A2-t1〜t2 | tick_budget_host.c (旧版 103981ce6fa4)・ne2k_bh_host.c (故障注入) | 新 | 130・150 | b2・c4 |
 | C1〜C3 | tick_clock の口・x86 の 100Hz の結線・host 試験 ([TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §5-1) | 新・変 | — | 先 |
 | B1 | sys/include/memmap.h (`#ifndef PIT_IRQ_HZ` → 100)。`OS32_TICK_HZ` と assert は C1・C2 | 変 | +3 | C2 |
 | B5 | sys/platform/pc98/pit_math.c + `test_pit_clock.py` のアンカー | 変 | +15・+6 | B1 |
@@ -234,7 +234,7 @@ typedef struct { u32 id, delay_us, next_lo, next_hi; MMT_CB cb; u32 user, missed
 | S1 | sys/hal/sound/snd_wake_tick.c (§3-5) | 新 | 50 | C1、hal-av の V0 |
 | G1〜G2 | userland/gshell/src/poll_clock.rs・multiapp.rs | 新・変 | 25・+4 | 独立 |
 | W1〜W4 | userland/lib/mmtime/mmtime.h・mmtime_clock.c・mmtime_event.c・mmtime_sleep.c | 新 | 50・70・170・45 | W1 が先 |
-| W5〜W7 | build/libs.mk・sdk.mk / tools/tests/mmtime_host.c・test_mmtime.py / userland/diag/mmtimetest.c。libmmtime・mmtimetest の規則は profile の旗と `\| $(ABI_CONTRACT_ORDER)`、W5 の受入に `check-type-contract` (末尾の追記) | 変・新 | 12 / 260・150 / 120 | W2〜W4 |
+| W5〜W7 | build/libs.mk・sdk.mk / mmtime_host.c (旧版 fa0ef4c06a31)・test_mmtime.py / userland/diag/mmtimetest.c。libmmtime・mmtimetest の規則は profile の旗と `\| $(ABI_CONTRACT_ORDER)`、W5 の受入に `check-type-contract` (末尾の追記) | 変・新 | 12 / 260・150 / 120 | W2〜W4 |
 | W8 | 互換層の winmm | 新 | 150 | 置き場が決まってから |
 
 ## 6. 受入 → 試験・変異 (無変異で exit 0、変異 1 行で exit 1)
@@ -277,7 +277,7 @@ typedef struct { u32 id, delay_us, next_lo, next_hi; MMT_CB cb; u32 user, missed
 - 第 3 回のレビューは「設計票は確定してよい」。直しなし。B・U・tail の数値は段 A2 の計測のゲートで確定する。
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
-- **第 4 段 B の型の契約 (§5 の W5・W7・B17)**: `build/abi_contract.mk` が probe の order-only を製品の object 一覧と `userland/{cmds,tests,system}` の直の object に付け、`build/libs.mk` の共通の規則・各ライブラリの規則に `| $(ABI_CONTRACT_ORDER)` が付いた。`tools/tests/test_type_contract.py` は `make -n -B` の全 C の呼出しの char/enum の旗と probe の前提を検査する (covers `build/**/*.mk`、解析できない呼出しは fail closed)。W5 の libmmtime の規則・W7 の mmtimetest・B17 の `TICK1K=1` の別像は、既存の macro の規則を使えば自動で掛かる。手書きの recipe なら profile の旗と `| $(ABI_CONTRACT_ORDER)` を付ける。`check-type-contract` を W5・B17 の受入に加える。
+- **第 4 段 B の型の契約 (§5 の W5・W7・B17)**: `build/abi_contract.mk` が probe の order-only を製品の object 一覧と `userland/{cmds,tests,system}` の直の object に付け、`build/libs.mk` の共通の規則・各ライブラリの規則に `| $(ABI_CONTRACT_ORDER)` が付いた。`test_type_contract.py (旧版 efd9edd10ae7)` は `make -n -B` の全 C の呼出しの char/enum の旗と probe の前提を検査する (covers `build/**/*.mk`、解析できない呼出しは fail closed)。W5 の libmmtime の規則・W7 の mmtimetest・B17 の `TICK1K=1` の別像は、既存の macro の規則を使えば自動で掛かる。手書きの recipe なら profile の旗と `| $(ABI_CONTRACT_ORDER)` を付ける。`check-type-contract` を W5・B17 の受入に加える。
 - **PowerPC でも組む (§5 の C1・A2-b3・A2-c6)**: `sys/hal/time/tick.c`・`sys/kern/irq/tick.c`・`sys/kern/sys.c` は PowerPC の像に入る共通のソース。新しいヘッダ `tick_clock.h` (`kernel/time/`)・`tick_budget.h`・`idle_work.h` は `kernel/` に置き、`arch/x86/`・`platform/pc98/`・`drivers/` のヘッダを include しない (include すると層の検査 `tools/check_layers.py` が止める)。tick_clock の置き場は [TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §3。
 
 ### S1 の PM 決定 (2026-11-21)

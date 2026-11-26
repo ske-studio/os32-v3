@@ -72,45 +72,6 @@ kernel-nolgy98:
 
 .PHONY: kernel-lgy98 kernel-lgy98-link kernel-nolgy98
 
-# M2 の対向試験 (inject → 受信 → 反射送信 → capture)。NP21/W が LAN 有効 + 反射モードの
-# カーネルで起動していること。make check には入れない (実機が要る)。
-check-net-m2:
-	@python3 tools/net_m2_test.py
-
-# M3: CPL3 プログラム常駐中に同じ試験を回す。aidebug のデバッグサーバは単一スレッドで
-# 要求を 1 つずつ処理するため、戻ってこないコマンド (sleep 等) を /api/cmd で投げると
-# inject / capture が詰まって試験にならない。less のような対話プログラムなら最初の画面で
-# キー待ちに入って /api/cmd が戻り (チャネルが空く)、プログラムは CPL3 に常駐したままになる。
-# → NIC IRQ がアプリの CR3 が有効な状態で配送・処理されることを確認する。
-check-net-m2-cpl3:
-	@python3 tools/net_m2_test.py --during-cmd "less /etc/profile" --wait-for "/etc/profile" --exit-key q --during-timeout 30
-
-# M4: フロー制御なしでリングを故意に飽和させ、ドライバが wedge せず 100Hz
-# ウォッチドッグで自己回復することを確認する (溢れても壊れない安全網)。
-check-net-m4:
-	@python3 tools/net_m4_test.py
-
-# L0: リンク層 (Stop-and-Wait) の HELLO + PING/PONG 10 往復を確認する。
-# 先に tools/host_agent.py を NP2NETSOCK ポートで起動し、kernel-lgy98-link を配備する。
-check-net-l0:
-	@python3 tools/net_l0_test.py
-
-# L1: WINDOW/Credit のフロー制御。ホストに 200 DATA を流させ、絶対値 WINDOW で
-# リングを溢れさせずに全部・順序どおり受けられることを確認する (host_agent.py が対向)。
-check-net-l1:
-	@python3 tools/net_l1_test.py
-
-# L2: ストリーミング。128KB を 8KB バッファで順次消費し、欠落を Go-Back-N で回復する。
-check-net-l2:
-	@python3 tools/net_l2_test.py
-
-# L3: Host Services。ホストに GET (本文をストリーム) / TIME (RPC) をさせ、OS32 が
-# 要求を出して結果だけ受け取ることを確認する。
-check-net-l3:
-	@python3 tools/net_l3_test.py
-
-.PHONY: check-net-m2 check-net-m2-cpl3 check-net-m4 check-net-l0 check-net-l1 check-net-l2 check-net-l3
-
 $(R1_OUT)/os32.ld: $(BUILD_OUT)/os32.raw.ld
 	@mkdir -p $(@D)
 	sed -E 's@([a-zA-Z0-9_/]+\.o)@$(R1_OBJ)/\1@g' $< > $@

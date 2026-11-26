@@ -42,7 +42,6 @@ zip/TTF の SHA-256 を照合し、固定した東雲ライセンス全文を添
   python3 tools/fetch_fonts.py --zip X.zip    # 手で置いた zip から展開 (オフラインのホスト)
   python3 tools/fetch_fonts.py --print-zip-sha256   # CI の cache key 用
 
-試験: tools/tests/test_fetch_fonts.py (make check-tools-host の 1 行。ネットワーク無し)
 """
 
 import argparse

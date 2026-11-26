@@ -37,7 +37,7 @@ r1→r2 の変更
 | PC-98 側の変換 | [docs/decisions/usb/USB_DESIGN.md](../usb/USB_DESIGN.md) と `:566` が `sys/platform/pc98/input/kbd.c` の deliver と修飾状態を指す。Caps・カナを含む文字化はこの系統の責務 |
 | PPC での再利用 | PACK のリンク前提では `sys/platform/pc98/input/kbd.c` は入らない。指定範囲にその変換表本体はなく、関数名・Caps/カナの詳細動作・現在の行番号は未確認。既存変換器を呼べるとは扱わない |
 | USB サービス | [docs/decisions/usb/USB_DESIGN.md](../usb/USB_DESIGN.md) は tick slot 0 と、EE=0 の syscall 待ち中にも動く10ms単位の terminal poll。時計は timebase |
-| 今の受入 | `tools/ppc/usb_run.py` は LAN 接続待ちを削除、`settings()` は LAN byte 入力を probe に置換。`accept()` は scan ログを照合する |
+| 今の受入 | `usb_run.py (旧版 402a96233090)` は LAN 接続待ちを削除、`settings()` は LAN byte 入力を probe に置換。`accept()` は scan ログを照合する |
 
 実物との食い違いは次の4件（未調査箇所は件数に含めない）。
 - D1: PACK の「kbd_inject を経由」は現 PowerMac provider には当てはまらない。ここへ scan を注入する案は採らない。
@@ -136,9 +136,9 @@ void usbp_input_key_repeat(u8 src, u8 sc) {
 | sys/platform/powermac/input_boot.c | LAN/USB の選択、先読み、drop 照会。input_decode.c の LAN 変換は維持 |
 | sys/platform/powermac/shell_boot.c | 待ちを LAN OPEN または USB FIFO 非空に変更。最初の USB キーを保持 |
 | build/targets/ppc-powermac.mk | 上記2個の .c を sh 像だけに追加。対象の規則本体は実装時に確認する |
-| ＋tools/tests/ppc_input_usb_host.c | 状態・変換・FIFO・provider 合流の host 試験（製品関数を実行） |
-| ＋tools/checks/ver-ppc-input-usb.py | host の実行と一意な変異。CHECK に全製品入力・header・試験本体を列挙 |
-| tools/ppc/usb_run.py / sc_run.py | 製品像の sh 受入を追加、既存 probe と LAN 遅延起動受入を保持。下記4本の anchor と件数検査を追従。CHECK の入力・covers を追従 |
+| ＋ppc_input_usb_host.c (旧版 d58b71db6a29) | 状態・変換・FIFO・provider 合流の host 試験（製品関数を実行） |
+| ＋ver-ppc-input-usb.py (旧版 b7cf31327e4f) | host の実行と一意な変異。CHECK に全製品入力・header・試験本体を列挙 |
+| usb_run.py (旧版 402a96233090) / sc_run.py | 製品像の sh 受入を追加、既存 probe と LAN 遅延起動受入を保持。下記4本の anchor と件数検査を追従。CHECK の入力・covers を追従 |
 | `docs/tasks/DEFERRED_TESTS.md` | §6のカナ・IME延期行を実装時に登録 |
 | `docs/decisions/ppc/PPC_SHELL_SC_DESIGN.md` | 入力・起動待ち・受入の正本を本設計へ更新（実装時） |
 
@@ -164,8 +164,8 @@ void usbp_input_key_repeat(u8 src, u8 sc) {
 - 入力・起動経路は製品のまま、観測用像の console_stream serial mirror への印と chunk 境界追加だけを許可する。置換を伴う既存 stall/probe 試験は別の受入として表示する。
 - 各変異は置換元が1箇所と確認し、到達印と意味上の不一致を観測する。compile失敗・単なる時間切れは RED の代用にしない。
 - `usb_run.py` の invert-key はログ引数が anchor。転送追加後は製品の `pm_input_usb_key(src,sc,down)` 呼出しへ anchor を移し、ログだけ反転する試験を残さない。
-- 実装時に変更行への既存変異を tools/tests まで検索し追従。host の --mutate、USB の --cpu both --mutate と --lan --mutate を前景で完走する。
-- 実装後は所定 preflight、make all と PowerPC sh 像、変更対象の試験、`python3 -B tools/checks/run.py --lint`。check-changed／全変異は実行しない。
+- 実装時に変更行への既存変異を 旧ホスト試験 まで検索し追従。host の --mutate、USB の --cpu both --mutate と --lan --mutate を前景で完走する。
+- 実装後は所定 preflight、make all と PowerPC sh 像、変更対象の試験、旧手順（49408a026769 の記録）。check-changed／全変異は実行しない。
 - AF_INET 不可の LAN 受入、QEMU/ROM 不足は理由付き SKIP。GREEN に数えず、実機 PowerMac の確認は別の残作業として報告する。
 - 今回は設計だけなので preflight --fix-fonts・build・試験は未実施。PACK の読取専用指定に従い、リポジトリは変更しない。
 

@@ -1,4 +1,4 @@
-# tools/tests/test_splash_wire.py — 結合試験と変異
+# test_splash_wire.py (旧版 1a5727f53cbf) — 結合試験と変異
 
 状態: **現行 (2026-11-01)**。
 

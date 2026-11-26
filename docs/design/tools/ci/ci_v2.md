@@ -100,7 +100,7 @@ ci_fetch の既定は VERIFIED 以上。`--allow-built` は実機調査向け。
 
 P3 の移動で check・build・sep・selfhost-probe の起動を止める。新 CI は新登録だけを実行する。P7-4 では P0-4 の保存値と新 CI の所要・件数を [gate.md](gate.md) に記録する。
 
-A7 後の P7-2 で片付ける旧部品は計 21。check・build・sep・selfhost-probe の全 13 ジョブ、旧実行入口 tools/checks/run.py と tools/ci/gate.py、ppc_scope.py、reuse_success.py、環境導入の 4 action（build-setup、gate-setup、ppc-setup、static-setup）が対象となる。land_gate.py と ci_fetch は新しい結果を読む。
+PC-98 と PowerMac のビルド環境は build-setup と ppc-setup が用意する。land_gate.py と ci_fetch は restructure-build の結果を読む。
 
 ## §8 取り込み SHA の固定
 

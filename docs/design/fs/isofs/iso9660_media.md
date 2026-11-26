@@ -21,4 +21,4 @@ ISO の読みとキャッシュの寿命そのものは [iso9660](iso9660.md)。
 
 ## 確かめ
 
-- `tools/tests/test_hostsvc_media.py` (`hostsvc_media_host.c`: キャッシュの hit の直前の像の差し替えで旧い PVD・ディレクトリを返さず載せ直す、ATAPI の回帰)。
+- `test_hostsvc_media.py (旧版 be4ac6ff194e)` (`hostsvc_media_host.c`: キャッシュの hit の直前の像の差し替えで旧い PVD・ディレクトリを返さず載せ直す、ATAPI の回帰)。

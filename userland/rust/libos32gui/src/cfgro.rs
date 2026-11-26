@@ -99,7 +99,7 @@ pub use crate::cfgabi::CfgDb;
 ///
 /// **C 側の実名は `os32_kapi_v89`** (生成ヘッダの `#define kapi
 /// OS32_KAPI_CRT_SYMBOL`、票 TASK_KAPI_DATA_FIELDS)。`sdk/kapi.json` の
-/// `crt_kapi_symbol` と一致していることを `tools/check_kapi_version.py` が見る。
+/// `crt_kapi_symbol` と一致していることを `check_kapi_version.py (旧版 92a5385ec871)` が見る。
 #[allow(non_upper_case_globals)]
 #[export_name = "os32_kapi_v89"]
 pub static mut kapi: *mut core::ffi::c_void = core::ptr::null_mut();

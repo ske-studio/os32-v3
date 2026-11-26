@@ -4,7 +4,7 @@
 
 ゲストの試験プログラムが合否を機械に読める形で返すための約束事。管理元はこのヘッダ 1 本で、
 読む側はゲスト一括実行のランナー `tools/guest_tests.py` (定数を同じ値で持つ)。
-試験は `tools/tests/test_result_conv.py` (実物の試験プログラムを贋の KernelAPI で走らせ、出た行と `main` の戻り値を同じ場面で見る)。
+試験は `test_result_conv.py (旧版 ee31b3c3405f)` (実物の試験プログラムを贋の KernelAPI で走らせ、出た行と `main` の戻り値を同じ場面で見る)。
 
 ## 1. 終了コード
 

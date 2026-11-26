@@ -31,5 +31,5 @@
 
 ## 検査
 
-- `tools/tests/test_osri_profile.py` (osri-profile): 正典の読み取り、CLI の振り分け、無指定 = 明示 B31 の 1 本の出力。
-- `tools/tests/test_osri.py`・`test_osri_enc2.py`・`test_osri_enc2_core.py` もこのヘッダを covers に持つ。
+- `test_osri_profile.py (旧版 158bfa11af3e)` (osri-profile): 正典の読み取り、CLI の振り分け、無指定 = 明示 B31 の 1 本の出力。
+- `test_osri.py (旧版 5d240bea3019)`・`test_osri_enc2.py`・`test_osri_enc2_core.py` もこのヘッダを covers に持つ。

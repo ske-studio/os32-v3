@@ -72,7 +72,7 @@ Trident の host 試験は libc なしの ILP32 実行形式を qemu-i386 で動
 部品ごとの独立した手本の trace を使い、幅・順序・値・RMW の保持ビットを検査する。
 ScreenInit の初回/反復、active EnterVT、leave/close、失敗後の再試行、容量全表、present の画像/端/範囲を確認する。
 新しい blank/viewport/video/DPMS は各手順の変異をコンパイルし、実行時 RED を確認する。
-`make all`、Trident host の変異なし実行、追加・変更試験の `--mutate`、`tools/checks/run.py --lint`、差分の空白検査を行う。
+`make all`、Trident host の変異なし実行、追加・変更試験の `--mutate`、旧手順（e528483c7736 の記録）、差分の空白検査を行う。
 全体の検査・全体の変異は今回の範囲外。実機表示、VSYNC 待ち、復帰品質は host だけでは確認できない。
 実機での冷間起動、再入場、98 文字の復帰、10往復、所有者終了/fault/STOP、写真・serial・版 hash の記録は PM の受入に残る。
 

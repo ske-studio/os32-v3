@@ -107,17 +107,17 @@
 |---|---|---|
 |W4a1|`docs/decisions/ARCH_COMPAT_CONTRACT.md`・`docs/decisions/ppc/PPC_NOTES.md`（2）/160|本設計を正典化。CTX、AC-SYNC-2 PPC列、既存W3との関係、USER syscallのEE/tick記述を更新。実装未適合を明記|
 |W4a2|`docs/decisions/IO_TIER_DESIGN.md`・`docs/decisions/network/LAN_BULK_DESIGN.md`（2）/160|W4a1後、§4の全対象（IO_TIER R1・set/get/reset・P1・試験、LAN F4を含む）を更新。N4/Jと入口FG1契約を整合|
-|W4b|新 `tools/tests/arch_ctx_host.c`・新 `tools/tests/test_arch_ctx.py`（2）/380|実 trap C を fake MSR/IRQ で組む共通契約vector。EE切替・入口拒否・復帰、CHECK inputs/covers/変異。新契約のREDを確認|
-|W4c|`kernel_vectors.S`・`kernel_trap.c`・`kernel_dec.c`（3、全てarch/ppc）/120|arch-ctx-host `tools/tests/test_arch_ctx.py` の PRE_W4C を切り替え、EE 許可後の成功と control を検証。上記 enable/出口/深さを一括変更。W4bと既存trap/DEC試験を実行。W4f・W4gと同じ統合の枝に積む（単独では既存の深さの試験が赤になり得る）。下記host stub追従も完了条件とし、ゲスト受入まではP3へ接続しない|
-|W4d|`sys/kern/exec/exec_syscall.inc`・`sys/kern/idle_work.h`・既存 `tools/tests/test_exec_syscall_fgpoll.py`（3）/100|共通注記/期待を整合。x86・PPCとも入口で仕事1巡、無効文脈と再入は仕事なし|
-|W4e|新 `tools/accept/arch_ctx_probe.c`・新 `tools/accept/arch_ctx.py`（2）/380|ppc-usb `tools/ppc/usb_run.py` は syscall 中の IRQ 進行・USB 継続を期待し、`tools/checks/ppc-usb.py` の登録も追従。両arch共通の観測列。QEMU/NP21/Wで下表を判定。PPCの32KB stack（`arch/ppc/platform_kboot_layout.h:29`）は、syscall内でnet_rx_idle等が動くため最大使用量を測り、境界を越えないことを確認。probeのカーネル組込は下記4か所を補助段で追従|
-|W4f|既存trap/DEC/idle試験とharness（各補助段1〜3）/各≤300|kboot-dec `tools/ppc/kboot_dec_host.c` の `tick_callback()` は実 dispatcher → DEC の深さ 1 → 0 を検証し、`tools/ppc/kboot_dec.py` の変異も移す。EE=0固定やDEC二重深さを期待する試験を新契約へ。変えた行の mutation anchor を rg で探し移動、一意・runtime RED|
+|W4b|新 `arch_ctx_host.c (旧版 4424887ee658)`・新 `test_arch_ctx.py (旧版 84e85f180a0d)`（2）/380|実 trap C を fake MSR/IRQ で組む共通契約vector。EE切替・入口拒否・復帰、CHECK inputs/covers/変異。新契約のREDを確認|
+|W4c|`kernel_vectors.S`・`kernel_trap.c`・`kernel_dec.c`（3、全てarch/ppc）/120|arch-ctx-host `test_arch_ctx.py (旧版 84e85f180a0d)` の PRE_W4C を切り替え、EE 許可後の成功と control を検証。上記 enable/出口/深さを一括変更。W4bと既存trap/DEC試験を実行。W4f・W4gと同じ統合の枝に積む（単独では既存の深さの試験が赤になり得る）。下記host stub追従も完了条件とし、ゲスト受入まではP3へ接続しない|
+|W4d|`sys/kern/exec/exec_syscall.inc`・`sys/kern/idle_work.h`・既存 `test_exec_syscall_fgpoll.py (旧版 c091864dbf2e)`（3）/100|共通注記/期待を整合。x86・PPCとも入口で仕事1巡、無効文脈と再入は仕事なし|
+|W4e|新 `arch_ctx_probe.c (旧版 714e47ed6ec6)`・新 `arch_ctx.py (旧版 73f25956448a)`（2）/380|ppc-usb `usb_run.py (旧版 402a96233090)` は syscall 中の IRQ 進行・USB 継続を期待し、`ppc-usb.py (旧版 47822a842815)` の登録も追従。両arch共通の観測列。QEMU/NP21/Wで下表を判定。PPCの32KB stack（`arch/ppc/platform_kboot_layout.h:29`）は、syscall内でnet_rx_idle等が動くため最大使用量を測り、境界を越えないことを確認。probeのカーネル組込は下記4か所を補助段で追従|
+|W4f|既存trap/DEC/idle試験とharness（各補助段1〜3）/各≤300|kboot-dec `kboot_dec_host.c (旧版 6298ca8596fe)` の `tick_callback()` は実 dispatcher → DEC の深さ 1 → 0 を検証し、`kboot_dec.py (旧版 8d5313fc0345)` の変異も移す。EE=0固定やDEC二重深さを期待する試験を新契約へ。変えた行の mutation anchor を rg で探し移動、一意・runtime RED|
 |W4g|非局所出口/共有状態の限定修正（棚卸し後に実ファイル指定、各1〜3）/各≤400|W4c接続前ゲート。確かめるだけで済む見込み（根拠は下記）だが段は残す。必要な修正なしの場合も根拠を記録。未確認のまま段を閉じない|
 |W4h|P3/IO_TIER/LAN側の既存担当段（各1〜3）/各≤400|W4c〜gの両arch受入後に接続。重複EE窓を作らず、待ちと予算の元試験を保持|
 
 - PPC の IRQ handler からは、非局所の出口 (longjmp・kill・exec_pending_transfer) を出さない。.Ltrap_busy が残り、次の PR=0 の IRQ が fatal になるため。
 - W4gの見込みの根拠: longjmpの着地 `sys/kern/exec/exec_launch.inc`・`sys/kern/exec/exec_schedule.inc` は _enable、PPCのsetjmp.Sは深さを復元する。IRQ frameはtrap slotでexec_kernel_spを読まない。arch_entry_enter・arch_user_resumeは先にppc_irq_save（`sys/arch/ppc/exec_enter.S`・`sys/arch/ppc/exec_resume.S`）。x86もsys_exitでIF=1のまま同じ着地へ進む。これらは確認を省く根拠ではなく、追加修正が不要と見込む根拠。
-- W4cの完了条件: kernel_trap.cを組むhost試験 `tools/ppc/test_user_trap_host.c`・`tools/ppc/kboot_dec_host.c`・`tools/tests/ppc_hostfs_io.c` に ppc_enable/ppc_irq_save のstubを用意する（ROLES §4-3）。追従はW4fの補助段に割り当て、W4cと同じ統合枝で検証する。
+- W4cの完了条件: kernel_trap.cを組むhost試験 `test_user_trap_host.c (旧版 82f6eb306688)`・`kboot_dec_host.c (旧版 6298ca8596fe)`・`ppc_hostfs_io.c (旧版 39d06743772f)` に ppc_enable/ppc_irq_save のstubを用意する（ROLES §4-3）。追従はW4fの補助段に割り当て、W4cと同じ統合枝で検証する。
 - W4eでprobeをカーネルへ組み込む場合は order.mk・common.mk・build_profile_x86.json・build/targets/ppc-powermac.mk の4か所を追従する。補助段は前2ファイル/後2ファイルの各2ファイル・各≤80行とし、1段3ファイル上限を守る。
 
 |試験/契約|受入の観測（ゲストはPM担当）|一意anchorの変異・RED条件|
@@ -130,7 +130,7 @@
 |P3接続、QEMU両CPU＋NP21/W|SH起動・通常syscall・LAN待ちでRX/期限が進む。LAN既存内容照合/遅延試験は維持|waitのfg_service欠落、IO_WAITでHLT、再入step実行→期限/内容/予算違反|
 
 - host は実 C の判定を確認し、assembly 入れ子・rfi/iret の合格を代用しない。QEMU は 7450 と 7455 の双方、x86 は NP21/W のログを独立に要求する。
-- 実装者は対象像（x86 kernelとPPC SHを含む）の指定ビルド、変更試験 `--mutate`、`python3 -B tools/checks/run.py --lint`。取り込みの全checkはCI、全変異はfull-check。check-changedは使わない。
+- 実装者は対象像（x86 kernelとPPC SHを含む）の指定ビルド、変更試験 `--mutate`、旧手順（b895ad1e29f5 の記録）。取り込みの全checkはCI、全変異はfull-check。check-changedは使わない。
 - 本稿は設計のみのため preflight --fix-fonts・ビルド・host・lint・変異・QEMU・NP21/W はすべて未実施。作業木への書込み禁止を優先し、適合合格は宣言しない。
 
 ## 7. 未決

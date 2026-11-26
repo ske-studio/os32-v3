@@ -189,9 +189,9 @@ data_off = 8 + 4 * layout["func_capacity"]
 
 |段・担当|新規／変更と目安|段の完了条件|
 |---|---|---|
-|1 本線|変更 tools/check_kapi_abi.py 70、tools/tests/test_kapi_abi.py 65|旧 JSON 基点の復元、x86 の負例を先に固定|
+|1 本線|変更 check_kapi_abi.py (旧版 9b17682e1660) 70、test_kapi_abi.py (旧版 e7c87ea23d6c) 65|旧 JSON 基点の復元、x86 の負例を先に固定|
 |2 本線|新 sdk/kapi_layout_x86.json 約350、変更 sdk/kapi.json 40、gen_kapi.py 100、kapi_rust_gen.py 25|x86 公開値・製品が一致。PPC 切替前は従来出力|
-|3 本線|変更 tools/tests/test_arch_compat.py 65、docs/KAPI_SPEC.md 30、ARCH_COMPAT_CONTRACT.md §4.2・§9 約10|両ターゲットを名前で検査。文書は docs-1124g を基準に統合|
+|3 本線|変更 test_arch_compat.py (旧版 feb27053b188) 65、docs/KAPI_SPEC.md 30、ARCH_COMPAT_CONTRACT.md §4.2・§9 約10|両ターゲットを名前で検査。文書は docs-1124g を基準に統合|
 |4 PPC|変更 sdk/kapi_layout_ppc.json 約325、変更 sdk/kapi_target_ppc.py 40、gen_kapi.py 120、kapi_rust_gen.py 45|compact 表・SDK ビュー・init/invoke を専用出力へ生成|
 |5 PPC|変更 arch/ppc/{exec_kapi.c,kapi_table.h,syscall_code.c} 各10〜30、PPC crt 40、exec の trampoline/launch/finish 各15〜30|SDK と製品を一緒に切替、独自 crt と親子復帰も確認|
 |6 PPC|変更 sdk/{os32x_hdr.py,mkos32x.py} 各25、sys/kern/exec/os32x_hdr.c 15、tools/ppc/test_kapi_{table,binding}.py 各60|機種別世代・刻印・実結線。4〜6 は製品切替まで同じ統合系列で検査|
@@ -199,7 +199,7 @@ data_off = 8 + 4 * layout["func_capacity"]
 |8 PPC|変更 platform/powermac/{platform_kboot_layout.h,kernel_boot.c,kboot_reserve.c,memory.c} 各20〜55、sys/arch/ppc/kernel.ld 25|guard・PD/PT・HPT の予約と walk を新配置に切替|
 |9 PPC|変更 sdk/link/ppc/app_sys.ld 15、sys/kern/exec/exec_launch.inc 20、tools/ppc/{kboot_accept.py,kboot_layout.py} 各60|機種の shell VA と新 memory 世代を梱包・受入へ反映。8 と同時に旧像を隔離|
 |10 PPC|変更 tools/{mkmod.py,ppc/root_pair.py} 各50〜90、build/targets/ppc-powermac.mk 40、module_pair.c 45、kernel/module/{module_schema.h,module_image.c} 各25|§5 の製品 ID・新形式・媒体別最終リンクを導入、KDEBUG 8 位置を維持|
-|11 PPC|変更 tools/accept/ppc_module.py 50、対応 tools/checks/ 登録各5〜15、PPC の KAPI_FILL・SHELL_ALIGN・MODULE_ALIGN 設計に各10〜20|各変異が意図した箇所で落ち、製品シェルと部品が起動|
+|11 PPC|変更 ppc_module.py (旧版 5d821c86e05a) 50、対応 旧検査登録 登録各5〜15、PPC の KAPI_FILL・SHELL_ALIGN・MODULE_ALIGN 設計に各10〜20|各変異が意図した箇所で落ち、製品シェルと部品が起動|
 
 - 段2で sdk/kapi_layout.py の resolve(target) が共通定義と対象台帳を検証・結合する。Make・shell も同関数の CLI を呼ぶ。PPC には段2で旧配置の暫定台帳を置き、段4で更新する。移行前基点の変換は履歴 blob に限定する。
 - 読み手（生成・検査）: gen_kapi、kapi_rust_gen、gen_kdebug_imports の ABI_SYMBOL、gen_generation_manifest、gen_memmap、check_kapi_abi、check_kapi_version の main/check_layout/check_spec_table、test_kapi_layout の変異入力。文書の使用端は x86 順の 8+4×slot数。
@@ -213,7 +213,7 @@ data_off = 8 + 4 * layout["func_capacity"]
 - 段4〜6で build/ppc-user.mk の一般 app・resident shell・独自 asm 入口の C/asm include、世代定数、crt、app.ld/app_sys.ld、梱包ツールと世代表を同じ PPC out-dir に結ぶ。compile/link/pack の各規則に消費する生成物を前提登録し、depfile・link map・梱包入力と台帳 touch 後の make trace で旧木への fallback と再生成漏れを検出する。
 - 段6で build/sdk.mk が配る SDK だけを隔離先に置き sdk/example/hello と木内試験アプリをビルド・梱包する。x86 SDK へ PPC ELF を渡すと失敗する。外部 apps/・game/ は H-7 再開時の受入とする。
 - §5 の HDD 組立では tools/ppc/install_packages.py に PPC 台帳由来の版を明示入力し、BOOT・MINIMAL に記録する。PPC 版だけ変更し両パッケージを再生成・復号して版の追従と x86 版の維持を検査する。
-- 段4〜6で PPC 部品 mkmod の版・layout-gen の供給を PPC 台帳からの生成値へ切替える。各変更段で tools/checks の covers・host/accept 登録と旧 wrap・番地・pair CRC 比較に依存した変異アンカーを対応する SDK 呼出し・機種区間・全長比較に更新する。
+- 段4〜6で PPC 部品 mkmod の版・layout-gen の供給を PPC 台帳からの生成値へ切替える。各変更段で 旧検査登録 の covers・host/accept 登録と旧 wrap・番地・pair CRC 比較に依存した変異アンカーを対応する SDK 呼出し・機種区間・全長比較に更新する。
 - 段11は① T8 の両媒体から通し起動し、製品シェル再起動、一般アプリと親復帰、KDEBUG・FEP の公開、HDD の異常終了経路、旧 x86 SDK 像と再現 cmp までを受入とする。
 - 段4〜6、8〜9は個別に生成・host 検査し、全経路が揃った切替点でのみ製品既定にする。旧受入像と新 SDK の混在を配布しない。
 - 各段で同一 toolchain、設定、固定した OS32_BUILD_COMMIT・SOURCE_DATE_EPOCH、submodule revision の PC-98 基準ビルドと clean ビルドを別出力に生成して cmp する。
@@ -254,10 +254,10 @@ data_off = 8 + 4 * layout["func_capacity"]
 本節は §2・§8 の該当の記述より優先する。
 
 - **S3-1 (sol P1・§2/§8 段 6 — 72 B のヘッダの読み込み側):** 今の `sys/kern/exec/exec_launch.inc` と `sys/kern/exec/os32x_hdr.c` は共有の `OS32X_HDR_SIZE=64` を使う。機種ごとの生成値を、読み込みのバッファ・読み込み長・デコード・形式の検査まで通す。受入に PowerPC の 72 B の正例と、64〜71 B で切れた負例を足す。x86 は 64 のまま (生成物は不変)。
-- **S3-2 (sol P2・N1/N3・§8 段 2):** 読み手の一覧に `tools/tests/test_vfs_excl.py` と `tools/tests/test_hsync_h3.py` を足す (旧 JSON の版と手書きの共有ヘッダの定義を直に照合している)。x86 の解決値と生成した定義の照合に移し、検査の `covers` に新しい入力を登録する。
+- **S3-2 (sol P2・N1/N3・§8 段 2):** 読み手の一覧に `test_vfs_excl.py (旧版 263ad0ddbef7)` と `test_hsync_h3.py (旧版 fa1734b84e30)` を足す (旧 JSON の版と手書きの共有ヘッダの定義を直に照合している)。x86 の解決値と生成した定義の照合に移し、検査の `covers` に新しい入力を登録する。
 - **S3-3 (sol P2・§8、PowerPC の HDD のパッケージの版):** `build/ppc-install-boot.mk` の `$(HD_PACKAGES)` の前提に PowerPC の版の生成物を登録し、同じ値を `tools/ppc/install_packages.py` に明示の引数で渡す。受入: 版だけ変えた増分の `make` で BOOT・MINIMAL の両方が作り直される。
-- **M1 (本線 P1・§2 手順 1 — 手書きの KAPI_VERSION):** x86 では、生成した `#define KAPI_VERSION <n>` の行を、今の `sdk/include/os32/os32_kapi_shared.h` の中の生成区間に **今と同じ書式で** 置く (別のヘッダへ移さない)。これを正規表現で読む物を段 2 の読み手に載せる: `tools/nhd_deploy.py` の `tree_kapi_version`、`tools/tests/test_public_surface.py`・`test_vfs_excl.py`・`test_hsync_h3.py`・`test_ver_api.py`、`tools/gen_sdk_manifest.py`、`build/sdk.mk`、mkpkg。`tree_kapi_version` が版を読めない時は **失敗で止める** (今の `legacy_pt_guard` は None で素通りする — 旧い区画表の NHD に新しいカーネルを配る守りが黙って消えるため)。受入に「版の行が読めない木で nhd_deploy が止まる」負例を足す。
-- **M2 (本線 P3・§8 段 2 の規模):** 読み手の一覧は例示で、正は CI が集めた地点 (kapi.json を読む地点を全部集めて未登録を拒む検査) とする。少なくとも次の試験も段 2 で移す: `tools/tests` の test_hwdev_module・test_kcg_module・test_kdebug_init・test_lan_module・test_pcm_module・test_trident_module・test_v86_module・test_sqlite_module_proto・test_mkmod・test_layout_defs・test_public_surface・test_remote_x9・test_ver_accept・test_ver_api・test_vfs_excl・test_host_notice・test_hsync_h3・test_kapi_out。合成の JSON を書く試験 (test_check_times・test_kapi_abi・test_ver_api) は許可リストで扱う。段 2 の規模の見積もりはこの分だけ大きくなる。
-- **M3 (本線 P3・§8 段 2・CI):** `tools/ci/ppc_scope.py` の `LAYOUT_PATTERNS` に `sdk/kapi_layout_*.json`・`sdk/kapi_layout.py` を足す (PowerPC の台帳だけの push でも PowerPC の像の計測を回す)。`.github/workflows/check.yml` の KAPI の段の `git diff --exit-code` の対象に、新しく生成する版の定義と `os32_generations.py` の表を足す。
+- **M1 (本線 P1・§2 手順 1 — 手書きの KAPI_VERSION):** x86 では、生成した `#define KAPI_VERSION <n>` の行を、今の `sdk/include/os32/os32_kapi_shared.h` の中の生成区間に **今と同じ書式で** 置く (別のヘッダへ移さない)。これを正規表現で読む物を段 2 の読み手に載せる: `tools/nhd_deploy.py` の `tree_kapi_version`、`test_public_surface.py (旧版 5022b67f9154)`・`test_vfs_excl.py`・`test_hsync_h3.py`・`test_ver_api.py`、`tools/gen_sdk_manifest.py`、`build/sdk.mk`、mkpkg。`tree_kapi_version` が版を読めない時は **失敗で止める** (今の `legacy_pt_guard` は None で素通りする — 旧い区画表の NHD に新しいカーネルを配る守りが黙って消えるため)。受入に「版の行が読めない木で nhd_deploy が止まる」負例を足す。
+- **M2 (本線 P3・§8 段 2 の規模):** 読み手の一覧は例示で、正は CI が集めた地点 (kapi.json を読む地点を全部集めて未登録を拒む検査) とする。少なくとも次の試験も段 2 で移す: `旧ホスト試験` の test_hwdev_module・test_kcg_module・test_kdebug_init・test_lan_module・test_pcm_module・test_trident_module・test_v86_module・test_sqlite_module_proto・test_mkmod・test_layout_defs・test_public_surface・test_remote_x9・test_ver_accept・test_ver_api・test_vfs_excl・test_host_notice・test_hsync_h3・test_kapi_out。合成の JSON を書く試験 (test_check_times・test_kapi_abi・test_ver_api) は許可リストで扱う。段 2 の規模の見積もりはこの分だけ大きくなる。
+- **M3 (本線 P3・§8 段 2・CI):** `ppc_scope.py (旧版 d4d22d1c0028)` の `LAYOUT_PATTERNS` に `sdk/kapi_layout_*.json`・`sdk/kapi_layout.py` を足す (PowerPC の台帳だけの push でも PowerPC の像の計測を回す)。`.github/workflows/check.yml` の KAPI の段の `git diff --exit-code` の対象に、新しく生成する版の定義と `os32_generations.py` の表を足す。
 
 状態: **設計まで (ユーザー 2026-11-24「実装はしないでね」)**。実装の段 (x86 は本線・PowerPC は PowerPC) は起こさない。PM 決定: 同じ入力の再ビルドは同じもの (ID は ID の欄を除いて正規化した kernel ELF と全部品の ELF の 128 bit の digest)。

@@ -3,7 +3,7 @@
 /*                                                                          */
 /*  票 docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md 部品 B (§1-v2 B-5' / §1-v3)。 */
 /*  ホスト側の写しは tools/serialfs_host.py。**両方を同時に変えること** —   */
-/*  tools/tests/test_serialfs.py が C の組み立てた列を Python で読み、その  */
+/*  test_serialfs.py (旧版 3080b693e474) が C の組み立てた列を Python で読み、その  */
 /*  逆も確かめる。                                                          */
 /*                                                                          */
 /*  フレーム (両向き同じ形、数値はすべてリトルエンディアン):                */

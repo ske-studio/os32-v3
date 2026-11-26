@@ -201,7 +201,7 @@ case 7 の両形式、7b の D88/RAW 同一性、case 9 の install 逆写像・
 起動後の自動 FD read/write がゼロであることを計測し、明示した保存媒体への保存も確認する。
 抜去したまま install の入力を読めること、HDD へ導入後に同じ kernel/pair で起動することを受け入れる。
 NP21/W は先行確認とし、実機抜去受入の代替にしない。
-実装時は指定環境・preflight、`make all`、変更試験の `--mutate`、`python3 -B tools/checks/run.py --lint`。
+実装時は指定環境・preflight、`make all`、変更試験の `--mutate`、旧手順（865b5ba9d1b7 の記録）。
 ABI 変更時は `make clean`→`make all`。mutation anchor を移し、新規試験は CHECK に入力を宣言する。
 landing は GitHub CI、全 mutation は full-check。check-changed は実行しない。
 今回は読み取り計画のため preflight・build・試験・配備は未実施、ファイル変更もない。
@@ -224,7 +224,7 @@ r1→r2 の変更の数 / 反論の数：10 / 0
 ## 確定 (2026-11-12、Opus 5.5 の第 2 回の条件付き Approve を PM が反映)
 - N1 (P2): B の FD のローダの段 (PB) の詳細設計の最初の確認項目に、1MB より上への転送の候補として (a) PC-98 の BIOS の拡張メモリへのブロック転送 (INT 1Fh AH=90h とされる。[HW3] に沿ってメーカー資料で確かめる)、(b) unreal mode、(c) r2 §4 の PM への往復 (最大の見積もり) を並べ、資料で確かめられた手段で見積もり直す。
 - N2 (P2): B は kernel を 2 回持つ (外の FAT と ISO の中)。2HD は 789KB + 293KiB + ISO の丸めで使える 1168KiB にほぼ届くか超える見込み (推定)、1.44MB は収まる見込み。2 回持つのを避ける案として「v2 の img_size (sys/platform/pc98/bootinfo_wire.h) を使い、V86 より前に kernel が低位の VK32 を写して install に渡す (ISO に kernel を入れない)」を候補に足す。ユーザーへの推奨は「まず今の中身のまま B。2HD の実測で超えたらこの案か中身の削減を、容量と失う機能を示してユーザーが決める」の条件付きにする。
-- N3 (P3): MEM_BOOT_BUNDLE (sys/include/memmap.h) は「ブート必須モジュールの展開先」として T5b/T6b が使う予定の帯。W6 の root に使うなら、P2 で用途を「W6 の root」に書き換えるか STAGING (0x500000) と分けて使うかを決め、memmap.h の注釈と tools/tests/memory_boot_host.c を追従させる。
+- N3 (P3): MEM_BOOT_BUNDLE (sys/include/memmap.h) は「ブート必須モジュールの展開先」として T5b/T6b が使う予定の帯。W6 の root に使うなら、P2 で用途を「W6 の root」に書き換えるか STAGING (0x500000) と分けて使うかを決め、memmap.h の注釈と memory_boot_host.c (旧版 22e2c0e54938) を追従させる。
 - 未決の振り分け: 本線 PM 3 件 (A か B か、pair の契約、CdModuleApi の版上げ。推奨は B・pair は今のまま・fs を外して版上げ)。B はローダと boot 情報 v3 で範囲が広がるので、本線 PM が B を採る時点でユーザーに知らせる (スコープの拡大)。ユーザー 1 件 (FD の中身を削るか、N2 の条件付き)。
 
 ## 本線のレビューと決定 (2026-11-12)

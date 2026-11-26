@@ -213,19 +213,19 @@ M1・M2 は同じ ide.c・ide.h を触るので直列。PowerPC の段は本線�
 | `sys/dev/ata/ide.c`・`ide_pio.inc`・`ide_multiple.inc` | M2 | §2-1 の表の差し替え (`ide_request.inc` は I/O を持たないので触らない) |
 | `sys/dev/ata/atapi.c` | M2 | `#include "platform_ide_ports.h"` を 1 行 |
 | `platform/powermac/*`・`arch/ppc/*`・`build/platform/powermac.mk` | P1 | §6-1 |
-| `sdk/kapi_target_ppc.py`・`tools/ppc/test_kapi_binding.py` の `EXPECTED_ABSENT_SLOTS` | P2 | 公開表と期待 |
+| `sdk/kapi_target_ppc.py`・`test_kapi_binding.py (旧版 3baaeeee4857)` の `EXPECTED_ABSENT_SLOTS` | P2 | 公開表と期待 |
 
 ### 6-3 触る既存の検査と固定 (名前の grep の結果)
 
 | 変える名前 | 当たる検査・固定 | する事 |
 |---|---|---|
-| `device_ide` (置き場) | `tools/tests/test_dep_dir_a_l05a.py` の `OLD・NEW` (変異の目印 `return ide_read_sector(drv, lba, buf);`)・`_l05b`・`_l06`・`_l08`・`_l09`・`_l10`、`test_ci_stab.py`、`fixtures/build_profile_x86.json`、`fixtures/dep_dir_a/l05a.json`、`docs/design/platform/pc98/README.md` | 道の文字列を新しい置き場へ。変異の目印の行は変わらない |
-| `sys/dev/ata/ide.c`・`ide.h` (中身) | `test_ide_pio.py` (変異の目印 の PIO コマンド送信・完了待ち は `ide_pio.inc` の文。M2 で後述の 4 件を移す)・`ide_pio_host.c`・`ide_hostshim/io.h`、`test_cd_read.py の IDE ポートの試験`・`cd_read_host.c` (番地 `IDE_*` を使う)、`test_hdd_stage1.py`、`test_src_layout.py`、`test_bootinfo.py`、module の試験 約 10 本 (`tools/tests/test_fm_module.py` の `product_image`・`tools/tests/test_cd_module.py` の `product_image` ほかは名前の一覧)、`tools/prototypes/cd_imports.def`、`build/cd-module.mk`、`tools/checks/` の host 試験 7 本の include の道 | 贋物の io.h はそのまま使える (PC-98 の実装が io.h を読む)。include の道に `platform/pc98` が入っているかを 1 本ずつ確かめる |
+| `device_ide` (置き場) | `test_dep_dir_a_l05a.py (旧版 6ce6d0e507d1)` の `OLD・NEW` (変異の目印 `return ide_read_sector(drv, lba, buf);`)・`_l05b`・`_l06`・`_l08`・`_l09`・`_l10`、`test_ci_stab.py`、`fixtures/build_profile_x86.json`、`fixtures/dep_dir_a/l05a.json`、`docs/design/platform/pc98/README.md` | 道の文字列を新しい置き場へ。変異の目印の行は変わらない |
+| `sys/dev/ata/ide.c`・`ide.h` (中身) | `test_ide_pio.py` (変異の目印 の PIO コマンド送信・完了待ち は `ide_pio.inc` の文。M2 で後述の 4 件を移す)・`ide_pio_host.c`・`ide_hostshim/io.h`、`test_cd_read.py の IDE ポートの試験`・`cd_read_host.c` (番地 `IDE_*` を使う)、`test_hdd_stage1.py`、`test_src_layout.py`、`test_bootinfo.py`、module の試験 約 10 本 (`test_fm_module.py (旧版 351ac0f827d2)` の `product_image`・`test_cd_module.py (旧版 770896d2d302)` の `product_image` ほかは名前の一覧)、`tools/prototypes/cd_imports.def`、`build/cd-module.mk`、`旧検査登録` の host 試験 7 本の include の道 | 贋物の io.h はそのまま使える (PC-98 の実装が io.h を読む)。include の道に `platform/pc98` が入っているかを 1 本ずつ確かめる |
 | `IDE_DATA`・`IDE_ALT_STATUS`・`IDE_DEV_CTRL`・`IDE_BANK1` (置き場) | `ide_pio_host.c`、`cd_read_host.c`、`test_cd_read.py`、`cd_read_tdd.md`、`docs/05_drivers.md` | 定義の置き場の記述を直す。値は同じ |
-| `ide_contract.h` (宣言が増える) | 贋物を持つ host 試験 (`ext2_*_host.c`・`tools/tests/disk_auth_host.c` の `platform_ide_write_sector・platform_ide_write_sectors`・`tools/tests/kapi_ranges_host.c` の `platform_ide_write_sector・platform_ide_write_sectors`・`dep_dir_d3_*_host.c`・`tools/tests/hdd_pt_fake.h` の `platform_ide_range_ok`) | 贋物の型が宣言と合うかを組んで確かめる |
+| `ide_contract.h` (宣言が増える) | 贋物を持つ host 試験 (`ext2_*_host.c`・`disk_auth_host.c (旧版 8cf3dd7a9e09)` の `platform_ide_write_sector・platform_ide_write_sectors`・`kapi_ranges_host.c (旧版 45b77bb29719)` の `platform_ide_write_sector・platform_ide_write_sectors`・`dep_dir_d3_*_host.c`・`hdd_pt_fake.h (旧版 28f26153b2da)` の `platform_ide_range_ok`) | 贋物の型が宣言と合うかを組んで確かめる |
 | `PC98_IRQ_IDE`・`PC98_IO_OPEN_BUS8` | 検査からの参照なし | — |
 | static の関数名 (`ide_wait_bsy` ほか) | `docs/design/drivers/ata/ide_pio.md` だけ | 名前は変えない |
-| 公開表 (P2) | `tools/ppc/test_kapi_binding.py` の `EXPECTED_ABSENT_SLOTS`・`test_kapi_table.py`、`sdk/kapi_target_ppc.py` の `ZERO_SLOTS` (`ide_drive_present` の 0 を返す組) | 7 本を在る側へ |
+| 公開表 (P2) | `test_kapi_binding.py (旧版 3baaeeee4857)` の `EXPECTED_ABSENT_SLOTS`・`test_kapi_table.py`、`sdk/kapi_target_ppc.py` の `ZERO_SLOTS` (`ide_drive_present` の 0 を返す組) | 7 本を在る側へ |
 | 層 | `tools/layers_baseline.json` (両像 0 のまま)、`ppc-compile` (common-compile) | M1 から両像で 0 |
 
 ### 6-4 受入 → 試験と変異

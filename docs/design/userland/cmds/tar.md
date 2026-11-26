@@ -33,7 +33,7 @@ tar t ARCHIVE              中身を一覧する
 
 ## ゲストでしか確かめられない事
 
-ホスト試験 (`tools/tests/test_tar_cmd.py`) は I/O を POSIX に差し替える (`-DHOST_TEST`) ので、次はゲストで見る。
+ホスト試験 (`test_tar_cmd.py (旧版 618d65bcfe4b)`) は I/O を POSIX に差し替える (`-DHOST_TEST`) ので、次はゲストで見る。
 
 - 読み側の後方 `sys_lseek` (`mtar_read_header` は 512 byte 読んでヘッダの先頭へ戻る) が ext2・HostDrv・FDD (FatFs) で同じに効くか。
 - `sys_open` の失敗でディレクトリを判別する方法が FS ごとに同じに効くか。

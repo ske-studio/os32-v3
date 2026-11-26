@@ -1,4 +1,4 @@
-# tools/tests/ext2_write_io_host.c — ext2 書込み I/O の回帰
+# ext2_write_io_host.c (旧版 a5c1ea237934) — ext2 書込み I/O の回帰
 
 > 状態: **現行 (2026-10-31)**
 

@@ -51,4 +51,4 @@ JSON の読み方は `docs/design/userland/lib/cfg/cfg_json.md`、トランザ�
 
 ## 検査
 
-`cfg-host` (`tools/tests/test_cfg.py`、本体 `tools/tests/cfg_host.c`) の `s3_roundtrip` (実 writer の出力を import して `cfg list` と再 export がバイト単位で一致)・`s3_scope`・`s3_args`・`s3_reject` (どの拒否でも DB が 1 行も変わらない)・`s3_fail` (途中の失敗で削除ごと巻き戻る、commit 後の close 失敗)・`s3_gen` (8192 件は通り 8193 件は拒否、巡回の間の差し替え)・`s3_bulk` (8192 件の実書き込み)。贋物は KAPI の境界と障害の注入だけ。
+`cfg-host` (`test_cfg.py (旧版 f84b12760091)`、本体 `cfg_host.c (旧版 947ea5937a47)`) の `s3_roundtrip` (実 writer の出力を import して `cfg list` と再 export がバイト単位で一致)・`s3_scope`・`s3_args`・`s3_reject` (どの拒否でも DB が 1 行も変わらない)・`s3_fail` (途中の失敗で削除ごと巻き戻る、commit 後の close 失敗)・`s3_gen` (8192 件は通り 8193 件は拒否、巡回の間の差し替え)・`s3_bulk` (8192 件の実書き込み)。贋物は KAPI の境界と障害の注入だけ。

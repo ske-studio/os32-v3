@@ -32,7 +32,6 @@ import host_agent as wire
 from host_agent import HostAgent
 from host_operator_socket import OperatorSocket
 from host_rshell import RSHELL, EXECUTE
-from usb_run import USB_QEMU_CLOCK
 
 USER = 'userland/shell/rshell_lan.c'
 SINK = 'sys/kern/console/con_sink.c'
@@ -219,7 +218,7 @@ def gem_assessment(previous, current):
 
 class Session:
     usb_devices = ("-device", "usb-kbd,id=kbd")
-    qemu_clock = USB_QEMU_CLOCK
+    qemu_clock = ['-icount', 'shift=auto']
     qmp_type = None  # None = the module-level PumpQMP at start() (tests patch link_sh_run.PumpQMP)
     machine = "mac99"
     reboot_args = ("-no-reboot",)
@@ -817,7 +816,7 @@ def flow_settings(folder, case):
     source = 'volatile unsigned shell_flow_error, shell_child_returning, shell_return_target, shell_valid_root;\n' + source
     guard = 'do { shell_flow_error = %d; for (;;) __asm__ volatile("" ::: "memory"); } while (0);'
     for fragment in ('exec_launch.inc', 'exec_finish.inc'):
-        text = (ROOT/'exec'/fragment).read_text()
+        text = (ROOT/'sys/kern/exec'/fragment).read_text()
         if fragment == 'exec_launch.inc':
             original = 'args.aux = is_shell ? (u32)(uptr)&g_shell_service : 0;'
             assignment = 'args.aux = 0;' if case == 'missing-aux' else original

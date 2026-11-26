@@ -168,9 +168,9 @@ if (old != down) {
 
 - 原則1段1〜3ファイル・400行以下。試験も数える。U1承認により公開ABIの原子的切替だけは例外とし、400行超をsolに出す。各段は対象を直接組むhost試験または既存試験の拡張で受入し、未結線部品は表の次段が接続先。
 - 共通部品を追加/変更する各段（特に1a・3a〜3c）はx86/PPC両方の像のリンクを必須受入とし、PPCの未定義symbolを残さない。必要なbuild登録段Bをその段の受入前に完了する。
-- `T_x` は `tools/tests/input_<x>_host.c`（新、80〜140行）、既存契約試験があればそれを変更。移動も追加+削除で数え、表の小移動は一回60〜100行を上限に反復する。
+- `T_x` は `tests/support/fixtures/input_<x>_host.c`（新、80〜140行）、既存契約試験があればそれを変更。移動も追加+削除で数え、表の小移動は一回60〜100行を上限に反復する。
 
-- 既存の基準はmainのARCH_COMPAT T1b（tools/tests/test_arch_compat.py）。AC-INPUT-1のPPC4件はXFAIL、AV_HALのIN2_MAX_DEV=16もmain反映済み。文書0/段0は実装対象から削除。
+- 既存の基準はmainのARCH_COMPAT T1b（test_arch_compat.py (旧版 feb27053b188)）。AC-INPUT-1のPPC4件はXFAIL、AV_HALのIN2_MAX_DEV=16もmain反映済み。文書0/段0は実装対象から削除。
 
 | 段 | ファイル（種類・概算） | 依存・出口・並列 |
 |---|---|---|
@@ -185,10 +185,10 @@ if (old != down) {
 | 3c[n] | legacy_mode.c（新/変80）、kbd.c（変100）、T_mode（新/変120） | gui_mode/STOP/flush、2段。V86 adapterは既存kbd側 |
 | 3d | sys/platform/pc98/input/kbd_hal.c（新100）、kbd.c（変60）、T_merge（変100） | 本体src登録/capture、旧採取を除去して二重採取ゼロ |
 | 4a | sys/hal/input/usb_input.c（新140）、PPC usb_platform.c（変60）、T_usb（新130） | 2b/3→usbpのkind/src写像・repeat・release。PPC文字入力維持 |
-| 4b | PPC input_usb.c（変160）、input_boot.c（変100）、tools/tests/test_arch_compat.py（変100） | 4a/3b/4c後、PowerPC P3③bがあればその後（input_boot.cは4c→P3③b→4bの直列）。共通状態/出口へ。③bのlocalを共通cooked ringに結び替え、③bで足したUSBの非消費peekを消す。U3までは旧keymap policy維持。raw/pressed/modsのbit 2/4/8をPASS化しPPC期待14→0、XFAIL表示/変異期待を更新、CHECK pins=[input-hal/4b]を外す |
-| 4b-map | platform/powermac/input_keymap.c（削除約70）、tools/tests/ppc_input_usb_host.c（変100）、tools/checks/ver-ppc-input-usb.py（変80） | **追補 INPUT_BIND_DESIGN §6 の段の後**。4b後、build登録削除は直前B段。旧pm_input_keymap直呼びと27期待をU3準拠の共通口試験へ変更、CHECK pins=[input-hal/4b-map,U3]とbasisを更新 |
+| 4b | PPC input_usb.c（変160）、input_boot.c（変100）、test_arch_compat.py (旧版 feb27053b188)（変100） | 4a/3b/4c後、PowerPC P3③bがあればその後（input_boot.cは4c→P3③b→4bの直列）。共通状態/出口へ。③bのlocalを共通cooked ringに結び替え、③bで足したUSBの非消費peekを消す。U3までは旧keymap policy維持。raw/pressed/modsのbit 2/4/8をPASS化しPPC期待14→0、XFAIL表示/変異期待を更新、CHECK pins=[input-hal/4b]を外す |
+| 4b-map | platform/powermac/input_keymap.c（削除約70）、ppc_input_usb_host.c (旧版 d58b71db6a29)（変100）、ver-ppc-input-usb.py (旧版 b7cf31327e4f)（変80） | **追補 INPUT_BIND_DESIGN §6 の段の後**。4b後、build登録削除は直前B段。旧pm_input_keymap直呼びと27期待をU3準拠の共通口試験へ変更、CHECK pins=[input-hal/4b-map,U3]とbasisを更新 |
 | 4c-pre | sys/kern/input_wait.c（新130）、T_wait（新130） | 1b後、待機契約を両archで受入、4cへ結線 |
-| 4c | sys/kern/input_wait.c（変100）、input_boot.c（変60）、tools/tests/test_arch_compat.py（変180） | **1b/4c-pre後**（4bに依らない）。PPCは既存input_boot.cの先読み付きtry_key/peek（LANとUSBの交互選択）をproviderのlocalとして登録し（terminalはNULL）、InputOpsの読み口（getkey_wait・getchar・peekkey・has_key）を同じ経路で共通の待ちへ委譲する。input_usb.cは変えず、独自状態の除去はP3③b。共通input_wait.cへ期限規則を先に置く。完了条件: PPC providerで待機開始起点（x86 kbd.cと同じ）・各待機30秒・期限後の文字CR/キーESC・FREEZE中の閉鎖・中断の要求を受けたら抜ける（要求はhostの偽物、USBのSTOPの実物はU3/4b-map）を試験で満たす。bit1をPASS化しPPC期待15→14、XFAILの列挙からbit1を外し、ppc-cancel-xpassを新しい中断経路を壊すRED（観測15）に替え、raw/pressed/modifiersのxpassの観測値を12/10/6に直す。CHECK pins=[input-hal/4b]（残るXFAIL 2/4/8） |
+| 4c | sys/kern/input_wait.c（変100）、input_boot.c（変60）、test_arch_compat.py (旧版 feb27053b188)（変180） | **1b/4c-pre後**（4bに依らない）。PPCは既存input_boot.cの先読み付きtry_key/peek（LANとUSBの交互選択）をproviderのlocalとして登録し（terminalはNULL）、InputOpsの読み口（getkey_wait・getchar・peekkey・has_key）を同じ経路で共通の待ちへ委譲する。input_usb.cは変えず、独自状態の除去はP3③b。共通input_wait.cへ期限規則を先に置く。完了条件: PPC providerで待機開始起点（x86 kbd.cと同じ）・各待機30秒・期限後の文字CR/キーESC・FREEZE中の閉鎖・中断の要求を受けたら抜ける（要求はhostの偽物、USBのSTOPの実物はU3/4b-map）を試験で満たす。bit1をPASS化しPPC期待15→14、XFAILの列挙からbit1を外し、ppc-cancel-xpassを新しい中断経路を壊すRED（観測15）に替え、raw/pressed/modifiersのxpassの観測値を12/10/6に直す。CHECK pins=[input-hal/4b]（残るXFAIL 2/4/8） |
 | 4d[n] | input_wait.c（変80）、kbd.c（変100）、T_wait（変100） | 1b/4c後、x86 wait/parkを4cで先に置いた同じ共通期限規則へ口ごとに2〜3段で載せる。4bとファイルが重ならず並列可 |
 | 5a | sys/hal/input/mouse_ext.c（新100）、pointer_state.c（新140）、T_pointer（新130） | 2a後、鍵盤移動とは並列可 |
 | 5b | sys/platform/pc98/input/mouse_hal.c（新130）、mouse_bus.c（変30）、T_pointer（変100） | IRQ採取を一度に限定 |
@@ -228,7 +228,7 @@ if (old != down) {
 | QEMU mac99 7450/7455 | 同じ試験SHAでUSB鍵盤→sh、raw押下/解放、USB mouse→PointerOps、LAN並行、中断待機、抜去。GUIは起動可能な構成で別記、状態probeだけでGUI合格にしない |
 | 実機 | Ra266本体+uPD720101、G4内蔵OHCI/カードを区別して同時押下・抜去・mouse・LAN併用。HighPoint交換はユーザーの物理操作。4MiB転送中p95≤50ms/max≤100ms（IO_TIER） |
 - 実装時は各CHECKに入力を宣言。移動/削除行に付く既存変異を `rg -n` で探して移設、anchor一意・コンパイル失敗でなく実行時RED。触った像（kernel、PPC、gshell、MINIMAL/FD）を組む。ABI段はclean→all。
-- 各段の触った試験を `--mutate`、最後に `python3 -B tools/checks/run.py --lint`。check-changed/全変異は手元で回さずCI/full-checkへ。ログは最終変更後のものだけ。
+- 各段の触った試験を `--mutate`、最後に 旧手順（778201b36787 の記録）。check-changed/全変異は手元で回さずCI/full-checkへ。ログは最終変更後のものだけ。
 - 本回は読むだけの作業木と設計書のみ。preflight --fix-fonts・build・lint・host/変異・エミュレータ・実機は実行していない（PACKの実装なし/書込先限定に従う）。調査と設計の整合/行数だけ検査した。
 ## 9. ユーザー決定（U1・U2・U3決定済み）
 | ID | 決定と反映 |

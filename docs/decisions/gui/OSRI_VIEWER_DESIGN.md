@@ -51,7 +51,7 @@
 | 既存公開ラスタ | dirty転送/flip後 `pc98_splash_raster_table` へ。`sys/platform/pc98/video/gfx_vram.c`。OSRI核ではない。 |
 
 - `sys/platform/pc98/video/gfx_vram.c` は目標行直前〜HBLANKの4 OUTだけ保護し、保護間にIF開放を置く方式。
-- `RASTER_LINE_US` は実装から削除済みで、`tools/tests/cpu_calibrate_host.c` のコメントだけに残る。古い120µs待ちを現在の根拠にしない。
+- `RASTER_LINE_US` は実装から削除済みで、`cpu_calibrate_host.c (旧版 905228a28899)` のコメントだけに残る。古い120µs待ちを現在の根拠にしない。
 - 読込失敗でもBBには部分画素が入り得る（`sys/kern/gfx/osri/gfx_osri.c` の `osri_load()`）。検査完了前の転送は禁止する。
 - B31は「HBLANK内に全OUTが収まる」保証ではない。enc2は可視域への色変更のはみ出しも評価する。
 - 根拠: `docs/design/tools/osri_enc2.md` の「時刻のモデル (はみ出しの見た目)」。生成時の探索はホスト専用（同じ文書の「役割の分担」）。
@@ -183,7 +183,7 @@ int gfx_osri_show(const char *path, u32 duration_ms);
 | `sys/kern/gfx/osri/gfx_osri.c`、S5のplan/play | 核を再利用しloaderに内部エラー理由を追加。公開KAPIのためにOBSマクロ分岐を復活させない。 |
 | `sdk/kapi.json`、`sdk/include/os32/os32_kapi_shared.h` | 末尾1枠、既存戻り値を使用、版。生成物は生成器のみ。 |
 | `build/app.conf`、`build/kernel.mk`、`userland/deploy.yaml` | 最低API版、--gfx、ソース登録、アプリ配置。登録変更は直列。 |
-| +`tools/tests/test_osri_view.py` / +`osri_view_host.c` | 契約・所有・終了のhost試験と変異、CHECK入力登録。 |
+| +`test_osri_view.py (旧版 01d84fa3aab3)` / +`osri_view_host.c` | 契約・所有・終了のhost試験と変異、CHECK入力登録。 |
 | `docs/KAPI_SPEC.md`、`sdk/README.md` | 公開契約・時間/延長・全画面所有・起動例を記載。 |
 
 - V0: S5a/b受入を前提確認。S5dの画面品質結果も参照し、未受入の核をviewerで正当化しない。

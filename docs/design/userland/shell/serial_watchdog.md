@@ -28,4 +28,4 @@
 
 ## 確かめ
 
-`make check-serial-vfast-host` (`tools/tests/test_serial_vfast.py` のケース watchdog)。rshell_serial の側は同じ試験の Python の段。
+`make check-serial-vfast-host` (`test_serial_vfast.py (旧版 850eef82c906)` のケース watchdog)。rshell_serial の側は同じ試験の Python の段。

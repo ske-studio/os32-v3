@@ -203,13 +203,13 @@ void sqlite_call_on_alt_stack(void (*call)(void *), u32 top, void *frame);
 |S stack|lib/sqlite3/sqlite_stack_ppc.S|新65|別 stack ABI、A後|
 |S guard結線|sys/kern/sqlite_engine.c|変12|PPC 条件の begin/end、B後|
 |S選択|sys/conf/features/sqlite.mk|変8|arch 排他選択|
-|T FP host|tools/tests/test_ppc_fp.py|新180|保存layout/命令/旗/禁止範囲|
-|T nano host|tools/tests/test_nano_targets.py|新190|x86 bytes/cache と PPC provider|
+|T FP host|test_ppc_fp.py (旧版 d92beaecaa83)|新180|保存layout/命令/旗/禁止範囲|
+|T nano host|test_nano_targets.py (旧版 3f16ca6b8994)|新190|x86 bytes/cache と PPC provider|
 |T FP guest|userland/ppc/fp_probe.S|新180|全FPR/FPSCR/可変長 ABI helper|
 |T libc guest|userland/ppc/newlib_probe.c|新160|%f/heap/file/exit|
 |T stack guest|tools/ppc/sqlite_stack_probe.S|新120|合成callback/非揮発/stack整列|
-|T受入|tools/accept/ppc_fp.py|新200|実ゲスト観測/変異/対照、全波後|
-|T登録|tools/checks/*.py|追加|新試験の CHECK 登録と入力/根拠/dep-dir 宣言|
+|T受入|ppc_fp.py (旧版 b4213d5446e3)|新200|実ゲスト観測/変異/対照、全波後|
+|T登録|旧登録 *.py|追加|新試験の CHECK 登録と入力/根拠/dep-dir 宣言|
 
 ROLES §4-3: toolchain/QEMU を使う各新試験は PPC_CROSS_DIR=/nonexistent で SKIP・rc=0、OS32_REQUIRE_PPC=1 併用で失敗する契約を持つ。
 
@@ -235,8 +235,8 @@ S guard結線は IME まで製品リンクしないが専用試験で組む。�
 - A は宣言だけ半日、別ファイル並列可。B は各行半日〜1日、FP実体→guard→結線の依存以外は並列可。
 - N1 の4道具は引数契約確定後に並列、帳簿/CI receipt 統合を先に検査。N2/S は別ファイルで並列、N3 は N1/N2/B 完了後。T の観測契約は A と同時に確定する。
 - 手本のある宣言/移植中はビルドせず、各波の実装が揃った時点で触った PPC kernel/kboot/全USER/stack試験を組む。共有道具を変えた波は x86 programs と byte 比較も必須。
-- 完了条件: 各新試験の CHECK を tools/checks/*.py に登録し、ROLES §4-3 の PPC_CROSS_DIR=/nonexistent で SKIP・rc=0、OS32_REQUIRE_PPC=1 併用で失敗を確認する。750 は USER/SQLite TU の最終 ELF 静的 ISA 監査だけとし、G3 起動対応は別段として後で扱う。
-- 最終ソース変更後に当該 host tests の `--mutate` と `python3 -B tools/checks/run.py --lint`。各新 test の CHECK に入力/根拠/dep-dir を列挙し、既存変異 anchor の移動漏れを tools/tests の検索で洗う。
+- 完了条件: 各新試験の CHECK を 旧登録 *.py に登録し、ROLES §4-3 の PPC_CROSS_DIR=/nonexistent で SKIP・rc=0、OS32_REQUIRE_PPC=1 併用で失敗を確認する。750 は USER/SQLite TU の最終 ELF 静的 ISA 監査だけとし、G3 起動対応は別段として後で扱う。
+- 最終ソース変更後に当該 host tests の `--mutate` と 旧手順（f577d10cc198 の記録）。各新 test の CHECK に入力/根拠/dep-dir を列挙し、既存変異 anchor の移動漏れを 旧ホスト試験 の検索で洗う。
 - 取り込みは CI の check/build/check-fast。check-changed/ローカル全変異は実行しない。QEMU 受入は PM が 7450/7455 各1回に統合してログ/終了値/変異対照を残す。x86 回帰は本線の既存 runner で行う。
 - この起草ではソース・成果物を変更していないためビルド/実行試験/独立レビューは未実施。読み取り専用指定を優先し、字体をコピーする preflight --fix-fonts も未実施。実装開始時は base確認/preflight を必須とする。
 

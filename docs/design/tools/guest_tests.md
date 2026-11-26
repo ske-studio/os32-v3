@@ -3,7 +3,7 @@
 ソース: `tools/guest_tests.py`・`tools/guest_tests.txt`
 
 所定の試験プログラムを NP21/W のゲストで一括実行し、ホストで合否を集計するランナー。`make check-guest` が本番、
-`make check-guest-host` がホスト試験 (`tools/tests/test_guest_tests.py`、NP21/W・HTTP・実時間に触らない)。
+`make check-guest-host` がホスト試験 (`test_guest_tests.py (旧版 0211b4e5744a)`、NP21/W・HTTP・実時間に触らない)。
 試験プログラム側の約束事 (終了コード 0/1/2・集計行) は `userland/lib/rt/testresult.h`。
 
 ## 1. 割り方

@@ -1,4 +1,4 @@
-# tools/tests/test_splash_raster_diag.py — 診断記録と変異
+# test_splash_raster_diag.py (旧版 c907f6a84336) — 診断記録と変異
 
 状態: **現行 (2026-11-01)**。
 

@@ -8,4 +8,4 @@
 プリエディットを消す。この順序を保つ。
 
 選択する候補、通常文字の追記、透過キーの返値は呼出し元が決める。
-検証は `tools/tests/ime_display_host.c` と `tools/tests/test_x11_shared.py`。
+検証は `ime_display_host.c (旧版 88012e02f541)` と `test_x11_shared.py (旧版 81caa9f12417)`。

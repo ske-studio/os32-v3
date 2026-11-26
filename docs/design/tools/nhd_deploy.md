@@ -15,4 +15,4 @@ NHD の ext2 区画を扱い、ファイルや起動部品を配備する。
 - **使用中の媒体**: NP21/W が NHD を開いていると配備が失敗し、古い像を起動しうる。
   停止してから配備し再起動後に `ver` と成果物を照合する。配備の失敗は終了コードで確認する。
   `ensure_local_nhd` はローカル像の存在を確認するが、稼働中の全直接呼出しを拒否する仕組みではない (`tools/nhd_deploy.py`)。
-  配備失敗の回帰は `tools/tests/test_nhd_deploy_failure.py` の `test_enospc_is_not_reported_as_success()`。
+  配備失敗の回帰は `test_nhd_deploy_failure.py (旧版 cb877993f7dc)` の `test_enospc_is_not_reported_as_success()`。

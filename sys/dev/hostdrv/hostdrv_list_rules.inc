@@ -4,7 +4,7 @@
  *  票: H1 (docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md §8 の H1 行 —
  *      「I/O 失敗を成功にしない」/ 対象「HostDrv のエラー処理」)
  *      Codex 実装レビュー 往復 3 からの派生 (コーダー報告 -> PM が到達性を確認)
- *  ホスト試験: tools/tests/hostdrv_list_host.c
+ *  ホスト試験: hostdrv_list_host.c (旧版 43ccd3dbd397)
  *
  *  直した点:
  *    1. `hostdrv_query_dir` が負値を返したら **VFS_OK を返さない**。

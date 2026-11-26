@@ -1,7 +1,7 @@
-# tools/ci/gate.py — 手本の CI (CI_GATE_DESIGN)
+# 旧 CI の設計と計測記録 (CI_GATE_DESIGN)
 
 > 状態: **現行 (2026-11-17)** — 出所: ユーザーの指示 (2026-11-17「既存の物の作りには欠点がありそうなので…そちらを改修するためのモデル的な ci を組んで」)。機種依存の分離の枝 (`wt/sep-*`) の workflow `sep` をこの形で組み、既存の workflow (check・build・full-check) を直す時の手本にする。既存の workflow はこの段では変えない。
-ソース: `tools/ci/gate.py`、`tools/check_time.py` (`CHECK_LOG_DIR`)、`.github/actions/gate-setup/action.yml`、`.github/workflows/sep.yml`、試験 `tools/tests/test_ci_gate.py` (検査 `ci-gate-host`)。生成物の一致は [sep_identity.md](sep_identity.md)
+旧実行器は P7-2 で撤去した。実行時の仕様は `git show dafe81642:docs/design/tools/ci/gate.md`、現行の関門は [CI 設計](ci_v2.md)、生成物の一致は [sep_identity.md](sep_identity.md) を参照する。
 
 ## 1. 既存の CI の欠点 (2026-11-17 の実物と実行履歴)
 
@@ -9,8 +9,8 @@
 |---|---|---|
 | F1 | **変異込みの検査が関門になっていなかった。** 毎回の CI は変異なしで、変異込みは夜間の `full-check` だけだった。2026-11-18 に、build の `checks` と check の PowerPC の段を変異込みにし、`full-check` を無くした | 夜間の full-check は 11-14〜17 の 4 回のうち 3 回が失敗し、同じ SHA の check・build は成功していた。変異の目印が古い検査が、数日〜数週間そのままだった |
 | F2 | **失敗がログから読めない。** 変異の「期待どおりの失敗」の出力が全部 1 本のログに流れる | 11-17 の full-check の失敗ログは 1.4 GB・1,200 万行。そのうち 1,087 万行が同じ 1 行の繰り返し。落ちた検査の名前は `*** [...check-<名>] Error` を grep しないと分からない |
-| F3 | **1 本の失敗が残りを隠す。** `tools/checks/run.py --run all` は最初の失敗で止まる。ジョブの `needs` で後ろのジョブも走らない | check.yml・full-check.yml の ppc-compile は `--run all`。11-17 は ppc-compile が 16 分で落ち、`ppc-qemu` は skipped |
-| F4 | **検査の一覧が YAML に手書きで写っている** | check.yml の static-check は `make check-<名>` を約 30 行並べる (選び方は冒頭の註の手順で人が決めた)。`tools/ci/ppc_scope.py` は共通・PowerPC・x86 のパスの一覧を別に持つ |
+| F3 | **1 本の失敗が残りを隠す。** 旧手順（4d70e2c233f0 の記録） は最初の失敗で止まる。ジョブの `needs` で後ろのジョブも走らない | check.yml・full-check.yml の ppc-compile は `--run all`。11-17 は ppc-compile が 16 分で落ち、`ppc-qemu` は skipped |
+| F4 | **検査の一覧が YAML に手書きで写っている** | check.yml の static-check は `make check-<名>` を約 30 行並べる (選び方は冒頭の註の手順で人が決めた)。`ppc_scope.py (旧版 d4d22d1c0028)` は共通・PowerPC・x86 のパスの一覧を別に持つ |
 | F5 | **用意の手順がジョブごとに書き写されている** | `apt-get install … gcc-13 qemu-user ccache …` の行が check.yml に 2 回、full-check.yml に 2 回、少しずつ違う中身で在る |
 | F6 | **環境が足りない検査が、飛ばされるか、途中で落ちる** | クロスコンパイラの無いジョブでは PowerPC の検査が SKIP で通る (build.yml の check-fast)。手元では `gcc-13` が無いと `FileNotFoundError` で落ち、変更が原因か環境が原因かをログを読んで判断することになる |
 | F7 | **CI と手元で入口が違う** | CI は YAML の中の shell、手元は `make check-<名>` か `run.py --run <名>`。`r1-fixture-host` は後者だと `KeyError: 'BUILD_OUT'` で落ちる (make の変数が要る) |
@@ -26,7 +26,7 @@
 | F1 関門になっていない | G1 | `checks` が全検査を変異込みで回す (決まりは main に入れる SHA の関門。push ごとに回るのは今の workflow の作りで、ユーザー決定 2026-11-25 で決まりから外した) |
 | F2 失敗がログから読めない | G3 | 検査ごとのログ、ジョブの要約に表、成果物は落ちた検査のログだけ |
 | F3 1 本の失敗が残りを隠す | G2 | `make -k`、`fail-fast: false`、ジョブのあいだに `needs` 無し、結果の行が無い検査は失敗 |
-| F4 一覧が YAML に手書き | G4 | YAML に検査の名前が無い。`tools/checks/run.py --list --shard` から取る |
+| F4 一覧が YAML に手書き | G4 | YAML に検査の名前が無い。旧手順（4d70e2c233f0 の記録） から取る |
 | F5 用意が書き写されている | G5 | `gate-setup` の 1 か所 |
 | F6 道具が足りないと飛ばすか途中で落ちる | G6 | 事前確認で全部挙げて終了コード 2、`OS32_REQUIRE_PPC=1`、SKIP の行を表に |
 | F7 入口が違う | G7 | `run:` は `gate.py run` の 1 行。手元でも同じコマンド |
@@ -34,58 +34,6 @@
 | F9 生成物の一致を確かめる仕組みが無い | G8 | `identity` のジョブ ([sep_identity.md](sep_identity.md)) |
 
 G9 (道具の試験) は `ci-gate-host`・`sep-identity-host`・`check-times-host`、G11 (同じ入力から同じ生成物) の例外は RAM root の ISO ([sep_identity.md](sep_identity.md) §2)、G12 (赤の実演) は §5。
-
-## 3. 形
-
-### 3-1. 入口 `tools/ci/gate.py run`
-
-apt は update を 300 秒、install を 600 秒で打ち切り、TERM の 30 秒後も残るプロセスには KILL を送る。失敗時は rc を summary に残す。
-static-setup の最後の `gate.py preflight --env static` はホストの道具と Python モジュールを確認し、
-不足をすべて入れ方とともに表示して rc=2 で止まる。そろえば rc=0 で検査へ進む。2026-11-20 の導入前は apt の時間切れが 2 件あり、
-どちらも検査は始まらず、終了時の統計だけが rc=127 を返した。導入後は summary の rc 別に数える。
-
-    python3 -B tools/ci/gate.py run --shard <番号>/<総数> --out <置き場> [--no-mutate] [--jobs N]
-    python3 -B tools/ci/gate.py run --env qemu-ppc --shard <番号>/<総数> --out <置き場>
-
-1. 道具の事前確認 (G6): `i386-elf-gcc` (`$CROSS_DIR/bin`)・`powerpc-elf-gcc` (`$PPC_CROSS_DIR/bin`)・`nasm`・`gcc-13`・`qemu-i386`・`qemu-system-ppc`・`genisoimage`・`e2fsck`・`cargo`。足りない物を入れ方と一緒に全部挙げ、終了コード 2。
-2. このシャードの検査の名前を `tools/checks/run.py --list --shard` から取る (G4)。
-3. `make -k -jN check CHECK_SHARD=… MUTATE=1` (`--no-mutate` なら `check-fast`、`MUTATE=0`) を、`CHECK_LOG_DIR=<置き場>/logs`・`CHECK_TIMES=<置き場>/check_times.tsv`・`OS32_REQUIRE_PPC=1` で回す。前提の準備・並列・順序は make の今の仕組みのまま (検査の走らせ方をもう 1 つ作らない)。
-4. `check_times.tsv` (検査・秒・終了コード) と検査ごとのログから表を作る: 通過・失敗・回っていない・SKIP の行がある。
-5. `<置き場>/results.json`、`<置き場>/failed-logs/` (落ちた検査のログの末尾 4 MiB)、`--env` の回では落ちた検査のゲストの証拠 `failed-logs/evidence/<検査>/` (シリアル・qemu.log・画面など、1 ファイル 512 KiB・1 検査 4 MiB まで、新しい物から。ログの最後の `evidence=<dir>` から、無ければ検査ごとの一時の置き場 `$RUNNER_TEMP/os32-ck/<検査>` (検査の TMPDIR) から。同じ回では OS32_KEEP_TMP=1 を立て、QEMU の受入の道具は一時の置き場を `tools/ppc/keep_tmp.py` の `temporary_directory` で作って消さない)、画面と `$GITHUB_STEP_SUMMARY` に表。失敗か、回っていない検査が 1 本でもあれば終了コード 1。検査は全部通ったのに make が落ちた時 (前提の準備、木が変わっていないことの照合) も 1。
-
-`--env <環境>` を付けた時は、その環境を要る検査 (`run.py --list --env`) だけをシャードに割り、手順 3 の make の代わりに、検査を 1 本ずつ順に `tools/checks/run.py --run <検査> --env <環境>` で回す (`run_each`)。1 本落ちても残りを回し、所要は同じ `check_times.tsv` に足す。QEMU で機械を丸ごと模擬する検査は、並べて回すと期限に間に合わなくなるので、シャードの中は直列にする。check.yml の `ppc-qemu` がこの入口を使う。
-
-SKIP の行は挙げるだけで落とさない: 試験が自分の出力として `SKIP` と印字する物 (飛ばす時の振る舞いを確かめる試験) と見分けられないため。環境が揃っていれば本物の SKIP は `OS32_REQUIRE_PPC=1` で失敗になる。
-
-### 3-2. 検査ごとのログ `tools/check_time.py`
-
-`CHECK_LOG_DIR` があると、検査の出力を `<CHECK_LOG_DIR>/<検査>.log` に落とす (標準出力と標準エラーを 1 本に)。無ければ今までどおり画面に出す。`make check`・`check-fast`・`check-changed` のどれでも効く。
-
-### 3-3. workflow `sep`
-
-| ジョブ | 中身 |
-|---|---|
-| `checks` (シャード 0〜5、`fail-fast: false`、**手動で起動した時だけ**) | `gate-setup` → `gate.py run --shard N/6` → 成果物 (`results.json`・`check_times.tsv`・`make.log`・`failed-logs/`) |
-| `identity` | `gate-setup` → `tools/ci/sep_identity.py` (結果をジョブの要約へ) |
-
-ジョブのあいだに `needs` は無い。検査の名前は YAML に 1 つも無い。
-分離の作業のあいだは、push で回すのは `identity` だけにしている (ユーザーの指示 2026-11-17「今回の実装に必要な分だけ」)。`checks` は Actions の Run workflow か `gh workflow run sep.yml --ref <枝>` で起動する。POLICY_CI の G1 (変異込みを push ごとに) は既存の workflow を直す時の目標で、この workflow はまだ満たしていない。
-
-### 3-4. 用意 `gate-setup`
-
-`build-setup` (x86 のクロスコンパイラ・Rust・フォント・apt) と `ppc-setup` (PowerPC のクロスコンパイラ) を呼び、足りない apt の物 (`gcc-13`・`qemu-system-ppc`・`qemu-system-data`・`seabios`。メタパッケージ `qemu-system` は全 arch を連れてきて遅いので使わない) と `requirements.txt` を入れ、`$CROSS_DIR/bin` を PATH に足す。ジョブの側には apt の行を書かない。
-
-## 4. 既存の workflow を直す時の当て方
-
-直す時の手順と順序は `docs/POLICY_CI.md` §2 (R1〜R8) が正典。ここには、既存の 3 つの workflow のどこを何に替えるかの対応だけを置く。
-
-| 既存 | 今の形 | 手本の形にするには |
-|---|---|---|
-| check.yml `static-check` | `make check-<名>` を手で並べる | クロスコンパイラ無しで回る検査に CHECK の `env` で印を付け、`gate.py run` に環境の絞り込みを足して一覧を登録から取る (G4)。static の事前確認は §3-1 |
-| check.yml `ppc-compile` | `run.py --run all`、`ppc_scope.py` のパスの一覧 | `gate.py run --env ppc-cross` に替える (G2・G3)。PowerPC を回すかどうかの判定は、パスの一覧ではなく所有者集合 (`build/select.mk`) から引く |
-| check.yml `ppc-qemu` | 2026-11-18 に `gate.py run --env qemu-ppc --shard i/4` の 4 分割にし、`needs` の鎖を外した (G2・G3・G10)。2026-11-21 のユーザー決定で 5 分割から i/6 の 6 分割に変更 (各段 20〜27 分、30 分での時間切れが 3 回)。2026-11-22 に 8 分割を経て 10 分割 (i/10) に変更。2026-11-24 のユーザー決定「20組に」で 20 分割 (i/20)、上限は 30 分のまま (§5-10)。検査ごとの所要を成果物 `check-times-<SHA>-ppc-qemu-<i>` に出す | 残りは `ppc_scope.py` のパスの一覧と、用意の行の重複 |
-| build.yml `checks` (6 シャード) | `make -k check CHECK_SHARD=…` (全部の検査を変異込み、2026-11-18 から) | `gate.py run --shard …` に替えると、表・検査ごとのログ・回っていない検査の検出が付く (G2・G3)。`gate-setup` にすると PowerPC の検査が SKIP にならない (G5・G6) |
-| 用意 | apt の行が 4 か所 | `gate-setup` に寄せる (G5) |
 
 ## 5. 入れた時に確かめたこと・測ったこと
 
@@ -115,7 +63,7 @@ SKIP の行は挙げるだけで落とさない: 試験が自分の出力とし�
 1. **キャッシュは枝ごと。** 枝が読めるキャッシュは自分の枝と main の物だけで、main の push は PowerPC の検査を範囲の判定で回さない事があるので、PowerPC のクロスコンパイラのキャッシュは main に無かった。新しい枝の最初の回は、PowerPC の各ジョブが 13〜15 分かけて組んでいた (`ppc-compile` が 4 分の回と 19〜21 分の回があったのはこのため)。check.yml に、main でキャッシュだけを保つジョブ `ppc-toolchain-cache` を足した。
 2. **検査の秒は、並んで回るほかの検査に左右される。** build のシャードの中は検査を並列に回すので、記録の秒は CPU を取り合った分を含む。同じ検査が回ごとに ±5 割動き、割り振りを変えると値も変わる。秒の中央値で重みを作り直しても揃わなかった。CPU 時間で測る形にするのが筋で、票 TASK_CI_REWORK の段に入れた。
 3. **QEMU の検査が x86 のシャードで「重い検査」として数えられている。** 12 本は x86 のシャードでは 1〜2 秒で終わる (ゲストを起動しない) のに、割り振りでは予算の値 (合計 13,500 秒、x86 の検査の実測の合計 22,346 秒の 6 割) で数えられ、それが入ったシャードは実際には軽かった。実測の重み (合計 3,638 秒) を入れて偏りの元は 4 分の 1 になった。x86 のシャードから外す (SKIP で通さない) のは票の段 S6。
-4. **変異の試験が落とすコアファイルが、別の検査を落とす。** qemu-user の中の試験をわざと落とす変異が `qemu_fixture_<時刻>_<pid>.core` を作業木の根に残し、同じシャードで同時に走った `check-map` が「宣言の無いファイル」として落ちた (`8078bf349` の checks (3))。割り振りが変わって重なっただけで、前から在った競合。`tools/checks/run.py --run` が検査を始める前にコアの上限を 0 にする形に直した。
+4. **変異の試験が落とすコアファイルが、別の検査を落とす。** qemu-user の中の試験をわざと落とす変異が `qemu_fixture_<時刻>_<pid>.core` を作業木の根に残し、同じシャードで同時に走った `check-map` が「宣言の無いファイル」として落ちた (`8078bf349` の checks (3))。割り振りが変わって重なっただけで、前から在った競合。旧手順（4d70e2c233f0 の記録） が検査を始める前にコアの上限を 0 にする形に直した。
 
 ## 5-2. 揺れの調べ (2026-11-18、票 TASK_CI_REWORK の段 S0)
 
@@ -196,7 +144,7 @@ build の dispatch:
 #### 4. main への push で PowerPC の段が中身を回すか
 
 - **変更前の実測。** 標本の main の push 5 回 (44290201312・44290142172・44277658303・44276821812・44274576283) は 5 回とも `Select PPC scope` の出力が `skip: x86-only, documentation-only, or empty branch delta`。ppc-compile 0.1〜0.2 分、ppc-qemu 4 本 0.1〜0.3 分 (用意以降の手順は飛ぶ)。ppc-toolchain-cache だけが 0.2〜0.4 分で走る
-- 規則 (`tools/ci/ppc_scope.py`): `PPC_ARCH` は push では `auto` (dispatch だけ入力の arch)。`x86` → skip、`ppc`・`both` → 回す、枝の名前が `wt/int-` で始まれば回す。それ以外は `git merge-base origin/main HEAD` から HEAD までの差分のパスを見て、docs/・*.md は飛ばし、共通の置き場 (kernel/・lib/・include/ …)・PowerPC の置き場・`build/*.mk`・決まったファイル (Makefile・check.yml など) があれば回す、x86 だけの置き場は飛ばし、知らない置き場は控えめに回す。差分が空なら skip
+- 規則 (`ppc_scope.py (旧版 d4d22d1c0028)`): `PPC_ARCH` は push では `auto` (dispatch だけ入力の arch)。`x86` → skip、`ppc`・`both` → 回す、枝の名前が `wt/int-` で始まれば回す。それ以外は `git merge-base origin/main HEAD` から HEAD までの差分のパスを見て、docs/・*.md は飛ばし、共通の置き場 (kernel/・lib/・include/ …)・PowerPC の置き場・`build/*.mk`・決まったファイル (Makefile・check.yml など) があれば回す、x86 だけの置き場は飛ばし、知らない置き場は控えめに回す。差分が空なら skip
 - main の push は before→HEAD が文書だけなら PowerPC を省く。コードを含む場合は同じ SHA の `wt/int-*` の check の push が成功していれば省き、それ以外は x86 だけの変更でも compile と QEMU 6 本を回す。強制 push・before の欠落時も全部回す。 導入後の main push 20 回で、省略と実行の本数・所要を測る。
 - 枝でも飛ぶ例: wt/ppc-kapi-fill の 2 回 (44290719097・44289493633) は差分が x86 と文書だけと判定されて skip
 
@@ -227,7 +175,7 @@ static-check の Check map は 5 分、Host tests は 6 分（検査本体の実
 
 | ジョブ | 回る時 | ふだんの所要 | 上限 |
 |---|---|---|---|
-| `ppc-layout-inventory` (check.yml) | 像の配置に効くファイルを触った push の時だけ (`tools/ci/ppc_scope.py --inventory`。kernel.ld・memmap.h・platform_*_layout.h・build/images・ppc-powermac.mk・root の生成の道具・sdk/kapi.json ほか)。当たらない時は SKIP の理由の行 | 約 31 分 (195 像) | 90 分 |
+| `ppc-layout-inventory` (check.yml) | 像の配置に効くファイルを触った push の時だけ (旧手順（4d70e2c233f0 の記録）。kernel.ld・memmap.h・platform_*_layout.h・build/images・ppc-powermac.mk・root の生成の道具・sdk/kapi.json ほか)。当たらない時は SKIP の理由の行 | 約 31 分 (195 像) | 90 分 |
 
 ふだんは代表の 1 検査 `ppc-root-lz4-layout-host` (製品 5 像・最大の受入 3 像・64 KiB の整列の跳ね) だけが ppc-qemu の組で回る。2026-11-22 の 10 組の割り振りと、同日の 8 組の実測 4 回の中央値による所要の見積もりは次のとおり。
 
@@ -259,4 +207,4 @@ static-check の Check map は 5 分、Host tests は 6 分（検査本体の実
 
 20 組 (2026-11-24 のユーザー決定「20組に」、上限 30 分のまま) の最初の回 (76ec252b8、check 45349078850): ppc-qemu の各組 10〜18 分 (用意込み、組 0 の `ppc-display-guest` 単独が 18 分)、全部 success。runner の空き待ちで組の開始が 07:35〜08:06 にずれ、push から最後のジョブまでは 44 分 (10 組の時は 30〜36 分)。組 0 が通った回の実測で 25 分を越えたら、`ppc-display-guest` の中を割る案 (変異・待ちの見直し、または 2 本に分ける) を出す (本線 PM、11-24)。
 
-2026-11-25: int-ppc-1124d の回 (e62bca29f、check 45427776109) で組 0 の `ppc-display-guest` 単独が 1785 秒 (ステップの上限 30 分まで 15 秒、18 分の回もあり回ごとの振れが大きい)。本線 PM と決めて 2 本に分けた: `tools/accept/ppc_display.py --part i/2` が normal と変異の場合 18 の 1 つおき (9 ずつ) を回し、`ppc-display-guest` (0/2) と `ppc-display-guest-b` (1/2)。変異の集合・covers・basis は同じ (関門を弱めない)。normal のビルドと起動は 2 本とも要る。重みは仮に 950 秒ずつ、次の回の check-times で `calibrate_weights.py --merge` して作り直す。
+2026-11-25: int-ppc-1124d の回 (e62bca29f、check 45427776109) で組 0 の `ppc-display-guest` 単独が 1785 秒 (ステップの上限 30 分まで 15 秒、18 分の回もあり回ごとの振れが大きい)。本線 PM と決めて 2 本に分けた: 旧手順（4d70e2c233f0 の記録） が normal と変異の場合 18 の 1 つおき (9 ずつ) を回し、`ppc-display-guest` (0/2) と `ppc-display-guest-b` (1/2)。変異の集合・covers・basis は同じ (関門を弱めない)。normal のビルドと起動は 2 本とも要る。重みは仮に 950 秒ずつ、次の回の check-times で `calibrate_weights.py --merge` して作り直す。

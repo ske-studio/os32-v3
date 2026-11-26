@@ -200,7 +200,7 @@ int time_sync(void); /* 非待機受付、既に要求中はAGAIN、結果はtim
 - 生成ファイルはF2の生成成果物であり別実装者に手編集させない。app.conf要求版、確定設計・KAPI仕様の記録は各1ファイルずつ統合段に分ける。E4/E5は前提設計の着地時に実パスを照合する。
 
 ## 9. 受入 → 試験と変異
-| 独立の試験ファイル（tools/tests/test_time_*.py）/段 | 観測による受入 → 1行変異 |
+| 独立の試験ファイル（tests/hal/time_*.py）/段 | 観測による受入 → 1行変異 |
 |---|---|
 | calendar / B1 | host:1980/2000閏日・不正BCD・月12・2079境界が正しい → 月をBCD変換 |
 | clock / B2–B4 | host:tick FFFFFFFF→0、p1=1のpending繰上りと次IRQで二重加算なし、負slew/stepでもmedia非減少、raw不変 → 上位tick桁上がり削除 |

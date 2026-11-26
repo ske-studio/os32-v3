@@ -76,7 +76,7 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 
 ### check_gui_proto
 
-`tools/check_gui_proto.py` が両者の
+`check_gui_proto.py (旧版 9dfb30aa7e08)` が両者の
 数表を突き合わせる。
 
 ### gen_memmap
@@ -85,14 +85,14 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 
 ## 索引
 
-- [tools/accept/README](accept/README.md)
+- [手動受入の設計](accept/README.md)
 
 - [tools/check_doc_line_refs](check_doc_line_refs.md)
 - [tools/check_archive_refs](check_archive_refs.md)
 - [tools/check_kapi_abi](check_kapi_abi.md)
 - [tools/check_layers](check_layers.md)
 
-- [tools/checks/README](checks/README.md)
+- [検査の登録と実行](checks/README.md)
 
 - [tools/ci/gate](ci/gate.md)
 
@@ -125,7 +125,7 @@ map の LOAD 一覧・各 .o の size・最終 ELF・KMOD header を照合する
 
 - [tools/rshell_recover](rshell_recover.md)
 
-- [tools/tests/README](tests/README.md)
+- [旧ホスト試験の設計記録](tests/README.md)
 
 - [tools/img2osri](img2osri.md)
 

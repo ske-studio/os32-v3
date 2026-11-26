@@ -154,7 +154,7 @@ void rsh_lan_reset(void);
 |2|PowerPC|sys/platform/powermac/lan_service.c|変更 10–20|像別の固定 peer 準備・選択と PDIAG 抑止を §5 に合わせる|
 |3|PowerPC|sys/platform/powermac/link_platform.c|変更 15–30|TB 読みと再入抑止を 製品の一枠で共有し、USB・LAN を個別に進め、旧像入口は必要な構成だけに残す|
 |4|PowerPC|sys/platform/powermac/ppc_kernel.c|変更 25–45|登録の時期と成否、USB、root 失敗後の待ちを結線|
-|5|試験|tools/tests/test_net_link.py、test_net_rx_work.py、test_remote_x11.py、製品 QEMU 台本|変更|§7 の観測と変異。tools/ppc/test_lan_terminal_host.py は旧 PLN1 専用で維持|
+|5|試験|test_net_link.py (旧版 5bc3c6ced683)、test_net_rx_work.py、test_remote_x11.py、製品 QEMU 台本|変更|§7 の観測と変異。test_lan_terminal_host.py (旧版 677c00ca1f6b) は旧 PLN1 専用で維持|
 |6|本線|docs/decisions/network/LAN_OPERATOR_DESIGN.md|変更 5–10|同一 ms の活動中 poll、保守 callback の実際の所有者を反映|
 |7|本線|docs/decisions/ARCH_COMPAT_CONTRACT.md|変更 2–4|§9 に NIC・周期源の物理差を記録|
 |8|本線|docs/tasks/network/TASK_LAN_OPERATOR.md|変更 2–5|製品受入ログを P3⑥・P5 の該当項目へ対応付け|

@@ -75,5 +75,5 @@
 
 ## 検査
 
-`install-recover-host` (`tools/tests/test_install_recover.py`、本体 `tools/tests/install_recover_host.c`)。実物の `install_recover.inc`・`sys/kapi/kapi_db.c`・SQLite・`os32_sqlite_vfs.c`・`sys/fs/vfs_fd.c` を RAM の backend で組み、stat の三値・inode の共有・rename の中途半端・read の負・short write・unlink・sync・db close の失敗を注入する。
+`install-recover-host` (`test_install_recover.py (旧版 756c816fa3b8)`、本体 `install_recover_host.c (旧版 e491db921901)`)。実物の `install_recover.inc`・`sys/kapi/kapi_db.c`・SQLite・`os32_sqlite_vfs.c`・`sys/fs/vfs_fd.c` を RAM の backend で組み、stat の三値・inode の共有・rename の中途半端・read の負・short write・unlink・sync・db close の失敗を注入する。
 各段の各失敗で「切り替え前なら元の対が 1 バイトも変わらない」「欠損は欠損のまま」「作った物だけ消える」「両名が残れば消さずに止まる」「journal が別の世代と混ざらない」を見る。連鎖 (失敗 → 再実行が門で止まる → revert → recover、recover → revert → recover、revert の途中の失敗 → 再 revert、`.new` の close 失敗 → 次回停止 → revert → `rm` → recover) も通す。

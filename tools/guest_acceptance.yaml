@@ -1,5 +1,5 @@
 # E08 con_sink: 同一構成・本変更だけなら起動成功数は c34dbed8 から7減、描画2判定とfail=0を確認する。
-# 過去の固定総数は当時の記録。現行の総数は他試験の変更も合算して実測 (tools/tests/con_sink_tdd.md E08節)。
+# 過去の固定総数は当時の記録。現行の総数は他試験の変更も合算して実測。
 # Acceptance index; batch entry names resolve through guest_tests.txt.
 # contract は項目が確かめる性質の正典 (仕様・決定の文書、試験・道具のコード、延期は DEFERRED_TESTS) を 1 つか並びで指す。
 # docs/archive/ は指さない ([D4]、gen_guest_acceptance.py が落とす)。合否の閾値 (±10% など)・観測の段取り・fixture 固有の値は
@@ -1637,8 +1637,8 @@
   gate: T2h
   contract:
   - docs/tasks/DEFERRED_TESTS.md#S-1
-  - tools/tests/test_np21w_trial.py
-  - tools/tests/test_np21w_ini_live.py
+  - tools/np21w_trial.py
+  - tools/np21w_ini_live.py
   mode: manual
   prereq: "R0: 現 ini の USEGD5430 / USEPEGCP / ExMemory / NP2NETSOCK の有無・値と元の GFX= を保存。新 NHD・ISO/FD の写しは [D2] 1 回、後続へ流用しない。Full install 後に gfxmode pegc → /etc/system.cfg 読み戻し → emu_reset (/api/reset) → hal_test 1 行目 PEGC を開始条件にする。; kdebug_state == 1 かつ kdebug_pair_crc == ver の Image CRC"
   entry: Windows opt-in 9 件の対照

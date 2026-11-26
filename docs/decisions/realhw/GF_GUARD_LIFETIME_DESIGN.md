@@ -172,11 +172,11 @@ void gf4_service_cleanup_reset(struct gf4_ctx *); /* release_all成功・診断�
 | S1 | sys/dev/video/geforce/display/save.c | 終端abandonと元rc保持。D6/V1/T1後 |
 | S2 | sys/dev/video/geforce/display/service.c | init順序、quiesce後のretire、共通リセット、pendingによるenter拒否、管理slot寿命。T1/S1後 |
 | S3 | sys/dev/video/geforce/diag/gf_display_test.c | 失敗後cleanup、abandon成功時だけCUI owner/sessionをゼロ化。S1後、S2と並列可 |
-| H1 | tools/tests/test_gf_command.py | 実MM/production map結合、変異登録。M5後 |
-| H2 | tools/tests/test_gf_display.py | 停止失敗/回収/再enter結合、変異登録。S2/S3後 |
-| H3 | tools/tests/test_gf5.py | tile寿命/init/保存復元、変異登録。T2後 |
-| H4 | tools/tests/gf1_instmem_map_host.c | production adapterのrid照会・map/unmap結合。M5後 |
-| H5 | tools/tests/test_gf1_instmem_map.py | H4のCHECK入力/変異登録。H4後 |
+| H1 | test_gf_command.py (旧版 c46a29959fd1) | 実MM/production map結合、変異登録。M5後 |
+| H2 | test_gf_display.py (旧版 983602fcd992) | 停止失敗/回収/再enter結合、変異登録。S2/S3後 |
+| H3 | test_gf5.py (旧版 e11bfb5c2301) | tile寿命/init/保存復元、変異登録。T2後 |
+| H4 | gf1_instmem_map_host.c (旧版 b4da1556543b) | production adapterのrid照会・map/unmap結合。M5後 |
+| H5 | test_gf1_instmem_map.py (旧版 b7df932d2ca7) | H4のCHECK入力/変異登録。H4後 |
 | I1 | tools/hwdev_layout.json | struct gf4_ctx /struct gf5 と保存値表を最終配置へ追随。D5/D6/T2/S2後、統合担当 |
 
 - 宣言段でfake APIも凍結: 第n回read/write/map/unmap失敗、書いた後のI/O失敗、全slot初期値、台帳/借用件数観測。既存試験登録にH5を含めて追随する。

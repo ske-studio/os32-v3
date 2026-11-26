@@ -178,7 +178,7 @@ HTTPエラーではステータスコードも残す。任意の応答本文や�
 `ok: true` は全手順と終端 `done` の実行完了を意味し、画面内容の正しさの証明ではない。
 
 ホスト試験とRED→GREENの記録:
-[`../tests/test_emu_playbook.py`](../tests/test_emu_playbook.py)、
-[`../tests/emu_playbook_tdd.md`](../tests/emu_playbook_tdd.md)。
+`../tests/test_emu_playbook.py` (旧版の Git blob `a8ef45f3e73a`)、
+`../tests/emu_playbook_tdd.md` (旧版の Git blob `8db0918763a1`)。
 
 今回の検証はホスト限定。ゲスト操作はPMレビュー完了まで実施しない。

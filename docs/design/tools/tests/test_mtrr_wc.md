@@ -1,4 +1,4 @@
-# tools/tests/test_mtrr_wc.py — MTRR WC の模型試験
+# test_mtrr_wc.py (旧版 aff66a818303) — MTRR WC の模型試験
 
 > 状態: **現行 (2026-11-01)**
 

@@ -21,7 +21,7 @@
 | 障害を追う | [POLICY_DEBUG.md](POLICY_DEBUG.md) (§2 反映確認 → §4 教訓集 → §5 道具) | — | `tools/np21w_mcp/`、`/api/tvram` |
 | 共通・CPU・機種・装置の境目に触る | スキル `.claude/skills/os32-arch-sep`、[層の検査 §3・§4・§8](design/tools/check_layers.md)、[ソースの選択](design/build/select.md) | 持ち主の置き場 (`sys/arch/<cpu>/`・`sys/platform/<機種>/`・`sys/dev/`・共通)、口は `sys/include/<名>_contract.h`・固定名 `platform_<名>.h` | `python3 -B -m tests.infra.ci run --check <id>` (include_layers・link_layers・build_sources)、両方の像のビルド |
 | 検査を足す・変える | [ROLES §0](tasks/agents/ROLES.md) | 検査本体と `tests/registry.toml` ([登録仕様](design/tools/checks/registry_v2.md)) | `python3 -B -m tests.infra.ci run --check <id> --mutate` |
-| 旧 CI の所要を調べる (参考のみ、P7 で削除) | スキル `.claude/skills/os32-ci-inventory`、[棚卸しの道具](design/tools/ci/time_inventory.md) | `tools/checks/weights.json` (重み)、workflow の行列 | `python3 tools/ci/time_inventory.py <成果物の置き場>`、前後のジョブの実時間 |
+| CI の所要を調べる | スキル `.claude/skills/os32-ci-inventory` | 同じ run のジョブ所要と結果表 | 集計結果の bundle seconds を参照 |
 | CI の赤を読む・回し直す | スキル `.claude/skills/os32-ci-read`、[POLICY_CI.md](POLICY_CI.md) | — | `gh run list` (数分おきに 1 回) |
 | NP21/W の受入を別の機械で回す | スキル `.claude/skills/os32-emu-remote`、[08_build §8-5](08_build.md) | 枠 (ポート・ini・NHD・HostDrv) は pc98emu の機械の `C:\np21w`・`C:\os32-N` | 配布物の BUILD_INFO・manifest の `build=`・ゲストの `ver` の照合 |
 | 票を完了にする・文書を減らす | スキル `.claude/skills/os32-archive`、[POLICY_ARCHIVE.md](POLICY_ARCHIVE.md) | 要約は `docs/design/<ソースと同じパス>.md`、移動は `tools/move_docs.py` | 登録の docs_* 4 本、`python3 -B -m tests.infra.ci lint` |

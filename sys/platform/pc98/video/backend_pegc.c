@@ -426,7 +426,7 @@ static void pegc_prepare(void)
 }
 
 /* 480 ラインへ入るポート操作の全部 (MMIO の前まで)。ホスト試験
- * (tools/tests/test_pegc_mode.py) はここを実物のまま回して OUT 列を見る。 */
+ * (test_pegc_mode.py (旧版 ac277b2ce769)) はここを実物のまま回して OUT 列を見る。 */
 /* 実機の ROM が止めたまま返す両 GDC を、OS32 が呼び手 (AH=40h / 0Ch の役) と
  * して表示開始する — ROM の列に対する OS32 の追加 (票 §3-3)。 */
 static void pegc_enter_480_ports(void)

@@ -200,7 +200,7 @@ void __cdecl os32_libc_fini(void);              /* entry[1] */
 |D6|`build/packages.yaml`（変更不要）|既存のBOOT＋MINIMAL選択でFDを維持、fd.exclude追加なし|
 |D7|`sdk/libc/boot_index.py`（新）|ABI票＋配備選択からshlib.idx生成、一覧の重複手書きを避ける|
 - app auxの構造体定義はA3、stackへの配置はB6、読出しはC2。clock頁の実体と更新処理は時刻設計の実装段へ渡し、未提供のP7は0/0を渡す。
-- 検査は次表の各項目に `tools/tests/test_libc_shlib_<項目>.py` を新設し各1段、CHECK.inputsを宣言。guest fixtureも各1ファイル段。正典更新は `docs/09_exec.md`・`docs/KAPI_SPEC.md`・`sdk/README.md` を各1段。
+- 検査は次表の各項目に `旧ホスト試験 test_libc_shlib_<項目>.py` を新設し各1段、CHECK.inputsを宣言。guest fixtureも各1ファイル段。正典更新は `docs/09_exec.md`・`docs/KAPI_SPEC.md`・`sdk/README.md` を各1段。
 
 ## 10. 受入 → 試験と変異
 H=host、N=NP21/W、R=PC-9821。変異は各試験の一意な1行anchor、通常成功／変異実行時REDを必須にする。

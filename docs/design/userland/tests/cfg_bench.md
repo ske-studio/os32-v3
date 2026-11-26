@@ -50,4 +50,4 @@ failures 0
 
 ## 検査
 
-`tools/tests/test_cfg.py` の `s5_pure` (引数・巡回・失敗の数え方・集計・整形の純関数)、`s5_bench` (実 DB の上の通し。接続を持っている間の yield が 0、短い走りで yield 1 回・1 KB を超える走りで 2 回以上、close 後にプールが開始値へ戻る、get 中の ERROR 遷移が `status 4 ERROR` に出る)。`--sanitize` に符号付き桁あふれの検査が入る。ホストの `u32` は 64 bit なので、平均の丸めの 32 bit 桁あふれはホストでは踏まない。
+`test_cfg.py (旧版 f84b12760091)` の `s5_pure` (引数・巡回・失敗の数え方・集計・整形の純関数)、`s5_bench` (実 DB の上の通し。接続を持っている間の yield が 0、短い走りで yield 1 回・1 KB を超える走りで 2 回以上、close 後にプールが開始値へ戻る、get 中の ERROR 遷移が `status 4 ERROR` に出る)。`--sanitize` に符号付き桁あふれの検査が入る。ホストの `u32` は 64 bit なので、平均の丸めの 32 bit 桁あふれはホストでは踏まない。

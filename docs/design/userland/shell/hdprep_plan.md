@@ -40,5 +40,5 @@ hdprep は**空のディスク専用**で、`--force` は無い。
 
 ## 確かめ
 
-`make check-hdd-stage1-host` (`tools/tests/test_hdd_stage1.py`) のケース `hdprep_geom`・`hdprep_disk`・`hdprep_mounts`・`hdprep_plan`。
+`make check-hdd-stage1-host` (`test_hdd_stage1.py (旧版 6201b26bccf0)`) のケース `hdprep_geom`・`hdprep_disk`・`hdprep_mounts`・`hdprep_plan`。
 `make check-hdprep-command-host MUTATE=1` は登録された実コマンドをメモリ媒体に対して実行する。空ディスク検査と確認拒否で全セクタが等しいこと、試し書きの照合失敗で整形前に止まること、成功時の試し書き・整形・表更新・マウント検読の順を確認する。

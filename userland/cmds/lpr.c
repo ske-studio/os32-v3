@@ -9,7 +9,7 @@
 /*  line.split() で種別を読むため)、空 basename は "file"、`-` は "stdin"。   */
 /*  終了コード: 0 成功 / 1 業務失敗 (ESERVICE) / 2 リンク / 3 usage /         */
 /*              4 ローカル I/O (読み取り失敗)。                              */
-/*  ホスト TDD は -DHOST_TEST (tools/tests/host_cmd_host.c)。                 */
+/*  ホスト TDD は -DHOST_TEST (host_cmd_host.c (旧版 72755fc95850))。                 */
 /* ======================================================================== */
 
 #ifdef HOST_TEST

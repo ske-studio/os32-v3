@@ -51,7 +51,7 @@ qemu-system-ppc -M mac99 -cpu 7450 -m 128M -smp 1 -accel tcg \
   -prom-env 'boot-device=cd:,\PPCKERN.ELF' -prom-env 'auto-boot?=true' \
   -nographic -serial file:a.log -serial file:b.log -monitor none -qmp stdio
 ```
-- 新 `tools/ppc/kboot_run.py`。run.py:175/mmu_run.py:32のISO・QMP stdio方式を再利用。ROMは実行用バイナリのみ。toolchain/QEMU版、ROM/ELF hash、link map、コマンド、raw A/Bログを保存する。
+- 新 `kboot_run.py (旧版 3c4a2c5ec78d)`。run.py:175/mmu_run.py:32のISO・QMP stdio方式を再利用。ROMは実行用バイナリのみ。toolchain/QEMU版、ROM/ELF hash、link map、コマンド、raw A/Bログを保存する。
 - 起動から60秒で次の順序を要求（可変値をparse、各節目1回、FAIL/FATAL/UNSUPPORTED無し）。最終行を固定印字するだけでは不合格。
 ```text
 KBOOT OF-CAPTURE ram=<bytes> admitted=<bytes> tb_hz=<hz>
@@ -96,8 +96,8 @@ KBOOT ALIVE tick_delta=<n> tb_us=<n> of_calls_delta=0
 |H3 本体graph|H2、段階link・未解決/PIT_HZ利用者監査|build/targets/ppc-powermac.mk Δ40、build/arch/ppc-sources.mk Δ20、build/platform/powermac.mk Δ20、build/targets/ppc-powermac.mk ＋100|I|
 |T1 host|各部品着後、入力/更新列/順序|tools/ppc/kboot_host.c ＋280、kboot_model_host.c ＋180、kboot_host.py ＋100|I|
 |T2 guest|C〜H後、実fault・root・IRQ・tick|arch/ppc/kboot_probe.S ＋150、platform/powermac/kboot_probe.c ＋160|P|
-|T3 acceptance|T1/T2/H3、二CPU＋負試験|tools/ppc/kboot_run.py ＋240、kboot_mutations.py ＋100|I|
-|T4 回帰・記録|全段後|tools/checks/ppc-kboot-host.py ＋25（CHECK inputs明記）、arch/README.md Δ20、docs/tasks/ppc/TASK_PPC_SEP.md Δ20|I|
+|T3 acceptance|T1/T2/H3、二CPU＋負試験|kboot_run.py (旧版 3c4a2c5ec78d) ＋240、kboot_mutations.py ＋100|I|
+|T4 回帰・記録|全段後|旧登録 ppc-kboot-host.py ＋25（CHECK inputs明記）、arch/README.md Δ20、docs/tasks/ppc/TASK_PPC_SEP.md Δ20|I|
 - 並列の波：{A1,B1,C1,G1}→{A2,B2,C2,D1,E1,F1}→{B3,C3,C4,D2,E2,F2,G2}→{D3,E3,H1}→H2→H3→T（各波内も表の依存順を守る。H1の最終分類はD3/E3後）。分離3 F・4 F・5 C1〜C3/Zの着地を待たない。E3は②専用外部入口にE2を接続できる（§6）。段Pは②直後GMACの前提で、②の待ち条件ではない。
 - 見積もり計：製品約3,000〜3,700行（ベクタ再利用約350行込み）、試験約1,200行、文書/選択約200行。D単独の旧1,730〜2,200行には本体link/OF予約/console/MPICは含まれない。1人直列で約15〜24人日。未着分離段の待ち時間は②のcritical pathに含めない。
 
@@ -233,7 +233,7 @@ void pm_log_write(const char *bytes, u32 n);
 |tick/time|host TB wrap/余り/負DEC/出力未変更、QEMU2秒TB対tick|DEC再装填削除→tick増分不足RED|
 |console/LAN口|host二sink順/失敗drop/va_args、QEMU Aのみ節目出力|ESCC data store省略→節目欠落RED|
 |x86不変|build_compare（通常/R1/配布対象）、変更部host、差ならNP21/W|source選択にPPC provider混入→選択fixture RED、生成物比較も失敗|
-- 実装者は各段の要求build、触った試験の`--mutate`、`python3 -B tools/checks/run.py --lint`。新変異はunique anchor、既存mmu_run.py:214以降のanchorを移す場合は旧単体像の試験も維持する。
+- 実装者は各段の要求build、触った試験の`--mutate`、旧手順（ad7e9fbf1fc8 の記録）。新変異はunique anchor、既存mmu_run.py:214以降のanchorを移す場合は旧単体像の試験も維持する。
 - selected/knownは実.dによる更新、bootstrap7本など既存必須集合を落とさない。全リンクprofileの成功と通常selected失敗一覧は別に報告。CI landing/full-checkの役割はROLES §0に従い、make check-changed/全変異をローカルで回さない。
 
 ## 10. 危険・未確認・PM推奨
@@ -256,7 +256,7 @@ void pm_log_write(const char *bytes, u32 n);
 
 ## 実装中の PM 決定 (2026-11-10)
 - **B3 の区間の一致** (astra 第 1 回 P2): high probe=0 では共通 mm の physmem は [15MiB,4GiB) が一続きの UNKNOWN (非 RAM)、ledger は [15,16)MiB と [16MiB,4GiB) の BACKGROUND になり、§4 の「ledger の BACKGROUND と physmem の除外が同じ区間で一致」は字面どおりには成り立たない。② では allocator が system も HPT も 16MiB 以上も渡さないことが成り立つので、**② の受入は「全ページの非 RAM の一致 + allocator の除外」で足りる**とする。共通 mm に high 登録と独立した除外の経路を足すと x86 の生成物が変わり NP21/W が要るので、16MiB を超える RAM を使う段 (② の後) へ送る。
-- **B3 で見つかった既存の x86 の試験の判定** (tools/tests/test_boot_readers.py、全 REQUIRE の失敗を exit=1 に畳む): B3 の範囲外。直すなら x86 本線の試験の整備として別に出す。
+- **B3 で見つかった既存の x86 の試験の判定** (test_boot_readers.py (旧版 cfd1eae70ddc)、全 REQUIRE の失敗を exit=1 に畳む): B3 の範囲外。直すなら x86 本線の試験の整備として別に出す。
 - **E3 (IRQ の adapter) は ② の後へ**: 本線の PCI IRQ の共通部 (bitmap) はまだ main に無く、§6 の l.176 のとおり ② は E2 の 0x500 専用の dispatch で閉じる。E3 は本線の bitmap が入った後に出す。これで第 4 波は D3 と H1 になり、H1 は D3 の後に出せる。
 - **E1 の mac99 の互換**: QEMU mac99 の OF は macio の assigned-addresses と ranges の親で phys.hi の n を 0 のまま割当済みの番地を入れる。E1 は曖昧でない場合だけ受け入れ、BAR の候補が曖昧なら拒否する。G4 の OF が同じ形かは実機で確かめる。
 - **G2 の能力無しの値**: 画面の座標は -1、サイズは 0×0。戻り値の無い cursor/GDC の制御は何もしない。LF は変換しない (x86 の serial の出力の慣習に合わせる)。sys/kern/kprintf_attr.c は kboot の profile で選ばず、属性の変換の口は G2 が出す。

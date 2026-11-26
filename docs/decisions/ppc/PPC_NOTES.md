@@ -24,7 +24,7 @@
 ## 3. QEMU (mac99)
 
 - OpenBIOS の画面は既定で 800x600x32。FB の文字端末は初段 INDEX8 だけなので `-g 800x600x8` で動かす。
-- FB の受入は `PPC_FB=1 python3 -B tools/ppc/usb_run.py` (S-B/S-C/S-D も同じ環境変数)。`-g 800x600x8 -display none` を選ぶ。`-nographic` は OF の stdout をシリアルに変え、display の採取を行えないため FB の観測には使わない。USB の product 試験は `screen.ppm` も残す。環境変数を省くと従来のシリアル経路を使う。
+- FB の受入は 旧手順（422c11a0ec91 の記録） (S-B/S-C/S-D も同じ環境変数)。`-g 800x600x8 -display none` を選ぶ。`-nographic` は OF の stdout をシリアルに変え、display の採取を行えないため FB の観測には使わない。USB の product 試験は `screen.ppm` も残す。環境変数を省くと従来のシリアル経路を使う。
 - この作業環境の OpenBIOS 1.1 (2026-06-24 build) は display の `color@` で例外を出し、catch セルを返さない。method 呼出しでは catch の初期値を失敗にし、未返却を成功と取り違えない。`color@` が失敗したときだけ、切り離し前に `color!` (r g b index) で 0=黒・255=白を書き、前景255・背景0、`fb_color_rc=4` (WRITTEN) を記録する。書込みも失敗したら端末を付けない。読めた場合は CLUT を変えず、明るい方を前景にする (OK=1、同じ明るさは EQUAL=3 で拒否)。
 - USB の受入は `-icount shift=auto` (TCG では OHCI のフレームの時計が TB から遅れる)。
 - LAN・USB の受入は時間に敏感で、ホストの負荷が高い (load 10 前後) と時間切れや打鍵の重複で落ちることがある。負荷の下がった時に回し直して確かめる。
@@ -35,7 +35,7 @@ QEMU の sungem は、受信リングが満杯の間に来た電文を溜め、R
 - 平均の tick の進みは変わらない。
 - send-key の hold-time 100 ms が、実時間で 3〜967 ms になった (眠らない時は 87 ms〜)。
 - 実時間で 100 ms 押しても、ゲストには 500 ms を超えて見えて、繰り返しが出た。
-- そのため USB の打鍵の受入は、押す長さをゲストの時計に合わせる。ゲストの押下 (長押しは最初の REPEAT) を見てから離す (tools/ppc/usb_run.py の key)。
+- そのため USB の打鍵の受入は、押す長さをゲストの時計に合わせる。ゲストの押下 (長押しは最初の REPEAT) を見てから離す (usb_run.py (旧版 402a96233090) の key)。
 - NAP で前景が DEC と同時に起きるので、受入が足す観測の枠 (~USBSTREAM) の書き込みに、IRQ の側の USB の行が割り込みやすい。枠は IRQ を止めて一続きに書く。
 - 製品の振る舞いは変えない。
 
@@ -59,7 +59,7 @@ QEMU の sungem は、受信リングが満杯の間に来た電文を溜め、R
 - USER の fd1・文字出力・printf は共通 console の mirror から `console_stream_write` へ送り、LAN terminal と ESCC に各 byte を 1 回送る。既存の有限キューと poll を保つ。起動・ドライバの診断は同じ formatter を別名で組み、`pm_diag_write` から LAN LOG/ESCC と共通 console の画面へ送る。この画面出力では terminal mirror を抑え、LOG を terminal に再投入しない。
 - sh の clear は `tvram_clear` KAPI の PowerPC endpoint から共通 console の画面消去・原点復帰を呼び、`ESC[2J ESC[H` は stream だけへ送る。共通 console は ESC 列を解釈しない。mirror は [console の契約](../../design/kernel/console/console.md) を参照。x86 の CUI/GUI の描画門は同じ。取り込み前の NP21/W の CUI ver・shell 出力・CONSOLE_DUAL の受入は本線 PM が行う。
 - USB の診断 (打鍵・enumeration・mouse・release を含む) は既存 LOG/ESCC に送り、端末画面へは出さない。同期 formatter の間だけ `pm_log_stream_only` を保存・設定・復元する。USER の echo/kprintf/fd1 はこれまでどおり共通 console と mirror へ送る。
-- 画素の受入は `python3 -B tools/ppc/fb_run.py --mutate` (`ppc-fb` check)。NIC 無しの mac99、USB で sh を開始し、固定した UTF-8 echo の `/fb.sh` を source する。PPM・固定期待行列・像/フォント/Unicode 表の SHA-256・stream を `$TMPDIR/fb-run-*/` に残す。fbcon のカーソルは下 2 走査線の反転なので、oracle は `cursor_top=14` を使う。LAN 切断前後の比較は別途 LAN が使える環境で行う。
+- 画素の受入は 旧手順（422c11a0ec91 の記録） (`ppc-fb` check)。NIC 無しの mac99、USB で sh を開始し、固定した UTF-8 echo の `/fb.sh` を source する。PPM・固定期待行列・像/フォント/Unicode 表の SHA-256・stream を `$TMPDIR/fb-run-*/` に残す。fbcon のカーソルは下 2 走査線の反転なので、oracle は `cursor_top=14` を使う。LAN 切断前後の比較は別途 LAN が使える環境で行う。
 - 共通 console への移行後、FB が無い場合も console_get_cursor_x/y は論理カーソル座標を返す (旧 kboot_console の -1 とは異なる)。
 
 ## 6. PowerPC の試験と CI
@@ -67,7 +67,7 @@ QEMU の sungem は、受信リングが満杯の間に来た電文を溜め、R
 - **CI の check-fast には、PowerPC の toolchain・QEMU・LAN の socket が無い。**
   - PPC の cross gcc・qemu-system-ppc・socket を使う試験は、無い環境ではその半分を `SKIP <理由>` と表示して 0 を返す。host の側の試験と変異は、必ず回す。
   - CI で PowerPC を必ず組むのは、check.yml の `ppc-compile` の job。そこでは `OS32_REQUIRE_PPC=1` が立つので、toolchain が無ければ失敗にする。
-  - 手本は `tools/tests/test_link_platform.py`・`tools/ppc/compile_ci.py`・`tools/checks/ppc-sc.py`。
+  - 手本は `test_link_platform.py (旧版 c4bc40be8d05)`・`compile_ci.py (旧版 3d07969b3073)`・`ppc-sc.py (旧版 bdd8b904e457)`。
 - **新しい試験は、取り込む前に `PPC_CROSS_DIR=/nonexistent` でも 1 回回す。** CI と同じ形で、SKIP と rc=0 になることを確かめる。2026-11-14 に、P1a の link-platform-host と P1f の gem-adapter-host が無条件に cross gcc を呼び、CI で落ちた。
 - **実装者の sandbox では socket が使えない。**
   - LAN と link の QEMU の受入 (link_run・sc_run の LAN・net-link-host の本物の agent) は、PM が手元で回す。

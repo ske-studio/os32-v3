@@ -1,7 +1,7 @@
 # tools/check_layers.py — 層の番人 (LAYER_GUARD_DESIGN: 共通・arch・platform・装置の依存の検査)
 
 > 状態: **現行 (2026-11-17)** — 出所: 機種依存の分離の作り直しの最初の段 (ユーザー決定 2026-11-17「共通ソースが機種ヘッダを読む数 0・ビルド 1 系統・入口の骨格 1 本」)。製品のコードは触らない。
-ソース: `tools/check_layers.py`、基準 `tools/layers_baseline.json`、試験 `tools/tests/test_layers.py`、登録 `tools/checks/layers-host.py`・`layers-x86.py`・`layers-ppc.py`
+ソース: `tools/check_layers.py`、基準 `tools/layers_baseline.json`、試験 `test_layers.py (旧版 dbb7eed86d0b)`、登録 `layers-host.py (旧版 31e9278d3496)`・`layers-x86.py`・`layers-ppc.py`
 
 ## 1. 目的
 
@@ -70,12 +70,12 @@
 |---|---|
 | `tools/check_layers.py` | 分類・規則・基準との照合・`--write-baseline`・`--image`・`--root`。標準ライブラリだけ |
 | `tools/layers_baseline.json` | 基準 (実装の段で両方の像を組んで書く) |
-| `tools/tests/test_layers.py` | 偽の作業木と偽の `.d` で R1〜R7・固定名の例外・契約の実装の内側の辺が違反にならないこと・R6 の優先・相対と末尾一致の解決・生成ソースの読み替え・new と stale・空の根を確かめる。`--mutate` で規則ごとに RED |
-| `tools/checks/layers-host.py` | 上の試験の登録 (`needs=[]`) |
-| `tools/checks/layers-x86.py` | `x86-pc98` の実測 (`needs=['make:all']`) |
-| `tools/checks/layers-ppc.py` | `ppc-powermac` の実測 (`env=['ppc-cross']`、`needs=['make:ppc-ci-image']`、道具が無いときの SKIP・FAIL は `tools/checks/ppc_registered.py` と同じ決まり) |
+| `test_layers.py (旧版 dbb7eed86d0b)` | 偽の作業木と偽の `.d` で R1〜R7・固定名の例外・契約の実装の内側の辺が違反にならないこと・R6 の優先・相対と末尾一致の解決・生成ソースの読み替え・new と stale・空の根を確かめる。`--mutate` で規則ごとに RED |
+| `layers-host.py (旧版 31e9278d3496)` | 上の試験の登録 (`needs=[]`) |
+| `layers-x86.py (旧版 f95fe4eff7a5)` | `x86-pc98` の実測 (`needs=['make:all']`) |
+| `layers-ppc.py (旧版 1d0429399e1b)` | `ppc-powermac` の実測 (`env=['ppc-cross']`、`needs=['make:ppc-ci-image']`、道具が無いときの SKIP・FAIL は `ppc_registered.py (旧版 aea7c86973f5)` と同じ決まり) |
 
-`basis` は `['LAYER_GUARD_DESIGN §4', 'LAYER_GUARD_DESIGN §5']`。`layers-host` の試験は偽の木 (TemporaryDirectory) だけを読むので、`tools/checks/run.py` の `PATH_AUDIT_ALLOW` に道具と試験の 2 行を載せる。
+`basis` は `['LAYER_GUARD_DESIGN §4', 'LAYER_GUARD_DESIGN §5']`。`layers-host` の試験は偽の木 (TemporaryDirectory) だけを読むので、`run.py (旧版 bdcca5c408c4)` の `PATH_AUDIT_ALLOW` に道具と試験の 2 行を載せる。
 
 ## 7. 入れた時の基準値と確かめたこと
 

@@ -47,4 +47,4 @@ OK かつ close 成功なら出さない (kprintf の 1 行 `gshell: cfg OK colo
 
 ## 検査
 
-`userland/gshell/host/settings_tests.rs` (`make check-gshell-host`、`userland/gshell/host/integration.py` が rustc で組む)。`cfg_*` は `host/mocks.rs` の贋物 `CfgFake` で、DB を動かす操作 (`Open`・`GetInt`・`Begin`・`SetInt`・`Commit`・`Rollback`・`Close`) の順を記録する。S09b・S14 はスケジューラの関数を順に直接呼ぶ試験で、`handler` → 実 park → `standalone_loop` の実遷移は通していない (ゲスト受入の担当)。
+`settings_tests.rs (旧版 b32248ea9df8)` (`make check-gshell-host`、`integration.py (旧版 14d0fb10090f)` が rustc で組む)。`cfg_*` は `host/mocks.rs` の贋物 `CfgFake` で、DB を動かす操作 (`Open`・`GetInt`・`Begin`・`SetInt`・`Commit`・`Rollback`・`Close`) の順を記録する。S09b・S14 はスケジューラの関数を順に直接呼ぶ試験で、`handler` → 実 park → `standalone_loop` の実遷移は通していない (ゲスト受入の担当)。

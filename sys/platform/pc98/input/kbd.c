@@ -139,7 +139,7 @@ static u8 kbd_lock_bits_from_bios(u8 bios_shift)
 
 /* Use the immutable boot BDA; page0 is NP outside V86 sessions. */
 #if defined(KBD_HOST_TEST) && !defined(__KERNEL_BUILD__)
-extern u8 kbd_host_bios_shift;   /* tools/tests/kbd_dlog_host.c */
+extern u8 kbd_host_bios_shift;   /* kbd_dlog_host.c (旧版 fb194f50a529) */
 static u8 kbd_bios_shift_peek(void) { return kbd_host_bios_shift; }
 #else
 static u8 kbd_bios_shift_peek(void)

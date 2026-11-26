@@ -71,8 +71,8 @@ PPC の gui_default は x86 同様 SYSTEM.CFG の GUI を読む。prepare は利
 |7|build/ppc-user.mk|同じ userland/gshell を明示 cargo target で staticlib 化。PPC 用 gfx・cfg、resident CRT、syscalls、既存 newlib nano/allocator と libgcc で app_sys.ld にリンク。shell と同じ guard・objcopy・mkos32x。未解決 extern、x86 asm、SHM の endian 固定を参照元単位で解消|
 |8|build/targets/ppc-powermac.mk|kb-user と root の依存に gshell.bin を追加。像更新時に root 再生成|
 |9|sys/platform/powermac/shell_loop_ops.c|設定値と実能力により GUI 起動、失敗時に CUI を再利用|
-|10|tools/tests/test_of_fb.py|色・世代・部分転送を host fixture で照合|
-|11|tools/accept/ppc_gui.py（新規）|既存 ppc_mouse の build / Session を使い製品経路の起動・復帰を照合|
+|10|test_of_fb.py (旧版 1fbffe526220)|色・世代・部分転送を host fixture で照合|
+|11|ppc_gui.py (旧版 25433881617a)（新規）|既存 ppc_mouse の build / Session を使い製品経路の起動・復帰を照合|
 
 追加の共通化が必要なら変更元ごとに段を分割する。生成した表の手編集や機種マクロによる gshell の分岐は行わない。
 

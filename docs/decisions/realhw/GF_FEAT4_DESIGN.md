@@ -194,8 +194,8 @@ struct gf4_test_ops { struct gf4_ctx *ctx;
 | 段 / ファイル | 機能・依存・行目安 |
 |---|---|
 | A0 sys/dev/video/geforce/display/api.h 新、sys/dev/video/geforce/gfinit_mode.h・kdebug/gfinit_* 変 | API/型/定数/出典表、head別snapshotに全呼出し/fixtureを追随、hwdev.mk:126のVPLL probeも再compile / F1〜3 / 180＋追随分 |
-| A1 tools/tests/gf_display_host.h 新 | 偽MMIO indexed/AR/LUT/時刻/IRQ counter/VRAMとI2C slave骨格 / A0 / 220 |
-| A2 tools/tests/test_gf_display.py 新 | 部品link・fixture・変異登録・image/import計測骨格 / A1 / 100 |
+| A1 tests/support/fixtures/gf_display_host.h 新 | 偽MMIO indexed/AR/LUT/時刻/IRQ counter/VRAMとI2C slave骨格 / A0 / 220 |
+| A2 test_gf_display.py (旧版 983602fcd992) 新 | 部品link・fixture・変異登録・image/import計測骨格 / A1 / 100 |
 | A3 sys/dev/video/geforce/diag/gf_display_test.c 新 | serial dispatch/復元/カメラ用case番号の骨格、試験ops bind / A0 / 100 |
 | B0 sys/dev/video/geforce/display/modes.c 変 | 候補/ID/能力/容量検査 / A0 / 130 |
 | B1 sys/dev/video/geforce/display/timing.c,format.c,fifo.c 変 | 各既存責務の引数化・pitch/depth/FIFO / B0 / 計180 |
@@ -216,7 +216,7 @@ struct gf4_test_ops { struct gf4_ctx *ctx;
 | C3 drivers/video/geforce/geforce_module.c/.h、tools/module_schema.py、build/geforce-module.mk・hwdev.mk、docs/08_build.md 変 | ABI宣言を前倒し: accel_out/foundation_outを保持して版4→5、display欄と前方宣言のfeature5_outを追加 (F5 A0待ちなし)。PM決定（1）: schema:188のimage_max/mem_maxを各163840B (160KiB)、load_span_maxを212992B (208KiB)へ拡大し容量表へGEFORCE行を同期。根拠はmodule_runtime.c:73–78の一般割当域からの連続頁取得で、固定帯域・常駐予約は無い。header/schema/loader/manifest期待値を同一所有者が揃え、生成物再作成はPM登録段。リンク分離・像検査・全backend再ビルドは統合後 / 宣言を先行、登録はF3 C3後 / 計90＋容量表 |
 | C4 sys/dev/video/geforce/gf_display_data.c 新、kernelのソース列 変 | helper ops/state所有・bind、B4/B11 kernel部分だけをkernelにlink、moduleに重複linkしない / B4,B11 / 60 |
 - C3のhwdev.mkは新規ddc/dpms/flip/gamma/tmds/tv/heads.cを全てfilter-out (全てgeforce.mod専用)、edid.c/tv_data.c/gf_display_data.cはkernel専用。既存cursor.cは診断のhide列を維持し独立VRAM窓を使う画像APIをGF_PRODUCTION_MODULE内に限定。既存modes/modeset/output/palette/blank/service/quiesceのF1〜3・helper参照も同条件に置き、hwdev側は従来診断列。timing/format/fifo/PLLは共有純計算/MMIOを維持。hwdev/R1/VPLL/GFA/非module backendの実linkで未解決参照を検出。
-- 各Bでtools/tests/gf_display_b<N>_host.cを同時作成、実部品をlink、A1で依存を偽装し各40〜100行。A3へ各caseを追加、共有登録はC段で直列統合。kdebug/gfinit_pll/は既存純整数solverを再利用、同じ計算の別実装を増やさない。
+- 各Bでtests/support/fixtures/gf_display_b<N>_host.cを同時作成、実部品をlink、A1で依存を偽装し各40〜100行。A3へ各caseを追加、共有登録はC段で直列統合。kdebug/gfinit_pll/は既存純整数solverを再利用、同じ計算の別実装を増やさない。
 
 ## 12. 受入 → 試験・変異・段分け
 | 受入 | ホスト偽MMIO/変異 (変異時にRED必須) | 実機serial / カメラ | CHECK名・正常対照・DEFERRED_TESTS行ID |
@@ -308,7 +308,7 @@ F4 A0はF3の面/窓契約後、C3のABI宣言はF5 A0を待たず先行する�
 | 同 部品間口（定義は各所有B/C） | `i32 gf4_surface_check(struct gf4_ctx *,const struct gf3_surface *,const struct gf4_mode *);` B0所有、BYTESのF3検査後に表示3format/pitch64B/開始4B/CR field幅を検査。`i32 gf4_route_check(struct gf4_ctx *,const struct gf4_route *);` B9所有。`i32 gf4_lut_load(struct gf4_ctx *,u8);` B8所有、palette/gammaが共用。`i32 gf4_heads_apply(struct gf4_ctx *,u32 heads);` B12所有、F1 wanted_headsとch->headsを一致させる。 |
 | 同 計算／encoder口 | `i32 gf4_timing_calc(const struct gf4_mode *,struct gfinit_mode *); i32 gf4_format_calc(const struct gf4_mode *,const struct gf3_surface *,struct gfinit_mode *); void gf4_fifo_calc(struct gfinit_mode *); i32 gf4_pll_calc(const struct gf4_mode *,const struct gf4_route *,const struct gfinit_mode_saved *,const struct gfinit_pll_limits *,struct gfinit_mode *);` 各B1/B2所有。B9/B10/B11は `i32 gf4_{analog,tmds,tv}_load(struct gf4_ctx *,const struct gf4_route *,const struct gfinit_mode *,u32 dl)` と同形の `_dpms`（mode引数をenum gf4_dpmsへ置換）。 |
 | `sys/dev/video/geforce/gfinit_mode.h`、`display/calc.h`、`kdebug/gfinit_*` | `gfinit_mode_head_saved={u8 cr1c,cr33,cr3c,cr4b,cr52; u32 gpio_ext,crtc850;}`、`gfinit_mode_saved={struct gfinit_mode_head_saved head[2]; u32 pllsel,sel_clk;}`へ置換。gfinit_modeにu8 head; u32 fp_horiz[7],fp_vert[7],dither,dither_regs[6],fp_debug[3],fp_margin,tv_vtotal,tv_vskew,tv_vsync_delay,tv_htotal,tv_hskew,tv_hsync_delay,tv_hsync_delay2を追加（N/dispnv04/disp.h:30–75）。rollbackの全体像はstate.work/rollbackと既存recover機構が持つ。旧診断gfinit_mode_calcはhead0既定modeのラッパー、旧gf_mode_*呼出しも既定ラッパーを保持し全fixtureを追随。 |
-| gfinit_mode追従の担当 | F4 A0: sys/dev/video/geforce/gfinit_mode.h、hwdev/gf/display/{calc.h,state.h,baseline.c,extended.c,pll_program.c,calc.c}、sys/dev/video/geforce/internal.h、kdebug/gfinit_*（特にgfinit_plan_c.c:225）のhead別参照・offsetofを更新。tools/tests/{gf_display_host.c,gfinit_mode_host.c}の位置指定初期化を欄名指定へ変更。同じF4 A0がtools/tests/test_gf_display.pyのprevious_calcを修正し、基点の源とともに `git show 13bc5619:sys/dev/video/geforce/gfinit_mode.h` で得たヘッダーを一時include木へ配置して基点TUだけに優先適用する（現行TUは現行ヘッダー）。A0のhead[2]変更と同時に取り込み、A2待ちにしない。A2はこの分離を維持して登録を引き継ぐ。PM登録段: tools/hwdev_layout.jsonの旧684/20と生成hwdev_contract.hのsizeof/offset契約を再生成・同期。旧定数を手で残さない。 |
+| gfinit_mode追従の担当 | F4 A0: sys/dev/video/geforce/gfinit_mode.h、hwdev/gf/display/{calc.h,state.h,baseline.c,extended.c,pll_program.c,calc.c}、sys/dev/video/geforce/internal.h、kdebug/gfinit_*（特にgfinit_plan_c.c:225）のhead別参照・offsetofを更新。tests/support/fixtures/{gf_display_host.c,gfinit_mode_host.c}の位置指定初期化を欄名指定へ変更。同じF4 A0がtests/dev/gf_display.pyのprevious_calcを修正し、基点の源とともに `git show 13bc5619:sys/dev/video/geforce/gfinit_mode.h` で得たヘッダーを一時include木へ配置して基点TUだけに優先適用する（現行TUは現行ヘッダー）。A0のhead[2]変更と同時に取り込み、A2待ちにしない。A2はこの分離を維持して登録を引き継ぐ。PM登録段: tools/hwdev_layout.jsonの旧684/20と生成hwdev_contract.hのsizeof/offset契約を再生成・同期。旧定数を手で残さない。 |
 | `sys/include/gfx_hal.h` / `geforce_module.h`・schema | §2のGfxCursorImage/GfxScanout・8hookを末尾に追加。GfxScanoutはID不再利用を使いctx内の同IDからgenerationを得る。Contextは既存accel_out/foundation_outを保持してdisplay_data/state/out,feature5_out追加、版4→5はF4 C3宣言担当だけ。F5で再変更しない。 |
 | `production.h` / `gf_display_data.c` | productionにはgf4_ctxのみ埋込み、state/helperはkernelが貸す。大きいmode/LUT/TV/rollbackをmoduleへ複製しない。C4がversion/size検査してbind、C2がready成功後公開。全backend追随と生成はPM統合段。 |
 
@@ -323,7 +323,7 @@ F4 A0はF3の面/窓契約後、C3のABI宣言はF5 A0を待たず先行する�
 
 ### A1 host土台の完全な受渡し規約（G1）
 
-| 共通API／F4追加 | 宣言と意味（tools/tests/gf4_display_fake.hが唯一の所有者（既存gf_display_host.cを土台名に使わない）） |
+| 共通API／F4追加 | 宣言と意味（tests/support/fixtures/gf4_display_fake.hが唯一の所有者（既存gf_display_host.cを土台名に使わない）） |
 |---|---|
 | F3から再利用できる範囲 | A1/gf_accel_host.h:7–11,63–103を確認。`GF3_HOST_UNIT=12`でincludeし、gf3_host_init/trace_clear/fail_at/ref_*と記録型だけ借りる。12は依存stubを一切定義しない。既存B0等の選択をF4に流用しない。gf_command_host.hとの同時includeなし。 |
 | 新型 | `enum gf4_host_op { D_READ,D_WRITE,D_CLOCK,D_SLEEP,D_SNAPSHOT,D_IRQ,D_FENCE,D_FENCE_WAIT,D_FAULT,D_MATCH,D_MAP,D_UNMAP,D_FORMAT,D_SURFACE,D_ROUTE,D_LUT,D_HEADS,D_EDID,D_TV,D_LOAD,D_SAVE,D_RESTORE,D_SCRIPT,D_EXTERNAL,D_DPMS,D_OP_COUNT }; struct gf4_host_event { enum gf4_host_op op; u32 nth,a[12]; const void *p[4]; i32 rc; }; struct gf4_host_read { u32 bar,off,width,value; };` |
@@ -333,7 +333,7 @@ F4 A0はF3の面/窓契約後、C3のABI宣言はF5 A0を待たず先行する�
 | 失敗・状態 | nth=1始まり、0は全回、rc=0解除。成功失敗とも引数/返却rcを記録しobserveは帰還前。trace_clearは記録数・callsだけ、失敗設定/VRAM/時刻を保持。バッファ不足・script不一致は常時有効assert→exit(1)、製品ENOSPCへ偽装しない。map/unmapはV0の変更なし／失敗時保持を模す。 |
 | 引数記録と対応名 | event.aは宣言順の非pointer引数（structは宣言順へ展開）、event.pはpointer順、余り0。構造体内容はobserveで即時照合。FENCE/WAIT=gf2_fence_emit/wait、SNAPSHOT/IRQ=gf_irq_snapshot/enable、MATCH/MAP/UNMAP=gf_vram_match/view_map/view_unmap、FORMAT/SURFACE=gf3_format_get/surface_check、ROUTE/LUT/HEADS=gf4_route_check/lut_load/heads_apply、EDID/TV=gf4_data_ops、SCRIPT/EXTERNAL=gf4_exec_ops。typed callbackのctx/ownerも記録する。 |
 | stub選択 | 必須GF4_HOST_UNIT=0..12（B番号）、13=C0、14=依存stubなし。製品TU自身の関数は定義しない。B0:FORMAT/SURFACE/MATCH/EDID、B1/B3/B4:外部依存なし＋io、B2:既存PLL parser/solver実物、B5:FENCE/WAIT/encoder DPMS、B6:MATCH/MAP/UNMAP、B7:FENCE/WAIT/FAULT＋gf4_surface_check＋SNAPSHOT、B8:ioのみ、B9〜B11:ROUTE/TV/SCRIPT/EXTERNAL（製品自身除外）、B12:IRQ/SNAPSHOT、C0:各Bの公開口。B1/B11のファイル分割は補助リンク一覧で選択し重複stubを禁止。全stubはapi.h/F1〜3の実宣言を使う。 |
-| oracle・登録 | B単独はgolden MMIO／呼出し順／所有遷移で合否判定。GPU画像の生成を仮定しない。packet/画像参照は必要な結合に限定。read script・EDID規格fixture・MIT列の出典と再生成法をrepoに置きCIはrefsを読まない。A2は既存tools/tests/test_gf_display.pyへの追記（CHECK名gf-display-host、BASE 13bc5619照合、previous_calcの基点ヘッダー分離はA0担当）で、層2caseとgf_display_{host,modes_host,blank_host,palette_host}.cを保持。B0/B5/B8がmodes.c/blank.c/palette.c変更に伴う既存試験追従を担当。A2が依存link/CHECK/変異登録を一元所有、-m32/-nostdlib・自前_start、heap/VLA/libcなし。 |
+| oracle・登録 | B単独はgolden MMIO／呼出し順／所有遷移で合否判定。GPU画像の生成を仮定しない。packet/画像参照は必要な結合に限定。read script・EDID規格fixture・MIT列の出典と再生成法をrepoに置きCIはrefsを読まない。A2は既存tests/dev/gf_display.pyへの追記（CHECK名gf-display-host、BASE 13bc5619照合、previous_calcの基点ヘッダー分離はA0担当）で、層2caseとgf_display_{host,modes_host,blank_host,palette_host}.cを保持。B0/B5/B8がmodes.c/blank.c/palette.c変更に伴う既存試験追従を担当。A2が依存link/CHECK/変異登録を一元所有、-m32/-nostdlib・自前_start、heap/VLA/libcなし。 |
 
 | 64bit型・除算（F4/F5共通） | PMが統合段でsys/include/types.hへtypedef unsigned long long u64; typedef long long i64;を1回追加。os32_kapi_shared.hは変更なし、hostdrvfs_proto.hの同一typedefはC11で許容。製品TUでは64bitの除算・剰余を書かず、PLL誤差0.5%等は範囲を確認した乗算比較で表現し、vmap符号付き式・cursor・tile計算もこの制約を守る。各Bが製品側の計算を所有し、hostの-m32/-nostdlibとlibgccをリンクしない.modの双方で__udivdi3/__divdi3等を要求しない。2026-11-04ユーザー決定に従いkernelもlibgccを前提にしない。F4 A1がF3 A1の1ff4e2d2（gf_accel_host.h）の64bit除算helperを試験コード専用として共通土台へ再利用し、F5 A1も同じ定義を使う（1リンク1定義）。host helperで製品側の依存を隠さず、A2/A3のリンク確認では製品TUの当該未解決symbolが無いことも確認する。 |
 
@@ -383,7 +383,7 @@ F4のF3待ちは機能結合5段＋共有登録1段＝6段（上表）。A0/Bコ
 | restartの公開順／fence世代 | restartはBM先行→必要devinit→F1/F2→F3 objectsまで受付閉。性能/thermal/tile→VRAM→F4 restore→IRQ要求→全slot/scan hookを再bindして公開。F2 startがepochを進めるので二重加算しない。旧ticketは新epochの完了として通さず、未完了要求は再送しない。mode変更だけならepochは不変。 |
 | snapshot free | 呼出元が所有しgf5は借用。確定設計のfree契約に従い、FAULTを理由とするEBUSYや「唯一の復旧手段」判定は追加しない。free時は借用image参照を外し、所有するextent画像・trip・metadataを解放する。ROM/借用helperは最後のsnapshotとcleanupが終わるまで保持。 |
 
-### A1で共有するhost API（G1、tools/tests/gf5_fake.h）
+### A1で共有するhost API（G1、gf5_fake.h (旧版 978bfc949fbd)）
 
 | 型・API／部品選択 | 実装すべき契約 |
 |---|---|

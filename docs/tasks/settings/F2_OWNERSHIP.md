@@ -34,7 +34,7 @@ F1 は受入済みという依頼条件を前提とする。
 | 場所 | 現状と F2 に必要な差分 |
 |---|---|
 | `sys/kapi/kapi_db.c` | DbSlot は owner／isolated を保持。finalize→必要なら ROLLBACK→sqlite3_close、close 失敗時は slot のみ隔離。FD の情報はない。owner/all cleanup は isolated を再試行しない |
-| `tools/tests/kapi_db_owned_tdd.md` | F1 の既存 host 証跡は実 DB slot＋SQLite mock。実 VFS／FD／exec／FEP 生存の証拠ではない |
+| `kapi_db_owned_tdd.md (旧版 33c9830fe229)` | F1 の既存 host 証跡は実 DB slot＋SQLite mock。実 VFS／FD／exec／FEP 生存の証拠ではない |
 | `lib/sqlite3/os32_sqlite_vfs.c` | Os32File は fd だけ。xOpen は現在 owner の `vfs_open`。xClose は void の `vfs_close` を呼ぶ。`os32_sqlite_db_fd` は main しか返さない |
 | `sys/fs/vfs_fd.c` | FD 表は in_use／protect／owner。vfs_open は res_owner_get で付与。vfs_close は protect を無視して表を空ける。vfs_close_owned だけが protect を除外する。backend close callback は現在ない |
 | `sys/fs/fd_redirect.c` | owner は再利用される nest 整数。redirect reset は直接 vfs_close を呼ぶため、「protect したから全 close 経路で安全」ではない |
@@ -163,7 +163,7 @@ int vfs_count_sqlite(const VfsSqliteCookie *cookie);
 
 ### 3.3 F2a HOST 限定の確定契約（F2b–d の承認・完了とは別）
 
-F2a の編集対象は `sys/fs/vfs_fd.c`、`sys/fs/vfs.h`、`tools/tests/` の専用 harness／TDD 記録、
+F2a の編集対象は `sys/fs/vfs_fd.c`、`sys/fs/vfs.h`、`tests/integration/` の専用 harness／TDD 記録、
 および本節の契約明確化のみ。初稿 §1 の文書限定作業と区別する。exec／SQLite／FEP は未接続。
 
 - `VfsSqliteCookie = {int group_index, u32 generation}`、
@@ -295,7 +295,7 @@ SQLite エンジン内部を fault で中断したケースに通常 close を�
 
 順序は a→b→c→d。b/c 途中で default 未所属 file open の拒否を有効にして FEP を壊す配備をしない。
 段階途中は host 限定、ゲストへ渡せる単位は a–d の統合済み成果物。
-新規 host 試験は `tools/tests/` に限定し、実 FD/VFS/DB 実装をコンパイルして境界だけ shim 化する。
+新規 host 試験は `tests/integration/` に限定し、実 FD/VFS/DB 実装をコンパイルして境界だけ shim 化する。
 実装の複製で順序が合っているように見せない。exec の privileged 部分は host seam を最小化し、
 callsite の静的検査も組み合わせる。新規 guest binary の必要性・名前・deploy.yaml 登録は後日承認する。
 

@@ -2,7 +2,7 @@
 /*  IRQ_MATH.C — 動的 IRQ の判断だけ (I/O なし)                             */
 /*                                                                          */
 /*  ここには outp/inp も tick_count も無い。全部の分岐がホストで踏める。     */
-/*    → sys/kern/irq/irq_math.h の先頭、tools/tests/irq_math_tdd.md               */
+/*    → sys/kern/irq/irq_math.h の先頭、irq_math_tdd.md (旧版 2a70ec1cad58)               */
 /* ======================================================================== */
 
 #include "irq_math.h"

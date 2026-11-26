@@ -6,7 +6,7 @@
 //!
 //! 表示する行は実行中カーネルの sys_ver_info から一度だけ取得する。
 //! 文言・順序は sys/kern/ver_format.c が持ち、About は kind ごとに区切る。
-//! CUI との一致・ABI・窓の寸法は tools/tests/test_about_info.py で確認する。
+//! CUI との一致・ABI・窓の寸法は test_about_info.py (旧版 85ada75c1e56) で確認する。
 //!
 //! 閉じ方: RETURN / ESC / OK ボタン / 閉じるボタン / GRPH+f･4 (WM 側)。
 #![no_std]

@@ -12,7 +12,7 @@
  *  あり続けるための約束 (設計 §3-2)。
  *
  *  結線 (publish / retire / wm_mark の呼出し、frame[5]) は S3b で
- *  sys/kern/exec/exec.c に入る。ホスト試験は tools/tests/shell_service_host.c。
+ *  sys/kern/exec/exec.c に入る。ホスト試験は shell_service_host.c (旧版 9520172b43c3)。
  * ======================================================================== */
 #include "shell_service.h"
 #include "appslot.h"        /* appslot_cur / appslot_get / APP_ID_SHELL / APP_STATE_RUNNING */

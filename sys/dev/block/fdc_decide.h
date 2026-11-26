@@ -8,8 +8,8 @@
 /*    (b) RECALIBRATE の EC (77 ステップでトラック 0 に届かなかった)        */
 /*  がエミュレータでは再現せず、机上の判断のまま実機で落ちていたため。      */
 /*                                                                          */
-/*  試験: tools/tests/fdc_seek_host.c + tools/tests/test_fdc_seek.py        */
-/*  記録: tools/tests/fdc_seek_tdd.md                                       */
+/*  試験: fdc_seek_host.c (旧版 69b059bfbf46) + test_fdc_seek.py (旧版 2459dade21fe)        */
+/*  記録: fdc_seek_tdd.md (旧版 59860ec05823)                                       */
 /*  出典: µPD765A データシート (ST0 / SENSE INTERRUPT STATUS)               */
 /* ======================================================================== */
 

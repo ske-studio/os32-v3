@@ -41,6 +41,6 @@
 
 ## 確かめ
 
-- `tools/tests/test_hostsvc_nic.py`・`test_hostsvc_nic_rx.py` (3 バイトの判定、EOF=5 を SFS にしない、片方の満杯が他方を止めない)。
+- `test_hostsvc_nic.py (旧版 144988ea1d46)`・`test_hostsvc_nic_rx.py` (3 バイトの判定、EOF=5 を SFS にしない、片方の満杯が他方を止めない)。
 - `test_hostsvc_link_core.py`・`test_hostsvc_lgy98.py`・`test_hostsvc_lgy98_attach.py`・`test_hostsvc_e82557.py` (装置の登録と選択、LGY の無い機械で 82557 の lan.mod の輸入が解決する)。
-- 共通の土台は `tools/tests/hostsvc_fixture.h` (libc なし ILP32、偽の adapter・時計・IF)。
+- 共通の土台は `hostsvc_fixture.h (旧版 b120953abc20)` (libc なし ILP32、偽の adapter・時計・IF)。

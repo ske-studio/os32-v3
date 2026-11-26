@@ -42,4 +42,4 @@ u32 memory_boot_detect(u32 mem_kb)
 - `memory_boot_ram_kb()` は登録した span の合計 (低位 + 高位)。上端 `sys_mem_kb` とは別で、高位 RAM のある構成では差が 15〜16MB の穴の 1MB になる。8MB 構成では一致する。
 - デバイス窓を張れるかは「RAM の上端」でなく「窓に RAM が登録されているか」(`pgalloc_range_has_ram`、`docs/design/mm/pgalloc.md`) で決める。15MB・32MB 構成では上端が窓より上でも、システム空間は穴なので窓を張れる。
 
-検査: `tools/tests/test_memory_boot.py` (`memory_boot_host.c`)・`tools/tests/test_physmem.py` (`test_high_ram_has_no_artificial_ceiling`)・`tools/tests/test_pgalloc_range.py`。`memory_boot_detect` の実ハードの動き (0594h の読み・書き込みの確認) はホストで確かめられない。
+検査: `test_memory_boot.py (旧版 61b2b8039959)` (`memory_boot_host.c`)・`test_physmem.py (旧版 e8cb10046c4d)` (`test_high_ram_has_no_artificial_ceiling`)・`test_pgalloc_range.py (旧版 7c17bcf37682)`。`memory_boot_detect` の実ハードの動き (0594h の読み・書き込みの確認) はホストで確かめられない。

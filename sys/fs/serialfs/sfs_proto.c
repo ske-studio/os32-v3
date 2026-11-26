@@ -2,7 +2,7 @@
 /*  SFS_PROTO.C — SerialFS のフレームと時間の規則 (純粋)                    */
 /*                                                                          */
 /*  形式の正典は sys/fs/serialfs/sfs_proto.h の頭。ホスト側の写しは                       */
-/*  tools/serialfs_host.py (tools/tests/test_serialfs.py が相互に照合する)。 */
+/*  tools/serialfs_host.py (test_serialfs.py (旧版 3080b693e474) が相互に照合する)。 */
 /*  カーネルの外 (ホスト試験) でもそのまま組めるよう、依存は crc32 だけ。   */
 /* ======================================================================== */
 #include "sfs_proto.h"

@@ -71,6 +71,6 @@ quiesce と接続・group の解放を確認できたときだけ予約を解除
 
 ### 検査
 
-- `fep-core-boot` (`tools/tests/test_fep_core_boot.py`): 実物の SQLite で probe の順・予約の優先順・丸め・接続数・rollback、probe の group の寿命。
+- `fep-core-boot` (`test_fep_core_boot.py (旧版 d702953ff4bd)`): 実物の SQLite で probe の順・予約の優先順・丸め・接続数・rollback、probe の group の寿命。
 - `sqlite-module-proto-host`: 起動の経路の既存の場合 (settings の予約が辞書より小さいときなど)。
 - `fep-budget-host`・`fep-worst-load-host`: 2 接続と probe の最大の使用量と 192 KiB の基準。

@@ -23,7 +23,7 @@
 /*    QUARANTINE。                                                          */
 /*                                                                          */
 /*  票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-4                             */
-/*  記録: tools/tests/pci_bind_tdd.md                                       */
+/*  記録: pci_bind_tdd.md (旧版 7b39305029ac)                                       */
 /* ======================================================================== */
 
 #ifndef PCI_BIND_H

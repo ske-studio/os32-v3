@@ -4,8 +4,8 @@
 /*  I/O も割り込み禁止も持たない。sys/platform/pc98/input/kbd.c の IRQ1 ハンドラが           */
 /*  kbd_dlog_push を呼び (IF=0 のまま、再入しない)、kbd_diag_log が          */
 /*  irq_save の間に kbd_dlog_copy でローカルへ写す。ホスト試験               */
-/*  (tools/tests/test_kbd_dlog.py) が実物をそのまま #include して回す。      */
-/*  票: docs/tasks/gui/TASK_KBD_NAV.md §3、記録: tools/tests/kbd_dlog_tdd.md   */
+/*  (test_kbd_dlog.py (旧版 2a446906e839)) が実物をそのまま #include して回す。      */
+/*  票: docs/tasks/gui/TASK_KBD_NAV.md §3、記録: kbd_dlog_tdd.md (旧版 31b7588f3708)   */
 /* ======================================================================== */
 
 #ifndef __KBD_DLOG_H

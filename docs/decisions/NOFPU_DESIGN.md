@@ -271,7 +271,7 @@
 | kernel.elf | 既存731852byte（symbol込み）。常駐 section 増分は soft計算+emulator 約60–160KiBを仮置き |
 | sqlite.elf / sqlite.mod | 既存518780 / 396280byte。f64 subset/helper 増分20–80KiBを仮置き、重複分も数える |
 | vmkernel.lz4 | 既存337365byte、上限520192byte（boot/boot_defs.h）。差182827byteだが未圧縮増分とは比較しない |
-| 起動2HD FD | 1261568byte、FAT/cluster込み、tools/tests/test_packages.py の空き64KiB以上 |
+| 起動2HD FD | 1261568byte、FAT/cluster込み、test_packages.py (旧版 beb24a48ad1a) の空き64KiB以上 |
 | RAM | AppSlot の108byteは増やさない。active108byte、作業state/buffer、SoftFloat globals/stackを別計測 |
 | SQLite pool | 既存512KiB。code/work stack の追加をこの値に含めた扱いにしない |
 
@@ -320,10 +320,10 @@
 | A5 | `sys/kern/ver_info.h` | 私有snapshotへFPU欄 |
 | B16 | `sys/kern/ver_collect.c` | 確定値を収集 |
 | B17 | `sys/kern/ver_format.c` | hw/none(emu)表示、長さ制限維持 |
-| B18 | `tools/tests/x87_emu_host.c`（新） | libcなしの実x87対照・状態/境界fixture |
-| B19 | `tools/tests/test_nofpu.py`（新） | 命令棚卸し/ABI/日時/変異runner |
-| C10 | `tools/checks/nofpu-host.py`（新） | CHECK inputs/依存宣言 |
-| C11 | `tools/tests/test_x87.py` | 既存host試験のprivileged probeをhook化、hw/emu両系 |
+| B18 | `tests/support/fixtures/x87_emu_host.c`（新） | libcなしの実x87対照・状態/境界fixture |
+| B19 | `test_nofpu.py (旧版 a12cc4f9bd0f)`（新） | 命令棚卸し/ABI/日時/変異runner |
+| C10 | `nofpu-host.py (旧版 b44a4f9e2f1b)`（新） | CHECK inputs/依存宣言 |
+| C11 | `test_x87.py (旧版 a765d128444b)` | 既存host試験のprivileged probeをhook化、hw/emu両系 |
 | C12 | `userland/diag/fp_stop.c` | 既存check/loopを両系で共通期待、停止復元検証 |
 | C13 | `tools/guest_tests.txt` | fp_stop checkは無しでもPASS 3/3、skip/kill期待を禁止 |
 | C14 | `docs/09_exec.md` | software state/例外/通常KAPIの契約 |

@@ -9,7 +9,7 @@
  *
  *  中身は main.c から 1 行も変えずに移しただけ (2026-09-16、票
  *  docs/archive/shell/TASK_SH_TRUNCATION.md §5 の段 1「足場」)。切り出しの
- *  目的はホスト試験 (tools/tests/sh_truncation_host.c) が
+ *  目的はホスト試験 (sh_truncation_host.c (旧版 e16688ff4188)) が
  *  try_exec / try_exec_from_path / run_cmd_internal を**実物のまま**
  *  #include できるようにすること — これらは main.c の static なので、
  *  main.c を丸ごと取り込まないと触れなかった。
@@ -208,8 +208,8 @@ static int try_exec(const char *bin_path, int argc, char **argv,
 
 #ifdef SHELL_AS_APP
 /* sh_launch / パイプバッファの実体。ホスト TDD が同じソースを #include
- * できるように別ファイルにしてある (tools/tests/sh_launch_host.c,
- * tools/tests/sh_shell_host.c)。 */
+ * できるように別ファイルにしてある (sh_launch_host.c (旧版 a8858fb9b295),
+ * sh_shell_host.c (旧版 c10923bbc5ad))。 */
 #include "sh_launch.inc"
 #include "sh_pipe.inc"
 #endif /* SHELL_AS_APP */

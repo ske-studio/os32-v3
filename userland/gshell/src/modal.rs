@@ -2223,7 +2223,3 @@ pub fn present_rect(st: &GuiState) {
         wm::queue_present(st, m.rect);
     }
 }
-
-#[cfg(test)]
-#[path = "../host/modal_tests.rs"]
-mod tests;

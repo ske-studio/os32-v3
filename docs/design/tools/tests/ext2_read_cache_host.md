@@ -1,4 +1,4 @@
-# tools/tests/ext2_read_cache_host.c — 読取回帰試験
+# ext2_read_cache_host.c (旧版 f8f322e428ee) — 読取回帰試験
 
 > 状態: **現行 (2026-10-31)**
 

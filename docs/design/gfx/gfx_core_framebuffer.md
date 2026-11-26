@@ -25,4 +25,4 @@
 
 ## 検査
 
-`tools/tests/test_gfx_kernel_fb.py` が実 gfx_core・3 backend・台帳・paging・surface_query/lease を連結し、reserve 前の NULL、reserve 後の 32,000 B 間隔、各 backend の prepare → init → init_200 → shutdown、AUTO の Cirrus → PEGC → PC98 fallback、PEGC DISPLAY の UC 登録を確かめる。
+`test_gfx_kernel_fb.py (旧版 68b79d89963f)` が実 gfx_core・3 backend・台帳・paging・surface_query/lease を連結し、reserve 前の NULL、reserve 後の 32,000 B 間隔、各 backend の prepare → init → init_200 → shutdown、AUTO の Cirrus → PEGC → PC98 fallback、PEGC DISPLAY の UC 登録を確かめる。

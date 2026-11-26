@@ -13,5 +13,5 @@ HDD ローダが ext2 の `/boot/vmkernel.lz4` を読むための最小の読み
 
 ## 確かめ
 
-`make check-hdd-stage2-host` (`tools/tests/test_hdd_stage2.py`、`tools/tests/ext2_mini_host.c`) のケース `mini`:
+`make check-hdd-stage2-host` (`test_hdd_stage2.py (旧版 f26dff44ab09)`、`ext2_mini_host.c (旧版 0aa26a04855e)`) のケース `mini`:
 1,000B と 508KiB ちょうどは読んで後ろに書かない、508KiB + 1 と 600KiB は `EXT2M_ERR_TOO_BIG` で読み先が変わらない。

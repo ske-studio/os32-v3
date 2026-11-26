@@ -26,4 +26,4 @@
 
 ## 検査
 
-`tools/tests/test_cfg.py` の `TSV_FIXTURES` (58 件) を同じ byte 列のまま `cfg_tsv_parse` (`cfg_init` 経由) と `tools/mk_settings_db.py` の両方に通し、accept・reject の一致を見る (`TSV PARITY`)。
+`test_cfg.py (旧版 f84b12760091)` の `TSV_FIXTURES` (58 件) を同じ byte 列のまま `cfg_tsv_parse` (`cfg_init` 経由) と `tools/mk_settings_db.py` の両方に通し、accept・reject の一致を見る (`TSV PARITY`)。

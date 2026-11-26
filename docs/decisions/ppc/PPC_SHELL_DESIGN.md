@@ -322,10 +322,10 @@ VfsOps ramfs_ops = {
 |A25/W0 †|変更 sys/fs/vfs.h|VFS_DEV_RAM 追加|1〜3|
 |A26/W0 †|新規 sys/fs/ramfs/ramfs.h|上限・ops 宣言|20|
 |A27/W1 †|新規 sys/fs/ramfs/ramfs.c|一階層ramfs、A25/A26|200〜300|
-|H1/W2|新規 tools/tests/test_ppc_terminal.py|端末host試験|150〜230|
-|H2/W2|新規 tools/tests/test_ram_root.py|RAM/ISO＋ramfs製品コード試験|150〜220|
-|H3/W2|新規 tools/tests/test_resident_cli.py|CLI製品コード試験|90〜140|
-|Q1/W3|新規 tools/ppc/shell_run.py|S-A通し受入|120〜180|
+|H1/W2|新規 旧ホスト試験 test_ppc_terminal.py|端末host試験|150〜230|
+|H2/W2|新規 test_ram_root.py (旧版 8e091b7ed8ac)|RAM/ISO＋ramfs製品コード試験|150〜220|
+|H3/W2|新規 test_resident_cli.py (旧版 4b96fbfe3777)|CLI製品コード試験|90〜140|
+|Q1/W3|新規 shell_run.py (旧版 2bc137a055de)|S-A通し受入|120〜180|
 
 - A23 の既存 TU は `sys/fs/vfs.c`、`sys/fs/vfs_fd.c`、`sys/dev/base/dev.c`、`sys/fs/isofs/iso9660.c`、`sys/fs/isofs/iso9660_media.c`。新規 TU は上表の S-A 実体を加える。
 - vfs.c の FD 参照により vfs_fd.c も候補閉包へ入る。gc-sections による消去と残る推移依存は実リンクで確認し、万能stubで埋めない。
@@ -349,7 +349,7 @@ VfsOps ramfs_ops = {
 - packet・FIFO 故障は host 試験に集約。QEMU では重ねず、既存9印・5診断を再利用する。
 - 媒体なしの ELF 直接起動だけを「抜去試験済み」と数えない。実機 FD/CD 抜去は各実機段で確認する。
 - 予約収容・サイズ・未解決0・FP/AltiVec不使用は製品ELF/mapで確認。専用ゲスト試験を増やさない。
-- 実装者は対象build、触った試験の `--mutate`、`python3 -B tools/checks/run.py --lint`。CHECK に入力を宣言する。
+- 実装者は対象build、触った試験の `--mutate`、旧手順（c15e33930ca4 の記録）。CHECK に入力を宣言する。
 - PM の統合build・CIへ進める。ローカル全変異・check-changed は実行しない。
 - 今回は設計のみで preflight・全試験未実施。QuickSilver 実機、PC-98 FD一枚起動、S-B は S-A の実施済み受入に含めない。
 

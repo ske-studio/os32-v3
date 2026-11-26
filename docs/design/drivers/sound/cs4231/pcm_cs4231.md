@@ -129,7 +129,7 @@ MCE 付きで I9 = CAL 1 → MCE 付きで I16 = DACZ → R0 = 9 で MCE を落�
 
 - **ISR と foreground の状態観測**: 停止待ちで通常の読みを使うと、最適化で読みがループ外へ移り、ISR が完了しても期限切れになる。
   `pcm_wait_stopped` は ISR が更新する状態を volatile 経由で繰り返し読む。別の I/O 命令による偶然の再読込みに頼らず、この観測契約を保つ。
-  `tools/tests/pcm_cs4231_host.c` の `case_close()` は停止完了の状態遷移を検査する。
+  `pcm_cs4231_host.c (旧版 8d6596ae4052)` の `case_close()` は停止完了の状態遷移を検査する。
 - **foreground の判定と公開は 1 つの禁止区間**: close の入口、close の期限切れ (STOP_REQ の公開と停止の入口)、reclaim の引き取り、
   set_volume の判定と書き。分けると tick が間に入り、止まった装置を DRAINING で上書きする・古い期限で FAULTED にする・
   RS_RESTART が unmask してから foreground がリングを free する・FAULTED の後に装置へ書く、が起きた。
@@ -153,9 +153,9 @@ MCE 付きで I9 = CAL 1 → MCE 付きで I16 = DACZ → R0 = 9 で MCE を落�
 
 | 検査 | 見ているもの |
 |---|---|
-| `make check-pcm-cs4231-host` (`tools/tests/test_pcm_cs4231.py`、記録 `tools/tests/pcm_cs4231_tdd.md`) | 実物を `#include` し `io.h` だけ模型に差し替え: 連続性の全組・保証内の正常列と喪失列・補充の余裕・消す前の underrun・drain の段階・番犬・満杯からの自動開始・ステージングの 2 分割・close の期限式・音量・列の順序 (I14→I15、MCE 無しの I9、MODE2 無しの I24、DRS を待たない mask、期限の毎 tick 初期化を変異で)・状態の遷移と 1 度だけの解放・foreground と tick の交互試験 (`PCM_PREEMPT`) |
-| `pcm-refill-host` (`tools/tests/test_pcm_refill.py`) | tick の救済の閾値・補充の起点・DMA の期限 |
-| `pcm-e4-host` (`tools/tests/test_pcm_e4.py`) | 共有 IRQ10 (実 I24 の handler と偽装置)。ゲストは `make kernel-pcm-e4-diag` の像で `pcm_test e4` |
+| `make check-pcm-cs4231-host` (`test_pcm_cs4231.py (旧版 8806077bde45)`、記録 `pcm_cs4231_tdd.md (旧版 b69f05d9bd5d)`) | 実物を `#include` し `io.h` だけ模型に差し替え: 連続性の全組・保証内の正常列と喪失列・補充の余裕・消す前の underrun・drain の段階・番犬・満杯からの自動開始・ステージングの 2 分割・close の期限式・音量・列の順序 (I14→I15、MCE 無しの I9、MODE2 無しの I24、DRS を待たない mask、期限の毎 tick 初期化を変異で)・状態の遷移と 1 度だけの解放・foreground と tick の交互試験 (`PCM_PREEMPT`) |
+| `pcm-refill-host` (`test_pcm_refill.py (旧版 aadecf802127)`) | tick の救済の閾値・補充の起点・DMA の期限 |
+| `pcm-e4-host` (`test_pcm_e4.py (旧版 36a81d2e03fb)`) | 共有 IRQ10 (実 I24 の handler と偽装置)。ゲストは `make kernel-pcm-e4-diag` の像で `pcm_test e4` |
 | `pcm-module-host`・`pcm-contract-host` | 部品の読み込み・巻き戻しと再生、KAPI / façade / 本体を通した契約 |
 
 NP21/W はフォークの `/api/sound` (CS4231 の PEN / IEN / MODE2 / I8 / Base / PI の累積 / 0F40h、`?pcm=1` で直近 1 秒の生 frame) を

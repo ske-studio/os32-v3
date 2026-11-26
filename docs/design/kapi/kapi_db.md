@@ -12,7 +12,7 @@ SQLite 接続とステートメントをハンドルとして公開する。
   (`sys/kapi/kapi_db.c` の `shm_write_row()`, `sys/kapi/kapi_db.c`)。ユーザーから読めるよう、
   エラー文字列は共有領域へ写される (`sys/kapi/kapi_db.c`)。
   呼出し元によるハンドルの所有検査は `sys/kapi/kapi_db.c` の `slot_get()` にある。
-  `tools/tests/test_db_errstr.py` と `tools/tests/test_db_caller.py` が検査する。
+  `test_db_errstr.py (旧版 4f1b10929afc)` と `test_db_caller.py (旧版 0e5e43d0f720)` が検査する。
 
 ## 内部設計と契約 (D1)
 
@@ -73,7 +73,7 @@ SQLite 接続とステートメントをハンドルとして公開する。
 
 ### 検査
 
-`tools/tests/test_db_errstr.py` (本体 `tools/tests/kapi_db_v50_host.c`、実 `sys/kapi/kapi_db.c` + 実 SQLite + 実 `sys/fs/vfs_fd.c` + RAM のバックエンド)。上の各規則がケース名 (`open_existing`・`prepare_only`・`binds`・`error_code`・`shm_bound`・`shm_exact`・`stat_faults`・`journal_mode`・`step_no_stmt`・`path_len`・`transient`・`sql_tail_sqlite`・`prepare_replaces`・`materialize_fail`・`resolve_len`・`resolve_truncate`・`resolve_depth`・`cpl3_paths`・`owner_isolation`・`order_new`・`order_old`) に対応する。回収の順序はソースの本文でも確かめる。CPL=3 の受入はゲストの `userland/diag/db_v50_test.c`。
+`test_db_errstr.py (旧版 4f1b10929afc)` (本体 `kapi_db_v50_host.c (旧版 efcd32cfb5e9)`、実 `sys/kapi/kapi_db.c` + 実 SQLite + 実 `sys/fs/vfs_fd.c` + RAM のバックエンド)。上の各規則がケース名 (`open_existing`・`prepare_only`・`binds`・`error_code`・`shm_bound`・`shm_exact`・`stat_faults`・`journal_mode`・`step_no_stmt`・`path_len`・`transient`・`sql_tail_sqlite`・`prepare_replaces`・`materialize_fail`・`resolve_len`・`resolve_truncate`・`resolve_depth`・`cpl3_paths`・`owner_isolation`・`order_new`・`order_old`) に対応する。回収の順序はソースの本文でも確かめる。CPL=3 の受入はゲストの `userland/diag/db_v50_test.c`。
 
 ## 診断文と空文字列の置き場 (`db_last_error`・`db_column_text`)
 
@@ -95,7 +95,7 @@ CPL=3 に返す文字列は、カーネルの番地 (`.rodata` の定数・slot 
 - `DB_ResultHeader.error_offset` と userland の `db_errmsg()` は 1 回の `db_exec` の結果に結びついた別の欄で、この領域とは別物。
 - 自己診断 `db_v50_selftest()` (ホスト試験が呼ぶ) は領域の取り決め (診断領域 = 結果の上限、診断文と空文字列が重ならない、空文字列が NUL、長い文が上限で切れる) を bit 5 で見る。
 
-検査: `tools/tests/test_db_errstr.py` (`make check-db-errstr-host`、本体 `tools/tests/db_errstr_host.c`、実 `sys/kapi/kapi_db.c` + 実 SQLite)。範囲 (`IN_SHM`) は `errstr_range`・`coltext_range`、切り詰めと NUL は `errstr_truncate`、上限ちょうどと +1 は `result_bound`、取り決めは `diag_layout`。`DB_SHM_BLOCK_SIZE` を名指ししないことは静的な番人 `check_no_block_size`。
+検査: `test_db_errstr.py (旧版 4f1b10929afc)` (`make check-db-errstr-host`、本体 `db_errstr_host.c (旧版 423d3e5600dd)`、実 `sys/kapi/kapi_db.c` + 実 SQLite)。範囲 (`IN_SHM`) は `errstr_range`・`coltext_range`、切り詰めと NUL は `errstr_truncate`、上限ちょうどと +1 は `result_bound`、取り決めは `diag_layout`。`DB_SHM_BLOCK_SIZE` を名指ししないことは静的な番人 `check_no_block_size`。
 
 ## `kapi_db_column_text` の範囲検査
 
@@ -107,4 +107,4 @@ CPL=3 に返す文字列は、カーネルの番地 (`.rodata` の定数・slot 
 - 列情報の `data_offset` は `0 < data_offset < DB_SHM_RESULT_LIMIT`。
 - 外れたら SHM 上の空文字列 (`db_shm_empty`) を返す (カーネルの .rodata は CPL=3 から読めないので `""` を返さない)。slot が無い・文が無いときも同じ。
 
-検査は `tools/tests/test_kapi_bounds.py` (実 `slot_get` と実 `kapi_db_column_text` を、改竄した column_count・data_offset で通す。SQLite は実行しない)。
+検査は `test_kapi_bounds.py (旧版 9543608bb83e)` (実 `slot_get` と実 `kapi_db_column_text` を、改竄した column_count・data_offset で通す。SQLite は実行しない)。

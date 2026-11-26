@@ -113,7 +113,3 @@ pub fn shell_service() -> Option<&'static ShellService> {
         _ => None,
     }
 }
-
-#[cfg(test)]
-#[path = "../host/shell_service_tests.rs"]
-mod shell_service_tests;

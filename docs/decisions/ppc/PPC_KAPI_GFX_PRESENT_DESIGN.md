@@ -39,7 +39,7 @@ PM 決定 (r1 の未決 2 件は確定): gfx_init_200 は PowerMac で実寸で�
 ### 1-2. 食い違いでない確認
 
 - 変更矩形の列の処理は 5a-ii で sys/hal/gfx/gfx_dirty.c に入っている (gfx_dirty.h: gfx_dirty_add・gfx_dirty_merge・gfx_dirty_at)。
-- PowerPC の「無いはず」は gfx 19 本・gfx2 4 本 (sdk/kapi_target_ppc.py の PROVIDER_GROUPS、tools/ppc/test_kapi_binding.py の EXPECTED_ABSENT_SLOTS)。
+- PowerPC の「無いはず」は gfx 19 本・gfx2 4 本 (sdk/kapi_target_ppc.py の PROVIDER_GROUPS、test_kapi_binding.py (旧版 3baaeeee4857) の EXPECTED_ABSENT_SLOTS)。
 - check_op: 規則は共通の check() (sys/hal/gfx/v2/check_op.c の shadow・check)、装置の答えは be->check。OF FB の shim_check (sys/dev/video/of_fb/of_fb_v2.c の shim_check、表 の check) は NOSYS を返すが、共通の規則は条件により SW と答える (レビューの照合)。**5b は check_op.c に触らない。x86 の答えは変わらない**。
 
 ### 1-3. 統合の判断 3 点 (POLICY_DEV §1)
@@ -124,7 +124,7 @@ void __cdecl gfx_present_raster(GFX_RasterPalTable *table)
 - `gfx_present_raster` の `gfx_counters.commits++` から `pc98_splash_raster_table(pc98_splash_raster_state(), table)` の呼び出しまで (呼び出しを含む。転送 → 再生の順ごと) を `gfx_planar_present_raster` に。
 - `gfx_diag_px` を `gfx_present_diag` に改名して外部へ (中身は同じ)。
 - `_flush_dirty_queue`・`_merge_prev_dirty`・`_flip_page` は static のまま。display_wait_vsync・display_flip_pages はここからだけ呼ぶ (**flip・VSYNC 待ちは装置側**、[HW1] のとおり GDC は platform の display_* 越し)。
-- 変異の目印 (tools/tests/test_boot_splash_native.py の MUTATIONS の 'omit nonflip transfer'・'omit raster flip' ほか) は残る側の行なので、字面を変えない。
+- 変異の目印 (test_boot_splash_native.py (旧版 729852acc8b2) の MUTATIONS の 'omit nonflip transfer'・'omit raster flip' ほか) は残る側の行なので、字面を変えない。
 
 ### 2-5. PowerMac の後端
 
@@ -188,9 +188,9 @@ x86 の build_compare の見込み: **関数差 0 にはならない。移すだ
 | 5b-A4 | PowerPC | sys/platform/powermac/display_provider.c | 空実装 3 本と display_provider_present_ok (§2-6) |
 | 5b-B1 | 本線 | sys/platform/pc98/video/gfx_vram.c | 共通の分を削り、planar の口 3 本を外部に (§2-4) |
 | 5b-B2 | 本線 | sys/hal/gfx/gfx_present.c (新) + common.mk・order.mk + 両像の build-selection の fixture | §2-3・§2-6 |
-| 5b-B3 | 本線 | tools/tests/: 新しい host 試験 gfx_present_host.c、test_sep5_gfx_init.py (関数抽出 が `_present_dirty` を名前で抜く → gfx_planar_present_dirty と共通の present_dirty へ)、test_boot_splash_native.py (fixture に gfx_present.c、変異の当て先 present の変異)、tools/tests/test_gfx_attach.py の TARGET_SRCS・tools/tests/test_gfx_boot.py の test_present_lifecycle のソースの列 | A1〜A3・A9 |
-| 5b-C1 | PowerPC | sdk/kapi_target_ppc.py、tools/ppc/test_kapi_binding.py | PROVIDER_GROUPS['gfx'] の不在の集合から 7 本を外す (19 → 12) |
-| 5b-C2 | PowerPC | dispprb (ゲストの観測プログラム) と tools/accept/ppc_display.py | A4〜A6・A11・A12 |
+| 5b-B3 | 本線 | 旧ホスト試験: 新しい host 試験 gfx_present_host.c、test_sep5_gfx_init.py (関数抽出 が `_present_dirty` を名前で抜く → gfx_planar_present_dirty と共通の present_dirty へ)、test_boot_splash_native.py (fixture に gfx_present.c、変異の当て先 present の変異)、test_gfx_attach.py (旧版 ad621da00d0b) の TARGET_SRCS・test_gfx_boot.py (旧版 4cd97ce216a6) の test_present_lifecycle のソースの列 | A1〜A3・A9 |
+| 5b-C1 | PowerPC | sdk/kapi_target_ppc.py、test_kapi_binding.py (旧版 3baaeeee4857) | PROVIDER_GROUPS['gfx'] の不在の集合から 7 本を外す (19 → 12) |
+| 5b-C2 | PowerPC | dispprb (ゲストの観測プログラム) と ppc_display.py (旧版 5e1f27510eb6) | A4〜A6・A11・A12 |
 
 - **取り込みの順: 5b-A (A1〜A4 を 1 単位) → 5b-B (B1〜B3 を 1 単位) → 5b-C**。5b-A の後は口が宣言され PowerMac に定義があるだけで、どちらの像も今のまま組める (PowerMac の 4 個は未使用の記号)。5b-B で gfx_present.c が共通の一覧に入っても PowerMac のリンクは欠けない。5b-B1 と B2 は片方だけでは x86 が組めないので必ず同じ単位。
 - 並列: 5b-A の中の本線 2 本と PowerPC 2 本は別ファイルで並列。5b-B (本線) の間に PowerPC は 5b-C2 の dispprb を先に書ける (公開前は呼び出しが欠如の答えになる)。5b-C1 は 5b-B の取り込みの後に直列 (公開表は PowerPC の担当が直列)。
@@ -204,10 +204,10 @@ x86 の build_compare の見込み: **関数差 0 にはならない。移すだ
 | A1 | packed の列の掃き出しが矩形ごとに present_rect を呼び、commits は 1 だけ増え、列が空になる | host: gfx_present_host.c (偽の後端で gfx_present.c + gfx_dirty.c を直に組む。両機種の幅・門のマクロで 2 通り) | `gfx_counters.commits = commits_before + 1` を消す |
 | A2 | bb_b == 0 では 6 本とも後端・planar の口を呼ばない | 同上 | gfx_present_rect の `!bb_b` を外す |
 | A3 | present_raster: 表が不正なら何もしない、packed なら planar の口を呼ばず列だけ掃く、planar なら口を 1 回呼ぶ | 同上 | packed の判定を外して常に planar の口へ |
-| A4 | PowerMac (800x600x8、tools/accept/ppc_display.py の Session の指定): 保護行より下で右端 x=799 を含む矩形を add_dirty_rect → present_dirty し、表示の画素が出る。番兵 = 列の 32 px の丸めと of_fb_copy の 4 px の丸めの外に置いた画素が変わらない | QEMU: check-ppc-display-guest、dispprb + fb_pixel.py、7450・7455 の両方 | PowerMac の DISPLAY_V1_WIDTH を 32 狭める (x=799 の画素が出ず実行時に赤) |
+| A4 | PowerMac (800x600x8、ppc_display.py (旧版 5e1f27510eb6) の Session の指定): 保護行より下で右端 x=799 を含む矩形を add_dirty_rect → present_dirty し、表示の画素が出る。番兵 = 列の 32 px の丸めと of_fb_copy の 4 px の丸めの外に置いた画素が変わらない | QEMU: check-ppc-display-guest、dispprb + fb_pixel.py、7450・7455 の両方 | PowerMac の DISPLAY_V1_WIDTH を 32 狭める (x=799 の画素が出ず実行時に赤) |
 | A5 | PowerMac: 640 より右 (x=704〜767 など) だけの矩形が add_dirty_rect と全画面の present の両方で出る | 同上 | PowerMac の DISPLAY_V1_WIDTH を 640 に固定 (実行時に赤) |
 | A6 | PowerMac: gfx_init_200 の後、面の寸法が 800x600 のまま (gfx2_screen_surface → gfx2_surface_desc)、gfx2_lock で影へ書いた画素が present_rect で表示に出る | 同上 (gfx_screen_info・gfx_get_framebuffer は 5b の後も不在なので使わない) | dispprb の期待でなくコード側: gfx_kapi_init_200 の束縛を欠如の答えに戻す (実行時に赤) |
-| A7 | PowerMac の像が組め、7 本が通常の wrap で束縛、gfx の残り 12 本と gfx2 の 4 本は不在のまま、不在の組のヘッダ除外 (gfx_hal.h・palette.h) が崩れない | PPC のリンク (--no-undefined)、tools/ppc/test_kapi_binding.py (親設計 §4 の通常・欠如の両方) | 空実装 1 本を消す / 不在の集合に gfx_present を戻す |
+| A7 | PowerMac の像が組め、7 本が通常の wrap で束縛、gfx の残り 12 本と gfx2 の 4 本は不在のまま、不在の組のヘッダ除外 (gfx_hal.h・palette.h) が崩れない | PPC のリンク (--no-undefined)、test_kapi_binding.py (旧版 3baaeeee4857) (親設計 §4 の通常・欠如の両方) | 空実装 1 本を消す / 不在の集合に gfx_present を戻す |
 | A8 | x86: 差が §3 の列挙の中だけ (実測の一覧を票に貼る) | build_compare | — |
 | A9 | x86: 画面の振る舞いと順が変わらない (planar の flip・非 flip、PEGC の packed、ラスタ) | NP21/W: 既存の gfx の受入 (gdi_test・gfx200_test・起動のスプラッシュ)、host: test_sep5_gfx_init・test_boot_splash_native・test_gfx_attach・test_gfx_boot | 既存の変異が実行時に RED |
 | A10 | 層の検査: gfx_present.c が機種・装置のヘッダを直に読まない | check-layers | gfx_present.c に `#include "pc98.h"` を足す |
@@ -235,7 +235,7 @@ x86 の build_compare の見込み: **関数差 0 にはならない。移すだ
 - ビルド・build_compare・試験は回していない。§3 の差はコンパイラのインラインの見込みで、実測ではない。
 - check_layers が platform_display_fallback.h 越しのマクロ 2 個を今の DISPLAY_FALLBACK_BACKEND と同じ扱いで通すかは、docs/design/tools/check_layers.md §8 を読んでいないので実装の前に確かめる。通らない時は関数の口に替える (x86 に call が増えるので §3 の列挙に足して報告)。
 - §2-6 の 3 点 (今のアプリの番号の取得口、display_text_hide と pm_console_text_ready の関係、起動の端末が 6 本を呼ばないこと)。
-- gfx_vram.c を直に組む・名前で抜く host 試験の全数。実装者が `grep -l "gfx_vram\|_present_dirty" tools/tests/*.py` で数える。
+- gfx_vram.c を直に組む・名前で抜く host 試験の全数。実装者が `grep -l "gfx_vram\|_present_dirty" 旧ホスト試験 *.py` で数える。
 - build-selection の fixture の置き場と、dispprb のソースの置き場は読んでいない (レビューの指摘の名前のまま書いた)。
 
 ## 7. 反論

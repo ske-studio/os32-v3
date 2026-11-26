@@ -50,4 +50,4 @@ rename は原子的と仮定しない。失敗を返したら本体と `.new` �
 
 ## 検査
 
-`tools/tests/test_cfg.py` の `init` (既存・0 byte・journal・`.new` の残骸で拒否して消さない、生成物の形、tsv の欠損と違反で `.new` が残らない) と `rename` (VFS の模型で「新名追加 → 旧名削除」の途中失敗を注入)。ext2 の rename の実物はホストでは踏まない。
+`test_cfg.py (旧版 f84b12760091)` の `init` (既存・0 byte・journal・`.new` の残骸で拒否して消さない、生成物の形、tsv の欠損と違反で `.new` が残らない) と `rename` (VFS の模型で「新名追加 → 旧名削除」の途中失敗を注入)。ext2 の rename の実物はホストでは踏まない。

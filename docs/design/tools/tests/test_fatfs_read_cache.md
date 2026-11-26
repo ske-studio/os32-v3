@@ -1,4 +1,4 @@
-# tools/tests/test_fatfs_read_cache.py — 保持試験の実行
+# test_fatfs_read_cache.py (旧版 88c54b3e7dc8) — 保持試験の実行
 
 > 状態: **現行 (2026-10-31)**
 

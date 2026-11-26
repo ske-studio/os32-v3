@@ -2,7 +2,7 @@
 > 状態: **現行 (2026-11-18)** — 出所: TASK_SH_TRUNCATION の契約を今のソースと照らして要約
 ソース: `userland/shell/main.c`・`userland/shell/shell.h`・`userland/shell/sh_exec.inc`・`userland/shell/sh_args.inc`・`userland/shell/sh_launch.inc`・`userland/shell/cmd_script.c`・`userland/shell/cmd_env.c`・`userland/shell/cmd_base.c`・`userland/shell/cmd_mnt.c`・`userland/shell/cmd_sys.c`・`userland/shell/cmd_filer.c`・`userland/shell/rshell.c`・`userland/shell/rshell_lan.c`・`userland/shell/ui.c`
 
-試験は `tools/tests/sh_truncation_host.c` (登録表と `execute_command` を実物で通す)。
+試験は `sh_truncation_host.c (旧版 e16688ff4188)` (登録表と `execute_command` を実物で通す)。
 利用者に見える形の一部は `docs/manpages/source.1` の LIMITS。
 
 ## 1. 規則 — 切り詰めたら実行しない

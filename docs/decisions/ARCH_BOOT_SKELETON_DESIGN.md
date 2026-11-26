@@ -51,7 +51,7 @@ PC-98 の 6 と 7 は同じ kernel_boot_memory 内で連続する。6 の入口�
 
 調査記述と実物で修正する点は次の 2 件。
 
-1. order B1 の「呼び出しは確認できなかった」は製品に限る。sys/platform/powermac/shell_boot.c:pm_shell_boot は tools/tests/ppc_sh_boot.py の test_main が直接呼ぶ。
+1. order B1 の「呼び出しは確認できなかった」は製品に限る。sys/platform/powermac/shell_boot.c:pm_shell_boot は ppc_sh_boot.py (旧版 5a9698ae3a9a) の test_main が直接呼ぶ。
 2. order A3 の置き場は翻訳単位と定義を区別する。sys/hal/gfx/gfx_core.c:gfx_prepare_backend と同じ翻訳単位でも、gfx_boot_reserve の本体は sys/hal/gfx/gfx_core_surface.inc:gfx_boot_reserve。
 
 POLICY_DEV §1 の統合判断をこの変更に当てる。
@@ -166,7 +166,7 @@ sys/conf/images/ppc-flags.mk が入力を正規化し、ppc-powermac.mk と buil
 - trap 負試験、layout 表示、self-IPI、時計測定、時限 LAN poll は観測専用入口へ抽出。製品にも現に出る行・停止条件は製品用の機種フックから同じ実装を呼ぶ。
 - PPCKERN.ELF と link-sh は S3/S4 の RAM 出口を共有。frame なしは直接 LAN poll。検証・登録・mount/path 失敗は取得済み媒体を §3 の registered に従い片付け、LAN poll に入り S5 以降を呼ばない。解放異常は常に優先して停止。HDD 選択・mount/path 失敗は両 ELF・link-sh とも停止。
 - 旧 shell_boot.c/.h と cli_boot.c/.h は製品参照 0 を各像の map と未解決参照で再確認して削除。
-- tools/tests/ppc_sh_boot.py と tools/ppc/test_cli_boot.py の旧入口直接呼出しは、現行 shell_loop_ops の再起動・入力と画像選択の検査に置換する。
+- ppc_sh_boot.py (旧版 5a9698ae3a9a) と test_cli_boot.py (旧版 9522f1110567) の旧入口直接呼出しは、現行 shell_loop_ops の再起動・入力と画像選択の検査に置換する。
 - IMAGE 省略・旧旗なしは powermac。明示した KBOOT_LINK/SH/SHELL は現行の省略値と 0/1 判定を保持。複数・未知 IMAGE、非二値、LINK+SHELL、SH+SHELL、LINK/SH/SHELL と NEGATIVE の併用、正規化後の IMAGE 不一致は make エラー。
 - T6 は KBOOT_SHELL_LAYOUT_DIAG=1 を旧 ppc_kernel.o から layout 表示の移動先へ渡し、旗変更時の再コンパイルと build/platform/powermac.mk の報告実装選択を連動させる。通常の powermac/link-sh は report_product.c（READY/ALIVE 出力なし）、layout 指定と core/link は report_diag.c。
 
@@ -218,10 +218,10 @@ PPC は PPCKERN.ELF と root 像を別計測する。限界を超えた段はリ
 |T5 同担当|変更 同 console_text.c、input_boot.c、exec_boot.c、shell_loop_ops.c|各 10〜35 行。文字資源、寸法、trap、ops を提供|
 |T5 同担当|新 同 boot_memory.c、boot_media.c、platform_boot.h|各 30〜80 行。製品と診断が使う機種側の段|
 |T6 PowerPC|新 同 boot_diag.c、変更 sys/conf/images/ppc-flags.mk、build/targets/ppc-powermac.mk、build/ppc-install-boot.mk|各 100/15/30 行。正規化後の入口を選択|
-|T6 同担当|変更 build/platform/powermac.mk、tools/accept/ppc_shell_layout.py と selector 試験|layout のコンパイル・リンク選択、既存の指定と変異を維持|
+|T6 同担当|変更 build/platform/powermac.mk、ppc_shell_layout.py (旧版 0abf3e9faafe) と selector 試験|layout のコンパイル・リンク選択、既存の指定と変異を維持|
 |T6 同担当|削除 同 shell_boot.*、cli_boot.*、変更 §4 の直接試験 2 本|旧ファイル全行、試験各 30〜60 行|
 |T7 x86 本線|変更 sys/kern/init/kernel_start.c、新 init/boot_product.c、変更 build/sources/common.mk、order.mk、build/platform/pc98.mk と PPC のソース列|各 10/55/10 行。製品入口を切替|
-|T8 x86 本線|T4 で拡張する既存 tools/tests/test_boot_order.py と容量・契約試験|最終 fixture 比較。boot-order-host の登録を継承|
+|T8 x86 本線|T4 で拡張する既存 test_boot_order.py (旧版 f296f5418a3e) と容量・契約試験|最終 fixture 比較。boot-order-host の登録を継承|
 
 ## 8. 受入・変異と着手順
 
@@ -253,7 +253,7 @@ PPC は PPCKERN.ELF と root 像を別計測する。限界を超えた段はリ
 - T6 は T5 後。T7 は T1〜T6 の両機種リンク後。T8 の fixture 作成は T0 後、最終受入は T7 後。
 - 各票の取込み条件は対象リンクと担当変異の検出。T1 は媒体解放、T2 は SQL 障害、T3 は pipe/共有写像、T4 は PC-98 の IRQ・媒体・常駐部品列。T4 完了までに既存 boot-order-host の covers・pins・変異の目印を移す。
 - T5 は PPC の HDD/RAM・文字欠損、T6 は両 ELF・全 selector・USB と trap の変異、T7 は両製品の通し起動と fatal 後の呼出しゼロを検査。T8 は全行の最終比較。
-- T5 の媒体・機種処理移動、T6 の診断入口・selector 移動、T7 の pm_exec_boot 呼出し・製品入口切替では、移す行と同じ票で usb_run.py、hdd_root_accept.py、ata_accept.py、fep_boot_accept.py の計測挿入先、test_build_selection.py の Make 行変異先、対応する tools/checks/ の covers を追随させる。各段で該当通常系成功と各変異の意図した観測差による失敗を取込み条件とする。
+- T5 の媒体・機種処理移動、T6 の診断入口・selector 移動、T7 の pm_exec_boot 呼出し・製品入口切替では、移す行と同じ票で usb_run.py、hdd_root_accept.py、ata_accept.py、fep_boot_accept.py の計測挿入先、test_build_selection.py の Make 行変異先、対応する 旧検査登録 の covers を追随させる。各段で該当通常系成功と各変異の意図した観測差による失敗を取込み条件とする。
 - T0 と PPC 単独段は x86 の kernel.bin、vmkernel.lz4、kdebug.bin、両 FD の基準ハッシュと一致させる。
 - T1〜T3 は未リンクなら一致、既存リンク対象を変更した段と T4/T7 は x86 kernel/FD の差を許し map と展開内容を照合する。 差を許す各段で §6 の実容量と両 FD の起動も測る。
 - 全段で SDK、シェル、ユーザー部品、KAPI 生成表は同じ入力でバイト比較。T8 は試験だけなので T7 の製品と一致。

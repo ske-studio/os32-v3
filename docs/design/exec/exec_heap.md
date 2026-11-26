@@ -10,7 +10,7 @@
 - 子の終了後に親ヒープを初期化し直すと、先頭のブロックヘッダが上書きされる。
   `sys/kern/exec/exec.c` は `exec_heap_restore_state` を使い、ヒープの中身を保つ
   (`sys/kern/exec/exec_heap.c`)。復帰に `exec_heap_init_at` を使わない。
-  親子の実行文脈は `tools/tests/test_exec_r1.py` で確認する。
+  親子の実行文脈は `test_exec_r1.py (旧版 b50e9720332b)` で確認する。
 
 - newlib の sbrk と exec_heap が同じ領域から伸びると互いの割当を上書きする。
   常駐シェルは画像と sbrk の上限を exec_heap の開始位置で区切る
@@ -43,4 +43,4 @@
 - `exec_heap_user_trim` は当該 AS が active なときだけ動き、先に**全 arena** (INITIAL を含む) を検証する。ARENA の末尾が FREE のブロックなら、その頭と最小の中身を残してページ単位で末尾を返す (`appmem_exec_trim`)。INITIAL は返さない。返却に失敗したら header と使用量を変えずに止める。返したページ数を返す。
 - IRQ・例外の中、毒状態の AS では確保・解放・trim をしない。
 
-検査は `tools/tests/test_appmem_map.py` (実 exec_heap・kmalloc・caller_access・生成 KAPI wrapper を同じ ILP32 足場で連結)。
+検査は `test_appmem_map.py (旧版 8180480a2758)` (実 exec_heap・kmalloc・caller_access・生成 KAPI wrapper を同じ ILP32 足場で連結)。

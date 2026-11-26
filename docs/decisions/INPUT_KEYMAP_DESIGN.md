@@ -194,7 +194,7 @@ legacy_cooked_push(((u16)sc << 8) | byte);
 |S1m|`sys/platform/powermac/input_keymap_backend.c` 新|PPC、S1ht→map2登録、S1xと並列|
 |S2h|`sys/dev/usb/hid_kbd_map.c` 変|os32powerpc、S1ht/H-hid後→手書き表を撤去、compat_sc/norepeat/orderは生成表への参照だけ|
 |H-usbp|`sys/platform/powermac/usb_platform.c` 変|os32powerpc、H-usb/S2h後→新usage口の暫定実体を追加、旧sc口へ明示変換（下記）。S2mと直列|
-|S2u[n]|`sys/dev/usb/hid_kbd.c`＋`tools/tests/usb_hid_host.c` 変|os32powerpc、H-usbp/H-hid/S2h後→usage送出とhost callback/期待を同段更新、norepeat/order参照|
+|S2u[n]|`sys/dev/usb/hid_kbd.c`＋`usb_hid_host.c (旧版 4c09cf10c6de)` 変|os32powerpc、H-usbp/H-hid/S2h後→usage送出とhost callback/期待を同段更新、norepeat/order参照|
 |S2a|`sys/hal/input/usb_input.c` 変/新|os32powerpc、S0d/H-usb→usageからcapture、src/repeat/release|
 |S2x|`sys/platform/pc98/input/kbd_hal.c` 変|S1x/S0d→PC98 keycode入口。本体scのbreak分離|
 |S2m|`sys/platform/powermac/usb_platform.c` 変|os32powerpc、H-usbp/S1m/S2a/S2u後→新usage口をcaptureへ結線、暫定変換と旧sc口を除去|
@@ -210,7 +210,7 @@ legacy_cooked_push(((u16)sc << 8) | byte);
 |G[n]|`userland/lib/input/kbd_policy.c`、`userland/gshell/src/input.rs` 各別段|A0z後→評価済み意味イベント一回配送（WM評価器なし）、旧U1/U3gを更新|
 |D|`platform/powermac/input_keymap.c` 削除|全結線・policy受入後、旧4b-map。build除去は先行B|
 
-- T段は製品段ごとの `tools/tests/input_<段>_host.c` とCHECK実行器をそれぞれ1ファイルで準備、製品段受入時に実行する。 B段はorder.mk/commonまたはarch一覧/fixture/PPC一覧を各1ファイルずつ。対象製品段の受入前に全登録を完了する。
+- T段は製品段ごとの `旧ホスト試験 input_<段>_host.c` とCHECK実行器をそれぞれ1ファイルで準備、製品段受入時に実行する。 B段はorder.mk/commonまたはarch一覧/fixture/PPC一覧を各1ファイルずつ。対象製品段の受入前に全登録を完了する。
 - S2uの現物は `hid_kbd.c`。E0〜E7のmake/break→lock類（39/47/53/88等）→残り、各群内はusage昇順。Shift+AだけでなくCaps+Aも同一報告で大文字にする。生成orderの3群を使う。
 - S1hのnorepeatはE0〜E7・lock/Clear・IME_ON/OFF等で1、S2hは `(bits[usage>>3]>>(usage&7))&1` を返すだけ。S2uは候補設定/発火の両方で参照し、A保持中Capsを押してもrepeat候補はAのまま。表交換後のlogical修飾/操作repeatはHALでも抑止する。
 - H-usbpの暫定adapterはusage別heldから互換sc参照数を作り、旧 `usbp_input_key` へscを渡す（04→1D）。最後のalias解放だけbreak、repeatも明示sc変換。未写像usageは旧出口に渡さず、releaseで暫定状態も消す。
@@ -271,9 +271,9 @@ os32powerpc のレビュー (PPC の Opus が PPC の実物と照合、K1・K3�
 
 |ID|重さ・段|PM 決定 (段の完了条件に入れる)|
 |---|---|---|
-|K1|P1・S2u|試験の追従を 3 ファイルにする。usb_hid_host.c、tools/tests/usb_stack_host.c (同ファイル内 の usbp_input_key だけの用意と `topology()` の sc 0x70・0x1d の期待)、tools/tests/test_usb_hid.py の変異の目印 `i = (order + 0x70) & 127;` の移設|
+|K1|P1・S2u|試験の追従を 3 ファイルにする。usb_hid_host.c、usb_stack_host.c (旧版 40ba8664eb3e) (同ファイル内 の usbp_input_key だけの用意と `topology()` の sc 0x70・0x1d の期待)、test_usb_hid.py (旧版 cdf7a7bb8e27) の変異の目印 `i = (order + 0x70) & 127;` の移設|
 |K2|P2・S2h|test_usb_hid.py の目印 `case 0x47: return 0xff;` の移設、test_usb_hid.py と test_usb_stack.py の SOURCES・covers に生成表を足す。E3・E7 の互換 sc は監査が済むまで 0xff (usb_hid_host.c の期待を保つ)|
-|K3|P2・S2m|新しい usage の口も、serial に旧い口と同じ形の行 `USB KEY src=.. sc=.. down=` と `USB REPEAT` を出す (usage を添える)。tools/ppc/usb_run.py と test_ppc_usb_link.py の目印を保つ|
+|K3|P2・S2m|新しい usage の口も、serial に旧い口と同じ形の行 `USB KEY src=.. sc=.. down=` と `USB REPEAT` を出す (usage を添える)。usb_run.py (旧版 402a96233090) と test_ppc_usb_link.py の目印を保つ|
 |K4|P2・S2m・S3m・S3b|3 段は同じ統合の枝で 1 回に取り込む (S2m だけでは provider が input_usb.c の ring を読み続け、USB のキーが失われる)|
 |K5|P2・S2a・S2m|S2m で usbp_input_src_alloc → input_src_register と km_source_bind、release → input_src_release を加え、usbp の src から (in2 の src, 世代) への写しを持つ|
 |K6|P2・S3m・S3b|pm_input_usb_take・peek・has_key・dropped の名前は、共通の出口を包む薄い関数として保つ。dropped は共通の出口の取りこぼしの数を返す。ppc_input_usb_host.c は包みの試験に置き換える。使う所 (arch_compat_vectors.c、test_ppc_link_sh.py、ppc_sh_input.py、ppc_sh_boot.py、test_arch_compat.py) は名前を保つので変えない。ROLES §4-3 の追従表に写す|
@@ -506,7 +506,7 @@ sources[src - 1].used = 0;
   sourceが生存中に掃除するので既存のinput_src_info検査を通せる。
 - 空inlineを選ぶ理由はH0bにリンク依存や機能実装を持ち込まず、最適化後の両像を保持するため。
   weak stubは使わない。S0aがinlineを外部実体へ替える際、既存のin2_dev.c直接リンク試験にも
-  stubまたはregistryを足す。`tools/tests/test_input_keymap_h0b.py` もS0aの追従ファイルとし、
+  stubまたはregistryを足す。`test_input_keymap_h0b.py (旧版 82ab74f8d951)` もS0aの追従ファイルとし、
   空inlineを置換するanchor/assertを外部実体の試験へ同時に切り替える。
   S0c/S0dのrelease結線前は新captureを有効化しない。
 
@@ -543,7 +543,7 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 
 ## S3・S3d の取り込みで後の段へ送る項目 (2026-11-17、Opus レビュー、どれも P3)
 
-- tools/tests/keymap_s3_oracle.py: 意図した差の一覧の new と M0 の fixture の oracle を、読み込みのときに直接 assert する (今は製品を介した推移だけ)。
+- keymap_s3_oracle.py (旧版 bce77d59baa9): 意図した差の一覧の new と M0 の fixture の oracle を、読み込みのときに直接 assert する (今は製品を介した推移だけ)。
 - no_keydata の判定と、kbd_merge.c の capture_state の boot_locks の上乗せを消す変異を 1 本ずつ足す。
 - legacy_keymap.c: 静的な表が不正 (km_eval の INVAL) なら予備の経路も全キーを捨てる。今の表では起きない。S3x の段で、起動時に km_eval を 1 回試して boot.log に残すかを決める。
 - userland/gshell/src/input.rs の旧い表の写しは G 段で更新する。

@@ -250,8 +250,8 @@ volatile u32 *ppc_hpt_ptr(u32 pa); /* 語順はentryごとhi,lo、native u32 */
 |sys/arch/ppc/arch_io.h / arch_cpu.h|新65／新40：契約への薄い接続|
 |sys/platform/powermac/platform_io.h / dump.c|新45／新60：MMIO接続／整数16進dump|
 |sys/arch/ppc/entry.S / mmu.ld / build/ppc.mk|変更5／新45／変更40：新入口選択／配置／独立ppc-mmuターゲット（旧bootは維持）|
-|tools/ppc/mmu_fake.c / mmu_fixture.h|新180／新80：libcなしfake／BSD順序の固定fixture|
-|tools/ppc/mmu_run.py / sys/arch/ppc/mmu_probe.S|新160／新90：QEMU/QMP受入／faultとレジスタcanary|
+|mmu_fake.c (旧版 f6e702f02179) / mmu_fixture.h|新180／新80：libcなしfake／BSD順序の固定fixture|
+|mmu_run.py (旧版 bb78586699bd) / sys/arch/ppc/mmu_probe.S|新160／新90：QEMU/QMP受入／faultとレジスタcanary|
 
 ## 7. 受入・変異・段分け
 

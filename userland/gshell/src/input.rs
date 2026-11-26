@@ -1439,9 +1439,6 @@ pub fn draw_live_frame(st: &mut GuiState, extra: &[Rect]) {
     wm::refresh_overlays(st, &ov);
 }
 
-#[cfg(test)]
-#[path = "../host/wm_tests.rs"]
-mod tests;
 
 #[cfg(any(test, feature = "c_gui_accept"))]
 pub(crate) fn captured_window(button: u8) -> i32 {

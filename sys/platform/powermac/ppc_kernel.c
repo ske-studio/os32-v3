@@ -14,7 +14,7 @@
  * and the ESCC/MPIC I/G aliases mapped. Brings the common mm online, proves
  * trap/guard/flush, MPIC delivery and the 1 kHz decrementer with real
  * operations, then idles with EE=1. The nine KBOOT lines are the acceptance
- * contract read by tools/ppc/kboot_run.py; every pass word below is computed.
+ * contract read by kboot_run.py (旧版 3c4a2c5ec78d); every pass word below is computed.
  *
  * Not PC-98 sys/platform/pc98/kernel.c: no VFS, root mount, module load, exec_init or
  * user entry (those are milestone 3). Nothing here claims those services. */

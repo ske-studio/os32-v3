@@ -221,18 +221,18 @@ P1 系列を含む main `4e0e8b1e` の実物を確認した。契約 ID は `doc
 |P5-sc/sh|`tools/ppc/sc_run`・`ppc_sh_output`を各1ファイル別依頼|各250|P5-t／P3受入前|
 |P5-sd/fs|`tools/ppc/sd_run`・`tools/ppc_hostfs.py`を各1ファイル別依頼|各250|P5-t／P4受入前|
 |P5-usb|`tools/ppc/usb_run`、共通transportへ|250|P5-t／当該台本の節目より先、遅くとも既定切替前|
-|P4c 試験|ppc-hostfs-io: `tools/tests/ppc_hostfs_io.c`|試験|新経路の期限・IRQ 拒否・再実行禁止を検証|
-|P4a 試験|ppc-hostfs-server: `tools/tests/ppc_hostfs_server.py`|試験|新経路の write 一回・世代失効・RO を検証|
-|P4a 試験|ppc-hostfs-wire: `tools/tests/ppc_hostfs_wire.py`|試験|新 codec の長さ・CRC 拒否を検証|
-|P2/P5-log 試験|ppc-lan-p23: `tools/ppc/test_lan_p23.py` の `exercise()`|試験|新 LOG・WDATA・予約 NOTIFY 診断の形式を検証|
-|P3 試験|ppc-lan-terminal-host: `tools/ppc/test_lan_terminal_host.py`|試験|READY/NOTIFY/RSH OUT の端末内容・欠落報告を検証|
-|P5-sd/fs 試験|ppc-sd: `tools/ppc/sd_run.py`|試験|新 transport で永続化・再起動後の旧要求拒否を検証|
-|P4 結線試験|hostsvc-init: `tools/tests/hostsvc_init_host.c`|試験|pointer 一致に代え /host 常駐・borrowed 寿命を振る舞いで検証|
-|P4a 試験|lanfs-host: `tools/tests/test_lanfs.py`|試験|新経路を検証し serial SFS・netcd を維持|
+|P4c 試験|ppc-hostfs-io: `ppc_hostfs_io.c (旧版 39d06743772f)`|試験|新経路の期限・IRQ 拒否・再実行禁止を検証|
+|P4a 試験|ppc-hostfs-server: `ppc_hostfs_server.py (旧版 1824f38d76c6)`|試験|新経路の write 一回・世代失効・RO を検証|
+|P4a 試験|ppc-hostfs-wire: `ppc_hostfs_wire.py (旧版 bf8d2471bf51)`|試験|新 codec の長さ・CRC 拒否を検証|
+|P2/P5-log 試験|ppc-lan-p23: `test_lan_p23.py (旧版 91a3a46fdbc4)` の `exercise()`|試験|新 LOG・WDATA・予約 NOTIFY 診断の形式を検証|
+|P3 試験|ppc-lan-terminal-host: `test_lan_terminal_host.py (旧版 677c00ca1f6b)`|試験|READY/NOTIFY/RSH OUT の端末内容・欠落報告を検証|
+|P5-sd/fs 試験|ppc-sd: `sd_run.py (旧版 edc6604c1432)`|試験|新 transport で永続化・再起動後の旧要求拒否を検証|
+|P4 結線試験|hostsvc-init: `hostsvc_init_host.c (旧版 8e2c69f9035b)`|試験|pointer 一致に代え /host 常駐・borrowed 寿命を振る舞いで検証|
+|P4a 試験|lanfs-host: `test_lanfs.py (旧版 ca0109562bf5)`|試験|新経路を検証し serial SFS・netcd を維持|
 - 結線小差分も別依頼: con_sink.h、shellヘッダ、gshell module宣言、x86 build、PPC build、PPC mailboxのlock/heap結線、PPC boot/hostfs_boot、console stream口、host_agentのLOG重複記録をそれぞれ1ファイル・各150行以下。共通tick予算のarch口も1ファイルずつP1へ含め、無制限stubで完了にしない。
 - P1/P2 の診断像、P3 の link CLI 像、P4 の HostFS 像は初期移植の個別検証に使った。製品の P3/P5 は既存の共通 rshell/capture を使い、X/G の受入、wire と Host Services の契約を引き継ぐ。製品シェルから端末・保存を一巡し、診断像では起動と診断を回帰確認する。
 - X0→X1–X9→X10–X14→G1–G4を先に出してx86受入。P1→X6のLOG受け口/P5-logの表示→P2c→P2a/b→P3→P4→既定切替。P5-tと各台本は対応節目の前に完了。共通ファイルは直列、PPC設計の正典3票とnetwork正典への契約更新はPMが各1ファイル段で行う。
-- 各段の試験は `tools/tests/test_remote_<段>.py`、台本は `tools/accept/remote_<節目>.py` に各400行以下で別依頼。CHECKには現行のcovers等で入力を宣言、変更行の既存mutation anchorを検索して移設。対象build/触った試験--mutate/lint、ABI段clean→all、取り込みCIとfull-checkの役割はROLES §0どおり。
+- 各段の試験は `旧ホスト試験 test_remote_<段>.py`、台本は `tools/ops/remote_<節目>.py` に各400行以下で別依頼。CHECKには現行のcovers等で入力を宣言、変更行の既存mutation anchorを検索して移設。対象build/触った試験--mutate/lint、ABI段clean→all、取り込みCIとfull-checkの役割はROLES §0どおり。
 - 旧 transport の試験は旧像の回帰として保持し、新しい像の必須合否から外す。対応する新 transport の期待は上表の各段で検証する。
 - 像予算: x86追加RAMはcapture管理＋shell結果buf8KiB＋gshell FIFO8KiB＋転送buf（各1400B程度）、既存sink8KiB/通知16KiB/link ringを再利用。PPCは既存PLN1削除との差とlink/mailbox/8handle分をmapで実測し、kboot/CLI/HostFS各像を別比較。P1でheap高水位をmapとともに記録して1MiB以内を確認し、link像にはlink_txbufだけが残りPLN1の静的TX/RX領域がないことをmapで確認する。capture増量時は各bufの実容量で再計上する。text/FD圧縮増分を未測定の数値で保証しない。
 

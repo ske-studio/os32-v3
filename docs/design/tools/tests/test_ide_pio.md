@@ -1,4 +1,4 @@
-# tools/tests/test_ide_pio.py — IDE 模型のビルドと変異
+# test_ide_pio.py (旧版 d5615d973b29) — IDE 模型のビルドと変異
 
 > 状態: **現行 (2026-10-31)**
 

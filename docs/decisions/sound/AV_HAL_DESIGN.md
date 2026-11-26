@@ -14,7 +14,7 @@
 | R5-P1-1 | R0a・R0b のカーネル側: sdk/kapi.json の includes の snd_engine.h、v86_io.c の `snd_state_for_os32` (V86 の往復の戻り側)、fm_module.c の candidate.tick・candidate.snd_set_master・snd_tick の登録、fm_body.c・fm_module.c の fm_startup_sound。tick の参照の取得を外し、静止は fm_all_off・ssg_all_off・quiet に結ぶ |
 | R5-P1-2 | R0c のビルドと配置: build/libs.mk の旧アーカイブ、build/sdk.mk のヘッダのコピー、userland/deploy.yaml の 3 バイナリ |
 | R5-P2-1 | tools/hwdev_layout.json は KernelAPI のメンバーの一覧なので**廃止の 10 欄も残す**。AV0 の後の実際の構造体から再生成 (tools/gen_hwdev_contract.py の DWARF 照合) |
-| R5-P2-2 | 試験と登録: gshell の host 試験 (wm_tests.rs、mocks.rs) の snd_focus を av_focus_set に、test_v86_module.py の import の期待を全キーオフに、test_packages.py の sndctl、build/kernel-objects.mk・tools/checks/run.py の登録 |
+| R5-P2-2 | 試験と登録: gshell の host 試験 (wm_tests.rs、mocks.rs) の snd_focus を av_focus_set に、test_v86_module.py の import の期待を全キーオフに、test_packages.py の sndctl、build/kernel-objects.mk・run.py (旧版 bdcca5c408c4) の登録 |
 | 独立の洗い出し | 廃止の名前を grep で洗い直し、上に無かった 9 か所を足した (README.md・build/packages.yaml・sys/kern/exec/exec_kapi_init.inc・sys/dev/hwdev/generated/hwdev_layout.txt・sdk/rust/os32api/src/kapi_generated.rs・display_cleanup_host.c・v86_gcap_abort_host.c・k5b_gshell_tdd.md・gshell/src/wm.rs・shell/sh_exec.inc の注記) |
 
 ## r4→r5 の変更
@@ -150,7 +150,7 @@
 | sound/hal ↔ KAPI | PCM 1 本 (変換しない、混ぜない) | 形式の選択・混ぜ・合成・MIDI (HAL ライブラリ) |
 | HAL ライブラリ ↔ 互換層 | 混ぜの声 (voice)・合成器・MIDI 装置 | DS/waveOut/midiOut の型・GUID・スタブ |
 | 入口 ↔ input/hal | 報告の解釈 (sc・相対量・XInput の形) | 時刻・seq・リング・前景・独占・回収 |
-| 共通 ↔ PC-98 | `sound/hal`・`input/hal` は include/ の型だけ (番人 tools/check_av_portable.py) | I/O ポート・8237・8251・バスマウス |
+| 共通 ↔ PC-98 | `sound/hal`・`input/hal` は include/ の型だけ (番人 check_av_portable.py (旧版 53b9560b1b2e)) | I/O ポート・8237・8251・バスマウス |
 
 - カーネルにミキサは置かない (ユーザー原文「カーネルに直にミキサーを実装するのは反対です」)。HAL ライブラリの状態はアプリの中にあり、アプリの終了で消える。カーネルの回収は PCM の流れだけ。
 
@@ -570,29 +570,29 @@ int sndl_midi_long(u32 h, const void *p, u32 n);  int sndl_midi_reset(u32 h);  i
 | tools/hwdev_layout.json → sys/dev/hwdev/generated/hwdev_contract.h・hwdev_layout.txt | KernelAPI のメンバーの一覧なので**廃止の 10 欄も残す** (番号を残すのと同じ)。AV0 の後の実際の構造体から再生成し、tools/gen_hwdev_contract.py の DWARF 照合を通す (R5-P2-1) |
 | sdk/rust/os32api/src/kapi_generated.rs | 生成物。R0a の再生成で retired の口も型どおり残る |
 | build/kernel-objects.mk | CORE_KERNEL_INCLUDES の snd_engine の登録を外す |
-| tools/ops/check_arm_compile.py、tools/tests/fixtures (dep_dir_a/l01.json・dep_dir_c/manifest.json・build_profile_x86.json)、tools/tests/test_src_layout.py | snd_engine の行を外す |
+| tools/ops/check_arm_compile.py、旧ホスト試験 fixtures (dep_dir_a/l01.json・dep_dir_c/manifest.json・build_profile_x86.json)、test_src_layout.py (旧版 8e97ce616a37) | snd_engine の行を外す |
 | userland/shell/cmd_base.c (beep = fm_startup_sound)・cmd_sys.c (play = fm_play_mml) | コマンドと help の行を削除 (呼び手の除去) |
 | userland/diag/bench/main.c (test_fm()) | FM の MML の計測の項を削除 |
-| userland/diag/raw_wait_test.c の `fm` のモード | モードを削除 (STOP で待ちを抜ける試験は kbd・serial・db・log のモードで残る)。tools/tests/raw_wait_guest_host.c の fm の場合も削除 |
-| tools/tests/test_raw_wait.py (`mml wait probe`・`mml key off` の CASES) と `main()` (audit.MUTATIONS から next() で取る所)、tools/tests/raw_wait_tdd.md の fm のモードの記述 | 2 件を CASES と変異の一覧から削除し (next() が見つからずに落ちないよう両方から)、raw_wait_tdd.md の記述も外す (R0c) |
+| userland/diag/raw_wait_test.c の `fm` のモード | モードを削除 (STOP で待ちを抜ける試験は kbd・serial・db・log のモードで残る)。raw_wait_guest_host.c (旧版 2709e302b840) の fm の場合も削除 |
+| test_raw_wait.py (旧版 3460e77d467d) (`mml wait probe`・`mml key off` の CASES) と `main()` (audit.MUTATIONS から next() で取る所)、raw_wait_tdd.md (旧版 459c451207bf) の fm のモードの記述 | 2 件を CASES と変異の一覧から削除し (next() が見つからずに落ちないよう両方から)、raw_wait_tdd.md の記述も外す (R0c) |
 | userland/gshell/src/multiapp.rs `sync_snd_focus` | `av_focus_set` だけを呼ぶ |
 | userland/lib/snd の旧 libos32snd.c・libos32snd.h・userland/system/sndctl.c・sndtest.c・sndtest2.c | 削除 (ディレクトリ userland/lib/snd と名前 libos32snd は L1〜L5 の新しい HAL ライブラリが引き継ぐ。R0c と L5 の間は libos32snd が無い期間で、使う側も R0c で消えるので壊れない) |
 | build/libs.mk | 旧 libos32snd.a の規則と束ねの行を外す (`INC_libos32snd`・`LIBSND_*` の名前は L5 が新しい中身で足し直す) |
 | build/sdk.mk | `SDK_LIB_HEADER_DIRS` から snd を外し、ヘッダのコピーの行を外す |
 | userland/deploy.yaml | sndctl.bin・sndtest.bin・sndtest2.bin の配置を外す |
 | build/packages.yaml | 注記の sndctl を外す |
-| tools/checks/run.py | "snd/libos32snd" の登録を外す (L5 で新しい中身の登録を足し直す) |
-| tools/tests/test_packages.py | sndctl の期待を外す |
+| run.py (旧版 bdcca5c408c4) | "snd/libos32snd" の登録を外す (L5 で新しい中身の登録を足し直す) |
+| test_packages.py (旧版 beb24a48ad1a) | sndctl の期待を外す |
 | userland/gshell/src/wm.rs | `sync_snd_focus` の呼びを、名前を変えた `sync_av_focus` に (multiapp.rs と同じ段) |
-| userland/gshell/host/wm_tests.rs、mocks.rs | snd_focus の偽と期待を av_focus_set に (試験の名前も `av_focus_is_called_once_per_focus_change`) |
-| tools/tests/test_v86_module.py | `snd_set_master` の import の期待を `fm_all_off`・`ssg_all_off` に |
-| tools/tests/display_cleanup_host.c・v86_gcap_abort_host.c | 同名のスタブ `snd_state_for_os32` は**保持する** (v86_io.c の static 関数の名前は変えず中身だけ全キーオフにするので、包みを持たない試験の抽出がこのスタブを要る。スタブだけを消すと未定義になる) |
-| tools/tests/k5b_gshell_tdd.md | snd_focus の記述を av_focus_set に (記録の文書) |
+| wm_tests.rs (旧版 bb1fab993dc8)、mocks.rs | snd_focus の偽と期待を av_focus_set に (試験の名前も `av_focus_is_called_once_per_focus_change`) |
+| test_v86_module.py (旧版 e92e6993bcde) | `snd_set_master` の import の期待を `fm_all_off`・`ssg_all_off` に |
+| display_cleanup_host.c (旧版 6d1c57ed114f)・v86_gcap_abort_host.c | 同名のスタブ `snd_state_for_os32` は**保持する** (v86_io.c の static 関数の名前は変えず中身だけ全キーオフにするので、包みを持たない試験の抽出がこのスタブを要る。スタブだけを消すと未定義になる) |
+| k5b_gshell_tdd.md (旧版 ac66c9ac4e40) | snd_focus の記述を av_focus_set に (記録の文書) |
 | README.md:117 | コマンドの一覧から `sndctl`・`play` を外す |
 | userland/shell/sh_exec.inc | 注記の例を sndctl でない物に |
 | userland/rust/gui_demo/src/lib.rs (set_bgm()) | BGM の行を削除 |
 | userland/diag/audit_test.c・kstr_boundary.c | 口ごとの期待値 (void は戻ること・is_playing は 0・snd_focus は NOSYS) に直す。kstr の文字列引数の検査から fm_play_mml を外す |
-| 試験: tools/tests/test_fm_module.py・fm_module_host.c (snd の欄の検査と変異を外し OPS_VERSION 2 を確かめる)、fm_playback_host.c (MML の再生の試験、削除)、kapi_audit_host.c・test_kapi_audit.py (retired の 3 種の期待値)、test_kapi_strings.py (fm_play_mml の文字列の検査を外す)、test_tick.py (snd_tick を外す)、test_exec_r1.py・test_exec_hwb_abort.py・exec_image_host.c (snd_owner_exit の期待を外す)、x87_lifecycle_host.c・font_source_host.c (snd の偽の実体を外す) | 各ファイルの CHECK と変異のうち snd/MML を対象にする物は削除、残す物は廃止の応答を期待に |
+| 試験: test_fm_module.py (旧版 351ac0f827d2)・fm_module_host.c (snd の欄の検査と変異を外し OPS_VERSION 2 を確かめる)、fm_playback_host.c (MML の再生の試験、削除)、kapi_audit_host.c・test_kapi_audit.py (retired の 3 種の期待値)、test_kapi_strings.py (fm_play_mml の文字列の検査を外す)、test_tick.py (snd_tick を外す)、test_exec_r1.py・test_exec_hwb_abort.py・exec_image_host.c (snd_owner_exit の期待を外す)、x87_lifecycle_host.c・font_source_host.c (snd の偽の実体を外す) | 各ファイルの CHECK と変異のうち snd/MML を対象にする物は削除、残す物は廃止の応答を期待に |
 | SYNTH §6 の snd の SOFT・persist・借用 ch | 設計から外す (§8) |
 - 再開する時は libos32snd の上にユーザー空間の MML として作る (別票)。
 - 洗い出し (2026-11-09、PM の依頼で独立に): `grep -rlE 'snd_(bgm|se_|set_master|focus|tick|init|cleanup|owner_exit|engine|state_for)|fm_play_mml|fm_startup_sound|sndctl|sndtest|libos32snd|lib/snd'` (.git・build/out・docs・game・apps を除く) の 70 ファイルは、上の表の行と生成物 (kapi_generated.c・kapi_call_generated.h・os32_kapi_generated.h・kapi_generated.rs・hwdev_contract.h・hwdev_layout.txt) で全部覆った。表の外の残りは無い (docs は PM の文書の更新、game は範囲外)。
@@ -727,8 +727,8 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 
 | 段 | ファイル | 呼ぶ | 書く共有の状態 | 行 | I | 前提 |
 |---|---|---|---|---|---|---|
-| AV0 | §10 の全ヘッダ・kapi.json と生成物・a0_weak.c ×2・tools/tests/av_abi_host.c・tools/check_av_portable.py・tools/checks/av_wiring.txt・av_no_weak.sh | — | — | 750 | — | HAL v2 A0 |
-| AV0 試験 | dep-dir-a-l01-host: `tools/tests/test_dep_dir_a_l01.py`・`tools/tests/fixtures/dep_dir_a/l01.json` は公開 ABI 保持と内部 FM ops 世代変更を分けて検証する | — | — | 試験 | IA | AV0/R0a |
+| AV0 | §10 の全ヘッダ・kapi.json と生成物・a0_weak.c ×2・av_abi_host.c (旧版 06b8b336658c)・check_av_portable.py (旧版 53b9560b1b2e)・av_wiring.txt (旧版 775dc3ee892c)・av_no_weak.sh | — | — | 750 | — | HAL v2 A0 |
+| AV0 試験 | dep-dir-a-l01-host: `test_dep_dir_a_l01.py (旧版 605af3c741cd)`・`l01.json (旧版 8f0af0167c2f)` は公開 ABI 保持と内部 FM ops 世代変更を分けて検証する | — | — | 試験 | IA | AV0/R0a |
 | F1 | sys/kern/av_focus.c (+exec の入口・出口 2 行) | in2_on_focus・gui の登録状態 | `av_fg_owner` | 110 | IA | AV0 |
 | N1 | sys/hal/input/in2_dev.c | — | `in2_srcs[IN2_MAX_DEV]` | 130 | IA | AV0 |
 | N2 | sys/hal/input/in2_ring.c (128・seq・合算・LOST・STOP) | in2_time_ms | ring・drop | 190 | IA | AV0 |
@@ -749,8 +749,8 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | S6 | sys/hal/sound/snd2_pos.c (pos・wait) | S5 | — | 100 | IS | 段 B |
 | S7 | sys/hal/sound/snd2_dsp.c | S1・be->dsp_* | — | 120 | IS | 段 B |
 | S8 | sys/hal/sound/snd2_v1.c (pcm_* の再現) | S5・S6 | — | 150 | IS | 段 B |
-| S8 試験 | pcm-cs4231-host: `tools/tests/pcm_cs4231_host.c` は半面一括の action/filled に代えて区間・途中追補を検証する | — | — | 試験 | IS | S8 |
-| S8 試験 | pcm-refill-host: `tools/tests/pcm_refill_host.c` の `verify()` は補充期限・未再生領域の保護・再同期を検証する | — | — | 試験 | IS | S8 |
+| S8 試験 | pcm-cs4231-host: `pcm_cs4231_host.c (旧版 8d6596ae4052)` は半面一括の action/filled に代えて区間・途中追補を検証する | — | — | 試験 | IS | S8 |
+| S8 試験 | pcm-refill-host: `pcm_refill_host.c (旧版 6464c76bffc6)` の `verify()` は補充期限・未再生領域の保護・再同期を検証する | — | — | 試験 | IS | S8 |
 | S9 | sys/dev/sound/cs4231/pcm_hw.c (SndBackend、pcm_cs4231.c の装置の列・証拠・IRQ を残し中核を S3〜S5 へ移す。pcm_body.c の表を差し替え) | — | 装置の内部 | 250 | IS | 段 B |
 | K1 | sys/kapi/kapi_snd2.c | S* | — | 200 | IS | 段 B |
 | E1 | sys/kern/exec/exec_finish.inc ((6b) を snd2_reclaim、(6c) in2_reclaim) | S5・N7 | — | 4 | IA/IS | — |
@@ -763,9 +763,9 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | Q1 | sound/hal/snd2_fmq.c (V86 の FM の溜め場、seq) | — | 溜め場 | 90 | IL | AV0 |
 | R0a | §7-6 の表の KAPI の行: kapi.json の retired・sdk/gen_kapi.py の retired の body・生成物 | — | — | 80 | IA | AV0 と同じ版上げ |
 | R0b | §7-6 の表のカーネル・部品・build の行 (snd_engine の削除・fm_body/fm_module (tick と静止)/fm.c/fm_contract.h・init・exec・v86_io の往復の両方・imports.def・fm-module.mk・kernel-objects.mk・hwdev_layout の再生成 (AV0 の後)・check_arm_compile と配置の表) | fm_all_off・ssg_all_off | — | −1,300 / +20 | IA | R0a |
-| R0b 試験 | fm-module-host: `tools/tests/fm_module_host.c`・`tools/tests/fm_playback_host.c` の `_start()` は tick/MML に代えて raw FM・全キーオフ・静止を検証する | — | — | 試験 | IA | R0b |
-| R0b 試験 | v86-module-host: `tools/tests/test_v86_module.py` は新しい fm_all_off/ssg_all_off の exception 安全性を検証する | — | — | 試験 | IA | R0b |
-| R0c | §7-6 の表の userland・ビルドと配置・試験の行 (shell の beep・play、bench、raw_wait、gshell と host 試験、lib/snd・system の削除、libs.mk・sdk.mk・deploy.yaml・packages.yaml・checks/run.py、gui_demo、audit・kstr、tools/tests の CHECK と変異、README) | — | — | −900 / +80 | IA | R0a |
+| R0b 試験 | fm-module-host: `fm_module_host.c (旧版 ebb56c5c8164)`・`fm_playback_host.c (旧版 bfd83acaad33)` の `_start()` は tick/MML に代えて raw FM・全キーオフ・静止を検証する | — | — | 試験 | IA | R0b |
+| R0b 試験 | v86-module-host: `test_v86_module.py (旧版 e92e6993bcde)` は新しい fm_all_off/ssg_all_off の exception 安全性を検証する | — | — | 試験 | IA | R0b |
+| R0c | §7-6 の表の userland・ビルドと配置・試験の行 (shell の beep・play、bench、raw_wait、gshell と host 試験、lib/snd・system の削除、libs.mk・sdk.mk・deploy.yaml・packages.yaml・checks/run.py、gui_demo、audit・kstr、tests/sound/ の CHECK と変異、README) | — | — | −900 / +80 | IA | R0a |
 | V0 | 資料の確認 (CS4231 の I20/I21 と PCM の IRQ の共存・PIT の one-shot)。結果を本書に追記、両方駄目ならユーザーに諮る | — | — | — | — | 照らし直し |
 | V1 | platform/pc98/legacy/v86_fm_timer.c (timer A/B・CSM・status の模型・仮想 IRQ の判定・pending の消去) | v86_pic_should_inject・Q1 | 模型 | 230 | IL | V0・Q1 |
 | V2 | platform/pc98/legacy/v86_fm_io.c (+v86_io.c の bitmap の拒否と戻し・in/out の先頭の分岐 2 行、`v86_io_in2` の保留・reply・影の有効性) | V1・Q1 | latch・FIFO・reply | 260 | IL | V1 |
@@ -832,7 +832,7 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | IOREAD: IN を完了せずに戻り、reply で完了、reply 無しの run は INVAL (R2-P1-5・P1-6) | v86_session_host | EIP を先に進める |
 | FIFO 満杯の OUT は実行せずに戻り次で再実行 (R2-P1-5) | v86_session_host | 満杯で捨てる |
 | CSM の発音が書きと同じ FIFO で順に (R2-P1-6) | v86_fm_timer_host | 別の列に積む |
-| ホストの MIDI: close と切断で all notes off・reset (R2-P2-6) | tools/tests/host_agent_midi_test.py | 切断の処理を外す |
+| ホストの MIDI: close と切断で all notes off・reset (R2-P2-6) | tests/sound/host_agent_midi_test.py | 切断の処理を外す |
 | X4 では UI の状態機械に触らない、X3 で取消と release の合成 (R2-P2-5) | gshell の host 試験 (excl.rs) | X4 でドラッグを終える |
 | 声の足し算の飽和・16.16 の位相 | sndl_mix_host | 飽和を外す |
 | GameControllerDB の 10 行の写し | pad2_map_host | 反転の bit を無視 |
@@ -858,7 +858,7 @@ period 256・lead 3 で 60 秒、underrun 0 と IF=0 の全区間の最大時間
 | r1 の P1-4 の直し案「backend に v1/v2 の利用の種別を持ち交差操作を拒否」 | 採らない (r2 のまま)。ユーザー決定で状態を 1 か所に統合し、混ぜる検査は要らない。第 2 回・第 3 回のレビューも「採用してよい」とした |
 
 ## 確定 (2026-11-09、astra の第 6 回、PM が反映)
-- R6-P2-1: tools/tests/test_raw_wait.py の MML の 2 件と tools/tests/raw_wait_tdd.md の記述を R0c の削除の一覧に足した (§7-6)。
+- R6-P2-1: test_raw_wait.py (旧版 3460e77d467d) の MML の 2 件と raw_wait_tdd.md (旧版 459c451207bf) の記述を R0c の削除の一覧に足した (§7-6)。
 - R6-P2-2: display_cleanup_host.c・v86_gcap_abort_host.c の同名のスタブ `snd_state_for_os32` は保持すると明記した (§7-6)。
 
 ## 確定の後の追記 1 (2026-11-09、ユーザー決定、PM が反映)
@@ -1006,7 +1006,7 @@ int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i)
 | C1 | sys/dev/sound/fm/opn_chip.c (SndChipBackend: 扱いの表・bank1・read・open/close・静止の列。opn_write_checked を bank つきに) | C0 | 装置の内部 | 240 | IS | C0 |
 | C2 | sys/hal/sound/snd2_chip.c (登録・owner・gen・implicit・FAULTED・reclaim の FM の行、CPU 非依存) | be->* | `snd2_chips[]` | 170 | IS | S1 |
 | C3 | sys/kapi/kapi_snd2_chip.c | C2 | — | 120 | IS | C2・AV0 |
-| C4 | fm_body.c・fm_module.c (start の登録・detach の解除・旧 6 口の包みに implicit と即戻り)・fm.c (失敗で即戻る)・fm の imports.def (snd2_chip_register/unregister/implicit)・fm-module.mk・tools/checks/av_wiring.txt と a0_weak・av_no_weak.sh IS に snd2_chip_* | C1・C2 | — | 80 | IS | C1〜C3 |
+| C4 | fm_body.c・fm_module.c (start の登録・detach の解除・旧 6 口の包みに implicit と即戻り)・fm.c (失敗で即戻る)・fm の imports.def (snd2_chip_register/unregister/implicit)・fm-module.mk・av_wiring.txt (旧版 775dc3ee892c) と a0_weak・av_no_weak.sh IS に snd2_chip_* | C1・C2 | — | 80 | IS | C1〜C3 |
 | L6 | userland/lib/snd/chip.c (sndl_chip_*・合成順・資源・FALLDOWN の濾し・PCM の参照数・read の反映) | snd2_chip_*・L1〜L3 | h の表・参照数 | 260 | IL | C3・L3 |
 | L7 | userland/lib/snd/midi_fm.c (GM → OPN、L2 から分ける、出口は L6) | L6 | voice の割当 | 250 | IL | L6 |
 | V8 | userland/cmds/v86.c の既定の選び + v86_session.c・v86_io.c の HW の begin/end と往復の結線 | C2・V3 | — | 50 | IL | V3・V6 |
@@ -1063,4 +1063,4 @@ int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i)
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
 - **v86s_* の KAPI の通り道 (§9-2・§10、V3・V5)**: V86 を走らせる口は今 `sys/kern/exec/exec_syscall.inc` の `legacy_call_dispatch(slot, wrapper, src, count, result)` → `sys/platform/pc98/legacy/guest.c` → `v86_call_dispatch` (`sys/platform/pc98/legacy/v86_call.c` の slot の switch) を通り、`arch_kapi_read_block`・`shared_stack`・呼び手の pin を検査してから `arch_kapi_invoke` する (第 3 段 D2 で引数が `args, bytes` → `struct kapi_arg_source *src, unsigned count` に変わった)。v86s_* の 4 口の slot は `KAPI_SLOT_V86_BOOT2` と同じくこの switch に足す (begin は path 2 本を持つ 136B の構造体 1 本、run は 3 引数)。PPC は `platform/none/legacy_guest.c-` の switch で断る。`kapi/kapi_v86s.c` は検査だけを持ち、`platform/pc98/legacy` を直に呼ばない。
-- **第 4 段 B の型の契約 (§7-6・§12 の R0c・L5・合成器の段)**: `build/abi_contract.mk` が C のコンパイル規則に order-only の `| $(ABI_CONTRACT_ORDER)` を付け、`test_type_contract.py` (covers `build/**/*.mk`) が `make -n -B` の全 C の呼出しの char/enum の旗と probe の前提を検査する (解析できない呼出しは fail closed)。R0c で外す `build/libs.mk` の範囲は不変 (同ファイル内 の規則に `| $(ABI_CONTRACT_ORDER)` が付いた)。L5 で足し直す libs.mk の規則と新しい `build/os32snd.mk` (と合成器の段の .mk) の C の規則は、`KERNEL_CFLAGS`/`CFLAGS_BASE`/`PROGRAM_FLAGS` 由来の profile の旗と `| $(ABI_CONTRACT_ORDER)` を持ち、object を `ALL_TARGET_OBJECTS` 等の一覧に載せる。`check-type-contract` (`tools/checks/run.py`) を L5・合成器の段の受入に加える。
+- **第 4 段 B の型の契約 (§7-6・§12 の R0c・L5・合成器の段)**: `build/abi_contract.mk` が C のコンパイル規則に order-only の `| $(ABI_CONTRACT_ORDER)` を付け、`test_type_contract.py` (covers `build/**/*.mk`) が `make -n -B` の全 C の呼出しの char/enum の旗と probe の前提を検査する (解析できない呼出しは fail closed)。R0c で外す `build/libs.mk` の範囲は不変 (同ファイル内 の規則に `| $(ABI_CONTRACT_ORDER)` が付いた)。L5 で足し直す libs.mk の規則と新しい `build/os32snd.mk` (と合成器の段の .mk) の C の規則は、`KERNEL_CFLAGS`/`CFLAGS_BASE`/`PROGRAM_FLAGS` 由来の profile の旗と `| $(ABI_CONTRACT_ORDER)` を持ち、object を `ALL_TARGET_OBJECTS` 等の一覧に載せる。`check-type-contract` (`run.py (旧版 bdcca5c408c4)`) を L5・合成器の段の受入に加える。

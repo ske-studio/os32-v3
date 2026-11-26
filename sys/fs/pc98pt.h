@@ -8,7 +8,7 @@
 /*    シェル     userland/shell/cmd_hdprep.c (hdprep)                        */
 /*    インストーラ userland/system/inst_disk.c (cdinst / install、段 2)      */
 /*    ホスト     tools/pc98pt.py (nhd_deploy.py の書き手、同じ値をホスト試験  */
-/*               tools/tests/test_hdd_stage1.py が突き合わせる)              */
+/*               test_hdd_stage1.py (旧版 6201b26bccf0) が突き合わせる)              */
 /*                                                                          */
 /*  **標準配置** (FreeBSD pc98 の diskpc98.h / MS-DOS と同じ、32B × 16):     */
 /*    +0  mid     bit7 = 起動可能                                           */

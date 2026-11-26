@@ -1,7 +1,7 @@
 # tools/ci/sep_identity.py — 機種依存の分離の枝専用の検査 (SEP_IDENTITY_DESIGN)
 
 > 状態: **現行 (2026-11-17)** — 出所: 機種依存の分離の作り直し (ユーザーの提案 2026-11-17「ci を今回用の事専用で用意しては？」)。
-ソース: `tools/ci/sep_identity.py`、`.github/workflows/sep.yml`、試験 `tools/tests/test_sep_identity.py` (検査 `sep-identity-host`)
+ソース: `tools/ci/sep_identity.py`、`.github/workflows/sep.yml`、試験 `test_sep_identity.py (旧版 8b2dd0a7a3ac)` (検査 `sep-identity-host`)
 
 ## 1. なぜ要るか
 

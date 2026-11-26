@@ -20,7 +20,7 @@
 /*                 MAX_IMAGE_SIZE)、展開先の容量 (ブロックと inode)。        */
 /*                                                                          */
 /*  I/O は持たない。書く手順は inst_hdd.c。                                  */
-/*  試験: tools/tests/test_hdd_stage2.py (記録 tools/tests/hdd_stage2_tdd.md) */
+/*  試験: test_hdd_stage2.py (旧版 f26dff44ab09) (記録 hdd_stage2_tdd.md (旧版 8a7aff931c32)) */
 /*  型は C の素の型だけ (os32api.h と sys/include/types.h のどちらとも組める)。  */
 /* ======================================================================== */
 

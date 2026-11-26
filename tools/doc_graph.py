@@ -233,8 +233,7 @@ def classify(path, lines):
             or path.startswith(('docs/POLICY_', '.claude/'))):
         return 1
     if (path == 'docs/tasks/DEFERRED_TESTS.md'
-            or path.startswith('docs/tasks/agents/')
-            or (path.startswith('tools/tests/') and path.endswith('_tdd.md'))):
+            or path.startswith('docs/tasks/agents/')):
         return 5
     status = next((m[1].lstrip('* ').strip() for line in lines[:HEAD_LINES]
                    if (m := STATUS.search(line))), '')

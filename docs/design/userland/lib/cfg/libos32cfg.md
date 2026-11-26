@@ -111,4 +111,4 @@ DELETE journal で rollback・I/O 失敗の伝播・通常の再 open の整合�
 
 ## 検査
 
-`tools/tests/test_cfg.py` (本体 `tools/tests/cfg_host.c`): 実物の library・`userland/cmds/cfg.c`・`sys/kapi/kapi_db.c`・SQLite・RAM の VFS を組み、`missing`・`corrupt`・`version`・`types`・`roundtrip`・`txn`・`limits`・`enum`・`meta`・`shm_copy`・`init`・`rename`・`tsv`・`args`・`cmd`・`list_big` などを見る。`--target` で i386-elf の `-Werror`、`--sanitize` で ASan と符号付き桁あふれ。
+`test_cfg.py (旧版 f84b12760091)` (本体 `cfg_host.c (旧版 947ea5937a47)`): 実物の library・`userland/cmds/cfg.c`・`sys/kapi/kapi_db.c`・SQLite・RAM の VFS を組み、`missing`・`corrupt`・`version`・`types`・`roundtrip`・`txn`・`limits`・`enum`・`meta`・`shm_copy`・`init`・`rename`・`tsv`・`args`・`cmd`・`list_big` などを見る。`--target` で i386-elf の `-Werror`、`--sanitize` で ASan と符号付き桁あふれ。

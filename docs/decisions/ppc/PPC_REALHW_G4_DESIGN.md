@@ -221,7 +221,7 @@ int gem_phy_sample(struct gem *g, struct gem_phy_sample *out);
 - linker の同梱範囲は D7 で確認済み。NOTE 等の全適合は未判定で配布検査を要する。既存 root 像・予約/DMA 池の非衝突も照合する。
 - AF_PACKET は既存 Packet を使う。socket の htons と bind の protocol 表現を混ぜて「修正」せず pcap で wire の 0x88b6 を証明する。
 - ノートで実 iface の MAC=getname、G4 peer 一致、PACKET_OUTGOING 除外、短い frame、別 EtherType、boot_id 更新を試す。
-- `def run_rh(host, case, evidence): ...` を新規 tools/ppc/realhw_run.py に置く。Host を使い回し判定結果/期限/証拠だけ所有する。
+- `def run_rh(host, case, evidence): ...` を新規 realhw_run.py (旧版 cf3acc15e747) に置く。Host を使い回し判定結果/期限/証拠だけ所有する。
 - root socket 作成失敗は RH0 失敗。UDP の代替試験を AF_PACKET 合格と記録しない。
 
 ### RH4: USB 1P の実機差分
@@ -258,8 +258,8 @@ int gem_phy_sample(struct gem *g, struct gem_phy_sample *out);
 | RH2-B | sys/platform/powermac/pci_config.c | early_quiesce の clock→PCI 順。gmac_clock.c の既存処理を使用 |
 | RH2-C | sys/dev/net/gem/gem_phy.c | 標準読取 sample/採取 ID に合う profile、core に画面処理を入れない |
 | RH2-D | sys/platform/powermac/lan_service.c | PHY 採取の通知・nonce/段ログ、既存 poll budget 維持 |
-| RH0-A | +tools/ppc/realhw_image.py | ELF/NOTE/link 範囲の配布検査。未知 NOTE 内容を捏造しない |
-| RH0-B | +tools/ppc/realhw_run.py | AF_PACKET を使う実機試験/証拠、QEMU runner と結果を分離 |
+| RH0-A | +realhw_image.py (旧版 4a1d122a3ed3) | ELF/NOTE/link 範囲の配布検査。未知 NOTE 内容を捏造しない |
+| RH0-B | +realhw_run.py (旧版 cf3acc15e747) | AF_PACKET を使う実機試験/証拠、QEMU runner と結果を分離 |
 | RH4-A | +platform/powermac/usb_rh_diag.c | PCI/HC の読取 snapshot |
 | RH4-B | sys/platform/powermac/usb_boot.c | 必要な場合だけ NEC EHCI 静止/companion、既存 takeover 再利用 |
 
@@ -283,7 +283,7 @@ int gem_phy_sample(struct gem *g, struct gem_phy_sample *out);
 | USB | usb_run、EE=0 待ち/時刻源の既存変異 | NEC 2 OHCI、抜差し、LAN と同時動作 | RH_USB_OCR: OCR 削除 → IR を保持する模型で start 拒否 |
 
 - 新規試験は CHECK に入力を宣言し、各変異は実行時 RED を確認。危険な変異像を実機へ配る必要はない。
-- 既存の product 行を変える実装時は tools/tests の mutation anchor を検索・移動し、触った試験だけ --mutate。
+- 既存の product 行を変える実装時は 旧ホスト試験 の mutation anchor を検索・移動し、触った試験だけ --mutate。
 - 実装時は指定 base の preflight、影響する PPC 各像のビルドと既存先行受入、lint を最終差分後に完走する。
 - full mutation/check-changed は回さず CI に委ねる。今回の設計のみでは preflight --fix-fonts/ビルド/実機試験は未実行。
 - 証拠の単位は像 SHA256 + 実機個体/OF/PVR + boot_id + 時刻 + camera frame 名 + pcap + raw log + 判定表。

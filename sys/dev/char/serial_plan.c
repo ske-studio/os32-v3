@@ -3,8 +3,8 @@
 /*                                                                          */
 /*  ここには副作用のある行を 1 つも置かない。sys/dev/char/serial.c から切り出して */
 /*  あるのは、**NP21/W が通信速度を模擬しない** 判定をホストで試験するため。 */
-/*    試験: tools/tests/test_serial_vfast.py                                */
-/*    記録: tools/tests/serial_vfast_tdd.md                                 */
+/*    試験: test_serial_vfast.py (旧版 850eef82c906)                                */
+/*    記録: serial_vfast_tdd.md (旧版 a6de03cdab60)                                 */
 /*                                                                          */
 /*  出典: docs/hw/undocumented/io_rs.md (0130h〜013Ah の各項)               */
 /*        NP21/W src/io/serial.c rs232c_vfast_setrs232cspeed / i132 / i136  */

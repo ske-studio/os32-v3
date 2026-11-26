@@ -14,7 +14,7 @@
 - P1-1 (文字列の契約): 入口を足さず、**既に在る共通の写し** (sys/kapi/kapi_strings.c の inputs が `KAPI_SLOT_SYS_SWITCH_SHELL` を `{1, 1, VFS_MAX_PATH}` で登録、copy_caller_cstr で写してからラッパーへ) を契約として §2-3 と §3 の E 行に書いた。空・読み取りの失敗・NUL なし・範囲外・成功時だけ更新の順を 1 行ずつ。反論 1。
 - **PM 決定 (P1-1 への返答)**: パスの文字列は **x86 と同じ扱い**、写しは足さない。確かめた結果: PowerPC の入口は x86 の CPL=3 のアプリと**同じ共通の道**を通る (sys/arch/ppc/kernel_trap.c の ppc_trap_dispatch → `exec_syscall_dispatch` → sys/kern/exec/exec_syscall.inc の exec_kapi_special)。ただしその道は、文字列の slot では早期の範囲検証 (sys/kern/exec/exec_syscall.inc の exec_syscall_dispatch) でなく、その手前の既存の写し (sys/kapi/kapi_strings.c の inputs・kapi_strings_from_source) が受ける — x86 のアプリも今そうなっている。gui.c が直に読むのは CPL=0 で直呼びする x86 のシェルだけ。揃える作業は無く、5d は何も足さない (§2-3)。
 - P1-2 (common.mk の条件が FEATURE_FEP の確定より前): **空の提供者 ime_control_absent.c を取り下げた**。終了のフックを選ばないので gui_owner_exit は PowerPC のリンクで捨てられ (build/targets/ppc-powermac.mk の KB_FLAGS `-ffunction-sections`、リンク時の `--gc-sections`)、ime_set_render の参照が残らない。後でフックを選ぶ段の形は §2-5 に 1 行 (build/select.mk の FEATURE_FEP の後で選ぶ)。
-- P1-3 (tools/tests/test_geforce.py の main の目印): **sys/kern/gui.c の gui_owner_exit を変えない** (表示の境目のマクロを取り下げた)。目印はそのまま。後で変える段の形は §2-5 に 1 行。
+- P1-3 (test_geforce.py (旧版 4b690286e6b4) の main の目印): **sys/kern/gui.c の gui_owner_exit を変えない** (表示の境目のマクロを取り下げた)。目印はそのまま。後で変える段の形は §2-5 に 1 行。
 - P2 (切替先が次の要求を書いて異常終了): §3 の L 行を「前の結果」と「要求の有無」の独立の 2 軸に直し、A4 に引継ぎと 1 度だけの消費を足した。
 - P2 (shutdown と端末の復帰の観測): gfx_shutdown の呼び出しを足しも変えもしないので対象が無くなった。sh の fault の表示は今のまま機種フック (sys/platform/powermac/console_text.c の display_provider_owner_exit)。
 - P2 (M5 を戻す変異): フックを選ばないので M5 を取り下げた。反論 2。
@@ -102,7 +102,7 @@ PowerPC の KAPI は全部 `exec_syscall_dispatch` を通る (sys/arch/ppc/kerne
 ### 2-5. 取り下げた物の、後の段での形 (GUI の実行の主体の段への申し送り)
 
 - フックを選ぶ時の ime_set_render の空の提供者: 選ぶ条件は build/select.mk の FEATURE_FEP (`include sys/conf/features/fep.mk` の `endif`) の**後ろ**に置く (common.mk は build/select.mk の IMAGE_FEATURES で先に読まれ、FEATURE_FEP の既定値はその後に決まる)。
-- sys/kern/gui.c の gui_owner_exit を機種のマクロに替える時: tools/tests/test_geforce.py の stage が抜く `function(gui,'gui_owner_exit')` の前に PC-98 のマクロの定義行を足し、gui_owner_exit の変異 の目印を新しい行へ移して赤を確かめる。
+- sys/kern/gui.c の gui_owner_exit を機種のマクロに替える時: test_geforce.py (旧版 4b690286e6b4) の stage が抜く `function(gui,'gui_owner_exit')` の前に PC-98 のマクロの定義行を足し、gui_owner_exit の変異 の目印を新しい行へ移して赤を確かめる。
 
 ## 3. 失敗の表 (全部の出口)
 
@@ -142,7 +142,7 @@ L = PowerMac のループ (pm_shell_boot)。**次の周の動きは「要求の�
         (void)exec_last_result(&kind, &code);     /* sys/kern/exec/exec.c の exec_last_result */
         report(kind, code);
         if (switched) continue;                   /* L4〜L6 */
-        /* 既定の sh の 2 行の break は字面を変えない (目印: tools/tests/test_ppc_link_sh.py の main、tools/tests/ppc_sh_boot.py の main) */
+        /* 既定の sh の 2 行の break は字面を変えない (目印: test_ppc_link_sh.py (旧版 043afe0103f4) の main、ppc_sh_boot.py (旧版 5a9698ae3a9a) の main) */
 ```
 
 ## 4. 部品の大きさと x86 の差の見込み
@@ -167,8 +167,8 @@ x86 の build_compare: M1・M2 (ヘッダだけ)、M3 (展開後が同じ式)、
 | M3 | 本線 | sys/kern/gui.c | include 1 行と sys_switch_shell の owner 判定 の置き換え。gui.c を単体で組む host の試験の include の道も同じ段 | M2 |
 | P2 | PPC | platform/powermac/session_shell.c (新設) + build/platform/powermac.mk の C_PLATFORM_EXEC | §2-2。host の試験 (門の真偽の表) も同じ段 | P1 |
 | M4 | 本線 | build/sources/common.mk | sys/kern/gui.c を PENDING (C_COMMON_PC98_PENDING) から C_COMMON_EXEC (C_COMMON_EXEC) へ。hooks.mk は**触らない** | M3・P2 |
-| P3 | PPC | sys/platform/powermac/shell_boot.c + tools/tests/ppc_sh_boot.py・test_ppc_link_sh.py の土台 | §3 のループ。土台に pm_shell_select の stub、A4 の場面 | P2・M4 |
-| P4 | PPC | userland/ppc/swprobe.c (新設)・build/ppc-user.mk への登録・tools/accept/ppc_switch.py (新設)・tools/checks/ppc-switch-guest.py (新設、inputs・covers・重みの登録) | A5〜A9。5c-C0 と同じ仮の結線 (台本が公開表の写しから 1 本を抜いて組み、KB_ROOT_BINS (build/targets/ppc-powermac.mk の KB_ROOT_BINS) に swprobe を足す) | P3 |
+| P3 | PPC | sys/platform/powermac/shell_boot.c + ppc_sh_boot.py (旧版 5a9698ae3a9a)・test_ppc_link_sh.py の土台 | §3 のループ。土台に pm_shell_select の stub、A4 の場面 | P2・M4 |
+| P4 | PPC | userland/ppc/swprobe.c (新設)・build/ppc-user.mk への登録・旧受入 ppc_switch.py (新設)・旧登録 ppc-switch-guest.py (新設、inputs・covers・重みの登録) | A5〜A9。5c-C0 と同じ仮の結線 (台本が公開表の写しから 1 本を抜いて組み、KB_ROOT_BINS (build/targets/ppc-powermac.mk の KB_ROOT_BINS) に swprobe を足す) | P3 |
 | P5 | PPC | sdk/kapi_target_ppc.py | `'gui'` から sys_switch_shell を抜く | P4 が緑 |
 
 ### 5-2. 前提の段の表
@@ -184,10 +184,10 @@ x86 の build_compare: M1・M2 (ヘッダだけ)、M3 (展開後が同じ式)、
 
 | 変える名前 | 当たる検査・固定 | 直し方 |
 |---|---|---|
-| sys/kern/gui.c の sys_switch_shell の owner 判定 と include (M3) | gui.c を実物で組む: tools/tests/test_ring3_guard.py の KERNEL_SRCS (目印 登録と切替の変異 は sys_switch_shell の owner 判定 を使わない。登録・切替の変異 の**置き換え後**の字面が旧 sys_switch_shell の owner 判定 と同じ形だったので、一意性の数え方を確かめる)、tools/tests/test_trim_kernel.py の TARGET_SRCS・build_fixture・main、tools/tests/test_x11_shared.py の SOURCES、tools/tests/test_d2_services.py の contracts、test_trim_flow・test_trim_back_rs・test_kstop・tools/tests/test_gf5.py の function。関数だけ抜く tools/tests/test_geforce.py の stage・main は当たらない | session_shell.h が読めるよう `-Iplatform/pc98` か stub を土台ごとに足す |
-| common.mk (M4) | tools/tests/fixtures/build_profile_ppc.json (gui.o が入る。`sys/kern/exec/absent/exec_gui.c` は 3 像に**残る**ことを固定)・build_profile_x86.json (不変)、test_build_selection.py、test_sep_identity.py、test_ppc_rshell_link.py、tools/checks の exec-image-host・build-selection-host・check-select-host | fixture の作り直し |
-| shell_boot.c・session_shell.c (P2・P3) | ppc_sh_boot.py (exec_run の stub が "/bin/sh.bin" を照合、目印 既定パスの検査)、tools/tests/test_ppc_link_sh.py の CHECK・main、tools/ppc/link_sh_run.py の BOOT・app_started、sc_run.py・usb_run.py・fb_run.py、tools/accept/arch_ctx.py、test_ppc_sd_run.py、tools/checks の ppc-sh-boot・ppc-sh-output・ppc-sc・ppc-sd・ppc-usb・ppc-fp-guest・ppc-cli-boot | 目印の行は残す。単体で組む土台に stub |
-| sdk/kapi_target_ppc.py (P5) | tools/ppc/test_kapi_binding.py の EXPECTED_ABSENT_SLOTS・insert_group・generate、test_kapi_table.py、tools/checks の ppc-kapi-binding・ppc-kapi-table・ppc-reset・ppc-stream-host、test_arch_compat.py・test_pcm_contract.py・test_remote_x9.py | 不在の並びから 1 本を抜く |
+| sys/kern/gui.c の sys_switch_shell の owner 判定 と include (M3) | gui.c を実物で組む: test_ring3_guard.py (旧版 8e0bfe6189d3) の KERNEL_SRCS (目印 登録と切替の変異 は sys_switch_shell の owner 判定 を使わない。登録・切替の変異 の**置き換え後**の字面が旧 sys_switch_shell の owner 判定 と同じ形だったので、一意性の数え方を確かめる)、test_trim_kernel.py (旧版 e2ed82192ce3) の TARGET_SRCS・build_fixture・main、test_x11_shared.py (旧版 81caa9f12417) の SOURCES、test_d2_services.py (旧版 a368a577f699) の contracts、test_trim_flow・test_trim_back_rs・test_kstop・test_gf5.py (旧版 e11bfb5c2301) の function。関数だけ抜く test_geforce.py (旧版 4b690286e6b4) の stage・main は当たらない | session_shell.h が読めるよう `-Iplatform/pc98` か stub を土台ごとに足す |
+| common.mk (M4) | build_profile_ppc.json (旧版 80da850b3508) (gui.o が入る。`sys/kern/exec/absent/exec_gui.c` は 3 像に**残る**ことを固定)・build_profile_x86.json (不変)、test_build_selection.py、test_sep_identity.py、test_ppc_rshell_link.py、旧検査登録 の exec-image-host・build-selection-host・check-select-host | fixture の作り直し |
+| shell_boot.c・session_shell.c (P2・P3) | ppc_sh_boot.py (exec_run の stub が "/bin/sh.bin" を照合、目印 既定パスの検査)、test_ppc_link_sh.py (旧版 043afe0103f4) の CHECK・main、tools/ppc/link_sh_run.py の BOOT・app_started、sc_run.py・usb_run.py・fb_run.py、arch_ctx.py (旧版 73f25956448a)、test_ppc_sd_run.py、旧検査登録 の ppc-sh-boot・ppc-sh-output・ppc-sc・ppc-sd・ppc-usb・ppc-fp-guest・ppc-cli-boot | 目印の行は残す。単体で組む土台に stub |
+| sdk/kapi_target_ppc.py (P5) | test_kapi_binding.py (旧版 3baaeeee4857) の EXPECTED_ABSENT_SLOTS・insert_group・generate、test_kapi_table.py、旧検査登録 の ppc-kapi-binding・ppc-kapi-table・ppc-reset・ppc-stream-host、test_arch_compat.py・test_pcm_contract.py・test_remote_x9.py | 不在の並びから 1 本を抜く |
 
 ### 5-4. 受入 → 試験と変異
 

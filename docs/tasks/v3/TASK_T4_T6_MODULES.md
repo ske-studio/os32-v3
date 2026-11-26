@@ -32,7 +32,7 @@ r5 は main `4bb31fe` の再照合 (`~/os32-tmp/run/t5recheck/RECHECK.md`・`TIC
 | 8MB/17MB/実機の構成別受入 | 要改訂 (実施時期のみ) | `docs/tasks/DEFERRED_TESTS.md` の10-14決定で最終段へ。途中は64MB、D9/D21の最低条件・必須サービスは維持 |
 | 像・RAMの基準 | T4受入後に再採取 | T3値は履歴。T5-0aで同一SHA・設定のcore/module/guard/FD残量を基準化 (§7-2) |
 
-**T3引渡し値 (履歴、T5の予算には使わない)** (`docs/archive/v3/TASK_T3_LAYOUT.md`)：既存成果物のbuild IDは `ab020da` (`build/out/kernel.map:3833`)。main `952f16b` との差は文書3本と `tools/tests/test_nano_adapter.py` のみ。再ビルド値ではない。
+**T3引渡し値 (履歴、T5の予算には使わない)** (`docs/archive/v3/TASK_T3_LAYOUT.md`)：既存成果物のbuild IDは `ab020da` (`build/out/kernel.map:3833`)。main `952f16b` との差は文書3本と `test_nano_adapter.py (旧版 f86f6c836656)` のみ。再ビルド値ではない。
 `__bss_end=__sqlite_start=0x198000`、`__sqlite_end=0x254200`、`__kernel_resident_end=0x276000` (`build/out/kernel.map:4473,4477,8033,8038`)。core BSS→SQLite→guard→128KiB stackのリンク時連結配置で、KHEAP192KiBはresident終端から算出する (`build/os32.ld`、`sys/include/memmap.h`)。常駐像上限0x275000 B、resident占有0x176000 B。鎖末尾0x2E1000からSLACK終端0x3E0000まで0xFF000=1,044,480 B (255頁) だが、連続空きの保証ではない。
 案5の配置はDMA=0x7F0000/64KiB、PT26頁 (使用11)、guard=0x3FB000、kstack=0x3FC000から16KiB、shell=0x400000 (`sys/include/memmap.h`)。後続の配置期待はこの基準から導出する。
 `kernel.bin`=390,340 B、`sqlite.bin`=374,968 B、`vmkernel.lz4`=502,027 B、508KiB上限まで **520,192−502,027=18,165 B**。T3受入時のSLACK free=236/busy=19、KHEAP peak=3,784 B、kstack peak=4,348 Bは観測範囲の値。各段で同構成のmap・圧縮長・最大連続空きを測り直す (§7-2)。
@@ -66,7 +66,7 @@ X-11の出発点は `~/os32-tmp/evidence/2026-10-07/audit-classification.md:33,4
 
 ### 1-3. X-1 公開 NUL 入力・可変引数の担当表
 
-受入後 (2026-10-22) に現行の契約として [KAPI_SPEC の担当表](../../KAPI_SPEC.md#公開-nul-入力可変引数の担当表-x-1) へ移した (`tools/tests/test_kapi_print.py` の照合先も同じ表)。
+受入後 (2026-10-22) に現行の契約として [KAPI_SPEC の担当表](../../KAPI_SPEC.md#公開-nul-入力可変引数の担当表-x-1) へ移した (`test_kapi_print.py (旧版 9fc21687abf3)` の照合先も同じ表)。
 
 ## 2. モジュール形式と呼出し契約
 
@@ -134,7 +134,7 @@ record は export の解決済み値・依存 handle `{slot, generation}`・life
 broker 接続用の `module_ref_acquire/release` は STARTING の owner/text 所属を照合する核であり、既存 IRQ/tick/DMA broker の部品対応は後続の接続で行う。services_public transaction・kaudit_boot の勘定はT4で接続済み、EARLY owner移譲は作らない。
 T5c-0 の登録契約: FS/Device は init の最後に公開し、登録前に `MODULE_REF_REGISTRATION` (handler=0) を取得する。登録失敗ならその参照だけを戻す。rollback の detach はマウント/利用者を先に断ち、`vfs_unregister_fs` / `dev_unregister` 成功後に参照を戻す。FS はマウントが残れば BUSY・表不変、Device の解除は検索表だけで、保持された `Device *` は adapter が断つまで参照を戻さない。未解除参照または停止失敗は既存の QUARANTINED と逆順 rollback に渡し、依存閉包の body/所有RAMを保持する (MINIMAL_QUARANTINED と同じ回収不可の扱い)。一般公開/boot transaction の診断は各部品の接続段で既存経路へ渡す。全 broker の owner 化や自動 unload 表より小さく、既存 lifecycle と参照計数を再利用できるためこの方式を採る。永久 DEVICE 予約は触らない。
 `tools/module_schema.py` の許可 ID 一覧は kdebug/sqlite/fep/ATAPI+iso9660/kcg/fm/pcm/v86/lan/cirrus の10件 (FAT・HostDrv は core)。生成 `MODULE_RECORD_CAP=10` はこの件数で決まり、満杯は open/owner確保前に拒否する。未切出し ID の画像 policy はまだ無く、loader は従来どおり拒否する。STARTING IRQ の有効化・tick/callback/DMA の停止は各 adapter が参照核を使って行い、`module_exports` の RUNNING 門で IRQ を抑止しない。
-host の受入・PM 用変異は `tools/tests/module_runtime_tdd.md`、既存 kdebug の実像・pair・OFF/RUNNING 回帰は `tools/tests/kdebug_init_tdd.md` を参照する。
+host の受入・PM 用変異は `module_runtime_tdd.md (旧版 b553130f0f49)`、既存 kdebug の実像・pair・OFF/RUNNING 回帰は `kdebug_init_tdd.md (旧版 a2e41df82dea)` を参照する。
 
 ## 3. T4 SQLite と FEP 案 A
 
@@ -281,7 +281,7 @@ T5の順は **T5-0a → T5-0b → T5a-1/2/3 → T5b-4 (縮小) → T5c-0 (前倒
 | T4b-4 (1日) | VFS FD identity・MAIN_DB重複門・F3a/c | ①相対/絶対/別名の同一ext2 inodeを拒否 ②parked/親子/同owner/隔離済みも拒否 ③CREATEは新FDのみcloseし既存内容不変 ④別DB/:memory:成功 ⑤truncate/sync/delete/access失敗を各SQLite rcへ伝播 ⑥pOutFlagsは実open結果 ⑦RO write/truncate拒否 ⑧FAT/HostDrv/LAN版host MAIN_DBは作成前拒否。path比較置換/登録早期解除/成功固定/RO門削除変異を検出。FDWP-1をRO全体の受入とせず、F3 rc伝播を確認 (§3-2)。 |
 | T4b-4c (削除済み) | 不変CDのRO VFS経路 | 2026-10-24 に削除 (票 TASK_TEST_TIDY の TT5)。通常CD読取/cdinstはT5b-5で維持。 |
 | T4b-5 (1日) | X-11全12口の契約表・共有サービス回帰 | ①12口の主体・入力・返値・状態変化・出力寿命・取消を表に明記 (IME9口は入力/モード/辞書管理に分類) ②CUI/WM通常配送で入力1回消費 ③parent/child/park-resumeで候補・辞書・出力の寿命が表と一致 ④無効mode/variantで状態不変 ⑤exec結果の「全体の直前1件」を親子切替で観測 ⑥gui_callの実owner/内部op拒否・正規WM配送を観測 ⑦con_sinkの先着/別reader EXIST/終了時返却を観測。二重配送/無効値書込/owner差替/reader早期解放変異を検出。子正常/fault/STOP→親→次KAPIのesp0/callerとUSER別勘定も確認 (§3-1/3-3)。 |
-| T4b-7 (1日) | E11-A2b raw KAPIゲストfixture ([試験・PM手順](../../../tools/tests/raw_wait_tdd.md)) | ①kbd/IME/serial無入力待ち・FM長音の各CUI/GUIでSTOP→shell/WM復帰 ②通常完了も成功 ③内部ログ/SQLite中は中断0 ④owner回収1回・Key-OFF・候補取消・池復帰。取消削除/内部ログに取消混入の変異を検出。親復帰後のesp0/caller・次KAPIとUSER別勘定を確認 (§3-1/3-3)。 |
+| T4b-7 (1日) | E11-A2b raw KAPIゲストfixture (試験・PM手順 (旧版の Git blob `459c451207bf`)) | ①kbd/IME/serial無入力待ち・FM長音の各CUI/GUIでSTOP→shell/WM復帰 ②通常完了も成功 ③内部ログ/SQLite中は中断0 ④owner回収1回・Key-OFF・候補取消・池復帰。取消削除/内部ログに取消混入の変異を検出。親復帰後のesp0/caller・次KAPIとUSER別勘定を確認 (§3-1/3-3)。 |
 | T4b-8 (1日) | X-1残る文字列・kprintfの棚卸し/接続 | ①全公開NUL入力/可変引数の担当が確定 ②format/%s/引数窓の端をB1で処理 ③ページ末尾NUL成功、次ページ欠落/未終端は副作用前失敗 ④通常表示同一。生ポインタ読取へ戻す変異を検出。量が多ければAPI群別に分割 |
 | T4c-1 (1日) | SQLite module build・typed facade・全stub | ①旧連結sqlite section/addr参照と固定stack依存が消える ②全db API/診断がstubかtyped exportへ ③通常db_test/db_mem_used成功 ④旧新混在はinit0で拒否。直呼び残存/NULL stub変異を検出。/bootへ配布しhsync bootで対更新 (§5-4)。resident終端・stack・KHEAP算出と監査を切替 (§7-2)。依頼に `rg -l "__sqlite_\|SQLITE_STACK\|__kernel_resident_end"` の全参照一覧 (paging/kentry/isr・監査・tools/testsも含む) を添える。VK32をcore1本へ変更、Unicode順序・配布世代門も同期 (§3-4/5-4)。 加えて `make kernel` がカーネルの像と対の部品 (kdebug.bin・SQLite の部品、T5 以降は起動時に読む部品) を全部組むこと (部品の一覧は `build/kernel.mk` の 1 つの変数、ユーザー決定 2026-10-18)。 SQLITE の policy (`tools/module_schema.py`) を PAIR 必須にし、mkmod に `--vmkernel` を必須で渡す (T4a の時点では PAIR を禁じていて、同じ版の古い部品を受け入れうる — T4a のレビュー R5)。 `module_start` は prefix の返却に失敗して回収まで済んだときに 0 を返す (`sys/kern/module/module_runtime.c`) — 呼び手は戻り値だけで成功と判断せず状態を見るか、0 以外を返す形に直す (T4a のレビュー Q1)。 |
 | T4c-2 (1日) | services_public・settings→FEP transaction | ①公開前db/imeはstub、全成功で同時公開 ②各init確保/設定close/FEP CRC/辞書欠落/予約不足を注入 ③戻せた失敗はSQLite owner占有0・MINIMAL ④close/shutdown失敗は隔離byteとMINIMAL_QUARANTINEDを診断。早期公開/隔離free変異を検出。Unicode7頁を保持し欠落等はかなのみ継続 (§3-4)、配布世代門を回帰 (§5-4)。監査diff0 (§7-2)。起動tickを前後比較 (NP21/W参考値、現591〜595 / 544〜558、合否に使わない)。 |

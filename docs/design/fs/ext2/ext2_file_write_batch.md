@@ -26,4 +26,4 @@ createは子inode完成・finish後に既存add_entry→sync。名前公開失�
 abortはI/Oをしない。部分公開のbitmap/表を逆書込みせず、漏れ・孤児・集計差は
 ホストe2fsckへ渡す。完了済み512Bが保持される模型を対象とし、装置の電源断キャッシュ
 並替えやセクタ破断は保証しない。全Device要求の各512B位置の故障と停止像、
-64KiBの6KiB読/69KiB書は `tools/tests/test_ext2_write_batch.py` で検証する。
+64KiBの6KiB読/69KiB書は `test_ext2_write_batch.py (旧版 5ed75b949a7b)` で検証する。

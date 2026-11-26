@@ -13,7 +13,7 @@ GNU tar は gnulib + autotools + GPL、busybox tar は GPLv2 なので採らな�
 
 利用者: `userland/cmds/tar.c` (`/bin/tar.bin`)。ビルド規則は
 `build/programs.mk` の `lib/microtar/microtar_prog.o` + `userland/cmds/tar.elf`
-(`lib/lz4_prog.o` と同じ形)。ホスト試験は `tools/tests/test_tar_cmd.py`。
+(`lib/lz4_prog.o` と同じ形)。ホスト試験は `test_tar_cmd.py (旧版 618d65bcfe4b)`。
 
 I/O は `mtar_t` の関数ポインタ (read/write/seek/close) なので、OS32 側は
 そこへ KAPI (`sys_open` / `sys_read` / `sys_write` / `sys_lseek` / `sys_close`)
@@ -54,7 +54,7 @@ I/O は `mtar_t` の関数ポインタ (read/write/seek/close) なので、OS32 
    (票 S6-P)。`static const char nul[512]` (.rodata) を使ってブロック単位で
    書く。呼び出しは 1523 回 → **5 回**、セクタ I/O は 15258 → **78**。
    書く中身 (ゼロ) も位置の勘定 (`twrite` が `tar->pos` を進める) も
-   上流と同じ。実測は `tools/tests/s6p_tdd.md`、診断は
+   上流と同じ。実測は `s6p_tdd.md (旧版 4df944b09756)`、診断は
    `docs/archive/settings/TASK_S6P.md`。
    `nul[]` を自動変数にしないこと — 外部プログラムのスタックは細い。
 
@@ -64,7 +64,7 @@ I/O は `mtar_t` の関数ポインタ (read/write/seek/close) なので、OS32 
 
 microtar が書くのは **ustar の magic 欄を持たない v7 形式のヘッダ**
 (512B、チェックサムは符号なし和 + 256)。欄の位置・意味は ustar と同じで、
-Python の `tarfile` はこれを読める (`tools/tests/test_tar_cmd.py` が
+Python の `tarfile` はこれを読める (`test_tar_cmd.py (旧版 618d65bcfe4b)` が
 毎回確かめる)。Python の `tarfile` が書いた ustar / GNU 形式も
 `mtar_read_header` で読める (prefix 欄・PAX 拡張・base-256 の巨大サイズ・
 100 バイトを超える名前は非対応 — 使わない)。

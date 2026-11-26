@@ -37,5 +37,5 @@
 
 ## 検査
 
-- `tools/tests/test_splash_obs.py` (splash-obs-host): 独立の時計を持つ I/O の模型で、表示中の先頭番号・G→R→B の順・空の行・H の再武装・VSYNC での DROP・待ちの上限での停止・全出口での IF の復元・次フレームの初期色の復元を確かめる。通常と観測で同じ列になること、32 本以上の emit がリンクされないことも見る。先頭番号・再武装・VSYNC・IF の各削除は実行時 RED。
-- `tools/tests/test_splash_wire.py`・`test_splash_v2.py`: 起動の結線の中で使う。
+- `test_splash_obs.py (旧版 8ab116a7a93e)` (splash-obs-host): 独立の時計を持つ I/O の模型で、表示中の先頭番号・G→R→B の順・空の行・H の再武装・VSYNC での DROP・待ちの上限での停止・全出口での IF の復元・次フレームの初期色の復元を確かめる。通常と観測で同じ列になること、32 本以上の emit がリンクされないことも見る。先頭番号・再武装・VSYNC・IF の各削除は実行時 RED。
+- `test_splash_wire.py (旧版 1a5727f53cbf)`・`test_splash_v2.py`: 起動の結線の中で使う。

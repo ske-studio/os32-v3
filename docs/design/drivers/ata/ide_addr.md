@@ -34,5 +34,5 @@ hdprep の計画 (`userland/shell/hdprep_plan.c`) は同じ規則で上限を出
 
 ## 確かめ
 
-`make check-hdd-stage1-host` (`tools/tests/test_hdd_stage1.py`) のケース `ata_lba28`・`ata_range`・`ata_chs`。
+`make check-hdd-stage1-host` (`test_hdd_stage1.py (旧版 6201b26bccf0)`) のケース `ata_lba28`・`ata_range`・`ata_chs`。
 NP21/W の LBA の解釈と実機の I/O はホストでは見ていない。

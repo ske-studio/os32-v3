@@ -11,7 +11,7 @@ route01 とセルは上層の切替後に判定し、共有列の終了条件に
 
 - **読戻しできないビット**: 書いた値と全ビットを比較すると、動作していても照合で止まることがある。
   `sys/dev/video/geforce/display/checks.c` は mask の範囲だけを比較し、50C bit28、CR1A bit3/5、680A24 を必須照合から外す。
-  判定側も同じ mask を使う。`tools/tests/gfinit_plan_c_host.c` の CHECK 試験で照合条件を検査する。
+  判定側も同じ mask を使う。`gfinit_plan_c_host.c (旧版 70d661a27cd2)` の CHECK 試験で照合条件を検査する。
 
 ## 移し替えた設計
 

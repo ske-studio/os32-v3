@@ -1,6 +1,6 @@
 # splash_raster_host.c — 再生器のホスト模型
 
-状態: **現行 (2026-11-01)**。ソース: `tools/tests/splash_raster_host.c`。
+状態: **現行 (2026-11-01)**。ソース: `splash_raster_host.c (旧版 5d5dfa684b7b)`。
 
 実製品Cをincludeし、sys_time_now・IN/OUT・IRQ境界だけを偽装する。走査周期は
 24/31kHzの整数比から独立に作り、非表示全体型/VS型、周期ずれ、未知の高幅、

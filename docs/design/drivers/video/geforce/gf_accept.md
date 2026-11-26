@@ -29,5 +29,5 @@ readback は各矩形の300回完了後、point を確認してから行う。�
 計時後に report callback へ1行ずつ渡す。パターンは記録の送出中にカメラで確認する。
 全ケース後に RAM CLIENT 全面を再転送して戻す。1起動で1回だけ計測する。
 
-レコードと操作手順の正典は GF_ACCEL_DESIGN §5、集計の仕様は tools/accept/gf_accel
+レコードと操作手順の正典は GF_ACCEL_DESIGN §5、集計の仕様は tools/ops/gf_accel
 の個別設計書。host模型は実CPUのWC・PCI drain・表示を証明しない。

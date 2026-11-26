@@ -29,4 +29,4 @@
 
 ## 確かめ
 
-- `tools/tests/test_lanfs.py` (`lanfs_host.c`)・`test_hostsvc_image.py`・`test_hostsvc_block.py`・`test_hostsvc_sfs_lan.py`・`test_hostsvc_serialfs.py` (--allow-write の有無の差、応答の喪失と再送で 1 回だけ書く)。
+- `test_lanfs.py (旧版 ca0109562bf5)` (`lanfs_host.c`)・`test_hostsvc_image.py`・`test_hostsvc_block.py`・`test_hostsvc_sfs_lan.py`・`test_hostsvc_serialfs.py` (--allow-write の有無の差、応答の喪失と再送で 1 回だけ書く)。

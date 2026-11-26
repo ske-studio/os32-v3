@@ -152,7 +152,7 @@ int pc98_route_to_gf(void)
 | D3 | sys/kern/console/console.c (門 4 か所 + console_session_clear) + host の stub 3 本 | D1 | ±20、各 +3 |
 | D4 | sys/platform/pc98/video/pc98_route.c | D1 | +4 |
 | D5 | sys/platform/pc98/kernel.c (423・484) + sys/platform/pc98/kernel_gfx_config.inc | D1・D3 | ±8 |
-| D6 | tools/tests/console_dual_host.c + tools/checks/console-dual-host.py | H0・D1〜D5 | +240 / +20 (400 行を超えたら、判定と列挙 (A1・A1g・A2) と門・経路 (A3・A4) の 2 本に分ける) |
+| D6 | console_dual_host.c (旧版 4b121d4f002b) + console-dual-host.py (旧版 235d6a3f7316) | H0・D1〜D5 | +240 / +20 (400 行を超えたら、判定と列挙 (A1・A1g・A2) と門・経路 (A3・A4) の 2 本に分ける) |
 | D7 | 設定の説明 1 行 (文書) | PM | +1 |
 - 実装者は全部 terra。H0・D1 の .h を先に固定し D2〜D5 を並列、**H0・D1〜D6 を 1 本の統合の枝 (wt/int-*) で CI 1 回**の取り込みの単位にする。
 - HAL v2 との境目: GF の行は最初から gfx2 の列挙 (HAL v2 の K1 を D2 に吸収、末尾の 2026-11-12 の追記)。
@@ -164,7 +164,7 @@ int pc98_route_to_gf(void)
 | A1 判定: cfg × sink × V86 × backend (pc98・pegc・trident・cirrus・geforce) × started × route_safe × セル × 更新条件 4 つ (gfx_shutdown の GF→PC98、同じ世代での鍵の変化)。V86 中は inp/outp・セルの呼び出し 0 回 | console_dual.c と **display_dual.c の実物**を組み、inp/outp・セル・`gfx2_active`・`gfx2_head_info`・`gfx2_connector_info`・`gfx_is_started` (偽の gfx2_adapter) だけ差し替え (libc なし) | host |
 | A1g 列挙: 偽の gfx2_adapter の head[0..1] の attached・connector_mask・mode_id・scan_sid と state の組で、表は 98 + heads 行 (head 1 停止なら running=0・NONE)、DESK は state=OK で attached な head だけ (LOST なら NONE、TEXT は残る)、v1 の机 (conn_mask=0) でも connector が backend の値から決まる (H0)、head と connector の入れ替えでも正しい、欄の変化で鍵が変わり表が作り直される。判定の道で `gfx2_connector_info` (DDC の I/O) を呼ばない | 同上 | host |
 | A2 display_dual_text_on の前後で gfx_current_height・gfx_flip_enabled・gfx_display_page が不変、出す I/O の列が GDC STOP・FF1・TEXT START だけ | 同上 | host |
-| A3 console.c の門 4 か所、was_live で 443 が消さない、console_session_clear が sink に CLEAR を積み TVRAM を残す。**通し**: active → gfx_shutdown (started=0・PC98) → 484 → 422-423 の起動表示が追記で 0 行目が不変 → GF 再開で active に戻る | console.c と kernel.c の該当の関数を host で組む既存の型 (tools/tests/legacy_callers_host.c の流儀) | host |
+| A3 console.c の門 4 か所、was_live で 443 が消さない、console_session_clear が sink に CLEAR を積み TVRAM を残す。**通し**: active → gfx_shutdown (started=0・PC98) → 484 → 422-423 の起動表示が追記で 0 行目が不変 → GF 再開で active に戻る | console.c と kernel.c の該当の関数を host で組む既存の型 (legacy_callers_host.c (旧版 7e9f751d95c1) の流儀) | host |
 | A4 route: cfg=1 で 0FACh 無書込み・safe=route_safe、cfg=0 で従来どおり | pc98_route.c を組み I/O 差し替え | host |
 | A5 回帰: CONSOLE_DUAL=0 と未指定で今と同じ (GUI 中 TVRAM 凍結)。=1 + GFX=pegc/pc98/cirrus で断りの 1 行・机に文字が重ならない | NP21/W (GF が無いので 2 画面の経路はここでは通らない) | NP21/W |
 | A6 GF の D-SUB 直結 + =1: 98 のモニターに kprintf・端末の出力が流れ、GF の D-SUB に机 (カメラ)。gshell の異常終了と再起動で 98 の記録が残り 0 行目が上書きされない。GUI→CUI で消えない。表が 3 行 (DVI の head は NONE、`con_dual_outputs` をシリアルの診断で出す) | 実機 (結線はユーザー、物理操作は立会い) | 実機 |
@@ -186,7 +186,7 @@ int pc98_route_to_gf(void)
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
 - **実装の時機 (os32powerpc の指摘)**: 本票が触るファイルは PowerPC 第 5 段 C1〜C3・B1〜B6 と同じ。cfb9cec3 の時点では第 5 段で入ったのは A (`sys/hal/gfx/gfx_internal.h`) と E・F だけで、§7 の 4 ファイル (`sys/kern/console/console.c`・`console_backend.h`・`sys/platform/pc98/console.c`・`sys/include/text_screen.h`) は変化なし。実装は第 5 段 Z の後に出し、そのとき移った先の構成で §1 の F1〜F10 の file:line と §7 の置き場を照らし直してから依頼する。§7 の「D3 と C1 は先に入った方に載せ直す (推奨: D3 が先)」はこの順に書き換えた。
 - **D5 と層の検査**: `sys/platform/pc98/kernel.c` は PC-98 の platform のソース。D5 は `console_dual.h` だけを include する。共通の側 (console_dual.c・console.c) に `drivers/`・`platform/pc98/` のヘッダを足さない (足すと `tools/check_layers.py` が止める)。
-- **その他の前提は変化なし**: `tools/tests/legacy_callers_host.c` は D2 で `v86_call_dispatch` のスタブの型 (`src, count`) だけ変わり、console の偽の置き換え (`console_render_allowed()`) は同じ。GF は 1 枚の前提も保たれる (`sys/dev/video/geforce/geforce_platform.c` が 2 枚目を `second ... ignored` と記録、`sys/dev/video/geforce/diag/recover.h`)。
+- **その他の前提は変化なし**: `legacy_callers_host.c (旧版 7e9f751d95c1)` は D2 で `v86_call_dispatch` のスタブの型 (`src, count`) だけ変わり、console の偽の置き換え (`console_render_allowed()`) は同じ。GF は 1 枚の前提も保たれる (`sys/dev/video/geforce/geforce_platform.c` が 2 枚目を `second ... ignored` と記録、`sys/dev/video/geforce/diag/recover.h`)。
 
 ## 確定の後の追記 (2026-11-12、main 15738b50 との照らし直し、PM 決定)
 - **D1g を廃止し、HAL v2 の K1 を D2 に吸収する**: HAL v2 の C1・C11・G10 が main にあり、I3 は実機で PASS しているので、gf_outputs.[ch] は作らない。display_dual.c は最初から gfx2 の列挙で表を作る。HAL_V2_DESIGN §12 の K1 の行 (:1228) は「CONSOLE_DUAL の D2 に吸収」で閉じる。
@@ -209,7 +209,7 @@ int pc98_route_to_gf(void)
   - gfx_shutdown は sys/hal/gfx/gfx_core.c、パニックの直書きは sys/platform/pc98/emergency.c (platform_fault_cell())。
   - 設定の読み込みは sys/platform/pc98/kernel_gfx_config.inc (kernel_gfx_config()) の後に入れる。
   - console.c の門 (53-57・106・388・428-445) と pc98_route.c (22-25・39-42・44-57) はそのまま。
-- **D3 の付帯**: console.c を組む host 試験 3 本 (tools/tests/con_sink_host.c・sep5_console_host.c・legacy_callers_host.c) に con_dual_* の stub (0 を返す) を足す。test_sep5_console.py の目印の行 (`    return con_backend_safe() &&`) は変えない。PowerPC 第 5 段 C1 は main にあり、console.c は `con_backend_safe()` 経由 (sys/platform/pc98/console.c)。D3 はその上に載せる。
+- **D3 の付帯**: console.c を組む host 試験 3 本 (con_sink_host.c (旧版 1f34b894effc)・sep5_console_host.c・legacy_callers_host.c) に con_dual_* の stub (0 を返す) を足す。test_sep5_console.py の目印の行 (`    return con_backend_safe() &&`) は変えない。PowerPC 第 5 段 C1 は main にあり、console.c は `con_backend_safe()` 経由 (sys/platform/pc98/console.c)。D3 はその上に載せる。
 - **§4 に足す**: GF の LOST (sys/hal/gfx/v2/fence.c) は 0FACh・safe に触らないので、TEXT の行は描き続け、DESK の行は state ≠ OK で NONE にする。
 - **§2-1・§2-2・§6・§8 を書き換えた** (gf_outputs と sig を消し、gfx2 の列挙と display_dual_key に)。
 - **段の表**: §7 を書き換えた (H0 を足し D1g を削除)。

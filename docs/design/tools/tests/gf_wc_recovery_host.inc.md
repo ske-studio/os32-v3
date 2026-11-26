@@ -1,7 +1,7 @@
-# tools/tests/gf_wc_recovery_host.inc — 停止経路の回帰
+# gf_wc_recovery_host.inc (旧版 ae30f9d39e5e) — 停止経路の回帰
 
 > 状態: **現行 (2026-11-01)** — GF_ACCEL_DESIGN §4・§8 T1
-ソース: `tools/tests/gf_wc_recovery_host.inc`
+ソース: `gf_wc_recovery_host.inc (旧版 ae30f9d39e5e)`
 
 `test_geforce.py` の ILP32/qemu 試験。実物の HAL・backend・geforce_body の共通 stop・gf_wc_stop と、exec から切り出した fault 移譲/通常文脈の着地/finish/所有者通知、gui_owner_exit を結ぶ。longjmp は実物の setjmp.asm をリンクする。開始時の WC 取得と MSR/device 操作は模型であり、適用条件は既存 gf_wc_host が検査する。
 

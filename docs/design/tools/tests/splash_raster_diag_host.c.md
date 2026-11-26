@@ -1,4 +1,4 @@
-# tools/tests/splash_raster_diag_host.c — 再生器の診断試験
+# splash_raster_diag_host.c (旧版 5c7e7156d35c) — 再生器の診断試験
 
 状態: **現行 (2026-11-01)**。
 

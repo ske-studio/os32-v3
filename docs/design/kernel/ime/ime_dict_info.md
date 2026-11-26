@@ -66,7 +66,7 @@ license などそれ以外は `NOTFOUND`。偽の原文や件数 0 を返さな�
 
 ## 検査
 
-- `fep-store-info` (`tools/tests/test_fep_store_info.py`): 全キー、状態ごとの戻り、capacity 0/1/2/256/257、EOF・`INT_MAX`、UTF-8 の途中で切った原文の再結合、失効のとき SQL を流さないこと、呼び手の域。変異 (`info-*`) は `fep-boundary-host` にもある。
-- `fep-module` (`tools/tests/test_fep_module.py`): ops の表と stub の `NOSYS`、起動の接続数の中継。
-- `ime-info` (`tools/tests/test_ime_info.py`): 表示が byte で切った原文を壊さないこと。
+- `fep-store-info` (`test_fep_store_info.py (旧版 4336bd65a4de)`): 全キー、状態ごとの戻り、capacity 0/1/2/256/257、EOF・`INT_MAX`、UTF-8 の途中で切った原文の再結合、失効のとき SQL を流さないこと、呼び手の域。変異 (`info-*`) は `fep-boundary-host` にもある。
+- `fep-module` (`test_fep_module.py (旧版 24679ebfcab9)`): ops の表と stub の `NOSYS`、起動の接続数の中継。
+- `ime-info` (`test_ime_info.py (旧版 9e82390aa20e)`): 表示が byte で切った原文を壊さないこと。
 - ゲスト: `userland/diag/fep_meta_test.c` (20 キーの全 byte を辞書の meta と照合、`entry_count` が実数と一致)。

@@ -730,7 +730,7 @@ static int fatfs_vfs_is_mounted(void *ctx)
  * FatFs (FF_USE_LFN = 0、SBCS の FF_CODE_PAGE) は短い名前を探すときに英小文字を
  * 大文字にし、0x80 以上は符号ページの大文字化表 (ff.c の TBL_CT437) で畳む。
  * VFS の BUSY / pinned の名前比較を**同じ規則**にするための 1 バイト版。
- * 表は ff.c の TBL_CT437 の写し (一致は tools/tests/test_vfs_fd_path.py の
+ * 表は ff.c の TBL_CT437 の写し (一致は test_vfs_fd_path.py (旧版 3062ccc08e29) の
  * fatfold 段が ff.c の本文と突き合わせる)。符号ページを変えたらここも替える。 */
 #if FF_CODE_PAGE != 437 || FF_USE_LFN != 0
 #error "fat_name_fold: FatFs の名前規則 (CP437・LFN なし) と表を合わせ直すこと"

@@ -32,7 +32,7 @@ Worktrees have no `.env`. Before anything else, export
 `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp/run/<stage> HOST32_RUNNERS=qemu`
 (TMPDIR must be on disk; `/tmp` is RAM; native runners hit SIGSYS in the Codex sandbox), then run
 `tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Build the image requested for the change and run the affected registered checks. Use `--mutate` for checks you add or modify. Once feature development resumes, add a check for the affected contract in the same change.
-The PM pushes the candidate to `wt/int-*` and runs `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` before fast-forwarding main. The evidence identifies the successful latest attempt of the same restructure-build run and records both PC-98 and PowerMac boots. Legacy checks are reference material only until removal in P7.
+The PM pushes the candidate to `wt/int-*` and runs `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` before fast-forwarding main. The evidence identifies the successful latest attempt of the same restructure-build run and records both PC-98 and PowerMac boots.
 Run checks in the foreground and wait for them to finish instead of re-reading partial logs; never abort and restart a run. Only logs produced after your last source change count as passing.
 Never commit (the sandbox keeps `.git` read-only; the PM commits).
 
@@ -58,7 +58,7 @@ The step-by-step playbooks live under `.claude/skills/<name>/SKILL.md`. They are
 - `os32-test-basis`: register checks and verify their mutations.
 - `os32-kapi-add`: adding or changing a KernelAPI entry.
 - `os32-ci-read`: reading CI failures and re-running (PM).
-- `os32-ci-inventory`: legacy shard measurements, for reference until P7.
+- `os32-ci-inventory`: CI timing records.
 - `os32-archive`: summarizing a finished ticket into `docs/design/` before moving it to `docs/archive/` (PM; policy in [docs/POLICY_ARCHIVE.md](docs/POLICY_ARCHIVE.md)).
 
 ## Authoritative Guidance

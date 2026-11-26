@@ -19,7 +19,7 @@ extern void kdi_set_kbd_inject_drop_count(u32 value);
 /*  実機で毎回踏むのは「積んだ順に 1 バイトずつ出る」「UTF-8 の並びが        */
 /*  変わらない」「あふれは新しい方を捨てる」「破棄で空になる」「読み手が     */
 /*  居ない間の注入は拒否」の 5 つ。権限が**通る**側はホスト試験              */
-/*  (tools/tests/kbd_inject_host.c) が con_sink の読み手を作って見る —       */
+/*  (kbd_inject_host.c (旧版 4c4e8e01e6df)) が con_sink の読み手を作って見る —       */
 /*  ここで作ると CON_SINK_REC_MAX の受け皿をカーネル帯に常駐させることに     */
 /*  なり、256B で収めた意味がなくなる。                                      */
 /*                                                                          */

@@ -63,7 +63,7 @@
 | K 排他 | `kernel/**` `exec/**` `sys/include/memmap.h` `sdk/kapi.json` と生成物 4 つ、`sdk/include/os32/os32_kapi_shared.h`、`sdk/include/os32/os32_gui_shared.h` (新規)、`sdk/link/app.ld`、`userland/shell/**` (K4 の `os32gui`) |
 | W 排他 | `userland/gshell/**` (新規) |
 | C 排他 | `userland/rust/libos32gui/**`、`userland/rust/gui_demo/**`、`sdk/rust/os32api/src/gui/**` (新規、共有定数の Rust 側) |
-| PM | `tools/check_gui_proto.py` (新規)、`docs/tasks/gui/**`、`docs/ROADMAP.md` |
+| PM | `check_gui_proto.py (旧版 9dfb30aa7e08)` (新規)、`docs/tasks/gui/**`、`docs/ROADMAP.md` |
 | 共有 (PM 経由で追加) | `build/programs.mk`、`userland/deploy.yaml`、`docs/KAPI_SPEC.md`、`CLAUDE.md` |
 
 - KAPI に足すのは K だけ。H が KAPI を要るときは K1 の票に「H1 からの依頼」として載せる
@@ -73,7 +73,7 @@
 ## 4. 契約から先に固める共有定数 (K1 の成果物、他レーンはこれを写す)
 
 `sdk/include/os32/os32_gui_shared.h` に C で置き、`sdk/rust/os32api/src/gui/proto.rs` に
-C レーンが同じ値を写す。PM の `tools/check_gui_proto.py` が両者を突き合わせ、`make check`
+C レーンが同じ値を写す。PM の `check_gui_proto.py (旧版 9dfb30aa7e08)` が両者を突き合わせ、`make check`
 に入る。**以後は末尾追記のみ** (契約 T5)。
 
 | 項目 | 提案値 (K1 が確定させる) |

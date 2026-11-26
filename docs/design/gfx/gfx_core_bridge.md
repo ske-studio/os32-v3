@@ -20,4 +20,4 @@
 
 ## 検査
 
-`tools/tests/test_gfx_attach.py` が kernel 側 (query・lease・台帳・paging・3 backend) と SDK の core・描画 C を連結し、互換 token の再利用、TRUSTED の不正出力で終了要求を立てないこと、USER に kernel alias を返さないこと、失敗時の出力消去と終了要求を確かめる。
+`test_gfx_attach.py (旧版 ad621da00d0b)` が kernel 側 (query・lease・台帳・paging・3 backend) と SDK の core・描画 C を連結し、互換 token の再利用、TRUSTED の不正出力で終了要求を立てないこと、USER に kernel alias を返さないこと、失敗時の出力消去と終了要求を確かめる。

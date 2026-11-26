@@ -2,7 +2,7 @@
 ;;
 ;; 正本はこのファイル。sys/platform/pc98/kdebug/v86_gcap.c の v86_gcap_code[] はこれを
 ;;   nasm -f bin sys/platform/pc98/kdebug/v86_test16_gcap.asm -o /tmp/g.bin
-;; で組んだバイト列そのもの (tools/tests/test_v86_gcap.py が組み直して照合する)。
+;; で組んだバイト列そのもの (test_v86_gcap.py (旧版 9a39e870844e) が組み直して照合する)。
 ;;
 ;; 配置: CS = 0x8A00 (linear 0x8A000)。入口は 0x40 刻みの固定オフセット
 ;; (v86_gcap.c の GCAP_ENTRY_*)。データは 0x8C00:0000 (V86_TEST_MAGIC_ADDR)。

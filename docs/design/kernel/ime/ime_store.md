@@ -67,5 +67,5 @@ GNU11・libc なしで組める形にしてある (host 試験も libc なしで
 
 ## 検査
 
-- `fep-store-contracts` (`tools/tests/test_fep_store_contracts.py`): 宣言が libc なしで組めること、試験の土台 (`tools/tests/fep_store_fixture.h`)。
-- `fep-conn` (`tools/tests/test_fep_conn.py`): 閉じる順、失敗で隔離すること、`fep_conn_ready` の判定順。
+- `fep-store-contracts` (`test_fep_store_contracts.py (旧版 22cc64ce590c)`): 宣言が libc なしで組めること、試験の土台 (`fep_store_fixture.h (旧版 a791bd9a343d)`)。
+- `fep-conn` (`test_fep_conn.py (旧版 134a56b788c3)`): 閉じる順、失敗で隔離すること、`fep_conn_ready` の判定順。

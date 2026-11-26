@@ -8,7 +8,7 @@ SURFACE の GF 識別定数は既存 ID の末尾へ追加し、`sys/kern/mm/pga
 
 - **RAM 上端と穴**: 高位 RAM の上端がデバイス窓より上でも、窓自体は RAM のない穴かもしれない。
   `sys/kern/mm/pgalloc.c` の `pgalloc_range_has_ram(first, end)` に PFN 半開区間を渡し、凍結した物理地図で重複を調べる。
-  未初期化や不正な範囲も安全側で扱う。`tools/tests/test_pgalloc_range.py` が窓と境界を検査する。
+  未初期化や不正な範囲も安全側で扱う。`test_pgalloc_range.py (旧版 7c17bcf37682)` が窓と境界を検査する。
 
 ## 内部設計と契約 (D1)
 
@@ -56,4 +56,4 @@ owner タグ: kernel / boot / shlib / gshell / AS ごと / モジュール名。
 - 解除の口は無い。DEVICE owner の回収は断られ、MODULE の一括回収 (`ledger_reclaim_owner`) の後も DEVICE の区間と eligible の落としは残る。予約は写像ではない (PTE は変えない)。
 - `ledger_selfcheck` は区間の非重複の例外として、DEVICE が BACKGROUND に重なることだけを許す。
 
-検査: `tools/tests/test_device_reservation.py` (`check-memory-host` の中、`--mutate` 付き)。実物の `sys/kern/mm/pgalloc.c`・`sys/platform/pc98/pci_resources.c` などを ILP32 で取り込み、`irq_restore` のたびに L1 / L2 の不変条件を全ページ検査する。失敗の後は表を中身まで比べる。
+検査: `test_device_reservation.py (旧版 6c8990917e0d)` (`check-memory-host` の中、`--mutate` 付き)。実物の `sys/kern/mm/pgalloc.c`・`sys/platform/pc98/pci_resources.c` などを ILP32 で取り込み、`irq_restore` のたびに L1 / L2 の不変条件を全ページ検査する。失敗の後は表を中身まで比べる。

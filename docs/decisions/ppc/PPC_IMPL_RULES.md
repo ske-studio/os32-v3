@@ -12,21 +12,21 @@ CI は統合の枝で os32-v3 の PM が 1 回だけ回すので、PowerPC の�
 
 | # | 型 | 洗い方 |
 |---|---|---|
-| 1 | 関数名・ファイル名で書いた例外の一覧 (tools/check_p2v_allow.txt・check_privileged_allow.txt・check_kprintf_window_allow.txt)。関数を動かす・名前を変えると古くなる | `make check-p2v check-privileged check-arch-asm check-le-access` を 1 本ずつ |
+| 1 | 関数名・ファイル名で書いた例外の一覧 (check_p2v_allow.txt (旧版 71d3829bcc20)・check_privileged_allow.txt・check_kprintf_window_allow.txt)。関数を動かす・名前を変えると古くなる | `make check-p2v check-privileged check-arch-asm check-le-access` を 1 本ずつ |
 | 2 | 生成物の鮮度 (check-vk32-crc-host)。生成器や生成物の一覧 (build/kernel.mk の KAPI_GENERATED など) を触った | clean ビルドの後に `make check-vk32-crc-host` |
-| 3 | ソースの一覧の 3 か所 (build/sources/order.mk・選択の一覧・tools/tests/fixtures/build_profile_x86.json の C_KERNEL、PORT_FLOW の l.85) | 3 か所を揃え、`python3 -B tools/tests/test_build_selection.py` |
+| 3 | ソースの一覧の 3 か所 (build/sources/order.mk・選択の一覧・build_profile_x86.json (旧版 060af0634e08) の C_KERNEL、PORT_FLOW の l.85) | 3 か所を揃え、旧手順（8d01bcd79a67 の記録） |
 | 4 | 写しの木で組む試験 (subprocess で gcc、HEADERS/TREE_FILES/MIRROR/FILES の一覧、関数の切り出し、自前の -I、間接 include、.c の include、`__ASSEMBLER__` で cpu.h を読む物) | 触ったヘッダ・ソースの名前を tools/・build/・Makefile・docs/ で grep し、全部追従 |
-| 5 | tools/checks/*.py と試験の CHECK の covers/inputs が、どのファイルにも当たらない glob になる (check-map が落ちる) | 新しいファイルを covers に足す。covers の衝突は ast で 3 方向の和にして検算する (正規表現で切ると `[ch]` の glob で壊れる) |
+| 5 | 移動後の入力が登録から抜ける | tests/registry.toml の sources と変異対象を確認し、変更した登録を lint と変異付きで確かめる |
 | 6 | tools/source_roots.py の SCAN_ROOTS (新しい置き場が走査の外) | 新しい置き場を足す |
-| 7 | kdebug の import (sys/kern/module/kdebug_imports.def の source 欄、slot は詰めない・並べ替えない) と tools/tests/fixtures/dep_dir_a/l01.json の指紋。FEP の MODULE_ABI_GEN の指紋 (部品の contracts の字面から計算) | 指紋を変えない。contracts のヘッダはコメント 1 字も触らない |
-| 8 | tools/tests/test_ci_stab.py の規則 (`if not mutant:` を書かない、covers に足す、試験の補助関数に `run` という名前を使わない) | `python3 -B tools/tests/test_ci_stab.py` |
-| 9 | 新しい host32 の試験が 32 ビットの libc (crt1.o) に頼る (CI と WSL に無い、この PC にはあるので手元では通る) | `gcc -m32 -ffreestanding -fno-pie -no-pie -nostdlib -static`、`_start` から exit (手本 tools/tests/test_abi_boundary.py、tools/tests/host32.py) |
+| 7 | kdebug の import (sys/kern/module/kdebug_imports.def の source 欄、slot は詰めない・並べ替えない) と l01.json (旧版 8f0af0167c2f) の指紋。FEP の MODULE_ABI_GEN の指紋 (部品の contracts の字面から計算) | 指紋を変えない。contracts のヘッダはコメント 1 字も触らない |
+| 8 | test_ci_stab.py (旧版 9638b0458a02) の規則 (`if not mutant:` を書かない、covers に足す、試験の補助関数に `run` という名前を使わない) | 旧手順（8d01bcd79a67 の記録） |
+| 9 | 新しい host32 の試験が 32 ビットの libc (crt1.o) に頼る (CI と WSL に無い、この PC にはあるので手元では通る) | `gcc -m32 -ffreestanding -fno-pie -no-pie -nostdlib -static`、`_start` から exit (手本 test_abi_boundary.py (旧版 5f8d37427f37)、host32.py (旧版 09c54f7f5df1)) |
 | 10 | 層の検査 (共通のソースが機種のヘッダを読む辺、tools/layers_baseline.json) | 像を組んでから `python3 -B tools/check_layers.py` で増やさない。減らした段は同じ変更で `--write-baseline` |
-| 11 | GeForce まわりを組む host 試験 | tools/tests/recover_gf_dev_stub.c のリンクが要る。main を取り込んだら GeForce の試験 (test_geforce・test_gf_*・recovery など) を回し直す |
-| 12 | 新しいヘッダを既存のヘッダから include した (第 5 段 A で CI の build が落ちた) | `grep -rl '<既存のヘッダ>' tools/tests/test_*.py` の全部を実際に回す |
+| 11 | GeForce まわりを組む host 試験 | recover_gf_dev_stub.c (旧版 1db0aad791f0) のリンクが要る。main を取り込んだら GeForce の試験 (test_geforce・test_gf_*・recovery など) を回し直す |
+| 12 | 新しいヘッダを既存のヘッダから include した (第 5 段 A で CI の build が落ちた) | `rg -l '<既存のヘッダ>' tests/` の全部を実際に回す |
 | 13 | 文書の枝 (文書だけの push では build の CI が走らず、統合の枝で初めて出る) | `make check-docs-tree` を**単独で**回して出力の NG を見る。票 (docs/tasks/) どうしは「上位:」と後続以外リンクせず、「票 TASK_<名>」と名前を文字で書く |
 
-最後に `make check-map`・`make check-check-select-host`・`python3 -B tools/checks/run.py --lint`・`git diff --check`。前提のビルドが要る試験 (needs=['make:sqlite-module-proto'] など) は先にその make を回す。
+最後に `make check-map`・`make check-check-select-host`・旧手順（8d01bcd79a67 の記録）・`git diff --check`。前提のビルドが要る試験 (needs=['make:sqlite-module-proto'] など) は先にその make を回す。
 
 ## 2. 環境
 
@@ -54,6 +54,6 @@ CI は統合の枝で os32-v3 の PM が 1 回だけ回すので、PowerPC の�
 - **NP21/W の受入の頻度 (ユーザー指示 2026-11-11、本線の PM 経由、正典は ROLES §4-2)**: NP21/W は統合の枝を main に入れる直前の 1 回だけが既定 (HAL v2 は I1・I2・I3 の結線の節目ごとに 1 回)。**PowerPC の x86 の生成物が変わる段 (★、例 S-B の B01・B02) は単独で NP21/W を回さず、次の HAL の節目の回に相乗りさせる** — 依頼の文に「★: 次の節目に相乗り」と書き、受入の追加の項目 (その段が触った領域だけ) を添える。急ぐ理由があるときだけ本線の PM に言う。区分 I は今までどおり CI だけで受ける。
 - **ソースを移す段は旧パスに空の規則を置く** (os32-v3 の PM 決定 2026-11-10、本線も同じ扱い): 差分ビルドの作業木では古い `.d` が旧パスを指したまま残り、`No rule to make target '<旧パス>'` で落ちる (第 5 段 C2 の kernel/ime/ime_render_tvram.c で起きた)。移した段で、その .o を組む mk に `<旧パス>: ;` を理由 1 行 (日付・移した先・差分ビルドの古い .d の対策) の注記つきで置く。空の規則は次の大きな整理で消してよい。
 - **積む枝は、土台の枝の「直しの後」の先端から切る。統合の前に祖先の照合をする** (2026-11-10): 到達点 ② の B3 を B2 の直しの前の版から枝分けしていて、統合の枝に B2 の直しが入っていなかった。統合の枝を作ったら、含めるはずの全部の枝について `git merge-base --is-ancestor origin/<枝> HEAD` を回す。
-- **統合で初めて出る食い違いは回帰の入口で拾う** (2026-11-10): 後の段が共有ファイル (ofw.c・arch_cpu.h・kernel_trap.c) を変えると、前の段の試験の link の一覧が合わなくなる (4 本で起きた)。段を 1 本にまとめたら `python3 -B tools/ppc/kboot_all.py --mutate` と単体像 (build/ppc.mk・run.py・mmu_run.py) を回す。
+- **統合で初めて出る食い違いは回帰の入口で拾う** (2026-11-10): 後の段が共有ファイル (ofw.c・arch_cpu.h・kernel_trap.c) を変えると、前の段の試験の link の一覧が合わなくなる (4 本で起きた)。段を 1 本にまとめたら 旧手順（8d01bcd79a67 の記録） と単体像 (build/ppc.mk・run.py・mmu_run.py) を回す。
 - **検査を止めたら子のプロセスも止める** (2026-11-10): 裏の検査の script だけを kill すると、子の試験 (QEMU) が残って同じ TMPDIR を使い、次の回の試験を落とす。`pgrep -af 'kboot_|qemu-system-ppc'` が 0 になってから回し直す。
 - **並列で走らせた段はまとめて CI** (ユーザー指示・本線 PM 合意 2026-11-13): 段ごとに CI を回さず、PM が `wt/int-ppc-<日付><記号>` に束ねて [skip ci] のまま本線 PM に渡す (本線 PM が `wt/int-*` として push し CI を起動、本線の束と合わせるかは本線 PM が決める)。束ねる前に段ごとの対象の check、文書の 4 検査 (links・orphans・status・tree)、doc_graph を手元で通す。x86 の生成物が変わる段を含む時は build_compare と中身を添えて承認を求める。単独の段は従来どおり。

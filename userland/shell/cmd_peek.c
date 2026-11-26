@@ -22,7 +22,7 @@
 /*  そのまま回す。使えれば kdebug が 1 KB ごとに SFS_T_DUMP のフレームを    */
 /*  送り、ここは 16 進行を出さずに見出しと                                  */
 /*  `peek: ok len= crc32= tag= frames=` だけをシリアルへ出す。--lan は -l。 */
-/*  ホスト側の照合: tools/rshell_peek.py。試験: tools/tests/kpeek_cli_host.c */
+/*  ホスト側の照合: tools/rshell_peek.py。試験: kpeek_cli_host.c (旧版 81fb6c3ac999) */
 /* ======================================================================== */
 #include "shell.h"
 #include <stdlib.h>

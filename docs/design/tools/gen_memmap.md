@@ -27,4 +27,4 @@
 - **はみ出し** (`escaped_children`): 子の帯が親の帯の外にある (例: GUI 予約が SHM 本体の外)。
 - **写しのずれ** (`mirrors`): C のヘッダを読めない相手と SDK に出る写し (`MIRRORS` の表: `build/os32.ld`・`sdk/link/*.ld`・`sdk/os32x_hdr.py`・`tools/mkshlib.py`・Rust のスタブ・ブートのヘッダとローダ) の値が `memmap.h` と違う。`sys/arch/x86/kernel/kentry.asm` は値を持たず生成ヘッダの名前 (`LAYOUT_MEM_KSTACK_TOP`) を引く形で、数値の直書きに戻ったら名指しで落とす。
 
-検査: `make check-memmap-host` (`tools/tests/test_memmap_gen.py`)。実物の `sys/include/memmap.h` をそのまま使い、`kernel.map` だけを差し替えて壊れた地図 (予算超過・逆転・重なり) と直った地図を作る。ほかに、はみ出し・生成物の改変と欠落・写しのずれ・`kernel.map` 無し。`--mutate` は検査を 1 つずつ外した版で落ちることを見る。
+検査: `make check-memmap-host` (`test_memmap_gen.py (旧版 af81cd9b2d2d)`)。実物の `sys/include/memmap.h` をそのまま使い、`kernel.map` だけを差し替えて壊れた地図 (予算超過・逆転・重なり) と直った地図を作る。ほかに、はみ出し・生成物の改変と欠落・写しのずれ・`kernel.map` 無し。`--mutate` は検査を 1 つずつ外した版で落ちることを見る。

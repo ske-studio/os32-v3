@@ -24,4 +24,4 @@ GUI 端末の中の `sh.bin` は、入力行の再描画にコンソールの座
 
 ## 検査
 
-`make check-sh-exec-host` の `tools/tests/test_sh_shell.py` (`sh_shell_host.c`)。`sh_redraw.inc` と `cmd_script.c` をそのまま取り込み、出力の KAPI と座標の KAPI の呼び出しを数える。同じ試験の `source` 中の `exit` (次の行・`goto` のループ・ネストした `source` の外側も走らない) は `docs/design/userland/shell/exit_status.md` の「4. `exit [N]` と終了要求」の契約。
+`make check-sh-exec-host` の `test_sh_shell.py (旧版 2492278e473b)` (`sh_shell_host.c`)。`sh_redraw.inc` と `cmd_script.c` をそのまま取り込み、出力の KAPI と座標の KAPI の呼び出しを数える。同じ試験の `source` 中の `exit` (次の行・`goto` のループ・ネストした `source` の外側も走らない) は `docs/design/userland/shell/exit_status.md` の「4. `exit [N]` と終了要求」の契約。

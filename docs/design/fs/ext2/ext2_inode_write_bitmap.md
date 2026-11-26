@@ -16,4 +16,4 @@ cancel は当窓の未確定 bit だけをRAMで戻し、I/Oを出さない。
 
 後始末で媒体の bit を返す前に workspace を abort する。保持 bitmap を残すと
 後の finish が返却済みの bit を再度立てる。故障・回数・全32群の回帰は
-`tools/tests/test_ext2_write_batch.py`。
+`test_ext2_write_batch.py (旧版 5ed75b949a7b)`。

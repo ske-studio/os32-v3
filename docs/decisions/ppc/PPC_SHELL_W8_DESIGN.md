@@ -272,11 +272,11 @@ if reply is not None:
 |P12|sys/arch/ppc/ppc_trap.h|P11の照会宣言、P04へ結線|5／不変|
 |H01|tools/ppc_hostfs.py 新規|LanServer契約再利用・1028B・boot reset|280／不変|
 |H02|tools/ppc_lan_host.py|codec・オプション・boot追従・初期化表|180／不変|
-|T01|tools/tests/ppc_hostfs_wire.py 新規|C/Python境界・外部payload・256B保護|330／不変|
-|T02|tools/tests/ppc_hostfs_io.c 新規|実SfsIo・偽TB/LAN・IRQ文脈・状態gate|360／不変|
-|T03|tools/tests/ppc_hostfs_io.py 新規|T02のbuild/run/CHECK/変異・trap接続|180／不変|
-|T04|tools/tests/ppc_hostfs_server.py 新規|実Server・遅延複製・boot/nonce・保存|360／不変|
-|T05|tools/accept/ppc_sd.py 新規|第3像受入・ホスト継続稼働でゲスト再起動|350／不変|
+|T01|ppc_hostfs_wire.py (旧版 bf8d2471bf51) 新規|C/Python境界・外部payload・256B保護|330／不変|
+|T02|ppc_hostfs_io.c (旧版 39d06743772f) 新規|実SfsIo・偽TB/LAN・IRQ文脈・状態gate|360／不変|
+|T03|ppc_hostfs_io.py (旧版 293aea4f9f30) 新規|T02のbuild/run/CHECK/変異・trap接続|180／不変|
+|T04|ppc_hostfs_server.py (旧版 1824f38d76c6) 新規|実Server・遅延複製・boot/nonce・保存|360／不変|
+|T05|旧受入 ppc_sd.py 新規|第3像受入・ホスト継続稼働でゲスト再起動|350／不変|
 |D01|docs/decisions/ppc/PPC_SHELL_W8_DESIGN.md 新規|共：確定した本契約|260〜320／不変|
 |D02|docs/decisions/ppc/ARCH_BRINGUP_ORDER.md|共：S-D到達条件・試験入口|15／不変|
 
@@ -305,7 +305,7 @@ if reply is not None:
 - G2：P04〜08/P11/P12＋T02/T03でmount・TB期限・IRQ文脈・世代・VFS接続を固定する。
 - G3：P09/P10/H02＋T05。第3像を再buildし、mac99の7450/7455でS-DとS-CのUSER起動・子exec復帰を確認する。
 - 各CHECKに製品入力を宣言。変更行の既存変異anchorを検索し、一意なanchorと正常対照・実行時REDを確認する。
-- 追加・変更試験の `--mutate` と `python3 -B tools/checks/run.py --lint` を実行し、最後の変更後の完走ログだけを採用する。
+- 追加・変更試験の `--mutate` と 旧手順（e909291cee04 の記録） を実行し、最後の変更後の完走ログだけを採用する。
 - 実装者は触ったPPC像をbuild。PM/CIはx86生成物を基点比較し、PPC診断/CLI像はcodec・trap変更を含め動作回帰する。
 - check-changed・全変異は実装者では実行しない。x86不変のW8段はNP21/W不要、★段は本線の受入で確認する。
 - G4：実機G4で保存・断線・再起動を確認する。未実施は延期台帳へ残し、QEMU合格と区別する。
@@ -326,7 +326,7 @@ r1→r2 の変更の数 8 / 反論の数 0
 - 共通の場所: 共通の serialfs の 4 実装をそのまま link し、VFS・kernel・SDK・共通の sh は変えない。全段 x86 不変。PC-98 の後の段 (起動の後の mount の結線、FD・HDD・Host Services の保存・再起動の NP21/W の受入) は本線が起こす。
 
 ## 実装で決めたこと (2026-11-12、PM)
-- 段の分け方: A (P02・P03・T01) → C (H01・H02・T04) → B (P01・P04・P11・P12・T02・T03) → D (P05〜P10) → E (T05・D02)。T05 の置き場は sb_run・sc_run と並べて `tools/ppc/sd_run.py` (表の tools/accept/ppc_sd.py から変更)、検査名 ppc-sd。T01 は検査 ppc-hostfs-wire、T02/T03 は ppc-hostfs-io。
+- 段の分け方: A (P02・P03・T01) → C (H01・H02・T04) → B (P01・P04・P11・P12・T02・T03) → D (P05〜P10) → E (T05・D02)。T05 の置き場は sb_run・sc_run と並べて `sd_run.py (旧版 edc6604c1432)` (表の 旧受入 ppc_sd.py から変更)、検査名 ppc-sd。T01 は検査 ppc-hostfs-wire、T02/T03 は ppc-hostfs-io。
 - P11: kctx_irq_depth の定義を持たない試験の fixture 4 本 (kboot_vectors_fixture.c・kboot_trap_host.c・test_user_trap_host.c・test_lan_p22d_host.c) には試験の側に定義を足した。製品の共有の所は変えない。P12 は変更なし。
 - 共通の sys/fs/serialfs/sfs_proto.h の `SFS_TICK_MS` を `TICK_MS` から `10u` に (SfsIo.now の 10ms の約束)。PowerPC の像の監査 (PIT_HZ の利用者の禁止) に当たったため。本線 PM 了承、x86 の生成物は不変。x86 の SfsIo.now の供給元は tick_count (serialfs_session.c の sio_now、kernel_boot_memory.inc の boot_sfs_now)。TICK_MS・PIT_HZ のほかの利用者は本線の段 L。
 - P06・P07: lan_service.c・root_boot.c の追加は KBOOT_SH の像だけに入れ、診断・CLI の像を不変に保つ。hostfs.h に pm_hostfs_boot・pm_hfs_bind_peer・pm_hfs_peer を足した。FS_REQ の宛先は最後に観測した FS の peer、未観測なら boot の peer_mac。

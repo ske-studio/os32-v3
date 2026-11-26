@@ -72,7 +72,7 @@ shell (owner 1) の異常終了は、通常文脈の所有者回収で WM 登録
   - `gui_register`: 門に落ちたら・handler が NULL なら `OS32_ERR_INVAL` で、登録済みのハンドラは変えない。
   - `gui_ime_set_render`: 門に落ちたら表も NULL も黙って無視し (戻りは void)、`gui_ime_render_rejected` を数える。アプリの回収では描画先に触らず、gshell (owner 1) の終了で NULL (TVRAM 版) に戻る。
 
-検査: `make check-ring3-guard-host` (`tools/tests/test_ring3_guard.py`) と `sys/kern/kdebug/kselftest/ime_render_gate.inc`。
+検査: `make check-ring3-guard-host` (`test_ring3_guard.py (旧版 8e0bfe6189d3)`) と `sys/kern/kdebug/kselftest/ime_render_gate.inc`。
 
 ## 同期 COMMIT の描画主体
 

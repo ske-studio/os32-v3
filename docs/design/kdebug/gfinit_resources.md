@@ -45,7 +45,7 @@ Type 1 の転送窓の検査は維持し、配下装置の領域を窓全体で�
 
 ## 試験
 
-`tools/tests/gfinit_bus_host.c` は mask を返す fake config と実際の測定処理を組む。
+`gfinit_bus_host.c (旧版 a70f347c2680)` は mask を返す fake config と実際の測定処理を組む。
 USB・SCSI 1000:000f・82557・Trident・GeForce、ROM、64bit、bridge、未割当てと
 全 config 復元を照合する。書込み順と probe 中の decode 無効も照合する。`test_gfinit_bus.py --mutate` は decode 復元漏れも実行時 RED にする。
 `test_pci_scan.py` は本物の pci_init / pci_scan_bus / pci_record を fake I/O に対して実行し、

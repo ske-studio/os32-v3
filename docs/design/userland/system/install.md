@@ -37,5 +37,5 @@ FDD (FAT12) から起動して hd0 にシステムを入れる `install` (無印
 
 ## 検査
 
-`install-fresh-host` (`tools/tests/test_install_fresh.py`、本体 `tools/tests/install_fresh_host.c`)。実物の `install.c` を `#define main install_main` で取り込み、KAPI だけを贋物にする (`sys_ls` は FAT のように大文字を返す、`ide_identify` は 96 byte の並び `IdeIdentifyWire` で書く)。
+`install-fresh-host` (`test_install_fresh.py (旧版 5ea36b4bc0ef)`、本体 `install_fresh_host.c (旧版 59cb48eaa6d5)`)。実物の `install.c` を `#define main install_main` で取り込み、KAPI だけを贋物にする (`sys_ls` は FAT のように大文字を返す、`ide_identify` は 96 byte の並び `IdeIdentifyWire` で書く)。
 `nokernel`・`vmkernel`・`lower`・`precheck`・`decline`・`boot_fail`・`copy_fail`・`mkdir_init`・`bounds`・`srcname`・`sync_fail`・`idetype` がこの節の約束を見る。ホストは LP64 なので型は実型との大きさ・全 offset の一致で見て、`sizeof(IdeInfo) == 96` と offset 92 は `--target` の i386-elf のコンパイル時の表明で固定する。

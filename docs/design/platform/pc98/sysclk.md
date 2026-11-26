@@ -9,7 +9,7 @@
 - **判定前に使わない**: 未判定の既定値を機種の実クロックと取り違えると tick や通信速度がずれる。
   `sys/platform/pc98/clock.c` は BIOS 0501h bit7 の 1 を 1.9968MHz、0 を 2.4576MHz とする。
   8MHz 系の SCLK1 7.9872MHz、5/10MHz 系の 9.8304MHz をそれぞれ 4 分周した値と整合する。
-  `sys/platform/pc98/kernel_boot_cpu.inc` は PIT 初期化より先に判定する。`tools/tests/dep_dir_b_timer_host.c` が両系統を検査する。
+  `sys/platform/pc98/kernel_boot_cpu.inc` は PIT 初期化より先に判定する。`dep_dir_b_timer_host.c (旧版 395ce6017801)` が両系統を検査する。
 
 ## 内部設計と契約 (D1)
 

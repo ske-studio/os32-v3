@@ -44,7 +44,7 @@
 #define CRC32_XOROUT    0xFFFFFFFFUL
 
 /* nibble 表: crc32_core_nib[i] = 反転多項式で i を 4 ビット送った値。
- * tools/tests/hsync_h1_host.c が実行時に組み直して一致を確かめる。 */
+ * hsync_h1_host.c (旧版 937391bfaaa5) が実行時に組み直して一致を確かめる。 */
 static const u32 crc32_core_nib[16] = {
     0x00000000UL, 0x1DB71064UL, 0x3B6E20C8UL, 0x26D930ACUL,
     0x76DC4190UL, 0x6B6B51F4UL, 0x4DB26158UL, 0x5005713CUL,

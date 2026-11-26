@@ -21,4 +21,4 @@ master の共有 PT を書く汎用口と、SHM・トランポリンの USER を
 
 ## 検査
 
-`tools/tests/test_shm_user.py` が実 `sys/kern/mm/paging.c`・`sys/kern/mm/pgalloc.c`・`sys/kern/mm/shm.c`・V86 の写像部を ILP32 で動かし、2 つの AS で SHM の lock・free・回収後の USER/RW/WB、2 本目の AS からの書込み、USER 欠落時の無変更拒否、live AS 中の汎用口の拒否、起動口の 1 回性と順序を確かめる。
+`test_shm_user.py (旧版 90c5181c7d63)` が実 `sys/kern/mm/paging.c`・`sys/kern/mm/pgalloc.c`・`sys/kern/mm/shm.c`・V86 の写像部を ILP32 で動かし、2 つの AS で SHM の lock・free・回収後の USER/RW/WB、2 本目の AS からの書込み、USER 欠落時の無変更拒否、live AS 中の汎用口の拒否、起動口の 1 回性と順序を確かめる。

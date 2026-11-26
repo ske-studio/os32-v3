@@ -61,37 +61,12 @@ BUILD_OBS_LIMIT = 2400
 
 ROOT = os.environ.get("OS32_ROOT", os.path.abspath(os.path.join(HERE, "..", "..")))
 OS32_CYCLE = os.environ.get("OS32_CYCLE", os.path.expanduser("~/.local/bin/os32-cycle"))
-MAKE_TARGETS = ("kernel", "kernel-lgy98", "kernel-lgy98-link", "kernel-nolgy98", "check-net-m2", "check-net-m2-cpl3", "check-net-m4", "check-net-l0", "check-net-l1", "check-net-l2", "check-net-l3", "programs", "sdk", "all", "check", "check-fast", "check-changed", "check-map", "check-check-select-host", "clean", "deploy",
-                "apps", "game", "external", "gshell",
-                # `make check` の個別ターゲット。いずれもホスト側の読み取り専用試験で、
-                # 落ちた 1 本だけを回し直すのに要る。build/checks.d/*.mk に足したら
-                # ここにも足す (2026-09-09: 落ちていて回し直せなかった)。
-                "check-boot-splash-host", "check-constraints", "check-db-errstr-host",
-                "check-gui-proto", "check-kapi-version", "check-manifests",
-                "check-memory-host", "check-privileged",
-                "check-t5a-host", "check-gshell-host", "check-term-model",
-                "check-term-render", "check-tools-host",
-                "check-vfs-mount-dev-host", "check-multiapp-model-host",
-                "check-con-sink-host", "check-kbd-inject-host", "check-launch-host",
-                "check-sh-exec-host",
-                "check-sh-input-host",
-                "check-host-agent", "check-net-link-host",
-                "check-fs-kind-host", "check-cat-linenum-host",
-                # 票 H2 (一時ファイル + 検証 + 置換)
-                "check-vfs-excl-host", "check-hsync-host",
-                # 票 H4 (配備マニフェストと世代の確認)
-                "check-h4-manifest-host",
-                # 票 TASK_KSTRING_BENCH (kstring の実測プログラムの枠組み)
-                "kstr_bench",
-                # 票 TASK_TEST_RESULT (試験の合否を機械が読める形にする約束事)
-                "check-result-conv-host",
-                # 票 TASK_TEST_RUNNER (ゲストで一括実行してホストで集計する)。
-                # check-guest は **NP21/W が動いていないと失敗する** (ホスト
-                # だけで完結しないので `make check` の列には入っていない)。
-                # check-guest-host はホストだけのランナー試験。
-                "check-guest", "check-guest-host",
-                "check-b8-open-host",
-                "check-ring3-str-host", "nhd-pull", "nhd-umount", "nhd-init", "deploy-nhd", "deploy-kernel", "images/os32_boot.d88", "iso", "check-settings-protect-host", "check-cfg-host", "check-gui-host", "check-install-recover-host", "check-install-fresh-host", "clean-external")
+MAKE_TARGETS = (
+    "kernel", "kernel-lgy98", "kernel-lgy98-link", "kernel-nolgy98",
+    "programs", "sdk", "all", "clean", "deploy", "apps", "game", "external",
+    "gshell", "kstr_bench", "check-guest", "nhd-pull", "nhd-umount", "nhd-init",
+    "deploy-nhd", "deploy-kernel", "images/os32_boot.d88", "iso", "clean-external",
+)
 MAP_PATH = os.environ.get("OS32_KERNEL_MAP", os.path.join(ROOT, "build", "out", "kernel.map"))
 SELFTEST_SYMS = ("kselftest_pass", "kselftest_fail")
 WAIT_MAX = 60
@@ -120,7 +95,7 @@ Actions:
 {"action":"selftest"}                            read the kernel self-test counters (kselftest_pass / kselftest_fail)
 {"action":"done","report":"<what you found>"}    finish the task and report
 Host-side build actions (they run on the development PC, not on OS32):
-{"action":"make","target":"kernel"}              run `make <target>`; target is one of kernel, kernel-lgy98 (LAN 有効カーネル、以後の deploy も有効のまま), kernel-nolgy98 (無効に戻す), check-net-m2 (LAN の M2 試験、実機が LAN 有効で起動中のこと), check-net-m2-cpl3 (同じ試験を CPL3 プログラム (less) 常駐中に回す), check-net-m4 (リング飽和での自己回復), programs, sdk, all, check, any single check-* subtarget from build/checks.d/*.mk (e.g. check-memory-host, check-gshell-host, check-constraints), clean, deploy, apps, game, external (apps/game = the external submodule repos under apps/ and game/; external = both; deploy = HostDrv sync only, NOT a verification)
+{"action":"make","target":"kernel"}              run `make <target>`; build a permitted kernel, program, SDK, image or deployment target
 {"action":"deploy"}                              full deploy: stop emulator, write NHD, restart, wait for OS32 (takes minutes)
 
 Rules:

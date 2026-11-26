@@ -9,7 +9,7 @@
 /*  終了コード: 0 成功 / 1 業務 (非 200) / 2 リンク / 3 usage・url 長 /       */
 /*              4 ローカル I/O。                                             */
 /*  本文は host_get の sink でストリーミング (>64KB でメモリ一定)。           */
-/*  ホスト TDD は -DHOST_TEST (tools/tests/host_cmd_host.c)。                 */
+/*  ホスト TDD は -DHOST_TEST (host_cmd_host.c (旧版 72755fc95850))。                 */
 /* ======================================================================== */
 
 #ifdef HOST_TEST

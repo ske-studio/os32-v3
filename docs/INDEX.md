@@ -31,11 +31,11 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 | 実行形式 (`os32x_format`) が変わる版の実機への入れ方 | [REALHW_FORMAT_UPDATE.md](REALHW_FORMAT_UPDATE.md) | スキル os32-realhw-update の世代の表 (案内のみ) |
 | 延ばした試験・SKIP・ホストだけの合格・未結線 (持越し) | [tasks/DEFERRED_TESTS.md](tasks/DEFERRED_TESTS.md) (未完了だけを持つ。終わった行は消す) | 各票・引き継ぎは参照のみ。同じ延期を票や memory に写さない |
 | 番地・帯域 | `sys/include/memmap.h` (定義)、[02_memory.md §2-1](02_memory.md) (説明)、`build/out/MEMMAP.md` (実ビルドの生成地図、`make docs-gen`) | CLAUDE.md は入口のみ |
-| KAPI の一覧・オフセット・版 | `sdk/kapi.json` → [KAPI_SPEC.md §4](KAPI_SPEC.md#4-kernelapi-構造体レイアウト) | README.md / このファイル / KAPI_SPEC.md の版番号 (`tools/check_kapi_version.py` が照合。CLAUDE.md は版数を持たない) |
+| KAPI の一覧・オフセット・版 | `sdk/kapi.json` → [KAPI_SPEC.md §4](KAPI_SPEC.md#4-kernelapi-構造体レイアウト) | README.md / このファイル / KAPI_SPEC.md の版番号 (CLAUDE.md は版数を持たない) |
 | KAPI 追加手順 | [KAPI_SPEC.md §3-1](KAPI_SPEC.md) | スキル `.claude/skills/os32-kapi-add` と CLAUDE.md (どちらもポインタのみ) |
 | KAPI 版番号・エラー番号の予約 (未実装の先取り調停) | [KAPI_SPEC.md §3-2](KAPI_SPEC.md) | 各計画 (GUI TASK_K1、network LINK_PLAN) は参照 |
 | エラーコード | `os32_kapi_shared.h` の `OS32_ERR_*` | 各 FS は境界で翻訳 |
-| GUI 共有プロトコル (op / イベント / 構造体 / SHM 配置) | `sdk/include/os32/os32_gui_shared.h` (C が正典) → [os32_gui_shared.md](design/sdk/include/os32/os32_gui_shared.md) (契約) | `sdk/rust/os32api/src/gui/proto.rs` は写し (`tools/check_gui_proto.py` = `make check-gui-proto` が照合)、[tasks/gui/PROTO_LAYOUT.md](tasks/gui/PROTO_LAYOUT.md) |
+| GUI 共有プロトコル (op / イベント / 構造体 / SHM 配置) | `sdk/include/os32/os32_gui_shared.h` (C が正典) → [os32_gui_shared.md](design/sdk/include/os32/os32_gui_shared.md) (契約) | `sdk/rust/os32api/src/gui/proto.rs` は写し、[tasks/gui/PROTO_LAYOUT.md](tasks/gui/PROTO_LAYOUT.md) |
 | ビルドターゲット・ツール・コンパイラフラグ | [08_build.md](08_build.md) (フラグの実体は `build/config.mk`) | CLAUDE.md「Build Commands」(日常分のみ) |
 | 配備 3 経路の使い分け | [08_build.md §8-4](08_build.md#配備3経路) | [POLICY_DEV.md §4](POLICY_DEV.md)、CLAUDE.md、スキル `run-os32` |
 | ディレクトリ木 | [08_build.md §8-3](08_build.md) | CLAUDE.md / INDEX は参照のみ |
@@ -54,7 +54,7 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 | LAN の設計・進捗 | ドライバ = [tasks/network/PLAN.md](tasks/network/PLAN.md)、リンク層と Host Services = [tasks/network/LINK_PLAN.md](tasks/network/LINK_PLAN.md) | 05_drivers / DEVELOPMENT は要約 + リンク |
 | 設定の置き場 (system.cfg の残すキー、settings.db のスキーマ / API / リカバリ) | [tasks/settings/DESIGN.md](tasks/settings/DESIGN.md) (受入完了 2026-09-14、v1.3) | ROADMAP は 1 行 |
 | アプリ帯の広さ・私有量 (v3) | [現行目標](decisions/MEMMAP_V3.md) D9 と [配置・容量の契約](design/include/memmap.md)・[池の運用](design/kernel/module/module_runtime.md)、実装の契約は [09_exec](09_exec.md)・[02_memory §2-1](02_memory.md)・[KAPI_SPEC](KAPI_SPEC.md) (T2 の票 TASK_T2_APPBAND と T2d〜h は受入完了でアーカイブ: `docs/archive/v3/TASK_T2_APPBAND.md`、`docs/archive/v3/TASK_T2D_T2H.md`) | 02_memory.md は地図の説明。旧 v2.1 の帯と未記録ゲスト受入は APP_BAND_PDE (アーカイブ: `docs/archive/v3/APP_BAND_PDE.md`) の履歴として区別 |
-| 試験の一覧 (`make check` のターゲット、`_tdd.md` と票の対応) | `build/out/TESTS.md` / `build/out/HOST32.md` (生成表、`make tests-inventory`)、[TESTS.md](TESTS.md) (手書きの読み方・判断) | [08_build.md](08_build.md) は手順と参照のみ |
+| 登録検査の一覧と実行方法 | [TESTS.md](TESTS.md)、[検査の登録](../tests/registry.toml) | [08_build.md](08_build.md) はビルド手順 |
 | 移植性 (CPU / 機種の 2 軸、ARM 計測、順序 1〜4 の経過) | [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md) (計測と経過)、[../arch/README.md](../arch/README.md) (足し方) | `docs/archive/portability/SURVEY_N1.md` (調査)、`archive/arch_port/` は**別リポジトリ `pw-sh4-research` の調査の快照** (正典はそちら。本リポジトリでは更新しない)、`docs/archive/portability/TASK_KSTRING_BENCH.md` (kstring の速度実測 **完了 2026-09-17** — x86 は asm 維持、C 版は他 32 ビットアーキ向け。数字は ARM_GAUGE §9、語長の前提は §10) |
 | PowerMac の root と部品の検証 | [root_pair.md](design/platform/powermac/root_pair.md) | CRC と rd0 の公開条件 |
 | PowerPC と PowerMac のハードウェア・規約の事実 | [ppc/README.md](ppc/README.md) | 設計の採用判断は decisions/ppc/、作業の状態は tasks/ppc/ |
@@ -80,7 +80,7 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 | 実機の調査・試行・復帰の核と装置ごとの部品 (HWDEV、kdebug.bin の上限 92% への対処、IDE・USB・SATA など将来の装置の要件) | [tasks/realhw/TASK_HWDEV.md](tasks/realhw/TASK_HWDEV.md) (実装中 — M1〜M5・BARLEN・route-test は main、次は S8) | 構造・API・装置の要件は [hwdev_private.md](design/hwdev/hwdev_private.md)・[hwdev_imports.md](design/hwdev/hwdev_imports.md)・[DEVICE_STATES.md](decisions/realhw/DEVICE_STATES.md) (票の §5 から辿る)、[TASK_REALHW_RECOVER.md](tasks/realhw/TASK_REALHW_RECOVER.md)・[TASK_GEFORCE6200.md](tasks/realhw/TASK_GEFORCE6200.md) |
 | 実機 Ra266 の PEGC 640x480 (実機 ROM の OUT 列に合わせたモード設定と受け入れ) | [05_drivers.md §5-5](05_drivers.md) (出入りの順序・ROM の記録との照合・`pegcchk`。票 TASK_PEGC480_REALHW は受入完了でアーカイブ: `docs/archive/realhw/TASK_PEGC480_REALHW.md`) | [RELEASE_v2.1.md](RELEASE_v2.1.md) §2-1、[POLICY_DEBUG §4-62](POLICY_DEBUG.md#4-62-pegc-の実機モード)、`archive/realhw_v21/TASK_PEGC_RA266_TIMING.md` (起票の完了記録) |
 | 現行 / 未実装 / 過去 の区別 | 各文書の冒頭に「現行仕様」「計画」「YYYY-MM-DD 時点のスナップショット」を明記 | — |
-| 票の状態行の語彙 | [POLICY_DEV.md §8](POLICY_DEV.md) の表 (`tools/check_docs_status.py` がそこから読む) | 下の「タスク」節の冒頭 (語の列挙のみ) |
+| 票の状態行の語彙 | [POLICY_DEV.md §8](POLICY_DEV.md) の表 (登録検査 `docs_status` がそこから読む) | 下の「タスク」節の冒頭 (語の列挙のみ) |
 
 起動時に読むデバッグ部品 `/boot/kdebug.bin` (`KDEBUG=1`) の形式と口は [08_build §8-2](08_build.md#起動時に読む部品の形式-kmod-v1)、到達確認と対の配備は [POLICY_DEBUG §2](POLICY_DEBUG.md) (票 TASK_DBGREF は受入完了でアーカイブ: `docs/archive/v3/TASK_DBGREF.md`)。
 標準フォントの描画を D15 に届かせる改善 (描き済みの字形の束・枠の詰め直し・先読み・領域の拡大・ラスタの整数化、KPEEK より先) は [TASK_FONTPERF](tasks/v3/TASK_FONTPERF.md)。
@@ -103,20 +103,16 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 現在のビルド成果物を読み、MEMMAP.md を `build/out/` に書き出す。
 `docs-gen` 自体はビルドしない。地図の入力が無い・古い場合は再ビルドを求めて停止する。
 ツールチェーンの準備は [INSTALL.md](../INSTALL.md)。
-試験表の TESTS.md・HOST32.md は `make tests-inventory` (カーネルのビルド不要)。
 
 | 出力 | 内容・説明の正典 |
 |---|---|
-| `build/out/TESTS.md` | Make の検査ターゲット・コマンド・対象ソース・記録・票・CI。読み方と判断は [TESTS.md](TESTS.md) |
-| `build/out/HOST32.md` | runner ごとに実行する試験の一覧。運用は [08_build.md §8-4](08_build.md) |
 | `build/out/MEMMAP.md` | 現在の `kernel.map` と `memmap.h` から求めた絶対番地・予算・余裕。説明は [02_memory.md §2-1](02_memory.md) |
 
 生成物は既存の gitignore 対象ディレクトリに置き、コミットしない。
 ブランチ間の競合と生成本文の鮮度による取り込み失敗を避け、必要な時点で再生成して読む。
 生成前にも索引を読めるよう、出力パスはコード表記とする。
-`check-tests-inventory` は登録・入力対応、`check-memmap` は配置・予算・写し・定数を検査する。
 生成文書との一致はゲートに含めない。`kernel.map` 自体のビルド鮮度の確認は残す。
-`make docs-win` は生成後、文書と 3 つの生成物を同じ相対配置で Windows 側へ写す。
+`make docs-win` は生成後、文書と生成物を同じ相対配置で Windows 側へ写す。
 
 ## カーネル技術仕様書 (§1-§10)
 
@@ -424,7 +420,7 @@ archive/gui_v14/ (アーカイブ: `docs/archive/gui_v14/TASK_EDIT_GUI.md`) (v1.
 | [tasks/gui/TASK_OSRI_VIEWER.md](tasks/gui/TASK_OSRI_VIEWER.md) | .osri ビューアー (ユーザーアプリ) — カーネルに再生を任せる KAPI・既存の画面の門・表示時間 — **設計確定・実装は GeForce の後 (2026-11-04)** |
 | [tasks/gui/TASK_VIDEO_HAL.md](tasks/gui/TASK_VIDEO_HAL.md) | 表示の HAL の設計 — 計画 (2026-11-06)。GeForce と Trident のドライバの後に設計、上限は GeForce・下限は 640×400、最初に HAL の機能の一覧 |
 | `docs/archive/gui_v14/TASK_EDIT_GUI.md` | テキストエディタの GUI 版 **受入完了 (2026-09-18)** — v1.4 の最後の受入試験。API の退行検出を兼ねる (複数行の編集部品) |
-| [../tools/tests/gui_review_20260910_tdd.md](../tools/tests/gui_review_20260910_tdd.md) / [gui_review3_20260910_tdd.md](../tools/tests/gui_review3_20260910_tdd.md) | v1.3 レビュー往復 (2026-09-10) の試験記録 (完了記録) |
+| GUI レビュー第1回 (旧版の Git blob `e9bc2dcbfa68`) / gui_review3_20260910_tdd.md (旧版の Git blob `f488025b0463`) | v1.3 レビュー往復 (2026-09-10) の試験記録 (完了記録) |
 
 ### カーネル 2.0 (完了記録)・ブート刷新・v4 草案
 
@@ -460,7 +456,7 @@ archive/v21/ (アーカイブ: `docs/archive/README.md`) へ落とした (FORK_P
 
 | ドキュメント | 内容 |
 |-------------|------|
-| [TESTS.md](TESTS.md) | **試験の一覧の入口** (読み方・判断の正典) — `make check` の全ターゲット、`_tdd.md` と票の対応、改善提言 |
+| [TESTS.md](TESTS.md) | **試験の一覧の入口** (読み方・判断の正典) — 登録検査とゲスト受入の実行方法 |
 | `docs/archive/TEST_INVENTORY_2026-09-14.md` | 試験の棚卸し (2026-09-14 の快照)。正典は `TESTS.md` へ移行 |
 | `docs/archive/debug_kcg_load_font.md` | `kcg_load_font` クラッシュの仮説計画 (単発の障害記録) |
 | `docs/archive/v21/cross_compiler_rebuild.md` / `docs/archive/v21/ext2_dind_debug.md` | クロスコンパイラ再構築 / ext2 二重間接の障害記録 |

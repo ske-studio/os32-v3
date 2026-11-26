@@ -13,7 +13,7 @@ EtherType 0x88B5 のリンクを介してクリップボードや印刷などを
 - 印刷: `--printer` を付けると Linux では CLOSE で `lp` の stdin に非同期で流す (`print_start`、shell を通さない argv)。raw は `lp -o raw` で、Linux の `--printer` の時だけ (それ以外は 501)。ジョブ番号と STATUS の queued/done/error はエージェントが持つ。CUPS が無ければ 503 (`ServiceUnavailable`)。
 - 長い処理 (HTTP・印刷) は、OS32 の STATUS に制御の PROCESSING で答え続ける。OS32 の要求の期限 (相手が 1000ms 進まなければ `HOSTDOWN`) はこれで延びる (`docs/design/net/link_host_api.md`)。答えなければ延びない。
 - `lan_bridge.py` は SFS (`05 53 46` で始まる payload) を link へ通さない。SFS は `lanfs_host.py` ([tools/lanfs_host](lanfs_host.md)) が受ける。
-- 確かめ: `tools/tests/test_hostsvc_linux.py` (Linux の CLIP・PRINT、依存の無い時の 503)・`test_hostsvc_services.py`。
+- 確かめ: `test_hostsvc_linux.py (旧版 7588119d5f26)` (Linux の CLIP・PRINT、依存の無い時の 503)・`test_hostsvc_services.py`。
 
 ## リンクのセッションと rid 台帳
 

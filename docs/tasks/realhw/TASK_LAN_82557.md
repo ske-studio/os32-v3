@@ -43,7 +43,7 @@
 | **L-A** | **PCI の列挙**: `sys/dev/pci/pci.c` (メカニズム #1 の config r/w、bus 0 の全デバイスを走査、vendor/device/class/BAR/Interrupt Line)、シェル `lspci`、`pci_find(vendor, device)`。判定は純粋関数に切り出してホスト試験 | 2〜3KB | **実機**: `lspci` で 8086:1229 (82557) と BAR (I/O 窓)、IRQ が出る |
 | **L-B** | **82557 ドライバ (最小)**: PCI から I/O BAR と IRQ、SCB 経由で reset / EEPROM から MAC / Configure / IA setup / CU (TX: 1 コマンドずつ) / RU (RX: RFD 連結、簡略モード)、割り込みは RU の Frame Received + CU 完了。参照は Intel の SDM と BSD 実装 ([HW3]、§5-3) | 10〜15KB | **実機**: MAC が読める → 自己送信 (ループバック) → ホストへ HELLO |
 | **L-C** | **NIC 境界の一般化**: `lgy98.c` ↔ `sys/net/link.c` の結びつきを関数表 (`sys/net/nic.h`: tx / mac / irq / poll) にして 82557 を 2 つ目の NIC に。起動時は PCI に 82557 が居ればそれ、無ければ LGY-98 (設定は手動でよい、v3 §3) | 1〜2KB | NP21/W (LGY-98 の回帰 L0〜L3) + 実機 |
-| **L-D** | **ホストの橋** `tools/lan_bridge.py` (**Ubuntu 側 Python、標準ライブラリのみ** — AF_PACKET。scapy も Npcap も要らない): NIC で EtherType 0x88B5 を拾い、`host_agent.py --listen` の FrameStream へ流し、逆も返す。**実装済み** (ホスト試験 `make check-lan-bridge-host`、記録 [`tools/tests/lan_bridge_tdd.md`](../../../tools/tests/lan_bridge_tdd.md)) | ホストのみ | 実機 ↔ ホスト |
+| **L-D** | **ホストの橋** `tools/lan_bridge.py` (**Ubuntu 側 Python、標準ライブラリのみ** — AF_PACKET。scapy も Npcap も要らない): NIC で EtherType 0x88B5 を拾い、`host_agent.py --listen` の FrameStream へ流し、逆も返す。**実装済み** (ホスト試験 `make check-lan-bridge-host`、記録 `lan_bridge_tdd.md` (旧版の Git blob `fe1d7287820c`)) | ホストのみ | 実機 ↔ ホスト |
 | **L-D2** | **Ubuntu 向けのホスト側バックエンド**: `host_agent.py` のクリップボード (`clip.exe`/PowerShell) と印刷 (win32print) は Windows 前提。Linux では `xclip`/`wl-copy` と `lp` (CUPS) に差し替える (無ければ 503、既存の方針どおり) | ホストのみ | Ubuntu 機で `hclip` / `lpr` |
 | **L-E** | **Host Services の疎通**: 実機で `link_selftest` (L0〜L3 相当) → クリップボード / 印刷 / `wget` / TIME | — | 実機 |
 
@@ -57,7 +57,7 @@ L-A と L-D は独立 (並行できる)。**L-B の前に結線の土台** (`TAS
 - ID `2000:(5c00〜5c0f)` だけ PCR に `old | 0562`、同値なら省略、読み戻しは `0062` だけ照合 (不一致 `pcr=ng`)。資料の予約 bit は書込み 0 指定だが、依頼どおり FreeBSD の 0100/0400 設定を採用し効用は実機未確認。`E82557_PHYVENDOR=0` は読出しだけ (既定 1)。
 - 観測は nsc、link、tx の 3 種。全項目を 78 桁に収めるため tx は 3 行に分割 (計 5 行)。BMSR は履歴/現在の両方、PAR と DCR/FCSCR/RECR は生の hex 値 (差分なし)。別 ID では vendor reg を読まず、その欄の ffff は未取得。
 - `LB2c=PASS` は mdi/cfg/ia/tx/stat/stop の成功だけ。good、link、PCR の照合不一致は合否外。HELLO は `OS32-LB-HELLO`、60 B。TX2 の段 ID は ABI 用に残し呼ばない。
-- 模型・変異の契約は [e82557_drv_tdd.md](../../../tools/tests/e82557_drv_tdd.md)、検査ログと同条件の像の比較は `~/os32-tmp/run/lb2c/`。実機での送信・原因は未確認、受入の持越しは [DEFERRED_TESTS.md](../DEFERRED_TESTS.md)。
+- 模型・変異の契約は e82557_drv_tdd.md (旧版の Git blob `22a9ebebe89b`)、検査ログと同条件の像の比較は `~/os32-tmp/run/lb2c/`。実機での送信・原因は未確認、受入の持越しは [DEFERRED_TESTS.md](../DEFERRED_TESTS.md)。
 
 ### 2-1. L-D の使い方 (Ubuntu ノート)
 
@@ -122,7 +122,7 @@ AF_PACKET の bind と `sendto` は実機の回で確かめる (§5-2)。
 | L-A PCI | `0CF8h` のアドレス語の組み立て (bus/dev/fn/reg、bit31)、BAR の種別と大きさの復号 (I/O / メモリ / 32-64 ビット、サイズ = `~(mask) + 1`)、クラス・ベンダ表の引き、列挙の走査順とマルチファンクション判定 (Header Type bit7)、`lspci` の整形 | **純粋関数に切り出してホスト試験** (変異つき)。NP21/W では `0CF8h` が無いので `lspci` は「PCI 無し」を正しく報告することだけ見る |
 | L-B 82557 | SCB コマンド語・CB/RFD の直列化 (LE、C 構造体の padding に依存しない)、EEPROM の読み出しビット列 (opcode 6、アドレス幅の自動判定)、RFD リングの前後処理 (EL/S ビット、RU の再開判定)、Configure の 22 バイト | 純粋関数 + ホスト試験。**動作はエミュレータで一切見られない** |
 | L-C NIC 境界 | `sys/net/nic.h` の関数表に LGY-98 を載せ替えて **L0〜L3 の回帰が NP21/W で通る**こと | NP21/W (既存の `link_selftest` / L1〜L3) |
-| L-D 橋 | AF_PACKET ↔ FrameStream の中継 (フレームの往復、EtherType のフィルタ、MAC の照合)、FrameStream の枠付け | **済 (2026-09-22)**: `make check-lan-bridge-host`。橋の `--fake-nic` (NIC の差し替え口) に贋 OS32 を繋ぎ、対向は **実物の `host_agent.py`** を `--unix` で子プロセス起動。root も `veth` も要らない。記録 [`tools/tests/lan_bridge_tdd.md`](../../../tools/tests/lan_bridge_tdd.md) |
+| L-D 橋 | AF_PACKET ↔ FrameStream の中継 (フレームの往復、EtherType のフィルタ、MAC の照合)、FrameStream の枠付け | **済 (2026-09-22)**: `make check-lan-bridge-host`。橋の `--fake-nic` (NIC の差し替え口) に贋 OS32 を繋ぎ、対向は **実物の `host_agent.py`** を `--unix` で子プロセス起動。root も `veth` も要らない。記録 `lan_bridge_tdd.md` (旧版の Git blob `fe1d7287820c`) |
 | L-E Host Services | プロトコルそのもの | 既に NP21/W で受入済み (LINK_PLAN §5-1)。実機では **経路が変わるだけ** |
 
 ### 5-2. 実機でしか分からないこと — 最初の 1 回で全部まとめて取る

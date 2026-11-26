@@ -1,6 +1,6 @@
-# tools/check_le_access.py — 設計
+# check_le_access.py (旧版 18506c2136e0) — 設計
 > 状態: **現行 (2026-11-18)** — 出所: 移植準備 順序 4-a (SURVEY_N1)・TASK_CLANG_CHECKS の契約を今のソースと照らして要約
-ソース: `tools/check_le_access.py` (`GUARDED`・`direct_access`・`rules`・`main`)・`tools/clang_ast/__init__.py` (`alignment_cast`)・`sys/include/endian_le.h`
+ソース: `check_le_access.py (旧版 18506c2136e0)` (`GUARDED`・`direct_access`・`rules`・`main`)・`tools/clang_ast/__init__.py` (`alignment_cast`)・`sys/include/endian_le.h`
 
 媒体・書庫の上のバイト列 (ext2 の superblock / group descriptor / inode / ディレクトリエントリ / 間接表、ISO9660 のレコード、KCG フォント書庫のヘッダ) を `*(u32 *)&buf[off]` で読み書きすると、「CPU がリトルエンディアン」と「非整列アクセスが許される」の 2 つの前提が隠れる。x86 では動くが、整列を要求する CPU では落ち、ビッグエンディアンでは値が化ける。ARM のコンパイル計測には現れない (コンパイルは通り、壊れるのは実行時)。外部形式は `sys/include/endian_le.h` の `le16_rd`・`le16_wr`・`le32_rd`・`le32_wr` (バイト単位で組み立てる純 C) を通す (`make check-le-access`)。
 
@@ -20,4 +20,4 @@
 
 木全体の整列キャストの棚卸しは別の道具 `tools/clang_ast/align.py` (件数を出すだけで落とさない)。
 
-検査の道具の試験: `tools/tests/test_clang_ast.py` (typedef・複数の修飾子・文字列連結の asm・マクロの asm と対照を有効な C で確かめ、規則を壊す変異が実行時に落ちることを見る)。
+検査の道具の試験: `test_clang_ast.py (旧版 5317fe59a07d)` (typedef・複数の修飾子・文字列連結の asm・マクロの asm と対照を有効な C で確かめ、規則を壊す変異が実行時に落ちることを見る)。

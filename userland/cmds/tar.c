@@ -11,7 +11,7 @@
 /*  ustar の読み書きは lib/microtar (rxi、MIT) をそのまま使い、I/O だけ      */
 /*  KAPI (sys_open / sys_read / sys_write / sys_lseek / sys_close) に        */
 /*  差し替える。ホスト試験用に -DHOST_TEST で POSIX に切り替わる             */
-/*  (tools/tests/test_tar_cmd.py)。                                          */
+/*  (test_tar_cmd.py (旧版 618d65bcfe4b))。                                          */
 /*                                                                          */
 /*  名前は先頭の '/' を落として格納する (GNU tar と同じ)。ustar の name 欄は */
 /*  100 バイトで、NUL 終端のために 99 バイトを超える名前は拒否する。         */

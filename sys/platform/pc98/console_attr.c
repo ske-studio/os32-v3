@@ -4,8 +4,8 @@
 /*  ここには副作用のある行を 1 つも置かない (I/O も VRAM も触らない)。      */
 /*  printf の機種依存変換を分けてあるのは、実機でしか見えない変換を          */
 /*  ホストで試験するため。                                                  */
-/*    試験: tools/tests/test_kprintf_attr.py                                */
-/*    記録: tools/tests/kprintf_attr_tdd.md                                 */
+/*    試験: test_kprintf_attr.py (旧版 7363e51b8c00)                                */
+/*    記録: kprintf_attr_tdd.md (旧版 275ddd161a31)                                 */
 /*                                                                          */
 /*  なぜ要るか (2026-09-22、実機 PC-9821Ra266):                             */
 /*    カーネルの通常ログは `kprintf(KLOG_ATTR, …)` を使う。                 */

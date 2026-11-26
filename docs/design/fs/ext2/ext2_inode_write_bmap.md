@@ -15,4 +15,4 @@ trim は成功prefix以後の新規dataと追加参照を外し、新規の空�
 
 表の公開前にdataとbitmapを完了させる。逆順では使用中inodeから未割当dataを
 辿れてしまう。dirty表を追い出して先に公開しない。直接→単間接→二重間接、
-下位表切替、途中の512B像は `tools/tests/test_ext2_write_batch.py` で検証する。
+下位表切替、途中の512B像は `test_ext2_write_batch.py (旧版 5ed75b949a7b)` で検証する。

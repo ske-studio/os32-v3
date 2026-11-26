@@ -6,7 +6,7 @@
 /*                                                                          */
 /*  終了コード: 0 成功 / 1 業務失敗 (ESERVICE = 503) / 2 リンク /            */
 /*              3 usage・空・4096B 超 / 4 ローカル I/O。                     */
-/*  ホスト TDD は -DHOST_TEST (tools/tests/host_cmd_host.c)。                 */
+/*  ホスト TDD は -DHOST_TEST (host_cmd_host.c (旧版 72755fc95850))。                 */
 /* ======================================================================== */
 
 #ifdef HOST_TEST

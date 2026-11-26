@@ -1,6 +1,6 @@
-# tools/accept/ — 設計
+# 手動受入の設計記録
 > 状態: **現行 (2026-10-31)** — 出所: RECOVER_T4B_INJECT (D1 で移した)
-ソース: `tools/accept/`
+手動受入の現行入口は `tools/ops/` と `tools/guest_acceptance.yaml`。
 
 ## 外部と実機の運用入口
 

@@ -3,7 +3,7 @@
 /*                                                                          */
 /*  ここで踏むのは「CPL=3 から実機で呼んだときだけ分かること」だけ。          */
 /*  ワイヤの反例 (欠落・重複・墓標・再同期) はホスト試験                      */
-/*  (tools/tests/test_net_link.py / test_host_agent.py) が見る。             */
+/*  (test_net_link.py (旧版 5bc3c6ced683) / test_host_agent.py) が見る。             */
 /*                                                                          */
 /*    1. `GET /pattern/65536` — AGAIN ループで受け切り、内容が一致する        */
 /*    2. `GET /notfound` — 業務結果 404                                      */

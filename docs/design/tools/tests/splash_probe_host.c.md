@@ -1,4 +1,4 @@
-# tools/tests/splash_probe_host.c — プローブの試験模型
+# splash_probe_host.c (旧版 42465234e77d) — プローブの試験模型
 
 状態: **現行 (2026-11-01)**。
 

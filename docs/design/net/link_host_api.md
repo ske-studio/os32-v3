@@ -37,4 +37,4 @@ KAPI の `host_open`・`host_status`・`host_read`・`host_write`・`host_close`
 
 ## 確かめ
 
-- `tools/tests/test_hostsvc_link_api.py` (本物の API と期限の hook: UP でない open・期限切れの各口が `HOSTDOWN`、ハンドルごとの期限)・`test_hostsvc_link_core.py`・`test_host_lib.py` (`host_lib_host.c`)。
+- `test_hostsvc_link_api.py (旧版 632fbb33fbfa)` (本物の API と期限の hook: UP でない open・期限切れの各口が `HOSTDOWN`、ハンドルごとの期限)・`test_hostsvc_link_core.py`・`test_host_lib.py` (`host_lib_host.c`)。

@@ -37,4 +37,4 @@
 
 ## 検査
 
-`tools/tests/test_gfx_reinit.py` が実 gfx_core・3 backend・lease・surface_query・paging・pgalloc を 3 つの AS で連結し、revoke と regen の順序、段の間の not-ready、第三 AS の不変、旧 token の INVAL・旧 ref の STALE、200 行の geometry、revoke 失敗の継続、移譲の 1 回性を確かめる。
+`test_gfx_reinit.py (旧版 0da1bb7f6c45)` が実 gfx_core・3 backend・lease・surface_query・paging・pgalloc を 3 つの AS で連結し、revoke と regen の順序、段の間の not-ready、第三 AS の不変、旧 token の INVAL・旧 ref の STALE、200 行の geometry、revoke 失敗の継続、移譲の 1 回性を確かめる。

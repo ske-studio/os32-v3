@@ -382,7 +382,7 @@ def ensure_local_nhd():
 # ensure_mounted_for_kernel() が立てる。立っている間の do_mount は、NHD を
 # **取り込んだ後・マウントの前**に旧配置の門を通す (Codex ラリー 2 の 2)。
 # 引数にしないのは、試験が do_mount / ensure_mounted を引数なしの贋物に
-# 差し替えるため (tools/tests/test_deploy_protect.py ほか)。
+# 差し替えるため。
 _GUARD_NEXT_MOUNT = False
 
 

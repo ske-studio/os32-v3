@@ -19,4 +19,4 @@
 
 ## 検査
 
-`tools-host` の中の `tools/tests/test_mk_blank_nhd.py`: ヘッダのバイト列、C の計算 (1・100・200・4351 と範囲外)、本体の長さ、`--force`、symlink の拒否、`nhd_deploy.py` の定数との一致。
+`tools-host` の中の `test_mk_blank_nhd.py (旧版 702d850df2a8)`: ヘッダのバイト列、C の計算 (1・100・200・4351 と範囲外)、本体の長さ、`--force`、symlink の拒否、`nhd_deploy.py` の定数との一致。

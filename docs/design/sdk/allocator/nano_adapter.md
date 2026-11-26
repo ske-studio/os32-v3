@@ -48,4 +48,4 @@ newlib nano (私有化した member) の上に SDK の adapter を被せ、複�
 - busy 中・未初期化なら 0。各 arena で、保存した free list の末尾の chunk が break に接していれば、`page_up(chunk + 12)` (頭と次参照に要る分) を残して以降のページを unmap する。primary は image の端ページも残す。
 - arena ごとに unmap が成功してから size・break・`mapped_end` を確定する。失敗した arena は状態を変えず、走査は続けて成功したページ数を合計する。live の chunk・非選択の arena の生きている chunk は読まない・動かさない。空の副 arena は丸ごと返す。
 
-検査は `tools/tests/test_nano_adapter.py` (実 nano の member をリンクし、穴の再利用・整列の追加取得・EXACT 失敗・副 arena・跨ぎ realloc・trim と、リンクの負例)。
+検査は `test_nano_adapter.py (旧版 f86f6c836656)` (実 nano の member をリンクし、穴の再利用・整列の追加取得・EXACT 失敗・副 arena・跨ぎ realloc・trim と、リンクの負例)。

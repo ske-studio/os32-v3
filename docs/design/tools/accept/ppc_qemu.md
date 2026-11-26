@@ -2,7 +2,7 @@
 
 > 状態: **現行 (2026-11-19)** — 出所: KAPI の提供者無しを埋める段 (マウス・KCG・表示の公開 P6・`sys_ver_info`・PCI) で、2026-11-19 の 1 日に受入と CI が落ちた記録
 
-対象: `tools/accept/ppc_*.py`・`tools/ppc/*_run.py`・`tools/checks/ppc-*-guest.py` と、`userland/ppc/*prob.c` の probe。
+対象: `旧受入 ppc_*.py`・`tools/ppc/*_run.py`・`旧登録 ppc-*-guest.py` と、`userland/ppc/*prob.c` の probe。
 型 (full_only・rc=3・TMPDIR・変異ごとに別の像・NULL を渡さない・出力先を 0 でない値で始める) は [PPC_KAPI_FILL_DESIGN](../../../decisions/ppc/PPC_KAPI_FILL_DESIGN.md) の受入の節に従う。この 1 枚は、その型を守っても落ちた所だけを並べる。
 
 ## 1. 画面を撮る時
@@ -25,7 +25,7 @@
 
 | 落ちた形 | 原因 | 直し方 |
 |---|---|---|
-| 共有メモリの受入の変異が、`'pointer': (frozenset({` を見つけられない | slot を公開すると、`sdk/kapi_target_ppc.py` の PROVIDER_GROUPS から、その組の行が消える | 組の名前に頼らず、表の頭 `PROVIDER_GROUPS = {` の直後に足す (`tools/ppc/test_kapi_binding.py` の `insert_group` と同じ形) |
+| 共有メモリの受入の変異が、`'pointer': (frozenset({` を見つけられない | slot を公開すると、`sdk/kapi_target_ppc.py` の PROVIDER_GROUPS から、その組の行が消える | 組の名前に頼らず、表の頭 `PROVIDER_GROUPS = {` の直後に足す (`test_kapi_binding.py (旧版 3baaeeee4857)` の `insert_group` と同じ形) |
 | 互換の試験の「提供者無しの問い合わせ」の見本が成り立たない (`mouse_available`、その前は `pci_count` の隣の行) | 見本にした slot を、後の段で公開した | 見本は、公開の予定が無い組 (`snd_bgm_is_playing` など) から選ぶ。公開の段の完了条件に「見本・目印に使われていないか」を `rg` で確かめる行を入れる |
 | マウスの受入の変異 default-bounds の目印 `if (target.width && target.height)` が無い | 先に入った段で、`target` が `console_text.c` の static に移った | 取り込み (merge) の後に、変異の目印を含む受入を回す。目印は、意味の近い 1 行を選ぶ |
 | 起動の列の形の試験 (`test_ppc_terminal_work.py`) が落ちる | 固定された並び (hostfs → usb → work → input) の途中に 1 行を足した | 足す行を、固定の並びの外 (前か後) に置く。並びの意味が変わる時だけ試験を直す |
@@ -42,7 +42,7 @@
 
 | 落ちた形 | 原因 | 直し方 |
 |---|---|---|
-| `ppc-qemu` の 1 本が 30 分の上限で落ちる (2 回) | 新しい受入に `tools/checks/weights.json` の値が無く、予算の 1200 秒で割り振られて、重い受入と同じ 1 本に重なった | 受入を足す段で、`weights.json` に見積もりの秒を足す (近い受入の値)。CI で測れたら `--merge` で作り直す ([os32-ci-inventory](../../../../.claude/skills/os32-ci-inventory/SKILL.md)) |
+| `ppc-qemu` の 1 本が 30 分の上限で落ちる (2 回) | 新しい受入に `weights.json (旧版 a34c927e1b5d)` の値が無く、予算の 1200 秒で割り振られて、重い受入と同じ 1 本に重なった | 受入を足す段で、`weights.json` に見積もりの秒を足す (近い受入の値)。CI で測れたら `--merge` で作り直す ([os32-ci-inventory](../../../../.claude/skills/os32-ci-inventory/SKILL.md)) |
 | 手元の `check-ppc-usb` が時間切れ (rc=124) | 4 コアの機械で、実装者のビルドと host の検査に重なり、負荷が 11〜12 になった | QEMU の受入は、本線の 16 コアの機械 (pc98emu のセッション) に頼む。枝・SHA・検査の名前を渡し、rc・所要・GREEN/RED の行・落ちた所の写しの文字を返してもらう |
 | 実装者の報告で QEMU が「未実行」 | 実装者の sandbox ではループバックのソケットが開けず、QEMU を起動できない | 実装者は、変異ごとの像の sha が別々であることまでを確かめる。QEMU は PM が回す |
 

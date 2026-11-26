@@ -68,7 +68,7 @@ extern u32 v86_gp_ip;
 /* ------------------------------------------------------------------------ */
 /*  ゲストのコード。正本は sys/platform/pc98/kdebug/v86_test16_gcap.asm                        */
 /*    nasm -f bin sys/platform/pc98/kdebug/v86_test16_gcap.asm -o /tmp/g.bin                  */
-/*  で組んだバイト列そのもの (tools/tests/test_v86_gcap.py が照合する)。     */
+/*  で組んだバイト列そのもの (test_v86_gcap.py (旧版 9a39e870844e) が照合する)。     */
 /* ------------------------------------------------------------------------ */
 static const u8 v86_gcap_code[] = {
     0xB8, 0x00, 0x8C, 0x8E, 0xD8, 0xA1, 0x00, 0x00, 0x8B, 0x1E, 0x02, 0x00,

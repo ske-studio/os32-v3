@@ -4,7 +4,7 @@
 /*  libos32host の host_time を叩くだけ。RTC は設定しない (表示のみ — KAPI に */
 /*  rtc_write が無い、内蔵 `date -sync` は将来のシェル票)。                   */
 /*  終了コード: 0 成功 / 2 リンク (host link down / timeout / NIC 無し)。     */
-/*  ホスト TDD は -DHOST_TEST (tools/tests/host_cmd_host.c)。                 */
+/*  ホスト TDD は -DHOST_TEST (host_cmd_host.c (旧版 72755fc95850))。                 */
 /* ======================================================================== */
 
 #ifdef HOST_TEST

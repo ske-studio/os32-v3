@@ -3,7 +3,7 @@
 /*                                                                          */
 /*  票: docs/archive/realhw_v21/TASK_SERIAL_HOSTFS.md 部品 A-4                    */
 /*  形式: boot/boot_defs.h の「VK32 ヘッダ (v2)」                          */
-/*  試験: tools/tests/test_vk32_crc.py (この C と FD の ASM に同じ壊れた    */
+/*  試験: test_vk32_crc.py (旧版 787690e6f03c) (この C と FD の ASM に同じ壊れた    */
 /*        イメージを渡し、同じ VK32_ERR_* で断ることを見る)                  */
 /*                                                                          */
 /*  検査の順序 (FD の pm_vk32_boot と同じ):                                 */

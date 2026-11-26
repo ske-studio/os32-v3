@@ -19,7 +19,7 @@ LZ4 ブロック形式の展開。HDD ローダの `boot_lz4_decode` (`boot/vk32
 
 ## 確かめ
 
-- `make check-vmkernel-lz4-host` (`tools/tests/test_vmkernel_lz4.py`、ハーネス `tools/tests/vmkernel_lz4_host.c`): 合成データで上の流れを
+- `make check-vmkernel-lz4-host` (`test_vmkernel_lz4.py (旧版 77f7db622389)`、ハーネス `vmkernel_lz4_host.c (旧版 1fea306bc8c5)`): 合成データで上の流れを
   **含むことを数えて**一致を見る (`synthetic`)、`--real` で build/out の kernel.bin、mkvmkernel の上限 (`oversize`・`boundary`、ちょうど
   520,192 は通り +1 は落ち、古い出力も消す)。`lz4_mini.c` と `lib/lz4.c` は `--target` でローダと同じ i386-elf-gcc で組み、ASM は
   `pm_lz4_decode` を切り出して `nasm -f elf32` で組む。

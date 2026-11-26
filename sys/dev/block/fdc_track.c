@@ -2,7 +2,7 @@
 /*  FDC_TRACK.C — FD の読み出しをトラック単位に束ねる (I/O を触らない)      */
 /*                                                                          */
 /*  ここには I/O もタイマも置かない。読むのは ops 経由だけ。                */
-/*  理由と契約は fdc_track.h、試験は tools/tests/test_fdc_track.py。        */
+/*  理由と契約は fdc_track.h、試験は test_fdc_track.py (旧版 1f253a73fa6c)。        */
 /* ======================================================================== */
 
 #include "fdc_track.h"

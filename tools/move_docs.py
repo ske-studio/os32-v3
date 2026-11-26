@@ -28,7 +28,7 @@ move_docs.py — 文書を動かし、リポジトリ中の参照を追従させ
 
 対象は **リポジトリ内の追跡されている `.md` すべて** —
 `docs/**` (`docs/archive/` も)、`CLAUDE.md`、`README.md`、`arch/README.md`、
-`platform/README.md`、`tools/tests/*_tdd.md`、`.claude/skills/**`。
+`platform/README.md`、`.claude/skills/**`。
 `git ls-files` で集めるので、gitignore されている `docs/hw/` は入らない。
 
 `--ext` で拡張子を足すと、**ソースコードも同じ規則で追従させられる**。票の
@@ -68,13 +68,7 @@ move_docs.py — 文書を動かし、リポジトリ中の参照を追従させ
 スキーム付き、`/` 始まり、`#` だけのものは対象外。
 
 **(2) 素のパス言及** — バッククォートの中などに地の文として書かれた
-リポジトリルートからのパス (`docs/archive/settings/TASK_S2.md`,
-`tools/tests/s2_tdd.md` など)。票と TDD 記録は
-「対象票: `docs/tasks/…`」のように**リンクではなく素のパス**で
-書き合う慣例があり (`tools/check_docs_orphans.py` の規則 2、
-`tools/gen_tests_inventory.py` の規則 4 がこれを読む)、ここが古いままだと
-孤児検査と試験一覧の「票」列が外れる。ルート相対なので参照元の位置には
-依らない。前後がパス文字 (英数 `/` `.` `-` `_`) でないときだけ当てるので、
+リポジトリルートからのパス。参照元の位置には依らない。前後がパス文字 (英数 `/` `.` `-` `_`) でないときだけ当てるので、
 `…/TASK_S2.md` のような長いパスの一部を齧ることはない。
 
 **(3) パスそのものを表示文字にしたリンクのラベル** —
@@ -100,8 +94,7 @@ move_docs.py — 文書を動かし、リポジトリ中の参照を追従させ
 ## 使い終わったら
 
     python3 tools/ops/check_docs_links.py        # リンクと見出しアンカー
-    python3 tools/check_docs_orphans.py      # 索引から辿れなくなっていないか
-    make tests-inventory   # build/out/ の票の列を引き直す (コミット不要)
+    python3 -B -m tests.infra.ci run --check docs_navigation      # 索引から辿れなくなっていないか
 
 `docs/INDEX.md` の索引行と、アーカイブ先の README は人が書く。運用は
 `docs/archive/README.md`。
@@ -462,8 +455,7 @@ def main():
     print("")
     print("完了。次に回すもの:")
     print("  python3 tools/ops/check_docs_links.py")
-    print("  python3 tools/check_docs_orphans.py")
-    print("  make tests-inventory  # build/out/ の生成表、コミット不要")
+    print("  python3 -B -m tests.infra.ci run --check docs_navigation")
     return 0
 
 

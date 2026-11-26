@@ -22,4 +22,4 @@
 
 ## 検査
 
-`tools/tests/test_boot_splash_native.py`・`test_dep_dir_d_splash.py`・`test_splash_wire.py` がこのファイルを組む。
+`test_boot_splash_native.py (旧版 729852acc8b2)`・`test_dep_dir_d_splash.py`・`test_splash_wire.py` がこのファイルを組む。

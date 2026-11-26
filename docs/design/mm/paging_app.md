@@ -36,4 +36,4 @@
 
 ## 検査
 
-`tools/tests/test_appmem_map.py` が実 `sys/kern/mm/paging_app.c`・`exec/appmem*.c`・paging・pgalloc・physmem を連結し、全確保位置への失敗注入、IRQ 区間の状態、CR3 再ロードの回数、返却の順序を確かめる。
+`test_appmem_map.py (旧版 8180480a2758)` が実 `sys/kern/mm/paging_app.c`・`exec/appmem*.c`・paging・pgalloc・physmem を連結し、全確保位置への失敗注入、IRQ 区間の状態、CR3 再ロードの回数、返却の順序を確かめる。

@@ -58,6 +58,6 @@ CREATE INDEX idx_user_yomi ON dict_user(yomi);
 
 ## 検査
 
-- `fep-user-store` (`tools/tests/test_fep_user_store.py`): 作成・検査・不一致・作りかけ・ROFS の故障の注入 (libc なし)。
+- `fep-user-store` (`test_fep_user_store.py (旧版 3a08d732e6df)`): 作成・検査・不一致・作りかけ・ROFS の故障の注入 (libc なし)。
 - `fep-store-search`: 学習の有無で接続数が 1/2、不一致で学習が止まり system の検索が続く。
 - ゲスト: `userland/diag/fep_meta_test.c` (専用の学習 DB で ID・品詞の版を一時に変えて学習が止まること)。

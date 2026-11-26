@@ -38,7 +38,6 @@ SHA-256 を照合。第三者ミラーは使わない。プロキシは `https_p
 - ttf と旧 `.kcgfont` はゲストに配らない。`make all` は旧 font を生成せず、KCG 部品が ROM を読む。
   host 試験 fixture のライセンス条件は `assets/fonts/README.OS32`。
 
-試験: `tools/tests/test_fetch_fonts.py` (`make check-tools-host` の 1 行。ネットワーク無し)。
 
 ### §8-2 ビルドパイプライン
 
@@ -244,7 +243,7 @@ os32-v3/
 | 機能の有無 | 機能別のソース集合は `build/features/`、像ごとの構成は `build/images/` に置く。 |
 | ユーザーランド | シェル・コマンド・ライブラリは `userland/` の役割別の木を共有する。libc の移植は POLICY_DEV §1 に従う。 |
 | ビルド | CPU・機種ごとのソース集合を `build/arch/`・`build/platform/` に登録し、`build/select.mk` で選ぶ。集合と並べ順は [select の設計](design/build/select.md) を参照。 |
-| ホストの試験・道具 | 試験は `tools/tests/`、道具は `tools/` の同じ役割のものに足す。対象 CPU が違うときは引数で選ぶ。 |
+| ホストの試験・道具 | 試験は `tests/<対象>/`、道具は `tools/` の同じ役割のものに足す。対象 CPU が違うときは引数で選ぶ。 |
 | 文書 | 設計は `docs/design/` でソースの配置に合わせ、決定と作業票は領域別の木に足す。CPU・機種別の参考資料は `docs/ppc/` のようにまとめる。 |
 
 1. PM は上の図と表で、移植する各部に対応する既存の実装を探す。新しいディレクトリやビルド用の mk が要る場合は、作る前に役割と配置先を設計に記す。
@@ -385,23 +384,7 @@ python3 tools/gen_memmap.py --manifest --check
 <a id="検査の3段"></a>
 #### 登録検査の回し方
 
-対象の契約を [登録仕様](design/tools/checks/registry_v2.md) と `tests/registry.toml` で確認し、`python3 -B -m tests.infra.ci run --check <id>` を回す。追加・変更した検査は `--mutate` 付きで回し、登録は `python3 -B -m tests.infra.ci lint` で照合する。担当ごとの完了条件は [ROLES §0](tasks/agents/ROLES.md)。古い検査は関門ではない (P7 で消す)。参考に読むだけ。
-
-#### 検査のキャッシュ (作業木の外、2026-11-04)
-
-作業木を作り直しても同じ入力を調べ直さないよう、2 つのキャッシュを作業木の外に置く。どちらも消してよく、無い・壊れている・書けないときは全部調べる (結果は変わらない)。
-
-| キャッシュ | 対象 | 置き場 (既定) | 切り替え |
-|---|---|---|---|
-| 翻訳単位の結果 (`tools/clang_ast/result_cache.py`) | `check-c-dialect`・`check-p2v`・`check-arch-asm` とその host 試験の単位ごとの指摘 | `${XDG_CACHE_HOME:-~/.cache}/os32/checks/v1/<道具>/` | `OS32_CHECK_CACHE=<置き場>` / `off` |
-| host32 の固定物 (`tools/tests/host32.py` の `build()`) | `host32.build` で組む host 試験の実行物 | `${XDG_CACHE_HOME:-~/.cache}/os32/host32-fixtures/` (512 MiB / 8192 件で古い順に消す) | `OS32_HOST32_CACHE=<置き場>` / `off` (= 今までの `build/out/host32-fixtures/`) |
-
-- 環境変数 `CI` が空でなく、切り替えを指定していないときは、結果のキャッシュは使わず、固定物は `build/out/` に置く。build の checks は作業木の `.ci-cache/check-cache` を使う。c-dialect の担当シャードは main の最新の互換キャッシュを復元し、main への push でだけ `v1/c-dialect/` を保存する。wt/** は復元のみ。main への push で担当シャードの成功結果を使い回した回は、専用ジョブが `make check-c-dialect`（前提の make all を含む）で予熱して保存する。予熱の失敗は main の成否に影響しない。c-dialect-host は check-c-dialect の完了を待って温めを再利用し、p2v は同じ検査内の2回の走査で共有する。full-check の既定は変えない。
-- 結果の鍵: 単位のソースと全部の依存 (system・生成ヘッダを含む) の生のバイト、`clang -E` の展開結果、元の引数と実効の引数、`clang --version` と libclang の版、検査器と `tools/clang_ast/` の中身の hash。作業木の root は `<root>` に直してから入れるので、ほかの作業木でも当たる。解析の失敗は保存しない。当たっても make の dry-run・言語モード・探り・SDK の検査は毎回回る。
-- 固定物の鍵: 前処理の結果、引数 (作業木の root と一時ディレクトリの名前は直す。`-Wl,`・`-Xlinker`・`-L`・`-D` とその値は直さない。`-g` のときは何も直さず cwd も入れる)、コンパイラの識別、`.o`/`.a` の中身。
-- C のコンパイルは `tools/tests/cc_cache.py` で ccache を選択的に使う。host32 と対応する host/cross 試験では、通常のコンパイルとリンクを翻訳単位ごとに分け、変異で変わらない単位を再利用する。PATH は包まない。`OS32_NO_CCACHE=1` で無効。`-g` 付きのコンパイルとリンクなど、分割の影響があり得る呼び出しは直接実行する。`base_dir` のパス書き換えと sloppiness は使わず、`__FILE__`・デバッグ情報・cwd を保つ。
-- make 本体も ccache があれば `CC` に挟む (`CC` = `ccache <gcc>`、`CCACHE=` で無効。Python の道具も `CCACHE=` を尊重する)。`CC` を 1 つの実行ファイルとして渡す所 (`gen_hwdev_contract.py --cc`・ビルド選択と PPC の計測・AST の道具) は ccache を挟まない `RAW_CC` を使う。make の写しの木を組む試験は `tools/tests/build_fixture.py` の `copy_build_tree` を使い、`build/` の外で make が読むファイルは同じファイルの `CONFIG_INPUTS` に足す。CI は固定版の静的 ccache 本体を OS/arch 別に保存し、コンパイル結果はコンパイラ版・コミット・ジョブ/シャード別のキーで保存する (各ジョブ `CCACHE_MAXSIZE=1G`)。結果キャッシュと違い、試験実行は毎回行う。
-- 容量を見る・消す: `du -sh ~/.cache/os32/checks ~/.cache/os32/host32-fixtures`、消すときは各ディレクトリごと。
+対象の契約を [登録仕様](design/tools/checks/registry_v2.md) と `tests/registry.toml` で確認し、`python3 -B -m tests.infra.ci run --check <id>` を回す。追加・変更した検査は `--mutate` 付きで回し、登録は `python3 -B -m tests.infra.ci lint` で照合する。担当ごとの完了条件は [ROLES §0](tasks/agents/ROLES.md)。
 
 <a id="kapi-v63-移行"></a>
 #### KAPI v63 への移行 (データ欄の固定配置、票 TASK_KAPI_DATA_FIELDS (アーカイブ: `docs/archive/kernel_v21/TASK_KAPI_DATA_FIELDS.md`))
@@ -630,7 +613,7 @@ diff / du / cal / man。残すコマンド・FD の profile・インストーラ
 - **古い PKG**: `--plan` は出力先の他の `*.PKG` を消す (ISO は `packages/` を丸ごと焼く)。
 - **apps/ と game/** (private submodule) は CD に入れない。`make all` では作られず CI では空なので、
   入れると媒体の中身が環境で変わる。これらは `make deploy` + `hsync` で配る。
-- 検査は `make check-packages-host` ([`tools/tests/test_packages.py`](../tools/tests/test_packages.py)):
+- 配布物を確認する項目:
   振り分けの否定側、分割、実物の mkpkg で作った PKG と ISO の中の PKG を読み戻して
   配備の全ファイルが同じバイト列で揃うこと、cdinst.c のベース名と展開順との一致、
   GUI.PKG = `gui` タグ、旧 font が全一覧に無いこと、
@@ -688,9 +671,7 @@ FD 上のパスはすべて 8.3 に収まること (mkfat12 は収まらない�
 mkpkg が先に断る)。**`core` / `base` に足した物は `fd.exclude` 以外 FD にも入る** — 空きは 2026-09-25 に
 **2HD 359KB / 1221KB、1.44MB 568KB / 1424KB** (MINIMAL をレスキュー兼インストーラに絞った後。
 絞る前は 2HD が数 KB 溢れて作れず、1.44MB は 211KB)。2026-11-08 (アプリの .text を読み取り専用にして末尾をページの境目に揃え、2HD が 54KB に減ったので `fd.exclude` に hexdump.bin を足した後 — ユーザー決定) は **2HD 75KB、1.44MB 266KB** (1.44MB は hexdump を外す前の値)。2026-11-11 に sqlite.mod を除外した後は **2HD 443KB、1.44MB 655KB**。`fd.exclude` は kdebug.bin・hwdev.mod・geforce.mod・fm.mod・pcm.mod・fep.mod・sqlite.mod・hexdump.bin・less.bin (理由は build/packages.yaml の各行)。2HD が先に尽きるので、MINIMAL に
-足すときは `make all` の FD の行 (`クラスタ使用: … 残り …KB`) を見る。**空きが 64KB
-(`tools/tests/test_packages.py` の `FD_MIN_FREE_KB`、2HD と 1.44MB の両方) を切ると
-`make check-packages-host` が落ちる** — 溢れて `make all` が割れる前に、MINIMAL に足す物を
+足すときは `make all` の FD の行 (`クラスタ使用: … 残り …KB`) を見る。**空きが 64KB を切ったら**、 溢れて `make all` が割れる前に、MINIMAL に足す物を
 見直すか FD から外す物を決める合図。
 以前 FD にだけあった試験用の `/bin/timetest.bin` / `/bin/pcmtest.bin` は外した (DEBUG の
 `/usr/bin/time_test.bin` / `pcm_test.bin`)。検査は `make check-packages-host` の case 7 が
@@ -740,41 +721,8 @@ mkpkg が先に断る)。**`core` / `base` に足した物は `fd.exclude` 以�
 
 #### C ソース検査 (clang)
 
-`tools/clang_ast/` が `make -n -B all` の実際の翻訳単位・旗を取得し、
-i386 向け libclang AST を作る。ビルド自体は引き続き i386-elf GCC。
-ホストには `clang libclang-dev llvm-dev python3-clang` (Ubuntu apt) が必要。
-全 TypeLoc を辿る C++ 補助器の組み立てには LLVM 開発ヘッダと `libLLVM`、
-`libclang-cpp` が必要で、clang/libclang/resource header と同じ版を使う。
-導入後はリポジトリのルートでロードと組み立てを確認する:
-
-```bash
-python3 -c 'import clang.cindex; clang.cindex.Index.create()'
-PYTHONPATH=tools python3 -c 'from clang_ast.type_occurrences import visitor_binary; print(visitor_binary())'
-```
-
-クロス GCC を導入しない静的 CI では、C AST 検査の標準ヘッダを Ubuntu の
-`libnewlib-dev` (`/usr/include/newlib`) から取る。クロス newlib があればそちらを優先する。
-`OS32_CLANG_CROSS_FREE=1` の dry-run は、外部リンク入力 `libc.a` の空規則と、
-GCC が PATH に無い場合の libgcc パス問い合わせ専用 shim を一時ディレクトリに置く。
-実際の C コンパイル規則・依存はすべて辿る。通常ビルドには適用しない。
-この明示的な限定モードで GCC が無いときだけ、`check-c-dialect` の言語モード・
-拒否の探り・SDK 例の検査も clang を使う。GCC の定義マクロ・条件分岐との同等性は未検証。
-clang の解析失敗・不足入力は非0で終了する。`make all` の後に検査する。
-実ビルドで選ばれたソースとそこから取り込むヘッダが対象で、未使用ヘッダ・
-非選択の `#if` 分岐は対象外。旗の読み替え・判定・比較の詳細は
-TASK_CLANG_CHECKS (アーカイブ: `docs/archive/v3/TASK_CLANG_CHECKS.md`) §4・§6。
-
-- `make check-p2v`: canonical type とマクロ展開で物理キャスト・物理引数、
-  user/lease の V2P、関数内 CONST を検査。[C5] の file:function:reason は
-  `tools/check_p2v_allow.txt` (65件) を引き継ぐ。
-- `make check-c-dialect`: GCC の実効言語モード・拒否探りを保持し、内部の
-  atomic/TLS/restrict/VLA/匿名メンバー/旧式定義は clang の型・宣言・診断で検査。
-  公開 SDK は gnu89/gnu11 診断と libclang token でも確認する。
-- `make check-arch-asm`: AST の asm template (マクロ・連結文字列も含む) から
-  hlt/cli/sti を検査。arch/*/arch_*.h と ARCH-ASM-OK の例外を保持。
-- `make check-le-access`: ext2 / ISO9660 / KCG / utf8 の9ファイルの
-  pointee alignment が上がる cast を canonical type で検査。
-  外部形式は `sys/include/endian_le.h` の le16/le32 アクセサを通す。
+登録検査の `c_dialect`・`p2v`・`ring3_instructions` は各構成の製品入力を検査する。
+手動の整列監査で使う clang と Python のバインディングは次節を参照する。
 
 #### `tools/audit_cast_align.sh`
 
@@ -793,31 +741,19 @@ tools/audit_cast_align.sh all
 重複していた `create_fat12_d88.py` は撤去。FD生成は `tools/mkfat12.py` を使う。
 
 #### `tools/ops/check_docs_links.py`
-文書のリンク切れ検査 (`make check` の `check-docs-links`)。`lychee` (Rust 製のリンク検査器) を
+文書移動後の手動リンク検査。`lychee` (Rust 製のリンク検査器) を
 `--offline --include-fragments` で呼ぶ薄い包みで、**相対パスの実在**と**見出しアンカーの実在**の
 両方を見る。日本語の見出し (`08_build.md#配備3経路`) も GitHub と同じ規則で判定できる。
 対象は `docs/**/*.md` (gitignore されたミラーの `docs/hw/` だけ除く) と `CLAUDE.md` /
-`README.md` / `arch/README.md` / `platform/README.md` / `tools/tests/*_tdd.md`。
+`README.md` / `arch/README.md` / `platform/README.md`。
 **`docs/archive/` は除外しない** — 完了した票を archive へ移したあとも相対パスが生きていることを
 見るのが目的の 1 つで、移動で 1 段ずれるのはいちばん起きやすい壊し方だから。外部 URL は
 見ない (`--offline`)。900 リンクで 0.03 秒。`lychee` が無い環境では `SKIP` と出して終了コード 0
 (`cargo install lychee` で `~/.cargo/bin` に入り、包みが PATH に無くても探す)。
 
-#### `tools/check_docs_orphans.py`
-孤児文書の検出 — リンク切れの裏返しで、「**どこからも指されていない**」文書を挙げる
-(lychee の守備範囲外なので自前、Python 標準ライブラリのみ)。`docs/INDEX.md` を唯一の起点として
-相対リンクを推移的に辿り、到達できない `docs/**/*.md` を列挙する。`tools/tests/*_tdd.md` は票の
-根拠なので索引から辿れる必要はなく、起点集合に `docs/tasks/**` と `docs/archive/**` の票を含め
-(受入完了して archive へ落ちた票も票)、票が慣例どおり素のパスで書いた言及も参照とみなす。
-索引に載せないと決めた例外は `docs/.orphans-allow` (1 行 1 パス、`#` コメント可) に理由つきで書く。
+#### 索引からの到達
 
-```bash
-make check-docs-orphans        # 単体
-```
-2026-09-15 の棚卸し時点では docs 31 本 + TDD 記録 20 本が未参照だった (検査の不備ではなく、
-票を書いて `INDEX.md` に載せ忘れた取りこぼしの実数)。そのあいだは門にすると通すために例外表へ
-全部書き写すことになり `.orphans-allow` が「黙らせる表」に化けるので単体運用にしていたが、
-索引を直して 0 になったので `make check` の列へ入れてある。
+`python3 -B -m tests.infra.ci run --check docs_navigation` で現行の文書を確かめる。
 
 #### `tools/move_docs.py`
 
@@ -832,12 +768,10 @@ python3 tools/move_docs.py SRC DST [SRC DST ...]
 ```
 
 動かす一覧は道具の中に持たず、引数か TSV で外から与える。書き換えるのは 3 つの形だけで本文には
-触らない — (1) `](相対パス#見出し)` と参照定義、(2) 地の文のルート相対パス言及 (票と
-`tools/tests/*_tdd.md` が互いを指す慣例の書き方)、(3) 表示文字がパスそのもののリンクのラベル。
+触らない — (1) `](相対パス#見出し)` と参照定義、(2) 地の文のルート相対パス言及、(3) 表示文字がパスそのもののリンクのラベル。
 動いた文書自身の中のリンクは深さが変わるので全部引き直す。`--dry-run` で一覧だけ出せる。
 運用 (何を落として何を残すか、落としたあとに守ること) は
-`docs/archive/README.md`。実行後は `check-docs-links` / `check-docs-orphans` /
-`make check-tests-inventory` (登録の照合) の 3 つを回す。
+`docs/POLICY_ARCHIVE.md`。実行後は登録検査の docs_links と docs_navigation を回す。
 
 **`--ext` / `--rewrite-only`** — 追従させるのは `.md` だけではない。票の番号や設計の正典は
 ヘッダやモジュールの先頭コメントに「仕様: `docs/tasks/…`」と書く慣例があり、文書だけ動かすと
@@ -871,8 +805,7 @@ Ubuntu (WSL2 では Ubuntu 側のシェル) で OS32 のリポジトリのルー
 |---|---|
 | 本体ビルドとホスト試験 | [build-setup](../.github/actions/build-setup/action.yml)。NASM、ISO 作成の genisoimage、ext2 の作成・検査の e2fsprogs、32 ビット試験の qemu-user を含む。 |
 | PowerPC クロスの構築 | [ppc-setup](../.github/actions/ppc-setup/action.yml) の構築依存を入れる。 |
-| 全検査 | [gate-setup](../.github/actions/gate-setup/action.yml) は上の二つに gcc-13 と PowerPC ゲスト用の qemu-system-ppc、ファームウェアの qemu-system-data、VGA ROM の seabios を加える。全機種を取得するメタパッケージ qemu-system は導入時間が長いため、この構成では個別に入れる。 |
-| 静的検査 | [static-setup](../.github/actions/static-setup/action.yml)。C の AST 検査に使う clang・libclang・python3-clang の動作確認は [§8-4 の C ソース検査](#c-ソース検査-clang) を参照。文書リンク用の lychee は [停止中の check.yml.disabled の Install lychee](../.github/workflows/check.yml.disabled) と同じ版を PATH に置き、`lychee --version` を確認する。 |
+| 登録検査 | [検査用 workflow](../.github/workflows/restructure-check-bundle.yml)が構成ごとの依存を導入する。 |
 
 Python の依存は [requirements.txt](../requirements.txt) から入れる。Ubuntu の `python3-venv` を用意し、apt の clang バインディングも読める仮想環境を使う。次回のビルド時も同じ環境を有効にする。
 
@@ -921,12 +854,12 @@ NP21/W の受入は、同じ LAN の別の Windows 機械で回せる (ユーザ
 
 ```bash
 make all
-make check-fast
-make ppc-ci-image
-python3 -B tools/checks/run.py --select --files README.md docs/08_build.md
+make ARCH=ppc PLATFORM=powermac all iso
+python3 -B -m tests.infra.ci lint
+python3 -B -m tests.infra.ci run --check docs_links
 ```
 
-最後の行には自分が変更したファイルを渡し、表示された検査名を `make 検査名 MUTATE=1` で実行する。ここまで通れば、両機種のビルドと選んだ検査の環境が揃っている。CI の全検査は `make check` で実行する (§8-4)。PowerMac G4 の製品の像は `make ARCH=ppc PLATFORM=powermac` で作る。像の選択と出力先は本章の PowerPC 製品規則、CI の構成は [§8-6](#8-6-github-actions-での本体ビルド)、機種の技術資料は [docs/ppc/](ppc/README.md) を参照。
+登録検査の全件は `python3 -B -m tests.infra.ci run --mutate` で実行する (§8-4)。PowerMac G4 の製品の像は `make ARCH=ppc PLATFORM=powermac` で作る。像の選択と出力先は本章の PowerPC 製品規則、CI の構成は [§8-6](#8-6-github-actions-での本体ビルド)、機種の技術資料は [docs/ppc/](ppc/README.md) を参照。
 
 #### nano allocator の入力台帳 (T2f f1a)
 
@@ -1011,113 +944,6 @@ GitHub Actionsでの新規構築はf1a作業中は未実施、PMがCI runで確�
 ### §8-6 GitHub Actions での本体ビルド
 
 作り直し期間は [restructure-build.yml](../.github/workflows/restructure-build.yml) が PC-98 と PowerPC の像を組む。取り込み条件は [ci_v2 §0](design/tools/ci/ci_v2.md)。全件集計は同文書 §4 に従う。
-
-#### 移動前の CI（作り直し期間は停止）
-
-古い検査は関門ではない (P7 で消す)。参考に読むだけ。
-
-`.github/workflows/build.yml` (workflow 名 `build`) は、配布物の `artifacts` と
-検査6シャード (`checks (0)`〜`checks (5)`) を依存関係なしで並列に動かす。
-共通の composite action で準備し、`artifacts` は core の完全ビルド・配布物の upload を行う。
-各検査シャードは `make -k check CHECK_SHARD=i/6` (全部の検査を変異込み。決まりは main に入れる SHA の関門) を回し、そのシャードの CHECK needs
-(推移的な check 前提を含む) に必要な make 前提だけを `check-prepare` で組む。
-main へ入れる判定は配布物・検査6本と静的ゲートの `check.yml` がすべて合格すること
-(変異込みの `make check` は回さない)。arch-asm と le-access は build の全範囲検査に集約し、
-クロス無しの静的ゲートからは実行しない。
-`check.yml` はイベント種別と ref がともに同じ場合に古い実行を取り消す。タグの push では起動しない。手動の起動 (workflow_dispatch) は入力の arch を区別しないので、同じ ref で続けて起こすと最後の 1 本だけが残る (両方を回すなら arch=both)。
-
-main の push は before→HEAD が文書だけなら PowerPC を省く。コードを含む場合は同じ SHA の `wt/int-*` の check の push が成功していれば省き、それ以外は x86 だけの変更でも compile と QEMU 6 本を回す。強制 push・before の欠落時も全部回す。
-
-main への push では `tools/ci/reuse_success.py` が `gh api` と `GITHUB_TOKEN` で
-同じ workflow の枝の push run を調べる (build は `wt/**`、check は統合枝 `wt/int-*` だけ)。SHA の40桁完全一致・workflow ID 一致・
-同一リポジトリ・completed・conclusion=success が揃った場合だけ、検査とその準備を省略する。
-取得失敗・不明な応答・該当 run 無しでは通常どおり実行する。手動・PR・main 以外の push は
-省略しない。配布物は main でも必ず作るため、`tools/ci_fetch.sh` の既定の取得先は変わらない。
-
-分割は `tools/checks/run.py --list --shard i/6` で再現する。check needs の連結成分をまとめ、
-重み合計の降順 (同値は名前順) で最も軽いシャードへ割り当てる LPT。各検査は全体で1回、
-check 前提は同じシャードに入り、計時ターゲットの依存で前提の成功後に本体を実行する。
-matrix の fail-fast は無効で、1本が失敗しても残りの結果を集める。
-`check-times-<SHA>-<i>` の6 artifacts に各シャードの TSV を保存する (再利用時は新たな計測なし)。
-
-重みは `tools/checks/weights.json` に保存した成功計測値の中央値 (秒) を使う。
-同ファイルの sources に元の check-times artifact 名と TSV の SHA-256、samples に検査ごとの
-標本数を保存する。今の値は 2026-11-18 の変異込みの 5 回 (30 TSV) の中央値。
-`gh run download <RUN_ID> --pattern 'check-times-*' --dir <DIR>` で取得後、
-`python3 -B tools/checks/calibrate_weights.py <DIR>...` で指定した記録から更新する。QEMU を要る検査 (宣言の `env` に `qemu-ppc`) は `check-times-<SHA>-ppc-qemu-<i>` の記録だけを、ほかの検査は x86 のシャードの記録だけを標本にする (x86 のシャードでは QEMU の検査は名前だけ回って 1〜2 秒で終わる)。偏りと重みのずれの棚卸しは `python3 -B tools/ci/time_inventory.py <DIR>...` ([design/tools/ci/time_inventory.md](design/tools/ci/time_inventory.md)、スキル `.claude/skills/os32-ci-inventory`)。
-budget は重みの2倍で、超過は警告だけ。未計測の検査は CHECK の宣言 budget を
-重み・警告閾値の既定値に使い、計測後の更新で分離する。
-
-**狙い**: 開発ホストの回線が従量課金のことがあるので、ホストからはソースを push する
-(小さい) だけにし、イメージの受け渡しは GitHub → 実機に繋がったホスト (Ubuntu ノート)
-で済ませる。
-
-| 項目 | 内容 |
-|---|---|
-| 起動 | `main` / `wt/**` への push、tag `v*` の push、手動 (workflow_dispatch)。同じ ref の古い run は打ち切る |
-| ビルド | `artifacts`: `make -j$(nproc) all` → `make -j$(nproc) deploy-u3 iso` (一時 `HOSTDRV_DIR` / `NP21W_DIR`) → upload。配布物の 1 呼出しで起動 FD 2 種・ISO・HostDrv を同じ build に揃え、世代表・期待表を今の成果物から再生成する。並列の `checks` 6本: `make -k check CHECK_SHARD=i/6` (全部の検査を変異込み。必要な前提だけ準備、同じ SHA の統合枝で成功済みなら検査を省略) |
-| 準備・runner | `.github/actions/build-setup/action.yml` が ccache の静的本体 (版と SHA-256 を固定)・apt・Rust・クロスツールチェーンとフォントのキャッシュ・取得を共有する。配布物は常に `ubuntu-latest`。検査は `ske-studio` が `ske-studio/os32-v3` の `main`・`wt/**` へ push した初回だけ、`OS32_SELFHOST_SHARDS` (番号の JSON 配列、例 `[4]`) のシャードを ci-server で実行し、ほかは標準で実行する。同じ ref の concurrency をジョブ別にも設ける |
-| submodule | **`apps/` と `game/` (private submodule) は v3 の CI では組まない** (ユーザー決定 2026-09-30: 今回の開発に要らないので `SUBMODULE_TOKEN` は登録しない)。必要になったら secret `SUBMODULE_TOKEN` (os32-apps / os32-game の Contents: read を持つ fine-grained PAT) で submodule 取得 + `make external` の step を足す (FORK_PLAN §3 d ③ (アーカイブ: `docs/archive/v3/FORK_PLAN.md`)) |
-| フォント | IPAex の TTF はリポジトリに無く `tools/fetch_fonts.py` が IPA の公式配布から取る (§8-2)。CI は `OS32_ACCEPT_IPA_LICENSE=1` で非対話に同意し (リポジトリ所有者が同意済みの前提)、取れた ttf を key `ipaex-<zip の SHA-256>` (`fetch_fonts.py --print-zip-sha256`) で `actions/cache` に置く |
-| 文書だけの push | `docs/**`・`*.md`・`.claude/**` だけの push では回さない (`paths-ignore`。文書の検査は `check.yml`)。同じ ref の run は 1 つ (`cancel-in-progress`) なので、**run の途中でその ref へ push すると打ち切られる** |
-| ツールチェーン | `tools/ci/build_cross.sh` (§8-5) で `~/opt/cross` に作り、`actions/cache` で保存。キーは `cross-i386-elf-<OS>-gcc<版>-newlib<版>-<構築入力/builder/inventory名のSHA256>` (`check_nano_inputs.py --cache-key`)。**構築入力・builder・inventory名を変えたときに作り直す**。SDK用ソース/patch・local hash値の変更はキーを変えない。os32 での実測 (2026-09-23): 初回はツールチェーン約 25 分、キャッシュが効けば run 全体で約 2 分 (ubuntu-latest 4 vCPU、キャッシュ 335MB)。os32-v3 での実走はまだ (最初の push で見る) |
-| PowerPC (段1) | check.yml の専用 job `ppc-compile` だけが `ppc-setup` を使い、`tools/ci/build_cross_ppc.sh` で nano newlib 付き toolchain を別キーに保存。`PPC_CROSS_DIR` と `OS32_REQUIRE_PPC=1` を渡し、`check-ppc-compile` で `KBOOT_SH=1` の像を組む (QEMU 不要)。auto は origin/main との merge-base からの差で PPC・共通変更を選び、統合枝は常時実行。手動 arch は auto/x86/ppc/both。PowerPC の検査も変異込みで回す。QEMU でゲストを起動する検査は job `ppc-qemu` が 20 本に割って並べる (`python3 -B tools/ci/gate.py run --env qemu-ppc --shard i/20`、シャードの中は 1 本ずつ。`ppc-compile` とは鎖にしない)。検査ごとの所要は `check-times-<SHA>-ppc-qemu-<i>` に保存する。 |
-| Rust | `rust-toolchain.toml` (nightly + rust-src) を `rustup toolchain install` (引数なし) で解決。`target/` のキャッシュは無し (最小構成。遅ければ `Swatinem/rust-cache` を足す) |
-| apt | `build-essential nasm genisoimage e2fsprogs qemu-user clang libclang-dev llvm-dev python3-clang` + ツールチェーン構築の `libgmp-dev libmpfr-dev libmpc-dev texinfo bison flex`。`.deb` を `actions/cache` に保存し、キーは OS の版・arch・runner image の版・パッケージ一覧の SHA-256。miss 時だけ既定ミラーから取得し、復元後は `/var/cache/apt/archives` から `--no-download` で入れる。Host dependencies の上限は 1200 秒、共通準備全体は 90 分。Python は `requirements.txt`。FD イメージは `tools/mkfat12.py` (純 Python) なので mtools は要らない |
-| 上限 | 配布物・各検査シャードとも `timeout-minutes: 150` |
-
-- 次の実行から全シャードを標準に戻すには、リポジトリ変数 `OS32_SELFHOST_SHARDS` を `[]` にする。未設定・空でもすべて標準になる。
-- **今の値は `[]` (2026-11-23 から)**: ユーザーが ci-server を止める前に変えた (ユーザー決定 2026-11-23「変えて」)。ci-server を起こし直したら、ユーザーに確かめて `[4]` に戻す。止めている間の遅れの見込みは、組 4 が標準の runner に移るだけで 1 本の時はほぼ変わらず、枝が重なる時に待ちが数分延びる程度 (11-23 の実測: 自前の組 4 は約 12 分、標準の組は 12〜19 分)。
-- 自前の runner を待っている実行は取り消し、取り消しの完了を待つ。
-- 同じ実行を回し直すと、変数の値にかかわらず全シャードが標準で動く。
-- 変数は数の JSON 配列 (`[]` か `[4]` のような形) だけにする。壊れた JSON は、信頼された push の checks の 6 本を全部赤にする。配列でない値 (`14` など) は文字列の部分一致になり、意図しないシャードが自前に乗る。
-- 自前の runner が止まっていると、そのシャードは GitHub の側で queued のまま待ち、自動では標準に戻らない (待ちは timeout-minutes に数えない)。queued が 10 分を越えたら、変数を `[]` に戻して取り消し・回し直す (スキル os32-ci-read)。
-
-**成果物** (artifact 名 `os32-<ブランチ名の / を - に>-<sha7>-a<attempt>`、保持 30 日):
-
-| ファイル | 中身 |
-|---|---|
-| `os32_boot.d88` / `os32_boot.img` | 2HD 1232KB の起動 FD (D88 / 生イメージ) |
-| `os32_boot144.img` | 1.44MB の起動 FD (生イメージ、[boot_fat「落とし穴」](design/boot/boot_fat.md#落とし穴)) |
-| `os32_install.iso` | インストール ISO |
-| `packages/*.PKG` | パッケージ |
-| `vmkernel.lz4` / `kernel.map` | カーネルとシンボル (kselftest の番地はこの map で引く) |
-| `hostdrv.tar.gz` | 同じ build の HostDrv 一式 (`hostdrv/`、hsync の名札 `.deploy/manifest.txt` を含む)。SerialFS の配備元 |
-| `deploy-set.json` / `generations-manifest.json` (生成済みなら) | 配備期待集合 (各ファイルの SHA-256) と世代表 |
-| `BUILD_INFO.txt` / `SHA256SUMS` | コミット・ref・日時・run の URL・gcc / rustc の版・各ファイルのサイズと sha256。同じ build の照合結果 (両 FD 内のカーネルと HostDrv の SHA-256 一致、D88 と生像の一致、`deploy_source_check --deploy-set` の rc=0) を記録し、不一致なら CI は失敗 (`tools/ci_fetch.sh` が読む) |
-
-os32 の `build.yml` にあった埋め込み commit id の照合、tag → Release の job は
-最小構成に含めていない (要るときに足す)。
-
-**実機ホスト側の取り方** — `tools/ci_fetch.sh` (要 `gh`、`gh auth login` を 1 回。
-public repo でも artifact の API ダウンロードには認証が要る):
-
-```bash
-tools/ci_fetch.sh                       # main の最新 run (既定 --repo ske-studio/os32-v3)
-tools/ci_fetch.sh --branch wt/ci
-tools/ci_fetch.sh --sha 0a5247f         # そのコミットの run (短縮 SHA 可)
-tools/ci_fetch.sh --sha 0a5247f --wait  # VERIFIED を待つ
-tools/ci_fetch.sh --dry-run             # 選ばれる run と artifact を表示するだけ
-```
-
-指定 SHA またはブランチの最新 restructure-build run と最新 attempt を選び、既定は VERIFIED から取得する。
-実機調査用は `--allow-built` で BUILT から取得できる。両機種の受入を照合する場合は `--evidence JSON` で ACCEPTED を表示する。
-指定状態に届かなければ終了 1。`--wait` は run の完了まで 10 秒ごとに照会する。
-
-保存先は `./os32-ci/<artifact 名>/` (`--dir` で変更)。取得後に `BUILD_INFO.txt` を表示し、
-`SHA256SUMS` で全ファイルを照合する (不一致は終了 1、`gh` が無い / 未認証は終了 2)。
-
-**R7 の更新準備**: `ci_fetch.sh --sha <対象 SHA>` → SHA-256 照合成功を確認 →
-取得先で `tar -xzf hostdrv.tar.gz` → ソース木の `python3 tools/deploy_source_check.py
---root <取得先>/hostdrv --deploy-set <取得先>/deploy-set.json` が rc=0 になることを確認 →
-同じ取得先の `os32_boot.img` (2HD 生) の FD への書込みは**ユーザー自身**が行う (ノートの USB FDD、2026-10-11 決定) →
-`tools/rshell_serial.py` の `--serve-host <取得先>/hostdrv` で SerialFS に渡す。配備元は取得先に展開した `hostdrv/`
-をそのまま使い、作業場の `C:\os32` は使わない (名札外のファイルが常にある)。実機のそのほかの物理操作は個別承認。
-新 FD からの 2 段同期 (U3 の修正版 B — 新 FD 起動 + 全体同期と `/sys` 同期を別々に): 新 FD で起動 (HDD の hsync は使わない) → `hsync --root /hd0 --no-backup` (全体、`/sys` は除外される) → `hsync --root /hd0 sys` → 両方を `--verify` で変更 0 件・errors 0。同期の前に配備元の名札照合 (`deploy_source_check.py`)、同期の後に HDD 側の余剰照合 (シリアルの `ls -R`) を行い、1 件でも欠け・不一致・余剰があれば HDD 起動しない。準備・復旧・予行を含む 0〜7 の全手順は詳細設計 `~/os32-tmp/run/h/T2H_DESIGN.md` §3-4 (リポジトリ外)。
-**再起動と再同期** (R7 の教訓、2026-10-14 反省会): 実機の再起動は rshell の `reboot` (シリアル) で行う — 本体のリセットボタンが効かないことがあった。起動待ちは出力の待ち受け (`wait_text` の類) で 1 回だけ待ち、`ver` を連打しない (連打がリセット直後の起動を邪魔した)。
-
-> ⚠️ artifact は「ビルドが通った」ことしか保証しない。NP21/W でも実機でも起動していない
-> ([V4])。実機へ入れたら kselftest の値を**その artifact の `kernel.map`** の番地で読む。
 
 ### CPU・機種のビルド選択
 

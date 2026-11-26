@@ -13,10 +13,10 @@
 /*    - 割込み文脈 (ISR の kprintf) からも積めるよう IF を退避する           */
 /*      (sys/kern/console/con_sink.c と同じ書き方)。                                  */
 /*    - 書き出しの手順は BootlogFsOps 越しで、偽の VFS で試験できる          */
-/*      (tools/tests/bootlog_host.c)。                                     */
+/*      (bootlog_host.c (旧版 baae69e11824))。                                     */
 /*                                                                          */
 /*  純粋な部分は sys/kern/init/bootlog.c、VFS と版情報へ結ぶのは                  */
-/*  sys/kern/init/bootlog_save.c。記録: tools/tests/bootlog_tdd.md                 */
+/*  sys/kern/init/bootlog_save.c。記録: bootlog_tdd.md (旧版 89cd41173e6a)                 */
 /* ======================================================================== */
 
 #ifndef __BOOTLOG_H
@@ -54,7 +54,7 @@
  *   - write: **FS ごとに違う** — ext2 は成功で 0 (sys/fs/ext2/ext2_vfs.c の
  *     ext2_to_vfs_err)、FAT は書いたバイト数 (sys/fs/fat/fatfs_vfs.c の f_write の bw、
  *     f_close の失敗は負)。判定は bootlog_write_ok が種別で揃える。
- *     偽の VFS (tools/tests/bootlog_host.c) も種別ごとにこの生の値を返す。 */
+ *     偽の VFS (bootlog_host.c (旧版 baae69e11824)) も種別ごとにこの生の値を返す。 */
 typedef struct {
     int (*mkdir)(const char *path);
     int (*rm)(const char *path);

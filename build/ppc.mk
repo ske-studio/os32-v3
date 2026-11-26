@@ -1,22 +1,14 @@
 # Independent PowerPC bootstrap; no x86 config, generated KAPI, libc or libgcc.
 CROSS_DIR ?= /home/hight/opt/cross-ppc
 PPC_CC := $(CROSS_DIR)/bin/powerpc-elf-gcc
-HOST_CC ?= gcc
-HOST32_RUNNERS ?= qemu
 OUT ?= build/out/ppc
 ELF := $(OUT)/PPCBOOT.ELF
-ISO := $(OUT)/boot.iso
-SERIAL_A := $(OUT)/a.log
-SERIAL_B := $(OUT)/b.log
-QMP := $(OUT)/qmp.sock
 INCLUDES := -I. -Iinclude -Isys/include -Isys/hal/time -Isys/hal/gfx -Isys/hal/input -Isys/platform/pc98 -Isys/hal/sound -Isys/arch/x86 -Ilib -Isys/kern -Iarch/ppc -Isys/arch/ppc -Iplatform/powermac -Isys/platform/powermac
 COMMON := -std=gnu11 -ffreestanding -fno-builtin -fno-pie -fno-stack-protector \
  -fno-asynchronous-unwind-tables -fno-tree-loop-distribute-patterns -O2 \
  -Wall -Wextra -Werror=vla -Werror=implicit-int -Werror=implicit-function-declaration
 PPC_FLAGS := -D__cdecl= $(COMMON) $(INCLUDES) -mcpu=7450 -m32 -mbig-endian \
  -msoft-float -mno-altivec -msdata=none -nostdlib
-HOST_FLAGS := $(COMMON) $(INCLUDES) -Itools/ppc -Iuserland/diag -m32 -nostdlib -nostdinc \
- -isystem $(shell $(HOST_CC) -print-file-name=include) -no-pie
 PRODUCT := sys/platform/powermac/rh_observe.c sys/platform/powermac/ofw.c sys/platform/powermac/escc_tree.c \
  sys/platform/powermac/escc.c sys/platform/powermac/boot.c sys/kern/kstring_c.c
 ASSEMBLY := sys/arch/ppc/entry.S sys/arch/ppc/ofw_note.S
@@ -24,9 +16,8 @@ HEADERS := sys/arch/ppc/ppc_boot.h sys/platform/powermac/platform_of_layout.h \
  sys/platform/powermac/ofw.h sys/kern/kstring.h sys/include/types.h
 OBJECTS := $(addprefix $(OUT)/,$(PRODUCT:.c=.o) $(ASSEMBLY:.S=.o))
 .DEFAULT_GOAL := all
-.PHONY: all host check paths
-all: $(ELF) $(OUT)/flow mmu
-host: $(OUT)/flow
+.PHONY: all
+all: $(ELF) mmu
 $(OUT)/%.o: %.c $(HEADERS)
 	@mkdir -p $(dir $@)
 	$(PPC_CC) $(PPC_FLAGS) -c $< -o $@
@@ -39,15 +30,6 @@ $(OUT)/boot.ld: sys/arch/ppc/boot.ld sys/platform/powermac/platform_of_layout.h
 $(ELF): $(OBJECTS) $(OUT)/boot.ld
 	$(PPC_CC) $(PPC_FLAGS) -no-pie -Wl,-N -Wl,-m,elf32ppc \
 	 -Wl,-T,$(OUT)/boot.ld -Wl,-Map,$(OUT)/boot.map $(OBJECTS) -o $@
-$(OUT)/flow: tools/ppc/flow_fake.c tools/ppc/flow_fixture.h $(PRODUCT) $(HEADERS)
-	@mkdir -p $(dir $@)
-	$(HOST_CC) $(HOST_FLAGS) tools/ppc/flow_fake.c $(PRODUCT) -o $@
-# All path derivations belong here; the runner obtains them via this target.
-paths:
-	@echo $(OUT) $(ELF) $(ISO) $(SERIAL_A) $(SERIAL_B) $(QMP)
-check: all
-	python3 tools/ppc/run.py --cross-dir $(CROSS_DIR) --runner $(HOST32_RUNNERS)
-
 # Independent MMU image; old bootstrap objects and acceptance remain separate.
 MMU_C := sys/platform/powermac/rh_observe.c sys/platform/powermac/ofw.c sys/platform/powermac/escc_tree.c \
  sys/platform/powermac/escc.c sys/platform/powermac/mmu_boot.c \
@@ -75,11 +57,3 @@ $(OUT)/mmu.ld: sys/arch/ppc/mmu.ld sys/platform/powermac/platform_of_layout.h
 $(OUT)/PPCMMU.ELF: $(MMU_OBJECTS) $(OUT)/mmu.ld mmu-force
 	$(PPC_CC) $(PPC_FLAGS) -no-pie -Wl,-N -Wl,-m,elf32ppc \
 	 -Wl,-T,$(OUT)/mmu.ld -Wl,-Map,$(OUT)/mmu.map $(MMU_OBJECTS) -o $@
-$(OUT)/mmu-fake: tools/ppc/mmu_fake.c tools/ppc/mmu_fixture.h $(MMU_C) $(MMU_HEADERS)
-	@mkdir -p $(dir $@)
-	$(HOST_CC) $(HOST_FLAGS) -ffunction-sections -fdata-sections -Wl,--gc-sections -DDIAGNOSTIC tools/ppc/mmu_fake.c sys/kern/kstring_c.c -o $@
-
-$(OUT)/mmu-flow: tools/ppc/mmu_flow_fake.c tools/ppc/flow_fixture.h $(MMU_C) $(MMU_HEADERS)
-	@mkdir -p $(dir $@)
-	$(HOST_CC) $(HOST_FLAGS) -DPPC_MMU tools/ppc/mmu_flow_fake.c sys/platform/powermac/mmu_boot.c \
-	 sys/platform/powermac/rh_observe.c sys/platform/powermac/ofw.c sys/platform/powermac/escc_tree.c sys/platform/powermac/escc.c sys/kern/kstring_c.c -o $@

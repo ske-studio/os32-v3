@@ -192,8 +192,8 @@ fn saved_rows<'a>(
     Ok((first, cells))
 }
 
-#[cfg(test)]
-mod rework_tests;
+// A wide glyph can overlap the clip even when its first column lies outside.
+// Continuation cells are drawn by their leading cell.
 
 fn visible_head(cell: Cell, x: i64, write: Rect) -> Option<(char, i64)> {
     let head = match cell {

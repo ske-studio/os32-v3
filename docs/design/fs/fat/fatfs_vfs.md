@@ -53,4 +53,4 @@ VFS close から backend への通知は増やさない。
 
 ## 検査
 
-`vfs-mount-dev-host` の中の `tools/tests/test_fatfs_stat.py` (本体 `tools/tests/fatfs_stat_host.c`)。実物の `sys/fs/fat/fatfs_vfs.c` を `#include` し、FatFs の関数だけを贋物にする (`f_stat` は次の `FRESULT` を返す、`f_readdir` は台本を 1 段ずつ返す)。stat の写像 7 件と列挙 4 件。実 FatFs が 8.3 に収まらない名前で `FR_INVALID_NAME` を返すことは贋物で仮定している。
+`vfs-mount-dev-host` の中の `test_fatfs_stat.py (旧版 51782cbfbbe1)` (本体 `fatfs_stat_host.c (旧版 9e89b11af4a2)`)。実物の `sys/fs/fat/fatfs_vfs.c` を `#include` し、FatFs の関数だけを贋物にする (`f_stat` は次の `FRESULT` を返す、`f_readdir` は台本を 1 段ずつ返す)。stat の写像 7 件と列挙 4 件。実 FatFs が 8.3 に収まらない名前で `FR_INVALID_NAME` を返すことは贋物で仮定している。

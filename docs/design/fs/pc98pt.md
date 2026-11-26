@@ -46,5 +46,5 @@ Python の `make_os32` は同じ入力 (誤りを含む) で 1 バイトも違�
 
 ## 確かめ
 
-`make check-hdd-stage1-host` (`tools/tests/test_hdd_stage1.py`) のケース `pt_offsets`・`pt_817`・`pt_1663`・`pt_reject` と、
+`make check-hdd-stage1-host` (`test_hdd_stage1.py (旧版 6201b26bccf0)`) のケース `pt_offsets`・`pt_817`・`pt_1663`・`pt_reject` と、
 C と Python の突き合わせ。

@@ -2,7 +2,7 @@
 > 状態: **現行 (2026-11-18)** — 出所: TASK_FSTAT_REDIR の契約を今のソースと照らして要約
 ソース: `sys/fs/vfs_fd.c` (`vfs_fstat`・`vfs_isatty`)・`sys/fs/fd_redirect.c` (`fd_redirect_ifmt`・`fd_is_redirected`)
 
-試験は `tools/tests/fstat_redir_host.c` (実物の `sys/fs/vfs.c`・`sys/fs/vfs_fd.c`・`sys/fs/fd_redirect.c` を取り込む) と、
+試験は `fstat_redir_host.c (旧版 80c520c5f4bd)` (実物の `sys/fs/vfs.c`・`sys/fs/vfs_fd.c`・`sys/fs/fd_redirect.c` を取り込む) と、
 ゲスト側の `userland/diag/stat_t.c`。
 
 ## 1. 判定の管理元は 1 本 ([C4])
@@ -17,7 +17,7 @@
 
 `vfs_isatty`・`vfs_fstat`・`fd_is_redirected` の 3 つとも、これから導く。`isatty` / `fstat` が
 `fd_is_redirected` を直に見たり、別々に判定したりしない (2 か所で判定すると食い違う)。
-`tools/tests/test_fstat_redir.py` の `check_single_source()` がこの形を静的に見張る。
+`test_fstat_redir.py (旧版 d5335b145884)` の `check_single_source()` がこの形を静的に見張る。
 
 ## 2. 契約
 

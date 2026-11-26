@@ -1,4 +1,4 @@
-# tools/tests/ide_pio_host.c — IDE ポート模型
+# ide_pio_host.c (旧版 bfdac7b758dc) — IDE ポート模型
 
 > 状態: **現行 (2026-10-31)**
 
@@ -14,7 +14,7 @@ IDENTIFY の語で LBA28／現在 CHS／既定 CHS／SASI を設定する。
 - 相間の古い DRQ と BSY+DRQ で転送しない。READ ERR+DRQ は読み捨て、WRITE は送らない。
 - 途中失敗で後続チャンクと再試行を止め、次要求の BSY 待ち上限と idle 復帰後の内容を確認。
 
-実行は [test_ide_pio.py](test_ide_pio.md) (`python3 -B tools/tests/test_ide_pio.py`)。
+実行は [test_ide_pio.py](test_ide_pio.md) (旧手順（eaf9914fd665 の記録）)。
 `--mutate` は未変更コピーの成功を先に確認し、製品 inc の意味変異を組んで
 実行時 assertion による RED を要求する。コンパイル失敗や signal は kill と数えない。
 CHECK に製品・inc・shim・試験入力を宣言する。

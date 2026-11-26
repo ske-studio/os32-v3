@@ -15,7 +15,7 @@ IMAGES = {
                                  'kdebug', 'lan', 'pcm', 'sqlite-proto', 'trident', 'v86', 'usb')),
     'ppc-powermac': ('ppc', 'powermac', ('ppc-kboot', 'ppc-powermac')),
 }
-# 数えない場所: CI (tools/ppc/compile_ci.py の 4 像) が組まない像の置き場 (根の直下の shell・neg*)。
+# 数えない場所: 旧計測の 4 像に含まれない構成の置き場 (根の直下の shell・neg*)。
 SKIP_FIRST = {'ppc-kboot': ('shell', 'neg')}
 # include/ にある機種名のヘッダ -> (軸, 機種)。置き場を移したら行を消す。
 NAMED = {

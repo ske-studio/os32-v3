@@ -33,4 +33,4 @@
 
 ## 検査
 
-`tools/tests/test_kapi_out.py` (`make check-kapi-out`)。合成した最小の `kapi.json` で解釈と順序 (`interpretation`)・誤りごとの拒否と「何も書かない」(`refuse`)・実物の `sdk/kapi.json` が `--check-only` を通ること (`real`) を見る。`--mutate` は生成器の検査を写しで壊し、`refuse` が落ちることを見る。
+`test_kapi_out.py (旧版 015d6d7bdfe6)` (`make check-kapi-out`)。合成した最小の `kapi.json` で解釈と順序 (`interpretation`)・誤りごとの拒否と「何も書かない」(`refuse`)・実物の `sdk/kapi.json` が `--check-only` を通ること (`real`) を見る。`--mutate` は生成器の検査を写しで壊し、`refuse` が落ちることを見る。

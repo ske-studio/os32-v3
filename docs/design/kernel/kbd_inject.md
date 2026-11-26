@@ -46,4 +46,4 @@ GUI 中の打鍵の注入リング。GUI 中は IRQ1 が raw リングにしか�
 
 ## 検査
 
-`tools/tests/test_kbd_inject.py` (`kbd_inject_host.c`)。`sys/kern/kbd_inject.c` と `sys/kern/console/con_sink.c` を同じ翻訳単位に取り込み、読み手の確立は本物の `con_sink_read()` で行う。park・resume の側は `docs/design/exec/appslot_transition.md`。
+`test_kbd_inject.py (旧版 c3e98ca9f9e7)` (`kbd_inject_host.c`)。`sys/kern/kbd_inject.c` と `sys/kern/console/con_sink.c` を同じ翻訳単位に取り込み、読み手の確立は本物の `con_sink_read()` で行う。park・resume の側は `docs/design/exec/appslot_transition.md`。

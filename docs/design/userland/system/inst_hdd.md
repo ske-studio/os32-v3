@@ -57,7 +57,7 @@ cdinst (CD) と install (FD) が共有する、KAPI で hd0 (= DA 80h だけ、H
 
 ## 確かめ
 
-`make check-hdd-stage2-host` (`tools/tests/test_hdd_stage2.py`) の `cdinst_host.c` と `install_fresh_host.c` のケース
+`make check-hdd-stage2-host` (`test_hdd_stage2.py (旧版 f26dff44ab09)`) の `cdinst_host.c` と `install_fresh_host.c` のケース
 (`modes`・`preflight`・`incomplete`・`erase`・`erase_fail`・`erase_mount`・`keys` ほか)。贋の鍵は長さ付きのバイト列 (NUL も
 1 バイト) で、鍵を渡すたびに write・format・umount が 0 回であることを見る。
 

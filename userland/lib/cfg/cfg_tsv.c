@@ -2,7 +2,7 @@
 /*  CFG_TSV.C — settings.tsv の最小 reader (純関数、票 §1-7d)               */
 /*                                                                          */
 /*  tools/mk_settings_db.py の parse_tsv と**同じ規則**で読む。判定が一致    */
-/*  することは tools/tests/test_cfg.py が同じ fixture を両方へ通して固定する。*/
+/*  することは test_cfg.py (旧版 f84b12760091) が同じ fixture を両方へ通して固定する。*/
 /*                                                                          */
 /*  行長の上限を持たない: 1 バイトずつ引き取り、列ごとの上限 (scope 63 /     */
 /*  key 63 / type 4 / text 255B / blob 8192 文字 / int は先頭ゼロを畳んで    */

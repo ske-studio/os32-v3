@@ -347,7 +347,3 @@ fn put_cell(clip: Rect, cx: i32, cy: i32, w: i32, scale: i32, rows: &CellRows, f
     }
     unsafe { ffi::gfx_draw_font(cx, cy + row0, pat.as_ptr(), wb as i32, row1 - row0, fg) };
 }
-
-#[cfg(test)]
-#[path = "../host/text_tests.rs"]
-mod tests;

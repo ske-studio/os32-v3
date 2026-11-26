@@ -18,7 +18,7 @@
 - mm は案 D。管理 RAM は 16MiB に限定し geometry {15M,15M,16M,16M,16M}。HPT は 128KiB (allocator の外)。ESCC・MPIC の alias は device aperture の静的 PT の固定 offset。
 - trap は DR=0 で frame を作り、spill は real のまま。0x500 と fatal の MMIO は frame 完成後に DR=1 の I/G alias で触る。
 - MPIC は CPU0・TPR 0、配送試験は自己 IPI。decrementer は 1000Hz の周期加算型 (周期は platform が与える)。
-- 受入は新しい `tools/ppc/kboot_run.py`: 60 秒以内に `KBOOT` の 9 行が順に出て、READY の後に tick が TB と ±5% で継続 (7450・7455 の 2 回) と負試験。
+- 受入は新しい `kboot_run.py (旧版 3c4a2c5ec78d)`: 60 秒以内に `KBOOT` の 9 行が順に出て、READY の後に tick が TB と ±5% で継続 (7450・7455 の 2 回) と負試験。
 
 | 波 | 段 |
 |---|---|
@@ -56,12 +56,12 @@
 | H1 | 閉包の未解決の provider sys/arch/ppc/kboot_unavailable.c (ring3_call_from_user の 1 件) | (kbh) | 本体の link | 可 (H2・H3 と一緒に 3 回) |
 | H2 | 本体の初期化 sys/platform/powermac/ppc_kernel.c、probe sys/arch/ppc/kernel_probe.S | (kbh) | QEMU 7450/7455 | 同上 |
 | H3 | 本体の link build/targets/ppc-powermac.mk、監査 tools/ppc/kboot_audit.py、受入 tools/ppc/kboot_accept.py | (kbh) | 負像 2・製品の変異 10・監査の変異 4 | 同上 |
-| T4 | 回帰の入口 tools/ppc/kboot_all.py | (kbh) | 20/20 | PM が読んで着地 |
+| T4 | 回帰の入口 kboot_all.py (旧版 85377355faf2) | (kbh) | 20/20 | PM が読んで着地 |
 
 H1〜H3・T4 は統合の枝 wt/ppc-kbh (全段を 1 本にまとめた枝) にある。
 
 ## 3. 受入 (2026-11-10)
 
-合 — 証拠 ~/os32-tmp/evidence/2026-11-10/ppc-kboot/RESULT.md。入口は `make ARCH=ppc PLATFORM=powermac` と `python3 -B tools/ppc/kboot_accept.py --mutate`、回帰は `python3 -B tools/ppc/kboot_all.py --mutate`。x86 の生成物は main 2259debc と全一致 (build_compare)。
+合 — 証拠 ~/os32-tmp/evidence/2026-11-10/ppc-kboot/RESULT.md。入口は `make ARCH=ppc PLATFORM=powermac` と `python3 -B tools/ppc/kboot_accept.py --mutate`、回帰は 旧手順（3f7f9d4b6bfe の記録）。x86 の生成物は main 2259debc と全一致 (build_compare)。
 
 未確認・持越し: G4 実機 (PPC-KBOOT-RH)、E3 (本線の PCI IRQ の共通部の後)、16MiB を超える RAM と system の明示の予約、tick の単位 (PIT_HZ=100 の利用者は ② の閉包に無いことを監査で保証、③ の前に整合)、SHM の共有 USER の写像の trampoline (② は実行しない RO の 0 ページ、exec の段で差し替え)。次は決定 (c) の LAN (GMAC と Host Services)。

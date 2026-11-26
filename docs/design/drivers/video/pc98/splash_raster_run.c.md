@@ -32,5 +32,5 @@
 
 ## 検査
 
-- `tools/tests/test_splash_v2.py` (splash-v2-host): 残り 0・preview 不足・読み込みの超過・全 DROP・IF=0・NO_SYNC・tick の停止と wrap・fallback の残り時間を確かめる。DROP の無課金・期限の再起算は実行時 RED。
-- `tools/tests/test_splash_wire.py`: 起動の結線の中で使う。
+- `test_splash_v2.py (旧版 2443845d59b2)` (splash-v2-host): 残り 0・preview 不足・読み込みの超過・全 DROP・IF=0・NO_SYNC・tick の停止と wrap・fallback の残り時間を確かめる。DROP の無課金・期限の再起算は実行時 RED。
+- `test_splash_wire.py (旧版 1a5727f53cbf)`: 起動の結線の中で使う。

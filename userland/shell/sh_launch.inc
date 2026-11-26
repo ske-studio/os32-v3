@@ -6,7 +6,7 @@
  *  独立した .c にすると常駐 shell.bin のリンクにも空の .o が混ざるため
  *  (受入 S7 は常駐の SHA-256 一致)。
  *
- *  ホスト TDD (tools/tests/sh_launch_host.c) はこのファイルをそのまま
+ *  ホスト TDD (sh_launch_host.c (旧版 a8858fb9b295)) はこのファイルをそのまま
  *  #include して DONE / FAILED / STALE / FULL の 4 経路を見る — 模型ではなく
  *  出荷するソースそのもの。
  * ======================================================================== */
@@ -199,7 +199,7 @@ int sh_launch(const char *cmdline)
 #endif
 }
 
-/* sh_launch の**後ろ**に置く: tools/tests/sh_launch_host.c はこの .inc だけを
+/* sh_launch の**後ろ**に置く: sh_launch_host.c (旧版 a8858fb9b295) はこの .inc だけを
  * #include する (shell.h を通さない) ので、前に置くと宣言が無い。 */
 int sh_exec_result(const char *cmdline, int *kind, int *code)
 {

@@ -18,7 +18,7 @@
 #include "kprintf.h"
 
 /* ST0 のビット定義と判定は sys/dev/block/fdc_decide.h / .c にある
- * (I/O を引かずにホストで試験するため — tools/tests/fdc_seek_tdd.md)。 */
+ * (I/O を引かずにホストで試験するため — fdc_seek_tdd.md (旧版 59860ec05823))。 */
 #define FDC_DTL_UNUSED  0xFF    /* DTL未使用時の値 */
 
 /* 外部: tick_count (idt.c) */

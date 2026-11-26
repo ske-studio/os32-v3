@@ -33,7 +33,7 @@ metadata失敗後の逆書込み・解放や、失敗要求内の成功セクタ
 
 ## 検証と落とし穴
 
-`tools/tests/test_ext2_write_run.py` は製品ext2とRAM Device模型で、新規/既存の
+`test_ext2_write_run.py (旧版 00fb0ce70f4c)` は製品ext2とRAM Device模型で、新規/既存の
 1/2/32/33/64本、非連続、表割当の隙間、端数RMWとゼロ埋め、65ブロックに触れる
 非整列64KiBの窓境界を検証する。D1を温めた書込み後の再read/statも確認する。
 各Device要求の前後と全512B境界に一過性/持続故障を注入し、失敗run全体の未計上・

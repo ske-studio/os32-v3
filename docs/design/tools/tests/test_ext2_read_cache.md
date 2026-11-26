@@ -1,4 +1,4 @@
-# tools/tests/test_ext2_read_cache.py — 読取回帰試験
+# test_ext2_read_cache.py (旧版 bcecce67a936) — 読取回帰試験
 
 > 状態: **現行 (2026-10-31)**
 
@@ -12,4 +12,4 @@ inode／表／データの key・hit・値コピー、連続区間と 32 制限�
 コンパイル失敗や runner の異常終了を kill に数えない。
 生／sector 読取の失敗と raw／sector／範囲書込の失効は、関数を含む一意な目印で
 呼出しごとに変異させ、assertion 直前の故障経路も照合する。
-実行は `python3 -B tools/tests/test_ext2_read_cache.py [--mutate]`。
+実行は 旧手順（961f253c5139 の記録）。

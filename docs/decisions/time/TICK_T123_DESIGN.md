@@ -182,22 +182,22 @@ static int pcm_tick_rescue_due(u32 pos, u32 rate, u32 margin_us);
 | B9 | 変更 build/kernel-objects.mk | 5 | B1、A6 と直列 |
 | C0 | 新 sys/dev/sound/cs4231/pcm_refill.h | 100 | 位置と純粋な閾値計算、static inline |
 | C1 | 変更 sys/dev/sound/cs4231/pcm_cs4231.c | 120 | C0、origin・延期判定・既存停止契約・診断 |
-| Q1a | 新 tools/tests/test_tick_tsc.py | 180 | A1〜A8（A5 除外）、CHECK・host32 runner・変異 |
-| Q1b | 新 tools/tests/tick_tsc_host.c | 360 | Q1a、libc なし校正・単調性模型 |
-| Q2a | 新 tools/tests/test_net_rx_work.py | 180 | B1〜B9（B7/B8 除外）、CHECK・runner・変異 |
-| Q2b | 新 tools/tests/net_rx_work_host.c | 360 | Q2a、割込み・残存・idle・e82557 模型 |
-| Q3a | 新 tools/tests/test_pcm_refill.py | 180 | C0/C1、CHECK・runner・変異 |
-| Q3b | 新 tools/tests/pcm_refill_host.c | 360 | Q3a、DMA・期限・コピー元模型 |
-| E1 | 変更 tools/tests/test_tick_budget.py | ≤100 | A4、予算単位・stub・anchor 付替え |
-| E2 | 変更 tools/tests/test_clock_caller.py | ≤100 | A3、PIT 専用口・保存復元 |
-| E3 | 変更 tools/tests/test_hostsvc_nic.py | ≤100 | B4、idle/service 結線 |
-| E4 | 変更 tools/tests/test_hostsvc_nic_rx.py | ≤100 | B3、有限 demux・take |
-| E5 | 変更 tools/tests/test_ne2k_bh.py | ≤100 | B6、早期 return 後の残存 |
-| E6 | 変更 tools/tests/test_ne2000_dma.py | ≤100 | B5/B6、batch・文脈 |
-| E7 | 変更 tools/tests/test_pcm_cs4231.py | ≤100 | C1、origin・延期・停止 |
-| E8 | 変更 tools/tests/test_pcm_e4.py | ≤100 | C1、close/reclaim 退行 |
-| E9 | 変更 tools/tests/test_net_link.py | ≤100 | B4、link_due・e82557 |
-| E10 | 変更 tools/tests/test_hostsvc_sfs_lan.py | ≤100 | B3/B4、SFS/LINK 退行 |
+| Q1a | 新 test_tick_tsc.py (旧版 51856afdd05b) | 180 | A1〜A8（A5 除外）、CHECK・host32 runner・変異 |
+| Q1b | 新 tick_tsc_host.c (旧版 36d45be01857) | 360 | Q1a、libc なし校正・単調性模型 |
+| Q2a | 新 test_net_rx_work.py (旧版 47db1a88be65) | 180 | B1〜B9（B7/B8 除外）、CHECK・runner・変異 |
+| Q2b | 新 net_rx_work_host.c (旧版 0d7823568fbf) | 360 | Q2a、割込み・残存・idle・e82557 模型 |
+| Q3a | 新 test_pcm_refill.py (旧版 aadecf802127) | 180 | C0/C1、CHECK・runner・変異 |
+| Q3b | 新 pcm_refill_host.c (旧版 6464c76bffc6) | 360 | Q3a、DMA・期限・コピー元模型 |
+| E1 | 変更 test_tick_budget.py (旧版 b1f52bbc080b) | ≤100 | A4、予算単位・stub・anchor 付替え |
+| E2 | 変更 test_clock_caller.py (旧版 3affd3901cf4) | ≤100 | A3、PIT 専用口・保存復元 |
+| E3 | 変更 test_hostsvc_nic.py (旧版 144988ea1d46) | ≤100 | B4、idle/service 結線 |
+| E4 | 変更 test_hostsvc_nic_rx.py (旧版 1aa9453dc8ec) | ≤100 | B3、有限 demux・take |
+| E5 | 変更 test_ne2k_bh.py (旧版 e2fc5c9980e1) | ≤100 | B6、早期 return 後の残存 |
+| E6 | 変更 test_ne2000_dma.py (旧版 6c32586ebf0a) | ≤100 | B5/B6、batch・文脈 |
+| E7 | 変更 test_pcm_cs4231.py (旧版 8806077bde45) | ≤100 | C1、origin・延期・停止 |
+| E8 | 変更 test_pcm_e4.py (旧版 36a81d2e03fb) | ≤100 | C1、close/reclaim 退行 |
+| E9 | 変更 test_net_link.py (旧版 5bc3c6ced683) | ≤100 | B4、link_due・e82557 |
+| E10 | 変更 test_hostsvc_sfs_lan.py (旧版 99fa3fb9b454) | ≤100 | B3/B4、SFS/LINK 退行 |
 
 - 大段 T1/T2/T3 を一括で 1 人に渡さない。A0/B0/C0 の契約確定後、A・B・C の実装は並列可。A6/B9 と A2/A7 は同一ファイルなので直列。実装開始は本設計のレビュー後。
 - E1〜E10 が参照する既存 host C に stub/期待値の修正が必要なら、各 C を独立した追補段（1 ファイル・≤200 行）として割当し、Python に C harness を埋め込まない。新規は test_tick_clock.py と同じ host32 の libc なし構成とする。
@@ -266,7 +266,7 @@ PACK3 の T1/T2/T3 報告に対する追補。本節は §2 の欠落窓、§3 �
 - net_jiffy は net_tick の後に上記を判定し、ticking を保持して有限 demux、次に link_tick を実行する。IRQ 救済から IF=1 専用 net_rx_service を呼ばず、共通の有限 demux を IF=0 のまま呼ぶ。既存 tick_budget の RX 当番と 8 frame/120µs の小さい側を上限にし、当番の予算終了時は受信を進めず pending を残す。link_tick/link_due の既存契約は維持する。NE2K はこの例外の対象外。
 - 到達可能な非救済対照は「bind/idle 巡回から 1 ジフィ」「協調 service が ticking を保持中」「RX 当番予算切れ」「NE2K」。2 ジフィ・idle 未巡回・空列も有効な救済経路で、recv が AGAIN、copy/demux frame 数 0 を検証する。CPU を回し続けるアプリで e82557 の link が落ちないという N1 の実機受入は変更しない。
 - Q2a/Q2b の N1 変異「pending の検査を消す」は廃止する。代わりに「ジフィ閾値を常時成立」「RX 当番予算検査を削除」「e82557 限定を削除」を別々に RED とする。pending の有無を人為的に操作して到達不能な対照を作らない。年齢 1/2 ジフィ、idle 復帰、空列、連続到着と予算切れ残存を実際の wrapper/idle 経路から試す。
-- §6 の追補段 **E3c** を割り当てる: `tools/tests/hostsvc_nic_host.c` だけ、変更 ≤200 行、B4/E3 に依存。登録 callback は net_jiffy とし、通常 demux は IF=1・depth=0、N1 の e82557 救済だけ IF=0 と区別して検査する。callback==net_tick と一律 IF=0 demux の旧期待を置き換え、wrapper の link_tick、再入、登録失敗、unbind の既存検査を残す。E3 の Python はこの C を CHECK 入力に含め、C harness を埋め込まない。
+- §6 の追補段 **E3c** を割り当てる: `hostsvc_nic_host.c (旧版 fbeb1c91b642)` だけ、変更 ≤200 行、B4/E3 に依存。登録 callback は net_jiffy とし、通常 demux は IF=1・depth=0、N1 の e82557 救済だけ IF=0 と区別して検査する。callback==net_tick と一律 IF=0 demux の旧期待を置き換え、wrapper の link_tick、再入、登録失敗、unbind の既存検査を残す。E3 の Python はこの C を CHECK 入力に含め、C harness を埋め込まない。
 
 ### T3: 512 frame を残して救済する
 

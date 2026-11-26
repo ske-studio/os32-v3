@@ -88,7 +88,7 @@
 /* コピー先が /etc/settings.db* かを字句で見る純関数 (票 S0-D / D0)。
  * HostDrv に古い settings.db が残っていても NHD の本体を切り詰めない。
  * 実体は userland/system/hsync_protect.inc、ホスト試験は
- * tools/tests/test_hsync_protect.py。 */
+ * test_hsync_protect.py (旧版 120342cd6a70)。 */
 #include "hsync_protect.inc"
 
 /* CRC-32 のストリーム核 (カーネルと共用、票 H1 / 設計書 §4.1)。
@@ -98,7 +98,7 @@
 #include "sys/kern/exec/os32x_hdr.c"
 
 /* `/boot/vmkernel.old` を作ってよいかの純規則 (票 TASK_SERIAL_HOSTFS §1-v3)。
- * ホスト試験は tools/tests/test_serialfs.py (hsync_bootold)。 */
+ * ホスト試験は test_serialfs.py (旧版 3080b693e474) (hsync_bootold)。 */
 #include "hsync_bootold.inc"
 
 /* コピーは 64KB 単位。比較はその 64KB を 32KB x 2 に割って使う
@@ -180,7 +180,7 @@
 #define HR_ROOT_STAT_FAIL "root_stat_failed" /* --root の根を stat できない (I/O 失敗・NOMOUNT) */
 
 /* ext2 のルート inode 番号。**sys/fs/ext2/ext2.h の EXT2_ROOT_INO が正典**で、外部
- * プログラムからは引けないので写しを置く (ずれは tools/tests/test_hsync_h2.py
+ * プログラムからは引けないので写しを置く (ずれは test_hsync_h2.py (旧版 778035c73934)
  * が両方を読んで突き合わせる、[C4])。
  *
  * --root の根が ext2 かを**KAPI を足さずに**確かめる印に使う: VFS はマウントの
@@ -199,7 +199,7 @@
 
 /* VFS が 1 パスで扱える要素数。**sys/fs/vfs.h の VFS_MAX_PATH_DEPTH が正典**で、
  * 外部プログラムからはそのヘッダを引けないので写しを置く。ずれの検出は
- * tools/tests/test_hsync_h1.py が両方を読んで突き合わせる ([C4])。
+ * test_hsync_h1.py (旧版 5528cf72894a) が両方を読んで突き合わせる ([C4])。
  *
  * sys/fs/vfs.c の正規化は上限を越えた要素を**黙って捨てる** (エラーを返さない)。
  * `/host` を前置すると同期元は指定より 1 要素深くなるので、32 要素ちょうどの

@@ -10,7 +10,7 @@ record でも ID/BAR/legacy/範囲/route/セル/バス失敗は止める。必�
 - **必須照合と観測**: 書込み後の全レジスタを必須照合すると、読戻し値が異なる箇所で停止し、残りを調べられない。
   `sys/dev/video/geforce/diag/gfinit_plan_c.c` はルールに verify mask を持たせ、必須 CHECK と記録を区別する。
   診断では `--verify record|required` と実行時の除外ファイルを選べる (`userland/shell/cmd_gfinit.c`)。
-  除外は実際に読戻しを保証できない範囲に限り、`tools/tests/gfinit_plan_c_host.c` で計画の照合を検査する。
+  除外は実際に読戻しを保証できない範囲に限り、`gfinit_plan_c_host.c (旧版 70d661a27cd2)` で計画の照合を検査する。
 
 ## GF6200_4C_DESIGN
 

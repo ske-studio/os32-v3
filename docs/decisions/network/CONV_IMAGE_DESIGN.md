@@ -171,9 +171,9 @@ int os32_host_image_release(Os32ImageInfo *image, u32 timeout);
 | B3 | 新 userland/lib/host/host_image_copy.c | 面コピー/palette lease補助、B2、既存HALのみ |
 | B5 | 新 sdk/rust/os32api/src/host_image.rs | C相当の用途別API、共通host.rs上、B1と契約一致 |
 | B6 | 改 sdk/rust/os32api/src/lib.rs | module公開、B5 |
-| T1 | 新 tools/tests/test_host_image.py | host golden/実行時変異、自身のCHECKに全入力、A1～A7 |
-| T2 | 新 tools/tests/host_image_sdk.c | C89とSDK fake transport/面guard検証、B1～B3 |
-| T3 | 新 tools/tests/test_host_image_sdk.py | T2ビルド・qemu実行・変異・CHECK、T2 |
+| T1 | 新 tests/userland/host_image.py | host golden/実行時変異、自身のCHECKに全入力、A1～A7 |
+| T2 | 新 tests/support/fixtures/host_image_sdk.c | C89とSDK fake transport/面guard検証、B1～B3 |
+| T3 | 新 tests/userland/host_image_sdk.py | T2ビルド・qemu実行・変異・CHECK、T2 |
 | T4 | 新 userland/tests/host_image_test.c | NP21/W/実機で取得→表示→復帰、B2/B3 |
 | D1 | 改 docs/archive/network/NET_HOSTSVC_DESIGN.md | 採用後にサービス境界・受入結果を反映、全段後 |
 - B4は不要: build/libs.mkがuserland/lib/host/*.cをwildcard収集する。

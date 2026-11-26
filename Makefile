@@ -24,10 +24,6 @@
 #  既定で CPU の数だけ並べる。実測 (16 コア): kernel 23.7 秒 → 11.8 秒、
 #  all 70.1 秒 → 31.0 秒。`make -j1` と書けば従来どおり逐次になる。
 #
-#  `make check` も並列で回る。変異試験は一時ディレクトリの写しの木に変異を
-#  当てる作り (tools/tests/mutpar.py) で、実物のソースは読むだけ。以前は
-#  実物を書き換えて戻す試験を 2 段目 (-j1) に分けていた (2026-09-26 に解消、
-#  docs/08_build.md・票 docs/archive/tools/TASK_CHECK_MUT_PARALLEL.md §5)。
 # ----------------------------------------------------------------------------
 OS32_NPROC := $(shell nproc 2>/dev/null || echo 1)
 ifeq ($(filter -j%,$(MAKEFLAGS)),)
@@ -53,21 +49,11 @@ include build/abi_contract.mk
 
 # The bootstrap remains independent; always forward its own cross directory.
 PPC_CROSS_DIR ?= /home/hight/opt/cross-ppc
-.PHONY: ppc-boot ppc-boot-check
+.PHONY: ppc-boot
 ppc-boot:
 	$(MAKE) --no-print-directory -j1 -f build/ppc.mk CROSS_DIR=$(PPC_CROSS_DIR) all
-ppc-boot-check:
-	$(MAKE) --no-print-directory -j1 -f build/ppc.mk CROSS_DIR=$(PPC_CROSS_DIR) check
-
-# Stage 1 PPC image prerequisite; local toolchains remain optional.
-.PHONY: ppc-ci-image
-ppc-ci-image:
-	PPC_CROSS_DIR="$(PPC_CROSS_DIR)" python3 -B tools/ppc/compile_ci.py
-
 # ドキュメントを Windows 側 (C:\WATCOM\docs\os32) へミラー / 逆方向は tools/sync_hwdocs.sh
-.PHONY: docs-gen tests-inventory docs-win
-tests-inventory:
-	python3 tools/gen_tests_inventory.py --write
+.PHONY: docs-gen docs-win
 
 docs-gen:
 	python3 tools/gen_memmap.py --write

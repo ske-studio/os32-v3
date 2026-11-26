@@ -1,6 +1,6 @@
 /* cmd_recover.c — `recover status` / `recover now <session>` (realhw_recover T3)、
  * `recover virtual begin|step|end` (T4b)。kdebug_call の私有 op (sys/kern/kdebug/recover_wire.h)
- * で状態を読み、now は指定 session の復旧を頼む。ホスト側: tools/rshell_recover.py。試験: tools/tests/recover_cli_host.c */
+ * で状態を読み、now は指定 session の復旧を頼む。ホスト側: tools/rshell_recover.py。試験: recover_cli_host.c (旧版 1804a196c065) */
 #include "shell.h"
 #include "../../sys/kern/kdebug/recover_wire.h"
 

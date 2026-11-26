@@ -203,7 +203,7 @@ T5最終一式 (`846dbeb`) の入口はVK32圧縮像220,607B、core raw 362,288B
 
 ### 3-2. 試験の実行と判定
 
-変異は実ソースの復元・検証を1箇所ずつ欠かし、正常対照GREEN→意図した観測のREDを対応づける。ビルド失敗は検出成功に数えない。font readerはhost破損corpus/上限±1とguest実I/Oの両方、V86は `check-v86-gcap-host`・T2のrecovery/lifecycle/SHM/surface試験を改訂して使う (`TASK_DBGREF.md:271-277`)。最後の変更後に選択した変異・静的検査を実行し、受入像のSHA/CRC/実行rc/観測前後値/画像の所在をRESULTへ残す。新しい採取手順は `tools/accept/`、恒久的な診断の本文は増やさない。
+変異は実ソースの復元・検証を1箇所ずつ欠かし、正常対照GREEN→意図した観測のREDを対応づける。ビルド失敗は検出成功に数えない。font readerはhost破損corpus/上限±1とguest実I/Oの両方、V86は `check-v86-gcap-host`・T2のrecovery/lifecycle/SHM/surface試験を改訂して使う (`TASK_DBGREF.md:271-277`)。最後の変更後に選択した変異・静的検査を実行し、受入像のSHA/CRC/実行rc/観測前後値/画像の所在をRESULTへ残す。新しい採取手順は `旧手動受入`、恒久的な診断の本文は増やさない。
 
 DBGREF既定はKDEBUG=0、観測は対の `/boot/kdebug.bin` がRUNNINGかつpair CRC一致の像で行う (`TASK_DBGREF.md:6,370`)。基点ではgcap本体は `sys/platform/pc98/kdebug/v86_gcap.c` に移設済みで、coreの `sys/platform/pc98/legacy/v86_gcap.c` はops呼出し/NOSYSの受け口。OFF `v86 -g` はNOSYS・低位副作用0、ONは採取成功/中断を受け入れる。通常 `-t/-b/-d` と必須復元はOFFでも検証し、デバッグ部品不在を受入のSKIP成功にしない。
 

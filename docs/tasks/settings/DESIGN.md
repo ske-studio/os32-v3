@@ -174,7 +174,7 @@ gshell 起動
 - **hot journal は自動回復しない**。`cfg_open` は BUSY_RECOVERY を CORRUPT として扱い、get は既定値、set / begin は拒否する (`userland/lib/cfg/libos32cfg.c`)。
 - 回復は `install --recover-settings` だけが行う。残った journal は `.bak-journal` に写してから消し、切り替える。
 - **強制終了・電源断の耐性 (DELETE journal の回復) は保証しない (未検証)**。ゲストで確かめたのは「`cfg set` → ハードリセット → 値が残る」までで、強制終了の試験は別途承認した使い捨てイメージでだけ行う。
-- リカバリの失敗点の網羅はホスト試験 (`tools/tests/install_recover_host.c`) の範囲。
+- リカバリの失敗点の網羅はホスト試験 (`install_recover_host.c (旧版 e491db921901)`) の範囲。
 
 経緯: S2 `docs/archive/settings/TASK_S2.md`、S3 `docs/archive/settings/TASK_S3.md`。
 
@@ -200,7 +200,7 @@ tar c /hd0/backup/etc.tar /etc/settings.json /etc/system.cfg /etc/profile   # �
 - **tar**: `userland/cmds/tar.c` の `tar c ARCHIVE PATH...` / `tar x ARCHIVE [-C DIR]` (既定は `.`) / `tar t ARCHIVE` は実装済み。圧縮は持たず、外側で `lz4` を掛ける (`etc.tar.lz4`)。
   扱うのは通常ファイルとディレクトリ (再帰) だけ。所有者・時刻は保存しない (書庫では 0)。ustar の読み書きは `lib/microtar/` (MIT、改変点は `lib/microtar/README.OS32`)。
   名前は先頭の `/` を落として格納し、99B を超える名前は拒否して非ゼロ終了する。展開では `..` を含む名前と絶対パスを断る。
-  試験は `tools/tests/test_tar_cmd.py`。経緯と受入の記録: `docs/archive/settings/TASK_S6.md`。
+  試験は `test_tar_cmd.py (旧版 618d65bcfe4b)`。経緯と受入の記録: `docs/archive/settings/TASK_S6.md`。
 - リカバリモードとの関係: `install --recover-settings` はマスタ DB を戻す。バックアップからの
   復元は `cfg import` (通常運用) で、リカバリモードにも `--from <json|tar.lz4>` を足せる (S3 に含める)。
 - 自動バックアップ: 設定を書き戻すたびに JSON を出すのは重いので、**`install` / 大きな変更の

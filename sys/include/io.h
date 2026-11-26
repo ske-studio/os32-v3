@@ -23,7 +23,7 @@
 /*                                                                          */
 /*  カーネル側の C ソース (kernel/ drivers/ exec/ fs/ kapi/ lib/ net/ gfx/)  */
 /*  は hlt / cli / sti を直接 asm で書かない。ここの原始命令だけを使う。      */
-/*  番人は tools/check_arch_asm.py (make check)。                            */
+/*  番人は check_arch_asm.py (旧版 1426e1f3d889) (make check)。                            */
 /*                                                                          */
 /*  下の宣言に付いた註は「何を保証するか」の契約であって x86 の説明ではない。 */
 /*  別アーキテクチャへ移すときは、命令列ではなく **契約** を再現すること。    */

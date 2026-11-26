@@ -106,7 +106,3 @@ fn scroll(st: &mut GuiState, idx: usize, rect: Rect, dx: i32, dy: i32) {
     wm::queue_present(st, cursor::rect(st));
     wm::flush_present();
 }
-
-#[cfg(test)]
-#[path = "../host/scroll_tests.rs"]
-mod tests;

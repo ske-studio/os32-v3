@@ -3,7 +3,7 @@
 /*                                                                          */
 /*  方針と API は sys/include/bootlog.h。ここは I/O も VFS も触らない:           */
 /*  溜める・あふれを数える・書き出し用の 1 本を組む・書き出しの手順 (ops    */
-/*  越し)。ホスト試験 tools/tests/bootlog_host.c がこのファイルをそのまま    */
+/*  越し)。ホスト試験 bootlog_host.c (旧版 baae69e11824) がこのファイルをそのまま    */
 /*  #include する。VFS と版情報へ結ぶのは sys/kern/init/bootlog_save.c。           */
 /*                                                                          */
 /*  「リング」と呼んでいるが、先頭を残す方針なので実体は前から詰める 1 本の  */

@@ -18,7 +18,7 @@
 | P1 A7 | 「対向を止めるだけ」をやめ、再 HELLO が要る状態を作ってから期限を見る形に。LINK の期限切れの handle 解放・新 sid の読取・旧 FD の STALE を足した |
 | P1 scope の資格と回収 | scope に owner を記録し、end は開いた owner だけ、開いた owner の終了で scope だけ回収する (§2-2、段 M2b・M4・M5) |
 | P1 A5・A8・U1 | PowerMac の kprintf は LAN の診断ログへ出る (sys/platform/powermac/log_printf.c、platform/powermac/console_log.c の pm_diag_write)。観測点は追記で link の結果 RSH OUT に確定 (診断 LOG の案は取り下げ)、W8 設計と計画の 6b 受入 の更新を段 P6 に入れた |
-| P2 段の単独受入・比較 | 旧経路が動いたまま口を足す → 登録 → 切替 → 純移動、の順に分けた。関数差は「見込み」でなく実測の申告。直前の版と a76398a35 の両方と比べる。PPC の公開表の欠落の期待 (tools/ppc/test_kapi_binding.py の EXPECTED_ABSENT_SLOTS) の更新を P5 に |
+| P2 段の単独受入・比較 | 旧経路が動いたまま口を足す → 登録 → 切替 → 純移動、の順に分けた。関数差は「見込み」でなく実測の申告。直前の版と a76398a35 の両方と比べる。PPC の公開表の欠落の期待 (test_kapi_binding.py (旧版 3baaeeee4857) の EXPECTED_ABSENT_SLOTS) の更新を P5 に |
 | P2 試験の届き方 | A2 は製品の登録を通るゲスト、A6・A7 は実物の常駐所有者を組む host、A8 は実物の boot 経路を組む host に割り当て直した。A8 の変異は begin 側の再初期化に |
 | P2 契約 ID | AC-SFS-1・AC-CTX-1/4・AC-KAPI-1 を §1-2・§2-2 に結んだ。LINK の FG1 待機と非 LINK の TB 時計の poll を明記 |
 | 未決 | U2 は PM 決定 (a) で確定。U1 も PM 決定 (追記) で確定し、未決は 0 件 |
@@ -170,12 +170,12 @@ int serialfs_session_end(int exit_code)
 | M6 | 本線 | sys/fs/serialfs/serialfs_session.c | 前景を `sfs_fg_begin/end` に包み、表 `sfs_session_fg` と `set_fg` を足す。`g_fg` の初期値は同じファイルの表 (旧経路のまま動く) | その場。host |
 | M7 | 本線 | sys/platform/pc98/boot.c | `serialfs_init()` の後に `serialfs_session_set_fg(&sfs_session_fg)` (この時点では同じ値の上書き) | その場。host |
 | M8 | 本線 | sys/fs/serialfs/serialfs_session.c | `g_fg` の初期値を NULL に (切替。登録だけが経路になる) | その場。**NP21/W ②**: UART の `sfs run`、変異は A2 |
-| M9 | 本線 | sys/fs/serialfs/sfs_session_fg.c (新設) | 前景の本体と `sfs_lan_peer_mac` を SRC_MOVE §3 の手順で純移動。common.mk (共有の登録ファイル、持ち主から受け取る) で入口を C_COMMON_USERSHELL へ、fg を PC98_PENDING へ。order.mk・試験の covers・変異の目印 (tools/tests/test_serialfs.py の SESSION_SRCS・SESSION_MUTATIONS を全件洗う)・test_src_layout・test_dep_dir_a_l06・docs/design の追従 | C。関数差 0 |
+| M9 | 本線 | sys/fs/serialfs/sfs_session_fg.c (新設) | 前景の本体と `sfs_lan_peer_mac` を SRC_MOVE §3 の手順で純移動。common.mk (共有の登録ファイル、持ち主から受け取る) で入口を C_COMMON_USERSHELL へ、fg を PC98_PENDING へ。order.mk・試験の covers・変異の目印 (test_serialfs.py (旧版 3080b693e474) の SESSION_SRCS・SESSION_MUTATIONS を全件洗う)・test_src_layout・test_dep_dir_a_l06・docs/design の追従 | C。関数差 0 |
 | M10 | 本線 | sys/fs/serialfs/serialfs_persistent.c | 旧 scope_begin/end の包みを外す (試験の呼び元を `_owned` へ) | 片付け。host |
 | P0 | PowerPC | sys/platform/powermac/hostfs.h | `pm_hfs_describe` の宣言 | M1 の後 |
 | P1 | PowerPC | sys/platform/powermac/hostfs_link_peer.c | 定義 (LINK の像だけ)。r2 の P2 (hostfs_peer.c) は追記で削除 | P0 の後 |
 | P3 | PowerPC | sys/platform/powermac/hostfs_boot.c | cfg に `.describe = pm_hfs_describe` (`#if KBOOT_LINK` の中) | P1 の後 |
-| P5 | PowerPC | sdk/kapi_target_ppc.py + 生成物 + tools/ppc/test_kapi_binding.py の EXPECTED_ABSENT_SLOTS | 'serialfs' の組を公開、欠落の期待から `sfs_begin`・`sfs_end` を外す。map と nm -l で wrap → platform_serialfs_session_* → serialfs_session_* のパス一致 | M4・M5・M9・P3 の後。最後 |
+| P5 | PowerPC | sdk/kapi_target_ppc.py + 生成物 + test_kapi_binding.py (旧版 3baaeeee4857) の EXPECTED_ABSENT_SLOTS | 'serialfs' の組を公開、欠落の期待から `sfs_begin`・`sfs_end` を外す。map と nm -l で wrap → platform_serialfs_session_* → serialfs_session_* のパス一致 | M4・M5・M9・P3 の後。最後 |
 | P6 | PowerPC (文書) | docs/decisions/ppc/PPC_SHELL_W8_DESIGN.md の PPC_SHELL_W8_DESIGN — PowerPC の到達点 S-D、docs/decisions/ppc/PPC_KAPI_FILL_DESIGN.md の 5. 受入と変異 | W8 の「不在指定は維持」を 6b の公開で更新。計画の 6b 受入 の観測を「link の結果 RSH OUT の `sfs: exit=N`」、変異を「exit の行を落とす」に書き直す | P5 と同じ取り込み |
 
 - 並列: 本線の M1〜M10 は直列 (同じ 3 ファイルを行き来する)。P0〜P3 は M1 の後なら M2〜M9 と並列可。NP21/W は ①・② の 2 回、直列。
@@ -211,7 +211,7 @@ int serialfs_session_end(int exit_code)
 
 ## 確定 (2026-11-20、sol の第 2 回「条件付きで可」、PM が反映)
 - C1 (P1 A5/A8): PowerMac の kboot-link-sh の SHELL_REMOTE_APP は rshell_lan.c の rsh_lan_execute() が行をそのまま execute_command() に渡し、常駐シェル側の `sfs run` の特別処理に入らない。P5 の後に PowerMac の LAN の行全体を受ける入口を段に足し (PowerPC の段 P5b)、子の実行を sfs_begin/end で囲んでから A5/A8 を通す。観測は console_printf → console sink → capture → RSH OUT で成り立つ。
-- C2 (P1 P5): LINK だけに公開する。FEATURE_LINK を像ごとの生成の引数に渡し、serialfs の不在の指定を kboot-link-sh でだけ外す (kboot-sh・kboot-shell は NOSYS のまま、同じ ABI のスロット)。P5 の検査は不在の期待の更新に加え、LINK 側の未定義の参照の許可・必須の集合に platform_serialfs_session_{begin,end} を足し、両プロファイルの生成の結果と ABI のヘッダの一致を確かめる (tools/ppc/test_kapi_binding.py)。
+- C2 (P1 P5): LINK だけに公開する。FEATURE_LINK を像ごとの生成の引数に渡し、serialfs の不在の指定を kboot-link-sh でだけ外す (kboot-sh・kboot-shell は NOSYS のまま、同じ ABI のスロット)。P5 の検査は不在の期待の更新に加え、LINK 側の未定義の参照の許可・必須の集合に platform_serialfs_session_{begin,end} を足し、両プロファイルの生成の結果と ABI のヘッダの一致を確かめる (test_kapi_binding.py (旧版 3baaeeee4857))。
 - C3 (P1 M5): 回収は FEATURE_USERSHELL に連動して配線する (PC-98・kboot-link-sh・kboot-sh に共通の常駐の所有者が入る、EXEC だけの kboot-shell は no-op、EXEC の無い像には呼び元が無い)。既存の HOOK_reclaim は PC98_PENDING 連動なので、SerialFS 用の条件は独立させる。§4 の入口の include は appslot.h でなく sys/fs/fd_redirect.h (res_owner_get の宣言元)。
 - C4 (P2 A7): 期限の後の poll を試験の手順に: OPEN の成功の後に STATUS を止め、復帰の後に poll を 1 回進めて close=1 と pending の解除を確かめる (handle の解放の変異はこれで届く)。
 - C5 (M4): kprintf → console_printf は PC-98 では ELF の alias で呼び先は同じ番地だが、.o の再配置の先のシンボルは変わり得る。M4 は書式の %s 化と owner の検査も含むので、出力は lan_result、生成物はリンクの後の逆アセンブルと build_compare で確かめる。既存の kprintf を指す変異の目印は M4 で移す。

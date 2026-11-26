@@ -2,7 +2,7 @@
 /*  IDE_ADDR.C — ATA のセクタ指定の選択と範囲検査 (純粋関数)                 */
 /*                                                                          */
 /*  規則は ide_addr.h。sys/dev/ata/ide.c がレジスタに書く値は全部ここで作る。     */
-/*  試験: tools/tests/test_hdd_stage1.py (記録 tools/tests/hdd_stage1_tdd.md)  */
+/*  試験: test_hdd_stage1.py (旧版 6201b26bccf0) (記録 hdd_stage1_tdd.md (旧版 b895f780947c))  */
 /* ======================================================================== */
 
 #include "ide_addr.h"

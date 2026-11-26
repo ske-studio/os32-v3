@@ -193,8 +193,8 @@ int io_pump(unsigned int budget_us); /* callback数、負=失敗 */
 |D3|変更 sys/dev/net/ne2000/ne2000.c|100|D2、bhの分割・予算|
 |D4|変更 sys/dev/net/ne2000/ne2000_control.inc|15|D3、登録切替|
 |D5|変更 sys/platform/pc98/tsc_clock.c|25|A5、起動例外adapter|
-|E1|新 tools/tests/io_tier_host.c|350|A1、偽時計/要求/provider|
-|E2|新 tools/tests/test_io_tier.py|200|E1、CHECK inputs/covers・変異|
+|E1|新 tests/support/fixtures/io_tier_host.c|350|A1、偽時計/要求/provider|
+|E2|新 tests/hal/io_tier.py|200|E1、CHECK inputs/covers・変異|
 - T1/T2はR8のcount境界、L1はR5の終了時復元に必要な結線。実装前に既存の共通回収位置を限定確認する。ビルド登録・PPC選択集合・生成KAPI結線も各ファイル単位で追従する。生成物は手編集しない。
 - net/bulk_work.cとlink前景移行はLAN側の段。io-tier側にD6を作らない。順: A0/A1→共通/時計→host→FG移行→KAPI/PPC pumpとowner回収→guest。
 
@@ -238,7 +238,7 @@ int io_pump(unsigned int budget_us); /* callback数、負=失敗 */
 - P1 (予算の換算): service ごとの予算の count は、時計の token (source・generation) と policy の generation の組ごとに 16 枠の表に持ち、組が変わった巡の入口でだけ us_to_count で取り直す。巡の上限も同じ。毎巡の入口の換算は表の参照だけで、時計の読みの回数 (§5 の 1+2K+M) は変えない。
 - P2 (N5 の syscall あたりの合算): A3 は 1 回の io_dispatch の最大時間 (count) と、dispatch の時間の累計 (u32 の count、wrap 可) を持つ。syscall の入口と出口で累計の差を取って最大を記録するのは、syscall の入口に結ぶ段 (C2・C4・P1) へ送る。
 - P3 (owner の終了時の復元): io_policy_owner_exit は io_dispatch_running に関わらず表を差し替える (void のまま)。dispatcher は Tier と予算を巡の入口で policy の generation を見て取り直すだけなので、巡の途中の差し替えは次の巡から効く。BUSY を返すのはアプリが呼ぶ set・reset だけ。
-- P4 (試験の実行): host の試験は tools/tests/host32.py の runner (native と qemu-i386 の user 実行) で回してよい。依頼の「QEMU に触らない」は PowerPC の QEMU の system emulation の意味。preflight の build/out の像が無い NG は、この段では make all をしないので無視してよい。
+- P4 (試験の実行): host の試験は host32.py (旧版 09c54f7f5df1) の runner (native と qemu-i386 の user 実行) で回してよい。依頼の「QEMU に触らない」は PowerPC の QEMU の system emulation の意味。preflight の build/out の像が無い NG は、この段では make all をしないので無視してよい。
 - P5 (換算の係数、T1・T2 共通、2026-11-16): 時計の準備のときに、その源の Hz から mul (u32) と shift (0..32) を 1 回だけ作る。shift は mul = floor((hz << shift) / 1000000) が 2^32 未満に収まる最大の値で、準備のときの 64bit 除算は可 (lib/divdi3.c)。換算は count = (u32)(((u64)us * mul) >> shift) の掛け算とシフトだけで、切り捨て。結果が 2^31 (半周) 以上になる us は AGAIN。mul・shift・source・generation は provider の static に 1 組で持ち、source か generation が違う us_to_count は AGAIN。x86 の PIT の源は周期込みの count の Hz、TSC は校正後の Hz で、校正が終わったら generation を進める。
 - P6 (像への登録と provider の結線、2026-11-16): io_work.c・io_policy.c を x86 と PowerPC の像に入れるのは A5 (idle_work.c は両方の像に入っているため)。T1・T2 は provider (ops) と install の関数を置き、platform の時計の初期化から install を呼ぶ 1 行は、A5 が main に入った後に入れる。
 - P7 (T1 の TSC の率の受け渡し、2026-11-16): sys/platform/pc98/tsc_clock.c に、校正の世代 `tsc_generation` (static u32) を足す。state が TSC_READY に入るとき、および TSC_READY から出るとき (FAILED・OFF) にだけ 1 進める。読み取りの口 `int pc98_tsc_rate(u32 *mult, u32 *shift, u32 *generation)` を tsc_clock.h に足す。TSC_READY なら epoch の mult・shift (cycles→µs の係数) と世代を返して 0、それ以外は NOSYS。短い irq_save/restore で一貫した組を返す。T1 の provider は、read と us_to_count で pc98_tsc_rate の世代が手元の組と違うときにだけ、その mult・shift から P5 の us→count の mul・shift を作り直す (64bit 除算はこの作り直しのときだけ)。TSC が READY でなければ PIT の源を使う。source は TSC と PIT で固定の値、generation は provider が源の切り替えか tsc_generation の変化のたびに進める。tsc_clock.c の変更はこの世代と口だけに限る。

@@ -41,6 +41,6 @@ PowerMac の USERSHELL 像は前景を登録しない。常駐 LAN が無効な�
 
 ## 確かめ
 
-`make check-serialfs-host` (`tools/tests/test_serialfs.py`) の C の段 (`tools/tests/serialfs_session_host.c`)・GATE の段
+`make check-serialfs-host` (`test_serialfs.py (旧版 3080b693e474)`) の C の段 (`serialfs_session_host.c (旧版 99645a4a4966)`)・GATE の段
 (`serial_gate_host.c` が実物の `sys/dev/char/serial.c` を偽のポートで回す)。セッション中に rshell へフレームが漏れない、
 セッション外の本文にフレームがあっても答えない、を見る。NP21/W と実機は残る。

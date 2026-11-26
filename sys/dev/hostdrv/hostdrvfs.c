@@ -101,7 +101,7 @@ int hostdrvfs_detect(void)
 /* ハイパーバイザーコール: invoke_info の線形アドレスを送信し処理実行。
  * NP21/W IA32: generic/hostdrvnt.c:3779-3784 → ia32/paging.h:360-371 は
  * 現 CR3 で supervisor 線形アクセスする。埋め込むポインタも V2P しない
- * ([C5] の例外、tools/check_p2v_allow.txt / TASK_T1_LEDGER §5-3)。
+ * ([C5] の例外、check_p2v_allow.txt (旧版 71d3829bcc20) / TASK_T1_LEDGER §5-3)。
  * 通信バッファは master / アプリ AS 共通のカーネル帯に置き、caller の
  * read/write バッファは g_databuf との CPU コピーだけで触る。 */
 static void hostdrv_hypercall(void)
@@ -538,7 +538,7 @@ static int hdrv_is_mounted(void *ctx)
 
 /* 列挙ループと「成功と言ってよいか」は純関数へ切り出してある (票 H1)。
  * 途中で切れた列挙 / 件数上限での打ち切りを VFS_OK で返さない。
- * ホスト試験は tools/tests/hostdrv_list_host.c。 */
+ * ホスト試験は hostdrv_list_host.c (旧版 43ccd3dbd397)。 */
 #include "hostdrv_list_rules.inc"
 
 /* hdrv_list_run に渡す入れ物。ハイパーコール側の状態は g_databuf なので、
@@ -681,7 +681,7 @@ static int hdrv_get_file_size(void *ctx, const char *path, u32 *size)
     hostdrv_cleanup_close();
 
     /* 判定は純関数へ (sys/dev/hostdrv/hostdrv_stat_rules.inc)。ホストで直接叩ける
-     * = 変異で落ちる試験が書ける (tools/tests/b8_open_host.c の 段 C)。
+     * = 変異で落ちる試験が書ける (b8_open_host.c (旧版 2cd6db9b20ad) の 段 C)。
      * **問い合わせは 1 回のまま** — 種別は同じ応答の Directory で分かる。 */
     return hdrv_size_result(rc, is_dir);
 }
@@ -714,11 +714,11 @@ static int hdrv_read_stream(void *ctx, const char *path,
 /* 「成功と言ってよいか」の判定は純関数へ切り出してある (票 H1)。
  * 失敗したまま VFS_OK を返してゼロサイズを「実在する空ファイル」に
  * 化けさせない / 64bit EndOfFile を u32 へ黙って切り詰めない。
- * ホスト試験は tools/tests/hsync_h1_host.c (A11)。
+ * ホスト試験は hsync_h1_host.c (旧版 937391bfaaa5) (A11)。
  *
  * 票 H3 で LastWriteTime -> st_mtime を足した。FILETIME (1601 起点・100ns)
  * から Unix 秒への変換も同じ .inc の純関数 (hdrv_filetime_to_unix) が持つ。
- * ホスト試験は tools/tests/hsync_h3_host.c (A16)。 */
+ * ホスト試験は hsync_h3_host.c (旧版 09444cd93ad3) (A16)。 */
 static int hdrv_stat(void *ctx, const char *path, OS32_Stat *buf)
 {
     int rc;

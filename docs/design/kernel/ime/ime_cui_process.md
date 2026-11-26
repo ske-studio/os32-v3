@@ -8,4 +8,4 @@ Shift+Space は ON/OFF を切り替え、確定バイトがあれば 1 バイト
 con_sink の迂回、入力 owner の記録、中断後の取消は各入口に残す。
 GUI は WM がモード切替と透過キーを保持するため、この関数を使わない。
 確定列と保留キーの順序は `ime_delivery.inc` が扱う。
-検証は `tools/tests/x11_shared_host_l45.inc` と既存の IMETAB 各経路。
+検証は `x11_shared_host_l45.inc (旧版 a9af63aad6a2)` と既存の IMETAB 各経路。

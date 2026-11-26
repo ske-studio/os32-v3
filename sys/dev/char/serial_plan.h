@@ -6,8 +6,8 @@
 /*  待ち予算) をホストで試験するため — **NP21/W は通信速度を模擬しない**    */
 /*  ので、ここは「エミュレータで確認済み」が通用しない。                     */
 /*                                                                          */
-/*    試験: tools/tests/test_serial_vfast.py                                */
-/*    記録: tools/tests/serial_vfast_tdd.md                                 */
+/*    試験: test_serial_vfast.py (旧版 850eef82c906)                                */
+/*    記録: serial_vfast_tdd.md (旧版 a6de03cdab60)                                 */
 /*    資料: docs/hw/undocumented/io_rs.md (0130h〜013Ah)                    */
 /*    票  : docs/archive/realhw_v21/TASK_SERIAL_VFAST.md                          */
 /* ======================================================================== */

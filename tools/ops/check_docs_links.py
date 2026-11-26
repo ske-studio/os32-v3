@@ -34,7 +34,6 @@ check_docs_links.py — 文書のリンク切れ検査 (lychee の薄い包み)
     解決する。現行文書にはこの読み替えを適用しない。
   * `CLAUDE.md` / `README.md` — AI と人の入口。
   * `arch/README.md` / `platform/README.md` — 移植準備で入った層の説明。
-  * `tools/tests/*_tdd.md` — 票が根拠として指す TDD の記録。
 
 ## lychee が無い環境
 
@@ -79,7 +78,6 @@ INPUTS = [
     "README.md",
     "arch/README.md",
     "platform/README.md",
-    "tools/tests/*_tdd.md",
 ]
 
 # 検査から外すパス。docs/hw は gitignore されたミラー。

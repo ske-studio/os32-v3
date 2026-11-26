@@ -3,11 +3,11 @@
 /*                                                                          */
 /*  probe は呼び手が渡した関数ポインタなので、ホスト試験が偽 driver を      */
 /*  並べて DECLINE → 次へ / QUARANTINE → 打ち切り の遷移を全部踏める        */
-/*  (tools/tests/test_pci_bind.py)。**NP21/W には PCI が無い**ので、        */
+/*  (test_pci_bind.py (旧版 a1c024281b45))。**NP21/W には PCI が無い**ので、        */
 /*  この層はエミュレータでは 1 行も走らない — だからホストで固定する。      */
 /*                                                                          */
 /*  票  : docs/tasks/v3/TASK_HAL_WIRING.md §1-4                             */
-/*  記録: tools/tests/pci_bind_tdd.md                                       */
+/*  記録: pci_bind_tdd.md (旧版 7b39305029ac)                                       */
 /* ======================================================================== */
 
 #include "pci_bind.h"

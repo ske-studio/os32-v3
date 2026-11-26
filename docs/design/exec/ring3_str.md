@@ -38,4 +38,4 @@ WM (gshell、CPL=0 の常駐シェル) はアプリの syscall の中で走る�
 - 深さが素通しにするのは **WM がいま渡すポインタ** だけ。アプリが前に登録したバッファ (`fd_redirect` の出力先) は、登録時の由来を `sys/kern/exec/redir_access.c` が保持し、深さに関係なく表を歩く。
 - #PF/#GP の帰属 (`sys/arch/x86/kernel/isr_handlers.c`) は `ring3_in_syscall` だけを見る。この判定はそこを変えない。
 
-検査: `make check-ring3-guard-host` (`tools/tests/test_ring3_guard.py`、実物を `#include`) の表の段。
+検査: `make check-ring3-guard-host` (`test_ring3_guard.py (旧版 8e0bfe6189d3)`、実物を `#include`) の表の段。

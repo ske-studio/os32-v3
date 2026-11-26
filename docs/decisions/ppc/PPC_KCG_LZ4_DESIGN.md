@@ -66,7 +66,7 @@ if args and args[0] == '--ebdt':
     return 0
 # この後は既存TTF引数処理。入口は sys.exit(main()) として失敗を伝える。
 ```
-build_ebdt_payload は現行build_ebdtのpayload構築部を分離した内部関数。`build_ebdt(path)` は `pack_kcg(build_ebdt_payload(path), 'none')` を返す形で残す（tools/tests/test_kcg_ebdt.py が header 付き全バイトを期待するため、G1）。TTFの既定fallbackと --no-lz4 は維持する。
+build_ebdt_payload は現行build_ebdtのpayload構築部を分離した内部関数。`build_ebdt(path)` は `pack_kcg(build_ebdt_payload(path), 'none')` を返す形で残す（test_kcg_ebdt.py (旧版 193b679af3c6) が header 付き全バイトを期待するため、G1）。TTFの既定fallbackと --no-lz4 は維持する。
 明示 --lz4 の依存不足は失敗。圧縮bodyがP以上ならflags=0に戻すが、依存不足を無圧縮成功で隠さない。
 生成に使うlz4版を固定して再現性を確認し、形式・サイズ・SHAを記録する。
 build編集順: ①生成器と試験を先行 ②L1のloader受入完了 ③font-fetch.mkの製品EBDT呼出しへ --lz4 を追加。

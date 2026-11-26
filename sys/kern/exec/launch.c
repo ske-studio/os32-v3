@@ -7,7 +7,7 @@
 /*    - 「次にどれを取るか」以上の順番の規則 → WM (gshell)                    */
 /*    - CR3 / setjmp / ページテーブル → sys/kern/exec/exec.c                          */
 /*  だからこの .c はホストでそのまま試験できる                               */
-/*  (tools/tests/launch_host.c が sys/kern/exec/appslot.c と組んで回す)。             */
+/*  (launch_host.c (旧版 52bf49eeb213) が sys/kern/exec/appslot.c と組んで回す)。             */
 /*                                                                          */
 /*  不変条件 (壊れると実機では「起動しない」「プロンプトに戻らない」          */
 /*  「ERR_FULL で固着」としか見えない):                                      */

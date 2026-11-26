@@ -138,8 +138,8 @@ raw と pending_raw は、満杯でも境目・独占中の重要入力を読み
 
 |追加試験と段ごとの接続|独立に RED にする変異|
 |---|---|
-|A：test_input_focus.py・input_focus_host.c のソース一覧に合算の実体を接続し、不足する機器口だけスタブ化。test_input_merge.py でも非独占 A 保持→owner 変更→反復なし→実 break→再押下を確認。|tools/tests/test_input_focus.py の run 前後の旧 release・境目の代入、IRQ の文字列を transition の対応する更新へ移す。owner 交代の保持採取だけを外す。|
-|B：新設の tools/tests/test_gshell_excl.py と Rust host ハーネスで状態取得・窓リング・append 成否を制御。各入口を個別に通し gen のみ進む境目、失敗 make、Pointer 単独の押下→満杯→旧窓座標の解除を照合。|各入口の同期を一つずつ外す／excl だけ比較／失敗 append も記録／Pointer の記録を省く。|
+|A：test_input_focus.py・input_focus_host.c のソース一覧に合算の実体を接続し、不足する機器口だけスタブ化。test_input_merge.py でも非独占 A 保持→owner 変更→反復なし→実 break→再押下を確認。|test_input_focus.py (旧版 68aa261b30eb) の run 前後の旧 release・境目の代入、IRQ の文字列を transition の対応する更新へ移す。owner 交代の保持採取だけを外す。|
+|B：新設の test_gshell_excl.py (旧版 83c3f93567db) と Rust host ハーネスで状態取得・窓リング・append 成否を制御。各入口を個別に通し gen のみ進む境目、失敗 make、Pointer 単独の押下→満杯→旧窓座標の解除を照合。|各入口の同期を一つずつ外す／excl だけ比較／失敗 append も記録／Pointer の記録を省く。|
 |C：同ハーネスで非独占 A 保持中の同一 owner の set_focus・破棄、キー切替後のマウス、左端で交代後の右端、全画面 TAB を確認。旧アプリを起床して消費させ、再送途中の切替・ABORTED を経て無入力 X3 で残り各一回。|両デバイスへの終了伝播を外す／同一 owner の掃除を省く／注入後に門を移す／起床を止める／observed 更新で再送表を消す。|
 |A・C：raw と退避を別々に満杯にし、通常・同一区間反復・未保護修飾を混在させて除去順を照合。二つの GRPH 区間を積み、開始後に通常入力で埋めても追加打鍵なしで二回順に確定する。|各キューの隣接する保護順位を逆転／確定枠の予約を外す／異なる区間の確定も重複扱いする。|
 |D：make kernel と make ppc-ci-image の KAPI コンパイルに使う実際の機種 include パスで各ヘッダの値を照合。同じ選択で input_focus_host.c の公開 acquire を呼び、前景・有効 flags で PC-98 の成功と gen 更新、PPC の NOSYS と全状態不変を観測。A〜C の閉じの試験も維持する。|各機種の設定値を個別に反転する。|

@@ -24,4 +24,4 @@ cookie・知らない status) は IO。
 
 ## 確かめ
 
-`make check-serialfs-host` (`tools/tests/test_serialfs.py`) の C の段 (VFS の契約と障害の注入)。
+`make check-serialfs-host` (`test_serialfs.py (旧版 3080b693e474)`) の C の段 (VFS の契約と障害の注入)。

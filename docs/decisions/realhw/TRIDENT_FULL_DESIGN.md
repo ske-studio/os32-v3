@@ -231,7 +231,7 @@ hostはMMIO記録fakeで値/幅/順/分岐を比較し、GPU描画は実機で�
 | F10/F17 DPMS/HAL | head/state/非active/4状態をhost／kdebug診断からmode・cursor・DPMS On↔省電力を実機確認 | stateのStandby/Suspend交換、診断callback未接続 |
 | 対象外枝 | mono expand/color pattern/DDC2の登録・I/Oが無いことをhost確認 | 無効callbackの登録を挿入 |
 | 統合 | 全製品実装後make all、追加/変更試験--mutate、checks/run.py --lint／実機で全段一巡。実装中はPORT_FLOWに従いビルドをまとめる | module登録/import漏れをlink/能力試験で検出 |
-- 追従試験（`tools/tests/`、各ファイル別の試験段、対応製品段後）: F3=test_trident_mode、F5=test_trident_vram、F6=test_trident_resources、F7=test_trident_present、F8=test_trident_palette、F9=test_trident_lifecycle、F10=test_trident_contracts、F13〜F16=test_trident_module、F6/F12=test_device_reservation（:281-294のtrident本体）。各.pyと同名_host.cは別所有段にし、固定640/単一mode/NULL hook/RAM CLIENT期待と変異anchorを更新する。
+- 追従試験（`tests/dev/`、各ファイル別の試験段、対応製品段後）: F3=test_trident_mode、F5=test_trident_vram、F6=test_trident_resources、F7=test_trident_present、F8=test_trident_palette、F9=test_trident_lifecycle、F10=test_trident_contracts、F13〜F16=test_trident_module、F6/F12=test_device_reservation（:281-294のtrident本体）。各.pyと同名_host.cは別所有段にし、固定640/単一mode/NULL hook/RAM CLIENT期待と変異anchorを更新する。
 - F12/F12aはtest_ledger/test_ledger_surface_mapと対応hostを追従。F1/F2/F4/F17は新規accel/cursor/video/診断試験を別ファイル段にする。既存module/contracts/lifecycleの正常起動・失敗解放・復帰経路を残し、新機能有効時とNoAccelの双方を追加する。
 - 順序: F0→F1〜F5/F8並列→F12系列→F6→F7/F9→F10→F13→F17（F16はF0後に先行）。F14→F15はimport生成の直列段。F11と試験ファイル段は所有重複なく実施。Hの公開口確定前もF17診断で受入し、公開機能の完成とは区別する。
 - 実装者はbase SHA指定のpreflightとCROSS_DIR/TMPDIR/HOST32_RUNNERS設定を行う。変更anchorを移した既存変異も追従。全体変異/check-changedは実装者では回さず、取り込みはCI check/build、full-checkは既定の運用に従う。
@@ -321,7 +321,7 @@ F5 sys/dev/video/trident/vram.c: usable に decode 上限も反映し、ペー�
 - A1 (P1): Close の後の再 prepare (lease ゼロ・I/O なし) は、両面を既定 mode の形に regen し、device.mode.selected も既定に戻す (前の mode のまま再 init しない)。上の「再 prepare/init は…現在の形を使う」はこの文で置き換える。試験に「16bpp に切り替え → Close → 再選択 → init が Trident で通る」。
 - A2 (P2): 大きさが違うときの作り直しは、両面を release してから DISPLAY → CLIENT の順に create する (片面だけ解放すると重なりの検査 pgalloc_surface.inc で落ちる)。
 - A3 (P2): 作り直しの後の SID は暫定の面と同じであることを要求し、違えば失敗にする (gfx_core_surface.inc (gfx_reinit_surface_roles()) の pending の印は SID ごと)。試験で確かめる。
-- A4 (P3): F6h で configure の宣言を変えたら、試験の複製も追従する: tools/tests/trident_resources_host.c、test_trident_contracts.py、test_trident_resources.py、test_trim_flow.py。
+- A4 (P3): F6h で configure の宣言を変えたら、試験の複製も追従する: trident_resources_host.c (旧版 1d61f85accf3)、test_trident_contracts.py、test_trident_resources.py、test_trim_flow.py。
 - 実装中の欠け (PM 決定 2026-11-07): Close (F9) から core の面の unready・lease の revoke は呼ばない。lease の回収と面の再公開は既存の gfx_shutdown (gfx_core) が持つ経路のまま。gfx_return_emergency は緊急の戻りで lease を考えない (シングルタスク、戻った先は CUI)。表の Close の行の「unready・lease revoke」は削る。configure に Close 用の呼び出しも別の callback も足さない。Close の後の再入場は A1 (再 prepare で既定の形に regen) で整える。
 
 ## 追記 (2026-11-07、退避の構成を既定に): RAM CLIENT + byte present を Trident の既定にする

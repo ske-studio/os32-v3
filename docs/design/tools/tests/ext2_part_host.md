@@ -1,4 +1,4 @@
-# tools/tests/ext2_part_host.c — ext2 区画境界の試験
+# ext2_part_host.c (旧版 9c65535dee0c) — ext2 区画境界の試験
 
 > 状態: **現行 (2026-10-31)**
 

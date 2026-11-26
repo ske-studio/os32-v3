@@ -9,10 +9,10 @@ Cirrus のモード、リレー、描画面と表示を HAL に提供する。
 - **写像とリレーの寿命**: shutdown でページ写像を剥がすと、次のアプリの初期化前に必要な面を使えず fault しうる。
   起動時の supervisor + PCD 写像を保ち、CPL=3 には CLIENT 面だけを lease する (`sys/dev/video/cirrus/backend_cirrus.c`)。
   再 init はリレー状態を 0 に戻し enter で再設定し、shutdown はハード側の窓を閉じる (`sys/dev/video/cirrus/backend_cirrus.c`)。
-  `tools/tests/test_gfx_kernel_fb.py` が面の寿命を検査する。
+  `test_gfx_kernel_fb.py (旧版 68b79d89963f)` が面の寿命を検査する。
 - **窓と probe**: RAM の上端だけでは穴にある窓を誤拒否する。窓全体のページを物理地図に問い合わせる (`sys/platform/pc98/video/cirrus/cirrus_identify.c`)。
   リニア窓はデバイス aperture に置き (`sys/platform/pc98/wab_xe10.h`)、auto probe は NP21/W 検出後にボード ID を読む (`sys/dev/video/cirrus/backend_cirrus.c`)。
-  `tools/tests/test_cirrus_win.py` が窓の重複・範囲を検査する。
+  `test_cirrus_win.py (旧版 c6379f3b83c7)` が窓の重複・範囲を検査する。
 
 ## probe の段 (`cirrus_probe`)
 
@@ -24,7 +24,7 @@ Cirrus のモード、リレー、描画面と表示を HAL に提供する。
 4. チップの解錠キーの往復。
 
 結果は `s_probed`・`s_probe_ok` に 1 回だけ残す。NP21/W の Cirrus 構成 (`USEGD5430`) の auto では `hal_test` が `backend cirrus (packed 8bpp)` で、実行中のリニア窓 `s_lin` は 0xFE000000 (2MB)。
-`tools/tests/test_cirrus_win.py` の段 7 と `--mutate` (auto で門を通らずに ID を読む・`GFX=cirrus` でも門を課す・窓の判定より前に NP21/W を判定する) がこの順序を固定する。
+`test_cirrus_win.py (旧版 c6379f3b83c7)` の段 7 と `--mutate` (auto で門を通らずに ID を読む・`GFX=cirrus` でも門を課す・窓の判定より前に NP21/W を判定する) がこの順序を固定する。
 
 ## 設計の補足
 

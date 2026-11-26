@@ -8,7 +8,7 @@ description: レビューを通った段 (作業木のブランチ) を push し
 規則の正典は [ROLES §0](../../../docs/tasks/agents/ROLES.md) (検査の段、全体検査は節目、検査中も main を編集してよい)。
 ここはその手順を 1 本にしたもの。
 
-> **作り直し票の取り込み**は `wt/int-*` の候補 SHA を push し、`restructure-build` の同じ run の最新 attempt の全ジョブと全件集計（変異込み）の成功を待つ。`python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` に候補の sha・run_id・attempt・boots を渡す。boots は今回の PC-98 と PowerMac の媒体・sha256・artifact_id・到達点・ログ。文書だけでも両方を取り直す。再生成の一致は登録の build_identity が確かめる。古い検査は関門ではない (P7 で消す)。参考に読むだけ。[CI 設計 §4・§8](../../../docs/design/tools/ci/ci_v2.md)
+> **作り直し票の取り込み**は `wt/int-*` の候補 SHA を push し、`restructure-build` の同じ run の最新 attempt の全ジョブと全件集計（変異込み）の成功を待つ。`python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` に候補の sha・run_id・attempt・boots を渡す。boots は今回の PC-98 と PowerMac の媒体・sha256・artifact_id・到達点・ログ。文書だけでも両方を取り直す。再生成の一致は登録の build_identity が確かめる。[CI 設計 §4・§8](../../../docs/design/tools/ci/ci_v2.md)
 
 次は P4 の実測例。毎回、候補の実測値と読めるログ・媒体のパスに置き換える。PC-98 の reached には selftest の成功数と失敗数 0 を記録する。land_gate.py は PC-98 の boots に整数の `selftest_fail` があり、値が 0 であることを確かめる (U27)。
 

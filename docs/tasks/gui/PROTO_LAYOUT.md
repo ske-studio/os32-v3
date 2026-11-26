@@ -7,7 +7,7 @@
 > Rust 側: `sdk/rust/os32api/src/gui/proto.rs` (C レーンが写す)
 
 数値・配置の更新先は C 共有ヘッダだけであり、Rust の写しは
-`tools/check_gui_proto.py` で照合する。本書は配置の読み方を説明する参考資料で、
+`check_gui_proto.py (旧版 9dfb30aa7e08)` で照合する。本書は配置の読み方を説明する参考資料で、
 独立した数値表を持たない。以後の追加は契約 T5 の末尾追記に従う。
 
 ## スロットの構造

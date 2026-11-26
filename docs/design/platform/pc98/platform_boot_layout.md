@@ -27,7 +27,7 @@ OS の配置 (帯・鎖・池・アプリ帯) は `sys/include/memmap.h` が持�
 - 道具: `tools/gen_memmap.py` の `read_defines()` が `sys/include/memmap.h` の後ろにこのヘッダを続けて
   1 つの定義の集まりとして解く (`PLATFORM_HDR_RELS`)。地図 `build/out/MEMMAP.md`・重なりの検査・
   生成ヘッダ `memmap_layout.h` の `LAYOUT_` の名前は、分ける前と同じ中身。
-- NASM: 写し `boot/memmap_defs.inc`。値の一致は `tools/tests/test_boot_named_constants.py`。
+- NASM: 写し `boot/memmap_defs.inc`。値の一致は `test_boot_named_constants.py (旧版 ec2b81bf9d3b)`。
 
 ## 番地を変える時
 

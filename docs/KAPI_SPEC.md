@@ -70,12 +70,12 @@ make programs
    (`KAPI_SLOT_<NAME>` = `int 0x80` のスロット番号。型に依存しないので crt0 非依存の
    自己完結テストからも include できる) / `sys/kapi/kapi_generated.c` /
    `sys/kern/exec/exec_kapi_init.inc` / `sdk/rust/os32api/src/kapi_generated.rs`。
-   GitHub Actions (`.github/workflows/check.yml`) が生成物と kapi.json の一致を検査する。
+   登録検査 `kapi_sync` が生成物と kapi.json の一致を検査する。
 4. カーネル側に実体を実装する。
 5. 本仕様書のオフセット表を更新し、新APIに依存するプログラムの
    `build/app.conf` の要求バージョンを引き上げる。
 6. [ABI] に従い `make clean` → `make all` を実行する。変更した API の試験と
-   `python3 -B tools/checks/run.py --lint` を行い、担当別の検査は
+   `python3 -B -m tests.infra.ci lint` を行い、担当別の検査は
    [ROLES.md](tasks/agents/ROLES.md) §0「検査」に従う。外部 apps/game の再構築は
    H-7 の再開条件 (票 T2H_EXTERNAL_GATE) に従い、再開決定後に行う。
 
@@ -622,7 +622,7 @@ OF には vblank 同期がなく、転送中の画面が見えることがある
 ### DB API (v29-v31)
 
 FEP の SQLite 予約は既定 192 KiB、settings の system scope の `fep_mem_reserve_kb` で引下げも許可し、下限未満は診断して下限に丸める (MINIMAL にせず、上限の扱いは従来どおり)。
-下限 `OS32_SQLITE_FEP_RESERVE_MIN` は T4a-4 (`tools/tests/fep_budget_host.c`、ログ `~/os32-tmp/run/t4a/fix1_budget*.log`) の実 IPADIC 最大 101,376 B・合成最大 99,328 B の大きい方を KiB に切り上げた 99 KiB とする (ユーザー決定 2026-10-18)。
+下限 `OS32_SQLITE_FEP_RESERVE_MIN` は T4a-4 (計測ログ `~/os32-tmp/run/t4a/fix1_budget*.log`) の実 IPADIC 最大 101,376 B・合成最大 99,328 B の大きい方を KiB に切り上げた 99 KiB とする (ユーザー決定 2026-10-18)。
 
 SQLite 部品が無いとき、`db_*` は `OS32_ERR_NOSYS` を返し、`db_last_error` は診断文字列を返す。
 FD 起動の辞書なしは `SQLITE_ONLY` とし、recover-settings のため `db_*` は公開、IME は stub、FEP 予約は 0 とする (ユーザー決定 2026-10-19)。
@@ -1124,7 +1124,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
 - **NP21/W は `0CF8h` を実装していない。** `pci_init()` は読み戻しが一致しない
   ことを見て `[pci] mech#1 absent` を出し、その場で戻る。これは失敗ではなく
   正しい報告 ([V4])。復号の側はホスト試験 (`make check-pci-decode-host`) で
-  固めてある — 記録は `tools/tests/pci_decode_tdd.md`。
+  固めてある。
 - 資料は `docs/hw/undocumented/io_pci.md` (図2 = アドレス語、446〜479 行 =
   `0CF8h` / `0CFCh`) と Intel 8255x SDM Table 1 (Type 0 ヘッダ)。
 

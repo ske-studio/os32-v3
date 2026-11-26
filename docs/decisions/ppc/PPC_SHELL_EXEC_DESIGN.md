@@ -383,7 +383,7 @@ make ARCH=ppc PLATFORM=powermac hello
 
 ## 確定の後の追記 1 (2026-11-12、S-B の実装と受入で決めたこと、PM)
 
-S-B の受入は QEMU 7450・7455 で到達 (tools/ppc/sb_run.py、LAN 端末から `/bin/hello.bin ok` → `hello ok` → `exit=7` を 2 回、USER text への store → `exit=-2` → その後の hello も `exit=7`)。段の状態は票 TASK_PPC_SHELL が持つ。
+S-B の受入は QEMU 7450・7455 で到達 (sb_run.py (旧版 3c5018178a68)、LAN 端末から `/bin/hello.bin ok` → `hello ok` → `exit=7` を 2 回、USER text への store → `exit=-2` → その後の hello も `exit=7`)。段の状態は票 TASK_PPC_SHELL が持つ。
 
 - **B21 はやめた**: USER の番地の copy は共通の sys/kern/exec/redir_access.c (ページ表で引いた PA を P2V で写す) をそのまま使う。PPC の copy の backend は作らない。
 - **B03**: target の判定の口は `arch/<arch>/arch_exec_image.h` の `arch_exec_image_accept(flags)` (`exec_arch.h` は既存の sys/include/exec_arch.h と名前がぶつかるのでやめた)。x86 は関数形式の macro (static inline だと GCC の局所記号の名前が変わり os32x_hdr.o が変わる)。
@@ -396,4 +396,4 @@ S-B の受入は QEMU 7450・7455 で到達 (tools/ppc/sb_run.py、LAN 端末か
 - **B33・B35**: 受入のアプリは userland/ppc/{hello,fault}.c (userland/tests/*.c は x86 の build が wildcard で拾う)。build は build/ppc-user.mk (`make ARCH=ppc PLATFORM=powermac hello`)。root の像には tools/mkroot_image.py の `--bin` で入れる。
 - **B27**: link_guard の PPC の検査は世代の刻印を ELF の endian で比べ、nano の検査は x86 の app.ld だけ。`-lc`・`-lm`・`-lgcc` を断る (別表記まで断る指摘は過剰防御として不採用)。
 - **F16**: PPC の `exec_font_guard_run` は callback を直接呼ぶ (PPC には保護区間の仕組みが無い、NOSYS にする指摘は不採用)。
-- **本線との約束**: 共通のソースに include・依存を足す段は、そのソースを covers に持つ tools/checks の check を全部 `make check-<name> MUTATE=0` で回してから送る。統合の枝の先頭の commit には `[skip ci]` を付けない。
+- **本線との約束**: 共通のソースに include・依存を足す段は、そのソースを covers に持つ 旧検査登録 の check を全部 `make check-<name> MUTATE=0` で回してから送る。統合の枝の先頭の commit には `[skip ci]` を付けない。

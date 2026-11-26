@@ -38,7 +38,7 @@ $(addprefix $(KERNEL_OBJ_PREFIX),sys/kern/kdebug/kdebug_module.o sys/kern/module
 SHELL_SERVICE_OBJ = $(KERNEL_OBJ_PREFIX)sys/kern/exec/shell_service.o
 $(SHELL_SERVICE_OBJ): private KERNEL_CFLAGS += -fno-optimize-sibling-calls
 # S3b から C_KERNEL に入る (結線は sys/kern/exec/exec.c)。旗が付くことは
-# `make -n` で確かめる (tools/tests/test_shell_service.py の静的検査も見る)。
+# `make -n` で確かめる。
 
 # T2h: entirely separate objects, dependencies, build ID, map and image.
 R1_OUT := $(BUILD_OUT)/r1

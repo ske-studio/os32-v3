@@ -321,7 +321,7 @@ LAN の語があるだけ)。PC-98 固有部分の一次資料は §7 の simk98
 |---|---|---|
 | M0 | **凍結 (エミュレータ基準)** | 下表。実カードの列は未確認のまま |
 | M1 | **エミュレータで合格** (2026-09-05) | `make clean` → `kernel-lgy98` → NHD 配備。起動後 `ne2k_nic` を `/api/mem` で読み: RUNNING、MAC = ini の値、PROM 重複あり、RAM 32KB 検出 (PSTOP 0xC0)、RAM 全域パターン試験 0 エラー、Remote DMA 往復 (1/2/3/59/60/61/255/256/257/1513/1514B、読み側余白無傷) 0 エラー、RDC timeout 0。kselftest 42/0、配備後回帰 6/6 |
-| M2 | **エミュレータで合格** (inject/capture 経路) | `make check-net-m2` (`tools/net_m2_test.py`): 14/60/61/100/255/256/257/1000/1513/1514B の反射が内容一致、連続 10 フレーム順序どおり、1000〜1514B × 60 逐次で PSTOP wrap を繰り返して 0 失敗、ドライバ計数 = 送った数、NP21/W 側 drop 0。**未実施**: 対向機との raw Ethernet (helper は ARP/ICMP/UDP しか返さず、IP 層が無いので保留)、内部 loopback (NP21/W が再現しない、実機項目) |
+| M2 | **エミュレータで合格** (inject/capture 経路) | `make check-net-m2` (`net_m2_test.py (旧版 8fdf61a5f704)`): 14/60/61/100/255/256/257/1000/1513/1514B の反射が内容一致、連続 10 フレーム順序どおり、1000〜1514B × 60 逐次で PSTOP wrap を繰り返して 0 失敗、ドライバ計数 = 送った数、NP21/W 側 drop 0。**未実施**: 対向機との raw Ethernet (helper は ARP/ICMP/UDP しか返さず、IP 層が無いので保留)、内部 loopback (NP21/W が再現しない、実機項目) |
 | M3 | **エミュレータで合格** (2026-09-05) | IRQ 駆動: IRQ5 スタブ登録 + IMR。`make check-net-m2` を IRQ 駆動カーネルで実行し `irq +80`・0 drop・ACK 後の recheck が毎回機能。`make check-net-m2-cpl3` で CPL3 プログラム (`less`) 常駐中も `irq +80`・0 drop、`less` は正常終了しシェル復帰。kselftest 42/0、回帰 6/6 |
 | M4 | **エミュレータで合格** (2026-09-05) | 「溢れても・取りこぼしても壊れない」安全網。`ne2k_timer_tick` を 100Hz 受信ウォッチドッグ化 (RUNNING/OVW_WAIT かつ非 busy なら毎 tick 有界 poll、健全時は CURR 1 読みで戻る)。`make check-net-m4`: 200 フレーム一括 inject でも state RUNNING・drop 0・バースト後の単発受信 OK・wedge なし。リンク層向けに `ne2k_rx_ring_free_pages()` / `ne2k_rx_queue_free()` を公開。M3 で見つけた wedge (リングに残り二度と IRQ が来ない) の再発防止。**注記**: 本試験では IRQ が追いつき watchdog_frames は 0 (ウォッチドッグは安全網として実装・コードレビュー確認、強制 IRQ 喪失下の発火は未計測)。NP21/W は OVW を立てず黙って捨てるため OVW 復帰経路は実カード項目 |
 | M5 | 未着手 | 実機で性能・サイズ・現行仕様化。**実カードは Intel 82557 になる** (2026-09-17 決裁)。82557 は受信の作りが NE2000 と別 (ディスクリプタ連結) なので、M4 の「溢れからの復帰」の宿題は**82557 の言葉で立て直す** |
@@ -349,7 +349,7 @@ LAN の語があるだけ)。PC-98 固有部分の一次資料は §7 の simk98
 
 - **NASM の生成 include は不要**: `ne2000_io.asm` はポート番号を引数で受けるので、
   レジスタ定数の正典は `sys/dev/net/ne2000/ne2000_regs.h` 1 か所で済む。
-- **リング計算を `ne2000_ring.c` に分離**: I/O 無しの純粋関数にし、`tools/tests/ne2000_ring_test.c`
+- **リング計算を `ne2000_ring.c` に分離**: I/O 無しの純粋関数にし、`ne2000_ring_test.c (旧版 5003eacfe3d5)`
   をホスト gcc で `make check` から回す (実カード形式と NP21/W 形式の両方、ページ境界、PSTOP wrap、
   異常ヘッダ)。幾何だけでは count の形式違い (FCS の有無) は検出できないので、その判定は
   `np2_detect()` と M0 の実機確認に置く。
@@ -365,7 +365,7 @@ LAN の語があるだけ)。PC-98 固有部分の一次資料は §7 の simk98
 - IRQ 入口 (`isr_stub.asm` のスタブ、`idt.c` の登録、IMR の有効化) は M3 で入れる。
   `ne2k_irq()` の busy/pending の枠だけ先に置いた。
 - **M2 の試験経路は反射モード**: `LGY98_FLAG_REFLECT` で `timer_handler` (100Hz) から `lgy98_tick()`
-  が `ne2k_poll(2)` と受信フレームの MAC 入れ替え送信を行う。`tools/net_m2_test.py` が
+  が `ne2k_poll(2)` と受信フレームの MAC 入れ替え送信を行う。`net_m2_test.py (旧版 8fdf61a5f704)` が
   `/api/net/inject` → `/api/net/capture` (dir=tx) と `lgy98_reflected` (kernel.map 経由) で照合する。
   試験は `make check-net-m2` (ローカル AI の許可リスト) で回す。KAPI は未追加。
 

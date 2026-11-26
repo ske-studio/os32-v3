@@ -1,4 +1,4 @@
-# tools/tests/test_gf_accel.py — 受入の producer と consumer
+# test_gf_accel.py (旧版 af1ae2c15513) — 受入の producer と consumer
 
 > 状態: **現行 (2026-11-01)**
 

@@ -30,4 +30,4 @@ BCLOSE 0x32: handle u32 → status i32
 
 ## 確かめ
 
-- `tools/tests/test_hostsvc_block_contract.py` (wire の offset と長さ、libc なし ILP32)・`test_hostsvc_block.py`・`test_hostsvc_image.py` (ホストの 2048B の一致・範囲外の拒否・像の差し替えで STALE)。
+- `test_hostsvc_block_contract.py (旧版 4810acf9d233)` (wire の offset と長さ、libc なし ILP32)・`test_hostsvc_block.py`・`test_hostsvc_image.py` (ホストの 2048B の一致・範囲外の拒否・像の差し替えで STALE)。

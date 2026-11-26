@@ -3,7 +3,7 @@
 /*                                                                          */
 /*  1 要求 = 1 応答。線への出入りは SfsIo 経由なので、カーネルでは          */
 /*  sys/dev/char/serial.c のゲートの口 (sys/fs/serialfs/sfs_session_fg.c)、ホスト試験では   */
-/*  偽の線と偽のホスト (tools/tests/serialfs_host.c) につながる。            */
+/*  偽の線と偽のホスト (serialfs_host.c (旧版 6b97a1216784)) につながる。            */
 /*                                                                          */
 /*  規則 (票 TASK_SERIAL_HOSTFS §1-v2 B-5' / §1-v3):                        */
 /*   - 番号違い・種別違い・セッション違い・CRC 違いのフレームは**数えずに   */

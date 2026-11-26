@@ -32,7 +32,7 @@ PM 決定 (2026-11-10、設計の往復の中で。ユーザーに報告済み):
 - 層: OF の tree の採取 (takeover の前) → UniNorth の PCI の設定空間 (OF が示す 1 つの BDF だけ) → MMIO の alias (BAR 2MiB のうち 64KiB を I/G で) → DMA の pool (像の予約の中、descriptor は I/G、buffer は cache の同期) → GEM の core (reset・MIF/PHY・ring・MAC・tx・rx、レジスタも descriptor も LE) → ログの sink (byte 詰めの待ち行列) と線の上の形式 → 診断 monitor → ホストの道具。
 - 置き場: drivers/net/gem/ (core)、platform/powermac/ (tree・PCI・DMA・clock・ログ・線・monitor・service)、arch/ppc/ (alias・cache・probe)、tools/ (ホストの道具と meter)。x86 の生成物は変えない (全段 I、build_compare で確かめる)。
 - 段: 製品の段 P0〜P33 (1 ファイル = 1 段) と、各段の直後の host 試験の段 H*。並列に出せる組と前提は設計の §6。最初の段 P0 は QEMU での採取とホストの UDP 経路の確認、資料の取り寄せ。
-- 受入: A0〜A12 (設計の §7)。QEMU の meter (tools/ppc/kboot_run.py) に LAN の印を足し、既存の KBOOT の 9 行は変えない。7450 と 7455 で、保存したログと欠落数・診断の応答を照合する。
+- 受入: A0〜A12 (設計の §7)。QEMU の meter (kboot_run.py (旧版 3c4a2c5ec78d)) に LAN の印を足し、既存の KBOOT の 9 行は変えない。7450 と 7455 で、保存したログと欠落数・診断の応答を照合する。
 - 実機で初めて確かめる物: clock gate、PHY の固有の処置、DMA の到達性と cache、PCI の domain の差。QEMU の合格から外挿しない。
 
 ## 2. 段の状態
@@ -100,7 +100,7 @@ gcc 14 の再発防止 (6 本目から int*.sh に固定):
 - `grep -n "'gcc'" tools/ppc/test_lan_p*.py tools/ppc/kboot_*.py` で、`-Werror` の付かない gcc 呼び出しを 0 件にする。5 本目で落ちた test_lan_p23.py の driver.c がこの形だった。
 - 依頼文の完了条件に「H の中の host gcc は全部 `-Wall -Wextra -Werror`、できない所は `-Werror=incompatible-pointer-types -Werror=int-conversion -Werror=implicit-function-declaration -Werror=implicit-int` (gcc 13 が受ける名前だけ)」を入れる。
 - 変異で「compile が落ちる = RED」を数える H は、期待の診断の文字列を gcc の版に依らない形 (`_Static_assert` の文言) に限る。
-- 手元に gcc 14 を置くのは環境の変更なのでユーザーに確認してから。置けたら PATH の先頭に gcc → gcc-14 の shim を置いて、CI が回す H (tools/checks の登録分) だけ回す。
+- 手元に gcc 14 を置くのは環境の変更なのでユーザーに確認してから。置けたら PATH の先頭に gcc → gcc-14 の shim を置いて、CI が回す H (旧検査登録 の登録分) だけ回す。
 
 ### 3.3 見込み (実績: 実装 15〜40 分、レビュー 5〜10 分、往復 1〜3 回 = 1 段 0.5〜2 時間)
 

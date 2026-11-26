@@ -51,7 +51,7 @@ CRC32 は zlib.crc32 と同じ。v1 の像はどちらのローダも `VK32_ERR_
 
 ## 確かめ
 
-`make check-vk32-crc-host` (`tools/tests/test_vk32_crc.py`、ハーネス `tools/tests/vk32_host.c`)。C (`--target` で i386-elf-gcc -Os) と
+`make check-vk32-crc-host` (`test_vk32_crc.py (旧版 787690e6f03c)`、ハーネス `vk32_host.c (旧版 9d7f82324539)`)。C (`--target` で i386-elf-gcc -Os) と
 ASM (`VK32_HOST_BEGIN`〜`END` を切り出して `nasm -f elf32`) に同じ像を渡す: `format`・`good`・`corrupt` (43 通り)・`edge` (末尾が
 ちょうど帯の上端)・`real` (build/out と images/ の像)。コミット ID は `make check-build-id-host`。
 NP21/W・実機の起動と壊した像で止まることはホストでは見ていない。

@@ -46,7 +46,7 @@ static u32 native_cache_bits(u32 a)
 - 実際に張った上端 (PFN) は `paging_boot_identity_end()` で公開する。16MB の申告なら 4096。15〜16MB のシステム空間と、上端より上は Not-Present。
 - ブート窓より上の RAM は `pgalloc_stage_online` が `paging_map_phys` で、boot workspace から取った PT で張る。
 
-検査: `tools/tests/test_paging_bounds.py` (`paging_bounds_host.c`)。
+検査: `test_paging_bounds.py (旧版 e127d9736f0a)` (`paging_bounds_host.c`)。
 
 ## アプリ帯の AS (`sys/kern/mm/paging_addrspace.inc`・`sys/kern/mm/paging_lease.inc`)
 
@@ -61,7 +61,7 @@ static u32 native_cache_bits(u32 a)
 - `paging_addrspace_destroy` は lease が残っていれば何もしない。lease PT → アプリ PT → PD の順に所有者付きで返し、返却失敗なら AS を毒状態にして止める。active な PD は破棄しない。破棄後、所有者のページ数と池の空きは作成前に戻る。
 - 自己診断 `paging_app_band_selftest` (kselftest に載る) は 64 枚の AS を作り、PT 0 枚・master の帯 PDE が 0 であること、stack の最上ページへの写像と解放、破棄後に空きが元へ戻ることを見る。
 
-検査は `tools/tests/test_app_band_pde.py` (実 `sys/kern/mm/paging.c` をホストで動かす)。
+検査は `test_app_band_pde.py (旧版 5a548b788956)` (実 `sys/kern/mm/paging.c` をホストで動かす)。
 
 ## 地図の自己診断と、最悪配置の表明
 
@@ -91,4 +91,4 @@ static u32 native_cache_bits(u32 a)
 
 **表明の条件に浮動番地を混ぜない。** 浮いた番地と固定番地を同じ帯で隣り合わせにしない (スタックはカーネル帯の外の固定番地に置く)。
 
-検査: `make check-memmap-host` の `tools/tests/test_memmap_boot.py` (本体 `tools/tests/memmap_boot_host.c`)。実物の `sys/kern/mm/paging.c` を `#include` し、起動順を再生してから自己診断を呼ぶ。`sys/kern/mm/shm.c` の `shm_init` は写しで再生し、写しが本物の本文とずれていないことを突き合わせる。`--mutate` の中心は `band-unbounded` (浮動番地の規則を帯の外へ広げる)。
+検査: `make check-memmap-host` の `test_memmap_boot.py (旧版 b2230a400579)` (本体 `memmap_boot_host.c (旧版 3ca1f13be78d)`)。実物の `sys/kern/mm/paging.c` を `#include` し、起動順を再生してから自己診断を呼ぶ。`sys/kern/mm/shm.c` の `shm_init` は写しで再生し、写しが本物の本文とずれていないことを突き合わせる。`--mutate` の中心は `band-unbounded` (浮動番地の規則を帯の外へ広げる)。

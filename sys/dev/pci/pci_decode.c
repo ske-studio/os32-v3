@@ -4,7 +4,7 @@
 /*  ここには副作用のある行を 1 つも置かない。sys/dev/pci/pci.c から切り出して   */
 /*  あるのは、**NP21/W が PCI を実装していない** (`0CF8h` が無い) ために    */
 /*  列挙そのものを走らせて確かめられるのが実機 PC-9821Ra266 だけだから。    */
-/*    試験: tools/tests/test_pci_decode.py / 記録: tools/tests/pci_decode_tdd.md */
+/*    試験: test_pci_decode.py (旧版 a5ba7472a1c6) / 記録: pci_decode_tdd.md (旧版 c1e937d1c664) */
 /*                                                                          */
 /*  出典: `docs/hw/undocumented/io_pci.md` 図2 (76〜109 行) と 0CF8h の      */
 /*        ビット定義 (446〜462 行)、PCI 規格の Type 0 ヘッダ                */

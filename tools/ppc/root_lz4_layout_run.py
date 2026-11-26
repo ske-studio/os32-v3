@@ -30,8 +30,9 @@ import time
 import zlib
 
 from lan_probe import PROMPT, ROM, cells as property_cells, properties
-from root_lz4_layout import STAGING_BASE, STAGING_SIZE
-from root_lz4_inventory import PAGE, ROOT, envelope, segments
+from root_lz4_layout import PAGE, STAGING_BASE, STAGING_SIZE, segments
+
+ROOT = Path(__file__).resolve().parents[2]
 
 LOW = 0x100000
 WINDOW = 0xf00000
@@ -101,7 +102,7 @@ SECTIONS {{
                     '-msdata=none', '-DPPC_MMU', '-ffreestanding', '-fno-pie', '-nostdlib', '-O2',
                     '-D__cdecl=', '-fno-stack-protector', '-fno-builtin', '-ffunction-sections',
                     '-Wl,--gc-sections,-z,noexecstack,-z,max-page-size=4096', '-Wl,-T,'+str(linker),
-                    *['-I'+str(ROOT/p) for p in ('include','lib','arch/ppc','platform/powermac')],
+                    *['-I'+str(ROOT/p) for p in ('sys/include','lib','sys/arch/ppc','sys/platform/powermac')],
                     asm, ROOT/'sys/arch/ppc/entry.S', ROOT/'sys/arch/ppc/kernel_entry.S',
                     ROOT/'sys/kern/kstring_c.c', ROOT/'sys/arch/ppc/ofw_note.S', ROOT/'tools/ppc/root_lz4_probe.c',
                     ROOT/'sys/platform/powermac/ofw.c', '-o', elf], cwd=out, check=True)
@@ -278,7 +279,8 @@ def main():
     out = args.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
     rows = json.loads(args.inventory.read_text())
-    sizes = envelope(rows)
+    sizes = {key: max(row[key] for row in rows)
+             for key in ("resident_end", "chain_end", "frame", "packed", "iso_pages")}
     sizes['resident_end'] = LOW + max(row['low_memsz'] for row in rows)
     sizes['low_filesz'] = max(row['low_filesz'] for row in rows)
     os.environ.setdefault('PPC_CROSS_DIR', '/home/hight/opt/cross-ppc')

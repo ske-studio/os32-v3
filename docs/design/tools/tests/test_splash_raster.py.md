@@ -1,6 +1,6 @@
 # test_splash_raster.py — 再生器のCHECKと変異
 
-状態: **現行 (2026-11-01)**。ソース: `tools/tests/test_splash_raster.py`。
+状態: **現行 (2026-11-01)**。ソース: `test_splash_raster.py (旧版 a5703c681da0)`。
 
 CHECKは実際に読む製品・模型・実行補助を宣言する。i386-elfで実製品を含む模型を
 コンパイルし、qemu-i386で実行する。通常版のGREEN後、--mutateは製品Cだけを

@@ -27,5 +27,5 @@
 
 ## 確かめ
 
-`make check-cpu-calibrate-host` (`tools/tests/test_cpu_calibrate.py`、`tools/tests/cpu_calibrate_host.c`) のケース `fast_cpu`・`slow_cpu`・
+`make check-cpu-calibrate-host` (`test_cpu_calibrate.py (旧版 fe32cedfe0f1)`、`cpu_calibrate_host.c (旧版 905228a28899)`) のケース `fast_cpu`・`slow_cpu`・
 `give_up`・`delay_scale`。起動時は kselftest が校正の整合を見る。

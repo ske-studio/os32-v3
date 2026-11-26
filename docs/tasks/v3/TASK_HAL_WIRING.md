@@ -182,7 +182,7 @@ ISR の中からの登録・解除・自己解除は禁止 (契約、debug ビ�
 最初の登録で `irq_enable`、最後の解除で `irq_disable`。共有者が勝手に `irq_disable` を呼ばない (契約)。
 この層は遅延処理を持たない (driver 側の tick フックはこの層の外で、解除の前に driver が自分で止める)。
 
-- **実装・受入**: ホスト合格。証拠は `tools/tests/irq_math_tdd.md`、ゲストの合否と観測範囲は
+- **実装・受入**: ホスト合格。証拠は `irq_math_tdd.md (旧版 2a70ec1cad58)`、ゲストの合否と観測範囲は
   受入記録 W1/W3 (アーカイブ: `docs/archive/v3/TASK_HAL_WIRING_RESULTS.md`)。
   実 IRQ の共有・slave 側・V86 中、NE2000 enter/leave・再初期化窓・tick 回収、CPL=3 中の片方解除・noisy隔離・IRQ0所要時間・rshell/LAN通信の観測を、人工 `int 0x23` の合格で代用しない。
   LGY-98 の登録拒否時は既存 tick 回収によるポーリング稼働を維持する (PCI probe の利用不可とは区別)。
@@ -247,7 +247,7 @@ int  dma_above_1mb_state(void);   /* DMA_A20_VERIFIED / DMA_A20_UNREADABLE / DMA
   発行せず `fdc_report_fail` の phase に "dma" を足して出す**。`fdc_abort_transfer` と `fdc_recover` (fdc.c 480 行) の
   `DMA_MASK_CH2` 直書きも `dma_chan_mask(2)` に。
 
-- **実装・受入**: ホスト合格 (`tools/tests/dma8237_tdd.md`)。FDC の受入は
+- **実装・受入**: ホスト合格 (`dma8237_tdd.md (旧版 a03ad83b29fe)`)。FDC の受入は
   受入記録 W2 (アーカイブ: `docs/archive/v3/TASK_HAL_WIRING_RESULTS.md`)。
   timeout→abort→再試行、実機 FD と 0439h の確認は未観測分を残す。
   エラーは `OS32_ERR_INVAL` / `OS32_ERR_AGAIN` / `OS32_ERR_NOSYS` の内部別名を使う。
@@ -298,7 +298,7 @@ int  dma_above_1mb_state(void);   /* DMA_A20_VERIFIED / DMA_A20_UNREADABLE / DMA
   FDC の 1KB は**静的配列のまま** (起動最初期に要る)。
 - 純粋関数: 最初適合 + 整列 + 64KB 跨ぎの判定、span の登録 / 解放 / 不正解放をホスト試験に。
 
-- **実装・受入**: ホスト合格 (`tools/tests/dma_pool_tdd.md`)。地図・サイズの受入は
+- **実装・受入**: ホスト合格 (`dma_pool_tdd.md (旧版 427c49a99093)`)。地図・サイズの受入は
   受入記録 W5 (アーカイブ: `docs/archive/v3/TASK_HAL_WIRING_RESULTS.md`)。
   現行配置は `sys/include/memmap.h`、生成地図は `build/out/MEMMAP.md` を参照。
 
@@ -361,7 +361,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
 - 表は静的 (`sys/platform/pc98/kernel.c`、最初は 82557 の 1 行)。`pci_bind_all` は **pgalloc と DMA プールの初期化の後**。
   §3 の動的読み込みが来たら `size` で版を確かめる。
 
-- **実装・受入**: ホスト合格 (`tools/tests/pci_bind_tdd.md`)。診断取得口も実装済み。
+- **実装・受入**: ホスト合格 (`pci_bind_tdd.md (旧版 7b39305029ac)`)。診断取得口も実装済み。
   `pci_bind_info` はローカルの8Bスナップショットを書き、NULL・帯境界跨ぎ・idx範囲外は INVAL、
   writable 検査の拒否は kill。線の状態は取得時に合成する。NP21/W/実機の結線・隔離の観測範囲は
   LAN 票と、受入 W3/W6 の記録 (アーカイブ `docs/archive/v3/TASK_HAL_WIRING_RESULTS.md`) にある。
@@ -424,7 +424,7 @@ int pci_bind_all(const struct pci_driver *const *table, int n);   /* 1 件ずつ
   試験の注入中 (`time_test_feed_n > 0`) はクランプを通さない — 境界の count を撃ち分ける試験が
   わざと小さい値を作るため)。**実機での回数は W4 の記録項目**。
 
-- **実装・受入**: ホスト合格 (`tools/tests/time_math_tdd.md`、`tools/tests/test_ring3_str.py`)。
+- **実装・受入**: ホスト合格 (`time_math_tdd.md (旧版 7f139fedfba1)`、`test_ring3_str.py (旧版 f97908e92c94)`)。
   NP21/W と実機の W4 は合格。証拠と未観測の PIT 位相は
   受入記録 W4 (アーカイブ: `docs/archive/v3/TASK_HAL_WIRING_RESULTS.md`)。
   RO 出力・非恒等写像・CR3 復帰・IF=0 10.2ms の観測は受入条件として残し、

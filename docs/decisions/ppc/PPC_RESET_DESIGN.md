@@ -43,7 +43,7 @@ POLICY_DEV §1 の HAL 中心期における「新装置に着手しない」の
 統合の判断（POLICY_DEV §1）：
 - 役目は PC-98 と共通。現在の機械をリセットする一操作であり、終了ポリシーは共通 sys_reboot が持つ。
 - 口は platform_reset 一つ。shell、RSH、KAPI に機種分岐を足さない。
-- PPC の提供者無し 190 本（tools/ppc/test_kapi_binding.py）のうち装置の組の第一段。次の rtc_read は同じ識別・転送を使える。今回は時計の入口を足さない。
+- PPC の提供者無し 190 本（test_kapi_binding.py (旧版 3baaeeee4857)）のうち装置の組の第一段。次の rtc_read は同じ識別・転送を使える。今回は時計の入口を足さない。
 
 ## 2. 層と置き場
 
@@ -177,7 +177,7 @@ Apple の Power Mac G4 (September 2002) Developer Note、vendor/text/apple-pmg4-
 ## 4. KAPI と検査の追従
 
 - 'sys' の absent 集合を buz_on/buz_off のみにする。既存 sys_reboot を通常生成へ戻す。rtc_read は sdk/kapi_target_ppc.py のまま。
-- tools/ppc/test_kapi_binding.py の未定義許可に sys_reboot を加え、PPC KAPI .o に実際に U sys_reboot があること、最終 ELF で解決することを検査。
+- test_kapi_binding.py (旧版 3baaeeee4857) の未定義許可に sys_reboot を加え、PPC KAPI .o に実際に U sys_reboot があること、最終 ELF で解決することを検査。
 - absent stub は 189 本。単純な個数だけに頼らず reboot の実呼出し、buzzer 2 本の空実装、rtc の absent を確認。host のリンク用 stub は必要な fixture にだけ足す。
 - sdk/kapi.json の既存スロット・型・版を使うので ABI 追記は 0。PPC 提供者の差だけが生成 C に出る。生成物を手で直さない。
 - os32-kapi-add に従い、将来 ABI を増やす段では api 末尾追記、JSON version と os32_kapi_shared.h の KAPI_VERSION を同期して再生成する。
@@ -205,15 +205,15 @@ Apple の Power Mac G4 (September 2002) Developer Note、vendor/text/apple-pmg4-
 | sys/platform/powermac/ppc_kernel.c | takeover 後の準備呼出し | 2 |
 | build/platform/powermac.mk | 機種ソースとこの機種が使う装置ソースの明示列挙 | 1 |
 | sdk/kapi_target_ppc.py | sys の absent を 2 本にする | 1 |
-| tools/ppc/test_kapi_binding.py | stub・通常生成・nm、reboot を absent に戻す変異 | 12 |
-| tools/tests/fixtures/build_profile_ppc.json | 各像の KB_C を生成値に同期 | 1 |
+| test_kapi_binding.py (旧版 3baaeeee4857) | stub・通常生成・nm、reboot を absent に戻す変異 | 12 |
+| build_profile_ppc.json (旧版 80da850b3508) | 各像の KB_C を生成値に同期 | 1 |
 | tools/host_rshell.py | reboot 自動退避と、別 boot を観測した resume の明示退避 | 10 |
 | tools/host_operator_socket.py | resume を既存の pending ID に通し、退避結果を一度取得・消費 | 4 |
-| tools/tests/test_remote_x13.py | socket と operator の別 boot、遅着、次の submit | 30 |
-| tools/tests/via_host.c | MMIO/timebase の模擬、正常・競合・期限 | 120 |
-| tools/tests/test_powermac_reset.py | host 実行、OF fixture、変異と CHECK/covers | 90 |
+| test_remote_x13.py (旧版 72d7f5e77b7e) | socket と operator の別 boot、遅着、次の submit | 30 |
+| via_host.c (旧版 f0c02e3f5f81) | MMIO/timebase の模擬、正常・競合・期限 | 120 |
+| test_powermac_reset.py (旧版 5127aa0c9712) | host 実行、OF fixture、変異と CHECK/covers | 90 |
 | tools/ppc/link_sh_run.py | 旧 link-sh の reset ケースを製品起動へ移し、RSH と QMP で観測 | 45 |
-| tools/checks/ppc-reset.py | 両 mac99 ケースと入力の宣言 | 15 |
+| ppc-reset.py (旧版 f9a568efea75) | 両 mac99 ケースと入力の宣言 | 15 |
 
 既存 host 側の確認・変更箇所（tools/ppc/ 配下）
 
@@ -249,7 +249,7 @@ Apple の Power Mac G4 (September 2002) Developer Note、vendor/text/apple-pmg4-
 反論なし。
 
 ## 確定 (2026-11-18、Opus 第 2 回、PM が反映)
-- P3-1: §6 の既存の host の土台と試験の一覧に足す — (a) kboot_info.h を読む tools/ppc/kboot_memory_host.c、(b) 本文の文字列を目印に読む tools/tests/test_ppc_terminal_work.py と tools/tests/test_arch_ctx.py (sys/platform/powermac/ppc_kernel.c)、tools/tests/test_ppc_cpu_nap.py (sys/platform/powermac/kernel_boot.c)、(c) tools/checks/ppc-rh-fb.py の covers (kernel_boot.c)。ppc_kernel.c は呼び出しを 1 行足すだけなので、各試験の目印が外れないかを実装者が grep と MUTATE=1 で確かめる。
+- P3-1: §6 の既存の host の土台と試験の一覧に足す — (a) kboot_info.h を読む kboot_memory_host.c (旧版 91112f54fadf)、(b) 本文の文字列を目印に読む test_ppc_terminal_work.py (旧版 4f017e5a3f7c) と test_arch_ctx.py (旧版 84e85f180a0d) (sys/platform/powermac/ppc_kernel.c)、test_ppc_cpu_nap.py (旧版 0a6dbf7254ef) (sys/platform/powermac/kernel_boot.c)、(c) ppc-rh-fb.py (旧版 c359483333f5) の covers (kernel_boot.c)。ppc_kernel.c は呼び出しを 1 行足すだけなので、各試験の目印が外れないかを実装者が grep と MUTATE=1 で確かめる。
 - P3-2: §3 via_command — Cuda の応答 frame を待つのは `in != NULL かつ cap > 0` の時だけ。それ以外は送信の完了で戻る。
 - P3-3: §2 platform_reset — 失敗の時に LAN の LOG を流し続ける期限は、ppc_kernel.c の既存の 2 秒の poll と同じ `2 × tb_hz` (TB の差) とする。
 - P3-4: §5 の「受信は 1 byte ずつ廃棄」「MMIO は通常 2 ページ」を、cap まで保存・窓 3 ページに直した (上の §5)。
@@ -311,10 +311,10 @@ QEMU は既存 USB 起動と reset の正常経路で確認し、実機の BAR �
 ### §6　実装単位
 
 R-b の直し一段。platform/powermac/{kernel_boot.c,via_window.h,usb_platform.c,usb_boot.c}
-と tools/tests/test_powermac_reset.py 配下の試験登録・host fixture を対象とする。
+と test_powermac_reset.py (旧版 5127aa0c9712) 配下の試験登録・host fixture を対象とする。
 system.c は公開済み窓の利用者のまま。共通層・装置層・KAPI の変更は不要。
 
 ### 追記の確定 (2026-11-18、Opus 第 1 回、PM が反映)
 - R-b の astra のレビューの P2 3 件 — (a) sys/platform/powermac/kernel_boot.c の install_via が pm_usb_roots の構成の窓 (usb_boot.c の root->pa+0x800000 と +0xc00000) と照合していない、(b) sys/platform/powermac/via_tree.c の ranges が別 BDF・別 BAR でも数値が mac-io の BAR0 の内なら採用する (BAR トークン付きの親番地では BDF・BAR の一致を必須に)、(c) via_tree.c で ofw_child/ofw_peer の失敗 -1 を正常の終端 0 と同じに扱う (-1 は探索の失敗として伝播、候補の発見の後に失敗する fixture を足す) — は、この追記の範囲外で、R-b の実装の直しとして PM が出す ((a) はこの追記の照合と同じ段にまとめてよい)。
 - 根拠の実物の値: QEMU mac99 で VIA は pa=80016000 (R-b の LOG)。OHCI の BAR0 の値は実装の段の QEMU で LOG に出して並べる。G4 の値は未確認。
-- 試験の土台 (PM 決定): 新しく tools/ppc/usb_via_overlap_host.c を作り、差し替える関数は paging_map_phys・usbp_cfg_read32・usbp_cfg_write32 (または今の cfg の書き込みの関数)・pm_usb_roots の窓・OHCI の start。登録は tools/tests/test_powermac_reset.py の CHECK (powermac-reset) に足す。
+- 試験の土台 (PM 決定): 新しく usb_via_overlap_host.c (旧版 af9976e10932) を作り、差し替える関数は paging_map_phys・usbp_cfg_read32・usbp_cfg_write32 (または今の cfg の書き込みの関数)・pm_usb_roots の窓・OHCI の start。登録は test_powermac_reset.py (旧版 5127aa0c9712) の CHECK (powermac-reset) に足す。

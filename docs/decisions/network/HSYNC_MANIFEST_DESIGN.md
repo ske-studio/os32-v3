@@ -178,9 +178,9 @@
 | B/1 | tools/host_tree_manifest.py 新規 | 350 | iterator・snapshot・仮想stat/read、HostFSを直接受ける |
 | C/2 | tools/serialfs_host.py 変更 | 90 | stat共用mtime/fd helperとstat/read/close結線、B後 |
 | D/2 | userland/system/hsync.c 変更 | 220 | A include、列挙切替、ss 供給、コピー CRC、集計 |
-| E/2 | tools/tests/test_hsync_inventory.py 新規 | 350 | A を組む C harness、CHECK inputs 宣言 |
-| F/2 | tools/tests/test_host_tree_manifest.py 新規 | 350 | B の host/境界/失敗/変異、CHECK inputs 宣言 |
-| G/3 | tools/tests/test_hsync_inventory_flow.py 新規 | 380 | C/D と三 adapter の統合、旧動作退行・計数 |
+| E/2 | test_hsync_inventory.py (旧版 8b21e69c8106) 新規 | 350 | A を組む C harness、CHECK inputs 宣言 |
+| F/2 | test_host_tree_manifest.py (旧版 98dea4a5db24) 新規 | 350 | B の host/境界/失敗/変異、CHECK inputs 宣言 |
+| G/3 | test_hsync_inventory_flow.py (旧版 e8da32b9dc6e) 新規 | 380 | C/D と三 adapter の統合、旧動作退行・計数 |
 | H/3 | docs/archive/network/NET_HOSTSVC_DESIGN.md 変更 | 55 | 仮想ファイル wire と寿命の正典追記 |
 - 波1は A/B 並列、波2は C/D/E/F 並列、波3は G/H 並列。各ファイルの担当を重ねない。
 - A の静的 helper は既存 KernelAPI と CRC 核を使用。build list 変更なしの .inc 方式。
@@ -216,7 +216,7 @@
 - NP21/Wシリアル/LANとQEMU7450/7455の正常四条件はhsync終了値0、--verify下の注入CRC破損・STALE・不正HMD1は非0かつ対象公開なし。fallback成功は0。台本自身も全期待一致で0、不一致/timeout/終了値未取得は非0とする。
 - E/F/G は CHECK dict に製品・include・fixture 入力を宣言。移動/削除する行の既存 mutation anchor を検索して移す。
 - 波1/2は担当テストの --mutate と必要ビルド。D 後は hsync を含む programs/userland image を構築する。
-- 波3統合は x86/PPC の対象ビルド、変更テスト --mutate、python3 -B tools/checks/run.py --lint。
+- 波3統合は x86/PPC の対象ビルド、変更テスト --mutate、python3 -B run.py (旧版 bdcca5c408c4) --lint。
 - check-changed/全変異は実装者では走らせず、CI と full-check の役割を維持。全ログは最後の変更後に採る。
 - PM は build size 差、NP21/W の4条件、QEMU両CPUを受入。未実施は合格とせず理由を残す。
 

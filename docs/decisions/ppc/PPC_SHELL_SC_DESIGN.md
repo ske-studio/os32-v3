@@ -209,12 +209,12 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 - r1 の S03 は launch 段へ吸収し、登録・runtime・環境の3ファイルを S01 にまとめる。
 - 「共」は x86 と共有する場所。「★」は x86 生成物変更予定。現時点では全段なし。
 - 差が出れば★へ変更し、理由と x86 の受入を追加する。既定値変更で比較を回避しない。
-- 表の新規 check 名は提案。L は `python3 -B tools/checks/run.py --lint`。
+- 表の新規 check 名は提案。L は 旧手順（adf3eeceab88 の記録）。
 - R は runtime、I は入力、X は同期 launch、O は出力分離、SC は第3像の専用試験。
 
 |段|ファイル|行数|依存|共通の場所か|★か|追従する試験|回す check|
 |---|---|---:|---|---|---|---|---|
-|N01|`userland/ppc/nest.c`、`tools/ppc/sc_run.py`、`build/ppc-user.mk`、`build/targets/ppc-powermac.mk` (root に足す bin の変数と試験用の出力先)|≤300|最初|PPC専用|なし|試験用root・nest反復・既存hello/fault|nest QEMU、USER build、L|
+|N01|`userland/ppc/nest.c`、`sc_run.py (旧版 a0164610a69c)`、`build/ppc-user.mk`、`build/targets/ppc-powermac.mk` (root に足す bin の変数と試験用の出力先)|≤300|最初|PPC専用|なし|試験用root・nest反復・既存hello/fault|nest QEMU、USER build、L|
 |P01|`userland/ppc/sh/profile.h`|≤80|なし|専用|なし|S01/S02 の既定展開・選択契約|X、L|
 |P02|`input_decode.c`、`input_boot.c`、`input_boot.h`（platform/powermac）|≤365|なし|専用|なし|I、既存LAN入力試験|I、L|
 |P03|`sys/platform/powermac/kboot_console.c`、`build/targets/ppc-powermac.mk`|≤120|N01 (同じ mk、直列)|PPC専用|なし|O、既存kboot出力・変異|O、既存対象試験、L|
@@ -226,12 +226,12 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 |S02|`userland/shell/sh_exec.inc`、`sh_launch.inc`|≤120|N01/P01|共|なし|sh_launch/status/truncation、X|対象host試験、x86 programs、L|
 |B01|`build/ppc-user.mk`|≤120|U01–03/S01–02|PPC専用|なし|R、既存ls/help、hello/fault|sh＋hello/fault build、R、L|
 |B02|`build/targets/ppc-powermac.mk`、`sys/platform/powermac/ppc_kernel.c`|≤180|P02–04/B01|PPC専用|なし|三像・NEGATIVE・既存消費者|三像build、対象kboot/LAN試験、L|
-|T01|`tools/tests/ppc_sh_runtime.py`、`ppc_sh_input.py`|≤400|U/P|試験|なし|R/I の実ソース試験と変異|R/I --mutate、L|
+|T01|`ppc_sh_runtime.py (旧版 2ee684555fb9)`、`ppc_sh_input.py`|≤400|U/P|試験|なし|R/I の実ソース試験と変異|R/I --mutate、L|
 |T02|`test_ver_shell.py`、`test_hwb_shell.py`、`test_about_info.py`|≤200|S01|試験|なし|旧anchor・include・固定hash・dep-dir|各変更試験 --mutate、L|
-|T03|`test_mem_stat.py`、`sh_shell_host.c`、`tools/checks/ver-shell-host.py`|≤200|S01|試験|なし|同上、CHECK の入力追従|mem/sh-shell/ver-shell-host、L|
+|T03|`test_mem_stat.py`、`sh_shell_host.c`、`ver-shell-host.py (旧版 d16443824a9a)`|≤200|S01|試験|なし|同上、CHECK の入力追従|mem/sh-shell/ver-shell-host、L|
 |T04|`test_sh_launch.py`、`sh_launch_host.c`、`sh_status_host.c`|≤300|S02|試験|なし|要求表の既存期待＋同期結果|sh-launch/sh-status --mutate、L|
-|T05|`sh_truncation_host.c`、`tools/tests/ppc_sh_launch.py`|≤300|S02|試験|なし|拒否の共有・PATH走査停止|sh-truncation/X --mutate、L|
-|T06|`tools/tests/ppc_sh_output.py`、`tools/ppc/sc_run.py`|≤400|B02|試験|なし|O、三像・S-C・変異|O/SC --mutate、L|
+|T05|`sh_truncation_host.c`、`ppc_sh_launch.py (旧版 49aea18bc1ab)`|≤300|S02|試験|なし|拒否の共有・PATH走査停止|sh-truncation/X --mutate、L|
+|T06|`旧ホスト試験 ppc_sh_output.py`、`sc_run.py (旧版 a0164610a69c)`|≤400|B02|試験|なし|O、三像・S-C・変異|O/SC --mutate、L|
 |D01|`docs/09_exec.md`|約25|SC完了|共|なし|実装契約との照合|文書対象check、L|
 |D02|`TASK_PPC_SHELL.md`、`docs/tasks/DEFERRED_TESTS.md`|≤60|SC結果|文書|なし|S-C記録・実機延期1行|文書対象check、L|
 
@@ -259,7 +259,7 @@ CLI像 ：RAM root → pm_exec_boot → pm_cli_boot
 |x86 不変|既定登録列を変更|shell.bin または sh.bin の基点比較が不一致|
 
 - 各 anchor は一意にし、実行時 RED を確認する。文字列検査だけで成立としない。
-- 変更・削除する製品行の anchor を `tools/tests` で検索し、対応する T 段で移す。
+- 変更・削除する製品行の anchor を `旧ホスト試験` で検索し、対応する T 段で移す。
 - x86 は `make programs` で常駐 shell.bin と USER sh.bin の両方をビルドし、基点とバイト比較する。
 - 対応 ELF・生成 KAPI も比較する。共通 kernel 変更が必要になれば `make kernel` を追加する。
 - 診断像・CLI 像は同条件の基点生成物と比較し、既存試験の期待値を保つ。

@@ -20,4 +20,4 @@ VFS の API の一覧・パスの長さ・最終要素の `.` / `..`・FD の失
 - `mkdir /hd0/a/`・`/hd0//b`・`/hd0/a//c/` は畳まれて通常の名前になるので作れる (ドライバには `"/a"` などで届く)。
 - ext2 側にも同じ守り (`ext2_vfs_mkdir` のルート = EXIST、`ext2_name_check`) があり冗長だが、ext2 以外のドライバのために VFS でも断る。
 
-検査: `make check-ext2-empty-name-host` (`tools/tests/test_ext2_empty_name.py`)。段 `vfs`・`root` が `/hd0` と `/` に載せた ext2 で、段 `synth` が合成ドライバを `/syn` に載せて、ドライバまで届かないことを見る。
+検査: `make check-ext2-empty-name-host` (`test_ext2_empty_name.py (旧版 1972f33be05e)`)。段 `vfs`・`root` が `/hd0` と `/` に載せた ext2 で、段 `synth` が合成ドライバを `/syn` に載せて、ドライバまで届かないことを見る。

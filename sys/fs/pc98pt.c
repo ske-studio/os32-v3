@@ -2,8 +2,8 @@
 /*  PC98PT.C — PC-98 区画表の共有部 (純粋関数)                              */
 /*                                                                          */
 /*  配置・規則・呼び手の一覧は pc98pt.h。                                   */
-/*  試験: tools/tests/hdd_stage1_host.c + tools/tests/test_hdd_stage1.py    */
-/*  記録: tools/tests/hdd_stage1_tdd.md                                     */
+/*  試験: hdd_stage1_host.c (旧版 ecc1de1ac95c) + test_hdd_stage1.py (旧版 6201b26bccf0)    */
+/*  記録: hdd_stage1_tdd.md (旧版 b895f780947c)                                     */
 /* ======================================================================== */
 
 #include "pc98pt.h"

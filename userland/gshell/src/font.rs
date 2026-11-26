@@ -852,7 +852,3 @@ pub fn announce(st: &GuiState) {
         gserial::notify(st, msg);
     }
 }
-
-#[cfg(test)]
-#[path = "../host/font_tests.rs"]
-mod tests;

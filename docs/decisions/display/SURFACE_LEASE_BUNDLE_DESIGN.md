@@ -70,8 +70,8 @@ if (source->role == LEDGER_ROLE_DISPLAY)
 |3|新 sys/platform/pc98/display_bundle.c (と build/platform/pc98.mk の 1 行)|`display_provider_bundle_ok` の PC-98 の定義 (DISPLAY かつ PC98 のときだけ真) を単独で組める小さなファイルに置く (確定 N3 (a))。|
 |3b|新 sys/platform/powermac/display_bundle.c (と build/platform/powermac.mk の 1 行)|PowerMac の定義 (CLIENT かつ OF_FB のときだけ真)。FEATURE_EXEC の PPC 像は surface_query.c を既に組み `--no-undefined` で link するので、本線の段 2〜4 と同じ取り込みに入れる (確定 N2)。|
 |4|sys/kern/exec/surface_query.c と、surface_query.c を組む host 試験のつなぎ (surface_query_host.c・public_surface_host.c・gfx_kernel_fb_host.c・memmap_audit_host.c など、grep で全部)|bundle のみ新しい口へ接続。つなぎには display_provider_bundle_ok の定義を足す (確定 N2b)。ここまでは x86 の 4 面制限が本体にも残る。段 2・3・3b・4 は同じ取り込みの単位。|
-|5・7（一括）|sys/kern/exec/lease.c、tools/tests/test_surface_bundle.py|固定条件と入力長を一般化し、bridge を DISPLAY に限定。同時に旧条件を指す変異の目印と試験の依存を更新。|
-|6|tools/tests/surface_bundle_host.c|公開入口で後端の拒否を、本体で可変件数と復元を検証。|
+|5・7（一括）|sys/kern/exec/lease.c、test_surface_bundle.py (旧版 03714882501b)|固定条件と入力長を一般化し、bridge を DISPLAY に限定。同時に旧条件を指す変異の目印と試験の依存を更新。|
+|6|surface_bundle_host.c (旧版 05931bb6a23d)|公開入口で後端の拒否を、本体で可変件数と復元を検証。|
 |8（PPC PM・5c）|PowerPC の公開表|段 3b の定義は本線が入れる。5c では gfx_surface_lease の束を公開する配線だけ。|
 |9（本線）|docs/KAPI_SPEC.md、docs/decisions/ppc/PPC_KAPI_FILL_DESIGN.md の受入表|前者に PPC の role・件数を併記。後者の「束の後半失敗で先頭も未取得」を host の複数件 source の受入に移す。文書変更を PowerPC PM に知らせる。|
 

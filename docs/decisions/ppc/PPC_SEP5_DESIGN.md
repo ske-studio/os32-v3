@@ -120,7 +120,7 @@ MESSAGES['sdk'] = 'sdk'
 - 全行KAPI slot/世代・SDK公開ヘッダ・CRT入口・FEP指紋は不変。SDKツール/stagingメタデータだけS段で変化。kdebug等のpaired checksum変化とABI変化を区別する。
 |段/前提|主ファイル・補助（新規/変更規模）|区分・受入（§6）|
 |---|---|---|
-|A コピー/基点|sys/hal/gfx/gfx_internal.h 16、sys/include/copy_units.h +12、arch/{x86,ppc}/arch_copy.h 各+25、tools/tests/host_arch/arch_copy.h +25|I、H1/比較。HALとgfx_internalで衝突。sys/platform/pc98/video/backend_pegc_present.incの呼出もH1対象|
+|A コピー/基点|sys/hal/gfx/gfx_internal.h 16、sys/include/copy_units.h +12、arch/{x86,ppc}/arch_copy.h 各+25、arch_copy.h (旧版 f3435009e485) +25|I、H1/比較。HALとgfx_internalで衝突。sys/platform/pc98/video/backend_pegc_present.incの呼出もH1対象|
 |B1 palette/A|sys/hal/gfx/palette.c 12、sys/kern/console/display_restore.h +25、sys/platform/pc98/display.c +20、sys/platform/powermac/display.c +25（未対応口）|C、H2/N1/N3。HAL palette試験と直列|
 |B2 scroll/B1|sys/hal/gfx/gfx_scroll.c 55、sys/platform/pc98/gfx_scroll.c 移55、sys/kern/console/display_restore.h 5|C、H2/N3。vram_scroll_yは移さない|
 |B3 init/B2|sys/hal/gfx/gfx_core.c 70、sys/hal/gfx/gfx_core_init.inc 35、sys/platform/pc98/gfx_init.c +110、同.h +15|C、H3/N1/N3。HAL coreと直列|
@@ -133,12 +133,12 @@ MESSAGES['sdk'] = 'sdk'
 |D1 WC/独立|sys/dev/video/geforce/gf_wc.c 130、sys/arch/x86/kernel/video_wc.c 移150、sys/include/video_wc.h +25、sys/arch/ppc/video_wc.c +20|C、H5/N4。mtrr_wc.cは既存実体を使用|
 |D2 accept/D1|sys/dev/video/geforce/gf_accept.c 110、sys/arch/x86/video/gf_accept_cpu.c 移130、sys/arch/ppc/video/gf_accept_cpu.c +8、build/geforce-module.mkのGFA source/規則15|C、H5/N4。module ABI/exportsは不変|
 |E SQLite/独立|lib/sqlite3/sqlite3.c 9、sys/include/diag_stack.h +8、arch/{x86,ppc}/arch_diag_stack.h 各+12|I(off)/C(on)、H6。第4段r2はtypesを変更せず競合なし|
-|F boot選択/独立|tools/tests/test_sep5_boot.py +120、tools/checks/sep5-boot-host.py +15。製品ファイル変更0|I、H7。既設のPPC boot/sdk/programs拒否、boot像不変|
+|F boot選択/独立|test_sep5_boot.py (旧版 31277df0731b) +120、sep5-boot-host.py (旧版 3f1d44ec9623) +15。製品ファイル変更0|I、H7。既設のPPC boot/sdk/programs拒否、boot像不変|
 |S1 profile/第3段F後|sdk/target_profile.py 40、build/sdk-target.mk +45、build/config.mk 15、sdk/target_profile_cli.py +45、tools/build_compare.py 10（tool pin）|I、H8。config/order登録は他段と直列|
 |S2 SDK接続/S1|build/sdk.mk 15、sdk/example/hello/Makefile 15、sdk/rustc_stamp.py 15（target拒否）、build/programs.mkのRust呼出規則20、userland/{rust,gshell}/.cargo/config.toml 0（検証入力のみ）、SDK README/arch README各15、tools/build_compare.py 10（配布tool pin）|I、H8/N5。PPC SDK拒否確認、CRT/JSON本文変更なし。arch/README.mdは第4段Fと直列|
 |Z 全段・第4段F後|tools/ppc/{selected_success,known_header_dependencies}.json 実測分、arch/README.md・TASK_PPC_SEP.md 各15、受入台本30|I、H9、全Nと容量/比較記録。第4段Fとarch/README.md・docs/tasks/ppc/TASK_PPC_SEP.mdが衝突（S2のarch READMEも同じ）|
-- source結線は製品のsourceを変える各段（Fは除く）のbuild/{sources/order.mk,select.mk,arch/x86-sources.mk,platform/pc98.mk,platform/powermac.mk}に各3–20行、tools/tests/fixtures/build_profile_x86.json各3–15行。移設位置で元のリンク順を保持する。全部Zへ先送りしない。
-- 新規hostはtools/tests/test_sep5_{copy,display,provider,console,wc,trace,boot,sdk,boundary}.py 各120–220行、必要なC harness各80–180行。各CHECK inputsと新tools/checks/sep5-{copy,display,provider,console,wc,trace,boot,sdk,boundary}-host.py登録各10–25行。既存試験の追従は§5各ファイル2–30行（抽出変更は30–100行）。
+- source結線は製品のsourceを変える各段（Fは除く）のbuild/{sources/order.mk,select.mk,arch/x86-sources.mk,platform/pc98.mk,platform/powermac.mk}に各3–20行、旧ホスト試験 fixtures/build_profile_x86.json各3–15行。移設位置で元のリンク順を保持する。全部Zへ先送りしない。
+- 新規hostは旧ホスト試験 test_sep5_{copy,display,provider,console,wc,trace,boot,sdk,boundary}.py 各120–220行、必要なC harness各80–180行。各CHECK inputsと新旧登録 sep5-{copy,display,provider,console,wc,trace,boot,sdk,boundary}-host.py登録各10–25行。既存試験の追従は§5各ファイル2–30行（抽出変更は30–100行）。
 - 製品の新規/変更約1,600–2,400行＋移設約600行、試験新規約1,800–3,000行、既存追従約500–1,200行。原計画900–2,000行は試験とinc/選択漏れを含まないため幅を広げた。実装開始時に各段のdiffで更新する。
 - 第3段D2/D3/E2/E3はexec/kapiの共有口を変えるためS1/S2は第3段F完了後。C1のlegacy_guest_fakeとgfx host抽出もD2と直列。第4段r2 §5はtypes/GF/GUIの製品編集を含まないためB5/D1/E/S1のその前提は外す。S2/Zの文書衝突は上表。GFX_ACCEL_HALのcore/internal/palette/vram・draw/geom・GUI試験は同時編集しない。
 - Aのuserland複製userland/lib/gfx/libgfx_internal.hは後段（GFX_ACCEL_HALのH2a・L2–L6・G3、PEGC DIRECTの残件と同じ台帳）。本段で解消した扱いにしない。
@@ -146,7 +146,7 @@ MESSAGES['sdk'] = 'sdk'
 - 比較台帳: tools/build_compare.pyのH2_OBJECT_MOVESをB2/B5/D1/D2で点検（各3–10行）。元objectが残る抽出は移動表へ入れず旧objectの比較と新objectのC差分を記録し、丸ごとの移動だけ実際の旧新名を追加。C2はFEP出力名を保持するため追加不要、source/STT_FILEを確認。A/C3/E(off)/F/Zはobject移動なし、不一致ならI受入を止める。
 - S1/S2はALLOWED_TOOL_DIFFSへ実配布のtarget_profile.py/CLI/rustc_stamp.py等の旧新sha256を段ごとにレビュー後pin（新規の旧値はNone）。未配布ファイルは登録せず、パスだけの例外や全SDK除外を作らない。基点/段直前の比較を両方記録。
 ## 5. host依存の全件台帳
-- T=tools/tests/、C=tools/checks/。下表で移設元/先と担当段を結び、source/include/抽出/MIRRORとCHECK covers/inputsを同段で更新。契約ヘッダのcoversは削除しない。既存globで新パスを覆う場合は重複登録不要。
+- T=旧ホスト試験、C=旧検査登録。下表で移設元/先と担当段を結び、source/include/抽出/MIRRORとCHECK covers/inputsを同段で更新。契約ヘッダのcoversは削除しない。既存globで新パスを覆う場合は重複登録不要。
 |段|移設/変更対象|T試験・C coversの追従（拡張子省略）|
 |---|---|---|
 |A|gfx_internal→copy_units/arch_copy、PEGC呼出|T test_gfx_copy/attach/kernel_fb/transfer・host_arch; C gfx-host・arch-asm・c-dialect|
@@ -201,7 +201,7 @@ MESSAGES['sdk'] = 'sdk'
 |N4 WC（D）|起動/描画退行無し・非対応時正常fallback・受入ログ。NP21/Wで対応GPUのWC効果は測れない。実効帯域や実機試験を完了条件に足さない|
 |N5 SDK（S）|配布SDKだけで組んだC helloとRustアプリの起動・引数・終了・再起動、LS callback、resident shell aux/APIを確認。boot/CRT選択の変更はbyte一致でもN1/N5で受入|
 - I段はtools/build_compare.shでbuild_id/日時固定、対応.oのtext/rodata/relocation、ELF load section、vmkernel.lz4、通常/R1/moduleを比較。移設に伴うsymbol番地の差を正規化して一致扱いにしない。比較の基点は各段直前＋本票基点の双方を記録。
-- 実装者は変更したkernel/SQLite・R1・GF受入module・boot像・SDK/該当userlandを省略せずビルド、触った試験--mutateと`python3 -B tools/checks/run.py --lint`。ABI変更ならclean→all。landingはCI check/build、全mutationはfull-check。check-changedは回さない。最後のソース変更後のログのみ合格とする。
+- 実装者は変更したkernel/SQLite・R1・GF受入module・boot像・SDK/該当userlandを省略せずビルド、触った試験--mutateと旧手順（81a6961200c5 の記録）。ABI変更ならclean→all。landingはCI check/build、全mutationはfull-check。check-changedは回さない。最後のソース変更後のログのみ合格とする。
 ## 7. selectedとknownの差分目標
 - 現行固定値は90 TU/21組。check_compile.pyの`--source-profile selected --accept --json`と実.dで確認してからJSONを減らす。通過TUを選択から外して件数を良く見せない。移設元/先の同一性も別欄で記録する。
 - A/Bの新規通過候補は`sys/platform/pc98/video/gfx_vram.c`、`sys/hal/gfx/gfx_core.c`、C1は`sys/kern/console/console.c`、D1は`sys/dev/video/geforce/gf_wc.c`（GF配置の残る二次障害は実装時に別計測）。各TUの二次障害を実測し、通過数は未確定。gfx_scroll.c/palette.cは既に90本に含まれ、新規成功には加算しない。

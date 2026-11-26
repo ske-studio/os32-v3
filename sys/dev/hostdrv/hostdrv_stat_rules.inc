@@ -2,7 +2,7 @@
  *  hostdrv_stat_rules.inc — hdrv_stat() の「成功と言ってよいか」の純規則
  *
  *  票: H1 (docs/archive/shell/HSYNC_IMPROVEMENT_PLAN.md §2 / §4.3)
- *  ホスト試験: tools/tests/hsync_h1_host.c (A11)
+ *  ホスト試験: hsync_h1_host.c (旧版 937391bfaaa5) (A11)
  *
  *  直した点:
  *    1. Basic / Standard 情報の問い合わせに失敗しても最後に成功を返す経路が
@@ -15,7 +15,7 @@
  *  票 H3 で LastWriteTime -> st_mtime の変換を足した (下の
  *  hdrv_filetime_to_unix)。**判定は純関数のまま**なので、境界 (1970 年より
  *  前 / 未提供 / os_time_t の範囲外) はホストで直接叩いて確かめられる
- *  (tools/tests/hsync_h3_host.c の A16)。
+ *  (hsync_h3_host.c (旧版 09444cd93ad3) の A16)。
  *
  *  ハイパーコールにもカーネルの他のヘッダにも触らない純関数なので、
  *  ホストでそのまま走らせて試験できる。

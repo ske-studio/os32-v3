@@ -25,5 +25,5 @@
 
 ## 検査
 
-- `tools/tests/test_osri_profile.py`: 引数の振り分けと、無指定 = 明示 B31 の出力。
-- `tools/tests/test_osri.py`: 旧方式の変換と、誤差拡散・プレーン配置・CRC。
+- `test_osri_profile.py (旧版 158bfa11af3e)`: 引数の振り分けと、無指定 = 明示 B31 の出力。
+- `test_osri.py (旧版 5d240bea3019)`: 旧方式の変換と、誤差拡散・プレーン配置・CRC。

@@ -34,4 +34,4 @@ ACK/WINDOW (OS32→ホスト) も rid=0。WINDOW の単位は通数 (4 固定)�
 
 ## 確かめ
 
-- `tools/tests/test_link_notify.py` (`link_notify_host.c`、時計を 0xFFFFFF00 から始めて一周を見る)・`test_hostsvc_contracts.py` (wire の offset と長さ)・`test_host_notify.py` (送り手)。
+- `test_link_notify.py (旧版 422c6dd181af)` (`link_notify_host.c`、時計を 0xFFFFFF00 から始めて一周を見る)・`test_hostsvc_contracts.py` (wire の offset と長さ)・`test_host_notify.py` (送り手)。

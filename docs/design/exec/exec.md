@@ -11,12 +11,12 @@
   現行の `exec_setjmp` は必要なレジスタと文脈の深さを保存し、`exec_longjmp` で復元する
   (`sys/arch/x86/kernel/setjmp.asm`, `sys/arch/x86/kernel/setjmp.asm`)。
   復帰後に使う文脈は呼出し前に控え、保存場所の寿命を守る (`sys/kern/exec/exec.c`)。
-  実行文脈の回帰は `tools/tests/test_exec_r1.py` で確認する。
+  実行文脈の回帰は `test_exec_r1.py (旧版 b50e9720332b)` で確認する。
 
 - 終了時に全 FD やパイプを回収すると、親や常駐処理の資源まで壊す。
   `sys/kern/exec/exec.c` は終了する owner の DB、FD、パイプを回収し、保護 FD を除外する。
   DB の rollback に FD が要るため DB の回収を FD より先にする。
-  所有者別回収は `tools/tests/test_owner_reclaim.py` で確認する。
+  所有者別回収は `test_owner_reclaim.py (旧版 48940da43109)` で確認する。
 
 - syscall 中の WM の fault も、その syscall を出したアプリに帰属する。
   画面に例外が出ずアプリが消える場合、`fault_kill_count` とともに
@@ -100,4 +100,4 @@ ring3_wm_leave内に残す。
 - WM の中の #PF/#GP や門の拒否はアプリの kill として畳まれる (例外画面は出ず `fault_kill_count` だけ増える)。`ring3_kill_kind` は種別が FAULT で深さが 1 以上なら `ring3_wm_fault_count` を +1 する。**深さを 0 に戻す前に数える** (後に置くと常に 0)。CTRL+STOP (ABORTED) は数えない。
 - ISR の 2 つの kill の行 (例外と #PF) は深さが 1 以上なら ` (in WM)` を足す。kill するかどうかの判定は変えない。
 
-検査: `make check-ring3-guard-host` (`tools/tests/test_ring3_guard.py`)。exec.c と ISR はホストで組めないので、`ring3_wm_fault_count` の位置と ` (in WM)` は本文の字面で見る。
+検査: `make check-ring3-guard-host` (`test_ring3_guard.py (旧版 8e0bfe6189d3)`)。exec.c と ISR はホストで組めないので、`ring3_wm_fault_count` の位置と ` (in WM)` は本文の字面で見る。

@@ -48,14 +48,14 @@ sdk/include の 19 ヘッダでは public が true のまま images に依存先
 | 道具 | 現在の一覧 | 切替後 |
 |---|---|---|
 | tools/check_layers.py | DEVICE_ROOTS・NAMED と像の軸 | kind・target・header_role を include の両端で参照 |
-| tools/ci/ppc_scope.py | COMMON・PPC・X86・EXACT・LAYOUT_PATTERNS | 対象名・像・依存の完全性で選択 |
+| ppc_scope.py (旧版 d4d22d1c0028) | COMMON・PPC・X86・EXACT・LAYOUT_PATTERNS | 対象名・像・依存の完全性で選択 |
 | tools/source_roots.py | 検査別の SCAN_ROOTS | 所属・対象・検査の適用条件から走査パスを生成 |
-| tools/checks/run.py | FULL・SCAN_ROOTS | 所属と依存で選び、登録固有の covers は検査入力として結合 |
+| run.py (旧版 bdcca5c408c4) | FULL・SCAN_ROOTS | 所属と依存で選び、登録固有の covers は検査入力として結合 |
 | tools/ops/check_arm_compile.py | KNOWN_NON_KERNEL・IMPL_DIRS と走査根 | カーネル像の所属・対象で絞る |
-| tools/check_c_dialect.py | VENDOR_DIRS、SDK_HDR_DIR、公開ヘッダ・見本の glob | 第三者の所属、SDK 配布宣言の public、見本のビルド入力から対象を得る。C 方言の規則は検査に残す |
-| tools/check_av_portable.py | sound/hal・input/hal の C とヘッダ | 所属宣言に HAL の役割とサブシステムを付けて選ぶ |
-| tools/check_usb_portable.py | drivers/usb の走査とファイル名の接頭辞 | USB の所属宣言と実装の役割から対象を選ぶ。許される include は検査の契約 |
-| tools/check_manifests.py、tools/gen_kdebug_imports.py、tools/gen_hwdev_contract.py | プログラムの入力、後二者は GF のソース・ヘッダ | 各対象を共通の所属・依存の宣言から列挙する |
+| check_c_dialect.py (旧版 d768037598ba) | VENDOR_DIRS、SDK_HDR_DIR、公開ヘッダ・見本の glob | 第三者の所属、SDK 配布宣言の public、見本のビルド入力から対象を得る。C 方言の規則は検査に残す |
+| check_av_portable.py (旧版 53b9560b1b2e) | sound/hal・input/hal の C とヘッダ | 所属宣言に HAL の役割とサブシステムを付けて選ぶ |
+| check_usb_portable.py (旧版 9abc67fa5e56) | drivers/usb の走査とファイル名の接頭辞 | USB の所属宣言と実装の役割から対象を選ぶ。許される include は検査の契約 |
+| check_manifests.py (旧版 7862924cb7de)、tools/gen_kdebug_imports.py、tools/gen_hwdev_contract.py | プログラムの入力、後二者は GF のソース・ヘッダ | 各対象を共通の所属・依存の宣言から列挙する |
 | tools/check_privileged.py | SCAN_DIRS の userland 以下の object | 像のユーザーランド入力から対応する object を取得する |
 | tools/restructure/owners.py | KERNEL_ROOTS と調査対象の規則 | P4 の 3の全件照合後 P7 で撤去 |
 | tools/restructure/hal_inventory.py | COMMON・OWNERS・SCOPES | 役割の判断を HAL の表に渡し P7 で撤去 |
@@ -67,21 +67,21 @@ tools/ の走査根の定数、glob・rglob・os.walk、git ls-files の利用�
 
 ## A1 の不要の候補
 
-16 本のうち、使用を確認できた道具は 15 本。残る tools/g16/scan_ui_chars.py は GUI ソースから文字を集める。Makefile、build 以下の .mk、tools/checks の登録、workflow、スキル、他の道具の呼出し・import、現行 docs の手順で呼出元は各 0 件。生成した ui_chars.txt には手動更新の注記があり、gen_preload16.py はその文字表を使う。手元での更新頻度は未確認。A1 で不要の候補として提示し、入口への移行対象から外す。削除の判断は D-11 と同じく別票で行う。
+16 本のうち、使用を確認できた道具は 15 本。残る tools/g16/scan_ui_chars.py は GUI ソースから文字を集める。Makefile、build 以下の .mk、旧検査登録 の登録、workflow、スキル、他の道具の呼出し・import、現行 docs の手順で呼出元は各 0 件。生成した ui_chars.txt には手動更新の注記があり、gen_preload16.py はその文字表を使う。手元での更新頻度は未確認。A1 で不要の候補として提示し、入口への移行対象から外す。削除の判断は D-11 と同じく別票で行う。
 
 再調査は `python3 -B tools/restructure/tool_callers.py PATH...`。出力は対象パス、該当ファイル数、各ファイル名と最初の該当行の TSV。追跡中の手順・コマンド・Make の明示前提・Python import を静的に探す。自己参照、一覧の記載、アーカイブとハードウェア資料は集計から除く。動的に組み立てたコマンドや木の外での手動実行は未確認。
 
 | 対象 | 呼出元ファイル数 | 所在の例 |
 |---|---:|---|
-| `tools/check_layers.py` | 6 | tools/checks/layers-ppc.py |
-| `tools/ci/ppc_scope.py` | 2 | .github/workflows/check.yml |
-| `tools/source_roots.py` | 4 | tools/check_arch_asm.py |
-| `tools/checks/run.py` | 44 | .github/workflows/build.yml |
+| `tools/check_layers.py` | 6 | layers-ppc.py (旧版 1d0429399e1b) |
+| `ppc_scope.py (旧版 d4d22d1c0028)` | 2 | .github/workflows/check.yml |
+| `tools/source_roots.py` | 4 | check_arch_asm.py (旧版 1426e1f3d889) |
+| `run.py (旧版 bdcca5c408c4)` | 44 | .github/workflows/build.yml |
 | `tools/ops/check_arm_compile.py` | 2 | build/sdk.mk |
-| `tools/check_c_dialect.py` | 3 | tools/checks/c-dialect.py |
-| `tools/check_av_portable.py` | 1 | tools/tests/test_av_abi.py |
-| `tools/check_usb_portable.py` | 2 | tools/checks/usb-portable.py |
-| `tools/check_manifests.py` | 4 | tools/checks/manifests.py |
+| `check_c_dialect.py (旧版 d768037598ba)` | 3 | c-dialect.py (旧版 8a69154bcd63) |
+| `check_av_portable.py (旧版 53b9560b1b2e)` | 1 | test_av_abi.py (旧版 db319aadc343) |
+| `check_usb_portable.py (旧版 9abc67fa5e56)` | 2 | usb-portable.py (旧版 203f8b4e9554) |
+| `check_manifests.py (旧版 7862924cb7de)` | 4 | manifests.py (旧版 d343d873fee2) |
 | `tools/g16/scan_ui_chars.py` | 0 | 該当なし |
 | `tools/gen_kdebug_imports.py` | 25 | build/cd-module.mk |
 | `tools/gen_hwdev_contract.py` | 5 | build/kdebug.mk |

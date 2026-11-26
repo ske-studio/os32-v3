@@ -17,4 +17,4 @@ PC-98 のテキスト VRAM (TVRAM) へのセル単位の読み書き。KAPI の 
 
 ## 検査
 
-`tools/tests/test_kapi_bounds.py` が実 `sys/platform/pc98/console.c` を ILP32 で組み、TVRAM の両面とその間・外側の番兵、アクセス回数で確かめる。
+`test_kapi_bounds.py (旧版 9543608bb83e)` が実 `sys/platform/pc98/console.c` を ILP32 で組み、TVRAM の両面とその間・外側の番兵、アクセス回数で確かめる。

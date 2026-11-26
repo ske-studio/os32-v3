@@ -11,7 +11,7 @@
 - 素案は Fable が起草 (`~/os32-tmp/run/policy-review/DRAFT.md` → r2)、レビューは astra (`REVIEW.md`)。
 - 2026-10-31: P3(b) の振り分け (108 本: 消す 0・tier 4 2・直す 83・そのまま 23、`~/os32-tmp/run/policy-p3/P3b_SURVEY.md`) について「**触るときに直す**」— 手本 1 本 (test_exec_image.py) だけ今直し、残りはその試験を触る段で §D の形に。P4 (置き場の移動) は「**見送る**」— 新しい検査だけソースと同じ置き場に。
 
-- 2026-10-31 (PM の見つけたこと、未着手): `tools/checks/run.py` の `compiler_headers` は `gcc -MM` の結果のうち `.h` だけを拾い、`.inc` を捨てる。加えて旧 yaml から写した covers が `.inc` を手で並べているので、`.inc` を 1 本切り出すたびに宣言を何十本も追従させることになる (E01b で 51 本)。案: `.inc` も `-MM` から拾い、covers に `.c` を持つ検査は手で並べた `.inc` を外す — 200 コミットの同値を当たりの増加側に限って確かめてから。 → **2026-10-31 済み** (fb32ce6c、ユーザー承認): `.inc` を -MM から拾い宣言 130 本から 933 項目を外した (200 コミットで当たり ⊇、増加 5 件)。同時に、ビルド定義のコメントだけの差で段 4 にしない (基点があるとき)・ユーザーランドの中間物を .SECONDARY に (2 回目の make all が 804→329 行) — sol・terra 実装、astra レビュー。
+- 2026-10-31 (PM の見つけたこと、未着手): `run.py (旧版 bdcca5c408c4)` の `compiler_headers` は `gcc -MM` の結果のうち `.h` だけを拾い、`.inc` を捨てる。加えて旧 yaml から写した covers が `.inc` を手で並べているので、`.inc` を 1 本切り出すたびに宣言を何十本も追従させることになる (E01b で 51 本)。案: `.inc` も `-MM` から拾い、covers に `.c` を持つ検査は手で並べた `.inc` を外す — 200 コミットの同値を当たりの増加側に限って確かめてから。 → **2026-10-31 済み** (fb32ce6c、ユーザー承認): `.inc` を -MM から拾い宣言 130 本から 933 項目を外した (200 コミットで当たり ⊇、増加 5 件)。同時に、ビルド定義のコメントだけの差で段 4 にしない (基点があるとき)・ユーザーランドの中間物を .SECONDARY に (2 回目の make all が 804→329 行) — sol・terra 実装、astra レビュー。
 
 ## 本文 (素案 r2 の写し)
 
@@ -35,8 +35,8 @@
 | 対象 | 数 | 読み方 |
 |---|---|---|
 | 規則の文書 | POLICY_DEV 429 行、POLICY_DEBUG 1,590、CONSTRAINTS 217、ROLES 126、SRC_MOVE 63、CLAUDE.md 103、AGENTS.md 48、skills 12 本 1,442 — 計 4,018 行 | ROLES §0 の「検査」の行 2,614 字に 3 つの流れ (3 段・Tx・実機の版) と承認の日付 6 件が混ざる |
-| 検査の 3 か所 | **`make` の列 237 本** (`check_lists`)、build/checks.d **244** .mk、tools/check_map.d **241** .yaml **8,699 行** (平均 36 入力、82 本が `**` を含む)、tools/tests/test_*.py **313** 本 (mk から呼ばれるのは 181 本、残りは `host32_check` 経由や他の道具 63 本) | 1 検査が 3 ファイルに分かれ、`check_select.py` (1,565 行) が読み合わせる。mk の 43 本は recipe が 2 行以上、4 本は前提の目標を持つ (`check-ver-info-host`、`sdk.mk`) |
-| 3 か所の追従 | 10-16 以降の非 merge コミットで check_map.d を触ったもの **253**、checks.d 131、tools/tests 491。yaml だけのコミットは **3** | 対応表は「試験を直すたびに一緒に直す」税。独立に価値を足した回数 (3) に対して 250 回の追従 |
+| 検査の 3 か所 | **`make` の列 237 本** (`check_lists`)、build/checks.d **244** .mk、tools/check_map.d **241** .yaml **8,699 行** (平均 36 入力、82 本が `**` を含む)、旧ホスト試験 test_*.py **313** 本 (mk から呼ばれるのは 181 本、残りは `host32_check` 経由や他の道具 63 本) | 1 検査が 3 ファイルに分かれ、`check_select.py` (1,565 行) が読み合わせる。mk の 43 本は recipe が 2 行以上、4 本は前提の目標を持つ (`check-ver-info-host`、`sdk.mk`) |
+| 3 か所の追従 | 10-16 以降の非 merge コミットで check_map.d を触ったもの **253**、checks.d 131、旧ホスト試験 491。yaml だけのコミットは **3** | 対応表は「試験を直すたびに一緒に直す」税。独立に価値を足した回数 (3) に対して 250 回の追従 |
 | 所要 | 10-25 の記録 (`n8/check_times.tsv`、198 本、変異なし) 直列 **1,311 s**、181 本は 10 s 未満、静的 3 本 (c-dialect 154・p2v 108・arch-asm 69) で 331 s (25%)。古い記録 (226 本) は 3,195 s だが -j の重なりの下の値で、**38 本が今は無い (kstr-bench を含む)、49 本が未計測** | 今の 237 本の直列の所要は未計測 (記録は 198 本まで)。静的 3 本が 1/4〜1/3 は 2 記録で一致 |
 | 選び方 | `plan()` の mode `sel` は `st = list(par)` = **全部を回し**、変異だけ当たりに絞る (`check_select.py:1402`)。**直近 60 コミット**: 文書だけ 18、`sel` 30 (当たり **中央値 16 本**、最小 2、最大 46)、`full` (安全側で全部) 4、ヘッダを含む 8 は未計測 | 当たりだけ回せば 237 → 16 本 (中央値)。待ちの主因はここ |
 | 試験の形 | ソースを `read_text()` で読む 224 本、実カーネルの .c を組む 144 本、文字位置で切り出す 36 本、hash・行数の固定値 64 本。共有部品: host32.py (154 本が使う)・kernel_includes.py (144)・mutpar.py (80)・kernel_layout.py (19)・kernel_boot_source.py (14) | 313 本のうち `main` を持つ 305、`--mutate` を受ける 240、`MUTATIONS` 149、unittest/pytest 59。宣言 + `run()` への機械変換が利く形 |
@@ -106,83 +106,10 @@ r1 §A-1〜A-7 のまま (CONSTRAINTS 19 → 14 ID、POLICY_DEV 34 → 15 節、
 - **unmatched の扱い**: 対象の宣言が無いファイルは `--lint` と変更選択の入口でエラーにする。実際の入力を covers に宣言し、検査対象外は明示的な NOTEST、ビルドなど全体に届く入力は段 4 の経路に登録する。
 - **段 4 の頻度**: 票の終わりか週 1 の早い方 (G-2)。CI は check-fast のまま。
 
-## C-2. 1 検査 1 ファイルとランナー (新、ユーザー提案 2026-10-30)
+## C-2. 旧登録と実行器
 
-**何が問題か**: 1 検査が mk (回し方)・yaml (選ぶ元)・test_*.py (中身) の 3 か所に分かれ、選ぶ元が手書き 8,699 行。試験を直すたびに yaml が追従し (10-16 以降 253 コミット)、`check_select.py` 1,565 行が 3 か所を読み合わせて辻褄を検査する (`--lint`、`check-map` で 101 s)。
-
-### C-2-1 宣言の書き方
-
-検査ファイルは**自分が何を見て、いつ回り、何が先に要るか**を先頭で宣言し、`run()` を持つ。ランナーは宣言を `ast` で読む (import しない — 読むだけなら 313 本で数秒 [推])。
-
-```python
-### tools/checks/mm/dma_pool.py   (移す前は tools/tests/test_dma_pool.py の先頭に足す)
-CHECK = dict(
-    name="dma-pool-host",            # make check-dma-pool-host の名 (CI・スキルが呼ぶ)
-    tier=1,                          # 1 直接 / 3 共有 (当たりだけ) / 4 全体だけ / 0 文書 (当たりだけ)
-    covers=["sys/kern/mm/dma_pool_math.c", "sys/kern/mm/dma_pool.c", "lib/dma_contract.c",
-            "sys/dev/dma/dma8237_math.c"],   # 組む・読むソース。ヘッダは gcc -MM で導く (書かない)
-    needs=[],                        # 先に要る make の目標: "kernel" / "all" / "sqlite-module-proto"
-    budget=15,                       # 秒 (変異なし)。超えたら段 4 の報告に載る (rc は変えない)
-    runners=["native", "qemu"],      # host32 を使う検査だけ (HOST32_RUNNERS の既定、sdk.mk:150)
-    mutate_tier=2,                   # 変異を回す最も浅い段 (省略時 2、安定部分は 4)
-)
-
-def run(ctx) -> int:
-    """ctx.mutate (bool) / ctx.runner / ctx.files (静的検査が受ける変わった翻訳単位) / ctx.tmp"""
-    ...
-```
-
-- 静的検査 (p2v・c-dialect・arch-asm・privileged・kprintf-window) は `covers=["**/*.c", "**/*.asm"]`・`scope="files"` で、`ctx.files` に**変わった翻訳単位** (変えた .h を include する .c は gcc -MM の逆引き) を受けて差分だけ見る。今は `--root` しか受けない (`check_p2v.py`、`check_arch_asm.py`)。段 4 では全部。
-- 他の道具を呼ぶだけの検査 (`check-memmap` → `gen_memmap.py --check`、`check-shlib` → `mkshlib.py --check`、63 本) は、`run()` が subprocess で呼ぶ 10 行の検査ファイルにする。道具の本体は動かさない。
-- 生成物を読む検査 (今の `artifact_readers:` 10 本) は `needs=["all"]` + covers に `build/out/**` の読む物。`--lint` の「読み手の登録漏れ」(`check_select.py:1150-1207`) は「covers に無い build/out を読んだ」の 1 検査に縮む。
-- 1 検査に試験スクリプトが 2 本以上 (mk の 43 本、`check-ver-info-host` は 11 本の前提 + 2 本) は、`run()` が順に呼ぶか、`needs` に他の検査の名を書く (前提は 4 本だけ)。
-
-### C-2-2 ランナーの選び方 (規則はこの 1 か所、`tools/checks/run.py`)
-
-1. **列**: `tools/checks/**/*.py` (移行中は `tools/tests/test_*.py` も) の CHECK を読み、`--list` で make の列を出す。並び順は `budget` の大きい順 (今の `CHECK_PAR_ORDER` の手書きの番号 244 個が消える)。
-2. **変更**: `git diff <基点>` か `--files`。`ignore`・`docs_only`・`notest`・`full` の 5 種の glob (今の `check_map.yaml` の全体方針 115 行 → ランナーの定数 約 40 行)。
-3. **当たり**: 変更 ∩ (covers ∪ covers の gcc -MM ヘッダ)。ヘッダは今の `compiler_headers` (`check_select.py:963`) をそのまま持ち込み、結果を `build/out/` にキャッシュ。
-4. **段**: 変更の共通の親の深さ → 1〜3、`full` の glob に当たれば 4。宣言漏れはエラー。
-5. **回す**: 段 0〜3 は `{c | c が当たり ∧ c.tier != 4}` とその前提だけ。静的・tier 0・tier 3 の無条件追加はしない。段 4 は全部。変異は `段 ≥ c.mutate_tier` の当たりだけ。
-6. **先に組む**: 回す検査の `needs` の和集合を 1 回 `make`。
-7. **出力**: 今の `check_changed.sh` と同じ `CC_STAGE1`・`CC_MUT1` + `CC_TIER`・`CC_NEEDS`。`make check-changed` (`sdk.mk`) の形は変えない。
-8. **`--lint`**: 宣言のあるファイルだけが列に載る・covers のパスが実在する・`name` が重複しない・build/out を読むなら needs にある。数秒。
-
-### C-2-3 今の 3 か所からの移し替え (機械変換 + 同値の確認)
-
-- **変換の道具** (一時、`tools/checks/convert.py`、終わったら消す): mk の recipe → `run()` (`python3 -B tools/tests/X.py $(MUT)` → `main` の呼び出し、`host32_check` → `runners`、gcc の行 → subprocess)、mk の前提 → `needs`、yaml → `covers` (**.c/.asm/.inc/.py/データだけ残し、ヘッダ・自分の mk/yaml・`**` を落とす**)、`tier` は PM が渡す一覧 (既定 1、`docs_always` → 0、共有 → 3、§B-2 → 4、`broad` の静的 → `scope="files"`)、`budget` は 10-25 の記録 × 2 (未計測は 60)。
-- **同値の確認** (PM、取り込みの前): main の直近 200 非 merge コミットについて `check_select.py --select --files <差分>` の `CC_MUT1` (= 今の当たり) と `run.py --select --files <差分>` の当たりを比べ、**全件で同じ**ことを見る。違いが出たら理由を 1 行ずつ (ヘッダを落とした・自己参照・`**` の過大) 読み、過小 (新で選ばれない) は covers に戻す。直近 60 件で 3 分だったので 200 件は 10 分 [推]。
-- **置き場の移動は分ける**: 宣言とランナーが入り同値が確かめられた後に、`tools/tests/test_x.py` → `tools/checks/<ソースと同じパス>/x.py` (ハーネス .c と `_tdd.md` も一緒) を `move_files.py` で機能ディレクトリごとに (G-7)。224 本が `read_text()` のパスを持つので、参照の書き換えは道具で。
-
-### C-2-4 make・CI・スキルとの関係
-
-- `make check-<名>` は残る: `sdk.mk` の `include build/checks.d/*.mk`  を **1 つのパターン規則** `check-%: ; python3 tools/checks/run.py --run $*` と `CHECK_PAR_TARGETS := $(shell run.py --list)` に置き換える。`check` / `check-fast` / `check-changed` / `check-par` の名と `MUTATE=` の意味 (`sdk.mk`) は変えない。
-- CI: `check.yml` の `make check-*` 28 行と `build.yml` の `make check-fast` は**そのまま**。`gen_tests_inventory.py` (mk と check.yml を読む) は `run.py --list --json` を読む形に。
-- スキル: `os32-delegate` :30・:34、`os32-land` :35 の `check_select.py` → `run.py` (5 か所)。`--pack` (依頼文の参照) は使っていれば `run.py --pack` に移す。`test_changes.py` の `TEST_PREFIXES` から check_map.d・checks.d を外す。
-
-### C-2-5 消えるもの・残るもの
-
-| 今 | 後 |
-|---|---|
-| `tools/check_map.d/` 241 本 8,699 行 | **消える** (covers が検査ファイルの中) |
-| `build/checks.d/` 244 本 (+ `CHECK_PAR_ORDER` の番号) | **消える** (パターン規則 1 つ) |
-| `tools/check_map.yaml` 115 行 | ランナーの定数 約 40 行 (5 種の glob と基準枝) |
-| `tools/check_select.py` 1,565 行 | `tools/checks/run.py` 約 400 行 [推] (持ち込むのは `compiler_headers`・`make_narrow`・変更の列挙) |
-| `test_check_select.py` 1,222 + `test_checkinfra.py` 526 行、`check-check-select-host` 73 s + `check-map` 101 s | ランナーの試験 1 本 約 300 行 [推]、10 s 以内 |
-| 共有部品 `tools/tests/{host32,kernel_includes,mutpar,kernel_layout,kernel_boot_source}.py` | **残る** (`tools/checks/lib/` へ移すのは置き場の移動のとき) |
-| ROLES §4-1「対応表に Makefile を書かない」、08_build の「対応表」の説明 | 消える |
-
-### C-2-6 段の分け方と実装者
-
-| 段 | 中身 | 担当 | 見積り |
-|---|---|---|---|
-| R0 | 設計票 (宣言の形・選び方の規則・同値の確かめ方・CC_* の互換)、design-rally 1 往復 | astra 起草 → Opus レビュー | 1 日 |
-| R1 | `run.py` (--list/--select/--run/--lint) + `convert.py` + ランナーの試験。`check_select.py` は 1,565 行なので terra に出さない | sol | 2 日 |
-| R2 | 変換の実行、tier の一覧 (PM)、200 コミットの同値、違いの読み | PM (道具を回す) | 1 日 |
-| R3 | 切替: `sdk.mk` のパターン規則、CI の inventory、スキル 5 か所、`test_changes.py`、旧 3 か所の削除、08_build §8-4・ROLES §0 の書き換え | terra (機械的) | 1 日 |
-| R4 (任意、後) | 置き場の移動 `tools/checks/<path>/` を機能ごとに `move_files.py` で | terra 並列 (SRC_MOVE L の型) | 2 日 |
-
-R1 と S (静的 3 本の `--files`、§F) は触るファイルが衝突しないので並列。
+当時の宣言・移行・同値比較の手順は `git show dafe81642:docs/tasks/v3/TASK_POLICY_LIGHT.md` にある。
+現行の検査本体と fixture の置き場所、登録と変異は [登録仕様](../../design/tools/checks/registry_v2.md) に従う。
 
 ## D. 試験の書き方
 
@@ -225,11 +152,11 @@ r1 §E の 6 項に 1 つ差し替え: **6. 試験を足す = 検査ファイル
 
 ## H. 実測の出所 (r2 で足した分)
 
-- 本数: `python3 -c "import check_select as c; ..."` で `check_lists` = 237、`load_map()["checks"]` = 241・入力 8,699・平均 36.1・中央値 25・`**` 82。`ls build/checks.d | wc -l` 244。mk の分類: `grep -l "tools/tests/test_" build/checks.d/*.mk` 181、recipe 2 行以上 43、前提あり 4 (`sdk.mk`、`check-ver-info-host.mk`)。
+- 本数: `python3 -c "import check_select as c; ..."` で `check_lists` = 237、`load_map()["checks"]` = 241・入力 8,699・平均 36.1・中央値 25・`**` 82。`ls build/checks.d | wc -l` 244。mk の分類: `grep -l "旧ホスト試験 test_" build/checks.d/*.mk` 181、recipe 2 行以上 43、前提あり 4 (`sdk.mk`、`check-ver-info-host.mk`)。
 - 所要: `~/os32-tmp/run/n8/check_times.tsv` (2026-10-25、198 本、合計 1,310.95 s、10 s 未満 181)。古い `barlen-impl/final-times.tsv` (226 本、3,194.93 s) は今の列と突き合わせて 38 本が無い (kstr-bench は `3937eca9` 2026-10-24 で削除)、49 本が未計測。
 - 選び方: `check_select.py:1402` (`st = list(par)`)、`:1388` (unmatched → 全部)、`:963` (gcc -MM)、`:975-989` (`extract`・`effective_checks`)、`:1150-1207` (lint)、`:1534` (main)。直近 60 コミットの `plan()` の実行: 文書だけ 18・`sel` 30 (当たりの中央値 16)・`full` 4・ヘッダ含み 8 (未計測)。
-- 追従: `git log --since=2026-10-16 --no-merges -- tools/check_map.d` 253、`build/checks.d` 131、`tools/tests` 491、yaml だけのコミット 3。
+- 追従: `git log --since=2026-10-16 --no-merges -- tools/check_map.d` 253、`build/checks.d` 131、`旧ホスト試験` 491、yaml だけのコミット 3。
 - 試験の形: `main` 305、`--mutate` 240、`MUTATIONS` 149、unittest/pytest 59、共有部品の使用数は `grep -l "import host32|from host32"` など (154/144/80/19/14)。
 - 安定の候補: `check_map.d/*.yaml` の kernel 層の .c/.asm/.inc を全部 `beh.tsv` ≤ 2 かつ活発な領域の外で絞る → 11 検査 (B-2 の表)、所要は n8 の値。ファイル単位では 112/297。
-- 規則の行: `ROLES.md:17` (検査の行、実機の調べの版の文)、`:86` (ゲスト受入 3 段の (2))、`:108` (T4 で踏んだもの)。`sdk.mk` (MUTATE)、同ファイル内 (check-changed)、同ファイル内 (HOST32_RUNNERS)、同ファイル内 (host32_check)、同ファイル内 (include checks.d)。`check_p2v.py`・`check_arch_asm.py` (`--root` だけ)、`check_c_dialect.py` (main)。`.github/workflows/check.yml` の `make check-*` 28 行。スキルの参照: `os32-delegate/SKILL.md:30,34`、`os32-land/SKILL.md:35`。`tools/test_changes.py`、`tools/gen_tests_inventory.py` 冒頭 (mk と check.yml を読む)。
+- 規則の行: `ROLES.md:17` (検査の行、実機の調べの版の文)、`:86` (ゲスト受入 3 段の (2))、`:108` (T4 で踏んだもの)。`sdk.mk` (MUTATE)、同ファイル内 (check-changed)、同ファイル内 (HOST32_RUNNERS)、同ファイル内 (host32_check)、同ファイル内 (include checks.d)。`check_p2v.py`・`check_arch_asm.py` (`--root` だけ)、`check_c_dialect.py` (main)。`.github/workflows/check.yml` の `make check-*` 28 行。スキルの参照: `os32-delegate/SKILL.md:30,34`、`os32-land/SKILL.md:35`。`test_changes.py (旧版 02fa8d41c5f1)`、`gen_tests_inventory.py (旧版 c39cf013be5f)` 冒頭 (mk と check.yml を読む)。
 - r1 の出所 (§H) はそのまま有効。

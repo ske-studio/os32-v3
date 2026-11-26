@@ -202,8 +202,8 @@ KiB=1024B。以下はリンク実測前の予算幅、圧縮前。追加依存�
 | R8 PC98回帰 | A/Hのhost: gfx_init前・DUAL=0・GF無し・CUIの各条件で TVRAM のみ更新、FB/表示列挙I/Oは0回。GF GUI/98 TEXTとGUI clear門も実物で比較。NP21/W節目受入 | safeをTEXT行数に置換して起動ログ消失をRED、console.cのsink/dual門反転で描画先/回数不一致をRED |
 | R9 G4単体 | OF4.2.1f2/ATY,R200、LAN無しで待機案内→USBでsh→コマンド/clear/長出力/BS、白黒・最下行・段印保持を写真とログで照合。LAN追加時も同じ出力 | 8bpp白黒交換はhostでもRED、最終合否は実機 |
 
-- new CHECK dict に source/header/font fixture/build の全入力を宣言。変更/除去行の既存mutation anchorを tools/tests で検索し移設。各anchorは一意、正常対照PASS・変異版runtime RED。
-- 実装時は依頼SHAのpreflight、対象像のbuild、追加/変更試験 --mutate、`python3 -B tools/checks/run.py --lint`。foregroundで完走。check-changed/全変異は回さず、取り込みcheck/buildはGitHub CI。
+- new CHECK dict に source/header/font fixture/build の全入力を宣言。変更/除去行の既存mutation anchorを 旧ホスト試験 で検索し移設。各anchorは一意、正常対照PASS・変異版runtime RED。
+- 実装時は依頼SHAのpreflight、対象像のbuild、追加/変更試験 --mutate、旧手順（38c5047d9ec6 の記録）。foregroundで完走。check-changed/全変異は回さず、取り込みcheck/buildはGitHub CI。
 - 本票ではbuild・preflight --fix-fonts・変異・実機試験は未実行。PACK2 が設計差分のみ・リポジトリ書込み禁止と指定しているため。照合基点は r1 の361af19cを継承。独立レビューはPMの次の設計ラリーで行う。
 
 ## 7. 未決 (ユーザー判断: 2件)

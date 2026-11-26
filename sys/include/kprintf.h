@@ -20,7 +20,7 @@ char kprintf_spec(const char **cursor, int *width, int *left_align,
                   char *pad_char);
 
 /* kprintf の属性 1 バイトを PC-98 のテキスト属性へ直す (純粋関数)。
- * 実体は sys/kern/kprintf_attr.c、試験は tools/tests/test_kprintf_attr.py。
+ * 実体は sys/kern/kprintf_attr.c、試験は test_kprintf_attr.py (旧版 7363e51b8c00)。
  *
  * 呼び出し側の 70 か所以上が PC/AT (CGA) 流の 0x07 などを渡していて、
  * PC-98 の属性としてそのまま書かれると **画面に 1 文字も出ない**

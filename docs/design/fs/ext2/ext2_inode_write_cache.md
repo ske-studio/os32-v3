@@ -13,4 +13,4 @@ commit は保持するrawの対象位置だけをencodeして書く。隣接inod
 
 親ディレクトリのRMWをこの子inodeの保持中に挟まない。createはfinishで保持を
 閉じてからadd_entryを呼ぶ。隣接inode・uid/gid/generationの保存とinode公開失敗は
-`tools/tests/test_ext2_write_batch.py` で検証する。
+`test_ext2_write_batch.py (旧版 5ed75b949a7b)` で検証する。

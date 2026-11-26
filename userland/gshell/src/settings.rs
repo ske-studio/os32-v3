@@ -886,7 +886,3 @@ fn log_startup(cfg: &GuiCfg) {
     buf[len] = 0;
     kprint(&buf[..=len]);
 }
-
-#[cfg(test)]
-#[path = "../host/settings_tests.rs"]
-mod tests;

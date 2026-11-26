@@ -10,7 +10,7 @@ FDD では媒体ジオメトリを取得してアクセスする。
 - **FDD のジオメトリ**: 2HD 固定のセクタ長や SPT で変換すると 1.44MB 媒体の位置がずれる。
   読込み側もドライバの `fdc_get_geom` を使う (`sys/dev/block/fat_diskio.c`, `sys/dev/block/fat_diskio.c`)。
   セクタサイズ取得や書込みも同じ媒体情報と揃える。媒体変更時は両形式で確認する。
-  関連するホスト試験は `tools/tests/test_fdc_track.py`。
+  関連するホスト試験は `test_fdc_track.py (旧版 1f253a73fa6c)`。
 
 ## 内部設計と契約 (D1)
 

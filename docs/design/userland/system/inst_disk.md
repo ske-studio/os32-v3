@@ -50,5 +50,5 @@ IPL 1〜512B (`INST_E_IPL_SIZE`)、ローダ 1〜8192B (`INST_LOADER_MAX`、`INS
 
 ## 確かめ
 
-`make check-hdd-stage2-host` (`tools/tests/test_hdd_stage2.py`、`tools/tests/hdd_stage2_host.c`) のケース `classify817`・
+`make check-hdd-stage2-host` (`test_hdd_stage2.py (旧版 f26dff44ab09)`、`hdd_stage2_host.c (旧版 89440456122b)`) のケース `classify817`・
 `classify1663`・`bootfiles`・`blocks`・`space`・`iplpt`・`room`・`consts`・`paths`。

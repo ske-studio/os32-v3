@@ -29,5 +29,5 @@ CD の `.PKG` から hd0 へ入れる。hd0 の扱い (順序・ERASE・鍵) は
 
 ## 確かめ
 
-`make check-hdd-stage2-host` (`tools/tests/test_hdd_stage2.py`、`tools/tests/cdinst_host.c`) のケース `ok817`・`ok1663`・`modes`・
+`make check-hdd-stage2-host` (`test_hdd_stage2.py (旧版 f26dff44ab09)`、`cdinst_host.c (旧版 02d9e8c00598)`) のケース `ok817`・`ok1663`・`modes`・
 `preflight`・`paths`・`final`・`incomplete` と real PKG paths (実物の `packages/*.PKG` の全項目が `inst_check_path` を通る)。

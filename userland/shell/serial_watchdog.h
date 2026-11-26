@@ -27,10 +27,10 @@
 /*  ので、勝手に速度が戻ると手元の操作の方が驚く。                           */
 /*                                                                          */
 /*  ここは**依存を 1 つも持たない**。シェル (userland/shell/rshell.c) から   */
-/*  使い、ホスト試験 (tools/tests/serial_vfast_host.c) は .c をそのまま      */
+/*  使い、ホスト試験 (serial_vfast_host.c (旧版 abdb25442030)) は .c をそのまま      */
 /*  #include して回す。                                                     */
-/*    試験: tools/tests/test_serial_vfast.py (ケース watchdog)              */
-/*    記録: tools/tests/serial_vfast_tdd.md                                 */
+/*    試験: test_serial_vfast.py (旧版 850eef82c906) (ケース watchdog)              */
+/*    記録: serial_vfast_tdd.md (旧版 a6de03cdab60)                                 */
 /*    票  : docs/archive/realhw_v21/TASK_SERIAL_VFAST.md                          */
 /* ======================================================================== */
 

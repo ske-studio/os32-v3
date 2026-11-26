@@ -10,7 +10,7 @@
 /*  読み手は「最後に読んだ seq」を渡すだけで、飛んだ分は seq の飛びで分かる。*/
 /*                                                                          */
 /*  排他は呼び手の責任 (IRQ1 の中の push は IF=0、copy は irq_save の間)。   */
-/*  ホスト試験は tools/tests/test_kbd_dlog.py (記録 kbd_dlog_tdd.md)。       */
+/*  ホスト試験は test_kbd_dlog.py (旧版 2a446906e839) (記録 kbd_dlog_tdd.md)。       */
 /* ======================================================================== */
 
 #include "kbd_dlog.h"

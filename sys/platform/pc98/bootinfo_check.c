@@ -3,8 +3,8 @@
 /*  BOOTINFO_CHECK.C — ブート情報域の検証と表示行 (純粋関数)                */
 /*                                                                          */
 /*  I/O も低位メモリも触らない。sys/kern/init/bootinfo.c が 0x7E00 の写しを渡す。  */
-/*    試験: tools/tests/test_bootinfo.py (+ bootinfo_host.c)                */
-/*    記録: tools/tests/bootinfo_tdd.md                                     */
+/*    試験: test_bootinfo.py (旧版 307f0c73339c) (+ bootinfo_host.c)                */
+/*    記録: bootinfo_tdd.md (旧版 c9bd686f9a21)                                     */
 /*    票  : docs/archive/realhw_v21/TASK_HDD_INSTALL.md 段 0                      */
 /*                                                                          */
 /*  バイト列は**オフセットで**読む。ホストの u32 は 64bit なので構造体を     */

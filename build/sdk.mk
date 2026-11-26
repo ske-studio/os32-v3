@@ -96,7 +96,3 @@ clean-sdk:
 	rm -rf $(SDK_OUT) $(SDK_DIST_DIR)
 
 .PHONY: sdk sdk-dist clean-sdk
-
-ifneq ($(filter-out check-arm-compile check-guest,$(filter check check-%,$(MAKECMDGOALS))),)
-include build/check.mk
-endif

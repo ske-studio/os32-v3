@@ -384,7 +384,7 @@ if (q.size == sizeof(q) && q.test == GF6_PRIM && !q.rc) {
     request->session = 0; request->rc = rc; return rc;
 }
 ```
-4. **ビルド**: build/hwdev.mk の `HWDEV_GF` に `gf_prim_bench` を足す。tools/tests/test_kdebug_imports.py の許可の一覧に、新しく使う名前があれば足す。
+4. **ビルド**: build/hwdev.mk の `HWDEV_GF` に `gf_prim_bench` を足す。test_kdebug_imports.py (旧版 ec2d8a4c41b3) の許可の一覧に、新しく使う名前があれば足す。
 5. **項目** (session、0 は全部): 1 `fence` (1×1 の fill = t_f)・2 `fill` (全面)・3 `copy` (全面、重なり無し)・4 `mono` (1KB の不透明)・5 `ifc` (64KB の upload、force_m2mf=false)・6 `m2mf` (64KB の upload、force_m2mf=true)・7 `bar0` (BAR0 0x000000 の 32 ビットの読み = t_d)。書き先は `o->test_surface` で、表示面には書かない。test_surface が 640×480 より小さいときは、面の寸法で測って寸法も出す。
 6. **時計と回数**: `f->io.timing.clock_us` (gf_accel_test.c と同じ)。1 本が短いので、100 本を 1 組として組の時間を測る。warmup 1 組の後に本番 50 組。
 7. **CPU の WC の put は測らない**: test_surface の写像は WC の窓 (512KiB) の外なので、値が違ってしまう。DESIGN の 24µs/KB (TASK_GF_ACCEL 段 0、全面 7.37ms) をそのまま使う。

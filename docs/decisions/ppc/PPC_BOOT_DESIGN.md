@@ -138,8 +138,8 @@ int ofw_map_io(int mmu, unsigned ac, cell pa) {
 | sys/arch/ppc/entry.S | 105 | B1 BAT/MSR・BSS・CPU/MMIO、object ビルド |
 | sys/arch/ppc/boot.ld | 40 | B2 cpp・リンク記号、script 生成 |
 | sys/arch/ppc/ofw_note.S | 25 | B3 NOTE、object ビルド |
-| tools/ppc/flow_fixture.h | 70 | T1 手本の期待列、fixture コンパイル |
-| tools/ppc/flow_fake.c | 130 | T2 CI/MMIO fake・_start、object ビルド |
+| flow_fixture.h (旧版 fe1fb5e17355) | 70 | T1 手本の期待列、fixture コンパイル |
+| flow_fake.c (旧版 af073221c5a6) | 130 | T2 CI/MMIO fake・_start、object ビルド |
 | sys/platform/powermac/ofw.c | 175 | C1 CI/setup、T2 で host TDD・PPC object |
 | sys/platform/powermac/escc_tree.c | 140 | C2 木・open・条件付き map、T2・PPC object |
 | sys/platform/powermac/escc.c | 55 | C3 送信/drain、T2 で host TDD・PPC object |
@@ -149,7 +149,7 @@ int ofw_map_io(int mmu, unsigned ac, cell pa) {
 - 新規 14 ファイル・約1185行、既存 sys/kern/kstring_c.c を無変更で source に加える。1 実装者が段ごとにビルド、製品 C は実装と host TDD で進める。D2 完成前は同じ旗の直接コマンドで object/host を組み、host は完成済み製品部品のケースから順に有効にする。BSD から移す部分に著作権・許諾本文を残す。Linux/OpenBIOS/QEMU の GPL ソースは読まない・写さない。
 - 実装時の文書は docs/tasks/ppc/。この設計改訂は依頼どおり作業ディレクトリだけに置き、リポジトリへは書かない。
 - 独立 `make -f build/ppc.mk CROSS_DIR=/home/hight/opt/cross-ppc`、生成物は全て `build/out/ppc/`。既存 config/Makefile/.gitignore を変更しない。
-- PM 別枝の前提：tools/checks/run.py の NOTEST に `('arch/ppc/**', ())`、`('platform/powermac/**', ())`、`('tools/ppc/**', ())`、`('build/ppc.mk', ())`。実装者は触らず、PM が PC-98 側 PM に渡す（同 同ファイル内 の実物確認済み）。
+- PM 別枝の前提：run.py (旧版 bdcca5c408c4) の NOTEST に `('arch/ppc/**', ())`、`('platform/powermac/**', ())`、`('tools/ppc/**', ())`、`('build/ppc.mk', ())`。実装者は触らず、PM が PC-98 側 PM に渡す（同 同ファイル内 の実物確認済み）。
 - CHECK は登録せず make check 外の計測器。CI runner に PPC/QEMU を要求しない。既存検査の TU は既存 make の対象、PPC C の命令は .S に置く。NOTEST の前提適用後に通常 CI check/build の success を確認する。
 
 ## 6. 受入・変異・台本

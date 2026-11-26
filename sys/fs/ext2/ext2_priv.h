@@ -9,7 +9,7 @@
 /* 媒体の上の欄 (superblock / group descriptor / inode / dirent / 間接表) は
  * すべて LE のバイト列。`*(u32 *)&buf[off]` は x86 の非アラインアクセスと
  * バイト順に寄りかかるので使わず、le16_rd / le16_wr / le32_rd / le32_wr を通す。
- * ビットマップは 1 バイトずつ触るので対象外。番人は tools/check_le_access.py。 */
+ * ビットマップは 1 バイトずつ触るので対象外。番人は check_le_access.py (旧版 18506c2136e0)。 */
 #include "endian_le.h"
 
 /* ext2独自ヘルパーを廃止し、ASM最適化済みのkstring関数に転送 */

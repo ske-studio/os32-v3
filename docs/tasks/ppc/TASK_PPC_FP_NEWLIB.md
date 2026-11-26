@@ -14,14 +14,14 @@
 ## 1. 段
 - 確定設計 §7 の表の波 A (宣言) → B (FP 実体・guard・結線・旗・監査) → N1 (nano の道具と帳簿) → N2 (CRT と配置) → N3 (USER の結線) → S (カーネルの SQLite の別 stack の口) → T (試験と受入)。
 - 受入は QEMU 7450・7455。750 (G3) は USER と SQLite の TU の最終 ELF の静的監査だけ。G3 の起動対応は範囲外 (別の段、ユーザーに後で諮る)。
-- 共通の場所 (sys/include/exec_arch.h・sdk/allocator/nano_inputs.json・tools/ci/build_cross_ppc.sh・sys/kern/sqlite_engine.c・sys/conf/features/sqlite.mk・lib/sqlite3/・tools/checks/) に触る段は、統合の枝に入れる前に本線に知らせる。x86 の生成物と nano の bytes は変えない。
+- 共通の場所 (sys/include/exec_arch.h・sdk/allocator/nano_inputs.json・tools/ci/build_cross_ppc.sh・sys/kern/sqlite_engine.c・sys/conf/features/sqlite.mk・lib/sqlite3/・旧検査登録) に触る段は、統合の枝に入れる前に本線に知らせる。x86 の生成物と nano の bytes は変えない。
 
 ## 3. 今の状態 (2026-11-17、止めた時点)
 | 段 | 状態 |
 |---|---|
-| 波 A・B (FPU の保存・復元・初期化、USER の MSR[FP]、0x800、旗と監査) | main (int-1117b、10680c11)。QEMU の受入 tools/accept/ppc_fp.py は 7450・7455 で正像 GREEN、変異 5 本が理由どおり RED |
+| 波 A・B (FPU の保存・復元・初期化、USER の MSR[FP]、0x800、旗と監査) | main (int-1117b、10680c11)。QEMU の受入 ppc_fp.py (旧版 b4213d5446e3) は 7450・7455 で正像 GREEN、変異 5 本が理由どおり RED |
 | N1・N2 (nano の道具の PPC の分岐・帳簿の PPC の節・cross-ppc の記録・app.ld の小さいデータの節) | main (int-1117c、028023fa) |
-| N3 (USER を newlib に結線、crt0 の _init と help) と PPC の KAPI の直し (sys/arch/ppc/kapi_call.c の caller と va_next) | main (133205ea、11-18)。以前は枝 wt/ppc-newlib。本線の統合の枝 int-1117e で CI の追従をしていた。tools/accept/ppc_newlib.py は 7450・7455 で正像 GREEN、変異 3 本 RED (sbss はゲストで見えないので host の試験に任せた) |
-| N3 の CI の追従 (tools/accept/arch_ctx.py のリンクの閉包、halt-ee の目印) | wt/ppc-newlib a65d4e53。リンクは通ったが、QEMU の --mutate の受入は途中で止めた (未検証)。統合に入れる前に受入を回すこと |
+| N3 (USER を newlib に結線、crt0 の _init と help) と PPC の KAPI の直し (sys/arch/ppc/kapi_call.c の caller と va_next) | main (133205ea、11-18)。以前は枝 wt/ppc-newlib。本線の統合の枝 int-1117e で CI の追従をしていた。ppc_newlib.py (旧版 e9a625727f26) は 7450・7455 で正像 GREEN、変異 3 本 RED (sbss はゲストで見えないので host の試験に任せた) |
+| N3 の CI の追従 (arch_ctx.py (旧版 73f25956448a) のリンクの閉包、halt-ee の目印) | wt/ppc-newlib a65d4e53。リンクは通ったが、QEMU の --mutate の受入は途中で止めた (未検証)。統合に入れる前に受入を回すこと |
 | S (カーネルの SQLite の別スタックの .S と口) | 枝 wt/ppc-sqlite-stack (追補 PPC_SQLITE_STACK_DESIGN、S-a terra・S-b sol、Opus のレビューは両方取り込み可、QEMU 7450・7455 で S1 GREEN・変異 2 本 RED) |
 - 受入で見つけて直した物: PPC の KAPI の kprintf が caller 未初期化と va_next 未実装で kill されていた (sys/arch/ppc/kapi_call.c)。RAM root の ISO は level 1 なので USER の bin の名前は 8.3。

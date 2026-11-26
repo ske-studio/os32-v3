@@ -22,4 +22,4 @@
 
 ## 検査
 
-`tools/tests/test_splash_obs.py` (splash-obs-host): 実 C の走査と持ち主の処理を I/O の模型で動かし、通常と観測で同じ列になることを確かめる。
+`test_splash_obs.py (旧版 8ab116a7a93e)` (splash-obs-host): 実 C の走査と持ち主の処理を I/O の模型で動かし、通常と観測で同じ列になることを確かめる。

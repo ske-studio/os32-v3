@@ -16,7 +16,6 @@
 #  展開側 (boot/lz4_mini.c・boot/loader_fat_new.asm の pm_lz4_decode) は無変更。
 #  生成したイメージが HDD ローダの上限 MAX_IMAGE_SIZE (boot/boot_defs.h) を
 #  超えたら**出力を書かずに失敗**する (TASK_HDD_INSTALL N8 の生成側)。
-#  ホスト試験: tools/tests/test_vmkernel_lz4.py / test_vk32_crc.py
 #  明示 --kernel-addr は旧CLI/合成fixture用。ELFとの併用時は
 #  一致を要求する。製品の通常/R1ビルドは --elf を使う。
 #

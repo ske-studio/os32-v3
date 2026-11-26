@@ -46,5 +46,5 @@
 
 ## 検査
 
-- `tools/tests/test_splash_v2.py` (splash-v2-host): 実際の準備器で、非 0 件の再生・固定画像・32 本超の拒否 (転送 0・全解放・ロゴ)・転送後の失敗の片付け・31k/24k・残り 0・前置きの不足・全 DROP・tick の停止と wrap。件数の拒否の再導入・解放の欠落・前置きの削除・期限の再起算は実行時 RED。
-- `tools/tests/test_splash_wire.py` (splash-wire-host): 固定・v1・v2 の実ファイルを、実ローダー・実再生器・期限・片付けまで通す。
+- `test_splash_v2.py (旧版 2443845d59b2)` (splash-v2-host): 実際の準備器で、非 0 件の再生・固定画像・32 本超の拒否 (転送 0・全解放・ロゴ)・転送後の失敗の片付け・31k/24k・残り 0・前置きの不足・全 DROP・tick の停止と wrap。件数の拒否の再導入・解放の欠落・前置きの削除・期限の再起算は実行時 RED。
+- `test_splash_wire.py (旧版 1a5727f53cbf)` (splash-wire-host): 固定・v1・v2 の実ファイルを、実ローダー・実再生器・期限・片付けまで通す。

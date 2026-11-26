@@ -25,4 +25,4 @@ newlib (stdio) は負の戻り値を「-11 バイト書けた」などと読み�
 - 通す口: `_read`・`_write`・`_open`・`_lseek`・`_fstat`・`_stat`・`_unlink` (と同名の別名)。
 - `_close` は `sys_close` の戻りを見ず、常に int 0 を返す。
 
-検査: `make check-vfs-fd-path-host` (`tools/tests/test_vfs_fd_path.py` の段 `errno`、本体 `tools/tests/newlib_errno_host.c`、実物の `syscalls.c` を newlib のヘッダで)。
+検査: `make check-vfs-fd-path-host` (`test_vfs_fd_path.py (旧版 3062ccc08e29)` の段 `errno`、本体 `newlib_errno_host.c (旧版 bcd1002cf266)`、実物の `syscalls.c` を newlib のヘッダで)。

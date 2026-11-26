@@ -4,7 +4,7 @@
 ;; **正典は sys/include/memmap.h (番地) と sys/include/bootinfo.h (形式)。**
 ;; NASM は C のヘッダを読めないので値を写して持つ。
 ;;   番地の一致        tools/gen_memmap.py --check (MIRRORS)
-;;   名前ごとの値の一致 tools/tests/test_bootinfo.py (make check-bootinfo-host)
+;;   名前ごとの値の一致 test_bootinfo.py (旧版 307f0c73339c) (make check-bootinfo-host)
 ;; 片方だけ直すと、ローダとカーネルが別の場所を読んで静かにずれる。
 ;; 票: docs/archive/realhw_v21/TASK_HDD_INSTALL.md 段 0
 ;; ============================================================

@@ -18,7 +18,7 @@
 //! `op_wait` のループ先頭 = WM の 1 周が終わって状態が整っている地点。
 //! ここから longjmp するので、書きかけの WM 状態があると宙に浮く。
 //!
-//! 規則 (D11-3) は `tools/tests/multiapp_model_host.c` の `ma_should_park` /
+//! 規則 (D11-3) は `multiapp_model_host.c (旧版 193acea8d871)` の `ma_should_park` /
 //! `ma_pick` と 1 対 1 に対応させてある:
 //!
 //! | 模型 | ここ |
@@ -50,9 +50,9 @@
 //! - [`should_park`] の (a) と [`pick_poll`] の門に `launch_pending()` を足した
 //!   (`launch_take` も owner 1 専用なので、譲らないと取りに行けない)。
 //! - `WAIT_POLL` 群は **巡回 + 同じ ms に 1 回** ([`pick_poll`])。模型
-//!   `ma_pick_poll` (`tools/tests/multiapp_model_host.c`) はまだ T8 の
+//!   `ma_pick_poll` (`multiapp_model_host.c (旧版 193acea8d871)`) はまだ T8 の
 //!   「ID 昇順」のままで、この 1 点だけ 1 対 1 ではない — 巡回と ms の
-//!   検査は `userland/gshell/host/wm_tests.rs` の T9-W 検査 6 / 7 が持つ。
+//!   検査は `wm_tests.rs (旧版 bb1fab993dc8)` の T9-W 検査 6 / 7 が持つ。
 //! - CTRL+STOP は STOP park の張本人を優先し、居なければ要求表の連鎖の**末尾** ([`abort_target`] / [`chain_tail`])。
 
 use crate::wm::GuiState;

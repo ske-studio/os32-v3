@@ -33,4 +33,4 @@ FAT12 からカーネル像を読み、検査して起動する。
   6000h + 最大 4.3KB で 64KB を越えない)。ホスト試験は同じソース (`FAT_HOST_BEGIN`〜`END`) を bits 32 で組み、2HD と 1.44MB の
   両方の `MAX_CLUSTER` で回す。
 - ローダは 1 クラスタを超えてよい (IPL がチェーンで読む)。images/ の FAT でチェーンが正しいことまでを試験が見る。
-- 試験: `make check-vk32-crc-host` (`tools/tests/test_vk32_crc.py` の `fat`・`corrupt`・`real`)。
+- 試験: `make check-vk32-crc-host` (`test_vk32_crc.py (旧版 787690e6f03c)` の `fat`・`corrupt`・`real`)。

@@ -3,7 +3,7 @@
 /*                                                                          */
 /*  ここには副作用のある行を 1 つも置かない。sys/dev/block/fdc.c から切り出して   */
 /*  あるのは、実機でしか踏まない分岐をホストで試験するため。                */
-/*    試験: tools/tests/test_fdc_seek.py / 記録: tools/tests/fdc_seek_tdd.md */
+/*    試験: test_fdc_seek.py (旧版 2459dade21fe) / 記録: fdc_seek_tdd.md (旧版 59860ec05823) */
 /*                                                                          */
 /*  出典: µPD765A データシート (ST0 / SENSE INTERRUPT STATUS)               */
 /* ======================================================================== */

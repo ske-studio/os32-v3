@@ -12,10 +12,10 @@
 
 | 段 | 次へ進む条件 | 受入の試験 | PowerPC の例 |
 |---|---|---|---|
-| 起動 | 機種の初期化を終え、診断出力を観測できる | `tools/ppc/kboot_all.py` | kboot・LAN |
-| インストール用 RAM root | 読み取り専用 ISO の `rd0` を root、ramfs の `rd1` を `/tmp` に mount し読み書きできる | `tools/ppc/shell_run.py` | W2〜W3、共通化は W6 |
-| USER アプリ 1 本 | hello を起動し出力と exit 値を観測、fault 後も復帰する | `tools/ppc/sb_run.py` | W5、S-B |
-| USER の入れ子 | USER の親から子を起動し終了して親へ戻る | `tools/ppc/sc_run.py` の N01 | W7、N01 (`nest`) |
+| 起動 | 機種の初期化を終え、診断出力を観測できる | `kboot_all.py (旧版 85377355faf2)` | kboot・LAN |
+| インストール用 RAM root | 読み取り専用 ISO の `rd0` を root、ramfs の `rd1` を `/tmp` に mount し読み書きできる | `shell_run.py (旧版 2bc137a055de)` | W2〜W3、共通化は W6 |
+| USER アプリ 1 本 | hello を起動し出力と exit 値を観測、fault 後も復帰する | `sb_run.py (旧版 3c5018178a68)` | W5、S-B |
+| USER の入れ子 | USER の親から子を起動し終了して親へ戻る | `sc_run.py (旧版 a0164610a69c)` の N01 | W7、N01 (`nest`) |
 | 製品シェル | owner 1 の枠で起動し、子の終了から復帰、シェルの終了後に回収して次のシェルを起動する | 通常の端末で終了値・次の prompt を確認 | PPC_SHELL_ALIGN_X86_DESIGN |
 | 保存先 | HDD の ext2 root と共通 VFS/link の /host で再起動後に保存を読める | 製品シェルで書込みと読み戻し | W8、S-D は /host の保存のみ |
 
@@ -54,7 +54,7 @@ PowerPC では S-A の端末と S-B の USER 実行の診断に常駐 CLI を使
 RAM root は起動後に元の媒体を必要としないことも確認する。
 `/tmp` は揮発性であり、S-D で保存先 `/host` の後 mount と区別する。
 S-D は CD 切離し後の作成・追記・短い上書き・64KiB 複写・列挙と、FS 不在時の期限・端末継続・再開を確認する。
-入口は `tools/ppc/sd_run.py --cpu both --mutate`。AF_INET の無い環境は SKIP とし、実行済みとは数えない。
+入口は 旧手順（b25c1d08445f の記録）。AF_INET の無い環境は SKIP とし、実行済みとは数えない。
 境界の単体検査は T02/T03 `ppc-hostfs-io`、T04 `ppc-hostfs-server`、T01 `ppc-hostfs-wire`。
 開発用 CLI の端末と poll は platform 側に閉じ、CPU 依存を共通 CLI に持ち込まない。
 PowerPC では kboot の印と LAN 診断で起動を確認した。USER の入れ子は sh の起動前に確認し、子終了後の親の継続を観測した。

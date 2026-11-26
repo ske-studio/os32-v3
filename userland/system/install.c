@@ -70,7 +70,7 @@ static KernelAPI *g_api;
 /* ======== 回復モードの KAPI 境界 (票 S3-I §1) ======== */
 /* `--recover-settings` / `--revert-settings` の本体は install_recover.inc に
  * あり、KAPI へは RecoverOps (関数ポインタ表) 経由でしか触らない。ホスト
- * TDD (tools/tests/install_recover_host.c) が同じ .inc を取り込めるように
+ * TDD (install_recover_host.c (旧版 e491db921901)) が同じ .inc を取り込めるように
  * するため。通常インストール経路はこの表を使わない。 */
 
 static int rop_stat(const char *p, OS32_Stat *st)  { return g_api->sys_stat(p, st); }
@@ -257,7 +257,7 @@ static int confirm_install(void) {
  * 当てて正規名で写す — そのまま写すと HDD に /etc/filetype が残り、HDD
  * 起動では filetypes が失われる (実装レビュー往復 2。既定フォントも同じ扱い
  * だったが、2026-09-25 に MINIMAL から NORMAL へ移して FD に載らなくなった)。
- * この表は packages.yaml の fd.rename / fd.only と tools/tests/test_packages.py
+ * この表は packages.yaml の fd.rename / fd.only と test_packages.py (旧版 beb24a48ad1a)
  * case 9 が突き合わせる (足したら両方直す)。
  *   hdd が /boot/ … : ファイルとしては写さない。ブート領域へ書く (boot_hdd /
  *                     loader) か、Phase 3 で別に写す (vmkernel.lz4)

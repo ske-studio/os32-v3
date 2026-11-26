@@ -2,7 +2,6 @@
 """OS32 LAN bridge — 物理 NIC (AF_PACKET) ↔ host_agent.py の FrameStream。
 
 票: docs/tasks/realhw/TASK_LAN_82557.md §2 の **L-D** / §5-1
-記録: tools/tests/lan_bridge_tdd.md
 
 実機 PC-9821Ra266 とホスト (Ubuntu ノート) をローカルのスイッチで直結し、
 OS32 リンクプロトコル (raw Ethernet, EtherType 0x88B5、docs/tasks/network/

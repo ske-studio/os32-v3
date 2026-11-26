@@ -67,4 +67,4 @@ GUI アプリ 4 本の同時実行のうち、**誰を次に起こすか・走�
 
 ## 検査
 
-`make check-gshell-host` (`userland/gshell/host/wm_tests.rs`、実物の `GuiState` と `multiapp`)。規則の模型は `tools/tests/multiapp_model_host.c` (`test_multiapp_model.py`) で、`ma_should_park`・`ma_pick`・`MA_INPUT_STREAK_MAX`・`MA_STARVE_BOUND` がここと 1 対 1。ポーリング群の巡回と ms の間引きだけは模型が ID 昇順のままで、`wm_tests.rs` が持つ。
+`make check-gshell-host` (`wm_tests.rs (旧版 bb1fab993dc8)`、実物の `GuiState` と `multiapp`)。規則の模型は `multiapp_model_host.c (旧版 193acea8d871)` (`test_multiapp_model.py`) で、`ma_should_park`・`ma_pick`・`MA_INPUT_STREAK_MAX`・`MA_STARVE_BOUND` がここと 1 対 1。ポーリング群の巡回と ms の間引きだけは模型が ID 昇順のままで、`wm_tests.rs` が持つ。

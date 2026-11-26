@@ -40,8 +40,8 @@
 /*  dev_blk_write) からも fdc_write_sector_geom に来るので、diskio.c の     */
 /*  破棄だけでは古い中身が残る (レビューの指摘)。                          */
 /*                                                                          */
-/*  試験: tools/tests/test_fdc_track.py + tools/tests/fdc_track_host.c      */
-/*  記録: tools/tests/fdc_track_tdd.md                                      */
+/*  試験: test_fdc_track.py (旧版 1f253a73fa6c) + fdc_track_host.c (旧版 457166824f47)      */
+/*  記録: fdc_track_tdd.md (旧版 0ffa89387115)                                      */
 /* ======================================================================== */
 
 #ifndef FDC_TRACK_H

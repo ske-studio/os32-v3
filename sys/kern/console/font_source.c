@@ -11,7 +11,7 @@
  *  font_lease_close_owned(id) を vfs_close_owned(id) の直前に呼ぶ (結線は
  *  S3b)。shell の lease は shell_service_retire → font_lease_close_shell。
  *
- *  ホスト試験は tools/tests/font_source_host.c (sys/fs/vfs_fd.c と一緒に実物で)。
+ *  ホスト試験は font_source_host.c (旧版 7d5ad2ae928e) (sys/fs/vfs_fd.c と一緒に実物で)。
  * ======================================================================== */
 #include "font_source.h"
 #include "exec.h"           /* ring3_call_from_user / ring3_fault_kill / OS32_ERR_* */

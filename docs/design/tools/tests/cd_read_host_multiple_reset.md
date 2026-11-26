@@ -1,4 +1,4 @@
-# tools/tests/cd_read_host_multiple_reset.inc — 実 SRST 経路の通知
+# cd_read_host_multiple_reset.inc (旧版 48c47a96cc10) — 実 SRST 経路の通知
 
 > 状態: **現行 (2026-10-31)**
 

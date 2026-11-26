@@ -13,7 +13,7 @@
  *
  * 集計行の書式と終了コードの対応は C 側の唯一の管理元
  * userland/lib/rt/testresult.h と同じ (`<名前>: PASS <n>/<m>` / 0・1・2)。
- * ずれていないことは tools/tests/test_result_conv.py が突き合わせる。
+ * ずれていないことは test_result_conv.py (旧版 ee31b3c3405f) が突き合わせる。
  */
 #![no_std]
 #![no_main]

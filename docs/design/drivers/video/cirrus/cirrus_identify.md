@@ -25,7 +25,7 @@
 
 ## 検査
 
-`tools/tests/test_cirrus_win.py` (本体 `tools/tests/cirrus_win_host.c`、実物の `cirrus_identify.c`・`backend_cirrus.c` を include し、物理地図を贋物にする)。見る構成:
+`test_cirrus_win.py (旧版 c6379f3b83c7)` (本体 `cirrus_win_host.c (旧版 4807cc191f12)`、実物の `cirrus_identify.c`・`backend_cirrus.c` を include し、物理地図を贋物にする)。見る構成:
 
 | 構成 | 期待 |
 |---|---|

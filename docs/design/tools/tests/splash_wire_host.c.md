@@ -1,4 +1,4 @@
-# tools/tests/splash_wire_host.c — 結合試験ハーネス
+# splash_wire_host.c (旧版 e3173aeb461c) — 結合試験ハーネス
 
 状態: **現行 (2026-11-01)**。
 

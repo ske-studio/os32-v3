@@ -7,7 +7,6 @@
       `<名前>: PASS <n>/<m>` の約束事。**このランナーはその両方を見て、
       食い違いを不合格として報告する。片方だけ見ると約束事が壊れても誰も
       気づけない。**
-記録: tools/tests/guest_tests_tdd.md
 
 ## なぜこの形か
 
@@ -24,7 +23,7 @@ OS32 のシェルには **ループも `;` の連結も無い** (票 §1、実�
 
 **生成と集計はエミュレータにも時計にも触らない。** そこが壊れていたら
 ゲストで回しても意味がないので、贋物の入力だけで全部試験できるようにして
-ある (tools/tests/test_guest_tests.py)。
+ある。
 
   純粋 (この上半分)   parse_list / build_script / parse_output / classify /
                       aggregate / format_report / Watch / running_test /

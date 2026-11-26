@@ -22,5 +22,5 @@
 
 ## 検査
 
-- `tools/tests/test_splash_obs.py`・`test_splash_wire.py`・`test_splash_v2.py`: 前置きが 1 回だけ呼ばれ、経過が期限から差し引かれること。前置きの削除・無課金は実行時 RED。
-- `tools/tests/test_splash_raster_diag.py`: `PlRow` を使う診断の経路。
+- `test_splash_obs.py (旧版 8ab116a7a93e)`・`test_splash_wire.py`・`test_splash_v2.py`: 前置きが 1 回だけ呼ばれ、経過が期限から差し引かれること。前置きの削除・無課金は実行時 RED。
+- `test_splash_raster_diag.py (旧版 c907f6a84336)`: `PlRow` を使う診断の経路。

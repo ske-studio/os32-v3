@@ -3,7 +3,7 @@
 > 2026-11-20 の見直しで x86 の形に改めた ([DESIGN_X86_AUDIT](../../decisions/ppc/DESIGN_X86_AUDIT.md))。
 
 > 状態: **実装中 (2026-11-20)** — [段の計画](../../decisions/ppc/PPC_KAPI_FILL_DESIGN.md) に従い、共通の提供者で KAPI の機能を揃える。既存の二重実装はその後に整理する。
-> 完了の基準: sdk/kapi_target_ppc.py の PROVIDER_GROUPS に残るのが計画の §2 で E (PowerMac に無くて正しい) とした slot だけになり、各段で「両像のリンク map と nm -l で slot → wrap の呼ぶ先 → 定義元のソースのパスが同じ」「arch/ppc・platform/powermac に x86 と同じ名前の新しい定義が 0」を確かめ、tools/ppc/test_kapi_binding.py の本数がその数に一致する。
+> 完了の基準: sdk/kapi_target_ppc.py の PROVIDER_GROUPS に残るのが計画の §2 で E (PowerMac に無くて正しい) とした slot だけになり、各段で「両像のリンク map と nm -l で slot → wrap の呼ぶ先 → 定義元のソースのパスが同じ」「arch/ppc・platform/powermac に x86 と同じ名前の新しい定義が 0」を確かめ、test_kapi_binding.py (旧版 3baaeeee4857) の本数がその数に一致する。
 
 ## 0. ユーザー決定 (2026-11-18)
 - 「KAPI の提供者無し 190 本を埋める計画を、先に作ってよいか。先に。ただし、x86 と重複するような実装はだめです」。

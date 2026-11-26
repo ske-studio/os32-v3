@@ -36,10 +36,10 @@
 |---|---|---|
 |構成|build/select.mk → sys/conf/images/pc98.mk → 所有者別集合と legacy 順|同じ選択器が先に sys/conf/images/ppc-flags.mk を読み、最後の override IMAGE の結果で機能表と kboot 順を読む。無指定は link-sh。|
 |リンクと内側の root|build/targets/x86-pc98.mk の all と build/sources/order.mk|build/targets/ppc-powermac.mk の KB_LINK_COMMAND、build/ppc-root-pair.mk の grouped target。exec 像は root-input.iso から最終 PPCKERN.ELF と root.iso を組で発行。kboot_audit.py が最終 ELF と PPCKERN.map を検査。|
-|媒体と配布|build/image.mk の FDD_IMAGE_ARGS と fd144、build/deploy.mk の deploy-fd と deploy-nhd|kb-user がユーザー像を組み、ROOT_MANIFEST が /sys/shell.bin を配置。外側の CD は tools/ppc/link_sh_run.py の Session.start と tools/ppc/ata_accept.py の guest が個別生成。PPC の deploy は未対応。|
+|媒体と配布|build/image.mk の FDD_IMAGE_ARGS と fd144、build/deploy.mk の deploy-fd と deploy-nhd|kb-user がユーザー像を組み、ROOT_MANIFEST が /sys/shell.bin を配置。外側の CD は tools/ppc/link_sh_run.py の Session.start と ata_accept.py (旧版 52972d5d2d51) の guest が個別生成。PPC の deploy は未対応。|
 |通常入力|製品 FD/HDD でシェルを起動|sys/platform/powermac/shell_loop_ops.c の共通ループ用操作と fb_run.py:observe の USB キー・画面観測。link_sh_run.py:main の normal は settings(observe_flow=True) の計測用。|
 
-tools/ppc/compile_ci.py:run の現行呼出し（SH, LINK 順）は次の通り。最後に 1,1 で common-compile を呼ぶ。
+compile_ci.py (旧版 3d07969b3073):run の現行呼出し（SH, LINK 順）は次の通り。最後に 1,1 で common-compile を呼ぶ。
 
 |引数|実効像|検査するもの|
 |---|---|---|
@@ -121,13 +121,13 @@ iso と deploy-iso を phony にする。生成は make ARCH=ppc PLATFORM=powerm
    Session(media, cpu, evidence, timeout)
    ```
 
-   tools/accept の ppc_{boot_info,console_cells,db,display,display_lifecycle,font,fp,gfx2,kcg,loop,mouse,newlib,path,pci,port,rtc,sfs,shell_layout,shm,sqlite_static,surface,sysinfo,ver}、tools/ppc の link_sh_run（LineSession、ResetSession を含む）、fb_run、ppc_sh_output、sb_run、sc_run、sd_run、usb_run と checks/ppc-reset.py の受渡しを一括変更。レイアウト・実機 ELF・core の専用メーターなど ELF だけを読む入口は build を使用する。診断の build-only でも媒体を要求する経路には genisoimage が必要。
+   旧手動受入 の ppc_{boot_info,console_cells,db,display,display_lifecycle,font,fp,gfx2,kcg,loop,mouse,newlib,path,pci,port,rtc,sfs,shell_layout,shm,sqlite_static,surface,sysinfo,ver}、tools/ppc の link_sh_run（LineSession、ResetSession を含む）、fb_run、ppc_sh_output、sb_run、sc_run、sd_run、usb_run と checks/ppc-reset.py の受渡しを一括変更。レイアウト・実機 ELF・core の専用メーターなど ELF だけを読む入口は build を使用する。診断の build-only でも媒体を要求する経路には genisoimage が必要。
 4. compile_ci.py は core、link、明示製品 all、製品 common-compile を要求。旧 sh/shell の同値性は選択検査で毎回確認する。ppc_ci.py:matrix の期待引数は実装の IMAGES を読まず固定し、一段ごとに異なる失敗コードを返して後段未実行とコードの伝播を検査。製品抜け・失敗無視の変異で RED。build-setup と PPC CI の製品生成ジョブに genisoimage を配置。変更する checks の covers に選択器、共有機能表、target、媒体 API、各 runner を、needs に対象のクロス環境・ISO 生成ツール、ゲスト検査には ROM と QEMU を反映する（各登録の既存形式に従う）。ppc-link-sh-run と ppc-link-sh-flow の両方で場合集合と変異を保つ。
 5. B04（設計中）は platform/powermac の LAN poll・rshell 操作、link_sh_run.py の ready/close、B06（未着手）は shell_loop_ops.c と fb_run.py の端末・USB 観測が接点。これは予定の接点で、担当側の編集ファイルと着地 SHA は未確定。統合時は LAN 接続・閉鎖後の手元入力、TIME 完了後の画面判定を担当間で突合し、既存の LAN OFF／USB 再接続の負試験を維持。B07 から製品側へ観測フックを足さない。
 
 
-- (確定の追記、sol 第 3 回 P1) CI の `--product` には新製品の `KB_ELF` と一緒に、同じ Make の選択で得た新製品の `KB_SH_OUT/shell.bin` を渡し、`tools/ppc/kboot_layout.py` の `report_product()` は ISO の中のシェルをその新しいパスと照合する (旧 `build/out/ppc-user/link-sh/shell.bin` の固定参照をやめる)。
-- (確定の追記、sol 第 3 回 P2) 層の検査の走査の根を足す段で、`tools/tests/test_layers.py` の `test_generated_kapi_and_build_headers` は新旧の両方の根に正常な `.d` を置き (`empty == []` を保つ)、違反の場合は新製品の側の `.d` だけに違反を入れて検出を確かめる。
+- (確定の追記、sol 第 3 回 P1) CI の `--product` には新製品の `KB_ELF` と一緒に、同じ Make の選択で得た新製品の `KB_SH_OUT/shell.bin` を渡し、`kboot_layout.py (旧版 ca41853c713a)` の `report_product()` は ISO の中のシェルをその新しいパスと照合する (旧 `build/out/ppc-user/link-sh/shell.bin` の固定参照をやめる)。
+- (確定の追記、sol 第 3 回 P2) 層の検査の走査の根を足す段で、`test_layers.py (旧版 dbb7eed86d0b)` の `test_generated_kapi_and_build_headers` は新旧の両方の根に正常な `.d` を置き (`empty == []` を保つ)、違反の場合は新製品の側の `.d` だけに違反を入れて検出を確かめる。
 
 ## 4　合否
 

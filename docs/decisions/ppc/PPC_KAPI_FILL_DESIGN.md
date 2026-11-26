@@ -238,7 +238,7 @@ A の場合も、対象像が持つ弱い代役に解決されていないこと
 8. os32-kapi-add の生成差分・kapi-abi・生成再現性・呼出受入を適用。今回は既存 slot の提供だけなので版上げ・指紋更新・SDK 要求版変更は不要。
 9. 公開 ABI 変更が不可避な案はこの段から外す。別の承認後、KAPI_SPEC §3-1 の末尾追加・版同期・再生成・clean→all を適用。外部 apps/game は H-7 に従う。
 
-10. 各段で tools/ppc/test_kapi_binding.py の len(entries)==190 を段の不在 slot 集合との一致へ追従し、ALLOWED_UNDEFINED は残る正当な参照だけに更新。group-empty の gfx が空になる段では残存組を対象に替え、変異が実行時 RED になることを確認する。
+10. 各段で test_kapi_binding.py (旧版 3baaeeee4857) の len(entries)==190 を段の不在 slot 集合との一致へ追従し、ALLOWED_UNDEFINED は残る正当な参照だけに更新。group-empty の gfx が空になる段では残存組を対象に替え、変異が実行時 RED になることを確認する。
 11. ROLES §4-3 に従い TU の追加・移動は build/sources/order.mk、像別選択、build_profile_x86.json の C_KERNEL、ppc-powermac.mk を追従。check-build-selection-host と make all を確認する。試験の CHECK.covers・変異アンカーも実際の定義元へ更新し lint と対象変異を通す。
 
 ### 5. 受入と変異
@@ -281,7 +281,7 @@ PowerMac の暦時計は reset と同じ VIA インスタンスを使う。Apple
 
 - 各組で通常 wrap が残留 stub に解決された場合に成功経路の観測が失敗すること。E は機種固有の後端呼出が0回であることも host 側で計数する。
 - make ppc-ci-image の common-compile、両機種の layer 検査、各段で §3 のパス一致・同名新規定義0の照合記録、像ごとのリンク map と nm -l を保存。map に共通本体が一つあり、PPC 後端の新規定義は機種・装置操作だけか diff で検査する。
-- 実装段では make all、該当する guest/host 試験と変異、python3 -B tools/checks/run.py --lint。変更した製品行に依存する既存の変異も追従させる。
+- 実装段では make all、該当する guest/host 試験と変異、python3 -B run.py (旧版 bdcca5c408c4) --lint。変更した製品行に依存する既存の変異も追従させる。
 - 取り込み候補の revision ができたら python3 -B tools/build_compare.py a76398a35 <候補revision> --all を実行し、同じ固定時刻・ビルド情報で x86 の生成物を比較する。
 - 移動のみの段は x86 同一を合格条件とする。共通 HAL の変更で差が必要なら段を分離し、変更対象を申告して NP21/W で対になるアプリ操作を検証する。
 - 今回は設計のみ。ソース変更・フォント配備・ビルド・QEMU・変異・build_compare は未実施。上表の成功例は実測結果ではなく各段の完了条件である。

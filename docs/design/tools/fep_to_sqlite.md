@@ -63,5 +63,5 @@ user_version が 0 で page_size が 1024、`dict` の 4 列が prepare でき�
 
 ## 検査
 
-- `fep-generator-meta` (`tools/tests/test_fep_generator_meta.py`): 生成した meta を SQLite の中身と照合 (`entry_count`・checksum・原文)。
-- `fep-meta` (`tools/tests/test_fep_meta.py`): 独立に作った正解と、製品の probe で旧形式・未来版・壊れたヘッダ・meta の欠け。
+- `fep-generator-meta` (`test_fep_generator_meta.py (旧版 3f7a52fc7577)`): 生成した meta を SQLite の中身と照合 (`entry_count`・checksum・原文)。
+- `fep-meta` (`test_fep_meta.py (旧版 2eca3ea1b8a5)`): 独立に作った正解と、製品の probe で旧形式・未来版・壊れたヘッダ・meta の欠け。

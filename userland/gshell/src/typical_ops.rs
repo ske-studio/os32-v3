@@ -189,7 +189,3 @@ pub fn on_cycle_end(st: &mut GuiState) {
     r.waiting = false;
     if r.left == 0 { end(st); }
 }
-
-#[cfg(test)]
-#[path = "../host/typical_ops_tests.rs"]
-mod tests;

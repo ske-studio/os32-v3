@@ -67,4 +67,4 @@ EINVAL・ENOVA・EFULL は物理を確保する前に決まる。
 
 ## 検査
 
-`tools/tests/test_appmem.py` (表と計画、実 `sys/kern/exec/appmem.c` を ILP32 でリンク) と `tools/tests/test_appmem_map.py` (取引と teardown、実 paging・pgalloc と連結)。
+`test_appmem.py (旧版 17b5db1c877a)` (表と計画、実 `sys/kern/exec/appmem.c` を ILP32 でリンク) と `test_appmem_map.py (旧版 8180480a2758)` (取引と teardown、実 paging・pgalloc と連結)。

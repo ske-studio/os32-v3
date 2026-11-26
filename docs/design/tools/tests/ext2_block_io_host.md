@@ -1,4 +1,4 @@
-# tools/tests/ext2_block_io_host.c — ext2 範囲 I/O 模型
+# ext2_block_io_host.c (旧版 7cb5ea6769af) — ext2 範囲 I/O 模型
 
 > 状態: **現行 (2026-10-31)**
 
@@ -17,7 +17,7 @@ data は fs_error を立てず、metadata は立てる。
 mounted な metadata 失敗時には、専用バッファで媒体の errors 印を書くことも通す。
 D1 の保持枠と関数別失効・remount の統合試験は D1 の結線後に行う。
 
-実行は `python3 -B tools/tests/test_ext2_block_io.py`。
+実行は 旧手順（0a4a1e2428e6 の記録）。
 `--mutate` は未変更コピーの成功後、範囲・overflow・count・失敗契約を壊した
 製品 inc の実行時 assertion による RED を要求する。
 CHECK は新 inc と入力を宣言する。既存の HDD stage1、read_bound、write_io は回帰対象。

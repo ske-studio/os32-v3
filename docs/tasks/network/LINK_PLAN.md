@@ -100,7 +100,7 @@ DP8390 は受信リングで各パケットの前に 4 バイトの独自受信�
   最も確実な情報なので、これを credit の 1 単位あたり消費量の基準にする。
 - 試験: 代表長 (60 / 61 / 255 / 256 / 257 / 1514B) を inject し、CURR の進みを
   記録して「フレーム長 → 消費ページ数」の表を凍結する (Stop-and-Wait 段階で実施)。
-- `tools/net_m2_test.py` は既に CURR 由来の `rx_next` を観測できる。ここに
+- `net_m2_test.py (旧版 8fdf61a5f704)` は既に CURR 由来の `rx_next` を観測できる。ここに
   ページ消費の計測を足す。
 
 ## 3. 大容量データは再結合せずストリーミング
@@ -186,7 +186,7 @@ Host Services    HTTP / File / RPC を KAPI 末尾追加。Host Agent を実装
 
 - L0〜L3 は実装・エミュレータ合格 (2026-09-05)。各段の条件は §5、試験出力・ページ消費実測・修正経緯は 完了記録 (アーカイブ: `docs/archive/network/LINK_IMPLEMENTATION_RECORDS.md`)。
 - N1 はワイヤ v2・KAPI v51 の 5 本を公開し、コア受入完了 (2026-09-14)。契約は `HOST_SERVICES_PLAN` §3、駆動は `link_tick()`。同期版 API は廃止済み。
-- N1 のホスト試験・ケース対応は [n1_tdd.md](../../../tools/tests/n1_tdd.md)、ゲスト判定と制限は TASK_N1 (アーカイブ: `docs/archive/network/TASK_N1.md`)。64KB 超の F6 は N3 の `wget` で再確認済み (`HOST_SERVICES_PLAN` §9-3)。
+- N1 のホスト試験・ケース対応は n1_tdd.md (旧版の Git blob `31334bf80a05`)、ゲスト判定と制限は TASK_N1 (アーカイブ: `docs/archive/network/TASK_N1.md`)。64KB 超の F6 は N3 の `wget` で再確認済み (`HOST_SERVICES_PLAN` §9-3)。
 - 実 LAN での受入は未実施。N5 (`HOST_SERVICES_PLAN` §7) と [NIC の実機項目](PLAN.md#エミュレータでは確認できないこと-m4m5-の実機項目) に残す。
 - N1 の Agent 再起動後の STALE と `gui_busy` 同時実行は、既存のゲスト記録では未確認 (ホスト試験との区別を維持)。個別手順と当時の代替証拠は N1 ゲスト記録 (アーカイブ: `docs/archive/network/TASK_N1.md`)。
 

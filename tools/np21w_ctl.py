@@ -75,8 +75,7 @@ NP21/W 側の仕様: np21w-src/docs/03-api-reference.md「アプリ層の口」�
             起動直後に終了した・ダイアログが出ている・API が応答しない・起動完了しない)、
             2 = 引数や設定の誤り。
 
-試験: tools/tests/test_np21w_ctl.py (Windows 側の操作は WinOps、HTTP は Http を偽物に
-差し替える)。
+Windows 側の操作は WinOps、HTTP は Http が担当する。
 """
 
 import argparse

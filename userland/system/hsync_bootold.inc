@@ -14,7 +14,7 @@
 /*  求めたもの (zlib.crc32 と同じ)。欄の位置は entry_count から決まる:       */
 /*    image_crc = 16 + 20n + 4  (n = entry_count、boot/boot_defs.h の         */
 /*    VK32_OFF_IMAGE_CRC)。ユーザーランドは boot/ を見ないので値を写して     */
-/*    持つ — tools/tests/test_serialfs.py が boot_defs.h と照合する。        */
+/*    持つ — test_serialfs.py (旧版 3080b693e474) が boot_defs.h と照合する。        */
 /*                                                                          */
 /*  T4c-1 は v2 のまま core 1 本。旧 core+SQLite 2 本も復旧用に読める。  */
 /*  .old の復元時には、手順でその像と同版の /boot の対部品も一式復元する。 */

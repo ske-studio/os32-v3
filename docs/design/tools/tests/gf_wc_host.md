@@ -1,6 +1,6 @@
-# tools/tests/gf_wc_host.c — 設計
+# gf_wc_host.c (旧版 951dc9c6bd20) — 設計
 > 状態: **現行 (2026-11-01)** — GF_ACCEL_DESIGN §8 T1
-ソース: `tools/tests/gf_wc_host.c`
+ソース: `gf_wc_host.c (旧版 951dc9c6bd20)`
 
 test_geforce.py から起動する ILP32/qemu fixture。gf_wc.c の読み取り CPU primitives だけを fake に置換し、実物の適用条件・geforce_body の共通 stop・backend の init/leave/enter/shutdown/present を接続する。MTRR の命令列自体は T0 の担当。
 

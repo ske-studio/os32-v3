@@ -173,9 +173,9 @@ weights.json に登録し、同じ runner で初回3回の経過と WAV サイ�
 |1a 半日|新 userland/tests/hw/es1370_probe.hwb +45、既存像の台本収録表 +1|cfg 採取、橋・I/O 資源・不足する読取り口を特定|
 |1b 1日|変更 sys/platform/powermac/hwb_resource.c +40、hwb_window.c +35、新 platform/powermac/pci_io.c +90、新 platform/pc98/hwb_bar_window.c +60 と PC-98 HW_OP 配送の接続 +10|PC-98 は window bar → BDF 資源照合 → 窓 handle → mmioread32 → 検査済み base+off の inl。両機種で BAR 指定 I/O 窓で段1の値を観測。TICK 待ちなし|
 |2a 半日|新 include/pci_io_contract.h +25、platform/pc98/pci_io.c +35、両機種の DMA アダプタ各 +35|範囲・LE・bus 翻訳・coherent 契約を模型で確認|
-|2b 1日|新 drivers/sound/es1370/regs.h +65、pcm_hw.c +260、tools/tests/es1370_host.c +180|観測後に装置列を実装。HAL と時計は模型で代替可能| 段2出口で停止証拠・F・初期位相の観測記録を確認。一つでも確定できなければ当該構成の PCM 統合と段4受入を保留する。
+|2b 1日|新 drivers/sound/es1370/regs.h +65、pcm_hw.c +260、tests/support/fixtures/es1370_host.c +180|観測後に装置列を実装。HAL と時計は模型で代替可能| 段2出口で停止証拠・F・初期位相の観測記録を確認。一つでも確定できなければ当該構成の PCM 統合と段4受入を保留する。
 |3 1日|変更 両機種の PCI bind 各 +15、sound/hal の期限配送・位置対・補充判定・DRAIN 保存口 +85、build/targets/ppc-powermac.mk と PC-98 の対象規則各 +10|TICK 段 B の残りと SndBackend 中核、PPC の期限配送・KAPI 結線後に実機像へ統合|
-|4 半日〜1日|新 userland/tests/es1370_pcm.c +85、tools/tests/es1370_wav.py +100、ppc-qemu 起動規則 +20、tools/checks/weights.json +1|段3後に WAV とシリアルの同時合格|
+|4 半日〜1日|新 userland/tests/es1370_pcm.c +85、tests/sound/es1370_wav.py +100、ppc-qemu 起動規則 +20、weights.json (旧版 a34c927e1b5d) +1|段3後に WAV とシリアルの同時合格|
 
 段3の着手条件は TICK 段 B、AV HAL S1–S6、K1、E1。PPC 像の対象規則へ HAL 中核、KAPI 表、時計所有 API、協調配送、PCI bind、DMA アダプタ、共通後端を結線し、ゲストの open から期限配送まで確認する。
 1–2 は進行可。段3で本線の所有者・解除・補充を再利用し、段4のゲスト試験まで別の暫定 PCM KAPI は設けない。

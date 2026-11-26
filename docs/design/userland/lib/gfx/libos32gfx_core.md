@@ -9,7 +9,7 @@
 - **描画形式の初期化漏れ**: attach で PACKED8 を設定しないと、漢字描画がプレーン形式に落ちて表示されない。
   `userland/lib/gfx/libos32gfx_core.c` は CLIENT 面を query / lease し、取得した形式から `gfx_packed` を設定する (`gfx_refresh()`)。
   init と attach の両方で同じ接続処理を使い、世代変更や失敗時の lease 寿命も守る。
-  `tools/tests/gfx_attach_host.c` の `run()` が接続・再接続と失敗を検査する。
+  `gfx_attach_host.c (旧版 0464dfd63c41)` の `run()` が接続・再接続と失敗を検査する。
 
 ## 設計 (D1 で移した)
 
@@ -40,4 +40,4 @@ SDK はそのポインタへ直接描く (`libos32gfx_core.c` の `kapi_query()`
 - アプリの静的リンクの実体と `libos32gui.shlib` の実体は**別々に** token を持つ。両方を使うアプリは、どちらかを再開する前に両方を check する。片方だけ取り直しに失敗したら、その実体は自分の token を返して描画を止める (もう一方は描ける)。Rust の `os32api` の `check()` も失敗で自分の実体を detach する。
 - 生の pointer を保存して再 init をまたいで使うのは契約の外。
 
-検査: `tools/tests/test_gfx_attach.py` (kernel 側と SDK の core・描画 C を連結、3 backend・反復取得・世代変更・8 本満杯・不正 view の巻き戻し・描画の停止)、`tools/tests/test_gfx_reattach.py` (core と描画を静的と shlib の 2 組リンクし、再 init・200 行の後の両世代と片側の失敗)、`tools/tests/test_gui_reattach.py` (Rust の client・gdi)。
+検査: `test_gfx_attach.py (旧版 ad621da00d0b)` (kernel 側と SDK の core・描画 C を連結、3 backend・反復取得・世代変更・8 本満杯・不正 view の巻き戻し・描画の停止)、`test_gfx_reattach.py (旧版 4863c1f6b3a0)` (core と描画を静的と shlib の 2 組リンクし、再 init・200 行の後の両世代と片側の失敗)、`test_gui_reattach.py (旧版 ff6d76737a0b)` (Rust の client・gdi)。

@@ -31,5 +31,5 @@ LBA を仮定して書き始めない。区画の位置を BIOS 幾何で決め�
 
 ## 確かめ
 
-`make check-hdd-stage1-host` (`tools/tests/test_hdd_stage1.py`) のケース `format_clamp`・`format_at_16652`・`format_at_refuse`
-(`tools/tests/ext2_part_host.c`) と、作った像の `e2fsck -fn` clean。
+`make check-hdd-stage1-host` (`test_hdd_stage1.py (旧版 6201b26bccf0)`) のケース `format_clamp`・`format_at_16652`・`format_at_refuse`
+(`ext2_part_host.c (旧版 9c65535dee0c)`) と、作った像の `e2fsck -fn` clean。
