@@ -92,7 +92,7 @@ def rust_layout(cpu, measured):
             '[lib]\npath="measure.rs"\n[dependencies]\nos32api={path=' + json.dumps(str(crate)) + '}\n')
         (folder / "measure.rs").write_text("#![no_std]\nuse core::mem::{align_of,offset_of,size_of};\n" +
                                            "\n".join(expected))
-        cmd = ["cargo", "check", "--offline", "--manifest-path", folder / "Cargo.toml", "-Zjson-target-spec",
+        cmd = ["cargo", "check", "--manifest-path", folder / "Cargo.toml", "-Zjson-target-spec",
                "-Zbuild-std=core,alloc,compiler_builtins", "--target", root / f"sdk/rust/{target}-os32-none.json"]
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode:
