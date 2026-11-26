@@ -33,13 +33,13 @@ description: CPU・機種・装置の分離を壊さずにコードを足す・�
 
 ```bash
 make all && make ARCH=ppc PLATFORM=powermac kernel          # 両方の像が組める
-make check-layers-x86 check-layers-ppc check-layers-host MUTATE=0    # 違反 0 (基準は増やさない)
-make check-build-selection-host check-select-host MUTATE=0             # ソースの選択と検査の選択
-python3 -B tools/checks/run.py --select --files <触ったファイル…>    # 触ったファイルを読む検査 (この中から直接組む物を回す)
+for id in include_layers link_layers src_owner build_sources ppc_common_compile; do
+    python3 -B -m tests.infra.ci run --check "$id" || exit 1
+done
 ```
 
-- 共通の置き場のソースは PowerPC のコンパイラでも通ること (CI の check の `ppc-compile`)。x86 だけの型の幅に頼らない (PowerPC の `u32` は `unsigned long`)。
-- 試験が手本・写しの木を自前で作っている所に追従が要る: host 試験の `-I` の一覧 (`tools/tests/kernel_includes.py` は `build/config.mk` を展開するので自動)、変異の時だけ写すディレクトリの一覧、手本のヘッダの差し替え定義。`MUTATE=0` では見つからないので、触った試験は `MUTATE=1` で 1 回回す。
+- 共通の置き場のソースは PowerPC のコンパイラでも通ること (登録 ID `ppc_common_compile`)。x86 だけの型の幅に頼らない (PowerPC の `u32` は `unsigned long`)。
+- 試験が手本・写しの木を自前で作っている所に追従が要る: host 試験の `-I` の一覧 (`tools/tests/kernel_includes.py` は `build/config.mk` を展開するので自動)、変異の時だけ写すディレクトリの一覧、手本のヘッダの差し替え定義。通常実行 では見つからないので、触った試験は `--mutate` 付き で 1 回回す。
 
 ## 4. ソースを移す
 
@@ -48,16 +48,9 @@ python3 -B tools/checks/run.py --select --files <触ったファイル…>    # 
 移した後に漏れやすい所 (2026-11-17〜18 に実際に漏れた):
 
 - `tools/source_roots.py` の走査の根 (ファイル単位で挙げている検査がある。外れると、その検査は違反を検出しなくなる — 変異込みでしか気付かない)。
-- 検査の宣言の `covers` (`python3 -B tools/checks/run.py --lint` が `uncovered input` を挙げる)。
-- 文書の中のパス (`make check-docs-links`)、ソースを特定のコミットと比べている試験。
+- 検査の登録の `sources` (移動先に合わせ、`python3 -B -m tests.infra.ci lint` で登録を確かめる)。
+- 文書の中のパス (`python3 -B -m tests.infra.ci run --check docs_links`)、ソースを特定のコミットと比べている試験。
 
 ## 5. 生成物が変わるか
 
-分離の枝 (`wt/sep-*`) は CI の `sep` が、x86 の生成物と PowerPC の像の `.o` を基点 (`origin/main` との merge-base) と比べる。
-
-- 移すだけ・口に替えるだけの段は、同じでなければ落ちる。
-- 変わるのが正しい段は、コミットの本文に行として書く: `Sep-Changes: x86`・`Sep-Changes: ppc`・`Sep-Changes: x86 ppc`。
-- `x86` を宣言した段は NP21/W の受入、`ppc` を宣言した段は QEMU の検査で確かめる。
-- 手元で比べる: `python3 -B tools/ci/sep_identity.py --work <空の置き場>` (20 分ほど)。
-
-取り込みはスキル os32-land、CI の赤の読み方は os32-ci-read。
+登録検査 `build_identity` が候補の二つの清浄ビルドを照合する。取り込みは os32-land に従う。

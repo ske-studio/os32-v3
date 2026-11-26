@@ -15,7 +15,7 @@ description: NP21/W の受入 (エミュレータの試験) を、別の機械�
 | セッション | Remote Control の `pc98emu` (名前は変わり得るので毎回 `ListAgents`)。役は受付・割り振り・照合。受入の本体は版ごとのサブエージェント |
 | 機械 | Windows 11 + WSL2 (mirrored)、16 コア。Smart App Control は Off (自前ビルドの無署名の NP21/W を動かすため、ユーザーが 2026-11-19 に切った) |
 | リポジトリ | 向こうの `~/os32-v3` (読むだけ、push しない)。GitHub は**読み取りだけの権限** (Contents・Actions を Read-only の fine-grained token。push・PR・CI の起動はしない) |
-| 像 | **CI の build の配布物** (`os32-<枝>-<SHA7>`) を `gh run download` で取る。向こうではビルドしない (クロスコンパイラは入れない) |
+| 像 | **restructure-build の配布物** (`os32-<枝>-<SHA7>`) を `gh run download` で取る。向こうではビルドしない (クロスコンパイラは入れない) |
 | NP21/W | `C:\np21w` (本線の機械から写した ai-debug 版の exe・ROM・ini)。ROM と NHD は著作権物・作業物なので**外へ出さない** (GitHub にも上げない) |
 | 枠 | 枠 N (1〜8、ユーザー指示 2026-11-19「4 本でも軽いなら最大 8 枠」) = デバッグの API `aidbport=8025+100(N-1)` (8025・8125・…・8725)、LAN の口 `NP2NETSOCK=127.0.0.1:8026+100(N-1)` (8026・8126・…、host agent の待ち受けも同じ番号)、ini `np21x64w-iN.ini`、NHD・起動 FD `C:\np21w\iN\`、HostDrv `C:\os32-N`。枠 1 は `np21x64w.ini`・`C:\np21w\os32.nhd`・`C:\os32` のまま。**8025〜8028 の連番にしない** — mirrored の WSL は loopback を共有するので、枠 2 の API が 8026 で待つと枠 1 の LAN の口がそこへつながる (2026-11-19 の試しで判明)。占有は `C:\np21w\slot-N.lock` (SHA・開始の時刻・頼んだ人) |
 | 元の NHD | `C:\np21w\base\os32.nhd` (読むだけ、sha256 先頭 `b81e4d4254cc6eb6`、2026-11-19 の main 225c257 の手前)。枠の NHD はここから戻す |
@@ -31,7 +31,7 @@ description: NP21/W の受入 (エミュレータの試験) を、別の機械�
 
 ```
 [os32pm → pc98emu] 依頼 <N>: <何の受入か>
-版: <枝> <SHA> (CI の build の run id <id>、配布物 os32-<枝>-<SHA7>)。枠の割り当ては任せる (同時に回す版があれば別の枠)。
+版: <枝> <SHA> (restructure-build の run id <id>、最新 attempt <番号>、配布物 os32-<枝>-<SHA7>)。枠の割り当ては任せる (同時に回す版があれば別の枠)。
 配備: 配布物の hostdrv.tar.gz を枠の HostDrv に置く → ゲストで hsync --no-backup --fep-off → "copied=0 errors=0" まで hsync → 要れば hsync sys → reset → ver。
       ブート領域 (deploy-kernel 相当) が要る時だけ: 枠の NP21/W を止める → 枠の NHD に配備 → 起動 ([D1] の順)。
 受入の項目: 1 行に 1 つ。何を打ち・何が出れば合格か (画面の文字・ログの行・数)。変異や比べる基点があれば書く。
@@ -40,7 +40,7 @@ description: NP21/W の受入 (エミュレータの試験) を、別の機械�
 ```
 
 - 受入の項目は、段の票・持越し台帳 (docs/tasks/DEFERRED_TESTS.md) の行から写す。PM の推測で増やさない。
-- CI がまだ success でない SHA は頼まない (配布物の名前と run id を `gh run list` で確かめてから)。文書だけのコミットには build が走らないので、その前の配布物の SHA を使う。
+- 候補 SHA を `wt/int-*` に push し、`restructure-build` の同じ run の最新 attempt が全件集計まで成功したことを確かめる。文書だけの変更も、その候補の PC-98 と PowerMac の起動記録を揃えて `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` を回す。 配布物の artifact_id・媒体名・sha256・到達点とログを報告する。
 
 ## 3. pc98emu の中の流れ (向こうの型。依頼に毎回は書かない)
 

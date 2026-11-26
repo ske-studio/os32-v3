@@ -29,7 +29,9 @@ memory は PM だけが読む。実装者・レビュアー・別の PM は読�
 ## 2. 書いた後
 
 ```bash
-CHECK_NO_NEEDS=1 make check-docs-links check-docs-orphans check-docs-status check-docs-tree check-constraints MUTATE=0
+for id in docs_links docs_navigation docs_source_refs docs_status; do
+    python3 -B -m tests.infra.ci run --check "$id" || exit 1
+done
 ```
 
 文書だけの変更は、この検査を手元で回して main へ (スキル os32-land の「文書だけ」の行)。依頼文・レビューの依頼には、関係する行を前提として書く (スキル os32-delegate)。

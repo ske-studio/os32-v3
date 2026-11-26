@@ -2,21 +2,21 @@
 
 > 状態: **現行 (2026-11-17)** — CI (GitHub Actions の workflow・composite action・CI から呼ぶ道具) を作る時と、既存の CI を直す時の決まりの正典。ユーザーの指示 (2026-11-17「ci 作成のポリシーと改修ポリシーをドキュメント化して」)。
 
-対象は `.github/workflows/`・`.github/actions/`・`tools/ci/` と、検査の登録 (`tools/checks/`、試験ファイルの中の `CHECK`) を作る・直す人。
-決まりの根拠になった既存の CI の欠点の実測 (F1〜F9) と、決まりどおりに組んだ手本の形は [design/tools/ci/gate.md](design/tools/ci/gate.md)。取り込みの手順 (どの結論で main に入れるか) は [ROLES §0「検査」](tasks/agents/ROLES.md)、検査の宣言の欄は [TESTS.md](TESTS.md) が正典で、ここには写さない。
+対象は `.github/workflows/`・`.github/actions/`・`tools/ci/` と、検査の登録 (`tests/registry.toml`) を作る・直す人。
+決まりの根拠になった既存の CI の欠点の実測 (F1〜F9) と、決まりどおりに組んだ手本の形は [design/tools/ci/gate.md](design/tools/ci/gate.md)。取り込みの手順 (どの結論で main に入れるか) は [ROLES §0「検査」](tasks/agents/ROLES.md)、検査の宣言の欄は [registry_v2.md](design/tools/checks/registry_v2.md) が正典で、ここには写さない。
 
-結果の読み方・回し直し・CI が起動しない時の手順は、スキル `.claude/skills/os32-ci-read`。待ち時間の棚卸し (検査ごとの所要・シャードの偏り・重みの作り直し) は、スキル `.claude/skills/os32-ci-inventory`。
+結果の読み方・回し直し・CI が起動しない時の手順は、スキル `.claude/skills/os32-ci-read`。古い検査は関門ではない (P7 で消す)。参考に読むだけ。 停止前の所要の記録はスキル `.claude/skills/os32-ci-inventory`。
 
-作り直し票の G1 は統合枝 wt/int-* の候補 SHA・指定 run の最新 attempt の全件集計（変異・同じ入力の再生成を含む）の成功と、同じ候補の両機種の起動受入を求める。旧 CI の R2・R3 は適用しない。[新 CI の関門](design/tools/ci/ci_v2.md#8-取り込み-sha-の固定)
+作り直し票の G1 は統合枝 wt/int-* の候補 SHA・指定 run の最新 attempt の全件集計（変異・同じ入力の再生成を含む）の成功と、同じ候補の両機種の起動受入を求める。旧 CI の R2・R3 は適用しない。早送り前に `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` を回す。[新 CI の関門](design/tools/ci/ci_v2.md#8-取り込み-sha-の固定)
 
 ## §1. 作る時の決まり
 
 | # | 決まり | 理由・実例 |
 |---|---|---|
-| G1 | **関門にならない検査を作らない。** 変異込みの全検査は **main に入れる SHA** で回し、赤は入る前に止める (途中の push ごとに全件を回す決まりではない)。コードを main に入れる SHA は `wt/int-*` の全期待ジョブの success を要する（文書の取り込み直しは PARALLEL_BRANCHES §3）。夜間だけ・手動だけの検査に、関門の役を持たせない。**ユーザー決定 2026-11-25: 全件の検査は main に入れる時、が元の決まり (「push ごとに全部」は 11-18 の PM の対処で広がった物)。今の workflow は push ごとに回したままで、新しい CI (票 【案内】[TASK_RESTRUCTURE](tasks/restructure/TASK_RESTRUCTURE.md) の P6) で「main に入れる SHA に全件・途中の push は関係する検査」の形にする** | 夜間の `full-check` は 2026-11-14〜17 の 4 回のうち 3 回が失敗し、その間も同じ SHA が毎回の CI を通って main に入った。変異の目印がずれた検査が 2 本、数日〜数週間そのままだった |
+| G1 | **関門にならない検査を作らない。** 変異込みの全検査は **main に入れる SHA** で回し、赤は入る前に止める (途中の push ごとに全件を回す決まりではない)。文書だけの候補も同じ関門を通す | 夜間の `full-check` は 2026-11-14〜17 の 4 回のうち 3 回が失敗し、その間も同じ SHA が毎回の CI を通って main に入った。変異の目印がずれた検査が 2 本、数日〜数週間そのままだった |
 | G2 | **全部回して、全部挙げる。** 1 本落ちても残りを回す (`make -k`、行列は `fail-fast: false`)。ジョブを `needs` で鎖にするのは、前のジョブの成果物を実際に読む時だけ。結果の行が無い検査 (回っていない) は失敗に数える | `tools/checks/run.py --run all` は最初の失敗で止まる。11-17 は ppc-compile が 1 本目で落ち、後ろの ppc-qemu は実行されなかった |
 | G3 | **結果は表で、ログは落ちた分だけ。** 検査ごとに 1 本のログ (`CHECK_LOG_DIR`)。画面とジョブの要約に出すのは、件数・落ちた検査の名前・その末尾・遅い検査だけ。成果物は結果の JSON と落ちた検査のログ。変異の「期待どおりの失敗」を共有のログに流さない | 11-17 の `full-check` の失敗ログは 1.4 GB・1,200 万行で、どの検査が落ちたかは grep しないと分からなかった |
-| G4 | **何を回すかは登録から引く。** workflow の YAML に検査の名前・ソースのパスの一覧を書かない。検査の集合・シャードの割り方・要る環境は `CHECK` の宣言から、arch ごとの対象は所有者集合 (`build/select.mk`) から引く | check.yml の static-check は `make check-<名>` を約 30 行手で並べ、`tools/ci/ppc_scope.py` は共通・PowerPC・x86 のパスの一覧を別に持っている。一覧が 2 つあると片方が古くなる |
+| G4 | **何を回すかは登録から引く。** workflow の YAML に検査の名前・ソースのパスの一覧を書かない。検査の集合・シャードの割り方・要る環境は `tests/registry.toml` の登録から、arch ごとの対象は所有者集合 (`build/select.mk`) から引く | check.yml の static-check は `make check-<名>` を約 30 行手で並べ、`tools/ci/ppc_scope.py` は共通・PowerPC・x86 のパスの一覧を別に持っている。一覧が 2 つあると片方が古くなる |
 | G5 | **用意は 1 か所。** 道具の導入は composite action にまとめ、ジョブには書かない。どのジョブも同じ環境にする。外から取る物は版と sha256 を固定し、キャッシュの鍵には入力のハッシュを入れる | `apt-get install … gcc-13 …` の行が check.yml と full-check.yml に 4 回、少しずつ違う中身で書かれている |
 | G6 | **足りない道具は、検査を始める前に全部まとめて挙げて止める。** 環境の不足 (終了コード 2) と検査の失敗 (終了コード 1) を分ける。道具が無い検査を飛ばして通さない。SKIP の行がある検査は結果の表に挙げる | apt は update を 300 秒、install を 600 秒で打ち切り、TERM の 30 秒後も残るプロセスには KILL を送る。static-check は static-setup の最後に道具と Python モジュールの不足を summary に列挙し、終了コード 2 で止まる。クロスコンパイラの無いジョブでは PowerPC の検査が SKIP で通る。手元では `gcc-13` が無いと検査の途中で `FileNotFoundError` になり、変更が原因かどうかをログから読み分けることになった |
 | G7 | **CI と手元で同じ入口。** workflow の `run:` は道具を 1 行で呼ぶだけにし、同じコマンドを手元で回せるようにする。合否の判定・集計・分岐を YAML の shell に書かない | `r1-fixture-host` は `make check-…` では通り、`run.py --run …` では `KeyError: 'BUILD_OUT'` で落ちる。入口が 2 つあると、片方でしか見つからない失敗が出る |
@@ -27,7 +27,6 @@
 | G12 | **入れる前に、赤が見えることを 1 回実演する。** 検査を 1 本わざと落とした枝で、残りが最後まで回ること・表と成果物に出ること・ジョブが失敗で終わることを確かめる。道具の無い環境で終了コード 2 になることも確かめる | 緑だけを見て入れた関門は、落ちた時に何が見えるかが分からない |
 | G13 | **重い検査は中を並列にできるか検討する。** 検査を足す・変異や場合を足す時、独立に回せる繰り返し (変異ごとの組み直しと実行、場合ごとの実行) は `tools/tests/mutpar.py` の `run_ordered` に載せる (並べる数は `jobs()` が CPU から決める、出力の順は前と同じ)。直列に残すのは、`os.environ`・`sys.path`・カレントディレクトリ・元の木などを書き換える場合だけで、その理由を試験の中に 1 行書く。CI の実測で 300 秒を越える検査は、並列にしたか・できない理由を、検査の棚卸し (スキル `os32-ci-inventory`) の表に残す。並列にしたら、前後と直列 (`jobs=1`) で変異ごとの RED/SURVIVED が一致すること、CI の runner のメモリの上限を越えないことを確かめる | `gf5-host` は 217 本の変異を 1 本ずつ組み直して回し、CI で 13〜27 分、CPU は 1 スレッドだけだった (2026-11-19、ユーザーの指摘)。`run_ordered` に載せて手元の 8 並列で 1,029 秒 → 415 秒。300 秒を越える host の検査はほかに 17 本あった |
 
-自動判定では、文書・作り直しの道具だけの変更は統合枝と main の push でも `ppc-scope` で判定し、`ppc-compile` と `ppc-qemu` の 20 組を runner の割り当て前に飛ばす。
 
 - **G14 検査の棚卸しはユーザーが決める** (ユーザー決定 2026-11-20「今後棚卸し内容は私が決めることにします」): CI から検査を外す・軽くする・戻すことは、PM が実測 (重い順の表・何を確かめているか・外した時に失う物) を出し、ユーザーが選ぶ。PM は自分で外さない。外した検査は持越し台帳 (docs/tasks/DEFERRED_TESTS.md) に戻す条件付きで書く。重みの作り直しと検査の中の並列化 (G13) は、検査の集合を変えないので PM が進めてよい。
 
@@ -58,4 +57,4 @@
 | 回る検査の集合が、置き換える前より減っていない | R3 |
 | CI の道具の試験と変異が通る。workflow の本文を読む試験を変異込みで回した | G9・R6 |
 | 所要時間の前後を書いた | G10・R8 |
-| 出す前に、workflow・action・CI の道具を読む物を `python3 -B tools/checks/run.py --select --files <触ったファイル>` で出し、`check-map` と一緒に手元で変異込みで回した (2026-11-18 の S2a は check-map を回さず covers の漏れで 1 回赤) | R6 |
+| 変更した契約を登録の sources と照合し、`python3 -B -m tests.infra.ci lint` と `python3 -B -m tests.infra.ci run --check <id> --mutate` を回した | R6 |

@@ -1,9 +1,11 @@
 ---
 name: os32-ci-inventory
-description: CI の待ち時間の棚卸し。検査ごとの所要・シャードの偏り・重みのずれを成果物の記録から測り、重みを作り直してシャードを揃える。CI が遅くなったと感じた時、検査を大きく足した・変異を足した後、節目 (月に 1 回・大きな取り込みの後) に使う。赤の読み方は os32-ci-read、CI の作りを変える決まりは POLICY_CI。
+description: 停止した旧 CI の所要とシャード分割の参考記録。
 ---
 
 # os32-ci-inventory — CI の所要の棚卸し
+
+古い検査は関門ではない (P7 で消す)。参考に読むだけ。 以下は停止前の測定手順。
 
 決まりは [POLICY_CI](../../../docs/POLICY_CI.md) G10 (時間を割り、測り、見えるようにする)、道具の設計は [time_inventory](../../../docs/design/tools/ci/time_inventory.md)。待ち時間は一番遅いジョブで決まる。シャードの割り振りは検査ごとの重み (`tools/checks/weights.json`) で釣り合いを取るので、重みが実態とずれると遅くなる。
 
