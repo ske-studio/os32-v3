@@ -84,15 +84,10 @@ void ppc_cpu_load_segments(void);
 void ppc_cpu_load_sdr1(u32 sdr1);
 /* Foreground wait requires EE=1; preserves EE. */
 void ppc_cpu_nap(void);
-void ppc_enable(void);
-u32 ppc_irq_save(void);
-void ppc_irq_restore(u32 saved_msr);
-int ppc_irq_enabled(void);
 void ppc_vector_install(const struct ppc_vector_image *image);
 void ppc_tlb_flush_all(void);
 void ppc_tlb_flush_one(u32 va);
 void ppc_sr_sdr1_load(const u32 sr[16], u32 sdr1);
-void ppc_enable_translation(void);
 void ppc_cache_copy(void *dst, const void *src, u32 size);
 u32 ppc_read_pvr(void);
 u32 ppc_read_hid0(void);

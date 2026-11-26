@@ -1,4 +1,5 @@
 /* Read-only PLN1 diagnostics. The service serializes calls and validates peers. */
+#include "arch_io.h"
 #include "lan_boot.h"
 #include "sys/arch/ppc/kernel_probe.h"
 #include "sys/arch/ppc/ppc_trap.h"

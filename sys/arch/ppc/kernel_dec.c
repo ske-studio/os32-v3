@@ -2,6 +2,7 @@
  * NetBSD sys/arch/powerpc/powerpc/clock.c:108-116,139-159:
  * add periods to the negative DEC, preserving interrupt latency/phase.
  * Unlike the OpenBSD macppc re-arm scheme, never restart a full period. */
+#include "arch_io.h"
 #include "ppc_trap.h"
 #include "sys/hal/time/tick_clock.h"
 #include "sys/kern/irq/tick.h"

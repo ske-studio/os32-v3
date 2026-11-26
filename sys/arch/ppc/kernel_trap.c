@@ -1,6 +1,7 @@
 /* MPC7450UM 4.6.3 table 4-10, 4.6.4; OpenBSD powerpc/trap.c:266-299
  * (spill precedes ordinary fault; consume onfault before returning).
  * No demand paging, x86 frame handlers, or implicit platform dependencies. */
+#include "arch_io.h"
 #include "ppc_trap.h"
 #include "ppc_hpt.h"
 #include "exec_arch.h"

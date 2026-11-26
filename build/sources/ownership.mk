@@ -1297,3 +1297,8 @@ OWN_ASM_CONTRACT += sys/kern/kstring_asm.asm|sys/kern/kstring.h
 OWN_ASM_CONTRACT += sys/arch/x86/kernel/setjmp.asm|sys/include/ksetjmp.h
 OWN_ASM_CONTRACT += sys/arch/ppc/kernel_mmu.S|sys/arch/ppc/arch_cpu.h
 OWN_GENERATED += build/out/memmap_layout.h|共通実装|-|ordinary
+
+# P43 group 2: PowerPC IRQ/MMU assembly and the no-exec caller contract.
+OWN_ASM_CONTRACT += sys/arch/ppc/mmu.S|sys/arch/ppc/arch_io.h|sys/arch/ppc/arch_cpu.h
+OWN_CONTRACT += sys/include/exec_caller_contract.h|common
+OWN_COMPILE_SET += C_ARCH_NOEXEC|core|link|neg1

@@ -1,5 +1,6 @@
 /* W4e test-image observer, entered from the acceptance shell loop.
  * The real trap, DEC, MPIC, exec and syscall providers remain linked. */
+#include "arch_io.h"
 #include "ppc_trap.h"
 #include "shell_loop_ops.h"
 #include "ppc_hpt.h"

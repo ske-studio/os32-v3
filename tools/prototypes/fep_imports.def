@@ -335,7 +335,7 @@
       "symbol": "ring3_call_from_user",
       "context": "normal",
       "irq": false,
-      "source": "sys/kern/exec/exec.h"
+      "source": "sys/include/exec_caller_contract.h"
     },
     {
       "symbol": "ring3_fault_kill",

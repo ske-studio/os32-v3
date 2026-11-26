@@ -1,6 +1,7 @@
 /* OpenHCI 1.0a; MPC7450UM ch.5 (I/G mappings, sync/eieio).
  * DMA is remapped cache-inhibited before use, like gmac_dma.c's control page.
  * UniNorth's identity 16MB DMA window is the same as gmac_tree.c/pm_dma_bus. */
+#include "arch_io.h"
 #include "usb_boot.h"
 #include "rh_observe.h"
 #include "via_window.h"

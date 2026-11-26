@@ -1,4 +1,5 @@
 /* UniNorth configuration access: NetBSD macppc/pci/uninorth.c:191-271. */
+#include "arch_io.h"
 #include "lan_boot.h"
 #include "ppc_oea.h"
 #include "kernel_boot.h"
