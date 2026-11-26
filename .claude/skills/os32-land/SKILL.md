@@ -1,6 +1,6 @@
 ---
 name: os32-land
-description: レビューを通った段 (作業木のブランチ) を push して GitHub の CI (check・build) を通し、通ったら main に取り込んで作業木を片付ける。PM が段・後片付け・文書を main に入れるときに使う。検査の基点 (最後の全体検査) の更新、落ちたときの直し方、台帳の閉じ方も含む。実装の依頼は os32-delegate、設計の往復は os32-design-rally。
+description: レビューを通った段 (作業木のブランチ) を push して GitHub の CI (restructure-build) を通し、通ったら main に取り込んで作業木を片付ける。PM が段・後片付け・文書を main に入れるときに使う。検査の基点 (最後の全体検査) の更新、落ちたときの直し方、台帳の閉じ方も含む。実装の依頼は os32-delegate、設計の往復は os32-design-rally。
 ---
 
 # os32-land — 段の取り込み・CI・push
@@ -8,19 +8,20 @@ description: レビューを通った段 (作業木のブランチ) を push し
 規則の正典は [ROLES §0](../../../docs/tasks/agents/ROLES.md) (検査の段、全体検査は節目、検査中も main を編集してよい)。
 ここはその手順を 1 本にしたもの。
 
-> **作り直し票の取り込み**は `wt/int-*` の候補 SHA を push し、`restructure-build` の同じ run の最新 attempt の全ジョブと全件集計（変異込み）の成功を待つ。`python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` に候補の sha・run_id・attempt・boots を渡す。boots は今回の PC-98 と PowerMac の媒体・sha256・artifact_id・到達点・ログ。文書だけでも両方を取り直す。再生成の一致は登録の build_identity が確かめる。下の旧 workflow の手順は休止中。[CI 設計 §4・§8](../../../docs/design/tools/ci/ci_v2.md)
+> **作り直し票の取り込み**は `wt/int-*` の候補 SHA を push し、`restructure-build` の同じ run の最新 attempt の全ジョブと全件集計（変異込み）の成功を待つ。`python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` に候補の sha・run_id・attempt・boots を渡す。boots は今回の PC-98 と PowerMac の媒体・sha256・artifact_id・到達点・ログ。文書だけでも両方を取り直す。再生成の一致は登録の build_identity が確かめる。古い検査は関門ではない (P7 で消す)。参考に読むだけ。[CI 設計 §4・§8](../../../docs/design/tools/ci/ci_v2.md)
 
 ## 1. 取り込む前
 
 - レビューが「取り込み可」か。要修正なら直してから (軽い指摘は PM が直すか、次の段の依頼に書いて設計票の末尾に「送り項目」として残す)。
 - 作業木に未コミットが無いか (`git -C ~/wt/os32-v3/<名> status --short`)。PM が直したら作業木でコミットしてから merge。
 - 直しのログは**最後の変更より後**のものだけ合格に数える。PM が直したら、その直しに当たる試験を自分で回す
-  (`CROSS_DIR=/home/hight/opt/cross python3 -B tools/tests/<試験>.py`)。足した・触った試験は、ROLES §0「検査」に従いその試験を `--mutate` で確かめる。
+  (`python3 -B -m tests.infra.ci run --check <id>`、足した・触った検査は `--mutate` 付き)。
 
 ## 2. merge
 
 ```bash
 cd /home/hight/os32-v3
+git switch wt/int-<日付><記号>
 git merge --no-ff -q wt/<名> -m "<段>: <中身> — <書き手> 実装、<レビュアー> レビュー取り込み可
 
 Co-Authored-By: …
@@ -36,21 +37,21 @@ GitHub の CI (ユーザー決定 2026-11-05、メインストリームを含む
 
 | 何を入れたか | 検査 |
 |---|---|
-| 文書だけ (docs・票・CLAUDE.md・スキル) | **枝を push して check (約 4 分) の success を読んでから main へ** (手元の検査だけで main に入れない、ユーザー決定 2026-11-19)。push の前に、その場で `CHECK_NO_NEEDS=1 make check-docs-links check-docs-orphans check-docs-status check-docs-tree check-constraints MUTATE=0` (`CHECK_NO_NEEDS=1` は宣言の前提 (`make all`) を組まない — 文書の検査は成果物を読まない。check-docs-tree は相互リンクの数を基準と比べる — リンクを足したら必ず入れる)。**新しい文書は `git add` してから検査する** — 文書の木 (tools/doc_graph.py) は `git ls-files` の .md だけを見るので、追跡されていない新しいファイルのリンクを数えない。文書だけのコミットには build が走らないので、main の CI も気づかない (2026-11-07、PowerPC の票の追加で踏んだ)。**検査が読む文書を触ったら、その検査も足す** — 例: `docs/KAPI_SPEC.md` の表 → `check-kapi-version`。どの検査が文書を読むかは `python3 tools/checks/run.py --select --files <文書>` で出す。文書だけのコミットには build が走らない (path filter) |
-| 段・小さな取り込み | コードを含む SHA は単独の段でも `wt/int-<日付><記号>` に push し、早送り前に `python3 -B tools/ci/land_gate.py <SHA>` の成功とその SHA の受入 PASS を確かめる。 |
+| 文書だけ | push 前に対象の登録検査を ID で回す。取り込みは次の行と同じ。 |
+| すべての取り込み | 候補 SHA を `wt/int-*` に push し、今回の両機種の起動記録を揃えて `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` の成功を確かめる。 |
 
 - 待ちには上限を付ける。取り込み直しは PARALLEL_BRANCHES §3 の G と M の手順に従う。
 - 並列の枝が先に main に入ったら、main を取り込んで push し直し、CI を通し直す。
 
 ## 3-1. ゲストの受入と実機は CI の成果物から
 
-NP21/W の受入と実機の更新は、CI の artifacts のジョブが作った成果物を `tools/ci_fetch.sh --sha <SHA>` で取って配る (検査した版と配った版が一致する)。artifacts のジョブが成功していれば、check-fast の途中でも取れる (調べの版はこれで実機へ。main に入れるのは 統合枝の全期待ジョブが成功し受入が PASS してから)。
+同じ run の最新 attempt の成果物を使い、機種ごとに媒体・sha256・artifact_id・到達点・ログを記録する。
 
 ## 4. 落ちたとき
 
-1. `gh run view <id> --log-failed` (空なら `gh api repos/ske-studio/os32-v3/actions/jobs/<id>/logs`) で、`make[3]: *** [build/sdk.mk: check-<名>]` の行から落ちた検査を全部出す。check.log の `^make…: ***` の grep は使わない — 並列の検査の出力が混ざって `make[3]: ***` が行頭に来ないことがあり、2026-11-01 に落ちた 2 本のうち 1 本を見落として push した (CI の check で発覚)。
-2. その対象の周辺だけ読む (`sed -n` で行を絞る)。MUTATION の RED は期待どおりの行なので数えない。
-3. 直して main に別コミット。**落ちた対象だけ**を回し直して rc=0 を確かめる。全体を回し直さない。
+1. 失敗したジョブのログと集計結果から検査 ID・構成・失敗理由を読む。
+2. 候補の作業木で直し、`python3 -B -m tests.infra.ci run --check <id>` で確かめる。変異の失敗なら `--mutate` を付ける。
+3. 直した候補を push し、§3 の証拠を取り直す。
 4. CI でだけ落ちて手元で再現しないときは、substream (Ubuntu 24.04・gcc 13・qemu 8.2、GitHub の runner と同じ) で再現する (`ssh substream`、2026-11-05 の gcc 13 の件)。
 
 今までに踏んだもの:
@@ -60,21 +61,20 @@ NP21/W の受入と実機の更新は、CI の artifacts のジョブが作っ�
 - 作業木の `assets/fonts` に IPAex が無い (同意済みの main から写す、gitignore)。
 - CI だけ落ちる: CI は 32bit の試験を native で走らせる (手元は qemu)。`HOST32_RUNNERS="native qemu"` で再現する。
 - 自分が書いていない変更がコミットに紛れる: 作業木はほかのエージェントも書ける。`git add -A` の前に `git status --short` を読み、覚えの無いファイルは外して出所を確かめる (2026-11-17、`userland/diag/hw/tri_burst.hwb` の 18 行が紛れて検査が落ちた)。
-- CI が 1 本も起動しない: コミットの本文に、CI を飛ばす印 (角括弧つきの skip ci) の文字列が説明としてでも入っていると、GitHub は CI を飛ばす。印の名前を文に書く時は角括弧を付けない。空のコミット・同じ木の force-push では build が起動しない (`gh workflow run build.yml --ref <枝>`)。変更が文書だけの時も build は起動しないが、それで正しい — 文書だけは check の success で取り込み、build は手で起こさない (ユーザー決定 2026-11-19)。push の直後に `gh run list --branch <枝>` で起動を確かめる (2026-11-18)。
+- CI が起動しないときは、候補の枝名と push した SHA を確かめる。
 - CI の待ち: `gh run watch` を何本も裏で回さない (3 秒ごとに問い合わせて、API の上限 1 時間 5,000 回を使い切る)。`gh run list` を数分おきに 1 回。
 - 揺れる試験: 回し直し (`gh run rerun <id> --failed`) で通したら、検査の名前・落ち方・日付を `docs/tasks/DEFERRED_TESTS.md` に行で残す。同じ検査の 2 回目が出たら、直すまで行を閉じない (回し直しで通す運用を常態にしない)。
-- CI だけ落ちる (2): `.github/workflows/check.yml` は検査を**名前で直接**呼ぶ。手元の check-changed はこのファイルを見ないので、検査を消す・改名・束ねた取り込みは `grep -rn <検査名> .github` で参照が残っていないか見てから push する (2026-10-24、TT5 で消した 2 本の名前が残り CI が `No rule to make target` で落ちた)。
 
 ## 5. main への取り込みと CI
 
 ```bash
-python3 -B tools/ci/land_gate.py <SHA>
+git switch main
+python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON> &&
 git merge --ff-only <SHA>
 git push -q origin main
 ```
 
-- main への push では、同じ SHA の push の成功を `tools/ci/reuse_success.py` が確かめる。build の checks は `wt/**` の build の成功を使える。check の PowerPC の証拠には `wt/int-*` の check の成功だけを使える。配布物と static-check は毎回作る・回す。
-- main の run が取り消された (cancelled) 時も結論として読む。取り消しは成功に数えず、次の取り込みより先にその SHA の main を回し直す (後の文書だけの push が PowerPC を飛ばすと、取り消された回のコードが PowerPC を通らないまま main が緑に見えるため)。
+- 取り消された attempt は成功に数えない。
 - main の CI の build が赤なら最優先で直す。
 - 実機に入れる SHA は artifacts のジョブが成功したものを選ぶ (os32-realhw-update)。
 

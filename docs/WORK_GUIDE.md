@@ -20,7 +20,7 @@
 | ビルド・配備の仕組みを変える | [08_build.md](08_build.md) | `Makefile` `build/*.mk` `tools/*.py` | [08_build §8-4](08_build.md)・[ROLES §0「検査」](tasks/agents/ROLES.md) |
 | 障害を追う | [POLICY_DEBUG.md](POLICY_DEBUG.md) (§2 反映確認 → §4 教訓集 → §5 道具) | — | `tools/np21w_mcp/`、`/api/tvram` |
 | 共通・CPU・機種・装置の境目に触る | スキル `.claude/skills/os32-arch-sep`、[層の検査 §3・§4・§8](design/tools/check_layers.md)、[ソースの選択](design/build/select.md) | 持ち主の置き場 (`sys/arch/<cpu>/`・`sys/platform/<機種>/`・`sys/dev/`・共通)、口は `sys/include/<名>_contract.h`・固定名 `platform_<名>.h` | `make check-layers-x86 check-layers-ppc`、両方の像のビルド |
-| 検査を足す・試験の固定を直す | スキル `.claude/skills/os32-test-basis`、[POLICY_DEV §6](POLICY_DEV.md)、[TESTS.md](TESTS.md) | `tools/checks/<名>.py` (宣言)・`tools/tests/` | `python3 tools/checks/run.py --lint`、`MUTATE=1 make check-<名>` |
+| 検査を足す・変える | [ROLES §0](tasks/agents/ROLES.md) | `tests/` の対象の検査と登録 | `python3 -B -m tests.infra.ci run --check <id> --mutate` |
 | CI が遅い・検査を大きく足した後 | スキル `.claude/skills/os32-ci-inventory`、[棚卸しの道具](design/tools/ci/time_inventory.md) | `tools/checks/weights.json` (重み)、workflow の行列 | `python3 tools/ci/time_inventory.py <成果物の置き場>`、前後のジョブの実時間 |
 | CI の赤を読む・回し直す | スキル `.claude/skills/os32-ci-read`、[POLICY_CI.md](POLICY_CI.md) | — | `gh run list` (数分おきに 1 回) |
 | NP21/W の受入を別の機械で回す | スキル `.claude/skills/os32-emu-remote`、[08_build §8-5](08_build.md) | 枠 (ポート・ini・NHD・HostDrv) は pc98emu の機械の `C:\np21w`・`C:\os32-N` | 配布物の BUILD_INFO・manifest の `build=`・ゲストの `ver` の照合 |

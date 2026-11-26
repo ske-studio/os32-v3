@@ -18,7 +18,7 @@ Use the WSL toolchain described in [INSTALL.md](INSTALL.md): i386-elf GCC, NASM,
 - `make kernel`: build the kernel and SQLite.
 - `make programs`: build userland programs.
 - apps/game builds are deferred under H-7. Run `git submodule update --init` and `make external` only after the [reopening gate](docs/tasks/v3/T2H_EXTERNAL_GATE.md#再開前に揃える-8-項目) is satisfied and reopening is approved.
-- `make check-<name>`: one host test or repository check (add `MUTATE=1` for its mutants). CI runs `make check` (every check with its mutants, in six shards); do not run the full set locally (see the worktree section). Stages and times: [docs/08_build.md](docs/08_build.md) §8-4.
+- Run one registered check with `python3 -B -m tests.infra.ci run --check <id>`. Add `--mutate` to exercise its registered mutations.
 - `make math_test`: build an individual guest test.
 
 Run images in NP21/W. Stop the emulator before `make deploy-kernel`, then restart it. See [docs/08_build.md](docs/08_build.md) for deployment details.
@@ -28,10 +28,8 @@ Run images in NP21/W. Stop the emulator before `make deploy-kernel`, then restar
 Worktrees have no `.env`. Before anything else, export
 `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp/run/<stage> HOST32_RUNNERS=qemu`
 (TMPDIR must be on disk; `/tmp` is RAM; native runners hit SIGSYS in the Codex sandbox), then run
-`tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Build what the request asks for (`make all`, or `make kernel` / the module / userland image you touched — never suppress the build that catches ripple into other tests), then the tests you added or touched with `--mutate` (each mutation anchor unique and
-RED at runtime; if you changed or removed a product line, `grep -rn` tools/tests for mutations anchored on it and move
-them), and `python3 -B tools/checks/run.py --lint` (a new test declares its inputs in its own `CHECK` dict). Do not run
-the full mutation pass locally: the landing check is GitHub CI (check + build, every check with mutation; docs/tasks/agents/ROLES.md §0). `make check-changed` is an optional local convenience, never a gate.
+`tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Build the image requested for the change and run the affected registered checks. Use `--mutate` for checks you add or modify. Once feature development resumes, add a check for the affected contract in the same change.
+The PM pushes the candidate to `wt/int-*` and runs `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` before fast-forwarding main. The evidence identifies the successful latest attempt of the same restructure-build run and records both PC-98 and PowerMac boots. Legacy checks are reference material only until removal in P7.
 Run checks in the foreground and wait for them to finish instead of re-reading partial logs; never abort and restart a run. Only logs produced after your last source change count as passing.
 Never commit (the sandbox keeps `.git` read-only; the PM commits).
 
@@ -54,10 +52,10 @@ Use focused Conventional Commits, matching history: `fix(exec): ...`, `feat(depl
 The step-by-step playbooks live under `.claude/skills/<name>/SKILL.md`. They are plain Markdown; read the one that matches the task before starting.
 
 - `os32-arch-sep`: adding or moving code across the common / CPU / machine / device boundary (layer check, contract headers, `platform_<name>.h`, `Sep-Changes:`).
-- `os32-test-basis`: registering a check, replacing hash / commit / count pins, fixing stale mutation anchors.
+- `os32-test-basis`: legacy check conventions, for reference until P7.
 - `os32-kapi-add`: adding or changing a KernelAPI entry.
 - `os32-ci-read`: reading CI failures and re-running (PM).
-- `os32-ci-inventory`: measuring per-check time and shard balance, recalibrating `tools/checks/weights.json` (PM).
+- `os32-ci-inventory`: legacy shard measurements, for reference until P7.
 - `os32-archive`: summarizing a finished ticket into `docs/design/` before moving it to `docs/archive/` (PM; policy in [docs/POLICY_ARCHIVE.md](docs/POLICY_ARCHIVE.md)).
 
 ## Authoritative Guidance
