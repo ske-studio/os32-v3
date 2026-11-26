@@ -8,7 +8,7 @@
 #include "arch_io.h"
 #include "arch_cpu.h"
 #include "ppc_pd.h"
-#include "ppc_memmap.h"
+#include "platform_ppc_memmap.h"
 #include "platform_memory.h"
 
 static u32 status[17], memory[8];

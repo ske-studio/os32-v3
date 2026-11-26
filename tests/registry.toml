@@ -110,6 +110,7 @@ limits = "API 応答を与えた関門の判定。媒体自体の起動は別の
 gates = ["push", "main"]
 mutations = [
     { id = "accept_stale_attempt", config = "local", replace = "tools/ci/land_gate.py", old = "or number(run['run_attempt']) != attempt", new = "or False", fail = "invalid run_attempt accepted", when = "after_build" },
+    { id = "accept_failed_selftest", config = "local", replace = "tools/ci/land_gate.py", old = "if type(count) is not int or count != 0:", new = "if False:", fail = "invalid PC-98 selftest count accepted", when = "after_build" },
     { id = "accept_partial_boot", config = "local", replace = "tools/ci/land_gate.py", old = "if machines != {'pc98', 'powermac'}:", new = "if not machines:", fail = "missing PowerMac boot accepted", when = "after_build" },
 ]
 
@@ -294,3 +295,56 @@ expect = "公開定義と配布物・仕様の表が一致する"
 limits = "生成した C・Rust と仕様の公開表"
 gates = ["push", "main"]
 mutations = [{ id = "changed_data_offset", config = "pc98", when = "after_build", replace = "sdk/include/os32/os32_kapi_slots.h", old = "#define KAPI_DATA_FIELDS_OFF 0x608", new = "#define KAPI_DATA_FIELDS_OFF 0x60c", fail = "generated definition differs: sdk/include/os32/os32_kapi_slots.h" }]
+
+[[check]]
+id = "c_dialect"
+spec = { path = "docs/CONSTRAINTS.md", section = "[C1] C11 (GNU11) を内部実装の基準とする" }
+subsystem = "infra"
+level = "L0"
+sources = ["make:all", "sdk/include/os32", "tests/support/product.py"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"], ppc = ["link-sh"] }
+needs = []
+expect = "実効方言・必須診断と公開ヘッダの呼出側方言を満たす"
+limits = "代表構成。内部 AST の追加規約と公開 ABI は別の契約"
+gates = ["push", "main"]
+mutations = [{ id = "sqlite_language", config = "pc98", when = "after_build", replace = "build/config.mk", old = "C_STD_SQLITE     = -std=gnu89", new = "C_STD_SQLITE     = -std=gnu11", fail = "lib/sqlite3/sqlite3.c: expected GNU89" },
+ { id = "weaken_vla", config = "pc98", when = "after_build", replace = "build/config.mk", old = "CFLAGS_COMMON = $(C_STD) $(C_DIALECT_ERRORS) $(CFLAGS_MACHINE)", new = "CFLAGS_COMMON = $(C_STD) $(C_DIALECT_ERRORS) $(CFLAGS_MACHINE) -Wno-error=vla", fail = "missing diagnostic vla" },
+ { id = "public_c99", config = "link-sh", when = "after_build", replace = "sdk/include/os32/os32_ver_info.h", old = "#define OS32_VER_LINES 20", new = "static inline int os32_c3_probe(int a[static 2]) { return a[0]; }\n#define OS32_VER_LINES 20", fail = "os32_ver_info.h: gnu89" }]
+
+[[check]]
+id = "p2v"
+spec = { path = "docs/CONSTRAINTS.md", section = "[C5] 物理番地とポインタの変換" }
+subsystem = "infra"
+level = "L0"
+sources = ["make:kernel", "make:boot", "sys/include/memmap.h", "tests/support/product.py"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"], ppc = ["link-sh"] }
+needs = []
+expect = "物理引数と恒等番地の直接キャストを変換口に限定する"
+limits = "選択済み C の同一式。独立アセンブリと整数の代入をまたぐ追跡は対象外"
+gates = ["push", "main"]
+mutations = [{ id = "boot_extra_cast", config = "pc98", when = "after_build", replace = "boot/boot_main.c", old = "file_base = (u8 *)LOAD_BUF;", new = "file_base = (u8 *)LOAD_BUF;\n    file_base = (u8 *)(LOAD_BUF + 1);", fail = "boot_main: raw physical cast" },
+ { id = "raw_page_directory", config = "link-sh", when = "after_build", replace = "sys/kern/mm/paging.c", old = "pd = P2V(as->pd_phys);", new = "pd = (u32 *)as->pd_phys;", fail = "paging_as_audit: raw physical cast" },
+ { id = "raw_page_table", config = "pc98", when = "after_build", replace = "sys/kern/mm/paging_boot.inc", old = "page_directory[i] = V2P(page_tables[i]) | PAGE_RW;", new = "page_directory[i] = (u32)page_tables[i] | PAGE_RW;", fail = "paging_init: raw physical cast" },
+ { id = "user_address_as_phys", config = "pc98", when = "after_build", replace = "sys/kern/mm/paging_addrspace.inc", old = "return V2P(page_directory);", new = "return V2P((void *)MEM_EXEC_LOAD_ADDR);", fail = "V2P on USER or lease address" }]
+
+[[check]]
+id = "ring3_instructions"
+spec = { path = "docs/09_exec.md", section = "PC-98 の実行コードの命令制約" }
+subsystem = "infra"
+level = "L1"
+sources = ["make:programs", "sdk/link/app.ld", "sdk/link/shlib.ld", "sdk/link/app_sys.ld"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "最終 ELF の実行命令が特権・ISA・整数専用の各条件を満たす"
+limits = "配布ユーザーランド。カーネル・機種部品・16-bit 起動は後段"
+gates = ["push", "main"]
+mutations = [
+ { id = "user_halt", config = "pc98", when = "after_build", replace = "userland/diag/ring3_hello.c", old = "mark[1] = R3_DONE;", new = '__asm__ volatile("hlt"); mark[1] = R3_DONE;', fail = "ring3_hello.elf: privileged hlt" },
+ { id = "fault_extra_halt", config = "pc98", when = "after_build", replace = "userland/diag/faulttest.c", old = '__asm__ __volatile__("hlt" : : : "memory");', new = '__asm__ __volatile__("hlt\n\thlt" : : : "memory");', fail = "faulttest.elf: privileged hlt" },
+ { id = "fault_moved_halt", config = "pc98", when = "after_build", replace = "userland/diag/faulttest.c", old = '''        __asm__ __volatile__("hlt" : : : "memory");
+    } else if (streq(kind, "de")) {''', new = '''    } else if (streq(kind, "de")) {
+        __asm__ __volatile__("hlt" : : : "memory");''', fail = "faulttest.elf: privileged hlt" },
+ { id = "user_bswap", config = "pc98", when = "after_build", replace = "userland/diag/ring3_hello.c", old = "mark[1] = R3_DONE;", new = '__asm__ volatile("bswap %%eax" ::: "eax"); mark[1] = R3_DONE;', fail = "ring3_hello.elf: isa386 bswap" }]

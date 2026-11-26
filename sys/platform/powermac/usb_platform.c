@@ -10,7 +10,7 @@
 #include "sys/hal/input/in2_int.h"
 #include "mouse_pointer_contract.h"
 #include "usb_platform.h"
-#include "ppc_memmap.h"
+#include "platform_ppc_memmap.h"
 #include "sys/kern/mm/paging.h"
 #include "sys/kern/mm/kmalloc.h"
 #include "sys/kern/irq/tick.h"

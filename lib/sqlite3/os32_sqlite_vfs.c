@@ -412,11 +412,13 @@ static int os32FileSize(sqlite3_file *pFile, sqlite3_int64 *pSize)
 /* ロック系: シングルタスクのため全て no-op */
 static int os32Lock(sqlite3_file *f, int l)
 {
+    (void)l;
     if (!file_live(f)) return SQLITE_IOERR_LOCK;
     return SQLITE_OK;
 }
 static int os32Unlock(sqlite3_file *f, int l)
 {
+    (void)l;
     if (!file_live(f)) return SQLITE_IOERR_UNLOCK;
     return SQLITE_OK;
 }
@@ -456,7 +458,7 @@ static const sqlite3_io_methods os32_io_methods = {
     os32SectorSize,
     os32DeviceCharacteristics,
     /* v2, v3 メソッドは NULL */
-    0, 0, 0, 0, 0
+    0, 0, 0, 0, 0, 0
 };
 
 /* DB接続の main ファイルが使う OS32 VFS fd を返す (失敗時 -1)。

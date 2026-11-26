@@ -176,9 +176,9 @@ static int probe_flush(void)
     volatile unsigned char *va = flush_a;
     flush_a[0] = 0xA5; flush_b[0] = 0x5B;
     if (*va != 0xA5) return 0;                       /* HPT entry for A is live */
-    if (paging_set_page((u32)flush_a, (u32)flush_b, PAGE_RW) != 0) return 0;
+    if (paging_set_page((u32)flush_a, V2P(flush_b), PAGE_RW) != 0) return 0;
     int moved = *va == 0x5B;
-    if (paging_set_page((u32)flush_a, (u32)flush_a, PAGE_RW) != 0) return 0;
+    if (paging_set_page((u32)flush_a, V2P(flush_a), PAGE_RW) != 0) return 0;
     return moved && *va == 0xA5;
 }
 

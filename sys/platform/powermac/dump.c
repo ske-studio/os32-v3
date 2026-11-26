@@ -1,7 +1,7 @@
 /* The bounded byte protocol is shared with the existing BSD-derived ESCC. */
 #include "ofw.h"
 #include "ppc_frame.h"
-#include "ppc_memmap.h"
+#include "platform_ppc_memmap.h"
 static struct pm_escc console;
 void pm_mmu_console_bind(u32 pa)
 {

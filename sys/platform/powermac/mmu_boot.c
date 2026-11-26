@@ -147,7 +147,7 @@
 #include "ofw.h"
 #include "rh_observe.h"
 #include "ppc_pmap.h"
-#include "ppc_memmap.h"
+#include "platform_ppc_memmap.h"
 #include "kstring.h"
 static struct pm_regions ram, avail;
 static struct pm_boot_info info;
