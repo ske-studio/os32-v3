@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tests.infra.include_layers import finish_layers, rule, target_wrong
 from tests.support.link_symbols import data_declarations, declarations, references, symbols
 from tests.support.media import Failure, main
-from tests.support.product import build, commands, declared_sources, recipes
+from tests.support.product import build, commands, declared_sources, private_imports, recipes
 from tools.ownership import Inventory
 
 
@@ -43,6 +43,12 @@ def verify(config):
                     for _, args in commands(config) if "--elf" in args and "--metadata" in args}
     imports = {out: {row["name"] for row in json.loads(Path(path).read_text())["imports"]}
                for out, path in import_files.items() if out in links}
+    private = {module: (directory, stub) for directory, stub, module in private_imports(config, inventory)}
+
+    for module, (_, stub_source) in private.items():
+        if not any(objects[obj][0] == stub_source for obj in links.get(module, ()) if obj in objects):
+            raise Failure(f"{config} {module} missing private import stub {stub_source}")
+
     @lru_cache(None)
     def types(obj):
         return declarations(objects[obj][1], stage / "types.aux")
@@ -143,6 +149,20 @@ def verify(config):
                 and not (stub[:1] == [config] and symbol in stub[1:])):
             errors.add(f"{config} {output}: weak provider {p} for {symbol} lacks optional contract")
         violation = rule(config, owner(r), owner(p))
+        for module, (directory, stub_source) in private.items():
+            if p != str(directory / "kdebug_import_slots.c") or symbol != "kdebug_import_slots":
+                continue
+            header = str(directory / "kdebug_imports.h")
+            expected = ("VarDecl", f"unsigned long[{len(imports[module])}]")
+            provider_types = data_types(provider)
+            if (module == output and definition.upper() == "D"
+                    and (header, symbol, expected, False) in provider_types
+                    and (p, symbol, expected, True) in provider_types
+                    and (r == stub_source or
+                         (header, symbol, expected, False) in data_types(reader))):
+                violation = None
+            else:
+                errors.add(f"{config} {output}: private slot contract {r} -> {symbol} -> {p}")
         if not violation:
             continue
         allowed = {signature for header, role, name, signature in types(reader)

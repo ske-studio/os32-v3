@@ -109,3 +109,33 @@ def source_key(source, cache):
     if cache and path.is_relative_to(cache[0]):
         return str(cache[1] / path.relative_to(cache[0]))
     return source
+
+
+def private_imports(config, inventory):
+    """Pair the generator outputs with the ELF packaged using their metadata."""
+    generated = {}
+    components = {}
+    for line in recipe_lines(config):
+        if not any(tool in line for tool in ("tools/gen_kdebug_imports.py ", "tools/mkmod.py ")):
+            continue
+        args = shlex.split(line)
+        if args[:2] == ["python3", "tools/gen_kdebug_imports.py"] and "--stub" in args:
+            directory = Path(args[args.index("--out-dir") + 1])
+            generated[str(directory / "kdebug_imports.json")] = (
+                directory, args[args.index("--stub") + 1])
+        if args[:2] == ["python3", "tools/mkmod.py"] and "--elf" in args:
+            metadata = args[args.index("--metadata") + 1]
+            components.setdefault(metadata, set()).add(args[args.index("--elf") + 1])
+    contracts = []
+    for header, (metadata,) in inventory.tables["OWN_PRIVATE_IMPORT"].items():
+        if metadata not in components:
+            continue
+        if metadata not in generated:
+            raise OSError(f"{config} missing import generator for {metadata}")
+        directory, stub = generated[metadata]
+        if str(directory / "kdebug_import_macros.h") != header:
+            raise OSError(f"{config} import generator does not provide {header}")
+        if len(components[metadata]) != 1:
+            raise OSError(f"{config} ambiguous private import component for {metadata}")
+        contracts.append((directory, stub, next(iter(components[metadata]))))
+    return contracts

@@ -1,6 +1,6 @@
 /* Simple index/data pairs only; the selected register is never written. */
 #include "probe_wire.h"
-#include "../../arch/x86/kdebug/kdebug_window.h"
+#include "kdebug_window_contract.h"
 #include "memmap.h"
 #include "io.h"
 #include "../../platform/pc98/kdebug/generated/kdebug_import_macros.h"

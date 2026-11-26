@@ -18,8 +18,26 @@
 #include "pcm_e4_diag.h"
 #endif
 
-/* isr_handlers.c。EOI は送らない診断だけの関数 (票 §1-1 の 5)。 */
-extern void isr_unexpected_report(u32 irq);
+/* ======================================================================== */
+/*  isr_unexpected_report — 誰も受けなかった IRQ の**診断だけ**             */
+/*  (sys/kern/irq/irq.c の irq_finish から呼ばれる)                               */
+/*                                                                          */
+/*  **EOI は送らない。** 動的経路で EOI を送るのは irq_finish() の 1 か所    */
+/*  だけで、IRQ15 のスプリアス検査 (スレーブ ISR の IR7) もそちらに移した    */
+/*  (票 TASK_HAL_WIRING §1-1 の 5)。2 か所から EOI が出ると、片方が          */
+/*  スプリアスを見落としてスレーブの ISR ビットを消してしまう。             */
+/*                                                                          */
+/*  元は isr_unexpected_irq() で、IRQ_UNEXP スタブから EOI ごと呼ばれていた。 */
+/* ======================================================================== */
+static void isr_unexpected_report(u32 irq)
+{
+    static u16 reported = 0;
+
+    if (irq < IRQ_LINE_MAX && !(reported & (u16)(1u << irq))) {
+        reported |= (u16)(1u << irq);
+        kprintf(ATTR_YELLOW, "[isr] unclaimed IRQ%d (no registrant claimed it)\n", (int)irq);
+    }
+}
 
 struct irq_line irq_lines[IRQ_DYN_COUNT];
 u32 irq_unexpected = 0;

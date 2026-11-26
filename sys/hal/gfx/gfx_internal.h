@@ -53,7 +53,7 @@ void gfx_scroll_init(void);
  * display_only=0 covers CLIENT and DISPLAY; 1 covers DISPLAY only. */
 void gfx_reinit_surface_roles(int finish, int display_only);
 /* PC98 planar の初期化・スプラッシュ終了専用 (戻りの描画ページは1)。 */
-void gfx_clear_planar_pages(u32 plane_size);
+#include "platform_gfx_init.h"
 
 /* ======================================================================== */
 /*  I/O・メモリ操作インライン                                               */

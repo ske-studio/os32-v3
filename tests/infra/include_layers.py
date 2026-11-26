@@ -9,7 +9,7 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tests.support.media import Failure, main
-from tests.support.product import build, recipes
+from tests.support.product import build, private_imports, recipes
 from tools.ownership import Inventory
 
 
@@ -149,11 +149,22 @@ def verify(config):
         if name.endswith(".h") and len(entry) < 3:
             raise OSError(f"{config} missing generated header role {name}")
         return dict(kind=entry[0], target=entry[1], header_role=entry[2] if len(entry) > 2 else None)
+    private = {str(directory / "kdebug_import_macros.h"): module
+               for directory, _, module in private_imports(config, inventory)}
     for parent, child, obj in sorted(edges):
         if not parent.is_relative_to(root) or not child.is_relative_to(root):
             continue
         p, c = str(parent.relative_to(root)), str(child.relative_to(root))
         reader, header = owner(p), owner(c)
+        if c in inventory.tables["OWN_PRIVATE_IMPORT"]:
+            outputs = {output for output, inputs in links.items() if obj in inputs}
+            module = private.get(c)
+            if (module is None or outputs != {module} or target_wrong(config, reader)
+                    or target_wrong(config, header)):
+                errors.add(f"{config} private import {p} -> {c} outside {module}")
+                continue
+            if p == objects[obj][0]:
+                continue
         if header["header_role"] == "module_import" and p == objects[obj][0]:
             module = inventory.tables["OWN_GENERATED"][c][3]
             if obj in links.get(module, ()) and not target_wrong(config, reader):

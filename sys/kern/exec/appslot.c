@@ -627,7 +627,8 @@ int appslot_gfx_claim(int gui_mode)
 int appslot_gfx_owner(void) { return g_gfx_owner; }
 
 /* Optional resident diagnostic display, absent from standalone appslot hosts. */
-extern void gf_display_owner_exit(int id) __attribute__((weak));
+#include "geforce_contract.h"
+#pragma weak gf_display_owner_exit
 /* Resource generations identify ownership intervals, including failed init. */
 void appslot_gfx_resource_acquire(int owner)
 {

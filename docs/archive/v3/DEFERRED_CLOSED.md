@@ -610,3 +610,5 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | PPC-USB-LAN-FLAKE | 2026-11-14 閉鎖 — usb_run.py --lan --mutate の最初の echo alive に前の場面の打鍵が 1 字残る件は台本の競合 (USB の `echo discarded` の全字の echo を待たずに LAN OPEN)。各字は 1 回ずつ配達されていてゲストと共通の部分は無関係。OPEN の前に全字の echo を待つ直し (wt/usb-flake 538eb153)、PPC_FB=0・1 で 3 回続けて GREEN、待ちを外した変異は RED (票 TASK_PPC_SHELL、証拠は ~/os32-tmp/run/usb-flake/) |
 | PPC-FB-RH | 2026-11-14 閉鎖 — G4 実機で受入 (待機の案内から sh、白黒と段の印の帯、日本語の表示、長い出力のスクロールと最下行、BS と clear、USB のキーボードの入力)。TASK_PPC_REALHW §2 |
 | CI-RUSTUP-RUSTSRC-FLAKE | 2026-11-18 閉鎖 — runner が rust-src の登録の無い同じ版の toolchain を持って始まる型 (49 ジョブ中 1 本)。用意で消してから入れ直す形に直した。証拠は docs/design/tools/ci/gate.md §5-2 と票 TASK_CI_REWORK の段 S0 |
+| P43-INCLUDE | P4 の 3 の include の層の違反 9 件 | 2026-11-26 | 組 1・3・6 で解消 (data/p43_violations.tsv の各行の「組 n で解消」)、登録の deferred を外した — U26 |
+| P43-LINK | P4 の 3 のリンクの層の違反 68 件 (PC-98 46・PowerMac core 22) | 2026-11-26 | 組 1〜6 で解消、登録の deferred を外した — U26 |

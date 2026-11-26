@@ -36,7 +36,7 @@ volatile u32 sqlite_engine_active;
 u32 sqlite_engine_stack_top;
 #define SQLITE_STACK_MARK 0xa5
 static u32 sqlite_stack_peak;
-extern void sqlite_call_on_alt_stack(void (*call)(void *), u32 top, void *frame);
+#include "sqlite_stack_contract.h"
 
 int sqlite_engine_available(int io)
 {

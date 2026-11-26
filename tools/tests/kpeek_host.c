@@ -21,6 +21,7 @@
 #include "pc98.h"
 #include "paging.h"
 #include "sys/dev/pci/pci.h"
+#include "sys/dev/video/geforce/diag/recover.h"
 
 /* ---- 出力と終了 (libc なし、ILP32 の int 0x80 — cirrus_win_host.c と同じ) ---- */
 static void output(const char *s)

@@ -1317,3 +1317,18 @@ OWN_HEADER += sys/platform/powermac/platform_trap_sink.h|fixed_contract
 OWN_HEADER += sys/platform/pc98/platform_kernel_entry.h|fixed_contract
 OWN_HEADER += sys/platform/pc98/platform_v86_isr.h|fixed_contract
 OWN_ASM_CONTRACT += sys/platform/pc98/legacy/v86_entry.asm|sys/platform/pc98/platform_v86_isr.h
+
+# P43 組 4: 診断窓と部品専用の import。
+OWN_CONTRACT += sys/include/recover_window_contract.h
+OWN_CONTRACT += sys/include/kdebug_window_contract.h
+OWN_PRIVATE_IMPORT += sys/platform/pc98/kdebug/generated/kdebug_import_macros.h|sys/platform/pc98/kdebug/generated/kdebug_imports.json
+
+# P43 組 6: PC-98 の機種定数・常駐契約・SQLite の別スタック。
+OWN_HEADER += sys/platform/pc98/platform_fault_screen.h|fixed_contract
+OWN_HEADER += sys/platform/pc98/platform_gfx_init.h|fixed_contract
+OWN_HEADER += sys/platform/powermac/platform_gfx_init.h|fixed_contract
+OWN_CONTRACT += sys/include/kdebug_resident_contract.h|common
+OWN_CONTRACT += sys/include/font_fault_contract.h|common
+OWN_CONTRACT += sys/include/sqlite_stack_contract.h|common
+OWN_ASM_CONTRACT += lib/sqlite3/sqlite_stack.asm|sys/include/sqlite_stack_contract.h
+OWN_ASM_CONTRACT += sys/arch/ppc/sqlite_stack_ppc.S|sys/include/sqlite_stack_contract.h

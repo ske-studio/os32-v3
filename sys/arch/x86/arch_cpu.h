@@ -36,13 +36,11 @@ static inline u32 arch_mmu_current_root(void)
     return cr3_val;
 }
 
-/* CR3 への書き込みは、同じ値でも TLB を全部捨てる (i386 に PCID は無い)。 */
+void x86_mmu_load_root(u32 root_phys);
+
 static inline void arch_mmu_load_root(u32 root_phys)
 {
-    /* CR3 is a static TSS field: hardware task switch does not save it.
-     * Keep the outgoing task root for the #DF diagnostic. */
-    __asm__ volatile("mov %1, %0; mov %1, %%cr3"
-                     : "=m"(kernel_tss.cr3) : "r"(root_phys) : "memory");
+    x86_mmu_load_root(root_phys);
 }
 
 /* i386 互換: CR3 リロード方式。invlpg は i486+ なので使えない。 */

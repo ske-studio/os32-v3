@@ -1,7 +1,7 @@
 #ifndef PLATFORM_HWB_H
 #define PLATFORM_HWB_H
 
-#include "sys/arch/x86/kdebug/kdebug_window.h"
+#include "kdebug_window_contract.h"
 #include "memmap.h"
 #include "io.h"
 #include "sys/platform/pc98/kdebug/generated/kdebug_import_macros.h"

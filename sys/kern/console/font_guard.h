@@ -13,6 +13,6 @@
  * The same boundary serves the shell (service table v2 font_guard_run). */
 int font_guard_run(int (*call)(void *), void *context);
 extern volatile u32 font_guard_active;
-void font_guard_fault(u32 vector, u32 eip, u32 address) __attribute__((noreturn));
+#include "font_fault_contract.h"
 
 #endif

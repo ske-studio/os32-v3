@@ -17,6 +17,7 @@
 #include "platform_device.h"
 #include "dev.h"
 #include "os_time.h"
+#include "clock_service.h"
 #include "pc98pt.h"   /* PC98PartEntry (票 TASK_HDD_INSTALL 段 1-4) */
 #include "bootinfo.h" /* bootinfo_part_geom (区画表の幾何、m4) */
 
@@ -794,4 +795,43 @@ static VfsOps fatfs_ops = {
 int fatfs_init(void)
 {
     return vfs_register_fs(&fatfs_ops);
+}
+
+#define DOS_YEAR_BASE 1980
+#define DOS_DATE_WORD_SHIFT 16
+#define DOS_DATE_YEAR_SHIFT 9
+#define DOS_DATE_MONTH_SHIFT 5
+#define DOS_TIME_HOUR_SHIFT 11
+#define DOS_TIME_MIN_SHIFT 5
+#define DOS_TIME_SECOND_UNIT 2
+
+/* ======================================================================== */
+/*  get_fattime — FAT時刻取得 (RTCから)                                     */
+/* ======================================================================== */
+
+DWORD get_fattime(void)
+{
+    ClockDate t;
+    DWORD fattime;
+    int year;
+
+    clock_read_date(&t);
+    year = t.year;
+
+    /* FAT時刻フォーマット:
+     *   bit[31:25] = 年 (1980年起点, 0-127)
+     *   bit[24:21] = 月 (1-12)
+     *   bit[20:16] = 日 (1-31)
+     *   bit[15:11] = 時 (0-23)
+     *   bit[10:5]  = 分 (0-59)
+     *   bit[4:0]   = 秒/2 (0-29)
+     */
+    fattime = ((DWORD)(year - DOS_YEAR_BASE) << (DOS_DATE_WORD_SHIFT + DOS_DATE_YEAR_SHIFT))
+            | ((DWORD)t.month << (DOS_DATE_WORD_SHIFT + DOS_DATE_MONTH_SHIFT))
+            | ((DWORD)t.day << DOS_DATE_WORD_SHIFT)
+            | ((DWORD)t.hour << DOS_TIME_HOUR_SHIFT)
+            | ((DWORD)t.min << DOS_TIME_MIN_SHIFT)
+            | ((DWORD)(t.sec / DOS_TIME_SECOND_UNIT));
+
+    return fattime;
 }

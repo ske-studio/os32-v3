@@ -22,25 +22,7 @@
 /*  PIC (8259相当) — PC9800Bible §1-4, §4-3 #1/#2                         */
 /* ====================================================================== */
 /*  マスタ: IRQ0-7, スレーブ: IRQ8-15 (カスケード IRQ7)                     */
-/* ポート値の正典。sys/arch/x86/kernel/idt.h の同名の写しの除去は N2 で行う。 */
-#define PIC1_CMD   0x00
-#define PIC1_DATA  0x02
-#define PIC2_CMD   0x08
-#define PIC2_DATA  0x0A
-
-
-/* 8259 の線数と制御欄。 */
-#define PIC_IRQS             8
-#define PIC_IRQ_MASK         (PIC_IRQS - 1)
-#define PIC_SLAVE_LAST_IRQ   (2 * PIC_IRQS - 1)
-#define PIC_LAST_ISR_BIT     (1U << PIC_IRQ_MASK)
-#define PIC_ICW1_INIT        0x10
-#define PIC_ICW1_ICW4        0x01
-#define PIC_ICW1_SINGLE      0x02
-#define PIC_OCW3_SELECT      0x08
-#define PIC_OCW3_READ_REG    0x02
-#define PIC_OCW3_READ_ISR    0x01
-#define PIC_VECTOR_MASK      0xF8
+#include "platform_pic.h"
 
 #define PC98_IRQ_SERIAL      4
 #define PC98_IRQ_IDE         9
