@@ -1,7 +1,7 @@
 # Set FEP_OUT to the target-specific generation directory before including.
 FEP_BODY_NAMES := fep_body ime ime_dict ime_conn ime_user_store ime_dict_info ime_suspend ime_romkana
 FEP_DISPLAY_NAMES := ime_render_tvram ime_display
-FEP_GEN := $(addprefix $(FEP_OUT)/,fep_imports.h fep_imports.json fep_import_slots.c fep_import_stubs.S fep_provider_types.c fep_kexports.c)
+FEP_GEN := $(addprefix $(FEP_OUT)/,fep_imports.h fep_resident.h fep_providers.h fep_imports.json fep_import_slots.c fep_import_stubs.S fep_provider_types.c fep_kexports.c)
 
 # A query goal must not run generators while make reads its makefiles.
 # Recover a missing depfile when an FEP output is next requested.

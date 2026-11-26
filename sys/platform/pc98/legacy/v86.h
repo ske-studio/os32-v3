@@ -1,3 +1,4 @@
+#include "platform_v86_isr.h"
 /* ======================================================================== */
 /*  V86.H — 仮想8086モード ランタイム                                       */
 /*                                                                          */
@@ -144,11 +145,9 @@ void v86_enter(const struct v86_context *ctx);
 
 /* #GP の V86 経路から呼ばれる一次ハンドラ (sys/platform/pc98/legacy/v86.c)。
  * 0 を返すと V86 へ復帰、非 0 でセッション終了。 */
-int v86_gp_handler(u32 *frame);
 
 /* #GP 以外の例外を V86 中に食らったときの記録。isr_stub.asm から呼ぶ。
  * 記録したらセッションは畳む (呼び出し側が v86_exit_to_kernel する)。 */
-void v86_fault_handler(u32 *frame, u32 vector);
 
 /* セッションが終了した理由 */
 enum v86_exit_reason v86_get_exit_reason(void);
@@ -178,7 +177,6 @@ int v86_is_active(void);
  * ゲストの IVT を引いてスタックに FLAGS/CS/IP を積み、ISR へ飛ばす。 */
 /* 実 IRQ をゲストに反射する。第 2 引数は **IRQ 番号** (ベクタではない)。
  * ベクタとマスクの判定は仮想 PIC (v86_pic.h) が行う。 */
-void v86_reflect_irq(u32 *frame, u32 irq);
 
 /* #GP フレーム版の割り込み注入。ゲストの INT n のうち HLE しないものを
  * ゲスト自身の IVT (多くは BIOS ROM) へ流すために使う。
@@ -217,12 +215,10 @@ u32 v86_irq_reflect_count(void);
 #define V86_GP_LIMIT        50000UL
 
 /* タイマ IRQ の反射経路から呼ぶ。上限超過なら非 0。 */
-int v86_tick_and_check_timeout(void);
 
 /* 脱出ホットキー (CTRL+GRPH+DEL)。キーボード ISR が要求を立て、
  * asm スタブが畳む。longjmp を 1 か所に寄せるための 2 段構え。 */
 void v86_request_exit(void);
-int  v86_check_exit_request(void);
 
 /* KAPI が指す v86_smoke_test・v86_boot・v86_boot2・v86_disk_test は sys/include/v86_contract.h。 */
 

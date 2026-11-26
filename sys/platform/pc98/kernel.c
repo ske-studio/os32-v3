@@ -1,3 +1,4 @@
+#include "platform_kernel_entry.h"
 #include "usb_resident.h"
 #include "boot_token.h"
 #include "kernel_start.h"

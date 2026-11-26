@@ -98,5 +98,6 @@ def data_declarations(cmd, config):
             ty = decl["type"]
             defined = (decl.get("storageClass") != "extern" if decl["kind"] == "VarDecl" else
                        any(n["kind"] in ("CompoundStmt", "AliasAttr") for n in decl.get("inner", [])))
-            records.append((files[pos], decl["mangledName"], ty.get("desugaredQualType", ty["qualType"]), defined))
+            signature = (decl["kind"], ty.get("desugaredQualType", ty["qualType"]))
+            records.append((files[pos], decl["mangledName"], signature, defined))
     return records

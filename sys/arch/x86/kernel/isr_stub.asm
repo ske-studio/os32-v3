@@ -1,3 +1,4 @@
+#include "platform_v86_isr.h"
 ;; ============================================================
 ;; isr_stub.asm — 割り込みハンドラASMスタブ (32ビット)
 ;;
@@ -111,10 +112,6 @@ extern kbd_irq_handler
 extern serial_irq_handler
 extern tick_clock_step
 extern mouse_irq_handler
-extern v86_reflect_irq
-extern v86_tick_and_check_timeout
-extern v86_check_exit_request
-extern v86_exit_to_kernel
 ;; CPL=3 アプリの強制脱出 (CTRL+STOP)。要求があれば longjmp して戻らない
 ;; (sys/kern/exec/exec.c、票 K2 作業 4)。
 extern ring3_abort_check
@@ -157,7 +154,6 @@ isr_stub_%1:
         jmp     isr_common
 %endmacro
 
-extern v86_fault_handler
 
 ;; マクロ: エラーコードなし例外 — V86 分岐付き
 ;;
@@ -322,8 +318,6 @@ ISR_NOERR_V86 31
 ;; CPU自動push後のスタック (ESP低位→高位):
 ;;   [error_code] [EIP] [CS] [EFLAGS] (V86ならさらに [ESP][SS][ES][DS][FS][GS])
 ;; ============================================================
-extern v86_gp_handler
-extern v86_exit_to_kernel
 
 global isr_stub_13
 isr_stub_13:

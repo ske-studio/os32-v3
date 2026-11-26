@@ -1,3 +1,4 @@
+#include "platform_kernel_takeover.h"
 /* OF-PPC 8.2/4.2.4; OpenBSD macppc/locore0.S:87.
  * PT_LOAD code, data and the A2 stack are physical identity addresses.
  * No firmware callback is possible beyond this boundary. */

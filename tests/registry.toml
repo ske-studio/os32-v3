@@ -174,7 +174,10 @@ limits = "書庫・部分リンクの内部は対象外"
 gates = ["push", "main"]
 mutations = [{ id = "wrong_cpu_object", config = "core", when = "after_build", replace = "build/targets/ppc-powermac.mk", old = "KB_C := $(C_KERNEL)", new = "KB_C := $(C_KERNEL) sys/arch/x86/kernel/double_fault.c", fail = "incompatible link input sys/arch/x86/kernel/double_fault.c" },
  { id = "provider_type", config = "core", when = "after_build", replace = "sys/arch/ppc/arch_cpu.h", old = "u32 ppc_root_current(void);", new = "#if __INCLUDE_LEVEL__ > 1\nunsigned short ppc_root_current(void);\n#else\nu32 ppc_root_current(void);\n#endif", fail = "paging.c -> ppc_root_current -> sys/arch/ppc/kernel_mmu.S" },
- { id = "provider_owner", config = "core", when = "after_build", replace = "build/sources/ownership.mk", old = "OWN_ASM_CONTRACT += sys/arch/ppc/kernel_mmu.S|sys/arch/ppc/arch_cpu.h", new = "OWN_ASM_CONTRACT += sys/arch/ppc/kernel_mmu.S|sys/arch/ppc/arch_io.h", fail = "paging.c -> ppc_root_current -> sys/arch/ppc/kernel_mmu.S" }]
+ { id = "provider_owner", config = "core", when = "after_build", replace = "build/sources/ownership.mk", old = "OWN_ASM_CONTRACT += sys/arch/ppc/kernel_mmu.S|sys/arch/ppc/arch_cpu.h", new = "OWN_ASM_CONTRACT += sys/arch/ppc/kernel_mmu.S|sys/arch/ppc/arch_io.h", fail = "paging.c -> ppc_root_current -> sys/arch/ppc/kernel_mmu.S" },
+ { id = "asm_reader_extern", config = "core", when = "after_build", replace = "sys/platform/powermac/platform_kernel_entry.h", old = ".extern name", new = "/* declaration removed */", fail = "kernel_entry.S -> ppc_kernel_start ->" },
+ { id = "asm_reader_machine", config = "core", when = "after_build", replace = "sys/arch/ppc/kernel_takeover.S", old = "#include \"platform_kernel_takeover.h\"", new = "#define OS32_NASM\n#include \"sys/platform/pc98/platform_kernel_entry.h\"", fail = "kernel_takeover.S -> ppc_kernel_real_start ->" },
+ { id = "asm_reader_type", config = "core", when = "after_build", replace = "sys/platform/powermac/platform_kernel_entry.h", old = "BOOT_FUNCTION(void, ppc_kernel_start, (ppc_ci ci), )", new = "#if __INCLUDE_LEVEL__ == 1\nBOOT_FUNCTION(void, ppc_kernel_start, (unsigned int ci), )\n#else\nBOOT_FUNCTION(void, ppc_kernel_start, (ppc_ci ci), )\n#endif", fail = "kernel_entry.S -> ppc_kernel_start ->" }]
 
 [[check]]
 id = "hal_contracts"
