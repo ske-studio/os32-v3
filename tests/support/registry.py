@@ -5,7 +5,7 @@ import tomllib
 
 FIELDS = set("id spec subsystem level sources environment arch needs expect limits gates mutations".split())
 OWNERS = set("kern hal arch platform dev gfx sound input fs net kapi boot lib sdk userland tools integration system infra".split())
-ENVIRONMENTS = {"qemu-ppc", "python", "linux-x86-cross", "linux-ppc-cross", "linux-cross"}
+ENVIRONMENTS = {"qemu-ppc", "python-yaml", "python", "linux-x86-cross", "linux-ppc-cross", "linux-cross"}
 
 
 def demand(condition, message):
@@ -36,7 +36,7 @@ def validate(checks, root):
         demand(isinstance(row, dict), "invalid check")
         missing = FIELDS - row.keys()
         demand(not missing, "missing field " + ", ".join(sorted(missing)))
-        demand(row.keys() == FIELDS, "unexpected field")
+        demand(row.keys() <= FIELDS | {"deferred"}, "unexpected field")
         name = row["id"]
         demand(identifier(name) and name not in ids, f"invalid or duplicate id {name}")
         ids.add(name)
@@ -63,6 +63,16 @@ def validate(checks, root):
         for values in arch.values():
             demand(strings(values) and configs.isdisjoint(values), "invalid configs")
             configs.update(values)
+        if "deferred" in row:
+            deferral = row["deferred"]
+            demand(isinstance(deferral, dict) and deferral.keys() == {"ledger", "config", "gates"},
+                   "invalid deferral")
+            ledger_id = deferral["ledger"]
+            demand(string(ledger_id) and re.fullmatch(r"[A-Za-z0-9_-]+", ledger_id), "invalid ledger ID")
+            ledger = (root / "docs/tasks/DEFERRED_TESTS.md").read_text()
+            demand(re.search(r"^\| " + re.escape(ledger_id) + r" \|", ledger, re.M), "unknown ledger ID")
+            demand(deferral["config"] in configs and strings(deferral["gates"])
+                   and set(deferral["gates"]) <= set(row["gates"]), "invalid deferral condition")
         demand(isinstance(row["mutations"], list) and row["mutations"], "missing mutations")
         for mutation in row["mutations"]:
             demand(isinstance(mutation, dict), "invalid mutation")

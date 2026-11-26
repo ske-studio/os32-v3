@@ -63,3 +63,14 @@ SKIP は出さない。変異は通常の PASS を確かめた後、登録から
 ## 成果物を取得するとき
 
 成果物状態は登録欄に足さず、取得時に manifest（候補 SHA・構成・配布 run/attempt・artifact ID・sha256）、同じ SHA の全件集計、受入記録から導く。BUILT は生成済みで調査に取得可。VERIFIED は候補の指定 run の最新 attempt とその全件集計が成功し、取り込みに使える。ACCEPTED は対象 SHA・媒体 sha256 に結び付いた必要なゲスト・実機受入が完了したもの。受入だけで必須 CI を通過した扱いにはしない。文書変更も U21 の間は候補ごとに起動する。[CI 設計 §5・§8](../ci/ci_v2.md)
+
+## 実行と証拠の取得
+
+`python3 -B -m tests.infra.ci run --output DIR` は通常の全件、`--mutate`
+は変異込み。plan.json・構成別ログ・bundle JSON・summary.json を DIR に保存する。
+CI は同じ入口の plan から CPU の束を引き、run に `--bundle` と
+`--plan-file` を渡す。collect は候補の登録から計画を再計算し、各結果と照合する。
+統合枝 wt/int-* と main は main 関門、途中の枝は push 関門。P4 の 3 の所有の
+入口ができるまでは scope.tsv の所属を計画に載せ、未確定の入力も実行する。
+任意欄 deferred は ledger（現行の持越し台帳の行 ID）・config・gates を持つ。
+この組を承認した登録だけが当該関門で DEFERRED になる。現在この欄を持つ登録はない。

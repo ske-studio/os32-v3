@@ -81,3 +81,17 @@ expect = "各媒体が設計のシリアル到達点に達し neg1 は期待し�
 limits = "QEMU mac99 の起動到達まで"
 gates = ["push", "main"]
 mutations = [{ id = "boot_wrong_config", config = "core", replace = "boot-serial.log", old = "KBOOT READY stage=pre-user", new = "KBOOT HALTED", fail = "boot did not reach KBOOT READY", when = "after_build" }]
+
+[[check]]
+id = "collection_contract"
+spec = { path = "docs/design/tools/ci/ci_v2.md", section = "§2 共通入口" }
+subsystem = "infra"
+level = "M"
+sources = ["tests/infra/ci.py"]
+environment = "python"
+arch = { host = ["local"] }
+needs = []
+expect = "独立した失敗の後も全件を集計し、欠落と禁じた再利用を拒む"
+limits = "ローカルの実行器・集計器まで"
+gates = ["push", "main"]
+mutations = [{ id = "allow_reuse", config = "local", replace = "tests/infra/ci.py", old = 'allowed = ("PASS", "FAIL",', new = 'allowed = ("REUSED", "PASS", "FAIL",', fail = "REUSED must be rejected", when = "after_build" }]
