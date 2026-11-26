@@ -204,74 +204,30 @@ jobs:
           path: ${{ runner.temp }}/planned/plan.json
           if-no-files-found: error
       - run: python3 -B -m tests.infra.ci lint
-  checks:
-    needs: [plan, artifacts, powerpc]
-    if: ${{ !cancelled() && needs.plan.result == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 150
-    strategy:
-      fail-fast: false
-      matrix:
-        bundle: ${{ fromJSON(needs.plan.outputs.bundles) }}
-    env:
-      BUNDLE: ${{ matrix.bundle }}
-      OS32_KAPI_BASE: ${{ needs.plan.outputs.kapi_base }}
-      GATE: ${{ (startsWith(github.ref_name, 'wt/int-') || github.ref_name == 'main') && 'main' || 'push' }}
-      OS32_ACCEPT_IPA_LICENSE: "1"
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - run: python3 -m pip install markdown-it-py
-      - uses: actions/download-artifact@v4
-        with:
-          name: plan-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/planned
-      - uses: actions/download-artifact@v4
-        if: matrix.bundle == 'x86'
-        with:
-          name: ${{ needs.artifacts.outputs.name }}
-          path: ${{ runner.temp }}/products/pc98
-      - uses: actions/download-artifact@v4
-        if: matrix.bundle == 'ppc'
-        with:
-          pattern: ppc-*-${{ github.sha }}-a${{ github.run_attempt }}
-          path: ${{ runner.temp }}/products
-      - if: matrix.bundle == 'host'
-        run: python3 -m pip install PyYAML
-      - uses: ./.github/actions/build-setup
-        if: matrix.bundle != 'host'
-      - name: Cache KAPI layout check dependencies
-        if: matrix.bundle == 'x86' || matrix.bundle == 'ppc'
-        uses: actions/cache@v4
-        continue-on-error: true
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ${{ runner.temp }}/kapi-targets
-          key: kapi-layout-v1-${{ runner.os }}-${{ matrix.bundle }}-${{ hashFiles('rust-toolchain.toml', '**/Cargo.lock', 'sdk/rust/*-os32-none.json') }}
-      - uses: ./.github/actions/ppc-setup
-        if: matrix.bundle == 'ppc'
-      - if: matrix.bundle == 'ppc'
-        # 推奨パッケージ (GUI・音声の pipewire ほか) は入れない — runner の索引の古さで security の 404 を 2 回踏んだ (2026-11-26)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qemu-system-ppc seabios || { sudo apt-get update && sudo apt-get install -y --no-install-recommends --fix-missing qemu-system-ppc seabios; }
-      - env:
-          OS32_PRODUCT_DIR: ${{ runner.temp }}/products
-          OS32_KAPI_CACHE: ${{ runner.temp }}/kapi-targets
-        run: python3 -B -m tests.infra.ci run --bundle "$BUNDLE" --mutate --gate "$GATE" --output "$RUNNER_TEMP/results" --plan-file "$RUNNER_TEMP/planned/plan.json"
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: checks-${{ github.run_attempt }}-${{ matrix.bundle }}
-          path: |
-            ${{ runner.temp }}/results/bundle-*.json
-            ${{ runner.temp }}/results/*.log
-          if-no-files-found: error
+  checks-host:
+    needs: [plan]
+    if: contains(fromJSON(needs.plan.outputs.bundles), 'host')
+    uses: ./.github/workflows/restructure-check-bundle.yml
+    with:
+      bundle: host
+      kapi_base: ${{ needs.plan.outputs.kapi_base }}
+  checks-x86:
+    needs: [plan, artifacts]
+    if: contains(fromJSON(needs.plan.outputs.bundles), 'x86')
+    uses: ./.github/workflows/restructure-check-bundle.yml
+    with:
+      bundle: x86
+      kapi_base: ${{ needs.plan.outputs.kapi_base }}
+      pc98_artifact: ${{ needs.artifacts.outputs.name }}
+  checks-ppc:
+    needs: [plan, powerpc]
+    if: contains(fromJSON(needs.plan.outputs.bundles), 'ppc')
+    uses: ./.github/workflows/restructure-check-bundle.yml
+    with:
+      bundle: ppc
+      kapi_base: ${{ needs.plan.outputs.kapi_base }}
   collect:
-    needs: [plan, artifacts, powerpc, checks]
+    needs: [plan, artifacts, powerpc, checks-host, checks-x86, checks-ppc]
     if: always()
     runs-on: ubuntu-latest
     env:
@@ -299,7 +255,7 @@ jobs:
           path: ${{ runner.temp }}/results/summary.json
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
-        if: success() && needs.plan.result == 'success' && needs.checks.result == 'success' && needs.artifacts.result == 'success' && needs.powerpc.result == 'success'
+        if: success() && needs.plan.result == 'success' && needs.checks-host.result == 'success' && needs.checks-x86.result == 'success' && needs.checks-ppc.result == 'success' && needs.artifacts.result == 'success' && needs.powerpc.result == 'success'
         with:
           name: verified-${{ github.sha }}-a${{ github.run_attempt }}
           path: ${{ runner.temp }}/results/summary.json
