@@ -20,11 +20,13 @@ import fetch_fonts
 def prerequisites(environment, cpu, config, sources):
     if environment == "python":
         return
-    ppc = environment == "linux-ppc-cross" or environment == "linux-cross" and cpu == "ppc"
+    ppc = environment in ("linux-ppc-cross", "qemu-ppc") or environment == "linux-cross" and cpu == "ppc"
     directory = Path(os.environ.get("PPC_CROSS_DIR" if ppc else "CROSS_DIR",
                                     Path.home() / "opt" / ("cross-ppc" if ppc else "cross")))
     prefix = "powerpc-elf" if ppc else "i386-elf"
     tools = ["make", "python3"]
+    if environment == "qemu-ppc":
+        tools.append("qemu-system-ppc")
     modules = []
     if not ppc:
         tools += ["gcc", "cargo", "rustc", "xorriso", "nasm"]

@@ -67,3 +67,17 @@ expect = "登録が通り、必須の欄を欠く登録を lint が拒否する"
 limits = "製品の実行結果は調べない"
 gates = ["push", "main"]
 mutations = [{ id = "lint_accepts_missing", config = "local", replace = "tests/support/registry.py", old = "missing = FIELDS", new = "row.setdefault('needs', [])\n        missing = FIELDS", fail = "missing field not rejected: needs", when = "after_build" }]
+
+[[check]]
+id = "ppc_boot"
+spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の起動到達点" }
+subsystem = "system"
+level = "L4"
+sources = ["make:all", "make:iso"]
+environment = "qemu-ppc"
+arch = { ppc = ["core", "link", "sh", "link-sh", "shell", "neg1"] }
+needs = []
+expect = "各媒体が設計のシリアル到達点に達し neg1 は期待した例外で停止する"
+limits = "QEMU mac99 の起動到達まで"
+gates = ["push", "main"]
+mutations = [{ id = "boot_wrong_config", config = "core", replace = "boot-serial.log", old = "KBOOT READY stage=pre-user", new = "KBOOT HALTED", fail = "boot did not reach KBOOT READY", when = "after_build" }]

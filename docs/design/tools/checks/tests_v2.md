@@ -51,3 +51,11 @@ PC-98 は all・kernel-r1 と deploy-u3・iso を組み、kernel.elf・kernel.ma
 main の再生成比較は各構成を同じコミット ID・時刻で清浄な木から 2 回組む。x86 は P2-0 の build_compare.artifacts(all_products=True) と packages の配布物、PowerPC は各指定の ELF とオブジェクトを比較し、パス集合の差も落とす。P2-0 と同じく PowerPC の boot.iso は媒体の時刻が入るため存在だけを要求する。link-sh/root_image_blob.o を生成する構成でもこのファイルは存在だけを比較する（現行の ROOT_BLOB は空）。
 
 PowerPC の common-compile は ppc-ci-image と同じ KBOOT_SH=1・KBOOT_LINK=1 で C_COMMON_PC98_PENDING と C_COMMON_COMPILE_ONLY_PPC の C 入力ごとに PowerPC ELF の再配置可能オブジェクトを生成する。リンクと起動は対象外。
+
+## PowerMac の起動到達点
+
+QEMU mac99・7450・128 MiB に構成ごとの boot.iso を入れる。core はシリアルの
+`KBOOT READY stage=pre-user`、link はその後の LAN link=1 と `LINK HEAP used=`、
+sh・link-sh・shell は `Loading /sys/shell.bin` に続くシェルのコマンド待ち通知（シリアル EOT）と `LINK HEAP used=`
+までを確認する。neg1 は `FATAL trap vector=0x300 reason=0x2 addr=0x80000`
+で停止し、READY に進まないことを確認する。PC-98 は配布媒体を pc98emu が手で受け入れる。
