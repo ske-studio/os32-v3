@@ -1,13 +1,14 @@
 /* Resident FEP adapter. The implementation and its state live in fep.mod. */
 #include "fep_module.h"
 #include "fep_boot.h"
-#include "fep_imports.h"
+#include "fep_resident.h"
 #include "../../fs/fd_redirect.h"
 #include "../sqlite_engine.h"
 #include "platform_module_pair.h"
 #include "config.h"
 #include "os32_generations.h"
 #include "input_service.h"
+#include "sys/input/input_context.h"
 #include "con_sink.h"
 #include "kstring.h"
 #include "io.h"
@@ -15,9 +16,6 @@
 #include "../mm/pgalloc.h"
 
 extern void ring3_abort_check(void);
-extern const u32 fep_kexports[];
-extern const struct module_symbol_contract fep_import_contracts[];
-extern const struct module_symbol_contract fep_export_contracts[];
 
 static int fep_closed = 1;
 int fep_services_public(void) { return !fep_closed && services_public; }

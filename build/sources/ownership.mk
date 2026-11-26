@@ -1302,3 +1302,10 @@ OWN_GENERATED += build/out/memmap_layout.h|共通実装|-|ordinary
 OWN_ASM_CONTRACT += sys/arch/ppc/mmu.S|sys/arch/ppc/arch_io.h|sys/arch/ppc/arch_cpu.h
 OWN_CONTRACT += sys/include/exec_caller_contract.h|common
 OWN_COMPILE_SET += C_ARCH_NOEXEC|core|link|neg1
+
+# P43 組 3: FEP 常駐側の生成物と部品内の表示契約。
+OWN_CONTRACT += sys/kern/ime/ime_display_private.h|common
+OWN_GENERATED += build/out/fep/fep_resident.h|共通実装|-|ordinary
+OWN_GENERATED += build/out/ppc-kboot/link-sh/fep/fep_resident.h|共通実装|-|ordinary
+OWN_GENERATED += build/out/fep/fep_providers.h|共通実装|-|ordinary
+OWN_GENERATED += build/out/ppc-kboot/link-sh/fep/fep_providers.h|共通実装|-|ordinary

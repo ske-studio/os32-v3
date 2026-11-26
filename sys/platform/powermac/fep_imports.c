@@ -1,5 +1,5 @@
 /* Resident providers for the shared FEP private ABI. */
-#include "fep_imports.h"
+#include "fep_providers.h"
 #include "input_service.h"
 #include "kernel_tick.h"
 #include "kboot_log.h"
