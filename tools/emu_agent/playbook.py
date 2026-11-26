@@ -439,7 +439,7 @@ def _live_factory(session):
     if root not in sys.path:
         sys.path.insert(0, root)
     from tools.emu_agent import agent
-    from tools import gui_gate
+    from tools.ops import gui_gate
     url = urllib.parse.urlsplit(agent.FLM_BASE)
     if (url.scheme not in ('http', 'https') or url.hostname not in
             ('127.0.0.1', 'localhost', '::1') or url.username or url.password):

@@ -9,15 +9,15 @@ import pathlib
 import struct
 import sys
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'sdk'))
 import os32x_hdr as H
 
 INPUTS = {
-    'app': 'userland/tests/h2_stack.bin',
+    'app': 'userland/diag/h2_stack.bin',
     'shell': 'userland/shell.bin',
     'shlib': 'userland/libos32gui.shlib',
-    'dependent': 'userland/tests/gui_demo.bin',
+    'dependent': 'userland/diag/gui_demo.bin',
 }
 
 

@@ -1,4 +1,4 @@
-# tools/accept/gf_accel.py — 保存済み計測の照合と統計
+# tools/ops/gf_accel.py — 保存済み計測の照合と統計
 
 > 状態: **現行 (2026-11-01)**
 

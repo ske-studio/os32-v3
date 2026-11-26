@@ -4,7 +4,7 @@
 Generate a WAV with make_pcm_wav.py, copy it to HostDrv and play it with
 pcm_play. During playback save GET /api/sound?pcm=1 as JSON (the API keeps
 approximately the most recent second). Then run:
-    python3 tools/tests/pcm_play_guest.py test.wav sound.json --min-frames 22050
+    python3 tools/sound/snd2/pcm_play_guest.py test.wav sound.json --min-frames 22050
 
 The longest contiguous match is measured in complete stereo frames; either
 input may have a leading offset. The exit status is zero only if the match

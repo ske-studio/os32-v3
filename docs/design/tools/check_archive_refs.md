@@ -1,7 +1,7 @@
-# tools/check_archive_refs.py — アーカイブを指す参照の戻り止め
+# tools/ops/check_archive_refs.py — アーカイブを指す参照の戻り止め
 
 > 状態: **現行 (2026-11-18)** — ユーザー指示 2026-11-18 (増加だけ止める・[D4] を実態に合わせて書き分ける)。決まりの本文は [CONSTRAINTS](../../CONSTRAINTS.md) の [D4]。
-ソース: `tools/check_archive_refs.py`・`tools/archive_refs_baseline.json`・`tools/tests/test_archive_refs.py`
+ソース: `tools/ops/check_archive_refs.py`・`tools/ops/archive_refs_baseline.json`・`tools/tests/test_archive_refs.py`
 
 ## 目的
 
@@ -26,13 +26,13 @@
 
 ## 基準
 
-`tools/archive_refs_baseline.json` は `{ファイル: 件数}`。ファイルごとに、基準より多くても少なくても落ちる。
+`tools/ops/archive_refs_baseline.json` は `{ファイル: 件数}`。ファイルごとに、基準より多くても少なくても落ちる。
 基準に無いファイルは 0 件が基準なので、新しいファイルに 1 件書けば落ちる。
 
 | 起きた事 | する事 |
 |---|---|
 | 新しく書いて増えた | 現行の文書を指す形に直す |
-| 契約を現行の文書へ要約して、引き先を替えて減った | `python3 tools/check_archive_refs.py --write-baseline` |
+| 契約を現行の文書へ要約して、引き先を替えて減った | `python3 tools/ops/check_archive_refs.py --write-baseline` |
 | 票を移した追従で、来歴の註が増えた | 試験の覚えの出所は移す前に付け替える。残るソースの註の分は、同じ変更で `--write-baseline` |
 
 作った時の件数 (2026-11-18): 260 ファイル・362 件 (試験の覚え 76 本 121 件、ソース 114 本 128 件、道具の Python 70 本 113 件)。

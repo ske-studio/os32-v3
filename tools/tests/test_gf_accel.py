@@ -5,7 +5,7 @@ CHECK = dict(name='gf-accel-host', tier=1, needs=[], budget=30.7,
             'sys/dev/video/geforce/command.h', 'sys/dev/video/geforce/foundation.h',
             'drivers/video/geforce/*', 'tools/tests/gf_accel*',
             'tools/tests/gf_command_runtime_host.h',
-            'tools/tests/test_gf_accel.py', 'tools/accept/gf_accel.py',
+            'tools/tests/test_gf_accel.py', 'tools/ops/gf_accel.py',
             'sys/arch/x86/video/gf_accept_cpu.c', 'sys/include/video_wc.h', 'sys/dev/video/geforce/gf_accept.c', 'sys/dev/video/geforce/gf_present.c',
             'sys/dev/video/geforce/geforce_module.h', 'sys/dev/video/geforce/production.h',
             'userland/gshell/src/**', 'userland/gshell/host/**', 'userland/gshell/build.rs',
@@ -541,7 +541,7 @@ def component_hosts(selected, mutate):
 
 
 def consumer(source=None):
-    spec = importlib.util.spec_from_file_location('gf_accel', ROOT/'tools/accept/gf_accel.py')
+    spec = importlib.util.spec_from_file_location('gf_accel', ROOT/'tools/ops/gf_accel.py')
     module = importlib.util.module_from_spec(spec)
     if source is None:
         spec.loader.exec_module(module)
@@ -819,7 +819,7 @@ def acceptance_main():
         paths = [Path(directory)/f'{mode}.log' for mode in range(3)]
         for path, log in zip(paths, logs):
             path.write_text(log)
-        command = [sys.executable, '-B', str(ROOT/'tools/accept/gf_accel.py'), '--build-id', 'fixture',
+        command = [sys.executable, '-B', str(ROOT/'tools/ops/gf_accel.py'), '--build-id', 'fixture',
                    '--pair-crc', '123', *map(str, paths)]
         assert subprocess.run(command, capture_output=True).returncode == 0
         assert subprocess.run(command+['--require-wm'], capture_output=True).returncode == 1
@@ -827,7 +827,7 @@ def acceptance_main():
         assert subprocess.run(command, capture_output=True).returncode == 1
     print('PASS acceptance: real present, 3 modes, 10+300 samples, readback, BIOS SKIP, failed clock/point, version and ranks')
     if '--mutate' in sys.argv:
-        original = (ROOT/'tools/accept/gf_accel.py').read_text()
+        original = (ROOT/'tools/ops/gf_accel.py').read_text()
         anchor = "status != 'OK' or effective != expected"
         assert original.count(anchor) == 1
         bad = consumer(original.replace(anchor, "status != 'OK'", 1))

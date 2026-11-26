@@ -1,6 +1,6 @@
 /* T3c3 / F-9. Real USER malloc + KAPI forwarding observer, no fault injection.
  * Run without arguments for isolated children and exit-reclamation checks.
- * Format/procedure: tools/accept/t3c3.md. Keep inputs and v=1 stable for c4. */
+ * Format/procedure: tools/ops/t3c3.md. Keep inputs and v=1 stable for c4. */
 #include "os32api.h"
 #include <errno.h>
 #include <stdint.h>

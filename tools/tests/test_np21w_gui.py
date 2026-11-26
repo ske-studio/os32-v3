@@ -150,7 +150,8 @@ class SharedClientTests(unittest.TestCase):
             run.assert_not_called()
 
     def test_gate_and_serial_use_shared_client_with_custom_url(self):
-        from tools import gui_gate, rshell_serial
+        from tools import rshell_serial
+        from tools.ops import gui_gate
         client = gui_gate.emu
         with patch.object(client, 'get', return_value=(200, b'{}', {'X-Screen-Source': '98'})) as get, \
              patch.object(client, 'post', return_value=b'answer\xff') as post:
@@ -756,7 +757,7 @@ class GuiTests(unittest.TestCase):
             with self.assertRaises(ValueError): gui.decode_ring(payload,0,0,len(payload))
 
     def test_legacy_transport_injection_mutant_caught_without_http(self):
-        path = ROOT / 'tools/gui_gate.py'
+        path = ROOT / 'tools/ops/gui_gate.py'
         spec = importlib.util.spec_from_file_location('gate_test',path)
         gate = importlib.util.module_from_spec(spec); spec.loader.exec_module(gate)
         gate.post, gate.get, gate.time = self.http.post, self.http.get, self.http.clock

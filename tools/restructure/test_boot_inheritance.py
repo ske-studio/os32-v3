@@ -65,7 +65,7 @@ def exercise(source, root):
 
     case('same medium after docs edit', True, paths=b'docs/images/demo_0532.png\0')
     case('listed markdown', True, paths=b'docs/CONSTRAINTS.md\0')
-    case('test instructions', False, paths=b'docs/CONSTRAINTS.md\0tools/accept/gf_a4.md\0')
+    case('test instructions', False, paths=b'docs/CONSTRAINTS.md\0tools/ops/gf_a4.md\0')
     case('unlisted markdown', False, paths=b'docs/new-file.md\0')
     case('packaged manual', False, paths=b'docs/manpages/hsync.1\0')
     case('generator input', False, paths=b'docs/design/hwdev/hwdev_imports.md\0')

@@ -50,7 +50,7 @@
  "sys/platform/pc98/legacy/v86_mem.h": 2,
  "sys/platform/pc98/legacy/v86_pic.h": 1,
  "sdk/include/os32/os32_kapi_shared.h": 1,
- "tools/check_docs_links.py": 31,
+ "tools/ops/check_docs_links.py": 31,
  "tools/checks/run.py": 3,
  "tools/deploy_protect.py": 2,
  "tools/gen_build_id.py": 1,

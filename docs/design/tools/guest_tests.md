@@ -1,6 +1,6 @@
 # tools/guest_tests.py — 設計
 > 状態: **現行 (2026-11-18)** — 出所: TASK_TEST_RUNNER の契約を今のソースと照らして要約
-ソース: `tools/guest_tests.py`・`tools/tests/guest_tests.txt`
+ソース: `tools/guest_tests.py`・`tools/guest_tests.txt`
 
 所定の試験プログラムを NP21/W のゲストで一括実行し、ホストで合否を集計するランナー。`make check-guest` が本番、
 `make check-guest-host` がホスト試験 (`tools/tests/test_guest_tests.py`、NP21/W・HTTP・実時間に触らない)。
@@ -13,7 +13,7 @@
 ファイルの見張り、rshell の開き直し) は薄く保ち、`run_suite(guest, host_dir, entries, …, now=, sleep=, log=)` に
 ゲスト・時計・待ちを注入できる。
 
-## 2. 一覧 (`tools/tests/guest_tests.txt`、`parse_list`)
+## 2. 一覧 (`tools/guest_tests.txt`、`parse_list`)
 
 1 行 1 件。`#` から行末はコメント、空行は無視。行の最初の語が名前 (`[A-Za-z_][A-Za-z0-9_]*`)、行全体がゲストに
 打たせる命令 (`restest all` → 名前 `restest`)。名前の重複・使えない字・空の一覧は誤り。

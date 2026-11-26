@@ -13,7 +13,7 @@
   source      .c .h .inc .asm .S
   python      tools/ の下の .py
 
-基準 tools/archive_refs_baseline.json は {ファイル: 件数}。ファイルごとに、基準より多くても
+基準 tools/ops/archive_refs_baseline.json は {ファイル: 件数}。ファイルごとに、基準より多くても
 少なくても落ちる (少ない時、票を移した追従で来歴の註が増えた時は --write-baseline で書き直す)。
 基準に無いファイルは 0 件。
 """
@@ -24,8 +24,8 @@ import re
 import subprocess
 import sys
 
-ROOT = Path(__file__).resolve().parents[1]
-BASELINE = 'tools/archive_refs_baseline.json'
+ROOT = Path(__file__).resolve().parents[2]
+BASELINE = 'tools/ops/archive_refs_baseline.json'
 CURRENT = 'docs/archive/README.md'
 SOURCE_EXTS = ('.c', '.h', '.inc', '.asm', '.S')
 REFERENCE = re.compile(r'docs/archive/(?:[A-Za-z0-9_\-]+/)*[A-Za-z0-9_.\-]+\.[A-Za-z0-9]+')

@@ -42,16 +42,15 @@ LE アクセサ化) の効果を同じ物差しで見るための計測器。
 
 ## 使い方
 
-    python3 tools/check_arm_compile.py           # 人が読む表
-    python3 tools/check_arm_compile.py --json     # 機械可読
-    ARM_CC=/path/to/gcc python3 tools/check_arm_compile.py
+    python3 tools/ops/check_arm_compile.py           # 人が読む表
+    python3 tools/ops/check_arm_compile.py --json     # 機械可読
+    ARM_CC=/path/to/gcc python3 tools/ops/check_arm_compile.py
 
 `arm-none-eabi-gcc` が無い環境では SKIP と出して終了コード 0。計測器なので、
 道具が無いことは失敗ではない。
 """
 
 import argparse
-from source_roots import SCAN_ROOTS
 import json
 import os
 from pathlib import Path
@@ -64,7 +63,11 @@ import tempfile
 
 from concurrent.futures import ThreadPoolExecutor
 
-PROJ_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TOOLS = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(TOOLS))
+from source_roots import SCAN_ROOTS
+
+PROJ_DIR = str(TOOLS.parent)
 
 KERNEL_MK = os.path.join(PROJ_DIR, "build", "kernel.mk")
 
@@ -503,7 +506,7 @@ def main():
         for p in drift:
             print("    %s" % p)
         print("    (カーネルに足したなら C_KERNEL へ、そうでないなら")
-        print("     tools/check_arm_compile.py の KNOWN_NON_KERNEL へ理由つきで)")
+        print("     tools/ops/check_arm_compile.py の KNOWN_NON_KERNEL へ理由つきで)")
         print("")
 
     print("  記録先: docs/tasks/portability/ARM_GAUGE.md")

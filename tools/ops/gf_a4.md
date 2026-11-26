@@ -11,7 +11,7 @@ main 0〜4 の結果を見て、同じ試行の PAUSED から VERIFY を一度�
 | 根拠略号 | `/home/hight/os32-v3/` からのファイル名（以下 `略号:行`） |
 |---|---|
 | D | `docs/design/kdebug/gfinit.md` |
-| M | `tools/accept/gf_main.md`（末尾の確定 N1〜N3 を本文より優先） |
+| M | `tools/ops/gf_main.md`（末尾の確定 N1〜N3 を本文より優先） |
 | S | `docs/design/userland/shell/cmd_gfinit.md` |
 | G / E | `sys/dev/video/geforce/diag/gfinit.c` / `sys/dev/video/geforce/diag/gfinit_exec.c` |
 | P / H | `sys/dev/video/geforce/diag/gfinit_plan.c` / `sys/dev/video/geforce/diag/gfinit_plan.h` |

@@ -119,7 +119,7 @@ X4 経路の離しも `release_capture` を通す。ここだけ `forward_button
 同じ手を使うので、生成規則を 1 か所に寄せた (KAPI の形はここには書かない)。
 `integration.py` はこれを使う形に置き換えた — 置換後も 32 passed で変化なし。
 
-## 実機確認 (2026-09-10、NP21/W 9801 planar 400 ライン、PM が `tools/gui_gate.py` で実施)
+## 実機確認 (2026-09-10、NP21/W 9801 planar 400 ライン、PM が `tools/ops/gui_gate.py` で実施)
 
 観測点は `gui_bench` の `CLICK n` (text VRAM に書く。`/api/tvram` で読む)。
 `gui_bench` は `on_raw` で `Button` を数えるので、**WM がアプリへ配ったか**そのものが見える。

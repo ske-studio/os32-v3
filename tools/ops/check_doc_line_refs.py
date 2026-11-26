@@ -10,7 +10,7 @@
 ような 1 文字の木の記法でも、パスが一致すれば数える。ファイル名だけの形 (`kernel.c:521`) は、
 外部の同名のファイルと区別できないので数えない。
 
-基準 tools/doc_line_refs_baseline.json は {文書: 件数}。文書ごとに、基準より多くても少なくても
+基準 tools/ops/doc_line_refs_baseline.json は {文書: 件数}。文書ごとに、基準より多くても少なくても
 落ちる (少ない時は --write-baseline で基準を書き直す)。基準に無い文書は 0 件。
 """
 import argparse
@@ -20,8 +20,8 @@ import re
 import subprocess
 import sys
 
-ROOT = Path(__file__).resolve().parents[1]
-BASELINE = 'tools/doc_line_refs_baseline.json'
+ROOT = Path(__file__).resolve().parents[2]
+BASELINE = 'tools/ops/doc_line_refs_baseline.json'
 EXCLUDED = ('docs/archive/', 'docs/hw/')
 # ディレクトリ付きのパス + ':' + 行番号 (範囲・列挙の先頭の数字だけ見る)。
 REFERENCE = re.compile(r'((?:[A-Za-z0-9_.\-]+/)+[A-Za-z0-9_.\-]+\.[A-Za-z0-9]+):(\d+)')

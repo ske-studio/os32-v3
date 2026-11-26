@@ -3,7 +3,7 @@ import hashlib,json,sys
 p=Path(sys.argv[1]); base=p.parent/'base'; t=p/'tmp/verified-tree'; replay=p/'tmp/replay-tree'
 sys.path.insert(0,str(Path.cwd()/'tools'))
 from build_compare import candidate_path
-moves={Path(r['from']):Path(r['to']) for r in json.load(open('docs/tasks/restructure/data/move_map.json'))}
+moves={Path(r['from']):Path(r['to']) for r in json.loads(Path(__file__).with_name('move_map.json').read_text())}
 objects={k.with_suffix('.o'):(k,v) for k,v in moves.items() if k.suffix in ('.c','.s','.S','.asm')}
 diff={Path(l.split()[1]) for l in (p/'compare-final.log').read_text().splitlines() if l.startswith('DIFF ')}
 def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()

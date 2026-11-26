@@ -4,7 +4,7 @@
 move_docs.py — 文書を動かし、リポジトリ中の参照を追従させる
 
 文書を `git mv` しただけでは、その文書を指していた**相対リンクが黙って
-壊れる**。壊れたことは `tools/check_docs_links.py` (lychee) が次に回った
+壊れる**。壊れたことは `tools/ops/check_docs_links.py` (lychee) が次に回った
 ときに初めて分かり、しかも「どこをどう直せばよいか」は人が 1 本ずつ
 数え直すことになる。受入完了した票を `docs/archive/` へ落とす棚卸しでは
 1 回で数十本動くので、この追従を手でやると必ず取りこぼす。
@@ -99,7 +99,7 @@ move_docs.py — 文書を動かし、リポジトリ中の参照を追従させ
 
 ## 使い終わったら
 
-    python3 tools/check_docs_links.py        # リンクと見出しアンカー
+    python3 tools/ops/check_docs_links.py        # リンクと見出しアンカー
     python3 tools/check_docs_orphans.py      # 索引から辿れなくなっていないか
     make tests-inventory   # build/out/ の票の列を引き直す (コミット不要)
 
@@ -461,7 +461,7 @@ def main():
 
     print("")
     print("完了。次に回すもの:")
-    print("  python3 tools/check_docs_links.py")
+    print("  python3 tools/ops/check_docs_links.py")
     print("  python3 tools/check_docs_orphans.py")
     print("  make tests-inventory  # build/out/ の生成表、コミット不要")
     return 0

@@ -12,7 +12,7 @@ OS32 は単一利用者・単一タスク・協調切替で攻撃者を想定し
 |---|---|
 | D | docs/design/hwdev/gf_load_state.md |
 | V | docs/design/kdebug/gfinit_decode.md |
-| M / A / S | tools/accept/gf_main.md / tools/accept/gf_a4.md / tools/accept/gf_s8.md |
+| M / A / S | tools/ops/gf_main.md / tools/ops/gf_a4.md / tools/ops/gf_s8.md |
 | W / G | tools/rshell_recover.py / sys/dev/video/geforce/diag/gfinit.c |
 | B / K | tools/tests/gfinit_budget_host.c / sys/platform/pc98/kdebug/kpeek.c |
 

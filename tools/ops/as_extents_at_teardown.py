@@ -26,7 +26,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools'))
 sys.path.insert(0, str(ROOT))
-from tools.tests.kernel_includes import include_flags
+from build_profile import query
 from np21w_mcp import np21w_client as emu
 WORD_BYTES = struct.calcsize('<I')
 LAYOUT_SOURCE = r'''
@@ -90,7 +90,7 @@ def generate_offsets(cross):
     with tempfile.TemporaryDirectory(prefix='ext-layout-') as directory:
         obj = Path(directory) / 'layout.o'
         subprocess.run([str(cross / 'i386-elf-gcc'), '-std=gnu11', '-ffreestanding',
-                        *include_flags(ROOT), '-x', 'c', '-c',
+                        *query(ROOT, ["ARCH=x86", "PLATFORM=pc98"], config_only=True)["INC_KERNEL"], '-x', 'c', '-c',
                         '-', '-o', str(obj)], input=LAYOUT_SOURCE, text=True,
                        cwd=ROOT, check=True, capture_output=True)
         raw = subprocess.check_output([str(cross / 'i386-elf-nm'), '--defined-only',

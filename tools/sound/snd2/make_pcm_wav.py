@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Create a two-second 44.1 kHz, 16-bit stereo sine WAV for pcm_play.
 
-Usage: python3 tools/tests/make_pcm_wav.py /path/to/test.wav
+Usage: python3 tools/sound/snd2/make_pcm_wav.py /path/to/test.wav
 Copy the resulting file to HostDrv for guest playback.
 """
 import argparse

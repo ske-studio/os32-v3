@@ -8,8 +8,8 @@ CHECK = dict(name='sndl-image-host', tier=1, needs=['make:all'], budget=3,
              covers=['tools/tests/sndl_image_host.c', 'tools/tests/host32.py',
                      'userland/diag/sndl_test.c', 'sdk/sndl/stub.c', 'sdk/include/os32/*.h',
                      'userland/lib/snd/**', 'sdk/mkos32x.py', 'sdk/link/shlib.ld',
-                     'tools/accept/snd2/verify_soft.py', 'tools/accept/snd2/verify_wave.py',
-                     'tools/accept/snd2/soft_tone.cpp', 'lib/os32_opna/upstream/**',
+                     'tools/sound/snd2/verify_soft.py', 'tools/sound/snd2/verify_wave.py',
+                     'tools/sound/snd2/soft_tone.cpp', 'lib/os32_opna/upstream/**',
                      'build/os32snd.mk', 'sdk/os32x_hdr.py'],
              basis=['docs/decisions/sound/AV_HAL_DESIGN.md §7 x86 アプリからの読み込み'])
 
@@ -35,7 +35,7 @@ def run(ctx):
         asm.write_text(f'.section .rodata\n.balign 4\n.global sound_blob, app_blob\n'
                        f'sound_blob: .incbin "{blob}"\n.balign 4\napp_blob: .incbin "{app}"\n'
                        '.section .note.GNU-stack,"",@progbits\n')
-        sys.path.insert(0, str(root / 'tools/accept/snd2'))
+        sys.path.insert(0, str(root / 'tools/sound/snd2'))
         import verify_soft
         import struct
         for mode in ['offline', 'soft'] + (['bad-version'] if ctx.mutate else []):

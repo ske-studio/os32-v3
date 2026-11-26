@@ -146,7 +146,7 @@ def main():
         writer.writerow(['区分', 'パス', '判断・証拠'])
         writer.writerows(review)
     moves = move_rows(read_rows(DATA / 'layout.tsv'))
-    (DATA / 'move_map.json').write_text(json.dumps(moves, indent=2) + '\n')
+    (ROOT / 'tools/ci/replay/move_map.json').write_text(json.dumps(moves, indent=2) + '\n')
 
 
 if __name__ == '__main__':

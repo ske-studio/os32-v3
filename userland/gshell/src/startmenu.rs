@@ -61,7 +61,7 @@ const PATH_LEN: usize = 128;
 /// 走査するディレクトリ (契約 D2)。
 static PROG_DIR: &[u8] = b"/usr/bin\0";
 
-/* root メニューの項目。**行番号は台本 (`tools/gui_gate.py`) の
+/* root メニューの項目。**行番号は台本 (`tools/ops/gui_gate.py`) の
  * `ROW_PROGRAMS` / `ROW_FILEMAN` / `ROW_RUN` / `ROW_SETTINGS` / `ROW_CUI` /
  * `ROW_HALT`) と 1 対 1**。Settings... を Run... の次に足したので
  * CUI mode / Shut Down が 1 行下がった (票 S4 §3)。 */
@@ -724,7 +724,7 @@ pub fn draw(st: &GuiState, clip: Rect) {
 
 /// root メニューの項目 idx のラベル (**NUL を含まない**)。
 ///
-/// `tools/gui_gate.py` の `ROW_*` が指す行の中身を試験から確かめるための窓口
+/// `tools/ops/gui_gate.py` の `ROW_*` が指す行の中身を試験から確かめるための窓口
 /// (票 S4 §5 の (7))。行の順が変わると台本が別の項目に当たるので、
 /// 「6 項目・この順」をここで固定する。
 pub fn root_label(idx: usize) -> &'static [u8] {

@@ -1,7 +1,7 @@
 """Link-SH transport and CPU/arrival-time acceptance."""
 CHECK = dict(name='ppc-link-sh-run', env=['ppc-cross','qemu-ppc'], tier=2,
     budget=2400, needs=['make:ppc-ci-image'], full_only=True,
-    covers=['sys/kern/exec/exec.c', 'sys/kern/exec/exec_launch.inc', 'sys/kern/exec/exec_finish.inc', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'sys/fs/serialfs/serialfs_persistent.c', 'tools/ppc/link_sh_run.py', 'tools/tests/test_ppc_link_sh_run.py',
+    covers=['sys/kern/exec/exec.c', 'sys/kern/exec/exec_launch.inc', 'sys/kern/exec/exec_finish.inc', 'tools/ppc/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'sys/fs/serialfs/serialfs_persistent.c', 'tools/ppc/link_sh_run.py', 'tools/tests/test_ppc_link_sh_run.py',
             'build/targets/ppc-powermac.mk','build/ppc-user.mk','userland/shell/rshell_lan.c',
             'platform/powermac/**','arch/ppc/**','kernel/console/**','sys/kern/mm/kmalloc.c',
             'tools/host_agent.py','tools/host_operator_socket.py','tools/host_rshell.py',

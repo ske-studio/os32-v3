@@ -32,7 +32,7 @@
 | `tools/check_layers.py`・`tools/layers_baseline.json` | 共通 → arch・機種・装置の読みを止める (基準 0)。持ち主は**パスで決めている** | 古い検査なので移動から回さない。所有の表から引く形で `P4.md` の 3 に載せる (D-12) |
 | `build/select.mk` と `build/sources/*.mk` ほか | ビルドの所有者集合と順 (`build/sources/order.mk`) | P1-2 で「所有の表の元」にする候補 |
 | `tools/checks/run.py`・`tools/ci/gate.py`・`tools/ci/land_gate.py`・`tools/check_time.py` | 検査の登録・選択・実行・表・取り込みの判定 | P6 |
-| `tools/move_docs.py`・`tools/check_docs_links.py`・`check_docs_orphans.py` | 文書の移動とリンクの検査 | 移動では置換だけ。文書の検査は `P4.md` の 3 で載せる |
+| `tools/move_docs.py`・`tools/ops/check_docs_links.py`・`check_docs_orphans.py` | 文書の移動とリンクの検査 | 移動では置換だけ。文書の検査は `P4.md` の 3 で載せる |
 
 関係する既存の票 (重なりは P6・P8 で畳む。それまでは各票が正典):
 `v3/TASK_CI_REWORK` の S3〜S7 (入口・一覧・表・SKIP・重み) = 仕様 §8・§11・§14 の一部、`ppc/TASK_PPC_SEP` の残件 = 仕様 Phase 8、`v3/TASK_REDUNDANCY` = 仕様 §15 の重複実装、`v3/TASK_POLICY_LIGHT` の試験の 4 段 = 仕様 §7 の分類、[DEFERRED_TESTS](../DEFERRED_TESTS.md) §2 の `CI-WAIT-PPC20`。

@@ -48,7 +48,7 @@
 4. `python3 tools/move_docs.py --into docs/archive/<籠> <票> … --dry-run` で書き換えを見てから、`--dry-run` を外して移す。
 5. `python3 tools/doc_delink_archive.py --dry-run` で現行 → アーカイブのリンクを見て、文字に戻す。
 6. `docs/archive/README.md` の籠の表と、`docs/INDEX.md` の行 (所在を文字で) を直す。
-7. `python3 tools/check_archive_refs.py --write-baseline` (来歴の註が増減した時)。
+7. `python3 tools/ops/check_archive_refs.py --write-baseline` (来歴の註が増減した時)。
 8. 検査: `CHECK_NO_NEEDS=1 make check-docs-links check-docs-orphans check-docs-status check-docs-tree check-docs-line-refs check-archive-refs check-tests-inventory MUTATE=0` と `python3 tools/checks/run.py --lint`。新しい文書は先に `git add -N` (追跡されていない文書は検査に入らない)。
 
 ## §5. 検査が見る事

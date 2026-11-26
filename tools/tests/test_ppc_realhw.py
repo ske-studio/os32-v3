@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise distribution limits and real-hardware transcript assessment."""
 CHECK = dict(name='ppc-realhw', tier=2, budget=10, needs=['make:all'],
-             covers=['sys/kern/exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c',
+             covers=['sys/kern/exec/exec.c', 'tools/ppc/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c',
         'sys/fs/serialfs/serialfs_persistent.c',
         'sys/kern/console/con_sink.c',
         'sys/kern/console/console.c',

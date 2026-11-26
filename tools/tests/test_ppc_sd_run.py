@@ -10,7 +10,7 @@ import sd_run as meter
 import link_sh_run as link
 
 CHECK = dict(name='ppc-sd-meter', env=['ppc-cross'], tier=1, budget=10, needs=['make:ppc-ci-image'],
-    covers=['sys/arch/ppc/exec_enter.S', 'sys/kern/exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'sys/platform/powermac/shell_loop_ops.c', 'userland/shell/main.c', 'userland/shell/rshell.c',
+    covers=['sys/arch/ppc/exec_enter.S', 'sys/kern/exec/exec.c', 'tools/ppc/ppc_shell_flow.inc', 'sys/platform/powermac/shell_loop_ops.c', 'userland/shell/main.c', 'userland/shell/rshell.c',
         'sys/arch/ppc/entry.S',
         'sys/arch/ppc/kernel_dec.c',
         'sys/arch/ppc/kernel_mmu.S',

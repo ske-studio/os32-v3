@@ -3,7 +3,7 @@
 """
 check_docs_orphans.py — どこからも辿れない文書 (孤児) の検出
 
-リンク切れ (`tools/check_docs_links.py`) の裏返し。あちらは「指した先が
+リンク切れ (`tools/ops/check_docs_links.py`) の裏返し。あちらは「指した先が
 無い」を見るが、こちらは「**誰からも指されていない**」を見る。lychee の
 守備範囲ではないのでこちらで持つ (Python 標準ライブラリだけで動き、
 `lychee` は要らない)。

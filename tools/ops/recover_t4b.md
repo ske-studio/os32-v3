@@ -78,7 +78,7 @@ P はポート、C は実 Image CRC、D は証拠ディレクトリ、CASE は�
 helper は end だけを送る。ver は再送せず、COM1 reader や /api/cmd を並行させない。
 
 ```sh
-python3 tools/accept/recover_t4b_host.py --port "$P" --session "$N" --image-crc "$C" --state "$D/$CASE.json" --log "$D/$CASE.log" --raw "$D/$CASE.bottom.raw" --drop none > "$D/$CASE.out"
+python3 tools/ops/recover_t4b_host.py --port "$P" --session "$N" --image-crc "$C" --state "$D/$CASE.json" --log "$D/$CASE.log" --raw "$D/$CASE.bottom.raw" --drop none > "$D/$CASE.out"
 # 別の normal session の end で --drop final、その次の別 session で --drop eot
 ```
 

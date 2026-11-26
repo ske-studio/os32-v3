@@ -104,7 +104,7 @@ x86 にしか意味の無い仕組みなので `include/` に契約を置かず�
 
 6. **計る。** 移植度は合否ではなく数字で見る:
 
-       python3 tools/check_arm_compile.py        # または make check-arm-compile
+       python3 tools/ops/check_arm_compile.py        # または make check-arm-compile
 
    基準値と経過は [`docs/tasks/portability/ARM_GAUGE.md`](../docs/tasks/portability/ARM_GAUGE.md)。
    この計測器は `ARCH=x86` の木を ARM コンパイラに通すもので、`arch/arm/` が

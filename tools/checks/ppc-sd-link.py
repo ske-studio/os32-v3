@@ -3,7 +3,7 @@
 icount is only for USB typing tests; HostFS acceptance runs without icount."""
 CHECK = dict(name='ppc-sd-link', env=['ppc-cross', 'qemu-ppc'], tier=2,
     needs=['make:ppc-ci-image'], budget=1800, full_only=True,
-    covers=['sys/kern/exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/checks/ppc-sd-link.py', 'tools/tests/test_ppc_sd_run.py',
+    covers=['sys/kern/exec/exec.c', 'tools/ppc/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/checks/ppc-sd-link.py', 'tools/tests/test_ppc_sd_run.py',
             'tools/ppc/**', 'tools/*.py', 'build/targets/ppc-powermac.mk', 'build/ppc-user.mk',
             'fs/serialfs/*.[ch]', 'platform/powermac/**', 'arch/ppc/**',
             'userland/shell/rshell_lan.c', 'kernel/console/**', 'sys/kern/mm/kmalloc.c',

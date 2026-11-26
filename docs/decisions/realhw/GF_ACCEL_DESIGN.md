@@ -121,7 +121,7 @@ int (*wc_start)(void); int (*wc_stop)(void);
 - PCI config 0x0c の cache-line size は dword 単位、0 は未設定として記録（CPU cache line と混同しない）。Command/latency/BAR raw、CPUID family/model/stepping、MTRRCAP/全組/DEF_TYPE、PAT有無、元/現 PTE も採る。
 - CPU cache line は対応 leaf4、なければ P6 の leaf2 descriptor を [SDM Vol.2 CPUID 表](https://cdrdv2-public.intel.com/868137/325462-089-sdm-vol-1-2abcd-3abcd-4.pdf)で解読（raw も保存）。CLFLUSH 非対応の P6 で leaf1 EBX の値を line size として使わない。不明なら不明と記す。
 - 受入用 platform.report callback を kernel 側 gf_wc.c に持たせ、計測完了後の record を serial_puts（O/drivers/char/serial.h）へ出す。計時中のシリアル出力を止め、常用版に sample 配列を含めない。
-- tools/accept/gf_accel.py は保存済みシリアルログから版/設定/個別時間を照合し集計。実機操作は PM→ノート側セッション、表示の判定は RA266.md §3-1 のカメラ、数字はシリアル。
+- tools/ops/gf_accel.py は保存済みシリアルログから版/設定/個別時間を照合し集計。実機操作は PM→ノート側セッション、表示の判定は RA266.md §3-1 のカメラ、数字はシリアル。
 
 ### 5.1 受入版の作成と入替 (S14〜S16/T3)
 
@@ -166,7 +166,7 @@ total=present、event/composite=0とする。次周期にアプリが描く時�
 含めない。総合の操作応答は実機台本でも見る。
 
 ```sh
-python3 -B tools/accept/gf_accel.py --build-id f5468c6c-gfa-r2 \
+python3 -B tools/ops/gf_accel.py --build-id f5468c6c-gfa-r2 \
   --pair-crc 0x1234abcd --require-wm byte-uc.log dword-uc.log dword-wc.log > comparison.json
 ```
 
@@ -205,7 +205,7 @@ WC不成立は理由付きSKIPで、比較の合格と数えない。レコー�
 | S16 userland/gshell/src/wm.rs | 受入時だけイベント/合成/presentの計時、+20–40、S14後 |
 | T0 +tools/tests/test_mtrr_wc.py | fake CPUID/MSR/CR・PTE不変とCHECK/変異、160–230、S0後に並列 |
 | T1 tools/tests/test_geforce.py | 転送store trace・端・WC寿命と既存写像維持、+60–100、S2/S7/S10後 |
-| T3 +tools/accept/gf_accel.py | シリアル記録の統計/版照合、80–130、S14後 |
+| T3 +tools/ops/gf_accel.py | シリアル記録の統計/版照合、80–130、S14後 |
 - r2 の S3–S6（mm の型/分割/同期）、S9（native 状態別検査）、T2（台帳変更試験）の6段を削除。21段→15段、追跡のため残る段の ID は維持する。
 - Cファイル名のみの行は drivers/video/geforce/（hwdev/arch/mm/build は表記どおり）。各段は半日以内〜1日、共有ヘッダを先に確定。既存fixtureが別ファイルならその1本を追加子段として指名する。
 - Tx は各段 make kernel＋触った像/直接試験、最後に make all・全差分候補 MUTATE=0・触った変異・lint、静的5本と取り込みは ROLES §0。本依頼では実装・ビルド・機器操作をしない。

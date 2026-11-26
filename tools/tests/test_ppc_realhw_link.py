@@ -5,7 +5,7 @@
 nest の試験時計: FINDINGS / realhw_run.py の期限の契約。
 """
 CHECK = dict(name='ppc-realhw-link', tier=1, budget=10, needs=['make:all'],
-             covers=['sys/kern/exec/exec.c', 'tools/accept/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/ppc/realhw_run.py', 'tools/tests/test_ppc_realhw_link.py',
+             covers=['sys/kern/exec/exec.c', 'tools/ppc/ppc_shell_flow.inc', 'userland/shell/main.c', 'userland/shell/rshell.c', 'tools/ppc/realhw_run.py', 'tools/tests/test_ppc_realhw_link.py',
                      'tools/ppc/sc_run.py', 'tools/ppc/sd_run.py',
                      'tools/ppc/kboot_run.py', 'tools/ppc/kboot_accept.py',
                      'tools/ppc/kboot_mutations.py', 'tools/ppc/sb_run.py',

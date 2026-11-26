@@ -18,10 +18,10 @@
 ## 1. 計測器
 
     make check-arm-compile                          # 人が読む表
-    python3 tools/check_arm_compile.py --json       # 機械可読
-    ARM_CC=<path> python3 tools/check_arm_compile.py
+    python3 tools/ops/check_arm_compile.py --json       # 機械可読
+    ARM_CC=<path> python3 tools/ops/check_arm_compile.py
 
-実体は [`tools/check_arm_compile.py`](../../../tools/check_arm_compile.py)。
+実体は [`tools/ops/check_arm_compile.py`](../../../tools/ops/check_arm_compile.py)。
 `arm-none-eabi-gcc` が無い環境では SKIP と出して**終了コード 0**。
 
 ### `make check` には入れていない
@@ -37,7 +37,7 @@
 |---|---|
 | 対象集合 | `build/kernel.mk` の `C_KERNEL` (カーネルに実際にリンクされる C ソースの正典) |
 | フラグ | `build/config.mk` の `CFLAGS_COMMON` を**読んで**使い、x86 専用の `-m32` `-march=i386` `-mno-red-zone` だけを外す。`-O2 -D__KERNEL_BUILD__` を足してカーネル本番ビルドに揃える |
-| インクルード | `build/config.mk` の `INC_*` を読む。`build/kernel.mk` の個別ルールも写してある (`fs/fat/fatfs/` は `INC_FATFS`、`drivers/` の例外集合は `tools/check_arm_compile.py` の `DRIVERS_INC_KERNEL` を参照) |
+| インクルード | `build/config.mk` の `INC_*` を読む。`build/kernel.mk` の個別ルールも写してある (`fs/fat/fatfs/` は `INC_FATFS`、`drivers/` の例外集合は `tools/ops/check_arm_compile.py` の `DRIVERS_INC_KERNEL` を参照) |
 | コンパイル | `-c -o /dev/null` (コード生成まで) |
 
 フラグとインクルードを `config.mk` から**読む**のは、ここに書き写すと二重管理に
@@ -197,7 +197,7 @@
 インクルードパスやフラグの写し間違いで落ちていたら、計測は移植性ではなく
 自分の設定ミスを測っていることになる。同じ計測器を `i386-elf-gcc` で回した:
 
-    ARM_CC=i386-elf-gcc python3 tools/check_arm_compile.py
+    ARM_CC=i386-elf-gcc python3 tools/ops/check_arm_compile.py
     → 通った本数 : 92 / 92
 
 **92/92。**よって対象集合・インクルードパス・フラグは本番ビルドを再現できており、
@@ -427,7 +427,7 @@ x86 の既定は `sys/kern/kstring_asm.asm` のまま (`build/kernel.mk` の `AR
 
 分類 (a) の意味は「差し替え先がまだ決まっていない、その場の x86 asm」なので、
 `arch/` や `platform/` の下に入ったものは (b) 側に数えるよう
-`tools/check_arm_compile.py` の `classify()` を直した (基底名の一覧では
+`tools/ops/check_arm_compile.py` の `classify()` を直した (基底名の一覧では
 `arch_cpu.h` / `x86_desc.h` を取りこぼす。順序 3 で `arch_io.h` /
 `platform_io.h` を (b) に入れたのと同じ理由)。ラベルも
 「(b) arch/ platform/ の実装経由」に改めた。**計測器を直さずに測ると

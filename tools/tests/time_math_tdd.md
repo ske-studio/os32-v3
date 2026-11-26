@@ -130,7 +130,7 @@ i386-elf の `--target` も GNU11 -Werror で通過。
 `time: clamped ... of 10000 reads` と `time: 1ms delay measured ...` を記録する。
 位相探索の `real-PIT` / `UNVERIFIED` と `1000 reads` のコスト表示は受入対象から外す。
 CPL0 の1範囲・2範囲の素通しは `test_kapi_ranges.py` の実範囲関数で確認する。
-ゲスト受入の項目は `tools/tests/guest_acceptance.yaml` の `e08-time-now`。
+ゲスト受入の項目は `tools/guest_acceptance.yaml` の `e08-time-now`。
 私有 import の6枠 (127/128/174/175/181/182) は `retained` とし、番号・型・実体を保持する。
 `tick_count` の枠132も S2 の参照がなくなるため `retained` とするが、kpeek 等では現役のまま。
 この指定による私有ABI印の変更は kernel/kdebug の対ビルドで反映する。公開KAPIは不変。

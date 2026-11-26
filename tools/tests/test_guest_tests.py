@@ -40,7 +40,7 @@ import tempfile
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 TOOLS = ROOT / "tools"
 TARGET = TOOLS / "guest_tests.py"
-LIST_FILE = ROOT / "tools/tests/guest_tests.txt"
+LIST_FILE = ROOT / "tools/guest_tests.txt"
 
 sys.path.insert(0, str(TOOLS))
 import guest_tests as gt                                        # noqa: E402
@@ -209,7 +209,7 @@ def t_parse_list():
     check(len(errs) == 1 and "空" in errs[0], "空の一覧は誤り")
 
     real, errs = gt.parse_list(LIST_FILE.read_text(encoding="utf-8"))
-    eq(errs, [], "実物の tools/tests/guest_tests.txt が読める")
+    eq(errs, [], "実物の tools/guest_tests.txt が読める")
     check(len(real) >= 16, "実物の一覧が第 1 陣の 16 本以上ある (%d)" % len(real))
     names = [e.name for e in real]
     for banned in ("kbd_echo", "mouse_test", "blit_test", "tile_bench",
