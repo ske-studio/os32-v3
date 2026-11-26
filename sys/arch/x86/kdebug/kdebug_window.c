@@ -5,9 +5,6 @@
 #ifndef KPEEK_HOST
 #include "io.h"
 #endif
-#ifndef KDEBUG_WINDOW_HOST
-#include "../../../platform/pc98/kdebug/generated/kdebug_import_macros.h"
-#endif
 #define RECOVER_PAGE_MASK (MEM_PAGE_SIZE - 1U)
 
 static u32 window_hal_irq_save(void *opaque) { (void)opaque; return irq_save(); }
