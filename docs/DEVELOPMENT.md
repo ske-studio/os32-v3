@@ -73,7 +73,7 @@
 | `sdk/include/os32/os32_kapi_slots.h` | `KAPI_SLOT_*` = `int 0x80` のスロット番号 (生成物、型非依存) | [KAPI_SPEC §3-1](KAPI_SPEC.md) |
 | `sdk/include/os32/os32_gui_shared.h` `sdk/rust/os32api/src/gui/` | GUI の op / イベント / SHM レイアウト (C と Rust に同じ値) | 設計 `docs/design/sdk/include/os32/os32_gui_shared.md`、票 `tasks/gui/PROTO_LAYOUT.md` |
 | `sdk/link/app.ld` `app_sys.ld` `shlib.ld` `sdk/crt/crt0.asm` | アプリ (私有 VA 0x80100000) / シェル帯 (0x400000、gshell) / 共有ライブラリ (私有 VA 0x80000000) のリンク | [09](09_exec.md)、[02 §2-1](02_memory.md) |
-| `sdk/gen_kapi.py` `kapi_rust_gen.py` `mkos32x.py` `tools/mkshlib.py` | KAPI 生成、OS32X ヘッダ付与、`.shlib` 生成と番号表照合 (`make check-shlib`) | [08 §8-4](08_build.md) |
+| `sdk/gen_kapi.py` `sdk/kapi_rust_gen.py` `sdk/mkos32x.py` `tools/mkshlib.py` | KAPI 生成、OS32X ヘッダ付与、`.shlib` 生成 | [08 §8-4](08_build.md) |
 
 ### ドライバ `sys/dev/` (装置の種類ごと)
 

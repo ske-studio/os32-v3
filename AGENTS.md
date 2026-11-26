@@ -32,7 +32,7 @@ Worktrees have no `.env`. Before anything else, export
 `CROSS_DIR=/home/hight/opt/cross TMPDIR=/home/hight/os32-tmp/run/<stage> HOST32_RUNNERS=qemu`
 (TMPDIR must be on disk; `/tmp` is RAM; native runners hit SIGSYS in the Codex sandbox), then run
 `tools/preflight.sh --base <SHA from the request> --fix-fonts` and fix every NG. Build the image requested for the change and run the affected registered checks. Use `--mutate` for checks you add or modify. Once feature development resumes, add a check for the affected contract in the same change.
-The PM pushes the candidate to `wt/int-*` and runs `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` before fast-forwarding main. The evidence identifies the successful latest attempt of the same restructure-build run and records both PC-98 and PowerMac boots.
+The PM pushes the candidate to `wt/int-*` and runs `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` before fast-forwarding main. The evidence identifies the successful latest attempt of the same restructure-build run and records boots for the machines selected by the plan. Documentation-only candidates boot both PC-98 and PowerMac.
 Run checks in the foreground and wait for them to finish instead of re-reading partial logs; never abort and restart a run. Only logs produced after your last source change count as passing.
 Never commit (the sandbox keeps `.git` read-only; the PM commits).
 

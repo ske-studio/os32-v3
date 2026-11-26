@@ -214,7 +214,8 @@ os32-v3/
 │   └── platform/   機種依存の実装 (pc98/、powermac/)。PC-98 の V86 モニタは pc98/legacy/
 ├── lib/            汎用ライブラリ (utf8, path, sqlite3, zlib, microtar 等。vendor したものは各ディレクトリの README.OS32 が出所とライセンスの正典)
 ├── userland/       ユーザー空間 (shell/, gshell/ (GUI シェル, Rust), cmds/, system/, tests/, rust/ (libos32gui 等), lib/)
-├── .github/        作り直し期間の CI は workflows/restructure-build.yml
+├── tests/          登録検査の本体、登録表 registry.toml、実行・集計の入口
+├── .github/        統合と週次・手動の CI は workflows/restructure-build.yml
 ├── apps/           git submodule (ske-studio/os32-apps) — 標準アプリ。make external / make apps
 ├── game/           git submodule (ske-studio/os32-game) — 対戦スゴロク RPG。make external / make game
 ├── docs/hw/        PC-98 資料のローカルミラー (git 管理外、tools/sync_hwdocs.sh)
@@ -222,7 +223,7 @@ os32-v3/
 ├── build/          モジュール化 Makefile 群 (config.mk, kernel.mk, programs.mk, libs.mk, deploy.mk, image.mk, sdk.mk 等) + リンカスクリプト
 │   └── out/        ビルド成果物 (kernel.bin, sqlite.mod, kdebug.bin, vmkernel.lz4, unicode.bin, kernel.elf/.map、カーネルの .o/.d は obj/)
 ├── assets/         データアセット (DB, 辞書, profile 等)
-├── tools/          ホスト上でのイメージ生成・デプロイ・検査ツール (nhd_deploy, mkshlib, check_*, emu_agent/ (ローカル AI の実機操作), np21w_mcp/, np21w_ctl (NP21/W の停止・起動))
+├── tools/          ホスト上でのイメージ生成・デプロイ・運用ツール (nhd_deploy, mkshlib, emu_agent/ (ローカル AI の実機操作), np21w_mcp/, np21w_ctl (NP21/W の停止・起動))
 ├── packages/       生成された .PKG (make packages)
 ├── images/         生成されたブートイメージ (make all / iso)
 ├── Makefile        マスタービルドスクリプト (build/*.mk を include)
@@ -236,11 +237,11 @@ os32-v3/
 
 | 役割 | 追加先の決め方 |
 |---|---|
-| CPU の命令・例外・MMU | `arch/<CPU>/` の中を例外処理などの役割で分ける。 |
-| 機種の起動情報・割り込みの配線・装置の番地 | `platform/<機種>/` にまとめる。 |
-| 装置のドライバ | `drivers/` の装置の種類に合う場所に足す。同じ装置を使う機種は実装を共有する。 |
-| OS の機能 | 上の図で同じ機能を担当する共通の場所に足す。たとえば起動の流れは `init/`、ファイルシステムは `fs/` が持つ。 |
-| 機能の有無 | 機能別のソース集合は `build/features/`、像ごとの構成は `build/images/` に置く。 |
+| CPU の命令・例外・MMU | `sys/arch/<CPU>/` の中を例外処理などの役割で分ける。 |
+| 機種の起動情報・割り込みの配線・装置の番地 | `sys/platform/<機種>/` にまとめる。 |
+| 装置のドライバ | `sys/dev/` の装置の種類に合う場所に足す。同じ装置を使う機種は実装を共有する。 |
+| OS の機能 | 上の図で同じ機能を担当する共通の場所に足す。たとえば起動の流れは `sys/kern/init/`、ファイルシステムは `sys/fs/` が持つ。 |
+| 機能の有無 | 機能別のソース集合は `sys/conf/features/`、像ごとの構成は `sys/conf/images/` に置く。 |
 | ユーザーランド | シェル・コマンド・ライブラリは `userland/` の役割別の木を共有する。libc の移植は POLICY_DEV §1 に従う。 |
 | ビルド | CPU・機種ごとのソース集合を `build/arch/`・`build/platform/` に登録し、`build/select.mk` で選ぶ。集合と並べ順は [select の設計](design/build/select.md) を参照。 |
 | ホストの試験・道具 | 試験は `tests/<対象>/`、道具は `tools/` の同じ役割のものに足す。対象 CPU が違うときは引数で選ぶ。 |
@@ -943,7 +944,7 @@ GitHub Actionsでの新規構築はf1a作業中は未実施、PMがCI runで確�
 
 ### §8-6 GitHub Actions での本体ビルド
 
-作り直し期間は [restructure-build.yml](../.github/workflows/restructure-build.yml) が PC-98 と PowerPC の像を組む。取り込み条件は [ci_v2 §0](design/tools/ci/ci_v2.md)。全件集計は同文書 §4 に従う。
+[restructure-build.yml](../.github/workflows/restructure-build.yml) が変更の所属から媒体・検査・変異を選ぶ。文書だけでも PC-98 の起動 FD と PowerMac core を組む。公開契約・ABI・ビルド規則・workflow・登録・影響不明の変更、週次・手動実行は全件。選び方は ci_v2 §10、取り込み条件は [ci_v2 §0](design/tools/ci/ci_v2.md)。全件集計は同文書 §4 に従う。
 
 ### CPU・機種のビルド選択
 
@@ -952,7 +953,7 @@ GitHub Actionsでの新規構築はf1a作業中は未実施、PMがCI runで確�
 製品規則は `build/targets/`、共有コンパイル規則は `build/kernel-objects.mk` にある。
 新しい選択 mk は通常の再構築依存であり、同じ出力先の target 変更は拒否する。
 `FEATURE_*` の off は完全非搭載サービスが未実装のため `kernel-compile` 専用。
-像の構成 (どの機能を入れるか) は arch・platform と独立の軸で、`build/images/<IMAGE>.mk` が決める
+像の構成 (どの機能を入れるか) は arch・platform と独立の軸で、`sys/conf/images/<IMAGE>.mk` が決める
 (x86-pc98 の既定は `pc98`、ppc-powermac の既定は `kboot-link`。設計は
 [design/build/select.md](design/build/select.md))。
 

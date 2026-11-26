@@ -14,7 +14,7 @@
 | シェルを触る | [07_shell.md](07_shell.md) | `userland/shell/` | rshell から `/api/cmd`。パイプ・リダイレクトは `ext_cmd1 \| ext_cmd2` も |
 | 日本語入力 (FEP) | 票 `tasks/fep/00_INDEX.md` (進捗の正典) | `sys/kern/ime/ime*.c` | メモリ os32-fep-testing の手順、`/api/key` |
 | GUI シェル | 票 `tasks/gui/TASKS.md` (§7 = 経過の正典) → 各票、決定 `docs/design/sdk/include/os32/os32_gui_shared.md` (凍結) | 票の排他ゾーン (§3) | `os32gui` → `/api/key` / `/api/mouse` (`ax/ay`) / `/api/screenshot`、`ring3_guard cirrus\|pegc\|bb`、`gfxmode` + reset で 3 バックエンド、Cirrus は ini の WAB ([D2]) |
-| CI / 取り込み | [ci_v2 §0](design/tools/ci/ci_v2.md) | `.github/workflows/restructure-build.yml`、`tools/ci/land_gate.py` | 候補 SHA の全ビルド、同じ run の最新 attempt の全件集計、両機種の起動 |
+| CI / 取り込み | [ci_v2 §0](design/tools/ci/ci_v2.md) | `.github/workflows/restructure-build.yml`、`tools/ci/land_gate.py` | 候補 SHA の選択計画、同じ run の最新 attempt の集計と対象機種の起動（文書は両機種） |
 | V86 / DOS | [V86 の現行設計](design/kernel/v86/README.md)・[09_exec](09_exec.md) | `sys/platform/pc98/legacy/v86*.c` | `v86 -t` / `-b`、脱出は CTRL+STOP |
 | LAN (LGY-98) | ドライバ 票 `tasks/network/PLAN.md` (M0〜M5、進捗 §9)、リンク層+Host Services 票 `tasks/network/LINK_PLAN.md` | `sys/dev/net/ne2000/lgy98.c` `ne2000.c` `ne2000_ring.c` `ne2000_io.asm`、有効化は `make kernel-lgy98` (戻すのは `kernel-nolgy98`) | [08_build §8-4](08_build.md)・[ROLES §0「検査」](tasks/agents/ROLES.md) |
 | ビルド・配備の仕組みを変える | [08_build.md](08_build.md) | `Makefile` `build/*.mk` `tools/*.py` | [08_build §8-4](08_build.md)・[ROLES §0「検査」](tasks/agents/ROLES.md) |

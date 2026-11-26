@@ -1,6 +1,6 @@
 # プロジェクト制約 — 正典
 
-規則の正典。参照側との ID の一致は `make check-constraints` で検査する。
+規則の正典。参照側は本書の ID を使う。
 
 ## C / ABI
 
@@ -72,7 +72,7 @@
 
 ## 検証
 
-`make check-manifests` は `deploy.yaml` を検査する。
+ユーザーランドの配備先の宣言は `userland/deploy.yaml` に置く。
 
 ### [V1] HostDrv だけでは検証にならない
 
