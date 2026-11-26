@@ -146,7 +146,6 @@ mutations = [{ id = "missing_translation", config = "core", when = "after_build"
 
 [[check]]
 id = "include_layers"
-deferred = { ledger = "P43-INCLUDE", config = ["pc98"], gates = ["push", "main"] }
 spec = { path = "docs/design/tools/check_layers.md", section = "9. 構成ごとの include 直辺" }
 subsystem = "infra"
 level = "L0"
@@ -165,7 +164,6 @@ mutations = [{ id = "new_nasm_device_edge", config = "pc98", when = "after_build
 
 [[check]]
 id = "link_layers"
-deferred = { ledger = "P43-LINK", config = ["pc98", "core"], gates = ["push", "main"] }
 spec = { path = "docs/design/tools/check_layers.md", section = "10. 最終リンクの採用とシンボル解決" }
 subsystem = "infra"
 level = "L0"
