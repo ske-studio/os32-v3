@@ -30,6 +30,7 @@ def sqlite_directory(config, root):
 
 
 def recipe_lines(config, goals=("kernel",)):
+    """PPC Make expansion creates the SQLite cache directory and flock lock in the worktree."""
     sqlite_directory(config, Path.cwd())
     proc = subprocess.run(["make", "-j1", "-Bn", *flags(config), *goals], capture_output=True, text=True)
     if proc.returncode:

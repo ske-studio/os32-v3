@@ -321,7 +321,8 @@ needs = []
 expect = "物理引数と恒等番地の直接キャストを変換口に限定する"
 limits = "選択済み C の同一式。独立アセンブリと整数の代入をまたぐ追跡は対象外"
 gates = ["push", "main"]
-mutations = [{ id = "raw_page_directory", config = "link-sh", when = "after_build", replace = "sys/kern/mm/paging.c", old = "pd = P2V(as->pd_phys);", new = "pd = (u32 *)as->pd_phys;", fail = "paging_as_audit: raw physical cast" },
+mutations = [{ id = "boot_extra_cast", config = "pc98", when = "after_build", replace = "boot/boot_main.c", old = "file_base = (u8 *)LOAD_BUF;", new = "file_base = (u8 *)LOAD_BUF;\n    file_base = (u8 *)(LOAD_BUF + 1);", fail = "boot_main: raw physical cast" },
+ { id = "raw_page_directory", config = "link-sh", when = "after_build", replace = "sys/kern/mm/paging.c", old = "pd = P2V(as->pd_phys);", new = "pd = (u32 *)as->pd_phys;", fail = "paging_as_audit: raw physical cast" },
  { id = "raw_page_table", config = "pc98", when = "after_build", replace = "sys/kern/mm/paging_boot.inc", old = "page_directory[i] = V2P(page_tables[i]) | PAGE_RW;", new = "page_directory[i] = (u32)page_tables[i] | PAGE_RW;", fail = "paging_init: raw physical cast" },
  { id = "user_address_as_phys", config = "pc98", when = "after_build", replace = "sys/kern/mm/paging_addrspace.inc", old = "return V2P(page_directory);", new = "return V2P((void *)MEM_EXEC_LOAD_ADDR);", fail = "V2P on USER or lease address" }]
 
@@ -339,4 +340,8 @@ limits = "配布ユーザーランド。カーネル・機種部品・16-bit 起
 gates = ["push", "main"]
 mutations = [
  { id = "user_halt", config = "pc98", when = "after_build", replace = "userland/diag/ring3_hello.c", old = "mark[1] = R3_DONE;", new = '__asm__ volatile("hlt"); mark[1] = R3_DONE;', fail = "ring3_hello.elf: privileged hlt" },
+ { id = "fault_extra_halt", config = "pc98", when = "after_build", replace = "userland/diag/faulttest.c", old = '__asm__ __volatile__("hlt" : : : "memory");', new = '__asm__ __volatile__("hlt\n\thlt" : : : "memory");', fail = "faulttest.elf: privileged hlt" },
+ { id = "fault_moved_halt", config = "pc98", when = "after_build", replace = "userland/diag/faulttest.c", old = '''        __asm__ __volatile__("hlt" : : : "memory");
+    } else if (streq(kind, "de")) {''', new = '''    } else if (streq(kind, "de")) {
+        __asm__ __volatile__("hlt" : : : "memory");''', fail = "faulttest.elf: privileged hlt" },
  { id = "user_bswap", config = "pc98", when = "after_build", replace = "userland/diag/ring3_hello.c", old = "mark[1] = R3_DONE;", new = '__asm__ volatile("bswap %%eax" ::: "eax"); mark[1] = R3_DONE;', fail = "ring3_hello.elf: isa386 bswap" }]

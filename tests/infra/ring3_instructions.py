@@ -18,9 +18,7 @@ EXTENDED = {0, 1, 2, 3, 6, 0x20, 0x21, 0x22, 0x23, 0x24, 0x26,
             0xab, 0xac, 0xad, 0xaf, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7,
             0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf}
 PREFIX = {0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65, 0x66, 0x67, 0xf0, 0xf2, 0xf3}
-FAULT = {"userland/diag/faulttest.elf": ("main", "do_fault"),
-         "userland/diag/h3a.elf": ("main", "h3_fire", "h3_run"),
-         "userland/diag/h3b.elf": ("main", "h3_fire", "h3_run")}
+FAULT = {"userland/diag/faulttest.elf", "userland/diag/h3a.elf", "userland/diag/h3b.elf"}
 
 
 def extended_386(code, mnemonic):
@@ -92,7 +90,7 @@ def verify(config):
     if set(links.values()) != {"app.ld", "app_sys.ld", "shlib.ld"}:
         raise OSError("incomplete program link roles")
     # Re-link source mutations through the product rules.
-    make("userland/diag/ring3_hello.bin")
+    make("userland/diag/ring3_hello.bin", "userland/diag/faulttest.bin")
     dump = Path(os.environ["CROSS_DIR"]) / "bin/i386-elf-objdump"
     selected = packages(config, links)
     errors = []
@@ -109,22 +107,27 @@ def verify(config):
         if proc.returncode:
             raise OSError(proc.stderr)
         symbol = ""
+        fault_address = None
         count = faults = 0
         for line in proc.stdout.splitlines():
             label = re.match(r'^\w+ <(.+)>:$', line)
             if label:
                 symbol = label[1]
+                if symbol == "os32_gp_injection":
+                    fault_address = line.split()[0].lstrip("0")
             fields = line.strip().split("\t")
             if len(fields) < 3 or not fields[0].endswith(":"):
                 continue
             count += 1
             asm = fields[2].strip()
             for rule in issues(bytes.fromhex(fields[1]), asm, ring3, Path(elf).stem == "libos32snd"):
-                if rule == "privileged" and asm == "hlt" and symbol in FAULT.get(elf, ()):
+                if rule == "privileged" and asm == "hlt" and elf in FAULT and fields[0][:-1] == fault_address:
                     faults += 1
                     if faults == 1:
                         continue
                 errors.append(f"{elf}: {rule} {asm} at {fields[0]} <{symbol}>")
+        if elf in FAULT and faults != 1:
+            errors.append(f"{elf}: missing GP injection hlt")
         if not count:
             raise OSError(f"{elf}: empty disassembly")
     if errors:

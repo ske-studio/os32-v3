@@ -80,7 +80,8 @@ static void h3_fire(KernelAPI *api, u32 mode)
         *(volatile u32 *)KERNEL_LOAD_ADDR = H3_MAGIC;
         break;
     case H3_GP:
-        __asm__ volatile("hlt");
+        __asm__ volatile("os32_gp_injection:" ::: "memory");
+        __asm__ volatile("hlt" ::: "memory");
         break;
     case H3_DE: {
         u32 dividend = 1;

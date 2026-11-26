@@ -143,6 +143,7 @@ static int do_fault(KernelAPI *api, const char *kind)
 {
     if (streq(kind, "gp")) {
         api->kprintf(0x0E, "%s", "faulttest: raising #GP (hlt at CPL=3)\n");
+        __asm__ __volatile__("os32_gp_injection:" : : : "memory");
         __asm__ __volatile__("hlt" : : : "memory");
     } else if (streq(kind, "de")) {
         api->kprintf(0x0E, "%s", "faulttest: raising #DE (div by zero)\n");

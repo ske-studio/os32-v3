@@ -66,7 +66,7 @@
 - コンパイル証拠：`tmp/compile-d/{arch_cpu.h,arch_io.h,platform_io.h,paging.o,compile.log}`。cross-ppc GCC 13.2.0、`build/ppc.mk`相当のfreestanding/O2/7450/BE32/soft-float/no-altivec、試作includeを先頭にして `-c S/mm/paging.c`。ログ空、readelfはELF32 big-endian PowerPC。外部ppc_*へつなぐ宣言の検証であり、実HPT実装をリンクした結果ではない。nmはlibgcc未参照、既存memset等は未解決のまま。再現用コマンドは `tmp/compile-d/command.sh`。
 - Dなら境界設計§2の意味API/transaction導入、§3のPD/PT raw隔離、§5の表形式を隠すためだけの移設・呼び手変更は不要になる。既存prepare/commit・owner/lease方針を保持できる。一方でplatformの地図、BAT/guard、V86・PAT/MTRR・特権入口の分離、PPC ABI修正は残る。B全体が不要と断言はしない。
 - **今回はCに決定**。到達点はmm非リンクの例外・変換試験であり、Cは16個のwired写像で足りる。Dのコンパイル上の利点は実証できたが、この段ではその利用者をリンクせず、spill/追出し・RAM BAT撤去の費用が先行する。Dは整数C_KERNEL接続時の第一比較候補とし、Bへの着手を既定にしない。
-- Cで書く物の再利用の概算（レビュアー）：そのまま約70%、手直し約20%（vectors.S・ppc_frame.h）、捨てる約10%（ppc_mapping[]・旧rootの仮置き・ppc_memmap.h）。`pmap.c` の `pte_insert / pte_unset` を `ppc_mapping[]` から分けて書く。
+- Cで書く物の再利用の概算（レビュアー）：そのまま約70%、手直し約20%（vectors.S・ppc_frame.h）、捨てる約10%（ppc_mapping[]・旧rootの仮置き・platform_ppc_memmap.h）。`pmap.c` の `pte_insert / pte_unset` を `ppc_mapping[]` から分けて書く。
 - Cの旧API対応：`current_root/load_root`は未定義リンク先、`flush_tlb`はNPの全列（書換はpmap経由）、`enable`はIR/DRのみ。`ppc_select_context` は同contextでもSR/SDR1を設定して全TLB消去、共通BAT不変、EE=0で呼ぶ。SDR1のbase/maskをpd_physに偽装しない。
 - Cの単一context、固定16 `ppc_mapping{va,pa,attr,slot,rc}` はOS32試験容量（手本の値ではない）。primary/secondary満杯時は旧写像を保って-1、呼び手は診断停止。置換は先に枠を確保する。
 
@@ -91,7 +91,7 @@
 - OF quiesce の分岐も照合する：N/sys/arch/macppc/macppc/machdep.c:140–142 は PowerMac11,2 / 12,1 / 7,2 のみ、NO:186–187で実行。対象QuickSilver/mac99はこの条件外なので呼ばない。OF translations の取り込み（FP:896–937）も完全切離しのため採用しない。
 - HPT の配置は保存した available を使い、低256MiBとの積集合から low vectors、ELFの全load/BSS/stackを除外して FP:1995–2029 の整列・区間分割・不足停止を適用する。予約の確定とbase/maskの記録は順2a、ゼロ化は境界後。available取得後は割当系OF呼出を止めるためclaim/再呼出は要らない。HPTをELF内の巨大BSSに置かない。RAM全量の常駐マップは今段不要。
 - [C4] `sys/platform/powermac/platform_of_layout.h` に低位予約端、BAT窓、試験VA、周期、`PM_DEC_DUMP_N=2`、写像容量、stack/ELF予算を一元化。SPR/MSR/PTEのビットは `sys/arch/ppc/ppc_oea.h`。既存0x6000 ELF予算/0x10000 image予算（S/platform/powermac/platform_of_layout.h）は新独立ターゲット用に見積り直し、リンク ASSERT に反映。
-- [C5] `sys/platform/powermac/ppc_memmap.h` を新設：`pm_p2v_ram(pa)`/`pm_v2p_ram(p)` は低256MiBの予約済み RAM 内だけ恒等、`pm_p2v_io(pa)` は下記固定 ESCC alias。pmap lookupは固定mapping16個を検索しoffsetを加算する内部関数（BATなら恒等）、追加の共通APIにはしない。S/include/memmap.h (MEM_PDE_SHIFT) の x86 配置は取り込まない。任意 alias に V2P キャストは禁止；pmap lookup を用いる。
+- [C5] `sys/platform/powermac/platform_ppc_memmap.h` を新設：`pm_p2v_ram(pa)`/`pm_v2p_ram(p)` は低256MiBの予約済み RAM 内だけ恒等、`pm_p2v_io(pa)` は下記固定 ESCC alias。pmap lookupは固定mapping16個を検索しoffsetを加算する内部関数（BATなら恒等）、追加の共通APIにはしない。S/include/memmap.h (MEM_PDE_SHIFT) の x86 配置は取り込まない。任意 alias に V2P キャストは禁止；pmap lookup を用いる。
 - I/O は DBAT にしない。ESCCの PA を4KiB単位で覆う PTE を `0xf0000000+ページ内offset` に設置（窓が跨げば2枚）、WIMG=I|G=0x28、PP=2。RAM alias は M=0x10、PP=2/3。根拠 NP と N/sys/arch/powerpc/include/oea/pte.h:77–108、FP:399–404。OF の I/O マップは捨てる。ESCC は byte load/store＋eieio（S/arch/ppc/entry.S）を維持。
 - 固定試験 VA は0x40000000（BAT0外）、VAの同じページ内offsetを保つ。RAM PAは予約済み試験ページ。HPT hi=`V | (vsid<<7) | H | ((va>>22)&0x3f)`、hash=`(vsid ^ ((va>>12)&0xffff)) & mask`、secondary=`hash^mask`、lo=`pa | WIMG | PP`。SR は T=0、Ks=0、Kp=1、N=0、VSID=(1<<4)|segment（FP:157 の生成式；単一固定contextはOS32の選択）。
 - PTE変更/削除は NP:788–825 をそのまま使う：有効性検査→shadow.V消去→sync→実PTE.V消去→sync→tlbie(VA)→sync→eieio→tlbsync→sync→R/C をshadowへ回収；再挿入は上表8。全消去だけで旧 HPT を残す unmap は禁止。
@@ -240,7 +240,7 @@ volatile u32 *ppc_hpt_ptr(u32 pa); /* 語順はentryごとhi,lo、native u32 */
 |PPC独立枝（S以下）|新規/変更・目安行数／1機能|
 |---|---|
 |sys/platform/powermac/mmu_boot.c|新180：OF情報の取得とhandoff、既存boot.cの診断停止までの経路は旧ターゲットとして保持|
-|sys/platform/powermac/ppc_memmap.h / platform_of_layout.h|新35／変更20：RAM/MMIO変換／番地定数|
+|sys/platform/powermac/platform_ppc_memmap.h / platform_of_layout.h|新35／変更20：RAM/MMIO変換／番地定数|
 |sys/arch/ppc/takeover.S / cpu_setup.c|新80／新60：不可逆入口／PVRとHID設定|
 |sys/arch/ppc/pmap.c / ppc_pmap.h|新250／新35：写像とHPT／型宣言|
 |sys/arch/ppc/mmu.S / ppc_oea.h|新90／新70：SR/SDR1/TLB／OEA定数|

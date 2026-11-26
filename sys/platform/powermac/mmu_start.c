@@ -1,7 +1,7 @@
 #include "ppc_pmap.h"
 #include "rh_observe.h"
 #include "ppc_frame.h"
-#include "ppc_memmap.h"
+#include "platform_ppc_memmap.h"
 #include "arch_io.h"
 #include "arch_cpu.h"
 #include "platform_io.h"

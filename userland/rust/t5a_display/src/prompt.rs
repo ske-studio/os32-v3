@@ -404,8 +404,8 @@ impl Candidates {
     }
 }
 
-fn ends_with(bytes: &[u8], suffix: &[u8]) -> bool {
-    bytes.len() >= suffix.len() && &bytes[bytes.len() - suffix.len()..] == suffix
+fn has_bin_suffix(bytes: &[u8]) -> bool {
+    matches!(bytes, [.., b'.', b'b', b'i', b'n'])
 }
 
 /// 先頭トークンから候補パスを作る (票 E3)。
@@ -431,7 +431,7 @@ pub fn candidates(name: &[u8]) -> Candidates {
         }
         return out;
     }
-    let suffix: &[u8] = if ends_with(name, SUFFIX) { b"" } else { SUFFIX };
+    let suffix: &[u8] = if has_bin_suffix(name) { b"" } else { SUFFIX };
     for dir in DIRS {
         let mut p = Path::new();
         if p.push(dir) && p.push(name) && p.push(suffix) {

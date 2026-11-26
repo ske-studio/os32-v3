@@ -31,7 +31,7 @@
 /* OpenBSD trap.c:279-295; exact probe record is OS32's acceptance harness. */
 #include "ppc_frame.h"
 #include "ppc_pmap.h"
-#include "ppc_memmap.h"
+#include "platform_ppc_memmap.h"
 void ppc_exception(struct ppc_frame *f)
 {
     if (f->vector==PPC_VECTOR_DEC) { ppc_dec_interrupt(f); return; }

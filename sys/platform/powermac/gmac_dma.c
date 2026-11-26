@@ -1,7 +1,7 @@
 /* OpenBSD sys/dev/ic/gem.c:146-175: coherent control DMA allocation. */
 #include "lan_boot.h"
 #include "sys/dev/net/gem/gem.h"
-#include "ppc_memmap.h"
+#include "platform_ppc_memmap.h"
 #include "sys/kern/mm/paging.h"
 
 #define DMA_BLOCK 0x10000u

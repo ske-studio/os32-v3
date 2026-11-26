@@ -17,7 +17,11 @@ PHYSICAL = {"paging_set_page": 1, "paging_map_range": 2, "paging_map_phys": 1,
             "paging_addrspace_map_user": 2, "paging_addrspace_map_user_range_phys": 3,
             "dma_split_addr": 0, "dma_check_args": 1, "dma_chan_setup": 1}
 # Identity accesses before the PC-98 enables paging (C5).
-BOOT = {("wr32_low", "addr"), ("boot_main", "LOAD_BUF"), ("boot_main", "VK32_LOAD_MIN")}
+BOOT = {
+    ("wr32_low", b"*(volatileu32*)addr=v;"),
+    ("boot_main", b"file_base=(u8*)LOAD_BUF;"),
+    ("boot_main", b"rc=vk32_boot(file_base,(u32)file_size,(u8*)VK32_LOAD_MIN,&img_crc);"),
+}
 
 
 PHYS_MACROS = {"LOAD_BUF", "VK32_LOAD_MIN", "TVRAM_CHAR_BASE", "TVRAM_ATTR_BASE",
@@ -88,9 +92,10 @@ def observe(source, argv, config, errors, observed):
                     or path == Path("boot/boot_main.c") and "addr" in refs):
                 issue = "raw physical cast"
             if path == Path("boot/boot_main.c"):
-                exceptions = {(function, word) for word in words | refs} & BOOT
-                if exceptions:
-                    observed.update(exceptions)
+                statement = data[data.rfind(b"\n", 0, start) + 1:data.find(b"\n", start)]
+                site = (function, b"".join(statement.split()))
+                if site in BOOT and site not in observed:
+                    observed.add(site)
                     issue = None
             if path == Path("sys/include/memmap.h") and function in ("P2V", "P2V_IO", "V2P"):
                 issue = None
