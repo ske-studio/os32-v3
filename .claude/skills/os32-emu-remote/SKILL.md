@@ -40,7 +40,7 @@ description: NP21/W の受入 (エミュレータの試験) を、別の機械�
 ```
 
 - 受入の項目は、段の票・持越し台帳 (docs/tasks/DEFERRED_TESTS.md) の行から写す。PM の推測で増やさない。
-- 候補 SHA を `wt/int-*` に push し、`restructure-build` の同じ run の最新 attempt が全件集計まで成功したことを確かめる。文書だけの変更も、その候補の PC-98 と PowerMac の起動記録を揃えて `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` を回す。 配布物の artifact_id・媒体名・sha256・到達点とログを報告する。
+- 候補 SHA を `wt/int-*` に push し、`restructure-build` の同じ run の最新 attempt が全件集計まで成功したことを確かめる。文書だけの変更も、その候補の PC-98 と PowerMac の起動記録を揃えて `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` を回す。 `tools/ci_fetch.sh --sha <SHA> --wait` で VERIFIED を取得し、配布物の artifact_id・媒体名・sha256・到達点とログを報告する。
 
 req62〜req64 で使った最小の受入項目。毎回起動を記録し、製品ソースを変更した時は該当する行を加える。
 

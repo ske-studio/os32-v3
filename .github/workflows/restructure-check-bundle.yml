@@ -1,0 +1,73 @@
+name: restructure check bundle
+on:
+  workflow_call:
+    inputs:
+      bundle:
+        required: true
+        type: string
+      kapi_base:
+        required: true
+        type: string
+      pc98_artifact:
+        type: string
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      BUNDLE: ${{ inputs.bundle }}
+      OS32_KAPI_BASE: ${{ inputs.kapi_base }}
+      GATE: ${{ (startsWith(github.ref_name, 'wt/int-') || github.ref_name == 'main') && 'main' || 'push' }}
+      OS32_ACCEPT_IPA_LICENSE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: python3 -m pip install markdown-it-py
+      - uses: actions/download-artifact@v4
+        with:
+          name: plan-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/planned
+      - uses: actions/download-artifact@v4
+        if: inputs.bundle == 'x86'
+        with:
+          name: ${{ inputs.pc98_artifact }}
+          path: ${{ runner.temp }}/products/pc98
+      - uses: actions/download-artifact@v4
+        if: inputs.bundle == 'ppc'
+        with:
+          pattern: ppc-*-${{ github.sha }}-a${{ github.run_attempt }}
+          path: ${{ runner.temp }}/products
+      - if: inputs.bundle == 'host'
+        run: python3 -m pip install PyYAML
+      - uses: ./.github/actions/build-setup
+        if: inputs.bundle != 'host'
+      - name: Cache KAPI layout check dependencies
+        if: inputs.bundle == 'x86' || inputs.bundle == 'ppc'
+        uses: actions/cache@v4
+        continue-on-error: true
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ runner.temp }}/kapi-targets
+          key: kapi-layout-v1-${{ runner.os }}-${{ inputs.bundle }}-${{ hashFiles('rust-toolchain.toml', '**/Cargo.lock', 'sdk/rust/*-os32-none.json') }}
+      - uses: ./.github/actions/ppc-setup
+        if: inputs.bundle == 'ppc'
+      - if: inputs.bundle == 'ppc'
+        # 推奨パッケージ (GUI・音声の pipewire ほか) は入れない — runner の索引の古さで security の 404 を 2 回踏んだ (2026-11-26)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-ppc seabios || { sudo apt-get update && sudo apt-get install -y --no-install-recommends --fix-missing qemu-system-ppc seabios; }
+      - env:
+          OS32_PRODUCT_DIR: ${{ runner.temp }}/products
+          OS32_KAPI_CACHE: ${{ runner.temp }}/kapi-targets
+        run: python3 -B -m tests.infra.ci run --bundle "$BUNDLE" --mutate --gate "$GATE" --output "$RUNNER_TEMP/results" --plan-file "$RUNNER_TEMP/planned/plan.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checks-${{ github.run_attempt }}-${{ inputs.bundle }}
+          path: |
+            ${{ runner.temp }}/results/bundle-*.json
+            ${{ runner.temp }}/results/*.log
+          if-no-files-found: error

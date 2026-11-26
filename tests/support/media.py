@@ -1,6 +1,7 @@
 """Build phases shared by the media and reproducibility checks."""
 import os
 from pathlib import Path
+import shutil
 import stat
 import subprocess
 import sys
@@ -42,7 +43,25 @@ def make(*args):
     run("make", "-j" + os.environ.get("OS32_BUILD_JOBS", "8"), *args)
 
 
+def distributed(config):
+    directory = os.environ.get("OS32_PRODUCT_DIR")
+    if not directory:
+        return None
+    name = "pc98" if config == "pc98" else (
+        f"ppc-{config}-{os.environ['GITHUB_SHA']}-a{os.environ['GITHUB_RUN_ATTEMPT']}")
+    product = Path(directory) / name
+    subprocess.run(["sha256sum", "--quiet", "-c", "SHA256SUMS"], cwd=product, check=True)
+    return product
+
+
 def ppc_build(config):
+    product = distributed(config)
+    if product:
+        folder = PPC_OUT / PPC[config][1]
+        folder.mkdir(parents=True, exist_ok=True)
+        for name in ("PPCKERN.ELF", "boot.iso"):
+            shutil.copy2(product / name, folder / name)
+        return
     make(*PPC_MAKE, *PPC[config][0], "all", "iso")
 
 
@@ -52,6 +71,21 @@ def ppc_verify(config):
 
 
 def x86_build(config):
+    product = distributed(config)
+    if product:
+        OUT.mkdir(parents=True, exist_ok=True)
+        FD.mkdir(exist_ok=True)
+        for name in ("vmkernel.lz4", "kernel.map", "kernel.elf", "deploy-set.json"):
+            shutil.copy2(product / name, OUT / name)
+        for name in ("os32_boot.d88", "os32_boot.img", "os32_boot144.img", "os32_install.iso"):
+            shutil.copy2(product / name, FD / name)
+        shutil.copytree(product / "packages", "packages", dirs_exist_ok=True)
+        stage = Path(".check-stage")
+        stage.mkdir()
+        shutil.copy2(product / "hostdrv.tar.gz", stage)
+        with tarfile.open(stage / "hostdrv.tar.gz") as packed:
+            packed.extractall(stage, filter="data")
+        return
     np21w = Path(".check-stage/np21w").absolute()
     hostdrv = Path(".check-stage/hostdrv").absolute()
     np21w.mkdir(parents=True, exist_ok=True)

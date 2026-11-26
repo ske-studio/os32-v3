@@ -377,7 +377,8 @@ def main():
     env["PATH"] = str(cross_bin) + os.pathsep + env.get("PATH", os.defpath)
     for key in ("MAKEFLAGS", "MFLAGS", "GNUMAKEFLAGS", "MAKEOVERRIDES"):
         env.pop(key, None)
-    env.update(OS32_CHECK_REPOSITORY=str(ROOT), OS32_BUILD_COMMIT=commit[:12], SOURCE_DATE_EPOCH=epoch, TZ="UTC", LC_ALL="C",
+    short_sha = subprocess.check_output(["git", "rev-parse", "--short=7", "HEAD"], cwd=ROOT, text=True).strip()
+    env.update(OS32_CHECK_REPOSITORY=str(ROOT), OS32_BUILD_COMMIT=short_sha, SOURCE_DATE_EPOCH=epoch, TZ="UTC", LC_ALL="C",
                PYTHONDONTWRITEBYTECODE="1")
     with tempfile.TemporaryDirectory() as tmp:
         candidate = Path(tmp)

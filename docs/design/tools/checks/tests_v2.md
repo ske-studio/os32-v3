@@ -61,3 +61,7 @@ QEMU mac99・7450・128 MiB に構成ごとの boot.iso を入れる。core は�
 sh・link-sh・shell は `Loading /sys/shell.bin` に続くシェルのコマンド待ち通知（シリアル EOT）と `LINK HEAP used=`
 までを確認する。neg1 は `FATAL trap vector=0x300 reason=0x2 addr=0x80000`
 で停止し、READY に進まないことを確認する。PC-98 は配布媒体を pc98emu が手で受け入れる。
+
+QEMU は構成の到達点を観測した時点で終了し、観測中の時間切れは ERROR（終了コード 2）、採取済みのログに必要な到達点が欠ける場合は FAIL（終了コード 1）とする。
+
+CI の媒体検査と PowerMac 起動は同じ attempt の配布物を読む。手元では同じ検査の build 段で媒体を作る。再現性比較は二つの空の木で組み、KAPI の Rust 検査は C の実測値から作る専用 crate を対象 ABI で検査するため、専用の Cargo キャッシュを使う。

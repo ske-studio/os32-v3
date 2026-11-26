@@ -5,11 +5,13 @@
 # artifact の API ダウンロードには認証が要る)。
 #
 # 使い方:
-#   tools/ci_fetch.sh [--branch main] [--sha SHA] [--dir DIR] [--repo OWNER/REPO] [--dry-run] [--wait]
+#   tools/ci_fetch.sh [--branch main] [--sha SHA] [--dir DIR] [--repo OWNER/REPO] [--dry-run] [--wait] [--allow-built] [--evidence JSON]
 #     --branch  最新の run をこのブランチから選ぶ (既定 main)
 #     --sha     このコミットの run を選ぶ (短縮 SHA 可。--branch と併用すると両方で絞る)
 #     --dir     保存先の親 (既定 ./os32-ci)。中に artifact 名のディレクトリを作る
-#     --wait    artifacts ジョブが未完了なら 10 秒ごとに待つ (失敗なら終了)
+#     --allow-built  実機調査用に BUILT から取得する (既定は VERIFIED 以上)
+#     --evidence JSON  land_gate で両機種の記録を照合して ACCEPTED を表示する
+#     --wait    指定した状態になるまで待つ
 #     --dry-run 選んだ run と artifact を表示するだけでダウンロードしない
 #
 # 終了コード: 0 = 取得して sha256 一致、1 = 失敗 (該当 run 無し・照合不一致など)、
@@ -24,6 +26,8 @@ SHA=""
 DIR="./os32-ci"
 DRY=0
 WAIT=0
+ALLOW_BUILT=0
+EVIDENCE=""
 
 usage() { awk 'NR>1 && !/^#/ {exit} NR>1 {sub(/^# ?/, ""); print}' "$0"; }
 
@@ -33,6 +37,8 @@ while [ $# -gt 0 ]; do
         --sha)     SHA="$2"; shift 2 ;;
         --dir)     DIR="$2"; shift 2 ;;
         --repo)    REPO="$2"; shift 2 ;;
+        --allow-built) ALLOW_BUILT=1; shift ;;
+        --evidence) EVIDENCE="$2"; shift 2 ;;
         --wait)    WAIT=1; shift ;;
         --dry-run) DRY=1; shift ;;
         -h|--help) usage; exit 0 ;;
@@ -95,39 +101,33 @@ if [ -z "$RUN_ID" ]; then
     exit 1
 fi
 
-# run 全体の成功は待たず、upload まで済んだ artifacts ジョブだけを取得条件にする。
 while true; do
-    JOBS="$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100")"
-    read -r ART_STATE CHECK_STATE < <(printf '%s' "$JOBS" | python3 -c '
-import json, sys
-jobs = {j["name"]: j.get("conclusion") or j["status"] for j in json.load(sys.stdin)["jobs"]}
-states = [jobs.get("checks (" + str(i) + ")", "queued") for i in range(6)]
-state = ("success" if all(s == "success" for s in states) else
-         next((s for s in states if s != "success"), "queued"))
-print(jobs.get("artifacts", "queued"), jobs.get("checks", state))')
-    if [ "$ART_STATE" = success ]; then
-        if [ "$CHECK_STATE" != success ]; then
-            echo "ci_fetch.sh: 検査は失敗 (または実行中): checks=$CHECK_STATE" >&2
-        fi
-        break
+    RUN=$(gh api "repos/$REPO/actions/runs/$RUN_ID")
+    read -r ATTEMPT STATUS < <(python3 -c 'import json,sys
+r=json.load(sys.stdin)
+print(r["run_attempt"],r["status"])' <<< "$RUN")
+    ART="os32-${HEAD_BRANCH//\//-}-${HEAD_SHA:0:7}-a$ATTEMPT"
+    MARKER="verified-$HEAD_SHA-a$ATTEMPT"
+    NAMES=$(gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/artifacts?per_page=100" \
+        --jq '.artifacts[] | select(.expired == false) | .name')
+    STATE=MISSING
+    if grep -Fxq "$ART" <<< "$NAMES"; then
+        STATE=BUILT
+        if grep -Fxq "$MARKER" <<< "$NAMES"; then STATE=VERIFIED; fi
     fi
-    case "$ART_STATE" in
-        queued|in_progress|waiting|pending|requested)
-            echo "ci_fetch.sh: artifacts のジョブを待っている (run $RUN_ID: $ART_STATE)" >&2
-            [ "$WAIT" = 1 ] || exit 1
-            sleep 10
-            ;;
-        *)
-            echo "ci_fetch.sh: artifacts のジョブが成功していない (run $RUN_ID: $ART_STATE)" >&2
-            exit 1
-            ;;
-    esac
+    if [[ "$STATE" == VERIFIED || ( "$STATE" == BUILT && "$ALLOW_BUILT" == 1 ) ]]; then break; fi
+    echo "ci_fetch.sh: run $RUN_ID attempt $ATTEMPT state=$STATE" >&2
+    [[ "$WAIT" == 1 && "$STATUS" != completed ]] || exit 1
+    sleep 10
 done
-
-# --- artifact 名 (os32-<ref>-<sha7>) を API で引く。-n で指定すると保存先直下に展開される ---
-ART="$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" \
-        --jq '[.artifacts[] | select(.expired == false) | select(.name | startswith("os32-"))][0].name // empty')"
-
+if [[ -n "$EVIDENCE" ]]; then
+    python3 -c 'import json,sys
+e=json.load(open(sys.argv[1]))
+sys.exit((e["run_id"],e["attempt"]) != (int(sys.argv[2]),int(sys.argv[3])))' "$EVIDENCE" "$RUN_ID" "$ATTEMPT"
+    GITHUB_REPOSITORY="$REPO" python3 -B "$(dirname "$0")/ci/land_gate.py" "$HEAD_SHA" --evidence "$EVIDENCE"
+    STATE=ACCEPTED
+fi
+echo "state:    $STATE (attempt $ATTEMPT)"
 echo "run:      $RUN_ID  ($HEAD_BRANCH @ ${HEAD_SHA:0:7}, $CREATED)"
 echo "url:      https://github.com/$REPO/actions/runs/$RUN_ID"
 if [ -z "$ART" ]; then
