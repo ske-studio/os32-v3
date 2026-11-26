@@ -121,7 +121,7 @@ PM は着地の前に worktree の `git log -1` を確かめる。参照先が�
 
 | 変更の種類 | 追従させるもの | 確かめ方 |
 |---|---|---|
-| カーネル・部品に新しいソースを足す | `build/sources/order.mk` (リンクの順)、`build/sources/common.mk` か arch・platform の一覧 (選択)、`tools/tests/fixtures/build_profile_x86.json` の `C_KERNEL`。PowerPC の像に入るなら `build/targets/ppc-powermac.mk` の一覧 | `check-build-selection-host`、`make all` |
+| カーネル・部品に新しいソースを足す | `build/sources/ownership.mk` に所属を宣言し、対象の像のソース一覧とリンク順に追加する | 登録検査 `build_sources`・`src_owner`、対象の像のビルド |
 | KAPI を足す・変える (`sdk/kapi.json`) | 版の 2 か所 (kapi.json・`os32_kapi_shared.h`) と、版を書いた文書 (README・INDEX・KAPI_SPEC)。前の口は変えない (末尾追加だけ、`kapi-abi` が基点と比べる。壊す時はコミットの本文に `KAPI-Break: <理由>`)。レビュー済みの指紋: `tools/tests/hwdev_contract_fixture.py` の HWDEV の layout CRC と inventory、`tools/tests/test_ime_display_boundary.py` の FEP_MODULE_ABI_GEN | `check-kapi-abi`・`check-hwdev-image-host`・`check-ime-display-boundary-host`・KAPI の検査 (audit・ranges・version)、`make clean && make all` |
 | 共通の場所 (kernel/・net/・fs/・include/・userland/shell・kernel/console) を触る | PowerPC の像のリンク (CI の job ppc-compile が merge-base からの差で判定して組む。手元で先に確かめるときも同じコマンド) | `PATH=/home/hight/opt/cross-ppc/bin:$PATH make ARCH=ppc PLATFORM=powermac KBOOT_SH=1` |
 | 製品の関数の呼び出しを 1 つ足す | その関数の兄弟の stub を持つ試験の土台 (`#include` で取り込む土台と、python が切り出して組む試験の両方) | grep で呼び手と stub を全部見る |

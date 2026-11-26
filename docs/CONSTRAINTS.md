@@ -26,7 +26,7 @@
 
 ### [C5] 物理番地とポインタの変換
 
-**規則**: 恒等 supervisor 領域の物理番地からポインタへは `P2V` / `P2V_IO`、定数式には `P2V_CONST` / `P2V_IO_CONST`、ページング前は `P2V_BOOT` を使う。装置・PTE・CR3 に渡すポインタは `V2P`、アプリ帯・lease 窓は AS / SURFACE から物理を求める。例外は `tools/check_p2v_allow.txt` に関数と理由を記録する。
+**規則**: 恒等 supervisor 領域の物理番地からポインタへは `P2V` / `P2V_IO`、定数式には `P2V_CONST` / `P2V_IO_CONST`、ページング前は `P2V_BOOT` を使う。装置・PTE・CR3 に渡すポインタは `V2P`、アプリ帯・lease 窓は AS / SURFACE から物理を求める。登録検査 `p2v` の例外は `tests/infra/p2v.py` に定める。起動時は `boot/boot_main.c` の関数と文を `BOOT` で照合し、PowerMac の変換は `sys/platform/powermac/platform_*.h` の `pm_p2v_ram` と `pm_v2p_ram` に限る。
 
 新登録では機種固有の変換本体を機種の固定名 `platform_*.h` に置き、共通コードからは P2V/V2P を使う。PC-98 のページング前の `boot_main` の LOAD_BUF・VK32_LOAD_MIN と `wr32_low` の bootinfo 書込みは物理番地を直接参照するため、この位置に限って許す。
 

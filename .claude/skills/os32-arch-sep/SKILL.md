@@ -1,6 +1,6 @@
 ---
 name: os32-arch-sep
-description: CPU・機種・装置の分離を壊さずにコードを足す・移す。層の検査 (check-layers) が落ちた時、共通のソースから機種や装置の物を使いたい時、機種ごとに違う番地・設定を足す時、ソースの置き場を持ち主に合わせて移す時、生成物が変わる段を分離の枝で出す時に使う。
+description: CPU・機種・装置の分離を壊さずにコードを足す・移す。層の検査 (include_layers・link_layers) が落ちた時、共通のソースから機種や装置の物を使いたい時、機種ごとに違う番地・設定を足す時、ソースの置き場を持ち主に合わせて移す時、生成物が変わる段を分離の枝で出す時に使う。
 ---
 
 # os32-arch-sep — 機種依存の分離を保つ
@@ -11,20 +11,20 @@ description: CPU・機種・装置の分離を壊さずにコードを足す・�
 
 | 書く物 | 置き場 | 読んでよいヘッダ |
 |---|---|---|
-| CPU に依る物 (例外・コンテキスト・命令) | `arch/<cpu>/` | 共通の口、同じ arch。機種のヘッダは固定名 `platform_*.h` だけ |
-| 機種に依る物 (起動・番地・BIOS・割り込みの配線) | `platform/<機種>/` | 何でも (同じ像の arch・platform) |
-| 装置のドライバ | `drivers/`・`hwdev/`・`kdebug/` | 共通の口。arch のヘッダは固定名 `arch_*.h` だけ |
-| それ以外 (kernel・mm・fs・exec・gfx・net・lib・include) | 共通 | 共通と、固定名 `arch_*.h`・`platform_*.h`、`include/<名>_contract.h` |
+| CPU に依る物 (例外・コンテキスト・命令) | `sys/arch/<cpu>/` | 共通の口、同じ arch。機種のヘッダは固定名 `platform_*.h` だけ |
+| 機種に依る物 (起動・番地・BIOS・割り込みの配線) | `sys/platform/<機種>/` | 何でも (同じ像の arch・platform) |
+| 装置のドライバ | `sys/dev/` (表示は video/、HWDEV は hwdev/) | 共通の口。arch のヘッダは固定名 `arch_*.h` だけ |
+| 共通の実装・宣言 | `sys/kern/`・`sys/fs/`・`sys/hal/`・`sys/net/`・`sys/input/`・`sys/kapi/`・`sys/include/`・`lib/` | 共通と、固定名 `arch_*.h`・`platform_*.h`、`sys/include/<名>_contract.h` |
 
-像に入るソースは `build/select.mk` の所有者集合から像の構成 (`build/images/`) で選ぶ。新しいソースは、持ち主の集合の一覧に 1 行足す (一覧の置き場と書き方は select の設計書。Makefile に手書きの一覧を作らない)。
+像に入るソースは `build/select.mk` の所有者集合から像の構成 (`sys/conf/images/`) で選ぶ。新しいソースは、持ち主の集合の一覧に 1 行足す (一覧の置き場と書き方は select の設計書。Makefile に手書きの一覧を作らない)。
 
 ## 2. 共通から機種・装置の物を使いたい時
 
 | したい事 | 形 |
 |---|---|
-| 共通が装置の関数・型を使う | 共通が要る宣言だけを `include/<名>_contract.h` に置き、装置のヘッダがそれを include する。共通は contract だけを読む |
-| 機種ごとに実装が違う小さい物 (インライン・定数・表) | 固定名 `platform/<機種>/platform_<名>.h`。`-Iplatform/$(PLATFORM)` が実装を選ぶ。**両方の機種に同じ名前で置く** |
-| 共通が CPU の関数を使う | 契約のヘッダ (`sys/include/cpu.h`・`sys/include/io.h` など) に宣言、実装は固定名 `arch/<cpu>/arch_<名>.h` |
+| 共通が装置の関数・型を使う | 共通が要る宣言だけを `sys/include/<名>_contract.h` に置き、装置のヘッダがそれを include する。共通は contract だけを読む |
+| 機種ごとに実装が違う小さい物 (インライン・定数・表) | 固定名 `sys/platform/<機種>/platform_<名>.h`。`-Isys/platform/$(PLATFORM)` が実装を選ぶ。**両方の機種に同じ名前で置く** |
+| 共通が CPU の関数を使う | 契約のヘッダ (`sys/include/cpu.h`・`sys/include/io.h` など) に宣言、実装は固定名 `sys/arch/<cpu>/arch_<名>.h` |
 | 共通が機種の定数を使う | 共通の側に機種に依らない名前で値を持ち、機種のソースに `_Static_assert` で一致を固定する |
 | 機種だけの番地 | 機種のヘッダに置く (PC-98 の起動と低位メモリは `sys/platform/pc98/platform_boot_layout.h`)。OS の配置は `sys/include/memmap.h`。地図の道具 `tools/gen_memmap.py` は両方を読む (`PLATFORM_HDR_RELS`) |
 | `-D` で名前を差し替えたい | しない。口 (関数・固定名のヘッダ) にする |

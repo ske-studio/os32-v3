@@ -56,7 +56,7 @@
 
 ## §2. コーディング規約
 
-C の基準は [C1](CONSTRAINTS.md)、検査は `make check-c-dialect`。既存コードの言語機能・型を一括置換しない。
+C の基準は [C1](CONSTRAINTS.md)、登録検査は `c_dialect`。既存コードの言語機能・型を一括置換しない。
 呼出し規約・文字列操作は [CONSTRAINTS.md](CONSTRAINTS.md)、アセンブラは [10_notes.md](10_notes.md) を参照。
 
 ### 数値演算は整数を第一選択にする (ユーザー決定)

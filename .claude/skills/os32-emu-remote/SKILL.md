@@ -42,6 +42,18 @@ description: NP21/W の受入 (エミュレータの試験) を、別の機械�
 - 受入の項目は、段の票・持越し台帳 (docs/tasks/DEFERRED_TESTS.md) の行から写す。PM の推測で増やさない。
 - 候補 SHA を `wt/int-*` に push し、`restructure-build` の同じ run の最新 attempt が全件集計まで成功したことを確かめる。文書だけの変更も、その候補の PC-98 と PowerMac の起動記録を揃えて `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` を回す。 配布物の artifact_id・媒体名・sha256・到達点とログを報告する。
 
+req62〜req64 で使った最小の受入項目。毎回起動を記録し、製品ソースを変更した時は該当する行を加える。
+
+| 変更箇所 | pc98emu に頼む項目と合格の目印 |
+|---|---|
+| 全候補 (製品ソースに変更がなければこの行だけ) | 候補媒体で起動し、`ver` の Commit・Image CRC を照合。媒体の sha256・artifact_id、`SERVICES_READY public=1`、selftest の成功数と `selftest_fail=0` をログに残す。 |
+| FEP / SQLite | `ime info`、Shift+Space の候補表示と復元。sqlite.mod・fep.mod をそれぞれ欠いた時は利用不能の表示と `ver` の応答を確認。SQLite は `db_test` 9/9。 |
+| V86 | `v86 -t` は OK。`v86 -g -t` は kdebug on で OK、off で `could not start`。 |
+| kdebug | on・off の各設定が再起動後も保たれ、on で pair の CRC が像と一致し、mem・peek が応答する。 |
+| exec | `math_test` 110/110 の後にシェルへ戻り `ver` が応答。t5a_display から kbd_echo・kbd_echo.bin を起動し、打鍵が表示され、q で戻る。 |
+| FAT | ファイルを作成・更新し、各時刻と操作時刻の差が 2 秒以内。 |
+| GUI / 端末 | 打鍵、GUI の出入り、端末 2 つの起動・切替・終了を確認し、終了後の leftover・audit_fail がともに 0。 |
+
 ## 3. pc98emu の中の流れ (向こうの型。依頼に毎回は書かない)
 
 1. 空いている枠を選び、`slot-N.lock` を置く。無ければ待つ (待ちの行を本線に一言)。

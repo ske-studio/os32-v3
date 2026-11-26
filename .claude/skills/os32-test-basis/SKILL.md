@@ -9,4 +9,6 @@ description: 試験の期待の出所 (basis) を設計に結び、ソースの�
 
 登録を `python3 -B -m tests.infra.ci lint` で照合し、`python3 -B -m tests.infra.ci run --check <id> --mutate` で正常対照と各変異の検出を確認する。機能実装の再開後は、触る契約の検査を同じ変更で足す。
 
+物理番地の定数や欄を足した時は、`tests/infra/p2v.py` の `PHYS_MACROS` (定数名) または `observe` 内の `refs` と照合する名前の集合 (欄名) にも足す。
+
 古い検査は関門ではない (P7 で消す)。参考に読むだけ。

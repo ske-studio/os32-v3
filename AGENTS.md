@@ -4,11 +4,14 @@
 
 OS32 is a 32-bit bare-metal OS for NEC PC-9801/9821 machines (x86) and the PowerMac G4 (PowerPC). The tree is split by owner:
 
-- **Common** (builds for every machine): `init/` (the boot skeleton `kernel_start.c`), `kernel/` (with `irq/`, `time/`, `module/`, `console/`, `ime/`, `dev/`), `mm/`, `exec/`, `fs/` (one subdirectory per filesystem), `gfx/` (the HAL common layer), `net/`, `input/`, `kapi/`, `lib/`, `include/`.
-- **CPU**: `arch/x86/`, `arch/ppc/`. **Machine**: `platform/pc98/` (PC-98 boot phases in `kernel.c`, the V86 monitor in `legacy/`), `platform/powermac/`.
-- **Devices**: `drivers/` (one subdirectory per device class; video backends in `drivers/video/`), `hwdev/`, `kdebug/`.
+- **Common** code lives in `sys/kern/` (including `init/`, `mm/` and `exec/`), `sys/fs/`, `sys/hal/`, `sys/net/`, `sys/input/`, `sys/kapi/`, `sys/include/` and `lib/`.
+- **CPU** implementations live in `sys/arch/x86/` and `sys/arch/ppc/`. **Machine** implementations live in `sys/platform/pc98/` (including the V86 monitor in `legacy/`) and `sys/platform/powermac/`.
+- **Devices** live in `sys/dev/`, including video backends in `video/` and HWDEV in `hwdev/`. Feature and image configurations live in `sys/conf/`.
 
-Layering rule (enforced in CI by `tools/check_layers.py`, baseline zero): common code must not include a CPU, machine or device header. When common code needs a device function, declare it in `include/<name>_contract.h` and let the device header include that; a header that each machine implements differently uses the fixed name `platform_<name>.h`; machine-specific sources live under their owner. The fix table is `docs/design/tools/check_layers.md` §8. Every source in a common directory must also compile for PowerPC (`make ppc-ci-image`, target `common-compile`). See `docs/08_build.md` §8-3 for the tree. `userland/` contains the shell, commands, libraries, and tests. `sdk/` provides application headers, startup code, and Rust bindings. `apps/` and `game/` are independent Git submodules. Assets live in `assets/`; build rules and host tools live in `build/` and `tools/`.
+CI checks include and link dependencies with `include_layers` and `link_layers`. Common code uses device declarations in `sys/include/<name>_contract.h` and fixed-name interfaces such as `platform_<name>.h` for machine-specific implementations. The fix table is `docs/design/tools/check_layers.md` §8. The `ppc_common_compile` check compiles common sources for PowerPC.
+Declare each new source's owner in `build/sources/ownership.mk` for the `src_owner` and `build_sources` checks.
+
+See `docs/08_build.md` §8-3 for the tree. `userland/` contains the shell, commands, libraries, and tests. `sdk/` provides application headers, startup code, and Rust bindings. `apps/` and `game/` are independent Git submodules. Assets live in `assets/`; build rules and host tools live in `build/` and `tools/`.
 
 ## Build, Test, and Development Commands
 
