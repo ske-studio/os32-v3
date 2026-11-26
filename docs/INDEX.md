@@ -40,7 +40,7 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 | 配備 3 経路の使い分け | [08_build.md §8-4](08_build.md#配備3経路) | [POLICY_DEV.md §4](POLICY_DEV.md)、CLAUDE.md、スキル `run-os32` |
 | ディレクトリ木 | [08_build.md §8-3](08_build.md) | CLAUDE.md / INDEX は参照のみ |
 | ソースの付け替え手順 (置き場だけを変える: 対応表・道具・バイト比較・踏んだこと) | [SRC_MOVE.md](SRC_MOVE.md) | TASK_SRC_LAYOUT (アーカイブ: `docs/archive/v3/TASK_SRC_LAYOUT.md`) §9、[POLICY_DEV](POLICY_DEV.md) §2 |
-| CI の本体ビルド (GitHub Actions の成果物・キャッシュ・取り方) | [08_build.md §8-6](08_build.md) (`.github/workflows/build.yml`、`tools/ci/build_cross.sh`、`tools/ci_fetch.sh`) | `check.yml` の冒頭コメント |
+| CI の本体ビルド (GitHub Actions の成果物・キャッシュ・取り方) | [08_build.md §8-6](08_build.md) (`.github/workflows/restructure-build.yml`、`tools/ci/build_cross.sh`、`tools/ci_fetch.sh`) | [CI 設計 §10](design/tools/ci/ci_v2.md) |
 | ファイル → 役割 → 仕様の対応 | [DEVELOPMENT.md §2](DEVELOPMENT.md) | — |
 | 設計書 (1 機能 1 ファイル、ソースと同じディレクトリ構造) | `docs/design/<ソースと同じパス>.md` (決まりは [POLICY_DEV.md §9](POLICY_DEV.md) の 2a) | 現行決定は下の「決定」。[設計書の入口](design/README.md) |
 | 第三者の部品とライセンス (版・改変の有無・原文の所在) | [../THIRD_PARTY.md](../THIRD_PARTY.md) (原文は各 vendor ディレクトリと `assets/*/README.OS32`) | README.md「ライセンス」(リンクのみ)、[../requirements.txt](../requirements.txt) (ホストの Python 依存) |
@@ -345,6 +345,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 | ドキュメント | 内容 |
 |---|---|
 | [tasks/restructure/TASK_RESTRUCTURE.md](tasks/restructure/TASK_RESTRUCTURE.md) | **入口 — 計画 (2026-11-25)**。`sys/` と `tests/` への移行・検査の棚卸し・CI の作り直し。段ごとのファイル (`P0.md`〜`P8.md`)・決まり (`RULES.md`)・ユーザーの決定 (`DECISIONS.md`)・今の実物 (`NOW.md`) の索引 |
+| `docs/archive/restructure/` | P0 の調査記録と移行台帳 6 本の保存先。現在の所有とビルド指定は `build/sources/ownership.mk`、移動の再現入力は `tools/ci/replay/` |
 | [tasks/restructure/SRC_QA_RESTRUCTURE_SPEC.md](tasks/restructure/SRC_QA_RESTRUCTURE_SPEC.md) | ユーザーの仕様の原文 (草案・未承認、§1〜§19) |
 
 ### 試験と道具

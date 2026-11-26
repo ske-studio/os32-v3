@@ -185,21 +185,9 @@ fixture では CALL 先を script 番号 255 として扱う。命令数は圧�
 
 ## 5. 書き込みの中身
 
-### 5-1. 619 の書込み候補の分類
+### 5-1. 書込みの許可
 
-fixture は 193 命令が起こしうる操作を 1 件ずつ並べ (索引レジスタの選択の書込みを含む)、**619 件の書込み候補**にした。
-これを戻す処理 (recover) の許可表 (`sys/dev/video/geforce/diag/recover_gf.c`、target 145・rule 544) に照らした分類 (4a S1 追補、ADDENDUM.final の末尾):
-
-| 分類 | 件数 | 中身 | 今の扱い |
-|---|---:|---|---|
-| 許可 (rule あり) | **513** | 定数・RMW などの書込み 257 + RAM の組で選ぶ書込み 256 (32 の 32 個 × 8 択) | rule 513 件。許可表にはこれに固定・復元の 31 件を足して 544 件 |
-| PLL の内部手順待ち | **101** | 4A・4B の 3 個から展開される PLL の制御・係数・補助レジスタの書込み | rule 無し・拒否。S4 で手順を決めてから |
-| COPY の式待ち | **2** | DFAF の COPY (strap → CR3C) と E7FB の COPY_NV_REG (10020Ch → 1700h) | rule 無し・拒否。S2 で式を登録してから |
-| 一時値の再生待ち | **3** | RESET の 184Ch の戻し、CR57 の戻し (head0・head1 で 1 件ずつ) | rule 無し・拒否。同じ命令の中で読んだ値を戻す仕組みが S2/S5 で要る |
-| 合計 | 619 | — | 残る 106 件が拒否のまま。解消まで全 ROM の実行は許可しない |
-
-- 一度「VGA 別名の検査の欠け 1」(602858h、PCRTC head1 の通常レジスタが別名と誤認される) があったが、S1 追補で検査を実ポートに限って解消し 0 件になった。
-- fixture の書込み候補は**証拠であって許可表ではない**。すべて DENY_W のまま置き、許可は recover の許可表だけが持つ。
+S1 では 193 命令の書込み候補を分類した。実行時に許す対象・手順・値は `sys/dev/video/geforce/diag/recover_gf.c` の規則で決まる。ROM と照合するデータは §8-2 に示す。
 
 ### 5-2. レジスタ群ごとに何をしているか
 
@@ -228,7 +216,7 @@ fixture は 193 命令が起こしうる操作を 1 件ずつ並べ (索引レ�
 - 中身 [確]: head0 の SR01 の bit5 を落とす 1 命令 (INDEX_IO)。VGA の SR01 bit5 は Screen Off なので、これは「head0 の画面オフの解除」= 表示を有効にする系の書込み。
 - 表示を有効にする書込みは 4a では原則拒否だが、**この 1 件だけをユーザー決定 (2026-10-21) で許した**。条件は cfg 50h=0・54h=0 (PBUS 1850h・1854h=0) を実行前後に読み戻し、保持していること。
 - 安全の根拠: cfg 50h=0 の間は GeForce の映像出力が止まっている [資: envytools `bus/pci.rst`]。かつ 4a の間は 98 の切替回路 0FACh が 98 表示のまま (RGB-IN を選ばない) [確: 4a は 0FACh を読み書きしない設計]。
-- fixture では `GF_N1_MAIN 3`・`GF_N1_PC 0xe81e` の旗。他の表示有効化は静的に拒否する。
+- 対象は main 3 の PC 0xe81e。他の表示有効化は静的に拒否する。
 
 ---
 
@@ -256,7 +244,7 @@ fixture は 193 命令が起こしうる操作を 1 件ずつ並べ (索引レ�
 | 10022Ch | 41088102 | 同上 |
 | 100234h | 00266622 | 同上 |
 
-- 残りの PFB の値 (100230h・100238h・1002C0h・1002C8h・1004xxh など) は fixture の全表にある。4a の合否では上の 5 つを必ず比べ、後から上書きがあるものは「その命令の直後」と「最終値」を分けて比べる。
+- 残りの PFB の値 (100230h・100238h・1002C0h・1002C8h・1004xxh など) は fixture の命令列で確認できる。4a の合否では上の 5 つを必ず比べ、後から上書きがあるものは「その命令の直後」と「最終値」を分けて比べる。
 - メモリの種類 [推]: perf 表の Memory 200MHz とメモリ PLL 400MHz から DDR 系と読んでいる。確かめていない。
 
 ### 6-3. PLL
@@ -268,7 +256,7 @@ fixture は 193 命令が起こしうる操作を 1 件ずつ並べ (索引レ�
 | 映像 head0 (VPLL1) | 680508h (680578h・680580h・1584h・C040h と組) | 36,000kHz | main 2 先頭の PLL2 | 同上 (nouveau `devinit/nv04.c`) |
 
 - 式 [資]: `f ≈ 27000 × N1 × N2 / (M1 × M2 × 2^P)` kHz (単段なら N2=M2=1)。係数の探し方 (順・丸め・単段/二段・NV4x の段間の制約) は nouveau `clk/pllnv04.c` に従う。OS32 は整数演算だけで、二段の積の上限 27000 × 255 × 255 = 1,755,675,000 が u32 に収まることを静的に確かめる設計。
-- limits の在りか: PLL limits 表 0x5bc8 (版 0x21、4 件)。VCO1/2 の上下限・入力周波数・N/M の範囲・max_p などを nouveau `bios/pll.c` の読み方で読む。4004h・4024h の limits は reg−4 (4000h・4020h) で引く [資]。**4 件が具体的にどの PLL か・1 件の長さは要約していない** (fixture でも「長さ不明」の印)。
+- limits の在りか: PLL limits 表 0x5bc8 (版 0x21、4 件)。VCO1/2 の上下限・入力周波数・N/M の範囲・max_p などを nouveau `bios/pll.c` の読み方で読む。4004h・4024h の limits は reg−4 (4000h・4020h) で引く [資]。**4 件が具体的にどの PLL か・1 件の長さは要約していない**。
 - 要求のメモリ 400MHz と perf 表の Memory 200MHz は別の符号化の値で、片方を誤記として半分にはしない (設計の決定)。コア 200MHz と perf の Core 300MHz の違いの理由は不明 [推: 起動中は低いクロックで回す]。
 - PLL の手順 (4000h/4004h・4020h/4024h・4038h/403Ch・4600h・C040h の書く順と退避・復元) は S4 の作業で、まだ決まっていない。
 
@@ -339,9 +327,9 @@ fixture は 193 命令が起こしうる操作を 1 件ずつ並べ (索引レ�
 ### 8-2. ROM と fixture の一致
 
 - 写し: `~/os32-tmp/run/gf6200_4a/nvbios/init_scripts.txt` (WSL 側、211 行) — nvbios の出力の init script の部分。一部の行は圧縮表記なので fixture のバイト列は写しから復元した値。VBIOS 由来なので公開リポジトリには置かない (PM 判断 2026-10-21)。
-- fixture: `tools/gfinit_fixture.h` — 9 本の開始・長さ・CRC32 (`gf_scripts`)、193 命令 (`gf_instructions`)、619 の書込み候補 (`gf_effects`)、表の位置と大きさ (`gf_table_spans`)、main の順。ROM のバイトは init script のデータの範囲だけで、x86 コードは含まない。
+- fixture: `tools/gfinit_fixture.h` — 9 本の開始・長さ・CRC32 (`gf_scripts`)、193 命令 (`gf_instructions`)。ROM のバイトは init script のデータの範囲だけで、x86 コードは含まない。
 - 照合: [`tools/gfinit_rom_check.py`](../../../tools/gfinit_rom_check.py) をノートで ROM の実物に当て、**9 本の範囲の CRC32 がすべて一致** (rc=0、605ae6a、2026-10-21)。ROM を出力・保存せず、9 つの範囲だけを比べる。`--list` で期待値 (開始・長さ・CRC) を ROM 無しで表示できる。
-- 写しと fixture の一致を見る試験は `make check-gfinit-fixture-host` (`test_gfinit_fixture.py` (旧版の Git blob `5168e3b077ab`))。これは CI で回らない PM のローカル検査 ([DEFERRED_TESTS](../DEFERRED_TESTS.md) の GF4A-S1-FIXTURE)。CI では `check-recover-gf` が fixture と許可表の照合だけを見る。
+- 再照合の条件と証拠の所在は [持越し台帳の GF4A-S1-FIXTURE](../DEFERRED_TESTS.md)。
 
 ### 8-3. 使った資料
 

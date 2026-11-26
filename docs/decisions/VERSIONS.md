@@ -31,7 +31,7 @@ Build・Commit・Image CRC と KernelAPI の版は、製品版とは別の識別
 | リポジトリ名 | **`os32-v3`** (https://github.com/ske-studio/os32-v3、2026-09-30 作成) |
 | 公開範囲 | **パブリック** |
 | submodule (`apps/` `game/`) | os32-v3 も同じ submodule を参照して引き継ぐ。**当面の保守は os32 側で続ける** (一旦) |
-| CI | **os32-v3 で作り直す** (os32 の `.github/workflows/build.yml` をそのまま移さない) |
+| CI | **os32-v3 で作り直す** (os32 のビルド workflow は移植対象外) |
 | 文書の正典 | **os32-v3 (このリポジトリ) に置く**。os32 の docs は v2.1 時点の記録 (os32 の INDEX 冒頭の注記) |
 | 共有の道具 (`tools/`、NP21/W のフォーク `~/np21w-src`) | 共有するが、**動作保証は v3 側だけ** — v2.x 側で動かなくなっても直す義務は無い |
 

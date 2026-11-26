@@ -29,10 +29,7 @@ T5b 撤去 (2026-09-10、`1c98613`) で消えた被覆: 「上位 UI (メニュ�
 メニュー / FEP まで広げた (記録 `gshell_buttonup_tdd.md (旧版 dba6e0b26da1)`、`check-gshell-host` 100 本)。
 製品コードの修正は無し (`release_capture()` 経路は 4 経路とも正しかった)。
 
-**CI の範囲 (独立レビュー 2026-09-10 の指摘)**: `.github/workflows/check.yml` は静的整合性
-(manifest / 制約 ID / KAPI 版数) と NE2000 試験が中心で、`check-gshell-host` や filer の
-ホスト試験は**走っていない** (CI 環境に rustc が無い)。**CI 成功を GUI の動作確認とは扱わない。**
-GUI 側の回帰は手元の `make check` (rustc あり) と実機が正。CI に rustc を足すかは別途決める。
+**GUI の動作確認**: 2026-09-10 のレビュー時、当時の静的検査が成功しても GUI の入力や filer の動作は確認できなかった。現在の CI で検証する範囲は `tests/registry.toml` の各登録に従い、GUI の入力結果は対象のゲストで確認する。
 
 試験項目の棚卸しと `stat` の追加は 2026-09-14 に着地済み (§6 の ROADMAP)。
 

@@ -1,6 +1,4 @@
 from pathlib import Path
-import csv
-import os
 import re
 import shlex
 import tempfile
@@ -97,34 +95,6 @@ def observe_nasm(source, cpp, intermediate, args):
         raise OSError("incomplete NASM include trace")
 
 
-def finish_layers(check, config, errors):
-    ledger = {"include_layers": "P43-INCLUDE", "link_layers": "P43-LINK"}[check]
-    if os.getenv("OS32_LAYER_DEFERRAL") == ledger:
-        known = set()
-        outstanding = set()
-        with Path("docs/tasks/restructure/data/p43_violations.tsv").open() as stream:
-            for row in csv.DictReader(stream, delimiter="\t"):
-                if (row["検査"], row["構成"]) != (check, config):
-                    continue
-                edge, rule = row["位置・辺"], row["契約"].split()[-1]
-                if check == "link_layers":
-                    output, edge = edge.split(" ", 1)
-                    key = f"{config} {output}: {edge} ({rule})"
-                else:
-                    key = f"{config} {rule} {edge}"
-                known.add(key)
-                if not row["根拠"].endswith("で解消。"):
-                    outstanding.add(key)
-        for edge in sorted(known - errors):
-            print("resolved", edge)
-        if errors and errors <= outstanding:
-            print(f"{ledger} {len(errors)} outstanding")
-            sys.exit(3)
-        errors = errors - outstanding
-    if errors:
-        raise Failure("\n".join(sorted(errors)))
-
-
 def verify(config):
     inventory = Inventory(Path.cwd())
     nasm = {}
@@ -172,7 +142,8 @@ def verify(config):
         violation = rule(config, reader, header)
         if violation:
             errors.add(f"{config} {violation} {p} -> {c}")
-    finish_layers("include_layers", config, errors)
+    if errors:
+        raise Failure("\n".join(sorted(errors)))
 
 
 if __name__ == "__main__":

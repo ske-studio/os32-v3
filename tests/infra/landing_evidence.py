@@ -85,11 +85,11 @@ def verify(config):
     boot = dict(machine="pc98", sha=sha, run_id=19, attempt=2, artifact_id=1,
                 sha256="digest", result="success", reached="shell", log=__file__, media=__file__)
     with patch.object(gate, "medium_digest", return_value="digest"), patch.object(gate, "digest", return_value="digest"):
-        gate.verify_boot("", repo, 3, run, [], dict(boot, selftest_fail=0))
-        gate.verify_boot("", repo, 3, run, [], dict(boot, machine="powermac"))
+        gate.verify_boot("", run, [], dict(boot, selftest_fail=0))
+        gate.verify_boot("", run, [], dict(boot, machine="powermac"))
         for extra in ({}, {"selftest_fail": 1}, {"selftest_fail": False}, {"selftest_fail": "0"}):
             try:
-                gate.verify_boot("", repo, 3, run, [], dict(boot, **extra))
+                gate.verify_boot("", run, [], dict(boot, **extra))
             except ValueError as exc:
                 if "selftest_fail" in str(exc):
                     continue

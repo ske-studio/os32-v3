@@ -214,7 +214,7 @@ os32-v3/
 │   └── platform/   機種依存の実装 (pc98/、powermac/)。PC-98 の V86 モニタは pc98/legacy/
 ├── lib/            汎用ライブラリ (utf8, path, sqlite3, zlib, microtar 等。vendor したものは各ディレクトリの README.OS32 が出所とライセンスの正典)
 ├── userland/       ユーザー空間 (shell/, gshell/ (GUI シェル, Rust), cmds/, system/, tests/, rust/ (libos32gui 等), lib/)
-├── .github/        作り直し期間の CI は workflows/restructure-build.yml。旧 4 本は .disabled
+├── .github/        作り直し期間の CI は workflows/restructure-build.yml
 ├── apps/           git submodule (ske-studio/os32-apps) — 標準アプリ。make external / make apps
 ├── game/           git submodule (ske-studio/os32-game) — 対戦スゴロク RPG。make external / make game
 ├── docs/hw/        PC-98 資料のローカルミラー (git 管理外、tools/sync_hwdocs.sh)
@@ -850,6 +850,8 @@ NP21/W を使う場合は [INSTALL.md](../INSTALL.md) に従い、`NP21W_DIR` �
 
 NP21/W の受入は、同じ LAN の別の Windows 機械で回せる (ユーザー決定 2026-11-19)。その機械には Windows + WSL2 (mirrored) と `gh` (読み取りだけの token) とリポジトリの clone を置き、NP21/W の ai-debug 版・ROM・NHD はこの機械から ssh で写す (ROM は外へ出さない)。像は CI の build の配布物を `gh run download` で取るので、クロスコンパイラは要らない。自前ビルドの NP21/W は無署名なので、Windows の Smart App Control を切っておく。枠 (ポート・ini・NHD・HostDrv の組) と依頼の形はスキル [os32-emu-remote](../.claude/skills/os32-emu-remote/SKILL.md)。
 
+実機ノートの常駐サービスは `/opt/os32` の作業木を使い、G4 にも相対パスで起動する作業木がある。pc98emu は運用の台本を import または git archive で取り出す。道具の置き場を変える場合は両方へ知らせ、サービスの起動元、コピー、台本が実行時に開くヘッダ・ソースまで確かめる。apps・game の入力は配布した SDK。外部ビルドの再開条件は T2H_EXTERNAL_GATE に従う。
+
 #### ビルドと検査で確かめる
 
 ```bash
@@ -919,7 +921,6 @@ python3 tools/check_nano_inputs.py --cross-dir "$CROSS_DIR" --record-built \
 各変数はそのtoolchainを作った未改変の実入力へ設定する。元の入力が残っていない場合は
 `tools/ci/build_cross.sh --prefix "$CROSS_DIR" --work "$CROSS_WORK" < /dev/null`
 で作り直す (§8-5冒頭の手順)。構築スクリプトが同じ検証とreceipt生成を行う。
-CIの `build.yml` は `make check` の同じ検査を使う。
 CI再構築ではDWARF内のbuild path等が異なり得るため、手元のアーカイブhashとのbyte一致は要求しない。
 `tools/ci/build_cross.sh` はtarball/関連ソースの固定hash・実configure・CFLAGS・nano提供元を
 検査した後、構築固有のhashをprefix直下の `os32-nano-build.json` に記録する。
@@ -937,7 +938,6 @@ upstream/configure/GCC/target/CFLAGS/patchesとbuilder内容を正規化JSONか�
 名前を追加すると古いreceiptを持つキャッシュを作り直し、hash値だけの変更ではキーは変わらない。
 SDK節・local hash値・symbolsは除外する。OS/GCC/newlib版をキーのprefixにも付ける。
 旧キーのキャッシュは再構築する。検査器だけの変更は再構築せず、現在の検査器でreceiptを再検査する。
-クロスtoolchain無しの `check.yml` の静的集合には追加しない。
 GitHub Actionsでの新規構築はf1a作業中は未実施、PMがCI runで確認する。
 システムの `libc.a` の手編集・allocator公開切替は行わない。
 

@@ -64,11 +64,7 @@ QEMU の sungem は、受信リングが満杯の間に来た電文を溜め、R
 
 ## 6. PowerPC の試験と CI
 
-- **CI の check-fast には、PowerPC の toolchain・QEMU・LAN の socket が無い。**
-  - PPC の cross gcc・qemu-system-ppc・socket を使う試験は、無い環境ではその半分を `SKIP <理由>` と表示して 0 を返す。host の側の試験と変異は、必ず回す。
-  - CI で PowerPC を必ず組むのは、check.yml の `ppc-compile` の job。そこでは `OS32_REQUIRE_PPC=1` が立つので、toolchain が無ければ失敗にする。
-  - 手本は `test_link_platform.py (旧版 c4bc40be8d05)`・`compile_ci.py (旧版 3d07969b3073)`・`ppc-sc.py (旧版 bdd8b904e457)`。
-- **新しい試験は、取り込む前に `PPC_CROSS_DIR=/nonexistent` でも 1 回回す。** CI と同じ形で、SKIP と rc=0 になることを確かめる。2026-11-14 に、P1a の link-platform-host と P1f の gem-adapter-host が無条件に cross gcc を呼び、CI で落ちた。
+- CI は `restructure-build` の計画で選ばれた PowerMac 構成を `powerpc` ジョブで組む。検査の前提となるクロスコンパイラや QEMU が足りない場合は環境エラーとして記録する。検査 ID、対象構成と実行環境の正本は `tests/registry.toml`。
 - **実装者の sandbox では socket が使えない。**
   - LAN と link の QEMU の受入 (link_run・sc_run の LAN・net-link-host の本物の agent) は、PM が手元で回す。
   - 試験を、環境 (socket の有無) によって別の手順に切り替わる作りにしない (2026-11-14 の ppc-fb)。

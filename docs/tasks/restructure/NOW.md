@@ -18,7 +18,7 @@
 | `build/` (`.mk` 約 60 本、所有者集合は `build/select.mk`・`build/sources/`・`build/arch/`・`build/platform/`・`build/features/`) | — | `build/` に残す。`sys/conf/` に何を置くか (D-6) |
 | `boot/` 23・`sdk/` 72・`userland/` 678・`assets/` 24 | — | そのまま |
 | `sample/` 11・`packages/`・`images/`・`game/`・`apps/` (submodule、H-7 で延期) | — | D-7 |
-| `tools/tests/` 1,840・`tools/checks/` 317・`tools/accept/` 63・`tools/ppc/` 188 (道具と試験が混在)・`tools/ci/` 9 | 2,417 | 古い検査は移さない (U10、`P5.md`)。運用の道具は `tools/` に残す |
+| 検査本体 1,840・登録 317・外部受入 63・`tools/ppc/` 188 (道具と試験が混在)・`tools/ci/` 9 | 2,417 | 古い検査は移さない (U10、`P5.md`)。運用の道具は `tools/` に残す |
 | `userland/tests/` 136 (ゲストで動く試験のプログラム) | — | D-8 |
 
 検査: 登録は 814 本 (旧手順（a704ddae62ab の記録）)、`CHECK` を持つファイルは 847、変異を持つ試験ファイルは約 910。CI は check (static-check・ppc-compile・ppc-qemu 20 組)・build (artifacts・checks 6 組)・sep (`wt/sep-**` だけ、生成物の一致と変異込みの検査)。
@@ -28,7 +28,7 @@
 | 道具 | 役目 | この票での使い所 |
 |---|---|---|
 | `tools/move_files.py`・`tools/include_resolve.py`・`tools/source_roots.py`・`kernel_includes.py (旧版 75957ada52f3)` | 対応表 JSON からの `git mv` と参照の置換、include の解決先の前後比較、走査の根、試験の `-I` | P3 の移動 |
-| `tools/build_compare.py`・`tools/ci/sep_identity.py`・`.github/workflows/sep.yml` | 生成物の一致 (x86 は出荷する生成物、PowerPC は `.o` の sha256) | P2-1 で「置き場が変わる」場合に対応させ、P3 の移動の合格に使う |
+| `tools/build_compare.py`・`tools/ci/sep_identity.py`・基点の分離検証 workflow | 生成物の一致 (x86 は出荷する生成物、PowerPC は `.o` の sha256) | P2-1 で「置き場が変わる」場合に対応させ、P3 の移動の合格に使う |
 | `check_layers.py (旧版 6b4b6f68ba81)`・`layers_baseline.json (旧版 40b6b3b1488c)` | 共通 → arch・機種・装置の読みを止める (基準 0)。持ち主は**パスで決めている** | 古い検査なので移動から回さない。所有の表から引く形で `P4.md` の 3 に載せる (D-12) |
 | `build/select.mk` と `build/sources/*.mk` ほか | ビルドの所有者集合と順 (`build/sources/order.mk`) | P1-2 で「所有の表の元」にする候補 |
 | `run.py (旧版 bdcca5c408c4)`・`gate.py (旧版 a09e7eda6a38)`・`tools/ci/land_gate.py`・`check_time.py (旧版 47248fa4d9b7)` | 検査の登録・選択・実行・表・取り込みの判定 | P6 |

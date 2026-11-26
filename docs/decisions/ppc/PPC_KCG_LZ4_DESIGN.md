@@ -43,7 +43,7 @@ console_route・段 I・PLANAR4・FD フォント収録・実行中切替コマ�
 - 確保不能時はエラーで戻り、既存streamを継続する。公開kcg_load_fontのNOSYS、x86のROM/module選択は不変。
 
 ## 2. L0 — 生成（受け手: PowerPC）
-触るファイル: tools/gen_font16.py、build/font-fetch.mk、生成試験（tools/tests配下、CHECK入力宣言を含む）。
+触るファイル: tools/gen_font16.py、build/font-fetch.mk、当時の生成試験（CHECK 入力宣言を含む）。
 TTF/EBDTのpayloadを共通 pack_kcg(payload, compression) に渡す。明示LZ4は lz4.block の store_size=False。
 EBDTは現行の3引数形式を維持し、末尾に --lz4 / --no-lz4 を任意で1個許す。argvの受け方は次の形にする。
 ```python

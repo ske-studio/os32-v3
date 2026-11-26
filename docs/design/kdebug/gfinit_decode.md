@@ -46,7 +46,7 @@ switch と既存 include 構成を保って共有。recover 型からの切離�
 
 | 記号 | 固定契約 |
 | --- | --- |
-|e|`gf_effects` 全体の0始まりordinal。W/SELECT/DATAのsubstep=eを維持（pc内連番ではない）。同一opcodeの各eを個別登録|
+|e|S1 で採番した書込み候補全体の0始まりordinal（基点 `64aff86c9`）。W/SELECT/DATAのsubstep=eを維持（pc内連番ではない）。同一opcodeの各eを個別登録|
 |補助substep|Q=0x10000+j、通常C=0x11000+j（jは命令内で0始まり、表の出現順）。繰返す通常C/Qはその都度jを増やす。通常Cは0x11000–0x110ff内に限定し、PLL入口Cはn・k・合流の有無によらず固定substep=0x11101（分岐先ごとに同じargc=3のlayoutを共有）。0x11100は予約のみで範囲外Cを生成しない。既存eと衝突しない|
 |K（skip形）|substep=`0x20000+pc`、NONE、`[I(length)]`（argc=1）。値の配列を含むROM内容はplan.rom_crcで担保する。実pcごとにargc固定のlayoutを登録。rule/expr=NONE|
 |通常辺F|next[0]=next[1]=列の次node。末尾は次命令、終了はNONE。異なるhead/skipだけ状態別nodeを作り、同一状態に合流|

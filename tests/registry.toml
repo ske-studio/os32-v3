@@ -153,7 +153,7 @@ id = "include_layers"
 spec = { path = "docs/design/tools/check_layers.md", section = "9. 構成ごとの include 直辺" }
 subsystem = "infra"
 level = "L0"
-sources = ["docs/tasks/restructure/data/p43_violations.tsv", "build/sources/ownership.mk", "make:kernel"]
+sources = ["build/sources/ownership.mk", "make:kernel"]
 environment = "linux-cross"
 arch = { x86 = ["pc98"], ppc = ["core"] }
 needs = []
@@ -171,7 +171,7 @@ id = "link_layers"
 spec = { path = "docs/design/tools/check_layers.md", section = "10. 最終リンクの採用とシンボル解決" }
 subsystem = "infra"
 level = "L0"
-sources = ["docs/tasks/restructure/data/p43_violations.tsv", "build/sources/ownership.mk", "make:kernel"]
+sources = ["build/sources/ownership.mk", "make:kernel"]
 environment = "linux-cross"
 arch = { x86 = ["pc98"], ppc = ["core"] }
 needs = []

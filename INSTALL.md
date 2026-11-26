@@ -145,6 +145,6 @@ bash tools/audit_cast_align.sh --help
 
 詳細は [docs/08_build.md](docs/08_build.md) §8-4。
 
-クロスツールチェーンを使わない静的 CI (`check.yml`) では、`libnewlib-dev` の
+クロスツールチェーンを使わずに解析するときは、`libnewlib-dev` の
 `/usr/include/newlib` を解析用に使う。ローカルのクロス newlib があればそちらを優先する。
 clang 本体・libclang・LLVM 開発ヘッダ・libLLVM・resource header は同じ版を使う。

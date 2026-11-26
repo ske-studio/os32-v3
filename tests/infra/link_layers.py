@@ -7,7 +7,7 @@ import subprocess
 from functools import lru_cache
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from tests.infra.include_layers import finish_layers, rule, target_wrong
+from tests.infra.include_layers import rule, target_wrong
 from tests.support.link_symbols import data_declarations, declarations, references, symbols
 from tests.support.media import Failure, main
 from tests.support.product import build, commands, declared_sources, private_imports, recipes
@@ -198,7 +198,8 @@ def verify(config):
                    for origin, role, name, signature in assembly_declarations(provider, header)):
                 continue
         errors.add(edge)
-    finish_layers("link_layers", config, errors)
+    if errors:
+        raise Failure("\n".join(sorted(errors)))
 
 
 if __name__ == "__main__":

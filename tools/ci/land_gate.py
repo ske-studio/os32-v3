@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Verify the integration push evidence for a fast-forward to main."""
 import argparse
-import csv
-from fnmatch import fnmatchcase
 import hashlib
 import io
 import zipfile
@@ -17,9 +15,6 @@ from urllib.parse import urlencode
 from pathlib import Path
 
 import yaml
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from deploy_manifests import CORE_MANIFEST_RELPATHS
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
@@ -75,7 +70,7 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def medium_digest(base, run, artifacts, boot, artifact_id=None):
+def medium_digest(base, run, artifacts, boot, artifact_id):
     sha = run['head_sha']
     if boot['machine'] == 'pc98':
         name = f"os32-{run['head_branch'].replace('/', '-')}-{sha[:7]}"
@@ -87,7 +82,7 @@ def medium_digest(base, run, artifacts, boot, artifact_id=None):
         raise ValueError('unrecognized boot machine or image')
     name += f"-a{run['run_attempt']}"
     matches = [row for row in artifacts if row['name'] == name and not row['expired']
-               and (artifact_id is None or row['id'] == artifact_id)]
+               and row['id'] == artifact_id]
     if len(matches) != 1 or boot['filename'] not in filenames:
         raise ValueError('boot medium does not identify a unique artifact')
     artifact, = matches
@@ -101,49 +96,14 @@ def medium_digest(base, run, artifacts, boot, artifact_id=None):
             return hashlib.file_digest(medium, 'sha256').hexdigest()
 
 
-def documentation_only(sha, paths):
-    def read(path):
-        return command('git', 'show', f'{sha}:{path}').decode('utf-8')
-
-    ledger = read('docs/tasks/restructure/data/scope.tsv')
-    docs = {row['パス'] for row in csv.DictReader(io.StringIO(ledger), delimiter='\t')
-            if row['所属種類'] == '文書'}
-    if not paths <= docs:
-        return False
-    # P6-0: build/kdebug.mk feeds the HWDEV specification to the generator.
-    image_inputs = ['docs/design/hwdev/hwdev_imports.md']
-    for manifest in CORE_MANIFEST_RELPATHS:
-        entries = yaml.safe_load(read(manifest))['filesystem']['files']
-        image_inputs.extend(entry['host'] for entry in entries if not entry.get('host_only'))
-    return not any(fnmatchcase(path, pattern) for path in paths for pattern in image_inputs)
-
-
-def verify_boot(base, repo, workflow, run, artifacts, boot):
+def verify_boot(base, run, artifacts, boot):
     if boot['machine'] == 'pc98':
         count = boot.get('selftest_fail')
         if type(count) is not int or count != 0:
             raise ValueError('PC-98 requires selftest_fail=0')
-    sha = run['head_sha']
-    previous = boot['sha']
     rid, attempt = number(boot['run_id']), number(boot['attempt'])
     artifact_id = number(boot['artifact_id'])
-    if previous != sha:
-        if not re.fullmatch('[0-9a-f]{40}', previous):
-            raise ValueError('invalid previous SHA')
-        command('git', 'merge-base', '--is-ancestor', previous, 'origin/main')
-        command('git', 'merge-base', '--is-ancestor', previous, sha)
-        paths = command('git', 'diff', '--no-renames', '--name-only', '-z', previous, sha, '--')
-        if not documentation_only(sha, {os.fsdecode(path) for path in paths.split(b'\0') if path}):
-            raise ValueError('previous boot record requires a documentation-only change')
-        prior = api(f'{base}/runs/{rid}/attempts/{attempt}')
-        if (not eligible(prior, repo, previous, workflow, 'wt/') or prior['id'] != rid
-                or prior['run_attempt'] != attempt):
-            raise ValueError('previous boot run or attempt does not match')
-        prior_artifacts = pages(f'{base}/runs/{rid}/artifacts', 'artifacts', {})
-        if medium_digest(base, prior, prior_artifacts, boot, artifact_id) != boot['sha256']:
-            raise ValueError('previous boot artifact digest mismatch')
-        artifact_id = None  # Locate the independently built candidate by name.
-    elif rid != run['id'] or attempt != run['run_attempt']:
+    if rid != run['id'] or attempt != run['run_attempt']:
         raise ValueError('boot run or attempt does not match candidate')
     if (medium_digest(base, run, artifacts, boot, artifact_id) != boot['sha256']
             or boot['result'] != 'success' or not boot['reached']
@@ -222,7 +182,7 @@ def verify(repo, sha, evidence):
         machine = boot['machine']
         if boot['sha'] != sha:
             raise ValueError('both boot records must be from the candidate')
-        verify_boot(base, repo, ident, run, artifacts, boot)
+        verify_boot(base, run, artifacts, boot)
         machines.add(machine)
     if machines != required:
         return [f"candidate boot records required for {sorted(required)}"]

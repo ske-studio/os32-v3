@@ -1,7 +1,7 @@
 # TASK_CI_REWORK — 既存の CI (check・build) を手本の形に直す
 
-> 状態: **計画 (2026-11-18)** — 本線の再開の最初の仕事 (ユーザー決定 2026-11-18「本線が再開するのは旧い CI の手直しから」)。票は特務の PM が実測から書いた。**S0 は完了** (本線の PM、2026-11-18。原因と直し、同じ SHA の 10 回の結果は [gate.md](../../design/tools/ci/gate.md) §5-2、基準 (5) を満たした)。**S1 は完了** (§1 の表、[gate.md](../../design/tools/ci/gate.md) §5-3)。**S2 は完了** (S2a・S2b・S2c、2026-11-18〜19、gate.md §5-4。check.yml の apt-get は 0 行 = 完了の基準 (2) の check.yml の分)。S3 以降は未着手。**S3〜S7 はこの票では進めない — 残りは `restructure/P6.md` (CI を一から作る、ユーザー決定 2026-11-25) に移した。この票は S0〜S2 の記録と §1 の実測の出所として残す。**
-> 完了の基準: (1) `.github/workflows/check.yml` に `make check-<名>` の手書きの行が 0 (今 31 行)、(2) workflow の中の `apt-get install` が 0 行 (今 3 行。用意は composite action だけ)、(3) わざと 2 本落とした枝で、check・build のどのジョブも残りを最後まで回し、落ちた 2 本の名前がジョブの要約の表に出る、(4) 置き換えの前後で回る検査の名前の集合が減っていない事を機械で確かめた記録がある、(5) 揺れた検査 2 本 (`ppc-sd-link`・`ppc-usb`) が同じ SHA の 10 回の実行で 10 回通り、用意の手順も 10 回落ちない、(6) 道具が無い時に SKIP で通る検査が 0。6 つを満たした SHA が main に在る。
+> 状態: **計画 (2026-11-18)** — 本線の再開の最初の仕事 (ユーザー決定 2026-11-18「本線が再開するのは旧い CI の手直しから」)。票は特務の PM が実測から書いた。**S0 は完了** (本線の PM、2026-11-18。原因と直し、同じ SHA の 10 回の結果は [gate.md](../../design/tools/ci/gate.md) §5-2、基準 (5) を満たした)。**S1 は完了** (§1 の表、[gate.md](../../design/tools/ci/gate.md) §5-3)。**S2 は完了** (S2a・S2b・S2c、2026-11-18〜19、gate.md §5-4。当時の検査 workflow の apt-get は 0 行 = 完了の基準 (2) の検査側)。S3 以降は未着手。**S3〜S7 はこの票では進めない — 残りは `restructure/P6.md` (CI を一から作る、ユーザー決定 2026-11-25) に移した。この票は S0〜S2 の記録と §1 の実測の出所として残す。**
+> 完了の基準: (1) 当時の検査 workflow に `make check-<名>` の手書きの行が 0 (今 31 行)、(2) workflow の中の `apt-get install` が 0 行 (今 3 行。用意は composite action だけ)、(3) わざと 2 本落とした枝で、check・build のどのジョブも残りを最後まで回し、落ちた 2 本の名前がジョブの要約の表に出る、(4) 置き換えの前後で回る検査の名前の集合が減っていない事を機械で確かめた記録がある、(5) 揺れた検査 2 本 (`ppc-sd-link`・`ppc-usb`) が同じ SHA の 10 回の実行で 10 回通り、用意の手順も 10 回落ちない、(6) 道具が無い時に SKIP で通る検査が 0。6 つを満たした SHA が main に在る。
 
 決まりは [POLICY_CI](../../POLICY_CI.md) (作る時 G1〜G13、改修する時 R1〜R8)。手本の形と、11-17 の欠点の実測は [gate.md](../../design/tools/ci/gate.md)。この票は、11-18 に関門を変異込みへ切り替えた後に残っている分を、段に切る。
 
@@ -25,7 +25,7 @@ push から最後のジョブが終わるまで: check と build の両方が最
 | G2 全部回して全部挙げる | check の static-check・ppc-compile は最初の失敗で止まる (ppc-qemu は 11-18 に直した) | ppc-compile が 1 本で落ち、ppc-qemu は走らなかった。直して回し直し (1 往復 50 分) |
 | G3 結果は表で | check は表が無い。落ちた検査は `gh run view --log-failed` を読んで探す | 失敗の行を探すのに、ログを 3 回取り直した |
 | G4 何を回すかは登録から | static-check は手書きの 31 行。`ppc_scope.py (旧版 d4d22d1c0028)` は共通・PowerPC の置き場の一覧を自前で持つ | 新しい検査 2 本 (`archive-refs`) を手で足した。足し忘れると build でしか回らない |
-| G5 用意は 1 か所 | `apt-get install` が check.yml に 3 行、中身が違う | ppc-compile にだけ `qemu-system-ppc` が無く、変異の試験 (`test_lan_p29.py (旧版 f0af390e6cb6)`) が落ちた |
+| G5 用意は 1 か所 | `apt-get install` が 当時の検査 workflow に 3 行、中身が違う | ppc-compile にだけ `qemu-system-ppc` が無く、変異の試験 (`test_lan_p29.py (旧版 f0af390e6cb6)`) が落ちた |
 | G6 道具が無い時に通さない | クロスコンパイラの無いジョブでは検査が SKIP で通る | S1 の実測: build の checks は 1 回で SKIP の行 86〜109 行。大半は PowerPC の台本約 35 本が道具を手元の既定の置き場 `/home/hight/opt/cross-ppc` に探して飛ばしている。ほかに lychee・freetype-py が無くて飛ぶ行。static-check は毎回 3 行 (`check-ext2-empty-name-host`・`check-vfs-fd-path-host` のターゲット側の確かめ)。ppc-qemu の表の SKIP は 52 本とも 0 |
 | G7 CI と手元で同じ入口 | `make check-…` と `run.py --run …` の 2 つ | 11-18 は出ていない (11-17 に `r1-fixture-host` が片方だけで落ちた) |
 | 揺れる検査 | 無し (11-18 の S0 で 2 本とも原因が分かった)。`ppc-sd-link` は揺れではなかった: 11-17 の回 (枝 wt/sep-ci の手本の CI の最初の回) は用意に `qemu-system` (mac99 の VGA の ROM) が無く、PowerPC の QEMU の検査 11 本が起動直後の QMP EOF で落ちていた (`boot1 READY` の待ちには入っていない)。`50da7775f` で直っている。用意の rustup は、runner が rust-src の登録の無い同じ版の toolchain を持って始まる型 (直近 49 ジョブ中 1 本) | 用意は壊れた toolchain を消してから入れ直す形に直した (S0)。詳細は [gate.md](../../design/tools/ci/gate.md) §5-2 |
@@ -44,7 +44,7 @@ push から最後のジョブが終わるまで: check と build の両方が最
 |---|---|---|---|
 | S0 | 揺れる検査の原因を調べて直す (`ppc-sd-link` と用意の rustup。`ppc-usb` は 11-18 に直したので、10 回の確かめだけ)。調べ方: 同じ SHA で `gh workflow run` を 10 回、落ちた回の QEMU のログ (成果物) を読む。期限の値を延ばすだけの直しはしない (何を待っているかを突き止める) | R4 | 基準 (5) |
 | S1 | 実測を取り直して §1 の表を更新する: 直近 20 回の成功率・ジョブごとの所要・SKIP の行の数・main への push で PowerPC の段が回る条件 | R1 | §1 の表に数字と実行の番号 |
-| S2 | 用意を 1 か所に: check.yml の `apt-get install` 3 行を composite action (`build-setup`・`ppc-setup`・`gate-setup`) に寄せ、PowerPC の 2 ジョブを同じ環境にする | G5 | 基準 (2)。前後で回る検査の集合が同じ |
+| S2 | 用意を 1 か所に: 当時の検査 workflow の `apt-get install` 3 行を composite action (`build-setup`・`ppc-setup`・`gate-setup`) に寄せ、PowerPC の 2 ジョブを同じ環境にする | G5 | 基準 (2)。前後で回る検査の集合が同じ |
 | S3 | 入口を 1 つに: check の 3 ジョブの `run:` を、手本と同じ道具 (`gate.py (旧版 a09e7eda6a38)`) の 1 行にする。手元でも同じコマンドで回る | G7 | 手元と CI で同じ結果の表 |
 | S4 | 一覧を登録から: static-check の 31 行を、検査の宣言 (`CHECK` の tier・環境) から引く。`ppc_scope.py` の置き場の一覧を所有者集合 (`build/select.mk`) から引く | G4 | 基準 (1)・(4) |
 | S5 | 全部回して表に: check の残りの 2 ジョブ (static-check・ppc-compile) を、1 本落ちても残りを回す形に (ppc-qemu は済み)。`needs` の鎖は成果物を読む所だけ残す。落ちた検査の名前・末尾・遅い検査をジョブの要約に出す | G2・G3・G10 | 基準 (3) (G12 の実演の枝を 1 本作る) |
@@ -67,7 +67,7 @@ CI の待ち時間は、検査が増えるたび・変異が増えるたびに�
 
 ## 3. やらない事
 
-- sep.yml を消して check・build に畳む事 (分離の枝専用の関門は、分離の仕事が終わるまで残す)。
+- 分離枝専用の関門を通常の関門に統合する事（当時の構成は `dafe81642` で確認できる）。
 - x86 の起動を CI で自動に確かめる関門 (NP21/W は CI に載らない。別の票で扱う)。
 - 関門を弱める変更 (シャードから検査を外す・変異を外す・期限を延ばして通す)。外す検査が出たら、名前・理由・直す票をこの票の §1 に挙げ、空になったら消す (R4)。
 

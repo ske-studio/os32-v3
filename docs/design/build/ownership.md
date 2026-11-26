@@ -1,96 +1,23 @@
 # 追跡ファイルの所属と像への依存
 
-> 状態: P1-2 の設計案（A1 で確認、入口の実装は P4 の 3）。根拠は SRC_QA_RESTRUCTURE_SPEC §5・§15 と P0_FINDINGS の P0-1・P0-2。
-
-> 注 (2026-11-25、U10): 仕様 §15 のうち木の形の検査は、移動の後に新しい検査として足す `P4.md` の 3 (木の形) に移った (前の版の P2-2〜P2-7 から)。
+> 状態: **現行 (2026-11-27)** — 仕様 §5・§15 の所有宣言と構成別照合。
+ソース: `build/sources/ownership.mk`、`tools/ownership.py`、`tests/infra/src_owner.py`、`tests/infra/build_sources.py`。
 
 ## 所属を決める単位
 
-[担当表](../../tasks/restructure/data/scope.tsv)の「担当」「種類」は配置作業を割り振る P1-0 の判断。「所属種類」は次の規則で生表をパス結合した初版で、配置が決まる前から使える。
-
-| 入力 | 所属種類 |
-|---|---|
-| 製品の共通コード・内部ヘッダ・共通ユーザーランド | 共通実装 |
-| P0-1 の層が arch（名前付きヘッダを含む）、CPU の命令・レジスタ・専用呼出規約に依存する実装 | CPU固有実装 |
-| platform 層（名前付きヘッダを含む）、PC-98 の boot | 機種固有実装 |
-| device 層の製品（drivers、hwdev、kdebug） | デバイス固有実装 |
-| SDK の公開物（配布するリンク・変換の道具も含む） | 公開インターフェース |
-| 検査本体・支援・実行基盤・運用の道具 | 開発・検査用実装 |
-| 説明・仕様・ライセンス | 文書 |
-| ビルド規則・リンク配置などの定義 | ビルドの定義 |
-| 同梱データ・見本 | 資産 |
-| 担当表の第三者の物、外部リポジトリの gitlink | 第三者の物 |
-
-P1-0 の個別の用途判断を先に適用し、製品にだけ P0-1 の層を使う。例えば試験が vendor を入力にしても vendor の所有は変わらない。末尾の棚卸し用ファイルも開発・検査用実装とし、P1 の配置作業の母数と分けて照合する。
-
-像の対象は、その構成が何をコンパイル・リンクするかで決める。所属は、実装が提供する機能と、その実装に必要な命令・機種仕様・装置で決める。例えば userland/ppc/hello.c は PPC 像に入るが SDK の呼出しだけなので共通実装。同じ場所の dbprob.c は FPSCR を操作するため CPU 固有。sys/kern/kprintf.c は C_COMMON_CORE で書式処理を提供し、固定名 platform_kprintf.h を通じて機種に出力を委ねるため共通実装。
-
-P1 の照合は check_layers.owner の名前つきヘッダと配置、担当表の用途、基点の Make 所属集合に直接記されたソースを使う。すべての所属候補と記入値を照合し、食い違いをパスごとに表示する。NAMED のヘッダと固定名の契約ヘッダは、その宣言・配置が定める所属と異なれば根拠欄の記述にかかわらず失敗する。その他の食い違いでは採用した種類と理由を「所属判断=種類：理由」と根拠欄に記す。例えば sys/dev/pci/pci.c は C_COMMON_EXEC に入るが、PCI 装置の処理を提供する。条件式・wildcard を含む像の依存全体の展開は P4 の 3の問い合わせが扱う。
+追跡パスごとに、実装が提供する機能と、必要な命令・機種仕様・装置から所属を決める。例えば `sys/kern/kprintf.c` の書式処理は共通実装で、出力先は各機種が実装する。SDK の公開物、開発・検査用実装、ビルド定義、文書、資産、第三者の物にも所属を付ける。ホスト試験に使う第三者ライブラリは第三者の所属を保つ。製品にコンパイルされるか、どの像が使うか、SDK に配布するかは別の問いとして扱う。
 
 ## P4 の 3の正本と問い合わせ
 
-ビルドの既存の選択式を維持し、所属の宣言は build/sources/ の Make 集合に集約する。既存の所属集合を再利用し、そこに現れないヘッダ・文書・資産等には同じ場所でディレクトリ既定と個別指定を宣言する。個別指定を優先し、同じ優先度の競合と未宣言は P4 の 3 の所有の検査 のエラー。複数の機能集合・リンク順への登場は所有の重複に数えない。scope.tsv は初期値の引き渡しで、切り替え後に再編集する正本にはしない。[現行の選択式](select.md)
-
-P4 の 3が作る入口は `python3 tools/ownership.py [--revision REV] -- PATH...`。指定版（省略時は作業木）の追跡パスを対象にし、パス省略時は全件をパス順、指定時は引数順に UTF-8 の JSON Lines で返す。所有は kind と対象名 target（共通なら null）、公開は SDK の配布宣言から得る真偽、像は構成と出力の組の集合（重複なし、辞書順）。例えば sdk/kapi.json の P0 観測を表すレコードは次の形になる。
-
-```json
-{"path":"sdk/kapi.json","kind":"公開インターフェース","target":null,"header_role":null,"public":true,"images":[],"images_complete":false}
-```
-
-P4 の 3 の層の検査 は同じ所属宣言の header_role を使う。P4 の 3への初期移行で NAMED の各ヘッダを named、fixed_name が認める実装ヘッダを fixed_contract、それ以外のヘッダを ordinary、ヘッダ以外を null とする。例えば sys/platform/pc98/pc98.h は named・機種 pc98 なので共通から読むと R4、platform_kprintf.h の各機種版は fixed_contract なので対応機種の共通から読める。異なる CPU・機種の target を読む辺にはどちらも先に R6 を適用する。移動後も宣言を引き継ぎ、検査側に旧パスの一覧を残さない。
-
-sdk/include の 19 ヘッダでは public が true のまま images に依存先が入る。像ごとに展開した Make の入力・リンク順、コンパイラの include 依存、Cargo の crate・依存表、リンカスクリプト、生成・変換・媒体収録の前提を出力まで順方向に辿る。P0-2 の link_evidence と link_order はこの照合に使う。例えば loader.ld から通常・デバッグの ELF、boot_main.c から ELF を経た loader_hdd.bin への辺も拾う。未調査構成・解決できない条件があれば既知の辺を返し images_complete を false にする。空配列で true の場合だけ依存先が無いと言える。
-
-パス未知・所属競合・指定版の読出し失敗は診断を標準エラーに出し非ゼロで終了。P4 の 3 の所有の検査 は全追跡集合・配置・コンパイル登録を照合する。P4 の 3 の層の検査 は include 辺の両端の所属とヘッダの役割を照合する。P1-7 と run.py --select は改名前後・削除前の版も問い合わせ、欠損・不完全な依存では全件へ広げる。
+`python3 tools/ownership.py [--revision REV] -- PATH...` は、対象版の追跡パスについて所有の種類と対象名、ヘッダの役割、公開の有無、判明した像を JSON Lines で返す。現在の問い合わせは `images_complete=false` を返すため、像の空欄だけで依存先なしとは判断できない。ビルドで採用した入力は構成別に展開した Make の選択式と照らす。リンク順、リンカスクリプト、ELF から最終媒体への変換も、ソースの所属とは別に確かめる。[現行の選択式](select.md)
 
 ## 自前の一覧を読む箇所
 
-| 道具 | 現在の一覧 | 切替後 |
-|---|---|---|
-| check_layers.py (旧版 6b4b6f68ba81) | DEVICE_ROOTS・NAMED と像の軸 | kind・target・header_role を include の両端で参照 |
-| ppc_scope.py (旧版 d4d22d1c0028) | COMMON・PPC・X86・EXACT・LAYOUT_PATTERNS | 対象名・像・依存の完全性で選択 |
-| tools/source_roots.py | 検査別の SCAN_ROOTS | 所属・対象・検査の適用条件から走査パスを生成 |
-| run.py (旧版 bdcca5c408c4) | FULL・SCAN_ROOTS | 所属と依存で選び、登録固有の covers は検査入力として結合 |
-| tools/ops/check_arm_compile.py | KNOWN_NON_KERNEL・IMPL_DIRS と走査根 | カーネル像の所属・対象で絞る |
-| check_c_dialect.py (旧版 d768037598ba) | VENDOR_DIRS、SDK_HDR_DIR、公開ヘッダ・見本の glob | 第三者の所属、SDK 配布宣言の public、見本のビルド入力から対象を得る。C 方言の規則は検査に残す |
-| check_av_portable.py (旧版 53b9560b1b2e) | sound/hal・input/hal の C とヘッダ | 所属宣言に HAL の役割とサブシステムを付けて選ぶ |
-| check_usb_portable.py (旧版 9abc67fa5e56) | drivers/usb の走査とファイル名の接頭辞 | USB の所属宣言と実装の役割から対象を選ぶ。許される include は検査の契約 |
-| check_manifests.py (旧版 7862924cb7de)、tools/gen_kdebug_imports.py、tools/gen_hwdev_contract.py | プログラムの入力、後二者は GF のソース・ヘッダ | 各対象を共通の所属・依存の宣言から列挙する |
-| tools/check_privileged.py | SCAN_DIRS の userland 以下の object | 像のユーザーランド入力から対応する object を取得する |
-| tools/restructure/owners.py | KERNEL_ROOTS と調査対象の規則 | P4 の 3の全件照合後 P7 で撤去 |
-| tools/restructure/hal_inventory.py | COMMON・OWNERS・SCOPES | 役割の判断を HAL の表に渡し P7 で撤去 |
-| tools/restructure/path_refs.py | ROOTS | 移動表へ参照を渡し P7 で撤去 |
-
-tools/ の走査根の定数、glob・rglob・os.walk、git ls-files の利用箇所を照合した。check_arch_asm・check_p2v・check_kprintf_window の走査根は source_roots の行に含む。配布済み SDK を再帰してハッシュを記録する gen_sdk_manifest は生成後の媒体を読む。
-
-全件を列挙する入口は同じ Make 宣言を展開する。個々の検査の入力・試験 fixture・像のリンク順は、それぞれの契約として残す。移動後の照合では宣言から出した全件と Git の追跡パスの差、所属が一意に決まらないパスをそれぞれ報告する。
+全件の所有を列挙する道具と検査の計画は同じ所有宣言を読む。各検査が扱う入力、SDK の配布物、像のリンク順は個別の契約に従う。
 
 ## A1 の不要の候補
 
-16 本のうち、使用を確認できた道具は 15 本。残る tools/g16/scan_ui_chars.py は GUI ソースから文字を集める。Makefile、build 以下の .mk、旧検査登録 の登録、workflow、スキル、他の道具の呼出し・import、現行 docs の手順で呼出元は各 0 件。生成した ui_chars.txt には手動更新の注記があり、gen_preload16.py はその文字表を使う。手元での更新頻度は未確認。A1 で不要の候補として提示し、入口への移行対象から外す。削除の判断は D-11 と同じく別票で行う。
-
-再調査は `python3 -B tools/restructure/tool_callers.py PATH...`。出力は対象パス、該当ファイル数、各ファイル名と最初の該当行の TSV。追跡中の手順・コマンド・Make の明示前提・Python import を静的に探す。自己参照、一覧の記載、アーカイブとハードウェア資料は集計から除く。動的に組み立てたコマンドや木の外での手動実行は未確認。
-
-| 対象 | 呼出元ファイル数 | 所在の例 |
-|---|---:|---|
-| `check_layers.py (旧版 6b4b6f68ba81)` | 6 | layers-ppc.py (旧版 1d0429399e1b) |
-| `ppc_scope.py (旧版 d4d22d1c0028)` | 2 | .github/workflows/check.yml |
-| `tools/source_roots.py` | 4 | check_arch_asm.py (旧版 1426e1f3d889) |
-| `run.py (旧版 bdcca5c408c4)` | 44 | .github/workflows/build.yml |
-| `tools/ops/check_arm_compile.py` | 2 | build/sdk.mk |
-| `check_c_dialect.py (旧版 d768037598ba)` | 3 | c-dialect.py (旧版 8a69154bcd63) |
-| `check_av_portable.py (旧版 53b9560b1b2e)` | 1 | test_av_abi.py (旧版 db319aadc343) |
-| `check_usb_portable.py (旧版 9abc67fa5e56)` | 2 | usb-portable.py (旧版 203f8b4e9554) |
-| `check_manifests.py (旧版 7862924cb7de)` | 4 | manifests.py (旧版 d343d873fee2) |
-| `tools/g16/scan_ui_chars.py` | 0 | 該当なし |
-| `tools/gen_kdebug_imports.py` | 25 | build/cd-module.mk |
-| `tools/gen_hwdev_contract.py` | 5 | build/kdebug.mk |
-| `tools/check_privileged.py` | 5 | build/os32snd.mk |
-| `tools/restructure/owners.py` | 1 | tools/restructure/test_owners.py |
-| `tools/restructure/hal_inventory.py` | 1 | tools/restructure/test_hal_inventory.py |
-| `tools/restructure/path_refs.py` | 2 | tools/restructure/artifact_paths.py |
-
-呼び出し元の件数には文書のコマンド例も入るので、現役の呼び出し元の数としては読まない。調べる道具が拾わない形: `python -m` での起動、`sys.path` を経た同じ階層や `tools/` の直下以外への裸の import、変数でパスを組み立てる `$(shell …)` (sol のレビュー 2026-11-25)。
+P1 の呼出元調査は基点 `4146cf146` の記録。静的な参照だけでは木の外の手動実行、組み立てられたパス、共有作業木を使うサービスの有無を確定できない。運用の入口の移動・撤去は利用者の確認を伴う。
 
 ## 構造の関門（仕様 §15）
 

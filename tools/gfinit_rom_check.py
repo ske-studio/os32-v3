@@ -20,7 +20,7 @@ def fixture_tables(text):
     def table(name):
         return [tuple(int(v.strip(), 0) for v in match.split(','))
                 for match in re.findall(r'^\s+' + name + r'\(([^\n]+)\),$', text, re.M)]
-    return table('GF_SCRIPT'), table('GF_INSN'), table('GF_EFFECT')
+    return table('GF_SCRIPT'), table('GF_INSN')
 
 
 def check_rom(rom, scripts, instructions):
@@ -38,7 +38,7 @@ def main():
     parser.add_argument('rom', nargs='?', type=pathlib.Path)
     parser.add_argument('--list', action='store_true')
     args = parser.parse_args()
-    scripts, instructions, _ = fixture_tables(FIXTURE.read_text())
+    scripts, instructions = fixture_tables(FIXTURE.read_text())
     if len(scripts) != 9 or len(instructions) != 193:
         parser.error('fixture table missing or malformed')
     for sid, start, length, crc, _, count, _, _ in scripts:

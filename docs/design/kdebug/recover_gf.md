@@ -64,7 +64,7 @@ RMW を REC_EXPR に替えるのは **65 の RMW のうち e18 (zero_target 1850
 
 - CONSTANT/SELECT の保持式 `(old & keep) | value` は `write_mask=(~keep|value)&width_mask` と同じ value.mask/value.bits で表し、literal 以外は RANGE と旧値差分検査を併用する。
 
-- RUN の substep は fixture gf_effects の0始まり ordinal とし、SELECT の8選択肢も別 substep に固定する
+- RUN の substep は S1 で採番した書込み候補の0始まり ordinal（基点 `64aff86c9`） とし、SELECT の8選択肢も別 substep に固定する
 
 - read_safe は元命令が読む RMW と VGA indexed、および既定の config/PBUS/PMC 制御に限定し、未分類の literal/trigger の verify_mask は0；PLL/PFB/strap/PRAMIN は COLD とし保存値を終端再生しない。CR44/CR1F/CR11 だけ局所 RW とする。
 

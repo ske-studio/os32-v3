@@ -12,7 +12,7 @@ from pathlib import Path
 import re
 import subprocess
 
-EXCLUDED = ('docs/tasks/restructure/data/', 'docs/archive/', 'docs/hw/', 'third_party/', 'lib/sqlite3/sqlite3.',
+EXCLUDED = ('docs/archive/', 'docs/hw/', 'third_party/', 'lib/sqlite3/sqlite3.',
             'lib/zlib/', 'lib/microtar/', 'fs/fat/fatfs/ff.', 'sys/fs/fat/fatfs/diskio.h',
             'userland/lib/ui/microui.', 'userland/lib/font/vendor/',
             'kdebug/generated/', 'hwdev/generated/', 'lib/sqlite3/generated/',

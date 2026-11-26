@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # i386-elf クロスツールチェーン (binutils 2.41 + GCC 13.2.0 + newlib 4.4.0 nano) を構築する。
 #
-# 手順の正典は docs/08_build.md §8-5。GitHub Actions (.github/workflows/build.yml, §8-6)
+# 手順の正典は docs/08_build.md §8-5。GitHub Actions (.github/actions/build-setup/action.yml, §8-6)
 # と手元の再構築の両方で使う。build/config.mk が `i386-elf-*` の名前と
 # `$(CROSS_DIR)/lib/gcc/i386-elf/13.2.0` をハードコードしているので版は固定。
 #

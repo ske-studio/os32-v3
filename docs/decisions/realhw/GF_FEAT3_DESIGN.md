@@ -318,7 +318,7 @@ struct gf3_test_ops { struct gf3_ctx *ctx;
 | build/hwdev.mk・sys/dev/hwdev/hwdev_imports.def・docs/design/hwdev/hwdev_imports.md | 各層共有計算/診断変更 | 各層登録担当の直列列。import変更は表/件数も同時、他段は必要性と取得元ヘッダーを報告。 |
 | tools/gen_hwdev_contract.py・tools/hwdev_layout.json・契約/schema/import生成物（sys/kern/module/module_schema.hを含む） | 全層の配置/契約変更 | PMの登録段だけ。生成器の件数/台帳を追随し、生成は全部品統合後に1回。sys/kern/module/module_schema.hはtools/gen_module_schema.pyの生成物で、点検時:259–260にgeforceの上限131072がある。F4 C3がtools/module_schema.pyを変更したらPM登録段で再生成する。B担当による生成/生成物手編集なし。 |
 | test_gf_command.py (旧版 c46a29959fd1)・test_gf_accel.py・test_gf_display.py・test_gf5.py | F2追随、各層B群 | 前者はPM登録段、残りはF3 A2/F4 A2/F5 A3が各1人で所有。BはCHECK/case/変異tupleを報告。 |
-| hwdev_contract_fixture.py・test_dep_dir_a_l02.py・sh_{status,shell,truncation}_host.c・recover_virtual_fixture_host.inc・hwdev_audit.py（tools/tests等） | 契約/ソース追加の波及 | PM登録段が該当分を追随。各実装者は当たる一覧を報告、件数/CRCは可能なら元から導出。 |
+| hwdev_contract_fixture.py・test_dep_dir_a_l02.py・sh_{status,shell,truncation}_host.c・recover_virtual_fixture_host.inc・hwdev_audit.py（当時のホスト試験） | 契約/ソース追加の波及 | PM登録段が該当分を追随。各実装者は当たる一覧を報告、件数/CRCは可能なら元から導出。 |
 | kdebug/gfinit_*・sys/dev/video/geforce/gfinit_mode.h・sys/dev/video/geforce/diag/gf_command_test.c・DEFERRED_TESTS.md | F4 A0、F5 C0/C1、F3 T1、全層台帳 | F4 A0を先行。F5 C0はB1と同一所有者で直列、C1 tables.incはF4 A0後。診断dispatch/台帳はPM登録段へ追加行報告。 |
 
 ### 依存と並列発注

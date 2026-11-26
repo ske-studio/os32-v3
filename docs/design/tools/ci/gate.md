@@ -9,10 +9,10 @@
 |---|---|---|
 | F1 | **変異込みの検査が関門になっていなかった。** 毎回の CI は変異なしで、変異込みは夜間の `full-check` だけだった。2026-11-18 に、build の `checks` と check の PowerPC の段を変異込みにし、`full-check` を無くした | 夜間の full-check は 11-14〜17 の 4 回のうち 3 回が失敗し、同じ SHA の check・build は成功していた。変異の目印が古い検査が、数日〜数週間そのままだった |
 | F2 | **失敗がログから読めない。** 変異の「期待どおりの失敗」の出力が全部 1 本のログに流れる | 11-17 の full-check の失敗ログは 1.4 GB・1,200 万行。そのうち 1,087 万行が同じ 1 行の繰り返し。落ちた検査の名前は `*** [...check-<名>] Error` を grep しないと分からない |
-| F3 | **1 本の失敗が残りを隠す。** 旧手順（4d70e2c233f0 の記録） は最初の失敗で止まる。ジョブの `needs` で後ろのジョブも走らない | check.yml・full-check.yml の ppc-compile は `--run all`。11-17 は ppc-compile が 16 分で落ち、`ppc-qemu` は skipped |
-| F4 | **検査の一覧が YAML に手書きで写っている** | check.yml の static-check は `make check-<名>` を約 30 行並べる (選び方は冒頭の註の手順で人が決めた)。`ppc_scope.py (旧版 d4d22d1c0028)` は共通・PowerPC・x86 のパスの一覧を別に持つ |
-| F5 | **用意の手順がジョブごとに書き写されている** | `apt-get install … gcc-13 qemu-user ccache …` の行が check.yml に 2 回、full-check.yml に 2 回、少しずつ違う中身で在る |
-| F6 | **環境が足りない検査が、飛ばされるか、途中で落ちる** | クロスコンパイラの無いジョブでは PowerPC の検査が SKIP で通る (build.yml の check-fast)。手元では `gcc-13` が無いと `FileNotFoundError` で落ち、変更が原因か環境が原因かをログを読んで判断することになる |
+| F3 | **1 本の失敗が残りを隠す。** 旧手順（4d70e2c233f0 の記録） は最初の失敗で止まる。ジョブの `needs` で後ろのジョブも走らない | 当時の通常・全件検査 の ppc-compile は `--run all`。11-17 は ppc-compile が 16 分で落ち、`ppc-qemu` は skipped |
+| F4 | **検査の一覧が YAML に手書きで写っている** | 当時の検査 workflow の static-check は `make check-<名>` を約 30 行並べる (選び方は冒頭の註の手順で人が決めた)。`ppc_scope.py (旧版 d4d22d1c0028)` は共通・PowerPC・x86 のパスの一覧を別に持つ |
+| F5 | **用意の手順がジョブごとに書き写されている** | `apt-get install … gcc-13 qemu-user ccache …` の行が 当時の通常・全件検査に各 2 回、少しずつ違う中身で在る |
+| F6 | **環境が足りない検査が、飛ばされるか、途中で落ちる** | クロスコンパイラの無いジョブでは PowerPC の検査が SKIP で通る (当時のビルド workflow の check-fast)。手元では `gcc-13` が無いと `FileNotFoundError` で落ち、変更が原因か環境が原因かをログを読んで判断することになる |
 | F7 | **CI と手元で入口が違う** | CI は YAML の中の shell、手元は `make check-<名>` か `run.py --run <名>`。`r1-fixture-host` は後者だと `KeyError: 'BUILD_OUT'` で落ちる (make の変数が要る) |
 | F8 | **時間がかかり、どこが遅いかが成果物を開かないと分からない** | full-check は 1 ジョブで 147 分 (11-17) |
 | F9 | **生成物が基点と同じかを確かめる仕組みが無い** | 移すだけの変更のたびに、手元で `tools/build_compare.py` と `.o` の比較を 20〜40 分かけて回した |
@@ -60,10 +60,16 @@ G9 (道具の試験) は `ci-gate-host`・`sep-identity-host`・`check-times-hos
 
 この棚卸しで分かった事:
 
-1. **キャッシュは枝ごと。** 枝が読めるキャッシュは自分の枝と main の物だけで、main の push は PowerPC の検査を範囲の判定で回さない事があるので、PowerPC のクロスコンパイラのキャッシュは main に無かった。新しい枝の最初の回は、PowerPC の各ジョブが 13〜15 分かけて組んでいた (`ppc-compile` が 4 分の回と 19〜21 分の回があったのはこのため)。check.yml に、main でキャッシュだけを保つジョブ `ppc-toolchain-cache` を足した。
+1. **キャッシュは枝ごと。** 枝が読めるキャッシュは自分の枝と main の物だけで、main の push は PowerPC の検査を範囲の判定で回さない事があるので、PowerPC のクロスコンパイラのキャッシュは main に無かった。新しい枝の最初の回は、PowerPC の各ジョブが 13〜15 分かけて組んでいた (`ppc-compile` が 4 分の回と 19〜21 分の回があったのはこのため)。当時の検査 workflow に、main でキャッシュだけを保つジョブ `ppc-toolchain-cache` を足した。
 2. **検査の秒は、並んで回るほかの検査に左右される。** build のシャードの中は検査を並列に回すので、記録の秒は CPU を取り合った分を含む。同じ検査が回ごとに ±5 割動き、割り振りを変えると値も変わる。秒の中央値で重みを作り直しても揃わなかった。CPU 時間で測る形にするのが筋で、票 TASK_CI_REWORK の段に入れた。
 3. **QEMU の検査が x86 のシャードで「重い検査」として数えられている。** 12 本は x86 のシャードでは 1〜2 秒で終わる (ゲストを起動しない) のに、割り振りでは予算の値 (合計 13,500 秒、x86 の検査の実測の合計 22,346 秒の 6 割) で数えられ、それが入ったシャードは実際には軽かった。実測の重み (合計 3,638 秒) を入れて偏りの元は 4 分の 1 になった。x86 のシャードから外す (SKIP で通さない) のは票の段 S6。
 4. **変異の試験が落とすコアファイルが、別の検査を落とす。** qemu-user の中の試験をわざと落とす変異が `qemu_fixture_<時刻>_<pid>.core` を作業木の根に残し、同じシャードで同時に走った `check-map` が「宣言の無いファイル」として落ちた (`8078bf349` の checks (3))。割り振りが変わって重なっただけで、前から在った競合。旧手順（4d70e2c233f0 の記録） が検査を始める前にコアの上限を 0 にする形に直した。
+
+### 作り直し前との比較に使う記録
+
+2026-11-25 の直近 20 push（確定した 18 件のうち成功 15 件）の最長所要は 2,999 秒。統合枝 `3b1cecee3` の全件 CI は check 45568507923・build 45568508091。取得できた 30 ジョブの本文は合計 139,581,115 バイト。RED の結果形式に合う 9,042 行には個別の結果とその総括の重複があり、SKIP の 123 行も大半を検査名に帰属できなかった。**移行前の変異総数は不明**。現行の比較には登録ごとの宣言数・実行数・検出数と通常・変異の所要を使う。
+
+P3 の生成物比較の基点はタグ `v3-pre-restructure` のコミット `c23d187bc0621f51cea1883df032ef058526cf88`。P3 の受入記録では check 45661182928 と build 45661182759 はともに成功。保存した `SHA256SUMS` の SHA-256 は `8b5842ab79085c63ab70c3178823dffd7febd2e258ce04e6bd73a73679bf5639`。
 
 ## 5-2. 揺れの調べ (2026-11-18、票 TASK_CI_REWORK の段 S0)
 
@@ -72,7 +78,7 @@ G9 (道具の試験) は `ci-gate-host`・`sep-identity-host`・`check-times-hos
 | 用意の `rustup toolchain install` が `rust-src` の `detected conflict` で落ちる (run 44234810239 の 1 回目、`ppc-qemu (0)`) | 直近の check・build・sep の 49 ジョブのログ | 落ちた 1 本だけが `using existing install for nightly-2026-04-29` で始まった (ほかの 48 本は部品 4 つを新しく取る)。この手順より前に rustc を呼ぶ手順は無く、runner が rust-src のファイルは在るが部品として登録されていない toolchain を持っていた。手元で同じ状態 (`multirust-config.toml` と `components` から rust-src を外し、ファイルは残す) を作ると、同じ conflict で落ちる | `.github/actions/build-setup`: toolchain が在って rust-src が登録されていなければ、消してから入れる。判定はリポジトリの外で `RUSTUP_AUTO_INSTALL=0` を付けて打つ — 中で打つと `rust-toolchain.toml` を読んだ rustup が判定の前に toolchain を入れてしまう (最初の直し `af58ea349` の 10 回では 62 ジョブ全部がそうなり、判定が runner の元の状態を見ていなかった) |
 | `ppc-sd-link` の QMP EOF (run 44016465654、11-17、枝 wt/sep-ci の build の checks 2/6) | その回のログ、同じ回の `ppc-mmu` | 揺れではない。用意に `qemu-system` (mac99 の VGA の ROM = seabios) が無く、QEMU が起動直後に終わった。同じ回の PowerPC の QEMU の検査 11 本が同じ形で落ちている。QEMU の stderr は成果物に残っていなかった | `50da7775f` (gate-setup に qemu-system、`gate.py` の道具の事前確認に firmware と VGA の ROM) で直っている。PowerPC の台本に潜む競合 2 つ (`sd_run.py` の UDP の口を閉じてから QEMU に bind させる間、`mmu_run.py`・`run.py` の `build/out/ppc` の固定の名前) は、証拠は無く PowerPC の PM が平時に直す |
 
-10 回の確かめ (`af58ea349`、`gh workflow run check.yml -f arch=both` を 10 回): 10 回とも success。`ppc-sd-link`・`ppc-usb` は各回の `ppc-qemu` で回って通った (各 150〜182 秒・約 430 秒)。用意の失敗は 0。
+10 回の確かめ (`af58ea349`、当時の検査 workflow を `arch=both` で手動起動): 10 回とも success。`ppc-sd-link`・`ppc-usb` は各回の `ppc-qemu` で回って通った (各 150〜182 秒・約 430 秒)。用意の失敗は 0。
 
 判定の直しの後の 10 回 (`1ee8d5090`、同じく `arch=both` で 10 回): 10 回とも success。rustup の用意は 62 ジョブで、auto-install 0・部品を新しく取った 62・壊れた toolchain を見つけて消した 0・conflict 0 (この 10 回では runner の壊れた状態は出なかった)。`ppc-sd-link`・`ppc-usb` は各回で回って通った (11 回ずつ、push の回を含む)。票の基準 (5) を満たした。
 
@@ -108,7 +114,7 @@ push から最後のジョブが終わるまで (run の created_at → 最後�
 | 区分 | run の結果 | 所要 |
 |---|---|---|
 | check の push 20 回 | success 15・failure 5・cancelled 0 | 上の表 |
-| build の push 20 回 | success 9・failure 4・cancelled 7 (同じ枝の次の push で打ち切り。build.yml の `concurrency: cancel-in-progress`) | 上の表 |
+| build の push 20 回 | success 9・failure 4・cancelled 7 (同じ枝の次の push で打ち切り。当時のビルド workflow の `concurrency: cancel-in-progress`) | 上の表 |
 | check の dispatch 20 回 (11-14、古い形) | success 19・cancelled 1 | static-check 4.7 (3.5〜5.7) 分、ppc-compile 1.0 (0.8〜14.6) 分、全体 中央 5.1・最大 14.7 分 |
 | build の dispatch 20 回 | success 12・failure 2・cancelled 6 | 今の形の `checks` 17.0 (9.3〜34.6) 分 (n=24)、古い形の `check-fast` 5.5 (3.4〜12.2) 分 (n=70) |
 | S0 の dispatch 20 回 (同じ SHA の揺れの確かめ) | success 20 (ジョブも 140 本全部 success、ppc-toolchain-cache は skipped) | 実行は ppc-compile 4.3 (3.2〜8.7)・ppc-qemu 15.7 (12.9〜22.5)・static-check 4.8 (3.7〜13.0) 分。20 本を同時に起動したので待ちが中央 40〜43 分・最大 95 分、全体は中央 63.4・最大 111.2 分 (所要の基準には使えない) |
@@ -144,7 +150,7 @@ build の dispatch:
 #### 4. main への push で PowerPC の段が中身を回すか
 
 - **変更前の実測。** 標本の main の push 5 回 (44290201312・44290142172・44277658303・44276821812・44274576283) は 5 回とも `Select PPC scope` の出力が `skip: x86-only, documentation-only, or empty branch delta`。ppc-compile 0.1〜0.2 分、ppc-qemu 4 本 0.1〜0.3 分 (用意以降の手順は飛ぶ)。ppc-toolchain-cache だけが 0.2〜0.4 分で走る
-- 規則 (`ppc_scope.py (旧版 d4d22d1c0028)`): `PPC_ARCH` は push では `auto` (dispatch だけ入力の arch)。`x86` → skip、`ppc`・`both` → 回す、枝の名前が `wt/int-` で始まれば回す。それ以外は `git merge-base origin/main HEAD` から HEAD までの差分のパスを見て、docs/・*.md は飛ばし、共通の置き場 (kernel/・lib/・include/ …)・PowerPC の置き場・`build/*.mk`・決まったファイル (Makefile・check.yml など) があれば回す、x86 だけの置き場は飛ばし、知らない置き場は控えめに回す。差分が空なら skip
+- 規則 (`ppc_scope.py (旧版 d4d22d1c0028)`): `PPC_ARCH` は push では `auto` (dispatch だけ入力の arch)。`x86` → skip、`ppc`・`both` → 回す、枝の名前が `wt/int-` で始まれば回す。それ以外は `git merge-base origin/main HEAD` から HEAD までの差分のパスを見て、docs/・*.md は飛ばし、共通の置き場 (kernel/・lib/・include/ …)・PowerPC の置き場・`build/*.mk`・決まったファイル (Makefile・検査 workflow など) があれば回す、x86 だけの置き場は飛ばし、知らない置き場は控えめに回す。差分が空なら skip
 - main の push は before→HEAD が文書だけなら PowerPC を省く。コードを含む場合は同じ SHA の `wt/int-*` の check の push が成功していれば省き、それ以外は x86 だけの変更でも compile と QEMU 6 本を回す。強制 push・before の欠落時も全部回す。 導入後の main push 20 回で、省略と実行の本数・所要を測る。
 - 枝でも飛ぶ例: wt/ppc-kapi-fill の 2 回 (44290719097・44289493633) は差分が x86 と文書だけと判定されて skip
 
@@ -175,7 +181,7 @@ static-check の Check map は 5 分、Host tests は 6 分（検査本体の実
 
 | ジョブ | 回る時 | ふだんの所要 | 上限 |
 |---|---|---|---|
-| `ppc-layout-inventory` (check.yml) | 像の配置に効くファイルを触った push の時だけ (旧手順（4d70e2c233f0 の記録）。kernel.ld・memmap.h・platform_*_layout.h・build/images・ppc-powermac.mk・root の生成の道具・sdk/kapi.json ほか)。当たらない時は SKIP の理由の行 | 約 31 分 (195 像) | 90 分 |
+| `ppc-layout-inventory` (当時の検査 workflow) | 像の配置に効くファイルを触った push の時だけ (旧手順（4d70e2c233f0 の記録）。kernel.ld・memmap.h・platform_*_layout.h・build/images・ppc-powermac.mk・root の生成の道具・sdk/kapi.json ほか)。当たらない時は SKIP の理由の行 | 約 31 分 (195 像) | 90 分 |
 
 ふだんは代表の 1 検査 `ppc-root-lz4-layout-host` (製品 5 像・最大の受入 3 像・64 KiB の整列の跳ね) だけが ppc-qemu の組で回る。2026-11-22 の 10 組の割り振りと、同日の 8 組の実測 4 回の中央値による所要の見積もりは次のとおり。
 

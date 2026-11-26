@@ -29,7 +29,7 @@ sys/kern/ver_collect.c と sys/kern/ver_format.c は C_COMMON_EXEC で両機種�
 1. **前提**: `build/config.mk` の新しいディレクトリの一覧が 1 つの変数 (`KERNEL_SRC_DIRS`) にあり、各 `INC_*` はそれを引く形になっていること (L1 では行ごとに書き足したので、L2 の最初にまとめる — 並びを変えずに、成果物のバイト一致で確かめる)。
 2. 対応表 JSON を書く (`[{"from": "kernel/paging.c", "to": "sys/kern/mm/paging.c"}, …]`)。名前は変えない。
 3. `python3 tools/move_files.py <表> --dry-run` → 置換の件数と「置換しきれない一覧」を見る → 適用。
-4. 一覧に出た所を手で直す (ビルドの `*-module.mk`・`kdebug.mk`・`os32.ld` のパスで選ぶ規則、試験の分割パスなど)。直したファイルと行を報告に書く。
+4. 静的な置換から漏れるパス（変数で組み立てる Make の前提、分割されたリテラル、glob や動的 import）を、展開後の入力と利用者の手順で照合する。一覧に出た所を手で直す (ビルドの `*-module.mk`・`kdebug.mk`・`os32.ld` のパスで選ぶ規則、試験の分割パスなど)。直したファイルと行を報告に書く。
 5. 新しいディレクトリを `KERNEL_SRC_DIRS` (→ INC_KERNEL ほか) と、最上位なら `tools/source_roots.py` に足す。
 6. 生成物は入力 (`sys/kern/module/kdebug_imports.def`・`sys/dev/hwdev/hwdev_imports.def`・`tools/prototypes/*_imports.def`) の置換と .mk の修正の後、適用時の JSON の `regenerate` にあるターゲットを `make` に渡して作り直す。古い `.d` が消えたファイルを指して make が止まったら `build/out/obj` の `.d` を消して組み直す。
 7. 完了条件 (下) を満たして報告。

@@ -354,7 +354,7 @@
 - host executable は -nostdlib、独自 _start/exit、libc/libmなし。真のx87側はinline asm、入力/出力bit列と状態を比較する。
 - Sandbox の host32 は qemu を使用し、privileged CR0/IDT操作はhookで検査。QEMU対照を「実hardware x87」と呼ばない。
 - 実hardware対照は同一fixtureを sandbox外の通常WSLでnative実行して採取する。既存SIGSYS制限を回避できたと仮定しない。
-- 変異anchorは一意、実行assert/exit REDを記録。静的命令監査のREDは別列扱い。変更/削除anchorは既存tools/testsから移す。
+- 変異anchorは一意、実行assert/exit REDを記録。静的命令監査のREDは別列扱い。変更/削除anchorは当時のホスト試験から移す。
 - NP21/W は **iniでno-FPUを作れる**。NekoProject21 の cpu_fami=3/cpu_mode=0（386）、4/2（486SX）、または cpu_feat bit0=0。
 - 手元 source: `/home/hight/np21w-src` HEAD `a535090400660e8b37350d91aa959a9a2442b7ba`。cpu.h:519/:647、system_inst.c:298 を確認した。
 - 同版 pccore.c:723 は全設定0だと既定全機能に戻る。再現iniは family/model と明示feature maskを保存し、実効値を読戻す。

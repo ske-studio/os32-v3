@@ -27,7 +27,7 @@
 | 部分 | 候補 | 理由・注意 |
 |---|---|---|
 | 翻訳の原本 (人が編集する形) | **GNU gettext の PO 形式** — `msgctxt` = 区分、`msgid` = key、`msgstr` = 訳文 | 翻訳者の道具 (Poedit など)、差分の取り込み (`msgmerge`)、未訳・あいまい訳の印 (`fuzzy`) がそのまま使える。ID を `msgid` に入れる「キー方式の PO」は一般的な使い方。英語の原文も PO (`en`) に置くか、ソースの内蔵文字列から抽出するかは設計で |
-| ホストの生成器 | Python の PO 読み取り (`polib`、または GNU gettext の `msgfmt` で `.mo` → Python 標準の `gettext` モジュールで読む) → SQLite (`mk_settings_db.py` と同じ流儀で `messages.db` を作る) | 今は `polib` も `msgfmt` も入っていない — 依存の追加は設計票で決める (CI の `build.yml` にも) |
+| ホストの生成器 | Python の PO 読み取り (`polib`、または GNU gettext の `msgfmt` で `.mo` → Python 標準の `gettext` モジュールで読む) → SQLite (`mk_settings_db.py` と同じ流儀で `messages.db` を作る) | 今は `polib` も `msgfmt` も入っていない — 依存の追加は設計票で決める（CI のビルド環境も対象） |
 | 番号付き引数の書式 | **POSIX の `%n$` 書式** (`"%2$s を %1$s にコピー"`) | gettext の `c-format` 検査が引数の数・型の食い違いを見つける。**注意: 今の newlib は nano 構成 (`--enable-newlib-nano-formatted-io`、[08_build.md](../../08_build.md)) で、nano の printf は `%n$` を扱わない** — 選択肢は (a) 番号付きを扱う小さな前処理 (引数を並べ替えて通常の printf へ渡す)、(b) newlib の位置引数の構成 (`--enable-newlib-io-pos-args`、nano と両立しない — 容量の実測が要る)。どちらにしても書式そのものは POSIX のまま。Rust 側は `format!` の番号付き引数 (`{0}`) に写すか、同じ前処理を使う |
 | 複数形・数の書き方 | gettext の `Plural-Forms` (英語・日本語では要るのは英語だけ) | 最初は英語の 2 形だけ。言語を増やすときに CLDR の規則へ |
 | 言語の指定 | `settings.db` の `system` 区分に 1 キー (`locale/lang` など、値は BCP 47 の言語タグ `en` / `ja`) | `TASK_CONTROL_PANEL` の項目に入れる |
