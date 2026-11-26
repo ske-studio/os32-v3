@@ -9,7 +9,7 @@ OS32 is a 32-bit bare-metal OS for NEC PC-9801/9821 machines (x86) and the Power
 - **Devices** live in `sys/dev/`, including video backends in `video/` and HWDEV in `hwdev/`. Feature and image configurations live in `sys/conf/`.
 
 CI checks include and link dependencies with `include_layers` and `link_layers`. Common code uses device declarations in `sys/include/<name>_contract.h` and fixed-name interfaces such as `platform_<name>.h` for machine-specific implementations. The fix table is `docs/design/tools/check_layers.md` §8. The `ppc_common_compile` check compiles common sources for PowerPC.
-Declare each new source's owner in `build/sources/ownership.mk` for the `src_owner` and `build_sources` checks.
+Declare each new source's owner in `build/sources/ownership.mk` and register its build configurations through a source set covered by `OWN_COMPILE_SET` or a per-file `OWN_COMPILE` entry. Verify with `src_owner` and `build_sources`.
 
 See `docs/08_build.md` §8-3 for the tree. `userland/` contains the shell, commands, libraries, and tests. `sdk/` provides application headers, startup code, and Rust bindings. `apps/` and `game/` are independent Git submodules. Assets live in `assets/`; build rules and host tools live in `build/` and `tools/`.
 

@@ -29,6 +29,8 @@ description: CPU・機種・装置の分離を壊さずにコードを足す・�
 | 機種だけの番地 | 機種のヘッダに置く (PC-98 の起動と低位メモリは `sys/platform/pc98/platform_boot_layout.h`)。OS の配置は `sys/include/memmap.h`。地図の道具 `tools/gen_memmap.py` は両方を読む (`PLATFORM_HDR_RELS`) |
 | `-D` で名前を差し替えたい | しない。口 (関数・固定名のヘッダ) にする |
 
+固定名の契約ヘッダは各実装のパスを `build/sources/ownership.mk` の `OWN_HEADER` に `fixed_contract` として宣言する。層を越えて関数・データを参照するとき、`link_layers` は参照側が読んだ契約ヘッダ（`OWN_CONTRACT` または `fixed_contract`）の宣言と、提供側の定義のシグネチャ・型の一致を確かめる。アセンブリの提供側は対応する契約ヘッダを `OWN_ASM_CONTRACT` に登録する。
+
 ## 3. 確かめる
 
 ```bash
