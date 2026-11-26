@@ -831,6 +831,8 @@ def main():
                         help='CD 媒体の構成 (build/packages.yaml)。中身は配備マニフェストのタグから決める')
     parser.add_argument('--check-plan', action='store_true',
                         help='--plan の振り分けだけ検査する (ファイルは読まない)')
+    parser.add_argument('--fd-inputs', action='store_true',
+                        help='起動 FD に必要な Make 入力をビルド前に列挙する')
     parser.add_argument('--fd-args', action='store_true',
                         help='--plan の fd: から起動 FD の mkfat12 --tree 引数 (fd=host …) を出す')
     parser.add_argument('--fd-loader',
@@ -865,15 +867,16 @@ def main():
                     print(f"  {len(data):>9}  {name}")
                 else:
                     print(f"  {'<dir>':>9}  {name}")
-    elif args.plan and args.fd_args:
+    elif args.plan and (args.fd_args or args.fd_inputs):
         files, problems = fd_plan(load_plan(args.plan), args.base, args.fd_loader)
-        problems += [f"{h} not found (FD {g})" for g, h in files
-                     if not os.path.isfile(os.path.join(args.base, h))]
+        if not args.fd_inputs:
+            problems += [f"{h} not found (FD {g})" for g, h in files
+                         if not os.path.isfile(os.path.join(args.base, h))]
         if problems:
             for p in problems:
                 print(f"ERROR: {p}", file=sys.stderr)
             sys.exit(1)
-        print(' '.join(f"{g}={h}" for g, h in files))
+        print(" ".join(h if args.fd_inputs else f"{g}={h}" for g, h in files))
     elif args.plan and args.check_plan:
         resolved, problems = expand_plan(load_plan(args.plan), args.base)
         for p in problems:

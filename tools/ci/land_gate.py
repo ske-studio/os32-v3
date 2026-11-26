@@ -12,6 +12,7 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 from urllib.parse import urlencode
 from pathlib import Path
 
@@ -19,6 +20,10 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from deploy_manifests import CORE_MANIFEST_RELPATHS
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+from tests.support.impact import comparison
 
 
 def command(*args, timeout=30):
@@ -145,6 +150,34 @@ def verify_boot(base, repo, workflow, run, artifacts, boot):
         raise ValueError('invalid boot evidence')
 
 
+def planned_boots(base, run, artifacts):
+    sha, attempt = run["head_sha"], run["run_attempt"]
+    matches = [row for row in artifacts if row["name"] == f"plan-{attempt}" and not row["expired"]]
+    if len(matches) != 1:
+        raise ValueError("missing unique candidate selection plan")
+    artifact, = matches
+    data = command("gh", "api", f"{base}/artifacts/{number(artifact['id'])}/zip")
+    if artifact["digest"] != "sha256:" + hashlib.sha256(data).hexdigest():
+        raise ValueError("selection artifact digest mismatch")
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        plan = json.loads(archive.read("plan.json"))
+    previous = command("git", "rev-parse", "origin/main").decode().strip()
+    command("git", "merge-base", "--is-ancestor", previous, sha)
+    identity = dict(sha=sha, kapi_base=previous, run=str(run["id"]), attempt=str(attempt),
+                    mutate=True, gate="main")
+    rows = tomllib.loads(command("git", "show", f"{sha}:tests/registry.toml").decode())["check"]
+    expected = comparison(ROOT, rows, previous, sha, False)
+    if (plan["identity"] != identity or plan["base"] != previous or plan["selection"] != expected
+            or [[e["id"], e["config"]] for e in plan["entries"]] != expected["entries"]):
+        raise ValueError("candidate selection plan differs from current main comparison")
+    machines = set()
+    if expected["pc98"] != "none":
+        machines.add("pc98")
+    if expected["powerpc"]:
+        machines.add("powermac")
+    return machines
+
+
 def verify(repo, sha, evidence):
     workflow = 'restructure-build.yml'
     base = f'repos/{repo}/actions'
@@ -160,6 +193,7 @@ def verify(repo, sha, evidence):
     marker = f"verified-{sha}-a{attempt}"
     if sum(row["name"] == marker and not row["expired"] for row in artifacts) != 1:
         raise ValueError("candidate artifact is BUILT, VERIFIED required")
+    required = planned_boots(base, run, artifacts)
     machines = set()
     for boot in evidence['boots']:
         machine = boot['machine']
@@ -167,8 +201,8 @@ def verify(repo, sha, evidence):
             raise ValueError('both boot records must be from the candidate')
         verify_boot(base, repo, ident, run, artifacts, boot)
         machines.add(machine)
-    if machines != {'pc98', 'powermac'}:
-        return ['both PC-98 and PowerMac boot records required']
+    if machines != required:
+        return [f"candidate boot records required for {sorted(required)}"]
     return []
 
 

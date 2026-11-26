@@ -8,7 +8,7 @@ description: レビューを通った段 (作業木のブランチ) を push し
 規則の正典は [ROLES §0](../../../docs/tasks/agents/ROLES.md) (検査の段、全体検査は節目、検査中も main を編集してよい)。
 ここはその手順を 1 本にしたもの。
 
-> **作り直し票の取り込み**は `wt/int-*` の候補 SHA を push し、`restructure-build` の同じ run の最新 attempt の全ジョブと全件集計（変異込み）の成功を待つ。`python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` に候補の sha・run_id・attempt・boots を渡す。boots は今回の PC-98 と PowerMac の媒体・sha256・artifact_id・到達点・ログ。文書だけでも両方を取り直す。再生成の一致は登録の build_identity が確かめる。古い検査は関門ではない (P7 で消す)。参考に読むだけ。[CI 設計 §4・§8](../../../docs/design/tools/ci/ci_v2.md)
+> **作り直し票の取り込み**は `wt/int-*` の候補 SHA を push し、`restructure-build` の同じ run の最新 attempt のplan で選んだジョブと検査の集計（変異込み）の成功を待つ。`python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` に候補の sha・run_id・attempt・boots を渡す。boots は計画で選んだ機種の今回の媒体・sha256・artifact_id・到達点・ログ。文書だけでも両方を取り直す。再生成の一致は登録の build_identity が確かめる。古い検査は関門ではない (P7 で消す)。参考に読むだけ。[CI 設計 §4・§8](../../../docs/design/tools/ci/ci_v2.md)
 
 次は P4 の実測例。毎回、候補の実測値と読めるログ・媒体のパスに置き換える。PC-98 の reached には selftest の成功数と失敗数 0 を記録する。land_gate.py は PC-98 の boots に整数の `selftest_fail` があり、値が 0 であることを確かめる (U27)。
 
@@ -78,14 +78,14 @@ GitHub の CI (ユーザー決定 2026-11-05、メインストリームを含む
 | 何を入れたか | 検査 |
 |---|---|
 | 文書だけ | push 前に対象の登録検査を ID で回す。取り込みは次の行と同じ。 |
-| すべての取り込み | 候補 SHA を `wt/int-*` に push し、今回の両機種の起動記録を揃えて `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` の成功を確かめる。 |
+| すべての取り込み | 候補 SHA を `wt/int-*` に push し、計画で媒体を作る各機種の今回の起動記録を揃えて `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` の成功を確かめる。 |
 
 - 待ちには上限を付ける。取り込み直しは PARALLEL_BRANCHES §3 の G と M の手順に従う。
 - 並列の枝が先に main に入ったら、main を取り込んで push し直し、CI を通し直す。
 
 ## 3-1. ゲストの受入と実機は CI の成果物から
 
-`tools/ci_fetch.sh --sha <SHA> --wait` で同じ run の最新 attempt の VERIFIED 媒体を使い、機種ごとに媒体・sha256・artifact_id・到達点・ログを記録する。
+`tools/ci_fetch.sh --sha <SHA> --wait` で PC-98 の媒体を取る。PowerMac は同じ run の最新 attempt の VERIFIED を確認し、計画にある `ppc-<image>-<SHA>-a<attempt>` を取得する。対象機種ごとに媒体・sha256・artifact_id・到達点・ログを記録する。
 
 ## 4. 落ちたとき
 
@@ -124,3 +124,5 @@ git push -q origin main
 - 台帳の行を閉じるとき: 証拠 (RESULT.md) を確かめ、閉鎖台帳 (アーカイブ: `docs/archive/v3/DEFERRED_CLOSED.md`) の末尾へ
   `| ID | 中身 | 日付 | 証拠の所在 — 何で閉じたか |` を足し、現行の台帳から行を消して状態行を更新。
 - 節目では HANDOVER の §1 (KAPI の版など) と §2 (次の一手) を書き換える。
+
+取り込み前に最新 attempt の plan.json で main の基点、対象の媒体・検査、対象外の理由を確認する。plan が欠けた run は取り込めない。
