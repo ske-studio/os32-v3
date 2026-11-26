@@ -76,7 +76,7 @@ jobs:
             sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-${{ hashFiles('lib/sqlite3/**') }}-
             sqlite-${{ runner.os }}-${{ steps.sqlite-cache-key.outputs.compilers }}-
 
-      # tools/check_docs_links.py は lychee を PATH か ~/.cargo/bin に探し、無ければ SKIP (rc=0)
+      # tools/ops/check_docs_links.py は lychee を PATH か ~/.cargo/bin に探し、無ければ SKIP (rc=0)
       # で通ってしまう。CI では必ず入れて実際に検査させる (版と sha256 を固定した prebuilt binary)。
       - name: Cache lychee archive
         id: lychee-cache

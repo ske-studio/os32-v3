@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""文書の行番号つきの参照の検査 (tools/check_doc_line_refs.py) を、偽の木で確かめる。"""
+"""文書の行番号つきの参照の検査 (tools/ops/check_doc_line_refs.py) を、偽の木で確かめる。"""
 import argparse
 import contextlib
 import importlib.util
@@ -12,7 +12,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-TOOL = ROOT / 'tools/check_doc_line_refs.py'
+TOOL = ROOT / 'tools/ops/check_doc_line_refs.py'
 
 
 def load(path):

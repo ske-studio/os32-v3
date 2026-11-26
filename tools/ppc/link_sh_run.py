@@ -148,7 +148,7 @@ P3_STIMULUS
         opts.extend(['PPC_RES_MUT_SRC='+extra_user, 'PPC_RES_MUT_FILE='+str(source)])
     if observe_flow:
         source = 'sys/kern/exec/exec.c'
-        observer = ROOT/'tools/accept/ppc_shell_flow.inc'
+        observer = ROOT/'tools/ppc/ppc_shell_flow.inc'
         sources[source] = (ROOT/source).read_text() + '\n#include "'+str(observer)+'"\n'
         opts.append('KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=ppc_trap_dispatch,--wrap=exec_run')
     require(len(sources) <= 3, 'kernel mutation slots')
@@ -837,7 +837,7 @@ def flow_settings(folder, case):
             if case == 'return-target':
                 text = replace_once(text, 'parent = appslot_return_target(id);', 'parent = id;')
         (folder/fragment).write_text(text)
-    observer = ROOT/'tools/accept/ppc_shell_flow.inc'
+    observer = ROOT/'tools/ppc/ppc_shell_flow.inc'
     (folder/'exec.c').write_text(source + '\n#include "' + str(observer) + '"\n')
     entry = (ROOT/'sys/arch/ppc/exec_enter.S').read_text()
     # Record the actual branch before an invalid root can be used by the MMU.

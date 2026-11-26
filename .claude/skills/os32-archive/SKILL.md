@@ -33,9 +33,9 @@ git grep -n "$T" -- docs/tasks/DEFERRED_TESTS.md          # 持越しの台帳
   (既に在れば節を足す。仕様に同じ契約が在ればその節を引き先に) (4) 覚えの「票:」「契約の正典は」を設計書のパスと節に替える。
 書き方: 行番号でソースを指さない。設計書にアーカイブのパスを書かない。設計書どうしの相互リンクを作らない。
   無効な記述は削除。確かめていない事は書かない。冒頭は「# <パス> — 設計」「> 状態: **現行 (日付)** — 出所: …」「ソース: `…`」。
-触らない物: ソース・試験のコードとその註、tools/archive_refs_baseline.json、docs/INDEX.md、docs/archive/、
+触らない物: ソース・試験のコードとその註、tools/ops/archive_refs_baseline.json、docs/INDEX.md、docs/archive/、
   docs/design/**/README.md、担当の外の覚え。
-最後に: git add -N の後、python3 -B tools/check_doc_line_refs.py と tools/check_docs_links.py。
+最後に: git add -N の後、python3 -B tools/ops/check_doc_line_refs.py と tools/ops/check_docs_links.py。
 報告 (30 行以内): 書いた設計書 / 付け替えた覚えと残した参照 / 票・覚えと今のソースの食い違い (不具合の疑いは別に) / 確かめられなかった事。
 ```
 
@@ -61,7 +61,7 @@ python3 -B tools/doc_delink_archive.py               # 文字に戻す
 
 ```bash
 git add -A -N .
-python3 -B tools/check_archive_refs.py --write-baseline     # 来歴の註・覚えの件数が変わった時
+python3 -B tools/ops/check_archive_refs.py --write-baseline     # 来歴の註・覚えの件数が変わった時
 for id in docs_links docs_navigation docs_source_refs docs_status; do
     python3 -B -m tests.infra.ci run --check "$id" || exit 1
 done

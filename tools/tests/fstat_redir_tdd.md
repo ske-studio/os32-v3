@@ -159,7 +159,7 @@ TARGET i386-elf -Werror COMPILE PASS (sys/fs/fd_redirect.c)
 | 食い違い (§1 の不具合) | `fstat`=CHR / `isatty`=0 | **FAIL 3/5** | FAIL 4/5 (気づけない) |
 | FS が応えない | `stat`/`fstat` が失敗 | FAIL 1/5 | FAIL 1/5 |
 
-`tools/tests/guest_tests.txt` の `stat_t # PASS 5/5` は据え置き (件数は 5 のまま)。
+`tools/guest_tests.txt` の `stat_t # PASS 5/5` は据え置き (件数は 5 のまま)。
 
 ## 確かめていないこと ([V4])
 

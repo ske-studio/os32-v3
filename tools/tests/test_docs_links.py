@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import check_docs_links as links
+from ops import check_docs_links as links
 
 
 @unittest.skipUnless(links.find_lychee(), 'lychee is not installed')

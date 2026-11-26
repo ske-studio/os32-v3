@@ -4,7 +4,7 @@ python3 -B tools/tests/test_src_layout.py [--mutate]
 Mutants run the same normal cases in small independent trees.
 """
 CHECK = dict(name='src-layout-host', tier=1,
-    covers=['sys/platform/pc98/ver_backend.c', 'sys/dev/hwdev/hwdev_module.c', 'sys/platform/pc98/sysclk.c', 'sys/platform/pc98/kernel.c', 'sys/platform/pc98/boot_display.c', 'sys/platform/pc98/boot_platform.c', 'sys/platform/pc98/boot_splash.c', 'platform/pc98/boot_*.h', 'platform/pc98/*.inc', 'sys/platform/powermac/ppc_kernel.c', 'sys/platform/pc98/gfx_scroll.c', 'sys/platform/pc98/gfx_init.c', 'sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_surfaces.c', 'sys/platform/pc98/boot_capture.c', 'sys/platform/pc98/bios_snapshot.c', 'sys/platform/pc98/bootinfo_report.c', 'sys/platform/pc98/bootinfo_geom.c', 'sys/platform/pc98/bootinfo_check.c', 'sys/platform/pc98/bootinfo_capture.c', 'sys/dev/video/geforce/gf_accept.c', 'sys/dev/video/geforce/gf_wc.c', 'sys/kern/module/kdebug_imports.def', 'tools/source_roots.py', 'tools/check_arm_compile.py', 'sys/platform/pc98/kernel.c', 'sys/kern/mm/paging.c', 'sys/arch/x86/kernel/idt.c', 'sys/dev/ata/ide.c', 'sys/dev/ata/cd_module.c', 'sys/dev/video/geforce/geforce_platform.c', 'sys/platform/pc98/video/backend_pc98.c', 'sys/platform/pc98/video/cirrus/cirrus_identify.c', 'sys/fs/ext2/ext2_super.c', 'sys/fs/fat/fatfs/ff.c', 'sys/fs/serialfs/serialfs_session.c', 'sys/fs/serialfs/sfs_session_fg.c', 'tools/move_files.py', 'tools/include_resolve.py', 'tools/build_compare.sh', 'tools/build_compare.py', 'tools/gen_build_id.py', 'sys/kern/kdebug/kdebug_module.c', 'sys/kern/ver_format.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/test_ver_version.py', 'tools/tests/ver_test_utils.py', 'tools/tests/kernel_includes.py', 'sys/arch/x86/kernel/kentry.asm', 'boot/loader_fat_new.asm', 'build/kernel.mk', 'build/os32.ld', 'sys/dev/ata/cd_body.c', 'sys/dev/block/fdc.c', 'sys/dev/block/loop_dev.c', 'sys/platform/pc98/input/mouse.c', 'sys/dev/net/e82557/lan_body.c', 'sys/dev/net/e82557/lan_module.c', 'sys/dev/net/ne2000/lgy98.c', 'sys/dev/net/ne2000/ne2000.c', 'sys/dev/sound/cs4231/pcm_body.c', 'sys/dev/sound/cs4231/pcm_module.c', 'sys/dev/sound/fm/fm_body.c', 'sys/dev/sound/fm/fm_module.c', 'sys/dev/video/cirrus/backend_cirrus.c', 'sys/dev/video/cirrus/cirrus_body.c', 'sys/dev/video/cirrus/cirrus_module.c', 'sys/dev/video/geforce/backend_geforce.c', 'sys/dev/video/geforce/geforce_body.c', 'sys/dev/video/geforce/geforce_module.c', 'sys/dev/video/geforce/gf_present.c', 'sys/dev/video/kcg/kcg_body.c', 'sys/dev/video/kcg/kcg_module.c', 'sys/platform/pc98/video/backend_pegc.c', 'sys/platform/pc98/video/pc98_route.c', 'sys/fs/fd_redirect.c', 'sys/fs/pipe_buffer.c', 'sys/kapi/kapi_generated.c', 'lib/lz4.c', 'lib/sqlite3/os32_sqlite_test.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'sys/kern/mm/shm.c', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/generations.ld', 'sdk/link/shlib.ld', 'sdk/os32_generations.py', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/generations.rs', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/check_artifacts.py', 'tools/clang_ast/build.py', 'tools/gen_hwdev_pair.py', 'tools/gen_kdebug_imports.py', 'tools/gen_memmap.py', 'tools/gen_sqlite_imports.py', 'tools/mkmod.py', 'tools/mkshlib.py', 'tools/module_schema.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'sys/platform/pc98/ime_display.c', 'sys/platform/pc98/ime_render_tvram.c'],
+    covers=['sys/platform/pc98/ver_backend.c', 'sys/dev/hwdev/hwdev_module.c', 'sys/platform/pc98/sysclk.c', 'sys/platform/pc98/kernel.c', 'sys/platform/pc98/boot_display.c', 'sys/platform/pc98/boot_platform.c', 'sys/platform/pc98/boot_splash.c', 'platform/pc98/boot_*.h', 'platform/pc98/*.inc', 'sys/platform/powermac/ppc_kernel.c', 'sys/platform/pc98/gfx_scroll.c', 'sys/platform/pc98/gfx_init.c', 'sys/platform/pc98/gfx_selector.c', 'sys/platform/pc98/gfx_surfaces.c', 'sys/platform/pc98/boot_capture.c', 'sys/platform/pc98/bios_snapshot.c', 'sys/platform/pc98/bootinfo_report.c', 'sys/platform/pc98/bootinfo_geom.c', 'sys/platform/pc98/bootinfo_check.c', 'sys/platform/pc98/bootinfo_capture.c', 'sys/dev/video/geforce/gf_accept.c', 'sys/dev/video/geforce/gf_wc.c', 'sys/kern/module/kdebug_imports.def', 'tools/source_roots.py', 'tools/ops/check_arm_compile.py', 'sys/platform/pc98/kernel.c', 'sys/kern/mm/paging.c', 'sys/arch/x86/kernel/idt.c', 'sys/dev/ata/ide.c', 'sys/dev/ata/cd_module.c', 'sys/dev/video/geforce/geforce_platform.c', 'sys/platform/pc98/video/backend_pc98.c', 'sys/platform/pc98/video/cirrus/cirrus_identify.c', 'sys/fs/ext2/ext2_super.c', 'sys/fs/fat/fatfs/ff.c', 'sys/fs/serialfs/serialfs_session.c', 'sys/fs/serialfs/sfs_session_fg.c', 'tools/move_files.py', 'tools/include_resolve.py', 'tools/build_compare.sh', 'tools/build_compare.py', 'tools/gen_build_id.py', 'sys/kern/kdebug/kdebug_module.c', 'sys/kern/ver_format.c', 'tools/tests/host32.py', 'tools/tests/mutpar.py', 'tools/tests/test_ver_version.py', 'tools/tests/ver_test_utils.py', 'tools/tests/kernel_includes.py', 'sys/arch/x86/kernel/kentry.asm', 'boot/loader_fat_new.asm', 'build/kernel.mk', 'build/os32.ld', 'sys/dev/ata/cd_body.c', 'sys/dev/block/fdc.c', 'sys/dev/block/loop_dev.c', 'sys/platform/pc98/input/mouse.c', 'sys/dev/net/e82557/lan_body.c', 'sys/dev/net/e82557/lan_module.c', 'sys/dev/net/ne2000/lgy98.c', 'sys/dev/net/ne2000/ne2000.c', 'sys/dev/sound/cs4231/pcm_body.c', 'sys/dev/sound/cs4231/pcm_module.c', 'sys/dev/sound/fm/fm_body.c', 'sys/dev/sound/fm/fm_module.c', 'sys/dev/video/cirrus/backend_cirrus.c', 'sys/dev/video/cirrus/cirrus_body.c', 'sys/dev/video/cirrus/cirrus_module.c', 'sys/dev/video/geforce/backend_geforce.c', 'sys/dev/video/geforce/geforce_body.c', 'sys/dev/video/geforce/geforce_module.c', 'sys/dev/video/geforce/gf_present.c', 'sys/dev/video/kcg/kcg_body.c', 'sys/dev/video/kcg/kcg_module.c', 'sys/platform/pc98/video/backend_pegc.c', 'sys/platform/pc98/video/pc98_route.c', 'sys/fs/fd_redirect.c', 'sys/fs/pipe_buffer.c', 'sys/kapi/kapi_generated.c', 'lib/lz4.c', 'lib/sqlite3/os32_sqlite_test.c', 'lib/sqlite3/os32_sqlite_vfs.c', 'sys/kern/mm/shm.c', 'sdk/kapi.json', 'sdk/link/app.ld', 'sdk/link/app_sys.ld', 'sdk/link/generations.ld', 'sdk/link/shlib.ld', 'sdk/os32_generations.py', 'sdk/os32x_hdr.py', 'sdk/rust/os32api/src/generations.rs', 'sdk/rust/os32api/src/gui/proto.rs', 'sdk/rust/os32api/src/gui/stub.rs', 'tools/check_artifacts.py', 'tools/clang_ast/build.py', 'tools/gen_hwdev_pair.py', 'tools/gen_kdebug_imports.py', 'tools/gen_memmap.py', 'tools/gen_sqlite_imports.py', 'tools/mkmod.py', 'tools/mkshlib.py', 'tools/module_schema.py', 'tools/prototypes/sqlite_imports.def', 'tools/tests/owner_reclaim_host.c', 'tools/tests/test_owner_reclaim.py', 'userland/rust/libos32gui/src/shlib.rs', 'sys/platform/pc98/ime_display.c', 'sys/platform/pc98/ime_render_tvram.c'],
     needs=['make:all'], budget=3.7,
     kind='characterization',
 )
@@ -86,7 +86,7 @@ class LayoutTools(unittest.TestCase):
                              for name in ('INC_KERNEL', 'INC_DRIVERS', 'INC_GFX',
                                           'INC_FS', 'INC_FATFS', 'INC_EXEC',
                                           'INC_KAPI', 'INC_LIB')))
-        module = load('check_arm_compile')
+        module = load('ops/check_arm_compile')
         with patch.dict(os.environ, {'MAKEFLAGS': '-n --invalid-arm-query-option',
                                      'GNUMAKEFLAGS': '--invalid-arm-query-option'}):
             values = module.make_config_vars(self.root)
@@ -100,7 +100,7 @@ class LayoutTools(unittest.TestCase):
         self.assertEqual(dropped, ['-m32', '-march=i386'])
 
     def test_arm_sources_and_include_profiles_follow_relocations(self):
-        module = load('check_arm_compile')
+        module = load('ops/check_arm_compile')
         with patch.object(module, 'PROJ_DIR', str(ROOT)):
             files = module.scan_glob()
         # Compare the scan with the source inventory, including new worktree
@@ -360,9 +360,9 @@ def mutations():
         ('move_files.py', 'for match in pattern.finditer(text):', 'for match in []:'),
         ('move_files.py', 'for match in remaining_pattern.finditer(content):', 'for match in []:'),
         ('move_files.py', "'fs/fat/fatfs/ff.'", "'fs/fatfs/ff.'"),
-        ('check_arm_compile.py', 'input=query, cwd=config_root, env=env, text=True,',
+        ('ops/check_arm_compile.py', 'input=query, cwd=config_root, env=env, text=True,',
          'input=query.replace("$(INC_KERNEL)", "-Ibroken"), cwd=config_root, env=env, text=True,'),
-        ('check_arm_compile.py', 'if path in DRIVERS_INC_GFX:', 'if False:'),
+        ('ops/check_arm_compile.py', 'if path in DRIVERS_INC_GFX:', 'if False:'),
         ('include_resolve.py', '(file.parent, *directories)', '(*directories, file.parent)'),
         ('build_compare.py', 'before == after', 'before == before'),
         ('gen_build_id.py', '        return fixed', "        return 'unknown'"),
@@ -371,7 +371,8 @@ def mutations():
         with tempfile.TemporaryDirectory(prefix='layout-mutant-') as directory:
             tools = Path(directory)
             for name in ('move_files.py', 'include_resolve.py', 'build_compare.py', 'gen_build_id.py',
-                         'check_arm_compile.py', 'source_roots.py'):
+                         'ops/check_arm_compile.py', 'source_roots.py'):
+                (tools / name).parent.mkdir(exist_ok=True)
                 shutil.copy2(TOOLS / name, tools / name)
             text = (tools / filename).read_text()
             assert text.count(old) == 1, (filename, old)

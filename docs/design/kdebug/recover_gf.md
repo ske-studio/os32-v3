@@ -21,7 +21,7 @@
 
 - 根拠: nouveau (MIT、drivers/gpu/drm/nouveau/nvkm/subdev/devinit/nv04.c の setPLL_double_lowregs、NV44 は devinit=nv1a・pll_set=nv04) の MEM PLL の列は、4600h を書込みの前に読んで bit31 を立て、係数と制御の後に保存値へ戻す — OS32 の sys/dev/video/geforce/diag/gfinit_pll.c と同じ。nouveau は 4600h を書いた後に読み戻さない。envytools の rnndb (MIT) に 4600h の定義は無い。bit31 の意味と読み戻せるかは未確認 (WO とも断定しない)。
 
-- 決定: 4600h の書込みの列 (bit31 を立てる・保存値へ戻す) は変えない。**4600h の 2 規則 (substep 12020h と 1202Bh、表の tools/recover_tables/recover_tables_oracle.c・tools/recover_tables/recover_tables_oracle.c) だけ verify mask を 0 にする** (照合をしない、生成元から直し、生成物・承認表 tools/accept/gf_main.md の 4600h の行を同期)。7FFFFFFFh にはしない (下位 31bit の読み戻しの根拠も無い)。verify=0 の成功は PLL の lock や VRAM の成功を意味しない
+- 決定: 4600h の書込みの列 (bit31 を立てる・保存値へ戻す) は変えない。**4600h の 2 規則 (substep 12020h と 1202Bh、表の tools/recover_tables/recover_tables_oracle.c・tools/recover_tables/recover_tables_oracle.c) だけ verify mask を 0 にする** (照合をしない、生成元から直し、生成物・承認表 tools/ops/gf_main.md の 4600h の行を同期)。7FFFFFFFh にはしない (下位 31bit の読み戻しの根拠も無い)。verify=0 の成功は PLL の lock や VRAM の成功を意味しない
 
 > [要確認] 現行は診断も sys/dev/video/geforce/runner.c を使い、main 境界の 5 node を生成する。原文の静的展開・ordinal・verify 規則を現行実装と同一とは扱えない。
 

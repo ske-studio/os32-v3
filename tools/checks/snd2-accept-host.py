@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 
 CHECK = dict(name='snd2-accept-host', tier=1, needs=[], budget=1,
-             covers=['tools/accept/snd2/*.py'],
+             covers=['tools/sound/snd2/*.py'],
              basis=['docs/decisions/sound/AV_HAL_DESIGN.md §13-3'])
 
 
@@ -74,7 +74,7 @@ def if0_capture(script, mutate):
 
 
 def run(ctx):
-    scripts = ctx.root / 'tools/accept/snd2'
+    scripts = ctx.root / 'tools/sound/snd2'
     for path in scripts.glob('*.py'):
         compile(path.read_text(), str(path), 'exec')
     if0_capture(scripts / 'verify_if0.py', ctx.mutate)

@@ -5,7 +5,7 @@ root=Path.cwd()
 sys.path.insert(0,str(root/'tools'))
 import gen_sqlite_imports as generator
 rev='v3-pre-restructure'
-mapping={r['to']:r['from'] for r in json.load(open('docs/tasks/restructure/data/move_map.json'))}
+mapping={r['to']:r['from'] for r in json.loads(Path(__file__).with_name('move_map.json').read_text())}
 out=Path(os.environ['TMPDIR'])/'contract-replay'
 normal=Path.read_text
 for definition in sorted((root/'tools/prototypes').glob('*_imports.def')):

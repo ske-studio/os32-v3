@@ -149,7 +149,7 @@ GUI でなければ `emu_mouse` と `emu_type` はエラーになる (`off` は�
 画面末尾に現れたことを確かめてから `os32gui` を打つ経路だけ。
 `emu_key` の `seq=ESC` の前後に `emu_tvram` を採る。重なった rshell はそれぞれ閉じる。
 閉じた後、共有 `gui.key(text="os32gui")` → RETURN → `emu_status` で GUI を照合する。
-既存の台本では `tools.gui_gate.begin_gui(H)` がこの確認をまとめて行う。
+既存の台本では `tools.ops.gui_gate.begin_gui(H)` がこの確認をまとめて行う。
 **rshell 中に `text=` を打たない**。rshell は分割入力を別々のコマンドとして吸う。
 
 ## 入力と起動
@@ -209,7 +209,7 @@ launch が時間切れになった後は Start メニューが開いたままの
 ## GUI からの出口
 
 唯一の出口は **Start → CUI mode → Yes**。ESC はアプリへ渡り、GUI の終了にはならない。
-既存台本は `tools.gui_gate.leave_gshell(Mouse(H))`。戻った後、rshell が既に生きていれば
+既存台本は `tools.ops.gui_gate.leave_gshell(Mouse(H))`。戻った後、rshell が既に生きていれば
 重ねて起動しない。`ver` で確認する。
 この出口は `/etc/system.cfg` の **`GUI=0` を永続化**する。
 再び GUI へ入るには rshell を閉じて `os32gui`。次回の GUI 自動起動へ戻すときは、

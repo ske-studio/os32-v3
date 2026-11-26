@@ -1,6 +1,6 @@
 CHECK = dict(name='ppc-gui-guest', tier=2, needs=[], budget=1200,
     env=['ppc-cross', 'qemu-ppc', 'socket'], full_only=True,
-    covers=['tools/checks/ppc-gui-guest.py', 'tools/accept/ppc_gui.py', 'tools/accept/in2_gui_trial.py',
+    covers=['tools/checks/ppc-gui-guest.py', 'tools/accept/ppc_gui.py', 'tools/ops/in2_gui_trial.py',
             'tools/in2_gui_mutations.py', 'tools/accept/ppc_in2_cui.py', 'tools/accept/ppc_shm.py',
             'tools/ppc/**', 'tools/*.py', 'userland/gshell/**', 'userland/lib/**', 'userland/ppc/**', 'userland/shell/**',
             'Makefile', 'build/**', 'sdk/**', 'mm/**', 'exec/**', 'arch/ppc/**',

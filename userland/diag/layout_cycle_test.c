@@ -1,6 +1,6 @@
 /* T3c2: run under both resident shells. STOP is driven by the PM, never timed.
  * --once is the nested parent; --leaf leaves allocations for exit reclamation.
- * Registration and the GUI/CUI procedure: tools/accept/t3c2.md. */
+ * Registration and the GUI/CUI procedure: tools/ops/t3c2.md. */
 #include "os32api.h"
 #include "rt/testresult.h"
 #include <stdlib.h>

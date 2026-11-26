@@ -184,7 +184,7 @@ S2/S3 は先に両像を単独 build。S4 は宣言、ゲート・ring・解除�
 |NP21/W 対照|複数候補・先頭選択の CONVERT から XFER(3500) 一打で CANDLIST・選択不変、二打目で次候補。GUI は filter→raw、直接 STOP、Shift+Space を確認。物理 Ctrl+STOP、GUI STOP 抑止、V86 退出、RLDN。USB 結線後に LANG1/2 を実入力。|救済を logical に変更、LEGACY を ETX に変更。|
 |PPC QEMU|USB usage 0x90/0x91 を二度ずつ、続いて A。A のみ読み出し、peek 非消費と抜去を確認。|操作を互換 sc の cooked に戻す。|
 
-ime-stop-delivery-guest は tools/tests/guest_acceptance.yaml に NP21/W の手動受入として登録し索引を再生成する。STOP 試行と Ctrl+C 試行を個別に記録し、それぞれ未確定表示残存、アプリ終了、次字欠落・重複、UTF-8 末尾不一致のいずれでも当該試行を失敗とする。
+ime-stop-delivery-guest は tools/guest_acceptance.yaml に NP21/W の手動受入として登録し索引を再生成する。STOP 試行と Ctrl+C 試行を個別に記録し、それぞれ未確定表示残存、アプリ終了、次字欠落・重複、UTF-8 末尾不一致のいずれでも当該試行を失敗とする。
 
 各製品段で対象 build、共通変更は両 arch リンク、対象試験の変異と lint。NP21/W は本線統合の受入条件。
 build_compare は設計・試験だけなら x86 配布像一致。実装統合では kernel・FEP 部品・pair と格納像の差を期待する。

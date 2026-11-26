@@ -54,7 +54,7 @@ NP21/W・実機の受入はしない。分離の作り直しが終わったら�
 P2-0 が採った全像の一覧を `sha256sum` の形式 (小文字の SHA-256、空白 2 個、基点の木からの相対パス) で 1 ファイルにまとめる。基点の生成物は一覧の隣に同じ相対パスで保存する。候補の木は古い生成物が残らない所で組む。
 
     python3 -B tools/build_compare.py --baseline-build --tree BASE_TREE --base v3-pre-restructure -- make all kernel-r1
-    python3 -B tools/ci/sep_identity.py --manifest BASE/SHA256SUMS --move-map docs/tasks/restructure/data/move_map.json --tree TREE --base v3-pre-restructure -- make all kernel-r1
+    python3 -B tools/ci/sep_identity.py --manifest BASE/SHA256SUMS --move-map tools/ci/replay/move_map.json --tree TREE --base v3-pre-restructure -- make all kernel-r1
 
 1 行目はタグをチェックアウトした空のビルド木での採取、2 行目は候補の比較。両方とも基点 SHA の先頭 12 桁を OS32_BUILD_COMMIT、基点のコミット時刻（Unix 秒）を SOURCE_DATE_EPOCH に設定し、TZ=UTC・LC_ALL=C で GCC の __DATE__・__TIME__ を固定する。末尾のコマンドは木を組む工程 (例は x86 部分のみ)。全件の関門では配布物と PowerPC の 6 像まで作る工程を渡す。組み済みの木を比べ直す入口は `tools/build_compare.py` で、同じオプションから末尾のビルドコマンドを除く。どちらも基点を組み直さない。像のディレクトリを保って移動元のソースに対応するオブジェクトを探す。一覧と同じ場所の `PRESENCE` は、存在だけを確認する基点相対パスを 1 行に 1 本ずつ記す。ハッシュ一覧と重なる物も存在だけを見る（G11）。
 
@@ -70,6 +70,6 @@ P2-0 が採った全像の一覧を `sha256sum` の形式 (小文字の SHA-256�
 
 `Sep-Changes: reviewed-replay ARTIFACT CANDIDATE_SHA256 REPLAY_SHA256` は、移動で中身が変わった生成物を、旧い入力に戻した木で組み直すと基点と同じバイトになることを宣言する。道具 (`tools/build_compare.py`) が照らすのは候補の sha256 と、再現の木の sha256 が基点と一致することの 2 つだけなので、正しさの中身は「再現の木をどう作ったか」にある。P3 (2026-11-26) の 93 件の作り方はリポジトリに残す (DECISIONS の U20):
 
-- 再現の木: `tools/restructure/replay/replay-normalize.py` が候補の木に 3 つだけを戻す — (1) 生成済みの契約の値 11 個を旧い値に (`contract-replay.py`)、(2) kselftest の文字列 1 行を旧いパスに、(3) NASM の入力の名前 14 個を旧い名前に (`nasm-replay`)。
-- 照合: `audit-comparison.py` が 93 件の宣言・候補・基点・再現の sha256 を突き合わせる。差の一覧は [reviewed-differences.tsv](../../../tasks/restructure/data/reviewed-differences.tsv) (内訳: パス 24・HWDEV の CRC 7・部品の ABI の世代 20・それらの波及 42)。
+- 再現の木: `tools/ci/replay/replay-normalize.py` が候補の木に 3 つだけを戻す — (1) 生成済みの契約の値 11 個を旧い値に (`contract-replay.py`)、(2) kselftest の文字列 1 行を旧いパスに、(3) NASM の入力の名前 14 個を旧い名前に (`nasm-replay`)。
+- 照合: `audit-comparison.py` が 93 件の宣言・候補・基点・再現の sha256 を突き合わせる。差の一覧は [reviewed-differences.tsv](../../../../tools/ci/replay/reviewed-differences.tsv) (内訳: パス 24・HWDEV の CRC 7・部品の ABI の世代 20・それらの波及 42)。
 - 台本は PM の機械の置き場 (`~/os32-tmp/run/restructure/`) の絶対パスを前提にした記録で、そのまま回す道具ではない。差の種類は DECISIONS の U19。

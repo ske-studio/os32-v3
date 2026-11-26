@@ -325,7 +325,7 @@
 | C10 | `tools/checks/nofpu-host.py`（新） | CHECK inputs/依存宣言 |
 | C11 | `tools/tests/test_x87.py` | 既存host試験のprivileged probeをhook化、hw/emu両系 |
 | C12 | `userland/diag/fp_stop.c` | 既存check/loopを両系で共通期待、停止復元検証 |
-| C13 | `tools/tests/guest_tests.txt` | fp_stop checkは無しでもPASS 3/3、skip/kill期待を禁止 |
+| C13 | `tools/guest_tests.txt` | fp_stop checkは無しでもPASS 3/3、skip/kill期待を禁止 |
 | C14 | `docs/09_exec.md` | software state/例外/通常KAPIの契約 |
 | C15 | `docs/tasks/DEFERRED_TESTS.md` | 17/582からの除去結果と残る実機検証を記録 |
 | A7 | `sys/arch/x86/kernel/x87_emu_vendor/UPSTREAM.json`（新） | 関数別由来/hash/行/派生先と原文LICENSEを保存 |

@@ -8,7 +8,7 @@
    要らないので、Windows のヘッダ無しでホストで組める。
    `np21w-src` が無い環境ではここは SKIP する (OS32 のリポジトリだけでは完結しない)。
 
-2. `tools/gui_gate.py` の逃がし記法の展開 (K4) と、
+2. `tools/ops/gui_gate.py` の逃がし記法の展開 (K4) と、
    **既定では今までと 1 バイトも変わらないこと** (K6)。
 
 注意: **実際にゲストへキーが届くかはここでは分からない。** それは NP21/W を動かして
@@ -45,7 +45,7 @@ def check_emulator_table():
 
 def check_gui_gate():
     sys.path.insert(0, str(ROOT / 'tools'))
-    import gui_gate
+    from ops import gui_gate
 
     exp = gui_gate.expand_escapes
 

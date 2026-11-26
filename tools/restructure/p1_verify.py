@@ -429,7 +429,7 @@ def main():
     sources, _ = review_inputs(args.base, set(), expected)
     hal_status = verify_hal(args.hal_map, expected, sources)
     directory = args.table.parent
-    return verify_layout(args.table, directory / 'layout.tsv', directory / 'move_map.json', ROOT) or hal_status or scope_status
+    return verify_layout(args.table, directory / 'layout.tsv', ROOT / 'tools/ci/replay/move_map.json' if args.table == SCOPE else directory / 'move_map.json', ROOT) or hal_status or scope_status
 
 
 if __name__ == '__main__':

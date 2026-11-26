@@ -66,7 +66,7 @@ PROJ_DIR = os.path.dirname(HERE)
 # ---------------------------------------------------------------------------
 
 #: 一覧の正典 (票 §2-3 — 走らせるものは票ではなくファイルに持つ)
-LIST_REL = "tools/tests/guest_tests.txt"
+LIST_REL = "tools/guest_tests.txt"
 
 #: ゲストから見た作業場所。ホスト側の <HOSTDRV_DIR>/test/ に同じものが見える。
 GUEST_DIR = "/host/test"
@@ -662,7 +662,7 @@ class Np21Guest(object):
     def key(self, seq=None, text=None):
         import urllib.parse
         if text is not None:
-            # raw リングが浅いので 4 文字ずつ (tools/gui_gate.py の実測)。
+            # raw リングが浅いので 4 文字ずつ (tools/ops/gui_gate.py の実測)。
             i = 0
             while i < len(text):
                 self.client.post("/api/key",
@@ -683,7 +683,7 @@ class Np21Guest(object):
 
         **必ず ESC を先に送ってから `rshell` を打つ。** 生きたまま打つと
         rshell が 2 段に重なり、以降の ESC が内側しか閉じない
-        (tools/gui_gate.py の 2026-09-11 の教訓)。
+        (tools/ops/gui_gate.py の 2026-09-11 の教訓)。
         """
         self.key(seq="ESC")
         time.sleep(1.0)

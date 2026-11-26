@@ -807,8 +807,28 @@ userland/diag/h2_stack512.bin: userland/diag/h2_stack512.raw userland/diag/h2_st
 # Explicit opt-in only. .fixture files never enter deploy manifests/packages.
 .PHONY: h2-fixtures
 h2-fixtures: userland/diag/h2_stack.bin userland/shell.bin userland/libos32gui.shlib userland/diag/gui_demo.bin
-	python3 tools/gen_h2_fixtures.py --out $(BUILD_OUT)/h2-isolated
+	python3 tools/ops/gen_h2_fixtures.py --out $(BUILD_OUT)/h2-isolated
 
 # T2h/h3 shared fixture code (the generic rule does not include userland .d).
 userland/diag/h3a.o: userland/diag/h3a.c userland/diag/h3/fixture.inc userland/diag/h3/state.inc userland/diag/h3/protocol.h
 userland/diag/h3b.o: userland/diag/h3b.c userland/diag/h3/fixture.inc userland/diag/h3/state.inc userland/diag/h3/protocol.h
+
+# ARM コンパイル計測 (移植性準備の順序 1)。カーネル側の C ソースを 1 本ずつ
+# arm-none-eabi-gcc に通し、通った本数と失敗の分類を出す。
+#
+# **`check` の列にはわざと入れていない。** これは合否の門ではなく計測器で、
+# 今 ARM で通らないのは当たり前 (x86 前提でよい、と決めて書いてある)。
+# 門にすると「直さないと緑にならない」圧力がかかり、まだ設計の決まっていない
+# arch/ の分離を急がせてしまう。io.h 経由への統一 (順序 2) や arch/ 導入
+# (順序 3) の効果を同じ物差しで見るために、独立したターゲットとして呼ぶ。
+#
+# arm-none-eabi-gcc が無い環境では SKIP して終了コード 0。
+check-arm-compile:
+	@python3 tools/ops/check_arm_compile.py
+
+.PHONY: check-arm-compile
+
+check-guest:
+	python3 tools/guest_tests.py
+
+.PHONY: check-guest

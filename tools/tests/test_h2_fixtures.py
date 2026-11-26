@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT / 'sdk'))
 import os32x_hdr as H
 
 TARGET_SRC = [ROOT / 'userland/diag/h2_stack.c', ROOT / 'userland/diag/h2_stack_probe.inc',
-              ROOT / 'tools/gen_h2_fixtures.py']
+              ROOT / 'tools/ops/gen_h2_fixtures.py']
 MUTANTS = [
     ('pattern write', 'a[i] = (unsigned char)(H2_PATTERN ^ (i / H2_PAGE_BYTES));', 'a[i] = 0;'),
     ('deep recursion', 'ok = h2_deep(p, depth - 1);', 'ok = 1;'),
@@ -95,7 +95,7 @@ def test_built(tmp):
 
 
 def test_fixtures(tmp):
-    spec = importlib.util.spec_from_file_location('h2_generator', ROOT / 'tools/gen_h2_fixtures.py')
+    spec = importlib.util.spec_from_file_location('h2_generator', ROOT / 'tools/ops/gen_h2_fixtures.py')
     generator = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(generator)
     out = tmp / 'isolated'

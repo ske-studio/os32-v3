@@ -6,7 +6,7 @@ import sys
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-INDEX = ROOT / "tools/tests/guest_acceptance.yaml"
+INDEX = ROOT / "tools/guest_acceptance.yaml"
 REQUIRED = {"id", "gate", "contract", "mode", "prereq", "entry", "observe", "expect", "evidence"}
 
 
@@ -42,7 +42,7 @@ def validate(data, root=ROOT):
             raise ValueError("empty required field")
         if case["mode"] == "batch":
             from guest_tests import parse_list
-            entries, errors = parse_list((root / "tools/tests/guest_tests.txt").read_text())
+            entries, errors = parse_list((root / "tools/guest_tests.txt").read_text())
             ref = case["entry"]
             if errors or not isinstance(ref, dict) or set(ref) != {"guest_tests"} or ref["guest_tests"] not in {e.name for e in entries}:
                 raise ValueError("batch entry must reference a guest_tests.txt name")

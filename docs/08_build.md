@@ -231,7 +231,7 @@ os32-v3/
 └── docs/           仕様書ドキュメント群
 ```
 
-ファイルごとの役割は DEVELOPMENT.md §2 (ファイル地図)。P3 の移動前後のパスは `docs/tasks/restructure/data/move_map.json` で引ける。
+ファイルごとの役割は DEVELOPMENT.md §2 (ファイル地図)。P3 の移動前後のパスは `tools/ci/replay/move_map.json` で引ける。
 
 #### 新しい CPU・機種に着手する前に
 
@@ -792,7 +792,7 @@ tools/audit_cast_align.sh all
 旧5本 (正規表現版) は比較のあと撤去した (ユーザー決定 2026-10-01、git の履歴 `8612b06` 以前とリポジトリ外のバックアップに残る)。
 重複していた `create_fat12_d88.py` は撤去。FD生成は `tools/mkfat12.py` を使う。
 
-#### `tools/check_docs_links.py`
+#### `tools/ops/check_docs_links.py`
 文書のリンク切れ検査 (`make check` の `check-docs-links`)。`lychee` (Rust 製のリンク検査器) を
 `--offline --include-fragments` で呼ぶ薄い包みで、**相対パスの実在**と**見出しアンカーの実在**の
 両方を見る。日本語の見出し (`08_build.md#配備3経路`) も GitHub と同じ規則で判定できる。

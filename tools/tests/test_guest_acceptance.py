@@ -23,7 +23,7 @@ SLOT_BYTES = 204 + 108 + (6 + 4 + 2) * struct.calcsize('<I')
 sys.path.insert(0, str(ROOT / 'tools'))
 import gen_guest_acceptance as ga
 import tvdump_recv as tv
-sys.path.insert(0, str(ROOT / 'tools/accept'))
+sys.path.insert(0, str(ROOT / 'tools/ops'))
 import pt0_snapshot as pt
 import as_extents_at_teardown as ext
 sys.path.insert(0, str(ROOT / 'tools/tests'))
@@ -222,7 +222,7 @@ class AcceptanceTests(unittest.TestCase):
             paths = [Path(td) / name for name in ('base.json', 'other.json')]
             paths[0].write_text(json.dumps(base))
             paths[1].write_text(json.dumps(other))
-            cmd = [sys.executable, '-B', str(ROOT / 'tools/accept/pt0_snapshot.py'), '--compare', *map(str, paths), '--ignore-ad']
+            cmd = [sys.executable, '-B', str(ROOT / 'tools/ops/pt0_snapshot.py'), '--compare', *map(str, paths), '--ignore-ad']
             self.assertEqual(subprocess.run(cmd, capture_output=True).returncode, 0)
             other['ptes'][42] ^= 4
             paths[1].write_text(json.dumps(other))
@@ -428,30 +428,30 @@ class ExtentTests(unittest.TestCase):
     def test_prepare_cli(self):
         with tempfile.TemporaryDirectory() as td:
             out = Path(td) / 'deploy.json'
-            result = subprocess.run([sys.executable, '-B', str(ROOT / 'tools/accept/as_extents_at_teardown.py'),
+            result = subprocess.run([sys.executable, '-B', str(ROOT / 'tools/ops/as_extents_at_teardown.py'),
                                      'prepare', str(out)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(json.loads(out.read_text()), self.layout)
             # Existing evidence is never overwritten.
-            self.assertEqual(subprocess.run([sys.executable, '-B', str(ROOT / 'tools/accept/as_extents_at_teardown.py'),
+            self.assertEqual(subprocess.run([sys.executable, '-B', str(ROOT / 'tools/ops/as_extents_at_teardown.py'),
                                             'prepare', str(out)], capture_output=True).returncode, 1)
 
 
 MUTATIONS = [
-    ('tools/tests/guest_acceptance.yaml', '    tag: BB??\n    completion: 0', '    tag: BB??\n    completion: SURV'),
+    ('tools/guest_acceptance.yaml', '    tag: BB??\n    completion: 0', '    tag: BB??\n    completion: SURV'),
 
     ('tools/gen_guest_acceptance.py', 'or case["id"] in ids', 'or False'),
     ('tools/gen_guest_acceptance.py', 'if target == archive or archive in target.parents:', 'if target == archive:'),
-    ('tools/accept/pt0_snapshot.py', 'mask = ~AD_BITS if ignore_ad else ~0', 'mask = ~(AD_BITS | 4) if ignore_ad else ~0'),
-    ('tools/accept/as_extents_at_teardown.py', "as_ptr = word(slot, o['slot_as'])",
+    ('tools/ops/pt0_snapshot.py', 'mask = ~AD_BITS if ignore_ad else ~0', 'mask = ~(AD_BITS | 4) if ignore_ad else ~0'),
+    ('tools/ops/as_extents_at_teardown.py', "as_ptr = word(slot, o['slot_as'])",
      "as_ptr = word(slot, o['slot_as'] + WORD_BYTES)"),
-    ('tools/accept/as_extents_at_teardown.py',
+    ('tools/ops/as_extents_at_teardown.py',
      'EMIT(as_appmem, offsetof(struct addrspace, appmem));',
      'EMIT(as_appmem, offsetof(struct addrspace, appmem) + sizeof(u32));'),
-    ('tools/accept/as_extents_at_teardown.py', "table_start = o['as_appmem'] + o['table_e']",
+    ('tools/ops/as_extents_at_teardown.py', "table_start = o['as_appmem'] + o['table_e']",
      "table_start = o['as_appmem'] + WORD_BYTES + o['table_e']"),
-    ('tools/accept/as_extents_at_teardown.py', "as_ptr = word(slot, o['slot_as'])", "as_ptr = slot_ptr"),
-    ('tools/accept/as_extents_at_teardown.py', "offsets['kind_anon']: 'ANON', offsets['kind_arena']: 'EXEC_ARENA'",
+    ('tools/ops/as_extents_at_teardown.py', "as_ptr = word(slot, o['slot_as'])", "as_ptr = slot_ptr"),
+    ('tools/ops/as_extents_at_teardown.py', "offsets['kind_anon']: 'ANON', offsets['kind_arena']: 'EXEC_ARENA'",
      "offsets['kind_anon']: 'EXEC_ARENA', offsets['kind_arena']: 'ANON'"),
     ('tools/tvdump_recv.py', 'if (cols, rows) != (TVDM_COLS, TVDM_ROWS):', 'if False:'),
 ]

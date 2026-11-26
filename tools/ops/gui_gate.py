@@ -10,10 +10,10 @@
 np2sysp getmpos で位置を取るので dx/dy は効かない。docs/POLICY_DEBUG.md#4-23-gui-検証の実行環境)。
 
 使い方:
-  python3 tools/gui_gate.py v11            # v1.1 回帰: gui_demo のドラッグ / 重なり / クリック
-  python3 tools/gui_gate.py v11 --h 400    # 9801 (400 ライン) で
-  python3 tools/gui_gate.py shot NAME      # 今の画面を NAME.png に保存するだけ
-  python3 tools/gui_gate.py click X Y      # 1 回クリック (デバッグ)
+  python3 tools/ops/gui_gate.py v11            # v1.1 回帰: gui_demo のドラッグ / 重なり / クリック
+  python3 tools/ops/gui_gate.py v11 --h 400    # 9801 (400 ライン) で
+  python3 tools/ops/gui_gate.py shot NAME      # 今の画面を NAME.png に保存するだけ
+  python3 tools/ops/gui_gate.py click X Y      # 1 回クリック (デバッグ)
 
 出力: 各手順の要点 1 行と、スクリーンショット (--out、既定 build/out/gui_gate/) の PNG。
 判定は人間 (PM) がする。数値だけ自動で照合する: GUI に入った直後の `/api/status` が
@@ -39,7 +39,7 @@ import re
 import time
 import urllib.parse
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from tools.np21w_mcp import np21w_client as emu
 
 

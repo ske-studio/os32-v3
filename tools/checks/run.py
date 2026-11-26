@@ -81,7 +81,7 @@ NOTEST = (
     ('sample/runner.vbz', ()),
     ('sample/runner8.vbz', ()),
     ('sample/runner_hb.vbz', ()),
-    ('tools/accept/np21w_key_edge.patch', ()),  # Applied to the external NP21/W acceptance machine.
+    ('tools/ops/np21w_key_edge.patch', ()),  # Applied to the external NP21/W acceptance machine.
     ('tools/audit_cast_align.sh', ()),
     ('tools/create_fat12_d88.sh', ()),
     ('tools/emu_agent/mcp_server.py', ()),
@@ -442,13 +442,13 @@ PATH_AUDIT_ALLOW = {
     # Limit helper exceptions to these offline targets: other callers may read images.
     ("check-np21w-ctl-host", "tools/" + "nhd_profile" + ".py"):
         "FakeOps/FakeHttp replace image and process I/O; profile paths are only names",
-    ("check-np21w-gui-host", "tools/" + "gui_gate" + ".py"):
+    ("check-np21w-gui-host", "tools/ops/" + "gui_gate" + ".py"):
         "mock HTTP contract tests never call main or use its screenshot output directory",
     ("check-np21w-gui-host", "tools/np21w_mcp/" + "server" + ".py"):
         "MCP tests inject GUI observations/symbols; default build paths are never read",
-    ("check-gui-gate-host", "tools/" + "gui_gate" + ".py"):
+    ("check-gui-gate-host", "tools/ops/" + "gui_gate" + ".py"):
         "fake guest replaces HTTP/time/screenshots; main's output directory is unused",
-    ("check-key-inject-host", "tools/" + "gui_gate" + ".py"):
+    ("check-key-inject-host", "tools/ops/" + "gui_gate" + ".py"):
         "key expansion and mocked key sends only; main's output directory is unused",
     ("check-ci-gate-host", "tools/ci/gate.py"):
         "the host test calls pure functions on fake rows and logs; make and checks are never run",

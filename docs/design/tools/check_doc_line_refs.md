@@ -1,7 +1,7 @@
-# tools/check_doc_line_refs.py — 文書の行番号つきの参照の戻り止め
+# tools/ops/check_doc_line_refs.py — 文書の行番号つきの参照の戻り止め
 
 > 状態: **現行 (2026-11-17)** — ユーザー決定 2026-11-17 (行番号つきの参照を禁止する)。決まりの本文は [POLICY_DEV §9](../../POLICY_DEV.md)。
-ソース: `tools/check_doc_line_refs.py`・`tools/doc_line_refs_baseline.json`・`tools/tests/test_doc_line_refs.py`
+ソース: `tools/ops/check_doc_line_refs.py`・`tools/ops/doc_line_refs_baseline.json`・`tools/tests/test_doc_line_refs.py`
 
 ## 目的
 
@@ -18,7 +18,7 @@
 
 ## 基準
 
-`tools/doc_line_refs_baseline.json` は `{文書: 件数}` で、今は空 (`{}`)。基準に無い文書は 0 件が基準なので、どの文書でも 1 件あれば落ちる。
+`tools/ops/doc_line_refs_baseline.json` は `{文書: 件数}` で、今は空 (`{}`)。基準に無い文書は 0 件が基準なので、どの文書でも 1 件あれば落ちる。
 
 基準は増やさない (行番号を書く理由が出た時は、パスと関数・マクロ・節の名前で指す)。
 

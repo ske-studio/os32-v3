@@ -1,7 +1,7 @@
-# tools/gui_gate.py — 設計
+# tools/ops/gui_gate.py — 設計
 
 > 状態: **現行 (2026-11-18)** — 出所: TASK_S5 (§6 の R2 の予備調査と Cirrus の観測) の契約を今のソースと照らして要約
-ソース: `tools/gui_gate.py` (`close_rshell`・`begin_gui`・`back_to_cui`・`leave_gshell`・`Shots`)・`tools/np21w_mcp/gui.py` (`gui_entered`・`gui_height`)
+ソース: `tools/ops/gui_gate.py` (`close_rshell`・`begin_gui`・`back_to_cui`・`leave_gshell`・`Shots`)・`tools/np21w_mcp/gui.py` (`gui_entered`・`gui_height`)
 
 NP21/W の HTTP API で GUI の台本 (`v11`・`v12g1`・`v12g4`) を回す。画面の良否は人が撮影で見て、道具は「GUI に入れたか・CUI に戻れたか」を数値で照合する。
 

@@ -38,7 +38,7 @@ check_docs_links.py — 文書のリンク切れ検査 (lychee の薄い包み)
 
 ## lychee が無い環境
 
-`SKIP` と出して終了コード 0 (`tools/check_arm_compile.py` と同じ作法)。
+`SKIP` と出して終了コード 0 (`tools/ops/check_arm_compile.py` と同じ作法)。
 `lychee` は cargo で入れる外部の道具で、クロスコンパイラのように
 「無ければ OS32 がビルドできない」ものではない。無いことを失敗にすると、
 道具を入れていない環境で `make check` が一律に赤くなる。
@@ -50,8 +50,8 @@ check_docs_links.py — 文書のリンク切れ検査 (lychee の薄い包み)
 
 ## 使い方
 
-    python3 tools/check_docs_links.py          # make check-docs-links と同じ
-    python3 tools/check_docs_links.py -v       # lychee の出力をそのまま全部
+    python3 tools/ops/check_docs_links.py          # make check-docs-links と同じ
+    python3 tools/ops/check_docs_links.py -v       # lychee の出力をそのまま全部
 """
 
 import argparse
@@ -63,7 +63,7 @@ import shutil
 import subprocess
 import sys
 
-PROJ_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJ_DIR = str(Path(__file__).resolve().parents[2])
 
 LYCHEE = "lychee"
 
@@ -236,7 +236,7 @@ def main(argv=None):
     print("リンク切れ (または存在しない見出しアンカー) があります。")
     print("  * 文書を動かしたなら、指している側の相対パスを直す")
     print("  * 見出しを変えたなら、`#アンカー` を新しい見出しに合わせる")
-    print("  * 再現: python3 tools/check_docs_links.py -v")
+    print("  * 再現: python3 tools/ops/check_docs_links.py -v")
     return 1
 
 

@@ -7,7 +7,7 @@
   **CUI のまま RESULT: OK** になっていた。
 - 実行: `python3 -B tools/tests/test_gui_gate.py [--mutate]`
   (`make check-gui-gate-host`、`check-changed` / `check` で `--mutate` 付き)
-- 対象: `tools/gui_gate.py` (実物を `import`。`post` / `get` / `_cmd_raw` / `time` を偽物に差し替える)
+- 対象: `tools/ops/gui_gate.py` (実物を `import`。`post` / `get` / `_cmd_raw` / `time` を偽物に差し替える)
 
 ## 0. この試験が触らないもの
 

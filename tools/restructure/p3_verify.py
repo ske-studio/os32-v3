@@ -57,7 +57,7 @@ def main():
     parser.add_argument('--move-status', type=Path, help='git diff -M --name-status at the move boundary')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
-    rows = json.loads((root / 'docs/tasks/restructure/data/move_map.json').read_text())
+    rows = json.loads((root / 'tools/ci/replay/move_map.json').read_text())
     status = subprocess.check_output(
         ['git', 'diff', '-M', '--name-status', args.base], cwd=root, text=True)
     if args.move_status:

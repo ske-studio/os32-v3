@@ -1,4 +1,4 @@
-"""tools/gui_gate.py の「GUI に入れたか」の判定のホスト試験。
+"""tools/ops/gui_gate.py の「GUI に入れたか」の判定のホスト試験。
 
 記録: tools/tests/gui_gate_tdd.md
 経緯: docs/archive/settings/TASK_S5.md §6 (R2 の予備調査、2026-09-29)、.claude/skills/run-os32/SKILL.md#前提と-gui-への入口
@@ -16,7 +16,7 @@ RESULT: OK になっていた。ここで固定するのは 3 つ:
      tvram・/api/status を持つ) の上で、GUI に入れなければ NG、入れれば OK。
      NG の後は CUI + rshell へ戻す — 高さ違いで GUI に入っていれば GUI から抜けてから。
 
-NP21/W もゲストも要らない。実物の tools/gui_gate.py (または変異させた写し) を
+NP21/W もゲストも要らない。実物の tools/ops/gui_gate.py (または変異させた写し) を
 import して、post / get / _cmd_raw / time を偽物に差し替える。
 **実際のゲストで ESC が rshell を閉じるか・/api/status の値がこの通りかはここでは
 分からない** — それは NP21/W で確かめる。
@@ -39,7 +39,7 @@ from unittest.mock import patch
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-SRC = ROOT / "tools/gui_gate.py"
+SRC = ROOT / "tools/ops/gui_gate.py"
 SHARED = ROOT / "tools/np21w_mcp/gui.py"
 MARK = "[Remote shell closed]"
 PROMPT = "/> "
@@ -586,7 +586,7 @@ if __name__ == "__main__":
     with patch("urllib.request.urlopen", side_effect=AssertionError("LIVE HTTP FORBIDDEN")), \
             tempfile.TemporaryDirectory(prefix="os32-gui-gate-") as tmp:
         mod = load()
-        print("HOST import PASS (real tools/gui_gate.py)", flush=True)
+        print("HOST import PASS (real tools/ops/gui_gate.py)", flush=True)
         rc = run(mod, names, tmp)
         if "--mutate" in args:
             rc += mutate(tmp)

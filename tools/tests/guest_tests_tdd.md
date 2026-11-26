@@ -9,7 +9,7 @@
   その記録は [`result_conv_tdd.md`](result_conv_tdd.md)。
 - 実行: `python3 -B tools/tests/test_guest_tests.py [--mutate]`
   (`make check-guest-host` が同じものを `--mutate` 付きで回す)
-- 対象: `tools/guest_tests.py` (実物を `import`) / `tools/tests/guest_tests.txt` (実物を読む)
+- 対象: `tools/guest_tests.py` (実物を `import`) / `tools/guest_tests.txt` (実物を読む)
 
 ## 0. この試験が**触らないもの**
 
@@ -146,6 +146,6 @@ MUTATE 10 全体の上限で結果を全部捨てる                   RED (1 �
   ホスト側で**どれだけ遅れて**読めるか (`os.path.getsize` が伸びを拾えるか)
   は実機でしか分からない。見張りの秒数 (既定 180 秒) はそこで決め直すこと。
 - `/api/key` での **rshell の開き直しが本当に効くか**は未確認。形は
-  `tools/gui_gate.py` の実績 (ESC → `rshell` → `ver` で確かめる) を写した。
+  `tools/ops/gui_gate.py` の実績 (ESC → `rshell` → `ver` で確かめる) を写した。
 - 一覧の 16 本が**今も**その集計行を出すかは見ていない。載っている値は
   票 TASK_TEST_RESULT §9 (2026-09-17) の実測の写し。

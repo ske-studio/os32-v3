@@ -570,7 +570,7 @@ int sndl_midi_long(u32 h, const void *p, u32 n);  int sndl_midi_reset(u32 h);  i
 | tools/hwdev_layout.json → sys/dev/hwdev/generated/hwdev_contract.h・hwdev_layout.txt | KernelAPI のメンバーの一覧なので**廃止の 10 欄も残す** (番号を残すのと同じ)。AV0 の後の実際の構造体から再生成し、tools/gen_hwdev_contract.py の DWARF 照合を通す (R5-P2-1) |
 | sdk/rust/os32api/src/kapi_generated.rs | 生成物。R0a の再生成で retired の口も型どおり残る |
 | build/kernel-objects.mk | CORE_KERNEL_INCLUDES の snd_engine の登録を外す |
-| tools/check_arm_compile.py、tools/tests/fixtures (dep_dir_a/l01.json・dep_dir_c/manifest.json・build_profile_x86.json)、tools/tests/test_src_layout.py | snd_engine の行を外す |
+| tools/ops/check_arm_compile.py、tools/tests/fixtures (dep_dir_a/l01.json・dep_dir_c/manifest.json・build_profile_x86.json)、tools/tests/test_src_layout.py | snd_engine の行を外す |
 | userland/shell/cmd_base.c (beep = fm_startup_sound)・cmd_sys.c (play = fm_play_mml) | コマンドと help の行を削除 (呼び手の除去) |
 | userland/diag/bench/main.c (test_fm()) | FM の MML の計測の項を削除 |
 | userland/diag/raw_wait_test.c の `fm` のモード | モードを削除 (STOP で待ちを抜ける試験は kbd・serial・db・log のモードで残る)。tools/tests/raw_wait_guest_host.c の fm の場合も削除 |

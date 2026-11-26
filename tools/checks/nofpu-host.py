@@ -9,7 +9,7 @@ CHECK = dict(name='nofpu-host', tier=1, budget=12,
             'build/softfloat.mk', 'sys/conf/features/x87.mk', 'build/sources/order.mk',
             'build/kernel.mk', 'build/config.mk', 'build/out/**', 'images/**',
             'lib/softfloat/COPYING.txt', 'sys/arch/x86/kernel/x87_emu_vendor/LICENSE-I386C-FPU.TXT',
-            'userland/diag/fp_stop.c', 'tools/tests/guest_tests.txt'],
+            'userland/diag/fp_stop.c', 'tools/guest_tests.txt'],
     needs=['make:all', 'make:kernel-testnofpu'], basis=['[L1]'])
 
 

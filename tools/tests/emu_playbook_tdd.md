@@ -10,7 +10,7 @@
 - `CLAUDE.md`、`docs/CONSTRAINTS.md`、開発案内・索引。
 - `tools/emu_agent/agent.py` の定義、`run`、`main`、`parse_action`。
   汎用ループは不正JSONに再試行し、未知操作後も継続する。`done` は台本進捗を確認しない。
-- `tools/gui_gate.py`: `key(seq=None, text=None)` は4文字ごとにPOSTして0.35秒待つ。
+- `tools/ops/gui_gate.py`: `key(seq=None, text=None)` は4文字ごとにPOSTして0.35秒待つ。
   `Mouse(h).click(x,y)` / `.drag(x0,y0,x1,y1)` がmove/press/releaseを実行する。
   POST応答は元ヘルパーでは捨てられる。横座標換算は640ピクセル固定。
 - `tools/np21w_mcp/np21w_client.py` と `server.py` のステータスAPI定義。

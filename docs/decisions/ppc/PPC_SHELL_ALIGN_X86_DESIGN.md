@@ -268,7 +268,7 @@ void shell_loop_run(const struct shell_loop_ops *ops); /* 新設 */
 - tools/tests/test_resident_cli.py の CLI 専用 parser・疑似 FS と tools/checks/ppc-cli-boot.py は、同じ役目の製品受入が緑になってから廃止する。
 - tools/tests/test_ppc_link_sh*.py、test_ppc_sd_run.py、test_ppc_newlib.py、test_ppc_terminal_work.py の起動元と変異アンカーを同期。UTF-8 の RED は旧 runtime の差替えから実際の端末出力に移す。
 - tools/checks/ppc-{sh-boot,sh-runtime,sh-string,sh-launch-host,sh-output,sc,sd,rh-fb,usb,terminal-input,exec-entry,fp-guest}.py の covers と inputs を各段で更新。
-- tools/tests/guest_acceptance.yaml と tools/checks/guest-acceptance-host.py は新製品の台本を参照。tools/tests/fixtures/build_profile_ppc.json は五つの構成の kboot-query 結果から更新する。
+- tools/guest_acceptance.yaml と tools/checks/guest-acceptance-host.py は新製品の台本を参照。tools/tests/fixtures/build_profile_ppc.json は五つの構成の kboot-query 結果から更新する。
 - tools/tests/test_build_selection.py は完全な製品と診断の閉包を比較。x86 fixture は x86 の実際の共通ファイル移動だけ反映。追加・削除した検査名は tools/checks/weights.json と突き合わせる。
 - 既存の層検査は baseline 0。新設 init の依存を共通契約だけに収め、追加の例外は不要。共通ソースの PPC コンパイルも通す。
 - 実装段の受入ログは両 CPU と NP21/W の像・版・入出力を区別する。実機確認は同じ製品像の既存 realhw_run 台本に引き渡す。本稿の数値は静的照合とサイズ見積もりで、ゲスト実測は実装後に記録する。

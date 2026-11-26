@@ -51,7 +51,7 @@ sdk/include の 19 ヘッダでは public が true のまま images に依存先
 | tools/ci/ppc_scope.py | COMMON・PPC・X86・EXACT・LAYOUT_PATTERNS | 対象名・像・依存の完全性で選択 |
 | tools/source_roots.py | 検査別の SCAN_ROOTS | 所属・対象・検査の適用条件から走査パスを生成 |
 | tools/checks/run.py | FULL・SCAN_ROOTS | 所属と依存で選び、登録固有の covers は検査入力として結合 |
-| tools/check_arm_compile.py | KNOWN_NON_KERNEL・IMPL_DIRS と走査根 | カーネル像の所属・対象で絞る |
+| tools/ops/check_arm_compile.py | KNOWN_NON_KERNEL・IMPL_DIRS と走査根 | カーネル像の所属・対象で絞る |
 | tools/check_c_dialect.py | VENDOR_DIRS、SDK_HDR_DIR、公開ヘッダ・見本の glob | 第三者の所属、SDK 配布宣言の public、見本のビルド入力から対象を得る。C 方言の規則は検査に残す |
 | tools/check_av_portable.py | sound/hal・input/hal の C とヘッダ | 所属宣言に HAL の役割とサブシステムを付けて選ぶ |
 | tools/check_usb_portable.py | drivers/usb の走査とファイル名の接頭辞 | USB の所属宣言と実装の役割から対象を選ぶ。許される include は検査の契約 |
@@ -77,7 +77,7 @@ tools/ の走査根の定数、glob・rglob・os.walk、git ls-files の利用�
 | `tools/ci/ppc_scope.py` | 2 | .github/workflows/check.yml |
 | `tools/source_roots.py` | 4 | tools/check_arch_asm.py |
 | `tools/checks/run.py` | 44 | .github/workflows/build.yml |
-| `tools/check_arm_compile.py` | 2 | build/sdk.mk |
+| `tools/ops/check_arm_compile.py` | 2 | build/sdk.mk |
 | `tools/check_c_dialect.py` | 3 | tools/checks/c-dialect.py |
 | `tools/check_av_portable.py` | 1 | tools/tests/test_av_abi.py |
 | `tools/check_usb_portable.py` | 2 | tools/checks/usb-portable.py |

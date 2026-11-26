@@ -159,7 +159,7 @@ def cold_boot(paths, ini, base, mutant, exe=None):
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__, epilog='NP21/W must support scan/down on /api/key '
-        '(tools/accept/np21w_key_edge.patch).')
+        '(tools/ops/np21w_key_edge.patch).')
     parser.add_argument('--ini', required=True, type=Path, help='source slot ini (WSL path)')
     parser.add_argument('--images', type=Path, default=Path('build/out/pc98-in2-gui'))
     parser.add_argument('--mutant', choices=PC98_MUTATIONS)

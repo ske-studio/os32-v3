@@ -278,7 +278,7 @@ class LiveAdapterTests(unittest.TestCase):
     def setup_adapter(self):
         # gui_gate has no import-time I/O. Its real paced key / Mouse methods
         # run against these fake HTTP and sleep boundaries only.
-        from tools import gui_gate
+        from tools.ops import gui_gate
         gui = types.SimpleNamespace(**vars(gui_gate))
         self.posts, self.sleeps = [], []
         self.response = b'{"ok":true}'
@@ -411,7 +411,7 @@ class RawObservationTests(unittest.TestCase):
 
     @patch.object(p, '_single_get')
     def test_raw_observation_failure_cannot_be_hidden_by_helper(self, single_get):
-        from tools import gui_gate
+        from tools.ops import gui_gate
         for action, raw in (({'action': 'tvram'}, b'{"ok":false}'),
                             ({'action': 'tvram'}, b'{"lines":[],"error":"broken"}'),
                             ({'action': 'tvram'}, b'{}'),
@@ -430,7 +430,7 @@ class RawObservationTests(unittest.TestCase):
 
     @patch.object(p, '_single_get')
     def test_actual_observation_helpers_success_and_private_context(self, single_get):
-        from tools import gui_gate
+        from tools.ops import gui_gate
         with tempfile.TemporaryDirectory() as d:
             bmp = bytearray(54)
             bmp[:2] = b'BM'
@@ -565,7 +565,7 @@ SAFE_STATE = dict(ok=True, running=1, user_pause=0, trap_pause=0,
 
 class ReviewTests(unittest.TestCase):
     def integration(self, directory, state=None, get_error=None, post_failure=None):
-        from tools import gui_gate
+        from tools.ops import gui_gate
         agent = RawObservationTests().real_helpers(directory, b'{}')
         self.requests = []
         self.posts = []
@@ -792,7 +792,7 @@ class RedirectTransportTests(unittest.TestCase):
                 yield
 
     def input_case(self, status, action, fail_at=1):
-        from tools import gui_gate
+        from tools.ops import gui_gate
         with tempfile.TemporaryDirectory() as directory, self.transport(status, fail_at):
             agent = RawObservationTests().real_helpers(directory, b'{}')
             gui = types.SimpleNamespace(**vars(gui_gate))
@@ -849,7 +849,7 @@ class RedirectTransportTests(unittest.TestCase):
                 self.input_case(status, KEY)
 
     def test_post_success_requires_http_success_and_preserves_form_encoding(self):
-        from tools import gui_gate
+        from tools.ops import gui_gate
         action = {'action': 'key', 'seq': 'SHIFT+SPACE'}
         for status in (200, 201, 299):
             with self.subTest(status=status), tempfile.TemporaryDirectory() as directory, \
@@ -869,7 +869,7 @@ class RedirectTransportTests(unittest.TestCase):
                 self.assertIsNone(detail['attempted_operation'])
 
     def test_get_redirect_is_one_attempt_and_blocks_input(self):
-        from tools import gui_gate
+        from tools.ops import gui_gate
         for status in (302, 301, 303, 307, 308):
             for action in (KEY, {'action': 'status'}, {'action': 'tvram'},
                            {'action': 'screenshot'}):
