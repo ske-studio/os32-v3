@@ -30,8 +30,8 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
-| P43-INCLUDE | PC-98 の include の層違反 2 件。[辺・契約・修正案](restructure/data/p43_violations.tsv) | U25 (2026-11-26) | 製品の層を直す後続段で解消 |
-| P43-LINK | リンクの層違反 13 件 (PC-98 13、PowerMac core 0)。[辺・契約・修正案](restructure/data/p43_violations.tsv) | U25 (2026-11-26) | 製品の層を直す後続段で解消 |
+| P43-INCLUDE | PC-98 の include の層違反 0 件。[辺・契約・修正案](restructure/data/p43_violations.tsv) | U25 (2026-11-26) | 製品の層を直す後続段で解消 |
+| P43-LINK | リンクの層違反 0 件 (PC-98 0、PowerMac core 0)。[辺・契約・修正案](restructure/data/p43_violations.tsv) | U25 (2026-11-26) | 製品の層を直す後続段で解消 |
 | CI-APT-404 | runner の apt 索引と配布物のずれで QEMU の導入が 404 (run 45736476388 attempt 1) | 2026-11-26 | 対処済み。workflow は --no-install-recommends と seabios の明示で不要な依存を除く |
 | SYNTH-L4 | midi_host の MIDI 出力と close・切断時の reset | L4 が残る | [AV_HAL_DESIGN](../decisions/sound/AV_HAL_DESIGN.md) の L4・IL |
 | SYNTH-L7 | midi_fm の GM → OPN 変換と L6 経由の発音 | L7 が残る | [AV_HAL_DESIGN](../decisions/sound/AV_HAL_DESIGN.md) の L7・IL |

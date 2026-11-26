@@ -7,11 +7,24 @@
 /*  出典: FreeBSD sys/x86/isa/atpic.c, PC9800Bible §1-4                    */
 /* ======================================================================== */
 
-/* マスタPIC (IO_ICU1 = 0x00) */
-/* PIC1_CMD / PIC1_DATA are defined in pc98.h. */
+#define PIC1_CMD   0x00
+#define PIC1_DATA  0x02
+#define PIC2_CMD   0x08
+#define PIC2_DATA  0x0A
 
-/* スレーブPIC (IO_ICU2 = 0x08) */
-/* PIC2_CMD / PIC2_DATA are defined in pc98.h. */
+
+/* 8259 の線数と制御欄。 */
+#define PIC_IRQS             8
+#define PIC_IRQ_MASK         (PIC_IRQS - 1)
+#define PIC_SLAVE_LAST_IRQ   (2 * PIC_IRQS - 1)
+#define PIC_LAST_ISR_BIT     (1U << PIC_IRQ_MASK)
+#define PIC_ICW1_INIT        0x10
+#define PIC_ICW1_ICW4        0x01
+#define PIC_ICW1_SINGLE      0x02
+#define PIC_OCW3_SELECT      0x08
+#define PIC_OCW3_READ_REG    0x02
+#define PIC_OCW3_READ_ISR    0x01
+#define PIC_VECTOR_MASK      0xF8
 
 /* PC-98: カスケードはIR7 (PC/ATはIR2) */
 #define ICU_SLAVEID  7

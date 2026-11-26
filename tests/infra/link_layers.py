@@ -45,6 +45,10 @@ def verify(config):
                for out, path in import_files.items() if out in links}
     private = {module: (directory, stub) for directory, stub, module in private_imports(config, inventory)}
 
+    for module, (_, stub_source) in private.items():
+        if not any(objects[obj][0] == stub_source for obj in links.get(module, ()) if obj in objects):
+            raise Failure(f"{config} {module} missing private import stub {stub_source}")
+
     @lru_cache(None)
     def types(obj):
         return declarations(objects[obj][1], stage / "types.aux")

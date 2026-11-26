@@ -11,7 +11,7 @@
 #include "io.h"
 #include "text_screen.h"
 #include "../../../include/platform_emergency.h"
-#include "pc98.h"
+#include "platform_fault_screen.h"
 #include "serial_diag.h"
 #include "../../../kern/sqlite_engine.h"
 
@@ -72,9 +72,9 @@ void double_fault_halt(u32 cr2)
     hex_at(line + DF_COL_CR2, cr2);
     hex_at(line + DF_COL_CR3, kernel_tss.cr3);
     unsigned int col = 0;
-    for (const char *p = line; *p; p++, col++) { platform_fault_cell(col, (u8)*p, TATTR_RED); }
-    for (const char *p = guard; *p; p++, col++) { platform_fault_cell(col, (u8)*p, TATTR_RED); }
-    while (col < TVRAM_COLS) { platform_fault_cell(col++, ' ', TATTR_RED); }
+    for (const char *p = line; *p; p++, col++) { platform_fault_cell(col, (u8)*p, PLATFORM_FAULT_ATTR); }
+    for (const char *p = guard; *p; p++, col++) { platform_fault_cell(col, (u8)*p, PLATFORM_FAULT_ATTR); }
+    while (col < PLATFORM_FAULT_COLS) { platform_fault_cell(col++, ' ', PLATFORM_FAULT_ATTR); }
     serial_puts_polled(line);
     serial_puts_polled(guard);
     serial_puts_polled("\n");

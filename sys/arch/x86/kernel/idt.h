@@ -16,7 +16,6 @@
 /* ======== 基本型 ======== */
 #include "types.h"
 #include "gdt.h"
-#include "pc98.h"
 #include "../../../kern/irq/irq_math.h"
 #include "kernel_tick.h"
 

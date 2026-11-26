@@ -1,3 +1,4 @@
+#include "platform_gfx_init.h"
 /* OF keeps its firmware mode and CLUT. Legacy planar ports have no
  * equivalent on PowerMac; packed output is owned by backend_of_fb. */
 #include "display_restore.h"

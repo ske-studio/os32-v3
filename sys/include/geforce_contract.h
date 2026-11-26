@@ -15,4 +15,6 @@ bool geforce_fg_due(u32 now_tick);
 void geforce_display_stopped(void);
 void geforce_display_failed(void);
 
+void gf_display_owner_exit(int id);
+
 #endif

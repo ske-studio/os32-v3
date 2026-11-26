@@ -5,6 +5,7 @@
 #include <stddef.h>     /* offsetof (整数定数式。旧式の &((T*)0)->m は定数式でない) */
 #include "tss.h"
 #include "gdt.h"
+#include "cpu.h"
 #include "kstring.h"
 #include "x86_desc.h"   /* x86_load_tr (arch/x86/、契約なし) */
 
@@ -85,4 +86,13 @@ void tss_iomap_deny_all(void)
 int tss_iomap_is_allowed(u16 port)
 {
     return (kernel_tss.iomap[port / BITS_PER_BYTE] & (1 << (port % BITS_PER_BYTE))) ? 0 : 1;
+}
+
+/* CR3 への書き込みは、同じ値でも TLB を全部捨てる (i386 に PCID は無い)。 */
+void x86_mmu_load_root(u32 root_phys)
+{
+    /* CR3 is a static TSS field: hardware task switch does not save it.
+     * Keep the outgoing task root for the #DF diagnostic. */
+    __asm__ volatile("mov %1, %0; mov %1, %%cr3"
+                     : "=m"(kernel_tss.cr3) : "r"(root_phys) : "memory");
 }
