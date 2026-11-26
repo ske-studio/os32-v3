@@ -95,3 +95,17 @@ expect = "独立した失敗の後も全件を集計し、欠落と禁じた再�
 limits = "ローカルの実行器・集計器まで"
 gates = ["push", "main"]
 mutations = [{ id = "allow_reuse", config = "local", replace = "tests/infra/ci.py", old = 'allowed = ("PASS", "FAIL",', new = 'allowed = ("REUSED", "PASS", "FAIL",', fail = "REUSED must be rejected", when = "after_build" }]
+
+[[check]]
+id = "landing_evidence"
+spec = { path = "docs/design/tools/ci/ci_v2.md", section = "§8 取り込み SHA の固定" }
+subsystem = "infra"
+level = "M"
+sources = ["tools/ci/land_gate.py", ".github/workflows/restructure-build.yml"]
+environment = "python-yaml"
+arch = { host = ["local"] }
+needs = []
+expect = "候補の全ジョブの成功と両機種の今回の起動記録が揃う"
+limits = "API 応答を与えた関門の判定。媒体自体の起動は別の検査"
+gates = ["push", "main"]
+mutations = [{ id = "accept_partial_boot", config = "local", replace = "tools/ci/land_gate.py", old = "if machines != {'pc98', 'powermac'}:", new = "if not machines:", fail = "missing PowerMac boot accepted", when = "after_build" }]

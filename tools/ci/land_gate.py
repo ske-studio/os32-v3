@@ -15,14 +15,16 @@ import sys
 from urllib.parse import urlencode
 from pathlib import Path
 
+import tomllib
+
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from deploy_manifests import CORE_MANIFEST_RELPATHS
 
 
-def command(*args):
-    return subprocess.check_output(args, timeout=30)
+def command(*args, timeout=30):
+    return subprocess.check_output(args, timeout=timeout)
 
 
 def api(endpoint):
@@ -67,6 +69,9 @@ def expected_jobs(sha, workflow):
         if 'name' in job:
             raise ValueError(f'{name}: unsupported custom job name')
         matrix = job.get('strategy', {}).get('matrix', {})
+        if name == 'checks' and set(matrix) == {'bundle'}:
+            registry = tomllib.loads(command('git', 'show', f'{sha}:tests/registry.toml').decode())
+            matrix = {'bundle': sorted({cpu for row in registry['check'] for cpu in row['arch']})}
         if any(axis in ('include', 'exclude') or not isinstance(values, list) or not values
                for axis, values in matrix.items()):
             raise ValueError(f'{name}: unsupported matrix')
@@ -100,7 +105,7 @@ def verdict(runs, jobs, expected):
             seen.add(name)
             if job['status'] != 'completed':
                 continue
-            allowed_skip = expected.get(name, False) and job['conclusion'] == 'skipped'
+            allowed_skip = name != 'collect' and expected.get(name, False) and job['conclusion'] == 'skipped'
             if job['conclusion'] == 'success' or allowed_skip:
                 success.add(name)
             elif job['conclusion'] == 'skipped' and name not in expected:
@@ -137,7 +142,9 @@ def medium_digest(base, run, artifacts, boot, artifact_id=None):
     if len(matches) != 1 or boot['filename'] not in filenames:
         raise ValueError('boot medium does not identify a unique artifact')
     artifact, = matches
-    archive = command('gh', 'api', f"{base}/artifacts/{artifact['id']}/zip")
+    # Allow one minute per MiB on slow links, with a three-minute minimum.
+    timeout = max(180, 60 * (1 + artifact['size_in_bytes'] // (1024 * 1024)))
+    archive = command('gh', 'api', f"{base}/artifacts/{artifact['id']}/zip", timeout=timeout)
     if artifact['digest'] != 'sha256:' + hashlib.sha256(archive).hexdigest():
         raise ValueError('downloaded artifact digest mismatch')
     with zipfile.ZipFile(io.BytesIO(archive)) as bundle:
@@ -198,24 +205,19 @@ def verify(repo, sha, evidence):
     rid = number(evidence['run_id'])
     attempt = number(evidence['attempt'])
     run = api(f'{base}/runs/{rid}')
-    if (not eligible(run, repo, sha, ident, 'wt/') or number(run['run_attempt']) != attempt
+    if (not eligible(run, repo, sha, ident, 'wt/int-') or number(run['run_attempt']) != attempt
             or evidence['sha'] != sha):
         raise ValueError('candidate SHA or successful latest run attempt does not match')
     jobs = pages(f'{base}/runs/{rid}/attempts/{attempt}/jobs', 'jobs', {})
     failures = verdict([run], {(rid, attempt): jobs}, expected_jobs(sha, workflow))
-    comparison = evidence['comparison']
-    baseline = command('git', 'rev-parse', 'v3-pre-restructure^{commit}').decode().strip()
-    if (comparison['sha'] != sha or comparison['base'] != baseline
-            or type(comparison['exit']) is not int or comparison['exit'] != 0
-            or not Path(comparison['log']).is_file()):
-        failures.append('missing successful baseline comparison')
-    for name in ('SHA256SUMS', 'PRESENCE'):
-        if digest(Path(comparison['baseline_dir']) / name) != comparison['hashes'][name]:
-            failures.append(f'baseline digest mismatch: {name}')
+    if not any(job['name'] == 'collect' and job['conclusion'] == 'success' for job in jobs):
+        failures.append('missing successful full collection')
     artifacts = pages(f'{base}/runs/{rid}/artifacts', 'artifacts', {})
     machines = set()
     for boot in evidence['boots']:
         machine = boot['machine']
+        if boot['sha'] != sha:
+            raise ValueError('both boot records must be from the candidate')
         verify_boot(base, repo, ident, run, artifacts, boot)
         machines.add(machine)
     if machines != {'pc98', 'powermac'}:

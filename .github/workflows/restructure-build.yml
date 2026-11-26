@@ -112,6 +112,7 @@ jobs:
         with:
           name: ${{ steps.name.outputs.artifact }}
           path: out/
+          overwrite: true
           retention-days: 30
           if-no-files-found: error
   powerpc:
@@ -148,4 +149,84 @@ jobs:
         with:
           name: ppc-${{ matrix.image }}-${{ github.sha }}
           path: out/
+          overwrite: true
+          if-no-files-found: error
+  plan:
+    env:
+      GATE: ${{ (startsWith(github.ref_name, 'wt/int-') || github.ref_name == 'main') && 'main' || 'push' }}
+    runs-on: ubuntu-latest
+    outputs:
+      bundles: ${{ steps.plan.outputs.bundles }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        run: |
+          bundles=$(python3 -B -m tests.infra.ci plan --gate "$GATE" --mutate --output "$RUNNER_TEMP/planned")
+          echo "bundles=$bundles" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plan-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/planned/plan.json
+          if-no-files-found: error
+      - run: python3 -B -m tests.infra.ci lint
+  checks:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        bundle: ${{ fromJSON(needs.plan.outputs.bundles) }}
+    env:
+      BUNDLE: ${{ matrix.bundle }}
+      GATE: ${{ (startsWith(github.ref_name, 'wt/int-') || github.ref_name == 'main') && 'main' || 'push' }}
+      OS32_ACCEPT_IPA_LICENSE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: plan-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/planned
+      - if: matrix.bundle == 'host'
+        run: python3 -m pip install PyYAML
+      - uses: ./.github/actions/build-setup
+        if: matrix.bundle != 'host'
+      - uses: ./.github/actions/ppc-setup
+        if: matrix.bundle == 'ppc'
+      - if: matrix.bundle == 'ppc'
+        run: sudo apt-get install -y qemu-system-ppc
+      - run: python3 -B -m tests.infra.ci run --bundle "$BUNDLE" --mutate --gate "$GATE" --output "$RUNNER_TEMP/results" --plan-file "$RUNNER_TEMP/planned/plan.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: checks-${{ github.run_attempt }}-${{ matrix.bundle }}
+          path: |
+            ${{ runner.temp }}/results/bundle-*.json
+            ${{ runner.temp }}/results/*.log
+          if-no-files-found: error
+  collect:
+    needs: [plan, checks]
+    if: always()
+    runs-on: ubuntu-latest
+    env:
+      GATE: ${{ (startsWith(github.ref_name, 'wt/int-') || github.ref_name == 'main') && 'main' || 'push' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: plan-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/planned
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: checks-${{ github.run_attempt }}-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/results
+      - if: always()
+        run: python3 -B -m tests.infra.ci collect --mutate --gate "$GATE" --output "$RUNNER_TEMP/results" --plan-file "$RUNNER_TEMP/planned/plan.json" | tee -a "$GITHUB_STEP_SUMMARY"
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: summary-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/results/summary.json
           if-no-files-found: error
