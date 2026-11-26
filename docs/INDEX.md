@@ -49,7 +49,7 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 | 描画方式 (ページフリップ、200 ライン) | [05_drivers.md §5-5](05_drivers.md) | CLAUDE.md は参照のみ |
 | 落とし穴 | 技術詳細は [各機能の設計書](design/README.md) の「落とし穴」、検証の制限は [POLICY_DEBUG.md §4](POLICY_DEBUG.md#4-よくある落とし穴と教訓集) | 領域別の早見は POLICY_DEBUG §4 冒頭。CLAUDE.md は入口の 1 行だけ |
 | コーディング規約 (C11 (gnu11)、kstring、三層定数、asm、整数演算が第一選択) | [POLICY_DEV.md §2](POLICY_DEV.md) | CONSTRAINTS [C1]〜[C4] (規則行) |
-| 進捗 | 各票の冒頭の状態行 (語彙は [POLICY_DEV.md §8](POLICY_DEV.md)、`make check-docs-status`) と、最新の引き継ぎの残件表 (上の「引き継ぎ」の行)。領域の中の進捗は領域別索引 ([tasks/fep/00_INDEX.md](tasks/fep/00_INDEX.md)、archive/v21/v86v2/04 (アーカイブ: `docs/archive/v21/v86v2/04_implementation_status.md`)) | [ROADMAP.md](ROADMAP.md) (計画)、[CHANGELOG.md](../CHANGELOG.md) (履歴)。[tasks/gui/TASKS.md](tasks/gui/TASKS.md) のゲートは v1.1 の記録 |
+| 進捗 | 各票の冒頭の状態行 (語彙は [POLICY_DEV.md §8](POLICY_DEV.md)、`python3 -B -m tests.infra.ci run --check docs_status`) と、最新の引き継ぎの残件表 (上の「引き継ぎ」の行)。領域の中の進捗は領域別索引 ([tasks/fep/00_INDEX.md](tasks/fep/00_INDEX.md)、archive/v21/v86v2/04 (アーカイブ: `docs/archive/v21/v86v2/04_implementation_status.md`)) | [ROADMAP.md](ROADMAP.md) (計画)、[CHANGELOG.md](../CHANGELOG.md) (履歴)。[tasks/gui/TASKS.md](tasks/gui/TASKS.md) のゲートは v1.1 の記録 |
 | プログラムの一覧 | 各層の `deploy.yaml` (機械可読の正典)、コマンドは [07_shell.md §7-1](07_shell.md) | 09_exec / INDEX に表を持たない |
 | LAN の設計・進捗 | ドライバ = [tasks/network/PLAN.md](tasks/network/PLAN.md)、リンク層と Host Services = [tasks/network/LINK_PLAN.md](tasks/network/LINK_PLAN.md) | 05_drivers / DEVELOPMENT は要約 + リンク |
 | 設定の置き場 (system.cfg の残すキー、settings.db のスキーマ / API / リカバリ) | [tasks/settings/DESIGN.md](tasks/settings/DESIGN.md) (受入完了 2026-09-14、v1.3) | ROADMAP は 1 行 |
@@ -237,7 +237,7 @@ OS の肥大化したコードを削る段 (表を詰める・カーネル常駐
 
 ## タスク
 
-領域ごとに、**計画 → 票 → 記録**の順。票の冒頭の `状態:` 行が正典 (語彙: 計画 / 設計中 / 実装中 / 受入待ち / 受入完了・実機確認待ち / 受入完了 / 撤回 / 完了記録 / 草案 / 現行。**語彙の正典と意味は [POLICY_DEV.md §8](POLICY_DEV.md)**、`make check-docs-status` が機械で見る)。
+領域ごとに、**計画 → 票 → 記録**の順。票の冒頭の `状態:` 行が正典 (語彙: 計画 / 設計中 / 実装中 / 受入待ち / 受入完了・実機確認待ち / 受入完了 / 撤回 / 完了記録 / 草案 / 現行。**語彙の正典と意味は [POLICY_DEV.md §8](POLICY_DEV.md)**、`python3 -B -m tests.infra.ci run --check docs_status` が機械で見る)。
 受入完了して参照頻度が下がった票は `docs/archive/<領域>/` へ落とすが、**索引の行は残す** (リンク先が archive になるだけ)。
 移し方と運用は `docs/archive/README.md`。**v2.1 の時点の現在地と残件の一覧は最新の引き継ぎ** (正典表の「引き継ぎ」) にある。
 

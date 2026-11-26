@@ -191,7 +191,7 @@ os32-v3/
 ```bash
 make all           # カーネル + 全プログラム + SDK + D88イメージ + ISO (apps/game が無くても組める)
 make external      # apps/ + game/ — H-7 の再開決定後だけ (下記参照)
-make check-fast    # ホスト試験と文書・生成物の検査 (変異なし。取り込みの関門は GitHub の CI = 変異込み)
+python3 -B -m tests.infra.ci run --check docs_links  # 登録検査を 1 本実行する例
 make clean         # クリーン
 make deploy        # HostDrv (C:\os32) へのデプロイ (再起動不要)
 make deploy-kernel # NHDイメージへのデプロイ (要NP21/W再起動)

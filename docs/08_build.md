@@ -57,14 +57,12 @@ kernel.bin             → mkvmkernel.py      → build/out/vmkernel.lz4 (LZ4圧
                                                LZ4 高圧縮 (HC level 12、展開側は同じ形式で無変更)。
                                                合計が MAX_IMAGE_SIZE (boot/boot_defs.h、508KiB) を
                                                超えたら出力を消して失敗 (HDD ローダが読めない)。
-                                               試験: make check-vmkernel-lz4-host
                                                形式は VK32 v2 (エントリごとの展開後 CRC32 +
                                                完全長 + ファイル全体の CRC32)。両ローダが
                                                全部検査して外れたら止まる。
-                                               試験: make check-vk32-crc-host
 kernel.elf のリンクに build/out/build_id.c   → tools/gen_build_id.py (コミット ID。中身が
                                                変わったときだけ書くので、組み直すのは
-                                               build_id.o とリンクだけ)。試験: make check-build-id-host
+                                               build_id.o とリンクだけ)。
 
 ※ カーネル関連のビルド成果物はすべて `build/out/` に集約される (`BUILD_OUT`、gitignore対象)。
   `tools/gen_unicode` の出力 `unicode.bin` も同ディレクトリへ移動される。
@@ -81,7 +79,7 @@ core・VK32・各 `.mod` (hwdev は現行の `hwdev.mod`)・kdebug と R1 の同
 移動の準備は `tools/move_files.py <対応表.json> --dry-run` (移動・差分・分割パスの警告)。
 適用時は `git mv` と入力の置換後に生成ヘッダを再生成する。`tools/include_resolve.py -o includes.json` は
 `make all` の実際の `-I` 順で非活性分岐を含む引用 include を解決する (未解決は `null`)。
-走査ルートの正典は `tools/source_roots.py`。道具の小さな木での試験は `make check-src-layout-host`。
+走査ルートの正典は `tools/source_roots.py`。
 
 
 === HDD デプロイ ===
@@ -116,7 +114,7 @@ userland/gshell (Rust, cargo)  → libgshell.a
   + crt0 + libos32gfx (GFX_OBJ) → ld -T sdk/link/app_sys.ld → userland/gshell.bin (シェル帯 0x400000、make gshell)
 userland/rust/libos32gui       → ld -T sdk/link/shlib.ld     → userland/libos32gui.elf/.raw
                 → tools/mkshlib.py --api 42 → userland/libos32gui.shlib (/sys/lib、make shlib)
-                   (make check-shlib = 番号表の突き合わせ。ジャンプ表は末尾追記のみ)
+                   (ジャンプ表は末尾追記のみ)
 GUI アプリ      → libos32gui_stub (ジャンプ表への薄いスタブ) を静的リンク、libos32gfx は入れない
 ```
 
@@ -165,7 +163,7 @@ SQLite は既存 VA0/module 生成器で GNU89 の engine/VFS を組み、typed 
   - export (`:178`): slot が 1〜ops の口数の外か重複、入口が text の外、ver・name_hash が契約と違う、名前が hash と合わない、name_hash の重複。名前表を import→export の順に読み切って長さがちょうど合わない (`:193`)。
   - reloc (`:197`): 書込位置の 4 B が payload の外、元の値 (VA 0 基点) が mem_size を超える (one-past は可)、reloc どうしの 4 B が重なる、import slot と重なる。再配置のときも base + mem_size の overflow を断る (`:228`)。
 - **KDEBUG (ID 1)**: POST_ROOT・対の CRC 必須・stop 無し・ops は版 4・20 口 (`KDEBUG_OPS_VERSION`、`tools/module_schema.py` の `KDEBUG_OPS_NAMES`)。他の部品は ops 1 口 (`initialize`)。大きさと表の件数の上限は次の表。
-- **KDEBUG の口と呼ぶ文脈** (slot は `KDEBUG_OPS_NAMES` の順で 1 から): 1〜4 `selftest_*`・5 `crt_diag_bootlog` は起動の通常文脈、6 `gcap_capture` と 19 `dbg_call` は KAPI (slot 239 `v86_gdc_capture`・253 `kdebug_call`) の通常文脈、7〜15 `gcap_*` は #GP・V86 入場・IRQ 停止中の例外文脈 (`.def` で印を付けた import だけを呼べる — `check-kdebug-ctx-host`)、16 `gcap_release` と 17〜18 `nic_*` は通常文脈だけ (IRQ・tick・irq_save の中は不可)、20 `hwdev_core_get` は HWDEV の核 (`docs/design/hwdev/hwdev_imports.md`)。部品が無い・口が空のときは本体が呼ばずに OFF の振る舞い (KAPI は `OS32_ERR_NOSYS`、他は 0 か何もしない) をする。部品の `init` は候補表を埋めて返すだけで、割当・登録・装置の操作・import の呼出しをしない (`check-kdebug-init-host`)。そのため init が失敗しても回収だけで元に戻る。
+- **KDEBUG の口と呼ぶ文脈** (slot は `KDEBUG_OPS_NAMES` の順で 1 から): 1〜4 `selftest_*`・5 `crt_diag_bootlog` は起動の通常文脈、6 `gcap_capture` と 19 `dbg_call` は KAPI (slot 239 `v86_gdc_capture`・253 `kdebug_call`) の通常文脈、7〜15 `gcap_*` は #GP・V86 入場・IRQ 停止中の例外文脈 (`.def` で印を付けた import だけを呼べる)、16 `gcap_release` と 17〜18 `nic_*` は通常文脈だけ (IRQ・tick・irq_save の中は不可)、20 `hwdev_core_get` は HWDEV の核 (`docs/design/hwdev/hwdev_imports.md`)。部品が無い・口が空のときは本体が呼ばずに OFF の振る舞い (KAPI は `OS32_ERR_NOSYS`、他は 0 か何もしない) をする。部品の `init` は候補表を埋めて返すだけで、割当・登録・装置の操作・import の呼出しをしない。そのため init が失敗しても回収だけで元に戻る。
 - **KDEBUG=0 でも本体に残るもの**: lifecycle の監査 (`sys/kern/kaudit.c`、`audit_runs` の回数は ON と同じ) と自己試験の計数 (`sys/kern/kselftest_report.c`)。部品に移したのは kselftest の試験本体・`v86 -g` の記録器・crt_diag で、OFF ではファイルを開かず 0 B。
 
 #### 起動時に読む部品の大きさの上限と由来
@@ -313,10 +311,10 @@ KernelAPI の構造体を変えたときは `make clean` → `make all` が必�
 
 `make kernel-r1` は `OS32_R1_FIXTURE` を付け、object / 依存ファイルを
 `build/out/r1/obj/`、像・map・`manifest.json` を `build/out/r1/` に作る。
-製品の object と像は共有しない。`check-r1-fixture-host` は CPU 入口を模擬して
+製品の object と像は共有しない。撤去前の隔離試験では CPU 入口を模擬して
 実台帳と停止経路を検査し、clean を挟まない両ビルド順で製品 hash が変わらないことを
-確認する。両順ビルドは先頭 runner だけが `$TMPDIR` 内のソースの写しで行い、
-その写しだけで `__DATE__` / `__TIME__` を `SOURCE_DATE_EPOCH` で固定する。
+確認した。両順ビルドは先頭 runner だけが `$TMPDIR` 内のソースの写しで行い、
+その写しだけで `__DATE__` / `__TIME__` を `SOURCE_DATE_EPOCH` で固定した。
 
 試験像だけにある BSS `r1_fixture_arm[7]` の各添字に
 `R1_FIXTURE_ARM` (`sys/kern/r1_fixture.h`) を `emu_write_mem` で書くと一度だけ発火する。
@@ -364,7 +362,7 @@ allow-list の集合は `deploy-set.json` を正とし、`check: optional` の�
 | `build/out/deploy-set.json` | `tools/gen_deploy_set.py` | 配備の期待集合 (ゲストのパス・size・SHA-256、`check` の種別) | `nhd_deploy.py verify-set`、`deploy_source_check.py`、CI の成果物 |
 | `build/out/generations-manifest.json` | `tools/gen_generation_manifest.py` | 成果物の世代表 (build ID と各成果物の hash、apps/game は除く)。配備集合ではない | `gen_deploy_set.py`、世代の照合 |
 | `.deploy/manifest.txt` (HostDrv の `C:\os32` と NHD) | `tools/hostdrv_deploy.py` | hsync の名札 (この配備元の一式と KAPI の版)。1 件でも失敗したら消す | ゲストの `hsync` (KAPI の門、無ければ `manifest_absent`) |
-| `build/out/layout-manifest.json` | `tools/gen_memmap.py --manifest --write` (T3a0) | ELF から導いた配置の半開区間 (code/data/BSS/NOLOAD・鎖・SLACK・shell、owner/用途/ページ数/世代/hash) | `make check-memmap`、T3 の予算と写しの検査 |
+| `build/out/layout-manifest.json` | `tools/gen_memmap.py --manifest --write` (T3a0) | ELF から導いた配置の半開区間 (code/data/BSS/NOLOAD・鎖・SLACK・shell、owner/用途/ページ数/世代/hash) | T3 の配置予算と写しの照合 |
 ゲストが書いた後は **stop → umount → pull → verify-set**。
 `np21w_ctl.py start` は起動前にこの作業木の t2h stamp を失効させる
 (別 ini の起動も安全側に失効)。remote の hash が変わった場合も、pull を省いた照合・配備を拒否する。
@@ -635,10 +633,10 @@ diff / du / cal / man。残すコマンド・FD の profile・インストーラ
 場合は、その参照自身が書いたバイトも再利用する。窓はファイル境界でリセット
 しない。圧縮器もこの逐次コピーと同じ値で一致を判定する必要がある。
 `cdinst.c` は `pkg.c` に展開を委ね、ホストの `mkpkg.read_pkg` も同じ規則を使う。
-`make check-lzss-pkg-host` は固定種 0〜299 (既知の失敗入力は種250、SHA-256 を
+撤去前の圧縮試験では固定種 0〜299 (既知の失敗入力は種250、SHA-256 を
 試験に固定) と窓・重複参照・末尾の境界を、Python と実物の32ビット
-`pkg_parse` / `pkg_extract` で照合する。`MUTATE=1` では更新前の窓だけを見る
-旧圧縮器を復元し、両方の読み手で破損が検出されることも確認する。
+`pkg_parse` / `pkg_extract` で照合した。変異では更新前の窓だけを見る
+旧圧縮器を復元し、両方の読み手で破損が検出されることも確認した。
 
 ##### 起動 FD と MINIMAL
 
@@ -675,9 +673,9 @@ mkpkg が先に断る)。**`core` / `base` に足した物は `fd.exclude` 以�
 足すときは `make all` の FD の行 (`クラスタ使用: … 残り …KB`) を見る。**空きが 64KB を切ったら**、 溢れて `make all` が割れる前に、MINIMAL に足す物を
 見直すか FD から外す物を決める合図。
 以前 FD にだけあった試験用の `/bin/timetest.bin` / `/bin/pcmtest.bin` は外した (DEBUG の
-`/usr/bin/time_test.bin` / `pcm_test.bin`)。検査は `make check-packages-host` の case 7 が
-実物の 2 つのイメージを FAT12 として読み戻し、構成とバイト列で等しいことを見る。case 7b は
-配布物の `os32_boot.d88` のセクタを並べ直して `os32_boot.img` (RAW) と同じバイト列かを見る
+`/usr/bin/time_test.bin` / `pcm_test.bin`)。撤去前の配布試験では case 7 が
+実物の 2 つのイメージを FAT12 として読み戻し、構成とバイト列で等しいことを確かめた。case 7b は
+配布物の `os32_boot.d88` のセクタを並べ直して `os32_boot.img` (RAW) と同じバイト列かを確かめた
 (各トラックの R が重複なく 1〜spt であることも)。
 
 #### `build/app.conf` (OS32X ヘッダ設定)
@@ -715,8 +713,6 @@ mkpkg が先に断る)。**`core` / `base` に足した物は `fd.exclude` 以�
 `userland/sh` — 常駐シェルと同じソースを `-DSHELL_AS_APP` で app.ld の 0x80100000 (私有 VA) にリンクした CPL=3 版 — に
 立てる。GUI アプリの通常の起動経路 (`session_launch`) はこの宣言と無関係。
 
-`gfx` / `cui` は `make check-manifests` がソースの呼び出しと突き合わせて検出する (§2b)。
-`launcher` は同じ §2b が書式 (4 列目に置けるのは 3 つの印か省略) だけを見る。
 `apps/` `game/` は staged SDK 側でそれぞれの `Makefile` が `mkos32x` を呼ぶので、
 そちらの GFX プログラムには各リポジトリで `--gfx` を付ける。
 
@@ -760,7 +756,7 @@ tools/audit_cast_align.sh all
 
 **文書を動かし、リポジトリ中の `.md` の参照を追従させる** (検査ではなく、手で回す道具)。
 受入完了した票を `docs/archive/<領域>/` へ落とすときに使う。`git mv` だけでは指していた側の
-相対リンクが黙って壊れ、`check-docs-links` が次に回るまで気づけない。
+相対リンクが黙って壊れ、登録検査 `docs_links` が次に回るまで気づけない。
 
 ```bash
 python3 tools/move_docs.py --into docs/archive/network docs/tasks/network/TASK_N0.md --dry-run
@@ -905,7 +901,7 @@ morecore だけを持つ。USER の `_sbrk` と malloc は adapter の primary �
 unmap 成功時だけ list から確定除去し、失敗時は復元する。primary/BSS は返さない。
 65536 bytes 以上も f7 では nano 経路で、大塊の直接 map は f8 で切り替える。
 
-`CROSS_DIR=... make check-nano-inputs-host` は実アーカイブ/memberのhash、提供symbol、
+`python3 tools/check_nano_inputs.py --cross-dir "$CROSS_DIR"` は実アーカイブ/memberのhash、提供symbol、
 実 `-lc` リンクmapを検査する。i386出力はrelocatableとして検査し、実行はしない。
 receiptの無いtoolchainは **f1a参照ホスト (PMの開発ホストで採取した構築)** の固定台帳と照合する。
 他ホストや手作り/旧build_cross.sh構築では、同じ入力でもDWARFのbuild path差により

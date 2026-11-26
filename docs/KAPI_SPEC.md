@@ -466,8 +466,7 @@ VFS パスの NULL=cwd、`sys_redirect_fd` の NULL 拒否の戻り値、`sys_mo
 > `const char *` を返す KAPI 6 本はすべて CPL=3 が読める場所を返す (`sys_getcwd` /
 > `vfs_devname` / `path_get_drive` / `path_get_cwd` = トランポリンの写し、`db_last_error` /
 > `db_column_text` = 共有メモリ)。**4 本の写しは共用**なので、どれかを呼べば他の 3 本の
-> 返り値は上書きされる。`make check-hdd-stage2-host` の str-return guard が
-> kapi.json の target・生成物・exec.c の写しを突き合わせ、kselftest の
+> 返り値は上書きされる。kselftest の
 > `test_tramp_user_str` が実機で返り番地を見る。
 
 | Offset | フィールド | プロトタイプ |
@@ -1123,8 +1122,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   決める材料になる (票 §5-2 R1)。
 - **NP21/W は `0CF8h` を実装していない。** `pci_init()` は読み戻しが一致しない
   ことを見て `[pci] mech#1 absent` を出し、その場で戻る。これは失敗ではなく
-  正しい報告 ([V4])。復号の側はホスト試験 (`make check-pci-decode-host`) で
-  固めてある。
+  正しい報告 ([V4])。
 - 資料は `docs/hw/undocumented/io_pci.md` (図2 = アドレス語、446〜479 行 =
   `0CF8h` / `0CFCh`) と Intel 8255x SDM Table 1 (Type 0 ヘッダ)。
 
@@ -1197,7 +1195,7 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   `[irq N quarantined]` / `[irq N storm-masked]`。`result` が NONE で
   `line_state` が OK のとき (= 一致する driver が無いふつうの装置) は何も出さない。
 - **NP21/W には PCI が無い**ので、エミュレータではこの口は常に 0 件
-  (`lspci: no PCI`)。規則はホスト試験 `make check-pci-bind-host` が固める。
+  (`lspci: no PCI`)。
 
 ### CS4231 (MATE-X PCM) の再生 (v61)
 

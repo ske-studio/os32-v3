@@ -53,7 +53,7 @@ BIOS (INT 1Bh) を使用せず、I/Oポート直接制御および DMA (μPD8237
 | I/Oポート | 0x90 (メインステータス `FDC_MSR`), 0x92 (データ `FDC_FIFO`), 0x94 (コントロール `FDC_CTRL`) |
 | 転送方式 | DMA (μPD8237A ch2)。アドレス 0x09 / カウント 0x0B / バンク 0x23 / マスク 0x15 / モード 0x17 / F-F クリア 0x19 (`sys/dev/block/fdc.h`) |
 | 割り込み | IRQ11 (`fdc_irq_fired`) を待つ。上限は**機構の最悪値**から導く: SEEK/RECALIBRATE 1.5s (SRT 8ms × 80 トラック)、READ/WRITE 1s (最大 2 回転 + ヘッドロード)、リセット 0.5s (`sys/dev/block/fdc.h`)。以前の 200ms 一本値は NP21/W 基準で実機のシークに足りなかった ([POLICY_DEBUG §4-51](POLICY_DEBUG.md#4-51-fdc-の時間と-dma)) |
-| 割り込みの回収 | SEEK/RECALIBRATE の前に SENSE INTERRUPT STATUS で未回収分を排水 (上限 4、ST0=80h で尽きる)。pending 無しの SIS は **ST0 1 バイトだけ**返るので PCN を読まない。タイムアウト後も SIS を 1 回出し、SE が立っていれば取りこぼしとして完了扱い。RECALIBRATE の EC は再試行の合図 (2 回まで)。判定は `sys/dev/block/fdc_decide.c` (純粋関数、ホスト試験 `make check-fdc-seek-host`) |
+| 割り込みの回収 | SEEK/RECALIBRATE の前に SENSE INTERRUPT STATUS で未回収分を排水 (上限 4、ST0=80h で尽きる)。pending 無しの SIS は **ST0 1 バイトだけ**返るので PCN を読まない。タイムアウト後も SIS を 1 回出し、SE が立っていれば取りこぼしとして完了扱い。RECALIBRATE の EC は再試行の合図 (2 回まで)。判定は `sys/dev/block/fdc_decide.c` (純粋関数) |
 | リトライ | READ/WRITE は 3 回。失敗した試行の後に `fdc_recover()` (リセット → Specify → 排水 → recalibrate)。最終失敗だけ `[fdc] read fail ... st0/st1/st2` を 1 行出す ([V4]) |
 | DMAバッファ | 1 セクタ分 (1024B) を **1024B 境界に揃えた**静的バッファ — 64KB 境界をまたげない ([HW2])。`fdc_init()` が起動時に検査する |
 
@@ -168,7 +168,7 @@ AL bit0 = ラスタスキャンはどちらの並びでも許して 30h へ保�
 (画面を 200 ライン / 400 ライン・16 色へ決め打ち) は通らず、最後に CUI を作り直す。出力は画面と rshell の
 両方に出る 1 件 1 行の形。`v86 -g -t` は決まった I/O 列の試験ゲストで記録器を確かめる (実機へ通さない)。
 NP21/W の ROM は SYNC を内部状態へ直接書くので、エミュレータでは SYNC の列は採れない (件数は構成次第)。
-純粋部 (記録・判定) のホスト試験は `make check-v86-gcap-host`。記録器は KDEBUG 部品の中なので `KDEBUG=1` の起動でだけ動く (OFF は NOSYS)。
+記録器は KDEBUG 部品の中なので `KDEBUG=1` の起動でだけ動く (OFF は NOSYS)。
 [未] ROM の AH=30h の後は VSYNC 割り込みが止まり 0064h への書き込みで再開する ([U] io_disp.md) が、`v86 -g` は CUI を作り直すだけで 0064h を書かない。
 
 **PEGC の 480 ラインへの出入りは起動時の BIOS 状態に頼らず、実機 ROM の OUT 列に合わせる** (2026-09-29〜、経緯は [POLICY_DEBUG §4-62](POLICY_DEBUG.md#4-62-pegc-の実機モード)):
@@ -177,7 +177,7 @@ PITCH (80) → SCROLL → 表示開始の順に書く (クロックは SYNC の�
 (sel 09h の bit0 = CLOCK-1、読み値 bit1 = CLOCK-2) で読んだクロックへ戻し、PITCH (書き込み専用)・グラフィック GDC の SYNC・
 SCROLL の IM もそのクロックとの組で選ぶ (両方 5MHz なら PITCH 80・C/R 4Eh・IM 1、それ以外は 40・26h・0 — Bible 2-6 表2-27、2-7)。値は [sys/platform/pc98/pegc.h](../sys/platform/pc98/pegc.h) §10 に集約する。480 ラインと 400 ライン・31kHz の戻り (グラフィック GDC 2.5MHz) は実機 ROM の採取値。400 ライン・24kHz と 31kHz の 5MHz 用は実機未採取で、資料・NP21/W 由来の値を使う。GDC へは 1 バイトずつステータスの FIFO を見てから書く (コマンドの前は EMPTY、パラメータの前は FULL でない。
 上限 2µs × 5000 回で打ち切って数える — `pegc_gdc_fifo_timeouts`、kernel.map から読める)。09A8h へは bit1,0 だけを書く
-(実機の読みは 81h だが bit7〜2 は「常に 0」、PLL を持つ機種がある)。ホスト試験は `make check-pegc-mode-host`。
+(実機の読みは 81h だが bit7〜2 は「常に 0」、PLL を持つ機種がある)。
 
 - **順序と中身**: 入る (`pegc_enter_480_ports`) と戻る (`pegc_text_sync_400`) は同じ `pegc_apply_timing` を値だけ替えて通り、実機 Ra266 の ROM (INT 18h AH=30h) の列の順に書く — 6Ah 拡張モード (07h・21h・06h) と 41h → 表示停止 (68h 0Eh) → 09A8h (今の D0 が目標と違うときだけ、bit1,0 だけ) → GDC クロック → 両 GDC の RESET・MASTER/SLAVE と SYNC → テキスト CSRFORM・グラフィック CSRFORM (L/R = 0) → STOP2 → 両 GDC の PITCH・ZOOM・SCROLL (グラフィック LEN 3FFh) → 68h 08h・6Ah 69h (800 ライン構成)・6Eh (拡張アトリビュート、各書き込みの後に 5Fh の待ち)・テキスト CRTC (70h〜7Ah) → 68h 0Fh → START (ROM は両 GDC を止めたまま返すので、OS32 が呼び手として 480 では両 GDC、戻りではテキストだけ 6Bh)。ROM の待ちに合わせて 7 か所で VSYNC を待ち、1 回 50ms で打ち切って `pegc_vsync_timeouts` を数える。CUI へ戻るときは ROM の CSRFORM がカーソル非表示なので `console_hw_cursor_enable()` で戻す。
 - **ROM の記録が期待値**: 実機 ROM の 480 / 戻りの OUT 列 (各 94 行) は `pegc_mode_host.c (旧版 74eab42d0979)` の `ROM_S480` / `ROM_BACK` に数値のまま置き、`check-pegc-mode-host` の `rom_s480` / `rom_back` が実物の列と 1 行ずつ比べる。比べるのは `pegc_enter_480_ports()` と `pegc_text_sync_400()` の頭から終わりまで (MMIO・VRAM クリア・パレット・起動時の記録・診断の 09A0h の読みは外す)。違えてよい行は同じ試験の除外表 (`EDIT_COMMON` / `EDIT_BACK` / `ADD_*`) に理由付きで置く: 09A0h 03h の読み、PC-98GS 用の A46Eh・A660h と ROM バンク 063Ch (記録器が実機へ通していない)、描画コマンド A2h 20h・78h ([HW1])、戻りの 68h 09h (OS32 のグラフィックは 400 ライン)。**6Ah 07h・A0h DFh・A2h 28h・6Ah 06h の組は意味が資料に無い未解明の差分で、送っていない** — 実機で表示が崩れたら最初に疑う。
