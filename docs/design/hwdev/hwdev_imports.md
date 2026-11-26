@@ -25,9 +25,9 @@ slot は 0 始まり、追加は末尾だけ。この表を `tools/hwdev_audit.p
 | 14 | `recover_access` | `sys/dev/video/geforce/diag/recover.h` |
 | 15 | `recover_restore_point` | `sys/dev/video/geforce/diag/recover.h` |
 | 16 | `recover_target_address` | `sys/dev/video/geforce/diag/recover.h` |
-| 17 | `recover_window_hal_init` | `sys/dev/video/geforce/diag/recover.h` |
-| 18 | `recover_window_access` | `sys/dev/video/geforce/diag/recover.h` |
-| 19 | `recover_window_cleanup` | `sys/dev/video/geforce/diag/recover.h` |
+| 17 | `recover_window_hal_init` | `sys/include/recover_window_contract.h` |
+| 18 | `recover_window_access` | `sys/include/recover_window_contract.h` |
+| 19 | `recover_window_cleanup` | `sys/include/recover_window_contract.h` |
 | 20 | `recover_gf_pre` | `sys/dev/video/geforce/diag/recover.h` |
 | 21 | `recover_gf_result` | `sys/dev/video/geforce/diag/recover.h` |
 | 22 | `recover_gf_screen_safe` | `sys/dev/video/geforce/diag/recover.h` |

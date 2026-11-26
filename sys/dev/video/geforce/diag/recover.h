@@ -160,7 +160,6 @@ enum recover_request { REC_REQUEST_NOW, REC_REQUEST_STATUS };
 #define RECOVER_PRMVIO KPEEK_NV_PRMVIO0_OFF
 #define RECOVER_PRMCIO KPEEK_NV_PRMCIO0_OFF
 #define RECOVER_HEAD_STRIDE (KPEEK_NV_PCRTC1_OFF - KPEEK_NV_PCRTC0_OFF)
-#define RECOVER_WINDOW_PAGES 2U /* a peek chunk (< one page) spans at most two PTEs */
 #define RECOVER_CFG_SIZE PCI_CFG_SPACE_SIZE
 #define RECOVER_COMMAND PCI_CFG_COMMAND
 #define RECOVER_COMMAND_RUN  0x0106U
@@ -476,28 +475,7 @@ int trial_end(struct recover *r, const struct recover_token *token,
               enum recover_reason reason);
 int recover_request(struct recover *r, const struct recover_token *token,
                     enum recover_request request);
-/* T2 primitives: accessors are injectable; only local_cleanup owns release.
- * T2 maps one aligned datum per short window, peek one chunk (kdebug_window);
- * IRQs never span a script or wait. */
-struct recover_window_ops {
-    u32 (*irq_save)(void *opaque);
-    void (*irq_restore)(void *opaque, u32 flags);
-    u32 (*pte_read)(void *opaque, u32 va);
-    int (*map)(void *opaque, u32 va, u32 pa, u32 pages, u32 flags);
-    int (*unmap)(void *opaque, u32 va, u32 raw);
-    int (*load)(void *opaque, u32 va, u32 width, u32 *value);
-    int (*store)(void *opaque, u32 va, u32 width, u32 value);
-};
-struct recover_window {
-    const struct recover_window_ops *ops;
-    void *opaque;
-    u32 va, raw[RECOVER_WINDOW_PAGES], flags, pages;
-    bool owned, failed;
-};
-void recover_window_hal_init(struct recover_window *w);
-int recover_window_cleanup(struct recover_window *w);
-int recover_window_access(struct recover_window *w, u32 pa, u32 width,
-                          bool write, u32 *value);
+#include "recover_window_contract.h"
 
 /* Common 98 text proof, after screen_safe has independently verified decode.
  * cell is one explicitly reserved unused TVRAM word, not a general write API.

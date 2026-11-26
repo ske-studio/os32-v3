@@ -158,6 +158,9 @@ expect = "有効な include 直辺が所有の方向を守る"
 limits = "PC-98 と PowerMac core の C と前処理アセンブリ"
 gates = ["push", "main"]
 mutations = [{ id = "new_nasm_device_edge", config = "pc98", when = "after_build", replace = "sys/dev/net/ne2000/ne2000_io.asm", old = "section .text", new = "section .text\n%include \"sys/arch/x86/kernel/cpu_flags.inc\"", fail = "R5 sys/dev/net/ne2000/ne2000_io.asm -> sys/arch/x86/kernel/cpu_flags.inc" },
+ { id = "other_component_import_macro", config = "pc98", when = "after_build", replace = "sys/kern/ime/ime.c", old = "#include \"ime.h\"", new = "#include \"ime.h\"\n#include \"sys/platform/pc98/kdebug/generated/kdebug_import_macros.h\"", fail = "private import sys/kern/ime/ime.c" },
+ { id = "resident_import_macro", config = "pc98", when = "after_build", replace = "sys/kern/kdebug/kdebug_module.c", old = "#include \"kdebug_imports.h\"", new = "#include \"kdebug_imports.h\"\n#include \"sys/platform/pc98/kdebug/generated/kdebug_import_macros.h\"", fail = "private import sys/kern/kdebug/kdebug_module.c" },
+ { id = "wrong_target_import_macro", config = "core", when = "after_build", replace = "sys/kern/machcfg.c", old = "#include \"kprintf.h\"", new = "#include \"kprintf.h\"\n#define KDEBUG_IMPORTS_GENERATED_H\n#include \"sys/platform/pc98/kdebug/generated/kdebug_import_macros.h\"", fail = "private import sys/kern/machcfg.c" },
  { id = "named_machine_header", config = "core", when = "after_build", replace = "sys/kern/machcfg.c", old = "#include \"kprintf.h\"", new = "#include \"kprintf.h\"\n#include \"sys/platform/pc98/pc98.h\"", fail = "R6 sys/kern/machcfg.c -> sys/platform/pc98/pc98.h" }]
 
 [[check]]
@@ -174,6 +177,7 @@ expect = "最終リンクが対象構成の入力を採用する"
 limits = "書庫・部分リンクの内部は対象外"
 gates = ["push", "main"]
 mutations = [{ id = "wrong_cpu_object", config = "core", when = "after_build", replace = "build/targets/ppc-powermac.mk", old = "KB_C := $(C_KERNEL)", new = "KB_C := $(C_KERNEL) sys/arch/x86/kernel/double_fault.c", fail = "incompatible link input sys/arch/x86/kernel/double_fault.c" },
+ { id = "private_slot_extent", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/generated/kdebug_imports.h", old = "extern unsigned long kdebug_import_slots[KDEBUG_IMPORT_COUNT];", new = "extern unsigned long kdebug_import_slots[];", fail = "private slot contract" },
  { id = "provider_type", config = "core", when = "after_build", replace = "sys/arch/ppc/arch_cpu.h", old = "u32 ppc_root_current(void);", new = "#if __INCLUDE_LEVEL__ > 1\nunsigned short ppc_root_current(void);\n#else\nu32 ppc_root_current(void);\n#endif", fail = "paging.c -> ppc_root_current -> sys/arch/ppc/kernel_mmu.S" },
  { id = "provider_owner", config = "core", when = "after_build", replace = "build/sources/ownership.mk", old = "OWN_ASM_CONTRACT += sys/arch/ppc/kernel_mmu.S|sys/arch/ppc/arch_cpu.h", new = "OWN_ASM_CONTRACT += sys/arch/ppc/kernel_mmu.S|sys/arch/ppc/arch_io.h", fail = "paging.c -> ppc_root_current -> sys/arch/ppc/kernel_mmu.S" },
  { id = "asm_reader_extern", config = "core", when = "after_build", replace = "sys/platform/powermac/platform_kernel_entry.h", old = ".extern name", new = "/* declaration removed */", fail = "kernel_entry.S -> ppc_kernel_start ->" },

@@ -1317,3 +1317,8 @@ OWN_HEADER += sys/platform/powermac/platform_trap_sink.h|fixed_contract
 OWN_HEADER += sys/platform/pc98/platform_kernel_entry.h|fixed_contract
 OWN_HEADER += sys/platform/pc98/platform_v86_isr.h|fixed_contract
 OWN_ASM_CONTRACT += sys/platform/pc98/legacy/v86_entry.asm|sys/platform/pc98/platform_v86_isr.h
+
+# P43 組 4: 診断窓と部品専用の import。
+OWN_CONTRACT += sys/include/recover_window_contract.h
+OWN_CONTRACT += sys/include/kdebug_window_contract.h
+OWN_PRIVATE_IMPORT += sys/platform/pc98/kdebug/generated/kdebug_import_macros.h|sys/platform/pc98/kdebug/generated/kdebug_imports.json

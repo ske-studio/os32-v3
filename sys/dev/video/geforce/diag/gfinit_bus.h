@@ -1,6 +1,7 @@
 #ifndef KDEBUG_GFINIT_BUS_H
 #define KDEBUG_GFINIT_BUS_H
-#include "../../../../arch/x86/kdebug/kdebug_window.h"
+#include "recover.h"
+#include "kdebug_window_contract.h"
 /* S6 supplies existing pci_cfg_* imports. Command always uses write16;
  * no config DWORD read/modify/write, no GPU legacy I/O instructions. */
 struct gfinit_pci_ops {

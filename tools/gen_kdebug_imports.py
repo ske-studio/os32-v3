@@ -272,7 +272,7 @@ def check_nm(entries, nm=None, root=ROOT):
     return True
 
 
-def generate(entries, out_dir, stage=LAST_STAGE):
+def generate(entries, out_dir, stage=LAST_STAGE, stub=None):
     selected = entries[:STAGES[stage]]
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -323,7 +323,7 @@ def generate(entries, out_dir, stage=LAST_STAGE):
     for e in selected:
         asm += [f'.globl {e["name"]}', f'.type {e["name"]}, @function', f'{e["name"]}:', f'    jmp *kdebug_import_slots+{4*e["index"]}', f'.size {e["name"]}, .-{e["name"]}']
     asm += ['.section .note.GNU-stack,"",@progbits']
-    (out / 'kdebug_import_stubs.S').write_text('\n'.join(asm) + '\n')
+    (stub or out / 'kdebug_import_stubs.S').write_text('\n'.join(asm) + '\n')
     metadata = {'module_abi_gen': abi_hash(selected), 'stage': stage, 'count': len(selected), 'imports': selected}
     (out / 'kdebug_imports.json').write_text(json.dumps(metadata, indent=2) + '\n')
     return metadata
@@ -333,6 +333,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--def', dest='definition', type=Path, default=DEFAULT_DEF)
     parser.add_argument('--out-dir', type=Path)
+    parser.add_argument('--stub', type=Path)
     parser.add_argument('--stage', choices=STAGES, default=LAST_STAGE)
     parser.add_argument('--check-nm', action='store_true')
     parser.add_argument('--nm')
@@ -345,7 +346,7 @@ def main():
                   ' '.join(f'{stage}={count}' for stage, count in STAGES.items()) +
                   ' (linked core, data accessors and address manifest)')
         if args.out_dir:
-            generate(entries, args.out_dir, args.stage)
+            generate(entries, args.out_dir, args.stage, args.stub)
     except (ValueError, KeyError, OSError, subprocess.CalledProcessError) as exc:
         print(f'gen_kdebug_imports: {exc}', file=sys.stderr)
         return 1

@@ -122,21 +122,21 @@
     {
       "index": 17,
       "symbol": "recover_window_hal_init",
-      "source": "sys/dev/video/geforce/diag/recover.h",
+      "source": "sys/include/recover_window_contract.h",
       "kind": "FUNC",
       "group": "core"
     },
     {
       "index": 18,
       "symbol": "recover_window_access",
-      "source": "sys/dev/video/geforce/diag/recover.h",
+      "source": "sys/include/recover_window_contract.h",
       "kind": "FUNC",
       "group": "core"
     },
     {
       "index": 19,
       "symbol": "recover_window_cleanup",
-      "source": "sys/dev/video/geforce/diag/recover.h",
+      "source": "sys/include/recover_window_contract.h",
       "kind": "FUNC",
       "group": "core"
     },
