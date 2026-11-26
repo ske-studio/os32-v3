@@ -44,7 +44,7 @@
 ### 別のアーキテクチャで機能を作るときは、統合して作れるかを先に判断する (ユーザー決定 2026-11-14)
 
 あるアーキテクチャだけで機能を作るとき、または他のアーキテクチャや本線にある役目を別の形で作るときは、設計の §1 で次の 3 点を判断して書く。
-1. 同じ役目の機能・計画が、他のアーキテクチャや本線にあるか。票・確定設計・計画書 (例: [HOST_SERVICES_PLAN](tasks/network/HOST_SERVICES_PLAN.md)) を読んで確かめる。
+1. 同じ役目の機能・計画が、他のアーキテクチャや本線にあるか。票・確定設計・計画書 (例: 【案内】[HOST_SERVICES_PLAN](tasks/network/HOST_SERVICES_PLAN.md)) を読んで確かめる。
 2. あるなら、アーキテクチャに依る部分を HAL (`arch/`・`platform/` の口) に分けて、1 つの実装にするか。分けないなら、その理由を書く。
 3. 既存の計画・確定設計の向き (プロトコル・tick・mount・exec など) と合うか。合わない設計にするときは、実装の前にユーザーに確かめる。
 
@@ -93,7 +93,7 @@ C の基準は [C1](CONSTRAINTS.md)、検査は `make check-c-dialect`。既存�
 
 ## §6. 検証
 
-検証の段は [TASK_POLICY_LIGHT §C](tasks/v3/TASK_POLICY_LIGHT.md) と [08_build.md](08_build.md) を参照。実機試験の設計は [kdebug](design/kdebug/README.md) を参照。
+検証の段は [08_build.md](08_build.md) を参照。実機試験の設計は [kdebug](design/kdebug/README.md) を参照。
 
 ### 試験の期待と製品の設計 (ユーザー決定 2026-11-15)
 

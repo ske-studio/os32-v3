@@ -49,6 +49,10 @@
   "docs/tasks/ppc/TASK_PPC_KBOOT.md": "設計が PowerPC の進行中の作業 (P5 の残り) の土台。os32powerpc の再開の後に落とす",
   "docs/tasks/ppc/TASK_PPC_LAN.md": "設計が PowerPC の進行中の作業 (P5 の残り) の土台。os32powerpc の再開の後に落とす",
   "docs/tasks/ppc/TASK_PPC_REALHW.md": "設計が PowerPC の進行中の作業 (P5 の残り) の土台。os32powerpc の再開の後に落とす",
-  "docs/tasks/ppc/TASK_PPC_SEP.md": "機種依存の分離の今の仕組みと、ほかの票へ渡した残件の表の入口 (引き継ぎが指す)"
+  "docs/tasks/ppc/TASK_PPC_SEP.md": "機種依存の分離の今の仕組みと、ほかの票へ渡した残件の表の入口 (引き継ぎが指す)",
+  "docs/tasks/gui/v13/PLAN.md": "U25 (2026-11-26)。設計への要約・移管まで受入完了の記録を現行の棚に残す。",
+  "docs/tasks/network/HOST_SERVICES_PLAN.md": "U25 (2026-11-26)。設計への要約・移管まで受入完了の記録を現行の棚に残す。",
+  "docs/tasks/network/LINK_PLAN.md": "U25 (2026-11-26)。設計への要約・移管まで受入完了の記録を現行の棚に残す。",
+  "docs/tasks/network/PLAN.md": "U25 (2026-11-26)。設計への要約・移管まで受入完了の記録を現行の棚に残す。"
  }
 }
