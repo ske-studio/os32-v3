@@ -124,24 +124,6 @@ def verify(config):
         row.update(deferred=dict(ledger="fixture-approved", config=cfg, gates=["main"]))
         run_bundle(source, [plan[0]], args, {}, identity)
         check(collect([plan[0]], args, identity) == 0, "approved deferral was rejected")
-        # A scoped ledger entry still requires the verifier to run. A new
-        # violation (exit 1) must survive collection as a product failure.
-        row.update(environment="python", deferred=dict(ledger="P43-INCLUDE", config=cfg,
-                                                       gates=["main", "push"]))
-        for gate in ("main", "push"):
-            args.gate = gate
-            row["gates"] = [gate]
-            identity["gate"] = gate
-            (bodies / "first.py").write_text(
-                'import sys\nraise SystemExit(1 if sys.argv[-1] == "verify" else 0)\n')
-            run_bundle(source, [plan[0]], args, {}, identity)
-            check(collect([plan[0]], args, identity) == 1, "new layer violation must block collection")
-            observed = json.loads((out / "summary.json").read_text())["rows"][0]
-            check(observed["status"] == "FAIL", "new layer violation was deferred")
-        args.gate = identity["gate"] = "main"
-        row["gates"] = ["main"]
-        row["deferred"]["ledger"] = "fixture-approved"
-        run_bundle(source, [plan[0]], args, {}, identity)
         del row["deferred"]
         check(collect([plan[0]], args, identity) == 2, "unapproved deferral was accepted")
         row.update(gates=["push"])

@@ -63,8 +63,26 @@ P2-0 が採った全像の一覧を `sha256sum` の形式 (小文字の SHA-256�
 
 ## 7. 理由つきの差を旧い入力で再現する (`reviewed-replay`、P3)
 
-`Sep-Changes: reviewed-replay ARTIFACT CANDIDATE_SHA256 REPLAY_SHA256` は、移動で中身が変わった生成物を、旧い入力に戻した木で組み直すと基点と同じバイトになることを宣言する。道具 (`tools/build_compare.py`) が照らすのは候補の sha256 と、再現の木の sha256 が基点と一致することの 2 つだけなので、正しさの中身は「再現の木をどう作ったか」にある。P3 (2026-11-26) の 93 件の作り方はリポジトリに残す (DECISIONS の U20):
+宣言の形式は `Sep-Changes: reviewed-replay ARTIFACT CANDIDATE_SHA256 REASON`。基点相対の生成物名、候補の SHA-256（小文字 64 桁）、理由区分（`path`・`hwdev`・`module-abi`・`combined`）を順に書く。比較器は候補を宣言のハッシュと、再現木を基点のハッシュと照合する。P3 の候補は `2604e4964b9c`、基点は `v3-pre-restructure`。93 件の内訳はパス 24、HWDEV の CRC 7、部品の ABI の世代 20、複合 42。[照合表](../../../../tools/ci/replay/reviewed-differences.tsv)
 
-- 再現の木: `tools/ci/replay/replay-normalize.py` が候補の木に 3 つだけを戻す — (1) 生成済みの契約の値 11 個を旧い値に (`contract-replay.py`)、(2) kselftest の文字列 1 行を旧いパスに、(3) NASM の入力の名前 14 個を旧い名前に (`nasm-replay`)。
-- 照合: `audit-comparison.py` が 93 件の宣言・候補・基点・再現の sha256 を突き合わせる。差の一覧は [reviewed-differences.tsv](../../../../tools/ci/replay/reviewed-differences.tsv) (内訳: パス 24・HWDEV の CRC 7・部品の ABI の世代 20・それらの波及 42)。
-- 台本は PM の機械の置き場 (`~/os32-tmp/run/restructure/`) の絶対パスを前提にした記録で、そのまま回す道具ではない。差の種類は DECISIONS の U19。
+U20 の再現には §6 の固定環境と手元の基点一覧を使う。以下の `p` は P3 の記録を複製した作業用ディレクトリの絶対パス、`repo` は台本を収めた現在のリポジトリの絶対パスとする。`$p/tmp/verified-tree` に組み済みの候補、`$p/rebuild-final.log` にそのビルドログ、`$p/compare-final.log` に宣言適用前の差を置く。隣の `base/` に基点の一覧と生成物、`p2-0/first-build.log` に基点のビルドログを置く。
+
+1. 候補の Git 作業木で契約値を再計算し、新しい再現木に候補を複製する。
+
+       scripts="$repo/tools/ci/replay"
+       export TMPDIR="$p/tmp"
+       cd "$p/tmp/verified-tree"
+       python3 -B "$scripts/contract-replay.py" > "$p/module-abi.log"
+       cp -a . "$p/tmp/replay-tree"
+       python3 -B "$scripts/replay-normalize.py" "$p"
+
+2. 正規化は生成済み契約の値と kselftest の診断文字列を戻し、NASM の新旧入力名をログから対応づける。当時の追加補正では、再現木の `userland/diag/hw/{gf_palette,gf_regs,tri_burst4}.hwb`、`hsync.1`、SDK の配布テキストとその入力のパス表記も `move_map.json` の移動元に戻して基点のバイトと照合した。`userland/diag/kstr_asm_a.o` を再現木から除き、直接アセンブルする kstring も含めた保存版ラッパーを `AS` に渡す。
+
+       cd "$repo"
+       python3 -B tools/build_compare.py --baseline-build --tree "$p/tmp/replay-tree" --base v3-pre-restructure -- make AS="$scripts/nasm-replay" all kernel-r1
+
+3. ビルドで再配布された `build/sdk/` の `bin/os32x_hdr.py`、`include/rt/testresult.h`、`include/utf8.h`、`rust/os32api/src/gui/stub.rs` にも同じ旧パス表記を適用する。次に台本で93件を照合し、出力した宣言を比較器に渡す。
+
+       python3 -B "$scripts/audit-comparison.py" "$p"
+       cut -f1-5 "$scripts/reviewed-differences.tsv" | cmp - "$p/reviewed-differences.tsv"
+       python3 -B tools/build_compare.py --manifest "$p/../base/SHA256SUMS" --move-map "$scripts/move_map.json" --tree "$p/tmp/verified-tree" --declarations "$p/sep-changes.txt" --replay-tree "$p/tmp/replay-tree"

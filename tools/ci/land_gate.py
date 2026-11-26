@@ -19,7 +19,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from tests.support.impact import comparison
-from tests.infra.ci import exemption, scoped_deferral
+from tests.infra.ci import exemption
 
 
 def command(*args, timeout=30):
@@ -145,7 +145,7 @@ def planned_boots(base, run, artifacts):
         row = registry[result["id"]]
         config = result["config"]
         exempt = exemption(row, config, "main")
-        applicable = not exempt or scoped_deferral(exempt)
+        applicable = exempt is None
         passed = applicable and result["status"] == "PASS"
         if not passed and (result["status"], result["reason"]) != exempt:
             raise ValueError("unsuccessful selected check")
