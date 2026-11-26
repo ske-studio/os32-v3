@@ -230,7 +230,7 @@ PPC は PPCKERN.ELF と root 像を別計測する。限界を超えた段はリ
 |受入|試験環境・期待値|一行変異|
 |---|---|---|
 |段の欠落・重複なし|host の偽 provider が S0〜S9 の順、回数、最初の fatal 以降の呼出し 0 を照合|S4 呼出しを削る|
-|層の分離|host で tools/check_layers.py、共通製品列の機種条件 0、両ターゲットをリンク|共通に機種ヘッダを追加|
+|層の分離|host で include_layers、共通製品列の機種条件 0、両ターゲットをリンク|共通に機種ヘッダを追加|
 |メモリ先行|NP21/W の低メモリ・通常 FD/HDD と QEMU PPC の HDD で台帳、SHM、root 読出しを照合|共有写像を trampoline 生成前に移動|
 |IRQ と時計|既存 host 試験で calibrate 時 flags==1、未登録線は PIC mask。NP21/W で FD 待ちを完走|irq_start で未登録線を一本開ける|
 |早期 IRQ・媒体|host で校正時 IF=1、NP21/W で FDC 初期化・root 読出し各区間の IF=1 と DA/UA を記録し、両 FD を読む|別試行で校正前 _enable を削除、FD 側の再 _enable 後に対象区間のみ IF を落とす、1.44 MB 設定を削除。各観測点で検出|

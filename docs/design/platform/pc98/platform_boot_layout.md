@@ -23,7 +23,7 @@ OS の配置 (帯・鎖・池・アプリ帯) は `sys/include/memmap.h` が持�
 ## 読み方
 
 - C: `#include "platform_boot_layout.h"` (`-Iplatform/pc98`)。中で `memmap.h` を読む。V86 の側は
-  `sys/platform/pc98/legacy/v86_mem.h` 経由。共通のソースは読まない (層の検査 `tools/check_layers.py`)。
+  `sys/platform/pc98/legacy/v86_mem.h` 経由。共通のソースは読まない (層の検査 `include_layers`)。
 - 道具: `tools/gen_memmap.py` の `read_defines()` が `sys/include/memmap.h` の後ろにこのヘッダを続けて
   1 つの定義の集まりとして解く (`PLATFORM_HDR_RELS`)。地図 `build/out/MEMMAP.md`・重なりの検査・
   生成ヘッダ `memmap_layout.h` の `LAYOUT_` の名前は、分ける前と同じ中身。

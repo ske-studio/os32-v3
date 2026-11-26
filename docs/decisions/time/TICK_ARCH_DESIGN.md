@@ -119,7 +119,7 @@ void tick_clock_jiffy64(u32 *lo, u32 *hi); /* 周回しないジフィ。IF=0 �
 | `sys/hal/time/tick.c` (変) | `tick_count` (今の 同ファイル内) と tick_hi・raw・位相・ms の状態、§2-1 の 5 関数 |
 | `sys/include/kernel_tick.h` (変なし) | `extern volatile u32 tick_count;` のまま (ASM・既存の読み手) |
 | `sdk/include/os32/os32_kapi_shared.h` (変、+2) | `#define OS32_TICK_HZ 100` (リテラル。公開 tick の単位の明文化、C89)。**STATIC_ASSERT はここに置かない** (X4) |
-- PPC の閉包: tick_clock.h は `kernel/` に置き、`arch/x86/`・`platform/pc98/`・`drivers/` のヘッダを include しない (include すると層の検査 `tools/check_layers.py` が止める)。
+- PPC の閉包: tick_clock.h は `kernel/` に置き、`arch/x86/`・`platform/pc98/`・`drivers/` のヘッダを include しない (include すると層の検査 `include_layers` が止める)。
 - `kboot_dec.py (旧版 8d5313fc0345)` の host の組み立てに `-I sdk/include/os32` を、`inputs` に `sys/hal/time/tick_clock.h`・`sdk/include/os32/os32_kapi_shared.h` を足す (tick.c が OS32_TICK_HZ を読むため)。
 
 ### 3-2. arch の側

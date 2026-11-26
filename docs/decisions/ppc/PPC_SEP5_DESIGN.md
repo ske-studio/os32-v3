@@ -1,6 +1,6 @@
 # PPC_SEP5_DESIGN — 分離の第 5 段 (描画・残る asm・SDK)
 
-> 状態: **完了記録 (2026-11-09 確定、2026-11-17 に記録へ)** — 第 5 段は main に入った。分離の仕組みは 11-17 の作り直しで置き換わり、今の決まりは票 TASK_PPC_SEP の「現在地」(層の検査 `tools/check_layers.py`・所有者集合 `build/select.mk`・入口の骨格 `sys/kern/init/kernel_start.c`)。本文の selected の計測と known の表は今は無い。以下は確定した時の本文: 共通のコードが持つ PC-98 の画面・x86 の命令・SDK の i386 前提を、表示の backend・arch・SDK の target profile の後ろへ移す。x86 の ABI・生成物・表示と FEP の指紋は変えない (対象 V2〜V4・A3・A5・A7・K1・K2)。段の状態は票 TASK_PPC_SEP が持つ。
+> 状態: **完了記録 (2026-11-09 確定、2026-11-17 に記録へ)** — 第 5 段は main に入った。分離の仕組みは 11-17 の作り直しで置き換わり、今の決まりは票 TASK_PPC_SEP の「現在地」(層の検査 `include_layers`・所有者集合 `build/select.mk`・入口の骨格 `sys/kern/init/kernel_start.c`)。本文の selected の計測と known の表は今は無い。以下は確定した時の本文: 共通のコードが持つ PC-98 の画面・x86 の命令・SDK の i386 前提を、表示の backend・arch・SDK の target profile の後ろへ移す。x86 の ABI・生成物・表示と FEP の指紋は変えない (対象 V2〜V4・A3・A5・A7・K1・K2)。段の状態は票 TASK_PPC_SEP が持つ。
 > 出所: ~/os32-tmp/run/ppc-sep5/DESIGN.final.md を 2026-11-09 に写した (gpt-6-astra 起草 r1〜r2、Opus 5.5 第 1・2 回、PM が第 2 回の P3 と PM 決定を反映)。
 ## r1→r2 の変更
 - F1: 全部品contractsの字面不変を列挙。ime_render.hの編集を除きH9変異先を修正。

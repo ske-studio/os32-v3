@@ -21,7 +21,7 @@ CI は統合の枝で os32-v3 の PM が 1 回だけ回すので、PowerPC の�
 | 7 | kdebug の import (sys/kern/module/kdebug_imports.def の source 欄、slot は詰めない・並べ替えない) と l01.json (旧版 8f0af0167c2f) の指紋。FEP の MODULE_ABI_GEN の指紋 (部品の contracts の字面から計算) | 指紋を変えない。contracts のヘッダはコメント 1 字も触らない |
 | 8 | test_ci_stab.py (旧版 9638b0458a02) の規則 (`if not mutant:` を書かない、covers に足す、試験の補助関数に `run` という名前を使わない) | 旧手順（8d01bcd79a67 の記録） |
 | 9 | 新しい host32 の試験が 32 ビットの libc (crt1.o) に頼る (CI と WSL に無い、この PC にはあるので手元では通る) | `gcc -m32 -ffreestanding -fno-pie -no-pie -nostdlib -static`、`_start` から exit (手本 test_abi_boundary.py (旧版 5f8d37427f37)、host32.py (旧版 09c54f7f5df1)) |
-| 10 | 層の検査 (共通のソースが機種のヘッダを読む辺、tools/layers_baseline.json) | 像を組んでから `python3 -B tools/check_layers.py` で増やさない。減らした段は同じ変更で `--write-baseline` |
+| 10 | 層の検査 | `python3 -B -m tests.infra.ci run --check include_layers` と `python3 -B -m tests.infra.ci run --check link_layers` で違反 0 件を確認する |
 | 11 | GeForce まわりを組む host 試験 | recover_gf_dev_stub.c (旧版 1db0aad791f0) のリンクが要る。main を取り込んだら GeForce の試験 (test_geforce・test_gf_*・recovery など) を回し直す |
 | 12 | 新しいヘッダを既存のヘッダから include した (第 5 段 A で CI の build が落ちた) | `rg -l '<既存のヘッダ>' tests/` の全部を実際に回す |
 | 13 | 文書の枝 (文書だけの push では build の CI が走らず、統合の枝で初めて出る) | `make check-docs-tree` を**単独で**回して出力の NG を見る。票 (docs/tasks/) どうしは「上位:」と後続以外リンクせず、「票 TASK_<名>」と名前を文字で書く |

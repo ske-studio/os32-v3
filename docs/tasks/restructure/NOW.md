@@ -29,7 +29,7 @@
 |---|---|---|
 | `tools/move_files.py`・`tools/include_resolve.py`・`tools/source_roots.py`・`kernel_includes.py (旧版 75957ada52f3)` | 対応表 JSON からの `git mv` と参照の置換、include の解決先の前後比較、走査の根、試験の `-I` | P3 の移動 |
 | `tools/build_compare.py`・`tools/ci/sep_identity.py`・`.github/workflows/sep.yml` | 生成物の一致 (x86 は出荷する生成物、PowerPC は `.o` の sha256) | P2-1 で「置き場が変わる」場合に対応させ、P3 の移動の合格に使う |
-| `tools/check_layers.py`・`tools/layers_baseline.json` | 共通 → arch・機種・装置の読みを止める (基準 0)。持ち主は**パスで決めている** | 古い検査なので移動から回さない。所有の表から引く形で `P4.md` の 3 に載せる (D-12) |
+| `check_layers.py (旧版 6b4b6f68ba81)`・`layers_baseline.json (旧版 40b6b3b1488c)` | 共通 → arch・機種・装置の読みを止める (基準 0)。持ち主は**パスで決めている** | 古い検査なので移動から回さない。所有の表から引く形で `P4.md` の 3 に載せる (D-12) |
 | `build/select.mk` と `build/sources/*.mk` ほか | ビルドの所有者集合と順 (`build/sources/order.mk`) | P1-2 で「所有の表の元」にする候補 |
 | `run.py (旧版 bdcca5c408c4)`・`gate.py (旧版 a09e7eda6a38)`・`tools/ci/land_gate.py`・`check_time.py (旧版 47248fa4d9b7)` | 検査の登録・選択・実行・表・取り込みの判定 | P6 |
 | `tools/move_docs.py`・`tools/ops/check_docs_links.py`・`check_docs_orphans.py` | 文書の移動とリンクの検査 | 移動では置換だけ。文書の検査は `P4.md` の 3 で載せる |

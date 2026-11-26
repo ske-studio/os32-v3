@@ -144,7 +144,7 @@ PC-98 は kernel_boot_cpu（kernel.c）直後に begin。局面 1 の BOOT_AUTO_
 |7450・7455|host の HID0 初期値を全 0／全 1 とし、読戻しと無関係ビットを照合。QEMU は対応 PVR で起動・tick・root 後の値を記録|7450 の明示クリアを削る|
 |PC-98 の設定経路|NP21/W の同一 FD で欠損、0、1、2 を順に起動。シェルと要求値を確認|root を読む前に確定|
 |PowerMac のファイル経路|設定あり・なしの ROOT_MANIFEST で ELF を再生成し QEMU で上書き・既定を照合。mount 失敗・FS なしでも既定を確認|読取先を /host に替える|
-|層・容量|common-compile、tools/check_layers.py、両 arch ビルドと §5 のサイズ比較|共通 C に機種ヘッダを追加|
+|層・容量|common-compile、include_layers、両 arch ビルドと §5 のサイズ比較|共通 C に機種ヘッダを追加|
 |実機固有の停止|物理操作の承認後、7450 Quicksilver で既定 0 の読戻し、RSH 後の /host 連続読取完走。明示 1 の停止有無は別記|旧像の無条件 NAP とログを比較|
 
 

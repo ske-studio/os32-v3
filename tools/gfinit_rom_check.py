@@ -13,7 +13,7 @@ import pathlib
 import re
 import zlib
 
-FIXTURE = pathlib.Path(__file__).parent / 'tests/gfinit_fixture.h'
+FIXTURE = pathlib.Path(__file__).parent / 'gfinit_fixture.h'
 
 
 def fixture_tables(text):

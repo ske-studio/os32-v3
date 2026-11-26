@@ -436,5 +436,5 @@ void gfx_cmd_drop(void);
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
 - **H2a は不要で閉じる**: H2 は命令の読みの検査に既存の `ring3_user_range_ok` (`sys/kern/exec/exec.c`) を使って着地した (`sys/hal/gfx/gfx_hw_submit.c`)。「要れば `ring3_user_range_readable`」の条件は満たされないので H2a は出さない。§3-2 の断片と §7 の H2a の行を書き換えた (writable は今 `sys/kern/exec/exec.c`)。
-- **S1 と PPC**: `sys/platform/pc98/video/gfx_vram.c` は PC-98 の表示の装置のソース (PowerPC では組まない)。`_flush_dirty_queue()` の `_memcpy_w` は `arch_copy16` 経由。S1 は共通の `gfx/` に asm・pc98 のヘッダを足さない (足すと層の検査 `tools/check_layers.py` と PowerPC の `common-compile` が止める)。damage.rs のパスは `userland/gshell/src/damage.rs`。
+- **S1 と PPC**: `sys/platform/pc98/video/gfx_vram.c` は PC-98 の表示の装置のソース (PowerPC では組まない)。`_flush_dirty_queue()` の `_memcpy_w` は `arch_copy16` 経由。S1 は共通の `gfx/` に asm・pc98 のヘッダを足さない (足すと層の検査 `include_layers` と PowerPC の `common-compile` が止める)。damage.rs のパスは `userland/gshell/src/damage.rs`。
 - **G4m・G5m の位置**: GeForce の PCI の位置は `recover_gf_dev()` (`sys/dev/video/geforce/diag/recover.h`) で決まる。新しい段は 0:13 の直値を書かない (`sys/dev/video/geforce/gf_accept.c` の型を真似ない)。

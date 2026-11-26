@@ -247,7 +247,7 @@ os32-v3/
 | 文書 | 設計は `docs/design/` でソースの配置に合わせ、決定と作業票は領域別の木に足す。CPU・機種別の参考資料は `docs/ppc/` のようにまとめる。 |
 
 1. PM は上の図と表で、移植する各部に対応する既存の実装を探す。新しいディレクトリやビルド用の mk が要る場合は、作る前に役割と配置先を設計に記す。
-2. 共通コードから機種や装置を使う箇所は、固定名の `platform_<名>.h` や `include/<名>_contract.h` のどれを使うか設計で決める。依存ごとの選び方は [`tools/check_layers.py` の設計 §8「違反を 0 にした時の直し方」](design/tools/check_layers.md) を参照。
+2. 共通コードから機種や装置を使う箇所は、固定名の `platform_<名>.h` や `include/<名>_contract.h` のどれを使うか設計で決める。依存ごとの選び方は [`include_layers` の設計 §8「違反を 0 にした時の直し方」](design/tools/check_layers.md) を参照。
 3. PM は実装依頼にこの節へのリンクと、今回の役割・配置先の対応表を載せる。ソースの登録と実装後の検査は [os32-arch-sep §1・§3](../.claude/skills/os32-arch-sep/SKILL.md) に従う。
 
 ### §8-4 ホスト側イメージ生成ツール
@@ -961,7 +961,7 @@ PowerPC の `make ARCH=ppc PLATFORM=powermac [IMAGE=kboot-*]` は製品の像 `P
 (最上位からは sub-make で呼ぶ。`make ARCH=ppc PLATFORM=powermac` に `KBOOT_LINK`・`KBOOT_SH`・`KBOOT_SHELL`
 の旗を渡しても同じ像を選べる)。`PPC_CROSS_DIR=/home/hight/opt/cross-ppc`、出力は `build/out/ppc-kboot/` の下。
 module・SDK・配備へは進めない (明示エラー)。共通のソースが機種のヘッダを読む辺は
-`tools/check_layers.py` が両方の像で数える。
+`include_layers` が両方の像で数える。
 独立 bootstrap は `make ppc-boot` / `make ppc-boot-check`。
 原始命令ヘッダだけを足して移植完了とはしない（[arch の手順](../arch/README.md)）。
 

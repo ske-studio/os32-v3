@@ -42,7 +42,7 @@ switch と既存 include 構成を保って共有。recover 型からの切離�
 
 ## GF6200_4A_S2_LAYOUT
 
-参照：`/home/hight/os32-v3/{sys/dev/video/geforce/diag/recover.h,sys/dev/video/geforce/diag/recover_gf.c,gfinit_fixture.h (旧版 9f2651fbd119)}`、`gf6200_4a/nvbios/init_scripts.txt`、MIT nouveau `nvkm/subdev/bios/init.c` の各該当handler。x86コードは扱わない。
+参照：`/home/hight/os32-v3/{sys/dev/video/geforce/diag/recover.h,sys/dev/video/geforce/diag/recover_gf.c,tools/gfinit_fixture.h}`、`gf6200_4a/nvbios/init_scripts.txt`、MIT nouveau `nvkm/subdev/bios/init.c` の各該当handler。x86コードは扱わない。
 
 | 記号 | 固定契約 |
 | --- | --- |

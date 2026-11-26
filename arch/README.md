@@ -141,8 +141,7 @@ x86 の feature off は compile-only である。
 `build/sources/common.mk` の `C_COMMON_PC98_PENDING` に並んでいる。これらも
 PowerPC のコンパイラは通す (`make ppc-ci-image` の `common-compile`。リンクは
 しない)。共通のソースが機種・装置のヘッダを読む辺は
-`python3 -B tools/check_layers.py` が両方の像の `.d` から数え、基準
-(`tools/layers_baseline.json`、今は 0) より増えても減っても落ちる。直し方の表は
+`include_layers` が検査する。リンク時の参照は `link_layers` で確かめる。直し方の表は
 docs/design/tools/check_layers.md §8。起動の順は共通の `sys/kern/init/kernel_start.c` が
 持ち、局面の中身は `platform/<機種>/` が実装する。
 

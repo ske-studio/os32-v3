@@ -47,7 +47,7 @@ sdk/include の 19 ヘッダでは public が true のまま images に依存先
 
 | 道具 | 現在の一覧 | 切替後 |
 |---|---|---|
-| tools/check_layers.py | DEVICE_ROOTS・NAMED と像の軸 | kind・target・header_role を include の両端で参照 |
+| check_layers.py (旧版 6b4b6f68ba81) | DEVICE_ROOTS・NAMED と像の軸 | kind・target・header_role を include の両端で参照 |
 | ppc_scope.py (旧版 d4d22d1c0028) | COMMON・PPC・X86・EXACT・LAYOUT_PATTERNS | 対象名・像・依存の完全性で選択 |
 | tools/source_roots.py | 検査別の SCAN_ROOTS | 所属・対象・検査の適用条件から走査パスを生成 |
 | run.py (旧版 bdcca5c408c4) | FULL・SCAN_ROOTS | 所属と依存で選び、登録固有の covers は検査入力として結合 |
@@ -73,7 +73,7 @@ tools/ の走査根の定数、glob・rglob・os.walk、git ls-files の利用�
 
 | 対象 | 呼出元ファイル数 | 所在の例 |
 |---|---:|---|
-| `tools/check_layers.py` | 6 | layers-ppc.py (旧版 1d0429399e1b) |
+| `check_layers.py (旧版 6b4b6f68ba81)` | 6 | layers-ppc.py (旧版 1d0429399e1b) |
 | `ppc_scope.py (旧版 d4d22d1c0028)` | 2 | .github/workflows/check.yml |
 | `tools/source_roots.py` | 4 | check_arch_asm.py (旧版 1426e1f3d889) |
 | `run.py (旧版 bdcca5c408c4)` | 44 | .github/workflows/build.yml |

@@ -123,7 +123,7 @@ C_COMMON_HOOKS_ABSENT = $(foreach h,$(EXEC_HOOKS),$(if $(filter 0,$(HOOK_$(h))),
 | 移動 | `arch/ppc/exec_<名>.c` 14 本 → `exec/absent/exec_<名>.c` |
 | 改名 | `arch/{x86,ppc}/exec_cache.h` → `arch_exec_cache.h`、`arch/{x86,ppc}/exec_kapi.h` → `arch_exec_kapi.h` |
 | 削除 | `arch/x86/exec_<名>.h` 14 本、`arch/ppc/exec_<名>.h` 14 本 |
-| 変更 | `build/select.mk`・`build/sources/order.mk`・`build/arch/ppc-sources.mk`・`build/targets/ppc-powermac.mk`、`sys/kern/exec/exec.c` (include 2 行)、`sys/arch/ppc/syscall_code.c`・`exec_cache.c`・`exec_kapi.c` (include)、`sys/include/exec_arch.h`、`tools/layers_baseline.json`、`build_profile_ppc.json (旧版 80da850b3508)`、検査の `covers`、`arch/README.md`、`docs/design/build/select.md` (段 2 の行) |
+| 変更 | `build/select.mk`・`build/sources/order.mk`・`build/arch/ppc-sources.mk`・`build/targets/ppc-powermac.mk`、`sys/kern/exec/exec.c` (include 2 行)、`sys/arch/ppc/syscall_code.c`・`exec_cache.c`・`exec_kapi.c` (include)、`sys/include/exec_arch.h`、`layers_baseline.json (旧版 40b6b3b1488c)`、`build_profile_ppc.json (旧版 80da850b3508)`、検査の `covers`、`arch/README.md`、`docs/design/build/select.md` (段 2 の行) |
 
 ## 6. 未決
 

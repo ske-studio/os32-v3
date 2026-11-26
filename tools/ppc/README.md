@@ -10,4 +10,4 @@ CI の 6 指定は `.github/workflows/restructure-build.yml` の powerpc ジョ�
 `python3 -B -m tests.infra.ci run --check link_layers` で実行する。
 
 外部の手動観測には `link_sh_run.py` と `root_lz4_layout_run.py` を使う。
-前者はシェル観測用の `ppc_shell_flow.inc` を読み、後者は `--inventory` で渡された計測表を使う。
+前者はシェル観測用の `ppc_shell_flow.inc` を読み、後者は `--inventory` で渡された計測表を使う。生成手順は [root LZ4 設計](../../docs/decisions/ppc/PPC_ROOT_LZ4_DESIGN.md) の「手動観測用の計測表」を参照。

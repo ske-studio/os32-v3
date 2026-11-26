@@ -92,3 +92,13 @@ lib/crc32_core.inc と同じ配置で lib に共通 include を置く。boot/lz4
 - 記録 (2): 第 1 段の 5 の再レビュー案 (低位の物理の終端を別の記号にし __kernel_resident_end を予約込みに、共通の ASSERT を予約込みで当てる) を取る時は、共通の memmap の意味に触るので本線のレビューに戻す。
 - 記録 (3): 第 4 段の「共通コードの機種選択には sys/include/platform_module_pair.h を使う」は取り消す。root の区画の有無は確定の P2 のとおり build の 1 か所 (KB_EXEC) と kboot の情報で決め、pair のヘッダには入れない。
 - PM の段の分け方: 第 1 段を 1a (QEMU の OpenBIOS — 像の一覧と最大、診断の像、配置の採取の台本) と 1b (G4 の OF 4.x — ユーザーの承認の後、実機ノートへの依頼、診断の像は自分で起こし直す作り) に分ける。
+
+## 手動観測用の計測表
+
+観測対象の各構成を別々の `KB_OUT` で組み、各 ELF と同時に生成した `root.iso` を同じ場所に保つ。少なくとも root 付きの構成を一つ含める。次は link-sh 一構成の例。複数構成の上限を観測するときは、計測コマンドにそれぞれの ELF を追加する。
+
+```sh
+make ARCH=ppc PLATFORM=powermac IMAGE=kboot-link-sh KB_OUT=build/out/layout-link-sh kernel
+python3 -B tools/ppc/root_lz4_inventory.py build/out/layout-link-sh/PPCKERN.ELF > inventory.json
+python3 -B tools/ppc/root_lz4_layout_run.py --inventory inventory.json --out build/out/layout-probe
+```

@@ -1232,7 +1232,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 合計 カーネル約 7,200 行・ユーザーランド約 400 行。1,000 行を超えるファイルは無い。ATI の backend は別の設計。
 
 - **順の制約**: sys/kern/exec/lease.c は M3 と C14 の両方が触るので M3 → C14 の順にする (同時に走らせない)。
-- **PPC で組めること (完了条件)**: C14・M1・M2・M3 (sys/kern/exec/lease.c) と gfx/v2・gfx/sync の全 TU は PPC のクロスコンパイルが通ることを完了条件にする。`sys/hal/gfx/gfx_hw_submit.c`・`sys/platform/pc98/video/gfx_vram.c`・`sys/kern/mm/paging.c`・`sys/kern/mm/pgalloc.c`・`sys/kern/exec/lease.c` は PowerPC でも組む (像か `make ppc-ci-image` (像と `common-compile`))。gfx/v2・gfx/sync の新しい TU も `build/sources/common.mk` の組に足せば同じ関門を通る。gfx/v2・gfx/sync は pc98 と x86 のヘッダを include しない (CPU に依る所は §10 の arch の口、表示の機種に依る所は provider と backend の表)。x86 の asm・pc98 のヘッダを共通の TU に増やさない (増やすと層の検査 `tools/check_layers.py` が止める)。
+- **PPC で組めること (完了条件)**: C14・M1・M2・M3 (sys/kern/exec/lease.c) と gfx/v2・gfx/sync の全 TU は PPC のクロスコンパイルが通ることを完了条件にする。`sys/hal/gfx/gfx_hw_submit.c`・`sys/platform/pc98/video/gfx_vram.c`・`sys/kern/mm/paging.c`・`sys/kern/mm/pgalloc.c`・`sys/kern/exec/lease.c` は PowerPC でも組む (像か `make ppc-ci-image` (像と `common-compile`))。gfx/v2・gfx/sync の新しい TU も `build/sources/common.mk` の組に足せば同じ関門を通る。gfx/v2・gfx/sync は pc98 と x86 のヘッダを include しない (CPU に依る所は §10 の arch の口、表示の機種に依る所は provider と backend の表)。x86 の asm・pc98 のヘッダを共通の TU に増やさない (増やすと層の検査 `include_layers` が止める)。
 
 ### 12-1. 段ごとの失敗・入力の境界・試験
 観点は (1) 失敗の戻り値と失敗の後の状態、(2) 入力の境界 (0・あふれ・整列・上限)、(3) §13-1 の試験の行。どの段も「失敗では共有の状態を変えない (全部か無し)」が既定で、例外だけを書く。装置や写像の後始末が失敗した物は §7-3 の KEEP と (5) の隔離の 1 つの道へ寄せる。手本と同じ所は手本の名だけを書く。

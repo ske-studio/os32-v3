@@ -278,7 +278,7 @@ typedef struct { u32 id, delay_us, next_lo, next_hi; MMT_CB cb; u32 user, missed
 
 ## 確定の後の追記 (2026-11-10、今の main cfb9cec3 との前提の照らし直し、PM 決定)
 - **第 4 段 B の型の契約 (§5 の W5・W7・B17)**: `build/abi_contract.mk` が probe の order-only を製品の object 一覧と `userland/{cmds,tests,system}` の直の object に付け、`build/libs.mk` の共通の規則・各ライブラリの規則に `| $(ABI_CONTRACT_ORDER)` が付いた。`test_type_contract.py (旧版 efd9edd10ae7)` は `make -n -B` の全 C の呼出しの char/enum の旗と probe の前提を検査する (covers `build/**/*.mk`、解析できない呼出しは fail closed)。W5 の libmmtime の規則・W7 の mmtimetest・B17 の `TICK1K=1` の別像は、既存の macro の規則を使えば自動で掛かる。手書きの recipe なら profile の旗と `| $(ABI_CONTRACT_ORDER)` を付ける。`check-type-contract` を W5・B17 の受入に加える。
-- **PowerPC でも組む (§5 の C1・A2-b3・A2-c6)**: `sys/hal/time/tick.c`・`sys/kern/irq/tick.c`・`sys/kern/sys.c` は PowerPC の像に入る共通のソース。新しいヘッダ `tick_clock.h` (`kernel/time/`)・`tick_budget.h`・`idle_work.h` は `kernel/` に置き、`arch/x86/`・`platform/pc98/`・`drivers/` のヘッダを include しない (include すると層の検査 `tools/check_layers.py` が止める)。tick_clock の置き場は [TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §3。
+- **PowerPC でも組む (§5 の C1・A2-b3・A2-c6)**: `sys/hal/time/tick.c`・`sys/kern/irq/tick.c`・`sys/kern/sys.c` は PowerPC の像に入る共通のソース。新しいヘッダ `tick_clock.h` (`kernel/time/`)・`tick_budget.h`・`idle_work.h` は `kernel/` に置き、`arch/x86/`・`platform/pc98/`・`drivers/` のヘッダを include しない (include すると層の検査 `include_layers` が止める)。tick_clock の置き場は [TICK_ARCH_DESIGN](TICK_ARCH_DESIGN.md) §3。
 
 ### S1 の PM 決定 (2026-11-21)
 

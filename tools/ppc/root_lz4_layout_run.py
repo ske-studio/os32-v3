@@ -271,7 +271,8 @@ def capture(out, cpu, ram_mib, data, loads):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--inventory', type=Path, required=True)
+    ap.add_argument('--inventory', type=Path, required=True,
+                    help='generate with python3 tools/ppc/root_lz4_inventory.py ELF [ELF ...] > inventory.json')
     ap.add_argument('--candidate', type=lambda value: int(value, 0), default=STAGING_BASE)
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--build-only', action='store_true')

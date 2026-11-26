@@ -226,7 +226,7 @@ M1・M2 は同じ ide.c・ide.h を触るので直列。PowerPC の段は本線�
 | `PC98_IRQ_IDE`・`PC98_IO_OPEN_BUS8` | 検査からの参照なし | — |
 | static の関数名 (`ide_wait_bsy` ほか) | `docs/design/drivers/ata/ide_pio.md` だけ | 名前は変えない |
 | 公開表 (P2) | `test_kapi_binding.py (旧版 3baaeeee4857)` の `EXPECTED_ABSENT_SLOTS`・`test_kapi_table.py`、`sdk/kapi_target_ppc.py` の `ZERO_SLOTS` (`ide_drive_present` の 0 を返す組) | 7 本を在る側へ |
-| 層 | `tools/layers_baseline.json` (両像 0 のまま)、`ppc-compile` (common-compile) | M1 から両像で 0 |
+| 層 | `include_layers` (両像 0 のまま)、`ppc-compile` (common-compile) | M1 から両像で 0 |
 
 ### 6-4 受入 → 試験と変異
 
