@@ -194,7 +194,10 @@ jobs:
       - uses: ./.github/actions/ppc-setup
         if: matrix.bundle == 'ppc'
       - if: matrix.bundle == 'ppc'
-        run: sudo apt-get install -y qemu-system-ppc
+        # 推奨パッケージ (GUI・音声の pipewire ほか) は入れない — runner の索引の古さで security の 404 を 2 回踏んだ (2026-11-26)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-ppc || { sudo apt-get update && sudo apt-get install -y --no-install-recommends --fix-missing qemu-system-ppc; }
       - run: python3 -B -m tests.infra.ci run --bundle "$BUNDLE" --mutate --gate "$GATE" --output "$RUNNER_TEMP/results" --plan-file "$RUNNER_TEMP/planned/plan.json"
       - uses: actions/upload-artifact@v4
         if: always()
