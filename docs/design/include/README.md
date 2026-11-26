@@ -112,6 +112,8 @@ typedef struct PointerOps {
 
 - `MouseState`（i16×4+u8×2=10B）、ボタン・モード・カーソルの公開値は `sys/hal/input/pointer_service.h` へ。ドライバ内部のバスマウス/NP21操作は移さない。
 
+ポインタの登録後は一つの移動を与え、共通の pointer_poll から MouseState の座標差分・ボタンが届くことを確かめる。未登録の poll はゼロ状態、available は 0。装置のない構成にはその応答を許す。登録要否は入力サービスの「入力・ポインタ・時計の登録と到達」に従う。
+
 ### port_service
 
 ```c
