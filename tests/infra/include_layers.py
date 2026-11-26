@@ -1,5 +1,9 @@
 from pathlib import Path
+import csv
+import os
 import re
+import shlex
+import tempfile
 import subprocess
 import sys
 
@@ -57,9 +61,70 @@ def observe(source, args):
             stack.append(child)
 
 
+def observe_nasm(source, cpp, intermediate, args):
+    # Regenerate the input so after-build mutations reach both preprocessors.
+    subprocess.run(cpp, check=True)
+    cmd = args.copy()
+    out = cmd.index("-o")
+    del cmd[out:out + 2]
+    dependencies = subprocess.check_output([*cmd, "-M"], text=True)
+    names = shlex.split(dependencies.replace("\\\n", " ").split(":", 1)[1])
+    # Instrument the active input files in a private copy. NASM expands the
+    # markers in nesting order even when an include only defines macros.
+    with tempfile.TemporaryDirectory() as tmp:
+        for index, name in enumerate(names):
+            path = Path(name)
+            if path.is_absolute() or ".." in path.parts:
+                raise OSError(f"unexpected NASM dependency {name}")
+            target = Path(tmp) / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            body = path.read_bytes()
+            if name != intermediate:
+                body = f"P43_INCLUDE_BEGIN {index}\n".encode() + body + f"\nP43_INCLUDE_END {index}\n".encode()
+            target.write_bytes(body)
+        output = subprocess.check_output([*cmd, "-E"], cwd=tmp, text=True)
+    stack = [Path(source).resolve()]
+    for line in output.splitlines():
+        match = re.fullmatch(r"P43_INCLUDE_(BEGIN|END) (\d+)", line.strip())
+        if match:
+            path = Path(names[int(match[2])]).resolve()
+            if match[1] == "BEGIN":
+                yield stack[-1], path
+                stack.append(path)
+            elif stack.pop() != path:
+                raise OSError("unbalanced NASM include")
+    if len(stack) != 1:
+        raise OSError("incomplete NASM include trace")
+
+
+def finish_layers(check, config, errors):
+    ledger = {"include_layers": "P43-INCLUDE", "link_layers": "P43-LINK"}[check]
+    if os.getenv("OS32_LAYER_DEFERRAL") == ledger:
+        known = set()
+        with Path("docs/tasks/restructure/data/p43_violations.tsv").open() as stream:
+            for row in csv.DictReader(stream, delimiter="\t"):
+                if (row["検査"], row["構成"]) != (check, config):
+                    continue
+                edge, rule = row["位置・辺"], row["契約"].split()[-1]
+                if check == "link_layers":
+                    output, edge = edge.split(" ", 1)
+                    known.add(f"{config} {output}: {edge} ({rule})")
+                else:
+                    known.add(f"{config} {rule} {edge}")
+        for edge in sorted(known - errors):
+            print("resolved", edge)
+        if errors and errors <= known:
+            print(f"{ledger} {len(errors)} outstanding")
+            sys.exit(3)
+        errors = errors - known
+    if errors:
+        raise Failure("\n".join(sorted(errors)))
+
+
 def verify(config):
     inventory = Inventory(Path.cwd())
-    objects, links = recipes(config)
+    nasm = {}
+    objects, links = recipes(config, nasm=nasm)
     edges = set()
     errors = set()
     for obj, (source, args) in objects.items():
@@ -68,6 +133,8 @@ def verify(config):
         if source in inventory.paths and target_wrong(config, inventory.lookup(source)):
             errors.add(f"{config} R6 {source}")
         edges.update((parent, child, obj) for parent, child in observe(source, args))
+        if obj in nasm:
+            edges.update((p, c, obj) for p, c in observe_nasm(source, args, *nasm[obj]))
     root = Path.cwd()
     def owner(name):
         if name in inventory.paths:
@@ -90,8 +157,7 @@ def verify(config):
         violation = rule(config, reader, header)
         if violation:
             errors.add(f"{config} {violation} {p} -> {c}")
-    if errors:
-        raise Failure("\n".join(sorted(errors)))
+    finish_layers("include_layers", config, errors)
 
 
 if __name__ == "__main__":

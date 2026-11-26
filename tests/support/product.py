@@ -44,7 +44,7 @@ def commands(config, goals=("kernel",)):
         yield output, args
 
 
-def recipes(config, goals=("kernel",)):
+def recipes(config, goals=("kernel",), nasm=None):
     objects, links, preprocessed = {}, {}, {}
     for output, args in commands(config, goals):
         compiler = next((i for i, arg in enumerate(args) if arg.endswith("-elf-gcc")), None)
@@ -59,6 +59,8 @@ def recipes(config, goals=("kernel",)):
         elif Path(args[0]).name == "nasm" and "-f" in args:
             sources = [x for x in args if x.endswith(".asm")]
             if sources:
+                if nasm is not None and sources[0] in preprocessed:
+                    nasm[output] = sources[0], args
                 objects[output] = preprocessed.get(sources[0], (sources[0], []))
         elif output.lower().endswith(".elf") and "-r" not in args:
             links[output] = [x for x in args if x.endswith((".o", ".a"))]
