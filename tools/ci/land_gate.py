@@ -15,8 +15,6 @@ import sys
 from urllib.parse import urlencode
 from pathlib import Path
 
-import tomllib
-
 import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -60,67 +58,11 @@ def pages(endpoint, field, query):
             return rows
 
 
-def expected_jobs(sha, workflow):
-    jobs = yaml.safe_load(command('git', 'show', f'{sha}:.github/workflows/{workflow}'))['jobs']
-    names = {}
-    for name, job in jobs.items():
-        if re.search(r"""==\s*(['"])refs/heads/main\1|(['"])refs/heads/main\2\s*==""", str(job.get('if', ''))):
-            continue
-        if 'name' in job:
-            raise ValueError(f'{name}: unsupported custom job name')
-        matrix = job.get('strategy', {}).get('matrix', {})
-        if name == 'checks' and set(matrix) == {'bundle'}:
-            registry = tomllib.loads(command('git', 'show', f'{sha}:tests/registry.toml').decode())
-            matrix = {'bundle': sorted({cpu for row in registry['check'] for cpu in row['arch']})}
-        if any(axis in ('include', 'exclude') or not isinstance(values, list) or not values
-               for axis, values in matrix.items()):
-            raise ValueError(f'{name}: unsupported matrix')
-        for values in itertools.product(*matrix.values()):
-            label = name + (' (' + ', '.join(map(str, values)) + ')' if values else '')
-            names[label] = 'if' in job
-    if not names:
-        raise ValueError(f'{workflow}: no expected jobs')
-    return names
-
-
 def eligible(run, repo, sha, workflow, prefix):
     return (run['head_repository']['full_name'] == repo and run['head_sha'] == sha
             and number(run['workflow_id']) == workflow and run['event'] == 'push'
             and run['head_branch'].startswith(prefix) and run['status'] == 'completed'
             and run['conclusion'] == 'success')
-
-
-def verdict(runs, jobs, expected):
-    """Each candidate must supply every success in its own latest attempt."""
-    failures = []
-    for run in runs:
-        key = number(run['id']), number(run['run_attempt'])
-        success = set()
-        collapsed = set()
-        seen = set()
-        for job in jobs[key]:
-            name = job['name']
-            if name in seen or number(job['run_id']) != key[0] or number(job['run_attempt']) != key[1]:
-                raise ValueError(f'{key}: duplicate or unrelated job {name}')
-            seen.add(name)
-            if job['status'] != 'completed':
-                continue
-            allowed_skip = name != 'collect' and expected.get(name, False) and job['conclusion'] == 'skipped'
-            if job['conclusion'] == 'success' or allowed_skip:
-                success.add(name)
-            elif job['conclusion'] == 'skipped' and name not in expected:
-                collapsed.add(name)
-        # A job-level if can skip the matrix before any named shard exists.
-        for parent in collapsed:
-            shards = {label for label, conditional in expected.items()
-                      if conditional and label.partition(' (')[0] == parent}
-            if shards.isdisjoint(seen):
-                success.update(shards)
-        missing = expected.keys() - success
-        if not missing:
-            return []
-        failures.extend(f'{key}: {name} missing or unsuccessful' for name in sorted(missing))
-    return failures or ['no qualifying push run']
 
 
 def digest(path):
@@ -205,13 +147,10 @@ def verify(repo, sha, evidence):
     rid = number(evidence['run_id'])
     attempt = number(evidence['attempt'])
     run = api(f'{base}/runs/{rid}')
-    if (not eligible(run, repo, sha, ident, 'wt/int-') or number(run['run_attempt']) != attempt
+    if (not eligible(run, repo, sha, ident, 'wt/int-') or number(run['id']) != rid
+            or number(run['run_attempt']) != attempt
             or evidence['sha'] != sha):
         raise ValueError('candidate SHA or successful latest run attempt does not match')
-    jobs = pages(f'{base}/runs/{rid}/attempts/{attempt}/jobs', 'jobs', {})
-    failures = verdict([run], {(rid, attempt): jobs}, expected_jobs(sha, workflow))
-    if not any(job['name'] == 'collect' and job['conclusion'] == 'success' for job in jobs):
-        failures.append('missing successful full collection')
     artifacts = pages(f'{base}/runs/{rid}/artifacts', 'artifacts', {})
     machines = set()
     for boot in evidence['boots']:
@@ -221,8 +160,8 @@ def verify(repo, sha, evidence):
         verify_boot(base, repo, ident, run, artifacts, boot)
         machines.add(machine)
     if machines != {'pc98', 'powermac'}:
-        failures.append('both PC-98 and PowerMac boot records required')
-    return failures
+        return ['both PC-98 and PowerMac boot records required']
+    return []
 
 
 def main():

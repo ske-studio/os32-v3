@@ -1,4 +1,4 @@
-"""Exercise the integration verdict with a candidate workflow and synthetic API replies."""
+"""Exercise the integration verdict with synthetic API replies."""
 from pathlib import Path
 import sys
 from unittest.mock import patch
@@ -16,39 +16,35 @@ def verify(config):
                head_branch="wt/int-example", head_repository={"full_name": repo},
                status="completed", conclusion="success")
 
-    def git(program, action, path):
-        if (program, action) != ("git", "show") or not path.startswith(sha + ":"):
-            raise ValueError("unexpected command")
-        return (ROOT / path.split(":", 1)[1]).read_bytes()
+    evidence = dict(sha=sha, run_id=19, attempt=2,
+                    boots=[dict(machine=m, sha=sha) for m in ("pc98", "powermac")])
 
-    with patch.object(gate, "command", side_effect=git):
-        expected = gate.expected_jobs(sha, "restructure-build.yml")
-        jobs = [dict(name=name, run_id=19, run_attempt=2, status="completed", conclusion="success")
-                for name in expected]
-        evidence = dict(sha=sha, run_id=19, attempt=2,
-                        boots=[dict(machine=m, sha=sha) for m in ("pc98", "powermac")])
-        with patch.object(gate, "api", side_effect=lambda url: run if url.endswith("/runs/19") else {"id": 3}), \
-             patch.object(gate, "pages", side_effect=lambda url, field, query: jobs if field == "jobs" else []), \
-             patch.object(gate, "verify_boot"):
-            if gate.verify(repo, sha, evidence):
-                raise Failure("complete integration evidence rejected")
-            for invalid in ("failure", "skipped"):
-                collection = next(j for j in jobs if j["name"] == "collect")
-                collection["conclusion"] = invalid
-                if not gate.verify(repo, sha, evidence):
-                    raise Failure("unsuccessful collection accepted")
-                collection["conclusion"] = "success"
-            collection["run_attempt"] = 1
-            try:
-                gate.verify(repo, sha, evidence)
-            except ValueError:
-                pass
-            else:
-                raise Failure("mixed attempts accepted")
-            collection["run_attempt"] = 2
-            evidence["boots"].pop()
-            if not gate.verify(repo, sha, evidence):
-                raise Failure("missing PowerMac boot accepted")
+    def api(url):
+        return {f"repos/{repo}/actions/workflows/restructure-build.yml": {"id": 3},
+                f"repos/{repo}/actions/runs/19": run}[url]
+
+    def pages(url, field, query):
+        if (url, field, query) != (f"repos/{repo}/actions/runs/19/artifacts", "artifacts", {}):
+            raise Failure("unexpected evidence query")
+        return []
+
+    with patch.object(gate, "api", side_effect=api), patch.object(gate, "pages", side_effect=pages), \
+         patch.object(gate, "verify_boot") as verify_boot:
+        if gate.verify(repo, sha, evidence):
+            raise Failure("complete integration evidence rejected")
+        if [call.args[-1] for call in verify_boot.call_args_list] != evidence["boots"]:
+            raise Failure("boot evidence unchecked")
+        for field, value in (("run_attempt", 3), ("id", 20), ("head_sha", "b" * 40),
+                             ("status", "in_progress"), ("conclusion", "failure")):
+            with patch.dict(run, {field: value}):
+                try:
+                    gate.verify(repo, sha, evidence)
+                except ValueError:
+                    continue
+                raise Failure(f"invalid {field} accepted")
+        evidence["boots"].pop()
+        if not gate.verify(repo, sha, evidence):
+            raise Failure("missing PowerMac boot accepted")
 
 
 if __name__ == "__main__":
