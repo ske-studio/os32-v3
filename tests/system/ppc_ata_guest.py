@@ -11,7 +11,7 @@ import zlib
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tests.support.media import Failure, require
 from tests.support.ppc_fixture import FIXTURE, diagnostic_media
-from tests.support.ppc_vm import guest
+from tests.support.ppc_vm import guest, guest_args
 
 CPUS = ("7450", "7455")
 CASES = ("normal", "absent", "write", "deny")
@@ -115,11 +115,12 @@ def boot(cpu, case, media, disk, version):
         devices.extend(["-drive", f"file={raw},if=ide,index=0,format=raw,cache=writethrough"])
     started = time.monotonic()
     try:
-        with guest(iso, cpu, directory, devices=devices, deadline=started + 90) as vm:
-            (directory / "boot.json").write_text(json.dumps(dict(
+        (directory / "boot.json").write_text(json.dumps(dict(
                 metadata, sha=os.getenv("GITHUB_SHA") or os.getenv("OS32_BUILD_COMMIT"), run=os.getenv("GITHUB_RUN_ID"),
                 attempt=os.getenv("GITHUB_RUN_ATTEMPT"), cpu=cpu, case=case,
-                origin=started, qemu=version, argv=vm.process.args)))
+                origin=started, qemu=version, iso=str(iso), argv=guest_args(iso, cpu, directory, devices))))
+        with (directory / "qemu-stderr.log").open("wb") as stderr, guest(
+                iso, cpu, directory, devices=devices, deadline=started + 90, stderr=stderr) as vm:
             vm.wait(lambda output: None if "ATA done" in output.splitlines() else "ATA done")
             vm.diagnose()
         fault = observe(case, directory, disk)
@@ -127,7 +128,7 @@ def boot(cpu, case, media, disk, version):
     except (OSError, Failure) as exc:
         reason = f"{cpu}/{case} {exc}"
         (directory / "failure.txt").write_text(reason)
-        return (1 if isinstance(exc, (TimeoutError, Failure)) else 2), reason
+        return (1 if isinstance(exc, Failure) else 2), reason
 
 
 def verify():

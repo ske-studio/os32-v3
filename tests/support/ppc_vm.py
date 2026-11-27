@@ -114,19 +114,24 @@ class Guest:
                 self.record("unavailable", f"{name}: {exc}")
 
 
-@contextmanager
-def guest(iso, cpu, directory, *, devices, deadline):
-    directory.mkdir(parents=True, exist_ok=True)
+def guest_args(iso, cpu, directory, devices):
     serial = directory / "boot-serial.log"
-    serial.touch()
-    args = ["qemu-system-ppc", "-M", "mac99", "-cpu", cpu, "-m", "128M",
+    return ["qemu-system-ppc", "-M", "mac99", "-cpu", cpu, "-m", "128M",
             "-accel", "tcg", "-cdrom", str(iso), "-boot", "d", "-prom-env",
             r"boot-device=cd:,\PPCKERN.ELF", "-g", "800x600x8", "-display", "none",
             "-serial", f"file:{serial}", "-serial", f"file:{directory}/serial1.log",
             "-trace", f"enable=escc_mem_writeb_data,file={directory}/uart.trace",
             *devices, "-monitor", "none", "-qmp", "stdio", "-no-reboot"]
+
+
+@contextmanager
+def guest(iso, cpu, directory, *, devices, deadline, stderr=None):
+    directory.mkdir(parents=True, exist_ok=True)
+    serial = directory / "boot-serial.log"
+    serial.touch()
+    args = guest_args(iso, cpu, directory, devices)
     with serial.open("rb") as reader, subprocess.Popen(
-            args, stdin=subprocess.PIPE, stdout=subprocess.PIPE) as process:
+            args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr) as process:
         vm = Guest(process, reader, directory, deadline)
         try:
             while vm.greeting is None:

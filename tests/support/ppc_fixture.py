@@ -1,6 +1,7 @@
 """Build ATA diagnostic media from the current verification tree."""
 from pathlib import Path
 import hashlib
+import json
 import os
 import subprocess
 
@@ -21,8 +22,17 @@ def diagnostic_media(case):
     directory = Path(os.environ["OS32_VERIFY_OUT"]).resolve() / case
     directory.mkdir()
     user = directory / "user"
+    staging = directory / "tmp"
+    staging.mkdir()
+    unicode_bin = directory / "unicode.bin"
+    manifest = json.loads(Path("build/ppc-ram-root.json").read_text())
+    manifest["/sys/unicode.bin"] = str(unicode_bin)
+    template = directory / "root-template.json"
+    template.write_text(json.dumps(manifest))
     args = ["make", "-j" + os.getenv("OS32_BUILD_JOBS", "8"), *PPC_MAKE,
-            "IMAGE=kboot-sh", f"KB_OUT={directory}", f"KB_SH_OUT={user}"]
+            "IMAGE=kboot-sh", f"KB_OUT={directory}", f"KB_SH_OUT={user}",
+            f"BUILD_OUT={directory / 'build'}", f"KB_BODY_OUT={directory.parent / 'sqlite-body'}",
+            f"ROOT_MANIFEST={template}", f"PPC_UNICODE={unicode_bin}"]
     copies = {}
 
     def substitute(slot, original, filename, source):
@@ -88,7 +98,7 @@ void ata_wait_probe(void)
     substitute("KB_MUT", driver, "ide-meter.c", source)
     substitute("KB_MUT_EXTRA", boot, "boot.c", adapter)
     args.extend(["all", "iso"])
-    subprocess.run(args, check=True)
+    subprocess.run(args, check=True, env={**os.environ, "TMPDIR": str(staging)})
     iso = directory / "boot.iso"
     return iso, dict(make=args, fixture=copies, **{
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()

@@ -38,7 +38,8 @@ ROOT_OBJCOPY := $(KB_OBJCOPY)
 ROOT_ELF_FORMAT := elf32-powerpc
 ROOT_CPU := powerpc
 ROOT_MANIFEST ?= build/ppc-ram-root.json
-ROOT_DEPS ?= assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt build/out/unicode.bin $(KB_ROOT_SHELL)
+PPC_UNICODE ?= build/out/unicode.bin
+ROOT_DEPS ?= assets/fonts/shino16.kcgfont assets/fonts/JF-Dot-Shinonome16-LICENSE.txt $(PPC_UNICODE) $(KB_ROOT_SHELL)
 KB_ROOT_DIAG := $(if $(filter 1,$(FEATURE_KDEBUG)),$(KB_OUT)/kdebug.bin)
 # Set PPC_SYSTEM_CFG to a system.cfg containing KDEBUG=1 for a diagnostic root.
 PPC_SYSTEM_CFG ?=
@@ -62,7 +63,7 @@ $(PPC_LOOP_SAMPLE): build/targets/ppc-powermac.mk
 
 include build/font-fetch.mk
 
-build/out/unicode.bin: tools/gen_unicode.c lib/unicode_jis_table.h sys/kern/console/unicode_file.h sys/include/endian_le.h sys/include/types.h sys/include/callconv.h
+$(PPC_UNICODE): tools/gen_unicode.c lib/unicode_jis_table.h sys/kern/console/unicode_file.h sys/include/endian_le.h sys/include/types.h sys/include/callconv.h
 	@mkdir -p $(dir $@)
 	gcc -std=gnu11 -O2 -I. -Iinclude -Isys/include -Isys/hal/time -Isys/hal/gfx -Isys/hal/input -Isys/hal/sound tools/gen_unicode.c -o $(dir $@)gen_unicode
 	$(dir $@)gen_unicode --pairs $@
