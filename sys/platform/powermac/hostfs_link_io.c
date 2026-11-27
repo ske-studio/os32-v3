@@ -152,7 +152,7 @@ static void pm_hfs_cancel(void *ctx, const u8 *buf, u32 n, u32 deadline)
     struct pm_hfs_transport *t = ctx;
     if (deadline != until || !same_frame(buf, n)) return;
     if (pending) finish(OS32_ERR_TIMEOUT);
-    if (owns_rx) {
+    if (owns_rx) { /* unread reply of this exchange; a no-op once it was read to the end */
         t->rx_pos = t->rx_end;
         owns_rx = false;
     }

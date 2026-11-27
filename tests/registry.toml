@@ -631,4 +631,4 @@ needs = []
 expect = "同一要求の保留を同期解放し、seq 更新では BYE を送らず新 nonce で旧 sid を閉じる"
 limits = "mac99、制御した下位応答とメモリ内ホスト。実 client の期限切れから実 link までの道は ppc_usb_lan (段 3)"
 gates = ["push", "main"]
-mutations = [{ id = "drop_hfs_cancel", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/hostfs_link_io.c", old = "pm_hfs_put_until, pm_hfs_cancel", new = "pm_hfs_put_until, 0", fail = "hostfs cancel left pending" }]
+mutations = [{ id = "drop_hfs_cancel", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/hostfs_link_io.c", old = "pm_hfs_put_until, pm_hfs_cancel", new = "pm_hfs_put_until, 0", fail = "hostfs cancel left pending" }, { id = "keep_expired_reply", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/hostfs_link_io.c", old = "        t->rx_pos = t->rx_end;", new = "        (void)t; /* expired reply kept */", fail = "expired reply" }]
