@@ -12,7 +12,6 @@ from tests.support.media import Failure
 from tests.support.ppc_vm import remaining
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
-import host_agent as wire
 from host_agent import HostAgent
 from host_operator_socket import OperatorSocket
 from ppc_lan_host import UDP
@@ -42,9 +41,20 @@ class Peer:
         self.enabled = True
         self.restart()
 
-    def restart(self):
+    def close(self):
         if self.socket:
             self.socket.close()
+            self.socket = None
+        if hasattr(self, "agent"):
+            for job in self.agent.pending.values():
+                proc = job["proc"]
+                proc.kill()
+                proc.p.wait()
+            self.agent.pending.clear()
+
+    def restart(self):
+        self.close()
+        self.gates.clear()
         agent = HostAgent(bytes.fromhex("02005e000001"), state_dir=str(self.vm.directory),
                           quiet=True, allow_net=False, file_root=str(self.root))
         self.agent = agent
@@ -73,6 +83,16 @@ class Peer:
                 sfs(rid, entry, out)
 
         agent._service_sfs = call
+        release = agent._on_release
+
+        def released(rid, out):
+            release(rid, out)
+            gate = self.gates.pop(rid, None)
+            if gate is not None:
+                gate["release"] = self.vm.word("tick_count", 0, self.vm.deadline)
+                self.vm.record("gate", dict(rid=rid, **gate))
+
+        agent._on_release = released
 
     def gate_call(self, rid):
         self.gates[rid] = {}
@@ -94,12 +114,12 @@ class Peer:
                 self.io.remote = addr
             frame = self.io.receive()
             if frame and self.enabled:
-                if self.gates and len(frame) >= wire.ETH_HDR + wire.LINK_HDR:
-                    header = wire.hdr_unpack(frame[wire.ETH_HDR:])
-                    if header[0] == wire.OP_RELEASE and header[6] in self.gates:
-                        self.gates[header[6]].setdefault("release", self.vm.word("tick_count", 0, self.vm.deadline))
                 self.agent.handle(frame, self)
         if self.enabled:
+            for rid in self.gates:
+                entry = self.agent.ledger.get(rid, {})
+                if "sfs_deadline" in entry:
+                    entry["sfs_deadline"] = float("inf")
             self.agent.tick(self)
         for fd in select.select(self.socket.fileno_list(), [], [], 0)[0]:
             self.socket.on_readable(fd)
@@ -133,43 +153,58 @@ class Peer:
 
     def wait_delivery(self, rid, state, seconds):
         deadline = min(self.vm.deadline, time.monotonic()+seconds)
-        self.wait(lambda: self.snapshot(deadline)["rid"] == rid and
-                  self.operator.pending["execute"].delivery == state, deadline, "delivery deadline")
+        generation = self.operator.generation
+        def delivered():
+            if self.outputs(rid, generation):
+                raise Failure(f"early OUT before release: generation={generation} rid={rid}")
+            p = self.operator.pending
+            return p and p["id"] == rid and p["execute"].delivery == state
+        self.wait(delivered, deadline, "delivery deadline")
 
     def expect_pending(self, rid, state, seconds):
+        generation = self.operator.generation
         until = time.monotonic()+seconds
         while time.monotonic() < until:
             self.pump()
             p = self.operator.pending
-            if not p or p["id"] != rid or p["state"] != state or p["result"] is not None:
-                raise Failure("command completed before release")
+            if self.outputs(rid, generation):
+                raise Failure(f"early OUT before release: generation={generation} rid={rid}")
+            if self.operator.generation != generation or not p or p["id"] != rid or p["state"] != state or p["result"] is not None:
+                raise Failure("pending state lost before release")
             time.sleep(.005)
 
+    def outputs(self, rid, generation):
+        return [e for e in self.events if e["generation"] == generation and
+                e["parts"][:2] == ["RSH", "OUT"] and e["parts"][3] == rid]
+
     def expect_once(self, rid, generation, payload, deadline):
-        def outputs():
-            return [e for e in self.events if e["generation"] == generation and
-                    e["parts"][:2] == ["RSH", "OUT"] and e["parts"][3] == rid]
-        self.wait(outputs, deadline, f"missing OUT {rid}")
-        data = bytes.fromhex(outputs()[0]["body"])
-        prefix = b"> " + self.lines[generation, rid].encode() + b"\n"
+        self.wait(lambda: self.outputs(rid, generation), deadline, f"missing OUT {rid}")
+        event = self.outputs(rid, generation)[0]
+        data = bytes.fromhex(event["body"])
         line = self.lines[generation, rid].encode()
-        if data.startswith(b"> > " + line*2 + b"\n\n") and data.endswith(b"\x04"):
-            raise Failure("duplicate PRINT payload")
-        if payload is not None and data != prefix + payload + b"\x04":
-            if ((payload and data == prefix + payload*2 + b"\x04") or
-                    data == prefix*2 + payload + b"\x04"):
+        prefix = b"> " + line + b"\n"
+        if payload is not None:
+            normal = prefix + payload + b"\x04"
+            # Command echo uses three PRINT calls. p3-output writes its payload in one call.
+            doubled = b"> > " + line * 2 + b"\n\n" + payload * 2 + b"\x04"
+            if line == b"p3-output" and data == doubled and event["parts"][4:] == ["0", str(len(data))]:
+                self.vm.record("duplicate PRINT", dict(rid=rid, generation=generation,
+                               normal=normal.hex(), observed=data.hex()))
                 raise Failure("duplicate PRINT payload")
-            raise Failure(f"unexpected output for {rid}: {data[:120]!r}")
+            if data != normal:
+                raise Failure(f"unexpected output for {rid}: {data[:120]!r}")
         self.wait(lambda: rid in self.operator.results or self.operator.take_result(), deadline, "OUT rejected")
         result = self.operator.results[rid]
-        if result["state"] != "done" or result["result"] != data or not data.startswith(prefix) or not data.endswith(b"\x04"):
+        if (result["state"] not in ("done", "truncated") or result["result"] != data or
+                result["drop"] != int(event["parts"][4]) or not data.endswith(b"\x04") or
+                (result["state"] == "done" and not data.startswith(prefix))):
             raise Failure("incomplete operator result")
         tick = self.vm.word("tick_count", 0, deadline)
         self.wait(lambda: (self.vm.word("tick_count", 0, deadline)-tick) % 2**32 >= 100,
                   deadline, "capture settlement")
-        if len(outputs()) != 1:
+        if len(self.outputs(rid, generation)) != 1:
             raise Failure("multiple OUT records")
-        return data[len(prefix):-1]
+        return dict(state=result["state"], drop=result["drop"], body=data)
 
     def notify_number(self, channel, opcode, data, deadline):
         remaining(deadline)
@@ -184,4 +219,4 @@ def peer(vm, root):
     try:
         yield op
     finally:
-        op.socket.close()
+        op.close()

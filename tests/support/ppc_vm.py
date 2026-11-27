@@ -154,9 +154,15 @@ class Guest:
             if len(data) != 4*cols*rows:
                 raise OSError("incomplete terminal cell dump")
             chars = "".join(chr(int.from_bytes(data[i:i+2], "big")) for i in range(0, len(data), 4))
-            return "\n".join(chars[i:i+cols] for i in range(0, len(chars), cols))
-        finally:
-            self.command("cont", deadline)
+            screen = "\n".join(chars[i:i+cols] for i in range(0, len(chars), cols))
+        except Exception:
+            try:
+                self.command("cont", time.monotonic() + 2)
+            except (OSError, RuntimeError, ValueError) as exc:
+                self.record("resume failed", str(exc))
+            raise
+        self.command("cont", time.monotonic() + 2)
+        return screen
 
     def hold_serial_line(self, deadline):
         with (self.directory / "uart.trace").open("rb") as trace:

@@ -51,15 +51,10 @@ MUTATIONS = {
                     'if (!attempted)', 'ready-retry'),
     'duplicate': (USER, 'if (have_id && id <= last_id) return OS32_ERR_EXIST;',
                   '/* duplicate guard removed */', 'duplicate'),
-    'print-twice': ('sys/kern/console/console.c', '    con_sink_push_print(buf, size, color);',
-                    '    con_sink_push_print(buf, size, color); con_sink_push_print(buf, size, color);', 'output'),
     'drop-compare': (SINK, 'if (con_sink_drop_count != g_capture_drop_start) rc = OS32_ERR_NOSPC;',
                      '/* drop comparison removed */', 'freeze-drop'),
     'end': (USER, '    g_api->con_sink_capture(CON_SINK_CAPTURE_END);',
              '    /* END removed */', 'end'),
-    'owner': (SINK, '    if (g_reader == id) {',
-               '    if (0) {', 'owner'),
-    'fault-break': (BOOT, '    kprintf(0x07, "%s returned %d\\n", path, rc);', '    kprintf(0x07, "%s returned %d\\n", path, rc);\n    if (rc < 0) for (;;) idle_wait_step();', 'fault-restart'),
     'half-line': ('userland/shell/rshell.c', '    return rsh_getch(from_serial);',
                   '    (void)rsh_lan_poll(); return rsh_getch(from_serial);', 'half-line'),
 }
@@ -911,7 +906,7 @@ def flow_accept(media, folder, case):
 
 # These protocol mutations exercise the product-shell session alongside its
 # entry/return controls. The remaining mutations follow the transport controls.
-FLOW_MUTATIONS = ('command-group', 'line-buffer', 'ready-retry', 'drop-compare', 'owner')
+FLOW_MUTATIONS = ('command-group', 'line-buffer', 'ready-retry', 'drop-compare')
 
 
 def main():

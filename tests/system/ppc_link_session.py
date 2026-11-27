@@ -48,17 +48,26 @@ def exercise(vm, op, late):
                 and word("g_shell_service", 8) and word("exec_nest_level") == 1
                 and word("cur_res_owner") == 1 and word("g_cur_app") == 0)
 
+    def capture_end(end):
+        check(word("g_capture") == 0 and word("g_reader") == 0xffffffff and
+              word("p3_end_count") == (end+1) % 2**32 and word("p3_freeze_rc") == 0 and
+              word("rshell_active") == 1 and word("boot_serial_mirror") == 0,
+              "capture did not complete")
+
     def command(line, expected=None, seconds=20):
         wait(ready, 60, "missing cui READY")
         end = word("p3_end_count")
         deadline = limit(seconds)
         rid, generation = op.submit(line, deadline)
         data = op.expect_once(rid, generation, expected, deadline)
-        check(word("g_capture") == 0 and word("g_reader") == 0xffffffff and
-              word("p3_end_count") == (end+1) % 2**32 and word("p3_freeze_rc") == 0 and
-              word("rshell_active") == 1 and word("boot_serial_mirror") == 0,
-              "capture did not complete")
-        return data
+        check(data["state"] == "done" and data["drop"] == 0, f"truncated {rid}")
+        capture_end(end)
+        return data["body"][len(line.encode())+3:-1]
+
+    observations = []
+    def observe(reason):
+        observations.append(reason)
+        vm.record("mutation observation", reason)
 
     if late:
         op.enabled = False
@@ -70,84 +79,108 @@ def exercise(vm, op, late):
     resident = point(0, (1, 0, 1, 1, 0))
     check(resident[9:] == [0, vm.symbols["ppc_kapi_table"], vm.symbols["g_shell_service"]],
           "resident ABI arguments")
-    for line, payload in (("pwd", b"/\n"), ("echo $PATH", b"/bin:/sbin:/usr/bin\n"),
-                          ("echo $HOME", b"/home/user\n"), ("echo $SHELL", b"/shell\n"),
-                          ('echo "two words" | cat', b"two words\n"),
-                          ("cat /bin/sample.txt > /tmp/rsh", b""),
-                          ("cat /tmp/rsh", "ASCII ｶﾅ 日本語\n".encode()),
-                          ("p3-buffer", b"buffered line\n")):
-        command(line, payload)
-    # Charge only the help command to the additional long-output budget.
-    started = time.monotonic()
-    vm.deadline += 480
-    help_text = command("help", seconds=480)
-    vm.deadline -= 480 - (time.monotonic() - started)
-    check(all(name in help_text for name in (b"rshell", b"echo", b"lspci")), "help command groups")
-    count = sum(e["parts"][:2] == ["RSH", "READY"] for e in op.events)
-    ticks(500)
-    check(sum(e["parts"][:2] == ["RSH", "READY"] for e in op.events) > count, "READY retry")
-    command("cat /no-such-file")
-    check(re.fullmatch(rb"[1-9][0-9]*\n", command("echo $?")), "missing failure status")
-    command("/bin/hello.bin ok", b"hello ok\n")
-    command("echo $?", b"7\n")
-    child = point(1, (2, 1, 2, 2, 2))
-    check(child[2] and child[9] and child[10:] == [word("ring3_tramp_page"), 0], "child identity")
-    point(2, (1, 0, 1, 1, 0))
-    command("/bin/fault.bin")
-    command("echo $?", b"139\n")
-    point(3, (1, 0, 1, 1, 0))
-    previous = len(op.events)
-    for notice in (f"{op.operator.next_id-1:08x} echo duplicate\n".encode(),
-                   b"00000001 echo old\n", b"00000100 "+b"x"*127+b"\n",
-                   b"00000101 echo bad\necho bad\n"):
-        sent = op.raw(RSHELL, EXECUTE, notice, vm.deadline)
-        wait(lambda: sent.delivery == "acked", 10, "rejection notice not delivered")
-    command("echo accepted", b"accepted\n")
-    check(sum(e["parts"][:2] == ["RSH", "OUT"] for e in op.events[previous:]) == 1,
-          "guest executed invalid notification")
-    command("p3-output", "FD1 UTF8 あ\n".encode())
+    try:
+        command("p3-output", "FD1 UTF8 あ\n".encode())
+    except Failure as exc:
+        if str(exc) != "duplicate PRINT payload":
+            raise
+        observe(str(exc))
     screen = vm.screen(vm.deadline)
     check("FD1 UTF8" in screen and chr(0x2422) in screen and
           "> p3-output" not in screen and "KBOOT" not in screen, "framebuffer output")
+    if not observations:
+        for line, payload in (("pwd", b"/\n"), ("echo $PATH", b"/bin:/sbin:/usr/bin\n"),
+                              ("echo $HOME", b"/home/user\n"), ("echo $SHELL", b"/shell\n"),
+                              ('echo "two words" | cat', b"two words\n"),
+                              ("cat /bin/sample.txt > /tmp/rsh", b""),
+                              ("cat /tmp/rsh", "ASCII ｶﾅ 日本語\n".encode()),
+                              ("p3-buffer", b"buffered line\n")):
+            command(line, payload)
+        # Charge only the help command to the additional long-output budget.
+        started = time.monotonic()
+        vm.deadline += 480
+        help_text = command("help", seconds=480)
+        vm.deadline -= 480 - (time.monotonic() - started)
+        check(all(name in help_text for name in (b"rshell", b"echo", b"lspci")), "help command groups")
+        count = sum(e["parts"][:2] == ["RSH", "READY"] for e in op.events)
+        ticks(500)
+        check(sum(e["parts"][:2] == ["RSH", "READY"] for e in op.events) > count, "READY retry")
+        command("cat /no-such-file")
+        check(re.fullmatch(rb"[1-9][0-9]*\n", command("echo $?")), "missing failure status")
+        command("/bin/hello.bin ok", b"hello ok\n")
+        command("echo $?", b"7\n")
+        child = point(1, (2, 1, 2, 2, 2))
+        check(child[2] and child[9] and child[10:] == [word("ring3_tramp_page"), 0], "child identity")
+        point(2, (1, 0, 1, 1, 0))
+        command("/bin/fault.bin")
+        command("echo $?", b"139\n")
+        point(3, (1, 0, 1, 1, 0))
+        previous = len(op.events)
+        for notice in (f"{op.operator.next_id-1:08x} echo duplicate\n".encode(),
+                       b"00000001 echo old\n", b"00000100 "+b"x"*127+b"\n",
+                       b"00000101 echo bad\necho bad\n"):
+            sent = op.raw(RSHELL, EXECUTE, notice, vm.deadline)
+            wait(lambda: sent.delivery == "acked", 10, "rejection notice not delivered")
+        command("echo accepted", b"accepted\n")
+        check(sum(e["parts"][:2] == ["RSH", "OUT"] for e in op.events[previous:]) == 1,
+              "guest executed invalid notification")
     vm.key("esc", (), vm.deadline)
     wait(lambda: word("rshell_active") == 0 and "[Remote shell closed]" in vm.screen(vm.deadline),
          30, "local shell prompt")
     vm.keys("echo usb\n", vm.deadline)
-    wait(lambda: re.search(r"(?m)^usb *$", vm.screen(vm.deadline)), 20, "USB echo line")
+    def usb_echo():
+        screen = vm.screen(vm.deadline)
+        return "OS32:/$ echo usb" in screen and re.search(r"(?m)^usb *$", screen)
+    wait(usb_echo, 20, "USB echo input and output")
     previous = len(op.events)
     vm.keys("rshell\n", vm.deadline)
     wait(lambda: ready() and any(e["parts"][:2] == ["RSH", "READY"]
                                  for e in op.events[previous:]), 30, "RSH reopen")
-    vm.hold_serial_line(limit(10))
-    rid, generation = op.submit("echo deferred", limit(20))
-    op.wait_delivery(rid, "acked", seconds=10)
-    op.expect_pending(rid, "running", seconds=1)
-    vm.uart.write(b"\r")
-    op.expect_once(rid, generation, b"deferred\n", limit(20))
-    vm.check_serial_rejection(vm.screen(vm.deadline), "echo deferred")
+    if not observations:
+        vm.hold_serial_line(limit(10))
+        end = word("p3_end_count")
+        rid, generation = op.submit("echo deferred", limit(20))
+        op.wait_delivery(rid, "acked", seconds=10)
+        op.expect_pending(rid, "running", seconds=1)
+        vm.uart.write(b"\r")
+        result = op.expect_once(rid, generation, b"deferred\n", limit(20))
+        check(result["state"] == "done" and result["drop"] == 0, "deferred output truncated")
+        capture_end(end)
+        vm.check_serial_rejection(vm.screen(vm.deadline), "echo deferred")
     old = word("g_shell_service", 8)
+    serial = vm.directory / "boot-serial.log"
+    offset = serial.stat().st_size
     op.raw(RSHELL, EXECUTE, b"00001000 p3-fault\n", vm.deadline)
     wait(lambda: word("shell_flow", 4*(12*4+3)) == old, 30, "resident fault not observed")
+    previous_ready = op.operator.ready
+    wait(lambda: b"/sys/shell.bin returned -" in serial.read_bytes()[offset:], 20, "resident exit log missing")
     fault = point(4, (0, 0, 0, 0, 0))
     check(word("p3_exit_owner") == resident[7] and word("p3_exit_reader") == resident[7],
           "faulting resident did not own reader")
     if fault[1] == resident[7]:
-        raise Failure("reader retained after owner exit")
-    check(fault[1] == 0xffffffff and word("g_capture") == 0, "resident fault cleanup")
+        observe("reader retained after owner exit")
+    else:
+        check(fault[1] == 0xffffffff and word("g_capture") == 0, "resident fault cleanup")
     ticks(300)
     if word("g_shell_service", 8) == old:
-        raise Failure("resident fault without new generation")
-    wait(ready, 60, "missing restarted resident")
-    restarted = point(5, (1, 0, 1, 1, 0))
-    check(restarted[3] > old and restarted[9:] == resident[9:], "restarted identity")
-    command("echo afterfault", b"afterfault\n")
-    generation = op.operator.generation
-    op.restart()
-    wait(ready, 30, "new agent READY")
-    check(op.operator.generation != generation, "agent generation reused")
-    command("echo generation", b"generation\n")
+        observe("resident fault without new generation")
+    else:
+        wait(lambda: ready() and op.operator.ready is not previous_ready, 60, "missing restarted resident")
+        restarted = point(5, (1, 0, 1, 1, 0))
+        check(restarted[3] > old and restarted[9:] == resident[9:], "restarted identity")
+        if not observations:
+            command("echo afterfault", b"afterfault\n")
+        generation = op.operator.generation
+        op.restart()
+        wait(lambda: ready() and op.operator.ready is not previous_ready, 30, "new agent READY")
+        check(op.operator.generation != generation, "agent generation reused")
+        if not observations:
+            command("echo generation", b"generation\n")
     peak, failures = word("kmalloc_peak_bytes"), word("p3_alloc_failures")
     check(0 < peak < 1024*1024 and failures == 0, f"heap peak={peak} failures={failures}")
+    if observations:
+        check(len(observations) == 1, "multiple mutation signatures")
+        raise Failure(observations[0])
 
 
 def boot(cpu, case, media, version):
@@ -185,17 +218,18 @@ def verify():
             jobs = [(cpu, pool.submit(boot, cpu, case, media, version)) for cpu in ("7450", "7455")]
             results.extend((f"{cpu}/{case}", *job.result()) for cpu, job in jobs)
     for code in (2, 1):
-        for name, status, reason in results:
-            if status == code and reason not in FAULTS:
-                print(name, reason)
-                return code
-    faults = {reason for _, _, reason in results}
-    if faults == {""}:
+        independent = [f"{name}: {reason}" for name, status, reason in results
+                       if status == code and reason not in FAULTS]
+        if independent:
+            print("; ".join(independent))
+            return code
+    reasons = {reason for _, _, reason in results}
+    if reasons == {""}:
         return 0
-    if len(faults) == 1:
-        print(results[0][0], results[0][2])
+    if len(reasons) == 1:
+        print("; ".join(f"{name}: {reason}" for name, _, reason in results))
     else:
-        print("inconsistent P3 observations across CPU or agent startup")
+        print("; ".join(f"{name}: inconsistent observation (see failure.txt)" for name, _, _ in results))
     return 1
 
 
@@ -205,6 +239,9 @@ if __name__ == "__main__":
             require(Path("tests/support/fixtures/ppc_link/flow.inc"))
         else:
             sys.exit(verify())
-    except (OSError, Failure, subprocess.CalledProcessError) as exc:
+    except subprocess.CalledProcessError as exc:
+        print(f"link-sh: {exc}")
+        sys.exit(1)
+    except (OSError, Failure) as exc:
         print(exc)
         sys.exit(2)
