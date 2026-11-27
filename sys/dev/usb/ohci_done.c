@@ -3,6 +3,7 @@
 #include "sys/dev/usb/ohci_internal.h"
 
 #ifdef TICK_PROBE
+#include <stdbool.h>
 static void record_first(struct irq10_event *event, u32 bits)
 {
     if (++event->count != 1) return;
@@ -12,6 +13,15 @@ static void record_first(struct irq10_event *event, u32 bits)
         __asm__ volatile("rdtsc" : "=a"(lo), "=d"(hi) : : "memory");
         event->first = ((unsigned long long)hi << 32) | lo;
     }
+}
+
+static void record_window(struct irq10_window_event *w, u32 bits, u32 enable, u32 gen)
+{
+    if (!w->event.count) {
+        w->gen = gen;
+        w->enable = enable;
+    }
+    record_first(&w->event, bits);
 }
 
 u32 ohci_intr_collect(struct usb_hc *hc)
@@ -36,17 +46,22 @@ u32 ohci_intr_collect(struct usb_hc *hc)
         if (diag->collecting) {
             u32 enable = ohci_rd(hc, OHCI_INTERRUPT_ENABLE);
             u32 bits = st & enable & (OHCI_INTR_WDH | OHCI_INTR_RHSC);
-            if (bits) {
-                struct irq10_window_event *w = &diag->window[side];
-                if (!w->event.count) {
-                    w->gen = diag->pcm.generation;
-                    w->enable = enable;
-                    if (side) diag->capture(&diag->service, 1);
+            struct irq10_window_event *wdh = &diag->window[side].wdh;
+            struct irq10_window_event *rhsc = &diag->window[side].rhsc;
+            if (side) {
+                bool first_wdh = (bits & OHCI_INTR_WDH) && !wdh->event.count;
+                bool first_rhsc = (bits & OHCI_INTR_RHSC) && !rhsc->event.count;
+                if (first_rhsc) {
+                    diag->capture(&diag->service_rhsc, 1);
+                    if (first_wdh) diag->service_wdh = diag->service_rhsc;
+                } else if (first_wdh) {
+                    diag->capture(&diag->service_wdh, 1);
                 }
-                record_first(&w->event, bits);
-                w->wdh += !!(bits & OHCI_INTR_WDH);
-                w->rhsc += !!(bits & OHCI_INTR_RHSC);
             }
+            if (bits & OHCI_INTR_RHSC)
+                record_window(rhsc, bits, enable, diag->pcm.generation);
+            if (bits & OHCI_INTR_WDH)
+                record_window(wdh, bits, enable, diag->pcm.generation);
         }
     }
 #endif

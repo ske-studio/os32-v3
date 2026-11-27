@@ -60,7 +60,7 @@ struct irq10_line {
 };
 struct irq10_window_event {
     struct irq10_event event;
-    unsigned int gen, rhsc, wdh, enable;
+    unsigned int gen, enable;
 };
 struct irq10_regs { unsigned int gen; unsigned char valid, i12, i9, i10, i14, i15; };
 struct irq10_pcm {
@@ -76,9 +76,9 @@ struct irq10_diag {
     int attach_rc;
     unsigned int enable, status, control;
     struct irq10_event usb[2];
-    struct irq10_window_event window[2];
+    struct { struct irq10_window_event wdh, rhsc; } window[2];
     unsigned int collecting;
-    struct irq10_line attach, begin, end, service, pcm_open;
+    struct irq10_line attach, begin, end, service_wdh, service_rhsc, pcm_open;
     void (*capture)(struct irq10_line *, int);
     struct irq10_pcm pcm;
 };

@@ -49,7 +49,7 @@ struct irq10_diag irq10_diag = {.tickack = 1, .capture = capture_line};
 static void begin_diag_window(void)
 {
     kmemset(irq10_diag.window, 0, sizeof(irq10_diag.window));
-    irq10_diag.service.valid = irq10_diag.end.valid = 0;
+    irq10_diag.service_wdh.valid = irq10_diag.service_rhsc.valid = irq10_diag.end.valid = 0;
     capture_line(&irq10_diag.begin, 0);
     irq10_diag.collecting = 1;
 }

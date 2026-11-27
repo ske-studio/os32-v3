@@ -35,6 +35,19 @@ static void show_line(const char *label, const struct irq10_line *line)
             label, line->valid, line->gen, line->count, line->shared,
             line->storm, line->isolated, line->master, line->slave);
 }
+static void show_window(const char *side, const char *cause, const struct irq10_window_event *w)
+{
+    kprintf(7, "window %s %s count=%u first-bits=%08x enable=%08x gen=%u ",
+            side, cause, w->event.count, w->event.bits, w->enable, w->gen);
+    cycles("first-tsc", w->event.first); kprintf(7, "\n");
+}
+static void show_service(const char *label, const struct irq10_line *line)
+{
+    show_line(label, line);
+    if (line->valid)
+        kprintf(7, "%s IRR(master/slave)=%02x/%02x ISR=%02x/%02x\n", label,
+                line->irr[0], line->irr[1], line->isr[0], line->isr[1]);
+}
 static void show_irq10(const struct irq10_diag *d)
 {
     cycles("irq10-total", d->arrivals); cycles("first-tsc", d->first);
@@ -49,19 +62,16 @@ static void show_irq10(const struct irq10_diag *d)
         cycles("first-tsc", d->usb[i].first); kprintf(7, "\n");
     }
     for (unsigned int i = 0; i < 2; ++i) {
-        const struct irq10_window_event *w = &d->window[i];
-        kprintf(7, "window %s RHSC=%u WDH=%u first-bits=%08x enable=%08x gen=%u ",
-                i ? "service" : "irq", w->rhsc, w->wdh, w->event.bits, w->enable, w->gen);
-        cycles("first-tsc", w->event.first); kprintf(7, "\n");
+        const char *side = i ? "service" : "irq";
+        show_window(side, "WDH", &d->window[i].wdh);
+        show_window(side, "RHSC", &d->window[i].rhsc);
     }
     show_line("attach", &d->attach);
     show_line("window-start", &d->begin);
     show_line("window-stop", &d->end);
     show_line("PCM-open", &d->pcm_open);
-    show_line("service-first", &d->service);
-    if (d->service.valid)
-        kprintf(7, "service-first IRR(master/slave)=%02x/%02x ISR=%02x/%02x\n",
-                d->service.irr[0], d->service.irr[1], d->service.isr[0], d->service.isr[1]);
+    show_service("service-first-WDH", &d->service_wdh);
+    show_service("service-first-RHSC", &d->service_rhsc);
     const struct irq10_pcm *p = &d->pcm;
     kprintf(7, "starts=%u route-gen=%u PI-gen=%u I11=%02x tick-gen=%u gen-pi=%u gen-acks=%u\n",
             p->generation, p->route_gen, p->pi_gen, p->i11, p->tick_gen, p->tick_gen_pi, p->tick_gen_acks);
