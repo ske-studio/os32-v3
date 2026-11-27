@@ -136,13 +136,26 @@ def exercise(vm, op, late):
     wait(usb_echo, 20, "USB echo input and output")
     previous = len(op.events)
     vm.keys("rshell\n", vm.deadline)
-    wait(lambda: ready() and any(e["parts"][:2] == ["RSH", "READY"]
-                                 for e in op.events[previous:]), 30, "RSH reopen")
+    def reopened():
+        # The host records READY before sending its response. Keep servicing
+        # the exchange until the guest releases it, including any retries.
+        return ready() and word("rshell_active") and any(
+            e["parts"][:2] == ["RSH", "READY"] and
+            op.agent.ledger.get(e["link_rid"], {}).get("st") == "RELEASED"
+            for e in op.events[previous:])
+    wait(reopened, 30, "RSH reopen")
     if not observations:
-        vm.hold_serial_line(limit(10))
         end = word("p3_end_count")
+        vm.hold_serial_line(limit(10))
         rid, generation = op.submit("echo deferred", limit(20))
-        op.wait_delivery(rid, "acked", seconds=10)
+        try:
+            op.wait_delivery(rid, "acked", seconds=10)
+        except Failure as exc:
+            pending = op.operator.pending
+            sender = op.agent.notifier
+            delivery = pending["execute"].delivery if pending else None
+            raise Failure(f"{exc} (rid={rid} delivery={delivery} window={sender.window} "
+                          f"silent={sender.silent})") from exc
         op.expect_pending(rid, "running", seconds=1)
         vm.uart.write(b"\r")
         result = op.expect_once(rid, generation, b"deferred\n", limit(20))
