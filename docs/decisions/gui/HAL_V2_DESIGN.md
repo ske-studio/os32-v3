@@ -403,7 +403,7 @@ int gfx2_owner_release(struct addrspace *as)
         if (s->state == LOCKED_RO || s->state == LOCKED_RW)
             (void)gfx2_surf_state_set(s, GFX2_ST_IDLE);      /*     lock を外す。表の遷移なので失敗しない */
     for each head h scanning a surf of as->owner:
-        (void)gfx2_head_restore_v1(a, h);                    /* (3) 失敗 (IO) でも scan_ref は C13 が外す。外せない head は scan_ref が残り (5) へ */
+        (void)gfx2_head_restore_v1(a, h);                    /* (3) C13 は切り替え成功時だけ旧面の参照を外す。復元失敗時は走査面と保留面の参照を保ち (5) へ */
     for each surf s of as->owner:
         if (!(s->flags & GFX2_SF_KEEP) && !s->scan_ref &&
             gfx2_surf_quiesce(s, GFX2_RELEASE_DL) == 0 &&

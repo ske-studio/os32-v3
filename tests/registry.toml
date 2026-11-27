@@ -1089,9 +1089,10 @@ sources = ["sys/hal/gfx/v2/display.c", "sys/hal/gfx/v2/surface.c", "sys/include/
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "走査中の面を free して CLOSING、flip 完了後のみ旧 backing を解放"
+expect = "走査中の面を free して CLOSING、flip 完了または復元成功後に旧 backing を解放。復元 IO なら走査面・参照を保持"
 limits = "メモリ上の画素と写像先を観測。実機の走査は対象外"
 gates = ["push", "main"]
 mutations = [
   { id = "gfx2_scan_release_early", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/surface.c", old = "if (s->scan_ref || !surf_done(s)) {", new = "if (!surf_done(s)) {", fail = "FAIL active scan reference" },
+  { id = "gfx2_restore_detach_on_io", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/display.c", old = "&mode, s))\n        return OS32_ERR_IO;", new = "&mode, s)) {\n        gfx2_head_detach(a, head);\n        return OS32_ERR_IO;\n    }", fail = "FAIL failed restore backing" },
 ]

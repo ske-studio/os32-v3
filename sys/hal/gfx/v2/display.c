@@ -194,18 +194,16 @@ int gfx2_head_restore_v1(struct gfx2_adapter *a, u32 head)
     struct gfx2_surf *s = NULL;
     GFX2_ModeInfo mode = {0};
     if (head >= a->heads) return OS32_ERR_IO;
-    if (!m) { gfx2_head_detach(a, head); return OS32_ERR_IO; }
+    if (!m) return OS32_ERR_IO;
     for (u32 i = 0; i < GFX2_MAX_SURFACES; i++) {
         struct gfx2_surf *p = &gfx2_surfs[i];
         if (p->state != GFX2_ST_FREE && (p->flags & GFX2_SF_ALIAS) && p->adapter == a->index &&
             p->head == head && p->role == GFX2_ROLE_DISPLAY) { s = p; break; }
     }
-    if (!s) { gfx2_head_detach(a, head); return OS32_ERR_IO; }
+    if (!s) return OS32_ERR_IO;
     mode.id = m->hw_mode; mode.w = m->width; mode.h = m->height; mode.fmt = s->fmt;
-    if (a->be->mode_set(a->ctx, head, a->head[head].conn_mask, &mode, s)) {
-        gfx2_head_detach(a, head);
+    if (a->be->mode_set(a->ctx, head, a->head[head].conn_mask, &mode, s))
         return OS32_ERR_IO;
-    }
     gfx2_head_detach(a, head);
     gfx2_scan_ref_swap(a, head, s);
     gfx_policy_scan_changed();

@@ -32,9 +32,19 @@ static int flip_done(void *ctx, u32 head, u32 *sid)
     return retired ? 0 : OS32_ERR_BUSY;
 }
 
+static int mode_result;
+static u32 scan_sid;
+
+static int set_mode(void *ctx, u32 head, u32 mask, const GFX2_ModeInfo *mode,
+                    const struct gfx2_surf *s)
+{
+    if (!mode_result) scan_sid = s->sid;
+    return mode_result;
+}
+
 static int run(void)
 {
-    static const GfxBackendV2 be = {.release = release, .flip_done = flip_done};
+    static const GfxBackendV2 be = {.release = release, .flip_done = flip_done, .mode_set = set_mode};
     struct gfx2_surf *old = &gfx2_surfs[0], *next = &gfx2_surfs[1];
     adapter.be = &be;
     adapter.heads = 1;
@@ -54,6 +64,27 @@ static int run(void)
     gfx2_closing_sweep(&adapter);
     if (released != retired || old->state != GFX2_ST_FREE ||
         next->scan_ref != 1 || adapter.head[0].scan_sid != next->sid) return 2;
+    static const GfxMode mode = {.width = 640, .height = 480};
+    static GfxBackend v1 = {.selected_mode = &mode};
+    struct gfx2_surf *alias = &gfx2_surfs[2];
+    *alias = (struct gfx2_surf){.sid = 1026, .state = GFX2_ST_IDLE,
+                                .flags = GFX2_SF_ALIAS, .role = GFX2_ROLE_DISPLAY};
+    adapter.v1 = &v1;
+    next->owner = 7;
+    next->pool = GFX2_POOL_VRAM;
+    released = 0;
+    scan_sid = next->sid;
+    mode_result = OS32_ERR_IO;
+    if (gfx2_head_restore_v1(&adapter, 0) != OS32_ERR_IO) return 3;
+    if (gfx2_surface_free(next->sid)) return 3;
+    gfx2_closing_sweep(&adapter);
+    if (released || adapter.head[0].scan_sid != scan_sid || next->scan_ref != 1 ||
+        next->state != GFX2_ST_CLOSING) return 3;
+    mode_result = 0;
+    if (gfx2_head_restore_v1(&adapter, 0)) return 4;
+    gfx2_closing_sweep(&adapter);
+    if (released != 1025 || next->state != GFX2_ST_FREE || alias->scan_ref != 1 ||
+        scan_sid != alias->sid || adapter.head[0].scan_sid != scan_sid) return 4;
     return 0;
 }
 
