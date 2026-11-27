@@ -63,20 +63,21 @@ static int teardown(Snd2Device *d, unsigned flags, int stop_failed, int opened)
     Snd2Stream *s = &d->stream;
     stream_metric(TP_SND_TEARDOWN);
     s->closing = 1;
-    int leak = stop_failed || (opened && d->be->hw_stop(d->ctx) < 0);
-    if (leak) {
-        s->state = SND2_ST_FAULTED;
-        snd2_fault(d);
-    }
+    int leak = stop_failed || (opened && d->be->hw_stop(d->ctx, 1) < 0);
     stream_unlock(flags);
-    if (opened) d->be->hw_release(d->ctx, leak);
+    if (opened && d->be->hw_release(d->ctx, leak) < 0) leak = 1;
     if (!d->writing) snd2_stg_free(s);
     flags = stream_lock(TP_SND_TEARDOWN);
     s->ring = 0;
     ++s->gen;
     s->owner = 0;
     s->closing = d->writing;
-    if (!leak) s->state = SND2_ST_IDLE;
+    if (leak) {
+        s->state = SND2_ST_FAULTED;
+        snd2_fault(d);
+    } else {
+        s->state = SND2_ST_IDLE;
+    }
     stream_unlock(flags);
     return leak ? OS32_ERR_IO : 0;
 }
@@ -324,7 +325,7 @@ void snd2_advance(u32 dev)
             int valid = d->be->hw_pos(d->ctx, &hw) >= 0;
             if (snd2_seg_observe(s, valid, hw, now) < 0) {
                 stream_metric(TP_SND_RESYNC);
-                if (d->be->hw_stop(d->ctx) < 0) {
+                if (d->be->hw_stop(d->ctx, 0) < 0) {
                     teardown(d, flags, 1, 1);
                     return;
                 }
@@ -332,12 +333,8 @@ void snd2_advance(u32 dev)
                 (void)start_hw(d, flags, 1);
                 return;
             }
-            /* v1 close must return with IRQ and DMA released. Its caller
-             * finishes the drain outside the device advance callback. */
-            if (!s->v1 && s->state == SND2_ST_DRAIN && s->played == s->written) {
-                teardown(d, flags, 0, 1);
-                return;
-            }
+            /* The foreground close observes played and performs teardown
+             * with interrupts enabled for the backend's DRS wait. */
         }
     }
     stream_unlock(flags);
@@ -356,7 +353,7 @@ int snd2_stream_pause(u32 id)
             d->stream.state = SND2_ST_PAUSE;
         } else if (d->be->hw_pos(d->ctx, &hw) < 0) rc = OS32_ERR_IO;
         else if (snd2_seg_observe(&d->stream, 1, hw, tick_clock_ms()) < 0) {
-            if (d->be->hw_stop(d->ctx) < 0) {
+            if (d->be->hw_stop(d->ctx, 0) < 0) {
                 teardown(d, flags, 1, 1);
                 return OS32_ERR_IO;
             }
@@ -428,7 +425,7 @@ int snd2_stream_close(u32 id, u32 how)
             rc = s->state == SND2_ST_FAULTED || s->owner || s->played != s->written ? OS32_ERR_IO : 0;
             break;
         }
-        if (s->state != SND2_ST_DRAIN || (s->v1 && s->played == s->written) ||
+        if (s->state != SND2_ST_DRAIN || s->played == s->written ||
             tick_clock_ms() - begin >= timeout) {
             rc = s->played == s->written ? 0 : OS32_ERR_IO;
             int stop_rc = teardown(d, flags, 0, 1);

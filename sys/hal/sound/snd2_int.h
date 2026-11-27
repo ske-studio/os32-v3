@@ -2,7 +2,7 @@
 #define SND2_INT_H
 #include "av_contract.h"
 
-#define SND_HAL2_ABI 1
+#define SND_HAL2_ABI 2
 #define SND2_MAX_RING_FRAMES 4096U
 #define SND2_MAX_SEGMENTS 16U
 typedef struct Snd2Stream {          /* sys/hal/sound/snd2_int.h。書くのは sound/hal だけ */
@@ -43,15 +43,15 @@ u32 snd2_seg_played_now(const Snd2Stream *s);
 /* Negative means continuity lost: stop before changing the ring. */
 void snd2_seg_after_publish(Snd2Stream *s, u32 hw, u32 now);
 int snd2_seg_observe(Snd2Stream *s, int have_pos, u32 hw, u32 now);
-typedef struct SndBackend {          /* sys/hal/sound/snd2_int.h、SND_HAL2_ABI 1 */
+typedef struct SndBackend {          /* sys/hal/sound/snd2_int.h、SND_HAL2_ABI 2 */
     u32 abi;
     int  (*caps)(void *ctx, SND2_Caps *o);
     int  (*hw_open)(void *ctx, const SND2_Fmt *f, u32 period, u8 **ring);   /* リングは [HW2] を守った DMA の面 */
     int  (*hw_start)(void *ctx);                    /* リングは中核が埋めてから */
     int  (*hw_pos)(void *ctx, u32 *frame);          /* IF=0。読めなければ <0 */
     int  (*hw_ack)(void *ctx);                      /* IRQ。自分の要因なら 1 */
-    int  (*hw_stop)(void *ctx);                     /* IF=0、上限つき。0 = 止まった証拠あり、<0 = 無し */
-    void (*hw_release)(void *ctx, int leak);        /* leak=1: dma_mark_leaked でリングを隔離 */
+    int  (*hw_stop)(void *ctx, int closing);        /* IF=0。close は停止を要求し、release で停止確認。 */
+    int  (*hw_release)(void *ctx, int leak);        /* 停止・復元を確認できなければ隔離し、負を返す。 */
     int  (*hw_volume)(void *ctx, u32 l, u32 r);
     int  (*hw_timer_arm)(void *ctx, u32 after_us);  /* NULL = 無い。after_us=0 で解除。V86 の FM の起床 (§9-4) */
     void (*hw_timer_ack)(void *ctx);                /* タイマの要因を消す (IRQ の中、backend が要因を分けた後) */

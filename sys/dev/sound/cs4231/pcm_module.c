@@ -8,6 +8,9 @@ _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table
 #include "pcm_module.h"
 #include "pcm_imports.h"
 #include "platform_module_pair.h"
+#include "platform_irq.h"
+#include "../../dma/dma8237.h"
+#include "pcm_cs4231.h"
 #include "config.h"
 #include "os32_generations.h"
 #include "kstring.h"
@@ -185,8 +188,52 @@ static int pcm_stop_dma(struct module_record *r)
     return r->dma_refs == 0;
 }
 
+static int bios_route = -1;
+static int route_sampled;
+static int pcm_quarantined;
+
+int pcm_module_bios_route(void) { return bios_route; }
+
+int pcm_module_dma_acquire(const void *owner)
+{
+    return dma_chan_acquire(PCM_DMA_CHAN, owner);
+}
+
+void pcm_module_dma_release(const void *owner, int quarantine)
+{
+    if (quarantine) {
+        dma_chan_quarantine(PCM_DMA_CHAN, owner);
+        pcm_quarantined = 1;
+    } else {
+        dma_chan_release(PCM_DMA_CHAN, owner);
+    }
+}
+
+/* A460h ID 6 identifies the Nf/Np built-in sound family. DMA #1 is
+ * unavailable on Np (PC-98 io_sound, A460h and 0F40h). */
+static const char *pcm_boot_refusal(void)
+{
+    if (platform_irq_reserved(PCM_IRQ)) return "FM present or unknown at 0188h/0288h";
+    if (pcm_quarantined) return "DMA #1 quarantined";
+    if (!route_sampled) {
+        route_sampled = 1;
+        if (((u8)inp(PCM_PORT_WSSID) & PCM_WSSID_MASK) == PCM_WSSID_VALUE)
+            bios_route = (u8)inp(PCM_PORT_ROUTE);
+    }
+    if (bios_route < 0 || bios_route == 0xff) return "WSS unavailable";
+    if ((bios_route & 0x38) != 0x20) return "BIOS WSS IRQ is not INT5";
+    if ((bios_route & 7) > 3 && (bios_route & 7) != 7) return "reserved WSS DMA code";
+    if (((u8)inp(0xa460) >> 4) == 6) return "Nf/Np sound family";
+    return 0;
+}
+
 int pcm_module_load(void)
 {
+    const char *reason = pcm_boot_refusal();
+    if (reason) {
+        kprintf(KLOG_ATTR, "[pcm] skipped: %s (0F40h=%x)\n", reason, bios_route);
+        return MODULE_INIT_FAILED;
+    }
     if (tick_register(PC98_TICK_PCM, pcm_tick) != 0) return MODULE_INIT_FAILED;
     if (pcm_handle.generation) return MODULE_BUSY;
     u32 pair = 0;
@@ -206,8 +253,8 @@ int pcm_module_load(void)
     int rc = module_load(&request, &pcm_handle);
     if (!rc) rc = module_start(pcm_handle);
     if (!rc && !module_exports(pcm_handle)) rc = MODULE_INIT_FAILED;
-    kprintf(KLOG_ATTR, "[pcm] module rc=%d pair=%08x tick=%d\n",
-            rc, pair, tick_target != 0);
+    kprintf(KLOG_ATTR, "[pcm] BIOS 0F40h=%x INT5 IRQ12 vector 14h module rc=%d pair=%08x tick=%d\n",
+            bios_route, rc, pair, tick_target != 0);
     return rc;
 }
 

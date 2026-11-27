@@ -191,12 +191,12 @@ static int dma_setup(u32 phys_addr, u16 byte_count, int is_write)
 {
     int rc;
 
-    dma_chan_mask(FDC_DMA_CHANNEL);
-    rc = dma_chan_setup(FDC_DMA_CHANNEL, phys_addr, (u32)byte_count,
+    dma_chan_mask(FDC_DMA_CHANNEL, &fdc_dma_owned);
+    rc = dma_chan_setup(FDC_DMA_CHANNEL, &fdc_dma_owned, phys_addr, (u32)byte_count,
                         is_write ? DMA_DIR_FROM_MEM : DMA_DIR_TO_MEM,
                         DMA_MODE_SINGLE);
     if (rc != 0) return rc;
-    dma_chan_unmask(FDC_DMA_CHANNEL);
+    dma_chan_unmask(FDC_DMA_CHANNEL, &fdc_dma_owned);
     return 0;
 }
 

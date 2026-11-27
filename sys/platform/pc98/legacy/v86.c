@@ -17,6 +17,7 @@
 #include "v86_bios.h"
 #include "../../../kern/module/module.h"
 #include "platform_device.h"
+#include "platform_irq.h"
 #include "../../../arch/x86/kernel/idt.h"
 #include "kprintf.h"
 #include "io.h"
@@ -459,7 +460,7 @@ void v86_runtime_end(void)
 {
     v86_active = 0;
     if (!v86_session.running) return;
-    irq_disable(V86_IRQ_SOUND);
+    if (platform_irq_reserved(V86_IRQ_SOUND)) irq_disable(V86_IRQ_SOUND);
     irq_disable(V86_IRQ_VSYNC);
     tss_set_esp0(v86_session.saved_esp0);
     v86_session.running = 0;
@@ -498,7 +499,7 @@ int v86_run_limit(const struct v86_context *ctx, u32 tick_limit)
     /* サウンドボードの IRQ をセッション中だけ開ける。
      * ゲストの FM ドライバは OPN のタイマ割り込みで演奏を進めるので、
      * これを開けないと「音源は見えるのに曲が鳴らない」状態になる。 */
-    irq_enable(V86_IRQ_SOUND);
+    if (platform_irq_reserved(V86_IRQ_SOUND)) irq_enable(V86_IRQ_SOUND);
 
     /* VSYNC もセッション中だけ開ける。OS32 は使わないので普段は塞いである。
      * Ys はフィールドに入ると自分で IRQ2 のマスクを外し (実測: master IMR が

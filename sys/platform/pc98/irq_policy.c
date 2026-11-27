@@ -2,17 +2,25 @@
 #include "platform_irq.h"
 #include "irq_math.h"
 #include "pc98.h"
+#include "platform_fm_probe.h"
 
 static const unsigned dynamic_lines[PLATFORM_IRQ_DYNAMIC_COUNT] = {
-    3, 5, 6, 8, 9, 10, 11, 14, 15
+    3, 5, 6, 8, 9, 10, 11, 14, 15, 12
 };
 static const struct irq_topology topology = {
     PLATFORM_IRQ_LINES, PLATFORM_IRQ_DYNAMIC_COUNT, dynamic_lines
 };
-const struct irq_topology *platform_irq_topology(void) { return &topology; }
+/* Append IRQ12 so entries installed before the probe keep their indices. */
+static const struct irq_topology legacy_topology = {
+    PLATFORM_IRQ_LINES, PLATFORM_IRQ_DYNAMIC_COUNT - 1, dynamic_lines
+};
+const struct irq_topology *platform_irq_topology(void)
+{
+    return platform_fm_irq12_released() ? &topology : &legacy_topology;
+}
 int platform_irq_reserved(unsigned line)
 {
-    return irq_dyn_index_in(&topology, line) < 0;
+    return irq_dyn_index_in(platform_irq_topology(), line) < 0;
 }
 
 int irq_eoi_plan(unsigned int irq, int slave_isr_bit7)

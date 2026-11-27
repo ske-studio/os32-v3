@@ -260,6 +260,9 @@ void platform_boot_machine(void)
     tvram_print(9, 4, "SND..", TATTR_GREEN);
     kprintf(KLOG_ATTR, "[BOOT] fm_module_load...\n");
     int snd_rc = fm_module_load();
+    if (memory_boot_dma_available()) {
+        pcm_module_load();
+    }
     tvram_print(14, 4, snd_rc ? "-- " : "OK ", TATTR_WHITE);
     kprintf(KLOG_ATTR, "[BOOT] snd module rc=%d\n", snd_rc);
 

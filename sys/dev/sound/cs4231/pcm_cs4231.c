@@ -21,8 +21,8 @@
 #include "kmalloc.h"     /* ステージングは DMA しないので KHEAP から */
 #include "irq.h"
 #include "tick_clock.h"  /* tick_clock_jiffy64 */
-#ifdef OS32_PCM_MODULE
 #include "pcm_module.h"
+#ifdef OS32_PCM_MODULE
 extern u32 ktime_ticks(void);
 #define tick_count ktime_ticks()
 #define irq_register pcm_module_irq_register
@@ -64,7 +64,10 @@ static int  s_owner;
 static u32 s_hal_period;
 static void (*s_hal_advance)(void);
 static int  s_irq_reg;
-/* advance runs from IRQ10 or the timer IRQ. Only foreground may detach. */
+static int dma_owned, route_attempted, codec_started, mode2_verified;
+static int release_stop_requested;
+static u32 release_deadline;
+/* advance runs from IRQ12 or the timer IRQ. Only foreground may detach. */
 static volatile int s_in_advance;
 static volatile int s_release_pending;
 static int s_release_leak;
@@ -122,6 +125,29 @@ static void cs_write(u8 idx, u8 val)
     irq_restore(f);
 }
 
+/* Return -1 when I24 cannot establish the state of the playback latch. */
+static int pcm_read_pi(void)
+{
+    unsigned int flags = irq_save();
+    u8 status = 0xff;
+
+    if (!(inp(PCM_PORT_R0) & PCM_R0_INIT)) {
+        outp(PCM_PORT_R0, PCM_I_ALTSTAT);
+        status = (u8)inp(PCM_PORT_R1);
+    }
+    irq_restore(flags);
+    if (status == 0xff) return -1;
+    return (status & PCM_ALT_PI) != 0;
+}
+
+static int pcm_clear_release_pi(void)
+{
+    int pi = pcm_read_pi();
+    if (pi != 1) return pi == 0;
+    cs_write(PCM_I_ALTSTAT, 0);
+    return pcm_read_pi() == 0;
+}
+
 /* 期限の比較。符号付きの差で見るので tick_count の巻き戻りに強い。 */
 static int pcm_past(u32 deadline)
 {
@@ -140,6 +166,7 @@ static int pcm_ready(int kind)
     if (kind == PCM_OP_WAIT_INIT) return 1;
     v = cs_read(PCM_I_ERRSTAT);
     pcm_diag_drs = v;
+    if (v == PCM_R0_INIT || v == 0xff) return 0;
     if (kind == PCM_OP_WAIT_ACI) return (v & PCM_ERR_ACI) == 0;
     return (v & PCM_ERR_DRS) == 0;
 }
@@ -273,10 +300,10 @@ static int pcm_run(const struct pcm_op *ops, int n, int at, int blocking)
         case PCM_OP_CHK_MODE2:
             if ((cs_read(PCM_I_MODEID) & PCM_MODE2) == 0) return OS32_ERR_IO;
             break;
-        case PCM_OP_DMA_MASK:   dma_chan_mask(PCM_DMA_CHAN); break;
-        case PCM_OP_DMA_UNMASK: dma_chan_unmask(PCM_DMA_CHAN); break;
+        case PCM_OP_DMA_MASK:   dma_chan_mask(PCM_DMA_CHAN, &dma_owned); break;
+        case PCM_OP_DMA_UNMASK: dma_chan_unmask(PCM_DMA_CHAN, &dma_owned); break;
         case PCM_OP_DMA_SETUP:
-            if (dma_chan_setup(PCM_DMA_CHAN, s_ring_phys, PCM_RING_BYTES,
+            if (dma_chan_setup(PCM_DMA_CHAN, &dma_owned, s_ring_phys, PCM_RING_BYTES,
                                DMA_DIR_FROM_MEM, DMA_MODE_CYCLIC) != 0)
                 return OS32_ERR_IO;
             break;
@@ -289,7 +316,7 @@ static int pcm_run(const struct pcm_op *ops, int n, int at, int blocking)
         case PCM_OP_RING_FILL:  if (!s_hal_advance) pcm_ring_fill(); break;
         case PCM_OP_TIMEBASE:   if (!s_hal_advance) pcm_timebase(); break;
         case PCM_OP_DEADLINE:   s_deadline = tick_count + o->b; break;
-        case PCM_OP_ACK_TC:     dma_chan_ack_tc(PCM_DMA_CHAN); break;
+        case PCM_OP_ACK_TC:     dma_chan_ack_tc(PCM_DMA_CHAN, &dma_owned); break;
         default: break;
         }
     }
@@ -384,11 +411,11 @@ static void pcm_advance_restart(void)
     if (g_pcm.close_pending) g_pcm.state = PCM_ST_DRAINING;
 }
 
-enum pcm_advance_origin { PCM_FROM_IRQ10, PCM_FROM_TICK };
+enum pcm_advance_origin { PCM_FROM_IRQ, PCM_FROM_TICK };
 
 #ifdef PCM_REFILL_DIAG
 /* Build with KERNEL_CFLAGS_EXTRA=-DPCM_REFILL_DIAG.
- * Private map symbols: [IRQ10, IRQ0], observation and copy/zero separately.
+ * Private map symbols: [IRQ12, IRQ0], observation and copy/zero separately.
  * Clock instrumentation is diagnostic-only; totals/maxima are microseconds. */
 struct pcm_refill_stat { u32 calls, total_us, max_us; };
 struct pcm_refill_stat pcm_diag_observe[2], pcm_diag_refill[2];
@@ -415,21 +442,21 @@ static void pcm_advance_run(enum pcm_advance_origin origin)
     if (g_pcm.state == PCM_ST_RUNNING && g_pcm.close_pending)
         g_pcm.state = PCM_ST_DRAINING;
 
-    if (dma_chan_remaining(PCM_DMA_CHAN, &left, &tc) == 0) {
+    if (dma_chan_remaining(PCM_DMA_CHAN, &dma_owned, &left, &tc) == 0) {
         p1 = pcm_pos_frames(left);
         have = 1;
         /* tc は**判定に使わない** (往復 6 R1/R2)。診断の通知だけ落とす。 */
-        if (tc) dma_chan_ack_tc(PCM_DMA_CHAN);
+        if (tc) dma_chan_ack_tc(PCM_DMA_CHAN, &dma_owned);
     }
     now = pcm_now();
     if (origin == PCM_FROM_TICK && have &&
         p1 / PCM_HALF_FRAMES != g_pcm.half) {
         /* Recheck immediately before either deferral or pcm_obs. Do not
          * publish a half/staging/drain change until the rescue is due. */
-        have = dma_chan_remaining(PCM_DMA_CHAN, &left, &tc) == 0;
+        have = dma_chan_remaining(PCM_DMA_CHAN, &dma_owned, &left, &tc) == 0;
         if (have) {
             p1 = pcm_pos_frames(left);
-            if (tc) dma_chan_ack_tc(PCM_DMA_CHAN);
+            if (tc) dma_chan_ack_tc(PCM_DMA_CHAN, &dma_owned);
         }
         now = pcm_now();
         if (have && p1 / PCM_HALF_FRAMES != g_pcm.half &&
@@ -473,7 +500,9 @@ static int pcm_advance(enum pcm_advance_origin origin)
     }
 
     /* 共通の PI の ack。**受理の判定にだけ**使い、連続性には使わない。 */
+    if (origin == PCM_FROM_IRQ && (!dma_owned || !mode2_verified || !(inp(PCM_PORT_R2) & 1))) return IRQ_NONE;
     handled = pcm_codec_ack();
+    if (origin == PCM_FROM_IRQ && !handled) return IRQ_NONE;
 
     switch (g_pcm.state) {
     case PCM_ST_RUNNING:
@@ -520,20 +549,20 @@ static int pcm_irq(unsigned int irq, void *arg)
 {
     (void)irq; (void)arg;
     if (s_hal_advance) {
-        if (s_claimed || s_mce_busy || g_pcm.state != PCM_ST_RUNNING)
+        if (!dma_owned || !mode2_verified || s_claimed || s_mce_busy || g_pcm.state != PCM_ST_RUNNING)
             return IRQ_NONE;
-        if (!pcm_codec_ack()) return IRQ_NONE;
-        pcm_hal_advance(PCM_FROM_IRQ10);
+        if (!(inp(PCM_PORT_R2) & 1) || !pcm_codec_ack()) return IRQ_NONE;
+        pcm_hal_advance(PCM_FROM_IRQ);
         return IRQ_HANDLED;
     }
-    return pcm_advance(PCM_FROM_IRQ10);
+    return pcm_advance(PCM_FROM_IRQ);
 }
 
 void pcm_tick(void)
 {
     if (s_hal_advance) {
-        if (s_claimed || s_mce_busy) return;
-        /* Release a latched PI even when its IRQ10 edge was missed. */
+        if (s_claimed || s_mce_busy || g_pcm.state == PCM_ST_OPENING) return;
+        /* Release a latched PI even when its IRQ12 edge was missed. */
         if (g_pcm.state == PCM_ST_RUNNING) (void)pcm_codec_ack();
         pcm_hal_advance(PCM_FROM_TICK);
         return;
@@ -547,6 +576,7 @@ void pcm_tick(void)
 /*  MODE1 のまま I25 を選ぶと IA4 が無視されて I9 に化けるので、             */
 /*  **MODE2 を書いて読み戻してから** I25 を読む (往復 2 R1)。                */
 /* ======================================================================== */
+
 static int pcm_detect(void)
 {
     u8 v;
@@ -557,6 +587,7 @@ static int pcm_detect(void)
     if ((cs_read(PCM_I_MODEID) & PCM_ID_MASK) != PCM_ID_VALUE) return 0;
     cs_write(PCM_I_MODEID, PCM_MODE2);
     if ((cs_read(PCM_I_MODEID) & PCM_MODE2) == 0) return 0;
+    mode2_verified = 1;
     v = (u8)(cs_read(PCM_I_VERSION) & PCM_VER_MASK);
     if (v != PCM_VER_CS4231 && v != PCM_VER_CS4231A) return 0;
     s_version = v;
@@ -566,15 +597,7 @@ static int pcm_detect(void)
 void pcm_init(void)
 {
     g_pcm.state = PCM_ST_CLOSED;
-    if (!pcm_detect()) {
-        kprintf(KLOG_ATTR, "[pcm] none\n");
-        return;
-    }
-    s_present = 1;
-    kprintf(KLOG_ATTR, "[pcm] CS4231 v=%d irq %d dma %d fmt 0x%X\n",
-            (int)(s_version == PCM_VER_CS4231 ? PCM_VER_NAME_4231
-                                              : PCM_VER_NAME_4231A),
-            (int)PCM_IRQ, (int)PCM_DMA_CHAN, (int)PCM_FMT_44100);
+    s_present = pcm_module_bios_route() >= 0;
 }
 
 int pcm_state(void)   { return (int)g_pcm.state; }
@@ -583,11 +606,62 @@ int pcm_present(void) { return s_present; }
 /* ======================================================================== */
 /*  6. 資源の解放 — **1 度だけ** (契約として finalized で固定する)          */
 /* ======================================================================== */
+/* Caller holds IF=0. Reclaim and HAL teardown publish the stop request
+ * before releasing their lock. Deferred release uses this same deadline. */
+static void pcm_request_release_stop(void)
+{
+    s_claimed = 1;
+    if (codec_started && !release_stop_requested) {
+        cs_write_locked(PCM_I_PINCTL, 0);
+        cs_write_locked(PCM_I_IFACE, PCM_IFACE_CAL1);
+        release_deadline = tick_count + PCM_STOP_TICKS;
+        release_stop_requested = 1;
+    }
+}
+
 static void pcm_release(int leak)
 {
     if (g_pcm.finalized) return;
     s_claimed = 1;              /* 以後 advance は装置にもリングにも触らない */
 
+    if (dma_owned) {
+        if (codec_started) {
+            unsigned int flags = irq_save();
+            pcm_request_release_stop();
+            irq_restore(flags);
+        }
+        if (codec_started && !leak) {
+            while (!pcm_ready(PCM_OP_WAIT_DRS)) {
+                if (!_irq_enabled() || (int)(tick_count - release_deadline) >= 0) {
+                    leak = 1;
+                    break;
+                }
+            }
+        }
+        dma_chan_mask(PCM_DMA_CHAN, &dma_owned);
+        if (route_attempted && !leak) {
+            /* A mismatched route gives no verified codec access. A codec
+             * returning INIT (all registers read 80h) cannot prove stop. */
+            u8 iface = 0xff, pin = 0xff;
+            if (codec_started && !(inp(PCM_PORT_R0) & PCM_R0_INIT)) {
+                iface = cs_read(PCM_I_IFACE);
+                pin = cs_read(PCM_I_PINCTL);
+            }
+            if (iface == PCM_R0_INIT || pin == PCM_R0_INIT ||
+                (iface & PCM_IFACE_PEN) || (pin & PCM_PINCTL_IEN) ||
+                !pcm_ready(PCM_OP_WAIT_DRS) ||
+                (mode2_verified && !pcm_clear_release_pi())) {
+                leak = 1;
+            } else {
+                outp(PCM_PORT_ROUTE, pcm_module_bios_route());
+                leak = (u8)inp(PCM_PORT_ROUTE) != pcm_module_bios_route();
+            }
+        }
+        if (leak) kprintf(KLOG_ATTR, "[pcm] DMA #1 quarantined, ring retained\n");
+        pcm_module_dma_release(&dma_owned, leak);
+        dma_owned = route_attempted = codec_started = mode2_verified = 0;
+        release_stop_requested = 0;
+    }
     if (s_irq_reg) {
         if (irq_unregister(PCM_IRQ, pcm_irq, 0) != 0) {
             s_release_leak = leak;
@@ -630,12 +704,11 @@ static int pcm_owner_ok(void)
 /* ======================================================================== */
 /*  7. KAPI の実体                                                          */
 /* ======================================================================== */
-/* open の**巻き戻し (逆順)**。DMA は未開始でマスク中なので解放して安全。
- * `0F40h` は 0x1A のまま残す — detach 状態で装置レジスタを書かせない。 */
+/* Unwind only resources acquired by this open. */
 static int pcm_open_fail(int rc)
 {
     pcm_release(0);
-    return rc;
+    return s_fault_sticky ? OS32_ERR_IO : rc;
 }
 
 static int pcm_open_device(u32 rate, u32 period, void (*advance)(void))
@@ -661,9 +734,7 @@ static int pcm_open_device(u32 rate, u32 period, void (*advance)(void))
     g_pcm.finalized = 0;
     g_pcm.state = PCM_ST_OPENING;
     s_claimed = 0;
-    rc = pcm_seq_prologue(&tbl);
-    pcm_run(tbl, rc, 0, 1);
-    if (!pcm_detect()) return pcm_open_fail(OS32_ERR_NOSYS);
+    if (!s_present) return pcm_open_fail(OS32_ERR_NOSYS);
 
     /* **DMA するのはリングだけ**。プールは 64KB しかなく 82557 と分け合う
      * ので、DMA しないステージングは KHEAP から取る (PM 2026-09-23)。
@@ -679,9 +750,28 @@ static int pcm_open_device(u32 rate, u32 period, void (*advance)(void))
     kmemset(s_ring, 0, PCM_RING_BYTES);
     if (s_stg) kmemset(s_stg, 0, PCM_STG_BYTES);
 
-    if (irq_register(PCM_IRQ, pcm_irq, 0, IRQ_F_SHARED) != 0)
+    if (irq_register(PCM_IRQ, pcm_irq, 0, IRQ_F_SHARED) != 0) {
+        kprintf(KLOG_ATTR, "[pcm] IRQ12 busy\n");
         return pcm_open_fail(PCM_ERR_BUSY);
+    }
     s_irq_reg = 1;
+    if (pcm_module_dma_acquire(&dma_owned)) {
+        kprintf(KLOG_ATTR, "[pcm] DMA #1 busy\n");
+        return pcm_open_fail(PCM_ERR_BUSY);
+    }
+    dma_owned = 1;
+    dma_chan_mask(PCM_DMA_CHAN, &dma_owned);
+    u8 route = (pcm_module_bios_route() & 0xf8) | 2;
+    route_attempted = 1;
+    outp(PCM_PORT_ROUTE, route);
+    if ((u8)inp(PCM_PORT_ROUTE) != route) {
+        kprintf(KLOG_ATTR, "[pcm] WSS route readback failed (requested %x)\n", route);
+        return pcm_open_fail(OS32_ERR_IO);
+    }
+    codec_started = 1;
+    rc = pcm_seq_prologue(&tbl);
+    pcm_run(tbl, rc, 0, 1);
+    if (!pcm_detect()) return pcm_open_fail(OS32_ERR_NOSYS);
 
     rc = pcm_run(ops, pcm_seq_init(fmt, ops), 0, 1);
     s_mce_busy = 0;
@@ -803,7 +893,7 @@ int pcm_set_volume(u32 percent)
 static int pcm_wait_stopped(u32 ticks)
 {
     u32 dl = tick_count + ticks;
-    /* state は ISR (tick / IRQ10) が書く。**volatile で読む** — 素の読みだと
+    /* state は ISR (tick / IRQ12) が書く。**volatile で読む** — 素の読みだと
      * コンパイラがループの外へ持ち上げ、期限まで回って必ず失敗した
      * (E3 で close が毎回 IO になった、2026-09-23)。 */
     volatile u8 *st = &g_pcm.state;
@@ -843,7 +933,7 @@ int pcm_close(void)
     irq_restore(f);
 
     if (st == PCM_ST_FAULTED) { pcm_release(1); return OS32_ERR_IO; }
-    if (idle) { pcm_release(0); return 0; }
+    if (idle) { pcm_release(0); return s_fault_sticky ? OS32_ERR_IO : 0; }
 
     if (g_pcm.drain_failed) pcm_diag_df_site |= PCM_DIAG_DF_OBS;
     if (!pcm_wait_stopped(pcm_close_ticks(g_pcm.stg.staged, g_pcm.rate))) {
@@ -876,7 +966,7 @@ int pcm_close(void)
     if (g_pcm.state == PCM_ST_FAULTED) { pcm_release(1); return OS32_ERR_IO; }
     rc = g_pcm.drain_failed ? OS32_ERR_IO : 0;
     pcm_release(0);
-    return rc;
+    return s_fault_sticky ? OS32_ERR_IO : rc;
 }
 
 /* ======================================================================== */
@@ -910,15 +1000,8 @@ void pcm_reclaim(int owner)
      * して (unmask、PEN=1) から foreground がリングを free していた
      * (Codex 実装レビュー blocker 1)。`irq_unregister` は tick を止めない。 */
     s_claimed = 1;
-    evid = 1;
-    if (st == PCM_ST_FAULTED) {
-        evid = 0;
-    } else if (st != PCM_ST_OPEN && st != PCM_ST_STOP_DONE) {
-        /* RUNNING / DRAINING / RS_* / STOP_REQ: 境界は問わずに止める。 */
-        evid = pcm_abort_proven();
-    }
-    if (evid) g_pcm.state = PCM_ST_STOP_DONE;
-    else pcm_enter_faulted(PCM_DIAG_FAULT_RECLAIM);
+    evid = st != PCM_ST_FAULTED;
+    if (evid) pcm_request_release_stop();
     irq_restore(f);
     pcm_release(evid ? 0 : 1);
 }
@@ -953,23 +1036,28 @@ int pcm_codec_pos(u32 *frame)
 {
     u32 left;
     int tc;
-    if (dma_chan_remaining(PCM_DMA_CHAN, &left, &tc) != 0) return OS32_ERR_IO;
-    if (tc) dma_chan_ack_tc(PCM_DMA_CHAN);
+    if (dma_chan_remaining(PCM_DMA_CHAN, &dma_owned, &left, &tc) != 0) return OS32_ERR_IO;
+    if (tc) dma_chan_ack_tc(PCM_DMA_CHAN, &dma_owned);
     *frame = pcm_pos_frames(left);
     return 0;
 }
 
 int pcm_codec_ack(void)
 {
-    if (!(cs_read(PCM_I_ALTSTAT) & PCM_ALT_PI)) return 0;
+    if (pcm_read_pi() != 1) return 0;
     cs_write(PCM_I_ALTSTAT, 0);
     return 1;
 }
 
-int pcm_codec_stop(void)
+int pcm_codec_stop(int closing)
 {
     if (s_release_pending) return s_release_leak ? OS32_ERR_IO : 0;
-    if (!s_hal_advance || g_pcm.state == PCM_ST_OPEN) return 0;
+    if (!s_hal_advance) return 0;
+    if (closing) {
+        pcm_request_release_stop();
+        return 0;
+    }
+    if (g_pcm.state == PCM_ST_OPEN) return 0;
     if (!pcm_abort_proven()) {
         /* teardown restores IF before release. Block the shared IRQ now. */
         s_claimed = 1;
@@ -979,16 +1067,23 @@ int pcm_codec_stop(void)
     return 0;
 }
 
-void pcm_codec_release(int leak)
+int pcm_codec_release(int leak)
 {
-    if (!s_hal_advance || s_release_pending) return;
+    if (!s_hal_advance || s_release_pending) return s_fault_sticky ? OS32_ERR_IO : 0;
     if (s_in_advance) {
         s_claimed = 1;
         s_release_leak = leak;
         s_release_pending = 1;
-        return;
+        if (leak && dma_owned) {
+            dma_chan_mask(PCM_DMA_CHAN, &dma_owned);
+            pcm_module_dma_release(&dma_owned, 1);
+            dma_owned = 0;
+            pcm_enter_faulted(PCM_DIAG_FAULT_RECLAIM);
+        }
+        return leak ? OS32_ERR_IO : 0;
     }
     pcm_release(leak);
+    return s_fault_sticky ? OS32_ERR_IO : 0;
 }
 
 void pcm_codec_volume(u8 left, u8 right)

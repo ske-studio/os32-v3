@@ -156,10 +156,4 @@ static void kernel_boot_memory(u32 mem_kb, struct boot_context *boot)
     if (!netcd_boot) {
         kernel_boot_lan(boot);
     }
-
-    /* CS4231 (MATE-X PCM) の検出だけ (票 TASK_PCM_CS4231 §2-1)。
-     * 無い機械では `[pcm] none` を出して静かに戻る — 以降の起動は変わらない。 */
-    if (memory_boot_dma_available()) {
-        pcm_module_load();
-    }
 }

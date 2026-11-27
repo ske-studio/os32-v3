@@ -5,6 +5,17 @@
 #include "platform_fm_probe.h"
 
 static int fm_irq12_blocked;
+static int fm_irq12_released;
+
+void platform_fm_release_irq12(void)
+{
+    fm_irq12_released = 1;
+}
+
+int platform_fm_irq12_released(void)
+{
+    return fm_irq12_released;
+}
 
 /* Boot probe calls with IF clear. The latch survives module unload. */
 void platform_fm_block_irq12(void)

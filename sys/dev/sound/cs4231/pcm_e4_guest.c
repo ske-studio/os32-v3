@@ -76,9 +76,10 @@ static int run_case(enum pcm_e4_case scene)
 int pcm_e4_run(void)
 {
     if (!_irq_enabled()) return OS32_ERR_IO;
-    if (pcm_state() != PCM_ST_CLOSED || irq_lines[irq_dyn_index(PCM_IRQ)].count)
+    int line = irq_dyn_index(PCM_IRQ);
+    if (line < 0 || pcm_state() != PCM_ST_CLOSED || irq_lines[line].count)
         return OS32_ERR_BUSY;
-    serial_puts("[pcm-e4] software sharing only; electrical sharing requires 82557 hardware\n");
+    serial_puts("[pcm-e4] IRQ12 software sharing, WSS INT5, V86 vector 14h\n");
     for (enum pcm_e4_case scene = PCM_E4_PCM; scene <= PCM_E4_TICK; scene++) {
         int rc = run_case(scene);
         if (rc) {

@@ -2674,6 +2674,22 @@
       "stage": "S6",
       "context_safe": false,
       "retained": true
+    },
+    {
+      "index": 328,
+      "symbol": "dma_chan_acquire",
+      "source": "sys/dev/dma/dma8237.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false
+    },
+    {
+      "index": 329,
+      "symbol": "dma_chan_release",
+      "source": "sys/dev/dma/dma8237.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false
     }
   ]
 }

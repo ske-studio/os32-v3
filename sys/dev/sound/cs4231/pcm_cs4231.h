@@ -32,10 +32,8 @@
 #define PCM_PORT_R2      0x0F46   /* Status。**何を書いても INT が消える** */
 #define PCM_PORT_R3      0x0F47   /* PIO — 使わない */
 
-/*  0F40h: bit5-3 = INT (011 = INT41 = IRQ10)、bit2-0 = DMA (010 = #1)。
- *  IRQ10 は §1-1 の動的な線で、LGY-98 の既定 (3/5) と FDC (#2) を避ける。 */
-#define PCM_ROUTE_INT41_DMA1  0x1A
-#define PCM_IRQ               10
+/* WSS INT5 is PIC IRQ12. Preserve the BIOS INT field. */
+#define PCM_IRQ               12
 #define PCM_DMA_CHAN          1
 
 /*  0F43h の WSS ID。下位 6 ビットが 000100b。 */

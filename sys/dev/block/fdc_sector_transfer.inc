@@ -12,6 +12,7 @@ static int fdc_transfer_sector_geom(int drv, int cyl, int head, int sect,
     int write_protected = 0;
     int dma_armed = 0;      /* DMA ch2 をアンマスクしたまま抜けていないか */
 
+    if (!fdc_dma_owned) return -1;
     kmemset(results, 0, sizeof(results));
     if (write) {
         /* **書く前に世代を進める** — 先読みが古いセクタを当てないようにする。
@@ -75,7 +76,7 @@ static int fdc_transfer_sector_geom(int drv, int cyl, int head, int sect,
 
         /* WRITE の NW を NR より先に見る。読み終えたので DMA を閉じて抜ける。 */
         if (write && (results[1] & FDC_ST1_NW)) {
-            dma_chan_mask(FDC_DMA_CHANNEL);
+            dma_chan_mask(FDC_DMA_CHANNEL, &fdc_dma_owned);
             dma_armed = 0;
             write_protected = 1;
             break;
@@ -84,7 +85,7 @@ static int fdc_transfer_sector_geom(int drv, int cyl, int head, int sect,
         /* NR は両方向とも回復より前に打ち切る。リザルトを読み終えているので
          * DMA を閉じるだけでよい (リセットは要らない)。 */
         if ((results[0] & FDC_ST0_NR) != 0) {
-            dma_chan_mask(FDC_DMA_CHANNEL);
+            dma_chan_mask(FDC_DMA_CHANNEL, &fdc_dma_owned);
             dma_armed = 0;
             phase = "nr";
             break;

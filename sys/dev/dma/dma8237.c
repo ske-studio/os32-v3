@@ -35,6 +35,38 @@ struct dma_chan_state {
 };
 
 static struct dma_chan_state s_chan[DMA_CHAN_COUNT];
+static const void *channel_owner[DMA_CHAN_COUNT];
+static char quarantined;
+
+static int change_owner(unsigned int ch, const void *old, const void *next)
+{
+    if (ch >= DMA_CHAN_COUNT) return DMA_ERR_ARG;
+    unsigned int flags = irq_save();
+    int ok = channel_owner[ch] == old;
+    if (ok) {
+        channel_owner[ch] = next;
+        /* setup requires a mask issued by the current owner. */
+        s_chan[ch].masked = 0;
+    }
+    irq_restore(flags);
+    return ok ? 0 : OS32_ERR_BUSY;
+}
+
+int dma_chan_acquire(unsigned int ch, const void *owner)
+{
+    return owner ? change_owner(ch, 0, owner) : DMA_ERR_ARG;
+}
+
+int dma_chan_release(unsigned int ch, const void *owner)
+{
+    return owner ? change_owner(ch, owner, 0) : DMA_ERR_ARG;
+}
+
+int dma_chan_quarantine(unsigned int ch, const void *owner)
+{
+    return owner ? change_owner(ch, owner, &quarantined) : DMA_ERR_ARG;
+}
+
 static int s_ready;
 static int s_a20_state = DMA_A20_UNKNOWN;
 static u8  s_a20_pre;
@@ -130,23 +162,31 @@ int dma8237_ready(void)
 /* ======================================================================== */
 /*  マスク / アンマスク                                                     */
 /* ======================================================================== */
-void dma_chan_mask(unsigned int ch)
+void dma_chan_mask(unsigned int ch, const void *owner)
 {
     unsigned int flags;
 
     if (ch >= DMA_CHAN_COUNT) return;
     flags = irq_save();
+    if (!owner || channel_owner[ch] != owner) {
+        irq_restore(flags);
+        return;
+    }
     outp(DMA8237_MASK1, dma_mask_byte(ch, 1));
     s_chan[ch].masked = 1;
     irq_restore(flags);
 }
 
-void dma_chan_unmask(unsigned int ch)
+void dma_chan_unmask(unsigned int ch, const void *owner)
 {
     unsigned int flags;
 
     if (ch >= DMA_CHAN_COUNT) return;
     flags = irq_save();
+    if (!owner || channel_owner[ch] != owner) {
+        irq_restore(flags);
+        return;
+    }
     outp(DMA8237_MASK1, dma_mask_byte(ch, 0));
     s_chan[ch].masked = 0;
     irq_restore(flags);
@@ -158,7 +198,7 @@ void dma_chan_unmask(unsigned int ch)
 /*  **積んだだけでマスクは外さない。** 外すのは呼び手が装置の準備を          */
 /*  終えてから (FDC なら Read/Write Data コマンドを出す直前)。               */
 /* ======================================================================== */
-int dma_chan_setup(unsigned int ch, u32 phys, u32 bytes, int dir, int mode)
+int dma_chan_setup(unsigned int ch, const void *owner, u32 phys, u32 bytes, int dir, int mode)
 {
     unsigned int flags;
     u32 count;
@@ -180,6 +220,10 @@ int dma_chan_setup(unsigned int ch, u32 phys, u32 bytes, int dir, int mode)
     count = dma_bytes_to_count(bytes);
 
     flags = irq_save();
+    if (!owner || channel_owner[ch] != owner) {
+        irq_restore(flags);
+        return DMA_ERR_STATE;
+    }
 
     /* マスク中が前提。開いたまま積むと、積んでいる途中の半端な番地で
      * 転送が走る。 */
@@ -216,7 +260,7 @@ int dma_chan_setup(unsigned int ch, u32 phys, u32 bytes, int dir, int mode)
 /*  扱い、count を読むたびにステータスを見直す。SINGLE で done が立ったら    */
 /*  count は見ない (TC 後の FFFFh を拾うだけ)。                             */
 /* ======================================================================== */
-int dma_chan_remaining(unsigned int ch, u32 *bytes_left, int *tc_seen)
+int dma_chan_remaining(unsigned int ch, const void *owner, u32 *bytes_left, int *tc_seen)
 {
     unsigned int flags;
     u16 port_count;
@@ -228,6 +272,10 @@ int dma_chan_remaining(unsigned int ch, u32 *bytes_left, int *tc_seen)
     (void)dma_port_count(ch, &port_count);
 
     flags = irq_save();
+    if (!owner || channel_owner[ch] != owner) {
+        irq_restore(flags);
+        return DMA_ERR_STATE;
+    }
     single = (s_chan[ch].mode != DMA_MODE_CYCLIC);
 
     for (tries = 0; tries < DMA_READ_TRIES; tries++) {
@@ -268,12 +316,16 @@ done_zero:
     return 0;
 }
 
-void dma_chan_ack_tc(unsigned int ch)
+void dma_chan_ack_tc(unsigned int ch, const void *owner)
 {
     unsigned int flags;
 
     if (ch >= DMA_CHAN_COUNT) return;
     flags = irq_save();
+    if (!owner || channel_owner[ch] != owner) {
+        irq_restore(flags);
+        return;
+    }
     s_chan[ch].tc_event = 0;
     irq_restore(flags);
 }
