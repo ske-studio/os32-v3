@@ -1,0 +1,7 @@
+# 本線の sol の r3 レビュー (第 2 回、os32pm 経由): §0 の期限の判定は可。保留 — 下を補えば確定可
+§0: 「同じ交換で prev < deadline ≤ end を満たす最初の有効な観測から別の前景周回を挟まず close する条件は、前景が観測できる粒度で厳密」。
+- P1 §2/§6 (Ra266 LAN): put の BUSY/AGAIN 経路は応答を受信バッファに取り込む。現行は put 後に get を一度呼び、フレーム検証と HELLO の peer 確定まで進み得る (sfs_lan.c:33–54,59–99,130–140、sfs_client.c:243–254)。r3 の get 省略は同じ期限切れでも受信バッファの状態を変える。常駐・モジュール両方で BUSY 中に応答を格納してから期限に達する入力を段 0・段 1・最終像に明記。該当 CALL と HELLO で旧応答の誤採用がなく次の要求が成功することを確認。差が出て既存契約を守れなければ §2 の別票条件。
+- P2 §6 (Ra266 hsync): 同じ入力の再実行はサイズと mtime が一致すると本文を読まずに成功し得る (docs/design/userland/system/hsync_compare.md)。LAN と UART それぞれで 2 回目はコピー元を変更するか別の新規宛先、実コピー・終了コード 0・全バイト一致。UART は通常の `sfs run hsync`。
+- P2 §3 (PPC の最初の観測): prev は client と待機可能な poll を共通通番で並べた直前の比較値と明記。OPEN 前の client 比較も受付記録から full rid へ引き継ぐ。poll 入口の tick と実際の期限比較値は IRQ を挟んで異なり得るので end には比較に使った値を保存 (hostfs_link_io.c:73–79)。can_wait=0 の入口は原因診断に使い有効な観測の列には入れない。
+- P2 §5 (差し替え枠): 第 4・5 枠は fixture 側の指定に加え build/targets/ppc-powermac.mk:155,259–261,299–302,336 の再帰 make での解除、ソース選択、依存、検査への引き渡しも揃える。通常像と rpc_ticks 像がそれぞれ計測入りの serialfs.c を組んだことを確認。
+本線 PM: r4 (最後の回) で 4 点を補う。fable の P2 (片道 BYE) の直し案も r4 に。本線の条件: (1) x86 の LAN・UART の BYE の送り方は変えない (sfs_lan は TX 受付で返る同期なので cancel=0 で挙動同じ、を段 0 の模型で固定) (2) 「HELLO が古いセッションを置き換える」をホストの側 (tools/host_agent.py ほか SerialFS のホスト実装) が今もそう動く事を file:line で示し、seq 上限の小試験でホストが BYE 無しの HELLO で古い sid を捨てる事を確かめる (3) fable の P3 3 件も r4 に。r4 は本線 sol の第 3 回 (最後)。
