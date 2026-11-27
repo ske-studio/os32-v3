@@ -360,3 +360,17 @@ mutations = [
     } else if (streq(kind, "de")) {''', new = '''    } else if (streq(kind, "de")) {
         __asm__ __volatile__("hlt" : : : "memory");''', fail = "faulttest.elf: privileged hlt" },
  { id = "user_bswap", config = "pc98", when = "after_build", replace = "userland/diag/ring3_hello.c", old = "mark[1] = R3_DONE;", new = '__asm__ volatile("bswap %%eax" ::: "eax"); mark[1] = R3_DONE;', fail = "ring3_hello.elf: isa386 bswap" }]
+
+[[check]]
+id = "cs4231_tick_ack"
+spec = { path = "docs/design/drivers/sound/cs4231/pcm_cs4231.md", section = "advance (IRQ10 と tick が呼ぶ唯一の入口)" }
+subsystem = "sound"
+level = "L2"
+sources = ["sys/dev/sound/cs4231", "tests/support/fixtures/cs4231_tick_ack", "tools/ops/kernel_includes.py", "build/config.mk"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "再生中に取り逃した PI を tick が I24 の読みと 0 書きで消し、次の再生境界で IRQ10 を受理する"
+limits = "HAL 再生中のポート模型。実機の配線、割り込みの時刻、停止遷移は対象外"
+gates = ["push", "main"]
+mutations = [{ id = "omit_tick_ack", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "if (g_pcm.state == PCM_ST_RUNNING) (void)pcm_codec_ack();", new = "(void)0;", fail = "missed PI after tick" }]
