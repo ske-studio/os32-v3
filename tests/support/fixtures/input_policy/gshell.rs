@@ -1,0 +1,220 @@
+// Model only the event sink, focus sample and window identities.
+extern crate self as os32api;
+pub mod gui {
+    pub mod proto {
+        pub const GUI_MAX_WINDOWS: usize = 2;
+        pub const GUI_EV_KEY: u8 = 1;
+        pub const GUI_EV_BUTTON: u8 = 2;
+        pub const GUI_EV_POINTER: u8 = 3;
+        pub const GUI_EV_TEXT: u8 = 4;
+        #[derive(Copy, Clone)]
+        pub struct GuiEvent { pub window: u32, pub kind: u8, pub sub: u8, pub payload: [u8; 8] }
+    }
+}
+use gui::proto::*;
+thread_local! {
+    static RAW: std::cell::RefCell<std::collections::VecDeque<i32>> = Default::default();
+    static FLAGS: std::cell::Cell<u32> = Default::default();
+}
+pub mod av {
+    #[allow(non_camel_case_types)]
+    pub struct IN2_WmState { pub size: u32, pub gen: u32, pub excl: u32, pub owner: i32 }
+}
+pub struct Api { pub get_tick: unsafe fn() -> u32, pub kbd_trygetrawkey: unsafe fn() -> i32, pub kbd_is_pressed: unsafe fn(i32) -> i32, pub in2_wm_state: unsafe fn(&mut av::IN2_WmState) -> i32 }
+pub fn api() -> Api { Api { get_tick: || 0, kbd_trygetrawkey: || RAW.with(|q| q.borrow_mut().pop_front().unwrap_or(-1)), kbd_is_pressed: |_| 0, in2_wm_state: |s| { s.excl = FLAGS.get(); 0 } } }
+#[path = "../../../../userland/gshell/src/excl.rs"]
+mod excl;
+mod wm {
+    use super::*;
+    use std::cell::{Cell, RefCell};
+    pub struct Window { pub owner: i32, pub id: u32 }
+    impl Window { pub fn client_origin(&self) -> (i32,i32) { (0,0) } }
+    pub struct Cursor { pub shown: bool }
+    pub struct GuiState {
+        pub excl: excl::State, pub windows: [Window; 2], pub cursor: Cursor,
+        pub pending_raw: [i32;128], pub pending_rank: [u8;128], pub pending_raw_n: usize,
+        pub pending_tab: bool, pub pending_switch: bool, pub pending_raw_dropped: u32,
+        pub held_keys: [bool;128], pub stop_suppressed: bool, pub stop_tick: u32,
+        pub abort_seen: bool, pub switching: bool, pub switches: usize,
+        pub front: usize, pub space: Cell<usize>, pub events: RefCell<Vec<GuiEvent>>,
+    }
+    impl GuiState {
+        pub fn front_id(&self) -> u32 { self.windows[self.front].id }
+        pub fn front_owner(&self) -> i32 { self.windows[self.front].owner }
+        pub fn win_by_id(&self, id: u32) -> Option<usize> { self.windows.iter().position(|w| w.id == id) }
+        pub fn slot_of_owner(&self, owner: i32) -> Option<usize> { self.windows.iter().position(|w| w.owner == owner) }
+    }
+    pub fn queue_present(_: &mut GuiState, _: ()) {}
+    pub fn flush_present() {}
+}
+mod cursor {
+    pub fn rect(_: &super::wm::GuiState) {}
+    pub fn hide(_: &mut super::wm::GuiState) {}
+}
+mod multiapp {
+    use std::sync::atomic::{AtomicI32, Ordering};
+    pub static OWNER: AtomicI32 = AtomicI32::new(2);
+    pub static FAIL_NEXT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    pub fn av_owner() -> i32 { OWNER.load(Ordering::Relaxed) }
+    pub fn sync_av_focus(st: &mut super::wm::GuiState) {
+        if !FAIL_NEXT.swap(false, Ordering::Relaxed) { OWNER.store(st.front_owner(), Ordering::Relaxed); }
+    }
+}
+mod modal { pub fn is_open() -> bool { false } }
+mod startmenu { pub fn is_open() -> bool { false } }
+mod fep {
+    pub fn is_on() -> bool { false }
+    pub fn toggle_pending() -> bool { false }
+}
+mod kbdnav {
+    use super::wm::GuiState;
+    pub fn is_wm_raw(_: &GuiState, raw: i32) -> bool { matches!(raw & 127, 15 | 96 | 115) }
+    pub fn pump_delivered_make(_: &mut GuiState, _: u8) {}
+    pub fn on_key(st: &mut GuiState, _: u8, down: bool, _: u32) { st.switching = down; }
+    pub fn finish_if_released(st: &mut GuiState, _: u8, _: bool, mods: u32) -> bool {
+        if !st.switching || mods & 8 != 0 { return false; }
+        st.switching = false;
+        st.switches += 1;
+        true
+    }
+}
+#[path = "../../../../userland/gshell/src/raw_keyboard.rs"]
+mod raw_keyboard;
+use wm::GuiState;
+const SC_STOP: u8 = 0x60;
+const SC_CTRL: u8 = 0x74;
+const SC_SHIFT: u8 = 0x70;
+const SC_TAB: u8 = 15;
+const SC_GRPH: u8 = 0x73;
+const MOD_CTRL: u32 = 16;
+const MOD_GRPH: u32 = 8;
+const STOP_SUPPRESS_TICKS: u32 = 50;
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum Ctx { Pump, Wait }
+impl Ctx { fn wm_ui(self) -> bool { self == Ctx::Wait } }
+mod input {
+    use super::wm::GuiState;
+    pub(crate) use super::raw_keyboard::purge_boundary;
+    pub fn cancel_capture(_: &mut GuiState) {}
+    pub fn next_serial(_: &mut GuiState, _: usize) -> u16 { 0 }
+}
+mod ring {
+    use super::*;
+    pub fn append(st: &wm::GuiState, _: usize, ev: &GuiEvent) -> bool {
+        if st.space.get() == 0 { return false; }
+        st.space.set(st.space.get()-1);
+        st.events.borrow_mut().push(*ev);
+        true
+    }
+    pub fn ev_key(down: bool, window: u32, scan: u8, _: u8, _: u8, _: u16) -> GuiEvent {
+        let mut ev = GuiEvent {window, kind: GUI_EV_KEY, sub: down as u8, payload: [0;8]};
+        ev.payload[0] = scan;
+        ev
+    }
+    pub fn ev_text(window: u32, payload: [u8; 8], sub: u8, _: u16) -> GuiEvent {
+        GuiEvent { window, kind: GUI_EV_TEXT, sub, payload }
+    }
+    pub fn ev_pointer(window: u32, _: i16, _: i16, sub: u8, _: u16) -> GuiEvent {
+        GuiEvent {window, kind: GUI_EV_POINTER, sub, payload: [0;8]}
+    }
+    pub fn ev_button(down: bool, window: u32, _: i16, _: i16, button: u8, _: u16) -> GuiEvent {
+        let mut ev = GuiEvent {window, kind: GUI_EV_BUTTON, sub: down as u8, payload: [0;8]};
+        ev.payload[4] = button;
+        ev
+    }
+}
+fn main() {
+    let mut st = wm::GuiState {
+        excl: excl::State::NEW, windows: [wm::Window {owner: 2, id: 10}, wm::Window {owner: 3, id: 11}],
+        pending_raw: [0;128], pending_rank: [0;128], pending_raw_n: 0,
+        pending_tab: false, pending_switch: false, pending_raw_dropped: 0,
+        held_keys: [false;128], stop_suppressed: false, stop_tick: 0,
+        abort_seen: false, switching: false, switches: 0,
+        front: 0, cursor: wm::Cursor {shown: false}, space: 2.into(), events: Default::default(),
+    };
+    assert!(excl::append(&mut st, 0, &ring::ev_key(true, 10, 42, 0, 0, 0)));
+    assert!(excl::append(&mut st, 0, &ring::ev_pointer(10, 0, 0, 1, 0)));
+    st.front = 1;
+    multiapp::FAIL_NEXT.store(true, std::sync::atomic::Ordering::Relaxed);
+    excl::observe(&mut st);
+    excl::settle(&mut st);
+    assert_eq!(multiapp::av_owner(), 2);
+    st.space.set(1);
+    assert!(!excl::append(&mut st, 1, &ring::ev_key(true, 11, 42, 0, 0, 0)));
+    st.space.set(0);
+    excl::observe(&mut st);
+    excl::settle(&mut st);
+    assert!(!st.excl.open(excl::KBD));
+    assert_eq!(multiapp::av_owner(), 3);
+    for expected in [GUI_EV_KEY, GUI_EV_BUTTON, GUI_EV_POINTER] {
+        st.space.set(1);
+        excl::settle(&mut st);
+        let events = st.events.borrow();
+        let last = events.last().unwrap();
+        assert_eq!((last.window,last.kind,last.sub),(10,expected,0));
+    }
+    assert!(st.excl.open(excl::KBD));
+    assert_eq!(st.events.borrow().len(),5);
+    // A failed make creates no release obligation. Reuse the slot of a
+    // successful make before settlement and leave the replacement untouched.
+    assert!(!excl::append(&mut st, 1, &ring::ev_key(true, 11, 51, 0, 0, 0)));
+    st.space.set(1);
+    assert!(excl::append(&mut st, 1, &ring::ev_key(true, 11, 52, 0, 0, 0)));
+    st.windows[1].id = 12;
+    st.space.set(8);
+    excl::observe(&mut st);
+    excl::settle(&mut st);
+    assert!(st.excl.open(excl::KBD));
+    assert_eq!(st.events.borrow().len(),6);
+
+    // A full deferred queue and a full window ring must still admit WM controls.
+    FLAGS.set(excl::KBD as u32);
+    excl::observe(&mut st);
+    excl::settle(&mut st);
+    st.space.set(0);
+    for _ in 0..128 { raw_keyboard::defer_raw(&mut st, 42 | 256); }
+    let start = i32::from(SC_TAB) | 256 | ((MOD_GRPH as i32) << 9);
+    let finish = i32::from(SC_GRPH);
+    let stop = i32::from(SC_STOP) | 256 | ((MOD_CTRL as i32) << 9);
+    RAW.with(|q| q.borrow_mut().extend([start, finish, start, finish, stop]));
+    let mut captured = false;
+    for _ in 0..5 {
+        assert!(matches!(raw_keyboard::next(&mut st, Ctx::Pump, false, &mut captured),
+                         raw_keyboard::Step::Consumed));
+    }
+    assert!(captured);
+    for _ in 0..128 {
+        match raw_keyboard::next(&mut st, Ctx::Wait, false, &mut captured) {
+            raw_keyboard::Step::End => break,
+            raw_keyboard::Step::Consumed => (),
+            raw_keyboard::Step::Deliver(scan, down, _) => {
+                assert!(!excl::append(&mut st, 1, &ring::ev_key(down, 12, scan, 0, 0, 0)));
+            }
+        }
+    }
+    assert_eq!(st.switches, 2);
+    assert!(st.abort_seen);
+    assert_eq!(st.events.borrow().len(), 6);
+    st.space.set(8);
+    for flags in [excl::KBD as u32, 0] {
+        FLAGS.set(flags);
+        excl::observe(&mut st);
+        excl::settle(&mut st);
+        RAW.with(|q| q.borrow_mut().push_back(42 | 256));
+        if let raw_keyboard::Step::Deliver(scan, down, _) =
+            raw_keyboard::next(&mut st, Ctx::Wait, true, &mut captured) {
+            excl::deliver_window_key(&mut st, 1, 12, scan, down, b'a', 0);
+        }
+        let events = st.events.borrow();
+        let delivered = &events[6..];
+        if flags == 0 {
+            assert_eq!(delivered.len(), 2);
+            assert_eq!((delivered[0].window, delivered[0].kind), (12, GUI_EV_KEY));
+            assert_eq!((delivered[1].window, delivered[1].kind, delivered[1].payload[0]),
+                       (12, GUI_EV_TEXT, b'a'));
+        } else {
+            assert!(delivered.is_empty());
+        }
+    }
+
+}

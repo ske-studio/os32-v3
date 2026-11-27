@@ -685,3 +685,25 @@ mutations = [{ id = "omit_held_snapshot", config = "pc98", when = "after_build",
     { id = "suppress_key_grph", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "sc == KEY_GRPH", new = "0", fail = "exclusive transition changed delivery" },
     { id = "suppress_key_tab", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "sc == KEY_TAB", new = "0", fail = "exclusive transition changed delivery" },
     { id = "gate_in2_during_kbd", config = "pc98", when = "after_build", replace = "sys/hal/input/kbd_merge.c", old = "if (!legacy_active()) input_emit_in2(e);", new = "if (!legacy_active() && !in2_excl_keyboard()) input_emit_in2(e);", fail = "exclusive transition changed delivery" }]
+
+[[check]]
+id = "gshell_excl"
+spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
+subsystem = "input"
+level = "L1"
+sources = ["userland/gshell/src/excl.rs", "userland/gshell/src/raw_keyboard.rs", "userland/gshell/src/cursor.rs", "userland/gshell/src/input.rs", "tests/support/fixtures/input_policy/gshell.rs"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "焦点通知失敗から再試行し、旧窓の release を一件ずつ再送。通常窓は独占中ゼロ・解除後一件。ドラッグ取消と静止カーソル復帰を確認。退避・配送満杯でも STOP と二つの切替を処理する"
+limits = "WM の ring と焦点通知は host fixture"
+gates = ["push", "main"]
+mutations = [{ id = "remove_window_capture_gate", config = "pc98", when = "after_build", replace = "userland/gshell/src/raw_keyboard.rs", old = "if !st.excl.open(crate::excl::KBD) { return Step::Consumed; }", new = "// capture gate removed", fail = "incorrect old-window release" },
+    { id = "block_controls_on_full_delivery", config = "pc98", when = "after_build", replace = "userland/gshell/src/raw_keyboard.rs", old = "if !space_ok && ordinary_pump", new = "if !space_ok", fail = "incorrect old-window release" },
+    { id = "block_controls_on_full_defer", config = "pc98", when = "after_build", replace = "userland/gshell/src/raw_keyboard.rs", old = "if ordinary_pump && !ui_defer &&", new = "if !ui_defer &&", fail = "incorrect old-window release" },
+    { id = "accept_failed_focus", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "st.excl.focus_confirmed = crate::multiapp::av_owner() == next.owner;", new = "st.excl.focus_confirmed = true;", fail = "incorrect old-window release" },
+    { id = "repeat_settled_key", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "st.excl.delivered[i].keys[scan / 8] &= !bit;", new = "let _ = bit;", fail = "incorrect old-window release" },
+    { id = "reuse_window_slot", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "st.win_by_id(rec.window) != Some(i) || ", new = "false || ", fail = "incorrect old-window release" },
+    { id = "discard_full_release", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "if !ring::append(st, slot, &ev) { return false; }\n            st.excl.delivered[i].keys", new = "let _ = ring::append(st, slot, &ev);\n            st.excl.delivered[i].keys", fail = "incorrect old-window release" },
+    { id = "forget_pointer_buttons", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "rec.buttons = ev.sub;", new = "rec.buttons = 0;", fail = "incorrect old-window release" },
+    { id = "repeat_accepted_button", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "st.excl.delivered[i].buttons &= !bit;", new = "st.excl.delivered[i].buttons |= bit;", fail = "incorrect old-window release" }]

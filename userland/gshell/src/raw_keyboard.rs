@@ -231,5 +231,10 @@ pub(super) fn next(st: &mut GuiState, ctx: Ctx, space_ok: bool, captured: &mut b
         }
         return Step::Consumed;
     }
+    if st.held_keys[scan as usize] {
+        if !down { st.held_keys[scan as usize] = false; }
+        return Step::Consumed;
+    }
+    if !st.excl.open(crate::excl::KBD) { return Step::Consumed; }
     Step::Deliver(scan, down, mods)
 }

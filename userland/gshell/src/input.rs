@@ -384,11 +384,6 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
             raw_keyboard::Step::Consumed => continue,
             raw_keyboard::Step::Deliver(scan, down, mods) => (scan, down, mods),
         };
-        if st.held_keys[scan as usize] {
-            if !down { st.held_keys[scan as usize] = false; }
-            continue;
-        }
-        if !st.excl.open(crate::excl::KBD) { continue; }
         if !space_ok {
             if let Some(t) = focus_target(st) {
                 ring::add_dropped(st, t.slot, 1);
@@ -508,23 +503,7 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
             Some(t) => t,
             None => continue,
         };
-        let serial = next_serial(st, t.slot);
-        let ev = ring::ev_key(down, t.win_id, scan, ch, mods as u8, serial);
-        let _delivered = crate::excl::append(st, t.slot, &ev);
-        #[cfg(feature = "c_gui_accept")]
-        if _delivered && scan == 0x1d {
-            crate::gserial::reply_to(false, b"!", format_args!("C-GUI KEY {} {}", t.win_id, down as u8));
-        }
-
-        /* 印字可能キーは Text も配送 (契約 U2a。FEP が消費していれば上で
-         * continue しているので二重にはならない)。 */
-        if down && ch >= 0x20 && ch <= 0x7E {
-            let mut utf8 = [0u8; 8];
-            utf8[0] = ch;
-            let s2 = next_serial(st, t.slot);
-            let evt = ring::ev_text(t.win_id, utf8, 1, s2);
-            crate::excl::append_delivery(st, t.slot, &evt);
-        }
+        crate::excl::deliver_window_key(st, t.slot, t.win_id, scan, down, ch, mods);
     }
 
     /* FEP の確定文字列を `Text` (8B ずつ、`more`) で流す (契約 U2)。 */
