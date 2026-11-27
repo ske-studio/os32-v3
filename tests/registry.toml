@@ -662,3 +662,26 @@ expect = "同一要求の保留を同期解放し、seq 更新では BYE を送�
 limits = "mac99、制御した下位応答とメモリ内ホスト。実 client の期限切れから実 link までの道は ppc_usb_lan (段 3)"
 gates = ["push", "main"]
 mutations = [{ id = "drop_hfs_cancel", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/hostfs_link_io.c", old = "pm_hfs_put_until, pm_hfs_cancel", new = "pm_hfs_put_until, 0", fail = "hostfs cancel left pending" }, { id = "keep_expired_reply", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/hostfs_link_io.c", old = "        t->rx_pos = t->rx_end;", new = "        (void)t; /* expired reply kept */", fail = "expired reply" }]
+
+[[check]]
+id = "input_focus"
+spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
+subsystem = "input"
+level = "L1"
+sources = ["sys/hal/input/legacy_ring.c", "sys/kapi/kapi_in2.c", "sys/hal/input/in2_reclaim.c", "sys/hal/input/kbd_merge.c", "sys/platform/pc98/platform_input_caps.h", "sys/platform/powermac/platform_input_caps.h", "sys/hal/input/in2_excl.c", "sys/hal/input/keymap_registry.c", "sys/hal/input/keymap_eval.c", "sys/hal/input/keymap_state.c", "sys/hal/input/legacy_keymap.c", "sys/hal/input/legacy_mode.c", "sys/input/keymaps/hid_jp.c", "tests/support/fixtures/input_policy/focus.c", "tests/support/fixtures/input_policy/entry.S"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "KBD→MOUSE で保持を採取し、解放世代が進むと次の make を通す。制御キーは独占中も通す"
+limits = "物理イベントと LOST の出力先は host fixture。実機 IRQ は観測しない"
+gates = ["push", "main"]
+mutations = [{ id = "omit_held_snapshot", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "valid[sc] = input_key_pressed(sc);", new = "valid[sc] = 0;", fail = "exclusive transition changed delivery" },
+    { id = "first_break_advances", config = "pc98", when = "after_build", replace = "sys/hal/input/kbd_merge.c", old = "!down && cnt[sc] == 0", new = "!down", fail = "exclusive transition changed delivery" },
+    { id = "pc98_acquire_closed", config = "pc98", when = "after_build", replace = "sys/platform/pc98/platform_input_caps.h", old = "IN2_PUBLIC_EXCLUSIVE 1", new = "IN2_PUBLIC_EXCLUSIVE 0", fail = "exclusive transition changed delivery" },
+    { id = "powermac_acquire_closed", config = "pc98", when = "after_build", replace = "sys/platform/powermac/platform_input_caps.h", old = "IN2_PUBLIC_EXCLUSIVE 1", new = "IN2_PUBLIC_EXCLUSIVE 0", fail = "exclusive transition changed delivery" },
+    { id = "focus_lost_reordered", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_reclaim.c", old = "in2_ring_lost(IN2_LOST_FOCUS);\n    in2_excl_focus(old);", new = "in2_excl_focus(old);\n    in2_ring_lost(IN2_LOST_FOCUS);", fail = "exclusive transition changed delivery" },
+    { id = "suppress_key_stop", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "sc == KEY_STOP", new = "0", fail = "exclusive transition changed delivery" },
+    { id = "suppress_key_ctrl", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "sc == KEY_CTRL", new = "0", fail = "exclusive transition changed delivery" },
+    { id = "suppress_key_grph", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "sc == KEY_GRPH", new = "0", fail = "exclusive transition changed delivery" },
+    { id = "suppress_key_tab", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "sc == KEY_TAB", new = "0", fail = "exclusive transition changed delivery" },
+    { id = "gate_in2_during_kbd", config = "pc98", when = "after_build", replace = "sys/hal/input/kbd_merge.c", old = "if (!legacy_active()) input_emit_in2(e);", new = "if (!legacy_active() && !in2_excl_keyboard()) input_emit_in2(e);", fail = "exclusive transition changed delivery" }]
