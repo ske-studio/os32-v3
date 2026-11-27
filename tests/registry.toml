@@ -390,7 +390,7 @@ sources = ["sys/dev/sound/cs4231", "tests/support/fixtures/cs4231_tick_ack", "to
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "IRQ10/12 と tick で各状態の PI を読んで解除し、PI が無い tick の I/O 回数と禁止状態での無アクセスを確認する"
+expect = "PCM 設計「状態機械」「advance」に従い IRQ10/12 と tick で各状態の PI を読んで解除し、PI が無い tick の I/O 回数と禁止状態での無アクセスを確認する"
 limits = "HAL の状態別ポート模型。実機の配線と割り込み時刻は対象外"
 gates = ["push", "main"]
 mutations = [
@@ -532,10 +532,11 @@ sources = ["sys/dev/sound/cs4231", "sys/hal/sound", "sys/dev/dma", "lib/dma_cont
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "選択した IRQ12 または IRQ10 と DMA #1 取得後だけ経路を更新し、停止の証拠を確認して元の経路を復元する"
+expect = "選択した IRQ12 または IRQ10 と DMA #1 取得後だけ経路を更新し、PCM 設計（pcm_cs4231.md「状態機械」「advance」「start / close / reclaim」）に従い、初回 start の PI 読み・条件付き解除、close の DRS 待ち中の IRQ/tick 回収、再同期の 3 tick 期限、DRS 解除後の mask・停止証拠・再始動または経路復元を確認する"
 limits = "PCM 実入口と 8237 所有表のホスト模型。実機の配線とタイミングは対象外"
 gates = ["push", "main"]
 mutations = [
+ { id = "close_wait_ack", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "release_waiting_drs = 1;", new = "release_waiting_drs = 0;", fail = "close tick missed PI" },
  { id = "extend_resync_wait", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "s_deadline = tick_count + PCM_STOP_TICKS;", new = "s_deadline = tick_count + PCM_STOP_TICKS + 1;", fail = "resync timeout quarantine" },
  { id = "fm_route", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "? PCM_ROUTE_INT41_DMA1 :", new = "? 0x22 :", fail = "codec before route readback" },
  { id = "skip_pi_readback", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "return pcm_read_pi() == 0;", new = "return 1;", fail = "legacy close with PI" },

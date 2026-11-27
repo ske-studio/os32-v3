@@ -66,6 +66,7 @@ static void (*s_hal_advance)(void);
 static int  s_irq_reg;
 static int dma_owned, route_attempted, codec_started, mode2_verified;
 static int release_stop_requested;
+static volatile int release_waiting_drs;
 static u32 release_deadline;
 /* advance runs from IRQ12 or the timer IRQ. Only foreground may detach. */
 static volatile int s_in_advance;
@@ -547,9 +548,9 @@ static void pcm_hal_advance(enum pcm_advance_origin origin)
     --s_in_advance;
 }
 
-static int pcm_hal_can_advance(void)
+static int pcm_hal_can_ack(void)
 {
-    return dma_owned && mode2_verified && !s_claimed && !s_mce_busy &&
+    return dma_owned && mode2_verified && (!s_claimed || release_waiting_drs) && !s_mce_busy &&
            g_pcm.state != PCM_ST_CLOSED && g_pcm.state != PCM_ST_OPENING &&
            g_pcm.state != PCM_ST_FAULTED;
 }
@@ -558,10 +559,12 @@ static int pcm_irq(unsigned int irq, void *arg)
 {
     (void)irq; (void)arg;
     if (s_hal_advance) {
-        if (!pcm_hal_can_advance())
+        if (!pcm_hal_can_ack())
             return IRQ_NONE;
         if (!(inp(PCM_PORT_R2) & 1) || !pcm_codec_ack()) return IRQ_NONE;
-        pcm_hal_advance(PCM_FROM_IRQ);
+        if (!s_claimed) {
+            pcm_hal_advance(PCM_FROM_IRQ);
+        }
         return IRQ_HANDLED;
     }
     return pcm_advance(PCM_FROM_IRQ);
@@ -570,10 +573,10 @@ static int pcm_irq(unsigned int irq, void *arg)
 void pcm_tick(void)
 {
     if (s_hal_advance) {
-        if (!pcm_hal_can_advance()) return;
+        if (!pcm_hal_can_ack()) return;
         /* Release a latched PI even when its interrupt edge was missed. */
         (void)pcm_codec_ack();
-        pcm_hal_advance(PCM_FROM_TICK);
+        if (!s_claimed) pcm_hal_advance(PCM_FROM_TICK);
         return;
     }
     (void)pcm_advance(PCM_FROM_TICK);
@@ -640,12 +643,14 @@ static void pcm_release(int leak)
             irq_restore(flags);
         }
         if (codec_started && !leak) {
+            release_waiting_drs = 1;
             while (!pcm_ready(PCM_OP_WAIT_DRS)) {
                 if (!_irq_enabled() || (int)(tick_count - release_deadline) >= 0) {
                     leak = 1;
                     break;
                 }
             }
+            release_waiting_drs = 0;
         }
         dma_chan_mask(PCM_DMA_CHAN, &dma_owned);
         if (route_attempted && !leak) {
