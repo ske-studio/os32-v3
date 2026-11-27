@@ -131,16 +131,29 @@ static void pm_hfs_idle(void *ctx)
     if (!pm_hfs_can_wait(ctx)) return;
     idle_wait_step();
 }
+static int same_frame(const u8 *buf, u32 n)
+{
+    if (n != tx_len) return 0;
+    for (u32 i = 0; i < n; ++i)
+        if (buf[i] != tx[i]) return 0;
+    return 1;
+}
+
+static void pm_hfs_cancel(void *ctx, const u8 *buf, u32 n, u32 deadline)
+{
+    (void)ctx;
+    if (!pending || deadline != until || !same_frame(buf, n)) return;
+    finish(OS32_ERR_TIMEOUT);
+}
+
 static int pm_hfs_put_until(void *ctx, const u8 *buf, u32 n, u32 deadline)
 {
     if (!pm_hfs_can_wait(ctx)) return -1;
     if ((i32)(pm_hfs_now(ctx) - deadline) >= 0) return OS32_ERR_TIMEOUT;
     if (!buf || !n || n > sizeof(tx)) return -1;
-    int same = n == tx_len;
-    for (u32 i = 0; same && i < n; ++i) if (buf[i] != tx[i]) same = 0;
     /* Preserve both completed and failed identities: no reopen after lost reply.
      * A different sid/seq (or HELLO nonce) starts a genuinely new SFS frame. */
-    if (same) return result;
+    if (same_frame(buf, n)) return result;
     if (pending) return -1;
     for (u32 i = 0; i < n; ++i) tx[i] = buf[i];
     tx_len = n;
@@ -158,5 +171,5 @@ static int pm_hfs_put(void *ctx, const u8 *buf, u32 n)
 }
 const SfsIo pm_hostfs_io = {
     pm_hfs_put, pm_hfs_get, pm_hfs_now, pm_hfs_idle,
-    pm_hfs_can_wait, pm_hfs_put_until, 0
+    pm_hfs_can_wait, pm_hfs_put_until, pm_hfs_cancel
 };

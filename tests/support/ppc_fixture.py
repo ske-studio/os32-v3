@@ -290,3 +290,47 @@ def hwb_media():
              *(directory.glob("*.sh")), poll, HWB / "points.inc"]
     return iso, dict(make=args, hashes={p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                                         for p in files})
+
+
+def hfs_cancel_media():
+    directory = Path(os.environ["OS32_VERIFY_OUT"]).resolve() / "hfs-cancel"
+    directory.mkdir()
+    transport = PM / "hostfs_link_io.c"
+    source = transport.read_text()
+    fixture = Path("tests/support/fixtures/ppc_link/hfs_cancel.inc").read_text()
+    site = "static int phase;"
+    # The probe shares the translation unit solely to observe state at return.
+    helpers, probe = fixture.split("static void probe_cancel", 1)
+    source = edit(source, site, site + "\n" + helpers)
+    for old, new in (
+        ("return link_platform_now();", "return clock_now;"),
+        ("idle_wait_step();", "++clock_now; pm_hfs_link_poll();"),
+        ("platform_host_open(request, pos, 0)", "((void)request, probe_open())"),
+        ("platform_host_write(handle, tx + written, tx_len - written, 0)",
+         "probe_write(tx + written, tx_len - written)"),
+        ("platform_host_status(handle, &status, &length, 0)",
+         "(status = 200, length = reply_len, 0)"),
+        ("platform_host_read_stage(handle, length - received, &data, 0)",
+         "(data = reply, (i32)reply_len)"),
+        ("platform_host_close(handle, 0)", "probe_close(handle, 0)"),
+        ("    if (same_frame(buf, n)) return result;",
+         "    if (n >= SFS_HDR_LEN && buf[SFS_OFF_TYPE] == SFS_T_HELLO) ++hello_puts;\n"
+         "    if (same_frame(buf, n)) return result;"),
+    ):
+        source = edit(source, old, new)
+    boot = PM / "ppc_kernel.c"
+    entry = edit(boot.read_text(), "        pm_exec_boot();",
+                 '        extern const char *hfs_cancel_probe(void);\n'
+                 '        kprintf(7, "HFS result=%s\\r\\n", hfs_cancel_probe());\n'
+                 '        pm_exec_boot();')
+    args = ["make", "-j" + os.getenv("OS32_BUILD_JOBS", "8"), *PPC_MAKE,
+            "IMAGE=kboot-link-sh", "KBOOT_SH=1", "KBOOT_LINK=1",
+            f"KB_OUT={directory}", f"KB_SH_OUT={directory / 'user'}",
+            f"BUILD_OUT={directory / 'build'}"]
+    for slot, path, content in (("KB_MUT", transport, source + "\nstatic void probe_cancel" + probe),
+                                ("KB_MUT_EXTRA", boot, entry)):
+        target = directory / path.name
+        target.write_text(content)
+        args.extend([f"{slot}_SRC={path}", f"{slot}_FILE={target}"])
+    subprocess.run([*args, "all", "iso"], check=True)
+    return directory / "boot.iso"

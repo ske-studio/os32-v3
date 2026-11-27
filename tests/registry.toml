@@ -618,3 +618,17 @@ expect = "期限切れで同一要求を同期で一度解放し、seq 更新で
 limits = "仮想時計と模擬 transport。装置の進行は対象外"
 gates = ["push", "main"]
 mutations = [{ id = "skip_expired_cancel", config = "pc98", when = "after_build", replace = "sys/fs/serialfs/sfs_client.c", old = "    if (sent && c->io->cancel)\n        c->io->cancel(c->ctx, c->tx, flen, deadline);\n", new = "    (void)sent;\n", fail = "expired exchange left pending CALL" }]
+
+[[check]]
+id = "ppc_hfs_cancel"
+spec = { path = "docs/design/fs/serialfs/serialfs_persistent.md", section = "絶対期限での交換終了" }
+subsystem = "system"
+level = "L4"
+sources = ["make:all", "make:iso", "sys/platform/powermac/hostfs_link_io.c", "sys/platform/powermac/ppc_kernel.c", "sys/fs/serialfs/serialfs_persistent.c", "sys/fs/serialfs/sfs_client.c", "tests/support/fixtures/ppc_link/hfs_cancel.inc", "tests/support/ppc_fixture.py", "tests/support/ppc_vm.py", "tools/host_sfs_link.py", "tools/lanfs_host.py", "tools/serialfs_host.py"]
+environment = "qemu-ppc"
+arch = { ppc = ["link-sh"] }
+needs = []
+expect = "同一要求の保留を同期解放し、seq 更新では BYE を送らず新 nonce で旧 sid を閉じる"
+limits = "mac99、制御した下位応答とメモリ内ホスト"
+gates = ["push", "main"]
+mutations = [{ id = "drop_hfs_cancel", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/hostfs_link_io.c", old = "pm_hfs_put_until, pm_hfs_cancel", new = "pm_hfs_put_until, 0", fail = "hostfs cancel left pending" }]
