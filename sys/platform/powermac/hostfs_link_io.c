@@ -1,6 +1,7 @@
 /* LAN_OPERATOR_DESIGN §5: one deferred SFS CALL, one absolute deadline.
  * SfsClient's retries must never allocate a second link request for this frame.
  * PLN1 keeps its independent transport in hostfs_io.c. */
+#include <stdbool.h>
 #include "hostfs.h"
 #include "sys/fs/serialfs/sfs_lan.h"
 #include "platform_host.h"
@@ -15,6 +16,8 @@ static u8 tx[SFS_BUFFER_FRAME], response[SFS_BUFFER_FRAME];
 static u32 tx_len, written, received, length, until;
 static i32 handle = -1;
 static int pending, result;
+/* The saved tx/deadline owns the unread RX only after its READ installed it. */
+static bool owns_rx;
 
 enum { HFS_OPEN, HFS_WRITE, HFS_STATUS, HFS_READ };
 static int phase;
@@ -52,6 +55,7 @@ int pm_hfs_rx_frame(const u8 *frame, u32 len)
     for (i = 0; i < len; ++i) t->rx[i] = frame[i];
     t->rx_pos = 0;
     t->rx_end = len;
+    owns_rx = false;
     return 0;
 }
 
@@ -117,7 +121,11 @@ void pm_hfs_link_poll(void)
         if (rc == OS32_ERR_AGAIN) return;
         if (rc <= 0 || (u32)rc > length - received) { finish(-1); return; }
         for (i32 i = 0; i < rc; ++i) response[received++] = data[i];
-        if (received == length) finish(pm_hfs_rx_frame(response, length));
+        if (received == length) {
+            rc = pm_hfs_rx_frame(response, length);
+            owns_rx = rc == 0;
+            finish(rc);
+        }
         return;
     }
     }
@@ -141,9 +149,13 @@ static int same_frame(const u8 *buf, u32 n)
 
 static void pm_hfs_cancel(void *ctx, const u8 *buf, u32 n, u32 deadline)
 {
-    (void)ctx;
-    if (!pending || deadline != until || !same_frame(buf, n)) return;
-    finish(OS32_ERR_TIMEOUT);
+    struct pm_hfs_transport *t = ctx;
+    if (deadline != until || !same_frame(buf, n)) return;
+    if (pending) finish(OS32_ERR_TIMEOUT);
+    if (owns_rx) {
+        t->rx_pos = t->rx_end;
+        owns_rx = false;
+    }
 }
 
 static int pm_hfs_put_until(void *ctx, const u8 *buf, u32 n, u32 deadline)
@@ -156,6 +168,7 @@ static int pm_hfs_put_until(void *ctx, const u8 *buf, u32 n, u32 deadline)
     if (same_frame(buf, n)) return result;
     if (pending) return -1;
     for (u32 i = 0; i < n; ++i) tx[i] = buf[i];
+    owns_rx = false;
     tx_len = n;
     until = deadline;
     written = received = length = 0;

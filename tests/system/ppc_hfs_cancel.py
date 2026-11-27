@@ -57,6 +57,8 @@ def verify():
         result = re.search(r"^HFS result=(.+)$", output, re.M)[1]
         if result != "pass":
             raise Failure(result)
+        if re.findall(r"^HFS discarded prefix=(\d+)$", output, re.M) != ["0", "1"]:
+            raise Failure("missing unread or partially read reply case")
         host_renewal([bytes.fromhex(n) for n in re.findall(r"^HFS hello=([0-9a-f]+)$", output, re.M)])
         print(cpu, "cancel and host renewal passed")
 

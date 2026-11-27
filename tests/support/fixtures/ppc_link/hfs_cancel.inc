@@ -81,16 +81,31 @@ const char *hfs_cancel_probe(void)
             pm_hostfs_io.put_until(ctx, frame, sizeof(frame), 101) != OS32_ERR_TIMEOUT ||
             pending) return "completed identity";
     }
-    u8 completed[64];
-    u32 len = sfs_encode(completed, SFS_T_STAT | SFS_T_RESP, 1, 1, 0, 0);
-    if (pm_hostfs_io.put_until(ctx, completed, len, 100)) return "poll admission";
-    unsigned before = closes;
-    for (int i = 0; i < 4; ++i) pm_hfs_link_poll();
-    probe_cancel(completed, len, 100);
-    if (pending || result || closes != before + 1 ||
-        pm_hostfs_io.put_until(ctx, completed, len, 101)) return "poll completed";
-    for (u32 i = 0; i < len; ++i)
-        if (pm_hostfs_io.get(ctx) != completed[i]) return "lost completed reply";
+    for (unsigned prefix = 0; prefix <= 1; ++prefix) {
+        u8 expired[64], next[64];
+        u32 len = sfs_encode(expired, SFS_T_STAT | SFS_T_RESP, 1, 2 * prefix + 1, 0, 0);
+        u32 next_len = sfs_encode(next, SFS_T_STAT | SFS_T_RESP, 1, 2 * prefix + 2, 0, 0);
+        unsigned before = closes;
+        if (pm_hostfs_io.put_until(ctx, expired, len, 100)) return "poll admission";
+        for (int i = 0; i < 4; ++i) pm_hfs_link_poll();
+        probe_cancel(next, next_len, 100);
+        probe_cancel(expired, len, 101);
+        if (pm_hostfs_transport.rx_end - pm_hostfs_transport.rx_pos != len)
+            return "unrelated cancel discarded reply";
+        if (prefix && pm_hostfs_io.get(ctx) != expired[0]) return "partial read";
+        clock_now = 100;
+        probe_cancel(expired, len, 100);
+        if (pending || result || closes != before + 1 || pm_hostfs_io.get(ctx) != -1 ||
+            pm_hostfs_io.put_until(ctx, expired, len, 101)) return "expired reply";
+        if (pm_hostfs_io.put_until(ctx, next, next_len, 101)) return "next admission";
+        for (int i = 0; i < 4; ++i) pm_hfs_link_poll();
+        probe_cancel(expired, len, 100);
+        for (u32 i = 0; i < next_len; ++i)
+            if (pm_hostfs_io.get(ctx) != next[i]) return "next reply";
+        if (pm_hostfs_io.get(ctx) != -1) return "trailing reply";
+        kprintf(7, "HFS discarded prefix=%u\r\n", prefix);
+        clock_now = 0;
+    }
 
     SfsClient *client = (SfsClient *)sfs_persistent_client();
     if (!client || sfs_ensure_session(100)) return "initial HELLO";
