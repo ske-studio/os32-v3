@@ -110,17 +110,21 @@ void opn_probe_once(struct fm_probe_record *record, int busy, unsigned char irq_
 
     (void)now_us; /* Kept in the version 4 FM module interface. */
     record->native_model = probe_primary(irq_shadow, &record->contained);
-    if (busy || !record->contained) return;
+    if (!record->contained || (busy && record->native_model != OPN_PROBE_ABSENT)) return;
 
-    if (open_bus(0x288)) record->bank[1].model = OPN_PROBE_ABSENT;
+    int alternate_absent = open_bus(0x288);
     unsigned feature = inp(OPNA_ID_PORT);
     unsigned board = feature >> 4;
     int stable = inp(OPNA_ID_PORT) == feature;
     /* A460h: 7 = integrated CS4231 without FM, 15 = no ID or 26-class. */
     int primary_may_be_absent = board == 7 || board == 15;
+    int primary_absent = record->native_model == OPN_PROBE_ABSENT &&
+                         open_bus(OPN_ADDR) && stable && primary_may_be_absent;
+    if (busy && !(primary_absent && alternate_absent)) return;
+
+    if (alternate_absent) record->bank[1].model = OPN_PROBE_ABSENT;
     record->bank[0].model = record->native_model;
-    if (record->native_model == OPN_PROBE_ABSENT &&
-        (!open_bus(OPN_ADDR) || !stable || !primary_may_be_absent))
+    if (record->native_model == OPN_PROBE_ABSENT && !primary_absent)
         record->bank[0].model = OPN_PROBE_UNKNOWN;
     if (record->native_model == OPN_PROBE_OPN)
         record->bank[0].model = OPN_PROBE_PRESENT;

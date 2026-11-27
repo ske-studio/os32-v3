@@ -1,6 +1,7 @@
 #include "idt.h"
 #include "sys/dev/sound/fm/fm_module.c"
 #include "opn_chip.h"
+#include "sys/platform/pc98/pic.c" /* Reset boot-only latches between machine scenarios. */
 
 extern int fm_module_init(FmModuleApi *);
 const SndChipBackend opn_chip_backend;
@@ -12,7 +13,8 @@ static enum opn_probe_result registered;
 static unsigned status, id, index_reg, feature, alt_status, alt_data;
 static unsigned writes, reads, alt_reads, imr_writes, mask = 0xff, elapsed;
 static unsigned busy_after_ff, busy_reads, timer_reads;
-static int frozen_clock;
+static int frozen_clock, unstable_feature;
+static unsigned feature_reads;
 static unsigned trace[16], trace_count;
 static int ticks, fail_stop, fail_restore, restores;
 
@@ -50,19 +52,13 @@ const u32 *module_exports(struct module_handle handle) { (void)handle; return 0;
 int res_owner_get(void) { return 0; }
 int snd2_chip_implicit(int owner) { (void)owner; return 0; }
 
-const struct irq_topology *platform_irq_topology(void)
-{
-    static const unsigned lines[] = {3, 10, 12, 13};
-    static const struct irq_topology topology = {16, 4, lines};
-    return &topology;
-}
 static int sound_irq(unsigned irq, void *arg) { (void)irq; (void)arg; return IRQ_NONE; }
 
 unsigned inp(unsigned port)
 {
     ++reads;
     if (!frozen_clock) elapsed += 5;
-    if (port == 0xa460) return feature;
+    if (port == 0xa460) return feature ^ (feature_reads++ && unstable_feature);
     if (port == 0xa468) return 0;
     if (port == 0x188) {
         if (index_reg == 0xff && busy_reads < busy_after_ff) {
@@ -112,6 +108,7 @@ static void reset(void)
     boot_probe = (struct fm_probe_record){0};
     trace_count = writes = reads = elapsed = alt_reads = imr_writes = restores = 0;
     index_reg = busy_after_ff = busy_reads = timer_reads = frozen_clock = 0;
+    fm_irq12_released = fm_irq12_blocked = unstable_feature = feature_reads = 0;
     status = id = alt_status = alt_data = feature = 0xff;
 }
 static void check_opna_wait(unsigned delay, int frozen)
@@ -141,6 +138,27 @@ static void check_board(unsigned value, enum opn_probe_result expected)
     feature = value;
     require(!start() && boot_probe.bank[0].model == expected,
             expected == OPN_PROBE_ABSENT ? "CS4231-only open bus" : "FM board open bus");
+}
+
+static void check_registered_bus(unsigned line, unsigned board, int unstable,
+                                 unsigned primary_data, unsigned alternate, int absent)
+{
+    reset();
+    require(platform_irq_reserved(12), "initial IRQ12 topology");
+    require(!irq_register(line, sound_irq, 0, IRQ_F_SHARED), "candidate registration");
+    writes = imr_writes = 0;
+    feature = board;
+    unstable_feature = unstable;
+    id = primary_data;
+    alt_data = alternate;
+    require(!start() && boot_probe.native_model == OPN_PROBE_ABSENT, "registered native absence");
+    require(!writes && !imr_writes, "registered IRQ write");
+    if (absent && !boot_probe.bank[0].model && !boot_probe.bank[1].model)
+        require(0, "registered open bus: 0188=0 0288=0");
+    enum opn_probe_result expected = absent ? OPN_PROBE_ABSENT : OPN_PROBE_UNKNOWN;
+    require(boot_probe.bank[0].model == expected && boot_probe.bank[1].model == expected &&
+            platform_irq_reserved(12) == !absent, "registered bus evidence");
+    require(!irq_unregister(line, sound_irq, 0), "candidate unregister");
 }
 
 void _start(void)
@@ -201,6 +219,15 @@ void _start(void)
     require(!start() && registered == OPN_PROBE_OPN, "registered native attach");
     require(!imr_writes && !alt_reads && !boot_probe.bank[0].model &&
             !boot_probe.bank[1].model, "registered IRQ");
+    require(platform_irq_reserved(12), "native IRQ12 reservation");
+    require(!irq_unregister(10, sound_irq, 0), "unregister IRQ10");
+    check_registered_bus(10, 0x73, 0, 0xff, 0xff, 1);
+    check_registered_bus(3, 0x73, 0, 0xff, 0xff, 1);
+    check_registered_bus(10, 0xff, 0, 0xff, 0xff, 1);
+    check_registered_bus(10, 0x73, 0, 0xff, 0, 0);
+    check_registered_bus(10, 0x73, 1, 0xff, 0xff, 0);
+    check_registered_bus(10, 0x41, 0, 0xff, 0xff, 0);
+    check_registered_bus(10, 0x73, 0, 0, 0xff, 0);
     reset();
     status = 0;
     mask = 0;

@@ -57,6 +57,7 @@ static int exercise(int dma, int fm, int value, int wss, int board, int expect)
 void _start(void)
 {
     int ok = exercise(0, 0, 0x20, 4, 0xff, 0) &&
+             exercise(1, 0, 0x20, 4, 0x73, 1) &&
              exercise(1, 1, 0x20, 4, 0xff, 1) &&
              exercise(1, 0, 0x20, 0xff, 0xff, 0) &&
              exercise(1, 0, 0x20, 4, 0x60, 0);
