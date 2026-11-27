@@ -103,6 +103,17 @@ class Peer:
         self.gates[rid] = {}
         return self.gates[rid]
 
+    def latest_ready(self, start=0):
+        for index in range(len(self.events) - 1, start - 1, -1):
+            event = self.events[index]
+            if event["parts"][:2] == ["RSH", "READY"]:
+                return event["link_rid"]
+        return None
+
+    def ready_released(self, start=0):
+        rid = self.latest_ready(start)
+        return self.agent.ledger.get(rid, {}).get("st") == "RELEASED"
+
     def send(self, frame):
         self.io.send(frame)
 
