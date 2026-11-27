@@ -730,3 +730,230 @@ gates = ["push", "main"]
 mutations = [
   { id = "gfx2_final_i3_weak_function", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/enum.c", old = "int gfx2_head_info(u32 index, u32 head, GFX2_HeadInfo *out)", new = "int omitted_gfx2_head_info(u32 index, u32 head, GFX2_HeadInfo *out)", fail = "provider binding/type gfx2_head_info" },
 ]
+
+[[check]]
+id = "gfx2_heap"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/vram_heap.c", "tests/support/fixtures/gfx2/gfx2_heap.c", "sys/hal/gfx/v2/gfx2_int.h", "sys/hal/gfx/v2/gfx2_sw.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "整列・結合と入力拒否、2048 区間への成功、2049 区間への失敗で全区間が不変"
+limits = "ILP32 のメモリ模型。実 DMA・走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_heap_merge_suffix", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/vram_heap.c", old = "if (i + 1 < h->n", new = "if (0 && i + 1 < h->n", fail = "FAIL merge suffix" },
+  { id = "gfx2_heap_double_free", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/vram_heap.c", old = "h->blk[i].off == off && h->blk[i].used", new = "h->blk[i].off == off", fail = "FAIL double free" },
+  { id = "gfx2_heap_reject_2048", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/vram_heap.c", old = "extra > GFX2_HEAP_BLOCKS - h->n", new = "extra >= GFX2_HEAP_BLOCKS - h->n", fail = "FAIL reject 2048" },
+  { id = "gfx2_heap_change_heap_on_2049", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/vram_heap.c", old = "if (extra > GFX2_HEAP_BLOCKS - h->n)", new = "if (extra > GFX2_HEAP_BLOCKS - h->n && --h->n)", fail = "FAIL change heap on 2049" },
+]
+
+[[check]]
+id = "gfx2_format_id"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/format.c", "tests/support/fixtures/gfx2/gfx2_format_id.c", "sys/hal/gfx/v2/gfx2_int.h", "sys/hal/gfx/v2/gfx2_sw.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "形式 0・11・0x40 を INVAL とする"
+limits = "ILP32 のメモリ模型。実 DMA・走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_format_id_invalid_format", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/format.c", old = "fmt < GFX2_FMT_INDEX8 || fmt > GFX2_FMT_UYVY || !o", new = "fmt > GFX2_FMT_UYVY || !o", fail = "FAIL invalid format" },
+]
+
+[[check]]
+id = "gfx2_enum_bounds"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/enum.c", "sys/kern/kstring_c.c", "tests/support/fixtures/gfx2/gfx2_enum_bounds.c", "sys/hal/gfx/v2/gfx2_int.h", "sys/hal/gfx/v2/gfx2_sw.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "端の mode・head を INVAL とし出力を保存"
+limits = "ILP32 のメモリ模型。実 DMA・走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_enum_bounds_mode_at_count", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/enum.c", old = "i >= (u32)count", new = "i > (u32)count", fail = "FAIL mode at count" },
+]
+
+[[check]]
+id = "gfx2_sw_fill"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/sw_fill.c", "tests/support/fixtures/gfx2/gfx2_sw_fill.c", "sys/hal/gfx/v2/gfx2_int.h", "sys/hal/gfx/v2/gfx2_sw.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "4×4 INDEX8 全 0、(1,1,2,2) に 7 → 内側 4 画素だけ 7"
+limits = "ILP32 のメモリ模型。実 DMA・走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sw_fill_fill_pixels", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/sw_fill.c", old = "x < r->x + r->w;", new = "x <= r->x + r->w;", fail = "FAIL fill pixels" },
+]
+
+[[check]]
+id = "gfx2_sw_copy"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/sw_copy.c", "tests/support/fixtures/gfx2/gfx2_sw_copy.c", "sys/hal/gfx/v2/gfx2_int.h", "sys/hal/gfx/v2/gfx2_sw.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "1 行 [0..7]、(0)→(2) 幅 6 → [0,1,0,1,2,3,4,5]"
+limits = "ILP32 のメモリ模型。実 DMA・走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sw_copy_overlap_pixels", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/sw_copy.c", old = "ex->clip.x > sx && !sv->sync", new = "ex->clip.x < sx && !sv->sync", fail = "FAIL overlap pixels" },
+]
+
+[[check]]
+id = "gfx2_sw_rop"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/sw_rop.c", "tests/support/fixtures/gfx2/gfx2_sw_rop.c", "sys/hal/gfx/v2/gfx2_int.h", "sys/hal/gfx/v2/gfx2_sw.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "ROP3 0x66 (S^D)、D=0x0F・S=0xFF / 0x5A (P^D)、mono P=0xAA の行 → 0xF0 / 交互に反転"
+limits = "ILP32 のメモリ模型。実 DMA・走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sw_rop_rop_pixels", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/sw_rop.c", old = "(i & 4 ? p : ~p) & (i & 2 ? s : ~s) & (i & 1 ? d : ~d)", new = "(i & 1 ? p : ~p) & (i & 2 ? s : ~s) & (i & 4 ? d : ~d)", fail = "FAIL rop pixels" },
+]
+
+[[check]]
+id = "gfx2_sw_rop4"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/sw_rop4.c", "tests/support/fixtures/gfx2/gfx2_sw_rop4.c", "sys/hal/gfx/v2/gfx2_int.h", "sys/hal/gfx/v2/gfx2_sw.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "mask 0xF0、前景 ROP 0xCC・背景 0x00 → 左 4 画素 = S、右 4 = 0"
+limits = "ILP32 のメモリ模型。実 DMA・走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sw_rop4_mask_pixels", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/sw_rop4.c", old = "(u8)op->rop : (u8)(op->rop >> 8)", new = "(u8)(op->rop >> 8) : (u8)op->rop", fail = "FAIL mask pixels" },
+]
+
+[[check]]
+id = "gfx2_sw_mono"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/sw_mono.c", "tests/support/fixtures/gfx2/gfx2_sw_mono.c", "sys/hal/gfx/v2/gfx2_int.h", "sys/hal/gfx/v2/gfx2_sw.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "0xA0・幅 3・fg=1・bg 透過 → [1,_,1]"
+limits = "ILP32 のメモリ模型。実 DMA・走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sw_mono_mono_pixels", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/sw_mono.c", old = "0x80u >> (bit & 7)", new = "1u << (bit & 7)", fail = "FAIL mono pixels" },
+]
+
+[[check]]
+id = "gfx2_sw_hostdata"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/sw_hostdata.c", "tests/support/fixtures/gfx2/gfx2_sw_hostdata.c", "sys/hal/gfx/v2/gfx2_int.h", "sys/hal/gfx/v2/gfx2_sw.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "2×2 の元、key=3 → key の画素だけ書かない"
+limits = "ILP32 のメモリ模型。実 DMA・走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sw_hostdata_keyed_pixels", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/sw_hostdata.c", old = "pixel >= op->skey.v && pixel <= op->skey.x", new = "0", fail = "FAIL keyed pixels" },
+]
+
+[[check]]
+id = "gfx2_sw_readback"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/sw_readback.c", "tests/support/fixtures/gfx2/gfx2_sw_readback.c", "sys/hal/gfx/v2/gfx2_int.h", "sys/hal/gfx/v2/gfx2_sw.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "2×2 の面 → 同じ 4 画素・pitch どおり"
+limits = "ILP32 のメモリ模型。実 DMA・走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sw_readback_output_pitch", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/sw_readback.c", old = "u8 *dst = kbuf + y * op->pitch;", new = "u8 *dst = kbuf + y * op->sw * info.cpp;", fail = "FAIL output pitch" },
+]
+
+[[check]]
+id = "gfx2_sw_stretch"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/sw_stretch.c", "lib/divdi3.c", "tests/support/fixtures/gfx2/gfx2_sw_stretch.c", "sys/hal/gfx/v2/gfx2_int.h", "sys/hal/gfx/v2/gfx2_sw.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "最近点 [10,20] 2→4 / 双線形 [10,20] 2→4 → [10,10,20,20] / [10,13,18,20]"
+limits = "ILP32 のメモリ模型。実 DMA・走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sw_stretch_bilinear_pixels", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/sw_stretch.c", old = "(u32)(f - 32768u)", new = "(u32)f", fail = "FAIL bilinear pixels" },
+]
+
+[[check]]
+id = "gfx2_sw_ckey"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/sw_ckey.c", "tests/support/fixtures/gfx2/gfx2_sw_ckey.c", "sys/hal/gfx/v2/gfx2_int.h", "sys/hal/gfx/v2/gfx2_sw.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "src [1,2,1]・key 1、dst [9,9,9] → [9,2,9]"
+limits = "ILP32 のメモリ模型。実 DMA・走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sw_ckey_key_endpoint", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/sw_ckey.c", old = "sv <= op->skey.x", new = "sv < op->skey.x", fail = "FAIL key endpoint" },
+]
+
+[[check]]
+id = "gfx2_sw_alpha"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/sw_alpha.c", "sys/hal/gfx/v2/format.c", "tests/support/fixtures/gfx2/gfx2_sw_alpha.c", "sys/hal/gfx/v2/gfx2_int.h", "sys/hal/gfx/v2/gfx2_sw.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "src 0x80404040 (premult)・dst 0xFF000000 → 0xFF404040"
+limits = "ILP32 のメモリ模型。実 DMA・走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sw_alpha_alpha_pixels", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/format.c", old = "t += 128;", new = "(void)t;", fail = "FAIL alpha pixels" },
+]
+
+[[check]]
+id = "gfx2_sw_line"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/sw_line.c", "tests/support/fixtures/gfx2/gfx2_sw_line.c", "sys/hal/gfx/v2/gfx2_int.h", "sys/hal/gfx/v2/gfx2_sw.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "(0,0)→(2,1) → (0,0)・(1,0) だけ"
+limits = "ILP32 のメモリ模型。実 DMA・走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sw_line_line_pixels", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/sw_line.c", old = "if (e > 0) {", new = "if (e >= 0) {", fail = "FAIL line pixels" },
+]
