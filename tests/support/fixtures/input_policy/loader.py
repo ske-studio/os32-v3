@@ -25,6 +25,11 @@ in2_reclaim input_discard_stop install_reclaim_owner io_kapi_owner_exit io_sysca
 io_syscall_suspend kapi_strings_cleanup_owned kbd_inject_owner_exit launch_owner_exit
 legacy_abort_begin legacy_cleanup legacy_closing legacy_end legacy_lowmap_busy legacy_pinned
 paging_current_cr3 paging_kernel_pd_phys paging_load_cr3 pipe_free_owned
+io_policy_owner_exit in2_excl_drop_raw input_legacy_provider appmem_init paging_addrspace_map_user_range_phys paging_addrspace_protect_code_ro
+kselftest_run_audit serial_puts_polled gfx2_owner_release exec_selftest_run_audit exec_shlib_data_pages shlib_data_pages exec_shlib_addrspace_attach
+shlib_addrspace_attach ledger_owner_pages lease_revoke_all exec_gfx_owner_release gf_owner_release
+exec_shlib_addrspace_detach shlib_addrspace_detach paging_addrspace_free_user_range
+paging_addrspace_destroy ledger_reclaim_owner ledger_owner_retire kfree exec_serial_puts_polled
 sfs_persistent_scope_owner_exit shell_svc_font_guard_run shell_svc_font_source_close
 shell_svc_font_source_open shell_svc_font_source_read_at shell_svc_font_source_validate
 shm_free_owned snd2_chip_reclaim snd2_reclaim vfs_close vfs_close_owned vfs_open vfs_seek
@@ -34,7 +39,7 @@ shm_free_owned snd2_chip_reclaim snd2_reclaim vfs_close vfs_close_owned vfs_open
 def run(config, folder):
     ppc = config == "link-sh"
     prefix = "powerpc" if ppc else "i386"
-    cross = os.environ.get("PPC_CROSS_DIR", "/home/hight/opt/cross-ppc") if ppc else os.environ["CROSS_DIR"]
+    cross = os.environ["PPC_CROSS_DIR" if ppc else "CROSS_DIR"]
     tool = Path(cross) / "bin"
     cc = tool / (prefix + "-elf-gcc")
     recipe = next(cmd for source, cmd in recipes(config)[0].values()
@@ -50,7 +55,12 @@ def run(config, folder):
                "sys/kern/exec/ring3_str.c", "sys/kern/av_focus.c", "sys/kern/init/shell_loop.c", "sys/kern/exec/appslot.c", "sys/kern/exec/os32x_hdr.c",
                "sys/kern/kstring_c.c", "sys/fs/fd_redirect.c", "sys/kern/exec/shell_service.c",
                "sys/input/input_context.c", "sys/input/input_interrupt.c", "sys/input/input_ime_gate.c",
-               "sys/input/input_delivery.c", "sys/input/input_policy.c"]
+               "sys/input/input_delivery.c", "sys/input/input_policy.c",
+               "sys/kern/exec/launch.c", "sys/kern/io_kapi.c", "sys/hal/input/input_service.c",
+               "sys/hal/input/in2_excl.c", "sys/hal/input/in2_reclaim.c",
+               "sys/hal/input/legacy_ring.c", "sys/hal/input/legacy_mode.c",
+               "sys/hal/input/keymap_registry.c", "sys/hal/input/keymap_eval.c",
+               "sys/input/keymaps/hid_jp.c", "sys/input/keymaps/pc98_jp.c"]
     objects = []
     for source in sources:
         obj = folder / (prefix + "-" + Path(source).stem + ".o")
