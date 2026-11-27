@@ -683,6 +683,23 @@ mutations = [{ id = "drop_legacy_enter", config = "link-sh", when = "after_build
     { id = "dequeue_while_exclusive", config = "pc98", when = "after_build", replace = "sys/input/input_policy.c", old = "now.owner != owner || in2_excl_keyboard()", new = "now.owner != owner", fail = "private provider or v2 LE mismatch" }]
 
 [[check]]
+id = "input_exec_entry"
+spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
+subsystem = "input"
+level = "L1"
+sources = ["sys/input/input_context.c", "sys/kern/init/shell_loop.c", "sys/kern/exec/appslot.c", "sys/kern/exec/exec_entry_commit.inc", "tests/support/fixtures/input_policy/loader.c", "tests/support/fixtures/input_policy/loader.py", "tests/support/fixtures/input_policy/jump.S", "sys/kern/exec/exec_schedule.inc", "sys/kern/exec/exec_launch.inc", "sys/kern/exec/exec_finish.inc"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"], ppc = ["link-sh"] }
+needs = []
+expect = "予約は前景に選べず、有効化後に選んだ子の解放で親世代へ戻る"
+limits = "両 CPU の実 shell loader と lease を通し arch entry を捕捉。VFS・FP・デバイスは fixture"
+gates = ["push", "main"]
+mutations = [{ id = "expose_reserved_owner", config = "pc98", when = "after_build", replace = "sys/input/input_context.c", old = "context_owners[owner].state == OWNER_ACTIVE &&", new = "1 &&", fail = "owner reservation visibility or recovery" },
+    { id = "omit_entry_activation", config = "link-sh", when = "after_build", replace = "sys/kern/exec/exec_entry_commit.inc", old = "input_context_owner_activate(id, is_shell || (!gui_session && !gui));", new = "(void)gui_session;", fail = "first arch entry or failed reservation" },
+    { id = "omit_park_generation", config = "pc98", when = "after_build", replace = "sys/kern/exec/exec_schedule.inc", old = "exec_notify_owned(id, EXEC_KIND_ABORTED, exec_gen);", new = "exec_notify_owned(id, EXEC_KIND_ABORTED, 0);", fail = "first arch entry or failed reservation" },
+    { id = "restore_unstarted_shell", config = "pc98", when = "after_build", replace = "sys/kern/exec/exec_finish.inc", old = "if (id != APP_ID_SHELL) exec_restore_context(launcher_id);", new = "exec_restore_context(launcher_id);", fail = "first arch entry or failed reservation" }]
+
+[[check]]
 id = "input_focus"
 spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
 subsystem = "input"
