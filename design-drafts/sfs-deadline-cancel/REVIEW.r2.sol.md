@@ -1,0 +1,14 @@
+# 本線の sol の r2 レビュー (第 1 回、os32pm 経由、2026-11-27): r3 が要る、ユーザー判断 0 件
+§1 の期限生成、ensure・再接続への引き渡し、READ ごとの期限、再送間隔、二つの期限切れ出口、PPC の保留と前景 poll は実コードと一致。7455 の client 復帰時刻は現行ログでは未確定。静的照合。
+- P1 §1/§6 (UART): UART の製品入口は sfs_session_fg.c:273–282 と serialfs.c:79–85。通常交換は送信完了後に試行タイマーを始め再試行ごとに更新 (sfs_client.c:72–98)。UART を期限付き API に直結して赤を出しても Ra266 の hsync の赤とは言えない。直し: 通常入口で無応答・TX 停滞・次回成功を測り、合否は既存の試行・ゲート契約に置く。UART に絶対期限を課すなら対象仕様と変更する入口を明記。
+- P1 §1/§2/§6 (82557): sfs_lan.c:130–140 の成功は送信受付、e82557.c:579–608 は TX_ISSUED と DMA を残し得る。nic.c:164–171 に送信後の dispatch。未完了数ゼロを一律に課すと正常な送信完了待ちまで赤、NIC 停止を誘発。直し: 常駐・モジュールとも実際の net_tx・ドライバ・tick 経路を使い、受付済み DMA の完了と SFS 固有の再送・保留を区別。BUSY/AGAIN、期限際の受付、遅延応答と次要求を注入し、装置側で時計を進めて復帰 tick と再発行を測る。
+- P1 §2/§5/§6 (版 4): lan_module.h:11 だけ上げると LAN の配布スキーマは版 3 のまま (tools/module_schema.py:173–181)。ローダーは本体 policy と component の両方に照合 (module_image.c:137–138)。直し: 段 1 でスキーマ・生成ヘッダ・本体・lan.mod を同期、版 4 同士のロードと新旧混在の拒否を確認。Ra266 の HDD 配布も対で。
+- P1 §2 (片道 BYE): serialfs_persistent.c:144–163 は BYE が受付成功してから時計が期限に達すると HELLO 前に HOSTDOWN。片道関数の内側だけに cancel を足してもこの経路では BYE が pending のまま、同期限の HELLO も BYE 保留中なら最初の put を拒否 (hostfs_link_io.c:143–150)。直し: BYE 受理から HELLO へ引き渡すまでの所有者と、期限で中断する全経路の閉じ方を定め、seq 上限更新で BYE 受付直後に期限を跨ぐケースを追加。
+- P2 §2/§3 (共通出口): put が期限まで費やした場合も現行は get を呼んでから期限を判定 (sfs_client.c:243–254)。片道版は transport 自身の短い上限でも TIMEOUT を返せる (sfs_lan.c:109–112,130–132)。直し: put 復帰後に期限到達なら get 前に共通出口へ、片道の明示 TIMEOUT は絶対期限前でも通知、両方を mock で固定。
+- P2 §2/§3 (cancel 契約): 同一 ctx・全バイト・期限が再利用されると古い通知を識別できない。現行 close は IRQ 保護下で回収と RELEASE 予約、dispatch しない (device_host.c:24–27、link_host_api.inc:345–380)。直し: cancel は同じ前景交換から同期で一度通知、保存・遅延発行・同じ client/transport への再入を禁止。期限の異なる同一フレームの put は既存の結果を返し、元の期限・照合対象を更新しない事を試験。
+- P2 §1/§5 (表の全数): PC-98 常駐の時計専用 boot_sfs_clock が一覧にない (kernel_boot_memory.inc:34–36,68–74)。直し: 時計専用で末尾は暗黙のゼロと明記、段 0 の常駐模型で _halt を使うこの時計の経路を再現。
+- P1 §3/§5 (PPC 計測の実装): 既存 fixture は link と hostfs_link_io の差し替えに加え exec を第 3 枠で差し替え (ppc_fixture.py:131–152,223–229)。start と client return の記録位置には serialfs.c と sfs_client.c も要る。期限値だけでは同期限の BYE・HELLO・CALL を識別できず、POLL が先に閉じると現行 handle から rid を引けない。直し: fixture の差し替え枠・変異の適用順と、受付時のフレーム照合から OPEN 後の full rid 退避、close 後の client return までの記録位置を指定。時刻に加えイベント順と close 回数を保存し同 tick 内の順序を判定。
+- P2 §3/§7 (前景不在の証明): end_tick の超過だけでは前景が来なかったのか、来ても can_wait や経路の問題で閉じられなかったのかを判別できない。直し: 対象 rid の期限前後で前景 poll の到達、can_wait、client の最初の期限判定を採り、厳密な end_tick == deadline を維持して原因を判定。
+- P2 §3–§6 (受入と変異): 段 0 の実 transport 模型と段 1 の cancel 除去変異は別の証明。PPC 小試験の配置・実行方法、既存影響検査の一覧、Ra266 の hsync 受入も未指定。直し: 段 0 の 3 構成は同じ入力を段 1・最終像で再実行、除去変異は実 client＋mock、rpc_ticks は両 CPU の full rid・設定 50 の専用目印。段 2 の小試験と段 4 の検査 ID を指定、Ra266 HDD の LAN・シリアル両方で hsync の終了コード・転送内容・再実行を受入に。
+未決の振り分け: PM は共通 cancel を先に進め厳密な期限の検査を維持。ユーザー判断は 0 件。前景不在が実測され jiffy 側まで広げる必要が生じた時点で別段をユーザーへ。
+os32pm の判断: §7 の未決は sol の振り分けどおり。r3 を本線に貼る (第 2 回)。
