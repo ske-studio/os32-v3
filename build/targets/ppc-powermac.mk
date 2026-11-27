@@ -119,7 +119,7 @@ include build/sqlite-gen.mk
 # Keep one dependency-tracked body for each compiler/flag configuration.
 # Body mutations use the image's own output and source substitution rules.
 KB_BODY_OUT := $(KB_OUT)
-ifeq ($(filter $(SQLITE_HARD_C) sys/arch/ppc/sqlite_restore.S,$(KB_MUT_SRC) $(KB_MUT_EXTRA_SRC) $(KB_MUT_THIRD_SRC)),)
+ifeq ($(filter $(SQLITE_HARD_C) sys/arch/ppc/sqlite_restore.S,$(KB_MUT_SRC) $(KB_MUT_EXTRA_SRC) $(KB_MUT_THIRD_SRC) $(KB_MUT_FOURTH_SRC) $(KB_MUT_FIFTH_SRC)),)
 KB_BODY_KEY := $(shell printf '%s\n' '$(KB_CC) $(subst -I$(KB_OUT),-I@out,$(KB_FLAGS)) $(KB_TU_FLAGS)' | sha256sum | cut -d' ' -f1)
 KB_BODY_OUT := build/out/ppc-kboot/sqlite-cache/$(KB_BODY_KEY)
 endif
@@ -152,7 +152,7 @@ ifneq ($(KB_BODY_OUT),$(KB_OUT))
 .PHONY: ppc-sqlite-refresh
 $(KB_GROUP).o: ppc-sqlite-refresh $(SQLITE_GENERATED)
 	@mkdir -p $(KB_BODY_OUT)
-	+@flock $(KB_BODY_OUT)/build.lock $(MAKE) KB_OUT=$(KB_BODY_OUT) KB_BODY_OUT=$(KB_BODY_OUT) KB_MUT_SRC= KB_MUT_FILE= KB_MUT_EXTRA_SRC= KB_MUT_EXTRA_FILE= KB_MUT_THIRD_SRC= KB_MUT_THIRD_FILE= $@
+	+@flock $(KB_BODY_OUT)/build.lock $(MAKE) KB_OUT=$(KB_BODY_OUT) KB_BODY_OUT=$(KB_BODY_OUT) KB_MUT_SRC= KB_MUT_FILE= KB_MUT_EXTRA_SRC= KB_MUT_EXTRA_FILE= KB_MUT_THIRD_SRC= KB_MUT_THIRD_FILE= KB_MUT_FOURTH_SRC= KB_MUT_FOURTH_FILE= KB_MUT_FIFTH_SRC= KB_MUT_FIFTH_FILE= $@
 else
 $(KB_HARD): $(SQLITE_GENERATED)
 $(KB_HARD) $(KB_GROUP).raw.o: sys/conf/features/sqlite-static.mk build/softfloat.mk
@@ -258,7 +258,14 @@ KB_MUT_EXTRA_SRC ?=
 KB_MUT_EXTRA_FILE ?=
 KB_MUT_THIRD_SRC ?=
 KB_MUT_THIRD_FILE ?=
-kb_src = $(if $(and $(KB_MUT_SRC),$(filter $(KB_MUT_SRC),$1)),$(KB_MUT_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_EXTRA_SRC),$1),$(KB_MUT_EXTRA_FILE) -I$(dir $1),$(if $(filter $(KB_MUT_THIRD_SRC),$1),$(KB_MUT_THIRD_FILE) -I$(dir $1),$1)))
+KB_MUT_FOURTH_SRC ?=
+KB_MUT_FOURTH_FILE ?=
+KB_MUT_FIFTH_SRC ?=
+KB_MUT_FIFTH_FILE ?=
+kb_slots := KB_MUT KB_MUT_EXTRA KB_MUT_THIRD KB_MUT_FOURTH KB_MUT_FIFTH
+kb_files = $(foreach slot,$(kb_slots),$($(slot)_FILE))
+kb_replacement = $(strip $(foreach slot,$(kb_slots),$(if $(filter $1,$($(slot)_SRC)),$($(slot)_FILE))))
+kb_src = $(if $(call kb_replacement,$1),$(call kb_replacement,$1) -I$(dir $1),$1)
 .PHONY: ppc-layout-force
 $(KB_OUT)/config/c-gui.flags: ppc-layout-force
 	@mkdir -p $(@D)
@@ -296,10 +303,10 @@ endif
 $(KB_OUT)/sys/dev/ata/ide.o: private KB_TU_FLAGS += -Wno-sign-compare
 $(KB_OUT)/lib/lz4.o: KB_TU_FLAGS += -O0
 $(KB_OUT)/sys/kern/console/console.o: KB_TU_FLAGS = -Wno-sign-compare
-$(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk build/sources/hooks.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
+$(KB_OUT)/%.o: %.c $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk build/sources/hooks.mk $(kb_files)
 	@mkdir -p $(dir $@)
 	$(KB_CC) $(KB_QUOTE_FLAGS) $(KB_FLAGS) $(KB_TU_FLAGS) -c $(call kb_src,$<) -o $@
-$(KB_OUT)/%.o: %.S $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk build/sources/hooks.mk $(KB_MUT_FILE) $(KB_MUT_EXTRA_FILE) $(KB_MUT_THIRD_FILE)
+$(KB_OUT)/%.o: %.S $(KB_OUT)/memmap_layout.h build/targets/ppc-powermac.mk build/sources/hooks.mk $(kb_files)
 	@mkdir -p $(dir $@)
 	$(KB_CC) $(KB_FLAGS) -c $(call kb_src,$<) -o $@
 $(KB_OUT)/kernel.ld: sys/arch/ppc/kernel.ld sys/platform/powermac/platform_kboot_layout.h $(KB_OUT)/memmap_layout.h
@@ -333,7 +340,7 @@ KB_LINK_COMMAND = $(KB_LINK_PREFIX) $(KB_CC) $(KB_FLAGS) -MF $(KB_ELF).d -no-pie
 # ISO media tick-rate debt is documented in PPC_SHELL_DESIGN §8; RAM media is fixed.
 audit: $(KB_ELF)
 	@python3 -B tools/ppc/kboot_audit.py --elf $(KB_ELF) --map $(KB_ELF:.ELF=.map) --objects $(KB_OBJ) $(KB_EXTRA) $(KB_SQLITE_AUDIT) --fp-object $(KB_OUT)/sys/arch/ppc/fp_context.o --nm $(KB_NM) --objdump $(KB_OBJDUMP) \
-	 --sources $(filter-out sys/fs/isofs/iso9660.c,$(KB_C)) $(KB_ASM) $(SQLITE_HARD_C) $(if $(KB_VFS),$(KB_VFS).c sys/arch/ppc/sqlite_restore.S) $(if $(KB_MUT_SRC),--mutant $(KB_MUT_SRC) $(KB_MUT_FILE)) $(if $(KB_MUT_EXTRA_SRC),--mutant $(KB_MUT_EXTRA_SRC) $(KB_MUT_EXTRA_FILE)) $(if $(KB_MUT_THIRD_SRC),--mutant $(KB_MUT_THIRD_SRC) $(KB_MUT_THIRD_FILE)) \
+	 --sources $(filter-out sys/fs/isofs/iso9660.c,$(KB_C)) $(KB_ASM) $(SQLITE_HARD_C) $(if $(KB_VFS),$(KB_VFS).c sys/arch/ppc/sqlite_restore.S) $(foreach slot,$(kb_slots),$(if $($(slot)_SRC),--mutant $($(slot)_SRC) $($(slot)_FILE))) \
 	 -- $(KB_CC) $(KB_FLAGS) $(KB_SQLITE_INC) $(if $(filter 1,$(FEATURE_FEP)),-I$(FEP_OUT))
 
 -include $(KB_OBJ:.o=.d)

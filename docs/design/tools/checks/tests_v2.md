@@ -108,3 +108,9 @@ UART trace、QMP 履歴、画面、要求と世代ごとの出力を evidence �
 ## PowerMac の HW run 中断
 
 7450 の KDEBUG 付き link-sh を 1 台起動し、300 秒以内に OHCI の正常読出しと wait・poll の LAN・USB 各中断を観測する。poll は実 PCI 読出しの進行を要求する。先に打った e を残し、同一 run の ABORT とプロンプト復帰後に cho retained-… を送り、20 秒内に retained-… の単独行を確認する。再 load の終了値は 0、中断と再 load の POINT は順に 1、0 とする。再 load の POINT が 1 の変異を検出する。
+
+## PowerMac の USB と RPC
+
+7450・7455 の link-sh で初回 ESC・Ctrl-C、正常 cat、応答抑止時の単独 HOSTDOWN、USB 入力の進行、再 cat、抜去中の LAN と再列挙後の USB/LAN を確認する。各 CPU の期限は 180 秒。WDATA から RELEASE の host 差は 80〜200 tick。
+
+同一 full rid の OPEN に結び付けた設定幅は 100 tick。待機可能な poll と client の実比較で prev < deadline ≤ end を最初に満たす周回に close が 1 回あり、最初の終了理由は POLL または CLIENT。CLIENT の timeout・close・return はこの順で、timeout と close は同一周回。POLL の通知は close 後。変異 rpc_ticks は設定幅 50 を直接観測し、両 CPU が確認した時だけ suppressed CALL configured for 50 ticks を返す。

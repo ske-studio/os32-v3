@@ -128,9 +128,16 @@ def clock_media():
     return iso, dict(make=args, hashes=hashes)
 
 
+RPC_FIELDS = """rid generation start deadline seen wdata release prev prev_event end end_event
+                end_round source timeout_tick timeout_round timeout_event close_tick close_round
+                close_event closes return_tick return_event reason reason_tick poll_tick poll_round
+                can_wait prior_poll prior_tick prior_wait late_poll late_tick late_wait first_client_event first_client_tick""".split()
+
+
 def meter_rpc(meter):
     link = Path("sys/net/link.c")
     trace = Path("tests/support/fixtures/ppc_link/rpc.inc").read_text()
+    trace = edit(trace, "/* RPC_FIELDS */", "u32 " + ", ".join(RPC_FIELDS) + ";")
     source = edit(link.read_text(), "static struct link_handle link_h[LINK_HANDLES];",
                   "static struct link_handle link_h[LINK_HANDLES];\n" + trace)
     for marker, rid, field in (("e->w_due = 0;\n            e->last_tx_tick = link_platform_now();",
@@ -138,18 +145,65 @@ def meter_rpc(meter):
                                ("e->rel_tick = link_platform_now();", "e->rel_rid", "release")):
         tick = "e->last_tx_tick" if field == "wdata" else "e->rel_tick"
         source = edit(source, marker, marker + f"\n                rpc_sent({rid}, {tick}, RPC_{field.upper()});")
-    meter("KB_MUT", link, source)
+    api = link.with_name("link_host_api.inc").read_text()
+    api = edit(api, "e->state = LINK_H_STALE;", """e->state = LINK_H_STALE;
+        volatile struct rpc_sample *sample = &rpc_trace[e->rid % 16];
+        if (sample->rid == e->rid && (sample->seen & RPC_OPEN))
+            rpc_reason(sample, RPC_IDLE);""")
+    meter("KB_MUT", link, edit(source, '#include "link_host_api.inc"', api))
 
+    header = '#include "tests/support/fixtures/ppc_link/rpc.h"'
     io = PM / "hostfs_link_io.c"
-    source = edit(io.read_text(), "static int phase;", """static int phase;
-extern void rpc_opened(int handle, u32 deadline);
-extern void rpc_expired(int handle, u32 now);""")
-    source = edit(source, "handle = rc;", "handle = rc;\n        rpc_opened(handle, until);")
-    source = edit(source, "if ((i32)(pm_hfs_now(0) - until) >= 0) {",
-                  """u32 now = pm_hfs_now(0);
-    if ((i32)(now - until) >= 0) {
-        if (handle >= 0) rpc_expired(handle, now);""")
+    source = edit(io.read_text(), "static int phase;", header + "\nstatic int phase;\nstatic u32 close_reason;")
+    source = edit(source, "pending = 1;", "rpc_accept(ctx, buf, n, deadline);\n    pending = 1;")
+    source = edit(source, "handle = rc;", "handle = rc;\n        rpc_opened(handle);")
+    source = edit(source, "if (!pending || !pm_hfs_can_wait(0)) return;", """if (!pending) return;
+    int can_wait = pm_hfs_can_wait(0);
+    rpc_poll(pm_hfs_now(0), can_wait);
+    if (!can_wait) return;""")
+    source = edit(source, "pm_hfs_now(0) - until", "rpc_compare(pm_hfs_now(0), RPC_POLL) - until")
+    source = edit(source, "        finish(OS32_ERR_TIMEOUT);", "        close_reason = RPC_POLL;\n        finish(OS32_ERR_TIMEOUT);")
+    source = edit(source, "if (pending) finish(OS32_ERR_TIMEOUT);",
+                  "if (pending) { close_reason = RPC_CLIENT; finish(OS32_ERR_TIMEOUT); }")
+    source = edit(source, "if (handle >= 0) (void)platform_host_close(handle, 0);",
+                  """if (handle >= 0) {
+        rpc_close(handle, close_reason ? close_reason : RPC_OTHER);
+        (void)platform_host_close(handle, 0);
+    }
+    close_reason = 0;""")
     meter("KB_MUT_EXTRA", io, source)
+
+    serialfs = Path("sys/fs/serialfs/serialfs.c")
+    source = edit(serialfs.read_text(), "static u32 sfs_deadline", header + "\nstatic u32 sfs_deadline")
+    source = edit(source, "c->io->now(c->ctx) + SFS_OPERATION_TICKS",
+                  "rpc_start(c->io->now(c->ctx), SFS_OPERATION_TICKS)")
+    meter("KB_MUT_FOURTH", serialfs, source)
+    print(next(line for line in source.splitlines() if line.startswith("#define SFS_OPERATION_TICKS")), flush=True)
+
+    client = serialfs.with_name("sfs_client.c")
+    source = edit(client.read_text(), "int sfs_client_oneway_deadline", header + "\nint sfs_client_oneway_deadline")
+    args = "c->ctx, c->tx, flen, deadline"
+    # Start a fresh comparison history before the first client deadline check.
+    for error in ("OS32_ERR_TIMEOUT", "OS32_ERR_HOSTDOWN"):
+        site = f"if ((i32)(c->io->now(c->ctx) - deadline) >= 0) return {error};"
+        source = edit(source, site, "rpc_begin(deadline);\n    " + site.replace(
+            "c->io->now(c->ctx)", "rpc_compare(c->io->now(c->ctx), RPC_CLIENT)"))
+    site = "int rc = sfs_exchange_deadline(c, flen, SFS_T_HELLO"
+    source = edit(source, site, "rpc_begin(deadline);\n    " + site)
+    source = edit(source, "(i32)(c->io->now(c->ctx) - deadline) >= 0) {",
+                  "(i32)(rpc_compare(c->io->now(c->ctx), RPC_CLIENT) - deadline) >= 0) {")
+    source = edit(source, "    int rc = c->io->put_until ?", f"    rpc_frame({args});\n    int rc = c->io->put_until ?")
+    site = "if (sent) c->resends++;"
+    source = edit(source, site, site + f"\n            rpc_frame({args});")
+    source = edit(source, "(now - deadline) >= 0) goto expired",
+                  "(rpc_compare(now, RPC_CLIENT) - deadline) >= 0) goto expired")
+    source = edit(source, "(c->io->now(c->ctx) - deadline) >= 0) goto expired",
+                  "(rpc_compare(c->io->now(c->ctx), RPC_CLIENT) - deadline) >= 0) goto expired")
+    source = edit(source, "if (sent && c->io->cancel)\n        c->io->cancel(" + args + ");",
+                  f"if (sent && c->io->cancel) {{\n        rpc_timeout({args});\n        c->io->cancel({args});\n    }}")
+    source = edit(source, "c->timeouts++;\n    return OS32_ERR_HOSTDOWN;",
+                  f"c->timeouts++;\n    rpc_return({args});\n    return OS32_ERR_HOSTDOWN;")
+    meter("KB_MUT_FIFTH", client, source)
 
 
 def meter_capture(meter):
