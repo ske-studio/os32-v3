@@ -1,5 +1,5 @@
 bits 32
-extern platform_irq_reserved, irq_dispatch, v86_reflect_irq, vm, mouse_irq_handler, outp, kctx_irq_depth
+extern irq_dyn_index, irq_dispatch, v86_reflect_irq, vm, mouse_irq_handler, outp, kctx_irq_depth
 %define IRQ_ENTER inc dword [kctx_irq_depth]
 %define IRQ_LEAVE dec dword [kctx_irq_depth]
 %define RESTORE_KSEG

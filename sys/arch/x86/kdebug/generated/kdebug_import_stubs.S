@@ -1641,4 +1641,14 @@ path_init:
 input_display_restore_drain:
     jmp *kdebug_import_slots+1308
 .size input_display_restore_drain, .-input_display_restore_drain
+.globl dma_chan_acquire
+.type dma_chan_acquire, @function
+dma_chan_acquire:
+    jmp *kdebug_import_slots+1312
+.size dma_chan_acquire, .-dma_chan_acquire
+.globl dma_chan_release
+.type dma_chan_release, @function
+dma_chan_release:
+    jmp *kdebug_import_slots+1316
+.size dma_chan_release, .-dma_chan_release
 .section .note.GNU-stack,"",@progbits

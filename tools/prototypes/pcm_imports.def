@@ -148,6 +148,24 @@
       "source": "sys/dev/sound/cs4231/pcm_module.h",
       "context": "normal",
       "irq": true
+    },
+    {
+      "symbol": "pcm_module_bios_route",
+      "source": "sys/dev/sound/cs4231/pcm_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pcm_module_dma_acquire",
+      "source": "sys/dev/sound/cs4231/pcm_module.h",
+      "context": "normal",
+      "irq": false
+    },
+    {
+      "symbol": "pcm_module_dma_release",
+      "source": "sys/dev/sound/cs4231/pcm_module.h",
+      "context": "normal",
+      "irq": false
     }
   ]
 }

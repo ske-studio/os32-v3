@@ -146,7 +146,7 @@ static void fdc_abort_transfer(void)
 {
     /* 1. まず DMA を止める。以後 dma_setup が「マスク→設定→アンマスク」
      *    するので、ここではマスクしたままにしておいてよい。 */
-    dma_chan_mask(FDC_DMA_CHANNEL);
+    dma_chan_mask(FDC_DMA_CHANNEL, &fdc_dma_owned);
 
     /* 2. FDC をリセットして実行フェーズを畳む。覚えているシリンダも捨てる。 */
     fdc_forget_all();
@@ -255,7 +255,7 @@ static int fdc_recover(int drv)
 {
     int rc;
 
-    dma_chan_mask(FDC_DMA_CHANNEL);
+    dma_chan_mask(FDC_DMA_CHANNEL, &fdc_dma_owned);
     rc = fdc_reset();
     if (rc != 0) return rc;
     return fdc_recalibrate(drv);

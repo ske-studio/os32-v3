@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 3243424623,
+  "module_abi_gen": 2956060572,
   "stage": "S6",
-  "count": 328,
+  "count": 330,
   "imports": [
     {
       "stage": "S1",
@@ -585,8 +585,8 @@
       "name": "dma_chan_mask",
       "kind_name": "FUNC",
       "type_ver": 1,
-      "signature": "void dma_chan_mask(unsigned int ch);",
-      "source_declaration": "void dma_chan_mask(unsigned int ch);",
+      "signature": "void dma_chan_mask(unsigned int ch, const void *owner);",
+      "source_declaration": "void dma_chan_mask(unsigned int ch, const void *owner);",
       "dtype": null,
       "array": false
     },
@@ -600,8 +600,8 @@
       "name": "dma_chan_setup",
       "kind_name": "FUNC",
       "type_ver": 1,
-      "signature": "int dma_chan_setup(unsigned int ch, u32 phys, u32 bytes, int dir, int mode);",
-      "source_declaration": "int dma_chan_setup(unsigned int ch, u32 phys, u32 bytes, int dir, int mode);",
+      "signature": "int dma_chan_setup(unsigned int ch, const void *owner, u32 phys, u32 bytes, int dir, int mode);",
+      "source_declaration": "int dma_chan_setup(unsigned int ch, const void *owner, u32 phys, u32 bytes, int dir, int mode);",
       "dtype": null,
       "array": false
     },
@@ -4970,6 +4970,36 @@
       "type_ver": 1,
       "signature": "int input_display_restore_drain(void);",
       "source_declaration": "int input_display_restore_drain(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 328,
+      "symbol": "dma_chan_acquire",
+      "source": "sys/dev/dma/dma8237.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "name": "dma_chan_acquire",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int dma_chan_acquire(unsigned int ch, const void *owner);",
+      "source_declaration": "int dma_chan_acquire(unsigned int ch, const void *owner);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 329,
+      "symbol": "dma_chan_release",
+      "source": "sys/dev/dma/dma8237.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "name": "dma_chan_release",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int dma_chan_release(unsigned int ch, const void *owner);",
+      "source_declaration": "int dma_chan_release(unsigned int ch, const void *owner);",
       "dtype": null,
       "array": false
     }

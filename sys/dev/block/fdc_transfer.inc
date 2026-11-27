@@ -94,6 +94,7 @@ int fdc_read_sectors(int drv, int cyl, int head, int sect, int count,
     int seek_failed = 0;
     u8 failed_seek_st0;
 
+    if (!fdc_dma_owned) return -1;
     if (g == 0 || count < 1 || sect < 1) return FDC_MULTI_ERR_RANGE;
     eot = sect + count - 1;
     if (eot > (int)g->spt) return FDC_MULTI_ERR_RANGE;          /* トラックをまたぐ (MT 無し) */
@@ -145,7 +146,7 @@ int fdc_read_sectors(int drv, int cyl, int head, int sect, int count,
     have_results = (n > 0);
     if (n < FDC_RESULT_BYTES) goto fail;
     /* リザルトを読み終えた = 実行フェーズは終わっている。DMA を閉じる。 */
-    dma_chan_mask(FDC_DMA_CHANNEL);
+    dma_chan_mask(FDC_DMA_CHANNEL, &fdc_dma_owned);
     dma_armed = 0;
     if ((results[0] & FDC_ST0_IC_MASK) != FDC_ST0_IC_NORMAL) {
         /* NR は回復より前に打ち切る (単発と同じ。ラリー 2 の Codex)。 */

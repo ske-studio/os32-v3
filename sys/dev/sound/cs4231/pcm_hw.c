@@ -57,17 +57,17 @@ static int hw_ack(void *ctx)
     return pcm_codec_ack();
 }
 
-static int hw_stop(void *ctx)
+static int hw_stop(void *ctx, int closing)
 {
     (void)ctx;
     pcm_module_refill_tick(-1);
-    return pcm_codec_stop();
+    return pcm_codec_stop(closing);
 }
 
-static void hw_release(void *ctx, int leak)
+static int hw_release(void *ctx, int leak)
 {
     (void)ctx;
-    pcm_codec_release(leak);
+    return pcm_codec_release(leak);
 }
 
 static u8 attenuation(u32 step)

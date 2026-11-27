@@ -195,6 +195,8 @@ void fdc_get_stats(struct fdc_stats *out)
  * 失敗していると、速度が元に戻ったことが画面で分からない。 */
 #define FDC_MULTI_FAIL_REPORT_MAX  4
 
+static int fdc_dma_owned;
+
 #include "fdc_io.inc"
 
 /* ======================================================================== */
@@ -266,6 +268,10 @@ int fdc_init(void)
 
     /* [HW2] DMA の窓を 64KB 境界をまたがない位置に決める
      * (fdc_buf_setup — 取れなければそこで言う)。 */
+    if (!fdc_dma_owned) {
+        if (dma_chan_acquire(FDC_DMA_CHANNEL, &fdc_dma_owned)) return -1;
+        fdc_dma_owned = 1;
+    }
     fdc_buf_setup();
 
     /* 0439h (1MB 超への DMA 禁止) は **dma8237_init() が起動の早い段階で

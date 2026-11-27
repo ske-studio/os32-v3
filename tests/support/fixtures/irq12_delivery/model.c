@@ -98,6 +98,7 @@ void _start(void)
     session(2);
     boot_probe.bank[0].model = boot_probe.bank[1].model = OPN_PROBE_ABSENT;
     publish_probe_irq_policy();
+    require(slave_mask & 16, "initial IRQ12 mask");
     require(irq_dyn_index(12) >= 0, "both absent topology");
     fixed_lines();
     session(0);

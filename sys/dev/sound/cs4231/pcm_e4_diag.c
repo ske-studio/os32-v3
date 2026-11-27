@@ -31,7 +31,7 @@ void pcm_e4_dispatch_enter(unsigned int irq)
     struct pcm_e4_sample *s = &pcm_e4_sample;
     if (irq != PCM_IRQ || s->scene == PCM_E4_OFF || s->done) return;
     if (s->scene == PCM_E4_TICK) {
-        s->dispatches++; /* any IRQ10 is interference in the no-IRQ case */
+        s->dispatches++; /* any IRQ12 is interference in the no-IRQ case */
         return;
     }
     /* This is before any handler, hence before the real PCM I24 ack.

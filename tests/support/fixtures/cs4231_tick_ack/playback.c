@@ -6,6 +6,7 @@ static unsigned int index_reg, status, reads, clears, advances;
 
 unsigned int inp(unsigned int port)
 {
+    if (port == PCM_PORT_R2) return status ? 1 : 0;
     if (port != PCM_PORT_R1 || index_reg != PCM_I_ALTSTAT) abort();
     ++reads;
     return status;
@@ -34,6 +35,7 @@ static void advance(void) { ++advances; }
 
 int main(void)
 {
+    dma_owned = mode2_verified = 1;
     s_hal_advance = advance;
     g_pcm.state = PCM_ST_RUNNING;
     if (!playback_edge() || playback_edge()) return 1;
@@ -43,7 +45,14 @@ int main(void)
                 reads, clears, status, advances);
         return 1;
     }
-    if (!playback_edge() || pcm_irq(PCM_IRQ, 0) != IRQ_HANDLED) return 1;
+    if (PCM_IRQ != 12 || !playback_edge() || pcm_irq(12, 0) != IRQ_HANDLED) {
+        fprintf(stderr, "IRQ12 delivery failed\n");
+        return 1;
+    }
+    if (pcm_irq(12, 0) != IRQ_NONE || advances != 2) {
+        fprintf(stderr, "duplicate playback advance\n");
+        return 1;
+    }
     return status || advances != 2 || reads != 2 || clears != 2;
 }
 
@@ -53,8 +62,8 @@ int sys_time_now(u32 *lo, u32 *hi) { abort(); }
 void tick_clock_jiffy64(u32 *lo, u32 *hi) { abort(); }
 void *kmemcpy(void *dst, const void *src, u32 size) { abort(); }
 void *kmemset(void *dst, int value, u32 size) { abort(); }
-void dma_chan_ack_tc(unsigned int ch) { abort(); }
-void dma_chan_mask(unsigned int ch) { abort(); }
-void dma_chan_unmask(unsigned int ch) { abort(); }
-int dma_chan_setup(unsigned int ch, u32 phys, u32 bytes, int dir, int mode) { abort(); }
-int dma_chan_remaining(unsigned int ch, u32 *left, int *tc) { abort(); }
+void dma_chan_ack_tc(unsigned int ch, const void *owner) { abort(); }
+void dma_chan_mask(unsigned int ch, const void *owner) { abort(); }
+void dma_chan_unmask(unsigned int ch, const void *owner) { abort(); }
+int dma_chan_setup(unsigned int ch, const void *owner, u32 phys, u32 bytes, int dir, int mode) { abort(); }
+int dma_chan_remaining(unsigned int ch, const void *owner, u32 *left, int *tc) { abort(); }

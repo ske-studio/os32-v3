@@ -184,6 +184,9 @@ int dma_check_args(unsigned int ch, u32 phys, u32 bytes, int dir, int mode);
 /* fdc_init より前、sysclk_detect の次に kernel.c から 1 回だけ呼ぶ。
  * 0439h bit2 (1MB 超への DMA 禁止) を RMW で落とし、3 値の診断を記録する。 */
 void dma8237_init(void);
+int dma_chan_acquire(unsigned int ch, const void *owner);
+int dma_chan_release(unsigned int ch, const void *owner);
+int dma_chan_quarantine(unsigned int ch, const void *owner);
 
 /* DMA_A20_* のいずれか。dma8237_init より前は DMA_A20_UNKNOWN。 */
 int dma_above_1mb_state(void);
@@ -196,19 +199,19 @@ void dma_above_1mb_raw(u8 *pre, u8 *post);
  * 呼ぶ前に dma_chan_mask を通っていること (マスクされていなければ負)。
  *   0 = 積んだ / DMA_ERR_ARG = 引数 / DMA_ERR_STATE = マスクされていない
  * 失敗した setup は自チャネルの done / tc_event を**消さない**。 */
-int dma_chan_setup(unsigned int ch, u32 phys, u32 bytes, int dir, int mode);
+int dma_chan_setup(unsigned int ch, const void *owner, u32 phys, u32 bytes, int dir, int mode);
 
-void dma_chan_mask(unsigned int ch);
-void dma_chan_unmask(unsigned int ch);
+void dma_chan_mask(unsigned int ch, const void *owner);
+void dma_chan_unmask(unsigned int ch, const void *owner);
 
 /* 残バイト数と TC の通知。手順と返却の規則は票 §1-2。
  *   0 = *bytes_left / *tc_seen を埋めた
  *   DMA_ERR_ARG   = ch が範囲外 / 出力が NULL
  *   DMA_ERR_AGAIN = 3 組とも揃わなかった (出力は触らない) */
-int dma_chan_remaining(unsigned int ch, u32 *bytes_left, int *tc_seen);
+int dma_chan_remaining(unsigned int ch, const void *owner, u32 *bytes_left, int *tc_seen);
 
 /* 保持している TC の通知を消す (done は次の setup まで残る)。 */
-void dma_chan_ack_tc(unsigned int ch);
+void dma_chan_ack_tc(unsigned int ch, const void *owner);
 
 /* 保持している状態をそのまま覗く (kselftest / 診断用。I/O は出さない)。
  * done / tc_event は NULL 可。ch が範囲外なら負。 */

@@ -314,8 +314,6 @@ void pcm_obs(struct pcm_core *c, int have_pos, u32 p1, u32 now,
 /* open の (2)〜(4): 先に新しい経路を結び、BIOS の旧設定の要因を止める。
  * **detach 状態 (0F40h = 0) で装置レジスタを書かない**ので経路が先。 */
 static const struct pcm_op seq_prologue[] = {
-    OP(PCM_OP_DMA_MASK, 0, 0),
-    OP(PCM_OP_PORT, PCM_POFS_ROUTE, PCM_ROUTE_INT41_DMA1),
     OP(PCM_OP_PORT, PCM_POFS_R2, 0),
     OP(PCM_OP_REG, PCM_I_IFACE, PCM_IFACE_CAL1),      /* PEN=0 */
     OP(PCM_OP_REG, PCM_I_PINCTL, 0)                   /* IEN=0 */

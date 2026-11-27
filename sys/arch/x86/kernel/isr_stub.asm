@@ -728,7 +728,7 @@ irq_stub_2:
         popad
         IRETD_USER
 
-extern platform_irq_reserved
+extern irq_dyn_index
 global irq_stub_12
 irq_stub_12:
         IRQ_ENTER
@@ -736,9 +736,9 @@ irq_stub_12:
         RESTORE_KSEG
         cld                     ;; 同上
         push    dword 12
-        call    platform_irq_reserved
+        call    irq_dyn_index
         test    eax, eax
-        jnz     .legacy_sound
+        js      .legacy_sound
         call    irq_dispatch
         add     esp, ABI_WORD_BYTES
         jmp     .done_sound
