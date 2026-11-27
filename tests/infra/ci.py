@@ -1,6 +1,6 @@
 """Plan, run and collect registry checks in local or hosted builds."""
 import argparse
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, deque
 import importlib.util
 import json
 import math
@@ -73,6 +73,10 @@ def prerequisites(environment, cpu, config, sources):
     return missing
 
 
+class MissingPrerequisites(OSError):
+    pass
+
+
 def check_prerequisites(plan, args, identity):
     failures = {}
     for row, cpu, config in plan:
@@ -82,16 +86,23 @@ def check_prerequisites(plan, args, identity):
                 failures[row["id"], config] = missing
     if failures:
         records = []
-        for (name, config), missing in failures.items():
-            reason = ", ".join(sorted(missing))
+        for row, cpu, config in plan:
+            name = row["id"]
+            exempt = exemption(row, config, args.gate)
+            if exempt:
+                status, reason = exempt
+            elif (name, config) in failures:
+                status, reason = "ERROR", ", ".join(sorted(failures[name, config]))
+            else:
+                continue
             log = f"{name}-{config}.log"
             (args.output / log).write_text(reason + "\n")
-            records.append(dict(id=name, config=config, status="ERROR", reason=reason,
+            records.append(dict(id=name, config=config, status=status, reason=reason,
                                 seconds=0, log=log, mutations={}))
         bundle = args.output / f"bundle-{args.bundle or 'all'}.json"
         bundle.write_text(json.dumps(dict(identity=identity, records=records, seconds=0)))
         missing = set.union(*failures.values())
-        raise OSError("\n".join(sorted(missing)))
+        raise MissingPrerequisites("\n".join(sorted(missing)))
 
 
 def mutate(tree, mutation):
@@ -213,13 +224,13 @@ def execute(candidate, row, cpu, config, mutations, env, log, outcomes, destinat
         shutil.copytree(candidate, tree, dirs_exist_ok=True)
         cmd = [sys.executable, "-B", f'tests/{row["subsystem"]}/{row["id"]}.py', config]
 
-        def invoke(phase, environment):
-            return subprocess.run(cmd + [phase], cwd=tree, env=environment, stdout=subprocess.PIPE,
+        def invoke(phase, environment, output):
+            return subprocess.run(cmd + [phase], cwd=tree, env=environment, stdout=output,
                                   stderr=subprocess.STDOUT, text=True, errors="replace")
 
-        def verify():
+        def verify(output):
             with tempfile.TemporaryDirectory(dir=tree) as out:
-                return invoke("verify", {**env, "OS32_VERIFY_OUT": out})
+                return invoke("verify", {**env, "OS32_VERIFY_OUT": out}, output)
 
         def failure(proc, phase, label):
             print(proc.stdout, end="", file=log)
@@ -228,9 +239,19 @@ def execute(candidate, row, cpu, config, mutations, env, log, outcomes, destinat
             return lines[-1] if lines else f"{phase} exited {proc.returncode}"
 
         for phase in ("build", "verify"):
-            proc = invoke("build", env) if phase == "build" else verify()
+            start = log.tell()
+            proc = invoke("build", env, log) if phase == "build" else verify(log)
             if proc.returncode:
-                return state(proc.returncode), failure(proc, phase, "normal")
+                save_evidence(tree, destination / "normal")
+                with open(log.name, "rb") as stream:
+                    end = stream.seek(0, os.SEEK_END)
+                    tail = b""
+                    while end > start and b"\n" not in tail:
+                        size = min(4096, end - start)
+                        end = stream.seek(end - size)
+                        tail = (stream.read(size) + tail).rstrip()
+                lines = tail.decode(errors="replace").splitlines()
+                return state(proc.returncode), lines[-1] if lines else f"{phase} exited {proc.returncode}"
         for m in mutations:
             start = time.monotonic()
             target = tree / next(m[k] for k in ("remove", "append", "replace") if k in m)
@@ -241,7 +262,7 @@ def execute(candidate, row, cpu, config, mutations, env, log, outcomes, destinat
                         shutil.rmtree(tree / "evidence")
                     shutil.copy2(target, saved)
                     mutate(tree, m)
-                    proc = verify()
+                    proc = verify(subprocess.PIPE)
                     detected = proc.returncode == 1 and m["fail"] in proc.stdout
                     result = "RED" if detected else state(proc.returncode)
                     if result in ("PASS", "FAIL"):
@@ -385,6 +406,14 @@ def collect(plan, args, identity, plan_errors=()):
             rc = max(rc, 1)
         if broken or status in ("FAIL", "ERROR", "NOT_RUN"):
             failed.append(item)
+    if getattr(args, "github_output", None):
+        with args.github_output.open("a") as output:
+            print("failure_logs<<END_LOGS", file=output)
+            for item in table:
+                if (item["status"] in ("FAIL", "ERROR")
+                        or any(m["result"] != "RED" for m in item["mutations"].values())):
+                    print(args.output.resolve() / item["log"], file=output)
+            print("END_LOGS", file=output)
     if records:
         errors.append(f"unexpected rows {list(records)}")
     if errors:
@@ -405,7 +434,8 @@ def collect(plan, args, identity, plan_errors=()):
             print("Missing mutations:", ", ".join(item["missing_mutations"]))
         logfile = args.output / item["log"]
         if logfile.is_file():
-            print("\n".join("    " + line for line in logfile.read_text(errors="replace").splitlines()[-12:]))
+            with logfile.open(errors="replace") as stream:
+                print("".join("    " + line for line in deque(stream, maxlen=12)).rstrip())
     print()
     for item in sorted(table, key=lambda item: -item["seconds"])[:5]:
         print("slow", item["id"], item["config"], f'{item["seconds"]:.1f}s')
@@ -439,6 +469,7 @@ def main():
     parser.add_argument("--bundle")
     parser.add_argument("--gate", choices=["push", "main"], default="main")
     parser.add_argument("--output", type=Path, default=Path("build/out/check-results"))
+    parser.add_argument("--github-output", type=Path)
     parser.add_argument("--base", default=os.getenv("OS32_CI_BASE"))
     parser.add_argument("--full", action="store_true", default=os.getenv("GITHUB_EVENT_NAME") in ("schedule", "workflow_dispatch"))
     parser.add_argument("--plan-file", type=Path)
@@ -486,7 +517,10 @@ def main():
         (args.output / "plan.json").write_text(json.dumps(expected, ensure_ascii=False, indent=2))
     if args.command == "collect":
         return collect(plan, args, identity, plan_errors)
-    check_prerequisites(plan, args, identity)
+    try:
+        check_prerequisites(plan, args, identity)
+    except MissingPrerequisites as exc:
+        return collect(plan, args, identity, [str(exc)])
     env = os.environ.copy()
     cross_bin = Path(env.get("CROSS_DIR", Path.home() / "opt/cross")) / "bin"
     env["PATH"] = str(cross_bin) + os.pathsep + env.get("PATH", os.defpath)

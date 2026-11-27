@@ -28,10 +28,32 @@ def verify_selection():
     inventory = Inventory(root)
     rows = tomllib.loads((root / "tests/registry.toml").read_text())["check"]
 
-    for row in rows:
-        body = root / "tests" / row["subsystem"] / (row["id"] + ".py")
-        if row["id"] != "collection_contract":
-            check("OS32_VERIFY_OUT" not in body.read_text(), "legacy verify environment")
+    legacy_bodies = (
+        "infra/ppc_media_build.py",
+        "infra/x86_media_build.py",
+        "infra/ppc_common_compile.py",
+        "infra/build_identity.py",
+        "infra/registry_fields.py",
+        "system/ppc_boot.py",
+        "infra/landing_evidence.py",
+        "infra/src_owner.py",
+        "infra/build_sources.py",
+        "infra/include_layers.py",
+        "infra/link_layers.py",
+        "infra/hal_contracts.py",
+        "infra/test_registration.py",
+        "tools/docs_links.py",
+        "tools/docs_navigation.py",
+        "tools/docs_source_refs.py",
+        "tools/docs_status.py",
+        "tools/kapi_abi.py",
+        "tools/kapi_sync.py",
+        "infra/c_dialect.py",
+        "infra/p2v.py",
+        "infra/ring3_instructions.py",
+    )
+    for body in legacy_bodies:
+        check("OS32_VERIFY_OUT" not in (root / "tests" / body).read_text(), "legacy verify environment")
     rows.append(dict(next(row for row in rows if row["id"] == "ppc_boot"),
                      id="net_fixture", environment="qemu-ppc-net", sources=[]))
 
@@ -131,12 +153,16 @@ def verify(config):
         identity = dict(sha="fixture", run="local", attempt="1", mutate=False, gate="main")
         for args.bundle in ("host", "ppc"):
             run_bundle(source, [r for r in plan if r[1] == args.bundle], args, {}, identity)
+        args.github_output = root / "github-output"
         output = io.StringIO()
         with redirect_stdout(output):
             check(collect(plan, args, identity) == 1, "two failures must block collection")
         summary = json.loads((out / "summary.json").read_text())
         check([r["status"] for r in summary["rows"]] == ["FAIL", "FAIL", "PASS"],
               "remaining check did not run")
+        check(args.github_output.read_text().splitlines() == [
+            "failure_logs<<END_LOGS", str(out / "first-test.log"), str(out / "second-test.log"),
+            "END_LOGS"], "failure log selection")
         check(all(f"{name} diagnostic" in output.getvalue() for name in ("first", "second")),
               "missing failure tails")
         path = out / "bundle-host.json"
@@ -226,7 +252,8 @@ def verify(config):
         workflow = yaml.safe_load(Path(".github/workflows/restructure-check-bundle.yml").read_text())
         uploads = [step["with"]["path"].splitlines() for job in workflow["jobs"].values()
                    for step in job["steps"] if step.get("uses", "").startswith("actions/upload-artifact@")]
-        check(any("${{ runner.temp }}/results/evidence/" in paths for paths in uploads),
+        check(["${{ runner.temp }}/results/bundle-*.json", "${{ steps.run_checks.outputs.failure_logs }}",
+               "${{ runner.temp }}/results/evidence/"] in uploads,
               "failure evidence upload missing")
 
 

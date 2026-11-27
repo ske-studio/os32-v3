@@ -131,7 +131,7 @@ PC-98 と PowerMac のビルド環境は build-setup と ppc-setup が用意す�
 ## P6-2〜P6-4 の取り込み手順
 
 統合用の wt/int-* に候補 SHA を push する。plan・checks・collect は候補の登録を
-使い、collect の結果は summary-<attempt> に残る。各束の構成別ログは
+使い、collect の結果は summary-<attempt> に残る。実行器が選ぶ通常失敗・変異 UNDETECTED / ERROR の構成別ログは
 checks-<attempt>-<束> にある。全件集計の欠け・失敗・別 attempt は取り込みを止める。
 この段では全件を同じ attempt で回すため、再試行は全ジョブを指定する。
 基点比較は移動時で終了し、以後は build_identity が候補の二つの清浄ビルドを照合する。

@@ -940,7 +940,7 @@ GitHub Actionsでの新規構築はf1a作業中は未実施、PMがCI runで確�
 
 ### §8-6 GitHub Actions での本体ビルド
 
-実失敗の証拠は今回の checks 成果物の evidence/ 以下にある。
+今回の checks 成果物には実失敗の構成ログと evidence/ 以下の証拠を収める。
 
 [restructure-build.yml](../.github/workflows/restructure-build.yml) が変更の所属から媒体・検査・変異を選ぶ。文書だけでも PC-98 の起動 FD と PowerMac core を組む。公開契約・ABI・ビルド規則・workflow・登録・影響不明の変更、週次・手動実行は全件。選び方は ci_v2 §10、取り込み条件は [ci_v2 §0](design/tools/ci/ci_v2.md)。選択計画の集計は同文書 §4 に従う。
 
