@@ -95,9 +95,7 @@ userland/shell/%.o: userland/shell/%.c $(SHELL_DEPS) | $(ABI_CONTRACT_ORDER)
 
 # PCI の純粋な復号 (sys/dev/pci/pci_decode.c) を `lspci` / `pcidump` からも使う。
 # **写さない** — BAR の種別と番地、クラス名、Header Type の切り出しは
-# カーネルと 1 文字も違ってはいけない。ホスト試験 (check-pci-decode-host) が
-# 見張っているのはこの 1 本だけなので、CPL=3 側でも同じソースをもう一度
-# コンパイルして繋ぐ。I/O も静的配列も触らないのでそのまま通る。
+# カーネルと同じソースを CPL=3 用にもコンパイルして繋ぐ。復号の旧検査は撤去済み。ここを変更する際に tests/ に検査を追加する。
 PCI_DECODE_USER_OBJ = userland/shell/pci_decode_user.o
 $(PCI_DECODE_USER_OBJ): sys/dev/pci/pci_decode.c sys/dev/pci/pci_decode.h | $(ABI_CONTRACT_ORDER)
 	$(CC) $(PROGRAM_FLAGS) -Idrivers -c sys/dev/pci/pci_decode.c -o $@
@@ -594,7 +592,7 @@ userland/system/hsync.elf: lib/crc32_core.inc sys/kern/exec/os32x_hdr.c sys/kern
 # ユーザーランドぶん。ゲームは game/Makefile が自前で持つ。
 # build/app.conf のキーはリポジトリルートからの拡張子なしパス
 # (例: userland/cmds/wc)。キーが実在するターゲットと
-# 一致しているかは make check-app-conf で検査できる。
+# app.conf との一致を確かめる旧検査は撤去済み。ここを変更する際に tests/ に検査を追加する。
 # 列: 名前 APIバージョン ヒープサイズ [gfx|cui|launcher]
 #   4 列目 gfx = 全画面 GFX を使う宣言 (OS32X_FLAG_GFX、mkos32x --gfx)。
 #   省略 = 無し。gfx_init / gfx_init_200 を呼ぶプログラムに立てる (票 T8 D1a)。
@@ -604,7 +602,7 @@ userland/system/hsync.elf: lib/crc32_core.inc sys/kern/exec/os32x_hdr.c sys/kern
 #   4 列目 launcher = 起動要求者の宣言 (OS32X_FLAG_LAUNCHER、mkos32x --launcher)。
 #   launch_req (KAPI v49) を呼ぶもの (端末 / sh) に立てる。カーネルはこの
 #   宣言の無い CPL=3 からの launch_req を断る (票 T9 D3、D1a)。
-#   いずれも立て忘れは make check-manifests が検出する。
+#   フラグの立て忘れを調べる旧検査は撤去済み。ここを変更する際に tests/ に検査を追加する。
 userland/%.raw: userland/%.elf
 	$(OBJCOPY) -O binary $< $@
 
@@ -702,7 +700,7 @@ $(eval $(call DEFINE_RUST_PROGRAM,gui_bench,userland/diag,))
 # 先頭 4KB がジャンプ表 (OS32ShlibHeader)。crt0 は付けない (入口は表であって
 # _start ではない)。tools/mkshlib.py が ELF のセクション情報からヘッダの
 # text_pages / data_vaddr / data_pages を焼き、OS32X_FLAG_SHLIB 付きの OS32X にする。
-# 番号表 (shlib.rs と stub.rs) の突き合わせは make check-shlib。
+# shlib.rs と stub.rs の番号表を照合する旧検査は撤去済み。ここを変更する際に tests/ に検査を追加する。
 SHLIB_GUI_LIB = $(RUST_TARGET_DIR)/liblibos32gui.a
 
 $(SHLIB_GUI_LIB): FORCE $(RUST_KAPI_RS)

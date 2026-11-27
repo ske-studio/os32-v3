@@ -71,10 +71,15 @@ def scope(path, inventory, direct, product_inputs):
 def impact(rows, paths, inventory, force=False):
     scopes = {}
     direct_pairs = set()
-    product_inputs = media_inputs(inventory) if inventory is not None else []
+    if inventory is not None and not hasattr(inventory, "media_inputs"):
+        inventory.media_inputs = media_inputs(inventory)
+    product_inputs = inventory.media_inputs if inventory is not None else []
     for path in sorted(paths):
         direct = {r["id"] for r in rows if path == f'tests/{r["subsystem"]}/{r["id"]}.py'
                   or any(path == source or path.startswith(source + "/") for source in r["sources"])}
+        spec_checks = {r["id"] for r in rows if r["spec"]["path"] == path}
+        if spec_checks:
+            direct.update(spec_checks | {"test_registration"})
         scopes[path] = scope(path, inventory, direct, product_inputs)
         for name in direct:
             bundles = {"x86", "ppc", "host"}
@@ -84,6 +89,7 @@ def impact(rows, paths, inventory, force=False):
                 bundles.discard("x86")
             direct_pairs.update((name, bundle) for bundle in bundles)
     product_scopes = {"x86", "ppc", "kernel", "userland", "shared-userland", "ppc-userland"}
+    declared_configs = set()
     shared_programs = set()
     if not force and "full" not in scopes.values() and product_scopes.intersection(scopes.values()):
         from tools.ownership_images import image_dependencies
@@ -96,6 +102,7 @@ def impact(rows, paths, inventory, force=False):
             if kind not in product_scopes:
                 continue
             outputs = inventory.declared_images.get(path, ())
+            declared_configs.update(config for config, _ in outputs)
             if not outputs or Path(path).suffix not in (".c", ".asm", ".s", ".S"):
                 scopes[path] = "full"
             elif any(config == "pc98" and output.startswith("userland/") and output.endswith((".elf", ".bin"))
@@ -104,10 +111,10 @@ def impact(rows, paths, inventory, force=False):
     kinds = set(scopes.values())
     if shared_programs:
         kinds.add("userland")
-    ppc_user_images = set()
+    ppc_configs = declared_configs.intersection(PPC)
     for path, kind in scopes.items():
         if kind in ("ppc-userland", "shared-userland"):
-            ppc_user_images.update(set(inventory.tables["OWN_COMPILE"].get(path, PPC)).intersection(PPC))
+            ppc_configs.update(set(inventory.tables["OWN_COMPILE"].get(path, PPC)).intersection(PPC))
     if "shared-userland" in kinds:
         kinds.add("userland")
     full = force or not paths or "full" in kinds
@@ -117,8 +124,9 @@ def impact(rows, paths, inventory, force=False):
     userland_checks = {"ring3_instructions", "c_dialect", "x86_media_build", "build_identity"}
     entries = []
     skipped = {}
-    images = set(PPC) if full or "ppc" in cpu_bundles else set(ppc_user_images)
-    pc98 = "distribution" if full or "x86" in cpu_bundles or "userland" in kinds else "none"
+    images = set(PPC) if full or "ppc" in cpu_bundles else set(ppc_configs)
+    needs_distribution = full or "pc98" in declared_configs or "x86" in cpu_bundles or "userland" in kinds
+    pc98 = "distribution" if needs_distribution else "none"
     for row in rows:
         name = row["id"]
         for bundle, configs in row["arch"].items():
@@ -132,9 +140,9 @@ def impact(rows, paths, inventory, force=False):
                 selected |= "checks" in kinds and name in GATE_CHECKS
                 selected |= "docs" in kinds and name.startswith("docs_")
             for config in configs:
-                matches_user_image = bundle == "ppc" and config in ppc_user_images and name in (
+                matches_config = bundle == "ppc" and config in ppc_configs and name in (
                     "c_dialect", "ppc_media_build", "ppc_boot", "build_identity")
-                if selected or matches_user_image:
+                if selected or matches_config:
                     entries.append([name, config])
                     if name in ("ppc_media_build", "ppc_boot"):
                         images.add(config)

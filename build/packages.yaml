@@ -29,7 +29,7 @@
 #    docs      → NORMAL   man ページ
 #    data      → NORMAL   FEP 辞書、MGX サンプル
 #    test      → DEBUG    試験バイナリと試験用データ (userland/tests/ 由来は必ずこれ)
-#  1 行のタグはちょうど 1 つのパッケージに当たること (検査が見る)。
+#  1 行のタグはちょうど 1 つのパッケージに当たること。
 #
 #  cdinst の選択肢との対応 (userland/system/cdinst.c)。展開は依存の順
 #  BOOT → MINIMAL → GUI → NORMAL → DEBUG:
@@ -97,17 +97,15 @@ exclude: []
 
 # ---------------------------------------------------------------------------
 # 起動 FD (build/image.mk の images/os32_boot.d88 と images/os32_boot144.img)。
-# 中身は from のパッケージから exclude を除いた集合 (make
-# check-packages-host が実物のイメージで等しいことを見る)。違うのは:
+# 中身は from のパッケージから exclude を除いた集合。違うのは次の項目。
 #   exclude FD には不要な物。guest と reason を書く (CD の集合には残す)
 #   rename  FAT (FatFs は LFN なし) の 8.3 に収まらない名前と、FD 上の置き場所が
 #           HDD と違う物。guest は配備マニフェストのゲストパス、fd は FD 上のパス
 #   only    FD だけが要る起動用の物。host の {loader} は make が渡す
 #           (2HD: boot/loader_fat_new.bin、1.44MB: boot/loader_fat144.bin)
 # どれも reason: を必ず書く。install.bin (FD → HDD) はこの表を逆に当てて正規名で
-# 写す (userland/system/install.c の fd_renames / fd_only。足したら両方直す —
-# make check-packages-host の case 9 が突き合わせ、FD → install → HDD の集合が
-# MINIMAL から fd.exclude を除いた集合と等しいことも見る)。
+# 写す (userland/system/install.c の fd_renames / fd_only。足したら両方直す)。
+# FD から HDD に写した集合と MINIMAL から fd.exclude を除いた集合を照合する旧検査は撤去済み。ここを変更する際に tests/ に検査を追加する。
 # ---------------------------------------------------------------------------
 fd:
   from: [boot, minimal]

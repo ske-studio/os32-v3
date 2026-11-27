@@ -7,7 +7,7 @@
 # build/packages.yaml の fd: から tools/mkpkg.py --fd-args が作る (FD だけに
 # 要る LOADER.BIN / profile と、FAT の 8.3 に合わせた置き場所の違いもそこ)。
 # ここに一覧を書かないこと — 2026-09-24 まで FDD_MIN_CMDS を手で持っていて
-# CD の MINIMAL とずれていた。make check-packages-host が実物で等しいかを見る。
+# CD の MINIMAL とずれていた。実物で集合を照合する旧検査は撤去済み。ここを変更する際に tests/ に検査を追加する。
 # 2hd と 1.44MB で 1 つを使う。$(1) = LOADER.BIN のもと。
 FDD_IMAGE_DEPS = boot $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES) programs unicode_bin \
                  $(BUILD_OUT)/settings.db assets-deployed build/packages.yaml \

@@ -20,10 +20,14 @@ def check(value, why):
 def verify_selection():
     import tomllib
     from tests.support.impact import impact, PPC
+    from tools.ownership_images import image_dependencies
     from tools.ownership import Inventory
     root = Path.cwd()
     inventory = Inventory(root)
     rows = tomllib.loads((root / "tests/registry.toml").read_text())["check"]
+
+    declared = image_dependencies(inventory, declared_only=True)
+    inventory.declared_images = declared
 
     def plan(path):
         result = impact(rows, [path], inventory)
@@ -75,6 +79,18 @@ def verify_selection():
         result, entries = plan(path)
         check(result["full"] and result["sdk"] and result["userland"] and not result["skipped"]
               and len(entries) == sum(len(c) for r in rows for c in r["arch"].values()), "full scope")
+
+    for path in sorted(inventory.paths):
+        result, entries = plan(path)
+        configs = {config for config, _ in declared.get(path, ())}
+        selected = set(result["powerpc"])
+        if result["pc98"] == "distribution":
+            selected.add("pc98")
+        check(configs <= selected, f"declared images: {path}: {sorted(configs - selected)}")
+        for row in rows:
+            if row["spec"]["path"] == path:
+                required = {(row["id"], c) for configs in row["arch"].values() for c in configs}
+                check(required | {("test_registration", "local")} <= entries, f"spec input: {path}")
 
 
 def verify(config):

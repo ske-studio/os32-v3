@@ -113,7 +113,7 @@ DEPFLAGS = -MMD -MP
 #                    暗黙宣言を既定では警告にしかしない (既定のエラー化は GCC 14 から)
 #                    ので明示する。VLA は gnu89 でも拡張として通るので言語モードに
 #                    かかわらず要る (非定数式の STATIC_ASSERT もここで止まる)
-# 実際に効いている言語モードは make check-c-dialect が確かめる。
+# 実効言語モードの旧検査は撤去済み。現行の登録は tests/ の c_dialect。
 C_STD            = -std=gnu11
 C_STD_SQLITE     = -std=gnu89
 C_DIALECT_ERRORS = -Werror=implicit-function-declaration -Werror=implicit-int -Werror=vla
@@ -203,8 +203,7 @@ LDFLAGS = -m $(ELF_EMULATION) -T $(BUILD_OUT)/os32.ld -Map=$(BUILD_OUT)/kernel.m
 #
 # -Isys/arch/$(ARCH) -Isys/platform/$(PLATFORM) は **足さない**。外部プログラムは
 # CPL=3 で走り、in/out も cli/sti も #GP になるので sys/include/io.h を引く
-# ソースが 1 本も無い (2026-09-15 に全ツリーを grep して確認。番人は
-# tools/check_privileged.py)。もし将来ユーザーランドが io.h を引くように
+# ソースが 1 本も無い (2026-09-15 に確認)。将来ユーザーランドが io.h を引くように
 # なったら、それは特権命令を呼ぼうとしている印なので、-I を足す前に
 # 「なぜ CPL=3 のコードが原始命令を要るのか」を先に疑うこと。
 PROGRAM_FLAGS = $(USER_CFLAGS) -I. -Iinclude -Isys/arch/x86 -Isys/hal/gfx -Isys/hal/input -Isys/hal/sound -Isys/hal/time -Isys/include -Isys/platform/pc98 $(SDK_INC) -Iuserland/lib -I$(CROSS_DIR)/i386-elf/include
