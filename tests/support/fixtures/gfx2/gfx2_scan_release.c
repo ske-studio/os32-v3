@@ -130,6 +130,26 @@ static int run(void)
     gfx2_closing_sweep(&adapter);
     if (released != 1025 || next->state != GFX2_ST_FREE || alias->scan_ref != 1 ||
         scan_sid != alias->sid || adapter.head[0].scan_sid != scan_sid) return 4;
+    struct gfx2_surf *pending = &gfx2_surfs[3];
+    *pending = (struct gfx2_surf){.sid = 1027, .owner = 7, .state = GFX2_ST_IDLE,
+                                  .pool = GFX2_POOL_VRAM, .usage = GFX2_USE_SCANOUT};
+    *old = (struct gfx2_surf){.sid = 2048, .owner = 7, .state = GFX2_ST_IDLE,
+                              .pool = GFX2_POOL_VRAM, .usage = GFX2_USE_SCANOUT,
+                              .fmt = GFX2_FMT_INDEX8, .w = 8, .h = 8};
+    retired = 0;
+    if (gfx2_flip(0, 0, pending->sid, 0, 10) != OS32_ERR_AGAIN ||
+        gfx2_surface_free(pending->sid)) return 9;
+    mode_result = OS32_ERR_IO;
+    if (gfx2_mode_set(0, 0, 1, 1, old->sid) != OS32_ERR_IO ||
+        pending->scan_ref != 1 || alias->scan_ref != 1) return 9;
+    mode_result = 0;
+    if (gfx2_mode_set(0, 0, 1, 1, old->sid)) return 9;
+    gfx2_closing_sweep(&adapter);
+    if (pending->state != GFX2_ST_FREE || released != 1027 ||
+        old->scan_ref != 1 || alias->scan_ref) return 9;
+    flip_result = 0;
+    retired = old->sid;
+    if (gfx2_flip(0, 0, old->sid, 0, 10)) return 9;
     return 0;
 }
 

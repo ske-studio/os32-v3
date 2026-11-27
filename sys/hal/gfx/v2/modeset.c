@@ -56,6 +56,7 @@ int gfx2_mode_set(u32 index, u32 head, u32 conn_mask, u32 mode_id, u32 sid)
     rc = a->be->mode_set(a->ctx, head, conn_mask, &mode, s);
     if (rc) return rc;
     if (a->state != GFX2_AD_OK) gfx2_adapter_recovered(a);
+    gfx2_head_detach(a, head);
     gfx2_scan_ref_swap(a, head, s);
     a->head[head].mode_id = mode_id;
     a->head[head].conn_mask = conn_mask;

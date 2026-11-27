@@ -13,6 +13,7 @@ int gfx2_caller_get(struct gfx2_caller *c) { c->app_id=1; c->owner=2; return 0; 
 i32 gfx_screen_owner(void) { return 1; }
 struct gfx2_surf *gfx2_surf_get(u32 sid,u32 owner,int *rc) { (void)owner; *rc=OS32_ERR_STALE; return sid == 1 ? &surf : 0; }
 int gfx2_surf_quiesce(struct gfx2_surf *s,u32 dl) { (void)s;(void)dl; return qrc; }
+void gfx2_head_detach(struct gfx2_adapter *p, u32 h) { p->head[h].scan_sid = 0; }
 void gfx2_scan_ref_swap(struct gfx2_adapter *p,u32 h,struct gfx2_surf *s) { swaps++; p->head[h].scan_sid=s->sid; }
 void gfx2_adapter_recovered(struct gfx2_adapter *p) { p->state=GFX2_AD_OK; }
 void gfx_policy_scan_changed(void) { policy++; }

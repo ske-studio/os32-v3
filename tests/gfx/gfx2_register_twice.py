@@ -12,4 +12,5 @@ if __name__ == "__main__":
         "sys/dev/video/geforce/gf_v2_ops.c", "sys/dev/video/geforce/gf_v2_life.c",
     ], {1: "repeated registration", 2: "active fallback", 3: "confirmed stop",
         4: "unconfirmed stop", 5: "alias rebind", 6: "held alias", 7: "full alias table", 8: "replacement alias",
-        9: "failed switch revoked alias", 10: "retired alias still public"}, gc_sections=True)
+        9: "failed switch revoked alias", 10: "retired alias still public",
+        11: "fallback console after failed switch"}, gc_sections=True)

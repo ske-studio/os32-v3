@@ -14,7 +14,10 @@ static void gfx_init_mode(int legacy200)
     /* GDC 初期化より前にバックエンドを決める。 */
     int initialized = gfx_select_and_init_backend(legacy200);
     if (initialized < 0) return;
-    gfx2_register_selected();
+    if (gfx2_register_selected()) {
+        display_provider_console_return();
+        return;
+    }
     if (initialized) {
         const GfxMode *mode = gfx_backend_mode(g_backend);
         gfx_reinit_surfaces(1);

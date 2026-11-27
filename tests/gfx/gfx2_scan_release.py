@@ -11,4 +11,5 @@ if __name__ == "__main__":
                {1: "active scan reference", 2: "retired backing",
                 3: "failed restore backing", 4: "restored backing",
                 5: "pre-write rejection", 6: "uncertain flip references",
-                7: "flip before mode set", 8: "initial mode set"}, gc_sections=True)
+                7: "flip before mode set", 8: "initial mode set",
+                9: "mode set supersedes pending flip"}, gc_sections=True)

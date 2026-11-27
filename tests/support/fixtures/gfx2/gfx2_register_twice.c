@@ -51,9 +51,29 @@ void *kmemset(void *dst, int value, u32 n)
 }
 void *memset(void *dst, int value, unsigned n) { return kmemset(dst, value, n); }
 
+static GfxBackend gf = {.shutdown = shutdown}, pc98;
+GfxBackend *g_backend;
+#define DISPLAY_FALLBACK_BACKEND (&pc98)
+#define GFX_HEIGHT 400
+static int gfx_current_height, gfx_flip_enabled, gfx_display_page, gfx_started;
+static int finishes, returns;
+static u32 display_provider_ledger(const GfxBackend *be)
+{ return be == &pc98 ? GFX2_KIND_PC98 : GFX2_KIND_GEFORCE; }
+static void display_provider_each(void (*fn)(GfxBackend *, void *), void *arg) {}
+int ring3_call_from_user(void) { return 0; }
+int con_sink_is_enabled(void) { return 0; }
+int appslot_gfx_owner(void) { return 1; }
+static void display_provider_raster_reset(void) {}
+static int display_provider_console_owns_scanout(void) { return 0; }
+static int display_provider_restore_fallback(GfxBackend *be) { return be == &gf; }
+static void display_provider_console_return(void) { returns++; }
+static void gfx_reinit_surfaces(int finish) { finishes += finish; }
+static void gfx_select_mode(GfxBackend *be, int legacy200) {}
+static void gfx_bind_client(void) {}
+#include "sys/hal/gfx/gfx_core_shutdown.inc"
+
 static int run(void)
 {
-    static GfxBackend gf = {.shutdown = shutdown}, pc98;
     for (int attempt = 0; attempt < 2; attempt++) {
         if (gfx2_adapter_register(&gf, GFX2_KIND_GEFORCE, GFX2_AF_ACTIVE)) return 1;
         struct gfx2_adapter *a = gfx2_active();
@@ -77,7 +97,12 @@ static int run(void)
             for (u32 i = 3; i < GFX2_MAX_SURFACES; i++)
                 gfx2_surfs[i].state = GFX2_ST_IDLE;
             if (gfx2_adapter_register(&pc98, GFX2_KIND_PC98, GFX2_AF_ACTIVE) != OS32_ERR_NOSPC ||
-                warnings != 1 || gfx2_active() != a || alias->scan_ref != 1 || alias->sid != old_sid ||
+                warnings != 1) return 7;
+            g_backend = &gf;
+            gfx_started = 1;
+            gfx_shutdown();
+            if (finishes || returns != 1 || gfx_started || g_backend != &pc98) return 11;
+            if (warnings != 2 || gfx2_active() != a || alias->scan_ref != 1 || alias->sid != old_sid ||
                 alias->gpu_off != old_off) return 7;
             if (before != revokes) return 9;
             if (gfx2_surf_alias_update(alias, NULL) != OS32_ERR_BUSY) return 6;
@@ -92,7 +117,7 @@ static int run(void)
             if (stops != 1 || a->gen != gen + 1 || scan->scan_ref || pend->scan_ref ||
                 a->head[1].scan_sid || a->head[1].pend_sid ||
                 gfx2_surf_destroy(scan) || gfx2_surf_destroy(pend) || released != 2) return 3;
-        } else if (stops != 3 || a->gen != gen + 2 || a->head[1].scan_sid != scan->sid ||
+        } else if (stops != 5 || a->gen != gen + 3 || a->head[1].scan_sid != scan->sid ||
                    a->head[1].pend_sid != pend->sid || scan->scan_ref != 1 ||
                    pend->scan_ref != 1 || a->state != GFX2_AD_LOST_HELD ||
                    gfx2_surf_destroy(scan) != OS32_ERR_BUSY ||
