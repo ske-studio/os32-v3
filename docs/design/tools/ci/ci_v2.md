@@ -18,7 +18,7 @@ P3 で最小の CI を入れる。移動後、P4 の最初の新しい検査と�
 
 移動前の関門は現行 CI の全件 success。P3 の変更で旧 workflow 4 本を止め、候補 SHA を直接 checkout する新 workflow を入れる。x86 の make all と配布媒体の生成、PowerPC の 6 像のビルドを並列化し、独立したジョブは失敗後も続ける。PowerPC の各構成では、出力先の `PPCKERN.ELF` と `boot.iso` がともに非空の通常ファイルであることを求める。各ジョブが必須ファイルの一覧と sha256 を出す。移動枝では PM の機械で候補 SHA を組み、P2-1 でタグ v3-pre-restructure の保存物と比較する。差には Sep-Changes: の宣言と差ごとのレビューを要する。その後、同じ入力で再生成して比較するのは main に入れる候補 SHA だけとする。途中の push では再生成比較を省く。ビルド破損・コンパイラ不足・必須ファイル欠落はそれぞれ赤とする。
 
-配布物の名前は現行のままとし、ノートは tools/ci_fetch.sh で候補 SHA の媒体を取得する。pc98emu は依頼の run 番号と成果物名を指定して `gh run download <run-id> -n <成果物名>` で媒体を取り、同じ run の最新 attempt の札 `verified-<SHA>-a<n>` の有無を報告する。ci_fetch --sha は同じ SHA の別の run を選ぶことがある。U21 の間は文書だけの変更も含め、取り込みごとに pc98emu が PC-98 の媒体を NP21/W で手動起動する。PowerPC の起動用の像は QEMU で確認する。記録には候補 SHA、媒体を出した run ID・attempt 番号、媒体の sha256、到達点、画面またはログの所在を書く。
+配布物の名前は現行のままとし、ノートは tools/ci_fetch.sh で候補 SHA の媒体を取得する。pc98emu は依頼の run 番号と成果物名を指定して `gh run download <run-id> -n <成果物名>` で媒体を取り、同じ run の最新 attempt の札 `verified-<SHA>-a<n>` の有無を報告する。ci_fetch --sha は同じ SHA の別の run を選ぶことがある。取り込みごとに pc98emu が U30 の計画に従って候補媒体を NP21/W で手動起動する。配布の計画では HDD 起動で `selftest_fail=0` を確認する。文書だけの計画では FD 起動で `ver` だけを実行し、Commit・Image CRC・FD loader を記録する。PowerPC の起動用の像は QEMU で確認する。記録には候補 SHA、媒体を出した run ID・attempt 番号、媒体の sha256、到達点、画面またはログの所在を書く。
 
 仮の関門はこの票の変更だけを扱う。候補 SHA の指定 run の最新 attempt 自体が完了・成功し、同じ attempt のビルドが success で、PM の機械での生成物比較の記録（候補 SHA・基点 SHA・比較ログ・終了値 0・`SHA256SUMS` と `PRESENCE` それぞれの SHA-256）を取り込み判定に添え、基点と同じ到達点を確認した起動記録を §4 の条件で媒体に照合できれば通す。P6-2〜P6-4 を揃える取り込みで、同じ受入記録を入力とする §4 の全件集計に切り替える。
 
