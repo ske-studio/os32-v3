@@ -8,32 +8,10 @@
 #define TIMER_B_FLAG 0x02
 #define TIMER_B_START_ENABLE 0x0a
 
-/* The PC-98 clock runs with IF clear. Give normal probing 2 ms
- * and reserve a separate 2 ms for cleanup. A stalled clock also has a
- * finite poll count. Check at every status sample, including BUSY. */
-struct poll_window {
-    int (*now)(u32 *, u32 *);
-    u32 start;
-    unsigned remaining;
-};
-
-static void begin_window(struct poll_window *window)
-{
-    window->remaining = window->now(&window->start, 0) ? 0 : POLL_LIMIT;
-}
-
-static int within_window(struct poll_window *window)
-{
-    u32 now;
-    if (!window->remaining) return 0;
-    --window->remaining;
-    return !window->now(&now, 0) && now - window->start < 2000;
-}
-
 /* Return a settled status, or -1 on timeout/invalid bus response. */
-static int ready_status(struct poll_window *window)
+static int ready_status(void)
 {
-    while (within_window(window)) {
+    for (int i = 0; i < POLL_LIMIT; ++i) {
         unsigned status = inp(OPN_STATUS);
         if (!(status & OPN_BUSY))
             return (status & ~TIMER_FLAGS) ? -1 : (int)status;
@@ -41,13 +19,13 @@ static int ready_status(struct poll_window *window)
     return -1;
 }
 
-static int write_reg(struct poll_window *window, uchar reg, uchar value)
+static int write_reg(uchar reg, uchar value)
 {
-    int before = ready_status(window);
+    int before = ready_status();
     if (before < 0)
         return 0;
     outp(OPN_ADDR, reg);
-    int after = ready_status(window);
+    int after = ready_status();
     if (after < 0)
         return 0;
     io_wait_n(20);
@@ -56,14 +34,14 @@ static int write_reg(struct poll_window *window, uchar reg, uchar value)
     return 1;
 }
 
-static int stop_and_clear(struct poll_window *window)
+static int stop_and_clear(void)
 {
-    return write_reg(window, OPN_REG_TIMER_CTRL, OPN_TIMER_STOP) && ready_status(window) == 0;
+    return write_reg(OPN_REG_TIMER_CTRL, OPN_TIMER_STOP) && ready_status() == 0;
 }
 
-static int timer_b_rose(struct poll_window *window)
+static int timer_b_rose(void)
 {
-    while (within_window(window)) {
+    for (int i = 0; i < POLL_LIMIT; ++i) {
         unsigned status = inp(OPN_STATUS);
         if (status & OPN_BUSY)
             continue;
@@ -75,8 +53,7 @@ static int timer_b_rose(struct poll_window *window)
     return 0;
 }
 
-static enum opn_probe_result probe_primary(struct poll_window *window,
-                                           unsigned char irq_shadow,
+static enum opn_probe_result probe_primary(unsigned char irq_shadow,
                                            unsigned char *contained)
 {
     unsigned first = inp(OPN_STATUS);
@@ -84,34 +61,33 @@ static enum opn_probe_result probe_primary(struct poll_window *window,
     if (first == 0xff && second == 0xff)
         return OPN_PROBE_ABSENT;
 
-    int status = ready_status(window);
-    if (status < 0 || ready_status(window) != status)
+    int status = ready_status();
+    if (status < 0 || ready_status() != status)
         return OPN_PROBE_UNKNOWN;
 
     *contained = 0;
     outp(OPN_ADDR, 0xff);
     io_wait_n(6);
-    if (ready_status(window) < 0) return OPN_PROBE_UNKNOWN;
+    if (ready_status() < 0) return OPN_PROBE_UNKNOWN;
     unsigned id = inp(OPN_DATA);
-    if (inp(OPN_DATA) != id || !stop_and_clear(window))
+    if (inp(OPN_DATA) != id || !stop_and_clear())
         return OPN_PROBE_UNKNOWN;
     if (id == 1) {
         *contained = 1;
         return OPN_PROBE_OPNA;
     }
 
-    if (!write_reg(window, OPN_REG_TIMER_B, 0xff) ||
-        !write_reg(window, 0x29, irq_shadow & ~0x03))
+    if (!write_reg(OPN_REG_TIMER_B, 0xff) ||
+        !write_reg(0x29, irq_shadow & ~0x03))
         return OPN_PROBE_UNKNOWN;
 
-    int rose = write_reg(window, OPN_REG_TIMER_CTRL, TIMER_B_START_ENABLE) &&
-               timer_b_rose(window);
-    begin_window(window);
-    int stopped = write_reg(window, OPN_REG_TIMER_CTRL, OPN_TIMER_STOP);
+    int rose = write_reg(OPN_REG_TIMER_CTRL, TIMER_B_START_ENABLE) &&
+               timer_b_rose();
+    int stopped = write_reg(OPN_REG_TIMER_CTRL, OPN_TIMER_STOP);
     if (!stopped)
-        stopped = write_reg(window, OPN_REG_TIMER_CTRL, OPN_TIMER_STOP);
-    int cleared = ready_status(window) == 0;
-    int restored = write_reg(window, 0x29, irq_shadow) && ready_status(window) == 0;
+        stopped = write_reg(OPN_REG_TIMER_CTRL, OPN_TIMER_STOP);
+    int cleared = ready_status() == 0;
+    int restored = write_reg(0x29, irq_shadow) && ready_status() == 0;
     *contained = stopped && cleared && restored;
     if (!*contained || !rose) return OPN_PROBE_UNKNOWN;
     return OPN_PROBE_OPN;
@@ -132,9 +108,8 @@ void opn_probe_once(struct fm_probe_record *record, int busy, unsigned char irq_
     record->bank[0].base = 0x188;
     record->bank[1].base = 0x288;
 
-    struct poll_window window = {.now = now_us};
-    begin_window(&window);
-    record->native_model = probe_primary(&window, irq_shadow, &record->contained);
+    (void)now_us; /* Kept in the version 4 FM module interface. */
+    record->native_model = probe_primary(irq_shadow, &record->contained);
     if (busy || !record->contained) return;
 
     if (open_bus(0x288)) record->bank[1].model = OPN_PROBE_ABSENT;

@@ -11,6 +11,8 @@ volatile u32 kctx_irq_depth;
 static enum opn_probe_result registered;
 static unsigned status, id, index_reg, feature, alt_status, alt_data;
 static unsigned writes, reads, alt_reads, imr_writes, mask = 0xff, elapsed;
+static unsigned busy_after_ff, busy_reads, timer_reads;
+static int frozen_clock;
 static unsigned trace[16], trace_count;
 static int ticks, fail_stop, fail_restore, restores;
 
@@ -59,10 +61,17 @@ static int sound_irq(unsigned irq, void *arg) { (void)irq; (void)arg; return IRQ
 unsigned inp(unsigned port)
 {
     ++reads;
-    elapsed += 5;
+    if (!frozen_clock) elapsed += 5;
     if (port == 0xa460) return feature;
     if (port == 0xa468) return 0;
-    if (port == 0x188) return status;
+    if (port == 0x188) {
+        if (index_reg == 0xff && busy_reads < busy_after_ff) {
+            ++busy_reads;
+            return 0x80;
+        }
+        if (trace_count && trace[trace_count - 1] == 0x18a0a) ++timer_reads;
+        return status;
+    }
     if (port == 0x18a) return id;
     if (port == 0x288 || port == 0x28a) {
         ++alt_reads;
@@ -102,10 +111,35 @@ static void reset(void)
     require(fm_detach(&module), "detach");
     boot_probe = (struct fm_probe_record){0};
     trace_count = writes = reads = elapsed = alt_reads = imr_writes = restores = 0;
+    index_reg = busy_after_ff = busy_reads = timer_reads = frozen_clock = 0;
     status = id = alt_status = alt_data = feature = 0xff;
+}
+static void check_opna_wait(unsigned delay, int frozen)
+{
+    reset();
+    frozen_clock = frozen;
+    busy_after_ff = delay;
+    status = 0;
+    id = 1;
+    struct fm_probe_record record = {0};
+    opn_probe_once(&record, 0, 0, sys_time_now);
+    /* Native write sequence and sample boundary from main d15296e91. */
+    if (delay == 10000) {
+        require(record.native_model == OPN_PROBE_UNKNOWN &&
+                busy_reads == delay && trace_count == 1 && trace[0] == 0x188ff,
+                "poll boundary");
+        require(!record.contained, "unconfirmed stop");
+    } else {
+        require(record.native_model == OPN_PROBE_OPNA && record.contained &&
+                busy_reads == delay && trace_count == 3 && trace[0] == 0x188ff &&
+                trace[1] == 0x18827 && trace[2] == 0x18a30, "poll boundary");
+    }
 }
 void _start(void)
 {
+    check_opna_wait(410, 0);
+    check_opna_wait(9999, 1);
+    check_opna_wait(10000, 1);
     reset();
     require(!start() && boot_probe.bank[0].model == OPN_PROBE_ABSENT &&
             boot_probe.bank[1].model == OPN_PROBE_ABSENT, "open bus");
@@ -116,7 +150,7 @@ void _start(void)
     reset();
     status = 0;
     require(!start() && !registered, "missing timer transition");
-    require(elapsed < 4100 && boot_probe.contained, "poll deadline");
+    require(timer_reads == 10001 && boot_probe.contained, "timer poll limit");
     reset();
     status = alt_status = 0; /* Multimedia Orchestra OPL3 returns 00h/FFh. */
     ticks = 1;
