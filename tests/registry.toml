@@ -374,3 +374,17 @@ expect = "再生中に取り逃した PI を tick が I24 の読みと 0 書き�
 limits = "HAL 再生中のポート模型。実機の配線、割り込みの時刻、停止遷移は対象外"
 gates = ["push", "main"]
 mutations = [{ id = "omit_tick_ack", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "if (g_pcm.state == PCM_ST_RUNNING) (void)pcm_codec_ack();", new = "(void)0;", fail = "missed PI after tick" }]
+
+[[check]]
+id = "ime_result"
+spec = { path = "docs/KAPI_SPEC.md", section = "共有サービス12口の契約 (X-11 / T4b-5)" }
+subsystem = "system"
+level = "L2"
+sources = ["userland/cmds/ime.c", "userland/cmds/ime_info.inc", "sdk/include/os32", "tests/support/fixtures/ime_result"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "ime on・mode は要求状態になれば従来の成功文と 0、未成立なら成功文なし・stderr 診断・非 0"
+limits = "ホストの KAPI stub を使う CLI 検査。ゲストの辞書ロードとモジュール公開は対象外"
+gates = ["push", "main"]
+mutations = [{ id = "skip_active_check", config = "pc98", when = "after_build", replace = "userland/cmds/ime.c", old = "if (!api->ime_is_active())", new = "if (0)", fail = "unavailable on: rc=0" }]
