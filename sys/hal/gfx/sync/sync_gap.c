@@ -17,5 +17,5 @@ u32 gfxsync_gap_loops(u32 loops_per_tick, u32 ns)
             loops |= 1u << bit;
         }
     }
-    return loops;
+    return value && loops != (u32)-1 ? loops + 1 : loops;
 }

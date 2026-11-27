@@ -957,3 +957,73 @@ gates = ["push", "main"]
 mutations = [
   { id = "gfx2_sw_line_line_pixels", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/sw_line.c", old = "if (e > 0) {", new = "if (e >= 0) {", fail = "FAIL line pixels" },
 ]
+
+[[check]]
+id = "gfx2_sync_gap"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "10. CPU 直描きの同期バックエンド層" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/sync/sync_gap.c", "tests/support/fixtures/gfx2/gfx2_sync_gap.c", "sys/hal/gfx/sync/sync_int.h", "sys/include/gfx_sync.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "Y2 は 8.5 回を 9 回とし、整数・ゼロを保存し上限で飽和する"
+limits = "ILP32 の host 上の値を観測。実機での待ち時間・表示は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sync_gap_minimum_wait", config = "pc98", when = "after_build", replace = "sys/hal/gfx/sync/sync_gap.c", old = "value && loops != (u32)-1", new = "0", fail = "FAIL minimum wait" },
+  { id = "gfx2_sync_gap_saturated_remainder", config = "pc98", when = "after_build", replace = "sys/hal/gfx/sync/sync_gap.c", old = "value && loops != (u32)-1", new = "value", fail = "FAIL saturated remainder" },
+]
+
+[[check]]
+id = "gfx2_sync_bind"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "10. CPU 直描きの同期バックエンド層" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/sync/sync_bind.c", "tests/support/fixtures/gfx2/gfx2_sync_bind.c", "sys/hal/gfx/sync/sync_int.h", "sys/include/gfx_sync.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "Y4 は無効な hook で SHADOW に戻り、override の解除で bind 時の設定を復元する"
+limits = "ILP32 の host 上の値を観測。実機での待ち時間・表示は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sync_bind_sync_read", config = "pc98", when = "after_build", replace = "sys/hal/gfx/sync/sync_bind.c", old = "(c->method == GFXSYNC_M_SYNC_READ && !t->sync_read)", new = "0", fail = "FAIL sync read" },
+  { id = "gfx2_sync_bind_wait_port", config = "pc98", when = "after_build", replace = "sys/hal/gfx/sync/sync_bind.c", old = "(c->method == GFXSYNC_M_WAIT_PORT && !t->wait_port)", new = "0", fail = "FAIL wait port" },
+  { id = "gfx2_sync_bind_readback", config = "pc98", when = "after_build", replace = "sys/hal/gfx/sync/sync_bind.c", old = "(c->flush == GFXSYNC_F_READBACK && !t->flush)", new = "0", fail = "FAIL readback" },
+  { id = "gfx2_sync_bind_direct_read", config = "pc98", when = "after_build", replace = "sys/hal/gfx/sync/sync_bind.c", old = "c->read == GFXSYNC_R_SHADOW || !t->read32", new = "0", fail = "FAIL direct read" },
+  { id = "gfx2_sync_bind_override_clear", config = "pc98", when = "after_build", replace = "sys/hal/gfx/sync/sync_bind.c", old = "ctx->cfg = ctx->bind_cfg;", new = "(void)ctx;", fail = "FAIL override clear" },
+]
+
+[[check]]
+id = "gfx2_sync_bounds"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "10. CPU 直描きの同期バックエンド層" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/sync/sync_write.c", "tests/support/fixtures/gfx2/gfx2_sync_bounds.c", "sys/hal/gfx/sync/sync_int.h", "sys/include/gfx_sync.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "Y3 は末尾を越す 2 行の write を INVAL とし、最初の行も不変"
+limits = "ILP32 の host 上の値を観測。実機での待ち時間・表示は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sync_bounds_partial_write", config = "pc98", when = "after_build", replace = "sys/hal/gfx/sync/sync_write.c", old = "h - 1 > (c->t.bytes - row - n) / c->t.pitch", new = "0", fail = "FAIL partial write" },
+]
+
+[[check]]
+id = "gfx2_sync_rows"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "10. CPU 直描きの同期バックエンド層" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/sync/sync_write.c", "tests/support/fixtures/gfx2/gfx2_sync_rows.c", "sys/hal/gfx/sync/sync_int.h", "sys/include/gfx_sync.h", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "Y3 の非整列 7 バイトを 2 行読み書きし、待ち回数・画素・READBACK flush を照合"
+limits = "ILP32 の host 上の値を観測。実機での待ち時間・表示は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sync_rows_byte_tail", config = "pc98", when = "after_build", replace = "sys/hal/gfx/sync/sync_write.c", old = "else c->t.va[off + i] = src[i];", new = "else (void)src[i];", fail = "FAIL byte tail" },
+  { id = "gfx2_sync_rows_readback_flush", config = "pc98", when = "after_build", replace = "sys/hal/gfx/sync/sync_write.c", old = "c->t.flush && !c->t.flush(c->t.opaque)", new = "1", fail = "FAIL readback flush" },
+]

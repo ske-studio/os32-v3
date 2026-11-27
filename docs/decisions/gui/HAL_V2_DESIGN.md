@@ -605,7 +605,7 @@ mode=SHADOW  unit=4  method=GAP  gap_ns=80  flush=NONE  read_ns=1500  read=SHADO
 | mode | SHADOW・DIRECT | 正本が RAM の影か VRAM か |
 | unit | 1・2・4 | 1 回の書きの幅 (バイト) |
 | method | PLAIN・GAP・SYNC_READ・WAIT_PORT | 書きの後の待ち。今の `TRI_PRESENT_*` (present.c) と 1 対 1 (BYTE は unit=1 + PLAIN) |
-| gap_ns | 0〜100000 | GAP の間隔。`cpu_loops_per_tick()` (sys/platform/pc98/time/cpu_calibrate.c) で回数に直す (write_gap.c の算数をそのまま移す) |
+| gap_ns | 0〜100000 | GAP の間隔。`cpu_loops_per_tick()` (sys/platform/pc98/time/cpu_calibrate.c) で回数に直す (最小の待ちを守るため端数は切り上げ、上限で飽和する。旧 write_gap の切り捨てからの意図した変更) |
 | flush | NONE・READBACK・SERIALIZE | WC の吐き出し方 (UC の読み、または直列化の命令) |
 | read_ns・read | 整数・SHADOW/DIRECT | 読み出しの遅さと読む元。ROP・α・dst の鍵のように dst を読む sw の操作は read=SHADOW なら RAM から |
 - I/O 番地は設定に書かない。SYNC_READ・WAIT_PORT の実体は backend が `GfxSyncTarget` の hook で渡す (Trident の CR+6 の読み present.c、PC-98 の 5Fh present.c)。
