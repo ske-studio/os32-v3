@@ -1,3 +1,4 @@
+#include "../../input/input_policy.h"
 #include "install_management.h"
 #include "av_contract.h"
 #include "sys/kern/idle_work.h"
@@ -86,6 +87,7 @@ void exec_init(void) {
     /* アプリ ID の表を空にし、シェル帯 (ID 1) を走っている状態にする。
      * res_owner_set(1) もここで行われる (票 K5 の D3)。 */
     appslot_init();
+    input_interrupt_init();
     /* 起動要求表 (票 T9 D3) も空から始める。 */
     launch_init();
 }
@@ -495,6 +497,8 @@ int ring3_user_range_ok(u32 p, u32 len)
 
 #include "exec_image_map.inc"
 
+
+
 #include "exec_finish.inc"
 
 #include "exec_syscall.inc"
@@ -525,6 +529,7 @@ static int exec_shell_layout(u32 text, u32 bss, u32 heap,
 #include "exec_image.inc"
 #include "exec_argv.inc"
 
+#include "exec_entry_commit.inc"
 #include "exec_launch.inc"
 
 /* ======================================================================== */
@@ -548,7 +553,7 @@ static int exec_map_launch_err(int rc)
     }
 }
 
-int exec_run(const char *cmdline)
+static int exec_run_context(const char *cmdline, int initial_gui)
 {
     int rc;
 
@@ -560,13 +565,23 @@ int exec_run(const char *cmdline)
 
     AppSlot *caller = appslot_get(appslot_cur());
     rc = (exec_nest_level != 0 && caller && caller->gui)
-         ? EXEC_ERR_INVALID : exec_launch(cmdline, 0);
+         ? EXEC_ERR_INVALID : exec_launch(cmdline, 0, initial_gui);
 
     if (g_last_kind == EXEC_KIND_NONE) {
         g_last_kind = exec_map_launch_err(rc);
         g_last_code = 0;
     }
     return rc;
+}
+
+int exec_run(const char *cmdline)
+{
+    return exec_run_context(cmdline, 0);
+}
+
+int exec_run_initial_shell(const char *cmdline, int is_gui)
+{
+    return exec_run_context(cmdline, is_gui);
 }
 
 /* ======================================================================== */
@@ -603,7 +618,7 @@ i32 exec_start(const char *cmdline)
 {
     if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;
     if (cmdline == 0 || cmdline[0] == '\0') return OS32_ERR_INVAL;
-    return exec_launch(cmdline, 1);
+    return exec_launch(cmdline, 1, 0);
 }
 
 #include "exec_schedule.inc"

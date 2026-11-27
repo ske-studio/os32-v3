@@ -34,15 +34,7 @@ static void exec_cui_display_abort(void)
 static void exec_input_owner_exit(int id)
 {
     AppSlot *a = appslot_get(id);
-    u32 gen = 0;
-    if (a) {
-        if (id == APP_ID_SHELL) gen = g_shell_service.generation;
-        else if (a->cpl3 && a->as) gen = a->as->generation;
-    }
-    if (gen) {
-        input_interrupt_exec_exit((u32)id, gen);
-        (void)input_context_owner_release((u32)id, gen);
-    }
+    if (a) input_context_owner_quiesce(id, a->exec_gen);
     if (id == APP_ID_SHELL) {
         unsigned int irq = irq_save();
 #if PLATFORM_HWB_SESSION

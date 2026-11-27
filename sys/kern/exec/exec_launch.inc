@@ -15,7 +15,7 @@ static int exec_entry_store(void *owner, u32 va, const void *src, u32 bytes)
 /*  共通。仮想レイアウト (app.ld / memmap.h の RING3_*) は 1 バイトも         */
 /*  動かない (I12/I13) — 動いたのは「物理をどこから取るか」だけ。            */
 /* ======================================================================== */
-static int exec_launch(const char *cmdline, int gui_arg)
+static int exec_launch(const char *cmdline, int gui_arg, int initial_gui)
 {
     if (exec_font_guard_active()) return OS32_ERR_BUSY;
     if (exec_legacy_lowmap_busy()) return EXEC_ERR_INVALID;
@@ -257,6 +257,7 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
     /* ======== スロットに諸元を書く (まだ commit しない) ======== */
     ctx = appslot_at(id);
+    if (is_shell) appslot_shell_reserve_generation();
     ctx->load_addr = load_base;
     ctx->stack_top = stack_top;
     ctx->stack_size = stack_size;
@@ -387,30 +388,9 @@ static int exec_launch(const char *cmdline, int gui_arg)
 
         if (want_ring3) exec_selftest_run_audit("AS-launch");
 
-        arch_fp_save(&fp_parent[fp_depth]);
-        arch_fp_init();
-
-        /* ======== ここで初めて「走っているのはこの ID」になる ======== */
-        if (is_shell) {
-            appslot_shell_commit();
-            /* T7b-b2 §3-1: 確定した shell の text 範囲で内部入口を登録する。
-             * 順は retire → publish に固定 — 前の shell の終了 (exec_finish)
-             * で retire 済みでも、ここで重ねて retire してから publish する
-             * (retire 抜きの publish は旧 shell の lease を開いたまま残す)。 */
-            shell_service_retire();
-            shell_service_publish(load_base, text_sz);
-        } else {
-            io_parent_depth = io_syscall_suspend(launcher_id); /* IO_SYSCALL_CHILD */
-            appslot_start_commit(id, gui, need_pages);
-            if (want_ring3) exec_owner_diag(ctx, 0, 0, 0);
-            /* 暴走判定の起点 (票 T9 §12 S6)。 */
-            appslot_mark_scheduled(id, tick_count);
-        }
-        av_focus_exec_enter(id);
-        exec_nest_level = ctx->depth;
-
-        exec_entry_calls++;
-        arch_entry_enter(&ctx->entry, want_ring3 ? ctx->as->pd_phys : 0);
+        int rc = exec_enter_prepared(ctx, id, launcher_id, gui, initial_gui,
+                                     text_sz, &io_parent_depth);
+        if (rc) return exec_launch_abort(launcher_id, id, rc);
         /* CPL=0 プログラムから普通に戻ってきた = 正常終了 (§1 事実 15)。 */
         exec_exit(EXEC_SUCCESS, EXEC_KIND_EXITED);
     }

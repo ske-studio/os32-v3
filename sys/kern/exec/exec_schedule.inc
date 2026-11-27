@@ -327,10 +327,11 @@ static void exec_kill_one(int id)
     if (!a) return;
     /* 走っていないので CR3 は master のまま。owner も 1 のまま動かさない
      * — 回収は全部 ID を明示して呼ぶ (D3)。 */
+    u32 exec_gen = a->exec_gen;
     exec_reclaim_resources(id);
     exec_teardown_app(a);
     appslot_reclaim(id);
-    exec_notify_owned(id, EXEC_KIND_ABORTED);
+    exec_notify_owned(id, EXEC_KIND_ABORTED, exec_gen);
     /* 生存アプリの集合が変わる瞬間 = transition。G7 の switch ではない。 */
     ring3_transition_count++;
 }
