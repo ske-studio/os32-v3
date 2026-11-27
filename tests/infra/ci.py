@@ -77,6 +77,17 @@ class MissingPrerequisites(OSError):
     pass
 
 
+def clear_selected_evidence(plan, args):
+    """Drop evidence of the selected rows before anything can stop the run (no stale proof)."""
+    root = (args.output / "evidence").resolve()
+    for row, _cpu, config in plan:
+        destination = (args.output / "evidence" / row["id"] / config).resolve()
+        if not destination.is_relative_to(root):
+            raise ValueError(f"invalid evidence directory {destination}")
+        if destination.exists():
+            shutil.rmtree(destination)
+
+
 def check_prerequisites(plan, args, identity):
     failures = {}
     for row, cpu, config in plan:
@@ -517,6 +528,7 @@ def main():
         (args.output / "plan.json").write_text(json.dumps(expected, ensure_ascii=False, indent=2))
     if args.command == "collect":
         return collect(plan, args, identity, plan_errors)
+    clear_selected_evidence(plan, args)
     try:
         check_prerequisites(plan, args, identity)
     except MissingPrerequisites as exc:
