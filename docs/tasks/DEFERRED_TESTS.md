@@ -30,6 +30,11 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
+| PPC-BOOT-RETRY | ppc_boot で link-sh が到達点を欠き、sh が dec_rate で停止した（各 1 回）。いずれも同じ像の再実行で通った | A7 の合否外で観測 | os32powerpc が再現条件を調べる |
+| FEP-MISSING-STATUS | fep.mod または sqlite.mod が欠けても ime on が「FEP enabled.」を返す。fep.mod だけが欠けても services が MINIMAL まで戻る | A7 の合否外で観測 | 各構成の表示と services の遷移が仕様どおりか確かめる |
+| GUI-TERM-FONT | GUI の端末を 2 つ開くと 1 つ目に `font: open rc=-4` が出る。表示は崩れない | A7 の合否外で観測 | 端末を 2 つ開いてフォントの open が失敗する条件を調べる |
+| V86-B-TIMEOUT | v86 -b の 5 分の時間切れは未確認 | A7 の合否外。待ち続ける V86 の試験像がない | 試験像を用意して時間切れを確かめる |
+| HEADER-CHECK-NAMES | ヘッダの注記 11 か所に古い検査名が残る | A7 の合否外。注記も部品の識別値に入るため残した | P8 の候補で hash を見直す時に注記を更新する |
 | CI-APT-404 | runner の apt 索引と配布物のずれで QEMU の導入が 404 (run 45736476388 attempt 1) | 2026-11-26 | 対処済み。workflow は --no-install-recommends と seabios の明示で不要な依存を除く |
 | SYNTH-L4 | midi_host の MIDI 出力と close・切断時の reset | L4 が残る | [AV_HAL_DESIGN](../decisions/sound/AV_HAL_DESIGN.md) の L4・IL |
 | SYNTH-L7 | midi_fm の GM → OPN 変換と L6 経由の発音 | L7 が残る | [AV_HAL_DESIGN](../decisions/sound/AV_HAL_DESIGN.md) の L7・IL |

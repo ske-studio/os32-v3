@@ -41,7 +41,7 @@ SHA-256 を照合。第三者ミラーは使わない。プロキシは `https_p
 
 ### §8-2 ビルドパイプライン
 
-候補 SHA を `wt/int-*` に push し、`restructure-build` の同じ run の最新 attempt が全件集計まで成功したことを確かめる。文書だけの変更も、その候補の PC-98 と PowerMac の起動記録を揃えて `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` を回す。 [CI 設計](design/tools/ci/ci_v2.md)
+候補 SHA を `wt/int-*` に push し、`restructure-build` の同じ run の最新 attempt が選択計画の集計まで成功したことを確かめる。文書だけの変更も、その候補の PC-98 と PowerMac の起動記録を揃えて `python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` を回す。 [CI 設計](design/tools/ci/ci_v2.md)
 
 ```
 === カーネルビルド ===
@@ -940,7 +940,7 @@ GitHub Actionsでの新規構築はf1a作業中は未実施、PMがCI runで確�
 
 ### §8-6 GitHub Actions での本体ビルド
 
-[restructure-build.yml](../.github/workflows/restructure-build.yml) が変更の所属から媒体・検査・変異を選ぶ。文書だけでも PC-98 の起動 FD と PowerMac core を組む。公開契約・ABI・ビルド規則・workflow・登録・影響不明の変更、週次・手動実行は全件。選び方は ci_v2 §10、取り込み条件は [ci_v2 §0](design/tools/ci/ci_v2.md)。全件集計は同文書 §4 に従う。
+[restructure-build.yml](../.github/workflows/restructure-build.yml) が変更の所属から媒体・検査・変異を選ぶ。文書だけでも PC-98 の起動 FD と PowerMac core を組む。公開契約・ABI・ビルド規則・workflow・登録・影響不明の変更、週次・手動実行は全件。選び方は ci_v2 §10、取り込み条件は [ci_v2 §0](design/tools/ci/ci_v2.md)。選択計画の集計は同文書 §4 に従う。
 
 ### CPU・機種のビルド選択
 
