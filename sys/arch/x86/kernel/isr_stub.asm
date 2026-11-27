@@ -728,12 +728,22 @@ irq_stub_2:
         popad
         IRETD_USER
 
+extern platform_irq_reserved
 global irq_stub_12
 irq_stub_12:
         IRQ_ENTER
         pushad
         RESTORE_KSEG
         cld                     ;; 同上
+        push    dword 12
+        call    platform_irq_reserved
+        test    eax, eax
+        jnz     .legacy_sound
+        call    irq_dispatch
+        add     esp, ABI_WORD_BYTES
+        jmp     .done_sound
+.legacy_sound:
+        add     esp, ABI_WORD_BYTES
 
         ;; スレーブPICにEOI送出 → マスタPICにもEOI送出 (カスケード)
         mov     al, OCW2_EOI
@@ -741,6 +751,7 @@ irq_stub_12:
         out     PIC1_CMD, al
 
         V86_REFLECT 12          ;; IRQ12 (サウンド)。既定では INT 14h に落ちる
+.done_sound:
 
         IRQ_LEAVE
         popad

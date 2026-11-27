@@ -446,3 +446,23 @@ mutations = [
  { id = "first_stop", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "*contained = 0;", new = "*contained = 1;", fail = "unconfirmed stop" },
  { id = "irq12_reopen", config = "pc98", when = "after_build", replace = "sys/platform/pc98/pic.c", old = "if (irq == 12 && fm_irq12_blocked) return;", new = "(void)fm_irq12_blocked;", fail = "IRQ12 reopened" },
  { id = "poll_timeout", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "#define POLL_LIMIT 10000", new = "#define POLL_LIMIT 10001", fail = "poll boundary" }]
+
+[[check]]
+id = "irq12_delivery"
+spec = { path = "docs/design/kernel/irq/irq.md", section = "初段の段と受入" }
+subsystem = "sound"
+level = "L2"
+sources = ["sys/dev/sound/fm", "sys/arch/x86/kernel/isr_stub.asm", "sys/kern/irq", "sys/platform/pc98", "tests/support/fixtures/irq12_delivery", "tests/support/fixtures/fm_probe/io.h", "tools/ops/kernel_includes.py", "tools/gen_sqlite_imports.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "両ベース ABSENT 時の共有配送・解除・物理 EOI と反射抑止、IRQ2・13・PCI 登録維持"
+limits = "実スタブ本体を実行。特権命令・ゲストフレーム・PIC は模型"
+gates = ["push", "main"]
+mutations = [
+ { id = "reverse", config = "pc98", when = "after_build", replace = "sys/kern/irq/irq_math.c", old = "for (i = 0; i < n; i++)", new = "for (i = n - 1; i >= 0; i--)", fail = "shared order" },
+ { id = "drop_remaining", config = "pc98", when = "after_build", replace = "sys/kern/irq/irq_math.c", old = "ln->slot[i] = ln->slot[i + 1];", new = "ln->slot[i].fn = 0;", fail = "shared order" },
+ { id = "double_eoi", config = "pc98", when = "after_build", replace = "sys/platform/pc98/irq_complete.c", old = "pic_eoi(claim->line);", new = "pic_eoi(claim->line); pic_eoi(claim->line);", fail = "physical EOI" },
+ { id = "session_enable", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (platform_irq_reserved(V86_IRQ_SOUND)) irq_enable", new = "irq_enable", fail = "session sound mask" },
+ { id = "session_disable", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (platform_irq_reserved(V86_IRQ_SOUND)) irq_disable", new = "irq_disable", fail = "session sound mask" },
+ { id = "guest_reflection", config = "pc98", when = "after_build", replace = "sys/arch/x86/kernel/isr_stub.asm", old = "jmp     .done_sound", new = "V86_REFLECT 12\n        jmp     .done_sound", fail = "guest reflection" }]

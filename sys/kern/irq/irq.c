@@ -57,7 +57,7 @@ void irq_topology_check(void)
     const struct irq_topology *t = platform_irq_topology();
     unsigned i, j;
     int valid = t->lines == PLATFORM_IRQ_LINES &&
-                t->dynamic_count == PLATFORM_IRQ_DYNAMIC_COUNT && t->dynamic_lines;
+                t->dynamic_count <= PLATFORM_IRQ_DYNAMIC_COUNT && t->dynamic_lines;
     if (valid) for (i = 0; i < t->dynamic_count; i++) {
         if (t->dynamic_lines[i] >= t->lines || platform_irq_reserved(t->dynamic_lines[i]))
             valid = 0;

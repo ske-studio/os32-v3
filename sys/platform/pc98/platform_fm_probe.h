@@ -4,6 +4,8 @@
 #include "irq.h"
 
 void platform_fm_block_irq12(void);
+void platform_fm_release_irq12(void);
+int platform_fm_irq12_released(void);
 
 /* PC-98 sound IRQ selectors INT0, INT4, INT5, INT6. */
 static inline int platform_fm_probe_busy(void)

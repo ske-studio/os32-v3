@@ -17,6 +17,16 @@ const struct fm_probe_record *fm_boot_probe(void)
     return &boot_probe;
 }
 
+static void publish_probe_irq_policy(void)
+{
+    if (!boot_probe.contained) {
+        platform_fm_block_irq12();
+    } else if (boot_probe.complete && boot_probe.bank[0].model == OPN_PROBE_ABSENT &&
+               boot_probe.bank[1].model == OPN_PROBE_ABSENT) {
+        platform_fm_release_irq12();
+    }
+}
+
 extern const u32 fm_kexports[];
 extern const struct module_symbol_contract fm_import_contracts[];
 extern const struct module_symbol_contract fm_export_contracts[];
@@ -95,7 +105,7 @@ static int fm_start(struct module_record *r, u32 entry, u32 *exports)
     candidate_valid = 1;
     unsigned flags = irq_save();
     candidate.probe(&boot_probe, platform_fm_probe_busy(), 0, sys_time_now);
-    if (!boot_probe.contained) platform_fm_block_irq12();
+    publish_probe_irq_policy();
     irq_restore(flags);
     kprintf(KLOG_ATTR, "[fm] 0188=%u 0288=%u (0=? 1=absent 2=OPN 3=OPNA 4=present)\n",
             boot_probe.bank[0].model, boot_probe.bank[1].model);
