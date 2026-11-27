@@ -663,7 +663,7 @@ static void pcm_release(int leak)
         release_stop_requested = 0;
     }
     if (s_irq_reg) {
-        if (irq_unregister(PCM_IRQ, pcm_irq, 0) != 0) {
+        if (irq_unregister(pcm_module_irq_line(), pcm_irq, 0) != 0) {
             s_release_leak = leak;
             s_release_pending = 1;
             return;
@@ -750,8 +750,8 @@ static int pcm_open_device(u32 rate, u32 period, void (*advance)(void))
     kmemset(s_ring, 0, PCM_RING_BYTES);
     if (s_stg) kmemset(s_stg, 0, PCM_STG_BYTES);
 
-    if (irq_register(PCM_IRQ, pcm_irq, 0, IRQ_F_SHARED) != 0) {
-        kprintf(KLOG_ATTR, "[pcm] IRQ12 busy\n");
+    if (irq_register(pcm_module_irq_line(), pcm_irq, 0, IRQ_F_SHARED) != 0) {
+        kprintf(KLOG_ATTR, "[pcm] IRQ%u busy\n", pcm_module_irq_line());
         return pcm_open_fail(PCM_ERR_BUSY);
     }
     s_irq_reg = 1;
@@ -761,7 +761,8 @@ static int pcm_open_device(u32 rate, u32 period, void (*advance)(void))
     }
     dma_owned = 1;
     dma_chan_mask(PCM_DMA_CHAN, &dma_owned);
-    u8 route = (pcm_module_bios_route() & 0xf8) | 2;
+    u8 route = pcm_module_irq_line() == PCM_IRQ_INT41 ? PCM_ROUTE_INT41_DMA1 :
+               (pcm_module_bios_route() & 0xf8) | 2;
     route_attempted = 1;
     outp(PCM_PORT_ROUTE, route);
     if ((u8)inp(PCM_PORT_ROUTE) != route) {

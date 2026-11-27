@@ -370,7 +370,7 @@ mutations = [
 
 [[check]]
 id = "cs4231_tick_ack"
-spec = { path = "docs/design/drivers/sound/cs4231/pcm_cs4231.md", section = "IRQ12 への移行案（2026-11-27、実装前）" }
+spec = { path = "docs/design/drivers/sound/cs4231/pcm_cs4231.md", section = "S3 のつなぎと S4 の受入（2026-11-27）" }
 subsystem = "sound"
 level = "L2"
 sources = ["sys/dev/sound/cs4231", "tests/support/fixtures/cs4231_tick_ack", "tools/ops/kernel_includes.py", "build/config.mk"]
@@ -437,10 +437,12 @@ sources = ["sys/dev/sound/fm", "sys/platform/pc98/platform_fm_probe.h", "sys/ker
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "両ベースの判定、各待ちの 10,000 回境界とネイティブ書込み列、タイマ遷移、既登録時の FM 登録と IMR 保持、再 attach の I/O ゼロ、停止失敗の隔離"
+expect = "両ベースの判定、開放バスと A460h の識別 ID の整合、各待ちの 10,000 回境界とネイティブ書込み列、タイマ遷移、既登録時の FM 登録と IMR 保持、再 attach の I/O ゼロ、停止失敗の隔離"
 limits = "ポート模型。実機配線とゲスト演奏は S4"
 gates = ["push", "main"]
 mutations = [
+ { id = "reject_cs4231_only", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "board == 7 || board == 15", new = "board == 15", fail = "CS4231-only open bus" },
+ { id = "accept_fm_board", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "board == 7 || board == 15", new = "board == 5 || board == 7 || board == 15", fail = "FM board open bus" },
  { id = "id_only", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "!*contained || !rose", new = "!*contained", fail = "missing timer transition" },
  { id = "skip_alt", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "if (open_bus(0x288))", new = "if (0)", fail = "open bus" },
  { id = "opl3_write", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "if (open_bus(0x288))", new = "if (inp(0x288) == 0) outp(0x288, 0xff); if (open_bus(0x288))", fail = "alternate write" },
@@ -504,7 +506,7 @@ limits = "通常起動の音源呼出部と常駐判定を実行。FM 判定・I
 gates = ["push", "main"]
 mutations = [
  { id = "dma_gate", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kernel.c", old = "if (memory_boot_dma_available()) {", new = "if (1) {", fail = "PCM boot DMA gate" },
- { id = "ignore_fm", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_module.c", old = "if (platform_irq_reserved(PCM_IRQ))", new = "if (0)", fail = "PCM boot admission" }]
+ { id = "reject_fm", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_module.c", old = "if (pcm_quarantined)", new = "if (platform_irq_reserved(PCM_IRQ)) return \"FM\"; if (pcm_quarantined)", fail = "PCM boot admission" }]
 
 [[check]]
 id = "pcm_route"
@@ -515,10 +517,11 @@ sources = ["sys/dev/sound/cs4231", "sys/hal/sound", "sys/dev/dma", "lib/dma_cont
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "IRQ12 と DMA #1 取得後だけ経路を更新し、停止の証拠を確認して元の経路を復元する"
+expect = "選択した IRQ12 または IRQ10 と DMA #1 取得後だけ経路を更新し、停止の証拠を確認して元の経路を復元する"
 limits = "PCM 実入口と 8237 所有表のホスト模型。実機の配線とタイミングは対象外"
 gates = ["push", "main"]
 mutations = [
+ { id = "fm_route", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "? PCM_ROUTE_INT41_DMA1 :", new = "? 0x22 :", fail = "codec before route readback" },
  { id = "skip_pi_readback", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "return pcm_read_pi() == 0;", new = "return 1;", fail = "legacy close with PI" },
  { id = "unowned_mask", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "if (pcm_module_dma_acquire(&dma_owned)) {", new = "dma_chan_mask(PCM_DMA_CHAN, &dma_owned); if (pcm_module_dma_acquire(&dma_owned)) {", fail = "other owner mask" },
  { id = "mask_without_owner", config = "pc98", when = "after_build", replace = "sys/dev/dma/dma8237.c", old = "if (!owner || channel_owner[ch] != owner) {\n        irq_restore(flags);\n        return;\n    }\n    outp(DMA8237_MASK1, dma_mask_byte(ch, 1));", new = "outp(DMA8237_MASK1, dma_mask_byte(ch, 1));", fail = "other owner mask" },

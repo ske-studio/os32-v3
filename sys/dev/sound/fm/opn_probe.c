@@ -116,9 +116,11 @@ void opn_probe_once(struct fm_probe_record *record, int busy, unsigned char irq_
     unsigned feature = inp(OPNA_ID_PORT);
     unsigned board = feature >> 4;
     int stable = inp(OPNA_ID_PORT) == feature;
+    /* A460h: 7 = integrated CS4231 without FM, 15 = no ID or 26-class. */
+    int primary_may_be_absent = board == 7 || board == 15;
     record->bank[0].model = record->native_model;
     if (record->native_model == OPN_PROBE_ABSENT &&
-        (!open_bus(OPN_ADDR) || !stable || (board != 15 && board != 3 && board != 5)))
+        (!open_bus(OPN_ADDR) || !stable || !primary_may_be_absent))
         record->bank[0].model = OPN_PROBE_UNKNOWN;
     if (record->native_model == OPN_PROBE_OPN)
         record->bank[0].model = OPN_PROBE_PRESENT;

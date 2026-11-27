@@ -27,6 +27,7 @@ int pcm_module_quiet(void);
 int pcm_module_irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsigned int flags);
 int pcm_module_irq_unregister(unsigned int irq, irq_handler_fn fn, void *arg);
 int pcm_module_dma_alloc(u32 size, u32 align, u32 limit, struct dma_buf *out);
+unsigned int pcm_module_irq_line(void);
 int pcm_module_bios_route(void);
 int pcm_module_dma_acquire(const void *owner);
 void pcm_module_dma_release(const void *owner, int quarantine);

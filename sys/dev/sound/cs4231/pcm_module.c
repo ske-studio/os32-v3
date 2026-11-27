@@ -190,7 +190,10 @@ static int pcm_stop_dma(struct module_record *r)
 
 static int bios_route = -1;
 static int route_sampled;
+static unsigned int pcm_irq_line;
 static int pcm_quarantined;
+
+unsigned int pcm_module_irq_line(void) { return pcm_irq_line; }
 
 int pcm_module_bios_route(void) { return bios_route; }
 
@@ -213,15 +216,15 @@ void pcm_module_dma_release(const void *owner, int quarantine)
  * unavailable on Np (PC-98 io_sound, A460h and 0F40h). */
 static const char *pcm_boot_refusal(void)
 {
-    if (platform_irq_reserved(PCM_IRQ)) return "FM present or unknown at 0188h/0288h";
     if (pcm_quarantined) return "DMA #1 quarantined";
     if (!route_sampled) {
+        pcm_irq_line = platform_irq_reserved(PCM_IRQ) ? PCM_IRQ_INT41 : PCM_IRQ;
         route_sampled = 1;
         if (((u8)inp(PCM_PORT_WSSID) & PCM_WSSID_MASK) == PCM_WSSID_VALUE)
             bios_route = (u8)inp(PCM_PORT_ROUTE);
     }
     if (bios_route < 0 || bios_route == 0xff) return "WSS unavailable";
-    if ((bios_route & 0x38) != 0x20) return "BIOS WSS IRQ is not INT5";
+    if (pcm_irq_line == PCM_IRQ && (bios_route & 0x38) != 0x20) return "BIOS WSS IRQ is not INT5";
     if ((bios_route & 7) > 3 && (bios_route & 7) != 7) return "reserved WSS DMA code";
     if (((u8)inp(0xa460) >> 4) == 6) return "Nf/Np sound family";
     return 0;
@@ -253,8 +256,9 @@ int pcm_module_load(void)
     int rc = module_load(&request, &pcm_handle);
     if (!rc) rc = module_start(pcm_handle);
     if (!rc && !module_exports(pcm_handle)) rc = MODULE_INIT_FAILED;
-    kprintf(KLOG_ATTR, "[pcm] BIOS 0F40h=%x INT5 IRQ12 vector 14h module rc=%d pair=%08x tick=%d\n",
-            bios_route, rc, pair, tick_target != 0);
+    kprintf(KLOG_ATTR, "[pcm] BIOS 0F40h=%x irq %u (%s) dma 1 module rc=%d pair=%08x tick=%d\n",
+            bios_route, pcm_irq_line, pcm_irq_line == PCM_IRQ ? "FM absent, BIOS INT5" :
+            "FM present or unknown, INT41", rc, pair, tick_target != 0);
     return rc;
 }
 
