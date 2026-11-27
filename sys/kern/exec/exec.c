@@ -553,7 +553,7 @@ static int exec_map_launch_err(int rc)
     }
 }
 
-static int exec_run_context(const char *cmdline, int initial_gui)
+int exec_run(const char *cmdline)
 {
     int rc;
 
@@ -565,23 +565,13 @@ static int exec_run_context(const char *cmdline, int initial_gui)
 
     AppSlot *caller = appslot_get(appslot_cur());
     rc = (exec_nest_level != 0 && caller && caller->gui)
-         ? EXEC_ERR_INVALID : exec_launch(cmdline, 0, initial_gui);
+         ? EXEC_ERR_INVALID : exec_launch(cmdline, 0);
 
     if (g_last_kind == EXEC_KIND_NONE) {
         g_last_kind = exec_map_launch_err(rc);
         g_last_code = 0;
     }
     return rc;
-}
-
-int exec_run(const char *cmdline)
-{
-    return exec_run_context(cmdline, 0);
-}
-
-int exec_run_initial_shell(const char *cmdline, int is_gui)
-{
-    return exec_run_context(cmdline, is_gui);
 }
 
 /* ======================================================================== */
@@ -618,7 +608,7 @@ i32 exec_start(const char *cmdline)
 {
     if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;
     if (cmdline == 0 || cmdline[0] == '\0') return OS32_ERR_INVAL;
-    return exec_launch(cmdline, 1, 0);
+    return exec_launch(cmdline, 1);
 }
 
 #include "exec_schedule.inc"

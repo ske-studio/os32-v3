@@ -8,7 +8,7 @@ static int exec_enter_prepared(AppSlot *ctx, int id, int launcher_id, int gui,
     u32 parent_gen = parent ? appslot_at(launcher_id)->exec_gen : 0;
     int gui_session = con_sink_is_enabled();
     if (input_context_owner_reserve(id, ctx->exec_gen, parent, parent_gen,
-            is_shell && initial_gui ? INPUT_CONTEXT_GUI : INPUT_CONTEXT_RUNNING))
+            initial_gui ? INPUT_CONTEXT_GUI : INPUT_CONTEXT_RUNNING))
         return EXEC_ERR_INVALID;
 
     arch_fp_save(&fp_parent[exec_nest_level]);

@@ -25,7 +25,7 @@ void shell_loop_run(const struct shell_loop_ops *ops)
             is_gui = 0;
         }
         ops->loading(cur_shell, is_gui);
-        int rc = exec_run_initial_shell(reason == 1 ? SYS_SHELL_BIN " --kcg-unavailable" : cur_shell, is_gui);
+        int rc = exec_run(reason == 1 ? SYS_SHELL_BIN " --kcg-unavailable" : cur_shell);
         ops->result(cur_shell, rc, is_gui, gui_fault_streak);
 
         if (rc < 0 && rc != EXEC_ERR_FAULT) {

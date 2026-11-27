@@ -15,7 +15,7 @@ static int exec_entry_store(void *owner, u32 va, const void *src, u32 bytes)
 /*  共通。仮想レイアウト (app.ld / memmap.h の RING3_*) は 1 バイトも         */
 /*  動かない (I12/I13) — 動いたのは「物理をどこから取るか」だけ。            */
 /* ======================================================================== */
-static int exec_launch(const char *cmdline, int gui_arg, int initial_gui)
+static int exec_launch(const char *cmdline, int gui_arg)
 {
     if (exec_font_guard_active()) return OS32_ERR_BUSY;
     if (exec_legacy_lowmap_busy()) return EXEC_ERR_INVALID;
@@ -388,6 +388,7 @@ static int exec_launch(const char *cmdline, int gui_arg, int initial_gui)
 
         if (want_ring3) exec_selftest_run_audit("AS-launch");
 
+        int initial_gui = is_shell && kstrcmp(resolved, SYS_GSHELL_BIN) == 0;
         int rc = exec_enter_prepared(ctx, id, launcher_id, gui, initial_gui,
                                      text_sz, &io_parent_depth);
         if (rc) return exec_launch_abort(launcher_id, id, rc);
