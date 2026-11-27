@@ -178,34 +178,60 @@ class Peer:
                 e["parts"][:2] == ["RSH", "OUT"] and e["parts"][3] == rid]
 
     def expect_once(self, rid, generation, payload, deadline):
-        self.wait(lambda: self.outputs(rid, generation), deadline, f"missing OUT {rid}")
+        line = self.lines[generation, rid].encode()
+        prefix = b"> " + line + b"\n"
+        # RELEASE replaces the ledger entry. Retain the OUT reply across a pump.
+        replies = {}
+        service = self.agent._service_rshell
+
+        def observe(link_rid, entry, parts, out):
+            service(link_rid, entry, parts, out)
+            if parts[:2] == ["RSH", "OUT"] and parts[3] == rid:
+                replies[link_rid] = entry["resp"]
+
+        if line == b"p3-output":
+            self.agent._service_rshell = observe
+        try:
+            self.wait(lambda: self.outputs(rid, generation), deadline, f"missing OUT {rid}")
+        finally:
+            if line == b"p3-output":
+                self.agent._service_rshell = service
         event = self.outputs(rid, generation)[0]
         duplicate = False
         data = bytes.fromhex(event["body"])
-        line = self.lines[generation, rid].encode()
-        prefix = b"> " + line + b"\n"
         if payload is not None:
             normal = prefix + payload + b"\x04"
             # Command echo uses three PRINT calls. p3-output writes its payload in one call.
             doubled = b"> > " + line * 2 + b"\n\n" + payload * 2 + b"\x04"
             if line == b"p3-output" and data == doubled and event["parts"][4:] == ["0", str(len(data))]:
+                pending = self.operator.pending
+                if (replies.get(event["link_rid"]) != (400, 0) or not pending or
+                        pending["generation"] != generation or pending["id"] != rid or
+                        pending["boot"] != event["parts"][2].lower() or pending["mode"] != "cui" or
+                        pending["line"].encode() != line or pending["state"] != "running" or
+                        pending["result"] is not None or rid in self.operator.results):
+                    raise Failure("missing operator rejection for doubled prefix")
                 self.vm.record("duplicate PRINT", dict(rid=rid, generation=generation,
+                               state=pending["state"], status=400, reason="doubled command prefix",
                                normal=normal.hex(), observed=data.hex()))
-                duplicate = True  # keep checking the result, capture settlement and one-OUT
+                duplicate = True
             elif data != normal:
                 raise Failure(f"unexpected output for {rid}: {data[:120]!r}")
-        self.wait(lambda: rid in self.operator.results or self.operator.take_result(), deadline, "OUT rejected")
-        result = self.operator.results[rid]
-        if (result["state"] not in ("done", "truncated") or result["result"] != data or
-                result["drop"] != int(event["parts"][4]) or not data.endswith(b"\x04") or
-                (result["state"] == "done" and not duplicate and not data.startswith(prefix))):
-            raise Failure("incomplete operator result")
+        if not duplicate:
+            self.wait(lambda: rid in self.operator.results or self.operator.take_result(), deadline, "OUT rejected")
+            result = self.operator.results[rid]
+            if (result["state"] not in ("done", "truncated") or result["result"] != data or
+                    result["drop"] != int(event["parts"][4]) or not data.endswith(b"\x04") or
+                    (result["state"] == "done" and not data.startswith(prefix))):
+                raise Failure("incomplete operator result")
         tick = self.vm.word("tick_count", 0, deadline)
         self.wait(lambda: (self.vm.word("tick_count", 0, deadline)-tick) % 2**32 >= 100,
                   deadline, "capture settlement")
         if len(self.outputs(rid, generation)) != 1:
             raise Failure("multiple OUT records")
-        return dict(state=result["state"], drop=result["drop"], body=data, duplicate=duplicate)
+        if duplicate:
+            return dict(duplicate=True)
+        return dict(state=result["state"], drop=result["drop"], body=data, duplicate=False)
 
     def notify_number(self, channel, opcode, data, deadline):
         remaining(deadline)
