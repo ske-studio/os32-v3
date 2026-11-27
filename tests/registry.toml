@@ -278,7 +278,7 @@ needs = []
 expect = "状態語と完了条件が正典に従う"
 limits = "現行の対象票"
 gates = ["push", "main"]
-mutations = [{ id = "unknown_status", config = "local", when = "after_build", replace = "docs/tasks/restructure/TASK_RESTRUCTURE.md", old = "> 状態: **実装中", new = "> 状態: **未定義", fail = "未定義" }]
+mutations = [{ id = "unknown_status", config = "local", when = "after_build", replace = "docs/tasks/restructure/TASK_RESTRUCTURE.md", old = "> 状態: **", new = "> 状態: **未定義・", fail = "未定義" }]
 
 [[check]]
 id = "kapi_abi"
