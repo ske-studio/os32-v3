@@ -119,7 +119,16 @@ static void capture_regs(struct irq10_regs *r)
     r->i10 = cs_read(PCM_I_PINCTL);
     r->i14 = cs_read(PCM_I_BASE_HI);
     r->i15 = cs_read(PCM_I_BASE_LO);
+    r->gen = diag->pcm.generation;
     r->valid = 1;
+}
+static void capture_start(void)
+{
+    struct irq10_pcm *p = &diag->pcm;
+    ++p->generation;
+    p->tick_gen = p->generation;
+    p->tick_gen_pi = p->tick_gen_acks = 0;
+    if (!p->start.valid) capture_regs(&p->start);
 }
 static int diag_ack(int tick)
 {
@@ -129,7 +138,9 @@ static int diag_ack(int tick)
     if (bits & PCM_ALT_PI) {
         if (!p->source) {
             p->source = tick ? 2 : 1;
+            p->pi_gen = p->generation;
             p->i24 = bits;
+            p->i11 = cs_read(PCM_I_ERRSTAT); /* R2 clears PUR/COR. */
             p->r2 = inp(PCM_PORT_R2);
             p->r0 = inp(PCM_PORT_R0);
             outp(PIC2_CMD, OCW3_IRR);
@@ -140,10 +151,10 @@ static int diag_ack(int tick)
             p->imr = inp(PIC2_DATA);
             p->master_imr = inp(PIC1_DATA);
         }
-        if (tick) ++p->tick_pi;
+        if (tick) { ++p->tick_pi; ++p->tick_gen_pi; }
         if (!tick || diag->tickack) {
             cs_write_locked(PCM_I_ALTSTAT, 0);
-            if (tick) ++p->tick_acks;
+            if (tick) { ++p->tick_acks; ++p->tick_gen_acks; }
         }
     }
     irq_restore(flags);
@@ -310,6 +321,7 @@ static int pcm_run(const struct pcm_op *ops, int n, int at, int blocking)
             outp(PCM_PORT_ROUTE + o->a, o->b);
 #ifdef TICK_PROBE
             if (diag && o->a == PCM_POFS_ROUTE) {
+                diag->pcm.route_gen = diag->pcm.generation;
                 ++diag->pcm.route_count;
                 diag->pcm.route_step = at + 1;
                 diag->pcm.route_value = o->b;
@@ -439,7 +451,7 @@ static void pcm_advance_restart(void)
     }
     g_pcm.resyncs++;
 #ifdef TICK_PROBE
-    capture_regs(&diag->pcm.start);
+    capture_start();
 #endif
     if (g_pcm.close_pending) g_pcm.state = PCM_ST_DRAINING;
 }
@@ -768,6 +780,7 @@ static int pcm_open_device(u32 rate, u32 period, void (*advance)(void))
     g_pcm.state = PCM_ST_OPEN;
 #ifdef TICK_PROBE
     capture_regs(&diag->pcm.open);
+    diag->capture(&diag->pcm_open, 0);
 #endif
     s_owner = advance ? 0 : res_owner_get();
     s_deadline = 0;
@@ -792,7 +805,7 @@ static void pcm_start(void)
     f = irq_save();
     pcm_run(ops, n, 0, 0);
 #ifdef TICK_PROBE
-    capture_regs(&diag->pcm.start);
+    capture_start();
 #endif
     if (g_pcm.close_pending) g_pcm.state = PCM_ST_DRAINING;
     irq_restore(f);
@@ -1028,7 +1041,7 @@ int pcm_codec_start(void)
     int n = pcm_seq_restart(&ops);
     if (pcm_run(ops, n, 0, 0) < 0) return 1; /* setup failed before unmask */
 #ifdef TICK_PROBE
-    capture_regs(&diag->pcm.start);
+    capture_start();
 #endif
     g_pcm.state = PCM_ST_RUNNING;
     return 0;

@@ -19,7 +19,43 @@ extern void *kmemset(void *, int, unsigned int);
 extern unsigned long long tp_host_clock;
 extern unsigned int kctx_irq_depth;
 #endif
+#ifndef TICK_PROBE_HOST
+#include "platform_pic.h"
+static void capture_line(struct irq10_line *s, int pending)
+{
+    unsigned int flags = irq_save();
+    const struct irq_line *line = &irq_lines[irq_dyn_index(10)];
+    s->gen = irq10_diag.pcm.generation;
+    s->count = line->count;
+    s->shared = line->count && (line->slot[0].flags & IRQ_F_SHARED);
+    s->storm = line->storm_masked;
+    s->isolated = line->quarantined;
+    s->master = inp(PIC1_DATA);
+    s->slave = inp(PIC2_DATA);
+    if (pending) {
+        const unsigned int port[2] = {PIC1_CMD, PIC2_CMD};
+        for (unsigned int i = 0; i < 2; ++i) {
+            outp(port[i], OCW3_IRR);
+            s->irr[i] = inp(port[i]);
+            outp(port[i], OCW3_ISR);
+            s->isr[i] = inp(port[i]);
+            outp(port[i], OCW3_IRR);
+        }
+    }
+    s->valid = 1;
+    irq_restore(flags);
+}
+struct irq10_diag irq10_diag = {.tickack = 1, .capture = capture_line};
+static void begin_diag_window(void)
+{
+    kmemset(irq10_diag.window, 0, sizeof(irq10_diag.window));
+    irq10_diag.service.valid = irq10_diag.end.valid = 0;
+    capture_line(&irq10_diag.begin, 0);
+    irq10_diag.collecting = 1;
+}
+#else
 struct irq10_diag irq10_diag = {.tickack = 1};
+#endif
 static struct irq10_diag irq10_copy;
 #ifndef TICK_PROBE_HOST
 #include "arch_cpu.h"
@@ -330,6 +366,9 @@ void tick_probe_boot(void)
         data.empty_cost = now() - t;
         window = now();
         irq10_diag.window_start = window;
+        #ifndef TICK_PROBE_HOST
+        begin_diag_window();
+#endif
         data.running = 1; /* capture boot splash before shell exists */
     }
 }
@@ -385,12 +424,22 @@ int tick_probe_control(struct tp_control *c)
                     tick_fast_set(0);
                 else if (c->action != TP_S1_FIXTURE)
                     snd_wake_arm(c->action == TP_S1_WAIT ? 300000000u : 1000u);
+                #ifndef TICK_PROBE_HOST
+                begin_diag_window();
+#endif
                 window = now();
                 data.running = 1;
             }
             irq_restore(flags);
             if (rc) return rc;
-        } else if (available) { window = now(); data.running = 1; }
+        } else if (available) {
+            unsigned int flags = irq_save();
+#ifndef TICK_PROBE_HOST
+            begin_diag_window();
+#endif
+            window = now(); data.running = 1;
+            irq_restore(flags);
+        }
         c->snapshot = 0;
         return 0;
     } else if (c->action == 2) {
@@ -398,6 +447,10 @@ int tick_probe_control(struct tp_control *c)
         __asm__ volatile("cli" : : : "memory");
 #endif
         if (data.running) {
+#ifndef TICK_PROBE_HOST
+            irq10_diag.collecting = 0;
+            capture_line(&irq10_diag.end, 0);
+#endif
             data.elapsed[splash] += now() - window;
             for (unsigned int i = 0; i < TP_METRICS; i++)
                 if (pending[i].valid) data.lost++;

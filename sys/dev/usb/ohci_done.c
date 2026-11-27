@@ -2,13 +2,54 @@
  * USB_DESIGN §4-6-1 D1 and §7-1. Scan works with no WDH interrupt. */
 #include "sys/dev/usb/ohci_internal.h"
 
+#ifdef TICK_PROBE
+static void record_first(struct irq10_event *event, u32 bits)
+{
+    if (++event->count != 1) return;
+    event->bits = bits;
+    if (arch_cpu_has_tsc()) {
+        u32 hi, lo;
+        __asm__ volatile("rdtsc" : "=a"(lo), "=d"(hi) : : "memory");
+        event->first = ((unsigned long long)hi << 32) | lo;
+    }
+}
+
 u32 ohci_intr_collect(struct usb_hc *hc)
+{
+    return ohci_diag_collect(hc, 0);
+}
+
+u32 ohci_diag_collect(struct usb_hc *hc, unsigned int side)
+#else
+u32 ohci_intr_collect(struct usb_hc *hc)
+#endif
 {
     struct ohci_dmamem *m;
     u32 st;
     if (hc->state != HC_RUNNING) return 0;
     st = ohci_rd(hc, OHCI_INTERRUPT_STATUS) & OHCI_WATCH;
     if (!st) return 0;
+#ifdef TICK_PROBE
+    struct irq10_diag *diag = usb_diag_for(hc);
+    if (diag) {
+        record_first(&diag->usb[side], st);
+        if (diag->collecting) {
+            u32 enable = ohci_rd(hc, OHCI_INTERRUPT_ENABLE);
+            u32 bits = st & enable & (OHCI_INTR_WDH | OHCI_INTR_RHSC);
+            if (bits) {
+                struct irq10_window_event *w = &diag->window[side];
+                if (!w->event.count) {
+                    w->gen = diag->pcm.generation;
+                    w->enable = enable;
+                    if (side) diag->capture(&diag->service, 1);
+                }
+                record_first(&w->event, bits);
+                w->wdh += !!(bits & OHCI_INTR_WDH);
+                w->rhsc += !!(bits & OHCI_INTR_RHSC);
+            }
+        }
+    }
+#endif
     m = hc->hcpriv;
     if (st & OHCI_INTR_WDH) {
         ohci_sync(hc, hc->dma[0].bus + 0x84u, 4, USBP_TO_CPU);

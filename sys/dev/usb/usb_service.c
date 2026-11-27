@@ -62,8 +62,8 @@ void usb_service(void)
         u16 frame;
         if (hc->state != HC_RUNNING) continue;
 #ifdef TICK_PROBE
-        p = hc->ops->intr_collect(hc);
-        usb_diag_event(hc, 1, p);
+        p = hc->ops->intr_collect == ohci_intr_collect ? ohci_diag_collect(hc, 1) :
+            hc->ops->intr_collect(hc);
         p |= hc->isr_pending;
 #else
         p = hc->isr_pending | hc->ops->intr_collect(hc);

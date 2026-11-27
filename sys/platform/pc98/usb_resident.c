@@ -236,6 +236,7 @@ int pc98_usb_resident_start(struct module_handle owner, struct pc98_usb_core *co
         int rc = usb_resident_irq_attach(owner, &hc->pci, core->isr, hc);
         hc->has_irq = !rc;
         if (!irq10_diag.attached && dev.bus == 0 && dev.dev == 13 && dev.fn == 1) {
+            irq10_diag.capture(&irq10_diag.attach, 0);
             irq10_diag.attached = 1;
             irq10_diag.attach_rc = rc;
             irq10_diag.has_irq = hc->has_irq;

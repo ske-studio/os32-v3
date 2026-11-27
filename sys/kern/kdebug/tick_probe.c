@@ -26,8 +26,14 @@ static unsigned long long average(unsigned long long total, unsigned int count)
 }
 static void codec_regs(const char *stage, const struct irq10_regs *r)
 {
-    kprintf(7, "%s valid=%u I12=%02x I9=%02x I10=%02x I14=%02x I15=%02x\n",
-            stage, r->valid, r->i12, r->i9, r->i10, r->i14, r->i15);
+    kprintf(7, "%s valid=%u gen=%u I12=%02x I9=%02x I10=%02x I14=%02x I15=%02x\n",
+            stage, r->valid, r->gen, r->i12, r->i9, r->i10, r->i14, r->i15);
+}
+static void show_line(const char *label, const struct irq10_line *line)
+{
+    kprintf(7, "%s valid=%u gen=%u handlers=%u shared-flag=%u storm=%u isolated=%u IMR(master/slave)=%02x/%02x\n",
+            label, line->valid, line->gen, line->count, line->shared,
+            line->storm, line->isolated, line->master, line->slave);
 }
 static void show_irq10(const struct irq10_diag *d)
 {
@@ -42,7 +48,23 @@ static void show_irq10(const struct irq10_diag *d)
                 d->usb[i].count, d->usb[i].bits);
         cycles("first-tsc", d->usb[i].first); kprintf(7, "\n");
     }
+    for (unsigned int i = 0; i < 2; ++i) {
+        const struct irq10_window_event *w = &d->window[i];
+        kprintf(7, "window %s RHSC=%u WDH=%u first-bits=%08x enable=%08x gen=%u ",
+                i ? "service" : "irq", w->rhsc, w->wdh, w->event.bits, w->enable, w->gen);
+        cycles("first-tsc", w->event.first); kprintf(7, "\n");
+    }
+    show_line("attach", &d->attach);
+    show_line("window-start", &d->begin);
+    show_line("window-stop", &d->end);
+    show_line("PCM-open", &d->pcm_open);
+    show_line("service-first", &d->service);
+    if (d->service.valid)
+        kprintf(7, "service-first IRR(master/slave)=%02x/%02x ISR=%02x/%02x\n",
+                d->service.irr[0], d->service.irr[1], d->service.isr[0], d->service.isr[1]);
     const struct irq10_pcm *p = &d->pcm;
+    kprintf(7, "starts=%u route-gen=%u PI-gen=%u I11=%02x tick-gen=%u gen-pi=%u gen-acks=%u\n",
+            p->generation, p->route_gen, p->pi_gen, p->i11, p->tick_gen, p->tick_gen_pi, p->tick_gen_acks);
     codec_regs("open", &p->open); codec_regs("start", &p->start);
     kprintf(7, "0F40 writes=%u step=%u value=%02x tickack=%u tick-pi=%u tick-acks=%u\n",
             p->route_count, p->route_step, p->route_value, d->tickack, p->tick_pi, p->tick_acks);

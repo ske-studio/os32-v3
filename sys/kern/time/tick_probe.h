@@ -54,9 +54,18 @@ struct irq10_event {
     unsigned int count, bits;
     unsigned long long first;
 };
-struct irq10_regs { unsigned char valid, i12, i9, i10, i14, i15; };
+struct irq10_line {
+    unsigned int valid, gen, count, shared, storm, isolated, master, slave;
+    unsigned int irr[2], isr[2];
+};
+struct irq10_window_event {
+    struct irq10_event event;
+    unsigned int gen, rhsc, wdh, enable;
+};
+struct irq10_regs { unsigned int gen; unsigned char valid, i12, i9, i10, i14, i15; };
 struct irq10_pcm {
     struct irq10_regs open, start;
+    unsigned int generation, pi_gen, route_gen, tick_gen, tick_gen_pi, tick_gen_acks, i11;
     unsigned int route_count, route_step, route_value;
     unsigned int source, i24, r2, r0, irr, isr, imr, master_imr;
     unsigned int tick_pi, tick_acks;
@@ -67,6 +76,10 @@ struct irq10_diag {
     int attach_rc;
     unsigned int enable, status, control;
     struct irq10_event usb[2];
+    struct irq10_window_event window[2];
+    unsigned int collecting;
+    struct irq10_line attach, begin, end, service, pcm_open;
+    void (*capture)(struct irq10_line *, int);
     struct irq10_pcm pcm;
 };
 extern struct irq10_diag irq10_diag;

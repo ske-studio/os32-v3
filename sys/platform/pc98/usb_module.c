@@ -13,9 +13,6 @@ static int usb_irq(void *arg)
 {
     struct usb_hc *hc = arg;
     u32 pending = hc->ops->intr_collect(hc);
-#ifdef TICK_PROBE
-    usb_diag_event(hc, 0, pending);
-#endif
     hc->isr_pending |= pending;
     return pending ? USBP_IRQ_HANDLED : USBP_IRQ_NONE;
 }
