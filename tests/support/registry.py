@@ -5,7 +5,7 @@ import tomllib
 
 FIELDS = set("id spec subsystem level sources environment arch needs expect limits gates mutations".split())
 OWNERS = set("kern hal arch platform dev gfx sound input fs net kapi boot lib sdk userland tools integration system infra".split())
-ENVIRONMENTS = {"qemu-ppc", "python-yaml", "python", "linux-x86-cross", "linux-ppc-cross", "linux-cross"}
+ENVIRONMENTS = {"qemu-ppc", "qemu-ppc-net", "python-yaml", "python", "linux-x86-cross", "linux-ppc-cross", "linux-cross"}
 
 
 def demand(condition, message):

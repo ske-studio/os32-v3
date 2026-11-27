@@ -1,5 +1,7 @@
 # 試験一覧
 
+実失敗は集計の最終診断と、同じ attempt の checks 成果物の evidence/ 以下を照合する。
+
 登録検査の契約、対象構成、期待値、変異は [検査の登録](../tests/registry.toml) にある。
 登録欄の意味と実行結果の読み方は [登録の仕様](design/tools/checks/registry_v2.md) を参照する。
 

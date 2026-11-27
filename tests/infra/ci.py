@@ -7,6 +7,7 @@ import math
 import os
 from pathlib import Path
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -24,16 +25,18 @@ import fetch_fonts
 
 
 def prerequisites(environment, cpu, config, sources):
+    missing = set()
     if environment == "python-yaml" and importlib.util.find_spec("yaml") is None:
-        raise OSError("missing Python module yaml")
+        missing.add("missing Python module yaml")
     if environment in ("python", "python-yaml"):
-        return
-    ppc = environment in ("linux-ppc-cross", "qemu-ppc") or environment == "linux-cross" and cpu == "ppc"
+        return missing
+    qemu = environment.startswith("qemu-ppc")
+    ppc = qemu or environment == "linux-ppc-cross" or environment == "linux-cross" and cpu == "ppc"
     directory = Path(os.environ.get("PPC_CROSS_DIR" if ppc else "CROSS_DIR",
                                     Path.home() / "opt" / ("cross-ppc" if ppc else "cross")))
     prefix = "powerpc-elf" if ppc else "i386-elf"
     tools = ["make", "python3"]
-    if environment == "qemu-ppc":
+    if qemu:
         tools.append("qemu-system-ppc")
     modules = []
     if not ppc:
@@ -45,16 +48,50 @@ def prerequisites(environment, cpu, config, sources):
             modules = ["lz4", "PIL", "fontTools"]
     for module in modules:
         if importlib.util.find_spec(module) is None:
-            raise OSError(f"missing Python module {module}")
+            missing.add(f"missing Python module {module}")
     tools += [directory / "bin" / f"{prefix}-{tool}" for tool in
               ("gcc", "as", "ar", "ld", "objcopy", "objdump", "nm", "readelf")]
     for tool in tools:
         if not shutil.which(tool):
-            raise OSError(f"missing tool {tool}")
-    for file in ("include/stdio.h", "lib/libc.a"):
-        with (directory / prefix / file).open("rb") as stream:
-            if not stream.read(1):
-                raise OSError(f"empty newlib {file}")
+            missing.add(f"missing tool {tool}")
+    files = [directory / prefix / name for name in ("include/stdio.h", "lib/libc.a")]
+    if qemu:
+        files.append(Path("/usr/share/qemu/openbios-ppc"))
+    for path in files:
+        try:
+            with path.open("rb") as stream:
+                if not stream.read(1):
+                    missing.add(f"empty prerequisite {path}")
+        except OSError:
+            missing.add(f"unreadable prerequisite {path}")
+    if environment == "qemu-ppc-net":
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                sock.bind(("127.0.0.1", 0))
+        except OSError:
+            missing.add("loopback UDP bind (AF_INET)")
+    return missing
+
+
+def check_prerequisites(plan, args, identity):
+    failures = {}
+    for row, cpu, config in plan:
+        if not exemption(row, config, args.gate):
+            missing = prerequisites(row["environment"], cpu, config, row["sources"])
+            if missing:
+                failures[row["id"], config] = missing
+    if failures:
+        records = []
+        for (name, config), missing in failures.items():
+            reason = ", ".join(sorted(missing))
+            log = f"{name}-{config}.log"
+            (args.output / log).write_text(reason + "\n")
+            records.append(dict(id=name, config=config, status="ERROR", reason=reason,
+                                seconds=0, log=log, mutations={}))
+        bundle = args.output / f"bundle-{args.bundle or 'all'}.json"
+        bundle.write_text(json.dumps(dict(identity=identity, records=records, seconds=0)))
+        missing = set.union(*failures.values())
+        raise OSError("\n".join(sorted(missing)))
 
 
 def mutate(tree, mutation):
@@ -144,39 +181,82 @@ def state(rc):
     return {0: "PASS", 1: "FAIL"}.get(rc, "ERROR")
 
 
-def execute(candidate, row, cpu, config, mutations, env, log, outcomes):
-    prerequisites(row["environment"], cpu, config, row["sources"])
+def save_evidence(tree, destination):
+    evidence = tree / "evidence"
+    if not evidence.is_dir() or evidence.is_symlink():
+        return
+    for case in sorted(evidence.glob("*/*")):
+        if not case.is_dir() or case.resolve() != case:
+            continue
+        remaining = 4 * 1024 * 1024
+        truncated = {}
+        directory = destination / case.relative_to(evidence)
+        directory.mkdir(parents=True, exist_ok=True)
+        for path in sorted(case.rglob("*")):
+            if not path.is_file() or path.resolve() != path:
+                continue
+            relative = path.relative_to(case)
+            target = directory / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            limit = remaining if path.suffix.lower() in (".ppm", ".png") else min(remaining, 256 * 1024)
+            with path.open("rb") as stream:
+                data = stream.read(limit)
+            target.write_bytes(data)
+            remaining -= len(data)
+            truncated[str(relative)] = path.stat().st_size - len(data)
+        (directory / "manifest.json").write_text(json.dumps(dict(truncated_bytes=truncated)))
+
+
+def execute(candidate, row, cpu, config, mutations, env, log, outcomes, destination):
     with tempfile.TemporaryDirectory() as tmp:
         tree = Path(tmp)
         shutil.copytree(candidate, tree, dirs_exist_ok=True)
         cmd = [sys.executable, "-B", f'tests/{row["subsystem"]}/{row["id"]}.py', config]
+
+        def invoke(phase, environment):
+            return subprocess.run(cmd + [phase], cwd=tree, env=environment, stdout=subprocess.PIPE,
+                                  stderr=subprocess.STDOUT, text=True, errors="replace")
+
+        def verify():
+            with tempfile.TemporaryDirectory(dir=tree) as out:
+                return invoke("verify", {**env, "OS32_VERIFY_OUT": out})
+
+        def failure(proc, phase, label):
+            print(proc.stdout, end="", file=log)
+            save_evidence(tree, destination / label)
+            lines = proc.stdout.rstrip().splitlines()
+            return lines[-1] if lines else f"{phase} exited {proc.returncode}"
+
         for phase in ("build", "verify"):
-            rc = subprocess.run(cmd + [phase], cwd=tree, env=env, stdout=log,
-                                stderr=subprocess.STDOUT).returncode
-            if rc:
-                return state(rc), f"{phase} exited {rc}"
+            proc = invoke("build", env) if phase == "build" else verify()
+            if proc.returncode:
+                return state(proc.returncode), failure(proc, phase, "normal")
         for m in mutations:
             start = time.monotonic()
             target = tree / next(m[k] for k in ("remove", "append", "replace") if k in m)
             with tempfile.TemporaryDirectory() as backup:
                 saved = Path(backup) / "original"
                 try:
+                    if (tree / "evidence").exists():
+                        shutil.rmtree(tree / "evidence")
                     shutil.copy2(target, saved)
                     mutate(tree, m)
-                    proc = subprocess.run(cmd + ["verify"], cwd=tree, env=env, stdout=subprocess.PIPE,
-                                          stderr=subprocess.STDOUT, text=True, errors="replace")
-                    print(proc.stdout, file=log)
+                    proc = verify()
                     detected = proc.returncode == 1 and m["fail"] in proc.stdout
                     result = "RED" if detected else state(proc.returncode)
                     if result in ("PASS", "FAIL"):
                         result = "UNDETECTED"
+                    reason = failure(proc, "verify", m["id"]) if result != "RED" else None
                 except (OSError, ValueError) as exc:
+                    reason = str(exc)
                     print(exc, file=log)
                     result = "ERROR"
                 finally:
                     if saved.exists():
                         shutil.copy2(saved, target)
                 outcomes[m["id"]] = dict(result=result, seconds=time.monotonic()-start)
+                if reason:
+                    outcomes[m["id"]]["reason"] = reason
                 print(m["id"], result, file=log)
     return "PASS", "build and verify passed"
 
@@ -190,6 +270,8 @@ def run_bundle(candidate, plan, args, env, identity):
     for row, cpu, config in plan:
         began = time.monotonic()
         name = row["id"]
+        if Path(config).name != config or config in (".", ".."):
+            raise ValueError(f"invalid configuration directory {config!r}")
         logfile = f"{name}-{config}.log"
         outcomes = {}
         with (args.output / logfile).open("w") as log:
@@ -199,7 +281,12 @@ def run_bundle(candidate, plan, args, env, identity):
             else:
                 mutations = [m for m in row["mutations"] if args.mutate and m["config"] == config]
                 try:
-                    status, reason = execute(candidate, row, cpu, config, mutations, env, log, outcomes)
+                    destination = args.output / "evidence" / name / config
+                    if destination.resolve() != args.output.resolve() / "evidence" / name / config:
+                        raise ValueError(f"invalid evidence directory {destination}")
+                    if destination.exists():
+                        shutil.rmtree(destination)
+                    status, reason = execute(candidate, row, cpu, config, mutations, env, log, outcomes, destination)
                 except (OSError, ValueError) as exc:
                     status, reason = "ERROR", str(exc)
                 print(reason, file=log)
@@ -311,6 +398,9 @@ def collect(plan, args, identity, plan_errors=()):
         print(f'| {name} | {stats["declared"]} | {stats["executed"]} | {stats["red"]} | {stats["seconds"]:.1f} |')
     for item in failed:
         print(f'\n{item["id"]} {item["config"]} — {item["reason"]}')
+        for mid, outcome in item["mutations"].items():
+            if outcome.get("reason"):
+                print(mid, outcome["result"], outcome["reason"])
         if item["missing_mutations"]:
             print("Missing mutations:", ", ".join(item["missing_mutations"]))
         logfile = args.output / item["log"]
@@ -396,6 +486,7 @@ def main():
         (args.output / "plan.json").write_text(json.dumps(expected, ensure_ascii=False, indent=2))
     if args.command == "collect":
         return collect(plan, args, identity, plan_errors)
+    check_prerequisites(plan, args, identity)
     env = os.environ.copy()
     cross_bin = Path(env.get("CROSS_DIR", Path.home() / "opt/cross")) / "bin"
     env["PATH"] = str(cross_bin) + os.pathsep + env.get("PATH", os.defpath)

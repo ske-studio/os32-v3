@@ -72,4 +72,5 @@ jobs:
           path: |
             ${{ runner.temp }}/results/bundle-*.json
             ${{ runner.temp }}/results/*.log
+            ${{ runner.temp }}/results/evidence/
           if-no-files-found: error
