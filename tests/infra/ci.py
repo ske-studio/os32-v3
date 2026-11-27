@@ -98,9 +98,9 @@ def clear_selected_evidence(plan, args):
 
 def check_prerequisites(plan, args, identity):
     failures = {}
-    for row, cpu, config in plan:
+    for row, bundle, config in plan:
         if not exemption(row, config, args.gate):
-            missing = prerequisites(row["environment"], cpu, config, row["sources"])
+            missing = prerequisites(row["environment"], bundle.partition("-")[0], config, row["sources"])
             if missing:
                 failures[row["id"], config] = missing
     if failures:
@@ -157,15 +157,30 @@ STATES = ("PASS", "FAIL", "ERROR", "NOT_RUN", "NOT_APPLICABLE", "DEFERRED", "REU
 
 
 def selection(rows, args):
+    loads = defaultdict(list)
     for row in rows:
-        if args.check and args.check != row["id"]:
-            continue
         for cpu, configs in row["arch"].items():
-            if args.bundle and cpu != args.bundle:
-                continue
             for config in configs:
-                if not args.config or config == args.config:
-                    yield row, cpu, config
+                bundle = cpu
+                if cpu == "ppc":
+                    environment = row["environment"]
+                    group = "build"
+                    if environment == "qemu-ppc-net":
+                        group = "net"
+                    elif environment == "qemu-ppc" and row["level"] == "L4":
+                        group = "guest"
+                    # Until measured, reserve a whole runner for a new row.
+                    seconds = row.get("ppc_seconds", {}).get(config, 900)
+                    bins = loads[group]
+                    index = next((i for i, used in enumerate(bins) if used + seconds <= 900), len(bins))
+                    if index == len(bins):
+                        bins.append(0)
+                    bins[index] += seconds
+                    bundle = f"ppc-{group}-{index + 1}"
+                if ((not args.check or args.check == row["id"])
+                        and (not args.config or args.config == config)
+                        and (not args.bundle or args.bundle in (cpu, bundle))):
+                    yield row, (cpu if args.bundle == cpu else bundle), config
 
 
 def exemption(row, config, gate):
@@ -192,7 +207,8 @@ def manifest(plan, identity):
         except OwnershipError:
             ownership[path] = None  # src_owner reports invalid placement on the full run.
     entries = []
-    for row, cpu, config in plan:
+    for row, bundle, config in plan:
+        cpu = bundle.partition("-")[0]
         inputs = {path: ownership.get(path) for path in row["sources"]}
         if any(path.startswith("make:") for path in inputs):
             for target in (ROOT / "build/targets").glob(f"{cpu}-*.mk"):
@@ -201,7 +217,7 @@ def manifest(plan, identity):
 
         mids = [m["id"] for m in row["mutations"] if m["config"] == config
                 and identity["mutate"] and not exemption(row, config, identity["gate"])]
-        entries.append(dict(id=row["id"], config=config, bundle=cpu, owner=row["subsystem"],
+        entries.append(dict(id=row["id"], config=config, bundle=bundle, owner=row["subsystem"],
                             level=row["level"], environment=row["environment"], inputs=inputs,
                             mutations=mids))
     return dict(identity=identity, entries=entries)
@@ -359,7 +375,7 @@ def read_bundle(path, identity):
 
 def collect(plan, args, identity, plan_errors=()):
     plan = list(plan)
-    owners = {(row["id"], config): cpu for row, cpu, config in plan}
+    owners = {(row["id"], config): bundle for row, bundle, config in plan}
     records = {}
     errors = list(plan_errors)
     durations = {}
@@ -462,9 +478,9 @@ def collect(plan, args, identity, plan_errors=()):
 
 
 def job_errors(jobs, selected, entries):
-    bundles = {entry["bundle"] for entry in entries}
+    families = {entry["bundle"].split("-")[0] for entry in entries}
     required = dict(plan=True, artifacts=selected["pc98"] != "none", powerpc=bool(selected["powerpc"]))
-    required.update({f"checks-{cpu}": cpu in bundles for cpu in ("host", "x86", "ppc")})
+    required.update({f"checks-{cpu}": cpu in families for cpu in ("host", "x86", "ppc")})
     errors = []
     for job, active in required.items():
         wanted = "success" if active else "skipped"

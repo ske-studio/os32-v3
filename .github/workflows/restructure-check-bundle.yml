@@ -45,7 +45,7 @@ jobs:
       - uses: ./.github/actions/build-setup
         if: inputs.bundle != 'host'
       - name: Cache KAPI layout check dependencies
-        if: inputs.bundle == 'x86' || inputs.bundle == 'ppc'
+        if: inputs.bundle == 'x86' || startsWith(inputs.bundle, 'ppc-')
         uses: ./.github/actions/cache
         continue-on-error: true
         with:
@@ -55,8 +55,8 @@ jobs:
             ${{ runner.temp }}/kapi-targets
           key: kapi-layout-v1-${{ runner.os }}-${{ inputs.bundle }}-${{ hashFiles('rust-toolchain.toml', '**/Cargo.lock', 'sdk/rust/*-os32-none.json') }}
       - uses: ./.github/actions/ppc-setup
-        if: inputs.bundle == 'ppc'
-      - if: inputs.bundle == 'ppc'
+        if: startsWith(inputs.bundle, 'ppc-')
+      - if: startsWith(inputs.bundle, 'ppc-')
         # 推奨パッケージ (GUI・音声の pipewire ほか) は入れない — runner の索引の古さで security の 404 を 2 回踏んだ (2026-11-26)
         run: |
           sudo apt-get update

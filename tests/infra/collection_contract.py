@@ -10,7 +10,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from unittest.mock import patch
 
-from tests.infra.ci import clear_selected_evidence, check_prerequisites, collect, job_errors, run_bundle
+from tests.infra.ci import clear_selected_evidence, check_prerequisites, collect, job_errors, run_bundle, selection
 from tests.support.media import Failure, main
 
 
@@ -104,6 +104,10 @@ def verify_selection():
     jobs = {job: {"result": "success"} for job in ("plan", "artifacts", "powerpc", "checks-host")}
     jobs.update({job: {"result": "skipped"} for job in ("checks-x86", "checks-ppc")})
     check(not job_errors(jobs, result, [{"bundle": "host"}]), "planned skip rejected")
+    jobs["checks-ppc"]["result"] = "success"
+    check(not job_errors(jobs, result, [{"bundle": name} for name in
+                        ("host", "ppc-net-1", "ppc-guest-1")]), "PPC matrix success rejected")
+    jobs["checks-ppc"]["result"] = "skipped"
     jobs["powerpc"]["result"] = "skipped"
     check(job_errors(jobs, result, [{"bundle": "host"}]), "missing required boot medium accepted")
     for path in ("sdk/kapi.json", "sys/include/ide_contract.h", "sys/kern/exec/os32x_hdr.h",
@@ -171,8 +175,20 @@ def verify(config):
             (bodies / f"{name}.py").write_text(f'import sys\nif sys.argv[-1] == "verify":\n    print("{name} diagnostic")\n    sys.exit({rc})\n')
             plan.append((dict(id=name, subsystem="infra", gates=["main"], mutations=[],
                               environment="python", sources=[]), cpu, "test"))
+        rows = [dict(row, arch={cpu: [cfg]}, level="L4", environment=env)
+                for (row, cpu, cfg), env in zip(plan, ("python", "qemu-ppc-net", "qemu-ppc"))]
+        rows[-1]["arch"] = {"ppc": ["test"]}
+        selector = SimpleNamespace(check=None, config=None, bundle=None)
+        plan = list(selection(rows, selector))
+        check([bundle for _, bundle, _ in plan] == ["host", "ppc-net-1", "ppc-guest-1"],
+              "PPC runner separation")
+        overflow = dict(rows[1], id="overflow", ppc_seconds={"test": 500})
+        rows[1]["ppc_seconds"] = {"test": 410}
+        selector.check = "overflow"
+        check([bundle for _, bundle, _ in selection([*rows, overflow], selector)] == ["ppc-net-2"],
+              "overweight PPC bundle or filter-dependent assignment")
         identity = dict(sha="fixture", run="local", attempt="1", mutate=False, gate="main")
-        for args.bundle in ("host", "ppc"):
+        for args.bundle in ("host", "ppc-net-1", "ppc-guest-1"):
             run_bundle(source, [r for r in plan if r[1] == args.bundle], args, {}, identity)
         args.github_output = root / "github-output"
         output = io.StringIO()
@@ -186,6 +202,11 @@ def verify(config):
             "END_LOGS"], "failure log selection")
         check(all(f"{name} diagnostic" in output.getvalue() for name in ("first", "second")),
               "missing failure tails")
+        guest = out / "bundle-ppc-guest-1.json"
+        wrong = guest.with_name("bundle-ppc-net-2.json")
+        guest.rename(wrong)
+        check(collect(plan, args, identity) == 2, "misplaced PPC bundle accepted")
+        wrong.rename(guest)
         path = out / "bundle-host.json"
         bundle = json.loads(path.read_text())
         bundle["records"][-1]["status"] = "REUSED"
@@ -194,11 +215,12 @@ def verify(config):
         path.unlink()
         check(collect(plan, args, identity) == 1, "missing bundle must block collection")
         summary = json.loads((out / "summary.json").read_text())
-        check(summary["rows"][-1]["status"] == "NOT_RUN", "missing result must be NOT_RUN")
+        check(summary["rows"][0]["status"] == "NOT_RUN", "missing result must be NOT_RUN")
         row, cpu, cfg = plan[0]
         row.update(environment="linux-x86-cross")
         args.bundle = "host"
-        (out / "bundle-ppc.json").unlink()
+        (out / "bundle-ppc-net-1.json").unlink()
+        (out / "bundle-ppc-guest-1.json").unlink()
         row.update(environment="qemu-ppc-net")
         import socket
         def which(tool):

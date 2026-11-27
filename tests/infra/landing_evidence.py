@@ -49,6 +49,19 @@ def selection_artifact(run):
 
     if read_plan() != ({"powermac"}, "none"):
         raise Failure("wrong boot evidence for a PowerMac-only plan")
+    plan["entries"][0]["bundle"] = "ppc-guest-1"
+    expected["entries"].append(["example", "link"])
+    plan["entries"].append(dict(id="example", config="link", bundle="ppc-net-1"))
+    summary["rows"].append(dict(summary["rows"][0], config="link"))
+    if read_plan() != ({"powermac"}, "none"):
+        raise Failure("split PowerPC plan rejected")
+    with patch.dict(summary, rows=summary["rows"][:1]):
+        try:
+            read_plan()
+        except ValueError:
+            pass
+        else:
+            raise Failure("missing second PPC bundle accepted")
     for field, changed in (("base", run["head_sha"]), ("entries", []),
                            ("selection", dict(expected, skipped={})),
                            ("identity", dict(plan["identity"], attempt="1"))):
@@ -59,8 +72,8 @@ def selection_artifact(run):
                 continue
             raise Failure(f"invalid selection {field} accepted")
     for field, changed in (("rc", 1), ("rows", []), ("selection", {}),
-                           ("rows", [dict(summary["rows"][0], status="FAIL")]),
-                           ("rows", [dict(summary["rows"][0], mutations={"extra": {"result": "RED"}})]),
+                           ("rows", [dict(summary["rows"][0], status="FAIL"), summary["rows"][1]]),
+                           ("rows", [dict(summary["rows"][0], mutations={"extra": {"result": "RED"}}), summary["rows"][1]]),
                            ("identity", dict(summary["identity"], run="18")),
                            ("identity", dict(summary["identity"], attempt="1"))):
         with patch.dict(summary, {field: changed}):

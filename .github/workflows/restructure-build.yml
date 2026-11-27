@@ -245,6 +245,7 @@ jobs:
       sdk: ${{ steps.plan.outputs.sdk }}
       userland: ${{ steps.plan.outputs.userland }}
       bundles: ${{ steps.plan.outputs.bundles }}
+      ppc_bundles: ${{ steps.plan.outputs.ppc_bundles }}
       kapi_base: ${{ steps.comparison.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
@@ -269,6 +270,7 @@ jobs:
         run: |
           bundles=$(python3 -B -m tests.infra.ci plan --gate "$GATE" --mutate --output "$RUNNER_TEMP/planned")
           jq -r '.selection | "pc98=\(.pc98)", "userland=\(.userland)", "sdk=\(.sdk)", "powerpc=\(.powerpc|tojson)"' "$RUNNER_TEMP/planned/plan.json" >> "$GITHUB_OUTPUT"
+          echo "ppc_bundles=$(jq -c '[.[] | select(startswith("ppc-"))]' <<< "$bundles")" >> "$GITHUB_OUTPUT"
           echo "bundles=$bundles" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
@@ -299,10 +301,14 @@ jobs:
     if: >-
       !cancelled() && needs.plan.result == 'success' &&
       (needs.powerpc.result == 'success' || needs.powerpc.result == 'skipped') &&
-      contains(fromJSON(needs.plan.outputs.bundles), 'ppc')
+      needs.plan.outputs.ppc_bundles != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        bundle: ${{ fromJSON(needs.plan.outputs.ppc_bundles) }}
     uses: ./.github/workflows/restructure-check-bundle.yml
     with:
-      bundle: ppc
+      bundle: ${{ matrix.bundle }}
       ppc_media: ${{ needs.plan.outputs.powerpc != '[]' }}
       kapi_base: ${{ needs.plan.outputs.kapi_base }}
   collect:

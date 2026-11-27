@@ -2,7 +2,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from tests.support.registry import load, validate
+from tests.support.registry import FIELDS, load, validate
 from tests.support.media import Failure, main
 
 
@@ -14,6 +14,7 @@ def verify_configs(root, row):
     for config in ("..", ".", "nested/config", "nested\\config", ""):
         candidate = dict(row, arch={"host": [config]}, mutations=[
             dict(mutation, config=config) for mutation in row["mutations"]])
+        candidate.pop("ppc_seconds", None)
         try:
             validate([candidate], root)
         except ValueError as exc:
@@ -26,7 +27,14 @@ def verify(config):
     root = Path.cwd()
     row = load(root)[0]
     verify_configs(root, row)
-    for field in row:
+    for weights in ([], {"unknown": 1}, {"core": 0}, {"core": True}):
+        try:
+            validate([dict(row, ppc_seconds=weights)], root)
+        except ValueError as exc:
+            if str(exc) == "invalid ppc_seconds":
+                continue
+        raise Failure("invalid PPC weight accepted")
+    for field in FIELDS:
         incomplete = row.copy()
         del incomplete[field]
         try:

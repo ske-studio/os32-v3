@@ -1,5 +1,6 @@
 [[check]]
 id = "ppc_media_build"
+ppc_seconds = { core = 1, link = 1, sh = 1, link-sh = 1, shell = 1, neg1 = 1 }
 spec = { path = "docs/design/tools/ci/ci_v2.md", section = "§0 最小 workflow と仮の関門" }
 subsystem = "infra"
 level = "L1"
@@ -28,6 +29,7 @@ mutations = [{ id = "x86_missing_iso", config = "pc98", remove = "images/os32_in
 
 [[check]]
 id = "ppc_common_compile"
+ppc_seconds = { link-sh = 4 }
 spec = { path = "docs/design/tools/checks/tests_v2.md", section = "配布物と再生成の合否" }
 subsystem = "infra"
 level = "L1"
@@ -42,6 +44,7 @@ mutations = [{ id = "common_missing_object", config = "link-sh", remove = "build
 
 [[check]]
 id = "build_identity"
+ppc_seconds = { core = 9, link = 10, sh = 65, link-sh = 63, shell = 62, neg1 = 9 }
 spec = { path = "docs/design/tools/checks/tests_v2.md", section = "配布物と再生成の合否" }
 subsystem = "infra"
 level = "L1"
@@ -71,6 +74,7 @@ mutations = [{ id = "allow_unsafe_config", config = "local", replace = "tests/su
 
 [[check]]
 id = "ppc_boot"
+ppc_seconds = { core = 3, link = 5, sh = 7, link-sh = 7, shell = 7, neg1 = 3 }
 spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の起動到達点" }
 subsystem = "system"
 level = "L4"
@@ -88,7 +92,7 @@ id = "collection_contract"
 spec = { path = "docs/design/tools/ci/ci_v2.md", section = "§2 共通入口" }
 subsystem = "infra"
 level = "M"
-sources = ["tests/infra/ci.py", "tests/support/impact.py", "tools/ownership_images.py", "tests/support/registry.py", ".github/workflows/restructure-check-bundle.yml", "tests/registry.toml"]
+sources = ["tests/infra/ci.py", "tests/support/impact.py", "tools/ownership_images.py", "tests/support/registry.py", ".github/workflows/restructure-build.yml", ".github/workflows/restructure-check-bundle.yml", "tests/registry.toml"]
 environment = "python-yaml"
 arch = { host = ["local"] }
 needs = []
@@ -147,6 +151,7 @@ mutations = [{ id = "owner_conflict", config = "local", when = "after_build", re
 
 [[check]]
 id = "build_sources"
+ppc_seconds = { core = 10, link = 5, sh = 7, link-sh = 7, shell = 7, neg1 = 5 }
 spec = { path = "docs/design/build/ownership.md", section = "構成別のコンパイル登録" }
 subsystem = "infra"
 level = "L0"
@@ -162,6 +167,7 @@ mutations = [{ id = "missing_translation", config = "core", when = "after_build"
 
 [[check]]
 id = "include_layers"
+ppc_seconds = { core = 12 }
 spec = { path = "docs/design/tools/check_layers.md", section = "9. 構成ごとの include 直辺" }
 subsystem = "infra"
 level = "L0"
@@ -180,6 +186,7 @@ mutations = [{ id = "new_nasm_device_edge", config = "pc98", when = "after_build
 
 [[check]]
 id = "link_layers"
+ppc_seconds = { core = 58 }
 spec = { path = "docs/design/tools/check_layers.md", section = "10. 最終リンクの採用とシンボル解決" }
 subsystem = "infra"
 level = "L0"
@@ -201,6 +208,7 @@ mutations = [{ id = "wrong_cpu_object", config = "core", when = "after_build", r
 
 [[check]]
 id = "hal_contracts"
+ppc_seconds = { sh = 3, link-sh = 3, shell = 3 }
 spec = { path = "docs/design/include/input_service.md", section = "入力・ポインタ・時計の登録と到達" }
 subsystem = "infra"
 level = "L2"
@@ -226,7 +234,7 @@ expect = "各本体と登録が一対一で仕様の節が存在する"
 limits = "候補の追跡パス"
 gates = ["push", "main"]
 mutations = [
-    { id = "unregistered_test", config = "local", when = "after_build", replace = "tests/registry.toml", old = "[[check]]\nid = \"ppc_media_build\"\nspec = { path = \"docs/design/tools/ci/ci_v2.md\", section = \"§0 最小 workflow と仮の関門\" }\nsubsystem = \"infra\"\nlevel = \"L1\"\nsources = [\"make:all\", \"make:iso\"]\nenvironment = \"linux-ppc-cross\"\narch = { ppc = [\"core\", \"link\", \"sh\", \"link-sh\", \"shell\", \"neg1\"] }\nneeds = []\nexpect = \"ビルド成功、PPCKERN.ELF と boot.iso が非空\"\nlimits = \"起動到達と再生成時の一致は別の検査\"\ngates = [\"push\", \"main\"]\nmutations = [{ id = \"ppc_core_missing_iso\", config = \"core\", when = \"after_build\", remove = \"build/out/ppc-kboot/boot.iso\", fail = \"missing boot.iso\" }]", new = "# Removed the media check registration", fail = "unregistered body tests/infra/ppc_media_build.py" },
+    { id = "unregistered_test", config = "local", when = "after_build", replace = "tests/registry.toml", old = "[[check]]\nid = \"ppc_media_build\"\nppc_seconds = { core = 1, link = 1, sh = 1, link-sh = 1, shell = 1, neg1 = 1 }\nspec = { path = \"docs/design/tools/ci/ci_v2.md\", section = \"§0 最小 workflow と仮の関門\" }\nsubsystem = \"infra\"\nlevel = \"L1\"\nsources = [\"make:all\", \"make:iso\"]\nenvironment = \"linux-ppc-cross\"\narch = { ppc = [\"core\", \"link\", \"sh\", \"link-sh\", \"shell\", \"neg1\"] }\nneeds = []\nexpect = \"ビルド成功、PPCKERN.ELF と boot.iso が非空\"\nlimits = \"起動到達と再生成時の一致は別の検査\"\ngates = [\"push\", \"main\"]\nmutations = [{ id = \"ppc_core_missing_iso\", config = \"core\", when = \"after_build\", remove = \"build/out/ppc-kboot/boot.iso\", fail = \"missing boot.iso\" }]", new = "# Removed the media check registration", fail = "unregistered body tests/infra/ppc_media_build.py" },
     { id = "registered_body_missing", config = "local", when = "after_build", remove = "tests/infra/ppc_media_build.py", fail = "missing body tests/infra/ppc_media_build.py" },
     { id = "registered_section_missing", config = "local", when = "after_build", replace = "docs/design/tools/checks/tests_v2.md", old = "## 配布物と再生成の合否", new = "## 配布の合否", fail = "missing or duplicate section" },
 ]
@@ -289,6 +297,7 @@ mutations = [{ id = "unknown_status", config = "local", when = "after_build", re
 
 [[check]]
 id = "kapi_abi"
+ppc_seconds = { core = 1 }
 spec = { path = "docs/KAPI_SPEC.md", section = "§3-4 公開 ABI の比較基点と破断" }
 subsystem = "tools"
 level = "L0"
@@ -303,6 +312,7 @@ mutations = [{ id = "changed_slot", config = "pc98", when = "after_build", repla
 
 [[check]]
 id = "kapi_sync"
+ppc_seconds = { link-sh = 15 }
 spec = { path = "docs/KAPI_SPEC.md", section = "§3-5 公開定義と生成物の同期" }
 subsystem = "tools"
 level = "L0"
@@ -317,6 +327,7 @@ mutations = [{ id = "changed_data_offset", config = "pc98", when = "after_build"
 
 [[check]]
 id = "c_dialect"
+ppc_seconds = { link-sh = 58 }
 spec = { path = "docs/CONSTRAINTS.md", section = "[C1] C11 (GNU11) を内部実装の基準とする" }
 subsystem = "infra"
 level = "L0"
@@ -333,6 +344,7 @@ mutations = [{ id = "sqlite_language", config = "pc98", when = "after_build", re
 
 [[check]]
 id = "p2v"
+ppc_seconds = { link-sh = 108 }
 spec = { path = "docs/CONSTRAINTS.md", section = "[C5] 物理番地とポインタの変換" }
 subsystem = "infra"
 level = "L0"
@@ -402,6 +414,7 @@ mutations = [{ id = "skip_on_mode_check", config = "pc98", when = "after_build",
 
 [[check]]
 id = "ppc_ata_guest"
+ppc_seconds = { sh = 309 }
 spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の ATA ゲスト完了" }
 subsystem = "system"
 level = "L4"
@@ -531,6 +544,7 @@ mutations = [
 
 [[check]]
 id = "ppc_link_session"
+ppc_seconds = { link-sh = 473 }
 spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の遠隔シェル" }
 subsystem = "system"
 level = "L4"

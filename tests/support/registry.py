@@ -40,7 +40,7 @@ def validate(checks, root):
         demand(isinstance(row, dict), "invalid check")
         missing = FIELDS - row.keys()
         demand(not missing, "missing field " + ", ".join(sorted(missing)))
-        demand(row.keys() <= FIELDS | {"deferred"}, "unexpected field")
+        demand(row.keys() <= FIELDS | {"deferred", "ppc_seconds"}, "unexpected field")
         name = row["id"]
         demand(identifier(name) and name not in ids, f"invalid or duplicate id {name}")
         ids.add(name)
@@ -62,6 +62,9 @@ def validate(checks, root):
         demand(document.is_file() and string(spec["section"]), "missing spec")
         arch = row["arch"]
         demand(isinstance(arch, dict) and arch and arch.keys() <= {"x86", "ppc", "host"}, "invalid arch")
+        weights = row.get("ppc_seconds", {})
+        demand(isinstance(weights, dict) and weights.keys() <= set(arch.get("ppc", ()))
+               and all(type(n) is int and n > 0 for n in weights.values()), "invalid ppc_seconds")
         configs = set()
         for values in arch.values():
             demand(strings(values) and all(map(config_component, values)) and configs.isdisjoint(values), "invalid configs")
