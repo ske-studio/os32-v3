@@ -26,6 +26,7 @@ static int context(u32 id, u32 head, int owner, struct gfx2_adapter **out,
 
 void gfx2_flip_poll(struct gfx2_adapter *a)
 {
+    if (a->state == GFX2_AD_LOST_HELD) return;
     for (u32 h = 0; h < a->heads; h++) {
         struct gfx2_head *head = &a->head[h];
         u32 retired = 0;

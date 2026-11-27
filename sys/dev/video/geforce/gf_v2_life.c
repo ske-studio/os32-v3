@@ -37,6 +37,7 @@ int gf_v2_start(struct gf_v2 *g, u32 dl)
     const struct gf4_test_ops *ops = gf_v2_disp();
     struct gf4_ctx *c = ops ? ops->ctx : NULL;
     int rc;
+    if (g->lost == GF_V2_STOP_UNCONFIRMED) return OS32_ERR_IO;
     g->lost = 1;
     if (!c || !c->ready || !c->accepting || !c->ch || !c->accel || c->ch->state != GF2_RUN ||
         !c->accel->ready || c->accel->epoch != c->ch->epoch) return GF3_ESTATE;
@@ -55,6 +56,7 @@ int gf_v2_stop(void *ctx)
     const struct gf4_test_ops *ops = gf_v2_disp();
     struct gf4_ctx *c = ops ? ops->ctx : NULL;
     struct gf2_fence f; u32 dl = 0; int rc;
+    if (g->lost == GF_V2_STOP_UNCONFIRMED) return OS32_ERR_IO;
     g->lost = 1;
     if (!g->ch || g->ch->state == GF2_OFF || g->ch->epoch != g->epoch) return 0;
     rc = gf2_fault_check(g->ch);
@@ -64,5 +66,5 @@ int gf_v2_stop(void *ctx)
     if (!rc) rc = gf2_fence_wait(g->ch, f, dl);
     if (!rc) return 0;
     if (c && c->links && c->links->failed) (void)c->links->failed(c->links->owner, rc, dl);
-    return g->ch->state == GF2_OFF ? 0 : OS32_ERR_IO;
+    return g->lost != GF_V2_STOP_UNCONFIRMED && g->ch->state == GF2_OFF ? 0 : OS32_ERR_IO;
 }

@@ -86,6 +86,7 @@ extern struct gfx2_surf gfx2_surfs[GFX2_MAX_SURFACES /* 1024 */];     /* 実体�
 extern const GfxBackendV2 gfx2_v1_shim, gfx2_lost_be;
 struct gfx2_adapter *gfx2_adapter_get(u32 a);
 int gfx2_adapter_register(GfxBackend *v1, u32 kind, u32 flags);
+void gfx2_detach_stopped_heads(struct gfx2_adapter *);
 void gfx2_adapter_activate(struct gfx2_adapter *);
 struct gfx2_adapter *gfx2_active(void);
 void gfx2_adapter_unregister(GfxBackend *v1);

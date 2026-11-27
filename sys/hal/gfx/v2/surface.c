@@ -163,6 +163,8 @@ int gfx2_surf_alias_update(struct gfx2_surf *s, const struct gfx2_alias_desc *d)
 {
     u32 old_sid = s->sid;
     if (!(s->flags & GFX2_SF_ALIAS)) return OS32_ERR_INVAL;
+    if (s->scan_ref && gfx2_adapters[s->adapter].state == GFX2_AD_LOST_HELD)
+        return OS32_ERR_BUSY;
     if ((s->state != GFX2_ST_IDLE && s->state != GFX2_ST_LOST) || !surf_done(s) ||
         s->map_as) return OS32_ERR_BUSY;
     surf_generation(s, s->gen + 1);

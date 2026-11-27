@@ -1116,3 +1116,24 @@ mutations = [
   { id = "gfx2_gf_flip_reject_after_write", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/display/flip.c", old = "return rc ? OS32_ERR_AGAIN : 0;", new = "return rc;", fail = "FAIL post-write uncertainty" },
   { id = "gfx2_gf_flip_skip_vblank", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_display.c", old = "== c->hold[head].after) return OS32_ERR_BUSY;", new = "== c->hold[head].after) return 0;", fail = "FAIL vblank retirement" },
 ]
+
+[[check]]
+id = "gfx2_register_twice"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/backend_reg.c", "sys/hal/gfx/v2/v1_bridge.c", "sys/hal/gfx/v2/display.c", "sys/hal/gfx/v2/surface.c", "sys/hal/gfx/v2/fence.c", "sys/dev/video/geforce/gf_v2_ops.c", "sys/dev/video/geforce/gf_v2_life.c", "sys/dev/video/geforce/gf_v2.h", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_register_twice.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "R5。再登録で gen と走査参照が不変。PC-98 への切替で GF の ACTIVE が外れ、停止成功時は旧面と保留面を解放できる。停止失敗時は両 sid・参照を保ち、backing を解放しない"
+limits = "表示装置の停止結果を模型で与える。別名の sid・backing は実装で照合。実機の停止は観測しない"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_register_duplicate", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "a = adapter_by_v1(v1);", new = "a = NULL;", fail = "FAIL repeated registration" },
+  { id = "gfx2_register_active", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "o->flags &= ~GFX2_AF_ACTIVE;", new = "(void)o;", fail = "FAIL active fallback" },
+  { id = "gfx2_stop_failure_forgotten", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_ops.c", old = "gf_v2_inst.lost = GF_V2_STOP_UNCONFIRMED;", new = "gf_v2_inst.lost = 1;", fail = "FAIL unconfirmed stop" },
+  { id = "gfx2_detach_after_stop_failure", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "if (rc) {\n        gfx2_adapter_lost(a, 1);", new = "if (0) {\n        gfx2_adapter_lost(a, 1);", fail = "FAIL unconfirmed stop" },
+  { id = "gfx2_rebind_held_scan", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/surface.c", old = "if (s->scan_ref && gfx2_adapters[s->adapter].state == GFX2_AD_LOST_HELD)", new = "if (0)", fail = "FAIL held alias" },
+  { id = "gfx2_poll_held_scan", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/display.c", old = "if (a->state == GFX2_AD_LOST_HELD) return;", new = "(void)0;", fail = "FAIL unconfirmed stop" },
+]

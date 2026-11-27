@@ -396,9 +396,10 @@ void gfx_shutdown(void)
         g_backend = DISPLAY_FALLBACK_BACKEND;
         gfx2_register_selected();
         gfx_bind_client();
+    } else {
+        struct gfx2_adapter *a = gfx2_active();
+        if (a) gfx2_detach_stopped_heads(a);
     }
-    struct gfx2_adapter *a = gfx2_active();
-    if (a) for (u32 h = 0; h < a->heads; h++) gfx2_head_detach(a, h);
 rebind:
     gfx_reinit_surfaces(1);
     display_provider_console_return();

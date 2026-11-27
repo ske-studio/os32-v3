@@ -29,6 +29,8 @@ struct gf_v2 {                                   /* 実体は G1 */
     struct gf_v2_home home;                      /* G2 */
     u32 pal_set; u8 pal[768];                    /* G2 */
 };
+#define GF_V2_STOP_UNCONFIRMED 2u
+void gf_v2_stopped(int rc);
 #define GF_V2_STOP_US 1000000u
 
 int gf_v2_fence_idle(struct gf_v2 *, u32 dl);

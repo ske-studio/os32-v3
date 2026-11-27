@@ -146,14 +146,30 @@ int gfx2_adapter_register(GfxBackend *v1, u32 kind, u32 flags)
     return 0;
 }
 
+void gfx2_detach_stopped_heads(struct gfx2_adapter *a)
+{
+    int rc = a->kind == GFX2_KIND_GEFORCE ? a->be->stop(a->ctx) : 0;
+    if (rc) {
+        gfx2_adapter_lost(a, 1);
+        kprintf(KLOG_ATTR, "[gfx2] adapter %u stop rc=%d, retaining surfaces\n", a->index, rc);
+        return;
+    }
+    if (a->state == GFX2_AD_LOST_HELD) return;
+    for (u32 h = 0; h < a->heads; h++) gfx2_head_detach(a, h);
+}
+
 void gfx2_adapter_activate(struct gfx2_adapter *a)
 {
     for (u32 i = 0; i < GFX2_MAX_ADAPTERS; i++) {
         struct gfx2_adapter *o = &gfx2_adapters[i];
         if (o == a || !(o->flags & GFX2_AF_ACTIVE)) continue;
+        u32 gen = o->gen;
         o->flags &= ~GFX2_AF_ACTIVE;
-        for (u32 h = 0; h < o->heads; h++) gfx2_head_detach(o, h);
-        if (++o->gen == 0) o->gen = 1;
+        /* Stop scanout before checking the result through the v2 stop hook. */
+        if (o->kind == GFX2_KIND_GEFORCE && o->v1->shutdown) o->v1->shutdown();
+        gfx2_detach_stopped_heads(o);
+        o->gen = gen + 1;
+        if (!o->gen) o->gen = 1;
     }
     a->flags |= GFX2_AF_ACTIVE;
     v1_bridge_rebind();

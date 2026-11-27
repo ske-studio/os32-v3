@@ -39,7 +39,6 @@
 #include "gf_v2.h"
 extern const GfxBackendV2 gf_backend_v2;
 int gf_v2_idle(void);
-void gf_v2_stopped(void);
 #include "leave_log.h"
 #include "../../../hal/gfx/gfx_internal.h"
 #include "../../../hal/gfx/gfx_policy.h"
@@ -485,11 +484,14 @@ static int geforce_stop_common(bool force)
 #endif
     /* Sample stopped GF state before route_to_98 performs the final redraw. */
 #ifdef OS32_GEFORCE_MODULE
-    gf_v2_stopped();
     geforce_leave_log(leave_io, rc);
 #endif
     int route_rc = (was_routed || forced_stop) ? pc98_route_to_98() : 0;
     if (route_rc) rc = -1;
+#ifdef OS32_GEFORCE_MODULE
+    /* A foundation reset alone cannot confirm display shutdown. */
+    gf_v2_stopped(rc ? rc : forced_stop ? GF1_ESTOP : 0);
+#endif
     active = routed = 0;
     if (rc) failed = 1;
     return rc;

@@ -20,8 +20,13 @@ int gf_v2_idle(void)
     return rc ? rc : gf_v2_fence_idle(g, dl);
 }
 
-void gf_v2_stopped(void)
+void gf_v2_stopped(int rc)
 {
+    if (rc) {
+        gf_v2_inst.lost = GF_V2_STOP_UNCONFIRMED;
+        return;
+    }
+    gf_v2_inst.lost = 1;
     if (gf_v2_inst.ch && gf_v2_inst.ch->state == GF2_OFF)
         gf_v2_gart_reset(&gf_v2_inst);
 }

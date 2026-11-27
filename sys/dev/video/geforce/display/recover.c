@@ -73,6 +73,7 @@
  * OS32 keeps resident reservation nodes and value loans instead of BOs;
  * no local quiesce, release, replay, or publication during restart. */
 #include "api.h"
+#include "../gf_v2.h"
 #include "stage.h"
 #include "../internal.h"
 #include "../accel_service.h"
@@ -282,7 +283,10 @@ i32 gf4_service_failed(void *owner,i32 cause,u32 dl)
     if (!c) return GF4_EINVAL;
     c->accepting=false; c->reusable=false;
     i32 rc=gf4_service_stop(c,dl);
-    if (rc) c->recovery_rc=rc;
+    if (rc) {
+        c->recovery_rc=rc;
+        gf_v2_stopped(rc);
+    }
     geforce_display_failed();
     return rec_result(c,cause);
 }
