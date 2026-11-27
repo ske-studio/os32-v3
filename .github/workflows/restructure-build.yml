@@ -23,6 +23,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.diag_tick_s1
     runs-on: ubuntu-latest
     timeout-minutes: 150
+    env:
+      OS32_ACCEPT_IPA_LICENSE: "1"
     steps:
       - uses: actions/checkout@v4
         with:
