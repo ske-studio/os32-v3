@@ -293,6 +293,7 @@ def hwb_media():
 
 
 def hfs_cancel_media():
+    """Build the ppc_hfs_cancel image. Transport is replaced by probes; nothing after the HFS result line is guaranteed."""
     directory = Path(os.environ["OS32_VERIFY_OUT"]).resolve() / "hfs-cancel"
     directory.mkdir()
     transport = PM / "hostfs_link_io.c"
