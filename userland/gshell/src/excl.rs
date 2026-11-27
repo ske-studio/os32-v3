@@ -198,6 +198,7 @@ pub fn settle(st: &mut wm::GuiState) {
         input::purge_boundary(st, st.excl.purge_same_owner);
         st.excl.purge_same_owner = false;
         input::cancel_capture(st);
+        if st.drag_index >= 0 { wm::drop_drag_frame(st); }
         st.excl.prepared = st.excl.observed;
     }
     let mut complete = true;
@@ -258,4 +259,36 @@ pub(crate) fn append_delivery(st: &wm::GuiState, slot: usize, ev: &GuiEvent) -> 
     let accepted = ring::append(st, slot, ev);
     if accepted { DELIVERIES.fetch_add(1, core::sync::atomic::Ordering::Relaxed); }
     accepted
+}
+
+pub fn restore_mouse_baseline(st: &mut wm::GuiState, buttons: u8, mx: i32, my: i32) {
+    if st.excl.mouse_baseline {
+        st.excl.held_buttons = buttons;
+        st.prev_buttons = 0;
+        st.click_button = 0;
+        st.delivered_button = 0;
+        st.excl.mouse_baseline = false;
+        crate::cursor::move_to(st, mx, my);
+    }
+}
+
+pub fn deliver_window_key(st: &mut wm::GuiState, slot: usize, window: u32, scan: u8,
+                          down: bool, ch: u8, mods: u32) {
+    let serial = input::next_serial(st, slot);
+    let ev = ring::ev_key(down, window, scan, ch, mods as u8, serial);
+    let _delivered = append(st, slot, &ev);
+    #[cfg(feature = "c_gui_accept")]
+    if _delivered && scan == 0x1d {
+        crate::gserial::reply_to(false, b"!", format_args!("C-GUI KEY {} {}", window, down as u8));
+    }
+
+    /* 印字可能キーは Text も配送 (契約 U2a。FEP が消費していれば上で
+     * continue しているので二重にはならない)。 */
+    if down && ch >= 0x20 && ch <= 0x7E {
+        let mut utf8 = [0u8; 8];
+        utf8[0] = ch;
+        let s2 = input::next_serial(st, slot);
+        let evt = ring::ev_text(window, utf8, 1, s2);
+        append_delivery(st, slot, &evt);
+    }
 }

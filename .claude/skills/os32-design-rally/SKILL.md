@@ -7,6 +7,9 @@ description: 設計票・計画票を「起草 → 独立レビュー → 直し
 
 役の割り当ては [ROLES §0](../../../docs/tasks/agents/ROLES.md) を参照。**起草は astra** (`gpt-6.2-astra` を codex で、`~/os32-tmp/bin/codex_run.sh <名> gpt-6.2-astra <主の作業木> <PACK>`、書き込みは codex_run.sh に渡した段の名前のディレクトリ ~/os32-tmp/run/<段の名>/ の中だけ (sandbox の範囲。r2 以降を別の段の名で起こす時は、そのディレクトリに書かせて PM が往復の置き場に写す)、リポジトリは読むだけ — 2026-11-20 夕から、前は Fable、ユーザー決定「fable が枯渇してきたので」)、**レビューは sol** (`gpt-6.2-sol` を codex の read-only で。実装の astra と別のモデルにするため。PM が自分で代わりに読まない) (ユーザー決定 2026-11-19、Opus → astra → sol と決め直した最後)。下の §2 の依頼の型はそのまま起草者 (astra) に渡す (書く先は ~/os32-tmp/run/<名>/)。§3 のレビューの依頼は sol に渡し、§4 の往復は前回のレビューの返答と差分を添えて sol を起こし直す (codex は文脈を持ち越さない)。
 
+
+> **枝** (ユーザー指示 2026-11-28、[PARALLEL_BRANCHES](../../../docs/tasks/agents/PARALLEL_BRANCHES.md) §1 の 0): 設計の稿は、その機能の流れの枝 1 本にコミットを積む。確定の後の実装も同じ枝で続ける (設計の枝と実装の枝を分けない)。
+
 ## 1. 置き場
 
 - **往復の版** (`DESIGN.r1.md` → `REVIEW.r1.md` (PM がレビューの返答を写す) → `DESIGN.r2.md` …、起草者のログ) は `~/os32-tmp/run/<名>/` に置く。リポジトリには入れない。

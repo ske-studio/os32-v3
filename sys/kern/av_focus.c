@@ -1,6 +1,8 @@
 #include "av_contract.h"
 #include "exec_gui.h"
 #include "app_ids.h"
+#include "io.h"
+#include "../input/input_context.h"
 #include "../hal/input/in2_int.h"
 
 extern int res_owner_get(void);
@@ -29,8 +31,12 @@ int av_focus_is_wm(void)
 int av_focus_set(int owner)
 {
     if (!av_focus_is_wm()) return OS32_ERR_INVAL;
-    select_owner(owner);
-    return 0;
+    unsigned irq = irq_save();
+    u32 destination = owner ? (u32)owner : APP_ID_SHELL;
+    int rc = input_context_owner_select(destination, input_context_owner_generation(destination));
+    if (!rc) select_owner(owner);
+    irq_restore(irq);
+    return rc ? OS32_ERR_INVAL : 0;
 }
 
 int av_focus_owner(void)

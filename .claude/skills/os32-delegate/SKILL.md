@@ -15,6 +15,7 @@ git worktree add -q -b wt/<名> ~/wt/os32-v3/<名> <基点の SHA>
 ~/os32-tmp/bin/seed_fonts.sh ~/wt/os32-v3/<名>   # assets/fonts/ を全部 (IPAex・Inconsolata・JF-Dot、gitignore)。codex のサンドボックスはネットに出られず (DNS 不可)、無いと make all がフォントの取得で rc=2 (2026-11-04、gf4-fxc・fxd)
 ```
 
+- **枝は流れごとに 1 本** ([PARALLEL_BRANCHES](../../../docs/tasks/agents/PARALLEL_BRANCHES.md) §1 の 0、ユーザー指示 2026-11-28): 同じ流れの次の段・レビューの直し・設計の後の実装は、今ある作業木と枝で続ける (新しい `wt/<名>` を作らない)。新しく作るのは、並列に別の流れを始める時だけ。
 - 触るファイルが重ならない段は並列で出す。重なるなら順に (先の段を取り込んでから次を作る)。
 - **依頼の大きさ**: 1 回の依頼は ROLES §0「段の大きさ」の 1 段 (半日〜1 日) まで。Tx でまとめるときも codex の timeout (7100 秒 ≈ 2 時間) に収まる量にする (2026-10-23、B1+B2 の 8 時間を 1 回に出して止めた反省)。
 - 依頼より前に、設計の「送り項目」(前の段のレビューで後へ回した指摘) を確定設計の末尾に書いておく。確定設計の所在はリポジトリの写し `docs/decisions/<領域>/` (os32-design-rally §1)。~/os32-tmp/run/ の final だけに書かない。

@@ -2140,3 +2140,96 @@ mutations = [
   { id = "trident_sync_clear", config = "pc98", when = "after_build", replace = "sys/dev/video/trident/present.c", old = "gfxsync_override_clear(d->sync_ctx);", new = "(void)d;", fail = "FAIL clear restores default sync settings" },
   { id = "trident_sync_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/trident/present.c", old = "d->sync_generation == d->res->generation", new = "d->sync_generation != 0", fail = "FAIL changed display generation rebinds sync context" },
 ]
+
+[[check]]
+id = "input_policy_abi"
+spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
+subsystem = "input"
+level = "L1"
+sources = ["sys/input/input_delivery.h", "sys/input/input_delivery.c", "sys/input/input_policy.c", "sys/kapi/input_policy_provider.c", "sys/platform/pc98/input_keymap.c", "sys/platform/powermac/input_keymap_backend.c", "tests/support/fixtures/input_policy/wire.c", "tests/support/fixtures/input_policy/legacy_shell.c", "userland/shell/ui.c", "sys/hal/input/legacy_keymap.c", "tests/support/fixtures/input_policy/layout.rs", "tests/support/fixtures/input_policy/gshell.rs", "tests/support/fixtures/input_policy/entry.S", "userland/gshell/src/pump.rs", "userland/gshell/src/input.rs", "userland/gshell/src/raw_keyboard.rs", "userland/gshell/src/excl.rs"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"], ppc = ["link-sh"] }
+needs = []
+expect = "Action と Key の全 offset とサイズ、Rust の v2 LE 列と i386・PowerPC の実デコードが一致。初期化失敗後も九口は NOSYS、旧 WM pump が通常窓へ Key と Text を各一件配送、CUI は Enter で一行実行"
+limits = "公開前の provider と内部配送を実行。失敗注入後の raw をホストの WM pump に渡す。窓リングとマウスは fixture。生成 syscall は対象外"
+gates = ["push", "main"]
+mutations = [{ id = "omit_ikm_row_limit", config = "pc98", when = "after_build", replace = "sys/input/input_policy.c", old = "n > IKM_MAX_ROWS || ", new = "0 || ", fail = "private provider or v2 LE mismatch" },
+    { id = "drop_legacy_enter", config = "link-sh", when = "after_build", replace = "sys/hal/input/legacy_keymap.c", old = "byte = result->op;", new = "byte = 0;", fail = "private provider or v2 LE mismatch" },
+    { id = "omit_pc98_window_delivery", config = "pc98", when = "after_build", replace = "userland/gshell/src/input.rs", old = "crate::excl::deliver_window_key(st, t.slot, t.win_id, scan, down, ch, mods);", new = "// omit delivery", fail = "legacy GUI window delivery mismatch" },
+    { id = "omit_mac_window_delivery", config = "link-sh", when = "after_build", replace = "userland/gshell/src/input.rs", old = "crate::excl::deliver_window_key(st, t.slot, t.win_id, scan, down, ch, mods);", new = "// omit delivery", fail = "legacy GUI window delivery mismatch" },
+    { id = "omit_pc98_policy_boot", config = "pc98", when = "after_build", replace = "sys/platform/pc98/input_keymap.c", old = "rc = ikm_policy_init", new = "rc = 0 && ikm_policy_init", fail = "private provider or v2 LE mismatch" },
+    { id = "omit_mac_policy_boot", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/input_keymap_backend.c", old = "int rc = ikm_policy_init", new = "int rc = 0 && ikm_policy_init", fail = "private provider or v2 LE mismatch" },
+    { id = "swap_action_generation", config = "pc98", when = "after_build", replace = "sys/input/input_delivery.h", old = "action, command_gen", new = "command_gen, action", fail = "invalid delivery layout" },
+    { id = "release_wrong_policy_gen", config = "pc98", when = "after_build", replace = "sys/input/input_policy.c", old = "owner == saved_owner && gen == saved_gen", new = "owner == saved_owner", fail = "private provider or v2 LE mismatch" },
+    { id = "dequeue_while_exclusive", config = "pc98", when = "after_build", replace = "sys/input/input_policy.c", old = "now.owner != owner || in2_excl_keyboard()", new = "now.owner != owner", fail = "private provider or v2 LE mismatch" }]
+
+[[check]]
+id = "input_exec_entry"
+spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
+subsystem = "input"
+level = "L1"
+sources = ["sys/input/input_context.c", "sys/kern/init/shell_loop.c", "sys/kern/exec/appslot.c", "sys/kern/exec/exec_entry_commit.inc", "tests/support/fixtures/input_policy/loader.c", "tests/support/fixtures/input_policy/loader.py", "tests/support/fixtures/input_policy/jump.S", "sys/kern/exec/exec_schedule.inc", "sys/kern/exec/exec_launch.inc", "sys/kern/exec/exec_finish.inc", "sys/kern/io_kapi.c", "sys/hal/input/input_service.c", "sys/hal/input/legacy_mode.c", "sys/hal/input/legacy_ring.c", "sys/input/input_policy.c", "tests/support/fixtures/input_policy/entry.S"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"], ppc = ["link-sh"] }
+needs = []
+expect = "同期子予約の失敗で親 CR3・heap・syscall・shell lease・AV 前景を保持。正常・fault・STOP・park 回収で同世代の表を復元する"
+limits = "両 CPU の実 shell loader と lease を通し arch entry を捕捉。VFS・FP・デバイスは fixture"
+gates = ["push", "main"]
+mutations = [{ id = "premature_retire", config = "pc98", when = "after_build", replace = "sys/kern/exec/exec_entry_commit.inc", old = "    if (input_context_owner_reserve", new = "    if (!is_shell) shell_service_retire();\n    if (input_context_owner_reserve", fail = "first arch entry or failed reservation" },
+    { id = "premature_av", config = "pc98", when = "after_build", replace = "sys/kern/exec/exec_entry_commit.inc", old = "    if (input_context_owner_reserve", new = "    if (!is_shell) av_focus_exec_enter(id);\n    if (input_context_owner_reserve", fail = "first arch entry or failed reservation" },
+    { id = "omit_aborted_stop_cleanup", config = "link-sh", when = "after_build", replace = "sys/kern/exec/exec_finish.inc", old = "if (kind == EXEC_KIND_ABORTED) input_discard_stop();", new = "(void)kind;", fail = "first arch entry or failed reservation" },
+    { id = "omit_child_abort_restore", config = "pc98", when = "after_build", replace = "sys/kern/exec/exec_finish.inc", old = "if (id != APP_ID_SHELL) exec_restore_context(launcher_id);", new = "(void)launcher_id;", fail = "first arch entry or failed reservation" },
+    { id = "omit_policy_restore", config = "pc98", when = "after_build", replace = "sys/kern/exec/exec_finish.inc", old = "ikm_policy_owner_exit(id, exec_gen);", new = "(void)exec_gen;", fail = "first arch entry or failed reservation" },
+    { id = "expose_reserved_owner", config = "pc98", when = "after_build", replace = "sys/input/input_context.c", old = "context_owners[owner].state == OWNER_ACTIVE &&", new = "1 &&", fail = "owner reservation visibility or recovery" },
+    { id = "omit_entry_activation", config = "pc98", when = "after_build", replace = "sys/kern/exec/exec_entry_commit.inc", old = "input_context_owner_activate(id, is_shell || (!gui_session && !gui));", new = "(void)gui_session;", fail = "first arch entry or failed reservation" },
+    { id = "omit_park_generation", config = "pc98", when = "after_build", replace = "sys/kern/exec/exec_schedule.inc", old = "exec_notify_owned(id, EXEC_KIND_ABORTED, exec_gen);", new = "exec_notify_owned(id, EXEC_KIND_ABORTED, 0);", fail = "first arch entry or failed reservation" },
+    { id = "restore_unstarted_shell", config = "pc98", when = "after_build", replace = "sys/kern/exec/exec_finish.inc", old = "if (id != APP_ID_SHELL) exec_restore_context(launcher_id);", new = "exec_restore_context(launcher_id);", fail = "first arch entry or failed reservation" }]
+
+[[check]]
+id = "input_focus"
+spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
+subsystem = "input"
+level = "L1"
+sources = ["sys/hal/input/legacy_ring.c", "sys/kapi/kapi_in2.c", "sys/hal/input/in2_reclaim.c", "sys/hal/input/kbd_merge.c", "sys/platform/pc98/platform_input_caps.h", "sys/platform/powermac/platform_input_caps.h", "sys/hal/input/in2_excl.c", "sys/hal/input/keymap_registry.c", "sys/hal/input/keymap_eval.c", "sys/hal/input/keymap_state.c", "sys/hal/input/legacy_keymap.c", "sys/hal/input/legacy_mode.c", "sys/input/keymaps/hid_jp.c", "tests/support/fixtures/input_policy/focus.c", "tests/support/fixtures/input_policy/entry.S"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "KBD→MOUSE で保持を採取し、解放世代が進むと次の make を通す。制御キーは独占中も通す"
+limits = "物理イベントと LOST の出力先は host fixture。実機 IRQ は観測しない"
+gates = ["push", "main"]
+mutations = [{ id = "omit_held_snapshot", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "valid[sc] = input_key_pressed(sc);", new = "valid[sc] = 0;", fail = "exclusive transition changed delivery" },
+    { id = "first_break_advances", config = "pc98", when = "after_build", replace = "sys/hal/input/kbd_merge.c", old = "!down && cnt[sc] == 0", new = "!down", fail = "exclusive transition changed delivery" },
+    { id = "pc98_acquire_closed", config = "pc98", when = "after_build", replace = "sys/platform/pc98/platform_input_caps.h", old = "IN2_PUBLIC_EXCLUSIVE 1", new = "IN2_PUBLIC_EXCLUSIVE 0", fail = "exclusive transition changed delivery" },
+    { id = "powermac_acquire_closed", config = "pc98", when = "after_build", replace = "sys/platform/powermac/platform_input_caps.h", old = "IN2_PUBLIC_EXCLUSIVE 1", new = "IN2_PUBLIC_EXCLUSIVE 0", fail = "exclusive transition changed delivery" },
+    { id = "focus_lost_reordered", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_reclaim.c", old = "in2_ring_lost(IN2_LOST_FOCUS);\n    in2_excl_focus(old);", new = "in2_excl_focus(old);\n    in2_ring_lost(IN2_LOST_FOCUS);", fail = "exclusive transition changed delivery" },
+    { id = "suppress_key_stop", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "sc == KEY_STOP", new = "0", fail = "exclusive transition changed delivery" },
+    { id = "suppress_key_ctrl", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "sc == KEY_CTRL", new = "0", fail = "exclusive transition changed delivery" },
+    { id = "suppress_key_grph", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "sc == KEY_GRPH", new = "0", fail = "exclusive transition changed delivery" },
+    { id = "suppress_key_tab", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "sc == KEY_TAB", new = "0", fail = "exclusive transition changed delivery" },
+    { id = "gate_in2_during_kbd", config = "pc98", when = "after_build", replace = "sys/hal/input/kbd_merge.c", old = "if (!legacy_active()) input_emit_in2(e);", new = "if (!legacy_active() && !in2_excl_keyboard()) input_emit_in2(e);", fail = "exclusive transition changed delivery" }]
+
+[[check]]
+id = "gshell_excl"
+spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
+subsystem = "input"
+level = "L1"
+sources = ["userland/gshell/src/excl.rs", "userland/gshell/src/raw_keyboard.rs", "userland/gshell/src/stop_dispatch.rs", "userland/gshell/src/cursor.rs", "userland/gshell/src/input.rs", "tests/support/fixtures/input_policy/gshell.rs"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "焦点通知失敗から再試行し、旧窓の release を一件ずつ再送。通常窓は独占中ゼロ・解除後一件。ドラッグ取消と静止カーソル復帰を確認。退避・配送満杯でも STOP と二つの切替を処理する"
+limits = "WM の ring と焦点通知は host fixture"
+gates = ["push", "main"]
+mutations = [{ id = "skip_hidden_stationary_cursor", config = "pc98", when = "after_build", replace = "userland/gshell/src/cursor.rs", old = "if st.cursor.shown && st.cursor.x == x", new = "if st.cursor.x == x", fail = "incorrect old-window release" },
+    { id = "repeat_wm_stop", config = "pc98", when = "after_build", replace = "userland/gshell/src/stop_dispatch.rs", old = "st.abort_seen = false;", new = "// leave STOP pending", fail = "incorrect old-window release" },
+    { id = "skip_static_cursor", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "crate::cursor::move_to(st, mx, my);", new = "// leave cursor hidden", fail = "incorrect old-window release" },
+    { id = "skip_drag_cancel", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "if st.drag_index >= 0 { wm::drop_drag_frame(st); }", new = "// omitted", fail = "incorrect old-window release" },
+    { id = "remove_window_capture_gate", config = "pc98", when = "after_build", replace = "userland/gshell/src/raw_keyboard.rs", old = "if !st.excl.open(crate::excl::KBD) { return Step::Consumed; }", new = "// capture gate removed", fail = "incorrect old-window release" },
+    { id = "block_controls_on_full_delivery", config = "pc98", when = "after_build", replace = "userland/gshell/src/raw_keyboard.rs", old = "if !space_ok && ordinary_pump", new = "if !space_ok", fail = "incorrect old-window release" },
+    { id = "block_controls_on_full_defer", config = "pc98", when = "after_build", replace = "userland/gshell/src/raw_keyboard.rs", old = "if ordinary_pump && !ui_defer &&", new = "if !ui_defer &&", fail = "incorrect old-window release" },
+    { id = "accept_failed_focus", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "st.excl.focus_confirmed = crate::multiapp::av_owner() == next.owner;", new = "st.excl.focus_confirmed = true;", fail = "incorrect old-window release" },
+    { id = "repeat_settled_key", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "st.excl.delivered[i].keys[scan / 8] &= !bit;", new = "let _ = bit;", fail = "incorrect old-window release" },
+    { id = "reuse_window_slot", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "st.win_by_id(rec.window) != Some(i) || ", new = "false || ", fail = "incorrect old-window release" },
+    { id = "discard_full_release", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "if !ring::append(st, slot, &ev) { return false; }\n            st.excl.delivered[i].keys", new = "let _ = ring::append(st, slot, &ev);\n            st.excl.delivered[i].keys", fail = "incorrect old-window release" },
+    { id = "forget_pointer_buttons", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "rec.buttons = ev.sub;", new = "rec.buttons = 0;", fail = "incorrect old-window release" },
+    { id = "repeat_accepted_button", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "st.excl.delivered[i].buttons &= !bit;", new = "st.excl.delivered[i].buttons |= bit;", fail = "incorrect old-window release" }]

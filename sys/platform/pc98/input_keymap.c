@@ -1,3 +1,5 @@
+#include "../../input/input_policy.h"
+#include "kprintf.h"
 #include "../../hal/input/keymap.h"
 #include "../../hal/input/in2_int.h"
 #include "os32_kapi_shared.h"
@@ -17,5 +19,8 @@ int pc98_input_keymap_register(u16 *generation)
         input_src_release((u8)src, *generation);
         return rc;
     }
+    rc = ikm_policy_init(IKM_PLATFORM_PC98, &pc98_jp_backend, &hid_jp_backend,
+                         input_policy_pressed);
+    if (rc) kprintf(KLOG_LEGACY_RED, "[kbd] input policy initialization failed (%d)\n", rc);
     return src;
 }

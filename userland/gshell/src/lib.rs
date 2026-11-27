@@ -385,41 +385,7 @@ fn cycle_due(last_tick: u32) -> bool {
     (unsafe { (os32api::api().get_tick)() }) != last_tick
 }
 
-/// top-level (owner 1) で受けた CTRL+STOP を処理する (票 T8 D4d / T9 受入 S6)。
-///
-/// `abort_seen` を消費する点は 3 つある:
-///
-/// | 点 | どんな周か |
-/// |---|---|
-/// | `handler.rs` の `op_wait` | アプリが待っていて WM がその中 (X3) で回っている |
-/// | ここ (全画面) | 全画面 GFX プログラムが park していて WM は描かない (票 T8 D4d) |
-/// | ここ (ウィンドウ) | **`WAIT_POLL` のアプリが居て WM が単独ループで回っている** |
-///
-/// 3 つ目が抜けていて実機の受入 S6 が落ちた (2026-09-13)。端末 → `sh` → 子の
-/// 連鎖では、`sh` の `sys_yield` が `should_park` に端末を譲らせるので WM は
-/// ずっと単独ループに居る。IRQ1 の `appslot_abort_request()` は「走っている
-/// **アプリ**」にしか要求を立てられず (`g_cur` がシェル帯なら何もしない =
-/// `ring3_abort_count` が増えない) 、raw リングから来る `abort_seen` だけが
-/// 手がかりなのに、それを見る経路がここに無かった。
-///
-/// 全画面の枝は実機で通っている形 (T8 F8) をそのまま残す — `redirect_abort`
-/// が予約を積み、同じ 1 周の `resume_one` → `drain_top_level` が実行する。
-/// ウィンドウモードの枝は [`multiapp::abort_at_top_level`] が直に実行する
-/// (予約は「表に載っている ID」にしか積めないが、連鎖の末尾が WM の表から
-/// 落ちていても CTRL+STOP は届かなければならない)。
-///
-/// 戻り値は畳んだ ID (0 = 何も畳まなかった)。
-fn top_level_abort(st: &mut wm::GuiState) -> i32 {
-    if !st.abort_seen {
-        return 0;
-    }
-    st.abort_seen = false;
-    if fullscreen::active() {
-        multiapp::redirect_abort(st, 0);
-        return 0;
-    }
-    multiapp::abort_at_top_level(st)
-}
+use multiapp::top_level_abort;
 
 /// デバッグ用の F1〜F5 経路 ([`DEBUG_SHORTCUTS`])。製品では `launch_pending` が
 /// 立たないので呼ばれない (出荷形の起動は Start → Run... = `GUI_SESSION_LAUNCH`)。

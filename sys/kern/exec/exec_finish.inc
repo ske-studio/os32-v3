@@ -162,11 +162,12 @@ static void exec_reclaim_resources(int id)
     in2_reclaim(id); /* (6c) Before focus moves to the parent. */
 }
 
-static void exec_notify_owned(int id, int kind)
+static void exec_notify_owned(int id, int kind, u32 exec_gen)
 {
     /* (7) GUI リソース回収 (契約 T4 / U8)。WM がこの owner のウィンドウ・
      * サーフェス・タイマ・スロットを回収する。畳む 3 経路すべてが
      * ここを通るので、WM は 1 か所で回収できる。 */
+    ikm_policy_owner_exit(id, exec_gen);
     if (kind == EXEC_KIND_ABORTED) input_discard_stop();
     av_focus_exec_leave(id, res_owner_get());
     exec_ime_owner_exit(id);
@@ -229,12 +230,17 @@ static void exec_notify_owned(int id, int kind)
     exec_gfx_owner_exit(id);
     appslot_gfx_owner_exit(id);
     (void)input_display_restore_drain();
+    unsigned input_irq = irq_save();
+    input_ime_exec_exit(id, exec_gen);
+    input_interrupt_exec_exit(id, exec_gen);
+    input_context_owner_release(id, exec_gen);
+    irq_restore(input_irq);
 }
 
-static void exec_reclaim_owned(int id, int kind)
+static void exec_reclaim_owned(int id, int kind, u32 exec_gen)
 {
     exec_reclaim_resources(id);
-    exec_notify_owned(id, kind);
+    exec_notify_owned(id, kind, exec_gen);
 }
 
 /* ======================================================================== */
@@ -256,9 +262,10 @@ static int exec_launch_abort(int launcher_id, int id, int status)
         paging_load_cr3(paging_kernel_pd_phys());
         exec_teardown_app(a);
         a->pages = 0;
-        appslot_start_release(id);
+        if (id == APP_ID_SHELL) appslot_shell_cancel_generation();
+        else appslot_start_release(id);
     }
-    exec_restore_context(launcher_id);
+    if (id != APP_ID_SHELL) exec_restore_context(launcher_id);
     return status;
 }
 
@@ -284,6 +291,7 @@ static void exec_finish(int id, int status, int kind)
     int parent = APP_ID_SHELL;
 
     if (!a) return;
+    u32 exec_gen = a->exec_gen;
     exec_exit_status = status;
 
     /* 票 TASK_EXIT_STATUS §2-1: 種別は **呼び手** が決める。ここで status から
@@ -313,7 +321,7 @@ static void exec_finish(int id, int status, int kind)
         g_cur_app = 0;
         exec_nest_level = 0;
         res_owner_set(0);
-        exec_reclaim_owned(id, kind);
+        exec_reclaim_owned(id, kind, exec_gen);
         /* T7b-b2 §3-1: shell の内部入口を外し shell lease を全部閉じる。
          * 次の shell の publish はこの後 (exec_run の appslot_shell_commit 直後)。 */
         shell_service_retire();
@@ -330,7 +338,7 @@ static void exec_finish(int id, int status, int kind)
          * 切替ではない。appslot_switch_to が transition_count で別勘定する。 */
         appslot_switch_to(parent);
         exec_restore_context(parent);
-        exec_notify_owned(id, kind);
+        exec_notify_owned(id, kind, exec_gen);
     }
     (void)io_syscall_suspend(id); /* IO_SYSCALL_EXIT */
 }

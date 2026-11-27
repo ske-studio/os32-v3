@@ -1,3 +1,4 @@
+#include "../../input/input_policy.h"
 #include "install_management.h"
 #include "av_contract.h"
 #include "sys/kern/idle_work.h"
@@ -86,6 +87,7 @@ void exec_init(void) {
     /* アプリ ID の表を空にし、シェル帯 (ID 1) を走っている状態にする。
      * res_owner_set(1) もここで行われる (票 K5 の D3)。 */
     appslot_init();
+    input_interrupt_init();
     /* 起動要求表 (票 T9 D3) も空から始める。 */
     launch_init();
 }
@@ -495,6 +497,8 @@ int ring3_user_range_ok(u32 p, u32 len)
 
 #include "exec_image_map.inc"
 
+
+
 #include "exec_finish.inc"
 
 #include "exec_syscall.inc"
@@ -525,6 +529,7 @@ static int exec_shell_layout(u32 text, u32 bss, u32 heap,
 #include "exec_image.inc"
 #include "exec_argv.inc"
 
+#include "exec_entry_commit.inc"
 #include "exec_launch.inc"
 
 /* ======================================================================== */

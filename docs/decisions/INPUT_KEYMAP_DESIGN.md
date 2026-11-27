@@ -152,7 +152,7 @@ legacy_cooked_push(((u16)sc << 8) | byte);
 
 - 欠落行はOS既定から補完、直前表へのpatchにしない。kind6のprofile単位全置換、owner保存/reset/終了復元/BUSYはB§4を維持。
 - map1はPC98だけ、map2は両archが受理。他arch profileは全体拒否。x86 USBでも操作profileはPC98の1/2である。 setは押下中BUSY、安定した機械lock位置だけは許可。snapshot検証後短い排他でactive交換、全体失敗は旧表/保存表を不変。
-- 既定exact1024行+2表5セル1920行=2944行。任意bank付き最大3968行にaccent/操作を加えるためcount上限8192、最大wire131088B。
+- 既定exact1024行+2表5セル1920行=2944行。これらは OS 既定に含まれる。差分 profile の count 上限は1024、最大wireは16400B。
 - wireを丸ごと常駐コピーせず1行ずつ退避編成。重複/範囲/長さ積算/予約/BE-LEを検査し、native struct cast禁止。 旧getkey/raw/in2のslot・型は不変。内部keysym化だけならABI変更なし。新policy APIと下記意味イベント公開は親A0zで末尾追加・版上げ1回。
 - GUI用 `kbd_policy_key_read(out,max)` を追加。評価器/lock状態はカーネル1本、RustのWMとuserlandラッパーに評価器を作らない。
 - 評価済みイベントはu32×12（48B）: src_generation、map_id、keycode、sc_down_repeat、physical_mods、logical_mods、time_ms、map_generation、keysym、kind、action、value。
@@ -242,7 +242,7 @@ legacy_cooked_push(((u16)sc << 8) | byte);
 |互換出口 S3|裸STOP=6000/XFER=3500/UP上位3A/RLDN由来、物理Ctrl+STOP cookedなし、GUI filter/raw。NP21/WとPPC QEMU|上位scを落とす/LEGACYをETX化/GUI filterまたはCtrl+STOP抑止を除去|
 |LANG1/2 S4|Apple判定なしで全HIDの90 ON/91 OFFを二度、repeat、未確定、辞書失敗、owner交代。PPC QEMU usage注入|絶対指定をtoggleに替える|
 |PPC結線 S2u/S2m/S3b|暫定usage04→旧a/移行後usage04→共通a、alias解放、callback→capture→read、peek非消費、raw/mods/pressed、LAN優先。QEMU打鍵/抜去|usageをscに無変換で渡す/共通capture迂回/peek消費|
-|wire W/A0z|BE/LE全offset、8192上限、重複、他profile、v2/予約値検証、短get、reset復元/BUSY|version検査/保存契機を除去|
+|wire W/A0z|BE/LE全offset、1024上限、重複、他profile、v2/予約値検証、短get、reset復元/BUSY|version検査/保存契機を除去|
 |GUI G|左右別設定、同sc別usage、Command、英数/かな、焦点世代、評価済み値/lock一回更新。EXCL規則|rawから二重文字生成/世代検査除去|
 |本体 S3x|NP21/W Caps/Kana/CTRL+STOP/IME取消、Ctrl+数字の旧byte利用側|救済判定をlogical Ctrlに変更|
 |x86 USB 1E接続時|本体Shift+USB Aと逆、HID共通表、抜去。NP21/Wは装置再現可能時のみ|USBをPC98 mapへ誤bind|
@@ -572,7 +572,7 @@ PM決定 (2026-11-17): S0aは`km_source_release`の空inlineを維持し、別�
 |端末context (u8)|0 共通、1 LINE_EDIT、2 RUNNING、3 BYTE_INPUT、4 GUI|0は文脈共通、5..255予約。B§4を維持。kind5/6/8に使用。runtimeのcontext_setでは共通0を指定せず1..4|
 |map_id|1 PC98 (128キー)、2 HID (256キー)|0は無効、3..65535予約。`sys/hal/input/keymap.h` の `KM_MAP_PC98 / KM_MAP_HID`、`sys/hal/input/keymap_registry.c` の `valid_map`。kind1..4/7のcontext (u8) とkind8のselector (u16) に載せる。map1はPC98機だけ、map2は両機種|
 
-`legacy_mode.c` のGUI真偽値 (`sys/hal/input/legacy_mode.c` の `kbd_set_gui_mode`) をprofile/contextの番号に転用しない。`sys/hal/input/in2_int.h` の `InputEvent / INPUT_ORIGIN_* / INPUT_KIND_*` のevent・flags・origin・kindも独立。ゲームのINPUT_CTXはB§3のとおり独立。外枠のLE16B/16Bは `sys/input/input_policy.h` の `IKM_HEADER_SIZE / IKM_ROW_SIZE`、v2・header.flags=0・count≤8192は `sys/input/input_policy.c` の `ikm_wire_header` と一致する。`sys/kern/io_policy.c` の `read_le / write_le` には同じ大きさとLE処理があるが、I/Oのservice ID (`sys/kern/io_policy.h` の `IO_SVC_*`) は入力IDへ流用しない。
+`legacy_mode.c` のGUI真偽値 (`sys/hal/input/legacy_mode.c` の `kbd_set_gui_mode`) をprofile/contextの番号に転用しない。`sys/hal/input/in2_int.h` の `InputEvent / INPUT_ORIGIN_* / INPUT_KIND_*` のevent・flags・origin・kindも独立。ゲームのINPUT_CTXはB§3のとおり独立。外枠のLE16B/16Bは `sys/input/input_policy.h` の `IKM_HEADER_SIZE / IKM_ROW_SIZE`、v2・header.flags=0・count≤1024は `sys/input/input_policy.c` の `ikm_wire_header` と一致する。`sys/kern/io_policy.c` の `read_le / write_le` には同じ大きさとLE処理があるが、I/Oのservice ID (`sys/kern/io_policy.h` の `IO_SVC_*`) は入力IDへ流用しない。
 
 ### 2. 操作ID (1列挙)
 
@@ -678,7 +678,7 @@ B§3のCHAR_ETXはCHARで通常文字の評価が03になった由来を指す�
 
 KEYSYM/EXACTのkeysymはNetBSDのu16値を維持し、独自の列挙を足さない。0はNUL、無文字は0xf500。value>0xffff、不正Unicode (surrogate 0xd800..0xdfff、非文字0xfffe/0xffff)、H0bのDead群0x0300..0x036fを拒否する。NetBSD機能keysymをUnicodeの私用領域という理由で拒否しない。Plain 0x80..0xffのbyte出力抑止とwireの受理は別 (§2)。HID 0..3の無入力/エラー拒否はcaptureの規則であり、256行の表の予約セル自体を消す規則ではない。
 
-重複キーはB§4どおり **(kind, profile, context, index, selector)**。kind8でもauxを重複キーに追加しない (同じキーの修飾違い2行も重複)。完全一致の行を後勝ちにせず全体拒否する。COMPATとEXTはselectorが異なる別指定で、COMPAT同士の重複も拒否。kind5+kind6は合計128行以下、wire全体は8192行以下・長さは16+16×count (最大131088B)。kind8を既存の128行枠へ暗黙に足さない。欠落補完・kind6のprofile単位全置換・他arch拒否・失敗時にactive/保存表不変は§5/B§4を維持する。
+重複キーはB§4どおり **(kind, profile, context, index, selector)**。kind8でもauxを重複キーに追加しない (同じキーの修飾違い2行も重複)。完全一致の行を後勝ちにせず全体拒否する。COMPATとEXTはselectorが異なる別指定で、COMPAT同士の重複も拒否。kind5+kind6は合計16行以下、wire全体は1024行以下・長さは16+16×count (最大16400B)。kind8をkind5+kind6の16行枠へ暗黙に足さない。欠落補完・kind6のprofile単位全置換・他arch拒否・失敗時にactive/保存表不変は§5/B§4を維持する。
 
 本追記は採番と値域の明文化だけで、accent/deadの待ち状態・Command互換scの監査・A0z公開の保留を解除しない。通常のBSD操作と救済キーの意味、IME優先、既定割当、シングルタスク・協調切替も変えない。
 
@@ -694,7 +694,7 @@ KEYSYM/EXACTのkeysymはNetBSDのu16値を維持し、独自の列挙を足さ�
 - 結線の段（A0zとその前の段）へ送る項目:
   - 表を差し替えたときに、機械式のlockを物理の位置から導き直し、意味の変わったUSBのlockのbitを戻す（INPUT_BIND_DESIGN §2）。
   - `ikm_policy_owner_exit`をアプリの終了・killの共通の回収から呼ぶ。今は呼ぶ所が無く、保存したownerがBUSYを握ったまま残る。
-  - 8192行のsetの時間を実測する（insertが1行ごとに表を頭から読む）。遅ければ、整列済みのwireに末尾追記する速い経路を足す。
+  - 1024行のsetの時間を実測する（insertが1行ごとに表を頭から読む）。遅ければ、整列済みのwireに末尾追記する速い経路を足す。
   - 表を入れた後の`km_eval`の割込み停止中のlookup（最大22回×64行）の時間を測る。
 
 ## S3x の実装判断

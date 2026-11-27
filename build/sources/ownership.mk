@@ -557,7 +557,6 @@ OWN_BUILD_ROLE += sys/arch/x86/video/gf_accept_cpu.c|GeForce acceptance build
 OWN_BUILD_ROLE += sys/dev/sound/cs4231/pcm_e4_diag.c|PCM_E4_DIAG_BUILD diagnostic
 OWN_BUILD_ROLE += sys/dev/sound/cs4231/pcm_e4_guest.c|PCM_E4_DIAG_BUILD diagnostic
 OWN_BUILD_ROLE += sys/dev/video/geforce/gf_accept.c|GeForce acceptance build
-OWN_BUILD_ROLE += sys/input/input_policy.c|PowerPC common-compile target
 OWN_BUILD_ROLE += sys/kern/cli/resident_cli.c|FEATURE_CLI diagnostic CLI
 OWN_BUILD_ROLE += sys/kern/exec/absent/exec_font_lease.c|feature-disabled exec hook selected by hooks.mk
 OWN_BUILD_ROLE += sys/kern/exec/absent/exec_gfx.c|feature-disabled exec hook selected by hooks.mk

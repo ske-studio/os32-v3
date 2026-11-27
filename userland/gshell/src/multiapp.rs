@@ -469,43 +469,9 @@ fn has_top_level_work(mm: &Multi) -> bool {
     false
 }
 
-/// CTRL+STOP の宛先がフォーカス窓の**別の**アプリだったとき (契約 T6、決裁 A1)。
-///
-/// カーネルは IRQ1 で「いま走っているアプリ」にしか要求を立てられないので、
-/// そのままにすると**意図しない 1 本が死ぬ**。走っている本人の要求を降ろし
-/// (`exec_abort_clear`)、フォーカス窓の owner を畳む (`exec_kill`)。どちらも
-/// owner 1 からしか呼べないので、ここでは**予約するだけ**。
-/// [`should_park`] が予約を見て譲らせ、top-level の [`drain_top_level`] が実行する。
-/// top-level (owner 1) で受けた CTRL+STOP を**その場で実行する**
-/// (票 T9 D8、実機受入 S6 の修正 2026-09-13)。呼ぶのは単独ループの
-/// [`crate::top_level_abort`] だけ。戻り値は畳んだ ID (0 = 何も畳まなかった)。
-///
-/// ここは既に owner 1 の文脈なので、`exec_abort_clear` も `exec_kill` も
-/// その場で通る (`drain_top_level` と同じ地点)。
-///
-/// `exec_abort_clear()` を**必ず先に**呼ぶ (決裁 A1 と同じ順序)。IRQ1 は宛先を
-/// 選べないので、走っていた別の 1 本に要求が載っていることがある — 降ろさずに
-/// 畳むと、その 1 本が次の syscall の出口で巻き添えで死ぬ。
-pub fn abort_at_top_level(st: &GuiState) -> i32 {
-    /* `op_wait` の中で見た周は `handler.rs` が [`redirect_abort`] で予約を
-     * 積んでいて、同じ 1 周の [`drain_top_level`] が実行する。ここで重ねると
-     * 連鎖の末尾を 2 本ぶん畳む。 */
-    if m().abort_clear_req {
-        return 0;
-    }
-    let target = abort_target(st);
-    /* SAFETY: KAPI の関数表は `os32_init` が据えた有効なポインタ。
-     * `exec_abort_clear` は引数なし・戻りは値で、owner 1 から呼んでいる。 */
-    unsafe {
-        (os32api::api().exec_abort_clear)();
-    }
-    if target == 0 || target == APP_ID_SHELL {
-        /* 宛先が居ない (窓もスロットも無い) / シェル帯。要求を降ろしただけ。 */
-        return 0;
-    }
-    kill_for_request(target);
-    target
-}
+#[path = "stop_dispatch.rs"]
+mod stop_dispatch;
+pub(crate) use stop_dispatch::top_level_abort;
 
 /// CTRL+STOP の宛先が**走っている本人** (または宛先なし) だったときの予約
 /// (票 T9 受入 S6 の 3 回目、実機 2026-09-13)。
@@ -533,6 +499,13 @@ pub fn reserve_abort_self(st: &GuiState, cur: i32) {
     m().abort_kill_target = if abort_target(st) == cur { cur } else { 0 };
 }
 
+/// CTRL+STOP の宛先がフォーカス窓の**別の**アプリだったとき (契約 T6、決裁 A1)。
+///
+/// カーネルは IRQ1 で「いま走っているアプリ」にしか要求を立てられないので、
+/// そのままにすると**意図しない 1 本が死ぬ**。走っている本人の要求を降ろし
+/// (`exec_abort_clear`)、フォーカス窓の owner を畳む (`exec_kill`)。どちらも
+/// owner 1 からしか呼べないので、ここでは**予約するだけ**。
+/// [`should_park`] が予約を見て譲らせ、top-level の [`drain_top_level`] が実行する。
 pub fn redirect_abort(st: &GuiState, cur: i32) {
     let f = abort_target(st);
     if f == 0 || f == cur {
