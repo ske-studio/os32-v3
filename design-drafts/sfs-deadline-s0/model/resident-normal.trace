@@ -1,0 +1,22 @@
+accepted tick=0 type=01 seq=0
+accept tick=0 completion_due=1
+put tick=0 type=01 deadline=100 rc=0
+tx DMA tick=1 accepted_at=0
+rx DMA tick=1 nonce=3971697494 peer=2
+setup deadline=100 return=1 rc=0 gets=29 rx=42/42 prepared=1 linked=1 peer=2 resends=0 accepts=1
+accepted tick=1 type=02 seq=0
+accept tick=1 completion_due=2
+put tick=1 type=02 deadline=101 rc=0
+tx DMA tick=2 accepted_at=1
+accepted tick=2 type=01 seq=0
+accept tick=2 completion_due=3
+put tick=2 type=01 deadline=101 rc=0
+tx DMA tick=3 accepted_at=2
+rx DMA tick=3 nonce=3971697495 peer=2
+renew deadline=101 return=3 rc=0 gets=29 rx=42/42 prepared=1 linked=1 peer=2 resends=0 accepts=2
+accepted tick=3 type=10 seq=1
+accept tick=3 completion_due=5
+put tick=3 type=10 deadline=4 rc=0
+edge call deadline=4 return=4 rc=-18 gets=1 rx=0/0 prepared=1 linked=1 peer=2 resends=0 accepts=1
+tx DMA tick=5 accepted_at=3
+after deadline dma_done=4 accepts=0

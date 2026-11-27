@@ -1,0 +1,46 @@
+trial_ticks=362
+tick=0 tx=01 gate=1
+put tick=0 type=01 rc=0 gate=1
+tick=383 tx=01 gate=1
+put tick=383 type=01 rc=0 gate=1
+tick=766 tx=01 gate=1
+put tick=766 type=01 rc=0 gate=1
+tick=1149 tx=01 gate=1
+put tick=1149 type=01 rc=0 gate=1
+silent hello tick=1562 rc=-1 gate=0 retries=3 accepted=4 bye=0 dead=0 hold=0 rx=0/0 gets=1570
+put tick=1582 type=01 rc=-1 gate=1
+put tick=1603 type=01 rc=-1 gate=1
+put tick=1624 type=01 rc=-1 gate=1
+put tick=1645 type=01 rc=-1 gate=1
+stalled hello tick=1696 rc=-1 gate=0 retries=3 accepted=0 bye=0 dead=0 hold=0 rx=0/0 gets=118
+tick=1696 tx=01 gate=1
+put tick=1696 type=01 rc=0 gate=1
+reacquire tick=1696 rc=0 gate=1 retries=0 accepted=1 bye=0 dead=0 hold=0 rx=28/28 gets=28
+tick=1696 tx=14 gate=1
+put tick=1696 type=14 rc=0 gate=1
+tick=2079 tx=14 gate=1
+put tick=2079 type=14 rc=0 gate=1
+tick=2462 tx=14 gate=1
+put tick=2462 type=14 rc=0 gate=1
+tick=2845 tx=14 gate=1
+put tick=2845 type=14 rc=0 gate=1
+silent call tick=3207 rc=-1 gate=1 retries=3 accepted=4 bye=0 dead=0 hold=0 rx=28/28 gets=1518
+tick=3207 tx=02 gate=1
+put tick=3207 type=02 rc=0 gate=1
+tick=3258 tx=21 gate=1
+put tick=3258 type=21 rc=0 gate=1
+ordinary end tick=3258 rc=0 gate=0 retries=3 accepted=2 bye=1 dead=0 hold=0 rx=28/28 gets=52
+tick=3258 tx=01 gate=1
+put tick=3258 type=01 rc=0 gate=1
+begin tick=3258 rc=0 gate=1 retries=0 accepted=1 bye=0 dead=0 hold=0 rx=28/28 gets=28
+put tick=3278 type=14 rc=-1 gate=1
+put tick=3299 type=14 rc=-1 gate=1
+put tick=3320 type=14 rc=-1 gate=1
+put tick=3341 type=14 rc=-1 gate=1
+stalled call tick=3341 rc=-1 gate=1 retries=3 accepted=0 bye=0 dead=0 hold=0 rx=28/28 gets=66
+exhausted call tick=3341 rc=-1 gate=1 retries=3 accepted=0 bye=0 dead=3 hold=0 rx=28/28 gets=0
+tick=3341 tx=02 gate=1
+put tick=3341 type=02 rc=0 gate=1
+tick=3392 tx=21 gate=1
+put tick=3392 type=21 rc=0 gate=1
+exhausted end tick=3392 rc=0 gate=0 retries=3 accepted=2 bye=1 dead=3 hold=0 rx=28/28 gets=52

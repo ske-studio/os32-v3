@@ -1,0 +1,25 @@
+accept tick=0 completion_due=1
+tx DMA tick=1 accepted_at=0
+accept tick=10 completion_due=11
+tx DMA tick=11 accepted_at=10
+accept tick=20 completion_due=21
+tx DMA tick=21 accepted_at=20
+accept tick=30 completion_due=31
+tx DMA tick=31 accepted_at=30
+accept tick=40 completion_due=41
+tx DMA tick=41 accepted_at=40
+accept tick=50 completion_due=51
+tx DMA tick=51 accepted_at=50
+accept tick=60 completion_due=61
+tx DMA tick=61 accepted_at=60
+accept tick=70 completion_due=71
+tx DMA tick=71 accepted_at=70
+accept tick=80 completion_due=101
+rx DMA tick=91 nonce=1 peer=1
+during retry rx=14/60 prepared=0 linked=0
+deadline=100 return=100 rc=-18 gets=91 at_deadline=1 rx=15/42 prepared=1 linked=1 peer=1 resends=9 accepts=9 dma_done=8
+tx DMA tick=101 accepted_at=80
+accept tick=101 completion_due=102
+tx DMA tick=102 accepted_at=101
+rx DMA tick=102 nonce=2 peer=2
+next deadline=200 return=102 rc=0 peer=2 sid=7 accepts=10 dma_done=10
