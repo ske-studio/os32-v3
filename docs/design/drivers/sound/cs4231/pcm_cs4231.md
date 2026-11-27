@@ -8,6 +8,16 @@ frame (左右 1 組 = 4 バイト)。録音・PIO・8 ビット・モノラル�
 DMA #0/#3・XTAL1 系のレート (48k など) は持たない。本体は部品 `pcm.mod` (module id 7、`build/pcm-module.mk`) にあり、
 常駐側の façade は [pcm_module](pcm_module.md)。数は `pcm_cs4231.h` に 1 か所だけ置く ([C4])。
 
+## IRQ12 への移行案（2026-11-27、実装前）
+
+Ra266 の BIOS 初期値は 0x20。診断像 9a8486cb3 で 0F40h に **0x22（INT5 / IRQ12、DMA #1）** を書くと 30 秒の再生中に IRQ12 が 5,138 回届き、到着時に R2.INT と I24.PI が共に立った。0x1A の対照窓では PCM の IRQ10 到着は 0。全対応機で 0x22 を指定し、BIOS 値は起動診断にだけ記録する。DMA #1 を確保するドライバなので BIOS 値の丸ごと復元は行わず、失敗時にも接続を残して codec と DMA を停止する。
+
+0F40h の INT と DMA の符号は PC-98 資料 io_sound.md の同ポートの節、INT5 の符号は FreeBSD stable/11 の PC98 用 MSS 設定、IRQ12・DRQ1 の組合せは同版の既定に基づく。PI の意味とクリアは Crystal CS4231A DS139PP2 の R2・I24 に従う。V86 との共有は OS32 の設計である。[FreeBSD mss.c](https://github.com/freebsd/freebsd-src/blob/stable/11/sys/dev/sound/isa/mss.c)・[PC98 GENERIC.hints](https://github.com/freebsd/freebsd-src/blob/stable/11/sys/pc98/conf/GENERIC.hints)
+
+IRQ 側は所有権・MODE2・状態を確認し、R2.INT があるときだけ I24 を読む。PI があれば既存の再生専用 ack を済ませてから DMA 位置で advance する。PI がなければ装置に書かず IRQ_NONE。RUNNING 中の tick の PI 確認と ack、停止・drain の期限、欠測時の位置観測を残す。IRQ と tick は IF=0 で直列化し、同じ PI を二度計上せず、tick の advance は位置と時刻で判定する。通常補充が IRQ12 に移ると IRQ0 の補充回数は減り得るが、tick の観測と再同期は残る。通常 wave と強制 epoch の窓を分けて実測する。
+
+SNDboard は NP21/W が載せる音源構成を選ぶ。IRQ の配送は OS が書いた経路を観測して判定する。移行の段と両機種の受入は [IRQ12 共有の設計](../../../kernel/irq/irq.md#pc-98-irq12-共有の移行案) に置く。以下の IRQ10・0x1A と受入記録は移行前の実装を示す。
+
 ## ハードウェアの手順と根拠
 
 典拠: Crystal CS4231A データシート DS139PP2 (`docs/hw/crystal/cs4231a.pdf`、gitignore のミラー)、`docs/hw/undocumented/io_sound.md`
@@ -15,7 +25,7 @@ DMA #0/#3・XTAL1 系のレート (48k など) は持たない。本体は部品
 
 | 項目 | 事実と使い方 |
 |---|---|
-| ポート | `0F40h` 経路 (W)、`0F43h` WSS ID、`0F44h` R0 Index (INIT / MCE / TRD / IA4-0)、`0F45h` R1 Data、`0F46h` R2 Status (何を書いても INT が消える)、`0F47h` PIO (使わない) |
+| ポート | `0F40h` 経路 (R/W)、`0F43h` WSS ID、`0F44h` R0 Index (INIT / MCE / TRD / IA4-0)、`0F45h` R1 Data、`0F46h` R2 Status (何を書いても INT が消える)、`0F47h` PIO (使わない) |
 | 経路 `0F40h` | bit5-3 = INT (011 = INT41 = IRQ10)、bit2-0 = DMA (010 = #1)。**`0x1A` = IRQ10 + DMA #1** (`PCM_ROUTE_INT41_DMA1`)。IRQ10 は動的な線で LGY-98 の既定 (3/5) と FDC (#2) を避ける。書くとその場で DMA の attach が変わる |
 | 検出 (`pcm_detect`) | 一続きで: `0F43h` の下位 6 ビット = 000100b → R0 が 0x80 でなくなるまで待つ → I12 の ID3-0 = 1010b → **MODE2 を書いて読み戻す** → I25 の V2-0 = 100 (CS4231) / 101 (CS4231A) (p.36/38)。`A460h` のサウンド ID は見ない (NP21/W の `SNDboard=0x64` では B460h に移る) |
 | I8 | 16 ビット LE ステレオ、XTAL2 (16.9344MHz)。44.1k = ÷384 → `0x5B`、22.05k = ÷768 → `0x57` (p.33)。XTAL2 の無い機械では出ない |
