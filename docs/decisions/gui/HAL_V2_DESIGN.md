@@ -1761,7 +1761,7 @@ __attribute__((weak)) int gf_v2_owns(const struct gf3_surface *a0) { (void)a0; r
 |---|---|---|
 | gfx2_abi | I1 | ABI |
 | gfx2_format | I2 | 形式の式 |
-| gfx2_fence_wrap | I1 | fence の折り返し |
+| gfx2_fence_wrap | I1 | fence の折り返し（既存検査の移行のみ） |
 | gfx2_fence_failure | I1 | 失敗の完了 |
 | gfx2_gf_ring | I2 | 輪の満杯 |
 | gfx2_batch_snapshot | I2 | 束の写し |
@@ -1854,11 +1854,11 @@ __attribute__((weak)) int gf_v2_owns(const struct gf3_surface *a0) { (void)a0; r
 |---|---|---|
 | gfx2_guest_i1 | normal/R1 とも起動自己試験 1 回成功、gfx2_i1 の親・子 PASS、lock 中 audit が進み、終了後 leftover/audit_fail 増分 0 | 起動の自己試験呼出を落とし回数 0 |
 | gfx2_guest_i2 | gfx2_i2 で混在描画の CRC と done、自分の fence が完了かつ失敗範囲外、audit_fail 増分 0 | C14 の CLIENT 別名を別 RAM に結び、混在画素の CRC 不一致 |
-| gfx2_guest_i3 | gfx2_i3 で列挙・同期画素・PEGC の mode/flip NOSYS。別 AS から DISPLAY lease 中に投入して BUSY、解除後に gshell の画面・色を復元 | lease の競合検査を外して別 AS の投入成功を検出 |
+| gfx2_guest_i3 | gfx2_i3 で列挙・同期画素・PEGC の mode/flip NOSYS。画面所有者が DISPLAY lease 中に FILL して BUSY、解除後は同じ FILL が成功。終了後の gshell の画面・色も照合 | submit の DISPLAY lease_count 判定だけを省き、保持中の FILL 成功を検出 |
 
-ゲストの PASS 行のみで I3 の別 AS と gshell 復元は判定できない。二つの AS を重ねる台本と復元前後の同じ静止画領域・palette の照合を追加する。§13-3 の GF/Trident の結果は別に保存する。
+I3 は同じ所有者の lease 前後の rc・done・画素を記録し、gshell 復元は同じ静止画領域・palette で別に照合する。§13-3 の GF/Trident の結果は別に保存する。
 
-**基準版の予測** (2097c56f2、実行前)。最終像・実関数の正常系は実装と過去の受入から緑を予想する。GF の旧 SF2D/GART の成功期待、failed_upto の絶対ゼロ、unmap 後に PT が必ず残る期待を移すと赤になる。これらは上の更新済み期待を使う。現行登録のまま三つの guest ID の実測を要求すると証拠不足で NOT_RUN、現行 i3 のログだけでは別 AS の BUSY の観測も欠ける。これまでの受入から現行版の製品 FAIL は断定できない。正常対照が落ちたら該当 §13 の観測を示し、仕様との差を製品・旧期待・環境に切り分けてから変異へ進む。
+**基準版の予測** (2097c56f2、実行前)。最終像・実関数の正常系は実装と過去の受入から緑を予想する。GF の旧 SF2D/GART の成功期待、failed_upto の絶対ゼロ、unmap 後に PT が必ず残る期待を移すと赤になる。これらは上の更新済み期待を使う。現行登録のまま三つの guest ID の実測を要求すると証拠不足で NOT_RUN、現行 i3 は同じ所有者の lease 中に FILL 成功を期待しており、台本 5 の BUSY 契約との差がある。これまでの受入から現行版の製品 FAIL は断定できない。正常対照が落ちたら該当 §13 の観測を示し、仕様との差を製品・旧期待・環境に切り分けてから変異へ進む。
 
 ### 旧入口と追加登録の台帳（第2稿）
 
@@ -1873,7 +1873,7 @@ __attribute__((weak)) int gf_v2_owns(const struct gf3_surface *a0) { (void)a0; r
 | gfx2_sw_fill, gfx2_copy, gfx2_sw_rop, gfx2_rop4, gfx2_mono, gfx2_hostdata, gfx2_readback, gfx2_stretch, gfx2_ckey, gfx2_alpha, gfx2_line, gfx2_rh | I2 sw_fill〜sw_line、pattern | §3-3 と §13-1 S1〜S11。共通参照画素、clip 外番兵、op ごとの変異を使う |
 | gf_v2_alloc, gf_v2_gart, gf_g8, gf_v2_g4_supplement, gf_v2_ops, gf_v2_rop3, gf_v2_fence, gf_v2_life | I1 heap/gf_page_table；I2 gf_range/keep/rop3/ring/start/stop, fence_order, lost | §13-1 G4/G5/G7/G11・G8 追記・正常停止追記。R6 は drain 成功の LOST のみ mode_set で復旧。drain 失敗なら PC-98 へ退避、mode_set は IO、再起動で復帰。固い LOST を mode_set で解除する変異 |
 | gf_v2_readback | I2 gf_readback | I2 設計追記・S7。INDEX8 DISPLAY 別名の現行 VRAM 予約を毎回引く。解放直後 IO・packet 0、同番地の再予約後成功、通常面の失効 identity は拒否。7×3 を pitch 11 に読み余白 0xa5、GF 期限切れは TIMEOUT。旧予約を cache、出力 pitch を幅にする、期限切れを IO にする各変異 |
-| gfx2_i3, gfx2_i3_guest, gfx2_display, gfx2_enum, gfx2_modeset, gf_v2_display, gf_v2_enum | I3 enum_bounds, modeset_failure, scan_release, present_retry, gf_home/flip/palette/scan/connector/modes, guest_i3 | §13-1・13-2。列挙端・失敗時解放・走査復元、下記 AS 競合。fake のゲスト入口試験を実起動の証拠と混同しない |
+| gfx2_i3, gfx2_i3_guest, gfx2_display, gfx2_enum, gfx2_modeset, gf_v2_display, gf_v2_enum | I3 enum_bounds, modeset_failure, scan_release, present_retry, gf_home/flip/palette/scan/connector/modes, guest_i3 | §13-1・13-2。列挙端・失敗時解放・走査復元、下記の同一所有者による lease 前後の投入。fake のゲスト入口試験を実起動の証拠と混同しない |
 | packages（D1 配布分）, gfxsync_cfg, gfxsync_gap, gfxsync_write, gfxsync_bind | I3 sync_defaults/package, sync_gap, sync_rows, sync_bind/bounds/publish | §10 Y1〜Y4。設定鍵の優先・不正区画 fallback、gap の丸め、unit 未整列端、待ちの単位数、read/write pitch、flush NONE/READBACK/SERIALIZE と実効 mode を記録。優先逆転、丸め切捨て、末尾書込省略、flush 省略、無効 hook で DIRECT 維持を個別に検出 |
 | trident_sync | I3 trident_sync | §10 T1 と「T1 の診断の上書き」追記。初回 bind/publish、同世代再利用、世代更新で NULL publish→unbind→bind→publish、bind/publish 失敗後 ctx・世代消去。SYNC/WAIT/GAP override、不正値で旧値保持、clear で既定。世代比較反転、失敗時 unbind 省略、clear 省略 |
 | gfx2_wiring / gfx2_no_weak | I1〜I3 final_i1/i2/i3 | §12 と §13-1 P2-2。上記 ELF/map と reader の負対照 |
@@ -1884,6 +1884,6 @@ __attribute__((weak)) int gf_v2_owns(const struct gf3_surface *a0) { (void)a0; r
 1. host 担当は linux-x86-cross の実行環境に qemu-user の qemu-i386 を配備し、32bit ELF の起動を prerequisite で照合する。現行 prerequisites の cross compiler 判定だけでは不足する。正常対照を先に走らせ、環境不足・仕様違反・狙った観測名付き変異 RED を別々に保存。after_build の後は verify が対象を再コンパイル・再リンクし、D1 は GUI 媒体を再生成する。正常と各変異ごとに候補の清浄な入力から専用出力先を作り、ELF/map・媒体・ログを共有しない。
 2. PM は tools/guest_tests.txt と tools/guest_acceptance.yaml の受入形式で pc98emu に候補 SHA、normal/R1 の媒体ハッシュ、PEGC 設定、起動コマンド、観測名・期待値を渡す。pc98emu は媒体の作業コピーを各起動で初期化し、NP21/W の serial 生ログ、終了値、gshell の静止画・palette、構成と媒体の識別を返す。GUI 操作は tools/ops/pc98_in2_gui.py と in2_gui_trial.py の既存入口を使う。PM が同一候補・試行との対応を確認する。
 3. I1 は normal/R1 の起動自己試験 1 回、64×64 の lock VA が gfx2 写像帯内、DISCARD ゼロ→全画素に連番を書込→子の audit 後も全値一致、子の lock 保持終了後の free/leftover/bad_free/audit_fail の前後値を記録する。親の PASS とともに件数・比較値をログに出す。自己試験省略と終了時回収省略を別媒体で確認する。
-4. I2 は先に v1 CLIENT と DISPLAY の対象帯を index 0 で初期化。gfx2_i2 の v2 HOSTDATA で CLIENT 左上 64×4 を index 5、v1 gfx_fill_rect で左上 4×1 を 7、v1 present_rect で 64×4 を DISPLAY に転送する。CLIENT と DISPLAY の READBACK 各 256B を「先頭 4B が 7、残り 252B が 5」と byte 比較し CRC・done・fence を保存する。変異版は C14 が CLIENT 別名の backing を本物の v1 CLIENT から同じ寸法・pitch の独立 RAM に差し替える。v2 CLIENT は全 5、v1 present 後の DISPLAY は先頭 4B が 7、残りは 0 になる。両 READBACK・CRC を採ってから判定し、bridge-pixels と screen-pixels を区別する。C14 の begin/end 自体は host で呼出順を別に検査する。
-5. I3 は画面所有者 AS A が DISPLAY の RW lease を取得、token を保持したまま子の別 AS B を起動する。B は A が渡した DISPLAY sid 宛に FILL を submit、BUSY・done 0・画素不変を観測する。B 終了後 A が surface_unlease(token)、全画面を抜け gshell に所有権を返す。同じ静止領域・palette を開始前と照合する。現行 submit の surface() は gfx2_surf_get の非所有者 INVAL が lock 照合に先行するため、この台本は BUSY の期待で正常対照が赤になる可能性がある。B の rc と done を先に実測し、§13-2 の BUSY を満たしてから競合拒否を省く変異へ進む。
+4. I2 は index 0・5・7 を異なる固定色にし、v1 CLIENT の対象帯を 0 で初期化して present する。NP21/W の表示採取で物理走査面の左上 64×4 が全て 0 の色であることを確認する。gfx2_i2 の v2 HOSTDATA で CLIENT 左上 64×4 を index 5、v1 gfx_fill_rect で左上 4×1 を 7、v1 present_rect で 64×4 を DISPLAY に転送する。CLIENT と DISPLAY の READBACK 各 256B を「先頭 4B が 7、残り 252B が 5」と byte 比較し CRC・done・fence を保存する。変異版は C14 が CLIENT 別名の backing を本物の v1 CLIENT から同じ寸法・pitch の独立 RAM に差し替える。v2 CLIENT は全 5、v1 present 後の DISPLAY は先頭 4B が 7、残りは 0 になる。両 READBACK は別名の観測として保存する。物理走査面は present 後の NP21/W の表示から同じ矩形を独立に採取し、先頭 4 画素が 7 の色、残りが 5 の色と照合する。別媒体で試験対象の present 転送だけを省くと、両別名は正常対照と一致し、物理走査面だけが初期色のまま不一致になる。C14 の begin/end 自体は host で呼出順を別に検査する。
+5. I3 は画面所有者 A が有効な DISPLAY sid と v1 DISPLAY の RW lease を取得する。lease 写像の対象画素を FILL 色と異なる値に設定し、同じ A がその sid に FILL を 1 件 submit する。BUSY・done=0 と写像から読んだ画素不変を照合する。surface_unlease(token) の後で同じ FILL が成功・done=1、同期 READBACK が指定色と一致することを採る。現行 submit.c の surface() は v2 の lock 状態を調べる。実装段では sid・所有者の検証後、DISPLAY 別名に対して adapter の kind と LEDGER_ROLE_DISPLAY で引く既存 v1 台帳の lease_count が非ゼロなら発行前に BUSY を返す（SHADOW の backing は CLIENT）。変異はこの lease_count 判定だけを省き、保持中の rc・done の違いを採る。既存 gfx2_i3 の同期画素往復は解除後に行う。全画面終了後は gshell の同じ静止領域・palette を開始前と別途照合する。
 6. runner 接続は独立の実装段。tests/ の環境語彙、prerequisites、pc98emu への受渡しと試行回収、証跡 reader、通常・各変異の独立した媒体生成と boot を揃える。reader は SHA・媒体ハッシュ・構成・変異名・観測値を照合し、古いログ・別媒体・欠測を拒否する。正常と全変異を往復して初めて guest_i1/i2/i3 を必須 gate に登録する。Ra266 の §13-3 は実機担当が別に採る。
