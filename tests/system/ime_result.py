@@ -23,14 +23,14 @@ def verify(config):
             (["mode", "kata"], "Mode switched to Katakana."),
         ]:
             states = ["unavailable", "available"]
-            if args == ["mode", "hira"]:
+            if args in (["on"], ["mode", "hira"]):
                 states.append("stuck")
             for state in states:
                 result = subprocess.run(["qemu-x86_64", exe, state, *args], capture_output=True, text=True)
                 if state == "available":
                     ok = result.returncode == 0 and result.stdout == message + "\n" and not result.stderr
                 else:
-                    ok = result.returncode > 0 and message not in result.stdout + result.stderr and result.stderr.strip()
+                    ok = result.returncode == 1 and not result.stdout and len(result.stderr.splitlines()) == 1 and result.stderr.strip()
                 if not ok:
                     errors.append(f"{state} {' '.join(args)}: rc={result.returncode} stdout={result.stdout.strip()!r} stderr={result.stderr.strip()!r}")
     if errors:

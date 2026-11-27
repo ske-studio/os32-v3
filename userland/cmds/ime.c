@@ -64,8 +64,8 @@ int main(int argc, char **argv, KernelAPI *api)
 
     if (strcmp(argv[1], "on") == 0) {
         api->ime_set_mode(IME_MODE_HIRAGANA);
-        if (!api->ime_is_active()) {
-            fprintf(stderr, "ime: FEP not available\n");
+        if (!api->ime_is_active() || api->ime_get_mode() != IME_MODE_HIRAGANA) {
+            fprintf(stderr, "ime: could not enable Hiragana mode\n");
             return 1;
         }
         printf("FEP enabled.\n");
