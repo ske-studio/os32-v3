@@ -39,6 +39,17 @@ class Guest:
         chunk = os.read(self.process.stdout.fileno(), 8192)
         if not chunk:
             raise OSError("QMP closed")
+        self.consume(chunk)
+
+    def drain(self):
+        """Record whatever QMP left in the pipe after QEMU has exited."""
+        try:
+            while chunk := os.read(self.process.stdout.fileno(), 8192):
+                self.consume(chunk)
+        except (OSError, ValueError) as exc:
+            self.record("unavailable", f"drain: {exc}")
+
+    def consume(self, chunk):
         lines = (self.buffer + chunk).split(b"\n")
         self.buffer = lines.pop()
         for line in lines:
@@ -74,9 +85,21 @@ class Guest:
             missing = missing_marker(output.decode(errors="replace"))
             if missing is None:
                 return
-            if self.process.poll() is not None:
-                raise OSError(f"QEMU exited {self.process.returncode} waiting for {missing!r}")
-            self.pump(min(0.1, remaining(self.deadline)))
+            seconds = min(0.1, remaining(self.deadline))
+            if self.process.poll() is None:
+                try:
+                    self.pump(seconds)
+                    continue
+                except TimeoutError:
+                    raise
+                except OSError:
+                    pass
+            # QEMU or its QMP pipe ended: the guest may have written the marker just before.
+            output += self.serial.read()
+            missing = missing_marker(output.decode(errors="replace"))
+            if missing is None:
+                return
+            raise OSError(f"QEMU exited {self.process.poll()} waiting for {missing!r}")
 
     def diagnose(self):
         for name, arguments in (("query-status", {}), ("screendump", {
@@ -116,3 +139,4 @@ def guest(iso, cpu, directory, *, devices, deadline):
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait()
+            vm.drain()
