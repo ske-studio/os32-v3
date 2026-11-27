@@ -423,3 +423,21 @@ expect = "2HD RAW は 1261568 バイト、先頭は STI と自分に戻る JMP�
 limits = "像の構造を検査する。既定の時間切れと終了後の再 attach はゲスト試験で確認する"
 gates = ["push", "main"]
 mutations = [{ id = "oversized_timeout_image", config = "pc98", when = "after_build", append = "build/out/tests/v86_timeout.img", fail = "unexpected RAW size: 1261569" }]
+
+[[check]]
+id = "fm_probe"
+spec = { path = "docs/design/kernel/irq/irq.md", section = "S1 の音源判定" }
+subsystem = "sound"
+level = "L2"
+sources = ["sys/dev/sound/fm", "sys/platform/pc98/platform_fm_probe.h", "sys/kern/irq", "sys/platform/pc98/pic.c", "sys/platform/pc98/irq_complete.c", "tests/support/fixtures/fm_probe", "tools/ops/kernel_includes.py", "build/config.mk"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "両ベースの判定、タイマ遷移、既登録・再 attach の I/O ゼロ"
+limits = "ポート模型。実機配線とゲスト演奏は S4"
+gates = ["push", "main"]
+mutations = [
+ { id = "id_only", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "!*contained || !rose", new = "!*contained", fail = "missing timer transition" },
+ { id = "skip_alt", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "i < 2", new = "i < 1", fail = "open bus" },
+ { id = "unknown_absent", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "if (status < 0 || ready_status(base) != status)\n        return OPN_PROBE_UNKNOWN;", new = "if (status < 0 || ready_status(base) != status) return OPN_PROBE_ABSENT;", fail = "unknown first" },
+ { id = "registered_imr", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "if (busy) return;", new = "if (busy) { outp(0x0a, 0xff); return; }", fail = "registered IRQ" }]
