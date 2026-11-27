@@ -5,7 +5,7 @@ import tomllib
 
 FIELDS = set("id spec subsystem level sources environment arch needs expect limits gates mutations".split())
 OWNERS = set("kern hal arch platform dev gfx sound input fs net kapi boot lib sdk userland tools integration system infra".split())
-ENVIRONMENTS = {"qemu-ppc", "python-yaml", "python", "linux-x86-cross", "linux-ppc-cross", "linux-cross"}
+ENVIRONMENTS = {"qemu-ppc", "qemu-ppc-net", "python-yaml", "python", "linux-x86-cross", "linux-ppc-cross", "linux-cross"}
 
 
 def demand(condition, message):
@@ -23,6 +23,10 @@ def identifier(name):
 
 def strings(values, empty=False):
     return isinstance(values, list) and (empty or values) and all(map(string, values)) and len(set(values)) == len(values)
+
+
+def config_component(name):
+    return string(name) and name not in (".", "..") and "/" not in name and "\\" not in name and "\0" not in name
 
 
 def relative(name):
@@ -60,7 +64,7 @@ def validate(checks, root):
         demand(isinstance(arch, dict) and arch and arch.keys() <= {"x86", "ppc", "host"}, "invalid arch")
         configs = set()
         for values in arch.values():
-            demand(strings(values) and configs.isdisjoint(values), "invalid configs")
+            demand(strings(values) and all(map(config_component, values)) and configs.isdisjoint(values), "invalid configs")
             configs.update(values)
         if "deferred" in row:
             deferral = row["deferred"]

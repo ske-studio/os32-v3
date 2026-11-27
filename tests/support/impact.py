@@ -138,12 +138,13 @@ def impact(rows, paths, inventory, force=False):
                 selected |= bool(cpu_bundles) and name == "src_owner"
                 selected |= "checks" in kinds and name in GATE_CHECKS
                 selected |= "docs" in kinds and name.startswith("docs_")
+            qemu = row["environment"].startswith("qemu-ppc")
             for config in configs:
-                matches_config = bundle == "ppc" and config in ppc_configs and name in (
-                    "c_dialect", "ppc_media_build", "ppc_boot", "build_identity")
+                matches_config = bundle == "ppc" and config in ppc_configs and (qemu or name in (
+                    "c_dialect", "ppc_media_build", "build_identity"))
                 if selected or matches_config:
                     entries.append([name, config])
-                    if name in ("ppc_media_build", "ppc_boot"):
+                    if qemu or name == "ppc_media_build":
                         images.add(config)
                     elif name == "x86_media_build":
                         pc98 = "distribution"

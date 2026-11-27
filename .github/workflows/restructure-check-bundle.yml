@@ -61,15 +61,17 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends qemu-system-ppc seabios || { sudo apt-get update && sudo apt-get install -y --no-install-recommends --fix-missing qemu-system-ppc seabios; }
-      - env:
+      - id: run_checks
+        env:
           OS32_PRODUCT_DIR: ${{ runner.temp }}/products
           OS32_KAPI_CACHE: ${{ runner.temp }}/kapi-targets
-        run: python3 -B -m tests.infra.ci run --bundle "$BUNDLE" --mutate --gate "$GATE" --output "$RUNNER_TEMP/results" --plan-file "$RUNNER_TEMP/planned/plan.json"
+        run: python3 -B -m tests.infra.ci run --bundle "$BUNDLE" --mutate --gate "$GATE" --output "$RUNNER_TEMP/results" --github-output "$GITHUB_OUTPUT" --plan-file "$RUNNER_TEMP/planned/plan.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: checks-${{ github.run_attempt }}-${{ inputs.bundle }}
           path: |
             ${{ runner.temp }}/results/bundle-*.json
-            ${{ runner.temp }}/results/*.log
+            ${{ steps.run_checks.outputs.failure_logs }}
+            ${{ runner.temp }}/results/evidence/
           if-no-files-found: error

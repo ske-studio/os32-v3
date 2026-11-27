@@ -18,10 +18,10 @@ class PrerequisitesTest(unittest.TestCase):
             with patch.dict("os.environ", PPC_CROSS_DIR=tmp, CROSS_DIR=tmp), patch(
                 "shutil.which", side_effect=lambda tool: tool not in missing
             ), patch("importlib.util.find_spec", return_value=True):
-                prerequisites("linux-cross", "ppc", "core", ["make:iso"])
-                with self.assertRaisesRegex(OSError, "missing tool xorriso"):
-                    prerequisites("linux-cross", "x86", "pc98", ["make:iso"])
-                missing.add("genisoimage")
-                prerequisites("linux-ppc-cross", "ppc", "link-sh", ["make:common-compile"])
-                with self.assertRaisesRegex(OSError, "missing tool genisoimage"):
-                    prerequisites("linux-ppc-cross", "ppc", "core", ["make:iso"])
+                self.assertEqual(prerequisites("linux-cross", "ppc", "core", ["make:iso"]), set())
+                self.assertEqual(prerequisites("linux-cross", "x86", "pc98", ["make:iso"]),
+                                 {"missing tool xorriso"})
+                missing.update(("genisoimage", "isoinfo"))
+                self.assertEqual(prerequisites("linux-ppc-cross", "ppc", "link-sh", ["make:common-compile"]), set())
+                self.assertEqual(prerequisites("linux-ppc-cross", "ppc", "core", ["make:iso"]),
+                                 {"missing tool genisoimage", "missing tool isoinfo"})

@@ -8,7 +8,9 @@ import tempfile
 from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from tests.infra.ci import collect, job_errors, run_bundle
+from unittest.mock import patch
+
+from tests.infra.ci import clear_selected_evidence, check_prerequisites, collect, job_errors, run_bundle
 from tests.support.media import Failure, main
 
 
@@ -26,6 +28,35 @@ def verify_selection():
     inventory = Inventory(root)
     rows = tomllib.loads((root / "tests/registry.toml").read_text())["check"]
 
+    legacy_bodies = (
+        "infra/ppc_media_build.py",
+        "infra/x86_media_build.py",
+        "infra/ppc_common_compile.py",
+        "infra/build_identity.py",
+        "infra/registry_fields.py",
+        "system/ppc_boot.py",
+        "infra/landing_evidence.py",
+        "infra/src_owner.py",
+        "infra/build_sources.py",
+        "infra/include_layers.py",
+        "infra/link_layers.py",
+        "infra/hal_contracts.py",
+        "infra/test_registration.py",
+        "tools/docs_links.py",
+        "tools/docs_navigation.py",
+        "tools/docs_source_refs.py",
+        "tools/docs_status.py",
+        "tools/kapi_abi.py",
+        "tools/kapi_sync.py",
+        "infra/c_dialect.py",
+        "infra/p2v.py",
+        "infra/ring3_instructions.py",
+    )
+    for body in legacy_bodies:
+        check("OS32_VERIFY_OUT" not in (root / "tests" / body).read_text(), "legacy verify environment")
+    rows.append(dict(next(row for row in rows if row["id"] == "ppc_boot"),
+                     id="net_fixture", environment="qemu-ppc-net", sources=[]))
+
     declared = image_dependencies(inventory, declared_only=True)
     inventory.declared_images = declared
 
@@ -42,6 +73,8 @@ def verify_selection():
     check(result["pc98"] == "distribution" and set(result["powerpc"]) == {"sh", "link-sh", "shell"}
           and ("ppc_boot", "shell") in entries and ("ppc_boot", "core") not in entries,
           "shared userland media")
+    check({cfg for name, cfg in entries if name == "net_fixture"} == set(result["powerpc"]),
+          "net fixture image selection")
     result, entries = plan("sys/kern/av_focus.c")
     check(result["pc98"] == "distribution" and result["powerpc"] == list(PPC)
           and not result["userland"] and not result["sdk"], "kernel products")
@@ -102,7 +135,28 @@ def verify_selection():
 
 
 
+def verify_link(component):
+    with tempfile.TemporaryDirectory() as tmp:
+        output = Path(tmp).resolve()
+        directory = output / "evidence" / "first" / "local"
+        directory.mkdir(parents=True)
+        marker = directory / "serial.log"
+        marker.write_text("existing")
+        linked = output / component
+        with patch.object(Path, "is_symlink", lambda path: path == linked), patch("shutil.rmtree") as remove:
+            try:
+                clear_selected_evidence([({"id": "first"}, "host", "local")], SimpleNamespace(output=output))
+            except ValueError:
+                pass
+            else:
+                raise Failure(f"accepted linked component {component}")
+            remove.assert_not_called()
+        check(marker.read_text() == "existing", "existing evidence changed")
+
+
 def verify(config):
+    for component in ("evidence", "evidence/first", "evidence/first/local"):
+        verify_link(component)
     verify_selection()
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
@@ -114,18 +168,22 @@ def verify(config):
         args = SimpleNamespace(gate="main", output=out, mutate=False, bundle=None)
         plan = []
         for name, cpu, rc in (("first", "host", 1), ("second", "ppc", 1), ("last", "host", 0)):
-            (bodies / f"{name}.py").write_text(f'print("{name} diagnostic")\nraise SystemExit({rc})\n')
+            (bodies / f"{name}.py").write_text(f'import sys\nif sys.argv[-1] == "verify":\n    print("{name} diagnostic")\n    sys.exit({rc})\n')
             plan.append((dict(id=name, subsystem="infra", gates=["main"], mutations=[],
                               environment="python", sources=[]), cpu, "test"))
         identity = dict(sha="fixture", run="local", attempt="1", mutate=False, gate="main")
         for args.bundle in ("host", "ppc"):
             run_bundle(source, [r for r in plan if r[1] == args.bundle], args, {}, identity)
+        args.github_output = root / "github-output"
         output = io.StringIO()
         with redirect_stdout(output):
             check(collect(plan, args, identity) == 1, "two failures must block collection")
         summary = json.loads((out / "summary.json").read_text())
         check([r["status"] for r in summary["rows"]] == ["FAIL", "FAIL", "PASS"],
               "remaining check did not run")
+        check(args.github_output.read_text().splitlines() == [
+            "failure_logs<<END_LOGS", str(out / "first-test.log"), str(out / "second-test.log"),
+            "END_LOGS"], "failure log selection")
         check(all(f"{name} diagnostic" in output.getvalue() for name in ("first", "second")),
               "missing failure tails")
         path = out / "bundle-host.json"
@@ -139,12 +197,37 @@ def verify(config):
         check(summary["rows"][-1]["status"] == "NOT_RUN", "missing result must be NOT_RUN")
         row, cpu, cfg = plan[0]
         row.update(environment="linux-x86-cross")
-        from unittest.mock import patch
-        with patch("shutil.which", return_value=None):
-            args.bundle = "host"
-            (out / "bundle-ppc.json").unlink()
-            run_bundle(source, [plan[0]], args, {}, identity)
-        check(collect([plan[0]], args, identity) == 2, "missing tools must be ERROR")
+        args.bundle = "host"
+        (out / "bundle-ppc.json").unlink()
+        row.update(environment="qemu-ppc-net")
+        import socket
+        def which(tool):
+            return None if Path(tool).name in ("qemu-system-ppc", "powerpc-elf-gcc") else str(tool)
+        # Model a complete cross installation on hosts without a PPC toolchain.
+        def open_prerequisite(path, mode="r", **kwargs):
+            if mode == "rb":
+                return io.BytesIO(b"x")
+            return open(path, mode, **kwargs)
+
+        with patch.object(Path, "open", open_prerequisite):
+            with patch("shutil.which", side_effect=which), patch("socket.socket") as udp:
+                try:
+                    check_prerequisites([plan[0]], args, identity)
+                except OSError as exc:
+                    check(all(name in str(exc) for name in ("qemu-system-ppc", "powerpc-elf-gcc")),
+                          "missing prerequisites incomplete")
+                else:
+                    raise Failure("missing prerequisites accepted")
+                udp.assert_called_once_with(socket.AF_INET, socket.SOCK_DGRAM)
+            with patch("shutil.which", return_value="tool"), patch("socket.socket", side_effect=OSError):
+                try:
+                    check_prerequisites([plan[0]], args, identity)
+                except OSError as exc:
+                    check(str(exc) == "loopback UDP bind (AF_INET)", "loopback-only prerequisite")
+                else:
+                    raise Failure("missing loopback accepted")
+                row.update(environment="qemu-ppc")
+                check_prerequisites([plan[0]], args, identity)
 
         row.update(deferred=dict(ledger="fixture-approved", config=cfg, gates=["main"]))
         run_bundle(source, [plan[0]], args, {}, identity)
@@ -156,6 +239,43 @@ def verify(config):
         check(collect([plan[0]], args, identity) == 0, "gate exemption was rejected")
         check(json.loads((out / "summary.json").read_text())["rows"][0]["status"] == "NOT_APPLICABLE",
               "gate exemption missing")
+
+        args.mutate = True
+        row.update(environment="python", gates=["main"])
+        (source / "flag").write_text("good")
+        (bodies / "first.py").write_text(
+            "import os, sys\nfrom pathlib import Path\n"
+            "if sys.argv[-1] == 'verify':\n"
+            "    work = Path(os.environ['OS32_VERIFY_OUT'])\n"
+            "    assert work.parent == Path.cwd() and not list(work.iterdir())\n"
+            "    flag = Path('flag').read_text()\n"
+            "    case = Path('evidence/7450/boot')\n"
+            "    case.mkdir(parents=True)\n"
+            "    (case / 'serial.log').write_text(flag * 300000)\n"
+            "    print(flag + ' diagnostic')\n"
+            "    sys.exit(int(flag != 'good'))\n")
+        row["mutations"] = [dict(id=value, config=cfg, replace="flag", old="good", new=value,
+                                 fail="expected diagnostic") for value in ("expected", "unexpected_failure")]
+        run_bundle(source, [plan[0]], args, {}, identity)
+        check(collect([plan[0]], args, identity) == 1, "undetected mutation accepted")
+        item = json.loads((out / "summary.json").read_text())["rows"][0]
+        log = (out / item["log"]).read_text()
+        check("expected diagnostic" not in log and "unexpected_failure diagnostic" in log,
+              "expected RED forwarded")
+        dest = out / "evidence/first/test"
+        check({p.name for p in dest.iterdir()} == {"unexpected_failure"}, "failure evidence selection")
+        case = dest / "unexpected_failure/7450/boot"
+        check((case / "serial.log").stat().st_size == 256 * 1024
+              and json.loads((case / "manifest.json").read_text())["truncated_bytes"]["serial.log"] > 0
+              and item["mutations"]["unexpected_failure"]["reason"] == "unexpected_failure diagnostic",
+              "failure evidence or reason missing")
+        import yaml
+        workflow = yaml.safe_load(Path(".github/workflows/restructure-check-bundle.yml").read_text())
+        uploads = [step["with"]["path"].splitlines() for job in workflow["jobs"].values()
+                   for step in job["steps"] if step.get("uses", "").startswith("actions/upload-artifact@")]
+        check(["${{ runner.temp }}/results/bundle-*.json", "${{ steps.run_checks.outputs.failure_logs }}",
+               "${{ runner.temp }}/results/evidence/"] in uploads,
+              "failure evidence upload missing")
 
 
 if __name__ == "__main__":
