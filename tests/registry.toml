@@ -73,14 +73,14 @@ id = "ppc_boot"
 spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の起動到達点" }
 subsystem = "system"
 level = "L4"
-sources = ["make:all", "make:iso"]
+sources = ["make:all", "make:iso", "tests/support/ppc_vm.py", "tests/support/media.py"]
 environment = "qemu-ppc"
 arch = { ppc = ["core", "link", "sh", "link-sh", "shell", "neg1"] }
 needs = []
-expect = "各媒体が設計のシリアル到達点に達し neg1 は期待した例外で停止する"
-limits = "QEMU mac99 の起動到達まで"
+expect = "6像の起動順と否定像を両 CPU で検証"
+limits = "mac99 TCG の起動40秒"
 gates = ["push", "main"]
-mutations = [{ id = "boot_wrong_config", config = "core", replace = "boot-serial.log", old = "KBOOT READY stage=pre-user", new = "KBOOT HALTED", fail = "boot did not reach KBOOT READY", when = "after_build" }]
+mutations = [{ id = "boot_wrong_config", config = "core", when = "after_build", replace = "7450/boot-serial.log", old = "KBOOT READY stage=pre-user", new = "KBOOT HALTED", fail = "boot did not reach KBOOT READY" }, { id = "missing_7455", config = "core", when = "after_build", remove = "7455/boot-serial.log", fail = "missing 7455 boot serial" }]
 
 [[check]]
 id = "collection_contract"
