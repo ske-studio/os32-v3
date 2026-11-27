@@ -22,7 +22,13 @@
 | 12 所要 | seconds | 実行器が各結果に書く実測秒。登録の手書きは 12 項で、所要の予想値は不要 |
 | 13 変異 | mutations | 1 個以上の宣言。ID は全登録で一意。適用構成・操作対象・操作の時点と内容・検出すべき失敗を指定 |
 
-PowerPC の構成には任意の `ppc_seconds` 表を付ける。値は同じ hosted run の正常と全変異の秒数を行ごとに合計し、切り上げた正の整数。[CI の所要の棚卸し](../../../../.claude/skills/os32-ci-inventory/SKILL.md) に従い、同じ hosted run の collect の結果表をジョブ所要と照合し、対象行の正常と各変異の実測秒を合計してから切り上げる。結果を `tests/registry.toml` の該当検査の `ppc_seconds.<構成>` に書く。未計測の構成は値を省き、計測まで暫定の 900 秒で割り当てる。900 秒を超える登録は lint が拒む。実測が上限を超えた検査は G13 に従って中を分割する。
+### PowerPC の構成別重み（ppc_seconds）
+
+PowerPC の構成には任意の `ppc_seconds` 表を付ける。未計測の構成は値を省き、計測まで暫定の 900 秒で割り当てる。900 秒を超える登録は lint が拒む。実測が上限を超えた検査は G13 に従って中を分割する。
+
+1. hosted の `restructure-build` で conclusion が `success` の run を選ぶ。[workflow の collect ジョブ](../../../../.github/workflows/restructure-build.yml) は `if: always()` で失敗時も成果物を保存する。成功した attempt N の成果物 `summary-<N>` の `summary.json` だけを使い、`identity.attempt` が N に一致し、`rc` が 0 であることを確認する。
+2. 対象の `(id, config)` に一致する `rows[]` の `status` が `PASS` であることを確認する。その行の `seconds` と同じ行の `mutations` にある全変異の `seconds` を合計し、最後に切り上げた正の整数を `tests/registry.toml` の該当検査の `ppc_seconds.<構成>` に書く。run 45992489854 の attempt 1 では、`ppc_boot_clock/core` の正常 6.37 秒と変異 5.91、6.24、5.81 秒の合計は約 24.3 秒で、登録値は 25 秒になる。
+3. 更新の前後で `python3 -B -m tests.infra.ci plan --full --gate push` を実行し、`(id, config)` の集合と各行の必須変異の集合が一致することを確認する。各行の束への割り当てと束ごとの登録重みを表にする。更新を入れた枝の新しい成功 run で、同じ手順で選んだ `summary.json` の `durations` にある各 `bundle-<束名>` の所要が 900 秒以内であることを確認する。更新前後の登録重みと実測秒を [ci_v2.md §6 全件の所要](../ci/ci_v2.md#6-全件の所要) の表に記録する。
 
 ## 本体と登録の双方向照合
 
