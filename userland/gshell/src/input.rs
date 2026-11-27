@@ -242,7 +242,6 @@ pub fn cancel_capture(st: &mut GuiState) {
         }
     }
     st.synth_buttons = 0;
-    if st.drag_index >= 0 { wm::drop_drag_frame(st); }
 }
 
 /// 完全な id の窓への配送先 (窓が消えていれば None)。
@@ -555,14 +554,7 @@ fn capture_mouse(st: &mut GuiState, ctx: Ctx, end_batch: bool) {
     let moved = mx != st.mouse_x || my != st.mouse_y;
     st.mouse_x = mx;
     st.mouse_y = my;
-    if st.excl.mouse_baseline {
-        st.excl.held_buttons = mi.buttons;
-        st.prev_buttons = 0;
-        st.click_button = 0;
-        st.delivered_button = 0;
-        st.excl.mouse_baseline = false;
-        cursor::move_to(st, mx, my);
-    }
+    crate::excl::restore_mouse_baseline(st, mi.buttons, mx, my);
     st.excl.held_buttons &= mi.buttons;
     let btn = mi.buttons & !st.excl.held_buttons;
     // 全解放から始まる押下だけがクリックを開始する。同時押しは左を優先。

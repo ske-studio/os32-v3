@@ -6,6 +6,8 @@ pub mod gui {
         pub const GUI_EV_KEY: u8 = 1;
         pub const GUI_EV_BUTTON: u8 = 2;
         pub const GUI_EV_POINTER: u8 = 3;
+        pub const GUI_COLOR_TEXT: u8 = 1;
+        pub const GUI_COLOR_WINDOW: u8 = 2;
         pub const GUI_EV_TEXT: u8 = 4;
         #[derive(Copy, Clone)]
         pub struct GuiEvent { pub window: u32, pub kind: u8, pub sub: u8, pub payload: [u8; 8] }
@@ -20,8 +22,8 @@ pub mod av {
     #[allow(non_camel_case_types)]
     pub struct IN2_WmState { pub size: u32, pub gen: u32, pub excl: u32, pub owner: i32 }
 }
-pub struct Api { pub get_tick: unsafe fn() -> u32, pub kbd_trygetrawkey: unsafe fn() -> i32, pub kbd_is_pressed: unsafe fn(i32) -> i32, pub in2_wm_state: unsafe fn(&mut av::IN2_WmState) -> i32 }
-pub fn api() -> Api { Api { get_tick: || 0, kbd_trygetrawkey: || RAW.with(|q| q.borrow_mut().pop_front().unwrap_or(-1)), kbd_is_pressed: |_| 0, in2_wm_state: |s| { s.excl = FLAGS.get(); 0 } } }
+pub struct Api { pub exec_abort_clear: unsafe fn() -> i32, pub get_tick: unsafe fn() -> u32, pub kbd_trygetrawkey: unsafe fn() -> i32, pub kbd_is_pressed: unsafe fn(i32) -> i32, pub in2_wm_state: unsafe fn(&mut av::IN2_WmState) -> i32 }
+pub fn api() -> Api { Api { exec_abort_clear: || { multiapp::STOP_TRACE.with(|t| t.borrow_mut().push(0)); 0 }, get_tick: || 0, kbd_trygetrawkey: || RAW.with(|q| q.borrow_mut().pop_front().unwrap_or(-1)), kbd_is_pressed: |_| 0, in2_wm_state: |s| { s.excl = FLAGS.get(); 0 } } }
 #[path = "../../../../userland/gshell/src/excl.rs"]
 mod excl;
 mod wm {
@@ -29,13 +31,18 @@ mod wm {
     use std::cell::{Cell, RefCell};
     pub struct Window { pub owner: i32, pub id: u32 }
     impl Window { pub fn client_origin(&self) -> (i32,i32) { (0,0) } }
-    pub struct Cursor { pub shown: bool }
+    pub struct Rect;
+    impl Rect {
+        pub fn new(_: i32, _: i32, _: i32, _: i32) -> Rect { Rect }
+        pub fn intersects(&self, _: &Rect) -> bool { unreachable!() }
+    }
     pub struct GuiState {
-        pub excl: excl::State, pub windows: [Window; 2], pub cursor: Cursor,
+        pub excl: excl::State, pub windows: [Window; 2], pub cursor: cursor::Cursor, pub screen_w: i32, pub screen_h: i32,
         pub pending_raw: [i32;128], pub pending_rank: [u8;128], pub pending_raw_n: usize,
         pub pending_tab: bool, pub pending_switch: bool, pub pending_raw_dropped: u32,
         pub held_keys: [bool;128], pub stop_suppressed: bool, pub stop_tick: u32,
         pub abort_seen: bool, pub switching: bool, pub switches: usize,
+        pub drag_index: i32, pub prev_buttons: u8, pub click_button: u8, pub delivered_button: u8,
         pub front: usize, pub space: Cell<usize>, pub events: RefCell<Vec<GuiEvent>>,
     }
     impl GuiState {
@@ -44,22 +51,52 @@ mod wm {
         pub fn win_by_id(&self, id: u32) -> Option<usize> { self.windows.iter().position(|w| w.id == id) }
         pub fn slot_of_owner(&self, owner: i32) -> Option<usize> { self.windows.iter().position(|w| w.owner == owner) }
     }
-    pub fn queue_present(_: &mut GuiState, _: ()) {}
+    pub fn drop_drag_frame(st: &mut GuiState) { st.drag_index = -1; }
+    pub fn queue_present(_: &mut GuiState, _: Rect) {}
     pub fn flush_present() {}
 }
-mod cursor {
-    pub fn rect(_: &super::wm::GuiState) {}
-    pub fn hide(_: &mut super::wm::GuiState) {}
+#[path = "../../../../userland/gshell/src/cursor.rs"]
+mod cursor;
+mod gfx {
+    thread_local! { pub static PIXELS: std::cell::RefCell<[u8; 256]> = const { std::cell::RefCell::new([0; 256]) }; }
+    pub unsafe fn gfx_pixel(x: i32, y: i32, color: u8) {
+        PIXELS.with(|p| p.borrow_mut()[(y * 16 + x) as usize] = color);
+    }
 }
+mod ffi {
+    pub unsafe fn gfx_get_pixel(x: i32, y: i32) -> u8 {
+        super::gfx::PIXELS.with(|p| p.borrow()[(y * 16 + x) as usize])
+    }
+}
+#[no_mangle]
+static gfx_direct: i32 = 0;
+// The fixture selects the software framebuffer. A direct command is unexpected.
+#[no_mangle]
+extern "C" fn gfx_cmd_get(_:i32, _:i32, _:i32, _:i32, _: *mut u8, _:u32) -> i32 { unreachable!() }
+#[no_mangle]
+extern "C" fn gfx_cmd_enqueue_put(_:i32, _:i32, _:i32, _:i32, _: *const u8, _:u32, _:i32) -> i32 { unreachable!() }
+#[no_mangle]
+extern "C" fn gfx_cmd_enqueue_mono(_:i32, _:i32, _:i32, _:i32, _: *const u8, _:u32, _:u8,
+                                   _:i32, _:i32, _:i32, _:i32, _:i32) -> i32 { unreachable!() }
 mod multiapp {
     use std::sync::atomic::{AtomicI32, Ordering};
     pub static OWNER: AtomicI32 = AtomicI32::new(2);
     pub static FAIL_NEXT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    const APP_ID_SHELL: i32 = 1;
+    pub struct Multi { pub abort_clear_req: bool }
+    fn m() -> Multi { Multi { abort_clear_req: false } }
+    thread_local! { pub static STOP_TRACE: std::cell::RefCell<Vec<i32>> = Default::default(); }
+    fn abort_target(st: &super::wm::GuiState) -> i32 { st.front_owner() }
+    fn kill_for_request(id: i32) { STOP_TRACE.with(|t| t.borrow_mut().push(id)); }
+    pub fn redirect_abort(_: &super::wm::GuiState, _: i32) { unreachable!() }
+    mod stop_dispatch { include!("../../../../userland/gshell/src/stop_dispatch.rs"); }
+    pub(crate) use stop_dispatch::top_level_abort;
     pub fn av_owner() -> i32 { OWNER.load(Ordering::Relaxed) }
     pub fn sync_av_focus(st: &mut super::wm::GuiState) {
         if !FAIL_NEXT.swap(false, Ordering::Relaxed) { OWNER.store(st.front_owner(), Ordering::Relaxed); }
     }
 }
+mod fullscreen { pub fn active() -> bool { false } }
 mod modal { pub fn is_open() -> bool { false } }
 mod startmenu { pub fn is_open() -> bool { false } }
 mod fep {
@@ -130,7 +167,8 @@ fn main() {
         pending_tab: false, pending_switch: false, pending_raw_dropped: 0,
         held_keys: [false;128], stop_suppressed: false, stop_tick: 0,
         abort_seen: false, switching: false, switches: 0,
-        front: 0, cursor: wm::Cursor {shown: false}, space: 2.into(), events: Default::default(),
+        drag_index: -1, prev_buttons: 0, click_button: 0, delivered_button: 0,
+        front: 0, cursor: cursor::Cursor::EMPTY, screen_w: 16, screen_h: 16, space: 2.into(), events: Default::default(),
     };
     assert!(excl::append(&mut st, 0, &ring::ev_key(true, 10, 42, 0, 0, 0)));
     assert!(excl::append(&mut st, 0, &ring::ev_pointer(10, 0, 0, 1, 0)));
@@ -194,6 +232,9 @@ fn main() {
     }
     assert_eq!(st.switches, 2);
     assert!(st.abort_seen);
+    assert_eq!(multiapp::top_level_abort(&mut st), 3);
+    assert_eq!(multiapp::top_level_abort(&mut st), 0);
+    multiapp::STOP_TRACE.with(|trace| assert_eq!(trace.borrow().as_slice(), &[0, 3]));
     assert_eq!(st.events.borrow().len(), 6);
     st.space.set(8);
     for flags in [excl::KBD as u32, 0] {
@@ -216,5 +257,21 @@ fn main() {
             assert!(delivered.is_empty());
         }
     }
+
+    cursor::show(&mut st);
+    assert_eq!(unsafe { ffi::gfx_get_pixel(0, 0) }, GUI_COLOR_TEXT);
+    st.drag_index = 1;
+    FLAGS.set(excl::MOUSE);
+    excl::observe(&mut st);
+    excl::settle(&mut st);
+    assert_eq!(st.drag_index, -1);
+    assert!(!st.cursor.shown);
+    assert_eq!(unsafe { ffi::gfx_get_pixel(0, 0) }, 0);
+    FLAGS.set(0);
+    excl::observe(&mut st);
+    excl::settle(&mut st);
+    excl::restore_mouse_baseline(&mut st, 0, 0, 0);
+    assert!(st.cursor.shown);
+    assert_eq!(unsafe { ffi::gfx_get_pixel(0, 0) }, GUI_COLOR_TEXT);
 
 }

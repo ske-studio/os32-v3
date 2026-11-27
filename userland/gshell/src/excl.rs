@@ -198,6 +198,7 @@ pub fn settle(st: &mut wm::GuiState) {
         input::purge_boundary(st, st.excl.purge_same_owner);
         st.excl.purge_same_owner = false;
         input::cancel_capture(st);
+        if st.drag_index >= 0 { wm::drop_drag_frame(st); }
         st.excl.prepared = st.excl.observed;
     }
     let mut complete = true;
@@ -258,6 +259,17 @@ pub(crate) fn append_delivery(st: &wm::GuiState, slot: usize, ev: &GuiEvent) -> 
     let accepted = ring::append(st, slot, ev);
     if accepted { DELIVERIES.fetch_add(1, core::sync::atomic::Ordering::Relaxed); }
     accepted
+}
+
+pub fn restore_mouse_baseline(st: &mut wm::GuiState, buttons: u8, mx: i32, my: i32) {
+    if st.excl.mouse_baseline {
+        st.excl.held_buttons = buttons;
+        st.prev_buttons = 0;
+        st.click_button = 0;
+        st.delivered_button = 0;
+        st.excl.mouse_baseline = false;
+        crate::cursor::move_to(st, mx, my);
+    }
 }
 
 pub fn deliver_window_key(st: &mut wm::GuiState, slot: usize, window: u32, scan: u8,
