@@ -14,7 +14,7 @@ import tempfile
 import time
 
 from tests.support.tracked import paths
-from tests.support.registry import load
+from tests.support.registry import config_component, load
 from tests.support.impact import comparison
 from tools.ownership import Inventory, OwnershipError
 
@@ -77,15 +77,23 @@ class MissingPrerequisites(OSError):
     pass
 
 
+def clear_row_evidence(output, name, config):
+    destination = output
+    for component in ("evidence", name, config):
+        if not config_component(component):
+            raise ValueError(f"invalid evidence component {component!r}")
+        destination = destination / component
+        if destination.is_symlink():
+            raise ValueError(f"invalid evidence directory {destination}")
+    if destination.exists():
+        shutil.rmtree(destination)
+    return destination
+
+
 def clear_selected_evidence(plan, args):
     """Drop evidence of the selected rows before anything can stop the run (no stale proof)."""
-    root = (args.output / "evidence").resolve()
     for row, _cpu, config in plan:
-        destination = (args.output / "evidence" / row["id"] / config).resolve()
-        if not destination.is_relative_to(root):
-            raise ValueError(f"invalid evidence directory {destination}")
-        if destination.exists():
-            shutil.rmtree(destination)
+        clear_row_evidence(args.output, row["id"], config)
 
 
 def check_prerequisites(plan, args, identity):
@@ -302,7 +310,7 @@ def run_bundle(candidate, plan, args, env, identity):
     for row, cpu, config in plan:
         began = time.monotonic()
         name = row["id"]
-        if Path(config).name != config or config in (".", ".."):
+        if not config_component(config):
             raise ValueError(f"invalid configuration directory {config!r}")
         logfile = f"{name}-{config}.log"
         outcomes = {}
@@ -313,11 +321,7 @@ def run_bundle(candidate, plan, args, env, identity):
             else:
                 mutations = [m for m in row["mutations"] if args.mutate and m["config"] == config]
                 try:
-                    destination = args.output / "evidence" / name / config
-                    if destination.resolve() != args.output.resolve() / "evidence" / name / config:
-                        raise ValueError(f"invalid evidence directory {destination}")
-                    if destination.exists():
-                        shutil.rmtree(destination)
+                    destination = clear_row_evidence(args.output, name, config)
                     status, reason = execute(candidate, row, cpu, config, mutations, env, log, outcomes, destination)
                 except (OSError, ValueError) as exc:
                     status, reason = "ERROR", str(exc)
@@ -485,6 +489,7 @@ def main():
     parser.add_argument("--full", action="store_true", default=os.getenv("GITHUB_EVENT_NAME") in ("schedule", "workflow_dispatch"))
     parser.add_argument("--plan-file", type=Path)
     args = parser.parse_args()
+    args.output = args.output.resolve()
     rows = load(ROOT)
     plan = list(selection(rows, args))
     if not plan:

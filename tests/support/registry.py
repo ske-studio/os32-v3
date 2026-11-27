@@ -25,6 +25,10 @@ def strings(values, empty=False):
     return isinstance(values, list) and (empty or values) and all(map(string, values)) and len(set(values)) == len(values)
 
 
+def config_component(name):
+    return string(name) and name not in (".", "..") and "/" not in name and "\\" not in name and "\0" not in name
+
+
 def relative(name):
     return string(name) and not Path(name).is_absolute() and ".." not in Path(name).parts and name == str(Path(name))
 
@@ -60,7 +64,7 @@ def validate(checks, root):
         demand(isinstance(arch, dict) and arch and arch.keys() <= {"x86", "ppc", "host"}, "invalid arch")
         configs = set()
         for values in arch.values():
-            demand(strings(values) and configs.isdisjoint(values), "invalid configs")
+            demand(strings(values) and all(map(config_component, values)) and configs.isdisjoint(values), "invalid configs")
             configs.update(values)
         if "deferred" in row:
             deferral = row["deferred"]

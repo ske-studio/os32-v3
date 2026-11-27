@@ -10,7 +10,7 @@ from types import SimpleNamespace
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from unittest.mock import patch
 
-from tests.infra.ci import check_prerequisites, collect, job_errors, run_bundle
+from tests.infra.ci import clear_selected_evidence, check_prerequisites, collect, job_errors, run_bundle
 from tests.support.media import Failure, main
 
 
@@ -135,7 +135,28 @@ def verify_selection():
 
 
 
+def verify_link(component):
+    with tempfile.TemporaryDirectory() as tmp:
+        output = Path(tmp).resolve()
+        directory = output / "evidence" / "first" / "local"
+        directory.mkdir(parents=True)
+        marker = directory / "serial.log"
+        marker.write_text("existing")
+        linked = output / component
+        with patch.object(Path, "is_symlink", lambda path: path == linked), patch("shutil.rmtree") as remove:
+            try:
+                clear_selected_evidence([({"id": "first"}, "host", "local")], SimpleNamespace(output=output))
+            except ValueError:
+                pass
+            else:
+                raise Failure(f"accepted linked component {component}")
+            remove.assert_not_called()
+        check(marker.read_text() == "existing", "existing evidence changed")
+
+
 def verify(config):
+    for component in ("evidence", "evidence/first", "evidence/first/local"):
+        verify_link(component)
     verify_selection()
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
