@@ -37,6 +37,8 @@ int gf_v2_gart_start(struct gf_v2 *g, u32 dl)
     struct gf2_fence fence;
     int rc, restarted;
     if (live(g)) return 0;
+    /* RAMHT publication succeeded but FIFO resume failed. F2 stop owns it. */
+    if (!g->gart.epoch && obj->handle) return OS32_ERR_IO;
     if (ch->state != GF2_RUN) return GF3_ESTATE;
     /* The previous epoch's instance was already freed by F2 stop. */
     *obj = (struct gf2_object){0};
@@ -118,8 +120,13 @@ int gf_v2_gart_unbind(struct gf_v2 *g, u32 gpu_off, u32 n)
     for (u32 i = 0; i < t->count; i++) {
         const struct gf_v2_gart_bind *b = &t->bind[i];
         if (b->first != (gpu_off >> GART_PAGE_SHIFT) || b->n != n) continue;
+        if (!t->epoch && t->obj.handle && g->ch->state != GF2_OFF) return OS32_ERR_IO;
+        /* A fault in the current epoch does not confirm that DMA has stopped. */
+        if (t->epoch && t->epoch == g->ch->epoch && g->ch->state != GF2_OFF &&
+            g->ch->state != GF2_RUN) return OS32_ERR_IO;
         if (live(g))
-            for (u32 j = 0; j < n; j++) (void)pte_write(g, b->first + j, 0);
+            for (u32 j = 0; j < n; j++)
+                if (pte_write(g, b->first + j, 0)) return OS32_ERR_IO;
         for (u32 j = i + 1; j < t->count; j++) t->bind[j - 1] = t->bind[j];
         t->bind[--t->count] = (struct gf_v2_gart_bind){0};
         return 0;

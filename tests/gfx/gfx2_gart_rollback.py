@@ -1,0 +1,11 @@
+"""Verify bind failure releases all pages and pins."""
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from tests.support.gfx2_host import host_check
+
+
+if __name__ == "__main__":
+    host_check("gfx2_gart", ["sys/hal/gfx/v2/gart.c"],
+               {2: "bind failure releases all pages and pins"}, gc_sections=True)

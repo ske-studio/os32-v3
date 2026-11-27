@@ -43,6 +43,7 @@ struct gfx2_surf *gfx2_surf_get(u32 sid, u32 owner, int *rc)
     struct gfx2_caller c;
     *rc = OS32_ERR_STALE;
     if (!sid || s->state == GFX2_ST_FREE || s->sid != sid) return NULL;
+    if ((s->flags & GFX2_SF_ALIAS) && !s->role) return NULL;
     *rc = OS32_ERR_INVAL;
     if (s->owner == GFX2_OWNER_SCREEN) {
         if (gfx2_caller_get(&c) || c.owner != owner || c.app_id != gfx_screen_owner()) return NULL;

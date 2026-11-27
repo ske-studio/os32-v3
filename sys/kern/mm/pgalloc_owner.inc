@@ -260,7 +260,7 @@ static int transfer_owner(u32 pfn, int n, u32 from, u32 to, int pinned)
     flags = irq_save();
     ledger_note(LEDGER_OP_TRANSFER, from, LEDGER_CALLER());
     ok = 0;
-    if (!owner_ok(from) || !(pinned ? owner_ok(to) : owner_ram(to)) || !pfn_span_ok(pfn, n)) goto done;
+    if (!owner_ok(from) || !owner_ram(to) || !pfn_span_ok(pfn, n)) goto done;
     for (i = 0; i < (u32)n; i++)
         if (!page_owned(pfn + i, from)) goto done;
         else if (!pinned && pin_map[pfn + i]) { ledger_bad_free++; goto done; }

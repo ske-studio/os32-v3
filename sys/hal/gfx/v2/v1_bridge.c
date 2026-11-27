@@ -35,7 +35,7 @@ static int v1_alias_desc(u32 role, struct gfx2_alias_desc *d)
     return 0;
 }
 
-void v1_bridge_rebind(void)
+int v1_bridge_rebind(void)
 {
     for (u32 role = GFX2_ROLE_DISPLAY; role <= GFX2_ROLE_CLIENT; role++) {
         struct gfx2_alias_desc d;
@@ -48,11 +48,21 @@ void v1_bridge_rebind(void)
             }
             continue;
         }
+        if (s->scan_ref && gfx2_adapters[s->adapter].state == GFX2_AD_LOST_HELD) {
+            if (!has || s->adapter == d.adapter || role != GFX2_ROLE_DISPLAY) continue;
+            /* Allocate before revoking: a failed switch preserves the old alias. */
+            int rc = gfx2_surf_alias(gfx2_active(), &d, &alias[role]);
+            if (rc) return rc == OS32_ERR_FULL ? OS32_ERR_NOSPC : rc;
+            (void)gfx2_lock_revoke(s);
+            s->role = 0; /* The old head still owns this slot. */
+            continue;
+        }
         int rc = gfx2_surf_quiesce(s, GFX2_REBIND_DL);
         if (rc == OS32_ERR_TIMEOUT) continue;
         (void)gfx2_lock_revoke(s);
         (void)gfx2_surf_alias_update(s, has ? &d : NULL);
     }
+    return 0;
 }
 
 int v1_bridge_begin(u32 role, u32 access)

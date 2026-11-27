@@ -233,9 +233,10 @@ __attribute__((weak)) int gfx2_adapter_register(GfxBackend *v1, u32 kind, u32 fl
     (void)flags;
     return OS32_ERR_NOSYS;
 }
-__attribute__((weak)) void gfx2_adapter_activate(struct gfx2_adapter * a0)
+__attribute__((weak)) int gfx2_adapter_activate(struct gfx2_adapter * a0)
 {
     (void)a0;
+    return OS32_ERR_NOSYS;
 }
 __attribute__((weak)) struct gfx2_adapter * gfx2_active(void)
 {
@@ -569,8 +570,9 @@ __attribute__((weak)) void v1_bridge_end(u32 role, u32 access, u32 fence)
     (void)access;
     (void)fence;
 }
-__attribute__((weak)) void v1_bridge_rebind(void)
+__attribute__((weak)) int v1_bridge_rebind(void)
 {
+    return 0;
 }
 __attribute__((weak)) void gfx2_scan_ref_get(struct gfx2_surf * a0)
 {

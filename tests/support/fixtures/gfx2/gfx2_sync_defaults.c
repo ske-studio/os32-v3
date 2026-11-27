@@ -1,8 +1,12 @@
 #include "sys/hal/gfx/sync/sync_int.h"
 #include "vfs.h"
 
+#ifndef GFX2_SYNC_PROFILE
+#define GFX2_SYNC_PROFILE "assets/gfx/sync.cfg"
+#endif
+
 __asm__(".pushsection .rodata\n"
-        "profile: .incbin \"assets/gfx/sync.cfg\"\n.byte 0\n.popsection");
+        "profile: .incbin \"" GFX2_SYNC_PROFILE "\"\n.byte 0\n.popsection");
 extern const char profile[];
 static const char *input = profile, *cursor;
 

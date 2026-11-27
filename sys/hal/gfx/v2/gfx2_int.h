@@ -87,7 +87,7 @@ extern const GfxBackendV2 gfx2_v1_shim, gfx2_lost_be;
 struct gfx2_adapter *gfx2_adapter_get(u32 a);
 int gfx2_adapter_register(GfxBackend *v1, u32 kind, u32 flags);
 void gfx2_detach_stopped_heads(struct gfx2_adapter *);
-void gfx2_adapter_activate(struct gfx2_adapter *);
+int gfx2_adapter_activate(struct gfx2_adapter *);
 struct gfx2_adapter *gfx2_active(void);
 void gfx2_adapter_unregister(GfxBackend *v1);
 int gfx2_caller_get(struct gfx2_caller *);
@@ -147,7 +147,7 @@ int gfx2_surf_quarantine(struct gfx2_surf *);
 void gfx2_quarantine_drain(struct gfx2_adapter *);
 int v1_bridge_begin(u32 role, u32 access);
 void v1_bridge_end(u32 role, u32 access, u32 fence);
-void v1_bridge_rebind(void);
+int v1_bridge_rebind(void);
 void gfx2_scan_ref_get(struct gfx2_surf *);
 void gfx2_scan_ref_put(struct gfx2_surf *);
 

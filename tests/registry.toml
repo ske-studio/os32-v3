@@ -1131,9 +1131,1010 @@ limits = "表示装置の停止結果を模型で与える。別名の sid・bac
 gates = ["push", "main"]
 mutations = [
   { id = "gfx2_register_duplicate", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "a = adapter_by_v1(v1);", new = "a = NULL;", fail = "FAIL repeated registration" },
-  { id = "gfx2_register_active", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "o->flags &= ~GFX2_AF_ACTIVE;", new = "(void)o;", fail = "FAIL active fallback" },
-  { id = "gfx2_stop_failure_forgotten", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_ops.c", old = "gf_v2_inst.lost = GF_V2_STOP_UNCONFIRMED;", new = "gf_v2_inst.lost = 1;", fail = "FAIL unconfirmed stop" },
-  { id = "gfx2_detach_after_stop_failure", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "if (rc) {\n        gfx2_adapter_lost(a, 1);", new = "if (0) {\n        gfx2_adapter_lost(a, 1);", fail = "FAIL unconfirmed stop" },
+  { id = "gfx2_register_active", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "old->flags &= ~GFX2_AF_ACTIVE;", new = "(void)old;", fail = "FAIL active fallback" },
+  { id = "gfx2_stop_failure_forgotten", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_ops.c", old = "gf_v2_inst.lost = GF_V2_STOP_UNCONFIRMED;", new = "gf_v2_inst.lost = 1;", fail = "FAIL full alias table" },
+  { id = "gfx2_detach_after_stop_failure", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "if (rc) {\n        gfx2_adapter_lost(a, 1);", new = "if (0) {\n        gfx2_adapter_lost(a, 1);", fail = "FAIL full alias table" },
+  { id = "gfx2_alias_full_rc", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/v1_bridge.c", old = "rc == OS32_ERR_FULL ? OS32_ERR_NOSPC : rc", new = "rc", fail = "FAIL full alias table" },
   { id = "gfx2_rebind_held_scan", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/surface.c", old = "if (s->scan_ref && gfx2_adapters[s->adapter].state == GFX2_AD_LOST_HELD)", new = "if (0)", fail = "FAIL held alias" },
   { id = "gfx2_poll_held_scan", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/display.c", old = "if (a->state == GFX2_AD_LOST_HELD) return;", new = "(void)0;", fail = "FAIL unconfirmed stop" },
+]
+
+[[check]]
+id = "gfx2_gart_rollback"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/gart.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_gart.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "bind failure releases all pages and pins"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gart_rollback_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/gart.c", old = "pgalloc_unpin(gart_pfns[first + pinned], 1, owner);", new = "(void)owner;", fail = "FAIL bind failure releases all pages and pins" },
+]
+
+[[check]]
+id = "gfx2_gart_keep"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/gart.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_gart.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "unbind failure retains ownership and pins"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gart_keep_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/gart.c", old = "if (a->be->gart_unbind(a->ctx, s->gpu_off, s->gart_n)) return OS32_ERR_IO;", new = "(void)a->be->gart_unbind(a->ctx, s->gpu_off, s->gart_n);", fail = "FAIL unbind failure retains ownership and pins" },
+]
+
+[[check]]
+id = "gfx2_quiesce"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/modeset.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_modeset.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "quiesce timeout leaves head unchanged"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_quiesce_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/modeset.c", old = "if (rc) return rc;\n    if (a->state == GFX2_AD_LOST_HELD", new = "(void)rc;\n    if (a->state == GFX2_AD_LOST_HELD", fail = "FAIL quiesce timeout leaves head unchanged" },
+]
+
+[[check]]
+id = "gfx2_modeset_failure"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/modeset.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_modeset.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "mode failure leaves head unchanged"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_modeset_failure_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/modeset.c", old = "if (rc) return rc;\n    if (a->state != GFX2_AD_OK", new = "(void)rc;\n    if (a->state != GFX2_AD_OK", fail = "FAIL mode failure leaves head unchanged" },
+]
+
+[[check]]
+id = "gfx2_gf_page_table"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/gf_v2_gart.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_gf_page_table.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "failed PTE clear retains binding"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gf_page_table_fault", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_gart.c", old = "g->ch->state != GF2_RUN) return OS32_ERR_IO;", new = "0) return OS32_ERR_IO;", fail = "FAIL faulted channel retains binding" },
+  { id = "gfx2_gf_page_table_resume", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_gart.c", old = "if (!t->epoch && t->obj.handle", new = "if (0 && !t->epoch && t->obj.handle", fail = "FAIL published table retained after resume failure" },
+  { id = "gfx2_gf_page_table_restart", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_gart.c", old = "if (!g->gart.epoch && obj->handle)", new = "if (0 && !g->gart.epoch && obj->handle)", fail = "FAIL published table retained after resume failure" },
+  { id = "gfx2_gf_page_table_clear", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_gart.c", old = "(void)pte_write(g, chosen + k, 0);", new = "(void)k;", fail = "FAIL failed bind clears installed PTEs" },
+  { id = "gfx2_gf_page_table_best", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_gart.c", old = "gap >= n && gap < best", new = "gap >= n && best == GF_V2_GART_PAGES + 1u", fail = "FAIL best fit reuses smaller hole" },
+  { id = "gfx2_gf_page_table_replay", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_gart.c", old = "j < b->n; j++", new = "j < 0; j++", fail = "FAIL new epoch replays all retained bindings" },
+  { id = "gfx2_gf_page_table_epoch", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_gart.c", old = "g->gart.epoch == g->ch->epoch &&", new = "true &&", fail = "FAIL stale epoch rejects mapped range" },
+  { id = "gfx2_gf_page_table_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_gart.c", old = "if (pte_write(g, b->first + j, 0)) return OS32_ERR_IO;", new = "(void)pte_write(g, b->first + j, 0);", fail = "FAIL failed PTE clear retains binding" },
+]
+
+[[check]]
+id = "gfx2_alloc_rollback"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/surface.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_surface.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "failed allocation restores backing"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_alloc_rollback_overflow", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/surface.c", old = " || pitch > ~0UL / h", new = " || 0", fail = "FAIL failed allocation restores backing" },
+  { id = "gfx2_alloc_rollback_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/surface.c", old = "if (surf_backing_free(a, s)) goto keep; /* creation rollback */", new = "(void)a;", fail = "FAIL failed allocation restores backing" },
+]
+
+[[check]]
+id = "gfx2_alias_owner"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/surface.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_surface.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "borrowed alias requires screen ownership"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_alias_owner_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/surface.c", old = "c.owner != owner || c.app_id != gfx_screen_owner()", new = "c.owner != owner", fail = "FAIL borrowed alias requires screen ownership" },
+]
+
+[[check]]
+id = "gfx2_alias_update"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/surface.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_surface.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "rebind updates scanned alias generation"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_alias_update_generation", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/surface.c", old = "surf_generation(s, s->gen + 1);\n    for", new = "surf_generation(s, s->gen);\n    for", fail = "FAIL rebind updates scanned alias generation" },
+  { id = "gfx2_alias_update_release", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/surface.c", old = "if (s->flags & GFX2_SF_ALIAS) return OS32_ERR_INVAL; /* borrowed backing */", new = "if (0) return OS32_ERR_INVAL; /* borrowed backing */", fail = "FAIL rebind updates scanned alias generation" },
+  { id = "gfx2_alias_update_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/surface.c", old = "gfx2_adapters[i].head[h].scan_sid = s->sid;", new = "gfx2_adapters[i].head[h].scan_sid = old_sid;", fail = "FAIL rebind updates scanned alias generation" },
+]
+
+[[check]]
+id = "gfx2_surface_state"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/surface.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_surface.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "locked surface transition matrix"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_surface_state_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/surface.c", old = "old >= GFX2_ST_IDLE && old <= GFX2_ST_CLOSING && st == GFX2_ST_LOST", new = "old == GFX2_ST_IDLE && st == GFX2_ST_LOST", fail = "FAIL locked surface transition matrix" },
+]
+
+[[check]]
+id = "gfx2_detach_failure"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/owner_release.c", "tests/support/fixtures/gfx2/gfx2_owner_release.c", "sys/hal/gfx/v2/surface.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_surface.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "failed unmap retains the mapping"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_detach_failure_detach", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/owner_release.c", old = "            gfx2_map_detach(s);", new = "            (void)s;", fail = "FAIL teardown detaches a failed mapping" },
+  { id = "gfx2_detach_failure_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/surface.c", old = "/* C7 leaves map_* unchanged on IO;", new = "s->map_as = NULL; /* C7 leaves map_* unchanged on IO;", fail = "FAIL failed unmap retains the mapping" },
+]
+
+[[check]]
+id = "gfx2_fence_wrap"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/fence.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_fence.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "wrapped fence zero is skipped"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_fence_wrap_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/fence.c", old = "if (!f) f = 1;", new = "if (!f) f = 0;", fail = "FAIL wrapped fence zero is skipped" },
+]
+
+[[check]]
+id = "gfx2_fence_failure"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/fence.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_fence.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "pending failed writes become lost"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_fence_failure_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/fence.c", old = "reached(a->fence.failed_upto, s->last_write))", new = "1)", fail = "FAIL pending failed writes become lost" },
+]
+
+[[check]]
+id = "gfx2_fence_order"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/fence.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_fence.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "issued fence advances after emission"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_fence_order_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/fence.c", old = "int rc = a->be->fence_emit(a->ctx, f, GFX2_EMIT_DL);", new = "int rc = (a->fence.issued = f, a->be->fence_emit(a->ctx, f, GFX2_EMIT_DL));", fail = "FAIL issued fence advances after emission" },
+]
+
+[[check]]
+id = "gfx2_discard"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/lock.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_lock.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "discard still waits for concurrent device access"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_discard_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/lock.c", old = "rc = gfx2_cpu_begin(s, access, GFX2_LOCK_DL_US);", new = "rc = flags & GFX2_LOCK_DISCARD ? 0 : gfx2_cpu_begin(s, access, GFX2_LOCK_DL_US);", fail = "FAIL discard still waits for concurrent device access" },
+]
+
+[[check]]
+id = "gfx2_map_rollback"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/lock.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_lock.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "mapping failure removes installed PTEs"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_map_rollback_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/lock.c", old = "if (mapped && paging_lease_unmap(as, base, mapped))", new = "if (0)", fail = "FAIL mapping failure removes installed PTEs" },
+]
+
+[[check]]
+id = "gfx2_staging_failure"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/lock.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_lock.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "failed staging unmap retains its pages"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_staging_failure_zero", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/lock.c", old = "kmemset(s->staging, 0, n * PAGE_SIZE);", new = "(void)s->staging;", fail = "FAIL discard clears reused pages" },
+  { id = "gfx2_staging_failure_drop", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/lock.c", old = "    gfx2_staging_drop(s);", new = "    (void)s;", fail = "FAIL unlock returns staging pages" },
+  { id = "gfx2_staging_failure_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/lock.c", old = "if (s->staging && !(s->flags & GFX2_SF_KEEP))", new = "if (s->staging)", fail = "FAIL failed staging unmap retains its pages" },
+]
+
+[[check]]
+id = "gfx2_owner_release"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["lib/divdi3.c", "sys/hal/gfx/v2/backend_reg.c", "sys/hal/gfx/v2/check_op.c", "sys/hal/gfx/v2/display.c", "sys/hal/gfx/v2/fence.c", "sys/hal/gfx/v2/format.c", "sys/hal/gfx/v2/gart.c", "sys/hal/gfx/v2/lock.c", "sys/hal/gfx/v2/submit.c", "sys/hal/gfx/v2/surface.c", "sys/hal/gfx/v2/sw_alpha.c", "sys/hal/gfx/v2/sw_ckey.c", "sys/hal/gfx/v2/sw_copy.c", "sys/hal/gfx/v2/sw_fill.c", "sys/hal/gfx/v2/sw_hostdata.c", "sys/hal/gfx/v2/sw_line.c", "sys/hal/gfx/v2/sw_mono.c", "sys/hal/gfx/v2/sw_readback.c", "sys/hal/gfx/v2/sw_rop.c", "sys/hal/gfx/v2/sw_rop4.c", "sys/hal/gfx/v2/sw_stretch.c", "sys/hal/gfx/v2/sw_table.c", "sys/hal/gfx/v2/sysmem.c", "sys/hal/gfx/v2/v1_shim.c", "sys/hal/gfx/v2/vram_heap.c", "sys/kern/exec/appslot.h", "sys/kern/exec/exec_finish.inc", "tests/support/fixtures/gfx2/gfx2_backing.c", "tests/support/fixtures/gfx2/gfx2_exec_teardown.inc", "sys/hal/gfx/v2/owner_release.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_owner_release.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "teardown quarantines a busy backing"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_owner_release_exit", config = "pc98", when = "after_build", replace = "sys/kern/exec/exec_finish.inc", old = "if (exec_gfx_owner_release(a->as))", new = "if (0)", fail = "FAIL exit releases locked pages" },
+  { id = "gfx2_owner_release_poison", config = "pc98", when = "after_build", replace = "sys/kern/exec/exec_finish.inc", old = "if (exec_gfx_owner_release(a->as))", new = "if (exec_gfx_owner_release(a->as) && 0)", fail = "FAIL failed unmap poisons address space" },
+  { id = "gfx2_owner_release_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/owner_release.c", old = "if (gfx2_surf_quarantine(s)) poison = 1;", new = "if (gfx2_surf_destroy(s)) poison = 1;", fail = "FAIL teardown quarantines a busy backing" },
+]
+
+[[check]]
+id = "gfx2_staging_release"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/owner_release.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_owner_release.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "address space teardown drops alias staging"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_staging_release_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/owner_release.c", old = "        gfx2_staging_drop(s);", new = "        (void)s;", fail = "FAIL address space teardown drops alias staging" },
+]
+
+[[check]]
+id = "gfx2_caps_size"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/caps.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_caps.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "returned capabilities respect buffer size"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_caps_size_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/caps.c", old = "size < sizeof(c) ? size : sizeof(c)", new = "sizeof(c)", fail = "FAIL returned capabilities respect buffer size" },
+]
+
+[[check]]
+id = "gfx2_batch_snapshot"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/submit.c", "sys/hal/gfx/v2/check_op.c", "sys/hal/gfx/v2/sw_table.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_submit.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "execution uses the captured operation"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_batch_snapshot_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/submit.c", old = "rc = run_one(a, &execs[i]);", new = "struct gfx2_exec altered = execs[i]; altered.op = &ops[i]; rc = run_one(a, &altered);", fail = "FAIL execution uses the captured operation" },
+]
+
+[[check]]
+id = "gfx2_submit_scan"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/submit.c", "sys/hal/gfx/v2/check_op.c", "sys/hal/gfx/v2/sw_table.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_submit.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "invalid preflight prevents every operation"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_submit_scan_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/submit.c", old = "if (rc) goto out;\n    }\n    kmemset(&pattern", new = "if (rc) break;\n    }\n    kmemset(&pattern", fail = "FAIL invalid preflight prevents every operation" },
+]
+
+[[check]]
+id = "gfx2_pattern"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/submit.c", "sys/hal/gfx/v2/check_op.c", "sys/hal/gfx/v2/sw_table.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_submit.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "pattern use requires initialization"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_pattern_depth", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/submit.c", old = "pat.color[i] &= mask;", new = "pat.color[i] &= 255;", fail = "FAIL pattern preserves destination depth" },
+  { id = "gfx2_pattern_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/submit.c", old = "if ((o->flags & GFX2_F_PAT) && !pattern.kind)", new = "if ((o->flags & GFX2_F_PAT) && 0)", fail = "FAIL pattern use requires initialization" },
+]
+
+[[check]]
+id = "gfx2_unsupported"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/submit.c", "sys/hal/gfx/v2/check_op.c", "sys/hal/gfx/v2/sw_table.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_submit.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "unsupported operation is rejected"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_unsupported_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/submit.c", old = "return e->how == GFX2_HOW_NOSUPPORT ? OS32_ERR_NOSYS : 0;", new = "e->how = GFX2_HOW_SW; return 0;", fail = "FAIL unsupported operation is rejected" },
+]
+
+[[check]]
+id = "gfx2_shim"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/display.c", "lib/divdi3.c", "sys/hal/gfx/v2/backend_reg.c", "sys/hal/gfx/v2/check_op.c", "sys/hal/gfx/v2/fence.c", "sys/hal/gfx/v2/format.c", "sys/hal/gfx/v2/gart.c", "sys/hal/gfx/v2/lock.c", "sys/hal/gfx/v2/submit.c", "sys/hal/gfx/v2/surface.c", "sys/hal/gfx/v2/sw_alpha.c", "sys/hal/gfx/v2/sw_ckey.c", "sys/hal/gfx/v2/sw_copy.c", "sys/hal/gfx/v2/sw_fill.c", "sys/hal/gfx/v2/sw_hostdata.c", "sys/hal/gfx/v2/sw_line.c", "sys/hal/gfx/v2/sw_mono.c", "sys/hal/gfx/v2/sw_readback.c", "sys/hal/gfx/v2/sw_rop.c", "sys/hal/gfx/v2/sw_rop4.c", "sys/hal/gfx/v2/sw_stretch.c", "sys/hal/gfx/v2/sw_table.c", "sys/hal/gfx/v2/sysmem.c", "sys/hal/gfx/v2/vram_heap.c", "tests/support/fixtures/gfx2/gfx2_backing.c", "sys/hal/gfx/v2/v1_shim.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_v1_shim.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "shim reports an empty device heap"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_shim_register", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "be = v1->v2 ? v1->v2 : &gfx2_v1_shim;", new = "be = v1->v2 ? v1->v2 : &gfx2_lost_be;", fail = "FAIL v1 registration selects shim" },
+  { id = "gfx2_shim_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/v1_shim.c", old = "*base = *size = *phys = 0;", new = "*base = *size = *phys = 1;", fail = "FAIL shim reports an empty device heap" },
+]
+
+[[check]]
+id = "gfx2_gf_connector"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/gf_v2_enum.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gf_v2_enum.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "paired DVI outputs report DVI-I"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gf_connector_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_enum.c", old = "pair = paired(c, r);", new = "pair = 0;", fail = "FAIL paired DVI outputs report DVI-I" },
+]
+
+[[check]]
+id = "gfx2_gf_modes"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/gf_v2_enum.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gf_v2_enum.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "mode enumeration respects the route head mask"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gf_modes_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_enum.c", old = " && (c->routes[j].head_mask & (1u << head))", new = " && 1", fail = "FAIL mode enumeration respects the route head mask" },
+]
+
+[[check]]
+id = "gfx2_format"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/format.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_format.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "five bit colors expand with replicated bits"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_format_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/format.c", old = "(v << 3) | (v >> 2)", new = "(v << 3)", fail = "FAIL five bit colors expand with replicated bits" },
+]
+
+[[check]]
+id = "gfx2_user_color"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["userland/lib/gfx/v2/color.c", "sys/hal/gfx/v2/format.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_user.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "palette ties choose the lower index"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_user_color_distance", config = "pc98", when = "after_build", replace = "userland/lib/gfx/v2/color.c", old = "dr * dr + dg * dg + db * db", new = "__builtin_abs(dr) + __builtin_abs(dg) + __builtin_abs(db)", fail = "FAIL palette uses squared RGB distance" },
+  { id = "gfx2_user_color_skip", config = "pc98", when = "after_build", replace = "userland/lib/gfx/v2/color.c", old = "distance < best_distance", new = "distance <= best_distance", fail = "FAIL palette ties choose the lower index" },
+]
+
+[[check]]
+id = "gfx2_sysmem"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/sysmem.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_sysmem.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "allocated page tail is initialized"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sysmem_free", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/sysmem.c", old = "if (!pgalloc_free_n_owner(s->owner, s->sys_pfn, (int)s->sys_n))", new = "if (0)", fail = "FAIL failed page release preserves backing" },
+  { id = "gfx2_sysmem_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/sysmem.c", old = "kmemset(s->kva, 0, n * PAGE_SIZE);", new = "kmemset(s->kva, 0, s->bytes);", fail = "FAIL allocated page tail is initialized" },
+]
+
+[[check]]
+id = "gfx2_audit"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/map_audit.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_map_audit.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "unexpected mapped page fails audit"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_audit_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/map_audit.c", old = "return have == want ? 0 : -1;", new = "return have >= want ? 0 : -1;", fail = "FAIL unexpected mapped page fails audit" },
+]
+
+[[check]]
+id = "gfx2_gf_ring"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/gf_v2_fence.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gf_v2_fence.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "full fence ring waits before reuse"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gf_ring_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_fence.c", old = "if (r->count == GF_V2_RING) {", new = "if (r->count > GF_V2_RING) {", fail = "FAIL full fence ring waits before reuse" },
+]
+
+[[check]]
+id = "gfx2_gf_rop3"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/accel_rop3.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gf_v2_rop3.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "color pattern selects color pattern commands"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gf_rop3_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/accel_rop3.c", old = "value = kind == GF3_PAT_COLOR ? 2 : 1;", new = "value = 1;", fail = "FAIL color pattern selects color pattern commands" },
+]
+
+[[check]]
+id = "gfx2_gf_home"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/gf_v2_display.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gf_v2_display.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "restoration uses the saved mode and scanout"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gf_home_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_display.c", old = "g->home.mode_id, &g->home.front", new = "m->id, &g->home.front", fail = "FAIL restoration uses the saved mode and scanout" },
+]
+
+[[check]]
+id = "gfx2_gf_palette"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/gf_v2_display.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gf_v2_display.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "indexed mode reloads saved palette"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gf_palette_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_display.c", old = "front.fmt == GF3_INDEX8 && g->pal_set", new = "front.fmt == GF3_INDEX8 && 0", fail = "FAIL indexed mode reloads saved palette" },
+]
+
+[[check]]
+id = "gfx2_module_abi"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/backend_reg.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_backend_reg.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "backend ABI mismatch is rejected"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_module_abi_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "if (be->abi != GFX_HAL2_ABI)", new = "if (0)", fail = "FAIL backend ABI mismatch is rejected" },
+]
+
+[[check]]
+id = "gfx2_module_text"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/backend_reg.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_backend_reg.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "module callbacks must belong to its text"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_module_text_null", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "if (!be->hook) return OS32_ERR_INVAL;", new = "if (0 && !be->hook) return OS32_ERR_INVAL;", fail = "FAIL built-in table requires every callback" },
+  { id = "gfx2_module_text_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "if (mod && !module_text_contains", new = "if (0 && mod && !module_text_contains", fail = "FAIL module callbacks must belong to its text" },
+]
+
+[[check]]
+id = "gfx2_quarantine_owner"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/backend_reg.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_backend_reg.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "failed quarantine owner creation can be retried"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_quarantine_owner_initial", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "quar_warned = 1;", new = "quar_warned = 1; return OS32_ERR_NOSPC;", fail = "FAIL failed quarantine owner creation can be retried" },
+  { id = "gfx2_quarantine_owner_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "if (!gfx2_quar_owner &&", new = "if (!quar_warned && !gfx2_quar_owner &&", fail = "FAIL failed quarantine owner creation can be retried" },
+]
+
+[[check]]
+id = "gfx2_sync_publish"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["lib/divdi3.c", "sys/hal/gfx/v2/check_op.c", "sys/hal/gfx/v2/display.c", "sys/hal/gfx/v2/fence.c", "sys/hal/gfx/v2/format.c", "sys/hal/gfx/v2/gart.c", "sys/hal/gfx/v2/lock.c", "sys/hal/gfx/v2/submit.c", "sys/hal/gfx/v2/surface.c", "sys/hal/gfx/v2/sw_alpha.c", "sys/hal/gfx/v2/sw_ckey.c", "sys/hal/gfx/v2/sw_copy.c", "sys/hal/gfx/v2/sw_fill.c", "sys/hal/gfx/v2/sw_hostdata.c", "sys/hal/gfx/v2/sw_line.c", "sys/hal/gfx/v2/sw_mono.c", "sys/hal/gfx/v2/sw_readback.c", "sys/hal/gfx/v2/sw_rop.c", "sys/hal/gfx/v2/sw_rop4.c", "sys/hal/gfx/v2/sw_stretch.c", "sys/hal/gfx/v2/sw_table.c", "sys/hal/gfx/v2/sysmem.c", "sys/hal/gfx/v2/v1_shim.c", "sys/hal/gfx/v2/vram_heap.c", "tests/support/fixtures/gfx2/gfx2_backing.c", "sys/hal/gfx/v2/backend_reg.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_backend_reg.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "published context reflects the effective sync mode"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sync_publish_shadow", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/check_op.c", old = "a->state == GFX2_AD_OK && shadow(a, ex->dst)", new = "0 && shadow(a, ex->dst)", fail = "FAIL published shadow reaches submission and present" },
+  { id = "gfx2_sync_publish_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "*mode = (u32)gfxsync_mode(*ctx);", new = "*mode = GFXSYNC_DIRECT;", fail = "FAIL published context reflects the effective sync mode" },
+]
+
+[[check]]
+id = "gfx2_gf_start"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/gf_v2_life.c", "sys/dev/video/geforce/gf_v2_fence.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gf_v2_life.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "new channel epoch resets stale fence state"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gf_start_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_life.c", old = "if (g->epoch != c->ch->epoch) gf_v2_fence_reset(g);", new = "(void)g->epoch;", fail = "FAIL new channel epoch resets stale fence state" },
+]
+
+[[check]]
+id = "gfx2_gf_stop"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/gf_v2_life.c", "sys/dev/video/geforce/gf_v2_fence.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gf_v2_life.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "successful idle fence completes stop"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gf_stop_idle", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_life.c", old = "if (!rc) rc = gf_v2_fence_idle(g, dl);", new = "if (!rc) rc = 0;", fail = "FAIL stop drains pending fence ring" },
+  { id = "gfx2_gf_stop_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_life.c", old = "if (!rc) return 0;", new = "if (!rc) rc = GF2_ETIME;", fail = "FAIL successful idle fence completes stop" },
+]
+
+[[check]]
+id = "gfx2_rebind"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/v1_bridge.c", "sys/hal/gfx/v2/surface.c", "sys/hal/gfx/v2/lock.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_v1_bridge.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "rebind revokes the borrowed locked surface"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_rebind_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/v1_bridge.c", old = "(void)gfx2_lock_revoke(s);\n        (void)gfx2_surf_alias_update", new = "(void)gfx2_surf_alias_update", fail = "FAIL rebind revokes the borrowed locked surface" },
+]
+
+[[check]]
+id = "gfx2_abi"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sdk/include/os32/os32_gfx2.h", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_abi.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "reserved HeadInfo array has six words"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_abi_skip", config = "pc98", when = "after_build", replace = "sdk/include/os32/os32_gfx2.h", old = "unsigned long reserved[6];", new = "unsigned long reserved[5]; unsigned long padding;", fail = "FAIL reserved HeadInfo array has six words" },
+]
+
+[[check]]
+id = "gfx2_cpu_end"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/fence.c", "tests/support/fixtures/gfx2/cpu_model/arch_cpu.h", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_fence.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "CPU write to VRAM serializes once"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_cpu_end_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/fence.c", old = "if (s->pool == GFX2_POOL_VRAM) arch_cpu_serialize();", new = "if (s->pool != GFX2_POOL_VRAM) arch_cpu_serialize();", fail = "FAIL CPU write to VRAM serializes once" },
+]
+
+[[check]]
+id = "gfx2_pin"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/kern/mm/pgalloc_owner.inc", "sys/kern/mm/physmem.c", "sys/kern/mm/pgalloc.c", "tests/support/fixtures/gfx2/pgalloc_host_fixture.h", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/pgalloc_pin.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "pinned pages cannot be freed"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_pin_transfer", config = "pc98", when = "after_build", replace = "sys/kern/mm/pgalloc_owner.inc", old = "!pinned && pin_map[pfn + i]", new = "0 && !pinned && pin_map[pfn + i]", fail = "FAIL pinned range cannot transfer" },
+  { id = "gfx2_pin_reclaim", config = "pc98", when = "after_build", replace = "sys/kern/mm/pgalloc_owner.inc", old = "page_owned(p, owner) && pin_map[p]", new = "0 && page_owned(p, owner) && pin_map[p]", fail = "FAIL pinned owner cannot be reclaimed" },
+  { id = "gfx2_pin_skip", config = "pc98", when = "after_build", replace = "sys/kern/mm/pgalloc_owner.inc", old = " || pin_map[pfn + i]) goto bad;", new = ") goto bad;", fail = "FAIL pinned pages cannot be freed" },
+]
+
+[[check]]
+id = "gfx2_pin_limit"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/kern/mm/pgalloc_owner.inc", "sys/kern/mm/physmem.c", "sys/kern/mm/pgalloc.c", "tests/support/fixtures/gfx2/pgalloc_host_fixture.h", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/pgalloc_pin.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "pin count saturates at 255"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_pin_limit_device", config = "pc98", when = "after_build", replace = "sys/kern/mm/pgalloc_owner.inc", old = "!owner_ok(from) || !owner_ram(to) ||", new = "!owner_ok(from) || !(pinned ? owner_ok(to) : owner_ram(to)) ||", fail = "FAIL device owner received pinned RAM" },
+  { id = "gfx2_pin_limit_skip", config = "pc98", when = "after_build", replace = "sys/kern/mm/pgalloc_owner.inc", old = " || pin_map[pfn + i] == 255", new = " || 0", fail = "FAIL pin count saturates at 255" },
+]
+
+[[check]]
+id = "gfx2_paging_map"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/kern/mm/paging_gfx2.inc", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/paging_gfx2.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "failed mapping restores page tables"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_paging_map_present", config = "pc98", when = "after_build", replace = "sys/kern/mm/paging_gfx2.inc", old = " % PTE_COUNT] & PTE_PRESENT)", new = " % PTE_COUNT] & 0)", fail = "FAIL failed mapping restores page tables" },
+  { id = "gfx2_paging_map_skip", config = "pc98", when = "after_build", replace = "sys/kern/mm/paging_gfx2.inc", old = "pgalloc_free_n_owner(as->owner, pending[k] / PAGE_SIZE, 1);", new = "if (pending[k] == PAGE_SIZE) pgalloc_free_n_owner(as->owner, pending[k] / PAGE_SIZE, 1);", fail = "FAIL failed mapping restores page tables" },
+]
+
+[[check]]
+id = "gfx2_lost"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/gf_v2_display.c", "tests/support/fixtures/gfx2/gf_v2_display.c", "sys/hal/gfx/v2/check_op.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_check_op.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "lost adapter bypasses hardware check"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_lost_recover", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_display.c", old = "rc = gf_v2_start(g, dl); if (rc) return gf_v2_rc(rc);", new = "rc = gf_v2_start(g, dl); if (rc) g->lost = 0;", fail = "FAIL mode set preserves hard LOST" },
+  { id = "gfx2_lost_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/check_op.c", old = "a->state == GFX2_AD_OK && !a->be->check(a->ctx, ex)", new = "!a->be->check(a->ctx, ex)", fail = "FAIL lost adapter bypasses hardware check" },
+]
+
+[[check]]
+id = "gfx2_how"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/submit.c", "sys/hal/gfx/v2/check_op.c", "sys/hal/gfx/v2/sw_table.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_submit.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "shape query agrees with execution choice"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_how_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/submit.c", old = "return e->how == GFX2_HOW_NOSUPPORT ? OS32_ERR_NOSYS : 0;", new = "return 0;", fail = "FAIL shape query agrees with execution choice" },
+]
+
+[[check]]
+id = "gfx2_v1_direct"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/gfx_hw_submit.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx_accel_hal.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "stale display generation rejects submission"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_v1_direct_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/gfx_hw_submit.c", old = "if (gen != gfx_policy_gen) return OS32_ERR_STALE;\n    if (n", new = "if (0) return OS32_ERR_STALE;\n    if (n", fail = "FAIL stale display generation rejects submission" },
+]
+
+[[check]]
+id = "gfx2_gf_channel"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/gf_v2_ops.c", "sys/dev/video/geforce/gf_v2_weak.c", "sys/dev/video/geforce/gf_v2_fence.c", "sys/dev/video/geforce/gf_v2_life.c", "sys/dev/video/geforce/accel_rop3.c", "sys/dev/video/geforce/accel_rop.c", "sys/dev/video/geforce/vram_view.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gf_v2_ops.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "custom emit restores default ROP on failure"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gf_channel_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_ops.c", old = "if (custom) {\n            int restore", new = "if (custom && !rc) {\n            int restore", fail = "FAIL custom emit restores default ROP on failure" },
+]
+
+[[check]]
+id = "gfx2_free_order"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/surface.c", "sys/hal/gfx/v2/gart.c", "tests/support/fixtures/gfx2/gfx2_gart.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_free_order.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "unmap and release precede unbind and page release"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_free_order_unbind", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/gart.c", old = "if (a->be->gart_unbind(a->ctx, s->gpu_off, s->gart_n)) return OS32_ERR_IO;\n    for (i = 0; i < s->gart_n; i++) {\n        if (i < release_n) {\n            pgalloc_unpin(gart_pfns[first + i], 1, gart_owners[first + i]);", new = "for (i = 0; i < s->gart_n; i++) {\n        if (i < release_n) {\n            pgalloc_unpin(gart_pfns[first + i], 1, gart_owners[first + i]);\n            if (!i && a->be->gart_unbind(a->ctx, s->gpu_off, s->gart_n)) return OS32_ERR_IO;", fail = "FAIL unmap and release precede unbind and page release" },
+  { id = "gfx2_free_order_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/surface.c", old = "if (s->pool != GFX2_POOL_SYSMEM && a->be->release(a->ctx, s)) goto keep;\n    if (surf_backing_free", new = "if (0) goto keep;\n    if (surf_backing_free", fail = "FAIL unmap and release precede unbind and page release" },
+]
+
+[[check]]
+id = "gfx2_gf_range"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/gf_v2_weak.c", "sys/dev/video/geforce/gf_v2_fence.c", "sys/dev/video/geforce/gf_v2_life.c", "sys/dev/video/geforce/accel_rop3.c", "sys/dev/video/geforce/accel_rop.c", "sys/dev/video/geforce/vram_view.c", "sys/dev/video/geforce/gf_v2_ops.c", "tests/support/fixtures/gfx2/gf_v2_ops.c", "sys/dev/video/geforce/accel_surface.c", "sys/dev/video/geforce/accel_fill.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_gf_geometry.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "GART reads require a bound range"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gf_range_fill", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_ops.c", old = "if (d->pool == GFX2_POOL_GART)", new = "if (d->pool == GFX2_POOL_GART && op->op == GFX2_OP_FILL) return 0;\n    if (d->pool == GFX2_POOL_GART)", fail = "FAIL GART destination FILL rejected" },
+  { id = "gfx2_gf_range_reservation", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/accel_surface.c", old = "c->range_q(c->range_opaque, s->dma, s->off, s->bytes)", new = "gf_vram_match(c->ch, 0, s->reservation_id, s->generation, s->off, s->bytes, 0)", fail = "FAIL bound GART source allowed" },
+  { id = "gfx2_gf_range_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/accel_surface.c", old = " : GF3_EINVAL;", new = " : 0;", fail = "FAIL GART reads require a bound range" },
+]
+
+[[check]]
+id = "gfx2_gf_keep"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/accel_fill.c", "sys/dev/video/geforce/accel_surface.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_gf_geometry.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "KEEP preserves ROP and emits rectangle"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gf_keep_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/accel_fill.c", old = "if (alu != GF3_ALU_KEEP) {", new = "if (1) {", fail = "FAIL KEEP preserves ROP and emits rectangle" },
+]
+
+[[check]]
+id = "gfx2_gf_scan"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/backend_geforce.c", "sys/dev/video/geforce/gf_v2_display.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_gf_scan.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "v2 scan does not replace the v1 front"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gf_scan_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/backend_geforce.c", old = "if (gf_v2_owns(front)) return;", new = "(void)front;", fail = "FAIL v2 scan does not replace the v1 front" },
+]
+
+[[check]]
+id = "gfx2_gf_readback"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/geforce/gf_v2_ops.c", "sys/dev/video/geforce/gf_v2_life.c", "sys/dev/video/geforce/accel_surface.c", "sys/dev/video/geforce/accel_transfer.c", "sys/dev/video/geforce/accel_m2mf.c", "sys/dev/video/geforce/vram_view.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gf_v2_readback.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "display readback resolves the current reservation"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gf_readback_pitch", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_ops.c", old = "op->pitch * op->sh, op->pitch", new = "op->pitch * op->sh, op->sw", fail = "FAIL readback preserves pitch padding" },
+  { id = "gfx2_gf_readback_timeout", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_life.c", old = "case GF4_ETIME: return OS32_ERR_TIMEOUT;", new = "case GF4_ETIME: return OS32_ERR_IO;", fail = "FAIL readback reports fence timeout" },
+  { id = "gfx2_gf_readback_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_ops.c", old = "s.reservation_id = v.reservation_id;", new = "s.reservation_id = 0;", fail = "FAIL display readback resolves the current reservation" },
+]
+
+[[check]]
+id = "gfx2_kapi_guard"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L1"
+sources = ["sys/kapi/kapi_generated.c", "sdk/kapi.json", "sdk/include/os32/os32_gfx2.h", "tests/support/media.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "wrapper pointer extent"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_kapi_guard_skip", config = "pc98", when = "after_build", replace = "sys/kapi/kapi_generated.c", old = "KAPI_OUT_LEN(o, sizeof(GFX2_HeadInfo))", new = "0", fail = "FAIL wrapper pointer extent" },
+  { id = "gfx2_kapi_guard_gamma", config = "pc98", when = "after_build", replace = "sys/kapi/kapi_generated.c", old = "KAPI_OUT_LEN(rgb768, 1536u)", new = "1", fail = "FAIL wrapper pointer extent" },
+  { id = "gfx2_kapi_guard_palette", config = "pc98", when = "after_build", replace = "sys/kapi/kapi_generated.c", old = "kapi_out_mul(KAPI_OUT_LEN(xrgb, count), 4u)", new = "1", fail = "FAIL wrapper pointer extent" },
+  { id = "gfx2_kapi_guard_ops", config = "pc98", when = "after_build", replace = "sys/kapi/kapi_generated.c", old = "kapi_out_mul(KAPI_OUT_LEN(ops, n), (u32)(sizeof(GFX2_Op)))", new = "1", fail = "FAIL wrapper pointer extent" },
+]
+
+[[check]]
+id = "gfx2_sync_package"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L1"
+sources = ["build/core.yaml", "build/packages.yaml", "tools/mkpkg.py", "build/image.mk", "sys/hal/gfx/sync/sync_cfg.c", "assets/gfx/sync.cfg", "tests/support/fixtures/gfx2/gfx2_sync_defaults.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = ["packages/GUI.PKG"]
+expect = "missing packaged sync.cfg"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sync_package_skip", config = "pc98", when = "after_build", replace = "build/core.yaml", old = "guest: /etc/gfx/sync.cfg\n      tags: [gui]", new = "guest: /etc/gfx/sync.cfg\n      tags: [core]", fail = "FAIL missing packaged sync.cfg" },
+]
+
+[[check]]
+id = "gfx2_gart_visible"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/display.c", "sys/hal/gfx/v2/v1_shim.c", "sys/hal/gfx/v2/lock.c", "sys/hal/gfx/v2/backend_reg.c", "sys/hal/gfx/v2/surface.c", "sys/hal/gfx/v2/sysmem.c", "sys/hal/gfx/v2/gart.c", "sys/hal/gfx/v2/submit.c", "sys/hal/gfx/v2/check_op.c", "sys/hal/gfx/v2/format.c", "sys/hal/gfx/v2/fence.c", "sys/hal/gfx/v2/vram_heap.c", "sys/hal/gfx/v2/sw_alpha.c", "sys/hal/gfx/v2/sw_ckey.c", "sys/hal/gfx/v2/sw_copy.c", "sys/hal/gfx/v2/sw_fill.c", "sys/hal/gfx/v2/sw_hostdata.c", "sys/hal/gfx/v2/sw_line.c", "sys/hal/gfx/v2/sw_mono.c", "sys/hal/gfx/v2/sw_readback.c", "sys/hal/gfx/v2/sw_rop.c", "sys/hal/gfx/v2/sw_rop4.c", "sys/hal/gfx/v2/sw_stretch.c", "sys/hal/gfx/v2/sw_table.c", "lib/divdi3.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_backing.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "GART mapping resolves each physical page"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_gart_visible_visibility", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/check_op.c", old = "if (!shape) return gfx2_cpu_visible(s);", new = "if (!shape) return !!s->kva;", fail = "FAIL GART CPU access follows address space" },
+  { id = "gfx2_gart_visible_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/lock.c", old = "phys = pfns[k] * PAGE_SIZE;", new = "phys = (pfns[0] + k) * PAGE_SIZE;", fail = "FAIL GART mapping resolves each physical page" },
+]
+
+[[check]]
+id = "gfx2_backing_submit"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/display.c", "sys/hal/gfx/v2/v1_shim.c", "sys/hal/gfx/v2/submit.c", "sys/hal/gfx/v2/backend_reg.c", "sys/hal/gfx/v2/surface.c", "sys/hal/gfx/v2/sysmem.c", "sys/hal/gfx/v2/gart.c", "sys/hal/gfx/v2/lock.c", "sys/hal/gfx/v2/check_op.c", "sys/hal/gfx/v2/format.c", "sys/hal/gfx/v2/fence.c", "sys/hal/gfx/v2/vram_heap.c", "sys/hal/gfx/v2/sw_alpha.c", "sys/hal/gfx/v2/sw_ckey.c", "sys/hal/gfx/v2/sw_copy.c", "sys/hal/gfx/v2/sw_fill.c", "sys/hal/gfx/v2/sw_hostdata.c", "sys/hal/gfx/v2/sw_line.c", "sys/hal/gfx/v2/sw_mono.c", "sys/hal/gfx/v2/sw_readback.c", "sys/hal/gfx/v2/sw_rop.c", "sys/hal/gfx/v2/sw_rop4.c", "sys/hal/gfx/v2/sw_stretch.c", "sys/hal/gfx/v2/sw_table.c", "lib/divdi3.c", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/gfx2_backing.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "unregistered adapter invalidates prior submission generation"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_backing_submit_map", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/lock.c", old = "phys = pfns[k] * PAGE_SIZE;", new = "phys = (pfns[0] + k) * PAGE_SIZE;", fail = "FAIL GART mapping resolves each physical page" },
+  { id = "gfx2_backing_submit_skip", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/submit.c", old = "if (gen != a->gen) return OS32_ERR_STALE;", new = "if (0) return OS32_ERR_STALE;", fail = "FAIL unregistered adapter invalidates prior submission generation" },
+]
+
+[[check]]
+id = "trident_sync"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/dev/video/trident/present.c", "sys/dev/video/trident/regs.c", "tests/support/fixtures/gfx2/trident_device_fake.c", "tests/support/fixtures/gfx2/trident_sync_fake.c", "tests/support/fixtures/gfx2/trident_device_fake.h", "sys/hal/gfx/v2/gfx2_int.h", "tests/support/fixtures/gfx2/trident_sync.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "changed display generation rebinds sync context"
+limits = "32 ビットのホスト模型で状態と戻り値を観測。実機の動作は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "trident_sync_unbind", config = "pc98", when = "after_build", replace = "sys/dev/video/trident/present.c", old = "if (rc) { trident_sync_unbind(d); return rc; }", new = "if (rc) return rc;", fail = "FAIL publication failure discards context" },
+  { id = "trident_sync_clear", config = "pc98", when = "after_build", replace = "sys/dev/video/trident/present.c", old = "gfxsync_override_clear(d->sync_ctx);", new = "(void)d;", fail = "FAIL clear restores default sync settings" },
+  { id = "trident_sync_skip", config = "pc98", when = "after_build", replace = "sys/dev/video/trident/present.c", old = "d->sync_generation == d->res->generation", new = "d->sync_generation != 0", fail = "FAIL changed display generation rebinds sync context" },
 ]

@@ -34,7 +34,7 @@ static int flip_done(void *ctx, u32 head, u32 *sid)
 
 const GfxBackendV2 gfx2_v1_shim;
 void gfx2_adapter_recovered(struct gfx2_adapter *a) {}
-void v1_bridge_rebind(void) {}
+int v1_bridge_rebind(void) { return 0; }
 int gfx_fullscreen_owner(void) { return 0; }
 
 static int enum_conn(void *ctx, u32 conn, GFX2_ConnectorInfo *out)
