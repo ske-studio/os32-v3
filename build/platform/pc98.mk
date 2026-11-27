@@ -17,6 +17,9 @@ C_ORDER_TAIL += sys/platform/pc98/usb_resident.c sys/platform/pc98/usb_load.c sy
 # Relocatable USB body; pairing and installation belong to the image rules.
 PC98_USB_BODY_SOURCES = sys/platform/pc98/usb_module.c sys/platform/pc98/usb_module_runtime.c sys/input/keymaps/hid_jp.c $(filter-out sys/dev/usb/ehci_quiesce.c sys/hal/input/usb_input.c,$(C_COMMON_USB))
 PC98_USB_BODY_OBJECTS = $(addprefix $(BUILD_OUT)/usb/,$(PC98_USB_BODY_SOURCES:.c=.o))
+ifeq ($(TICK_PROBE_BUILD),1)
+$(PC98_USB_BODY_OBJECTS): private CFLAGS_BASE += -DTICK_PROBE
+endif
 $(BUILD_OUT)/usb/%.o: %.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_BASE) -Os $(INC_KERNEL) -c $< -o $@

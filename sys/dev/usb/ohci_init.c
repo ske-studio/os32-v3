@@ -169,6 +169,14 @@ int ohci_start(struct usb_hc *hc)
              !!(ohci_rd(hc, OHCI_CONTROL) & OHCI_CTL_RWC));
     log_power(hc);
     if (hc->has_irq) ohci_wr(hc, OHCI_INTERRUPT_ENABLE, OHCI_INTR_MIE);
+#ifdef TICK_PROBE
+    struct irq10_diag *diag = usb_diag_for(hc);
+    if (diag) {
+        diag->enable = ohci_rd(hc, OHCI_INTERRUPT_ENABLE);
+        diag->status = ohci_rd(hc, OHCI_INTERRUPT_STATUS);
+        diag->control = ohci_rd(hc, OHCI_CONTROL);
+    }
+#endif
     return 0;
 }
 

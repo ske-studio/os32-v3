@@ -103,6 +103,54 @@ static u8 cs_read(u8 idx)
     return v;
 }
 
+#ifdef TICK_PROBE
+static void cs_write_locked(u8 idx, u8 val);
+#include "sys/kern/time/tick_probe.h"
+#include "platform_pic.h"
+static struct irq10_diag *diag;
+void pcm_bind_diag(struct irq10_diag *storage)
+{
+    diag = storage;
+}
+static void capture_regs(struct irq10_regs *r)
+{
+    r->i12 = cs_read(PCM_I_MODEID);
+    r->i9 = cs_read(PCM_I_IFACE);
+    r->i10 = cs_read(PCM_I_PINCTL);
+    r->i14 = cs_read(PCM_I_BASE_HI);
+    r->i15 = cs_read(PCM_I_BASE_LO);
+    r->valid = 1;
+}
+static int diag_ack(int tick)
+{
+    struct irq10_pcm *p = &diag->pcm;
+    unsigned int flags = irq_save();
+    u8 bits = cs_read(PCM_I_ALTSTAT);
+    if (bits & PCM_ALT_PI) {
+        if (!p->source) {
+            p->source = tick ? 2 : 1;
+            p->i24 = bits;
+            p->r2 = inp(PCM_PORT_R2);
+            p->r0 = inp(PCM_PORT_R0);
+            outp(PIC2_CMD, OCW3_IRR);
+            p->irr = inp(PIC2_CMD);
+            outp(PIC2_CMD, OCW3_ISR);
+            p->isr = inp(PIC2_CMD);
+            outp(PIC2_CMD, OCW3_IRR);
+            p->imr = inp(PIC2_DATA);
+            p->master_imr = inp(PIC1_DATA);
+        }
+        if (tick) ++p->tick_pi;
+        if (!tick || diag->tickack) {
+            cs_write_locked(PCM_I_ALTSTAT, 0);
+            if (tick) ++p->tick_acks;
+        }
+    }
+    irq_restore(flags);
+    return !!(bits & PCM_ALT_PI);
+}
+#endif
+
 /* idx に **bit6 (MCE) を立てて渡せば MCE が保たれる**。素の idx なら落ちる —
  * I9 / I16 はそれだと反映されない (DS139PP2 p.34)。ハードの R0 の並びのまま。
  * _locked は**呼び手が irq_save の中**にいるとき用 (判定と複数の書きを 1 つの
@@ -258,7 +306,16 @@ static int pcm_run(const struct pcm_op *ops, int n, int at, int blocking)
             else
                 cs_write(o->a, o->b);
             break;
-        case PCM_OP_PORT:      outp(PCM_PORT_ROUTE + o->a, o->b); break;
+        case PCM_OP_PORT:
+            outp(PCM_PORT_ROUTE + o->a, o->b);
+#ifdef TICK_PROBE
+            if (diag && o->a == PCM_POFS_ROUTE) {
+                ++diag->pcm.route_count;
+                diag->pcm.route_step = at + 1;
+                diag->pcm.route_value = o->b;
+            }
+#endif
+            break;
         case PCM_OP_WAIT_INIT:
         case PCM_OP_WAIT_ACI:
         case PCM_OP_WAIT_DRS:
@@ -381,6 +438,9 @@ static void pcm_advance_restart(void)
         return;
     }
     g_pcm.resyncs++;
+#ifdef TICK_PROBE
+    capture_regs(&diag->pcm.start);
+#endif
     if (g_pcm.close_pending) g_pcm.state = PCM_ST_DRAINING;
 }
 
@@ -473,7 +533,12 @@ static int pcm_advance(enum pcm_advance_origin origin)
     }
 
     /* 共通の PI の ack。**受理の判定にだけ**使い、連続性には使わない。 */
-    handled = pcm_codec_ack();
+#ifdef TICK_PROBE
+    if (g_pcm.state == PCM_ST_RUNNING || g_pcm.state == PCM_ST_DRAINING)
+        handled = diag_ack(origin == PCM_FROM_TICK);
+    else
+#endif
+        handled = pcm_codec_ack();
 
     switch (g_pcm.state) {
     case PCM_ST_RUNNING:
@@ -522,7 +587,11 @@ static int pcm_irq(unsigned int irq, void *arg)
     if (s_hal_advance) {
         if (s_claimed || s_mce_busy || g_pcm.state != PCM_ST_RUNNING)
             return IRQ_NONE;
+#ifdef TICK_PROBE
+        if (!diag_ack(0)) return IRQ_NONE;
+#else
         if (!pcm_codec_ack()) return IRQ_NONE;
+#endif
         pcm_hal_advance(PCM_FROM_IRQ10);
         return IRQ_HANDLED;
     }
@@ -534,7 +603,11 @@ void pcm_tick(void)
     if (s_hal_advance) {
         if (s_claimed || s_mce_busy) return;
         /* Release a latched PI even when its IRQ10 edge was missed. */
+#ifdef TICK_PROBE
+        if (g_pcm.state == PCM_ST_RUNNING) (void)diag_ack(1);
+#else
         if (g_pcm.state == PCM_ST_RUNNING) (void)pcm_codec_ack();
+#endif
         pcm_hal_advance(PCM_FROM_TICK);
         return;
     }
@@ -653,6 +726,9 @@ static int pcm_open_device(u32 rate, u32 period, void (*advance)(void))
     if (pcm_refill_threshold(rate) >= PCM_HALF_FRAMES) return OS32_ERR_INVAL;
 
     /* 巻き戻しも pcm_release を通るので、**1 度だけ**の錠を先に外す。 */
+#ifdef TICK_PROBE
+    kmemset(&diag->pcm, 0, sizeof(diag->pcm));
+#endif
     s_hal_period = period;
 #ifdef SND2_REFILL_DIAG
     hal_pi = hal_ticks = hal_max_us = 0;
@@ -690,6 +766,9 @@ static int pcm_open_device(u32 rate, u32 period, void (*advance)(void))
     kmemset(&g_pcm, 0, sizeof(g_pcm));
     g_pcm.rate = rate;
     g_pcm.state = PCM_ST_OPEN;
+#ifdef TICK_PROBE
+    capture_regs(&diag->pcm.open);
+#endif
     s_owner = advance ? 0 : res_owner_get();
     s_deadline = 0;
     s_seq_at = 0;
@@ -712,6 +791,9 @@ static void pcm_start(void)
     n = pcm_seq_start(&ops);
     f = irq_save();
     pcm_run(ops, n, 0, 0);
+#ifdef TICK_PROBE
+    capture_regs(&diag->pcm.start);
+#endif
     if (g_pcm.close_pending) g_pcm.state = PCM_ST_DRAINING;
     irq_restore(f);
 }
@@ -945,6 +1027,9 @@ int pcm_codec_start(void)
     const struct pcm_op *ops;
     int n = pcm_seq_restart(&ops);
     if (pcm_run(ops, n, 0, 0) < 0) return 1; /* setup failed before unmask */
+#ifdef TICK_PROBE
+    capture_regs(&diag->pcm.start);
+#endif
     g_pcm.state = PCM_ST_RUNNING;
     return 0;
 }

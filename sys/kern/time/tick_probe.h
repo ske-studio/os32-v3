@@ -49,8 +49,29 @@ void tick_probe_device_end(unsigned int id, struct tp_device_mark m, unsigned in
 void tick_probe_pio_begin(void);
 void tick_probe_pio_end(void);
 enum { TP_S1_IDLE = 4, TP_S1_WAIT, TP_S1_DUE, TP_S1_FIXTURE };
+enum { TP_IRQ10_SHOW = 8, TP_TICKACK_ON, TP_TICKACK_OFF };
+struct irq10_event {
+    unsigned int count, bits;
+    unsigned long long first;
+};
+struct irq10_regs { unsigned char valid, i12, i9, i10, i14, i15; };
+struct irq10_pcm {
+    struct irq10_regs open, start;
+    unsigned int route_count, route_step, route_value;
+    unsigned int source, i24, r2, r0, irr, isr, imr, master_imr;
+    unsigned int tick_pi, tick_acks;
+};
+struct irq10_diag {
+    unsigned long long arrivals, first, window_start;
+    unsigned int tickack, attached, has_irq, command, line, pin, pirq[4];
+    int attach_rc;
+    unsigned int enable, status, control;
+    struct irq10_event usb[2];
+    struct irq10_pcm pcm;
+};
+extern struct irq10_diag irq10_diag;
 struct tp_request { unsigned int action; }; /* 1=start, 2=stop, 3=show */
-struct tp_control { unsigned int action; const struct tp_snapshot *snapshot; };
+struct tp_control { unsigned int action; const struct tp_snapshot *snapshot; const struct irq10_diag *diag; };
 void tick_probe_boot(void);
 void tick_probe_splash(unsigned int active);
 void tick_probe_begin(unsigned int metric);

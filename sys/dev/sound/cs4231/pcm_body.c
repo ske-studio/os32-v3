@@ -3,6 +3,9 @@
 
 int pcm_module_init(PcmModuleApi *out)
 {
+#ifdef TICK_PROBE
+    pcm_bind_diag(((struct pcm_diag_init *)out)->storage);
+#endif
     *out = (PcmModuleApi){
         .open = pcm_open,
         .write_check = pcm_write_check,

@@ -2,6 +2,30 @@
 #define OHCI_PRIV_H
 #include "sys/dev/usb/usb_core.h"
 #include "sys/dev/usb/ohci_regs.h"
+#ifdef TICK_PROBE
+#include "sys/kern/time/tick_probe.h"
+#include "arch_cpu.h"
+extern struct irq10_diag *usb_irq10_storage;
+static inline struct irq10_diag *usb_diag_for(const struct usb_hc *hc)
+{
+    return hc->pci.bus == 0 && hc->pci.dev == 13 && hc->pci.fn == 1 ?
+           usb_irq10_storage : 0;
+}
+static inline void usb_diag_event(const struct usb_hc *hc, unsigned side, u32 bits)
+{
+    struct irq10_diag *d = usb_diag_for(hc);
+    if (!d || !bits) return;
+    struct irq10_event *e = &d->usb[side];
+    if (++e->count == 1) {
+        e->bits = bits;
+        if (arch_cpu_has_tsc()) {
+            unsigned int hi, lo;
+            __asm__ volatile("rdtsc" : "=a"(lo), "=d"(hi) : : "memory");
+            e->first = ((unsigned long long)hi << 32) | lo;
+        }
+    }
+}
+#endif
 /* NetBSD dev/usb/ohci.c:ohci_init saves these before resetting the bus. */
 static inline struct ohci_firmware ohci_firmware_read(volatile u8 *regs, u32 control)
 {

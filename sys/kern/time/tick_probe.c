@@ -19,6 +19,11 @@ extern void *kmemset(void *, int, unsigned int);
 extern unsigned long long tp_host_clock;
 extern unsigned int kctx_irq_depth;
 #endif
+struct irq10_diag irq10_diag = {.tickack = 1};
+static struct irq10_diag irq10_copy;
+#ifndef TICK_PROBE_HOST
+#include "arch_cpu.h"
+#endif
 static struct tp_snapshot data;
 static struct tp_mark pending[TP_METRICS], interval, if0;
 static unsigned int splash, epoch;
@@ -151,6 +156,12 @@ void tick_probe_irq_enter(unsigned int irq)
 #ifdef SND2_WRITER_DIAG
     sw_irq(irq);
 #endif
+    if (irq == 10 && ++irq10_diag.arrivals == 1) {
+#ifndef TICK_PROBE_HOST
+        if (arch_cpu_has_tsc())
+#endif
+            irq10_diag.first = now();
+    }
     if (!data.running) return;
     if (irq == 10) tick_probe_extra_begin(TP_PCM_IRQ10);
     if (irq == 5) irq5_active = 1;
@@ -318,6 +329,7 @@ void tick_probe_boot(void)
         unsigned long long t = now();
         data.empty_cost = now() - t;
         window = now();
+        irq10_diag.window_start = window;
         data.running = 1; /* capture boot splash before shell exists */
     }
 }
@@ -337,6 +349,18 @@ static void s1_fixture(unsigned int now_ms)
 int tick_probe_control(struct tp_control *c)
 {
     /* Caller is cooperative, IF=1. Freeze with a tiny raw CLI section. */
+#ifndef TICK_PROBE_HOST
+    if (c->action >= TP_IRQ10_SHOW && c->action <= TP_TICKACK_OFF) {
+        if (data.running) return -1;
+        unsigned int flags = irq_save();
+        if (c->action != TP_IRQ10_SHOW)
+            irq10_diag.tickack = c->action == TP_TICKACK_ON;
+        irq10_copy = irq10_diag;
+        irq_restore(flags);
+        c->diag = &irq10_copy;
+        return 0;
+    }
+#endif
     int s1 = c->action >= TP_S1_IDLE && c->action <= TP_S1_FIXTURE;
     if (c->action == 1 || s1) {
         if (data.running) return -1;

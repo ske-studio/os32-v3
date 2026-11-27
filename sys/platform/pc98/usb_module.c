@@ -3,24 +3,42 @@
 #include "sys/dev/usb/ohci_priv.h"
 #include "sys/hal/input/usb_input.h"
 
+#ifdef TICK_PROBE
+#include "usb_probe.h"
+struct irq10_diag *usb_irq10_storage;
+#endif
 struct module_handle pc98_usb_module_owner;
 
 static int usb_irq(void *arg)
 {
     struct usb_hc *hc = arg;
     u32 pending = hc->ops->intr_collect(hc);
+#ifdef TICK_PROBE
+    usb_diag_event(hc, 0, pending);
+#endif
     hc->isr_pending |= pending;
     return pending ? USBP_IRQ_HANDLED : USBP_IRQ_NONE;
 }
 
 int usb_module_init(struct module_handle owner)
 {
+#ifdef TICK_PROBE
+    static struct usb_diag_init args = {
+        .storage = &usb_irq10_storage, .core = {
+            .ops = &ohci_ops, .isr = usb_irq, .register_hc = usb_hc_register,
+            .dead = usb_hc_dead, .service = usb_service
+        }
+    };
+    pc98_usb_module_owner = owner;
+    int active = pc98_usb_resident_start(owner, &args.core);
+#else
     static struct pc98_usb_core core = {
         .ops = &ohci_ops, .isr = usb_irq, .register_hc = usb_hc_register,
         .dead = usb_hc_dead, .service = usb_service
     };
     pc98_usb_module_owner = owner;
     int active = pc98_usb_resident_start(owner, &core);
+#endif
     return active < 0 ? active : 0;
 }
 

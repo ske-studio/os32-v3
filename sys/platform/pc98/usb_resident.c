@@ -1,4 +1,7 @@
 #include "usb_resident.h"
+#ifdef TICK_PROBE
+#include "sys/kern/time/tick_probe.h"
+#endif
 #include "usb_probe.h"
 #include "kprintf.h"
 #include "idle_work.h"
@@ -213,6 +216,9 @@ int pc98_usb_resident_start(struct module_handle owner, struct pc98_usb_core *co
     struct pci_dev dev;
     unsigned used = 0;
     int active = 0, found = 0;
+#ifdef TICK_PROBE
+    *((struct usb_diag_init *)core)->storage = &irq10_diag;
+#endif
     for (u32 i = 0; used < PC98_USB_HCS && !pci_get(i, &dev); i++) {
         struct usb_hc *hc = &core->hc[used];
         if (!pc98_usb_is_ohci(&dev)) continue;
@@ -226,7 +232,22 @@ int pc98_usb_resident_start(struct module_handle owner, struct pc98_usb_core *co
             continue;
         }
         hc->ops = core->ops;
+#ifdef TICK_PROBE
+        int rc = usb_resident_irq_attach(owner, &hc->pci, core->isr, hc);
+        hc->has_irq = !rc;
+        if (!irq10_diag.attached && dev.bus == 0 && dev.dev == 13 && dev.fn == 1) {
+            irq10_diag.attached = 1;
+            irq10_diag.attach_rc = rc;
+            irq10_diag.has_irq = hc->has_irq;
+            irq10_diag.command = pci_cfg_read16(0, 13, 1, 4);
+            irq10_diag.line = pci_cfg_read8(0, 13, 1, 0x3c);
+            irq10_diag.pin = pci_cfg_read8(0, 13, 1, 0x3d);
+            for (unsigned j = 0; j < 4; ++j)
+                irq10_diag.pirq[j] = pci_cfg_read8(0, 6, 0, 0x60 + j);
+        }
+#else
         hc->has_irq = !usb_resident_irq_attach(owner, &hc->pci, core->isr, hc);
+#endif
         if (!hc->has_irq)
             kprintf(KLOG_ATTR, "[usb] %u:%u.%u IRQ unavailable, polling\n", dev.bus, dev.dev, dev.fn);
         if (!hc->ops->start(hc)) {

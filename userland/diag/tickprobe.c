@@ -15,7 +15,13 @@ int main(int argc, char **argv, KernelAPI *api)
         if (!strcmp(argv[1], "fixture")) q.action = TP_S1_FIXTURE;
         if (!strcmp(argv[1], "show")) q.action = 3;
     }
-    if (!q.action) { printf("tickprobe start|idle|wait|due|fixture|stop|show\n"); return 1; }
+    if (argc == 3 && !strcmp(argv[1], "irq10diag") && !strcmp(argv[2], "show"))
+        q.action = TP_IRQ10_SHOW;
+    if (argc == 3 && !strcmp(argv[1], "tickack")) {
+        if (!strcmp(argv[2], "on")) q.action = TP_TICKACK_ON;
+        if (!strcmp(argv[2], "off")) q.action = TP_TICKACK_OFF;
+    }
+    if (!q.action) { printf("tickprobe start|idle|wait|due|fixture|stop|show|irq10diag show|tickack on|tickack off\n"); return 1; }
     if (api->version < 78 || !api->kdebug_call) return 1;
     int rc = api->kdebug_call(TP_OP, &q, sizeof(q));
     if (rc) printf("tickprobe rc=%d (diagnostic image and KDEBUG=1 required)\n", rc);

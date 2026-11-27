@@ -6,6 +6,10 @@
 _Static_assert(PC98_TICK_COUNT <= TICK_SLOT_COUNT, "PC98 tick slots exceed table");
 /* Resident facade and IRQ/tick/DMA references, using the T5c-0 record. */
 #include "pcm_module.h"
+#ifdef TICK_PROBE
+#include "sys/kern/time/tick_probe.h"
+#include "pcm_hw.h"
+#endif
 #include "pcm_imports.h"
 #include "platform_module_pair.h"
 #include "config.h"
@@ -142,7 +146,13 @@ static int pcm_start_module(struct module_record *r, u32 entry, u32 *exports)
 {
     (void)exports;
     int (*init)(PcmModuleApi *) = (int (*)(PcmModuleApi *))(uptr)entry;
+#ifdef TICK_PROBE
+    struct pcm_diag_init args = {.storage = &irq10_diag};
+    int rc = init(&args.api);
+    candidate = args.api;
+#else
     int rc = init(&candidate);
+#endif
     u32 entries[PCM_MODULE_API_SLOTS];
     STATIC_ASSERT(sizeof(candidate) == sizeof(entries), pcm_facade_size);
     kmemcpy(entries, &candidate, sizeof(entries));

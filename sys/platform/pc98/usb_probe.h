@@ -3,6 +3,14 @@
 #include "pci_dev_contract.h"
 #include "usb_platform.h"
 
+#ifdef TICK_PROBE
+#include "usb_resident.h"
+struct usb_diag_init {
+    struct pc98_usb_core core;
+    struct irq10_diag **storage;
+};
+#endif
+
 static inline int pc98_usb_is_ohci(const struct pci_dev *dev)
 {
     return dev->vendor == 0x1033 && dev->device == 0x0035 &&

@@ -1,6 +1,9 @@
 /* Cooperative replacement of FB controller/usb_controller.c:363-418. */
 #include "sys/dev/usb/usb_internal.h"
 #include "sys/dev/usb/ohci_regs.h"
+#ifdef TICK_PROBE
+#include "sys/dev/usb/ohci_priv.h"
+#endif
 #include "endian_dma.h"
 struct hc_record {
     struct usb_hc *hc;
@@ -58,7 +61,14 @@ void usb_service(void)
         u32 p, now;
         u16 frame;
         if (hc->state != HC_RUNNING) continue;
-        p = hc->isr_pending | hc->ops->intr_collect(hc); hc->isr_pending = 0;
+#ifdef TICK_PROBE
+        p = hc->ops->intr_collect(hc);
+        usb_diag_event(hc, 1, p);
+        p |= hc->isr_pending;
+#else
+        p = hc->isr_pending | hc->ops->intr_collect(hc);
+#endif
+        hc->isr_pending = 0;
         if (p & OHCI_INTR_UE) { usb_hc_dead(hc, USB_WHY_UE); continue; }
         hc->ops->scan(hc, 32);
         if (hc->state != HC_RUNNING) continue;
