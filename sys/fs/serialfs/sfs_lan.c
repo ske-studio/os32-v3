@@ -147,7 +147,7 @@ static int lan_put(void *ctx, const u8 *buf, u32 n)
     return lan_put_until(ctx, buf, n, deadline) == 0 ? 0 : -1;
 }
 
-const SfsIo sfs_lan_io = {lan_put, lan_get, lan_now, lan_idle, lan_can_wait, lan_put_until};
+const SfsIo sfs_lan_io = {lan_put, lan_get, lan_now, lan_idle, lan_can_wait, lan_put_until, 0};
 
 void sfs_lan_init(SfsLan *lan, const SfsLanNic *nic,
                   const SfsIo *clock, void *clock_ctx)

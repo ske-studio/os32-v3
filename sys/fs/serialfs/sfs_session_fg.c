@@ -94,7 +94,7 @@ static int sio_can_wait(void *ctx)
     return _irq_enabled();
 }
 
-static const SfsIo g_sio = { sio_put, sio_get, sio_now, sio_idle, sio_can_wait, 0 };
+static const SfsIo g_sio = { sio_put, sio_get, sio_now, sio_idle, sio_can_wait, 0, 0 };
 
 /* 保留リングを LOG フレームで送る */
 static void sfs_send_log(void)

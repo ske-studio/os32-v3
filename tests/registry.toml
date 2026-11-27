@@ -604,3 +604,17 @@ expect = "4組の中断・保留行と再 load"
 limits = "7450 KDEBUG"
 gates = ["push", "main"]
 mutations = [{ id = "hwb_sticky", config = "link-sh", when = "after_build", replace = "sys/kern/exec/exec_abort.inc", old = "u32 pending = g_hwb_abort_pending;\n    g_hwb_abort_pending = 0;", new = "u32 pending = g_hwb_abort_pending;", fail = "reload POINT retained abort" }]
+
+[[check]]
+id = "sfs_deadline_cancel"
+spec = { path = "docs/design/fs/serialfs/serialfs_persistent.md", section = "絶対期限での交換終了" }
+subsystem = "system"
+level = "L2"
+sources = ["sys/fs/serialfs/sfs_client.c", "sys/fs/serialfs/sfs_client.h", "sys/fs/serialfs/serialfs_persistent.c", "sys/fs/serialfs/sfs_proto.c", "sys/fs/serialfs/sfs_proto.h", "lib/crc32.c", "sys/kern/kstring_c.c", "tools/ops/kernel_includes.py", "tests/support/fixtures/sfs_deadline_cancel"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "期限切れで同一要求を同期で一度解放し、seq 更新では HELLO 前に BYE の所有を終える"
+limits = "仮想時計と模擬 transport。装置の進行は対象外"
+gates = ["push", "main"]
+mutations = [{ id = "skip_expired_cancel", config = "pc98", when = "after_build", replace = "sys/fs/serialfs/sfs_client.c", old = "    if (sent && c->io->cancel)\n        c->io->cancel(c->ctx, c->tx, flen, deadline);\n", new = "    (void)sent;\n", fail = "expired exchange left pending CALL" }]

@@ -143,7 +143,9 @@ int sfs_ensure_session(u32 deadline)
 
     if (c->sid && c->seq > SFS_PERSISTENT_SEQ_LIMIT) {
         /* A failed BYE is harmless: HELLO replaces the old session. */
-        (void)sfs_client_oneway_deadline(c, SFS_T_BYE, 0, 0, deadline);
+        rc = sfs_client_oneway_deadline(c, SFS_T_BYE, 0, 0, deadline);
+        if (!rc && c->io->cancel)
+            c->io->cancel(c->ctx, c->tx, SFS_HDR_LEN + SFS_CRC_LEN, deadline);
     }
     c->sid = 0;
     c->dead = SFS_DEAD_NONE;

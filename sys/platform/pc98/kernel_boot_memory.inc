@@ -32,7 +32,7 @@ static int boot_sfs_can_wait(void *ctx)
 }
 
 static const SfsIo boot_sfs_clock = {
-    .now = boot_sfs_now, .idle = boot_sfs_idle, .can_wait = boot_sfs_can_wait
+    .now = boot_sfs_now, .idle = boot_sfs_idle, .can_wait = boot_sfs_can_wait, .cancel = 0
 };
 
 static void kernel_boot_hostsvc(struct boot_context *boot)

@@ -47,3 +47,13 @@
 ## 確かめ
 
 - `test_hostsvc_persistent.py (旧版 030af773a023)` (sfs run の外の読み書き、コマンド終了後も mount、ホストの再起動で古い FD が STALE・新しい open は成功)・`test_hostsvc_sfs_deadline.py` (入口から 1000ms + 1 tick で HOSTDOWN、次の要求で再送信)・`test_hostsvc_serialfs.py`・`test_hostsvc_sfs_lan.py`・`test_hostsvc_open.py`・`test_hostsvc_init.py` (起動の結線と設定の鍵)・`test_serialfs.py` (UART の既存の動作)。
+
+## 絶対期限での交換終了
+
+確定設計 §2 の終了契約。期限付き交換は送信を試みた後の期限切れで、
+同じ前景交換から任意の cancel を一度呼んでから HOSTDOWN を返し、timeouts を一つ増やす。
+通知には put と同じ ctx、符号化済みの全バイトと長さ、絶対期限を渡す。
+送信前の期限切れと正常応答では通知しない。常駐の同期 transport は cancel を 0 とする。
+LAN モジュールはローダーが全関数スロットを照合するため、自身の text 内の空の cancel を登録する。
+期限付き片道送信は put 中の期限到達、または put 自身の TIMEOUT で一度通知する。
+seq 更新時に受理された BYE は ensure が所有し、次の時計確認と HELLO の組み立ての前に cancel する。

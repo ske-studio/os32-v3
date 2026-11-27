@@ -218,7 +218,11 @@ int sfs_client_oneway_deadline(SfsClient *c, u8 type, const u8 *payload,
         c->io->put_until(c->ctx, c->tx, flen, deadline) :
         c->io->put(c->ctx, c->tx, flen);
     if (rc == OS32_ERR_TIMEOUT ||
-        (i32)(c->io->now(c->ctx) - deadline) >= 0) return OS32_ERR_TIMEOUT;
+        (i32)(c->io->now(c->ctx) - deadline) >= 0) {
+        if (c->io->cancel)
+            c->io->cancel(c->ctx, c->tx, flen, deadline);
+        return OS32_ERR_TIMEOUT;
+    }
     return rc == 0 ? 0 : OS32_ERR_IO;
 }
 
@@ -234,10 +238,7 @@ static int sfs_exchange_deadline(SfsClient *c, u16 flen, u8 type, u16 seq,
     sfs_dec_abort(&c->dec);
     for (;;) {
         u32 now = c->io->now(c->ctx);
-        if ((i32)(now - deadline) >= 0) {
-            c->timeouts++;
-            return OS32_ERR_HOSTDOWN;
-        }
+        if ((i32)(now - deadline) >= 0) goto expired;
         if ((i32)(now - retry) >= 0) {
             if (sent) c->resends++;
             if (c->io->put_until)
@@ -248,10 +249,7 @@ static int sfs_exchange_deadline(SfsClient *c, u16 flen, u8 type, u16 seq,
             retry = c->io->now(c->ctx) + SFS_LAN_RETRY_TICKS;
         }
         int b = c->io->get(c->ctx);
-        if ((i32)(c->io->now(c->ctx) - deadline) >= 0) {
-            c->timeouts++;
-            return OS32_ERR_HOSTDOWN;
-        }
+        if ((i32)(c->io->now(c->ctx) - deadline) >= 0) goto expired;
         if (b < 0) {
             c->io->idle(c->ctx);
             continue;
@@ -270,6 +268,12 @@ static int sfs_exchange_deadline(SfsClient *c, u16 flen, u8 type, u16 seq,
         }
         c->stray++;
     }
+
+expired:
+    if (sent && c->io->cancel)
+        c->io->cancel(c->ctx, c->tx, flen, deadline);
+    c->timeouts++;
+    return OS32_ERR_HOSTDOWN;
 }
 
 int sfs_client_hello_deadline(SfsClient *c, u32 nonce, u32 deadline)

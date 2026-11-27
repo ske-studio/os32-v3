@@ -37,6 +37,10 @@ typedef struct {
      * 切れたら OS32_ERR_TIMEOUT。期限付きの要求・片道は、これが有れば put の代わりに使う
      * (PM 決定 2026-11-07、C1・C3 の停止から。NET_HOSTSVC_DESIGN 「C1・C3 で決めたこと」)。 */
     int  (*put_until)(void *ctx, const u8 *buf, u32 n, u32 deadline);
+    /* Optional nonblocking, idempotent release after a put attempt. Called once
+     * synchronously by the owning foreground exchange. buf is valid only during
+     * this call. Do not retain arguments, defer, reenter, send, or dispatch. */
+    void (*cancel)(void *ctx, const u8 *buf, u32 n, u32 deadline);
 } SfsIo;
 
 /* 線を死んだと見なした理由 (診断用) */

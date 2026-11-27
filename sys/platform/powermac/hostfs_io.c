@@ -98,5 +98,5 @@ static int pm_hfs_put(void *ctx, const u8 *buf, u32 n)
 
 const SfsIo pm_hostfs_io = {
     pm_hfs_put, pm_hfs_get, pm_hfs_now, pm_hfs_idle,
-    pm_hfs_can_wait, pm_hfs_put_until
+    pm_hfs_can_wait, pm_hfs_put_until, 0
 };
