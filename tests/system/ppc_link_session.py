@@ -139,10 +139,7 @@ def exercise(vm, op, late):
     def reopened():
         # The host records READY before sending its response. Keep servicing
         # the exchange until the guest releases it, including any retries.
-        return ready() and word("rshell_active") and any(
-            e["parts"][:2] == ["RSH", "READY"] and
-            op.agent.ledger.get(e["link_rid"], {}).get("st") == "RELEASED"
-            for e in op.events[previous:])
+        return ready() and word("rshell_active") and op.ready_released(previous)
     wait(reopened, 30, "RSH reopen")
     if not observations:
         end = word("p3_end_count")

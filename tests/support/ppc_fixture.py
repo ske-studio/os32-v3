@@ -128,7 +128,51 @@ def clock_media():
     return iso, dict(make=args, hashes=hashes)
 
 
-def link_media(*, usb_trace=False, overflow=False):
+def meter_rpc(meter):
+    link = Path("sys/net/link.c")
+    trace = Path("tests/support/fixtures/ppc_link/rpc.inc").read_text()
+    source = edit(link.read_text(), "static struct link_handle link_h[LINK_HANDLES];",
+                  "static struct link_handle link_h[LINK_HANDLES];\n" + trace)
+    for marker, rid, field in (("e->w_due = 0;\n            e->last_tx_tick = link_platform_now();",
+                                "e->rid", "wdata"),
+                               ("e->rel_tick = link_platform_now();", "e->rel_rid", "release")):
+        tick = "e->last_tx_tick" if field == "wdata" else "e->rel_tick"
+        source = edit(source, marker, marker + f"\n                rpc_sent({rid}, {tick}, RPC_{field.upper()});")
+    meter("KB_MUT", link, source)
+
+    io = PM / "hostfs_link_io.c"
+    source = edit(io.read_text(), "static int phase;", """static int phase;
+extern void rpc_opened(int handle, u32 deadline);
+extern void rpc_expired(int handle, u32 now);""")
+    source = edit(source, "handle = rc;", "handle = rc;\n        rpc_opened(handle, until);")
+    source = edit(source, "if ((i32)(pm_hfs_now(0) - until) >= 0) {",
+                  """u32 now = pm_hfs_now(0);
+    if ((i32)(now - until) >= 0) {
+        if (handle >= 0) rpc_expired(handle, now);""")
+    meter("KB_MUT_EXTRA", io, source)
+
+
+def meter_capture(meter):
+    sink = Path("sys/kern/console/con_sink.c")
+    prefix, body = sink.read_text().split("int con_sink_capture(unsigned int op)")
+    body, suffix = body.split("int con_sink_capture_active", 1)
+    body = edit(body, "    con_sink_unlock(f);", """    if (op == CON_SINK_CAPTURE_FREEZE) p3_freeze_rc = rc;
+    if (op == CON_SINK_CAPTURE_END && rc == 0) ++p3_end_count;
+    con_sink_unlock(f);""")
+    suffix = edit(suffix, "void con_sink_owner_exit(int id)", """volatile int p3_exit_reader, p3_exit_owner;
+void con_sink_owner_exit(int id)""")
+    suffix = edit(suffix, "    if (id == CON_SINK_NO_READER) return;", """    p3_exit_owner = id;
+    p3_exit_reader = g_reader;
+    if (id == CON_SINK_NO_READER) return;""")
+    meter("KB_MUT", sink, prefix + "volatile int p3_freeze_rc;\nvolatile unsigned p3_end_count;\n"
+          + "int con_sink_capture(unsigned int op)" + body + "int con_sink_capture_active" + suffix)
+    heap = Path("sys/kern/mm/kmalloc.c")
+    alloc = "    void *p = kheap_alloc(&kernel_heap, size);"
+    meter("KB_MUT_EXTRA", heap, "volatile unsigned p3_alloc_failures;\n" +
+          edit(heap.read_text(), alloc, alloc + "\n    if (size && !p) ++p3_alloc_failures;"))
+
+
+def link_media(*, usb_trace=False, overflow=False, rpc_trace=False):
     directory = Path(os.environ["OS32_VERIFY_OUT"]).resolve() / "link-sh"
     directory.mkdir()
     user = directory / "user"
@@ -176,23 +220,10 @@ def link_media(*, usb_trace=False, overflow=False):
         } else accepting''')
     meter("PPC_SH_MUT", shell, "#include <stdio.h>\n" +
           edit(shell.read_text(), "        accepting = rsh_lan_execute(line);", stimuli))
-    sink = Path("sys/kern/console/con_sink.c")
-    prefix, body = sink.read_text().split("int con_sink_capture(unsigned int op)")
-    body, suffix = body.split("int con_sink_capture_active", 1)
-    body = edit(body, "    con_sink_unlock(f);", """    if (op == CON_SINK_CAPTURE_FREEZE) p3_freeze_rc = rc;
-    if (op == CON_SINK_CAPTURE_END && rc == 0) ++p3_end_count;
-    con_sink_unlock(f);""")
-    suffix = edit(suffix, "void con_sink_owner_exit(int id)", """volatile int p3_exit_reader, p3_exit_owner;
-void con_sink_owner_exit(int id)""")
-    suffix = edit(suffix, "    if (id == CON_SINK_NO_READER) return;", """    p3_exit_owner = id;
-    p3_exit_reader = g_reader;
-    if (id == CON_SINK_NO_READER) return;""")
-    meter("KB_MUT", sink, prefix + "volatile int p3_freeze_rc;\nvolatile unsigned p3_end_count;\n"
-          + "int con_sink_capture(unsigned int op)" + body + "int con_sink_capture_active" + suffix)
-    heap = Path("sys/kern/mm/kmalloc.c")
-    alloc = "    void *p = kheap_alloc(&kernel_heap, size);"
-    meter("KB_MUT_EXTRA", heap, "volatile unsigned p3_alloc_failures;\n" +
-          edit(heap.read_text(), alloc, alloc + "\n    if (size && !p) ++p3_alloc_failures;"))
+    if rpc_trace:
+        meter_rpc(meter)
+    else:
+        meter_capture(meter)
     execute = Path("sys/kern/exec/exec.c")
     flow = Path("tests/support/fixtures/ppc_link/flow.inc")
     meter("KB_MUT_THIRD", execute, execute.read_text() + "\n" + flow.read_text())

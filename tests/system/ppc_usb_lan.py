@@ -76,6 +76,11 @@ def exercise(vm, op, late):
     wait(lambda: "wdata" in gate, "suppressed SFS CALL WDATA")
     key("shift")
     wait(lambda: "release" in gate, "guest RELEASE of suppressed CALL")
+    # rpc.inc keeps the last sixteen request slots, tagged with their full rid.
+    offset = (gate["rid"] % 16) * 24
+    fields = ("rid", "deadline", "detected", "wdata", "release", "seen")
+    guest = {name: vm.word("rpc_trace", offset + 4*i, deadline) for i, name in enumerate(fields)}
+    vm.record("rpc ticks", dict(host=gate, guest=guest))
     ticks = (gate["release"] - gate["wdata"]) & 0xffffffff
     result = op.expect_once(rid, generation, b"cat: /host/f: Host is down\n", deadline)
     check(result["state"] == "done" and result["drop"] == 0, "incomplete cat failure")
@@ -109,7 +114,7 @@ def exercise(vm, op, late):
     check(ticks >= 80, EARLY)
 
 def verify():
-    media = link_media(usb_trace=True)
+    media = link_media(usb_trace=True, rpc_trace=True)
     version = subprocess.check_output(["qemu-system-ppc", "--version"], text=True)
     with ThreadPoolExecutor(2) as pool:
         jobs = [pool.submit(boot, cpu, "usb-lan", media, version, exercise, 180, "usb-mouse,id=mouse")

@@ -15,13 +15,55 @@ EARLY = "resumed before serial Enter"
 
 def exercise(vm, op, late):
     deadline = vm.deadline
+    sender = op.agent.notifier
+    last_ack = None
+    execute_seq = None
+    acknowledge = sender.ack
+
+    def ack(sess, epoch, seq, window):
+        nonlocal last_ack, execute_seq
+        if (sess, epoch) == (sender.sess, sender.epoch) and seq < sender.next_seq:
+            last_ack = seq
+            pending = op.operator.pending
+            for number, payload in sender.inflight:
+                if pending and payload is pending["execute"]:
+                    execute_seq = number
+        acknowledge(sess, epoch, seq, window)
+
+    sender.ack = ack
+
+    def observe(stage):
+        ready = op.latest_ready()
+        pending = op.operator.pending
+        vm.record("half-line", dict(stage=stage, ready_rid=ready,
+                  ready_state=op.agent.ledger.get(ready, {}).get("st"),
+                  generation=op.operator.generation, rid=pending["id"] if pending else None,
+                  delivery=pending["execute"].delivery if pending else None,
+                  execute_seq=next((n for n, payload in sender.inflight
+                                    if pending and payload is pending["execute"]), execute_seq),
+                  next_seq=sender.next_seq, inflight=[seq for seq, _ in sender.inflight],
+                  ack=last_ack, window=sender.window, silent=sender.silent))
+
+    try:
+        run_half_line(vm, op, deadline, observe)
+    except (Failure, TimeoutError) as exc:
+        if isinstance(exc, TimeoutError) or "deadline" in str(exc) or str(exc) == "initial cui READY":
+            observe("deadline")
+        raise
+    finally:
+        sender.ack = acknowledge
+
+
+def run_half_line(vm, op, deadline, observe):
     op.wait(lambda: op.operator.ready and op.operator.ready["mode"] == "cui"
-            and op.operator.ready["state"] != "running",
+            and op.operator.ready["state"] != "running" and op.ready_released(),
             min(deadline, time.monotonic() + 60), "initial cui READY")
+    observe("before input")
     vm.hold_serial_line(deadline)
     vm.keys("echo half", deadline)
     rid, generation = op.submit("echo resumed", deadline)
 
+    observe("submit")
     try:
         op.wait_delivery(rid, "acked", seconds=10)
         op.expect_pending(rid, "running", seconds=1)
