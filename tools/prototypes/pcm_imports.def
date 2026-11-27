@@ -166,6 +166,12 @@
       "source": "sys/dev/sound/cs4231/pcm_module.h",
       "context": "normal",
       "irq": true
+    },
+    {
+      "symbol": "pcm_module_irq_line",
+      "source": "sys/dev/sound/cs4231/pcm_module.h",
+      "context": "normal",
+      "irq": false
     }
   ]
 }

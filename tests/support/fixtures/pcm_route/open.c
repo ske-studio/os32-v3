@@ -13,6 +13,7 @@ static unsigned frame;
 static int playing;
 
 
+static unsigned expected_irq, expected_route;
 static unsigned bios, route, index_reg, regs[32], writes, route_writes;
 static int registered, owned, irq_busy, dma_busy, reject_set, reject_restore;
 static int retained, readback, stuck, drs_reads;
@@ -26,7 +27,7 @@ static void require(int ok, const char *message)
 
 unsigned inp(unsigned port)
 {
-    if (port == PCM_PORT_ROUTE) { readback = route == ((bios & 0xf8) | 2); return route; }
+    if (port == PCM_PORT_ROUTE) { readback = route == expected_route; return route; }
     if (port == PCM_PORT_WSSID) return PCM_WSSID_VALUE;
     if (port == PCM_PORT_R0) {
         if (stuck) require(model_if, "DRS wait with IF=0");
@@ -65,6 +66,7 @@ void outp(unsigned port, unsigned value)
     }
 }
 
+unsigned int pcm_module_irq_line(void) { return expected_irq; }
 int pcm_module_bios_route(void) { return bios; }
 int pcm_module_dma_acquire(const void *owner)
 {
@@ -81,13 +83,14 @@ void pcm_module_dma_release(const void *owner, int quarantine)
 }
 int irq_register(unsigned irq, irq_handler_fn fn, void *arg, unsigned flags)
 {
-    require(irq == 12, "IRQ12 open");
+    require(irq == expected_irq, "wrong PCM IRQ");
     if (irq_busy) return -1;
     registered = 1;
     return 0;
 }
 int irq_unregister(unsigned irq, irq_handler_fn fn, void *arg)
 {
+    require(irq == expected_irq, "wrong IRQ release");
     require(!owned, "IRQ returned before DMA");
     registered = 0;
     return 0;
@@ -166,8 +169,10 @@ static void exercise_hal(const char *scene)
 
 int main(int argc, char **argv)
 {
-    reserved_bit = argc > 3 ? 0x80 : 0;
+    reserved_bit = argc > 3 && !strcmp(argv[3], "reserved-bit") ? 0x80 : 0;
     bios = route = strtoul(argv[1], 0, 0);
+    expected_irq = argc > 3 && !strcmp(argv[3], "fm") ? 10 : 12;
+    expected_route = expected_irq == 10 ? 0x1a : ((bios & 0xf8) | 2);
     irq_busy = !strcmp(argv[2], "irq");
     dma_busy = !strcmp(argv[2], "dma");
     reject_set = !strcmp(argv[2], "mismatch");
@@ -186,7 +191,7 @@ int main(int argc, char **argv)
         require(rc && retained && route_writes == 1, "unverified route recovery");
         return 0;
     }
-    require(!rc && route == ((bios & 0xf8) | 2), "open route");
+    require(!rc && route == expected_route, "open route");
     if (!strcmp(argv[2], "drain")) {
         static u8 samples[PCM_RING_BYTES];
         playing = 1;

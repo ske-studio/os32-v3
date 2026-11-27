@@ -50,17 +50,19 @@ static int exercise(int dma, int fm, int value, int wss, int board, int expect)
     bios_route = -1;
     route_sampled = fm_called = pcm_called = accepted = route_reads = 0;
     boot_sound();
-    return fm_called && pcm_called == dma && accepted == expect;
+    return fm_called && pcm_called == dma && accepted == expect &&
+           (!expect || pcm_module_irq_line() == (fm ? 10u : 12u));
 }
 
 void _start(void)
 {
     int ok = exercise(0, 0, 0x20, 4, 0xff, 0) &&
-             exercise(1, 1, 0x20, 4, 0xff, 0) &&
+             exercise(1, 1, 0x20, 4, 0xff, 1) &&
              exercise(1, 0, 0x20, 0xff, 0xff, 0) &&
              exercise(1, 0, 0x20, 4, 0x60, 0);
     for (unsigned v = 0; v <= 255; ++v) {
         int valid = (v & 0x38) == 0x20 && ((v & 7) < 4 || (v & 7) == 7);
+        ok &= exercise(1, 1, v, 4, 0xff, v != 0xff && ((v & 7) < 4 || (v & 7) == 7));
         ok &= exercise(1, 0, v, 4, 0xff, valid);
     }
     ok &= exercise(1, 0, 0x61, 4, 0xff, 1);

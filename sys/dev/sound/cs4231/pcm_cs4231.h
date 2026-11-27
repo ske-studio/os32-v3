@@ -34,6 +34,8 @@
 
 /* WSS INT5 is PIC IRQ12. Preserve the BIOS INT field. */
 #define PCM_IRQ               12
+#define PCM_IRQ_INT41         10
+#define PCM_ROUTE_INT41_DMA1  0x1a
 #define PCM_DMA_CHAN          1
 
 /*  0F43h の WSS ID。下位 6 ビットが 000100b。 */
