@@ -104,3 +104,16 @@ UART trace、QMP 履歴、画面、要求と世代ごとの出力を evidence �
 ## PowerMac の長い出力
 
 7450 で110行を出力し、480秒内に truncated と正の drop、freeze の非零終了値を観測する。同じ VM で echo recovered の完全な応答を確認する。PPC-P3OVF-QEMU により延期中。
+
+## PowerMac の USB と RPC
+
+ppc_usb_lan は link-sh を 7450・7455 で各1回冷起動する（各180秒）。
+マウスのみの列挙を60秒、追加した鍵盤の列挙を30秒以内に確認する。
+agent 有効化前の最初の ESC で RSH が閉じ、USB の echo first は Ctrl-C 後の Enter で単独行 first を返す。
+RSH を開き cat /host/f の既知の内容を確認してから、次の SFS CALL の WDATA に対する応答を抑止する。
+Shift を送り、WDATA から同じ rid の RELEASE までの符号なし32ビットの tick 差を80〜200（両端含む）とする。
+cat の結果は単独行 cat: /host/f: Host is down。USB の単独行 hi、tick の進行、USB KEY、HC dead の不在を確認する。
+抑止解除後の cat で内容が戻り、鍵盤抜去で USB RELEASE が出て抜去中も LAN echo が返る。
+鍵盤再列挙は30秒以内、再接続後は USB と LAN でそれぞれ echo alive が成功する。
+rpc_ticks は期限を100から50に縮め、同じ観測列で80 tick 未満の RELEASE を検出する。
+OPEN による未完行取消の再開条件は台帳 PPC-USB-LAN に記す。
