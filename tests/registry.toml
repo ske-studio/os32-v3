@@ -664,6 +664,22 @@ gates = ["push", "main"]
 mutations = [{ id = "drop_hfs_cancel", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/hostfs_link_io.c", old = "pm_hfs_put_until, pm_hfs_cancel", new = "pm_hfs_put_until, 0", fail = "hostfs cancel left pending" }, { id = "keep_expired_reply", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/hostfs_link_io.c", old = "        t->rx_pos = t->rx_end;", new = "        (void)t; /* expired reply kept */", fail = "expired reply" }]
 
 [[check]]
+id = "input_policy_abi"
+spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
+subsystem = "input"
+level = "L1"
+sources = ["sys/input/input_delivery.h", "sys/input/input_delivery.c", "sys/input/input_policy.c", "sys/kapi/input_policy_provider.c", "tests/support/fixtures/input_policy/wire.c", "tests/support/fixtures/input_policy/layout.rs"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"], ppc = ["link-sh"] }
+needs = []
+expect = "Action と Key の全 offset とサイズ、Rust の v2 LE 列と i386・PowerPC の実デコードが一致する"
+limits = "公開前の provider と内部配送を実行。生成 syscall は対象外"
+gates = ["push", "main"]
+mutations = [{ id = "swap_action_generation", config = "link-sh", when = "after_build", replace = "sys/input/input_delivery.h", old = "action, command_gen", new = "command_gen, action", fail = "invalid delivery layout" },
+    { id = "release_wrong_policy_gen", config = "pc98", when = "after_build", replace = "sys/input/input_policy.c", old = "owner == saved_owner && gen == saved_gen", new = "owner == saved_owner", fail = "private provider or v2 LE mismatch" },
+    { id = "dequeue_while_exclusive", config = "pc98", when = "after_build", replace = "sys/input/input_policy.c", old = "now.owner != owner || in2_excl_keyboard()", new = "now.owner != owner", fail = "private provider or v2 LE mismatch" }]
+
+[[check]]
 id = "input_focus"
 spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
 subsystem = "input"
