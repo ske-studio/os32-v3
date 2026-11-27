@@ -13,4 +13,4 @@ CI の 6 指定は `.github/workflows/restructure-build.yml` の powerpc ジョ�
 未移行の外部手動観測には `link_sh_run.py` と `root_lz4_layout_run.py` を使う。
 前者はシェル観測用の `tests/support/fixtures/ppc_link/flow.inc` を読み、後者は `--inventory` で渡された計測表を使う。生成手順は [root LZ4 設計](../../docs/decisions/ppc/PPC_ROOT_LZ4_DESIGN.md) の「手動観測用の計測表」を参照。
 
-USB と RPC の受入は共通入口の `run --check ppc_usb_lan`、半行中の遠隔要求は `run --check ppc_usb_lanq` を使う。
+半行中の遠隔要求は `run --check ppc_usb_lanq` を使う。
