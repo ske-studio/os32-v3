@@ -374,3 +374,17 @@ expect = "再生中に取り逃した PI を tick が I24 の読みと 0 書き�
 limits = "HAL 再生中のポート模型。実機の配線、割り込みの時刻、停止遷移は対象外"
 gates = ["push", "main"]
 mutations = [{ id = "omit_tick_ack", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "if (g_pcm.state == PCM_ST_RUNNING) (void)pcm_codec_ack();", new = "(void)0;", fail = "missed PI after tick" }]
+
+[[check]]
+id = "v86_timeout_image"
+spec = { path = "docs/design/kernel/v86/v86.md", section = "CUI の FD 起動と既定の時間切れ" }
+subsystem = "system"
+level = "L1"
+sources = ["tests/support/fixtures/v86_timeout/generate.py"]
+environment = "python"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "2HD RAW は 1261568 バイト、先頭は STI と自分に戻る JMP、残りは全てゼロ"
+limits = "像の構造を検査する。既定の時間切れと終了後の再 attach はゲスト試験で確認する"
+gates = ["push", "main"]
+mutations = [{ id = "oversized_timeout_image", config = "pc98", when = "after_build", append = "build/out/tests/v86_timeout.img", fail = "unexpected RAW size: 1261569" }]
