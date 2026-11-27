@@ -131,7 +131,8 @@ def clock_media():
 RPC_FIELDS = """rid generation start deadline seen wdata release prev prev_event end end_event
                 end_round source timeout_tick timeout_round timeout_event close_tick close_round
                 close_event closes return_tick return_event reason reason_tick poll_tick poll_round
-                can_wait prior_poll prior_tick prior_wait late_poll late_tick late_wait first_client_event first_client_tick""".split()
+                can_wait prior_poll prior_tick prior_wait late_poll late_tick late_wait first_client_event first_client_tick
+                prev_client_event prev_client_tick""".split()
 
 
 def meter_rpc(meter):

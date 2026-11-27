@@ -113,4 +113,4 @@ UART trace、QMP 履歴、画面、要求と世代ごとの出力を evidence �
 
 7450・7455 の link-sh で初回 ESC・Ctrl-C、正常 cat、応答抑止時の単独 HOSTDOWN、USB 入力の進行、再 cat、抜去中の LAN と再列挙後の USB/LAN を確認する。各 CPU の期限は 180 秒。WDATA から RELEASE の host 差は 80〜200 tick。
 
-同一 full rid の OPEN に結び付けた設定幅は 100 tick。待機可能な poll と client の実比較で prev < deadline ≤ end を最初に満たす周回に close が 1 回あり、最初の終了理由は POLL または CLIENT。CLIENT の timeout・close・return はこの順で、timeout と close は同一周回。POLL の通知は close 後。変異 rpc_ticks は設定幅 50 を直接観測し、両 CPU が確認した時だけ suppressed CALL configured for 50 ticks を返す。
+同一 full rid の OPEN に結び付けた設定幅は 100 tick。待機可能な poll と client の実比較で prev < deadline ≤ end を最初に満たす周回に close が 1 回あり、最初の終了理由は POLL または CLIENT。CLIENT の timeout・close・return はこの順で、timeout と close は同一周回。POLL の通知は close 後。prev と end は記録の作り (prev は期限未満の最後の比較、end は最初の期限以上の比較) から順序が決まるので、判定の決め手は end の周回と close の周回の一致と close 1 回。幅は OPEN の直後の 1 回の時計の読みから作り、cat の完了と RELEASE の直後に読んで、USB・出力・重複の検査より先に分類する。変異 rpc_ticks は設定幅 50 を直接観測し、両 CPU が確認した時だけ suppressed CALL configured for 50 ticks を返す。

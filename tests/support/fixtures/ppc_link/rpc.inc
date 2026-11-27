@@ -99,9 +99,14 @@ u32 rpc_compare(u32 now, u32 source)
     if (source == RPC_CLIENT) ++foreground;
     if (!s) return now;
     u32 event = ++sequence;
-    if (source == RPC_CLIENT && !s->first_client_event && (i32)(now - s->deadline) >= 0) {
-        s->first_client_event = event;
-        s->first_client_tick = now;
+    if (source == RPC_CLIENT && !s->first_client_event) {
+        if ((i32)(now - s->deadline) < 0) {
+            s->prev_client_event = event;
+            s->prev_client_tick = now;
+        } else {
+            s->first_client_event = event;
+            s->first_client_tick = now;
+        }
     }
     if (!s->end_event) {
         if ((i32)(now - s->deadline) >= 0) {

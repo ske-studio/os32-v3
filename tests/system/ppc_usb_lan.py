@@ -21,12 +21,63 @@ def ordered(before, after):
     return 0 < distance(before, after) < 0x80000000
 
 
+def client_crossing(g):
+    if not (g["prev_client_event"] and g["first_client_event"] and
+            ordered(g["prev_client_event"], g["first_client_event"]) and
+            ordered(g["prev_client_tick"], g["deadline"]) and
+            distance(g["deadline"], g["first_client_tick"]) < 0x80000000):
+        return False
+    if g["source"] == 2:
+        return (g["first_client_event"], g["first_client_tick"]) == (g["end_event"], g["end"])
+    return (g["source"] == 1 and ordered(g["end_event"], g["first_client_event"]) and
+            distance(g["end"], g["first_client_tick"]) < 0x80000000)
+
+
+def deadline_cause(g):
+    deadline = g["deadline"]
+    missing = "incomplete deadline measurement"
+    if not (g["seen"] == 7 and g["source"] in (1, 2) and
+            all(g[k] for k in ("prev_event", "end_event", "end_round", "close_event", "close_round",
+                               "prior_poll", "poll_round")) and
+            client_crossing(g) and ordered(g["prior_tick"], deadline) and
+            g["prior_wait"] in (0, 1) and g["can_wait"] in (0, 1) and
+            ordered(g["prev_event"], g["end_event"]) and ordered(g["prev"], deadline) and
+            distance(deadline, g["end"]) < 0x80000000 and
+            ordered(g["end_event"], g["close_event"])):
+        return missing
+    late = g["late_poll"]
+    if late:
+        if not (ordered(g["prior_poll"], late) and
+                distance(deadline, g["late_tick"]) < 0x80000000 and
+                distance(late, g["poll_round"]) < 0x80000000 and
+                distance(g["late_tick"], g["poll_tick"]) < 0x80000000 and
+                g["late_wait"] in (0, 1) and
+                (late != g["poll_round"] or (g["late_tick"], g["late_wait"]) ==
+                 (g["poll_tick"], g["can_wait"]))):
+            return missing
+    elif (g["prior_poll"], g["prior_tick"], g["prior_wait"]) != (
+            g["poll_round"], g["poll_tick"], g["can_wait"]):
+        return missing
+    if ordered(g["end_round"], g["close_round"]):
+        return "close delayed after valid deadline observation"
+    if g["close_round"] != g["end_round"] or not ordered(deadline, g["end"]):
+        return missing
+    if late and ordered(late, g["end_round"]):
+        if not g["late_wait"]:
+            return "foreground poll reached but unable to wait"
+        return missing
+    if ordered(g["prior_poll"], g["end_round"]):
+        return "no foreground deadline comparison before observing round"
+    return missing
+
+
 def check_close(g):
     check(g["seen"] == 7, "missing OPEN, WDATA or RELEASE")
     check(g["reason"] == g["source"] and g["reason"] in (1, 2), "first termination cause")
     check(g["prev_event"] and g["end_event"] and ordered(g["prev_event"], g["end_event"]) and
           ordered(g["prev"], g["deadline"]) and distance(g["deadline"], g["end"]) < 0x80000000,
           "missing first foreground deadline crossing")
+    check(client_crossing(g), "missing client deadline crossing")
     check(g["closes"] == 1 and g["close_event"] and g["close_round"] == g["end_round"] and
           ordered(g["end_event"], g["close_event"]), "close outside first observing round")
     check(g["timeout_event"] and g["return_event"] and ordered(g["close_event"], g["return_event"]),
@@ -52,13 +103,16 @@ def exercise(vm, op, late):
     def screen_line(text):
         return any(row.strip(" \x00") == text for row in vm.screen(deadline).splitlines())
 
-    def key(code, modifiers=()):
+    def send_key(code, modifiers=()):
         offset = len(serial())
         codes = (*modifiers, code)
         events = [{"type": "key", "data": {"down": down, "key": {"type": "qcode", "data": c}}}
                   for down, group in ((True, codes), (False, reversed(codes))) for c in group]
         vm.command("input-send-event", deadline, events=events)
-        wait(lambda: serial()[offset:].count(b" down=0") >= len(codes), "USB key release " + code)
+        return lambda: wait(lambda: serial()[offset:].count(b" down=0") >= len(codes), "USB key release " + code)
+
+    def key(code, modifiers=()):
+        send_key(code, modifiers)()
 
     def type_line(line):
         for char in line:
@@ -100,21 +154,33 @@ def exercise(vm, op, late):
     op.next_call = gate
     rid, generation = op.submit("cat /host/f", deadline)
     wait(lambda: "wdata" in gate, "suppressed SFS CALL WDATA")
-    key("shift")
+    shift_released = send_key("shift")
     wait(lambda: "release" in gate, "guest RELEASE of suppressed CALL")
-    result = op.expect_once(rid, generation, b"cat: /host/f: Host is down\n", deadline)
+    wait(lambda: op.outputs(rid, generation), "suppressed cat completion")
     offset = (gate["rid"] % 16) * len(RPC_FIELDS) * 4
-    guest = {name: vm.word("rpc_trace", offset + 4*i, deadline) for i, name in enumerate(RPC_FIELDS)}
-    vm.record("rpc ticks", dict(host=gate, guest=guest))
-    check(guest["rid"] == gate["rid"] and guest["seen"] & 1 and guest["generation"],
+
+    def read(name):
+        return vm.word("rpc_trace", offset + 4 * RPC_FIELDS.index(name), deadline)
+
+    tag = {name: read(name) for name in ("rid", "seen", "generation", "start", "deadline")}
+    check(tag["rid"] == gate["rid"] and tag["seen"] & 1 and tag["generation"],
           "missing tagged CALL deadline")
-    width = distance(guest["start"], guest["deadline"])
+    width = distance(tag["start"], tag["deadline"])
     check(width in (50, 100), f"unexpected CALL width {width}")
 
+    def check_guest():
+        guest = {name: tag[name] if name in tag else read(name) for name in RPC_FIELDS}
+        vm.record("rpc ticks", dict(host=gate, guest=guest))
+        try:
+            check_close(guest)
+            ticks = distance(gate["wdata"], gate["release"])
+            check(80 <= ticks <= 200, f"SFS RELEASE after {ticks} ticks")
+        except Failure as exc:
+            raise Failure(f"{exc} ({deadline_cause(guest)})") from exc
+
     def check_host():
+        result = op.expect_once(rid, generation, b"cat: /host/f: Host is down\n", deadline)
         check(result["state"] == "done" and result["drop"] == 0, "incomplete cat failure")
-        ticks = distance(gate["wdata"], gate["release"])
-        check(80 <= ticks <= 200, f"SFS RELEASE after {ticks} ticks")
 
     def recovery():
         key("esc")
@@ -144,10 +210,14 @@ def exercise(vm, op, late):
         open_shell()
         command("echo alive", b"alive\n")
 
-    for observation in (lambda: check_close(guest), check_host, recovery):
+    check_observations(width, vm, (check_guest, shift_released, check_host, recovery))
+
+
+def check_observations(width, vm, observations):
+    for observation in observations:
         try:
             observation()
-        except (Failure, TimeoutError, RuntimeError, OSError, ValueError) as exc:
+        except Exception as exc:  # width 50 is already settled; later diagnostics must not hide it
             if width != 50:
                 raise
             vm.record("short CALL diagnostics", str(exc))
