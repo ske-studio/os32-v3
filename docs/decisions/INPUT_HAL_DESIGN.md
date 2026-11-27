@@ -357,10 +357,10 @@ R は各 ≤350 行の観測単位に分割する。既済み 7d は正常対照
 |A0z、sol の原子的切替 ≤400 行例外|sdk/kapi.json 末尾追加、version と shared header の KAPI_VERSION を同期。C と Rust の生成器を実行し、両機種の実 provider、関数表、要求版、KAPI_SPEC・README・INDEX を同時更新。kapi_abi・kapi_sync・c_dialect、make clean → make all、PPC 像リンク。v91 から先行版が入った場合は末尾と次版を再採番。外部 apps/game は H-7 に従う|
 |共通ラッパー ≤380 行|userland/lib/input に文脈・操作ラッパーを置き、既存ゲームの input_bind とは独立に SDK の結果・失敗を伝える|
 |U2-x0 / U2-p0 各 ≤350 行|x0 が共通 shell_loop・exec 引数と PC-98 入口、p0 が pm_shell_loop_ops の機種入口と検証を持つ。PC-98 と PPC の実入口で初回・fallback・再起動の最初の poll まで LINE_EDIT+ISIG/ICANON。GUI と通常子は対象外。x0 後に INPUT-S4-CANCEL を実機で確認|
-|U2 各 ≤350 行|両 shell の prompt・poll・組込 begin/end・外部子の親復帰・EOF/ESC を通す|
+|U2 各 ≤350 行|**最初に ACTION の配送の owner の実打鍵を Action のリングへ積む結線** (input_delivery_action、同じ消費入力を byte に積まない — A0z の後、それまで action_read は 0 件、PM の決定 2026-11-28)。両 shell の prompt・poll・組込 begin/end・外部子の親復帰・EOF/ESC を通す|
 |E-x / E-p 各 ≤380 行|U2 と M6/M7 後、arch adapter を exec_abort に接続。RUNNING の真正な中断だけを同世代へ配送、IME 取消と表示復帰、PC-98 CTRL+STOP と PPC Ctrl+Pause の救済を確認|
 |L 各 ≤350 行|両 E 後、input_legacy の serial/LAN/注入を sc=0 で一度だけ解釈し、peek 無副作用|
-|G[n] 各 ≤380 行|A0z・共通ラッパー後に CUI と並行。WM が評価済み Key を一度配送、独占・焦点・消費 make/break を R と同時に通す|
+|G[n] 各 ≤380 行|A0z・共通ラッパー後に CUI と並行。**最初に実打鍵の採取 (input_capture_key) から Key のリングへ積む結線** (input_delivery_key、採取時の評価済み世代を持つ — A0z は口の公開だけで、それまで key_read は 0 件、PM の決定 2026-11-28)。WM が評価済み Key を一度配送、独占・焦点・消費 make/break を R と同時に通す|
 
 os32powerpc へは公開 layout・HID provider 初期化契約・共通 exec 引数・R の期待を渡す。担当は PPC provider の BE 照合、p0、E-p、7450/7455 の USB/LAN CUI と GUI・独占の退行確認。QEMU の記録と G4 実機の未確認項目を分けて報告する。
 
