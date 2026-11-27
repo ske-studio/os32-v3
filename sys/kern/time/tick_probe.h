@@ -49,7 +49,7 @@ void tick_probe_device_end(unsigned int id, struct tp_device_mark m, unsigned in
 void tick_probe_pio_begin(void);
 void tick_probe_pio_end(void);
 enum { TP_S1_IDLE = 4, TP_S1_WAIT, TP_S1_DUE, TP_S1_FIXTURE };
-enum { TP_IRQ10_SHOW = 8, TP_TICKACK_ON, TP_TICKACK_OFF, TP_PCMIRQ_10, TP_PCMIRQ_12 };
+enum { TP_IRQ10_SHOW = 8, TP_TICKACK_ON, TP_TICKACK_OFF, TP_PCMIRQ_10, TP_PCMIRQ_12, TP_PCMIRQ_CONTROL };
 struct irq10_event {
     unsigned int count, bits;
     unsigned long long first;
@@ -69,11 +69,14 @@ struct irq10_pcm {
     unsigned int route_count, route_step, route_value;
     unsigned int source, i24, r2, r0, irr, isr, imr, master_imr;
     unsigned int tick_pi, tick_acks;
+    unsigned long long before_play, after_play;
+    unsigned int sampling, arrivals_saved, samples_read;
+    struct { unsigned long long tsc; unsigned int i24, r2, batch; } sample[4];
 };
 struct irq10_diag {
     unsigned long long arrivals, first, window_start;
     unsigned long long irq12_arrivals, irq12_first;
-    unsigned int pcmirq, pcm_busy, irq12_owned;
+    unsigned int pcmirq, pcm_busy, irq12_owned, irq12_blocked, mask_control;
     int (*v86_open)(void);
     unsigned int tickack, attached, has_irq, command, line, pin, pirq[4];
     int attach_rc;

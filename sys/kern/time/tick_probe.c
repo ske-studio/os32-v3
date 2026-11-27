@@ -194,11 +194,16 @@ void tick_probe_irq_enter(unsigned int irq)
     sw_irq(irq);
 #endif
     if (irq == 12) {
-        if (++irq10_diag.irq12_arrivals == 1) {
+        struct irq10_pcm *p = &irq10_diag.pcm;
+        int save = p->sampling && p->arrivals_saved < 4;
+        if (++irq10_diag.irq12_arrivals == 1 || save) {
+            unsigned long long t = 0;
 #ifndef TICK_PROBE_HOST
             if (arch_cpu_has_tsc())
 #endif
-                irq10_diag.irq12_first = now();
+                t = now();
+            if (irq10_diag.irq12_arrivals == 1) irq10_diag.irq12_first = t;
+            if (save) p->sample[p->arrivals_saved++].tsc = t;
         }
         return;
     }
@@ -399,14 +404,15 @@ int tick_probe_control(struct tp_control *c)
 {
     /* Caller is cooperative, IF=1. Freeze with a tiny raw CLI section. */
 #ifndef TICK_PROBE_HOST
-    if (c->action >= TP_IRQ10_SHOW && c->action <= TP_PCMIRQ_12) {
+    if (c->action >= TP_IRQ10_SHOW && c->action <= TP_PCMIRQ_CONTROL) {
         if (data.running && c->action < TP_PCMIRQ_10) return -1;
         unsigned int flags = irq_save();
         if (c->action >= TP_PCMIRQ_10) {
-            if (irq10_diag.pcm_busy || (c->action == TP_PCMIRQ_12 && legacy_session_open())) {
+            if (irq10_diag.pcm_busy || (c->action != TP_PCMIRQ_10 && (irq10_diag.irq12_blocked || legacy_session_open()))) {
                 irq_restore(flags);
                 return -1;
             }
+            irq10_diag.mask_control = c->action == TP_PCMIRQ_CONTROL;
             irq10_diag.pcmirq = c->action == TP_PCMIRQ_12 ? 12 : 10;
         } else if (c->action != TP_IRQ10_SHOW)
             irq10_diag.tickack = c->action == TP_TICKACK_ON;

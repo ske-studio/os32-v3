@@ -53,7 +53,14 @@ static void show_irq10(const struct irq10_diag *d)
     cycles("irq10-total", d->arrivals); cycles("first-tsc", d->first);
     cycles("boot-window-tsc", d->window_start); kprintf(7, "\n");
     cycles("irq12-total", d->irq12_arrivals); cycles("first-tsc", d->irq12_first);
-    kprintf(7, "pcmirq=%u\n", d->pcmirq);
+    kprintf(7, "pcmirq=%u control=%u irq12-blocked=%u\n", d->pcmirq, d->mask_control, d->irq12_blocked);
+    cycles("before-play", d->pcm.before_play); cycles("after-play", d->pcm.after_play);
+    kprintf(7, "\n");
+    for (unsigned int i = 0; i < d->pcm.arrivals_saved; ++i) {
+        cycles("arrival-tsc", d->pcm.sample[i].tsc);
+        kprintf(7, "next-tick I24=%02x R2=%02x batch=%u\n", d->pcm.sample[i].i24,
+                d->pcm.sample[i].r2, d->pcm.sample[i].batch);
+    }
     kprintf(7, "OHCI 0:13.1 captured=%u attach=%d has_irq=%u enable=%08x status=%08x control=%08x\n",
             d->attached, d->attach_rc, d->has_irq, d->enable, d->status, d->control);
     kprintf(7, "COMMAND=%04x LINE=%u PIN=%u PIRQ[60..63]=%02x %02x %02x %02x\n",

@@ -61,7 +61,7 @@ static const struct v86_ident_ent {
 int v86_session_begin(u32 owner)
 {
 #ifdef TICK_PROBE
-    if (irq10_diag.irq12_owned) return -1;
+    if (irq10_diag.irq12_owned || irq10_diag.irq12_blocked) return -1;
 #endif
     if (v86_session.open || v86_session.closing || v86_session.release_pending) {
         return -1;              /* 二重セットアップ */

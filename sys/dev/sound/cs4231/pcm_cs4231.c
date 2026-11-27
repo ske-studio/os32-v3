@@ -124,6 +124,36 @@ static void capture_regs(struct irq10_regs *r)
     r->gen = diag->pcm.generation;
     r->valid = 1;
 }
+/* IF=0. Poll only the cascade and slave IR4, and EOI only a polled ISR.
+ * A higher-priority ISR can prevent polling. Keep IRQ12 quarantined then. */
+static int drain_irq12(void)
+{
+    unsigned int master = inp(PIC1_DATA), slave = inp(PIC2_DATA);
+    outp(PIC2_CMD, OCW3_IRR);
+    if (!(inp(PIC2_CMD) & IRQ12_IMR_BIT)) return 1;
+    outp(PIC1_DATA, 0xff ^ (1U << ICU_SLAVEID));
+    outp(PIC2_DATA, 0xff ^ IRQ12_IMR_BIT);
+    outp(PIC1_CMD, 0x0c);
+    if (inp(PIC1_CMD) == (0x80 | ICU_SLAVEID)) {
+        outp(PIC2_CMD, 0x0c);
+        if (inp(PIC2_CMD) == 0x84) outp(PIC2_CMD, 0x64);
+        outp(PIC1_CMD, 0x60 | ICU_SLAVEID);
+    }
+    outp(PIC2_DATA, slave);
+    outp(PIC1_DATA, master);
+    outp(PIC1_CMD, OCW3_IRR);
+    outp(PIC2_CMD, OCW3_IRR);
+    return !(inp(PIC2_CMD) & IRQ12_IMR_BIT);
+}
+
+static void begin_irq12_window(void)
+{
+    if (diag->irq12_owned && !diag->pcm.sampling) {
+        diag->pcm.before_play = diag->irq12_arrivals;
+        diag->pcm.sampling = 1;
+    }
+}
+
 static void capture_start(void)
 {
     struct irq10_pcm *p = &diag->pcm;
@@ -137,6 +167,16 @@ static int diag_ack(int tick)
     struct irq10_pcm *p = &diag->pcm;
     unsigned int flags = irq_save();
     u8 bits = cs_read(PCM_I_ALTSTAT);
+    if (tick && p->samples_read < p->arrivals_saved) {
+        unsigned int batch = p->arrivals_saved - p->samples_read;
+        unsigned int r2 = inp(PCM_PORT_R2);
+        while (p->samples_read < p->arrivals_saved) {
+            unsigned int i = p->samples_read++;
+            p->sample[i].i24 = bits;
+            p->sample[i].r2 = r2;
+            p->sample[i].batch = batch;
+        }
+    }
     if (bits & PCM_ALT_PI) {
         if (!p->source) {
             p->source = tick ? 2 : 1;
@@ -683,7 +723,13 @@ static void pcm_release(int leak)
 #ifdef TICK_PROBE
     unsigned int flags = irq_save();
     if (diag->irq12_owned) {
-        outp(PIC2_DATA, (inp(PIC2_DATA) & ~IRQ12_IMR_BIT) | saved_irq12_mask);
+        diag->pcm.after_play = diag->irq12_arrivals;
+        diag->pcm.sampling = 0;
+        outp(PIC2_DATA, inp(PIC2_DATA) | IRQ12_IMR_BIT);
+        outp(PCM_PORT_ROUTE, PCM_ROUTE_INT41_DMA1);
+        if (!drain_irq12() || leak) diag->irq12_blocked = 1;
+        if (!diag->irq12_blocked)
+            outp(PIC2_DATA, (inp(PIC2_DATA) & ~IRQ12_IMR_BIT) | saved_irq12_mask);
         diag->irq12_owned = 0;
     }
     irq_restore(flags);
@@ -758,15 +804,15 @@ static int pcm_open_device(u32 rate, u32 period, void (*advance)(void))
     /* 巻き戻しも pcm_release を通るので、**1 度だけ**の錠を先に外す。 */
 #ifdef TICK_PROBE
     unsigned int flags = irq_save();
-    if (diag->pcmirq == 12) {
-        if (diag->v86_open()) {
+    if (diag->pcmirq == 12 || diag->mask_control) {
+        if (diag->irq12_blocked || diag->v86_open()) {
             irq_restore(flags);
             return PCM_ERR_BUSY;
         }
         unsigned int imr = inp(PIC2_DATA);
         saved_irq12_mask = imr & IRQ12_IMR_BIT;
         diag->irq12_owned = 1;
-        outp(PIC2_DATA, imr & ~IRQ12_IMR_BIT);
+        outp(PIC2_DATA, imr | IRQ12_IMR_BIT);
     }
     diag->pcm_busy = 1;
     irq_restore(flags);
@@ -811,6 +857,16 @@ static int pcm_open_device(u32 rate, u32 period, void (*advance)(void))
     g_pcm.rate = rate;
     g_pcm.state = PCM_ST_OPEN;
 #ifdef TICK_PROBE
+    if (diag->irq12_owned) {
+        flags = irq_save();
+        if (!drain_irq12()) {
+            diag->irq12_blocked = 1;
+            irq_restore(flags);
+            return pcm_open_fail(OS32_ERR_IO);
+        }
+        outp(PIC2_DATA, inp(PIC2_DATA) & ~IRQ12_IMR_BIT);
+        irq_restore(flags);
+    }
     capture_regs(&diag->pcm.open);
     diag->capture(&diag->pcm_open, 0);
 #endif
@@ -835,6 +891,9 @@ static void pcm_start(void)
 
     n = pcm_seq_start(&ops);
     f = irq_save();
+#ifdef TICK_PROBE
+    begin_irq12_window();
+#endif
     pcm_run(ops, n, 0, 0);
 #ifdef TICK_PROBE
     capture_start();
@@ -1071,6 +1130,9 @@ int pcm_codec_start(void)
      * the ring, so neither the legacy RING_FILL nor TIMEBASE runs here. */
     const struct pcm_op *ops;
     int n = pcm_seq_restart(&ops);
+#ifdef TICK_PROBE
+    begin_irq12_window();
+#endif
     if (pcm_run(ops, n, 0, 0) < 0) return 1; /* setup failed before unmask */
 #ifdef TICK_PROBE
     capture_start();
