@@ -93,7 +93,18 @@ static void lan_idle(void *ctx)
 { if (lan_callable()) candidate.io.idle(ctx); }
 static int lan_can_wait(void *ctx)
 { return lan_callable() ? candidate.io.can_wait(ctx) : 0; }
-const SfsIo sfs_lan_io = {lan_put, lan_get, lan_now, lan_idle, lan_can_wait, lan_put_until, 0};
+static void lan_cancel(void *ctx, const u8 *buf, u32 n, u32 deadline)
+{
+    if (lan_callable()) candidate.io.cancel(ctx, buf, n, deadline);
+}
+static void lan_accept_hello(void *ctx)
+{
+    if (lan_callable()) candidate.io.accept_hello(ctx);
+}
+const SfsIo sfs_lan_io = {
+    lan_put, lan_get, lan_now, lan_idle, lan_can_wait, lan_put_until,
+    lan_cancel, lan_accept_hello
+};
 
 int lan_module_irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsigned int flags)
 {

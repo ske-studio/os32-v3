@@ -123,6 +123,22 @@ static void sfs_note_fail(SfsClient *c)
         c->dead = SFS_DEAD_FAILS;
 }
 
+static int sfs_accept_hello(SfsClient *c, const SfsFrame *f)
+{
+    if (sfs_get16(f->payload + SFS_HELLO_RSP_VER) != SFS_VERSION ||
+        sfs_get16(f->payload + SFS_HELLO_RSP_MAX) < SFS_MAX_PAYLOAD) return OS32_ERR_IO;
+    if (c->io->accept_hello) c->io->accept_hello(c->ctx);
+    if (sfs_get16(f->payload + SFS_HELLO_RSP_MAX) < c->max_payload)
+        /* A smaller peer falls back to the serial wire limit. */
+        c->max_payload = SFS_MAX_PAYLOAD;
+    c->dec.max_payload = c->max_payload;
+    c->sid = f->sid;
+    c->seq = 0;
+    c->fails = 0;
+    c->dead = SFS_DEAD_NONE;
+    return 0;
+}
+
 int sfs_client_hello(SfsClient *c, u32 nonce)
 {
     u8 pl[SFS_HELLO_REQ_LEN];
@@ -136,17 +152,7 @@ int sfs_client_hello(SfsClient *c, u32 nonce)
     flen = sfs_encode(c->tx, SFS_T_HELLO, 0, 0, pl, SFS_HELLO_REQ_LEN);
     if (sfs_exchange(c, flen, SFS_T_HELLO, 0, 1, nonce, &f) != 0)
         return OS32_ERR_IO;
-    if (sfs_get16(f.payload + SFS_HELLO_RSP_VER) != SFS_VERSION ||
-        sfs_get16(f.payload + SFS_HELLO_RSP_MAX) < SFS_MAX_PAYLOAD) return OS32_ERR_IO;
-    if (sfs_get16(f.payload + SFS_HELLO_RSP_MAX) < c->max_payload)
-        /* A smaller peer falls back to the serial wire limit. */
-        c->max_payload = SFS_MAX_PAYLOAD;
-    c->dec.max_payload = c->max_payload;
-    c->sid = f.sid;
-    c->seq = 0;
-    c->fails = 0;
-    c->dead = SFS_DEAD_NONE;
-    return 0;
+    return sfs_accept_hello(c, &f);
 }
 
 static void sfs_note_rtt(SfsClient *c, u32 lo, u32 hi, int valid)
@@ -246,7 +252,9 @@ static int sfs_exchange_deadline(SfsClient *c, u16 flen, u8 type, u16 seq,
             else
                 (void)c->io->put(c->ctx, c->tx, flen);
             sent++;
-            retry = c->io->now(c->ctx) + SFS_LAN_RETRY_TICKS;
+            now = c->io->now(c->ctx);
+            if ((i32)(now - deadline) >= 0) goto expired;
+            retry = now + SFS_LAN_RETRY_TICKS;
         }
         int b = c->io->get(c->ctx);
         if ((i32)(c->io->now(c->ctx) - deadline) >= 0) goto expired;
@@ -263,6 +271,7 @@ static int sfs_exchange_deadline(SfsClient *c, u16 flen, u8 type, u16 seq,
                 return OS32_ERR_IO;
         }
         if (sfs_match(c, &f, type, seq, hello, nonce)) {
+            if ((i32)(c->io->now(c->ctx) - deadline) >= 0) goto expired;
             *got = f;
             return sent;
         }
@@ -270,6 +279,7 @@ static int sfs_exchange_deadline(SfsClient *c, u16 flen, u8 type, u16 seq,
     }
 
 expired:
+    sfs_dec_abort(&c->dec);
     if (sent && c->io->cancel)
         c->io->cancel(c->ctx, c->tx, flen, deadline);
     c->timeouts++;
@@ -287,17 +297,7 @@ int sfs_client_hello_deadline(SfsClient *c, u32 nonce, u32 deadline)
     u16 flen = sfs_encode(c->tx, SFS_T_HELLO, 0, 0, pl, sizeof(pl));
     int rc = sfs_exchange_deadline(c, flen, SFS_T_HELLO, 0, 1, nonce, &f, deadline);
     if (rc < 0) return rc;
-    if (sfs_get16(f.payload + SFS_HELLO_RSP_VER) != SFS_VERSION ||
-        sfs_get16(f.payload + SFS_HELLO_RSP_MAX) < SFS_MAX_PAYLOAD)
-        return OS32_ERR_IO;
-    if (sfs_get16(f.payload + SFS_HELLO_RSP_MAX) < c->max_payload)
-        c->max_payload = SFS_MAX_PAYLOAD;
-    c->dec.max_payload = c->max_payload;
-    c->sid = f.sid;
-    c->seq = 0;
-    c->fails = 0;
-    c->dead = SFS_DEAD_NONE;
-    return 0;
+    return sfs_accept_hello(c, &f);
 }
 
 static int sfs_call_deadline(SfsClient *c, u8 op, const void *in, u16 n,

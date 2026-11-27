@@ -2,14 +2,6 @@
 #include "sys/dev/block/netcd.h"
 #include "e82557.h" /* Device probe table; moved only in L02. */
 
-static void lan_cancel(void *ctx, const u8 *buf, u32 n, u32 deadline)
-{
-    (void)ctx;
-    (void)buf;
-    (void)n;
-    (void)deadline;
-}
-
 int lan_module_init(LanModuleApi *out)
 {
     *out = (LanModuleApi){
@@ -22,7 +14,6 @@ int lan_module_init(LanModuleApi *out)
         .lan_reset = sfs_lan_reset, .io = sfs_lan_io,
         .adapter = &net_e82557_adapter, .netcd_register = netcd_register
     };
-    out->io.cancel = lan_cancel;
     return 0;
 }
 const struct {

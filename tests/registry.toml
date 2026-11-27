@@ -606,6 +606,20 @@ gates = ["push", "main"]
 mutations = [{ id = "hwb_sticky", config = "link-sh", when = "after_build", replace = "sys/kern/exec/exec_abort.inc", old = "u32 pending = g_hwb_abort_pending;\n    g_hwb_abort_pending = 0;", new = "u32 pending = g_hwb_abort_pending;", fail = "reload POINT retained abort" }]
 
 [[check]]
+id = "sfs_stale_peer"
+spec = { path = "docs/design/fs/serialfs/sfs_client.md", section = "LAN の絶対期限と peer の確定" }
+subsystem = "system"
+level = "L2"
+sources = ["sys/fs/serialfs", "sys/dev/net/e82557", "sys/net", "sys/kern/irq", "sys/hal/time", "sys/kern/io_work.c", "sys/kern/io_policy.c", "sys/kern/idle_work.c", "sys/kern/kstring_c.c", "lib/crc32.c", "tools/ops/kernel_includes.py", "build/lan-module.mk", "tests/support/fixtures/sfs_stale_peer"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "HELLO の期限後は peer 未確定、CALL の期限後は未読分なし。次の交換は自分の応答を採用する"
+limits = "82557 の記述子・時計の模型。モジュールはロード済みとして接続し、PCI 探索・実機の進行は対象外"
+gates = ["push", "main"]
+mutations = [{ id = "keep_expired_rx", config = "pc98", when = "after_build", replace = "sys/fs/serialfs/sfs_client.c", old = "    if (sent && c->io->cancel)", new = "    if (0 && sent && c->io->cancel)", fail = "FAIL expired CALL kept unread reply" }, { id = "drop_accepted_peer", config = "pc98", when = "after_build", replace = "sys/fs/serialfs/sfs_lan.c", old = "        lan->peer[i] = lan->rx[SFS_LAN_MAC_LEN + i];", new = "        lan->peer[i] = 0;", fail = "FAIL new HELLO" }]
+
+[[check]]
 id = "sfs_deadline_cancel"
 spec = { path = "docs/design/fs/serialfs/serialfs_persistent.md", section = "絶対期限での交換終了" }
 subsystem = "system"

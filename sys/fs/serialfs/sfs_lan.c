@@ -42,7 +42,7 @@ static int lan_receive(SfsLan *lan)
         lan->rx[ETH_TYPE_OFF + 1] != (SFS_LAN_ETHERTYPE & 0xff) ||
         !mac_equal(lan->rx, lan->mac) ||
         mac_equal(lan->rx + SFS_LAN_MAC_LEN, lan->mac)) return 0;
-    if ((lan->linked || lan->peer_fixed) &&
+    if (((lan->linked && !lan->hello) || lan->peer_fixed) &&
         !mac_equal(lan->rx + SFS_LAN_MAC_LEN, lan->peer))
         return 0;
     if (lan->rx[SFS_LAN_HDR_LEN] != SFS_ENQ ||
@@ -60,7 +60,7 @@ static int lan_prepare(SfsLan *lan)
 {
     SfsDec dec;
     SfsFrame frame;
-    u32 i, n;
+    u32 i;
     int r;
 
     if (lan->prepared) return 1;
@@ -70,14 +70,12 @@ static int lan_prepare(SfsLan *lan)
         r = sfs_dec_feed(&dec, lan->rx[i], &frame);
         if (r < 0) break;
         if (r != 1) continue;
-        if (!lan->linked) {
-            if (!lan->hello || frame.type != (SFS_T_HELLO | SFS_T_RESP) ||
+        if (!lan->hello && !lan->linked) break;
+        if (lan->hello) {
+            if (frame.type != (SFS_T_HELLO | SFS_T_RESP) ||
                 frame.sid == 0 || frame.seq != 0 || frame.len < SFS_HELLO_RSP_LEN ||
                 sfs_get32(frame.payload) != 0 ||
                 sfs_get32(frame.payload + SFS_HELLO_RSP_NONCE) != lan->nonce) break;
-            for (n = 0; n < SFS_LAN_MAC_LEN; n++)
-                lan->peer[n] = lan->rx[SFS_LAN_MAC_LEN + n];
-            lan->linked = 1;
         }
         lan->rx_pos = SFS_LAN_HDR_LEN;
         lan->rx_end = i + 1;
@@ -114,12 +112,12 @@ static int lan_put_until(void *ctx, const u8 *buf, u32 n, u32 deadline)
     if (buf[SFS_OFF_TYPE] == SFS_T_HELLO && n >= SFS_HDR_LEN + SFS_HELLO_REQ_LEN + SFS_CRC_LEN) {
         lan->nonce = sfs_get32(buf + SFS_HDR_LEN + SFS_HELLO_REQ_NONCE);
         lan->hello = 1;
-        lan->linked = 0;
-    } else if (!lan->linked) {
-        return -1;
+    } else {
+        lan->hello = 0;
+        if (!lan->linked) return -1;
     }
     for (i = 0; i < SFS_LAN_MAC_LEN; i++) {
-        lan->tx[i] = lan->linked ? lan->peer[i] : 0xff;
+        lan->tx[i] = (lan->linked && !lan->hello) ? lan->peer[i] : 0xff;
         lan->tx[SFS_LAN_MAC_LEN + i] = lan->mac[i];
     }
     lan->tx[ETH_TYPE_OFF] = SFS_LAN_ETHERTYPE >> 8;
@@ -147,7 +145,31 @@ static int lan_put(void *ctx, const u8 *buf, u32 n)
     return lan_put_until(ctx, buf, n, deadline) == 0 ? 0 : -1;
 }
 
-const SfsIo sfs_lan_io = {lan_put, lan_get, lan_now, lan_idle, lan_can_wait, lan_put_until, 0};
+static void lan_cancel(void *ctx, const u8 *buf, u32 n, u32 deadline)
+{
+    SfsLan *lan = ctx;
+    (void)buf;
+    (void)n;
+    (void)deadline;
+    lan->rx_pos = lan->rx_end = 0;
+    lan->prepared = lan->hello = 0;
+    lan->nonce = 0;
+}
+
+static void lan_accept_hello(void *ctx)
+{
+    SfsLan *lan = ctx;
+    /* The last byte returned by get belongs to the datagram still in rx. */
+    for (u32 i = 0; i < SFS_LAN_MAC_LEN; i++)
+        lan->peer[i] = lan->rx[SFS_LAN_MAC_LEN + i];
+    lan->linked = 1;
+    lan->hello = 0;
+}
+
+const SfsIo sfs_lan_io = {
+    lan_put, lan_get, lan_now, lan_idle, lan_can_wait, lan_put_until,
+    lan_cancel, lan_accept_hello
+};
 
 void sfs_lan_init(SfsLan *lan, const SfsLanNic *nic,
                   const SfsIo *clock, void *clock_ctx)

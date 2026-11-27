@@ -41,6 +41,8 @@ typedef struct {
      * synchronously by the owning foreground exchange. buf is valid only during
      * this call. Do not retain arguments, defer, reenter, send, or dispatch. */
     void (*cancel)(void *ctx, const u8 *buf, u32 n, u32 deadline);
+    /* Optional foreground commit of the HELLO datagram just accepted by client. */
+    void (*accept_hello)(void *ctx);
 } SfsIo;
 
 /* 線を死んだと見なした理由 (診断用) */
