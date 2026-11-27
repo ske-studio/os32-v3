@@ -20,6 +20,7 @@ int in2_excl_keyboard(void) { return exclusive; }
 static unsigned diagnostics;
 #ifdef FAIL_INIT
 int legacy_shell_dispatch(void);
+int write_gui_raw(const int *raw);
 int __wrap_ikm_policy_init(u8 platform, const KmBackend *pc98, const KmBackend *hid,
                            int (*pressed)(void))
 {
@@ -103,7 +104,9 @@ static int test_provider(void)
             input_emit_keymap(&result, 1, 1, 0, 0);
         }
         if (gui) {
-            if (legacy_raw_take() != (0x1d | KBD_RAW_MAKE) || legacy_raw_take() != -1 ||
+            int raw = legacy_raw_take();
+            if (raw != (0x1d | KBD_RAW_MAKE) || write_gui_raw(&raw) != sizeof raw ||
+                legacy_raw_take() != -1 ||
                 legacy_cooked_take() != -1) return 17;
         } else if (!legacy_shell_dispatch() || legacy_raw_take() != -1) return 18;
     }

@@ -668,14 +668,16 @@ id = "input_policy_abi"
 spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
 subsystem = "input"
 level = "L1"
-sources = ["sys/input/input_delivery.h", "sys/input/input_delivery.c", "sys/input/input_policy.c", "sys/kapi/input_policy_provider.c", "sys/platform/pc98/input_keymap.c", "sys/platform/powermac/input_keymap_backend.c", "tests/support/fixtures/input_policy/wire.c", "tests/support/fixtures/input_policy/legacy_shell.c", "userland/shell/ui.c", "sys/hal/input/legacy_keymap.c", "tests/support/fixtures/input_policy/layout.rs"]
+sources = ["sys/input/input_delivery.h", "sys/input/input_delivery.c", "sys/input/input_policy.c", "sys/kapi/input_policy_provider.c", "sys/platform/pc98/input_keymap.c", "sys/platform/powermac/input_keymap_backend.c", "tests/support/fixtures/input_policy/wire.c", "tests/support/fixtures/input_policy/legacy_shell.c", "userland/shell/ui.c", "sys/hal/input/legacy_keymap.c", "tests/support/fixtures/input_policy/layout.rs", "tests/support/fixtures/input_policy/gshell.rs", "tests/support/fixtures/input_policy/entry.S", "userland/gshell/src/pump.rs", "userland/gshell/src/input.rs", "userland/gshell/src/raw_keyboard.rs", "userland/gshell/src/excl.rs"]
 environment = "linux-cross"
 arch = { x86 = ["pc98"], ppc = ["link-sh"] }
 needs = []
-expect = "Action と Key の全 offset とサイズ、Rust の v2 LE 列と i386・PowerPC の実デコードが一致。初期化失敗後も九口は NOSYS、GUI は一件、CUI は Enter で一行実行"
-limits = "公開前の provider と内部配送を実行。生成 syscall は対象外"
+expect = "Action と Key の全 offset とサイズ、Rust の v2 LE 列と i386・PowerPC の実デコードが一致。初期化失敗後も九口は NOSYS、旧 WM pump が通常窓へ Key と Text を各一件配送、CUI は Enter で一行実行"
+limits = "公開前の provider と内部配送を実行。失敗注入後の raw をホストの WM pump に渡す。窓リングとマウスは fixture。生成 syscall は対象外"
 gates = ["push", "main"]
 mutations = [{ id = "drop_legacy_enter", config = "link-sh", when = "after_build", replace = "sys/hal/input/legacy_keymap.c", old = "byte = result->op;", new = "byte = 0;", fail = "private provider or v2 LE mismatch" },
+    { id = "omit_pc98_window_delivery", config = "pc98", when = "after_build", replace = "userland/gshell/src/input.rs", old = "crate::excl::deliver_window_key(st, t.slot, t.win_id, scan, down, ch, mods);", new = "// omit delivery", fail = "legacy GUI window delivery mismatch" },
+    { id = "omit_mac_window_delivery", config = "link-sh", when = "after_build", replace = "userland/gshell/src/input.rs", old = "crate::excl::deliver_window_key(st, t.slot, t.win_id, scan, down, ch, mods);", new = "// omit delivery", fail = "legacy GUI window delivery mismatch" },
     { id = "omit_pc98_policy_boot", config = "pc98", when = "after_build", replace = "sys/platform/pc98/input_keymap.c", old = "rc = ikm_policy_init", new = "rc = 0 && ikm_policy_init", fail = "private provider or v2 LE mismatch" },
     { id = "omit_mac_policy_boot", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/input_keymap_backend.c", old = "int rc = ikm_policy_init", new = "int rc = 0 && ikm_policy_init", fail = "private provider or v2 LE mismatch" },
     { id = "swap_action_generation", config = "pc98", when = "after_build", replace = "sys/input/input_delivery.h", old = "action, command_gen", new = "command_gen, action", fail = "invalid delivery layout" },

@@ -22,21 +22,45 @@ pub mod av {
     #[allow(non_camel_case_types)]
     pub struct IN2_WmState { pub size: u32, pub gen: u32, pub excl: u32, pub owner: i32 }
 }
-pub struct Api { pub exec_abort_clear: unsafe fn() -> i32, pub get_tick: unsafe fn() -> u32, pub kbd_trygetrawkey: unsafe fn() -> i32, pub kbd_is_pressed: unsafe fn(i32) -> i32, pub in2_wm_state: unsafe fn(&mut av::IN2_WmState) -> i32 }
-pub fn api() -> Api { Api { exec_abort_clear: || { multiapp::STOP_TRACE.with(|t| t.borrow_mut().push(0)); 0 }, get_tick: || 0, kbd_trygetrawkey: || RAW.with(|q| q.borrow_mut().pop_front().unwrap_or(-1)), kbd_is_pressed: |_| 0, in2_wm_state: |s| { s.excl = FLAGS.get(); 0 } } }
+pub struct Api {
+    pub gfx_screen_owner: unsafe fn() -> i32,
+    pub kbd_inject: unsafe fn(*const u8, i32) -> i32,
+    pub kbd_dropped_count: unsafe fn() -> u32,
+    pub exec_abort_clear: unsafe fn() -> i32,
+    pub get_tick: unsafe fn() -> u32,
+    pub kbd_trygetrawkey: unsafe fn() -> i32,
+    pub kbd_is_pressed: unsafe fn(i32) -> i32,
+    pub in2_wm_state: unsafe fn(&mut av::IN2_WmState) -> i32,
+}
+pub fn api() -> Api {
+    Api {
+        gfx_screen_owner: || unreachable!(),
+        kbd_inject: |_, _| unreachable!(),
+        kbd_dropped_count: || 0,
+        exec_abort_clear: || { multiapp::STOP_TRACE.with(|t| t.borrow_mut().push(0)); 0 },
+        get_tick: || 0,
+        kbd_trygetrawkey: || RAW.with(|q| q.borrow_mut().pop_front().unwrap_or(-1)),
+        kbd_is_pressed: |_| 0,
+        in2_wm_state: |s| { s.excl = FLAGS.get(); 0 },
+    }
+}
 #[path = "../../../../userland/gshell/src/excl.rs"]
 mod excl;
 mod wm {
     use super::*;
     use std::cell::{Cell, RefCell};
     pub struct Window { pub owner: i32, pub id: u32 }
-    impl Window { pub fn client_origin(&self) -> (i32,i32) { (0,0) } }
+    impl Window {
+        pub fn id(&self, _: usize) -> u32 { self.id }
+        pub fn client_origin(&self) -> (i32,i32) { (0,0) }
+    }
     pub struct Rect;
     impl Rect {
         pub fn new(_: i32, _: i32, _: i32, _: i32) -> Rect { Rect }
         pub fn intersects(&self, _: &Rect) -> bool { unreachable!() }
     }
     pub struct GuiState {
+        pub inited: bool, pub in_pump: bool, pub now: u32, pub last_kbd_dropped: u32,
         pub excl: excl::State, pub windows: [Window; 2], pub cursor: cursor::Cursor, pub screen_w: i32, pub screen_h: i32,
         pub pending_raw: [i32;128], pub pending_rank: [u8;128], pub pending_raw_n: usize,
         pub pending_tab: bool, pub pending_switch: bool, pub pending_raw_dropped: u32,
@@ -46,10 +70,20 @@ mod wm {
         pub front: usize, pub space: Cell<usize>, pub events: RefCell<Vec<GuiEvent>>,
     }
     impl GuiState {
+        pub fn front_index(&self) -> Option<usize> { Some(self.front) }
         pub fn front_id(&self) -> u32 { self.windows[self.front].id }
         pub fn front_owner(&self) -> i32 { self.windows[self.front].owner }
         pub fn win_by_id(&self, id: u32) -> Option<usize> { self.windows.iter().position(|w| w.id == id) }
         pub fn slot_of_owner(&self, owner: i32) -> Option<usize> { self.windows.iter().position(|w| w.owner == owner) }
+    }
+    #[cfg(legacy_gui)]
+    pub fn g() -> &'static mut GuiState {
+        // Same single-threaded, non-reentrant entry as the registered WM pump.
+        static mut STATE: *mut GuiState = std::ptr::null_mut();
+        unsafe {
+            if STATE.is_null() { STATE = Box::into_raw(Box::new(window_state())); }
+            &mut *STATE
+        }
     }
     pub fn drop_drag_frame(st: &mut GuiState) { st.drag_index = -1; }
     pub fn queue_present(_: &mut GuiState, _: Rect) {}
@@ -91,23 +125,45 @@ mod multiapp {
     pub fn redirect_abort(_: &super::wm::GuiState, _: i32) { unreachable!() }
     mod stop_dispatch { include!("../../../../userland/gshell/src/stop_dispatch.rs"); }
     pub(crate) use stop_dispatch::top_level_abort;
+    pub fn chain_tail(owner: i32) -> i32 { owner }
+    pub fn note_injected_key(_: i32) { unreachable!() }
     pub fn av_owner() -> i32 { OWNER.load(Ordering::Relaxed) }
     pub fn sync_av_focus(st: &mut super::wm::GuiState) {
         if !FAIL_NEXT.swap(false, Ordering::Relaxed) { OWNER.store(st.front_owner(), Ordering::Relaxed); }
     }
 }
-mod fullscreen { pub fn active() -> bool { false } }
-mod modal { pub fn is_open() -> bool { false } }
-mod startmenu { pub fn is_open() -> bool { false } }
+mod fullscreen {
+    pub fn owner() -> i32 { unreachable!() }
+    pub fn active() -> bool { false }
+}
+mod modal {
+    pub fn is_input() -> bool { false }
+    pub fn on_key(_: &mut super::GuiState, _: u8, _: u8, _: u32) { unreachable!() }
+    pub fn is_open() -> bool { false }
+}
+mod startmenu {
+    pub fn on_key(_: &mut super::GuiState, _: u8) { unreachable!() }
+    pub fn is_open() -> bool { false }
+}
 mod fep {
+    use super::GuiState;
+    #[derive(PartialEq)]
+    pub enum Fed { Pass, Consumed }
+    pub fn feed(_: &mut GuiState, _: u8, _: u8, _: u32) -> Fed { Fed::Pass }
+    pub fn flush_text(_: &mut GuiState) {}
+    pub fn toggle(_: &mut GuiState) { unreachable!() }
+    pub fn request_toggle() { unreachable!() }
+    pub fn apply_pending_commit(_: &mut GuiState) { unreachable!() }
+    pub fn apply_pending_toggle(_: &mut GuiState) { unreachable!() }
     pub fn is_on() -> bool { false }
     pub fn toggle_pending() -> bool { false }
 }
 mod kbdnav {
     use super::wm::GuiState;
+    pub fn pre(_: &mut GuiState, _: u8, _: bool, _: u32) -> bool { unreachable!() }
     pub fn is_wm_raw(_: &GuiState, raw: i32) -> bool { matches!(raw & 127, 15 | 96 | 115) }
     pub fn pump_delivered_make(_: &mut GuiState, _: u8) {}
-    pub fn on_key(st: &mut GuiState, _: u8, down: bool, _: u32) { st.switching = down; }
+    pub fn on_key(st: &mut GuiState, _: u8, down: bool, _: u32) -> bool { st.switching = down; true }
     pub fn finish_if_released(st: &mut GuiState, _: u8, _: bool, mods: u32) -> bool {
         if !st.switching || mods & 8 != 0 { return false; }
         st.switching = false;
@@ -127,9 +183,23 @@ const MOD_CTRL: u32 = 16;
 const MOD_GRPH: u32 = 8;
 const STOP_SUPPRESS_TICKS: u32 = 50;
 #[derive(Copy, Clone, PartialEq, Eq)]
-enum Ctx { Pump, Wait }
-impl Ctx { fn wm_ui(self) -> bool { self == Ctx::Wait } }
+pub enum Ctx { Pump, Wait, Standalone }
+impl Ctx { fn wm_ui(self) -> bool { self != Ctx::Pump } }
+#[cfg(legacy_gui)]
+mod diagnostics { pub fn shortcut(_: u8, _: u32) -> bool { unreachable!() } }
+#[cfg(legacy_gui)]
+mod gserial { pub fn lost(_: &mut super::GuiState) { unreachable!() } }
 mod input {
+    #[cfg(legacy_gui)]
+    use super::{fep, kbdnav, modal, raw_keyboard, ring, startmenu, SC_SHIFT, SC_CTRL, SC_STOP, MOD_CTRL};
+    #[cfg(legacy_gui)]
+    pub use super::Ctx;
+    #[cfg(legacy_gui)]
+    include!(env!("WM_KEYBOARD_ITEMS"));
+    #[cfg(legacy_gui)]
+    fn standalone_key(_: &mut GuiState, _: u8) { unreachable!() }
+    #[cfg(legacy_gui)]
+    fn capture_mouse(_: &mut GuiState, _: Ctx, _: bool) {}
     use super::wm::GuiState;
     pub(crate) use super::raw_keyboard::purge_boundary;
     pub fn cancel_capture(_: &mut GuiState) {}
@@ -137,7 +207,11 @@ mod input {
 }
 mod ring {
     use super::*;
-    pub fn append(st: &wm::GuiState, _: usize, ev: &GuiEvent) -> bool {
+    pub fn space(st: &GuiState, _: usize) -> usize { st.space.get() }
+    pub fn add_dropped(_: &mut GuiState, _: usize, _: u16) { unreachable!() }
+    pub fn append(st: &wm::GuiState, slot: usize, ev: &GuiEvent) -> bool {
+        #[cfg(legacy_gui)]
+        assert_eq!(slot, st.front);
         if st.space.get() == 0 { return false; }
         st.space.set(st.space.get()-1);
         st.events.borrow_mut().push(*ev);
@@ -160,8 +234,9 @@ mod ring {
         ev
     }
 }
-fn main() {
-    let mut st = wm::GuiState {
+fn window_state() -> wm::GuiState {
+    wm::GuiState {
+        inited: true, in_pump: false, now: 0, last_kbd_dropped: 0,
         excl: excl::State::NEW, windows: [wm::Window {owner: 2, id: 10}, wm::Window {owner: 3, id: 11}],
         pending_raw: [0;128], pending_rank: [0;128], pending_raw_n: 0,
         pending_tab: false, pending_switch: false, pending_raw_dropped: 0,
@@ -169,7 +244,11 @@ fn main() {
         abort_seen: false, switching: false, switches: 0,
         drag_index: -1, prev_buttons: 0, click_button: 0, delivered_button: 0,
         front: 0, cursor: cursor::Cursor::EMPTY, screen_w: 16, screen_h: 16, space: 2.into(), events: Default::default(),
-    };
+    }
+}
+#[cfg(not(legacy_gui))]
+fn main() {
+    let mut st = window_state();
     assert!(excl::append(&mut st, 0, &ring::ev_key(true, 10, 42, 0, 0, 0)));
     assert!(excl::append(&mut st, 0, &ring::ev_pointer(10, 0, 0, 1, 0)));
     st.front = 1;
@@ -274,4 +353,22 @@ fn main() {
     assert!(st.cursor.shown);
     assert_eq!(unsafe { ffi::gfx_get_pixel(0, 0) }, GUI_COLOR_TEXT);
 
+}
+
+#[cfg(legacy_gui)]
+#[path = "../../../../userland/gshell/src/pump.rs"]
+mod pump;
+
+#[cfg(legacy_gui)]
+fn main() {
+    let raw: i32 = std::env::args().nth(1).unwrap().parse().unwrap();
+    wm::g().space.set(8);
+    RAW.with(|q| q.borrow_mut().push_back(raw));
+    pump::gshell_gui_pump();
+    pump::gshell_gui_pump();
+    let events = wm::g().events.borrow();
+    assert_eq!(events.len(), 2);
+    let (key, text) = (&events[0], &events[1]);
+    assert_eq!((key.window, key.kind, key.sub, key.payload[0]), (10, GUI_EV_KEY, 1, 0x1d));
+    assert_eq!((text.window, text.kind, text.sub, text.payload[0]), (10, GUI_EV_TEXT, 1, b'a'));
 }

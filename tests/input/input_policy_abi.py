@@ -1,12 +1,42 @@
 """Compile the private delivery layout with the two production C compilers."""
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from tests.support.media import Failure, main
+
+
+def verify_gui(fixture, tmp, raw, byteorder):
+    if len(raw) != 4:
+        raise Failure("missing legacy GUI raw word")
+    # Compile whole keyboard items from the candidate. The pump entry, raw
+    # decoder and window delivery modules are included directly by the fixture.
+    source = Path("userland/gshell/src/input.rs").read_text()
+    items = []
+    for kind, name in [
+        ("const", "MOD_SHIFT"), ("const", "MOD_CAPS"), ("const", "SC_SPACE"),
+        ("static", "SC2A"), ("static", "SC2A_SHIFT"), ("fn", "translate"),
+        ("struct", "Target"), ("fn", "focus_target"), ("fn", "capture"),
+        ("fn", "capture_keyboard"), ("fn", "capture_keyboard_observed"),
+    ]:
+        start = re.search(rf"^(?:pub(?:\(crate\))? )?{kind} {name}\b", source, re.M)
+        if not start:
+            raise Failure(f"missing WM keyboard item {name}")
+        end = {"const": ";", "static": "\n];", "fn": "\n}", "struct": "\n}"}[kind]
+        stop = source.index(end, start.end()) + len(end)
+        items.append(source[start.start():stop])
+    keyboard = Path(tmp) / "keyboard.rs"
+    keyboard.write_text("\n".join(items))
+    exe = Path(tmp) / "legacy_gui"
+    subprocess.run(["rustc", "--edition=2021", "-Awarnings", "--cfg", "legacy_gui",
+                    fixture / "gshell.rs", "-o", exe], check=True,
+                   env={**os.environ, "WM_KEYBOARD_ITEMS": str(keyboard)})
+    if subprocess.run([exe, str(int.from_bytes(raw, byteorder))]).returncode:
+        raise Failure("legacy GUI window delivery mismatch")
 
 
 def verify(config):
@@ -61,8 +91,11 @@ def verify(config):
                          "-Isdk/include", "userland/shell/ui.c", fixture / "legacy_shell.c"]
         for extra in ([], failure_probe):
             subprocess.run(command + extra + ["-lgcc", "-o", exe], check=True)
-            if subprocess.run([runner, exe]).returncode:
+            result = subprocess.run([runner, exe], stdout=subprocess.PIPE)
+            if result.returncode:
                 raise Failure("private provider or v2 LE mismatch")
+            if extra:
+                verify_gui(fixture, tmp, result.stdout, "big" if ppc else "little")
 
 if __name__ == "__main__":
     main(lambda config: None, verify)
