@@ -409,3 +409,17 @@ expect = "読出し・媒体なし・予約書込み・未予約拒否"
 limits = "mac99 IDE 専用 raw"
 gates = ["push", "main"]
 mutations = [{ id = "ata_read_lba", config = "sh", when = "after_build", replace = "sys/dev/ata/ide_request.inc", old = "else rc = ide_read_one(drive, lba, dst);", new = "else rc = ide_read_one(drive, lba == 2047 ? 2046 : lba, dst);", fail = "read 2047 returned sector 2046" }, { id = "ata_write_count", config = "sh", when = "after_build", replace = "sys/dev/ata/ide.c", old = "return ide_request(unit, lba, count, 0, sectors);", new = "for (u32 i=0; i<count; ++i) { int rc=ide_request(unit,lba+i,1,0,(const u8 *)sectors+i*512); if (rc) return rc; } return 0;", fail = "correct payload used two write commands" }]
+
+[[check]]
+id = "v86_timeout_image"
+spec = { path = "docs/design/kernel/v86/v86.md", section = "CUI の FD 起動と既定の時間切れ" }
+subsystem = "system"
+level = "L1"
+sources = ["tests/support/fixtures/v86_timeout/generate.py"]
+environment = "python"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "2HD RAW は 1261568 バイト、先頭は STI と自分に戻る JMP、残りは全てゼロ"
+limits = "像の構造を検査する。既定の時間切れと終了後の再 attach はゲスト試験で確認する"
+gates = ["push", "main"]
+mutations = [{ id = "oversized_timeout_image", config = "pc98", when = "after_build", append = "build/out/tests/v86_timeout.img", fail = "unexpected RAW size: 1261569" }]
