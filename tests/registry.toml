@@ -525,3 +525,17 @@ mutations = [
  { id = "reuse_quarantined", config = "pc98", when = "after_build", replace = "sys/dev/dma/dma8237.c", old = "change_owner(ch, owner, &quarantined)", new = "change_owner(ch, owner, 0)", fail = "DMA quarantine ownership" },
  { id = "ignore_release_error", config = "pc98", when = "after_build", replace = "sys/hal/sound/snd2_stream.c", old = "if (opened && d->be->hw_release(d->ctx, leak) < 0) leak = 1;", new = "if (opened) d->be->hw_release(d->ctx, leak);", fail = "HAL close lost restore failure" },
  { id = "early_restore", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "while (!pcm_ready(PCM_OP_WAIT_DRS))", new = "while (0)", fail = "DRS deadline" }]
+
+[[check]]
+id = "ppc_link_session"
+spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の遠隔シェル" }
+subsystem = "system"
+level = "L4"
+sources = ["make:all", "make:iso", "tests/support/ppc_vm.py", "tests/support/ppc_fixture.py", "tests/support/fixtures/ppc_link", "tests/support/ppc_peer.py", "tools/host_agent.py", "tools/host_rshell.py", "tools/host_operator_socket.py", "tools/ppc_lan_host.py", "tools/host_sfs_link.py", "sys/kern/console/console.c", "sys/platform/powermac/shell_loop_ops.c", "sys/kern/console/con_sink.c", "userland/shell/rshell_lan.c", "sys/kern/exec/exec.c", "sys/kern/mm/kmalloc.c"]
+environment = "qemu-ppc-net"
+arch = { ppc = ["link-sh"] }
+needs = []
+expect = "出力全体・常駐世代・owner 回復"
+limits = "agent 先行と後起動"
+gates = ["push", "main"]
+mutations = [{ id = "double_print", config = "link-sh", when = "after_build", replace = "sys/kern/console/console.c", old = "    con_sink_push_print(buf, size, color);", new = "    con_sink_push_print(buf, size, color); con_sink_push_print(buf, size, color);", fail = "duplicate PRINT payload" }, { id = "fault_restart", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/shell_loop_ops.c", old = "    kprintf(0x07, \"%s returned %d\\n\", path, rc);", new = "    kprintf(0x07, \"%s returned %d\\n\", path, rc);\n    if (rc < 0) for (;;) idle_wait_step();", fail = "resident fault without new generation" }, { id = "reader_owner", config = "link-sh", when = "after_build", replace = "sys/kern/console/con_sink.c", old = "    if (g_reader == id) {", new = "    if (0) {", fail = "reader retained after owner exit" }]

@@ -56,7 +56,7 @@ def build(config):
         jobs = {cpu: pool.submit(boot, cpu, config, iso, metadata) for cpu in CPUS}
         for cpu, job in jobs.items():
             error, seconds = job.result()
-            status = "PASS" if error is None else "ERROR" if isinstance(error, OSError) else "FAIL"
+            status = "PASS" if error is None else "ERROR" if isinstance(error, OSError) and not isinstance(error, TimeoutError) else "FAIL"
             print(f"{cpu}/{config} {status} {seconds:.3f}s")
             if error:
                 print(error)
@@ -69,7 +69,8 @@ def build(config):
                     print(f"{cpu}/{config} serial unavailable: {exc}")
                 errors.append(error)
     if errors:
-        raise next((e for e in errors if isinstance(e, OSError)), errors[0])
+        error_type = OSError if any(isinstance(e, OSError) and not isinstance(e, TimeoutError) for e in errors) else Failure
+        raise error_type("; ".join(map(str, errors)))
 
 
 def missing_marker(config, output):
@@ -97,7 +98,7 @@ def verify(config):
         except Failure as exc:
             errors.append(f"{cpu}/{config}: {exc}")
     if errors:
-        raise Failure("\n".join(errors))
+        raise Failure("; ".join(errors))
 
 
 if __name__ == "__main__":
