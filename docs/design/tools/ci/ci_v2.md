@@ -107,6 +107,8 @@ ci_fetch の既定は VERIFIED 以上。`--allow-built` は実機調査向け。
 
 分割前の単一ジョブは約 20 分。暫定の ppc-guest-2 は `ppc_boot_clock/core` のみで、正常 4.8 秒と変異計 11.3 秒から登録重みを 17 秒とした。現行の ppc-guest-1 はこの行と `ppc_boot` の 6 構成、`ppc_ata_guest/sh` を含む。待ち込みの全件成功 push 中央値は PM の統合 run で採る。
 
+2026-11-27 の重みの更新（registry_v2「PowerPC の構成別重み」の手順）。標本は main a77e100f1 の run 46021992053 attempt 1（identity.mutate=true、rc=0、対象行の全必須変異が RED）の summary-1。正常と全変異の秒の合計を切り上げて、`ppc_usb_lanq/link-sh` 95 秒（94.8）、`ppc_hwb_command/link-sh` 149 秒（148.1）、`ppc_hfs_cancel/link-sh` 99 秒（98.5）を新しく登録し、`ppc_boot_clock/core` を 17 から 20 秒（19.5）にした。`ppc_link_overflow/link-sh` は DEFERRED で実測が無いため未計測のまま（暫定 900 秒で単独の束、中は実行されない）。更新の前後で `plan --full --gate push --mutate` の（id, config）の集合と必須変異の集合は同じ。PowerPC の束は 7 から 4 に減り、登録重みの合計は ppc-build-1 28 行 530 秒、ppc-guest-1 9 行 460 秒、ppc-net-1 3 行 717 秒、ppc-net-2 1 行（overflow のみ）。同じ run の束の実測は ppc-build-1 535 秒、ppc-guest-1 286 秒、ppc-guest-2 98 秒、ppc-net-1 429 秒、ppc-net-2 95 秒、ppc-net-4 148 秒。更新後の束ごとの所要は、この変更の候補の成功 run で確かめて下に足す。
+
 **所要の目標（A1 推奨）** は全件成功の統合 push で、最初の run 作成から最後の必須ジョブ完了までの中央値を 30 分以内とする。P0-4 の成功した統合 5 push は 1,773〜2,544 秒、中央値 1,984 秒。全 20 push 中の最長は 2,999 秒、ジョブの待ち中央値は 11 秒、最大 1,671 秒だった。途中と全件、待ちと実行を分けて同じ定義で報告し、短縮のために検査を落とさない。
 
 2026-11-27 の赤の実演（run 45955692227、attempt 1）。READY の期待値を変えると PPC の像 6 構成はビルドに成功し、ppc_boot の core・link が失敗、残り 4 構成は合格した。PC-98 は計画外。checks-ppc と collect が失敗し、land_gate は rc=1。成果物には bundle と失敗した 2 構成のログ・両 CPU の証跡が残り、serial 末尾は LAN STATE まで読めた。理由欄は最初の 7450 の期限切れだけで、7455 の理由の併記 (c) は 1127h で修正予定。G6 は os32powerpc の手元の記録（ppc-tv2-ci/fix1、verified/g12.log）で照合する。
