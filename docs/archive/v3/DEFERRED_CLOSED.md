@@ -612,3 +612,8 @@ X-2 の前半 (e8a の RO 日本語) は `accept_e11/RESULT.md` の GUI 日本�
 | CI-RUSTUP-RUSTSRC-FLAKE | 2026-11-18 閉鎖 — runner が rust-src の登録の無い同じ版の toolchain を持って始まる型 (49 ジョブ中 1 本)。用意で消してから入れ直す形に直した。証拠は docs/design/tools/ci/gate.md §5-2 と票 TASK_CI_REWORK の段 S0 |
 | P43-INCLUDE | P4 の 3 の include の層の違反 9 件 | 2026-11-26 | 組 1・3・6 で解消 (data/p43_violations.tsv の各行の「組 n で解消」)、登録の deferred を外した — U26 |
 | P43-LINK | P4 の 3 のリンクの層の違反 68 件 (PC-98 46・PowerMac core 22) | 2026-11-26 | 組 1〜6 で解消、登録の deferred を外した — U26 |
+
+## 2026-11-27
+
+- V86-B-TIMEOUT — pc98emu req77（製品 cafe6ce、試験像 466f6f0ed）。2 回とも 327.3 秒で v86_ticks=30000、reason=4、loop_slots[0].in_use=0、その後 ver 正常。証跡 pc98emu の ~/art/req77/。
+- PPC-BOOT-DEC-RATE-LOAD (2026-11-27 完了)。ホスト負荷下の 7455 が起動中に dec_rate で停止。QEMU の起動時 DEC 処理速度。変更前の負荷下 40 回で dec_rate の再現は 0 件、うち 1 回は OpenBIOS で期限切れ。PowerPC の PM。8 ms の始点・終点対照は旧式で停止、新式で READY。三故障は両 CPU で固有 RED。変更後の負荷下 (link-sh と shell は同じ kboot-link-sh の ELF・同じ到達印を構成名ごとに) link-sh・shell は各 20/20 回全到達。証跡 ~/os32-tmp/run/ppc-decrate-impl/accept/{manifest.json,load-manifest.json,probes.log}
