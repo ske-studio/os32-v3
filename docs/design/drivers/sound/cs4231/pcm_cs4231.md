@@ -212,3 +212,9 @@ NP21/W はフォークの `/api/sound` (CS4231 の PEN / IEN / MODE2 / I8 / Base
 - ホスト試験に無いもの: 生成 wrapper を通した `pcm_write` の契約 (範囲・あふれ・端数の順序)、交互試験の補強 (2 段目の期限境界での STOP_DONE、
   解放 → 再 open の claim の引き継ぎ、親 owner に戻った状態の reclaim)。
 - `PCM_REFILL_COPY_US` は仮の値で実機の受入が要る (`pcm_refill.h` の注記)。
+
+## 次段で BIOS INT5 を保つ open（設計案）
+
+常駐側の配線判定で IRQ12 の共有を許可した 118 と 86+WSS は、FM 搭載でも PCM を IRQ12 に登録する。上記 S3 の資源取得・読戻し・停止・隔離の順序を使い、0F40h の DMA 欄だけを #1 にする。req83 の観測から導く open 中／close 後の期待値は、118 が 22h／23h、86+WSS が 22h／22h、Ra266 が 22h／20h。元値と設定値が等しい場合も IRQ と DMA の所有を取得して読戻しを確認する。118 の元 DMA #3 の mask を操作しない。PCM 側は R2.INT と I24.PI を満たす再生要求だけを処理し、FM／FIFO の ack とゲスト反射は音源所有側が担当する。PCM だけの機械で将来提供するソフト音源は、仮想タイマ／FIFO の周期で仮想 IRQ12 を要求できる。PCM の物理 period とゲストの演奏周期を独立に保つ。[配線確定・先行検査・受入](../../../kernel/irq/irq.md#次段の配線確定と有効化設計案基点-c34ee44f1)
+
+codec の間接 index/data アクセスと MODE2 の登録配置は Crystal DS139PP2（R2、I24）および BSD 実装の ad_read、ad_write と CS4231 初期化表を照合した。PC-98 の線選択には上記の機種資料を用いる。[NetBSD ad1848.c](https://raw.githubusercontent.com/NetBSD/src/trunk/sys/dev/ic/ad1848.c)
