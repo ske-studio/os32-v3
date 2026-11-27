@@ -57,6 +57,7 @@ int gfx2_flip(u32 id, u32 head, u32 sid, u32 flags, u32 deadline_ms)
     u32 dl = deadline_ms > U32_MAX / 1000u ? U32_MAX : deadline_ms * 1000u;
     if (rc) return rc;
     if (!DISPLAY_V1_PRESENT_OK()) return OS32_ERR_BUSY;
+    if (!a->head[head].scan_sid) return OS32_ERR_INVAL;
     gfx2_flip_poll(a);
     if (a->head[head].pend_sid) return OS32_ERR_BUSY;
     if (flags & ~GFX2_FLIP_VBLANK) return OS32_ERR_INVAL;

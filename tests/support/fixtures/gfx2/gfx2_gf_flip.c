@@ -54,6 +54,9 @@ static int run(void)
     foundation.io.timing.clock_us = clock_us;
     foundation.io.timing.wait_us = wait_us;
     state.head[0].enabled = true;
+    if (gf_v2_flip(&backend, 0, &target, 0, 100) != OS32_ERR_INVAL ||
+        writes || base || backend.head[0].scan_sid || backend.head[0].pend_sid ||
+        backend.head[0].retired_sid || ctx.hold[0].pending) return 6;
     backend.head[0].scan_sid = 1024;
     backend.node[0].value = (struct gf_vram_reservation){
         .owner = &target, .reservation_id = 2, .generation = 1

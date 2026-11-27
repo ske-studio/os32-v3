@@ -11,4 +11,4 @@ if __name__ == "__main__":
                                 "sys/dev/video/geforce/gf_v2_life.c"],
                {1: "pre-write rejection", 2: "post-write uncertainty",
                 3: "pending readback", 4: "confirmed retirement",
-                5: "vblank retirement"}, gc_sections=True)
+                5: "vblank retirement", 6: "flip before mode set"}, gc_sections=True)

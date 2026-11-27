@@ -97,6 +97,7 @@ int gf_v2_flip(void *ctx, u32 head, const struct gfx2_surf *s, u32 flags, u32 us
     struct gf3_surface front; u32 dl = 0; int rc;
     if (!ops) return OS32_ERR_IO;
     if (head >= GF4_HEADS || !s || (s->flags & GFX2_SF_ALIAS)) return OS32_ERR_INVAL;
+    if (!g->head[head].scan_sid) return OS32_ERR_INVAL;
     if (g->head[head].pend_sid) return OS32_ERR_BUSY;
     rc = surface(s, &front); if (rc) return rc;
     rc = gf_v2_deadline(ops->ctx->ch, us, &dl);

@@ -72,13 +72,13 @@ static int drawing(KernelAPI *api, u8 white)
         api->gfx2_surface_create(0, 8, 2, GFX2_FMT_INDEX8, GFX2_POOL_SYSMEM,
                                  GFX2_USE_SCANOUT, &small)) return 28;
     if (api->gfx2_mode_set(0, 0, 1, 2, scan) != OS32_ERR_INVAL ||
-        api->gfx2_mode_set(0, 0, 1, 1, small) != OS32_ERR_INVAL ||
-        api->gfx2_flip(0, 0, scan, GFX2_FLIP_VBLANK, 1000) != OS32_ERR_NOSYS) return 29;
+        api->gfx2_mode_set(0, 0, 1, 1, small) != OS32_ERR_INVAL) return 29;
     fill.dst = scan;
     fill.dx = 700;
     fill.dw = 24;
     if (api->gfx2_submit(0, &fill, 1, gen, &done, &fence) || done != 1 ||
         api->gfx2_mode_set(0, 0, 1, 1, scan)) return 30;
+    if (api->gfx2_flip(0, 0, scan, GFX2_FLIP_VBLANK, 1000) != OS32_ERR_NOSYS) return 29;
     checkpoint(api, shadow, 'm');
     fill.fg.v = white ^ 255;
     if (api->gfx2_submit(0, &fill, 1, gen, &done, &fence) || done != 1 ||

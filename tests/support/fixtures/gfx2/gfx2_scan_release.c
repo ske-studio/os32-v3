@@ -32,11 +32,31 @@ static int flip_done(void *ctx, u32 head, u32 *sid)
     return retired ? 0 : OS32_ERR_BUSY;
 }
 
+const GfxBackendV2 gfx2_v1_shim;
+void gfx2_adapter_recovered(struct gfx2_adapter *a) {}
+void v1_bridge_rebind(void) {}
+int gfx_fullscreen_owner(void) { return 0; }
+
+static int enum_conn(void *ctx, u32 conn, GFX2_ConnectorInfo *out)
+{
+    out->possible_heads = 1;
+    return 0;
+}
+
+static int enum_mode(void *ctx, u32 head, u32 fmt, u32 i, GFX2_ModeInfo *out)
+{
+    if (i || fmt != GFX2_FMT_INDEX8) return OS32_ERR_INVAL;
+    *out = (GFX2_ModeInfo){.id = 1, .fmt = fmt, .w = 8, .h = 8};
+    return 0;
+}
+
+static unsigned flips;
 static int flip_result;
 int appslot_gui_present_ok(void) { return 1; }
 int gfx2_surf_quiesce(struct gfx2_surf *s, u32 dl) { return 0; }
 static int flip(void *ctx, u32 head, const struct gfx2_surf *s, u32 flags, u32 dl)
 {
+    ++flips;
     return flip_result;
 }
 
@@ -52,7 +72,7 @@ static int set_mode(void *ctx, u32 head, u32 mask, const GFX2_ModeInfo *mode,
 
 static int run(void)
 {
-    static const GfxBackendV2 be = {.flip = flip, .release = release, .flip_done = flip_done, .mode_set = set_mode};
+    static const GfxBackendV2 be = {.enum_conn = enum_conn, .enum_mode = enum_mode, .flip = flip, .release = release, .flip_done = flip_done, .mode_set = set_mode};
     struct gfx2_surf *old = &gfx2_surfs[0], *next = &gfx2_surfs[1];
     adapter.be = &be;
     adapter.heads = 1;
@@ -61,10 +81,17 @@ static int run(void)
                               .pool = GFX2_POOL_VRAM};
     next->sid = 1025;
     next->state = GFX2_ST_IDLE;
-    gfx2_scan_ref_swap(&adapter, 0, old);
+    adapter.caps.connectors = 1;
+    old->fmt = GFX2_FMT_INDEX8;
+    old->w = old->h = 8;
+    old->usage = GFX2_USE_SCANOUT;
     next->owner = 7;
     next->usage = GFX2_USE_SCANOUT;
     next->pool = GFX2_POOL_VRAM;
+    if (gfx2_flip(0, 0, next->sid, 0, 10) != OS32_ERR_INVAL || flips ||
+        adapter.head[0].scan_sid || adapter.head[0].pend_sid ||
+        old->scan_ref || next->scan_ref) return 7;
+    if (gfx2_mode_set(0, 0, 1, 1, old->sid) || scan_sid != old->sid) return 8;
     flip_result = OS32_ERR_TIMEOUT;
     if (gfx2_flip(0, 0, next->sid, 0, 10) != flip_result ||
         adapter.head[0].pend_sid || next->scan_ref || old->scan_ref != 1) return 5;

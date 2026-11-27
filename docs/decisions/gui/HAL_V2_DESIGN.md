@@ -1253,7 +1253,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 | C10 | `gfx2_caps` は失敗で `*o` を書かない。`gfx2_caps_refresh` は §11-2 | `size` は 4 以上 (未満は INVAL)。`min(size, 256)` バイトだけ書く | caps の size |
 | C11 | INVAL は `*o` を書かない | head は `a->heads` 未満、conn は `connectors` 未満、mode の `i` は `gfx2_mode_count` 未満、EDID の `block` は `edid_blocks` 未満。外は INVAL | 列挙の範囲 |
 | C12 | §9-3 (元から足りていた) | §9-3 | quiesce・mode_set の途中の失敗 |
-| C13 | 書込後の未確定は AGAIN で新面を保留する。書込前の flip の拒否は `pend_sid`・scan_ref を変えない。palette の失敗は `gfx2_pal` を変えない。present の `gfxsync_write_rows` の失敗は IO で `dirty` を残す (次の present でまた送る) | palette は `count >= 1` かつ `count <= 256 − first`。cursor は ARGB8888 で `cursor_w`・`cursor_h` 以内。present の矩形は面で切り、空なら 0 で何もしない | 走査面の解放・palette の範囲・present の失敗 |
+| C13 | v2 の flip はその head の v2 mode_set 成功後だけ。走査面がない時は書込み前に INVAL。書込後の未確定は AGAIN で新面を保留する。書込前の flip の拒否は `pend_sid`・scan_ref を変えない。palette の失敗は `gfx2_pal` を変えない。present の `gfxsync_write_rows` の失敗は IO で `dirty` を残す (次の present でまた送る) | palette は `count >= 1` かつ `count <= 256 − first`。cursor は ARGB8888 で `cursor_w`・`cursor_h` 以内。present の矩形は面で切り、空なら 0 で何もしない | 走査面の解放・palette の範囲・present の失敗 |
 | C14 | `v1_bridge_begin` の rc は記録だけで、v1 の入口は進む (TIMEOUT の後は adapter が LOST で待つ物は失敗の完了、BUSY は DIRECT の別名の lock の間で unlock が面の全体を書き戻す)。rebind は §6-5 (quiesce が TIMEOUT の役は lock も閉じず旧のまま、ほかは `gfx2_lock_revoke` → `alias_update`)。`gfx2_lock_revoke`: ALIAS でない面は INVAL で何も変えない、unmap の IO でも map_as・staging を外して IO | — | 別名の面・別名の更新・lock 中の rebind (lock した DIRECT の別名で mode を替える → 旧 sid の unlock は STALE、map_as・staging が無い、staging の頁は持ち主へ返った) |
 | C15 | §7-3 (別名の `map_as` の拾いを足した) | — | 回収・unmap の失敗・staging の回収 |
 | C16 | shim は §11-7。`gfx2_lost_be` の `gart_unbind` は 0 | — | shim |
@@ -1292,7 +1292,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 | パターン | SET_PATTERN の前の PAT → INVAL。色パターン 0x12345678 を INDEX8 に → 0x78、565 に → 0x5678 | submit.c の未設定の検査を外す / 下位を採るマスクを 8bit 固定に | I2 |
 | 状態遷移 | §7-1 の表の全セル | surface.c の LOCKED_RO の書きの拒否を外す | I1 |
 | DISCARD | fake の未完了の FILL → DISCARD の lock が last_write を待つ | lock.c の DISCARD の時の待ちを省く | I1 |
-| 走査面の解放 | 書込前の拒否は不変。書込後の未確定は保留の flip。両面の free は CLOSING、新面の反映後は旧面だけ空 | surface.c の scan_ref の検査を外す | I3 |
+| 走査面の解放 | v2 mode_set 前の flip は INVAL、走査番地・参照は不変。書込前の拒否は不変。書込後の未確定は保留の flip。両面の free は CLOSING、新面の反映後は旧面だけ空 | surface.c の scan_ref の検査を外す | I3 |
 | quiesce | fake の wait が TIMEOUT → mode_set は TIMEOUT、`be->mode_set` は呼ばれず、head・世代は不変 | modeset.c の `if (rc) return rc;` を外す | I3 |
 | mode_set の途中の失敗 | 有効な mode で fake の `be->mode_set` が IO → 走査面・scan_ref・世代・`gfx_policy_reeval` の回数が不変 | modeset.c の失敗の return を世代の更新の後に動かす | I3 |
 | pin | pin の頁で free・transfer・reclaim が全部拒否、transfer_pinned だけ通る | pgalloc_owner.inc の 3 つの検査を 1 つずつ外す | I1 |
@@ -1856,7 +1856,7 @@ __attribute__((weak)) int gf_v2_owns(const struct gf3_surface *a0) { (void)a0; r
 |---|---|---|
 | gfx2_guest_i1 | normal/R1 とも起動自己試験 1 回成功、gfx2_i1 の親・子 PASS、lock 中 audit が進み、終了後 leftover/audit_fail 増分 0 | 起動の自己試験呼出を落とし回数 0 |
 | gfx2_guest_i2 | gfx2_i2 で混在描画の CRC と done、自分の fence が完了かつ失敗範囲外、audit_fail 増分 0 | C14 の CLIENT 別名を別 RAM に結び、混在画素の CRC 不一致 |
-| gfx2_guest_i3 | gfx2_i3 で列挙・同期画素・PEGC の mode/flip NOSYS。画面所有者が DISPLAY lease 中に FILL して BUSY、解除後は同じ FILL が成功。終了後の gshell の画面・色も照合 | submit の DISPLAY lease_count 判定だけを省き、保持中の FILL 成功を検出 |
+| gfx2_guest_i3 | gfx2_i3 で列挙・同期画素・PEGC の mode は NOSYS、走査面未設定の flip は INVAL。画面所有者が DISPLAY lease 中に FILL して BUSY、解除後は同じ FILL が成功。終了後の gshell の画面・色も照合 | submit の DISPLAY lease_count 判定だけを省き、保持中の FILL 成功を検出 |
 
 I3 は同じ所有者の lease 前後の rc・done・画素を記録し、gshell 復元は同じ静止画領域・palette で別に照合する。§13-3 の GF/Trident の結果は別に保存する。
 

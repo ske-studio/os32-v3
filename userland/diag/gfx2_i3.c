@@ -126,9 +126,11 @@ static int exercise(KernelAPI *api, u32 a, const GFX2_AdapterInfo *info)
         } else {
             REQUIRE("mode-nosys", rc == OS32_ERR_NOSYS);
         }
-        REQUIRE("flip-nosys", api->gfx2_flip(a, 0, next, 0, WAIT_MS) == OS32_ERR_NOSYS);
-        api->kprintf(ATTR, "gfx2_i3 mode=%s flip=NOSYS (backend contract)\n",
-                     info->backend_kind == OS32_SURFACE_TRIDENT ? "v1" : "NOSYS");
+        CALL("shim-head", api->gfx2_head_info(a, 0, &head));
+        int flip_expected = head.scanout_sid ? OS32_ERR_NOSYS : OS32_ERR_INVAL;
+        REQUIRE("shim-flip", api->gfx2_flip(a, 0, next, 0, WAIT_MS) == flip_expected);
+        api->kprintf(ATTR, "gfx2_i3 mode=%s flip=%d (backend contract)\n",
+                     info->backend_kind == OS32_SURFACE_TRIDENT ? "v1" : "NOSYS", flip_expected);
     }
     if (token) { CALL("fullscreen-leave", api->surface_unlease(token)); token = 0; }
     if (switched) {

@@ -1085,14 +1085,15 @@ id = "gfx2_scan_release"
 spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
 subsystem = "gfx"
 level = "L2"
-sources = ["sys/hal/gfx/v2/display.c", "sys/hal/gfx/v2/surface.c", "sys/include/display_provider.h", "sys/hal/gfx/v2/gfx2_int.h", "sys/include/gfx_sync.h", "tests/support/fixtures/gfx2/gfx2_scan_release.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+sources = ["sys/hal/gfx/v2/display.c", "sys/hal/gfx/v2/surface.c", "sys/hal/gfx/v2/modeset.c", "sys/include/display_provider.h", "sys/hal/gfx/v2/gfx2_int.h", "sys/include/gfx_sync.h", "tests/support/fixtures/gfx2/gfx2_scan_release.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "書込前の拒否は不変、書込後の未確定は両面を保持し、反映後に旧 backing だけ解放。復元 IO なら走査面・参照を保持"
+expect = "mode_set 前は INVAL で参照不変。書込前の拒否は不変、書込後の未確定は両面を保持し、反映後に旧 backing だけ解放。復元 IO なら走査面・参照を保持"
 limits = "メモリ上の画素と写像先を観測。実機の走査は対象外"
 gates = ["push", "main"]
 mutations = [
+  { id = "gfx2_flip_without_mode", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/display.c", old = "if (!a->head[head].scan_sid) return OS32_ERR_INVAL;", new = "(void)0;", fail = "FAIL flip before mode set" },
   { id = "gfx2_scan_release_early", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/surface.c", old = "if (s->scan_ref || !surf_done(s)) {", new = "if (!surf_done(s)) {", fail = "FAIL active scan reference" },
   { id = "gfx2_flip_uncertain_rejected", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/display.c", old = "if (rc && rc != OS32_ERR_AGAIN) return rc;", new = "if (rc) return rc;", fail = "FAIL uncertain flip references" },
   { id = "gfx2_restore_detach_on_io", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/display.c", old = "&mode, s))\n        return OS32_ERR_IO;", new = "&mode, s)) {\n        gfx2_head_detach(a, head);\n        return OS32_ERR_IO;\n    }", fail = "FAIL failed restore backing" },
@@ -1107,10 +1108,11 @@ sources = ["sys/dev/video/geforce/display/flip.c", "sys/dev/video/geforce/gf_v2_
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "書込前の期限切れは未発行。書込後の読戻し失敗は AGAIN、再確認まで保留。vblank の後に旧 sid を一度だけ返す"
+expect = "mode_set 前は INVAL で走査番地への書込みなし。書込前の期限切れは未発行。書込後の読戻し失敗は AGAIN、再確認まで保留。vblank の後に旧 sid を一度だけ返す"
 limits = "MMIO・fence・vblank は模型。装置のタイミングは対象外"
 gates = ["push", "main"]
 mutations = [
+  { id = "gfx2_gf_flip_without_mode", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_display.c", old = "if (!g->head[head].scan_sid) return OS32_ERR_INVAL;", new = "(void)0;", fail = "FAIL flip before mode set" },
   { id = "gfx2_gf_flip_reject_after_write", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/display/flip.c", old = "return rc ? OS32_ERR_AGAIN : 0;", new = "return rc;", fail = "FAIL post-write uncertainty" },
   { id = "gfx2_gf_flip_skip_vblank", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_v2_display.c", old = "== c->hold[head].after) return OS32_ERR_BUSY;", new = "== c->hold[head].after) return 0;", fail = "FAIL vblank retirement" },
 ]
