@@ -243,3 +243,13 @@ PM 決定に従い共通 cancel を先に実装する。前景不在が同一 ri
 ## 段 0 の後に決めたこと (2026-11-27、本線 PM)
 - 段 0 で x86 の 82557 常駐の違反 1 件 (期限切れの HELLO が期限時の get で旧 peer を確定、sfs_client.c:250・sfs_lan.c:80,98) を観測。結果は wip/sfs-deadline-design fe9fff94a の design-drafts/sfs-deadline-s0/RESULTS.md。未観測 2 件 (旧 CALL 応答の次 CALL への採用、モジュールの旧 HELLO) は本線 sol が同じ模型で観測する。
 - §2 の「put 復帰後に期限到達なら get 前に expired へ進む」は本線の別票 SFS-X86-STALE-PEER へ移した。段 1 は cancel の口と期限切れの出口の一本化だけで、get と期限判定の順序は今のまま (x86 の振る舞いを変えない)。§3 の「put で期限に達する交換は get 呼出 0、通知 1」の試験も別票へ移す (段 1 では get の回数は今の順序どおり、通知 1 だけを見る)。
+
+## 段 1 の実装で決めたこと (2026-11-27、PM)
+- LAN モジュールの LanModuleApi は adapter の前の全スロットがモジュールの text を指す事を常駐側の lan_start_module が要求する (lan_module.c:183、lan_module.h:28)。io.cancel=0 はこの照合で MODULE_INIT_FAILED になる (設計の欠け、段 1 の実装者が報告)。
+- PM 決定: ローダーの照合は緩めない (0 を許す例外を足さない)。モジュールは自分の text の中に何もしない cancel (非待機・冪等の契約を満たす空の関数) を置いて io.cancel に入れる。挙動は cancel=0 と同じ (同期 transport で取り消す要求が無い)。スロット数は 23→24、ops 版 3→4。常駐の同期表 (sfs_lan.c・sfs_session_fg.c・boot_sfs_clock) は cancel=0 のまま。
+
+## BSD との突き合わせで決めたこと (2026-11-27、PM、ユーザーの指摘「問題の解決に BSD 系を参考にしているか」の後)
+- 突き合わせ: sol の読み取り調査 /home/hight/os32-tmp/run/sfs-bsd-check/REPORT.md (FreeBSD 6eae951 sys/rpc の clnt_dg.c・clnt_vc.c・clnt_rc.c、sys/fs/nfsclient、sys/dev/fxp/if_fxp.c、NetBSD 36eddebc sys/nfs・sys/dev/ic/i82557.c、OpenBSD b907757 sys/dev/ic/fxp.c)。段 1 の期限切れの出口、段 2 の保留 CALL の解除、遅れた応答の識別子照合、82557 の送信完了の扱いは手本と合う (P1 なし)。
+- 違う 1 点 (P2、段 2): FreeBSD は要求の出口で配送済みで未処理の応答も解放する (clnt_dg.c:765–780、clnt_vc.c:590–603)。OS32 の §2 は「先に poll が終了した場合は pending=0 で戻る。成功済み受信バッファも消去しない」としていたため、READ 完了で共有 RX に格納した後に client が失効すると cancel が空振りし、未読分が残って次の応答の格納を拒む (hostfs_link_io.c:39–69,114–121,142–146)。
+- PM 決定: §2 の該当行を「期限切れの交換に属する未読の応答は cancel で破棄する (同じフレーム・期限の照合で、その交換が格納した分だけ。別の交換の応答には触れない)」に改める。段 2 の検査 ppc_hfs_cancel の「poll が先に終えた時に結果と未読の応答が残る」の期待を、「残らない (破棄される)・直後の別要求の応答が格納され採用される」に改め、READ 完了直後と部分読出し後の失効の 2 場合を足す。
+- x86 の peer の確定と未読の残留 (段 0 の違反) は別票 SFS-X86-STALE-PEER のまま。手本の形 (現行 nonce の応答を期限内に採用する時点まで peer の確定を遅らせ、失効した交換の未読分を捨てる) を別票に渡す。
