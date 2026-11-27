@@ -1839,23 +1839,51 @@ __attribute__((weak)) int gf_v2_owns(const struct gf3_surface *a0) { (void)a0; r
 
 **13 欄の割付**。id は上表、spec.path は本文書、spec.section は §13-1 の見出し全文。subsystem は gfx、配置は tests/gfx/<id>.py。level は単一の実関数 L2、複数部品の結線 L3、ABI と最終 ELF は L1。sources は受入行の製品実体と取り込むヘッダ・生成入力を現行パスで列挙する (共通は sys/hal/gfx/v2、同期は sys/hal/gfx/sync、GF は sys/dev/video/geforce、pin/写像は現行 mm・arch/x86、AS 終了は sys/kern/exec)。environment は linux-x86-cross、arch は x86=[pc98]。ホスト実関数は libc 無しの 32bit harness を qemu-i386 で実行する。needs は自己完結の host では空。limits は fake の fault/呼出順とメモリ画素まで、実 DMA・走査・割込み時刻は §13-3。gates は push と main、seconds は実測結果。各 mutation は ID に検査 ID と故障名を含め、config=pc98、隔離木の after_build replace とその後の verify の中で対象を再コンパイル・実行する。各 fail は当該観測名を含む。正常対照・変異の適用・意図した FAIL の三つを別々に記録する。
 
-**最初の三件**。gfx2_final_i1 / gfx2_final_i2 / gfx2_final_i3 は §12 の段表と §13-1 P2-2 に従い、同一候補から作った build/out/kernel.{elf,map} と build/out/geforce/geforce.{elf,map} を needs とする。旧配線表 (8449a3a45 の親、tools/checks/gfx2_wiring.txt) の段・所有像・関数/データを §12・§14 と照合して入力名簿を作る。移行時の内訳は I1 が kernel 関数63・データ8・GF関数7、I2 が28・0・15、I3 が40・0・16。数は移行漏れの点検に使う。対象 ELF の定義・型・束縛と、対応 map の入力節の半開区間を突合する。未定義、weak、異種、a0_weak.o/gf_v2_weak.o 内、空の名簿、読めない map を診断する。各段で強い提供元を抜いた弱い版を再リンクする。I1 はデータを弱くした版、強い同名を仮実体の入力節内に置いた人工 ELF/map も落とす。正規像を壊す実験は隔離木で行う。
+**最初の三件**。gfx2_final_i1 / gfx2_final_i2 / gfx2_final_i3 は §12 の段表と §13-1 P2-2 に従い、同一候補から作った build/out/kernel.{elf,map} と build/out/geforce/geforce.{elf,map} を needs とする。旧配線表 (8449a3a45 の親、tools/checks/gfx2_wiring.txt) の段・所有像・関数/データを §12・§14 と照合して入力名簿を作る。移行時の内訳は I1 が kernel 関数63・データ8・GF関数7、I2 が28・0・15、I3 が40・0・16。数は移行漏れの点検に使う。対象 ELF の定義・型・束縛と、対応 map の入力節の半開区間を突合する。未定義、weak、異種、当該構成の仮実体入力節内、空の名簿、読めない map を診断する。各段で強い提供元を抜いた弱い版を再リンクする。I1 はデータを弱くした版、強い同名を仮実体の入力節内に置いた人工 ELF/map も落とす。named symbol の存在だけを見る reader に戻す負対照では人工の強い仮実体を見逃し、reader の品質試験自身が RED になること。通常 GUI PC-98 と R1 監査構成の kernel を別リンクなら両方検査し、配布する通常 GF module は mkmod 直前の ELF/map を採る。host の fake や単体 .o で正しい定義があっても配布像の解決先は決まらず、weak でもリンクは通る。先に提供元を確定して後続の画素・表示検査を同じ候補に結ぶ。仮実体入力は対象構成の build 入力から同定し、旧パス・件数・番地を固定しない。
 
 **期待の更新と結合の追加**。
 
 - gfx2_v1_direct は §8 (描画加速設計) の DIRECT→SHADOW と古い世代の submit を通す。変異は世代検査を省く。gfx2_abi は kapi_abi の対象型を引き、未収録の sizeof/offsetof を補う。
 - gfx2_sysmem / gfx2_gart_visible / gfx2_shim は §14 に従い、I1 で backing・AS・回収、I2 の結合 gfx2_backing_submit で公開 FILL/READBACK、別 AS 拒否、unregister 後 STALE を観測する。変異は map_va を先頭 PFN の連続写像に替える。gfx2_paging_map は unmap で空 PT を即時返す場合も許し、破棄後の owner/空き頁を照合する。
-- gfx2_gf_range は G8 確定追記の M2MF 入出力と SIFM 元だけを HW とし、SF2D に GART を結ばないことを method 記録で検査する。変異は GART 宛 FILL を HW 可にする。gfx2_gf_stop は輪 3 件の idle→stop→新 epoch の start で failed_upto が増えないことを含む。変異は正常停止の idle を省く。色鍵と α の画素は SW で観測する。
+- gfx2_gf_range は G8 確定追記の M2MF 入出力と SIFM 元だけを HW とし、SF2D に GART を結ばないことを method 記録で検査する。range_q 未設定 EINVAL、bind [0,8KiB) 内成功、[4,12KiB) と加算 overflow は ERANGE、VRAM 対照を保つ。範囲照合を予約照合へ戻す変異と GART 宛 FILL を HW 可にする変異を独立に掛ける。gfx2_gf_stop は輪 3 件の idle→stop→新 epoch の start で failed_upto が増えないことを含む。変異は正常停止の idle を省く。色鍵と α の画素は SW で観測する。
 - gfx2_sync_defaults に加え gfx2_sync_package (L1、GUI 配布物が needs) を設け、配布先 /etc/gfx/sync.cfg の実バイトを Y1 に読ませる。変異は GUI 配布入力から D1 を除き再生成。Trident 行は gap=80、GF は NOTFOUND と既定。ファイル無し時の動作は sync_defaults で別入力として確認する。
 
-**PEGC の結合**。次の三件は spec.section=§13-2 の見出し全文、L4、環境 np21w-pegc (実行器への追加案)、arch=x86 [pc98]、同一 SHA の normal/R1 媒体と kernel.map が入力。対応 runner のない hosted 束はゲストの PASS を生成できない。PM の NP21/W 受入を SHA・媒体ハッシュ・serial 生ログ付きで接続してから必須化する。接続までの欠測は NOT_RUN。limits は PEGC のみ、GF の出力・Trident の欠けは §13-3。
+**PEGC の結合**。次の三件は spec.section=§13-2 の見出し全文、L4、環境 np21w-pegc (実行器への追加案)、arch=x86 [pc98]、同一 SHA の normal/R1 媒体と kernel.map が入力。対応 runner のない hosted 束はゲストの PASS を生成できない。PM の NP21/W 受入を SHA・媒体ハッシュ・serial 生ログ付きで接続してから必須化する。接続まで PM の候補受入として台帳に欠測を記録し、必須 registry には登録しない。必須 NOT_RUN は集計で赤になる。limits は PEGC のみ、GF の出力・Trident の欠けは §13-3。
 
 | ID | 観測・合格 | 変異 (候補を再ビルドし同じ台本で起動) |
 |---|---|---|
 | gfx2_guest_i1 | normal/R1 とも起動自己試験 1 回成功、gfx2_i1 の親・子 PASS、lock 中 audit が進み、終了後 leftover/audit_fail 増分 0 | 起動の自己試験呼出を落とし回数 0 |
-| gfx2_guest_i2 | gfx2_i2 で混在描画の CRC と done、自分の fence が完了かつ失敗範囲外、audit_fail 増分 0 | C14 の同期を抜き v1 present と v2 描画の CRC 不一致 |
+| gfx2_guest_i2 | gfx2_i2 で混在描画の CRC と done、自分の fence が完了かつ失敗範囲外、audit_fail 増分 0 | C14 の CLIENT 別名を別 RAM に結び、混在画素の CRC 不一致 |
 | gfx2_guest_i3 | gfx2_i3 で列挙・同期画素・PEGC の mode/flip NOSYS。別 AS から DISPLAY lease 中に投入して BUSY、解除後に gshell の画面・色を復元 | lease の競合検査を外して別 AS の投入成功を検出 |
 
 ゲストの PASS 行のみで I3 の別 AS と gshell 復元は判定できない。二つの AS を重ねる台本と復元前後の同じ静止画領域・palette の照合を追加する。§13-3 の GF/Trident の結果は別に保存する。
 
 **基準版の予測** (2097c56f2、実行前)。最終像・実関数の正常系は実装と過去の受入から緑を予想する。GF の旧 SF2D/GART の成功期待、failed_upto の絶対ゼロ、unmap 後に PT が必ず残る期待を移すと赤になる。これらは上の更新済み期待を使う。現行登録のまま三つの guest ID の実測を要求すると証拠不足で NOT_RUN、現行 i3 のログだけでは別 AS の BUSY の観測も欠ける。これまでの受入から現行版の製品 FAIL は断定できない。正常対照が落ちたら該当 §13 の観測を示し、仕様との差を製品・旧期待・環境に切り分けてから変異へ進む。
+
+### 旧入口と追加登録の台帳（第2稿）
+
+旧名は撤去直前の test_*.py の stem。対応する *-host 起動口と *_host.c は同じ行に含む。下記の既存 ID は上表の expect と変異を引き継ぐ。追加 ID の spec は根拠節の現行見出し全文を用い、expect に受入行・追記名を併記する。
+
+| 旧入口 | 段・登録 ID（共通の gfx2_ 接頭辞を省略） | 根拠・観測と故障 |
+|---|---|---|
+| gfx2_abi, gfx2_kapi | I1 abi, kapi_guard | §11 公開口・§13-1 ABI。生成 wrapper の各 pointer に必要長ぴったり・1B 不足・NULL を与え、本体の呼出回数と rc を記録。HeadInfo、gamma、palette 配列、op 配列の検査長を個別に縮めて不足時の誤通過を捕捉 |
+| gfx2_i1, gfx2_backend_reg, gfx2_surface, gfx2_heap, gfx2_gart, gfx2_lock, gfx2_fence, gfx2_owner_release, gfx2_map_audit, pgalloc_pin, paging_gfx2, gfx2_sysmem, gfx2_v1_shim | I1 register_twice, surface_state, pin/pin_limit, heap, gart_rollback/keep, discard, fence_wrap/failure, owner_release, audit, paging_map, sysmem, shim；I2 backing_submit | §13-1 対応行。I1 は同一 AS/allocator で初期化→lock→終了を結合し、回収を省く変異で owner・空き頁の差を検出 |
+| gfx2_i2, gfx2_caps, gfx2_check_op/equiv, gfx2_submit, gfx2_exec, gfx2_v1_bridge | I2 caps_size, how, submit_scan, batch_snapshot, fence_order, rebind, backing_submit | §13-1。check/submit の判定一致、done と失敗位置、別名世代、別 AS 拒否・backing 往復。世代照合・束の snapshot を個別に省く |
+| gfx2_format, gfx2_user | I2 format, user_color | §3 形式の式・§14 U1。公開ライブラリ gfx2_color_pack から INDEX8 の RGB 二乗距離最小、同距離は小番号。二乗を絶対値にする変異、同点で後勝ちにする変異に別入力 |
+| gfx2_sw_fill, gfx2_copy, gfx2_sw_rop, gfx2_rop4, gfx2_mono, gfx2_hostdata, gfx2_readback, gfx2_stretch, gfx2_ckey, gfx2_alpha, gfx2_line, gfx2_rh | I2 sw_fill〜sw_line、pattern | §3-3 と §13-1 S1〜S11。共通参照画素、clip 外番兵、op ごとの変異を使う |
+| gf_v2_alloc, gf_v2_gart, gf_g8, gf_v2_g4_supplement, gf_v2_ops, gf_v2_rop3, gf_v2_fence, gf_v2_life | I1 heap/gf_page_table；I2 gf_range/keep/rop3/ring/start/stop, fence_order, lost | §13-1 G4/G5/G7/G11・G8 追記・正常停止追記。R6 は drain 成功の LOST のみ mode_set で復旧。drain 失敗なら PC-98 へ退避、mode_set は IO、再起動で復帰。固い LOST を mode_set で解除する変異 |
+| gf_v2_readback | I2 gf_readback | I2 設計追記・S7。INDEX8 DISPLAY 別名の現行 VRAM 予約を毎回引く。解放直後 IO・packet 0、同番地の再予約後成功、通常面の失効 identity は拒否。7×3 を pitch 11 に読み余白 0xa5、GF 期限切れは TIMEOUT。旧予約を cache、出力 pitch を幅にする、期限切れを IO にする各変異 |
+| gfx2_i3, gfx2_i3_guest, gfx2_display, gfx2_enum, gfx2_modeset, gf_v2_display, gf_v2_enum | I3 enum_bounds, modeset_failure, scan_release, present_retry, gf_home/flip/palette/scan/connector/modes, guest_i3 | §13-1・13-2。列挙端・失敗時解放・走査復元、下記 AS 競合。fake のゲスト入口試験を実起動の証拠と混同しない |
+| packages（D1 配布分）, gfxsync_cfg, gfxsync_gap, gfxsync_write, gfxsync_bind | I3 sync_defaults/package, sync_gap, sync_rows, sync_bind/bounds/publish | §10 Y1〜Y4。設定鍵の優先・不正区画 fallback、gap の丸め、unit 未整列端、待ちの単位数、read/write pitch、flush NONE/READBACK/SERIALIZE と実効 mode を記録。優先逆転、丸め切捨て、末尾書込省略、flush 省略、無効 hook で DIRECT 維持を個別に検出 |
+| trident_sync | I3 trident_sync | §10 T1 と「T1 の診断の上書き」追記。初回 bind/publish、同世代再利用、世代更新で NULL publish→unbind→bind→publish、bind/publish 失敗後 ctx・世代消去。SYNC/WAIT/GAP override、不正値で旧値保持、clear で既定。世代比較反転、失敗時 unbind 省略、clear 省略 |
+| gfx2_wiring / gfx2_no_weak | I1〜I3 final_i1/i2/i3 | §12 と §13-1 P2-2。上記 ELF/map と reader の負対照 |
+| V1 の gfx_accel_hal, gfx_policy/geforce_policy/reattach/draw_direct/hw_mono_cpu/transfer/movecopy, gf_direct, wm_composite_tests（窓移動・scroll）、console_dual（A1〜A4）、ppc-gfx2-guest / ppc_gfx2 | 周辺回帰の別票 | H1/H2 の世代・方式は v1_direct に残す。V1 固有の表示/UI と PPC の boot・媒体・表示は各機種の受入で扱う。PEGC の結果を代用しない |
+
+### PEGC 台本と登録までの段
+
+1. host 担当は linux-x86-cross の実行環境に qemu-user の qemu-i386 を配備し、32bit ELF の起動を prerequisite で照合する。現行 prerequisites の cross compiler 判定だけでは不足する。正常対照を先に走らせ、環境不足・仕様違反・狙った観測名付き変異 RED を別々に保存。after_build の後は verify が対象を再コンパイル・再リンクし、D1 は GUI 媒体を再生成する。正常と各変異ごとに候補の清浄な入力から専用出力先を作り、ELF/map・媒体・ログを共有しない。
+2. PM は tools/guest_tests.txt と tools/guest_acceptance.yaml の受入形式で pc98emu に候補 SHA、normal/R1 の媒体ハッシュ、PEGC 設定、起動コマンド、観測名・期待値を渡す。pc98emu は媒体の作業コピーを各起動で初期化し、NP21/W の serial 生ログ、終了値、gshell の静止画・palette、構成と媒体の識別を返す。GUI 操作は tools/ops/pc98_in2_gui.py と in2_gui_trial.py の既存入口を使う。PM が同一候補・試行との対応を確認する。
+3. I1 は normal/R1 の起動自己試験 1 回、64×64 の lock VA が gfx2 写像帯内、DISCARD ゼロ→全画素に連番を書込→子の audit 後も全値一致、子の lock 保持終了後の free/leftover/bad_free/audit_fail の前後値を記録する。親の PASS とともに件数・比較値をログに出す。自己試験省略と終了時回収省略を別媒体で確認する。
+4. I2 は先に v1 CLIENT と DISPLAY の対象帯を index 0 で初期化。gfx2_i2 の v2 HOSTDATA で CLIENT 左上 64×4 を index 5、v1 gfx_fill_rect で左上 4×1 を 7、v1 present_rect で 64×4 を DISPLAY に転送する。CLIENT と DISPLAY の READBACK 各 256B を「先頭 4B が 7、残り 252B が 5」と byte 比較し CRC・done・fence を保存する。変異版は C14 が CLIENT 別名の backing を本物の v1 CLIENT から同じ寸法・pitch の独立 RAM に差し替える。v2 CLIENT は全 5、v1 present 後の DISPLAY は先頭 4B が 7、残りは 0 になる。両 READBACK・CRC を採ってから判定し、bridge-pixels と screen-pixels を区別する。C14 の begin/end 自体は host で呼出順を別に検査する。
+5. I3 は画面所有者 AS A が DISPLAY の RW lease を取得、token を保持したまま子の別 AS B を起動する。B は A が渡した DISPLAY sid 宛に FILL を submit、BUSY・done 0・画素不変を観測する。B 終了後 A が surface_unlease(token)、全画面を抜け gshell に所有権を返す。同じ静止領域・palette を開始前と照合する。現行 submit の surface() は gfx2_surf_get の非所有者 INVAL が lock 照合に先行するため、この台本は BUSY の期待で正常対照が赤になる可能性がある。B の rc と done を先に実測し、§13-2 の BUSY を満たしてから競合拒否を省く変異へ進む。
+6. runner 接続は独立の実装段。tests/ の環境語彙、prerequisites、pc98emu への受渡しと試行回収、証跡 reader、通常・各変異の独立した媒体生成と boot を揃える。reader は SHA・媒体ハッシュ・構成・変異名・観測値を照合し、古いログ・別媒体・欠測を拒否する。正常と全変異を往復して初めて guest_i1/i2/i3 を必須 gate に登録する。Ra266 の §13-3 は実機担当が別に採る。
