@@ -196,10 +196,10 @@ def meter_rpc(meter):
     source = edit(source, "    int rc = c->io->put_until ?", f"    rpc_frame({args});\n    int rc = c->io->put_until ?")
     site = "if (sent) c->resends++;"
     source = edit(source, site, site + f"\n            rpc_frame({args});")
-    source = edit(source, "(now - deadline) >= 0) goto expired",
-                  "(rpc_compare(now, RPC_CLIENT) - deadline) >= 0) goto expired")
-    source = edit(source, "(c->io->now(c->ctx) - deadline) >= 0) goto expired",
-                  "(rpc_compare(c->io->now(c->ctx), RPC_CLIENT) - deadline) >= 0) goto expired")
+    for spaces in (8, 12):
+        for clock in ("now", "c->io->now(c->ctx)"):
+            site = "\n" + " " * spaces + f"if ((i32)({clock} - deadline) >= 0) goto expired;"
+            source = edit(source, site, site.replace(clock, f"rpc_compare({clock}, RPC_CLIENT)"))
     source = edit(source, "if (sent && c->io->cancel)\n        c->io->cancel(" + args + ");",
                   f"if (sent && c->io->cancel) {{\n        rpc_timeout({args});\n        c->io->cancel({args});\n    }}")
     source = edit(source, "c->timeouts++;\n    return OS32_ERR_HOSTDOWN;",

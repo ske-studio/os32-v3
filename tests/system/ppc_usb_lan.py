@@ -67,13 +67,16 @@ def deadline_cause(g):
             return "foreground poll reached but unable to wait"
         return missing
     if ordered(g["prior_poll"], g["end_round"]):
-        return "no foreground deadline comparison before observing round"
+        return "first foreground deadline crossing after deadline tick"
     return missing
 
 
 def check_close(g):
     check(g["seen"] == 7, "missing OPEN, WDATA or RELEASE")
-    check(g["reason"] == g["source"] and g["reason"] in (1, 2), "first termination cause")
+    # The link idle expiry (WDATA + 100) can only coincide with the deadline (start + 100);
+    # the upper layer must still close exactly once in the first observing round.
+    check(g["source"] in (1, 2) and (g["reason"] == g["source"] or
+          (g["reason"] == 3 and g["reason_tick"] == g["deadline"])), "first termination cause")
     check(g["prev_event"] and g["end_event"] and ordered(g["prev_event"], g["end_event"]) and
           ordered(g["prev"], g["deadline"]) and distance(g["deadline"], g["end"]) < 0x80000000,
           "missing first foreground deadline crossing")
@@ -82,7 +85,7 @@ def check_close(g):
           ordered(g["end_event"], g["close_event"]), "close outside first observing round")
     check(g["timeout_event"] and g["return_event"] and ordered(g["close_event"], g["return_event"]),
           "missing client timeout or return")
-    if g["reason"] == 2:
+    if g["source"] == 2:
         check(ordered(g["end_event"], g["timeout_event"]) and ordered(g["timeout_event"], g["close_event"])
               and g["timeout_round"] == g["close_round"], "client timeout/close order")
     else:
