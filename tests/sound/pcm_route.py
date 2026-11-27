@@ -25,6 +25,8 @@ def verify(config):
                         "-I.", *include_flags(ROOT), "tests/support/fixtures/pcm_route/owner.c",
                         "sys/dev/dma/dma8237.c", "sys/dev/dma/dma8237_math.c", "lib/dma_contract.c", "-o", owner], check=True)
         subprocess.run(["qemu-x86_64", owner], check=True)
+        for case in ("normal", "pi-clear", "hal-drain"):
+            subprocess.run(["qemu-x86_64", exe, "32", case, "reserved-bit"], check=True)
         for bios in (0x20, 0x61, 0x23):
             for case in ("normal", "irq", "dma", "mismatch", "restore", "drs", "drain",
                          "hal-drain", "hal-reclaim", "hal-restore", "pi", "hal-pi", "pi-clear", "pi-readback"):

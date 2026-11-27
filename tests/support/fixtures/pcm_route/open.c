@@ -16,7 +16,7 @@ static int playing;
 static unsigned bios, route, index_reg, regs[32], writes, route_writes;
 static int registered, owned, irq_busy, dma_busy, reject_set, reject_restore;
 static int retained, readback, stuck, drs_reads;
-static int stuck_pi, invalid_readback;
+static int stuck_pi, invalid_readback, init, reserved_bit;
 volatile u32 tick_count;
 
 static void require(int ok, const char *message)
@@ -30,9 +30,10 @@ unsigned inp(unsigned port)
     if (port == PCM_PORT_WSSID) return PCM_WSSID_VALUE;
     if (port == PCM_PORT_R0) {
         if (stuck) require(model_if, "DRS wait with IF=0");
-        return index_reg;
+        return index_reg | init;
     }
     if (port == PCM_PORT_R1) {
+        if (index_reg == PCM_I_ALTSTAT) return regs[index_reg] | reserved_bit;
         if (index_reg == PCM_I_MODEID) return regs[index_reg] | PCM_ID_VALUE;
         if (index_reg == PCM_I_VERSION) return PCM_VER_CS4231;
         if (index_reg == PCM_I_ERRSTAT && stuck) {
@@ -59,7 +60,7 @@ void outp(unsigned port, unsigned value)
     if (port == PCM_PORT_R1) {
         require(!model_if, "unlocked codec write");
         if (index_reg == PCM_I_ALTSTAT && stuck_pi) return;
-        if (index_reg == PCM_I_ALTSTAT && invalid_readback) value = PCM_R0_INIT;
+        if (index_reg == PCM_I_ALTSTAT && invalid_readback) init = PCM_R0_INIT;
         regs[index_reg & 31] = value;
     }
 }
@@ -165,6 +166,7 @@ static void exercise_hal(const char *scene)
 
 int main(int argc, char **argv)
 {
+    reserved_bit = argc > 3 ? 0x80 : 0;
     bios = route = strtoul(argv[1], 0, 0);
     irq_busy = !strcmp(argv[2], "irq");
     dma_busy = !strcmp(argv[2], "dma");

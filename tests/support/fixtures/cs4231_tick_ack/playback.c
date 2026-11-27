@@ -6,6 +6,7 @@ static unsigned int index_reg, status, reads, clears, advances;
 
 unsigned int inp(unsigned int port)
 {
+    if (port == PCM_PORT_R0) return index_reg;
     if (port == PCM_PORT_R2) return status ? 1 : 0;
     if (port != PCM_PORT_R1 || index_reg != PCM_I_ALTSTAT) abort();
     ++reads;

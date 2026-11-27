@@ -128,8 +128,15 @@ static void cs_write(u8 idx, u8 val)
 /* Return -1 when I24 cannot establish the state of the playback latch. */
 static int pcm_read_pi(void)
 {
-    u8 status = cs_read(PCM_I_ALTSTAT);
-    if (status == 0xff || status == PCM_R0_INIT) return -1;
+    unsigned int flags = irq_save();
+    u8 status = 0xff;
+
+    if (!(inp(PCM_PORT_R0) & PCM_R0_INIT)) {
+        outp(PCM_PORT_R0, PCM_I_ALTSTAT);
+        status = (u8)inp(PCM_PORT_R1);
+    }
+    irq_restore(flags);
+    if (status == 0xff) return -1;
     return (status & PCM_ALT_PI) != 0;
 }
 
