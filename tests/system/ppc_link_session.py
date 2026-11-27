@@ -62,6 +62,8 @@ def exercise(vm, op, late):
         data = op.expect_once(rid, generation, expected, deadline)
         check(data["state"] == "done" and data["drop"] == 0, f"truncated {rid}")
         capture_end(end)
+        if data.get("duplicate"):
+            raise Failure("duplicate PRINT payload")  # only after capture END and one-OUT held
         return data["body"][len(line.encode())+3:-1]
 
     observations = []

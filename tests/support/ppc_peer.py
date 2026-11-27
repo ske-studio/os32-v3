@@ -180,6 +180,7 @@ class Peer:
     def expect_once(self, rid, generation, payload, deadline):
         self.wait(lambda: self.outputs(rid, generation), deadline, f"missing OUT {rid}")
         event = self.outputs(rid, generation)[0]
+        duplicate = False
         data = bytes.fromhex(event["body"])
         line = self.lines[generation, rid].encode()
         prefix = b"> " + line + b"\n"
@@ -190,21 +191,21 @@ class Peer:
             if line == b"p3-output" and data == doubled and event["parts"][4:] == ["0", str(len(data))]:
                 self.vm.record("duplicate PRINT", dict(rid=rid, generation=generation,
                                normal=normal.hex(), observed=data.hex()))
-                raise Failure("duplicate PRINT payload")
-            if data != normal:
+                duplicate = True  # keep checking the result, capture settlement and one-OUT
+            elif data != normal:
                 raise Failure(f"unexpected output for {rid}: {data[:120]!r}")
         self.wait(lambda: rid in self.operator.results or self.operator.take_result(), deadline, "OUT rejected")
         result = self.operator.results[rid]
         if (result["state"] not in ("done", "truncated") or result["result"] != data or
                 result["drop"] != int(event["parts"][4]) or not data.endswith(b"\x04") or
-                (result["state"] == "done" and not data.startswith(prefix))):
+                (result["state"] == "done" and not duplicate and not data.startswith(prefix))):
             raise Failure("incomplete operator result")
         tick = self.vm.word("tick_count", 0, deadline)
         self.wait(lambda: (self.vm.word("tick_count", 0, deadline)-tick) % 2**32 >= 100,
                   deadline, "capture settlement")
         if len(self.outputs(rid, generation)) != 1:
             raise Failure("multiple OUT records")
-        return dict(state=result["state"], drop=result["drop"], body=data)
+        return dict(state=result["state"], drop=result["drop"], body=data, duplicate=duplicate)
 
     def notify_number(self, channel, opcode, data, deadline):
         remaining(deadline)
