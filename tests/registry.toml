@@ -70,6 +70,7 @@ expect = "登録が通り、必須の欄を欠く登録を lint が拒否する"
 limits = "製品の実行結果は調べない"
 gates = ["push", "main"]
 mutations = [{ id = "allow_unsafe_config", config = "local", replace = "tests/support/registry.py", old = "and all(map(config_component, values))", new = "and True", fail = "unsafe configuration accepted", when = "after_build" },
+             { id = "allow_oversized_weight", config = "local", when = "after_build", replace = "tests/support/registry.py", old = "0 < n <= PPC_BUNDLE_SECONDS", new = "0 < n", fail = "invalid PPC weight accepted" },
              { id = "lint_accepts_missing", config = "local", replace = "tests/support/registry.py", old = "missing = FIELDS", new = "row.setdefault('needs', [])\n        missing = FIELDS", fail = "missing field not rejected: needs", when = "after_build" }]
 
 [[check]]
@@ -468,6 +469,7 @@ mutations = [
 
 [[check]]
 id = "ppc_boot_clock"
+ppc_seconds = { core = 17 }
 spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の DEC 処理速度" }
 subsystem = "system"
 level = "L4"

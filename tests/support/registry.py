@@ -3,6 +3,7 @@ from pathlib import Path
 import re
 import tomllib
 
+PPC_BUNDLE_SECONDS = 900
 FIELDS = set("id spec subsystem level sources environment arch needs expect limits gates mutations".split())
 OWNERS = set("kern hal arch platform dev gfx sound input fs net kapi boot lib sdk userland tools integration system infra".split())
 ENVIRONMENTS = {"qemu-ppc", "qemu-ppc-net", "python-yaml", "python", "linux-x86-cross", "linux-ppc-cross", "linux-cross"}
@@ -64,7 +65,7 @@ def validate(checks, root):
         demand(isinstance(arch, dict) and arch and arch.keys() <= {"x86", "ppc", "host"}, "invalid arch")
         weights = row.get("ppc_seconds", {})
         demand(isinstance(weights, dict) and weights.keys() <= set(arch.get("ppc", ()))
-               and all(type(n) is int and n > 0 for n in weights.values()), "invalid ppc_seconds")
+               and all(type(n) is int and 0 < n <= PPC_BUNDLE_SECONDS for n in weights.values()), "invalid ppc_seconds")
         configs = set()
         for values in arch.values():
             demand(strings(values) and all(map(config_component, values)) and configs.isdisjoint(values), "invalid configs")

@@ -14,7 +14,7 @@ import tempfile
 import time
 
 from tests.support.tracked import paths
-from tests.support.registry import config_component, load
+from tests.support.registry import PPC_BUNDLE_SECONDS, config_component, load
 from tests.support.impact import comparison
 from tools.ownership import Inventory, OwnershipError
 
@@ -170,9 +170,9 @@ def selection(rows, args):
                     elif environment == "qemu-ppc" and row["level"] == "L4":
                         group = "guest"
                     # Until measured, reserve a whole runner for a new row.
-                    seconds = row.get("ppc_seconds", {}).get(config, 900)
+                    seconds = row.get("ppc_seconds", {}).get(config, PPC_BUNDLE_SECONDS)
                     bins = loads[group]
-                    index = next((i for i, used in enumerate(bins) if used + seconds <= 900), len(bins))
+                    index = next((i for i, used in enumerate(bins) if used + seconds <= PPC_BUNDLE_SECONDS), len(bins))
                     if index == len(bins):
                         bins.append(0)
                     bins[index] += seconds

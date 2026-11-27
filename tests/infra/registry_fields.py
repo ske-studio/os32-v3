@@ -27,7 +27,8 @@ def verify(config):
     root = Path.cwd()
     row = load(root)[0]
     verify_configs(root, row)
-    for weights in ([], {"unknown": 1}, {"core": 0}, {"core": True}):
+    validate([dict(row, ppc_seconds={"core": 900})], root)
+    for weights in ([], {"unknown": 1}, {"core": 0}, {"core": True}, {"core": 901}):
         try:
             validate([dict(row, ppc_seconds=weights)], root)
         except ValueError as exc:
