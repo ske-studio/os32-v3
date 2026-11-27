@@ -224,7 +224,7 @@ int gfx2_unlock(u32 sid)
         !(s->state == GFX2_ST_LOST && s->map_as == c.as)) return OS32_ERR_INVAL;
     access = s->state == GFX2_ST_LOCKED_RO ? GFX2_CPU_R : (GFX2_CPU_R | GFX2_CPU_W);
     all = (struct gfx2_rect){0, 0, s->w, s->h};
-    if (s->staging) {
+    if (s->staging && (access & GFX2_CPU_W)) {
         if (gfx2_sync_get(gfx2_adapter_get(s->adapter), s->head, &ctx, &mode) ||
             mode != GFXSYNC_DIRECT ||
             gfxsync_write_rows(ctx, 0, 0, s->w, s->h, s->staging, s->staging_pitch)) rc = OS32_ERR_IO;

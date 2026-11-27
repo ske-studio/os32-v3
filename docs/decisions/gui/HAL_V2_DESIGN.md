@@ -232,6 +232,7 @@ return rc;   /* 走査 2 の rc は装置の失敗だけ (§6-3)。k_ops[k_done]
 - 完了を見た時 (cpu_begin・submit・fence_query) に `done(f)` の欄を 0 に戻す。発行の番号が 2^30 の倍数を越えるたびに全部の面を掃除し、残る値と completed の距離を < 2^31 に保つ (1,024 面を回すだけ)。
 
 ### 6-2. CPU が触る前
+- READONLY の unlock は staging を書き戻さない。DISCARD を併用しても同じ。
 - 1 か所 `gfx2_cpu_begin(surf, access)`: 読む → `wait(last_write)`。書く → `wait(last_write)`・`wait(last_read)`。`gfx2_cpu_end(surf, access)` は書いた時だけ、面の種類で 1 つを行う (C3。backend の hook は使わない):
 
 | 面 | cpu_end の書きの後 |
@@ -273,7 +274,7 @@ int gf_v2_fence_emit(struct gf_v2 *g, u32 v2, u32 dl)
 |---|---|---|---|
 | v2 の VRAM・GART の面 | 自分 (影は持たない) | 可 | lock の間に直接 |
 | 同期層の SHADOW の表示面 (PEGC・Trident の SHADOW) | RAM の影 (sw の `view.base` = RAM の正本、`view.sync = NULL`。VRAM への転送は C13 の present だけ) | **しない** (`check_op` が SW を返す。Trident の GE も使わない) | 影に書き dirty に足す。present が `gfxsync_write_rows` で写す |
-| 同期層の DIRECT の表示面 | VRAM | 可 (GE の後は `tri_sync` が fence の代わり) | lock は RAM の写し (staging) を渡す: lock で `gfxsync_read_rows` (DISCARD なら 0 で埋める)、unlock で面の全体を `gfxsync_write_rows`。生の VRAM の VA は渡さない。staging の頁と写像は §7-5 |
+| 同期層の DIRECT の表示面 | VRAM | 可 (GE の後は `tri_sync` が fence の代わり) | lock は RAM の写し (staging) を渡す: lock で `gfxsync_read_rows` (DISCARD なら 0 で埋める)、書込み可の unlock で面の全体を `gfxsync_write_rows`。生の VRAM の VA は渡さない。staging の頁と写像は §7-5 |
 - 同期の対象は「同期の対象の別名面」(C14 が `gfx2_surf_alias` で作る表示面) だけ。通常の面 (SYSMEM・VRAM・GART の create の面) は ctx を拾わない (`gfx2_sync_get` を呼ばず 1 行目の扱い)。別名面のどの行を使うかは `gfx2_sync_get(a, head, &ctx, &mode)` (C1、§11-2) の 1 口だけで決める: `NOTFOUND` = 同期層の面でない (1 行目)、`mode == GFXSYNC_SHADOW` = 2 行目、`GFXSYNC_DIRECT` = 3 行目。C7 (lock の staging)・C8 (SW へ回す)・C9 (`gfx2_view.sync`)・C13 (present) はこの値だけを見る。面と head の対応は「別名の面の `role` の head」(C14 が作成の時に `gfx2_surf_alias` の `head` に入れる)。
 | v1 の GeForce の DISPLAY (H2 の DIRECT) | VRAM | v1 の INDEX8 の口だけ | v1 の規則 (H2) |
 
@@ -334,7 +335,7 @@ int gfx2_lock(u32 sid, u32 flags, void **va, u32 *pitch);   int gfx2_unlock(u32 
 | CLOSING | STALE | INVAL | STALE | INVAL | 条件が揃うと空 (§7-3) |
 | LOST | STALE | 可 (LOCKED のまま失われた時) | STALE | 可 | |
 - sid: 下位 10 bit = 表の位置 (1,024 面)、上位 22 bit = 世代 (解放で +1)。呼んだ者の `gfx2_caller.owner` (§6-5 の 1 口) と面の持ち主が違えば INVAL。
-- lock の flags: READONLY・DISCARD・DONOTWAIT。**DISCARD でも待ちは同じ** (`wait(last_write)`・`wait(last_read)`)。DISCARD の効果は「中身を読まない」だけ: staging の面は lock の時の読みを省く。DONOTWAIT で未完了なら `OS32_ERR_BUSY`。
+- lock の flags: READONLY・DISCARD・DONOTWAIT。**DISCARD でも待ちは同じ** (`wait(last_write)`・`wait(last_read)`)。DISCARD の効果は「中身を読まない」だけ: staging の面は lock の時の読みを省く。READONLY の unlock は書き戻さない。READONLY と DISCARD を併用すると staging は 0 で、元の画素は変わらない。DONOTWAIT で未完了なら `OS32_ERR_BUSY`。
 
 ### 7-2. 確保と GF の予約
 - pool: VRAM・GART・SYSMEM (MANAGED は libos32gfx)。usage: RENDER2D・SCANOUT・CURSOR・STAGING・TEXTURE (欄だけ)。tiling は backend が選び、CPU から線形に見える物だけ。
@@ -497,7 +498,7 @@ int gfx2_map_audit(const struct addrspace *as)
 | 中身 | DISCARD なら 0 で埋める (前の持ち主の中身を見せない)。ほかは `gfxsync_read_rows` で面の全体を読む |
 | 写像先 | 呼んだ AS の gfx2 の帯 (§7-4)。`gfx2_map` は `gfx2_surf_page` から頁を引く。`gfx2_surf_page` は staging がある間は `staging_pfn + k` (WB) を返す (C17 の監査も同じ値で照らす) |
 | 寿命 | lock から unlock まで。別名は画面の持ち主が替わるので、AS をまたいで写像を持ち越さない |
-| unlock の順 | `gfxsync_write_rows` (面の全体) → `gfx2_cpu_end` (§6-2 の `gfxsync_flush`) → `gfx2_unmap` → `gfx2_staging_drop` → IDLE |
+| unlock の順 | READONLY の unlock は書き戻さない。書込み可のときだけ `gfxsync_write_rows` (面の全体) → `gfx2_cpu_end` (§6-2 の `gfxsync_flush`) → `gfx2_unmap` → `gfx2_staging_drop` → IDLE |
 | 失敗 | lock: 頁が取れない → NOSPC。`gfx2_map` の失敗 → 頁を返してその rc。`gfxsync_read_rows` の失敗 → 写像と頁を戻して IO。どれも状態は IDLE のまま。unlock: `write_rows` が失敗しても順を最後まで進めて IO (状態は IDLE)。`gfx2_unmap` の IO → `gfx2_map_detach` し、staging の欄を 0 にして頁は `staging_owner` のまま残し IO (PTE はその AS に残るが、AS の破棄 exec_finish.inc が PT を外した後の reclaim `exec_teardown_app()` で返る) |
 | `gfx2_staging_drop` | `pgalloc_free_n_owner(staging_owner, staging_pfn, staging_n)` で返して欄を 0。KEEP の面は返さず欄だけ 0。呼ぶのは C7 (unlock) と C15 (§7-3 の (2)) |
 | AS の終了 | §7-3 の (1)・(2)。別名は `s->map_as == as` で拾う |
@@ -1297,7 +1298,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 | 回収 | GPU が終わらない → GART の頁が隔離の owner へ移り、owner_release は 0、AS の owner の頁数は 0。写像を外せない → IO → X1 が poison | owner_release.c の quarantine を destroy に / X1 の分岐を外す | I1 |
 | 写像 | 3 区間の 2 つ目で失敗 → 1 つ目も外れる。外した後に頁の持ち主は不変 | lock.c の巻き戻しを外す | I1 |
 | 別名の面 | 画面の持ち主は sid を得て submit 可、他の AS は INVAL、`v1_bridge_rebind` の後に古い sid は STALE | surface.c の SCREEN の例外を「誰でも」に | I2 |
-| 同期の面の lock | DIRECT の別名の lock の va が gfx2 の帯の staging の写像 (VRAM の VA でも kmalloc の番地でもない)、unlock で write_rows に面の全体。SHADOW の別名と VRAM の別名の lock は INVAL | lock.c の staging の分岐を外す | I3 |
+| 同期の面の lock | DIRECT の別名の lock の va が gfx2 の帯の staging の写像 (VRAM の VA でも kmalloc の番地でもない)、書込み可の unlock で write_rows に面の全体。READONLY の unlock は書き戻さず、DISCARD を併用しても面の全画素が不変。SHADOW の別名と VRAM の別名の lock は INVAL | lock.c の staging の分岐を外す / READONLY の書き戻し省略を外す | I3 |
 | check_op と submit | 全 op × 形式 × pool で how が同じ | submit.c が check_op でなく caps2d を見る | I2 |
 | 同期層 | 設定の欠け・範囲外・hook の欠けで既定、gap の回数が今の trident の値 (65・7・38 の場合) と同じ | sync_bind.c の組み合わせの拒否を 1 つずつ | I3 |
 | module | 古い世代の module を拒む・`v2=NULL` で動く (shim)・module の表の .text の外のポインタを拒む | backend_reg.c の abi の比較を外す | I1 |
