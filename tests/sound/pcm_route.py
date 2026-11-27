@@ -27,7 +27,7 @@ def verify(config):
         subprocess.run(["qemu-x86_64", owner], check=True)
         for bios in (0x20, 0x61, 0x23):
             for case in ("normal", "irq", "dma", "mismatch", "restore", "drs", "drain",
-                         "hal-drain", "hal-reclaim", "hal-restore"):
+                         "hal-drain", "hal-reclaim", "hal-restore", "pi", "hal-pi", "pi-clear", "pi-readback"):
                 subprocess.run(["qemu-x86_64", exe, str(bios), case], check=True)
 
 

@@ -370,7 +370,7 @@ mutations = [
 
 [[check]]
 id = "cs4231_tick_ack"
-spec = { path = "docs/design/drivers/sound/cs4231/pcm_cs4231.md", section = "advance (IRQ10 と tick が呼ぶ唯一の入口)" }
+spec = { path = "docs/design/drivers/sound/cs4231/pcm_cs4231.md", section = "IRQ12 への移行案（2026-11-27、実装前）" }
 subsystem = "sound"
 level = "L2"
 sources = ["sys/dev/sound/cs4231", "tests/support/fixtures/cs4231_tick_ack", "tools/ops/kernel_includes.py", "build/config.mk"]
@@ -380,7 +380,9 @@ needs = []
 expect = "再生中に取り逃した PI を tick が I24 の読みと 0 書きで消し、次の再生境界で IRQ12 を受理する"
 limits = "HAL 再生中のポート模型。実機の配線、割り込みの時刻、停止遷移は対象外"
 gates = ["push", "main"]
-mutations = [{ id = "omit_tick_ack", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "if (g_pcm.state == PCM_ST_RUNNING) (void)pcm_codec_ack();", new = "(void)0;", fail = "missed PI after tick" },
+mutations = [
+ { id = "ack_invalid_i24", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "if (pcm_read_pi() != 1) return 0;", new = "if (!pcm_read_pi()) return 0;", fail = "invalid I24 claimed by IRQ12" },
+ { id = "omit_tick_ack", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "if (g_pcm.state == PCM_ST_RUNNING) (void)pcm_codec_ack();", new = "(void)0;", fail = "missed PI after tick" },
  { id = "irq10", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.h", old = "#define PCM_IRQ               12", new = "#define PCM_IRQ               10", fail = "IRQ12 delivery failed" },
  { id = "double_advance", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "pcm_hal_advance(PCM_FROM_IRQ);", new = "pcm_hal_advance(PCM_FROM_IRQ); pcm_hal_advance(PCM_FROM_IRQ);", fail = "duplicate playback advance" }]
 
@@ -499,6 +501,7 @@ expect = "IRQ12 と DMA #1 取得後だけ経路を更新し、停止の証拠�
 limits = "PCM 実入口と 8237 所有表のホスト模型。実機の配線とタイミングは対象外"
 gates = ["push", "main"]
 mutations = [
+ { id = "skip_pi_readback", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "return pcm_read_pi() == 0;", new = "return 1;", fail = "legacy close with PI" },
  { id = "unowned_mask", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "if (pcm_module_dma_acquire(&dma_owned)) {", new = "dma_chan_mask(PCM_DMA_CHAN, &dma_owned); if (pcm_module_dma_acquire(&dma_owned)) {", fail = "other owner mask" },
  { id = "mask_without_owner", config = "pc98", when = "after_build", replace = "sys/dev/dma/dma8237.c", old = "if (!owner || channel_owner[ch] != owner) {\n        irq_restore(flags);\n        return;\n    }\n    outp(DMA8237_MASK1, dma_mask_byte(ch, 1));", new = "outp(DMA8237_MASK1, dma_mask_byte(ch, 1));", fail = "other owner mask" },
  { id = "reuse_quarantined", config = "pc98", when = "after_build", replace = "sys/dev/dma/dma8237.c", old = "change_owner(ch, owner, &quarantined)", new = "change_owner(ch, owner, 0)", fail = "DMA quarantine ownership" },

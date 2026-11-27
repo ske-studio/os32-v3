@@ -165,7 +165,7 @@
       "symbol": "pcm_module_dma_release",
       "source": "sys/dev/sound/cs4231/pcm_module.h",
       "context": "normal",
-      "irq": false
+      "irq": true
     }
   ]
 }

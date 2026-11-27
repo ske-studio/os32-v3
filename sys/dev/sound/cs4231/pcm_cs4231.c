@@ -125,6 +125,22 @@ static void cs_write(u8 idx, u8 val)
     irq_restore(f);
 }
 
+/* Return -1 when I24 cannot establish the state of the playback latch. */
+static int pcm_read_pi(void)
+{
+    u8 status = cs_read(PCM_I_ALTSTAT);
+    if (status == 0xff || status == PCM_R0_INIT) return -1;
+    return (status & PCM_ALT_PI) != 0;
+}
+
+static int pcm_clear_release_pi(void)
+{
+    int pi = pcm_read_pi();
+    if (pi != 1) return pi == 0;
+    cs_write(PCM_I_ALTSTAT, 0);
+    return pcm_read_pi() == 0;
+}
+
 /* 期限の比較。符号付きの差で見るので tick_count の巻き戻りに強い。 */
 static int pcm_past(u32 deadline)
 {
@@ -626,10 +642,10 @@ static void pcm_release(int leak)
             }
             if (iface == PCM_R0_INIT || pin == PCM_R0_INIT ||
                 (iface & PCM_IFACE_PEN) || (pin & PCM_PINCTL_IEN) ||
-                !pcm_ready(PCM_OP_WAIT_DRS)) {
+                !pcm_ready(PCM_OP_WAIT_DRS) ||
+                (mode2_verified && !pcm_clear_release_pi())) {
                 leak = 1;
             } else {
-                if (mode2_verified) (void)pcm_codec_ack();
                 outp(PCM_PORT_ROUTE, pcm_module_bios_route());
                 leak = (u8)inp(PCM_PORT_ROUTE) != pcm_module_bios_route();
             }
@@ -1021,7 +1037,7 @@ int pcm_codec_pos(u32 *frame)
 
 int pcm_codec_ack(void)
 {
-    if (!(cs_read(PCM_I_ALTSTAT) & PCM_ALT_PI)) return 0;
+    if (pcm_read_pi() != 1) return 0;
     cs_write(PCM_I_ALTSTAT, 0);
     return 1;
 }

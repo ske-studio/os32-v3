@@ -16,6 +16,7 @@ static int playing;
 static unsigned bios, route, index_reg, regs[32], writes, route_writes;
 static int registered, owned, irq_busy, dma_busy, reject_set, reject_restore;
 static int retained, readback, stuck, drs_reads;
+static int stuck_pi, invalid_readback;
 volatile u32 tick_count;
 
 static void require(int ok, const char *message)
@@ -57,6 +58,8 @@ void outp(unsigned port, unsigned value)
     if (port == PCM_PORT_R0) index_reg = value;
     if (port == PCM_PORT_R1) {
         require(!model_if, "unlocked codec write");
+        if (index_reg == PCM_I_ALTSTAT && stuck_pi) return;
+        if (index_reg == PCM_I_ALTSTAT && invalid_readback) value = PCM_R0_INIT;
         regs[index_reg & 31] = value;
     }
 }
@@ -147,10 +150,13 @@ static void exercise_hal(const char *scene)
         return;
     }
     stuck = !strcmp(scene, "hal-reclaim");
-    reject_restore = !stuck;
+    stuck_pi = !strcmp(scene, "hal-pi");
+    if (stuck_pi) regs[PCM_I_ALTSTAT] = PCM_ALT_PI;
+    reject_restore = !stuck && !stuck_pi;
     if (stuck) snd2_reclaim(1);
     else require(snd2_stream_close(stream, SND2_CLOSE_ABORT) == OS32_ERR_IO,
                  "HAL close lost restore failure");
+    require(!stuck_pi || route_writes == 1, "HAL restored route with PI");
     require(retained && !registered && dma_busy &&
             snd2_stream_open(&desc, &stream) == OS32_ERR_IO, "HAL quarantine");
     require(!stuck || (drs_reads >= PCM_STOP_TICKS && route_writes == 1),
@@ -190,9 +196,14 @@ int main(int argc, char **argv)
         return 0;
     }
     stuck = !strcmp(argv[2], "drs");
+    stuck_pi = !strcmp(argv[2], "pi");
+    invalid_readback = !strcmp(argv[2], "pi-readback");
+    if (stuck_pi || invalid_readback || !strcmp(argv[2], "pi-clear"))
+        regs[PCM_I_ALTSTAT] = PCM_ALT_PI;
     if (stuck) pcm_reclaim(1);
     else rc = pcm_close();
-    if (stuck || reject_restore) {
+    if (stuck_pi || invalid_readback) require(rc == OS32_ERR_IO && route_writes == 1, "legacy close with PI");
+    if (stuck || reject_restore || stuck_pi || invalid_readback) {
         require(retained && dma_busy && !registered, "quarantine");
         require(!stuck || (drs_reads >= PCM_STOP_TICKS && route_writes == 1), "DRS deadline");
         require(pcm_open(44100) == OS32_ERR_IO, "quarantine reopen");

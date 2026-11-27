@@ -53,7 +53,18 @@ int main(void)
         fprintf(stderr, "duplicate playback advance\n");
         return 1;
     }
-    return status || advances != 2 || reads != 2 || clears != 2;
+    if (status || reads != 2 || clears != 2) return 1;
+    status = 0xff;
+    if (pcm_irq(12, 0) != IRQ_NONE || clears != 2 || advances != 2) {
+        fprintf(stderr, "invalid I24 claimed by IRQ12\n");
+        return 1;
+    }
+    pcm_tick();
+    if (reads != 4 || clears != 2 || advances != 3) {
+        fprintf(stderr, "invalid I24 tick recovery\n");
+        return 1;
+    }
+    return 0;
 }
 
 /* Legacy advance shares these entry points. A HAL tick must bypass it. */
