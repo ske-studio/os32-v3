@@ -1752,3 +1752,110 @@ __attribute__((weak)) int gf_v2_owns(const struct gf3_surface *a0) { (void)a0; r
 - 実機 (main 40074740、GF): `gfx2_rh` (fence 512 回と gfx_shutdown→gfx_init) の後、次のプロセスの `gfx2_i2` が fence-completed で FAIL し、再起動まで続いた。起動直後・i1 の後の i2 は PASS。原因は、正常な停止の道 (`geforce_stop_common`) が `gf_v2` の輪を idle にせず、次の `gf_v2_start` の `gf_v2_fence_reset` が HW で終わっていた項目まで `failed_upto` に入れ、中核の `failed_upto` (累積、戻さない) が 0 でなくなったこと。
 - 決定: §6-3 の正常な停止の行のとおり nouveau の idle → del (kill 0) に寄せる (`gf_v2_fence_idle` を `geforce_stop_common` の `stop_device` の前で呼ぶ)。中核 (sys/hal/gfx/v2/fence.c) と `gf_v2_fence_reset` は変えない。
 - 試験の期待: `failed_upto` は設計どおり累積なので、ゲスト試験 (gfx2_i2 の fence-completed、gfx2_rh の fence-state) は「自分の fence が失敗の範囲に入っていない」を見る: `(!failed || (i32)(failed - fence) < 0) && (!fence || (i32)(completed - fence) >= 0)`。正常な停止で failed が 0 のまま残ることは host 試験 gf_v2_life で押さえる (輪 3 件 → idle → count 0・completed が最新・failed_upto 0、続けて epoch を進めて `gf_v2_start` → failed_upto 0)。
+
+## レビュー案 (2026-11-28) — I1〜I3 の登録検査の復旧
+
+登録の単位は §13-1 の受入行とする。下表の ID ごとに、その行の入力・観測を expect、指定された独立の故障を mutations に展開する。§14 と後日の確定追記が旧期待を更新した箇所は下記の指定を優先する。
+
+| 登録 ID | 段 | §13-1 の受入行 |
+|---|---|---|
+| gfx2_abi | I1 | ABI |
+| gfx2_format | I2 | 形式の式 |
+| gfx2_fence_wrap | I1 | fence の折り返し |
+| gfx2_fence_failure | I1 | 失敗の完了 |
+| gfx2_gf_ring | I2 | 輪の満杯 |
+| gfx2_batch_snapshot | I2 | 束の写し |
+| gfx2_submit_scan | I2 | submit の検査 |
+| gfx2_pattern | I2 | パターン |
+| gfx2_surface_state | I1 | 状態遷移 |
+| gfx2_discard | I1 | DISCARD |
+| gfx2_scan_release | I3 | 走査面の解放 |
+| gfx2_quiesce | I3 | quiesce |
+| gfx2_modeset_failure | I3 | mode_set の途中の失敗 |
+| gfx2_pin | I1 | pin |
+| gfx2_owner_release | I1 | 回収 |
+| gfx2_map_rollback | I1 | 写像 |
+| gfx2_alias_owner | I2 | 別名の面 |
+| gfx2_sync_lock | I3 | 同期の面の lock |
+| gfx2_how | I2 | check_op と submit |
+| gfx2_sync_bind | I3 | 同期層 |
+| gfx2_module_abi | I1 | module |
+| gfx2_quarantine_owner | I1 | 隔離の owner (C1) |
+| gfx2_format_id | I2 | 形式の番号 (C2) |
+| gfx2_cpu_end | I1 | cpu_end の吐き出し (C3) |
+| gfx2_alloc_rollback | I1 | 作成の途中の失敗 (C4) |
+| gfx2_free_order | I1 | 解放の順 (C4・C6) |
+| gfx2_heap | I1 | heap (C5) |
+| gfx2_gart_rollback | I1 | GART の作成の失敗 (C6) |
+| gfx2_gart_keep | I1 | unbind の失敗 (C6) |
+| gfx2_gf_page_table | I1 | GART の頁表 (G5) |
+| gfx2_staging_failure | I1 | staging の失敗 (C7) |
+| gfx2_staging_release | I1 | staging の回収 (C15) |
+| gfx2_caps_size | I2 | caps の size (C10) |
+| gfx2_enum_bounds | I3 | 列挙の範囲 (C11) |
+| gfx2_present_retry | I3 | palette の範囲・present の失敗 (C13) |
+| gfx2_sync_bounds | I3 | 行の範囲 (Y3) |
+| gfx2_pin_limit | I1 | pin の上限 (M1) |
+| gfx2_paging_map | I1 | paging_gfx2_map (M2) |
+| gfx2_v1_direct | I2 | H1/H2 の回帰 |
+| gfx2_fence_order | I2 | fence の順 (P1-1) |
+| gfx2_sync_publish | I3 | sync の判定 (P1-2) |
+| gfx2_gf_range | I2 | GART の範囲 (P1-3) |
+| gfx2_alias_update | I2 | 別名の更新 (P1-4) |
+| gfx2_detach_failure | I1 | unmap の失敗 (P1-5) |
+| gfx2_module_text | I1 | .text の検査 (P1-6) |
+| gfx2_audit | I1 | 監査との共存 (R1) |
+| gfx2_sysmem | I1 | SYSMEM の往復 (R2) |
+| gfx2_gart_visible | I1 | GART への SW (R3) |
+| gfx2_shim | I1 | shim (R4) |
+| gfx2_register_twice | I1 | init の 2 回目 (R5) |
+| gfx2_lost | I2 | LOST の後 (R6) |
+| gfx2_gf_channel | I2 | channel の既定 (R8) |
+| gfx2_gf_rop3 | I2 | ROP3・パターン (G7) |
+| gfx2_gf_keep | I2 | GF の KEEP (G4 の追補) |
+| gfx2_rebind | I2 | lock 中の rebind (C14・C7) |
+| gfx2_unsupported | I2 | NOSUPPORT の戻り値 (R9) |
+| gfx2_final_i1 | I1 | weak の検査 (P2-2) |
+| gfx2_sw_fill | I2 | S1 fill |
+| gfx2_sw_copy | I2 | S2 copy |
+| gfx2_sw_rop | I2 | S3 rop |
+| gfx2_sw_rop4 | I2 | S4 rop4 |
+| gfx2_sw_mono | I2 | S5 mono |
+| gfx2_sw_hostdata | I2 | S6 hostdata |
+| gfx2_sw_readback | I2 | S7 readback |
+| gfx2_sw_stretch | I2 | S8 stretch |
+| gfx2_sw_ckey | I2 | S9 ckey |
+| gfx2_sw_alpha | I2 | S10 alpha |
+| gfx2_sw_line | I2 | S11 line |
+| gfx2_gf_stop | I2 | GF の stop (G11) |
+| gfx2_gf_start | I2 | GF の start (G11) |
+| gfx2_gf_home | I3 | GF の戻り先 (G2) |
+| gfx2_gf_flip | I3 | GF の flip (G2) |
+| gfx2_gf_palette | I3 | GF の palette の入れ直し (G2) |
+| gfx2_gf_scan | I3 | v1 の走査を変えない (G2) |
+| gfx2_gf_connector | I3 | GF の接続の種類と状態 (G10) |
+| gfx2_gf_modes | I3 | GF の mode の列挙 (G10) |
+| gfx2_sync_defaults | I3 | sync.cfg の既定の中身 (D1) |
+
+**13 欄の割付**。id は上表、spec.path は本文書、spec.section は §13-1 の見出し全文。subsystem は gfx、配置は tests/gfx/<id>.py。level は単一の実関数 L2、複数部品の結線 L3、ABI と最終 ELF は L1。sources は受入行の製品実体と取り込むヘッダ・生成入力を現行パスで列挙する (共通は sys/hal/gfx/v2、同期は sys/hal/gfx/sync、GF は sys/dev/video/geforce、pin/写像は現行 mm・arch/x86、AS 終了は sys/kern/exec)。environment は linux-x86-cross、arch は x86=[pc98]。ホスト実関数は libc 無しの 32bit harness を qemu-i386 で実行する。needs は自己完結の host では空。limits は fake の fault/呼出順とメモリ画素まで、実 DMA・走査・割込み時刻は §13-3。gates は push と main、seconds は実測結果。各 mutation は ID に検査 ID と故障名を含め、config=pc98、隔離木の after_build replace とその後の verify の中で対象を再コンパイル・実行する。各 fail は当該観測名を含む。正常対照・変異の適用・意図した FAIL の三つを別々に記録する。
+
+**最初の三件**。gfx2_final_i1 / gfx2_final_i2 / gfx2_final_i3 は §12 の段表と §13-1 P2-2 に従い、同一候補から作った build/out/kernel.{elf,map} と build/out/geforce/geforce.{elf,map} を needs とする。旧配線表 (8449a3a45 の親、tools/checks/gfx2_wiring.txt) の段・所有像・関数/データを §12・§14 と照合して入力名簿を作る。移行時の内訳は I1 が kernel 関数63・データ8・GF関数7、I2 が28・0・15、I3 が40・0・16。数は移行漏れの点検に使う。対象 ELF の定義・型・束縛と、対応 map の入力節の半開区間を突合する。未定義、weak、異種、a0_weak.o/gf_v2_weak.o 内、空の名簿、読めない map を診断する。各段で強い提供元を抜いた弱い版を再リンクする。I1 はデータを弱くした版、強い同名を仮実体の入力節内に置いた人工 ELF/map も落とす。正規像を壊す実験は隔離木で行う。
+
+**期待の更新と結合の追加**。
+
+- gfx2_v1_direct は §8 (描画加速設計) の DIRECT→SHADOW と古い世代の submit を通す。変異は世代検査を省く。gfx2_abi は kapi_abi の対象型を引き、未収録の sizeof/offsetof を補う。
+- gfx2_sysmem / gfx2_gart_visible / gfx2_shim は §14 に従い、I1 で backing・AS・回収、I2 の結合 gfx2_backing_submit で公開 FILL/READBACK、別 AS 拒否、unregister 後 STALE を観測する。変異は map_va を先頭 PFN の連続写像に替える。gfx2_paging_map は unmap で空 PT を即時返す場合も許し、破棄後の owner/空き頁を照合する。
+- gfx2_gf_range は G8 確定追記の M2MF 入出力と SIFM 元だけを HW とし、SF2D に GART を結ばないことを method 記録で検査する。変異は GART 宛 FILL を HW 可にする。gfx2_gf_stop は輪 3 件の idle→stop→新 epoch の start で failed_upto が増えないことを含む。変異は正常停止の idle を省く。色鍵と α の画素は SW で観測する。
+- gfx2_sync_defaults に加え gfx2_sync_package (L1、GUI 配布物が needs) を設け、配布先 /etc/gfx/sync.cfg の実バイトを Y1 に読ませる。変異は GUI 配布入力から D1 を除き再生成。Trident 行は gap=80、GF は NOTFOUND と既定。ファイル無し時の動作は sync_defaults で別入力として確認する。
+
+**PEGC の結合**。次の三件は spec.section=§13-2 の見出し全文、L4、環境 np21w-pegc (実行器への追加案)、arch=x86 [pc98]、同一 SHA の normal/R1 媒体と kernel.map が入力。対応 runner のない hosted 束はゲストの PASS を生成できない。PM の NP21/W 受入を SHA・媒体ハッシュ・serial 生ログ付きで接続してから必須化する。接続までの欠測は NOT_RUN。limits は PEGC のみ、GF の出力・Trident の欠けは §13-3。
+
+| ID | 観測・合格 | 変異 (候補を再ビルドし同じ台本で起動) |
+|---|---|---|
+| gfx2_guest_i1 | normal/R1 とも起動自己試験 1 回成功、gfx2_i1 の親・子 PASS、lock 中 audit が進み、終了後 leftover/audit_fail 増分 0 | 起動の自己試験呼出を落とし回数 0 |
+| gfx2_guest_i2 | gfx2_i2 で混在描画の CRC と done、自分の fence が完了かつ失敗範囲外、audit_fail 増分 0 | C14 の同期を抜き v1 present と v2 描画の CRC 不一致 |
+| gfx2_guest_i3 | gfx2_i3 で列挙・同期画素・PEGC の mode/flip NOSYS。別 AS から DISPLAY lease 中に投入して BUSY、解除後に gshell の画面・色を復元 | lease の競合検査を外して別 AS の投入成功を検出 |
+
+ゲストの PASS 行のみで I3 の別 AS と gshell 復元は判定できない。二つの AS を重ねる台本と復元前後の同じ静止画領域・palette の照合を追加する。§13-3 の GF/Trident の結果は別に保存する。
+
+**基準版の予測** (2097c56f2、実行前)。最終像・実関数の正常系は実装と過去の受入から緑を予想する。GF の旧 SF2D/GART の成功期待、failed_upto の絶対ゼロ、unmap 後に PT が必ず残る期待を移すと赤になる。これらは上の更新済み期待を使う。現行登録のまま三つの guest ID の実測を要求すると証拠不足で NOT_RUN、現行 i3 のログだけでは別 AS の BUSY の観測も欠ける。これまでの受入から現行版の製品 FAIL は断定できない。正常対照が落ちたら該当 §13 の観測を示し、仕様との差を製品・旧期待・環境に切り分けてから変異へ進む。

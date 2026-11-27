@@ -438,3 +438,31 @@ void gfx_cmd_drop(void);
 - **H2a は不要で閉じる**: H2 は命令の読みの検査に既存の `ring3_user_range_ok` (`sys/kern/exec/exec.c`) を使って着地した (`sys/hal/gfx/gfx_hw_submit.c`)。「要れば `ring3_user_range_readable`」の条件は満たされないので H2a は出さない。§3-2 の断片と §7 の H2a の行を書き換えた (writable は今 `sys/kern/exec/exec.c`)。
 - **S1 と PPC**: `sys/platform/pc98/video/gfx_vram.c` は PC-98 の表示の装置のソース (PowerPC では組まない)。`_flush_dirty_queue()` の `_memcpy_w` は `arch_copy16` 経由。S1 は共通の `gfx/` に asm・pc98 のヘッダを足さない (足すと層の検査 `include_layers` と PowerPC の `common-compile` が止める)。damage.rs のパスは `userland/gshell/src/damage.rs`。
 - **G4m・G5m の位置**: GeForce の PCI の位置は `recover_gf_dev()` (`sys/dev/video/geforce/diag/recover.h`) で決まる。新しい段は 0:13 の直値を書かない (`sys/dev/video/geforce/gf_accept.c` の型を真似ない)。
+
+## レビュー案 (2026-11-28) — G4m の結線と S1・G5m の計測
+
+### G4m — INDEX8 の不透明 MONO
+
+G3 の `gf_direct_ops` (sys/dev/video/geforce/gf_direct.c) に mono を置く。backend_geforce.c は既にこの表を公開し、gfx_policy.c が DIRECT に入る時だけ mono を写す。gf_hook.c 内に実体を置けば、現走査面・ctx・温度 poll・deadline の所有者を増やさずに済む。新規ファイル案からの変更はこの一点。公開 ABI と v2 の emit は対象外。
+
+1. gfx_hw_submit の世代、元の strided extent、画面 clip の検査を通す。背景は key=0..255、前景は color の下位 8 bit。key=-1 は既存の gfx_hw_mono_cpu が透明画素を保存する。空の交差は成功、転送 0。
+2. gf3_mono は符号なしの原矩形全体を surface_check してから clip する。負の原点を cast しない。可視矩形を r と clip の両方に渡す。元の左上からの差を dx,dy とし、dx が 8 の倍数なら bits + dy*pitch + dx/8 を借りる。ram.bytes は (ch−1)*pitch + ceil(cw/8)。積と加算は検査済み元範囲内に収まることを確認する。
+3. dx%8 が非ゼロの時は可視行を MSB 左で詰め直す。出力 bit j は元 bit dx+j、各行の末尾の使わない bit は 0。最後の有効 bit を越えて次バイトを読まない。固定長の作業域に収まる行数ずつ送り、r.y と元行を共に進める。同期呼出の復帰後に作業域を再利用する。作業域は kernel stack の予算内で決める。走査面全体分の一時領域は不要。
+4. active・INDEX8・ctx を確認し、fill と同じ poll と期限取得を通す。gf3_mono の fence 待ちまでを hook の寿命とする。途中の IO・期限切れは上へ返す。当該命令を done に含めず、既に書いた帯を CPU で再送しない。
+5. 登録案 gfx_v1_mono_clip。公開 submit から CPU と GF の結果を同じ番兵面で比べる。幅 1,7,8,9,31,32,33、左欠け 0..7、上下・右欠け、pitch の余白、末尾ぴったり、複数帯、背景 0/255/透過を含む。画素差・範囲外変更とも 0。透明時 GPU 呼出 0、不透明・無欠け時 1。変異は左欠けを byte に切り捨てる、透明を HW に送る、帯 2 の失敗を成功にする。Ra266 GF の scroll で露出帯と周囲の READBACK が基準と一致し、MONO 発行を記録する。§4 の約 1.3KB は見積もり。
+
+### S1 — SHADOW で転送が増えた場所を決める
+
+同じ画面寸法・配置・入力で P0a の move / scroll / menu / desktop / char / list を PEGC (NP21/W)、Trident (Ra266、gap 80ns)、GF (Ra266、SHADOW を確認) で採る。各操作 warmup 10、本番 50。開始と終了は P0a §6、GOP1 の時間・present_bytes・commits・hw_ops の差と有効数を保存する。FAILED と焦点不足は原因を記録して採り直す。
+
+1. 一回の入力につき、各フレームの実際に塗った矩形の和集合の画素数 P を合計する。damage.rs の 32px 丸め前・丸め後・結合後、present に渡った矩形、最終 backend の各書込矩形を記録する。転送画素数 T は同じ画素へ二度書けば二度数える。PLANAR4 は plane ごとの実バイトとページを記録し、4 plane 一組の 1 byte 幅を 8px と換算する。前ページ差分・端数の丸めも含める。packed INDEX8 は実 payload 1B=1px。pitch の穴は実際に書いた時だけ加算する。P=0 の回は無描画として別記。
+2. 機種・操作ごとに ΣT/ΣP > 1.5 の組を対象にする。増分が最初に出る段を選ぶ。WM の結合が原因なら damage.rs、packed present なら sys/hal/gfx/gfx_present.c、PLANAR4 の前ページとの差なら sys/platform/pc98/video/gfx_vram.c。頁交替に必要な差分も含めた完全描画との照合を優先する。
+3. 受入案は対象の同じ 50 回で ΣT/ΣP ≤ 1.5、基準より実書込バイト減、全画素差 0、失敗 0。毎 flip の表示面を比較し、C14 混在・present 失敗後の dirty 再送を含める。非対象の 6 操作も bytes と p50/p95 を併記する。必要なページ復元だけで 1.5 を超える組は、その下限の実測を PM に戻し、合格値を再決定する。
+
+### G5m — PUT と GET の切替点
+
+Ra266 GF の DIRECT・INDEX8・同じ WC 窓内の走査面で CPU 行転送と同期 M2MF を交互に測る。P0b の prim 5/6 は試験面への IFC/M2MF upload であり、WC PUT と GET の比較値はここで採る。受入用プローブで同じ検査済み矩形を両経路に渡し、PUT は最後の drain/fence 復帰、GET は dst の最終行が読める時点まで計時する。staging への写し、行 pitch、poll と待ちを含める。表示内容は保存し終了後に復元する。
+
+- 各方向で 160B、1/2/4/8/16/32/64KiB を掃引する。各サイズで短い多行と長い少行、pitch=w と余白あり、先頭ずれ 0/1/3 を試す。比較単位は clip 後の w*h。通常の lib の PUT は 4KiB に分かれるので、公開 submit/get と通常クライアントで実際に届くサイズの分布も記録する。
+- P0b と同じ 100 本を 1 組、warmup 1 組、本番 50 組。組ごとに方向・寸法・pitch・転送方式・同期回数・µs・rc を記録する。転送後に別手段で payload とガードを照合し、差 0、失敗 0 を必須とする。
+- PM に渡す候補 T_put と T_get は、同サイズとそれより大きい全測定点・形状で M2MF の p50 と p95 がともに CPU 未満となる最小 payload。境界付近を細分し T−1/T/T+1 で選択と画素を確認する。同点・逆転・未測定範囲は CPU を既定とし、全点で勝てない方向は切替を導入しない。色鍵 PUT と短い転送は CPU。送出前に DMA 利用不可なら CPU、送出後の失敗は返す。最終票には方向ごとの byte 値と機種・SHA・測定表を添える。
