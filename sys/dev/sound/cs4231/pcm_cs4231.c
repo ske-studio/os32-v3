@@ -282,6 +282,8 @@ static int pcm_run(const struct pcm_op *ops, int n, int at, int blocking)
                 cs_write(o->a, (u8)(s_hal_period - 1));
             else if (s_hal_advance && o->a == PCM_I_BASE_HI)
                 cs_write(o->a, (u8)((s_hal_period - 1) >> 8));
+            else if (s_hal_advance && o->a == PCM_I_ALTSTAT && g_pcm.state != PCM_ST_OPENING)
+                pcm_codec_ack();
             else
                 cs_write(o->a, o->b);
             break;
@@ -545,11 +547,18 @@ static void pcm_hal_advance(enum pcm_advance_origin origin)
     --s_in_advance;
 }
 
+static int pcm_hal_can_advance(void)
+{
+    return dma_owned && mode2_verified && !s_claimed && !s_mce_busy &&
+           g_pcm.state != PCM_ST_CLOSED && g_pcm.state != PCM_ST_OPENING &&
+           g_pcm.state != PCM_ST_FAULTED;
+}
+
 static int pcm_irq(unsigned int irq, void *arg)
 {
     (void)irq; (void)arg;
     if (s_hal_advance) {
-        if (!dma_owned || !mode2_verified || s_claimed || s_mce_busy || g_pcm.state != PCM_ST_RUNNING)
+        if (!pcm_hal_can_advance())
             return IRQ_NONE;
         if (!(inp(PCM_PORT_R2) & 1) || !pcm_codec_ack()) return IRQ_NONE;
         pcm_hal_advance(PCM_FROM_IRQ);
@@ -561,9 +570,9 @@ static int pcm_irq(unsigned int irq, void *arg)
 void pcm_tick(void)
 {
     if (s_hal_advance) {
-        if (s_claimed || s_mce_busy || g_pcm.state == PCM_ST_OPENING) return;
-        /* Release a latched PI even when its IRQ12 edge was missed. */
-        if (g_pcm.state == PCM_ST_RUNNING) (void)pcm_codec_ack();
+        if (!pcm_hal_can_advance()) return;
+        /* Release a latched PI even when its interrupt edge was missed. */
+        (void)pcm_codec_ack();
         pcm_hal_advance(PCM_FROM_TICK);
         return;
     }
@@ -973,16 +982,6 @@ int pcm_close(void)
 /* ======================================================================== */
 /*  8. 回収 — 待たない abort。fault/STOP も着地後 IF=1 の通常文脈 (R1)。   */
 /* ======================================================================== */
-/* IF=0. Mask the DMA channel and verify the codec has accepted PEN=0. */
-static int pcm_abort_proven(void)
-{
-    const struct pcm_op *ops;
-    int n = pcm_seq_abort(&ops);
-    pcm_run(ops, n, 0, 0);
-    return (inp(PCM_PORT_R0) & PCM_R0_INIT) == 0 &&
-           (cs_read(PCM_I_IFACE) & PCM_IFACE_PEN) == 0;
-}
-
 void pcm_reclaim(int owner)
 {
     unsigned int f;
@@ -1059,13 +1058,24 @@ int pcm_codec_stop(int closing)
         return 0;
     }
     if (g_pcm.state == PCM_ST_OPEN) return 0;
-    if (!pcm_abort_proven()) {
-        /* teardown restores IF before release. Block the shared IRQ now. */
-        s_claimed = 1;
-        return OS32_ERR_IO;
+    if (g_pcm.state != PCM_ST_RS_STOP) {
+        cs_write_locked(PCM_I_PINCTL, 0);
+        cs_write_locked(PCM_I_IFACE, PCM_IFACE_CAL1);
+        s_deadline = tick_count + PCM_STOP_TICKS;
+        g_pcm.state = PCM_ST_RS_STOP;
     }
-    g_pcm.state = PCM_ST_OPEN;
-    return 0;
+    if (!pcm_past(s_deadline) && pcm_ready(PCM_OP_WAIT_DRS)) {
+        dma_chan_mask(PCM_DMA_CHAN, &dma_owned);
+        u8 iface = cs_read(PCM_I_IFACE);
+        if (iface != PCM_R0_INIT && !(iface & PCM_IFACE_PEN) && pcm_clear_release_pi()) {
+            g_pcm.state = PCM_ST_RS_RESTART;
+            return 0;
+        }
+    } else if ((int)(tick_count - s_deadline) < 0) {
+        return 1;
+    }
+    s_claimed = 1;
+    return OS32_ERR_IO;
 }
 
 int pcm_codec_release(int leak)

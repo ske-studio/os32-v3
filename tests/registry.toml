@@ -390,12 +390,12 @@ sources = ["sys/dev/sound/cs4231", "tests/support/fixtures/cs4231_tick_ack", "to
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "再生中に取り逃した PI を tick が I24 の読みと 0 書きで消し、次の再生境界で IRQ12 を受理する"
-limits = "HAL 再生中のポート模型。実機の配線、割り込みの時刻、停止遷移は対象外"
+expect = "IRQ10/12 と tick で各状態の PI を読んで解除し、PI が無い tick の I/O 回数と禁止状態での無アクセスを確認する"
+limits = "HAL の状態別ポート模型。実機の配線と割り込み時刻は対象外"
 gates = ["push", "main"]
 mutations = [
  { id = "ack_invalid_i24", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "if (pcm_read_pi() != 1) return 0;", new = "if (!pcm_read_pi()) return 0;", fail = "invalid I24 claimed by IRQ12" },
- { id = "omit_tick_ack", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "if (g_pcm.state == PCM_ST_RUNNING) (void)pcm_codec_ack();", new = "(void)0;", fail = "missed PI after tick" },
+ { id = "omit_tick_ack", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "(void)pcm_codec_ack();", new = "(void)0;", fail = "missed PI after tick" },
  { id = "irq10", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.h", old = "#define PCM_IRQ               12", new = "#define PCM_IRQ               10", fail = "IRQ12 delivery failed" },
  { id = "double_advance", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "pcm_hal_advance(PCM_FROM_IRQ);", new = "pcm_hal_advance(PCM_FROM_IRQ); pcm_hal_advance(PCM_FROM_IRQ);", fail = "duplicate playback advance" }]
 
@@ -536,6 +536,7 @@ expect = "選択した IRQ12 または IRQ10 と DMA #1 取得後だけ経路を
 limits = "PCM 実入口と 8237 所有表のホスト模型。実機の配線とタイミングは対象外"
 gates = ["push", "main"]
 mutations = [
+ { id = "extend_resync_wait", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "s_deadline = tick_count + PCM_STOP_TICKS;", new = "s_deadline = tick_count + PCM_STOP_TICKS + 1;", fail = "resync timeout quarantine" },
  { id = "fm_route", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "? PCM_ROUTE_INT41_DMA1 :", new = "? 0x22 :", fail = "codec before route readback" },
  { id = "skip_pi_readback", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "return pcm_read_pi() == 0;", new = "return 1;", fail = "legacy close with PI" },
  { id = "unowned_mask", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "if (pcm_module_dma_acquire(&dma_owned)) {", new = "dma_chan_mask(PCM_DMA_CHAN, &dma_owned); if (pcm_module_dma_acquire(&dma_owned)) {", fail = "other owner mask" },

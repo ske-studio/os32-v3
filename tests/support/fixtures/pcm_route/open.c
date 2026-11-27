@@ -10,13 +10,13 @@ static void preempt(unsigned site);
 
 unsigned model_if = 1;
 static unsigned frame;
-static int playing;
+static int playing, resync_wait, resync_masks, observed_pi;
 
 
 static unsigned expected_irq, expected_route;
 static unsigned bios, route, index_reg, regs[32], writes, route_writes;
 static int registered, owned, irq_busy, dma_busy, reject_set, reject_restore;
-static int retained, readback, stuck, drs_reads;
+static int retained, readback, stuck, drs_reads, abort_wait;
 static int stuck_pi, invalid_readback, init, reserved_bit;
 volatile u32 tick_count;
 
@@ -30,13 +30,25 @@ unsigned inp(unsigned port)
     if (port == PCM_PORT_ROUTE) { readback = route == expected_route; return route; }
     if (port == PCM_PORT_WSSID) return PCM_WSSID_VALUE;
     if (port == PCM_PORT_R0) {
-        if (stuck) require(model_if, "DRS wait with IF=0");
+        if (stuck || (abort_wait && drs_reads < PCM_STOP_TICKS))
+            require(model_if, "DRS wait with IF=0");
         return index_reg | init;
     }
     if (port == PCM_PORT_R1) {
-        if (index_reg == PCM_I_ALTSTAT) return regs[index_reg] | reserved_bit;
+        if (index_reg == PCM_I_ALTSTAT) {
+            observed_pi = regs[index_reg] & PCM_ALT_PI;
+            return regs[index_reg] | reserved_bit;
+        }
         if (index_reg == PCM_I_MODEID) return regs[index_reg] | PCM_ID_VALUE;
         if (index_reg == PCM_I_VERSION) return PCM_VER_CS4231;
+        if (index_reg == PCM_I_ERRSTAT && abort_wait) {
+            require(!(regs[PCM_I_IFACE] & PCM_IFACE_PEN) &&
+                    !(regs[PCM_I_PINCTL] & PCM_PINCTL_IEN), "DRS before halt");
+            if (++drs_reads < PCM_STOP_TICKS) {
+                ++tick_count;
+                return PCM_ERR_DRS;
+            }
+        }
         if (index_reg == PCM_I_ERRSTAT && stuck) {
             ++tick_count;
             ++drs_reads;
@@ -51,6 +63,8 @@ void outp(unsigned port, unsigned value)
 {
     require(owned && registered, "unowned device write");
     ++writes;
+    if (abort_wait) require(port != PCM_PORT_R2, "abort wrote R2");
+    if (resync_wait) require(port != PCM_PORT_R2, "resync wrote R2");
     if (port == PCM_PORT_ROUTE) {
         ++route_writes;
         if (!(route_writes == 1 ? reject_set : reject_restore)) route = value;
@@ -59,6 +73,10 @@ void outp(unsigned port, unsigned value)
     require(readback, "codec before route readback");
     if (port == PCM_PORT_R0) index_reg = value;
     if (port == PCM_PORT_R1) {
+        if (resync_wait && index_reg == PCM_I_ALTSTAT) {
+            require(observed_pi && value == 0, "resync I24 write without observed PI");
+            observed_pi = 0;
+        }
         require(!model_if, "unlocked codec write");
         if (index_reg == PCM_I_ALTSTAT && stuck_pi) return;
         if (index_reg == PCM_I_ALTSTAT && invalid_readback) init = PCM_R0_INIT;
@@ -95,7 +113,16 @@ int irq_unregister(unsigned irq, irq_handler_fn fn, void *arg)
     registered = 0;
     return 0;
 }
-void dma_chan_mask(unsigned ch, const void *owner) { require(owned && ch == 1, "other owner mask"); ++writes; }
+void dma_chan_mask(unsigned ch, const void *owner)
+{
+    require(owned && ch == 1, "other owner mask");
+    if (abort_wait) require(drs_reads >= PCM_STOP_TICKS, "abort mask before DRS");
+    if (resync_wait) {
+        require(!(regs[PCM_I_ERRSTAT] & PCM_ERR_DRS) || s_claimed, "mask before DRS");
+        ++resync_masks;
+    }
+    ++writes;
+}
 void dma_chan_unmask(unsigned ch, const void *owner) { require(owned && ch == 1, "other owner unmask"); }
 void dma_chan_ack_tc(unsigned ch, const void *owner) { require(owned && ch == 1, "other owner TC"); }
 int dma_chan_setup(unsigned ch, const void *owner, u32 phys, u32 size, int dir, int mode)
@@ -148,6 +175,34 @@ static void exercise_hal(const char *scene)
             "HAL write");
     playing = 1;
     require(!snd2_stream_start(stream), "HAL start");
+    if (!strncmp(scene, "hal-resync", 10)) {
+        int timeout = !strcmp(scene, "hal-resync-timeout");
+        resync_wait = 1;
+        regs[PCM_I_ERRSTAT] = PCM_ERR_DRS;
+        tick_count += 100;
+        unsigned flags = irq_save();
+        pcm_tick();
+        require(!(regs[PCM_I_IFACE] & PCM_IFACE_PEN) && !resync_masks, "pending DRS");
+        for (unsigned i = 1; i <= PCM_STOP_TICKS; ++i) {
+            ++tick_count;
+            if (!timeout && i == PCM_STOP_TICKS) regs[PCM_I_ERRSTAT] = 0;
+            regs[PCM_I_ALTSTAT] = PCM_ALT_PI;
+            pcm_tick();
+            require(!regs[PCM_I_ALTSTAT], "resync pending PI");
+            if (i < PCM_STOP_TICKS) require(!resync_masks && !dma_busy, "early timeout");
+        }
+        irq_restore(flags);
+        if (timeout) require(dma_busy && route_writes == 1, "resync timeout quarantine");
+        else require(resync_masks && (regs[PCM_I_IFACE] & PCM_IFACE_PEN), "resync restart");
+        return;
+    }
+    if (!strcmp(scene, "hal-abort")) {
+        abort_wait = 1;
+        regs[PCM_I_ALTSTAT] = PCM_ALT_PI;
+        require(!snd2_stream_close(stream, SND2_CLOSE_ABORT) && !registered &&
+                !owned && route == bios && !regs[PCM_I_ALTSTAT], "foreground HAL abort");
+        return;
+    }
     if (!strcmp(scene, "hal-drain")) {
         require(!snd2_stream_close(stream, SND2_CLOSE_DRAIN) &&
                 !registered && !owned && route == bios, "foreground HAL drain");

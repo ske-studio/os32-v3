@@ -195,7 +195,7 @@ int snd2_write_checked(u32 id, const void *buf, u32 bytes,
                 } else {
                     snd2_stg_publish(s, n);
                     u32 hw;
-                    if (s->state == SND2_ST_RUN && !s->restart_pending &&
+                    if (s->state == SND2_ST_RUN && !s->stop_pending && !s->restart_pending &&
 #ifdef TICK_PROBE
                         !d->gap_active &&
 #endif
@@ -226,6 +226,20 @@ static int start_hw(Snd2Device *d, unsigned flags, int resync)
     }
     stream_unlock(flags);
     return rc ? OS32_ERR_IO : 0;
+}
+
+/* Keep the ring untouched until the backend proves that DMA stopped. */
+static int resync_hw(Snd2Device *d, unsigned flags)
+{
+    int rc = d->be->hw_stop(d->ctx, 0);
+    d->stream.stop_pending = rc > 0;
+    if (rc < 0) return teardown(d, flags, 1, 1);
+    if (rc > 0) {
+        stream_unlock(flags);
+        return 0;
+    }
+    snd2_seg_resync(&d->stream, tick_clock_ms());
+    return start_hw(d, flags, 1);
 }
 
 int snd2_stream_start(u32 id)
@@ -287,7 +301,7 @@ int snd2_arm_observation_gap(Snd2Device *d)
     Snd2Stream *s = &d->stream;
     int rc = OS32_ERR_BUSY;
     if (s->owner && s->owner == res_owner_get() && !s->closing &&
-        s->state == SND2_ST_RUN && !s->restart_pending && !d->gap_active) {
+        s->state == SND2_ST_RUN && !s->stop_pending && !s->restart_pending && !d->gap_active) {
         d->gap_start_ms = tick_clock_ms();
         d->gap_active = 1;
         rc = 0;
@@ -315,6 +329,10 @@ void snd2_advance(u32 dev)
                 d->gap_active = 0;
             }
 #endif
+            if (s->stop_pending) {
+                (void)resync_hw(d, flags);
+                return;
+            }
             if (s->restart_pending) {
                 stream_metric(TP_SND_RESYNC);
                 snd2_seg_reset(s, now);
@@ -325,12 +343,7 @@ void snd2_advance(u32 dev)
             int valid = d->be->hw_pos(d->ctx, &hw) >= 0;
             if (snd2_seg_observe(s, valid, hw, now) < 0) {
                 stream_metric(TP_SND_RESYNC);
-                if (d->be->hw_stop(d->ctx, 0) < 0) {
-                    teardown(d, flags, 1, 1);
-                    return;
-                }
-                snd2_seg_resync(s, now);
-                (void)start_hw(d, flags, 1);
+                (void)resync_hw(d, flags);
                 return;
             }
             /* The foreground close observes played and performs teardown
@@ -348,19 +361,14 @@ int snd2_stream_pause(u32 id)
     if (!rc && d->stream.state == SND2_ST_RUN) {
         /* A failed position read cannot identify the DMA-protected segments. */
         u32 hw;
-        if (d->stream.restart_pending) {
+        if (d->stream.stop_pending || d->stream.restart_pending) {
             d->stream.paused = 1;
             d->stream.state = SND2_ST_PAUSE;
         } else if (d->be->hw_pos(d->ctx, &hw) < 0) rc = OS32_ERR_IO;
         else if (snd2_seg_observe(&d->stream, 1, hw, tick_clock_ms()) < 0) {
-            if (d->be->hw_stop(d->ctx, 0) < 0) {
-                teardown(d, flags, 1, 1);
-                return OS32_ERR_IO;
-            }
             d->stream.paused = 1;
             d->stream.state = SND2_ST_PAUSE;
-            snd2_seg_resync(&d->stream, tick_clock_ms());
-            return start_hw(d, flags, 1);
+            return resync_hw(d, flags);
         } else {
             snd2_seg_pause(&d->stream);
             d->stream.state = SND2_ST_PAUSE;

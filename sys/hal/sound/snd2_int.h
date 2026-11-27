@@ -19,6 +19,7 @@ typedef struct Snd2Stream {          /* sys/hal/sound/snd2_int.h。書くのは 
     u32 refill_tried, gap_tried; /* per-ring-slot bits and first underrun evidence */
     u32 min_stg, gap_frame, gap_n, gap_next, gap_stg, max_dma_step;
 #endif
+    u8 stop_pending;                 /* resync waiting for DMA to stop */
     u8 restart_pending;              /* DMA proven stopped during resync */
     u16 resume_silence; /* protected empty slots at resume, cleared on retirement */
     u8 had_data;                     /* distinguishes a silent start from starvation */
@@ -50,7 +51,7 @@ typedef struct SndBackend {          /* sys/hal/sound/snd2_int.h、SND_HAL2_ABI 
     int  (*hw_start)(void *ctx);                    /* リングは中核が埋めてから */
     int  (*hw_pos)(void *ctx, u32 *frame);          /* IF=0。読めなければ <0 */
     int  (*hw_ack)(void *ctx);                      /* IRQ。自分の要因なら 1 */
-    int  (*hw_stop)(void *ctx, int closing);        /* IF=0。close は停止を要求し、release で停止確認。 */
+    int  (*hw_stop)(void *ctx, int closing);        /* IF=0。再同期の正値は停止待ち。close は停止を要求し、release で停止確認。 */
     int  (*hw_release)(void *ctx, int leak);        /* 停止・復元を確認できなければ隔離し、負を返す。 */
     int  (*hw_volume)(void *ctx, u32 l, u32 r);
     int  (*hw_timer_arm)(void *ctx, u32 after_us);  /* NULL = 無い。after_us=0 で解除。V86 の FM の起床 (§9-4) */

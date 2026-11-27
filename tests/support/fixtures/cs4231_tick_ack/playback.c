@@ -4,11 +4,14 @@
 
 static unsigned int index_reg, status, reads, clears, advances;
 
+static unsigned int r0_reads, selects, r2_reads, observed_pi;
+
 unsigned int inp(unsigned int port)
 {
-    if (port == PCM_PORT_R0) return index_reg;
-    if (port == PCM_PORT_R2) return status ? 1 : 0;
+    if (port == PCM_PORT_R0) { ++r0_reads; return index_reg; }
+    if (port == PCM_PORT_R2) { ++r2_reads; return status ? 1 : 0; }
     if (port != PCM_PORT_R1 || index_reg != PCM_I_ALTSTAT) abort();
+    observed_pi = status & PCM_ALT_PI;
     ++reads;
     return status;
 }
@@ -16,11 +19,13 @@ unsigned int inp(unsigned int port)
 void outp(unsigned int port, unsigned int value)
 {
     if (port == PCM_PORT_R0) {
+        ++selects;
         index_reg = value;
         return;
     }
     if (port != PCM_PORT_R1 || index_reg != PCM_I_ALTSTAT || value || !status ||
-        reads != clears + 1) abort();
+        (!observed_pi && status != 0xff)) abort();
+    observed_pi = 0;
     ++clears;
     status = 0;
 }
@@ -65,7 +70,47 @@ int main(void)
         fprintf(stderr, "invalid I24 tick recovery\n");
         return 1;
     }
-    return 0;
+    const int states[] = {PCM_ST_OPEN, PCM_ST_STOP_DONE, PCM_ST_RS_STOP,
+                          PCM_ST_RS_RESTART, PCM_ST_STOP_REQ, PCM_ST_DRAINING,
+                          PCM_ST_RUNNING, PCM_ST_OPENING, PCM_ST_CLOSED, PCM_ST_FAULTED};
+    int failures = 0;
+    for (unsigned i = 0; i < sizeof(states) / sizeof(*states); ++i) {
+        g_pcm.state = states[i];
+        int active = states[i] != PCM_ST_OPENING && states[i] != PCM_ST_CLOSED &&
+                     states[i] != PCM_ST_FAULTED;
+        for (unsigned irq = 10; irq <= 12; irq += 2) {
+            for (int from_irq = 0; from_irq <= 1; ++from_irq) {
+                for (int pi = 0; pi <= 1; ++pi) {
+                    reads = clears = selects = r0_reads = r2_reads = 0;
+                    status = pi ? PCM_ALT_PI : 0;
+                    int handled = 0;
+                    if (from_irq) handled = pcm_irq(irq, 0) == IRQ_HANDLED;
+                    else pcm_tick();
+                    int probe = active && (!from_irq || pi);
+                    if (reads != probe || r0_reads != probe || clears != (active && pi) ||
+                        selects != reads + clears || r2_reads != (active && from_irq) ||
+                        handled != (active && from_irq && pi)) {
+                        fprintf(stderr, "PI access state=%d irq=%u from_irq=%d pi=%d\n",
+                                states[i], irq, from_irq, pi);
+                        ++failures;
+                    }
+                }
+            }
+        }
+    }
+    g_pcm.state = PCM_ST_RUNNING;
+    for (int guard = 0; guard < 4; ++guard) {
+        dma_owned = guard != 0;
+        mode2_verified = guard != 1;
+        s_claimed = guard == 2;
+        s_mce_busy = guard == 3;
+        status = PCM_ALT_PI;
+        reads = clears = selects = r0_reads = r2_reads = advances = 0;
+        pcm_tick();
+        if (pcm_irq(12, 0) != IRQ_NONE || reads || clears || selects ||
+            r0_reads || r2_reads || advances) return 1;
+    }
+    return failures != 0;
 }
 
 /* Legacy advance shares these entry points. A HAL tick must bypass it. */
