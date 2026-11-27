@@ -3,15 +3,7 @@
 
 #include "input_context.h"
 
-typedef struct {
-    u32 action, command_gen, time_ms, value;
-} KbdPolicyAction;
-
-typedef struct {
-    u32 src_generation, map_id, keycode, sc_down_repeat;
-    u32 physical_mods, logical_mods, time_ms, map_generation;
-    u32 keysym, kind, action, value;
-} KbdPolicyKey;
+#include "os32_kbd_policy.h"
 
 void input_delivery_flush(void);
 int input_delivery_action(const KbdPolicySnapshot *dst, const KbdPolicyAction *action);

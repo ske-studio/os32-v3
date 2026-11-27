@@ -338,9 +338,18 @@ extern int __cdecl wrap_snd2_chip_close(u32 h);
 extern int __cdecl wrap_install_begin(const InstallPlanV1 *plan, u32 *handle);
 extern int __cdecl wrap_install_rescan(u32 handle);
 extern int __cdecl wrap_install_end(u32 handle, u32 outcome);
+extern int __cdecl wrap_kbd_policy_set(const void *wire, u32 length);
+extern int __cdecl wrap_kbd_policy_get(void *wire, u32 capacity, u32 *needed);
+extern int __cdecl wrap_kbd_policy_reset(void);
+extern int __cdecl wrap_kbd_policy_context_set(u32 context, u32 flags);
+extern int __cdecl wrap_kbd_policy_command_begin(void);
+extern int __cdecl wrap_kbd_policy_command_end(void);
+extern int __cdecl wrap_kbd_policy_delivery_set(u32 mode);
+extern int __cdecl wrap_kbd_policy_action_read(KbdPolicyAction *out, u32 max);
+extern int __cdecl wrap_kbd_policy_key_read(KbdPolicyKey *out, u32 max);
 
 kapi->magic = 0x4B415049UL;
-kapi->version = 91;
+kapi->version = 92;
 
     kapi->gfx_init = wrap_gfx_init;
     kapi->gfx_init_200 = wrap_gfx_init_200;
@@ -682,6 +691,15 @@ kapi->version = 91;
     kapi->install_begin = wrap_install_begin;
     kapi->install_rescan = wrap_install_rescan;
     kapi->install_end = wrap_install_end;
+    kapi->kbd_policy_set = wrap_kbd_policy_set;
+    kapi->kbd_policy_get = wrap_kbd_policy_get;
+    kapi->kbd_policy_reset = wrap_kbd_policy_reset;
+    kapi->kbd_policy_context_set = wrap_kbd_policy_context_set;
+    kapi->kbd_policy_command_begin = wrap_kbd_policy_command_begin;
+    kapi->kbd_policy_command_end = wrap_kbd_policy_command_end;
+    kapi->kbd_policy_delivery_set = wrap_kbd_policy_delivery_set;
+    kapi->kbd_policy_action_read = wrap_kbd_policy_action_read;
+    kapi->kbd_policy_key_read = wrap_kbd_policy_key_read;
     {
         u32 _kr;
         for (_kr = 0; _kr < (u32)KAPI_FUNC_RESERVED; _kr++)

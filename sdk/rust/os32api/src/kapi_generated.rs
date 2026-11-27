@@ -349,17 +349,26 @@ pub struct KernelAPI {
     /* idx 339 */ pub install_begin: unsafe extern "C" fn(plan: *const crate::install::InstallPlanV1, handle: *mut u32) -> i32,
     /* idx 340 */ pub install_rescan: unsafe extern "C" fn(handle: u32) -> i32,
     /* idx 341 */ pub install_end: unsafe extern "C" fn(handle: u32, outcome: u32) -> i32,
-    /* idx 342..385 予約 (C の kapi_reserved[]) */ pub kapi_reserved: [u32; 44],
+    /* idx 342 */ pub kbd_policy_set: unsafe extern "C" fn(wire: *const u8, length: u32) -> i32,
+    /* idx 343 */ pub kbd_policy_get: unsafe extern "C" fn(wire: *mut u8, capacity: u32, needed: *mut u32) -> i32,
+    /* idx 344 */ pub kbd_policy_reset: unsafe extern "C" fn() -> i32,
+    /* idx 345 */ pub kbd_policy_context_set: unsafe extern "C" fn(context: u32, flags: u32) -> i32,
+    /* idx 346 */ pub kbd_policy_command_begin: unsafe extern "C" fn() -> i32,
+    /* idx 347 */ pub kbd_policy_command_end: unsafe extern "C" fn() -> i32,
+    /* idx 348 */ pub kbd_policy_delivery_set: unsafe extern "C" fn(mode: u32) -> i32,
+    /* idx 349 */ pub kbd_policy_action_read: unsafe extern "C" fn(out: *mut crate::kbd_policy::KbdPolicyAction, max: u32) -> i32,
+    /* idx 350 */ pub kbd_policy_key_read: unsafe extern "C" fn(out: *mut crate::kbd_policy::KbdPolicyKey, max: u32) -> i32,
+    /* idx 351..385 予約 (C の kapi_reserved[]) */ pub kapi_reserved: [u32; 35],
     pub sbrk_heap_limit: u32,  /* newlib _sbrk用ヒープ上限アドレス (exec_runでセットされる) */
     pub shm_base: u32,  /* 共有メモリ (MEM_SHM_BASE) の先頭アドレス。DB結果受け渡しに使用 (exec_initでセット) */
 }
 
 /* KernelAPI マジックナンバー */
 pub const KAPI_MAGIC: u32 = 0x4B415049;  /* "KAPI" */
-pub const KAPI_VERSION: u32 = 91;
+pub const KAPI_VERSION: u32 = 92;
 
 /* 関数表の容量とデータ欄の固定配置 (票 TASK_KAPI_DATA_FIELDS、v63) */
-pub const KAPI_FUNC_COUNT: u32 = 340;
+pub const KAPI_FUNC_COUNT: u32 = 349;
 pub const KAPI_FUNC_CAPACITY: u32 = 384;
 pub const KAPI_DATA_FIELDS_OFF: u32 = 0x608;
 /// データ欄が固定になった KAPI 版 (= C の OS32X_HDR_V3_MIN_API)。これ未満の

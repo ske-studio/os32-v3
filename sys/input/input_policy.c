@@ -19,7 +19,7 @@ int ikm_wire_header(const u8 *wire, u32 length, u32 *count)
     u32 n;
     if (!wire || !count || length < IKM_HEADER_SIZE ||
         wire[0] != 'I' || wire[1] != 'K' || wire[2] != 'M' || wire[3] != '1' ||
-        read16(wire + 4) != 2 || read16(wire + 6) != IKM_ROW_SIZE ||
+        read16(wire + 4) != KBD_POLICY_WIRE_VERSION || read16(wire + 6) != IKM_ROW_SIZE ||
         read32(wire + 12) != 0)
         return OS32_ERR_INVAL;
     n = read32(wire + 8);
@@ -491,7 +491,7 @@ int ikm_policy_get(void *wire, u32 capacity, u32 *needed)
     if (capacity < *needed) return OS32_ERR_FULL; /* W4_SHORT */
     if (!p) return OS32_ERR_INVAL;
     p[0] = 'I'; p[1] = 'K'; p[2] = 'M'; p[3] = '1';
-    write16(p + 4, 2); write16(p + 6, IKM_ROW_SIZE);
+    write16(p + 4, KBD_POLICY_WIRE_VERSION); write16(p + 6, IKM_ROW_SIZE);
     write32(p + 8, count); write32(p + 12, 0);
     for (u32 i = 0; i < count; ++i) {
         IkmRow row;
@@ -586,7 +586,7 @@ int ikm_policy_action_read(u32 owner, u32 gen, KbdPolicyAction *out, u32 max)
     unsigned irq = irq_save();
     KbdPolicySnapshot now;
     int rc;
-    if (max > 128 || (max && !out)) rc = OS32_ERR_INVAL;
+    if (max > KBD_POLICY_READ_MAX || (max && !out)) rc = OS32_ERR_INVAL;
     else if (!machine) rc = OS32_ERR_NOSYS;
     else if (!gen || input_context_owner_generation(owner) != gen) rc = OS32_ERR_STALE;
     else if (input_context_snapshot(&now) || now.owner != owner || in2_excl_keyboard())
@@ -601,7 +601,7 @@ int ikm_policy_key_read(u32 owner, u32 gen, int wm, KbdPolicyKey *out, u32 max)
 {
     unsigned irq = irq_save();
     int rc;
-    if (max > 128 || (max && !out)) rc = OS32_ERR_INVAL;
+    if (max > KBD_POLICY_READ_MAX || (max && !out)) rc = OS32_ERR_INVAL;
     else if (!machine) rc = OS32_ERR_NOSYS;
     else if (!gen || input_context_owner_generation(owner) != gen) rc = OS32_ERR_STALE;
     else if (owner != APP_ID_SHELL || !wm) rc = OS32_ERR_INVAL;

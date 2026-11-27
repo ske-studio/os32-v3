@@ -44,11 +44,10 @@ int input_context_command_begin(KbdPolicyContext *state)
     state->saved_flags = state->flags;
     input_delivery_flush();
     discard_pending();
-    if (++state->next_gen == 0) ++state->next_gen;
     state->context = INPUT_CONTEXT_RUNNING;
     state->flags = INPUT_CONTEXT_ISIG;
     state->command_active = 1;
-    state->command_gen = state->next_gen;
+    state->command_gen = ++state->next_gen;
     irq_restore(irq);
     return 0;
 }

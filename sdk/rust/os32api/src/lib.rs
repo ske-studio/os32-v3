@@ -14,6 +14,7 @@ extern crate alloc;
 /* kapi_rust_gen.py で自動生成されたKernelAPIバインディング */
 pub mod av;
 pub mod install;
+pub mod kbd_policy;
 pub mod kapi_generated;
 pub use kapi_generated::*;
 

@@ -32,6 +32,8 @@ TYPE_MAP = {
     "os_time_t":       "u32",
     "const char *":    "*const u8",
     "char *":          "*mut u8",
+    "KbdPolicyAction *": "*mut crate::kbd_policy::KbdPolicyAction",
+    "KbdPolicyKey *": "*mut crate::kbd_policy::KbdPolicyKey",
     "const InstallPlanV1 *": "*const crate::install::InstallPlanV1",
     "const void *":    "*const u8",
     "void *":          "*mut u8",

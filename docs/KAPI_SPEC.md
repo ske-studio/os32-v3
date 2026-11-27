@@ -1,4 +1,4 @@
-# KernelAPI v91 仕様書
+# KernelAPI v92 仕様書
 
 外部プログラム (OS32X) がカーネル機能を利用するためのAPIテーブル仕様。
 
@@ -16,8 +16,8 @@
 | 最大プログラムサイズ | 仮想配置で決まる: image・BSS・libc の初期域は 0x80100000 から、exec_heap の予約起点 0x88000000 の手前まで (配置と検査は [09_exec.md](09_exec.md)「Ring3 の USER 写像」) |
 | プログラム専用ヒープ | exec_heap 0x88000000〜 (既定 64KB だけ map、`mem_map` で伸長) と libc の sbrk |
 | プログラム専用スタック | 0x90000000 の直下に可変量 (既定 256KiB、OS32X ヘッダの `stack_size`)、その下に guard 1 ページ |
-| 現在のバージョン | **91** |
-| 合計エントリ数 | **388** (ヘッダ 2 + 関数表の容量 384 (うち実装 340・予約 44) + データフィールド 2)。データ欄は **0x608 に固定** (§4-0) |
+| 現在のバージョン | **92** |
+| 合計エントリ数 | **388** (ヘッダ 2 + 関数表の容量 384 (うち実装 349・予約 35) + データフィールド 2)。データ欄は **0x608 に固定** (§4-0) |
 
 ---
 
@@ -141,6 +141,7 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 | v89 | **実装** | 関数表容量 384、実装 298。ABI 世代 2、CRT 実名 os32_kapi_v89。全イメージを再構築する。 |
 | v90 | **実装** | AV HAL の 39 口を slot 298〜336 に追加。関数表容量 384、使用 337、データ開始 0x608、ABI 世代 2。 |
 | v91 | **宣言追加** | 導入管理の install_begin / install_rescan / install_end (slot 337〜339)。 | B05 §5 |
+| v92 | **実装** | 鍵盤ポリシー・端末文脈・評価済み配送の `kbd_policy_*` 9 口 (slot 340〜348)。 | [入力 HAL 設計 §10](decisions/INPUT_HAL_DESIGN.md#10-a0z-追補案2026-11-28操作端末文脈の公開) |
 | v88 | **実装 (段 6c の D2)** | slot の追加なし。`ext2_format` / `ext2_format_at` の `drv` に loop の `0x0600..0x0603` (`OS32_DRV_LOOP(slot)`) を足す。v87 の出荷版以前はこの範囲を拒否する | 本書 [ext2 の loop の drv](#ext2-loop-drv) |
 
 調停 (2026-09-06、同日改訂): GUI (K1〜W2) を先に実装するので **v42 = GUI、v43 = ネットワーク Host Services**
@@ -162,6 +163,14 @@ KAPI は append-only で版番号は単調増加。複数の計画が独立に�
 同じ票で既存の **-11 `STALE`** を VFS の FD にも使う (unlink・置き換え rename・umount で失効した FD の
 read / write / fstat / seek)。版数は据え置き。
 Host Services (2026-11-05) は **-18 `HOSTDOWN`** (ホストに届かない・応答が無い・NIC 未 bind) と **-19 `TIMEOUT`** (SDK host_call の全体期限) を取り、番号の追加だけなので KAPI 版数は据え置く。
+
+### 鍵盤ポリシー (v92)
+
+PC-98 と PowerMac で IKM1 v2 (LE、最大 1024 行・16400 B) の設定・取得・復帰と端末文脈を公開する。
+`KbdPolicyAction` (16 B) と `KbdPolicyKey` (48 B) はネイティブエンディアンで、各 read は最大 128 件。
+`kbd_policy_get` は容量不足時に必要量だけを返す。端末通知は前景の ACTION モード、Key は GUI シェルの CPL0 呼び出しに限る。
+引数の形、ユーザーページ権限、provider の状態と呼出権限の順で検査する。
+失敗時の戻り値と各フィールドの配置は [入力 HAL 設計 §10.1](decisions/INPUT_HAL_DESIGN.md#101-公開表と実装の境界) を参照。
 
 ### 導入管理 (v91)
 
@@ -332,7 +341,7 @@ v62 まではデータ欄 (`sbrk_heap_limit` / `shm_base`) を関数表の**直�
 |---|---|---|
 | 関数表の容量 R | **384** スロット (`KAPI_FUNC_CAPACITY`) | `sdk/kapi.json` の `func_capacity` |
 | データ欄の先頭 | **0x608** = 8 + 4 × R (`KAPI_DATA_FIELDS_OFF`) | `sdk/gen_kapi.py` が生成 |
-| 予約スロット | 340〜383。カーネル実表はすべて 0。ユーザー表はスタブを指し、dispatch が実装数で範囲外を拒否する。 | `sys/kern/exec/exec.c` |
+| 予約スロット | 349〜383。カーネル実表はすべて 0。ユーザー表はスタブを指し、dispatch が実装数で範囲外を拒否する。 | `sys/kern/exec/exec.c` |
 | ユーザー表の配置 | 第 1 頁に表 (0x000〜0x60f) と文字列 (0x610〜0x70f)。第 2 頁にスタブ (0x1000〜0x1bff) と sys_ls shim (0x1c00〜0x1cbf)。両頁とも USER/RO。 | `sys/kern/exec/ring3_str.h` |
 
 関数を足すときは `kapi_reserved[]` が 1 本減るだけで、データ欄は動かない。**関数数が R を
@@ -2255,6 +2264,15 @@ private import 表は `sys/kern/module/kdebug_imports.def` が正で、317 件
 | 0x54c | install_begin | `int(const InstallPlanV1 *plan, u32 *handle)` |
 | 0x550 | install_rescan | `int(u32 handle)` |
 | 0x554 | install_end | `int(u32 handle, u32 outcome)` |
+| 0x558 | kbd_policy_set | `int(const void *wire, u32 length)` |
+| 0x55C | kbd_policy_get | `int(void *wire, u32 capacity, u32 *needed)` |
+| 0x560 | kbd_policy_reset | `int(void)` |
+| 0x564 | kbd_policy_context_set | `int(u32 context, u32 flags)` |
+| 0x568 | kbd_policy_command_begin | `int(void)` |
+| 0x56C | kbd_policy_command_end | `int(void)` |
+| 0x570 | kbd_policy_delivery_set | `int(u32 mode)` |
+| 0x574 | kbd_policy_action_read | `int(KbdPolicyAction *out, u32 max)` |
+| 0x578 | kbd_policy_key_read | `int(KbdPolicyKey *out, u32 max)` |
 
 - `gfx2_check_op` と `gfx2_submit` は同じ規則に従う (照会が可と答えた操作は実行も通る)。**INDEX8 宛ての ALPHA は照会で 0/NOSUPPORT、実行で `OS32_ERR_NOSYS` (何も描かない)** — 以前は照会が SW で可・実行で NOSYS の不一致が x86 (PEGC) にもあった (GFX2-ALPHA-INDEX8-1、PowerPC の調べで見つけた、直しは 39d87fb53、NP21/W 依頼 47 で x86 の回帰なし、2026-11-24)。
 

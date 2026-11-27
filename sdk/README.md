@@ -78,6 +78,12 @@ api->gfx_present_dirty();   /* ここで初めて転送される */
 描けば転送量が減る。16MHz 級の実機では全画面転送のコストが支配的なので、
 これが効く。
 
+### 鍵盤ポリシー (KAPI v92)
+
+`kbd_policy_*` を使うプログラムは最低 KAPI 版を 92 に指定します。C の `os32_kbd_policy.h` と
+Rust の `os32api::kbd_policy` に配送型と IKM1 v2 の定数があります。
+[KernelAPI 仕様の鍵盤ポリシー節](../docs/KAPI_SPEC.md#鍵盤ポリシー-v92) を参照してください。
+
 ### 文字列を返す KAPI の寿命
 
 `sys_getcwd` / `vfs_devname` / `path_get_drive` / `path_get_cwd` の返り値は、

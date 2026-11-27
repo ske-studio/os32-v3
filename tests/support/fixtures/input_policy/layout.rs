@@ -1,12 +1,7 @@
-#[repr(C)]
-struct Action { action: u32, command_gen: u32, time_ms: u32, value: u32 }
-
-#[repr(C)]
-struct Key {
-    src_generation: u32, map_id: u32, keycode: u32, sc_down_repeat: u32,
-    physical_mods: u32, logical_mods: u32, time_ms: u32, map_generation: u32,
-    keysym: u32, kind: u32, action: u32, value: u32,
-}
+#[path = "../../../../sdk/rust/os32api/src/kbd_policy.rs"]
+#[allow(dead_code)]
+mod kbd_policy;
+use kbd_policy::*;
 
 macro_rules! offsets {
     ($ty:ty, $($field:ident),+) => {{
@@ -19,11 +14,11 @@ macro_rules! offsets {
 }
 
 fn main() {
-    offsets!(Action, action, command_gen, time_ms, value);
-    offsets!(Key, src_generation, map_id, keycode, sc_down_repeat, physical_mods,
+    offsets!(KbdPolicyAction, action, command_gen, time_ms, value);
+    offsets!(KbdPolicyKey, src_generation, map_id, keycode, sc_down_repeat, physical_mods,
              logical_mods, time_ms, map_generation, keysym, kind, action, value);
     let mut wire = Vec::from(*b"IKM1");
-    for n in [2u16, 16] { wire.extend(n.to_le_bytes()); }
+    for n in [KBD_POLICY_WIRE_VERSION as u16, KBD_POLICY_ROW_SIZE as u16] { wire.extend(n.to_le_bytes()); }
     for n in [1u32, 0] { wire.extend(n.to_le_bytes()); }
     wire.extend([8, 2, 1, 0]);
     for n in [0x1234u16, 0xabcd] { wire.extend(n.to_le_bytes()); }

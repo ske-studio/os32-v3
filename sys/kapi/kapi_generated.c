@@ -6,6 +6,7 @@
 #include "gfx.h"
 #include "palette.h"
 #include "input_service.h"
+#include "input_policy_provider.h"
 #include "exec_heap.h"
 #include "kmalloc.h"
 #include "paging.h"
@@ -69,7 +70,7 @@ extern int kapi_osri_show(const char *path, u32 duration_ms);
 #include "kapi_profile.h"
 
 #ifdef KAPI_PROFILE
-volatile u32 kapi_hits[340];
+volatile u32 kapi_hits[349];
 #endif
 
 /* 各スロットの cdecl 引数バイト数 (固定分)。int 0x80 ディスパッチャが
@@ -415,6 +416,15 @@ const u16 kapi_argsize[KAPI_FUNC_COUNT] = {
     8,  /* install_begin */
     4,  /* install_rescan */
     8,  /* install_end */
+    8,  /* kbd_policy_set */
+    12,  /* kbd_policy_get */
+    0,  /* kbd_policy_reset */
+    8,  /* kbd_policy_context_set */
+    0,  /* kbd_policy_command_begin */
+    0,  /* kbd_policy_command_end */
+    4,  /* kbd_policy_delivery_set */
+    8,  /* kbd_policy_action_read */
+    8,  /* kbd_policy_key_read */
 };
 
 /* 各スロットの固定引数のうち早期検査するポインタのビットマスク (bit k = 引数 k)。
@@ -760,6 +770,15 @@ const u16 kapi_argptr[KAPI_FUNC_COUNT] = {
     0x0000,  /* install_begin */
     0x0000,  /* install_rescan */
     0x0000,  /* install_end */
+    0x0000,  /* kbd_policy_set */
+    0x0000,  /* kbd_policy_get */
+    0x0000,  /* kbd_policy_reset */
+    0x0000,  /* kbd_policy_context_set */
+    0x0000,  /* kbd_policy_command_begin */
+    0x0000,  /* kbd_policy_command_end */
+    0x0000,  /* kbd_policy_delivery_set */
+    0x0000,  /* kbd_policy_action_read */
+    0x0000,  /* kbd_policy_key_read */
 };
 
 /* ---- 出力ポインタの書き込み可検査 (票 TASK_KAPI_OUTPUT_GUARD) --------
@@ -3432,5 +3451,84 @@ int __cdecl wrap_install_end(u32 handle, u32 outcome)
 {
     KAPI_HIT(339);
     return install_end(handle, outcome);
+}
+
+int __cdecl wrap_kbd_policy_set(const void *wire, u32 length)
+{
+    KAPI_HIT(340);
+    if (length < KBD_POLICY_HEADER_SIZE || length > KBD_POLICY_MAX_WIRE || (length - KBD_POLICY_HEADER_SIZE) % KBD_POLICY_ROW_SIZE || !wire || (u32)wire > U32_MAX - (length - 1u)) return OS32_ERR_INVAL;
+    /* 入力の全範囲を B1 で検査 (USER/read)。 */
+    if (!kapi_in_range((u32)wire, KAPI_OUT_LEN(wire, length))) {
+        ring3_fault_kill();
+    }
+    return input_provider_set(wire, length);
+}
+
+int __cdecl wrap_kbd_policy_get(void *wire, u32 capacity, u32 *needed)
+{
+    KAPI_HIT(341);
+    if (!needed || ((u32)needed & 3u) || (u32)needed > U32_MAX - 3u || capacity > KBD_POLICY_MAX_WIRE || (capacity && (!wire || (u32)wire > U32_MAX - (capacity - 1u) || ((u32)wire <= (u32)needed + 3u && (u32)needed <= (u32)wire + (capacity - 1u))))) return OS32_ERR_INVAL;
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable((u32)needed, KAPI_OUT_LEN(needed, sizeof(u32)),
+                                    (u32)wire, KAPI_OUT_LEN(wire, capacity))) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return input_provider_get(wire, capacity, needed);
+}
+
+int __cdecl wrap_kbd_policy_reset(void)
+{
+    KAPI_HIT(342);
+    return input_provider_reset();
+}
+
+int __cdecl wrap_kbd_policy_context_set(u32 context, u32 flags)
+{
+    KAPI_HIT(343);
+    return input_provider_context_set(context, flags);
+}
+
+int __cdecl wrap_kbd_policy_command_begin(void)
+{
+    KAPI_HIT(344);
+    return input_provider_command_begin();
+}
+
+int __cdecl wrap_kbd_policy_command_end(void)
+{
+    KAPI_HIT(345);
+    return input_provider_command_end();
+}
+
+int __cdecl wrap_kbd_policy_delivery_set(u32 mode)
+{
+    KAPI_HIT(346);
+    return input_provider_delivery_set(mode);
+}
+
+int __cdecl wrap_kbd_policy_action_read(KbdPolicyAction *out, u32 max)
+{
+    KAPI_HIT(347);
+    if (max > KBD_POLICY_READ_MAX || (max && (!out || ((u32)out & 3u) || (u32)out > U32_MAX - (max * sizeof(KbdPolicyAction) - 1u)))) return OS32_ERR_INVAL;
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable(
+            (u32)out, kapi_out_mul(KAPI_OUT_LEN(out, max), (u32)(sizeof(KbdPolicyAction))),
+            (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return input_provider_action_read(out, max);
+}
+
+int __cdecl wrap_kbd_policy_key_read(KbdPolicyKey *out, u32 max)
+{
+    KAPI_HIT(348);
+    if (max > KBD_POLICY_READ_MAX || (max && (!out || ((u32)out & 3u) || (u32)out > U32_MAX - (max * sizeof(KbdPolicyKey) - 1u)))) return OS32_ERR_INVAL;
+    /* 出力範囲が書けるか (票 TASK_KAPI_OUTPUT_GUARD) */
+    if (!ring3_user_ranges_writable(
+            (u32)out, kapi_out_mul(KAPI_OUT_LEN(out, max), (u32)(sizeof(KbdPolicyKey))),
+            (u32)0, 0u)) {
+        ring3_fault_kill();   /* 戻らない */
+    }
+    return input_provider_key_read(out, max);
 }
 

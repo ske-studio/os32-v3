@@ -4,7 +4,8 @@
 #include "input_delivery.h"
 #include "../hal/input/keymap.h"
 
-enum { IKM_HEADER_SIZE = 16, IKM_ROW_SIZE = 16, IKM_MAX_ROWS = 1024 };
+enum { IKM_HEADER_SIZE = KBD_POLICY_HEADER_SIZE, IKM_ROW_SIZE = KBD_POLICY_ROW_SIZE,
+       IKM_MAX_ROWS = KBD_POLICY_MAX_ROWS };
 typedef struct {
     u8 kind, profile, context, flags;
     u16 index, selector;
