@@ -78,6 +78,8 @@ collect は §2 の照合を行い、通常検査の状態別件数と変異の�
 
 配布ジョブは媒体名に `-a<attempt>` を付けて BUILT を公開する。検査ジョブは同じ run の同名の配布物を展開し、SHA256SUMS を照合する。全件集計と依存ジョブが成功した場合だけ、collect が集計 JSON を別の成果物 `verified-<SHA>-a<attempt>` として公開する。再実行は全ジョブを対象にする。以前の attempt の媒体や合格札は使えない。
 
+Ra266 の tick-s1 計測には、対象 ref の restructure-build を手動で起動し、boolean 入力 `diag_tick_s1`（既定 false）を選ぶ。専用ジョブは `TICK_PROBE_BUILD=1` の HostDrv 一式（`tick/tickprobe.bin` と `tick/snd2_test_diag.bin` を含む）を tar.gz にし、同じビルドの `kernel.map`、`obj/sys/platform/pc98/tsc_clock.o`、外側の `SHA256SUMS` とともに `tick-s1-<SHA>-a<attempt>` として公開する。run 番号と成果物名を指定して取得し、pc98emu が NP21/W で起動した同じ tar.gz を実機に渡す。この任意ジョブは §10 の計画、VERIFIED の集計、land_gate の照合の対象外。
+
 ci_fetch の既定は VERIFIED 以上。`--allow-built` は実機調査向け。`--evidence JSON` では land_gate が両機種の起動記録を照合し、合格した媒体を ACCEPTED と表示する。受入記録は PM の証拠 JSON とログに保持する。
 
 問い合わせ時に、媒体の manifest（SHA、構成、ビルド run/attempt、artifact ID、sha256）、§4 の集計、受入記録から次を導く。

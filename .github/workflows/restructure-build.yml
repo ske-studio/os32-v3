@@ -6,6 +6,10 @@ on:
     - cron: "17 19 * * 0"
   workflow_dispatch:
     inputs:
+      diag_tick_s1:
+        description: Build the Ra266 tick-s1 diagnostic HostDrv image
+        type: boolean
+        default: false
       kapi_base:
         description: Previous main SHA for a manual main candidate
         type: string
@@ -15,6 +19,46 @@ concurrency:
   group: restructure-build-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  tick-s1:
+    if: github.event_name == 'workflow_dispatch' && inputs.diag_tick_s1
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      OS32_ACCEPT_IPA_LICENSE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: ./.github/actions/build-setup
+      - name: Build tick-s1 diagnostic image
+        shell: bash
+        run: |
+          export PATH="$CROSS_DIR/bin:$PATH" TZ=UTC LC_ALL=C
+          export OS32_BUILD_COMMIT="$(git rev-parse --short=7 HEAD)"
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          make -j"$(nproc)" TICK_PROBE_BUILD=1 all build/out/tickprobe.bin build/out/snd2_test_diag.bin
+      - name: Package tick-s1 HostDrv and matching symbols
+        shell: bash
+        run: |
+          export HOSTDRV_DIR="$RUNNER_TEMP/s1-hostdrv"
+          package="$RUNNER_TEMP/tick-s1"
+          object=obj/sys/platform/pc98/tsc_clock.o
+          mkdir -p "$HOSTDRV_DIR" "$package/$(dirname "$object")"
+          python3 tools/hostdrv_deploy.py sync
+          mkdir -p "$HOSTDRV_DIR/tick"
+          cp build/out/{tickprobe,snd2_test_diag}.bin "$HOSTDRV_DIR/tick/"
+          (cd "$HOSTDRV_DIR" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > "$RUNNER_TEMP/s1-sums"
+          cp "$RUNNER_TEMP/s1-sums" "$HOSTDRV_DIR/SHA256SUMS"
+          tar -C "$RUNNER_TEMP" -czf "$package/tick-s1-hostdrv.tar.gz" s1-hostdrv
+          cp build/out/kernel.map "$package/"
+          cp "build/out/$object" "$package/$object"
+          (cd "$package" && sha256sum tick-s1-hostdrv.tar.gz kernel.map "$object" > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tick-s1-${{ github.sha }}-a${{ github.run_attempt }}
+          path: ${{ runner.temp }}/tick-s1/
+          retention-days: 30
+          if-no-files-found: error
   artifacts:
     needs: plan
     if: needs.plan.outputs.pc98 != 'none'
