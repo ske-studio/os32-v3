@@ -64,6 +64,10 @@ int main(int argc, char **argv, KernelAPI *api)
 
     if (strcmp(argv[1], "on") == 0) {
         api->ime_set_mode(IME_MODE_HIRAGANA);
+        if (!api->ime_is_active() || api->ime_get_mode() != IME_MODE_HIRAGANA) {
+            fprintf(stderr, "ime: could not enable Hiragana mode\n");
+            return 1;
+        }
         printf("FEP enabled.\n");
         return 0;
     }
@@ -80,15 +84,21 @@ int main(int argc, char **argv, KernelAPI *api)
             return 1;
         }
         if (strcmp(argv[2], "hira") == 0) {
-            api->ime_set_mode(IME_MODE_HIRAGANA);
-            printf("Mode switched to Hiragana.\n");
+            mode = IME_MODE_HIRAGANA;
+            mode_str = "Hiragana";
         } else if (strcmp(argv[2], "kata") == 0) {
-            api->ime_set_mode(IME_MODE_KATAKANA);
-            printf("Mode switched to Katakana.\n");
+            mode = IME_MODE_KATAKANA;
+            mode_str = "Katakana";
         } else {
             printf("Error: Invalid mode '%s'. Use 'hira' or 'kata'.\n", argv[2]);
             return 1;
         }
+        api->ime_set_mode(mode);
+        if (api->ime_get_mode() != mode) {
+            fprintf(stderr, "ime: mode switch failed\n");
+            return 1;
+        }
+        printf("Mode switched to %s.\n", mode_str);
         return 0;
     }
 
