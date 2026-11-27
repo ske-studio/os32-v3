@@ -213,5 +213,5 @@ int gf4_flip(struct gf4_ctx *c, u8 head, const struct gf3_surface *front,
 done:
     /* Serial output follows completion, including its final vblank wait. */
     diagnostic(head, sync, &edge, &pre, &post, rc);
-    return rc;
+    return rc ? OS32_ERR_AGAIN : 0;
 }

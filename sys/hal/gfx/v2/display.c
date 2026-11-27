@@ -66,11 +66,11 @@ int gfx2_flip(u32 id, u32 head, u32 sid, u32 flags, u32 deadline_ms)
     rc = gfx2_surf_quiesce(s, dl);
     if (rc) return rc;
     rc = a->be->flip(a->ctx, head, s, flags, dl);
-    if (rc) return rc;
+    if (rc && rc != OS32_ERR_AGAIN) return rc;
     gfx2_scan_ref_get(s);
     a->head[head].pend_sid = sid;
-    gfx2_flip_poll(a);
-    return 0;
+    if (!rc) gfx2_flip_poll(a);
+    return rc;
 }
 
 int gfx2_vblank_wait(u32 id, u32 head, u32 after, u32 deadline_ms, u32 *seen)

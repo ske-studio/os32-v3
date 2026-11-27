@@ -10,16 +10,21 @@ static const struct gf4_test_ops *display(void)
     return ops && ops->ctx && ops->ctx->state ? ops : 0;
 }
 
-int gf_v2_owns(const struct gf3_surface *s)
+static const struct gfx2_surf *front_owner(const struct gf_v2 *g, const struct gf3_surface *s)
 {
     u32 i;
     if (!s) return 0;
     for (i = 0; i < GFX2_MAX_SURFACES; i++) {
-        const struct gf_vram_reservation *v = &gf_v2_inst.node[i].value;
+        const struct gf_vram_reservation *v = &g->node[i].value;
         if (v->owner && v->reservation_id == s->reservation_id &&
-            v->generation == s->generation) return 1;
+            v->generation == s->generation) return v->owner;
     }
     return 0;
+}
+
+int gf_v2_owns(const struct gf3_surface *s)
+{
+    return front_owner(&gf_v2_inst, s) != NULL;
 }
 
 static int surface(const struct gfx2_surf *s, struct gf3_surface *out)
@@ -53,7 +58,7 @@ int gf_v2_mode_set(void *ctx, u32 head, u32 mask, const GFX2_ModeInfo *m,
     if (s->flags & GFX2_SF_ALIAS) {
         if (head) return OS32_ERR_INVAL;
         if (!g->home.valid)
-            return c->state->head[0].front.off == s->gpu_off ? 0 : OS32_ERR_INVAL;
+            return !c->hold[0].pending && c->state->head[0].front.off == s->gpu_off ? 0 : OS32_ERR_INVAL;
         conn = g->home.conn;
         if (conn >= c->nroutes) return OS32_ERR_INVAL;
         route = c->routes[conn]; route.head = head;
@@ -95,11 +100,12 @@ int gf_v2_flip(void *ctx, u32 head, const struct gfx2_surf *s, u32 flags, u32 us
     if (g->head[head].pend_sid) return OS32_ERR_BUSY;
     rc = surface(s, &front); if (rc) return rc;
     rc = gf_v2_deadline(ops->ctx->ch, us, &dl);
-    if (!rc) rc = ops->flip(ops->ctx, head, &front, !!(flags & GFX2_FLIP_VBLANK), dl);
     if (rc) return gf_v2_rc(rc);
+    rc = ops->flip(ops->ctx, head, &front, !!(flags & GFX2_FLIP_VBLANK), dl);
+    if (rc && rc != OS32_ERR_AGAIN) return gf_v2_rc(rc);
     if (ops->ctx->hold[head].pending) g->head[head].pend_sid = s->sid;
     else { g->head[head].retired_sid = g->head[head].scan_sid; g->head[head].scan_sid = s->sid; }
-    return 0;
+    return rc;
 }
 
 int gf_v2_flip_done(void *ctx, u32 head, u32 *retired)
@@ -116,8 +122,12 @@ int gf_v2_flip_done(void *ctx, u32 head, u32 *retired)
             if (c->hold[head].base_verified && stats.vblank[head] == c->hold[head].after) return OS32_ERR_BUSY;
             rc = gf_v2_deadline(c->ch, GF3_TIMEOUT_US, &dl);
             if (!rc) rc = gf4_flip_complete(c, head, dl);
-            if (rc) { h->pend_sid = 0; return gf_v2_rc(rc); }
+            if (rc) return OS32_ERR_BUSY;
         }
+        /* A readback can also have confirmed the old front. Keep both
+         * references until the new front is confirmed or the head stops. */
+        const struct gfx2_surf *owner = front_owner(g, &c->state->head[head].front);
+        if (!owner || owner->sid != h->pend_sid) return OS32_ERR_BUSY;
         h->retired_sid = h->scan_sid; h->scan_sid = h->pend_sid; h->pend_sid = 0;
     }
     *retired = h->retired_sid; h->retired_sid = 0; return 0;

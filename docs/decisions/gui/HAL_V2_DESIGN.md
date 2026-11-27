@@ -373,6 +373,7 @@ int gfx2_sysmem_free(struct gfx2_surf *s)      /* 前提: 写像は外れてい�
 - GART の面の CPU から (R3): GART の頁は連続でないので `kva` は NULL。作成の時に C4 が C7 の `gfx2_map` で持ち主の AS の gfx2 の帯へ連続の VA で張り (失敗なら面を返して NOSPC)、sw の `view.base = map_va`・`pitch` で見る。sw がこの base を使えるのは CR3 が持ち主の AS の時 (= 持ち主の KAPI の中の submit・lock) だけで、C8 の `gfx2_check_exec` は `gfx2_cpu_visible(s)` (C7: `kva` か `map_as == 今の AS`) が偽なら §4-2 の (5) で NOSUPPORT。present・v1 の橋・`gfx2_owner_release` は GART の面を sw で触らない。
 
 ### 7-3. 走査面の解放
+- 走査番地の書込み後に反映が未確定なら AGAIN を返し、新面を保留の flip として参照する。新面の反映か head の停止を確認するまで両面を保つ。
 - 面は `scan_ref` を持つ: head の今の走査面で +1、保留中の flip の先で +1。flip の反映 (vblank の後に backend が報告) か head の停止で −1。
 - `free` は `scan_ref > 0` か fence が未完了なら CLOSING にして戻る。vblank の処理と `fence_query`・submit の入口で CLOSING を見回り、両方 0 になったら C4 の `gfx2_surf_destroy` で実際に返す。
 - 返す順はこの 1 つだけ (§8・§11-2 も同じ)。TTM の `ttm_bo_release` と同じ順: fence の完了 (ttm_bo.c:265 の待ち・:277-311 の遅れた破棄) → CPU の写像の解除 (:272-273、ユーザーの写像は参照を持つので解放の前に消えている ttm_bo_vm.c:350-367) → GPU の写像の解除 (:185-186 の `delete_mem_notify` → nouveau_bo.c:1093 の `nouveau_vma_unmap`) → GART の unbind と頁の解放 (:188 → :1487-1494 → nouveau_bo.c:1442-1455 の unbind → `ttm_pool_free`)。
@@ -1252,7 +1253,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 | C10 | `gfx2_caps` は失敗で `*o` を書かない。`gfx2_caps_refresh` は §11-2 | `size` は 4 以上 (未満は INVAL)。`min(size, 256)` バイトだけ書く | caps の size |
 | C11 | INVAL は `*o` を書かない | head は `a->heads` 未満、conn は `connectors` 未満、mode の `i` は `gfx2_mode_count` 未満、EDID の `block` は `edid_blocks` 未満。外は INVAL | 列挙の範囲 |
 | C12 | §9-3 (元から足りていた) | §9-3 | quiesce・mode_set の途中の失敗 |
-| C13 | flip の失敗は `pend_sid`・scan_ref を変えない。palette の失敗は `gfx2_pal` を変えない。present の `gfxsync_write_rows` の失敗は IO で `dirty` を残す (次の present でまた送る) | palette は `count >= 1` かつ `count <= 256 − first`。cursor は ARGB8888 で `cursor_w`・`cursor_h` 以内。present の矩形は面で切り、空なら 0 で何もしない | 走査面の解放・palette の範囲・present の失敗 |
+| C13 | 書込後の未確定は AGAIN で新面を保留する。書込前の flip の拒否は `pend_sid`・scan_ref を変えない。palette の失敗は `gfx2_pal` を変えない。present の `gfxsync_write_rows` の失敗は IO で `dirty` を残す (次の present でまた送る) | palette は `count >= 1` かつ `count <= 256 − first`。cursor は ARGB8888 で `cursor_w`・`cursor_h` 以内。present の矩形は面で切り、空なら 0 で何もしない | 走査面の解放・palette の範囲・present の失敗 |
 | C14 | `v1_bridge_begin` の rc は記録だけで、v1 の入口は進む (TIMEOUT の後は adapter が LOST で待つ物は失敗の完了、BUSY は DIRECT の別名の lock の間で unlock が面の全体を書き戻す)。rebind は §6-5 (quiesce が TIMEOUT の役は lock も閉じず旧のまま、ほかは `gfx2_lock_revoke` → `alias_update`)。`gfx2_lock_revoke`: ALIAS でない面は INVAL で何も変えない、unmap の IO でも map_as・staging を外して IO | — | 別名の面・別名の更新・lock 中の rebind (lock した DIRECT の別名で mode を替える → 旧 sid の unlock は STALE、map_as・staging が無い、staging の頁は持ち主へ返った) |
 | C15 | §7-3 (別名の `map_as` の拾いを足した) | — | 回収・unmap の失敗・staging の回収 |
 | C16 | shim は §11-7。`gfx2_lost_be` の `gart_unbind` は 0 | — | shim |
@@ -1266,7 +1267,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 | Y1〜Y4 | 設定の読みの誤り・範囲外は区画を捨てて既定 + kprintf (§10 の表と同じ扱い)。`gfxsync_bind` は FULL・INVAL で ctx を取らない。`write_rows`・`read_rows` は範囲外を INVAL で 1 バイトも書かない (present.c と同じ検査)。`flush` は hook の rc。`unbind(NULL)` は何もしない | `unit` は 1・2・4、`gap_ns` は 0〜100000、`bind` の `va`・`bytes`・`pitch` が 0 は INVAL、矩形は `y + h` と `x + w` の u32 のあふれ込みで `bytes`・`pitch` に収める | 同期層・行の範囲 |
 | T1・P1 | `gfxsync_bind` の失敗は v1 の init の失敗にし、今の pc98 への落ち (gfx_core.c) の道に乗せる | — | 同期層 (trident の 65・7・38 の場合を移す) |
 | G1・G7 | emit の中の状態の設定の失敗は装置の失敗 (§11-6 の R8)。`gf3_rop3_set` は引数の誤りと 32bpp では何も積まない。G1 は `*_emit` の rc に関わらず既定へ戻す | `kind` は 0〜2、`fmt` は INDEX8・565 (ほかは EUNSUPPORTED・EFORMAT) | channel の既定・fence の順・パターンの詰め方・ROP3 の method の順 |
-| G2 | mode_set の失敗は層 4 が退避した状態へ戻す (`gf4_change_end`、§9-3)、`home` は失敗で記録しない。flip の失敗は `head[]` を変えない。palette は最初の失敗の rc を返し `pal` は書いた後 (次の mode_set で入れ直す)。層 4 の窓口が閉じている (`gf_v2_disp() == NULL`) は IO | head は 2 未満、conn_mask はちょうど 1 bit で `c->nroutes` 未満、その route の `head_mask` に head が無ければ INVAL。dpms は 0〜3、cursor の show は 0・1、cursor の面は ARGB8888 で `kva` が非 NULL | mode_set の途中の失敗・GF の戻り先・GF の flip・GF の palette の入れ直し・v1 の走査を変えない |
+| G2 | mode_set の失敗は層 4 が退避した状態へ戻す (`gf4_change_end`、§9-3)、`home` は失敗で記録しない。書込後の未確定は AGAIN で新面を保留する。書込前の flip の拒否は `head[]` を変えない。palette は最初の失敗の rc を返し `pal` は書いた後 (次の mode_set で入れ直す)。層 4 の窓口が閉じている (`gf_v2_disp() == NULL`) は IO | head は 2 未満、conn_mask はちょうど 1 bit で `c->nroutes` 未満、その route の `head_mask` に head が無ければ INVAL。dpms は 0〜3、cursor の show は 0・1、cursor の面は ARGB8888 で `kva` が非 NULL | mode_set の途中の失敗・GF の戻り先・GF の flip・GF の palette の入れ直し・v1 の走査を変えない |
 | G10 | 列挙は書き先を失敗で書かない。DDC の失敗は EDID 無し (status は下の表) | head は 2 未満、conn は `c->nroutes` 未満、fmt は 1〜10、i は数えた件数未満、EDID の block は 0〜255 | GF の接続の種類と状態・GF の mode の列挙 |
 | G11 | start の失敗は `lost = 1` のまま (層 3・4 は持ち主に任せ、何も戻さない)。stop の drain の失敗は層 4 の `links->failed` へ渡し、channel が OFF なら 0、OFF でなければ IO (中核が LOST_HELD) | — | GF の stop・GF の start |
 | G4 | §6-3 (元から足りていた)。KEEP の追補は §11-6 | — | 輪の満杯・KEEP |
@@ -1291,7 +1292,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 | パターン | SET_PATTERN の前の PAT → INVAL。色パターン 0x12345678 を INDEX8 に → 0x78、565 に → 0x5678 | submit.c の未設定の検査を外す / 下位を採るマスクを 8bit 固定に | I2 |
 | 状態遷移 | §7-1 の表の全セル | surface.c の LOCKED_RO の書きの拒否を外す | I1 |
 | DISCARD | fake の未完了の FILL → DISCARD の lock が last_write を待つ | lock.c の DISCARD の時の待ちを省く | I1 |
-| 走査面の解放 | scan_ref=1 で free → CLOSING、flip_done の後に空 | surface.c の scan_ref の検査を外す | I3 |
+| 走査面の解放 | 書込前の拒否は不変。書込後の未確定は保留の flip。両面の free は CLOSING、新面の反映後は旧面だけ空 | surface.c の scan_ref の検査を外す | I3 |
 | quiesce | fake の wait が TIMEOUT → mode_set は TIMEOUT、`be->mode_set` は呼ばれず、head・世代は不変 | modeset.c の `if (rc) return rc;` を外す | I3 |
 | mode_set の途中の失敗 | 有効な mode で fake の `be->mode_set` が IO → 走査面・scan_ref・世代・`gfx_policy_reeval` の回数が不変 | modeset.c の失敗の return を世代の更新の後に動かす | I3 |
 | pin | pin の頁で free・transfer・reclaim が全部拒否、transfer_pinned だけ通る | pgalloc_owner.inc の 3 つの検査を 1 つずつ外す | I1 |
@@ -1356,7 +1357,7 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 | GF の stop (G11) | fake の channel が RUN・同じ epoch で drain が通る → 0、`lost` が 1、`links->failed` は 0 回。drain が ETIME → `links->failed` が 1 回、fake が OFF にすれば 0・しなければ IO。epoch が違う・OFF → drain も failed も呼ばず 0 | gf_v2_life.c の drain の成功の `return 0` を外す (成功でも failed が呼ばれる) | I2 |
 | GF の start (G11) | epoch が変わった後 → 輪が空・`failed_upto` が輪の最新・`gf3_range_query_set` → `gf_v2_gart_start` の順・`lost` 0。層 3 が ready でない → GF3_ESTATE・`lost` 1・gart_start は 0 回 | gf_v2_life.c の `gf_v2_fence_reset` の呼び出しを外す | I2 |
 | GF の戻り先 (G2) | v1 の走査 (head 0 が enabled、G9 の予約でない) の上で v2 の面へ mode_set → `home` に v1 の front・mode id・route の番号・palette、層 4 の set_mode に `{gpu_off, priv[0], priv[1]}`。別名の面で mode_set → 層 4 に home の値、`home.valid` 0、palette を home から入れ直す。v2 の mode_set が失敗 → `home.valid` 0 | gf_v2_display.c の別名の分岐で home の代わりに引数の mode を使う | I3 |
-| GF の flip (G2) | 非同期の flip → `pend_sid`、vblank の数が `after` のまま → flip_done は BUSY、数が進む → 0・retired = 前の走査の sid、続けて呼ぶと retired 0 | gf_v2_display.c の数の比べの BUSY を 0 に | I3 |
+| GF の flip (G2) | 非同期の flip と書込後の未確定 → `pend_sid`、vblank の数が `after` のまま → flip_done は BUSY、数が進む → 0・retired = 前の走査の sid、続けて呼ぶと retired 0 | gf_v2_display.c の数の比べの BUSY を 0 に | I3 |
 | GF の palette の入れ直し (G2) | head 0 が 565 の間に palette(10, 2) → 層 4 の palette_set は 0 回・`pal` に残る。INDEX8 へ mode_set → palette_set(0, 256) が 1 回で 10・11 番が写っている | gf_v2_display.c の mode_set の後の入れ直しを外す | I3 |
 | v1 の走査を変えない (G2) | G9 の予約の front で `gf_hook_scan_changed` → `selected_front`・`gfx_policy_scan_changed` の回数が不変。v1 の予約の front → 今までどおり更新 | backend_geforce.c の `gf_v2_owns` の 1 行を外す | I3 |
 | GF の接続の種類と状態 (G10) | 同じ connector の ANALOG・TMDS の 2 本 → 両方 DVI_I。fake の EDID の byte 20 bit7 が 1 → TMDS が ON・ANALOG が OFF、edid_blocks = 1 + byte 126。DDC が無応答 → TMDS は OFF・ANALOG は UNKNOWN。clone_mask は 0。TV は tv_sense の値 | gf_v2_enum.c の相方の検出を外す (DVI_I が VGA・DVI_D になる) | I3 |
@@ -1650,8 +1651,8 @@ static void geforce_v2_start(void)
 | hook | 層 4 (OS32) | nouveau | G2 の決め |
 |---|---|---|---|
 | mode_set | `ops->set_mode` = gf4_set_mode (display/modeset.c:327-375) | N/dispnv04/crtc.c:643-669 (mode_set)・:708-751 (prepare・commit)・:609-640 (swap_fbs の pin = OS32 は G9 の予約) | conn_mask は 1 bit (clone_mask = 0 なので C12 が先に断る)、route = `c->routes[conn]` の写しに `head` を入れる (route_equal は head を見ない、display/output.c:59-66。crtc は modeset で選ぶ、N/dispnv04/dac.c:556 の possible_crtcs)。`head_mask` に無い head は INVAL。`g->lost` なら最初に `gf_v2_start`。別名なら上の「抜ける時」。成功で `head[h] = {s->sid, 0, 0}`、INDEX8 で `pal_set` なら `gf4_palette_set(c, h, 0, 256, g->pal)` (失敗は kprintf だけで 0。mode は確定済み) |
-| flip | `ops->flip` = gf4_flip (display/flip.c:159-217、sync = flags & GFX2_FLIP_VBLANK) | N/dispnv04/crtc.c:1136-1217 (page_flip)・:1074-1087 (flip_complete) | 別名は INVAL、`pend_sid` があれば BUSY。成功の後 `c->hold[h].pending` なら `pend_sid = s->sid`、でなければ (同期の flip は確定済み) `retired = scan; scan = s->sid` |
-| flip_done | `gf4_flip_complete` (flip.c) を直に (窓口を通った後) | 同上 | `pend_sid` が無ければ retired を返して 0 に。hold が pending で `base_verified` かつ vblank の数 (`gf_irq_snapshot` の `vblank[h]`、flip.c と同じ数) が `hold.after` のままなら BUSY。進んでいれば `gf4_flip_complete(c, h, now + GF3_TIMEOUT_US)` (待たずに確定)、失敗は `pend_sid = 0` で rc。hold が pending でなければ (vblank_wait が先に確定した) そのまま入れ替え |
+| flip | `ops->flip` = gf4_flip (display/flip.c:159-217、sync = flags & GFX2_FLIP_VBLANK) | N/dispnv04/crtc.c:1136-1217 (page_flip)・:1074-1087 (flip_complete) | 別名は INVAL、`pend_sid` があれば BUSY。書込後の未確定は AGAIN を返して保留する。成功の後 `c->hold[h].pending` なら `pend_sid = s->sid`、でなければ (同期の flip は確定済み) `retired = scan; scan = s->sid` |
+| flip_done | `gf4_flip_complete` (flip.c) を直に (窓口を通った後) | 同上 | `pend_sid` が無ければ retired を返して 0 に。hold が pending で `base_verified` かつ vblank の数 (`gf_irq_snapshot` の `vblank[h]`、flip.c と同じ数) が `hold.after` のままなら BUSY。進んでいれば `gf4_flip_complete(c, h, now + GF3_TIMEOUT_US)` (待たずに確定)、失敗は両面を保持して rc。hold が pending でなければ確定済みの front が新面の時だけ入れ替え |
 | vblank_wait | `ops->vblank_wait` = gf4_vblank_wait (flip.c。保留の flip を先に確定) | N/dispnv04/crtc.c:1277-1284 (vblank の割込み) | そのまま |
 | palette | `gf4_palette_set` (display/gamma.c:80-92) を直に | N/dispnv04/crtc.c:777-799 (8bpp の palette と 16/32bpp の gamma は同じ LUT) | xrgb を `pal[]` に RGB 8 bit で写し `pal_set = 1`、enabled で INDEX8 の head 全部に送る (層 4 は INDEX8 でない head の palette を受けない、gamma.c)、最初の失敗の rc |
 | gamma | `ops->gamma` = gf4_gamma (gamma.c、565・X888 だけ) | N/dispnv04/crtc.c:816-836 | `rgb768` を `const u16 (*)[256]` で渡す |
@@ -1770,7 +1771,7 @@ __attribute__((weak)) int gf_v2_owns(const struct gf3_surface *a0) { (void)a0; r
 | gfx2_pattern | I2 | パターン |
 | gfx2_surface_state | I1 | 状態遷移 |
 | gfx2_discard | I1 | DISCARD |
-| gfx2_scan_release | I3 | 走査面の解放 |
+| gfx2_scan_release | I3 | 書込前の拒否は不変。書込後の未確定は新面を保留し、新面の反映まで両面を保持し、反映後は旧面だけ解放 |
 | gfx2_quiesce | I3 | quiesce |
 | gfx2_modeset_failure | I3 | mode_set の途中の失敗 |
 | gfx2_pin | I1 | pin |
