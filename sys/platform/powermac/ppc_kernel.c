@@ -111,15 +111,45 @@ static void kboot_stop(const char *why)
 
 #include "pci_boot_memory.inc"
 
-static unsigned long long tb_now(void)
+static void check_dec_samples(const struct ppc_dec_sample *s0,
+                              const struct ppc_dec_sample *s1, bool valid,
+                              u32 hz, u32 ticks)
 {
-    u32 hi, lo, again;
-    do {
-        __asm__ volatile("mftbu %0" : "=r"(hi));
-        __asm__ volatile("mftb %0" : "=r"(lo));
-        __asm__ volatile("mftbu %0" : "=r"(again));
-    } while (hi != again);
-    return ((unsigned long long)hi << 32) | lo;
+    typedef unsigned long long u64_time;
+    u64_time a0 = s0->tb_before, b0 = s0->tb_after;
+    u64_time a1 = s1->tb_before, b1 = s1->tb_after;
+    u64_time r0 = ((u64_time)s0->raw_hi << 32) | s0->raw_lo;
+    u64_time r1 = ((u64_time)s1->raw_hi << 32) | s1->raw_lo;
+    u64_time got = r1 >= r0 ? r1 - r0 : 0;
+    u64_time dmin = 0, dmax = 0, low = 0, high = 0;
+    const char *why;
+    if (!valid) why = "missing";
+    else if (a0 == a1 && b0 == b1 && r0 == r1) why = "same-sample";
+    else if (a0 > b0 || b0 > a1 || a1 > b1) why = "order";
+    else if (r1 <= r0) why = "raw-order";
+    else {
+        dmin = a1 - b0;
+        dmax = b1 - a0;
+        if (dmax > ~0ULL / PM_DEC_HZ) why = "overflow";
+        else {
+            low = dmin * PM_DEC_HZ / hz;
+            high = dmax * PM_DEC_HZ / hz;
+            if (got < high && high - got > high / 50 + 2) why = "rate-low";
+            else if (got > low && got - low > low / 50 + 2) why = "rate-high";
+            else return;
+        }
+    }
+#define DEC_WORDS(x) (u32)((x) >> 32), (u32)(x)
+    kprintf(KBOOT_ATTR, "KBOOT dec_rate got=%08x%08x L=%08x%08x U=%08x%08x "
+            "dmin=%08x%08x dmax=%08x%08x ticks=%u reason=%s\r\n",
+            DEC_WORDS(got), DEC_WORDS(low), DEC_WORDS(high), DEC_WORDS(dmin),
+            DEC_WORDS(dmax), ticks, why);
+    kprintf(KBOOT_ATTR, "KBOOT dec_rate a0=%08x%08x b0=%08x%08x a1=%08x%08x "
+            "b1=%08x%08x width0=%08x%08x width1=%08x%08x\r\n",
+            DEC_WORDS(a0), DEC_WORDS(b0), DEC_WORDS(a1), DEC_WORDS(b1),
+            DEC_WORDS(b0-a0), DEC_WORDS(b1-a1));
+#undef DEC_WORDS
+    kboot_stop("dec_rate");
 }
 
 /* D2 provider. Line 1 is the complete, build-independent verdict (the
@@ -185,9 +215,9 @@ static int probe_flush(void)
 static void ipi_handler(struct ppc_frame *f) { (void)f; ++ipi_seen; }
 static int wait_until(volatile u32 *value, u32 target, u32 tb_hz, u32 ms)
 {
-    unsigned long long end = tb_now() + (unsigned long long)tb_hz / 1000 * ms;
+    unsigned long long end = ppc_read_tb64() + (unsigned long long)tb_hz / 1000 * ms;
     while (*value < target)
-        if (tb_now() >= end) return 0;
+        if (ppc_read_tb64() >= end) return 0;
     return 1;
 }
 
@@ -361,6 +391,7 @@ void platform_boot_machine(void)
     pm_clock_bind(info);
     if (platform_clock_init(pm_tick_hz()) != 0) kboot_stop("clock_init");
     if (ppc_dec_start(info->tb_hz, pm_tick_hz()) != 0) kboot_stop("dec_start");
+    ppc_dec_sample_enable(true);
     pm_via_prepare();
 
     if (pm_mpic_init(dev->mpic_va, dev->mpic_bytes, dev->mpic_order) != PM_MPIC_INIT_OK)
@@ -429,29 +460,25 @@ void platform_boot_services(void)
     /* The clock provider must advance with the time base: read it twice
      * at least ~20 ms apart and compare its microseconds with the TB interval. */
     u32 us0 = 0, us_lo = 0, us_hi = 0, hi0 = 0;
-    u32 raw0_lo, raw0_hi, raw1_lo, raw1_hi;
+    struct ppc_dec_sample s0 = {0}, s1 = {0};
     u32 saved = ppc_irq_save();                 /* contract: read with IF=0 */
-    unsigned long long tb0_a = tb_now();
-    tick_clock_raw(&raw0_lo, &raw0_hi);
+    int ok0 = ppc_dec_sample_read(&s0);
+    unsigned long long tb0_a = ppc_read_tb64();
     int clock_ok = platform_clock_read_us(&us0, &hi0) == 0;
-    unsigned long long tb0_b = tb_now();
+    unsigned long long tb0_b = ppc_read_tb64();
     ppc_irq_restore(saved);
     u32 after = tick_count + 3;
     if (!wait_until((volatile u32 *)&tick_count, after, info->tb_hz, 1000))
         kboot_stop("no tick");
     saved = ppc_irq_save();
-    unsigned long long tb1_a = tb_now();
-    tick_clock_raw(&raw1_lo, &raw1_hi);
+    int ok1 = ppc_dec_sample_read(&s1);
+    unsigned long long tb1_a = ppc_read_tb64();
     clock_ok = platform_clock_read_us(&us_lo, &us_hi) == 0 && clock_ok;
-    unsigned long long tb1_b = tb_now();
+    unsigned long long tb1_b = ppc_read_tb64();
+    ppc_dec_sample_enable(false);
     u32 ticks = tick_count;
     ppc_irq_restore(saved);
-    unsigned long long raw0 = ((unsigned long long)raw0_hi << 32) | raw0_lo;
-    unsigned long long raw1 = ((unsigned long long)raw1_hi << 32) | raw1_lo;
-    unsigned long long dec_want = (tb1_a - tb0_a) * PM_DEC_HZ / info->tb_hz;
-    unsigned long long dec_got = raw1 - raw0;
-    unsigned long long dec_error = dec_got > dec_want ? dec_got - dec_want : dec_want - dec_got;
-    if (dec_error > dec_want / 50 + 2) kboot_stop("dec_rate");
+    check_dec_samples(&s0, &s1, ok0 == 0 && ok1 == 0, info->tb_hz, ticks);
     if (!clock_ok || hi0 || us_hi) kboot_stop("clock_read");
     u32 want = (u32)((tb1_b - tb0_a) * 1000000 / info->tb_hz);
     unsigned long long lower = (tb1_a - tb0_b) * 1000000 / info->tb_hz;
@@ -473,11 +500,11 @@ void platform_boot_services(void)
                 dev->gmac_ready ? lan_log_rc : LAN_ENODEV);
     }
 
-    unsigned long long start = tb_now();
+    unsigned long long start = ppc_read_tb64();
     u32 tick0 = tick_count;
     pm_report_ready(start);
     unsigned long long now;
-    do { now = tb_now(); pm_lan_poll(now); } while (now - start < 2ULL * info->tb_hz);
+    do { now = ppc_read_tb64(); pm_lan_poll(now); } while (now - start < 2ULL * info->tb_hz);
     pm_report_alive(now, start, tick0, info);
 #if KBOOT_SHELL || KBOOT_SH
     kprintf(KBOOT_ATTR, "FB full_rc=%d color_rc=%d\r\n",
@@ -573,5 +600,5 @@ void platform_boot_run(void)
         shell_loop_run(&pm_shell_loop_ops);
     }
 #endif
-    for (;;) pm_lan_poll(tb_now());
+    for (;;) pm_lan_poll(ppc_read_tb64());
 }

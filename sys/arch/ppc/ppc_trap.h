@@ -1,6 +1,7 @@
 /* Kernel-only trap boundary. Call registration with EE=0 on the boot CPU. */
 #ifndef OS32_PPC_TRAP_H
 #define OS32_PPC_TRAP_H
+#include <stdbool.h>
 #include "ppc_frame.h"
 #include "ppc_pd.h"
 enum ppc_trap_reason {
@@ -22,6 +23,13 @@ void ppc_trap_set_handler(u32 vector, void (*handler)(struct ppc_frame *));
  * tick_hz must be PM_DEC_HZ (1ms DEC); tick_clock_step makes 10ms ticks.
  * Failure leaves existing clock untouched. */
 int ppc_dec_start(u32 tb_hz, u32 tick_hz);
+/* Boot CPU only, with EE clear at enable and read. */
+struct ppc_dec_sample {
+    unsigned long long tb_before, tb_after;
+    u32 raw_lo, raw_hi;
+};
+void ppc_dec_sample_enable(bool enable);
+int ppc_dec_sample_read(struct ppc_dec_sample *out);
 void ppc_decrementer_interrupt(struct ppc_frame *frame);
 /* Foreground only; returns with EE enabled. Never call from trap/IRQ. */
 void arch_cpu_idle(void);

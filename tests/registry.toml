@@ -446,3 +446,21 @@ mutations = [
  { id = "first_stop", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "*contained = 0;", new = "*contained = 1;", fail = "unconfirmed stop" },
  { id = "irq12_reopen", config = "pc98", when = "after_build", replace = "sys/platform/pc98/pic.c", old = "if (irq == 12 && fm_irq12_blocked) return;", new = "(void)fm_irq12_blocked;", fail = "IRQ12 reopened" },
  { id = "poll_timeout", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "#define POLL_LIMIT 10000", new = "#define POLL_LIMIT 10001", fail = "poll boundary" }]
+
+[[check]]
+id = "ppc_boot_clock"
+spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の DEC 処理速度" }
+subsystem = "system"
+level = "L4"
+sources = ["make:all", "make:iso", "tests/support/ppc_vm.py", "tests/support/ppc_fixture.py", "tests/system/ppc_boot.py", "sys/arch/ppc/kernel_dec.c", "sys/arch/ppc/ppc_trap.h", "sys/arch/ppc/ppc_oea.h", "sys/platform/powermac/ppc_kernel.c", "sys/hal/time/tick.c"]
+environment = "qemu-ppc"
+arch = { ppc = ["core"] }
+needs = []
+expect = "core は READY、半速・100 Hz・始点再使用は固有診断に続いて FATAL kboot dec_rate"
+limits = "7455。速すぎる DEC は変異で守っていない。"
+gates = ["push", "main"]
+mutations = [
+  { id = "dec_half_rate", config = "core", when = "after_build", replace = "sys/arch/ppc/kernel_dec.c", old = "period = tb_hz / tick_hz;", new = "period = 2 * (tb_hz / tick_hz);", fail = "7455/rate-low" },
+  { id = "dec_100_hz", config = "core", when = "after_build", replace = "sys/arch/ppc/kernel_dec.c", old = "period = tb_hz / tick_hz;", new = "period = 10 * (tb_hz / tick_hz);", fail = "7455/rate-low" },
+  { id = "dec_same_sample", config = "core", when = "after_build", replace = "sys/platform/powermac/ppc_kernel.c", old = "int ok1 = ppc_dec_sample_read(&s1);", new = "int ok1 = ok0; s1 = s0;", fail = "7455/same-sample" },
+]

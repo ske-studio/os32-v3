@@ -93,6 +93,17 @@ u32 ppc_read_pvr(void);
 u32 ppc_read_hid0(void);
 void ppc_write_hid0(u32 value);
 int ppc_read_dec(void);
+static inline unsigned long long ppc_read_tb64(void)
+{
+    u32 hi, lo, again;
+    do {
+        __asm__ volatile("mftbu %0" : "=r"(hi) :: "memory");
+        __asm__ volatile("mftb %0" : "=r"(lo) :: "memory");
+        __asm__ volatile("mftbu %0" : "=r"(again) :: "memory");
+    } while (hi != again);
+    return ((unsigned long long)hi << 32) | lo;
+}
+
 u32 ppc_read_tb(void);
 void ppc_write_dec(u32 value);
 void ppc_bat_reset(u32 count);
