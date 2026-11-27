@@ -15,7 +15,7 @@ runs:
         echo "key=cross-powerpc-elf-${{ runner.os }}-binutils2.41-gcc${gcc}-newlib${newlib}-${builder}" >> "$GITHUB_OUTPUT"
     - name: Cache powerpc-elf toolchain
       id: cache
-      uses: actions/cache@v4
+      uses: ./.github/actions/cache
       env:
         SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
       with:

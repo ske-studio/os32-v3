@@ -46,7 +46,7 @@ jobs:
         if: inputs.bundle != 'host'
       - name: Cache KAPI layout check dependencies
         if: inputs.bundle == 'x86' || inputs.bundle == 'ppc'
-        uses: actions/cache@v4
+        uses: ./.github/actions/cache
         continue-on-error: true
         with:
           path: |

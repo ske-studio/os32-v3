@@ -7,7 +7,7 @@ runs:
       # with timeout and cache downloads with the cache action's segment limit.
       - name: Cache ccache binary
         id: ccache-binary
-        uses: actions/cache@v4
+        uses: ./.github/actions/cache
         env:
           SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
         with:
@@ -48,7 +48,7 @@ runs:
 
       - name: Cache apt archives
         id: apt-cache
-        uses: actions/cache@v4
+        uses: ./.github/actions/cache
         env:
           SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
         with:
@@ -109,7 +109,7 @@ runs:
 
       - name: Cache i386-elf toolchain
         id: cross-cache
-        uses: actions/cache@v4
+        uses: ./.github/actions/cache
         env:
           SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
         with:
@@ -132,7 +132,7 @@ runs:
           echo "latin=inconsolata-$(python3 tools/fetch_fonts.py --family inconsolata --print-zip-sha256)" >> "$GITHUB_OUTPUT"
 
       - name: Cache IPAex fonts
-        uses: actions/cache@v4
+        uses: ./.github/actions/cache
         env:
           SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
         with:
@@ -143,7 +143,7 @@ runs:
 
       # 欧文 (Inconsolata + OFL) は IPA と別の key にして、IPA の既存キャッシュを使い続ける。
       - name: Cache Inconsolata font
-        uses: actions/cache@v4
+        uses: ./.github/actions/cache
         env:
           SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
         with:
@@ -159,7 +159,7 @@ runs:
       # 41MB の zip は保存せず、必要な TTF とライセンスだけを独立した key で保存する。
       # 束 (JF-Dot-Shinonome16.g16、TASK_FONTPERF) は cache せず make all が毎回 TTF から作る (1〜2 s)。
       - name: Cache JF Dot Shinonome16 font
-        uses: actions/cache@v4
+        uses: ./.github/actions/cache
         env:
           SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
         with:

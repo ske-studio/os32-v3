@@ -1,0 +1,29 @@
+name: OS32 CI cache
+description: Restore on every run and save on main, weekly and manual full runs
+inputs:
+  path:
+    description: Files or directories to cache
+    required: true
+  key:
+    description: Cache key
+    required: true
+outputs:
+  cache-hit:
+    description: Exact key match from the active restore step
+    value: ${{ steps.shared.outputs.cache-hit || steps.readonly.outputs.cache-hit }}
+runs:
+  using: composite
+  steps:
+    # The combined action saves in its post-job step, after cache users finish.
+    - id: shared
+      if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.path }}
+        key: ${{ inputs.key }}
+    - id: readonly
+      if: github.ref != 'refs/heads/main' && github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ inputs.path }}
+        key: ${{ inputs.key }}
