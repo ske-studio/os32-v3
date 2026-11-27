@@ -738,7 +738,7 @@ struct gfx2_surf {
     u32 last_write, last_read;           /* C3 だけ (gfx2_fence_note) */
     u16 scan_ref, flags;                 /* C4 (scan_ref_get/put)。flags: GFX2_SF_ALIAS 1 (C4)・GFX2_SF_KEEP 2 (C4・C15) */
     u8 head, role;                       /* C4 (別名だけ。同期層の ctx を引く head) */
-    struct gfx2_rect dirty;              /* C4 (gfx2_dirty_add)、C13 の present が読んで 0 に */
+    struct gfx2_rect dirty;              /* C4 (gfx2_dirty_add)、C13 の present が未転送の外接矩形を残す */
     struct addrspace *map_as; u32 map_va, map_npages; /* C7 だけ */
     u8 *staging; u32 staging_pitch;      /* C7 (DIRECT の別名の lock の写し、§7-5) */
     u32 staging_pfn, staging_n, staging_owner; /* C7 (staging の連続の頁と持ち主、§7-5) */
@@ -1201,7 +1201,7 @@ void gfx2_adapter_activate(struct gfx2_adapter *a)            /* ACTIVE の付�
 | C10 | sys/hal/gfx/v2/caps.c (+include/gfx_sync.h の `gfxsync_profile` の宣言・sys/hal/gfx/sync/a0_weak.c の weak (out を "" に)・`gfx2_wiring.txt (旧版 4a41234457ae)` の `I3 kernel gfxsync_profile`) | `be->caps`・C1 (`gfx2_sync_get`)・`gfxsync_profile` (Y4) | 公開・C1 (`gfx2_caps_refresh`)・C16 (`gfx2_caps_from_v1`、§4-1 の shim の列) | `adapter.caps` | 140 | I2 |
 | C11 | sys/hal/gfx/v2/enum.c | `be->enum_*`・`edid` (v1 から作る列挙は C11 の `gfx2_v1_enum_*` (§11-2) で、C16 の shim が呼ぶ) | 公開・C12・C16 | — | 200 | I3 |
 | C12 | sys/hal/gfx/v2/modeset.c | C3・C4・C11・`be->mode_set`・`gfx_policy_reeval` (H4) | 公開 | `adapter.head[]`・`restore_on_leave` | 160 | I3 |
-| C13 | sys/hal/gfx/v2/display.c | `be->flip`・`flip_done`・`vblank_wait`・`palette`・`gamma`・`cursor_*`・`dpms` (v1 だけの backend は C16 の shim の中で v1 の hook へ)・C4・`gfxsync_write_rows` | 公開・C1 (`gfx2_head_detach`・`gfx2_pal_reset16`)・C14 (`gfx2_pal_set_v1`)・C15 | `adapter.head[].pend_sid`、`surf.dirty` を 0 に、`gfx2_pal` (§9-2) | 240 | I3 |
+| C13 | sys/hal/gfx/v2/display.c | `be->flip`・`flip_done`・`vblank_wait`・`palette`・`gamma`・`cursor_*`・`dpms` (v1 だけの backend は C16 の shim の中で v1 の hook へ)・C4・`gfxsync_write_rows` | 公開・C1 (`gfx2_head_detach`・`gfx2_pal_reset16`)・C14 (`gfx2_pal_set_v1`)・C15 | `adapter.head[].pend_sid`、`surf.dirty` を転送後に更新、`gfx2_pal` (§9-2) | 240 | I3 |
 | C14 | sys/hal/gfx/v2/v1_bridge.c (+gfx_core.c 3 か所・gfx_hw_submit.c・surface_query.c・sys/platform/pc98/video/gfx_vram.c (present_rect `_present_dirty_packed()`・`gfx_present()`)・sys/hal/gfx/gfx_core_api.inc (fill・blit `gfx_hw_fill_rect()`、パレットの写しの `gfx2_pal_set_v1` を `gfx_set_palette_hal` 同ファイル内・`gfx_lease_palette` 同ファイル内)・sys/kern/exec/lease.c (DISPLAY の lease、`surface_lease`・`surface_lease_bundle`) の呼ぶ行)。sys/kern/exec/lease.c は M3 も触るので **M3 の後**に着手。C7 の追補 `gfx2_lock_revoke` (sys/hal/gfx/v2/lock.c・gfx2_int.h の宣言・`gfx2_wiring.txt (旧版 4a41234457ae)` に `I2 kernel gfx2_lock_revoke`、§6-5) を C14 の枝の最初の commit で入れる | C3・C4 (`gfx2_surf_alias`・`alias_update`)・C7 (`gfx2_lock_revoke`) | v1 の入口 | 別名の面 | 220 | I2 |
 | C16 | sys/hal/gfx/v2/v1_shim.c (R4、§11-7 のコード。`gfx2_v1_shim`・`gfx2_lost_be`) | C10 (`gfx2_caps_from_v1`)・C11 (`gfx2_v1_enum_*`)・v1 の hook | C1 | — | 180 | I1 |
 | C17 | sys/hal/gfx/v2/map_audit.c (R1、§7-4 のコード) | C7 (`gfx2_surf_page`) | M3 (`lease_audit_all`) | — | 70 | I1 |
@@ -1543,7 +1543,7 @@ sw の op ごと (各 S の host 試験。期待画素は §3-3 の式から手�
 | shim の mode_set の後 | C12 は shim の adapter の mode_set の成功の後に `v1_bridge_rebind()` を呼ぶ | C12 |
 | 全画面を抜ける | `restore_on_leave` を読むのは v1 の DISPLAY の lease の終わり (sys/kern/exec/lease.c の lease の終わりの 1 か所、C12 の追補)。`gfx2_head_restore_v1` は v1 の今の mode で `be->mode_set` を呼び直し、走査面を DISPLAY の別名へ | C12・C13 |
 | flip_done | C13 が `gfx2_vblank_wait`・`gfx2_flip`・`gfx2_fence_query` の入口で呼ぶ。0 かつ retired_sid ≠ 0 = 反映済み、BUSY = まだ、NOSYS (shim) = 同期で済んだとして即座に差し替え。保留中の 2 回目の flip は BUSY | C13 |
-| present | DISPLAY の別名へ、rect と dirty の交わりを送り、成功で dirty を 0。同期層でない (NOTFOUND) と DIRECT は 0 で何もしない | C13 |
+| present | DISPLAY の別名へ、rect と dirty の交わりを送り、成功時は未転送を含む最小の矩形を残す (再送を許す)。未転送がなければ dirty を空にする。同期層でない (NOTFOUND) と DIRECT は 0 で何もしない | C13 |
 | palette | `be->palette` は全 head に同じ値 | C13・G2 |
 | sync の値 | sync_int.h に (Y1 の段で A0 の追補): `GFXSYNC_M_PLAIN 0・GAP 1・SYNC_READ 2・WAIT_PORT 3`、`GFXSYNC_F_NONE 0・READBACK 1・SERIALIZE 2`、`GFXSYNC_R_SHADOW 1・DIRECT 2`。rows の x・w は画素、cpp は t.fmt (GFX2_FMT) から | Y1〜Y4 |
 | sync.cfg の読み | sysconfig では読めない (sys/kern/init/sysconfig.c (SYSCONFIG_MAX) の 1KB・1 行 1 組) ので、Y1 が vfs で `SYS_GFXSYNC_CFG` を読み自前で解く。書式: `[鍵]` の区画、`名=値` を空白で区切って 1 行に複数、`;` から行末は注釈、鍵と値は大文字小文字を区別しない、16 進は小文字に正規化、ファイルは 4KB まで。bind の鍵は 1 つ、Y1 が `pci:V:D` → `pci:V:*` と落とし、無ければ既定 | Y1 |

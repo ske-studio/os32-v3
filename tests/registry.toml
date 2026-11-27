@@ -1061,3 +1061,37 @@ mutations = [
   { id = "gfx2_sync_lock_readonly", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/lock.c", old = "s->staging && (access & GFX2_CPU_W)", new = "s->staging", fail = "FAIL readonly pixels" },
   { id = "gfx2_sync_lock_no_staging", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/lock.c", old = "if (ctx) {\n        n =", new = "if (0) {\n        n =", fail = "FAIL staging map" },
 ]
+
+[[check]]
+id = "gfx2_present_retry"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/display.c", "sys/hal/gfx/v2/palette_state.c", "sys/include/display_provider.h", "sys/hal/gfx/v2/gfx2_int.h", "sys/include/gfx_sync.h", "tests/support/fixtures/gfx2/gfx2_present_retry.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "palette 境界・転送失敗後の再試行、部分転送後の外接矩形と全画素を照合"
+limits = "メモリ上の画素と写像先を観測。実機の走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_present_retry_bounds", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/display.c", old = "count > 256 - first", new = "0", fail = "FAIL palette bounds" },
+  { id = "gfx2_present_retry_failed", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/display.c", old = "if (rc) return OS32_ERR_IO;", new = "if (rc) { s->dirty.w = 0; return OS32_ERR_IO; }", fail = "FAIL failed transfer retry" },
+  { id = "gfx2_present_retry_partial", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/display.c", old = "struct gfx2_rect *dirty = &s->dirty;", new = "s->dirty = (struct gfx2_rect){0}; return 0; struct gfx2_rect *dirty = &s->dirty;", fail = "FAIL center and remaining 20 pixels" },
+]
+
+[[check]]
+id = "gfx2_scan_release"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["sys/hal/gfx/v2/display.c", "sys/hal/gfx/v2/surface.c", "sys/include/display_provider.h", "sys/hal/gfx/v2/gfx2_int.h", "sys/include/gfx_sync.h", "tests/support/fixtures/gfx2/gfx2_scan_release.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "走査中の面を free して CLOSING、flip 完了後のみ旧 backing を解放"
+limits = "メモリ上の画素と写像先を観測。実機の走査は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_scan_release_early", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/surface.c", old = "if (s->scan_ref || !surf_done(s)) {", new = "if (!surf_done(s)) {", fail = "FAIL active scan reference" },
+]

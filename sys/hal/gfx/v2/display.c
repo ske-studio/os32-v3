@@ -172,13 +172,19 @@ int gfx2_present(u32 id, u32 head, i16 x, i16 y, u16 w, u16 h)
     if (rc == OS32_ERR_NOSYS) {
         rc = gfxsync_write_rows(ctx, l, t, r - l, b - t, s->kva + t * s->pitch + l * cpp, s->pitch);
         if (rc) return OS32_ERR_IO;
-        s->dirty = (struct gfx2_rect){0};
-        return 0;
+    } else if (rc) return rc;
+
+    /* Only a strip spanning a whole dimension can shrink the bounding box. */
+    struct gfx2_rect *dirty = &s->dirty;
+    i32 right = dirty->x + dirty->w, bottom = dirty->y + dirty->h;
+    if (l == dirty->x && r == right) {
+        if (t == dirty->y && b == bottom) *dirty = (struct gfx2_rect){0};
+        else if (t == dirty->y) { dirty->y = b; dirty->h = bottom - b; }
+        else if (b == bottom) dirty->h = t - dirty->y;
+    } else if (t == dirty->y && b == bottom) {
+        if (l == dirty->x) { dirty->x = r; dirty->w = right - r; }
+        else if (r == right) dirty->w = l - dirty->x;
     }
-    if (rc) return rc;
-    if (l == s->dirty.x && t == s->dirty.y &&
-        r == s->dirty.x + s->dirty.w && b == s->dirty.y + s->dirty.h)
-        s->dirty = (struct gfx2_rect){0};
     return 0;
 }
 

@@ -61,7 +61,7 @@ struct gfx2_surf {
     u32 last_write, last_read;           /* C3 だけ (gfx2_fence_note) */
     u16 scan_ref, flags;                 /* C4 (scan_ref_get/put)。flags: GFX2_SF_ALIAS 1 (C4)・GFX2_SF_KEEP 2 (C4・C15) */
     u8 head, role;                       /* C4 (別名だけ。同期層の ctx を引く head) */
-    struct gfx2_rect dirty;              /* C4 (gfx2_dirty_add)、C13 の present が読んで 0 に */
+    struct gfx2_rect dirty;              /* C4 (gfx2_dirty_add)、C13 の present が未転送の外接矩形を残す */
     struct addrspace *map_as; u32 map_va, map_npages; /* C7 だけ */
     u8 *staging; u32 staging_pitch;      /* C7 (同期の面の lock の写し) */
     u32 staging_pfn, staging_n, staging_owner; /* C7 (staging の連続の頁と持ち主、§7-5) */
