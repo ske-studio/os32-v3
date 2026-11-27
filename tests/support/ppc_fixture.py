@@ -202,3 +202,60 @@ void con_sink_owner_exit(int id)""")
     return iso, dict(make=args, fixture=hashes, **{
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in (iso, directory / "PPCKERN.ELF")})
+
+
+HWB = Path("tests/support/fixtures/ppc_hwb")
+
+
+def hwb_media():
+    directory = Path(os.environ["OS32_VERIFY_OUT"]).resolve() / "ppc_hwb"
+    directory.mkdir()
+    manifest = json.loads(Path("build/ppc-ram-root.json").read_text())
+    scripts = Path("userland/diag/hw")
+    manifest["/hw/ohci.hwb"] = str(scripts / "mac99/ohci.hwb")
+    manifest["/hw/wait.hwb"] = str(scripts / "np21w_wait.hwb")
+    poll = directory / "poll.hwb"
+    poll.write_text("device d = id 106b:003f\npoll 32 pci d 0 0xffff 0 10000000 1000 -> x\nend\n")
+    manifest["/hw/poll.hwb"] = str(poll)
+    for via in ("lan", "usb"):
+        for op in ("wait", "poll"):
+            script = directory / f"{via}{op}.sh"
+            script.write_text(f"hw load /hw/{op}.hwb\necho loaded-{via}-{op} $?\n")
+            manifest[f"/hw/{script.name}"] = str(script)
+    manifest["/sys/unicode.bin"] = str(directory / "unicode.bin")
+    template = directory / "template.json"
+    template.write_text(json.dumps(manifest))
+    cfg = directory / "system.cfg"
+    cfg.write_text("KDEBUG=1\n")
+
+    source = Path("sys/kern/exec/exec.c")
+    abort = source.with_name("exec_abort.inc").read_text()
+    instrumented = directory / "exec_abort.inc"
+    site = "    return !!pending;"
+    instrumented.write_text("volatile u32 hw_points[9];\n" +
+                            edit(abort, site, (HWB / "points.inc").read_text() + site))
+    executor = directory / "exec-meter.c"
+    executor.write_text(edit(source.read_text(), '#include "exec_abort.inc"',
+                             f'#include "{instrumented}"'))
+    pci = PM / "pci_backend.c"
+    meter = directory / "pci-meter.c"
+    site = "{ return pm_pci_access(&root, bdf << 8, offset, width, 0, value); }"
+    meter.write_text("volatile unsigned hw_pci_reads;\n" + edit(pci.read_text(), site, """{
+    u32 rc = pm_pci_access(&root, bdf << 8, offset, width, 0, value);
+    if (!rc && offset == 0 && width == 4 && *value == 0x003f106b)
+        ++hw_pci_reads;
+    return rc;
+}"""))
+    args = ["make", "-j" + os.getenv("OS32_BUILD_JOBS", "8"), *PPC_MAKE,
+            "IMAGE=kboot-link-sh", "FEATURE_KDEBUG=1", f"KB_OUT={directory}",
+            f"KB_SH_OUT={directory}/user", f"BUILD_OUT={directory}/build",
+            f"KB_BODY_OUT={directory}/sqlite-body", f"PPC_UNICODE={directory}/unicode.bin",
+            f"ROOT_MANIFEST={template}", f"PPC_SYSTEM_CFG={cfg}",
+            f"KB_MUT_EXTRA_SRC={source}", f"KB_MUT_EXTRA_FILE={executor}",
+            f"KB_MUT_THIRD_SRC={pci}", f"KB_MUT_THIRD_FILE={meter}", "all", "iso"]
+    subprocess.run(args, check=True)
+    iso = directory / "boot.iso"
+    files = [iso, directory / "PPCKERN.ELF", executor, instrumented, meter, template, cfg,
+             *(directory.glob("*.sh")), poll, HWB / "points.inc"]
+    return iso, dict(make=args, hashes={p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                                        for p in files})

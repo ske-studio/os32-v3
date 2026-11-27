@@ -599,3 +599,17 @@ limits = "7450 先行480秒"
 gates = ["push", "main"]
 deferred = { ledger = "PPC-P3OVF-QEMU", config = "link-sh", gates = ["push", "main"] }
 mutations = [{ id = "freeze_drop", config = "link-sh", when = "after_build", replace = "sys/kern/console/con_sink.c", old = "if (con_sink_drop_count != g_capture_drop_start) rc = OS32_ERR_NOSPC;", new = "/* drop comparison removed */", fail = "positive drop with successful freeze" }]
+
+[[check]]
+id = "ppc_hwb_command"
+spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の HW run 中断" }
+subsystem = "system"
+level = "L4"
+sources = ["make:all", "make:iso", "tests/support/ppc_vm.py", "tests/support/ppc_fixture.py", "tests/support/fixtures/ppc_hwb", "tests/support/ppc_peer.py", "tools/host_agent.py", "tools/host_rshell.py", "tools/host_operator_socket.py", "tools/ppc_lan_host.py", "tools/host_sfs_link.py", "sys/kern/exec/exec.c", "sys/kern/exec/exec_abort.inc", "sys/platform/powermac/pci_backend.c"]
+environment = "qemu-ppc-net"
+arch = { ppc = ["link-sh"] }
+needs = []
+expect = "4組の中断・保留行と再 load"
+limits = "7450 KDEBUG"
+gates = ["push", "main"]
+mutations = [{ id = "hwb_sticky", config = "link-sh", when = "after_build", replace = "sys/kern/exec/exec_abort.inc", old = "u32 pending = g_hwb_abort_pending;\n    g_hwb_abort_pending = 0;", new = "u32 pending = g_hwb_abort_pending;", fail = "reload POINT retained abort" }]

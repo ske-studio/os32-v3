@@ -117,3 +117,7 @@ cat の結果は単独行 cat: /host/f: Host is down。USB の単独行 hi、tic
 鍵盤再列挙は30秒以内、再接続後は USB と LAN でそれぞれ echo alive が成功する。
 rpc_ticks は期限を100から50に縮め、同じ観測列で80 tick 未満の RELEASE を検出する。
 OPEN による未完行取消の再開条件は台帳 PPC-USB-LAN に記す。
+
+## PowerMac の HW run 中断
+
+7450 の KDEBUG 付き link-sh を 1 台起動し、300 秒以内に OHCI の正常読出しと wait・poll の LAN・USB 各中断を観測する。poll は実 PCI 読出しの進行を要求する。先に打った e を残し、同一 run の ABORT とプロンプト復帰後に cho retained-… を送り、20 秒内に retained-… の単独行を確認する。再 load の終了値は 0、中断と再 load の POINT は順に 1、0 とする。再 load の POINT が 1 の変異を検出する。
