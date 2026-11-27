@@ -429,15 +429,20 @@ id = "fm_probe"
 spec = { path = "docs/design/kernel/irq/irq.md", section = "S1 の音源判定" }
 subsystem = "sound"
 level = "L2"
-sources = ["sys/dev/sound/fm", "sys/platform/pc98/platform_fm_probe.h", "sys/kern/irq", "sys/platform/pc98/pic.c", "sys/platform/pc98/irq_complete.c", "tests/support/fixtures/fm_probe", "tools/ops/kernel_includes.py", "build/config.mk"]
+sources = ["sys/dev/sound/fm", "sys/platform/pc98/platform_fm_probe.h", "sys/kern/irq", "sys/platform/pc98/pic.c", "sys/platform/pc98/irq_complete.c", "tests/support/fixtures/fm_probe", "tools/ops/kernel_includes.py", "build/config.mk", "tools/gen_sqlite_imports.py", "tools/gen_kdebug_imports.py", "tools/prototypes/fm_imports.def"]
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "両ベースの判定、タイマ遷移、既登録・再 attach の I/O ゼロ"
+expect = "両ベースの判定、タイマ遷移、既登録時の FM 登録と IMR 保持、再 attach の I/O ゼロ、停止失敗の隔離"
 limits = "ポート模型。実機配線とゲスト演奏は S4"
 gates = ["push", "main"]
 mutations = [
  { id = "id_only", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "!*contained || !rose", new = "!*contained", fail = "missing timer transition" },
- { id = "skip_alt", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "i < 2", new = "i < 1", fail = "open bus" },
- { id = "unknown_absent", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "if (status < 0 || ready_status(base) != status)\n        return OPN_PROBE_UNKNOWN;", new = "if (status < 0 || ready_status(base) != status) return OPN_PROBE_ABSENT;", fail = "unknown first" },
- { id = "registered_imr", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "if (busy) return;", new = "if (busy) { outp(0x0a, 0xff); return; }", fail = "registered IRQ" }]
+ { id = "skip_alt", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "if (open_bus(0x288))", new = "if (0)", fail = "open bus" },
+ { id = "opl3_write", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "if (open_bus(0x288))", new = "if (inp(0x288) == 0) outp(0x288, 0xff); if (open_bus(0x288))", fail = "alternate write" },
+ { id = "unknown_absent", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "record->bank[0].model = record->native_model;", new = "record->bank[0].model = record->native_model == OPN_PROBE_UNKNOWN ? OPN_PROBE_ABSENT : record->native_model;", fail = "unknown first" },
+ { id = "registered_imr", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/fm_module.c", old = "unsigned flags = irq_save();", new = "unsigned flags = irq_save(); if (platform_fm_probe_busy()) outp(0x0a, 0xff);", fail = "registered IRQ" },
+ { id = "native_gate", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/fm_body.c", old = "chip.model = record->native_model;", new = "chip.model = record->bank[0].model;", fail = "native timer attach" },
+ { id = "first_stop", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "*contained = 0;", new = "*contained = 1;", fail = "first stop timeout" },
+ { id = "irq12_reopen", config = "pc98", when = "after_build", replace = "sys/platform/pc98/pic.c", old = "if (irq == 12 && fm_irq12_blocked) return;", new = "(void)fm_irq12_blocked;", fail = "IRQ12 reopened" },
+ { id = "poll_timeout", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "now - window->start < 2000", new = "now - window->start < 10000", fail = "poll deadline" }]

@@ -2,6 +2,18 @@
 #include "idt.h"
 #include "io.h"
 #include "platform_irq.h"
+#include "platform_fm_probe.h"
+
+static int fm_irq12_blocked;
+
+/* Boot probe calls with IF clear. The latch survives module unload. */
+void platform_fm_block_irq12(void)
+{
+    if (!fm_irq12_blocked) {
+        fm_irq12_blocked = 1;
+        irq_disable(12);
+    }
+}
 
 /* ======================================================================== */
 /*  pic_init — PIC (8259A ×2) 初期化                                       */
@@ -44,6 +56,7 @@ void irq_enable(unsigned int irq)
     u8 mask;
     unsigned int flags;
 
+    if (irq == 12 && fm_irq12_blocked) return;
     if (irq < PIC_IRQS) {
         port = PIC1_DATA;
     } else {

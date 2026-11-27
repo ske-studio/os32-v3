@@ -7,6 +7,7 @@
 #include "kstring.h"
 #include "kprintf.h"
 #include "io.h"
+#include "sys.h"
 #include "platform_fm_probe.h"
 
 static struct fm_probe_record boot_probe;
@@ -93,9 +94,10 @@ static int fm_start(struct module_record *r, u32 entry, u32 *exports)
             return MODULE_INIT_FAILED;
     candidate_valid = 1;
     unsigned flags = irq_save();
-    candidate.probe(&boot_probe, platform_fm_probe_busy(), 0);
+    candidate.probe(&boot_probe, platform_fm_probe_busy(), 0, sys_time_now);
+    if (!boot_probe.contained) platform_fm_block_irq12();
     irq_restore(flags);
-    kprintf(KLOG_ATTR, "[fm] 0188=%u 0288=%u (0=? 1=absent 2=OPN 3=OPNA)\n",
+    kprintf(KLOG_ATTR, "[fm] 0188=%u 0288=%u (0=? 1=absent 2=OPN 3=OPNA 4=present)\n",
             boot_probe.bank[0].model, boot_probe.bank[1].model);
     return candidate.attach(snd2_chip_fault, &boot_probe);
 }

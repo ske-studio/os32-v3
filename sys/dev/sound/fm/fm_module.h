@@ -4,7 +4,7 @@
 #include "fm_contract.h"
 #include "opn_probe.h"
 #include "../../../kern/module/module_runtime.h"
-#define FM_MODULE_OPS_VERSION 3u
+#define FM_MODULE_OPS_VERSION 4u
 typedef struct {
     void (*opn_write)(uchar reg, uchar val);
     void (*opn_init)(void);
@@ -19,7 +19,7 @@ typedef struct {
     void (*ssg_mixer)(uchar mask);
     void (*ssg_all_off)(void);
     int (*quiet)(void);
-    void (*probe)(struct fm_probe_record *, int, unsigned char);
+    void (*probe)(struct fm_probe_record *, int, unsigned char, int (*)(u32 *, u32 *));
     int (*attach)(void (*fault)(u32), const struct fm_probe_record *);
     int (*detach)(void);
 } FmModuleApi;

@@ -27,7 +27,7 @@ static int attach(void (*fault)(u32), const struct fm_probe_record *record)
 {
     contained = record->contained;
     if (!contained) return -1;
-    chip.model = record->bank[0].model;
+    chip.model = record->native_model;
     if (chip.model != OPN_PROBE_OPNA && chip.model != OPN_PROBE_OPN)
         return contained ? 0 : -1;
     chip.shared_irq = PCM_IRQ == 12;

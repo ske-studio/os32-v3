@@ -8,41 +8,63 @@
 #define TIMER_B_FLAG 0x02
 #define TIMER_B_START_ENABLE 0x0a
 
-/* Return a settled status, or -1 on timeout/invalid bus response. */
-static int ready_status(unsigned base)
+/* The PC-98 clock runs with IF clear. Give normal probing 2 ms
+ * and reserve a separate 2 ms for cleanup. A stalled clock also has a
+ * finite poll count. Check at every status sample, including BUSY. */
+struct poll_window {
+    int (*now)(u32 *, u32 *);
+    u32 start;
+    unsigned remaining;
+};
+
+static void begin_window(struct poll_window *window)
 {
-    for (int i = 0; i < POLL_LIMIT; ++i) {
-        unsigned status = inp(base);
+    window->remaining = window->now(&window->start, 0) ? 0 : POLL_LIMIT;
+}
+
+static int within_window(struct poll_window *window)
+{
+    u32 now;
+    if (!window->remaining) return 0;
+    --window->remaining;
+    return !window->now(&now, 0) && now - window->start < 2000;
+}
+
+/* Return a settled status, or -1 on timeout/invalid bus response. */
+static int ready_status(struct poll_window *window)
+{
+    while (within_window(window)) {
+        unsigned status = inp(OPN_STATUS);
         if (!(status & OPN_BUSY))
             return (status & ~TIMER_FLAGS) ? -1 : (int)status;
     }
     return -1;
 }
 
-static int write_reg(unsigned base, uchar reg, uchar value)
+static int write_reg(struct poll_window *window, uchar reg, uchar value)
 {
-    int before = ready_status(base);
+    int before = ready_status(window);
     if (before < 0)
         return 0;
-    outp(base, reg);
-    int after = ready_status(base);
+    outp(OPN_ADDR, reg);
+    int after = ready_status(window);
     if (after < 0)
         return 0;
     io_wait_n(20);
-    outp(base + 2, value);
+    outp(OPN_DATA, value);
     io_wait_n(20);
     return 1;
 }
 
-static int stop_and_clear(unsigned base)
+static int stop_and_clear(struct poll_window *window)
 {
-    return write_reg(base, OPN_REG_TIMER_CTRL, OPN_TIMER_STOP) && ready_status(base) == 0;
+    return write_reg(window, OPN_REG_TIMER_CTRL, OPN_TIMER_STOP) && ready_status(window) == 0;
 }
 
-static int timer_b_rose(unsigned base)
+static int timer_b_rose(struct poll_window *window)
 {
-    for (int i = 0; i < POLL_LIMIT; ++i) {
-        unsigned status = inp(base);
+    while (within_window(window)) {
+        unsigned status = inp(OPN_STATUS);
         if (status & OPN_BUSY)
             continue;
         if (status & ~TIMER_FLAGS)
@@ -53,97 +75,85 @@ static int timer_b_rose(unsigned base)
     return 0;
 }
 
-static enum opn_probe_result probe_bank(struct fm_probe_bank *bank, int feature,
-                                        unsigned char irq_shadow, int *contained)
+static enum opn_probe_result probe_primary(struct poll_window *window,
+                                           unsigned char irq_shadow,
+                                           unsigned char *contained)
 {
-    unsigned base = bank->base;
-    *contained = 1;
-    /* An open bus also has BUSY set. Distinguish repeated FF before polling. */
-    unsigned first = inp(base);
-    unsigned second = inp(base);
-    if (first == 0xff && second == 0xff) {
-        if (feature < 0)
-            return OPN_PROBE_UNKNOWN;
-        /* io_sound.md, A460h: IDs 2/4 select 0188h, 3/5 select 0288h.
-         * A masked or nonresponding board still occupies its selected base. */
-        switch (feature >> 4) {
-        case 15: return OPN_PROBE_ABSENT;
-        case 2: case 4: return base == 0x288 ? OPN_PROBE_ABSENT : OPN_PROBE_UNKNOWN;
-        case 3: case 5: return base == 0x188 ? OPN_PROBE_ABSENT : OPN_PROBE_UNKNOWN;
-        default: return OPN_PROBE_UNKNOWN;
-        }
+    unsigned first = inp(OPN_STATUS);
+    unsigned second = inp(OPN_STATUS);
+    if (first == 0xff && second == 0xff)
+        return OPN_PROBE_ABSENT;
+
+    int status = ready_status(window);
+    if (status < 0 || ready_status(window) != status)
+        return OPN_PROBE_UNKNOWN;
+
+    *contained = 0;
+    outp(OPN_ADDR, 0xff);
+    io_wait_n(6);
+    if (ready_status(window) < 0) return OPN_PROBE_UNKNOWN;
+    unsigned id = inp(OPN_DATA);
+    if (inp(OPN_DATA) != id || !stop_and_clear(window))
+        return OPN_PROBE_UNKNOWN;
+    if (id == 1) {
+        *contained = 1;
+        return OPN_PROBE_OPNA;
     }
 
-    if ((first == 0xff) != (second == 0xff))
+    if (!write_reg(window, OPN_REG_TIMER_B, 0xff) ||
+        !write_reg(window, 0x29, irq_shadow & ~0x03))
         return OPN_PROBE_UNKNOWN;
 
-    int status = ready_status(base);
-    if (status < 0 || ready_status(base) != status)
-        return OPN_PROBE_UNKNOWN;
-
-    outp(base, 0xff);
-    io_wait_n(6);
-    if (ready_status(base) < 0)
-        return OPN_PROBE_UNKNOWN;
-    unsigned id = inp(base + 2);
-    if (inp(base + 2) != id)
-        return OPN_PROBE_UNKNOWN;
-    bank->chip_id = id;
-    bank->chip_id_port = base + 2;
-    if (!stop_and_clear(base))
-        return OPN_PROBE_UNKNOWN;
-    if (id == 1)
-        return OPN_PROBE_OPNA;
-
-    if (feature < 0 || (feature >> 4) != 15)
-        return OPN_PROBE_UNKNOWN;
-
-    /* Shortest period. Verify a fresh transition, then stop even on timeout. */
-    if (!write_reg(base, OPN_REG_TIMER_B, 0xff) ||
-        !write_reg(base, 0x29, irq_shadow & ~0x03))
-        return OPN_PROBE_UNKNOWN;
-
-    int rose = write_reg(base, OPN_REG_TIMER_CTRL, TIMER_B_START_ENABLE) &&
-               timer_b_rose(base);
-    int stopped = write_reg(base, OPN_REG_TIMER_CTRL, OPN_TIMER_STOP);
+    int rose = write_reg(window, OPN_REG_TIMER_CTRL, TIMER_B_START_ENABLE) &&
+               timer_b_rose(window);
+    begin_window(window);
+    int stopped = write_reg(window, OPN_REG_TIMER_CTRL, OPN_TIMER_STOP);
     if (!stopped)
-        stopped = write_reg(base, OPN_REG_TIMER_CTRL, OPN_TIMER_STOP);
-    int cleared = ready_status(base) == 0;
-    int restored = write_reg(base, 0x29, irq_shadow) && ready_status(base) == 0;
+        stopped = write_reg(window, OPN_REG_TIMER_CTRL, OPN_TIMER_STOP);
+    int cleared = ready_status(window) == 0;
+    int restored = write_reg(window, 0x29, irq_shadow) && ready_status(window) == 0;
     *contained = stopped && cleared && restored;
-    if (!*contained || !rose)
-        return OPN_PROBE_UNKNOWN;
+    if (!*contained || !rose) return OPN_PROBE_UNKNOWN;
     return OPN_PROBE_OPN;
 }
 
-void opn_probe_once(struct fm_probe_record *record, int busy, unsigned char irq_shadow)
+static int open_bus(unsigned base)
+{
+    return inp(base) == 0xff && inp(base + 2) == 0xff &&
+           inp(base) == 0xff && inp(base + 2) == 0xff;
+}
+
+void opn_probe_once(struct fm_probe_record *record, int busy, unsigned char irq_shadow,
+                    int (*now_us)(u32 *, u32 *))
 {
     if (record->complete) return;
     record->complete = 1;
     record->contained = 1;
     record->bank[0].base = 0x188;
     record->bank[1].base = 0x288;
-    if (busy) return;
 
-    int feature = inp(OPNA_ID_PORT);
-    if ((int)inp(OPNA_ID_PORT) == feature) {
-        record->feature_port = OPNA_ID_PORT;
-        record->feature_id = feature;
-    } else {
-        feature = -1;
-    }
-    for (unsigned i = 0; i < 2; ++i) {
-        int contained;
-        struct fm_probe_bank *bank = &record->bank[i];
-        bank->model = probe_bank(bank, feature, irq_shadow, &contained);
-        if (!contained) {
-            record->contained = 0;
-            break;
+    struct poll_window window = {.now = now_us};
+    begin_window(&window);
+    record->native_model = probe_primary(&window, irq_shadow, &record->contained);
+    if (busy || !record->contained) return;
+
+    if (open_bus(0x288)) record->bank[1].model = OPN_PROBE_ABSENT;
+    unsigned feature = inp(OPNA_ID_PORT);
+    unsigned board = feature >> 4;
+    int stable = inp(OPNA_ID_PORT) == feature;
+    record->bank[0].model = record->native_model;
+    if (record->native_model == OPN_PROBE_ABSENT &&
+        (!open_bus(OPN_ADDR) || !stable || (board != 15 && board != 3 && board != 5)))
+        record->bank[0].model = OPN_PROBE_UNKNOWN;
+    if (record->native_model == OPN_PROBE_OPN)
+        record->bank[0].model = OPN_PROBE_PRESENT;
+    if (record->native_model == OPN_PROBE_OPNA) {
+        record->bank[0].chip_id_port = OPN_DATA;
+        record->bank[0].chip_id = 1;
+        if (stable && (board == 2 || board == 4)) {
+            record->feature_port = OPNA_ID_PORT;
+            record->feature_id = feature;
+            if (board == 4 && inp(0xa468) != 0xff) record->fifo_port = 0xa468;
         }
-        /* PC-9801-86 IDs 4/5 select the primary/alternate FM address.
-         * The FIFO control register is independent of the FM address. */
-        if (bank->model == OPN_PROBE_OPNA && feature >= 0 &&
-            (unsigned)(feature >> 4) == 4 + i && inp(0xa468) != 0xff)
-            record->fifo_port = 0xa468;
     }
 }
