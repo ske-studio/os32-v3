@@ -58,12 +58,12 @@ PowerPC の common-compile は ppc-ci-image と同じ KBOOT_SH=1・KBOOT_LINK=1 
 
 ## PowerMac の起動到達点
 
-QEMU mac99・7450・128 MiB に構成ごとの boot.iso を入れる。core はシリアルの
+各構成の同じ boot.iso を QEMU mac99・128 MiB の 7450 と 7455 で並列に起動し、各 CPU で 40 秒以内に到達点を確認する。core はシリアルの
 `KBOOT READY stage=pre-user`、link はその後の LAN link=1 と `LINK HEAP used=`、
 sh・link-sh・shell は `Loading /sys/shell.bin` に続くシェルのコマンド待ち通知（シリアル EOT）と `LINK HEAP used=`
 までを確認する。neg1 は `FATAL trap vector=0x300 reason=0x2 addr=0x80000`
 で停止し、READY に進まないことを確認する。PC-98 は配布媒体を pc98emu が手で受け入れる。
 
-QEMU は構成の到達点を観測した時点で終了し、観測中の時間切れは ERROR（終了コード 2）、採取済みのログに必要な到達点が欠ける場合は FAIL（終了コード 1）とする。
+QEMU は構成の到達点を観測した時点で終了し、観測中の時間切れは ERROR（終了コード 2）、片方の CPU のログが欠ける場合や、採取済みのログに必要な到達点が欠ける場合は FAIL（終了コード 1）とする。
 
 CI の媒体検査と PowerMac 起動は同じ attempt の配布物を読む。手元では同じ検査の build 段で媒体を作る。再現性比較は二つの空の木で組み、KAPI の Rust 検査は C の実測値から作る専用 crate を対象 ABI で検査するため、専用の Cargo キャッシュを使う。
