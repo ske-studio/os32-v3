@@ -171,7 +171,7 @@ B29 (`7d288722`、11 ファイル) のうち、**物理の周期に関わる所�
 |---|---|---|---|---|
 | P1 | `sys/arch/ppc/kernel_dec.c`・`sys/arch/ppc/ppc_trap.h`・`kboot_dec_host.c (旧版 6298ca8596fe)` (+ `kboot_dec.py` の変異・-I) | +8・±2・+14 (+4) | なし | kboot-dec の host と mac99 F2 (変異 1khz・jiffy-gate・step-call が RED) |
 | P2 | `sys/platform/powermac/clock.c`・`sys/platform/powermac/kboot_info.h`・`kboot_clock_fake.c (旧版 bbecbb96ad2e)` | ±2・+2・±6 | なし | kboot-clock |
-| P3 | `sys/platform/powermac/ppc_kernel.c` (CLOCK の hz・`dec_rate` の照合)・`kboot_mutations.py (旧版 b67d6b0c95b7)` (half-rate の期待と DEC 100Hz の変異)・注記 (`build/targets/ppc-powermac.mk`・`kboot_audit.py`・`kboot_run.py`) | +9・+5・+4 | なし | kboot-run/accept (QMP の論理 rate)・kboot-audit。half-rate と DEC 100Hz の変異が `FATAL kboot dec_rate` で RED |
+| P3 | `sys/platform/powermac/ppc_kernel.c` (CLOCK の hz・`dec_rate` の照合)・`kboot_mutations.py (旧版 b67d6b0c95b7)` (half-rate の期待と DEC 100Hz の変異) — 2026-11-27 から半速・100 Hz の確かめは登録検査 `ppc_boot_clock` (tests/system/ppc_boot_clock.py)・注記 (`build/targets/ppc-powermac.mk`・`kboot_audit.py`・`kboot_run.py`) | +9・+5・+4 | なし | kboot-run/accept (QMP の論理 rate)・kboot-audit。half-rate と DEC 100Hz の変異が `FATAL kboot dec_rate` で RED |
 - P1〜P3 は 1 本の枝 (`[skip ci]` で os32powerpc が push、本線 PM が統合の枝で CI)。P1 だけだと `pm_tick_hz()`=100 を `ppc_dec_start` が断り起動が止まる。
 - 依存: C1 (tick_clock の口)。PowerPC の変更の受入は QEMU と NP21/W の x86 回帰だけ (実機の回に載せない)。
 
