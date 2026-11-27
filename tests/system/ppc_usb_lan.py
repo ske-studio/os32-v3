@@ -90,7 +90,15 @@ def check_close(g):
               "poll close/notification order")
 
 
-def exercise(vm, op, late):
+def check_timing(guest, gate, vm):
+    if ordered(guest["deadline"], guest["end"]) or ordered(guest["end_round"], guest["close_round"]):
+        vm.record("guest deadline", deadline_cause(guest))
+    check_close(guest)
+    ticks = distance(gate["wdata"], gate["release"])
+    check(80 <= ticks <= 200, f"SFS RELEASE after {ticks} ticks")
+
+
+def exercise(vm, op, late, confirm_short):
     deadline = vm.deadline
     serial_log = vm.directory / "boot-serial.log"
 
@@ -168,15 +176,13 @@ def exercise(vm, op, late):
     width = distance(tag["start"], tag["deadline"])
     check(width in (50, 100), f"unexpected CALL width {width}")
 
+    if width == 50:
+        confirm_short()
+
     def check_guest():
         guest = {name: tag[name] if name in tag else read(name) for name in RPC_FIELDS}
         vm.record("rpc ticks", dict(host=gate, guest=guest))
-        try:
-            check_close(guest)
-            ticks = distance(gate["wdata"], gate["release"])
-            check(80 <= ticks <= 200, f"SFS RELEASE after {ticks} ticks")
-        except Failure as exc:
-            raise Failure(f"{exc} ({deadline_cause(guest)})") from exc
+        check_timing(guest, gate, vm)
 
     def check_host():
         result = op.expect_once(rid, generation, b"cat: /host/f: Host is down\n", deadline)
@@ -225,11 +231,29 @@ def check_observations(width, vm, observations):
         raise Failure(SHORT)
 
 
+def boot_cpu(cpu, media, version):
+    short = False
+
+    def confirm_short():
+        nonlocal short
+        short = True
+
+    def scenario(vm, op, late):
+        exercise(vm, op, late, confirm_short)
+
+    try:
+        result = boot(cpu, "usb-lan", media, version, scenario, 180, "usb-mouse,id=mouse")
+    except Exception:
+        if not short:
+            raise
+    return (1, SHORT) if short else result
+
+
 def verify():
     media = link_media(usb_trace=True, rpc_trace=True)
     version = subprocess.check_output(["qemu-system-ppc", "--version"], text=True)
     with ThreadPoolExecutor(2) as pool:
-        jobs = [pool.submit(boot, cpu, "usb-lan", media, version, exercise, 180, "usb-mouse,id=mouse")
+        jobs = [pool.submit(boot_cpu, cpu, media, version)
                 for cpu in ("7450", "7455")]
         results = [job.result() for job in jobs]
     if all(code == 0 for code, _ in results):
