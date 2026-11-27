@@ -125,3 +125,20 @@ int input_ime_action_take(const KbdPolicySnapshot *now, u32 popped, u32 *action)
 
 void input_ime_action_flush(void) { count = 0; }
 u32 input_ime_action_dropped(void) { return dropped; }
+
+
+/* Called under IRQ exclusion before publishing the next foreground. */
+void input_ime_exec_exit(u32 owner, u32 gen)
+{
+    if (ime_snapshot.owner == owner && ime_snapshot.exec_gen == gen)
+        ime_snapshot = (KbdPolicyImeSnapshot){0};
+    if (cancel_owner == owner && cancel_exec_gen == gen)
+        cancel_owner = cancel_exec_gen = 0;
+    unsigned kept = 0;
+    for (unsigned i = 0; i < count; ++i) {
+        struct ImeAction next = actions[(head + i) % 8];
+        if (next.owner != owner || next.exec_gen != gen)
+            actions[(head + kept++) % 8] = next;
+    }
+    count = kept;
+}

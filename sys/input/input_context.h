@@ -24,16 +24,22 @@ void input_interrupt_init(void);
 int input_context_command_begin(KbdPolicyContext *state);
 int input_context_command_end(KbdPolicyContext *state);
 
-/* exec_gen is the existing shell/AS generation, supplied by the caller.
+/* exec_gen identifies a single reservation of an exec slot.
  * Foreground selection is separate from registration; GUI routing stays in WM. */
 typedef struct {
     u32 owner, exec_gen, command_gen, context, flags;
 } KbdPolicySnapshot;
+int input_context_owner_reserve(u32 owner, u32 exec_gen, u32 parent, u32 parent_gen, u32 context);
+void input_context_owner_activate(u32 owner, int foreground);
 int input_context_owner_register(u32 owner, u32 exec_gen, u32 parent, u32 parent_gen);
 int input_context_first_shell(u32 exec_gen);
+u32 input_context_owner_generation(u32 owner);
 int input_context_owner_select(u32 owner, u32 exec_gen);
+void input_context_owner_quiesce(u32 owner, u32 gen);
 int input_context_owner_release(u32 owner, u32 exec_gen);
 int input_context_owner_set(u32 owner, u32 exec_gen, u32 context, u32 flags);
+int input_context_action_mode(u32 owner, u32 gen);
+int input_context_delivery_set(u32 owner, u32 gen, u32 mode);
 int input_context_owner_begin(u32 owner, u32 exec_gen);
 int input_context_owner_end(u32 owner, u32 exec_gen);
 int input_context_snapshot(KbdPolicySnapshot *out);
@@ -46,6 +52,7 @@ u32 input_interrupt_coalesced_count(void);
 int input_display_restore_capture(u32 owner);
 int input_display_restore_drain(void);
 int input_display_restore_lock(unsigned int *flags);
+void input_ime_exec_exit(u32 owner, u32 gen);
 void input_interrupt_exec_exit(u32 owner, u32 exec_gen);
 
 typedef struct {

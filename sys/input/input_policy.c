@@ -1,4 +1,5 @@
 #include "input_policy.h"
+#include "../hal/input/in2_int.h"
 #include "os32_kapi_shared.h"
 #include "io.h"
 #include "app_ids.h"
@@ -398,10 +399,13 @@ static int publish(const PolicyTable *table, u32 owner, u32 gen)
         saved = active; saved_owner = owner; saved_gen = gen; saved_valid = 1;
     }
     active = table;
+    input_delivery_flush();
     bump();
     irq_restore(flags);
     return 0;
 }
+
+int ikm_policy_ready(void) { return machine != 0; }
 
 u32 ikm_policy_generation(void) { return revision; }
 
@@ -457,6 +461,7 @@ void ikm_policy_owner_exit(u32 owner, u32 gen)
     unsigned flags = irq_save();
     if (saved_valid && owner == saved_owner && gen == saved_gen) {
         active = saved; /* W3_RESTORE */
+        input_delivery_flush();
         saved = 0; saved_valid = 0;
         bump();
     }
@@ -568,4 +573,37 @@ int ikm_policy_compat(u8 profile, u8 sc, u8 *byte)
     for (unsigned i = 0; i < sizeof(pairs) / sizeof(pairs[0]); ++i)
         if (pairs[i][0] == sc) { *byte = pairs[i][1]; return 0; }
     return OS32_ERR_NOTFOUND;
+}
+
+
+/* Internal targets. The generated argument and page guards precede these
+ * calls when the public table is enabled. IRQ exclusion spans check and pop. */
+int ikm_policy_action_read(u32 owner, u32 gen, KbdPolicyAction *out, u32 max)
+{
+    unsigned irq = irq_save();
+    KbdPolicySnapshot now;
+    int rc;
+    if (max > 128 || (max && !out)) rc = OS32_ERR_INVAL;
+    else if (!machine) rc = OS32_ERR_NOSYS;
+    else if (!gen || input_context_owner_generation(owner) != gen) rc = OS32_ERR_STALE;
+    else if (input_context_snapshot(&now) || now.owner != owner || in2_excl_keyboard())
+        rc = OS32_ERR_BUSY;
+    else if (!input_context_action_mode(owner, gen)) rc = OS32_ERR_INVAL;
+    else rc = (int)input_delivery_read_actions(out, max);
+    irq_restore(irq);
+    return rc;
+}
+
+int ikm_policy_key_read(u32 owner, u32 gen, int wm, KbdPolicyKey *out, u32 max)
+{
+    unsigned irq = irq_save();
+    int rc;
+    if (max > 128 || (max && !out)) rc = OS32_ERR_INVAL;
+    else if (!machine) rc = OS32_ERR_NOSYS;
+    else if (!gen || input_context_owner_generation(owner) != gen) rc = OS32_ERR_STALE;
+    else if (owner != APP_ID_SHELL || !wm) rc = OS32_ERR_INVAL;
+    else if (in2_excl_keyboard()) rc = OS32_ERR_BUSY;
+    else rc = (int)input_delivery_read_keys(out, max);
+    irq_restore(irq);
+    return rc;
 }

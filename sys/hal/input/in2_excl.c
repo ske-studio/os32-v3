@@ -1,4 +1,5 @@
 #include "in2_int.h"
+#include "../../input/input_delivery.h"
 #include "av_contract.h"
 #include "io.h"
 #include "kbd.h"
@@ -34,6 +35,7 @@ static void transition(int owner, u32 next, int focus)
     }
     acq_owner = owner;
     excl = next;
+    input_delivery_flush();
     ++gen;
     kbd_raw_purge_keep();
     in2_ring_lost(IN2_LOST_EXCL);

@@ -99,6 +99,22 @@ static u32 gfx_resource_owner, gfx_resource_gen, next_resource_gen;
 static unsigned int launch_reservations;
 
 static AppSlot g_slot[APP_SLOT_COUNT];
+/* Survives slot_zero so stale input cannot match a later launch. */
+static u32 exec_generations[APP_SLOT_COUNT];
+
+static void issue_exec_generation(int id)
+{
+    if (++exec_generations[id] == 0) ++exec_generations[id];
+    g_slot[id].exec_gen = exec_generations[id];
+}
+
+void appslot_shell_reserve_generation(void)
+{
+    unsigned irq = irq_save();
+    issue_exec_generation(APP_ID_SHELL);
+    irq_restore(irq);
+}
+
 static int g_cur = APP_ID_SHELL;
 
 /* gui_call がハンドラを呼ぶ間だけ立つ「いまの op は OP_WAIT か」(C4)。
@@ -161,6 +177,18 @@ static void slot_zero(AppSlot *a)
     u8 *b = (u8 *)a;
     u32 i;
     for (i = 0; i < (u32)sizeof(AppSlot); i++) b[i] = 0;
+}
+
+/* Restore the resident placeholder used by the kernel's shell loop.
+ * A failed initial launch has no running parent to switch back to. */
+void appslot_shell_cancel_generation(void)
+{
+    unsigned irq = irq_save();
+    AppSlot *slot = &g_slot[APP_ID_SHELL];
+    slot_zero(slot);
+    slot->state = APP_STATE_RUNNING;
+    slot->depth = 1;
+    irq_restore(irq);
 }
 
 void appslot_init(void)
@@ -292,7 +320,10 @@ int appslot_start_reserve(int gui)
 {
     unsigned int irq = irq_save();
     int id = appslot_start_admit(gui, 0, 0);
-    if (id > 0) launch_reservations |= 1u << id;
+    if (id > 0) {
+        issue_exec_generation(id);
+        launch_reservations |= 1u << id;
+    }
     irq_restore(irq);
     return id;
 }

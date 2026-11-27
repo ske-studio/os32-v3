@@ -1,6 +1,7 @@
 #ifndef INPUT_HAL_INPUT_POLICY_H
 #define INPUT_HAL_INPUT_POLICY_H
 #include "types.h"
+#include "input_delivery.h"
 #include "../hal/input/keymap.h"
 
 enum { IKM_HEADER_SIZE = 16, IKM_ROW_SIZE = 16, IKM_MAX_ROWS = 8192 };
@@ -21,9 +22,12 @@ int ikm_policy_set(const void *wire, u32 length, u32 owner, u32 gen);
 int ikm_policy_reset(u32 owner, u32 gen);
 void ikm_policy_owner_exit(u32 owner, u32 gen);
 int ikm_policy_get(void *wire, u32 capacity, u32 *needed);
+int ikm_policy_ready(void);
 u32 ikm_policy_generation(void);
 int ikm_policy_term(u8 profile, u8 context, u16 index, u8 *value);
 int ikm_policy_action(u8 profile, u8 context, u16 map, u16 keycode,
                        u8 sc, u16 mods, u8 *action);
 int ikm_policy_compat(u8 profile, u8 sc, u8 *byte);
+int ikm_policy_action_read(u32 owner, u32 gen, KbdPolicyAction *out, u32 max);
+int ikm_policy_key_read(u32 owner, u32 gen, int wm, KbdPolicyKey *out, u32 max);
 #endif
