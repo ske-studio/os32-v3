@@ -395,3 +395,17 @@ expect = "ime on・mode は要求状態になれば従来の成功文と 0、未
 limits = "ホストの KAPI stub を使う CLI 検査。ゲストの辞書ロードとモジュール公開は対象外"
 gates = ["push", "main"]
 mutations = [{ id = "skip_on_mode_check", config = "pc98", when = "after_build", replace = "userland/cmds/ime.c", old = "if (!api->ime_is_active() || api->ime_get_mode() != IME_MODE_HIRAGANA)", new = "if (!api->ime_is_active())", fail = "stuck on: rc=0" }]
+
+[[check]]
+id = "ppc_ata_guest"
+spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の ATA ゲスト完了" }
+subsystem = "system"
+level = "L4"
+sources = ["make:all", "make:iso", "tests/support/ppc_vm.py", "tests/support/ppc_fixture.py", "tests/support/fixtures/ppc_ata", "sys/dev/ata/ide_request.inc", "sys/dev/ata/ide_pio.inc", "sys/dev/ata/ide.c", "sys/platform/powermac/ide_boot.c", "sys/platform/powermac/ide_tree.c", "sys/platform/powermac/platform_ide_bus.h", "sys/dev/ide/device_ide.c", "sys/platform/powermac/ppc_kernel.c", "userland/shell/main.c"]
+environment = "qemu-ppc"
+arch = { ppc = ["sh"] }
+needs = []
+expect = "読出し・媒体なし・予約書込み・未予約拒否"
+limits = "mac99 IDE 専用 raw"
+gates = ["push", "main"]
+mutations = [{ id = "ata_read_lba", config = "sh", when = "after_build", replace = "sys/dev/ata/ide_request.inc", old = "else rc = ide_read_one(drive, lba, dst);", new = "else rc = ide_read_one(drive, lba == 2047 ? 2046 : lba, dst);", fail = "read 2047 returned sector 2046" }, { id = "ata_write_count", config = "sh", when = "after_build", replace = "sys/dev/ata/ide.c", old = "return ide_request(unit, lba, count, 0, sectors);", new = "for (u32 i=0; i<count; ++i) { int rc=ide_request(unit,lba+i,1,0,(const u8 *)sectors+i*512); if (rc) return rc; } return 0;", fail = "correct payload used two write commands" }]
