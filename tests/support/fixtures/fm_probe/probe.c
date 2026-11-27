@@ -135,6 +135,14 @@ static void check_opna_wait(unsigned delay, int frozen)
                 trace[1] == 0x18827 && trace[2] == 0x18a30, "poll boundary");
     }
 }
+static void check_board(unsigned value, enum opn_probe_result expected)
+{
+    reset();
+    feature = value;
+    require(!start() && boot_probe.bank[0].model == expected,
+            expected == OPN_PROBE_ABSENT ? "CS4231-only open bus" : "FM board open bus");
+}
+
 void _start(void)
 {
     check_opna_wait(410, 0);
@@ -144,6 +152,13 @@ void _start(void)
     require(!start() && boot_probe.bank[0].model == OPN_PROBE_ABSENT &&
             boot_probe.bank[1].model == OPN_PROBE_ABSENT, "open bus");
     require(!boot_probe.feature_port && !boot_probe.bank[0].chip_id_port, "open ID");
+    reset();
+    check_board(0x73, OPN_PROBE_ABSENT);
+    check_board(0x70, OPN_PROBE_ABSENT);
+    check_board(0x41, OPN_PROBE_UNKNOWN);
+    check_board(0x51, OPN_PROBE_UNKNOWN);
+    check_board(0x81, OPN_PROBE_UNKNOWN);
+    check_board(0x60, OPN_PROBE_UNKNOWN);
     reset();
     status = 4;
     require(!start() && boot_probe.bank[0].model == OPN_PROBE_UNKNOWN, "unknown first");
