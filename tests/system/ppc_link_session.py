@@ -198,14 +198,14 @@ def exercise(vm, op, late):
         raise Failure(observations[0])
 
 
-def boot(cpu, case, media, version, scenario=exercise, seconds=180):
+def boot(cpu, case, media, version, scenario=exercise, seconds=180, usb_device="usb-kbd,id=kbd"):
     iso, metadata = media
     directory = Path("evidence") / cpu / case
     directory.mkdir(parents=True)
     start = time.monotonic()
     observing = False
     try:
-        with network() as (io, devices), (directory / "qemu.stderr").open("wb") as err:
+        with network(usb_device) as (io, devices), (directory / "qemu.stderr").open("wb") as err:
             (directory / "boot.json").write_text(json.dumps(dict(metadata, cpu=cpu, case=case,
                 sha=os.getenv("GITHUB_SHA") or os.getenv("OS32_BUILD_COMMIT"), run=os.getenv("GITHUB_RUN_ID"),
                 attempt=os.getenv("GITHUB_RUN_ATTEMPT"), origin=start, qemu=version,

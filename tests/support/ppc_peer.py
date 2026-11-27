@@ -18,13 +18,13 @@ from ppc_lan_host import UDP
 
 
 @contextmanager
-def network():
+def network(usb_device="usb-kbd,id=kbd"):
     io = UDP("127.0.0.1:0,127.0.0.1:0")
     try:
         port = io.sock.getsockname()[1]
         yield io, ["-nic", "none", "-device", "sungem,netdev=lan,mac=52:54:00:12:34:56",
                    "-netdev", f"socket,id=lan,udp=127.0.0.1:{port},localaddr=127.0.0.1:0",
-                   "-usb", "-device", "usb-kbd,id=kbd", "-icount", "shift=auto"]
+                   "-usb", "-device", usb_device, "-icount", "shift=auto"]
     finally:
         io.sock.close()
 
@@ -55,6 +55,7 @@ class Peer:
     def restart(self):
         self.close()
         self.gates.clear()
+        self.next_call = None
         agent = HostAgent(bytes.fromhex("02005e000001"), state_dir=str(self.vm.directory),
                           quiet=True, allow_net=False, file_root=str(self.root))
         self.agent = agent
@@ -77,6 +78,10 @@ class Peer:
         sfs = agent._service_sfs
 
         def call(rid, entry, out):
+            if self.next_call is not None and entry["decl"] and len(entry["got"]) == entry["decl"]:
+                self.gates[rid] = self.next_call
+                self.next_call["rid"] = rid
+                self.next_call = None
             if rid in self.gates:
                 self.gates[rid].setdefault("wdata", self.vm.word("tick_count", 0, self.vm.deadline))
             else:
@@ -90,7 +95,7 @@ class Peer:
             gate = self.gates.pop(rid, None)
             if gate is not None:
                 gate["release"] = self.vm.word("tick_count", 0, self.vm.deadline)
-                self.vm.record("gate", dict(rid=rid, **gate))
+                self.vm.record("gate", dict(gate, rid=rid))
 
         agent._on_release = released
 
