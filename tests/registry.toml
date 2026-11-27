@@ -1027,3 +1027,20 @@ mutations = [
   { id = "gfx2_sync_rows_byte_tail", config = "pc98", when = "after_build", replace = "sys/hal/gfx/sync/sync_write.c", old = "else c->t.va[off + i] = src[i];", new = "else (void)src[i];", fail = "FAIL byte tail" },
   { id = "gfx2_sync_rows_readback_flush", config = "pc98", when = "after_build", replace = "sys/hal/gfx/sync/sync_write.c", old = "c->t.flush && !c->t.flush(c->t.opaque)", new = "1", fail = "FAIL readback flush" },
 ]
+
+[[check]]
+id = "gfx2_sync_defaults"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L2"
+sources = ["assets/gfx/sync.cfg", "sys/hal/gfx/sync/sync_cfg.c", "sys/hal/gfx/sync/sync_int.h", "sys/include/gfx_sync.h", "sys/include/config.h", "tests/support/fixtures/gfx2/gfx2_sync_defaults.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "D1 の PEGC と Trident、GF 不一致時の全既定値、ファイル欠落、完全一致優先、不正区画を照合"
+limits = "VFS はメモリ入力。配布像と実機での書き込み間隔は対象外"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_sync_defaults_gap", config = "pc98", when = "after_build", replace = "assets/gfx/sync.cfg", old = "gap_ns=80", new = "gap_ns=8", fail = "FAIL Trident gap" },
+  { id = "gfx2_sync_defaults_priority", config = "pc98", when = "after_build", replace = "sys/hal/gfx/sync/sync_cfg.c", old = "eq(section, wanted) ? 2 : (wildcard[0] && eq(section, wildcard) ? 1", new = "eq(section, wanted) ? 1 : (wildcard[0] && eq(section, wildcard) ? 2", fail = "FAIL exact match" },
+]

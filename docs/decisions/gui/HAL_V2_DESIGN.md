@@ -609,7 +609,7 @@ mode=SHADOW  unit=4  method=GAP  gap_ns=80  flush=NONE  read_ns=1500  read=SHADO
 | flush | NONE・READBACK・SERIALIZE | WC の吐き出し方 (UC の読み、または直列化の命令) |
 | read_ns・read | 整数・SHADOW/DIRECT | 読み出しの遅さと読む元。ROP・α・dst の鍵のように dst を読む sw の操作は read=SHADOW なら RAM から |
 - I/O 番地は設定に書かない。SYNC_READ・WAIT_PORT の実体は backend が `GfxSyncTarget` の hook で渡す (Trident の CR+6 の読み present.c、PC-98 の 5Fh present.c)。
-- 鍵の照合 (Y1): `pci:VVVV:DDDD` → `pci:VVVV:*` → 機種名 (`pegc`) の順。どれも無ければ組み込みの既定 (SHADOW・unit=1・PLAIN・flush=NONE)。
+- 鍵の照合 (Y1): PCI 鍵は `pci:VVVV:DDDD` → `pci:VVVV:*` の順。機種名の鍵はその名前だけを照合する。鍵が一致しなければ NOTFOUND と組み込みの既定 (SHADOW・unit=1・PLAIN・flush=NONE)。
 
 PM 決定 #2: `TRI_WRITE_GAP` はここへ移す (既定 80ns)。旧値の引き継ぎと「sync.cfg が system.cfg より優先」は配備の手順で保証し、カーネルは system.cfg の旧鍵を読まない。
 ```c
@@ -1675,7 +1675,7 @@ static void geforce_v2_start(void)
 - 既定の中身 (全文。書式は I2 の追記の「sync.cfg の読み」、値は §10 の例と同じ):
 ```
 ; /etc/gfx/sync.cfg — CPU 直描きの同期層 (HAL_V2_DESIGN §10)
-; 鍵は pci:VVVV:DDDD → pci:VVVV:* → 機種名の順に照らし、無ければ組み込みの既定
+; PCI 鍵は完全一致、次に同じ vendor の * を照合する。機種名はその名前だけを照合する。未一致は組み込みの既定
 ; (SHADOW unit=1 PLAIN flush=NONE)。; から行末は注釈。
 [pegc]
 mode=SHADOW  unit=4  method=PLAIN  flush=NONE  read_ns=0  read=SHADOW
