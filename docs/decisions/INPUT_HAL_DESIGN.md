@@ -320,6 +320,8 @@ slot commit 後は既存順で shell lease publish／親 syscall suspend、AV fo
 
 **配送の権限**。自分の登録世代だけが context_set できる。begin/end・delivery_set は同世代の前景だけが実行でき、背景は BUSY を discard_pending より先に返す。登録世代不一致は STALE。action_read は前景・ACTION を要求し、採取時の owner/exec_gen と command_gen を照合する。背景・独占は BUSY、モード不一致は INVAL。key_read は常駐 GUI shell の現行 owner/世代かつ既存 WM の権限（APP_ID_SHELL、CPL0、GUI session）に限定し、アプリ窓が前景でも仲介できる。非権限は INVAL。KBD 独占中の通常 Key は BUSY とし、STOP・CTRL・GRPH・TAB の WM 制御経路と in2 を維持する。拒否はいずれも出力とキューを動かさない。con_sink 中の IRQ は背景 RUNNING を参照せず、文脈操作は WM が確定した宛先で一度処理する。
 
+6b 合流時は §11.2 の input_work_invalidate_locked を旧 pending の清算に含める。成功条件を確定し、IRQ 排他を取ったまま旧配送先の反復枠と既存 pending を清算し、最後に新しい状態を公開する。適用点は表交換、前景の登録・選択・解放、配送に影響する context_set、command_begin/end、delivery_set、WM 焦点通知と G の消費口切替。背景の回収は解放する owner/exec_gen の枠だけを消す。予約・拒否では印を維持する。
+
 表交換・GUI 焦点交代（同 owner の別窓を含む）では旧 pending と compose を破棄し、旧窓への成功済み押下だけを清算する。消費済み make の break は同じ source の解放まで抑止。G は provider の初期化成功を確認した場合だけ WM pump を切り替える。失敗時は旧 raw・退避を清算せず旧 pump の通常 GUI 配送を続ける。成功時は切替境界で旧 raw・退避を清算してから通常配送の消費口を Key に一本化する。独占制御用 raw は通常配送へ戻さない。
 
 ### 10.3 登録検査を先行させる
@@ -382,11 +384,11 @@ PC-98 と PowerMac の各初期化入口で ikm_policy_init の失敗を注入�
 |PC-98 IRQ13、mouse_bus.c と mouse_hal.c|1ラッチ・4 nibble、MOVE 最大1と BUTTON 1。seamless は mouse.c の snapshot から従来どおり1回だけ採取（§7 の段表 5d）|なし。旧差分・in2 差分は各読者が独立に消費|
 |PC-98 USB の OHCI 割込み、usb_resident.c の usb_tick / usb_idle|割込みは要因の採取。tick と idle の scan_pending 調停、モジュール呼出し、ログ排出を既存の所有者に残す|鍵盤 tick の期限到来通知だけを共通 HAL へ渡す|
 |PowerMac の pm_usb_boot / pm_usb_poll、usb_boot.c の service|OHCI の MIE は無効。100 Hz の常駐サービスと10 ms 間隔の補助 poll が同じ HC を進める。USB の排他中は EE=0|同じ期限到来通知。DEC 出口で dispatch しない|
-|両機種の usb_service.c、hid_kbd.c、hid_mouse.c|HC 当たり scan(32)、完了・制御・探索・再 submit は USB 所有。鍵盤 boot report は8 byte、修飾8 bit＋6 usage の差分を既存の3順×256候補で採取。マウスは1報告の相対移動とボタン。切断は callback 停止後、源別解放上限128キー＋ボタン|kbd_tick は従来の初回500 ms、以後30 ms の整数期限を維持。1 iface 当たり1回の通知まで。協調が遅れた回数を後で連射しない|
+|両機種の usb_service.c、hid_kbd.c、hid_mouse.c|HC 当たり scan(32)、完了・制御・探索・再 submit は USB 所有。鍵盤 boot report は8 byte、修飾8 bit＋6 usage の差分を既存の3順×256候補で採取。マウスは1報告の相対移動とボタン。切断は callback 停止後、源別解放は HID map の256 usage を走査し、押下済み usage ごとに break を処理。互換 sc の集計は128欄|kbd_tick は従来の初回500 ms、以後30 ms の整数期限を維持。1 iface 当たり1回の通知まで。協調が遅れた回数を後で連射しない|
 |gshell/src/pump.rs の gshell_gui_pump、input::capture、X3 の待ち|X4 が上限付きの raw・pointer 取込みと窓用リング追記、X3 が焦点・ドラッグ・閉じる操作を担当。カーソル描画は既存 backend。通常の syscall / wait の FG1 巡で repeat を進める|HAL へ WM callback を登録しない。HAL 側は旧出口までとし、同一打鍵を別の GUI キューへ複製しない|
 |kern/input_legacy.c と機種別 InputLegacyProvider|PC-98 の serial 優先・GUI 注入・IME、PowerMac の LAN decoder/lookahead と USB の優先順、peek と try の消費差を保つ。wait は既存 idle_wait_step を使う|端末を先読みして消費する仕事は追加しない。将来の振動出力は USB サービス所有。現行 in2_pad_vibrate は接続 pad 不在を返す|
 
-IRQ・tick に6bが足せるのは、既存の USB 鍵盤4枠のうち該当する1枠に値をコピーし、io_request で印を付けるところまで。割当、時計予算の換算、残件ループ、描画、同期転送、待機は FG1 callback にも持ち込まない。上表の scan 上限は HC 全体や探索の総時間を保証する値ではない。
+USB サービスの IRQ マスク区間には HC・機器・iface の走査、転送 callback、探索が入る（usb_service.c）。scan(32) は HC ごとの一呼出の上限。6b の追加走査は保留4枠と io_request の登録表最大16枠。期限では従来の状態評価を1回行い、配送値を1枠に保存する。通知に割当・待機・時計予算換算を含めない。サービス全体の IRQ マスク時間と、FG1 が1枠の検証から旧出口の完了まで再度 IRQ を止める最長時間を分けて測る。
 
 ### 11.2 登録と通知の寿命
 
@@ -394,15 +396,19 @@ IRQ・tick に6bが足せるのは、既存の USB 鍵盤4枠のうち該当す�
 
 sys/kern/io_policy.h の永久 ID に IO_SVC_INPUT=5 を追記する。io_policy.c の rules と POLICY_SERVICES を5行にし、既定 Tier2、120 µs、許容1..500 µs とする。先行変更で5が使用済みなら次の未使用 ID へずらす。IOT1 は同じ LE 行形式。旧4行 set は欠けた入力行を既定で補う。get の必要長は80→96 byte、短い領域には FULL と必要長だけを返す。利用者指定の tier は既存 policy に従い、再配置後も FG1 と下記の件数上限を守る。
 
-保留は USB 鍵盤 handle 当たり1件、最大4件。src・generation・usage・採取時の焦点世代と GUI/CUI モードを値で保持する。新しい期限は同じ枠を更新する。別の反復対象へ変わる make、対象の break、detach/release、焦点・独占・GUI モードの切替では旧印を破棄する。反復対象変更は HID が repeatable と判定した時点で同期し、修飾変化で古い文字を新しい修飾に読み替えないよう、修飾・lock の遷移でも保留を清算する。次の正規期限から再開する。source 解放前に印を消し、再使用後に古い callback を許さない。USB iface、xfer、モジュール内関数へのポインタを保留に入れない。
+保留は USB 鍵盤 handle 当たり1件、最大4件。src/generation、usage、配送境界の世代、A0z 合流後の owner/exec_gen と、採取済みの KmKey・old・KmEvalResult・raw_due・修飾値を値で保持する。USB iface やモジュールのポインタは保存しない。各期限で既存 capture の検証・km_state_apply・評価を IRQ 排他中に一度行う。V86 中はこの時点で配送を抑止する。他は同じ枠を上書きして通知する。FG1 は評価済み値による旧出口だけを実行する。期限→ShiftA make→FG1→break は tap 成立、ShiftA make→別キー期限→ShiftA break→FG1 は期限時に tap 解除済みで ALT は反転しない。印の破棄は採取済み状態を巻き戻さない。
+
+HID と常駐 make は sys/hal/input/keymap.h の共通 inline 判定を用いる。HID map の norepeat bit が0、compat_sc が128未満、4文字面のどれかが void 以外の場合だけ対象を更新する。hid_kbd_repeatable はこの判定に委譲する。kbd_done は usage 通知後に対象を更新するので、常駐 usb_input_usage はその make 中に同じ判定で旧対象の枠を消す。非反復 make は対象を保つ。対象 break・detach は源別に解放前に消す。修飾・lock の遷移は PC-98 本体、全 USB 源、切断 release と boot lock 解放を含め、状態更新と同じ IRQ 排他内で全旧印を消す。
+
+共通内部口 input_work_invalidate_locked は配送境界の変更で全4枠を消して世代を進める。限定回収では該当源または owner/exec_gen の枠だけを消す。6b 単体では av_focus_set の認可済み WM 通知（select_owner の同値 return より前）、exec_enter/leave の前景変更、in2_excl の transition・reclaim、kbd_set_gui_mode、PC-98 v86.c の active 設定・解除に接続する。IRQ 排他内で旧印を消してから状態を公開する。同 owner への WM 通知も配送境界とする。合流時は §10.2 の成功した清算・公開点にも同じ口を接続する。FG1 は同じ排他で世代を照合するため、往復後の値の一致で旧印が復活することはない。
 
 ### 11.3 予算と再予約
 
 1単位は1枠の検証・消費（無効化済みの取り出しも最大1単位）。1巡最大4件、通常120 µs、max_unit_us 初期見積り30 µs。数値は整数の初期調整値。両機種で最長1単位を測り、公平枠で30 µs を超えれば値または単位を見直す。1件の途中で切らないため、時限は次を開始する上限である。
 
-1. 製品入口は AC-CTX 適合の idle_work_run / 明示 pump 経由の io_dispatch に限る。IF/EE 許可・IRQ 深さ0・ロック外。input_step は内部入口とし専用 busy を全出口で解放する。入れ子の dispatch は0、入れ子の step は IO_MORE で状態を動かさない。
-2. dispatcher の slice を引き継ぐ。io_slice_limit(slice,120,4) で残時間・公平枠1件を広げず、各単位の直前に io_slice_take を行う。換算失敗、時計世代交代、時限・件数到達では未着手の枠を保つ。u32 raw count の差と source/generation は既存 slice API に任せる。
-3. 4 bit の印を巡回順に選ぶ。短い IRQ 排他で slot の同一性・押下・配送境界を再確認し、印の消費と既存 input_capture_key の repeat 1件を不可分にする。割込み状態を戻してから次の単位へ。無効な印を捨てても後続枠は残す。in2 への repeat、押下数の加算、lock 反転はゼロ。
+1. 製品入口は AC-CTX 適合の idle_work_run / 明示 pump 経由の io_dispatch に限る。自動入口は idle_work_run の IF/EE・IRQ 深さ検査を使う。明示入口 kapi_io_pump にも dispatch 前に同じ検査を置き、不適合時は仕事量0。呼出元はロック外の FG1 に限る。FG0・排他中は採取・清算・io_request まで。input_step は内部入口とし専用 busy を全出口で解放する。入れ子の dispatch は0、入れ子の step は IO_MORE で状態を動かさない。
+2. dispatcher の slice を引き継ぐ。io_slice_limit(slice,120,4) で残時間・公平枠1件を広げず、各単位の直前に io_slice_take を行う。定常時は換算済み表を引く。表 miss 時の整数換算は FG1 内に限る。120 µs は開始締切であり、4件消化や締切までの完了は保証しない。換算失敗、時計世代交代、時限・件数到達では未着手の枠を保つ。u32 raw count の差と source/generation は既存 slice API に任せる。
+3. 4 bit の印を巡回順に選ぶ。短い IRQ 排他で slot の同一性・押下・配送境界を再確認し、印の消費と評価済み値の input_capture_delivery / input_emit_keymap による配送1件を不可分にする。割込み状態を戻してから次の単位へ。無効な印を捨てても後続枠は残す。in2 への repeat、押下数の加算、lock 反転はゼロ。
 4. 印が残れば IO_MORE、空なら IO_DONE。io_work.c が callback 前に pending を下げ、IO_MORE で再予約する。走行中の新しい io_request は次巡まで残る。HAL は dispatcher の pending を消さず、終了判定の直後の到着も失わない。未到来の期限には IO_MORE を返さず USB の次回通知を待つ。協調点のない区間には配送期限を約束しない。
 
 ### 11.4 RED を先に取る段と受入
@@ -415,3 +421,14 @@ sys/kern/io_policy.h の永久 ID に IO_SVC_INPUT=5 を追記する。io_policy
 |T、各 ≤280 行。文脈・競合・機種別の退行|IRQ/FG0・IF/EE=0 で印だけ、FG1 入れ子の二重消費0。4枠＋消費中の再通知、公平1件、時限ちょうど、u32 wrap、clock token 交代で次巡再開。take を消す、件数を広げる、busy を消す、残件で DONE、最後に pending を消す、巡回位置固定を各々 RED にする。最後は1件予算で先頭を毎巡補充し他枠の進行を測る|
 
 R は候補上で先に実行し、実装で同じ観測を GREEN にしてから取り込む。tests/registry.toml に spec・sources・expect・limits・mutations を宣言し各登録の --mutate と lint、src_owner・build_sources・include_layers・link_layers・ppc_common_compile を最終差分で確認。PC-98 像と PPC 像で text/BSS と最長単位を記録。NP21/W は本体打鍵・STOP・seamless・GUI/CUI、USB 搭載 PC-98 は USB 保持と抜去、PPC QEMU と G4 7450/7455 は USB 保持・Ctrl+Pause・LAN 入力・GUI 切替を機種別に記録する。実機未観測の時間値は推定のまま扱う。
+
+**段別の追従と独立対照**。各変異は一つずつ入れ、同じ入口の正常対照が通る状態から指定した観測だけを赤にする。
+
+|段|入口と正常対照|変異と判定|
+|---|---|---|
+|P|IOT1 旧4行 set 後、80 byte get は FULL・needed=96・領域不変、96 byte で再試行して5行を読む。外部利用者にもこの再試行を契約とする。現行製品で固定80 byte 呼出は確認されていない|必要長を80に戻すと再試行が失敗。sfs_stale_peer は実 io_work/io_policy を直接リンクするため同段で再実行し、固定行数やリンク依存があれば追従|
+|P/W|input_work.c は common HAL 所有、両像の常駐 source set・ownership.mk・PC-98 の link order に登録。HID は PC-98 モジュールと PPC 像で同じ header 判定をビルド|既存 usb_input_usage import を通して PC-98 旧出口で1件。PPC の USB REPEAT trace は期限通知、旧読出口の pump 前0・後1で配送を判定。import ABI・trace 形式は追加引数不要のため変更対象外|
+|W|保持中に非反復・非修飾 make を挟むと旧対象が1件、新反復対象 make では旧印0。本体または別 USB 源の修飾往復・lock 往復・修飾源抜去後は0、次の期限で1|判定の各条件を単独除去し対象と期限を読む。源内だけ清算、lock 清算省略、release 清算省略を各々検出|
+|W|両 ShiftA 順序で ALT 状態を同期経路と比較。V86 突入直前の印、ゲスト中だけの期限は復帰後0、復帰後の新期限は1|採取時 apply 省略と配送時 apply 再実行を別々に注入。active 時の通知を許す変異はゲスト中の保留数で、境界清算省略は突入前の印で検出|
+|T・合流|各成功境界の前に期限を置き、同 owner の別窓、同 slot 再 exec、command_begin/end、delivery_set 往復を WM・exec・公開 KAPI から通して旧出口0、新期限1。拒否なら旧印1|各境界の清算だけを外して旧印の残存を読む。既存焦点世代だけへの置換は同 owner 窓で検出|
+|T|idle_work_run と明示 pump の双方で IF/EE 禁止・IRQ 深さ非零を別々に注入し旧出口0、適合時1。adapter の1件目の配送中に試験 hook から同じ adapter を直接呼ぶ。別枠を残し、内側 MORE・消費0を観測|入口検査と adapter busy を別々に外す。公平枠1件で2枠を用意し件数制限を外す変異は同巡2件で赤。時計は両件が開始可能な値に固定|
