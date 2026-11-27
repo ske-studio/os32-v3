@@ -3,6 +3,8 @@
 #include "sys/kapi/input_policy_provider.h"
 #include "appslot.h"
 #include "io.h"
+#include "in2_int.h"
+#include "kbd_contract.h"
 
 unsigned input_test_irq;
 static int exclusive, caller = 1;
@@ -15,7 +17,54 @@ int input_display_restore_lock(unsigned *flags) { *flags = irq_save(); return 0;
 static void discard(void) {}
 
 int in2_excl_keyboard(void) { return exclusive; }
-static int pressed(void) { return 0; }
+static unsigned diagnostics;
+#ifdef FAIL_INIT
+int legacy_shell_dispatch(void);
+int __wrap_ikm_policy_init(u8 platform, const KmBackend *pc98, const KmBackend *hid,
+                           int (*pressed)(void))
+{
+    (void)platform; (void)pc98; (void)hid; (void)pressed;
+    return OS32_ERR_INVAL;
+}
+#endif
+volatile u32 tick_count;
+void appslot_poll_yield_reset(void) {}
+int input_key_pressed(u8 sc) { (void)sc; return 0; }
+int in2_excl_drop_raw(u8 sc, int is_break) { (void)sc; (void)is_break; return 0; }
+int input_policy_pressed(void) { return 0; }
+#ifdef __PPC__
+#include "input_usb.h"
+#include "usb_platform.h"
+int input_src_info(u8 src, u16 gen, u8 *kind, u8 *origin)
+{ *kind = INPUT_KIND_KBD; *origin = INPUT_ORIGIN_USB; return src == 1 && gen == 1; }
+int usb_input_alloc(int kind) { (void)kind; return 1; }
+void usbp_log(const char *fmt, ...) { (void)fmt; ++diagnostics; }
+#else
+#include "sys/hal/input/in2_int.h"
+void kprintf(u8 attr, const char *fmt, ...) { (void)attr; (void)fmt; ++diagnostics; }
+int input_src_register(u8 kind, u8 origin, u16 *gen)
+{ (void)kind; (void)origin; *gen = 1; return 1; }
+void input_src_release(u8 src, u16 gen) { (void)src; (void)gen; }
+int input_src_info(u8 src, u16 gen, u8 *kind, u8 *origin)
+{ *kind = INPUT_KIND_KBD; *origin = INPUT_ORIGIN_NATIVE; return src == 1 && gen == 1; }
+#endif
+
+static int check_unavailable(u8 *base, unsigned size)
+{
+    u8 readback[32];
+    u32 needed;
+    KbdPolicyAction out;
+    KbdPolicyKey key_out;
+    if (input_provider_set(base, size) != OS32_ERR_NOSYS ||
+        input_provider_get(readback, size, &needed) != OS32_ERR_NOSYS ||
+        input_provider_reset() != OS32_ERR_NOSYS ||
+        input_provider_context_set(INPUT_CONTEXT_RUNNING, INPUT_CONTEXT_ISIG) != OS32_ERR_NOSYS ||
+        input_provider_command_begin() != OS32_ERR_NOSYS || input_provider_command_end() != OS32_ERR_NOSYS ||
+        input_provider_delivery_set(0) != OS32_ERR_NOSYS ||
+        input_provider_action_read(&out, 1) != OS32_ERR_NOSYS ||
+        input_provider_key_read(&key_out, 1) != OS32_ERR_NOSYS) return 2;
+    return 0;
+}
 
 static int test_provider(void)
 {
@@ -26,19 +75,41 @@ static int test_provider(void)
                  2,0,2,0,37,0,0,0,65,0,0,0,0,0,0,0};
     u8 readback[sizeof base];
     u32 needed;
-    if (input_provider_set(base, sizeof base) != OS32_ERR_NOSYS ||
-        input_provider_get(readback, sizeof base, &needed) != OS32_ERR_NOSYS ||
-        input_provider_reset() != OS32_ERR_NOSYS ||
-        input_provider_context_set(INPUT_CONTEXT_RUNNING, INPUT_CONTEXT_ISIG) != OS32_ERR_NOSYS ||
-        input_provider_command_begin() != OS32_ERR_NOSYS || input_provider_command_end() != OS32_ERR_NOSYS ||
-        input_provider_delivery_set(0) != OS32_ERR_NOSYS ||
-        input_provider_action_read(&out, 1) != OS32_ERR_NOSYS ||
-        input_provider_key_read(&key_out, 1) != OS32_ERR_NOSYS) return 2;
+    if (check_unavailable(base, sizeof base)) return 2;
 #ifdef __PPC__
-    if (ikm_policy_init(IKM_PLATFORM_MAC, 0, &hid_jp_backend, pressed)) return 3;
+    pm_input_keymap_boot();
 #else
-    if (ikm_policy_init(IKM_PLATFORM_PC98, &pc98_jp_backend, &hid_jp_backend, pressed)) return 3;
+    u16 generation;
+    if (pc98_input_keymap_register(&generation) != 1) return 3;
 #endif
+#ifdef FAIL_INIT
+#ifdef __PPC__
+    if (usbp_input_src_alloc(USBP_INPUT_KBD) != 1) return 3;
+
+    if (km_source_bind(1, 1, KM_MAP_HID)) return 3;
+    const u16 keys[] = {4, 40};
+#else
+    const u16 keys[] = {0x1d, 0x1c};
+#endif
+    KmSource source;
+    KmState state = {0};
+    KmEvalResult result;
+    if (km_source_lookup(1, 1, &source)) return 15;
+    for (int gui = 1; gui >= 0; --gui) {
+        kbd_set_gui_mode(gui);
+        for (int i = 0; i < (gui ? 1 : 2); ++i) {
+            if (km_eval(source.map, keys[i], &state, &result)) return 16;
+            km_legacy_compat(&result);
+            input_emit_keymap(&result, 1, 1, 0, 0);
+        }
+        if (gui) {
+            if (legacy_raw_take() != (0x1d | KBD_RAW_MAKE) || legacy_raw_take() != -1 ||
+                legacy_cooked_take() != -1) return 17;
+        } else if (!legacy_shell_dispatch() || legacy_raw_take() != -1) return 18;
+    }
+    return diagnostics != 1 || check_unavailable(base, sizeof base);
+#endif
+    if (diagnostics) return 3;
     appslots[1].exec_gen = 1;
     appslots[2].exec_gen = 2;
     input_context_discard_register(discard);
