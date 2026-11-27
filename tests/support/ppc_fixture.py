@@ -1,4 +1,4 @@
-"""Build ATA diagnostic media from the current verification tree."""
+"""Build mac99 diagnostic media from the current verification tree."""
 from pathlib import Path
 import hashlib
 import json
@@ -126,3 +126,71 @@ def clock_media():
     for path in (iso, directory / "PPCKERN.ELF"):
         hashes[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
     return iso, dict(make=args, hashes=hashes)
+
+
+def link_media():
+    directory = Path(os.environ["OS32_VERIFY_OUT"]).resolve() / "link-sh"
+    directory.mkdir()
+    user = directory / "user"
+    temp = directory / "tmp"
+    temp.mkdir()
+    args = ["make", "-j" + os.getenv("OS32_BUILD_JOBS", "8"), *PPC_MAKE,
+            "IMAGE=kboot-link-sh", "KBOOT_SH=1", "KBOOT_LINK=1", "KBOOT_GEM_RX_DIAG=1",
+            f"KB_OUT={directory}", f"KB_SH_OUT={user}", f"BUILD_OUT={directory / 'build'}",
+            f"KB_BODY_OUT={directory / 'sqlite-body'}"]
+    unicode_bin = directory / "unicode.bin"
+    manifest = json.loads(Path("build/ppc-ram-root.json").read_text())
+    manifest["/sys/unicode.bin"] = str(unicode_bin)
+    template = directory / "root-template.json"
+    template.write_text(json.dumps(manifest))
+    sample = directory / "sample.txt"
+    sample.write_text("ASCII ｶﾅ 日本語\n", encoding="utf-8")
+    args.extend([f"ROOT_MANIFEST={template}", f"PPC_UNICODE={unicode_bin}",
+                 f"KB_ROOT_BINS={user}/hello.bin {user}/fault.bin {sample}",
+                 "KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=ppc_trap_dispatch,--wrap=exec_run"])
+    hashes = {}
+
+    def meter(slot, path, content):
+        target = directory / (path.stem + "-meter.c")
+        target.write_text(content)
+        hashes[target.name] = hashlib.sha256(target.read_bytes()).hexdigest()
+        args.extend([f"{slot}_SRC={path}", f"{slot}_FILE={target}"])
+
+    shell = Path("userland/shell/rshell_lan.c")
+    stimuli = r'''        if (!strcmp(line, "p3-buffer")) {
+            printf("buffered line\n");
+        } else if (!strcmp(line, "p3-fault")) {
+            __asm__ volatile("trap");
+        } else if (!strcmp(line, "p3-output")) {
+            const char message[] = "FD1 UTF8 \xe3\x81\x82\n";
+            g_api->tvram_clear();
+            g_api->sys_write(1, message, sizeof(message) - 1);
+        } else accepting = rsh_lan_execute(line);'''
+    meter("PPC_SH_MUT", shell, "#include <stdio.h>\n" +
+          edit(shell.read_text(), "        accepting = rsh_lan_execute(line);", stimuli))
+    sink = Path("sys/kern/console/con_sink.c")
+    prefix, body = sink.read_text().split("int con_sink_capture(unsigned int op)")
+    body, suffix = body.split("int con_sink_capture_active", 1)
+    body = edit(body, "    con_sink_unlock(f);", """    if (op == CON_SINK_CAPTURE_FREEZE) p3_freeze_rc = rc;
+    if (op == CON_SINK_CAPTURE_END && rc == 0) ++p3_end_count;
+    con_sink_unlock(f);""")
+    suffix = edit(suffix, "void con_sink_owner_exit(int id)", """volatile int p3_exit_reader, p3_exit_owner;
+void con_sink_owner_exit(int id)""")
+    suffix = edit(suffix, "    if (id == CON_SINK_NO_READER) return;", """    p3_exit_owner = id;
+    p3_exit_reader = g_reader;
+    if (id == CON_SINK_NO_READER) return;""")
+    meter("KB_MUT", sink, prefix + "volatile int p3_freeze_rc;\nvolatile unsigned p3_end_count;\n"
+          + "int con_sink_capture(unsigned int op)" + body + "int con_sink_capture_active" + suffix)
+    heap = Path("sys/kern/mm/kmalloc.c")
+    alloc = "    void *p = kheap_alloc(&kernel_heap, size);"
+    meter("KB_MUT_EXTRA", heap, "volatile unsigned p3_alloc_failures;\n" +
+          edit(heap.read_text(), alloc, alloc + "\n    if (size && !p) ++p3_alloc_failures;"))
+    execute = Path("sys/kern/exec/exec.c")
+    flow = Path("tests/support/fixtures/ppc_link/flow.inc")
+    meter("KB_MUT_THIRD", execute, execute.read_text() + "\n" + flow.read_text())
+    args += ["all", "iso"]
+    subprocess.run(args, check=True, env={**os.environ, "TMPDIR": str(temp)})
+    iso = directory / "boot.iso"
+    return iso, dict(make=args, fixture=hashes, **{
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in (iso, directory / "PPCKERN.ELF")})

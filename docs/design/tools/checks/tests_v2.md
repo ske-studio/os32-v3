@@ -81,3 +81,18 @@ deny は未予約の両 API の拒否、子の終了値73・provider 呼出し0�
 `ppc_boot_clock` は verify ごとに候補の DEC と kboot を core の隔離 ISO に組み、7455 の READY を確認する。
 半速・100 Hz は raw の不足、始点再使用は同一標本を全桁の比較値と端点で識別し、直後の FATAL 行まで観測する。
 一回きりの対照では同じ core の前景端点を EE=0 で 8 ms 遅らせる。注入しない時は新式・旧式とも READY であることを先に確かめる。注入時、旧式の誤差は始点で正、終点で負で停止し、新式は両方で READY とする。
+
+## PowerMac の遠隔シェル
+
+`ppc_link_session` は link-sh の診断像を 7450 と 7455 で起動し、各 CPU で
+agent の先行と常駐開始から 300 tick 後の起動を試す。CUI READY の期限は 60 秒、
+通常操作は VM ごとに 180 秒、help は別枠の 480 秒。作業ディレクトリ、環境、
+pipe、redirect、日英のファイル、flush の出力をコマンドの prefix と EOT まで照合する。
+同じ要求の結果は 1 回だけ受理し、重複・古い ID と不正な改行を拒否する。
+
+子の正常終了 7 と USER fault 139、USB と遠隔シェルの往復、常駐 fault 時の
+reader と capture の解放、常駐世代更新後と agent 再起動後の echo を確認する。
+heap peak は正で 1 MiB 未満、確保失敗は 0。各 VM の起動条件、serial、
+UART trace、QMP 履歴、画面、要求と世代ごとの出力を evidence に保存する。
+正常と 3 変異で同じ 4 VM を使い、PRINT の二重化、常駐世代の停止、
+終了した owner の reader 残留を個別に検出する。

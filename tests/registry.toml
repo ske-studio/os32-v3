@@ -464,3 +464,17 @@ mutations = [
   { id = "dec_100_hz", config = "core", when = "after_build", replace = "sys/arch/ppc/kernel_dec.c", old = "period = tb_hz / tick_hz;", new = "period = 10 * (tb_hz / tick_hz);", fail = "7455/rate-low" },
   { id = "dec_same_sample", config = "core", when = "after_build", replace = "sys/platform/powermac/ppc_kernel.c", old = "int ok1 = ppc_dec_sample_read(&s1);", new = "int ok1 = ok0; s1 = s0;", fail = "7455/same-sample" },
 ]
+
+[[check]]
+id = "ppc_link_session"
+spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の遠隔シェル" }
+subsystem = "system"
+level = "L4"
+sources = ["make:all", "make:iso", "tests/support/ppc_vm.py", "tests/support/ppc_fixture.py", "tests/support/fixtures/ppc_link", "tests/support/ppc_peer.py", "tools/host_agent.py", "tools/host_rshell.py", "tools/host_operator_socket.py", "tools/ppc_lan_host.py", "tools/host_sfs_link.py", "sys/kern/console/console.c", "sys/platform/powermac/shell_loop_ops.c", "sys/kern/console/con_sink.c", "userland/shell/rshell_lan.c", "sys/kern/exec/exec.c", "sys/kern/mm/kmalloc.c"]
+environment = "qemu-ppc-net"
+arch = { ppc = ["link-sh"] }
+needs = []
+expect = "出力全体・常駐世代・owner 回復"
+limits = "agent 先行と後起動"
+gates = ["push", "main"]
+mutations = [{ id = "double_print", config = "link-sh", when = "after_build", replace = "sys/kern/console/console.c", old = "    con_sink_push_print(buf, size, color);", new = "    con_sink_push_print(buf, size, color); con_sink_push_print(buf, size, color);", fail = "duplicate PRINT payload" }, { id = "fault_restart", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/shell_loop_ops.c", old = "    kprintf(0x07, \"%s returned %d\\n\", path, rc);", new = "    kprintf(0x07, \"%s returned %d\\n\", path, rc);\n    if (rc < 0) for (;;) idle_wait_step();", fail = "resident fault without new generation" }, { id = "reader_owner", config = "link-sh", when = "after_build", replace = "sys/kern/console/con_sink.c", old = "    if (g_reader == id) {", new = "    if (0) {", fail = "reader retained after owner exit" }]
