@@ -103,3 +103,26 @@ void ata_wait_probe(void)
     return iso, dict(make=args, fixture=copies, **{
         path.name: hashlib.sha256(path.read_bytes()).hexdigest()
         for path in (iso, directory / "PPCKERN.ELF")})
+
+
+def clock_media():
+    """Rebuild core with both observation sites from this candidate."""
+    directory = Path(os.environ["OS32_VERIFY_OUT"]).resolve() / "core"
+    staging = directory / "tmp"
+    staging.mkdir(parents=True)
+    args = ["make", "-j" + os.getenv("OS32_BUILD_JOBS", "8"), *PPC_MAKE,
+            "KBOOT_LINK=0", f"KB_OUT={directory}", f"KB_SH_OUT={directory / 'user'}",
+            f"BUILD_OUT={directory / 'build'}"]
+    hashes = {}
+    for slot, original in (("KB_MUT", Path("sys/arch/ppc/kernel_dec.c")),
+                           ("KB_MUT_EXTRA", PM / "ppc_kernel.c")):
+        target = directory / original.name
+        target.write_bytes(original.read_bytes())
+        hashes[target.name] = hashlib.sha256(target.read_bytes()).hexdigest()
+        args.extend([f"{slot}_SRC={original}", f"{slot}_FILE={target}"])
+    args.extend(["all", "iso"])
+    subprocess.run(args, check=True, env={**os.environ, "TMPDIR": str(staging)})
+    iso = directory / "boot.iso"
+    for path in (iso, directory / "PPCKERN.ELF"):
+        hashes[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return iso, dict(make=args, hashes=hashes)

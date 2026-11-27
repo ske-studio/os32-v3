@@ -142,11 +142,11 @@ B29 (`7d288722`、11 ファイル) のうち、**物理の周期に関わる所�
 | `sys/platform/powermac/clock.c` | `return 100;` | `return PM_DEC_HZ;` (物理 DEC の Hz と注記)。`platform_clock_init` の検査 同ファイル内 はこのまま | ±2 |
 | `sys/platform/powermac/kboot_info.h` | `u32 pm_tick_hz(void);` | `#define PM_DEC_HZ 1000u` を足し、宣言の注記を「物理 DEC の Hz」に | +2 |
 | `sys/platform/powermac/ppc_kernel.c` | `CLOCK hz=%u` に `pm_tick_hz()` | `OS32_TICK_HZ` を出す (行の書式・値 100 は変えない → `kboot_run.py` の `CLOCK hz=100` と一致) | ±1 |
-| `sys/platform/powermac/ppc_kernel.c` | 論理 tick 1 個 ・+3 個  の待ち、TB と µs の照合 | 待ちはこのまま。tb0・tb1 を読む同じ EE=0 の区間で `tick_clock_raw` も読み、raw の増分を TB の区間 `want = (tb1-tb0)*PM_DEC_HZ/tb_hz` (64bit) と比べる。`|got-want| > want/50 + 2` (2% と ±2) なら `kboot_stop("dec_rate")` | +8 |
+| `sys/platform/powermac/ppc_kernel.c` | 論理 tick 1 個・+3 個の待ち、TB と µs の照合 | 両端で最新 DEC 標本をコピー。mfdec 前と mtdec 後の TB を a,b とし、raw 差を (a1−b0) と (b1−a0) の各周期換算値 w と照合する。両方で絶対差 ≤ w/50 + 2。前景への配達遅延は測定外、中間の再装填の遅れは区間に残る | |
 | 試験 `kboot_dec_host.c (旧版 6298ca8596fe)` | 100Hz の期待値 (dec=250000 等) | B29 前の 1000Hz の期待値 (`25000000,1000` → dec=25000、`-75001` → 4 物理 step)。ジフィの期待を足す: 4 step では tick_count=0・calls=0、計 10 step で tick_count=1・calls=1、33333333 の 1000 回で sum=33333333 かつ tick_count が +100。2 回目の `ppc_dec_start` で config が断る値でも、動いている DEC と ready を変えない | +14 −9 |
 | 試験 `kboot_dec.py (旧版 8d5313fc0345)` | `('100hz', 'tick_hz != 100', ...)` | `('1khz', 'tick_hz != PM_DEC_HZ', 'tick_hz != 100', 5)`、追加 `jiffy-gate` (step の bit0 を見ずに毎回 dispatch → calls の check で RED)、`step-call` (step を消すと tick_count が進まない) | +3 −1 |
 | 試験 `kboot_clock_fake.c (旧版 bbecbb96ad2e)` | `platform_clock_init(100)`・`tick_hz==100` | B29 前に戻す (1000) | ±6 |
-| 試験 `kboot_mutations.py (旧版 b67d6b0c95b7)` | half-rate の RED の理由は `ALIVE tick/TB mismatch` | period を 2 倍にすると raw が TB の半分になり、ALIVE の前に止まる。期待を `'forbidden diagnostic', r'^FATAL kboot dec_rate$'` に。加えて「DEC を 100Hz に戻した像」(`kernel_dec.c` の `fraction >= PM_DEC_HZ` と period を 100Hz にする変異) も `FATAL kboot dec_rate` で RED になる行を足す | +5 −1 |
+| 試験 `ppc_boot_clock` | 半速と 100 Hz | period のみ 2 倍・10 倍にし、それぞれ処理速度の不足で dec_rate 停止を確認。始点再使用は same-sample で停止 | |
 | 変えない | `kboot_dec_fixture.inc` (`delta*100`、tick_count は論理)、`kboot_run.py` の PATTERNS と rate、`kboot_run_selftest.py`、`kboot_mutations.py` の METER | — | 0 |
 | 注記 | `build/targets/ppc-powermac.mk`「live 1 kHz tick counter」、`kboot_audit.py`「the kernel ticks at 1 kHz」、`kboot_run.py` | 「kboot_tick = 論理 100Hz の tick_count (DEC は物理 1kHz)」。audit の文言は「PIT_HZ は PC-98 の名前。共通は OS32_TICK_HZ」に | +4 |
 

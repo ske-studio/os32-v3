@@ -10,6 +10,21 @@
 
 static u32 period, remainder, fraction;
 static int ready;
+static bool sample_enabled, sample_valid;
+static struct ppc_dec_sample latest;
+
+void ppc_dec_sample_enable(bool enable)
+{
+    sample_enabled = enable;
+    sample_valid = false;
+}
+
+int ppc_dec_sample_read(struct ppc_dec_sample *out)
+{
+    if (!sample_valid) return -1;
+    *out = latest;
+    return 0;
+}
 
 static u32 next_period(void)
 {
@@ -30,6 +45,7 @@ int ppc_dec_start(u32 tb_hz, u32 tick_hz)
         tick_hz != PM_DEC_HZ) return -1;
     if (tick_clock_config(1, tick_hz)) return -1;
     ready = 0;
+    ppc_dec_sample_enable(false);
     period = tb_hz / tick_hz;
     remainder = tb_hz % tick_hz;
     fraction = 0;
@@ -46,6 +62,8 @@ void ppc_decrementer_interrupt(struct ppc_frame *frame)
         ppc_write_dec(PPC_DEC_FAR);
         return;
     }
+    bool capture = sample_enabled;
+    unsigned long long before = capture ? ppc_read_tb64() : 0;
     int remaining = ppc_read_dec();
     u32 elapsed = 0;
     /* A stale pending exception with positive DEC must not invent a tick.
@@ -55,6 +73,14 @@ void ppc_decrementer_interrupt(struct ppc_frame *frame)
         ++elapsed;
     }
     ppc_write_dec((u32)remaining);
+    if (capture && elapsed) {
+        unsigned long long after = ppc_read_tb64();
+        u32 lo, hi;
+        tick_clock_raw(&lo, &hi);
+        unsigned long long raw = (((unsigned long long)hi << 32) | lo) + elapsed;
+        latest = (struct ppc_dec_sample){before, after, (u32)raw, (u32)(raw >> 32)};
+        sample_valid = true;
+    }
     while (elapsed--)
         if (tick_clock_step() & TICK_STEP_JIFFY) tick_dispatch();
 }
