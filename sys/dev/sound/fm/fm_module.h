@@ -2,8 +2,9 @@
 #ifndef FM_MODULE_H
 #define FM_MODULE_H
 #include "fm_contract.h"
+#include "opn_probe.h"
 #include "../../../kern/module/module_runtime.h"
-#define FM_MODULE_OPS_VERSION 2u
+#define FM_MODULE_OPS_VERSION 4u
 typedef struct {
     void (*opn_write)(uchar reg, uchar val);
     void (*opn_init)(void);
@@ -18,10 +19,12 @@ typedef struct {
     void (*ssg_mixer)(uchar mask);
     void (*ssg_all_off)(void);
     int (*quiet)(void);
-    int (*attach)(void (*fault)(u32));
+    void (*probe)(struct fm_probe_record *, int, unsigned char, int (*)(u32 *, u32 *));
+    int (*attach)(void (*fault)(u32), const struct fm_probe_record *);
     int (*detach)(void);
 } FmModuleApi;
-#define FM_MODULE_API_SLOTS 15u
+#define FM_MODULE_API_SLOTS 16u
+const struct fm_probe_record *fm_boot_probe(void);
 int fm_module_load(void);
 int fm_module_abort(void);
 #endif

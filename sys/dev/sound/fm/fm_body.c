@@ -23,10 +23,11 @@ static void write_failed(void)
         report_fault(device);
 }
 
-static int attach(void (*fault)(u32))
+static int attach(void (*fault)(u32), const struct fm_probe_record *record)
 {
-    /* Boot probes before legacy ownership, with IRQ12 masked. */
-    chip.model = opn_probe(chip.irq_shadow, &contained);
+    contained = record->contained;
+    if (!contained) return -1;
+    chip.model = record->native_model;
     if (chip.model != OPN_PROBE_OPNA && chip.model != OPN_PROBE_OPN)
         return contained ? 0 : -1;
     chip.shared_irq = PCM_IRQ == 12;
@@ -69,7 +70,7 @@ int fm_module_init(FmModuleApi *out)
         .ssg_noise = ssg_noise,
         .ssg_mixer = ssg_mixer,
         .ssg_all_off = ssg_all_off,
-        .attach = attach, .detach = detach, .quiet = quiet
+        .probe = opn_probe_once, .attach = attach, .detach = detach, .quiet = quiet
     };
     return 0;
 }
