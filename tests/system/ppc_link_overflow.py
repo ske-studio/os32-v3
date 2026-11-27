@@ -12,7 +12,8 @@ from tests.system.ppc_link_session import boot
 def exercise(vm, op, late):
     def command(line, expected):
         op.wait(lambda: op.operator.ready and op.operator.ready["mode"] == "cui"
-                and op.operator.ready["state"] != "running", vm.deadline, "missing cui READY")
+                and op.operator.ready["state"] != "running" and op.ready_released(),
+                vm.deadline, "missing cui READY")
         rid, generation = op.submit(line, vm.deadline)
         return op.expect_once(rid, generation, expected, vm.deadline)
 

@@ -26,9 +26,9 @@
 
 PowerPC の構成には任意の `ppc_seconds` 表を付ける。未計測の構成は値を省き、計測まで暫定の 900 秒で割り当てる。900 秒を超える登録は lint が拒む。実測が上限を超えた検査は G13 に従って中を分割する。
 
-1. hosted の `restructure-build` で conclusion が `success` の run を選ぶ。[workflow の collect ジョブ](../../../../.github/workflows/restructure-build.yml) は `if: always()` で失敗時も成果物を保存する。成功した attempt N の成果物 `summary-<N>` の `summary.json` だけを使い、`identity.attempt` が N に一致し、`rc` が 0 であることを確認する。
+1. hosted の `restructure-build` で conclusion が `success` の run を選ぶ。[workflow の collect ジョブ](../../../../.github/workflows/restructure-build.yml) は `if: always()` で失敗時も成果物を保存する。成功した attempt N の成果物 `summary-<N>` の `summary.json` だけを使い、`identity.attempt` が N に一致し、`identity.mutate` が true、`rc` が 0 で、対象行の全必須変異が RED であることを確認する。
 2. 対象の `(id, config)` に一致する `rows[]` の `status` が `PASS` であることを確認する。その行の `seconds` と同じ行の `mutations` にある全変異の `seconds` を合計し、最後に切り上げた正の整数を `tests/registry.toml` の該当検査の `ppc_seconds.<構成>` に書く。run 45992489854 の attempt 1 では、`ppc_boot_clock/core` の正常 6.37 秒と変異 5.91、6.24、5.81 秒の合計は約 24.3 秒で、登録値は 25 秒になる。
-3. 更新の前後で `python3 -B -m tests.infra.ci plan --full --gate push` を実行し、`(id, config)` の集合と各行の必須変異の集合が一致することを確認する。各行の束への割り当てと束ごとの登録重みを表にする。更新を入れた枝の新しい成功 run で、同じ手順で選んだ `summary.json` の `durations` にある各 `bundle-<束名>` の所要が 900 秒以内であることを確認する。更新前後の登録重みと実測秒を [ci_v2.md §6 全件の所要](../ci/ci_v2.md#6-全件の所要) の表に記録する。
+3. 更新の前後で `python3 -B -m tests.infra.ci plan --full --gate push --mutate` を実行し、`(id, config)` の集合と各行の必須変異の集合が一致することを確認する。各行の束への割り当てと束ごとの登録重みを表にする。更新を入れた枝の新しい成功 run で、同じ手順で選んだ `summary.json` の `durations` にある各 `bundle-<束名>` の所要が 900 秒以内であることを確認する。更新前後の登録重みと実測秒を [ci_v2.md §6 全件の所要](../ci/ci_v2.md#6-全件の所要) の表に記録する。
 
 ## 本体と登録の双方向照合
 
