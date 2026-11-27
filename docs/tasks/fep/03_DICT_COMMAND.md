@@ -11,7 +11,7 @@
 ## 1. コマンド体系
 
 ```
-ime                      現在のモード/辞書を表示
+ime                      現在の FEP 状態を表示
 ime on | off             FEP 有効/無効 (ime_set_mode 経由)
 ime mode hira|kata       入力モード切替
 ime dict s|m|l           辞書バリアント切替 (再オープン)
@@ -20,6 +20,22 @@ ime user delete <yomi> [kanji]   学習エントリ削除
 ime user export [path]   CSV エクスポート (既定 /tmp/userdict.csv)
 ime user clear           学習辞書全消去 (確認プロンプト)
 ```
+
+### 1.1 モード操作の出力と終了値
+
+| コマンド | 成功条件 | 標準出力 (1 行) |
+|---|---|---|
+| `ime on` | FEP が有効で、読み戻したモードがひらがな | `FEP enabled.` |
+| `ime mode hira` | 読み戻したモードがひらがな | `Mode switched to Hiragana.` |
+| `ime mode kata` | 読み戻したモードがカタカナ | `Mode switched to Katakana.` |
+| `ime off` | OFF を要求。すでに OFF の場合も冪等に成功 | `FEP disabled.` |
+
+成功時は標準エラー出力が空で終了値は 0。上記の有効化・モード切替の要求が成立しなければ、
+標準出力は空で、標準エラー出力に診断を 1 行出して 1 を返す。成功判定は論理モードの到達に基づく。
+辞書接続の健全性は検査しない。
+
+引数なしの `ime` は状態を変更せず、`FEP: OFF` または `FEP: ON (Mode: <mode>)` を
+標準出力に 1 行表示して 0 を返す。`<mode>` は Hiragana、Katakana、未知の値なら Unknown。
 
 ---
 

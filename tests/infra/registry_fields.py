@@ -10,9 +10,22 @@ def build(config):
     load(Path.cwd())
 
 
+def verify_configs(root, row):
+    for config in ("..", ".", "nested/config", "nested\\config", ""):
+        candidate = dict(row, arch={"host": [config]}, mutations=[
+            dict(mutation, config=config) for mutation in row["mutations"]])
+        try:
+            validate([candidate], root)
+        except ValueError as exc:
+            if str(exc) == "invalid configs":
+                continue
+        raise Failure("unsafe configuration accepted")
+
+
 def verify(config):
     root = Path.cwd()
     row = load(root)[0]
+    verify_configs(root, row)
     for field in row:
         incomplete = row.copy()
         del incomplete[field]

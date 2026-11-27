@@ -18,7 +18,7 @@ P3 で最小の CI を入れる。移動後、P4 の最初の新しい検査と�
 
 移動前の関門は現行 CI の全件 success。P3 の変更で旧 workflow 4 本を止め、候補 SHA を直接 checkout する新 workflow を入れる。x86 の make all と配布媒体の生成、PowerPC の 6 像のビルドを並列化し、独立したジョブは失敗後も続ける。PowerPC の各構成では、出力先の `PPCKERN.ELF` と `boot.iso` がともに非空の通常ファイルであることを求める。各ジョブが必須ファイルの一覧と sha256 を出す。移動枝では PM の機械で候補 SHA を組み、P2-1 でタグ v3-pre-restructure の保存物と比較する。差には Sep-Changes: の宣言と差ごとのレビューを要する。その後、同じ入力で再生成して比較するのは main に入れる候補 SHA だけとする。途中の push では再生成比較を省く。ビルド破損・コンパイラ不足・必須ファイル欠落はそれぞれ赤とする。
 
-配布物の名前は現行のままとし、ノートは tools/ci_fetch.sh で候補 SHA の媒体を取得する。pc98emu は依頼の run 番号と成果物名を指定して `gh run download <run-id> -n <成果物名>` で媒体を取り、同じ run の最新 attempt の札 `verified-<SHA>-a<n>` の有無を報告する。ci_fetch --sha は同じ SHA の別の run を選ぶことがある。U21 の間は文書だけの変更も含め、取り込みごとに pc98emu が PC-98 の媒体を NP21/W で手動起動する。PowerPC の起動用の像は QEMU で確認する。記録には候補 SHA、媒体を出した run ID・attempt 番号、媒体の sha256、到達点、画面またはログの所在を書く。
+配布物の名前は現行のままとし、ノートは tools/ci_fetch.sh で候補 SHA の媒体を取得する。pc98emu は依頼の run 番号と成果物名を指定して `gh run download <run-id> -n <成果物名>` で媒体を取り、同じ run の最新 attempt の札 `verified-<SHA>-a<n>` の有無を報告する。ci_fetch --sha は同じ SHA の別の run を選ぶことがある。取り込みごとに pc98emu が U30 の計画に従って候補媒体を NP21/W で手動起動する。配布の計画では HDD 起動で `selftest_fail=0` を確認する。文書だけの計画では FD 起動で `ver` だけを実行し、Commit・Image CRC・FD loader を記録する。PowerPC の起動用の像は QEMU で確認する。記録には候補 SHA、媒体を出した run ID・attempt 番号、媒体の sha256、到達点、画面またはログの所在を書く。
 
 仮の関門はこの票の変更だけを扱う。候補 SHA の指定 run の最新 attempt 自体が完了・成功し、同じ attempt のビルドが success で、PM の機械での生成物比較の記録（候補 SHA・基点 SHA・比較ログ・終了値 0・`SHA256SUMS` と `PRESENCE` それぞれの SHA-256）を取り込み判定に添え、基点と同じ到達点を確認した起動記録を §4 の条件で媒体に照合できれば通す。P6-2〜P6-4 を揃える取り込みで、同じ受入記録を入力とする §4 の全件集計に切り替える。
 
@@ -55,6 +55,8 @@ P3 で最小の CI を入れる。移動後、P4 の最初の新しい検査と�
 変異には検査名・構成・変異 ID を付ける。検査ごとに宣言数、実行数、狙った異常を検出して赤になった数、変異の所要秒を出す。環境異常での終了は検出数に含めない。
 
 ## §4 全件の集計
+
+verify は毎回、候補の木内の空ディレクトリを OS32_VERIFY_OUT で受け取る。期待 RED の出力は転送しない。実失敗の最終診断を JSON と集計に載せ、木内 evidence/ の証拠を束の results/evidence/<検査>/<構成>/<normal または変異 ID>/ に保存する。各 case の上限は計 4 MiB、テキスト各 256 KiB で、manifest.json に省略バイト数を記す。
 
 集計ジョブは全ての束を needs に指定し、失敗時も各束の終了を待って collect を実行する。再実行時は全ジョブを回し直す。計画と各束の結果は attempt ごとの成果物に保存し、collect は今回の attempt の分だけを集計する。
 
@@ -131,7 +133,7 @@ PC-98 と PowerMac のビルド環境は build-setup と ppc-setup が用意す�
 ## P6-2〜P6-4 の取り込み手順
 
 統合用の wt/int-* に候補 SHA を push する。plan・checks・collect は候補の登録を
-使い、collect の結果は summary-<attempt> に残る。各束の構成別ログは
+使い、collect の結果は summary-<attempt> に残る。実行器が選ぶ通常失敗・変異 UNDETECTED / ERROR の構成別ログは
 checks-<attempt>-<束> にある。全件集計の欠け・失敗・別 attempt は取り込みを止める。
 この段では全件を同じ attempt で回すため、再試行は全ジョブを指定する。
 基点比較は移動時で終了し、以後は build_identity が候補の二つの清浄ビルドを照合する。

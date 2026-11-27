@@ -66,7 +66,8 @@ needs = []
 expect = "登録が通り、必須の欄を欠く登録を lint が拒否する"
 limits = "製品の実行結果は調べない"
 gates = ["push", "main"]
-mutations = [{ id = "lint_accepts_missing", config = "local", replace = "tests/support/registry.py", old = "missing = FIELDS", new = "row.setdefault('needs', [])\n        missing = FIELDS", fail = "missing field not rejected: needs", when = "after_build" }]
+mutations = [{ id = "allow_unsafe_config", config = "local", replace = "tests/support/registry.py", old = "and all(map(config_component, values))", new = "and True", fail = "unsafe configuration accepted", when = "after_build" },
+             { id = "lint_accepts_missing", config = "local", replace = "tests/support/registry.py", old = "missing = FIELDS", new = "row.setdefault('needs', [])\n        missing = FIELDS", fail = "missing field not rejected: needs", when = "after_build" }]
 
 [[check]]
 id = "ppc_boot"
@@ -87,14 +88,20 @@ id = "collection_contract"
 spec = { path = "docs/design/tools/ci/ci_v2.md", section = "§2 共通入口" }
 subsystem = "infra"
 level = "M"
-sources = ["tests/infra/ci.py", "tests/support/impact.py", "tools/ownership_images.py"]
+sources = ["tests/infra/ci.py", "tests/support/impact.py", "tools/ownership_images.py", "tests/support/registry.py", ".github/workflows/restructure-check-bundle.yml", "tests/registry.toml"]
 environment = "python-yaml"
 arch = { host = ["local"] }
 needs = []
 expect = "変更ファイルが入る宣言済みの像と仕様文書を読む検査を選び、独立した失敗の後も全件を集計し、欠落と禁じた再利用を拒む"
 limits = "ローカルの実行器・集計器まで"
 gates = ["push", "main"]
-mutations = [{ id = "drop_userland_check", config = "local", replace = "tests/support/impact.py", old = '{"ring3_instructions", "c_dialect",', new = '{"c_dialect",', fail = "userland checks", when = "after_build" },
+mutations = [{ id = "allow_linked_root", config = "local", replace = "tests/infra/ci.py", old = "if destination.is_symlink():", new = "if destination.is_symlink() and destination.parent != output:", fail = "accepted linked component evidence", when = "after_build" },
+             { id = "allow_linked_row", config = "local", replace = "tests/infra/ci.py", old = "if destination.is_symlink():", new = "if destination.is_symlink() and component != name:", fail = "accepted linked component evidence/first", when = "after_build" },
+             { id = "omit_evidence_upload", config = "local", replace = ".github/workflows/restructure-check-bundle.yml", old = "/results/evidence/", new = "/results/absent/", fail = "failure evidence upload missing", when = "after_build" },
+             { id = "omit_net_image", config = "local", replace = "tests/support/impact.py", old = "row[\"environment\"].startswith(\"qemu-ppc\")", new = "row[\"environment\"] == \"qemu-ppc\"", fail = "net fixture image selection", when = "after_build" },
+             { id = "forward_red", config = "local", replace = "tests/infra/ci.py", old = "if result != \"RED\" else None", new = "if True else None", fail = "expected RED forwarded", when = "after_build" },
+             { id = "first_missing_only", config = "local", replace = "tests/infra/ci.py", old = 'raise MissingPrerequisites("\n".join(sorted(missing)))', new = 'raise MissingPrerequisites("\n".join(sorted(missing)[:1]))', fail = "missing prerequisites incomplete", when = "after_build" },
+             { id = "drop_userland_check", config = "local", replace = "tests/support/impact.py", old = '{"ring3_instructions", "c_dialect",', new = '{"c_dialect",', fail = "userland checks", when = "after_build" },
              { id = "drop_declared_configs", config = "local", replace = "tests/support/impact.py", old = "declared_configs.update(config for config, _ in outputs)", new = "declared_configs.clear()", fail = "declared images:", when = "after_build" },
              { id = "drop_spec_input", config = "local", replace = "tests/support/impact.py", old = 'direct.add("test_registration")', new = "pass", fail = "spec input:", when = "after_build" },
              { id = "drop_shared_program", config = "local", replace = "tests/support/impact.py", old = "if shared_programs:", new = "if False:", fail = "shared program inputs", when = "after_build" },
@@ -374,3 +381,17 @@ expect = "再生中に取り逃した PI を tick が I24 の読みと 0 書き�
 limits = "HAL 再生中のポート模型。実機の配線、割り込みの時刻、停止遷移は対象外"
 gates = ["push", "main"]
 mutations = [{ id = "omit_tick_ack", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_cs4231.c", old = "if (g_pcm.state == PCM_ST_RUNNING) (void)pcm_codec_ack();", new = "(void)0;", fail = "missed PI after tick" }]
+
+[[check]]
+id = "ime_result"
+spec = { path = "docs/tasks/fep/03_DICT_COMMAND.md", section = "1.1 モード操作の出力と終了値" }
+subsystem = "system"
+level = "L2"
+sources = ["userland/cmds/ime.c", "userland/cmds/ime_info.inc", "sdk/include/os32", "tests/support/fixtures/ime_result"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "ime on・mode は要求状態になれば従来の成功文と 0、未成立なら成功文なし・stderr に診断 1 行・終了値 1"
+limits = "ホストの KAPI stub を使う CLI 検査。ゲストの辞書ロードとモジュール公開は対象外"
+gates = ["push", "main"]
+mutations = [{ id = "skip_on_mode_check", config = "pc98", when = "after_build", replace = "userland/cmds/ime.c", old = "if (!api->ime_is_active() || api->ime_get_mode() != IME_MODE_HIRAGANA)", new = "if (!api->ime_is_active())", fail = "stuck on: rc=0" }]
