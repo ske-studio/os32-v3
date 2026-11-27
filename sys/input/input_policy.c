@@ -388,7 +388,7 @@ static int busy(u32 owner, u32 gen)
 
 static void bump(void)
 {
-    if (++revision == 0) ++revision;
+    ++revision;
 }
 
 static int publish(const PolicyTable *table, u32 owner, u32 gen)

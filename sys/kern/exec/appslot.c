@@ -104,8 +104,8 @@ static u32 exec_generations[APP_SLOT_COUNT];
 
 static void issue_exec_generation(int id)
 {
-    if (++exec_generations[id] == 0) ++exec_generations[id];
-    g_slot[id].exec_gen = exec_generations[id];
+    /* Counters start at 0 and issue 1 first; 0 stays invalid until 2^32 launches of this slot. */
+    g_slot[id].exec_gen = ++exec_generations[id];
 }
 
 void appslot_shell_reserve_generation(void)
