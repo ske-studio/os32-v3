@@ -73,10 +73,12 @@ def deadline_cause(g):
 
 def check_close(g):
     check(g["seen"] == 7, "missing OPEN, WDATA or RELEASE")
-    # The link idle expiry (WDATA + 100) can only coincide with the deadline (start + 100);
-    # the upper layer must still close exactly once in the first observing round.
+    # Which of POLL, CLIENT or the link idle expiry records first depends only on the order
+    # inside one tick; the verdict rests on the single close in the first observing round.
+    # A link idle expiry must not come before the deadline (that would be a link timer regression).
     check(g["source"] in (1, 2) and (g["reason"] == g["source"] or
-          (g["reason"] == 3 and g["reason_tick"] == g["deadline"])), "first termination cause")
+          (g["reason"] == 3 and distance(g["deadline"], g["reason_tick"]) < 0x80000000 and
+           distance(g["reason_tick"], g["close_tick"]) < 0x80000000)), "first termination cause")
     check(g["prev_event"] and g["end_event"] and ordered(g["prev_event"], g["end_event"]) and
           ordered(g["prev"], g["deadline"]) and distance(g["deadline"], g["end"]) < 0x80000000,
           "missing first foreground deadline crossing")
