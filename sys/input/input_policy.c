@@ -120,10 +120,13 @@ static int row_key(u8 platform, const IkmRow *r, u32 *out)
 }
 
 /* Sorted delta keys, followed by 0/1/2 byte payloads. No wire copy or
- * separate seen bitmap. At most 8192 delta bytes + 1343 extension bytes
- * + 8192 payload bytes + 3968 second bytes = 21695 bytes.
+ * separate seen bitmap. Allow 3 bytes per row (delta and payload). Keys below
+ * 3972 have at most 31 two-byte deltas (3972 / 128). Larger keys
+ * have one payload byte, leaving room for a two-byte delta. At most
+ * 10 deltas need a third byte (170660 / 16384).
  * Invalid Unicode surrogate slots encode BSD_SPECIAL without a third byte. */
-enum { POLICY_BYTES = 21760, POLICY_STRIDE = 64, POLICY_INDEX = 128 };
+enum { POLICY_BYTES = 3 * IKM_MAX_ROWS + 31 + 10, POLICY_STRIDE = 64,
+       POLICY_INDEX = (IKM_MAX_ROWS + POLICY_STRIDE - 1) / POLICY_STRIDE };
 typedef struct { u32 key; u16 offset; } PolicyIndex;
 typedef struct {
     u8 data[POLICY_BYTES];
@@ -430,7 +433,7 @@ int ikm_policy_set(const void *wire, u32 length, u32 owner, u32 gen)
         row.value = read32(r + 8); row.aux = read32(r + 12);
         if (row_key(machine, &row, &key)) return OS32_ERR_INVAL;
         if (row.kind == 5 || row.kind == 6) {
-            if (++next->term_ext > 128) return OS32_ERR_INVAL;
+            if (++next->term_ext > IKM_MAX_ROWS / 64) return OS32_ERR_INVAL;
             if (row.kind == 6) next->ext_profiles |= 1u << row.profile;
         }
         if (insert(next, key, row_value(&row))) return OS32_ERR_INVAL;

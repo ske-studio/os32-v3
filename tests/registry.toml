@@ -675,7 +675,8 @@ needs = []
 expect = "Action と Key の全 offset とサイズ、Rust の v2 LE 列と i386・PowerPC の実デコードが一致。初期化失敗後も九口は NOSYS、旧 WM pump が通常窓へ Key と Text を各一件配送、CUI は Enter で一行実行"
 limits = "公開前の provider と内部配送を実行。失敗注入後の raw をホストの WM pump に渡す。窓リングとマウスは fixture。生成 syscall は対象外"
 gates = ["push", "main"]
-mutations = [{ id = "drop_legacy_enter", config = "link-sh", when = "after_build", replace = "sys/hal/input/legacy_keymap.c", old = "byte = result->op;", new = "byte = 0;", fail = "private provider or v2 LE mismatch" },
+mutations = [{ id = "omit_ikm_row_limit", config = "pc98", when = "after_build", replace = "sys/input/input_policy.c", old = "n > IKM_MAX_ROWS || ", new = "0 || ", fail = "private provider or v2 LE mismatch" },
+    { id = "drop_legacy_enter", config = "link-sh", when = "after_build", replace = "sys/hal/input/legacy_keymap.c", old = "byte = result->op;", new = "byte = 0;", fail = "private provider or v2 LE mismatch" },
     { id = "omit_pc98_window_delivery", config = "pc98", when = "after_build", replace = "userland/gshell/src/input.rs", old = "crate::excl::deliver_window_key(st, t.slot, t.win_id, scan, down, ch, mods);", new = "// omit delivery", fail = "legacy GUI window delivery mismatch" },
     { id = "omit_mac_window_delivery", config = "link-sh", when = "after_build", replace = "userland/gshell/src/input.rs", old = "crate::excl::deliver_window_key(st, t.slot, t.win_id, scan, down, ch, mods);", new = "// omit delivery", fail = "legacy GUI window delivery mismatch" },
     { id = "omit_pc98_policy_boot", config = "pc98", when = "after_build", replace = "sys/platform/pc98/input_keymap.c", old = "rc = ikm_policy_init", new = "rc = 0 && ikm_policy_init", fail = "private provider or v2 LE mismatch" },

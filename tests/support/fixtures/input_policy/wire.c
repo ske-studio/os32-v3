@@ -67,6 +67,23 @@ static int check_unavailable(u8 *base, unsigned size)
     return 0;
 }
 
+static int check_row_limit(void)
+{
+    static u8 wire[16 + 1025 * 16] = {'I','K','M','1',2,0,16,0,0,4};
+    u32 count;
+    for (unsigned i = 0; i < 1024; ++i) {
+        u8 *row = wire + 16 + i * 16;
+        row[0] = 2;
+        row[2] = 2;
+        row[4] = i / 5;
+        row[6] = i % 5;
+        row[8] = 65;
+    }
+    if (ikm_policy_set(wire, sizeof wire - 16, 0, 0)) return 1;
+    wire[8] = 1;
+    return ikm_wire_header(wire, sizeof wire, &count) != OS32_ERR_INVAL;
+}
+
 static int test_provider(void)
 {
     KbdPolicySnapshot snapshot;
@@ -112,7 +129,7 @@ static int test_provider(void)
     }
     return diagnostics != 1 || check_unavailable(base, sizeof base);
 #endif
-    if (diagnostics) return 3;
+    if (diagnostics || check_row_limit()) return 3;
     appslots[1].exec_gen = 1;
     appslots[2].exec_gen = 2;
     input_context_discard_register(discard);

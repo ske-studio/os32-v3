@@ -280,8 +280,8 @@ slot 347/348 の SDK 型名は KbdPolicyAction / KbdPolicyKey。context・flags�
 |口と範囲|① CPL0・CPL3 共通の INVAL|② CPL0 直呼び|② CPL3 syscall|③ 許可後の target|
 |---|---|---|---|---|
 |両 read の out（max × 16 / 48 B）|max > 128、正数時の NULL・4 B 非整列・末尾折返し。出力は一つ|ページ検査を省く|正数時に書込不可なら既存 fault kill|0 件指定は out を無視して 0。正数時だけ dequeue|
-|get の needed（4 B）と wire（capacity B）|needed の NULL・4 B 非整列・末尾折返し、capacity > 131088、正数時の wire の NULL・末尾折返し・needed との部分または全重複。wire は byte 整列|ページ検査を省く|needed と非空 wire のいずれかが書込不可なら既存 fault kill|容量 0 は wire を無視。容量不足は needed だけ書いて FULL、十分なら両方を書いて 0|
-|set の wire（length B）|16..131088 の範囲外、ヘッダを除く長さが 16 の倍数でない、NULL・末尾折返し。byte 整列、入力は一つ|ページ検査を省く|全域を読めなければ既存 fault kill|ヘッダ行数と length の一致を含む IKM1 の内容を検証してから交換|
+|get の needed（4 B）と wire（capacity B）|needed の NULL・4 B 非整列・末尾折返し、capacity > 16400、正数時の wire の NULL・末尾折返し・needed との部分または全重複。wire は byte 整列|ページ検査を省く|needed と非空 wire のいずれかが書込不可なら既存 fault kill|容量 0 は wire を無視。容量不足は needed だけ書いて FULL、十分なら両方を書いて 0|
+|set の wire（length B）|16..16400 の範囲外、ヘッダを除く長さが 16 の倍数でない、NULL・末尾折返し。byte 整列、入力は一つ|ページ検査を省く|全域を読めなければ既存 fault kill|ヘッダ行数と length の一致を含む IKM1 の内容を検証してから交換|
 
 input_policy_abi は次の競合を各々独立に観測する。CPL0 は形が正しければ呼出元がアクセス可能な実領域を渡す。失敗した呼出し自体による出力・表交換・dequeue はゼロとし、fault 終了に伴う owner 回収は §10.2 に従う。
 
@@ -296,7 +296,8 @@ input_policy_abi は次の競合を各々独立に観測する。CPL0 は形が�
 
 Key は native u32 の src_generation, map_id, keycode, sc_down_repeat, physical_mods, logical_mods, time_ms, map_generation, keysym, kind, action, value の順。全 offset は 0 から 4 刻み、48 B。src は下位8 bit、続く16 bit が source 世代。sc は下位8 bit、bit 8–11 は down/repeat/no_keydata/is_modifier。map_id・keysym は下位16 bit、予約 bit は 0。raw と in2 の物理入力、端末の Action、WM の Key は別形式。独占中は in2 に物理入力を渡し、WM の通常配送を閉じる。境界で compose・押下・保留配送を清算し、消費した make の break を新窓へ漏らさない。
 
-IKM1 はヘッダ16 B、version=2、行16 B、最大8192行。多バイト値は LE、最大131088 B。全行を一度ずつ読み、欠落値は OS 既定から補う。kind 6 の置換単位は profile。重複、予約 bit、異機種 profile、保留中の ACCENT と非零 accent_count は INVAL。押下中または他 owner が保存中なら BUSY。失敗時は active・保存先・世代を維持する。終了・異常・STOP は同じ owner/exec_gen の ikm_policy_owner_exit で復元する。8192 は wire 行数の上限。編成結果が一面の容量を超えれば INVAL、交換も初回保存もしない。表3面は各24 KiB 以下、圧縮像・BSS の増分を両機種で実測する。
+IKM1 はヘッダ16 B、version=2、行16 B、最大1024行。多バイト値は LE、最大16400 B。全行を一度ずつ読み、欠落値は OS 既定から補う。kind 6 の置換単位は profile。重複、予約 bit、異機種 profile、保留中の ACCENT と非零 accent_count は INVAL。押下中または他 owner が保存中なら BUSY。失敗時は active・保存先・世代を維持する。終了・異常・STOP は同じ owner/exec_gen の ikm_policy_owner_exit で復元する。kind 5/6 は合計16行まで。編成結果が一面の容量を超えれば INVAL、交換も初回保存もしない。表3面は各24 KiB 以下、圧縮像・BSS の増分を両機種で実測する。
+IKM は OS 既定からの差分 profile。2026-11-28 のユーザー決定で行の上限を下げ、PM は1機種の全128キーを8通りの修飾・文脈で置換できる1024行（16 + 1024 × 16 = 16400 B）を基準とした。
 
 pc98_input_keymap_register と pm_input_keymap_boot は必要な全 map 登録後、入力採取前に ikm_policy_init を一度呼ぶ。PC-98 は本体 map 1 と USB HID map 2、PowerMac は HID map 2 を渡す。押下照会は PC-98 本体と USB の合算、PPC は全 HID source の合算。初期化失敗は起動診断に記録し①②を通った九口は target で NOSYS を返し、旧入力で起動する。操作 profile は入力装置によらず PC-98 の CUI/GUI が 1/2（MS-DOS/Windows）、PowerMac が 3/4（Mac OS X）。共通 HAL が logical mods と表で評価し、WM に第二の評価器を置かない。例は PC-98 CUI の ESC による行取消、SUB (0x1a)+Enter による canonical の EOF 候補（物理 Ctrl+Z の値は表による）、Mac CUI の Ctrl+U・Ctrl+D、GUI コピーの Ctrl+C / Command+C。文脈は LINE_EDIT=1、RUNNING=2、BYTE_INPUT=3、GUI=4、flags は ISIG=1 と ICANON=2。ISIG 時の真正な VINTR は編集時に取消、実行時に中断。BYTE_INPUT と非 canonical の EOF は byte、空行の EOF 判定は編集側。IME 変換中の PC-98 STOP/ETX は取消を一度配送する。
 
