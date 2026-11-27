@@ -80,6 +80,7 @@ def verify_selection():
         check(result["full"] and result["sdk"] and result["userland"] and not result["skipped"]
               and len(entries) == sum(len(c) for r in rows for c in r["arch"].values()), "full scope")
 
+    spec_paths = {row["spec"]["path"] for row in rows}
     for path in sorted(inventory.paths):
         result, entries = plan(path)
         configs = {config for config, _ in declared.get(path, ())}
@@ -87,10 +88,18 @@ def verify_selection():
         if result["pc98"] == "distribution":
             selected.add("pc98")
         check(configs <= selected, f"declared images: {path}: {sorted(configs - selected)}")
-        for row in rows:
-            if row["spec"]["path"] == path:
-                required = {(row["id"], c) for configs in row["arch"].values() for c in configs}
-                check(required | {("test_registration", "local")} <= entries, f"spec input: {path}")
+        if path in spec_paths:
+            check(("test_registration", "local") in entries, f"spec input: {path}")
+
+    docs_entries = {(row["id"], "local") for row in rows if row["id"].startswith("docs_")}
+    for path in ("docs/design/tools/checks/tests_v2.md", "docs/design/tools/ci/ci_v2.md",
+                 "docs/CONSTRAINTS.md"):
+        result, entries = plan(path)
+        check(result["pc98"] == "fd" and result["powerpc"] == ["core"]
+              and entries == docs_entries | {("test_registration", "local")}, f"spec scope: {path}")
+    _, entries = plan("docs/KAPI_SPEC.md")
+    check({("kapi_sync", "pc98"), ("kapi_sync", "link-sh")} <= entries, "KAPI document input")
+
 
 
 def verify(config):

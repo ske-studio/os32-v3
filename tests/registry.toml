@@ -91,12 +91,12 @@ sources = ["tests/infra/ci.py", "tests/support/impact.py", "tools/ownership_imag
 environment = "python-yaml"
 arch = { host = ["local"] }
 needs = []
-expect = "変更ファイルが入る宣言済みの像と spec の参照元を選び、独立した失敗の後も全件を集計し、欠落と禁じた再利用を拒む"
+expect = "変更ファイルが入る宣言済みの像と仕様文書を読む検査を選び、独立した失敗の後も全件を集計し、欠落と禁じた再利用を拒む"
 limits = "ローカルの実行器・集計器まで"
 gates = ["push", "main"]
 mutations = [{ id = "drop_userland_check", config = "local", replace = "tests/support/impact.py", old = '{"ring3_instructions", "c_dialect",', new = '{"c_dialect",', fail = "userland checks", when = "after_build" },
              { id = "drop_declared_configs", config = "local", replace = "tests/support/impact.py", old = "declared_configs.update(config for config, _ in outputs)", new = "declared_configs.clear()", fail = "declared images:", when = "after_build" },
-             { id = "drop_spec_input", config = "local", replace = "tests/support/impact.py", old = 'direct.update(spec_checks | {"test_registration"})', new = "direct.update(spec_checks)", fail = "spec input:", when = "after_build" },
+             { id = "drop_spec_input", config = "local", replace = "tests/support/impact.py", old = 'direct.add("test_registration")', new = "pass", fail = "spec input:", when = "after_build" },
              { id = "drop_shared_program", config = "local", replace = "tests/support/impact.py", old = "if shared_programs:", new = "if False:", fail = "shared program inputs", when = "after_build" },
              { id = "allow_reuse", config = "local", replace = "tests/infra/ci.py", old = 'allowed = ("PASS", "FAIL",', new = 'allowed = ("REUSED", "PASS", "FAIL",', fail = "REUSED must be rejected", when = "after_build" }]
 

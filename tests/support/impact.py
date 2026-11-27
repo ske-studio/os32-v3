@@ -77,9 +77,8 @@ def impact(rows, paths, inventory, force=False):
     for path in sorted(paths):
         direct = {r["id"] for r in rows if path == f'tests/{r["subsystem"]}/{r["id"]}.py'
                   or any(path == source or path.startswith(source + "/") for source in r["sources"])}
-        spec_checks = {r["id"] for r in rows if r["spec"]["path"] == path}
-        if spec_checks:
-            direct.update(spec_checks | {"test_registration"})
+        if any(row["spec"]["path"] == path for row in rows):
+            direct.add("test_registration")
         scopes[path] = scope(path, inventory, direct, product_inputs)
         for name in direct:
             bundles = {"x86", "ppc", "host"}
