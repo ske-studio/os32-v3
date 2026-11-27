@@ -26,6 +26,7 @@ class Guest:
         self.replies = {}
         self.request_id = 0
         self.sequence = 0
+        self.qmp_closed = False
 
     def record(self, direction, message):
         self.sequence += 1
@@ -87,14 +88,17 @@ class Guest:
                 return
             seconds = min(0.1, remaining(self.deadline))
             if self.process.poll() is None:
+                if self.qmp_closed:
+                    time.sleep(seconds)  # QMP ended but QEMU still runs: keep watching serial
+                    continue
                 try:
                     self.pump(seconds)
-                    continue
                 except TimeoutError:
                     raise
                 except OSError:
-                    pass
-            # QEMU or its QMP pipe ended: the guest may have written the marker just before.
+                    self.qmp_closed = True
+                continue
+            # QEMU ended: the guest may have written the marker just before.
             output += self.serial.read()
             missing = missing_marker(output.decode(errors="replace"))
             if missing is None:
