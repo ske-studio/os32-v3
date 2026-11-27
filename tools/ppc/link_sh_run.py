@@ -51,12 +51,9 @@ MUTATIONS = {
                     'if (!attempted)', 'ready-retry'),
     'duplicate': (USER, 'if (have_id && id <= last_id) return OS32_ERR_EXIST;',
                   '/* duplicate guard removed */', 'duplicate'),
-    'drop-compare': (SINK, 'if (con_sink_drop_count != g_capture_drop_start) rc = OS32_ERR_NOSPC;',
-                     '/* drop comparison removed */', 'freeze-drop'),
     'end': (USER, '    g_api->con_sink_capture(CON_SINK_CAPTURE_END);',
              '    /* END removed */', 'end'),
-    'half-line': ('userland/shell/rshell.c', '    return rsh_getch(from_serial);',
-                  '    (void)rsh_lan_poll(); return rsh_getch(from_serial);', 'half-line'),
+
 }
 
 
@@ -142,7 +139,7 @@ P3_STIMULUS
         opts.extend(['PPC_RES_MUT_SRC='+extra_user, 'PPC_RES_MUT_FILE='+str(source)])
     if observe_flow:
         source = 'sys/kern/exec/exec.c'
-        observer = ROOT/'tools/ppc/ppc_shell_flow.inc'
+        observer = ROOT/'tests/support/fixtures/ppc_link/flow.inc'
         sources[source] = (ROOT/source).read_text() + '\n#include "'+str(observer)+'"\n'
         opts.append('KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=ppc_trap_dispatch,--wrap=exec_run')
     require(len(sources) <= 3, 'kernel mutation slots')
@@ -481,7 +478,7 @@ def cross(tool):
 
 
 def flow_point(s, index, expected):
-    words = [s.word('shell_flow', 4*(9*index+field)) for field in range(9)]
+    words = [s.word('shell_flow', 4*(12*index+field)) for field in range(3, 12)]
     generation, *fields = words
     require(generation > 0 and tuple(fields[:5]) == expected,
             f'resident flow point {index}: {words}')
@@ -526,33 +523,6 @@ class LineSession(Session):
                     self.uart = None
                     break
 
-    def hold_serial_line(self):
-        trace = self.out/'uart.trace'
-        with trace.open() as stream:
-            stream.seek(0, 2)
-            received = []
-            def consumed():
-                received.extend(int(value) for value in re.findall(
-                    r'escc_mem_readb_data Read channel [Aa], ch (\d+)', stream.read()))
-                return received == [27, 120]
-            self.uart.sendall(b'\x1bx')
-            self.wait(consumed, 'guest read ESC and x from UART A', 10)
-
-    def check_deferred(self, verdict):
-        pending = self.agent.operator.pending
-        self.wait(lambda: pending['execute'].delivery == 'acked', 'guest queued LAN command', 10)
-        self.settle(1)
-        require(pending['state'] == 'running' and pending['result'] is None, verdict)
-
-    def check_serial_rejection(self, screen, command):
-        lines = [line.rstrip() for line in screen.splitlines()]
-        rejected = 'rshell: line with ESC not executed'
-        require(any(rejected in line and any('> '+command in later for later in lines[i+1:])
-                    for i, line in enumerate(lines)), 'serial rejection before '+command)
-
-    def end_serial_line(self):
-        self.uart.sendall(b'\r')
-
     def close(self):
         try:
             super().close()
@@ -564,7 +534,7 @@ class LineSession(Session):
 def accept(media,cpu,out,timeout,late=False,verdict=None,overflow_mode="lines"):
     # The 7450 non-late VM also runs the overflow observation.
     check_help = verdict in (None, 'resident command groups')
-    check_overflow = cpu == '7450' and not late and verdict in (None, 'freeze-drop')
+    check_overflow = cpu == '7450' and not late and verdict is None and overflow_mode == 'cr'
     extra = OVERFLOW_SECONDS * (int(check_help) + int(check_overflow))
     s=LineSession(media,cpu,out,timeout+extra,late)
     try:
@@ -643,15 +613,6 @@ def accept(media,cpu,out,timeout,late=False,verdict=None,overflow_mode="lines"):
             s.settle(.25); screen=s.screen('usb')
         require(usb_seen(screen),'USB line screen')
         s.open_rshell()
-        s.hold_serial_line()
-        op=s.agent.operator; op.submit('cui','echo deferred','accept')
-        s.check_deferred('half-line')
-        s.end_serial_line()
-        s.wait(lambda: op.pending['state']=='done','deferred command')
-        result=op.take_result(); check_body('echo deferred',result['result'],b'deferred\n')
-        s.wait(lambda: s.word('g_capture')==0,'deferred END',5)
-        screen=s.screen('deferred')
-        s.check_serial_rejection(screen, 'echo deferred')
         if check_overflow:
             # Every overflow line scrolls the OF framebuffer, which is slow under
             # -icount (~2.7 s per scroll in QEMU 8.2), so one VM per run covers it.
@@ -831,7 +792,7 @@ def flow_settings(folder, case):
             if case == 'return-target':
                 text = replace_once(text, 'parent = appslot_return_target(id);', 'parent = id;')
         (folder/fragment).write_text(text)
-    observer = ROOT/'tools/ppc/ppc_shell_flow.inc'
+    observer = ROOT/'tests/support/fixtures/ppc_link/flow.inc'
     (folder/'exec.c').write_text(source + '\n#include "' + str(observer) + '"\n')
     entry = (ROOT/'sys/arch/ppc/exec_enter.S').read_text()
     # Record the actual branch before an invalid root can be used by the MMU.
@@ -906,7 +867,7 @@ def flow_accept(media, folder, case):
 
 # These protocol mutations exercise the product-shell session alongside its
 # entry/return controls. The remaining mutations follow the transport controls.
-FLOW_MUTATIONS = ('command-group', 'line-buffer', 'ready-retry', 'drop-compare')
+FLOW_MUTATIONS = ('command-group', 'line-buffer', 'ready-retry')
 
 
 def main():

@@ -558,3 +558,31 @@ expect = "出力全体・常駐世代・owner 回復"
 limits = "agent 先行と後起動"
 gates = ["push", "main"]
 mutations = [{ id = "double_print", config = "link-sh", when = "after_build", replace = "sys/kern/console/console.c", old = "    con_sink_push_print(buf, size, color);", new = "    con_sink_push_print(buf, size, color); con_sink_push_print(buf, size, color);", fail = "duplicate PRINT payload" }, { id = "fault_restart", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/shell_loop_ops.c", old = "    kprintf(0x07, \"%s returned %d\\n\", path, rc);", new = "    kprintf(0x07, \"%s returned %d\\n\", path, rc);\n    if (rc < 0) for (;;) idle_wait_step();", fail = "resident fault without new generation" }, { id = "reader_owner", config = "link-sh", when = "after_build", replace = "sys/kern/console/con_sink.c", old = "    if (g_reader == id) {", new = "    if (0) {", fail = "reader retained after owner exit" }]
+
+[[check]]
+id = "ppc_usb_lanq"
+spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の半行と LAN 要求" }
+subsystem = "system"
+level = "L4"
+sources = ["make:all", "make:iso", "tests/system/ppc_link_session.py", "tests/support/ppc_vm.py", "tests/support/ppc_fixture.py", "tests/support/fixtures/ppc_link", "tests/support/ppc_peer.py", "tools/host_agent.py", "tools/host_rshell.py", "tools/host_operator_socket.py", "tools/ppc_lan_host.py", "tools/host_sfs_link.py", "userland/shell/rshell.c", "userland/shell/rshell_lan.c", "sys/kern/exec/exec.c", "sys/kern/mm/kmalloc.c"]
+environment = "qemu-ppc-net"
+arch = { ppc = ["link-sh"] }
+needs = []
+expect = "ack・保留・解除後に一度だけ応答"
+limits = "serial と USB の半行"
+gates = ["push", "main"]
+mutations = [{ id = "half_line", config = "link-sh", when = "after_build", replace = "userland/shell/rshell.c", old = "    return rsh_getch(from_serial);", new = "    (void)rsh_lan_poll(); return rsh_getch(from_serial);", fail = "resumed before serial Enter" }]
+[[check]]
+id = "ppc_link_overflow"
+spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の長い出力" }
+subsystem = "system"
+level = "L4"
+sources = ["make:all", "make:iso", "tests/system/ppc_link_session.py", "tests/support/ppc_vm.py", "tests/support/ppc_fixture.py", "tests/support/fixtures/ppc_link", "tests/support/ppc_peer.py", "tools/host_agent.py", "tools/host_rshell.py", "tools/host_operator_socket.py", "tools/ppc_lan_host.py", "tools/host_sfs_link.py", "sys/kern/console/con_sink.c", "userland/shell/rshell_lan.c", "sys/kern/exec/exec.c", "sys/kern/mm/kmalloc.c"]
+environment = "qemu-ppc-net"
+arch = { ppc = ["link-sh"] }
+needs = []
+expect = "切捨てと freeze 失敗後の復帰"
+limits = "7450 先行480秒"
+gates = ["push", "main"]
+deferred = { ledger = "PPC-P3OVF-QEMU", config = "link-sh", gates = ["push", "main"] }
+mutations = [{ id = "freeze_drop", config = "link-sh", when = "after_build", replace = "sys/kern/console/con_sink.c", old = "if (con_sink_drop_count != g_capture_drop_start) rc = OS32_ERR_NOSPC;", new = "/* drop comparison removed */", fail = "positive drop with successful freeze" }]

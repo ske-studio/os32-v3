@@ -8,7 +8,7 @@
 |---|---|
 | pc98emu | `git archive <SHA> tools/sound/snd2/` で音声の台本・WAV 生成・PCM 照合を取得する。GUI は `tools/ops/pc98_in2_gui.py`、共通の試行は隣の `in2_gui_trial.py` を使う。 |
 | 実機ノート | 音声の手順は `tools/sound/snd2/README.md`。ゲストの実行一覧は `tools/guest_tests.txt`、手動受入の手順と合否は `tools/guest_acceptance.yaml` にある。 |
-| os32powerpc | 遠隔シェルの受入は `python3 -B -m tests.infra.ci run --check ppc_link_session`。未移行の手動観測では `tools/ppc/link_sh_run.py` が隣の `ppc_shell_flow.inc` を読む。枝の載せ直しに使う表は `tools/ci/replay/move_map.json`。 |
+| os32powerpc | 遠隔シェルの受入は `python3 -B -m tests.infra.ci run --check ppc_link_session`。未移行の手動観測では `tools/ppc/link_sh_run.py` が `tests/support/fixtures/ppc_link/flow.inc` を読む。枝の載せ直しに使う表は `tools/ci/replay/move_map.json`。 |
 
 手動の GUI・ARM 計測・H2 診断・実機採取と文書保守の台本は `tools/ops/` に置く。
 
