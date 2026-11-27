@@ -198,7 +198,7 @@ def exercise(vm, op, late):
         raise Failure(observations[0])
 
 
-def boot(cpu, case, media, version):
+def boot(cpu, case, media, version, scenario=exercise, seconds=180):
     iso, metadata = media
     directory = Path("evidence") / cpu / case
     directory.mkdir(parents=True)
@@ -210,12 +210,12 @@ def boot(cpu, case, media, version):
                 sha=os.getenv("GITHUB_SHA") or os.getenv("OS32_BUILD_COMMIT"), run=os.getenv("GITHUB_RUN_ID"),
                 attempt=os.getenv("GITHUB_RUN_ATTEMPT"), origin=start, qemu=version,
                 argv=guest_args(iso, cpu, directory, devices, True))))
-            with guest(iso, cpu, directory, devices=devices, deadline=start+180, stderr=err,
+            with guest(iso, cpu, directory, devices=devices, deadline=start+seconds, stderr=err,
                        interactive=True) as vm:
                 vm.network = io
                 with peer(vm, directory) as op:
                     observing = True
-                    exercise(vm, op, case == "late")
+                    scenario(vm, op, case == "late")
                 vm.diagnose()
         return 0, ""
     except (Failure, TimeoutError, OSError, ValueError, RuntimeError) as exc:

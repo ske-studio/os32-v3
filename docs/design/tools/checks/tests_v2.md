@@ -96,3 +96,11 @@ heap peak は正で 1 MiB 未満、確保失敗は 0。各 VM の起動条件、
 UART trace、QMP 履歴、画面、要求と世代ごとの出力を evidence に保存する。
 正常と 3 変異で同じ 4 VM を使い、PRINT の二重化、常駐世代の停止、
 終了した owner の reader 残留を個別に検出する。
+
+## PowerMac の半行と LAN 要求
+
+7450 と 7455 で serial の ESC 行を保持し、USB で echo half を打つ。LAN の echo resumed は10秒内に ack され、1秒間 running のまま結果を返さない。USB Enter の後で同じ世代・rid の応答が一度だけ届き、画面では ESC 行の棄却が実行に先行する。
+
+## PowerMac の長い出力
+
+7450 で110行を出力し、480秒内に truncated と正の drop、freeze の非零終了値を観測する。同じ VM で echo recovered の完全な応答を確認する。PPC-P3OVF-QEMU により延期中。

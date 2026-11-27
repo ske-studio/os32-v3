@@ -128,7 +128,7 @@ def clock_media():
     return iso, dict(make=args, hashes=hashes)
 
 
-def link_media():
+def link_media(*, usb_trace=False, overflow=False):
     directory = Path(os.environ["OS32_VERIFY_OUT"]).resolve() / "link-sh"
     directory.mkdir()
     user = directory / "user"
@@ -138,6 +138,8 @@ def link_media():
             "IMAGE=kboot-link-sh", "KBOOT_SH=1", "KBOOT_LINK=1", "KBOOT_GEM_RX_DIAG=1",
             f"KB_OUT={directory}", f"KB_SH_OUT={user}", f"BUILD_OUT={directory / 'build'}",
             f"KB_BODY_OUT={directory / 'sqlite-body'}"]
+    if usb_trace:
+        args.append("KBOOT_USB_KEY_TRACE=1")
     unicode_bin = directory / "unicode.bin"
     manifest = json.loads(Path("build/ppc-ram-root.json").read_text())
     manifest["/sys/unicode.bin"] = str(unicode_bin)
@@ -166,6 +168,12 @@ def link_media():
             g_api->tvram_clear();
             g_api->sys_write(1, message, sizeof(message) - 1);
         } else accepting = rsh_lan_execute(line);'''
+    if overflow:
+        stimuli = stimuli.replace("} else accepting", r''' } else if (!strcmp(line, "p3-overflow")) {
+            for (int i = 0; i < 110; ++i)
+                g_api->kprintf(7, "%s", "0123456789012345678901234567890123456789"
+                                       "0123456789012345678901234567890123456789\n");
+        } else accepting''')
     meter("PPC_SH_MUT", shell, "#include <stdio.h>\n" +
           edit(shell.read_text(), "        accepting = rsh_lan_execute(line);", stimuli))
     sink = Path("sys/kern/console/con_sink.c")
