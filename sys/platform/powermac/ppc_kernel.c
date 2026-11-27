@@ -451,7 +451,12 @@ void platform_boot_services(void)
     unsigned long long dec_want = (tb1_a - tb0_a) * PM_DEC_HZ / info->tb_hz;
     unsigned long long dec_got = raw1 - raw0;
     unsigned long long dec_error = dec_got > dec_want ? dec_got - dec_want : dec_want - dec_got;
-    if (dec_error > dec_want / 50 + 2) kboot_stop("dec_rate");
+    if (dec_error > dec_want / 50 + 2) {
+        /* Values for PPC-BOOT-DEC-RATE-LOAD: what was compared and how long the window was. */
+        kprintf(KBOOT_ATTR, "KBOOT dec_rate want=%u got=%u tb_delta=%u ticks=%u\r\n",
+                (u32)dec_want, (u32)dec_got, (u32)(tb1_a - tb0_a), ticks);
+        kboot_stop("dec_rate");
+    }
     if (!clock_ok || hi0 || us_hi) kboot_stop("clock_read");
     u32 want = (u32)((tb1_b - tb0_a) * 1000000 / info->tb_hz);
     unsigned long long lower = (tb1_a - tb0_b) * 1000000 / info->tb_hz;
