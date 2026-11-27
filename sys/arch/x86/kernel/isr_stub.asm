@@ -730,6 +730,7 @@ irq_stub_2:
 
 global irq_stub_12
 irq_stub_12:
+        TP_ENTER 12
         IRQ_ENTER
         pushad
         RESTORE_KSEG

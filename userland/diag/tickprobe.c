@@ -21,7 +21,11 @@ int main(int argc, char **argv, KernelAPI *api)
         if (!strcmp(argv[2], "on")) q.action = TP_TICKACK_ON;
         if (!strcmp(argv[2], "off")) q.action = TP_TICKACK_OFF;
     }
-    if (!q.action) { printf("tickprobe start|idle|wait|due|fixture|stop|show|irq10diag show|tickack on|tickack off\n"); return 1; }
+    if (argc == 3 && !strcmp(argv[1], "pcmirq")) {
+        if (!strcmp(argv[2], "10")) q.action = TP_PCMIRQ_10;
+        if (!strcmp(argv[2], "12")) q.action = TP_PCMIRQ_12;
+    }
+    if (!q.action) { printf("tickprobe start|idle|wait|due|fixture|stop|show|irq10diag show|tickack on|tickack off|pcmirq 10|pcmirq 12\n"); return 1; }
     if (api->version < 78 || !api->kdebug_call) return 1;
     int rc = api->kdebug_call(TP_OP, &q, sizeof(q));
     if (rc) printf("tickprobe rc=%d (diagnostic image and KDEBUG=1 required)\n", rc);

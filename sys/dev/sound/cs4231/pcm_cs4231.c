@@ -108,6 +108,8 @@ static void cs_write_locked(u8 idx, u8 val);
 #include "sys/kern/time/tick_probe.h"
 #include "platform_pic.h"
 static struct irq10_diag *diag;
+static unsigned int saved_irq12_mask;
+enum { IRQ12_IMR_BIT = 1U << 4, PCM_ROUTE_INT5_DMA1 = 0x22 };
 void pcm_bind_diag(struct irq10_diag *storage)
 {
     diag = storage;
@@ -318,14 +320,19 @@ static int pcm_run(const struct pcm_op *ops, int n, int at, int blocking)
                 cs_write(o->a, o->b);
             break;
         case PCM_OP_PORT:
-            outp(PCM_PORT_ROUTE + o->a, o->b);
 #ifdef TICK_PROBE
+            u8 value = o->b;
+            if (diag && o->a == PCM_POFS_ROUTE && diag->pcmirq == 12)
+                value = PCM_ROUTE_INT5_DMA1;
+            outp(PCM_PORT_ROUTE + o->a, value);
             if (diag && o->a == PCM_POFS_ROUTE) {
                 diag->pcm.route_gen = diag->pcm.generation;
                 ++diag->pcm.route_count;
                 diag->pcm.route_step = at + 1;
-                diag->pcm.route_value = o->b;
+                diag->pcm.route_value = value;
             }
+#else
+            outp(PCM_PORT_ROUTE + o->a, o->b);
 #endif
             break;
         case PCM_OP_WAIT_INIT:
@@ -673,6 +680,14 @@ static void pcm_release(int leak)
     if (g_pcm.finalized) return;
     s_claimed = 1;              /* 以後 advance は装置にもリングにも触らない */
 
+#ifdef TICK_PROBE
+    unsigned int flags = irq_save();
+    if (diag->irq12_owned) {
+        outp(PIC2_DATA, (inp(PIC2_DATA) & ~IRQ12_IMR_BIT) | saved_irq12_mask);
+        diag->irq12_owned = 0;
+    }
+    irq_restore(flags);
+#endif
     if (s_irq_reg) {
         if (irq_unregister(PCM_IRQ, pcm_irq, 0) != 0) {
             s_release_leak = leak;
@@ -692,6 +707,9 @@ static void pcm_release(int leak)
     } else {
         if (s_ring) dma_free(&s_ring_buf);
         g_pcm.state = PCM_ST_CLOSED;
+#ifdef TICK_PROBE
+        diag->pcm_busy = 0;
+#endif
     }
     s_ring = 0;
     s_stg = 0;
@@ -739,6 +757,20 @@ static int pcm_open_device(u32 rate, u32 period, void (*advance)(void))
 
     /* 巻き戻しも pcm_release を通るので、**1 度だけ**の錠を先に外す。 */
 #ifdef TICK_PROBE
+    unsigned int flags = irq_save();
+    if (diag->pcmirq == 12) {
+        if (diag->v86_open()) {
+            irq_restore(flags);
+            return PCM_ERR_BUSY;
+        }
+        unsigned int imr = inp(PIC2_DATA);
+        saved_irq12_mask = imr & IRQ12_IMR_BIT;
+        diag->irq12_owned = 1;
+        outp(PIC2_DATA, imr & ~IRQ12_IMR_BIT);
+    }
+    diag->pcm_busy = 1;
+    irq_restore(flags);
+    diag->pcm_open.valid = 0;
     kmemset(&diag->pcm, 0, sizeof(diag->pcm));
 #endif
     s_hal_period = period;

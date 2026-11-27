@@ -52,6 +52,8 @@ static void show_irq10(const struct irq10_diag *d)
 {
     cycles("irq10-total", d->arrivals); cycles("first-tsc", d->first);
     cycles("boot-window-tsc", d->window_start); kprintf(7, "\n");
+    cycles("irq12-total", d->irq12_arrivals); cycles("first-tsc", d->irq12_first);
+    kprintf(7, "pcmirq=%u\n", d->pcmirq);
     kprintf(7, "OHCI 0:13.1 captured=%u attach=%d has_irq=%u enable=%08x status=%08x control=%08x\n",
             d->attached, d->attach_rc, d->has_irq, d->enable, d->status, d->control);
     kprintf(7, "COMMAND=%04x LINE=%u PIN=%u PIRQ[60..63]=%02x %02x %02x %02x\n",
@@ -86,9 +88,14 @@ int tick_probe_call(void *buf, unsigned int size)
     if (!buf || size != sizeof(struct tp_request) || !_irq_enabled()) return -1;
     struct tp_control c = {((struct tp_request *)buf)->action, 0};
     int rc = debug_probe_control(TP_CONTROL, &c, sizeof(c));
+    if (rc && (c.action == TP_PCMIRQ_10 || c.action == TP_PCMIRQ_12)) {
+        kprintf(7, "pcmirq requires closed PCM and IRQ12 requires closed V86 session\n");
+        return rc;
+    }
     if (rc) { kprintf(7, "tickprobe: stop before start/show\n"); return rc; }
     if (c.diag) {
         if (c.action == TP_IRQ10_SHOW) show_irq10(c.diag);
+        else if (c.action >= TP_PCMIRQ_10) kprintf(7, "pcmirq=%u\n", c.diag->pcmirq);
         else kprintf(7, "tickack=%u\n", c.diag->tickack);
         return 0;
     }

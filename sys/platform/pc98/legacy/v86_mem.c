@@ -54,8 +54,15 @@ static const struct v86_ident_ent {
 #define V86_IDENT_MAP_N \
     ((int)(sizeof(v86_ident_map) / sizeof(v86_ident_map[0])))
 
+#ifdef TICK_PROBE
+#include "../../../kern/time/tick_probe.h"
+#endif
+
 int v86_session_begin(u32 owner)
 {
+#ifdef TICK_PROBE
+    if (irq10_diag.irq12_owned) return -1;
+#endif
     if (v86_session.open || v86_session.closing || v86_session.release_pending) {
         return -1;              /* 二重セットアップ */
     }

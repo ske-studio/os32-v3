@@ -21,6 +21,7 @@ extern unsigned int kctx_irq_depth;
 #endif
 #ifndef TICK_PROBE_HOST
 #include "platform_pic.h"
+#include "legacy_guest.h"
 static void capture_line(struct irq10_line *s, int pending)
 {
     unsigned int flags = irq_save();
@@ -45,7 +46,7 @@ static void capture_line(struct irq10_line *s, int pending)
     s->valid = 1;
     irq_restore(flags);
 }
-struct irq10_diag irq10_diag = {.tickack = 1, .capture = capture_line};
+struct irq10_diag irq10_diag = {.pcmirq = 10, .v86_open = legacy_session_open, .tickack = 1, .capture = capture_line};
 static void begin_diag_window(void)
 {
     kmemset(irq10_diag.window, 0, sizeof(irq10_diag.window));
@@ -192,6 +193,15 @@ void tick_probe_irq_enter(unsigned int irq)
 #ifdef SND2_WRITER_DIAG
     sw_irq(irq);
 #endif
+    if (irq == 12) {
+        if (++irq10_diag.irq12_arrivals == 1) {
+#ifndef TICK_PROBE_HOST
+            if (arch_cpu_has_tsc())
+#endif
+                irq10_diag.irq12_first = now();
+        }
+        return;
+    }
     if (irq == 10 && ++irq10_diag.arrivals == 1) {
 #ifndef TICK_PROBE_HOST
         if (arch_cpu_has_tsc())
@@ -389,10 +399,16 @@ int tick_probe_control(struct tp_control *c)
 {
     /* Caller is cooperative, IF=1. Freeze with a tiny raw CLI section. */
 #ifndef TICK_PROBE_HOST
-    if (c->action >= TP_IRQ10_SHOW && c->action <= TP_TICKACK_OFF) {
-        if (data.running) return -1;
+    if (c->action >= TP_IRQ10_SHOW && c->action <= TP_PCMIRQ_12) {
+        if (data.running && c->action < TP_PCMIRQ_10) return -1;
         unsigned int flags = irq_save();
-        if (c->action != TP_IRQ10_SHOW)
+        if (c->action >= TP_PCMIRQ_10) {
+            if (irq10_diag.pcm_busy || (c->action == TP_PCMIRQ_12 && legacy_session_open())) {
+                irq_restore(flags);
+                return -1;
+            }
+            irq10_diag.pcmirq = c->action == TP_PCMIRQ_12 ? 12 : 10;
+        } else if (c->action != TP_IRQ10_SHOW)
             irq10_diag.tickack = c->action == TP_TICKACK_ON;
         irq10_copy = irq10_diag;
         irq_restore(flags);
