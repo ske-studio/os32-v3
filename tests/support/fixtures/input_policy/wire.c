@@ -8,10 +8,11 @@
 #include "kbd_contract.h"
 
 unsigned input_test_irq;
-static int exclusive, caller = 1, user, deny_read, deny_write;
+static int exclusive, caller = 1, user, deny_read;
 static KernelAPI api;
 static uptr fault_jump[5];
-static u32 read_len, write_len[2];
+static u32 read_len, denied_write_addr;
+static struct { u32 addr, len; } write_ranges[2];
 
 int ring3_user_range_ok(u32 ptr, u32 len)
 {
@@ -22,11 +23,12 @@ int ring3_user_range_ok(u32 ptr, u32 len)
 
 int ring3_user_ranges_writable(u32 a, u32 la, u32 b, u32 lb)
 {
-    (void)a;
-    (void)b;
-    write_len[0] = la;
-    write_len[1] = lb;
-    return !user || ((!la || deny_write != 1) && (!lb || deny_write != 2));
+    write_ranges[0].addr = a;
+    write_ranges[0].len = la;
+    write_ranges[1].addr = b;
+    write_ranges[1].len = lb;
+    return !user || ((!la || a != denied_write_addr) &&
+                     (!lb || b != denied_write_addr));
 }
 
 void ring3_fault_kill(void)
@@ -100,8 +102,9 @@ static int check_guards(void)
     KbdPolicyKey key = {0};
     u32 needed = 0;
     user = 1;
-    deny_read = deny_write = 1;
-    read_len = write_len[0] = 0;
+    deny_read = 1;
+    denied_write_addr = (u32)&action;
+    read_len = write_ranges[0].len = 0;
     if (__builtin_setjmp(fault_jump)) return 1;
     if (api.kbd_policy_set(buffer.bytes, 17) != OS32_ERR_INVAL ||
         api.kbd_policy_set((void *)0xfffffff1UL, 16) != OS32_ERR_INVAL ||
@@ -111,7 +114,7 @@ static int check_guards(void)
         api.kbd_policy_action_read(NULL, 1) != OS32_ERR_INVAL ||
         api.kbd_policy_action_read((void *)0xfffffff4UL, 1) != OS32_ERR_INVAL ||
         api.kbd_policy_key_read(&key, KBD_POLICY_READ_MAX + 1) != OS32_ERR_INVAL ||
-        read_len || write_len[0]) return 1;
+        read_len || write_ranges[0].len) return 1;
     if (!__builtin_setjmp(fault_jump)) {
         api.kbd_policy_set(buffer.bytes, sizeof buffer);
         return 1;
@@ -121,18 +124,39 @@ static int check_guards(void)
         api.kbd_policy_action_read(&action, 1);
         return 1;
     }
-    if (write_len[0] != sizeof action) return 1;
-    deny_write = 2;
-    if (!__builtin_setjmp(fault_jump)) {
-        api.kbd_policy_get(buffer.bytes, sizeof buffer, &needed);
-        return 1;
-    }
-    if (write_len[0] != sizeof needed || write_len[1] != sizeof buffer || needed) return 1;
-    deny_read = deny_write = 0;
+    if (write_ranges[0].addr != (u32)&action ||
+        write_ranges[0].len != sizeof action) return 1;
+    deny_read = 0;
+    denied_write_addr = 0;
     if (api.kbd_policy_action_read((void *)1, 0) != OS32_ERR_NOSYS ||
         api.kbd_policy_key_read(NULL, 0) != OS32_ERR_NOSYS) return 1;
     user = 0;
     return api.kbd_policy_set(buffer.bytes, sizeof buffer) != OS32_ERR_NOSYS;
+}
+
+static int check_get_fault(int deny_wire)
+{
+    /* Static outputs retain their values across the simulated fault. */
+    static u32 needed;
+    static u8 wire[32];
+    needed = 0x5a5a5a5a;
+    for (unsigned i = 0; i < sizeof wire; ++i)
+        wire[i] = 0x5a;
+    user = 1;
+    denied_write_addr = deny_wire ? (u32)wire : (u32)&needed;
+    write_ranges[0].len = write_ranges[1].len = 0;
+    if (!__builtin_setjmp(fault_jump)) {
+        api.kbd_policy_get(wire, sizeof wire, &needed);
+        return 1;
+    }
+    user = 0;
+    denied_write_addr = 0;
+    if (write_ranges[0].addr != (u32)&needed || write_ranges[0].len != sizeof needed ||
+        write_ranges[1].addr != (u32)wire || write_ranges[1].len != sizeof wire ||
+        needed != 0x5a5a5a5a) return 1;
+    for (unsigned i = 0; i < sizeof wire; ++i)
+        if (wire[i] != 0x5a) return 1;
+    return 0;
 }
 
 static int check_rejected_reads(void)
@@ -143,19 +167,21 @@ static int check_rejected_reads(void)
     /* While exclusive, Action's target reports BUSY and a non-WM Key
      * target reports INVAL. The same ranges fault first on the user path. */
     exclusive = 1;
-    deny_write = 1;
+    denied_write_addr = (u32)&action;
     if (api.kbd_policy_action_read(&action, 1) != OS32_ERR_BUSY) return 1;
     user = 1;
     if (!__builtin_setjmp(fault_jump)) {
         api.kbd_policy_action_read(&action, 1);
         return 1;
     }
+    denied_write_addr = (u32)&key;
     if (!__builtin_setjmp(fault_jump)) {
         api.kbd_policy_key_read(&key, 1);
         return 1;
     }
     exclusive = 0;
     caller = 2;
+    denied_write_addr = (u32)&action;
     if (!__builtin_setjmp(fault_jump)) {
         api.kbd_policy_action_read(&action, 1);
         return 1;
@@ -164,7 +190,7 @@ static int check_rejected_reads(void)
     if (api.kbd_policy_action_read(&action, 1) != OS32_ERR_BUSY ||
         api.kbd_policy_key_read(&key, 1) != OS32_ERR_INVAL) return 1;
     caller = 1;
-    deny_write = 0;
+    denied_write_addr = 0;
     return action.action != 0x5a || key.keycode != 0x5a;
 }
 
@@ -204,7 +230,8 @@ static int test_provider(void)
     u32 needed;
     bind_policy(&api);
     if (KAPI_VERSION != 92 || KAPI_SLOT_KBD_POLICY_SET != 340 ||
-        KAPI_SLOT_KBD_POLICY_KEY_READ != 348 || check_guards()) return 19;
+        KAPI_SLOT_KBD_POLICY_KEY_READ != 348 || check_guards() ||
+        check_get_fault(0) || check_get_fault(1)) return 19;
     if (check_unavailable(base, sizeof base)) return 2;
     user = 1;
     if (check_unavailable(base, sizeof base)) return 2;
@@ -257,6 +284,7 @@ static int test_provider(void)
         api.kbd_policy_command_begin() || api.kbd_policy_command_end()) return 13;
     if (ikm_policy_set(base, sizeof base, 0, 0) || api.kbd_policy_set(base, sizeof base) ||
         api.kbd_policy_reset()) return 5;
+    if (check_get_fault(0) || check_get_fault(1)) return 19;
     if (api.kbd_policy_get(NULL, 0, &needed) != OS32_ERR_FULL || needed != 16) return 20;
     readback[0] = 0x5a;
     if (api.kbd_policy_get(readback, 1, &needed) != OS32_ERR_FULL ||

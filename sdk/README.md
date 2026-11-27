@@ -107,6 +107,7 @@ OS 側の `docs/KAPI_SPEC.md` の「API関数」の注記。)
 古い SDK のアプリが新しいカーネルで無条件に動くわけではありません。形式・KAPI 配置・ABI 世代・
 メモリ世代、および依存する共有ライブラリのプロトコルが一致する必要があります。
 世代が違う場合は現行 SDK で再構築します ([世代契約](../docs/KAPI_SPEC.md#t2c-os32x-v4-と生成する世代-kapi-v69))。
+配布済みの PowerMac 用 v91 版 `infoprob` は機能版の完全一致を要求するため、v92 以降では `INFO version failed` を返します。
 
 ## target の選択
 

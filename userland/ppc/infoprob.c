@@ -15,7 +15,7 @@ int main(int argc, char **argv, KernelAPI *api)
 
     (void)argc;
     (void)argv;
-    if (api->version != KAPI_VERSION)
+    if (api->version < KAPI_VERSION)
         return report(api, "INFO version failed\n", 1);
     memset(build, 0x5a, sizeof(build));
     api->sys_get_build_info(build, sizeof(build));
