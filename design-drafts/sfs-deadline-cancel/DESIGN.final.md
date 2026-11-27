@@ -239,3 +239,7 @@ PM 決定に従い共通 cancel を先に実装する。前景不在が同一 ri
 - 本線 sol 第 3 回 (最終) で条件付きで実装可。残り 1 件 (P2・§6 UART の BYE: 通常の seq 更新時の採取は常駐 LAN に、UART は通常終了時のゲート内 BYE と seq 枯渇時の従来の失敗・終了時 BYE を照合) を PM が §6 に反映し、本線 PM (os32pm) の判断で確定。
 - fable reviewer は r3 で確定可 (P2 片道 BYE と P3 3 件は r4 で反映)。
 - 段 0・1 (本線 x86 の持ち物) は os32pm の了承で PowerPC 側の astra が起こし、本線 sol のレビュー、取り込みは本線。
+
+## 段 0 の後に決めたこと (2026-11-27、本線 PM)
+- 段 0 で x86 の 82557 常駐の違反 1 件 (期限切れの HELLO が期限時の get で旧 peer を確定、sfs_client.c:250・sfs_lan.c:80,98) を観測。結果は wip/sfs-deadline-design fe9fff94a の design-drafts/sfs-deadline-s0/RESULTS.md。未観測 2 件 (旧 CALL 応答の次 CALL への採用、モジュールの旧 HELLO) は本線 sol が同じ模型で観測する。
+- §2 の「put 復帰後に期限到達なら get 前に expired へ進む」は本線の別票 SFS-X86-STALE-PEER へ移した。段 1 は cancel の口と期限切れの出口の一本化だけで、get と期限判定の順序は今のまま (x86 の振る舞いを変えない)。§3 の「put で期限に達する交換は get 呼出 0、通知 1」の試験も別票へ移す (段 1 では get の回数は今の順序どおり、通知 1 だけを見る)。
