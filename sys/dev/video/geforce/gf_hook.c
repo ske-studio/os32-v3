@@ -125,3 +125,56 @@ int geforce_blit(int dx, int dy, int sx, int sy, int w, int h)
     hook_ctx->last_rc = rc;
     return rc ? OS32_ERR_IO : 0;
 }
+
+/* Submit has checked the whole strided source. Keep each borrowed span
+ * inside it, including the short final row. */
+int geforce_mono(int x, int y, int w, int h, const u8 *bits, u32 pitch,
+                 u8 fg, int bg, int cx, int cy, int cw, int ch)
+{
+    u8 packed[256];
+    if (!hook_active || !hook_ctx) return OS32_ERR_NOSYS;
+    if (cw <= 0 || ch <= 0) return 0;
+    u32 dx = (u32)cx - (u32)x, dy = (u32)cy - (u32)y;
+    u32 rowbytes = ((u32)cw + 7) / 8;
+    u32 srcbytes = ((u32)w + 7) / 8;
+    if (!bits || w <= 0 || h <= 0 || bg < 0 || bg > 255 ||
+        cx < 0 || cy < 0 || cw > w || ch > h ||
+        dx > (u32)(w - cw) || dy > (u32)(h - ch) ||
+        pitch < srcbytes || (u32)(h - 1) > (U32_MAX - srcbytes) / pitch ||
+        rowbytes > sizeof(packed)) return OS32_ERR_INVAL;
+
+    while (ch > 0) {
+        const u8 *src = bits + dy * pitch + dx / 8;
+        struct gf3_ram ram;
+        u32 rows = (u32)ch;
+        if (dx % 8) {
+            if (rows > sizeof(packed) / rowbytes) rows = sizeof(packed) / rowbytes;
+            for (u32 i = 0; i < rows; i++) {
+                const u8 *line = src + i * pitch;
+                u8 *out = packed + i * rowbytes;
+                for (u32 j = 0; j < (u32)cw; j++) {
+                    u32 bit = dx % 8 + j;
+                    if (!(j % 8)) out[j / 8] = 0;
+                    if (line[bit / 8] & (0x80U >> (bit % 8)))
+                        out[j / 8] |= 0x80U >> (j % 8);
+                }
+            }
+            ram = (struct gf3_ram){packed, rows * rowbytes, rowbytes};
+        } else {
+            ram = (struct gf3_ram){(void *)src, (rows - 1) * pitch + rowbytes, pitch};
+        }
+        struct gf3_rect r = {(u32)cx, (u32)cy, (u32)cw, rows};
+        u32 dl;
+        int rc = hook_feature5_poll();
+        if (rc) return rc;
+        if (hook_deadline(&dl)) return OS32_ERR_IO;
+        rc = gf3_mono(hook_ctx, &hook_scan, r, &ram, fg, (u32)bg, r, dl);
+        gfx_counters.hw_ops++;
+        hook_ctx->last_rc = rc;
+        if (rc) return OS32_ERR_IO;
+        dy += rows;
+        cy += (int)rows;
+        ch -= (int)rows;
+    }
+    return 0;
+}

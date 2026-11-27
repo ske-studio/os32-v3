@@ -14,6 +14,7 @@
 extern int geforce_fill_rect(int, int, int, int, u8);
 extern int geforce_blit(int, int, int, int, int, int);
 extern int geforce_fill_rop(int, int, int, int, u8, u8);
+extern int geforce_mono(int, int, int, int, const u8 *, u32, u8, int, int, int, int, int);
 
 static int gf_front_in_cpu_map(const struct video_fb *fb)
 {
@@ -107,5 +108,6 @@ int gf_direct_get(int x, int y, int w, int h, u8 *dst, u32 pitch)
 
 const GfxDirectOps gf_direct_ops = {
     .fill_rect = geforce_fill_rect, .blit = geforce_blit,
-    .fill_rop = geforce_fill_rop, .put = gf_direct_put, .get = gf_direct_get
+    .fill_rop = geforce_fill_rop, .put = gf_direct_put, .get = gf_direct_get,
+    .mono = geforce_mono
 };

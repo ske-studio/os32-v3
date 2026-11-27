@@ -662,3 +662,71 @@ expect = "同一要求の保留を同期解放し、seq 更新では BYE を送�
 limits = "mac99、制御した下位応答とメモリ内ホスト。実 client の期限切れから実 link までの道は ppc_usb_lan (段 3)"
 gates = ["push", "main"]
 mutations = [{ id = "drop_hfs_cancel", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/hostfs_link_io.c", old = "pm_hfs_put_until, pm_hfs_cancel", new = "pm_hfs_put_until, 0", fail = "hostfs cancel left pending" }, { id = "keep_expired_reply", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/hostfs_link_io.c", old = "        t->rx_pos = t->rx_end;", new = "        (void)t; /* expired reply kept */", fail = "expired reply" }]
+
+[[check]]
+id = "gfx_v1_mono_clip"
+spec = { path = "docs/decisions/gui/GFX_ACCEL_HAL_DESIGN.md", section = "G4m — INDEX8 の不透明 MONO" }
+subsystem = "gfx"
+level = "L3"
+sources = ["sys/hal/gfx/gfx_hw_submit.c", "sys/hal/gfx/gfx_hw_mono_cpu.c", "sys/dev/video/geforce/gf_hook.c", "sys/dev/video/geforce/gf_direct.c", "sys/include/gfx_hal.h", "sys/dev/video/geforce/accel.h"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "公開 submit の CPU/GF 全画素と番兵が一致し、透明・空矩形は GPU 発行 0、整列時は元 pitch を借り、2 帯目失敗で done と描画が止まる"
+limits = "GF 呼出先はメモリ描画の模型。実機の発行・走査・期限は別に確認する"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx_v1_mono_clip_byte_floor", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_hook.c", old = "u32 bit = dx % 8 + j;", new = "u32 bit = j;", fail = "clipped pixels" },
+  { id = "gfx_v1_mono_clip_transparent", config = "pc98", when = "after_build", replace = "sys/hal/gfx/gfx_hw_submit.c", old = "if (c.key >= 0 && g_backend->mono)", new = "if (g_backend->mono)", fail = "transparent dispatch or submit" },
+  { id = "gfx_v1_mono_clip_band_error", config = "pc98", when = "after_build", replace = "sys/dev/video/geforce/gf_hook.c", old = "if (rc) return OS32_ERR_IO;\n        dy += rows;", new = "if (rc) return 0;\n        dy += rows;", fail = "second band failure" },
+]
+
+[[check]]
+id = "gfx2_final_i1"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L1"
+sources = ["make:kernel", "make:build/out/r1/kernel.elf", "make:build/out/geforce/geforce.elf", "build/sources/order.mk", "build/geforce-module.mk", "tests/support/gfx2_final.py", "tests/support/fixtures/gfx2_final/providers.txt"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = ["build/out/kernel.elf", "build/out/kernel.map", "build/out/r1/kernel.elf", "build/out/r1/kernel.map", "build/out/geforce/geforce.elf", "build/out/geforce/geforce.map"]
+expect = "I1 の名簿の全記号が配布 ELF で期待した型の強い定義に解決し、対応 map 上で仮実体の入力節の外にある"
+limits = "最終リンクの解決先を検査する。装置動作は別に確認する"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_final_i1_weak_function", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "struct gfx2_adapter *gfx2_active(void)", new = "struct gfx2_adapter *omitted_gfx2_active(void)", fail = "provider binding/type gfx2_active" },
+  { id = "gfx2_final_i1_weak_data", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/backend_reg.c", old = "struct gfx2_adapter gfx2_adapters[GFX2_MAX_ADAPTERS];", new = "extern struct gfx2_adapter gfx2_adapters[GFX2_MAX_ADAPTERS];", fail = "provider binding/type gfx2_adapters" },
+  { id = "gfx2_final_i1_named_only", config = "pc98", when = "after_build", replace = "tests/support/gfx2_final.py", old = "if placeholder[obj]:", new = "if False:", fail = "reader accepted strong placeholder" },
+]
+
+[[check]]
+id = "gfx2_final_i2"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L1"
+sources = ["make:kernel", "make:build/out/r1/kernel.elf", "make:build/out/geforce/geforce.elf", "build/sources/order.mk", "build/geforce-module.mk", "tests/support/gfx2_final.py", "tests/support/fixtures/gfx2_final/providers.txt"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = ["build/out/kernel.elf", "build/out/kernel.map", "build/out/r1/kernel.elf", "build/out/r1/kernel.map", "build/out/geforce/geforce.elf", "build/out/geforce/geforce.map"]
+expect = "I2 の名簿の全記号が配布 ELF で期待した型の強い定義に解決し、対応 map 上で仮実体の入力節の外にある"
+limits = "最終リンクの解決先を検査する。装置動作は別に確認する"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_final_i2_weak_function", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/format.c", old = "int gfx2_fmt_info(u32 fmt, struct gfx2_fmt_info *o)", new = "int omitted_gfx2_fmt_info(u32 fmt, struct gfx2_fmt_info *o)", fail = "provider binding/type gfx2_fmt_info" },
+]
+
+[[check]]
+id = "gfx2_final_i3"
+spec = { path = "docs/decisions/gui/HAL_V2_DESIGN.md", section = "13-1. host (libc 無し、各段のファイルを直に組む)。変異は「製品の行」を 1 つ変えて RED になること" }
+subsystem = "gfx"
+level = "L1"
+sources = ["make:kernel", "make:build/out/r1/kernel.elf", "make:build/out/geforce/geforce.elf", "build/sources/order.mk", "build/geforce-module.mk", "tests/support/gfx2_final.py", "tests/support/fixtures/gfx2_final/providers.txt"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = ["build/out/kernel.elf", "build/out/kernel.map", "build/out/r1/kernel.elf", "build/out/r1/kernel.map", "build/out/geforce/geforce.elf", "build/out/geforce/geforce.map"]
+expect = "I3 の名簿の全記号が配布 ELF で期待した型の強い定義に解決し、対応 map 上で仮実体の入力節の外にある"
+limits = "最終リンクの解決先を検査する。装置動作は別に確認する"
+gates = ["push", "main"]
+mutations = [
+  { id = "gfx2_final_i3_weak_function", config = "pc98", when = "after_build", replace = "sys/hal/gfx/v2/enum.c", old = "int gfx2_head_info(u32 index, u32 head, GFX2_HeadInfo *out)", new = "int omitted_gfx2_head_info(u32 index, u32 head, GFX2_HeadInfo *out)", fail = "provider binding/type gfx2_head_info" },
+]
