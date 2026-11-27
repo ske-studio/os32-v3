@@ -46,7 +46,8 @@ req62〜req64 で使った最小の受入項目。毎回起動を記録し、製
 
 | 変更箇所 | pc98emu に頼む項目と合格の目印 |
 |---|---|
-| 全候補 (製品ソースに変更がなければこの行だけ) | 候補媒体で起動し、`ver` の Commit・Image CRC を照合。媒体の sha256・artifact_id、`SERVICES_READY public=1`、selftest の成功数と `selftest_fail=0` をログに残す。 |
+| 起動 FD だけ（BUILD_INFO の `(boot FD)`） | 候補の os32_boot.d88 を FD 起動し、`ver` だけを実行。Commit・Image CRC・FD loader をログに残し、媒体の sha256・artifact_id を記録する。 |
+| PC-98 配布の HDD 起動 | 候補媒体で起動し、`ver` の Commit・Image CRC を照合。媒体の sha256・artifact_id、`SERVICES_READY public=1`、selftest の成功数と `selftest_fail=0` をログに残す。 |
 | FEP / SQLite | `ime info`、Shift+Space の候補表示と復元。sqlite.mod・fep.mod をそれぞれ欠いた時は利用不能の表示と `ver` の応答を確認。SQLite は `db_test` 9/9。 |
 | V86 | `v86 -t` は OK。`v86 -g -t` は kdebug on で OK、off で `could not start`。 |
 | kdebug | on・off の各設定が再起動後も保たれ、on で pair の CRC が像と一致し、mem・peek が応答する。 |

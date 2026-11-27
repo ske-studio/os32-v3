@@ -10,7 +10,7 @@ description: レビューを通った段 (作業木のブランチ) を push し
 
 > **作り直し票の取り込み**は `wt/int-*` の候補 SHA を push し、`restructure-build` の同じ run の最新 attempt の plan で選んだジョブと検査の集計（変異込み）の成功で VERIFIED を確認する。起動受入を照合した媒体の状態は ACCEPTED。`python3 -B tools/ci/land_gate.py <SHA> --evidence <JSON>` に候補の sha・run_id・attempt・boots を渡す。boots は計画で選んだ機種の今回の媒体・sha256・artifact_id・到達点・ログ。文書だけでも両方を取り直す。再生成の一致は登録の build_identity が確かめる。古い検査は P7-2 で消した。[CI 設計 §4・§8](../../../docs/design/tools/ci/ci_v2.md)
 
-次は P4 の実測例。毎回、候補の実測値と読めるログ・媒体のパスに置き換える。PC-98 の reached には selftest の成功数と失敗数 0 を記録する。land_gate.py は PC-98 の boots に整数の `selftest_fail` があり、値が 0 であることを確かめる (U27)。
+次は P4 の実測例。毎回、候補の実測値と読めるログ・媒体のパスに置き換える。PC-98 配布の HDD 起動の reached には selftest の成功数と失敗数 0 を記録する。land_gate.py は HDD 起動の boots に整数の `selftest_fail` があり、値が 0 であることを確かめる (U27・U30)。
 
 ```json
 {
@@ -47,6 +47,28 @@ description: レビューを通った段 (作業木のブランチ) を push し
       "reached": "KBOOT READY stage=pre-user"
     }
   ]
+}
+```
+
+起動 FD だけを作った候補では、boots の PC-98 の要素を次の形で記録する（架空の値）。`ver` の表示を転記し、同じ候補の PowerMac core の記録も添える。
+
+```json
+{
+  "machine": "pc98",
+  "boot_kind": "fd",
+  "filename": "os32_boot.d88",
+  "sha": "0123456789abcdef0123456789abcdef01234567",
+  "run_id": 123,
+  "attempt": 1,
+  "artifact_id": 456,
+  "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "log": "/path/to/ver.log",
+  "media": "/path/to/os32_boot.d88",
+  "result": "success",
+  "reached": "ver",
+  "ver_commit": "0123456",
+  "ver_image_crc": "1234abcd",
+  "ver_loader": "FD"
 }
 ```
 

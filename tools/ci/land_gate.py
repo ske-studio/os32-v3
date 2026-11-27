@@ -96,11 +96,23 @@ def medium_digest(base, run, artifacts, boot, artifact_id):
             return hashlib.file_digest(medium, 'sha256').hexdigest()
 
 
-def verify_boot(base, run, artifacts, boot):
+def verify_boot(base, run, artifacts, pc98_plan, boot):
     if boot['machine'] == 'pc98':
-        count = boot.get('selftest_fail')
-        if type(count) is not int or count != 0:
-            raise ValueError('PC-98 requires selftest_fail=0')
+        # Distribution records written before U30 implicitly describe an HDD boot.
+        kind = boot.get('boot_kind', 'hdd')
+        if (pc98_plan, kind) not in (('distribution', 'hdd'), ('fd', 'fd')):
+            raise ValueError('PC-98 boot kind differs from selection plan')
+        if kind == 'hdd':
+            count = boot.get('selftest_fail')
+            if type(count) is not int or count != 0:
+                raise ValueError('PC-98 requires selftest_fail=0')
+        else:
+            commit = boot.get('ver_commit')
+            if not isinstance(commit, str) or not re.fullmatch('[0-9a-f]{7,40}', commit) or not run['head_sha'].startswith(commit):
+                raise ValueError('FD ver Commit differs from candidate')
+            if (boot.get('filename') != 'os32_boot.d88' or boot.get('ver_loader') != 'FD'
+                    or not re.fullmatch('[0-9a-fA-F]{8}', boot.get('ver_image_crc', ''))):
+                raise ValueError('FD boot requires candidate D88, Image CRC and FD loader')
     rid, attempt = number(boot['run_id']), number(boot['attempt'])
     artifact_id = number(boot['artifact_id'])
     if rid != run['id'] or attempt != run['run_attempt']:
@@ -158,7 +170,7 @@ def planned_boots(base, run, artifacts):
         machines.add("pc98")
     if expected["powerpc"]:
         machines.add("powermac")
-    return machines
+    return machines, expected["pc98"]
 
 
 def verify(repo, sha, evidence):
@@ -176,13 +188,13 @@ def verify(repo, sha, evidence):
     marker = f"verified-{sha}-a{attempt}"
     if sum(row["name"] == marker and not row["expired"] for row in artifacts) != 1:
         raise ValueError("candidate artifact is BUILT, VERIFIED required")
-    required = planned_boots(base, run, artifacts)
+    required, pc98_plan = planned_boots(base, run, artifacts)
     machines = set()
     for boot in evidence['boots']:
         machine = boot['machine']
         if boot['sha'] != sha:
             raise ValueError('both boot records must be from the candidate')
-        verify_boot(base, run, artifacts, boot)
+        verify_boot(base, run, artifacts, pc98_plan, boot)
         machines.add(machine)
     if machines != required:
         return [f"candidate boot records required for {sorted(required)}"]

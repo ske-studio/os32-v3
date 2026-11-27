@@ -115,6 +115,9 @@ mutations = [
     { id = "accept_built", config = "local", replace = "tools/ci/land_gate.py", old = 'if sum(row["name"] == marker and not row["expired"] for row in artifacts) != 1:', new = "if False:", fail = "BUILT accepted for landing", when = "after_build" },
     { id = "accept_stale_attempt", config = "local", replace = "tools/ci/land_gate.py", old = "or number(run['run_attempt']) != attempt", new = "or False", fail = "invalid run_attempt accepted", when = "after_build" },
     { id = "accept_failed_selftest", config = "local", replace = "tools/ci/land_gate.py", old = "if type(count) is not int or count != 0:", new = "if False:", fail = "invalid PC-98 selftest count accepted", when = "after_build" },
+    { id = "require_fd_selftest", config = "local", replace = "tools/ci/land_gate.py", old = "if kind == 'hdd':", new = "if True:", fail = "PC-98 requires selftest_fail=0", when = "after_build" },
+    { id = "accept_fd_for_distribution", config = "local", replace = "tools/ci/land_gate.py", old = "('distribution', 'hdd'), ('fd', 'fd')", new = "('distribution', 'hdd'), ('distribution', 'fd'), ('fd', 'fd')", fail = "FD accepted for distribution", when = "after_build" },
+    { id = "ignore_fd_commit", config = "local", replace = "tools/ci/land_gate.py", old = "or not run['head_sha'].startswith(commit)", new = "or False", fail = "wrong FD Commit accepted", when = "after_build" },
     { id = "accept_partial_boot", config = "local", replace = "tools/ci/land_gate.py", old = "if machines != required:", new = "if not machines:", fail = "missing PowerMac boot accepted", when = "after_build" },
 ]
 

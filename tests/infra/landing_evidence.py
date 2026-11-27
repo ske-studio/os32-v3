@@ -47,7 +47,7 @@ def selection_artifact(run):
              patch.object(gate, "comparison", return_value=expected):
             return gate.planned_boots("", run, artifacts)
 
-    if read_plan() != {"powermac"}:
+    if read_plan() != ({"powermac"}, "none"):
         raise Failure("wrong boot evidence for a PowerMac-only plan")
     for field, changed in (("base", run["head_sha"]), ("entries", []),
                            ("selection", dict(expected, skipped={})),
@@ -85,11 +85,26 @@ def verify(config):
     boot = dict(machine="pc98", sha=sha, run_id=19, attempt=2, artifact_id=1,
                 sha256="digest", result="success", reached="shell", log=__file__, media=__file__)
     with patch.object(gate, "medium_digest", return_value="digest"), patch.object(gate, "digest", return_value="digest"):
-        gate.verify_boot("", run, [], dict(boot, selftest_fail=0))
-        gate.verify_boot("", run, [], dict(boot, machine="powermac"))
+        gate.verify_boot("", run, [], "distribution", dict(boot, selftest_fail=0))
+        gate.verify_boot("", run, [], "distribution", dict(boot, machine="powermac"))
+        fd = dict(boot, boot_kind="fd", filename="os32_boot.d88", ver_commit=sha[:7],
+                  ver_image_crc="12ab3456", ver_loader="FD")
+        gate.verify_boot("", run, [], "fd", fd)
+        for plan, record, message in (
+                ("distribution", dict(fd, selftest_fail=0), "FD accepted for distribution"),
+                ("fd", dict(boot, selftest_fail=0), "HDD accepted for FD plan"),
+                ("fd", dict(fd, ver_commit="b" * 7), "wrong FD Commit accepted"),
+                ("fd", dict(fd, ver_commit=""), "missing FD Commit accepted"),
+                ("fd", dict(fd, ver_image_crc=""), "missing FD Image CRC accepted"),
+                ("fd", dict(fd, ver_loader="HDD"), "wrong FD loader accepted")):
+            try:
+                gate.verify_boot("", run, [], plan, record)
+            except ValueError:
+                continue
+            raise Failure(message)
         for extra in ({}, {"selftest_fail": 1}, {"selftest_fail": False}, {"selftest_fail": "0"}):
             try:
-                gate.verify_boot("", run, [], dict(boot, **extra))
+                gate.verify_boot("", run, [], "distribution", dict(boot, **extra))
             except ValueError as exc:
                 if "selftest_fail" in str(exc):
                     continue
@@ -141,7 +156,7 @@ esac
                 raise
         else:
             raise Failure("missing selection plan accepted")
-        with patch.object(gate, "planned_boots", return_value={"pc98", "powermac"}):
+        with patch.object(gate, "planned_boots", return_value=({"pc98", "powermac"}, "distribution")):
             verify_verdict(gate, repo, sha, evidence, run, artifacts, verify_boot)
 
 
