@@ -25,9 +25,9 @@ static int prepare(int gui)
     return 0;
 }
 
-int exec_run(const char *path)
+static int run(const char *path, int line_edit)
 {
-    if (kstrcmp(path, fallback ? SYS_SHELL_BIN : second)) {
+    if (!line_edit || kstrcmp(path, fallback ? SYS_SHELL_BIN : second)) {
         verdict = 3;
         longjmp(done, 1);
     }
@@ -42,7 +42,10 @@ static void delay(void) { if (runs == 2) longjmp(done, 1); }
 
 static void two_runs(void)
 {
-    const struct shell_loop_ops ops = { default_cui, prepare, loading, result, failure, delay };
+    const struct shell_loop_ops ops = {
+        .gui_default = default_cui, .run = run, .prepare = prepare, .loading = loading,
+        .result = result, .failure = failure, .delay_clear = delay,
+    };
     runs = 0;
     if (!setjmp(done)) shell_loop_run(&ops);
 }

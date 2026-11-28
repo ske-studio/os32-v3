@@ -2506,7 +2506,7 @@ environment = "linux-cross"
 arch = { x86 = ["pc98"], ppc = ["link-sh"] }
 needs = []
 expect = "枠1の保留先を拒否の後も起動し、GUI prepare 失敗後の次周回も CUI を起動する"
-limits = "owner と exec_run と機種 ops は試験側で与える"
+limits = "owner と機種 ops は試験側で与える"
 gates = ["push", "main"]
 mutations = [{ id = "invert_owner", config = "pc98", when = "after_build", replace = "sys/kern/gui.c", old = "if (res_owner_get() != GUI_SHELL_OWNER) {", new = "if (res_owner_get() == GUI_SHELL_OWNER) {", fail = "shell owner request rejected" },
     { id = "keep_request", config = "link-sh", when = "after_build", replace = "sys/kern/gui.c", old = "    g_next_shell[0] = '\\0';", new = "    /* request retained */", fail = "switch request consumed twice" }]
