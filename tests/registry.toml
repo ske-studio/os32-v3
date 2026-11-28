@@ -591,7 +591,7 @@ mutations = [
 
 [[check]]
 id = "ppc_link_session"
-ppc_seconds = { link-sh = 713 }
+ppc_seconds = { link-sh = 664 }
 spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "段 12 F/5d 常駐シェル切替" }
 subsystem = "system"
 level = "L4"
@@ -606,6 +606,7 @@ mutations = [{ id = "double_print", config = "link-sh", when = "after_build", re
 
 [[check]]
 id = "ppc_usb_lan"
+ppc_seconds = { link-sh = 80 }
 spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の USB と RPC" }
 subsystem = "system"
 level = "L4"
@@ -625,7 +626,7 @@ level = "L4"
 sources = ["make:all", "make:iso", "tests/system/ppc_link_session.py", "tests/support/ppc_vm.py", "tests/support/ppc_fixture.py", "tests/support/fixtures/ppc_link", "tests/support/ppc_peer.py", "tools/host_agent.py", "tools/host_rshell.py", "tools/host_operator_socket.py", "tools/ppc_lan_host.py", "tools/host_sfs_link.py", "userland/shell/rshell.c", "userland/shell/rshell_lan.c", "sys/kern/exec/exec.c", "sys/kern/mm/kmalloc.c"]
 environment = "qemu-ppc-net"
 arch = { ppc = ["link-sh"] }
-ppc_seconds = { link-sh = 95 }
+ppc_seconds = { link-sh = 90 }
 needs = []
 expect = "ack・保留・解除後に一度だけ応答"
 limits = "serial と USB の半行"
@@ -654,7 +655,7 @@ level = "L4"
 sources = ["make:all", "make:iso", "tests/support/ppc_vm.py", "tests/support/ppc_fixture.py", "tests/support/fixtures/ppc_hwb", "tests/support/ppc_peer.py", "tools/host_agent.py", "tools/host_rshell.py", "tools/host_operator_socket.py", "tools/ppc_lan_host.py", "tools/host_sfs_link.py", "sys/kern/exec/exec.c", "sys/kern/exec/exec_abort.inc", "sys/platform/powermac/pci_backend.c"]
 environment = "qemu-ppc-net"
 arch = { ppc = ["link-sh"] }
-ppc_seconds = { link-sh = 149 }
+ppc_seconds = { link-sh = 155 }
 needs = []
 expect = "4組の中断・保留行と再 load"
 limits = "7450 KDEBUG"
@@ -697,7 +698,7 @@ level = "L4"
 sources = ["make:all", "make:iso", "sys/platform/powermac/hostfs_link_io.c", "sys/platform/powermac/ppc_kernel.c", "sys/fs/serialfs/serialfs_persistent.c", "sys/fs/serialfs/sfs_client.c", "tests/support/fixtures/ppc_link/hfs_cancel.inc", "tests/support/ppc_fixture.py", "tests/support/ppc_vm.py", "tools/host_sfs_link.py", "tools/lanfs_host.py", "tools/serialfs_host.py"]
 environment = "qemu-ppc"
 arch = { ppc = ["link-sh"] }
-ppc_seconds = { link-sh = 99 }
+ppc_seconds = { link-sh = 67 }
 needs = []
 expect = "同一要求の保留を同期解放し、seq 更新では BYE を送らず新 nonce で旧 sid を閉じる"
 limits = "mac99、制御した下位応答とメモリ内ホスト。実 client の期限切れから実 link までの道は ppc_usb_lan (段 3)"
@@ -2566,6 +2567,7 @@ mutations = [
 
 [[check]]
 id = "shell_switch_gate"
+ppc_seconds = { link-sh = 5 }
 spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "段 12 F/5d 常駐シェル切替" }
 subsystem = "system"
 level = "L1"

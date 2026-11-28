@@ -20,7 +20,7 @@ C_COMMON_EXEC += sys/kern/init/shell_loop.c sys/kern/gui.c sys/kern/module/modul
 C_COMMON_COMPILE_ONLY_PPC := sys/kern/fep_boot.c sys/kern/sqlite_engine.c $(C_EXT2_FORMATTER) sys/dev/ide/device_ide.c sys/dev/ata/ide_addr.c
 C_COMMON_IDE = sys/dev/ide/device_ide.c sys/dev/ata/ide.c sys/dev/ata/ide_addr.c
 C_COMMON_LOOP = sys/dev/loop/device_loop.c sys/dev/block/loop_dev.c
-ifeq ($(FEATURE_PC98_PENDING)$(FEATURE_LOOP),11)
+ifeq ($(FEATURE_LOOP),1)
 C_COMMON_LOOP += sys/dev/block/ext2_medium_loop.c
 C_ORDER_TAIL += sys/dev/block/ext2_medium_loop.c
 endif
