@@ -109,7 +109,17 @@ ci_fetch の既定は VERIFIED 以上。`--allow-built` は実機調査向け。
 
 2026-11-27 の重みの更新（registry_v2「PowerPC の構成別重み」の手順）。標本は main a77e100f1 の run 46021992053 attempt 1（identity.mutate=true、rc=0、対象行の全必須変異が RED）の summary-1。正常と全変異の秒の合計を切り上げて、`ppc_usb_lanq/link-sh` 95 秒（94.8）、`ppc_hwb_command/link-sh` 149 秒（148.1）、`ppc_hfs_cancel/link-sh` 99 秒（98.5）を新しく登録し、`ppc_boot_clock/core` を 17 から 20 秒（19.5）にした。`ppc_link_overflow/link-sh` は DEFERRED で実測が無いため未計測のまま（暫定 900 秒で単独の束、中は実行されない）。更新の前後で `plan --full --gate push --mutate` の（id, config）の集合と必須変異の集合は同じ。PowerPC の束は 7 から 4 に減り、登録重みの合計は ppc-build-1 28 行 530 秒、ppc-guest-1 9 行 460 秒、ppc-net-1 3 行 717 秒、ppc-net-2 1 行（overflow のみ）。同じ run の束の実測は ppc-build-1 535 秒、ppc-guest-1 286 秒、ppc-guest-2 98 秒、ppc-net-1 429 秒、ppc-net-2 95 秒、ppc-net-4 148 秒。更新後の成功 run 46026631361（attempt 1、mutate=true、rc=0）の束の実測は ppc-build-1 365 秒、ppc-guest-1 467 秒、ppc-net-1 594 秒、ppc-net-2（overflow、DEFERRED）0 秒で、どれも 900 秒以内。ジョブの所要は build 8 分、guest 9 分、net-1 11 分、net-2 2 分。
 
-2026-11-28 の重みの更新（同じ手順）。標本は 456e108f2 の run 46121377310 attempt 2（summary-2、mutate=true、対象行の全必須変異が RED）。`ppc_link_session/link-sh` を手元の暫定 713 秒から 576 秒（正常 156.2 + 変異 4 本 418.8 = 575.1）に、未計測で暫定 900 秒だった `shell_switch_gate/link-sh` に 5 秒（正常 2.3 + 変異 1.9 = 4.1）を登録した。前後の `plan --full --gate push --mutate` で（id, config）の集合 180 行と必須変異の集合 439 本は同じ。PowerPC の束は 12 から 10 に減る（ppc-build 7→6、ppc-net 4→3）。更新後の束の実測は、この更新を載せた候補の成功 run で確かめる。
+2026-11-28 の重みの更新（同じ手順、2 回）。1 回目の標本は 456e108f2 の run 46121377310 attempt 2（summary-2）で、`ppc_link_session/link-sh` を手元の暫定 713 秒から 576 秒（正常 156.2 + 変異 4 本 418.8 = 575.1）に、未計測で暫定 900 秒だった `shell_switch_gate/link-sh` に 5 秒（2.3 + 1.9 = 4.1）を登録した。これを載せた 5ce1d1c27 の run 46139622097 attempt 1（summary-1、mutate=true、gate=main、全行 PASS・全必須変異 RED）で `ppc_link_session` が 663.9 秒に伸び、同じ束の `ppc_hwb_command` 154.8 秒・`ppc_usb_lanq` 89.9 秒と合わせた ppc-net-1 が 908.7 秒で 900 秒を超えた。2 回目はこの run を標本に、LAN の行を下表の値にした（`ppc_usb_lan` は未計測の暫定 900 秒で単独の束だった）。前後とも `plan --full --gate push --mutate` の（id, config）180 行と必須変異 439 本の集合は同じ。束の数は PowerPC 12 → 10。
+
+| 行（link-sh） | 前の登録 | run 46139622097 の実測（正常 + 変異） | 新しい登録 | 前の束 | 新しい束 |
+|---|---:|---:|---:|---|---|
+| ppc_link_session | 576 | 663.9 | 664 | ppc-net-1 | ppc-net-1 |
+| ppc_usb_lan | 未計測 | 79.8 | 80 | ppc-net-2（単独） | ppc-net-1 |
+| ppc_usb_lanq | 95 | 89.9 | 90 | ppc-net-1 | ppc-net-1 |
+| ppc_hwb_command | 149 | 154.8 | 155 | ppc-net-1 | ppc-net-3 |
+| ppc_hfs_cancel | 99 | 66.7 | 67 | ppc-guest-1 | ppc-guest-1 |
+
+新しい ppc-net-1 の登録重みは 834 秒（同じ run の実測の和 833.6 秒）、ppc-net-3 は 155 秒。`ppc_link_session` は 2 回の hosted で 575〜664 秒と 15% 動いたので、更新後の成功 run の束の実測を次の候補で記録し、900 秒を超えたら G13 に従って SFS の場面を別 ID に分ける。
 
 **所要の目標（A1 推奨）** は全件成功の統合 push で、最初の run 作成から最後の必須ジョブ完了までの中央値を 30 分以内とする。P0-4 の成功した統合 5 push は 1,773〜2,544 秒、中央値 1,984 秒。全 20 push 中の最長は 2,999 秒、ジョブの待ち中央値は 11 秒、最大 1,671 秒だった。途中と全件、待ちと実行を分けて同じ定義で報告し、短縮のために検査を落とさない。
 
