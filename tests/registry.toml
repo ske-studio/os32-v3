@@ -2395,13 +2395,13 @@ subsystem = "fs"
 level = "L2"
 sources = ["sys/fs/ext2/ext2_fmt.c", "sys/fs/ext2/ext2_layout.c", "sys/platform/pc98/storage/ext2_medium_ide.c", "sys/dev/block/ext2_medium_loop.c", "sys/dev/block/loop_dev.c", "sys/include/loop_contract.h", "sys/include/ext2_medium_contract.h", "sys/fs/pc98pt.c", "tests/support/fixtures/ext2_medium_select/medium.c", "docs/decisions/fs/EXT2_MEDIUM_RESOLVE_DESIGN.md"]
 environment = "linux-x86-cross"
-arch = { host = ["local"] }
+arch = { x86 = ["pc98"] }
 needs = []
 expect = "二入口の戻り値と順序付き I/O と媒体差分が PC-98 の基点に一致する"
 limits = "管理なしのファイル媒体。ゲストの起動と PowerMac ATA の予約は対象外"
 gates = ["push", "main"]
 mutations = [
-    { id = "ext2_select_attached", config = "local", when = "after_build", replace = "sys/fs/ext2/ext2_fmt.c", old = "loop && loop->claims(drv)", new = "loop && loop->claims(drv) && loop->present(drv)", fail = "unattached loop performed HD I/O" },
-    { id = "ext2_select_early_reject", config = "local", when = "after_build", replace = "sys/fs/ext2/ext2_fmt.c", old = "u32 disk_sectors;", new = "u32 disk_sectors; if (ide_drive == 0x0604) return EXT2_ERR_INVAL;", fail = "explicit invalid drive probe sequence differs" },
-    { id = "ext2_select_mask", config = "local", when = "after_build", replace = "sys/fs/ext2/ext2_fmt.c", old = "u32 disk_sectors;", new = "u32 disk_sectors; ide_drive &= 0xff;", fail = "masked drive wrote hd0" },
+    { id = "ext2_select_attached", config = "pc98", when = "after_build", replace = "sys/fs/ext2/ext2_fmt.c", old = "loop && loop->claims(drv)", new = "loop && loop->claims(drv) && loop->present(drv)", fail = "unattached loop performed HD I/O" },
+    { id = "ext2_select_early_reject", config = "pc98", when = "after_build", replace = "sys/fs/ext2/ext2_fmt.c", old = "u32 disk_sectors;", new = "u32 disk_sectors; if (ide_drive == 0x0604) return EXT2_ERR_INVAL;", fail = "explicit invalid drive probe sequence differs" },
+    { id = "ext2_select_mask", config = "pc98", when = "after_build", replace = "sys/fs/ext2/ext2_fmt.c", old = "u32 disk_sectors;", new = "u32 disk_sectors; ide_drive &= 0xff;", fail = "masked drive wrote hd0" },
 ]
