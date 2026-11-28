@@ -226,6 +226,42 @@ static int check_row_limit(int public)
     return ikm_wire_header(wire, sizeof wire, &count) != OS32_ERR_INVAL;
 }
 
+/* Physical Ctrl+C from the machine descriptor, through both public exits. */
+static int terminal_interrupt(void)
+{
+#ifdef __PPC__
+    const u16 control = 0xe0, letter = 6;
+#else
+    const u16 control = KEY_CTRL, letter = 0x2b;
+#endif
+    KmKey k = {.src = 1, .generation = 1, .down = 1, .keycode = control};
+    KbdPolicyAction event;
+    if (api.kbd_policy_context_set(INPUT_CONTEXT_LINE_EDIT, INPUT_CONTEXT_ISIG | INPUT_CONTEXT_ICANON) ||
+        api.kbd_policy_delivery_set(KBD_POLICY_DELIVERY_ACTION) || input_capture_key(&k)) return 1;
+    k.keycode = letter;
+    tick_count = 73;
+    if (input_capture_key(&k) || input_capture_key(&k)) return 1;
+    k.down = 0;
+    if (input_capture_key(&k) || api.kbd_policy_action_read(&event, 1) != 1 ||
+        event.action != KBD_POLICY_ACTION_CANCEL_LINE || event.time_ms != 73 ||
+        event.command_gen || event.value || api.kbd_policy_action_read(&event, 1) ||
+        legacy_cooked_take() != -1) return 1;
+    if (api.kbd_policy_command_begin()) return 1;
+    k.down = 1;
+    if (input_capture_key(&k) || api.kbd_policy_action_read(&event, 1) != 1 ||
+        event.action != KBD_POLICY_ACTION_INTERRUPT || !event.command_gen ||
+        legacy_cooked_take() != -1) return 1;
+    k.down = 0;
+    if (input_capture_key(&k) || api.kbd_policy_command_end() ||
+        api.kbd_policy_delivery_set(KBD_POLICY_DELIVERY_BYTE)) return 1;
+    k.down = 1;
+    if (input_capture_key(&k) || (legacy_cooked_take() & 255) != 3) return 1;
+    k.down = 0;
+    if (input_capture_key(&k)) return 1;
+    k.keycode = control;
+    return input_capture_key(&k) || api.kbd_policy_context_set(INPUT_CONTEXT_RUNNING, INPUT_CONTEXT_ISIG);
+}
+
 static int test_provider(void)
 {
     KbdPolicySnapshot snapshot;
@@ -289,13 +325,15 @@ static int test_provider(void)
                           0x1a, 0x11, KM_MOD_COMMAND, &binding) ||
         binding != KBD_POLICY_ACTION_CLOSE) return 84;
 #endif
-    if (diagnostics || check_row_limit(0)) return 3;
+    if (diagnostics) return 3;
     appslots[1].exec_gen = 1;
     appslots[2].exec_gen = 2;
     input_context_discard_register(discard);
     if (input_context_owner_register(1, 1, 0, 0) || input_context_owner_select(1, 1) ||
         input_context_owner_register(2, 2, 1, 1) || input_context_snapshot(&snapshot))
         return 4;
+    if (terminal_interrupt()) return 99;
+    if (check_row_limit(0)) return 3;
     /* Carry the real public read and its raw mirror into the window pump. */
     KmKey press = { .src = 1, .generation = 1, .down = 1,
 #ifdef __PPC__

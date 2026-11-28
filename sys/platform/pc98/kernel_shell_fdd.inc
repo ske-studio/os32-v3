@@ -1,7 +1,7 @@
 /* CUI ロード失敗時の FDD 代替と致命時の案内。 */
 static void kernel_shell_fdd_fallback(int layout_bad)
 {
-    int rc = exec_run(SYS_SHELL_BIN_FDD);
+    int rc = exec_run_shell(SYS_SHELL_BIN_FDD, 1);
     if (rc < 0 && rc != EXEC_ERR_FAULT) {
         layout_bad |= exec_layout_rejected();
         if (layout_bad & EXEC_REJECT_MIN_API) {

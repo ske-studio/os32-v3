@@ -220,8 +220,12 @@ int input_capture_key(const KmKey *key)
             *consumed |= bit;
     }
     km_legacy_compat(&result);
-    if (!input_capture_delivery(key, old, &result, raw_due))
-        input_emit_keymap(&result, key->down, raw_due, kbd_shift_state, 0);
+    if (!input_capture_delivery(key, old, &result, raw_due)) {
+        if (!old && ikm_capture_terminal(key, source.map->id, state.mods, &result, e.time_ms))
+            *consumed |= bit;
+        else
+            input_emit_keymap(&result, key->down, raw_due, kbd_shift_state, 0);
+    }
     rc = 0;
 out:
     irq_restore(flags);

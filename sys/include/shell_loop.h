@@ -3,6 +3,7 @@
 
 struct shell_loop_ops {
     int (*gui_default)(void);
+    int (*run)(const char *cmdline, int line_edit);
     int (*prepare)(int gui); /* 0: ready, 1: missing KCG, 2: missing GUI dependency */
     void (*loading)(const char *path, int gui);
     void (*result)(const char *path, int rc, int gui, int streak);

@@ -127,6 +127,26 @@ int probe(void)
                                            input_policy_pressed) ||
         input_context_owner_register(1, 1, 0, 0) || input_context_owner_select(1, 1))
         return 19;
+    /* A printable binding consumes its make and repeat only in ACTION mode. */
+    kbd_set_gui_mode(0);
+    const u8 terminal[] = {'I','K','M','1',2,0,16,0,1,0,0,0,0,0,0,0,
+        8,3,2,0,4,0,2,0,KBD_POLICY_ACTION_REDRAW,0,0,0,0,0,0,0};
+    KbdPolicyAction action;
+    if (ikm_policy_set(terminal, sizeof terminal, 1, 1) ||
+        captured(1, 1) || captured(1, 0) || (legacy_cooked_take() & 255) != 'a' ||
+        input_context_delivery_set(1, 1, KBD_POLICY_DELIVERY_ACTION)) return 51;
+    tick_count = 123;
+    if (captured(1, 1) || captured(1, 1) || captured(1, 0) ||
+        ikm_policy_action_read(1, 1, &action, 1) != 1 ||
+        action.action != KBD_POLICY_ACTION_REDRAW || action.time_ms != 123 ||
+        action.command_gen || action.value || legacy_cooked_take() != -1 ||
+        ikm_policy_action_read(1, 1, &action, 1)) return 52;
+    if (captured(1, 1) || captured(1, 0) ||
+        input_context_owner_set(1, 1, INPUT_CONTEXT_LINE_EDIT, INPUT_CONTEXT_ISIG) ||
+        ikm_policy_action_read(1, 1, &action, 1) ||
+        input_context_delivery_set(1, 1, KBD_POLICY_DELIVERY_BYTE) ||
+        ikm_policy_reset(1, 1)) return 53;
+    kbd_set_gui_mode(1);
     KbdPolicyKey out;
     if (in2_acquire(IN2_EXCL_KBD) || captured(1, 1) || captured(1, 0) ||
         in2_unacquire() || ikm_policy_key_read(1, 1, 1, &out, 1)) return 20;

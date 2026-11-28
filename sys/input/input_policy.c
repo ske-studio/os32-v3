@@ -579,6 +579,44 @@ int ikm_policy_compat(u8 profile, u8 sc, u8 *byte)
 }
 
 
+/* Called after the physical rescue and IME paths, with IRQs excluded. */
+int ikm_capture_terminal(const KmKey *key, u16 map, u16 mods,
+                         const KmEvalResult *result, u32 time_ms)
+{
+    KbdPolicySnapshot dst;
+    u8 action;
+    if (!key->down || !machine || input_context_snapshot(&dst) ||
+        !input_context_action_mode(dst.owner, dst.exec_gen) || in2_excl_keyboard() ||
+        dst.context == INPUT_CONTEXT_GUI || dst.context == INPUT_CONTEXT_BYTE_INPUT)
+        return 0;
+    u8 profile = machine == IKM_PLATFORM_PC98 ? KBD_POLICY_PROFILE_PC98_CUI :
+                                                KBD_POLICY_PROFILE_MAC_CUI;
+    if (ikm_policy_action(profile, dst.context, map, key->keycode, result->compat_sc,
+                          mods, &action)) return 0;
+    if (!action && result->kind == KM_CHAR && result->sym <= 255 && !result->is_modifier) {
+        const u8 meaning[] = {0, KBD_POLICY_ACTION_INTERRUPT,
+            machine == IKM_PLATFORM_PC98 ? KBD_POLICY_ACTION_CANCEL_LINE : KBD_POLICY_ACTION_KILL_TO_BOL,
+            KBD_POLICY_ACTION_EOF_INPUT, KBD_POLICY_ACTION_KILL_TO_EOL, KBD_POLICY_ACTION_REDRAW};
+        for (unsigned id = KBD_POLICY_TERM_VINTR; id <= KBD_POLICY_TERM_REDRAW; ++id) {
+            u8 byte;
+            if (!term(active, profile, dst.context, id, &byte) && byte == result->sym &&
+                (dst.flags & (id == KBD_POLICY_TERM_VINTR ? INPUT_CONTEXT_ISIG : INPUT_CONTEXT_ICANON))) {
+                action = meaning[id];
+                break;
+            }
+        }
+    }
+    if (action == KBD_POLICY_ACTION_INTERRUPT) {
+        if (!(dst.flags & INPUT_CONTEXT_ISIG)) return 0;
+        if (dst.context == INPUT_CONTEXT_LINE_EDIT) action = KBD_POLICY_ACTION_CANCEL_LINE;
+    }
+    if (!action) return 0;
+    KbdPolicyAction event = {.action = action, .command_gen = dst.command_gen,
+        .time_ms = time_ms, .value = action == KBD_POLICY_ACTION_BSD_SPECIAL ? result->op : 0};
+    input_delivery_action(&dst, &event);
+    return 1; /* A full action ring still consumes the make. */
+}
+
 /* The capture caller holds IRQ exclusion across evaluation and publication. */
 int ikm_capture_gui_key(const KmKey *key, const KmSource *source, const KmState *state,
                          const KmEvalResult *result, u8 repeat, u8 consumed, u8 physical, u32 time_ms)

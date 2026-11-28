@@ -86,7 +86,17 @@ int exec_gui_registered(void)
     return round_no >= 1 && round_no <= 3;
 }
 void arch_fp_save(struct arch_fp_context *ctx) { (void)ctx; ++fp_saves; }
-static int gui_default(void) { return 1; }
+static int initial_cui, polls;
+static int gui_default(void) { return !initial_cui; }
+static int first_poll(void)
+{
+    ++polls;
+    KbdPolicySnapshot s;
+    if (input_context_snapshot(&s) || s.owner != APP_ID_SHELL ||
+        s.context != INPUT_CONTEXT_LINE_EDIT ||
+        s.flags != (INPUT_CONTEXT_ISIG | INPUT_CONTEXT_ICANON)) bad = 1;
+    return -1;
+}
 int gui_take_next_shell(char *path, int cap)
 {
     if (round_no != 1) return 0;
@@ -110,6 +120,7 @@ static void result(const char *path, int rc, int gui, int streak)
 {
     KbdPolicySnapshot s;
     (void)path; (void)gui; (void)streak;
+    if (initial_cui) __builtin_longjmp(entered, 1);
     if (round_no == 5) {
         bad |= rc != EXEC_ERR_INVALID || exec_nest_level || lease_before != g_shell_service.generation ||
                fp_saves != saves_before || input_context_snapshot(&s) || s.exec_gen != 999;
@@ -226,6 +237,7 @@ void arch_entry_enter(struct arch_entry_context *entry, u32 pd)
     if (probe_jump == child_jump) {
         ++child_entries;
         if (pd != 2 || active_pd != pd || io_syscall_suspend(APP_ID_SHELL) || input_context_snapshot(&s) ||
+            s.context != INPUT_CONTEXT_RUNNING || s.flags != INPUT_CONTEXT_ISIG ||
             s.owner != APP_ID_MIN || !s.exec_gen || ikm_policy_reset(s.owner, s.exec_gen) ||
             restored()) bad = 1;
         if (child_kind == 2) exec_fault_recover();
@@ -238,11 +250,14 @@ void arch_entry_enter(struct arch_entry_context *entry, u32 pd)
     }
     int gui = round_no >= 1 && round_no <= 3;
     if (pd || input_context_snapshot(&s) || s.owner != APP_ID_SHELL ||
-        !s.exec_gen || s.exec_gen == previous_gen || s.flags != INPUT_CONTEXT_ISIG ||
-        s.context != (gui ? INPUT_CONTEXT_GUI : INPUT_CONTEXT_RUNNING)) {
+        !s.exec_gen || s.exec_gen == previous_gen || s.flags != (gui ? INPUT_CONTEXT_ISIG :
+            INPUT_CONTEXT_ISIG | INPUT_CONTEXT_ICANON) ||
+        s.context != (gui ? INPUT_CONTEXT_GUI : INPUT_CONTEXT_LINE_EDIT)) {
         bad = 1;
         __builtin_longjmp(entered,1);
     }
+    if (!gui && kapi->kbd_trygetkey() != -1) bad = 1;
+    if (initial_cui) return;
     if (round_no == 0) bad |= check_child(s.exec_gen);
     if (round_no == 1) bad |= check_park_reclaim(s.exec_gen);
     bad |= input_context_owner_generation(APP_ID_SHELL) != s.exec_gen;
@@ -253,13 +268,21 @@ void arch_entry_enter(struct arch_entry_context *entry, u32 pd)
     if (gui) exec_fault_recover();
     if (round_no == 4) ring3_abort_kill();
 }
+void __real_shell_loop_run(const struct shell_loop_ops *ops);
+void __wrap_shell_loop_run(const struct shell_loop_ops *machine)
+{
+    const struct shell_loop_ops ops = {gui_default, machine->run, ready, loading, result,
+                                       failure, delay_clear};
+    __real_shell_loop_run(&ops);
+}
+
+void probe_machine(void);
 int probe(void)
 {
-    const struct shell_loop_ops ops = {gui_default, ready, loading, result, failure, delay_clear};
     kapi = &probe_api;
 #include "exec_kapi_init.inc"
     ring3_tramp_page = (u32)trampoline;
-    static const InputOps ops_input = {.discard_stop = discard_stop};
+    static const InputOps ops_input = {.trygetkey = first_poll, .discard_stop = discard_stop};
     input_register(&ops_input);
     appslot_init();
 #ifdef __PPC__
@@ -268,6 +291,15 @@ int probe(void)
     if (ikm_policy_init(IKM_PLATFORM_PC98, &pc98_jp_backend, &hid_jp_backend, no_keys)) return 1;
 #endif
     if (ikm_policy_set(baseline, sizeof baseline, 0, 0)) return 1;
-    if (!__builtin_setjmp(entered)) shell_loop_run(&ops);
+    initial_cui = 1;
+    if (!__builtin_setjmp(entered)) probe_machine();
+    if (bad || polls != 1) return 1;
+#ifndef __PPC__
+    extern void probe_fdd(void);
+    if (!__builtin_setjmp(entered)) probe_fdd();
+    if (bad || polls != 2) return 1;
+#endif
+    initial_cui = 0;
+    if (!__builtin_setjmp(entered)) probe_machine();
     return bad || observed != 6;
 }
