@@ -199,15 +199,23 @@ static int cmd_format(int argc, char **argv)
     int ret;
     const char *p;
 
-    if (argc < 2) {
-        shell_print_help(argv[0]);
-        return SH_STATUS_USAGE;
+    if (argc < 2 || argc > 3) goto usage;
+    p = argv[1];
+    if (p[0] == 'l' && p[1] == 'o') {
+        drv = OS32_DRV_LOOP(0);
+        p += 2;
     }
-    drv = argv[1][0] - '0';
-    if (argc > 2) {
-        p = argv[2];
+    if (*p < '0' || *p > '3' || p[1]) goto usage;
+    drv += *p - '0';
+    if (argc == 3) {
         sects = 0;
-        while (*p >= '0' && *p <= '9') sects = sects * 10 + (*p++ - '0');
+        for (p = argv[2]; *p; ++p) {
+            if (*p < '0' || *p > '9') goto usage;
+            u32 digit = *p - '0';
+            if (sects > (0xffffffffu - digit) / 10) goto usage;
+            sects = sects * 10 + digit;
+        }
+        if (!sects) goto usage;
     }
     g_api->kprintf(ATTR_YELLOW, "Formatting drive %d (%u sectors)...\n", drv, sects);
     ret = g_api->ext2_format(drv, sects);
@@ -217,6 +225,10 @@ static int cmd_format(int argc, char **argv)
     }
     g_api->kprintf(ATTR_GREEN, "%s", "Format complete.\n");
     return 0;
+
+usage:
+    shell_print_help(argv[0]);
+    return SH_STATUS_USAGE;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -677,7 +689,7 @@ static const ShellCmd sys_cmds[] = {
     { "dev",    cmd_dev,    "",              "List block/char devices" },
     { "df",     cmd_dev,    "",              "Alias for dev" },
     { "ide",    cmd_ide,    "[0-3]",         "Show IDE drive geometry" },
-    { "format", cmd_format, "[0-3] [sects]", "Format a drive to ext2" },
+    { "format", cmd_format, "<0-3|lo0-lo3> [SECTORS]", "Format a drive to ext2" },
     { "os32gui",cmd_os32gui,"[on|off|-t seconds]", "Switch to GUI shell now, or set GUI at boot" },
     { "gfxmode",cmd_gfxmode,"pc98|pegc|cirrus|geforce|trident|auto|diag stripes|altwin|off","Force the graphics backend at next boot" },
     { "kdebug", cmd_kdebug, "[on|off]",       "Show debug module state or set it at next boot" },
