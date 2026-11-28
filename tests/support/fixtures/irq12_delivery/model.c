@@ -39,6 +39,7 @@ static void guest_write(u16 port, u8 value)
 extern u32 entered[17];
 extern void check_enter(const struct v86_context *ctx);
 static int slicing;
+int v86_tick_and_check_timeout(void);
 void __real_v86_reflect_irq(u32 *frame, u32 irq);
 void v86_pic_request(u32 irq) {}
 int v86_pic_candidate(u32 *vector) { return -1; }
@@ -56,6 +57,7 @@ void v86_enter(const struct v86_context *ctx)
         for (unsigned i = 0; i <= V86I_GS; ++i) frame[i] = 0x100 + i;
         frame[V86I_EFLAGS] = EFLAGS_VM | EFLAGS_IF;
         __real_v86_reflect_irq(frame, 0);
+        require(v86_tick_and_check_timeout(), "timer return");
     }
     if (fault_exit) v86_runtime_end();
 }
@@ -236,6 +238,9 @@ void _start(void)
         require(entered[i] == (i == V86I_EFLAGS ? EFLAGS_VM | EFLAGS_IF : 0x100 + i),
                 "resume register frame");
     }
+    for (unsigned ticks = 2; ticks < V86_TICK_LIMIT; ++ticks)
+        require(v86_run_slice(&ctx) == V86_EXIT_SLICE, "early slice timeout");
+    require(v86_run_slice(&ctx) == V86_EXIT_TIMEOUT, "session slice timeout");
     slicing = 0;
     session(2);
     boot_probe.bank[0].model = boot_probe.bank[1].model = OPN_PROBE_ABSENT;

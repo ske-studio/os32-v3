@@ -4,6 +4,7 @@
 #undef main
 #include "check.h"
 
+static const char *expected_path, *expected_second;
 static int begin_rc, open_rc, fault, running, stream, ends, fallback, pumps, turns, keys;
 static int begin(const V86_Begin *b, u32 *sid)
 {
@@ -37,7 +38,12 @@ static int end(u32 sid)
     ++ends;
     return 0;
 }
-static int boot2(const char *path, const char *second) { ++fallback; return 1; }
+static int boot2(const char *path, const char *second) {
+    if (expected_path)
+        check(path == expected_path && second == expected_second, "fallback path pair");
+    ++fallback;
+    return 1;
+}
 
 int sndl_init(KernelAPI *kapi) { return 0; }
 int sndl_chip_open(const SNDL_ChipReq *r, u32 *id, SNDL_ChipGot *got)
@@ -73,5 +79,17 @@ void _start(void)
     for (fault = 0; fault <= 1; ++fault)
         check(boot_sound("fmtone.fdi", 0) == (fault ? 6 : 5), "command exit");
     check(ends == 3 && !running && !stream, "command cleanup");
+    char path[65];
+    for (unsigned i = 0; i < 64; ++i) path[i] = 'a';
+    path[64] = 0;
+    expected_path = path;
+    expected_second = "drive2.fdi";
+    check(boot_sound(expected_path, expected_second) == 1 && fallback == 2, "long primary");
+    expected_path = "drive1.fdi";
+    expected_second = path;
+    check(boot_sound(expected_path, expected_second) == 1 && fallback == 3, "long secondary");
+    fault = 1;
+    path[63] = 0;
+    check(boot_sound(path, path) == 6 && fallback == 3, "63 byte paths");
     passed();
 }

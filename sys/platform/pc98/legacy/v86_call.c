@@ -231,6 +231,7 @@ int v86s_begin(const V86_Begin *input, u32 *sid)
         return rc;
     }
     for (u32 port = 0x188; port <= 0x18f; ++port) tss_iomap_deny(port);
+    v86_session.ticks = 0;
     v86_session.soft_input = 1;
     v86_mem_suspend();
     paging_load_cr3(call.cr3);

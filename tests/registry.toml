@@ -508,6 +508,10 @@ expect = "IRQ12 の共有配送と従来の IRQ 線、SOFT の文脈・入力・
 limits = "実スタブ本体を実行。特権命令・ゲストフレーム・PIC は模型"
 gates = ["push", "main"]
 mutations = [
+ { id = "reset_slice_ticks", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (!slice_context) v86_session.ticks = 0;", new = "v86_session.ticks = 0;", fail = "session slice timeout" },
+ { id = "skip_slice_tick", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "v86_exit_request && v86_exit_reason != V86_EXIT_SLICE", new = "v86_exit_request", fail = "session slice timeout" },
+ { id = "reject_long_paths", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "return api->v86_boot2(path, second);\n    strcpy", new = "return OS32_ERR_INVAL;\n    strcpy", fail = "long primary" },
+ { id = "lose_second_path", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "return api->v86_boot2(path, second);\n    strcpy", new = "return api->v86_boot2(path, 0);\n    strcpy", fail = "fallback path pair" },
  { id = "lose_pump_key", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/guest.c", old = "return v86_is_active() || v86_session.soft_input;", new = "return v86_is_active();", fail = "pump input owner" },
  { id = "lose_pump_stop", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (v86_session.soft_input) v86_session.soft_stop = 1;", new = "(void)v86_session.soft_input;", fail = "pump stop retained" },
  { id = "omit_slice_bitmap", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_mem.c", old = "kmemcpy(kernel_tss.iomap, slice_mem->iomap, TSS_IOMAP_SIZE);", new = "(void)slice_mem->iomap;", fail = "resume DOS state" },

@@ -102,6 +102,7 @@ struct v86_session_state {
     int closing;
     volatile int active;
     int running;
+    volatile u32 ticks;
     int soft_input;
     int soft_stop;
     int aborting;

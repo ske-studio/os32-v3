@@ -344,7 +344,6 @@ static volatile u32 v86_irq_n = 0;
  * 注意: IOPL=3 ではゲストの CLI が実 IF を落とすため、ゲストが CLI した
  * まま暴走するとタイマ割り込み自体が来なくなり、この計測も止まる。
  * その場合の脱出手段は別途必要 (docs/archive/v21/v86v2/04_implementation_status.md §7)。 */
-static volatile u32 v86_ticks = 0;
 static volatile u32 v86_tick_limit = 0;
 
 u32 v86_irq_reflect_count(void) { return v86_irq_n; }
@@ -485,7 +484,7 @@ int v86_tick_and_check_timeout(void)
     /* 割り込み反射の失敗 (ゲストスタック不正) などで脱出要求が立って
      * いたら、タイマ経路でもセッションを畳む。ホットキー以外の要求は
      * キーボード IRQ が来ない限り放置されてしまうため。 */
-    if (v86_exit_request) {
+    if (v86_exit_request && v86_exit_reason != V86_EXIT_SLICE) {
         v86_exit_request = 0;
         return 1;
     }
@@ -493,11 +492,11 @@ int v86_tick_and_check_timeout(void)
      * #GP ウォッチドッグの budget をここで戻す。 */
     v86_gp_since_tick = 0;
 
-    if (++v86_ticks >= v86_tick_limit) {
+    if (++v86_session.ticks >= v86_tick_limit) {
         v86_exit_reason = V86_EXIT_TIMEOUT;
         return 1;
     }
-    return 0;
+    return v86_check_exit_request();
 }
 
 /* #GP スタブから呼ばれる脱出口。v86_run() の setjmp 地点へ戻る。 */
@@ -567,7 +566,7 @@ int v86_run_limit(const struct v86_context *ctx, u32 tick_limit)
     v86_gp_n = 0;
     v86_gp_since_tick = 0;
     v86_irq_n = 0;
-    v86_ticks = 0;
+    if (!slice_context) v86_session.ticks = 0;
     v86_tick_limit = tick_limit;
     v86_session.saved_esp0 = tss_get_esp0();
 

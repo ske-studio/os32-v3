@@ -159,12 +159,10 @@ static int do_gcap(int selftest)
 static int boot_sound(const char *path, const char *second)
 {
     V86_Begin b = {.size = sizeof b, .flags = V86S_FM_SOFT};
-    /* A long path can still use boot2 on a physical board. An empty path
-     * makes a selected SOFT candidate fail validation before acquiring it. */
-    if (strlen(path) < sizeof b.path && (!second || strlen(second) < sizeof b.second)) {
-        strcpy(b.path, path);
-        if (second) strcpy(b.second, second);
-    }
+    if (strlen(path) >= sizeof b.path || (second && strlen(second) >= sizeof b.second))
+        return api->v86_boot2(path, second);
+    strcpy(b.path, path);
+    if (second) strcpy(b.second, second);
     u32 sid, chip;
     int rc = api->v86s_begin(&b, &sid);
     if (rc == OS32_ERR_NOSYS) return api->v86_boot2(path, second);
