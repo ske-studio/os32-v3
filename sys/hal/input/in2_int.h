@@ -6,6 +6,7 @@
 /* Foreground boundary helpers run with interrupts masked. */
 int in2_excl_acquire(int owner, u32 flags);
 int in2_excl_unacquire(int owner);
+u32 in2_acquire_generation(void);
 u32 in2_focus_generation(void);
 void in2_reclaim_generation(void);
 int in2_excl_acquired(int owner);
@@ -17,6 +18,8 @@ void in2_excl_focus(int old);
 void in2_ring_clear(void);
 void in2_ring_lost(u8 reason);
 void kbd_raw_purge_keep(void);
+void legacy_raw_mark_release(void);
+int legacy_raw_release_pending(void);
 void mouse_ext_wheel(i16 delta);
 i32 mouse_ext_read_wheel(void);
 void in2_on_focus(int old, int owner);
@@ -133,6 +136,7 @@ void legacy_raw_discard_stop(void);
 void legacy_raw_flush(void);
 void legacy_raw_reset_dropped(void);
 u32 legacy_raw_dropped(void);
+void input_gui_key_lost(void);
 void legacy_raw_push(int keycode, int is_break, int mods);
 int legacy_raw_take(void);
 

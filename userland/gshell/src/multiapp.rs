@@ -167,6 +167,7 @@ pub struct Multi {
     running: i32,
     /// 直前に `av_focus_set` へ渡した owner。同じ値なら呼ばない (G10 の「1 回だけ」)。
     av_owner: i32,
+    av_window: u32,
     /// `exec_start` を呼んでから戻るまで。**起動したてのアプリはまだ表に
     /// 居ない** (表に載る id は `exec_start` の戻り値そのもの) ので、この間だけ
     /// 走っている ID を表へ迎える ([`should_park`] の adopt)。
@@ -205,6 +206,7 @@ impl Multi {
         input_streak: 0,
         running: 0,
         av_owner: -1,
+        av_window: 0,
         pending_start: false,
         abort_clear_req: false,
         abort_kill_target: 0,
@@ -1268,12 +1270,17 @@ pub fn kill_for_request(id: i32) -> i32 {
 pub fn sync_av_focus(st: &GuiState) {
     let target = st.front_owner();
     let mm = m();
-    if target == mm.av_owner {
+    if target == mm.av_owner && st.front_id() == mm.av_window {
         return;
     }
     if unsafe { (os32api::api().av_focus_set)(target) } == 0 {
         mm.av_owner = target;
+        mm.av_window = st.front_id();
     }
+}
+
+pub fn av_window() -> u32 {
+    m().av_window
 }
 
 /// いま `av_focus_set` に渡してある owner (試験と診断用)。

@@ -23,6 +23,8 @@ int ikm_policy_set(const void *wire, u32 length, u32 owner, u32 gen);
 int ikm_policy_reset(u32 owner, u32 gen);
 void ikm_policy_owner_exit(u32 owner, u32 gen);
 int ikm_policy_get(void *wire, u32 capacity, u32 *needed);
+int ikm_capture_gui_key(const KmKey *key, const KmSource *source, const KmState *state,
+                         const KmEvalResult *result, u8 repeat, u8 consumed, u8 physical, u32 time_ms);
 int ikm_policy_ready(void);
 u32 ikm_policy_generation(void);
 int ikm_policy_term(u8 profile, u8 context, u16 index, u8 *value);

@@ -31,6 +31,7 @@ struct Sample {
     window: u32,
     owner: i32,
     generation: u32,
+    acquire_gen: u32,
     flags: u32,
 }
 
@@ -68,9 +69,20 @@ pub fn observe(st: &mut wm::GuiState) {
     let mut out = os32api::av::IN2_WmState { size: 0, gen: 0, excl: 0, owner: 0 };
     st.excl.queried = true;
     st.excl.valid = unsafe { (os32api::api().in2_wm_state)(&mut out) } == 0;
+    let mut acquire_gen = st.excl.sample.map_or(0, |s| s.acquire_gen);
+    if st.excl.valid && !st.excl.sample.is_some_and(|s| s.generation == out.gen) {
+        let mut status = os32api::av::IN2_Status::default();
+        st.excl.valid = unsafe { (os32api::api().in2_status)(&mut status) } == 0;
+        acquire_gen = status.rsv[os32api::av::IN2_STATUS_ACQUIRE_GEN];
+    }
     if st.excl.valid {
-        let next = Sample { window: st.front_id(), owner: st.front_owner(), generation: out.gen, flags: out.excl };
+        let next = Sample { window: st.front_id(), owner: st.front_owner(), generation: out.gen, acquire_gen, flags: out.excl };
         if let Some(old) = st.excl.sample.filter(|old| *old != next) {
+            if old.acquire_gen != next.acquire_gen {
+                st.pending_raw_n = 0;
+                st.pending_switch = false;
+                st.pending_tab = false;
+            }
             st.excl.observed = st.excl.observed.wrapping_add(1);
             st.excl.mouse_baseline = true;
             // An owner transition purges kernel raw itself. Only scan the
@@ -78,7 +90,7 @@ pub fn observe(st: &mut wm::GuiState) {
             st.excl.purge_same_owner = old.owner == next.owner &&
                 (st.excl.purge_same_owner || old.window != next.window);
         }
-        st.excl.focus_confirmed = crate::multiapp::av_owner() == next.owner;
+        st.excl.focus_confirmed = crate::multiapp::av_owner() == next.owner && crate::multiapp::av_window() == next.window;
         st.excl.sample = Some(next);
     }
     if !st.excl.open(MOUSE) && st.cursor.shown {
@@ -274,9 +286,11 @@ pub fn restore_mouse_baseline(st: &mut wm::GuiState, buttons: u8, mx: i32, my: i
 
 pub fn deliver_window_key(st: &mut wm::GuiState, slot: usize, window: u32, scan: u8,
                           down: bool, ch: u8, mods: u32) {
-    let serial = input::next_serial(st, slot);
-    let ev = ring::ev_key(down, window, scan, ch, mods as u8, serial);
-    let _delivered = append(st, slot, &ev);
+    let _delivered = if scan < 128 {
+        let serial = input::next_serial(st, slot);
+        let ev = ring::ev_key(down, window, scan, ch, mods as u8, serial);
+        append(st, slot, &ev)
+    } else { false };
     #[cfg(feature = "c_gui_accept")]
     if _delivered && scan == 0x1d {
         crate::gserial::reply_to(false, b"!", format_args!("C-GUI KEY {} {}", window, down as u8));

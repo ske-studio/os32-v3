@@ -14,6 +14,7 @@ def verify(config):
     probe = """
 #include "input_context.h"
 unsigned ikm_policy_generation(void) { return 1; }
+void input_gui_key_lost(void) { __builtin_trap(); }
 int in2_excl_keyboard(void) { return 0; }
 int main(void) {
     KbdPolicySnapshot s;

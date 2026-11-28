@@ -61,6 +61,7 @@ typedef struct {
     IN2_EventData u;
     unsigned short flags, rsv;
 } IN2_Event;
+#define IN2_STATUS_ACQUIRE_GEN 0 /* rsv index, last raw-stream acquisition (WM only) */
 typedef struct { unsigned long size, acquired, focus_owner, focus_gen, dropped, rsv[3]; } IN2_Status;
 typedef struct { signed long dx, dy; unsigned long buttons; signed long wheel; } IN2_MouseState;
 typedef struct { unsigned long size, gen, excl, owner; } IN2_WmState;

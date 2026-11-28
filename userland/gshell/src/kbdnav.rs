@@ -441,7 +441,7 @@ fn set_mousekeys(st: &mut GuiState, on: bool) {
 
 /// WM のキーなら処理して true (アプリへ配らない)。SHIFT+SPACE (FEP) と
 /// CTRL+STOP の後、モーダル / メニュー / FEP / アプリより前に呼ぶ。
-pub fn on_key(st: &mut GuiState, scan: u8, down: bool, mods: u32) -> bool {
+pub fn on_key(st: &mut GuiState, scan: u8, down: bool, mods: u32, evaluated: bool) -> bool {
     if !down {
         /* 移動・サイズ中は離しも WM が取る (始めた RETURN の離しがアプリへ漏れない)。 */
         if kmove_active(st) {
@@ -464,14 +464,14 @@ pub fn on_key(st: &mut GuiState, scan: u8, down: bool, mods: u32) -> bool {
     let c = if crate::diagnostics::shortcut(scan, mods) {
         crate::diagnostics::dump();
         true
-    } else { make(st, scan, mods) };
+    } else { make(st, scan, mods, evaluated) };
     if c {
         set_consumed(st, scan, true);
     }
     c
 }
 
-fn make(st: &mut GuiState, scan: u8, mods: u32) -> bool {
+fn make(st: &mut GuiState, scan: u8, mods: u32, evaluated: bool) -> bool {
     /* 移動・サイズ中はキーを全部 WM が取る (票 §1-2 の表の右端)。 */
     if kmove_active(st) {
         kmove_key(st, scan, mods);
@@ -495,6 +495,7 @@ fn make(st: &mut GuiState, scan: u8, mods: u32) -> bool {
         }
     }
     if let Some(k) = shortcut(scan, mods) {
+        if evaluated && matches!(k, Shortcut::Switch | Shortcut::Close) { return false; }
         return run_shortcut(st, k, (mods & MOD_SHIFT) != 0);
     }
     if st.kn.mk_on && !fullscreen::active() && is_mk_pad(scan) {
@@ -555,6 +556,17 @@ fn run_shortcut(st: &mut GuiState, k: Shortcut, shift: bool) -> bool {
 
 /// 最初の TAB: その時点の MRU 順を写し、選択を 1 つ先 (SHIFT で 1 つ前) に置く。
 /// 前面の窓が無い (全部最小化) ときは並びの先頭 (SHIFT で末尾) から。
+pub(crate) fn policy_shortcut(st: &mut GuiState, action: u32, chord: bool, shift: bool) {
+    if action == os32api::kbd_policy::KBD_POLICY_ACTION_CLOSE {
+        run_shortcut(st, Shortcut::Close, shift);
+    } else if st.kn.sw_active {
+        advance_switch(st, shift);
+    } else {
+        run_shortcut(st, Shortcut::Switch, shift);
+        if !chord && st.kn.sw_active { finish_switch(st); }
+    }
+}
+
 fn begin_switch(st: &mut GuiState, back: bool) {
     let mut ids = [0u32; GUI_MAX_WINDOWS];
     let n = build_switch_list(st, &mut ids);

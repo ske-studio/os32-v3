@@ -551,9 +551,9 @@ int ikm_policy_action(u8 profile, u8 context, u16 map, u16 keycode,
             }
         }
         if (profile == 4 && sc == 0x29 && mask == (KM_MOD_COMMAND | KM_MOD_SHIFT)) *action = 14;
-        if (profile == 2 && mask == KM_MOD_ALT) {
-            if (sc == 0x0f) *action = 16;
-            if (sc == 0x65) *action = 17;
+        if (profile == 2 && (mask & KM_MOD_ALT) && !(mask & KM_MOD_CTRL)) {
+            if (sc == 0x0f) *action = KBD_POLICY_ACTION_SWITCH_APP;
+            if (sc == 0x65 && mask == KM_MOD_ALT) *action = KBD_POLICY_ACTION_CLOSE;
         }
     }
     return 0;
@@ -578,6 +578,39 @@ int ikm_policy_compat(u8 profile, u8 sc, u8 *byte)
     return OS32_ERR_NOTFOUND;
 }
 
+
+/* The capture caller holds IRQ exclusion across evaluation and publication. */
+int ikm_capture_gui_key(const KmKey *key, const KmSource *source, const KmState *state,
+                         const KmEvalResult *result, u8 repeat, u8 consumed, u8 physical, u32 time_ms)
+{
+    KbdPolicySnapshot dst;
+    u8 action, byte;
+    if (!machine || in2_excl_keyboard() || input_context_snapshot(&dst)) return 0;
+    u8 profile = machine == IKM_PLATFORM_PC98 ? 2 : 4;
+    u8 sc = result->compat_sc;
+    if (ikm_policy_action(profile, INPUT_CONTEXT_GUI, source->map->id, key->keycode,
+                          sc, state->mods, &action)) return 0;
+    if (consumed && !(repeat && action == KBD_POLICY_ACTION_SWITCH_APP &&
+                      (state->mods & (KM_MOD_COMMAND | KM_MOD_ALT)))) return 0;
+    KbdPolicyKey event = {
+        .src_generation = key->src | ((u32)key->generation << 8),
+        .map_id = source->map->id, .keycode = key->keycode,
+        .sc_down_repeat = sc | (key->down ? KBD_POLICY_SC_DOWN : 0) |
+            (repeat ? KBD_POLICY_SC_REPEAT : 0) |
+            (result->no_keydata ? KBD_POLICY_SC_NO_KEYDATA : 0) |
+            (result->is_modifier ? KBD_POLICY_SC_IS_MODIFIER : 0),
+        .physical_mods = physical, .logical_mods = state->mods | state->locks,
+        .time_ms = time_ms, .map_generation = source->map_generation,
+        .keysym = result->sym, .kind = result->kind, .action = action, .value = result->op
+    };
+    if (sc < 128 && !ikm_policy_compat(profile, sc, &byte)) {
+        event.kind = KM_LEGACY_CONTROL;
+        event.value = byte;
+    }
+    int wm_action = action == KBD_POLICY_ACTION_SWITCH_APP || action == KBD_POLICY_ACTION_CLOSE ||
+                    action == KBD_POLICY_ACTION_IME_ON || action == KBD_POLICY_ACTION_IME_OFF;
+    return input_delivery_key(&dst, &event) && wm_action;
+}
 
 /* Internal targets. The generated argument and page guards precede these
  * calls when the public table is enabled. IRQ exclusion spans check and pop. */
@@ -605,7 +638,7 @@ int ikm_policy_key_read(u32 owner, u32 gen, int wm, KbdPolicyKey *out, u32 max)
     else if (!machine) rc = OS32_ERR_NOSYS;
     else if (!gen || input_context_owner_generation(owner) != gen) rc = OS32_ERR_STALE;
     else if (owner != APP_ID_SHELL || !wm) rc = OS32_ERR_INVAL;
-    else if (in2_excl_keyboard()) rc = OS32_ERR_BUSY;
+    else if (in2_excl_keyboard() || (max && legacy_raw_release_pending())) rc = OS32_ERR_BUSY;
     else rc = (int)input_delivery_read_keys(out, max);
     irq_restore(irq);
     return rc;

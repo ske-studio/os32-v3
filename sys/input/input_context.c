@@ -227,8 +227,14 @@ int input_context_owner_release(u32 owner, u32 exec_gen)
 int input_context_owner_set(u32 owner, u32 exec_gen, u32 context, u32 flags)
 {
     unsigned int irq = irq_save();
-    int rc = context_owner_valid(owner, exec_gen)
-           ? input_context_set(&context_owners[owner].policy, context, flags) : OS32_ERR_STALE;
+    int rc = OS32_ERR_STALE;
+    if (context_owner_valid(owner, exec_gen)) {
+        KbdPolicyContext *policy = &context_owners[owner].policy;
+        int changed = policy->context != context || policy->flags != flags;
+        rc = input_context_set(policy, context, flags);
+        if (!rc && changed && owner == foreground_owner)
+            input_delivery_discard_keys();
+    }
     irq_restore(irq);
     return rc;
 }

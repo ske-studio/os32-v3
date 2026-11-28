@@ -378,10 +378,10 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
                 None => true, /* 宛先無し: 取り込んでも捨てるだけなので読む (キューを空ける) */
             }
         };
-        let (scan, down, mods) = match raw_keyboard::next(st, ctx, space_ok, &mut captured) {
+        let (scan, down, mods, evaluated) = match raw_keyboard::next(st, ctx, space_ok, &mut captured) {
             raw_keyboard::Step::End => break,
             raw_keyboard::Step::Consumed => continue,
-            raw_keyboard::Step::Deliver(scan, down, mods) => (scan, down, mods),
+            raw_keyboard::Step::Deliver(scan, down, mods, evaluated) => (scan, down, mods, evaluated),
         };
         if !space_ok {
             if let Some(t) = focus_target(st) {
@@ -399,7 +399,7 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
          * window. X4 already deferred this chord; on_key dumps only on make.
          * Keep every other WM shortcut behind the fullscreen injection path. */
         if ctx.wm_ui() && crate::diagnostics::shortcut(scan, mods) {
-            kbdnav::on_key(st, scan, down, mods);
+            kbdnav::on_key(st, scan, down, mods, evaluated.is_some());
             continue;
         }
 
@@ -407,7 +407,7 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
          * the injection ring. The kernel refuses terminal descendants, even
          * when their window is hidden; no background window receives this key. */
         if crate::fullscreen::active() && focus_target(st).is_none() {
-            let ch = translate(scan, mods);
+            let ch = evaluated.unwrap_or_else(|| translate(scan, mods));
             if down && ch != 0 {
                 let owner = unsafe { (os32api::api().gfx_screen_owner)() };
                 if unsafe { (os32api::api().kbd_inject)(&ch, 1) } > 0 {
@@ -434,7 +434,7 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
 
         /* WM のショートカットとマウスキー (票 KBD_NAV §1-2 / §1-3)。モーダル・
          * メニュー・FEP・アプリより前。状態ごとの扱いは kbdnav 側の表。 */
-        if ctx.wm_ui() && kbdnav::on_key(st, scan, down, mods) {
+        if ctx.wm_ui() && kbdnav::on_key(st, scan, down, mods, evaluated.is_some()) {
             continue;
         }
 
@@ -446,7 +446,7 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
          * `fep::flush_text` が field へ差し込む。 */
         if modal::is_open() {
             if down && ctx.wm_ui() {
-                let ch = translate(scan, mods);
+                let ch = evaluated.unwrap_or_else(|| translate(scan, mods));
                 if modal::is_input() && fep::feed(st, scan, ch, mods) == fep::Fed::Consumed {
                     continue;
                 }
@@ -480,7 +480,7 @@ pub(crate) fn capture_keyboard_observed(st: &mut GuiState, ctx: Ctx) -> bool {
             continue;
         }
 
-        let ch = translate(scan, mods);
+        let ch = evaluated.unwrap_or_else(|| translate(scan, mods));
 
         /* X1 の set_focus 等で予約した確定を、モーダルが閉じた後の最初の打鍵より
          * 先に元の窓へ流す (同じ周期でモーダルが閉じた場合、票 KBD_NAV §1-6)。 */

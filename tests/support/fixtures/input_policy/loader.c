@@ -156,6 +156,12 @@ static int check_park_reclaim(unsigned shell_gen)
         if (av_focus_set(id) || av_focus_get() != id || !av_focus_set(APP_ID_MAX + 1) ||
             input_context_snapshot(&foreground) || foreground.owner != (unsigned)id ||
             foreground.exec_gen != gen) return 1;
+        KbdPolicyKey tab = { .map_generation = ikm_policy_generation(),
+                             .sc_down_repeat = KEY_TAB | KBD_POLICY_SC_DOWN };
+        if (!input_delivery_key(&foreground, &tab) || !av_focus_set(APP_ID_MAX + 1) ||
+            kapi->kbd_policy_key_read(&tab, 1) != 1) return 1;
+        if (!input_delivery_key(&foreground, &tab) || av_focus_set(id) ||
+            kapi->kbd_policy_key_read(&tab, 1) != 0) return 1;
         appslot_resume_commit(id);
         if (kapi->kbd_policy_delivery_set(KBD_POLICY_DELIVERY_BYTE)) return 1;
         appslot_park_commit();

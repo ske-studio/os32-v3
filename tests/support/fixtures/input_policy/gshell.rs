@@ -1,8 +1,11 @@
 // Model only the event sink, focus sample and window identities.
 extern crate self as os32api;
+#[path = "../../../../sdk/rust/os32api/src/kbd_policy.rs"]
+pub mod kbd_policy;
 pub mod gui {
     pub mod proto {
-        pub const GUI_MAX_WINDOWS: usize = 2;
+        pub const OS32_ERR_NOSYS: i32 = -10;
+        pub const GUI_MAX_WINDOWS: usize = 3;
         pub const GUI_EV_KEY: u8 = 1;
         pub const GUI_EV_BUTTON: u8 = 2;
         pub const GUI_EV_POINTER: u8 = 3;
@@ -15,10 +18,20 @@ pub mod gui {
 }
 use gui::proto::*;
 thread_local! {
+    static ACQUIRE_GEN: std::cell::Cell<u32> = Default::default();
+    static GENERATION: std::cell::Cell<u32> = Default::default();
+    static RELEASED: std::cell::Cell<usize> = Default::default();
+    static POLICY: std::cell::Cell<bool> = Default::default();
+    static KEY: std::cell::Cell<Option<kbd_policy::KbdPolicyKey>> = Default::default();
+    static BATCH: std::cell::RefCell<std::collections::VecDeque<kbd_policy::KbdPolicyKey>> = Default::default();
     static RAW: std::cell::RefCell<std::collections::VecDeque<i32>> = Default::default();
     static FLAGS: std::cell::Cell<u32> = Default::default();
 }
 pub mod av {
+    pub const IN2_STATUS_ACQUIRE_GEN: usize = 0;
+    #[allow(non_camel_case_types)]
+    #[derive(Default)]
+    pub struct IN2_Status { pub rsv: [u32; 3] }
     #[allow(non_camel_case_types)]
     pub struct IN2_WmState { pub size: u32, pub gen: u32, pub excl: u32, pub owner: i32 }
 }
@@ -28,8 +41,10 @@ pub struct Api {
     pub kbd_dropped_count: unsafe fn() -> u32,
     pub exec_abort_clear: unsafe fn() -> i32,
     pub get_tick: unsafe fn() -> u32,
+    pub kbd_policy_key_read: unsafe fn(*mut kbd_policy::KbdPolicyKey, u32) -> i32,
     pub kbd_trygetrawkey: unsafe fn() -> i32,
     pub kbd_is_pressed: unsafe fn(i32) -> i32,
+    pub in2_status: unsafe fn(&mut av::IN2_Status) -> i32,
     pub in2_wm_state: unsafe fn(&mut av::IN2_WmState) -> i32,
 }
 pub fn api() -> Api {
@@ -39,9 +54,20 @@ pub fn api() -> Api {
         kbd_dropped_count: || 0,
         exec_abort_clear: || { multiapp::STOP_TRACE.with(|t| t.borrow_mut().push(0)); 0 },
         get_tick: || 0,
-        kbd_trygetrawkey: || RAW.with(|q| q.borrow_mut().pop_front().unwrap_or(-1)),
+        kbd_policy_key_read: |out, max| {
+            if !POLICY.get() { return gui::proto::OS32_ERR_NOSYS; }
+            if FLAGS.get() & excl::KBD != 0 { return ffi::OS32_ERR_BUSY; }
+            if max == 0 { return 0; }
+            if RELEASED.get() > 0 { return ffi::OS32_ERR_BUSY; }
+            if let Some(key) = KEY.take().or_else(|| BATCH.with(|q| q.borrow_mut().pop_front())) { unsafe { *out = key; } 1 } else { 0 }
+        },
+        kbd_trygetrawkey: || {
+            RELEASED.set(RELEASED.get().saturating_sub(1));
+            RAW.with(|q| q.borrow_mut().pop_front().unwrap_or(-1))
+        },
         kbd_is_pressed: |_| 0,
-        in2_wm_state: |s| { s.excl = FLAGS.get(); 0 },
+        in2_status: |s| { s.rsv[av::IN2_STATUS_ACQUIRE_GEN] = ACQUIRE_GEN.get(); 0 },
+        in2_wm_state: |s| { s.gen = GENERATION.get(); s.excl = FLAGS.get(); 0 },
     }
 }
 #[path = "../../../../userland/gshell/src/excl.rs"]
@@ -59,9 +85,12 @@ mod wm {
         pub fn new(_: i32, _: i32, _: i32, _: i32) -> Rect { Rect }
         pub fn intersects(&self, _: &Rect) -> bool { unreachable!() }
     }
+    #[derive(Default)]
+    pub struct Nav { pub sw_active: bool, pub sw_n: usize, pub sw_sel: usize, pub sw_ids: [u32; GUI_MAX_WINDOWS] }
     pub struct GuiState {
+        pub kn: Nav,
         pub inited: bool, pub in_pump: bool, pub now: u32, pub last_kbd_dropped: u32,
-        pub excl: excl::State, pub windows: [Window; 2], pub cursor: cursor::Cursor, pub screen_w: i32, pub screen_h: i32,
+        pub excl: excl::State, pub windows: [Window; GUI_MAX_WINDOWS], pub cursor: cursor::Cursor, pub screen_w: i32, pub screen_h: i32,
         pub pending_raw: [i32;128], pub pending_rank: [u8;128], pub pending_raw_n: usize,
         pub pending_tab: bool, pub pending_switch: bool, pub pending_raw_dropped: u32,
         pub held_keys: [bool;128], pub stop_suppressed: bool, pub stop_tick: u32,
@@ -85,6 +114,10 @@ mod wm {
             &mut *STATE
         }
     }
+    pub fn activate_index(st: &mut GuiState, index: usize) {
+        st.switches += 1;
+        st.front = index;
+    }
     pub fn drop_drag_frame(st: &mut GuiState) { st.drag_index = -1; }
     pub fn queue_present(_: &mut GuiState, _: Rect) {}
     pub fn flush_present() {}
@@ -98,6 +131,7 @@ mod gfx {
     }
 }
 mod ffi {
+    pub const OS32_ERR_BUSY: i32 = -17;
     pub unsafe fn gfx_get_pixel(x: i32, y: i32) -> u8 {
         super::gfx::PIXELS.with(|p| p.borrow()[(y * 16 + x) as usize])
     }
@@ -127,9 +161,14 @@ mod multiapp {
     pub(crate) use stop_dispatch::top_level_abort;
     pub fn chain_tail(owner: i32) -> i32 { owner }
     pub fn note_injected_key(_: i32) { unreachable!() }
+    static WINDOW: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(10);
+    pub fn av_window() -> u32 { WINDOW.load(Ordering::Relaxed) }
     pub fn av_owner() -> i32 { OWNER.load(Ordering::Relaxed) }
     pub fn sync_av_focus(st: &mut super::wm::GuiState) {
-        if !FAIL_NEXT.swap(false, Ordering::Relaxed) { OWNER.store(st.front_owner(), Ordering::Relaxed); }
+        if !FAIL_NEXT.swap(false, Ordering::Relaxed) {
+            OWNER.store(st.front_owner(), Ordering::Relaxed);
+            WINDOW.store(st.front_id(), Ordering::Relaxed);
+        }
     }
 }
 mod fullscreen {
@@ -153,17 +192,52 @@ mod fep {
     pub fn flush_text(_: &mut GuiState) {}
     pub fn toggle(_: &mut GuiState) { unreachable!() }
     pub fn request_toggle() { unreachable!() }
-    pub fn apply_pending_commit(_: &mut GuiState) { unreachable!() }
-    pub fn apply_pending_toggle(_: &mut GuiState) { unreachable!() }
+    pub fn apply_pending_commit(_: &mut GuiState) {}
+    pub fn apply_pending_toggle(_: &mut GuiState) {}
     pub fn is_on() -> bool { false }
     pub fn toggle_pending() -> bool { false }
 }
 mod kbdnav {
+    #[cfg(legacy_gui)]
+    use super::{MOD_GRPH, SC_GRPH, GUI_MAX_WINDOWS, modal, wm};
     use super::wm::GuiState;
-    pub fn pre(_: &mut GuiState, _: u8, _: bool, _: u32) -> bool { unreachable!() }
+    #[cfg(legacy_gui)]
+    include!(env!("WM_SHORTCUT_ITEM"));
+    #[cfg(legacy_gui)]
+    enum Shortcut { Close, Switch }
+    #[cfg(legacy_gui)]
+    fn run_shortcut(st: &mut GuiState, kind: Shortcut, back: bool) -> bool {
+        assert!(matches!(kind, Shortcut::Switch));
+        begin_switch(st, back);
+        true
+    }
+    #[cfg(legacy_gui)]
+    fn build_switch_list(st: &GuiState, ids: &mut [u32; GUI_MAX_WINDOWS]) -> usize {
+        let mut n = 0;
+        for offset in 0..GUI_MAX_WINDOWS {
+            let id = st.windows[(st.front + offset) % GUI_MAX_WINDOWS].id;
+            if id != 0 { ids[n] = id; n += 1; }
+        }
+        n
+    }
+    #[cfg(legacy_gui)]
+    fn dirty_taskbar(_: &mut GuiState) {}
+    #[cfg(legacy_gui)]
+    fn switchable(st: &GuiState, id: u32) -> bool { st.win_by_id(id).is_some() }
+    #[cfg(not(legacy_gui))]
+    pub fn policy_shortcut(_: &mut GuiState, _: u32, _: bool, _: bool) { unreachable!() }
+    pub fn pre(_: &mut GuiState, _: u8, _: bool, _: u32) -> bool { false }
     pub fn is_wm_raw(_: &GuiState, raw: i32) -> bool { matches!(raw & 127, 15 | 96 | 115) }
     pub fn pump_delivered_make(_: &mut GuiState, _: u8) {}
-    pub fn on_key(st: &mut GuiState, _: u8, down: bool, _: u32) -> bool { st.switching = down; true }
+    #[cfg(legacy_gui)]
+    pub fn on_key(st: &mut GuiState, scan: u8, down: bool, _: u32, _: bool) -> bool {
+        assert_eq!(scan, super::SC_TAB);
+        if down { run_shortcut(st, Shortcut::Switch, false); }
+        true
+    }
+    #[cfg(not(legacy_gui))]
+    pub fn on_key(st: &mut GuiState, _: u8, down: bool, _: u32, _: bool) -> bool { st.switching = down; true }
+    #[cfg(not(legacy_gui))]
     pub fn finish_if_released(st: &mut GuiState, _: u8, _: bool, mods: u32) -> bool {
         if !st.switching || mods & 8 != 0 { return false; }
         st.switching = false;
@@ -217,9 +291,10 @@ mod ring {
         st.events.borrow_mut().push(*ev);
         true
     }
-    pub fn ev_key(down: bool, window: u32, scan: u8, _: u8, _: u8, _: u16) -> GuiEvent {
+    pub fn ev_key(down: bool, window: u32, scan: u8, ch: u8, _: u8, _: u16) -> GuiEvent {
         let mut ev = GuiEvent {window, kind: GUI_EV_KEY, sub: down as u8, payload: [0;8]};
         ev.payload[0] = scan;
+        ev.payload[1] = ch;
         ev
     }
     pub fn ev_text(window: u32, payload: [u8; 8], sub: u8, _: u16) -> GuiEvent {
@@ -236,8 +311,8 @@ mod ring {
 }
 fn window_state() -> wm::GuiState {
     wm::GuiState {
-        inited: true, in_pump: false, now: 0, last_kbd_dropped: 0,
-        excl: excl::State::NEW, windows: [wm::Window {owner: 2, id: 10}, wm::Window {owner: 3, id: 11}],
+        kn: Default::default(), inited: true, in_pump: false, now: 0, last_kbd_dropped: 0,
+        excl: excl::State::NEW, windows: [wm::Window {owner: 2, id: 10}, wm::Window {owner: 3, id: 11}, wm::Window {owner: 0, id: 0}],
         pending_raw: [0;128], pending_rank: [0;128], pending_raw_n: 0,
         pending_tab: false, pending_switch: false, pending_raw_dropped: 0,
         held_keys: [false;128], stop_suppressed: false, stop_tick: 0,
@@ -277,11 +352,17 @@ fn main() {
     assert!(!excl::append(&mut st, 1, &ring::ev_key(true, 11, 51, 0, 0, 0)));
     st.space.set(1);
     assert!(excl::append(&mut st, 1, &ring::ev_key(true, 11, 52, 0, 0, 0)));
+    raw_keyboard::defer_raw(&mut st, i32::from(SC_TAB) | 256);
     st.windows[1].id = 12;
+    multiapp::FAIL_NEXT.store(true, std::sync::atomic::Ordering::Relaxed);
+    excl::observe(&mut st);
+    excl::settle(&mut st);
+    assert!(!st.excl.open(excl::KBD));
     st.space.set(8);
     excl::observe(&mut st);
     excl::settle(&mut st);
     assert!(st.excl.open(excl::KBD));
+    assert_eq!(st.pending_raw_n, 0);
     assert_eq!(st.events.borrow().len(),6);
 
     // A full deferred queue and a full window ring must still admit WM controls.
@@ -304,7 +385,7 @@ fn main() {
         match raw_keyboard::next(&mut st, Ctx::Wait, false, &mut captured) {
             raw_keyboard::Step::End => break,
             raw_keyboard::Step::Consumed => (),
-            raw_keyboard::Step::Deliver(scan, down, _) => {
+            raw_keyboard::Step::Deliver(scan, down, _, _) => {
                 assert!(!excl::append(&mut st, 1, &ring::ev_key(down, 12, scan, 0, 0, 0)));
             }
         }
@@ -321,7 +402,7 @@ fn main() {
         excl::observe(&mut st);
         excl::settle(&mut st);
         RAW.with(|q| q.borrow_mut().push_back(42 | 256));
-        if let raw_keyboard::Step::Deliver(scan, down, _) =
+        if let raw_keyboard::Step::Deliver(scan, down, _, _) =
             raw_keyboard::next(&mut st, Ctx::Wait, true, &mut captured) {
             excl::deliver_window_key(&mut st, 1, 12, scan, down, b'a', 0);
         }
@@ -361,7 +442,18 @@ mod pump;
 
 #[cfg(legacy_gui)]
 fn main() {
-    let raw: i32 = std::env::args().nth(1).unwrap().parse().unwrap();
+    if std::env::args().nth(1).as_deref() == Some("focus") {
+        focus_batches();
+        return;
+    }
+    let expected = std::env::args().nth(1).unwrap().as_bytes()[0];
+    let raw: i32 = std::env::args().nth(2).unwrap().parse().unwrap();
+    let fields: Vec<u32> = std::env::args().skip(3).map(|s| s.parse().unwrap()).collect();
+    if !fields.is_empty() {
+        let words: [u32; 12] = fields[..12].try_into().unwrap();
+        KEY.set(Some(unsafe { core::mem::transmute(words) }));
+        POLICY.set(true);
+    }
     wm::g().space.set(8);
     RAW.with(|q| q.borrow_mut().push_back(raw));
     pump::gshell_gui_pump();
@@ -370,5 +462,162 @@ fn main() {
     assert_eq!(events.len(), 2);
     let (key, text) = (&events[0], &events[1]);
     assert_eq!((key.window, key.kind, key.sub, key.payload[0]), (10, GUI_EV_KEY, 1, 0x1d));
-    assert_eq!((text.window, text.kind, text.sub, text.payload[0]), (10, GUI_EV_TEXT, 1, b'a'));
+    assert_eq!((text.window, text.kind, text.sub, text.payload[0]), (10, GUI_EV_TEXT, 1, expected));
+    drop(events);
+    if POLICY.get() {
+        let st = wm::g();
+        let mut captured = false;
+        let key = kbd_policy::KbdPolicyKey {
+            sc_down_repeat: 0x1ff, keysym: b'q' as u32, ..Default::default()
+        };
+        KEY.set(Some(key));
+        pump::gshell_gui_pump();
+        let events = st.events.borrow();
+        assert_eq!(events.len(), 3);
+        assert_eq!((events[2].kind, events[2].payload[0]), (GUI_EV_TEXT, b'q'));
+        drop(events);
+        KEY.set(Some(kbd_policy::KbdPolicyKey {action: kbd_policy::KBD_POLICY_ACTION_SWITCH_APP, ..key}));
+        assert!(matches!(raw_keyboard::next(st, Ctx::Wait, true, &mut captured),
+                         raw_keyboard::Step::Consumed));
+        assert_eq!(st.switches, 1);
+        assert_eq!(st.events.borrow().len(), 3);
+        st.events.take();
+        st.front = 0;
+        st.space.set(16);
+        for event in fields[12..].chunks_exact(12) {
+            let words: [u32; 12] = event.try_into().unwrap();
+            KEY.set(Some(unsafe { core::mem::transmute(words) }));
+            pump::gshell_gui_pump();
+        }
+        let events = st.events.borrow();
+        let byte = if expected == b'A' { b'c' } else { 3 };
+        assert_eq!(events.len(), if byte == 3 { 2 } else { 3 });
+        assert_eq!((events[0].kind, events[0].sub, events[0].payload[1]), (GUI_EV_KEY, 1, byte));
+        if byte != 3 { assert_eq!((events[1].kind, events[1].payload[0]), (GUI_EV_TEXT, byte)); }
+        let last = events.last().unwrap();
+        assert_eq!((last.kind, last.sub, last.payload[0]), (GUI_EV_KEY, 0, 0x2b));
+    }
+
+}
+
+#[cfg(legacy_gui)]
+fn focus_batches() {
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    std::io::stdin().read_to_end(&mut bytes).unwrap();
+    let mut words = bytes.chunks_exact(4).map(|w| i32::from_le_bytes(w.try_into().unwrap()));
+    let st = wm::g();
+    POLICY.set(true);
+    // Other phases use the existing sole front window.
+    st.windows[1].id = 0;
+    #[derive(Clone, Copy, PartialEq)]
+    enum Phase { Before, Acquire, ExclusiveChord, Released, Full, SingleSwitch, Reset, Unmapped, ReleaseBeforePump }
+    use Phase::*;
+    let mut switches = 0;
+    for phase in [Before, Acquire, ExclusiveChord, Released, Full, SingleSwitch, Reset, Unmapped, ReleaseBeforePump] {
+        let exclusive = matches!(phase, Acquire | ExclusiveChord);
+        FLAGS.set(if exclusive { excl::KBD } else { 0 });
+        if phase == ReleaseBeforePump {
+            RAW.with(|q| q.borrow_mut().extend(words.by_ref().take(4)));
+            RELEASED.set(4);
+        }
+        loop {
+            let rc = words.next().unwrap();
+            if rc != 1 {
+                assert_eq!(rc, if exclusive { ffi::OS32_ERR_BUSY } else { 0 });
+                break;
+            }
+            let data: [u32; 12] = std::array::from_fn(|_| words.next().unwrap() as u32);
+            BATCH.with(|q| q.borrow_mut().push_back(unsafe { core::mem::transmute(data) }));
+        }
+        for raw in words.by_ref() {
+            if raw == -1 { break; }
+            RAW.with(|q| q.borrow_mut().push_back(raw));
+        }
+        if phase == Acquire { RAW.with(|q| assert!(q.borrow().is_empty())); }
+        st.space.set(512);
+        excl::observe(st);
+        excl::settle(st);
+        if phase == ReleaseBeforePump {
+            pump::gshell_gui_pump();
+            input::capture_keyboard(st, Ctx::Wait);
+            input::capture_keyboard(st, Ctx::Wait);
+            switches += 2;
+        } else if matches!(phase, Before | ExclusiveChord | SingleSwitch) {
+            input::capture_keyboard(st, Ctx::Wait);
+            switches += 1;
+        } else {
+            pump::gshell_gui_pump();
+            pump::gshell_gui_pump();
+        }
+        let events = st.events.take();
+        assert!(events.iter().all(|e| e.window == 10));
+        match phase {
+            Released => {
+                assert_eq!(events.len(), 2);
+                assert_eq!((events[0].kind, events[0].sub, events[0].payload[0]), (GUI_EV_KEY, 1, 0x1d));
+                assert_eq!((events[1].kind, events[1].payload[0]), (GUI_EV_TEXT, b'a'));
+            }
+            Full => {
+                assert_eq!(events.len(), 255);
+                for pair in events[..254].chunks_exact(2) {
+                    assert_eq!((pair[0].kind, pair[0].sub, pair[0].payload[0]), (GUI_EV_KEY, 1, 0x1d));
+                    assert_eq!((pair[1].kind, pair[1].payload[0]), (GUI_EV_TEXT, b'a'));
+                }
+                assert_eq!((events[254].kind, events[254].sub, events[254].payload[0]), (GUI_EV_KEY, 0, 0x1d));
+            }
+            Unmapped => {
+                assert_eq!(events.len(), 1);
+                assert_eq!((events[0].kind, events[0].payload[0]), (GUI_EV_TEXT, b'q'));
+            }
+            _ => assert!(events.is_empty()),
+        }
+        assert_eq!(st.switches, switches);
+        RAW.with(|q| q.borrow_mut().clear());
+    }
+    st.windows[1] = wm::Window {owner: 2, id: 11};
+    let front = st.front;
+    let count = st.switches;
+    FLAGS.set(excl::KBD);
+    GENERATION.set(words.next().unwrap() as u32);
+    ACQUIRE_GEN.set(words.next().unwrap() as u32);
+    assert_eq!(words.next(), Some(ffi::OS32_ERR_BUSY));
+    for raw in words.by_ref().take_while(|&raw| raw >= 0) {
+        RAW.with(|q| q.borrow_mut().push_back(raw));
+    }
+    pump::gshell_gui_pump();
+    assert!(st.pending_raw_n > 0);
+    assert_eq!(st.switches, count);
+    FLAGS.set(0);
+    GENERATION.set(words.next().unwrap() as u32);
+    ACQUIRE_GEN.set(words.next().unwrap() as u32);
+    assert_eq!(words.next(), None);
+    excl::observe(st);
+    excl::settle(st);
+    input::capture_keyboard(st, Ctx::Wait);
+    assert_eq!((st.switches, st.front), (count, front), "switch after reacquisition without input");
+    for (shift, target) in [(false, 1usize), (true, 2usize)] {
+        st.front = 0;
+        excl::observe(st);
+        excl::settle(st);
+        let count = st.switches;
+        let mods = MOD_GRPH | u32::from(shift);
+        let tab = kbd_policy::KbdPolicyKey {
+            sc_down_repeat: 0x100 | SC_TAB as u32, physical_mods: mods,
+            logical_mods: kbd_policy::KBD_POLICY_MOD_ALT, action: kbd_policy::KBD_POLICY_ACTION_SWITCH_APP,
+            ..Default::default()
+        };
+        BATCH.with(|q| q.borrow_mut().extend([tab, kbd_policy::KbdPolicyKey {
+            sc_down_repeat: SC_GRPH as u32, ..Default::default()
+        }]));
+        RAW.with(|q| q.borrow_mut().extend([0x100 | SC_TAB as i32 | ((mods as i32) << 9), SC_GRPH as i32]));
+        input::capture_keyboard(st, Ctx::Wait);
+        assert_eq!(st.front, target);
+        excl::observe(st);
+        excl::settle(st);
+        input::capture_keyboard(st, Ctx::Wait);
+        assert_eq!(st.switches, count + 1);
+        RAW.with(|q| q.borrow_mut().clear());
+        st.windows[2] = wm::Window {owner: 2, id: 12};
+    }
 }
