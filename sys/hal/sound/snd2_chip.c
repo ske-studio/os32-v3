@@ -111,6 +111,19 @@ int snd2_chip_open(u32 dev, u32 *h)
     return rc;
 }
 
+#ifdef TICK_PROBE
+/* The diagnostic will close its handle, so even its own previous open is busy. */
+int snd2_chip_diag_open(u32 dev, u32 *h)
+{
+    Chip *c = device(dev);
+    if (!c || !h || c->info.kind != SND2_KIND_FM)
+        return OS32_ERR_INVAL;
+    if (c->owner)
+        return OS32_ERR_BUSY;
+    return snd2_chip_open(dev, h);
+}
+#endif
+
 int snd2_chip_implicit(int owner)
 {
     for (u32 i = 0; i < CHIP_COUNT; ++i)

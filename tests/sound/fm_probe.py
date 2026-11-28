@@ -24,6 +24,12 @@ def verify(config):
                         "sys/kern/irq/irq.c", "sys/platform/pc98/irq_policy.c",
                         "sys/platform/pc98/irq_complete.c", "-o", exe], check=True)
         subprocess.run(["qemu-i386", exe], check=True)
+        subprocess.run(["gcc", "-m32", "-nostdlib", "-static", "-fno-pie", "-no-pie",
+                        "-ffreestanding", "-fno-stack-protector", "-std=gnu11", "-O2",
+                        "-ffunction-sections", "-fdata-sections", "-Wl,--gc-sections",
+                        "-DTICK_PROBE", "-D__cdecl=", *include_flags(ROOT),
+                        fixture / "owner.c", "sys/hal/sound/snd2_chip.c", "-o", exe], check=True)
+        subprocess.run(["qemu-i386", exe], check=True)
 
 
 if __name__ == "__main__":

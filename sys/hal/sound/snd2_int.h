@@ -72,5 +72,8 @@ typedef struct SndChipBackend { u32 abi;                                  /* sys
 int snd2_chip_register(const SndChipBackend *be, void *c, const SND2_DevInfo *i);  int snd2_chip_unregister(u32 dev);
 int snd2_chip_dev_info(u32 index, SND2_DevInfo *out);
 void snd2_chip_fault(u32 dev);
+#ifdef TICK_PROBE
+int snd2_chip_diag_open(u32 dev, u32 *h);
+#endif
 int snd2_chip_implicit(int owner);
 #endif

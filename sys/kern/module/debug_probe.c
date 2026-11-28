@@ -3,6 +3,7 @@
 #include "kstring.h"
 #ifdef TICK_PROBE
 #include "tick_probe.h"
+#include "fm_contract.h"
 #include "io.h"
 #endif
 
@@ -192,6 +193,8 @@ void debug_probe_snapshot(struct probe_list *list)
 i32 debug_probe_control(u32 action, void *arg, u32 size)
 {
 #ifdef TICK_PROBE
+    if (action == TP_FM_SETTING && !arg && !size && _irq_enabled())
+        return fm_diag_irq_setting();
     if (action == TP_CONTROL && size == sizeof(struct tp_control) && arg &&
         _irq_enabled()) return tick_probe_control(arg);
 #endif

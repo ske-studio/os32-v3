@@ -447,7 +447,7 @@ id = "fm_probe"
 spec = { path = "docs/design/kernel/irq/irq.md", section = "S1 の音源判定" }
 subsystem = "sound"
 level = "L2"
-sources = ["sys/dev/sound/fm", "sys/platform/pc98/platform_fm_probe.h", "sys/platform/pc98/irq_policy.c", "sys/kern/irq", "sys/platform/pc98/pic.c", "sys/platform/pc98/irq_complete.c", "tests/support/fixtures/fm_probe", "tools/ops/kernel_includes.py", "build/config.mk", "tools/gen_sqlite_imports.py", "tools/gen_kdebug_imports.py", "tools/prototypes/fm_imports.def"]
+sources = ["sys/hal/sound/snd2_chip.c", "sys/hal/sound/snd2_int.h", "sys/dev/sound/fm", "sys/platform/pc98/platform_fm_probe.h", "sys/platform/pc98/irq_policy.c", "sys/kern/irq", "sys/platform/pc98/pic.c", "sys/platform/pc98/irq_complete.c", "tests/support/fixtures/fm_probe", "tools/ops/kernel_includes.py", "build/config.mk", "tools/gen_sqlite_imports.py", "tools/gen_kdebug_imports.py", "tools/prototypes/fm_imports.def"]
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
@@ -455,6 +455,9 @@ expect = "両ベースの判定、開放バスと A460h の識別 ID の整合�
 limits = "ポート模型。実機配線とゲスト演奏は S4"
 gates = ["push", "main"]
 mutations = [
+ { id = "unknown_index_select", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/fm_module.c", old = "if (rc >= 0) {", new = "if (1) {", fail = "unknown basic index" },
+ { id = "restore_wrong_index", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/fm_module.c", old = "outp(OPN_ADDR, SSG_REG_MIXER);", new = "outp(OPN_ADDR, 0x0e);", fail = "restore basic index" },
+ { id = "reuse_diag_handle", config = "pc98", when = "after_build", replace = "sys/hal/sound/snd2_chip.c", old = "if (c->owner)\n        return OS32_ERR_BUSY;", new = "if (c->owner && c->owner != res_owner_get())\n        return OS32_ERR_BUSY;", fail = "diagnostic FM ownership" },
  { id = "118_fifo", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "if (board == 4 && inp", new = "if ((board == 4 || board == 8) && inp", fail = "118 FIFO access" },
  { id = "touch_26k_irq_reg", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "!opn_only && !write_reg", new = "!write_reg", fail = "26K OPNA register" },
  { id = "reject_cs4231_only", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "board == 7 || board == 15", new = "board == 15", fail = "CS4231-only open bus" },

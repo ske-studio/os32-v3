@@ -1,5 +1,7 @@
 #include "idt.h"
+#define TICK_PROBE
 #include "sys/dev/sound/fm/fm_module.c"
+#undef TICK_PROBE
 #include "opn_chip.h"
 #include "sys/platform/pc98/pic.c" /* Reset boot-only latches between machine scenarios. */
 
@@ -51,6 +53,33 @@ int snd2_chip_unregister(u32 device) { (void)device; registered = OPN_PROBE_UNKN
 const u32 *module_exports(struct module_handle handle) { (void)handle; return 0; }
 int res_owner_get(void) { return 0; }
 int snd2_chip_implicit(int owner) { (void)owner; return 0; }
+
+static int diag_busy, mixer_error, setting_reads, diag_closes;
+int snd2_chip_dev_info(u32 index, SND2_DevInfo *out)
+{
+    if (index) return OS32_ERR_INVAL;
+    *out = (SND2_DevInfo){.kind = SND2_KIND_FM, .dev = 16};
+    return 0;
+}
+int snd2_chip_caps(u32 dev, SND2_ChipCaps *out, u32 size)
+{
+    *out = (SND2_ChipCaps){.base_port = OPN_ADDR, .chip = SND2_CHIP_OPNA};
+    return 0;
+}
+int snd2_chip_diag_open(u32 dev, u32 *h)
+{
+    if (diag_busy) return OS32_ERR_BUSY;
+    *h = dev;
+    return 0;
+}
+int snd2_chip_read(u32 h, u32 bank, u32 what, u32 reg)
+{
+    if (reg == SSG_REG_MIXER && mixer_error) return OS32_ERR_IO;
+    outp(OPN_ADDR, reg);
+    if (reg == 0x0e) ++setting_reads;
+    return id;
+}
+int snd2_chip_close(u32 h) { ++diag_closes; return 0; }
 
 static int sound_irq(unsigned irq, void *arg) { (void)irq; (void)arg; return IRQ_NONE; }
 
@@ -225,6 +254,20 @@ void _start(void)
             boot_probe.feature_port == 0xa460 && boot_probe.feature_id == feature,
             "118 feature ID");
     require(!fifo_reads && !boot_probe.fifo_port, "118 FIFO access");
+    diag_busy = 1;
+    require(fm_diag_irq_setting() == OS32_ERR_BUSY && !setting_reads && !diag_closes,
+            "busy diagnostic selection");
+    diag_busy = 0;
+    mixer_error = 1;
+    require(fm_diag_irq_setting() == OS32_ERR_IO && !setting_reads && diag_closes == 1,
+            "unknown basic index");
+    mixer_error = 0;
+    id = 0x80;
+    require(fm_diag_irq_setting() == 2 && setting_reads == 1 &&
+            index_reg == SSG_REG_MIXER, "restore basic index");
+    id |= 0x3f;
+    require(fm_diag_irq_setting() == 2 && setting_reads == 2 &&
+            diag_closes == 3, "joystick input changed wiring");
     require(fm_quiesce(&module) && fm_detach(&module), "lifecycle");
     reads = writes = 0;
     require(!start() && registered == OPN_PROBE_OPNA && !reads && !writes, "reattach");
