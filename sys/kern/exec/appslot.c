@@ -129,7 +129,7 @@ static u32 handler_generation[APP_SLOT_COUNT];
 
 void appslot_gui_registration(int active)
 {
-    if (++gui_generation == 0) ++gui_generation;
+    ++gui_generation; /* First issue is 1; 2^32 issues are outside the lifecycle. */
     registered_generation = active ? gui_generation : 0;
 }
 
@@ -664,7 +664,7 @@ int appslot_gfx_owner(void) { return g_gfx_owner; }
 void appslot_gfx_resource_acquire(int owner)
 {
     unsigned int irq = irq_save();
-    if (++next_resource_gen == 0) ++next_resource_gen;
+    ++next_resource_gen; /* First issue is 1; 2^32 issues are outside the lifecycle. */
     gfx_resource_owner = (u32)owner;
     gfx_resource_gen = next_resource_gen;
     irq_restore(irq);

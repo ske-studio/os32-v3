@@ -311,7 +311,7 @@ IRQ・WM・arch adapter の入力接続と新中断の有効化は §6 の後続
 
 ### 発行元・採取・照合
 
-- 世代の正は `sys/kern/exec/appslot.c` の画面所有管理に置く。既存 `g_gfx_owner` と別に、表示資源の組 `{u32 owner, resource_gen}` と発行カウンタ `u32 next_resource_gen` を持つ。0 は無し、発行時は加算して周回の 0 を飛ばし、一致だけで比べる (M5 の PM 決定と同じ)。解放で現在の組を 0 にしても発行カウンタは戻さない。初期化時だけ両方を 0 にする。AS・command・gfx_policy_gen (u16)・gfx2 adapter の世代を代用しない。
+- 世代の正は `sys/kern/exec/appslot.c` の画面所有管理に置く。既存 `g_gfx_owner` と別に、表示資源の組 `{u32 owner, resource_gen}` と発行カウンタ `u32 next_resource_gen` を持つ。0 は無し、初回は 1 を発行し、約 40 億回の発行は想定せず、一致だけで比べる (M5 の PM 決定と同じ)。解放で現在の組を 0 にしても発行カウンタは戻さない。初期化時だけ両方を 0 にする。AS・command・gfx_policy_gen (u16)・gfx2 adapter の世代を代用しない。
 - `appslot_gfx_claim(int gui_mode)` は従来の判定・戻り値を保持し、`r > 0` の所有取得時に owner 更新と新世代発行を同じ `irq_save` 区間で行う。同じ owner の再 claim でも進める。拒否・素通しでは進めない。
 - shell は `GFX_OWNER_WM == APP_ID_SHELL` であり、ID だけでは CUI の描画と通常 WM を分けられない。`sys/hal/gfx/gfx_core_init.inc` の `gfx_init_mode(int legacy200)` で、CUI (`!con_sink_is_enabled()`) かつ `res_owner_get() == APP_ID_SHELL` の初期化開始時に下記 acquire を呼ぶ。これで `sys/dev/video/geforce/diag/gf_display_test.c` の `display_cui` の診断 enter → `gfx_init()` と描画組込も同じ世代を得る。診断 enter は `sys/dev/video/geforce/diag/gf_display_test.c` の入口で、`display_cui_owner` や session を変更するより前に drain を完了させる (gfx_init 内だけでは新しい診断状態を旧印で回収しかねない)。GUI の WM 復帰・ブートの owner 0・CPL=0 子の素通しには発行しない。初期化が途中失敗しても取得試行の世代は巻き戻さず、後始末まで保持する。既存の画面所有 ID と取得許可を変更しない。
 

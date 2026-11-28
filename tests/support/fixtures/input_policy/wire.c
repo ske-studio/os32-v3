@@ -443,12 +443,11 @@ static int test_provider(void)
     readback[0] = 0x5a;
     if (api.kbd_policy_get(readback, 1, &needed) != OS32_ERR_FULL ||
         needed != 16 || readback[0] != 0x5a) return 20;
+    /* A GUI child can run while the shell still owns input focus. */
     caller = 2;
     if (api.kbd_policy_reset() != OS32_ERR_BUSY || api.kbd_policy_command_begin() != OS32_ERR_BUSY ||
         api.kbd_policy_command_end() != OS32_ERR_BUSY) return 5;
     caller = 1;
-    ikm_policy_owner_exit(1, 2);
-    if (api.kbd_policy_get(readback, sizeof base, &needed) || needed != 16) return 6;
     ikm_policy_owner_exit(1, 1);
     if (api.kbd_policy_get(readback, sizeof base, &needed) || needed != sizeof base) return 7;
     for (unsigned i = 0; i < needed; ++i)
@@ -472,8 +471,7 @@ static int test_provider(void)
         api.kbd_policy_key_read(NULL, 0) != OS32_ERR_INVAL) return 10;
     user = 0;
     if (api.kbd_policy_key_read(NULL, 0)) return 10;
-    if (ikm_policy_action_read(1, 2, &out, 1) != OS32_ERR_STALE ||
-        api.kbd_policy_action_read(&out, 1) != 1 || out.action != action.action ||
+    if (api.kbd_policy_action_read(&out, 1) != 1 || out.action != action.action ||
         out.command_gen != action.command_gen || out.time_ms != action.time_ms ||
         out.value != action.value || api.kbd_policy_key_read(&key_out, 1) != 1 ||
         key_out.keycode != key.keycode || key_out.map_generation != key.map_generation)

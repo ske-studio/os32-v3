@@ -76,7 +76,7 @@ int platform_clock_init(u32 tick_hz)
         if (mul < (1ULL << 32)) break;
         shift--;
     } while (1);
-    if (++io_generation == 0) io_generation = 1;
+    ++io_generation; /* First issue is 1; 2^32 issues are outside the lifecycle. */
     io_clock = (typeof(io_clock)){(u32)mul, shift, PM_IO_CLOCK_SOURCE, io_generation};
     clock_state.ready = 1;
     tick_budget_config();

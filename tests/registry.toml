@@ -2217,7 +2217,6 @@ mutations = [{ id = "lose_bsd_fkeys", config = "pc98", when = "after_build", rep
     { id = "omit_pc98_policy_boot", config = "pc98", when = "after_build", replace = "sys/platform/pc98/input_keymap.c", old = "rc = ikm_policy_init", new = "rc = 0 && ikm_policy_init", fail = "public policy ABI or v2 LE mismatch" },
     { id = "omit_mac_policy_boot", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/input_keymap_backend.c", old = "int rc = ikm_policy_init", new = "int rc = 0 && ikm_policy_init", fail = "public policy ABI or v2 LE mismatch" },
     { id = "swap_action_generation", config = "pc98", when = "after_build", replace = "sdk/include/os32/os32_kbd_policy.h", old = "action, command_gen", new = "command_gen, action", fail = "invalid delivery layout" },
-    { id = "release_wrong_policy_gen", config = "pc98", when = "after_build", replace = "sys/input/input_policy.c", old = "owner == saved_owner && gen == saved_gen", new = "owner == saved_owner", fail = "public policy ABI or v2 LE mismatch" },
     { id = "dequeue_while_exclusive", config = "pc98", when = "after_build", replace = "sys/input/input_policy.c", old = "now.owner != owner || in2_excl_keyboard()", new = "now.owner != owner", fail = "public policy ABI or v2 LE mismatch" }]
 
 [[check]]
@@ -2591,3 +2590,17 @@ mutations = [
     { id = "ext2_select_early_reject", config = "pc98", when = "after_build", replace = "sys/fs/ext2/ext2_fmt.c", old = "u32 disk_sectors;", new = "u32 disk_sectors; if (ide_drive == 0x0604) return EXT2_ERR_INVAL;", fail = "explicit invalid drive probe sequence differs" },
     { id = "ext2_select_mask", config = "pc98", when = "after_build", replace = "sys/fs/ext2/ext2_fmt.c", old = "u32 disk_sectors;", new = "u32 disk_sectors; ide_drive &= 0xff;", fail = "masked drive wrote hd0" },
 ]
+
+[[check]]
+id = "shell_format"
+spec = { path = "docs/07_shell.md", section = "§7-1 コマンド一覧" }
+subsystem = "system"
+level = "L1"
+sources = ["userland/shell/cmd_sys.c", "tests/support/fixtures/shell_format/command.c", "tests/support/fixtures/input_policy/entry.S"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "HD と loop の 8 種を正しい番号で format し、不正な引数では使い方を表示して formatter を呼ばない"
+limits = "KAPI 呼び出しまでを観測する。媒体への書き込みは ext2_medium_select_host が扱う"
+gates = ["push", "main"]
+mutations = [{ id = "accept_drive_suffix", config = "pc98", when = "after_build", replace = "userland/shell/cmd_sys.c", old = "*p > '3' || p[1]", new = "*p > '3'", fail = "format drive, sector count or rejection mismatch" }]

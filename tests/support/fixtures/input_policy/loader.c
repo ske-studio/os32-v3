@@ -63,7 +63,7 @@ volatile u32 kctx_irq_depth, kctx_exc_depth;
 unsigned char shell_area[0x100000] __attribute__((section(".probe_shell"),used));
 static uptr entered[5];
 static int observed;
-static unsigned round_no, previous_gen, fp_saves, lease_before, saves_before;
+static unsigned round_no, previous_gen, fp_saves;
 static int bad;
 static int no_keys(void) { return 0; }
 static const u8 baseline[] = {'I','K','M','1',2,0,16,0,1,0,0,0,0,0,0,0,
@@ -105,12 +105,6 @@ int gui_take_next_shell(char *path, int cap)
 }
 static int ready(int gui)
 {
-    if (round_no == 5) {
-        lease_before = g_shell_service.generation;
-        saves_before = fp_saves;
-        if (input_context_owner_register(APP_ID_SHELL, 999, 0, 0) ||
-            input_context_owner_select(APP_ID_SHELL, 999)) bad = 1;
-    }
     return !round_no && gui;
 }
 static void loading(const char *path, int gui) { (void)path; (void)gui; }
@@ -121,11 +115,8 @@ static void result(const char *path, int rc, int gui, int streak)
     KbdPolicySnapshot s;
     (void)path; (void)gui; (void)streak;
     if (initial_cui) __builtin_longjmp(entered, 1);
-    if (round_no == 5) {
-        bad |= rc != EXEC_ERR_INVALID || exec_nest_level || lease_before != g_shell_service.generation ||
-               fp_saves != saves_before || input_context_snapshot(&s) || s.exec_gen != 999;
-        input_context_owner_release(APP_ID_SHELL, 999);
-    } else bad |= !input_context_snapshot(&s) || !restored();
+    bad |= !input_context_snapshot(&s) || !restored();
+    if (round_no == 5 && (rc != EXEC_ERR_INVALID || exec_nest_level)) bad = 1;
     if (++round_no == 7) __builtin_longjmp(entered,1);
 }
 int vfs_read(const char *path, void *buf, u32 size)
@@ -147,7 +138,12 @@ int vfs_read(const char *path, void *buf, u32 size)
     for (unsigned i=0;i<16;++i) le32_wr((u8*)buf + i*4,hdr[i]);
     return sizeof hdr;
 }
-int vfs_read_fd(int fd, void *dst, u32 size) { (void)fd; (void)dst; return size; }
+int vfs_read_fd(int fd, void *dst, u32 size)
+{
+    (void)fd; (void)dst;
+    /* A truncated resident image fails before entry. */
+    return round_no == 5 ? 0 : (int)size;
+}
 int vfs_resolve_path(const char *path, char *out, int size)
 { kstrncpy(out,path,size); return VFS_OK; }
 static int check_park_reclaim(unsigned shell_gen)
