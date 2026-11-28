@@ -219,16 +219,16 @@ jobs:
           OS32_ACCEPT_IPA_LICENSE: "1"
         run: |
           case "$PPC_SEL" in
-            core) flags=(KBOOT_LINK=0); dir=. ;;
-            link) flags=(KBOOT_LINK=1); dir=link ;;
-            sh) flags=(KBOOT_SH=1 KBOOT_LINK=0); dir=link-sh ;;
-            link-sh) flags=(KBOOT_SH=1); dir=link-sh ;;
-            shell) flags=(KBOOT_SHELL=1 KBOOT_LINK=0); dir=link-sh ;;
-            neg1) flags=(NEGATIVE=1 KBOOT_LINK=0); dir=neg1 ;;
+            core) flags=(KBOOT_LINK=0); dir=ppc-kboot ;;
+            link) flags=(KBOOT_LINK=1); dir=ppc-kboot/link ;;
+            sh) flags=(KBOOT_SH=1 KBOOT_LINK=0); dir=ppc-kboot/link-sh ;;
+            link-sh) flags=(KBOOT_SH=1); dir=ppc-kboot/link-sh ;;
+            powermac) flags=(IMAGE=powermac); dir=ppc-powermac ;;
+            neg1) flags=(NEGATIVE=1 KBOOT_LINK=0); dir=ppc-kboot/neg1 ;;
           esac
           make -j"$(nproc)" ARCH=ppc PLATFORM=powermac "${flags[@]}" all iso
           mkdir -p out
-          cp "build/out/ppc-kboot/$dir/"{PPCKERN.ELF,boot.iso} out/
+          cp "build/out/$dir/"{PPCKERN.ELF,boot.iso} out/
           (cd out && sha256sum PPCKERN.ELF boot.iso > SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:

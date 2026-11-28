@@ -288,3 +288,46 @@ void shell_loop_run(const struct shell_loop_ops *ops); /* 新設 */
 - **E5a・E5 の LAN の提供の判定 (PM 決定 2026-11-20 夜、astra の止まりを受けて)**: 起動の案内の前に通知を消費せずに LAN の提供を判定する新しい口 (KAPI) は作らない — x86 の今の作り (rshell の中で `g_api->host_notice_read` があれば `rsh_lan_poll()` で通知を読む) に寄せる。入口の条件は「UART が使える (`serial_get_status()` で判定)、又は `host_notice_read` の slot がある」。実行中に `host_notice_read` が `NOSYS` を返したら「LAN の提供なし」として以後の LAN の poll をやめる (誤りとして扱わない、通知の消費の問題は起きない — 届いた通知は今と同じ処理)。
 - **E5 の READY の `host_open` の NOSYS (PM 決定 2026-11-20 夜)**: READY の `host_open` が `NOSYS` の間は今の x86 と同じく再試行を続ける (共通の `link_host_open` はリンクの初期化の前にも NOSYS を返すので、そこで止めると LAN が遅れて上がる x86 の構成を壊す)。「LAN の提供なし」として poll をやめる条件は `host_notice_read` の NOSYS だけ。UART も無い時は active のまま rshell でローカルの入力を処理する (それでよい)。
 - **E5・E6 の SFS の受入の台本 (PM 決定 2026-11-20 夜、sol の E5 のレビューを受けて)**: ppc_sfs.py (旧版 55711a435e84) の kboot-link-sh の台本を `/sys/shell.bin` の起動に切り替えるのは、`/sys/shell.bin` が像に入る PowerPC の段 E で (7450・7455 の両方で確かめる)。E6 で APP 専用の SFS の分岐を消したので、段 E と同じ統合の枝で入れるまで、この台本の正常系は単独では通らない。
+
+## 2026-11-28 の追記 (撤去の関門)
+
+基点 27f597802。§9 の C2・C4・C5 は収録済み。製品 root の入力は `build/ppc-ram-root.json` の `/sys/shell.bin`、常駐の起動は `build/platform/powermac.mk` の C_PLATFORM_USERSHELL と `sys/kern/init/shell_loop.c` の共通ループ `shell_loop_run` を通る。旧 CLI と USER 起動接着の撤去は製品起動の受入後に行う。
+
+### 製品媒体と互換名
+
+既定と IMAGE=powermac は build/out/ppc-powermac に出力する。sh・shell・link-sh の旧名と旗は kboot-link-sh と build/out/ppc-kboot/link-sh に正規化する。LINK/SH/SHELL=0/0/1 と NEGATIVE=0 は成功し、NEGATIVE=1 は正規化前に KBOOT_SHELL does not support NEGATIVE で拒否する。core/link/neg1 は診断像。全像の常駐終端は 0x375000 以下、chain は 0x3e0000 以下。製品・互換の root は 0x500000 の独立 LOAD、1 MiB 以下で root.iso と一致する。旧測定の常駐終端 0x396000・chain 0x401000 は /bin/sh.bin などと常駐 shell.bin を併載した像の値。各像の frame と ISO サイズを採取する。
+
+### 製品の無入力起動
+
+製品と sh/link-sh は 7450・7455 の各 CPU で Loading /sys/shell.bin、EOT、LINK HEAP の順に到達する。core は READY、link は READY・LAN・HEAP、neg1 は READY に達する前の TRAP を観測する。
+
+### 製品のコンパイル集合
+
+製品の all iso で展開する C_SELECTED と GAS_SELECTED に、個別入力、生成ソース、HDD の起動・導入用ソースを加え、コンパイル入力集合と照合する。
+
+### 製品の再生成
+
+各構成を独立に二度生成し、同じ集合と ELF のバイト列を照合する。時刻を含む boot.iso は非空とサイズの一致を確認する。
+
+### 製品の HAL 登録
+
+製品の LINK 入力は既存のゲストで確認し、製品のホスト側 HAL probe は CHECK_INPUT=0 で登録と残りのサービスを確認する。
+
+### 製品での共通ソース検査
+
+IMAGE=powermac の common-compile が選択する各入力に対し、製品出力先の PowerPC 再配置可能 ELF を照合する。
+
+### 製品の収集計画
+
+共有シェルの変更は PC-98 配布、sh、link-sh、powermac と ppc_boot/powermac を選ぶ。製品 all iso は既存の辞書入力から FEP.DB と導入パッケージ、HDD 起動媒体を生成し、PPCKERN.ELF と boot.iso を配布する。
+
+### 撤去前の検査登録
+
+各検査を現行の registry に登録し、製品媒体の正常系、媒体欠落と旧旗の誤受理を検出する変異を宣言する。
+
+登録・変異は `tests/registry.toml`、無入力の起動は `tests/system/ppc_boot.py` の missing_marker を参照する。旧 CLI の os32> と自動 outprobe は今回の起動条件から外す。`build/ppc-install-boot.mk` の HD_MEDIA_FILES と HD_PACKAGES が辞書と導入媒体の入力を持ち、`tools/ppc/boot_media.py` の package が製品 CD に収録する。
+
+### 段 1 の実装で設計者が決めたこと
+
+- 配布された互換像の照合に使う root.iso は、同じ CI 実行の一時ディレクトリで共有する。製品では配布 boot.iso の ROOT.ISO を抽出する。
+- 製品行の重みは手元の正常と必須変異の合計を切り上げた暫定値とし、取り込みの前に同じ候補の hosted の成功 attempt の集計 (registry_v2「PowerPC の構成別重み」) で置き換える。配布から検査する媒体・起動は同じ形式の配布物で測る。互換 root の生成時間は先に実行する sh に計上する。

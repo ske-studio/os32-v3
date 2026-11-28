@@ -1,3 +1,4 @@
+# 期待の出所: docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md「製品の収集計画」。
 """Exercise real runner, independent failures, and incomplete or invalid bundles."""
 from contextlib import redirect_stdout
 import io
@@ -70,8 +71,8 @@ def verify_selection():
     check(entries == {(name, "pc98") for name in ("ring3_instructions", "c_dialect",
                                                   "x86_media_build", "build_identity")}, "userland checks")
     result, entries = plan("userland/shell/cmd_dir.c")
-    check(result["pc98"] == "distribution" and set(result["powerpc"]) == {"sh", "link-sh", "shell"}
-          and ("ppc_boot", "shell") in entries and ("ppc_boot", "core") not in entries,
+    check(result["pc98"] == "distribution" and set(result["powerpc"]) == {"sh", "link-sh", "powermac"}
+          and ("ppc_boot", "powermac") in entries and ("ppc_boot", "core") not in entries,
           "shared userland media")
     check({cfg for name, cfg in entries if name == "net_fixture"} == set(result["powerpc"]),
           "net fixture image selection")

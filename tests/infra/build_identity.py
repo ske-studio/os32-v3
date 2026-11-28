@@ -1,3 +1,4 @@
+# 期待の出所: docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md「製品の再生成」。
 from contextlib import chdir
 from pathlib import Path
 import hashlib
@@ -8,7 +9,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from tests.support.media import (Failure, PPC, PPC_OUT, main, ppc_build, ppc_verify,
+from tests.support.media import (Failure, ppc_output, main, ppc_build, ppc_verify,
                                  require, x86_build, x86_verify)
 sys.path.insert(0, str(Path("tools").resolve()))
 from build_compare import artifacts
@@ -22,7 +23,7 @@ def inventory(config):
         paths.update(Path(".").rglob("*.o"))
         presence = set()
     else:
-        folder = PPC_OUT / PPC[config][1]
+        folder = ppc_output(config)
         paths = set(Path(".").rglob("*.o")) | {folder / "PPCKERN.ELF", folder / "boot.iso"}
         presence = {folder / "boot.iso"}
         if folder / "root_image_blob.o" in paths:
@@ -31,7 +32,7 @@ def inventory(config):
     for path in sorted(paths | presence):
         if path in presence:
             require(path)
-            result[str(path)] = "present"
+            result[str(path)] = path.stat().st_size if path.name == "boot.iso" else "present"
         else:
             if not path.is_file():
                 raise Failure(f"missing {path}")
