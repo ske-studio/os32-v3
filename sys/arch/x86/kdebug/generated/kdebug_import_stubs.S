@@ -1651,4 +1651,19 @@ dma_chan_acquire:
 dma_chan_release:
     jmp *kdebug_import_slots+1316
 .size dma_chan_release, .-dma_chan_release
+.globl paging_gfx2_map
+.type paging_gfx2_map, @function
+paging_gfx2_map:
+    jmp *kdebug_import_slots+1320
+.size paging_gfx2_map, .-paging_gfx2_map
+.globl paging_lease_unmap
+.type paging_lease_unmap, @function
+paging_lease_unmap:
+    jmp *kdebug_import_slots+1324
+.size paging_lease_unmap, .-paging_lease_unmap
+.globl pgalloc_arena_end
+.type pgalloc_arena_end, @function
+pgalloc_arena_end:
+    jmp *kdebug_import_slots+1328
+.size pgalloc_arena_end, .-pgalloc_arena_end
 .section .note.GNU-stack,"",@progbits

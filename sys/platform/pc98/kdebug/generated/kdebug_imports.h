@@ -151,8 +151,8 @@ void kdi_set_kbd_inject_drop_count(u32 value);
 const u8 *kdi_ptr_ring3_ls_start(void);
 const u8 *kdi_ptr_ring3_ls_end(void);
 u32 *kdi_ptr___kernel_resident_end(void);
-#define KDEBUG_IMPORT_COUNT 330
-#define KDEBUG_ABI_GEN 0xb031e79cu
+#define KDEBUG_IMPORT_COUNT 333
+#define KDEBUG_ABI_GEN 0x291e4d36u
 #include "sys/kern/module/module_image.h"
 extern void (*const kdebug_kexports[])(void);
 extern const struct module_symbol_contract kdebug_import_contracts[];

@@ -2690,6 +2690,30 @@
       "kind": "FUNC",
       "stage": "S6",
       "context_safe": false
+    },
+    {
+      "index": 330,
+      "symbol": "paging_gfx2_map",
+      "source": "sys/kern/mm/paging.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false
+    },
+    {
+      "index": 331,
+      "symbol": "paging_lease_unmap",
+      "source": "sys/kern/mm/paging.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false
+    },
+    {
+      "index": 332,
+      "symbol": "pgalloc_arena_end",
+      "source": "sys/kern/mm/pgalloc.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false
     }
   ]
 }

@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 2956060572,
+  "module_abi_gen": 689851702,
   "stage": "S6",
-  "count": 330,
+  "count": 333,
   "imports": [
     {
       "stage": "S1",
@@ -5000,6 +5000,51 @@
       "type_ver": 1,
       "signature": "int dma_chan_release(unsigned int ch, const void *owner);",
       "source_declaration": "int dma_chan_release(unsigned int ch, const void *owner);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 330,
+      "symbol": "paging_gfx2_map",
+      "source": "sys/kern/mm/paging.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "name": "paging_gfx2_map",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int paging_gfx2_map(struct addrspace *as, u32 va, u32 pa, u32 npages, u32 pte_flags);",
+      "source_declaration": "int paging_gfx2_map(struct addrspace *as, u32 va, u32 pa, u32 npages, u32 pte_flags);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 331,
+      "symbol": "paging_lease_unmap",
+      "source": "sys/kern/mm/paging.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "name": "paging_lease_unmap",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int paging_lease_unmap(struct addrspace *as, u32 base, u32 npages);",
+      "source_declaration": "int paging_lease_unmap(struct addrspace *as, u32 base, u32 npages);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 332,
+      "symbol": "pgalloc_arena_end",
+      "source": "sys/kern/mm/pgalloc.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "name": "pgalloc_arena_end",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "u32 pgalloc_arena_end(void);",
+      "source_declaration": "u32 pgalloc_arena_end(void);",
       "dtype": null,
       "array": false
     }

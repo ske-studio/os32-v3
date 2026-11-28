@@ -395,6 +395,9 @@ void (*const kdebug_kexports[])(void) = {
     (void (*)(void))input_display_restore_drain,
     (void (*)(void))dma_chan_acquire,
     (void (*)(void))dma_chan_release,
+    (void (*)(void))paging_gfx2_map,
+    (void (*)(void))paging_lease_unmap,
+    (void (*)(void))pgalloc_arena_end,
 };
 const unsigned long kdebug_abi_gen = KDEBUG_ABI_GEN;
 const unsigned long kdebug_kexport_count = KDEBUG_IMPORT_COUNT;
@@ -729,6 +732,9 @@ const struct module_symbol_contract kdebug_import_contracts[] = {
     {0x05d0c682u, 1, 1},
     {0xfae057d9u, 1, 1},
     {0x436960dcu, 1, 1},
+    {0x40eaab5cu, 1, 1},
+    {0xac649144u, 1, 1},
+    {0x59a456d7u, 1, 1},
 };
 const struct module_symbol_contract kdebug_export_contracts[MODULE_OPS_SLOTS] = {
     [0] = {0xbcb84611u, 1, 0},

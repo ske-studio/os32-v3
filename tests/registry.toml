@@ -2237,3 +2237,18 @@ mutations = [{ id = "skip_hidden_stationary_cursor", config = "pc98", when = "af
     { id = "discard_full_release", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "if !ring::append(st, slot, &ev) { return false; }\n            st.excl.delivered[i].keys", new = "let _ = ring::append(st, slot, &ev);\n            st.excl.delivered[i].keys", fail = "incorrect old-window release" },
     { id = "forget_pointer_buttons", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "rec.buttons = ev.sub;", new = "rec.buttons = 0;", fail = "incorrect old-window release" },
     { id = "repeat_accepted_button", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "st.excl.delivered[i].buttons &= !bit;", new = "st.excl.delivered[i].buttons |= bit;", fail = "incorrect old-window release" }]
+
+[[check]]
+id = "gfx_measure"
+spec = { path = "docs/decisions/gui/GFX_ACCEL_HAL_DESIGN.md", section = "レビュー案 (2026-11-28) — G4m の結線と S1・G5m の計測" }
+subsystem = "gfx"
+level = "L1"
+sources = ["tools/gfx_measure.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "重なる描画矩形の和集合、plane の転送画素、guard 不一致の形状の拒否"
+limits = "合成した入力の集計。実機の時間・画素を測らない"
+gates = ["push", "main"]
+mutations = [{ id = "plane_as_index8", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "transferred += 2 * size", new = "transferred += size", fail = "clipped union or plane transfer" },
+    { id = "ignore_guard", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "row['rc'] == row['diff'] == row['guard_diff'] == 0", new = "row['rc'] == row['diff'] == 0", fail = "guard failure accepted" }]
