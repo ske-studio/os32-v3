@@ -9,6 +9,62 @@ static KernelAPI *real_api;
 static SND2_Pos final_pos;
 static int have_pos;
 
+#ifdef SNDL_PUMP_DIAG
+struct pump_sample {
+    u32 sequence, us, played, written, queued, added, underruns;
+};
+static struct pump_sample samples[8192];
+static struct pump_sample *current;
+static u32 count;
+static int need_position;
+
+static int observed_pos(u32 stream, SND2_Pos *pos)
+{
+    int rc = real_api->snd2_stream_pos(stream, pos);
+    if (!rc && current && need_position) {
+        current->played = pos->played;
+        current->written = pos->written;
+        current->queued = pos->written - pos->played;
+        current->underruns = pos->underruns;
+        need_position = 0;
+    }
+    return rc;
+}
+
+static int observed_write(u32 stream, const void *buf, u32 bytes)
+{
+    int rc = real_api->snd2_stream_write(stream, buf, bytes);
+    if (current && rc > 0) current->added += (u32)rc / 4;
+    return rc;
+}
+
+static int dump_samples(void)
+{
+    int fd = real_api->sys_open("/host/pump.bin", KAPI_O_WRONLY | KAPI_O_CREAT | KAPI_O_TRUNC);
+    if (fd < 0) return fd;
+    u32 n = sizeof samples / sizeof samples[0];
+    u32 i = count > n ? count - n : 0;
+    while (i < count) {
+        u32 len = n - i % n;
+        if (len > count - i) len = count - i;
+        char *p = (char *)&samples[i % n];
+        u32 bytes = len * sizeof *current;
+        while (bytes) {
+            int written = real_api->sys_write(fd, p, bytes);
+            if (written <= 0) {
+                real_api->sys_close(fd);
+                return -1;
+            }
+            bytes -= written;
+            p += written;
+        }
+        i += len;
+    }
+    real_api->sys_close(fd);
+    return 0;
+}
+#endif
+
 static int observed_close(u32 stream, u32 how)
 {
     have_pos = real_api->snd2_stream_pos(stream, &final_pos) == 0;
@@ -36,8 +92,19 @@ static int soft_tone(KernelAPI *api)
         sndl_voice_play(voice) || api->sys_time_now(&start, &hi) ||
         sndl_chip_write(chip, tone, sizeof tone / sizeof tone[0], start) != sizeof tone / sizeof tone[0])
         return 3;
+#ifdef SNDL_PUMP_DIAG
+    if (api->sys_time_now(&now, &hi)) return 4;
+#endif
     do {
+#ifdef SNDL_PUMP_DIAG
+        current = &samples[count % (sizeof samples / sizeof samples[0])];
+        *current = (struct pump_sample){.sequence=count++, .us=now};
+        need_position = 1;
+#endif
         if (sndl_pump() || api->sys_time_now(&now, &hi)) return 4;
+#ifdef SNDL_PUMP_DIAG
+        current = 0;
+#endif
     } while (now-start < 2000000);
     if (sndl_voice_delete(voice) || sndl_chip_close(chip)) return 5;
     api->kprintf(7, "sndl soft OPNA left=fnum0269 block4 right=12345 period=256\n");
@@ -53,8 +120,16 @@ int main(int argc, char **argv, KernelAPI *api)
         real_api = api;
         observed_api = *api;
         observed_api.snd2_stream_close = observed_close;
+#ifdef SNDL_PUMP_DIAG
+        observed_api.snd2_stream_pos = observed_pos;
+        observed_api.snd2_stream_write = observed_write;
+#endif
         kapi = &observed_api;
         int rc = soft_tone(kapi);
+#ifdef SNDL_PUMP_DIAG
+        current = 0;
+        if (dump_samples()) rc = 7;
+#endif
         kapi = api;
         sndl_init(api);
         if (have_pos) api->kprintf(7, "sndl soft underruns=%u\n", final_pos.underruns);

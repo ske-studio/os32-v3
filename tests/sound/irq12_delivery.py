@@ -34,7 +34,7 @@ def verify(config):
                         "--out-dir", tmp], check=True)
         subprocess.run(["gcc", "-m32", "-nostdlib", "-static", "-fno-pie", "-no-pie",
                         "-ffreestanding", "-fno-stack-protector", "-I" + tmp, "-std=gnu11", "-O2", "-ffunction-sections", "-fdata-sections",
-                        "-Wl,--gc-sections,--wrap=v86_reflect_irq,--wrap=v86_boot_prepare,--wrap=v86_pic_request,--wrap=v86_pic_candidate,--section-start=.guestdata=0x21000,--section-start=.guest=0x20000", "-D__cdecl=", "-Itests/support/fixtures/fm_probe", "-I.",
+                        "-Wl,--gc-sections,--wrap=v86_reflect_irq,--wrap=v86_boot_prepare,--wrap=v86_pic_candidate,--section-start=.guestdata=0x21000,--section-start=.guest=0x20000", "-D__cdecl=", "-Itests/support/fixtures/fm_probe", "-I.",
                         *include_flags(ROOT), fixture / "model.c", obj,
                         "sys/platform/pc98/legacy/v86_pic.c", "sys/platform/pc98/irq_policy.c", "sys/platform/pc98/legacy/v86.c", "sys/kern/irq/irq_math.c",
                         "sys/kern/irq/irq.c", "sys/platform/pc98/pic.c",

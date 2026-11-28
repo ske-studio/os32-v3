@@ -4,6 +4,7 @@
 #include "module.h"
 
 struct v86_session_state v86_session;
+volatile u32 tick_count;
 void v86_reflect_irq(u32 *frame, u32 irq);
 
 #include "check.h"

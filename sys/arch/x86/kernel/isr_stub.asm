@@ -118,6 +118,7 @@ extern page_fault_handler
 extern timer_handler
 extern kbd_irq_handler
 extern serial_irq_handler
+extern v86_refill_timer_irq
 extern tick_clock_step
 extern mouse_irq_handler
 ;; CPL=3 アプリの強制脱出 (CTRL+STOP)。要求があれば longjmp して戻らない
@@ -585,6 +586,15 @@ irq_stub_0:
         mov     al, OCW2_EOI
         out     PIC1_CMD, al
         TP_END TP_EOI
+        test    dword [esp + ISR_IRQ_EFLAGS_OFF], EFLAGS_VM
+        jz      .done
+        push    esp
+        call    v86_refill_timer_irq
+        add     esp, ABI_WORD_BYTES
+        test    eax, eax
+        jz      .done
+        TP_LEAVE 0
+        call    v86_exit_to_kernel
 .done:
         IRQ_LEAVE
         TP_LEAVE 0

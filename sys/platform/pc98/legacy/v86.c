@@ -393,6 +393,14 @@ static int v86_do_int(u32 *frame, u32 vector,
 
 static int v86_deliver_pending(u32 *frame, int ip, int cs, int flags, int sp, int ss)
 {
+    if (slice_context && v86_session.soft_input) {
+        u32 elapsed = tick_count - v86_session.soft_jiffy;
+        if (elapsed >= v86_tick_limit) {
+            v86_exit_reason = V86_EXIT_TIMEOUT;
+            return 1;
+        }
+        if (v86_session.ticks < elapsed) v86_pic_request(0);
+    }
     if (!(frame[flags] & EFLAGS_IF)) return 0;
     u32 vector;
     int irq = v86_pic_candidate(&vector);
@@ -405,11 +413,17 @@ static int v86_deliver_pending(u32 *frame, int ip, int cs, int flags, int sp, in
     ++v86_irq_n;
     /* A cooperative session charges IRQ0 once, including a request held
      * across a refill or delivered after the guest unmasks the PIC. */
-    if (slice_context && irq == 0 && ++v86_session.ticks >= v86_tick_limit) {
-        v86_exit_reason = V86_EXIT_TIMEOUT;
-        return 1;
-    }
+    if (slice_context && irq == 0) ++v86_session.ticks;
     return 0;
+}
+
+/* A busy DOS loop need not trap after IRET. Use the intermediate PIT
+ * interrupts to retire overdue guest periods without ending the slice. */
+int v86_refill_timer_irq(u32 *frame)
+{
+    return slice_context && v86_session.soft_input &&
+        tick_count - v86_session.soft_jiffy > v86_session.ticks &&
+        v86_deliver_pending(frame, V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS);
 }
 
 void v86_reflect_irq(u32 *frame, u32 irq)
@@ -419,7 +433,7 @@ void v86_reflect_irq(u32 *frame, u32 irq)
 #endif
     if (!v86_active && !(irq == 1 && v86_session.soft_input)) return;
     if (irq == 0 && slice_context) slice_due = 1;
-    v86_pic_request(irq);
+    if (irq || !slice_context || !v86_session.soft_input) v86_pic_request(irq);
     /* Hardware interrupt entry from VM is already past any STI shadow. */
     if (!(frame[V86I_EFLAGS] & EFLAGS_VM)) return;
     if (v86_deliver_pending(frame, V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS)) {
@@ -596,7 +610,6 @@ int v86_run_limit(const struct v86_context *ctx, u32 tick_limit)
         if (slice_context && v86_session.soft_input) {
             struct v86_context *c = slice_context;
             u32 frame[] = {c->eip, c->cs, c->eflags, c->esp, c->ss};
-            if (tick_count != v86_session.soft_jiffy) v86_pic_request(0);
             if (v86_deliver_pending(frame, 0, 1, 2, 3, 4)) goto leave;
             c->eip = frame[0];
             c->cs = frame[1];
@@ -617,7 +630,6 @@ leave:
 #ifdef TICK_PROBE
     tick_probe_if_begin(EFLAGS_IF);
 #endif
-    if (slice_context) v86_session.soft_jiffy = tick_count;
     v86_runtime_end();
     irq_restore(v86_session.saved_eflags);
 

@@ -12,7 +12,7 @@ __attribute__((section(".guest"), aligned(16)))
 static const u8 guest_outs[16] = {0x6e};
 struct kdebug kdebug;
 struct ledger_surface ledger_surfaces[LEDGER_MAX_SURFACES];
-volatile u32 kctx_irq_depth, kctx_exc_depth;
+volatile u32 kctx_irq_depth, kctx_exc_depth, tick_count;
 static unsigned resets, detaches, releases;
 int v86_gp_handler(u32 *frame);
 

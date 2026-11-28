@@ -1,5 +1,6 @@
 """Run the ordinary OPNA pump while a simulated PCM device consumes frames."""
 from pathlib import Path
+import os
 import subprocess
 import sys
 import tempfile
@@ -15,6 +16,10 @@ def verify(config):
         cc = ["gcc", "-std=gnu11", "-O2", "-ffunction-sections", "-fdata-sections",
               "-Wl,--gc-sections", "-D__cdecl=", "-I.", "-Isdk/include/os32", "-Isdk/include"]
         fixture = Path("tests/support/fixtures/sndl_soft_feed")
+        cross = Path(os.environ["CROSS_DIR"]) / "bin/i386-elf-gcc"
+        subprocess.run([cross, *cc[1:], "-nostartfiles", "-static", "-Wl,-e,_start",
+                        fixture / "trace.c", "-o", exe], check=True)
+        subprocess.run(["qemu-i386", exe], check=True)
         for name in ("feed.c", "stalled.c"):
             subprocess.run([*cc, fixture / name, "userland/lib/snd/mix.c", "-o", exe], check=True)
             subprocess.run(["qemu-x86_64", exe], check=True)

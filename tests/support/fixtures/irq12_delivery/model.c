@@ -42,29 +42,34 @@ extern void check_enter(const struct v86_context *ctx);
 static int slicing;
 int v86_tick_and_check_timeout(void);
 void __real_v86_reflect_irq(u32 *frame, u32 irq);
-static unsigned suspended_ticks, expected_ticks;
-void __real_v86_pic_request(u32 irq);
+static unsigned timer_deliveries;
+int v86_refill_timer_irq(u32 *frame);
 int __real_v86_pic_candidate(u32 *vector);
 static u16 guest_ivt[512] __attribute__((section(".guestdata"), aligned(16)));
 static u16 guest_stack[32] __attribute__((section(".guestdata"), aligned(16)));
-static int test_timer, check_resume_timer, timeout_irq, forbid_entry;
-int irq_exited;
-void __wrap_v86_pic_request(u32 irq)
+static unsigned monotonic_ms(void)
 {
-    if (!irq && !v86_is_active()) ++suspended_ticks;
-    __real_v86_pic_request(irq);
+    struct { unsigned sec, ns; } ts;
+    int rc;
+    __asm__ volatile("int $0x80" : "=a"(rc) : "0"(265), "b"(1), "c"(&ts) : "memory");
+    require(!rc, "host monotonic clock");
+    return ts.sec * 1000 + ts.ns / 1000000;
 }
+static int test_timer, clock_run, check_resume_timer, timeout_irq, forbid_entry;
+int irq_exited;
 int __wrap_v86_pic_candidate(u32 *vector)
 {
     int irq = __real_v86_pic_candidate(vector);
+    if (irq == 0) ++timer_deliveries;
     if (irq >= 0) *vector += (u32)guest_ivt / 4;
     return irq;
 }
 void v86_enter(const struct v86_context *ctx)
 {
     require(!forbid_entry, "refill timeout entered DOS");
-    require(suspended_ticks == expected_ticks, "foreground jiffy before VM");
+
     if (timeout_irq) {
+        ++tick_count;
         vm = 1;
         irq_exited = eoi = 0;
         if (timeout_irq == 2) fire_2(); else fire_12();
@@ -92,6 +97,20 @@ void v86_enter(const struct v86_context *ctx)
         if (test_timer) {
             frame[V86I_SS] = (u32)guest_stack >> 4;
             frame[V86I_ESP] = sizeof guest_stack;
+        }
+        if (clock_run) {
+            /* Execute each timer handler (EOI, IRET), then spin in DOS until
+             * the next 1-ms hardware interrupt. Only the 10th ends a slice. */
+            for (unsigned ms = 1; ms < 10; ++ms) {
+                v86_pic_out(0, 0x20);
+                frame[V86I_EFLAGS] = EFLAGS_VM | EFLAGS_IF;
+                frame[V86I_ESP] = sizeof guest_stack;
+                require(!v86_refill_timer_irq(frame), "intermediate PIT");
+            }
+            v86_pic_out(0, 0x20);
+            frame[V86I_EFLAGS] = EFLAGS_VM | EFLAGS_IF;
+            frame[V86I_ESP] = sizeof guest_stack;
+            ++tick_count;
         }
         __real_v86_reflect_irq(frame, 0);
         require(v86_tick_and_check_timeout(), "timer return");
@@ -206,7 +225,6 @@ static void soft_boots(void)
                 ev[0].reg == 0x28 && ev[0].val == 0x10 && ev[0].seq == 1 &&
                 ev[1].reg == 0x28 && !ev[1].val && ev[1].seq == 2, "key off sequence");
         ++tick_count;
-        ++expected_ticks;
         require(!v86s_run(sid, &in, &ex) && ex.reason == 1 &&
                 v86s_fm_drain(sid, ev, 2, &seq) == 0, "empty slice");
         in.slice_ms = 0;
@@ -306,46 +324,47 @@ void _start(void)
     v86_pic_set_imr(0, 0xfe);
     guest_ivt[2 * 8] = 0x123;
     guest_ivt[2 * 8 + 1] = 0x2000;
-    ctx.eflags &= ~EFLAGS_IF;
-    ++tick_count;
-    ++expected_ticks;
-    require(v86_run_slice(&ctx) == V86_EXIT_SLICE && v86_session.ticks == 1 &&
-            ctx.eip == 0x123 && ctx.cs == 0x2000 && !(ctx.eflags & EFLAGS_IF) &&
-            ctx.esp == sizeof guest_stack - 6 &&
-            guest_stack[29] == 0x108 && guest_stack[30] == 0x109 &&
-            guest_stack[31] == EFLAGS_IF, "VM timer frame");
-    ctx.eflags |= EFLAGS_IF;
-    ++tick_count;
-    ++expected_ticks;
-    require(v86_run_slice(&ctx) == V86_EXIT_SLICE && v86_session.ticks == 1,
-            "in-service timer counted");
-    v86_pic_out(0, 0x20);
-    ctx.eip = 0x456;
-    ctx.cs = 0x2100;
-    check_resume_timer = 1;
-    require(v86_run_slice(&ctx) == V86_EXIT_SLICE && v86_session.ticks == 2 &&
-            !check_resume_timer, "foreground timer once");
-    v86_pic_out(0, 0x20);
-    ctx.eflags &= ~EFLAGS_IF; /* Deliver on physical IRQ0 after guest STI. */
-    v86_session.ticks = V86_TICK_LIMIT - 1;
-    require(v86_run_slice(&ctx) == V86_EXIT_TIMEOUT &&
-            v86_session.ticks == V86_TICK_LIMIT && guest_stack[29] == 0x108 &&
-            guest_stack[30] == 0x109 && guest_stack[31] == EFLAGS_IF,
-            "session slice timeout");
-    v86_pic_reset();
-    for (unsigned i = 0; i < 3; ++i) {
-        v86_pic_reset();
-        v86_pic_set_imr(0, 0xfe);
-        v86_session.ticks = V86_TICK_LIMIT - 1;
-        ++tick_count;
-        ++expected_ticks;
-        forbid_entry = i == 0;
-        timeout_irq = i == 1 ? 2 : i == 2 ? 12 : 0;
-        ctx.eflags = EFLAGS_VM | (forbid_entry ? EFLAGS_IF : 0);
+    /* Each 100-ms interval spends 90 ms refilling and 10 ms in DOS.
+     * Count the actual PIC candidates, including across jiffy wrap. */
+    tick_count = v86_session.soft_jiffy = 0xfffffff0u;
+    clock_run = 1;
+    unsigned start = monotonic_ms();
+    unsigned elapsed;
+    unsigned before = timer_deliveries;
+    unsigned base = tick_count;
+    do {
+        do elapsed = monotonic_ms() - start; while (elapsed / 10 < tick_count - base + 5);
+        /* The final jiffy arrives in DOS. All earlier jiffies elapsed in the pump. */
+        tick_count = base + elapsed / 10 - 1;
+        ctx.eflags = EFLAGS_VM | EFLAGS_IF;
         ctx.ss = (u32)guest_stack >> 4;
         ctx.esp = sizeof guest_stack;
-        require(v86_run_slice(&ctx) == V86_EXIT_TIMEOUT &&
-                v86_session.ticks == V86_TICK_LIMIT, "pending timer timeout");
+        require(v86_run_slice(&ctx) == V86_EXIT_SLICE, "host timed slice");
+        v86_pic_out(0, 0x20);
+    } while (elapsed < 1000);
+    require(timer_deliveries - before + 1 >= elapsed / 10 &&
+            timer_deliveries - before <= elapsed / 10 + 1, "host elapsed IRQ0 rate");
+    before = timer_deliveries;
+    for (unsigned burst = 0; burst < 10; ++burst) {
+        tick_count += 9;
+        ctx.eflags = EFLAGS_VM | EFLAGS_IF;
+        ctx.ss = (u32)guest_stack >> 4;
+        ctx.esp = sizeof guest_stack;
+        ctx.eip = 0x456;
+        ctx.cs = 0x2100;
+        check_resume_timer = 1;
+        require(v86_run_slice(&ctx) == V86_EXIT_SLICE, "clock slice");
+        v86_pic_out(0, 0x20);
+    }
+    require(timer_deliveries - before == 100, "100 IRQ0 per simulated second");
+    clock_run = 0;
+    for (unsigned i = 0; i < 3; ++i) {
+        tick_count = v86_session.soft_jiffy + V86_TICK_LIMIT - (i != 0);
+        forbid_entry = i == 0;
+        timeout_irq = i == 1 ? 2 : i == 2 ? 12 : 0;
+        ctx.eflags = EFLAGS_VM;
+        require(v86_run_slice(&ctx) == V86_EXIT_TIMEOUT, "masked timeout");
+        forbid_entry = 0;
     }
     timeout_irq = 0;
     v86_pic_reset();

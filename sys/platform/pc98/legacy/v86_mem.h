@@ -103,7 +103,7 @@ struct v86_session_state {
     volatile int active;
     int running;
     volatile u32 ticks;
-    u32 soft_jiffy;
+    u32 soft_jiffy; /* session start in 100-Hz jiffies */
     int soft_input;
     int soft_stop;
     int aborting;

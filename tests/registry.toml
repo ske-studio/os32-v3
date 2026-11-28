@@ -512,12 +512,13 @@ mutations = [
  { id = "fatal_prime_again", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "if (rc == OS32_ERR_AGAIN || (retrying && !rc)) {", new = "if (0) {", fail = "final drain" },
  { id = "run_during_poll", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_call.c", old = "else if (in->slice_ms) {", new = "else {", fail = "refill poll entered DOS" },
  { id = "skip_guest_prime", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "rc = sndl_prime_slice();", new = "rc = 0;", fail = "pre-run reserve" },
- { id = "freeze_foreground_clock", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (tick_count != v86_session.soft_jiffy) v86_pic_request(0);", new = "(void)tick_count;", fail = "foreground jiffy before VM" },
- { id = "reset_slice_ticks", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (!slice_context) v86_session.ticks = 0;", new = "v86_session.ticks = 0;", fail = "in-service timer counted" },
+ { id = "skip_intermediate_timer", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "tick_count - v86_session.soft_jiffy > v86_session.ticks &&", new = "0 &&", fail = "host elapsed IRQ0 rate" },
+ { id = "freeze_foreground_clock", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (v86_session.ticks < elapsed) v86_pic_request(0);", new = "(void)tick_count;", fail = "host elapsed IRQ0 rate" },
+ { id = "reset_slice_ticks", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (!slice_context) v86_session.ticks = 0;", new = "v86_session.ticks = 0;", fail = "host elapsed IRQ0 rate" },
  { id = "skip_vsync_exit", config = "pc98", when = "after_build", replace = "sys/arch/x86/kernel/isr_stub.asm", old = "%if %1 == 2 || %1 == 12", new = "%if %1 == 12", fail = "pending timer returned to DOS" },
  { id = "skip_sound_exit", config = "pc98", when = "after_build", replace = "sys/arch/x86/kernel/isr_stub.asm", old = "%if %1 == 2 || %1 == 12", new = "%if %1 == 2", fail = "pending timer returned to DOS" },
  { id = "resume_after_refill_timeout", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (v86_deliver_pending(frame, 0, 1, 2, 3, 4)) goto leave;", new = "(void)v86_deliver_pending(frame, 0, 1, 2, 3, 4);", fail = "refill timeout entered DOS" },
- { id = "skip_foreground_tick", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "slice_context && irq == 0 && ++v86_session.ticks", new = "slice_context && v86_active && irq == 0 && ++v86_session.ticks", fail = "foreground timer once" },
+ { id = "skip_foreground_tick", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "slice_context && irq == 0", new = "slice_context && v86_active && irq == 0", fail = "host elapsed IRQ0 rate" },
  { id = "reject_long_paths", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "return boot_result(\"v86_boot2\", api->v86_boot2(path, second));\n    strcpy", new = "return OS32_ERR_INVAL;\n    strcpy", fail = "long primary" },
  { id = "lose_second_path", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "return boot_result(\"v86_boot2\", api->v86_boot2(path, second));\n    strcpy", new = "return api->v86_boot2(path, 0);\n    strcpy", fail = "fallback path pair" },
  { id = "lose_pump_key", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/guest.c", old = "return v86_is_active() || v86_session.soft_input;", new = "return v86_is_active();", fail = "pump input owner" },
@@ -2422,7 +2423,7 @@ id = "sndl_soft_feed"
 spec = { path = "docs/decisions/sound/V86_SOFT86_DESIGN.md", section = "最初の DOS 聴取の実装と受入" }
 subsystem = "sound"
 level = "L1"
-sources = ["userland/cmds/v86.c", "userland/lib/snd/chip.c", "userland/lib/snd/pump.c", "userland/lib/snd/live.h", "tests/support/fixtures/sndl_soft_feed", "sys/hal/sound/snd2_seg.c", "sys/dev/sound/cs4231/pcm_cs4231_math.c"]
+sources = ["userland/diag/sndl_test.c", "userland/cmds/v86.c", "userland/lib/snd/chip.c", "userland/lib/snd/pump.c", "userland/lib/snd/live.h", "tests/support/fixtures/sndl_soft_feed", "sys/hal/sound/snd2_seg.c", "sys/dev/sound/cs4231/pcm_cs4231_math.c"]
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
@@ -2430,6 +2431,7 @@ expect = "両 DMA 経路の通常・DOS 負荷で underrun と挿入無音が 0�
 limits = "合成時間と DMA はホストモデル。NP21/W の時間と収録波形は受入で確認する"
 gates = ["push", "main"]
 mutations = [
+ { id = "count_requested_audio", config = "pc98", when = "after_build", replace = "userland/diag/sndl_test.c", old = "current->added += (u32)rc / 4;", new = "current->added += bytes / 4;", fail = "accepted frames" },
  { id = "renew_refill_deadline", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "if (!retrying) first_again = ex.guest_us;", new = "first_again = ex.guest_us;", fail = "unbounded refill retry" },
  { id = "ignore_refill_stop", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "if (rc || ex.reason == V86S_END) break;", new = "if (rc) break;", fail = "refill stop or deadline" },
  { id = "drain_stalled_suffix", config = "pc98", when = "after_build", replace = "userland/lib/snd/chip.c", old = "int abort = sndl_slice_pending();", new = "int abort = 0;", fail = "refill abort close" },

@@ -255,6 +255,7 @@ int v86s_run(u32 sid, const V86_RunIn *in, V86_Exit *out)
         in->reply_valid || soft->finished) return OS32_ERR_INVAL;
     int reason = V86_EXIT_SLICE;
     if (v86_session.soft_stop) reason = V86_EXIT_HOTKEY;
+    else if (tick_count - v86_session.soft_jiffy >= V86_TICK_LIMIT) reason = V86_EXIT_TIMEOUT;
     else if (in->slice_ms) {
 #ifdef TICK_PROBE
         tick_probe_soft_begin(TP_SOFT_ENTER);
