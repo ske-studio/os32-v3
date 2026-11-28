@@ -2232,7 +2232,8 @@ needs = []
 expect = "焦点通知失敗から再試行し、旧窓の release を一件ずつ再送。通常窓は独占中ゼロ・解除後一件。ドラッグ取消と静止カーソル復帰を確認。退避・配送満杯でも STOP と二つの切替を処理する"
 limits = "WM の ring と焦点通知は host fixture"
 gates = ["push", "main"]
-mutations = [{ id = "skip_hidden_stationary_cursor", config = "pc98", when = "after_build", replace = "userland/gshell/src/cursor.rs", old = "if st.cursor.shown && st.cursor.x == x", new = "if st.cursor.x == x", fail = "incorrect old-window release" },
+mutations = [{ id = "keep_old_window_tab", config = "pc98", when = "after_build", replace = "userland/gshell/src/raw_keyboard.rs", old = "boundary_control(st.pending_raw[i])", new = "wm_scan(st.pending_raw[i] as u8 & 127)", fail = "incorrect old-window release" },
+    { id = "skip_hidden_stationary_cursor", config = "pc98", when = "after_build", replace = "userland/gshell/src/cursor.rs", old = "if st.cursor.shown && st.cursor.x == x", new = "if st.cursor.x == x", fail = "incorrect old-window release" },
     { id = "repeat_wm_stop", config = "pc98", when = "after_build", replace = "userland/gshell/src/stop_dispatch.rs", old = "st.abort_seen = false;", new = "// leave STOP pending", fail = "incorrect old-window release" },
     { id = "skip_static_cursor", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "crate::cursor::move_to(st, mx, my);", new = "// leave cursor hidden", fail = "incorrect old-window release" },
     { id = "skip_drag_cancel", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "if st.drag_index >= 0 { wm::drop_drag_frame(st); }", new = "// omitted", fail = "incorrect old-window release" },

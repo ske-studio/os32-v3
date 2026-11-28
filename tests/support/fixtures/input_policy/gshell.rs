@@ -282,6 +282,7 @@ fn main() {
     assert!(!excl::append(&mut st, 1, &ring::ev_key(true, 11, 51, 0, 0, 0)));
     st.space.set(1);
     assert!(excl::append(&mut st, 1, &ring::ev_key(true, 11, 52, 0, 0, 0)));
+    raw_keyboard::defer_raw(&mut st, i32::from(SC_TAB) | 256);
     st.windows[1].id = 12;
     multiapp::FAIL_NEXT.store(true, std::sync::atomic::Ordering::Relaxed);
     excl::observe(&mut st);
@@ -291,6 +292,7 @@ fn main() {
     excl::observe(&mut st);
     excl::settle(&mut st);
     assert!(st.excl.open(excl::KBD));
+    assert_eq!(st.pending_raw_n, 0);
     assert_eq!(st.events.borrow().len(),6);
 
     // A full deferred queue and a full window ring must still admit WM controls.

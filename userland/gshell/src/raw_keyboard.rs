@@ -107,10 +107,17 @@ pub(crate) fn defer_raw(st: &mut GuiState, raw: i32) {
     if finish { st.pending_switch = false; }
 }
 
+// A plain Tab belongs to the old window. GRPH+Tab and its completion
+// belong to the WM, including a completion inferred from a later raw.
+fn boundary_control(raw: i32) -> bool {
+    let scan = raw as u8 & 127;
+    wm_scan(scan) && (scan != SC_TAB || raw & ((MOD_GRPH as i32) << 9) != 0)
+}
+
 pub(crate) fn purge_boundary(st: &mut GuiState, same_owner: bool) {
     let mut write = 0;
     for i in 0..st.pending_raw_n {
-        if wm_scan(st.pending_raw[i] as u8 & 127) || st.pending_rank[i] == SWITCH_OR_STOP {
+        if boundary_control(st.pending_raw[i]) || st.pending_rank[i] == SWITCH_OR_STOP {
             st.pending_raw[write] = st.pending_raw[i];
             st.pending_rank[write] = st.pending_rank[i];
             write += 1;
@@ -121,7 +128,7 @@ pub(crate) fn purge_boundary(st: &mut GuiState, same_owner: bool) {
         loop {
             let raw = unsafe { (os32api::api().kbd_trygetrawkey)() };
             if raw < 0 { break; }
-            if wm_scan(raw as u8 & 127) || (st.pending_switch && raw & ((MOD_GRPH as i32) << 9) == 0) { defer_raw(st, raw); }
+            if boundary_control(raw) || (st.pending_switch && raw & ((MOD_GRPH as i32) << 9) == 0) { defer_raw(st, raw); }
         }
         for (scan, held) in st.held_keys.iter_mut().enumerate() {
             *held = !wm_scan(scan as u8) && unsafe { (os32api::api().kbd_is_pressed)(scan as i32) } > 0;
