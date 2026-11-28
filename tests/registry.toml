@@ -2482,14 +2482,16 @@ id = "input_rshell_repeat"
 spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "11.3 予算と再予約" }
 subsystem = "input"
 level = "L1"
-sources = ["userland/shell/rshell.c", "userland/shell/serial_watchdog.c", "tests/support/fixtures/input_policy/rshell_repeat.c"]
+sources = ["userland/shell/rshell.c", "userland/shell/serial_watchdog.c", "userland/shell/rshell_lan.c", "sys/net/link_notify.c", "tests/support/fixtures/input_policy/rshell_repeat.c"]
 environment = "linux-x86-cross"
 arch = { ppc = ["link-sh"] }
 needs = []
-expect = "常駐 rshell が行内の空読み中に協調し、間隔を空けた UART 入力と4期限分のローカル repeat を同じ行に取り込み、LAN 通知を行末まで保留する"
-limits = "KAPI のローカル入力と pump を模擬。実際の時間間隔は PowerMac QEMU で別に測る"
+expect = "常駐 rshell が行内の空読み中に協調し、間隔を空けた UART 入力と4期限分のローカル repeat を同じ行に取り込み、同じ試行で LAN 要求の ACK と改行前の応答ゼロ、改行後の同一 ID への OUT 1 件を観測する"
+limits = "入力期限は空読み回数で模擬。mailbox と host KAPI はスタブで、UDP と実時間は対象外"
 gates = ["push", "main"]
 mutations = [
     { id = "rshell_no_pump", config = "link-sh", when = "after_build", replace = "userland/shell/rshell.c", old = "g_api->io_pump(500);", new = "(void)0;", fail = "resident line missed deferred repeat" },
-    { id = "rshell_late_pump", config = "link-sh", when = "after_build", replace = "userland/shell/rshell.c", old = "++polls & 255u", new = "++polls & 32767u", fail = "resident line missed deferred repeat" }
+    { id = "rshell_late_pump", config = "link-sh", when = "after_build", replace = "userland/shell/rshell.c", old = "++polls & 255u", new = "++polls & 32767u", fail = "resident line missed deferred repeat" },
+    { id = "rshell_no_lan_poll", config = "link-sh", when = "after_build", replace = "userland/shell/rshell.c", old = "g_api->host_notice_read && rsh_lan_poll() == RSH_LAN_EXIT", new = "0", fail = "queued LAN reply missing, early or duplicated" },
+    { id = "rshell_early_lan_poll", config = "link-sh", when = "after_build", replace = "userland/shell/rshell.c", old = "    return rsh_getch(from_serial);", new = "    (void)rsh_lan_poll(); return rsh_getch(from_serial);", fail = "queued LAN reply missing, early or duplicated" }
 ]
