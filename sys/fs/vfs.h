@@ -215,7 +215,7 @@ void vfs_umount(const char *prefix);
 /* 戻り値つきのアンマウント (KAPI sys_umount_checked、v64、票 TASK_HDD_INSTALL
  * §1-v3 N6)。**先に FS の sync を呼び、失敗したらアンマウントしない**。
  *   VFS_OK           … 書き戻してアンマウントした
- *   VFS_ERR_BUSY     … prefix が "/" (ルートは外さない)
+ *   VFS_ERR_BUSY     … ルート、または loop の像の FD を保持している
  *   VFS_ERR_NOTFOUND … その prefix はマウントされていない
  *   VFS_ERR_INVAL    … prefix が NULL
  *   sync の負値      … 書き戻せなかった (マウントは残る)

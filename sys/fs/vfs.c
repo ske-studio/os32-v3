@@ -592,7 +592,6 @@ void vfs_umount(const char *prefix)
     for (i = 0; i < VFS_MAX_FS; i++) {
         if (mounts[i].in_use && kstrcmp(mounts[i].prefix, prefix) == 0) {
             if (platform_install_medium() && !vfs_install_visible(mounts[i].fs_ctx)) return;
-            if (vfs_fd_mount_busy(mounts[i].fs_ctx, 1)) return;
             /* そのマウントの FD 全部に失効の印を付けてから fs_ctx を解放する
              * (票 TASK_VFS_FD_PATH)。印を先に見るので、以後の read / write /
              * fstat / seek が解放済みの fs_ctx を触らない。 */

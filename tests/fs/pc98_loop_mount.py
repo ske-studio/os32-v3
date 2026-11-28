@@ -30,6 +30,19 @@ def probe(flags):
                "sys/dev/block/ext2_medium_loop.c", "sys/platform/pc98/boot_names.c",
                "sys/platform/pc98/storage/ext2_medium_ide.c", "sys/kern/mm/kmalloc.c",
                "sys/kern/kstring.c", "sys/kern/kstring_c.c"]
+    if "-DBACKING_PROBE" in flags:
+        directory = exe.parent
+        image = directory / "a.img"
+        image.write_bytes(bytes(163840))
+        subprocess.run([sys.executable, "tools/mkfat12.py", "-g", "144", "-o",
+                        directory / "fat.img", f"A.IMG={image}"], check=True,
+                       stdout=subprocess.DEVNULL)
+        sources += [FIXTURE.with_name(name) for name in ("session.c", "fat.c", "devices.S")]
+        sources += ["sys/fs/serialfs/" + name + ".c" for name in
+                    ("sfs_session_fg", "serialfs", "sfs_proto")]
+        sources += ["sys/fs/fat/fatfs_vfs.c", "sys/fs/fat/fatfs/ff.c", "lib/os_time.c"]
+        flags = [*flags, "-Isys/kern/init", "-Isys/kern/exec", "-Isys/hal/time",
+                 f"-Wa,-I{directory}"]
     subprocess.run([cc, *flags, "-O2", "-ffreestanding", "-ffunction-sections", "-fdata-sections",
                     "-D__cdecl=", "-nostdlib", *["-I" + path for path in includes], FIXTURE, shell,
                     "tests/support/fixtures/input_policy/entry.S", *sources,
@@ -41,6 +54,9 @@ def probe(flags):
                        8: "loop remount content", 11: "duplicate image", 12: "backing mount",
                        13: "mounted format", 14: "mounted detach", 15: "ISO heap budget",
                        16: "low heap setup", 17: "low heap truncate",
+                       22: "foreground session attach", 23: "foreground pinned unmount",
+                       24: "stale loop I/O", 25: "foreground session reuse",
+                       26: "FAT image setup", 27: "duplicate FAT image",
                        18: "low heap write or create", 19: "low heap rename or unlink"}.get(rc, f"loop lifecycle step {rc}"))
 
     return result.stdout
@@ -48,6 +64,7 @@ def probe(flags):
 
 def verify(config):
     result = probe([])
+    probe(["-DBACKING_PROBE"])
     trace = probe(["-DHD_TRACE"])
     actual = [f'{"W" if write else "R"} {lba} {count}'
               for write, lba, count in struct.iter_unpack("<III", trace)]

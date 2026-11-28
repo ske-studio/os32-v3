@@ -155,6 +155,11 @@ int probe(void)
         memcmp(readback, payload, sizeof(payload))) return 21;
     return vfs_umount_checked("/hd0") != 0;
 #endif
+#ifdef BACKING_PROBE
+    extern int probe_session(void), probe_fat(void);
+    int rc = probe_session();
+    return rc ? rc : probe_fat();
+#endif
     if (vfs_dev_parse("lo4", &type, &unit) != VFS_ERR_INVAL ||
         vfs_dev_parse("lo00", &type, &unit) != VFS_ERR_INVAL) return 2;
     for (int i = 0; i < 4; i++) {
