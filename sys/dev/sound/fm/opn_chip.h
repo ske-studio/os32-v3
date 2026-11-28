@@ -10,6 +10,7 @@ struct opn_chip {
     u8 shared_irq, saved_id;
     /* Platform refreshes the 29h write shadow after external ownership. */
     u8 irq_shadow;
+    u16 fifo_port;
 };
 
 extern const SndChipBackend opn_chip_backend;

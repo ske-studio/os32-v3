@@ -8,6 +8,21 @@ static const char *expected_path, *expected_second;
 static int primed, retry_prime, yields;
 static i32 yield(void) { ++yields; return 0; }
 static int begin_rc, open_rc, fault, running, stream, ends, fallback, pumps, turns, keys;
+static int resets, fallback_reason = 1;
+static int count(void) { return 1; }
+static int info(u32 i, SND2_DevInfo *out)
+{
+    *out = (SND2_DevInfo){.kind = SND2_KIND_FM, .dev = 16};
+    return 0;
+}
+static int hw_open(u32 dev, u32 *h)
+{
+    check(!stream && dev == 16, "reset after stream release");
+    *h = 123;
+    return 0;
+}
+static int hw_reset(u32 h) { check(h == 123, "reset ownership"); ++resets; return 0; }
+static int hw_close(u32 h) { check(h == 123, "close ownership"); return 0; }
 static int begin(const V86_Begin *b, u32 *sid)
 {
     check(b->flags == 1 && b->size == sizeof *b && b->path[0], "begin request");
@@ -51,7 +66,7 @@ static int boot2(const char *path, const char *second) {
     if (expected_path)
         check(path == expected_path && second == expected_second, "fallback path pair");
     ++fallback;
-    return 1;
+    return fallback_reason;
 }
 
 int sndl_init(KernelAPI *kapi) { return 0; }
@@ -81,7 +96,9 @@ int sndl_chip_write(u32 chip, const SND2_RegW *w, u32 n, u32 at)
 int sndl_chip_close(u32 chip) { check(keys == 2 && pumps == 5, "final drain"); stream = 0; return 0; }
 void _start(void)
 {
-    static KernelAPI table = {.sys_yield = yield, .v86s_begin = begin, .v86s_run = run, .v86s_fm_drain = drain,
+    static KernelAPI table = {.version = KAPI_VERSION, .snd2_dev_count = count, .snd2_dev_info = info,
+                              .snd2_chip_open = hw_open, .snd2_chip_reset = hw_reset,
+                              .snd2_chip_close = hw_close, .sys_yield = yield, .v86s_begin = begin, .v86s_run = run, .v86s_fm_drain = drain,
                               .v86s_end = end, .v86_boot2 = boot2};
     api = &table;
     begin_rc = OS32_ERR_NOSYS;
@@ -96,6 +113,7 @@ void _start(void)
     retry_prime = 1;
     for (fault = 0; fault <= 1; ++fault)
         check(boot_sound("fmtone.fdi", 0) == (fault ? 6 : 5), "command exit");
+    check(resets == 1, "CTRL+STOP reset count");
     check(yields == 1, "resume after temporary full");
     check(ends == 3 && !running && !stream, "command cleanup");
     char path[65];
@@ -110,5 +128,10 @@ void _start(void)
     fault = 1;
     path[63] = 0;
     check(boot_sound(path, path) == 6 && fallback == 3, "63 byte paths");
+    check(resets == 1, "HLT reset count");
+    begin_rc = OS32_ERR_NOSYS;
+    expected_path = 0;
+    fallback_reason = 4;
+    check(boot_sound("fmtone.fdi", 0) == 4 && resets == 2, "timeout reset count");
     passed();
 }

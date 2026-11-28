@@ -88,6 +88,9 @@ static int chip_read(void *ctx, u32 bank, u32 what, u32 reg)
 static int chip_quiet(void *ctx)
 {
     unsigned count = banks(ctx);
+    struct opn_chip *chip = ctx;
+    if (chip->fifo_port)
+        outp(chip->fifo_port, 0); /* Stop playback and disable/ack FIFO IRQ. */
     if (!count)
         return OS32_ERR_IO;
     for (unsigned bank = 0; bank < count; ++bank)

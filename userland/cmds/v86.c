@@ -14,6 +14,7 @@
 /* ======================================================================== */
 #include "os32api.h"
 #include "sndl.h"
+#include "../lib/snd/sndreset.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -164,7 +165,7 @@ static int boot_result(const char *stage, int rc)
     return rc;
 }
 
-static int boot_sound(const char *path, const char *second)
+static int run_guest(const char *path, const char *second)
 {
     V86_Begin b = {.size = sizeof b, .flags = V86S_FM_SOFT};
     if (strlen(path) >= sizeof b.path || (second && strlen(second) >= sizeof b.second))
@@ -234,6 +235,17 @@ static int boot_sound(const char *path, const char *second)
     int end_rc = api->v86s_end(sid);
     if (!rc) rc = boot_result("v86s_end", end_rc);
     return rc ? rc : boot_result("v86s_run exit", (int)ex.code);
+}
+
+static int boot_sound(const char *path, const char *second)
+{
+    int reason = run_guest(path, second);
+    /* v86 boot exit codes 4 and 5 are timeout and CTRL+STOP. */
+    if (reason == 4 || reason == 5) {
+        int rc = sndreset_hardware(api);
+        if (rc && rc != OS32_ERR_NOTFOUND) return boot_result("sndreset", rc);
+    }
+    return reason;
 }
 
 int main(int argc, char **argv, KernelAPI *kapi)

@@ -1,5 +1,6 @@
 #include "shell.h"
 #include "config.h"
+#include "../lib/snd/sndreset.h"
 #include "os32/help.h"
 
 /* ======================================================================== */
@@ -40,6 +41,20 @@ static int cmd_help(int argc, char **argv)
     }
     g_api->kprintf(ATTR_WHITE, "%s", "\n  Use 'help <cmd>' or 'man <cmd>' for details.\n");
     return 0;
+}
+
+static int cmd_sndreset(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
+    int rc = sndreset_hardware(g_api);
+    if (rc == OS32_ERR_NOTFOUND)
+        g_api->kprintf(ATTR_WHITE, "%s", "sndreset: no device\n");
+    else if (rc)
+        g_api->kprintf(ATTR_RED, "sndreset: failed (rc=%d)\n", rc);
+    else
+        g_api->kprintf(ATTR_WHITE, "%s", "sndreset: OK\n");
+    return rc ? SH_STATUS_ERROR : 0;
 }
 
 static int cmd_clear(int argc, char **argv)
@@ -247,6 +262,7 @@ static const ShellCmd base_cmds[] = {
     { "uname",  cmd_ver,    "",      "Alias for ver" },
     { "date",   cmd_date,   "",      "Show RTC date/time" },
 #endif
+    { "sndreset", cmd_sndreset, "", "Reset sound hardware" },
     { "uptime", cmd_uptime, "",      "Show sys uptime" },
 #ifndef SH_BASE_MINIMAL
     { "np2",    cmd_np2,    "",      "Detect NP21/W emulator" },

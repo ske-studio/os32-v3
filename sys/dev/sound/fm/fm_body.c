@@ -30,6 +30,7 @@ static int attach(void (*fault)(u32), const struct fm_probe_record *record)
     chip.model = record->native_model;
     if (chip.model != OPN_PROBE_OPNA && chip.model != OPN_PROBE_OPN)
         return contained ? 0 : -1;
+    chip.fifo_port = record->fifo_port;
     chip.shared_irq = PCM_IRQ == 12;
     SND2_DevInfo info = {.kind = SND2_KIND_FM, .driver = "fm", .name = "OPNA"};
     if (chip.model == OPN_PROBE_OPN)

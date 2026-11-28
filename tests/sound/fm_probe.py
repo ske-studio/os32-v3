@@ -20,7 +20,7 @@ def verify(config):
                         "-ffreestanding", "-fno-stack-protector", "-I" + tmp, "-std=gnu11", "-O2", "-ffunction-sections", "-fdata-sections",
                         "-Wl,--gc-sections", "-D__cdecl=", "-I" + str(fixture), "-I.",
                         *include_flags(ROOT), fixture / "probe.c",
-                        "sys/dev/sound/fm/fm_body.c", "sys/dev/sound/fm/opn_probe.c", "sys/kern/irq/irq_math.c",
+                        "sys/dev/sound/fm/opn_chip.c", "sys/dev/sound/fm/fm_body.c", "sys/dev/sound/fm/opn_probe.c", "sys/kern/irq/irq_math.c",
                         "sys/kern/irq/irq.c", "sys/platform/pc98/irq_policy.c",
                         "sys/platform/pc98/irq_complete.c", "-o", exe], check=True)
         subprocess.run(["qemu-i386", exe], check=True)

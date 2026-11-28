@@ -6,7 +6,9 @@
 #include "sys/platform/pc98/pic.c" /* Reset boot-only latches between machine scenarios. */
 
 extern int fm_module_init(FmModuleApi *);
-const SndChipBackend opn_chip_backend;
+static struct opn_chip *attached;
+static int recording;
+static unsigned selected[2], registers[2][256], keys, fifo;
 void (*fm_write_failed)(void);
 int (*fm_read_mixer)(void);
 volatile u32 kctx_irq_depth;
@@ -46,7 +48,8 @@ void snd2_chip_fault(u32 dev) { (void)dev; }
 int snd2_chip_register(const SndChipBackend *be, void *chip, const SND2_DevInfo *info)
 {
     (void)be; (void)info;
-    registered = ((struct opn_chip *)chip)->model;
+    attached = chip;
+    registered = attached->model;
     return 1;
 }
 int snd2_chip_unregister(u32 device) { (void)device; registered = OPN_PROBE_UNKNOWN; return 0; }
@@ -94,6 +97,7 @@ static int sound_irq(unsigned irq, void *arg) { (void)irq; (void)arg; return IRQ
 
 unsigned inp(unsigned port)
 {
+    if (recording) return 0;
     ++reads;
     if (!frozen_clock) elapsed += 5;
     if (port == 0xa460) return feature ^ (feature_reads++ && unstable_feature);
@@ -116,6 +120,17 @@ unsigned inp(unsigned port)
 }
 void outp(unsigned port, unsigned value)
 {
+    if (recording) {
+        unsigned bank = port == OPNA_BANK1_ADDR || port == OPNA_BANK1_DATA;
+        if (port == 0xa468) fifo = value;
+        else if (port == OPN_ADDR || port == OPNA_BANK1_ADDR) selected[bank] = value;
+        else if (port == OPN_DATA || port == OPNA_BANK1_DATA) {
+            registers[bank][selected[bank]] = value;
+            if (!bank && selected[0] == 0x28 && value < 8) keys &= ~(1u << value);
+            else if (!bank && selected[0] == 0x28) keys |= 1u << (value & 7);
+        } else require(0, "unexpected quiet port");
+        return;
+    }
     ++writes;
     require(port != 0x288 && port != 0x28a, "alternate write");
     if (port == 0x188 || port == 0x18a) {
@@ -263,6 +278,21 @@ void _start(void)
     require(!start() && registered == OPN_PROBE_OPNA && boot_probe.bank[0].chip_id == 1 &&
             boot_probe.bank[0].chip_id_port == 0x18a && boot_probe.feature_id == feature &&
             boot_probe.feature_port == 0xa460 && boot_probe.fifo_port == 0xa468, "verified IDs");
+    recording = 1;
+    keys = 0x77;
+    fifo = 0xb0;
+    for (unsigned bank = 0; bank < 2; ++bank)
+        for (unsigned reg = 0; reg < 256; ++reg) registers[bank][reg] = 255;
+    require(!opn_chip_backend.quiet(attached), "reset failed");
+    require(!keys && !fifo, "FM keys or FIFO active");
+    for (unsigned bank = 0; bank < 2; ++bank)
+        for (unsigned slot = 0; slot < 4; ++slot)
+            for (unsigned ch = 0; ch < 3; ++ch)
+                require(registers[bank][0x40 + slot * 4 + ch] == 127, "operator TL");
+    for (unsigned ch = 0; ch < 3; ++ch)
+        require(!registers[0][8 + ch], "SSG volume");
+    require(registers[0][0x10] == 0xbf && !registers[1][0], "rhythm or ADPCM");
+    recording = 0;
     reset();
     status = 0;
     id = 1;
