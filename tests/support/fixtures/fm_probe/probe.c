@@ -75,6 +75,7 @@ int snd2_chip_diag_open(u32 dev, u32 *h)
 int snd2_chip_read(u32 h, u32 bank, u32 what, u32 reg)
 {
     if (reg == SSG_REG_MIXER && mixer_error) return OS32_ERR_IO;
+    if (reg == 0x0e && !mixer_error) require(index_reg == SSG_REG_MIXER, "fresh mixer selection");
     outp(OPN_ADDR, reg);
     if (reg == 0x0e) ++setting_reads;
     return id;
@@ -204,6 +205,14 @@ void _start(void)
     check_board(0x70, OPN_PROBE_ABSENT);
     check_board(0x41, OPN_PROBE_UNKNOWN);
     check_board(0x51, OPN_PROBE_UNKNOWN);
+    reset();
+    feature = 0x51;
+    alt_status = 0;
+    require(!start() && boot_probe.bank[1].model == OPN_PROBE_UNKNOWN,
+            "alternate-only board");
+    writes = 0;
+    require(fm_diag_irq_setting() == OS32_ERR_NOTFOUND && !writes &&
+            !diag_closes, "alternate-only diagnostic");
     check_board(0x81, OPN_PROBE_UNKNOWN);
     check_board(0x60, OPN_PROBE_UNKNOWN);
     reset();
@@ -262,9 +271,11 @@ void _start(void)
     require(fm_diag_irq_setting() == OS32_ERR_IO && !setting_reads && diag_closes == 1,
             "unknown basic index");
     mixer_error = 0;
+    outp(OPN_ADDR, OPN_REG_TIMER_CTRL); /* An intervening reset selected 27h. */
     id = 0x80;
     require(fm_diag_irq_setting() == 2 && setting_reads == 1 &&
             index_reg == SSG_REG_MIXER, "restore basic index");
+    outp(OPN_ADDR, OPN_REG_TIMER_B); /* BIOS I/O between exclusive windows. */
     id |= 0x3f;
     require(fm_diag_irq_setting() == 2 && setting_reads == 2 &&
             diag_closes == 3, "joystick input changed wiring");
