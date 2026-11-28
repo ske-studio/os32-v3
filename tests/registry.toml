@@ -2215,11 +2215,13 @@ sources = ["tests/input/input_policy_abi.py", "tests/support/fixtures/input_poli
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "KBD→MOUSE で保持を採取し、解放世代が進むと次の make を通す。取得前の raw を捨て、取得後の GRPH+Tab は1回。窓で独占中0、解除後1押下、満杯時の repeat と break、未写像の文字・単独切替、方針交換前の破棄を観測"
+expect = "KBD→MOUSE で保持を採取し、解放世代が進むと次の make を通す。取得前の raw を捨て、取得後の GRPH+Tab は WM の読取前に解除しても1回、解除後の同じ打鍵も Key から1回。窓で独占中0、解除後1押下、満杯時の repeat と break、未写像の文字・単独切替、方針交換前の破棄を観測"
 limits = "両機種の設定で HID を採取し、key_read と raw の戻り値をホストの WM に渡す。実機 IRQ、描画、切替先の選択は対象外"
 gates = ["push", "main"]
 mutations = [{ id = "requeue_normal_raw", config = "pc98", when = "after_build", replace = "userland/gshell/src/raw_keyboard.rs", old = "while matches!(policy,", new = "while policy == 0 || matches!(policy,", fail = "exclusive transition changed delivery" },
     { id = "reverse_switch_forward", config = "pc98", when = "after_build", replace = "userland/gshell/src/kbdnav.rs", old = "st.kn.sw_sel = if back", new = "st.kn.sw_sel = if false", fail = "exclusive transition changed delivery" },
+    { id = "lose_released_controls", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "legacy_raw_mark_release();", new = "(void)0;", fail = "exclusive transition changed delivery" },
+    { id = "include_post_release_mirrors", config = "pc98", when = "after_build", replace = "sys/hal/input/legacy_ring.c", old = "return released_count != 0;", new = "return kbd_raw_count != 0;", fail = "exclusive transition changed delivery" },
     { id = "replay_pre_acquire_controls", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "legacy_raw_flush();", new = "kbd_raw_purge_keep();", fail = "exclusive transition changed delivery" },
     { id = "retain_keys_at_acquire", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "input_delivery_flush();", new = "if (!owner) input_delivery_flush();", fail = "exclusive transition changed delivery" },
     { id = "duplicate_window_raw", config = "pc98", when = "after_build", replace = "userland/gshell/src/raw_keyboard.rs", old = "_ => -1,", new = "_ => unsafe { (os32api::api().kbd_trygetrawkey)() },", fail = "exclusive transition changed delivery" },
@@ -2256,7 +2258,7 @@ mutations = [{ id = "keep_old_window_tab", config = "pc98", when = "after_build"
     { id = "repeat_wm_stop", config = "pc98", when = "after_build", replace = "userland/gshell/src/stop_dispatch.rs", old = "st.abort_seen = false;", new = "// leave STOP pending", fail = "incorrect old-window release" },
     { id = "skip_static_cursor", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "crate::cursor::move_to(st, mx, my);", new = "// leave cursor hidden", fail = "incorrect old-window release" },
     { id = "skip_drag_cancel", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "if st.drag_index >= 0 { wm::drop_drag_frame(st); }", new = "// omitted", fail = "incorrect old-window release" },
-    { id = "remove_window_capture_gate", config = "pc98", when = "after_build", replace = "userland/gshell/src/raw_keyboard.rs", old = "if !st.excl.open(crate::excl::KBD) { return Step::Consumed; }", new = "// capture gate removed", fail = "incorrect old-window release" },
+    { id = "remove_window_capture_gate", config = "pc98", when = "after_build", replace = "userland/gshell/src/raw_keyboard.rs", old = "if (!evaluated && raw & EXCLUSIVE != 0) || !st.excl.open(crate::excl::KBD) { return Step::Consumed; }", new = "// capture gate removed", fail = "incorrect old-window release" },
     { id = "block_controls_on_full_delivery", config = "pc98", when = "after_build", replace = "userland/gshell/src/raw_keyboard.rs", old = "if !space_ok && ordinary_pump", new = "if !space_ok", fail = "incorrect old-window release" },
     { id = "block_controls_on_full_defer", config = "pc98", when = "after_build", replace = "userland/gshell/src/raw_keyboard.rs", old = "if ordinary_pump && !ui_defer &&", new = "if !ui_defer &&", fail = "incorrect old-window release" },
     { id = "ignore_window_focus", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "crate::multiapp::av_window() == next.window", new = "true", fail = "incorrect old-window release" },

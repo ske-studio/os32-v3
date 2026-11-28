@@ -9,6 +9,7 @@ use os32api::kbd_policy::*;
 
 // The deferred word carries the same scan/down/physical mods as raw plus
 // the capture-time byte, action and switch modifier for evaluated events.
+const EXCLUSIVE: i32 = 1 << 28;
 const EVALUATED: i32 = 1 << 29;
 const SWITCH_MOD: i32 = 1 << 30;
 
@@ -32,7 +33,8 @@ fn read_keyboard() -> i32 {
                 ((ch as i32) << 16) | ((key.action as i32) << 24) | EVALUATED |
                 if switching { SWITCH_MOD } else { 0 }
         }
-        os32api::gui::proto::OS32_ERR_NOSYS | OS32_ERR_BUSY =>
+        OS32_ERR_BUSY => (unsafe { (os32api::api().kbd_trygetrawkey)() }) | EXCLUSIVE,
+        os32api::gui::proto::OS32_ERR_NOSYS =>
             unsafe { (os32api::api().kbd_trygetrawkey)() },
         _ => -1,
     }
@@ -293,6 +295,6 @@ pub(super) fn next(st: &mut GuiState, ctx: Ctx, space_ok: bool, captured: &mut b
         if !down { st.held_keys[scan as usize] = false; }
         return Step::Consumed;
     }
-    if !st.excl.open(crate::excl::KBD) { return Step::Consumed; }
+    if (!evaluated && raw & EXCLUSIVE != 0) || !st.excl.open(crate::excl::KBD) { return Step::Consumed; }
     Step::Deliver(scan, down, mods, evaluated.then_some((raw >> 16) as u8))
 }

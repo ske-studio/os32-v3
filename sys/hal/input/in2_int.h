@@ -17,6 +17,8 @@ void in2_excl_focus(int old);
 void in2_ring_clear(void);
 void in2_ring_lost(u8 reason);
 void kbd_raw_purge_keep(void);
+void legacy_raw_mark_release(void);
+int legacy_raw_release_pending(void);
 void mouse_ext_wheel(i16 delta);
 i32 mouse_ext_read_wheel(void);
 void in2_on_focus(int old, int owner);

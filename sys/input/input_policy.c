@@ -638,7 +638,7 @@ int ikm_policy_key_read(u32 owner, u32 gen, int wm, KbdPolicyKey *out, u32 max)
     else if (!machine) rc = OS32_ERR_NOSYS;
     else if (!gen || input_context_owner_generation(owner) != gen) rc = OS32_ERR_STALE;
     else if (owner != APP_ID_SHELL || !wm) rc = OS32_ERR_INVAL;
-    else if (in2_excl_keyboard()) rc = OS32_ERR_BUSY;
+    else if (in2_excl_keyboard() || (max && legacy_raw_release_pending())) rc = OS32_ERR_BUSY;
     else rc = (int)input_delivery_read_keys(out, max);
     irq_restore(irq);
     return rc;

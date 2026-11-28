@@ -18,6 +18,7 @@ pub mod gui {
 }
 use gui::proto::*;
 thread_local! {
+    static RELEASED: std::cell::Cell<usize> = Default::default();
     static POLICY: std::cell::Cell<bool> = Default::default();
     static KEY: std::cell::Cell<Option<kbd_policy::KbdPolicyKey>> = Default::default();
     static BATCH: std::cell::RefCell<std::collections::VecDeque<kbd_policy::KbdPolicyKey>> = Default::default();
@@ -50,9 +51,13 @@ pub fn api() -> Api {
             if !POLICY.get() { return gui::proto::OS32_ERR_NOSYS; }
             if FLAGS.get() & excl::KBD != 0 { return ffi::OS32_ERR_BUSY; }
             if max == 0 { return 0; }
+            if RELEASED.get() > 0 { return ffi::OS32_ERR_BUSY; }
             if let Some(key) = KEY.take().or_else(|| BATCH.with(|q| q.borrow_mut().pop_front())) { unsafe { *out = key; } 1 } else { 0 }
         },
-        kbd_trygetrawkey: || RAW.with(|q| q.borrow_mut().pop_front().unwrap_or(-1)),
+        kbd_trygetrawkey: || {
+            RELEASED.set(RELEASED.get().saturating_sub(1));
+            RAW.with(|q| q.borrow_mut().pop_front().unwrap_or(-1))
+        },
         kbd_is_pressed: |_| 0,
         in2_wm_state: |s| { s.excl = FLAGS.get(); 0 },
     }
@@ -498,12 +503,16 @@ fn focus_batches() {
     // Other phases use the existing sole front window.
     st.windows[1].id = 0;
     #[derive(Clone, Copy, PartialEq)]
-    enum Phase { Before, Acquire, ExclusiveChord, Released, Full, SingleSwitch, Reset, Unmapped }
+    enum Phase { Before, Acquire, ExclusiveChord, Released, Full, SingleSwitch, Reset, Unmapped, ReleaseBeforePump }
     use Phase::*;
     let mut switches = 0;
-    for phase in [Before, Acquire, ExclusiveChord, Released, Full, SingleSwitch, Reset, Unmapped] {
+    for phase in [Before, Acquire, ExclusiveChord, Released, Full, SingleSwitch, Reset, Unmapped, ReleaseBeforePump] {
         let exclusive = matches!(phase, Acquire | ExclusiveChord);
         FLAGS.set(if exclusive { excl::KBD } else { 0 });
+        if phase == ReleaseBeforePump {
+            RAW.with(|q| q.borrow_mut().extend(words.by_ref().take(4)));
+            RELEASED.set(4);
+        }
         loop {
             let rc = words.next().unwrap();
             if rc != 1 {
@@ -521,7 +530,12 @@ fn focus_batches() {
         st.space.set(512);
         excl::observe(st);
         excl::settle(st);
-        if matches!(phase, Before | ExclusiveChord | SingleSwitch) {
+        if phase == ReleaseBeforePump {
+            pump::gshell_gui_pump();
+            input::capture_keyboard(st, Ctx::Wait);
+            input::capture_keyboard(st, Ctx::Wait);
+            switches += 2;
+        } else if matches!(phase, Before | ExclusiveChord | SingleSwitch) {
             input::capture_keyboard(st, Ctx::Wait);
             switches += 1;
         } else {

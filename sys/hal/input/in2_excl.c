@@ -34,10 +34,11 @@ static void transition(int owner, u32 next, int focus)
         }
     }
     /* An acquisition starts a fresh raw stream, including WM controls. */
-    if (!focus && owner && (owner != acq_owner || (next & ~excl)))
+    if (!(excl & ~next & IN2_EXCL_KBD) && !focus && owner && (owner != acq_owner || (next & ~excl)))
         legacy_raw_flush();
     else
         kbd_raw_purge_keep();
+    if (excl & ~next & IN2_EXCL_KBD) legacy_raw_mark_release();
     acq_owner = owner;
     excl = next;
     input_delivery_flush();

@@ -48,6 +48,15 @@ static int captured(u8 src, u8 down)
 /* Send each public read result and raw mirror to the host window pump.
  * Each batch ends with the empty (or exclusive BUSY) read and raw sentinel. */
 extern int write_gui_raw(const int *);
+static void write_key(const KbdPolicyKey *key)
+{
+    for (unsigned i = 0; i < sizeof *key; i += sizeof(int)) {
+        int word;
+        __builtin_memcpy(&word, (const u8 *)key + i, sizeof word);
+        write_gui_raw(&word);
+    }
+}
+
 static void window_batch(int read_raw)
 {
     KbdPolicyKey key;
@@ -55,13 +64,7 @@ static void window_batch(int read_raw)
     do {
         n = ikm_policy_key_read(1, 1, 1, &key, 1);
         write_gui_raw(&n);
-        if (n == 1) {
-            for (unsigned i = 0; i < sizeof key; i += sizeof(int)) {
-                int word;
-                __builtin_memcpy(&word, (const u8 *)&key + i, sizeof word);
-                write_gui_raw(&word);
-            }
-        }
+        if (n == 1) write_key(&key);
     } while (n == 1);
     do {
         n = read_raw ? legacy_raw_take() : -1;
@@ -194,6 +197,32 @@ int probe(void)
     if (ikm_policy_set(text, sizeof text, 1, 1)) return 41;
     f13.down = 1;
     if (input_capture_key(&f13)) return 42;
+    window_batch(1);
+    /* No WM read between acquisition, the exclusive chord and release. */
+    f13.down = 0;
+    if (input_capture_key(&f13)) return 44;
+    if (ikm_policy_set(alt_tab, sizeof alt_tab, 1, 1)) return 44;
+    for (int press = 0; press < 3; ++press) {
+        if (press == 1 && in2_acquire(IN2_EXCL_KBD)) return 45;
+        if (press == 2 && in2_unacquire()) return 46;
+        alt.down = tab.down = 1;
+        if (input_capture_key(&alt) || input_capture_key(&tab)) return 47;
+        alt.down = tab.down = 0;
+        if (input_capture_key(&tab) || input_capture_key(&alt)) return 48;
+    }
+    /* Read exactly as the WM does: a positive-capacity BUSY admits one raw. */
+    int count = 0, rc;
+    do {
+        rc = ikm_policy_key_read(1, 1, 1, &out, 1);
+        if (rc == OS32_ERR_BUSY) {
+            int control = legacy_raw_take();
+            if (control < 0 || ++count > 4) return 49;
+            write_gui_raw(&control);
+        }
+    } while (rc == OS32_ERR_BUSY);
+    if (count != 4 || rc != 1) return 50;
+    write_gui_raw(&rc);
+    write_key(&out);
     window_batch(1);
     return 0;
 }
