@@ -20,6 +20,7 @@ use gui::proto::*;
 thread_local! {
     static POLICY: std::cell::Cell<bool> = Default::default();
     static KEY: std::cell::Cell<Option<kbd_policy::KbdPolicyKey>> = Default::default();
+    static BATCH: std::cell::RefCell<std::collections::VecDeque<kbd_policy::KbdPolicyKey>> = Default::default();
     static RAW: std::cell::RefCell<std::collections::VecDeque<i32>> = Default::default();
     static FLAGS: std::cell::Cell<u32> = Default::default();
 }
@@ -47,7 +48,8 @@ pub fn api() -> Api {
         get_tick: || 0,
         kbd_policy_key_read: |out, _| {
             if !POLICY.get() { return gui::proto::OS32_ERR_NOSYS; }
-            if let Some(key) = KEY.take() { unsafe { *out = key; } 1 } else { 0 }
+            if FLAGS.get() & excl::KBD != 0 { return ffi::OS32_ERR_BUSY; }
+            if let Some(key) = KEY.take().or_else(|| BATCH.with(|q| q.borrow_mut().pop_front())) { unsafe { *out = key; } 1 } else { 0 }
         },
         kbd_trygetrawkey: || RAW.with(|q| q.borrow_mut().pop_front().unwrap_or(-1)),
         kbd_is_pressed: |_| 0,
@@ -172,12 +174,14 @@ mod fep {
     pub fn flush_text(_: &mut GuiState) {}
     pub fn toggle(_: &mut GuiState) { unreachable!() }
     pub fn request_toggle() { unreachable!() }
-    pub fn apply_pending_commit(_: &mut GuiState) { unreachable!() }
-    pub fn apply_pending_toggle(_: &mut GuiState) { unreachable!() }
+    pub fn apply_pending_commit(_: &mut GuiState) {}
+    pub fn apply_pending_toggle(_: &mut GuiState) {}
     pub fn is_on() -> bool { false }
     pub fn toggle_pending() -> bool { false }
 }
 mod kbdnav {
+    #[cfg(legacy_gui)]
+    use super::{MOD_GRPH, SC_GRPH};
     use super::wm::GuiState;
     #[cfg(legacy_gui)]
     include!(env!("WM_SHORTCUT_ITEM"));
@@ -198,10 +202,18 @@ mod kbdnav {
     }
     #[cfg(not(legacy_gui))]
     pub fn policy_shortcut(_: &mut GuiState, _: u32, _: bool, _: bool) { unreachable!() }
-    pub fn pre(_: &mut GuiState, _: u8, _: bool, _: u32) -> bool { unreachable!() }
+    pub fn pre(_: &mut GuiState, _: u8, _: bool, _: u32) -> bool { false }
     pub fn is_wm_raw(_: &GuiState, raw: i32) -> bool { matches!(raw & 127, 15 | 96 | 115) }
     pub fn pump_delivered_make(_: &mut GuiState, _: u8) {}
+    #[cfg(legacy_gui)]
+    pub fn on_key(st: &mut GuiState, scan: u8, down: bool, _: u32, _: bool) -> bool {
+        assert_eq!(scan, super::SC_TAB);
+        if down { run_shortcut(st, Shortcut::Switch, false); }
+        true
+    }
+    #[cfg(not(legacy_gui))]
     pub fn on_key(st: &mut GuiState, _: u8, down: bool, _: u32, _: bool) -> bool { st.switching = down; true }
+    #[cfg(not(legacy_gui))]
     pub fn finish_if_released(st: &mut GuiState, _: u8, _: bool, mods: u32) -> bool {
         if !st.switching || mods & 8 != 0 { return false; }
         st.switching = false;
@@ -405,6 +417,10 @@ mod pump;
 
 #[cfg(legacy_gui)]
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("focus") {
+        focus_batches();
+        return;
+    }
     let expected = std::env::args().nth(1).unwrap().as_bytes()[0];
     let raw: i32 = std::env::args().nth(2).unwrap().parse().unwrap();
     let fields: Vec<u32> = std::env::args().skip(3).map(|s| s.parse().unwrap()).collect();
@@ -442,4 +458,71 @@ fn main() {
         assert_eq!(st.events.borrow().len(), 3);
     }
 
+}
+
+#[cfg(legacy_gui)]
+fn focus_batches() {
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    std::io::stdin().read_to_end(&mut bytes).unwrap();
+    let mut words = bytes.chunks_exact(4).map(|w| i32::from_le_bytes(w.try_into().unwrap()));
+    let st = wm::g();
+    POLICY.set(true);
+    #[derive(Clone, Copy, PartialEq)]
+    enum Phase { Before, Acquire, ExclusiveChord, Released, Full, SingleSwitch, Reset, Unmapped }
+    use Phase::*;
+    let mut switches = 0;
+    for phase in [Before, Acquire, ExclusiveChord, Released, Full, SingleSwitch, Reset, Unmapped] {
+        let exclusive = matches!(phase, Acquire | ExclusiveChord);
+        FLAGS.set(if exclusive { excl::KBD } else { 0 });
+        loop {
+            let rc = words.next().unwrap();
+            if rc != 1 {
+                assert_eq!(rc, if exclusive { ffi::OS32_ERR_BUSY } else { 0 });
+                break;
+            }
+            let data: [u32; 12] = std::array::from_fn(|_| words.next().unwrap() as u32);
+            BATCH.with(|q| q.borrow_mut().push_back(unsafe { core::mem::transmute(data) }));
+        }
+        for raw in words.by_ref() {
+            if raw == -1 { break; }
+            RAW.with(|q| q.borrow_mut().push_back(raw));
+        }
+        if phase == Acquire { RAW.with(|q| assert!(q.borrow().is_empty())); }
+        st.space.set(512);
+        excl::observe(st);
+        excl::settle(st);
+        if matches!(phase, Before | ExclusiveChord | SingleSwitch) {
+            input::capture_keyboard(st, Ctx::Wait);
+            switches += 1;
+        } else {
+            pump::gshell_gui_pump();
+            pump::gshell_gui_pump();
+        }
+        let events = st.events.take();
+        assert!(events.iter().all(|e| e.window == 10));
+        match phase {
+            Released => {
+                assert_eq!(events.len(), 2);
+                assert_eq!((events[0].kind, events[0].sub, events[0].payload[0]), (GUI_EV_KEY, 1, 0x1d));
+                assert_eq!((events[1].kind, events[1].payload[0]), (GUI_EV_TEXT, b'a'));
+            }
+            Full => {
+                assert_eq!(events.len(), 255);
+                for pair in events[..254].chunks_exact(2) {
+                    assert_eq!((pair[0].kind, pair[0].sub, pair[0].payload[0]), (GUI_EV_KEY, 1, 0x1d));
+                    assert_eq!((pair[1].kind, pair[1].payload[0]), (GUI_EV_TEXT, b'a'));
+                }
+                assert_eq!((events[254].kind, events[254].sub, events[254].payload[0]), (GUI_EV_KEY, 0, 0x1d));
+            }
+            Unmapped => {
+                assert_eq!(events.len(), 1);
+                assert_eq!((events[0].kind, events[0].payload[0]), (GUI_EV_TEXT, b'q'));
+            }
+            _ => assert!(events.is_empty()),
+        }
+        assert_eq!(st.switches, switches);
+        RAW.with(|q| q.borrow_mut().clear());
+    }
+    assert_eq!(words.next(), None);
 }

@@ -2206,14 +2206,21 @@ id = "input_focus"
 spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
 subsystem = "input"
 level = "L1"
-sources = ["sys/input/input_policy.c", "sys/input/input_context.c", "sys/input/input_delivery.c", "sys/hal/input/legacy_ring.c", "sys/kapi/kapi_in2.c", "sys/hal/input/in2_reclaim.c", "sys/hal/input/kbd_merge.c", "sys/platform/pc98/platform_input_caps.h", "sys/platform/powermac/platform_input_caps.h", "sys/hal/input/in2_excl.c", "sys/hal/input/keymap_registry.c", "sys/hal/input/keymap_eval.c", "sys/hal/input/keymap_state.c", "sys/hal/input/legacy_keymap.c", "sys/hal/input/legacy_mode.c", "sys/input/keymaps/hid_jp.c", "tests/support/fixtures/input_policy/focus.c", "tests/support/fixtures/input_policy/entry.S"]
+sources = ["tests/input/input_policy_abi.py", "tests/support/fixtures/input_policy/gshell.rs", "userland/gshell/src/input.rs", "userland/gshell/src/raw_keyboard.rs", "userland/gshell/src/kbdnav.rs", "userland/gshell/src/excl.rs", "userland/gshell/src/pump.rs", "sys/input/input_policy.c", "sys/input/input_context.c", "sys/input/input_delivery.c", "sys/hal/input/legacy_ring.c", "sys/kapi/kapi_in2.c", "sys/hal/input/in2_reclaim.c", "sys/hal/input/kbd_merge.c", "sys/platform/pc98/platform_input_caps.h", "sys/platform/powermac/platform_input_caps.h", "sys/hal/input/in2_excl.c", "sys/hal/input/keymap_registry.c", "sys/hal/input/keymap_eval.c", "sys/hal/input/keymap_state.c", "sys/hal/input/legacy_keymap.c", "sys/hal/input/legacy_mode.c", "sys/input/keymaps/hid_jp.c", "tests/support/fixtures/input_policy/focus.c", "tests/support/fixtures/input_policy/entry.S"]
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "KBD→MOUSE で保持を採取し、解放世代が進むと次の make を通す。制御キーは独占中も通す"
-limits = "物理イベントと LOST の出力先は host fixture。実機 IRQ は観測しない"
+expect = "KBD→MOUSE で保持を採取し、解放世代が進むと次の make を通す。取得前の raw を捨て、取得後の GRPH+Tab は1回。窓で独占中0、解除後1押下、満杯時の repeat と break、未写像の文字・単独切替、方針交換前の破棄を観測"
+limits = "両機種の設定で HID を採取し、key_read と raw の戻り値をホストの WM に渡す。実機 IRQ、描画、切替先の選択は対象外"
 gates = ["push", "main"]
-mutations = [{ id = "omit_captured_gui_key", config = "pc98", when = "after_build", replace = "sys/input/input_policy.c", old = "return input_delivery_key(&dst, &event) && action != KBD_POLICY_ACTION_NONE;", new = "return 0;", fail = "exclusive transition changed delivery" },
+mutations = [{ id = "replay_pre_acquire_controls", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "legacy_raw_flush();", new = "kbd_raw_purge_keep();", fail = "exclusive transition changed delivery" },
+    { id = "retain_keys_at_acquire", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "input_delivery_flush();", new = "if (!owner) input_delivery_flush();", fail = "exclusive transition changed delivery" },
+    { id = "duplicate_window_raw", config = "pc98", when = "after_build", replace = "userland/gshell/src/raw_keyboard.rs", old = "_ => -1,", new = "_ => unsafe { (os32api::api().kbd_trygetrawkey)() },", fail = "exclusive transition changed delivery" },
+    { id = "emit_unmapped_window_key", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "let _delivered = if scan < 128", new = "let _delivered = if true", fail = "exclusive transition changed delivery" },
+    { id = "wait_for_modifier_on_single_switch", config = "pc98", when = "after_build", replace = "userland/gshell/src/kbdnav.rs", old = "if !chord && st.kn.sw_active", new = "if chord && st.kn.sw_active", fail = "exclusive transition changed delivery" },
+    { id = "lose_break_after_repeats", config = "pc98", when = "after_build", replace = "sys/input/input_delivery.c", old = "if (key_count < CAPACITY) return 1;", new = "if (key_count < CAPACITY) return 1; else return 0;", fail = "exclusive transition changed delivery" },
+    { id = "keep_old_policy_keys", config = "pc98", when = "after_build", replace = "sys/input/input_policy.c", old = "active = table;\n    input_delivery_flush();", new = "active = table;", fail = "exclusive transition changed delivery" },
+    { id = "omit_captured_gui_key", config = "pc98", when = "after_build", replace = "sys/input/input_policy.c", old = "return input_delivery_key(&dst, &event) && action != KBD_POLICY_ACTION_NONE;", new = "return 0;", fail = "exclusive transition changed delivery" },
     { id = "omit_held_snapshot", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "valid[sc] = input_key_pressed(sc);", new = "valid[sc] = 0;", fail = "exclusive transition changed delivery" },
     { id = "first_break_advances", config = "pc98", when = "after_build", replace = "sys/hal/input/kbd_merge.c", old = "!down && cnt[sc] == 0", new = "!down", fail = "exclusive transition changed delivery" },
     { id = "pc98_acquire_closed", config = "pc98", when = "after_build", replace = "sys/platform/pc98/platform_input_caps.h", old = "IN2_PUBLIC_EXCLUSIVE 1", new = "IN2_PUBLIC_EXCLUSIVE 0", fail = "exclusive transition changed delivery" },

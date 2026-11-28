@@ -11,9 +11,7 @@ from tests.support.media import Failure, main, make
 from tests.support.product import flags, recipes
 
 
-def verify_gui(fixture, tmp, raw, byteorder):
-    if len(raw) not in (4, 52):
-        raise Failure("missing legacy GUI raw word")
+def build_gui(fixture, tmp):
     # Compile whole keyboard items from the candidate. The pump entry, raw
     # decoder and window delivery modules are included directly by the fixture.
     source = Path("userland/gshell/src/input.rs").read_text()
@@ -35,11 +33,20 @@ def verify_gui(fixture, tmp, raw, byteorder):
     nav = Path("userland/gshell/src/kbdnav.rs").read_text()
     start = nav.index("pub(crate) fn policy_shortcut(")
     shortcut = Path(tmp) / "shortcut.rs"
-    shortcut.write_text(nav[start:nav.index("\n}", start) + 2])
+    finish = nav.index("pub fn finish_if_released(")
+    shortcut.write_text(nav[start:nav.index("\n}", start) + 2] + "\n" +
+                        nav[finish:nav.index("\n}", finish) + 2])
     exe = Path(tmp) / "legacy_gui"
     subprocess.run(["rustc", "--edition=2021", "-Awarnings", "--cfg", "legacy_gui",
                     fixture / "gshell.rs", "-o", exe], check=True,
                    env={**os.environ, "WM_KEYBOARD_ITEMS": str(keyboard), "WM_SHORTCUT_ITEM": str(shortcut)})
+    return exe
+
+
+def verify_gui(fixture, tmp, raw, byteorder):
+    if len(raw) not in (4, 52):
+        raise Failure("missing legacy GUI raw word")
+    exe = build_gui(fixture, tmp)
     words = [str(int.from_bytes(raw[i:i+4], byteorder)) for i in range(0, len(raw), 4)]
     # The 1024-row table installed by check_row_limit maps HID usage 4 to A.
     expected = "A" if byteorder == "big" and len(raw) == 52 else "a"

@@ -33,11 +33,15 @@ static void transition(int owner, u32 next, int focus)
             saved_gen[sc] = input_key_release_gen(sc);
         }
     }
+    /* An acquisition starts a fresh raw stream, including WM controls. */
+    if (!focus && owner && (owner != acq_owner || (next & ~excl)))
+        legacy_raw_flush();
+    else
+        kbd_raw_purge_keep();
     acq_owner = owner;
     excl = next;
     input_delivery_flush();
     ++gen;
-    kbd_raw_purge_keep();
     in2_ring_lost(IN2_LOST_EXCL);
 }
 
