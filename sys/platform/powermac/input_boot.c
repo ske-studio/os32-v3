@@ -1,4 +1,4 @@
-/* PLN1 local provider: decoded LAN first, then USB. */
+/* PowerMac USB and injected keyboard input. */
 #include "input_boot.h"
 #include "input_usb.h"
 #include "kbd_inject.h"
@@ -8,56 +8,10 @@
 #endif
 #include "input_service.h"
 #include "clock_source.h"
-#include "lan_boot.h"
 #include "sys/hal/input/in2_int.h"
 #include "con_sink.h"
 #include "sys/kern/exec/exec.h"
 #include "sys/kern/idle_work.h"
-#if !KBOOT_LINK
-#include "io.h"
-static PmInputDecoder decoder = { .pending = -1 };
-static int lan_lookahead = -1;
-
-static int lan_key(void)
-{
-    for (unsigned n = 0; n < 32; n++) {
-        int c;
-        u32 now, hi;
-        if (decoder.pending >= 0) {
-            c = decoder.pending;
-            decoder.pending = -1;
-        } else c = pm_terminal_trygetkey();
-        platform_clock_read_us(&now, &hi);
-        int key = pm_input_decode(&decoder, c, now);
-        if (key >= 0 || c < 0) return key;
-    }
-    return -1;
-}
-/* Finite byte collection is allowed; a completed LAN key stays until try. */
-static int lan_peek(void)
-{
-    if (lan_lookahead >= 0) return lan_lookahead;
-    lan_lookahead = lan_key();
-    return lan_lookahead;
-}
-static int peek(void)
-{
-    int key = lan_peek();
-    return key >= 0 ? key : pm_input_usb_peek();
-}
-static int try_key(void)
-{
-    int key = lan_peek();
-    if (key >= 0) {
-        u32 flags = irq_save();
-        lan_lookahead = -1;
-        pm_input_usb_note_remote();
-        irq_restore(flags);
-        return key;
-    }
-    return pm_input_usb_take();
-}
-#endif
 static u32 wait_ticks(void) { u32 lo = 0, hi; platform_clock_read_us(&lo, &hi); return lo; }
 static u32 wait_timeout(void) { return 30000000u; }
 static void wait_step(void) { idle_wait_step(); }
@@ -75,11 +29,7 @@ static int inject_try(void)
     return b;
 }
 static const struct InputLegacyProvider provider = {
-#if KBOOT_LINK
     .try_key = pm_input_usb_take, .peek_key = pm_input_usb_peek,
-#else
-    .try_key = try_key, .peek_key = peek,
-#endif
     .gui_active = gui_active, .inject_peek = inject_peek, .inject_try = inject_try,
     .terminal_try = NULL, .terminal_peek = NULL, .terminal_enabled = NULL,
     .wait_ticks = wait_ticks, .wait_timeout_ticks = wait_timeout,
@@ -106,13 +56,8 @@ static int key_kapi(void)
 #endif
     return key;
 }
-/* Busy pollers (e.g. a CUI script checking for ESC) never halt, so advance the
- * foreground work once per peek; idle_work_run refuses EE=0, IRQ and re-entry. */
 static int peek_key(void)
 {
-#if !KBOOT_LINK
-    idle_work_run();
-#endif
     return input_legacy_peek(IL_KEY);
 }
 static int has_key(void) { return peek_key() >= 0; }
@@ -134,10 +79,6 @@ static const InputOps ops = {
 };
 void pm_input_boot(void)
 {
-#if !KBOOT_LINK
-    decoder = (PmInputDecoder){ .pending = -1 };
-    lan_lookahead = -1;
-#endif
     input_legacy_register(&provider);
     input_register(&ops);
 }

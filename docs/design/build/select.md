@@ -1,6 +1,6 @@
 # build/select.mk — カーネルのビルドを 1 系統にし、像の構成の軸を作る (BUILD_UNIFY_DESIGN)
 
-> 状態: **現行 (2026-11-17)** — 出所: 機種依存の分離の作り直しの 2 段目 (ユーザー決定 2026-11-17「共通ソースが機種ヘッダを読む数 0・ビルド 1 系統・入口の骨格 1 本」)。Opus 5.5 のレビュー 2 回で確定。段 1a・1b・2 は実装済み、段 3 以降は未着手。§1 の実物は段 1a の前 (origin/main `75c7c6f69`) の姿。
+> 状態: **現行 (2026-11-17)** — 出所: 機種依存の分離の作り直しの 2 段目 (ユーザー決定 2026-11-17「共通ソースが機種ヘッダを読む数 0・ビルド 1 系統・入口の骨格 1 本」)。Opus 5.5 のレビュー 2 回で確定。段 1a〜5 は実装済み。§1 の実物は段 1a の前 (origin/main `75c7c6f69`) の姿。
 ソース: `build/select.mk`、`build/images/`、`build/sources/`、`build/arch/`、`build/platform/`、`build/features/`、`build/targets/ppc-powermac.mk`
 
 ## 1. 実物 (origin/main `75c7c6f69`)
@@ -35,70 +35,26 @@ SerialFS の入口 `serialfs_session.c` は USERSHELL で共有する。前景�
 
 ### 3-1. 像と機能
 
-`build/images/<名>.mk` が像の機能の値と順の式を決める。`build/select.mk` が最初に `include build/images/$(IMAGE).mk` する。
+`sys/conf/images/ppc-flags.mk` が名前と旗を照合し、正規化した像の機能を `sys/conf/images/<名>.mk` から選ぶ。
 
-| `IMAGE` | 使う所 | `LINK` | `EXEC` | `USERSHELL` | `USB` | `CLI` | `PC98_PENDING` | 順の式 |
-|---|---|---|---|---|---|---|---|---|
-| `pc98` | x86-pc98 の既定 | 1 | 1 | 1 | 0 | 0 | 1 | legacy |
-| `kboot-core` | `KBOOT_LINK=0` | 0 | 0 | 0 | 0 | 0 | 0 | kboot |
-| `kboot-link` | 旗なし (最上位の `make ARCH=ppc PLATFORM=powermac` の既定) | 1 | 0 | 0 | 0 | 0 | 0 | kboot |
-| `kboot-shell` | `KBOOT_SHELL=1 KBOOT_LINK=0` | 0 | 1 | 0 | 0 | 1 | 0 | kboot |
-| `kboot-sh` | `KBOOT_SH=1 KBOOT_LINK=0` | 0 | 1 | 1 | 1 | 0 | 0 | kboot |
-| `kboot-link-sh` | `KBOOT_SH=1` | 1 | 1 | 1 | 1 | 0 | 0 | kboot |
+| 像 | 指定例 | LINK | EXEC | USERSHELL | USB | LOOP | IDE | PC98_PENDING | 出力 (build/out 以下、PowerPC) |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| pc98 | x86-pc98 既定 | 1 | 1 | 1 | 0 | 1 | 1 | 1 | — |
+| powermac | PowerMac 既定、または IMAGE=powermac | 1 | 1 | 1 | 1 | 1 | 1 | 0 | ppc-powermac |
+| kboot-link-sh | KBOOT_SH=1 | 1 | 1 | 1 | 1 | 1 | 1 | 0 | ppc-kboot/link-sh |
+| kboot-core | KBOOT_LINK=0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | ppc-kboot (NEGATIVE=1 は neg1) |
+| kboot-link | KBOOT_LINK=1 | 1 | 0 | 0 | 0 | 0 | 0 | 0 | ppc-kboot/link |
 
-```make
-# sys/conf/images/kboot-link-sh.mk
-IMAGE_ORDER = kboot
-FEATURE_LINK = 1
-FEATURE_EXEC = 1
-FEATURE_USERSHELL = 1
-FEATURE_USB = 1
-FEATURE_CLI = 0
-FEATURE_PC98_PENDING = 0
-```
+互換名 `kboot-sh`・`kboot-shell` と旧旗 `KBOOT_LINK=0` に `KBOOT_SH=1` または `KBOOT_SHELL=1` を加えた指定は、いずれも kboot-link-sh に正規化する。旗の衝突と NEGATIVE の併用は正規化前に検査する。
+像の機能はコマンドラインから上書きできない。USERSHELL・USB・LOOP は EXEC を必要とする。
 
-像の機能の値は像のファイルだけが決める。コマンドラインで `FEATURE_LINK=0` のように上書きすると `select.mk` が止める (組み方を変える時は `IMAGE` を選ぶ)。PowerPC の像は名前 (`IMAGE=kboot-*`) でも旗 (`KBOOT_LINK`・`KBOOT_SH`・`KBOOT_SHELL`) でも選べる。対応は `sys/conf/images/ppc-flags.mk` が持ち、`select.mk` が ARCH=ppc の時に像のファイルより先に読む: 名前だけなら旗を名前から決め、旗だけなら像を旗から決め、両方をコマンドラインで与えて食い違えば止める (出力の置き場と中身が食い違わないように)。
-
-- 像の機能は `IMAGE_FEATURES = LINK EXEC USERSHELL USB CLI LOOP PC98_PENDING` として、今の 15 個 (`FEATURES`) と別の一覧に持つ。値の検査 (0 か 1)・未知の `FEATURE_*` の検査は両方を見る。`build/targets/x86-pc98.mk` の「0 があれば止める」は今の 15 個だけを見る (下の `KNOWN_FEATURE_VARIABLES` の項)。
-- 依存: `USERSHELL`・`CLI` は `EXEC` が要る。`USERSHELL` と `CLI` は同時に 1 にできない。`select.mk` の今の依存の検査と同じ書き方で足す。
-- `IMAGE` の既定は `select.mk` の冒頭で決める: `IMAGE ?= $(if $(filter powermac,$(PLATFORM)),kboot-link,pc98)`。`build/images/$(IMAGE).mk` が無ければ `$(error unknown IMAGE ...)`。
 - `KNOWN_FEATURE_VARIABLES` は今の 15 個のまま変えない (`build/targets/x86-pc98.mk` の「0 があれば止める」が読む。このファイルは `test_sep5_boot.py (旧版 31277df0731b)` が基点 `3ebbd208` とバイト単位で固定しているので触らない)。像の機能は `IMAGE_FEATURE_VARIABLES` に持ち、未知の `FEATURE_*` の検査は両方を見る。`kernel-objects.mk` の SELECTION_STAMP には `IMAGE=<名>` を足す。
 
 ### 3-2. 持ち主
 
 共通の場所の物は `build/sources/common.mk` に機能ごとの組で宣言し、`C_COMMON` は選ばれた組の和にする (`C_SELECTED` の式は変えない)。
 
-```make
-# build/sources/common.mk
-C_COMMON_CORE = <両 arch の全部の像に入る 18 本> sys/kern/kstring_c.c
-C_COMMON_LINK = sys/kern/dev/device_host.c sys/net/link.c sys/net/link_notify.c sys/net/host_mailbox.c sys/net/nic_rx.c sys/net/rx_work.c
-C_COMMON_EXEC = sys/kern/dev/device_fs.c <今 C_COMMON にあり PowerPC の exec の像に入る 93 本> sys/dev/base/dev.c sys/hal/input/legacy_ring.c sys/hal/input/legacy_mode.c sys/kern/port_service.c sys/kern/serial_diag.c
-C_COMMON_USERSHELL = sys/fs/serialfs/serialfs.c sys/fs/serialfs/serialfs_persistent.c sys/fs/serialfs/sfs_client.c sys/fs/serialfs/sfs_proto.c lib/crc32.c
-C_COMMON_USB = $(wildcard drivers/usb/usb_*.c drivers/usb/ohci_*.c drivers/usb/hid_*.c) sys/dev/usb/ehci_quiesce.c
-C_COMMON_CLI = sys/kern/cli/resident_cli.c
-C_COMMON_PC98_PENDING = <49 本>
-C_COMMON = $(C_COMMON_CORE) $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$(FEATURE_$(f))),$(C_COMMON_$(f))))
-```
-
-`C_COMMON_USB` の wildcard は今の `build/targets/ppc-powermac.mk` と同じ式で、`usb_module.c`・`usb_resident.c`・`usb_early_quiesce.c` を含むかは実装で今の一覧と突き合わせる (含むなら今と同じに)。
-
-arch・platform の物は、その持ち主のファイルが機能ごとの組を宣言する。組み合わせの条件 (USERSHELL かつ LINK) は持ち主のファイルが `$(if ...)` で自分で書く。
-
-```make
-# build/platform/powermac.mk (kboot の像の分)
-C_PLATFORM_CORE = sys/platform/powermac/rh_observe.c ... sys/dev/net/gem/gem_reset.c ... lib/lz4.c sys/platform/powermac/ppc_kernel.c
-C_PLATFORM_LINK = sys/platform/powermac/link_platform.c sys/platform/powermac/nic_gem.c sys/platform/powermac/link_log.c sys/platform/powermac/link_diag.c
-C_PLATFORM_NOLINK = sys/platform/powermac/lan_wire.c sys/platform/powermac/lan_terminal.c sys/platform/powermac/terminal_input.c sys/platform/powermac/host_unavailable.c
-C_PLATFORM_EXEC = sys/platform/powermac/root_boot.c ... sys/kern/console/fbcon.c sys/kern/console/gfx_console.c sys/kern/console/font_source_kcg.c sys/dev/video/of_fb/backend_of_fb.c sys/dev/video/of_fb/of_fb_v2.c sys/kern/dev/ram_ro.c sys/fs/ramfs/ramfs.c sys/fs/isofs/iso9660.c sys/fs/isofs/iso9660_media.c sys/kern/init/boot_root.c
-C_PLATFORM_NOEXEC = sys/platform/powermac/kboot_console.c
-C_PLATFORM_USERSHELL = sys/platform/powermac/shell_boot.c sys/platform/powermac/input_boot.c sys/platform/powermac/input_decode.c sys/platform/powermac/hostfs_boot.c sys/input/keymaps/hid_jp.c $(if $(filter 1,$(FEATURE_LINK)),sys/platform/powermac/hostfs_link_io.c sys/platform/powermac/hostfs_link_peer.c,sys/platform/powermac/hostfs_io.c sys/platform/powermac/hostfs_peer.c)
-C_PLATFORM_USB = sys/platform/powermac/input_usb.c platform/powermac/input_keymap.c sys/platform/powermac/usb_tree.c sys/platform/powermac/usb_platform.c sys/platform/powermac/usb_boot.c
-C_PLATFORM_CLI = sys/platform/powermac/cli_boot.c
-# build/select.mk — 像の順の式が kboot の時だけ足す
-C_PLATFORM += $(C_PLATFORM_CORE) $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$(FEATURE_$(f))),$(C_PLATFORM_$(f)),$(C_PLATFORM_NO$(f))))
-C_ARCH     += $(C_ARCH_CORE)     $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$(FEATURE_$(f))),$(C_ARCH_$(f)),$(C_ARCH_NO$(f))))
-GAS_SELECTED = $(GAS_ARCH_CORE)  $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$(FEATURE_$(f))),$(GAS_ARCH_$(f))))
-```
+PowerMac の機種別集合は `build/platform/powermac.mk` が持つ。製品とシェル互換像では C_PLATFORM_USERSHELL が常駐シェルの起動・入力・HostFS を選ぶ。
 
 持ち主を決めた物:
 
@@ -112,8 +68,7 @@ GAS_SELECTED = $(GAS_ARCH_CORE)  $(foreach f,$(IMAGE_FEATURES),$(if $(filter 1,$
 | `sys/platform/pc98/tsc_math.c`・`tsc_clock.c` | `C_PLATFORM` (pc98.mk)。`kernel-objects.mk` の足しは消す | — | rx_work と同じ末尾の一覧で並びを保つ |
 | `sys/kern/kstring_c.c` | `C_COMMON_CORE` に在り、x86 は順の一覧に無いので今までどおり落ちる (`KSTRING_C_SRC` の仕組みは変えない) | kboot の順の一覧に在る | 今の振る舞いを保つ |
 | `sys/kapi/kapi_generated.c` | `C_COMMON_PC98_PENDING` | 入らない (生成した物を `KB_EXTRA` で組む、今のまま) | |
-| `sys/platform/none/legacy_guest.c` | `FEATURE_V86=0` かつ `FEATURE_EXEC=1` の時 (`select.mk` に EXEC の条件を足す) | 同じ式で shell・sh・link-sh にだけ入る | core・link には今も入っていない |
-| `sys/kern/cli/resident_cli.c`、USB 21 本 | `CLI=0`・`USB=0` なので選ばれない | `C_COMMON_CLI`・`C_COMMON_USB` | x86 は USB を部品として組む |
+| `sys/platform/none/legacy_guest.c` | `FEATURE_V86=0` かつ `FEATURE_EXEC=1` の時 (`select.mk` に EXEC の条件を足す) | 同じ式で powermac・kboot-link-sh に入る | core・link には今も入っていない |
 
 x86-pc98 の既定の `C_KERNEL` 376 本は並びごと変えない (`build_profile_x86.json` を 1 字も変えない)。`FEATURE_PC98_DEVICES=0` などを付けた問い合わせでは、移した 10 本が残る (機種の装置ではないので、それが正しい)。
 
@@ -137,6 +92,8 @@ endif
 legacy の式は今の `select.mk` に末尾の一覧を足しただけ (x86 の並びは `… C_PLATFORM_NEW C_DIAGNOSTICS tsc_math tsc_clock rx_work` で今と同じ)。「順に無いソースで止める」検査は kboot の像だけに入れる (x86 は `sys/kern/kstring_c.c` が今も黙って落ちる)。
 
 ## 5. 段
+
+以下はビルド統合当時の実装記録。現行の像と出力は §3-1 を参照。
 
 ### 段 1a — PowerPC の一覧を所有者集合から引く
 

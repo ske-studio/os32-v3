@@ -1,3 +1,4 @@
+# 期待の出所: docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md「製品のコンパイル集合」。
 from pathlib import Path
 import sys
 

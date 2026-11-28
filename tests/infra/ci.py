@@ -44,7 +44,8 @@ def prerequisites(environment, cpu, config, sources):
         modules = ["lz4", "yaml", "PIL", "fontTools"]
     elif "make:iso" in sources:
         tools += ["genisoimage", "isoinfo"]
-        if config in ("sh", "link-sh", "shell"):
+        modules = ["lz4"]
+        if config in ("sh", "link-sh", "powermac"):
             modules = ["lz4", "PIL", "fontTools"]
     for module in modules:
         if importlib.util.find_spec(module) is None:
@@ -565,7 +566,9 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         candidate = Path(tmp)
         snapshot(candidate)
-        run_bundle(candidate, plan, args, env, identity)
+        with tempfile.TemporaryDirectory() as cache:
+            env["OS32_MEDIA_ROOT_CACHE"] = cache
+            run_bundle(candidate, plan, args, env, identity)
     return collect(plan, args, identity)
 
 

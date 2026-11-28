@@ -156,11 +156,6 @@ void pm_term_tx_complete(void); /* Only after gem_tx accepts the message. */
 int pm_term_state(struct lan_message *out);
 int pm_term_connected(void);
 const u8 *pm_term_peer(void);
-void pm_terminal_feed(const u8 *bytes, u32 len);
-void pm_terminal_line_lost(void);
-void pm_terminal_open(void);
-int pm_terminal_trygetkey(void);
-int pm_terminal_getkey(void);
 void pm_terminal_poll(void);
 #if KBOOT_SH
 int pm_terminal_work_register(void);

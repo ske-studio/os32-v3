@@ -75,7 +75,7 @@ def medium_digest(base, run, artifacts, boot, artifact_id):
     if boot['machine'] == 'pc98':
         name = f"os32-{run['head_branch'].replace('/', '-')}-{sha[:7]}"
         filenames = {'os32_boot.d88', 'os32_boot.img', 'os32_boot144.img', 'os32_install.iso'}
-    elif boot['machine'] == 'powermac' and boot['image'] in ('core', 'link', 'sh', 'link-sh', 'shell', 'neg1'):
+    elif boot['machine'] == 'powermac' and boot['image'] in ('core', 'link', 'sh', 'link-sh', 'powermac', 'neg1'):
         name = f"ppc-{boot['image']}-{sha}"
         filenames = {'boot.iso'}
     else:

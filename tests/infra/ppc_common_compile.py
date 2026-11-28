@@ -1,3 +1,4 @@
+# 期待の出所: docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md「製品での共通ソース検査」。
 from pathlib import Path
 import subprocess
 import sys
@@ -7,13 +8,13 @@ from tests.support.media import Failure, PPC_MAKE, main, make, require
 
 
 def build(config):
-    make(*PPC_MAKE, "KBOOT_SH=1", "KBOOT_LINK=1", "common-compile")
+    make(*PPC_MAKE, "IMAGE=powermac", "common-compile")
 
 
 def verify(config):
     # Expand the production input lists independently of the target prerequisites.
     rule = "list-inputs: ; @echo $(addprefix $(KB_OUT)/,$(filter %.c,$(C_COMMON_PC98_PENDING) $(C_COMMON_COMPILE_ONLY_PPC)))"
-    names = subprocess.check_output(["make", "-s", *PPC_MAKE, "KBOOT_SH=1", "KBOOT_LINK=1",
+    names = subprocess.check_output(["make", "-s", *PPC_MAKE, "IMAGE=powermac",
                                      "--eval", rule, "list-inputs"], text=True).split()
     if not names:
         raise Failure("empty common source list")

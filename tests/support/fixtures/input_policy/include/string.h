@@ -1,5 +1,5 @@
-#ifndef PPC_SH_STRING_H
-#define PPC_SH_STRING_H
+#ifndef INPUT_POLICY_FIXTURE_STRING_H
+#define INPUT_POLICY_FIXTURE_STRING_H
 
 #include <stddef.h>
 

@@ -22,7 +22,7 @@
 #include "rh_observe.h"
 #include "kstring.h"
 #include "via_window.h"
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
 #include "platform_ver.h"
 #endif
 #if KBOOT_SH
@@ -259,7 +259,7 @@ void ppc_boot_load_root(u32 root)
         if (ppc_root_current() || root != MEM_FIXED_PD_BASE) ppc_stop();
         install_alias(root, &escc_alias);
         install_alias(root, &mpic_alias);
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
         if (boot_devices.fb_full_rc == PM_RH_FULL_OK &&
             (!observe_alias_safe(root, &fb_alias) ||
              overlap(fb_alias.pa, fb_alias.bytes, clock_alias.pa, clock_alias.bytes))) {
@@ -320,7 +320,7 @@ void ppc_kernel_real_start(const struct pm_kboot_info *info)
     u32 pvr;
     boot_info = info;
     if (!ppc_cpu_identify(&pvr)) ppc_stop();
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
     pm_ver_note_pvr(pvr);
 #endif
     ppc_cpu_disable_bats(pvr);
@@ -420,7 +420,7 @@ void ppc_kernel_start(ppc_ci ci)
     plan_gmac(info);
     plan_via(&info->via);
     const struct pm_rh_fb *fb = pm_rh_framebuffer();
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
     boot_devices.fb_full_rc = pm_rh_capture_full();
     boot_devices.fb_color_rc = pm_rh_full_colors()->rc;
     if (boot_devices.fb_full_rc == PM_RH_FULL_OK) fb = pm_rh_full_framebuffer();

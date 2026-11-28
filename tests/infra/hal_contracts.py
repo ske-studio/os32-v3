@@ -1,3 +1,4 @@
+# 期待の出所: docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md「製品の HAL 登録」。
 from pathlib import Path
 import re
 import subprocess
@@ -51,7 +52,7 @@ def verify(config):
     for index, src in enumerate(sources):
         cmd = commands.get(src, commands[sources[0]])
         flags = [x for x in cmd if x.startswith(("-I", "-D"))]
-        flags.extend(["-D__cdecl=", "-DCHECK_INPUT=" + str(int(config != "shell"))])
+        flags.extend(["-D__cdecl=", "-DCHECK_INPUT=" + str(int(config != "powermac"))])
         if not pc98:
             flags.extend(["-msdata=none", "-msoft-float", "-fno-short-enums"])
         if src == "sys/dev/char/rtc.c":

@@ -1,3 +1,4 @@
+# 期待の出所: docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md「製品の無入力起動」。
 """Boot the candidate ISO on a mac99 and observe the guest serial console."""
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
@@ -10,7 +11,7 @@ import sys
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from tests.support.media import Failure, PPC, PPC_OUT, ppc_build, require
+from tests.support.media import Failure, ppc_output, ppc_build, require
 
 from tests.support.ppc_vm import guest
 
@@ -41,7 +42,7 @@ def boot(cpu, config, iso, metadata):
 
 def build(config):
     ppc_build(config)
-    iso = PPC_OUT / PPC[config][1] / "boot.iso"
+    iso = ppc_output(config) / "boot.iso"
     require(iso)
     try:
         version = subprocess.check_output(["qemu-system-ppc", "--version"], text=True)

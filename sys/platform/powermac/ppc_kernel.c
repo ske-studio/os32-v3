@@ -49,7 +49,7 @@
 #include "clock_source.h"
 #include "kernel_tick.h"
 
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
 #include "root_boot.h"
 #include "kernel_mount_children.h"
 #include "pm_console.h"
@@ -98,7 +98,7 @@ static struct pm_gmac_boot lan_boot;
 static volatile u32 ipi_seen;
 static unsigned char flush_a[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
 static unsigned char flush_b[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
-#if !KBOOT_SHELL && !KBOOT_SH
+#if !KBOOT_SH
 static unsigned char user_gate[PAGE_SIZE] __attribute__((aligned(PAGE_SIZE)));
 #endif
 
@@ -229,7 +229,7 @@ static void rh_phy_notify(const struct gem_phy_sample *p, int rc)
 }
 
 static int lan_log_rc;
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
 static int root_ready;
 #if OS32_HOOK_IME && OS32_FEATURE_IDE
 static int hdd_root_ready;
@@ -301,7 +301,7 @@ void platform_boot_machine(void)
         arch_cpu_stop();
     }
 
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
     pm_console_stream_init();
 #endif
     lan_log_rc = pm_lan_log_register();
@@ -328,7 +328,7 @@ void platform_boot_machine(void)
      * (sys/kern/mm/paging_map.inc). Its second argument is exec's trampoline page on
      * x86; milestone 2 has no exec, so a dedicated, never-executed, read-only
      * zero page stands in until exec/ provides the real one (milestone 3). */
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
     /* S-B: the shared USER page is exec's KAPI trampoline, as on x86. */
     sys_mem_kb = KBOOT_MEM_KB;
     exec_kapi_init();
@@ -338,7 +338,7 @@ void platform_boot_machine(void)
     int shared_user = paging_boot_user_shared((u32)user_gate, 1) == 0;
 #endif
     if (!shared_user) kboot_stop("KAPI trampoline");
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
     /* The fixed 192 KiB heap cannot hold the 296 KiB resident font. Reserve
      * a separate RAM arena before any heap clients exist; leave KAPI/SHM's
      * fixed layout intact. Allocation failure retains the stream-only path. */
@@ -411,7 +411,7 @@ static void apply_machine_config(void)
 }
 
 /* 局面 2 (EE=1): MPIC の配送と時計の実証・LAN・root・コンソール・入力。 */
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
 #if !PM_PRODUCT_BOOT
 static int start_media_root(const struct pm_kboot_info *info)
 {
@@ -506,7 +506,7 @@ void platform_boot_services(void)
     unsigned long long now;
     do { now = ppc_read_tb64(); pm_lan_poll(now); } while (now - start < 2ULL * info->tb_hz);
     pm_report_alive(now, start, tick0, info);
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
     kprintf(KBOOT_ATTR, "FB full_rc=%d color_rc=%d\r\n",
             dev->fb_full_rc, dev->fb_color_rc);
 #if OS32_FEATURE_IDE
@@ -584,7 +584,7 @@ void platform_boot_services(void)
 /* 局面 3: exec の用意と常駐シェル。シェルが無い像・root が無い時は LAN の poll で居続ける。 */
 void platform_boot_run(void)
 {
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
     if (root_ready) {
 #if OS32_HOOK_KAPI_DB
         /* Keep SQLite boot diagnostics on the registered log streams. */

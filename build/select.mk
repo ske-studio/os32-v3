@@ -16,14 +16,11 @@ include sys/conf/images/$(IMAGE).mk
 ifneq ($(ARCH)-$(PLATFORM),$(IMAGE_TARGET))
 $(error IMAGE $(IMAGE) is for $(IMAGE_TARGET), not $(ARCH)-$(PLATFORM))
 endif
-IMAGE_FEATURES = LINK EXEC USERSHELL USB CLI PC98_PENDING LOOP IDE
+IMAGE_FEATURES = LINK EXEC USERSHELL USB PC98_PENDING LOOP IDE
 # 像の機能は像のファイルだけが決める。組み方を変える時は IMAGE を選ぶ。
 $(foreach f,$(IMAGE_FEATURES),$(if $(findstring command,$(origin FEATURE_$(f))),$(error FEATURE_$(f) is fixed by IMAGE $(IMAGE); choose another IMAGE)))
 $(foreach f,$(IMAGE_FEATURES),$(if $(filter-out 1,$(words $(filter 0 1,$(FEATURE_$(f))))),$(error invalid FEATURE_$(f))))
-$(foreach f,USERSHELL USB CLI LOOP,$(if $(filter 1,$(FEATURE_$(f))),$(if $(filter 1,$(FEATURE_EXEC)),,$(error FEATURE_$(f) requires FEATURE_EXEC))))
-ifeq ($(FEATURE_USERSHELL)$(FEATURE_CLI),11)
-$(error FEATURE_USERSHELL and FEATURE_CLI are mutually exclusive)
-endif
+$(foreach f,USERSHELL USB LOOP,$(if $(filter 1,$(FEATURE_$(f))),$(if $(filter 1,$(FEATURE_EXEC)),,$(error FEATURE_$(f) requires FEATURE_EXEC))))
 include build/sources/order.mk
 include build/sources/common.mk
 include build/arch/$(ARCH)-sources.mk
