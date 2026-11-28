@@ -24,8 +24,8 @@ def verify(config):
                         "sys/dev/sound/cs4231/pcm_cs4231_math.c",
                         "userland/lib/snd/mix.c", "-o", exe], check=True)
         for channel in ("3", "1"):
-            for dos in ("0", "1"):
-                for divisor in (("3", "2") if dos == "1" else ("3",)):
+            for dos in ("1", "0"):
+                for divisor in ("3", "2"):
                     subprocess.run(["qemu-x86_64", exe, channel, dos, divisor], check=True)
 
 

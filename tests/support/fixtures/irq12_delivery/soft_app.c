@@ -5,7 +5,8 @@
 #include "check.h"
 
 static const char *expected_path, *expected_second;
-static int primed;
+static int primed, retry_prime, yields;
+static i32 yield(void) { ++yields; return 0; }
 static int begin_rc, open_rc, fault, running, stream, ends, fallback, pumps, turns, keys;
 static int begin(const V86_Begin *b, u32 *sid)
 {
@@ -60,6 +61,7 @@ int sndl_chip_open(const SNDL_ChipReq *r, u32 *id, SNDL_ChipGot *got)
 int sndl_prime_slice(void)
 {
     check(stream && pumps == turns + 1, "pre-run reserve");
+    if (retry_prime) { retry_prime = 0; return OS32_ERR_AGAIN; }
     primed = 1;
     return 0;
 }
@@ -74,7 +76,7 @@ int sndl_chip_write(u32 chip, const SND2_RegW *w, u32 n, u32 at)
 int sndl_chip_close(u32 chip) { check(keys == 2 && pumps == 5, "final drain"); stream = 0; return 0; }
 void _start(void)
 {
-    static KernelAPI table = {.v86s_begin = begin, .v86s_run = run, .v86s_fm_drain = drain,
+    static KernelAPI table = {.sys_yield = yield, .v86s_begin = begin, .v86s_run = run, .v86s_fm_drain = drain,
                               .v86s_end = end, .v86_boot2 = boot2};
     api = &table;
     begin_rc = OS32_ERR_NOSYS;
@@ -84,9 +86,12 @@ void _start(void)
     begin_rc = 0;
     open_rc = OS32_ERR_IO;
     check(boot_sound("fmtone.fdi", 0) == open_rc && ends == 1 && fallback == 1, "open failure");
+    check(!strcmp(boot_stage, "sndl_chip_open"), "sound failure stage");
     open_rc = 0;
+    retry_prime = 1;
     for (fault = 0; fault <= 1; ++fault)
         check(boot_sound("fmtone.fdi", 0) == (fault ? 6 : 5), "command exit");
+    check(yields == 1, "resume after temporary full");
     check(ends == 3 && !running && !stream, "command cleanup");
     char path[65];
     for (unsigned i = 0; i < 64; ++i) path[i] = 'a';

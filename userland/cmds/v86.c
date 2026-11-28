@@ -156,56 +156,70 @@ static int do_gcap(int selftest)
     return cap.status == V86G_ST_OK ? 0 : 1;
 }
 
+static const char *boot_stage;
+
+static int boot_result(const char *stage, int rc)
+{
+    if (rc < 0) boot_stage = stage;
+    return rc;
+}
+
 static int boot_sound(const char *path, const char *second)
 {
     V86_Begin b = {.size = sizeof b, .flags = V86S_FM_SOFT};
     if (strlen(path) >= sizeof b.path || (second && strlen(second) >= sizeof b.second))
-        return api->v86_boot2(path, second);
+        return boot_result("v86_boot2", api->v86_boot2(path, second));
     strcpy(b.path, path);
     if (second) strcpy(b.second, second);
     u32 sid, chip;
     int rc = api->v86s_begin(&b, &sid);
-    if (rc == OS32_ERR_NOSYS) return api->v86_boot2(path, second);
-    if (rc) return rc;
+    if (rc == OS32_ERR_NOSYS) return boot_result("v86_boot2", api->v86_boot2(path, second));
+    if (rc) return boot_result("v86s_begin", rc);
     SNDL_ChipReq req = {.size = sizeof req, .chip = SND2_CHIP_OPNA,
         .flags = SNDL_REQ_PREFER_SOFT, .pol = {SNDL_POL_SOFT, SNDL_POL_FAIL}};
     SNDL_ChipGot got;
-    rc = sndl_init(api);
-    if (!rc) rc = sndl_chip_open(&req, &chip, &got);
+    rc = boot_result("sndl_init", sndl_init(api));
+    if (!rc) rc = boot_result("sndl_chip_open", sndl_chip_open(&req, &chip, &got));
     int opened = !rc;
-    if (opened && got.backend != SNDL_SOFT) rc = OS32_ERR_NOSYS;
-    if (!rc) rc = sndl_pump();
+    if (opened && got.backend != SNDL_SOFT) rc = boot_result("soft backend", OS32_ERR_NOSYS);
+    if (!rc) rc = boot_result("sndl_pump", sndl_pump());
     V86_RunIn in = {.size = sizeof in, .slice_ms = 10};
     V86_Exit ex = {0};
     while (!rc) {
         rc = sndl_prime_slice();
-        if (rc) break;
+        if (rc == OS32_ERR_AGAIN) {
+            api->sys_yield();
+            rc = 0;
+            continue;
+        }
+        if (boot_result("sndl_prime_slice", rc)) break;
         rc = api->v86s_run(sid, &in, &ex);
-        if (rc) break;
+        if (boot_result("v86s_run", rc)) break;
         SND2_FmEv ev[32];
         int n;
         do {
             u32 seq;
             n = api->v86s_fm_drain(sid, ev, 32, &seq);
-            if (n < 0) { rc = n; break; }
+            if (n < 0) { rc = boot_result("v86s_fm_drain", n); break; }
             for (int i = 0; i < n; ++i) {
                 SND2_RegW w = {ev[i].bank, ev[i].reg, ev[i].val, 0};
-                if (sndl_chip_write(chip, &w, 1, ev[i].at_us) != 1) {
-                    rc = OS32_ERR_IO;
+                int accepted = sndl_chip_write(chip, &w, 1, ev[i].at_us);
+                if (accepted != 1) {
+                    rc = boot_result("sndl_chip_write", accepted < 0 ? accepted : OS32_ERR_IO);
                     break;
                 }
             }
         } while (!rc && n == 32);
-        if (!rc) rc = sndl_pump();
+        if (!rc) rc = boot_result("sndl_pump", sndl_pump());
         if (ex.reason != V86S_SLICE && ex.reason != V86S_FIFO) break;
     }
     if (opened) {
         int close_rc = sndl_chip_close(chip);
-        if (!rc) rc = close_rc;
+        if (!rc) rc = boot_result("sndl_chip_close", close_rc);
     }
     int end_rc = api->v86s_end(sid);
-    if (!rc) rc = end_rc;
-    return rc ? rc : (int)ex.code;
+    if (!rc) rc = boot_result("v86s_end", end_rc);
+    return rc ? rc : boot_result("v86s_run exit", (int)ex.code);
 }
 
 int main(int argc, char **argv, KernelAPI *kapi)
@@ -232,7 +246,7 @@ int main(int argc, char **argv, KernelAPI *kapi)
         }
         rc = boot_sound(argv[2], second);
         if (rc < 0) {
-            printf("  could not start (rc=%d)\n", rc);
+            printf("  could not start (%s rc=%d)\n", boot_stage, rc);
             printf("    -1 = image not found / attach failed\n");
             printf("    -2 = no memory for the guest\n");
             printf("    -3 = could not read the IPL\n");

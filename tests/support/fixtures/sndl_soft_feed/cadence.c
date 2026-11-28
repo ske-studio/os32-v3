@@ -11,6 +11,7 @@
 static short ring[4096][2], staging[8192][2];
 static Snd2Stream sink;
 static unsigned dma_frame, last_publish, max_gap, silent, sequence, channel;
+static unsigned clock_frame, next_tick_sample;
 static unsigned batch, turns, irq_phase, divisor;
 static unsigned short dma_count[4];
 /* External accounting in sample-clock frames, excluding pre-start priming. */
@@ -36,11 +37,15 @@ void snd2_stg_read(const Snd2Stream *s, u32 first, void *dst, u32 n)
         memcpy((short *)dst + 2*i, staging[(first + i) % 8192], 4);
 }
 static short marker(unsigned frame) { return 1 + frame % 30000; }
-static unsigned now_ms(void) { return dma_frame * 10 / 441; }
+static unsigned now_ms(void) { return clock_frame * 10 / 441; }
 
 static void advance(unsigned frames)
 {
-    while (frames-- && sink.state == SND2_ST_RUN) {
+    if (sink.state != SND2_ST_RUN) return;
+    clock_frame += frames;
+    /* DMA can advance several frames between visible count samples. */
+    unsigned target = clock_frame - clock_frame % 44;
+    while (dma_frame < target) {
         unsigned hw = dma_frame % 4096;
         if (!ring[hw][0]) ++silent;
         else if (ring[hw][0] != marker(dma_frame - silent) || ring[hw][1]) exit(3);
@@ -48,8 +53,14 @@ static void advance(unsigned frames)
         dma_count[channel] -= 4;
         if (dma_count[channel] == 0xffff) dma_count[channel] = sizeof ring - 1;
         hw = hw_position();
-        if (!((dma_frame + irq_phase) % 44) || !(hw % 256))
-            if (snd2_seg_observe(&sink, 1, hw, now_ms())) exit(4);
+        if (dma_frame % 44) continue;
+        int period_irq = hw / 256 != sink.last_hw / 256;
+        int tick = (dma_frame + irq_phase) / 441 !=
+                   (dma_frame - 44 + irq_phase) / 441;
+        if (period_irq || tick || sink.written != sink.copied || dma_frame >= next_tick_sample) {
+            next_tick_sample = dma_frame + 255 - hw % 256;
+            if (snd2_seg_observe(&sink, 1, hw, dma_frame * 10 / 441)) exit(4);
+        }
     }
 }
 static int position(u32 id, SND2_Pos *p)
@@ -57,7 +68,7 @@ static int position(u32 id, SND2_Pos *p)
     if (sink.state == SND2_ST_RUN) pos_cost += 2;
     advance(2);
     *p = (SND2_Pos){.cap = sink.cap, .written = sink.written,
-        .played = snd2_seg_played_now(&sink), .state = sink.state, .time_ms = now_ms()};
+        .played = snd2_seg_played_now(&sink), .state = sink.state, .underruns = sink.underruns, .time_ms = now_ms()};
     return 0;
 }
 static int publish(u32 id, const void *pcm, u32 bytes)
@@ -71,9 +82,9 @@ static int publish(u32 id, const void *pcm, u32 bytes)
         memcpy(staging[(sink.written+i) % 8192], (const short *)pcm+2*i, 4);
     sink.written += n;
     if (sink.state == SND2_ST_RUN && n) {
-        unsigned gap = dma_frame - last_publish;
+        unsigned gap = clock_frame - last_publish;
         if (gap > max_gap) max_gap = gap;
-        last_publish = dma_frame;
+        last_publish = clock_frame;
         snd2_seg_after_publish(&sink, hw_position(), now_ms());
     }
     return n*4;
@@ -86,7 +97,7 @@ static int start(u32 id)
 }
 static int clock_us(u32 *lo, u32 *hi)
 {
-    *lo = (uint64_t)dma_frame * 1000000 / 44100;
+    *lo = (uint64_t)clock_frame * 1000000 / 44100;
     *hi = 0;
     return 0;
 }
@@ -129,14 +140,19 @@ int main(int argc, char **argv)
     if (sndl_pump()) return 5;
     while (dma_frame < 132300) {
         if (dos) {
-            if (sndl_prime_slice()) {
+            unsigned before = clock_frame;
+            int rc;
+            while ((rc = sndl_prime_slice()) == OS32_ERR_AGAIN &&
+                   clock_frame - before < 44100)
+                advance(44);
+            if (rc) {
                 costs();
-                fprintf(stderr, "DOS refill deadline\n");
+                fprintf(stderr, "DOS refill deadline rc=%d\n", rc);
                 return 6;
             }
             ++slices;
             advance(88); /* resume low memory and re-enter DOS */
-            advance(441 - dma_frame % 441); /* next logical jiffy */
+            advance(441 - clock_frame % 441); /* next logical jiffy */
             advance(60); /* restore and drain */
         } else if (!(turns++ % 8)) {
             advance(380); /* occasional foreground work between ordinary pumps */

@@ -136,17 +136,17 @@ static int pump(int draining, const SND2_Pos *observed)
     u32 queued = written - pos.played;
     if (queued > pos.cap) return -1;
     u32 space = pos.cap - queued;
-    /* The HAL releases staging capacity at DMA period retirement. Avoid
-     * spending a render/write on the unretired tail of a healthy soft stream. */
-    if (!explicit_open && pcm_period == SNDL_SOFT_PERIOD && !draining &&
-        pos.state == SND2_ST_RUN && !pos.underruns && queued >= 2 * pcm_period) {
-        u32 tail = pos.played % pcm_period;
-        space = space > tail ? space - tail : 0;
+    /* Stage one period ahead for the implicit OPNA stream. A full HAL
+     * retains the suffix in scratch until a segment retires. */
+    int soft_run = !explicit_open && !draining && pcm_period == SNDL_SOFT_PERIOD &&
+                   pos.state == SND2_ST_RUN;
+    if (soft_run) {
+        if (!space && sent < buffered) {
+            if (observed) return 0;
+        } else {
+            space = (space / pcm_period + 1) * pcm_period;
+        }
     }
-    /* During DOS refill, render the next period into the existing scratch
-     * buffer before retirement. A short write keeps the unpublished suffix. */
-    if (observed && !space && sent < buffered) return 0;
-    if (observed && space < pcm_period) space = pcm_period;
     struct SndlWindow window = {0};
     while (space) {
         if (sent == buffered) {
@@ -155,10 +155,10 @@ static int pump(int draining, const SND2_Pos *observed)
             rc = sndl_chip_prepare(&window);
             if (rc) return rc;
             u32 n = space > 1024 ? 1024 : space;
-            /* Leave half a period for the DMA guard while rendering a batch. */
+            /* Allow a period of cached position age and the half-period DMA guard. */
             if (window.render_limit && pos.state == SND2_ST_RUN &&
                 n > window.render_limit && written - pos.played < written % window.render_limit +
-                    (2 * n + 2) / 3 + window.render_limit / 2)
+                    (2 * n + 2) / 3 + window.render_limit + window.render_limit / 2)
                 n = window.render_limit;
             __builtin_memset(stereo, 0, n * 2 * sizeof(*stereo));
             rc = sndl_mix_render(stereo, n, rate, record, 0);
@@ -169,6 +169,12 @@ static int pump(int draining, const SND2_Pos *observed)
             window.offset += n;
             buffered = n;
             sent = 0;
+        }
+        if (soft_run && !pos.underruns &&
+            written - (pos.played - pos.played % pcm_period) == pos.cap) {
+            /* Staging is full until retirement. Keep the prepared suffix. */
+            if (observed) return 0;
+            break;
         }
         u32 n = buffered - sent;
         if (n > space) n = space;
@@ -198,13 +204,13 @@ int sndl_pump(void)
     return pump(0, 0);
 }
 
-/* Budget in half milliseconds: a 10 ms jiffy, 3.5 ms to enter/return/drain,
- * 3 ms to publish 256 frames and 1 ms of DMA position age, plus the guard. */
+/* Keep 17.5 ms plus the DMA guard queued. The prepared period can be
+ * published directly on return even when the cached DMA position is old. */
 int sndl_prime_slice(void)
 {
     if (!refs || pcm_period != SNDL_SOFT_PERIOD) return OS32_ERR_INVAL;
     u32 reserve = (rate * 35 + 1999) / 2000 + pcm_period / 2;
-    u32 started = 0;
+    u32 started = 0, initial_queue = 0;
     int waiting = 0;
     for (;;) {
         SND2_Pos pos;
@@ -212,12 +218,18 @@ int sndl_prime_slice(void)
         if (rc) return rc;
         u32 queued = pos.written - pos.played;
         if (pos.state != SND2_ST_RUN || queued > pos.cap) return OS32_ERR_IO;
-        if (queued >= reserve + pos.written % SNDL_SOFT_PERIOD) return 0;
+        if (queued >= reserve && (explicit_open || buffered - sent >= pcm_period)) return 0;
         /* Staging space is released on period retirement. A short or zero
          * write can therefore be followed by progress at the next boundary. */
-        if (!waiting) started = pos.time_ms;
-        waiting = 1;
-        if (reserve > pos.cap || pos.time_ms - started >= 17) return OS32_ERR_AGAIN;
+        if (!waiting) {
+            started = pos.time_ms;
+            initial_queue = queued;
+            waiting = 1;
+        }
+        if (reserve > pos.cap) return OS32_ERR_INVAL;
+        if (pos.time_ms - started >= 17)
+            return sent < buffered || queued >= reserve || queued > initial_queue
+                ? OS32_ERR_AGAIN : OS32_ERR_TIMEOUT;
         rc = pump(0, &pos);
         if (rc) return rc;
     }
