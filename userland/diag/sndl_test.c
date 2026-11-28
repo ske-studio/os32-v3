@@ -1,6 +1,20 @@
 #include "sndl.h"
 #include <string.h>
 
+/* Bind the diagnostic's private KAPI table to the shared mixer so we can
+ * sample its actual stream immediately before drain close. */
+extern KernelAPI *kapi;
+static KernelAPI observed_api;
+static KernelAPI *real_api;
+static SND2_Pos final_pos;
+static int have_pos;
+
+static int observed_close(u32 stream, u32 how)
+{
+    have_pos = real_api->snd2_stream_pos(stream, &final_pos) == 0;
+    return real_api->snd2_stream_close(stream, how);
+}
+
 /* Algorithm 7, carrier 1 only, left output. The right channel marks each
  * 256-frame boundary so a capture can be aligned without a guest clock. */
 static int soft_tone(KernelAPI *api)
@@ -36,7 +50,15 @@ int main(int argc, char **argv, KernelAPI *api)
     short tone[] = {4096, -4096}, out[4] = {0};
     unsigned long voice, buffer, done, how;
     if (argc == 2 && !strcmp(argv[1], "soft")) {
-        int rc = soft_tone(api);
+        real_api = api;
+        observed_api = *api;
+        observed_api.snd2_stream_close = observed_close;
+        kapi = &observed_api;
+        int rc = soft_tone(kapi);
+        kapi = api;
+        sndl_init(api);
+        if (have_pos) api->kprintf(7, "sndl soft underruns=%u\n", final_pos.underruns);
+        if (!rc && (!have_pos || final_pos.underruns)) rc = 6;
         if (rc) api->kprintf(7, "sndl_test soft FAIL rc=%d\n", rc);
         else api->kprintf(7, "sndl_test soft PASS rc=0\n");
         return rc;

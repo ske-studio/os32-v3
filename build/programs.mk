@@ -743,7 +743,11 @@ FORCE:
 # programs: に足し忘れたターゲットは make all でビルドされないまま
 # tools/deploy.yaml が古いバイナリを NHD に残す (deploy.yaml 冒頭の警告を参照)。
 # プログラムを追加したらこの一覧にも必ず足すこと。
-programs_base: $(CRT0_OBJ) $(BASE_PROGRAMS_BIN) $(BUILD_OUT)/int80.img
+programs_base: $(CRT0_OBJ) $(BASE_PROGRAMS_BIN) $(BUILD_OUT)/int80.img $(BUILD_OUT)/fmtone.img
+
+$(BUILD_OUT)/fmtone.img: tests/sound/soft86_tone.asm
+	@mkdir -p $(@D)
+	$(AS) -f bin $< -o $@
 
 $(BUILD_OUT)/int80.img: tools/gen_v86_int80.py
 	python3 $< --out $@

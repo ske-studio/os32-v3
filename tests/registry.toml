@@ -2397,8 +2397,24 @@ sources = ["tests/sound/soft86_tone.asm"]
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "DOS COM に左単音の音色列、key-on と key-off が入る"
+expect = "2HD IPL の先頭セクタに左単音の音色列、key-on と key-off が入る"
 limits = "組立後のレジスタ列だけを確認する。OUT の実行と発音の長さはゲストで確認する"
 gates = ["push", "main"]
 mutations = [
+ { id = "short_image", config = "pc98", when = "after_build", replace = "tests/sound/soft86_tone.asm", old = "times 77*2*8*1024", new = "times 76*2*8*1024", fail = "invalid IPL geometry" },
  { id = "omit_key_off", config = "pc98", when = "after_build", replace = "tests/sound/soft86_tone.asm", old = "key_off: db 28h,0", new = "key_off: db 28h,10h", fail = "missing key-off" }]
+
+[[check]]
+id = "sndl_soft_feed"
+spec = { path = "docs/decisions/sound/V86_SOFT86_DESIGN.md", section = "最初の DOS 聴取の実装と受入" }
+subsystem = "sound"
+level = "L1"
+sources = ["userland/lib/snd/chip.c", "userland/lib/snd/pump.c", "userland/lib/snd/live.h", "tests/support/fixtures/sndl_soft_feed/feed.c"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "通常アプリの OPNA 補充中に DMA が進んでも、連続した PCM が無音を挟まず届く"
+limits = "合成時間と DMA はホストモデル。NP21/W の時間と収録波形は受入で確認する"
+gates = ["push", "main"]
+mutations = [
+ { id = "batch_soft_feed", config = "pc98", when = "after_build", replace = "userland/lib/snd/chip.c", old = "window->render_limit = SNDL_SOFT_PERIOD;", new = "window->render_limit = 0;", fail = "PCM supply gap" }]

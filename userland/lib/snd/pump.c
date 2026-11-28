@@ -41,7 +41,7 @@ static int pcm_acquire(const SND2_Fmt *fmt, u32 period, u32 lead)
 
 int sndl_soft_pcm_acquire(const SND2_Fmt *fmt)
 {
-    if (!refs) return pcm_acquire(fmt, 256, 3);
+    if (!refs) return pcm_acquire(fmt, SNDL_SOFT_PERIOD, 3);
     if (rate != 44100 && rate != 22050) return OS32_ERR_NOSYS;
     ++refs;
     return 0;
@@ -136,11 +136,13 @@ static int pump(int draining)
     while (space) {
         if (sent == buffered) {
             if (draining && pos.state != SND2_ST_IDLE && !sndl_mix_queued()) break;
-            u32 n = space > 1024 ? 1024 : space;
-            __builtin_memset(stereo, 0, n * 2 * sizeof(*stereo));
             if (!window.frames) window.frames = space;
             rc = sndl_chip_prepare(&window);
             if (rc) return rc;
+            u32 n = space > 1024 ? 1024 : space;
+            /* Publish each software OPNA period before synthesizing the next. */
+            if (window.render_limit && n > window.render_limit) n = window.render_limit;
+            __builtin_memset(stereo, 0, n * 2 * sizeof(*stereo));
             rc = sndl_mix_render(stereo, n, rate, record, 0);
             if (rc) return rc;
             rc = sndl_chip_mix(stereo, n, rate, &window);

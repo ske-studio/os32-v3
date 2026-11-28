@@ -5,7 +5,8 @@
 extern KernelAPI *sound_api;
 int sndl_pcm_release(u32 how);
 int sndl_pcm_active(void);
-struct SndlWindow { u32 now, frames, offset; };
+#define SNDL_SOFT_PERIOD 256U
+struct SndlWindow { u32 now, frames, offset, render_limit; };
 int sndl_chip_prepare(struct SndlWindow *window);
 int sndl_chip_mix(int32_t *stereo, unsigned frames, unsigned rate, const struct SndlWindow *window);
 int sndl_soft_pcm_acquire(const SND2_Fmt *fmt);

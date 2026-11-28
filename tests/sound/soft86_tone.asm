@@ -1,18 +1,22 @@
-; PC-98 DOS COM. The V86 monitor reflects IRQ0 at 100 Hz.
+; PC-98 2HD IPL loaded at 1fc0:0000. IRQ0 is reflected at 100 Hz.
 bits 16
-org 100h
+org 0
 start:
-    mov ax, 3508h
-    int 21h
-    mov [old_vector], bx
-    mov [old_vector+2], es
-    mov dx, timer
-    mov ax, 2508h
-    int 21h
+    cli
+    mov ax, cs
+    mov ss, ax
+    mov sp, 0400h
+    xor ax, ax
+    mov ds, ax
+    mov word [8*4], timer
+    mov [8*4+2], cs
+    push cs
+    pop ds
     in al, 02h
     mov [old_mask], al
     and al, 0feh
     out 02h, al
+    sti
     cld
     mov si, tone
     mov cx, (tone_end-tone)/2
@@ -29,11 +33,8 @@ start:
     call wait_ticks
     mov al, [old_mask]
     out 02h, al
-    lds dx, [old_vector]
-    mov ax, 2508h
-    int 21h
-    mov ax, 4c00h
-    int 21h
+    cli
+    hlt
 
 wait_ticks:
     mov cx, [ticks]
@@ -66,4 +67,7 @@ tone_end:
 key_off: db 28h,0
 ticks: dw 0
 old_mask: db 0
-old_vector: dd 0
+; Keep the code, data and stack in the sector loaded by boot2.
+times 1024-64-($-$$) db 0
+times 64 db 0
+times 77*2*8*1024-($-$$) db 0

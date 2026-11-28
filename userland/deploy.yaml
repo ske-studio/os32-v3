@@ -164,6 +164,10 @@ filesystem:
     - host: userland/diag/shutdown_probe.bin
       guest: /usr/bin/
       tags: [test]
+    - host: build/out/fmtone.img
+      guest: /test/fmtone.img
+      tags: [test]
+      host_only: true
     - host: build/out/int80.img
       guest: /test/int80.img
       tags: [test]

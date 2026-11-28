@@ -192,6 +192,7 @@ int sndl_chip_prepare(struct SndlWindow *window)
     /* Reserve timer events for every instance before advancing audio on any. */
     for (unsigned i = 0; i < 8; ++i) {
         if (!slots[i].fm) continue;
+        window->render_limit = SNDL_SOFT_PERIOD;
         if (!have_clock) {
             int rc = clock_now(&now);
             if (rc) return rc;
