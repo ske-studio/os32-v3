@@ -23,8 +23,8 @@ def verify(config, viewer=False, boot=False, occupied=False, registration=False,
     if viewer:
         sources.append(fixture / "osri_work.c")
         sources.extend("sys/platform/pc98/video/splash_raster" + suffix + ".c"
-                       for suffix in ("", "_play", "_plan"))
-        defines.append("-Wl,--wrap=pc98_splash_raster_state")
+                       for suffix in ("", "_play", "_plan", "_run"))
+        defines.append("-Wl,--wrap=pc98_splash_raster_state,--wrap=pl_run_timing")
     else:
         sources.append(fixture / ("work_boot.c" if boot else "work.c"))
         sources.append("sys/platform/" + ("powermac/usb_key_report.c" if ppc else "pc98/usb_module.c"))
@@ -63,6 +63,7 @@ def verify(config, viewer=False, boot=False, occupied=False, registration=False,
             sources.extend(["sys/input/keymaps/pc98_jp.c", inspector, jump, fixture / "work_v86.c", "sys/platform/pc98/legacy/v86.c"])
         if viewer:
             (path / "platform_io.h").write_text(
+                '#include "memmap.h"\n'
                 "unsigned osri_status(unsigned); void osri_out(unsigned,unsigned);\n"
                 "static inline unsigned inp(unsigned port){return osri_status(port); }\n"
                 "static inline void outp(unsigned port,unsigned value){osri_out(port,value); }\n")

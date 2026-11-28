@@ -84,6 +84,8 @@ int pc98_osri_show(const struct OsriImage *image, struct OsriViewRun *ctl)
         pl_run_init(&run, state, now, remaining);
         while (pl_run_more(&run, tick_count)) {
             idle_work_run();
+            if (pc98_osri_poll(&poll)) { rc = GFX_OSRI_SHOW_CANCELLED; goto done; }
+            if (!pl_run_more(&run, tick_count)) break;
             int frame = pl_v2_frame_poll(state, image, plan, pc98_osri_poll, &poll);
             if (frame == PL_FRAME_CANCEL) { rc = GFX_OSRI_SHOW_CANCELLED; goto done; }
             if (frame == PL_FRAME_NO_SYNC) goto done;

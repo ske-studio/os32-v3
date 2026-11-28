@@ -2427,17 +2427,19 @@ id = "input_work_viewer"
 spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "11.1 現行入口と分担" }
 subsystem = "input"
 level = "L1"
-sources = ["sys/platform/pc98/video/splash_raster.c", "sys/platform/pc98/video/splash_raster_plan.c", "sys/platform/pc98/video/splash_raster_play.c", "tests/input/input_work_hid.py", "tests/support/fixtures/input_policy/osri_work.c", "sys/platform/pc98/video/backend_pc98_osri.c", "sys/kern/idle_work.c", "sys/kern/io_work.c"]
+sources = ["sys/platform/pc98/video/splash_raster_run.c", "sys/platform/pc98/video/splash_raster.c", "sys/platform/pc98/video/splash_raster_plan.c", "sys/platform/pc98/video/splash_raster_play.c", "tests/input/input_work_hid.py", "tests/support/fixtures/input_policy/osri_work.c", "sys/platform/pc98/video/backend_pc98_osri.c", "sys/kern/idle_work.c", "sys/kern/io_work.c"]
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "固定・動的画像とも各フレームの開始前に他サービスが1回進み、描画完了・取消後のパレットとテキストが復元される"
+expect = "固定・動的画像とも各フレームの開始前に他サービスが1回進み、動的画像は協調後の取消・延長と残時間を反映し、描画完了・取消後のパレットとテキストが復元される"
 limits = "GDC の VSYNC・HBLANK と時刻は fixture。実 player の全パレット OUT と行1の色変更を照合。実機の走査線タイミングは対象外"
 gates = ["push", "main"]
 mutations = [
     { id = "wrong_row_color", config = "pc98", when = "after_build", replace = "sys/platform/pc98/video/splash_raster_plan.c", old = "r->value[r->count++] = (rgb >> 4) & GFX_PALETTE_COMPONENT_MASK;", new = "r->value[r->count++] = 0;", fail = "OSRI frame probe 2" },
     { id = "skip_fixed", config = "pc98", when = "after_build", replace = "sys/platform/pc98/video/backend_pc98_osri.c", old = "idle_work_run();\n            if (pc98_splash_raster_frame", new = "if (pc98_splash_raster_frame", fail = "OSRI frame probe" },
-    { id = "skip_dynamic", config = "pc98", when = "after_build", replace = "sys/platform/pc98/video/backend_pc98_osri.c", old = "idle_work_run();\n            int frame", new = "int frame", fail = "OSRI frame probe" }
+    { id = "skip_dynamic", config = "pc98", when = "after_build", replace = "sys/platform/pc98/video/backend_pc98_osri.c", old = "idle_work_run();\n            if (pc98_osri_poll", new = "if (pc98_osri_poll", fail = "OSRI frame probe" },
+    { id = "stale_budget", config = "pc98", when = "after_build", replace = "sys/platform/pc98/video/backend_pc98_osri.c", old = "if (!pl_run_more(&run, tick_count)) break;", new = "(void)0;", fail = "OSRI frame probe 3" },
+    { id = "skip_boundary_keys", config = "pc98", when = "after_build", replace = "sys/platform/pc98/video/backend_pc98_osri.c", old = "if (pc98_osri_poll(&poll)) { rc = GFX_OSRI_SHOW_CANCELLED; goto done; }", new = "(void)0;", fail = "OSRI frame probe 4" }
 ]
 
 [[check]]
@@ -2484,9 +2486,10 @@ sources = ["userland/shell/rshell.c", "userland/shell/serial_watchdog.c", "tests
 environment = "linux-x86-cross"
 arch = { ppc = ["link-sh"] }
 needs = []
-expect = "常駐 rshell が行内の空読み中に協調し、保留のローカル repeat を同じ行に一度だけ取り込む"
+expect = "常駐 rshell が行内の空読み中に協調し、間隔を空けた UART 入力と4期限分のローカル repeat を同じ行に取り込み、LAN 通知を行末まで保留する"
 limits = "KAPI のローカル入力と pump を模擬。実際の時間間隔は PowerMac QEMU で別に測る"
 gates = ["push", "main"]
 mutations = [
-    { id = "rshell_no_pump", config = "link-sh", when = "after_build", replace = "userland/shell/rshell.c", old = "g_api->io_pump(500);", new = "(void)0;", fail = "resident line missed deferred repeat" }
+    { id = "rshell_no_pump", config = "link-sh", when = "after_build", replace = "userland/shell/rshell.c", old = "g_api->io_pump(500);", new = "(void)0;", fail = "resident line missed deferred repeat" },
+    { id = "rshell_late_pump", config = "link-sh", when = "after_build", replace = "userland/shell/rshell.c", old = "++polls & 255u", new = "++polls & 32767u", fail = "resident line missed deferred repeat" }
 ]

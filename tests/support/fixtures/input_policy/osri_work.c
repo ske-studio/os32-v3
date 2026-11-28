@@ -19,18 +19,21 @@ static u8 palette[OSRI_COLORS];
 void *kmalloc(u32 bytes) { return bytes == sizeof plan ? (void *)&plan : saved_text; }
 void kfree(void *p) { (void)p; }
 struct SplashRaster *__wrap_pc98_splash_raster_state(void) { return &raster; }
-int pl_run_timing(const struct SplashRaster *s) { return s != &raster; }
+int __wrap_pl_run_timing(const struct SplashRaster *s) { return s != &raster; }
 int sys_time_now(u32 *lo, u32 *hi) { *lo = sample; *hi = 0; return 0; }
-void pl_run_init(struct PlRun *r, const struct SplashRaster *s, u32 start, u32 us)
-{ (void)s; (void)start; (void)us; r->good = 0; }
-int pl_run_more(const struct PlRun *r, u32 now) { (void)now; return r->good < 3; }
-void pl_run_charge(struct PlRun *r, int frame) { if (frame == PL_FRAME_OK) ++r->good; }
-void pl_run_extend(struct PlRun *r, u32 now, u32 us) { (void)r; (void)now; (void)us; }
-int gfx_osri_poll_abort(int caller) { (void)caller; return !image.count && frames == 3; }
+enum boundary_input { EMPTY, ESCAPE, ABORT, EXTEND };
+static enum boundary_input boundary;
+static int key = -1;
+int gfx_osri_poll_abort(int caller)
+{
+    (void)caller;
+    return (!image.count && frames == 3) || (boundary == ABORT && serviced) ||
+           (boundary == EXTEND && serviced == 2);
+}
 int con_sink_is_enabled(void) { return 0; }
 int input_trygetrawkey(void) { return -1; }
-int input_peekkey(void) { return -1; }
-int input_trygetkey(void) { return -1; }
+int input_peekkey(void) { return key; }
+int input_trygetkey(void) { int ch = key; key = -1; return ch; }
 void palette_set(int i, u8 r, u8 g, u8 b) { palette[i] = r; (void)g; (void)b; }
 void palette_get(int i, u8 *r, u8 *g, u8 *b) { *r = *g = *b = palette[i]; }
 void gfx_add_dirty_rect(int x, int y, int w, int h)
@@ -41,6 +44,8 @@ static void service(void)
 {
     if (input_test_irq || frames != raster.frame) ++bad;
     ++serviced;
+    if (serviced == 1 && boundary == ESCAPE) key = OSRI_ESC_ASCII;
+    if (serviced == 1 && boundary == EXTEND) key = 'a';
     ++tick_count;
 }
 
@@ -79,6 +84,9 @@ void osri_out(unsigned port, unsigned value)
 int probe(void)
 {
     if (idle_work_register(service)) return 1;
+    raster.total_lines = SPLASH_RASTER_VISIBLE_LINES;
+    raster.line_num_us = SPLASH_RASTER_LINE_NUM_US;
+    raster.line_den = SPLASH_RASTER_24K_DEN;
     for (unsigned dynamic = 0; dynamic < 2; ++dynamic) {
         image.count = dynamic;
         image.version = OSRI_VERSION_2;
@@ -88,12 +96,20 @@ int probe(void)
         palette[1] = 7;
         attributes[0] = 0x55;
         frames = serviced = cleared = presented = 0;
-        struct OsriViewRun ctl = {.duration_ms = 30000, .start = tick_count};
+        struct OsriViewRun ctl = {.duration_ms = 50, .start = tick_count};
         int rc = pc98_osri_show(&image, &ctl);
         if (rc != (dynamic ? GFX_OSRI_SHOW_DONE : GFX_OSRI_SHOW_CANCELLED) ||
             bad || frames != 3 || raster.frame != 3 || writes != 3 * (dynamic ? 68 : 64) ||
             row_writes != (dynamic ? 12 : 0) || cleared != 1 || presented != 1 ||
             attributes[0] != 0x55 || palette[1] != 7) return 2;
+    }
+    for (boundary = EMPTY; boundary <= EXTEND; ++boundary) {
+        raster.frame = frames = serviced = sample = writes = row_writes = 0;
+        struct OsriViewRun ctl = {.duration_ms = 20, .start = tick_count};
+        int rc = pc98_osri_show(&image, &ctl);
+        if (frames != (boundary == EXTEND ? 1u : 0u) || bad ||
+            rc != (boundary == EMPTY ? OS32_ERR_AGAIN : GFX_OSRI_SHOW_CANCELLED))
+            return 3 + boundary;
     }
     return 0;
 }
