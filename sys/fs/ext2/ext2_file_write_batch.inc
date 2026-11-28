@@ -10,13 +10,11 @@ void ext2_write_abort(Ext2Ctx *ctx)
     ext2_mem_zero(w, sizeof(Ext2WriteWork));
 }
 
-int ext2_write_begin(Ext2Ctx *ctx, u32 ino, const Ext2Inode *initial)
+static int ext2_write_prepare(Ext2Ctx *ctx)
 {
     Ext2WriteWork *w = ext2_write_workspace(ctx);
-    int ret;
-    ext2_read_cache_reset();
-    ext2_mem_zero(w, sizeof(*w));
     u32 bytes = ctx->num_groups * sizeof(Ext2WriteBitmap);
+    ext2_mem_zero(w, sizeof(*w));
     if (ctx->private_write) {
         w->block_bitmap = kzalloc(bytes);
         if (!w->block_bitmap) return EXT2_ERR_NOSPC;
@@ -24,7 +22,17 @@ int ext2_write_begin(Ext2Ctx *ctx, u32 ino, const Ext2Inode *initial)
         w->block_bitmap = hd_block_bitmap;
         ext2_mem_zero(hd_block_bitmap, bytes);
     }
-    w->ctx = ctx; w->active = 1; w->defer_inode = initial != 0;
+    w->ctx = ctx;
+    return EXT2_OK;
+}
+
+static int ext2_write_begin_prepared(Ext2Ctx *ctx, u32 ino, const Ext2Inode *initial)
+{
+    Ext2WriteWork *w = ext2_write_workspace(ctx);
+    int ret;
+    ext2_read_cache_reset();
+    w->active = 1;
+    w->defer_inode = initial != 0;
     if (ino == EXT2_WRITE_NEW_INO) {
         ret = ext2_write_bitmap_reserve_inode(ctx, &ino);
         if (ret != 0) { ext2_write_abort(ctx); return ret; }
@@ -33,6 +41,13 @@ int ext2_write_begin(Ext2Ctx *ctx, u32 ino, const Ext2Inode *initial)
     ret = ext2_write_inode_load(ctx, ino, initial);
     if (ret != 0) ext2_write_abort(ctx);
     return ret;
+}
+
+int ext2_write_begin(Ext2Ctx *ctx, u32 ino, const Ext2Inode *initial)
+{
+    int ret = ext2_write_prepare(ctx);
+    if (ret != 0) return ret;
+    return ext2_write_begin_prepared(ctx, ino, initial);
 }
 
 int ext2_write_map(Ext2Ctx *ctx, u32 logical, u32 *out_phys)

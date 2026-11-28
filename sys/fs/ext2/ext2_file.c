@@ -129,12 +129,15 @@ int ext2_write(Ext2Ctx *ctx, u32 ino, const void *data, u32 size)
     if (ret != 0) return ret;
     if ((inode.mode & EXT2_S_IFMT) != EXT2_S_IFREG) return EXT2_ERR_ISDIR;
     inode.mtime = ext2_current_time(); inode.ctime = inode.mtime;
+    ret = ext2_write_prepare(ctx);
+    if (ret != 0) return ret;
     /* The old references are removed before freeing or building new data. */
     ret = ext2_truncate_blocks(ctx, ino, &inode, &leaked);
-    if (ret != 0) return ret;
-    /* A metadata failure while returning old blocks forbids further writes. */
-    if (ctx->fs_error) return EXT2_ERR_IO;
-    ret = ext2_write_begin(ctx, ino, &inode);
+    if (ret != 0 || ctx->fs_error) {
+        ext2_write_abort(ctx);
+        return ret != 0 ? ret : EXT2_ERR_IO;
+    }
+    ret = ext2_write_begin_prepared(ctx, ino, &inode);
     if (ret != 0) return ret;
     ret = ext2_write_batch_transfer(ctx, data, size, 0, 1);
     if (ret < 0) {

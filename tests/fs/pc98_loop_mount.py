@@ -39,7 +39,9 @@ def probe(flags):
     if rc:
         raise Failure({2: "loop name resolution", 3: "loop mount count",
                        8: "loop remount content", 11: "duplicate image", 12: "backing mount",
-                       13: "mounted format", 14: "mounted detach", 15: "ISO heap budget"}.get(rc, f"loop lifecycle step {rc}"))
+                       13: "mounted format", 14: "mounted detach", 15: "ISO heap budget",
+                       16: "low heap setup", 17: "low heap truncate",
+                       18: "low heap write or create", 19: "low heap rename or unlink"}.get(rc, f"loop lifecycle step {rc}"))
 
     return result.stdout
 

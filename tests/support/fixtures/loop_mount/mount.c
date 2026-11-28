@@ -87,6 +87,37 @@ void kprintf(u8 attr, const char *fmt, ...) {}
 
 extern int shell_loop_lifecycle(char *image);
 
+/* Keep less than one bitmap block available on the mounted loop. */
+static int low_heap_writes(void)
+{
+    const char *path = "/lo2/data";
+    const char *new_path = "/lo2/absent";
+    const char *renamed = "/lo2/moved";
+    const char *spare = "/lo2/spare";
+    OS32_Stat st;
+    if (vfs_write(spare, "x", 1) < 0) return 16;
+    int fd = vfs_open(path, O_WRONLY);
+    if (fd < 0) return 16;
+    void *held = kmalloc(kmalloc_free() - 128);
+    if (!held || kmalloc_free() >= EXT2_BLOCK_SIZE) return 16;
+    if (vfs_open(path, O_WRONLY | O_TRUNC) != VFS_ERR_NOSPC ||
+        vfs_read(path, readback, sizeof(readback)) != sizeof(payload) ||
+        memcmp(readback, payload, sizeof(payload))) return 17;
+    if (vfs_write(path, "new", 3) != VFS_ERR_NOSPC ||
+        vfs_write_fd(fd, "new", 3) != VFS_ERR_NOSPC ||
+        vfs_open(new_path, O_WRONLY | O_CREAT | O_EXCL) != VFS_ERR_NOSPC ||
+        vfs_write(new_path, "new", 3) != VFS_ERR_NOSPC ||
+        vfs_stat(new_path, &st) != VFS_ERR_NOTFOUND) return 18;
+    vfs_close(fd);
+    /* Neither directory operation needs the file writer's bitmap. */
+    if (vfs_rename(spare, renamed) || vfs_read(renamed, readback, 1) != 1 ||
+        readback[0] != 'x' || vfs_rm(renamed) ||
+        vfs_stat(renamed, &st) != VFS_ERR_NOTFOUND) return 19;
+    kfree(held);
+    /* The caller remounts and compares all payload bytes. */
+    return 0;
+}
+
 int probe(void)
 {
     static Device hd = {.name = "hd0", .blk_read = disk_read, .blk_write = disk_write};
@@ -159,6 +190,8 @@ int probe(void)
         file[3] = value[4] = '0' + i;
         if (vfs_write(file, value, sizeof(value)) < 0) return 7;
     }
+    int low_heap_rc = low_heap_writes();
+    if (low_heap_rc) return low_heap_rc;
     for (int i = 0; i < 4; i++) {
         name[2] = prefix[3] = file[3] = value[4] = '0' + i;
         if (vfs_umount_checked(prefix) || vfs_dev_mount_count(OS32_DRV_LOOP(i)) != 0) return 3;
