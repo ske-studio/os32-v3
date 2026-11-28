@@ -227,7 +227,7 @@ void con_sink_owner_exit(int id)""")
           edit(heap.read_text(), alloc, alloc + "\n    if (size && !p) ++p3_alloc_failures;"))
 
 
-def link_media(*, usb_trace=False, overflow=False, rpc_trace=False):
+def link_media(*, usb_trace=False, overflow=False, rpc_trace=False, switch=False):
     directory = Path(os.environ["OS32_VERIFY_OUT"]).resolve() / "link-sh"
     directory.mkdir()
     user = directory / "user"
@@ -242,6 +242,13 @@ def link_media(*, usb_trace=False, overflow=False, rpc_trace=False):
     unicode_bin = directory / "unicode.bin"
     manifest = json.loads(Path("build/ppc-ram-root.json").read_text())
     manifest["/sys/unicode.bin"] = str(unicode_bin)
+    if switch:
+        second = directory / "second"
+        source = Path("tests/support/fixtures/ppc_link/second.c")
+        subprocess.run([*args, f"PPC_USER_OUT={second}", f"KB_SH_OUT={second}",
+                        f"PPC_RES_SRC={source} sdk/crt/syscalls.c sdk/allocator/nano_adapter.c",
+                        str(second / "shell.bin")], check=True)
+        manifest["/bin/second.bin"] = str(second / "shell.bin")
     template = directory / "root-template.json"
     template.write_text(json.dumps(manifest))
     sample = directory / "sample.txt"
@@ -268,6 +275,11 @@ def link_media(*, usb_trace=False, overflow=False, rpc_trace=False):
             g_api->tvram_clear();
             g_api->sys_write(1, message, sizeof(message) - 1);
         } else accepting = rsh_lan_execute(line);'''
+    if switch:
+        stimuli = stimuli.replace("} else accepting", r''' } else if (!strcmp(line, "s12-switch")) {
+            int rc = g_api->sys_switch_shell("/bin/second.bin");
+            if (!rc) g_api->sys_exit(0);
+        } else accepting''')
     if overflow:
         stimuli = stimuli.replace("} else accepting", r''' } else if (!strcmp(line, "p3-overflow")) {
             for (int i = 0; i < 110; ++i)

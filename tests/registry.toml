@@ -562,18 +562,18 @@ mutations = [
 
 [[check]]
 id = "ppc_link_session"
-ppc_seconds = { link-sh = 473 }
-spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の遠隔シェル" }
+ppc_seconds = { link-sh = 713 }
+spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "段 12 F/5d 常駐シェル切替" }
 subsystem = "system"
 level = "L4"
-sources = ["make:all", "make:iso", "tests/support/ppc_vm.py", "tests/support/ppc_fixture.py", "tests/support/fixtures/ppc_link", "tests/support/ppc_peer.py", "tools/host_agent.py", "tools/host_rshell.py", "tools/host_operator_socket.py", "tools/ppc_lan_host.py", "tools/host_sfs_link.py", "sys/kern/console/console.c", "sys/platform/powermac/shell_loop_ops.c", "sys/kern/console/con_sink.c", "userland/shell/rshell_lan.c", "sys/kern/exec/exec.c", "sys/kern/mm/kmalloc.c"]
+sources = ["make:all", "make:iso", "tests/support/ppc_vm.py", "tests/support/ppc_fixture.py", "tests/support/fixtures/ppc_link", "sys/kern/gui.c", "sys/kern/init/shell_loop.c", "tests/support/ppc_peer.py", "tools/host_agent.py", "tools/host_rshell.py", "tools/host_operator_socket.py", "tools/ppc_lan_host.py", "tools/host_sfs_link.py", "sys/kern/console/console.c", "sys/platform/powermac/shell_loop_ops.c", "sys/kern/console/con_sink.c", "userland/shell/rshell.c", "sys/fs/serialfs/serialfs_session.c", "userland/ppc/hello.c", "userland/shell/rshell_lan.c", "sys/kern/exec/exec.c", "sys/kern/mm/kmalloc.c"]
 environment = "qemu-ppc-net"
 arch = { ppc = ["link-sh"] }
 needs = []
-expect = "出力全体・常駐世代・owner 回復"
+expect = "出力全体・常駐世代・owner 回復・SFS 子と scope の終了・未マウント時の拒否・枠1で第二像が二度起動"
 limits = "agent 先行と後起動"
 gates = ["push", "main"]
-mutations = [{ id = "double_print", config = "link-sh", when = "after_build", replace = "sys/kern/console/console.c", old = "    con_sink_push_print(buf, size, color);", new = "    con_sink_push_print(buf, size, color); con_sink_push_print(buf, size, color);", fail = "duplicate PRINT payload" }, { id = "fault_restart", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/shell_loop_ops.c", old = "    kprintf(0x07, \"%s returned %d\\n\", path, rc);", new = "    kprintf(0x07, \"%s returned %d\\n\", path, rc);\n    if (rc < 0) for (;;) idle_wait_step();", fail = "resident fault without new generation" }, { id = "reader_owner", config = "link-sh", when = "after_build", replace = "sys/kern/console/con_sink.c", old = "    if (g_reader == id) {", new = "    if (0) {", fail = "reader retained after owner exit" }]
+mutations = [{ id = "double_print", config = "link-sh", when = "after_build", replace = "sys/kern/console/console.c", old = "    con_sink_push_print(buf, size, color);", new = "    con_sink_push_print(buf, size, color); con_sink_push_print(buf, size, color);", fail = "duplicate PRINT payload" }, { id = "fault_restart", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/shell_loop_ops.c", old = "    kprintf(0x07, \"%s returned %d\\n\", path, rc);", new = "    kprintf(0x07, \"%s returned %d\\n\", path, rc);\n    if (rc < 0) for (;;) idle_wait_step();", fail = "resident fault without new generation" }, { id = "reader_owner", config = "link-sh", when = "after_build", replace = "sys/kern/console/con_sink.c", old = "    if (g_reader == id) {", new = "    if (0) {", fail = "reader retained after owner exit" }, { id = "sfs_end", config = "link-sh", when = "after_build", replace = "userland/shell/rshell.c", old = "    (void)g_api->sfs_end(status);", new = "    (void)status;", fail = "SFS end missing after exit 7" }]
 
 [[check]]
 id = "ppc_usb_lan"
@@ -2495,3 +2495,18 @@ mutations = [
     { id = "rshell_no_lan_poll", config = "link-sh", when = "after_build", replace = "userland/shell/rshell.c", old = "g_api->host_notice_read && rsh_lan_poll() == RSH_LAN_EXIT", new = "0", fail = "queued LAN reply missing, early or duplicated" },
     { id = "rshell_early_lan_poll", config = "link-sh", when = "after_build", replace = "userland/shell/rshell.c", old = "    return rsh_getch(from_serial);", new = "    (void)rsh_lan_poll(); return rsh_getch(from_serial);", fail = "queued LAN reply missing, early or duplicated" }
 ]
+
+[[check]]
+id = "shell_switch_gate"
+spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "段 12 F/5d 常駐シェル切替" }
+subsystem = "system"
+level = "L1"
+sources = ["tests/support/product.py", "tests/support/fixtures/shell_switch/gate.c", "tests/support/fixtures/input_policy/entry.S", "sys/kern/gui.c", "sys/kern/init/shell_loop.c", "sys/kern/kstring_c.c"]
+environment = "linux-cross"
+arch = { x86 = ["pc98"], ppc = ["link-sh"] }
+needs = []
+expect = "枠1の保留先を拒否の後も起動し、GUI prepare 失敗後の次周回も CUI を起動する"
+limits = "owner と exec_run と機種 ops は試験側で与える"
+gates = ["push", "main"]
+mutations = [{ id = "invert_owner", config = "pc98", when = "after_build", replace = "sys/kern/gui.c", old = "if (res_owner_get() != GUI_SHELL_OWNER) {", new = "if (res_owner_get() == GUI_SHELL_OWNER) {", fail = "shell owner request rejected" },
+    { id = "keep_request", config = "link-sh", when = "after_build", replace = "sys/kern/gui.c", old = "    g_next_shell[0] = '\\0';", new = "    /* request retained */", fail = "switch request consumed twice" }]
