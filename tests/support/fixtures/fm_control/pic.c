@@ -17,6 +17,7 @@ __attribute__((section(".ivt"), used, retain))
 static const u16 guest_ivt[512] = {[0x14 * 2] = 16, [0x14 * 2 + 1] = 0x3000};
 struct kdebug kdebug;
 int v86_gp_handler(u32 *frame);
+int v86_soft_out(u16 port, u8 val) { return 0; }
 int v86_bios_is_hle(u32 vector) { return 0; }
 void v86_bios_dispatch(u32 *frame, u32 vector) {}
 u32 v86_io_in(u16 port, int size) { return 0; }

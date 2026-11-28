@@ -15,6 +15,8 @@
 #include "../../../kern/mm/paging.h"
 #include "../../../kern/mm/pgalloc.h"
 #include "io.h"
+#include "tss.h"
+#include "kmalloc.h"
 #include "v86_io.h"
 #include "v86_bios.h"
 #include "../../../kern/module/module.h"
@@ -53,6 +55,51 @@ static const struct v86_ident_ent {
 };
 #define V86_IDENT_MAP_N \
     ((int)(sizeof(v86_ident_map) / sizeof(v86_ident_map[0])))
+
+/* Allocated only for a cooperative guest. Its DOS RAM remains reserved. */
+static struct slice_memory {
+    u32 pte[V86_GUEST_MAP_END / PAGE_SIZE], pde;
+    u8 bios[PAGE_SIZE], mailbox[MEM_AUTOPLAY_MAILBOX_SIZE];
+    u8 iomap[TSS_IOMAP_SIZE];
+    int suspended;
+} *slice_mem;
+
+int v86_mem_enable_slices(void)
+{
+    slice_mem = kzalloc(sizeof *slice_mem);
+    if (!slice_mem) return -1;
+    kmemcpy(slice_mem->pte, v86_session.low_pte, sizeof slice_mem->pte);
+    slice_mem->pde = v86_session.lowmap.master_pde;
+    return 0;
+}
+
+void v86_mem_suspend(void)
+{
+    u32 flags = irq_save();
+    kmemcpy(slice_mem->bios, P2V(0), PAGE_SIZE);
+    kmemcpy(slice_mem->mailbox, P2V(MEM_AUTOPLAY_MAILBOX_BASE), MEM_AUTOPLAY_MAILBOX_SIZE);
+    kmemcpy(slice_mem->iomap, kernel_tss.iomap, TSS_IOMAP_SIZE);
+    kmemcpy(P2V(0), v86_bios_real_lowmem(), PAGE_SIZE);
+    kmemcpy(P2V(MEM_AUTOPLAY_MAILBOX_BASE), v86_call_mailbox(), MEM_AUTOPLAY_MAILBOX_SIZE);
+    tss_iomap_deny_all();
+    if (paging_lowmap_exchange(&v86_session.lowmap, slice_mem->pte, &slice_mem->pde))
+        for (;;) _stop();
+    slice_mem->suspended = 1;
+    irq_restore(flags);
+}
+
+void v86_mem_resume(void)
+{
+    u32 flags = irq_save();
+    if (paging_lowmap_exchange(&v86_session.lowmap, slice_mem->pte, &slice_mem->pde))
+        for (;;) _stop();
+    kmemcpy(v86_call_mailbox(), P2V(MEM_AUTOPLAY_MAILBOX_BASE), MEM_AUTOPLAY_MAILBOX_SIZE);
+    kmemcpy(P2V(MEM_AUTOPLAY_MAILBOX_BASE), slice_mem->mailbox, MEM_AUTOPLAY_MAILBOX_SIZE);
+    kmemcpy(P2V(0), slice_mem->bios, PAGE_SIZE);
+    kmemcpy(kernel_tss.iomap, slice_mem->iomap, TSS_IOMAP_SIZE);
+    slice_mem->suspended = 0;
+    irq_restore(flags);
+}
 
 int v86_session_begin(u32 owner)
 {
@@ -135,6 +182,11 @@ void v86_session_end(void)
     /* Preserve this context's IF, but leave guest IOPL/other flags behind. */
     if (v86_session.running)
         flags = (v86_session.saved_eflags & ~EFLAGS_IF) | (flags & EFLAGS_IF);
+    if (slice_mem && slice_mem->suspended) {
+        paging_load_cr3(v86_session.lowmap.root);
+        v86_mem_resume();
+    }
+    v86_session.soft_input = v86_session.soft_stop = 0;
     v86_runtime_end();
     v86_bios_restore_real();
     kmemcpy(P2V(MEM_AUTOPLAY_MAILBOX_BASE), v86_call_mailbox(),
@@ -193,6 +245,7 @@ release:
         if (v86_session.aborting) v86_module_session_release();
         goto done;
     }
+    if (slice_mem) { kfree(slice_mem); slice_mem = 0; }
     v86_bios_detach_disk();
     v86_session.release_pending = 0;
     gfx_v86_return();

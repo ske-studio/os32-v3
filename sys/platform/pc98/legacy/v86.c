@@ -1,4 +1,7 @@
 #include "v86_call.h"
+#ifdef TICK_PROBE
+#include "tick_probe.h"
+#endif
 /* ======================================================================== */
 /*  V86.C — 仮想8086モード ランタイム (Phase 1 最小実装)                    */
 /*                                                                          */
@@ -193,10 +196,38 @@ void v86_fault_handler(u32 *frame, u32 vector)
     v86_exit_reason = V86_EXIT_FAULT;
 }
 
+static struct v86_context *slice_context;
+static volatile int slice_due;
+static void save_slice(const u32 *frame, unsigned ip)
+{
+#ifdef TICK_PROBE
+    tick_probe_soft_begin(TP_SOFT_LEAVE);
+#endif
+    *slice_context = (struct v86_context){
+        .eip = frame[ip],
+        .cs = frame[ip + V86I_CS - V86I_EIP],
+        .eflags = frame[ip + V86I_EFLAGS - V86I_EIP],
+        .esp = frame[ip + V86I_ESP - V86I_EIP],
+        .ss = frame[ip + V86I_SS - V86I_EIP],
+        .es = frame[ip + V86I_ES - V86I_EIP],
+        .ds = frame[ip + V86I_DS - V86I_EIP],
+        .fs = frame[ip + V86I_FS - V86I_EIP],
+        .gs = frame[ip + V86I_GS - V86I_EIP],
+        .edi = frame[V86F_EDI],
+        .esi = frame[V86F_ESI],
+        .ebp = frame[V86F_EBP],
+        .ebx = frame[V86F_EBX],
+        .edx = frame[V86F_EDX],
+        .ecx = frame[V86F_ECX],
+        .eax = frame[V86F_EAX],
+    };
+    v86_exit_reason = V86_EXIT_SLICE;
+}
+
 static int v86_deliver_pending(u32 *frame, int ip, int cs, int flags, int sp, int ss);
 #include "v86_gp_emulate.inc"
 
-int v86_gp_handler(u32 *frame)
+static int v86_gp_dispatch(u32 *frame)
 {
     u32 cs  = frame[V86F_CS];
     u32 ip  = frame[V86F_EIP];
@@ -271,6 +302,22 @@ int v86_gp_handler(u32 *frame)
                                V86F_ESP, V86F_SS);
 }
 
+int v86_gp_handler(u32 *frame)
+{
+#ifdef TICK_PROBE
+    tick_probe_if_begin(EFLAGS_IF);
+#endif
+    int rc = v86_gp_dispatch(frame);
+    if (!rc && slice_context && slice_due) {
+        save_slice(frame, V86F_EIP);
+        rc = 1;
+    }
+#ifdef TICK_PROBE
+    if (!rc) tick_probe_if_end(EFLAGS_IF);
+#endif
+    return rc;
+}
+
 /* ======================================================================== */
 /*  割り込み反射                                                            */
 /*                                                                          */
@@ -289,6 +336,7 @@ int v86_gp_handler(u32 *frame)
 /* ======================================================================== */
 
 static volatile u32 v86_irq_n = 0;
+
 
 /* セッションのタイムアウト。タイマ反射のたびに数え、上限を超えたら
  * セッションを畳む。
@@ -359,12 +407,24 @@ static int v86_deliver_pending(u32 *frame, int ip, int cs, int flags, int sp, in
 
 void v86_reflect_irq(u32 *frame, u32 irq)
 {
-    if (!v86_active) return;
+#ifdef TICK_PROBE
+    if (irq == 0) tick_probe_soft_jiffy(v86_active && (frame[V86I_EFLAGS] & EFLAGS_VM));
+#endif
+    if (!v86_active && !(irq == 1 && v86_session.soft_input)) return;
+    if (irq == 0 && slice_context) slice_due = 1;
     v86_pic_request(irq);
     /* Hardware interrupt entry from VM is already past any STI shadow. */
-    if ((frame[V86I_EFLAGS] & EFLAGS_VM) &&
-        v86_deliver_pending(frame, V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS))
+    if (!(frame[V86I_EFLAGS] & EFLAGS_VM)) return;
+    if (v86_deliver_pending(frame, V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS)) {
         v86_exit_request = 1;
+        return;
+    }
+    if (irq == 0 && slice_context && !v86_exit_request) {
+        /* IRQ0 has acknowledged the physical PIC. Resume the reflected
+         * guest handler if delivery changed the return frame. */
+        save_slice(frame, V86I_EIP);
+        v86_exit_request = 1;
+    }
 }
 
 /* 戻り値 1 = 成功 / 0 = ゲストスタック不正 (呼び出し元でセッションを畳む) */
@@ -398,6 +458,7 @@ void v86_int80(u32 *frame)
  * (asm スタブ) に寄せるため。タイマのタイムアウトと同じ作法。 */
 void v86_request_exit(void)
 {
+    if (v86_session.soft_input) v86_session.soft_stop = 1;
     if (!v86_active) {
         return;
     }
@@ -442,6 +503,9 @@ int v86_tick_and_check_timeout(void)
 /* #GP スタブから呼ばれる脱出口。v86_run() の setjmp 地点へ戻る。 */
 void v86_longjmp_out(void)
 {
+#ifdef TICK_PROBE
+    if (slice_context) tick_probe_soft_begin(TP_SOFT_LEAVE);
+#endif
     v86_active = 0;
     exec_longjmp(v86_jmpbuf);
 }
@@ -454,10 +518,21 @@ int v86_run(const struct v86_context *ctx)
     return v86_run_limit(ctx, V86_TICK_LIMIT);
 }
 
+int v86_run_slice(struct v86_context *ctx)
+{
+    if (!ctx || slice_context || v86_active) return -1;
+    slice_due = 0;
+    slice_context = ctx;
+    int reason = v86_run_limit(ctx, V86_TICK_LIMIT);
+    slice_context = 0;
+    return reason;
+}
+
 /* Also called before the app fault longjmp. Keep exception IF disabled;
  * normal v86_run restores its caller EFLAGS after this common unwind. */
 void v86_runtime_end(void)
 {
+    slice_context = 0;
     v86_active = 0;
     if (!v86_session.running) return;
     if (platform_irq_reserved(V86_IRQ_SOUND)) irq_disable(V86_IRQ_SOUND);
@@ -510,10 +585,17 @@ int v86_run_limit(const struct v86_context *ctx, u32 tick_limit)
 
     if (exec_setjmp(v86_jmpbuf) == 0) {
         v86_active = 1;
+#ifdef TICK_PROBE
+        if (slice_context) tick_probe_soft_end(TP_SOFT_ENTER);
+        tick_probe_if_end(EFLAGS_IF); /* guest CLI is outside the OS32 interval */
+#endif
         v86_enter(ctx);         /* 正常には戻らない */
     }
 
     /* longjmp で戻ってきた */
+#ifdef TICK_PROBE
+    tick_probe_if_begin(EFLAGS_IF);
+#endif
     v86_runtime_end();
     irq_restore(v86_session.saved_eflags);
 
@@ -581,7 +663,7 @@ u32 v86_smoke_gpfl   = 0;   /* 同 ゲスト EFLAGS (IOPL 確認用) */
 
 int v86_smoke_test(void)
 {
-    struct v86_context ctx;
+    struct v86_context ctx = {0};
     volatile u16 *magic;
     int reason;
     u32 i;
@@ -683,7 +765,7 @@ u32 v86_disk_reason = 0;
 
 int v86_disk_test(const char *path)
 {
-    struct v86_context ctx;
+    struct v86_context ctx = {0};
     static u8 ref[V86_DISK_SECLEN];
     const u8 *got;
     u32 i, same;
@@ -785,10 +867,8 @@ u32 v86_boot_gpip    = 0;   /* 同 IP */
 u32 v86_boot_gpop    = 0;   /* 同 オペコード 4 バイト */
 u32 v86_boot_irq     = 0;   /* ゲストへ反射した IRQ 回数 */
 
-int v86_boot2(const char *path, const char *second)
+int v86_boot_prepare(const char *path, const char *second, struct v86_context *ctx)
 {
-    struct v86_context ctx;
-    int reason;
 
     if (v86_gui_refuse()) return -1;    /* 票 T8-2 */
 
@@ -837,16 +917,24 @@ int v86_boot2(const char *path, const char *second)
         return -3;
     }
 
-    ctx.eip    = 0x0000;
-    ctx.cs     = V86_IPL_SEG;
-    ctx.eflags = V86_EFLAGS_INIT;
-    ctx.esp    = V86_BOOT_SP;
-    ctx.ss     = V86_BOOT_SS;
-    ctx.es     = 0x0000;
-    ctx.ds     = 0x0000;
-    ctx.fs     = 0x0000;
-    ctx.gs     = 0x0000;
+    ctx->eip    = 0x0000;
+    ctx->cs     = V86_IPL_SEG;
+    ctx->eflags = V86_EFLAGS_INIT;
+    ctx->esp    = V86_BOOT_SP;
+    ctx->ss     = V86_BOOT_SS;
+    ctx->es     = 0x0000;
+    ctx->ds     = 0x0000;
+    ctx->fs     = 0x0000;
+    ctx->gs     = 0x0000;
 
+    return 0;
+}
+
+int v86_boot2(const char *path, const char *second)
+{
+    struct v86_context ctx = {0};
+    int reason = v86_boot_prepare(path, second, &ctx);
+    if (reason) return reason;
     reason = v86_run(&ctx);
 
     /* teardown 前に観測値を回収する */

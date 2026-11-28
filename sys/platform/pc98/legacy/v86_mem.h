@@ -102,6 +102,8 @@ struct v86_session_state {
     int closing;
     volatile int active;
     int running;
+    int soft_input;
+    int soft_stop;
     int aborting;
     int release_pending;
     k_jmpbuf jmpbuf;
@@ -113,6 +115,9 @@ extern struct v86_session_state v86_session;
 extern u32 v86_restore_mismatch;
 int v86_session_begin(u32 owner);
 void v86_session_end(void);
+int v86_mem_enable_slices(void);
+void v86_mem_suspend(void);
+void v86_mem_resume(void);
 void v86_runtime_end(void);
 int paging_v86_session_open(void);
 int paging_v86_map_range(u32 base, u32 end, u32 phys, u32 flags);

@@ -11,7 +11,7 @@
 #include "x86_flags.h"
 
 int legacy_init(void) { return v86_module_load(); }
-int legacy_active(void) { return v86_is_active(); }
+int legacy_active(void) { return v86_is_active() || v86_session.soft_input; }
 int legacy_pinned(void) { return v86_call_pinned(); }
 int legacy_session_open(void) { return v86_session.open; }
 int legacy_closing(void) { return v86_session.closing; }

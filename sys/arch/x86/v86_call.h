@@ -11,5 +11,6 @@ int v86_call_pinned(void);
 /* 0: other slot, 1: handled, -1: bad caller memory (cleaned before FAULT). */
 int v86_call_dispatch(u32 slot, void *target, struct kapi_arg_source *src, unsigned count,
                       u32 *result);
+int v86_soft_out(u16 port, u8 value);
 void v86_call_cleanup(void);
 #endif

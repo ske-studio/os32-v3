@@ -62,6 +62,9 @@ static int teardown(Snd2Device *d, unsigned flags, int stop_failed, int opened)
 {
     Snd2Stream *s = &d->stream;
     stream_metric(TP_SND_TEARDOWN);
+#ifdef TICK_PROBE
+    tick_probe_soft_close(s->played, s->written, s->underruns);
+#endif
     s->closing = 1;
     int leak = stop_failed || (opened && d->be->hw_stop(d->ctx, 1) < 0);
     stream_unlock(flags);
@@ -202,6 +205,9 @@ int snd2_write_checked(u32 id, const void *buf, u32 bytes,
                         s->epoch == epoch && d->be->hw_pos(d->ctx, &hw) >= 0)
                         snd2_seg_after_publish(s, hw, tick_clock_ms());
                     rc = n * stride;
+#ifdef TICK_PROBE
+                    tick_probe_soft_supply();
+#endif
                 }
             }
         }

@@ -11,6 +11,13 @@
 #include "vfs.h"
 #include "tss.h"
 #include "kprintf.h"
+#include "snd2_fmq.h"
+#include "platform_fm_probe.h"
+#include "sys.h"
+#ifdef TICK_PROBE
+#include "tick_probe.h"
+#include "tsc_clock.h"
+#endif
 
 #define V86_CALL_MAX_PATHS 2
 
@@ -25,6 +32,15 @@ static struct {
     char *path[V86_CALL_MAX_PATHS];
     V86Gcap *capture;
 } call;
+
+static struct soft_boot {
+    struct v86_context ctx;
+    SND2_FmQ events;
+    u32 sid;
+    int finished;
+    u8 index[2];
+} *soft;
+static u32 next_sid;
 
 static int shared_stack(uptr sp)
 {
@@ -72,6 +88,13 @@ void v86_call_cleanup(void)
     }
     if (call.capture) kfree(call.capture);
     call.capture = 0;
+    if (soft) {
+#ifdef TICK_PROBE
+        tick_probe_soft_session(0, 0, 0);
+#endif
+        kfree(soft);
+        soft = 0;
+    }
     call.pinned = 0;
 }
 
@@ -157,4 +180,133 @@ int v86_call_dispatch(u32 slot, void *target, struct kapi_arg_source *src, unsig
 out:
     v86_call_cleanup();
     return handled;
+}
+
+static int soft_candidate(void)
+{
+    if (!platform_fm_irq12_released()) return 0;
+    SND2_DevInfo info;
+    for (u32 i = 0; !kapi_snd2_dev_info(i, &info); ++i)
+        if (info.kind == SND2_KIND_PCM_OUT &&
+            (info.flags & (SND2_DEV_SOFT_CPU | SND2_DEV_READY)) ==
+            (SND2_DEV_SOFT_CPU | SND2_DEV_READY)) return 1;
+    return 0;
+}
+
+static int terminated_path(const char *path)
+{
+    for (unsigned i = 0; i < sizeof(((V86_Begin *)0)->path); ++i)
+        if (!path[i]) return 1;
+    return 0;
+}
+
+int v86s_begin(const V86_Begin *input, u32 *sid)
+{
+    if (!input || !sid || input->size != sizeof *input || input->flags != V86S_FM_SOFT)
+        return OS32_ERR_INVAL;
+    if (!soft_candidate()) return OS32_ERR_NOSYS;
+    if (call.pinned || !v86_call_admit()) return OS32_ERR_BUSY;
+    V86_Begin b = *input;
+    if (!b.path[0] || !terminated_path(b.path) || !terminated_path(b.second))
+        return OS32_ERR_INVAL;
+    if (!caller_access_get_user(&call.caller) || !shared_stack((uptr)&b) ||
+        !shared_stack(tss_get_esp0())) return OS32_ERR_BUSY;
+    soft = kzalloc(sizeof *soft);
+    if (!soft) return OS32_ERR_NOSPC;
+    call.cr3 = paging_current_cr3();
+    call.pinned = 1;
+#ifdef TICK_PROBE
+    u32 mult = 0, shift = 0, generation;
+    (void)pc98_tsc_rate(&mult, &shift, &generation);
+    tick_probe_soft_session(1, mult, shift);
+#endif
+    paging_load_cr3(paging_kernel_pd_phys());
+    int rc = v86_boot_prepare(b.path, b.second[0] ? b.second : 0, &soft->ctx);
+    if (!rc && v86_mem_enable_slices()) {
+        v86_session_end();
+        rc = OS32_ERR_NOSPC;
+    }
+    if (rc) {
+        v86_call_cleanup();
+        return rc;
+    }
+    for (u32 port = 0x188; port <= 0x18f; ++port) tss_iomap_deny(port);
+    v86_session.soft_input = 1;
+    v86_mem_suspend();
+    paging_load_cr3(call.cr3);
+    soft->sid = ++next_sid;
+    *sid = soft->sid;
+    return 0;
+}
+
+static int soft_owner(u32 sid)
+{
+    struct caller_access live;
+    return soft && sid == soft->sid && caller_access_get_user(&live) &&
+           live.as == call.caller.as && live.generation == call.caller.generation;
+}
+
+int v86s_run(u32 sid, const V86_RunIn *in, V86_Exit *out)
+{
+    if (!soft_owner(sid) || !in || !out || in->size != sizeof *in ||
+        in->reply_valid || soft->finished) return OS32_ERR_INVAL;
+    int reason = V86_EXIT_HOTKEY;
+    if (!v86_session.soft_stop) {
+#ifdef TICK_PROBE
+        tick_probe_soft_begin(TP_SOFT_ENTER);
+#endif
+        paging_load_cr3(paging_kernel_pd_phys());
+        v86_mem_resume();
+        reason = v86_run_slice(&soft->ctx);
+        v86_mem_suspend();
+        paging_load_cr3(call.cr3);
+#ifdef TICK_PROBE
+        tick_probe_soft_end(TP_SOFT_LEAVE);
+#endif
+    }
+    u32 hi;
+    *out = (V86_Exit){.size = sizeof *out, .code = reason};
+    out->fifo_n = soft->events.count;
+    if (sys_time_now(&out->guest_us, &hi)) return OS32_ERR_IO;
+    if (reason == V86_EXIT_SLICE) out->reason = V86S_SLICE;
+    else if (reason == V86_EXIT_FIFO) out->reason = V86S_FIFO;
+    else {
+        soft->finished = 1;
+        out->reason = reason == V86_EXIT_HLT || reason == V86_EXIT_HOTKEY ||
+                      reason == V86_EXIT_TRAP_PORT ? V86S_END : V86S_FAULT;
+    }
+    return 0;
+}
+
+int v86s_fm_drain(u32 sid, SND2_FmEv *out, u32 max, u32 *last_seq)
+{
+    if (!soft_owner(sid) || max > SND2_FMQ_LEN || (max && !out) || !last_seq)
+        return OS32_ERR_INVAL;
+    u32 n = snd2_fmq_drain(&soft->events, out, max);
+    *last_seq = soft->events.sequence - soft->events.count;
+    return (int)n;
+}
+
+int v86s_end(u32 sid)
+{
+    if (!soft_owner(sid)) return OS32_ERR_INVAL;
+    paging_load_cr3(paging_kernel_pd_phys());
+    v86_session_end();
+    v86_call_cleanup();
+    return 0;
+}
+
+/* Return -1 to retry a data byte after draining the full queue. */
+int v86_soft_out(u16 port, u8 value)
+{
+    if (!soft || port < 0x188 || port > 0x18f) return 0;
+    if (port & 1) return 1;
+    unsigned bank = (port >> 2) & 1;
+    if (!(port & 2)) {
+        soft->index[bank] = value;
+        return 1;
+    }
+    u32 now, hi;
+    if (sys_time_now(&now, &hi)) return -2;
+    return snd2_fmq_push(&soft->events, 1, bank, soft->index[bank], value, now) ? 1 : -1;
 }

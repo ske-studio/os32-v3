@@ -43,6 +43,22 @@ static int v86_gp_emulate(u32 *frame, const u8 *pc, u32 len)
 
     case 0xEE:  /* OUT DX, AL */
         port = (u16)(frame[V86F_EDX] & U16_MAX);
+        if (slice_context) {
+            int rc = v86_soft_out(port, (u8)frame[V86F_EAX]);
+            if (rc < 0) {
+                if (rc == -1) {
+                    save_slice(frame, V86F_EIP);
+                    v86_exit_reason = V86_EXIT_FIFO;
+                } else {
+                    v86_exit_reason = V86_EXIT_FAULT;
+                }
+                return 1;
+            }
+            if (rc) {
+                v86_advance_ip(frame, len + 1);
+                return 0;
+            }
+        }
         v86_io_out(port, 1, frame[V86F_EAX] & U8_MAX);
         v86_advance_ip(frame, len + 1);
         return 0;

@@ -2,6 +2,11 @@
 #include "sys/platform/pc98/legacy/v86_mem.h"
 #include "sys/platform/pc98/legacy/v86.h"
 #include "ksetjmp.h"
+#include "appslot.h"
+#include "redir_access.h"
+#include "av_contract.h"
+#include "v86_call.h"
+#include "module.h"
 #include "sys/dev/sound/fm/fm_module.c"
 
 extern void fire_2(void), fire_12(void), fire_13(void);
@@ -11,11 +16,47 @@ static unsigned slave_writes, master_writes;
 static int fault_exit;
 static unsigned requests;
 struct v86_session_state v86_session;
-u32 tss_get_esp0(void) { return 0; }
+u32 tss_get_esp0(void) { return 0x200000; }
 void tss_set_esp0(u32 esp0) {}
 int exec_setjmp(k_jmpbuf buf) { return 0; }
+static void require(int ok, const char *message);
+struct kdebug kdebug;
+static int write_tone;
+__attribute__((section(".guest"), aligned(16)))
+static const u8 byte_out[16] = {0xee};
+int v86_bios_is_hle(u32 vector) { return 0; }
+void v86_bios_dispatch(u32 *frame, u32 vector) {}
+u32 v86_io_in(u16 port, int size) { return 255; }
+void v86_io_out(u16 port, int size, u32 value) { require(0, "FM port fell through"); }
+static void guest_write(u16 port, u8 value)
+{
+    u32 gp[V86F_GS + 1] = {0};
+    gp[V86F_CS] = (u32)byte_out >> 4;
+    gp[V86F_EAX] = value;
+    gp[V86F_EDX] = port;
+    require(!v86_gp_handler(gp) && gp[V86F_EIP] == 1, "retire byte out");
+}
+extern u32 entered[17];
+extern void check_enter(const struct v86_context *ctx);
+static int slicing;
+void __real_v86_reflect_irq(u32 *frame, u32 irq);
+void v86_pic_request(u32 irq) {}
+int v86_pic_candidate(u32 *vector) { return -1; }
+void v86_pic_commit(u32 irq) {}
 void v86_enter(const struct v86_context *ctx)
 {
+    if (write_tone) {
+        write_tone = 0;
+        guest_write(0x188, 0x28);
+        guest_write(0x18a, 0x10);
+        guest_write(0x18a, 0);
+    }
+    if (slicing) {
+        u32 frame[V86I_GS + 1];
+        for (unsigned i = 0; i <= V86I_GS; ++i) frame[i] = 0x100 + i;
+        frame[V86I_EFLAGS] = EFLAGS_VM | EFLAGS_IF;
+        __real_v86_reflect_irq(frame, 0);
+    }
     if (fault_exit) v86_runtime_end();
 }
 void kprintf(u8 attr, const char *fmt, ...) {}
@@ -40,6 +81,84 @@ static void require(int ok, const char *message)
     __asm__ volatile("int $0x80" :: "a"(4), "b"(2), "c"(message), "d"(length) : "memory");
     __asm__ volatile("int $0x80" :: "a"(1), "b"(1));
     __builtin_unreachable();
+}
+static u32 cr3 = 0x3000, now_us;
+static int heap_busy, opens, suspends, resumes;
+static AppSlot caller_slot;
+static struct addrspace caller_as;
+volatile int ring3_in_syscall = 1, ring3_wm_depth;
+int con_sink_is_enabled(void) { return 0; }
+int appslot_cur(void) { return APP_ID_MIN; }
+AppSlot *appslot_get(int id) { return id == APP_ID_MIN ? &caller_slot : 0; }
+u32 paging_live_addrspaces(void) { return 1; }
+u32 paging_current_cr3(void) { return cr3; }
+u32 paging_kernel_pd_phys(void) { return 0x4000; }
+void paging_load_cr3(u32 value) { cr3 = value; }
+int caller_access_get_user(struct caller_access *c)
+{
+    *c = (struct caller_access){.as = &caller_as, .app_id = APP_ID_MIN, .generation = 1};
+    return 1;
+}
+void *kzalloc(u32 bytes)
+{
+    static u32 memory[2048];
+    require(!heap_busy && bytes <= sizeof memory, "soft allocation");
+    heap_busy = 1;
+    for (unsigned i = 0; i < sizeof memory / sizeof *memory; ++i) memory[i] = 0;
+    return memory;
+}
+void kfree(void *ptr) { heap_busy = 0; }
+int kapi_snd2_dev_info(u32 index, SND2_DevInfo *info)
+{
+    if (index) return -1;
+    info->kind = SND2_KIND_PCM_OUT;
+    info->flags = SND2_DEV_READY | SND2_DEV_SOFT_CPU;
+    return 0;
+}
+int __wrap_v86_boot_prepare(const char *path, const char *second, struct v86_context *ctx)
+{
+    require(cr3 == 0x4000 && !v86_session.open, "boot address space");
+    ++opens;
+    v86_session.open = 1;
+    return 0;
+}
+int v86_mem_enable_slices(void) { return 0; }
+void v86_mem_suspend(void) { require(cr3 == 0x4000, "suspend master"); ++suspends; }
+void v86_mem_resume(void) { require(cr3 == 0x4000, "resume master"); ++resumes; }
+void v86_session_end(void) { v86_session = (struct v86_session_state){0}; }
+void tss_iomap_deny(u16 port) { require(port >= 0x188 && port <= 0x18f, "trap port"); }
+int sys_time_now(u32 *lo, u32 *hi) { *lo = ++now_us; *hi = 0; return 0; }
+
+static void soft_boots(void)
+{
+    V86_Begin b = {.size = sizeof b, .flags = 1, .path = "tone.fdi"};
+    V86_RunIn in = {.size = sizeof in, .slice_ms = 10};
+    V86_Exit ex;
+    SND2_FmEv ev[2];
+    u32 sid, last = 0, seq;
+    caller_slot.state = APP_STATE_RUNNING;
+    caller_slot.parent = APP_ID_SHELL;
+    caller_slot.as = &caller_as;
+    v86_session.open = 0;
+    slicing = 1;
+    for (unsigned i = 0; i < 2; ++i) {
+        require(!v86s_begin(&b, &sid) && sid != last && cr3 == 0x3000, "soft restart");
+        require(v86s_begin(&b, &sid) == OS32_ERR_BUSY, "soft busy");
+        write_tone = 1;
+        require(!v86s_run(sid, &in, &ex) && ex.reason == 1 && cr3 == 0x3000, "slice return");
+        require(v86s_fm_drain(sid, ev, 2, &seq) == 2 && seq == 2 &&
+                ev[0].reg == 0x28 && ev[0].val == 0x10 && ev[0].seq == 1 &&
+                ev[1].reg == 0x28 && !ev[1].val && ev[1].seq == 2, "key off sequence");
+        require(!v86s_run(sid, &in, &ex) && ex.reason == 1 &&
+                v86s_fm_drain(sid, ev, 2, &seq) == 0, "empty slice");
+        v86_session.soft_stop = 1;
+        require(!v86s_run(sid, &in, &ex) && ex.reason == 4 && ex.code == V86_EXIT_HOTKEY,
+                "stop at pump");
+        require(!v86s_end(sid) && !heap_busy && cr3 == 0x3000 &&
+                !v86_call_pinned(), "end releases caller");
+        last = sid;
+    }
+    require(opens == 2 && suspends == 6 && resumes == 4, "repeat boundaries");
 }
 static int handler(unsigned irq, void *arg)
 {
@@ -94,10 +213,30 @@ void _start(void)
             boot_probe.bank[1 - bank].model = model;
             publish_probe_irq_policy();
             require(irq_dyn_index(12) < 0, "legacy topology");
+            V86_Begin b = {.size = sizeof b, .flags = V86S_FM_SOFT, .path = "tone.fdi"};
+            u32 sid;
+            require(v86s_begin(&b, &sid) == OS32_ERR_NOSYS && !heap_busy && !opens,
+                    "physical or unknown probe");
             delivery(0, 12);
         }
     }
     fixed_lines();
+    struct v86_context ctx = {0};
+    v86_session.open = slicing = 1;
+    require(v86_run_slice(&ctx) == V86_EXIT_SLICE, "slice exit");
+    require(ctx.eip == 0x108 && ctx.cs == 0x109 && ctx.esp == 0x10b &&
+            ctx.ss == 0x10c && ctx.eflags == (EFLAGS_VM | EFLAGS_IF) &&
+            ctx.es == 0x10d && ctx.ds == 0x10e && ctx.fs == 0x10f && ctx.gs == 0x110 &&
+            ctx.edi == 0x100 && ctx.esi == 0x101 && ctx.ebp == 0x102 &&
+            ctx.ebx == 0x104 && ctx.edx == 0x105 && ctx.ecx == 0x106 &&
+            ctx.eax == 0x107, "slice register frame");
+    check_enter(&ctx);
+    for (unsigned i = 0; i < 17; ++i) {
+        if (i == V86F_ESP_DUMMY) continue;
+        require(entered[i] == (i == V86I_EFLAGS ? EFLAGS_VM | EFLAGS_IF : 0x100 + i),
+                "resume register frame");
+    }
+    slicing = 0;
     session(2);
     boot_probe.bank[0].model = boot_probe.bank[1].model = OPN_PROBE_ABSENT;
     publish_probe_irq_policy();
@@ -119,5 +258,6 @@ void _start(void)
         require(slave_mask & 16, "empty line unmasked");
         delivery(0, 0);
     }
+    soft_boots();
     __asm__ volatile("int $0x80" :: "a"(1), "b"(0));
 }

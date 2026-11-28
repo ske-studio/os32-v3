@@ -53,6 +53,8 @@ cpu 386
 #include "../../../kern/time/tick_probe_ids.h"
 extern tick_probe_begin
 extern tick_probe_end
+extern tick_probe_soft_if_begin
+extern tick_probe_soft_if_end
 extern tick_probe_irq_enter
 extern tick_probe_irq_leave
 ;; The temporary PUSHAD preserves live results and the interrupted registers.
@@ -92,9 +94,15 @@ extern kctx_irq_depth
 extern kctx_exc_depth
 
 %macro IRQ_ENTER 0
+#ifdef TICK_PROBE
+        TP_CALL tick_probe_soft_if_begin, EFLAGS_IF
+#endif
         inc     dword [ss:kctx_irq_depth]
 %endmacro
 %macro IRQ_LEAVE 0
+#ifdef TICK_PROBE
+        TP_CALL tick_probe_soft_if_end, EFLAGS_IF
+#endif
         dec     dword [ss:kctx_irq_depth]
 %endmacro
 %macro EXC_ENTER 0
@@ -332,6 +340,7 @@ isr_stub_13:
 
         RESTORE_KSEG
 
+        cld                     ;; C uses the host direction; IRET restores guest DF
         mov     eax, esp
         push    eax                     ;; 引数: フレーム先頭 (u32*)
         call    v86_gp_handler

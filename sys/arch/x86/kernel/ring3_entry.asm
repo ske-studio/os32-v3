@@ -26,6 +26,18 @@
 cpu 386
 
 extern ring3_syscall_dispatch
+#ifdef TICK_PROBE
+extern tick_probe_soft_if_begin
+extern tick_probe_soft_if_end
+%macro SOFT_IF 1
+        push dword EFLAGS_IF
+        call %1
+        add esp, ABI_WORD_BYTES
+%endmacro
+#else
+%macro SOFT_IF 1
+%endmacro
+#endif
 
 section .text
 
@@ -48,8 +60,11 @@ int80_stub:
         ;; 待つため、IF=0 のままだと CPL=3 からの呼び出しで永久停止する
         ;; (2026-09-06、gdi_test の kbd_getchar と less の sys_halt で実測)。
         ;; iretd が EFLAGS をフレームから復元するので戻りの cli は不要。
+        cld
+        SOFT_IF tick_probe_soft_if_begin
         test    dword [esp + ISR_IRQ_EFLAGS_OFF], EFLAGS_VM  ;; saved EFLAGS.VM
         jnz     .dispatch
+        SOFT_IF tick_probe_soft_if_end
         sti
 .dispatch:
 
@@ -65,6 +80,8 @@ int80_stub:
         ;; (2026-09-06 gdi_test の gfx_pixel で実測)。iretd がフレームの
         ;; EFLAGS (IF=1) を復元するので、ユーザ側の IF は変わらない。
         cli
+        SOFT_IF tick_probe_soft_if_begin
+        SOFT_IF tick_probe_soft_if_end
 
         ;; 以下は ring3_resume と共有する出口 (票 K5b の P4)。
         ;; esp -> [pushad 8 語][EIP][CS][EFLAGS][userESP][userSS]

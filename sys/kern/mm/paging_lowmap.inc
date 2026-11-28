@@ -20,6 +20,24 @@ int paging_lowmap_snapshot(struct legacy_lowmap_snapshot *s, u32 *saved_pte,
     return 0;
 }
 
+/* The caller has switched to the captured master CR3 and masked IRQs.
+ * Keep the transaction pinned while its caller pumps a foreground device. */
+int paging_lowmap_exchange(struct legacy_lowmap_snapshot *s, u32 *pte, u32 *pde)
+{
+    if (lowmap_token != s || s->root != paging_current_cr3() ||
+        (u32)(uptr)page_directory != s->root) return -1;
+    for (u32 i = 0; i < s->page_count; ++i) {
+        u32 old = page_tables[0][i];
+        page_tables[0][i] = pte[i];
+        pte[i] = old;
+    }
+    u32 old = page_directory[0];
+    page_directory[0] = *pde;
+    *pde = old;
+    arch_mmu_flush_tlb();
+    return 0;
+}
+
 /* Restore is allocation-free and cannot leave a live backing alias behind.
  * Count a missing session, then restore the shared PT directly. No PDE USER
  * propagation to the current CR3 (which may differ from the captured CR3),

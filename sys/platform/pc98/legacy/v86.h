@@ -64,6 +64,7 @@ struct v86_context {
     u32 ds;
     u32 fs;
     u32 gs;
+    u32 edi, esi, ebp, ebx, edx, ecx, eax;
 };
 
 /* ------------------------------------------------------------------------ */
@@ -133,7 +134,9 @@ enum v86_exit_reason {
     V86_EXIT_TIMEOUT,
     V86_EXIT_HOTKEY,
     V86_EXIT_FAULT,         /* #PF など */
-    V86_EXIT_GP_LIMIT       /* #GP ウォッチドッグ (§4-10) */
+    V86_EXIT_GP_LIMIT,      /* #GP ウォッチドッグ (§4-10) */
+    V86_EXIT_SLICE,
+    V86_EXIT_FIFO
 };
 
 /* ======== API ======== */
@@ -154,6 +157,8 @@ u32 v86_last_gp_eflags(void);
 
 /* 1 セッション実行して終了理由を返す */
 int v86_run(const struct v86_context *ctx);
+int v86_boot_prepare(const char *path, const char *second, struct v86_context *ctx);
+int v86_run_slice(struct v86_context *ctx);
 
 /* v86_run と同じだが、タイムアウトを tick_limit (100Hz の tick 数) にする。
  * v86_run は V86_TICK_LIMIT (5 分) で呼ぶ。`v86 -g` は ROM の 1 呼び出しを

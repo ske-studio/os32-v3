@@ -468,6 +468,10 @@ userland/cmds/%.elf: userland/cmds/%.c sdk/link/app.ld $(CRT0_OBJ) | $(ABI_CONTR
 	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/cmds/$*.o
 	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/cmds/$*.o -lc -lgcc
 
+userland/cmds/v86.elf: userland/cmds/v86.c sdk/link/app.ld $(CRT0_OBJ) $(LIBDIR)/libos32sndl.a | $(ABI_CONTRACT_ORDER)
+	$(CC) $(PROGRAM_FLAGS) -MT $@ -c $< -o userland/cmds/v86.o
+	$(LD) $(PROGRAM_LDFLAGS) -o $@ $(CRT0_OBJ) userland/cmds/v86.o $(LIBDIR)/libos32sndl.a -lc -lgcc
+
 # cfg — 設定レジストリの CUI (libos32cfg を静的リンク、票 S2-C)。既定の
 # cmds/%.elf パターンはライブラリを引けないので明示規則。
 userland/cmds/cfg.o: userland/cmds/cfg.c userland/lib/cfg/libos32cfg.h | $(ABI_CONTRACT_ORDER)

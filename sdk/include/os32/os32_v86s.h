@@ -1,6 +1,12 @@
 #ifndef OS32_V86S_H
 #define OS32_V86S_H
 
+#define V86S_FM_SOFT 1UL
+#define V86S_SLICE 1UL
+#define V86S_FIFO  2UL
+#define V86S_END   4UL
+#define V86S_FAULT 5UL
+
 typedef struct { unsigned long size; char path[64]; char second[64]; unsigned long flags; } V86_Begin;
 typedef struct { unsigned long size, slice_ms, reply_valid; unsigned char reply[4]; unsigned long snd_status, shadow_seq, rsv[2]; } V86_RunIn;
 typedef struct { unsigned char bank, reg, kind, byte; } V86_ReadQ;

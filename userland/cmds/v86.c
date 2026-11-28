@@ -13,6 +13,7 @@
 /*  設計と実測データ: docs/archive/v21/v86v2/                               */
 /* ======================================================================== */
 #include "os32api.h"
+#include "sndl.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -155,6 +156,58 @@ static int do_gcap(int selftest)
     return cap.status == V86G_ST_OK ? 0 : 1;
 }
 
+static int boot_sound(const char *path, const char *second)
+{
+    V86_Begin b = {.size = sizeof b, .flags = V86S_FM_SOFT};
+    /* A long path can still use boot2 on a physical board. An empty path
+     * makes a selected SOFT candidate fail validation before acquiring it. */
+    if (strlen(path) < sizeof b.path && (!second || strlen(second) < sizeof b.second)) {
+        strcpy(b.path, path);
+        if (second) strcpy(b.second, second);
+    }
+    u32 sid, chip;
+    int rc = api->v86s_begin(&b, &sid);
+    if (rc == OS32_ERR_NOSYS) return api->v86_boot2(path, second);
+    if (rc) return rc;
+    SNDL_ChipReq req = {.size = sizeof req, .chip = SND2_CHIP_OPNA,
+        .flags = SNDL_REQ_PREFER_SOFT, .pol = {SNDL_POL_SOFT, SNDL_POL_FAIL}};
+    SNDL_ChipGot got;
+    rc = sndl_init(api);
+    if (!rc) rc = sndl_chip_open(&req, &chip, &got);
+    int opened = !rc;
+    if (opened && got.backend != SNDL_SOFT) rc = OS32_ERR_NOSYS;
+    if (!rc) rc = sndl_pump();
+    V86_RunIn in = {.size = sizeof in, .slice_ms = 10};
+    V86_Exit ex = {0};
+    while (!rc) {
+        rc = api->v86s_run(sid, &in, &ex);
+        if (rc) break;
+        SND2_FmEv ev[32];
+        int n;
+        do {
+            u32 seq;
+            n = api->v86s_fm_drain(sid, ev, 32, &seq);
+            if (n < 0) { rc = n; break; }
+            for (int i = 0; i < n; ++i) {
+                SND2_RegW w = {ev[i].bank, ev[i].reg, ev[i].val, 0};
+                if (sndl_chip_write(chip, &w, 1, ev[i].at_us) != 1) {
+                    rc = OS32_ERR_IO;
+                    break;
+                }
+            }
+        } while (!rc && n == 32);
+        if (!rc) rc = sndl_pump();
+        if (ex.reason != V86S_SLICE && ex.reason != V86S_FIFO) break;
+    }
+    if (opened) {
+        int close_rc = sndl_chip_close(chip);
+        if (!rc) rc = close_rc;
+    }
+    int end_rc = api->v86s_end(sid);
+    if (!rc) rc = end_rc;
+    return rc ? rc : (int)ex.code;
+}
+
 int main(int argc, char **argv, KernelAPI *kapi)
 {
     int rc;
@@ -177,7 +230,7 @@ int main(int argc, char **argv, KernelAPI *kapi)
         if (second) {
             printf("  second : %s\n", second);
         }
-        rc = api->v86_boot2(argv[2], second);
+        rc = boot_sound(argv[2], second);
         if (rc < 0) {
             printf("  could not start (rc=%d)\n", rc);
             printf("    -1 = image not found / attach failed\n");

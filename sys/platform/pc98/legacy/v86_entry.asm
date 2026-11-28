@@ -55,6 +55,13 @@ v86_enter:
         push    dword [esi + V86_CTX_CS]  ;; CS
         push    dword [esi + V86_CTX_EIP]  ;; EIP
 
+        mov     edi, [esi + V86_CTX_EDI]
+        mov     ebp, [esi + V86_CTX_EBP]
+        mov     ebx, [esi + V86_CTX_EBX]
+        mov     edx, [esi + V86_CTX_EDX]
+        mov     ecx, [esi + V86_CTX_ECX]
+        mov     eax, [esi + V86_CTX_EAX]
+        mov     esi, [esi + V86_CTX_ESI]
         iretd                           ;; → V86 モードへ
 
 ;; ------------------------------------------------------------

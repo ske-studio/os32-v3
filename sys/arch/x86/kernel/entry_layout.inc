@@ -39,4 +39,11 @@
 %define V86_CTX_DS 24
 %define V86_CTX_FS 28
 %define V86_CTX_GS 32
+%define V86_CTX_EDI 36
+%define V86_CTX_ESI 40
+%define V86_CTX_EBP 44
+%define V86_CTX_EBX 48
+%define V86_CTX_EDX 52
+%define V86_CTX_ECX 56
+%define V86_CTX_EAX 60
 %endif

@@ -14,6 +14,7 @@ struct legacy_lowmap_snapshot {
 int paging_lowmap_busy(void);
 int paging_lowmap_snapshot(struct legacy_lowmap_snapshot *s, u32 *saved_pte,
                           u32 page_count, u32 limit);
+int paging_lowmap_exchange(struct legacy_lowmap_snapshot *s, u32 *pte, u32 *pde);
 int paging_lowmap_restore(struct legacy_lowmap_snapshot *s);
 int paging_lowmap_map_range(struct legacy_lowmap_snapshot *s,
                            u32 base, u32 end, u32 phys, u32 flags);

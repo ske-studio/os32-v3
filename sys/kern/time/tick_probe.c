@@ -43,6 +43,97 @@ static unsigned long long now(void)
     return ((unsigned long long)hi << 32) | lo;
 #endif
 }
+static unsigned int soft_open, soft_valid, soft_if_active;
+static unsigned long long soft_if_start;
+static int jiffy_phase_us;
+static unsigned long long soft_start[TP_SOFT_PHASES], last_jiffy;
+static unsigned int duration_us(unsigned long long cycles)
+{
+    unsigned long long whole = cycles >> data.tsc_shift;
+    unsigned long long fraction = cycles - (whole << data.tsc_shift);
+    return whole * data.tsc_mult + ((fraction * data.tsc_mult) >> data.tsc_shift);
+}
+static void soft_record(struct tp_soft_sample *s, unsigned int us)
+{
+    ++s->count;
+    s->last_us = us;
+    if (us > s->worst_us) s->worst_us = us;
+}
+void tick_probe_soft_session(int open, unsigned int mult, unsigned int shift)
+{
+    soft_open = open;
+    soft_valid = 0;
+    last_jiffy = 0;
+    jiffy_phase_us = 0;
+    soft_if_active = 0;
+    if (open) {
+        data.tsc_mult = mult;
+        data.tsc_shift = shift;
+    }
+}
+void tick_probe_soft_begin(unsigned int phase)
+{
+    if (soft_open && data.running && data.tsc_mult && !(soft_valid & (1u << phase))) {
+        if (phase == TP_SOFT_ENTER) {
+            data.soft_switch[data.soft_switch_count % TP_SOFT_RECENT] = (struct tp_soft_switch){0};
+            ++data.soft_switch_count;
+        }
+        soft_start[phase] = now();
+        soft_valid |= 1u << phase;
+    }
+}
+void tick_probe_soft_end(unsigned int phase)
+{
+    if (soft_open && data.running && (soft_valid & (1u << phase))) {
+        unsigned int us = duration_us(now() - soft_start[phase]);
+        soft_record(&data.soft[phase], us);
+        if (data.soft_switch_count && phase != TP_SOFT_FEED) {
+            struct tp_soft_switch *s = &data.soft_switch[(data.soft_switch_count - 1) % TP_SOFT_RECENT];
+            if (phase == TP_SOFT_ENTER) s->resume_us = us;
+            else s->suspend_us = us;
+        }
+        soft_valid &= ~(1u << phase);
+    }
+}
+void tick_probe_soft_supply(void)
+{
+    tick_probe_soft_end(TP_SOFT_FEED);
+    tick_probe_soft_begin(TP_SOFT_FEED);
+}
+void tick_probe_soft_close(unsigned int played, unsigned int written, unsigned int underruns)
+{
+    if (!soft_open || !data.running) return;
+    data.soft_played = played;
+    data.soft_written = written;
+    data.soft_underruns = underruns;
+}
+void tick_probe_soft_if_begin(unsigned int flags)
+{
+    if (soft_open && data.running && data.tsc_mult && !soft_if_active && (flags & (1u << 9))) {
+        soft_if_start = now();
+        soft_if_active = 1;
+    }
+}
+void tick_probe_soft_if_end(unsigned int flags)
+{
+    if (soft_if_active && (flags & (1u << 9))) {
+        soft_record(&data.soft_if0, duration_us(now() - soft_if_start));
+        soft_if_active = 0;
+    }
+}
+void tick_probe_soft_jiffy(int guest)
+{
+    if (!soft_open || !data.running || !data.tsc_mult || !pending[TP_IRQ0].valid) return;
+    /* Classify after EOI, using the timestamp already taken at IRQ0 entry.
+     * Anchor to the first logical tick, and skip missed 100 Hz periods. */
+    unsigned long long t = pending[TP_IRQ0].t;
+    if (last_jiffy) {
+        jiffy_phase_us += (int)duration_us(t - last_jiffy) - 10000;
+        if (guest) soft_record(&data.guest_late, jiffy_phase_us > 0 ? jiffy_phase_us : 0);
+        if (jiffy_phase_us >= 10000) jiffy_phase_us %= 10000;
+    }
+    last_jiffy = t;
+}
 static struct tp_mark mark(void)
 {
     return (struct tp_mark){now(), epoch, splash, 1};
@@ -194,11 +285,13 @@ void tick_probe_irq_leave(unsigned int irq)
 }
 void tick_probe_if_begin(unsigned int flags)
 {
+    tick_probe_soft_if_begin(flags);
     if (data.running && !kctx_irq_depth && (flags & (1U << 9)) && !if0.valid)
         { if0 = mark(); if0_caller = (unsigned long)__builtin_return_address(0); }
 }
 void tick_probe_if_end(unsigned int flags)
 {
+    tick_probe_soft_if_end(flags);
     if (data.running && !kctx_irq_depth && (flags & (1U << 9)) && if0.valid) {
         unsigned long long end = now();
         unsigned int bank = if0.splash || splash || if0.epoch != epoch;

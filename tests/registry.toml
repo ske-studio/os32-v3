@@ -500,14 +500,25 @@ id = "irq12_delivery"
 spec = { path = "docs/design/kernel/irq/irq.md", section = "初段の段と受入" }
 subsystem = "sound"
 level = "L2"
-sources = ["sys/dev/sound/fm", "sys/arch/x86/kernel/isr_stub.asm", "sys/kern/irq", "sys/platform/pc98", "tests/support/fixtures/irq12_delivery", "tests/support/fixtures/fm_control/check.h", "tests/support/fixtures/fm_probe/io.h", "tools/ops/kernel_includes.py", "tools/gen_sqlite_imports.py", "tools/prototypes/fm_imports.def", "tools/module_schema.py", "tools/gen_kdebug_imports.py"]
+sources = ["sys/dev/sound/fm", "sys/kern/mm/paging_lowmap.inc", "sys/hal/sound/snd2_fmq.c", "sys/arch/x86/kernel/isr_stub.asm", "sys/kern/irq", "sys/platform/pc98", "tests/support/fixtures/irq12_delivery", "tests/support/fixtures/fm_control/check.h", "tests/support/fixtures/fm_probe/io.h", "tools/ops/kernel_includes.py", "tools/gen_sqlite_imports.py", "tools/prototypes/fm_imports.def", "userland/cmds/v86.c", "sdk/include/os32", "tools/module_schema.py", "tools/gen_kdebug_imports.py"]
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "両ベース ABSENT 時の共有配送・解除・物理 EOI と反射抑止、IRQ2・13・PCI 登録維持"
+expect = "IRQ12 の共有配送と従来の IRQ 線、SOFT の文脈・入力・発音列・再実行を確認"
 limits = "実スタブ本体を実行。特権命令・ゲストフレーム・PIC は模型"
 gates = ["push", "main"]
 mutations = [
+ { id = "lose_pump_key", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/guest.c", old = "return v86_is_active() || v86_session.soft_input;", new = "return v86_is_active();", fail = "pump input owner" },
+ { id = "lose_pump_stop", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (v86_session.soft_input) v86_session.soft_stop = 1;", new = "(void)v86_session.soft_input;", fail = "pump stop retained" },
+ { id = "omit_slice_bitmap", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_mem.c", old = "kmemcpy(kernel_tss.iomap, slice_mem->iomap, TSS_IOMAP_SIZE);", new = "(void)slice_mem->iomap;", fail = "resume DOS state" },
+ { id = "omit_soft_key_off", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_call.c", old = "return snd2_fmq_push(&soft->events,", new = "if (!value) return 1; return snd2_fmq_push(&soft->events,", fail = "key off sequence" },
+ { id = "retain_soft_sid", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_call.c", old = "soft->sid = ++next_sid;", new = "soft->sid = 1;", fail = "soft restart" },
+ { id = "omit_stream_release", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "int close_rc = sndl_chip_close(chip);", new = "int close_rc = 0;", fail = "stream release before end" },
+ { id = "physical_soft_out", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_gp_emulate.inc", old = "int rc = v86_soft_out(port, (u8)frame[V86F_EAX]);", new = "int rc = 0;", fail = "FM port fell through" },
+ { id = "resume_wrong_reg", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_entry.asm", old = "mov     ebp, [esi + V86_CTX_EBP]", new = "mov     ebp, [esi + V86_CTX_EBX]", fail = "resume register frame" },
+ { id = "skip_low_pte", config = "pc98", when = "after_build", replace = "sys/kern/mm/paging_lowmap.inc", old = "page_tables[0][i] = pte[i];", new = "(void)pte[i];", fail = "suspend page table" },
+ { id = "ignore_saved_probe", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_call.c", old = "if (!platform_fm_irq12_released()) return 0;", new = "(void)platform_fm_irq12_released();", fail = "physical or unknown probe" },
+ { id = "slice_wrong_sp", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = ".esp = frame[ip + V86I_ESP - V86I_EIP],", new = ".esp = frame[V86F_ESP_DUMMY],", fail = "slice register frame" },
  { id = "release_on_exception", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_mem.c", old = "if (kctx_irq_depth || kctx_exc_depth) goto done;", new = "if (kctx_irq_depth) goto done;", fail = "foreground release" },
  { id = "publish_unmasked", config = "pc98", when = "after_build", replace = "sys/platform/pc98/pic.c", old = "fm_irq12_released = 1;", new = "fm_irq12_released = 1; irq_enable(12);", fail = "initial IRQ12 mask" },
  { id = "reverse", config = "pc98", when = "after_build", replace = "sys/kern/irq/irq_math.c", old = "for (i = 0; i < n; i++)", new = "for (i = n - 1; i >= 0; i--)", fail = "shared order" },

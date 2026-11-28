@@ -28,3 +28,29 @@ fire_%1:
 FIRE 2
 FIRE 12
 FIRE 13
+
+; Execute the production frame builder. Capture the stack at the IRETD boundary.
+section .bss
+align 4
+kernel_tss: resd 2
+host_sp: resd 1
+global entered
+entered: resd 17
+section .text
+global check_enter
+check_enter:
+        mov eax, [esp + 4]
+        pushad
+        mov [host_sp], esp
+        push eax
+        call test_enter
+captured:
+        pushad
+        mov esi, esp
+        mov edi, entered
+        mov ecx, 17
+        cld
+        rep movsd
+        mov esp, [host_sp]
+        popad
+        ret

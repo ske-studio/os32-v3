@@ -19,7 +19,16 @@ struct tp_device { struct tp_stat full, pio; unsigned long long bytes; };
 enum { TP_WC, TP_IRQ3, TP_IRQ5, TP_BUDGET, TP_PIT,
        TP_SND_OTHER, TP_SND_START, TP_SND_PAUSE, TP_SND_ADVANCE, TP_SND_RESYNC,
        TP_SND_TEARDOWN, TP_PCM_IRQ10, TP_EXTRA_COUNT };
+enum tp_soft_phase { TP_SOFT_ENTER, TP_SOFT_LEAVE, TP_SOFT_FEED, TP_SOFT_PHASES };
+#define TP_SOFT_RECENT 16
+struct tp_soft_switch { unsigned int resume_us, suspend_us; };
+struct tp_soft_sample { unsigned int count, last_us, worst_us; };
 struct tp_snapshot {
+    struct tp_soft_sample soft[TP_SOFT_PHASES], guest_late, soft_if0;
+    struct tp_soft_switch soft_switch[TP_SOFT_RECENT];
+    unsigned int soft_switch_count;
+    unsigned int tsc_mult, tsc_shift, soft_played, soft_written, soft_underruns;
+
     struct tp_stat bank[2][TP_METRICS]; /* normal, splash/crossing */
     unsigned long long elapsed[2], splash_enter, splash_leave, empty_cost;
     unsigned long long arrival[2]; /* IRQ1 / IRQ10; external trace correlation */
@@ -35,6 +44,14 @@ struct tp_snapshot {
 };
 struct tp_mark { unsigned long long t; unsigned int epoch, splash, valid; };
 struct tp_device_mark { struct tp_mark start; unsigned long long pio; unsigned int context; };
+void tick_probe_soft_session(int open, unsigned int mult, unsigned int shift);
+void tick_probe_soft_begin(unsigned int phase);
+void tick_probe_soft_end(unsigned int phase);
+void tick_probe_soft_supply(void);
+void tick_probe_soft_close(unsigned int played, unsigned int written, unsigned int underruns);
+void tick_probe_soft_if_begin(unsigned int flags);
+void tick_probe_soft_if_end(unsigned int flags);
+void tick_probe_soft_jiffy(int guest);
 void tick_probe_sound_begin(unsigned int metric);
 void tick_probe_sound_metric(unsigned int metric);
 void tick_probe_sound_end(void);

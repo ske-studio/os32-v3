@@ -132,6 +132,12 @@ static int before(uint32_t a, uint32_t b)
     return (int32_t)(a-b) < 0;
 }
 
+int fmv_audio_due(const FmVoice *v, uint32_t until)
+{
+    return (v->pending && !before(until, v->pending->at)) ||
+           (v->audio && !before(until, v->audio->at));
+}
+
 static int enqueue(FmVoice *v, uint32_t at, unsigned reg, unsigned value)
 {
     Event *e = v->mem.alloc(sizeof *e);

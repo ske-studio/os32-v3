@@ -48,6 +48,24 @@ int tick_probe_call(void *buf, unsigned int size)
     if (s->s1_mode)
         kprintf(7, "s1-mode=%u notifications=%u\n", s->s1_mode, s->s1_notifications);
     if (!s->available) return 0;
+    if (s->tsc_mult) {
+        kprintf(7, "soft86 TSC mult=%u shift=%u (us = cycles * mult >> shift)\n",
+                s->tsc_mult, s->tsc_shift);
+        kprintf(7, "soft86 played=%u written=%u underruns=%u\n", s->soft_played,
+                s->soft_written, s->soft_underruns);
+        kprintf(7, "soft86 os32-if0 count=%u worst_us=%u\n", s->soft_if0.count, s->soft_if0.worst_us);
+        unsigned first = s->soft_switch_count > TP_SOFT_RECENT ? s->soft_switch_count - TP_SOFT_RECENT : 0;
+        for (unsigned i = first; i < s->soft_switch_count; ++i) {
+            const struct tp_soft_switch *v = &s->soft_switch[i % TP_SOFT_RECENT];
+            kprintf(7, "slice=%u resume_us=%u suspend_us=%u\n", i + 1, v->resume_us, v->suspend_us);
+        }
+        const char *const label[] = {"resume", "suspend", "supply-gap", "guest-jiffy-late"};
+        for (unsigned i = 0; i <= TP_SOFT_PHASES; ++i) {
+            const struct tp_soft_sample *v = i == TP_SOFT_PHASES ? &s->guest_late : &s->soft[i];
+            kprintf(7, "%s count=%u last_us=%u worst_us=%u\n", label[i], v->count,
+                    v->last_us, v->worst_us);
+        }
+    }
     cycles("empty-cost", s->empty_cost);
     cycles("splash-enter", s->splash_enter);
     cycles("splash-leave", s->splash_leave);

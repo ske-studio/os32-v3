@@ -225,7 +225,19 @@ int sndl_chip_close(u32 handle)
 {
     Chip *s = lookup(handle);
     if (!s) return OS32_ERR_INVAL;
-    int rc = s->fm ? sndl_pcm_release(SND2_CLOSE_DRAIN) : sound_api->snd2_chip_close(s->hw);
+    int rc = 0;
+    if (s->fm) {
+        u32 until;
+        rc = clock_now(&until);
+        while (!rc && fmv_audio_due(s->fm, until)) {
+            rc = sndl_pump();
+            if (!rc && fmv_audio_due(s->fm, until)) sound_api->sys_yield();
+        }
+        int closed = sndl_pcm_release(rc ? SND2_CLOSE_ABORT : SND2_CLOSE_DRAIN);
+        if (!rc) rc = closed;
+    } else {
+        rc = sound_api->snd2_chip_close(s->hw);
+    }
     if (!rc || !s->fm || !sndl_pcm_active()) {
         fmv_delete(s->fm);
         *s = (Chip){0};

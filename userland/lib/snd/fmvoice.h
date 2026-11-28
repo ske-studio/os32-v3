@@ -22,6 +22,7 @@ int fmv_new(FmVoice **out, FmvMemory mem, uint32_t now, int external_timer,
 void fmv_delete(FmVoice *v);
 void fmv_reset(FmVoice *v, uint32_t now);
 int fmv_write(FmVoice *v, uint32_t at, unsigned reg, unsigned value);
+int fmv_audio_due(const FmVoice *v, uint32_t until);
 int fmv_csm(FmVoice *v, uint32_t at);
 int fmv_read(FmVoice *v, uint32_t now, unsigned reg, unsigned *value);
 int fmv_status(FmVoice *v, uint32_t now, unsigned bank, unsigned *value);

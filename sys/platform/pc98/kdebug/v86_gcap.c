@@ -259,7 +259,7 @@ static void gd_set(u32 off, u16 v)
 static int gcap_run(V86Gcap *g, u32 entry, u32 phase, u16 ax, u16 bx,
                     u16 *oax, u16 *obx, int *done, int keep_if, u32 ticks)
 {
-    struct v86_context ctx;
+    struct v86_context ctx = {0};
     u32 off;
     int reason;
 
