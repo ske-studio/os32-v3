@@ -5,7 +5,7 @@ pub mod kbd_policy;
 pub mod gui {
     pub mod proto {
         pub const OS32_ERR_NOSYS: i32 = -10;
-        pub const GUI_MAX_WINDOWS: usize = 2;
+        pub const GUI_MAX_WINDOWS: usize = 3;
         pub const GUI_EV_KEY: u8 = 1;
         pub const GUI_EV_BUTTON: u8 = 2;
         pub const GUI_EV_POINTER: u8 = 3;
@@ -46,9 +46,10 @@ pub fn api() -> Api {
         kbd_dropped_count: || 0,
         exec_abort_clear: || { multiapp::STOP_TRACE.with(|t| t.borrow_mut().push(0)); 0 },
         get_tick: || 0,
-        kbd_policy_key_read: |out, _| {
+        kbd_policy_key_read: |out, max| {
             if !POLICY.get() { return gui::proto::OS32_ERR_NOSYS; }
             if FLAGS.get() & excl::KBD != 0 { return ffi::OS32_ERR_BUSY; }
+            if max == 0 { return 0; }
             if let Some(key) = KEY.take().or_else(|| BATCH.with(|q| q.borrow_mut().pop_front())) { unsafe { *out = key; } 1 } else { 0 }
         },
         kbd_trygetrawkey: || RAW.with(|q| q.borrow_mut().pop_front().unwrap_or(-1)),
@@ -72,11 +73,11 @@ mod wm {
         pub fn intersects(&self, _: &Rect) -> bool { unreachable!() }
     }
     #[derive(Default)]
-    pub struct Nav { pub sw_active: bool }
+    pub struct Nav { pub sw_active: bool, pub sw_n: usize, pub sw_sel: usize, pub sw_ids: [u32; GUI_MAX_WINDOWS] }
     pub struct GuiState {
         pub kn: Nav,
         pub inited: bool, pub in_pump: bool, pub now: u32, pub last_kbd_dropped: u32,
-        pub excl: excl::State, pub windows: [Window; 2], pub cursor: cursor::Cursor, pub screen_w: i32, pub screen_h: i32,
+        pub excl: excl::State, pub windows: [Window; GUI_MAX_WINDOWS], pub cursor: cursor::Cursor, pub screen_w: i32, pub screen_h: i32,
         pub pending_raw: [i32;128], pub pending_rank: [u8;128], pub pending_raw_n: usize,
         pub pending_tab: bool, pub pending_switch: bool, pub pending_raw_dropped: u32,
         pub held_keys: [bool;128], pub stop_suppressed: bool, pub stop_tick: u32,
@@ -99,6 +100,10 @@ mod wm {
             if STATE.is_null() { STATE = Box::into_raw(Box::new(window_state())); }
             &mut *STATE
         }
+    }
+    pub fn activate_index(st: &mut GuiState, index: usize) {
+        st.switches += 1;
+        st.front = index;
     }
     pub fn drop_drag_frame(st: &mut GuiState) { st.drag_index = -1; }
     pub fn queue_present(_: &mut GuiState, _: Rect) {}
@@ -181,25 +186,31 @@ mod fep {
 }
 mod kbdnav {
     #[cfg(legacy_gui)]
-    use super::{MOD_GRPH, SC_GRPH};
+    use super::{MOD_GRPH, SC_GRPH, GUI_MAX_WINDOWS, modal, wm};
     use super::wm::GuiState;
     #[cfg(legacy_gui)]
     include!(env!("WM_SHORTCUT_ITEM"));
     #[cfg(legacy_gui)]
     enum Shortcut { Close, Switch }
     #[cfg(legacy_gui)]
-    fn run_shortcut(st: &mut GuiState, kind: Shortcut, _: bool) -> bool {
+    fn run_shortcut(st: &mut GuiState, kind: Shortcut, back: bool) -> bool {
         assert!(matches!(kind, Shortcut::Switch));
-        st.kn.sw_active = true;
+        begin_switch(st, back);
         true
     }
     #[cfg(legacy_gui)]
-    fn advance_switch(_: &mut GuiState, _: bool) { unreachable!() }
-    #[cfg(legacy_gui)]
-    fn finish_switch(st: &mut GuiState) {
-        st.kn.sw_active = false;
-        st.switches += 1;
+    fn build_switch_list(st: &GuiState, ids: &mut [u32; GUI_MAX_WINDOWS]) -> usize {
+        let mut n = 0;
+        for offset in 0..GUI_MAX_WINDOWS {
+            let id = st.windows[(st.front + offset) % GUI_MAX_WINDOWS].id;
+            if id != 0 { ids[n] = id; n += 1; }
+        }
+        n
     }
+    #[cfg(legacy_gui)]
+    fn dirty_taskbar(_: &mut GuiState) {}
+    #[cfg(legacy_gui)]
+    fn switchable(st: &GuiState, id: u32) -> bool { st.win_by_id(id).is_some() }
     #[cfg(not(legacy_gui))]
     pub fn policy_shortcut(_: &mut GuiState, _: u32, _: bool, _: bool) { unreachable!() }
     pub fn pre(_: &mut GuiState, _: u8, _: bool, _: u32) -> bool { false }
@@ -267,9 +278,10 @@ mod ring {
         st.events.borrow_mut().push(*ev);
         true
     }
-    pub fn ev_key(down: bool, window: u32, scan: u8, _: u8, _: u8, _: u16) -> GuiEvent {
+    pub fn ev_key(down: bool, window: u32, scan: u8, ch: u8, _: u8, _: u16) -> GuiEvent {
         let mut ev = GuiEvent {window, kind: GUI_EV_KEY, sub: down as u8, payload: [0;8]};
         ev.payload[0] = scan;
+        ev.payload[1] = ch;
         ev
     }
     pub fn ev_text(window: u32, payload: [u8; 8], sub: u8, _: u16) -> GuiEvent {
@@ -287,7 +299,7 @@ mod ring {
 fn window_state() -> wm::GuiState {
     wm::GuiState {
         kn: Default::default(), inited: true, in_pump: false, now: 0, last_kbd_dropped: 0,
-        excl: excl::State::NEW, windows: [wm::Window {owner: 2, id: 10}, wm::Window {owner: 3, id: 11}],
+        excl: excl::State::NEW, windows: [wm::Window {owner: 2, id: 10}, wm::Window {owner: 3, id: 11}, wm::Window {owner: 0, id: 0}],
         pending_raw: [0;128], pending_rank: [0;128], pending_raw_n: 0,
         pending_tab: false, pending_switch: false, pending_raw_dropped: 0,
         held_keys: [false;128], stop_suppressed: false, stop_tick: 0,
@@ -425,7 +437,7 @@ fn main() {
     let raw: i32 = std::env::args().nth(2).unwrap().parse().unwrap();
     let fields: Vec<u32> = std::env::args().skip(3).map(|s| s.parse().unwrap()).collect();
     if !fields.is_empty() {
-        let words: [u32; 12] = fields.try_into().unwrap();
+        let words: [u32; 12] = fields[..12].try_into().unwrap();
         KEY.set(Some(unsafe { core::mem::transmute(words) }));
         POLICY.set(true);
     }
@@ -456,6 +468,21 @@ fn main() {
                          raw_keyboard::Step::Consumed));
         assert_eq!(st.switches, 1);
         assert_eq!(st.events.borrow().len(), 3);
+        st.events.take();
+        st.front = 0;
+        st.space.set(16);
+        for event in fields[12..].chunks_exact(12) {
+            let words: [u32; 12] = event.try_into().unwrap();
+            KEY.set(Some(unsafe { core::mem::transmute(words) }));
+            pump::gshell_gui_pump();
+        }
+        let events = st.events.borrow();
+        let byte = if expected == b'A' { b'c' } else { 3 };
+        assert_eq!(events.len(), if byte == 3 { 2 } else { 3 });
+        assert_eq!((events[0].kind, events[0].sub, events[0].payload[1]), (GUI_EV_KEY, 1, byte));
+        if byte != 3 { assert_eq!((events[1].kind, events[1].payload[0]), (GUI_EV_TEXT, byte)); }
+        let last = events.last().unwrap();
+        assert_eq!((last.kind, last.sub, last.payload[0]), (GUI_EV_KEY, 0, 0x2b));
     }
 
 }
@@ -468,6 +495,8 @@ fn focus_batches() {
     let mut words = bytes.chunks_exact(4).map(|w| i32::from_le_bytes(w.try_into().unwrap()));
     let st = wm::g();
     POLICY.set(true);
+    // Other phases use the existing sole front window.
+    st.windows[1].id = 0;
     #[derive(Clone, Copy, PartialEq)]
     enum Phase { Before, Acquire, ExclusiveChord, Released, Full, SingleSwitch, Reset, Unmapped }
     use Phase::*;
@@ -525,4 +554,29 @@ fn focus_batches() {
         RAW.with(|q| q.borrow_mut().clear());
     }
     assert_eq!(words.next(), None);
+    st.windows[1] = wm::Window {owner: 2, id: 11};
+    for (shift, target) in [(false, 1usize), (true, 2usize)] {
+        st.front = 0;
+        excl::observe(st);
+        excl::settle(st);
+        let count = st.switches;
+        let mods = MOD_GRPH | u32::from(shift);
+        let tab = kbd_policy::KbdPolicyKey {
+            sc_down_repeat: 0x100 | SC_TAB as u32, physical_mods: mods,
+            logical_mods: kbd_policy::KBD_POLICY_MOD_ALT, action: kbd_policy::KBD_POLICY_ACTION_SWITCH_APP,
+            ..Default::default()
+        };
+        BATCH.with(|q| q.borrow_mut().extend([tab, kbd_policy::KbdPolicyKey {
+            sc_down_repeat: SC_GRPH as u32, ..Default::default()
+        }]));
+        RAW.with(|q| q.borrow_mut().extend([0x100 | SC_TAB as i32 | ((mods as i32) << 9), SC_GRPH as i32]));
+        input::capture_keyboard(st, Ctx::Wait);
+        assert_eq!(st.front, target);
+        excl::observe(st);
+        excl::settle(st);
+        input::capture_keyboard(st, Ctx::Wait);
+        assert_eq!(st.switches, count + 1);
+        RAW.with(|q| q.borrow_mut().clear());
+        st.windows[2] = wm::Window {owner: 2, id: 12};
+    }
 }

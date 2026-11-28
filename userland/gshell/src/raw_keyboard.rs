@@ -158,7 +158,8 @@ pub(crate) fn purge_boundary(st: &mut GuiState, same_owner: bool) {
     }
     st.pending_raw_n = write;
     if same_owner {
-        loop {
+        let policy = unsafe { (os32api::api().kbd_policy_key_read)(core::ptr::null_mut(), 0) };
+        while matches!(policy, os32api::gui::proto::OS32_ERR_NOSYS | crate::ffi::OS32_ERR_BUSY) {
             let raw = unsafe { (os32api::api().kbd_trygetrawkey)() };
             if raw < 0 { break; }
             if boundary_control(raw) || (st.pending_switch && raw & ((MOD_GRPH as i32) << 9) == 0) { defer_raw(st, raw); }
@@ -215,6 +216,8 @@ pub(super) fn next(st: &mut GuiState, ctx: Ctx, space_ok: bool, captured: &mut b
     let scan = raw as u8;
     let evaluated = raw & EVALUATED != 0;
     let action = (raw >> 24) as u32 & 31;
+    let wm_action = matches!(action, KBD_POLICY_ACTION_SWITCH_APP | KBD_POLICY_ACTION_CLOSE |
+                            KBD_POLICY_ACTION_IME_ON | KBD_POLICY_ACTION_IME_OFF);
     let down = ((raw >> 8) & 1) != 0;
     let mods = ((raw >> 9) & 0x7F) as u32;
     #[cfg(feature = "c_gui_accept")]
@@ -236,7 +239,7 @@ pub(super) fn next(st: &mut GuiState, ctx: Ctx, space_ok: bool, captured: &mut b
     /* WM のショートカットとマウスキーは状態機械を動かすので X3 でだけ
      * 実行する (票 KBD_NAV §1-4)。X4 で見つけたら FEP と同じく、この raw と
      * 以後を全部退避して次の X3 へ回す (順序を保つ)。 */
-    if defer || (ctx == Ctx::Pump && (action != 0 || kbdnav::is_wm_raw(st, raw))) {
+    if defer || (ctx == Ctx::Pump && (wm_action || kbdnav::is_wm_raw(st, raw))) {
         defer_raw(st, raw);
         return Step::Consumed;
     }
@@ -257,7 +260,7 @@ pub(super) fn next(st: &mut GuiState, ctx: Ctx, space_ok: bool, captured: &mut b
 
     /* 修飾キーとして捨てる**前**に: カナ (マウスキーの切り替え) と、GRPH+TAB
      * 切り替え中の GRPH の離し (票 KBD_NAV §1-2 / §1-5)。 */
-    if evaluated && action != 0 {
+    if evaluated && wm_action {
         if down && st.excl.open(crate::excl::KBD) {
             match action {
                 KBD_POLICY_ACTION_SWITCH_APP | KBD_POLICY_ACTION_CLOSE =>

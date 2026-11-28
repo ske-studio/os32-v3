@@ -31,11 +31,13 @@ def build_gui(fixture, tmp):
     keyboard = Path(tmp) / "keyboard.rs"
     keyboard.write_text("\n".join(items))
     nav = Path("userland/gshell/src/kbdnav.rs").read_text()
-    start = nav.index("pub(crate) fn policy_shortcut(")
     shortcut = Path(tmp) / "shortcut.rs"
-    finish = nav.index("pub fn finish_if_released(")
-    shortcut.write_text(nav[start:nav.index("\n}", start) + 2] + "\n" +
-                        nav[finish:nav.index("\n}", finish) + 2])
+    nav_items = []
+    for name in ("policy_shortcut", "finish_if_released", "begin_switch", "advance_switch",
+                 "finish_switch", "switch_selection", "cancel_switch"):
+        start = re.search(rf"^(?:pub(?:\(crate\))? )?fn {name}\(", nav, re.M)
+        nav_items.append(nav[start.start():nav.index("\n}", start.end()) + 2])
+    shortcut.write_text("\n".join(nav_items))
     exe = Path(tmp) / "legacy_gui"
     subprocess.run(["rustc", "--edition=2021", "-Awarnings", "--cfg", "legacy_gui",
                     fixture / "gshell.rs", "-o", exe], check=True,
@@ -44,12 +46,12 @@ def build_gui(fixture, tmp):
 
 
 def verify_gui(fixture, tmp, raw, byteorder):
-    if len(raw) not in (4, 52):
+    if len(raw) not in (4, 148):
         raise Failure("missing legacy GUI raw word")
     exe = build_gui(fixture, tmp)
     words = [str(int.from_bytes(raw[i:i+4], byteorder)) for i in range(0, len(raw), 4)]
     # The 1024-row table installed by check_row_limit maps HID usage 4 to A.
-    expected = "A" if byteorder == "big" and len(raw) == 52 else "a"
+    expected = "A" if byteorder == "big" and len(raw) == 148 else "a"
     if subprocess.run([exe, expected, *words]).returncode:
         raise Failure("legacy GUI window delivery mismatch")
 
@@ -135,7 +137,7 @@ def verify(config):
             result = subprocess.run([runner, exe], stdout=subprocess.PIPE)
             if result.returncode:
                 raise Failure(f"public policy ABI or v2 LE mismatch (probe {result.returncode})")
-            if len(result.stdout) != (4 if extra else 52):
+            if len(result.stdout) != (4 if extra else 148):
                 raise Failure("missing capture output")
             verify_gui(fixture, tmp, result.stdout, "big" if ppc else "little")
 

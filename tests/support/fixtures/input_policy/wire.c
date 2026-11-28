@@ -319,6 +319,45 @@ static int test_provider(void)
     press.down = 0;
     if (input_capture_key(&press) || api.kbd_policy_reset() ||
         api.kbd_policy_key_read(&key_out, 1)) return 85;
+    /* Capture default Copy from the machine keyboard, including its break. */
+#ifdef __PPC__
+    unsigned modifier = 0xe3, letter = 6;
+#else
+    unsigned modifier = KEY_CTRL, letter = 0x2b;
+    u8 direction;
+    for (unsigned shift = 0; shift <= 1; ++shift)
+        if (ikm_policy_action(2, INPUT_CONTEXT_GUI, KM_MAP_PC98, KEY_TAB, KEY_TAB,
+                              KM_MOD_ALT | shift, &direction) ||
+            direction != KBD_POLICY_ACTION_SWITCH_APP) return 86;
+#endif
+    press.down = 1;
+    press.keycode = modifier;
+    if (input_capture_key(&press) || api.kbd_policy_key_read(&key_out, 1) != 1) return 87;
+    press.keycode = letter;
+    for (int down = 1; down >= 0; --down) {
+        press.down = down;
+        if (input_capture_key(&press) || api.kbd_policy_key_read(&key_out, 1) != 1 ||
+            key_out.action != KBD_POLICY_ACTION_COPY) return 88;
+        for (unsigned i = 0; i < sizeof key_out; i += 4) {
+            int word;
+            __builtin_memcpy(&word, (const u8 *)&key_out + i, 4);
+            if (write_gui_raw(&word) != 4) return 88;
+        }
+    }
+    press.keycode = modifier;
+    if (input_capture_key(&press) || api.kbd_policy_key_read(&key_out, 1) != 1) return 89;
+    press.keycode = letter;
+    u32 drops = legacy_raw_dropped();
+    for (unsigned i = 0; i < 150; ++i) {
+        press.down = !(i & 1);
+        if (input_capture_key(&press) || api.kbd_policy_key_read(&key_out, 1) != 1) return 90;
+    }
+    if (legacy_raw_dropped() != drops) return 91;
+    for (unsigned i = 0; i < 130; ++i) {
+        press.down = !(i & 1);
+        if (input_capture_key(&press)) return 92;
+    }
+    if (legacy_raw_dropped() != drops + 2) return 93;
     kbd_set_gui_mode(0);
     if (check_row_limit(1)) return 3;
     ikm_policy_owner_exit(1, 1);

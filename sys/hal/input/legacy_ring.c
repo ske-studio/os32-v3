@@ -1,5 +1,6 @@
 #include "in2_int.h"
 #include "io.h"
+#include "../../input/input_policy.h"
 #include "kbd_contract.h"
 /* The producer is IRQ1; flush/reset callers hold the same exclusion. */
 static volatile u16 kbd_buf[KBD_BUF_SIZE];
@@ -79,6 +80,14 @@ static volatile int kbd_raw_count = 0;
  * kbd_dropped_count() へ合算する。break を落とすと WM の修飾状態がずれるため必須。 */
 static volatile u32 kbd_raw_dropped = 0;
 
+void input_gui_key_lost(void) { ++kbd_raw_dropped; }
+
+static void raw_lost(unsigned count)
+{
+    if (!ikm_policy_ready() || in2_excl_keyboard()) kbd_raw_dropped += count;
+}
+
+
 static int keep_raw(int sc)
 {
     return sc == KEY_STOP || sc == KEY_CTRL || sc == KEY_GRPH || sc == KEY_TAB;
@@ -133,7 +142,7 @@ static int make_room(int slots, int limit, int rank)
     }
     kbd_raw_count = kept;
     kbd_raw_tail = raw_slot(kept);
-    kbd_raw_dropped += n;
+    raw_lost(n);
     return 1;
 }
 
@@ -177,7 +186,7 @@ void legacy_raw_push(int keycode, int is_break, int mods)
             priority[to] = priority[from];
             ++kept;
         }
-        kbd_raw_dropped += kbd_raw_count - kept;
+        raw_lost(kbd_raw_count - kept);
         kbd_raw_count = kept;
         kbd_raw_tail = raw_slot(kept);
         /* Before sealing the repeat, leave seats for both finish and STOP.
@@ -218,7 +227,7 @@ void legacy_raw_push(int keycode, int is_break, int mods)
     if ((start || finish) && kbd_raw_count + 1 + start >= KBD_BUF_SIZE)
         limit -= !has_ctrl_stop();
     if (!make_room(1 + start, limit, rank)) {
-        kbd_raw_dropped++;
+        raw_lost(1);
         return;
     }
     append_raw(keycode, is_break, mods, rank);

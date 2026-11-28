@@ -551,9 +551,9 @@ int ikm_policy_action(u8 profile, u8 context, u16 map, u16 keycode,
             }
         }
         if (profile == 4 && sc == 0x29 && mask == (KM_MOD_COMMAND | KM_MOD_SHIFT)) *action = 14;
-        if (profile == 2 && mask == KM_MOD_ALT) {
-            if (sc == 0x0f) *action = 16;
-            if (sc == 0x65) *action = 17;
+        if (profile == 2 && (mask & KM_MOD_ALT) && !(mask & KM_MOD_CTRL)) {
+            if (sc == 0x0f) *action = KBD_POLICY_ACTION_SWITCH_APP;
+            if (sc == 0x65 && mask == KM_MOD_ALT) *action = KBD_POLICY_ACTION_CLOSE;
         }
     }
     return 0;
@@ -607,7 +607,9 @@ int ikm_capture_gui_key(const KmKey *key, const KmSource *source, const KmState 
         event.kind = KM_LEGACY_CONTROL;
         event.value = byte;
     }
-    return input_delivery_key(&dst, &event) && action != KBD_POLICY_ACTION_NONE;
+    int wm_action = action == KBD_POLICY_ACTION_SWITCH_APP || action == KBD_POLICY_ACTION_CLOSE ||
+                    action == KBD_POLICY_ACTION_IME_ON || action == KBD_POLICY_ACTION_IME_OFF;
+    return input_delivery_key(&dst, &event) && wm_action;
 }
 
 /* Internal targets. The generated argument and page guards precede these

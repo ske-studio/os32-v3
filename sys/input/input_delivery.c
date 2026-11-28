@@ -58,6 +58,7 @@ static int key_room(const KbdPolicyKey *key)
         --key_count;
         return 1;
     }
+    input_gui_key_lost();
     return 0;
 }
 

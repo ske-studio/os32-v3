@@ -133,6 +133,7 @@ void legacy_raw_discard_stop(void);
 void legacy_raw_flush(void);
 void legacy_raw_reset_dropped(void);
 u32 legacy_raw_dropped(void);
+void input_gui_key_lost(void);
 void legacy_raw_push(int keycode, int is_break, int mods);
 int legacy_raw_take(void);
 
