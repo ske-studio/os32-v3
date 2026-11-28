@@ -2339,3 +2339,18 @@ mutations = [
     { id = "skip_ram_guard", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_transfer_bench.c", old = "guard += ram[h * rp] != GUARD;", new = "guard += 0;", fail = "transfer pixels or guard" },
     { id = "allow_ifc", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_transfer_bench.c", old = "&t->ram, true, dl", new = "&t->ram, false, dl", fail = "forced transfer failure" }
 ]
+
+[[check]]
+id = "soft86_tone_image"
+spec = { path = "docs/decisions/sound/V86_SOFT86_DESIGN.md", section = "最初の DOS 聴取の実装と受入" }
+subsystem = "sound"
+level = "L1"
+sources = ["tests/sound/soft86_tone.asm"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "DOS COM に左単音の音色列、key-on と key-off が入る"
+limits = "組立後のレジスタ列だけを確認する。OUT の実行と発音の長さはゲストで確認する"
+gates = ["push", "main"]
+mutations = [
+ { id = "omit_key_off", config = "pc98", when = "after_build", replace = "tests/sound/soft86_tone.asm", old = "key_off: db 28h,0", new = "key_off: db 28h,10h", fail = "missing key-off" }]
