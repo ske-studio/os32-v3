@@ -77,8 +77,11 @@ static enum opn_probe_result probe_primary(unsigned char irq_shadow,
         return OPN_PROBE_OPNA;
     }
 
+    /* A 26-class board has no A460h ID and no OPNA IRQ register. */
+    unsigned feature = inp(OPNA_ID_PORT);
+    int opn_only = (feature >> 4) == 15 && inp(OPNA_ID_PORT) == feature;
     if (!write_reg(OPN_REG_TIMER_B, 0xff) ||
-        !write_reg(0x29, irq_shadow & ~0x03))
+        (!opn_only && !write_reg(0x29, irq_shadow & ~0x03)))
         return OPN_PROBE_UNKNOWN;
 
     int rose = write_reg(OPN_REG_TIMER_CTRL, TIMER_B_START_ENABLE) &&
@@ -87,7 +90,7 @@ static enum opn_probe_result probe_primary(unsigned char irq_shadow,
     if (!stopped)
         stopped = write_reg(OPN_REG_TIMER_CTRL, OPN_TIMER_STOP);
     int cleared = ready_status() == 0;
-    int restored = write_reg(0x29, irq_shadow) && ready_status() == 0;
+    int restored = opn_only || (write_reg(0x29, irq_shadow) && ready_status() == 0);
     *contained = stopped && cleared && restored;
     if (!*contained || !rose) return OPN_PROBE_UNKNOWN;
     return OPN_PROBE_OPN;

@@ -14,7 +14,7 @@ static unsigned status, id, index_reg, feature, alt_status, alt_data;
 static unsigned writes, reads, alt_reads, imr_writes, mask = 0xff, elapsed;
 static unsigned busy_after_ff, busy_reads, timer_reads;
 static int frozen_clock, unstable_feature;
-static unsigned feature_reads;
+static unsigned feature_reads, fifo_reads;
 static unsigned trace[16], trace_count;
 static int ticks, fail_stop, fail_restore, restores;
 
@@ -59,7 +59,7 @@ unsigned inp(unsigned port)
     ++reads;
     if (!frozen_clock) elapsed += 5;
     if (port == 0xa460) return feature ^ (feature_reads++ && unstable_feature);
-    if (port == 0xa468) return 0;
+    if (port == 0xa468) { ++fifo_reads; return 0; }
     if (port == 0x188) {
         if (index_reg == 0xff && busy_reads < busy_after_ff) {
             ++busy_reads;
@@ -108,7 +108,7 @@ static void reset(void)
     boot_probe = (struct fm_probe_record){0};
     trace_count = writes = reads = elapsed = alt_reads = imr_writes = restores = 0;
     index_reg = busy_after_ff = busy_reads = timer_reads = frozen_clock = 0;
-    fm_irq12_released = fm_irq12_blocked = unstable_feature = feature_reads = 0;
+    fm_irq12_released = fm_irq12_blocked = unstable_feature = feature_reads = fifo_reads = 0;
     status = id = alt_status = alt_data = feature = 0xff;
 }
 static void check_opna_wait(unsigned delay, int frozen)
@@ -200,6 +200,14 @@ void _start(void)
             boot_probe.bank[1].model == OPN_PROBE_UNKNOWN, "alternate response");
     require(!boot_probe.bank[0].chip_id_port && !boot_probe.feature_port, "unverified ID");
     reset();
+    status = 2; /* A stale flag must be cleared before observing a new edge. */
+    ticks = 1;
+    feature = 0xff;
+    require(!start() && registered == OPN_PROBE_OPN && boot_probe.contained &&
+            !status && timer_reads && !fifo_reads, "26K Timer B");
+    for (unsigned i = 0; i < trace_count; ++i)
+        require(trace[i] != 0x18829, "26K OPNA register");
+    reset();
     alt_data = 0;
     require(!start() && boot_probe.bank[1].model == OPN_PROBE_UNKNOWN, "alternate data");
     reset();
@@ -231,6 +239,7 @@ void _start(void)
     reset();
     status = 0;
     mask = 0;
+    feature = 0x51;
     fail_restore = 1;
     require(start() && !boot_probe.contained && !fm_quiesce(&module), "restore timeout");
     require(mask == 0x10, "IRQ12 isolation");
