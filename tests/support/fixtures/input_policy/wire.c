@@ -262,6 +262,37 @@ static int terminal_interrupt(void)
     return input_capture_key(&k) || api.kbd_policy_context_set(INPUT_CONTEXT_RUNNING, INPUT_CONTEXT_ISIG);
 }
 
+#ifndef __PPC__
+static int terminal_bsd_keys(void)
+{
+    u8 exact[] = {'I','K','M','1',2,0,16,0,1,0,0,0,0,0,0,0,
+        3,0,1,0,0x1d,0,0,0,0,0xf5,0,0,1,0,0,0};
+    const u8 ops[] = {0x1b, 0x7a, 0x1a}; /* fkey1, fkey96, ignored scr16 */
+    KmKey key = {.src = 1, .generation = 1, .keycode = 0x1d};
+    KbdPolicyAction event;
+    for (unsigned i = 0; i < sizeof ops; ++i) {
+        exact[29] = ops[i];
+        if (api.kbd_policy_set(exact, sizeof exact)) return 1;
+        key.down = 1;
+        if (input_capture_key(&key) || legacy_cooked_take() != 0x1d00) return 1;
+        key.down = 0;
+        if (input_capture_key(&key) ||
+            api.kbd_policy_delivery_set(KBD_POLICY_DELIVERY_ACTION)) return 1;
+        key.down = 1;
+        if (input_capture_key(&key) || input_capture_key(&key)) return 1;
+        key.down = 0;
+        if (input_capture_key(&key)) return 1;
+        if (ops[i] != 0x1a &&
+            (api.kbd_policy_action_read(&event, 1) != 1 ||
+             event.action != KBD_POLICY_ACTION_BSD_SPECIAL || event.value != ops[i] ||
+             legacy_cooked_take() != -1)) return 1;
+        if (api.kbd_policy_action_read(&event, 1) ||
+            api.kbd_policy_delivery_set(KBD_POLICY_DELIVERY_BYTE)) return 1;
+    }
+    return api.kbd_policy_reset();
+}
+#endif
+
 static int test_provider(void)
 {
     KbdPolicySnapshot snapshot;
@@ -333,6 +364,10 @@ static int test_provider(void)
         input_context_owner_register(2, 2, 1, 1) || input_context_snapshot(&snapshot))
         return 4;
     if (terminal_interrupt()) return 99;
+#ifndef __PPC__
+    if (terminal_bsd_keys()) return 112;
+    ikm_policy_owner_exit(1, 1);
+#endif
     if (check_row_limit(0)) return 3;
     /* Carry the real public read and its raw mirror into the window pump. */
     KmKey press = { .src = 1, .generation = 1, .down = 1,

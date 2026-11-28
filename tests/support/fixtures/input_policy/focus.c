@@ -141,6 +141,18 @@ int probe(void)
         action.action != KBD_POLICY_ACTION_REDRAW || action.time_ms != 123 ||
         action.command_gen || action.value || legacy_cooked_take() != -1 ||
         ikm_policy_action_read(1, 1, &action, 1)) return 52;
+    /* Distinct timestamps identify every retained action, including its order. */
+    for (unsigned i = 0; i < 128; ++i) {
+        tick_count = i;
+        if (captured(1, 1) || captured(1, 0)) return 56;
+    }
+    tick_count = 128;
+    if (captured(1, 1) || captured(1, 1) || captured(1, 0) ||
+        legacy_cooked_take() != -1) return 57;
+    for (unsigned i = 0; i < 128; ++i)
+        if (ikm_policy_action_read(1, 1, &action, 1) != 1 ||
+            action.action != KBD_POLICY_ACTION_REDRAW || action.time_ms != i) return 58;
+    if (ikm_policy_action_read(1, 1, &action, 1)) return 59;
     if (captured(1, 1) || captured(1, 0) ||
         input_context_owner_set(1, 1, INPUT_CONTEXT_LINE_EDIT, INPUT_CONTEXT_ISIG) ||
         ikm_policy_action_read(1, 1, &action, 1) ||

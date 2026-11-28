@@ -593,6 +593,10 @@ int ikm_capture_terminal(const KmKey *key, u16 map, u16 mods,
                                                 KBD_POLICY_PROFILE_MAC_CUI;
     if (ikm_policy_action(profile, dst.context, map, key->keycode, result->compat_sc,
                           mods, &action)) return 0;
+    /* BSD fkey1..96 carry their original special ID in the Action. */
+    if (!action && result->kind == KM_BSD_SPECIAL &&
+        result->op >= 0x1b && result->op <= 0x7a)
+        action = KBD_POLICY_ACTION_BSD_SPECIAL;
     if (!action && result->kind == KM_CHAR && result->sym <= 255 && !result->is_modifier) {
         const u8 meaning[] = {0, KBD_POLICY_ACTION_INTERRUPT,
             machine == IKM_PLATFORM_PC98 ? KBD_POLICY_ACTION_CANCEL_LINE : KBD_POLICY_ACTION_KILL_TO_BOL,
