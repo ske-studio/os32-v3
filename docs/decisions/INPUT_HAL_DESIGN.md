@@ -336,7 +336,7 @@ slot commit 後は既存順で shell lease publish／親 syscall suspend、AV fo
 
 表交換・GUI 焦点交代（同 owner の別窓を含む）では旧 pending と compose を破棄し、旧窓への成功済み押下だけを清算する。消費済み make の break は同じ source の解放まで抑止。G は provider の初期化成功を確認した場合だけ WM pump を切り替える。失敗時は旧 raw・退避を清算せず旧 pump の通常 GUI 配送を続ける。成功時は切替境界で旧 raw・退避を清算してから通常配送の消費口を Key に一本化する。独占制御用 raw は通常配送へ戻さない。
 
-前景アプリ自身の set/reset が成功した場合も、旧 raw なら同じ窓に届いていた表交換前の未配送 Key を破棄する。
+アプリ自身が方針・文脈・配送を変更した時は、その成功を入力の区切りとする。set/reset、配送に影響する context_set、command_begin/end、delivery_set などの変更前に採取した未配送 Key は、旧 raw なら同じ窓に届いていた場合も破棄する。拒否された呼出しでは未配送 Key を保持する。
 
 ### 10.3 登録検査を先行させる
 

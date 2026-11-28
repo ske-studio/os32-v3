@@ -394,6 +394,19 @@ static int test_provider(void)
             return 80;
         if (api.kbd_policy_key_read(&key_out, 1) != 0) return 81;
     }
+    key.map_generation = ikm_policy_generation();
+    for (unsigned boundary = 0; boundary < 4; ++boundary) {
+        if (input_context_snapshot(&snapshot) || !input_delivery_key(&snapshot, &key))
+            return 82;
+        int rc;
+        switch (boundary) {
+        case 0: rc = api.kbd_policy_context_set(INPUT_CONTEXT_GUI, 0); break;
+        case 1: rc = api.kbd_policy_command_begin(); break;
+        case 2: rc = api.kbd_policy_command_end(); break;
+        default: rc = api.kbd_policy_delivery_set(0); break;
+        }
+        if (rc || api.kbd_policy_key_read(&key_out, 1)) return 83;
+    }
     if (input_context_owner_select(2, 2) || input_delivery_action(&snapshot, &action))
         return 12;
     return 0;
