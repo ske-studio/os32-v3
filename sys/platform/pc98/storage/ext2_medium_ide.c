@@ -29,7 +29,7 @@ Device *ext2_dev_for(int ide_drive)
  * (BOOTINFO_GEOM_BIOS / BOOTINFO_GEOM_IDENTIFY) を返す。legacy (NULL 可) は
  * NOPART のとき「旧配置の OS32 項目があった」なら 1。 */
 static int ext2_find_partition_ex(int ide_drive, u32 *out_start, u32 *out_len,
-                                  int *geom_src, int *legacy)
+                                  int *geom_src, int *legacy, int formatting)
 {
     u8 pt_sect[PC98PT_SECTOR_SIZE];
     u16 heads, spt;
@@ -55,8 +55,13 @@ static int ext2_find_partition_ex(int ide_drive, u32 *out_start, u32 *out_len,
     if (src < 0) return EXT2_ERR_NOPART;
     if (geom_src) *geom_src = src;
 
-    if (pc98pt_find_os32(pt_sect, heads, spt, info.total_sectors,
-                         (int *)0, &start, &len) != PC98PT_OK) {
+    if (formatting && src != BOOTINFO_GEOM_BIOS) return EXT2_ERR_NOPART;
+    int rc = pc98pt_find_os32(pt_sect, heads, spt, info.total_sectors,
+                         (int *)0, &start, &len);
+    if (rc != PC98PT_OK) {
+        if (formatting && rc == PC98PT_ERR_RANGE &&
+            !pc98pt_os32_is_legacy(pt_sect, heads, spt, info.total_sectors))
+            return EXT2_ERR_INVAL;
         if (legacy)
             *legacy = pc98pt_os32_is_legacy(pt_sect, heads, spt, info.total_sectors);
         return EXT2_ERR_NOPART;
@@ -69,13 +74,13 @@ static int ext2_find_partition_ex(int ide_drive, u32 *out_start, u32 *out_len,
 
 int ext2_find_partition(int ide_drive, u32 *out_start, u32 *out_len)
 {
-    return ext2_find_partition_ex(ide_drive, out_start, out_len, (int *)0, (int *)0);
+    return ext2_find_partition_ex(ide_drive, out_start, out_len, (int *)0, (int *)0, 0);
 }
 
 int ext2_find_partition_src(int ide_drive, u32 *out_start, u32 *out_len,
                             int *geom_src)
 {
-    return ext2_find_partition_ex(ide_drive, out_start, out_len, geom_src, (int *)0);
+    return ext2_find_partition_ex(ide_drive, out_start, out_len, geom_src, (int *)0, 0);
 }
 
 int platform_ext2_resolve(int ide_drive, Device **dev, u32 *base, u32 *len)
@@ -91,7 +96,7 @@ int platform_ext2_resolve(int ide_drive, Device **dev, u32 *base, u32 *len)
     {
         int src = 0, legacy = 0;
         ret = ext2_find_partition_ex(ide_drive, base, len,
-                                     &src, &legacy);
+                                     &src, &legacy, 0);
         if (ret == EXT2_ERR_NOPART && legacy) {
             /* v63 までの OS32 が書いた旧配置。v64 は読まない (票 段 1-4) ので、
              * NOPART だけでは直し方が分からない — 何をすればよいかを出す (Opus M2) */
@@ -119,7 +124,8 @@ static int ide_total_sectors(int drv, u32 *out)
 static int ide_find_part(int ide_drive, u32 *start, u32 *len)
 {
     int src = 0;
-    int ret = ext2_find_partition_src(ide_drive, start, len, &src);
+    int ret = ext2_find_partition_ex(ide_drive, start, len, &src, NULL,
+                                     (unsigned)ide_drive < VFS_DEV_UNIT_MAX);
     if (ret != EXT2_OK) return ret;
     /* 区画表の位置を IDENTIFY の幾何で読んだだけのときは書かない (m3)。
      * BIOS の幾何と違えば別の場所を指している (F4)。 */

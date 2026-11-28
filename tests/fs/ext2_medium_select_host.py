@@ -111,6 +111,11 @@ def observe(exe, case, folder):
         table[:2] = bytes([0x80, 0xe2])
         struct.pack_into("<H", table, 10, 1)
         struct.pack_into("<H", table, 14, max(1, c.capacity//17-1))
+    if c.state == "legacy":
+        struct.pack_into("<HHHH", table, 8, 17, 0, 18, 0)
+    if c.state == "range":
+        table[8] = 255
+        table[12:14] = b'\xff\xff'  # Invalid under the old layout too.
     with (folder/hd).open("wb") as f:
         f.truncate(max(c.capacity, 2)*512)
         f.seek(512)
@@ -129,7 +134,10 @@ def observe(exe, case, folder):
         raise Failure("masked drive wrote hd0")
     if c.drv == 0x604 and c.start == 18 and lines[:-1] != ["present 1540", "geometry 1540"]:
         raise Failure("explicit invalid drive probe sequence differs")
-    if lines[-1] != f"result {c.rc}":
+    if c.state == "mounted" and lines[:-1] != [f"present {c.drv}"]:
+        raise Failure("mounted HD reached partition discovery")
+    expected = NOPART if c.state == "identify" and c.start < 0 and 0 <= c.drv < 4 else c.rc
+    if lines[-1] != f"result {expected}":
         raise Failure(f"medium result {c}: {lines[-1]}")
     writes = [l.split() for l in lines if l.startswith("W ")]
     if c.rc and c.state not in ("write-error", "data-read-error", "read-error") and writes:
@@ -162,6 +170,9 @@ def observe(exe, case, folder):
     for name in [hd, *images]:
         with (folder/name).open("rb") as f:
             digests[name] = hashlib.file_digest(f, "sha256").hexdigest()
+    if expected != c.rc:
+        # Keep the original baseline for all other observations, including I/O.
+        trace = "\n".join([*lines[:-1], f"result {c.rc}"]) + "\n"
     return trace, digests
 
 
@@ -170,6 +181,10 @@ def verify(config):
         exe = Path(tmp)/"format"
         compile_fixture(ROOT, exe)
         subprocess.run(["qemu-x86_64", exe, "registration"], check=True)
+        for case in (Case(state="mounted", rc=-17), Case(state="range", rc=INVAL),
+                     Case(state="legacy", rc=NOPART)):
+            with tempfile.TemporaryDirectory(dir=tmp) as folder:
+                observe(exe, case, Path(folder))
         observations = hashlib.sha256()
         for case in cases():
             with tempfile.TemporaryDirectory(dir=tmp) as folder:

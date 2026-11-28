@@ -19,6 +19,11 @@ static u32 capacity;
 static int recording;
 
 static int mode(const char *value) { return strcmp(state, value) == 0; }
+int vfs_dev_mount_count(int drv)
+{
+    if (drv < 0 || drv > 3) abort();
+    return mode("mounted");
+}
 void kprintf(u8 attr, const char *fmt, ...) {}
 void *kmemset(void *p, int c, u32 n) { return memset(p, c, n); }
 void *kmemcpy(void *p, const void *q, u32 n) { return memcpy(p, q, n); }

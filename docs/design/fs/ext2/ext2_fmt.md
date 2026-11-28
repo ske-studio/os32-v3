@@ -17,9 +17,9 @@ ext2 を作る 2 つの入口。どちらも書く前に範囲を全部確かめ
 
 ## `ext2_format(drive, total_sectors)` (旧来の入口)
 
-区画表の OS32 区画 (`ext2_find_partition`) の先頭に作る。区画が無ければその誤り (`EXT2_ERR_NOPART` など) を返し、
+LOOP を選択した後、HD 0〜3 は対象 unit にマウントが一つでも残っていれば探索前に BUSY を返す。PC-98 は区画表の OS32 区画の先頭に作る。区画が無ければその誤り (`EXT2_ERR_NOPART` など) を返し、
 LBA を仮定して書き始めない。区画の位置を BIOS 幾何で決められず IDENTIFY の幾何で読んだだけのときは書かない
-(`EXT2_ERR_INVAL`、BIOS と違えば別の場所を指している)。total_sectors は 32 グループ (`EXT2L_MAX_SECTORS(EXT2_MAX_GROUPS)`)
+(`EXT2_ERR_NOPART`)。旧配置は NOPART、対象区画の範囲破損は INVAL。total_sectors は 32 グループ (`EXT2L_MAX_SECTORS(EXT2_MAX_GROUPS)`)
 で頭打ち (断らない) し、さらに区画の長さで頭打ちにする。
 
 ## 共通部 (`ext2_format_range`)

@@ -444,8 +444,7 @@ TASK_HDD_INSTALL (アーカイブ: `docs/archive/realhw_v21/TASK_HDD_INSTALL.md`
   読めない NHD も断る。通すのは **NHD のヘッダが無いファイル** (警告を出す) と**ファイルが無いとき**だけで、開けない・読めない・切り詰められた NHD や、移行の可否を調べる途中の例外 (OSError を含む) は断る。ただし **`deploy` (NP21/W の NHD を丸ごと上書きする push) は、ヘッダの無い・0 バイトの NHD も断る** (壊れたローカルの像で NP21/W の NHD を潰さない)。ローカルの NHD の読み取りの失敗 (OSError、旧配置の移行の可否を調べる途中のものを含む) は版に関係なく、`deploy` / `sync` / `sync-from-hostdrv` / `migrate-pt` のどれでも断る。
   ローカルの NHD が無いときは、取り込み (`ensure_local_nhd`) の**後・マウントの前**にもう一度見る。
   `hsync` はゲスト側なので止められない — 先に `make nhd-migrate-pt`。
-- **v64 の `format N` は、区画の位置を BIOS 幾何で決められないと書かない** (`EXT2_ERR_INVAL`、
-  `[EXT2] format: no BIOS geometry`)。当たる場面: DA 80h の HDD から起動して `format 1`
+- **現行の `format N` は書込み許可のある端末で対象 HD の全マウントを解除して実行する**。マウント中は BUSY、区画の位置を BIOS 幾何で決められないと NOPART で終了する。当たる場面: DA 80h の HDD から起動して `format 1`
   (HDD ローダは自分の DA しか AH=84h を聞かない)、段 0 より前のローダ (0x7E00 のブート情報域を
   書かない) で起動した標準配置の NHD。FD から起動し直せば 80h / 81h の両方が得られる。
   マウント (読むだけ) は IDENTIFY の幾何でも通る。

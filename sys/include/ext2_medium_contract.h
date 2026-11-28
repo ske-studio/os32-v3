@@ -14,6 +14,10 @@ struct ext2_medium_ops {                 /* 引数 drv は KAPI から来た値�
     u32  min_lba;                                       /* format_at の開始の下限 (HD = EXT2_FMT_MIN_LBA) */
     int (*claims)(int drv);  /* LOOP は番号のみ照合。HD は 0 可、選択時に呼ばない。 */
 };
+struct install_access;
+int ext2_format_range(const struct ext2_medium_ops *ops, int drv, u32 base, u32 length,
+                      u32 sectors, const struct install_access *access);
+
 /* LOOP が未登録または番号が対象外なら、HD の登録値 (未登録なら NULL) を使う。 */
 #define EXT2_MEDIUM_HD   0
 #define EXT2_MEDIUM_LOOP 1

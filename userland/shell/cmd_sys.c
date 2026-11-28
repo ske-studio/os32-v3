@@ -192,6 +192,18 @@ static int cmd_ide(int argc, char **argv)
     return 0;
 }
 
+static const char *format_reason(int rc)
+{
+    switch (rc) {
+    case -1:  return "I/O error";
+    case -5:  return "insufficient space";
+    case -10: return "invalid partition or length";
+    case -13: return "no approved partition";
+    case -17: return "device busy or reservation unavailable";
+    default:  return "unknown error";
+    }
+}
+
 static int cmd_format(int argc, char **argv)
 {
     int drv = 0;
@@ -217,10 +229,14 @@ static int cmd_format(int argc, char **argv)
         }
         if (!sects) goto usage;
     }
-    g_api->kprintf(ATTR_YELLOW, "Formatting drive %d (%u sectors)...\n", drv, sects);
+    if (drv < OS32_DRV_LOOP(0) && g_api->ide_write_sectors(drv, 0, 0, NULL)) {
+        g_api->kprintf(ATTR_RED, "%s", "Format failed: disk write not allowed (-1)\n");
+        return SH_STATUS_ERROR;
+    }
+    g_api->kprintf(ATTR_YELLOW, "Formatting %s...\n", argv[1]);
     ret = g_api->ext2_format(drv, sects);
     if (ret != 0) {
-        g_api->kprintf(ATTR_RED, "Format failed: %d\n", ret);
+        g_api->kprintf(ATTR_RED, "Format failed: %s (%d)\n", format_reason(ret), ret);
         return SH_STATUS_ERROR;
     }
     g_api->kprintf(ATTR_GREEN, "%s", "Format complete.\n");

@@ -207,7 +207,7 @@ static inline int fmt_write_root(const FormatIO *ctx, u32 gdt_blocks,
  * 呼び手 (ext2_format / ext2_format_at) が範囲を検証済みであること。
  * 大きさは ext2_layout_plan の固定点 — 最終グループに全メタデータが
  * 収まらなければそのグループを落として計算し直す (N7 / F12)。 */
-static int ext2_format_range(const struct ext2_medium_ops *ops, int ide_drive, u32 base_lba, u32 part_len,
+int ext2_format_range(const struct ext2_medium_ops *ops, int ide_drive, u32 base_lba, u32 part_len,
                              u32 sectors, const struct install_access *access)
 {
     int ret;
@@ -267,6 +267,19 @@ static const struct ext2_medium_ops *format_medium(int drv)
     return media[EXT2_MEDIUM_HD];
 }
 
+/* The previous managed provider accepts only a whole, pre-approved root.
+ * Keep that ABI until its platform header selects the automatic reservation. */
+#ifndef PLATFORM_INSTALL_FORMAT_HD
+static int platform_install_format_hd(int drv, u32 sectors)
+{
+    u32 start, length;
+    int rc = media[EXT2_MEDIUM_HD]->find_part(drv, &start, &length);
+    if (rc != EXT2_OK) return rc;
+    if (sectors != length) return EXT2_ERR_INVAL;
+    return ext2_format_at(drv, start, length);
+}
+#endif
+
 int ext2_format(int ide_drive, u32 total_sectors)
 {
     u32 start, len;
@@ -274,15 +287,16 @@ int ext2_format(int ide_drive, u32 total_sectors)
 
     const struct ext2_medium_ops *ops = format_medium(ide_drive);
     if (!ops || !ops->present(ide_drive)) return EXT2_ERR_IO;
+    if (ops == media[EXT2_MEDIUM_HD] && (unsigned)ide_drive < VFS_DEV_UNIT_MAX) {
+        if (vfs_dev_mount_count(ide_drive) > 0) return EXT2_ERR_BUSY;
+        if (platform_install_medium())
+            return platform_install_format_hd(ide_drive, total_sectors);
+    }
     /* 区画表の OS32 区画に作る。区画が無ければ作らない (以前は LBA 1088 を
      * 仮定して書き始めた、F12)。長さは区画で頭打ち — インストーラは
      * 「総数 - 1632」を渡すが、区画はシリンダ単位で切り下げてある。 */
     ret = ops->find_part(ide_drive, &start, &len);
     if (ret != EXT2_OK) return ret;
-    if (platform_install_medium() && (unsigned)ide_drive < VFS_DEV_UNIT_MAX) {
-        if (total_sectors != len) return EXT2_ERR_INVAL;
-        return ext2_format_at(ide_drive, start, len);
-    }
     /* 区画が 32 グループ (256MiB) より大きければ、上限の大きさへ頭打ちにする
      * (m2)。format_at は大きすぎる範囲を断る (hdprep は上限の内側で計画する)。 */
     if (total_sectors > EXT2L_MAX_SECTORS(EXT2_MAX_GROUPS))

@@ -2523,6 +2523,8 @@ expect = "二入口の戻り値と順序付き I/O と媒体差分が PC-98 の�
 limits = "管理なしのファイル媒体。ゲストの起動と PowerMac ATA の予約は対象外"
 gates = ["push", "main"]
 mutations = [
+    { id = "ext2_format_mounted", config = "pc98", when = "after_build", replace = "sys/fs/ext2/ext2_fmt.c", old = "vfs_dev_mount_count(ide_drive) > 0", new = "vfs_dev_mount_count(ide_drive) > 1", fail = "mounted HD reached partition discovery" },
+    { id = "ext2_format_bad_range", config = "pc98", when = "after_build", replace = "sys/platform/pc98/storage/ext2_medium_ide.c", old = "formatting && rc == PC98PT_ERR_RANGE", new = "0 && rc == PC98PT_ERR_RANGE", fail = "medium result" },
     { id = "ext2_select_attached", config = "pc98", when = "after_build", replace = "sys/fs/ext2/ext2_fmt.c", old = "loop && loop->claims(drv)", new = "loop && loop->claims(drv) && loop->present(drv)", fail = "unattached loop performed HD I/O" },
     { id = "ext2_select_early_reject", config = "pc98", when = "after_build", replace = "sys/fs/ext2/ext2_fmt.c", old = "u32 disk_sectors;", new = "u32 disk_sectors; if (ide_drive == 0x0604) return EXT2_ERR_INVAL;", fail = "explicit invalid drive probe sequence differs" },
     { id = "ext2_select_mask", config = "pc98", when = "after_build", replace = "sys/fs/ext2/ext2_fmt.c", old = "u32 disk_sectors;", new = "u32 disk_sectors; ide_drive &= 0xff;", fail = "masked drive wrote hd0" },
@@ -2540,4 +2542,6 @@ needs = []
 expect = "HD と loop の 8 種を正しい番号で format し、不正な引数では使い方を表示して formatter を呼ばない"
 limits = "KAPI 呼び出しまでを観測する。媒体への書き込みは ext2_medium_select_host が扱う"
 gates = ["push", "main"]
-mutations = [{ id = "accept_drive_suffix", config = "pc98", when = "after_build", replace = "userland/shell/cmd_sys.c", old = "*p > '3' || p[1]", new = "*p > '3'", fail = "format drive, sector count or rejection mismatch" }]
+mutations = [{ id = "format_skip_permission", config = "pc98", when = "after_build", replace = "userland/shell/cmd_sys.c", old = "drv < OS32_DRV_LOOP(0) && g_api->ide_write_sectors", new = "0 && g_api->ide_write_sectors", fail = "format drive, sector count or rejection mismatch" },
+    { id = "format_busy_reason", config = "pc98", when = "after_build", replace = "userland/shell/cmd_sys.c", old = "device busy or reservation unavailable", new = "device busy", fail = "format drive, sector count or rejection mismatch" },
+    { id = "accept_drive_suffix", config = "pc98", when = "after_build", replace = "userland/shell/cmd_sys.c", old = "*p > '3' || p[1]", new = "*p > '3'", fail = "format drive, sector count or rejection mismatch" }]

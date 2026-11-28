@@ -213,6 +213,7 @@ typedef struct {
 /* 区画表に OS32 の区画が無い / 項目の範囲が壊れている (票 TASK_HDD_INSTALL
  * 段 1-5)。以前は LBA 1088 へフォールバックしてそこを読み書きした。 */
 #define EXT2_ERR_NOPART  -13
+#define EXT2_ERR_BUSY    -17
 
 /* スーパーブロックの s_state / s_errors (ext2 の仕様どおり、offset 58 / 60)。
  *   s_state  … EXT2_VALID_FS (1) / EXT2_ERROR_FS (2) のビット
