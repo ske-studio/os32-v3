@@ -78,7 +78,7 @@ pub fn observe(st: &mut wm::GuiState) {
             st.excl.purge_same_owner = old.owner == next.owner &&
                 (st.excl.purge_same_owner || old.window != next.window);
         }
-        st.excl.focus_confirmed = crate::multiapp::av_owner() == next.owner;
+        st.excl.focus_confirmed = crate::multiapp::av_owner() == next.owner && crate::multiapp::av_window() == next.window;
         st.excl.sample = Some(next);
     }
     if !st.excl.open(MOUSE) && st.cursor.shown {

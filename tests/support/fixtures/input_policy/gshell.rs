@@ -127,9 +127,14 @@ mod multiapp {
     pub(crate) use stop_dispatch::top_level_abort;
     pub fn chain_tail(owner: i32) -> i32 { owner }
     pub fn note_injected_key(_: i32) { unreachable!() }
+    static WINDOW: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(10);
+    pub fn av_window() -> u32 { WINDOW.load(Ordering::Relaxed) }
     pub fn av_owner() -> i32 { OWNER.load(Ordering::Relaxed) }
     pub fn sync_av_focus(st: &mut super::wm::GuiState) {
-        if !FAIL_NEXT.swap(false, Ordering::Relaxed) { OWNER.store(st.front_owner(), Ordering::Relaxed); }
+        if !FAIL_NEXT.swap(false, Ordering::Relaxed) {
+            OWNER.store(st.front_owner(), Ordering::Relaxed);
+            WINDOW.store(st.front_id(), Ordering::Relaxed);
+        }
     }
 }
 mod fullscreen {
@@ -278,6 +283,10 @@ fn main() {
     st.space.set(1);
     assert!(excl::append(&mut st, 1, &ring::ev_key(true, 11, 52, 0, 0, 0)));
     st.windows[1].id = 12;
+    multiapp::FAIL_NEXT.store(true, std::sync::atomic::Ordering::Relaxed);
+    excl::observe(&mut st);
+    excl::settle(&mut st);
+    assert!(!st.excl.open(excl::KBD));
     st.space.set(8);
     excl::observe(&mut st);
     excl::settle(&mut st);

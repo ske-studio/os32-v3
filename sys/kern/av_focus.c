@@ -3,6 +3,7 @@
 #include "app_ids.h"
 #include "io.h"
 #include "../input/input_context.h"
+#include "../input/input_delivery.h"
 #include "../hal/input/in2_int.h"
 
 extern int res_owner_get(void);
@@ -34,7 +35,10 @@ int av_focus_set(int owner)
     unsigned irq = irq_save();
     u32 destination = owner ? (u32)owner : APP_ID_SHELL;
     int rc = input_context_owner_select(destination, input_context_owner_generation(destination));
-    if (!rc) select_owner(owner);
+    if (!rc) {
+        input_delivery_discard_keys();
+        select_owner(owner);
+    }
     irq_restore(irq);
     return rc ? OS32_ERR_INVAL : 0;
 }
