@@ -5,6 +5,8 @@ description: CPU・機種・装置の分離を壊さずにコードを足す・�
 
 # os32-arch-sep — 機種依存の分離を保つ
 
+> 前提: **他の機種へ移す時も UX/UI を揃える**。分離は内側の話で、利用者から見える物 (シェルのコマンドの綴り・引数・既定値、表示とエラーの文言、GUI の操作) は全機種で同じにする。機種の違いは下の層の提供者で吸収し、利用者の入口 (userland/shell・GUI) に機種の分岐を入れない ([POLICY_DEV](../../../docs/POLICY_DEV.md) §10「機種の間で UX/UI を揃える」)。
+
 決まりの正典: 層の規則と直し方は [check_layers](../../../docs/design/tools/check_layers.md) §3・§4・§8、ソースの選択は [select](../../../docs/design/build/select.md)、置き場の移動は [SRC_MOVE](../../../docs/SRC_MOVE.md)、生成物の一致は [sep_identity](../../../docs/design/tools/ci/sep_identity.md)。基準は「共通のソースが機種・装置のヘッダを読む数 0・ビルド 1 系統・入口の骨格 1 本」(ユーザー決定 2026-11-17)。
 
 ## 1. 置き場を決める (持ち主はパスで決まる)
