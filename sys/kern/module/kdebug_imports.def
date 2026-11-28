@@ -2714,6 +2714,30 @@
       "kind": "FUNC",
       "stage": "S6",
       "context_safe": false
+    },
+    {
+      "index": 333,
+      "symbol": "arch_video_wc_active",
+      "source": "sys/include/video_wc.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false
+    },
+    {
+      "index": 334,
+      "symbol": "gfx_screen_info",
+      "source": "sys/hal/gfx/gfx.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false
+    },
+    {
+      "index": 335,
+      "symbol": "gfx_surface_source",
+      "source": "sys/hal/gfx/gfx.h",
+      "kind": "FUNC",
+      "stage": "S6",
+      "context_safe": false
     }
   ]
 }

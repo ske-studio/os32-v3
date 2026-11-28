@@ -3,6 +3,7 @@
  * geforce_platform.c's permanent boot display map, not the larger WC range.
  * Dword stores and BAR0 drain follow gf_present.c (GF6200_4C_DESIGN §4). */
 #include "gfx_hal.h"
+#include "gf_direct_rows.h"
 #include "memmap.h"
 #include "geforce_module.h"
 #include "sys/dev/video/geforce/accel.h"
@@ -70,14 +71,7 @@ int gf_direct_put(int x, int y, int w, int h, const u8 *src, u32 pitch, int key)
             for (; n; --n, ++s, ++d)
                 if (*s != (u8)key) *d = *s;
         } else {
-            while (n && ((uptr)d & 3U)) { *d++ = *s++; --n; }
-            while (n >= 4) {
-                u32 value;
-                __builtin_memcpy(&value, s, sizeof(value));
-                *(volatile u32 *)d = value;
-                s += 4; d += 4; n -= 4;
-            }
-            while (n) { *d++ = *s++; --n; }
+            gf_direct_write_row(d, s, n);
         }
         src += pitch;
         dst += fb.pitch;
@@ -99,7 +93,7 @@ int gf_direct_get(int x, int y, int w, int h, u8 *dst, u32 pitch)
     for (int row = 0; row < h; row++) {
         rc = p->point(p->opaque);
         if (rc) return rc;
-        for (int col = 0; col < w; col++) dst[col] = src[col];
+        gf_direct_read_row(dst, src, (u32)w);
         src += fb.pitch;
         dst += pitch;
     }

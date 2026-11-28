@@ -1666,4 +1666,19 @@ paging_lease_unmap:
 pgalloc_arena_end:
     jmp *kdebug_import_slots+1328
 .size pgalloc_arena_end, .-pgalloc_arena_end
+.globl arch_video_wc_active
+.type arch_video_wc_active, @function
+arch_video_wc_active:
+    jmp *kdebug_import_slots+1332
+.size arch_video_wc_active, .-arch_video_wc_active
+.globl gfx_screen_info
+.type gfx_screen_info, @function
+gfx_screen_info:
+    jmp *kdebug_import_slots+1336
+.size gfx_screen_info, .-gfx_screen_info
+.globl gfx_surface_source
+.type gfx_surface_source, @function
+gfx_surface_source:
+    jmp *kdebug_import_slots+1340
+.size gfx_surface_source, .-gfx_surface_source
 .section .note.GNU-stack,"",@progbits

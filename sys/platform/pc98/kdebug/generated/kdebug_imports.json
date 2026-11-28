@@ -1,7 +1,7 @@
 {
-  "module_abi_gen": 689851702,
+  "module_abi_gen": 3706768287,
   "stage": "S6",
-  "count": 333,
+  "count": 336,
   "imports": [
     {
       "stage": "S1",
@@ -5045,6 +5045,51 @@
       "type_ver": 1,
       "signature": "u32 pgalloc_arena_end(void);",
       "source_declaration": "u32 pgalloc_arena_end(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 333,
+      "symbol": "arch_video_wc_active",
+      "source": "sys/include/video_wc.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "name": "arch_video_wc_active",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int arch_video_wc_active(void);",
+      "source_declaration": "int arch_video_wc_active(void);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 334,
+      "symbol": "gfx_screen_info",
+      "source": "sys/hal/gfx/gfx.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "name": "gfx_screen_info",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "void __cdecl gfx_screen_info(void *out);",
+      "source_declaration": "void __cdecl gfx_screen_info(void *out);",
+      "dtype": null,
+      "array": false
+    },
+    {
+      "index": 335,
+      "symbol": "gfx_surface_source",
+      "source": "sys/hal/gfx/gfx.h",
+      "kind": 1,
+      "stage": "S6",
+      "context_safe": false,
+      "name": "gfx_surface_source",
+      "kind_name": "FUNC",
+      "type_ver": 1,
+      "signature": "int gfx_surface_source(u32 role, struct surface_query_source *out);",
+      "source_declaration": "int gfx_surface_source(u32 role, struct surface_query_source *out);",
       "dtype": null,
       "array": false
     }

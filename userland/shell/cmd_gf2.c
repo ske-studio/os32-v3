@@ -1,5 +1,6 @@
 /* Shared CUI/GUI terminal entry for layer-2 serial acceptance. */
 #include "shell.h"
+#include "../../sys/include/gfx_measure_wire.h"
 #include "../../sys/dev/video/geforce/diag/gf_command_wire.h"
 #include "../../sys/dev/video/geforce/feature5.h"
 
@@ -23,6 +24,18 @@ int shell_cmd_gf2(int argc, char **argv)
         "save", "restore", "free", "poll", "wait", "last-rc", "boot-target"
     };
     struct gf2_request q = {0};
+    if (argc == 2 && str_eq(argv[1], "g5m"))
+        return g_api->version < GF2_KAPI_MIN || !g_api->kdebug_call ||
+               g_api->kdebug_call(GFX_G5M_RUN, 0, 0);
+    if (argc == 3 && str_eq(argv[1], "trace")) {
+        u32 enable = str_eq(argv[2], "on");
+        if (str_eq(argv[2], "pixels")) enable = 2;
+        if (str_eq(argv[2], "reference")) enable = 3;
+        if (str_eq(argv[2], "retry")) enable = 4;
+        if (!enable && !str_eq(argv[2], "off")) goto usage;
+        return g_api->version < GF2_KAPI_MIN || !g_api->kdebug_call ||
+               g_api->kdebug_call(GFX_TRACE_CONTROL, &enable, sizeof(enable));
+    }
     if (argc < 2) goto usage;
     if (str_eq(argv[1], "enter") || str_eq(argv[1], "leave")) {
         if (argc != 2) goto usage;
@@ -88,6 +101,6 @@ dispatch:
     }
     return rc || q.rc ? 1 : 0;
 usage:
-    g_api->kprintf(ATTR_WHITE, "Usage: gf2 enter|leave|status|start|reference|stop|recover|cycle|bad-handle|bad-method|vblank|accel <init|fill|copy|mono|ifc|upload|download|scale|present-m2mf|all> | prim <0-7> | display <packed-session> | feature <info|arg-lo|arg-hi|clock-read|clock-calc|clock-prog|ram-prog|perf-count|perf-get|perf-select|therm|fan-mode|fan-get|fan-cstate|volt-get|volt-set|volt-id|gpio-find|gpio-get|gpio-set|tile-find|tile-set|tile-clear|save|restore|free|poll|wait|last-rc|boot-target> [operand halfword]\n");
+    g_api->kprintf(ATTR_WHITE, "Usage: gf2 enter|leave|status|start|reference|stop|recover|cycle|bad-handle|bad-method|vblank|accel <init|fill|copy|mono|ifc|upload|download|scale|present-m2mf|all> | trace on|pixels|reference|retry|off | g5m | prim <0-7> | display <packed-session> | feature <info|arg-lo|arg-hi|clock-read|clock-calc|clock-prog|ram-prog|perf-count|perf-get|perf-select|therm|fan-mode|fan-get|fan-cstate|volt-get|volt-set|volt-id|gpio-find|gpio-get|gpio-set|tile-find|tile-set|tile-clear|save|restore|free|poll|wait|last-rc|boot-target> [operand halfword]\n");
     return 2;
 }

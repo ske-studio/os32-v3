@@ -1,6 +1,7 @@
 /* KAPI kdebug_call の受け口 (TASK_KPEEK §2-3)。本体は起動時に読む部品
  * (kdebug.bin の ops slot 19)。部品が無ければ OS32_ERR_NOSYS。 */
 #include "module.h"
+#include "gfx_measure_wire.h"
 #include "platform_hwb_session.h"
 #ifdef PM_KDEBUG
 struct kdebug kdebug;
@@ -15,6 +16,7 @@ STATIC_ASSERT(sizeof(KdebugPeek) == 40 + KDEBUG_PEEK_CHUNK, kdebug_peek_layout);
 
 i32 kdebug_call(u32 op, void *buf, u32 size)
 {
+    if (op == GFX_TRACE_EVENT || op == GFX_TRACE_POLICY) return OS32_ERR_INVAL; /* kernel observation only */
 #ifdef PCM_E4_DIAG
     if (op == PCM_E4_OP_RUN) {
         if (buf || size) return OS32_ERR_INVAL;

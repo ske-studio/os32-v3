@@ -60,17 +60,33 @@ def compare(pair):
     baseline, replay = s1(before), s1(after)
     if len(baseline) != 50 or len(replay) != 50 or len(before['inputs']) != 50:
         raise ValueError('expected 50 measured inputs after warmup')
+    # Timing/geometry and full pixel readback can come from separate replays.
+    images = [pair.get('before_pixels', before), pair.get('after_pixels', after)]
+    reference = pair.get('reference')
+    for capture in [*images, *([reference] if reference is not None else [])]:
+        for key in ('machine', 'operation', 'size', 'format', 'initial', 'inputs'):
+            if capture[key] != before[key]:
+                raise ValueError('different pixel replay ' + key)
+        if len(capture['samples']) != len(baseline):
+            raise ValueError('incomplete pixel replay')
     p = sum(s['P'] for s in baseline)
     summary = []
-    for run, rows in ((before, baseline), (after, replay)):
+    for (run, rows), capture in zip(((before, baseline), (after, replay)), images):
         times = []
         diff = failures = extra = 0
-        for sample, row in zip(run['samples'], rows):
-            failures += bool(sample['rc'])
+        for i, (sample, row) in enumerate(zip(run['samples'], rows)):
+            image = capture['samples'][i]
+            failures += bool(sample['rc'] or image['rc'])
+            oracle = reference['samples'][i] if reference is not None else image
+            failures += bool(oracle['rc'])
+            if len(image['frames']) != len(sample['frames']) or len(oracle['frames']) != len(image['frames']):
+                raise ValueError('different flip count in pixel replay')
             times.append(sample['us'])
-            for frame in sample['frames']:
+            for timing, frame, full in zip(sample['frames'], image['frames'], oracle['frames']):
+                if timing['present'] != frame['present']:
+                    raise ValueError('different present in pixel replay')
                 actual = bytes.fromhex(frame['scan'])
-                expected = bytes.fromhex(frame['reference'])
+                expected = bytes.fromhex(full['scan'] if reference is not None else frame['reference'])
                 if len(actual) != len(expected) or len(actual) != run['size'][0] * run['size'][1]:
                     raise ValueError('incomplete flip snapshot')
                 diff += sum(a != b for a, b in zip(actual, expected))
@@ -129,9 +145,140 @@ def g5m(run):
     return answer
 
 
+def retry(run):
+    """The packed fault replay only passes after the failed area is resent."""
+    pending = None
+    failures = recovered = 0
+    for sample in run['samples']:
+        for frame in sample['frames']:
+            if 'failed' in frame:
+                failures += 1
+                pending = frame['failed']
+            elif pending is not None:
+                draws = frame['present']
+                if union_pixels(draws + [pending], *run['size']) != union_pixels(draws, *run['size']):
+                    return dict(passed=False, failures=failures, recovered=recovered)
+                scan = bytes.fromhex(frame['scan'])
+                if len(scan) != math.prod(run['size']) or scan != bytes.fromhex(frame['reference']):
+                    return dict(passed=False, failures=failures, recovered=recovered)
+                pending = None
+                recovered += 1
+    return dict(passed=failures == recovered == 1, failures=failures, recovered=recovered)
+
+
+def serial_trace(lines, size, pixel_format):
+    """Decode a single P0a operation or a G5m sweep from its serial capture."""
+    samples, observed, groups = [], defaultdict(int), []
+    active = pending = frame = None
+    operation = mapping = None
+    for line in lines:
+        fields = line.strip().split()
+        if not fields:
+            continue
+        if fields[0] == 'GXT1':
+            if fields[1] == 'pixels':
+                if active is None or frame is None or 'scan' in frame:
+                    raise ValueError('pixel snapshot outside a flip')
+                for key, encoded in zip(('scan', 'reference'), fields[2:], strict=True):
+                    runs = bytes.fromhex(encoded)
+                    if len(runs) % 2 or 0 in runs[::2] or sum(runs[::2]) != size[0] * size[1]:
+                        raise ValueError('incomplete flip pixels')
+                    frame[key] = b''.join(bytes([value]) * count for count, value in
+                                          zip(runs[::2], runs[1::2])).hex()
+                continue
+            if fields[1] == 'overflow':
+                raise ValueError('incomplete trace: event buffer overflow')
+            if fields[1] == 'begin':
+                if active is not None or pending is not None or int(fields[2]) != len(samples):
+                    raise ValueError('missing or out-of-order input')
+                active, frame = [], None
+                continue
+            if fields[1] == 'end':
+                if active is None or int(fields[2]) != len(samples):
+                    raise ValueError('unmatched input end')
+                pending, active = active, None
+                continue
+            kind, _, x, y, w, h, n, detail = map(int, fields[1:])
+            if kind in (5, 6):
+                observed[('put' if kind == 5 else 'get', w, h, n, detail)] += 1
+            elif active is not None:
+                rect = [x, y, w, h]
+                if kind == 0:
+                    frame = dict(draw=[], raw=[], snap=[], merge=[], present=[],
+                                 previous=[], writes=[])
+                    active.append(frame)
+                elif frame is None:
+                    raise ValueError('rectangle outside a present')
+                elif kind == 1:
+                    frame['present'].append(rect)
+                    frame['draw'].append(rect)
+                elif kind == 8:
+                    frame['failed'] = rect
+                elif kind == 7:
+                    frame['page'] = detail
+                elif kind == 4:
+                    frame['previous'].append(rect)
+                elif kind == 2 and pixel_format == 'INDEX8':
+                    frame['writes'].append(dict(rect=rect, bytes=n))
+                elif kind == 3 and pixel_format == 'PLANAR4':
+                    for plane in range(4):
+                        frame['writes'].append(dict(rect=rect, bytes=n, plane=plane, page=detail))
+                else:
+                    raise ValueError('unexpected rectangle type or pixel format')
+        elif fields[0] == 'GOP1' and len(fields) == 7 and fields[2].isdigit():
+            if pending is None or int(fields[2]) != len(samples):
+                raise ValueError('missing input trace')
+            if operation is not None and operation != fields[1]:
+                raise ValueError('mixed operations')
+            operation = fields[1]
+            written = sum(w['bytes'] for f in pending for w in f['writes'])
+            if written != int(fields[4]):
+                raise ValueError('trace disagrees with present_bytes')
+            restore = sum(union_pixels(f['previous'], *size) // 2 for f in pending
+                          if not f['draw'])
+            samples.append(dict(frames=pending, us=0 if fields[3] == 'FAILED' else int(fields[3]),
+                                rc=int(fields[3] == 'FAILED' or any('failed' in f for f in pending)),
+                                commits=int(fields[5]),
+                                hw_ops=int(fields[6]), restore_bytes=restore))
+            pending = None
+        elif fields[:2] == ['G5M1', 'map']:
+            if mapping is not None:
+                raise ValueError('multiple benchmark sessions')
+            mapping = dict(attribute=fields[2], pitch=int(fields[3]),
+                           offset=int(fields[4]), span=int(fields[5]))
+        elif fields[:2] == ['G5M1', 'invalid']:
+            raise ValueError('G5m preflight transfer failed')
+        elif fields[0] == 'G5M1':
+            if mapping is None or mapping['attribute'] != 'WC':
+                raise ValueError('missing WC mapping')
+            direction, w, h, pitch, offset, route, index, count, us, rc, diff, guard, sync = fields[1:]
+            groups.append(dict(direction=direction, w=int(w), h=int(h), pitch=int(pitch),
+                               offset=int(offset), route=route, group=int(index), count=int(count),
+                               us=int(us), rc=int(rc), diff=int(diff), guard_diff=int(guard),
+                               sync=int(sync)))
+    if active is not None or pending is not None:
+        raise ValueError('truncated input')
+    return dict(size=size, format=pixel_format, operation=operation, samples=samples,
+                observed=sorted(observed), observed_counts=[[*key, observed[key]] for key in sorted(observed)],
+                groups=groups, mapping=mapping)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('stage', choices=['s1', 'compare', 'g5m'])
+    parser.add_argument('stage', choices=['s1', 'compare', 'g5m', 'decode', 'retry'])
     parser.add_argument('trace', type=argparse.FileType('r'))
+    parser.add_argument('--machine', help='machine and video configuration for replay comparison')
+    parser.add_argument('--initial', help='identifier of the saved initial state and input script')
+    parser.add_argument('--size', type=int, nargs=2, metavar=('WIDTH', 'HEIGHT'))
+    parser.add_argument('--format', choices=['PLANAR4', 'INDEX8'])
     args = parser.parse_args()
-    print(json.dumps({'s1': s1, 'compare': compare, 'g5m': g5m}[args.stage](json.load(args.trace)), indent=2))
+    if args.stage == 'decode':
+        if not args.size or min(args.size) <= 0 or not args.format:
+            parser.error('decode requires --size WIDTH HEIGHT and --format')
+        run = serial_trace(args.trace, args.size, args.format)
+        if args.machine and args.initial:
+            run.update(machine=args.machine, initial=args.initial,
+                       inputs=[[run['operation'], i] for i in range(len(run['samples']))])
+        print(json.dumps(run))
+        raise SystemExit
+    print(json.dumps({'s1': s1, 'compare': compare, 'g5m': g5m, 'retry': retry}[args.stage](json.load(args.trace)), indent=2))

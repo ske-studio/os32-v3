@@ -44,6 +44,11 @@ pub fn parse(arg: &[u8]) -> Option<(u8, u16)> {
     if words.next().is_some() || n == 0 || usize::from(n) > MAX { return None; }
     Some((op, n))
 }
+// Bracket a measured P0a input. All geometry comes from the kernel.
+fn trace_boundary(index: u16, begin: bool) {
+    let mut marker = u32::from(index) | if begin { 1 << 31 } else { 0 };
+    unsafe { (os32api::api().kdebug_call)(0x47585442, (&raw mut marker).cast(), 4); }
+}
 fn now() -> Option<u64> {
     let (mut lo, mut hi) = (0, 0);
     if unsafe { (os32api::api().sys_time_now)(&mut lo, &mut hi) } != 0 { return None; }
@@ -144,6 +149,7 @@ fn end(st: &mut GuiState) {
 pub fn on_cycle_end(st: &mut GuiState) {
     if !st.ops.active { return; }
     if !st.ops.waiting {
+        if st.ops.warm == WARM { trace_boundary(st.ops.i, true); }
         st.ops.base = stats(); st.ops.last_commit = st.ops.base.commits;
         let t = now(); st.ops.valid = t.is_some(); st.ops.t0 = t.unwrap_or(0);
         st.ops.deadline = unsafe { (os32api::api().get_tick)() }.wrapping_add(TIMEOUT_TICKS);
@@ -164,6 +170,7 @@ pub fn on_cycle_end(st: &mut GuiState) {
     }
     let t = now();
     let r = &mut st.ops;
+    if r.warm == WARM { trace_boundary(r.i, false); }
     let us = t.and_then(|t| t.checked_sub(r.t0)).filter(|v| *v < u64::from(FAILED));
     let us = if r.valid && !expired { us.map(|v| v as u32) } else { None };
     let pb = s.present_bytes.wrapping_sub(r.base.present_bytes);
