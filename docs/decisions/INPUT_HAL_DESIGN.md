@@ -300,6 +300,8 @@ input_policy_abi は次の競合を各々独立に観測する。CPL0 は形が�
 
 Key は native u32 の src_generation, map_id, keycode, sc_down_repeat, physical_mods, logical_mods, time_ms, map_generation, keysym, kind, action, value の順。全 offset は 0 から 4 刻み、48 B。src は下位8 bit、続く16 bit が source 世代。sc は下位8 bit、bit 8–11 は down/repeat/no_keydata/is_modifier。map_id・keysym は下位16 bit、予約 bit は 0。raw と in2 の物理入力、端末の Action、WM の Key は別形式。独占中は in2 に物理入力を渡し、WM の通常配送を閉じる。境界で compose・押下・保留配送を清算し、消費した make の break を新窓へ漏らさない。
 
+G が切り替えるのは窓への配送だけとし、同期 OSRI ビューアー・診断・起動画面などカーネル内の読み手は従来の raw を読む。
+
 互換 scan が 0xff のキー（F13・F14 など）は、割り当てた操作と文字を WM で処理し、窓への物理 Key イベントは省く。
 
 Key リングが満杯なら、新しい repeat は捨てる。make または break が届いた時は、未読の最も古い repeat を一件取り除き、残りの順序を保って末尾に新しいイベントを積む。未読がすべて make・break なら既存の入力を保持し、新しい make・break の投入失敗は従来の LOST の扱いに従う。

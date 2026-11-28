@@ -274,9 +274,11 @@ pub fn restore_mouse_baseline(st: &mut wm::GuiState, buttons: u8, mx: i32, my: i
 
 pub fn deliver_window_key(st: &mut wm::GuiState, slot: usize, window: u32, scan: u8,
                           down: bool, ch: u8, mods: u32) {
-    let serial = input::next_serial(st, slot);
-    let ev = ring::ev_key(down, window, scan, ch, mods as u8, serial);
-    let _delivered = append(st, slot, &ev);
+    let _delivered = if scan < 128 {
+        let serial = input::next_serial(st, slot);
+        let ev = ring::ev_key(down, window, scan, ch, mods as u8, serial);
+        append(st, slot, &ev)
+    } else { false };
     #[cfg(feature = "c_gui_accept")]
     if _delivered && scan == 0x1d {
         crate::gserial::reply_to(false, b"!", format_args!("C-GUI KEY {} {}", window, down as u8));

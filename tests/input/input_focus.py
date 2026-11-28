@@ -28,6 +28,7 @@ def verify(config):
                             "sys/hal/input/legacy_ring.c", "sys/hal/input/kbd_merge.c", "sys/kapi/kapi_in2.c",
                             "sys/hal/input/keymap_eval.c", "sys/hal/input/keymap_state.c",
                             "sys/hal/input/keymap_registry.c", "sys/hal/input/legacy_mode.c",
+                            "sys/input/input_policy.c", "sys/input/input_context.c", "sys/kern/kstring_c.c",
                             "sys/hal/input/legacy_keymap.c", "sys/input/keymaps/hid_jp.c",
                             fixture / "entry.S", fixture / "focus.c", "-o", exe], check=True)
             if subprocess.run(["qemu-i386", exe]).returncode:

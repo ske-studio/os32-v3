@@ -12,7 +12,7 @@ from tests.support.product import flags, recipes
 
 
 def verify_gui(fixture, tmp, raw, byteorder):
-    if len(raw) != 4:
+    if len(raw) not in (4, 52):
         raise Failure("missing legacy GUI raw word")
     # Compile whole keyboard items from the candidate. The pump entry, raw
     # decoder and window delivery modules are included directly by the fixture.
@@ -32,11 +32,18 @@ def verify_gui(fixture, tmp, raw, byteorder):
         items.append(source[start.start():stop])
     keyboard = Path(tmp) / "keyboard.rs"
     keyboard.write_text("\n".join(items))
+    nav = Path("userland/gshell/src/kbdnav.rs").read_text()
+    start = nav.index("pub(crate) fn policy_shortcut(")
+    shortcut = Path(tmp) / "shortcut.rs"
+    shortcut.write_text(nav[start:nav.index("\n}", start) + 2])
     exe = Path(tmp) / "legacy_gui"
     subprocess.run(["rustc", "--edition=2021", "-Awarnings", "--cfg", "legacy_gui",
                     fixture / "gshell.rs", "-o", exe], check=True,
-                   env={**os.environ, "WM_KEYBOARD_ITEMS": str(keyboard)})
-    if subprocess.run([exe, str(int.from_bytes(raw, byteorder))]).returncode:
+                   env={**os.environ, "WM_KEYBOARD_ITEMS": str(keyboard), "WM_SHORTCUT_ITEM": str(shortcut)})
+    words = [str(int.from_bytes(raw[i:i+4], byteorder)) for i in range(0, len(raw), 4)]
+    # The 1024-row table installed by check_row_limit maps HID usage 4 to A.
+    expected = "A" if byteorder == "big" and len(raw) == 52 else "a"
+    if subprocess.run([exe, expected, *words]).returncode:
         raise Failure("legacy GUI window delivery mismatch")
 
 
@@ -111,7 +118,8 @@ def verify(config):
                         "sys/input/keymaps/hid_jp.c", "sys/input/keymaps/pc98_jp.c",
                         "sys/platform/powermac/input_keymap_backend.c" if ppc else "sys/platform/pc98/input_keymap.c",
                         "-Isys/hal/input", "sys/hal/input/legacy_mode.c", "sys/hal/input/legacy_ring.c",
-                        "sys/hal/input/legacy_keymap.c", fixture / "wire.c", fixture / "entry.S", wrap]
+                        "sys/hal/input/legacy_keymap.c", "sys/hal/input/kbd_merge.c",
+                        "sys/hal/input/keymap_state.c", fixture / "wire.c", fixture / "entry.S", wrap]
         runner = "qemu-ppc" if ppc else "qemu-i386"
         failure_probe = ["-DFAIL_INIT", "-Wl,--wrap=ikm_policy_init", "-Iuserland/ppc/sh/include",
                          "-Isdk/include", "userland/shell/ui.c", fixture / "legacy_shell.c"]
@@ -120,8 +128,9 @@ def verify(config):
             result = subprocess.run([runner, exe], stdout=subprocess.PIPE)
             if result.returncode:
                 raise Failure(f"public policy ABI or v2 LE mismatch (probe {result.returncode})")
-            if extra:
-                verify_gui(fixture, tmp, result.stdout, "big" if ppc else "little")
+            if len(result.stdout) != (4 if extra else 52):
+                raise Failure("missing capture output")
+            verify_gui(fixture, tmp, result.stdout, "big" if ppc else "little")
 
 if __name__ == "__main__":
     main(build, verify)

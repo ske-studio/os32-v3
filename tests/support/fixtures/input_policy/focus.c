@@ -1,5 +1,6 @@
 #include "in2_int.h"
 #include "keymap.h"
+#include "sys/input/input_policy.h"
 #include "av_contract.h"
 #include "kbd_contract.h"
 
@@ -92,6 +93,41 @@ int probe(void)
     kbd_set_gui_mode(1);
     if (captured(1, 1)) return 17;
     int raw = legacy_raw_take();
-    return raw < 0 || (raw & KBD_RAW_KEY_MAKE_MASK) !=
-           (hid_jp_backend.compat_sc[4] | KBD_RAW_MAKE) || legacy_raw_take() != -1;
+    if (raw < 0 || (raw & KBD_RAW_KEY_MAKE_MASK) !=
+           (hid_jp_backend.compat_sc[4] | KBD_RAW_MAKE) || legacy_raw_take() != -1) return 18;
+    if (captured(1, 0) || ikm_policy_init(IKM_PLATFORM_MAC, 0, &hid_jp_backend,
+                                           input_policy_pressed) ||
+        input_context_owner_register(1, 1, 0, 0) || input_context_owner_select(1, 1))
+        return 19;
+    KbdPolicyKey out;
+    if (in2_acquire(IN2_EXCL_KBD) || captured(1, 1) || captured(1, 0) ||
+        in2_unacquire() || ikm_policy_key_read(1, 1, 1, &out, 1)) return 20;
+    if (captured(1, 1) || ikm_policy_key_read(1, 1, 1, &out, 1) != 1 ||
+        out.keysym != 'a' || out.sc_down_repeat != (0x1d | KBD_POLICY_SC_DOWN) ||
+        out.src_generation != 0x101 || out.map_generation != ikm_policy_generation() ||
+        ikm_policy_key_read(1, 1, 1, &out, 1)) return 21;
+    KmKey a = {.src = 1, .generation = 1, .keycode = 4, .down = 1, .repeat = 1};
+    /* Keep the next break when repeat occupied every seat. */
+    for (unsigned i = 0; i < 129; ++i)
+        if (input_capture_key(&a)) return 22;
+    if (captured(1, 0)) return 23;
+    for (unsigned i = 0; i < 127; ++i)
+        if (ikm_policy_key_read(1, 1, 1, &out, 1) != 1 ||
+            !(out.sc_down_repeat & KBD_POLICY_SC_REPEAT)) return 24;
+    if (ikm_policy_key_read(1, 1, 1, &out, 1) != 1 || out.sc_down_repeat != 0x1d)
+        return 25;
+    /* HID F13 has no compatibility scan. Bind it directly to SWITCH_APP. */
+    const u8 binding[] = {'I','K','M','1',2,0,16,0,1,0,0,0,0,0,0,0,
+        8,4,4,0,0x68,0,2,0,KBD_POLICY_ACTION_SWITCH_APP,0,0,0,0,0,0,0};
+    if (ikm_policy_set(binding, sizeof binding, 1, 1)) return 26;
+    KmKey f13 = {.src = 1, .generation = 1, .keycode = 0x68, .down = 1};
+    if (input_capture_key(&f13) || input_capture_key(&f13)) return 27;
+    f13.down = 0;
+    if (input_capture_key(&f13) || ikm_policy_key_read(1, 1, 1, &out, 1) != 1 ||
+        out.sc_down_repeat != (0xff | KBD_POLICY_SC_DOWN) ||
+        out.action != KBD_POLICY_ACTION_SWITCH_APP || ikm_policy_key_read(1, 1, 1, &out, 1))
+        return 28;
+    if (captured(1, 1) || captured(1, 0) || ikm_policy_reset(1, 1) ||
+        ikm_policy_key_read(1, 1, 1, &out, 1)) return 29;
+    return 0;
 }

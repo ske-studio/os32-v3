@@ -11,7 +11,6 @@ _start:
     int $0x80
 #endif
 
-#ifdef FAIL_INIT
 /* Pass the raw KAPI word to the host WM fixture using Linux write(1, p, 4). */
 .global write_gui_raw
 write_gui_raw:
@@ -31,5 +30,4 @@ write_gui_raw:
     int $0x80
     pop %ebx
     ret
-#endif
 #endif

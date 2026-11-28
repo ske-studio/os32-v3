@@ -63,9 +63,11 @@ int __wrap_ikm_policy_init(u8 platform, const KmBackend *pc98, const KmBackend *
 #endif
 volatile u32 tick_count;
 void appslot_poll_yield_reset(void) {}
-int input_key_pressed(u8 sc) { (void)sc; return 0; }
+int legacy_active(void) { return 0; }
+u32 in2_time_ms(void) { return tick_count; }
+void input_emit_in2(const InputEvent *e) { (void)e; }
 int in2_excl_drop_raw(u8 sc, int is_break) { (void)sc; (void)is_break; return 0; }
-int input_policy_pressed(void) { return 0; }
+
 #ifdef __PPC__
 #include "input_usb.h"
 #include "usb_platform.h"
@@ -277,6 +279,7 @@ static int test_provider(void)
     return diagnostics != 1 || check_unavailable(base, sizeof base);
 #endif
 #ifdef __PPC__
+    if (km_source_bind(1, 1, KM_MAP_HID)) return 3;
     /* Default GUI bindings use logical Command from either HID side. */
     u8 binding;
     if (ikm_policy_action(KBD_POLICY_PROFILE_MAC_GUI, INPUT_CONTEXT_GUI, KM_MAP_HID,
@@ -293,6 +296,30 @@ static int test_provider(void)
     if (input_context_owner_register(1, 1, 0, 0) || input_context_owner_select(1, 1) ||
         input_context_owner_register(2, 2, 1, 1) || input_context_snapshot(&snapshot))
         return 4;
+    /* Carry the real public read and its raw mirror into the window pump. */
+    KmKey press = { .src = 1, .generation = 1, .down = 1,
+#ifdef __PPC__
+        .keycode = 4
+#else
+        .keycode = 0x1d
+#endif
+    };
+    kbd_set_gui_mode(1);
+    if (input_capture_key(&press) || api.kbd_policy_key_read(&key_out, 1) != 1)
+        return 85;
+    int mirror = legacy_raw_take();
+    extern int write_gui_raw(const int *);
+    if (write_gui_raw(&mirror) != 4) return 85;
+    for (unsigned i = 0; i < sizeof key_out; i += 4) {
+        int word;
+        __builtin_memcpy(&word, (const u8 *)&key_out + i, 4);
+        if (write_gui_raw(&word) != 4) return 85;
+    }
+    if (api.kbd_policy_key_read(&key_out, 1)) return 85;
+    press.down = 0;
+    if (input_capture_key(&press) || api.kbd_policy_reset() ||
+        api.kbd_policy_key_read(&key_out, 1)) return 85;
+    kbd_set_gui_mode(0);
     if (check_row_limit(1)) return 3;
     ikm_policy_owner_exit(1, 1);
     if (api.kbd_policy_context_set(INPUT_CONTEXT_RUNNING, INPUT_CONTEXT_ISIG) ||

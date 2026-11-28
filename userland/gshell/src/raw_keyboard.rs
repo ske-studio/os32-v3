@@ -5,6 +5,39 @@ use super::{Ctx, GuiState, MOD_CTRL, MOD_GRPH, SC_CTRL, SC_GRPH, SC_SHIFT, SC_ST
 use super::report_accept_raw;
 use crate::{fep, kbdnav, modal, startmenu};
 
+use os32api::kbd_policy::*;
+
+// The deferred word carries the same scan/down/physical mods as raw plus
+// the capture-time byte, action and switch modifier for evaluated events.
+const EVALUATED: i32 = 1 << 29;
+const SWITCH_MOD: i32 = 1 << 30;
+
+fn read_keyboard() -> i32 {
+    use crate::ffi::OS32_ERR_BUSY;
+    let mut key = KbdPolicyKey::default();
+    match unsafe { (os32api::api().kbd_policy_key_read)(&mut key, 1) } {
+        1 => {
+            let flags = key.sc_down_repeat;
+            let ch = if flags & (KBD_POLICY_SC_NO_KEYDATA | KBD_POLICY_SC_IS_MODIFIER) != 0 {
+                0
+            } else if key.kind == KBD_POLICY_KIND_LEGACY_CONTROL {
+                key.value
+            } else if key.kind == KBD_POLICY_KIND_CHAR && key.keysym < 128 {
+                key.keysym
+            } else if key.kind == KBD_POLICY_KIND_CHAR && (0xf220..=0xf27f).contains(&key.keysym) {
+                key.keysym & 127
+            } else { 0 };
+            let switching = key.logical_mods & (KBD_POLICY_MOD_ALT | KBD_POLICY_MOD_COMMAND) != 0;
+            (flags as i32 & 0x1ff) | ((key.physical_mods as i32 & 127) << 9) |
+                ((ch as i32) << 16) | ((key.action as i32) << 24) | EVALUATED |
+                if switching { SWITCH_MOD } else { 0 }
+        }
+        os32api::gui::proto::OS32_ERR_NOSYS | OS32_ERR_BUSY =>
+            unsafe { (os32api::api().kbd_trygetrawkey)() },
+        _ => -1,
+    }
+}
+
 fn wm_scan(scan: u8) -> bool {
     matches!(scan, SC_STOP | SC_CTRL | SC_GRPH | SC_TAB)
 }
@@ -139,7 +172,7 @@ pub(crate) fn purge_boundary(st: &mut GuiState, same_owner: bool) {
 pub(super) enum Step {
     End,
     Consumed,
-    Deliver(u8, bool, u32),
+    Deliver(u8, bool, u32, Option<u8>),
 }
 
 pub(super) fn next(st: &mut GuiState, ctx: Ctx, space_ok: bool, captured: &mut bool) -> Step {
@@ -173,13 +206,15 @@ pub(super) fn next(st: &mut GuiState, ctx: Ctx, space_ok: bool, captured: &mut b
         st.pending_raw_n -= 1;
         r
     } else {
-        unsafe { (os32api::api().kbd_trygetrawkey)() }
+        read_keyboard()
     };
     if raw < 0 {
         return Step::End;
     }
     *captured = true;
-    let scan = (raw & 0x7F) as u8;
+    let scan = raw as u8;
+    let evaluated = raw & EVALUATED != 0;
+    let action = (raw >> 24) as u32 & 31;
     let down = ((raw >> 8) & 1) != 0;
     let mods = ((raw >> 9) & 0x7F) as u32;
     #[cfg(feature = "c_gui_accept")]
@@ -201,7 +236,7 @@ pub(super) fn next(st: &mut GuiState, ctx: Ctx, space_ok: bool, captured: &mut b
     /* WM のショートカットとマウスキーは状態機械を動かすので X3 でだけ
      * 実行する (票 KBD_NAV §1-4)。X4 で見つけたら FEP と同じく、この raw と
      * 以後を全部退避して次の X3 へ回す (順序を保つ)。 */
-    if defer || (ctx == Ctx::Pump && kbdnav::is_wm_raw(st, raw)) {
+    if defer || (ctx == Ctx::Pump && (action != 0 || kbdnav::is_wm_raw(st, raw))) {
         defer_raw(st, raw);
         return Step::Consumed;
     }
@@ -222,12 +257,25 @@ pub(super) fn next(st: &mut GuiState, ctx: Ctx, space_ok: bool, captured: &mut b
 
     /* 修飾キーとして捨てる**前**に: カナ (マウスキーの切り替え) と、GRPH+TAB
      * 切り替え中の GRPH の離し (票 KBD_NAV §1-2 / §1-5)。 */
-    if ctx.wm_ui() && kbdnav::finish_if_released(st, scan, down, mods) {
+    if evaluated && action != 0 {
+        if down && st.excl.open(crate::excl::KBD) {
+            match action {
+                KBD_POLICY_ACTION_SWITCH_APP | KBD_POLICY_ACTION_CLOSE =>
+                    kbdnav::policy_shortcut(st, action, raw & SWITCH_MOD != 0, mods & 1 != 0),
+                KBD_POLICY_ACTION_IME_ON | KBD_POLICY_ACTION_IME_OFF =>
+                    if fep::is_on() != (action == KBD_POLICY_ACTION_IME_ON) { fep::toggle(st); },
+                _ => (),
+            }
+        }
+        return Step::Consumed;
+    }
+    let switch_mods = if evaluated && raw & SWITCH_MOD != 0 { mods | MOD_GRPH } else { mods };
+    if ctx.wm_ui() && kbdnav::finish_if_released(st, scan, down, switch_mods) {
         if stop_raw(raw) { st.abort_seen = true; }
         return Step::Consumed;
     }
-    if ctx.wm_ui() && scan == SC_TAB && mods & MOD_GRPH != 0 {
-        kbdnav::on_key(st, scan, down, mods);
+    if !evaluated && ctx.wm_ui() && scan == SC_TAB && mods & MOD_GRPH != 0 {
+        kbdnav::on_key(st, scan, down, mods, false);
         return Step::Consumed;
     }
     if scan == SC_STOP && down && (mods & MOD_CTRL) != 0 {
@@ -238,10 +286,10 @@ pub(super) fn next(st: &mut GuiState, ctx: Ctx, space_ok: bool, captured: &mut b
         }
         return Step::Consumed;
     }
-    if st.held_keys[scan as usize] {
+    if scan < 128 && st.held_keys[scan as usize] {
         if !down { st.held_keys[scan as usize] = false; }
         return Step::Consumed;
     }
     if !st.excl.open(crate::excl::KBD) { return Step::Consumed; }
-    Step::Deliver(scan, down, mods)
+    Step::Deliver(scan, down, mods, evaluated.then_some((raw >> 16) as u8))
 }

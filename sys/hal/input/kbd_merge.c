@@ -3,6 +3,7 @@
 #include "kbd.h"
 #include "legacy_guest.h"
 #include "keymap.h"
+#include "../../input/input_policy.h"
 #include "os32_kapi_shared.h"
 
 #if OS32_HOOK_IME
@@ -185,6 +186,9 @@ int input_capture_key(const KmKey *key)
         if (key->keycode == KEY_CAPS) boot_locks[key->src - 1] &= ~SHIFT_CAPS;
         if (key->keycode == KEY_KANA) boot_locks[key->src - 1] &= ~SHIFT_KANA;
     }
+    u8 bit = 1u << (key->keycode & 7);
+    u8 *consumed = &suppressed[key->src - 1][key->keycode >> 3];
+    u8 was_consumed = *consumed & bit;
     set_held(key->src, key->keycode, key->down);
     sc = before.compat_sc;
     if (sc < 128 && old != key->down) update_count(sc, key->down);
@@ -202,13 +206,20 @@ int input_capture_key(const KmKey *key)
         if (sc == KEY_KANA) usb_lock ^= SHIFT_KANA;
     }
     kbd_shift_state = input_key_mods();
-    km_legacy_compat(&result);
     InputEvent e = { .src = key->src, .generation = key->generation,
         .time_ms = in2_time_ms(), .type = INPUT_EVENT_KEY, .sc = sc,
         .down = key->down, .buttons = kbd_shift_state };
     if (!legacy_active() && sc < 128 && old != key->down) input_emit_in2(&e);
     u8 raw_due = sc < 128 && (key->down || cnt[sc] == 0) &&
                  (old != key->down || key->down);
+    if (kbd_gui_mode && !legacy_active() && (raw_due || (sc == 0xff && (key->down || old))) &&
+        !in2_excl_drop_raw(sc, !key->down) &&
+        (sc == 0xff || !legacy_stop_filter(sc, !key->down, kbd_shift_state))) {
+        if (ikm_capture_gui_key(key, &source, &state, &result, key->down && old,
+                                was_consumed, kbd_shift_state, e.time_ms) && key->down && !old)
+            *consumed |= bit;
+    }
+    km_legacy_compat(&result);
     if (!input_capture_delivery(key, old, &result, raw_due))
         input_emit_keymap(&result, key->down, raw_due, kbd_shift_state, 0);
     rc = 0;

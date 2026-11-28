@@ -579,6 +579,37 @@ int ikm_policy_compat(u8 profile, u8 sc, u8 *byte)
 }
 
 
+/* The capture caller holds IRQ exclusion across evaluation and publication. */
+int ikm_capture_gui_key(const KmKey *key, const KmSource *source, const KmState *state,
+                         const KmEvalResult *result, u8 repeat, u8 consumed, u8 physical, u32 time_ms)
+{
+    KbdPolicySnapshot dst;
+    u8 action, byte;
+    if (!machine || in2_excl_keyboard() || input_context_snapshot(&dst)) return 0;
+    u8 profile = machine == IKM_PLATFORM_PC98 ? 2 : 4;
+    u8 sc = result->compat_sc;
+    if (ikm_policy_action(profile, INPUT_CONTEXT_GUI, source->map->id, key->keycode,
+                          sc, state->mods, &action)) return 0;
+    if (consumed && !(repeat && action == KBD_POLICY_ACTION_SWITCH_APP &&
+                      (state->mods & (KM_MOD_COMMAND | KM_MOD_ALT)))) return 0;
+    KbdPolicyKey event = {
+        .src_generation = key->src | ((u32)key->generation << 8),
+        .map_id = source->map->id, .keycode = key->keycode,
+        .sc_down_repeat = sc | (key->down ? KBD_POLICY_SC_DOWN : 0) |
+            (repeat ? KBD_POLICY_SC_REPEAT : 0) |
+            (result->no_keydata ? KBD_POLICY_SC_NO_KEYDATA : 0) |
+            (result->is_modifier ? KBD_POLICY_SC_IS_MODIFIER : 0),
+        .physical_mods = physical, .logical_mods = state->mods | state->locks,
+        .time_ms = time_ms, .map_generation = source->map_generation,
+        .keysym = result->sym, .kind = result->kind, .action = action, .value = result->op
+    };
+    if (sc < 128 && !ikm_policy_compat(profile, sc, &byte)) {
+        event.kind = KM_LEGACY_CONTROL;
+        event.value = byte;
+    }
+    return input_delivery_key(&dst, &event) && action != KBD_POLICY_ACTION_NONE;
+}
+
 /* Internal targets. The generated argument and page guards precede these
  * calls when the public table is enabled. IRQ exclusion spans check and pop. */
 int ikm_policy_action_read(u32 owner, u32 gen, KbdPolicyAction *out, u32 max)
