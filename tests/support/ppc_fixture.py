@@ -248,7 +248,8 @@ def link_media(*, usb_trace=False, overflow=False, rpc_trace=False):
     sample.write_text("ASCII ｶﾅ 日本語\n", encoding="utf-8")
     args.extend([f"ROOT_MANIFEST={template}", f"PPC_UNICODE={unicode_bin}",
                  f"KB_ROOT_BINS={user}/hello.bin {user}/fault.bin {sample}",
-                 "KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=ppc_trap_dispatch,--wrap=exec_run"])
+                 "KB_KEEP_RESET=-Wl,--wrap=arch_entry_enter,--wrap=ppc_trap_dispatch,"
+                 "--wrap=exec_run,--wrap=exec_run_shell"])
     hashes = {}
 
     def meter(slot, path, content):

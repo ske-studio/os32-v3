@@ -65,7 +65,14 @@ int __wrap_exec_run(const char *command)
     int rc = __real_exec_run(command);
     if (exec_nest_level == 1)
         observe_flow(rc == EXEC_ERR_FAULT ? CHILD_FAULT : CHILD_RETURN, current_msr());
-    else if (!exec_nest_level && rc == EXEC_ERR_FAULT)
+    return rc;
+}
+
+int __real_exec_run_shell(const char *, int);
+int __wrap_exec_run_shell(const char *command, int line_edit)
+{
+    int rc = __real_exec_run_shell(command, line_edit);
+    if (!exec_nest_level && rc == EXEC_ERR_FAULT)
         observe_flow(PARENT_FAULT, current_msr());
     return rc;
 }
