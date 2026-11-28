@@ -3,6 +3,8 @@
 
 #include "types.h"
 
+#define LOOP_MAX_SLOTS 4
+
 /* Numeric return codes retain each interface's existing contract. */
 #define LOOP_ERR_FORMAT (-2)
 #define LOOP_ERR_BUSY (-3)

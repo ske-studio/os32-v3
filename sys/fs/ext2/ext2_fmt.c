@@ -8,6 +8,7 @@ static const struct ext2_medium_ops *media[EXT2_MEDIUM_LOOP + 1];
 int ext2_medium_register(int kind, const struct ext2_medium_ops *ops)
 {
     if (kind < EXT2_MEDIUM_HD || kind > EXT2_MEDIUM_LOOP || !ops) return -1;
+    if (kind == EXT2_MEDIUM_LOOP && !ops->claims) return -1;
     if (media[kind]) return -1;
     media[kind] = ops;
     return 0;
@@ -261,8 +262,8 @@ static int ext2_format_range(const struct ext2_medium_ops *ops, int ide_drive, u
 
 static const struct ext2_medium_ops *format_medium(int drv)
 {
-    if (drv >= 0x0600 && drv <= 0x0603 && media[EXT2_MEDIUM_LOOP])
-        return media[EXT2_MEDIUM_LOOP];
+    const struct ext2_medium_ops *loop = media[EXT2_MEDIUM_LOOP];
+    if (loop && loop->claims(drv)) return loop;
     return media[EXT2_MEDIUM_HD];
 }
 

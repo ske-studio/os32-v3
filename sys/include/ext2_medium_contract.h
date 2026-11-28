@@ -12,10 +12,12 @@ struct ext2_medium_ops {                 /* 引数 drv は KAPI から来た値�
     struct _Device *(*dev)(int drv);                    /* ext2 の I/O が使う装置 */
     void (*after_write)(void);                          /* 0 可。書込 1 回ごとの mount 側の後始末 (HD: 読みのキャッシュの破棄) */
     u32  min_lba;                                       /* format_at の開始の下限 (HD = EXT2_FMT_MIN_LBA) */
+    int (*claims)(int drv);  /* LOOP は番号のみ照合。HD は 0 可、選択時に呼ばない。 */
 };
+/* LOOP が未登録または番号が対象外なら、HD の登録値 (未登録なら NULL) を使う。 */
 #define EXT2_MEDIUM_HD   0
 #define EXT2_MEDIUM_LOOP 1
-int ext2_medium_register(int kind, const struct ext2_medium_ops *ops);   /* 0 / -1 (範囲外・二重) */
+int ext2_medium_register(int kind, const struct ext2_medium_ops *ops);   /* 0 / -1 (範囲外・NULL・二重・LOOP の claims 欠落) */
 extern const struct ext2_medium_ops ext2_medium_ide_ops;                 /* sys/platform/pc98/storage/ext2_medium_ide.c */
 
 extern const struct ext2_medium_ops ext2_medium_loop_ops;

@@ -58,6 +58,7 @@ PC-9821シリーズ向け 32ビット ベアメタルOS
 | アプリ帯の広さ・私有量 (v3) | [現行目標](decisions/MEMMAP_V3.md) D9 と [配置・容量の契約](design/include/memmap.md)・[池の運用](design/kernel/module/module_runtime.md)、実装の契約は [09_exec](09_exec.md)・[02_memory §2-1](02_memory.md)・[KAPI_SPEC](KAPI_SPEC.md) (T2 の票 TASK_T2_APPBAND と T2d〜h は受入完了でアーカイブ: `docs/archive/v3/TASK_T2_APPBAND.md`、`docs/archive/v3/TASK_T2D_T2H.md`) | 02_memory.md は地図の説明。旧 v2.1 の帯と未記録ゲスト受入は APP_BAND_PDE (アーカイブ: `docs/archive/v3/APP_BAND_PDE.md`) の履歴として区別 |
 | 登録検査の一覧と実行方法 | [TESTS.md](TESTS.md)、[検査の登録](../tests/registry.toml) | [08_build.md](08_build.md) はビルド手順 |
 | 移植性 (CPU / 機種の 2 軸、ARM 計測、順序 1〜4 の経過) | [tasks/portability/ARM_GAUGE.md](tasks/portability/ARM_GAUGE.md) (計測と経過)、[../arch/README.md](../arch/README.md) (足し方) | `docs/archive/portability/SURVEY_N1.md` (調査)、`archive/arch_port/` は**別リポジトリ `pw-sh4-research` の調査の快照** (正典はそちら。本リポジトリでは更新しない)、`docs/archive/portability/TASK_KSTRING_BENCH.md` (kstring の速度実測 **完了 2026-09-17** — x86 は asm 維持、C 版は他 32 ビットアーキ向け。数字は ARM_GAUGE §9、語長の前提は §10) |
+| ext2 formatter の媒体解決と二入口の互換性 | [媒体解決の設計](decisions/fs/EXT2_MEDIUM_RESOLVE_DESIGN.md) |
 | PowerMac の root と部品の検証 | [root_pair.md](design/platform/powermac/root_pair.md) | CRC と rd0 の公開条件 |
 | PowerPC と PowerMac のハードウェア・規約の事実 | [ppc/README.md](ppc/README.md) | 設計の採用判断は decisions/ppc/、作業の状態は tasks/ppc/ |
 | PowerPC 移植の計画 (案 D、アーキテクチャ分離の 33 件の順と受入) | [tasks/ppc/TASK_PPC_SEP.md](tasks/ppc/TASK_PPC_SEP.md) | 足し方の正典は [../arch/README.md](../arch/README.md) |

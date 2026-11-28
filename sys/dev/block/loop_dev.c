@@ -46,7 +46,6 @@
 #define FDI_OFF_CYLS 28
 
 /* ======== 共通定数 ======== */
-#define LOOP_MAX_SLOTS    4
 
 /* フォーマット種別 (loop_dev.h で公開定義済み) */
 
