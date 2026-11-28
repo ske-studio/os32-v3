@@ -399,6 +399,9 @@ static int v86_deliver_pending(u32 *frame, int ip, int cs, int flags, int sp, in
             v86_exit_reason = V86_EXIT_TIMEOUT;
             return 1;
         }
+        /* Retain up to ten periods for a normal refill. Discard older
+         * deliveries after a long mask without moving the timeout origin. */
+        if (elapsed - v86_session.ticks > 10) v86_session.ticks = elapsed - 10;
         if (v86_session.ticks < elapsed) v86_pic_request(0);
     }
     if (!(frame[flags] & EFLAGS_IF)) return 0;

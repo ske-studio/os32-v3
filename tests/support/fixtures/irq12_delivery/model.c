@@ -43,6 +43,7 @@ static int slicing;
 int v86_tick_and_check_timeout(void);
 void __real_v86_reflect_irq(u32 *frame, u32 irq);
 static unsigned timer_deliveries;
+static int masked_burst, last_irq;
 int v86_refill_timer_irq(u32 *frame);
 int __real_v86_pic_candidate(u32 *vector);
 static u16 guest_ivt[512] __attribute__((section(".guestdata"), aligned(16)));
@@ -60,6 +61,7 @@ int irq_exited;
 int __wrap_v86_pic_candidate(u32 *vector)
 {
     int irq = __real_v86_pic_candidate(vector);
+    last_irq = irq;
     if (irq == 0) ++timer_deliveries;
     if (irq >= 0) *vector += (u32)guest_ivt / 4;
     return irq;
@@ -97,6 +99,29 @@ void v86_enter(const struct v86_context *ctx)
         if (test_timer) {
             frame[V86I_SS] = (u32)guest_stack >> 4;
             frame[V86I_ESP] = sizeof guest_stack;
+        }
+        if (masked_burst) {
+            tick_count += 100;
+            __real_v86_reflect_irq(frame, 0);
+            require(last_irq < 0, "masked IRQ0 delivered");
+            v86_pic_request(1);
+            v86_pic_request(12);
+            v86_pic_set_imr(0, 0x7c);
+            v86_pic_set_imr(1, 0xef);
+            unsigned timers = 0;
+            do {
+                frame[V86I_EFLAGS] = EFLAGS_VM | EFLAGS_IF;
+                frame[V86I_ESP] = sizeof guest_stack;
+                __real_v86_reflect_irq(frame, 0);
+                v86_pic_out(0, 0x20);
+                if (last_irq == 0) ++timers;
+                require(timers <= 10, "bounded IRQ0 backlog");
+            } while (last_irq == 0);
+            require(last_irq == 1, "pending keyboard after mask");
+            frame[V86I_EFLAGS] = EFLAGS_VM | EFLAGS_IF;
+            frame[V86I_ESP] = sizeof guest_stack;
+            __real_v86_reflect_irq(frame, 0);
+            require(last_irq == 12, "pending sound after mask");
         }
         if (clock_run) {
             /* Execute each timer handler (EOI, IRET), then spin in DOS until
@@ -358,6 +383,11 @@ void _start(void)
     }
     require(timer_deliveries - before == 100, "100 IRQ0 per simulated second");
     clock_run = 0;
+    masked_burst = 1;
+    v86_pic_set_imr(0, 0xff);
+    ctx.eflags = EFLAGS_VM | EFLAGS_IF;
+    require(v86_run_slice(&ctx) == V86_EXIT_SLICE, "masked burst slice");
+    masked_burst = 0;
     for (unsigned i = 0; i < 3; ++i) {
         tick_count = v86_session.soft_jiffy + V86_TICK_LIMIT - (i != 0);
         forbid_entry = i == 0;

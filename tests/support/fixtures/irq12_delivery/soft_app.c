@@ -7,7 +7,8 @@
 static const char *expected_path, *expected_second;
 static int primed, retry_prime, yields;
 static i32 yield(void) { ++yields; return 0; }
-static int begin_rc, open_rc, fault, running, stream, ends, fallback, pumps, turns, keys;
+static int begin_rc, open_rc, exit_code, running, stream, ends, fallback, pumps, turns, keys;
+static int poll_timeout, polled_end, close_rc, drains;
 static int resets, fallback_reason = 1;
 static int count(void) { return 1; }
 static int info(u32 i, SND2_DevInfo *out)
@@ -17,7 +18,7 @@ static int info(u32 i, SND2_DevInfo *out)
 }
 static int hw_open(u32 dev, u32 *h)
 {
-    check(!stream && dev == 16, "reset after stream release");
+    check(!running && !stream && dev == 16, "reset after stream release");
     *h = 123;
     return 0;
 }
@@ -29,27 +30,31 @@ static int begin(const V86_Begin *b, u32 *sid)
     if (begin_rc) return begin_rc;
     check(!running && !stream, "command restart");
     running = 1;
-    turns = pumps = keys = 0;
+    turns = pumps = keys = drains = polled_end = 0;
     *sid = 11;
     return 0;
 }
 static int run(u32 sid, const V86_RunIn *in, V86_Exit *ex)
 {
     check(sid == 11 && stream && pumps == turns + 1, "pump on empty slice");
+    check(!polled_end, "poll timeout result");
     if (!in->slice_ms) {
-        ex->reason = V86S_SLICE;
+        polled_end = poll_timeout;
+        ex->reason = poll_timeout ? V86S_FAULT : V86S_SLICE;
+        ex->code = poll_timeout ? 4 : 8;
         ex->guest_us = 17000 * yields;
         return 0;
     }
     check(primed, "pre-run reserve");
     primed = 0;
     ++turns;
-    ex->reason = turns < 4 ? 1 : fault ? 5 : 4;
-    ex->code = turns < 4 ? 8 : fault ? 6 : 5;
+    ex->reason = turns < 4 ? V86S_SLICE : exit_code == 6 ? V86S_FAULT : V86S_END;
+    ex->code = turns < 4 ? 8 : exit_code;
     return 0;
 }
 static int drain(u32 sid, SND2_FmEv *out, u32 n, u32 *seq)
 {
+    ++drains;
     if (turns != 1 && turns != 3) return 0;
     *out = (SND2_FmEv){1, 0, 0x28, turns == 1 ? 0x10 : 0, turns, keys + 1};
     *seq = keys + 1;
@@ -93,7 +98,12 @@ int sndl_chip_write(u32 chip, const SND2_RegW *w, u32 n, u32 at)
     ++keys;
     return 1;
 }
-int sndl_chip_close(u32 chip) { check(keys == 2 && pumps == 5, "final drain"); stream = 0; return 0; }
+int sndl_chip_close(u32 chip)
+{
+    if (!poll_timeout) check(keys == 2 && drains == 4 && pumps == 5, "final drain");
+    stream = 0;
+    return close_rc;
+}
 void _start(void)
 {
     static KernelAPI table = {.version = KAPI_VERSION, .snd2_dev_count = count, .snd2_dev_info = info,
@@ -101,21 +111,23 @@ void _start(void)
                               .snd2_chip_close = hw_close, .sys_yield = yield, .v86s_begin = begin, .v86s_run = run, .v86s_fm_drain = drain,
                               .v86s_end = end, .v86_boot2 = boot2};
     api = &table;
+    exit_code = 1;
+    check(boot_sound("fmtone.fdi", 0) == 1 && !resets, "HLT reset count");
     begin_rc = OS32_ERR_NOSYS;
     check(boot_sound("fmtone.fdi", 0) == 1 && fallback == 1, "legacy fallback");
     begin_rc = OS32_ERR_BUSY;
     check(boot_sound("fmtone.fdi", 0) == OS32_ERR_BUSY && fallback == 1, "busy fallback");
     begin_rc = 0;
     open_rc = OS32_ERR_IO;
-    check(boot_sound("fmtone.fdi", 0) == open_rc && ends == 1 && fallback == 1, "open failure");
+    check(boot_sound("fmtone.fdi", 0) == open_rc && ends == 2 && fallback == 1, "open failure");
     check(!strcmp(boot_stage, "sndl_chip_open"), "sound failure stage");
     open_rc = 0;
     retry_prime = 1;
-    for (fault = 0; fault <= 1; ++fault)
-        check(boot_sound("fmtone.fdi", 0) == (fault ? 6 : 5), "command exit");
+    for (exit_code = 5; exit_code <= 6; ++exit_code)
+        check(boot_sound("fmtone.fdi", 0) == exit_code, "command exit");
     check(resets == 1, "CTRL+STOP reset count");
     check(yields == 1, "resume after temporary full");
-    check(ends == 3 && !running && !stream, "command cleanup");
+    check(ends == 4 && !running && !stream, "command cleanup");
     char path[65];
     for (unsigned i = 0; i < 64; ++i) path[i] = 'a';
     path[64] = 0;
@@ -125,13 +137,18 @@ void _start(void)
     expected_path = "drive1.fdi";
     expected_second = path;
     check(boot_sound(expected_path, expected_second) == 1 && fallback == 3, "long secondary");
-    fault = 1;
+    exit_code = 1;
     path[63] = 0;
-    check(boot_sound(path, path) == 6 && fallback == 3, "63 byte paths");
-    check(resets == 1, "HLT reset count");
+    check(boot_sound(path, path) == 1 && fallback == 3, "63 byte paths");
+    poll_timeout = retry_prime = 1;
+    check(boot_sound(path, path) == 4 && resets == 2, "poll timeout result");
+    poll_timeout = 0;
+    exit_code = 5;
+    close_rc = OS32_ERR_IO;
+    check(boot_sound(path, path) == close_rc && resets == 3, "reset after close error");
     begin_rc = OS32_ERR_NOSYS;
     expected_path = 0;
     fallback_reason = 4;
-    check(boot_sound("fmtone.fdi", 0) == 4 && resets == 2, "timeout reset count");
+    check(boot_sound("fmtone.fdi", 0) == 4 && resets == 4, "timeout reset count");
     passed();
 }

@@ -510,6 +510,10 @@ expect = "IRQ12 の共有配送と従来の IRQ 線、SOFT の文脈・入力・
 limits = "実スタブ本体を実行。特権命令・ゲストフレーム・PIC は模型"
 gates = ["push", "main"]
 mutations = [
+ { id = "unbounded_irq0", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "v86_session.ticks = elapsed - 10;", new = "(void)elapsed;", fail = "bounded IRQ0 backlog" },
+ { id = "ignore_poll_fault", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "if (ex.reason == V86S_END || ex.reason == V86S_FAULT) {", new = "if (ex.reason == V86S_END) {", fail = "poll timeout result" },
+ { id = "lose_exit_on_close", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "if (result > 0) reason = result;", new = "reason = result;", fail = "reset after close error" },
+ { id = "reset_after_hlt", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "if (reason == 4 || reason == 5)", new = "if (reason == 1 || reason == 4 || reason == 5)", fail = "HLT reset count" },
  { id = "skip_stop_reset", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "reason == 4 || reason == 5", new = "reason == 4", fail = "CTRL+STOP reset count" },
  { id = "fatal_prime_again", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "if (rc == OS32_ERR_AGAIN || (retrying && !rc)) {", new = "if (0) {", fail = "final drain" },
  { id = "run_during_poll", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_call.c", old = "else if (in->slice_ms) {", new = "else {", fail = "refill poll entered DOS" },
@@ -2434,7 +2438,7 @@ gates = ["push", "main"]
 mutations = [
  { id = "count_requested_audio", config = "pc98", when = "after_build", replace = "userland/diag/sndl_test.c", old = "current->added += (u32)rc / 4;", new = "current->added += bytes / 4;", fail = "accepted frames" },
  { id = "renew_refill_deadline", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "if (!retrying) first_again = ex.guest_us;", new = "first_again = ex.guest_us;", fail = "unbounded refill retry" },
- { id = "ignore_refill_stop", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "if (rc || ex.reason == V86S_END) break;", new = "if (rc) break;", fail = "refill stop or deadline" },
+ { id = "ignore_refill_stop", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "if (ex.reason == V86S_END || ex.reason == V86S_FAULT) {", new = "if (0) {", fail = "refill stop or deadline" },
  { id = "drain_stalled_suffix", config = "pc98", when = "after_build", replace = "userland/lib/snd/chip.c", old = "int abort = sndl_slice_pending();", new = "int abort = 0;", fail = "refill abort close" },
  { id = "wait_for_retirement", config = "pc98", when = "after_build", replace = "userland/lib/snd/pump.c", old = "if (!full) {", new = "if (!room) return 0; if (!full) {", fail = "DOS refill deadline" },
  { id = "always_split", config = "pc98", when = "after_build", replace = "userland/lib/snd/pump.c", old = "if (n > window.frames - window.offset)", new = "if (n > period) n = period; if (n > window.frames - window.offset)", fail = "missing foreground batch" },

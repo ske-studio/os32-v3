@@ -165,7 +165,7 @@ static int boot_result(const char *stage, int rc)
     return rc;
 }
 
-static int run_guest(const char *path, const char *second)
+static int run_guest(const char *path, const char *second, int *guest_reason)
 {
     V86_Begin b = {.size = sizeof b, .flags = V86S_FM_SOFT};
     if (strlen(path) >= sizeof b.path || (second && strlen(second) >= sizeof b.second))
@@ -195,7 +195,11 @@ static int run_guest(const char *path, const char *second)
             in.slice_ms = 0;
             rc = boot_result("v86s_run", api->v86s_run(sid, &in, &ex));
             in.slice_ms = 10;
-            if (rc || ex.reason == V86S_END) break;
+            if (rc) break;
+            if (ex.reason == V86S_END || ex.reason == V86S_FAULT) {
+                *guest_reason = ex.code;
+                break;
+            }
             if (!retrying) first_again = ex.guest_us;
             if (ex.guest_us - first_again >= 50000) {
                 rc = boot_result("sndl_prime_slice", OS32_ERR_TIMEOUT);
@@ -210,6 +214,7 @@ static int run_guest(const char *path, const char *second)
         if (boot_result("sndl_prime_slice", rc)) break;
         rc = api->v86s_run(sid, &in, &ex);
         if (boot_result("v86s_run", rc)) break;
+        if (ex.reason == V86S_END || ex.reason == V86S_FAULT) *guest_reason = ex.code;
         SND2_FmEv ev[32];
         int n;
         do {
@@ -239,13 +244,15 @@ static int run_guest(const char *path, const char *second)
 
 static int boot_sound(const char *path, const char *second)
 {
-    int reason = run_guest(path, second);
+    int reason = 0;
+    int result = run_guest(path, second, &reason);
+    if (result > 0) reason = result; /* Legacy boot returns the exit code directly. */
     /* v86 boot exit codes 4 and 5 are timeout and CTRL+STOP. */
     if (reason == 4 || reason == 5) {
         int rc = sndreset_hardware(api);
         if (rc && rc != OS32_ERR_NOTFOUND) return boot_result("sndreset", rc);
     }
-    return reason;
+    return result;
 }
 
 int main(int argc, char **argv, KernelAPI *kapi)
