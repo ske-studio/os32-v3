@@ -338,8 +338,6 @@ int paging_pd_clone_selftest(void);
 int paging_map_user_keep_selftest(void);
 
 /* I1 boot observation; zero means map/read/write/unmap/PT reclamation passed. */
-int gfx2_map_selftest(void);
-extern u32 gfx2_map_selftest_runs, gfx2_map_selftest_result;
 
 /* T2c の高位アプリ帯の自己診断 (票 docs/tasks/v3/TASK_T2_APPBAND.md §5-1)。
  * 未使用 APP PDE/PT と master の高位 APP PDE が空であること、高位 stack

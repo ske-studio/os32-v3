@@ -2269,3 +2269,44 @@ mutations = [{ id = "keep_old_window_tab", config = "pc98", when = "after_build"
     { id = "discard_full_release", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "if !ring::append(st, slot, &ev) { return false; }\n            st.excl.delivered[i].keys", new = "let _ = ring::append(st, slot, &ev);\n            st.excl.delivered[i].keys", fail = "incorrect old-window release" },
     { id = "forget_pointer_buttons", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "rec.buttons = ev.sub;", new = "rec.buttons = 0;", fail = "incorrect old-window release" },
     { id = "repeat_accepted_button", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "st.excl.delivered[i].buttons &= !bit;", new = "st.excl.delivered[i].buttons |= bit;", fail = "incorrect old-window release" }]
+
+[[check]]
+id = "gfx_measure"
+spec = { path = "docs/decisions/gui/GFX_ACCEL_HAL_DESIGN.md", section = "レビュー案 (2026-11-28) — G4m の結線と S1・G5m の計測" }
+subsystem = "gfx"
+level = "L1"
+sources = ["tools/gfx_measure.py", "sys/platform/pc98/video/gfx_vram.c", "sys/platform/pc98/kdebug/kdebug_main.c", "sys/include/gfx_measure_wire.h", "sys/hal/gfx/gfx_dirty.h", "userland/gshell/src/typical_ops.rs", "sys/hal/gfx/gfx_present.c", "tests/support/fixtures/gfx2/gfx_packed_retry.c", "sys/platform/pc98/kdebug/gfx_snapshot.c", "tests/support/fixtures/gfx2/gfx_snapshot.c", "tests/support/gfx2_host.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "丸め後の矩形和・plane/page の画素・失敗矩形の再送と全画素一致・guard 不一致の形状の拒否"
+limits = "ホストの plane 写像と合成ログを使う。実機の速度・画素は別測定"
+gates = ["push", "main"]
+mutations = [
+    { id = "trace_product", config = "pc98", when = "after_build", replace = "sys/hal/gfx/gfx_dirty.h", old = "#ifdef GFX_MEASURE_DIAG", new = "#if 1", fail = "incorrect transfer observation mode" },
+    { id = "accept_truncated", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "run.get('completed_groups') == len(rows)", new = "True", fail = "incomplete or failed sweep accepted" },
+    { id = "ignore_previous", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "f['previous'] + f['draw']", new = "f['draw']", fail = "mixed page restoration" },
+    { id = "plane_as_index8", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "transferred += 2 * size", new = "transferred += size", fail = "clipped union or plane transfer" },
+    { id = "discard_failed_rect", config = "pc98", when = "after_build", replace = "sys/hal/gfx/gfx_present.c", old = "dirty_queue.count -= i;", new = "dirty_queue.count = 0;", fail = "failed packed present lost dirty" },
+    { id = "drop_scan_scroll", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_snapshot.c", old = "e->w, e->h, e->y);", new = "e->w, e->h, 0);", fail = "scan bank, scroll or reference pixels" },
+    { id = "skip_present", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "frame['draw'].append(rect)", new = "pass", fail = "kernel present trace" },
+    { id = "ignore_guard", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "row['rc'] == row['diff'] == row['guard_diff'] == 0", new = "row['rc'] == row['diff'] == 0", fail = "guard failure accepted" }]
+
+[[check]]
+id = "gfx_g5m_failure"
+spec = { path = "docs/decisions/gui/GFX_ACCEL_HAL_DESIGN.md", section = "G5m — PUT と GET の切替点" }
+subsystem = "gfx"
+level = "L3"
+sources = ["sys/platform/pc98/kdebug/gfx_transfer_bench.c", "sys/dev/video/geforce/gf_direct_rows.h", "sys/hal/gfx/gfx_hw_submit.c", "userland/shell/cmd_gf2.c", "tests/support/fixtures/gfx2/gfx_transfer_bench.c", "tests/support/gfx2_host.py", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "共用面への強制 M2MF が失敗したらその回は失敗、再起動要求は一回、二回目の起動は写像も RAM 確保もしない"
+limits = "GF は模型。実機の WC 属性・fence の経過時間は測らない"
+gates = ["push", "main"]
+mutations = [
+    { id = "hide_pending", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_transfer_bench.c", old = "!t->channel->staging_pending", new = "true", fail = "outstanding DMA recovery" },
+    { id = "retry_failed_dma", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_transfer_bench.c", old = "stopped = true;", new = "stopped = false;", fail = "G5m retried after DMA failure" },
+    { id = "skip_ram_guard", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_transfer_bench.c", old = "guard += ram[h * rp] != GUARD;", new = "guard += 0;", fail = "transfer pixels or guard" },
+    { id = "allow_ifc", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_transfer_bench.c", old = "&t->ram, true, dl", new = "&t->ram, false, dl", fail = "forced transfer failure" }
+]

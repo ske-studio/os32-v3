@@ -1,3 +1,5 @@
+#include "kdebug_resident_contract.h"
+struct kdebug kdebug;
 /* Real internal headers under ILP32; no libc or hardware access. */
 #include "gfx_hal.h"
 #include "gfx_policy.h"

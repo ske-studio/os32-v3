@@ -1,3 +1,4 @@
+#include "gfx_measure_wire.h"
 #include "kernel_tick.h"   /* tick_count */
 #include "sys/kern/module/module.h"
 #include "sys/dev/hwdev/generated/hwdev_contract.h"
@@ -126,8 +127,114 @@ static int recovery_attach(void)
     }
     return 0;
 }
+#ifdef GFX_MEASURE_DIAG
+/* Capture one input in RAM. Serial transmission follows its timing window. */
+extern int gfx_snapshot_take(u32 event, const struct gfx_trace_event *e);
+extern void gfx_snapshot_emit(u32 event);
+extern bool gfx_transfer_stopped(void);
+static u32 trace_mode;
+static bool input_active, fail_next;
+
+#define TRACE_PAGES 8U
+static struct gfx_trace_event *trace_events;
+static u32 trace_count;
+static bool trace_overflow;
+
+static void flush_trace(void)
+{
+    for (u32 i = 0; i < trace_count; i++) {
+        const struct gfx_trace_event *e = &trace_events[i];
+        serial_puts_polled("GXT1 ");
+        serial_diag_u32(e->kind); serial_puts_polled(" "); serial_diag_u32(e->frame);
+        serial_puts_polled(" "); serial_diag_i32(e->x);
+        serial_puts_polled(" "); serial_diag_i32(e->y);
+        serial_puts_polled(" "); serial_diag_i32(e->w);
+        serial_puts_polled(" "); serial_diag_i32(e->h);
+        serial_puts_polled(" "); serial_diag_u32(e->bytes);
+        serial_puts_polled(" "); serial_diag_u32(e->detail);
+        serial_puts_polled("\r\n");
+        gfx_snapshot_emit(i);
+    }
+    if (trace_overflow) serial_puts_polled("GXT1 overflow\r\n");
+    trace_count = 0;
+    trace_overflow = false;
+}
+
+static int gfx_trace_call(u32 op, void *buf, u32 size)
+{
+    if (op == GFX_TRACE_POLICY) {
+        if (!input_active) return GFX_TRACE_NORMAL;
+        if (size && fail_next) {
+            fail_next = false;
+            return GFX_TRACE_FAIL_ONCE;
+        }
+        return trace_mode == 3 ? GFX_TRACE_REDRAW : GFX_TRACE_NORMAL;
+    }
+    if (op == GFX_TRACE_EVENT) {
+        if (!trace_events) return 0;
+        if (!buf || size != sizeof(*trace_events)) return OS32_ERR_INVAL;
+        const struct gfx_trace_event *event = buf;
+        if ((event->kind == GFX_TRACE_PUT || event->kind == GFX_TRACE_GET) &&
+            gfx_transfer_stopped()) return 0;
+        if (trace_count < TRACE_PAGES * PAGE_SIZE / sizeof(*trace_events)) {
+            if (trace_mode >= 2 && input_active && event->kind == GFX_TRACE_FLIP &&
+                gfx_snapshot_take(trace_count, event)) trace_overflow = true;
+            trace_events[trace_count++] = *event;
+        } else trace_overflow = true;
+        return 0;
+    }
+    if (!buf || size != sizeof(u32)) return OS32_ERR_INVAL;
+    u32 command = *(u32 *)buf;
+    if (op == GFX_TRACE_BOUNDARY && !trace_events) return 0;
+    if (serial_gate_active()) return OS32_ERR_BUSY;
+    if (op == GFX_TRACE_BOUNDARY) {
+        if (command & GFX_TRACE_BEGIN) {
+            if (input_active) flush_trace();
+            input_active = true;
+            trace_count = 0;
+            trace_overflow = false;
+            serial_puts_polled("GXT1 begin ");
+            serial_diag_u32(command & ~GFX_TRACE_BEGIN);
+            serial_puts_polled("\r\n");
+        } else {
+            input_active = false;
+            flush_trace();
+            serial_puts_polled("GXT1 end ");
+            serial_diag_u32(command);
+            serial_puts_polled("\r\n");
+        }
+        return 0;
+    }
+    if (command > 4) return OS32_ERR_INVAL;
+
+    if (command && !trace_events) {
+        u32 phys = pgalloc_alloc_phys(LEDGER_OWNER_KERNEL, TRACE_PAGES);
+        if (!phys) return OS32_ERR_NOSPC;
+        trace_events = P2V(phys);
+    } else if (!command && trace_events) {
+        flush_trace();
+        if (!pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, V2P(trace_events) / PAGE_SIZE,
+                                  TRACE_PAGES)) return OS32_ERR_IO;
+        trace_events = 0;
+        input_active = false;
+    }
+    fail_next = command == 4;
+    trace_mode = command;
+    return 0;
+}
+
+extern int gfx_transfer_bench(void);
+#endif
+
 static i32 recovery_call(u32 op, void *buf, u32 size)
 {
+#ifdef GFX_MEASURE_DIAG
+    if (op == GFX_G5M_RUN)
+        return buf || size ? OS32_ERR_INVAL : gfx_transfer_bench();
+    if (op == GFX_TRACE_CONTROL || op == GFX_TRACE_EVENT ||
+        op == GFX_TRACE_BOUNDARY || op == GFX_TRACE_POLICY)
+        return gfx_trace_call(op, buf, size);
+#endif
 #ifdef TICK_PROBE
     if (op == TP_OP) return tick_probe_call(buf, size);
 #endif

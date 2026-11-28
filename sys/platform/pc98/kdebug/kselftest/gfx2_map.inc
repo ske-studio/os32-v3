@@ -1,16 +1,13 @@
 /* I1: real private PT, application CR3 read/write, unmap and owner teardown.
  * Result bits: 1=owner, 2=AS, 4=page, 8=map, 16=read, 32=write,
  * 64=unmap, 128=PTE, 256=page free, 512=AS/PT cleanup, 1024=free count. */
-u32 gfx2_map_selftest_runs, gfx2_map_selftest_result;
-
-int gfx2_map_selftest(void)
+static int gfx2_map_selftest(void)
 {
     struct addrspace as;
     u32 owner, pfn, saved, before = pgalloc_free_pages();
     u32 va = MEM_GFX2_MAP_BASE, k = (va - MEM_LEASE_BASE) >> PDE_SHIFT;
     unsigned int flags;
     int rc = 0;
-    gfx2_map_selftest_runs++;
     if (!ledger_owner_new(LEDGER_KIND_AS, 0, "gfx2-map-test", &owner)) {
         rc = 1; goto out;
     }
@@ -46,9 +43,9 @@ free_page:
     if (ledger_owner_pages(owner) || !ledger_owner_retire(owner)) rc |= 512;
     goto out;
 destroy:
-    if (selftest_as_end(&as)) rc |= 512;
+    paging_addrspace_destroy(&as);
+    if (ledger_owner_pages(owner) || !ledger_owner_retire(owner)) rc |= 512;
 out:
     if (before != pgalloc_free_pages()) rc |= 1024;
-    gfx2_map_selftest_result = (u32)rc;
     return rc;
 }

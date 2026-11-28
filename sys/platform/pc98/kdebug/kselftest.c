@@ -200,9 +200,14 @@ int kselftest_run_post_unicode(void)
 
 #include "../../../kern/kdebug/kselftest/slack_cycle.inc"
 
+#include "kselftest/gfx2_map.inc"
+
 int kselftest_run_post_exec(void)
 {
     u32 before = ksel_fail;
+    int map_rc = gfx2_map_selftest();
+    check(map_rc == 0, "gfx2: map round trip");
+    if (map_rc) kprintf(KLOG_ATTR, "[gfx2] map selftest rc=%d\n", map_rc);
     if (kdi_kaudit_skipped(KAUDIT_POST_EXEC)) return 0;
 
     check(kdi_kaudit_last_rc(KAUDIT_POST_EXEC) == 0, "post-exec: lifecycle audit");
