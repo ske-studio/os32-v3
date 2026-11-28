@@ -59,14 +59,11 @@ void v86_pic_reset(void);
 u32  v86_pic_in(u16 port);
 void v86_pic_out(u16 port, u32 value);
 
-/* IRQ をゲストに見せてよいか判定する。
- *
- * 見せてよければ注入すべきベクタ (ゲストが ICW2 に書いた base から引く) を
- * *out_vector に入れて 1 を返す。マスクされていれば IRR に立てるだけで 0。
- *
- * **必ずこれを通すこと。** 前回プロジェクトは IMR/ISR を見ずに注入し続けた
- * 結果、ゲストの SP が減り続けて IVT を割り込みフレームで上書きした。 */
-int  v86_pic_should_inject(u32 irq, u32 *out_vector);
+void v86_pic_request(u32 irq);
+void v86_pic_keyboard_read(int remaining);
+void v86_pic_soft_sound(u8 sources);
+int v86_pic_candidate(u32 *vector);
+void v86_pic_commit(u32 irq);
 
 /* 検証用 */
 u32  v86_pic_state(int slave);      /* isr<<16 | irr<<8 | imr */

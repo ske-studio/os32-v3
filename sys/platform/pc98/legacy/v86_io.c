@@ -384,6 +384,7 @@ u32 v86_io_in(u16 port, int size)
         v = v86_pic_in(port);
     } else if (v86_kbd_is_port(port)) {
         v = v86_kbd_in(port);
+        if (port == V86_KBD_DATA) v86_pic_keyboard_read(v86_kbd_pending());
     } else {
         v = (size == 1) ? 0xFFU : U16_MAX;
     }

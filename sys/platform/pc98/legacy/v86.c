@@ -193,6 +193,7 @@ void v86_fault_handler(u32 *frame, u32 vector)
     v86_exit_reason = V86_EXIT_FAULT;
 }
 
+static int v86_deliver_pending(u32 *frame, int ip, int cs, int flags, int sp, int ss);
 #include "v86_gp_emulate.inc"
 
 int v86_gp_handler(u32 *frame)
@@ -263,7 +264,11 @@ int v86_gp_handler(u32 *frame)
         return 1;
     }
 
-    return v86_gp_emulate(frame, pc, len);
+    if (v86_gp_emulate(frame, pc, len)) return 1;
+    /* At IOPL3 STI executes on the CPU. A successfully emulated trapped
+     * instruction has completed, including one immediately after STI. */
+    return v86_deliver_pending(frame, V86F_EIP, V86F_CS, V86F_EFLAGS,
+                               V86F_ESP, V86F_SS);
 }
 
 /* ======================================================================== */
@@ -319,20 +324,17 @@ static int v86_do_int(u32 *frame, u32 vector,
     if (!v86_guest_range_ok(sp_lin, V86_IRET_BYTES)) {
         return 0;
     }
-    gstack = (u16 *)v86_ptr(frame[i_ss], sp);
-
-    /* ゲストには VM ビットを見せない (下位 16bit だけ積む) */
-    gstack[0] = (u16)(frame[i_eip] & U16_MAX);
-    gstack[1] = (u16)(frame[i_cs]  & U16_MAX);
-    gstack[V86_IRET_FLAGS_WORD] = (u16)(frame[i_eflags] & U16_MAX);
-
-    frame[i_esp] = sp;
-
-    /* IVT からハンドラを引く。IVT はゲストの物理 0 番地にある。
-     * vector は u8 由来なので vector*4+4 <= 0x400 で常に範囲内。 */
     ivt = (const u16 *)(vector * V86_IVT_ENTRY_BYTES);
-    frame[i_eip] = ivt[0];
-    frame[i_cs]  = ivt[1];
+    u16 offset = ivt[0], segment = ivt[1];
+    if (!v86_guest_read_ok(((u32)segment << X86_REAL_SEG_SHIFT) + offset, 1))
+        return 0;
+    gstack = (u16 *)v86_ptr(frame[i_ss], sp);
+    gstack[0] = (u16)frame[i_eip];
+    gstack[1] = (u16)frame[i_cs];
+    gstack[V86_IRET_FLAGS_WORD] = (u16)frame[i_eflags];
+    frame[i_esp] = sp;
+    frame[i_eip] = offset;
+    frame[i_cs] = segment;
 
     /* 実機の割り込み受理と同じく IF と TF を落とす。
      * ゲストの IRET がスタックから FLAGS を戻すので IF は自動で復帰する。 */
@@ -340,31 +342,29 @@ static int v86_do_int(u32 *frame, u32 vector,
     return 1;
 }
 
-/* 実 IRQ をゲストに見せる。**引数は IRQ 番号であってベクタ番号ではない。**
- *
- * どのベクタへ落とすか、そもそも落としてよいかは仮想 PIC が決める。
- * ゲストが IMR で塞いでいる割り込みを注入し続けると、ゲストのスタックが
- * 際限なく伸びて IVT を割り込みフレームで踏み潰す — 前回プロジェクトが
- * 実際に起こした事故なので、ここは必ず v86_pic_should_inject() を通す。 */
+static int v86_deliver_pending(u32 *frame, int ip, int cs, int flags, int sp, int ss)
+{
+    if (!(frame[flags] & EFLAGS_IF)) return 0;
+    u32 vector;
+    int irq = v86_pic_candidate(&vector);
+    if (irq < 0) return 0;
+    if (!v86_do_int(frame, vector, ip, cs, flags, sp, ss, 0)) {
+        v86_exit_reason = V86_EXIT_FAULT;
+        return 1;
+    }
+    v86_pic_commit(irq);
+    ++v86_irq_n;
+    return 0;
+}
+
 void v86_reflect_irq(u32 *frame, u32 irq)
 {
-    u32 vector;
-
-    if (!v86_active) {
-        return;
-    }
-    if (!v86_pic_should_inject(irq, &vector)) {
-        return;
-    }
-    if (!v86_do_int(frame, vector,
-                    V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS, 0)) {
-        /* ゲストスタックが不正。IRQ スタブの中なのでここでは畳めない。
-         * 脱出要求を立てて、タイマ/キーボードスタブの判定経路で畳ませる。 */
-        v86_exit_reason = V86_EXIT_FAULT;
+    if (!v86_active) return;
+    v86_pic_request(irq);
+    /* Hardware interrupt entry from VM is already past any STI shadow. */
+    if ((frame[V86I_EFLAGS] & EFLAGS_VM) &&
+        v86_deliver_pending(frame, V86I_EIP, V86I_CS, V86I_EFLAGS, V86I_ESP, V86I_SS))
         v86_exit_request = 1;
-        return;
-    }
-    v86_irq_n++;
 }
 
 /* 戻り値 1 = 成功 / 0 = ゲストスタック不正 (呼び出し元でセッションを畳む) */

@@ -49,7 +49,9 @@ run の返却境界は FM と PCM で一つとする。begin 時刻を起点に�
 
 AV §9-4/V0 に従い次期限に I20/I21 を arm する。PI と TI の同時 ack・再設定が再生と共存できなければ PIT one-shot の既存時計との共存を測る。両方失敗なら 100 Hz 制限をユーザー判断に戻す。TI または期限用 PIT の handler は起床印を立てる。同時 PI は同じ dispatch で ack・再生補充を済ませる。物理 EOI 完了後、割込みスタブの IRET 直前に保存 EFLAGS.VM と起床印を調べる。VM なら命令境界の文脈を保存し、既存の v86_longjmp_out で run に SLICE を返す。通常 tick の slice 判定を待たない。非 VM なら印を保持し、次の run の VM 進入前に通常文脈で引き取る。run 間の pump・IOREAD 待ちではゲスト時計を進め、前景停止では停止時刻まで確定して時計を凍結、再開時に期限を張り直す。満了ごとに予定時刻の CSM を同じ通番列へ積み、同時刻の OUT より先に処理する。満杯では未処理期限を保ち CSM を合流させない。27h の A/B フラグ許可・個別クリア、29h の出力許可を独立に試す。
 
-実 FM 反射と SOFT は要求記録→候補選択→注入確定を共用する。現行 v86_pic_should_inject は片 IMR の検査で IRR/ISR を更新するので、この共通段で既存反射の呼出し元も移す。線の立上りを IRR にラッチし、音源 ack による入力解除でも未配送 IRR を保持する。SOFT の確定後は両側の EOI が揃い、なお線が active なら一回再要求する。実音源は同じ未解除要求を再反射せず、源別に解除を確認してから次を採る。片側 EOI では重複させない。ICW2 変更後は slave の現ベース＋4 を使う。非 VM 時も IRR に保持する。VM 復帰で仮想 IF・STI shadow・両 IMR・優先順位・ISR を検査する。スタックとベクタの検査、フレーム更新の成功後にだけ IRR を消費し slave IR4 と master IR7 を in-service にする。既定ベクタは INT 14h。一復帰につき一件、同時の IRQ0 を先に通す。仮想 EOI とマスク解除で残存要求を再評価する。物理 EOI は既存 dispatch complete に一任する。[IRQ 設計「後段の実音源共有と仮想 PIC」](../../design/kernel/irq/irq.md)
+実 FM 反射と SOFT は要求記録→候補選択→注入確定を共用する。ゲストの IRQ フレームと完了済み #GP 命令の復帰で候補を選ぶ。IOPL=3 の STI は CPU が実行し、ハードウェア IRQ の受理か、STI の次の捕捉命令が完了した時点で配送する。線の立上りを IRR にラッチし、音源 ack による入力解除でも未配送 IRR を保持する。SOFT の確定後は両側の EOI が揃い、なお線が active なら一回再要求する。実音源は同じ未解除要求を再反射せず、源別に解除を確認してから次を採る。片側 EOI では重複させない。ICW2 変更後は slave の現ベース＋4 を使う。非 VM 時も IRR に保持する。VM 復帰で仮想 IF・STI shadow・両 IMR・優先順位・ISR を検査する。スタックとベクタの検査、フレーム更新の成功後にだけ IRR を消費し slave IR4 と master IR7 を in-service にする。既定ベクタは INT 14h。一復帰につき一件、同時の IRQ0 を先に通す。仮想 EOI とマスク解除で残存要求を再評価する。物理 EOI は既存 dispatch complete に一任する。[IRQ 設計「後段の実音源共有と仮想 PIC」](../../design/kernel/irq/irq.md)
+
+固定優先順位、ISR と EOI の根拠は Intel 8259A の Fully Nested Mode と End of Interrupt（p.15）。比較実装は FreeBSD bhyve の要求選択と受理処理。PC-98 のカスケードはマスタ IR7 に接続する。[Intel 8259A](https://pdos.csail.mit.edu/6.828/2005/readings/hardware/8259A.pdf)・[FreeBSD vatpic.c](https://github.com/freebsd/freebsd-src/blob/main/sys/amd64/vmm/io/vatpic.c)
 
 ## Ra266 の受入窓
 

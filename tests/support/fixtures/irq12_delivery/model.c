@@ -9,6 +9,7 @@ volatile u32 kctx_irq_depth, tick_count;
 unsigned vm, reflection, mouse, order, eoi, slave_mask = 255;
 static unsigned slave_writes, master_writes;
 static int fault_exit;
+static unsigned requests;
 struct v86_session_state v86_session;
 u32 tss_get_esp0(void) { return 0; }
 void tss_set_esp0(u32 esp0) {}
@@ -19,7 +20,7 @@ void v86_enter(const struct v86_context *ctx)
 }
 void kprintf(u8 attr, const char *fmt, ...) {}
 void mouse_irq_handler(void) { ++mouse; }
-void __wrap_v86_reflect_irq(u32 *frame, u32 irq) { reflection += irq; }
+void __wrap_v86_reflect_irq(u32 *frame, u32 irq) { ++requests; if (vm) reflection += irq; }
 unsigned inp(unsigned port) { return port == 10 ? slave_mask : 255; }
 void outp(unsigned port, unsigned value)
 {
@@ -81,7 +82,9 @@ void _start(void)
     require(!irq_register(14, handler, (void *)3, IRQ_F_SHARED), "PCI registration");
     delivery(0, 12);
     vm = 0;
+    requests = 0;
     delivery(0, 0);
+    require(requests == 1, "non-VM request");
     vm = 1;
     boot_probe.complete = boot_probe.contained = 1;
     for (unsigned bank = 0; bank < 2; ++bank) {

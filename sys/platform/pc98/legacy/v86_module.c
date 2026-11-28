@@ -122,10 +122,24 @@ void v86_pic_set_imr(int slave, u8 imr)
     if (body_callable()) candidate.v86_pic_set_imr(slave, imr);
 }
 
-int v86_pic_should_inject(u32 irq, u32 *out_vector)
+void v86_pic_request(u32 irq)
 {
-    if (body_callable()) return candidate.v86_pic_should_inject(irq, out_vector);
-    return 0;
+    if (body_callable()) candidate.v86_pic_request(irq);
+}
+
+void v86_pic_soft_sound(u8 sources)
+{
+    if (body_callable()) candidate.v86_pic_soft_sound(sources);
+}
+
+int v86_pic_candidate(u32 *vector)
+{
+    return body_callable() ? candidate.v86_pic_candidate(vector) : -1;
+}
+
+void v86_pic_commit(u32 irq)
+{
+    if (body_callable()) candidate.v86_pic_commit(irq);
 }
 
 int v86_kbd_push(u8 scancode)
