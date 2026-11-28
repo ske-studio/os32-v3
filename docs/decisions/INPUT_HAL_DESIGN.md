@@ -435,6 +435,8 @@ WM は sync_av_focus で最後に通知が成功した front_id と owner を現
 
 1単位は1枠の検証・消費（無効化済みの取り出しも最大1単位）。1巡最大4件、通常120 µs、max_unit_us 初期見積り30 µs。数値は整数の初期調整値。両機種で最長1単位を測り、公平枠で30 µs を超えれば値または単位を見直す。1件の途中で切らないため、時限は次を開始する上限である。
 
+計測は同じ CPU・USB 鍵盤・前景で長押しと解放を繰り返す。診断像（PC-98 は make kernel-tick-probe、PowerMac は別 KB_OUT で INPUT_MEASURE_DIAG_BUILD=1）は KDEBUG=1、RUNNING を確認し、停止したゲストで kdebug の物理ロード先 base_pa に kdebug.elf の input_measure_stats のオフセットを足して 4 個の u32（USB サービス件数・最大 µs、FG1 消費件数・最大 µs）を読む。起動以降の最大で、空巡回は FG1 に数えず、30 µs と比べるのは FG1 の値だけ。製品像（通常ビルド、KDEBUG=0）では同じ長押しの make・repeat ごとの配送数と到着時刻を QEMU / NP21/W の外部記録から取り、初回遅延・以降の間隔・期待期限に対する不足・解放後の余分な配送を照合する。ゲストとホストの時計および観測粒度を記録し、診断像の最長値を併記して、予算の枯渇は製品像で判断する。
+
 1. 製品入口は AC-CTX 適合の idle_work_run / 明示 pump 経由の io_dispatch に限る。自動入口は idle_work_run の IF/EE・IRQ 深さ検査を使う。明示入口 kapi_io_pump にも dispatch 前に同じ検査を置き、不適合時は仕事量0。呼出元はロック外の FG1 に限る。FG0・排他中は採取・清算・io_request まで。adapter を呼ぶのは io_dispatch だけで、入れ子の dispatch は既存 running により仕事量0。
 2. dispatcher の slice を引き継ぐ。io_slice_limit(slice,120,4) で残時間・公平枠1件を広げず、各単位の直前に io_slice_take を行う。定常時は換算済み表を引く。表 miss 時の整数換算は FG1 内に限る。120 µs は開始締切であり、4件消化や締切までの完了は保証しない。換算失敗、時計世代交代、時限・件数到達では未着手の枠を保つ。u32 raw count の差と source/generation は既存 slice API に任せる。
 3. IRQ 排他内で固定4枠から有効な印を一つ選び、鍵盤 source の同一性と押下を確認し、印の消費と評価済み値の input_capture_delivery / input_emit_keymap による配送1件を不可分にする。割込み状態を戻してから次の単位へ。無効な印を捨てても後続枠は残す。in2 への repeat、押下数の加算、lock 反転はゼロ。

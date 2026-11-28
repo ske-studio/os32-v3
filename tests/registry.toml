@@ -2457,3 +2457,20 @@ mutations = [
     { id = "scan_before_register", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/input_keymap_backend.c", old = "    int rc_work = input_work_register();\n    if (rc_work < 0) usbp_log(\"USB repeat uses synchronous delivery (%d)\\n\", rc_work);\n    pm_usb_scan();", new = "    pm_usb_scan();\n    int rc_work = input_work_register();\n    if (rc_work < 0) usbp_log(\"USB repeat uses synchronous delivery (%d)\\n\", rc_work);", fail = "USB repeat delivery probe 2" },
     { id = "fallback_silent", config = "pc98", when = "after_build", replace = "sys/hal/input/input_work.c", old = "if (!rc) registered = 1;", new = "registered = 1;", fail = "USB repeat delivery probe 3" }
 ]
+
+[[check]]
+id = "input_measure"
+spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "11.3 予算と再予約" }
+subsystem = "input"
+level = "L1"
+sources = ["sys/kern/kdebug/input_measure_clock.h", "sys/kern/kdebug/input_measure.inc", "sys/include/input_measure.h", "tests/support/fixtures/input_policy/measure.c"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "OFF で採時ゼロ、RUNNING で USB と FG1 の件数・最長 µs を独立に保持し、時計失敗は数えない"
+limits = "私有の入口と時計を ILP32 fixture で接続する。実機の IRQ 時間は測らない"
+gates = ["push", "main"]
+mutations = [
+    { id = "input_measure_last", config = "pc98", when = "after_build", replace = "sys/kern/kdebug/input_measure.inc", old = "if (elapsed > input_measure_stats[index].max_us)", new = "if (1)", fail = "input timing counters" },
+    { id = "input_measure_off_clock", config = "pc98", when = "after_build", replace = "sys/kern/kdebug/input_measure_clock.h", old = "kdebug.state == KDEBUG_RUNNING &&", new = "1 &&", fail = "input timing counters" }
+]

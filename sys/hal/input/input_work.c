@@ -1,3 +1,6 @@
+#ifdef INPUT_MEASURE_DIAG
+#include "sys/kern/kdebug/input_measure_clock.h"
+#endif
 #include "input_work.h"
 #include "in2_int.h"
 #include "kbd.h"
@@ -52,6 +55,9 @@ int input_step(struct io_slice *slice)
     int limited = io_slice_limit(slice, INPUT_REPEAT_US, REPEAT_SLOTS);
     for (;;) {
         unsigned flags = irq_save();
+#ifdef INPUT_MEASURE_DIAG
+        struct input_measure_stamp stamp = input_measure_start();
+#endif
         unsigned i = 0;
         while (i < REPEAT_SLOTS && !slots[i].key.src) ++i;
         if (i == REPEAT_SLOTS || limited < 0 || !io_slice_take(slice)) {
@@ -72,6 +78,9 @@ int input_step(struct io_slice *slice)
             if (!input_capture_delivery(&slot.key, slot.old, &slot.result, slot.raw_due, slot.mods))
                 input_emit_keymap(&slot.result, slot.key.down, slot.raw_due, slot.mods, 0);
         }
+#ifdef INPUT_MEASURE_DIAG
+        input_measure_finish(stamp, INPUT_MEASURE_FG1);
+#endif
         irq_restore(flags);
     }
 }
