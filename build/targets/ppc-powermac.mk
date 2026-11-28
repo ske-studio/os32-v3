@@ -12,7 +12,7 @@ KB_OBJDUMP := $(PPC_CROSS_DIR)/bin/powerpc-elf-objdump
 KBOOT_TERM ?= lan
 KB_ROOT_BINS ?=
 KB_EXEC := $(filter 1,$(FEATURE_EXEC))
-KB_C_LEGACY := -DKBOOT_SHELL=$(FEATURE_CLI) -DKBOOT_SH=$(FEATURE_USERSHELL) -DKBOOT_LINK=$(FEATURE_LINK)
+KB_C_LEGACY := -DKBOOT_SH=$(FEATURE_USERSHELL) -DKBOOT_LINK=$(FEATURE_LINK)
 ifeq ($(IMAGE),powermac)
 KB_OUT ?= build/out/ppc-powermac
 else ifeq ($(origin KB_OUT),undefined)

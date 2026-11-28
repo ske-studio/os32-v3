@@ -331,3 +331,8 @@ IMAGE=powermac の common-compile が選択する各入力に対し、製品出�
 
 - 配布された互換像の照合に使う root.iso は、同じ CI 実行の一時ディレクトリで共有する。製品では配布 boot.iso の ROOT.ISO を抽出する。
 - 製品行の重みは手元の正常と必須変異の合計を切り上げた暫定値とし、取り込みの前に同じ候補の hosted の成功 attempt の集計 (registry_v2「PowerPC の構成別重み」) で置き換える。配布から検査する媒体・起動は同じ形式の配布物で測る。互換 root の生成時間は先に実行する sh に計上する。
+
+### 段 6〜9 の実装で設計者が決めたこと
+
+- `tests/support/fixtures/input_policy/include` の stdio.h と string.h は、`tests/input/input_policy_abi.py` の failure_probe だけが探索し、両 ABI で共有する。
+- `build/ppc-user.mk` は、USER sh のオブジェクト列に利用者のない個別の ls.o 規則も汎用規則と一緒に撤去する。

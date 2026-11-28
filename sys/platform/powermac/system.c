@@ -35,7 +35,7 @@ static unsigned long long via_tb(void *cookie)
     return ((unsigned long long)hi << 32) | lo;
 }
 
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
 enum {
     MAC_RTC_EPOCH_YEAR = 1904, MAC_RTC_EPOCH_WEEKDAY = 5, /* Friday */
     RTC_SECS_PER_MIN = 60, RTC_SECS_PER_HOUR = 3600, RTC_SECS_PER_DAY = 86400
@@ -105,7 +105,7 @@ void pm_via_prepare(void)
     };
     boot_error = window->rc;
     if (!boot_error) boot_error = via_prepare(&controller);
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
     if (!boot_error)
         clock_register(&pm_rtc_clock);
 #endif
