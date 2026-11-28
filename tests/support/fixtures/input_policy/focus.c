@@ -4,9 +4,10 @@
 #include "av_contract.h"
 #include "kbd_contract.h"
 
+u32 in2_ring_dropped(void) { return 0; }
 unsigned input_test_irq;
 static unsigned lost, physical;
-static u8 reasons[16];
+static u8 reasons[32];
 int res_owner_get(void) { return 1; }
 int av_focus_owner(void) { return 1; }
 int av_focus_is_wm(void) { return 1; }
@@ -224,5 +225,26 @@ int probe(void)
     write_gui_raw(&rc);
     write_key(&out);
     window_batch(1);
+    /* X4 drains the exclusive chord at the first unacquire syscall entry.
+     * The following three transitions can all occur before the next WM poll. */
+    if (in2_acquire(IN2_EXCL_KBD) || in2_wm_state(&state)) return 51;
+    IN2_Status status;
+    int generation = state.gen;
+    write_gui_raw(&generation);
+    if (in2_status(&status)) return 55;
+    generation = status.rsv[IN2_STATUS_ACQUIRE_GEN];
+    write_gui_raw(&generation);
+    alt.down = tab.down = 1;
+    if (input_capture_key(&alt) || input_capture_key(&tab)) return 52;
+    alt.down = tab.down = 0;
+    if (input_capture_key(&tab) || input_capture_key(&alt)) return 53;
+    window_batch(1);
+    if (in2_unacquire() || in2_acquire(IN2_EXCL_KBD) || in2_unacquire() ||
+        in2_wm_state(&state)) return 54;
+    generation = state.gen;
+    write_gui_raw(&generation);
+    if (in2_status(&status)) return 55;
+    generation = status.rsv[IN2_STATUS_ACQUIRE_GEN];
+    write_gui_raw(&generation);
     return 0;
 }

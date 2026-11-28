@@ -262,8 +262,10 @@ pub struct IN2_Event {
     pub rsv: u16,
 }
 
+pub const IN2_STATUS_ACQUIRE_GEN: usize = 0;
+
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct IN2_Status {
     pub size: u32,
     pub acquired: u32,

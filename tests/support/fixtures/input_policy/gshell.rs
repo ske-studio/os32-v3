@@ -18,6 +18,8 @@ pub mod gui {
 }
 use gui::proto::*;
 thread_local! {
+    static ACQUIRE_GEN: std::cell::Cell<u32> = Default::default();
+    static GENERATION: std::cell::Cell<u32> = Default::default();
     static RELEASED: std::cell::Cell<usize> = Default::default();
     static POLICY: std::cell::Cell<bool> = Default::default();
     static KEY: std::cell::Cell<Option<kbd_policy::KbdPolicyKey>> = Default::default();
@@ -26,6 +28,10 @@ thread_local! {
     static FLAGS: std::cell::Cell<u32> = Default::default();
 }
 pub mod av {
+    pub const IN2_STATUS_ACQUIRE_GEN: usize = 0;
+    #[allow(non_camel_case_types)]
+    #[derive(Default)]
+    pub struct IN2_Status { pub rsv: [u32; 3] }
     #[allow(non_camel_case_types)]
     pub struct IN2_WmState { pub size: u32, pub gen: u32, pub excl: u32, pub owner: i32 }
 }
@@ -38,6 +44,7 @@ pub struct Api {
     pub kbd_policy_key_read: unsafe fn(*mut kbd_policy::KbdPolicyKey, u32) -> i32,
     pub kbd_trygetrawkey: unsafe fn() -> i32,
     pub kbd_is_pressed: unsafe fn(i32) -> i32,
+    pub in2_status: unsafe fn(&mut av::IN2_Status) -> i32,
     pub in2_wm_state: unsafe fn(&mut av::IN2_WmState) -> i32,
 }
 pub fn api() -> Api {
@@ -59,7 +66,8 @@ pub fn api() -> Api {
             RAW.with(|q| q.borrow_mut().pop_front().unwrap_or(-1))
         },
         kbd_is_pressed: |_| 0,
-        in2_wm_state: |s| { s.excl = FLAGS.get(); 0 },
+        in2_status: |s| { s.rsv[av::IN2_STATUS_ACQUIRE_GEN] = ACQUIRE_GEN.get(); 0 },
+        in2_wm_state: |s| { s.gen = GENERATION.get(); s.excl = FLAGS.get(); 0 },
     }
 }
 #[path = "../../../../userland/gshell/src/excl.rs"]
@@ -567,8 +575,27 @@ fn focus_batches() {
         assert_eq!(st.switches, switches);
         RAW.with(|q| q.borrow_mut().clear());
     }
-    assert_eq!(words.next(), None);
     st.windows[1] = wm::Window {owner: 2, id: 11};
+    let front = st.front;
+    let count = st.switches;
+    FLAGS.set(excl::KBD);
+    GENERATION.set(words.next().unwrap() as u32);
+    ACQUIRE_GEN.set(words.next().unwrap() as u32);
+    assert_eq!(words.next(), Some(ffi::OS32_ERR_BUSY));
+    for raw in words.by_ref().take_while(|&raw| raw >= 0) {
+        RAW.with(|q| q.borrow_mut().push_back(raw));
+    }
+    pump::gshell_gui_pump();
+    assert!(st.pending_raw_n > 0);
+    assert_eq!(st.switches, count);
+    FLAGS.set(0);
+    GENERATION.set(words.next().unwrap() as u32);
+    ACQUIRE_GEN.set(words.next().unwrap() as u32);
+    assert_eq!(words.next(), None);
+    excl::observe(st);
+    excl::settle(st);
+    input::capture_keyboard(st, Ctx::Wait);
+    assert_eq!((st.switches, st.front), (count, front), "switch after reacquisition without input");
     for (shift, target) in [(false, 1usize), (true, 2usize)] {
         st.front = 0;
         excl::observe(st);

@@ -95,6 +95,7 @@ int in2_status(IN2_Status *o)
     *o = (IN2_Status){ .size = sizeof(*o), .acquired = in2_excl_acquired(res_owner_get()),
                        .focus_owner = av_focus_owner(), .focus_gen = in2_focus_generation(),
                        .dropped = in2_ring_dropped() };
+    if (av_focus_is_wm()) o->rsv[IN2_STATUS_ACQUIRE_GEN] = in2_acquire_generation();
     irq_restore(f);
     return 0;
 }

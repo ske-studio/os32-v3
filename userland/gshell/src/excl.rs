@@ -31,6 +31,7 @@ struct Sample {
     window: u32,
     owner: i32,
     generation: u32,
+    acquire_gen: u32,
     flags: u32,
 }
 
@@ -68,9 +69,20 @@ pub fn observe(st: &mut wm::GuiState) {
     let mut out = os32api::av::IN2_WmState { size: 0, gen: 0, excl: 0, owner: 0 };
     st.excl.queried = true;
     st.excl.valid = unsafe { (os32api::api().in2_wm_state)(&mut out) } == 0;
+    let mut acquire_gen = st.excl.sample.map_or(0, |s| s.acquire_gen);
+    if st.excl.valid && !st.excl.sample.is_some_and(|s| s.generation == out.gen) {
+        let mut status = os32api::av::IN2_Status::default();
+        st.excl.valid = unsafe { (os32api::api().in2_status)(&mut status) } == 0;
+        acquire_gen = status.rsv[os32api::av::IN2_STATUS_ACQUIRE_GEN];
+    }
     if st.excl.valid {
-        let next = Sample { window: st.front_id(), owner: st.front_owner(), generation: out.gen, flags: out.excl };
+        let next = Sample { window: st.front_id(), owner: st.front_owner(), generation: out.gen, acquire_gen, flags: out.excl };
         if let Some(old) = st.excl.sample.filter(|old| *old != next) {
+            if old.acquire_gen != next.acquire_gen {
+                st.pending_raw_n = 0;
+                st.pending_switch = false;
+                st.pending_tab = false;
+            }
             st.excl.observed = st.excl.observed.wrapping_add(1);
             st.excl.mouse_baseline = true;
             // An owner transition purges kernel raw itself. Only scan the

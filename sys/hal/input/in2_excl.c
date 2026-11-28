@@ -6,7 +6,7 @@
 
 static int acq_owner;
 static volatile u32 excl;
-static u32 gen, focus_gen;
+static u32 gen, focus_gen, acquire_gen;
 
 int in2_excl_keyboard(void)
 {
@@ -34,9 +34,10 @@ static void transition(int owner, u32 next, int focus)
         }
     }
     /* An acquisition starts a fresh raw stream, including WM controls. */
-    if (!(excl & ~next & IN2_EXCL_KBD) && !focus && owner && (owner != acq_owner || (next & ~excl)))
+    if (!(excl & ~next & IN2_EXCL_KBD) && !focus && owner && (owner != acq_owner || (next & ~excl))) {
+        acquire_gen = gen + 1;
         legacy_raw_flush();
-    else
+    } else
         kbd_raw_purge_keep();
     if (excl & ~next & IN2_EXCL_KBD) legacy_raw_mark_release();
     acq_owner = owner;
@@ -80,6 +81,11 @@ void in2_excl_focus(int old)
     if (acq_owner == old) transition(0, 0, 1);
     else transition(acq_owner, excl, 1);
     ++focus_gen;
+}
+
+u32 in2_acquire_generation(void)
+{
+    return acquire_gen;
 }
 
 u32 in2_focus_generation(void)

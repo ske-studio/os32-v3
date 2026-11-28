@@ -314,6 +314,8 @@ pc98_input_keymap_register と pm_input_keymap_boot は必要な全 map 登録�
 
 ### 10.2 前提と初期 shell
 
+WM は X4 の退避時に最後の独占取得世代を覚え、次に読む取得世代が変われば退避分を捨てる。解除だけでは捨てない。
+
 |前提|現行の製品入口と成立範囲|残る担当|
 |---|---|---|
 |M2/M3|本体・USB の make/break → km_eval・合算 release → legacy keydata。S0b/c/d、S2x/S3x、PPC S2m/S3m/S3b の旧出口は接続済み|A0 が評価済み世代を保持、A0z が read、G が WM 消費を接続|
