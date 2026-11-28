@@ -25,7 +25,8 @@ def verify(config):
                         "userland/lib/snd/mix.c", "-o", exe], check=True)
         for channel in ("3", "1"):
             for dos in ("0", "1"):
-                subprocess.run(["qemu-x86_64", exe, channel, dos], check=True)
+                for divisor in (("3", "2") if dos == "1" else ("3",)):
+                    subprocess.run(["qemu-x86_64", exe, channel, dos, divisor], check=True)
 
 
 if __name__ == "__main__":

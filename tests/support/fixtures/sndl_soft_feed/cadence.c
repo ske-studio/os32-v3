@@ -11,8 +11,17 @@
 static short ring[4096][2], staging[8192][2];
 static Snd2Stream sink;
 static unsigned dma_frame, last_publish, max_gap, silent, sequence, channel;
-static unsigned batch, turns, irq_phase;
+static unsigned batch, turns, irq_phase, divisor;
 static unsigned short dma_count[4];
+/* External accounting in sample-clock frames, excluding pre-start priming. */
+static unsigned pos_cost, publish_cost, sync_cost, render_cost, slices;
+static void costs(void)
+{
+    printf("DMA#%u cost 1/%u: slices=%u resume=%u drain=%u position=%u "
+           "sync=%u render=%u publish=%u (44.1 kHz clock frames)\n",
+           channel, divisor, slices, slices * 88, slices * 60,
+           pos_cost, sync_cost, render_cost, publish_cost);
+}
 
 static unsigned hw_position(void)
 {
@@ -45,6 +54,7 @@ static void advance(unsigned frames)
 }
 static int position(u32 id, SND2_Pos *p)
 {
+    if (sink.state == SND2_ST_RUN) pos_cost += 2;
     advance(2);
     *p = (SND2_Pos){.cap = sink.cap, .written = sink.written,
         .played = snd2_seg_played_now(&sink), .state = sink.state, .time_ms = now_ms()};
@@ -52,6 +62,7 @@ static int position(u32 id, SND2_Pos *p)
 }
 static int publish(u32 id, const void *pcm, u32 bytes)
 {
+    if (sink.state == SND2_ST_RUN) publish_cost += 12;
     advance(12);
     unsigned n = bytes/4;
     unsigned room = sink.cap - (sink.written - sink.played);
@@ -83,10 +94,13 @@ int fmv_render_part(FmVoice *v, uint32_t now, unsigned char *out,
                     uint32_t frames, uint32_t offset, uint32_t n)
 {
     if (!out) {
+        if (sink.state == SND2_ST_RUN) sync_cost += 14;
         advance(14); /* fixed cost of synchronizing a foreground FM instance */
         return 0;
     }
-    advance(8 + (n + 2)/3);
+    unsigned cost = 8 + (n + divisor - 1)/divisor;
+    if (sink.state == SND2_ST_RUN) render_cost += cost;
+    advance(cost);
     if (sink.state == SND2_ST_RUN && n > 256) ++batch;
     for (unsigned i = 0; i < n; ++i) {
         ((short *)out)[2*i] = marker(sequence++);
@@ -96,9 +110,10 @@ int fmv_render_part(FmVoice *v, uint32_t now, unsigned char *out,
 }
 int main(int argc, char **argv)
 {
-    if (argc != 3) return 2;
+    if (argc != 4) return 2;
     channel = atoi(argv[1]);
     int dos = atoi(argv[2]);
+    divisor = atoi(argv[3]);
     /* Both 8237 channels count bytes. Change service phase between routes. */
     dma_count[channel] = sizeof ring - 1;
     irq_phase = channel == 3 ? 0 : 29;
@@ -114,7 +129,12 @@ int main(int argc, char **argv)
     if (sndl_pump()) return 5;
     while (dma_frame < 132300) {
         if (dos) {
-            if (sndl_prime_slice()) return 6;
+            if (sndl_prime_slice()) {
+                costs();
+                fprintf(stderr, "DOS refill deadline\n");
+                return 6;
+            }
+            ++slices;
             advance(88); /* resume low memory and re-enter DOS */
             advance(441 - dma_frame % 441); /* next logical jiffy */
             advance(60); /* restore and drain */
@@ -123,6 +143,7 @@ int main(int argc, char **argv)
         }
         if (sndl_pump()) return 7;
     }
+    costs();
     printf("DMA#%u %s: underruns=%lu silent=%u max_gap=%.3f ms batches=%u\n",
            channel, dos ? "fmtone" : "soft", sink.underruns, silent, max_gap/44.1, batch);
     if (sink.underruns || silent || max_gap * 100000ULL >= 1741ULL * 44100) {

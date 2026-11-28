@@ -123,11 +123,13 @@ int sndl_voice_pos(u32 voice, u32 *buffer, u32 *play, u32 *gen)
     return 0;
 }
 
-static int pump(int draining)
+static int pump(int draining, const SND2_Pos *observed)
 {
     if (!refs) return OS32_ERR_INVAL;
     SND2_Pos pos;
-    int rc = sound_api->snd2_stream_pos(stream, &pos);
+    int rc = 0;
+    if (observed) pos = *observed;
+    else rc = sound_api->snd2_stream_pos(stream, &pos);
     if (rc) return rc;
     retire(pos.played);
     if (pos.state == SND2_ST_FAULTED) return OS32_ERR_IO;
@@ -141,6 +143,10 @@ static int pump(int draining)
         u32 tail = pos.played % pcm_period;
         space = space > tail ? space - tail : 0;
     }
+    /* During DOS refill, render the next period into the existing scratch
+     * buffer before retirement. A short write keeps the unpublished suffix. */
+    if (observed && !space && sent < buffered) return 0;
+    if (observed && space < pcm_period) space = pcm_period;
     struct SndlWindow window = {0};
     while (space) {
         if (sent == buffered) {
@@ -189,7 +195,7 @@ static int pump(int draining)
 
 int sndl_pump(void)
 {
-    return pump(0);
+    return pump(0, 0);
 }
 
 /* Budget in half milliseconds: a 10 ms jiffy, 3.5 ms to enter/return/drain,
@@ -212,7 +218,7 @@ int sndl_prime_slice(void)
         if (!waiting) started = pos.time_ms;
         waiting = 1;
         if (reserve > pos.cap || pos.time_ms - started >= 17) return OS32_ERR_AGAIN;
-        rc = pump(0);
+        rc = pump(0, &pos);
         if (rc) return rc;
     }
 }
@@ -230,7 +236,7 @@ int sndl_pcm_release(u32 how)
         /* A stopped queue or an unbounded loop needs an application decision. */
         if (!sndl_mix_can_drain()) return OS32_ERR_BUSY;
         while (sndl_mix_pending() || sent < buffered) {
-            int rc = pump(1);
+            int rc = pump(1, 0);
             if (rc == OS32_ERR_IO || rc == OS32_ERR_STALE) {
                 drain_error = rc;
                 how = SND2_CLOSE_ABORT;

@@ -41,7 +41,7 @@ PC-98 の V86 monitor が SOFT セッションに限り TSS I/O bitmap の 0188h
 
 ## FIFO から CS4231 まで
 
-仮想 FIFO は 32 KiB の byte リングとし、空／満、再生位置、閾値要求は monitor が所有する。経過時間×選択レートの整数剰余を保持し、完全な入力フレーム単位で消費する。停止中は進めず、形式やレート変更の直前に旧設定でその時刻まで進める。空なら無音とし残量を負にしない。満杯への書込み、閾値ちょうど、要求解除後の再発火、端数 byte の扱いは実 86 の短い I/O 列を基準に固定する。
+仮想 FIFO は 32 KiB の byte リングとし、空／満、再生位置、閾値要求は monitor が所有する。経過時間×選択レートの整数剰余を保持し、完全な入力フレーム単位で消費する。停止中は進めず、形式やレート変更の直前に旧設定でその時刻まで進める。空では残量を 0 に保つ。空時の DAC 出力、満杯への書込み、閾値ちょうど、要求解除後の再発火は末尾のユーザー決定に従い NP21/W 上のゲストから短い I/O 列で観測する。端数 byte の扱いは実 86 の短い I/O 列で確認する。
 
 monitor は消費した PCM と時刻付き FM イベントを順序付きでアプリに渡す。転送用キューとゲスト可視 FIFO は別に持ち、drain の頻度でゲストの残量を変えない。転送枠の不足は run の命令境界でアプリへ戻して解消する。既存 v86s_fm_drain のイベントに PCM byte を一個ずつ詰めると syscall とキューを圧迫するため、PCM は時刻・形式・長さを持つ一括転送を提案する。FM は 512 件（6 KiB）、PCM 転送列はまず一塊（ステレオ i16 で最大 1 KiB）で測る。公開 ABI の表現と採番は実装前レビュー事項。
 
@@ -73,7 +73,7 @@ PII 266 MHz で声数 1→3→6、SSG、FIFO、リズムを順に加え、各 pe
 
 1. NP21/W は req86 の**窓 2**（FM なし、WSS 単独、ini の表記は `SNDboard=60`）を選ぶ。PM は窓 2 の ini の写しを今回の試験名 `soft86-w2.ini` として明示的に `/isoft86-w2.ini` で起動し、実際の ini 名・値、像 SHA と媒体 CRC を収録に添える。保存済み 0188h・0288h の双方 ABSENT、WSS の BIOS INT5、実 stream open 成功、IRQ12・DMA #1 と played 増加を同じ起動で記録してから聴取する。0x64 は実 86 素通しの回帰窓。窓 2 の既存記録は wave の再生までで、冷間初回には underrun が一度ある。初回と再起動後の結果を別記する。[冷間起動の記録](../../tasks/DEFERRED_TESTS.md)
 2. CI 配布物の fmtone.img（RAW 77×2×8、1024 byte/sector）を使う。HostDrv 配備後、OS32 シェルで `v86 -b /host/test/fmtone.img` を実行する。FMTONE は先頭セクタから直接起動し、仮想 IRQ0 のベクタを設定する。通常の -b は FM_SOFT を指定して begin を試す。カーネルは保存 probe を読み、実音源・UNKNOWN・対象出力なしは資源取得前に NOSYS を返す。この戻りだけ従来の boot2 に進む。両 ABSENT の候補で begin が成功したら、アプリは最初の run より前に L3 のソフト OPNA と stream を開く。begin の BUSY や候補選択後の open 失敗はエラー終了し、取得済みの sid は end する。snd2 のユーザー設定値を probe の代用にしない。ゲストは sndl_test.c の左単音（algorithm 7、block 4、F-number 0269h）を基本 bank の byte OUT で設定する。28h=10h の後、仮想 IRQ0 の経過 tick をメモリで待ち、2 秒後に 28h=00h。待ちループ自体は I/O を行わない。消音を 1 秒保持して終了する。DOS 起動・終了、キーボードの既存経路を保つ。
-通常アプリのソフト OPNA でも、空きが複数 period のときは共通の合成時刻窓を保ち、残量が少なければ最初の 256 frames を確定し、余裕があれば最大 1024 frames をまとめて供給する。DOS へ戻る前は次の 10 ms、復帰・drain、最初の確定、DMA 位置の観測遅れ、128 frames のガードまでの残量を確保する。補充中もゲスト時計を進め、再入直前に満了した仮想要求を PIC の通常条件で配送する。初段の対象は IRQ0。後段の OPNA タイマと FIFO 閾値にも同じ時刻境界を使う。`sndl_test soft` は close 直前の underruns を表示し、0 以外は FAIL とする。
+通常アプリのソフト OPNA でも、空きが複数 period のときは共通の合成時刻窓を保ち、残量が少なければ最初の 256 frames を確定し、余裕があれば最大 1024 frames をまとめて供給する。DOS へ戻る前は次の 10 ms、復帰・drain、最初の確定、DMA 位置の観測遅れ、128 frames のガードまでの残量を確保する。次の period は退役待ちの間に既存バッファへ合成し、受理済みの末尾から供給を続ける。補充中もゲスト時計を進め、再入直前に満了した仮想要求を PIC の通常条件で配送する。初段の対象は IRQ0。後段の OPNA タイマと FIFO 閾値にも同じ時刻境界を使う。`sndl_test soft` は close 直前の underruns を表示し、0 以外は FAIL とする。
 
 3. v86_io.c の bitmap と実 OUT 入口で対象ポートを物理転送より先に消費し、index/data を Q1 に順番に渡す。v86.c は通常 tick 一回で VM の汎用・セグメントレジスタ、復帰 CS:EIP、SS:ESP、EFLAGS を保存して SLICE を返す。v86_session.c で同じ命令境界から再入し、終了・fault・取得途中失敗で bitmap と所有を戻す。kapi_v86s.c と v86_call.c は既存四口を dispatch。アプリは空の drain でも返却境界まで合成して既存 L3 を pump する。44.1 kHz、period 256、lead 3 を先に満たし、無 I/O 中も通常 tick（100 Hz で 10 ms）から次の供給完了までを含む供給間隔が 768 frames（17.41 ms）未満、underrun と未送信標本の欠落ゼロを実測する。SLICE 復帰時刻、drain の空振り・未処理数、供給時刻は kdebug 対部品で採る。V0 の採時・計数も同じ扱いとする。
 4. ホスト登録検査は保存 probe の両 ABSENT／実 86／UNKNOWN を入力し、自動選択と bitmap を照合する。SOFT の実 I/O 入口→run/drain→pump で音色列・key-on/off の通番、物理転送ゼロ、無 I/O の連続 SLICE 後の文脈と音の継続、正常終了・fault の各直後の bitmap 復元と stream 再取得を検証する。物理 OUT への落下、key-off 脱落、bitmap 復元漏れ、stream 解放漏れを各々変異にする。NP21/W は同一媒体を二回起動し、左単音約 2 秒→release 後の無音→再起動で再発音をライン収録と聴取で確認する。消音後の HLT で VM を抜ける。別試行で CTRL+STOP も確認する。終了境界まで残るイベントを drain・合成してから stream を drain close し、end で sid を返して同じコマンドを再実行する。ホストでは -b の分岐、BUSY／open 失敗で boot2 を呼ばないこと、各 SLICE の前後で PCM の物理 IRQ12 が有効なことも調べる。
@@ -104,11 +104,11 @@ Q1 と一括転送は u32 の at_us（約 71.6 分）・seq（毎秒 1 万件で
 
 対象 DOS ソフトごとに再生専用で足りるか、入力→発音の許容 ms、必要な最短タイマ周期と許容誤差を確認する。V0 の両起床源が成立しない場合の 100 Hz 制限、Ra266 未達時のレート・声数も判断を求める。118 の実 PCM 利用は既定要件である。
 
-## 資料から決める値と実機で決める値
+## 資料から決める値と観測で決める値
 
 手元の PC9800Bible「2-13 FM音源」冒頭と §2-13-3 は従来 OPN の範囲を明記し、基本 index/data、24h・25h の 10 bit Timer A、26h の 8 bit Timer B、27h の始動・フラグ制御を説明する。これを基本バンクの試験入力にする。OPNA 拡張と CSM の標本は既存ソフト OPNA と固定 fmgen の一致を回帰基準にし、物理割込み到着と DOS の許容遅延は別に測る。[合成器と参照標本](SYNTH_OPNA_DESIGN.md)
 
-A466h の bit 0 は選択レートの半周期ごとにゲスト時計で反転する LR クロック。A468h の bit 6 は録音方向、bit 5 は割込み許可。bit 4 に 0 を書くと要求を消し、続いて 1 を書いても要求は立たない。BSD ドライバの 0→1 を試験する。A46Ah は割込み禁止中に幅と左右を設定し、許可中は閾値を書く。既定は（値＋1）×128 byte。UNDOCUMENTED の値×128 byte との相違、等値／通過、ack 後の再発火は実機の 86 の計測で決める。32 KiB FIFO の 16 bit は符号付き上位 byte 先、ステレオは L→R、8 bit も符号付き。OPNA reg 0Eh の bit 7–6 は 11b（INT5、slave IR4、IRQ12）。NEC テクニカルデータブック p.263 の 26/K と FreeBSD の 86 ドライバが一致する。[NEC テクニカルデータブック](https://vtda.org/docs/computing/NEC/PC-9800TechnicalDataBookHARDWARE+OCR_1993.pdf)・[FreeBSD 4.11 pcm86.c](https://cgit.freebsd.org/src/tree/sys/i386/isa/sound/pcm86.c?h=release/4.11.0)・[OpenBSD nec86hw.c](https://github.com/openbsd/src/blob/master/sys/arch/luna88k/cbus/nec86hw.c)
+A466h の bit 0 は選択レートの半周期ごとにゲスト時計で反転する LR クロック。A468h の bit 6 は録音方向、bit 5 は割込み許可。bit 4 に 0 を書くと要求を消し、続いて 1 を書いても要求は立たない。BSD ドライバの 0→1 を試験する。A46Ah は割込み禁止中に幅と左右を設定し、許可中は閾値を書く。参照実装に基づく観測前の仮式は（値＋1）×128 byte。UNDOCUMENTED の値×128 byte との相違、等値／通過、ack 後の再発火は NP21/W の黒箱計測で決める。32 KiB FIFO の 16 bit は符号付き上位 byte 先、ステレオは L→R、8 bit も符号付き。OPNA reg 0Eh の bit 7–6 は 11b（INT5、slave IR4、IRQ12）。NEC テクニカルデータブック p.263 の 26/K と FreeBSD の 86 ドライバが一致する。[NEC テクニカルデータブック](https://vtda.org/docs/computing/NEC/PC-9800TechnicalDataBookHARDWARE+OCR_1993.pdf)・[FreeBSD 4.11 pcm86.c](https://cgit.freebsd.org/src/tree/sys/i386/isa/sound/pcm86.c?h=release/4.11.0)・[OpenBSD nec86hw.c](https://github.com/openbsd/src/blob/master/sys/arch/luna88k/cbus/nec86hw.c)
 
 分周 6、原振 7.9872 MHz の基準周期は tA = 144(1024−NA)/7.9872 MHz、tB = 2304(256−NB)/7.9872 MHz。ymfm と PMD の刻みに合わせる。YM2608 英訳の係数 72／1152 との差は実機の 86 の計測で決める。29h の IRQ 許可のリセット値は 1。27h の ENABLE と LOAD でタイマを動かし、29h に先に書かず満了時の線を調べる。[ymfm](https://github.com/aaronsgiles/ymfm/blob/main/src/ymfm_opn.cpp)
 
@@ -119,12 +119,12 @@ A466h の bit 0 は選択レートの半周期ごとにゲスト時計で反転�
 | 仕様 | 照合結果と実装前の判定 |
 |---|---|
 | 基本・拡張ポート／選択レート | NEC『PC-9800 シリーズ テクニカルデータブック HARDWARE』1993 p.266 は手元の本文未照合。86 ボードへの適用は仮説。 |
-| FIFO 容量・制御・閾値・IRQ | 手元の undocumented/io_sound.md 449–489、492–527、530–584、587–597 を確認。32 KiB と閾値単位 128 byte の二次資料。等値／通過、ack 後の再発火、満杯書込み、空時の DAC 出力はメーカー根拠と許諾範囲の実機列で確定する。 |
+| FIFO 容量・制御・閾値・IRQ | 手元の undocumented/io_sound.md 449–489、492–527、530–584、587–597 を確認。32 KiB と閾値単位 128 byte の二次資料。等値／通過、ack 後の再発火、満杯書込み、空時の DAC 出力は末尾の NP21/W 黒箱計測で確定する。 |
 | DSP・未定義ポート | 同 416–448 の対象機種を照合。A46Eh の機能は未照合。 |
 | YM2608 | 同 202–225、286–292 は status とレジスタの位置。タイマと IRQ 許可は上記の基準。86 の分周と CSM 順は実機で照合する。 |
 | CS4231A | 手元の docs/hw/crystal/cs4231a.txt 1492–1531、2248–2335 で I20/I21 と I24 の PI/TI を照合。共存時の現 handler の ack は V0 実測対象。FreeBSD stable/11 sys/dev/sound/isa/mss.c は参照候補で行番号・本文未照合。 |
 
-FreeBSD 4.11 pcm86.c 487、771–790、1876–1894 と OpenBSD nec86hw.c 841–846、986–1016 を参照。A460h bit 1 の切離し範囲、拡張マスク中の読み値、実レートは実機の 86 の計測で決める。各機能を製品へ載せる段でメーカー資料の該当箇所・適格実装の版／行／許諾と実機観測を項目別に記録し、矛盾・未確定項目は実装へ進めない。NP21/W はブラックボックスの入出力比較に限り、GPL のコード・構造を写さない。
+FreeBSD 4.11 pcm86.c 487、771–790、1876–1894 と OpenBSD nec86hw.c 841–846、986–1016 を参照。A460h bit 1 の切離し範囲、拡張マスク中の読み値は実機の 86 の計測で決める。実レートは NP21/W の黒箱計測で決める。各機能を製品へ載せる段でメーカー資料の該当箇所・適格実装の版／行／許諾と対象別の観測結果を項目別に記録し、矛盾・未確定項目は実装へ進めない。NP21/W はブラックボックスの入出力比較に限り、GPL のコード・構造を写さない。
 
 ## シングルタスクの棚卸し (2026-11-28)
 
@@ -140,7 +140,7 @@ FreeBSD 4.11 pcm86.c 487、771–790、1876–1894 と OpenBSD nec86hw.c 841–8
 
 ### 窓 2 の製品像で採る記録（PM の受入手順）
 
-1. FM 無し・WSS 有りの窓 2 で、製品像に対応する kernel.elf、kernel.map、v86.bin、各モジュールと設定を保存する。kdebug off で `v86 -b /host/test/fmtone.img` を実行し、終了・再実行を別々の窓として採る。SOFT の通常の区切りをまたいでも、ゲストに配送された論理 tick の上限は 1 セッションで 30,000。いずれかの起動パスが終端込み 64 byte の SOFT 引数に収まらない場合は、元の 2 パスで従来の起動口へ渡す。
+1. FM 無し・WSS 有りの窓 2 で、製品像に対応する kernel.elf、kernel.map、v86.bin、各モジュールと設定を保存する。kdebug off で `v86 -b /host/test/fmtone.img` を実行し、終了・再実行を別々の窓として採る。SOFT の通常の区切りをまたいでも、ゲストに配送された論理 tick の上限は 1 セッションで 30,000。VM 中と補充後のどちらも IRQ0 の注入確定時に一度数え、IF・IMR・ISR で保留中の要求は配送まで数えない。いずれかの起動パスが終端込み 64 byte の SOFT 引数に収まらない場合は、元の 2 パスで従来の起動口へ渡す。
 2. 出力の採取は [snd2 の受入手順](../../../tools/sound/snd2/README.md) の curl ループで、起動前から終了後まで `GET /api/sound?pcm=1` の生 JSON を保存する。各窓の s16le ステレオを `[frames_total - frames, frames_total)` に置く。44,100 Hz の連続区間で重複部分が同一、未収録 frame が 0 であることを確認する。HTTP の受信間隔は採時に使わない。左の発音・減衰・1 秒以上の無音と再発音を確認する。
 3. **ゲスト時間の採取口**はシンボル付きの窓 2 用 NP21/W（i386c のインタプリタ）に接続するホストデバッガ。対応するホスト実行ファイルの逆アセンブルで、`exec_1step` と `exec_allstep` のループ内の各ゲスト命令の実行直前を特定する。各経路で命令ごとに一度通る位置と PIT の `pic_setirq(0)` 呼出位置に自動継続のトレースポイントを置く。開始から終了まで通番、イベント種別、ゲスト CS:EIP、EFLAGS、CR3、必要なレジスタと次の時計をファイルに記録する。例として GDB の時計式は `(unsigned int)(i386core.s.clock + i386core.s.baseclock - i386core.s.remainclock)`、周波数は `pccore.realclock`。前後で周波数一定を確認し、隣り合う時計の unsigned 32 bit 差を 64 bit に累積する。µs は cycles × 1,000,000 / Hz、閾値との比較は丸める前に行う。ホストの停止時間を加算しない。本採取前に DMA 開始前から停止後までの短い試行で全命令を同期記録する。両経路を通ったことと、経路の切替前後で実行順（分岐先・割込み先を含む）がつながることを照合する。本採取でも各命令で同期停止し、保存が完了してから再開する。短い試行で連続性を確認できない場合、採取点の無効化・保存失敗があった場合は窓を無効にする。HTTP の /api/trace が返す CS:EIP の履歴だけではこの測定はできない。
 4. 対応 ELF を `i386-elf-objdump -dr` で逆アセンブルし、各採取点の命令番地を表に残す。カーネル CS と製品のロード番地を照合する。resume は v86s_run がカーネル PD に変更する直前から v86_enter 呼出直前まで。suspend は save_slice の先頭（インライン時はフレーム保存開始）、保存のない出口では v86_longjmp_out の先頭から、v86s_run が呼出元 CR3 を戻し終わるまで。run 番号ごとに開始と終了を組にする。IRQ0 は irq_stub_0 の入口から通常の割込み復帰または v86_exit_to_kernel 呼出直前までで最大を採る。IF=0 はゲスト命令境界の IF が落ちた時刻から立つまでをつなぎ、割込みゲート・IRETD・CR3 復元を含める。VM=1 の期間は OS32 の IF=0 から除外し、VM への出入りで区間を分ける。

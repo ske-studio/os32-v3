@@ -1,3 +1,4 @@
+#include "sys/platform/pc98/legacy/v86_pic.h"
 #include "idt.h"
 #include "sys/platform/pc98/legacy/v86_mem.h"
 #include "sys/platform/pc98/legacy/v86.h"
@@ -42,12 +43,32 @@ static int slicing;
 int v86_tick_and_check_timeout(void);
 void __real_v86_reflect_irq(u32 *frame, u32 irq);
 static unsigned suspended_ticks, expected_ticks;
-void v86_pic_request(u32 irq) { if (!irq && !v86_is_active()) ++suspended_ticks; }
-int v86_pic_candidate(u32 *vector) { return -1; }
-void v86_pic_commit(u32 irq) {}
+void __real_v86_pic_request(u32 irq);
+int __real_v86_pic_candidate(u32 *vector);
+static u16 guest_ivt[512] __attribute__((section(".guestdata"), aligned(16)));
+static u16 guest_stack[32] __attribute__((section(".guestdata"), aligned(16)));
+static int test_timer, check_resume_timer;
+void __wrap_v86_pic_request(u32 irq)
+{
+    if (!irq && !v86_is_active()) ++suspended_ticks;
+    __real_v86_pic_request(irq);
+}
+int __wrap_v86_pic_candidate(u32 *vector)
+{
+    int irq = __real_v86_pic_candidate(vector);
+    if (irq >= 0) *vector += (u32)guest_ivt / 4;
+    return irq;
+}
 void v86_enter(const struct v86_context *ctx)
 {
     require(suspended_ticks == expected_ticks, "foreground jiffy before VM");
+    if (check_resume_timer) {
+        require(ctx->eip == 0x123 && ctx->cs == 0x2000 && ctx->esp == 58 &&
+                ctx->eflags == EFLAGS_VM && guest_stack[29] == 0x456 &&
+                guest_stack[30] == 0x2100 && guest_stack[31] == EFLAGS_IF,
+                "foreground timer frame");
+        check_resume_timer = 0;
+    }
     if (write_tone) {
         write_tone = 0;
         guest_write(0x188, 0x28);
@@ -58,6 +79,10 @@ void v86_enter(const struct v86_context *ctx)
         u32 frame[V86I_GS + 1];
         for (unsigned i = 0; i <= V86I_GS; ++i) frame[i] = 0x100 + i;
         frame[V86I_EFLAGS] = EFLAGS_VM | EFLAGS_IF;
+        if (test_timer) {
+            frame[V86I_SS] = (u32)guest_stack >> 4;
+            frame[V86I_ESP] = sizeof guest_stack;
+        }
         __real_v86_reflect_irq(frame, 0);
         require(v86_tick_and_check_timeout(), "timer return");
     }
@@ -227,6 +252,7 @@ void _start(void)
         }
     }
     fixed_lines();
+    v86_pic_reset();
     struct v86_context ctx = {0};
     v86_session.open = slicing = 1;
     require(v86_run_slice(&ctx) == V86_EXIT_SLICE, "slice exit");
@@ -242,9 +268,39 @@ void _start(void)
         require(entered[i] == (i == V86I_EFLAGS ? EFLAGS_VM | EFLAGS_IF : 0x100 + i),
                 "resume register frame");
     }
-    for (unsigned ticks = 2; ticks < V86_TICK_LIMIT; ++ticks)
-        require(v86_run_slice(&ctx) == V86_EXIT_SLICE, "early slice timeout");
-    require(v86_run_slice(&ctx) == V86_EXIT_TIMEOUT, "session slice timeout");
+    require(!v86_session.ticks, "masked timer counted");
+    test_timer = 1;
+    v86_session.soft_input = 1;
+    v86_pic_set_imr(0, 0xfe);
+    guest_ivt[2 * 8] = 0x123;
+    guest_ivt[2 * 8 + 1] = 0x2000;
+    ctx.eflags &= ~EFLAGS_IF;
+    ++tick_count;
+    ++expected_ticks;
+    require(v86_run_slice(&ctx) == V86_EXIT_SLICE && v86_session.ticks == 1 &&
+            ctx.eip == 0x123 && ctx.cs == 0x2000 && !(ctx.eflags & EFLAGS_IF) &&
+            ctx.esp == sizeof guest_stack - 6 &&
+            guest_stack[29] == 0x108 && guest_stack[30] == 0x109 &&
+            guest_stack[31] == EFLAGS_IF, "VM timer frame");
+    ctx.eflags |= EFLAGS_IF;
+    ++tick_count;
+    ++expected_ticks;
+    require(v86_run_slice(&ctx) == V86_EXIT_SLICE && v86_session.ticks == 1,
+            "in-service timer counted");
+    v86_pic_out(0, 0x20);
+    ctx.eip = 0x456;
+    ctx.cs = 0x2100;
+    check_resume_timer = 1;
+    require(v86_run_slice(&ctx) == V86_EXIT_SLICE && v86_session.ticks == 2 &&
+            !check_resume_timer, "foreground timer once");
+    v86_pic_out(0, 0x20);
+    v86_session.ticks = V86_TICK_LIMIT - 1;
+    require(v86_run_slice(&ctx) == V86_EXIT_TIMEOUT &&
+            v86_session.ticks == V86_TICK_LIMIT && guest_stack[29] == 0x108 &&
+            guest_stack[30] == 0x109 && guest_stack[31] == EFLAGS_IF,
+            "session slice timeout");
+    v86_pic_reset();
+    v86_session.soft_input = test_timer = 0;
     slicing = 0;
     session(2);
     boot_probe.bank[0].model = boot_probe.bank[1].model = OPN_PROBE_ABSENT;

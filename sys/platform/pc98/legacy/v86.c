@@ -402,6 +402,12 @@ static int v86_deliver_pending(u32 *frame, int ip, int cs, int flags, int sp, in
     }
     v86_pic_commit(irq);
     ++v86_irq_n;
+    /* A cooperative session charges IRQ0 once, including a request held
+     * across a refill or delivered after the guest unmasks the PIC. */
+    if (slice_context && irq == 0 && ++v86_session.ticks >= v86_tick_limit) {
+        v86_exit_reason = V86_EXIT_TIMEOUT;
+        return 1;
+    }
     return 0;
 }
 
@@ -493,7 +499,7 @@ int v86_tick_and_check_timeout(void)
      * #GP ウォッチドッグの budget をここで戻す。 */
     v86_gp_since_tick = 0;
 
-    if (++v86_session.ticks >= v86_tick_limit) {
+    if (!slice_context && ++v86_session.ticks >= v86_tick_limit) {
         v86_exit_reason = V86_EXIT_TIMEOUT;
         return 1;
     }
