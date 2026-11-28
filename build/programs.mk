@@ -745,7 +745,7 @@ FORCE:
 # プログラムを追加したらこの一覧にも必ず足すこと。
 programs_base: $(CRT0_OBJ) $(BASE_PROGRAMS_BIN) $(BUILD_OUT)/int80.img $(BUILD_OUT)/fmtone.img
 
-$(BUILD_OUT)/fmtone.img: tests/sound/soft86_tone.asm
+$(BUILD_OUT)/fmtone.img: userland/diag/soft86_tone.asm
 	@mkdir -p $(@D)
 	$(AS) -f bin $< -o $@
 

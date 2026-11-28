@@ -1138,6 +1138,7 @@ OWN_COMPILE += userland/diag/shm_reuse_test.c|pc98
 OWN_COMPILE += userland/diag/shutdown_probe.c|pc98
 OWN_COMPILE += userland/diag/snd2_test.c|pc98
 OWN_COMPILE += userland/diag/sndl_test.c|pc98
+OWN_COMPILE += userland/diag/soft86_tone.asm|pc98
 OWN_COMPILE += userland/diag/sqlite_standalone/sqlite_standalone.c|pc98
 OWN_COMPILE += userland/diag/sqlite_standalone/sqlite_user_vfs.c|pc98
 OWN_COMPILE += userland/diag/stat_t.c|pc98

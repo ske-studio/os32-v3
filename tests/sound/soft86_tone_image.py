@@ -11,7 +11,7 @@ from tests.support.media import Failure, main
 def verify(config):
     with tempfile.TemporaryDirectory() as folder:
         image = Path(folder) / "fmtone.img"
-        subprocess.run(["nasm", "-f", "bin", "tests/sound/soft86_tone.asm",
+        subprocess.run(["nasm", "-f", "bin", "userland/diag/soft86_tone.asm",
                         "-o", image], check=True)
         program = image.read_bytes()
     if len(program) != 77*2*8*1024 or any(program[1024:]):
