@@ -340,6 +340,41 @@ static int test_provider(void)
     handler_owner = APP_ID_SHELL;
     if (!input_delivery_key(&snapshot, &key) || api.kbd_policy_key_read(&key_out, 1) != 1 ||
         api.kbd_policy_key_read(&key_out, 1)) return 25;
+    for (unsigned incoming = 0; incoming <= 1; ++incoming) {
+        for (unsigned i = 0; i < 128; ++i) {
+            key.time_ms = i;
+            key.action = KBD_POLICY_ACTION_NONE;
+            key.sc_down_repeat = KBD_POLICY_SC_DOWN;
+            if (i == 5 || i == 64) key.sc_down_repeat |= KBD_POLICY_SC_REPEAT;
+            if (!input_delivery_key(&snapshot, &key)) return 70;
+        }
+        key.sc_down_repeat = KBD_POLICY_SC_DOWN | KBD_POLICY_SC_REPEAT;
+        if (input_delivery_key(&snapshot, &key)) return 71;
+        key.sc_down_repeat = incoming ? KBD_POLICY_SC_DOWN : 0;
+        key.action = KBD_POLICY_ACTION_SWITCH_APP;
+        key.time_ms = 128;
+        if (!input_delivery_key(&snapshot, &key)) return 72;
+        for (unsigned i = 0; i <= 128; ++i) {
+            if (i == 5) continue;
+            if (api.kbd_policy_key_read(&key_out, 1) != 1 || key_out.time_ms != i ||
+                (i == 128 && (key_out.action != KBD_POLICY_ACTION_SWITCH_APP ||
+                              key_out.sc_down_repeat != key.sc_down_repeat)))
+                return 73;
+        }
+        if (api.kbd_policy_key_read(&key_out, 1)) return 74;
+    }
+    for (unsigned i = 0; i < 128; ++i) {
+        key.time_ms = i;
+        key.sc_down_repeat = i % 2 ? 0 : KBD_POLICY_SC_DOWN;
+        if (!input_delivery_key(&snapshot, &key)) return 75;
+    }
+    key.sc_down_repeat = KBD_POLICY_SC_DOWN | KBD_POLICY_SC_REPEAT;
+    if (input_delivery_key(&snapshot, &key)) return 76;
+    key.sc_down_repeat = KBD_POLICY_SC_DOWN;
+    if (input_delivery_key(&snapshot, &key)) return 77;
+    for (unsigned i = 0; i < 128; ++i)
+        if (api.kbd_policy_key_read(&key_out, 1) != 1 || key_out.time_ms != i)
+            return 78;
     handler_owner = 0;
     ring3_wm_depth = 0;
     caller = 1;

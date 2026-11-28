@@ -36,11 +36,30 @@ int input_delivery_action(const KbdPolicySnapshot *dst, const KbdPolicyAction *a
     return ok;
 }
 
+/* Keep the relative order of all surviving transitions, including across wrap. */
+static int key_room(const KbdPolicyKey *key)
+{
+    if (key_count < CAPACITY) return 1;
+    if (key->sc_down_repeat & KBD_POLICY_SC_REPEAT) return 0;
+    for (unsigned i = 0; i < key_count; ++i) {
+        if (!(keys[(key_head + i) % CAPACITY].sc_down_repeat & KBD_POLICY_SC_REPEAT))
+            continue;
+        while (i > 0) {
+            keys[(key_head + i) % CAPACITY] = keys[(key_head + i - 1) % CAPACITY];
+            --i;
+        }
+        key_head = (key_head + 1) % CAPACITY;
+        --key_count;
+        return 1;
+    }
+    return 0;
+}
+
 int input_delivery_key(const KbdPolicySnapshot *dst, const KbdPolicyKey *key)
 {
     unsigned irq = irq_save();
     int ok = key && current(dst) && key->map_generation == ikm_policy_generation() &&
-             key_count < CAPACITY;
+             key_room(key);
     if (ok) {
         keys[(key_head + key_count) % CAPACITY] = *key;
         ++key_count;
