@@ -210,6 +210,8 @@ if (old != down) {
 - PC-98 USB残り1E: (a)platform殻+試験≤350行、(b)PCI MMIO予約+resource結線+試験≤350、(c)早期EHCI静止+接続+試験≤300、(d)resident+試験≤300、(e)module+試験≤400、(f)tick登録+定義+試験≤250、(g)build/manifest各≤150、(h)usb_stat_get ABIをU1同様に別扱い。各1〜3ファイル、殻は2回に分けてもよい。
 - PC-98のDMA/PCI/tickはPPCのOF/TB実装を流用しない。BIOS EHCI引継ぎ/CF=0はOHCI段1から必要。新ハード設計をこの文書で追加せず、USB正典のRenesas S16265EJ5V0DS・FreeBSD ukbd.c:1102/1344・ums.c:218/592等の参照を継承する。
 
+修飾なしの単独キーに割り当てた SWITCH_APP は最初の make で切替を確定する。同じ押下の repeat と break は消費し、窓には配送しない。
+
 操作 ID の窓への通知は G の後の段で扱い、通知の形は未決とする。
 
 ## 8. 受入と変異（本回は計画のみ）
