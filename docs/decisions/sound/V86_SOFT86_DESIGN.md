@@ -68,12 +68,19 @@ AV §9-4/V0 に従い次期限に I20/I21 を arm する。PI と TI の同時 a
 
 PII 266 MHz で声数 1→3→6、SSG、FIFO、リズムを順に加え、各 period の trap・合成・pump cycles と各最大値、staging の供給時刻が HAL の補充期限に間に合ったかを記録する。欠音・期限超過ゼロ、pump 最大 768 frames、IRQ0 最大 200 µs、対象 HAL の IF=0 最大 1450 µs を要求する。既知波形で 8/16 bit の符号・byte 順、左右単独／両側、レート変更境界の位相継続を照合し、広い整数の加算後に一度だけ飽和した標本と一致させる。44.1 kHz 未達ならゲスト速度を保って 22.05 kHz で再測する。
 
+## 最初の DOS 聴取の実装と受入
+
+1. NP21/W は req86 の**窓 2**（FM なし、WSS 単独、ini の表記は `SNDboard=60`）を選ぶ。PM は窓 2 の ini の写しを今回の試験名 `soft86-w2.ini` として明示的に `/isoft86-w2.ini` で起動し、実際の ini 名・値、像 SHA と媒体 CRC を収録に添える。保存済み 0188h・0288h の双方 ABSENT、WSS の BIOS INT5、実 stream open 成功、IRQ12・DMA #1 と played 増加を同じ起動で記録してから聴取する。0x64 は実 86 素通しの回帰窓。窓 2 の既存記録は wave の再生までで、冷間初回には underrun が一度ある。初回と再起動後の結果を別記する。[冷間起動の記録](../../tasks/DEFERRED_TESTS.md)
+2. 実装する DOS 試験は `tests/sound/soft86_tone.asm`（NASM flat binary の COM）。DOS 起動媒体の写しに FMTONE.COM を入れ、AUTOEXEC.BAT で実行する。OS32 シェルから `v86 -b fmtone.fdi` でこの媒体を起動する。自動 SOFT 時だけ userland/cmds/v86.c が既存 begin/run/fm_drain/end を使う。実 FM なら従来の boot2 へ進む。ゲストは sndl_test.c の左単音（algorithm 7、block 4、F-number 0269h）を基本 bank の byte OUT で設定する。28h=10h の後、仮想 IRQ0 の経過 tick をメモリで待ち、2 秒後に 28h=00h。待ちループ自体は I/O を行わない。消音を 1 秒保持して終了する。DOS 起動・終了、キーボードの既存経路を保つ。
+3. v86_io.c の bitmap と実 OUT 入口で対象ポートを物理転送より先に消費し、index/data を Q1 に順番に渡す。v86.c は通常 tick 一回で VM の汎用・セグメントレジスタ、復帰 CS:EIP、SS:ESP、EFLAGS を保存して SLICE を返す。v86_session.c で同じ命令境界から再入し、終了・fault・取得途中失敗で bitmap と所有を戻す。kapi_v86s.c と v86_call.c は既存四口を dispatch。アプリは空の drain でも返却境界まで合成して既存 L3 を pump する。44.1 kHz、period 256、lead 3 を先に満たし、無 I/O 中も通常 tick（100 Hz で 10 ms）から次の供給完了までを含む供給間隔が 768 frames（17.41 ms）未満、underrun と未送信標本の欠落ゼロを実測する。SLICE 復帰時刻、drain の空振り・未処理数、供給時刻は kdebug 対部品で採る。V0 の採時・計数も同じ扱いとする。
+4. ホスト登録検査は保存 probe の両 ABSENT／実 86／UNKNOWN を入力し、自動選択と bitmap を照合する。SOFT の実 I/O 入口→run/drain→pump で音色列・key-on/off の通番、物理転送ゼロ、無 I/O の連続 SLICE 後の文脈と音の継続、正常終了・fault の各直後の bitmap 復元と stream 再取得を検証する。物理 OUT への落下、key-off 脱落、bitmap 復元漏れ、stream 解放漏れを各々変異にする。NP21/W は同一媒体を二回起動し、左単音約 2 秒→release 後の無音→再起動で再発音をライン収録と聴取で確認する。最終 key-off まで drain してから stream を閉じる。
+
 ## 依存順と先に赤にする検査
 
 | 段（製品行数の概算） | 入口で検証する差分 | 変更対象（新設予定を含む）と落とす変異 |
 |---|---| --- |
 | 最初の聴取（既存、NP21/W） | CS4231 が使える構成で診断コマンド `sndl_test soft` を実行。左の FM 単音を 2 秒聴き、右の 256 frames ごとの目印と PASS を確認する。実 FM を搭載した設定でもこのコマンドは SOFT を指定する。 | userland/diag/sndl_test.c。左の発音と右の目印を別々に収録する。 |
-| 最初の DOS の聴取（実装後、V2/V3/V5 と V6 の FM 出力部分） | 両ベース ABSENT・CS4231 利用可の構成で、短い DOS ゲストが byte OUT で上の音色を設定し key-on、通常の slice と pump を挟み key-off する。開始から消音まで耳で確かめ、終了後もう一度鳴らす。タイマ・CSM・FIFO を使わない曲に限る。NP21/W の 0x64 は 86+WSS なので自動 SOFT 選択の証拠には使えない。PCM 単独設定を用意できなければこの窓は Ra266 で採る。 | v86_io.c、V86 セッション、userland/cmds/v86.c。捕捉した OUT の物理転送ゼロ、key-off の取り落とし、close 後の再取得を検査。 |
+| 最初の DOS 聴取（Q1・L3 後、下記手順） | 窓 2 の PCM 単独機で自動 SOFT を選び、同じ DOS ゲストの発音・消音を二回収録する。通常 tick の SLICE を使う。 | V2 の byte OUT、V3 の文脈保存・drain・回収、V5 の既存四口、V6 の合成・pump だけを先行する。REP、IOREAD、期限起床、FIFO は後段。 |
 | V0 資料・実線測定 | 下記の未照合欄を埋める。I/O なし短周期、PI 単独、TI＋PI 同時で予定期限→検出→run 復帰→VM 再入→注入を実測し、上記の周期別予算と比較する。PI 単独では仮想要求ゼロ、同時 PI では補充完了を確認する。 | CS4231 の pcm_e4_diag.c と VM 復帰の診断対。PI を期限扱いする変異 |
 | 共通 IRQ/PIC（200–350） | 実 FM 反射と仮想要求で両 IMR、STI shadow、ICW2、片側 EOI、別要因残存、stack fault 時の IRR/ISR 不変を検査。 | v86_pic.c・v86.c。stack 検査前に IRR を消費 |
 | Q1（90、AV0 後） | FM 列の通番と満杯時の未発行を検査。 | snd2_fmq.c（予定）。満杯時にも seq を進める |

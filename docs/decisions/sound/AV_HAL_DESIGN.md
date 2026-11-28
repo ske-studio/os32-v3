@@ -766,8 +766,9 @@ u32 snd2_fmq_drain(SND2_FmQ *q, SND2_FmEv *out, u32 max);
 | R0b 試験 | fm-module-host: `fm_module_host.c (旧版 ebb56c5c8164)`・`fm_playback_host.c (旧版 bfd83acaad33)` の `_start()` は tick/MML に代えて raw FM・全キーオフ・静止を検証する | — | — | 試験 | IA | R0b |
 | R0b 試験 | v86-module-host: `test_v86_module.py (旧版 e92e6993bcde)` は新しい fm_all_off/ssg_all_off の exception 安全性を検証する | — | — | 試験 | IA | R0b |
 | R0c | §7-6 の表の userland・ビルドと配置・試験の行 (shell の beep・play、bench、raw_wait、gshell と host 試験、lib/snd・system の削除、libs.mk・sdk.mk・deploy.yaml・packages.yaml・checks/run.py、gui_demo、audit・kstr、tests/sound/ の CHECK と変異、README) | — | — | −900 / +80 | IA | R0a |
+| 最初の DOS 聴取 | v86_io.c の byte OUT・bitmap、v86.c の通常 SLICE 文脈保存、V3 の begin/run/drain/end と回収、V5 の既存四口、V6 の合成・pump。[窓 2 の DOS 試験・変異・受入](V86_SOFT86_DESIGN.md#最初の-dos-聴取の実装と受入) | Q1・L3 | 前景一セッション | V2/V3/V5/V6 の先行部分 | IL | Q1・L3（V0 と V1 の期限処理に依存しない） |
 | V0 | 資料の確認 (CS4231 の I20/I21 と PCM の IRQ の共存・PIT の one-shot)。結果を本書に追記、両方駄目ならユーザーに諮る | — | — | — | — | 照らし直し |
-| V1 | platform/pc98/legacy/v86_fm_timer.c (timer A/B・CSM・status の模型・仮想 IRQ の判定・pending の消去) | v86_pic_should_inject・Q1 | 模型 | 230 | IL | V0・Q1 |
+| V1 | platform/pc98/legacy/v86_fm_timer.c (timer A/B・CSM・status の模型・仮想 IRQ の判定・pending の消去) | v86_pic_should_inject・Q1 | 模型 | 230 | IL | Q1（偽時計）。期限起床との結線は V0 後 |
 | V2 | platform/pc98/legacy/v86_fm_io.c (+v86_io.c の bitmap の拒否と戻し・in/out の先頭の分岐 2 行、`v86_io_in2` の保留・reply・影の有効性) | V1・Q1 | latch・FIFO・reply | 260 | IL | V1 |
 | V3 | platform/pc98/legacy/v86_session.c (begin/run/end・ctx の書き戻し・IOREAD・SLICE・`v86_fm_session_end`) + v86_gp_emulate.inc の IN/OUT の幅 (opsize16・EAX・幅 4) と IN 4 形の保留 (EIP を進めない)・v86.c:265 の opsize16 の受け渡し・v86.c:503 の SOFT の分岐・run_limit の呼ぶ行 | V2 | セッション | 320 | IL | V2 |
 | V4 | drivers/sound/cs4231/pcm_timer.c (hw_timer_arm・解除・hw_timer_ack と IRQ の要因の分け) | — | 装置の内部 | 130 | IL | V0・IS |
