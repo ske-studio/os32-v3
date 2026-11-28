@@ -370,7 +370,11 @@ static int test_provider(void)
     }
     key.sc_down_repeat = KBD_POLICY_SC_DOWN | KBD_POLICY_SC_REPEAT;
     if (input_delivery_key(&snapshot, &key)) return 76;
-    key.sc_down_repeat = KBD_POLICY_SC_DOWN;
+    /* A plain Tab has no reserved seat among 128 unread transitions. */
+    key.action = KBD_POLICY_ACTION_NONE;
+    key.physical_mods = key.logical_mods = 0;
+    key.keycode = 15;
+    key.sc_down_repeat = 15 | KBD_POLICY_SC_DOWN;
     if (input_delivery_key(&snapshot, &key)) return 77;
     for (unsigned i = 0; i < 128; ++i)
         if (api.kbd_policy_key_read(&key_out, 1) != 1 || key_out.time_ms != i)

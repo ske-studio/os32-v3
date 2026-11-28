@@ -303,6 +303,7 @@ Key は native u32 の src_generation, map_id, keycode, sc_down_repeat, physical
 互換 scan が 0xff のキー（F13・F14 など）は、割り当てた操作と文字を WM で処理し、窓への物理 Key イベントは省く。
 
 Key リングが満杯なら、新しい repeat は捨てる。make または break が届いた時は、未読の最も古い repeat を一件取り除き、残りの順序を保って末尾に新しいイベントを積む。未読がすべて make・break なら既存の入力を保持し、新しい make・break の投入失敗は従来の LOST の扱いに従う。
+旧 raw が優先していた修飾なしの Tab も、WM が make・break を128件読み残した場合は LOST を許す。
 
 IKM1 はヘッダ16 B、version=2、行16 B、最大1024行。多バイト値は LE、最大16400 B。全行を一度ずつ読み、欠落値は OS 既定から補う。kind 6 の置換単位は profile。重複、予約 bit、異機種 profile、保留中の ACCENT と非零 accent_count は INVAL。押下中または他 owner が保存中なら BUSY。失敗時は active・保存先・世代を維持する。終了・異常・STOP は同じ owner/exec_gen の ikm_policy_owner_exit で復元する。kind 5/6 は合計16行まで。編成結果が一面の容量を超えれば INVAL、交換も初回保存もしない。既定表を const で共有し、各面には最大1024件の明示差分だけを置く。差分列3113 B（3 × 1024 + 31 + 10）、64件ごとの索引16個 × 8 B、管理9 B と整列を含めて一面3256 B、active・編成中・復帰先の三面で9768 B を上限とし、圧縮像・BSS の増分を両機種で実測する。
 IKM は OS 既定からの差分 profile。2026-11-28 のユーザー決定で行の上限を下げ、PM は1機種の全128キーを8通りの修飾・文脈で置換できる1024行（16 + 1024 × 16 = 16400 B）を基準とした。
