@@ -455,6 +455,7 @@ expect = "両ベースの判定、開放バスと A460h の識別 ID の整合�
 limits = "ポート模型。実機配線とゲスト演奏は S4"
 gates = ["push", "main"]
 mutations = [
+ { id = "118_fifo", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "if (board == 4 && inp", new = "if ((board == 4 || board == 8) && inp", fail = "118 FIFO access" },
  { id = "touch_26k_irq_reg", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "!opn_only && !write_reg", new = "!write_reg", fail = "26K OPNA register" },
  { id = "reject_cs4231_only", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "board == 7 || board == 15", new = "board == 15", fail = "CS4231-only open bus" },
  { id = "accept_fm_board", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "board == 7 || board == 15", new = "board == 5 || board == 7 || board == 15", fail = "FM board open bus" },

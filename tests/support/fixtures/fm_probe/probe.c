@@ -217,6 +217,14 @@ void _start(void)
     require(!start() && registered == OPN_PROBE_OPNA && boot_probe.bank[0].chip_id == 1 &&
             boot_probe.bank[0].chip_id_port == 0x18a && boot_probe.feature_id == feature &&
             boot_probe.feature_port == 0xa460 && boot_probe.fifo_port == 0xa468, "verified IDs");
+    reset();
+    status = 0;
+    id = 1;
+    feature = 0x81;
+    require(!start() && registered == OPN_PROBE_OPNA &&
+            boot_probe.feature_port == 0xa460 && boot_probe.feature_id == feature,
+            "118 feature ID");
+    require(!fifo_reads && !boot_probe.fifo_port, "118 FIFO access");
     require(fm_quiesce(&module) && fm_detach(&module), "lifecycle");
     reads = writes = 0;
     require(!start() && registered == OPN_PROBE_OPNA && !reads && !writes, "reattach");
