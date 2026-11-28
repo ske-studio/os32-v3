@@ -11,6 +11,8 @@ description: OS32 の KernelAPI (KAPI) を追加・変更するときに使う�
 
 ## 前提の確認
 
+- **OS32 はシングルタスク (前景 1 本・協調切替)**: KAPI の口・引数・表の大きさはシングルタスクに見合う物にする。複数の前景の同時呼び出し・悪意の呼び出し元を前提にした引数・権限・ロックを足さない (引数の明らかな誤りの確かめは残す、[POLICY_DEV](../../../docs/POLICY_DEV.md) §10)。
+
 - `sdk/kapi.json` が唯一の真実 ([ABI])。`os32_kapi_generated.h` / `kapi_generated.c` /
   `exec_kapi_init.inc` / `kapi_generated.rs` / `os32_kapi_slots.h` は**生成物**で、手編集しない。
 - 追加は **`api` 配列の末尾だけ** ([ABI])。並べ替え・削除は配備済みバイナリの ABI を壊す。
