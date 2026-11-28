@@ -1303,8 +1303,10 @@ v46 はそれを**カーネル内の 8KB のリング (シンク)** に溜め、
   グループ 0 のルートが収まる長さへ切り下げ、上限 32 グループ = 256MiB、超えれば
   `EXT2_ERR_NOSPC`)。既存の `ext2_format` は区画表の OS32 区画を探し (無ければ
   `EXT2_ERR_NOPART` = -13)、区画の長さと 32 グループ (524,290 セクタ) で頭打ちにする
-  (断らない)。区画の位置を **BIOS 幾何で**決められなかった (IDENTIFY に落ちた) ときは
-  書かずに `EXT2_ERR_INVAL` (読むだけのマウントは IDENTIFY でも通る)。
+  (断らない)。区画の位置を **BIOS 幾何で**決められなかった (IDENTIFY に落ちた)・旧配置・OS32 区画なしは
+  書かずに `EXT2_ERR_NOPART`、OS32 区画の範囲が壊れていれば `EXT2_ERR_INVAL` (読むだけのマウントは IDENTIFY でも通る)。
+  正規の HD 0〜3 が mount 中 (ルート・別名も数える) なら区画表を読む前に `EXT2_ERR_BUSY` (-17)。
+  許可 (`exec_disk_write_allowed`) が無ければ従来どおり装置を呼ばず -1。両機種で同じ (EXT2_MEDIUM_RESOLVE_DESIGN §11)。
 - **`dev_mount_count`** — `hd<drv>` を指す VFS のマウントの数 (どの prefix でも、
   ルートも数える)。`drv` が 0〜3 の外なら `OS32_ERR_INVAL`。ルートかどうかは
   `vfs_devname("/")` で見る。
