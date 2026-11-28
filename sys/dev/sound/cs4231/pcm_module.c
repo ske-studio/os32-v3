@@ -30,6 +30,23 @@ static void (*tick_target)(void);
 static irq_handler_fn irq_target;
 static unsigned int irq_line;
 
+#ifdef TICK_PROBE
+#include "platform_pic.h"
+#include "kernel_tick.h"
+extern int res_owner_get(void);
+static int diag_window;
+static irq_handler_fn registered_handler;
+static volatile unsigned diag_ack;
+
+static int pcm_diag_irq(unsigned irq, void *arg)
+{
+    int playing = candidate.state() == PCM_ST_RUNNING;
+    int rc = irq_target(irq, arg);
+    if (playing && rc == IRQ_HANDLED && !(inp(PCM_PORT_R2) & 1)) ++diag_ack;
+    return rc;
+}
+#endif
+
 static const Snd2Stream *refill_stream;
 
 /* Earliest possible boundary from a verified DMA movement. A PIT IRQ
@@ -94,6 +111,9 @@ int pcm_module_irq_register(unsigned int irq, irq_handler_fn fn, void *arg, unsi
 #ifdef PCM_E4_DIAG
         pcm_e4_attach(fn);
         rc = irq_register(irq, pcm_e4_irq, arg, flags);
+#elif defined(TICK_PROBE)
+        registered_handler = diag_window ? pcm_diag_irq : fn;
+        rc = irq_register(irq, registered_handler, arg, flags);
 #else
         rc = irq_register(irq, fn, arg, flags);
 #endif
@@ -110,6 +130,8 @@ int pcm_module_irq_unregister(unsigned int irq, irq_handler_fn fn, void *arg)
     unsigned int saved = irq_save();
 #ifdef PCM_E4_DIAG
     int rc = irq_unregister(irq, pcm_e4_irq, arg);
+#elif defined(TICK_PROBE)
+    int rc = irq_unregister(irq, registered_handler, arg);
 #else
     int rc = irq_unregister(irq, fn, arg);
 #endif
@@ -263,3 +285,60 @@ int pcm_module_load(void)
 }
 
 int pcm_module_abort(void) { return module_abort(pcm_handle); }
+
+#ifdef TICK_PROBE
+/* The released line means both FM banks were absent at boot. The module
+ * alone owns the WSS IRQ and DMA during this foreground window. */
+int pcm_diag_wss_irq(void)
+{
+    if (res_owner_get() <= 0) return OS32_ERR_INVAL;
+    int idx = irq_dyn_index(PCM_IRQ);
+    if (idx < 0 || pcm_irq_line != PCM_IRQ || !module_exports(pcm_handle))
+        return OS32_ERR_NOTFOUND;
+    if (irq_lines[idx].count || irq_lines[idx].quarantined ||
+        irq_lines[idx].storm_masked || pcm_quarantined || pcm_state() != PCM_ST_CLOSED)
+        return OS32_ERR_BUSY;
+    if ((u8)inp(PCM_PORT_ROUTE) != bios_route) return OS32_ERR_IO;
+    unsigned bit = 1u << (PCM_IRQ & PIC_IRQ_MASK);
+    unsigned masked = inp(PIC2_DATA) & bit;
+    diag_ack = 0;
+    diag_window = 1;
+    int rc = candidate.open(PCM_RATE_44100);
+    if (!rc) {
+        static const u32 silence[64];
+        for (unsigned frames = 0; frames < PCM_RING_FRAMES; frames += 64) {
+            if (candidate.write(silence, sizeof(silence)) != sizeof(silence)) {
+                rc = OS32_ERR_IO;
+                break;
+            }
+        }
+        u32 begin = tick_count;
+        while (!rc && !diag_ack && tick_count - begin < 2 * PIT_HZ) _halt();
+        int observed = diag_ack != 0;
+        int closed = candidate.close();
+        if (closed) rc = closed;
+        else if (!observed) rc = OS32_ERR_IO;
+    }
+    unsigned flags = irq_save();
+    if (pcm_quarantined || irq_lines[idx].count || pcm_state() != PCM_ST_CLOSED ||
+        (u8)inp(PCM_PORT_ROUTE) != bios_route) {
+        irq_quarantine_line(PCM_IRQ);
+        rc = OS32_ERR_IO;
+    } else if (!irq_lines[idx].storm_masked && !irq_lines[idx].quarantined) {
+        if ((inp(PIC2_DATA) & bit) != masked) {
+            if (masked) platform_irq_mask(PCM_IRQ);
+            else platform_irq_unmask(PCM_IRQ);
+        }
+        if ((inp(PIC2_DATA) & bit) != masked) {
+            irq_quarantine_line(PCM_IRQ);
+            rc = OS32_ERR_IO;
+        }
+    } else {
+        irq_quarantine_line(PCM_IRQ);
+        rc = OS32_ERR_IO;
+    }
+    diag_window = 0;
+    irq_restore(flags);
+    return rc;
+}
+#endif

@@ -3,6 +3,7 @@
 #define TICK_PROBE_H
 #define TP_BINS 16
 #define TP_OP 21U
+#define TP_WSS_IRQ 0x545002U
 #define TP_FM_SETTING 0x545001U
 #define TP_CONTROL 0x545000U
 #include "tick_probe_ids.h"

@@ -525,10 +525,13 @@ sources = ["sys/platform/pc98/kernel.c", "sys/platform/pc98/kernel_boot_memory.i
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "通常起動で FM の判定後に DMA が使える場合にだけ PCM をロード"
+expect = "通常起動で FM の判定後に DMA が使える場合にだけ PCM をロード。WSS 単独窓で IRQ 側 ack、IMR 復元と失敗時隔離を確認"
 limits = "通常起動の音源呼出部と常駐判定を実行。FM 判定・I/O・部品登録は模型"
 gates = ["push", "main"]
 mutations = [
+ { id = "count_prestart_pi", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_module.c", old = "if (playing && rc == IRQ_HANDLED", new = "if (rc == IRQ_HANDLED", fail = "WSS diagnostic window" },
+ { id = "wss_stuck_int", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_module.c", old = "rc == IRQ_HANDLED && !(inp(PCM_PORT_R2) & 1)", new = "rc == IRQ_HANDLED", fail = "WSS diagnostic window" },
+ { id = "wss_restore_failed_stop", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_module.c", old = "(u8)inp(PCM_PORT_ROUTE) != bios_route) {\n        irq_quarantine_line(PCM_IRQ);", new = "(u8)inp(PCM_PORT_ROUTE) != bios_route) {\n        platform_irq_unmask(PCM_IRQ);", fail = "WSS diagnostic window" },
  { id = "dma_gate", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kernel.c", old = "if (memory_boot_dma_available()) {", new = "if (1) {", fail = "PCM boot DMA gate" },
  { id = "reject_fm", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_module.c", old = "if (pcm_quarantined)", new = "if (platform_irq_reserved(PCM_IRQ)) return \"FM\"; if (pcm_quarantined)", fail = "PCM boot admission" }]
 
