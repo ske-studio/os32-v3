@@ -336,6 +336,8 @@ slot commit 後は既存順で shell lease publish／親 syscall suspend、AV fo
 
 表交換・GUI 焦点交代（同 owner の別窓を含む）では旧 pending と compose を破棄し、旧窓への成功済み押下だけを清算する。消費済み make の break は同じ source の解放まで抑止。G は provider の初期化成功を確認した場合だけ WM pump を切り替える。失敗時は旧 raw・退避を清算せず旧 pump の通常 GUI 配送を続ける。成功時は切替境界で旧 raw・退避を清算してから通常配送の消費口を Key に一本化する。独占制御用 raw は通常配送へ戻さない。
 
+前景アプリ自身の set/reset が成功した場合も、旧 raw なら同じ窓に届いていた表交換前の未配送 Key を破棄する。
+
 ### 10.3 登録検査を先行させる
 
 現行の hal_contracts は HAL 登録、kapi_abi / kapi_sync は表順・生成同期を測る。独占時の配送件数と順序は追加登録で観測する。実装の最初の候補を下表の R とし、各 ID に tests/registry.toml の spec・sources・expect・limits・mutations と host 本体を対で置く。正典は本節と 7d §5。歴史的な PPC NOSYS の期待は現在の両機種 acquire 成功へ更新する。

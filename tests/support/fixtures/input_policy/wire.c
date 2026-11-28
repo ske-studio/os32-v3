@@ -382,6 +382,18 @@ static int test_provider(void)
     handler_owner = 0;
     ring3_wm_depth = 0;
     caller = 1;
+    /* The same foreground publishes a table before the WM polls. */
+    for (unsigned reset = 0; reset < 2; ++reset) {
+        key.map_generation = ikm_policy_generation();
+        key.keycode = 0x1d;
+        key.sc_down_repeat = key.keycode | KBD_POLICY_SC_DOWN;
+        if (!input_delivery_key(&snapshot, &key)) return 79;
+        key.sc_down_repeat = key.keycode;
+        if (!input_delivery_key(&snapshot, &key)) return 79;
+        if (reset ? api.kbd_policy_reset() : api.kbd_policy_set(base, sizeof base))
+            return 80;
+        if (api.kbd_policy_key_read(&key_out, 1) != 0) return 81;
+    }
     if (input_context_owner_select(2, 2) || input_delivery_action(&snapshot, &action))
         return 12;
     return 0;
