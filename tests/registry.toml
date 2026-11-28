@@ -562,7 +562,7 @@ mutations = [
 
 [[check]]
 id = "ppc_link_session"
-ppc_seconds = { link-sh = 713 }
+ppc_seconds = { link-sh = 576 }
 spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "段 12 F/5d 常駐シェル切替" }
 subsystem = "system"
 level = "L4"
@@ -2497,6 +2497,7 @@ mutations = [
 
 [[check]]
 id = "shell_switch_gate"
+ppc_seconds = { link-sh = 5 }
 spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "段 12 F/5d 常駐シェル切替" }
 subsystem = "system"
 level = "L1"
