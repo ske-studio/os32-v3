@@ -336,3 +336,15 @@ IMAGE=powermac の common-compile が選択する各入力に対し、製品出�
 
 - `tests/support/fixtures/input_policy/include` の stdio.h と string.h は、`tests/input/input_policy_abi.py` の failure_probe だけが探索し、両 ABI で共有する。
 - `build/ppc-user.mk` は、USER sh のオブジェクト列に利用者のない個別の ls.o 規則も汎用規則と一緒に撤去する。
+
+### 段 11 E6 遠隔シェルと SFS
+
+tests/system/ppc_link_session.py の exercise は「PowerMac の遠隔シェル」(docs/design/tools/checks/tests_v2.md) の各観測を終え、同じ VM と peer で SFS を試す。7450・7455 の early・late とも、マウント済みの一行で子が一度開始し、sys/fs/serialfs/serialfs_session.c の serialfs_session_end が OUT に終了 7 を出す。元の CWD に戻り次の scope が開くこと、fault の後も次の子が走ることを確認する。最後に /host を外し、マウント表からの消失と userland/shell/rshell.c の rsh_lan_execute による拒否、子の出力がないことを確認する。
+tests/support/ppc_fixture.py の link_media が verify ごとに常駐 shell・root・起動媒体を隔離ビルドする。変異 sfs_end は sfs_run_child の end 呼出しを省き、既存の三変異の判定後に終了行の欠落で失敗する。
+
+段 11 の実装で設計者が決めたこと
+
+- userland/ppc/hello.c の hello scope を開始マーカーにし、CWD は /bin とする。
+- 二度目の umount がマウント表を照会して返す未マウント診断で消失を確認する。
+- 正常と sfs_end の shell.elf・root-input.iso・boot.iso の SHA-256 を ppc_link_session の CI 受入ログに記録する。
+- registry の重みは手元の実測 (正常 183.4 秒 + 変異 4 本 522.8 秒) の切り上げ 707 秒を暫定とし、hosted の成功 attempt の集計で置き換える。正常と全変異の合計が 900 秒を超えれば SFS の場面を別 ID に分ける。
