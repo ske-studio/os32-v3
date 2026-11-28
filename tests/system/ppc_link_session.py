@@ -1,5 +1,6 @@
 """PowerMac resident remote shell, with early and late host agents."""
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -16,7 +17,7 @@ from tests.support.ppc_vm import guest, guest_args
 from host_rshell import EXECUTE, RSHELL
 
 FAULTS = {"duplicate PRINT payload", "reader retained after owner exit",
-          "resident fault without new generation"}
+          "resident fault without new generation", "SFS end missing after exit 7"}
 
 
 def check(condition, reason):
@@ -194,6 +195,50 @@ def exercise(vm, op, late):
         check(len(observations) == 1, "multiple mutation signatures")
         raise Failure(observations[0])
 
+    # The three resident-shell mutations have already returned their own verdict.
+    command("cd /bin", b"")
+    # The CWD spelling (e.g. a trailing slash) belongs to the VFS; the scope only has to restore it.
+    cwd = command("pwd")
+    check(cwd.rstrip(b"\n").rstrip(b"/") == b"/bin", "cd /bin did not take effect")
+    def hello_scope():
+        lines = command("sfs run /bin/hello.bin scope").splitlines()
+        check(sum(line.startswith(b"sfs: transport=lan ") for line in lines) == 1,
+              "SFS scope did not begin")
+        check(lines.count(b"hello scope") == 1, "SFS child start count")
+        command("echo $?", b"7\n")
+        check(b"sfs: exit=7" in lines, "SFS end missing after exit 7")
+        check(lines.count(b"sfs: exit=7") == 1, "duplicate SFS end")
+        command("pwd", cwd)
+
+    hello_scope()
+    # A scope that moves the CWD must hand the original one back (sfs_restore_cwd in rshell.c).
+    moved = command("sfs run cd /").splitlines()
+    check(b"sfs: exit=0" in moved, "SFS cd scope completion")
+    command("pwd", cwd)
+    fault_lines = command("sfs run /bin/fault.bin").splitlines()
+    check(b"sfs: exit=139" in fault_lines, "SFS fault scope completion")
+    hello_scope()
+    command("umount /host", b"")
+    # cmd_umount queries the VFS mount table before attempting removal.
+    check(b"not mounted" in command("umount /host"), "/host still mounted")
+    refused = command("sfs run /bin/hello.bin scope")
+    check(b"requires --sfs-lan" in refused, "SFS LAN entry did not refuse without /host")
+    check(b"hello scope" not in refused, "SFS child started without /host")
+
+    if not late:
+        offset = serial.stat().st_size
+        previous = word("g_shell_service", 8)
+        op.submit("s12-switch", limit(10))
+        wait(lambda: serial.read_bytes()[offset:].count(b"/bin/second.bin returned 12") >= 2,
+             20, "second resident did not exit twice")
+        check(point(6, (0, 0, 0, 0, 0))[3] == previous, "switch retirement generation")
+        check(word("switch_service_inactive") == 1, "old shell service was not retired")
+        for index in (7, 8):
+            entry = point(index, (1, 0, 1, 1, 0))
+            check(entry[3] > previous and entry[9:] == resident[9:], "second resident identity")
+            previous = entry[3]
+        check(vm.screen(vm.deadline).count("S12 second resident") >= 2, "second startup markers")
+
 
 def boot(cpu, case, media, version, scenario=exercise, seconds=180, usb_device="usb-kbd,id=kbd"):
     iso, metadata = media
@@ -222,7 +267,11 @@ def boot(cpu, case, media, version, scenario=exercise, seconds=180, usb_device="
 
 
 def verify():
-    media = link_media()
+    media = link_media(switch=True)
+    directory = media[0].parent
+    files = (directory / "user/shell.elf", directory / "second/shell.bin", directory / "root-input.iso", media[0])
+    print("SFS media sha256 " + json.dumps({p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                                            for p in files}), flush=True)
     version = subprocess.check_output(["qemu-system-ppc", "--version"], text=True)
     results = []
     with ThreadPoolExecutor(2) as pool:

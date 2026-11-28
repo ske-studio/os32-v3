@@ -299,6 +299,10 @@ def execute(candidate, row, cpu, config, mutations, env, log, outcomes, destinat
                     shutil.copy2(target, saved)
                     mutate(tree, m)
                     proc = verify(subprocess.PIPE)
+                    if row["id"] == "ppc_link_session" and m["id"] == "sfs_end":
+                        for line in proc.stdout.splitlines():
+                            if line.startswith("SFS media sha256 "):
+                                print(m["id"], line, file=log)
                     detected = proc.returncode == 1 and m["fail"] in proc.stdout
                     result = "RED" if detected else state(proc.returncode)
                     if result in ("PASS", "FAIL"):
