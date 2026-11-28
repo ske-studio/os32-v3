@@ -1,3 +1,4 @@
+#include "sys/hal/input/input_work.h"
 #include "in2_int.h"
 #include "io.h"
 #include "kbd.h"
@@ -54,6 +55,8 @@ volatile u8 kbd_shift_state;
 
 void input_native_locks(u8 src, u8 mods)
 {
+    if (mechanical[src - 1] != (mods & (SHIFT_CAPS | SHIFT_KANA)))
+        input_work_invalidate_locked();
     mechanical[src - 1] = mods & (SHIFT_CAPS | SHIFT_KANA);
     boot_locks[src - 1] = mechanical[src - 1];
     kbd_shift_state = input_key_mods();
@@ -111,13 +114,14 @@ int input_capture_ime(const KmKey *key, u8 old, const KmEvalResult *result)
 
 #endif
 
-int input_capture_delivery(const KmKey *key, u8 old, const KmEvalResult *result, u8 raw_due)
+int input_capture_delivery(const KmKey *key, u8 old, const KmEvalResult *result,
+                           u8 raw_due, u8 mods)
 {
     u8 *held_byte = &suppressed[key->src - 1][key->keycode >> 3];
     u8 bit = 1u << (key->keycode & 7);
     if (legacy_active()) return 1;
     if (kbd_gui_mode) {
-        input_emit_keymap(result, key->down, raw_due, kbd_shift_state, 0);
+        input_emit_keymap(result, key->down, raw_due, mods, 0);
         return 1;
     }
     if ((*held_byte & bit) || (result->compat_sc == KEY_STOP && input_key_pressed(KEY_CTRL)))
@@ -130,6 +134,8 @@ int input_capture_delivery(const KmKey *key, u8 old, const KmEvalResult *result,
 void input_merge_key(InputEvent *e, u8 old, u8 origin)
 {
     u8 sc = e->sc, down = e->down;
+    if (down || (old && (sc == KEY_SHIFT || sc == KEY_CTRL || sc == KEY_GRPH ||
+                         sc == KEY_CAPS || sc == KEY_KANA))) input_work_invalidate_locked();
     set_held(e->src, sc, down);
     u8 bit = sc == KEY_CAPS ? SHIFT_CAPS : sc == KEY_KANA ? SHIFT_KANA : 0;
     if (origin == INPUT_ORIGIN_NATIVE) {
@@ -178,6 +184,8 @@ int input_capture_key(const KmKey *key)
     old = input_held_key(key->src, key->keycode);
     if (key->repeat && (!key->down || !old)) goto out;
     capture_state(&state);
+    KmState prior = state;
+    u8 prior_mods = kbd_shift_state;
     if (km_eval(source.map, key->keycode, &state, &before)) goto out;
     if (origin == INPUT_ORIGIN_NATIVE && key->keycode == KEY_KANA)
         before.effect |= KM_LOCK_KANA;
@@ -212,6 +220,22 @@ int input_capture_key(const KmKey *key)
     if (!legacy_active() && sc < 128 && old != key->down) input_emit_in2(&e);
     u8 raw_due = sc < 128 && (key->down || cnt[sc] == 0) &&
                  (old != key->down || key->down);
+    /* A new HID target supersedes the previous one even when its selected
+     * level is void. Nonrepeating makes also take precedence at a legacy exit. */
+    int newer_make = key->down && !key->repeat &&
+        (source.map->id != KM_MAP_HID || km_hid_repeatable(source.map, key->keycode) ||
+         raw_due || kbd_gui_mode || result.sym < 128 || result.action);
+    if (newer_make || (old != key->down && before.is_modifier) ||
+        prior_mods != kbd_shift_state || prior.mods != state.mods || prior.locks != state.locks)
+        input_work_invalidate_locked();
+    else if (!key->down)
+        input_work_release_locked(key->src, key->keycode);
+    if (origin == INPUT_ORIGIN_USB && key->repeat &&
+        (legacy_active() || input_work_repeat_locked(key, old, &result, raw_due,
+             kbd_shift_state, state, was_consumed, e.time_ms))) {
+        rc = 0;
+        goto out;
+    }
     if (kbd_gui_mode && !legacy_active() && (raw_due || (sc == 0xff && (key->down || old))) &&
         !in2_excl_drop_raw(sc, !key->down) &&
         (sc == 0xff || !legacy_stop_filter(sc, !key->down, kbd_shift_state))) {
@@ -220,7 +244,7 @@ int input_capture_key(const KmKey *key)
             *consumed |= bit;
     }
     km_legacy_compat(&result);
-    if (!input_capture_delivery(key, old, &result, raw_due)) {
+    if (!input_capture_delivery(key, old, &result, raw_due, kbd_shift_state)) {
         if (!old && ikm_capture_terminal(key, source.map->id, state.mods, &result, e.time_ms))
             *consumed |= bit;
         else
@@ -235,10 +259,12 @@ out:
 void km_release_keys(u8 src, u16 generation)
 {
     KmSource source;
+    u8 kind, origin;
+    if (!input_src_info(src, generation, &kind, &origin) || kind != INPUT_KIND_KBD) return;
+    input_work_release_locked(src, -1);
+    if (boot_locks[src - 1]) input_work_invalidate_locked();
     if (km_source_lookup(src, generation, &source)) {
-        u8 kind, origin;
-        if (input_src_info(src, generation, &kind, &origin) && kind == INPUT_KIND_KBD)
-            boot_locks[src - 1] = 0;
+        boot_locks[src - 1] = 0;
         return;
     }
     km_state_cancel_tap(src, generation);

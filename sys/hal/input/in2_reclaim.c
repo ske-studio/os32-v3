@@ -1,10 +1,12 @@
 #include "av_contract.h"
 #include "in2_int.h"
+#include "input_work.h"
 #include "io.h"
 
 static void clear_input(void)
 {
     i32 x, y;
+    input_work_invalidate_locked();
     in2_ring_clear();
     mouse_ext_read(&x, &y);
     mouse_ext_read_wheel();

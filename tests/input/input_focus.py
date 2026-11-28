@@ -27,7 +27,7 @@ def verify(config):
                             "-I" + str(fixture), "-I.", "-Isys/include", "-Isys/hal/input",
                             "-Isdk/include/os32", *selected, "-Wl,--wrap=input_key_pressed",
                              "sys/hal/input/in2_excl.c", "sys/hal/input/in2_reclaim.c",
-                            "sys/hal/input/legacy_ring.c", "sys/hal/input/kbd_merge.c", "sys/kapi/kapi_in2.c",
+                            "sys/hal/input/legacy_ring.c", "sys/hal/input/kbd_merge.c", "sys/hal/input/input_work.c", "sys/kern/io_work.c", "sys/kapi/kapi_in2.c",
                             "sys/hal/input/keymap_eval.c", "sys/hal/input/keymap_state.c",
                             "sys/hal/input/keymap_registry.c", "sys/hal/input/legacy_mode.c",
                             "sys/input/input_policy.c", "sys/input/input_context.c", "sys/kern/kstring_c.c",

@@ -1,3 +1,4 @@
+#include "sys/hal/input/input_work.h"
 #include "input_delivery.h"
 #include "input_policy.h"
 #include "io.h"
@@ -13,6 +14,7 @@ static unsigned action_head, action_count, key_head, key_count;
  * IRQ critical section as publication. Late producers present their snapshot. */
 void input_delivery_flush(void)
 {
+    input_work_invalidate_locked();
     action_head = action_count = 0;
     key_head = key_count = 0;
 }

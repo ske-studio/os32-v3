@@ -78,6 +78,6 @@ void input_emit_legacy_event(const InputEvent *event, u8 old, u8 raw_due)
         if (km_eval(legacy_map, sc, &state, &result)) return;
     } else if (!kbd_gui_mode) return;
     km_legacy_compat(&result);
-    if (!input_capture_delivery(&key, old, &result, raw_due))
+    if (!input_capture_delivery(&key, old, &result, raw_due, mods))
         input_emit_keymap(&result, key.down, raw_due, mods, 0);
 }

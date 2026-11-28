@@ -1,3 +1,4 @@
+#include "sys/hal/input/input_work.h"
 #include "v86_call.h"
 /* ======================================================================== */
 /*  V86.C — 仮想8086モード ランタイム (Phase 1 最小実装)                    */
@@ -442,6 +443,7 @@ int v86_tick_and_check_timeout(void)
 /* #GP スタブから呼ばれる脱出口。v86_run() の setjmp 地点へ戻る。 */
 void v86_longjmp_out(void)
 {
+    if (v86_active) input_work_invalidate_locked();
     v86_active = 0;
     exec_longjmp(v86_jmpbuf);
 }
@@ -458,6 +460,7 @@ int v86_run(const struct v86_context *ctx)
  * normal v86_run restores its caller EFLAGS after this common unwind. */
 void v86_runtime_end(void)
 {
+    if (v86_active) input_work_invalidate_locked();
     v86_active = 0;
     if (!v86_session.running) return;
     if (platform_irq_reserved(V86_IRQ_SOUND)) irq_disable(V86_IRQ_SOUND);
@@ -509,6 +512,7 @@ int v86_run_limit(const struct v86_context *ctx, u32 tick_limit)
     irq_enable(V86_IRQ_VSYNC);
 
     if (exec_setjmp(v86_jmpbuf) == 0) {
+        input_work_invalidate_locked();
         v86_active = 1;
         v86_enter(ctx);         /* 正常には戻らない */
     }

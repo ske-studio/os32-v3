@@ -2158,7 +2158,7 @@ id = "input_policy_abi"
 spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
 subsystem = "input"
 level = "L1"
-sources = ["userland/gshell/src/kbdnav.rs", "sys/hal/input/kbd_merge.c", "sys/hal/input/keymap_state.c", "sdk/kapi.json", "sdk/include/os32/os32_kbd_policy.h", "sdk/rust/os32api/src/kbd_policy.rs", "sys/kapi/kapi_generated.c", "sys/kern/exec/exec_kapi_init.inc", "sys/input/input_delivery.h", "sys/input/input_delivery.c", "sys/input/input_policy.c", "sys/kapi/input_policy_provider.c", "sys/platform/pc98/input_keymap.c", "sys/platform/powermac/input_keymap_backend.c", "tests/support/fixtures/input_policy/wire.c", "tests/support/fixtures/input_policy/legacy_shell.c", "userland/shell/ui.c", "sys/hal/input/legacy_keymap.c", "tests/support/fixtures/input_policy/layout.rs", "tests/support/fixtures/input_policy/gshell.rs", "tests/support/fixtures/input_policy/entry.S", "userland/gshell/src/pump.rs", "userland/gshell/src/input.rs", "userland/gshell/src/raw_keyboard.rs", "userland/gshell/src/excl.rs", "tests/support/fixtures/input_policy/include/stdio.h", "tests/support/fixtures/input_policy/include/string.h"]
+sources = ["sys/hal/input/input_work.c", "sys/hal/input/input_work.h", "userland/gshell/src/kbdnav.rs", "sys/hal/input/kbd_merge.c", "sys/hal/input/keymap_state.c", "sdk/kapi.json", "sdk/include/os32/os32_kbd_policy.h", "sdk/rust/os32api/src/kbd_policy.rs", "sys/kapi/kapi_generated.c", "sys/kern/exec/exec_kapi_init.inc", "sys/input/input_delivery.h", "sys/input/input_delivery.c", "sys/input/input_policy.c", "sys/kapi/input_policy_provider.c", "sys/platform/pc98/input_keymap.c", "sys/platform/powermac/input_keymap_backend.c", "tests/support/fixtures/input_policy/wire.c", "tests/support/fixtures/input_policy/legacy_shell.c", "userland/shell/ui.c", "sys/hal/input/legacy_keymap.c", "tests/support/fixtures/input_policy/layout.rs", "tests/support/fixtures/input_policy/gshell.rs", "tests/support/fixtures/input_policy/entry.S", "userland/gshell/src/pump.rs", "userland/gshell/src/input.rs", "userland/gshell/src/raw_keyboard.rs", "userland/gshell/src/excl.rs", "tests/support/fixtures/input_policy/include/stdio.h", "tests/support/fixtures/input_policy/include/string.h"]
 environment = "linux-cross"
 arch = { x86 = ["pc98"], ppc = ["link-sh"] }
 needs = []
@@ -2202,7 +2202,7 @@ id = "input_exec_entry"
 spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
 subsystem = "input"
 level = "L1"
-sources = ["sys/platform/pc98/kernel.c", "sys/platform/pc98/kernel_shell_fdd.inc", "sys/platform/powermac/shell_loop_ops.c", "sys/kern/av_focus.c", "tests/input/input_policy_abi.py", "sys/kapi/input_policy_provider.c", "sys/kapi/kapi_generated.c", "sys/kern/exec/exec_kapi_init.inc", "sys/input/input_context.c", "sys/kern/init/shell_loop.c", "sys/kern/exec/appslot.c", "sys/kern/exec/exec_entry_commit.inc", "tests/support/fixtures/input_policy/loader.c", "tests/support/fixtures/input_policy/loader.py", "tests/support/fixtures/input_policy/jump.S", "sys/kern/exec/exec_schedule.inc", "sys/kern/exec/exec_launch.inc", "sys/kern/exec/exec_finish.inc", "sys/kern/io_kapi.c", "sys/hal/input/input_service.c", "sys/hal/input/legacy_mode.c", "sys/hal/input/legacy_ring.c", "sys/input/input_policy.c", "tests/support/fixtures/input_policy/entry.S", "tests/support/fixtures/input_policy/include/stdio.h", "tests/support/fixtures/input_policy/include/string.h"]
+sources = ["sys/hal/input/input_work.c", "sys/hal/input/input_work.h", "sys/platform/pc98/kernel.c", "sys/platform/pc98/kernel_shell_fdd.inc", "sys/platform/powermac/shell_loop_ops.c", "sys/kern/av_focus.c", "tests/input/input_policy_abi.py", "sys/kapi/input_policy_provider.c", "sys/kapi/kapi_generated.c", "sys/kern/exec/exec_kapi_init.inc", "sys/input/input_context.c", "sys/kern/init/shell_loop.c", "sys/kern/exec/appslot.c", "sys/kern/exec/exec_entry_commit.inc", "tests/support/fixtures/input_policy/loader.c", "tests/support/fixtures/input_policy/loader.py", "tests/support/fixtures/input_policy/jump.S", "sys/kern/exec/exec_schedule.inc", "sys/kern/exec/exec_launch.inc", "sys/kern/exec/exec_finish.inc", "sys/kern/io_kapi.c", "sys/hal/input/input_service.c", "sys/hal/input/legacy_mode.c", "sys/hal/input/legacy_ring.c", "sys/input/input_policy.c", "tests/support/fixtures/input_policy/entry.S", "tests/support/fixtures/input_policy/include/stdio.h", "tests/support/fixtures/input_policy/include/string.h"]
 environment = "linux-cross"
 arch = { x86 = ["pc98"], ppc = ["link-sh"] }
 needs = []
@@ -2227,7 +2227,7 @@ id = "input_focus"
 spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
 subsystem = "input"
 level = "L1"
-sources = ["tests/input/input_policy_abi.py", "tests/support/fixtures/input_policy/gshell.rs", "userland/gshell/src/input.rs", "userland/gshell/src/raw_keyboard.rs", "userland/gshell/src/kbdnav.rs", "userland/gshell/src/excl.rs", "userland/gshell/src/pump.rs", "sys/input/input_policy.c", "sys/input/input_context.c", "sys/input/input_delivery.c", "sys/hal/input/legacy_ring.c", "sys/kapi/kapi_in2.c", "sys/hal/input/in2_reclaim.c", "sys/hal/input/kbd_merge.c", "sys/platform/pc98/platform_input_caps.h", "sys/platform/powermac/platform_input_caps.h", "sys/hal/input/in2_excl.c", "sys/hal/input/keymap_registry.c", "sys/hal/input/keymap_eval.c", "sys/hal/input/keymap_state.c", "sys/hal/input/legacy_keymap.c", "sys/hal/input/legacy_mode.c", "sys/input/keymaps/hid_jp.c", "tests/support/fixtures/input_policy/focus.c", "tests/support/fixtures/input_policy/entry.S"]
+sources = ["sys/hal/input/input_work.c", "sys/hal/input/input_work.h", "tests/input/input_policy_abi.py", "tests/support/fixtures/input_policy/gshell.rs", "userland/gshell/src/input.rs", "userland/gshell/src/raw_keyboard.rs", "userland/gshell/src/kbdnav.rs", "userland/gshell/src/excl.rs", "userland/gshell/src/pump.rs", "sys/input/input_policy.c", "sys/input/input_context.c", "sys/input/input_delivery.c", "sys/hal/input/legacy_ring.c", "sys/kapi/kapi_in2.c", "sys/hal/input/in2_reclaim.c", "sys/hal/input/kbd_merge.c", "sys/platform/pc98/platform_input_caps.h", "sys/platform/powermac/platform_input_caps.h", "sys/hal/input/in2_excl.c", "sys/hal/input/keymap_registry.c", "sys/hal/input/keymap_eval.c", "sys/hal/input/keymap_state.c", "sys/hal/input/legacy_keymap.c", "sys/hal/input/legacy_mode.c", "sys/input/keymaps/hid_jp.c", "tests/support/fixtures/input_policy/focus.c", "tests/support/fixtures/input_policy/entry.S"]
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
@@ -2377,4 +2377,83 @@ mutations = [
     { id = "retry_failed_dma", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_transfer_bench.c", old = "stopped = true;", new = "stopped = false;", fail = "G5m retried after DMA failure" },
     { id = "skip_ram_guard", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_transfer_bench.c", old = "guard += ram[h * rp] != GUARD;", new = "guard += 0;", fail = "transfer pixels or guard" },
     { id = "allow_ifc", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_transfer_bench.c", old = "&t->ram, true, dl", new = "&t->ram, false, dl", fail = "forced transfer failure" }
+]
+
+[[check]]
+id = "input_work_hid"
+spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "11.4 RED を先に取る段と受入" }
+subsystem = "input"
+level = "L1"
+sources = ["sys/kern/av_focus.c", "sys/hal/input/in2_reclaim.c", "sys/hal/input/in2_excl.c", "sys/input/input_context.c", "tests/support/fixtures/input_policy/work_focus.inc", "sys/platform/pc98/legacy/v86.c", "tests/support/fixtures/input_policy/work_v86.c", "tests/support/fixtures/input_policy/work_edges.inc", "sys/input/input_delivery.c", "sys/hal/input/keymap.h", "tests/support/fixtures/input_policy/work.c", "sys/dev/usb/hid_kbd.c", "sys/dev/usb/hid_kbd_map.c", "sys/platform/pc98/usb_module.c", "sys/platform/powermac/usb_key_report.c", "sys/hal/input/usb_input.c", "sys/hal/input/input_work.c", "sys/hal/input/kbd_merge.c", "sys/kern/io_work.c", "sys/kern/idle_work.c", "sys/kern/io_kapi.c", "sys/kern/io_policy.c"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"], ppc = ["link-sh"] }
+needs = []
+expect = "両 CPU の boot report と tick から、登録前は同期、登録後は協調点の前0・後1。4源の期限と再予約、修飾・境界の破棄、IRQ禁止時は配送0、公開表は80 byte"
+limits = "USB 転送完了と整数時計を fixture が供給。実機の割込み時間は測らない"
+gates = ["push", "main"]
+mutations = [
+    { id = "norepeat", config = "pc98", when = "after_build", replace = "sys/hal/input/keymap.h", old = "!(map->norepeat[usage >> 3] & (1u << (usage & 7)))", new = "1", fail = "USB repeat delivery probe 91" },
+    { id = "sc_range", config = "pc98", when = "after_build", replace = "sys/hal/input/keymap.h", old = "map->compat_sc[usage] < 128", new = "1", fail = "USB repeat delivery probe 92" },
+    { id = "empty_levels", config = "pc98", when = "after_build", replace = "sys/hal/input/keymap.h", old = "entry->group2[1] != 0xf500", new = "1", fail = "USB repeat delivery probe 93" },
+    { id = "duplicate_marks", config = "link-sh", when = "after_build", replace = "sys/hal/input/input_work.c", old = "if (slots[i].key.src == key->src) { free_slot = i; break; }", new = "(void)i;", fail = "USB repeat delivery probe 11" },
+    { id = "extra_in2", config = "pc98", when = "after_build", replace = "sys/hal/input/kbd_merge.c", old = "sc < 128 && old != key->down) input_emit_in2(&e)", new = "sc < 128 && (old != key->down || key->repeat)) input_emit_in2(&e)", fail = "USB repeat delivery probe 11" },
+    { id = "skip_repeat_state", config = "pc98", when = "after_build", replace = "sys/hal/input/kbd_merge.c", old = "if (km_state_apply(key, old, origin, before.effect))", new = "if (!key->repeat && km_state_apply(key, old, origin, before.effect))", fail = "USB repeat delivery probe 67" },
+    { id = "keep_same_owner", config = "link-sh", when = "after_build", replace = "sys/kern/av_focus.c", old = "        input_delivery_flush();", new = "        if (av_fg_owner != owner) input_delivery_flush();", fail = "USB repeat delivery probe 75" },
+    { id = "keep_on_acquire", config = "link-sh", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "    input_delivery_flush();", new = "    if (!owner) input_delivery_flush();", fail = "USB repeat delivery probe 79" },
+    { id = "keep_on_unacquire", config = "pc98", when = "after_build", replace = "sys/hal/input/in2_excl.c", old = "    input_delivery_flush();", new = "    if (owner) input_delivery_flush();", fail = "USB repeat delivery probe 81" },
+    { id = "keep_on_reclaim", config = "link-sh", when = "after_build", replace = "sys/hal/input/in2_reclaim.c", old = "    input_work_invalidate_locked();", new = "    (void)0;", fail = "USB repeat delivery probe 83" },
+    { id = "keep_begin", config = "link-sh", when = "after_build", replace = "sys/input/input_context.c", old = "    input_delivery_flush();\n    discard_pending();\n    state->context =", new = "    discard_pending();\n    state->context =", fail = "USB repeat delivery probe 23" },
+    { id = "keep_end", config = "link-sh", when = "after_build", replace = "sys/input/input_context.c", old = "    input_delivery_flush();\n    discard_pending();\n    state->command_gen =", new = "    discard_pending();\n    state->command_gen =", fail = "USB repeat delivery probe 25" },
+    { id = "keep_delivery", config = "pc98", when = "after_build", replace = "sys/input/input_context.c", old = "        input_delivery_flush();\n        context_owners[owner].action_mode", new = "        context_owners[owner].action_mode", fail = "USB repeat delivery probe 27" },
+    { id = "erase_new_arrival", config = "pc98", when = "after_build", replace = "sys/kern/io_work.c", old = "    running = 0;\n    return calls;", new = "    pending[1] = 0;\n    running = 0;\n    return calls;", fail = "USB repeat delivery probe 15" },
+    { id = "v86_entry", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "input_work_invalidate_locked();\n        v86_active = 1;", new = "v86_active = 1;", fail = "USB repeat delivery probe 57" },
+    { id = "v86_repeat", config = "pc98", when = "after_build", replace = "sys/hal/input/kbd_merge.c", old = "(legacy_active() || input_work_repeat_locked", new = "(input_work_repeat_locked", fail = "USB repeat delivery probe 58" },
+    { id = "widen_fair", config = "link-sh", when = "after_build", replace = "sys/kern/io_work.c", old = "s->max_units = minimum(units_left, max_units);", new = "s->max_units = max_units;", fail = "USB repeat delivery probe 42" },
+    { id = "wrong_clock_token", config = "pc98", when = "after_build", replace = "sys/kern/io_work.c", old = "source != s->clock_source || gen != s->clock_generation", new = "source != s->clock_source", fail = "USB repeat delivery probe 34" },
+    { id = "start_at_deadline", config = "link-sh", when = "after_build", replace = "sys/kern/io_work.c", old = "now - s->start_count >= s->limit_count", new = "now - s->start_count > s->limit_count", fail = "USB repeat delivery probe 37" },
+    { id = "old_binding", config = "pc98", when = "after_build", replace = "sys/hal/input/input_work.c", old = "!km_source_lookup(slot.key.src, slot.key.generation, &source) &&", new = "1 &&", fail = "USB repeat delivery probe 56" },
+    { id = "old_command", config = "pc98", when = "after_build", replace = "sys/input/input_delivery.c", old = "input_work_invalidate_locked();", new = "(void)0;", fail = "USB repeat delivery probe 23" },
+    { id = "irq_pump", config = "link-sh", when = "after_build", replace = "sys/kern/io_kapi.c", old = "if (!foreground()) return OS32_ERR_BUSY;\n    if (!budget_us)", new = "if (!_irq_enabled()) return OS32_ERR_BUSY;\n    if (!budget_us)", fail = "USB repeat delivery probe 10" },
+    { id = "masked_pump", config = "pc98", when = "after_build", replace = "sys/kern/io_kapi.c", old = "if (!foreground()) return OS32_ERR_BUSY;\n    if (!budget_us)", new = "if (kctx_irq_depth) return OS32_ERR_BUSY;\n    if (!budget_us)", fail = "USB repeat delivery probe 9" },
+    { id = "immediate", config = "pc98", when = "after_build", replace = "sys/hal/input/input_work.c", old = "if (!registered) return 0;", new = "return 0;", fail = "USB repeat delivery probe 8" },
+    { id = "drop_remainder", config = "link-sh", when = "after_build", replace = "sys/hal/input/input_work.c", old = "return i == REPEAT_SLOTS ? IO_DONE : IO_MORE;", new = "return IO_DONE;", fail = "USB repeat delivery probe 15" },
+    { id = "unbounded", config = "pc98", when = "after_build", replace = "sys/hal/input/input_work.c", old = "|| !io_slice_take(slice)", new = "|| 0", fail = "USB repeat delivery probe 15" },
+    { id = "idle_irq", config = "pc98", when = "after_build", replace = "sys/kern/idle_work.c", old = "if (kctx_irq_depth != 0) return;", new = "(void)kctx_irq_depth;", fail = "USB repeat delivery probe 10" },
+    { id = "idle_mask", config = "link-sh", when = "after_build", replace = "sys/kern/idle_work.c", old = "if (!_irq_enabled()) return;", new = "(void)0;", fail = "USB repeat delivery probe 9" }
+]
+
+[[check]]
+id = "input_work_viewer"
+spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "11.1 現行入口と分担" }
+subsystem = "input"
+level = "L1"
+sources = ["sys/platform/pc98/video/splash_raster.c", "sys/platform/pc98/video/splash_raster_plan.c", "sys/platform/pc98/video/splash_raster_play.c", "tests/input/input_work_hid.py", "tests/support/fixtures/input_policy/osri_work.c", "sys/platform/pc98/video/backend_pc98_osri.c", "sys/kern/idle_work.c", "sys/kern/io_work.c"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "固定・動的画像とも各フレームの開始前に他サービスが1回進み、描画完了・取消後のパレットとテキストが復元される"
+limits = "GDC の VSYNC・HBLANK と時刻は fixture。実 player の全パレット OUT と行1の色変更を照合。実機の走査線タイミングは対象外"
+gates = ["push", "main"]
+mutations = [
+    { id = "wrong_row_color", config = "pc98", when = "after_build", replace = "sys/platform/pc98/video/splash_raster_plan.c", old = "r->value[r->count++] = (rgb >> 4) & GFX_PALETTE_COMPONENT_MASK;", new = "r->value[r->count++] = 0;", fail = "OSRI frame probe 2" },
+    { id = "skip_fixed", config = "pc98", when = "after_build", replace = "sys/platform/pc98/video/backend_pc98_osri.c", old = "idle_work_run();\n            if (pc98_splash_raster_frame", new = "if (pc98_splash_raster_frame", fail = "OSRI frame probe" },
+    { id = "skip_dynamic", config = "pc98", when = "after_build", replace = "sys/platform/pc98/video/backend_pc98_osri.c", old = "idle_work_run();\n            int frame", new = "int frame", fail = "OSRI frame probe" }
+]
+
+[[check]]
+id = "input_work_context"
+spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "11.2 登録と通知の寿命" }
+subsystem = "input"
+level = "L1"
+sources = ["userland/gshell/src/multiapp.rs", "tests/support/fixtures/input_policy/gshell.rs", "tests/input/input_work_hid.py", "tests/support/fixtures/input_policy/work_boot.c", "sys/hal/input/input_work.c", "sys/kern/io_work.c", "sys/kern/io_policy.c", "sys/platform/pc98/boot.c", "sys/platform/powermac/input_keymap_backend.c"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"], ppc = ["link-sh"] }
+needs = []
+expect = "初回の鍵盤初期化と USB scan で配送を観測し、登録成功なら保留、ID 使用中なら同期で1件"
+limits = "実際の両起動関数を使い、機器の初回入力を fixture から供給する"
+gates = ["push", "main"]
+mutations = [
+    { id = "same_owner_window", config = "pc98", when = "after_build", replace = "userland/gshell/src/multiapp.rs", old = "target == mm.av_owner && st.front_id() == mm.av_window", new = "target == mm.av_owner", fail = "WM same-owner focus notification" },
+    { id = "scan_before_register", config = "link-sh", when = "after_build", replace = "sys/platform/powermac/input_keymap_backend.c", old = "    int rc_work = input_work_register();\n    if (rc_work < 0) usbp_log(\"USB repeat uses synchronous delivery (%d)\\n\", rc_work);\n    pm_usb_scan();", new = "    pm_usb_scan();\n    int rc_work = input_work_register();\n    if (rc_work < 0) usbp_log(\"USB repeat uses synchronous delivery (%d)\\n\", rc_work);", fail = "USB repeat delivery probe 2" },
+    { id = "fallback_silent", config = "pc98", when = "after_build", replace = "sys/hal/input/input_work.c", old = "if (!rc) registered = 1;", new = "registered = 1;", fail = "USB repeat delivery probe 3" }
 ]

@@ -1,3 +1,4 @@
+#include "sys/hal/input/input_work.h"
 #include "in2_int.h"
 #include "io.h"
 #include "os32_kapi_shared.h"
@@ -44,6 +45,7 @@ void kbd_set_gui_mode(int on)
     if (next == kbd_gui_mode) return;
 
     flags = irq_save();
+    input_work_invalidate_locked();
     kbd_gui_mode = next;
     kbd_stop_suppressed = 0;
     if (next) {
