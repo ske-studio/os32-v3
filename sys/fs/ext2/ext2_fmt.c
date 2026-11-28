@@ -286,6 +286,11 @@ static int platform_install_format_hd(int drv, u32 sectors)
 }
 #endif
 
+static int mounted_loop(const struct ext2_medium_ops *ops, int drive)
+{
+    return ops == media[EXT2_MEDIUM_LOOP] && vfs_dev_mount_count(drive) > 0;
+}
+
 int ext2_format(int ide_drive, u32 total_sectors)
 {
     u32 start, len;
@@ -293,6 +298,7 @@ int ext2_format(int ide_drive, u32 total_sectors)
 
     const struct ext2_medium_ops *ops = format_medium(ide_drive);
     if (!ops || !ops->present(ide_drive)) return EXT2_ERR_IO;
+    if (mounted_loop(ops, ide_drive)) return EXT2_ERR_BUSY;
     if (ops == media[EXT2_MEDIUM_HD] && (unsigned)ide_drive < VFS_DEV_UNIT_MAX) {
         if (vfs_dev_mount_count(ide_drive) > 0) return EXT2_ERR_BUSY;
         if (platform_install_medium())
@@ -316,6 +322,7 @@ int ext2_format_at(int ide_drive, u32 start_lba, u32 length)
 
     const struct ext2_medium_ops *ops = format_medium(ide_drive);
     if (!ops || !ops->present(ide_drive)) return EXT2_ERR_IO;
+    if (mounted_loop(ops, ide_drive)) return EXT2_ERR_BUSY;
     if (ops->total_sectors(ide_drive, &disk_sectors) != 0) return EXT2_ERR_IO;
     /* 範囲の検査。**どれか 1 つでも外れたら 1 バイトも書かない**。
      *   - 長さ 0 / 開始が IPL・区画表・ローダ (LBA 0〜17) に掛かる

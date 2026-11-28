@@ -212,6 +212,10 @@ int loop_dev_attach_fd(int fd, int slot, int fmt)
     if (s->in_use)
         return LOOP_ERR_BUSY;
 
+    /* 使用中のイメージの置き換え・削除を VFS に断らせる (票 TASK_VFS_FD_PATH
+     * 方針 v3 の 6)。幾何や D88 索引を持つので、開き直しでは続けられない */
+    ret = vfs_fd_set_pinned(fd, 1);
+    if (ret != VFS_OK) return ret == VFS_ERR_BUSY ? LOOP_ERR_BUSY : -1;
     fsize = vfs_get_size(fd);
 
     /* フォーマット別アタッチ処理 */
@@ -237,18 +241,17 @@ int loop_dev_attach_fd(int fd, int slot, int fmt)
         fmt_name = "RAW";
         break;
     default:
-        return LOOP_ERR_FORMAT;
+        ret = LOOP_ERR_FORMAT;
     }
 
-    if (ret != 0)
+    if (ret != 0) {
+        vfs_fd_set_pinned(fd, 0);
         return ret;
+    }
 
     /* デバイス活性化 */
     s->fd = fd;
     s->in_use = 1;
-    /* 使用中のイメージの置き換え・削除を VFS に断らせる (票 TASK_VFS_FD_PATH
-     * 方針 v3 の 6)。幾何や D88 索引を持つので、開き直しでは続けられない */
-    (void)vfs_fd_set_pinned(fd, 1);
     s->owns_fd = 0;  /* fd は呼び出し側が管理 */
     s->dev.sect_size   = (int)s->lba_sect_size;
     s->dev.total_sects = s->total_lba;
@@ -320,7 +323,7 @@ void loop_dev_detach(int slot)
     if (slot < 0 || slot >= LOOP_MAX_SLOTS) return;
 
     s = &loop_slots[slot];
-    if (!s->in_use) return;
+    if (!s->in_use || vfs_dev_mount_count(OS32_DRV_LOOP(slot)) > 0) return;
 
     /* 使用中の印を外す (attach_fd 経由の FD は呼び出し側に残る) */
     if (s->fd >= 0) (void)vfs_fd_set_pinned(s->fd, 0);

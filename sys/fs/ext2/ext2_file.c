@@ -1,5 +1,6 @@
 #include "ext2_priv.h"
 #include "kprintf.h"
+#include "kmalloc.h"
 
 /* Shared range reader for file and stream entry points. */
 #include "ext2_file_read_cache.inc"

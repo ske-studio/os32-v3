@@ -37,6 +37,8 @@ void vfs_device_names_register(const struct vfs_device_name *rows, unsigned n);
 
 - rows/件数を VFS が保持、実体は sys/platform/pc98/boot_names.c。pc98_boot_bind で一括登録、確保不要。VFS/FS の通常 init でこの表を消さない。未登録時は parse/番号検証とも失敗。
 - 純粋な字句解決表であり、drivers/dev の実在 Device 表とは別。fd2/3 や不在 hd も旧来の parse は成功するため dev_find 成功を条件にしない。PC-98 の lo0〜lo3 は DIGIT_EXACT で末尾まで照合し、VFS_DEV_LOOP と slot 番号に解決する。ext2 に渡す符号は OS32_DRV_LOOP(slot)。マウント数は同じ slot の HD と区別し、umount 成功後に減る。
+- loop の ext2 をマウントしている間は暗黙・範囲指定の format を BUSY にし、detach も拒否する。像の FD を保持している間は所属するマウントを外せない。書込み可能な FD と同じ像の重複装着は同じマウントの inode（パスで動く FS は正規化した名前）で判定する。
+- loop 上の ext2 の書込みから背後の ext2 に再入するため、各 loop は独立した作業域を持つ。ブロックビットマップは実グループ数だけ書込み開始時に確保し、完了・中止で返す。HD 単独の読書き要求の種別・LBA・セクタ数を維持する。
 - DIGIT_PREFIX は prefix 直後の **1 桁だけ**を範囲検査し、末尾は無視。COM、COM0、COM9、COMxyz は全て SERIAL/1。hostdrv0 は失敗。大小文字は区別。成功するまで出力ポインタへ書かない。
 
 - 使う文脈は起動/協調/KAPI、IRQ 内で parse/mount しない。ABI・マウント衝突判定・FS 側の型検査はそのまま。

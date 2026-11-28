@@ -2551,15 +2551,21 @@ id = "pc98_loop_mount"
 spec = { path = "docs/design/fs/README.md", section = "vfs" }
 subsystem = "fs"
 level = "L2"
-sources = ["sys/platform/pc98/boot_names.c", "sys/platform/pc98/storage/ext2_medium_ide.c", "sys/fs/vfs.c", "sys/fs/vfs_fd.c", "sys/fs/vfs.h", "sys/fs/vfs_device.h", "sys/fs/ext2", "sys/dev/block/loop_dev.c", "sys/dev/block/ext2_medium_loop.c", "sys/include/ext2_medium_contract.h", "sys/include/loop_contract.h", "tests/support/fixtures/loop_mount/mount.c", "tests/support/fixtures/input_policy/entry.S"]
+sources = ["sys/platform/pc98/boot_names.c", "sys/platform/pc98/storage/ext2_medium_ide.c", "sys/fs/vfs.c", "sys/fs/vfs_fd.c", "sys/fs/vfs.h", "sys/fs/vfs_device.h", "sys/fs/ext2", "sys/dev/block/loop_dev.c", "sys/dev/block/ext2_medium_loop.c", "sys/include/ext2_medium_contract.h", "sys/include/loop_contract.h", "sys/fs/isofs", "sys/kern/mm/kmalloc.c", "userland/shell/cmd_mnt.c", "userland/shell/cmd_sys.c", "userland/shell/cmd_fs_shared.c", "tests/support/fixtures/loop_mount/shell.c", "tests/support/fixtures/loop_mount/hd-io.txt", "tests/support/fixtures/loop_mount/mount.c", "tests/support/fixtures/input_policy/entry.S"]
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "ext2 上の像を lo0〜lo3 に装着して format・mount・書込み・umount・再 mount・読戻しが通り、HD と各 loop の mount 数を区別する"
-limits = "HD と時計は模型。シェルと機種起動は NP21/W の受入で確認する"
+expect = "ext2 上の像を lo0〜lo3 に装着して format・mount・書込み・umount・再 mount・読戻しが通り、HD と各 loop の mount 数・使用中の拒否・ISO との共存・HD 正常系の全要求を照合する"
+limits = "HD・CD と時計は模型。製品シェルの入口をホストで呼び、ゲスト起動と打鍵は NP21/W の受入で確認する"
 gates = ["push", "main"]
 mutations = [
     { id = "missing_loop_name", config = "pc98", when = "after_build", replace = "sys/platform/pc98/boot_names.c", old = '"lo", VFS_NAME_DIGIT_EXACT', new = '"lx", VFS_NAME_DIGIT_EXACT', fail = "loop name resolution" },
     { id = "count_loop_as_hd", config = "pc98", when = "after_build", replace = "sys/fs/vfs.c", old = "type = VFS_DEV_LOOP;", new = "type = VFS_DEV_HD;", fail = "loop mount count" },
+    { id = "allow_mounted_format", config = "pc98", when = "after_build", replace = "sys/fs/ext2/ext2_fmt.c", old = "vfs_dev_mount_count(drive) > 0", new = "vfs_dev_mount_count(drive) > 1", fail = "mounted format" },
+    { id = "allow_mounted_detach", config = "pc98", when = "after_build", replace = "sys/dev/block/loop_dev.c", old = "vfs_dev_mount_count(OS32_DRV_LOOP(slot)) > 0", new = "vfs_dev_mount_count(OS32_DRV_LOOP(slot)) > 1", fail = "mounted detach" },
+    { id = "ignore_backing_pin", config = "pc98", when = "after_build", replace = "sys/fs/vfs.c", old = "if (vfs_fd_mount_busy(mounts[i].fs_ctx, 1)) return VFS_ERR_BUSY;", new = "if (0) return VFS_ERR_BUSY;", fail = "backing mount" },
+    { id = "allow_duplicate_image", config = "pc98", when = "after_build", replace = "sys/fs/vfs_fd.c", old = "other->has_ino && f->ino == other->ino", new = "0", fail = "duplicate image" },
+    { id = "reserve_resident_bitmaps", config = "pc98", when = "after_build", replace = "sys/fs/ext2/ext2_vfs.c", old = "kzalloc(sizeof(Ext2WriteWork))", new = "kzalloc(sizeof(Ext2WriteWork) + 28 * EXT2_BLOCK_SIZE)", fail = "ISO heap budget" },
+    { id = "extra_hd_read", config = "pc98", when = "after_build", replace = "sys/fs/ext2/ext2_file_read_run.inc", old = "ret = ext2_read_data_blocks(ctx, phys, blocks, &dst[total_read]);", new = "ret = ext2_read_data_blocks(ctx, phys, blocks, &dst[total_read]); if (!ret) ret = ext2_read_data_blocks(ctx, phys, blocks, &dst[total_read]);", fail = "HD request sequence" },
     { id = "reuse_loop_device", config = "pc98", when = "after_build", replace = "sys/dev/block/ext2_medium_loop.c", old = "Device *dev = &devices[slot];", new = "Device *dev = &devices[0];", fail = "loop remount content" },
 ]

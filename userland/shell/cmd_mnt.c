@@ -35,12 +35,15 @@ static int cmd_umount(int argc, char **argv)
         shell_print_help(argv[0]);
         return SH_STATUS_USAGE;
     }
-    /* sys_umount は void なので、未マウントは先に弾いて知らせる */
     if (!g_api->sys_is_mounted(argv[1])) {
         g_api->kprintf(ATTR_RED, "umount: %s: not mounted\n", argv[1]);
         return SH_STATUS_ERROR;
     }
-    g_api->sys_umount(argv[1]);
+    int rc = g_api->sys_umount_checked(argv[1]);
+    if (rc < 0) {
+        g_api->kprintf(ATTR_RED, "umount: %s: %s\n", argv[1], fs_strerror(rc));
+        return SH_STATUS_ERROR;
+    }
     return 0;
 }
 
@@ -154,6 +157,10 @@ static int cmd_losetup(int argc, char **argv)
         }
         slot = atoi(argv[2]);
         g_api->loop_detach(slot);
+        if (g_api->loop_status(slot, &total, &bps)) {
+            g_api->kprintf(ATTR_RED, "losetup: lo%d is busy\n", slot);
+            return SH_STATUS_ERROR;
+        }
         g_api->kprintf(ATTR_GREEN, "losetup: lo%d detached\n", slot);
         return 0;
     }
@@ -205,7 +212,7 @@ static int cmd_losetup(int argc, char **argv)
         g_api->kprintf(ATTR_RED, "losetup: unsupported format\n");
         return SH_STATUS_ERROR;
     case -3:
-        g_api->kprintf(ATTR_RED, "losetup: slot %d already in use\n", slot);
+        g_api->kprintf(ATTR_RED, "losetup: slot %d or image already in use\n", slot);
         return SH_STATUS_ERROR;
     case -4:
         g_api->kprintf(ATTR_RED, "losetup: I/O error\n");

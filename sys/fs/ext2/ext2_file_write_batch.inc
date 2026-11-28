@@ -1,10 +1,12 @@
 /* One synchronous owner, separate from D1's read slots. */
 Ext2WriteWork ext2_write_work;
+static Ext2WriteBitmap hd_block_bitmap[EXT2_MAX_GROUPS];
 
 void ext2_write_abort(Ext2Ctx *ctx)
 {
     Ext2WriteWork *w = ext2_write_workspace(ctx);
     if (w->ctx != ctx) return;
+    if (ctx->private_write) kfree(w->block_bitmap);
     ext2_mem_zero(w, sizeof(Ext2WriteWork));
 }
 
@@ -14,6 +16,14 @@ int ext2_write_begin(Ext2Ctx *ctx, u32 ino, const Ext2Inode *initial)
     int ret;
     ext2_read_cache_reset();
     ext2_mem_zero(w, sizeof(*w));
+    u32 bytes = ctx->num_groups * sizeof(Ext2WriteBitmap);
+    if (ctx->private_write) {
+        w->block_bitmap = kzalloc(bytes);
+        if (!w->block_bitmap) return EXT2_ERR_NOSPC;
+    } else {
+        w->block_bitmap = hd_block_bitmap;
+        ext2_mem_zero(hd_block_bitmap, bytes);
+    }
     w->ctx = ctx; w->active = 1; w->defer_inode = initial != 0;
     if (ino == EXT2_WRITE_NEW_INO) {
         ret = ext2_write_bitmap_reserve_inode(ctx, &ino);

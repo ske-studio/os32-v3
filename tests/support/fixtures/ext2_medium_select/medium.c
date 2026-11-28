@@ -21,6 +21,7 @@ static int recording;
 static int mode(const char *value) { return strcmp(state, value) == 0; }
 int vfs_dev_mount_count(int drv)
 {
+    if (drv >= OS32_DRV_LOOP(0) && drv < OS32_DRV_LOOP(4)) return 0;
     if (drv < 0 || drv > 3) abort();
     return mode("mounted");
 }

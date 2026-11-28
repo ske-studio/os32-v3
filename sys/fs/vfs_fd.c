@@ -55,11 +55,13 @@ typedef struct {
 
 static VfsFile open_files[VFS_MAX_OPEN_FILES];
 
-int vfs_fd_mount_busy(void *ctx)
+int vfs_fd_mount_busy(void *ctx, int pinned_only)
 {
-    for (int i = VFS_FIRST_FILE_FD; i < VFS_MAX_OPEN_FILES; i++)
-        if (open_files[i].in_use && !open_files[i].stale && open_files[i].fs_ctx == ctx)
-            return 1;
+    for (int i = VFS_FIRST_FILE_FD; i < VFS_MAX_OPEN_FILES; i++) {
+        const VfsFile *f = &open_files[i];
+        if (f->in_use && !f->stale && f->fs_ctx == ctx &&
+            (!pinned_only || (f->pinned && f->lifetime != VFS_FD_FONT))) return 1;
+    }
     return 0;
 }
 
@@ -742,15 +744,6 @@ int vfs_fd_is_stale(int fd)
     return open_files[fd].stale;
 }
 
-int vfs_fd_set_pinned(int fd, int on)
-{
-    if (fd < VFS_FIRST_FILE_FD || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
-    if (!open_files[fd].in_use) return VFS_ERR_INVAL;
-    if (open_files[fd].lifetime == VFS_FD_FONT) return VFS_ERR_INVAL;
-    open_files[fd].pinned = on ? 1 : 0;
-    return VFS_OK;
-}
-
 int vfs_fd_set_sqlite_db(int fd)
 {
     if (fd < VFS_FIRST_FILE_FD || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
@@ -774,6 +767,26 @@ static int rel_covers(const VfsOps *ops, const char *a, const char *b)
     while (a[i] && b[i] && name_key(ops, a[i]) == name_key(ops, b[i])) i++;
     if (a[i] != '\0') return 0;
     return b[i] == '\0' || b[i] == '/';
+}
+
+int vfs_fd_set_pinned(int fd, int on)
+{
+    if (fd < VFS_FIRST_FILE_FD || fd >= VFS_MAX_OPEN_FILES) return VFS_ERR_INVAL;
+    VfsFile *f = &open_files[fd];
+    if (!f->in_use || f->lifetime == VFS_FD_FONT) return VFS_ERR_INVAL;
+    if (on) {
+        if (f->stale || f->pinned) return VFS_ERR_BUSY;
+        for (int i = VFS_FIRST_FILE_FD; i < VFS_MAX_OPEN_FILES; i++) {
+            VfsFile *other = &open_files[i];
+            if (!other->in_use || !other->pinned || other->stale ||
+                other->fs_ctx != f->fs_ctx || other->lifetime == VFS_FD_FONT ||
+                !((f->mode | other->mode) & (O_RDWR | O_WRONLY))) continue;
+            if (f->has_ino ? other->has_ino && f->ino == other->ino :
+                rel_covers(f->ops, f->path, other->path)) return VFS_ERR_BUSY;
+        }
+    }
+    f->pinned = on != 0;
+    return VFS_OK;
 }
 
 /* rel が「DB 名 + "-journal"」そのものなら 1。ジャーナルは DB と同じ

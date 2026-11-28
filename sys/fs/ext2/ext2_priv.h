@@ -82,7 +82,7 @@ typedef struct {
 typedef struct Ext2WriteWork {
     Ext2Ctx *ctx;
     u32 ino; /* inode 予約前だけ EXT2_WRITE_NEW_INO */
-    Ext2WriteBitmap block_bitmap[EXT2_MAX_GROUPS]; /* 添字が group */
+    Ext2WriteBitmap *block_bitmap; /* 添字が group */
     Ext2WriteBitmap inode_bitmap;
     Ext2WriteInodeReservation inode_reservation;
     Ext2WriteTable table[EXT2_WRITE_TABLE_SLOTS];
@@ -99,7 +99,7 @@ typedef struct Ext2WriteWork {
  * 製品の ILP32 配置を検査し、模型へ 32bit の配置を強制しない。 */
 STATIC_ASSERT(sizeof(u32) != 4 || sizeof(Ext2WriteRecord) == 16,
               ext2_write_record_size);
-STATIC_ASSERT(sizeof(u32) != 4 || sizeof(Ext2WriteWork) <= EXT2_WRITE_WORK_MAX_BYTES,
+STATIC_ASSERT(sizeof(u32) != 4 || sizeof(Ext2WriteWork) + sizeof(Ext2WriteBitmap) * EXT2_MAX_GROUPS <= EXT2_WRITE_WORK_MAX_BYTES,
               ext2_write_work_size);
 
 /* HD mounts share this workspace. Each loop mount has its own because its

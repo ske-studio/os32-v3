@@ -563,7 +563,7 @@ int vfs_install_precheck(u32 unit)
         MountPoint *mp = &mounts[i];
         if (!mp->in_use || mp->dev_type != VFS_DEV_HD ||
             !medium->view_unit(mp->dev_id, &raw) || raw != unit) continue;
-        if (!kstrcmp(mp->prefix, "/") || vfs_fd_mount_busy(mp->fs_ctx))
+        if (!kstrcmp(mp->prefix, "/") || vfs_fd_mount_busy(mp->fs_ctx, 0))
             return VFS_ERR_BUSY;
     }
     return 0;
@@ -592,6 +592,7 @@ void vfs_umount(const char *prefix)
     for (i = 0; i < VFS_MAX_FS; i++) {
         if (mounts[i].in_use && kstrcmp(mounts[i].prefix, prefix) == 0) {
             if (platform_install_medium() && !vfs_install_visible(mounts[i].fs_ctx)) return;
+            if (vfs_fd_mount_busy(mounts[i].fs_ctx, 1)) return;
             /* そのマウントの FD 全部に失効の印を付けてから fs_ctx を解放する
              * (票 TASK_VFS_FD_PATH)。印を先に見るので、以後の read / write /
              * fstat / seek が解放済みの fs_ctx を触らない。 */
@@ -615,6 +616,7 @@ static int vfs_umount_checked_internal(const char *prefix, int management)
             continue;
         if (platform_install_medium() && !management && !vfs_install_visible(mounts[i].fs_ctx))
             return VFS_ERR_BUSY;
+        if (vfs_fd_mount_busy(mounts[i].fs_ctx, 1)) return VFS_ERR_BUSY;
         /* ルートを外すと以後のパスが全部行き先を失う (シェル・ライブラリも)。 */
         if (mounts[i].prefix[0] == '/' && mounts[i].prefix[1] == '\0')
             return VFS_ERR_BUSY;
