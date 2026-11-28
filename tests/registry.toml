@@ -2280,3 +2280,19 @@ limits = "i386 ホストの列操作。同時刻の実音源の標本出力は�
 gates = ["push", "main"]
 mutations = [
  { id = "issue_full", config = "pc98", when = "after_build", replace = "sys/hal/sound/snd2_fmq.c", old = "if (q->count == SND2_FMQ_LEN) return 0;", new = "if (q->count == SND2_FMQ_LEN) { ++q->sequence; return 0; }", fail = "full queue issued" }]
+
+[[check]]
+id = "v86_fm_timer"
+spec = { path = "docs/decisions/sound/V86_SOFT86_DESIGN.md", section = "依存順と先に赤にする検査" }
+subsystem = "sound"
+level = "L2"
+sources = ["sys/platform/pc98/legacy/v86_fm_timer.c", "sys/hal/sound/snd2_fmq.c", "sys/platform/pc98/legacy/v86_fm_timer.h", "sys/hal/sound/snd2_fmq.h", "tests/support/fm_control.py", "tests/support/fixtures/fm_control/timer.c", "tests/support/fixtures/fm_control/check.h", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "固定目標の再開、期限の順序、一命令進行と連続過負荷終了"
+limits = "偽時計による前景制御。実チップの周期・配線・ゲスト遅延は測らない"
+gates = ["push", "main"]
+mutations = [
+ { id = "chase_clock", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_fm_timer.c", old = "if (!t->target_valid)", new = "if (1)", fail = "fixed target" },
+ { id = "allow_overload", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_fm_timer.c", old = "t->growing_windows >= 2", new = "t->growing_windows > 2", fail = "sustained overload" }]
