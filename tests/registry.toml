@@ -1,17 +1,18 @@
 [[check]]
 id = "ppc_media_build"
-ppc_seconds = { core = 1, link = 1, sh = 1, link-sh = 1, shell = 1, neg1 = 1 }
-spec = { path = "docs/design/tools/ci/ci_v2.md", section = "§0 最小 workflow と仮の関門" }
+ppc_seconds = { core = 1, link = 1, sh = 82, link-sh = 1, powermac = 8, neg1 = 1 }
+spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "製品媒体と互換名" }
 subsystem = "infra"
 level = "L1"
-sources = ["make:all", "make:iso"]
+sources = ["make:all", "make:iso", "tests/support/media.py", "sys/conf/images/ppc-flags.mk", "build/targets/ppc-powermac.mk", "build/ppc-install-boot.mk", "tools/ppc/boot_media.py", "tools/ppc/root_lz4_inventory.py", "tools/ppc/root_lz4_layout.py"]
 environment = "linux-ppc-cross"
-arch = { ppc = ["core", "link", "sh", "link-sh", "shell", "neg1"] }
+arch = { ppc = ["core", "link", "sh", "link-sh", "powermac", "neg1"] }
 needs = []
-expect = "ビルド成功、PPCKERN.ELF と boot.iso が非空"
+expect = "ビルド成功、PPCKERN.ELF と boot.iso が非空、構成名・出力先・旧旗の拒否理由・実像の帯と root を照合"
 limits = "起動到達と再生成時の一致は別の検査"
 gates = ["push", "main"]
-mutations = [{ id = "ppc_core_missing_iso", config = "core", when = "after_build", remove = "build/out/ppc-kboot/boot.iso", fail = "missing boot.iso" }]
+mutations = [{ id = "ppc_core_missing_iso", config = "core", when = "after_build", remove = "build/out/ppc-kboot/boot.iso", fail = "missing boot.iso" },
+    { id = "legacy_shell_negative", config = "powermac", when = "after_build", replace = "sys/conf/images/ppc-flags.mk", old = "$(error KBOOT_SHELL does not support NEGATIVE)", new = "# removed legacy guard", fail = "legacy shell accepted NEGATIVE" }]
 
 [[check]]
 id = "x86_media_build"
@@ -29,31 +30,31 @@ mutations = [{ id = "x86_missing_iso", config = "pc98", remove = "images/os32_in
 
 [[check]]
 id = "ppc_common_compile"
-ppc_seconds = { link-sh = 4 }
-spec = { path = "docs/design/tools/checks/tests_v2.md", section = "配布物と再生成の合否" }
+ppc_seconds = { powermac = 4 }
+spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "製品での共通ソース検査" }
 subsystem = "infra"
 level = "L1"
-sources = ["make:common-compile"]
+sources = ["make:common-compile", "build/targets/ppc-powermac.mk", "build/sources/common.mk"]
 environment = "linux-ppc-cross"
-arch = { ppc = ["link-sh"] }
+arch = { ppc = ["powermac"] }
 needs = []
 expect = "共通の各入力が PowerPC の再配置可能 ELF を生成する"
 limits = "リンクと起動は保証しない"
 gates = ["push", "main"]
-mutations = [{ id = "common_missing_object", config = "link-sh", remove = "build/out/ppc-kboot/link-sh/sys/kern/mm/dma_pool.o", fail = "missing dma_pool.o", when = "after_build" }]
+mutations = [{ id = "common_missing_object", config = "powermac", remove = "build/out/ppc-powermac/sys/kern/mm/dma_pool.o", fail = "missing dma_pool.o", when = "after_build" }]
 
 [[check]]
 id = "build_identity"
-ppc_seconds = { core = 9, link = 10, sh = 65, link-sh = 63, shell = 62, neg1 = 9 }
-spec = { path = "docs/design/tools/checks/tests_v2.md", section = "配布物と再生成の合否" }
+ppc_seconds = { core = 9, link = 10, sh = 65, link-sh = 63, powermac = 68, neg1 = 9 }
+spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "製品の再生成" }
 subsystem = "infra"
 level = "L1"
-sources = ["make:all", "make:kernel-r1", "make:deploy-u3", "make:iso"]
+sources = ["make:all", "make:kernel-r1", "make:deploy-u3", "make:iso", "tests/support/media.py", "build/ppc-install-boot.mk"]
 environment = "linux-cross"
-arch = { x86 = ["pc98"], ppc = ["core", "link", "sh", "link-sh", "shell", "neg1"] }
+arch = { x86 = ["pc98"], ppc = ["core", "link", "sh", "link-sh", "powermac", "neg1"] }
 needs = []
 expect = "同じ入力から再生成した生成物の集合とバイトが一致する"
-limits = "時刻を含む PowerPC 媒体と root_image_blob.o は存在だけを確認"
+limits = "PowerPC boot.iso は非空とサイズ、生成された root_image_blob.o は存在を確認"
 gates = ["main"]
 mutations = [{ id = "ppc_changed_elf", config = "core", append = "build/out/ppc-kboot/PPCKERN.ELF", fail = "different artifacts: build/out/ppc-kboot/PPCKERN.ELF", when = "after_build" }]
 
@@ -75,13 +76,13 @@ mutations = [{ id = "allow_unsafe_config", config = "local", replace = "tests/su
 
 [[check]]
 id = "ppc_boot"
-ppc_seconds = { core = 3, link = 5, sh = 7, link-sh = 7, shell = 7, neg1 = 3 }
-spec = { path = "docs/design/tools/checks/tests_v2.md", section = "PowerMac の起動到達点" }
+ppc_seconds = { core = 3, link = 5, sh = 7, link-sh = 7, powermac = 6, neg1 = 3 }
+spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "製品の無入力起動" }
 subsystem = "system"
 level = "L4"
-sources = ["make:all", "make:iso", "tests/support/ppc_vm.py", "tests/support/media.py"]
+sources = ["make:all", "make:iso", "tests/support/ppc_vm.py", "tests/support/media.py", "sys/platform/powermac/shell_loop_ops.c"]
 environment = "qemu-ppc"
-arch = { ppc = ["core", "link", "sh", "link-sh", "shell", "neg1"] }
+arch = { ppc = ["core", "link", "sh", "link-sh", "powermac", "neg1"] }
 needs = []
 expect = "6像の起動順と否定像を両 CPU で検証"
 limits = "mac99 TCG の起動40秒"
@@ -90,7 +91,7 @@ mutations = [{ id = "boot_wrong_config", config = "core", when = "after_build", 
 
 [[check]]
 id = "collection_contract"
-spec = { path = "docs/design/tools/ci/ci_v2.md", section = "§2 共通入口" }
+spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "製品の収集計画" }
 subsystem = "infra"
 level = "M"
 sources = ["tests/infra/ci.py", "tests/support/impact.py", "tools/ownership_images.py", "tests/support/registry.py", ".github/workflows/restructure-build.yml", ".github/workflows/restructure-check-bundle.yml", "tests/registry.toml"]
@@ -152,19 +153,19 @@ mutations = [{ id = "owner_conflict", config = "local", when = "after_build", re
 
 [[check]]
 id = "build_sources"
-ppc_seconds = { core = 10, link = 5, sh = 7, link-sh = 7, shell = 7, neg1 = 5 }
-spec = { path = "docs/design/build/ownership.md", section = "構成別のコンパイル登録" }
+ppc_seconds = { core = 10, link = 5, sh = 7, link-sh = 7, powermac = 7, neg1 = 5 }
+spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "製品のコンパイル集合" }
 subsystem = "infra"
 level = "L0"
 sources = ["build/sources/ownership.mk", "make:all", "make:iso", "tests/support/product.py"]
 environment = "linux-cross"
-arch = { x86 = ["pc98"], ppc = ["core", "link", "sh", "link-sh", "shell", "neg1"] }
+arch = { x86 = ["pc98"], ppc = ["core", "link", "sh", "link-sh", "powermac", "neg1"] }
 needs = []
 expect = "構成が指定した翻訳単位を製品のコンパイルが採用する"
 limits = "カーネルと部品"
 gates = ["push", "main"]
 mutations = [{ id = "missing_translation", config = "core", when = "after_build", replace = "build/select.mk", old = "C_KERNEL = $(C_SELECTED)", new = "C_KERNEL = $(filter-out sys/kern/machcfg.c,$(C_SELECTED))", fail = "sys/kern/machcfg.c missing from compilation" },
-    { id = "nonexistent_translation", config = "core", when = "after_build", replace = "build/sources/ownership.mk", old = "OWN_COMPILE_SET += C_SELECTED|pc98|core|link|sh|link-sh|shell|neg1", new = "OWN_COMPILE_SET += C_SELECTED|pc98|core|link|sh|link-sh|shell|neg1\nOWN_COMPILE += sys/kern/missing_input.c|core", fail = "sys/kern/missing_input.c missing input" }]
+    { id = "nonexistent_translation", config = "core", when = "after_build", replace = "build/sources/ownership.mk", old = "OWN_COMPILE_SET += C_SELECTED|pc98|core|link|sh|link-sh|powermac|neg1", new = "OWN_COMPILE_SET += C_SELECTED|pc98|core|link|sh|link-sh|powermac|neg1\nOWN_COMPILE += sys/kern/missing_input.c|core", fail = "sys/kern/missing_input.c missing input" }]
 
 [[check]]
 id = "include_layers"
@@ -209,13 +210,13 @@ mutations = [{ id = "wrong_cpu_object", config = "core", when = "after_build", r
 
 [[check]]
 id = "hal_contracts"
-ppc_seconds = { sh = 3, link-sh = 3, shell = 3 }
-spec = { path = "docs/design/include/input_service.md", section = "入力・ポインタ・時計の登録と到達" }
+ppc_seconds = { sh = 3, link-sh = 3, powermac = 3 }
+spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "製品の HAL 登録" }
 subsystem = "infra"
 level = "L2"
-sources = ["sys/platform/pc98/d2_bind.c", "sys/hal/input/input_service.c", "sys/hal/time/clock_service.c"]
+sources = ["sys/platform/pc98/d2_bind.c", "sys/hal/input/input_service.c", "sys/hal/time/clock_service.c", "sys/platform/powermac/system.c", "sys/platform/powermac/input_boot.c", "sys/platform/powermac/usb_platform.c", "tests/support/hal_powermac.c", "tests/support/product.py"]
 environment = "linux-cross"
-arch = { x86 = ["pc98"], ppc = ["sh", "link-sh", "shell"] }
+arch = { x86 = ["pc98"], ppc = ["sh", "link-sh", "powermac"] }
 needs = []
 expect = "製品初期化後にキー・ポインタ・日付を転送する"
 limits = "装置境界はホストで供給する"
@@ -224,7 +225,7 @@ mutations = [{ id = "unregistered_input", config = "pc98", when = "after_build",
 
 [[check]]
 id = "test_registration"
-spec = { path = "docs/design/tools/checks/registry_v2.md", section = "本体と登録の双方向照合" }
+spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "撤去前の検査登録" }
 subsystem = "infra"
 level = "M"
 sources = ["tests/registry.toml", "tests/support/registry.py"]
@@ -235,7 +236,7 @@ expect = "各本体と登録が一対一で仕様の節が存在する"
 limits = "候補の追跡パス"
 gates = ["push", "main"]
 mutations = [
-    { id = "unregistered_test", config = "local", when = "after_build", replace = "tests/registry.toml", old = "[[check]]\nid = \"ppc_media_build\"\nppc_seconds = { core = 1, link = 1, sh = 1, link-sh = 1, shell = 1, neg1 = 1 }\nspec = { path = \"docs/design/tools/ci/ci_v2.md\", section = \"§0 最小 workflow と仮の関門\" }\nsubsystem = \"infra\"\nlevel = \"L1\"\nsources = [\"make:all\", \"make:iso\"]\nenvironment = \"linux-ppc-cross\"\narch = { ppc = [\"core\", \"link\", \"sh\", \"link-sh\", \"shell\", \"neg1\"] }\nneeds = []\nexpect = \"ビルド成功、PPCKERN.ELF と boot.iso が非空\"\nlimits = \"起動到達と再生成時の一致は別の検査\"\ngates = [\"push\", \"main\"]\nmutations = [{ id = \"ppc_core_missing_iso\", config = \"core\", when = \"after_build\", remove = \"build/out/ppc-kboot/boot.iso\", fail = \"missing boot.iso\" }]", new = "# Removed the media check registration", fail = "unregistered body tests/infra/ppc_media_build.py" },
+    { id = "unregistered_test", config = "local", when = "after_build", replace = "tests/registry.toml", old = "[[check]]\nid = \"ppc_media_build\"\nppc_seconds = { core = 1, link = 1, sh = 82, link-sh = 1, powermac = 8, neg1 = 1 }\nspec = { path = \"docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md\", section = \"製品媒体と互換名\" }\nsubsystem = \"infra\"\nlevel = \"L1\"\nsources = [\"make:all\", \"make:iso\", \"tests/support/media.py\", \"sys/conf/images/ppc-flags.mk\", \"build/targets/ppc-powermac.mk\", \"build/ppc-install-boot.mk\", \"tools/ppc/boot_media.py\", \"tools/ppc/root_lz4_inventory.py\", \"tools/ppc/root_lz4_layout.py\"]\nenvironment = \"linux-ppc-cross\"\narch = { ppc = [\"core\", \"link\", \"sh\", \"link-sh\", \"powermac\", \"neg1\"] }\nneeds = []\nexpect = \"ビルド成功、PPCKERN.ELF と boot.iso が非空、構成名・出力先・旧旗の拒否理由・実像の帯と root を照合\"\nlimits = \"起動到達と再生成時の一致は別の検査\"\ngates = [\"push\", \"main\"]\nmutations = [{ id = \"ppc_core_missing_iso\", config = \"core\", when = \"after_build\", remove = \"build/out/ppc-kboot/boot.iso\", fail = \"missing boot.iso\" },\n    { id = \"legacy_shell_negative\", config = \"powermac\", when = \"after_build\", replace = \"sys/conf/images/ppc-flags.mk\", old = \"$(error KBOOT_SHELL does not support NEGATIVE)\", new = \"# removed legacy guard\", fail = \"legacy shell accepted NEGATIVE\" }]", new = "# Removed the media check registration", fail = "unregistered body tests/infra/ppc_media_build.py" },
     { id = "registered_body_missing", config = "local", when = "after_build", remove = "tests/infra/ppc_media_build.py", fail = "missing body tests/infra/ppc_media_build.py" },
     { id = "registered_section_missing", config = "local", when = "after_build", replace = "docs/design/tools/checks/tests_v2.md", old = "## 配布物と再生成の合否", new = "## 配布の合否", fail = "missing or duplicate section" },
 ]
@@ -2157,7 +2158,7 @@ id = "input_policy_abi"
 spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
 subsystem = "input"
 level = "L1"
-sources = ["userland/gshell/src/kbdnav.rs", "sys/hal/input/kbd_merge.c", "sys/hal/input/keymap_state.c", "sdk/kapi.json", "sdk/include/os32/os32_kbd_policy.h", "sdk/rust/os32api/src/kbd_policy.rs", "sys/kapi/kapi_generated.c", "sys/kern/exec/exec_kapi_init.inc", "sys/input/input_delivery.h", "sys/input/input_delivery.c", "sys/input/input_policy.c", "sys/kapi/input_policy_provider.c", "sys/platform/pc98/input_keymap.c", "sys/platform/powermac/input_keymap_backend.c", "tests/support/fixtures/input_policy/wire.c", "tests/support/fixtures/input_policy/legacy_shell.c", "userland/shell/ui.c", "sys/hal/input/legacy_keymap.c", "tests/support/fixtures/input_policy/layout.rs", "tests/support/fixtures/input_policy/gshell.rs", "tests/support/fixtures/input_policy/entry.S", "userland/gshell/src/pump.rs", "userland/gshell/src/input.rs", "userland/gshell/src/raw_keyboard.rs", "userland/gshell/src/excl.rs"]
+sources = ["userland/gshell/src/kbdnav.rs", "sys/hal/input/kbd_merge.c", "sys/hal/input/keymap_state.c", "sdk/kapi.json", "sdk/include/os32/os32_kbd_policy.h", "sdk/rust/os32api/src/kbd_policy.rs", "sys/kapi/kapi_generated.c", "sys/kern/exec/exec_kapi_init.inc", "sys/input/input_delivery.h", "sys/input/input_delivery.c", "sys/input/input_policy.c", "sys/kapi/input_policy_provider.c", "sys/platform/pc98/input_keymap.c", "sys/platform/powermac/input_keymap_backend.c", "tests/support/fixtures/input_policy/wire.c", "tests/support/fixtures/input_policy/legacy_shell.c", "userland/shell/ui.c", "sys/hal/input/legacy_keymap.c", "tests/support/fixtures/input_policy/layout.rs", "tests/support/fixtures/input_policy/gshell.rs", "tests/support/fixtures/input_policy/entry.S", "userland/gshell/src/pump.rs", "userland/gshell/src/input.rs", "userland/gshell/src/raw_keyboard.rs", "userland/gshell/src/excl.rs", "tests/support/fixtures/input_policy/include/stdio.h", "tests/support/fixtures/input_policy/include/string.h"]
 environment = "linux-cross"
 arch = { x86 = ["pc98"], ppc = ["link-sh"] }
 needs = []
@@ -2199,7 +2200,7 @@ id = "input_exec_entry"
 spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "10.3 登録検査を先行させる" }
 subsystem = "input"
 level = "L1"
-sources = ["sys/kern/av_focus.c", "tests/input/input_policy_abi.py", "sys/kapi/input_policy_provider.c", "sys/kapi/kapi_generated.c", "sys/kern/exec/exec_kapi_init.inc", "sys/input/input_context.c", "sys/kern/init/shell_loop.c", "sys/kern/exec/appslot.c", "sys/kern/exec/exec_entry_commit.inc", "tests/support/fixtures/input_policy/loader.c", "tests/support/fixtures/input_policy/loader.py", "tests/support/fixtures/input_policy/jump.S", "sys/kern/exec/exec_schedule.inc", "sys/kern/exec/exec_launch.inc", "sys/kern/exec/exec_finish.inc", "sys/kern/io_kapi.c", "sys/hal/input/input_service.c", "sys/hal/input/legacy_mode.c", "sys/hal/input/legacy_ring.c", "sys/input/input_policy.c", "tests/support/fixtures/input_policy/entry.S"]
+sources = ["sys/kern/av_focus.c", "tests/input/input_policy_abi.py", "sys/kapi/input_policy_provider.c", "sys/kapi/kapi_generated.c", "sys/kern/exec/exec_kapi_init.inc", "sys/input/input_context.c", "sys/kern/init/shell_loop.c", "sys/kern/exec/appslot.c", "sys/kern/exec/exec_entry_commit.inc", "tests/support/fixtures/input_policy/loader.c", "tests/support/fixtures/input_policy/loader.py", "tests/support/fixtures/input_policy/jump.S", "sys/kern/exec/exec_schedule.inc", "sys/kern/exec/exec_launch.inc", "sys/kern/exec/exec_finish.inc", "sys/kern/io_kapi.c", "sys/hal/input/input_service.c", "sys/hal/input/legacy_mode.c", "sys/hal/input/legacy_ring.c", "sys/input/input_policy.c", "tests/support/fixtures/input_policy/entry.S", "tests/support/fixtures/input_policy/include/stdio.h", "tests/support/fixtures/input_policy/include/string.h"]
 environment = "linux-cross"
 arch = { x86 = ["pc98"], ppc = ["link-sh"] }
 needs = []

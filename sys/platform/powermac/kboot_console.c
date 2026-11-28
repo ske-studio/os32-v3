@@ -8,7 +8,7 @@
 #include "kprintf.h"
 #include "kstring.h"
 #include "kboot_log.h"
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
 #include "sys/kern/console/console_stream.h"
 
 void pm_fd1_write(const char *buf, u32 size, u8 color)

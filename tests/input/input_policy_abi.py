@@ -130,7 +130,7 @@ def verify(config):
                         "sys/hal/input/legacy_keymap.c", "sys/hal/input/kbd_merge.c",
                         "sys/hal/input/keymap_state.c", fixture / "wire.c", fixture / "entry.S", wrap]
         runner = "qemu-ppc" if ppc else "qemu-i386"
-        failure_probe = ["-DFAIL_INIT", "-Wl,--wrap=ikm_policy_init", "-Iuserland/ppc/sh/include",
+        failure_probe = ["-DFAIL_INIT", "-Wl,--wrap=ikm_policy_init", f"-I{fixture / 'include'}",
                          "-Isdk/include", "userland/shell/ui.c", fixture / "legacy_shell.c"]
         for extra in ([], failure_probe):
             subprocess.run(command + extra + ["-lgcc", "-o", exe], check=True)

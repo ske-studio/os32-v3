@@ -4,7 +4,7 @@ from pathlib import Path
 from subprocess import CalledProcessError
 from tools.ownership import Inventory, OwnershipError, git
 
-PPC = ("core", "link", "sh", "link-sh", "shell", "neg1")
+PPC = ("core", "link", "sh", "link-sh", "powermac", "neg1")
 GATE_CHECKS = {"collection_contract", "landing_evidence", "registry_fields", "test_registration"}
 
 

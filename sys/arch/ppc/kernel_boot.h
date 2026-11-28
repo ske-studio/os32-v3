@@ -3,7 +3,7 @@
 #include "types.h"
 #include "memmap.h"
 #define PPC_BOOT_ALIAS_BYTES 0x40000U
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
 #define PPC_BOOT_FB_VA (MEM_DEVICE_APERTURE_BASE + 0x100000U)
 #define PPC_BOOT_FB_LIMIT 0x200000U
 #else

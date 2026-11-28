@@ -25,18 +25,7 @@ kapi_sync は target 名・rustc の版・target JSON の内容で検査専用�
 
 ## 最初の登録例 — PowerPC の配布像を組めること
 
-P4 順 1 のうち `ppc_media_build` は `tests/infra/ppc_media_build.py` に置く。期待の出所は [CI 設計 §0](../ci/ci_v2.md) の PowerPC 6 像と必須ファイル欠落時の赤。対象は製品の Make 規則とそこから組む入力。各構成を清浄な候補 SHA の木で `make ARCH=ppc PLATFORM=powermac <下記の指定> all iso` で組む。既存のビルドジョブをこの呼出しに載せ、出力を配布にも使う。
-
-| 構成 | make への指定 | build/out/ppc-kboot/ 以下の出力先 |
-|---|---|---|
-| core | KBOOT_LINK=0 | . |
-| link | KBOOT_LINK=1 | link |
-| sh | KBOOT_SH=1 KBOOT_LINK=0 | link-sh |
-| link-sh | KBOOT_SH=1 | link-sh |
-| shell | KBOOT_SHELL=1 KBOOT_LINK=0 | link-sh |
-| neg1 | NEGATIVE=1 KBOOT_LINK=0 | neg1 |
-
-実行器は作業木のルートで `python3 tests/infra/ppc_media_build.py <構成> build` を呼ぶ。build は上表の make を実行する。終了値 0 のときだけ、同じ木で末尾の引数を `verify` に替えて呼ぶ。verify は再ビルドせず、指定先の PPCKERN.ELF と boot.iso がそれぞれ非空の通常ファイルかを調べる。成功は 0、製品のビルド失敗・欠落・空ファイルは 1、道具不足や読出し異常は 2。診断には構成と原因を書く。6 構成の通常実行が全て通ればこの契約が通る。
+登録検査 `ppc_media_build` は core・link・sh・link-sh・powermac・neg1 の各構成で `make ARCH=ppc PLATFORM=powermac` の all と iso を組む。verify は PPCKERN.ELF と boot.iso、構成名・出力先、旧旗の拒否理由、実像の帯と root を照合する。構成と互換指定は [製品媒体と互換名](../../../decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md#製品媒体と互換名) に従う。
 
 変異の実行器は隔離した core の木で build が成功した直後（after_build）に、登録で指定した boot.iso を削除し、通常時と同じ verify を呼ぶ。終了値 1 と診断 `missing boot.iso` が揃えば検出となる。登録の全文は[登録設計の見本](registry_v2.md)に置く。当面は適用対象を毎回実行し、REUSED は使わない（U11）。バイト再現性と起動到達は別の検査が判定する。
 

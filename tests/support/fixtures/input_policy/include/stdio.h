@@ -1,5 +1,5 @@
-#ifndef PPC_SH_STDIO_H
-#define PPC_SH_STDIO_H
+#ifndef INPUT_POLICY_FIXTURE_STDIO_H
+#define INPUT_POLICY_FIXTURE_STDIO_H
 
 #include <stddef.h>
 #include <stdarg.h>

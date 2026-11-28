@@ -30,7 +30,7 @@
 
 | ID | 何を残したか | 理由 | 渡し先 |
 |---|---|---|---|
-| PPC-BOOT-RETRY | ppc_boot で link-sh が到達点を欠き、sh が dec_rate で停止した（各 1 回）。いずれも同じ像の再実行で通った | A7 の合否外で観測 | os32powerpc が再現条件を調べる |
+| PPC-BOOT-RETRY | ppc_boot で link-sh が到達点を欠き、sh が dec_rate で停止した（各 1 回）。いずれも同じ像の再実行で通った。run 46041986041 (本線 1128e の途中、2026-11-27) の ppc_boot core 7455 は OpenBIOS が CD の PPCKERN.ELF を読めず「No valid state has been set by load or init-program」で停止 (OS32 のコードの実行前、同じ像の 7450 は通過)。QEMU のファームウェアの読み込みの揺れと見る (1 回のみ) | A7 の合否外で観測 | os32powerpc が再現条件を調べる |
 | FEP-MISSING-STATUS | fep.mod または sqlite.mod が欠けても ime on が「FEP enabled.」を返す。fep.mod だけが欠けても services が MINIMAL まで戻る | A7 の合否外で観測 | 各構成の表示と services の遷移が仕様どおりか確かめる |
 | GUI-TERM-FONT | GUI の端末を 2 つ開くと 1 つ目に `font: open rc=-4` が出る。表示は崩れない | A7 の合否外で観測 | 端末を 2 つ開いてフォントの open が失敗する条件を調べる |
 | HEADER-CHECK-NAMES | ヘッダの注記 11 か所に古い検査名が残る | A7 の合否外。注記も部品の識別値に入るため残した | P8 の候補で hash を見直す時に注記を更新する |

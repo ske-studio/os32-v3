@@ -4,7 +4,7 @@
  * so emergency output also requires DR=1 and the I/G aperture. */
 #include "kboot_log.h"
 #include "ofw.h"
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
 #include "port_service.h"
 #endif
 static const struct pm_log_sink *sinks[PM_LOG_SINK_MAX];
@@ -48,7 +48,7 @@ static int serial_write(void *ctx, const char *bytes, u32 n)
     return pm_escc_write(ctx, bytes, n);
 }
 static const struct pm_log_sink serial_sink = { serial_write, &serial };
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
 /* Zilog UM0109 §3, BRG time constant with the MacIO 3.6864 MHz RTxC
  * and x16 async clock (NetBSD macppc zs.c:303,321,669-673). */
 enum {
@@ -126,7 +126,7 @@ int pm_log_escc_init(u32 csr_alias, u32 data_alias)
     serial.csr = csr_alias;
     serial.data = data_alias;
     pm_escc_rx_bind(&serial);
-#if KBOOT_SHELL || KBOOT_SH
+#if KBOOT_SH
     port_register(&escc_port);
 #endif
     return 0;

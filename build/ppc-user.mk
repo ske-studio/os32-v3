@@ -201,14 +201,6 @@ $(PPC_SH_DIR)/runtime.o: $(PPC_SH_RUNTIME_SRC) $(PPC_SH_PROFILE) userland/ppc/sh
 	@mkdir -p $(@D)
 	$(CC) $(PPC_SH_FLAGS) -Iuserland/ppc/sh -c $< -o $@
 
-$(PPC_SH_DIR)/%.o: userland/ppc/sh/%.c $(PPC_SH_PROFILE) userland/ppc/sh/profile.h
-	@mkdir -p $(@D)
-	$(CC) $(PPC_SH_FLAGS) -c $< -o $@
-
-$(PPC_SH_DIR)/ls.o: userland/lib/rt/ls.c
-	@mkdir -p $(@D)
-	$(CC) $(PPC_SH_FLAGS) -c $< -o $@
-
 $(PPC_USER_OUT)/sh.elf: $(PPC_USER_CRT) $(PPC_SH_OBJ) $(PPC_SH_RT) $(SDK_TARGET_APP_LINK) sdk/link_guard.py sdk/allocator/check_link_target.py $(PPC_USER_NANO) $(PPC_USER_NANO:.a=.json)
 	$(PPC_USER_LINK) -o $@ $(filter %.o,$^) $(PPC_USER_LIBS)
 

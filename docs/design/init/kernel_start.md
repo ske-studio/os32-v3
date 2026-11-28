@@ -35,7 +35,7 @@ void kernel_start(void)            /* 割り込み禁止で入る。戻らない
 |---|---|---|
 | 1 | スタックの印・ブート情報の写し・メモリの検出・CPU と例外・入力/FD/PCI/ディスク・ヒープ・root のマウント・部品の読み込み・時計・`exec_init`・IME・音源・`boot_token_init` | ESCC のログ・GMAC の静止・共通の mm (`memory_boot_init`・`shm_init`・ヒープ)・トラップ/ガード/flush の実証・時計・decrementer・MPIC |
 | 2 | `services_boot`・スプラッシュ・表示の準備と部品・共有ライブラリ・起動のログの保存 | MPIC の配送と時計の実証・`boot_token_init`・LAN・root・FB のコンソール・HostFS・USB・入力 |
-| 3 | `kernel_shell_loop` | `pm_exec_boot` と常駐シェル (`pm_shell_boot` / `pm_cli_boot`)。シェルの無い像は LAN の poll で居続ける |
+| 3 | `kernel_shell_loop` | `pm_exec_boot` の後、共通の `shell_loop_run(&pm_shell_loop_ops)` が常駐シェルを起動。シェルの無い像は LAN の poll で居続ける |
 
 ## 確かめ
 

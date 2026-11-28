@@ -37,11 +37,12 @@ int link_platform_tick_register(void (*fn)(void))
 
 #if KBOOT_SH
 #include "sys/platform/powermac/link_platform.h"
+#include "lan_boot.h"
 #include "usb_boot.h"
 #include "platform_hwb_session.h"
 #if PLATFORM_HWB_SESSION
 #include "remote_control.h"
-#include "terminal_fifo.inc"
+void ring3_abort_request(void);
 
 /* Link-SH owns the PPC control mailbox. Link NOTIFY validates the peer,
  * generation and sequence before queueing a terminal notification. */
@@ -68,7 +69,7 @@ static void terminal_receive(void)
     host_mailbox_commit(alive.host_generation, notice.serial);
     if (notice.kind == REMOTE_NOTIFY_HW_STOP && notice.length == 1 &&
         notice.data[0] == 3 && resident_cui_hw_active())
-        pm_terminal_feed(notice.data, notice.length);
+        ring3_abort_request();
 }
 #endif
 

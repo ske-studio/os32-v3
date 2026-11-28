@@ -9,16 +9,15 @@ import tarfile
 import zlib
 
 PPC = {
-    "core": (["KBOOT_LINK=0"], "."),
-    "link": (["KBOOT_LINK=1"], "link"),
-    "sh": (["KBOOT_SH=1", "KBOOT_LINK=0"], "link-sh"),
-    "link-sh": (["KBOOT_SH=1"], "link-sh"),
-    "shell": (["KBOOT_SHELL=1", "KBOOT_LINK=0"], "link-sh"),
-    "neg1": (["NEGATIVE=1", "KBOOT_LINK=0"], "neg1"),
+    "core": (["KBOOT_LINK=0"], "ppc-kboot"),
+    "link": (["KBOOT_LINK=1"], "ppc-kboot/link"),
+    "sh": (["KBOOT_SH=1", "KBOOT_LINK=0"], "ppc-kboot/link-sh"),
+    "link-sh": (["KBOOT_SH=1"], "ppc-kboot/link-sh"),
+    "powermac": (["IMAGE=powermac"], "ppc-powermac"),
+    "neg1": (["NEGATIVE=1", "KBOOT_LINK=0"], "ppc-kboot/neg1"),
 }
 PPC_MAKE = ["ARCH=ppc", "PLATFORM=powermac"]
 OUT = Path("build/out")
-PPC_OUT = OUT / "ppc-kboot"
 FD = Path("images")
 
 
@@ -54,10 +53,17 @@ def distributed(config):
     return product
 
 
+def ppc_output(config):
+    return OUT / PPC[config][1]
+
+
 def ppc_build(config):
-    product = distributed(config)
+    build_ppc_media(config, distributed(config))
+
+
+def build_ppc_media(config, product):
     if product:
-        folder = PPC_OUT / PPC[config][1]
+        folder = ppc_output(config)
         folder.mkdir(parents=True, exist_ok=True)
         for name in ("PPCKERN.ELF", "boot.iso"):
             shutil.copy2(product / name, folder / name)
@@ -67,7 +73,7 @@ def ppc_build(config):
 
 def ppc_verify(config):
     for name in ("PPCKERN.ELF", "boot.iso"):
-        require(PPC_OUT / PPC[config][1] / name)
+        require(ppc_output(config) / name)
 
 
 def x86_build(config):

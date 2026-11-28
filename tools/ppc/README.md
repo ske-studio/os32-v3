@@ -1,11 +1,9 @@
 
 ## PowerPC の像と層の検査
 
-PowerPC の製品の像は `make ARCH=ppc PLATFORM=powermac [IMAGE=kboot-*]` (または
-`make ARCH=ppc PLATFORM=powermac` に `KBOOT_LINK`・`KBOOT_SH`・`KBOOT_SHELL` の旗) で組む。
-ソースの一覧は x86 と同じ所有者集合 (`build/select.mk`) から引く
-(設計は docs/design/build/select.md)。PPC_CROSS_DIR の既定は `/home/hight/opt/cross-ppc`。
-CI の 6 指定は `.github/workflows/restructure-build.yml` の powerpc ジョブで確認できる。
+製品は `make ARCH=ppc PLATFORM=powermac`（既定の `IMAGE=powermac`）で組む。
+診断像と旧旗の互換出力は [像の選択表](../../docs/design/build/select.md) に従う。
+PPC_CROSS_DIR の既定は `/home/hight/opt/cross-ppc`。
 層の検査は `python3 -B -m tests.infra.ci run --check include_layers` と
 `python3 -B -m tests.infra.ci run --check link_layers` で実行する。
 
