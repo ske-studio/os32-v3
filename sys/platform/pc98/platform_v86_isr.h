@@ -18,6 +18,8 @@ BOOT_FUNCTION(void, v86_fault_handler, (u32 *frame, u32 vector), )
 /* 実 IRQ をゲストに反射する。第 2 引数は **IRQ 番号** (ベクタではない)。
  * ベクタとマスクの判定は仮想 PIC (v86_pic.h) が行う。 */
 BOOT_FUNCTION(void, v86_reflect_irq, (u32 *frame, u32 irq), )
+/* 中間 PIT 割り込みで未配送の IRQ0 を処理する。非 0 なら V86 を終了。 */
+BOOT_FUNCTION(int, v86_refill_timer_irq, (u32 *frame), )
 /* タイマ IRQ の反射経路から呼ぶ。上限超過なら非 0。 */
 BOOT_FUNCTION(int, v86_tick_and_check_timeout, (void), )
 /* キーボード ISR の脱出要求を確認し、非 0 ならセッションを畳む。 */

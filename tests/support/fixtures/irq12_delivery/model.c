@@ -44,7 +44,6 @@ int v86_tick_and_check_timeout(void);
 void __real_v86_reflect_irq(u32 *frame, u32 irq);
 static unsigned timer_deliveries;
 static int masked_burst, last_irq;
-int v86_refill_timer_irq(u32 *frame);
 int __real_v86_pic_candidate(u32 *vector);
 static u16 guest_ivt[512] __attribute__((section(".guestdata"), aligned(16)));
 static u16 guest_stack[32] __attribute__((section(".guestdata"), aligned(16)));

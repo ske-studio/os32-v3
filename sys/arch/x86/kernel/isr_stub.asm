@@ -118,7 +118,6 @@ extern page_fault_handler
 extern timer_handler
 extern kbd_irq_handler
 extern serial_irq_handler
-extern v86_refill_timer_irq
 extern tick_clock_step
 extern mouse_irq_handler
 ;; CPL=3 アプリの強制脱出 (CTRL+STOP)。要求があれば longjmp して戻らない
