@@ -6,8 +6,16 @@
 
 struct pm_diag_slots kdebug_import_slots __attribute__((section(".data.kdebug_import_slots")));
 
+#ifdef INPUT_MEASURE_DIAG
+#include "sys/kern/kdebug/input_measure.inc"
+#endif
+
 static i32 diag_call(u32 op, void *buf, u32 size)
 {
+#ifdef INPUT_MEASURE_DIAG
+    if (op == INPUT_MEASURE_USB || op == INPUT_MEASURE_FG1)
+        return input_measure_record(op, buf, size);
+#endif
     struct probe_wire *w = buf;
     if (op == HW_OP) {
         struct hw_req *req = buf;

@@ -38,6 +38,7 @@ void __cdecl kapi_sys_exit(int status);
 i32 exec_trim_done(u32 epoch);
 
 /* 従来の起動。子が終わるまで呼び出し元を塞ぐ (CUI の入れ子はこれ)。 */
+int exec_run_shell(const char *cmdline, int line_edit);
 int exec_run(const char *cmdline);
 
 /* 直前の exec_run の結果を「種別 + 値」で返す (KAPI v55、票 TASK_EXIT_STATUS)。

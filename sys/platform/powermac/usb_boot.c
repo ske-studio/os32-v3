@@ -1,6 +1,9 @@
 /* Takeover: FreeBSD (BSD-2) controller/ohci.c:183-214, ohci_pci.c.
  * PCI resources: Open Firmware PCI Binding 2.1. No BAR sizing writes.
  * IRQ-less OHCI: MIE stays clear; the 100Hz resident slot runs usb_service. */
+#ifdef INPUT_MEASURE_DIAG
+#include "sys/kern/kdebug/input_measure_clock.h"
+#endif
 #include "usb_boot.h"
 #include "sys/dev/usb/usb_core.h"
 #include "sys/dev/usb/ohci_priv.h"
@@ -14,7 +17,13 @@ static u32 count, active, last_service_ms;
 static void service(void)
 {
     last_service_ms = usbp_ms();
+#ifdef INPUT_MEASURE_DIAG
+    struct input_measure_stamp stamp = input_measure_start();
+#endif
     usb_service();
+#ifdef INPUT_MEASURE_DIAG
+    input_measure_finish(stamp, INPUT_MEASURE_USB);
+#endif
     for (u32 i = 0; i < count; i++) {
         struct usb_hc *hc = &controllers[i];
         for (u32 a = 1; a <= USB_DEV_MAX; a++) {

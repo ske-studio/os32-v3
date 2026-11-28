@@ -555,6 +555,11 @@ static int exec_map_launch_err(int rc)
 
 int exec_run(const char *cmdline)
 {
+    return exec_run_shell(cmdline, 0);
+}
+
+int exec_run_shell(const char *cmdline, int line_edit)
+{
     int rc;
 
     /* 票 §2-1: **入る前に消す**。消さないと「起動しなかった」経路
@@ -565,7 +570,7 @@ int exec_run(const char *cmdline)
 
     AppSlot *caller = appslot_get(appslot_cur());
     rc = (exec_nest_level != 0 && caller && caller->gui)
-         ? EXEC_ERR_INVALID : exec_launch(cmdline, 0);
+         ? EXEC_ERR_INVALID : exec_launch(cmdline, 0, line_edit);
 
     if (g_last_kind == EXEC_KIND_NONE) {
         g_last_kind = exec_map_launch_err(rc);
@@ -608,7 +613,7 @@ i32 exec_start(const char *cmdline)
 {
     if (res_owner_get() != APP_ID_SHELL) return OS32_ERR_INVAL;
     if (cmdline == 0 || cmdline[0] == '\0') return OS32_ERR_INVAL;
-    return exec_launch(cmdline, 1);
+    return exec_launch(cmdline, 1, 0);
 }
 
 #include "exec_schedule.inc"

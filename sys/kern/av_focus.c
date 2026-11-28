@@ -36,7 +36,7 @@ int av_focus_set(int owner)
     u32 destination = owner ? (u32)owner : APP_ID_SHELL;
     int rc = input_context_owner_select(destination, input_context_owner_generation(destination));
     if (!rc) {
-        input_delivery_discard_keys();
+        input_delivery_flush();
         select_owner(owner);
     }
     irq_restore(irq);

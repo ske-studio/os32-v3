@@ -1,3 +1,4 @@
+#include "sys/hal/input/input_work.h"
 /* PC-9821 boot wiring. Each callback retains its original boot boundary. */
 #include "boot.h"
 #include "boot_names.h"
@@ -47,6 +48,8 @@ static void pc98_boot_input(const struct boot_context *ctx)
     /* キーボード初期化。カナ・CAPS の初期値は保存済み BDA (053Ah) から取る。
      * page0 は通常 NP (sys/platform/pc98/pc98.h BIOS_WORK_KB_SHIFT、memmap.h)。 */
     tvram_print(48, 1, "KBD...", TATTR_GREEN);
+    int rc_work = input_work_register();
+    if (rc_work < 0) kprintf(TATTR_WHITE, "USB repeat uses synchronous delivery (%d)\n", rc_work);
     kbd_init();
     tvram_print(54, 1, "OK", TATTR_WHITE);
 

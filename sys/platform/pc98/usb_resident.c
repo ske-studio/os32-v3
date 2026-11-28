@@ -1,3 +1,6 @@
+#ifdef INPUT_MEASURE_DIAG
+#include "sys/kern/kdebug/input_measure_clock.h"
+#endif
 #include "usb_resident.h"
 #include "usb_probe.h"
 #include "kprintf.h"
@@ -99,7 +102,13 @@ static void run_scan(void)
         first_tick = 0;
         pc98_usb_service_log("[usb] first tick", NULL);
     }
+#ifdef INPUT_MEASURE_DIAG
+    struct input_measure_stamp stamp = input_measure_start();
+#endif
     tick_target();
+#ifdef INPUT_MEASURE_DIAG
+    input_measure_finish(stamp, INPUT_MEASURE_USB);
+#endif
 }
 
 static void usb_idle(void)

@@ -54,6 +54,7 @@
 | NP21W-KEYEDGE-MERGE | NP21/W のフォークの aidebug-key-edge (b49b96a83、/api/key の scan と down) をフォークの main に取り込むか | ユーザーの判断待ち (今は非公開の pre-release の exe で pc98emu が使用) | ユーザーの判断 |
 | CI-WAIT-PPC20 | GitHub Actions の push から最後のジョブまで約 28〜32 分。PowerPC の check の 20 組が同時の runner の上限を越え開始が最大 12 分待つ | 組の数は 2026-11-24 のユーザー決定「20組に」 — 変えるならユーザーに諮る | 2026-11-25: 文書・作り直しの道具だけの変更は独立した `ppc-scope` で判定し、統合枝と main でもジョブの `if` で ppc-qemu の 20 組と ppc-compile を飛ばす。PPC が必要な変更の待ち時間は引き続き実測する |
 | USB-TICK-BUDGET-1 | Ra266 で OHCI 完了・HID 入力・挿抜と共有 IRQ 負荷時の USB slot と IRQ0 の最大時間を測る。idle 繰り越し導入（2026-11-23）後は、完了の集中・挿抜・共有 IRQ 負荷で前景の usb_service の連続 IF=0 の最大時間と HID 入力の遅れも測る | 予約 90 µs は 3 HC × 30 µs の仮定 | 実測最大に余裕を加えて予約を再設定し、1 kHz で IRQ0 最大 200 µs 以内と入力継続を確認して閉じる |
+| USB-PPC-MASK | PowerMac の USB サービス全体の IRQ マスク時間。6b 前（5e8af30c8）の診断像の usb_service() 呼出しだけで QEMU 7450 で最大 2,111 µs、7455 で 1,811 µs（起動を含む） | 入力配送の FG1 移行前からある。後続の機器走査・ログを含む全マスク区間と実機の内訳は未測定 | USB サービスの予算を扱う段で、HC の走査・転送完了・探索のどこで時間を使うか実機で確認 |
 | USB-IDLE-LATENCY-1 | CPU を使い切る処理が協調点に戻らない間の HID 配送の遅れと IRQ の無い HC の見回り（sol レビュー 2026-11-23） | tick の予算拒否が続くと次の協調点まで配送が待たされ、遅れの上限がない。IRQ の無い HC の見回りも止まる | Ra266 で測定後、予算付きの実行点を設けるか、許容する遅れと条件を設計で決める |
 | INPUT-REPEAT | 押し続けたキーのリピート配送 | NP21/W の hold はメイクを繰り返さない | TASK_INPUT_HAL。メイクを反復する鍵盤で確認 |
 | INPUT-V86 | V86 ゲストへのキー配送 | ゲストで配送を確認する手順が無い | TASK_INPUT_HAL。V86 の受入手順を整えた時 |

@@ -415,7 +415,7 @@ PC-98 と PowerMac の各初期化入口で ikm_policy_init の失敗を注入�
 |gshell/src/pump.rs の gshell_gui_pump、input::capture、X3 の待ち|X4 が上限付きの raw・pointer 取込みと窓用リング追記、X3 が焦点・ドラッグ・閉じる操作を担当。カーソル描画は既存 backend。通常の syscall / wait の FG1 巡で repeat を進める|HAL へ WM callback を登録しない。HAL 側は旧出口までとし、同一打鍵を別の GUI キューへ複製しない|
 |kern/input_legacy.c と機種別 InputLegacyProvider|PC-98 の serial 優先・GUI 注入・IME、PowerMac の LAN decoder/lookahead と USB の優先順、peek と try の消費差を保つ。wait は既存 idle_wait_step を使う|端末を先読みして消費する仕事は追加しない。将来の振動出力は USB サービス所有。現行 in2_pad_vibrate は接続 pad 不在を返す|
 
-USB サービスの IRQ マスク区間には HC・機器・iface の走査、転送 callback、探索が入る（usb_service.c）。scan(32) は HC ごとの一呼出の上限。6b の追加走査は保留4枠と io_request の登録表最大16枠。期限では従来の状態評価を1回行い、配送値を1枠に保存する。通知に割当・待機・時計予算換算を含めない。採時・集約は kdebug 有効時に限る。サービス全体の IRQ マスク時間と、FG1 が1枠の検証から旧出口の完了まで再度 IRQ を止める最長時間を分けて測る。
+USB サービスの IRQ マスク区間には HC・機器・iface の走査、転送 callback、探索が入る（usb_service.c）。scan(32) は HC ごとの一呼出の上限。6b の追加走査は保留4枠と io_request の登録表最大16枠。期限では従来の状態評価を1回行い、配送値を1枠に保存する。通知に割当・待機・時計予算換算を含めない。採時・集約は kdebug 有効時に限る。USB 診断値は PC-98 の tick_target()、PowerMac の usb_service() の呼出し前後を測る。PC-98 の前処理、PowerMac の後続の機器走査・ログ、両機種の IRQ 取得・復元はこの区間の外にある。IRQ マスク全体と IRQ0 全体の実測は USB-TICK-BUDGET-1・USB-PPC-MASK で扱う。
 
 ### 11.2 登録と通知の寿命
 
@@ -423,7 +423,7 @@ USB サービスの IRQ マスク区間には HC・機器・iface の走査、�
 
 入力サービスの内部登録値は Tier2・120 µs 固定。io_work.c の登録時と policy 更新時に入力 ID には同じ固定値を供給し、既存の dispatcher と slice に接続する。IOT1 は4行・80 byte のまま。USB repeat に利用者別の優先度・時間設定を必要とする用途はない。
 
-保留は USB 鍵盤 handle 当たり1件、最大4件。src/generation、usage と、採取済みの KmKey・old・KmEvalResult・raw_due・修飾値を値で保持する。USB iface やモジュールのポインタは保存しない。各期限で既存 capture の検証・km_state_apply・評価を IRQ 排他中に一度行う。V86 中はこの時点で配送を抑止する。他は同じ枠を上書きして通知する。FG1 は評価済み値による旧出口だけを実行する。期限→ShiftA make→FG1→break は tap 成立、ShiftA make→別キー期限→ShiftA break→FG1 は期限時に tap 解除済みで ALT は反転しない。印の破棄は採取済み状態を巻き戻さない。
+保留は USB 鍵盤 handle 当たり1件、最大4件。src/generation、usage と、採取済みの KmKey・KmEvalResult・raw_due・修飾値を値で保持する。USB iface やモジュールのポインタは保存しない。各期限で既存 capture の検証・km_state_apply・評価を IRQ 排他中に一度行う。V86 中はこの時点で配送を抑止する。他は同じ枠を上書きして通知する。FG1 は評価済み値による旧出口だけを実行する。期限→ShiftA make→FG1→break は tap 成立、ShiftA make→別キー期限→ShiftA break→FG1 は期限時に tap 解除済みで ALT は反転しない。印の破棄は採取済み状態を巻き戻さない。
 
 HID と常駐 make は sys/hal/input/keymap.h の共通 inline 判定を用いる。HID map の norepeat bit が0、compat_sc が128未満、4文字面のどれかが void 以外の場合だけ対象を更新する。hid_kbd_repeatable はこの判定に委譲する。kbd_done は usage 通知後に対象を更新するので、常駐 usb_input_usage はその make 中に同じ判定で旧対象の枠を消す。非反復 make は HID の対象と次の正規期限を保つ。PC-98 本体と全 USB 鍵盤で、後発の通常 make が同期で旧出口へ進む直前に、同じ IRQ 排他内で全源の旧印を捨てる。A の期限後に B を打てばその巡は B だけを出し、次の正規期限から反復を再開する。対象 break・detach は源別に解放前に消す。修飾・lock の遷移は PC-98 本体、全 USB 源、切断 release と boot lock 解放を含め、状態更新と同じ IRQ 排他内で全旧印を消す。
 
@@ -435,10 +435,12 @@ WM は sync_av_focus で最後に通知が成功した front_id と owner を現
 
 1単位は1枠の検証・消費（無効化済みの取り出しも最大1単位）。1巡最大4件、通常120 µs、max_unit_us 初期見積り30 µs。数値は整数の初期調整値。両機種で最長1単位を測り、公平枠で30 µs を超えれば値または単位を見直す。1件の途中で切らないため、時限は次を開始する上限である。
 
+計測は同じ CPU・USB 鍵盤・前景で長押しと解放を繰り返す。診断像（PC-98 は make kernel-tick-probe、PowerMac は別 KB_OUT で INPUT_MEASURE_DIAG_BUILD=1）は KDEBUG=1、RUNNING を確認し、停止したゲストで kdebug の物理ロード先 base_pa に kdebug.elf の input_measure_stats のオフセットを足して 4 個の u32（USB 呼出し件数・区間最大 µs、FG1 消費件数・最大 µs）を読む。QEMU 7450/7455 の FG1 の最大 95/87 µs は IRQ 外で1件を配送する診断区間の値。30 µs は公平枠の開始判断の初期見積りで、IRQ0 の 200 µs 予算は IRQ0 全体を測って判定する。起動以降の最大で、空巡回は FG1 に数えず、30 µs と比べるのは FG1 の値だけ。製品像（通常ビルド、KDEBUG=0）では同じ長押しの make・repeat ごとの配送数と到着時刻を QEMU / NP21/W の外部記録から取り、初回遅延・以降の間隔・期待期限に対する不足・解放後の余分な配送を照合する。ゲストとホストの時計および観測粒度を記録し、診断像の最長値を併記して、予算の枯渇は製品像で判断する。
+
 1. 製品入口は AC-CTX 適合の idle_work_run / 明示 pump 経由の io_dispatch に限る。自動入口は idle_work_run の IF/EE・IRQ 深さ検査を使う。明示入口 kapi_io_pump にも dispatch 前に同じ検査を置き、不適合時は仕事量0。呼出元はロック外の FG1 に限る。FG0・排他中は採取・清算・io_request まで。adapter を呼ぶのは io_dispatch だけで、入れ子の dispatch は既存 running により仕事量0。
 2. dispatcher の slice を引き継ぐ。io_slice_limit(slice,120,4) で残時間・公平枠1件を広げず、各単位の直前に io_slice_take を行う。定常時は換算済み表を引く。表 miss 時の整数換算は FG1 内に限る。120 µs は開始締切であり、4件消化や締切までの完了は保証しない。換算失敗、時計世代交代、時限・件数到達では未着手の枠を保つ。u32 raw count の差と source/generation は既存 slice API に任せる。
 3. IRQ 排他内で固定4枠から有効な印を一つ選び、鍵盤 source の同一性と押下を確認し、印の消費と評価済み値の input_capture_delivery / input_emit_keymap による配送1件を不可分にする。割込み状態を戻してから次の単位へ。無効な印を捨てても後続枠は残す。in2 への repeat、押下数の加算、lock 反転はゼロ。
-4. 印が残れば IO_MORE、空なら IO_DONE。io_work.c が callback 前に pending を下げ、IO_MORE で再予約する。走行中の新しい io_request は次巡まで残る。HAL は dispatcher の pending を消さず、終了判定の直後の到着も失わない。未到来の期限には IO_MORE を返さず USB の次回通知を待つ。協調点のない区間には配送期限を約束しない。
+4. 印が残れば IO_MORE、空なら IO_DONE。io_work.c が callback 前に pending を下げ、IO_MORE で再予約する。走行中の新しい io_request は次巡まで残る。HAL は dispatcher の pending を消さず、終了判定の直後の到着も失わない。未到来の期限には IO_MORE を返さず USB の次回通知を待つ。協調点のない区間には配送期限を約束しない。常駐 rshell は行内の空読みを続ける間も一定回数ごとに io_pump を呼び、USB の次の期限までに前の印を消費できるようにする。
 
 ### 11.4 RED を先に取る段と受入
 

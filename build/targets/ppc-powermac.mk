@@ -272,6 +272,15 @@ $(KB_OUT)/config/c-gui.flags: ppc-layout-force
 	@echo '$(filter 1,$(PPC_C_GUI))' > $@.tmp
 	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
 $(KB_OUT)/sys/platform/powermac/shell_loop_ops.o: $(KB_OUT)/config/c-gui.flags
+KB_INPUT_MEASURE_OBJ := $(addprefix $(KB_OUT)/,diag.o sys/hal/input/input_work.o sys/platform/powermac/usb_boot.o sys/kern/module/kdebug_call.o)
+$(KB_INPUT_MEASURE_OBJ): $(KB_OUT)/config/input-measure.flags
+ifeq ($(INPUT_MEASURE_DIAG_BUILD),1)
+$(KB_INPUT_MEASURE_OBJ): private KB_FLAGS += -DINPUT_MEASURE_DIAG
+endif
+$(KB_OUT)/config/input-measure.flags: ppc-layout-force
+	@mkdir -p $(@D)
+	@echo '$(filter 1,$(INPUT_MEASURE_DIAG_BUILD))' > $@.tmp
+	@if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
 $(KB_OUT)/config/shell-layout.flags: ppc-layout-force
 	@mkdir -p $(@D)
 	@echo '$(filter 1,$(KBOOT_SHELL_LAYOUT_DIAG))' > $@.tmp

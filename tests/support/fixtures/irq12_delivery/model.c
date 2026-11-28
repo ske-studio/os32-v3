@@ -19,6 +19,7 @@ void v86_enter(const struct v86_context *ctx)
     if (fault_exit) v86_runtime_end();
 }
 void kprintf(u8 attr, const char *fmt, ...) {}
+void input_work_invalidate_locked(void) {}
 void mouse_irq_handler(void) { ++mouse; }
 void __wrap_v86_reflect_irq(u32 *frame, u32 irq) { ++requests; if (vm) reflection += irq; }
 unsigned inp(unsigned port) { return port == 10 ? slave_mask : 255; }

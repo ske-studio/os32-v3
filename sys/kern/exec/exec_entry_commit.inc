@@ -1,14 +1,13 @@
 /* All image, argv and arch preparation has succeeded. Failure here still
  * belongs to the pre-commit rollback path in exec_launch. */
 static int exec_enter_prepared(AppSlot *ctx, int id, int launcher_id, int gui,
-                               int initial_gui, u32 text_sz, volatile u32 *io_parent_depth)
+                               u32 context, u32 text_sz, volatile u32 *io_parent_depth)
 {
     int is_shell = id == APP_ID_SHELL;
     u32 parent = is_shell ? 0 : (u32)launcher_id;
     u32 parent_gen = parent ? appslot_at(launcher_id)->exec_gen : 0;
     int gui_session = con_sink_is_enabled();
-    if (input_context_owner_reserve(id, ctx->exec_gen, parent, parent_gen,
-            initial_gui ? INPUT_CONTEXT_GUI : INPUT_CONTEXT_RUNNING))
+    if (input_context_owner_reserve(id, ctx->exec_gen, parent, parent_gen, context))
         return EXEC_ERR_INVALID;
 
     arch_fp_save(&fp_parent[exec_nest_level]);

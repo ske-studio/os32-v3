@@ -36,6 +36,7 @@ pub mod av {
     pub struct IN2_WmState { pub size: u32, pub gen: u32, pub excl: u32, pub owner: i32 }
 }
 pub struct Api {
+    pub av_focus_set: unsafe fn(i32) -> i32,
     pub gfx_screen_owner: unsafe fn() -> i32,
     pub kbd_inject: unsafe fn(*const u8, i32) -> i32,
     pub kbd_dropped_count: unsafe fn() -> u32,
@@ -49,6 +50,7 @@ pub struct Api {
 }
 pub fn api() -> Api {
     Api {
+        av_focus_set: |_| if multiapp::FAIL_NEXT.swap(false, std::sync::atomic::Ordering::Relaxed) { -1 } else { 0 },
         gfx_screen_owner: || unreachable!(),
         kbd_inject: |_, _| unreachable!(),
         kbd_dropped_count: || 0,
@@ -161,15 +163,32 @@ mod multiapp {
     pub(crate) use stop_dispatch::top_level_abort;
     pub fn chain_tail(owner: i32) -> i32 { owner }
     pub fn note_injected_key(_: i32) { unreachable!() }
+    #[cfg(not(real_focus))]
     static WINDOW: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(10);
+    #[cfg(not(real_focus))]
     pub fn av_window() -> u32 { WINDOW.load(Ordering::Relaxed) }
+    #[cfg(not(real_focus))]
     pub fn av_owner() -> i32 { OWNER.load(Ordering::Relaxed) }
+    #[cfg(not(real_focus))]
     pub fn sync_av_focus(st: &mut super::wm::GuiState) {
         if !FAIL_NEXT.swap(false, Ordering::Relaxed) {
             OWNER.store(st.front_owner(), Ordering::Relaxed);
             WINDOW.store(st.front_id(), Ordering::Relaxed);
         }
     }
+    #[cfg(real_focus)]
+    mod actual_focus {
+        use crate::wm::GuiState;
+        struct State { av_window: u32, av_owner: i32 }
+        fn m() -> &'static mut State {
+            static mut STATE: State = State { av_window: 10, av_owner: 2 };
+            unsafe { &mut *std::ptr::addr_of_mut!(STATE) }
+        }
+        include!(env!("WM_FOCUS_ITEMS"));
+    }
+    #[cfg(real_focus)]
+    pub use actual_focus::{av_window, av_owner, sync_av_focus};
+
 }
 mod fullscreen {
     pub fn owner() -> i32 { unreachable!() }

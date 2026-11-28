@@ -3,6 +3,8 @@
 
 #include "types.h"
 
+#define IO_SVC_INPUT_REPEAT 0x49525054u
+#define INPUT_REPEAT_US 120u
 #define IO_PASS_US 500u
 
 /* Internal raw-count state: callers use begin/take, never access members. */

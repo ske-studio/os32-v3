@@ -13,6 +13,7 @@ from tests.support.media import Failure, main
 def verify(config):
     probe = """
 #include "input_context.h"
+void input_work_invalidate_locked(void) {}
 unsigned ikm_policy_generation(void) { return 1; }
 void input_gui_key_lost(void) { __builtin_trap(); }
 int in2_excl_keyboard(void) { return 0; }
@@ -33,7 +34,7 @@ int main(void) {
         (folder / "io.h").write_text("static unsigned irq_save(void){return 0;}\n"
                                      "static void irq_restore(unsigned flags){(void)flags;}\n")
         result = subprocess.run(["cc", "-Werror=implicit-function-declaration", "-I" + directory,
-                                 "-Isys/input", "-Isys/include", "-Isdk/include/os32",
+                                 "-I.", "-Isys/input", "-Isys/include", "-Isdk/include/os32",
                                  "sys/input/input_delivery.c", "sys/input/input_context.c",
                                  "-x", "c", "-", "-o", folder / "probe"], input=probe, text=True)
         if result.returncode or subprocess.run([folder / "probe"]).returncode:

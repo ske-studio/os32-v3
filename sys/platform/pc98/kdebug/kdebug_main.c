@@ -226,8 +226,16 @@ static int gfx_trace_call(u32 op, void *buf, u32 size)
 extern int gfx_transfer_bench(void);
 #endif
 
+#ifdef INPUT_MEASURE_DIAG
+#include "sys/kern/kdebug/input_measure.inc"
+#endif
+
 static i32 recovery_call(u32 op, void *buf, u32 size)
 {
+#ifdef INPUT_MEASURE_DIAG
+    if (op == INPUT_MEASURE_USB || op == INPUT_MEASURE_FG1)
+        return input_measure_record(op, buf, size);
+#endif
 #ifdef GFX_MEASURE_DIAG
     if (op == GFX_G5M_RUN)
         return buf || size ? OS32_ERR_INVAL : gfx_transfer_bench();

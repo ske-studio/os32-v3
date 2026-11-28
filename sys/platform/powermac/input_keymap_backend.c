@@ -1,3 +1,4 @@
+#include "sys/hal/input/input_work.h"
 #include "sys/input/input_policy.h"
 #include "input_usb.h"
 #include "usb_boot.h"
@@ -22,6 +23,8 @@ void pm_usb_boot(u32 tb_hz)
 {
     pm_usb_platform_init(tb_hz);
     pm_input_keymap_boot();
+    int rc_work = input_work_register();
+    if (rc_work < 0) usbp_log("USB repeat uses synchronous delivery (%d)\n", rc_work);
     pm_usb_scan();
 }
 

@@ -11,6 +11,7 @@
 #include "input_service.h"
 #include "con_sink.h"
 #include "kbd.h"
+#include "idle_work.h"
 
 int pc98_osri_show(const struct OsriImage *image, struct OsriViewRun *ctl);
 
@@ -82,6 +83,9 @@ int pc98_osri_show(const struct OsriImage *image, struct OsriViewRun *ctl)
         u32 remaining = prefix < budget ? budget - (u32)prefix : 0;
         pl_run_init(&run, state, now, remaining);
         while (pl_run_more(&run, tick_count)) {
+            idle_work_run();
+            if (pc98_osri_poll(&poll)) { rc = GFX_OSRI_SHOW_CANCELLED; goto done; }
+            if (!pl_run_more(&run, tick_count)) break;
             int frame = pl_v2_frame_poll(state, image, plan, pc98_osri_poll, &poll);
             if (frame == PL_FRAME_CANCEL) { rc = GFX_OSRI_SHOW_CANCELLED; goto done; }
             if (frame == PL_FRAME_NO_SYNC) goto done;
@@ -91,6 +95,7 @@ int pc98_osri_show(const struct OsriImage *image, struct OsriViewRun *ctl)
     } else {
         /* Fixed images have no deadline. Each finite VSYNC wait keeps IF open. */
         for (;;) {
+            idle_work_run();
             if (pc98_splash_raster_frame(state, image)) break;
             if (pc98_osri_poll(&poll)) { rc = GFX_OSRI_SHOW_CANCELLED; break; }
         }
