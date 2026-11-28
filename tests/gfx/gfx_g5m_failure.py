@@ -8,4 +8,5 @@ from tests.support.gfx2_host import host_check
 
 if __name__ == "__main__":
     host_check("gfx_transfer_bench", [], {1: "forced transfer failure",
-               2: "G5m retried after DMA failure", 3: "transfer pixels or guard"}, gc_sections=True, cflags=["-D__cdecl="])
+               2: "G5m retried after DMA failure", 3: "transfer pixels or guard",
+               4: "outstanding DMA recovery"}, gc_sections=True, cflags=["-D__cdecl="])

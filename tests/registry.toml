@@ -2250,7 +2250,10 @@ needs = []
 expect = "丸め後の矩形和・plane/page の画素・失敗矩形の再送と全画素一致・guard 不一致の形状の拒否"
 limits = "ホストの plane 写像と合成ログを使う。実機の速度・画素は別測定"
 gates = ["push", "main"]
-mutations = [{ id = "plane_as_index8", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "transferred += 2 * size", new = "transferred += size", fail = "clipped union or plane transfer" },
+mutations = [
+    { id = "accept_truncated", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "run.get('completed_groups') == len(rows)", new = "True", fail = "incomplete or failed sweep accepted" },
+    { id = "ignore_previous", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "f['previous'] + f['draw']", new = "f['draw']", fail = "mixed page restoration" },
+    { id = "plane_as_index8", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "transferred += 2 * size", new = "transferred += size", fail = "clipped union or plane transfer" },
     { id = "discard_failed_rect", config = "pc98", when = "after_build", replace = "sys/hal/gfx/gfx_present.c", old = "dirty_queue.count -= i;", new = "dirty_queue.count = 0;", fail = "failed packed present lost dirty" },
     { id = "drop_scan_scroll", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_snapshot.c", old = "e->w, e->h, e->y);", new = "e->w, e->h, 0);", fail = "scan bank, scroll or reference pixels" },
     { id = "skip_present", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "frame['draw'].append(rect)", new = "pass", fail = "kernel present trace" },
@@ -2269,6 +2272,7 @@ expect = "共用面への強制 M2MF が失敗したらその回は失敗、再�
 limits = "GF は模型。実機の WC 属性・fence の経過時間は測らない"
 gates = ["push", "main"]
 mutations = [
+    { id = "hide_pending", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_transfer_bench.c", old = "!t->channel->staging_pending", new = "true", fail = "outstanding DMA recovery" },
     { id = "retry_failed_dma", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_transfer_bench.c", old = "stopped = true;", new = "stopped = false;", fail = "G5m retried after DMA failure" },
     { id = "skip_ram_guard", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_transfer_bench.c", old = "guard += ram[h * rp] != GUARD;", new = "guard += 0;", fail = "transfer pixels or guard" },
     { id = "allow_ifc", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kdebug/gfx_transfer_bench.c", old = "&t->ram, true, dl", new = "&t->ram, false, dl", fail = "forced transfer failure" }

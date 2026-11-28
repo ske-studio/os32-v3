@@ -37,16 +37,32 @@ def verify(config):
     retried['samples'][0]['frames'][1]['scan'] = '0300'
     if retry(retried)['passed']:
         raise Failure('retry pixels')
-    shape = ['get', 8, 20, 15, 1]
-    groups = [dict(direction='get', w=8, h=20, pitch=15, offset=1, route=route, group=i,
+    shape = ['put', 8, 20, 15, 1]
+    groups = [dict(direction='put', w=8, h=20, pitch=15, offset=1, route=route, group=i,
                    us=us, count=100, rc=0, diff=0, guard_diff=0)
               for route, us in [('cpu', 2), ('m2mf', 1)] for i in range(51)]
-    run = dict(observed=[shape], groups=groups)
-    if g5m(run)['get']['shapes'] != [tuple(shape[1:])]:
+    run = dict(observed=[shape], groups=groups, completed_groups=len(groups))
+    if g5m(run)['put']['shapes'] != [tuple(shape[1:])]:
         raise Failure('shape selection')
+    for previous, expected in ((32, 8), (8, 4), (0, 0)):
+        mixed = [*lines[:3], f'GXT1 4 1 {previous} 0 16 1 0 0',
+                 'GXT1 3 1 0 0 48 1 6 1', 'GXT1 end 0', 'GOP1 move 0 37 24 1 0']
+        sample, = serial_trace(mixed, [48, 1], 'PLANAR4')['samples']
+        if sample['restore_bytes'] != expected:
+            raise Failure('mixed page restoration')
     groups[-1]['guard_diff'] = 1
-    if g5m(run)['get']['shapes']:
+    if g5m(run)['put']['shapes']:
         raise Failure('guard failure accepted')
+    groups[-1]['guard_diff'] = 0
+    rows = [f"G5M1 put 8 20 15 1 {r['route']} {r['group']} 100 {r['us']} 0 0 0 100"
+            for r in groups]
+    for tail in ([], ['G5M1 done 103'],
+                 ['G5M1 get 8 20 15 1 m2mf 0 0 0 -1 0 0 0', 'G5M1 done 103']):
+        log = ['G5M1 map WC 640 307200 10000', *rows, *tail]
+        decoded = serial_trace(log, [640, 480], 'INDEX8')
+        decoded['observed'] = [shape]
+        if g5m(decoded)['put']['threshold'] is not None:
+            raise Failure('incomplete or failed sweep accepted')
 
 
 if __name__ == '__main__':

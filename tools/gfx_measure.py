@@ -113,7 +113,11 @@ def g5m(run):
     """Only measured shapes observed at the public entry may enter the table."""
     groups = defaultdict(lambda: defaultdict(dict))
     observed = {tuple(shape) for shape in run['observed']}
-    for row in run['groups']:
+    rows = run['groups']
+    valid = bool(rows) and run.get('completed_groups') == len(rows)
+    for row in rows:
+        valid &= (row['rc'] == row['diff'] == row['guard_diff'] == 0
+                  and row['count'] == 100 and row['us'] >= 0)
         shape = tuple(row[key] for key in ('direction', 'w', 'h', 'pitch', 'offset'))
         if shape not in observed:
             continue
@@ -123,8 +127,7 @@ def g5m(run):
         samples = groups[shape][route]
         if group in samples:
             raise ValueError('duplicate group')
-        samples[group] = (row['us'] if row['rc'] == row['diff'] == row['guard_diff'] == 0
-                          and row['count'] == 100 and row['us'] >= 0 else None)
+        samples[group] = row['us']
     answer = {}
     for direction in ('put', 'get'):
         candidates = []
@@ -139,7 +142,7 @@ def g5m(run):
             win = len(stats) == 2 and all(a < b for a, b in zip(stats['m2mf'], stats['cpu']))
             candidates.append((shape[1] * shape[2], shape, win, stats))
         last_loss = max((size for size, _, win, _ in candidates if not win), default=-1)
-        allowed = [(size, shape) for size, shape, win, _ in candidates if win and size > last_loss]
+        allowed = [(size, shape) for size, shape, win, _ in candidates if valid and win and size > last_loss]
         answer[direction] = dict(threshold=min((s for s, _ in allowed), default=None),
                                  shapes=[shape[1:] for _, shape in allowed], measured=candidates)
     return answer
@@ -170,7 +173,7 @@ def serial_trace(lines, size, pixel_format):
     """Decode a single P0a operation or a G5m sweep from its serial capture."""
     samples, observed, groups = [], defaultdict(int), []
     active = pending = frame = None
-    operation = mapping = None
+    operation = mapping = completed_groups = None
     for line in lines:
         fields = line.strip().split()
         if not fields:
@@ -234,8 +237,8 @@ def serial_trace(lines, size, pixel_format):
             written = sum(w['bytes'] for f in pending for w in f['writes'])
             if written != int(fields[4]):
                 raise ValueError('trace disagrees with present_bytes')
-            restore = sum(union_pixels(f['previous'], *size) // 2 for f in pending
-                          if not f['draw'])
+            restore = sum((union_pixels(f['previous'] + f['draw'], *size) -
+                           union_pixels(f['draw'], *size)) // 2 for f in pending)
             samples.append(dict(frames=pending, us=0 if fields[3] == 'FAILED' else int(fields[3]),
                                 rc=int(fields[3] == 'FAILED' or any('failed' in f for f in pending)),
                                 commits=int(fields[5]),
@@ -246,11 +249,17 @@ def serial_trace(lines, size, pixel_format):
                 raise ValueError('multiple benchmark sessions')
             mapping = dict(attribute=fields[2], pitch=int(fields[3]),
                            offset=int(fields[4]), span=int(fields[5]))
+        elif fields[:2] == ['G5M1', 'done']:
+            if mapping is None or completed_groups is not None or len(fields) != 3:
+                raise ValueError('unexpected G5m completion')
+            completed_groups = int(fields[2])
         elif fields[:2] == ['G5M1', 'invalid']:
             raise ValueError('G5m preflight transfer failed')
         elif fields[0] == 'G5M1':
             if mapping is None or mapping['attribute'] != 'WC':
                 raise ValueError('missing WC mapping')
+            if completed_groups is not None:
+                raise ValueError('group after G5m completion')
             direction, w, h, pitch, offset, route, index, count, us, rc, diff, guard, sync = fields[1:]
             groups.append(dict(direction=direction, w=int(w), h=int(h), pitch=int(pitch),
                                offset=int(offset), route=route, group=int(index), count=int(count),
@@ -260,7 +269,7 @@ def serial_trace(lines, size, pixel_format):
         raise ValueError('truncated input')
     return dict(size=size, format=pixel_format, operation=operation, samples=samples,
                 observed=sorted(observed), observed_counts=[[*key, observed[key]] for key in sorted(observed)],
-                groups=groups, mapping=mapping)
+                groups=groups, mapping=mapping, completed_groups=completed_groups)
 
 
 if __name__ == '__main__':

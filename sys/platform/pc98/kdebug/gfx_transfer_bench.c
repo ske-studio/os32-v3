@@ -40,6 +40,7 @@ struct trial {
     volatile u8 *vram;
     u8 *storage;
     u32 offset;
+    u32 groups_done;
     bool get;
 };
 
@@ -60,8 +61,12 @@ static int transfer(struct trial *t, bool dma)
         u32 dl;
         if (!o || now(t, &dl)) return GF3_ESTATE;
         dl += GF3_TIMEOUT_US;
+        int saved_rc = o->ctx->last_rc;
         int rc = t->get ? o->download(o->ctx, &t->face, t->rect, &t->ram, dl) :
                           o->upload(o->ctx, &t->face, t->rect, &t->ram, true, dl);
+        /* Outstanding DMA and channel faults still require product recovery. */
+        if (!rc || (!t->channel->staging_pending && t->channel->state == GF2_RUN))
+            o->ctx->last_rc = saved_rc;
         if (rc) {
             stopped = true;
             serial_puts_polled("G5m: transfer failed; reboot before measuring again\r\n");
@@ -158,6 +163,7 @@ static int sweep(struct trial *t)
                         for (u32 route = 0; route < 2; route++) {
                             int rc = group(t, n, route ^ (n & 1U));
                             if (rc) return rc;
+                            t->groups_done++;
                         }
                 }
             }
@@ -229,5 +235,9 @@ int gfx_transfer_bench(void)
     }
     if (!pgalloc_free_n_owner(LEDGER_OWNER_KERNEL, phys / PAGE_SIZE, RAM_PAGES) && !rc)
         rc = GF2_EIO;
+    if (!rc) {
+        serial_puts_polled("G5M1 done"); field(t.groups_done);
+        serial_puts_polled("\r\n");
+    }
     return rc;
 }

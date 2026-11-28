@@ -16,7 +16,7 @@ static struct gf_foundation foundation = {
     .bar0 = (volatile u8 *)bar0,
     .io = {.read = read_io, .point = point, .timing.clock_us = clock_us}
 };
-static struct gf2_chan channel = {.f = &foundation};
+static struct gf2_chan channel = {.f = &foundation, .state = GF2_RUN};
 static struct gf3_ctx context = {.ready = true, .ch = &channel};
 static const struct gf3_surface surface = {
     .fmt = GF3_INDEX8, .off = GF_MODE_VRAM_BYTES, .bytes = sizeof(test_vram),
@@ -44,7 +44,7 @@ static int upload(struct gf3_ctx *c, const struct gf3_surface *s,
                   struct gf3_rect r, const struct gf3_ram *ram, bool forced, u32 dl)
 {
     if (forced) uploads++;
-    if (fail_upload) return GF2_EIO;
+    if (fail_upload) return c->last_rc = GF2_EIO;
     for (u32 y = 0; y < r.h; y++)
         for (u32 x = 0; x < r.w; x++)
             test_vram[(r.y + y) * s->pitch + r.x + x] = ((u8 *)ram->ptr)[y * ram->pitch + x];
@@ -97,9 +97,13 @@ void _start(void)
     uploads = downloads = 0;
     fail_upload = true;
     if (!rc) rc = gfx_transfer_bench() != GF2_EIO || uploads != 1 || downloads != 1 ||
-             closes != 1 || frees != 1 || messages != 1;
+             context.last_rc || closes != 1 || frees != 1 || messages != 1;
     if (!rc && (gfx_transfer_bench() != GF3_ESTATE || maps != 1 ||
                 allocations != 1 || messages != 1)) rc = 2;
+    channel.staging_pending = true;
+    t.get = false;
+    if (!rc && (transfer(&t, true) != GF2_EIO || context.last_rc != GF2_EIO ||
+                !channel.staging_pending)) rc = 4;
     __asm__ volatile("int $0x80" :: "a"(1), "b"(rc));
     __builtin_unreachable();
 }
