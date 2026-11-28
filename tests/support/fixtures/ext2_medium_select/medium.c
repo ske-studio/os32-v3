@@ -25,14 +25,19 @@ void *kmemcpy(void *p, const void *q, u32 n) { return memcpy(p, q, n); }
 u32 ext2_current_time(void) { return 12345; }
 void ext2_read_cache_reset(void) { puts("cache"); }
 
-int platform_ide_drive_present(int drv) { return !mode("absent"); }
+int platform_ide_drive_present(int drv) {
+    printf("present %d\n", drv);
+    return !mode("absent");
+}
 int platform_disk_geometry_get(int drv, struct platform_disk_geometry *out)
 {
+    printf("geometry %d\n", drv);
     out->total_sectors = capacity;
     return mode("geometry-error") ? -1 : 0;
 }
 int bootinfo_part_geom(int drv, u16 *heads, u16 *spt)
 {
+    printf("partition-geometry %d\n", drv);
     *heads = 1;
     *spt = 17;
     if (mode("no-bios")) return -1;
@@ -44,6 +49,7 @@ int platform_ide_range_ok(int drv, u32 lba, u32 count)
 }
 Device *dev_find(const char *name)
 {
+    printf("find %s\n", name);
     for (int i = 0; i < 4; i++)
         if (!strcmp(name, disks[i].name)) return &disks[i];
     return NULL;

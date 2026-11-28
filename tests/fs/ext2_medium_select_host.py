@@ -29,7 +29,7 @@ class Case:
 
 
 def cases():
-    # These two witnesses distinguish both requested mutations directly.
+    # Run mutation witnesses before the larger images.
     yield Case(drv=0x600, rc=IO)
     yield Case(drv=0x100, start=18, rc=INVAL)
     for start in (-1, 18):
@@ -42,6 +42,8 @@ def cases():
                           ("write-error", IO), ("data-read-error", IO)):
             if not implicit and state in ("no-part", "no-bios", "identify"):
                 rc = 0
+            if state in ("absent", "geometry-error"):
+                yield replace(hd, drv=3, state=state, rc=rc)
             yield replace(hd, state=state, rc=rc)
         for providers in (0, 2):
             yield replace(hd, providers=providers, rc=IO)
@@ -125,6 +127,8 @@ def observe(exe, case, folder):
     if c.drv == 0x100 and c.start == 18 and lines[-1] == "result 0" and any(
             line.startswith("W hd0 ") for line in lines):
         raise Failure("masked drive wrote hd0")
+    if c.drv == 0x604 and c.start == 18 and lines[:-1] != ["present 1540", "geometry 1540"]:
+        raise Failure("explicit invalid drive probe sequence differs")
     if lines[-1] != f"result {c.rc}":
         raise Failure(f"medium result {c}: {lines[-1]}")
     writes = [l.split() for l in lines if l.startswith("W ")]
@@ -174,7 +178,7 @@ def verify(config):
                 for name, digest in sorted(media.items()):
                     observations.update(name.encode() + bytes.fromhex(digest))
         # Ordered I/O, return values and final file bytes observed on the PC-98 base.
-        if observations.hexdigest() != "f03e02655f989685d1b854cb6c6af92a07e4b3cc79435d154552d7e792c67890":
+        if observations.hexdigest() != "c66f6ecba9b12b83eddcbc831ba8f1392dfafe26d7f22ac77bbaf5c2cb7cc79e":
             raise Failure("PC-98 formatter trace or medium differs from baseline")
 
 

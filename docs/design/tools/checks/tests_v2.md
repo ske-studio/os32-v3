@@ -106,4 +106,4 @@ UART trace、QMP 履歴、画面、要求と世代ごとの出力を evidence �
 
 ### ext2 formatter の媒体選択
 
-`ext2_medium_select_host` は PC-98 の二入口を実 formatter、HD・loop 提供者、実 loop ドライバに通す。基点と同じ入力で、戻り値、キャッシュ破棄と入出力の順序、装置、位置、長さ、媒体の最終内容を照合する。未装着 lo0 を hd0 に流す変異と、明示入口の生番号 0x0100 を hd0 に丸める変異を識別する。入力と境界は[媒体解決の設計](../../../decisions/fs/EXT2_MEDIUM_RESOLVE_DESIGN.md) §3 に従う。
+`ext2_medium_select_host` は PC-98 の二入口を実 formatter、HD・loop 提供者、実 loop ドライバに通す。基点と同じ入力で、戻り値、在否・幾何の問い合わせと装置名の解決からキャッシュ破棄・入出力までの呼び出し順、装置、位置、長さ、媒体の最終内容を照合する。未装着 lo0 を hd0 に流す変異と、明示入口の生番号 0x0100 を hd0 に丸める変異、明示入口で 0x0604 を問い合わせ前に拒否する変異を識別する。入力と境界は[媒体解決の設計](../../../decisions/fs/EXT2_MEDIUM_RESOLVE_DESIGN.md) §3 に従う。
