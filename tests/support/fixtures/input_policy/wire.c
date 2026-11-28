@@ -276,6 +276,16 @@ static int test_provider(void)
     }
     return diagnostics != 1 || check_unavailable(base, sizeof base);
 #endif
+#ifdef __PPC__
+    /* Default GUI bindings use logical Command from either HID side. */
+    u8 binding;
+    if (ikm_policy_action(KBD_POLICY_PROFILE_MAC_GUI, INPUT_CONTEXT_GUI, KM_MAP_HID,
+                          0x2b, 0x0f, KM_MOD_COMMAND, &binding) ||
+        binding != KBD_POLICY_ACTION_SWITCH_APP ||
+        ikm_policy_action(KBD_POLICY_PROFILE_MAC_GUI, INPUT_CONTEXT_GUI, KM_MAP_HID,
+                          0x1a, 0x11, KM_MOD_COMMAND, &binding) ||
+        binding != KBD_POLICY_ACTION_CLOSE) return 84;
+#endif
     if (diagnostics || check_row_limit(0)) return 3;
     appslots[1].exec_gen = 1;
     appslots[2].exec_gen = 2;
