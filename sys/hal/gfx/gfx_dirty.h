@@ -3,6 +3,29 @@
 
 #include "gfx_internal.h"
 
+#include "gfx_measure_wire.h"
+#include "kdebug_resident_contract.h"
+
+#ifdef GFX_MEASURE_DIAG
+/* The boot-paired debugger owns the session and all output. */
+#define GFX_TRACE(k, f, x, y, w, h, n, d) do { \
+    if (kdebug.ops.dbg_call) { \
+        struct gfx_trace_event event = {k, f, x, y, w, h, n, d}; \
+        kdebug.ops.dbg_call(GFX_TRACE_EVENT, &event, sizeof(event)); \
+    } \
+} while (0)
+
+static inline int gfx_trace_present_policy(int packed)
+{
+    if (!kdebug.ops.dbg_call) return GFX_TRACE_NORMAL;
+    return kdebug.ops.dbg_call(GFX_TRACE_POLICY, 0, packed);
+}
+
+#else
+#define GFX_TRACE(...) ((void)0)
+#define gfx_trace_present_policy(packed) GFX_TRACE_NORMAL
+#endif
+
 /* index is in [0, queue->count). The returned entry belongs to queue. */
 static inline const GFX_Rect *gfx_dirty_at(const DirtyRectQueue *queue, int index)
 {

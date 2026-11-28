@@ -453,19 +453,29 @@ G3 の `gf_direct_ops` (sys/dev/video/geforce/gf_direct.c) に mono を置く。
 
 ### S1 — SHADOW で転送が増えた場所を決める
 
+転送の観測点は診断の像だけに組み込む。S1・G5m の実機計測には `make kernel-gfx-measure-diag` の `build/out/gfx-measure-diag/` 一式を os32-realhw-update の診断像の手順で渡す。
+
 同じ画面寸法・配置・入力で P0a の move / scroll / menu / desktop / char / list を PEGC (NP21/W)、Trident (Ra266、gap 80ns)、GF (Ra266、SHADOW を確認) で採る。PEGC は PACKED8。NP21/W の PLANAR4 構成も別枠で同じ操作を採り、gfx_vram.c の候補判定に使う。各操作 warmup 10、本番 50。開始と終了は P0a §6、GOP1 の時間・present_bytes・commits・hw_ops の差と有効数を保存する。FAILED と焦点不足は原因を記録して採り直す。
 
-1. 一回の入力につき、各フレームの描画先への書込時点で clip し、最終描画面の座標へ移した矩形の和集合の画素数 P を合計する。damage.rs の 32px 丸め前・丸め後・結合後、present に渡った矩形、最終 backend の各書込矩形を記録する。転送画素数 T は同じ画素へ二度書けば二度数える。PLANAR4 は plane ごとの実バイトとページを記録し、4 plane 一組の 1 byte 幅を 8px と換算する。前ページ差分・端数の丸めも含める。packed INDEX8 は実 payload 1B=1px。pitch の穴は実際に書いた時だけ加算する。P=0,T=0 と P=0,T>0 を分け、後者の bytes を不要転送・必須ページ復元に追跡する。
+S1 は kdebug の対の部品を常駐契約で登録し、カーネル側の backend present 入口で丸めた後の矩形、gfx_vram.c の plane 転送入口で実転送を採る。シングルタスクでは WM の矩形は present 入口とほぼ一致するため WM 側は採らず、不足があれば後で検討する。矩形の和集合・画素比較・統計はホストで求める。
+
+診断版 gshell (`GF_ACCEPT_ID`・`GF_ACCEPT_MODE` を設定し、`CARGO_PROFILE_RELEASE_OPT_LEVEL=s make gshell GSHELL_FEATURES=gf_accel_accept` でリンク) で `gf2 trace on` の後に対象操作を再生する。GOP1 の本番入力ごとに開始・終了を通知し、描画中は kdebug の RAM に矩形を保存して採時後にシリアルへ出す。画素照合は同じ入力列の別走行で `gf2 trace pixels` を選ぶ。各 present の完了時（PLANAR4 は描画頁が表示頁になる直前）に走査画素と CLIENT 全面を採り、INDEX8 に展開した可逆 RLE で出す。画素採取の時間は性能値から外す。`gf2 trace off` で終了する。一操作のシリアルログは `python3 -B tools/gfx_measure.py decode trace.log --size 640 480 --format INDEX8` で JSON に戻る。PLANAR4 の場合は実際の高さと形式を指定する。入力境界・転送バイト・画素長の不一致や採取領域のあふれは欠測とする。比較用には decode に同じ `--machine` と `--initial`（保存済み初期画面・台本の識別子）を指定する。`compare` の JSON に採時走行 before/after、画素走行 before_pixels/after_pixels、同じ開始状態で `gf2 trace reference` を選び、各フレームで CLIENT 全面を転送した走行 reference を渡す。reference を省いた単独の転送検査は同じ flip の CLIENT 全面と照合する。
+
+packed の dirty present は、完了した矩形だけをキューから外す。失敗した矩形とその後ろを次回に再送し、一括 commit は全体が完了した時に数える。別の画素走行で `gf2 trace retry` を指定すると、本番の最初の packed dirty present を一回だけ失敗させる。decode の結果を `tools/gfx_measure.py retry` に渡し、失敗が一回、次の転送がその領域を覆い、全画素が CLIENT と一致することを確かめる。
+
+1. 一回の入力につき、各フレームの present 入口の矩形を clip し、その和集合の画素数 P を合計する。転送画素数 T は同じ画素へ二度書けば二度数える。PLANAR4 は plane ごとの実バイトとページを記録し、4 plane 一組の 1 byte 幅を 8px と換算する。前ページ差分・端数の丸めも含める。packed INDEX8 は実 payload 1B=1px。pitch の穴は実際に書いた時だけ加算する。P=0,T=0 と P=0,T>0 を分け、後者の bytes を不要転送・必須ページ復元に追跡する。
 2. 基準ランの初期状態・入力列と各入力の P を P基準 として保存し、変更後の実描画 P は診断に併記する。機種・操作ごとに基準ランの ΣP基準 > 0 かつ ΣT/ΣP基準 > 1.5 の組を対象にする。増分が最初に出る段を選ぶ。WM の結合が原因なら damage.rs、packed present なら sys/hal/gfx/gfx_present.c、PLANAR4 の前ページとの差なら sys/platform/pc98/video/gfx_vram.c。頁交替に必要な差分も含めた完全描画との照合を優先する。
 3. 受入案は対象の同じ 50 入力を再生し、変更後の ΣT/ΣP基準 ≤ 1.5、基準より実書込バイト減、全画素差 0、失敗 0。初期画面と 50 入力列を保存し、同じ初期状態から全画面を再描画した各 flip の期待画素と比較し、C14 混在も照合する。ΣP基準=0 の組には比を使わず、必須ページ復元を差し引いた余分な書込バイト 0 と各 flip の全画素一致で判定する。別の画素試験で present を一度失敗させ、次回の dirty 再送後に完全描画と一致することを確認する。6 操作のうち非対象の組も bytes と p50/p95 を併記する。必要なページ復元だけで 1.5 を超える組は、その下限の実測を PM に戻し、合格値を再決定する。
 
 ### G5m — PUT と GET の切替点
 
-Ra266 GF の DIRECT・INDEX8・同じ走査面で CPU 行転送と同期 M2MF を交互に測る。P0b の prim 5/6 は試験面への IFC/M2MF upload であり、WC PUT と GET の比較値はここで採る。受入用プローブで同じ検査済み矩形を両経路に渡し、CPU GET は使用中の読出写像属性を記録する。M2MF PUT は gf3_upload の force_m2mf=true で IFC を排除する。PUT は最後の WC drain/fence 復帰、GET は dst の最終行が読める時点まで計時する。staging への写し、行 pitch、poll と待ちを含める。表示内容は保存し終了後に復元する。
+Ra266 GF の DIRECT・INDEX8・走査面と同じ VRAM・形式・pitch の画面外の面で CPU 行転送と同期 M2MF を交互に測る。P0b の prim 5/6 は試験面への IFC/M2MF upload であり、WC PUT と GET の比較値はここで採る。強制経路・採時・入口の分布採取は kdebug 有効時の診断部品に置く。受入用プローブで同じ検査済み矩形を両経路に渡し、CPU GET は使用中の読出写像属性を記録する。M2MF PUT は gf3_upload の force_m2mf=true で IFC を排除する。PUT は最後の WC drain/fence 復帰、GET は dst の最終行が読める時点まで計時する。staging への写し、行 pitch、poll と待ちを含める。ほかの診断を止めた間だけ、kdebug の道具が GF サービスの既存の共用試験面を借りる。M2MF または fence が一度でも失敗したら、その回を無効と記録する。道具の static な印で再起動まで PUT・GET 両方の G5m 計測を止め、再起動を求める一行を出す。未完了の DMA が後から書き込んでも表示画素を壊さないよう、試験面を走査面から分ける。
 
-- 各方向で 160B、1/2/4/8/16/32/64KiB を掃引する。下表の二形状とも RAM pitch=w と w+7、RAM 先頭ずれ 0/1/3、走査面は現行 pitch を記録する。各矩形が走査面内に入ることを起動時に確認する。比較単位は clip 後の w*h。通常の lib の PUT は 4KiB に分かれるので、公開 submit/get と通常クライアントで実際に届くサイズの分布も記録する。
+DIRECT の公開入口の分布は `gf2 trace on` で対象クライアントを動かし、`gf2 trace off` で出す。続いて他診断が停止した状態で `gf2 g5m` を実行する。試験面の使用範囲が既存 WC 窓に収まることを確認し、最初の同期 GET の成功後に初期化する。G5M1 の各行は方向・幅・高さ・RAM pitch・ずれ・経路・組番号・完了本数・µs・rc・画素差・guard 差・同期回数。GXT1 と G5M1 を合わせて decode し、`python3 -B tools/gfx_measure.py g5m trace.json` で方向別に集計する。
+
+- 各方向で 160B、1/2/4/8/16/32/64KiB を掃引する。下表の二形状とも RAM pitch=w と w+7、RAM 先頭ずれ 0/1/3、試験面は現行 pitch を記録する。各矩形が試験面内に入ることを起動時に確認する。比較単位は clip 後の w*h。通常の lib の PUT は 4KiB に分かれるので、公開 submit/get と通常クライアントで実際に届くサイズの分布も記録する。
 - P0b と同じ 100 本を 1 組、warmup 1 組、本番 50 組。組ごとに方向・寸法・pitch・転送方式・同期回数・µs・rc を記録する。転送後に別手段で payload とガードを照合し、差 0、失敗 0 を必須とする。
-- PM に渡す候補 T_put と T_get は、採用する形状集合のうち当該サイズ以上の全組で M2MF の p50 と p95 がともに CPU 未満となる最小 payload。境界付近を細分し T−1/T/T+1 で選択と画素を確認する。同点・逆転・未測定範囲は CPU を既定とし、全点で勝てない方向は切替を導入しない。色鍵 PUT と短い転送は CPU。送出前に DMA 利用不可なら CPU、送出後の失敗は返す。公開入口で観測した (w,h,pitch,ずれ) のうち全条件を測った組を形状ガードの許可表にする。byte 境界だけで疎な点間を補間しない。採用後は境界前後と表外の同一 payload で経路・画素を記録する。最終票には PM の方向別採否、byte 境界、適用表と機種・SHA・測定表を添える。
+- PM に渡す候補 T_put と T_get は、採用する形状集合のうち当該サイズ以上の全組で M2MF の p50 と p95 がともに CPU 未満となる最小 payload。境界付近を細分し T−1/T/T+1 で選択と画素を確認する。同点・逆転・未測定範囲は CPU を既定とし、全点で勝てない方向は切替を導入しない。色鍵 PUT と短い転送は CPU。送出前に DMA 利用不可なら CPU、送出後の失敗は返す。公開入口で観測した (w,h,pitch,ずれ) のうち、その方向で実測した p50・p95 がともに勝った組だけを形状ガードの許可表にする。byte 境界だけで疎な点間を補間しない。採用後は境界前後と表外の同一 payload で経路・画素を記録する。最終票には PM の方向別採否、byte 境界、適用表と機種・SHA・測定表を添える。
 
 | payload (B) | 多行 w×h | 少行 w×h |
 |---:|---:|---:|
@@ -478,4 +488,4 @@ Ra266 GF の DIRECT・INDEX8・同じ走査面で CPU 行転送と同期 M2MF �
 | 32768 | 128×256 | 512×64 |
 | 65536 | 256×256 | 512×128 |
 
-境界 T±1 に走査面内の因数形状が無い場合は選択関数の byte 境界を host で検査し、実機では表内外それぞれの到達可能な直近形状で画素を採る。
+境界 T±1 に試験面内の因数形状が無い場合は選択関数の byte 境界を host で検査し、実機では表内外それぞれの到達可能な直近形状で画素を採る。

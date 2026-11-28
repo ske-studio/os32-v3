@@ -1,3 +1,5 @@
+#include "kdebug_resident_contract.h"
+struct kdebug kdebug;
 #include "gfx_hal.h"
 #include "gfx_policy.h"
 #include "sys/hal/gfx/v2/gfx2_int.h"
