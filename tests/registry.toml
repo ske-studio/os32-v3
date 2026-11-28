@@ -1,6 +1,6 @@
 [[check]]
 id = "ppc_media_build"
-ppc_seconds = { core = 1, link = 1, sh = 82, link-sh = 1, powermac = 9, neg1 = 1 }
+ppc_seconds = { core = 1, link = 1, sh = 82, link-sh = 1, powermac = 8, neg1 = 1 }
 spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "製品媒体と互換名" }
 subsystem = "infra"
 level = "L1"
@@ -30,7 +30,7 @@ mutations = [{ id = "x86_missing_iso", config = "pc98", remove = "images/os32_in
 
 [[check]]
 id = "ppc_common_compile"
-ppc_seconds = { powermac = 9 }
+ppc_seconds = { powermac = 4 }
 spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "製品での共通ソース検査" }
 subsystem = "infra"
 level = "L1"
@@ -45,7 +45,7 @@ mutations = [{ id = "common_missing_object", config = "powermac", remove = "buil
 
 [[check]]
 id = "build_identity"
-ppc_seconds = { core = 9, link = 10, sh = 65, link-sh = 63, powermac = 241, neg1 = 9 }
+ppc_seconds = { core = 9, link = 10, sh = 65, link-sh = 63, powermac = 68, neg1 = 9 }
 spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "製品の再生成" }
 subsystem = "infra"
 level = "L1"
@@ -76,7 +76,7 @@ mutations = [{ id = "allow_unsafe_config", config = "local", replace = "tests/su
 
 [[check]]
 id = "ppc_boot"
-ppc_seconds = { core = 3, link = 5, sh = 7, link-sh = 7, powermac = 14, neg1 = 3 }
+ppc_seconds = { core = 3, link = 5, sh = 7, link-sh = 7, powermac = 6, neg1 = 3 }
 spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "製品の無入力起動" }
 subsystem = "system"
 level = "L4"
@@ -153,7 +153,7 @@ mutations = [{ id = "owner_conflict", config = "local", when = "after_build", re
 
 [[check]]
 id = "build_sources"
-ppc_seconds = { core = 10, link = 5, sh = 7, link-sh = 7, powermac = 12, neg1 = 5 }
+ppc_seconds = { core = 10, link = 5, sh = 7, link-sh = 7, powermac = 7, neg1 = 5 }
 spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "製品のコンパイル集合" }
 subsystem = "infra"
 level = "L0"
@@ -210,7 +210,7 @@ mutations = [{ id = "wrong_cpu_object", config = "core", when = "after_build", r
 
 [[check]]
 id = "hal_contracts"
-ppc_seconds = { sh = 3, link-sh = 3, powermac = 8 }
+ppc_seconds = { sh = 3, link-sh = 3, powermac = 3 }
 spec = { path = "docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md", section = "製品の HAL 登録" }
 subsystem = "infra"
 level = "L2"
@@ -236,7 +236,7 @@ expect = "各本体と登録が一対一で仕様の節が存在する"
 limits = "候補の追跡パス"
 gates = ["push", "main"]
 mutations = [
-    { id = "unregistered_test", config = "local", when = "after_build", replace = "tests/registry.toml", old = "[[check]]\nid = \"ppc_media_build\"\nppc_seconds = { core = 1, link = 1, sh = 82, link-sh = 1, powermac = 9, neg1 = 1 }\nspec = { path = \"docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md\", section = \"製品媒体と互換名\" }\nsubsystem = \"infra\"\nlevel = \"L1\"\nsources = [\"make:all\", \"make:iso\", \"tests/support/media.py\", \"sys/conf/images/ppc-flags.mk\", \"build/targets/ppc-powermac.mk\", \"build/ppc-install-boot.mk\", \"tools/ppc/boot_media.py\", \"tools/ppc/root_lz4_inventory.py\", \"tools/ppc/root_lz4_layout.py\"]\nenvironment = \"linux-ppc-cross\"\narch = { ppc = [\"core\", \"link\", \"sh\", \"link-sh\", \"powermac\", \"neg1\"] }\nneeds = []\nexpect = \"ビルド成功、PPCKERN.ELF と boot.iso が非空、構成名・出力先・旧旗の拒否理由・実像の帯と root を照合\"\nlimits = \"起動到達と再生成時の一致は別の検査\"\ngates = [\"push\", \"main\"]\nmutations = [{ id = \"ppc_core_missing_iso\", config = \"core\", when = \"after_build\", remove = \"build/out/ppc-kboot/boot.iso\", fail = \"missing boot.iso\" },\n    { id = \"legacy_shell_negative\", config = \"powermac\", when = \"after_build\", replace = \"sys/conf/images/ppc-flags.mk\", old = \"$(error KBOOT_SHELL does not support NEGATIVE)\", new = \"# removed legacy guard\", fail = \"legacy shell accepted NEGATIVE\" }]", new = "# Removed the media check registration", fail = "unregistered body tests/infra/ppc_media_build.py" },
+    { id = "unregistered_test", config = "local", when = "after_build", replace = "tests/registry.toml", old = "[[check]]\nid = \"ppc_media_build\"\nppc_seconds = { core = 1, link = 1, sh = 82, link-sh = 1, powermac = 8, neg1 = 1 }\nspec = { path = \"docs/decisions/ppc/PPC_SHELL_ALIGN_X86_DESIGN.md\", section = \"製品媒体と互換名\" }\nsubsystem = \"infra\"\nlevel = \"L1\"\nsources = [\"make:all\", \"make:iso\", \"tests/support/media.py\", \"sys/conf/images/ppc-flags.mk\", \"build/targets/ppc-powermac.mk\", \"build/ppc-install-boot.mk\", \"tools/ppc/boot_media.py\", \"tools/ppc/root_lz4_inventory.py\", \"tools/ppc/root_lz4_layout.py\"]\nenvironment = \"linux-ppc-cross\"\narch = { ppc = [\"core\", \"link\", \"sh\", \"link-sh\", \"powermac\", \"neg1\"] }\nneeds = []\nexpect = \"ビルド成功、PPCKERN.ELF と boot.iso が非空、構成名・出力先・旧旗の拒否理由・実像の帯と root を照合\"\nlimits = \"起動到達と再生成時の一致は別の検査\"\ngates = [\"push\", \"main\"]\nmutations = [{ id = \"ppc_core_missing_iso\", config = \"core\", when = \"after_build\", remove = \"build/out/ppc-kboot/boot.iso\", fail = \"missing boot.iso\" },\n    { id = \"legacy_shell_negative\", config = \"powermac\", when = \"after_build\", replace = \"sys/conf/images/ppc-flags.mk\", old = \"$(error KBOOT_SHELL does not support NEGATIVE)\", new = \"# removed legacy guard\", fail = \"legacy shell accepted NEGATIVE\" }]", new = "# Removed the media check registration", fail = "unregistered body tests/infra/ppc_media_build.py" },
     { id = "registered_body_missing", config = "local", when = "after_build", remove = "tests/infra/ppc_media_build.py", fail = "missing body tests/infra/ppc_media_build.py" },
     { id = "registered_section_missing", config = "local", when = "after_build", replace = "docs/design/tools/checks/tests_v2.md", old = "## 配布物と再生成の合否", new = "## 配布の合否", fail = "missing or duplicate section" },
 ]
