@@ -455,15 +455,15 @@ G3 の `gf_direct_ops` (sys/dev/video/geforce/gf_direct.c) に mono を置く。
 
 同じ画面寸法・配置・入力で P0a の move / scroll / menu / desktop / char / list を PEGC (NP21/W)、Trident (Ra266、gap 80ns)、GF (Ra266、SHADOW を確認) で採る。PEGC は PACKED8。NP21/W の PLANAR4 構成も別枠で同じ操作を採り、gfx_vram.c の候補判定に使う。各操作 warmup 10、本番 50。開始と終了は P0a §6、GOP1 の時間・present_bytes・commits・hw_ops の差と有効数を保存する。FAILED と焦点不足は原因を記録して採り直す。
 
-WM と backend の記録は kdebug 有効時の計測用部品で採り、矩形の和集合・画素比較・統計はホストで求める。
+S1 は kdebug の対の部品を常駐契約で登録し、カーネル側の backend present 入口で丸めた後の矩形、gfx_vram.c の plane 転送入口で実転送を採る。シングルタスクでは WM の矩形は present 入口とほぼ一致するため WM 側は採らず、不足があれば後で検討する。矩形の和集合・画素比較・統計はホストで求める。
 
-1. 一回の入力につき、各フレームの描画先への書込時点で clip し、最終描画面の座標へ移した矩形の和集合の画素数 P を合計する。damage.rs の 32px 丸め前・丸め後・結合後、present に渡った矩形、最終 backend の各書込矩形を記録する。転送画素数 T は同じ画素へ二度書けば二度数える。PLANAR4 は plane ごとの実バイトとページを記録し、4 plane 一組の 1 byte 幅を 8px と換算する。前ページ差分・端数の丸めも含める。packed INDEX8 は実 payload 1B=1px。pitch の穴は実際に書いた時だけ加算する。P=0,T=0 と P=0,T>0 を分け、後者の bytes を不要転送・必須ページ復元に追跡する。
+1. 一回の入力につき、各フレームの present 入口の矩形を clip し、その和集合の画素数 P を合計する。転送画素数 T は同じ画素へ二度書けば二度数える。PLANAR4 は plane ごとの実バイトとページを記録し、4 plane 一組の 1 byte 幅を 8px と換算する。前ページ差分・端数の丸めも含める。packed INDEX8 は実 payload 1B=1px。pitch の穴は実際に書いた時だけ加算する。P=0,T=0 と P=0,T>0 を分け、後者の bytes を不要転送・必須ページ復元に追跡する。
 2. 基準ランの初期状態・入力列と各入力の P を P基準 として保存し、変更後の実描画 P は診断に併記する。機種・操作ごとに基準ランの ΣP基準 > 0 かつ ΣT/ΣP基準 > 1.5 の組を対象にする。増分が最初に出る段を選ぶ。WM の結合が原因なら damage.rs、packed present なら sys/hal/gfx/gfx_present.c、PLANAR4 の前ページとの差なら sys/platform/pc98/video/gfx_vram.c。頁交替に必要な差分も含めた完全描画との照合を優先する。
 3. 受入案は対象の同じ 50 入力を再生し、変更後の ΣT/ΣP基準 ≤ 1.5、基準より実書込バイト減、全画素差 0、失敗 0。初期画面と 50 入力列を保存し、同じ初期状態から全画面を再描画した各 flip の期待画素と比較し、C14 混在も照合する。ΣP基準=0 の組には比を使わず、必須ページ復元を差し引いた余分な書込バイト 0 と各 flip の全画素一致で判定する。別の画素試験で present を一度失敗させ、次回の dirty 再送後に完全描画と一致することを確認する。6 操作のうち非対象の組も bytes と p50/p95 を併記する。必要なページ復元だけで 1.5 を超える組は、その下限の実測を PM に戻し、合格値を再決定する。
 
 ### G5m — PUT と GET の切替点
 
-Ra266 GF の DIRECT・INDEX8・走査面と同じ VRAM・形式・pitch の画面外の面で CPU 行転送と同期 M2MF を交互に測る。P0b の prim 5/6 は試験面への IFC/M2MF upload であり、WC PUT と GET の比較値はここで採る。強制経路・採時・入口の分布採取は kdebug 有効時の診断部品に置く。受入用プローブで同じ検査済み矩形を両経路に渡し、CPU GET は使用中の読出写像属性を記録する。M2MF PUT は gf3_upload の force_m2mf=true で IFC を排除する。PUT は最後の WC drain/fence 復帰、GET は dst の最終行が読める時点まで計時する。staging への写し、行 pitch、poll と待ちを含める。M2MF または fence 待ちの失敗時は試験面を隔離し、その回を無効として記録して次へ進む。未完了の DMA が後から書き込んでも表示画素を壊さないよう、試験面を走査面から分ける。
+Ra266 GF の DIRECT・INDEX8・走査面と同じ VRAM・形式・pitch の画面外の面で CPU 行転送と同期 M2MF を交互に測る。P0b の prim 5/6 は試験面への IFC/M2MF upload であり、WC PUT と GET の比較値はここで採る。強制経路・採時・入口の分布採取は kdebug 有効時の診断部品に置く。受入用プローブで同じ検査済み矩形を両経路に渡し、CPU GET は使用中の読出写像属性を記録する。M2MF PUT は gf3_upload の force_m2mf=true で IFC を排除する。PUT は最後の WC drain/fence 復帰、GET は dst の最終行が読める時点まで計時する。staging への写し、行 pitch、poll と待ちを含める。GF サービスが起動時に G5m 専用の VRAM 範囲を予約する。M2MF または fence 待ちの失敗時はその回を無効と記録し、GF サービスがその範囲を再起動まで使用禁止にする。未完了の DMA が後から書き込んでも表示画素を壊さないよう、試験面を走査面から分ける。
 
 - 各方向で 160B、1/2/4/8/16/32/64KiB を掃引する。下表の二形状とも RAM pitch=w と w+7、RAM 先頭ずれ 0/1/3、試験面は現行 pitch を記録する。各矩形が試験面内に入ることを起動時に確認する。比較単位は clip 後の w*h。通常の lib の PUT は 4KiB に分かれるので、公開 submit/get と通常クライアントで実際に届くサイズの分布も記録する。
 - P0b と同じ 100 本を 1 組、warmup 1 組、本番 50 組。組ごとに方向・寸法・pitch・転送方式・同期回数・µs・rc を記録する。転送後に別手段で payload とガードを照合し、差 0、失敗 0 を必須とする。
