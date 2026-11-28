@@ -509,7 +509,8 @@ expect = "IRQ12 の共有配送と従来の IRQ 線、SOFT の文脈・入力・
 limits = "実スタブ本体を実行。特権命令・ゲストフレーム・PIC は模型"
 gates = ["push", "main"]
 mutations = [
- { id = "fatal_prime_again", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "if (rc == OS32_ERR_AGAIN) {", new = "if (0) {", fail = "final drain" },
+ { id = "fatal_prime_again", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "if (rc == OS32_ERR_AGAIN || (retrying && !rc)) {", new = "if (0) {", fail = "final drain" },
+ { id = "run_during_poll", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_call.c", old = "else if (in->slice_ms) {", new = "else {", fail = "refill poll entered DOS" },
  { id = "skip_guest_prime", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "rc = sndl_prime_slice();", new = "rc = 0;", fail = "pre-run reserve" },
  { id = "freeze_foreground_clock", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (tick_count != v86_session.soft_jiffy) v86_pic_request(0);", new = "(void)tick_count;", fail = "foreground jiffy before VM" },
  { id = "reset_slice_ticks", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (!slice_context) v86_session.ticks = 0;", new = "v86_session.ticks = 0;", fail = "in-service timer counted" },
@@ -2415,17 +2416,22 @@ id = "sndl_soft_feed"
 spec = { path = "docs/decisions/sound/V86_SOFT86_DESIGN.md", section = "最初の DOS 聴取の実装と受入" }
 subsystem = "sound"
 level = "L1"
-sources = ["userland/lib/snd/chip.c", "userland/lib/snd/pump.c", "userland/lib/snd/live.h", "tests/support/fixtures/sndl_soft_feed", "sys/hal/sound/snd2_seg.c", "sys/dev/sound/cs4231/pcm_cs4231_math.c"]
+sources = ["userland/cmds/v86.c", "userland/lib/snd/chip.c", "userland/lib/snd/pump.c", "userland/lib/snd/live.h", "tests/support/fixtures/sndl_soft_feed", "sys/hal/sound/snd2_seg.c", "sys/dev/sound/cs4231/pcm_cs4231_math.c"]
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "両 DMA 経路の通常・DOS 負荷で underrun と挿入無音が 0、最大供給間隔が 17.41 ms 未満"
+expect = "両 DMA 経路の通常・DOS 負荷で underrun と挿入無音が 0、最大供給間隔が 17.41 ms 未満。補充待ち・DOS slice 数を測り、退役停止と CTRL+STOP で片付ける"
 limits = "合成時間と DMA はホストモデル。NP21/W の時間と収録波形は受入で確認する"
 gates = ["push", "main"]
 mutations = [
- { id = "wait_for_retirement", config = "pc98", when = "after_build", replace = "userland/lib/snd/pump.c", old = "space = (space / pcm_period + 1) * pcm_period;", new = "space = space / pcm_period * pcm_period;", fail = "DOS refill deadline" },
- { id = "always_split", config = "pc98", when = "after_build", replace = "userland/lib/snd/pump.c", old = "n > window.render_limit && written - pos.played < written % window.render_limit +\n                    (2 * n + 2) / 3 + window.render_limit + window.render_limit / 2", new = "n > window.render_limit", fail = "missing foreground batch" },
- { id = "omit_slice_reserve", config = "pc98", when = "after_build", replace = "userland/lib/snd/pump.c", old = "if (queued >= reserve && (explicit_open || buffered - sent >= pcm_period))", new = "if (queued <= pos.cap)", fail = "DMA supply deadline" },
+ { id = "renew_refill_deadline", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "if (!retrying) first_again = ex.guest_us;", new = "first_again = ex.guest_us;", fail = "unbounded refill retry" },
+ { id = "ignore_refill_stop", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "if (rc || ex.reason == V86S_END) break;", new = "if (rc) break;", fail = "refill stop or deadline" },
+ { id = "drain_stalled_suffix", config = "pc98", when = "after_build", replace = "userland/lib/snd/chip.c", old = "int abort = sndl_slice_pending();", new = "int abort = 0;", fail = "refill abort close" },
+ { id = "wait_for_retirement", config = "pc98", when = "after_build", replace = "userland/lib/snd/pump.c", old = "if (!full) {", new = "if (!room) return 0; if (!full) {", fail = "DOS refill deadline" },
+ { id = "always_split", config = "pc98", when = "after_build", replace = "userland/lib/snd/pump.c", old = "if (n > window.frames - window.offset)", new = "if (n > period) n = period; if (n > window.frames - window.offset)", fail = "missing foreground batch" },
+ { id = "omit_slice_reserve", config = "pc98", when = "after_build", replace = "userland/lib/snd/pump.c", old = "buffered - sent >= pcm_period) return 0;", new = "1) return 0;", fail = "DMA supply deadline" },
+ { id = "delay_guest_return", config = "pc98", when = "after_build", replace = "userland/lib/snd/pump.c", old = "if (!explicit_open && written != previous", new = "if (waiting && pos.time_ms - started >= 8 && !explicit_open && written != previous", fail = "DOS refill progress" },
+ { id = "unpaced_retirement", config = "pc98", when = "after_build", replace = "userland/lib/snd/pump.c", old = "pos.time_ms - last_submit_ms < half_period_ms", new = "0", fail = "DMA supply deadline" },
  { id = "batch_soft_feed", config = "pc98", when = "after_build", replace = "userland/lib/snd/chip.c", old = "window->render_limit = SNDL_SOFT_PERIOD;", new = "window->render_limit = 0;", fail = "PCM supply gap" }]
 
 [[check]]

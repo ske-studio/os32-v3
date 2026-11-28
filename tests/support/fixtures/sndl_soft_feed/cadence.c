@@ -12,7 +12,8 @@ static short ring[4096][2], staging[8192][2];
 static Snd2Stream sink;
 static unsigned dma_frame, last_publish, max_gap, silent, sequence, channel;
 static unsigned clock_frame, next_tick_sample;
-static unsigned batch, turns, irq_phase, divisor;
+static unsigned width, next_transfer, variable, max_wait, max_prime;
+static unsigned batch, turns, irq_phase, pi_phase, divisor;
 static unsigned short dma_count[4];
 /* External accounting in sample-clock frames, excluding pre-start priming. */
 static unsigned pos_cost, publish_cost, sync_cost, render_cost, slices;
@@ -44,19 +45,23 @@ static void advance(unsigned frames)
     if (sink.state != SND2_ST_RUN) return;
     clock_frame += frames;
     /* DMA can advance several frames between visible count samples. */
-    unsigned target = clock_frame - clock_frame % 44;
-    while (dma_frame < target) {
-        unsigned hw = dma_frame % 4096;
-        if (!ring[hw][0]) ++silent;
-        else if (ring[hw][0] != marker(dma_frame - silent) || ring[hw][1]) exit(3);
-        ++dma_frame;
-        dma_count[channel] -= 4;
-        if (dma_count[channel] == 0xffff) dma_count[channel] = sizeof ring - 1;
-        hw = hw_position();
-        if (dma_frame % 44) continue;
-        int period_irq = hw / 256 != sink.last_hw / 256;
+    while (next_transfer <= clock_frame) {
+        unsigned previous = dma_frame;
+        while (dma_frame < next_transfer) {
+            unsigned hw = dma_frame % 4096;
+            if (!ring[hw][0]) ++silent;
+            else if (ring[hw][0] != marker(dma_frame - silent) || ring[hw][1]) exit(3);
+            ++dma_frame;
+            dma_count[channel] -= 4;
+            if (dma_count[channel] == 0xffff) dma_count[channel] = sizeof ring - 1;
+        }
+        unsigned hw = hw_position();
+        unsigned room = sink.cap - (sink.written - sink.played);
+        unsigned transferred = dma_frame - previous;
+        next_transfer += variable ? 1 + (room + transferred * 17 + hw) % width : width;
+        int period_irq = (dma_frame + pi_phase) / 256 != (previous + pi_phase) / 256;
         int tick = (dma_frame + irq_phase) / 441 !=
-                   (dma_frame - 44 + irq_phase) / 441;
+                   (previous + irq_phase) / 441;
         if (period_irq || tick || sink.written != sink.copied || dma_frame >= next_tick_sample) {
             next_tick_sample = dma_frame + 255 - hw % 256;
             if (snd2_seg_observe(&sink, 1, hw, dma_frame * 10 / 441)) exit(4);
@@ -89,6 +94,21 @@ static int publish(u32 id, const void *pcm, u32 bytes)
     }
     return n*4;
 }
+static int devices(void) { return 1; }
+static int device_info(u32 id, SND2_DevInfo *info)
+{
+    *info = (SND2_DevInfo){.kind = SND2_KIND_PCM_OUT};
+    return 0;
+}
+static int open_stream(const SND2_StreamDesc *desc, u32 *id)
+{
+    *id = 1;
+    sink = (Snd2Stream){.fmt=desc->fmt, .period=desc->period_frames,
+        .nseg=16, .lead=desc->lead_periods, .margin=128,
+        .cap=(desc->lead_periods + 1) * desc->period_frames,
+        .ring=(u8 *)ring, .state=SND2_ST_IDLE};
+    return 0;
+}
 static int start(u32 id)
 {
     snd2_seg_prime(&sink);
@@ -119,56 +139,103 @@ int fmv_render_part(FmVoice *v, uint32_t now, unsigned char *out,
     }
     return 0;
 }
+static int scenario(int dos, unsigned phase, unsigned pi_offset)
+{
+    dma_frame = last_publish = max_gap = silent = sequence = 0;
+    clock_frame = next_tick_sample = max_wait = max_prime = 0;
+    batch = turns = slices = 0;
+    pos_cost = publish_cost = sync_cost = render_cost = 0;
+    refs = 0;
+    memset(ring, 0, sizeof ring);
+    pi_phase = pi_offset;
+    next_transfer = 1 + (width - 1 + phase) % width;
+    /* Both 8237 channels count bytes. Change service phase between routes. */
+    dma_count[channel] = sizeof ring - 1;
+    irq_phase = channel == 3 ? 0 : 29;
+    static KernelAPI api = {.snd2_dev_count=devices, .snd2_dev_info=device_info,
+        .snd2_stream_open=open_stream, .snd2_stream_pos = position, .snd2_stream_write = publish,
+        .snd2_stream_start = start, .sys_time_now = clock_us};
+    sound_api = &api;
+    SND2_Fmt fmt = {.rate=44100, .bits=16, .channels=2, .enc=SND2_ENC_S16LE};
+    slots[0].fm = (FmVoice *)&api;
+    if (sndl_soft_pcm_acquire(&fmt) || sndl_pump()) return 5;
+    unsigned refill_start = clock_frame;
+    while (dma_frame < 132300) {
+        if (dos) {
+            unsigned before = clock_frame;
+            int rc = sndl_prime_slice();
+            unsigned first_again = clock_frame;
+            while (rc == OS32_ERR_AGAIN && clock_frame - first_again < 44100 / 20) {
+                advance(44); /* yield until the next foreground opportunity */
+                rc = sndl_prime_slice();
+            }
+            if (rc) {
+                costs();
+                fprintf(stderr, "DOS refill deadline rc=%d\n", rc);
+                return 6;
+            }
+            if (clock_frame - before > max_prime) max_prime = clock_frame - before;
+            unsigned waited = clock_frame - refill_start;
+            if (waited > max_wait) max_wait = waited;
+            ++slices;
+            advance(88); /* resume low memory and re-enter DOS */
+            advance(441 - clock_frame % 441); /* next logical jiffy */
+            advance(60); /* restore and drain */
+            refill_start = clock_frame;
+        } else if (!(turns++ % 8)) {
+            advance(380); /* occasional foreground work between ordinary pumps */
+        }
+        if (sndl_pump()) return 7;
+    }
+    if (sink.underruns || silent || max_gap * 100000ULL >= 1741ULL * 44100) {
+        fprintf(stderr, "DMA supply deadline: underruns=%lu silent=%u gap=%u\n",
+                sink.underruns, silent, max_gap);
+        return 1;
+    }
+    /* Across three seconds, require a slice per three jiffies on average.
+     * Bound both prime alone and the complete drain-to-reentry refill. */
+    if (dos && (slices < 100 || max_wait > 4 * 441 || max_prime > 2 * 441)) {
+        fprintf(stderr, "DOS refill progress: slices=%u foreground=%u prime=%u\n",
+                slices, max_wait, max_prime);
+        return 1;
+    }
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc != 4) return 2;
     channel = atoi(argv[1]);
     int dos = atoi(argv[2]);
     divisor = atoi(argv[3]);
-    /* Both 8237 channels count bytes. Change service phase between routes. */
-    dma_count[channel] = sizeof ring - 1;
-    irq_phase = channel == 3 ? 0 : 29;
-    static KernelAPI api = {.snd2_stream_pos = position, .snd2_stream_write = publish,
-        .snd2_stream_start = start, .sys_time_now = clock_us};
-    sound_api = &api;
-    refs = stream = 1;
-    pcm_period = 256;
-    rate = 44100;
-    slots[0].fm = (FmVoice *)&api;
-    sink = (Snd2Stream){.fmt = {.rate=44100}, .period=256, .nseg=16, .lead=3,
-        .margin=128, .cap=1024, .ring=(u8 *)ring, .state=SND2_ST_IDLE};
-    if (sndl_pump()) return 5;
-    while (dma_frame < 132300) {
-        if (dos) {
-            unsigned before = clock_frame;
-            int rc;
-            while ((rc = sndl_prime_slice()) == OS32_ERR_AGAIN &&
-                   clock_frame - before < 44100)
-                advance(44);
-            if (rc) {
-                costs();
-                fprintf(stderr, "DOS refill deadline rc=%d\n", rc);
-                return 6;
+    unsigned longest_gap = 0, longest_wait = 0, longest_prime = 0, fewest_slices = ~0U, batches = 0;
+    for (width = 1; width <= 256; ++width) {
+        for (variable = 0; variable <= 1; ++variable) {
+            for (unsigned alignment = 0; alignment < 4; ++alignment) {
+                unsigned phase = (alignment & 1) ? 97 : 0;
+                unsigned pi_offset = (alignment & 2) ? 97 : 0;
+                if (scenario(dos, phase, pi_offset)) {
+                    costs();
+                    fprintf(stderr, "width=%u variable=%u phase=%u PI=%u\n",
+                            width, variable, phase, pi_offset);
+                    return 1;
+                }
+                if (width == 44 && !variable && !alignment) costs();
+                if (max_gap > longest_gap) longest_gap = max_gap;
+                if (max_prime > longest_prime) longest_prime = max_prime;
+                if (max_wait > longest_wait) longest_wait = max_wait;
+                if (slices < fewest_slices) fewest_slices = slices;
+                batches += batch;
             }
-            ++slices;
-            advance(88); /* resume low memory and re-enter DOS */
-            advance(441 - clock_frame % 441); /* next logical jiffy */
-            advance(60); /* restore and drain */
-        } else if (!(turns++ % 8)) {
-            advance(380); /* occasional foreground work between ordinary pumps */
         }
-        if (sndl_pump()) return 7;
     }
-    costs();
-    printf("DMA#%u %s: underruns=%lu silent=%u max_gap=%.3f ms batches=%u\n",
-           channel, dos ? "fmtone" : "soft", sink.underruns, silent, max_gap/44.1, batch);
-    if (sink.underruns || silent || max_gap * 100000ULL >= 1741ULL * 44100) {
-        fprintf(stderr, "DMA supply deadline\n");
-        return 1;
-    }
-    if (!batch) {
+    if (!batches) {
         fprintf(stderr, "missing foreground batch\n");
         return 1;
     }
+    printf("DMA#%u %s cost 1/%u: 2048 cases, underruns=0 silent=0 gap=%.3f ms "
+           "foreground=%.3f ms prime=%.3f ms slices_min=%u batches=%u\n",
+           channel, dos ? "fmtone" : "soft", divisor, longest_gap/44.1,
+           longest_wait/44.1, longest_prime/44.1, fewest_slices, batches);
     return 0;
 }

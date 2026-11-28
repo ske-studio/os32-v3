@@ -2,7 +2,8 @@
 
 static u32 stream, refs, rate, written, sent, buffered;
 static int explicit_open;
-static u32 pcm_period;
+static enum { NORMAL_PUMP, DOS_READY, DOS_REFILL } feed_mode;
+static u32 pcm_period, last_submit_ms, half_period_ms;
 static int16_t scratch[2048];
 static int32_t stereo[2048];
 static SndlMixSpan records[512];
@@ -31,6 +32,9 @@ static int pcm_acquire(const SND2_Fmt *fmt, u32 period, u32 lead)
             failure = rc;
             continue;
         }
+        last_submit_ms = 0;
+        half_period_ms = (SNDL_SOFT_PERIOD * 500 + fmt->rate - 1) / fmt->rate;
+        feed_mode = NORMAL_PUMP;
         pcm_period = period;
         rate = fmt->rate;
         refs = 1;
@@ -63,7 +67,7 @@ static int record(void *ctx, const SndlMixSpan *s)
     if (count == 512) return 0;
     generations[count] = sndl_mix_generation(s->voice);
     records[count] = *s;
-    records[count++].offset += written;
+    records[count++].offset += written + buffered - sent;
     return 1;
 }
 
@@ -123,6 +127,79 @@ int sndl_voice_pos(u32 voice, u32 *buffer, u32 *play, u32 *gen)
     return 0;
 }
 
+/* Append to the unsent suffix. Voice positions include that suffix in their
+ * stream offset even when the HAL accepted only part of the last write. */
+static int render(struct SndlWindow *window, u32 n)
+{
+    __builtin_memset(stereo, 0, n * 2 * sizeof(*stereo));
+    int rc = sndl_mix_render(stereo, n, rate, record, 0);
+    if (!rc) rc = sndl_chip_mix(stereo, n, rate, window);
+    if (rc) return rc;
+    if (sent == buffered || buffered + n > sizeof scratch / (2 * sizeof *scratch)) {
+        buffered -= sent;
+        if (buffered) __builtin_memmove(scratch, scratch + 2 * sent, buffered * 4);
+        sent = 0;
+    }
+    sndl_mix_finish(stereo, scratch + 2 * buffered, n);
+    buffered += n;
+    window->offset += n;
+    return 0;
+}
+
+static int publish_frames(u32 n)
+{
+    int bytes = sound_api->snd2_stream_write(stream, scratch + 2 * sent, n * 4);
+    if (bytes <= 0) return bytes;
+    if ((bytes & 3) || (u32)bytes > n * 4) return OS32_ERR_IO;
+    sent += bytes / 4;
+    written += bytes / 4;
+    return bytes / 4;
+}
+
+/* Fill retired segments first. While the HAL owns all four, prepare the
+ * next two periods so a retirement can be supplied without synthesizing. */
+static int soft_feed(SND2_Pos pos, int priming)
+{
+    const u32 period = SNDL_SOFT_PERIOD;
+    u32 free_frames = pos.cap - (written - pos.played);
+    struct SndlWindow window = {.frames = (free_frames / period + 2) * period};
+    int synced = 0;
+    for (;;) {
+        if (pos.state != SND2_ST_RUN || written - pos.played > pos.cap) return OS32_ERR_IO;
+        u32 pending = buffered - sent;
+        u32 room = pos.cap - (written - pos.played);
+        u32 offset = pos.played % period;
+        if (!pos.underruns && room >= offset) room -= offset;
+        /* A coarse DMA count can retire two closely spaced periods followed
+         * by a long gap. Pace the last writable period on ordinary turns. */
+        if (feed_mode == NORMAL_PUMP && room == period && pos.time_ms - last_submit_ms < half_period_ms)
+            room = 0;
+        if (pending && room) {
+            u32 nframes = pending;
+            if (feed_mode == NORMAL_PUMP && nframes > period) nframes = period;
+            int n = publish_frames(nframes);
+            if (n <= 0) return n;
+            last_submit_ms = pos.time_ms;
+            if (priming) return 0;
+        } else {
+            int full = pending >= 2 * period || window.offset == window.frames;
+            if (full && (priming || synced)) return 0;
+            struct SndlWindow empty = {0};
+            int rc = sndl_chip_prepare(full ? &empty : &window);
+            if (rc) return rc;
+            synced = 1;
+            if (!full) {
+                u32 n = room ? period : 2 * period - pending;
+                if (n > window.frames - window.offset) n = window.frames - window.offset;
+                rc = render(&window, n);
+                if (rc) return rc;
+            }
+        }
+        int rc = sound_api->snd2_stream_pos(stream, &pos);
+        if (rc) return rc;
+    }
+}
+
 static int pump(int draining, const SND2_Pos *observed)
 {
     if (!refs) return OS32_ERR_INVAL;
@@ -136,17 +213,8 @@ static int pump(int draining, const SND2_Pos *observed)
     u32 queued = written - pos.played;
     if (queued > pos.cap) return -1;
     u32 space = pos.cap - queued;
-    /* Stage one period ahead for the implicit OPNA stream. A full HAL
-     * retains the suffix in scratch until a segment retires. */
-    int soft_run = !explicit_open && !draining && pcm_period == SNDL_SOFT_PERIOD &&
-                   pos.state == SND2_ST_RUN;
-    if (soft_run) {
-        if (!space && sent < buffered) {
-            if (observed) return 0;
-        } else {
-            space = (space / pcm_period + 1) * pcm_period;
-        }
-    }
+    if (!explicit_open && !draining && pcm_period == SNDL_SOFT_PERIOD && pos.state == SND2_ST_RUN)
+        return soft_feed(pos, observed != 0);
     struct SndlWindow window = {0};
     while (space) {
         if (sent == buffered) {
@@ -155,35 +223,18 @@ static int pump(int draining, const SND2_Pos *observed)
             rc = sndl_chip_prepare(&window);
             if (rc) return rc;
             u32 n = space > 1024 ? 1024 : space;
-            /* Allow a period of cached position age and the half-period DMA guard. */
             if (window.render_limit && pos.state == SND2_ST_RUN &&
                 n > window.render_limit && written - pos.played < written % window.render_limit +
                     (2 * n + 2) / 3 + window.render_limit + window.render_limit / 2)
                 n = window.render_limit;
-            __builtin_memset(stereo, 0, n * 2 * sizeof(*stereo));
-            rc = sndl_mix_render(stereo, n, rate, record, 0);
+            rc = render(&window, n);
             if (rc) return rc;
-            rc = sndl_chip_mix(stereo, n, rate, &window);
-            if (rc) return rc;
-            sndl_mix_finish(stereo, scratch, n);
-            window.offset += n;
-            buffered = n;
-            sent = 0;
-        }
-        if (soft_run && !pos.underruns &&
-            written - (pos.played - pos.played % pcm_period) == pos.cap) {
-            /* Staging is full until retirement. Keep the prepared suffix. */
-            if (observed) return 0;
-            break;
         }
         u32 n = buffered - sent;
         if (n > space) n = space;
-        int bytes = sound_api->snd2_stream_write(stream, scratch + 2*sent, n*4);
-        if (bytes <= 0) return bytes;
-        if ((bytes & 3) || (u32)bytes > n*4) return -1;
-        sent += bytes/4;
-        written += bytes/4;
-        space -= bytes/4;
+        int accepted = publish_frames(n);
+        if (accepted <= 0) return accepted;
+        space -= accepted;
         if (space && sent == buffered && window.render_limit && pos.state == SND2_ST_RUN) {
             rc = sound_api->snd2_stream_pos(stream, &pos);
             if (rc) return rc;
@@ -201,16 +252,20 @@ static int pump(int draining, const SND2_Pos *observed)
 
 int sndl_pump(void)
 {
-    return pump(0, 0);
+    int rc = pump(0, 0);
+    /* A normal turn follows the guest run and its event drain. Until then,
+     * terminating a retry must abort even if its last prime just succeeded. */
+    if (feed_mode != NORMAL_PUMP) feed_mode = rc ? DOS_REFILL : DOS_READY;
+    return rc;
 }
 
-/* Keep 17.5 ms plus the DMA guard queued. The prepared period can be
- * published directly on return even when the cached DMA position is old. */
-int sndl_prime_slice(void)
+/* The implicit stream enters DOS just after a write, with three periods
+ * queued and another ready to publish on return. */
+static int prime_slice(void)
 {
     if (!refs || pcm_period != SNDL_SOFT_PERIOD) return OS32_ERR_INVAL;
     u32 reserve = (rate * 35 + 1999) / 2000 + pcm_period / 2;
-    u32 started = 0, initial_queue = 0;
+    u32 started = 0, initial_queue = 0, previous = written;
     int waiting = 0;
     for (;;) {
         SND2_Pos pos;
@@ -218,7 +273,11 @@ int sndl_prime_slice(void)
         if (rc) return rc;
         u32 queued = pos.written - pos.played;
         if (pos.state != SND2_ST_RUN || queued > pos.cap) return OS32_ERR_IO;
-        if (queued >= reserve && (explicit_open || buffered - sent >= pcm_period)) return 0;
+        if (reserve > pos.cap) return OS32_ERR_INVAL;
+        if (explicit_open && queued >= reserve) return 0;
+        if (!explicit_open && written != previous && queued >= 3 * pcm_period &&
+            buffered - sent >= pcm_period) return 0;
+        previous = written;
         /* Staging space is released on period retirement. A short or zero
          * write can therefore be followed by progress at the next boundary. */
         if (!waiting) {
@@ -226,13 +285,25 @@ int sndl_prime_slice(void)
             initial_queue = queued;
             waiting = 1;
         }
-        if (reserve > pos.cap) return OS32_ERR_INVAL;
         if (pos.time_ms - started >= 17)
             return sent < buffered || queued >= reserve || queued > initial_queue
                 ? OS32_ERR_AGAIN : OS32_ERR_TIMEOUT;
         rc = pump(0, &pos);
         if (rc) return rc;
     }
+}
+
+int sndl_prime_slice(void)
+{
+    if (feed_mode == NORMAL_PUMP) feed_mode = DOS_READY;
+    int rc = prime_slice();
+    if (rc) feed_mode = DOS_REFILL;
+    return rc;
+}
+
+int sndl_slice_pending(void)
+{
+    return feed_mode == DOS_REFILL;
 }
 
 int sndl_pcm_release(u32 how)

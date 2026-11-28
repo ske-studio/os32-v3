@@ -185,12 +185,26 @@ static int boot_sound(const char *path, const char *second)
     if (!rc) rc = boot_result("sndl_pump", sndl_pump());
     V86_RunIn in = {.size = sizeof in, .slice_ms = 10};
     V86_Exit ex = {0};
+    u32 first_again = 0;
+    int retrying = 0;
     while (!rc) {
         rc = sndl_prime_slice();
-        if (rc == OS32_ERR_AGAIN) {
-            api->sys_yield();
-            rc = 0;
-            continue;
+        if (rc == OS32_ERR_AGAIN || (retrying && !rc)) {
+            int again = rc == OS32_ERR_AGAIN;
+            in.slice_ms = 0;
+            rc = boot_result("v86s_run", api->v86s_run(sid, &in, &ex));
+            in.slice_ms = 10;
+            if (rc || ex.reason == V86S_END) break;
+            if (!retrying) first_again = ex.guest_us;
+            if (ex.guest_us - first_again >= 50000) {
+                rc = boot_result("sndl_prime_slice", OS32_ERR_TIMEOUT);
+                break;
+            }
+            retrying = again;
+            if (again) {
+                api->sys_yield();
+                continue;
+            }
         }
         if (boot_result("sndl_prime_slice", rc)) break;
         rc = api->v86s_run(sid, &in, &ex);

@@ -229,12 +229,13 @@ int sndl_chip_close(u32 handle)
     int rc = 0;
     if (s->fm) {
         u32 until;
-        rc = clock_now(&until);
-        while (!rc && fmv_audio_due(s->fm, until)) {
+        int abort = sndl_slice_pending();
+        if (!abort) rc = clock_now(&until);
+        while (!abort && !rc && fmv_audio_due(s->fm, until)) {
             rc = sndl_pump();
             if (!rc && fmv_audio_due(s->fm, until)) sound_api->sys_yield();
         }
-        int closed = sndl_pcm_release(rc ? SND2_CLOSE_ABORT : SND2_CLOSE_DRAIN);
+        int closed = sndl_pcm_release(abort || rc ? SND2_CLOSE_ABORT : SND2_CLOSE_DRAIN);
         if (!rc) rc = closed;
     } else {
         rc = sound_api->snd2_chip_close(s->hw);

@@ -253,8 +253,9 @@ int v86s_run(u32 sid, const V86_RunIn *in, V86_Exit *out)
 {
     if (!soft_owner(sid) || !in || !out || in->size != sizeof *in ||
         in->reply_valid || soft->finished) return OS32_ERR_INVAL;
-    int reason = V86_EXIT_HOTKEY;
-    if (!v86_session.soft_stop) {
+    int reason = V86_EXIT_SLICE;
+    if (v86_session.soft_stop) reason = V86_EXIT_HOTKEY;
+    else if (in->slice_ms) {
 #ifdef TICK_PROBE
         tick_probe_soft_begin(TP_SOFT_ENTER);
 #endif

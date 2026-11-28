@@ -21,6 +21,11 @@ static int begin(const V86_Begin *b, u32 *sid)
 static int run(u32 sid, const V86_RunIn *in, V86_Exit *ex)
 {
     check(sid == 11 && stream && pumps == turns + 1, "pump on empty slice");
+    if (!in->slice_ms) {
+        ex->reason = V86S_SLICE;
+        ex->guest_us = 17000 * yields;
+        return 0;
+    }
     check(primed, "pre-run reserve");
     primed = 0;
     ++turns;

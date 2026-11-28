@@ -133,7 +133,7 @@ static void require(int ok, const char *message)
     __builtin_unreachable();
 }
 static u32 cr3 = 0x3000, now_us;
-static int heap_busy, opens, suspends, resumes;
+static int heap_busy, opens, suspends, resumes, polling_refill;
 static AppSlot caller_slot;
 static struct addrspace caller_as;
 volatile int ring3_in_syscall = 1, ring3_wm_depth;
@@ -174,7 +174,12 @@ int __wrap_v86_boot_prepare(const char *path, const char *second, struct v86_con
 }
 int v86_mem_enable_slices(void) { return 0; }
 void v86_mem_suspend(void) { require(cr3 == 0x4000, "suspend master"); ++suspends; }
-void v86_mem_resume(void) { require(cr3 == 0x4000, "resume master"); ++resumes; }
+void v86_mem_resume(void)
+{
+    require(!polling_refill, "refill poll entered DOS");
+    require(cr3 == 0x4000, "resume master");
+    ++resumes;
+}
 void v86_session_end(void) { v86_session = (struct v86_session_state){0}; }
 void tss_iomap_deny(u16 port) { require(port >= 0x188 && port <= 0x18f, "trap port"); }
 int sys_time_now(u32 *lo, u32 *hi) { *lo = ++now_us; *hi = 0; return 0; }
@@ -203,11 +208,16 @@ static void soft_boots(void)
         ++expected_ticks;
         require(!v86s_run(sid, &in, &ex) && ex.reason == 1 &&
                 v86s_fm_drain(sid, ev, 2, &seq) == 0, "empty slice");
+        in.slice_ms = 0;
+        polling_refill = 1;
+        require(!v86s_run(sid, &in, &ex) && ex.reason == V86S_SLICE, "refill poll result");
         v86_session.soft_stop = 1;
         require(!v86s_run(sid, &in, &ex) && ex.reason == 4 && ex.code == V86_EXIT_HOTKEY,
                 "stop at pump");
         require(!v86s_end(sid) && !heap_busy && cr3 == 0x3000 &&
                 !v86_call_pinned(), "end releases caller");
+        polling_refill = 0;
+        in.slice_ms = 10;
         last = sid;
     }
     require(opens == 2 && suspends == 6 && resumes == 4, "repeat boundaries");
