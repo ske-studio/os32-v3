@@ -16,7 +16,6 @@ void console_stream_write(const void *bytes, u32 len)
 #endif
 
 #include "kboot_log.h"
-#include "cli_boot.h"
 #include "platform_console.h"
 #include "console_output.h"
 #include "console.h"
@@ -52,10 +51,6 @@ void console_stream_write(const void *bytes, u32 len)
 void pm_fd1_write(const char *buf, u32 size, u8 color)
 {
     console_write(buf, size, color);
-}
-void pm_cli_write(const void *buf, u32 size)
-{
-    console_write(buf, size, 1);
 }
 static void emergency_puts(const char *s) { pm_log_write(s, kstrlen(s)); }
 static int emergency_gate(void) { return 0; }

@@ -35,7 +35,6 @@ void pm_term_receive(const struct lan_message *m, const u8 src[6])
         head = count = 0;
         out_next = out_drop = out_bytes = 0;
         connected = 1;
-        pm_terminal_open();
         return;
     }
     if (!connected || m->type != PLN1_TERM_IN ||
@@ -43,10 +42,8 @@ void pm_term_receive(const struct lan_message *m, const u8 src[6])
     if (m->seq < in_next) return;
     if (m->seq > in_next) {
         in_drop_frames += m->seq - in_next;
-        pm_terminal_line_lost();
     }
     in_next = m->seq + 1;
-    pm_terminal_feed(m->payload, m->payload_bytes);
 }
 
 void pm_term_write(const u8 *data, u32 bytes)

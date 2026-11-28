@@ -1,4 +1,4 @@
-#include "terminal_fifo.inc"
+#include "lan_boot.h"
 #if KBOOT_SH
 #include "usb_boot.h"
 #include "sys/kern/idle_work.h"
@@ -26,12 +26,6 @@ void pm_terminal_poll(void)
     pm_lan_poll(pm_terminal_tb());
 }
 
-int pm_terminal_getkey(void)
-{
-    int c;
-    while ((c = pm_terminal_trygetkey()) < 0) pm_terminal_poll();
-    return c;
-}
 
 #if KBOOT_SH
 /* FG1 work is independent of terminal reads; direct legacy polls remain. */
