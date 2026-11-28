@@ -33,10 +33,13 @@ def verify(config):
         subprocess.run(["gcc", "-m32", "-std=gnu11", "-O2", "-nostdlib", "-static",
                         "-ffunction-sections", "-fdata-sections", "-Wl,--gc-sections",
                         "-fno-pie", "-no-pie", "-ffreestanding", "-fno-stack-protector",
-                        "-D__cdecl=", "-I" + tmp, "-Itests/support/fixtures/fm_probe", "-I.",
+                        "-DTICK_PROBE", "-D__cdecl=", "-I" + tmp, "-Itests/support/fixtures/fm_probe", "-I.",
                         *include_flags(ROOT), "tests/support/fixtures/pcm_route/boot.c",
                         "-o", exe], check=True)
-        if subprocess.run(["qemu-i386", exe]).returncode:
+        rc = subprocess.run(["qemu-i386", exe]).returncode
+        if rc == 2:
+            raise RuntimeError("WSS diagnostic window")
+        if rc:
             raise RuntimeError("PCM boot admission")
 
 

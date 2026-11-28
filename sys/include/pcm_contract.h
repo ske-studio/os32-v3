@@ -70,6 +70,9 @@ int pcm_set_volume(u32 percent);
 /* kselftest / 診断の覗き口 (KAPI にはしない)。 */
 int pcm_state(void);
 int pcm_present(void);
+#ifdef TICK_PROBE
+int pcm_diag_wss_irq(void);
+#endif
 
 
 #endif

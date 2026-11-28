@@ -81,6 +81,8 @@ isr8:
         mov     ax, DATA_SEG
         mov     ds, ax
         inc     word [4]
+        mov     al, 0x20
+        out     0x00, al            ; EOI to virtual master PIC
         pop     ds
         pop     ax
         iret

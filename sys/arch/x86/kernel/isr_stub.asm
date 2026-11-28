@@ -121,21 +121,18 @@ extern ring3_abort_check
 ;;
 ;; ハードウェア割り込みはエラーコードを積まないので、PUSHAD 後の
 ;; EFLAGS は [esp+40] にある ([esp+32]=EIP, +36=CS, +40=EFLAGS)。
-;; VM ビットが立っていればゲストからの割り込みなので反射する。
+;; セッション中の要求を記録し、VM フレームの時だけ配送する。
 ;;
 ;; 引数は (frame*, irq 番号) の順。**ベクタ番号ではない。**
 ;; どのベクタに落とすかはゲストが ICW2 に書いた値で決まるので、
 ;; C 側が仮想 PIC に問い合わせて決める。マスクの判定も同じ場所。
 ;; ============================================================
 %macro V86_REFLECT 1
-        test    dword [esp + ISR_IRQ_EFLAGS_OFF], EFLAGS_VM  ;; EFLAGS.VM
-        jz      %%skip
         push    dword %1                        ;; IRQ 番号
         lea     eax, [esp + ABI_WORD_BYTES]  ;; frame 先頭 (PUSHAD)
         push    eax
         call    v86_reflect_irq
         add     esp, 2 * ABI_WORD_BYTES
-%%skip:
 %endmacro
 
 section .text

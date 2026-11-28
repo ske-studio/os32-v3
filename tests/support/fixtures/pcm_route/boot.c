@@ -1,10 +1,115 @@
+static void model_halt(void);
+#define _halt model_halt
 #include "sys/dev/sound/cs4231/pcm_module.c"
 
 static int available, reserved, route, id, family, fm_called, pcm_called, accepted;
-static int route_reads;
+static int route_reads, mask, opens, state, fail_stop, handled, r2, early_pi;
+static unsigned written;
+
+struct irq_line irq_lines[IRQ_DYN_COUNT];
+int irq_dyn_index(unsigned irq) { return irq == PCM_IRQ && !reserved ? 0 : -1; }
+void platform_irq_mask(unsigned irq) { mask |= 16; }
+void platform_irq_unmask(unsigned irq) { mask &= ~16; }
+int irq_quarantine_line(unsigned irq)
+{
+    irq_lines[0].quarantined = 1;
+    platform_irq_mask(irq);
+    return 0;
+}
+static irq_handler_fn installed;
+static int model_handler(unsigned irq, void *arg) { return handled; }
+int res_owner_get(void) { return 1; }
+struct module_record *module_record_get(struct module_handle handle)
+{
+    static struct module_record record;
+    return &record;
+}
+int module_ref_acquire(struct module_handle h, u32 owner, enum module_ref_kind kind, u32 fn)
+{
+    return 1;
+}
+int module_ref_release(struct module_handle h, enum module_ref_kind kind) { return 1; }
+int irq_register(unsigned irq, irq_handler_fn fn, void *arg, unsigned flags)
+{
+    if (irq != PCM_IRQ || installed) return IRQ_ERR_BUSY;
+    installed = fn;
+    ++irq_lines[0].count;
+    platform_irq_unmask(irq);
+    return 0;
+}
+int irq_unregister(unsigned irq, irq_handler_fn fn, void *arg)
+{
+    if (irq != PCM_IRQ || installed != fn) return IRQ_ERR_INVAL;
+    installed = 0;
+    --irq_lines[0].count;
+    platform_irq_mask(irq);
+    return 0;
+}
+static int model_state(void) { return state; }
+static int model_open(u32 rate)
+{
+    ++opens;
+    state = PCM_ST_OPEN;
+    written = 0;
+    int rc = pcm_module_irq_register(PCM_IRQ, model_handler, 0, IRQ_F_SHARED);
+    if (!rc && early_pi) {
+        handled = IRQ_HANDLED;
+        installed(PCM_IRQ, 0);
+        handled = IRQ_NONE;
+    }
+    return rc;
+}
+static int model_write(const void *buf, u32 bytes)
+{
+    written += bytes;
+    if (written >= PCM_RING_FRAMES * PCM_FRAME_BYTES) state = PCM_ST_RUNNING;
+    return bytes;
+}
+volatile u32 tick_count;
+static void model_halt(void)
+{
+    ++tick_count;
+    installed(PCM_IRQ, 0);
+}
+static int model_close(void)
+{
+    if (pcm_module_irq_unregister(PCM_IRQ, model_handler, 0)) return OS32_ERR_IO;
+    state = fail_stop ? PCM_ST_FAULTED : PCM_ST_CLOSED;
+    return fail_stop ? OS32_ERR_IO : 0;
+}
+static int window(void)
+{
+    reserved = pcm_quarantined = 0;
+    pcm_irq_line = PCM_IRQ;
+    route = bios_route = 0x20;
+    candidate.state = model_state;
+    candidate.open = model_open;
+    candidate.write = model_write;
+    candidate.close = model_close;
+    irq_lines[0].count = 1;
+    if (pcm_diag_wss_irq() != OS32_ERR_BUSY || opens) return 0;
+    irq_lines[0].count = 0;
+    handled = IRQ_HANDLED;
+    if (pcm_diag_wss_irq() || mask || irq_lines[0].count) return 0;
+    mask = 0xff;
+    if (pcm_diag_wss_irq() || mask != 0xff) return 0;
+    r2 = 1;
+    if (pcm_diag_wss_irq() != OS32_ERR_IO) return 0;
+    r2 = 0;
+    handled = IRQ_NONE;
+    early_pi = 1;
+    if (pcm_diag_wss_irq() != OS32_ERR_IO) return 0;
+    mask = 0;
+    fail_stop = 1;
+    if (pcm_diag_wss_irq() != OS32_ERR_IO || mask != 16 || !irq_lines[0].quarantined)
+        return 0;
+    return pcm_diag_wss_irq() == OS32_ERR_BUSY && opens == 5;
+}
 
 unsigned inp(unsigned port)
 {
+    if (port == PIC2_DATA) return mask;
+    if (port == PCM_PORT_R2) return r2;
     if (port == PCM_PORT_ROUTE) { ++route_reads; return route; }
     if (port == PCM_PORT_WSSID) return id;
     return family;
@@ -71,6 +176,7 @@ void _start(void)
     ok &= !pcm_boot_refusal() && pcm_module_bios_route() == 0x61 && route_reads == 1;
     pcm_quarantined = 1;
     ok &= pcm_boot_refusal() != 0;
-    __asm__ volatile("int $0x80" : : "a"(1), "b"(!ok));
+    if (ok && !window()) ok = -1;
+    __asm__ volatile("int $0x80" : : "a"(1), "b"(ok < 0 ? 2 : !ok));
     __builtin_unreachable();
 }

@@ -34,6 +34,15 @@ def verify(config):
                         "sys/kern/irq/irq.c", "sys/platform/pc98/pic.c",
                         "sys/platform/pc98/irq_complete.c", "-o", exe], check=True)
         subprocess.run(["qemu-i386", exe], check=True)
+        subprocess.run(["gcc", "-m32", "-nostdlib", "-static", "-fno-pie", "-no-pie",
+                        "-ffreestanding", "-fno-stack-protector", "-std=gnu11", "-O2",
+                        "-ffunction-sections", "-fdata-sections", "-Wl,--gc-sections",
+                        "-Wl,--section-start=.guest=0x20000", "-D__cdecl=", "-I.",
+                        "-Itests/support/fixtures/fm_probe", "-Itests/support/fixtures/fm_control",
+                        *include_flags(ROOT), fixture / "foreground.c",
+                        "sys/platform/pc98/legacy/v86.c", "sys/platform/pc98/legacy/v86_pic.c",
+                        "-o", exe], check=True)
+        subprocess.run(["qemu-i386", exe], check=True)
 
 
 if __name__ == "__main__":

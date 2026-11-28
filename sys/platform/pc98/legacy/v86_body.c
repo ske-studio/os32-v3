@@ -19,7 +19,10 @@ int v86_module_init(V86ModuleApi *out)
         .v86_io_trap_count = v86_io_trap_count,
         .v86_io_last_port = v86_io_last_port,
         .v86_pic_set_imr = v86_pic_set_imr,
-        .v86_pic_should_inject = v86_pic_should_inject,
+        .v86_pic_request = v86_pic_request,
+        .v86_pic_soft_sound = v86_pic_soft_sound,
+        .v86_pic_candidate = v86_pic_candidate,
+        .v86_pic_commit = v86_pic_commit,
         .v86_kbd_push = v86_kbd_push,
         .v86_kbd_pending = v86_kbd_pending,
     };

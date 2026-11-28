@@ -1,5 +1,7 @@
 #include "idt.h"
+#define TICK_PROBE
 #include "sys/dev/sound/fm/fm_module.c"
+#undef TICK_PROBE
 #include "opn_chip.h"
 #include "sys/platform/pc98/pic.c" /* Reset boot-only latches between machine scenarios. */
 
@@ -14,7 +16,7 @@ static unsigned status, id, index_reg, feature, alt_status, alt_data;
 static unsigned writes, reads, alt_reads, imr_writes, mask = 0xff, elapsed;
 static unsigned busy_after_ff, busy_reads, timer_reads;
 static int frozen_clock, unstable_feature;
-static unsigned feature_reads;
+static unsigned feature_reads, fifo_reads;
 static unsigned trace[16], trace_count;
 static int ticks, fail_stop, fail_restore, restores;
 
@@ -52,6 +54,42 @@ const u32 *module_exports(struct module_handle handle) { (void)handle; return 0;
 int res_owner_get(void) { return 0; }
 int snd2_chip_implicit(int owner) { (void)owner; return 0; }
 
+static int diag_busy, mixer_error, setting_reads, diag_closes, restore_error;
+int snd2_chip_dev_info(u32 index, SND2_DevInfo *out)
+{
+    if (index) return OS32_ERR_INVAL;
+    *out = (SND2_DevInfo){.kind = SND2_KIND_FM, .dev = 16};
+    return 0;
+}
+int snd2_chip_caps(u32 dev, SND2_ChipCaps *out, u32 size)
+{
+    *out = (SND2_ChipCaps){.base_port = OPN_ADDR, .chip = SND2_CHIP_OPNA};
+    return 0;
+}
+int snd2_chip_diag_open(u32 dev, u32 *h)
+{
+    if (diag_busy) return OS32_ERR_BUSY;
+    *h = dev;
+    return 0;
+}
+int snd2_chip_read(u32 h, u32 bank, u32 what, u32 reg)
+{
+    if (reg == SSG_REG_MIXER && mixer_error) return OS32_ERR_IO;
+    if (reg == 0x0e && !mixer_error) require(index_reg == SSG_REG_MIXER, "fresh mixer selection");
+    outp(OPN_ADDR, reg);
+    if (reg == 0x0e) ++setting_reads;
+    return id;
+}
+int snd2_chip_close(u32 h) { outp(OPN_ADDR, 0x10); ++diag_closes; return 0; }
+
+int snd2_chip_diag_close(u32 h, u32 reg)
+{
+    snd2_chip_close(h);
+    if (restore_error) return OS32_ERR_IO;
+    outp(OPN_ADDR, reg);
+    return 0;
+}
+
 static int sound_irq(unsigned irq, void *arg) { (void)irq; (void)arg; return IRQ_NONE; }
 
 unsigned inp(unsigned port)
@@ -59,7 +97,7 @@ unsigned inp(unsigned port)
     ++reads;
     if (!frozen_clock) elapsed += 5;
     if (port == 0xa460) return feature ^ (feature_reads++ && unstable_feature);
-    if (port == 0xa468) return 0;
+    if (port == 0xa468) { ++fifo_reads; return 0; }
     if (port == 0x188) {
         if (index_reg == 0xff && busy_reads < busy_after_ff) {
             ++busy_reads;
@@ -108,7 +146,7 @@ static void reset(void)
     boot_probe = (struct fm_probe_record){0};
     trace_count = writes = reads = elapsed = alt_reads = imr_writes = restores = 0;
     index_reg = busy_after_ff = busy_reads = timer_reads = frozen_clock = 0;
-    fm_irq12_released = fm_irq12_blocked = unstable_feature = feature_reads = 0;
+    fm_irq12_released = fm_irq12_blocked = unstable_feature = feature_reads = fifo_reads = 0;
     status = id = alt_status = alt_data = feature = 0xff;
 }
 static void check_opna_wait(unsigned delay, int frozen)
@@ -175,6 +213,14 @@ void _start(void)
     check_board(0x70, OPN_PROBE_ABSENT);
     check_board(0x41, OPN_PROBE_UNKNOWN);
     check_board(0x51, OPN_PROBE_UNKNOWN);
+    reset();
+    feature = 0x51;
+    alt_status = 0;
+    require(!start() && boot_probe.bank[1].model == OPN_PROBE_UNKNOWN,
+            "alternate-only board");
+    writes = 0;
+    require(fm_diag_irq_setting() == OS32_ERR_NOTFOUND && !writes &&
+            !diag_closes, "alternate-only diagnostic");
     check_board(0x81, OPN_PROBE_UNKNOWN);
     check_board(0x60, OPN_PROBE_UNKNOWN);
     reset();
@@ -200,6 +246,14 @@ void _start(void)
             boot_probe.bank[1].model == OPN_PROBE_UNKNOWN, "alternate response");
     require(!boot_probe.bank[0].chip_id_port && !boot_probe.feature_port, "unverified ID");
     reset();
+    status = 2; /* A stale flag must be cleared before observing a new edge. */
+    ticks = 1;
+    feature = 0xff;
+    require(!start() && registered == OPN_PROBE_OPN && boot_probe.contained &&
+            !status && timer_reads && !fifo_reads, "26K Timer B");
+    for (unsigned i = 0; i < trace_count; ++i)
+        require(trace[i] != 0x18829, "26K OPNA register");
+    reset();
     alt_data = 0;
     require(!start() && boot_probe.bank[1].model == OPN_PROBE_UNKNOWN, "alternate data");
     reset();
@@ -209,6 +263,34 @@ void _start(void)
     require(!start() && registered == OPN_PROBE_OPNA && boot_probe.bank[0].chip_id == 1 &&
             boot_probe.bank[0].chip_id_port == 0x18a && boot_probe.feature_id == feature &&
             boot_probe.feature_port == 0xa460 && boot_probe.fifo_port == 0xa468, "verified IDs");
+    reset();
+    status = 0;
+    id = 1;
+    feature = 0x81;
+    require(!start() && registered == OPN_PROBE_OPNA &&
+            boot_probe.feature_port == 0xa460 && boot_probe.feature_id == feature,
+            "118 feature ID");
+    require(!fifo_reads && !boot_probe.fifo_port, "118 FIFO access");
+    diag_busy = 1;
+    require(fm_diag_irq_setting() == OS32_ERR_BUSY && !setting_reads && !diag_closes,
+            "busy diagnostic selection");
+    diag_busy = 0;
+    mixer_error = 1;
+    require(fm_diag_irq_setting() == OS32_ERR_IO && !setting_reads && diag_closes == 1,
+            "unknown basic index");
+    mixer_error = 0;
+    outp(OPN_ADDR, OPN_REG_TIMER_CTRL); /* An intervening reset selected 27h. */
+    id = 0x80;
+    require(fm_diag_irq_setting() == 2 && setting_reads == 1 &&
+            index_reg == SSG_REG_MIXER, "restore basic index");
+    outp(OPN_ADDR, OPN_REG_TIMER_B); /* BIOS I/O between exclusive windows. */
+    id |= 0x3f;
+    require(fm_diag_irq_setting() == 2 && setting_reads == 2 &&
+            diag_closes == 3, "joystick input changed wiring");
+    trace_count = 0;
+    restore_error = 1;
+    require(fm_diag_irq_setting() == OS32_ERR_IO && diag_closes == 4, "diagnostic restore failure");
+    restore_error = 0;
     require(fm_quiesce(&module) && fm_detach(&module), "lifecycle");
     reads = writes = 0;
     require(!start() && registered == OPN_PROBE_OPNA && !reads && !writes, "reattach");
@@ -231,6 +313,7 @@ void _start(void)
     reset();
     status = 0;
     mask = 0;
+    feature = 0x51;
     fail_restore = 1;
     require(start() && !boot_probe.contained && !fm_quiesce(&module), "restore timeout");
     require(mask == 0x10, "IRQ12 isolation");

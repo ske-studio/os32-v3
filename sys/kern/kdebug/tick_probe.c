@@ -28,6 +28,17 @@ int tick_probe_call(void *buf, unsigned int size)
 {
     if (!buf || size != sizeof(struct tp_request) || !_irq_enabled()) return -1;
     struct tp_control c = {((struct tp_request *)buf)->action, 0};
+    if (c.action == TP_WSS_IRQ) {
+        int rc = debug_probe_control(TP_WSS_IRQ, 0, 0);
+        if (!rc) kprintf(7, "WSS IRQ12 PI acknowledged, route restored\n");
+        return rc;
+    }
+    if (c.action == TP_FM_SETTING) {
+        int setting = debug_probe_control(TP_FM_SETTING, 0, 0);
+        if (setting < 0) return setting;
+        kprintf(7, "FM 0Eh[7:6]=%u\n", (unsigned)setting);
+        return 0;
+    }
     int rc = debug_probe_control(TP_CONTROL, &c, sizeof(c));
     if (rc) { kprintf(7, "tickprobe: stop before start/show\n"); return rc; }
     if (!c.snapshot) { kprintf(7, "tickprobe: started\n"); return 0; }

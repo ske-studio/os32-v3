@@ -161,7 +161,7 @@ COMPONENTS = (
         dependencies=(), required=False,
         module_id=8, phase=CONSTANTS['PHASE_POST_ROOT'],
         required_flags=CONSTANTS['FLAG_PAIR'], allowed_flags=CONSTANTS['FLAG_PAIR'],
-        stop_allowed=0, positional_imports=0, ops_version=1, ops_slots=1,
+        stop_allowed=0, positional_imports=0, ops_version=2, ops_slots=1,
         image_max=65536, mem_max=65536,
         reloc_max=2048, export_max=1, load_span_max=81920,
         init_symbol='v86_module_init', imports_symbol='v86_import_slots',

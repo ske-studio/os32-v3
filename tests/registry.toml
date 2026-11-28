@@ -447,14 +447,21 @@ id = "fm_probe"
 spec = { path = "docs/design/kernel/irq/irq.md", section = "S1 の音源判定" }
 subsystem = "sound"
 level = "L2"
-sources = ["sys/dev/sound/fm", "sys/platform/pc98/platform_fm_probe.h", "sys/platform/pc98/irq_policy.c", "sys/kern/irq", "sys/platform/pc98/pic.c", "sys/platform/pc98/irq_complete.c", "tests/support/fixtures/fm_probe", "tools/ops/kernel_includes.py", "build/config.mk", "tools/gen_sqlite_imports.py", "tools/gen_kdebug_imports.py", "tools/prototypes/fm_imports.def"]
+sources = ["sys/hal/sound/snd2_chip.c", "sys/hal/sound/snd2_int.h", "sys/dev/sound/fm", "sys/platform/pc98/platform_fm_probe.h", "sys/platform/pc98/irq_policy.c", "sys/kern/irq", "sys/platform/pc98/pic.c", "sys/platform/pc98/irq_complete.c", "tests/support/fixtures/fm_probe", "tools/ops/kernel_includes.py", "build/config.mk", "tools/gen_sqlite_imports.py", "tools/gen_kdebug_imports.py", "tools/prototypes/fm_imports.def"]
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "両ベースの判定、開放バスと A460h の識別 ID の整合、各待ちの 10,000 回境界とネイティブ書込み列、タイマ遷移、既登録時の両ベース不在による IRQ12 公開、FM 登録と IMR 保持、再 attach の I/O ゼロ、停止失敗の隔離"
+expect = "両ベースの判定、開放バスと A460h の識別 ID の整合、各待ちの 10,000 回境界とネイティブ書込み列、タイマ遷移、既登録時の両ベース不在による IRQ12 公開、FM 登録と IMR 保持、診断解放時の基本 index と復元失敗の通知、再 attach の I/O ゼロ、停止失敗の隔離"
 limits = "ポート模型。実機配線とゲスト演奏は S4"
 gates = ["push", "main"]
 mutations = [
+ { id = "cache_diag_index", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/fm_module.c", old = "rc = snd2_chip_read(handle, 0, 2, SSG_REG_MIXER);", new = "static int known; rc = known ? 0 : snd2_chip_read(handle, 0, 2, SSG_REG_MIXER); if (rc >= 0) known = 1;", fail = "fresh mixer selection" },
+ { id = "unknown_index_select", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/fm_module.c", old = "if (rc >= 0) {", new = "if (1) {", fail = "unknown basic index" },
+ { id = "restore_wrong_index", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/fm_module.c", old = "snd2_chip_diag_close(handle, SSG_REG_MIXER)", new = "snd2_chip_diag_close(handle, 0x0e)", fail = "restore basic index" },
+ { id = "ignore_restore_failure", config = "pc98", when = "after_build", replace = "sys/hal/sound/snd2_chip.c", old = "quiet < 0 ? quiet : restore", new = "quiet", fail = "diagnostic FM ownership" },
+ { id = "reuse_diag_handle", config = "pc98", when = "after_build", replace = "sys/hal/sound/snd2_chip.c", old = "if (c->owner)\n        return OS32_ERR_BUSY;", new = "if (c->owner && c->owner != res_owner_get())\n        return OS32_ERR_BUSY;", fail = "diagnostic FM ownership" },
+ { id = "118_fifo", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "if (board == 4 && inp", new = "if ((board == 4 || board == 8) && inp", fail = "118 FIFO access" },
+ { id = "touch_26k_irq_reg", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "!opn_only && !write_reg", new = "!write_reg", fail = "26K OPNA register" },
  { id = "reject_cs4231_only", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "board == 7 || board == 15", new = "board == 15", fail = "CS4231-only open bus" },
  { id = "accept_fm_board", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "board == 7 || board == 15", new = "board == 5 || board == 7 || board == 15", fail = "FM board open bus" },
  { id = "id_only", config = "pc98", when = "after_build", replace = "sys/dev/sound/fm/opn_probe.c", old = "!*contained || !rose", new = "!*contained", fail = "missing timer transition" },
@@ -493,7 +500,7 @@ id = "irq12_delivery"
 spec = { path = "docs/design/kernel/irq/irq.md", section = "初段の段と受入" }
 subsystem = "sound"
 level = "L2"
-sources = ["sys/dev/sound/fm", "sys/arch/x86/kernel/isr_stub.asm", "sys/kern/irq", "sys/platform/pc98", "tests/support/fixtures/irq12_delivery", "tests/support/fixtures/fm_probe/io.h", "tools/ops/kernel_includes.py", "tools/gen_sqlite_imports.py", "tools/prototypes/fm_imports.def", "tools/module_schema.py", "tools/gen_kdebug_imports.py"]
+sources = ["sys/dev/sound/fm", "sys/arch/x86/kernel/isr_stub.asm", "sys/kern/irq", "sys/platform/pc98", "tests/support/fixtures/irq12_delivery", "tests/support/fixtures/fm_control/check.h", "tests/support/fixtures/fm_probe/io.h", "tools/ops/kernel_includes.py", "tools/gen_sqlite_imports.py", "tools/prototypes/fm_imports.def", "tools/module_schema.py", "tools/gen_kdebug_imports.py"]
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
@@ -501,6 +508,7 @@ expect = "両ベース ABSENT 時の共有配送・解除・物理 EOI と反射
 limits = "実スタブ本体を実行。特権命令・ゲストフレーム・PIC は模型"
 gates = ["push", "main"]
 mutations = [
+ { id = "release_on_exception", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_mem.c", old = "if (kctx_irq_depth || kctx_exc_depth) goto done;", new = "if (kctx_irq_depth) goto done;", fail = "foreground release" },
  { id = "publish_unmasked", config = "pc98", when = "after_build", replace = "sys/platform/pc98/pic.c", old = "fm_irq12_released = 1;", new = "fm_irq12_released = 1; irq_enable(12);", fail = "initial IRQ12 mask" },
  { id = "reverse", config = "pc98", when = "after_build", replace = "sys/kern/irq/irq_math.c", old = "for (i = 0; i < n; i++)", new = "for (i = n - 1; i >= 0; i--)", fail = "shared order" },
  { id = "drop_remaining", config = "pc98", when = "after_build", replace = "sys/kern/irq/irq_math.c", old = "ln->slot[i] = ln->slot[i + 1];", new = "ln->slot[i].fn = 0;", fail = "shared order" },
@@ -518,10 +526,13 @@ sources = ["sys/platform/pc98/kernel.c", "sys/platform/pc98/kernel_boot_memory.i
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "通常起動で FM の判定後に DMA が使える場合にだけ PCM をロード"
+expect = "通常起動で FM の判定後に DMA が使える場合にだけ PCM をロード。WSS 単独窓で IRQ 側 ack、IMR 復元と失敗時隔離を確認"
 limits = "通常起動の音源呼出部と常駐判定を実行。FM 判定・I/O・部品登録は模型"
 gates = ["push", "main"]
 mutations = [
+ { id = "count_prestart_pi", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_module.c", old = "if (playing && rc == IRQ_HANDLED", new = "if (rc == IRQ_HANDLED", fail = "WSS diagnostic window" },
+ { id = "wss_stuck_int", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_module.c", old = "rc == IRQ_HANDLED && !(inp(PCM_PORT_R2) & 1)", new = "rc == IRQ_HANDLED", fail = "WSS diagnostic window" },
+ { id = "wss_restore_failed_stop", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_module.c", old = "(u8)inp(PCM_PORT_ROUTE) != bios_route) {\n        irq_quarantine_line(PCM_IRQ);", new = "(u8)inp(PCM_PORT_ROUTE) != bios_route) {\n        platform_irq_unmask(PCM_IRQ);", fail = "WSS diagnostic window" },
  { id = "dma_gate", config = "pc98", when = "after_build", replace = "sys/platform/pc98/kernel.c", old = "if (memory_boot_dma_available()) {", new = "if (1) {", fail = "PCM boot DMA gate" },
  { id = "reject_fm", config = "pc98", when = "after_build", replace = "sys/dev/sound/cs4231/pcm_module.c", old = "if (pcm_quarantined)", new = "if (platform_irq_reserved(PCM_IRQ)) return \"FM\"; if (pcm_quarantined)", fail = "PCM boot admission" }]
 
@@ -2269,6 +2280,56 @@ mutations = [{ id = "keep_old_window_tab", config = "pc98", when = "after_build"
     { id = "discard_full_release", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "if !ring::append(st, slot, &ev) { return false; }\n            st.excl.delivered[i].keys", new = "let _ = ring::append(st, slot, &ev);\n            st.excl.delivered[i].keys", fail = "incorrect old-window release" },
     { id = "forget_pointer_buttons", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "rec.buttons = ev.sub;", new = "rec.buttons = 0;", fail = "incorrect old-window release" },
     { id = "repeat_accepted_button", config = "pc98", when = "after_build", replace = "userland/gshell/src/excl.rs", old = "st.excl.delivered[i].buttons &= !bit;", new = "st.excl.delivered[i].buttons |= bit;", fail = "incorrect old-window release" }]
+
+[[check]]
+id = "v86_sound_pic"
+spec = { path = "docs/decisions/sound/V86_SOFT86_DESIGN.md", section = "依存順と先に赤にする検査" }
+subsystem = "sound"
+level = "L2"
+sources = ["sys/platform/pc98/legacy/v86_pic.c", "sys/platform/pc98/legacy/v86.c", "sys/platform/pc98/legacy/v86_test16.asm", "sys/platform/pc98/legacy/v86_pic.h", "sys/platform/pc98/legacy/v86_io.c", "tests/support/fm_control.py", "tests/support/fixtures/fm_control/pic.c", "tests/support/fixtures/fm_control/check.h", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "両 IMR、両 EOI、IF とゲストフレーム失敗、鍵盤 FIFO の残存、自己試験 ISR による IRQ0 の連続配送を確認"
+limits = "i386 の保存フレームと PIC を検査。実 DOS ゲストの IRQ 遅延は実機窓で測る"
+gates = ["push", "main"]
+mutations = [
+ { id = "smoke_missing_eoi", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_test16.asm", old = "mov     al, 0x20", new = "mov     al, 0", fail = "smoke timer delivery" },
+ { id = "skip_gp_delivery", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "return v86_deliver_pending(frame, V86F_EIP", new = "return 0; return v86_deliver_pending(frame, V86F_EIP", fail = "return after STI successor" },
+ { id = "early_pic_commit", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (!v86_do_int(frame, vector, ip, cs, flags, sp, ss, 0))", new = "v86_pic_commit(irq); if (!v86_do_int(frame, vector, ip, cs, flags, sp, ss, 0))", fail = "frame fault commit" },
+ { id = "ignore_cascade_mask", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_pic.c", old = "if (!eligible(&pic_m, i)) continue;", new = "if (i != ICU_SLAVEID && !eligible(&pic_m, i)) continue;", fail = "cascade mask" },
+ { id = "forget_source", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_pic.c", old = "if (soft_sound_sources) v86_pic_request(12);", new = "(void)soft_sound_sources;", fail = "remaining source" }]
+
+[[check]]
+id = "snd2_fmq_host"
+spec = { path = "docs/decisions/sound/V86_SOFT86_DESIGN.md", section = "依存順と先に赤にする検査" }
+subsystem = "sound"
+level = "L2"
+sources = ["sys/hal/sound/snd2_fmq.c", "sys/hal/sound/snd2_fmq.h", "tests/support/fm_control.py", "tests/support/fixtures/fm_control/queue.c", "tests/support/fixtures/fm_control/check.h", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "通番と時刻が一周しても発行順を保持し、満杯で未発行"
+limits = "i386 ホストの列操作。同時刻の実音源の標本出力は対象外"
+gates = ["push", "main"]
+mutations = [
+ { id = "issue_full", config = "pc98", when = "after_build", replace = "sys/hal/sound/snd2_fmq.c", old = "if (q->count == SND2_FMQ_LEN) return 0;", new = "if (q->count == SND2_FMQ_LEN) { ++q->sequence; return 0; }", fail = "full queue issued" }]
+
+[[check]]
+id = "v86_fm_timer"
+spec = { path = "docs/decisions/sound/V86_SOFT86_DESIGN.md", section = "依存順と先に赤にする検査" }
+subsystem = "sound"
+level = "L2"
+sources = ["sys/platform/pc98/legacy/v86_fm_timer.c", "sys/hal/sound/snd2_fmq.c", "sys/platform/pc98/legacy/v86_fm_timer.h", "sys/hal/sound/snd2_fmq.h", "tests/support/fm_control.py", "tests/support/fixtures/fm_control/timer.c", "tests/support/fixtures/fm_control/check.h", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "固定目標の再開、期限の順序、一命令進行と連続過負荷終了"
+limits = "偽時計による前景制御。実チップの周期・配線・ゲスト遅延は測らない"
+gates = ["push", "main"]
+mutations = [
+ { id = "chase_clock", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_fm_timer.c", old = "if (!t->target_valid)", new = "if (1)", fail = "fixed target" },
+ { id = "allow_overload", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_fm_timer.c", old = "t->growing_windows >= 2", new = "t->growing_windows > 2", fail = "sustained overload" }]
 
 [[check]]
 id = "gfx_measure"

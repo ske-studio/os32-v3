@@ -111,6 +111,19 @@ int snd2_chip_open(u32 dev, u32 *h)
     return rc;
 }
 
+#ifdef TICK_PROBE
+/* The diagnostic will close its handle, so even its own previous open is busy. */
+int snd2_chip_diag_open(u32 dev, u32 *h)
+{
+    Chip *c = device(dev);
+    if (!c || !h || c->info.kind != SND2_KIND_FM)
+        return OS32_ERR_INVAL;
+    if (c->owner)
+        return OS32_ERR_BUSY;
+    return snd2_chip_open(dev, h);
+}
+#endif
+
 int snd2_chip_implicit(int owner)
 {
     for (u32 i = 0; i < CHIP_COUNT; ++i)
@@ -180,16 +193,34 @@ int snd2_chip_reset(u32 h)
     return c->be->quiet(c->ctx) < 0 ? fault(c) : 0;
 }
 
-static int release(Chip *c)
+static int finish_release(Chip *c, int status)
 {
-    int quiet = c->be->quiet(c->ctx);
     int close = c->be->close(c->ctx);
     c->owner = 0;
     c->gen = (c->gen + 1) & 0xffffff;
-    if (quiet < 0 || close < 0)
+    if (status < 0 || close < 0)
         return fault(c);
     return c->info.flags & SND2_DEV_FAULTED ? OS32_ERR_IO : 0;
 }
+
+static int release(Chip *c)
+{
+    return finish_release(c, c->be->quiet(c->ctx));
+}
+
+#ifdef TICK_PROBE
+/* quiet changes the basic index. Read it back while the bank is accessible
+ * and the diagnostic still owns the chip, even if an earlier read faulted. */
+int snd2_chip_diag_close(u32 h, u32 reg)
+{
+    Chip *c;
+    int rc = owned(h, &c);
+    if (rc) return rc;
+    int quiet = c->be->quiet(c->ctx);
+    int restore = c->be->read(c->ctx, 0, 2, reg);
+    return finish_release(c, quiet < 0 ? quiet : restore);
+}
+#endif
 
 int snd2_chip_close(u32 h)
 {

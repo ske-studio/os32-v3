@@ -7,7 +7,7 @@
 #include "v86_io.h"
 #include "v86_pic.h"
 #include "v86_kbd.h"
-#define V86_MODULE_OPS_VERSION 1u
+#define V86_MODULE_OPS_VERSION 2u
 typedef struct {
     int (*v86_bios_attach_disk)(const char *path);
     int (*v86_bios_attach_second)(const char *path);
@@ -26,11 +26,14 @@ typedef struct {
     u32 (*v86_io_trap_count)(void);
     u16 (*v86_io_last_port)(void);
     void (*v86_pic_set_imr)(int slave, u8 imr);
-    int (*v86_pic_should_inject)(u32 irq, u32 *out_vector);
+    void (*v86_pic_request)(u32 irq);
+    void (*v86_pic_soft_sound)(u8 sources);
+    int (*v86_pic_candidate)(u32 *vector);
+    void (*v86_pic_commit)(u32 irq);
     int (*v86_kbd_push)(u8 scancode);
     int (*v86_kbd_pending)(void);
 } V86ModuleApi;
-#define V86_MODULE_API_SLOTS 20u
+#define V86_MODULE_API_SLOTS 23u
 int v86_module_load(void);
 int v86_module_abort(void);
 int v86_module_session_acquire(void);

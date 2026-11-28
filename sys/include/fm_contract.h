@@ -28,6 +28,9 @@ typedef unsigned char uchar;
 
 /* OPN低レベル */
 void opn_init(void);
+#ifdef TICK_PROBE
+int fm_diag_irq_setting(void);
+#endif
 void opn_write(uchar reg, uchar val);
 
 /* FM音源 */

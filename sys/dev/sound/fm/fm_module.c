@@ -17,6 +17,44 @@ const struct fm_probe_record *fm_boot_probe(void)
     return &boot_probe;
 }
 
+#ifdef TICK_PROBE
+#include "snd2_int.h"
+#include "fm.h"
+
+/* Only the exclusive window selects registers. The mixer read establishes
+ * a known basic index without writing mixer data. */
+int fm_diag_irq_setting(void)
+{
+    if (!boot_probe.contained || boot_probe.bank[0].model != OPN_PROBE_OPNA ||
+        boot_probe.feature_port != OPNA_ID_PORT ||
+        (boot_probe.feature_id >> 4 != 4 && boot_probe.feature_id >> 4 != 8))
+        return OS32_ERR_NOTFOUND;
+
+    SND2_DevInfo info;
+    SND2_ChipCaps caps;
+    for (u32 i = 0; !snd2_chip_dev_info(i, &info); ++i) {
+        if (info.kind != SND2_KIND_FM || snd2_chip_caps(info.dev, &caps, sizeof(caps)) ||
+            caps.base_port != OPN_ADDR || caps.chip != SND2_CHIP_OPNA)
+            continue;
+        if (platform_fm_probe_busy())
+            return OS32_ERR_BUSY;
+        u32 handle;
+        int rc = snd2_chip_diag_open(info.dev, &handle);
+        if (rc) return rc;
+        rc = snd2_chip_read(handle, 0, 2, SSG_REG_MIXER);
+        if (rc >= 0) {
+            rc = snd2_chip_read(handle, 0, 2, 0x0e);
+            int closed = snd2_chip_diag_close(handle, SSG_REG_MIXER);
+            if (closed < 0) return closed;
+            return rc < 0 ? rc : (rc >> 6) & 3;
+        }
+        int closed = snd2_chip_close(handle);
+        return closed < 0 ? closed : rc;
+    }
+    return OS32_ERR_NOTFOUND;
+}
+#endif
+
 static void publish_probe_irq_policy(void)
 {
     if (!boot_probe.contained) {
