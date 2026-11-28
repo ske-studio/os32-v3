@@ -2265,3 +2265,18 @@ mutations = [
  { id = "early_pic_commit", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (!v86_do_int(frame, vector, ip, cs, flags, sp, ss, 0))", new = "v86_pic_commit(irq); if (!v86_do_int(frame, vector, ip, cs, flags, sp, ss, 0))", fail = "frame fault commit" },
  { id = "ignore_cascade_mask", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_pic.c", old = "if (!eligible(&pic_m, i)) continue;", new = "if (i != ICU_SLAVEID && !eligible(&pic_m, i)) continue;", fail = "cascade mask" },
  { id = "forget_source", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86_pic.c", old = "if (soft_sound_sources) v86_pic_request(12);", new = "(void)soft_sound_sources;", fail = "remaining source" }]
+
+[[check]]
+id = "snd2_fmq_host"
+spec = { path = "docs/decisions/sound/V86_SOFT86_DESIGN.md", section = "依存順と先に赤にする検査" }
+subsystem = "sound"
+level = "L2"
+sources = ["sys/hal/sound/snd2_fmq.c", "sys/hal/sound/snd2_fmq.h", "tests/support/fm_control.py", "tests/support/fixtures/fm_control/queue.c", "tests/support/fixtures/fm_control/check.h", "tools/ops/kernel_includes.py"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "通番と時刻が一周しても発行順を保持し、満杯で未発行"
+limits = "i386 ホストの列操作。同時刻の実音源の標本出力は対象外"
+gates = ["push", "main"]
+mutations = [
+ { id = "issue_full", config = "pc98", when = "after_build", replace = "sys/hal/sound/snd2_fmq.c", old = "if (q->count == SND2_FMQ_LEN) return 0;", new = "if (q->count == SND2_FMQ_LEN) { ++q->sequence; return 0; }", fail = "full queue issued" }]

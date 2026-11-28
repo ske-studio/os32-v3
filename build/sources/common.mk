@@ -1,4 +1,4 @@
-SND2_SOURCES = $(addprefix sys/hal/sound/snd2_,caps.c chip.c dsp.c pos.c reg.c seg.c stg.c stream.c v1.c) \
+SND2_SOURCES = $(addprefix sys/hal/sound/snd2_,caps.c chip.c dsp.c fmq.c pos.c reg.c seg.c stg.c stream.c v1.c) \
     sys/kapi/kapi_snd2.c sys/kapi/kapi_snd2_chip.c
 
 # 共通の場所の持ち物を像の機能ごとの組で宣言する (docs/design/build/select.md §3-2)。
