@@ -25,7 +25,7 @@ if (c == '\n') break;
 
 ```c
 /* sys/fs/vfs_device.h: VFS 内部契約。VFS_DEV_* の既存値は固定。 */
-enum vfs_name_mode { VFS_NAME_DIGIT_PREFIX, VFS_NAME_PREFIX, VFS_NAME_EXACT };
+enum vfs_name_mode { VFS_NAME_DIGIT_PREFIX, VFS_NAME_PREFIX, VFS_NAME_EXACT, VFS_NAME_DIGIT_EXACT };
 struct vfs_device_name {
     const char *prefix;
     int mode, type, first, count;
@@ -36,7 +36,7 @@ void vfs_device_names_register(const struct vfs_device_name *rows, unsigned n);
 ### vfs
 
 - rows/件数を VFS が保持、実体は sys/platform/pc98/boot_names.c。pc98_boot_bind で一括登録、確保不要。VFS/FS の通常 init でこの表を消さない。未登録時は parse/番号検証とも失敗。
-- 純粋な字句解決表であり、drivers/dev の実在 Device 表とは別。fd2/3 や不在 hd も旧来の parse は成功するため dev_find 成功を条件にしない。loop/lo は新規に受理しない。
+- 純粋な字句解決表であり、drivers/dev の実在 Device 表とは別。fd2/3 や不在 hd も旧来の parse は成功するため dev_find 成功を条件にしない。PC-98 の lo0〜lo3 は DIGIT_EXACT で末尾まで照合し、VFS_DEV_LOOP と slot 番号に解決する。ext2 に渡す符号は OS32_DRV_LOOP(slot)。マウント数は同じ slot の HD と区別し、umount 成功後に減る。
 - DIGIT_PREFIX は prefix 直後の **1 桁だけ**を範囲検査し、末尾は無視。COM、COM0、COM9、COMxyz は全て SERIAL/1。hostdrv0 は失敗。大小文字は区別。成功するまで出力ポインタへ書かない。
 
 - 使う文脈は起動/協調/KAPI、IRQ 内で parse/mount しない。ABI・マウント衝突判定・FS 側の型検査はそのまま。

@@ -39,6 +39,7 @@
 #define VFS_DEV_CD      3
 #define VFS_DEV_HOSTDRV 4
 #define VFS_DEV_RAM     5
+#define VFS_DEV_LOOP    6
 
 #define VFS_MOUNT_DEV_ENCODE(t, i) ((((t) & 0xFF) << 8) | ((i) & 0xFF))
 #define VFS_MOUNT_DEV_TYPE(x)      (((x) >> 8) & 0xFF)
@@ -220,8 +221,8 @@ void vfs_umount(const char *prefix);
  *   sync の負値      … 書き戻せなかった (マウントは残る)
  * 既存の vfs_umount (void、sync の失敗を捨てる) は変えない ([ABI])。 */
 int  vfs_umount_checked(const char *prefix);
-/* IDE ドライブ drive (hd<drive>) を指すマウントの数 (どの prefix でも、ルートも
- * 数える)。drive が 0〜3 の外なら VFS_ERR_INVAL。KAPI dev_mount_count (v64)。 */
+/* HD 0〜3 または OS32_DRV_LOOP(slot) のマウント数。ルート・別名も数える。
+ * 対象外の番号は VFS_ERR_INVAL。KAPI dev_mount_count。 */
 int  vfs_dev_mount_count(int drive);
 int  vfs_is_mounted(const char *prefix);
 const char *vfs_fstype(const char *prefix);

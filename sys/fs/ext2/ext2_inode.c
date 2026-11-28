@@ -29,9 +29,9 @@ static int ext2_read_inode_block(Ext2Ctx *ctx, u32 ino, u32 *block_num, u8 **dat
     *block_num = ctx->gd_table[group].inode_table + (index * ctx->sb_info.inode_size) / EXT2_BLOCK_SIZE;
     offset_in_block = (index * ctx->sb_info.inode_size) % EXT2_BLOCK_SIZE;
 
-    if (ext2_read_block(ctx, *block_num, ext2_g_blk) != 0) return EXT2_ERR_IO;
+    if (ext2_read_block(ctx, *block_num, ctx->block_buf) != 0) return EXT2_ERR_IO;
 
-    *data = &ext2_g_blk[offset_in_block];
+    *data = &ctx->block_buf[offset_in_block];
     return EXT2_OK;
 }
 
@@ -62,7 +62,7 @@ int ext2_write_inode(Ext2Ctx *ctx, u32 ino, const Ext2Inode *inode)
 
     ext2_inode_encode(dst, inode);
 
-    return ext2_write_block(ctx, block_num, ext2_g_blk);
+    return ext2_write_block(ctx, block_num, ctx->block_buf);
 }
 
 /* ======================================================================== */
@@ -93,7 +93,7 @@ int ext2_alloc_block(Ext2Ctx *ctx)
     for (g = 0; g < ctx->num_groups; g++) {
         if (ctx->gd_table[g].free_blocks == 0) continue;
 
-        ret = ext2_read_block(ctx, ctx->gd_table[g].block_bitmap, ext2_g_aux);
+        ret = ext2_read_block(ctx, ctx->gd_table[g].block_bitmap, ctx->aux_buf);
         if (ret != 0) return EXT2_ERR_IO;   /* 次のグループへ進まない */
 
         /* 最終グループはブロック数が端数になる場合がある */
@@ -106,16 +106,16 @@ int ext2_alloc_block(Ext2Ctx *ctx)
         }
 
         for (byte_idx = 0; (u32)byte_idx < BITMAP_BYTES(max_bits); byte_idx++) {
-            if (ext2_g_aux[byte_idx] == 0xFF) continue;
+            if (ctx->aux_buf[byte_idx] == 0xFF) continue;
             for (bit_idx = 0; bit_idx < BITS_PER_BYTE; bit_idx++) {
                 if ((u32)(byte_idx * BITS_PER_BYTE + bit_idx) >= max_bits) break;
-                if (!(ext2_g_aux[byte_idx] & (1 << bit_idx))) {
+                if (!(ctx->aux_buf[byte_idx] & (1 << bit_idx))) {
                     block_num = ctx->sb_info.first_data_block
                                 + g * ctx->sb_info.blocks_per_group
                                 + (u32)(byte_idx * BITS_PER_BYTE + bit_idx);
                     if (block_num >= ctx->sb_info.total_blocks) return EXT2_ERR_NOSPC;
-                    ext2_g_aux[byte_idx] |= (u8)(1 << bit_idx);
-                    ret = ext2_write_block(ctx, ctx->gd_table[g].block_bitmap, ext2_g_aux);
+                    ctx->aux_buf[byte_idx] |= (u8)(1 << bit_idx);
+                    ret = ext2_write_block(ctx, ctx->gd_table[g].block_bitmap, ctx->aux_buf);
                     if (ret != 0) return EXT2_ERR_IO;
                     ctx->gd_table[g].free_blocks--;
                     ctx->sb_info.free_blocks_count--;
@@ -161,13 +161,13 @@ int ext2_free_block(Ext2Ctx *ctx, u32 block_num)
     byte_idx = rel_bit / BITS_PER_BYTE;
     bit_idx  = rel_bit % BITS_PER_BYTE;
 
-    ret = ext2_read_block(ctx, ctx->gd_table[group].block_bitmap, ext2_g_aux);
+    ret = ext2_read_block(ctx, ctx->gd_table[group].block_bitmap, ctx->aux_buf);
     if (ret != 0) return EXT2_ERR_IO;
     /* 既に空き: 二重解放。空き数を二重に増やさない
      * (ext2_release_blocks の後始末はこれに頼る — そちらのコメント (2)) */
-    if (!(ext2_g_aux[byte_idx] & (1 << bit_idx))) return EXT2_OK;
-    ext2_g_aux[byte_idx] &= (u8)~(1 << bit_idx);
-    ret = ext2_write_block(ctx, ctx->gd_table[group].block_bitmap, ext2_g_aux);
+    if (!(ctx->aux_buf[byte_idx] & (1 << bit_idx))) return EXT2_OK;
+    ctx->aux_buf[byte_idx] &= (u8)~(1 << bit_idx);
+    ret = ext2_write_block(ctx, ctx->gd_table[group].block_bitmap, ctx->aux_buf);
     if (ret != 0) return EXT2_ERR_IO;
     ctx->gd_table[group].free_blocks++;
     ctx->sb_info.free_blocks_count++;
@@ -188,21 +188,21 @@ int ext2_alloc_inode(Ext2Ctx *ctx)
     for (g = 0; g < ctx->num_groups; g++) {
         if (ctx->gd_table[g].free_inodes == 0) continue;
 
-        ret = ext2_read_block(ctx, ctx->gd_table[g].inode_bitmap, ext2_g_aux);
+        ret = ext2_read_block(ctx, ctx->gd_table[g].inode_bitmap, ctx->aux_buf);
         if (ret != 0) return EXT2_ERR_IO;   /* 次のグループへ進まない */
 
         max_bits = ctx->sb_info.inodes_per_group;
 
         for (byte_idx = 0; (u32)byte_idx < BITMAP_BYTES(max_bits); byte_idx++) {
-            if (ext2_g_aux[byte_idx] == 0xFF) continue;
+            if (ctx->aux_buf[byte_idx] == 0xFF) continue;
             for (bit_idx = 0; bit_idx < BITS_PER_BYTE; bit_idx++) {
                 if ((u32)(byte_idx * BITS_PER_BYTE + bit_idx) >= max_bits) break;
-                if (!(ext2_g_aux[byte_idx] & (1 << bit_idx))) {
+                if (!(ctx->aux_buf[byte_idx] & (1 << bit_idx))) {
                     ino = g * ctx->sb_info.inodes_per_group
                           + (u32)(byte_idx * BITS_PER_BYTE + bit_idx) + 1;
                     if (ino > ctx->sb_info.total_inodes) return EXT2_ERR_NOSPC;
-                    ext2_g_aux[byte_idx] |= (u8)(1 << bit_idx);
-                    ret = ext2_write_block(ctx, ctx->gd_table[g].inode_bitmap, ext2_g_aux);
+                    ctx->aux_buf[byte_idx] |= (u8)(1 << bit_idx);
+                    ret = ext2_write_block(ctx, ctx->gd_table[g].inode_bitmap, ctx->aux_buf);
                     if (ret != 0) return EXT2_ERR_IO;
                     ctx->gd_table[g].free_inodes--;
                     ctx->sb_info.free_inodes_count--;
@@ -233,11 +233,11 @@ int ext2_free_inode(Ext2Ctx *ctx, u32 ino)
     byte_idx = rel_bit / BITS_PER_BYTE;
     bit_idx  = rel_bit % BITS_PER_BYTE;
 
-    ret = ext2_read_block(ctx, ctx->gd_table[group].inode_bitmap, ext2_g_aux);
+    ret = ext2_read_block(ctx, ctx->gd_table[group].inode_bitmap, ctx->aux_buf);
     if (ret != 0) return EXT2_ERR_IO;
-    if (!(ext2_g_aux[byte_idx] & (1 << bit_idx))) return EXT2_OK;
-    ext2_g_aux[byte_idx] &= (u8)~(1 << bit_idx);
-    ret = ext2_write_block(ctx, ctx->gd_table[group].inode_bitmap, ext2_g_aux);
+    if (!(ctx->aux_buf[byte_idx] & (1 << bit_idx))) return EXT2_OK;
+    ctx->aux_buf[byte_idx] &= (u8)~(1 << bit_idx);
+    ret = ext2_write_block(ctx, ctx->gd_table[group].inode_bitmap, ctx->aux_buf);
     if (ret != 0) return EXT2_ERR_IO;
     ctx->gd_table[group].free_inodes++;
     ctx->sb_info.free_inodes_count++;
@@ -320,9 +320,9 @@ int ext2_bmap_set(Ext2Ctx *ctx, Ext2Inode *inode, u32 file_block, u32 phys_block
             int ind_blk = ext2_alloc_block(ctx);
             if (ind_blk < 0) return ind_blk;   /* NOSPC / IO をそのまま (往復 6) */
             /* alloc_block は g_aux を使うので、表はその後で組む */
-            ext2_mem_zero(ext2_g_aux, EXT2_BLOCK_SIZE);
-            le32_wr(&ext2_g_aux[file_block * EXT2_BLOCK_PTR_SIZE], phys_block);
-            ret = ext2_write_block(ctx, (u32)ind_blk, ext2_g_aux);
+            ext2_mem_zero(ctx->aux_buf, EXT2_BLOCK_SIZE);
+            le32_wr(&ctx->aux_buf[file_block * EXT2_BLOCK_PTR_SIZE], phys_block);
+            ret = ext2_write_block(ctx, (u32)ind_blk, ctx->aux_buf);
             if (ret != 0) {
                 /* まだ誰も指していない。返せなければ漏れるだけ */
                 if (ext2_free_block(ctx, (u32)ind_blk) != 0) { /* 漏れ */ }
@@ -332,10 +332,10 @@ int ext2_bmap_set(Ext2Ctx *ctx, Ext2Inode *inode, u32 file_block, u32 phys_block
             inode->blocks += EXT2_SECTORS_PER_BLOCK;
             return EXT2_OK;
         }
-        ret = ext2_read_block(ctx, inode->block[EXT2_IND_BLOCK], ext2_g_aux);
+        ret = ext2_read_block(ctx, inode->block[EXT2_IND_BLOCK], ctx->aux_buf);
         if (ret != 0) return EXT2_ERR_IO;
-        le32_wr(&ext2_g_aux[file_block * EXT2_BLOCK_PTR_SIZE], phys_block);
-        return ext2_write_block(ctx, inode->block[EXT2_IND_BLOCK], ext2_g_aux) == 0
+        le32_wr(&ctx->aux_buf[file_block * EXT2_BLOCK_PTR_SIZE], phys_block);
+        return ext2_write_block(ctx, inode->block[EXT2_IND_BLOCK], ctx->aux_buf) == 0
                ? EXT2_OK : EXT2_ERR_IO;
     }
 
@@ -348,8 +348,8 @@ int ext2_bmap_set(Ext2Ctx *ctx, Ext2Inode *inode, u32 file_block, u32 phys_block
         if (inode->block[EXT2_DIND_BLOCK] == 0) {
             int dind_blk = ext2_alloc_block(ctx);
             if (dind_blk < 0) return dind_blk; /* NOSPC / IO をそのまま (往復 6) */
-            ext2_mem_zero(ext2_g_aux, EXT2_BLOCK_SIZE);
-            ret = ext2_write_block(ctx, (u32)dind_blk, ext2_g_aux);
+            ext2_mem_zero(ctx->aux_buf, EXT2_BLOCK_SIZE);
+            ret = ext2_write_block(ctx, (u32)dind_blk, ctx->aux_buf);
             if (ret != 0) {
                 if (ext2_free_block(ctx, (u32)dind_blk) != 0) { /* 漏れ */ }
                 return EXT2_ERR_IO;
@@ -359,31 +359,31 @@ int ext2_bmap_set(Ext2Ctx *ctx, Ext2Inode *inode, u32 file_block, u32 phys_block
             inode->blocks += EXT2_SECTORS_PER_BLOCK;
         }
 
-        ret = ext2_read_block(ctx, inode->block[EXT2_DIND_BLOCK], ext2_g_aux);
+        ret = ext2_read_block(ctx, inode->block[EXT2_DIND_BLOCK], ctx->aux_buf);
         if (ret != 0) return EXT2_ERR_IO;
 
-        ind1_block = le32_rd(&ext2_g_aux[ind1_idx * EXT2_BLOCK_PTR_SIZE]);
+        ind1_block = le32_rd(&ctx->aux_buf[ind1_idx * EXT2_BLOCK_PTR_SIZE]);
         if (ind1_block == 0) {
             int ind_blk = ext2_alloc_block(ctx);      /* g_aux を上書きする */
             if (ind_blk < 0) return ind_blk;   /* NOSPC / IO をそのまま (往復 6) */
 
             /* 1) 中身を書く (まだ誰も指していない) */
-            ext2_mem_zero(ext2_g_blk, EXT2_BLOCK_SIZE);
-            le32_wr(&ext2_g_blk[ind2_idx * EXT2_BLOCK_PTR_SIZE], phys_block);
-            ret = ext2_write_block(ctx, (u32)ind_blk, ext2_g_blk);
+            ext2_mem_zero(ctx->block_buf, EXT2_BLOCK_SIZE);
+            le32_wr(&ctx->block_buf[ind2_idx * EXT2_BLOCK_PTR_SIZE], phys_block);
+            ret = ext2_write_block(ctx, (u32)ind_blk, ctx->block_buf);
             if (ret != 0) {
                 if (ext2_free_block(ctx, (u32)ind_blk) != 0) { /* 漏れ */ }
                 return EXT2_ERR_IO;
             }
 
             /* 2) 二重間接表から指させる。alloc_block が g_aux を潰したので読み直す */
-            ret = ext2_read_block(ctx, inode->block[EXT2_DIND_BLOCK], ext2_g_aux);
+            ret = ext2_read_block(ctx, inode->block[EXT2_DIND_BLOCK], ctx->aux_buf);
             if (ret != 0) {
                 if (ext2_free_block(ctx, (u32)ind_blk) != 0) { /* 漏れ */ }
                 return EXT2_ERR_IO;
             }
-            le32_wr(&ext2_g_aux[ind1_idx * EXT2_BLOCK_PTR_SIZE], (u32)ind_blk);
-            ret = ext2_write_block(ctx, inode->block[EXT2_DIND_BLOCK], ext2_g_aux);
+            le32_wr(&ctx->aux_buf[ind1_idx * EXT2_BLOCK_PTR_SIZE], (u32)ind_blk);
+            ret = ext2_write_block(ctx, inode->block[EXT2_DIND_BLOCK], ctx->aux_buf);
             /* 失敗したら指されたかもしれない。**返さない** (漏れで止める) */
             if (ret != 0) return EXT2_ERR_IO;
 
@@ -391,10 +391,10 @@ int ext2_bmap_set(Ext2Ctx *ctx, Ext2Inode *inode, u32 file_block, u32 phys_block
             return EXT2_OK;
         }
 
-        ret = ext2_read_block(ctx, ind1_block, ext2_g_blk);
+        ret = ext2_read_block(ctx, ind1_block, ctx->block_buf);
         if (ret != 0) return EXT2_ERR_IO;
-        le32_wr(&ext2_g_blk[ind2_idx * EXT2_BLOCK_PTR_SIZE], phys_block);
-        return ext2_write_block(ctx, ind1_block, ext2_g_blk) == 0 ? EXT2_OK : EXT2_ERR_IO;
+        le32_wr(&ctx->block_buf[ind2_idx * EXT2_BLOCK_PTR_SIZE], phys_block);
+        return ext2_write_block(ctx, ind1_block, ctx->block_buf) == 0 ? EXT2_OK : EXT2_ERR_IO;
     }
     return EXT2_ERR_NOSPC;
 }
@@ -454,10 +454,10 @@ int ext2_bmap_set(Ext2Ctx *ctx, Ext2Inode *inode, u32 file_block, u32 phys_block
  * 残りは返し続ける — 参照はもう無いので、途中で止める理由が無い。
  * D6 の未公開 builder 専用口だけは metadata IO 後の返却を止める。
  *
- * バッファ: 表は ext2_g_blk (単一間接・二重間接) と ext2_g_dat (二重間接の
- * 内側) に置く。ext2_free_block が ext2_g_aux へビットマップを読み直すので、
- * 表を ext2_g_aux に置くと 1 本目を返した瞬間に表がビットマップへ化ける
- * (2026-09-06 の相互リンクの直接原因。gotcha §4-24)。ext2_g_dat は
+ * バッファ: 表は ctx->block_buf (単一間接・二重間接) と ctx->data_buf (二重間接の
+ * 内側) に置く。ext2_free_block が ctx->aux_buf へビットマップを読み直すので、
+ * 表を ctx->aux_buf に置くと 1 本目を返した瞬間に表がビットマップへ化ける
+ * (2026-09-06 の相互リンクの直接原因。gotcha §4-24)。ctx->data_buf は
  * ext2_write_stream のデータ用だが、そこからこの関数は呼ばれない。 */
 /* Deferred D6 builders stop cleanup writes after metadata IO. Other release
  * callers retain their existing boundary and leak accounting. */
@@ -478,11 +478,11 @@ static int ext2_release_blocks_mode(Ext2Ctx *ctx, const u32 *blocks, int stop_on
     }
 
     if (blocks[EXT2_IND_BLOCK] != 0) {
-        if (ext2_read_block(ctx, blocks[EXT2_IND_BLOCK], ext2_g_blk) != 0) {
+        if (ext2_read_block(ctx, blocks[EXT2_IND_BLOCK], ctx->block_buf) != 0) {
             leaked = 1;                         /* 表ごと漏らす */
         } else {
             for (j = 0; j < EXT2_ADDR_PER_BLOCK; j++) {
-                u32 blk = le32_rd(&ext2_g_blk[j * EXT2_BLOCK_PTR_SIZE]);
+                u32 blk = le32_rd(&ctx->block_buf[j * EXT2_BLOCK_PTR_SIZE]);
                 if (blk != 0 && ext2_release_free(ctx, blk, stop_on_error) != 0) leaked = 1;
             }
             if (ext2_release_free(ctx, blocks[EXT2_IND_BLOCK], stop_on_error) != 0) leaked = 1;
@@ -490,18 +490,18 @@ static int ext2_release_blocks_mode(Ext2Ctx *ctx, const u32 *blocks, int stop_on
     }
 
     if (blocks[EXT2_DIND_BLOCK] != 0) {
-        if (ext2_read_block(ctx, blocks[EXT2_DIND_BLOCK], ext2_g_blk) != 0) {
+        if (ext2_read_block(ctx, blocks[EXT2_DIND_BLOCK], ctx->block_buf) != 0) {
             leaked = 1;
         } else {
             for (j = 0; j < EXT2_ADDR_PER_BLOCK; j++) {
-                u32 ind1 = le32_rd(&ext2_g_blk[j * EXT2_BLOCK_PTR_SIZE]);
+                u32 ind1 = le32_rd(&ctx->block_buf[j * EXT2_BLOCK_PTR_SIZE]);
                 if (ind1 == 0) continue;
-                if (ext2_read_block(ctx, ind1, ext2_g_dat) != 0) {
+                if (ext2_read_block(ctx, ind1, ctx->data_buf) != 0) {
                     leaked = 1;                 /* 表ごと漏らす */
                     continue;
                 }
                 for (k = 0; k < EXT2_ADDR_PER_BLOCK; k++) {
-                    u32 blk = le32_rd(&ext2_g_dat[k * EXT2_BLOCK_PTR_SIZE]);
+                    u32 blk = le32_rd(&ctx->data_buf[k * EXT2_BLOCK_PTR_SIZE]);
                     if (blk != 0 && ext2_release_free(ctx, blk, stop_on_error) != 0) leaked = 1;
                 }
                 if (ext2_release_free(ctx, ind1, stop_on_error) != 0) leaked = 1;

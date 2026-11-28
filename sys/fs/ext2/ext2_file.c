@@ -59,6 +59,7 @@ static int ext2_create_abort_unwritten(Ext2Ctx *ctx, u32 ino, const Ext2Inode *i
 
 int ext2_create(Ext2Ctx *ctx, u32 dir_ino, const char *name, const void *data, u32 size)
 {
+    Ext2WriteWork *w = ext2_write_workspace(ctx);
     u32 new_ino, now;
     Ext2Inode inode;
     int ret;
@@ -80,10 +81,10 @@ int ext2_create(Ext2Ctx *ctx, u32 dir_ino, const char *name, const void *data, u
     inode.links_count = 1;
     ret = ext2_write_begin(ctx, EXT2_WRITE_NEW_INO, &inode);
     if (ret != 0) return ret;
-    new_ino = ext2_write_work.ino;
+    new_ino = w->ino;
     ret = ext2_write_batch_transfer(ctx, data, size, 0, 1);
     if (ret < 0) {
-        if (ext2_write_work.active) ext2_write_build_abort(ctx, 1);
+        if (w->active) ext2_write_build_abort(ctx, 1);
         return ret;
     }
     /* finish closed the child workspace before parent directory RMW. */
@@ -136,7 +137,7 @@ int ext2_write(Ext2Ctx *ctx, u32 ino, const void *data, u32 size)
     if (ret != 0) return ret;
     ret = ext2_write_batch_transfer(ctx, data, size, 0, 1);
     if (ret < 0) {
-        if (ext2_write_work.active) ext2_write_build_abort(ctx, 0);
+        if (ext2_write_workspace(ctx)->active) ext2_write_build_abort(ctx, 0);
         return ret;
     }
     if (ext2_sync(ctx) != 0) return EXT2_ERR_IO;
@@ -145,18 +146,19 @@ int ext2_write(Ext2Ctx *ctx, u32 ino, const void *data, u32 size)
 
 int ext2_write_stream(Ext2Ctx *ctx, u32 ino, const void *buf, u32 size, u32 offset)
 {
+    Ext2WriteWork *w = ext2_write_workspace(ctx);
     int ret;
     if (!ctx->mounted) return EXT2_ERR_NOMOUNT;
     ret = ext2_check_writable(ctx);
     if (ret != 0) return ret;
     ret = ext2_write_begin(ctx, ino, (const Ext2Inode *)0);
     if (ret != 0) return ret;
-    if ((ext2_write_work.inode.current.mode & EXT2_S_IFMT) != EXT2_S_IFREG) {
+    if ((w->inode.current.mode & EXT2_S_IFMT) != EXT2_S_IFREG) {
         ext2_write_abort(ctx);
         return EXT2_ERR_ISDIR;
     }
-    ext2_write_work.inode.current.mtime = ext2_current_time();
-    ext2_write_work.inode.dirty = 1;
+    w->inode.current.mtime = ext2_current_time();
+    w->inode.dirty = 1;
     ret = ext2_write_batch_transfer(ctx, buf, size, offset, 0);
     if (ret < 0) return ret;
     if (ext2_sync(ctx) != 0) return EXT2_ERR_IO;

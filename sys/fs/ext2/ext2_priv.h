@@ -18,12 +18,6 @@
 #define ext2_str_len(s)       ((int)kstrlen(s))
 #define ext2_str_ncmp(a,b,n)  kstrncmp((a),(b),(u32)(n))
 
-/* 共有バッファ (シングルタスクのため全インスタンスで共有)
- * 注意: 将来マルチタスク化する場合はインスタンスごとに分離が必要 */
-extern u8 ext2_g_blk[EXT2_BLOCK_SIZE];
-extern u8 ext2_g_aux[EXT2_BLOCK_SIZE];
-extern u8 ext2_g_dat[EXT2_BLOCK_SIZE]; /* ext2_write_stream データ読み書き専用 */
-
 /* D6: 同期 write 1 回だけが所有する作業領域。bitmap/表/inode と窓の進捗を保持する。
  * 実体は ext2_file_write_batch.inc。D1 の読取枠とは共有しない。 */
 #define EXT2_WRITE_WINDOW_BLOCKS 64u
@@ -85,7 +79,7 @@ typedef struct {
     u8 published; /* inode 書込み後は abort で再利用しない */
 } Ext2WriteInodeReservation;
 
-typedef struct {
+typedef struct Ext2WriteWork {
     Ext2Ctx *ctx;
     u32 ino; /* inode 予約前だけ EXT2_WRITE_NEW_INO */
     Ext2WriteBitmap block_bitmap[EXT2_MAX_GROUPS]; /* 添字が group */
@@ -108,9 +102,13 @@ STATIC_ASSERT(sizeof(u32) != 4 || sizeof(Ext2WriteRecord) == 16,
 STATIC_ASSERT(sizeof(u32) != 4 || sizeof(Ext2WriteWork) <= EXT2_WRITE_WORK_MAX_BYTES,
               ext2_write_work_size);
 
-/* 後段の batch 実装が 1 個だけ定義する。begin/finish/abort で全 valid を
- * 落とす。作業中に別の ext2 操作へ協調切替しない既存 scratch の契約を継承。 */
+/* HD mounts share this workspace. Each loop mount has its own because its
+ * synchronous backing-file I/O can enter the HD or another loop mount. */
 extern Ext2WriteWork ext2_write_work;
+static inline Ext2WriteWork *ext2_write_workspace(Ext2Ctx *ctx)
+{
+    return ctx->private_write ? ctx->private_write : &ext2_write_work;
+}
 
 /* -- ext2_inode_write_bitmap.inc (ext2_inode.c 内) -- */
 /* 現行の群/bit 探索順。予約は保持 bitmap と reserved だけを変更する。

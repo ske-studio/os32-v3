@@ -24,6 +24,7 @@ int ext2_format_range(const struct ext2_medium_ops *ops, int drv, u32 base, u32 
 int ext2_medium_register(int kind, const struct ext2_medium_ops *ops);   /* 0 / -1 (範囲外・NULL・二重・LOOP の claims 欠落) */
 extern const struct ext2_medium_ops ext2_medium_ide_ops;                 /* sys/platform/pc98/storage/ext2_medium_ide.c */
 
+const struct ext2_medium_ops *ext2_loop_medium(int drv);
 extern const struct ext2_medium_ops ext2_medium_loop_ops;
 
 #endif

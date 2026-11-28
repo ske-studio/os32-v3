@@ -37,8 +37,14 @@ typedef struct {
 } Ext2PathMemo;
 
 /* ext2インスタンスコンテキスト
- * 1インスタンスあたり約1.6KB (経路の記憶が約1KB)。kmalloc で動的確保する。 */
+ * kmalloc で動的確保する。 */
 typedef struct Ext2Ctx_tag {
+    /* A backing file can re-enter ext2 during a synchronous loop transfer. */
+    u8 error_sector[EXT2_SECTOR_SIZE];
+    u8 block_buf[EXT2_BLOCK_SIZE];
+    u8 aux_buf[EXT2_BLOCK_SIZE];
+    u8 data_buf[EXT2_BLOCK_SIZE];
+    struct Ext2WriteWork *private_write;
     int mounted;
     int drive_num;           /* 後方互換 (format等で使用) */
     u32 base_lba;

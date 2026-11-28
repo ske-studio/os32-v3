@@ -14,6 +14,11 @@ void ext2_data_cache_reset(void)
 static int ext2_read_partial(Ext2Ctx *ctx, u32 block, void *dst,
                              u32 offset, u32 size)
 {
+    if (ctx->private_write) {
+        if (ext2_read_data_block(ctx, block, ctx->data_buf) != 0) return EXT2_ERR_IO;
+        ext2_mem_copy(dst, ctx->data_buf + offset, size);
+        return EXT2_OK;
+    }
     if (!(ctx->mounted && !ctx->fs_error && ext2_data_cache.valid &&
           ext2_data_cache.ctx == ctx && ext2_data_cache.block == block)) {
         ext2_data_cache.valid = 0;

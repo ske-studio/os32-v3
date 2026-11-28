@@ -17,7 +17,7 @@ HD の書込み許可がある端末で実行する。対象 HD の全マウン�
 
 ## OPTIONS
 
-- `DRIVE` — HD 番号 (0-3) または loop 名 (lo0-lo3)
+- `DRIVE` — HD は `0`〜`3`、loop は `lo0`〜`lo3`。loop は先に losetup で像を装着する
 - `SECTORS` — 要求するセクタ数 (省略時: 2880)。実際に作る長さは要求・区画の長さ・32 グループの上限のうち一番小さい物
 
 ## EXAMPLES

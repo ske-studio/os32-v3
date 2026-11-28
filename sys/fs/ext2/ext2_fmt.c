@@ -260,11 +260,17 @@ int ext2_format_range(const struct ext2_medium_ops *ops, int ide_drive, u32 base
 /*  入口                                                                    */
 /* ======================================================================== */
 
-static const struct ext2_medium_ops *format_medium(int drv)
+const struct ext2_medium_ops *ext2_loop_medium(int drv)
 {
     const struct ext2_medium_ops *loop = media[EXT2_MEDIUM_LOOP];
     if (loop && loop->claims(drv)) return loop;
-    return media[EXT2_MEDIUM_HD];
+    return NULL;
+}
+
+static const struct ext2_medium_ops *format_medium(int drv)
+{
+    const struct ext2_medium_ops *loop = ext2_loop_medium(drv);
+    return loop ? loop : media[EXT2_MEDIUM_HD];
 }
 
 /* The previous managed provider accepts only a whole, pre-approved root.

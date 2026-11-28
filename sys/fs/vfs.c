@@ -9,6 +9,7 @@
 /* ======================================================================== */
 
 #include "install_access.h"
+#include "loop_contract.h"
 #include "vfs_device.h"
 #include "vfs.h"
 #include "os32_kapi_shared.h" /* O_RDONLY, SEEK_SET 等 */
@@ -391,8 +392,9 @@ int vfs_dev_parse(const char *name, int *dev_type, int *dev_id)
         int id = row->first;
         while (row->prefix[len] && name[len] == row->prefix[len]) len++;
         if (row->prefix[len]) continue;
-        if (row->mode == VFS_NAME_DIGIT_PREFIX) {
+        if (row->mode == VFS_NAME_DIGIT_PREFIX || row->mode == VFS_NAME_DIGIT_EXACT) {
             if (name[len] < '0' || name[len] > '9') continue;
+            if (row->mode == VFS_NAME_DIGIT_EXACT && name[len + 1]) continue;
             id = name[len] - '0';
             if (id < row->first || id - row->first >= row->count) continue;
         } else if (row->mode == VFS_NAME_EXACT && name[len]) {
@@ -641,10 +643,14 @@ int vfs_umount_checked(const char *prefix)
 int vfs_dev_mount_count(int drive)
 {
     int i, n = 0;
+    int type = VFS_DEV_HD;
 
-    if (drive < 0 || drive >= VFS_DEV_UNIT_MAX) return VFS_ERR_INVAL;
+    if (drive >= OS32_DRV_LOOP(0) && drive < OS32_DRV_LOOP(LOOP_MAX_SLOTS)) {
+        type = VFS_DEV_LOOP;
+        drive -= OS32_DRV_LOOP(0);
+    } else if (drive < 0 || drive >= VFS_DEV_UNIT_MAX) return VFS_ERR_INVAL;
     for (i = 0; i < VFS_MAX_FS; i++) {
-        if (mounts[i].in_use && mounts[i].dev_type == VFS_DEV_HD &&
+        if (mounts[i].in_use && mounts[i].dev_type == type &&
             mounts[i].dev_id == drive)
             n++;
     }

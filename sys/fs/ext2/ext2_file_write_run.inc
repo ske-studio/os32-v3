@@ -3,7 +3,7 @@
 static int ext2_write_run_window(Ext2Ctx *ctx, const u8 *src, u32 size,
                                   u32 offset, u32 *completed)
 {
-    Ext2WriteWork *w = &ext2_write_work;
+    Ext2WriteWork *w = ext2_write_workspace(ctx);
     u32 planned = 0, logical = offset / EXT2_BLOCK_SIZE;
     u32 edge = offset % EXT2_BLOCK_SIZE;
     int ret = EXT2_OK;
@@ -27,11 +27,11 @@ static int ext2_write_run_window(Ext2Ctx *ctx, const u8 *src, u32 size,
         int io;
         if (bytes > planned - *completed) bytes = planned - *completed;
         if (edge || bytes < EXT2_BLOCK_SIZE) {
-            if (r->flags & EXT2_WRITE_REC_NEW) ext2_mem_zero(ext2_g_dat, EXT2_BLOCK_SIZE);
-            else if (ext2_read_data_block(ctx, r->physical, ext2_g_dat) != 0)
+            if (r->flags & EXT2_WRITE_REC_NEW) ext2_mem_zero(ctx->data_buf, EXT2_BLOCK_SIZE);
+            else if (ext2_read_data_block(ctx, r->physical, ctx->data_buf) != 0)
                 return EXT2_ERR_IO;
-            ext2_mem_copy(ext2_g_dat + edge, data, bytes);
-            io = ext2_write_data_block(ctx, r->physical, ext2_g_dat);
+            ext2_mem_copy(ctx->data_buf + edge, data, bytes);
+            io = ext2_write_data_block(ctx, r->physical, ctx->data_buf);
         } else {
             while (blocks < (planned - *completed) / EXT2_BLOCK_SIZE &&
                    blocks < EXT2_DATA_RUN_MAX_BLOCKS &&

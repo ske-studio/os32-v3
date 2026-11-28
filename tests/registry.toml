@@ -2545,3 +2545,21 @@ gates = ["push", "main"]
 mutations = [{ id = "format_skip_permission", config = "pc98", when = "after_build", replace = "userland/shell/cmd_sys.c", old = "drv < OS32_DRV_LOOP(0) && g_api->ide_write_sectors", new = "0 && g_api->ide_write_sectors", fail = "format drive, sector count or rejection mismatch" },
     { id = "format_busy_reason", config = "pc98", when = "after_build", replace = "userland/shell/cmd_sys.c", old = "device busy or reservation unavailable", new = "device busy", fail = "format drive, sector count or rejection mismatch" },
     { id = "accept_drive_suffix", config = "pc98", when = "after_build", replace = "userland/shell/cmd_sys.c", old = "*p > '3' || p[1]", new = "*p > '3'", fail = "format drive, sector count or rejection mismatch" }]
+
+[[check]]
+id = "pc98_loop_mount"
+spec = { path = "docs/design/fs/README.md", section = "vfs" }
+subsystem = "fs"
+level = "L2"
+sources = ["sys/platform/pc98/boot_names.c", "sys/platform/pc98/storage/ext2_medium_ide.c", "sys/fs/vfs.c", "sys/fs/vfs_fd.c", "sys/fs/vfs.h", "sys/fs/vfs_device.h", "sys/fs/ext2", "sys/dev/block/loop_dev.c", "sys/dev/block/ext2_medium_loop.c", "sys/include/ext2_medium_contract.h", "sys/include/loop_contract.h", "tests/support/fixtures/loop_mount/mount.c", "tests/support/fixtures/input_policy/entry.S"]
+environment = "linux-x86-cross"
+arch = { x86 = ["pc98"] }
+needs = []
+expect = "ext2 上の像を lo0〜lo3 に装着して format・mount・書込み・umount・再 mount・読戻しが通り、HD と各 loop の mount 数を区別する"
+limits = "HD と時計は模型。シェルと機種起動は NP21/W の受入で確認する"
+gates = ["push", "main"]
+mutations = [
+    { id = "missing_loop_name", config = "pc98", when = "after_build", replace = "sys/platform/pc98/boot_names.c", old = '"lo", VFS_NAME_DIGIT_EXACT', new = '"lx", VFS_NAME_DIGIT_EXACT', fail = "loop name resolution" },
+    { id = "count_loop_as_hd", config = "pc98", when = "after_build", replace = "sys/fs/vfs.c", old = "type = VFS_DEV_LOOP;", new = "type = VFS_DEV_HD;", fail = "loop mount count" },
+    { id = "reuse_loop_device", config = "pc98", when = "after_build", replace = "sys/dev/block/ext2_medium_loop.c", old = "Device *dev = &devices[slot];", new = "Device *dev = &devices[0];", fail = "loop remount content" },
+]

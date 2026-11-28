@@ -53,7 +53,7 @@ static void ext2_inode_encode(u8 *dst, const Ext2Inode *inode)
 
 int ext2_write_inode_load(Ext2Ctx *ctx, u32 ino, const Ext2Inode *initial)
 {
-    Ext2WriteInode *slot = &ext2_write_work.inode;
+    Ext2WriteInode *slot = &ext2_write_workspace(ctx)->inode;
     u32 group = (ino - 1) / ctx->sb_info.inodes_per_group;
     u32 index = (ino - 1) % ctx->sb_info.inodes_per_group;
     if (ino == 0 || group >= ctx->num_groups) return EXT2_ERR_NOTFOUND;
@@ -71,12 +71,13 @@ int ext2_write_inode_load(Ext2Ctx *ctx, u32 ino, const Ext2Inode *initial)
 
 int ext2_write_inode_commit(Ext2Ctx *ctx)
 {
-    Ext2WriteInode *slot = &ext2_write_work.inode;
+    Ext2WriteWork *w = ext2_write_workspace(ctx);
+    Ext2WriteInode *slot = &w->inode;
     if (!slot->dirty) return EXT2_OK;
     ext2_inode_encode(slot->raw + slot->offset, &slot->current);
     if (ext2_write_block(ctx, slot->physical, slot->raw) != 0) return EXT2_ERR_IO;
     slot->dirty = 0;
-    if (ext2_write_work.inode_reservation.reserved)
-        ext2_write_work.inode_reservation.published = 1;
+    if (w->inode_reservation.reserved)
+        w->inode_reservation.published = 1;
     return EXT2_OK;
 }

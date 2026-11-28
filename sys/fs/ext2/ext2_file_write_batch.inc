@@ -3,13 +3,14 @@ Ext2WriteWork ext2_write_work;
 
 void ext2_write_abort(Ext2Ctx *ctx)
 {
-    if (ext2_write_work.ctx != ctx) return;
-    ext2_mem_zero(&ext2_write_work, sizeof(ext2_write_work));
+    Ext2WriteWork *w = ext2_write_workspace(ctx);
+    if (w->ctx != ctx) return;
+    ext2_mem_zero(w, sizeof(Ext2WriteWork));
 }
 
 int ext2_write_begin(Ext2Ctx *ctx, u32 ino, const Ext2Inode *initial)
 {
-    Ext2WriteWork *w = &ext2_write_work;
+    Ext2WriteWork *w = ext2_write_workspace(ctx);
     int ret;
     ext2_read_cache_reset();
     ext2_mem_zero(w, sizeof(*w));
@@ -31,7 +32,7 @@ int ext2_write_map(Ext2Ctx *ctx, u32 logical, u32 *out_phys)
 
 int ext2_write_reserve(Ext2Ctx *ctx, u32 logical, Ext2WriteRecord **out_record)
 {
-    Ext2WriteWork *w = &ext2_write_work;
+    Ext2WriteWork *w = ext2_write_workspace(ctx);
     Ext2WriteRecord *r;
     u32 physical;
     int ret;
@@ -54,7 +55,7 @@ int ext2_write_reserve(Ext2Ctx *ctx, u32 logical, Ext2WriteRecord **out_record)
 
 void ext2_write_data_done(Ext2Ctx *ctx, u32 n)
 {
-    Ext2WriteWork *w = &ext2_write_work;
+    Ext2WriteWork *w = ext2_write_workspace(ctx);
     u32 i;
     (void)ctx;
     for (i = 0; i < n; i++) w->record[w->data_done++].flags |= EXT2_WRITE_REC_DATA_DONE;
@@ -62,7 +63,7 @@ void ext2_write_data_done(Ext2Ctx *ctx, u32 n)
 
 int ext2_write_commit_window(Ext2Ctx *ctx)
 {
-    Ext2WriteWork *w = &ext2_write_work;
+    Ext2WriteWork *w = ext2_write_workspace(ctx);
     ext2_write_bmap_trim(ctx);
     if (ext2_write_bitmap_commit(ctx) != 0 || ext2_write_bmap_commit(ctx) != 0 ||
         (!w->defer_inode && ext2_write_inode_commit(ctx) != 0)) {
@@ -87,7 +88,7 @@ int ext2_write_finish(Ext2Ctx *ctx)
 static int ext2_write_batch_transfer(Ext2Ctx *ctx, const void *buf, u32 size,
                                      u32 offset, int complete)
 {
-    Ext2WriteWork *w = &ext2_write_work;
+    Ext2WriteWork *w = ext2_write_workspace(ctx);
     const u8 *src = (const u8 *)buf;
     u32 done = 0;
     int ret = EXT2_OK;
@@ -119,9 +120,10 @@ static int ext2_write_batch_transfer(Ext2Ctx *ctx, const void *buf, u32 size,
  * references. Drop retained bitmaps before the existing cleanup does any I/O. */
 static void ext2_write_build_abort(Ext2Ctx *ctx, int new_inode)
 {
-    Ext2Inode inode = ext2_write_work.inode.current;
-    u32 ino = ext2_write_work.ino;
-    int bitmap_done = ext2_write_work.inode_reservation.bitmap_done;
+    Ext2WriteWork *w = ext2_write_workspace(ctx);
+    Ext2Inode inode = w->inode.current;
+    u32 ino = w->ino;
+    int bitmap_done = w->inode_reservation.bitmap_done;
     ext2_write_abort(ctx);
     if (ctx->fs_error) return;
     if (new_inode && bitmap_done) {

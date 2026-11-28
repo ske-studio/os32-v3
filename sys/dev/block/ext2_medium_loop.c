@@ -50,9 +50,13 @@ static Device *loop_device(int drv)
 {
     /* priv は slot の番号を指す (整数を void * に詰めない — check_p2v の physical-cast を避ける) */
     static const int slots[LOOP_MAX_SLOTS] = { 0, 1, 2, 3 };
-    static Device dev = { .blk_read = loop_read, .blk_write = loop_write };
-    dev.priv = (void *)&slots[drv - OS32_DRV_LOOP(0)];
-    return &dev;
+    static Device devices[LOOP_MAX_SLOTS];
+    int slot = drv - OS32_DRV_LOOP(0);
+    Device *dev = &devices[slot];
+    dev->blk_read = loop_read;
+    dev->blk_write = loop_write;
+    dev->priv = (void *)&slots[slot];
+    return dev;
 }
 
 const struct ext2_medium_ops ext2_medium_loop_ops = {

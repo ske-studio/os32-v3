@@ -69,19 +69,19 @@ int ext2_mkdir(Ext2Ctx *ctx, u32 parent_ino, const char *name)
     inode.block[0] = (u32)new_blk;
 
     /* "." と ".." */
-    ext2_mem_zero(ext2_g_aux, EXT2_BLOCK_SIZE);
+    ext2_mem_zero(ctx->aux_buf, EXT2_BLOCK_SIZE);
     pos = 0;
-    le32_wr(&ext2_g_aux[pos], (u32)new_ino);
-    le16_wr(&ext2_g_aux[pos + EXT2_DIRENT_RECLEN_OFF], EXT2_DOT_RECLEN);
-    ext2_g_aux[pos + EXT2_DIRENT_NAMELEN_OFF] = 1; ext2_g_aux[pos + EXT2_DIRENT_TYPE_OFF] = EXT2_FT_DIR;
-    ext2_g_aux[pos + EXT2_DIRENT_NAME_OFF] = '.';
+    le32_wr(&ctx->aux_buf[pos], (u32)new_ino);
+    le16_wr(&ctx->aux_buf[pos + EXT2_DIRENT_RECLEN_OFF], EXT2_DOT_RECLEN);
+    ctx->aux_buf[pos + EXT2_DIRENT_NAMELEN_OFF] = 1; ctx->aux_buf[pos + EXT2_DIRENT_TYPE_OFF] = EXT2_FT_DIR;
+    ctx->aux_buf[pos + EXT2_DIRENT_NAME_OFF] = '.';
     pos = EXT2_DOT_RECLEN;
-    le32_wr(&ext2_g_aux[pos], parent_ino);
-    le16_wr(&ext2_g_aux[pos + EXT2_DIRENT_RECLEN_OFF], (u16)(EXT2_BLOCK_SIZE - EXT2_DOT_RECLEN));
-    ext2_g_aux[pos + EXT2_DIRENT_NAMELEN_OFF] = 2; ext2_g_aux[pos + EXT2_DIRENT_TYPE_OFF] = EXT2_FT_DIR;
-    ext2_g_aux[pos + EXT2_DIRENT_NAME_OFF] = '.'; ext2_g_aux[pos + EXT2_DIRENT_NAME_OFF + 1] = '.';
+    le32_wr(&ctx->aux_buf[pos], parent_ino);
+    le16_wr(&ctx->aux_buf[pos + EXT2_DIRENT_RECLEN_OFF], (u16)(EXT2_BLOCK_SIZE - EXT2_DOT_RECLEN));
+    ctx->aux_buf[pos + EXT2_DIRENT_NAMELEN_OFF] = 2; ctx->aux_buf[pos + EXT2_DIRENT_TYPE_OFF] = EXT2_FT_DIR;
+    ctx->aux_buf[pos + EXT2_DIRENT_NAME_OFF] = '.'; ctx->aux_buf[pos + EXT2_DIRENT_NAME_OFF + 1] = '.';
 
-    ret = ext2_write_block(ctx, (u32)new_blk, ext2_g_aux);
+    ret = ext2_write_block(ctx, (u32)new_blk, ctx->aux_buf);
     if (ret != 0) {
         /* inode はまだ書いていないので、new_blk を指すものは媒体に無い。
          * 親の links は上げたまま (多い側 = 安全側) */
@@ -148,18 +148,18 @@ static int ext2_is_dir_empty(Ext2Ctx *ctx, u32 dir_ino)
         ret = ext2_bmap(ctx, &inode, bi, &phys);
         if (ret != 0) return EXT2_ERR_IO;
         if (phys == 0) break;
-        ret = ext2_read_block(ctx, phys, ext2_g_aux);
+        ret = ext2_read_block(ctx, phys, ctx->aux_buf);
         if (ret != 0) return EXT2_ERR_IO;
 
         pos = 0;
         while (pos < EXT2_BLOCK_SIZE) {
-            u32 de_inode  = le32_rd(&ext2_g_aux[pos]);
-            u16 de_reclen = le16_rd(&ext2_g_aux[pos + EXT2_DIRENT_RECLEN_OFF]);
-            u8  de_namelen = ext2_g_aux[pos + EXT2_DIRENT_NAMELEN_OFF];
+            u32 de_inode  = le32_rd(&ctx->aux_buf[pos]);
+            u16 de_reclen = le16_rd(&ctx->aux_buf[pos + EXT2_DIRENT_RECLEN_OFF]);
+            u8  de_namelen = ctx->aux_buf[pos + EXT2_DIRENT_NAMELEN_OFF];
             if (de_reclen == 0) break;
             if (de_inode != 0) {
-                if (!(de_namelen == 1 && ext2_g_aux[pos + EXT2_DIRENT_NAME_OFF] == '.') &&
-                    !(de_namelen == 2 && ext2_g_aux[pos + EXT2_DIRENT_NAME_OFF] == '.' && ext2_g_aux[pos + EXT2_DIRENT_NAME_OFF + 1] == '.')) {
+                if (!(de_namelen == 1 && ctx->aux_buf[pos + EXT2_DIRENT_NAME_OFF] == '.') &&
+                    !(de_namelen == 2 && ctx->aux_buf[pos + EXT2_DIRENT_NAME_OFF] == '.' && ctx->aux_buf[pos + EXT2_DIRENT_NAME_OFF + 1] == '.')) {
                     return 0;
                 }
             }

@@ -33,10 +33,10 @@ i386 の保持オブジェクトの合計は 3248B（host ILP32 sizeof と kerne
 D2 の `EXT2_DATA_RUN_MAX_BLOCKS` と範囲 I/O の宣言は変更しない。
 
 `Ext2WriteWork` は同期 write 1 回につき `(ctx, ino)` 1 組が所有する固定領域。
-batch 実装が `ext2_write_work` を 1 個定義する。create の inode 予約前は
+HD は batch の静的領域 `ext2_write_work` を使う。loop は backing ファイルの書込みで別の ext2 に同期的に再入するため、mount ごとに同型の領域を確保し、umount で解放する。create の inode 予約前は
 `ino == EXT2_WRITE_NEW_INO` (0)。D1 とは別配列で、D1 reset は D6 を捨てない。
 begin は D1 を全失効し、begin/finish/abort は D6 の全 valid を落とす。
-既存 scratch と同じ非再入・操作中の別 ext2 操作への協調切替なしを前提とする。
+inode・ディレクトリ・データの scratch は各 Ext2Ctx に置く。loop の端数読取と間接表読取も自分の scratch を使い、backing 側の D1 キャッシュへの転送先と分ける。
 
 保持する型はブロック bitmap 32 枚、inode bitmap 1 枚、間接表 3 枚、
 生 inode 表 1 枚とデコード値・窓開始値、予約/進捗 67 件、inode 予約 1 件。

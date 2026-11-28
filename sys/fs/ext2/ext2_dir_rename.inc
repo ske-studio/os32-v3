@@ -21,16 +21,16 @@ static int ext2_parent_of(Ext2Ctx *ctx, u32 dir_ino, u32 *out)
     ret = ext2_bmap(ctx, &inode, 0, &phys);
     if (ret != 0) return EXT2_ERR_IO;
     if (phys == 0) return EXT2_ERR_IO;   /* ディレクトリに先頭ブロックが無い */
-    if (ext2_read_block(ctx, phys, ext2_g_aux) != 0) return EXT2_ERR_IO;
+    if (ext2_read_block(ctx, phys, ctx->aux_buf) != 0) return EXT2_ERR_IO;
 
     pos = 0;
     while (pos < EXT2_BLOCK_SIZE) {
-        u32 de_inode   = le32_rd(&ext2_g_aux[pos]);
-        u16 de_reclen  = le16_rd(&ext2_g_aux[pos + EXT2_DIRENT_RECLEN_OFF]);
-        u8  de_namelen = ext2_g_aux[pos + EXT2_DIRENT_NAMELEN_OFF];
+        u32 de_inode   = le32_rd(&ctx->aux_buf[pos]);
+        u16 de_reclen  = le16_rd(&ctx->aux_buf[pos + EXT2_DIRENT_RECLEN_OFF]);
+        u8  de_namelen = ctx->aux_buf[pos + EXT2_DIRENT_NAMELEN_OFF];
         if (de_reclen == 0) break;
         if (de_inode != 0 && de_namelen == 2 &&
-            ext2_g_aux[pos + EXT2_DIRENT_NAME_OFF] == '.' && ext2_g_aux[pos + EXT2_DIRENT_NAME_OFF + 1] == '.') {
+            ctx->aux_buf[pos + EXT2_DIRENT_NAME_OFF] == '.' && ctx->aux_buf[pos + EXT2_DIRENT_NAME_OFF + 1] == '.') {
             *out = de_inode;
             return EXT2_OK;
         }
@@ -54,19 +54,19 @@ static int ext2_set_dotdot(Ext2Ctx *ctx, u32 dir_ino, u32 new_parent)
     ret = ext2_bmap(ctx, &inode, 0, &phys);
     if (ret != 0) return EXT2_ERR_IO;
     if (phys == 0) return EXT2_ERR_IO;
-    ret = ext2_read_block(ctx, phys, ext2_g_aux);
+    ret = ext2_read_block(ctx, phys, ctx->aux_buf);
     if (ret != 0) return EXT2_ERR_IO;
 
     pos = 0;
     while (pos < EXT2_BLOCK_SIZE) {
-        u32 de_inode   = le32_rd(&ext2_g_aux[pos]);
-        u16 de_reclen  = le16_rd(&ext2_g_aux[pos + EXT2_DIRENT_RECLEN_OFF]);
-        u8  de_namelen = ext2_g_aux[pos + EXT2_DIRENT_NAMELEN_OFF];
+        u32 de_inode   = le32_rd(&ctx->aux_buf[pos]);
+        u16 de_reclen  = le16_rd(&ctx->aux_buf[pos + EXT2_DIRENT_RECLEN_OFF]);
+        u8  de_namelen = ctx->aux_buf[pos + EXT2_DIRENT_NAMELEN_OFF];
         if (de_reclen == 0) break;
         if (de_inode != 0 && de_namelen == 2 &&
-            ext2_g_aux[pos + EXT2_DIRENT_NAME_OFF] == '.' && ext2_g_aux[pos + EXT2_DIRENT_NAME_OFF + 1] == '.') {
-            le32_wr(&ext2_g_aux[pos], new_parent);
-            ret = ext2_write_block(ctx, phys, ext2_g_aux);
+            ctx->aux_buf[pos + EXT2_DIRENT_NAME_OFF] == '.' && ctx->aux_buf[pos + EXT2_DIRENT_NAME_OFF + 1] == '.') {
+            le32_wr(&ctx->aux_buf[pos], new_parent);
+            ret = ext2_write_block(ctx, phys, ctx->aux_buf);
             return (ret != 0) ? EXT2_ERR_IO : EXT2_OK;
         }
         pos += de_reclen;

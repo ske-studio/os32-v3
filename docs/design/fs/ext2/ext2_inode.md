@@ -10,8 +10,8 @@ read 入口は [inode 1 枠](ext2_inode_cache.md)、bmap は [間接表 2 枠](e
 
 ## 落とし穴
 
-- **解放中の scratch**: 解放がビットマップを `ext2_g_aux` に読むため、そこに間接表を残すとブロック番号が化け、他のファイルと交差リンクする。
-  解放をまたぐ表は `ext2_g_blk` と `ext2_g_dat` に置く (`sys/fs/ext2/ext2_inode.c`, `sys/fs/ext2/ext2_inode.c`)。
+- **解放中の scratch**: 解放がビットマップを `ctx->aux_buf` に読むため、そこに間接表を残すとブロック番号が化け、他のファイルと交差リンクする。
+  解放をまたぐ表は `ctx->block_buf` と `ctx->data_buf` に置く (`sys/fs/ext2/ext2_inode.c`, `sys/fs/ext2/ext2_inode.c`)。
   割当・解放を呼ぶ間は aux の内容を保持しない。関連する媒体整合検査は `test_b8_open.py (旧版 6455da9bbf55)`。
 
 - **参照を外してから解放**: inode が指すブロックを先に再利用すると、失敗時に別ファイルと共有される。

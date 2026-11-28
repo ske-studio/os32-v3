@@ -12,7 +12,7 @@ int ext2_list_dir(Ext2Ctx *ctx, u32 dir_ino, ext2_dir_callback cb, void *user_ct
     /* 走査中のディレクトリブロックはローカルに写す。コールバックの中で
      * 呼び出し側がファイルへ書く (例: `ls > file` — printf がリダイレクト先の
      * ext2_write_stream を呼ぶ) と、その経路の ext2_bmap / alloc_block が
-     * 共有バッファ ext2_g_aux を上書きし、2 件目以降のエントリがビットマップ
+     * 共有バッファ ctx->aux_buf を上書きし、2 件目以降のエントリがビットマップ
      * の中身 (0xFF...) に化けていた (2026-09-03 実測)。 */
     u8 blk[EXT2_BLOCK_SIZE];
 
@@ -112,20 +112,20 @@ int ext2_find_entry_loc(Ext2Ctx *ctx, u32 dir_ino, const char *name,
         if (ret != 0) return EXT2_ERR_IO;
         if (phys == 0) break;
 
-        ret = ext2_read_block(ctx, phys, ext2_g_aux);
+        ret = ext2_read_block(ctx, phys, ctx->aux_buf);
         if (ret != 0) return EXT2_ERR_IO;
 
         pos = 0;
         while (pos < EXT2_BLOCK_SIZE) {
-            u32 de_inode  = le32_rd(&ext2_g_aux[pos]);
-            u16 de_reclen = le16_rd(&ext2_g_aux[pos + EXT2_DIRENT_RECLEN_OFF]);
-            u8  de_namelen = ext2_g_aux[pos + EXT2_DIRENT_NAMELEN_OFF];
-            u8  de_type    = ext2_g_aux[pos + EXT2_DIRENT_TYPE_OFF];
+            u32 de_inode  = le32_rd(&ctx->aux_buf[pos]);
+            u16 de_reclen = le16_rd(&ctx->aux_buf[pos + EXT2_DIRENT_RECLEN_OFF]);
+            u8  de_namelen = ctx->aux_buf[pos + EXT2_DIRENT_NAMELEN_OFF];
+            u8  de_type    = ctx->aux_buf[pos + EXT2_DIRENT_TYPE_OFF];
 
             if (de_reclen == 0) break;
 
             if (de_inode != 0 && de_namelen == (u8)name_len) {
-                if (ext2_str_ncmp(name, (const char *)&ext2_g_aux[pos + EXT2_DIRENT_NAME_OFF], name_len) == 0) {
+                if (ext2_str_ncmp(name, (const char *)&ctx->aux_buf[pos + EXT2_DIRENT_NAME_OFF], name_len) == 0) {
                     if (out_ino) *out_ino = de_inode;
                     if (out_type) *out_type = de_type;
                     if (out_phys) *out_phys = phys;
@@ -198,14 +198,14 @@ int ext2_add_entry(Ext2Ctx *ctx, u32 dir_ino, const char *name, u32 ino, u8 file
         if (ret != 0) return EXT2_ERR_IO;
         if (phys == 0) break;
 
-        ret = ext2_read_block(ctx, phys, ext2_g_aux);
+        ret = ext2_read_block(ctx, phys, ctx->aux_buf);
         if (ret != 0) return EXT2_ERR_IO;
 
         pos = 0;
         while (pos < EXT2_BLOCK_SIZE) {
-            u32 de_inode  = le32_rd(&ext2_g_aux[pos]);
-            u16 de_reclen = le16_rd(&ext2_g_aux[pos + EXT2_DIRENT_RECLEN_OFF]);
-            u8  de_namelen = ext2_g_aux[pos + EXT2_DIRENT_NAMELEN_OFF];
+            u32 de_inode  = le32_rd(&ctx->aux_buf[pos]);
+            u16 de_reclen = le16_rd(&ctx->aux_buf[pos + EXT2_DIRENT_RECLEN_OFF]);
+            u8  de_namelen = ctx->aux_buf[pos + EXT2_DIRENT_NAMELEN_OFF];
             u16 de_actual;
 
             if (de_reclen == 0) break;
@@ -233,31 +233,31 @@ int ext2_add_entry(Ext2Ctx *ctx, u32 dir_ino, const char *name, u32 ino, u8 file
 
                 /* 1. 中身 (まだ見えない場所) */
                 if (de_inode != 0) {
-                    le32_wr(&ext2_g_aux[npos], ino);
-                    le16_wr(&ext2_g_aux[npos + EXT2_DIRENT_RECLEN_OFF], (u16)(de_reclen - de_actual));
+                    le32_wr(&ctx->aux_buf[npos], ino);
+                    le16_wr(&ctx->aux_buf[npos + EXT2_DIRENT_RECLEN_OFF], (u16)(de_reclen - de_actual));
                 } else {
-                    le32_wr(&ext2_g_aux[npos], 0);   /* まだ見せない */
+                    le32_wr(&ctx->aux_buf[npos], 0);   /* まだ見せない */
                 }
-                ext2_g_aux[npos + EXT2_DIRENT_NAMELEN_OFF] = (u8)name_len;
-                ext2_g_aux[npos + EXT2_DIRENT_TYPE_OFF] = file_type;
-                ext2_mem_copy(&ext2_g_aux[npos + EXT2_DIRENT_NAME_OFF], name, (u32)name_len);
+                ctx->aux_buf[npos + EXT2_DIRENT_NAMELEN_OFF] = (u8)name_len;
+                ctx->aux_buf[npos + EXT2_DIRENT_TYPE_OFF] = file_type;
+                ext2_mem_copy(&ctx->aux_buf[npos + EXT2_DIRENT_NAME_OFF], name, (u32)name_len);
 
                 if (!ext2_same_sector(commit_off < body_start ? commit_off : body_start,
                                       body_end > commit_off + commit_len
                                           ? body_end : commit_off + commit_len)) {
                     /* 中身と見せる瞬間が別セクタに載る: 中身だけ先に書く。
                      * 落ちても見えない (スラック / inode 0 のまま) */
-                    ret = ext2_write_block(ctx, phys, ext2_g_aux);
+                    ret = ext2_write_block(ctx, phys, ctx->aux_buf);
                     if (ret != 0) return EXT2_ERR_IO;
                 }
 
                 /* 2. 見せる (1 セクタに収まるフィールド 1 つ) */
                 if (de_inode != 0) {
-                    le16_wr(&ext2_g_aux[pos + EXT2_DIRENT_RECLEN_OFF], de_actual);
+                    le16_wr(&ctx->aux_buf[pos + EXT2_DIRENT_RECLEN_OFF], de_actual);
                 } else {
-                    le32_wr(&ext2_g_aux[npos], ino);
+                    le32_wr(&ctx->aux_buf[npos], ino);
                 }
-                ret = ext2_write_block(ctx, phys, ext2_g_aux);
+                ret = ext2_write_block(ctx, phys, ctx->aux_buf);
                 if (ret != 0) return EXT2_ERR_IO;
 
                 now = ext2_current_time();
@@ -291,14 +291,14 @@ int ext2_add_entry(Ext2Ctx *ctx, u32 dir_ino, const char *name, u32 ino, u8 file
 
         /* alloc_block が g_aux を使った後で組む。bmap_set も g_aux を潰すので
          * 中身はその前に書き終える (gotcha §4-24) */
-        ext2_mem_zero(ext2_g_aux, EXT2_BLOCK_SIZE);
-        le32_wr(&ext2_g_aux[0], ino);
-        le16_wr(&ext2_g_aux[EXT2_DIRENT_RECLEN_OFF], (u16)EXT2_BLOCK_SIZE);
-        ext2_g_aux[EXT2_DIRENT_NAMELEN_OFF] = (u8)name_len;
-        ext2_g_aux[EXT2_DIRENT_TYPE_OFF] = file_type;
-        ext2_mem_copy(&ext2_g_aux[EXT2_DIRENT_NAME_OFF], name, (u32)name_len);
+        ext2_mem_zero(ctx->aux_buf, EXT2_BLOCK_SIZE);
+        le32_wr(&ctx->aux_buf[0], ino);
+        le16_wr(&ctx->aux_buf[EXT2_DIRENT_RECLEN_OFF], (u16)EXT2_BLOCK_SIZE);
+        ctx->aux_buf[EXT2_DIRENT_NAMELEN_OFF] = (u8)name_len;
+        ctx->aux_buf[EXT2_DIRENT_TYPE_OFF] = file_type;
+        ext2_mem_copy(&ctx->aux_buf[EXT2_DIRENT_NAME_OFF], name, (u32)name_len);
 
-        ret = ext2_write_block(ctx, (u32)new_blk, ext2_g_aux);
+        ret = ext2_write_block(ctx, (u32)new_blk, ctx->aux_buf);
         if (ret != 0) {
             if (ext2_free_block(ctx, (u32)new_blk) != 0) { /* 漏れ */ }
             return EXT2_ERR_IO;
@@ -360,22 +360,22 @@ int ext2_delete_entry(Ext2Ctx *ctx, u32 dir_ino, const char *name)
         if (ret != 0) return EXT2_ERR_IO;
         if (phys == 0) break;
 
-        ret = ext2_read_block(ctx, phys, ext2_g_aux);
+        ret = ext2_read_block(ctx, phys, ctx->aux_buf);
         if (ret != 0) return EXT2_ERR_IO;
 
         pos = 0; prev_pos = 0;
         while (pos < EXT2_BLOCK_SIZE) {
-            u32 de_inode  = le32_rd(&ext2_g_aux[pos]);
-            u16 de_reclen = le16_rd(&ext2_g_aux[pos + EXT2_DIRENT_RECLEN_OFF]);
-            u8  de_namelen = ext2_g_aux[pos + EXT2_DIRENT_NAMELEN_OFF];
+            u32 de_inode  = le32_rd(&ctx->aux_buf[pos]);
+            u16 de_reclen = le16_rd(&ctx->aux_buf[pos + EXT2_DIRENT_RECLEN_OFF]);
+            u8  de_namelen = ctx->aux_buf[pos + EXT2_DIRENT_NAMELEN_OFF];
 
             if (de_reclen == 0) break;
 
             if (de_inode != 0 && de_namelen == (u8)name_len) {
-                if (ext2_str_ncmp(name, (const char *)&ext2_g_aux[pos + EXT2_DIRENT_NAME_OFF], name_len) == 0) {
+                if (ext2_str_ncmp(name, (const char *)&ctx->aux_buf[pos + EXT2_DIRENT_NAME_OFF], name_len) == 0) {
                     if (pos != prev_pos) {
-                        u16 prev_reclen = le16_rd(&ext2_g_aux[prev_pos + EXT2_DIRENT_RECLEN_OFF]);
-                        le16_wr(&ext2_g_aux[prev_pos + EXT2_DIRENT_RECLEN_OFF],
+                        u16 prev_reclen = le16_rd(&ctx->aux_buf[prev_pos + EXT2_DIRENT_RECLEN_OFF]);
+                        le16_wr(&ctx->aux_buf[prev_pos + EXT2_DIRENT_RECLEN_OFF],
                                 (u16)(prev_reclen + de_reclen));
                     }
                     /* 前のエントリへ併合する場合も**消したエントリの inode 番号を
@@ -386,9 +386,9 @@ int ext2_delete_entry(Ext2Ctx *ctx, u32 dir_ino, const char *name)
                      * を別名で指し、unlink でファイルを壊す)。
                      * rec_len と inode 番号が別セクタに載っても、どちらか一方が
                      * 届けばエントリは見えなくなる。 */
-                    le32_wr(&ext2_g_aux[pos], 0);
+                    le32_wr(&ctx->aux_buf[pos], 0);
                     ext2_ns_touch(ctx); /* before delete write */
-                    ret = ext2_write_block(ctx, phys, ext2_g_aux);
+                    ret = ext2_write_block(ctx, phys, ctx->aux_buf);
                     if (ret != 0) return EXT2_ERR_IO;
                     dir_inode.mtime = ext2_current_time();
                     return ext2_write_inode(ctx, dir_ino, &dir_inode); /* delete mtime */

@@ -18,6 +18,11 @@ static int ext2_indirect_cache_read(Ext2Ctx *ctx, u32 block, u32 index,
                                    int upper, u32 *value)
 {
     Ext2IndirectCache *slot = upper ? &ext2_indirect_upper : &ext2_indirect_lower;
+    if (ctx->private_write) {
+        if (ext2_read_block(ctx, block, ctx->data_buf) != 0) return EXT2_ERR_IO;
+        *value = le32_rd(ctx->data_buf + index * EXT2_BLOCK_PTR_SIZE);
+        return EXT2_OK;
+    }
     if (!(ctx->mounted && !ctx->fs_error && slot->valid &&
           slot->ctx == ctx && slot->block == block)) {
         slot->valid = 0;

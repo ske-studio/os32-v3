@@ -3,7 +3,7 @@
 #ifndef VFS_DEVICE_H
 #define VFS_DEVICE_H
 #include "vfs.h"
-enum vfs_name_mode { VFS_NAME_DIGIT_PREFIX, VFS_NAME_PREFIX, VFS_NAME_EXACT };
+enum vfs_name_mode { VFS_NAME_DIGIT_PREFIX, VFS_NAME_PREFIX, VFS_NAME_EXACT, VFS_NAME_DIGIT_EXACT };
 struct vfs_device_name {
     const char *prefix;
     int mode, type, first, count;

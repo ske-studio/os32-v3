@@ -417,13 +417,21 @@ static const VfsInoOps ext2_ino_ops = {
 static void *ext2_vfs_mount(int dev_id)
 {
     Ext2Ctx *ec;
-    /* ext2 は IDE (hd*) 専用。ext2_dev_for() / ext2_find_partition() は
-     * 下位バイトだけで "hd%d" を組み立てるので、種別を確かめずに通すと
-     * fd0 が hd0 として開かれ、同じパーティションが二重マウントされる。 */
-    if (VFS_MOUNT_DEV_TYPE(dev_id) != VFS_DEV_HD) return (void *)0;
+    int type = VFS_MOUNT_DEV_TYPE(dev_id);
+    if (type != VFS_DEV_HD && type != VFS_DEV_LOOP) return (void *)0;
+    STATIC_ASSERT(VFS_MOUNT_DEV_ENCODE(VFS_DEV_LOOP, 0) == OS32_DRV_LOOP(0),
+                  ext2_loop_drive_encoding);
     ec = (Ext2Ctx *)kzalloc(sizeof(Ext2Ctx));
     if (!ec) return (void *)0;
-    if (platform_ext2_vfs_mount(ec, VFS_MOUNT_DEV_ID(dev_id)) != EXT2_OK) {
+    if (type == VFS_DEV_LOOP) {
+        ec->private_write = kzalloc(sizeof(Ext2WriteWork));
+        if (!ec->private_write) {
+            kfree(ec);
+            return (void *)0;
+        }
+    }
+    if (platform_ext2_vfs_mount(ec, dev_id) != EXT2_OK) {
+        kfree(ec->private_write);
         kfree(ec);
         return (void *)0;
     }
@@ -435,6 +443,7 @@ static void ext2_vfs_umount(void *ctx)
     Ext2Ctx *ec = (Ext2Ctx *)ctx;
     if (ec) {
         ext2_unmount(ec);
+        kfree(ec->private_write);
         kfree(ec);
     }
 }

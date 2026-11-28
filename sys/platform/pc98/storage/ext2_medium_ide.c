@@ -86,6 +86,13 @@ int ext2_find_partition_src(int ide_drive, u32 *out_start, u32 *out_len,
 int platform_ext2_resolve(int ide_drive, Device **dev, u32 *base, u32 *len)
 {
     int ret;
+    const struct ext2_medium_ops *loop = ext2_loop_medium(ide_drive);
+    if (loop) {
+        ret = loop->find_part(ide_drive, base, len);
+        if (ret == EXT2_OK) *dev = loop->dev(ide_drive);
+        return ret;
+    }
+    if (ide_drive < 0 || ide_drive >= VFS_DEV_UNIT_MAX) return EXT2_ERR_IO;
     if (!platform_ide_drive_present(ide_drive)) return EXT2_ERR_IO;
 
     /* Device API ポインタを取得 */

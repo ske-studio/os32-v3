@@ -1,5 +1,6 @@
 /* PC-9821 lexical names, independent of the live Device registry. */
 #include "boot_names.h"
+#include "loop_contract.h"
 #include "../../fs/vfs_device.h"
 #include "../../dev/ata/ide.h"
 
@@ -9,6 +10,7 @@
 STATIC_ASSERT(IDE_MAX_DRIVES == VFS_DEV_UNIT_MAX, vfs_ide_unit_limit);
 static const struct vfs_device_name pc98_device_names[] = {
     {"hd", VFS_NAME_DIGIT_PREFIX, VFS_DEV_HD, 0, IDE_MAX_DRIVES},
+    {"lo", VFS_NAME_DIGIT_EXACT, VFS_DEV_LOOP, 0, LOOP_MAX_SLOTS},
     {"fd", VFS_NAME_DIGIT_PREFIX, VFS_DEV_FD, 0, PC98_FD_NAME_UNITS},
     {"COM", VFS_NAME_PREFIX, VFS_DEV_SERIAL, PC98_SERIAL_NAME_ID, PC98_SINGLE_NAME_COUNT},
     {"cd", VFS_NAME_DIGIT_PREFIX, VFS_DEV_CD, 0, IDE_MAX_DRIVES},
