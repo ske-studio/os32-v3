@@ -231,7 +231,7 @@ int input_capture_key(const KmKey *key)
     else if (!key->down)
         input_work_release_locked(key->src, key->keycode);
     if (origin == INPUT_ORIGIN_USB && key->repeat &&
-        (legacy_active() || input_work_repeat_locked(key, old, &result, raw_due,
+        (legacy_active() || input_work_repeat_locked(key, &result, raw_due,
              kbd_shift_state, state, was_consumed, e.time_ms))) {
         rc = 0;
         goto out;

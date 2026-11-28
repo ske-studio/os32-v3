@@ -2474,3 +2474,19 @@ mutations = [
     { id = "input_measure_last", config = "pc98", when = "after_build", replace = "sys/kern/kdebug/input_measure.inc", old = "if (elapsed > input_measure_stats[index].max_us)", new = "if (1)", fail = "input timing counters" },
     { id = "input_measure_off_clock", config = "pc98", when = "after_build", replace = "sys/kern/kdebug/input_measure_clock.h", old = "kdebug.state == KDEBUG_RUNNING &&", new = "1 &&", fail = "input timing counters" }
 ]
+
+[[check]]
+id = "input_rshell_repeat"
+spec = { path = "docs/decisions/INPUT_HAL_DESIGN.md", section = "11.3 予算と再予約" }
+subsystem = "input"
+level = "L1"
+sources = ["userland/shell/rshell.c", "userland/shell/serial_watchdog.c", "tests/support/fixtures/input_policy/rshell_repeat.c"]
+environment = "linux-x86-cross"
+arch = { ppc = ["link-sh"] }
+needs = []
+expect = "常駐 rshell が行内の空読み中に協調し、保留のローカル repeat を同じ行に一度だけ取り込む"
+limits = "KAPI のローカル入力と pump を模擬。実際の時間間隔は PowerMac QEMU で別に測る"
+gates = ["push", "main"]
+mutations = [
+    { id = "rshell_no_pump", config = "link-sh", when = "after_build", replace = "userland/shell/rshell.c", old = "g_api->io_pump(500);", new = "(void)0;", fail = "resident line missed deferred repeat" }
+]

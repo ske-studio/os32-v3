@@ -13,7 +13,7 @@ enum { REPEAT_SLOTS = 4 }; /* USB keyboard handles per machine. */
 static struct repeat_slot {
     KmKey key;
     KmEvalResult result;
-    u8 old, raw_due, mods, consumed;
+    u8 raw_due, mods, consumed;
     KmState state;
     u32 time_ms;
 } slots[REPEAT_SLOTS];
@@ -31,7 +31,7 @@ void input_work_release_locked(u8 src, int usage)
             slots[i].key.src = 0;
 }
 
-int input_work_repeat_locked(const KmKey *key, u8 old, const KmEvalResult *result,
+int input_work_repeat_locked(const KmKey *key, const KmEvalResult *result,
                              u8 raw_due, u8 mods, KmState state, u8 consumed, u32 time_ms)
 {
     if (!registered) return 0;
@@ -42,7 +42,7 @@ int input_work_repeat_locked(const KmKey *key, u8 old, const KmEvalResult *resul
     }
     if (free_slot < REPEAT_SLOTS) {
         slots[free_slot] = (struct repeat_slot){
-            .key = *key, .result = *result, .old = old, .raw_due = raw_due,
+            .key = *key, .result = *result, .raw_due = raw_due,
             .mods = mods, .consumed = consumed, .state = state, .time_ms = time_ms
         };
         io_request(IO_SVC_INPUT_REPEAT);
@@ -75,7 +75,7 @@ int input_step(struct io_slice *slice)
                 ikm_capture_gui_key(&slot.key, &source, &slot.state, &slot.result,
                                     1, slot.consumed, slot.mods, slot.time_ms);
             km_legacy_compat(&slot.result);
-            if (!input_capture_delivery(&slot.key, slot.old, &slot.result, slot.raw_due, slot.mods))
+            if (!input_capture_delivery(&slot.key, 1, &slot.result, slot.raw_due, slot.mods))
                 input_emit_keymap(&slot.result, slot.key.down, slot.raw_due, slot.mods, 0);
         }
 #ifdef INPUT_MEASURE_DIAG

@@ -423,7 +423,7 @@ USB サービスの IRQ マスク区間には HC・機器・iface の走査、�
 
 入力サービスの内部登録値は Tier2・120 µs 固定。io_work.c の登録時と policy 更新時に入力 ID には同じ固定値を供給し、既存の dispatcher と slice に接続する。IOT1 は4行・80 byte のまま。USB repeat に利用者別の優先度・時間設定を必要とする用途はない。
 
-保留は USB 鍵盤 handle 当たり1件、最大4件。src/generation、usage と、採取済みの KmKey・old・KmEvalResult・raw_due・修飾値を値で保持する。USB iface やモジュールのポインタは保存しない。各期限で既存 capture の検証・km_state_apply・評価を IRQ 排他中に一度行う。V86 中はこの時点で配送を抑止する。他は同じ枠を上書きして通知する。FG1 は評価済み値による旧出口だけを実行する。期限→ShiftA make→FG1→break は tap 成立、ShiftA make→別キー期限→ShiftA break→FG1 は期限時に tap 解除済みで ALT は反転しない。印の破棄は採取済み状態を巻き戻さない。
+保留は USB 鍵盤 handle 当たり1件、最大4件。src/generation、usage と、採取済みの KmKey・KmEvalResult・raw_due・修飾値を値で保持する。USB iface やモジュールのポインタは保存しない。各期限で既存 capture の検証・km_state_apply・評価を IRQ 排他中に一度行う。V86 中はこの時点で配送を抑止する。他は同じ枠を上書きして通知する。FG1 は評価済み値による旧出口だけを実行する。期限→ShiftA make→FG1→break は tap 成立、ShiftA make→別キー期限→ShiftA break→FG1 は期限時に tap 解除済みで ALT は反転しない。印の破棄は採取済み状態を巻き戻さない。
 
 HID と常駐 make は sys/hal/input/keymap.h の共通 inline 判定を用いる。HID map の norepeat bit が0、compat_sc が128未満、4文字面のどれかが void 以外の場合だけ対象を更新する。hid_kbd_repeatable はこの判定に委譲する。kbd_done は usage 通知後に対象を更新するので、常駐 usb_input_usage はその make 中に同じ判定で旧対象の枠を消す。非反復 make は HID の対象と次の正規期限を保つ。PC-98 本体と全 USB 鍵盤で、後発の通常 make が同期で旧出口へ進む直前に、同じ IRQ 排他内で全源の旧印を捨てる。A の期限後に B を打てばその巡は B だけを出し、次の正規期限から反復を再開する。対象 break・detach は源別に解放前に消す。修飾・lock の遷移は PC-98 本体、全 USB 源、切断 release と boot lock 解放を含め、状態更新と同じ IRQ 排他内で全旧印を消す。
 
@@ -440,7 +440,7 @@ WM は sync_av_focus で最後に通知が成功した front_id と owner を現
 1. 製品入口は AC-CTX 適合の idle_work_run / 明示 pump 経由の io_dispatch に限る。自動入口は idle_work_run の IF/EE・IRQ 深さ検査を使う。明示入口 kapi_io_pump にも dispatch 前に同じ検査を置き、不適合時は仕事量0。呼出元はロック外の FG1 に限る。FG0・排他中は採取・清算・io_request まで。adapter を呼ぶのは io_dispatch だけで、入れ子の dispatch は既存 running により仕事量0。
 2. dispatcher の slice を引き継ぐ。io_slice_limit(slice,120,4) で残時間・公平枠1件を広げず、各単位の直前に io_slice_take を行う。定常時は換算済み表を引く。表 miss 時の整数換算は FG1 内に限る。120 µs は開始締切であり、4件消化や締切までの完了は保証しない。換算失敗、時計世代交代、時限・件数到達では未着手の枠を保つ。u32 raw count の差と source/generation は既存 slice API に任せる。
 3. IRQ 排他内で固定4枠から有効な印を一つ選び、鍵盤 source の同一性と押下を確認し、印の消費と評価済み値の input_capture_delivery / input_emit_keymap による配送1件を不可分にする。割込み状態を戻してから次の単位へ。無効な印を捨てても後続枠は残す。in2 への repeat、押下数の加算、lock 反転はゼロ。
-4. 印が残れば IO_MORE、空なら IO_DONE。io_work.c が callback 前に pending を下げ、IO_MORE で再予約する。走行中の新しい io_request は次巡まで残る。HAL は dispatcher の pending を消さず、終了判定の直後の到着も失わない。未到来の期限には IO_MORE を返さず USB の次回通知を待つ。協調点のない区間には配送期限を約束しない。
+4. 印が残れば IO_MORE、空なら IO_DONE。io_work.c が callback 前に pending を下げ、IO_MORE で再予約する。走行中の新しい io_request は次巡まで残る。HAL は dispatcher の pending を消さず、終了判定の直後の到着も失わない。未到来の期限には IO_MORE を返さず USB の次回通知を待つ。協調点のない区間には配送期限を約束しない。常駐 rshell は行内の空読みを続ける間も一定回数ごとに io_pump を呼び、USB の次の期限までに前の印を消費できるようにする。
 
 ### 11.4 RED を先に取る段と受入
 
