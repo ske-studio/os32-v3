@@ -321,7 +321,7 @@ slot commit 後は既存順で shell lease publish／親 syscall suspend、AV fo
 
 **配送の権限**。自分の登録世代だけが context_set できる。begin/end・delivery_set は同世代の前景だけが実行でき、背景は BUSY を discard_pending より先に返す。登録世代不一致は STALE。action_read は前景・ACTION を要求し、採取時の owner/exec_gen と command_gen を照合する。背景・独占は BUSY、モード不一致は INVAL。key_read は常駐 GUI shell の現行 owner/世代かつ既存 WM の権限（APP_ID_SHELL、CPL0、GUI session）に限定し、アプリ窓が前景でも仲介できる。非権限は INVAL。KBD 独占中の通常 Key は BUSY とし、STOP・CTRL・GRPH・TAB の WM 制御経路と in2 を維持する。拒否はいずれも出力とキューを動かさない。con_sink 中の IRQ は背景 RUNNING を参照せず、文脈操作は WM が確定した宛先で一度処理する。
 
-登録済み WM の syscall 境界ポンプ X4（sys/kern/exec/exec_abort.inc の ring3_gui_pump、187–207 行）からの key_read は、WM の登録と正の wm_depth を確認し、現行 shell slot の owner・exec_gen を使う。入力 owner 表の登録世代との一致を確認してから読む（sys/kapi/input_policy_provider.c の current_caller、20–25 行）。アプリの直接呼出しは INVAL。X3 の gui_call は呼出元 owner を維持する（sys/kern/gui.c の gui_call、84–86 行）。X3 も同じ WM 登録と正の深さを持つため、この二条件だけでは両経路を区別できない。そこで既存の g_gui_pump_busy も確認し、登録済み WM の深さが正でポンプ実行中の場合に限り、key_read の呼出元を現行 shell slot の owner・exec_gen に確定する。
+登録済み WM 自身の key_read（OP_WAIT(0) の handler 内を含む）と X4 の callback（wm_depth > 0 かつ g_gui_pump_busy）は現行 shell slot の owner・exec_gen で読み、その他のアプリによる直接呼出しは INVAL とする。
 
 6b 合流時は §11.2 の input_work_invalidate_locked を旧 pending の清算に含める。成功条件を確定し、IRQ 排他を取ったまま旧配送先の反復枠と既存 pending を清算し、最後に新しい状態を公開する。適用点は表交換、前景の登録・選択・解放、配送に影響する context_set、command_begin/end、delivery_set、WM 焦点通知と G の消費口切替。前景から外れる時点で全反復枠を消す。背景だけの回収では現前景の反復枠を保つ。同 owner の別窓への成功通知も §11.2 の WM 経路で受ける。予約・拒否では印を維持する。
 

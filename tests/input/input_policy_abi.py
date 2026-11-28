@@ -103,7 +103,7 @@ def verify(config):
                         *(["-msdata=none", "-msoft-float"] if prefix == "powerpc" else []),
                         "-DRUST_WIRE=" + wire_initializer, "-fno-builtin", "sys/kern/kstring_c.c",
                         "sys/input/input_policy.c", "sys/input/input_delivery.c", "sys/input/input_context.c",
-                        "-Isys/kern/exec", "-Isys/kern/mm", "-D__cdecl=",
+                        "-Isys/kern", "-Isys/kern/exec", "-Isys/kern/mm", "-D__cdecl=",
                         "-Isys/arch/" + ("ppc" if prefix == "powerpc" else "x86"),
                         "-Isys/platform/" + ("powermac" if prefix == "powerpc" else "pc98"),
                         "sys/kapi/input_policy_provider.c",

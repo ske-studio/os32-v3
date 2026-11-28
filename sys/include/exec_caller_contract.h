@@ -6,4 +6,7 @@
  * 由来を記録するのに使う (redir_access_capture の RedirAccess)。 */
 int ring3_call_from_user(void);
 
+int ring3_gui_pump_busy(void);
+extern volatile int ring3_wm_depth;
+
 #endif

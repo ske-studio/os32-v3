@@ -39,7 +39,12 @@ void ring3_fault_kill(void)
 static AppSlot appslots[APP_SLOT_COUNT];
 int res_owner_get(void) { return caller; }
 AppSlot *appslot_get(int id) { return id == 1 || id == 2 ? &appslots[id] : 0; }
-int av_focus_is_wm(void) { return caller == 1; }
+volatile int ring3_wm_depth;
+static int pump_busy;
+int ring3_gui_pump_busy(void) { return pump_busy; }
+static int handler_owner;
+int gui_registered(void) { return 1; }
+int appslot_present_owner(void) { return handler_owner ? handler_owner : caller; }
 int ring3_call_from_user(void) { return user; }
 int input_display_restore_lock(unsigned *flags) { *flags = irq_save(); return 0; }
 static void discard(void) {}
@@ -324,6 +329,20 @@ static int test_provider(void)
         out.value != action.value || api.kbd_policy_key_read(&key_out, 1) != 1 ||
         key_out.keycode != key.keycode || key_out.map_generation != key.map_generation)
         return 11;
+    caller = 2;
+    pump_busy = 1;
+    if (api.kbd_policy_key_read(NULL, 0) != OS32_ERR_INVAL) return 22;
+    ring3_wm_depth = 1;
+    if (!input_delivery_key(&snapshot, &key) || api.kbd_policy_key_read(&key_out, 1) != 1)
+        return 23;
+    pump_busy = 0;
+    if (api.kbd_policy_key_read(NULL, 0) != OS32_ERR_INVAL) return 24;
+    handler_owner = APP_ID_SHELL;
+    if (!input_delivery_key(&snapshot, &key) || api.kbd_policy_key_read(&key_out, 1) != 1 ||
+        api.kbd_policy_key_read(&key_out, 1)) return 25;
+    handler_owner = 0;
+    ring3_wm_depth = 0;
+    caller = 1;
     if (input_context_owner_select(2, 2) || input_delivery_action(&snapshot, &action))
         return 12;
     return 0;

@@ -66,6 +66,11 @@ extern volatile u32 tick_count;
  * 通っても二重取り込みにならないようにカーネル側でも止める。 */
 static volatile int g_gui_pump_busy = 0;
 
+int ring3_gui_pump_busy(void)
+{
+    return g_gui_pump_busy;
+}
+
 /* 最後にポンプを回した tick と、その値が有効かどうか。
  * 「同じ tick の間は 1 回だけ」= 前回から 1 tick (10ms) 未満なら呼ばない。 */
 static u32 g_gui_pump_tick = 0;
