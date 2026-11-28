@@ -1,3 +1,4 @@
+#include "sys/hal/input/input_work.h"
 #include "v86_call.h"
 #include "kernel_tick.h"
 #ifdef TICK_PROBE
@@ -509,6 +510,7 @@ int v86_tick_and_check_timeout(void)
 /* #GP スタブから呼ばれる脱出口。v86_run() の setjmp 地点へ戻る。 */
 void v86_longjmp_out(void)
 {
+    if (v86_active) input_work_invalidate_locked();
 #ifdef TICK_PROBE
     if (slice_context) tick_probe_soft_begin(TP_SOFT_LEAVE);
 #endif
@@ -538,6 +540,7 @@ int v86_run_slice(struct v86_context *ctx)
  * normal v86_run restores its caller EFLAGS after this common unwind. */
 void v86_runtime_end(void)
 {
+    if (v86_active) input_work_invalidate_locked();
     slice_context = 0;
     v86_active = 0;
     if (!v86_session.running) return;
@@ -600,6 +603,7 @@ int v86_run_limit(const struct v86_context *ctx, u32 tick_limit)
             c->eflags = frame[2];
             c->esp = frame[3];
         }
+        input_work_invalidate_locked();
         v86_active = 1;
 #ifdef TICK_PROBE
         if (slice_context) tick_probe_soft_end(TP_SOFT_ENTER);

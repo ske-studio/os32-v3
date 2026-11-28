@@ -56,7 +56,7 @@ def run(config, folder):
                "sys/kern/exec/ring3_str.c", "sys/kern/av_focus.c", "sys/kern/init/shell_loop.c", "sys/kern/exec/appslot.c", "sys/kern/exec/os32x_hdr.c",
                "sys/kern/kstring_c.c", "sys/fs/fd_redirect.c", "sys/kern/exec/shell_service.c",
                "sys/input/input_context.c", "sys/input/input_interrupt.c", "sys/input/input_ime_gate.c",
-               "sys/input/input_delivery.c", "sys/input/input_policy.c", "sys/kapi/input_policy_provider.c",
+               "sys/hal/input/input_work.c", "sys/input/input_delivery.c", "sys/input/input_policy.c", "sys/kapi/input_policy_provider.c",
                "sys/kern/exec/launch.c", "sys/kern/io_kapi.c", "sys/hal/input/input_service.c",
                "sys/hal/input/in2_excl.c", "sys/hal/input/in2_reclaim.c",
                "sys/hal/input/legacy_ring.c", "sys/hal/input/legacy_mode.c",
@@ -67,14 +67,29 @@ def run(config, folder):
     wrapper = folder / (prefix + "-kapi.o")
     subprocess.run([cc, *flags, *(arg for arg in wrapper_recipe[1:] if arg.startswith(("-I", "-D"))),
                     "-c", generated, "-o", wrapper], check=True)
-    objects = [wrapper]
+    # Compile the machine's actual launch table. PC-98 keeps its entry local.
+    machine_source = ("sys/platform/powermac/shell_loop_ops.c" if ppc else
+                      "sys/platform/pc98/kernel.c")
+    machine_recipe = next(cmd for source, cmd in build_recipes if source == machine_source)
+    machine = folder / (prefix + "-machine.o")
+    machine_flags = [arg for arg in machine_recipe[1:] if arg.startswith(("-I", "-D", "-m"))]
+    bridge = '#include "' + machine_source + '"\n'
+    if ppc:
+        bridge += 'void probe_machine(void) { shell_loop_run(&pm_shell_loop_ops); }\n'
+    else:
+        bridge += 'void probe_machine(void) { kernel_shell_loop(); }\n'
+        bridge += 'void probe_fdd(void) { kernel_shell_fdd_fallback(0); }\n'
+    subprocess.run([cc, "-I.", *machine_flags, "-O1", "-ffunction-sections", "-fdata-sections",
+                    "-ffreestanding", "-x", "c", "-c",
+                    "-", "-o", machine], input=bridge, text=True, check=True)
+    objects = [wrapper, machine]
     for source in sources:
         obj = folder / (prefix + "-" + Path(source).stem + ".o")
         subprocess.run([cc, *flags, "-c", source, "-o", obj], check=True)
         objects.append(obj)
 
     combined = folder / (prefix + "-all.o")
-    subprocess.run([tool / (prefix + "-elf-ld"), "-r", *objects, "-o", combined], check=True)
+    subprocess.run([tool / (prefix + "-elf-ld"), "-r", "--wrap=shell_loop_run", *objects, "-o", combined], check=True)
     undefined = subprocess.check_output([tool / (prefix + "-elf-nm"), "-u", combined], text=True)
     stubs = folder / (prefix + "-stubs.S")
     with stubs.open("w") as out:

@@ -125,13 +125,26 @@ static int find(u32 id)
         if (slots[i].desc.id == id) return (int)i;
     return -1;
 }
+/* Internal input work has no row in the user-settable IOT1 table.
+ * Registration asks for bounds; refresh asks for the active value. */
+static int service_policy(u32 id, u8 *tier, u32 *budget, u32 *low, u32 *high)
+{
+    if (id == IO_SVC_INPUT_REPEAT) {
+        *tier = 2;
+        *budget = INPUT_REPEAT_US;
+        if (low) *low = *high = INPUT_REPEAT_US;
+        return 0;
+    }
+    if (low) return io_policy_limits(id, tier, budget, low, high);
+    return io_policy_lookup(id, tier, budget);
+}
 int io_register(const struct io_desc *d)
 {
     u8 tier; u32 budget, low, high;
     /* Allowed while io_dispatch runs (a provider may bind from a compat
      * callback, e.g. PPC net_start): the slot is only appended, its budget
      * count stays 0 until the next round's refresh, so this round skips it. */
-    if (!d || !d->step || io_policy_limits(d->id, &tier, &budget, &low, &high) < 0)
+    if (!d || !d->step || service_policy(d->id, &tier, &budget, &low, &high) < 0)
         return OS32_ERR_INVAL;
     if (d->default_tier < 1 || d->default_tier > 3 || d->default_tier != tier ||
         d->default_budget_us != budget || d->budget_min_us != low ||
@@ -139,7 +152,7 @@ int io_register(const struct io_desc *d)
         return OS32_ERR_INVAL;
     if (find(d->id) >= 0) return OS32_ERR_EXIST;
     if (count == IO_SLOTS) return OS32_ERR_FULL;
-    if (io_policy_lookup(d->id, &tier, &budget) < 0) return OS32_ERR_INVAL;
+    if (service_policy(d->id, &tier, &budget, 0, 0) < 0) return OS32_ERR_INVAL;
     unsigned int flags = irq_save();
     slots[count].budget_count = slots[count].unit_count = 0; /* skipped until refresh */
     slots[count].limit.valid = 0;
@@ -180,7 +193,7 @@ static void refresh_policy(void)
     if (policy_valid && policy_gen == gen) return;
     for (unsigned int i = 0; i < count; ++i) {
         u8 tier; u32 budget;
-        io_policy_lookup(slots[i].desc.id, &tier, &budget);
+        service_policy(slots[i].desc.id, &tier, &budget, 0, 0);
         unsigned int flags = irq_save();
         u32 bit = 1u << i;
         if (pending[slots[i].tier - 1] & bit) {

@@ -62,6 +62,15 @@ typedef struct {
 extern const KmBackend pc98_jp_backend;
 extern const KmBackend hid_jp_backend;
 
+static inline int km_hid_repeatable(const KmBackend *map, u8 usage)
+{
+    const KmEntry *entry = &map->entries[usage];
+    return map->compat_sc[usage] < 128 &&
+           !(map->norepeat[usage >> 3] & (1u << (usage & 7))) &&
+           (entry->group1[0] != 0xf500 || entry->group1[1] != 0xf500 ||
+            entry->group2[0] != 0xf500 || entry->group2[1] != 0xf500);
+}
+
 /* Held modifiers, lock actions and SHIFTA tag; see H0b for valid pairs. */
 typedef u16 KmEffect;
 enum {
@@ -130,7 +139,8 @@ int km_source_bind(u8 src, u16 generation, u16 map_id);
 int input_capture_key(const KmKey *key);
 
 /* S3: COMPAT annotates DOS bytes before any policy/legacy projection. */
-int input_capture_delivery(const KmKey *key, u8 old, const KmEvalResult *result, u8 raw_due);
+int input_capture_delivery(const KmKey *key, u8 old, const KmEvalResult *result,
+                           u8 raw_due, u8 mods);
 int input_capture_ime(const KmKey *key, u8 old, const KmEvalResult *result);
 void km_legacy_compat(KmEvalResult *result);
 void input_emit_keymap(const KmEvalResult *result, u8 down, u8 raw_due,

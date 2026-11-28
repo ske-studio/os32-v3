@@ -342,7 +342,11 @@ static void rshell_end_reply(void)
  * rsh_getch を通す (シリアルは 1 回しか読まない)。 */
 static int rsh_io_getch(void *ctx, int *from_serial)
 {
+    /* The resident shell calls KAPI directly. Let deferred input run during
+     * the 50000 empty reads between bytes, without sleeping the UART poll. */
+    static unsigned int polls;
     (void)ctx;
+    if (!(++polls & 255u)) g_api->io_pump(500);
     return rsh_getch(from_serial);
 }
 

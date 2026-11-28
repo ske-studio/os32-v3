@@ -1,5 +1,6 @@
 #include "shell_loop_ops.h"
 #include "console.h"
+#include "exec.h"
 #include "sys/kern/idle_work.h"
 #include "kprintf.h"
 
@@ -57,6 +58,7 @@ static void failure(int gui, int rc, int streak)
 
 const struct shell_loop_ops pm_shell_loop_ops = {
     .gui_default = gui_default,
+    .run = exec_run_shell,
     .prepare = prepare,
     .loading = loading,
     .result = result,

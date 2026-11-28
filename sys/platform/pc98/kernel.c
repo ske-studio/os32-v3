@@ -466,6 +466,7 @@ static inline void kernel_shell_loop(void)
 {
     static const struct shell_loop_ops ops = {
         .gui_default = pc98_gui_default,
+        .run = exec_run_shell,
         .prepare = pc98_shell_prepare,
         .loading = pc98_shell_loading,
         .result = pc98_shell_result,

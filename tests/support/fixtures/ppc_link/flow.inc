@@ -42,7 +42,7 @@ void __wrap_arch_entry_enter(struct arch_entry_context *entry, u32 root)
 {
     enum shell_point point = root ? FIRST_CHILD :
         shell_flow[FIRST_PARENT].generation ? NEXT_PARENT : FIRST_PARENT;
-    if (launching_second)
+    if (!root && launching_second)
         point = shell_flow[SECOND_ENTRY].generation ? SECOND_RESTART : SECOND_ENTRY;
     if (!shell_flow[point].generation) {
         u32 words[6];
@@ -67,8 +67,18 @@ void __wrap_ppc_trap_dispatch(struct ppc_frame *frame)
 int __real_exec_run(const char *);
 int __wrap_exec_run(const char *command)
 {
-    launching_second = !exec_nest_level && !kstrcmp(command, "/bin/second.bin");
     int rc = __real_exec_run(command);
+    if (exec_nest_level == 1)
+        observe_flow(rc == EXEC_ERR_FAULT ? CHILD_FAULT : CHILD_RETURN, current_msr());
+    return rc;
+}
+
+int __real_exec_run_shell(const char *, int);
+int __wrap_exec_run_shell(const char *command, int line_edit)
+{
+    launching_second = !exec_nest_level && !kstrcmp(command, "/bin/second.bin");
+    int rc = __real_exec_run_shell(command, line_edit);
+    launching_second = 0;
     if (!exec_nest_level && !rc && !kstrcmp(command, SYS_SHELL_BIN)) {
         u32 rejects = shell_service_reject_count;
         i32 result = g_shell_service.font_source_validate(0);
@@ -77,9 +87,7 @@ int __wrap_exec_run(const char *command)
             shell_service_reject_last == SHELL_SVC_REJ_INACTIVE;
         observe_flow(SWITCH_RETIRE, current_msr());
     }
-    if (exec_nest_level == 1)
-        observe_flow(rc == EXEC_ERR_FAULT ? CHILD_FAULT : CHILD_RETURN, current_msr());
-    else if (!exec_nest_level && rc == EXEC_ERR_FAULT)
+    if (!exec_nest_level && rc == EXEC_ERR_FAULT)
         observe_flow(PARENT_FAULT, current_msr());
     return rc;
 }

@@ -108,7 +108,8 @@ int input_context_owner_reserve(u32 owner, u32 exec_gen, u32 parent, u32 parent_
     unsigned int irq = irq_save();
     if (owner < APP_ID_SHELL || owner >= APP_SLOT_COUNT || !exec_gen ||
         context_owners[owner].state != OWNER_FREE ||
-        (context != INPUT_CONTEXT_RUNNING && context != INPUT_CONTEXT_GUI) ||
+        (context != INPUT_CONTEXT_RUNNING && context != INPUT_CONTEXT_GUI &&
+         !(context == INPUT_CONTEXT_LINE_EDIT && owner == APP_ID_SHELL && !parent)) ||
         (parent && (!context_owner_valid(parent, parent_gen) || parent == owner)) ||
         (!parent && parent_gen)) {
         irq_restore(irq);
@@ -117,6 +118,7 @@ int input_context_owner_reserve(u32 owner, u32 exec_gen, u32 parent, u32 parent_
     ContextOwner *entry = &context_owners[owner];
     input_context_init(&entry->policy);
     entry->policy.context = context;
+    if (context == INPUT_CONTEXT_LINE_EDIT) entry->policy.flags |= INPUT_CONTEXT_ICANON;
     entry->state = OWNER_RESERVED;
     entry->action_mode = 0;
     entry->parent = parent;
@@ -233,7 +235,7 @@ int input_context_owner_set(u32 owner, u32 exec_gen, u32 context, u32 flags)
         int changed = policy->context != context || policy->flags != flags;
         rc = input_context_set(policy, context, flags);
         if (!rc && changed && owner == foreground_owner)
-            input_delivery_discard_keys();
+            input_delivery_flush();
     }
     irq_restore(irq);
     return rc;

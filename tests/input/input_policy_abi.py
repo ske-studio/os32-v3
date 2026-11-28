@@ -127,7 +127,7 @@ def verify(config):
                         "sys/input/keymaps/hid_jp.c", "sys/input/keymaps/pc98_jp.c",
                         "sys/platform/powermac/input_keymap_backend.c" if ppc else "sys/platform/pc98/input_keymap.c",
                         "-Isys/hal/input", "sys/hal/input/legacy_mode.c", "sys/hal/input/legacy_ring.c",
-                        "sys/hal/input/legacy_keymap.c", "sys/hal/input/kbd_merge.c",
+                        "sys/hal/input/legacy_keymap.c", "sys/hal/input/kbd_merge.c", "sys/hal/input/input_work.c", "sys/kern/io_work.c",
                         "sys/hal/input/keymap_state.c", fixture / "wire.c", fixture / "entry.S", wrap]
         runner = "qemu-ppc" if ppc else "qemu-i386"
         failure_probe = ["-DFAIL_INIT", "-Wl,--wrap=ikm_policy_init", f"-I{fixture / 'include'}",

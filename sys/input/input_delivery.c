@@ -1,3 +1,4 @@
+#include "sys/hal/input/input_work.h"
 #include "input_delivery.h"
 #include "input_policy.h"
 #include "io.h"
@@ -11,15 +12,11 @@ static unsigned action_head, action_count, key_head, key_count;
 
 /* The foreground, command and delivery-mode publishers flush in the same
  * IRQ critical section as publication. Late producers present their snapshot. */
-void input_delivery_discard_keys(void)
-{
-    key_head = key_count = 0;
-}
-
 void input_delivery_flush(void)
 {
+    input_work_invalidate_locked();
     action_head = action_count = 0;
-    input_delivery_discard_keys();
+    key_head = key_count = 0;
 }
 
 static int current(const KbdPolicySnapshot *dst)
