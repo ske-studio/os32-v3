@@ -14,6 +14,7 @@ int v86_gp_handler(u32 *frame);
 void *kmemcpy(void *dst, const void *src, u32 bytes) { return dst; }
 void *v86_call_mailbox(void) { return 0; }
 void v86_bios_restore_real(void) {}
+void input_work_invalidate_locked(void) {}
 int paging_v86_restore(struct v86_session_state *s) { return 0; }
 void platform_fault_cell(u32 pos, u16 code, u8 attr) {}
 void _stop(void) { check(0, "restore mapping"); }
