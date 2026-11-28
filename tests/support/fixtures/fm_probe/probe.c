@@ -54,7 +54,7 @@ const u32 *module_exports(struct module_handle handle) { (void)handle; return 0;
 int res_owner_get(void) { return 0; }
 int snd2_chip_implicit(int owner) { (void)owner; return 0; }
 
-static int diag_busy, mixer_error, setting_reads, diag_closes;
+static int diag_busy, mixer_error, setting_reads, diag_closes, restore_error;
 int snd2_chip_dev_info(u32 index, SND2_DevInfo *out)
 {
     if (index) return OS32_ERR_INVAL;
@@ -80,7 +80,15 @@ int snd2_chip_read(u32 h, u32 bank, u32 what, u32 reg)
     if (reg == 0x0e) ++setting_reads;
     return id;
 }
-int snd2_chip_close(u32 h) { ++diag_closes; return 0; }
+int snd2_chip_close(u32 h) { outp(OPN_ADDR, 0x10); ++diag_closes; return 0; }
+
+int snd2_chip_diag_close(u32 h, u32 reg)
+{
+    snd2_chip_close(h);
+    if (restore_error) return OS32_ERR_IO;
+    outp(OPN_ADDR, reg);
+    return 0;
+}
 
 static int sound_irq(unsigned irq, void *arg) { (void)irq; (void)arg; return IRQ_NONE; }
 
@@ -279,6 +287,10 @@ void _start(void)
     id |= 0x3f;
     require(fm_diag_irq_setting() == 2 && setting_reads == 2 &&
             diag_closes == 3, "joystick input changed wiring");
+    trace_count = 0;
+    restore_error = 1;
+    require(fm_diag_irq_setting() == OS32_ERR_IO && diag_closes == 4, "diagnostic restore failure");
+    restore_error = 0;
     require(fm_quiesce(&module) && fm_detach(&module), "lifecycle");
     reads = writes = 0;
     require(!start() && registered == OPN_PROBE_OPNA && !reads && !writes, "reattach");

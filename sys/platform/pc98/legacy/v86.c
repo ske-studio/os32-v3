@@ -557,7 +557,8 @@ static const u8 v86_test_code[] = {
     0x03, 0x72, 0xF8, 0xFA, 0xB4, 0x04, 0xB0, 0x90, 0xCD, 0x1B, 0xBB, 0x00,
     0x00, 0x73, 0x08, 0x80, 0xFC, 0x60, 0x75, 0x03, 0xBB, 0x05, 0xB1, 0x89,
     0x1E, 0x06, 0x00, 0xC7, 0x06, 0x02, 0x00, 0x78, 0x56, 0xF4, 0x50, 0x1E,
-    0xB8, 0x00, 0x8C, 0x8E, 0xD8, 0xFF, 0x06, 0x04, 0x00, 0x1F, 0x58, 0xCF
+    0xB8, 0x00, 0x8C, 0x8E, 0xD8, 0xFF, 0x06, 0x04, 0x00, 0xB0, 0x20, 0xE6, 0x00, 0x1F,
+    0x58, 0xCF
 };
 
 /* スモークテストの結果を外から観測できるように残す。
@@ -646,17 +647,11 @@ int v86_smoke_test(void)
 
     v86_mem_teardown();
 
-    /* 期待値:
-     *   HLT で終了 / メモリ書き込み成功 / 拒否ポートの #GP 後も継続できた /
-     *   I/O トラップは拒否ポートの 2 回だけ (許可ポートは素通し) */
-    /* 期待値:
-     *   HLT で終了 / メモリ書き込み成功 / 拒否ポートの #GP 後も継続 /
-     *   I/O トラップは拒否ポートの 2 回だけ (許可ポートは素通し) /
-     *   ゲスト ISR が 3 回以上呼ばれた (= IRQ 反射が届いた) */
+    /* 拒否ポートの IN/OUT に加え、IRQ0 の各 ISR が EOI を送る。 */
     v86_smoke_result = (reason == V86_EXIT_HLT &&
                         v86_smoke_magic  == V86_TEST_MAGIC &&
                         v86_smoke_magic2 == 0x5678U &&
-                        v86_smoke_iotrap == 2U &&
+                        v86_smoke_iotrap == 2U + v86_smoke_gcnt &&
                         v86_smoke_gcnt   >= 3U &&
                         v86_smoke_bios   == 0xB105U &&
                         v86_smoke_bcnt   == 1U) ? 0 : 1;

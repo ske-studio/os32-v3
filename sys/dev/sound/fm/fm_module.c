@@ -44,23 +44,12 @@ int fm_diag_irq_setting(void)
         rc = snd2_chip_read(handle, 0, 2, SSG_REG_MIXER);
         if (rc >= 0) {
             rc = snd2_chip_read(handle, 0, 2, 0x0e);
-            /* A failed data read faults the HAL handle. Restore the known
-             * address directly as soon as hardware accepts another select. */
-            unsigned restore_flags = irq_save();
-            unsigned n = 0;
-            while (n < 10000 && (inp(OPN_STATUS) & OPN_BUSY)) ++n;
-            if (n == 10000) {
-                snd2_chip_fault(info.dev);
-                rc = OS32_ERR_IO;
-            } else {
-                outp(OPN_ADDR, SSG_REG_MIXER);
-                io_wait_n(6);
-            }
-            irq_restore(restore_flags);
+            int closed = snd2_chip_diag_close(handle, SSG_REG_MIXER);
+            if (closed < 0) return closed;
+            return rc < 0 ? rc : (rc >> 6) & 3;
         }
         int closed = snd2_chip_close(handle);
-        if (closed < 0) return closed;
-        return rc < 0 ? rc : (rc >> 6) & 3;
+        return closed < 0 ? closed : rc;
     }
     return OS32_ERR_NOTFOUND;
 }
