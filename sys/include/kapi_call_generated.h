@@ -345,6 +345,15 @@ static const u8 kapi_fixed_count[] = {
     2, /* install_begin */
     1, /* install_rescan */
     2, /* install_end */
+    2, /* kbd_policy_set */
+    3, /* kbd_policy_get */
+    0, /* kbd_policy_reset */
+    2, /* kbd_policy_context_set */
+    0, /* kbd_policy_command_begin */
+    0, /* kbd_policy_command_end */
+    1, /* kbd_policy_delivery_set */
+    2, /* kbd_policy_action_read */
+    2, /* kbd_policy_key_read */
 };
 static const u8 kapi_fixed_kind[][KAPI_FIXED_MAX] = {
     { 0 }, /* gfx_init */
@@ -687,5 +696,14 @@ static const u8 kapi_fixed_kind[][KAPI_FIXED_MAX] = {
     { KAPI_VALUE_POINTER, KAPI_VALUE_POINTER }, /* install_begin */
     { KAPI_VALUE_INTEGER }, /* install_rescan */
     { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* install_end */
+    { KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER }, /* kbd_policy_set */
+    { KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER, KAPI_VALUE_POINTER }, /* kbd_policy_get */
+    { 0 }, /* kbd_policy_reset */
+    { KAPI_VALUE_INTEGER, KAPI_VALUE_INTEGER }, /* kbd_policy_context_set */
+    { 0 }, /* kbd_policy_command_begin */
+    { 0 }, /* kbd_policy_command_end */
+    { KAPI_VALUE_INTEGER }, /* kbd_policy_delivery_set */
+    { KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER }, /* kbd_policy_action_read */
+    { KAPI_VALUE_POINTER, KAPI_VALUE_INTEGER }, /* kbd_policy_key_read */
 };
 #endif

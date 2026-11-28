@@ -6,6 +6,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from tests.input.input_policy_abi import build
 from tests.support.media import Failure, main
 
 
@@ -42,4 +43,4 @@ int main(void) {
             raise Failure("first arch entry or failed reservation")
 
 if __name__ == "__main__":
-    main(lambda config: None, verify)
+    main(build, verify)

@@ -42,7 +42,8 @@ def run(config, folder):
     cross = os.environ["PPC_CROSS_DIR" if ppc else "CROSS_DIR"]
     tool = Path(cross) / "bin"
     cc = tool / (prefix + "-elf-gcc")
-    recipe = next(cmd for source, cmd in recipes(config)[0].values()
+    build_recipes = recipes(config)[0].values()
+    recipe = next(cmd for source, cmd in build_recipes
                   if source == "sys/kern/exec/exec.c")
     fixture = Path("tests/support/fixtures/input_policy")
     flags = ["-I" + str(fixture), "-I.", "-ffunction-sections", "-fdata-sections",
@@ -55,13 +56,18 @@ def run(config, folder):
                "sys/kern/exec/ring3_str.c", "sys/kern/av_focus.c", "sys/kern/init/shell_loop.c", "sys/kern/exec/appslot.c", "sys/kern/exec/os32x_hdr.c",
                "sys/kern/kstring_c.c", "sys/fs/fd_redirect.c", "sys/kern/exec/shell_service.c",
                "sys/input/input_context.c", "sys/input/input_interrupt.c", "sys/input/input_ime_gate.c",
-               "sys/input/input_delivery.c", "sys/input/input_policy.c",
+               "sys/input/input_delivery.c", "sys/input/input_policy.c", "sys/kapi/input_policy_provider.c",
                "sys/kern/exec/launch.c", "sys/kern/io_kapi.c", "sys/hal/input/input_service.c",
                "sys/hal/input/in2_excl.c", "sys/hal/input/in2_reclaim.c",
                "sys/hal/input/legacy_ring.c", "sys/hal/input/legacy_mode.c",
                "sys/hal/input/keymap_registry.c", "sys/hal/input/keymap_eval.c",
                "sys/input/keymaps/hid_jp.c", "sys/input/keymaps/pc98_jp.c"]
-    objects = []
+    generated, wrapper_recipe = next((source, cmd) for source, cmd in build_recipes
+                                      if Path(source).name == "kapi_generated.c")
+    wrapper = folder / (prefix + "-kapi.o")
+    subprocess.run([cc, *flags, *(arg for arg in wrapper_recipe[1:] if arg.startswith(("-I", "-D"))),
+                    "-c", generated, "-o", wrapper], check=True)
+    objects = [wrapper]
     for source in sources:
         obj = folder / (prefix + "-" + Path(source).stem + ".o")
         subprocess.run([cc, *flags, "-c", source, "-o", obj], check=True)

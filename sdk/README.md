@@ -78,6 +78,12 @@ api->gfx_present_dirty();   /* ここで初めて転送される */
 描けば転送量が減る。16MHz 級の実機では全画面転送のコストが支配的なので、
 これが効く。
 
+### 鍵盤ポリシー (KAPI v92)
+
+`kbd_policy_*` を使うプログラムは最低 KAPI 版を 92 に指定します。C の `os32_kbd_policy.h` と
+Rust の `os32api::kbd_policy` に配送型と IKM1 v2 の定数があります。
+[KernelAPI 仕様の鍵盤ポリシー節](../docs/KAPI_SPEC.md#鍵盤ポリシー-v92) を参照してください。
+
 ### 文字列を返す KAPI の寿命
 
 `sys_getcwd` / `vfs_devname` / `path_get_drive` / `path_get_cwd` の返り値は、
@@ -101,6 +107,7 @@ OS 側の `docs/KAPI_SPEC.md` の「API関数」の注記。)
 古い SDK のアプリが新しいカーネルで無条件に動くわけではありません。形式・KAPI 配置・ABI 世代・
 メモリ世代、および依存する共有ライブラリのプロトコルが一致する必要があります。
 世代が違う場合は現行 SDK で再構築します ([世代契約](../docs/KAPI_SPEC.md#t2c-os32x-v4-と生成する世代-kapi-v69))。
+配布済みの PowerMac 用 v91 版 `infoprob` は機能版の完全一致を要求するため、v92 以降では `INFO version failed` を返します。
 
 ## target の選択
 

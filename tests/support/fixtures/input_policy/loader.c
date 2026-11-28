@@ -156,8 +156,12 @@ static int check_park_reclaim(unsigned shell_gen)
         if (av_focus_set(id) || av_focus_get() != id || !av_focus_set(APP_ID_MAX + 1) ||
             input_context_snapshot(&foreground) || foreground.owner != (unsigned)id ||
             foreground.exec_gen != gen) return 1;
+        appslot_resume_commit(id);
+        if (kapi->kbd_policy_delivery_set(KBD_POLICY_DELIVERY_BYTE)) return 1;
+        appslot_park_commit();
         if (av_focus_set(0) || input_context_snapshot(&foreground) ||
-            foreground.owner != APP_ID_SHELL || foreground.exec_gen != shell_gen) return 1;
+            foreground.owner != APP_ID_SHELL || foreground.exec_gen != shell_gen ||
+            kapi->kbd_policy_delivery_set(KBD_POLICY_DELIVERY_BYTE)) return 1;
         if (av_focus_set(id)) return 1;
         if (ikm_policy_reset(id, gen) || restored()) return 1;
         kbd_set_gui_mode(1);
@@ -235,7 +239,8 @@ void arch_entry_enter(struct arch_entry_context *entry, u32 pd)
     }
     if (round_no == 0) bad |= check_child(s.exec_gen);
     if (round_no == 1) bad |= check_park_reclaim(s.exec_gen);
-    bad |= input_context_delivery_set(s.owner, s.exec_gen, 0) != 0;
+    bad |= input_context_owner_generation(APP_ID_SHELL) != s.exec_gen;
+    bad |= kapi->kbd_policy_delivery_set(KBD_POLICY_DELIVERY_BYTE) != 0;
     bad |= ikm_policy_reset(s.owner, s.exec_gen) != 0 || restored();
     previous_gen = s.exec_gen;
     ++observed;
@@ -246,6 +251,7 @@ int probe(void)
 {
     const struct shell_loop_ops ops = {gui_default, ready, loading, result, failure, delay_clear};
     kapi = &probe_api;
+#include "exec_kapi_init.inc"
     ring3_tramp_page = (u32)trampoline;
     static const InputOps ops_input = {.discard_stop = discard_stop};
     input_register(&ops_input);

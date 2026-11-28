@@ -1,6 +1,6 @@
 {
   "generations": {"os32x_format": 5, "kapi_abi": 2, "memory_layout": 4, "shlib_protocol": 2},
-  "version": 91,
+  "version": 92,
   "func_capacity": 384,
   "crt_kapi_symbol": "os32_kapi_v89",
   "data_fields": [
@@ -22,6 +22,7 @@
     "gfx.h",
     "palette.h",
     "input_service.h",
+    "input_policy_provider.h",
     "exec_heap.h",
     "kmalloc.h",
     "paging.h",
@@ -2095,6 +2096,15 @@
     {"name": "snd2_chip_close", "target": "snd2_chip_close", "ret": "int", "args": ["u32 h"]},
     {"name": "install_begin", "target": "install_begin", "ret": "int", "args": ["const InstallPlanV1 *plan", "u32 *handle"], "in": [{"arg": "plan", "size": "sizeof(InstallPlanV1)"}], "out": [{"arg": "handle", "size": "sizeof(u32)"}]},
     {"name": "install_rescan", "target": "install_rescan", "ret": "int", "args": ["u32 handle"]},
-    {"name": "install_end", "target": "install_end", "ret": "int", "args": ["u32 handle", "u32 outcome"]}
+    {"name": "install_end", "target": "install_end", "ret": "int", "args": ["u32 handle", "u32 outcome"]},
+    {"name": "kbd_policy_set", "target": "input_provider_set", "ret": "int", "args": ["const void *wire", "u32 length"], "in": [{"arg": "wire", "len": "length"}], "invalid_length": "length < KBD_POLICY_HEADER_SIZE || length > KBD_POLICY_MAX_WIRE || (length - KBD_POLICY_HEADER_SIZE) % KBD_POLICY_ROW_SIZE || !wire || (u32)wire > U32_MAX - (length - 1u)"},
+    {"name": "kbd_policy_get", "target": "input_provider_get", "ret": "int", "args": ["void *wire", "u32 capacity", "u32 *needed"], "out": [{"arg": "needed", "size": "sizeof(u32)"}, {"arg": "wire", "len": "capacity"}], "invalid_length": "!needed || ((u32)needed & 3u) || (u32)needed > U32_MAX - 3u || capacity > KBD_POLICY_MAX_WIRE || (capacity && (!wire || (u32)wire > U32_MAX - (capacity - 1u) || ((u32)wire <= (u32)needed + 3u && (u32)needed <= (u32)wire + (capacity - 1u))))"},
+    {"name": "kbd_policy_reset", "target": "input_provider_reset", "ret": "int", "args": []},
+    {"name": "kbd_policy_context_set", "target": "input_provider_context_set", "ret": "int", "args": ["u32 context", "u32 flags"]},
+    {"name": "kbd_policy_command_begin", "target": "input_provider_command_begin", "ret": "int", "args": []},
+    {"name": "kbd_policy_command_end", "target": "input_provider_command_end", "ret": "int", "args": []},
+    {"name": "kbd_policy_delivery_set", "target": "input_provider_delivery_set", "ret": "int", "args": ["u32 mode"]},
+    {"name": "kbd_policy_action_read", "target": "input_provider_action_read", "ret": "int", "args": ["KbdPolicyAction *out", "u32 max"], "out": [{"arg": "out", "len": "max", "unit": "sizeof(KbdPolicyAction)"}], "invalid_length": "max > KBD_POLICY_READ_MAX || (max && (!out || ((u32)out & 3u) || (u32)out > U32_MAX - (max * sizeof(KbdPolicyAction) - 1u)))"},
+    {"name": "kbd_policy_key_read", "target": "input_provider_key_read", "ret": "int", "args": ["KbdPolicyKey *out", "u32 max"], "out": [{"arg": "out", "len": "max", "unit": "sizeof(KbdPolicyKey)"}], "invalid_length": "max > KBD_POLICY_READ_MAX || (max && (!out || ((u32)out & 3u) || (u32)out > U32_MAX - (max * sizeof(KbdPolicyKey) - 1u)))"}
   ]
 }

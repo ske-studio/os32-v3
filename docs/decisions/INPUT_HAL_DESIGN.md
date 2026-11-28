@@ -268,7 +268,7 @@ v91 の末尾は slot 339。次表の順で v92 の関数を追加する案と�
 |341|get(void *wire, u32 capacity, u32 *needed)|ikm_policy_get の正規化済み差分表。容量不足は FULL、needed のみ更新。NULL,0 で必要量取得|
 |342|reset(void)|ikm_policy_reset。最初の set/reset 成功時だけ復帰先を保存|
 |343|context_set(u32 context, u32 flags)|input_context_owner_set。宣言するだけで前景と command_gen は変化しない|
-|344–345|command_begin(void)、command_end(void)|input_context_owner_begin/end。旧 pending を破棄し、新しい非零世代の RUNNING+ISIG に入る。end は保存した文脈・flags に戻す。二重 begin / 対のない end は失敗|
+|344–345|command_begin(void)、command_end(void)|input_context_owner_begin/end。旧 pending を破棄し、u32 の command_gen を通常加算して RUNNING+ISIG に入る。コマンドの有無は command_active で判定する。end は保存した文脈・flags に戻す。二重 begin / 対のない end は失敗|
 |346|delivery_set(u32 mode)|owner 単位の BYTE=0（既定）/ACTION=1。切替時は compose・未配送入力を消し、表示復帰の後始末を完遂|
 |347|action_read(Action *out, u32 max)|ACTION の端末通知。u32 順に action, command_gen, time_ms, value の16 B。同じ消費入力を byte にも積まない|
 |348|key_read(Key *out, u32 max)|前景を仲介する WM が読む評価済み make/break/repeat。割当操作と文字を採取時の世代で一度だけ処理|
@@ -296,7 +296,7 @@ input_policy_abi は次の競合を各々独立に観測する。CPL0 は形が�
 
 Key は native u32 の src_generation, map_id, keycode, sc_down_repeat, physical_mods, logical_mods, time_ms, map_generation, keysym, kind, action, value の順。全 offset は 0 から 4 刻み、48 B。src は下位8 bit、続く16 bit が source 世代。sc は下位8 bit、bit 8–11 は down/repeat/no_keydata/is_modifier。map_id・keysym は下位16 bit、予約 bit は 0。raw と in2 の物理入力、端末の Action、WM の Key は別形式。独占中は in2 に物理入力を渡し、WM の通常配送を閉じる。境界で compose・押下・保留配送を清算し、消費した make の break を新窓へ漏らさない。
 
-IKM1 はヘッダ16 B、version=2、行16 B、最大1024行。多バイト値は LE、最大16400 B。全行を一度ずつ読み、欠落値は OS 既定から補う。kind 6 の置換単位は profile。重複、予約 bit、異機種 profile、保留中の ACCENT と非零 accent_count は INVAL。押下中または他 owner が保存中なら BUSY。失敗時は active・保存先・世代を維持する。終了・異常・STOP は同じ owner/exec_gen の ikm_policy_owner_exit で復元する。kind 5/6 は合計16行まで。編成結果が一面の容量を超えれば INVAL、交換も初回保存もしない。表3面は各24 KiB 以下、圧縮像・BSS の増分を両機種で実測する。
+IKM1 はヘッダ16 B、version=2、行16 B、最大1024行。多バイト値は LE、最大16400 B。全行を一度ずつ読み、欠落値は OS 既定から補う。kind 6 の置換単位は profile。重複、予約 bit、異機種 profile、保留中の ACCENT と非零 accent_count は INVAL。押下中または他 owner が保存中なら BUSY。失敗時は active・保存先・世代を維持する。終了・異常・STOP は同じ owner/exec_gen の ikm_policy_owner_exit で復元する。kind 5/6 は合計16行まで。編成結果が一面の容量を超えれば INVAL、交換も初回保存もしない。既定表を const で共有し、各面には最大1024件の明示差分だけを置く。差分列3113 B（3 × 1024 + 31 + 10）、64件ごとの索引16個 × 8 B、管理9 B と整列を含めて一面3256 B、active・編成中・復帰先の三面で9768 B を上限とし、圧縮像・BSS の増分を両機種で実測する。
 IKM は OS 既定からの差分 profile。2026-11-28 のユーザー決定で行の上限を下げ、PM は1機種の全128キーを8通りの修飾・文脈で置換できる1024行（16 + 1024 × 16 = 16400 B）を基準とした。
 
 pc98_input_keymap_register と pm_input_keymap_boot は必要な全 map 登録後、入力採取前に ikm_policy_init を一度呼ぶ。PC-98 は本体 map 1 と USB HID map 2、PowerMac は HID map 2 を渡す。押下照会は PC-98 本体と USB の合算、PPC は全 HID source の合算。初期化失敗は起動診断に記録し①②を通った九口は target で NOSYS を返し、旧入力で起動する。操作 profile は入力装置によらず PC-98 の CUI/GUI が 1/2（MS-DOS/Windows）、PowerMac が 3/4（Mac OS X）。共通 HAL が logical mods と表で評価し、WM に第二の評価器を置かない。例は PC-98 CUI の ESC による行取消、SUB (0x1a)+Enter による canonical の EOF 候補（物理 Ctrl+Z の値は表による）、Mac CUI の Ctrl+U・Ctrl+D、GUI コピーの Ctrl+C / Command+C。文脈は LINE_EDIT=1、RUNNING=2、BYTE_INPUT=3、GUI=4、flags は ISIG=1 と ICANON=2。ISIG 時の真正な VINTR は編集時に取消、実行時に中断。BYTE_INPUT と非 canonical の EOF は byte、空行の EOF 判定は編集側。IME 変換中の PC-98 STOP/ETX は取消を一度配送する。
@@ -313,7 +313,7 @@ pc98_input_keymap_register と pm_input_keymap_boot は必要な全 map 登録�
 
 初期 CUI の指定者は sys/kern/init/shell_loop.c の shell_loop_run。各周回で next_shell を取り込み、prepare の fallback を反映した最終 is_gui が 0 のときだけ、内部 exec 起動引数に初期 CUI の意図を渡す。理由 1 の --kcg-unavailable 付き起動、GUI ロード失敗と連続 fault 後の次周回にも同じ規則を適用する。一般 exec は既定 RUNNING+ISIG。ファイル名による exec 内の特権付与や次回起動まで残る大域フラグは用いない。
 
-**exec の予約と回収（A0z 公開の前提）**。exec の slot 管理が予約ごとに u32 の非零世代を発行し、解放で消さない slot 別カウンタと予約中／実行中 slot の exec_gen に保持する。0 を飛ばし、一致だけで照合する。shell lease は別寿命。exec_launch の FP 保存・初期化より前に、固定長の入力 owner 表で同じ slot を予約し、親の現行世代と初期文脈を検証する。予約は snapshot・syscall・前景選択から不可視。失敗は予約だけを取り消して既存の commit 前 exec_launch_abort でページ・起動元・slot を戻す。lease 発行・親 syscall suspend・AV 焦点変更はまだ行わない。
+**exec の予約と回収（A0z 公開の前提）**。exec の slot 管理が予約ごとに u32 の世代を発行し、解放で消さない slot 別カウンタと予約中／実行中 slot の exec_gen に保持する。予約中／実行中の状態で有効性を判定し、同じ slot の旧世代は exec_gen の不一致で拒否する。shell lease は別寿命。exec_launch の FP 保存・初期化より前に、固定長の入力 owner 表で同じ slot を予約し、親の現行世代と初期文脈を検証する。予約は snapshot・syscall・前景選択から不可視。失敗は予約だけを取り消して既存の commit 前 exec_launch_abort でページ・起動元・slot を戻す。lease 発行・親 syscall suspend・AV 焦点変更はまだ行わない。
 
 slot commit 後は既存順で shell lease publish／親 syscall suspend、AV focus、nest depth を確定し、割当済み入力 entry を IRQ 排他内で有効化してから arch_entry_enter。ここでは再登録・割当・失敗可能な検証をしない。A0z では CUI shell の公開と同じ IRQ 排他内で、first_shell と同じく APP_ID_SHELL の現行 exec_gen を前景に選ぶ。初回 entry から RUNNING+ISIG で前景限定口を使える。x0/p0 は予約時の初期文脈だけを LINE_EDIT+ISIG/ICANON に変える。一般子は RUNNING+ISIG、CUI の同期前景子だけを exec が選択する。GUI shell も初回 entry 前に GUI として登録・選択し、WM 初回通知までは shell に配送する。通知成功時にアプリ窓なら窓 owner の現行世代、机なら GUI shell の現行世代を選ぶ。通知失敗時には前景を維持する。
 
@@ -343,7 +343,7 @@ slot commit 後は既存順で shell lease publish／親 syscall suspend、AV fo
 |input_focus（raw）・gshell_excl（退避・配送）|各キューの保護順位を取り出し順で確認。二つの GRPH 区間が後続打鍵なしに二回順に確定。配送満杯でも制御は進む|各隣接順位の逆転／raw 置換・確定枠予約を外す／別区間を重複扱い／退避満杯で早期 return／space_ok 先行|
 |input_focus・gshell_excl|ABORTED 回収の STOP 一回と LOST 順、非独占アプリ・机・KBD_NAV 対照。両機種の実 include 選択で acquire 成功と gen 更新|解除後 clear／STOP 掃除省略／FOCUS 順逆転／常時配送停止／機種設定を個別に反転|
 
-新規登録案 **input_policy_abi** は実関数表・CPL3 wrap から九口を呼び、公開前は旧版の要求版照合と関数表末尾で slot 未追加を記録する（x86 CPL3 の範囲外 dispatch は kill）。別の対照には候補と同じ要求版・型・九 slot・生成 wrap を揃え、provider だけを未結線にする。各口に形・ページとも正当な引数を渡し、CPL3 の版照合通過、wrap 到達、target の NOSYS を個別に記録して RED とする。結線後は同じ呼出元で各口の結果を照合する（非 WM の Key は INVAL）。短い get・重複・整列・境界・max=0、背景 begin/end、非 WM の Key、古い世代の Action と拒否後の正当な読出しを検査する。PPC BE は Action/Key の全 offset と native 数値、IKM1 だけは LE の各 byte を x86 と照合する。
+新規登録案 **input_policy_abi** は実関数表・CPL3 wrap から九口を呼び、公開前は旧版の要求版照合と関数表末尾で slot 未追加を記録する（x86 CPL3 の範囲外 dispatch は kill）。別の対照には候補と同じ要求版・型・九 slot・生成 wrap を揃え、provider だけを未結線にする。各口に形・ページとも正当な引数を渡し、CPL3 の版照合通過、wrap 到達、target の NOSYS を個別に記録して RED とする。結線後は同じ呼出元で各口の結果を照合する（非 WM の Key は INVAL）。SDK・生成側・wrap・内部検証で同じ上限を用い、1024行の有効表の受理、1025行の拒否と旧表保持を確認する。短い get・重複・整列・境界・max=0、背景 begin/end、非 WM の Key、古い世代の Action と拒否後の正当な読出しを検査する。PPC BE は Action/Key の全 offset と native 数値、IKM1 だけは LE の各 byte を x86 と照合する。
 
 新規登録案 **input_exec_entry** は両機種 shell_loop → exec_launch → 最初の arch entry の snapshot を観測する。A0z 前の RED は shell の登録世代なし。A0z で登録世代と前景 snapshot の owner/exec_gen を別々に読み、CUI 初回 entry で delivery_set(BYTE) が 0 になることを確認する。登録済み・前景一致・同口成功でも文脈が RUNNING+ISIG なら x0/p0 用の独立した RED。各機種の初回・fallback・再起動で LINE_EDIT+ISIG/ICANON を観測して GREEN にする。GUI は初回通知前・アプリ窓・机の順に前景世代を読み、各時点の前景から delivery_set(BYTE) の成功を確認する。登録予約失敗を注入し entry 未到達、FP・lease・AV・親の次回 syscall と前景不変を確認。正常・fault・同期 STOP・park 後 reclaim、親先行終了、同 slot 再起動を通し、子の旧入力ゼロと次の前景世代を読む。
 
@@ -357,10 +357,10 @@ R は各 ≤350 行の観測単位に分割する。既済み 7d は正常対照
 |A0z、sol の原子的切替 ≤400 行例外|sdk/kapi.json 末尾追加、version と shared header の KAPI_VERSION を同期。C と Rust の生成器を実行し、両機種の実 provider、関数表、要求版、KAPI_SPEC・README・INDEX を同時更新。kapi_abi・kapi_sync・c_dialect、make clean → make all、PPC 像リンク。v91 から先行版が入った場合は末尾と次版を再採番。外部 apps/game は H-7 に従う|
 |共通ラッパー ≤380 行|userland/lib/input に文脈・操作ラッパーを置き、既存ゲームの input_bind とは独立に SDK の結果・失敗を伝える|
 |U2-x0 / U2-p0 各 ≤350 行|x0 が共通 shell_loop・exec 引数と PC-98 入口、p0 が pm_shell_loop_ops の機種入口と検証を持つ。PC-98 と PPC の実入口で初回・fallback・再起動の最初の poll まで LINE_EDIT+ISIG/ICANON。GUI と通常子は対象外。x0 後に INPUT-S4-CANCEL を実機で確認|
-|U2 各 ≤350 行|両 shell の prompt・poll・組込 begin/end・外部子の親復帰・EOF/ESC を通す|
+|U2 各 ≤350 行|**最初に ACTION の配送の owner の実打鍵を Action のリングへ積む結線** (input_delivery_action、同じ消費入力を byte に積まない — A0z の後、それまで action_read は 0 件、PM の決定 2026-11-28)。両 shell の prompt・poll・組込 begin/end・外部子の親復帰・EOF/ESC を通す|
 |E-x / E-p 各 ≤380 行|U2 と M6/M7 後、arch adapter を exec_abort に接続。RUNNING の真正な中断だけを同世代へ配送、IME 取消と表示復帰、PC-98 CTRL+STOP と PPC Ctrl+Pause の救済を確認|
 |L 各 ≤350 行|両 E 後、input_legacy の serial/LAN/注入を sc=0 で一度だけ解釈し、peek 無副作用|
-|G[n] 各 ≤380 行|A0z・共通ラッパー後に CUI と並行。WM が評価済み Key を一度配送、独占・焦点・消費 make/break を R と同時に通す|
+|G[n] 各 ≤380 行|A0z・共通ラッパー後に CUI と並行。**最初に実打鍵の採取 (input_capture_key) から Key のリングへ積む結線** (input_delivery_key、採取時の評価済み世代を持つ — A0z は口の公開だけで、それまで key_read は 0 件、PM の決定 2026-11-28)。WM が評価済み Key を一度配送、独占・焦点・消費 make/break を R と同時に通す|
 
 os32powerpc へは公開 layout・HID provider 初期化契約・共通 exec 引数・R の期待を渡す。担当は PPC provider の BE 照合、p0、E-p、7450/7455 の USB/LAN CUI と GUI・独占の退行確認。QEMU の記録と G4 実機の未確認項目を分けて報告する。
 
@@ -370,3 +370,10 @@ os32powerpc へは公開 layout・HID provider 初期化契約・共通 exec 引
 PC-98 と PowerMac の各初期化入口で ikm_policy_init の失敗を注入し、機種ごとに三つの結果を別々に記録する。①②を通る九口の NOSYS、旧 pump を使う GUI の通常窓への一打鍵一配送、旧 CUI での文字入力と Enter によるコマンド実行。成功対照では G が Key を一度だけ配送する。
 
 受入記録は機種別に採る。PC-98 は NP21/W で初回・fallback・再起動、IME 取消、二窓の保持・独占解除・CTRL+STOP を確認する。PPC QEMU は ppc_common_compile・ppc_media_build と起動、BE の九口、初回 entry・親復帰・slot 再利用を確認する。G4 7450 と 7455 はそれぞれ USB 打鍵・LAN の CUI、GUI の Command 操作、独占・Pointer・Ctrl+Pause 救済を記録する。実機未確認は機種・項目ごとに残す。
+
+### シングルタスクの棚卸し (2026-11-28)
+
+- IKM1 は一機種の128キー × 8通りを収める1024行・16400 B に統一し、受入検査に上限とその直後を加える。
+- 編成表は既定値を共有するため一面3256 B に縮める。交換失敗時の現行表保持と終了時の復元に要る三面を確保する。
+- command_gen の0飛ばしを削る。同じ owner で毎秒10回 begin しても一周は約13.6年後で、実行中かは command_active で分かる。
+- exec_gen の0飛ばしを削る。同じ slot を毎秒1回予約しても一周は約136年後で、通常の再利用には状態と世代一致の照合で足りる。
