@@ -141,6 +141,17 @@ extern ring3_abort_check
         push    eax
         call    v86_reflect_irq
         add     esp, 2 * ABI_WORD_BYTES
+%if %1 == 2 || %1 == 12
+        ;; VSYNC と音源の入口でも、保留中の IRQ0 の配送で上限に達しうる。
+        ;; IRQ0 と鍵盤の入口はそれぞれ専用の後処理で脱出する。
+        test    dword [esp + ISR_IRQ_EFLAGS_OFF], EFLAGS_VM
+        jz      %%done
+        call    v86_check_exit_request
+        test    eax, eax
+        jz      %%done
+        call    v86_exit_to_kernel
+%%done:
+%endif
 %endmacro
 
 section .text

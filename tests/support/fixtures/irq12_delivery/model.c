@@ -47,7 +47,8 @@ void __real_v86_pic_request(u32 irq);
 int __real_v86_pic_candidate(u32 *vector);
 static u16 guest_ivt[512] __attribute__((section(".guestdata"), aligned(16)));
 static u16 guest_stack[32] __attribute__((section(".guestdata"), aligned(16)));
-static int test_timer, check_resume_timer;
+static int test_timer, check_resume_timer, timeout_irq, forbid_entry;
+int irq_exited;
 void __wrap_v86_pic_request(u32 irq)
 {
     if (!irq && !v86_is_active()) ++suspended_ticks;
@@ -61,7 +62,16 @@ int __wrap_v86_pic_candidate(u32 *vector)
 }
 void v86_enter(const struct v86_context *ctx)
 {
+    require(!forbid_entry, "refill timeout entered DOS");
     require(suspended_ticks == expected_ticks, "foreground jiffy before VM");
+    if (timeout_irq) {
+        vm = 1;
+        irq_exited = eoi = 0;
+        if (timeout_irq == 2) fire_2(); else fire_12();
+        require(irq_exited && eoi == (timeout_irq == 2 ? 1u : 21u),
+                "pending timer returned to DOS");
+        return;
+    }
     if (check_resume_timer) {
         require(ctx->eip == 0x123 && ctx->cs == 0x2000 && ctx->esp == 58 &&
                 ctx->eflags == EFLAGS_VM && guest_stack[29] == 0x456 &&
@@ -90,7 +100,18 @@ void v86_enter(const struct v86_context *ctx)
 }
 void kprintf(u8 attr, const char *fmt, ...) {}
 void mouse_irq_handler(void) { ++mouse; }
-void __wrap_v86_reflect_irq(u32 *frame, u32 irq) { ++requests; if (vm) reflection += irq; }
+void __wrap_v86_reflect_irq(u32 *frame, u32 irq)
+{
+    ++requests;
+    if (vm) reflection += irq;
+    if (timeout_irq) {
+        u32 guest[V86I_GS + 1] = {0};
+        guest[V86I_EFLAGS] = frame[V86I_EFLAGS] | EFLAGS_IF;
+        guest[V86I_ESP] = sizeof guest_stack;
+        guest[V86I_SS] = (u32)guest_stack >> 4;
+        __real_v86_reflect_irq(guest, irq);
+    }
+}
 unsigned inp(unsigned port) { return port == 10 ? slave_mask : 255; }
 void outp(unsigned port, unsigned value)
 {
@@ -294,11 +315,28 @@ void _start(void)
     require(v86_run_slice(&ctx) == V86_EXIT_SLICE && v86_session.ticks == 2 &&
             !check_resume_timer, "foreground timer once");
     v86_pic_out(0, 0x20);
+    ctx.eflags &= ~EFLAGS_IF; /* Deliver on physical IRQ0 after guest STI. */
     v86_session.ticks = V86_TICK_LIMIT - 1;
     require(v86_run_slice(&ctx) == V86_EXIT_TIMEOUT &&
             v86_session.ticks == V86_TICK_LIMIT && guest_stack[29] == 0x108 &&
             guest_stack[30] == 0x109 && guest_stack[31] == EFLAGS_IF,
             "session slice timeout");
+    v86_pic_reset();
+    for (unsigned i = 0; i < 3; ++i) {
+        v86_pic_reset();
+        v86_pic_set_imr(0, 0xfe);
+        v86_session.ticks = V86_TICK_LIMIT - 1;
+        ++tick_count;
+        ++expected_ticks;
+        forbid_entry = i == 0;
+        timeout_irq = i == 1 ? 2 : i == 2 ? 12 : 0;
+        ctx.eflags = EFLAGS_VM | (forbid_entry ? EFLAGS_IF : 0);
+        ctx.ss = (u32)guest_stack >> 4;
+        ctx.esp = sizeof guest_stack;
+        require(v86_run_slice(&ctx) == V86_EXIT_TIMEOUT &&
+                v86_session.ticks == V86_TICK_LIMIT, "pending timer timeout");
+    }
+    timeout_irq = 0;
     v86_pic_reset();
     v86_session.soft_input = test_timer = 0;
     slicing = 0;

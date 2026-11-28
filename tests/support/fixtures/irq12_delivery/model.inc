@@ -29,6 +29,15 @@ FIRE 2
 FIRE 12
 FIRE 13
 
+extern v86_check_exit_request, irq_exited
+; Model the nonlocal exit separately from the normal IRETD return.
+v86_exit_to_kernel:
+        mov dword [irq_exited], 1
+        add esp, 4
+        IRQ_LEAVE
+        popad
+        ret 8
+
 ; Execute the production frame builder. Capture the stack at the IRETD boundary.
 section .bss
 align 4
