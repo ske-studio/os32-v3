@@ -5,7 +5,14 @@ static u8 shadow[128], screen[128];
 u8 *bb_b = shadow;
 u32 gfx_init_gen;
 int gfx_current_height = 1;
-struct kdebug kdebug;
+static unsigned frames;
+static i32 observe(u32 op, void *buf, u32 size)
+{
+    if (op == GFX_TRACE_EVENT && ((struct gfx_trace_event *)buf)->kind == GFX_TRACE_FRAME)
+        frames++;
+    return GFX_TRACE_NORMAL;
+}
+struct kdebug kdebug = {.ops.dbg_call = observe};
 GfxCounters gfx_counters;
 DirtyRectQueue dirty_queue, prev_dirty;
 static int attempts, fail_on = 2;
@@ -38,6 +45,7 @@ void _start(void)
     if (dirty_queue.count || attempts != 3 || gfx_counters.commits != 0 ||
         gfx_counters.present_bytes != 64) rc = 1;
     for (int i = 0; i < 128; i++) if (screen[i] != shadow[i]) rc = 1;
+    if (!rc && frames != EXPECT_FRAMES) rc = 2;
     __asm__ volatile("int $0x80" :: "a"(1), "b"(rc));
     __builtin_unreachable();
 }

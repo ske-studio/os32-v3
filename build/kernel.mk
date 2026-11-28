@@ -108,6 +108,12 @@ $(ASM_KERNEL_OBJ) $(C_KERNEL_OBJ) $(BUILD_ID_OBJ) $(R1_OBJECTS): $(LAYOUT_HEADER
 # Finish every paired image before snapshotting the boot distribution.
 $(BUILD_OUT)/generations-manifest.json: $(KERNEL_PAIRED_MODULES)
 
+.PHONY: kernel-gfx-measure-diag gfx-measure-diag-image
+kernel-gfx-measure-diag:
+	$(MAKE) BUILD_OUT=$(BUILD_OUT)/gfx-measure-diag GFX_MEASURE_DIAG_BUILD=1 gfx-measure-diag-image
+
+gfx-measure-diag-image: $(BUILD_OUT)/vmkernel.lz4 $(KERNEL_PAIRED_MODULES)
+
 # Raster diagnostics have their own object tree, map, image and paired modules.
 # Normal make kernel/all never defines SPLASH_RASTER_DIAG.
 .PHONY: kernel-splash-diag

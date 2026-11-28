@@ -453,6 +453,8 @@ G3 の `gf_direct_ops` (sys/dev/video/geforce/gf_direct.c) に mono を置く。
 
 ### S1 — SHADOW で転送が増えた場所を決める
 
+転送の観測点は診断の像だけに組み込む。S1・G5m の実機計測には `make kernel-gfx-measure-diag` の `build/out/gfx-measure-diag/` 一式を os32-realhw-update の診断像の手順で渡す。
+
 同じ画面寸法・配置・入力で P0a の move / scroll / menu / desktop / char / list を PEGC (NP21/W)、Trident (Ra266、gap 80ns)、GF (Ra266、SHADOW を確認) で採る。PEGC は PACKED8。NP21/W の PLANAR4 構成も別枠で同じ操作を採り、gfx_vram.c の候補判定に使う。各操作 warmup 10、本番 50。開始と終了は P0a §6、GOP1 の時間・present_bytes・commits・hw_ops の差と有効数を保存する。FAILED と焦点不足は原因を記録して採り直す。
 
 S1 は kdebug の対の部品を常駐契約で登録し、カーネル側の backend present 入口で丸めた後の矩形、gfx_vram.c の plane 転送入口で実転送を採る。シングルタスクでは WM の矩形は present 入口とほぼ一致するため WM 側は採らず、不足があれば後で検討する。矩形の和集合・画素比較・統計はホストで求める。

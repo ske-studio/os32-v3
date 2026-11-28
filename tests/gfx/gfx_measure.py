@@ -9,8 +9,10 @@ from tools.gfx_measure import s1, g5m, retry, serial_trace
 
 
 def verify(config):
-    run_host('gfx_packed_retry', ['sys/hal/gfx/gfx_present.c'],
-             {1: 'failed packed present lost dirty'}, gc_sections=True, cflags=['-D__cdecl='])
+    for flags in (['-DEXPECT_FRAMES=0'], ['-DGFX_MEASURE_DIAG', '-DEXPECT_FRAMES=2']):
+        run_host('gfx_packed_retry', ['sys/hal/gfx/gfx_present.c'],
+                 {1: 'failed packed present lost dirty', 2: 'incorrect transfer observation mode'},
+                 gc_sections=True, cflags=['-D__cdecl=', *flags])
     run_host('gfx_snapshot', [], {1: 'scan bank, scroll or reference pixels'},
              gc_sections=True, cflags=['-D__cdecl='])
     frame = dict(draw=[[-2, 0, 6, 2], [2, 1, 8, 2]], raw=[], snap=[], merge=[], present=[],

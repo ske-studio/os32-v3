@@ -9,14 +9,18 @@ static void gfx_v1_present_rect(int x, int y, int w, int h)
 {
     (void)v1_bridge_begin(GFX2_ROLE_CLIENT, GFX2_CPU_R);
     (void)v1_bridge_begin(GFX2_ROLE_DISPLAY, GFX2_CPU_W);
+#ifdef GFX_MEASURE_DIAG
     u32 before = gfx_counters.present_bytes;
     int packed = g_backend->bb_format != GFX_BB_PLANAR4;
     if (packed)
         GFX_TRACE(GFX_TRACE_PRESENT, gfx_counters.commits, x, y, w, h, 0, 0);
+#endif
     g_backend->present_rect(x, y, w, h);
+#ifdef GFX_MEASURE_DIAG
     if (packed)
         GFX_TRACE(GFX_TRACE_PACKED, gfx_counters.commits, x, y, w, h,
                   gfx_counters.present_bytes - before, 0);
+#endif
     v1_bridge_end(GFX2_ROLE_DISPLAY, GFX2_CPU_W, 0);
     v1_bridge_end(GFX2_ROLE_CLIENT, GFX2_CPU_R, 0);
 }
@@ -46,18 +50,23 @@ static int present_dirty_packed(void)
      * 「present (commit) 回数」なので、この 1 回ぶんに揃える。 */
     GFX_TRACE(GFX_TRACE_FRAME, gfx_counters.commits, 0, 0, 0, 0, 0, 0);
     commits_before = gfx_counters.commits;
-    int policy = gfx_trace_present_policy(1);
     u32 generation = gfx_init_gen;
     GfxBackend *backend = g_backend;
+#ifdef GFX_MEASURE_DIAG
+    int policy = gfx_trace_present_policy(1);
     int full = policy == GFX_TRACE_REDRAW;
     int count = full ? 1 : dirty_queue.count;
     for (i = 0; i < count; i++) {
+#else
+    for (i = 0; i < dirty_queue.count; i++) {
+#endif
         const GFX_Rect *r = gfx_dirty_at(&dirty_queue, i);
         u32 previous = gfx_counters.commits;
-        if (policy != GFX_TRACE_FAIL_ONCE) {
-            if (full) gfx_v1_present_rect(0, 0, DISPLAY_V1_WIDTH, gfx_current_height);
-            else gfx_v1_present_rect(r->x, r->y, r->w, r->h);
-        }
+#ifdef GFX_MEASURE_DIAG
+        if (full) gfx_v1_present_rect(0, 0, DISPLAY_V1_WIDTH, gfx_current_height);
+        else if (policy != GFX_TRACE_FAIL_ONCE)
+#endif
+            gfx_v1_present_rect(r->x, r->y, r->w, r->h);
         if (g_backend != backend || gfx_init_gen != generation) return 1;
         if (gfx_counters.commits == previous) {
             /* The void backend publishes completion in commits. Preserve this

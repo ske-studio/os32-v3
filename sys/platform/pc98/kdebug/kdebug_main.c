@@ -127,6 +127,7 @@ static int recovery_attach(void)
     }
     return 0;
 }
+#ifdef GFX_MEASURE_DIAG
 /* Capture one input in RAM. Serial transmission follows its timing window. */
 extern int gfx_snapshot_take(u32 event, const struct gfx_trace_event *e);
 extern void gfx_snapshot_emit(u32 event);
@@ -223,14 +224,17 @@ static int gfx_trace_call(u32 op, void *buf, u32 size)
 }
 
 extern int gfx_transfer_bench(void);
+#endif
 
 static i32 recovery_call(u32 op, void *buf, u32 size)
 {
+#ifdef GFX_MEASURE_DIAG
     if (op == GFX_G5M_RUN)
         return buf || size ? OS32_ERR_INVAL : gfx_transfer_bench();
     if (op == GFX_TRACE_CONTROL || op == GFX_TRACE_EVENT ||
         op == GFX_TRACE_BOUNDARY || op == GFX_TRACE_POLICY)
         return gfx_trace_call(op, buf, size);
+#endif
 #ifdef TICK_PROBE
     if (op == TP_OP) return tick_probe_call(buf, size);
 #endif

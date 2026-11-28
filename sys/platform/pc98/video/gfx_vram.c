@@ -40,6 +40,7 @@ static void _flip_page(void);
 /* ======================================================================== */
 /*  ダーティレクタングルのVRAM転送 (VSYNC同期内等で呼ばれる)              */
 /* ======================================================================== */
+#ifdef GFX_MEASURE_DIAG
 static void trace_planar_input(void)
 {
     if (!kdebug.ops.dbg_call) return;
@@ -54,6 +55,10 @@ static void trace_planar_input(void)
     }
 }
 
+#else
+#define trace_planar_input() ((void)0)
+#endif
+
 static void _flush_dirty_queue(void)
 {
     int i, row;
@@ -63,11 +68,16 @@ static void _flush_dirty_queue(void)
     u8 *vg_base = display_planar_plane(2);
     u8 *vi_base = display_planar_plane(3);
 
+#ifdef GFX_MEASURE_DIAG
     const GFX_Rect screen = {0, 0, GFX_WIDTH, gfx_current_height};
     int full = dirty_queue.count && gfx_trace_present_policy(0) == GFX_TRACE_REDRAW;
     int count = full ? 1 : dirty_queue.count;
     for (i = 0; i < count; i++) {
         const GFX_Rect *r = full ? &screen : gfx_dirty_at(&dirty_queue, i);
+#else
+    for (i = 0; i < dirty_queue.count; i++) {
+        const GFX_Rect *r = gfx_dirty_at(&dirty_queue, i);
+#endif
         int byte_x = r->x >> GVRAM_PIXELS_PER_BYTE_SHIFT;           /* 横は何バイト目か */
         int byte_w = r->w >> GVRAM_PIXELS_PER_BYTE_SHIFT;           /* 横幅のバイト数 */
         int words  = byte_w >> 1;         /* 16bit転送するワード数 */
@@ -126,10 +136,11 @@ static void _flip_page(void)
 
 void gfx_planar_present_dirty(int sync)
 {
-    if (!dirty_queue.count && (!gfx_flip_enabled || !prev_dirty.count)) return;
-    trace_planar_input();
+
     if (gfx_flip_enabled) {
         DirtyRectQueue snapshot;
+        if (dirty_queue.count == 0 && prev_dirty.count == 0) return;
+        trace_planar_input();
         gfx_counters.commits++;
         /* 今フレームのオリジナルdirtyを保存 (マージ前) */
         snapshot = dirty_queue;
@@ -138,6 +149,8 @@ void gfx_planar_present_dirty(int sync)
         prev_dirty = snapshot;
         _flip_page();
     } else {
+        if (dirty_queue.count == 0) return;
+        trace_planar_input();
         gfx_counters.commits++;
         if (sync) {
             /* VSYNC期間になるまで待つ */

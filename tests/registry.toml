@@ -2251,6 +2251,7 @@ expect = "丸め後の矩形和・plane/page の画素・失敗矩形の再送�
 limits = "ホストの plane 写像と合成ログを使う。実機の速度・画素は別測定"
 gates = ["push", "main"]
 mutations = [
+    { id = "trace_product", config = "pc98", when = "after_build", replace = "sys/hal/gfx/gfx_dirty.h", old = "#ifdef GFX_MEASURE_DIAG", new = "#if 1", fail = "incorrect transfer observation mode" },
     { id = "accept_truncated", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "run.get('completed_groups') == len(rows)", new = "True", fail = "incomplete or failed sweep accepted" },
     { id = "ignore_previous", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "f['previous'] + f['draw']", new = "f['draw']", fail = "mixed page restoration" },
     { id = "plane_as_index8", config = "pc98", when = "after_build", replace = "tools/gfx_measure.py", old = "transferred += 2 * size", new = "transferred += size", fail = "clipped union or plane transfer" },
