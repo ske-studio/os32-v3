@@ -32,7 +32,7 @@
 | 1d・3a・4a | PowerPC | 実装済み (b1437a4a3・720abc8ce・290c0e1eb) |
 | 1a・2a-i・2b・3b-i | 本線 | 済み (2026-11-21 に確かめた — lib/path.c・sys/kern/ver_collect.c・sys/kern/time/ktime.c は build/sources/common.mk の C_COMMON_EXEC、マウスは sys/hal/input/mouse_pointer.c に分かれ、sdk/kapi_target_ppc.py の PROVIDER_GROUPS に path・ver・time・mouse の slot は残っていない) |
 | 5b | 共通表示・PowerPC | A〜C 実装済み (e407702a0・caa544473・0227413b7) |
-| 5c・5d | 共通 HAL・シェル | 5c の B1〜B4 と 5c-A は実装済み。5d は EXEC 像の公開表に結線済み。段 12 で第二像の実行と切替要求の一回消費を確認して閉じる。|
+| 5c・5d | 共通 HAL・シェル | 5c の B1〜B4 と 5c-A は実装済み。5d は EXEC 像の公開表に結線済み。段 12 の切替要求の一回消費はホストで受入済み。第二像の実行は PM のゲスト受入待ち。|
 | 6b | SFS | 実装済み (2964a2003・2f4ed7d73)。既存の SHELL_REMOTE_SFS はシェル統合で整理する。|
 | 6c | filesystem・ATA | N/P/D1/D2 実装済み (D2 は 40a3e273c)。D3 は段 8 の ATA block provider の後、製品シェルで HDD の ext2 作成を確認する。|
 | 7a・7b | module・VFS | 7a P1〜P4b 実装済み (1c9ed35c5)。静的結線の残段は取り消す。L1 → L2 → FEP → KCG。辞書・学習は HDD の後に x86 と同じパスで公開する。SQLite の静的結線と db 17 本は main 28960a384 までに公開済み。製品シェルから VFS 上の DB を受け入れる。SQLite の module 化は任意（B08）。|

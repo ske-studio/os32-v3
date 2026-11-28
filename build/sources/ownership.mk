@@ -1323,3 +1323,6 @@ OWN_CONTRACT += sys/include/font_fault_contract.h|common
 OWN_CONTRACT += sys/include/sqlite_stack_contract.h|common
 OWN_ASM_CONTRACT += lib/sqlite3/sqlite_stack.asm|sys/include/sqlite_stack_contract.h
 OWN_ASM_CONTRACT += sys/arch/ppc/sqlite_stack_ppc.S|sys/include/sqlite_stack_contract.h
+OWN_FILE += tests/support/fixtures/ppc_link/second.c|開発・検査用実装|-
+OWN_FILE += tests/support/fixtures/shell_switch/gate.c|開発・検査用実装|-
+OWN_FILE += tests/system/shell_switch_gate.py|開発・検査用実装|-

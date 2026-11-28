@@ -348,3 +348,18 @@ tests/support/ppc_fixture.py の link_media が verify ごとに常駐 shell・r
 - 二度目の umount がマウント表を照会して返す未マウント診断で消失を確認する。
 - 正常と sfs_end の shell.elf・root-input.iso・boot.iso の SHA-256 を ppc_link_session の CI 受入ログに記録する。
 - registry の重みは手元の実測 (正常 183.4 秒 + 変異 4 本 522.8 秒) の切り上げ 707 秒を暫定とし、hosted の成功 attempt の集計で置き換える。正常と全変異の合計が 900 秒を超えれば SFS の場面を別 ID に分ける。
+
+## 段 12 F/5d 常駐シェル切替
+
+[段 11 E6 遠隔シェルと SFS](#段-11-e6-遠隔シェルと-sfs) の場面を終えた同じ VM で、枠 1 が公開表の sys_switch_shell で第二像を要求して退役する。第二像は枠 1・PR=0 で固有の文字列を出して終了する。追加要求がなくても共通 shell_loop の cur_shell が保持され、次の起動でも同じ文字列が出る。
+
+shell_switch_gate は共通 gui.c と shell_loop.c を結合する。枠 1 の保留中に空・過長・子からの要求を拒否して選択先を保つ。別の要求で GUI prepare が初回に失敗すると CUI に戻り、次周回でも GUI prepare は再試行しない。
+
+段 12 の実装で設計者が決めたこと
+
+- 各 CPU の early VM で一往復を観測する。旧像の正常復帰直後、第二像を起動する前に、旧世代のサービス表からの照会が未登録を理由に拒否されることを確認する。
+- 試験 root の第二像を /bin/second.bin とし、終了値 12 と画面の起動マーカーを照合する。
+- ホストでは prepare(gui) の GUI 呼出しだけを数え、各ケースを二周で終える。
+- tests/system/ppc_link_session.py の exercise は tests/support/ppc_fixture.py の link_media(switch=True) の媒体を使い、tests/support/fixtures/ppc_link/second.c の main を常駐 CRT で起動する。
+- tests/system/shell_switch_gate.py の verify は sys/kern/gui.c の sys_switch_shell と gui_take_next_shell、sys/kern/init/shell_loop.c の shell_loop_run、sys/kern/kstring_c.c の kstrcmp と kstrncpy を変異ごとの隔離先で再結合する。
+- [推] 所要は旧実測 707 秒に第二像のビルドを正常・変異の計五回分（各 5 秒見込み）、並行する early 二機種の往復に 20 秒を見込み、計 752 秒。同 ID を維持し、重みは PM の実測 708 秒（正常 182.2 秒、変異 525.8 秒）とする。

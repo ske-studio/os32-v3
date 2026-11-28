@@ -225,6 +225,20 @@ def exercise(vm, op, late):
     check(b"requires --sfs-lan" in refused, "SFS LAN entry did not refuse without /host")
     check(b"hello scope" not in refused, "SFS child started without /host")
 
+    if not late:
+        offset = serial.stat().st_size
+        previous = word("g_shell_service", 8)
+        op.submit("s12-switch", limit(10))
+        wait(lambda: serial.read_bytes()[offset:].count(b"/bin/second.bin returned 12") >= 2,
+             20, "second resident did not exit twice")
+        check(point(6, (0, 0, 0, 0, 0))[3] == previous, "switch retirement generation")
+        check(word("switch_service_inactive") == 1, "old shell service was not retired")
+        for index in (7, 8):
+            entry = point(index, (1, 0, 1, 1, 0))
+            check(entry[3] > previous and entry[9:] == resident[9:], "second resident identity")
+            previous = entry[3]
+        check(vm.screen(vm.deadline).count("S12 second resident") >= 2, "second startup markers")
+
 
 def boot(cpu, case, media, version, scenario=exercise, seconds=180, usb_device="usb-kbd,id=kbd"):
     iso, metadata = media
@@ -253,9 +267,9 @@ def boot(cpu, case, media, version, scenario=exercise, seconds=180, usb_device="
 
 
 def verify():
-    media = link_media()
+    media = link_media(switch=True)
     directory = media[0].parent
-    files = (directory / "user/shell.elf", directory / "root-input.iso", media[0])
+    files = (directory / "user/shell.elf", directory / "second/shell.bin", directory / "root-input.iso", media[0])
     print("SFS media sha256 " + json.dumps({p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                                             for p in files}), flush=True)
     version = subprocess.check_output(["qemu-system-ppc", "--version"], text=True)
