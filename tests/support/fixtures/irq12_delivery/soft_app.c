@@ -5,6 +5,7 @@
 #include "check.h"
 
 static const char *expected_path, *expected_second;
+static int primed;
 static int begin_rc, open_rc, fault, running, stream, ends, fallback, pumps, turns, keys;
 static int begin(const V86_Begin *b, u32 *sid)
 {
@@ -19,6 +20,8 @@ static int begin(const V86_Begin *b, u32 *sid)
 static int run(u32 sid, const V86_RunIn *in, V86_Exit *ex)
 {
     check(sid == 11 && stream && pumps == turns + 1, "pump on empty slice");
+    check(primed, "pre-run reserve");
+    primed = 0;
     ++turns;
     ex->reason = turns < 4 ? 1 : fault ? 5 : 4;
     ex->code = turns < 4 ? 8 : fault ? 6 : 5;
@@ -52,6 +55,12 @@ int sndl_chip_open(const SNDL_ChipReq *r, u32 *id, SNDL_ChipGot *got)
     check(running && !stream && r->chip == SND2_CHIP_OPNA, "soft open");
     stream = *id = 1;
     got->backend = SNDL_SOFT;
+    return 0;
+}
+int sndl_prime_slice(void)
+{
+    check(stream && pumps == turns + 1, "pre-run reserve");
+    primed = 1;
     return 0;
 }
 int sndl_pump(void) { check(running && stream, "pump handle"); ++pumps; return 0; }

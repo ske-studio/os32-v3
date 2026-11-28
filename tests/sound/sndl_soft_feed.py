@@ -17,6 +17,15 @@ def verify(config):
                         "-Isdk/include", "tests/support/fixtures/sndl_soft_feed/feed.c",
                         "userland/lib/snd/mix.c", "-o", exe], check=True)
         subprocess.run(["qemu-x86_64", exe], check=True)
+        subprocess.run(["gcc", "-std=gnu11", "-O2", "-ffunction-sections", "-fdata-sections",
+                        "-Wl,--gc-sections", "-D__cdecl=", "-I.", "-Isdk/include/os32",
+                        "-Isdk/include", "-Isys/include", "-Isys/kern",
+                        "tests/support/fixtures/sndl_soft_feed/cadence.c",
+                        "sys/dev/sound/cs4231/pcm_cs4231_math.c",
+                        "userland/lib/snd/mix.c", "-o", exe], check=True)
+        for channel in ("3", "1"):
+            for dos in ("0", "1"):
+                subprocess.run(["qemu-x86_64", exe, channel, dos], check=True)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 #include "v86_call.h"
+#include "kernel_tick.h"
 #ifdef TICK_PROBE
 #include "tick_probe.h"
 #endif
@@ -583,6 +584,16 @@ int v86_run_limit(const struct v86_context *ctx, u32 tick_limit)
     irq_enable(V86_IRQ_VSYNC);
 
     if (exec_setjmp(v86_jmpbuf) == 0) {
+        if (slice_context && v86_session.soft_input) {
+            struct v86_context *c = slice_context;
+            u32 frame[] = {c->eip, c->cs, c->eflags, c->esp, c->ss};
+            if (tick_count != v86_session.soft_jiffy) v86_pic_request(0);
+            if (v86_deliver_pending(frame, 0, 1, 2, 3, 4)) goto leave;
+            c->eip = frame[0];
+            c->cs = frame[1];
+            c->eflags = frame[2];
+            c->esp = frame[3];
+        }
         v86_active = 1;
 #ifdef TICK_PROBE
         if (slice_context) tick_probe_soft_end(TP_SOFT_ENTER);
@@ -591,10 +602,12 @@ int v86_run_limit(const struct v86_context *ctx, u32 tick_limit)
         v86_enter(ctx);         /* 正常には戻らない */
     }
 
+leave:
     /* longjmp で戻ってきた */
 #ifdef TICK_PROBE
     tick_probe_if_begin(EFLAGS_IF);
 #endif
+    if (slice_context) v86_session.soft_jiffy = tick_count;
     v86_runtime_end();
     irq_restore(v86_session.saved_eflags);
 

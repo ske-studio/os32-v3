@@ -41,11 +41,13 @@ extern void check_enter(const struct v86_context *ctx);
 static int slicing;
 int v86_tick_and_check_timeout(void);
 void __real_v86_reflect_irq(u32 *frame, u32 irq);
-void v86_pic_request(u32 irq) {}
+static unsigned suspended_ticks, expected_ticks;
+void v86_pic_request(u32 irq) { if (!irq && !v86_is_active()) ++suspended_ticks; }
 int v86_pic_candidate(u32 *vector) { return -1; }
 void v86_pic_commit(u32 irq) {}
 void v86_enter(const struct v86_context *ctx)
 {
+    require(suspended_ticks == expected_ticks, "foreground jiffy before VM");
     if (write_tone) {
         write_tone = 0;
         guest_write(0x188, 0x28);
@@ -151,6 +153,8 @@ static void soft_boots(void)
         require(v86s_fm_drain(sid, ev, 2, &seq) == 2 && seq == 2 &&
                 ev[0].reg == 0x28 && ev[0].val == 0x10 && ev[0].seq == 1 &&
                 ev[1].reg == 0x28 && !ev[1].val && ev[1].seq == 2, "key off sequence");
+        ++tick_count;
+        ++expected_ticks;
         require(!v86s_run(sid, &in, &ex) && ex.reason == 1 &&
                 v86s_fm_drain(sid, ev, 2, &seq) == 0, "empty slice");
         v86_session.soft_stop = 1;

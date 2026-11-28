@@ -24,7 +24,7 @@ IRQ 設計 S1 の保存判定を参照し、begin で再 probe しない。S2/S3
 
 ## ゲスト I/O と時間の所有
 
-PC-98 の V86 monitor が SOFT セッションに限り TSS I/O bitmap の 0188h–018Fh、A460h–A46Eh を禁止側に設定する。#GP の IN/OUT では既存の観測・実ポート転送より先に対象を消費する。A462h/A464h は GS/73 用 DSP で、SOFT 86 は未搭載として FFh／書き捨てとする。発音の時刻、タイマ満了、FIFO 消費を同じ単調時刻で比較し、同時刻では期限を反映してから命令を処理する。
+PC-98 の V86 monitor が SOFT セッションに限り TSS I/O bitmap の 0188h–018Fh、A460h–A46Eh と A66Eh を禁止側に設定する。#GP の IN/OUT では既存の観測・実ポート転送より先に対象を消費する。A462h/A464h は GS/73 用 DSP で、SOFT 86 は未搭載として FFh／書き捨てとする。発音の時刻、タイマ満了、FIFO 消費を同じ単調時刻で比較し、同時刻では期限を反映してから命令を処理する。
 
 | 対象 | monitor が答える操作 |
 |---|---|
@@ -32,6 +32,7 @@ PC-98 の V86 monitor が SOFT セッションに限り TSS I/O bitmap の 0188h
 | A460h | AV §9 の ID と拡張許可を返す。許可解除時は bank 1 を隠す。 |
 | A466h、A468h | FIFO 状態／音量、運転・停止・リセット・レート・割込み許可と要求を管理。 |
 | A46Ah、A46Ch | 制御状態に応じて形式・左右の指定または割込み閾値を設定し、再生データを byte 順に受ける。 |
+| A66Eh | bit 0 が 1 でミュート。 |
 | 範囲内の未定義番地と A46Eh | 初版案は FFh／書き捨て。実測・資料で機能が判明した番地だけ仕様化する。 |
 
 現行の v86_gp_emulate.inc は INS/OUTS 未対応で、a0_weak.c のセッション口は NOSYS。AV §9 の run/drain、幅 2/4 と同期読みは実装予定である。SOFT は幅 1/2/4 の IN/OUT・INS/OUTS を低位 byte から扱う。物理ポートを一つでも含む混在要素はアクセス前に未対応 fault とする。文字列は REP の有無、DF の両方向、16/32 bit のアドレスサイズに従い、一要素ずつ転送先／元の全 byte のメモリ権限とキュー容量を先に検査する。例外では完了要素だけ index・残数に反映する。
@@ -56,7 +57,7 @@ run の返却境界は FM と PCM で一つとする。begin 時刻を起点に�
 
 AV §9-4/V0 に従い次期限に I20/I21 を arm する。PI と TI の同時 ack・再設定が再生と共存できなければ PIT one-shot の既存時計との共存を測る。両方失敗なら 100 Hz 制限をユーザー判断に戻す。TI または期限用 PIT の handler は起床印を立てる。同時 PI は同じ dispatch で ack・再生補充を済ませる。物理 EOI 完了後、割込みスタブの IRET 直前に保存 EFLAGS.VM と起床印を調べる。VM なら命令境界の文脈を保存し、既存の v86_longjmp_out で run に SLICE を返す。通常 tick の slice 判定を待たない。非 VM なら印を保持し、次の run の VM 進入前に通常文脈で引き取る。run 間の pump・IOREAD 待ちではゲスト時計を進め、前景停止では停止時刻まで確定して時計を凍結、再開時に期限を張り直す。満了ごとに予定時刻の CSM を同じ通番列へ積み、同時刻の OUT より先に処理する。満杯では未処理期限を保ち CSM を合流させない。27h の A/B フラグ許可・個別クリア、29h の出力許可を独立に試す。
 
-実 FM 反射と SOFT は要求記録→候補選択→注入確定を共用する。ゲストの IRQ フレームと完了済み #GP 命令の復帰で候補を選ぶ。IOPL=3 の STI は CPU が実行し、ハードウェア IRQ の受理か、STI の次の捕捉命令が完了した時点で配送する。線の立上りを IRR にラッチし、音源 ack による入力解除でも未配送 IRR を保持する。SOFT の確定後は両側の EOI が揃い、なお線が active なら一回再要求する。実音源は同じ未解除要求を再反射せず、源別に解除を確認してから次を採る。片側 EOI では重複させない。ICW2 変更後は slave の現ベース＋4 を使う。非 VM 時も IRR に保持する。VM 復帰で仮想 IF・STI shadow・両 IMR・優先順位・ISR を検査する。スタックとベクタの検査、フレーム更新の成功後にだけ IRR を消費し slave IR4 と master IR7 を in-service にする。既定ベクタは INT 14h。一復帰につき一件、同時の IRQ0 を先に通す。仮想 EOI とマスク解除で残存要求を再評価する。物理 EOI は既存 dispatch complete に一任する。[IRQ 設計「後段の実音源共有と仮想 PIC」](../../design/kernel/irq/irq.md)
+実 FM 反射と SOFT は要求記録→候補選択→注入確定を共用する。ゲストの IRQ フレームと完了済み #GP 命令の復帰で候補を選ぶ。IOPL=3 の STI は CPU が実行し、ハードウェア IRQ の受理か、STI の次の捕捉命令が完了した時点で配送する。線の立上りを IRR にラッチし、音源 ack による入力解除でも未配送 IRR を保持する。PC-98 の 8259 はエッジトリガ。音源の論理和が 0→1 の時だけ IRR を立てる。両側に EOI を送っても線が active の間は次のエッジがなく、ハンドラは両要因を調べる。実音源は同じ未解除要求を再反射せず、源別に解除を確認してから次を採る。片側 EOI では重複させない。ICW2 変更後は slave の現ベース＋4 を使う。非 VM 時も IRR に保持する。VM 復帰で仮想 IF・STI shadow・両 IMR・優先順位・ISR を検査する。スタックとベクタの検査、フレーム更新の成功後にだけ IRR を消費し slave IR4 と master IR7 を in-service にする。既定ベクタは INT 14h。一復帰につき一件、同時の IRQ0 を先に通す。仮想 EOI とマスク解除で残存要求を再評価する。物理 EOI は既存 dispatch complete に一任する。[IRQ 設計「後段の実音源共有と仮想 PIC」](../../design/kernel/irq/irq.md)
 
 固定優先順位、ISR と EOI の根拠は Intel 8259A の Fully Nested Mode と End of Interrupt（p.15）。比較実装は FreeBSD bhyve の要求選択と受理処理。PC-98 のカスケードはマスタ IR7 に接続する。[Intel 8259A](https://pdos.csail.mit.edu/6.828/2005/readings/hardware/8259A.pdf)・[FreeBSD vatpic.c](https://github.com/freebsd/freebsd-src/blob/main/sys/amd64/vmm/io/vatpic.c)
 
@@ -72,7 +73,7 @@ PII 266 MHz で声数 1→3→6、SSG、FIFO、リズムを順に加え、各 pe
 
 1. NP21/W は req86 の**窓 2**（FM なし、WSS 単独、ini の表記は `SNDboard=60`）を選ぶ。PM は窓 2 の ini の写しを今回の試験名 `soft86-w2.ini` として明示的に `/isoft86-w2.ini` で起動し、実際の ini 名・値、像 SHA と媒体 CRC を収録に添える。保存済み 0188h・0288h の双方 ABSENT、WSS の BIOS INT5、実 stream open 成功、IRQ12・DMA #1 と played 増加を同じ起動で記録してから聴取する。0x64 は実 86 素通しの回帰窓。窓 2 の既存記録は wave の再生までで、冷間初回には underrun が一度ある。初回と再起動後の結果を別記する。[冷間起動の記録](../../tasks/DEFERRED_TESTS.md)
 2. CI 配布物の fmtone.img（RAW 77×2×8、1024 byte/sector）を使う。HostDrv 配備後、OS32 シェルで `v86 -b /host/test/fmtone.img` を実行する。FMTONE は先頭セクタから直接起動し、仮想 IRQ0 のベクタを設定する。通常の -b は FM_SOFT を指定して begin を試す。カーネルは保存 probe を読み、実音源・UNKNOWN・対象出力なしは資源取得前に NOSYS を返す。この戻りだけ従来の boot2 に進む。両 ABSENT の候補で begin が成功したら、アプリは最初の run より前に L3 のソフト OPNA と stream を開く。begin の BUSY や候補選択後の open 失敗はエラー終了し、取得済みの sid は end する。snd2 のユーザー設定値を probe の代用にしない。ゲストは sndl_test.c の左単音（algorithm 7、block 4、F-number 0269h）を基本 bank の byte OUT で設定する。28h=10h の後、仮想 IRQ0 の経過 tick をメモリで待ち、2 秒後に 28h=00h。待ちループ自体は I/O を行わない。消音を 1 秒保持して終了する。DOS 起動・終了、キーボードの既存経路を保つ。
-通常アプリのソフト OPNA でも、空きが複数 period のときは共通の合成時刻窓を保ち、256 frames ごとに PCM を供給する。`sndl_test soft` は close 直前の underruns を表示し、0 以外は FAIL とする。
+通常アプリのソフト OPNA でも、空きが複数 period のときは共通の合成時刻窓を保ち、残量が少なければ最初の 256 frames を確定し、余裕があれば最大 1024 frames をまとめて供給する。DOS へ戻る前は次の 10 ms、復帰・drain、最初の確定、DMA 位置の観測遅れ、128 frames のガードまでの残量を確保する。補充中もゲスト時計を進め、再入直前に満了した仮想要求を PIC の通常条件で配送する。初段の対象は IRQ0。後段の OPNA タイマと FIFO 閾値にも同じ時刻境界を使う。`sndl_test soft` は close 直前の underruns を表示し、0 以外は FAIL とする。
 
 3. v86_io.c の bitmap と実 OUT 入口で対象ポートを物理転送より先に消費し、index/data を Q1 に順番に渡す。v86.c は通常 tick 一回で VM の汎用・セグメントレジスタ、復帰 CS:EIP、SS:ESP、EFLAGS を保存して SLICE を返す。v86_session.c で同じ命令境界から再入し、終了・fault・取得途中失敗で bitmap と所有を戻す。kapi_v86s.c と v86_call.c は既存四口を dispatch。アプリは空の drain でも返却境界まで合成して既存 L3 を pump する。44.1 kHz、period 256、lead 3 を先に満たし、無 I/O 中も通常 tick（100 Hz で 10 ms）から次の供給完了までを含む供給間隔が 768 frames（17.41 ms）未満、underrun と未送信標本の欠落ゼロを実測する。SLICE 復帰時刻、drain の空振り・未処理数、供給時刻は kdebug 対部品で採る。V0 の採時・計数も同じ扱いとする。
 4. ホスト登録検査は保存 probe の両 ABSENT／実 86／UNKNOWN を入力し、自動選択と bitmap を照合する。SOFT の実 I/O 入口→run/drain→pump で音色列・key-on/off の通番、物理転送ゼロ、無 I/O の連続 SLICE 後の文脈と音の継続、正常終了・fault の各直後の bitmap 復元と stream 再取得を検証する。物理 OUT への落下、key-off 脱落、bitmap 復元漏れ、stream 解放漏れを各々変異にする。NP21/W は同一媒体を二回起動し、左単音約 2 秒→release 後の無音→再起動で再発音をライン収録と聴取で確認する。消音後の HLT で VM を抜ける。別試行で CTRL+STOP も確認する。終了境界まで残るイベントを drain・合成してから stream を drain close し、end で sid を返して同じコマンドを再実行する。ホストでは -b の分岐、BUSY／open 失敗で boot2 を呼ばないこと、各 SLICE の前後で PCM の物理 IRQ12 が有効なことも調べる。
@@ -107,19 +108,23 @@ Q1 と一括転送は u32 の at_us（約 71.6 分）・seq（毎秒 1 万件で
 
 手元の PC9800Bible「2-13 FM音源」冒頭と §2-13-3 は従来 OPN の範囲を明記し、基本 index/data、24h・25h の 10 bit Timer A、26h の 8 bit Timer B、27h の始動・フラグ制御を説明する。これを基本バンクの試験入力にする。OPNA 拡張と CSM の標本は既存ソフト OPNA と固定 fmgen の一致を回帰基準にし、物理割込み到着と DOS の許容遅延は別に測る。[合成器と参照標本](SYNTH_OPNA_DESIGN.md)
 
-UNDOCUMENTED io_sound.md の A466h は満杯 32 KiB・空、A468h は bit 5 で要求許可・bit 4 に 0 で ack、A46Ah は許可中の書込み値 ×128 byte を残量閾値、禁止中は幅・左右の設定、A46Ch は byte 入出力とする。この列を FIFO 段の通常試験に使う。閾値を飛び越す消費や ack 直後の再発火は同じ短い列を実 86 で測って決める。DOS ソフトごとの許容値は資料にも合成標本にも含まれない。タイマ駆動の曲を受ける段で上記 Ra266 の 60 秒窓を採り、最短周期、注入遅れ、曲速、発音までの外部収録をユーザーの聴取と突き合わせて決める。40.63 ms は実測前の設計予算である。
+A466h の bit 0 は選択レートの半周期ごとにゲスト時計で反転する LR クロック。A468h の bit 6 は録音方向、bit 5 は割込み許可。bit 4 に 0 を書くと要求を消し、続いて 1 を書いても要求は立たない。BSD ドライバの 0→1 を試験する。A46Ah は割込み禁止中に幅と左右を設定し、許可中は閾値を書く。既定は（値＋1）×128 byte。UNDOCUMENTED の値×128 byte との相違、等値／通過、ack 後の再発火は実機の 86 の計測で決める。32 KiB FIFO の 16 bit は符号付き上位 byte 先、ステレオは L→R、8 bit も符号付き。OPNA reg 0Eh の bit 7–6 は 11b（INT5、slave IR4、IRQ12）。NEC テクニカルデータブック p.263 の 26/K と FreeBSD の 86 ドライバが一致する。[NEC テクニカルデータブック](https://vtda.org/docs/computing/NEC/PC-9800TechnicalDataBookHARDWARE+OCR_1993.pdf)・[FreeBSD 4.11 pcm86.c](https://cgit.freebsd.org/src/tree/sys/i386/isa/sound/pcm86.c?h=release/4.11.0)・[OpenBSD nec86hw.c](https://github.com/openbsd/src/blob/master/sys/arch/luna88k/cbus/nec86hw.c)
+
+分周 6、原振 7.9872 MHz の基準周期は tA = 144(1024−NA)/7.9872 MHz、tB = 2304(256−NB)/7.9872 MHz。ymfm と PMD の刻みに合わせる。YM2608 英訳の係数 72／1152 との差は実機の 86 の計測で決める。29h の IRQ 許可のリセット値は 1。27h の ENABLE と LOAD でタイマを動かし、29h に先に書かず満了時の線を調べる。[ymfm](https://github.com/aaronsgiles/ymfm/blob/main/src/ymfm_opn.cpp)
+
+通常 slice の受入から、周期 10 ms 未満のタイマと補充猶予 10 ms 未満の FIFO 設定を除く。これらは V0 の期限起床が必要。1024 frames は 23.22 ms で典型的 Timer B の 12–21 ms を超える。FM と PCM を同じ stream と時計に揃え、入力から発音の予算は 40.63 ms とする。DOS ソフトごとの許容値は資料にも合成標本にも含まれない。タイマ駆動の曲を受ける段で上記 Ra266 の 60 秒窓を採り、最短周期、注入遅れ、曲速、発音までの外部収録をユーザーの聴取と突き合わせて決める。40.63 ms は実測前の設計予算である。
 
 ### HW3 の照合状況
 
 | 仕様 | 照合結果と実装前の判定 |
 |---|---|
 | 基本・拡張ポート／選択レート | NEC『PC-9800 シリーズ テクニカルデータブック HARDWARE』1993 p.266 は手元の本文未照合。86 ボードへの適用は仮説。 |
-| FIFO 容量・制御・閾値・IRQ | 手元の undocumented/io_sound.md 449–489、492–527、530–584、587–597 を確認。32 KiB と閾値単位 128 byte の二次資料。等値／通過、ack 後の再発火、満杯書込み、符号・byte 順はメーカー根拠と許諾範囲の実機列で確定する。 |
+| FIFO 容量・制御・閾値・IRQ | 手元の undocumented/io_sound.md 449–489、492–527、530–584、587–597 を確認。32 KiB と閾値単位 128 byte の二次資料。等値／通過、ack 後の再発火、満杯書込み、空時の DAC 出力はメーカー根拠と許諾範囲の実機列で確定する。 |
 | DSP・未定義ポート | 同 416–448 の対象機種を照合。A46Eh の機能は未照合。 |
-| YM2608 | 同 202–225、286–292 は status とレジスタの位置。タイマ周期・CSM 順・出力許可の Yamaha 本文および適格な実装行は未照合。 |
+| YM2608 | 同 202–225、286–292 は status とレジスタの位置。タイマと IRQ 許可は上記の基準。86 の分周と CSM 順は実機で照合する。 |
 | CS4231A | 手元の docs/hw/crystal/cs4231a.txt 1492–1531、2248–2335 で I20/I21 と I24 の PI/TI を照合。共存時の現 handler の ack は V0 実測対象。FreeBSD stable/11 sys/dev/sound/isa/mss.c は参照候補で行番号・本文未照合。 |
 
-86 FIFO と OPNA の BSD/MIT 手本は版・file:line 未確認。各機能を製品へ載せる段でメーカー資料の該当箇所・適格実装の版／行／許諾と実機観測を項目別に記録し、矛盾・未確定項目は実装へ進めない。NP21/W はブラックボックスの入出力比較に限り、GPL のコード・構造を写さない。
+FreeBSD 4.11 pcm86.c 487、771–790、1876–1894 と OpenBSD nec86hw.c 841–846、986–1016 を参照。A460h bit 1 の切離し範囲、拡張マスク中の読み値、実レートは実機の 86 の計測で決める。各機能を製品へ載せる段でメーカー資料の該当箇所・適格実装の版／行／許諾と実機観測を項目別に記録し、矛盾・未確定項目は実装へ進めない。NP21/W はブラックボックスの入出力比較に限り、GPL のコード・構造を写さない。
 
 ## シングルタスクの棚卸し (2026-11-28)
 

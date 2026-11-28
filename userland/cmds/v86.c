@@ -178,6 +178,8 @@ static int boot_sound(const char *path, const char *second)
     V86_RunIn in = {.size = sizeof in, .slice_ms = 10};
     V86_Exit ex = {0};
     while (!rc) {
+        rc = sndl_prime_slice();
+        if (rc) break;
         rc = api->v86s_run(sid, &in, &ex);
         if (rc) break;
         SND2_FmEv ev[32];

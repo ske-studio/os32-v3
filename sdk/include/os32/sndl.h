@@ -41,6 +41,8 @@ typedef struct {
 int sndl_open(const SND2_Fmt *fmt, u32 period, u32 lead);
 /* Nonblocking. Call at least once every 10 ms for the low-latency stream. */
 int sndl_pump(void);
+/* Check the running software stream before a 10 ms DOS slice. */
+int sndl_prime_slice(void);
 /* End or reset unbounded loops before DRAIN. A stopped nonempty queue
  * must be resumed or reset. BUSY leaves the stream open. */
 int sndl_close(u32 how);

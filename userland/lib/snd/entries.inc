@@ -16,3 +16,4 @@ SND_ENTRY sndl_chip_open
 SND_ENTRY sndl_chip_write
 SND_ENTRY sndl_chip_read
 SND_ENTRY sndl_chip_close
+SND_ENTRY sndl_prime_slice

@@ -23,6 +23,7 @@ enum {
     SNDL_E_CHIP_WRITE,
     SNDL_E_CHIP_READ,
     SNDL_E_CHIP_CLOSE,
+    SNDL_E_PRIME_SLICE,
     SNDL_NFUNC
 };
 

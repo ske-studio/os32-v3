@@ -509,6 +509,8 @@ expect = "IRQ12 の共有配送と従来の IRQ 線、SOFT の文脈・入力・
 limits = "実スタブ本体を実行。特権命令・ゲストフレーム・PIC は模型"
 gates = ["push", "main"]
 mutations = [
+ { id = "skip_guest_prime", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "rc = sndl_prime_slice();", new = "rc = 0;", fail = "pre-run reserve" },
+ { id = "freeze_foreground_clock", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (tick_count != v86_session.soft_jiffy) v86_pic_request(0);", new = "(void)tick_count;", fail = "foreground jiffy before VM" },
  { id = "reset_slice_ticks", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "if (!slice_context) v86_session.ticks = 0;", new = "v86_session.ticks = 0;", fail = "session slice timeout" },
  { id = "skip_slice_tick", config = "pc98", when = "after_build", replace = "sys/platform/pc98/legacy/v86.c", old = "v86_exit_request && v86_exit_reason != V86_EXIT_SLICE", new = "v86_exit_request", fail = "session slice timeout" },
  { id = "reject_long_paths", config = "pc98", when = "after_build", replace = "userland/cmds/v86.c", old = "return api->v86_boot2(path, second);\n    strcpy", new = "return OS32_ERR_INVAL;\n    strcpy", fail = "long primary" },
@@ -2409,12 +2411,14 @@ id = "sndl_soft_feed"
 spec = { path = "docs/decisions/sound/V86_SOFT86_DESIGN.md", section = "最初の DOS 聴取の実装と受入" }
 subsystem = "sound"
 level = "L1"
-sources = ["userland/lib/snd/chip.c", "userland/lib/snd/pump.c", "userland/lib/snd/live.h", "tests/support/fixtures/sndl_soft_feed/feed.c"]
+sources = ["userland/lib/snd/chip.c", "userland/lib/snd/pump.c", "userland/lib/snd/live.h", "tests/support/fixtures/sndl_soft_feed", "sys/hal/sound/snd2_seg.c", "sys/dev/sound/cs4231/pcm_cs4231_math.c"]
 environment = "linux-x86-cross"
 arch = { x86 = ["pc98"] }
 needs = []
-expect = "通常アプリの OPNA 補充中に DMA が進んでも、連続した PCM が無音を挟まず届く"
+expect = "両 DMA 経路の通常・DOS 負荷で underrun と挿入無音が 0、最大供給間隔が 17.41 ms 未満"
 limits = "合成時間と DMA はホストモデル。NP21/W の時間と収録波形は受入で確認する"
 gates = ["push", "main"]
 mutations = [
+ { id = "always_split", config = "pc98", when = "after_build", replace = "userland/lib/snd/pump.c", old = "n > window.render_limit && written - pos.played < written % window.render_limit +\n                    (2 * n + 2) / 3 + window.render_limit / 2", new = "n > window.render_limit", fail = "missing foreground batch" },
+ { id = "omit_slice_reserve", config = "pc98", when = "after_build", replace = "userland/lib/snd/pump.c", old = "if (queued >= reserve + pos.written % SNDL_SOFT_PERIOD)", new = "if (queued <= pos.cap)", fail = "DMA supply deadline" },
  { id = "batch_soft_feed", config = "pc98", when = "after_build", replace = "userland/lib/snd/chip.c", old = "window->render_limit = SNDL_SOFT_PERIOD;", new = "window->render_limit = 0;", fail = "PCM supply gap" }]

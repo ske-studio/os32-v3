@@ -13,7 +13,7 @@ static const u32 *sndl_table(KernelAPI *api)
     if (!api) return 0;
     if (bound_api == api) return table;
     if (header->magic != OS32_SHLIB_MAGIC || header->version != SNDL_TABLE_VERSION ||
-        header->_rsvd[0] != OS32_SHLIB_PROTOCOL || header->nfunc < SNDL_NFUNC) return 0;
+        header->_rsvd[0] != OS32_SHLIB_PROTOCOL || header->nfunc <= SNDL_E_CHIP_CLOSE) return 0;
     if (((int (*)(KernelAPI *))table[SNDL_E_INIT])(api)) return 0;
     bound_api = api;
     return table;
@@ -101,6 +101,14 @@ int sndl_pump(void)
     const u32 *table = sndl_table(kapi);
     if (!table) return -1;
     return ((int (*)(void))table[SNDL_E_PUMP])();
+}
+
+int sndl_prime_slice(void)
+{
+    const u32 *table = sndl_table(kapi);
+    const OS32ShlibHeader *header = (const OS32ShlibHeader *)SNDL_BASE;
+    if (!table || header->nfunc <= SNDL_E_PRIME_SLICE) return OS32_ERR_NOSYS;
+    return ((int (*)(void))table[SNDL_E_PRIME_SLICE])();
 }
 
 int sndl_close(u32 how)
