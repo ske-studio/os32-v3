@@ -198,9 +198,7 @@ POLICY_DEV §10「x86 に揃える」(ユーザー決定 2026-11-20、動作実�
 
 | 項目 | x86 (PC-98) | PowerPC (PowerMac) | 状態 | 揃える段・残す理由 |
 |---|---|---|---|---|
-| シェルの枠 (実行の枠の ID 1) | カーネルの起動のループ (`sys/platform/pc98/kernel.c` の外部シェル起動) が外部シェル (`shell.bin`・`gshell.bin`) をシェルの枠 ID 1 (`MEM_SHELL_LOAD_ADDR`) に `exec_run` し、終わったら `gui_take_next_shell` を見て起こし直す | `sys/platform/powermac/exec_boot.c` の `pm_exec_boot` が `exec_nest_level = 1` にして起動の文脈を ID 1 に見立て、`sh` は ID 2 以降の普通の枠で動く | **未揃え** (2026-11-20 に見つけた) | PPC_SHELL_ALIGN_X86_DESIGN に従い、5d の公開前に owner 1 の製品シェルと切替ループを揃える。 |
-| シェルの特権 | 外部シェルはシェルの枠で CPL=0、AS を作らない (`sys/kern/exec/exec.c` の注) | `sh` は USER の SDK で組んだ PR=1 のアプリ、アプリごとの AS | **未揃え** | 製品シェルの枠と一緒に揃える |
-| 起動の文脈 | 起動から外部シェルのループ | 常駐 CLI (`sys/kern/cli/resident_cli.c`、LAN の端末の入口) が起動の文脈で、そこから `sh` を起こす | **未揃え** | 製品シェルの枠と一緒に揃える |
+| シェルの切替 | 共通ループが切替要求を消費し、次の常駐シェルを枠 1 で起動する | 製品 root の常駐シェルは同じループから枠 1・PR=0 で起動。EXEC 像の公開表に結線済み | 5d の往復は未受入 | 段 12 で第二像の実行と要求の一回消費を確認する |
 | 部品の読み込み | FEP・SQLite は module | 初期移植では静的に結線 | 未揃え | 共通 loader の L1 → L2 → FEP → KCG。SQLite は静的のままとし、module への置き換えは任意の B08 とする。 |
 | root と /host | ディスクと共通 VFS | インストール媒体は RO RAM root、/host は link の SFS CALL | 製品媒体は未揃え | HDD の ext2 root を整え、辞書・学習を x86 と同じパスで公開する。 |
 | HDD の区画と起動の区画 | PC-98 の区画表と IPL・ローダ (`platform/pc98/`) | APM の区画表と、Open Firmware が読む起動用の小さな HFS の区画 (ローダとカーネル) | 残す (物理)。**最終の形はユーザー決定 (2026-11-21「最終的にはそうなって」、B05 の案 A)**。途中の段 (TFTP のカーネル + HDD の ext2 の root など) を経てよい | Open Firmware は ext2 を読めず HFS/HFS+・ISO9660・TFTP だけを読む。ext2 の root と hdprep・install の流れは共通 (PPC_ROOT_MOUNT_ALIGN_X86_DESIGN)。G4 の HDD への書き込みと NVRAM の boot-device の書き換えは、その時に中身を確かめて別に承認 ([D2]) |

@@ -28,7 +28,7 @@
 ## 2. B — 揃えられる 2 重 (重さの軽い順)
 | 順 | ID | 役目 | 重さ (調べの見込み) | 状態 |
 |---|---|---|---|---|
-| 1 | B15 | sys_switch_shell の提供の判定 (段 5d の門のマクロ) | 40–140 行、3–6 ファイル | 飛ばす (B03 と一緒に消える見込み、2026-11-20) |
+| 1 | B15 | sys_switch_shell の提供の判定 (段 5d の門のマクロ) | 40–140 行、3–6 ファイル | 完了。EXEC 像の公開表に結線済みで、5d 専用旗の追加は不要 |
 | 2 | B14 | KCG の提供者の接続 | 45–150 行、4–7 ファイル | 済み (2026-11-20、main 50691f607 — ANK・JIS の読み出しを sys/dev/video/kcg/kcg_read_provider.inc で x86 と PowerMac が共有、x86 の vmkernel.lz4・kcg.mod は一致、ARCH_COMPAT_CONTRACT §9 に行) |
 | 3 | B13 | exec の回収とカーネルの親の形 | 85–220 行、5–9 ファイル | 後回し (シェルの寄せ B03・B09 の設計の後、exec_nest_level を含む) |
 | 4 | B12 | SFS の scope の実行の包み | 90–240 行、4–8 ファイル | 後回し (シェルの寄せ B03・B09 の設計の後、rshell_lan.c の SHELL_REMOTE_SFS) |
@@ -40,7 +40,7 @@
 | 10 | B06 | 端末・入力の接続の方針 | 250–560 行、7–12 ファイル | 未着手 |
 | 11 | B05 | root と /host・装置の名前と mount の手続き | 260–600 行、7–13 ファイル | 未着手 |
 | 12 | B04 | LAN の運用・link の poll・rshell | 320–680 行、8–14 ファイル | 設計中 (本線、2026-11-21 — astra 起草、置き場は本線の機械の ~/os32-tmp/run/ppc-align-b04/) |
-| 13 | B03 | シェルの枠・再起動 (PowerPC の sh を ID 1 に) | 350–700 行、6–12 ファイル | 共通起動ループ D1〜D3 は main 844839af0。PowerPC の製品接続は未収録 |
+| 13 | B03 | シェルの枠・再起動 (PowerPC の常駐シェルを ID 1 に) | 350–700 行、6–12 ファイル | 共通起動ループ D1〜D3 は main 844839af0。wt/int-ppc で製品接続・旧接着撤去済み。切替の受入は段 12 |
 | 14 | B02 | 表示の選択・予約・描画の持ち主 | 400–850 行、8–15 ファイル | 未着手 |
 | 15 | B01 | 起動の段取りと exec の初期化 | 450–950 行、9–18 ファイル | 未着手 |
 
@@ -65,7 +65,7 @@ C01〜C15 (ARCH_DRIFT_AUDIT の C の表)。各行で「x86 に足す / PowerPC 
 止めるべき (置き換え先):
 | 文書 | 置き換え先 | 状態 |
 |---|---|---|
-| PPC_KAPI_GUI_SWITCH_DESIGN (5d) | シェルを x86 に寄せる設計 (B03・B09・B15、~/os32-tmp/run/ppc-shell-align/) の後に 5d を出し直す | PPC_SHELL_ALIGN_X86_DESIGN は origin/wip/kfill-designs で確定。段 A・B・C・E は main 未収録 |
+| PPC_KAPI_GUI_SWITCH_DESIGN (5d) | シェルを x86 に寄せる設計 (B03・B09・B15、~/os32-tmp/run/ppc-shell-align/) の後に 5d を出し直す | wt/int-ppc で公開結線済み。段 12 の往復検査待ち |
 | PPC_KAPI_FEP_INPUT_DESIGN (7a) | module の読み込みの PowerPC の接続 (C04: L1 → L2) の後に、x86 の fep.mod の形で 7a を出し直す (B08 は SQLite の任意の module 化で、7a の前提ではない) | PPC_MODULE_ALIGN_X86_DESIGN は origin/wip/kfill-designs で確定。本線側の L1 は main 779942989、L2 は e4d84e711。PowerPC 側の接続は main 未収録 |
 | PPC_KAPI_GFX_REST_DESIGN (5c) | ユーザー決定で入れる (上) | B1〜B4 と 5c-A は実装済み |
 
